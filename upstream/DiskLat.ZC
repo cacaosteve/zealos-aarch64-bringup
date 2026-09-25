@@ -1,16 +1,18 @@
-/* Milestone 115/118/121/122/125/134/136/143/144/145/146: Lattice compose from RedSea + DiskLat.
+/* Milestone 115/118/121/122/125/134/136/143/144/145/146/147/147: Lattice compose from RedSea + DiskLat.
  *
  * Upstream need: runzc-shaped path for a Lattice *Lite (not freeze catalog).
  *
  * Bring-up:
  *   - M145: rs_fmt_host(128) before put; BracePi + TurtleEnd + TurtleMove SPACE
  *   - M146: SC_CURSOR_* speed/idx + TURTLE_SPEED_STEP
+ *   - M147: DrawIt + aim/MS_* place (before \n restart)
  *   - Freeze catalog unchanged (ephemeral disk file)
  *   - return DiskLat();  expect 15
  */
 
 #define ANGLES 35
 #define TURTLE_SPEED_STEP 2.0
+#define TURTLE_SIZE 4
 
 F64 angles[ANGLES] = {
 	-2 * pi / 1,  -2 * pi / 2,  -2 * pi / 3,  -2 * pi / 4, -2 * pi / 5,
@@ -154,14 +156,37 @@ U0 SetMenu()
 	}
 }
 
+
+U0 DrawIt(CTask *, CDC *dc)
+{
+	Turtle t2;
+
+	MemCopy(&t2, &tt, sizeof(Turtle));
+	GrPrint(dc, 0, 0, "Layer:%f Speed:%f th:%5.1f Width:%f",
+		tt.z, tt.speed, tt.th * 180 / pi, tt.w);
+	TurtleMove(dc, &t2, RED, LTRED);
+	dc->color = LTRED;
+	GrLine(dc,
+		t2.x + TURTLE_SIZE * Cos(t2.th + pi / 2), t2.y + TURTLE_SIZE * Sin(t2.th + pi / 2),
+		t2.x + TURTLE_SIZE * Cos(t2.th - pi / 2), t2.y + TURTLE_SIZE * Sin(t2.th - pi / 2));
+	GrLine(dc,
+		t2.x + TURTLE_SIZE * Cos(t2.th + pi / 2), t2.y + TURTLE_SIZE * Sin(t2.th + pi / 2),
+		t2.x + TURTLE_SIZE * Cos(t2.th), t2.y + TURTLE_SIZE * Sin(t2.th));
+	GrLine(dc,
+		t2.x + TURTLE_SIZE * Cos(t2.th - pi / 2), t2.y + TURTLE_SIZE * Sin(t2.th - pi / 2),
+		t2.x + TURTLE_SIZE * Cos(t2.th), t2.y + TURTLE_SIZE * Sin(t2.th));
+}
+
 I64 DiskLat()
 {
 	CDC *dc;
 	I64 h;
 	I64 arg1;
 	I64 arg2;
+	Bool aim;
 
 	h = 0;
+	aim = FALSE;
 	dc = DCAlias;
 	DCDepthBufAlloc(dc);
 	MenuPush(
@@ -204,8 +229,13 @@ I64 DiskLat()
 	SetMenu;
 	Fs->win_inhibit = WIG_TASK_DEFAULT - WIF_FOCUS_TASK_MENU -
 		WIF_SELF_FOCUS - WIF_SELF_GRAB_SCROLL;
+	Fs->draw_it = &DrawIt;
 	try
 	{
+		Cls(0);
+		MsgQuePush(MESSAGE_MS_L_DOWN, 100, 100);
+		MsgQuePush(MESSAGE_MS_R_DOWN, 140, 100);
+		MsgQuePush(MESSAGE_MS_R_UP, 140, 100);
 		MsgQuePush(MESSAGE_KEY_DOWN, '3', 0);
 		MsgQuePush(MESSAGE_KEY_DOWN, 'e', 0);
 		MsgQuePush(MESSAGE_KEY_DOWN, '+', 0);
@@ -218,8 +248,26 @@ I64 DiskLat()
 
 		while (TRUE)
 		{
-			switch (MessageGet(&arg1, &arg2, 1 << MESSAGE_KEY_DOWN))
+			switch (MessageGet(&arg1, &arg2, 1 << MESSAGE_KEY_DOWN | 1 << MESSAGE_MS_L_DOWN |
+				1 << MESSAGE_MS_R_DOWN | 1 << MESSAGE_MS_R_UP | 1 << MESSAGE_MS_MOVE))
 			{
+				case MESSAGE_MS_L_DOWN:
+					tt.first = TRUE;
+					tt.x = arg1;
+					tt.y = arg2;
+					break;
+				case MESSAGE_MS_R_DOWN:
+					aim = TRUE;
+					tt.th = Arg(arg1 - tt.x, arg2 - tt.y);
+					break;
+				case MESSAGE_MS_MOVE:
+					if (aim)
+						tt.th = Arg(arg1 - tt.x, arg2 - tt.y);
+					break;
+				case MESSAGE_MS_R_UP:
+					tt.th = Arg(arg1 - tt.x, arg2 - tt.y);
+					aim = FALSE;
+					break;
 				case MESSAGE_KEY_DOWN:
 					switch (arg1)
 					{
@@ -278,6 +326,7 @@ I64 DiskLat()
 				case MESSAGE_NULL:
 					goto lt_done;
 			}
+			Refresh;
 		}
 lt_done:
 		MessageGet(,, 1 << MESSAGE_KEY_UP);

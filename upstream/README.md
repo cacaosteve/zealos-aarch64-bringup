@@ -1720,6 +1720,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 147 — DiskLat DrawIt + aim/MS_* 
+
+| Item | Path |
+|--|--|
+| Gap | DiskLat skipped DrawIt HUD and mouse place/aim |
+| Upstream need | `Lattice.ZC` `Fs->draw_it` + MS_L/R place/aim |
+| Bring-up | DiskLat DrawIt MemCopy HUD; MS_* + Refresh; still **15** |
+| Smoke | `hc: Upstream DiskLat` / `Lattice.ZC` (expect 15) |
+| Shell | `disklat` / `lattice` |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).
