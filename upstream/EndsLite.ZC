@@ -1,0 +1,106 @@
+/* Milestone 93: 'e' ends toggle + SetMenu + EndsLite.
+ *
+ * Upstream need: Lattice.ZC —
+ *   case 'e': tt.ends = !tt.ends; SetMenu;
+ *
+ * Bring-up:
+ *   - Scripted KEY 'e' toggles ends; Settings/Ends checked
+ *   - return EndsLite();  expect 15
+ */
+
+class Turtle
+{
+	F64 z;
+	Bool ends;
+} tt;
+
+U0 SetMenu()
+{
+	CMenuEntry *tmpse;
+	U8 buf[32];
+
+	/* Single stub: Layer first, Ends last so Ends checked sticks. */
+	StrPrint(buf, "Settings/Layer%d", ToI64(tt.z));
+	if (tmpse = MenuEntryFind(Fs->cur_menu, buf))
+		tmpse->checked = TRUE;
+	if (tmpse = MenuEntryFind(Fs->cur_menu, "Settings/Ends"))
+	{
+		if (tt.ends)
+			tmpse->checked = TRUE;
+		else
+			tmpse->checked = FALSE;
+	}
+}
+
+I64 EndsLite()
+{
+	I64 a1;
+	I64 a2;
+	I64 m;
+	I64 h;
+	I64 mask;
+	CMenuEntry *tmpse;
+
+	h = 0;
+	tt.z = 1.0;
+	tt.ends = FALSE;
+	mask = 1 << MESSAGE_KEY_DOWN;
+
+	if (!tt.ends)
+		h = h + 1;
+
+	MsgQuePush(MESSAGE_KEY_DOWN, 'e', 0);
+	MsgQuePush(MESSAGE_KEY_DOWN, 'e', 0);
+	MsgQuePush(MESSAGE_KEY_DOWN, 'e', 0);
+	MsgQuePush(MESSAGE_KEY_DOWN, CH_ESC, 0);
+
+	while (TRUE)
+	{
+		switch (MessageGet(&a1, &a2, mask))
+		{
+			case MESSAGE_KEY_DOWN:
+				switch (a1)
+				{
+					case 'e':
+						tt.ends = !tt.ends;
+						SetMenu;
+						break;
+					case CH_ESC:
+						goto lt_done;
+					case CH_SHIFT_ESC:
+						goto lt_done;
+				}
+				break;
+			case MESSAGE_NULL:
+				goto lt_done;
+		}
+	}
+lt_done:
+	/* Three toggles: FALSE→TRUE→FALSE→TRUE. */
+	if (tt.ends)
+		h = h + 2;
+	if (tmpse = MenuEntryFind(Fs->cur_menu, "Settings/Ends"))
+	{
+		if (tmpse->checked)
+			h = h + 4;
+	}
+	/* One more 'e' clears ends. */
+	MsgQuePush(MESSAGE_KEY_DOWN, 'e', 0);
+	m = MessageGet(&a1, &a2, mask);
+	if (m == MESSAGE_KEY_DOWN && a1 == 'e')
+	{
+		tt.ends = !tt.ends;
+		SetMenu;
+	}
+	if (!tt.ends)
+	{
+		if (tmpse = MenuEntryFind(Fs->cur_menu, "Settings/Ends"))
+		{
+			if (!tmpse->checked)
+				h = h + 8;
+		}
+	}
+	return h;
+}
+
+return EndsLite();

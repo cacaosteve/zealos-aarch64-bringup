@@ -1,0 +1,52 @@
+/* Milestone 64: member ++/-- + arrow/dot assign-expr + IncLite.
+ *
+ * Upstream need: Lattice.ZC -
+ *   tt.w++;  tt.speed += STEP;  if (tt.dé_idx) tt.dé_idx--;
+ *   if (r = t->w) { ... }
+ *
+ * Bring-up:
+ *   - obj.m++ / obj.m-- / ptr->m++ / ptr->m-- (I64 and F64)
+ *   - assign-as-expr for p->m = e / o.m = e
+ *   - return IncLite();  expect 15
+ */
+
+class Turtle
+{
+	F64 w;
+	F64 speed;
+	I64 idx;
+	Bool ends;
+};
+
+I64 IncLite()
+{
+	Turtle t;
+	Turtle *p;
+	F64 r;
+	I64 h;
+
+	t.w = 1.0;
+	t.speed = 2.0;
+	t.idx = 3;
+	t.ends = 1;
+	p = &t;
+
+	h = 0;
+	t.w++;
+	if (ToI64(t.w) == 2)
+		h = h + 1;
+	t.idx--;
+	if (t.idx == 2)
+		h = h + 2;
+	p->speed += 3.0;
+	if (ToI64(t.speed) == 5)
+		h = h + 4;
+	if (r = p->w)
+	{
+		if (ToI64(r) == 2)
+			h = h + 8;
+	}
+	return h;
+}
+
+return IncLite();

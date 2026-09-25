@@ -1,0 +1,47 @@
+/* Milestone 61: case char/range + CH_ESC/SPACE + setup stubs + SetupLite. */
+
+I64 SetupLite()
+{
+	I64 h;
+	I64 d;
+
+	h = 0;
+	SettingsPush;
+	AutoComplete;
+	WinBorder;
+	WinMax;
+	DocCursor;
+	DocClear;
+	SettingsPop;
+	try
+	{
+		h = h + 1;
+	}
+	catch
+		PutExcept;
+
+	d = '5';
+	switch (d)
+	{
+		case '0'...'9':
+			h = h + 2;
+			break;
+		case 'c':
+			h = h + 0;
+			break;
+	}
+	switch (CH_SPACE)
+	{
+		case CH_SPACE:
+			h = h + 4;
+			break;
+		case CH_SHIFT_ESC:
+			h = h + 0;
+			break;
+	}
+	if (CH_ESC == 0x1B && CH_SPACE == 0x20)
+		h = h + 8;
+	return h;
+}
+
+return SetupLite();

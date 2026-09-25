@@ -1,0 +1,29 @@
+/* Milestone 43: F64 class members (Lattice/Turtle shape).
+ *
+ * Upstream need: Demo/Graphics/Lattice.ZC — class Turtle { F64 x,y,... }.
+ *
+ * Bring-up deltas:
+ *   - class members may be F64; loads set expr_f64; += on members → FADD
+ *   - F64 != (HC_FNE)
+ *   - return Vec2Lite();  expect **25** (3²+4²)
+ */
+
+class Vec2
+{
+	F64 x;
+	F64 y;
+};
+
+I64 Vec2Lite()
+{
+	Vec2 v;
+
+	v.x = 3.0;
+	v.y = 4.0;
+	if (v.x != 3.0)
+		return 0;
+	v.x += 0.0;
+	return ToI64(v.x * v.x + v.y * v.y);
+}
+
+return Vec2Lite();

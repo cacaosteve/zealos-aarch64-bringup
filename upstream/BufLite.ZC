@@ -1,0 +1,38 @@
+/* Milestone 63: STR_LEN + StrPrint 3-arg + I64.u8[] + BufLite.
+ *
+ * Upstream need: Lattice.ZC -
+ *   U8 buf[STR_LEN];
+ *   StrPrint(buf, "Settings/Layer%d", i);
+ *   switch (arg2.u8[0]) { case SC_CURSOR_LEFT: ... }
+ *
+ * Bring-up:
+ *   - STR_LEN = 136
+ *   - StrPrint(dst, fmt, a0) with 2-4 args
+ *   - I64.u8[i] / .i8[i] / .u16[i] views
+ *   - array sizes may use named consts
+ *   - return BufLite();  expect 15
+ */
+
+I64 BufLite()
+{
+	U8 buf[STR_LEN];
+	I64 arg2;
+	I64 h;
+
+	h = 0;
+	buf[0] = 0;
+	StrPrint(buf, "Layer%d", 3);
+	if (buf[0] == 'L' && buf[5] == '3')
+		h = h + 1;
+	if (STR_LEN == 136)
+		h = h + 2;
+	arg2 = SC_CURSOR_LEFT;
+	if (arg2.u8[0] == SC_CURSOR_LEFT)
+		h = h + 4;
+	arg2 = 0x0102;
+	if (arg2.u8[0] == 2 && arg2.u8[1] == 1)
+		h = h + 8;
+	return h;
+}
+
+return BufLite();

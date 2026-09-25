@@ -1,0 +1,45 @@
+/* Milestone 85: MessageGet KEY_UP + UpLite.
+ *
+ * Upstream need: Lattice.ZC —
+ *   after ESC, MessageGet(,, 1<<MESSAGE_KEY_UP) drains release.
+ *
+ * Bring-up:
+ *   - Scripted KEY_DOWN then KEY_UP; UP-only mask after drain
+ *   - Virtio key release → MESSAGE_KEY_UP (same a1/a2 shape as DOWN)
+ *   - return UpLite();  expect 15
+ */
+
+I64 UpLite()
+{
+	I64 a1;
+	I64 a2;
+	I64 m;
+	I64 h;
+	I64 up_mask;
+	I64 both;
+
+	h = 0;
+	up_mask = 1 << MESSAGE_KEY_UP;
+	both = 1 << MESSAGE_KEY_DOWN | 1 << MESSAGE_KEY_UP;
+
+	/* Precedence: 1<<2|1<<3 == 12. */
+	if (both == 12)
+		h = h + 1;
+
+	/* Empty UP-only → MESSAGE_NULL. */
+	m = MessageGet(&a1, &a2, up_mask);
+	if (m == MESSAGE_NULL)
+		h = h + 2;
+
+	MsgQuePush(MESSAGE_KEY_DOWN, CH_ESC, 0);
+	MsgQuePush(MESSAGE_KEY_UP, CH_ESC, 0);
+	m = MessageGet(&a1, &a2, both);
+	if (m == MESSAGE_KEY_DOWN && a1 == CH_ESC)
+		h = h + 4;
+	m = MessageGet(&a1, &a2, up_mask);
+	if (m == MESSAGE_KEY_UP && a1 == CH_ESC)
+		h = h + 8;
+	return h;
+}
+
+return UpLite();

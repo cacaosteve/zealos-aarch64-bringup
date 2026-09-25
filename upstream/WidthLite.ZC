@@ -1,0 +1,89 @@
+/* Milestone 99: Lattice width keys + WidthLite.
+ *
+ * Upstream need: Lattice.ZC —
+ *   case '+': tt.w++;
+ *   case '-': if (tt.w) tt.w--;
+ *
+ * Bring-up:
+ *   - Scripted KEY '+'/'-' adjust width (distinct from AccelLite speed)
+ *   - return WidthLite();  expect 15
+ */
+
+class Turtle
+{
+	F64 w;
+} tt;
+
+I64 WidthLite()
+{
+	I64 a1;
+	I64 a2;
+	I64 h;
+	I64 mask;
+
+	h = 0;
+	tt.w = 12.0;
+	mask = 1 << MESSAGE_KEY_DOWN;
+
+	MsgQuePush(MESSAGE_KEY_DOWN, '+', 0);
+	MsgQuePush(MESSAGE_KEY_DOWN, '+', 0);
+	MsgQuePush(MESSAGE_KEY_DOWN, '-', 0);
+	MsgQuePush(MESSAGE_KEY_DOWN, CH_ESC, 0);
+
+	while (TRUE)
+	{
+		switch (MessageGet(&a1, &a2, mask))
+		{
+			case MESSAGE_KEY_DOWN:
+				switch (a1)
+				{
+					case '+':
+						tt.w = tt.w + 1.0;
+						break;
+					case '-':
+						if (tt.w)
+							tt.w = tt.w - 1.0;
+						break;
+					case CH_ESC:
+						goto lt_done;
+					case CH_SHIFT_ESC:
+						goto lt_done;
+				}
+				break;
+			case MESSAGE_NULL:
+				goto lt_done;
+		}
+	}
+lt_done:
+	/* ++ then -: 12 → 13 → 14 → 13. */
+	if (ToI64(tt.w) == 13)
+		h = h + 1;
+	/* One more '+'. */
+	MsgQuePush(MESSAGE_KEY_DOWN, '+', 0);
+	if (MessageGet(&a1, &a2, mask) == MESSAGE_KEY_DOWN && a1 == '+')
+		tt.w = tt.w + 1.0;
+	if (ToI64(tt.w) == 14)
+		h = h + 2;
+	/* Floor at 0. */
+	tt.w = 1.0;
+	MsgQuePush(MESSAGE_KEY_DOWN, '-', 0);
+	if (MessageGet(&a1, &a2, mask) == MESSAGE_KEY_DOWN && a1 == '-')
+	{
+		if (tt.w)
+			tt.w = tt.w - 1.0;
+	}
+	if (ToI64(tt.w) == 0)
+		h = h + 4;
+	/* Another '-' must not go negative. */
+	MsgQuePush(MESSAGE_KEY_DOWN, '-', 0);
+	if (MessageGet(&a1, &a2, mask) == MESSAGE_KEY_DOWN && a1 == '-')
+	{
+		if (tt.w)
+			tt.w = tt.w - 1.0;
+	}
+	if (ToI64(tt.w) == 0)
+		h = h + 8;
+	return h;
+}
+
+return WidthLite();

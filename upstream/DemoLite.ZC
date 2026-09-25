@@ -1,0 +1,190 @@
+/* Milestone 78: LatticeLite + LoopLite stitch + DemoLite.
+ *
+ * Upstream need: Lattice.ZC Lattice() —
+ *   setup → while MessageGet → CH_SPACE TurtleMove → CH_ESC exit → cleanup
+ *
+ * Bring-up:
+ *   - Seed MsgQuePush(SPACE) then MsgQuePush(ESC)
+ *   - Full Init/SetMenu/Fs + event loop + Step + cleanup
+ *   - return DemoLite();  expect 15
+ */
+
+#define ANGLES 3
+
+F64 angles[ANGLES] = {0.0, 0.0, 0.0};
+
+class Turtle
+{
+	F64 x;
+	F64 y;
+	F64 z;
+	F64 speed;
+	F64 th;
+	F64 w;
+	I64 idx;
+	CColorROPU16 edge;
+	CColorROPU16 middle;
+	Bool ends;
+	Bool first;
+} tt;
+
+U0 TurtlePlot(CDC *dc, Turtle *t, CColorROPU16 edge, CColorROPU16 middle)
+{
+	F64 w;
+
+	w = t->w / 2.0 - 1;
+	if (w < 0)
+		w = 0;
+	dc->color = middle;
+	GrLine3(dc,
+		t->x + w * Cos(t->th + pi / 2), t->y + w * Sin(t->th + pi / 2), t->z,
+		t->x + w * Cos(t->th - pi / 2), t->y + w * Sin(t->th - pi / 2), t->z);
+	w = t->w / 2.0;
+	dc->color = edge;
+	GrPlot3(dc, t->x + w * Cos(t->th + pi / 2), t->y + w * Sin(t->th + pi / 2), t->z);
+	GrPlot3(dc, t->x + w * Cos(t->th - pi / 2), t->y + w * Sin(t->th - pi / 2), t->z);
+}
+
+U0 TurtleMicroMove(Turtle *t, F64 dt)
+{
+	F64 c;
+	F64 s;
+
+	c = Cos(t->th);
+	s = Sin(t->th);
+	t->x = t->x + c * t->speed * dt;
+	t->y = t->y + s * t->speed * dt;
+	t->th = Wrap(t->th + dt * angles[t->idx]);
+}
+
+U0 TurtleMove(CDC *dc, Turtle *t, CColorROPU16 edge, CColorROPU16 middle)
+{
+	I64 i;
+	I64 l;
+
+	l = 4;
+	t->first = FALSE;
+	for (i = 0; i < l; i++)
+	{
+		TurtleMicroMove(t, 1.0 / l);
+		TurtlePlot(dc, t, edge, middle);
+	}
+}
+
+U0 TurtleInit(Turtle *t)
+{
+	MemSet(t, 0, sizeof(Turtle));
+	t->x = Fs->pix_width >> 1;
+	t->y = Fs->pix_height >> 1;
+	t->z = 5;
+	t->speed = 40.0;
+	t->th = 0.0;
+	t->w = 12.0;
+	t->edge = RED;
+	t->middle = YELLOW;
+	t->idx = 1;
+	t->first = TRUE;
+	t->ends = FALSE;
+}
+
+U0 SetMenu()
+{
+	I64 i;
+	U8 buf[STR_LEN];
+	CMenuEntry *tmpse;
+
+	for (i = 0; i <= 9; i++)
+	{
+		StrPrint(buf, "Settings/Layer%d", i);
+		if (tmpse = MenuEntryFind(Fs->cur_menu, buf))
+		{
+			if (i == ToI64(tt.z))
+				tmpse->checked = TRUE;
+			else
+				tmpse->checked = FALSE;
+		}
+	}
+	if (tmpse = MenuEntryFind(Fs->cur_menu, "Settings/Ends"))
+	{
+		if (tt.ends)
+			tmpse->checked = TRUE;
+		else
+			tmpse->checked = FALSE;
+	}
+}
+
+U0 DrawIt(CTask *, CDC *dc)
+{
+	dc->color = LTRED;
+}
+
+I64 DemoLite()
+{
+	CDC *dc;
+	I64 h;
+	I64 cx;
+	I64 arg1;
+	I64 arg2;
+	I64 mask;
+
+	h = 0;
+	dc = DCAlias;
+	DCDepthBufAlloc(dc);
+	MenuPush("File { Abort(,CH_SHIFT_ESC); Exit(,CH_ESC); }");
+	SettingsPush;
+	AutoComplete;
+	WinBorder;
+	WinMax;
+	DocCursor;
+	DocClear;
+
+	TurtleInit(&tt);
+	SetMenu;
+	Fs->win_inhibit = WIG_TASK_DEFAULT - WIF_FOCUS_TASK_MENU -
+		WIF_SELF_FOCUS - WIF_SELF_GRAB_SCROLL;
+	Fs->draw_it = &DrawIt;
+
+	cx = Fs->pix_width >> 1;
+	if (Fs->draw_it != 0 && ToI64(tt.x) == cx)
+		h = h + 1;
+
+	Cls(0);
+	mask = 1 << MESSAGE_KEY_DOWN | 1 << MESSAGE_MS_L_DOWN;
+	if (MsgQuePush(MESSAGE_KEY_DOWN, CH_SPACE, 0) &&
+	    MsgQuePush(MESSAGE_KEY_DOWN, CH_ESC, 0))
+		h = h + 2;
+
+	while (TRUE)
+	{
+		switch (MessageGet(&arg1, &arg2, mask))
+		{
+			case MESSAGE_KEY_DOWN:
+				switch (arg1)
+				{
+					case CH_SPACE:
+						TurtleMove(dc, &tt, tt.edge, tt.middle);
+						break;
+					case CH_ESC:
+					case CH_SHIFT_ESC:
+						goto lt_done;
+				}
+				break;
+			case MESSAGE_NULL:
+				goto lt_done;
+		}
+	}
+lt_done:
+	if (!tt.first && ToI64(tt.x) > cx)
+		h = h + 4;
+	if (GrPeek(ToI64(tt.x), ToI64(tt.y) + 6) == 0x00AA0000)
+		h = h + 8;
+
+	MessageGet(,, 1 << MESSAGE_KEY_UP);
+	SettingsPop;
+	DCFill(dc);
+	DCDel(dc);
+	MenuPop;
+	return h;
+}
+
+return DemoLite();

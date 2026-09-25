@@ -1,0 +1,36 @@
+/* Milestone 67: GrPrint %f + 5 fmt args + GrfLite.
+ *
+ * Upstream need: Lattice.ZC DrawIt —
+ *   GrPrint(dc, 0, 0, "Layer:%f Speed:%f é:%5.1f dé:%5.1f Width:%f",
+ *           tt.z, tt.speed, …);
+ *
+ * Bring-up:
+ *   - GrPrint accepts up to 9 args (dc,x,y,fmt + 5)
+ *   - Format args spilled to slots; %f / %N.Mf via hc_fmt_f64_bits
+ *   - return GrfLite();  expect 15
+ */
+
+I64 GrfLite()
+{
+	CDC *dc;
+	I64 n;
+	I64 h;
+
+	dc = DCAlias;
+	h = 0;
+	n = GrPrint(dc, 0, 0, "%f", 3.0);
+	if (n == 3)
+		h = h + 1;
+	n = GrPrint(dc, 0, 8, "L:%f", 2.0);
+	if (n == 5)
+		h = h + 2;
+	n = GrPrint(dc, 0, 16, "%f %f", 1.0, 2.5);
+	if (n == 7)
+		h = h + 4;
+	n = GrPrint(dc, 0, 24, "%5.1f", 4.0);
+	if (n == 3)
+		h = h + 8;
+	return h;
+}
+
+return GrfLite();

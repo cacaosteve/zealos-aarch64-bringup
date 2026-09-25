@@ -1,0 +1,94 @@
+/* Milestone 101: Lattice multi-section MenuPush + MenuFullLite.
+ *
+ * Upstream need: Lattice.ZC —
+ *   MenuPush("File {" … "}" "Play {" … "}" "Settings {" … "}");
+ *
+ * Bring-up:
+ *   - Adjacent string concat builds File/Play/Settings menu text
+ *   - SetMenu Layer loop + Ends; return MenuFullLite();  expect 15
+ */
+
+class Turtle
+{
+	F64 z;
+	Bool ends;
+} tt;
+
+U0 SetMenu()
+{
+	I64 i;
+	U8 buf[32];
+	CMenuEntry *tmpse;
+
+	for (i = 0; i <= 9; i++)
+	{
+		StrPrint(buf, "Settings/Layer%d", i);
+		if (tmpse = MenuEntryFind(Fs->cur_menu, buf))
+		{
+			if (i == ToI64(tt.z))
+				tmpse->checked = TRUE;
+			else
+				tmpse->checked = FALSE;
+		}
+	}
+	if (tmpse = MenuEntryFind(Fs->cur_menu, "Settings/Ends"))
+	{
+		if (tt.ends)
+			tmpse->checked = TRUE;
+		else
+			tmpse->checked = FALSE;
+	}
+}
+
+I64 MenuFullLite()
+{
+	I64 h;
+	CMenuEntry *tmpse;
+	U8 buf[32];
+
+	h = 0;
+	tt.z = 5;
+	tt.ends = TRUE;
+
+	/* Lattice-shaped adjacent concat (trimmed; full table is same form). */
+	if (MenuPush(
+		"File {"
+		"  Abort(,CH_SHIFT_ESC);"
+		"  Exit(,CH_ESC);"
+		"}"
+		"Play {"
+		"  Restart(,'\n');"
+		"  Step(,CH_SPACE);"
+		"}"
+		"Settings {"
+		"  Color(,'c');"
+		"  Ends(,'e');"
+		"  Layer5(,'5');"
+		"}"
+		) == 0)
+		h = h + 1;
+
+	SetMenu;
+	StrPrint(buf, "Settings/Layer%d", 5);
+	if (tmpse = MenuEntryFind(Fs->cur_menu, buf))
+	{
+		if (tmpse->checked)
+			h = h + 2;
+	}
+	if (tmpse = MenuEntryFind(Fs->cur_menu, "Settings/Ends"))
+	{
+		if (tmpse->checked)
+			h = h + 4;
+	}
+	tt.ends = FALSE;
+	SetMenu;
+	if (tmpse = MenuEntryFind(Fs->cur_menu, "Settings/Ends"))
+	{
+		if (!tmpse->checked)
+			h = h + 8;
+	}
+	MenuPop;
+	return h;
+}
+
+return MenuFullLite();

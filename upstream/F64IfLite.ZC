@@ -1,0 +1,43 @@
+/* Milestone 110: F64 if-cond + width floor in compose + F64IfLite.
+ *
+ * Upstream need: Lattice.ZC —
+ *   case '-': if (tt.w) tt.w--;
+ *   (F64 used as boolean in if)
+ *
+ * Bring-up:
+ *   - if (F64) → HC_F2I before JZ; HC_MAX_LOOPS 4→8
+ *   - NearLatticeLite '-' uses if (tt.w); F64IfLite → 15
+ */
+
+class Turtle
+{
+	F64 w;
+} tt;
+
+I64 F64IfLite()
+{
+	I64 h;
+
+	h = 0;
+	tt.w = 3.0;
+	if (tt.w)
+		h = h + 1;
+	tt.w = 0.0;
+	if (tt.w)
+		h = h + 99;
+	else
+		h = h + 2;
+	tt.w = 1.0;
+	if (tt.w)
+		tt.w = tt.w - 1.0;
+	if (ToI64(tt.w) == 0)
+		h = h + 4;
+	tt.w = 0.0;
+	if (tt.w)
+		tt.w = tt.w - 1.0;
+	if (ToI64(tt.w) == 0)
+		h = h + 8;
+	return h;
+}
+
+return F64IfLite();

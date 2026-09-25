@@ -1,0 +1,58 @@
+/* Milestone 84: MessageGet cursor scancodes + CursorLite.
+ *
+ * Upstream need: Lattice.ZC —
+ *   KEY_DOWN arg1==0 → arg2.u8[0] SC_CURSOR_* layer idx.
+ *
+ * Bring-up:
+ *   - Scripted KEY_DOWN(0, SC_*) + .u8[0] (virtio arrows → same shape on QEMU/UTM)
+ *   - return CursorLite();  expect 15
+ */
+
+#define ANGLES 4
+
+I64 CursorLite()
+{
+	I64 a1;
+	I64 a2;
+	I64 m;
+	I64 h;
+	I64 idx;
+	I64 mask;
+
+	h = 0;
+	idx = 1;
+	mask = 1 << MESSAGE_KEY_DOWN;
+
+	MsgQuePush(MESSAGE_KEY_DOWN, 0, SC_CURSOR_RIGHT);
+	MsgQuePush(MESSAGE_KEY_DOWN, 0, SC_CURSOR_RIGHT);
+	MsgQuePush(MESSAGE_KEY_DOWN, 0, SC_CURSOR_LEFT);
+	MsgQuePush(MESSAGE_KEY_DOWN, 'e', 0);
+
+	m = MessageGet(&a1, &a2, mask);
+	if (m == MESSAGE_KEY_DOWN && a1 == 0 && a2.u8[0] == SC_CURSOR_RIGHT)
+	{
+		if (idx < ANGLES - 1)
+			idx++;
+		h = h + 1;
+	}
+	m = MessageGet(&a1, &a2, mask);
+	if (m == MESSAGE_KEY_DOWN && a1 == 0 && a2.u8[0] == SC_CURSOR_RIGHT)
+	{
+		if (idx < ANGLES - 1)
+			idx++;
+		h = h + 2;
+	}
+	m = MessageGet(&a1, &a2, mask);
+	if (m == MESSAGE_KEY_DOWN && a1 == 0 && a2.u8[0] == SC_CURSOR_LEFT)
+	{
+		if (idx)
+			idx--;
+		h = h + 4;
+	}
+	m = MessageGet(&a1, &a2, mask);
+	if (m == MESSAGE_KEY_DOWN && a1 == 'e' && idx == 2)
+		h = h + 8;
+	return h;
+}
+
+return CursorLite();

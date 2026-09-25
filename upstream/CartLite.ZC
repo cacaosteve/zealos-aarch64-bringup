@@ -1,0 +1,31 @@
+/* Milestone 42: F64 subset for Cartesian-shaped graphs.
+ *
+ * Upstream need: Demo/Graphics/Cartesian.ZC (global F64 x,y; y=f(x)).
+ *
+ * Bring-up deltas:
+ *   - F64 locals/globals; literals via I2F; + - * / and < <= > >= ==
+ *   - ToI64 / ToF64; CPACR_EL1 FPEN for JIT
+ *   - Sample y=2*x over x in [-2,2] step 0.5; return hash of signs (**14**)
+ *   - return CartLite();
+ */
+
+F64 y;
+
+I64 CartLite()
+{
+	F64 x;
+	I64 h;
+
+	h = 0;
+	for (x = -2.0; x <= 2.0; x = x + 0.5)
+	{
+		y = 2.0 * x;
+		if (y < 0.0)
+			h = h + 1;
+		else
+			h = h + 2;
+	}
+	return h;
+}
+
+return CartLite();

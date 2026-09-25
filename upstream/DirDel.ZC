@@ -1,0 +1,133 @@
+/* Milestone 18: DirDel + slot reuse on RAM disk.
+ *
+ * Upstream shape: RedSea dir delete / free slot (no CDrive).
+ *
+ * Bring-up deltas:
+ *   - DirDel(name) clears a 32-byte entry
+ *   - Reuse first free slot via DirAlloc
+ *   - Delete "Hi", put "OS" in freed slot; lookup "OS"
+ *   - Returns payload len (2)
+ *   - return DirDel();
+ */
+
+U0 DirPut(I64 dir, I64 slot, I64 name, I64 blk, I64 len)
+{
+	U8 *e;
+	I64 *w;
+
+	e = dir + slot * 32;
+	MemSet(e, 0, 32);
+	MemCpy(e, name, StrLen(name) + 1);
+	w = e;
+	w[2] = blk;
+	w[3] = len;
+}
+
+I64 DirFind(I64 dir, I64 want)
+{
+	I64 i;
+	U8 *e;
+
+	for (i = 0; i < 8; i = i + 1)
+	{
+		e = dir + i * 32;
+		if (e[0] && StrCmp(e, want) == 0)
+			return i;
+	}
+	return -1;
+}
+
+I64 DirAlloc(I64 dir)
+{
+	I64 i;
+	U8 *e;
+
+	for (i = 0; i < 8; i = i + 1)
+	{
+		e = dir + i * 32;
+		if (!e[0])
+			return i;
+	}
+	return -1;
+}
+
+I64 DirDel(I64 dir, I64 want)
+{
+	I64 slot;
+	U8 *e;
+
+	slot = DirFind(dir, want);
+	if (slot < 0)
+		return 0;
+	e = dir + slot * 32;
+	MemSet(e, 0, 32);
+	return 1;
+}
+
+I64 DirDelDemo()
+{
+	U8 *dir;
+	U8 *data;
+	I64 *w;
+	U8 *e;
+	I64 slot, i, v, len;
+
+	dir = MAlloc(512);
+	data = MAlloc(512);
+	if (!dir || !data)
+		return 0;
+	MemSet(dir, 0, 512);
+
+	MemSet(data, 0, 512);
+	MemCpy(data, "Hi", 3);
+	BlkWrite(data, 1, 1);
+	DirPut(dir, 0, "Hi", 1, 2);
+
+	MemSet(data, 0, 512);
+	MemCpy(data, "Zeal", 5);
+	BlkWrite(data, 2, 1);
+	DirPut(dir, 1, "Zeal", 2, 4);
+
+	if (!DirDel(dir, "Hi"))
+		return 0;
+	if (DirFind(dir, "Hi") >= 0)
+		return 0;
+
+	slot = DirAlloc(dir);
+	if (slot != 0)
+		return 0;
+	MemSet(data, 0, 512);
+	MemCpy(data, "OS", 3);
+	BlkWrite(data, 3, 1);
+	DirPut(dir, slot, "OS", 3, 2);
+	BlkWrite(dir, 0, 1);
+
+	MemSet(dir, 0, 512);
+	BlkRead(dir, 0, 1);
+	slot = DirFind(dir, "OS");
+	if (slot != 0)
+		return 0;
+	e = dir + slot * 32;
+	w = e;
+	MemSet(data, 0, 512);
+	if (!BlkRead(data, w[2], 1))
+		return 0;
+	len = w[3];
+	if (StrCmp(data, "OS") != 0)
+		return 0;
+
+	Cls(0x00101820);
+	PrintAt(2, 1, "DirDel");
+	PrintAt(2, 3, e);
+	PrintAt(2, 4, data);
+	for (i = 0; i < len; i = i + 1)
+	{
+		v = data[i];
+		FillRect(80 + i * 140, 400 - (v & 63) * 4, 100, (v & 63) * 4 + 8, 0x00E08020);
+	}
+	Sleep(1200);
+	Free(0);
+	return len;
+}
+
+return DirDelDemo();

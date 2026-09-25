@@ -1,0 +1,137 @@
+/* Milestone 75: DrawIt-shaped compose + DrawItLite.
+ *
+ * Upstream need: Lattice.ZC —
+ *   U0 DrawIt(CTask *, CDC *dc) {
+ *     MemCopy(&t2, &tt, sizeof(Turtle));
+ *     GrPrint(dc, 0, 0, "Layer:%f …", …);
+ *     TurtleMove(dc, &t2, RED, LTRED);
+ *     dc->color = LTRED; GrLine(dc, …) ×3;
+ *   }
+ *
+ * Bring-up:
+ *   - Global tt + MemCopy into DrawIt local
+ *   - GrPrint HUD (%f ×5) + TurtleMove + head GrLines
+ *   - Fs->draw_it = &DrawIt
+ *   - return DrawItLite();  expect 15
+ */
+
+#define ANGLES 3
+#define TURTLE_SIZE 4
+
+F64 angles[ANGLES] = {0.0, 0.0, 0.0};
+
+class Turtle
+{
+	F64 x;
+	F64 y;
+	F64 z;
+	F64 speed;
+	F64 th;
+	F64 w;
+	I64 idx;
+	Bool ends;
+	Bool first;
+} tt;
+
+U0 TurtlePlot(CDC *dc, Turtle *t, CColorROPU16 edge, CColorROPU16 middle)
+{
+	F64 w;
+
+	w = t->w / 2.0 - 1;
+	if (w < 0)
+		w = 0;
+	dc->color = middle;
+	GrLine3(dc,
+		t->x + w * Cos(t->th + pi / 2), t->y + w * Sin(t->th + pi / 2), t->z,
+		t->x + w * Cos(t->th - pi / 2), t->y + w * Sin(t->th - pi / 2), t->z);
+	w = t->w / 2.0;
+	dc->color = edge;
+	GrPlot3(dc, t->x + w * Cos(t->th + pi / 2), t->y + w * Sin(t->th + pi / 2), t->z);
+	GrPlot3(dc, t->x + w * Cos(t->th - pi / 2), t->y + w * Sin(t->th - pi / 2), t->z);
+}
+
+U0 TurtleMicroMove(Turtle *t, F64 dt)
+{
+	F64 c;
+	F64 s;
+
+	c = Cos(t->th);
+	s = Sin(t->th);
+	t->x = t->x + c * t->speed * dt;
+	t->y = t->y + s * t->speed * dt;
+	t->th = Wrap(t->th + dt * angles[t->idx]);
+}
+
+U0 TurtleMove(CDC *dc, Turtle *t, CColorROPU16 edge, CColorROPU16 middle)
+{
+	I64 i;
+	I64 l;
+
+	l = 4;
+	t->first = FALSE;
+	for (i = 0; i < l; i++)
+	{
+		TurtleMicroMove(t, 1.0 / l);
+		TurtlePlot(dc, t, edge, middle);
+	}
+}
+
+U0 DrawIt(CTask *, CDC *dc)
+{
+	Turtle t2;
+
+	MemCopy(&t2, &tt, sizeof(Turtle));
+	GrPrint(dc, 0, 0, "L:%f S:%f T:%5.1f D:%5.1f W:%f",
+		tt.z, tt.speed, tt.th * 180 / pi, angles[tt.idx] * 180 / pi, tt.w);
+	TurtleMove(dc, &t2, RED, LTRED);
+	dc->color = LTRED;
+	GrLine(dc,
+		t2.x + TURTLE_SIZE * Cos(t2.th + pi / 2), t2.y + TURTLE_SIZE * Sin(t2.th + pi / 2),
+		t2.x + TURTLE_SIZE * Cos(t2.th - pi / 2), t2.y + TURTLE_SIZE * Sin(t2.th - pi / 2));
+	GrLine(dc,
+		t2.x + TURTLE_SIZE * Cos(t2.th + pi / 2), t2.y + TURTLE_SIZE * Sin(t2.th + pi / 2),
+		t2.x + TURTLE_SIZE * Cos(t2.th), t2.y + TURTLE_SIZE * Sin(t2.th));
+	GrLine(dc,
+		t2.x + TURTLE_SIZE * Cos(t2.th - pi / 2), t2.y + TURTLE_SIZE * Sin(t2.th - pi / 2),
+		t2.x + TURTLE_SIZE * Cos(t2.th), t2.y + TURTLE_SIZE * Sin(t2.th));
+}
+
+I64 DrawItLite()
+{
+	CDC *dc;
+	I64 h;
+	I64 n;
+
+	h = 0;
+	dc = DCAlias;
+	tt.x = 100.0;
+	tt.y = 100.0;
+	tt.z = 5.0;
+	tt.speed = 40.0;
+	tt.th = 0.0;
+	tt.w = 12.0;
+	tt.idx = 0;
+	tt.ends = FALSE;
+	tt.first = TRUE;
+
+	Cls(0);
+	Fs->draw_it = &DrawIt;
+	if (Fs->draw_it != 0)
+		h = h + 1;
+
+	n = GrPrint(dc, 0, 16, "L:%f", tt.z);
+	if (n >= 3)
+		h = h + 2;
+
+	DrawIt(0, dc);
+
+	/* Body edge RED at y±w/2 (=±6); head uses TURTLE_SIZE=4 — distinct. */
+	if (GrPeek(140, 106) == 0x00AA0000)
+		h = h + 4;
+	/* Nose tip LTRED at (x+TURTLE_SIZE, y) with th=0. */
+	if (GrPeek(144, 100) == 0x00FF5555)
+		h = h + 8;
+	return h;
+}
+
+return DrawItLite();

@@ -1,0 +1,58 @@
+/* Milestone 52: Class-star / F64 fn params, bare DCAlias + TurtleLite.
+ *
+ * Upstream need: Lattice.ZC —
+ *   U0 TurtleMicroMove(Turtle *t, F64 dt);
+ *   CDC *dc = DCAlias;
+ *
+ * Bring-up deltas:
+ *   - ASCII theta (not TempleOS theta); no CDC/GrPlot yet
+ *   - One member per decl (comma class members already in CommaLite)
+ *   - MicroMove returns I64; local checks instead of interactive loop
+ *   - return TurtleLite();  expect **15**
+ */
+
+class Turtle
+{
+	F64 x;
+	F64 y;
+	F64 speed;
+	F64 theta;
+};
+
+I64 MicroMove(Turtle *t, F64 dt)
+{
+	F64 c;
+	F64 s;
+	c = Cos(t->theta);
+	s = Sin(t->theta);
+	t->x = t->x + c * t->speed * dt;
+	t->y = t->y + s * t->speed * dt;
+	return 0;
+}
+
+I64 TurtleLite()
+{
+	Turtle t;
+	I64 dc;
+	I64 h;
+
+	t.x = 0.0;
+	t.y = 0.0;
+	t.speed = 1.0;
+	t.theta = 0.0;
+	dc = DCAlias;
+	MicroMove(&t, 0.1);
+
+	h = 0;
+	if (ToI64(t.x * 10.0) == 1)
+		h = h + 1;
+	if (ToI64(t.y * 100.0) == 0)
+		h = h + 2;
+	if (dc != 0)
+		h = h + 4;
+	if (ToI64(t.speed * 10.0) == 10)
+		h = h + 8;
+	return h;
+}
+
+return TurtleLite();

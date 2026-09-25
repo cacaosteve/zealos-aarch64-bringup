@@ -1,0 +1,55 @@
+/* Upstream inspiration: templeos/ZealOS/src/Demo/RadixSort.ZC
+ * (Init + count/bucket phase — no List* / DolDoc dumps)
+ *
+ * Bring-up deltas:
+ *   - Counting sort into U8 hist[64] instead of List pointer radix buckets
+ *   - Rand()&63 instead of RandU16&255
+ *   - Histogram bars via FillRect; PrintAt title
+ *   - Returns sum(hist)==N (16) as success
+ *   - MemSort; → return MemSort();
+ */
+
+U0 MemSort()
+{
+	U8 a[16];
+	U8 hist[64];
+	U8 out[16];
+	I64 i, v, s, x, y;
+
+	MemSet(hist, 0, 64);
+	MemSet(out, 0, 16);
+
+	for (i = 0; i < 16; i = i + 1)
+	{
+		a[i] = Rand() & 63;
+		hist[a[i]] = hist[a[i]] + 1;
+	}
+
+	s = 0;
+	for (i = 0; i < 64; i = i + 1)
+		s = s + hist[i];
+
+	v = 0;
+	for (i = 0; i < 64; i = i + 1)
+	{
+		while (hist[i])
+		{
+			out[v] = i;
+			v = v + 1;
+			hist[i] = hist[i] - 1;
+		}
+	}
+
+	Cls(0x00101820);
+	for (i = 0; i < 16; i = i + 1)
+	{
+		x = 40 + i * 40;
+		y = out[i] * 6;
+		FillRect(x, 500 - y, 28, y + 1, 0x0000C0FF);
+	}
+	PrintAt(2, 1, "MemSort");
+	Sleep(1200);
+	return s;
+}
+
+return MemSort();

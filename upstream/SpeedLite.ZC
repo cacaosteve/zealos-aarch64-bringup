@@ -1,0 +1,92 @@
+/* Milestone 94: speed/width keys + SpeedLite.
+ *
+ * Upstream need: Lattice.ZC —
+ *   '+'/'=' speed up; '-' speed down; ']'/'[' width
+ *
+ * Bring-up:
+ *   - Scripted KEY adjust tt.speed / tt.w via MessageGet
+ *   - return SpeedLite();  expect 15
+ */
+
+#define SPEED_STEP 5.0
+
+class Turtle
+{
+	F64 speed;
+	F64 w;
+} tt;
+
+I64 SpeedLite()
+{
+	I64 a1;
+	I64 a2;
+	I64 h;
+	I64 mask;
+
+	h = 0;
+	tt.speed = 40.0;
+	tt.w = 12.0;
+	mask = 1 << MESSAGE_KEY_DOWN;
+
+	MsgQuePush(MESSAGE_KEY_DOWN, '+', 0);
+	MsgQuePush(MESSAGE_KEY_DOWN, '=', 0);
+	MsgQuePush(MESSAGE_KEY_DOWN, '-', 0);
+	MsgQuePush(MESSAGE_KEY_DOWN, ']', 0);
+	MsgQuePush(MESSAGE_KEY_DOWN, '[', 0);
+	MsgQuePush(MESSAGE_KEY_DOWN, CH_ESC, 0);
+
+	while (TRUE)
+	{
+		switch (MessageGet(&a1, &a2, mask))
+		{
+			case MESSAGE_KEY_DOWN:
+				switch (a1)
+				{
+					case '+':
+					case '=':
+						tt.speed = tt.speed + SPEED_STEP;
+						break;
+					case '-':
+						if (tt.speed > SPEED_STEP)
+							tt.speed = tt.speed - SPEED_STEP;
+						break;
+					case ']':
+						tt.w = tt.w + 1.0;
+						break;
+					case '[':
+						if (tt.w > 1.0)
+							tt.w = tt.w - 1.0;
+						break;
+					case CH_ESC:
+						goto lt_done;
+					case CH_SHIFT_ESC:
+						goto lt_done;
+				}
+				break;
+			case MESSAGE_NULL:
+				goto lt_done;
+		}
+	}
+lt_done:
+	/* +5, +5, -5 → 45. */
+	if (ToI64(tt.speed) == 45)
+		h = h + 1;
+	/* ] then [ → back to 12. */
+	if (ToI64(tt.w) == 12)
+		h = h + 2;
+	/* One more '+' → 50. */
+	MsgQuePush(MESSAGE_KEY_DOWN, '+', 0);
+	if (MessageGet(&a1, &a2, mask) == MESSAGE_KEY_DOWN && a1 == '+')
+		tt.speed = tt.speed + SPEED_STEP;
+	if (ToI64(tt.speed) == 50)
+		h = h + 4;
+	/* One more ']' → 13. */
+	MsgQuePush(MESSAGE_KEY_DOWN, ']', 0);
+	if (MessageGet(&a1, &a2, mask) == MESSAGE_KEY_DOWN && a1 == ']')
+		tt.w = tt.w + 1.0;
+	if (ToI64(tt.w) == 13)
+		h = h + 8;
+	return h;
+}
+
+return SpeedLite();

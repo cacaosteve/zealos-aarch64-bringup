@@ -1,0 +1,44 @@
+/* Milestone 106: Lattice angles[] brace init (neg F64) + BraceAnglesLite.
+ *
+ * Upstream need: Lattice.ZC —
+ *   F64 angles[35] = { -2*π/1, …, 0, …, 2*π/1 };
+ *
+ * Bring-up:
+ *   - g_jit_buf 1536→8192 (HC_IR_ERR_SPACE on neg F64 brace init)
+ *   - Full brace table (decimals; π-expr fill remains in AnglesFullLite)
+ *   - return BraceAnglesLite();  expect 15
+ */
+
+#define ANGLES 35
+
+F64 angles[ANGLES] = {
+	-6.283185307, -3.141592654, -2.094395102, -1.570796327, -1.256637061,
+	-1.047197551, -0.785398163, -0.698131701, -0.628318531, -0.523598776,
+	-0.418879020, -0.349065850, -0.314159265, -0.261799388, -0.209439510,
+	-0.174532925, -0.157079633,
+	0.0,
+	0.157079633, 0.174532925, 0.209439510, 0.261799388, 0.314159265,
+	0.349065850, 0.418879020, 0.523598776, 0.628318531, 0.698131701,
+	0.785398163, 1.047197551, 1.256637061, 1.570796327, 2.094395102,
+	3.141592654, 6.283185307
+};
+
+I64 BraceAnglesLite()
+{
+	I64 h;
+	I64 mid;
+
+	h = 0;
+	mid = ANGLES / 2;
+	if (mid == 17)
+		h = h + 1;
+	if (ToI64(angles[mid] * 1000.0) == 0)
+		h = h + 2;
+	if (ToI64(angles[0] * 100.0) == -628)
+		h = h + 4;
+	if (ToI64(angles[ANGLES - 1] * 100.0) == 628)
+		h = h + 8;
+	return h;
+}
+
+return BraceAnglesLite();

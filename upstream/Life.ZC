@@ -1,0 +1,135 @@
+/* Milestone 41: Conway Life step on file-scope grids.
+ *
+ * Upstream: templeos/ZealOS/src/Demo/Graphics/Life.ZC
+ * (neighbor count + next buffer; no CDC / AnimateTask / Yield).
+ *
+ * Bring-up deltas:
+ *   - Global U8 cur[64]/nxt[64] + W (M40 file-scope)
+ *   - Open edges (At off-grid → 0); still-life 2×2 block
+ *   - One LifeStep; return live count **4**; plot cells on FB
+ *   - return Life();
+ */
+
+I64 W;
+U8 cur[64];
+U8 nxt[64];
+
+I64 At(I64 x, I64 y)
+{
+	if (x < 0)
+		return 0;
+	if (y < 0)
+		return 0;
+	if (x >= W)
+		return 0;
+	if (y >= W)
+		return 0;
+	return cur[y * W + x];
+}
+
+U0 SetN(I64 x, I64 y, I64 v)
+{
+	nxt[y * W + x] = v;
+}
+
+I64 Nbr(I64 x, I64 y)
+{
+	I64 c, dx, dy;
+
+	c = 0;
+	for (dy = -1; dy <= 1; dy = dy + 1)
+	{
+		for (dx = -1; dx <= 1; dx = dx + 1)
+		{
+			if (dx || dy)
+			{
+				if (At(x + dx, y + dy))
+					c = c + 1;
+			}
+		}
+	}
+	return c;
+}
+
+I64 LifeStep()
+{
+	I64 x, y, n, live, v;
+
+	live = 0;
+	for (y = 0; y < W; y = y + 1)
+	{
+		for (x = 0; x < W; x = x + 1)
+		{
+			n = Nbr(x, y);
+			v = At(x, y);
+			if (v)
+			{
+				if (n == 2)
+					SetN(x, y, 1);
+				else if (n == 3)
+					SetN(x, y, 1);
+				else
+					SetN(x, y, 0);
+			}
+			else
+			{
+				if (n == 3)
+					SetN(x, y, 1);
+				else
+					SetN(x, y, 0);
+			}
+		}
+	}
+	for (y = 0; y < W; y = y + 1)
+	{
+		for (x = 0; x < W; x = x + 1)
+		{
+			v = nxt[y * W + x];
+			cur[y * W + x] = v;
+			if (v)
+				live = live + 1;
+		}
+	}
+	return live;
+}
+
+U0 PlotGrid(I64 ox, I64 oy, I64 green)
+{
+	I64 x, y, dx, dy;
+
+	for (y = 0; y < W; y = y + 1)
+	{
+		for (x = 0; x < W; x = x + 1)
+		{
+			if (cur[y * W + x])
+			{
+				for (dy = 0; dy < 6; dy = dy + 1)
+					for (dx = 0; dx < 6; dx = dx + 1)
+						GrPlot(ox + x * 8 + dx, oy + y * 8 + dy, green);
+			}
+		}
+	}
+}
+
+I64 Life()
+{
+	I64 live, green;
+
+	W = 8;
+	MemSet(cur, 0, 64);
+	MemSet(nxt, 0, 64);
+	/* Still-life block at (3,3)-(4,4). */
+	cur[3 + 3 * 8] = 1;
+	cur[4 + 3 * 8] = 1;
+	cur[3 + 4 * 8] = 1;
+	cur[4 + 4 * 8] = 1;
+	live = LifeStep();
+	green = 0x0000C000;
+	Cls(0x00101820);
+	PlotGrid(80, 80, green);
+	PrintAt(2, 1, "Life");
+	Sleep(800);
+	return live;
+}
+
+return Life();

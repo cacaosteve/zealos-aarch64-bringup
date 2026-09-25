@@ -1,0 +1,109 @@
+/* Milestone 113: all SC_CURSOR keys in one switch + IdxAllLite.
+ *
+ * Upstream need: Lattice.ZC —
+ *   case 0: switch (arg2.u8[0]) {
+ *     SC_CURSOR_LEFT/RIGHT → idx; UP/DOWN → speed;
+ *   }
+ *
+ * Bring-up:
+ *   - One MessageGet key switch with all four cursors (NearLattice had UP/DOWN only)
+ *   - return IdxAllLite();  expect 15
+ */
+
+#define ANGLES 4
+#define TURTLE_SPEED_STEP 2.0
+
+class Turtle
+{
+	I64 idx;
+	F64 speed;
+} tt;
+
+I64 IdxAllLite()
+{
+	I64 h;
+	I64 arg1;
+	I64 arg2;
+	I64 mask;
+
+	h = 0;
+	tt.idx = 1;
+	tt.speed = 40.0;
+	mask = 1 << MESSAGE_KEY_DOWN;
+
+	MsgQuePush(MESSAGE_KEY_DOWN, 0, SC_CURSOR_RIGHT);
+	MsgQuePush(MESSAGE_KEY_DOWN, 0, SC_CURSOR_RIGHT);
+	MsgQuePush(MESSAGE_KEY_DOWN, 0, SC_CURSOR_LEFT);
+	MsgQuePush(MESSAGE_KEY_DOWN, 0, SC_CURSOR_UP);
+	MsgQuePush(MESSAGE_KEY_DOWN, 0, SC_CURSOR_DOWN);
+	MsgQuePush(MESSAGE_KEY_DOWN, CH_ESC, 0);
+
+	while (TRUE)
+	{
+		switch (MessageGet(&arg1, &arg2, mask))
+		{
+			case MESSAGE_KEY_DOWN:
+				switch (arg1)
+				{
+					case 0:
+						switch (arg2.u8[0])
+						{
+							case SC_CURSOR_LEFT:
+								if (tt.idx)
+									tt.idx--;
+								break;
+							case SC_CURSOR_RIGHT:
+								if (tt.idx < ANGLES - 1)
+									tt.idx++;
+								break;
+							case SC_CURSOR_UP:
+								tt.speed = tt.speed + TURTLE_SPEED_STEP;
+								break;
+							case SC_CURSOR_DOWN:
+								if (tt.speed >= TURTLE_SPEED_STEP)
+									tt.speed = tt.speed - TURTLE_SPEED_STEP;
+								break;
+						}
+						break;
+					case CH_ESC:
+					case CH_SHIFT_ESC:
+						goto lt_done;
+				}
+				break;
+			case MESSAGE_NULL:
+				goto lt_done;
+		}
+	}
+lt_done:
+	/* RIGHT RIGHT LEFT: 1 → 2 → 3 → 2. */
+	if (tt.idx == 2)
+		h = h + 1;
+	/* UP DOWN: 40 → 42 → 40. */
+	if (ToI64(tt.speed) == 40)
+		h = h + 2;
+	/* Floor idx at 0. */
+	tt.idx = 0;
+	MsgQuePush(MESSAGE_KEY_DOWN, 0, SC_CURSOR_LEFT);
+	if (MessageGet(&arg1, &arg2, mask) == MESSAGE_KEY_DOWN &&
+	    arg1 == 0 && arg2.u8[0] == SC_CURSOR_LEFT)
+	{
+		if (tt.idx)
+			tt.idx--;
+	}
+	if (tt.idx == 0)
+		h = h + 4;
+	/* Cap idx at ANGLES-1. */
+	tt.idx = ANGLES - 1;
+	MsgQuePush(MESSAGE_KEY_DOWN, 0, SC_CURSOR_RIGHT);
+	if (MessageGet(&arg1, &arg2, mask) == MESSAGE_KEY_DOWN &&
+	    arg1 == 0 && arg2.u8[0] == SC_CURSOR_RIGHT)
+	{
+		if (tt.idx < ANGLES - 1)
+			tt.idx++;
+	}
+	if (tt.idx == ANGLES - 1)
+		h = h + 8;
+	return h;
+}
+
+return IdxAllLite();

@@ -1,0 +1,90 @@
+/* Milestone 22: RedSea boot-sector stub (CRedSeaBoot-shaped).
+ *
+ * Upstream: KernelA.HH CRedSeaBoot + FileSysRedSea.ZC
+ * RedSeaValidate / RedSeaFormat — signatures only, no CDrive/FAT.
+ *
+ * Layout (512-byte sector 0):
+ *   [3]     signature  = MBR_PT_REDSEA (0x88)
+ *   [8..]   I64 drv_offset, sects, root_clus, bitmap_sects, unique_id
+ *   [510]   signature2 = 0xAA55 (LE)
+ *
+ * Bring-up deltas:
+ *   - RSFmt writes boot blk; RSChk validates + returns unique_id
+ *   - Returns unique_id (7)
+ *   - return RedSeaDemo();
+ */
+
+I64 RSFmt(I64 sects, I64 root, I64 bmap, I64 uid)
+{
+	U8 *br;
+	I64 *w;
+
+	br = MAlloc(512);
+	if (!br)
+		return 0;
+	MemSet(br, 0, 512);
+	br[3] = 0x88;
+	w = br + 8;
+	w[0] = 0;
+	w[1] = sects;
+	w[2] = root;
+	w[3] = bmap;
+	w[4] = uid;
+	br[510] = 0x55;
+	br[511] = 0xAA;
+	if (!BlkWrite(br, 0, 1))
+		return 0;
+	return 1;
+}
+
+I64 RSChk()
+{
+	U8 *br;
+	I64 *w;
+	I64 uid;
+
+	br = MAlloc(512);
+	if (!br)
+		return 0;
+	MemSet(br, 0, 512);
+	if (!BlkRead(br, 0, 1))
+		return 0;
+	if (br[3] != 0x88)
+		return 0;
+	if (br[510] != 0x55)
+		return 0;
+	if (br[511] != 0xAA)
+		return 0;
+	w = br + 8;
+	if (w[1] < 1)
+		return 0;
+	uid = w[4];
+	return uid;
+}
+
+I64 RedSeaDemo()
+{
+	I64 uid, root, v;
+
+	if (!RSFmt(16, 2, 1, 7))
+		return 0;
+	uid = RSChk();
+	if (uid != 7)
+		return 0;
+	root = 2;
+
+	Cls(0x00101820);
+	PrintAt(2, 1, "RedSea");
+	PrintAt(2, 3, "boot");
+	v = 0x88;
+	FillRect(80, 400 - (v & 63) * 4, 90, (v & 63) * 4 + 8, 0x00E0A020);
+	v = root;
+	FillRect(220, 400 - (v & 63) * 4, 90, (v & 63) * 4 + 8, 0x00E0A020);
+	v = uid;
+	FillRect(360, 400 - (v & 63) * 4, 90, (v & 63) * 4 + 8, 0x00E0A020);
+	Sleep(1200);
+	Free(0);
+	return uid;
+}
+
+return RedSeaDemo();

@@ -1,0 +1,43 @@
+/* Milestone 39: Notes — real multi-file program from RedSea.
+ *
+ * Loads DocLib.ZC via #include, builds a small on-screen note list.
+ * Returns total tag length (Hello+Zeal+OS+Doc == 14).
+ */
+
+#include "DocLib.ZC"
+
+I64 Notes()
+{
+	CDoc *doc;
+	CDocEntry *e;
+	I64 p, s, row, n;
+
+	doc = DocNew();
+	if (!doc)
+		return 0;
+	DocPrint(doc, "Hello");
+	DocPrint(doc, "Zeal");
+	DocPrint(doc, "OS");
+	DocPrint(doc, "Doc");
+
+	Cls(0x00101820);
+	PrintAt(2, 1, "Notes");
+	s = 0;
+	row = 3;
+	p = doc->next;
+	while (p != doc)
+	{
+		e = p;
+		PrintAt(2, row, e->tag);
+		n = StrLen(e->tag);
+		s = s + n;
+		FillRect(180 + row * 36, 400 - n * 36, 44, n * 36, 0x0040A0E0);
+		p = e->next;
+		row = row + 1;
+	}
+	Sleep(1200);
+	Free(0);
+	return s;
+}
+
+return Notes();

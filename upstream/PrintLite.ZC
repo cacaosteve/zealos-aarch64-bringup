@@ -1,0 +1,33 @@
+/* Milestone 56: GrPrint + PrintLite.
+ *
+ * Upstream need: Lattice.ZC —
+ *   GrPrint(dc, 0, 0, "Layer:%f …", tt.z, …);
+ *
+ * Bring-up deltas:
+ *   - GrPrint(dc,x,y,fmt[,a…]) draws fmt as literal (no %f yet)
+ *   - x/y are pixels (÷8 → text cells, like PrintAt)
+ *   - return PrintLite();  expect **15**
+ */
+
+I64 PrintLite()
+{
+	I64 dc;
+	I64 n;
+	I64 h;
+
+	dc = DCAlias;
+	n = GrPrint(dc, 16, 8, "Zeal");
+	h = 0;
+	if (dc != 0)
+		h = h + 1;
+	if (n == 4)
+		h = h + 2;
+	n = GrPrint(dc, 0, 0, "OK", 1.0, 2.0);
+	if (n == 2)
+		h = h + 4;
+	if (GrPrint(dc, 0, 16, "Hi") == 2)
+		h = h + 8;
+	return h;
+}
+
+return PrintLite();

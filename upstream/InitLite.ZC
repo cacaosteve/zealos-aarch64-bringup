@@ -1,0 +1,62 @@
+/* Milestone 54: Fs->pix_* + I64-to-F64 assign + InitLite.
+ *
+ * Upstream need: Lattice.ZC TurtleInit —
+ *   MemSet(t, 0, sizeof(Turtle));
+ *   t->x = Fs->pix_width >> 1;
+ *   t->y = Fs->pix_height >> 1;
+ *   t->edge = BLACK; t->middle = YELLOW; t->first = TRUE;
+ *
+ * Bring-up deltas:
+ *   - Fs->pix_width / pix_height from framebuffer
+ *   - I64 RHS auto-promoted via I2F when storing to F64
+ *   - return InitLite();  expect **15**
+ */
+
+class Turtle
+{
+	F64 x;
+	F64 y;
+	F64 z;
+	I64 edge;
+	I64 middle;
+	I64 idx;
+	Bool first;
+};
+
+I64 TurtleInit(Turtle *t)
+{
+	MemSet(t, 0, sizeof(Turtle));
+	t->x = Fs->pix_width >> 1;
+	t->y = Fs->pix_height >> 1;
+	t->z = 5;
+	t->edge = BLACK;
+	t->middle = YELLOW;
+	t->idx = 4;
+	t->first = TRUE;
+	return 0;
+}
+
+I64 InitLite()
+{
+	Turtle t;
+	I64 cx;
+	I64 cy;
+	I64 h;
+
+	TurtleInit(&t);
+	cx = Fs->pix_width >> 1;
+	cy = Fs->pix_height >> 1;
+
+	h = 0;
+	if (Fs->pix_width > 0)
+		h = h + 1;
+	if (ToI64(t.x) == cx)
+		h = h + 2;
+	if (ToI64(t.y) == cy)
+		h = h + 4;
+	if (t.edge == BLACK && t.middle == YELLOW && t.first)
+		h = h + 8;
+	return h;
+}
+
+return InitLite();

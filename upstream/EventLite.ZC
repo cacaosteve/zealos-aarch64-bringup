@@ -1,0 +1,114 @@
+/* Milestone 79: Lattice event handlers + EventLite.
+ *
+ * Upstream need: Lattice.ZC —
+ *   MS_L_DOWN → tt.x/y; MS_R_* → Arg aim;
+ *   KEY arg1==0 → SC_CURSOR_*; 'e' ends; '0'...'9' layer; ESC
+ *
+ * Bring-up:
+ *   - Scripted MsgQuePush mouse + scancode + 'e' + layer + ESC
+ *   - return EventLite();  expect 15
+ */
+
+#define ANGLES 4
+
+class Turtle
+{
+	F64 x;
+	F64 y;
+	F64 z;
+	F64 th;
+	I64 idx;
+	Bool ends;
+	Bool first;
+} tt;
+
+I64 EventLite()
+{
+	I64 arg1;
+	I64 arg2;
+	I64 h;
+	I64 mask;
+	Bool aim;
+
+	h = 0;
+	aim = FALSE;
+	tt.x = 0.0;
+	tt.y = 0.0;
+	tt.z = 0.0;
+	tt.th = 1.0;
+	tt.idx = 1;
+	tt.ends = FALSE;
+	tt.first = FALSE;
+
+	mask = 1 << MESSAGE_KEY_DOWN | 1 << MESSAGE_MS_L_DOWN |
+		1 << MESSAGE_MS_R_DOWN | 1 << MESSAGE_MS_R_UP;
+
+	MsgQuePush(MESSAGE_MS_L_DOWN, 100, 200);
+	MsgQuePush(MESSAGE_MS_R_DOWN, 200, 200);
+	MsgQuePush(MESSAGE_MS_R_UP, 200, 200);
+	MsgQuePush(MESSAGE_KEY_DOWN, 0, SC_CURSOR_RIGHT);
+	MsgQuePush(MESSAGE_KEY_DOWN, 'e', 0);
+	MsgQuePush(MESSAGE_KEY_DOWN, '3', 0);
+	MsgQuePush(MESSAGE_KEY_DOWN, CH_ESC, 0);
+
+	while (TRUE)
+	{
+		switch (MessageGet(&arg1, &arg2, mask))
+		{
+			case MESSAGE_MS_L_DOWN:
+				tt.first = TRUE;
+				tt.x = arg1;
+				tt.y = arg2;
+				break;
+			case MESSAGE_MS_R_DOWN:
+				aim = TRUE;
+				tt.th = Arg(arg1 - tt.x, arg2 - tt.y);
+				break;
+			case MESSAGE_MS_R_UP:
+				tt.th = Arg(arg1 - tt.x, arg2 - tt.y);
+				aim = FALSE;
+				break;
+			case MESSAGE_KEY_DOWN:
+				switch (arg1)
+				{
+					case 0:
+						if (arg2.u8[0] == SC_CURSOR_RIGHT)
+						{
+							if (tt.idx < ANGLES - 1)
+								tt.idx++;
+						}
+						if (arg2.u8[0] == SC_CURSOR_LEFT)
+						{
+							if (tt.idx)
+								tt.idx--;
+						}
+						break;
+					case '0'...'9':
+						tt.z = arg1 - '0';
+						break;
+					case 'e':
+						tt.ends = !tt.ends;
+						break;
+					case CH_ESC:
+						goto lt_done;
+					case CH_SHIFT_ESC:
+						goto lt_done;
+				}
+				break;
+			case MESSAGE_NULL:
+				goto lt_done;
+		}
+	}
+lt_done:
+	if (tt.first && ToI64(tt.x) == 100 && ToI64(tt.y) == 200)
+		h = h + 1;
+	if (ToI64(tt.th * 1000.0) == 0)
+		h = h + 2;
+	if (tt.idx == 2)
+		h = h + 4;
+	if (tt.ends && ToI64(tt.z) == 3)
+		h = h + 8;
+	return h;
+}
+
+return EventLite();

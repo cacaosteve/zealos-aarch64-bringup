@@ -1,0 +1,70 @@
+/* Upstream inspiration: templeos/ZealOS/src/Demo/Graphics/Life.ZC
+ * (neighbor GrPeek count) + System/Gr GrPeek/GrPlot primitives.
+ *
+ * Bring-up deltas:
+ *   - GrPlot(x,y,color) / GrPeek(x,y) — no CDC
+ *   - BlockScale cells (not 1px) so UTM FB is readable
+ *   - Fixed seed + one peek-count pass (not full AnimateTask)
+ *   - GREEN = 0x0000C000; returns neighbor-total for smoke
+ *   - PeekPlot; → return PeekPlot();
+ */
+
+U0 PlotCell(I64 cx, I64 cy, I64 color)
+{
+	I64 dx, dy;
+	for (dy = 0; dy < 6; dy = dy + 1)
+		for (dx = 0; dx < 6; dx = dx + 1)
+			GrPlot(cx + dx, cy + dy, color);
+}
+
+I64 PeekCell(I64 cx, I64 cy, I64 green)
+{
+	return GrPeek(cx + 3, cy + 3) == green;
+}
+
+U0 PeekPlot()
+{
+	I64 x, y, x1, y1, count, total;
+	I64 green;
+	I64 ox, oy;
+
+	green = 0x0000C000;
+	ox = 80;
+	oy = 80;
+	Cls(0x00101820);
+
+	/* Seed a small glider-ish blob (cell coords). */
+	PlotCell(ox + 2 * 8, oy + 2 * 8, green);
+	PlotCell(ox + 3 * 8, oy + 3 * 8, green);
+	PlotCell(ox + 4 * 8, oy + 3 * 8, green);
+	PlotCell(ox + 4 * 8, oy + 2 * 8, green);
+	PlotCell(ox + 4 * 8, oy + 1 * 8, green);
+
+	total = 0;
+	for (y = 0; y <= 6; y = y + 1)
+	{
+		for (x = 0; x <= 6; x = x + 1)
+		{
+			count = 0;
+			for (y1 = y - 1; y1 <= y + 1; y1 = y1 + 1)
+			{
+				for (x1 = x - 1; x1 <= x + 1; x1 = x1 + 1)
+				{
+					if (PeekCell(ox + x1 * 8, oy + y1 * 8, green))
+						count = count + 1;
+				}
+			}
+			total = total + count;
+			if (PeekCell(ox + x * 8, oy + y * 8, green))
+				PlotCell(ox + 200 + x * 8, oy + y * 8, 0x000000FF);
+			else if (count == 3)
+				PlotCell(ox + 200 + x * 8, oy + y * 8, 0x00FFFF00);
+		}
+	}
+
+	PrintAt(2, 1, "PeekPlot");
+	Sleep(1200);
+	return total;
+}
+
+return PeekPlot();

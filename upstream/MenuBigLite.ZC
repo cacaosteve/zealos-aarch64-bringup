@@ -1,0 +1,65 @@
+/* Milestone 102: Lattice-sized MenuPush + MenuBigLite.
+ *
+ * Upstream need: Lattice.ZC full File/Play/Settings MenuPush text (~414 chars).
+ *
+ * Bring-up:
+ *   - Adjacent string concat buf 241→512; hc_run_src IR bc 2048→4096
+ *   - return MenuBigLite();  expect 15
+ */
+
+I64 MenuBigLite()
+{
+	I64 h;
+	CMenuEntry *tmpse;
+
+	h = 0;
+	if (MenuPush(
+		"File {"
+		"  Abort(,CH_SHIFT_ESC);"
+		"  Exit(,CH_ESC);"
+		"}"
+		"Play {"
+		"  Restart(,'\n');"
+		"  Step(,CH_SPACE);"
+		"  Accelerator(,,SC_CURSOR_UP);"
+		"  Break(,,SC_CURSOR_DOWN);"
+		"  Left(,,SC_CURSOR_LEFT);"
+		"  Right(,,SC_CURSOR_RIGHT);"
+		"}"
+		"Settings {"
+		"  Color(,'c');"
+		"  Wider(,'+');"
+		"  Narrower(,'-');"
+		"  Ends(,'e');"
+		"  Layer0(,'0');"
+		"  Layer1(,'1');"
+		"  Layer2(,'2');"
+		"  Layer3(,'3');"
+		"  Layer4(,'4');"
+		"  Layer5(,'5');"
+		"  Layer6(,'6');"
+		"  Layer7(,'7');"
+		"  Layer8(,'8');"
+		"  Layer9(,'9');"
+		"}"
+		) == 0)
+		h = h + 1;
+	if (tmpse = MenuEntryFind(Fs->cur_menu, "Settings/Ends"))
+	{
+		tmpse->checked = TRUE;
+		if (tmpse->checked)
+			h = h + 2;
+	}
+	if (tmpse = MenuEntryFind(Fs->cur_menu, "Settings/Layer5"))
+	{
+		tmpse->checked = TRUE;
+		if (tmpse->checked)
+			h = h + 4;
+	}
+	MenuPop;
+	if (MenuPop() == 0)
+		h = h + 8;
+	return h;
+}
+
+return MenuBigLite();

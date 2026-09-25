@@ -1,0 +1,39 @@
+/* Milestone 69: builtin CMenuEntry + MenuEntryFind stub + CheckedLite.
+ *
+ * Upstream need: Lattice.ZC SetMenu —
+ *   CMenuEntry *tmpse;
+ *   if (tmpse = MenuEntryFind(Fs->cur_menu, buf))
+ *     tmpse->checked = TRUE;
+ *
+ * Bring-up:
+ *   - Builtin class CMenuEntry { I64 checked; }
+ *   - MenuEntryFind → &g_hc_menu_entry (always found for smoke)
+ *   - return CheckedLite();  expect 15
+ */
+
+I64 CheckedLite()
+{
+	CMenuEntry *tmpse;
+	I64 h;
+	U8 buf[32];
+
+	h = 0;
+	StrPrint(buf, "Settings/Layer%d", 3);
+	if (tmpse = MenuEntryFind(Fs->cur_menu, buf))
+		h = h + 1;
+	tmpse->checked = TRUE;
+	if (tmpse->checked == TRUE)
+		h = h + 2;
+	tmpse->checked = FALSE;
+	if (!tmpse->checked)
+		h = h + 4;
+	if (tmpse = MenuEntryFind(0, "Settings/Ends"))
+	{
+		tmpse->checked = 1;
+		if (tmpse->checked)
+			h = h + 8;
+	}
+	return h;
+}
+
+return CheckedLite();

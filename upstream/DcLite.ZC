@@ -1,0 +1,45 @@
+/* Milestone 65: builtin CDC + dc->color + DCAlias stub + DcLite.
+ *
+ * Upstream need: Lattice.ZC -
+ *   CDC *dc = DCAlias;
+ *   dc->color = middle;
+ *   GrPlot3(dc, ...); GrLine3(dc, ...);
+ *
+ * Bring-up:
+ *   - Builtin class CDC { I64 color; } (no #include)
+ *   - DCAlias() → &g_hc_cdc (shared stub)
+ *   - GrPlot3/GrLine3 read dc->color (palette 0..15 or raw RGB; dc==0 → yellow)
+ *   - return DcLite();  expect 15
+ */
+
+U0 SetMid(CDC *dc)
+{
+	dc->color = YELLOW;
+}
+
+I64 DcLite()
+{
+	CDC *dc;
+	I64 h;
+	I64 rgb;
+
+	h = 0;
+	dc = DCAlias;
+	if (dc != 0)
+		h = h + 1;
+	dc->color = LTRED;
+	if (dc->color == LTRED)
+		h = h + 2;
+	SetMid(dc);
+	if (dc->color == YELLOW)
+		h = h + 4;
+	rgb = 0x00AABBCC;
+	dc->color = rgb;
+	Cls(0);
+	GrPlot3(dc, 20, 30, 0);
+	if (GrPeek(20, 30) == rgb)
+		h = h + 8;
+	return h;
+}
+
+return DcLite();

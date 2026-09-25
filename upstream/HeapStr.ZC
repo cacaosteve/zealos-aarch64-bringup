@@ -1,0 +1,42 @@
+/* Milestone 7: heap strings — StrNew / StrCpy / StrCat (ZealOS-shaped).
+ *
+ * Upstream: templeos/ZealOS/src/Kernel/Memory/MAllocFree.ZC StrNew()
+ * + StrCpy/StrCat style joins (no CatPrint format args yet).
+ *
+ * Bring-up deltas:
+ *   - StrNew(s) → MAlloc + copy (no CTask heap arg)
+ *   - StrCpy / StrCat on heap buffers
+ *   - Char bars via FillRect for UTM visibility
+ *   - Returns StrLen of joined string for smoke
+ *   - return HeapStr();
+ */
+
+I64 HeapStr()
+{
+	U8 *a, *b, *c;
+	I64 n, i, h;
+
+	a = StrNew("Zeal");
+	b = StrNew("OS");
+	if (!a || !b)
+		return 0;
+	n = StrLen(a) + StrLen(b) + 1;
+	c = MAlloc(n);
+	if (!c)
+		return 0;
+	StrCpy(c, a);
+	StrCat(c, b);
+
+	Cls(0x00101820);
+	PrintAt(2, 1, c);
+	for (i = 0; i < StrLen(c); i = i + 1) {
+		h = 40 + (c[i] & 63);
+		FillRect(60 + i * 70, 420 - h, 50, h, 0x0000C0FF);
+	}
+	Sleep(1200);
+	n = StrLen(c);
+	Free(0);
+	return n;
+}
+
+return HeapStr();

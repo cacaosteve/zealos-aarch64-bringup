@@ -1,0 +1,29 @@
+/* Milestone 46: Sqrt + Wrap (Lattice math surface).
+ *
+ * Upstream need: Demo/Graphics/Lattice.ZC — Sqrt(y2); Wrap(θ).
+ *
+ * Bring-up deltas:
+ *   - Sqrt(x) via aarch64 FSQRT in hc_f64math.c
+ *   - Wrap(θ) / Wrap(θ, base) matching ZealOS Math.ZC ([base, base+2π))
+ *   - return SqrtLite();  expect **31**
+ */
+
+I64 SqrtLite()
+{
+	I64 h;
+
+	h = 0;
+	if (ToI64(Sqrt(9.0)) == 3)
+		h = h + 1;
+	if (ToI64(Sqrt(2.0) * 1000.0) == 1414)
+		h = h + 2;
+	if (ToI64(Wrap(0.0) * 1000.0) == 0)
+		h = h + 4;
+	if (ToI64(Wrap(3.0 * pi) * 1000.0) == -3141)
+		h = h + 8;
+	if (ToI64(Wrap(-3.0 * pi / 2.0) * 1000.0) == 1570)
+		h = h + 16;
+	return h;
+}
+
+return SqrtLite();

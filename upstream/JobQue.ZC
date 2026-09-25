@@ -1,0 +1,104 @@
+/* Milestone 10: QueueRemove + job list (ZealOS-shaped).
+ *
+ * Upstream: KernelB.HH QueueRemove + Job.ZC waiting/done queues.
+ *
+ * Bring-up deltas:
+ *   - QueueRemove unlinks a node (no Free of payload here)
+ *   - Insert five jobs; remove val==30; run/sum the rest
+ *   - Bars for remaining jobs; returns sum (120)
+ *   - return JobQue();
+ */
+
+class CQue
+{
+	I64 next;
+	I64 last;
+	I64 val;
+};
+
+U0 QueueInit(I64 head)
+{
+	I64 *h = head;
+	h[0] = head;
+	h[1] = head;
+}
+
+U0 QueueInsert(I64 entry, I64 pred)
+{
+	I64 *e = entry;
+	I64 *p = pred;
+	I64 succ;
+	I64 *s;
+
+	succ = p[0];
+	s = succ;
+	e[0] = succ;
+	e[1] = pred;
+	s[1] = entry;
+	p[0] = entry;
+}
+
+U0 QueueRemove(I64 entry)
+{
+	I64 *e = entry;
+	I64 *n;
+	I64 *l;
+
+	n = e[0];
+	l = e[1];
+	n[1] = e[1];
+	l[0] = e[0];
+}
+
+I64 JobQue()
+{
+	CQue head;
+	CQue *node;
+	CQue *n;
+	I64 i, s, p, drop;
+
+	QueueInit(&head);
+	for (i = 1; i <= 5; i = i + 1)
+	{
+		node = MAlloc(sizeof(CQue));
+		if (!node)
+			return 0;
+		node->val = i * 10;
+		QueueInsert(node, head.last);
+	}
+
+	/* Cancel job val==30 (middle of the list). */
+	drop = 0;
+	p = head.next;
+	while (p != &head)
+	{
+		n = p;
+		p = n->next;
+		if (n->val == 30)
+		{
+			QueueRemove(n);
+			drop = 1;
+		}
+	}
+	if (!drop)
+		return 0;
+
+	Cls(0x00101820);
+	PrintAt(2, 1, "JobQue");
+	s = 0;
+	i = 0;
+	p = head.next;
+	while (p != &head)
+	{
+		n = p;
+		s = s + n->val;
+		FillRect(60 + i * 90, 420 - n->val * 2, 60, n->val * 2, 0x00E08020);
+		p = n->next;
+		i = i + 1;
+	}
+	Sleep(1200);
+	Free(0);
+	return s;
+}
+
+return JobQue();

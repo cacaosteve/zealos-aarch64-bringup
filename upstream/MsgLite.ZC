@@ -1,0 +1,44 @@
+/* Milestone 57: DCDepthBufAlloc / PopUpColor / MessageGet + MsgLite.
+ *
+ * Upstream need: Lattice.ZC —
+ *   DCDepthBufAlloc(dc);
+ *   tt.middle = PopUpColor("Mid Color\n\n");
+ *   switch (MessageGet(&arg1, &arg2, 1 << MESSAGE_KEY_DOWN | …))
+ *
+ * Bring-up deltas:
+ *   - DCDepthBufAlloc stub → 0
+ *   - PopUpColor(header) → YELLOW (14), no UI
+ *   - MessageGet(p1,p2,mask) → 0; clears outs (queue deferred)
+ *   - MESSAGE_* constants (KernelA subset)
+ *   - return MsgLite();  expect **15**
+ */
+
+I64 MsgLite()
+{
+	I64 dc;
+	I64 a1;
+	I64 a2;
+	I64 c;
+	I64 m;
+	I64 h;
+
+	dc = DCAlias;
+	DCDepthBufAlloc(dc);
+	c = PopUpColor("Mid Color\n\n");
+	a1 = 99;
+	a2 = 99;
+	m = MessageGet(&a1, &a2, 1 << MESSAGE_KEY_DOWN | 1 << MESSAGE_MS_L_DOWN);
+
+	h = 0;
+	if (dc != 0)
+		h = h + 1;
+	if (c == YELLOW)
+		h = h + 2;
+	if (m == MESSAGE_NULL && a1 == 0 && a2 == 0)
+		h = h + 4;
+	if (MESSAGE_KEY_DOWN == 2 && MESSAGE_MS_L_DOWN == 5)
+		h = h + 8;
+	return h;
+}
+
+return MsgLite();

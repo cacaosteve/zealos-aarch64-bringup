@@ -1,0 +1,65 @@
+/* Milestone 48: class member comma lists (Lattice Turtle shape).
+ *
+ * Upstream need: Demo/Graphics/Lattice.ZC —
+ *   class Turtle { F64 x, y, z, speed, θ, w; ... }
+ *
+ * Bring-up deltas:
+ *   - class/union members: Type a, b, c;
+ *   - HC_MAX_MEMBERS 8→16 (Turtle-sized)
+ *   - return CommaLite();  expect **63**
+ */
+
+class Vec3
+{
+	F64 x, y, z;
+};
+
+class Pair
+{
+	I64 a, b;
+};
+
+class TurtleLite
+{
+	F64 x, y, z, speed, w;
+	I64 d;
+	Bool ends, first;
+};
+
+I64 CommaLite()
+{
+	I64 h;
+	Vec3 v;
+	Pair p;
+	TurtleLite t;
+
+	h = 0;
+	v.x = 1.0;
+	v.y = 2.0;
+	v.z = 3.0;
+	if (ToI64(v.x + v.y + v.z) == 6)
+		h = h + 1;
+	p.a = 10;
+	p.b = 20;
+	if (p.a + p.b == 30)
+		h = h + 2;
+	t.x = 1.0;
+	t.y = 2.0;
+	t.z = 3.0;
+	t.speed = 4.0;
+	t.w = 5.0;
+	t.d = 7;
+	t.ends = 1;
+	t.first = 0;
+	if (ToI64(t.x + t.y + t.z + t.speed + t.w) == 15)
+		h = h + 4;
+	if (t.d == 7)
+		h = h + 8;
+	if (t.ends == 1)
+		h = h + 16;
+	if (sizeof(Vec3) == 24)
+		h = h + 32;
+	return h;
+}
+
+return CommaLite();

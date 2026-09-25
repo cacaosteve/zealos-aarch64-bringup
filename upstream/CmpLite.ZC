@@ -1,0 +1,34 @@
+/* Milestone 70: F64 vs I64 compare promote + CmpLite.
+ *
+ * Upstream need: Lattice.ZC TurtlePlot / TurtleEnd —
+ *   if (w < 0) w = 0;
+ *   if (y2 >= 0) { … } else break;
+ *
+ * Bring-up:
+ *   - Mixed F64/I64 comparisons promote I64 via I2F (HC_FLT/FGE/…)
+ *   - return CmpLite();  expect 15
+ */
+
+I64 CmpLite()
+{
+	F64 w;
+	F64 y2;
+	I64 h;
+
+	h = 0;
+	w = -1.5;
+	if (w < 0)
+		h = h + 1;
+	w = 2.0;
+	if (!(w < 0))
+		h = h + 2;
+	y2 = 4.0;
+	if (y2 >= 0)
+		h = h + 4;
+	y2 = -0.5;
+	if (!(y2 >= 0))
+		h = h + 8;
+	return h;
+}
+
+return CmpLite();

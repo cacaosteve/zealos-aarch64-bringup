@@ -1,0 +1,46 @@
+/* Milestone 62: global class instance + CColorROPU16 + TtLite.
+ *
+ * Upstream need: Lattice.ZC -
+ *   class Turtle { ... CColorROPU16 edge, middle; } tt;
+ *   tt.edge = BLACK;  U0 F(..., CColorROPU16 edge, ...)
+ *
+ * Bring-up:
+ *   - `} tt;` / `} a, b;` after class -> file-scope instances
+ *   - CColorROPU16 as member/param (word-sized)
+ *   - return TtLite();  expect 15
+ */
+
+class Turtle
+{
+	F64 x;
+	F64 y;
+	CColorROPU16 edge;
+	CColorROPU16 middle;
+} tt;
+
+I64 PaintEdge(CColorROPU16 c)
+{
+	return c;
+}
+
+I64 TtLite()
+{
+	I64 h;
+
+	h = 0;
+	tt.x = 3.0;
+	tt.y = 4.0;
+	tt.edge = BLACK;
+	tt.middle = YELLOW;
+	if (ToI64(tt.x) == 3 && ToI64(tt.y) == 4)
+		h = h + 1;
+	if (tt.edge == BLACK)
+		h = h + 2;
+	if (tt.middle == YELLOW)
+		h = h + 4;
+	if (PaintEdge(tt.edge) == BLACK)
+		h = h + 8;
+	return h;
+}
+
+return TtLite();

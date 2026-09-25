@@ -1,0 +1,38 @@
+/* Milestone 51: TRUE/FALSE, palette colors, FAbs, DCAlias (Lattice surface).
+ *
+ * Upstream need: Lattice.ZC — while(TRUE); t->first=TRUE; middle=YELLOW;
+ *   DCAlias; FAbs for F64 abs.
+ *
+ * Bring-up deltas:
+ *   - TRUE/FALSE (same as true/false)
+ *   - ZealOS 16-color names → palette indices 0..15 (KernelA.HH)
+ *   - FAbs(x) F64 abs (sign-bit clear; +nofp-safe)
+ *   - DCAlias() → &g_hc_cdc (CDC stub; color field)
+ *   - return ColorLite();  expect **63**
+ */
+
+I64 ColorLite()
+{
+	I64 h;
+	Bool first;
+
+	h = 0;
+	if (TRUE)
+		h = h + 1;
+	if (!FALSE)
+		h = h + 2;
+	if (YELLOW == 14)
+		h = h + 4;
+	if (CYAN == 3)
+		h = h + 8;
+	if (ToI64(FAbs(-2.25) * 100.0) == 225)
+		h = h + 16;
+	if (DCAlias() != 0)
+		h = h + 32;
+	first = TRUE;
+	if (first && BLACK == 0 && WHITE == 15)
+		h = h + 0;
+	return h;
+}
+
+return ColorLite();

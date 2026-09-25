@@ -1,0 +1,46 @@
+/* Milestone 40: file-scope globals shared across functions.
+ *
+ * Upstream need: Demo/Graphics/Cartesian.ZC ("x must be global"),
+ * Life.ZC (cur_dc / restart), etc. — locals are per-frame; globals are absolute.
+ *
+ * Bring-up deltas:
+ *   - I64 / U8[] at file scope
+ *   - Helpers mutate shared state; main returns live + gen (== 8)
+ *   - return GlobShare();
+ */
+
+I64 gen;
+I64 live;
+U8 marks[8];
+
+I64 AddLive(I64 n)
+{
+	live = live + n;
+	return live;
+}
+
+I64 TickGen()
+{
+	gen = gen + 1;
+	marks[gen & 7] = gen;
+	return gen;
+}
+
+I64 GlobShare()
+{
+	I64 i, s;
+
+	gen = 0;
+	live = 0;
+	for (i = 0; i < 8; i = i + 1)
+		marks[i] = 0;
+	AddLive(3);
+	AddLive(4);
+	TickGen();
+	s = live + gen;
+	if (marks[1] != 1)
+		return 0;
+	return s;
+}
+
+return GlobShare();

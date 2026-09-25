@@ -1,0 +1,69 @@
+/* Milestone 91: MESSAGE_NULL idle → Refresh + IdleLite.
+ *
+ * Upstream need: Lattice.ZC —
+ *   empty MessageGet → WinMgr/Refresh paints; Sleep yields.
+ *
+ * Bring-up:
+ *   - Idle NULL loop: Refresh + Sleep until N frames
+ *   - Then scripted ESC exits
+ *   - return IdleLite();  expect 15
+ */
+
+class Turtle
+{
+	F64 x;
+	F64 y;
+} tt;
+
+U0 DrawIt(CTask *, CDC *dc)
+{
+	dc->color = LTRED;
+	GrPlot(dc, tt.x, tt.y);
+}
+
+I64 IdleLite()
+{
+	I64 a1;
+	I64 a2;
+	I64 m;
+	I64 h;
+	I64 mask;
+	I64 frames;
+
+	h = 0;
+	frames = 0;
+	tt.x = 80.0;
+	tt.y = 90.0;
+	mask = 1 << MESSAGE_KEY_DOWN;
+
+	Cls(0);
+	Fs->draw_it = 0;
+	if (Refresh() == 0)
+		h = h + 1;
+
+	Fs->draw_it = &DrawIt;
+	while (frames < 3)
+	{
+		m = MessageGet(&a1, &a2, mask);
+		if (m == MESSAGE_NULL)
+		{
+			if (Refresh())
+				frames = frames + 1;
+			Sleep(1);
+		}
+		else
+			break;
+	}
+	if (frames == 3)
+		h = h + 2;
+	if (GrPeek(80, 90) == 0x00FF5555)
+		h = h + 4;
+
+	MsgQuePush(MESSAGE_KEY_DOWN, CH_ESC, 0);
+	m = MessageGet(&a1, &a2, mask);
+	if (m == MESSAGE_KEY_DOWN && a1 == CH_ESC)
+		h = h + 8;
+	return h;
+}
+
+return IdleLite();

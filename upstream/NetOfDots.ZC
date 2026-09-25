@@ -1,0 +1,22 @@
+/* Upstream original: templeos/ZealOS/src/Demo/Graphics/NetOfDots.ZC
+ *
+ * ZealOS signature:
+ *   GrLine(CDC *dc=gr.dc, x1,y1,x2,y2, step=1, start=0)
+ * so the trailing `3` is dot spacing (step), not line width.
+ *
+ * Bring-up deltas (CDC / DocClear / PressAKey / DCFill only):
+ *   - no CDC: color is the 5th arg; step is the 6th
+ *   - Cls instead of DocClear; no key wait / DCFill
+ *   - NetOfDots; → return NetOfDots();
+ */
+
+U0 NetOfDots()
+{
+	I64 i;
+
+	Cls(0x00101820);
+	for (i = 0; i < 480; i += 20)
+		GrLine(i, 0, 0, 480 - i, 0x000000FF, 3);
+}
+
+return NetOfDots();

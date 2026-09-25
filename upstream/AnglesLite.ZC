@@ -1,0 +1,21 @@
+/* Milestone 44: F64 array brace init (Lattice angles[] shape).
+ *
+ * Upstream need: Demo/Graphics/Lattice.ZC — F64 angles[N] = { … }.
+ *
+ * Bring-up deltas:
+ *   - Type a[N] = { e0, e1, … }; (local + file-scope); remainder zeroed
+ *   - Index load/store already F64-aware (M42+)
+ *   - return AnglesLite();  expect **12**
+ */
+
+F64 a[4] = {1.0, 2.0, 3.0, 4.0};
+
+I64 AnglesLite()
+{
+	F64 b[2] = {0.5, 1.5};
+
+	a[3] = a[3] + b[0];
+	return ToI64(a[0] + a[1] + a[2] + a[3] + b[1]);
+}
+
+return AnglesLite();

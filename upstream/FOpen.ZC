@@ -1,0 +1,135 @@
+/* Milestone 19: FOpen / FClose / FBlkRead (ZealOS CFile-shaped).
+ *
+ * Upstream: Kernel/BlkDev/DiskCFile.ZC FOpen/FClose/FBlkRead —
+ * no CDrive, contiguous single-blk files only.
+ *
+ * Bring-up deltas:
+ *   - CFile { blk, len, pos, valid }
+ *   - FOpen(dir,name) / FClose(f) / FBlkRead(f,buf)
+ *   - Returns file len (4)
+ *   - return FOpenDemo();
+ */
+
+class CFile
+{
+	I64 blk;
+	I64 len;
+	I64 pos;
+	I64 valid;
+};
+
+U0 DirPut(I64 dir, I64 slot, I64 name, I64 blk, I64 len)
+{
+	U8 *e;
+	I64 *w;
+
+	e = dir + slot * 32;
+	MemSet(e, 0, 32);
+	MemCpy(e, name, StrLen(name) + 1);
+	w = e;
+	w[2] = blk;
+	w[3] = len;
+}
+
+I64 DirFind(I64 dir, I64 want)
+{
+	I64 i;
+	U8 *e;
+
+	for (i = 0; i < 8; i = i + 1)
+	{
+		e = dir + i * 32;
+		if (e[0] && StrCmp(e, want) == 0)
+			return i;
+	}
+	return -1;
+}
+
+I64 FOpen(I64 dir, I64 name)
+{
+	I64 slot;
+	U8 *e;
+	I64 *w;
+	CFile *f;
+
+	slot = DirFind(dir, name);
+	if (slot < 0)
+		return 0;
+	e = dir + slot * 32;
+	w = e;
+	f = MAlloc(sizeof(CFile));
+	if (!f)
+		return 0;
+	f->blk = w[2];
+	f->len = w[3];
+	f->pos = 0;
+	f->valid = 1;
+	return f;
+}
+
+I64 FClose(I64 faddr)
+{
+	CFile *f = faddr;
+	if (!f || !f->valid)
+		return 0;
+	f->valid = 0;
+	return 1;
+}
+
+I64 FBlkRead(I64 faddr, I64 buf)
+{
+	CFile *f = faddr;
+	if (!f || !f->valid)
+		return 0;
+	if (!BlkRead(buf, f->blk + f->pos, 1))
+		return 0;
+	f->pos = f->pos + 1;
+	return 1;
+}
+
+I64 FOpenDemo()
+{
+	U8 *dir;
+	U8 *data;
+	CFile *f;
+	I64 i, v, len;
+
+	dir = MAlloc(512);
+	data = MAlloc(512);
+	if (!dir || !data)
+		return 0;
+	MemSet(dir, 0, 512);
+	MemSet(data, 0, 512);
+	MemCpy(data, "Zeal", 5);
+	BlkWrite(data, 1, 1);
+	DirPut(dir, 0, "Zeal", 1, 4);
+	BlkWrite(dir, 0, 1);
+
+	MemSet(dir, 0, 512);
+	BlkRead(dir, 0, 1);
+	f = FOpen(dir, "Zeal");
+	if (!f)
+		return 0;
+	MemSet(data, 0, 512);
+	if (!FBlkRead(f, data))
+		return 0;
+	len = f->len;
+	if (!FClose(f))
+		return 0;
+	if (StrCmp(data, "Zeal") != 0)
+		return 0;
+
+	Cls(0x00101820);
+	PrintAt(2, 1, "FOpen");
+	PrintAt(2, 3, data);
+	for (i = 0; i < len; i = i + 1)
+	{
+		v = data[i];
+		FillRect(60 + i * 100, 400 - (v & 63) * 4, 70, (v & 63) * 4 + 8, 0x0000C0FF);
+	}
+	Sleep(1200);
+	Free(0);
+	return len;
+}
+
+return FOpenDemo();

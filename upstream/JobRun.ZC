@@ -1,0 +1,88 @@
+/* Milestone 11: drain-until-empty job runner (ZealOS JobRunOne-shaped).
+ *
+ * Upstream: Kernel/Job.ZC JobRunOne — pop next_waiting, QueueRemove, run.
+ *
+ * Bring-up deltas:
+ *   - No CJobCtrl / flags; CQue.val is the "work"
+ *   - Drain head.next until empty; bar per completed job
+ *   - Returns sum of vals 1..5 (==15)
+ *   - return JobRun();
+ */
+
+class CQue
+{
+	I64 next;
+	I64 last;
+	I64 val;
+};
+
+U0 QueueInit(I64 head)
+{
+	I64 *h = head;
+	h[0] = head;
+	h[1] = head;
+}
+
+U0 QueueInsert(I64 entry, I64 pred)
+{
+	I64 *e = entry;
+	I64 *p = pred;
+	I64 succ;
+	I64 *s;
+
+	succ = p[0];
+	s = succ;
+	e[0] = succ;
+	e[1] = pred;
+	s[1] = entry;
+	p[0] = entry;
+}
+
+U0 QueueRemove(I64 entry)
+{
+	I64 *e = entry;
+	I64 *n;
+	I64 *l;
+
+	n = e[0];
+	l = e[1];
+	n[1] = e[1];
+	l[0] = e[0];
+}
+
+I64 JobRun()
+{
+	CQue head;
+	CQue *node;
+	CQue *n;
+	I64 i, s, done;
+
+	QueueInit(&head);
+	for (i = 1; i <= 5; i = i + 1)
+	{
+		node = MAlloc(sizeof(CQue));
+		if (!node)
+			return 0;
+		node->val = i;
+		QueueInsert(node, head.last);
+	}
+
+	Cls(0x00101820);
+	PrintAt(2, 1, "JobRun");
+	s = 0;
+	done = 0;
+	/* JobRunOne-style: always take head.next until queue empty. */
+	while (head.next != &head)
+	{
+		n = head.next;
+		QueueRemove(n);
+		s = s + n->val;
+		FillRect(50 + done * 90, 400 - n->val * 50, 60, n->val * 50, 0x0000C0FF);
+		done = done + 1;
+	}
+	Sleep(1200);
+	Free(0);
+	return s;
+}
+
+return JobRun();

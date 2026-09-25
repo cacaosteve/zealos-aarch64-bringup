@@ -1,0 +1,24 @@
+/* Milestone 59 bring-up (updated M69): CMenuEntry is builtin; arrow checked.
+ *
+ * Upstream need: Lattice.ZC SetMenu — tmpse->checked = TRUE;
+ *
+ * Bring-up:
+ *   - Builtin CMenuEntry { I64 checked; }
+ *   - Local CMenuEntry *p = &e; p->checked
+ *   - return FindLite();  expect 15
+ */
+
+I64 FindLite()
+{
+	CMenuEntry e;
+	CMenuEntry *p;
+
+	e.checked = 0;
+	p = &e;
+	p->checked = 1;
+	if (p->checked)
+		return 15;
+	return 0;
+}
+
+return FindLite();

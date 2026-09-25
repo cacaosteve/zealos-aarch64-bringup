@@ -1,0 +1,33 @@
+/* Milestone 131: GrLine3 z-test via depth_buf + DepthLineLite.
+ *
+ * Upstream need: Lattice TurtlePlot mid GrLine3 with depth_buf.
+ *
+ * Bring-up:
+ *   - GrLine3 Bresenham interpolates z; occludes farther segments
+ *   - return DepthLineLite();  expect 15
+ */
+
+I64 DepthLineLite()
+{
+	CDC *dc;
+	I64 h;
+
+	h = 0;
+	dc = DCAlias;
+	DCDepthBufAlloc(dc);
+	Cls(0);
+	dc->color = LTRED;
+	if (GrLine3(dc, 10, 40, 100, 50, 40, 100))
+		h = h + 1;
+	if (GrPeek(30, 40) == 0x00FF5555)
+		h = h + 2;
+	if (!GrLine3(dc, 10, 40, 200, 50, 40, 200))
+		h = h + 4;
+	dc->color = LTRED;
+	GrLine3(dc, 10, 40, 50, 50, 40, 50);
+	if (GrPeek(30, 40) == 0x00FF5555)
+		h = h + 8;
+	return h;
+}
+
+return DepthLineLite();

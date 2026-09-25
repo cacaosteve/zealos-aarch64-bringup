@@ -1,0 +1,35 @@
+/* Upstream original: templeos/ZealOS/src/Demo/Lectures/MiniGrLib.ZC
+ * (MGInit / MGHLine / MGLine demo body — no MGCircle/F64/ã)
+ *
+ * Bring-up deltas:
+ *   - Draw with GrHLine/GrLine/Cls instead of offscreen image[] + MGUpdate
+ *   - GrHLine(x,y,w,color) vs MGHLine(x1,x2,y)
+ *   - FbH() for height; bright BGR colors; Sleep hold instead of Busy/LFBFlush
+ *   - MiniGr; → return MiniGr();
+ */
+
+U0 MiniGr()
+{
+	I64 i;
+	I64 h;
+
+	h = FbH();
+	Cls(0x00101820);
+
+	for (i = 0; i < 100; i = i + 1)
+		GrHLine(200 + i, 300 + i, 200, 0x0000C0FF);
+
+	for (i = 0; i < h; i = i + 10)
+		GrLine(i, 0, 0, h - i, 0x000000FF, 1);
+
+	for (i = 20; i < 180; i = i + 12)
+		GrCircle(500, 200, i, 0x00E08020);
+
+	for (i = 10; i < 80; i = i + 14)
+		GrFillCircle(500, 420, i, 0x0040C040);
+
+	PrintAt(2, 1, "MiniGr");
+	Sleep(1500);
+}
+
+return MiniGr();

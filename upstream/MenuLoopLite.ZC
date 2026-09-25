@@ -1,0 +1,107 @@
+/* Milestone 112: SetMenu clear-siblings in key loop + MenuLoopLite.
+ *
+ * Upstream need: Lattice.ZC —
+ *   case '0'...'9': tt.z = arg1-'0'; SetMenu;
+ *   SetMenu clears sibling Layer0–9 checked flags
+ *
+ * Bring-up:
+ *   - Full SetMenu for-loop inside MessageGet digit handler
+ *   - return MenuLoopLite();  expect 15
+ */
+
+class Turtle
+{
+	F64 z;
+	Bool ends;
+} tt;
+
+U0 SetMenu()
+{
+	I64 i;
+	U8 buf[32];
+	CMenuEntry *tmpse;
+
+	for (i = 0; i <= 9; i++)
+	{
+		StrPrint(buf, "Settings/Layer%d", i);
+		if (tmpse = MenuEntryFind(Fs->cur_menu, buf))
+		{
+			if (i == ToI64(tt.z))
+				tmpse->checked = TRUE;
+			else
+				tmpse->checked = FALSE;
+		}
+	}
+	if (tmpse = MenuEntryFind(Fs->cur_menu, "Settings/Ends"))
+	{
+		if (tt.ends)
+			tmpse->checked = TRUE;
+		else
+			tmpse->checked = FALSE;
+	}
+}
+
+I64 MenuLoopLite()
+{
+	I64 h;
+	I64 arg1;
+	I64 arg2;
+	I64 mask;
+	CMenuEntry *tmpse;
+	U8 buf[32];
+
+	h = 0;
+	tt.z = 0;
+	tt.ends = TRUE;
+	SetMenu;
+	mask = 1 << MESSAGE_KEY_DOWN;
+
+	MsgQuePush(MESSAGE_KEY_DOWN, '5', 0);
+	MsgQuePush(MESSAGE_KEY_DOWN, '2', 0);
+	MsgQuePush(MESSAGE_KEY_DOWN, CH_ESC, 0);
+
+	while (TRUE)
+	{
+		switch (MessageGet(&arg1, &arg2, mask))
+		{
+			case MESSAGE_KEY_DOWN:
+				switch (arg1)
+				{
+					case '0'...'9':
+						tt.z = arg1 - '0';
+						SetMenu;
+						break;
+					case CH_ESC:
+					case CH_SHIFT_ESC:
+						goto lt_done;
+				}
+				break;
+			case MESSAGE_NULL:
+				goto lt_done;
+		}
+	}
+lt_done:
+	if (ToI64(tt.z) == 2)
+		h = h + 1;
+	StrPrint(buf, "Settings/Layer%d", 2);
+	if (tmpse = MenuEntryFind(Fs->cur_menu, buf))
+	{
+		if (tmpse->checked)
+			h = h + 2;
+	}
+	/* Sibling from first digit cleared. */
+	StrPrint(buf, "Settings/Layer%d", 5);
+	if (tmpse = MenuEntryFind(Fs->cur_menu, buf))
+	{
+		if (!tmpse->checked)
+			h = h + 4;
+	}
+	if (tmpse = MenuEntryFind(Fs->cur_menu, "Settings/Ends"))
+	{
+		if (tmpse->checked)
+			h = h + 8;
+	}
+	return h;
+}
+
+return MenuLoopLite();

@@ -1,0 +1,62 @@
+/* Milestone 39: DolDoc-lite library (shared by Notes.ZC).
+ *
+ * Upstream shape: CDoc / CDocEntry queues + DocNew / DocPrint.
+ * No $$ cmds, wrap, or file IO.
+ */
+
+class CDoc
+{
+	I64 next;
+	I64 last;
+};
+
+class CDocEntry
+{
+	I64 next;
+	I64 last;
+	I64 tag;
+	I64 type;
+};
+
+U0 QueueInit(I64 head)
+{
+	I64 *h = head;
+	h[0] = head;
+	h[1] = head;
+}
+
+U0 QueueInsert(I64 entry, I64 pred)
+{
+	I64 *e = entry;
+	I64 *p = pred;
+	I64 succ;
+	I64 *s;
+
+	succ = p[0];
+	s = succ;
+	e[0] = succ;
+	e[1] = pred;
+	s[1] = entry;
+	p[0] = entry;
+}
+
+I64 DocNew()
+{
+	CDoc *d = MAlloc(sizeof(CDoc));
+	if (!d)
+		return 0;
+	QueueInit(d);
+	return d;
+}
+
+I64 DocPrint(I64 doc, I64 s)
+{
+	CDoc *d = doc;
+	CDocEntry *e = MAlloc(sizeof(CDocEntry));
+	if (!e)
+		return 0;
+	e->tag = StrNew(s);
+	e->type = 1;
+	QueueInsert(e, d->last);
+	return e;
+}

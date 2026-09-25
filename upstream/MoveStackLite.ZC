@@ -1,0 +1,112 @@
+/* Milestone 73: TurtlePlot + MicroMove + TurtleMove compose + MoveStackLite.
+ *
+ * Upstream need: Lattice.ZC DrawIt / Step —
+ *   TurtleMove(dc, &t2, RED, LTRED);
+ *   (Plot + MicroMove loop; End deferred)
+ *
+ * Bring-up:
+ *   - U0 TurtlePlot / TurtleMicroMove / TurtleMove (ASCII th)
+ *   - dc->color + GrLine3/GrPlot3
+ *   - fixed short step count (AbsI64(F64) deferred)
+ *   - ends=FALSE so TurtleEnd not required yet
+ *   - return MoveStackLite();  expect 15
+ */
+
+#define ANGLES 3
+
+F64 angles[ANGLES] = {0.0, 0.0, 0.0};
+
+class Turtle
+{
+	F64 x;
+	F64 y;
+	F64 z;
+	F64 speed;
+	F64 th;
+	F64 w;
+	I64 idx;
+	Bool ends;
+	Bool first;
+};
+
+U0 TurtlePlot(CDC *dc, Turtle *t, CColorROPU16 edge, CColorROPU16 middle)
+{
+	F64 w;
+
+	w = t->w / 2.0 - 1;
+	if (w < 0)
+		w = 0;
+	dc->color = middle;
+	GrLine3(dc,
+		t->x + w * Cos(t->th + pi / 2), t->y + w * Sin(t->th + pi / 2), t->z,
+		t->x + w * Cos(t->th - pi / 2), t->y + w * Sin(t->th - pi / 2), t->z);
+	w = t->w / 2.0;
+	dc->color = edge;
+	GrPlot3(dc, t->x + w * Cos(t->th + pi / 2), t->y + w * Sin(t->th + pi / 2), t->z);
+	GrPlot3(dc, t->x + w * Cos(t->th - pi / 2), t->y + w * Sin(t->th - pi / 2), t->z);
+}
+
+U0 TurtleMicroMove(Turtle *t, F64 dt)
+{
+	F64 c;
+	F64 s;
+
+	c = Cos(t->th);
+	s = Sin(t->th);
+	t->x = t->x + c * t->speed * dt;
+	t->y = t->y + s * t->speed * dt;
+	t->th = Wrap(t->th + dt * angles[t->idx]);
+}
+
+U0 TurtleMove(CDC *dc, Turtle *t, CColorROPU16 edge, CColorROPU16 middle)
+{
+	I64 i;
+	I64 l;
+
+	l = 4;
+	t->first = FALSE;
+	for (i = 0; i < l; i++)
+	{
+		TurtleMicroMove(t, 1.0 / l);
+		TurtlePlot(dc, t, edge, middle);
+	}
+}
+
+I64 MoveStackLite()
+{
+	Turtle t;
+	CDC *dc;
+	I64 h;
+	I64 rgb;
+
+	h = 0;
+	dc = DCAlias;
+	t.x = 100.0;
+	t.y = 100.0;
+	t.z = 0.0;
+	t.speed = 40.0;
+	t.th = 0.0;
+	t.w = 8.0;
+	t.idx = 0;
+	t.ends = FALSE;
+	t.first = TRUE;
+
+	Cls(0);
+	TurtleMove(dc, &t, RED, YELLOW);
+
+	/* Moved ~speed along +x (th=0). */
+	if (ToI64(t.x) >= 130 && ToI64(t.x) <= 150)
+		h = h + 1;
+	if (ToI64(t.y) >= 95 && ToI64(t.y) <= 105)
+		h = h + 2;
+	if (!t.first)
+		h = h + 4;
+
+	/* Edge GrPlot3 at (x, y±w/2); RED → palette 0x00AA0000. */
+	rgb = 0x00AA0000;
+	if (GrPeek(ToI64(t.x), ToI64(t.y) + 4) == rgb)
+		h = h + 8;
+	return h;
+}
+
+return MoveStackLite();

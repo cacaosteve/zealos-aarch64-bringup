@@ -1,0 +1,45 @@
+/* Milestone 103: Lattice try/catch + TryLite.
+ *
+ * Upstream need: Lattice.ZC —
+ *   try { … } catch PutExcept;
+ *
+ * Bring-up:
+ *   - try/catch parse as stmts (no exceptions yet)
+ *   - return TryLite();  expect 15
+ */
+
+I64 TryLite()
+{
+	I64 h;
+	I64 x;
+
+	h = 0;
+	x = 0;
+	try
+	{
+		x = x + 1;
+		x = x + 2;
+		h = h + 1;
+	}
+	catch
+		PutExcept;
+	if (x == 3)
+		h = h + 2;
+	try
+	{
+		h = h + 4;
+	}
+	catch
+		PutExcept;
+	/* Nested-shaped: catch path is a no-op stub. */
+	try
+	{
+		if (h == 7)
+			h = h + 8;
+	}
+	catch
+		PutExcept;
+	return h;
+}
+
+return TryLite();

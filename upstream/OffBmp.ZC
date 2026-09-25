@@ -1,0 +1,58 @@
+/* Milestone 6: MAlloc bump heap + offscreen U8 bitmap → GrPlot blit.
+ *
+ * Upstream shape: ZealOS MAlloc/Free + CDC body / GrBlot-style blit,
+ * without CDC (U8 *buf + GrPlot cells).
+ *
+ * Bring-up deltas:
+ *   - MAlloc(n) / Free(p) — bump heap (LIFO Free; Free(0) resets)
+ *   - U8* index store/load for offscreen buffer
+ *   - 4×4 PlotCell so UTM FB is readable
+ *   - Returns lit pixel count for smoke
+ *   - return OffBmp();
+ */
+
+U0 PlotCell(I64 cx, I64 cy, I64 color)
+{
+	I64 dx, dy;
+	for (dy = 0; dy < 4; dy = dy + 1)
+		for (dx = 0; dx < 4; dx = dx + 1)
+			GrPlot(cx + dx, cy + dy, color);
+}
+
+I64 OffBmp()
+{
+	I64 W, H, x, y, i, lit, color;
+	U8 *buf;
+
+	W = 40;
+	H = 24;
+	buf = MAlloc(W * H);
+	if (!buf)
+		return 0;
+	MemSet(buf, 0, W * H);
+
+	/* Checker / stripe pattern into offscreen buffer. */
+	for (y = 0; y < H; y = y + 1) {
+		for (x = 0; x < W; x = x + 1) {
+			i = y * W + x;
+			if (((x ^ y) & 4) == 0)
+				buf[i] = 1;
+		}
+	}
+
+	color = 0x00F0A020;
+	Cls(0x00101820);
+	lit = 0;
+	for (y = 0; y < H; y = y + 1) {
+		for (x = 0; x < W; x = x + 1) {
+			if (buf[y * W + x]) {
+				PlotCell(60 + x * 5, 50 + y * 5, color);
+				lit = lit + 1;
+			}
+		}
+	}
+	Free(buf);
+	return lit;
+}
+
+return OffBmp();

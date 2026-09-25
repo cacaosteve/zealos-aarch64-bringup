@@ -1,0 +1,75 @@
+/* Milestone 95: PopUpColor keys + MidLite.
+ *
+ * Upstream need: Lattice.ZC —
+ *   case 'c': tt.middle = PopUpColor(…);
+ *   case 'C': tt.edge = PopUpColor(…);
+ *
+ * Bring-up:
+ *   - Scripted KEY 'c'/'C' via MessageGet; PopUpColor → YELLOW
+ *   - return MidLite();  expect 15
+ */
+
+class Turtle
+{
+	CColorROPU16 edge;
+	CColorROPU16 middle;
+} tt;
+
+I64 MidLite()
+{
+	I64 a1;
+	I64 a2;
+	I64 h;
+	I64 mask;
+
+	h = 0;
+	tt.edge = RED;
+	tt.middle = BLACK;
+	mask = 1 << MESSAGE_KEY_DOWN;
+
+	if (tt.edge == RED && tt.middle == BLACK)
+		h = h + 1;
+
+	MsgQuePush(MESSAGE_KEY_DOWN, 'c', 0);
+	MsgQuePush(MESSAGE_KEY_DOWN, 'C', 0);
+	MsgQuePush(MESSAGE_KEY_DOWN, CH_ESC, 0);
+
+	while (TRUE)
+	{
+		switch (MessageGet(&a1, &a2, mask))
+		{
+			case MESSAGE_KEY_DOWN:
+				switch (a1)
+				{
+					case 'c':
+						tt.middle = PopUpColor("Mid Color\n\n");
+						break;
+					case 'C':
+						tt.edge = PopUpColor("Edge Color\n\n");
+						break;
+					case CH_ESC:
+						goto lt_done;
+					case CH_SHIFT_ESC:
+						goto lt_done;
+				}
+				break;
+			case MESSAGE_NULL:
+				goto lt_done;
+		}
+	}
+lt_done:
+	if (tt.middle == YELLOW)
+		h = h + 2;
+	if (tt.edge == YELLOW)
+		h = h + 4;
+	/* Re-pick middle after reset. */
+	tt.middle = CYAN;
+	MsgQuePush(MESSAGE_KEY_DOWN, 'c', 0);
+	if (MessageGet(&a1, &a2, mask) == MESSAGE_KEY_DOWN && a1 == 'c')
+		tt.middle = PopUpColor("Mid Color\n\n");
+	if (tt.middle == YELLOW)
+		h = h + 8;
+	return h;
+}
+
+return MidLite();

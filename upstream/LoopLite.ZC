@@ -1,0 +1,68 @@
+/* Milestone 77: MessageGet queue + Lattice event-loop + LoopLite.
+ *
+ * Upstream need: Lattice.ZC —
+ *   while (TRUE) {
+ *     switch (MessageGet(&arg1, &arg2, mask)) {
+ *       case MESSAGE_KEY_DOWN:
+ *         switch (arg1) {
+ *           case CH_SPACE: TurtleMove(...); break;
+ *           case CH_ESC: goto lt_done;
+ *         }
+ *     }
+ *   }
+ * lt_done:
+ *
+ * Bring-up:
+ *   - MsgQuePush(type,a1,a2) seeds scripted events (reset each hc_run_src)
+ *   - MessageGet pops queue; empty → MESSAGE_NULL (MsgLite unchanged)
+ *   - while/switch/goto CH_SPACE + CH_ESC loop shape
+ *   - return LoopLite();  expect 15
+ */
+
+I64 LoopLite()
+{
+	I64 arg1;
+	I64 arg2;
+	I64 h;
+	I64 steps;
+	I64 mask;
+
+	h = 0;
+	steps = 0;
+	mask = 1 << MESSAGE_KEY_DOWN | 1 << MESSAGE_MS_L_DOWN;
+
+	/* Seed: Step, then ESC — Lattice CH_SPACE / CH_ESC path. */
+	if (MsgQuePush(MESSAGE_KEY_DOWN, CH_SPACE, 0))
+		h = h + 1;
+	if (MsgQuePush(MESSAGE_KEY_DOWN, CH_ESC, 0))
+		h = h + 2;
+
+	while (TRUE)
+	{
+		switch (MessageGet(&arg1, &arg2, mask))
+		{
+			case MESSAGE_KEY_DOWN:
+				switch (arg1)
+				{
+					case CH_SPACE:
+						steps = steps + 1;
+						break;
+					case CH_ESC:
+					case CH_SHIFT_ESC:
+						goto lt_done;
+				}
+				break;
+			case MESSAGE_NULL:
+				goto lt_done;
+		}
+	}
+lt_done:
+	if (steps == 1)
+		h = h + 4;
+	MessageGet(,, 1 << MESSAGE_KEY_UP);
+	if (MessageGet(&arg1, &arg2, mask) == MESSAGE_NULL)
+		h = h + 8;
+	return h;
+}
+
+return LoopLite();

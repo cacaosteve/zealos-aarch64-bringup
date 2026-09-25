@@ -1,0 +1,30 @@
+/* Milestone 120: DCDepthBufReset + DepthRstLite.
+ *
+ * Upstream need: Lattice / GrDC.ZC —
+ *   DCDepthBufAlloc returns DCDepthBufReset(dc) with I32_MAX fill.
+ *
+ * Bring-up:
+ *   - DCDepthBufReset(dc); Alloc calls Reset like TempleOS
+ *   - return DepthRstLite();  expect 15
+ */
+
+I64 DepthRstLite()
+{
+	CDC *dc;
+	I64 h;
+
+	h = 0;
+	dc = DCAlias;
+	if (DCDepthBufReset(dc) == 0)
+		h = h + 1;
+	DCDepthBufAlloc(dc);
+	if (dc->depth_buf != 0)
+		h = h + 2;
+	if (DCDepthBufReset(dc) != 0)
+		h = h + 4;
+	if (DCDepthBufReset(dc) == dc->depth_buf)
+		h = h + 8;
+	return h;
+}
+
+return DepthRstLite();

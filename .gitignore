@@ -1,0 +1,16 @@
+# Build outputs
+build/
+esp/boot/hello.elf
+esp/EFI/BOOT/BOOTAA64.EFI
+*.iso
+*.img
+.DS_Store
+
+# Vendored boot firmware / Limine (download locally; see README / Makefile)
+third_party/limine-*.tar.*
+third_party/limine-12.9.0/
+third_party/limine-binary/
+third_party/limine-c-template/
+third_party/limine-v11-binary/
+third_party/edk2-ovmf-bins/
+third_party/edk2-ovmf-bins.tar.gz

@@ -1,0 +1,35 @@
+/* Milestone 45: Cos/Sin + pi (Lattice trig surface).
+ *
+ * Upstream need: Demo/Graphics/Lattice.ZC — Cos/Sin/ã on F64.
+ *
+ * Bring-up deltas:
+ *   - Cos(x)/Sin(x) builtins (F64 bits); Taylor in hc_f64math.c (FP TU)
+ *   - pi constant (IEEE bits; stand-in for TempleOS ã)
+ *   - Domain: finite |x| < 2^20; else quiet NaN
+ *   - return CosLite();  expect **63**
+ */
+
+I64 CosLite()
+{
+	I64 h;
+	F64 q;
+
+	h = 0;
+	if (ToI64(Cos(0.0) * 100.0) == 100)
+		h = h + 1;
+	if (ToI64(Sin(0.0) * 100.0) == 0)
+		h = h + 2;
+	if (ToI64(Cos(pi) * (-100.0)) == 100)
+		h = h + 4;
+	if (ToI64(Sin(pi / 2.0) * 100.0) == 100)
+		h = h + 8;
+	/* Negative quadrant (was wrong: Sin(-3pi/4) must be negative). */
+	q = -3.0 * pi / 4.0;
+	if (ToI64(Sin(q) * 1000.0) == -707)
+		h = h + 16;
+	if (ToI64(Cos(q) * 1000.0) == -707)
+		h = h + 32;
+	return h;
+}
+
+return CosLite();

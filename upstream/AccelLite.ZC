@@ -1,0 +1,100 @@
+/* Milestone 97: SC_CURSOR_UP/DOWN speed + AccelLite.
+ *
+ * Upstream need: Lattice.ZC —
+ *   case SC_CURSOR_UP:   tt.speed += TURTLE_SPEED_STEP;
+ *   case SC_CURSOR_DOWN: tt.speed -= TURTLE_SPEED_STEP;
+ *
+ * Bring-up:
+ *   - Scripted KEY_DOWN(0, SC_CURSOR_UP/DOWN) via MessageGet
+ *   - return AccelLite();  expect 15
+ */
+
+#define TURTLE_SPEED_STEP 2.0
+
+class Turtle
+{
+	F64 speed;
+} tt;
+
+I64 AccelLite()
+{
+	I64 a1;
+	I64 a2;
+	I64 m;
+	I64 h;
+	I64 mask;
+
+	h = 0;
+	tt.speed = 40.0;
+	mask = 1 << MESSAGE_KEY_DOWN;
+
+	MsgQuePush(MESSAGE_KEY_DOWN, 0, SC_CURSOR_UP);
+	MsgQuePush(MESSAGE_KEY_DOWN, 0, SC_CURSOR_UP);
+	MsgQuePush(MESSAGE_KEY_DOWN, 0, SC_CURSOR_DOWN);
+	MsgQuePush(MESSAGE_KEY_DOWN, CH_ESC, 0);
+
+	while (TRUE)
+	{
+		switch (MessageGet(&a1, &a2, mask))
+		{
+			case MESSAGE_KEY_DOWN:
+				switch (a1)
+				{
+					case 0:
+						switch (a2.u8[0])
+						{
+							case SC_CURSOR_UP:
+								tt.speed = tt.speed + TURTLE_SPEED_STEP;
+								break;
+							case SC_CURSOR_DOWN:
+								if (tt.speed >= TURTLE_SPEED_STEP)
+									tt.speed = tt.speed - TURTLE_SPEED_STEP;
+								break;
+						}
+						break;
+					case CH_ESC:
+						goto lt_done;
+					case CH_SHIFT_ESC:
+						goto lt_done;
+				}
+				break;
+			case MESSAGE_NULL:
+				goto lt_done;
+		}
+	}
+lt_done:
+	/* UP UP DOWN: 40 → 42 → 44 → 42. */
+	if (ToI64(tt.speed) == 42)
+		h = h + 1;
+	/* One more UP. */
+	MsgQuePush(MESSAGE_KEY_DOWN, 0, SC_CURSOR_UP);
+	m = MessageGet(&a1, &a2, mask);
+	if (m == MESSAGE_KEY_DOWN && a1 == 0 && a2.u8[0] == SC_CURSOR_UP)
+		tt.speed = tt.speed + TURTLE_SPEED_STEP;
+	if (ToI64(tt.speed) == 44)
+		h = h + 2;
+	/* Floor at 0 via DOWN from small speed. */
+	tt.speed = TURTLE_SPEED_STEP;
+	MsgQuePush(MESSAGE_KEY_DOWN, 0, SC_CURSOR_DOWN);
+	m = MessageGet(&a1, &a2, mask);
+	if (m == MESSAGE_KEY_DOWN && a1 == 0 && a2.u8[0] == SC_CURSOR_DOWN)
+	{
+		if (tt.speed >= TURTLE_SPEED_STEP)
+			tt.speed = tt.speed - TURTLE_SPEED_STEP;
+	}
+	if (ToI64(tt.speed) == 0)
+		h = h + 4;
+	/* One more DOWN must not go negative. */
+	MsgQuePush(MESSAGE_KEY_DOWN, 0, SC_CURSOR_DOWN);
+	m = MessageGet(&a1, &a2, mask);
+	if (m == MESSAGE_KEY_DOWN && a1 == 0 && a2.u8[0] == SC_CURSOR_DOWN)
+	{
+		if (tt.speed >= TURTLE_SPEED_STEP)
+			tt.speed = tt.speed - TURTLE_SPEED_STEP;
+	}
+	if (ToI64(tt.speed) == 0)
+		h = h + 8;
+	return h;
+}
+
+return AccelLite();

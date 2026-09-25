@@ -1,0 +1,40 @@
+/* Milestone 60: Fs->win_inhibit/draw_it + anonymous params + CH_/SC_ + FsLite.
+ *
+ * Upstream need: Lattice.ZC —
+ *   Fs->win_inhibit = WIF_SELF_FOCUS | …;
+ *   Fs->draw_it = &DrawIt;
+ *   U0 DrawIt(CTask *, CDC *dc) { … }
+ *   CH_SHIFT_ESC / SC_CURSOR_*
+ *
+ * Bring-up:
+ *   - Fs->win_inhibit / draw_it / cur_menu r/w stubs
+ *   - Anonymous fn params (`CTask *`) + opaque Class*
+ *   - CH_SHIFT_ESC, SC_CURSOR_{UP,DOWN,LEFT,RIGHT}
+ *   - return FsLite();  expect **15**
+ */
+
+U0 DrawIt(CTask *, CDC *dc)
+{
+	dc = dc;
+}
+
+I64 FsLite()
+{
+	I64 h;
+
+	h = 0;
+	Fs->win_inhibit = WIF_SELF_FOCUS;
+	if (Fs->win_inhibit == WIF_SELF_FOCUS)
+		h = h + 1;
+	Fs->draw_it = &DrawIt;
+	if (Fs->draw_it)
+		h = h + 2;
+	if (CH_SHIFT_ESC == 0x1C)
+		h = h + 4;
+	if (SC_CURSOR_UP == 0x48 && SC_CURSOR_DOWN == 0x50 &&
+	    SC_CURSOR_LEFT == 0x4B && SC_CURSOR_RIGHT == 0x4D)
+		h = h + 8;
+	return h;
+}
+
+return FsLite();

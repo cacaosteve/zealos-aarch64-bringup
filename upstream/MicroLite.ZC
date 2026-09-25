@@ -1,0 +1,74 @@
+/* Milestone 72: TurtleMicroMove-shaped MicroLite + longer fn names.
+ *
+ * Upstream need: Lattice.ZC —
+ *   U0 TurtleMicroMove(Turtle *t, F64 dt) { … Cos/Sin/Wrap/angles … }
+ *
+ * Bring-up:
+ *   - Fn names up to 23 chars (TurtleMicroMove)
+ *   - Cos/Sin/Wrap + angles[t->idx] + for i++
+ *   - return MicroLite();  expect 15
+ */
+
+#define ANGLES 3
+
+F64 angles[ANGLES] = {0.0, 0.0, 0.0};
+
+class Turtle
+{
+	F64 x;
+	F64 y;
+	F64 speed;
+	F64 th;
+	I64 idx;
+};
+
+I64 TurtleMicroMove(Turtle *t, F64 dt)
+{
+	F64 c;
+	F64 s;
+
+	c = Cos(t->th);
+	s = Sin(t->th);
+	t->x = t->x + c * t->speed * dt;
+	t->y = t->y + s * t->speed * dt;
+	t->th = Wrap(t->th + dt * angles[t->idx]);
+	return 0;
+}
+
+I64 MicroLite()
+{
+	Turtle t;
+	Turtle *p;
+	I64 i;
+	I64 l;
+	I64 h;
+
+	h = 0;
+	l = 4;
+	t.x = 0.0;
+	t.y = 0.0;
+	t.speed = 10.0;
+	t.th = 0.0;
+	t.idx = 0;
+	p = &t;
+
+	TurtleMicroMove(p, 1.0);
+	if (ToI64(t.x) == 10)
+		h = h + 1;
+	if (ToI64(t.y) == 0)
+		h = h + 2;
+
+	for (i = 0; i < l; i++)
+		TurtleMicroMove(p, 0.0);
+	if (ToI64(t.x) == 10)
+		h = h + 4;
+
+	t.th = 0.0;
+	t.speed = 5.0;
+	TurtleMicroMove(p, 2.0);
+	if (ToI64(t.x) == 20)
+		h = h + 8;
+	return h;
+}
+
+return MicroLite();

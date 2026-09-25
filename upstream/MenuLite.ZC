@@ -1,0 +1,33 @@
+/* Milestone 58: omitted call args + MenuPush/MenuPop + MenuLite.
+ *
+ * Upstream need: Lattice.ZC —
+ *   MessageGet(,, 1 << MESSAGE_KEY_UP);
+ *   MenuPush("File {…}");  MenuPop;
+ *
+ * Bring-up:
+ *   - Empty slots in calls → IMM 0 (NULL)
+ *   - MenuPush(str) / MenuPop / bare MenuPop; stubs
+ *   - return MenuLite();  expect **15**
+ */
+
+I64 MenuLite()
+{
+	I64 h;
+	I64 m;
+
+	h = 0;
+	MenuPush("File { Abort(,CH_SHIFT_ESC); }");
+	MenuPop;
+	m = MessageGet(,, 1 << MESSAGE_KEY_UP);
+	if (m == MESSAGE_NULL)
+		h = h + 1;
+	if (MenuPush("X") == 0)
+		h = h + 2;
+	if (MenuPop() == 0)
+		h = h + 4;
+	MessageGet(,, 1 << MESSAGE_KEY_DOWN | 1 << MESSAGE_MS_L_DOWN);
+	h = h + 8;
+	return h;
+}
+
+return MenuLite();

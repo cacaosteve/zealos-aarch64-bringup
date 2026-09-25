@@ -1,0 +1,42 @@
+/* Milestone 47: Arg (atan2) + AbsI64/MemCopy aliases (Lattice).
+ *
+ * Upstream need: Lattice.ZC — Arg(dx,dy); AbsI64; MemCopy.
+ *
+ * Bring-up deltas:
+ *   - Arg(x,y) = atan2(y,x) in hc_f64math.c (range (-π,π])
+ *   - AbsI64 → Abs; MemCopy → MemCpy
+ *   - return ArgLite();  expect **63**
+ */
+
+class Pt
+{
+	I64 x;
+	I64 y;
+};
+
+I64 ArgLite()
+{
+	I64 h;
+	Pt a;
+	Pt b;
+
+	h = 0;
+	if (ToI64(Arg(1.0, 0.0) * 1000.0) == 0)
+		h = h + 1;
+	if (ToI64(Arg(0.0, 1.0) * 1000.0) == 1570)
+		h = h + 2;
+	if (ToI64(Arg(-1.0, 0.0) * 1000.0) == 3141)
+		h = h + 4;
+	if (ToI64(Arg(0.0, -1.0) * 1000.0) == -1570)
+		h = h + 8;
+	if (AbsI64(-7) == 7)
+		h = h + 16;
+	a.x = 3;
+	a.y = 4;
+	MemCopy(&b, &a, sizeof(Pt));
+	if (b.x + b.y == 7)
+		h = h + 32;
+	return h;
+}
+
+return ArgLite();

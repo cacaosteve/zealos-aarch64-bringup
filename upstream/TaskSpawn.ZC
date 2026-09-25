@@ -1,0 +1,109 @@
+/* Milestone 12: CTask-lite spawn + run (ZealOS Spawn/TaskExe-shaped).
+ *
+ * Upstream: Kernel/KTask.ZC Spawn() + Job.ZC run-one — no real stacks/FPS.
+ *
+ * Bring-up deltas:
+ *   - CTask { next,last,kind,arg,res } on MAlloc
+ *   - "Spawn" = alloc + QueueInsert onto ready queue
+ *   - TaskExe(kind): 1 → arg+10, 2 → arg*2
+ *   - Drain ready queue; bars from res; return sum (42)
+ *   - return TaskSpawn();
+ */
+
+class CTask
+{
+	I64 next;
+	I64 last;
+	I64 kind;
+	I64 arg;
+	I64 res;
+};
+
+U0 QueueInit(I64 head)
+{
+	I64 *h = head;
+	h[0] = head;
+	h[1] = head;
+}
+
+U0 QueueInsert(I64 entry, I64 pred)
+{
+	I64 *e = entry;
+	I64 *p = pred;
+	I64 succ;
+	I64 *s;
+
+	succ = p[0];
+	s = succ;
+	e[0] = succ;
+	e[1] = pred;
+	s[1] = entry;
+	p[0] = entry;
+}
+
+U0 QueueRemove(I64 entry)
+{
+	I64 *e = entry;
+	I64 *n;
+	I64 *l;
+
+	n = e[0];
+	l = e[1];
+	n[1] = e[1];
+	l[0] = e[0];
+}
+
+I64 TaskExe(I64 taddr)
+{
+	CTask *t = taddr;
+	if (t->kind == 1)
+		t->res = t->arg + 10;
+	else if (t->kind == 2)
+		t->res = t->arg * 2;
+	else
+		t->res = t->arg;
+	return t->res;
+}
+
+I64 Spawn(I64 ready, I64 kind, I64 arg)
+{
+	CTask *t = MAlloc(sizeof(CTask));
+	CTask *head = ready;
+	if (!t)
+		return 0;
+	t->kind = kind;
+	t->arg = arg;
+	t->res = 0;
+	QueueInsert(t, head->last);
+	return t;
+}
+
+I64 TaskSpawn()
+{
+	CTask ready;
+	CTask *t;
+	I64 s, i;
+
+	QueueInit(&ready);
+	Spawn(&ready, 1, 5);
+	Spawn(&ready, 2, 7);
+	Spawn(&ready, 1, 3);
+
+	Cls(0x00101820);
+	PrintAt(2, 1, "TaskSpawn");
+	s = 0;
+	i = 0;
+	while (ready.next != &ready)
+	{
+		t = ready.next;
+		QueueRemove(t);
+		s = s + TaskExe(t);
+		FillRect(70 + i * 120, 400 - t->res * 8, 80, t->res * 8, 0x00E08020);
+		i = i + 1;
+	}
+	Sleep(1200);
+	Free(0);
+	return s;
+}
+
+return TaskSpawn();

@@ -1,0 +1,63 @@
+/* Milestone 16: file name table on RAM disk (RedSea/FBlk-lite).
+ *
+ * Upstream shape: Demo/Disk/DataBase.ZC FBlk-shaped dir + payload,
+ * without RedSea/CFile/CDrive.
+ *
+ * Bring-up deltas:
+ *   - Blk 0 = directory (name bytes + I64 blk/len via I64* view)
+ *   - Blk 1+ = file payload
+ *   - Dir/data via MAlloc (not U8[512] stack — pool too small)
+ *   - return NameFile(); expect len 5
+ */
+
+I64 NameFile()
+{
+	U8 *dir;
+	U8 *data;
+	I64 *e;
+	I64 i, s, v, len;
+
+	dir = MAlloc(512);
+	data = MAlloc(512);
+	if (!dir || !data)
+		return 0;
+	MemSet(dir, 0, 512);
+	MemSet(data, 0, 512);
+	MemCpy(dir, "Zeal", 5);
+	e = dir;
+	e[2] = 1;
+	e[3] = 5;
+	MemCpy(data, "Zeal!", 5);
+	if (!BlkWrite(dir, 0, 1))
+		return 0;
+	if (!BlkWrite(data, 1, 1))
+		return 0;
+
+	MemSet(dir, 0, 512);
+	MemSet(data, 0, 512);
+	if (!BlkRead(dir, 0, 1))
+		return 0;
+	e = dir;
+	if (e[2] != 1 || e[3] != 5)
+		return 0;
+	if (!BlkRead(data, e[2], 1))
+		return 0;
+	len = e[3];
+
+	Cls(0x00101820);
+	PrintAt(2, 1, "NameFile");
+	PrintAt(2, 3, dir);
+	PrintAt(2, 4, data);
+	s = 0;
+	for (i = 0; i < 5; i = i + 1)
+	{
+		v = data[i];
+		s = s + v;
+		FillRect(60 + i * 80, 400 - (v & 63) * 4, 60, (v & 63) * 4 + 8, 0x00E08020);
+	}
+	Sleep(1200);
+	Free(0);
+	return len;
+}
+
+return NameFile();

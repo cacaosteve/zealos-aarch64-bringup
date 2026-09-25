@@ -1,0 +1,132 @@
+/* Milestone 111: try/catch + '\n' restart compose + WrapLatticeLite.
+ *
+ * Upstream need: Lattice.ZC —
+ *   try { … } catch PutExcept;
+ *   case '\n': DCFill(dc); TurtleInit(&tt); SetMenu;
+ *
+ * Bring-up:
+ *   - One scripted loop with try/catch wrap + newline restart
+ *   - return WrapLatticeLite();  expect 15
+ */
+
+class Turtle
+{
+	F64 x;
+	F64 y;
+	F64 z;
+	F64 w;
+	F64 speed;
+	CColorROPU16 edge;
+	CColorROPU16 middle;
+	Bool ends;
+	Bool first;
+} tt;
+
+U0 TurtleInit(Turtle *t)
+{
+	MemSet(t, 0, sizeof(Turtle));
+	t->x = Fs->pix_width >> 1;
+	t->y = Fs->pix_height >> 1;
+	t->z = 5;
+	t->edge = BLACK;
+	t->middle = YELLOW;
+	t->first = TRUE;
+	t->ends = TRUE;
+}
+
+U0 SetMenu()
+{
+	CMenuEntry *tmpse;
+	U8 buf[32];
+
+	StrPrint(buf, "Settings/Layer%d", ToI64(tt.z));
+	if (tmpse = MenuEntryFind(Fs->cur_menu, buf))
+		tmpse->checked = TRUE;
+	if (tmpse = MenuEntryFind(Fs->cur_menu, "Settings/Ends"))
+	{
+		if (tt.ends)
+			tmpse->checked = TRUE;
+		else
+			tmpse->checked = FALSE;
+	}
+}
+
+I64 WrapLatticeLite()
+{
+	CDC *dc;
+	I64 h;
+	I64 arg1;
+	I64 arg2;
+	I64 mask;
+
+	h = 0;
+	dc = DCAlias;
+	MenuPush("File { Exit(,CH_ESC); }");
+	SettingsPush;
+	try
+	{
+		TurtleInit(&tt);
+		SetMenu;
+
+		/* Mutate, then '\n' restarts, then ESC. */
+		MsgQuePush(MESSAGE_KEY_DOWN, '3', 0);
+		MsgQuePush(MESSAGE_KEY_DOWN, 'e', 0);
+		MsgQuePush(MESSAGE_KEY_DOWN, '+', 0);
+		MsgQuePush(MESSAGE_KEY_DOWN, '\n', 0);
+		MsgQuePush(MESSAGE_KEY_DOWN, CH_ESC, 0);
+
+		mask = 1 << MESSAGE_KEY_DOWN;
+		while (TRUE)
+		{
+			switch (MessageGet(&arg1, &arg2, mask))
+			{
+				case MESSAGE_KEY_DOWN:
+					switch (arg1)
+					{
+						case '0'...'9':
+							tt.z = arg1 - '0';
+							SetMenu;
+							break;
+						case 'e':
+							tt.ends = !tt.ends;
+							SetMenu;
+							break;
+						case '+':
+							tt.w = tt.w + 1.0;
+							break;
+						case '\n':
+							DCFill(dc);
+							TurtleInit(&tt);
+							SetMenu;
+							break;
+						case CH_ESC:
+						case CH_SHIFT_ESC:
+							goto lt_done;
+					}
+					break;
+				case MESSAGE_NULL:
+					goto lt_done;
+			}
+		}
+lt_done:
+		MessageGet(,, 1 << MESSAGE_KEY_UP);
+	}
+	catch
+		PutExcept;
+
+	/* After '\n': back to init (z=5, ends TRUE, w=0). */
+	if (ToI64(tt.z) == 5)
+		h = h + 1;
+	if (tt.ends)
+		h = h + 2;
+	if (ToI64(tt.w) == 0)
+		h = h + 4;
+	if (tt.first && tt.middle == YELLOW)
+		h = h + 8;
+
+	SettingsPop;
+	MenuPop;
+	return h;
+}
+
+return WrapLatticeLite();

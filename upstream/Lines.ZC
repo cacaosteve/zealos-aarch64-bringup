@@ -1,0 +1,55 @@
+/* Upstream original: templeos/ZealOS/src/Demo/Graphics/Lines.ZC
+ *
+ * Bring-up deltas (CDC / CharScan / Fs / palette / postfix only):
+ *   - no CDC: GrLine(x1,y1,x2,y2,color,step)
+ *   - FbW()/FbH() instead of Fs->pix_width/height
+ *   - KeyHit() instead of CharScan; bounded frames for smoke
+ *   - Clamp/Sign/Rand instead of ClampI64/SignI64/RandI16
+ *   - `!--i` / `c++ & 15` rewritten as statements (frontend)
+ *   - Bright BGR palette (VGA index 0..15 is invisible on our FB)
+ *   - Sleep(1); drain KeyHit at start; seed endpoints apart
+ *   - Lines; → return Lines();
+ */
+
+U0 Lines()
+{
+	I64 x1 = 40, y1 = 40, x2 = 400, y2 = 300, i = 1, c = 0;
+	I64 vx1 = 2, vy1 = 1, vx2 = -1, vy2 = 2;
+	I64 frames = 0;
+	I64 color = 0x000000FF;
+
+	while (KeyHit())
+		GetKey();
+
+	Cls(0x00101820);
+	while (!KeyHit() && frames < 800)
+	{
+		i = i - 1;
+		if (!i)
+		{
+			i = 40;
+			c = c + 1;
+			if ((c & 3) == 0)
+				color = 0x000000FF;
+			if ((c & 3) == 1)
+				color = 0x0000FF00;
+			if ((c & 3) == 2)
+				color = 0x00FF0000;
+			if ((c & 3) == 3)
+				color = 0x00FFFFFF;
+		}
+		GrLine(x1, y1, x2, y2, color, 1);
+		vx1 = Clamp(vx1 + Sign(Rand() % 3 - 1), -5, 5);
+		vy1 = Clamp(vy1 + Sign(Rand() % 3 - 1), -5, 5);
+		vx2 = Clamp(vx2 + Sign(Rand() % 3 - 1), -5, 5);
+		vy2 = Clamp(vy2 + Sign(Rand() % 3 - 1), -5, 5);
+		x1 = Clamp(x1 + vx1, 0, FbW() - 1);
+		y1 = Clamp(y1 + vy1, 0, FbH() - 1);
+		x2 = Clamp(x2 + vx2, 0, FbW() - 1);
+		y2 = Clamp(y2 + vy2, 0, FbH() - 1);
+		Sleep(1);
+		frames = frames + 1;
+	}
+}
+
+return Lines();

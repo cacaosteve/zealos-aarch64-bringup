@@ -1,0 +1,43 @@
+/* Milestone 107: Lattice angles[] brace π exprs + BracePiLite.
+ *
+ * Upstream need: Lattice.ZC —
+ *   F64 angles[35] = { -2*π/1, -2*π/2, …, 0, …, 2*π/1 };
+ *
+ * Bring-up:
+ *   - Brace init with ASCII `pi` (same value as TempleOS π)
+ *   - Needs g_jit_buf 8K (M106); return BracePiLite();  expect 15
+ */
+
+#define ANGLES 35
+
+F64 angles[ANGLES] = {
+	-2 * pi / 1,  -2 * pi / 2,  -2 * pi / 3,  -2 * pi / 4, -2 * pi / 5,
+	-2 * pi / 6,  -2 * pi / 8,  -2 * pi / 9,  -2 * pi / 10,
+	-2 * pi / 12, -2 * pi / 15, -2 * pi / 18, -2 * pi / 20,
+	-2 * pi / 24, -2 * pi / 30, -2 * pi / 36, -2 * pi / 40,
+	0,
+	2 * pi / 40, 2 * pi / 36, 2 * pi / 30, 2 * pi / 24,
+	2 * pi / 20, 2 * pi / 18, 2 * pi / 15, 2 * pi / 12,
+	2 * pi / 10, 2 * pi / 9,  2 * pi / 8,  2 * pi / 6,
+	2 * pi / 5,  2 * pi / 4,  2 * pi / 3,  2 * pi / 2, 2 * pi / 1
+};
+
+I64 BracePiLite()
+{
+	I64 h;
+	I64 mid;
+
+	h = 0;
+	mid = ANGLES / 2;
+	if (mid == 17)
+		h = h + 1;
+	if (ToI64(angles[mid] * 1000.0) == 0)
+		h = h + 2;
+	if (ToI64(angles[0] * 100.0) == -628)
+		h = h + 4;
+	if (ToI64(angles[ANGLES - 1] * 100.0) == 628)
+		h = h + 8;
+	return h;
+}
+
+return BracePiLite();

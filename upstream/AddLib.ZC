@@ -1,0 +1,9 @@
+/* Milestone 38: tiny HolyC library for #include from RedSea.
+ *
+ * Loaded by UseAdd.ZC via #include "AddLib.ZC".
+ */
+
+I64 Add(I64 a, I64 b)
+{
+	return a + b;
+}

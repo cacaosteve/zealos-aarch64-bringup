@@ -1,0 +1,112 @@
+/* Milestone 104: Lattice TurtleMove step count + StepCountLite.
+ *
+ * Upstream need: Lattice.ZC —
+ *   l = 16 * AbsI64(t->w + 1) * AbsI64(t->speed + 1);
+ *
+ * Bring-up:
+ *   - Real 16* formula (EndLite used 2* for smoke length)
+ *   - Small w/speed so loop stays cheap; return StepCountLite();  expect 15
+ */
+
+#define ANGLES 3
+
+F64 angles[ANGLES] = {0.0, 0.0, 0.0};
+
+class Turtle
+{
+	F64 x;
+	F64 y;
+	F64 z;
+	F64 speed;
+	F64 th;
+	F64 w;
+	I64 idx;
+	Bool first;
+};
+
+U0 TurtlePlot(CDC *dc, Turtle *t, CColorROPU16 edge, CColorROPU16 middle)
+{
+	F64 w;
+
+	w = t->w / 2.0 - 1;
+	if (w < 0)
+		w = 0;
+	dc->color = middle;
+	GrLine3(dc,
+		t->x + w * Cos(t->th + pi / 2), t->y + w * Sin(t->th + pi / 2), t->z,
+		t->x + w * Cos(t->th - pi / 2), t->y + w * Sin(t->th - pi / 2), t->z);
+	w = t->w / 2.0;
+	dc->color = edge;
+	GrPlot3(dc, t->x + w * Cos(t->th + pi / 2), t->y + w * Sin(t->th + pi / 2), t->z);
+	GrPlot3(dc, t->x + w * Cos(t->th - pi / 2), t->y + w * Sin(t->th - pi / 2), t->z);
+}
+
+U0 TurtleMicroMove(Turtle *t, F64 dt)
+{
+	F64 c;
+	F64 s;
+
+	c = Cos(t->th);
+	s = Sin(t->th);
+	t->x = t->x + c * t->speed * dt;
+	t->y = t->y + s * t->speed * dt;
+	t->th = Wrap(t->th + dt * angles[t->idx]);
+}
+
+U0 TurtleMove(CDC *dc, Turtle *t, CColorROPU16 edge, CColorROPU16 middle)
+{
+	I64 i;
+	I64 l;
+
+	l = 16 * AbsI64(t->w + 1) * AbsI64(t->speed + 1);
+	t->first = FALSE;
+	for (i = 0; i < l; i++)
+	{
+		TurtleMicroMove(t, 1.0 / l);
+		TurtlePlot(dc, t, edge, middle);
+	}
+}
+
+I64 StepCountLite()
+{
+	Turtle t;
+	CDC *dc;
+	I64 h;
+	I64 l;
+
+	h = 0;
+	/* Formula checks (no draw). */
+	t.w = 0.0;
+	t.speed = 0.0;
+	l = 16 * AbsI64(t.w + 1) * AbsI64(t.speed + 1);
+	if (l == 16)
+		h = h + 1;
+	t.w = 1.0;
+	t.speed = 1.0;
+	l = 16 * AbsI64(t.w + 1) * AbsI64(t.speed + 1);
+	if (l == 64)
+		h = h + 2;
+
+	/* Move: w=0, speed=1 → l=32; th=0 → x += ~1. */
+	dc = DCAlias;
+	DCDepthBufAlloc(dc);
+	MemSet(&t, 0, sizeof(Turtle));
+	t.x = 100.0;
+	t.y = 100.0;
+	t.z = 5;
+	t.w = 0.0;
+	t.speed = 1.0;
+	t.th = 0.0;
+	t.idx = 0;
+	t.first = TRUE;
+	TurtleMove(dc, &t, RED, BLACK);
+	if (!t.first && ToI64(t.x) == 101)
+		h = h + 4;
+	if (GrPeek(ToI64(t.x), ToI64(t.y)) >= 0)
+		h = h + 8;
+	DCFill(dc);
+	DCDel(dc);
+	return h;
+}
+
+return StepCountLite();

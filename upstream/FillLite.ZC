@@ -1,0 +1,39 @@
+/* Milestone 53: F64-only fn params + DCFill/DCDel + FillLite.
+ *
+ * Upstream need: Lattice.ZC —
+ *   TurtleMicroMove(..., F64 dt) compared at call sites;
+ *   DCFill(dc); DCDel(dc);
+ *
+ * Bring-up:
+ *   - Clear expr_f64 after user calls so `F(0.1)==n` is I64 compare
+ *   - DCFill/DCDel stubs (CDC deferred)
+ *   - return FillLite();  expect **15**
+ */
+
+I64 Scale(F64 dt)
+{
+	return ToI64(dt * 10.0);
+}
+
+I64 FillLite()
+{
+	I64 dc;
+	I64 h;
+
+	dc = DCAlias;
+	DCFill(dc);
+	DCDel(dc);
+
+	h = 0;
+	if (Scale(0.1) == 1)
+		h = h + 1;
+	if (Scale(1.5) == 15)
+		h = h + 2;
+	if (dc != 0)
+		h = h + 4;
+	if (DCFill(dc) == 0)
+		h = h + 8;
+	return h;
+}
+
+return FillLite();

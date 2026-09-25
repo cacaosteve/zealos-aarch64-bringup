@@ -1,0 +1,60 @@
+/* Milestone 89: CH_SHIFT_ESC Abort + AbortLite.
+ *
+ * Upstream need: Lattice.ZC —
+ *   Menu Abort(,CH_SHIFT_ESC); case CH_SHIFT_ESC: exit
+ *
+ * Bring-up:
+ *   - CH_SHIFT_ESC == 0x1C; virtio Shift+Esc → 0x1C
+ *   - Scripted KEY_DOWN/UP Abort path (distinct from CH_ESC)
+ *   - return AbortLite();  expect 15
+ */
+
+I64 AbortLite()
+{
+	I64 a1;
+	I64 a2;
+	I64 m;
+	I64 h;
+	I64 mask;
+	I64 aborted;
+
+	h = 0;
+	aborted = 0;
+	mask = 1 << MESSAGE_KEY_DOWN;
+
+	if (CH_SHIFT_ESC == 0x1C)
+		h = h + 1;
+	if (CH_ESC == 0x1B)
+		h = h + 2;
+
+	MsgQuePush(MESSAGE_KEY_DOWN, CH_SHIFT_ESC, 0);
+	MsgQuePush(MESSAGE_KEY_UP, CH_SHIFT_ESC, 0);
+
+	while (TRUE)
+	{
+		switch (MessageGet(&a1, &a2, mask))
+		{
+			case MESSAGE_KEY_DOWN:
+				switch (a1)
+				{
+					case CH_SHIFT_ESC:
+						aborted = 1;
+						goto lt_done;
+					case CH_ESC:
+						goto lt_done;
+				}
+				break;
+			case MESSAGE_NULL:
+				goto lt_done;
+		}
+	}
+lt_done:
+	if (aborted)
+		h = h + 4;
+	m = MessageGet(&a1, &a2, 1 << MESSAGE_KEY_UP);
+	if (m == MESSAGE_KEY_UP && a1 == CH_SHIFT_ESC)
+		h = h + 8;
+	return h;
+}
+
+return AbortLite();

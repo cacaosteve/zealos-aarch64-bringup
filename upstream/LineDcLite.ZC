@@ -1,0 +1,49 @@
+/* Milestone 66: ZealOS GrLine(dc,...) + &fn draw_it + LineDcLite.
+ *
+ * Upstream need: Lattice.ZC DrawIt —
+ *   Fs->draw_it = &DrawIt;
+ *   dc->color = LTRED;
+ *   GrLine(dc, x1, y1, x2, y2);
+ *
+ * Bring-up:
+ *   - GrLine 5-arg = (dc,x1,y1,x2,y2) via dc->color
+ *   - Bring-up RGB lines use 6-arg (x1,y1,x2,y2,c,step)
+ *   - &FnName already emits JIT addr; smoke Fs->draw_it = &DrawIt
+ *   - return LineDcLite();  expect 15
+ */
+
+U0 DrawIt(CTask *, CDC *dc)
+{
+	dc->color = LTRED;
+	GrLine(dc, 10, 10, 50, 10);
+}
+
+I64 LineDcLite()
+{
+	CDC *dc;
+	I64 h;
+	I64 rgb;
+
+	h = 0;
+	dc = DCAlias;
+	dc->color = 0x00CC44AA;
+	Cls(0);
+	GrLine(dc, 5, 40, 80, 40);
+	rgb = 0x00CC44AA;
+	if (GrPeek(40, 40) == rgb)
+		h = h + 1;
+	dc->color = YELLOW;
+	GrLine(dc, 5, 60, 80, 60);
+	/* YELLOW palette → 0x00FFFF55 */
+	if (GrPeek(40, 60) == 0x00FFFF55)
+		h = h + 2;
+	Fs->draw_it = &DrawIt;
+	if (Fs->draw_it != 0)
+		h = h + 4;
+	DrawIt(0, dc);
+	if (GrPeek(30, 10) == 0x00FF5555)
+		h = h + 8;
+	return h;
+}
+
+return LineDcLite();

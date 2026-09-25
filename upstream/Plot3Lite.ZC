@@ -1,0 +1,35 @@
+/* Milestone 49: GrPlot3 / GrLine3 (Lattice 2D project).
+ *
+ * Upstream need: Demo/Graphics/Lattice.ZC — GrPlot3(dc,x,y,z); GrLine3(...).
+ *
+ * Bring-up deltas:
+ *   - GrPlot3/GrLine3 ignore dc + z; paint yellow (0x00FFFF00)
+ *   - F64 coords coerced via F2I at call (Cos/Sin results)
+ *   - HC_CALL7 for 7-arg GrLine3
+ *   - return Plot3Lite();  expect **15**
+ */
+
+I64 Plot3Lite()
+{
+	I64 h;
+	I64 yel;
+
+	h = 0;
+	yel = 0x00FFFF00;
+	Cls(0);
+	GrPlot3(0, 40, 40, 0);
+	if (GrPeek(40, 40) == yel)
+		h = h + 1;
+	GrLine3(0, 50, 50, 0, 80, 50, 0);
+	if (GrPeek(65, 50) == yel)
+		h = h + 2;
+	GrPlot3(0, 100.0, 120.0, 5.0);
+	if (GrPeek(100, 120) == yel)
+		h = h + 4;
+	GrLine3(0, 10.0, 200.0, 0.0, 40.0, 200.0, 1.0);
+	if (GrPeek(25, 200) == yel)
+		h = h + 8;
+	return h;
+}
+
+return Plot3Lite();

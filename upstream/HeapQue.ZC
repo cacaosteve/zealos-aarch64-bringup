@@ -1,0 +1,95 @@
+/* Milestone 9: circular queue on MAlloc — QueueInit / QueueInsert (ZealOS-shaped).
+ *
+ * Upstream: KernelA.HH CQueue + KernelB.HH QueueInit / QueueInsert
+ * (compiler intrinsics there; HolyC helpers here on I64 link words).
+ *
+ * Bring-up deltas:
+ *   - CQue { next, last, val } as three I64s (not CQueue*)
+ *   - QueueInit / QueueInsert / QueueCount as HolyC (I64 addrs)
+ *   - Five nodes val=10..50; bars via FillRect
+ *   - Returns sum (150) for smoke
+ *   - return HeapQue();
+ */
+
+class CQue
+{
+	I64 next;
+	I64 last;
+	I64 val;
+};
+
+U0 QueueInit(I64 head)
+{
+	I64 *h = head;
+	h[0] = head;
+	h[1] = head;
+}
+
+U0 QueueInsert(I64 entry, I64 pred)
+{
+	I64 *e = entry;
+	I64 *p = pred;
+	I64 succ;
+	I64 *s;
+
+	succ = p[0];
+	s = succ;
+	e[0] = succ;
+	e[1] = pred;
+	s[1] = entry;
+	p[0] = entry;
+}
+
+I64 QueueCount(I64 head)
+{
+	I64 *h = head;
+	I64 p, n;
+	I64 *q;
+
+	n = 0;
+	p = h[0];
+	while (p != head)
+	{
+		n = n + 1;
+		q = p;
+		p = q[0];
+	}
+	return n;
+}
+
+I64 HeapQue()
+{
+	CQue head;
+	CQue *node;
+	I64 i, s, p;
+	CQue *n;
+
+	QueueInit(&head);
+	for (i = 1; i <= 5; i = i + 1)
+	{
+		node = MAlloc(sizeof(CQue));
+		if (!node)
+			return 0;
+		node->val = i * 10;
+		QueueInsert(node, head.last);
+	}
+
+	Cls(0x00101820);
+	PrintAt(2, 1, "HeapQue");
+	s = 0;
+	i = 0;
+	p = head.next;
+	while (p != &head)
+	{
+		n = p;
+		s = s + n->val;
+		FillRect(60 + i * 80, 420 - n->val * 2, 50, n->val * 2, 0x0000C0FF);
+		p = n->next;
+		i = i + 1;
+	}
+	Sleep(1200);
+	Free(0);
+	return s;
+}
+
+return HeapQue();

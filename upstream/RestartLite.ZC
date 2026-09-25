@@ -1,0 +1,123 @@
+/* Milestone 98: Restart key + RestartLite.
+ *
+ * Upstream need: Lattice.ZC —
+ *   case '\n': DCFill(dc); TurtleInit(&tt); SetMenu;
+ *
+ * Bring-up:
+ *   - Scripted KEY_DOWN('\n') resets turtle + menu after mutations
+ *   - return RestartLite();  expect 15
+ */
+
+class Turtle
+{
+	F64 x;
+	F64 y;
+	F64 z;
+	I64 edge;
+	I64 middle;
+	Bool ends;
+	Bool first;
+} tt;
+
+U0 TurtleInit(Turtle *t)
+{
+	MemSet(t, 0, sizeof(Turtle));
+	t->x = Fs->pix_width >> 1;
+	t->y = Fs->pix_height >> 1;
+	t->z = 5;
+	t->edge = BLACK;
+	t->middle = YELLOW;
+	t->first = TRUE;
+	t->ends = TRUE;
+}
+
+U0 SetMenu()
+{
+	CMenuEntry *tmpse;
+	U8 buf[32];
+
+	StrPrint(buf, "Settings/Layer%d", ToI64(tt.z));
+	if (tmpse = MenuEntryFind(Fs->cur_menu, buf))
+		tmpse->checked = TRUE;
+	if (tmpse = MenuEntryFind(Fs->cur_menu, "Settings/Ends"))
+	{
+		if (tt.ends)
+			tmpse->checked = TRUE;
+		else
+			tmpse->checked = FALSE;
+	}
+}
+
+I64 RestartLite()
+{
+	CDC *dc;
+	I64 a1;
+	I64 a2;
+	I64 h;
+	I64 mask;
+	I64 cx;
+	CMenuEntry *tmpse;
+	U8 buf[32];
+
+	h = 0;
+	dc = DCAlias;
+	mask = 1 << MESSAGE_KEY_DOWN;
+	cx = Fs->pix_width >> 1;
+
+	TurtleInit(&tt);
+	/* Mutate away from init defaults. */
+	tt.x = 11.0;
+	tt.y = 22.0;
+	tt.z = 3;
+	tt.edge = RED;
+	tt.middle = CYAN;
+	tt.first = FALSE;
+	tt.ends = FALSE;
+	SetMenu;
+
+	if (ToI64(tt.x) == 11 && !tt.first && !tt.ends)
+		h = h + 1;
+
+	MsgQuePush(MESSAGE_KEY_DOWN, '\n', 0);
+	MsgQuePush(MESSAGE_KEY_DOWN, CH_ESC, 0);
+
+	while (TRUE)
+	{
+		switch (MessageGet(&a1, &a2, mask))
+		{
+			case MESSAGE_KEY_DOWN:
+				switch (a1)
+				{
+					case '\n':
+						DCFill(dc);
+						TurtleInit(&tt);
+						SetMenu;
+						break;
+					case CH_ESC:
+						goto lt_done;
+					case CH_SHIFT_ESC:
+						goto lt_done;
+				}
+				break;
+			case MESSAGE_NULL:
+				goto lt_done;
+		}
+	}
+lt_done:
+	if (ToI64(tt.x) == cx && tt.first)
+		h = h + 2;
+	if (tt.edge == BLACK && tt.middle == YELLOW && tt.ends)
+		h = h + 4;
+	if (ToI64(tt.z) == 5)
+	{
+		StrPrint(buf, "Settings/Layer%d", 5);
+		if (tmpse = MenuEntryFind(Fs->cur_menu, buf))
+		{
+			if (tmpse->checked)
+				h = h + 8;
+		}
+	}
+	return h;
+}
+
+return RestartLite();

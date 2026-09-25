@@ -1,0 +1,244 @@
+/* Milestone 30: FSize / FSeek on RedSea CFile.
+ *
+ * Upstream: DiskCFile.ZC FSize / FSeek — blk pos for FBlkRead/Write.
+ * Seek resets f->pos; FSize returns f->len (byte length).
+ *
+ * Bring-up deltas:
+ *   - FCreate + FBlkWrite "Seek"; FSeek(0); FBlkRead; FSize → 4
+ *   - RSFmt wipes data blks (re-run safe)
+ *   - return RSCSeekDemo();
+ */
+
+class CFile
+{
+	I64 blk;
+	I64 len;
+	I64 pos;
+	I64 valid;
+};
+
+I64 RSFmt(I64 sects, I64 uid)
+{
+	U8 *br;
+	U8 *map;
+	I64 *w;
+	I64 i;
+
+	br = MAlloc(512);
+	map = MAlloc(512);
+	if (!br || !map)
+		return 0;
+	MemSet(br, 0, 512);
+	br[3] = 0x88;
+	w = br + 8;
+	w[0] = 0;
+	w[1] = sects;
+	w[2] = 0;
+	w[3] = 1;
+	w[4] = uid;
+	br[510] = 0x55;
+	br[511] = 0xAA;
+	if (!BlkWrite(br, 0, 1))
+		return 0;
+	MemSet(map, 0, 512);
+	map[0] = 0x03;
+	if (!BlkWrite(map, 1, 1))
+		return 0;
+	MemSet(map, 0, 512);
+	for (i = 2; i < sects; i = i + 1)
+	{
+		if (!BlkWrite(map, i, 1))
+			return 0;
+	}
+	return 1;
+}
+
+I64 RSAlloc(I64 sects, I64 cnt)
+{
+	U8 *map;
+	I64 i, j, ok, b, m;
+
+	if (cnt < 1)
+		return 0;
+	map = MAlloc(512);
+	if (!map)
+		return 0;
+	MemSet(map, 0, 512);
+	if (!BlkRead(map, 1, 1))
+		return 0;
+	for (i = 0; i <= sects - cnt; i = i + 1)
+	{
+		ok = 1;
+		for (j = 0; j < cnt; j = j + 1)
+		{
+			b = i + j;
+			m = 1 << (b & 7);
+			if (map[b >> 3] & m)
+			{
+				ok = 0;
+				break;
+			}
+		}
+		if (ok)
+		{
+			for (j = 0; j < cnt; j = j + 1)
+			{
+				b = i + j;
+				m = 1 << (b & 7);
+				map[b >> 3] = map[b >> 3] | m;
+			}
+			if (!BlkWrite(map, 1, 1))
+				return 0;
+			return i;
+		}
+	}
+	return 0;
+}
+
+I64 FCreate(I64 root, I64 name, I64 blk)
+{
+	U8 *dir;
+	U8 *e;
+	I64 *w;
+	CFile *f;
+	I64 i, slot;
+
+	dir = MAlloc(512);
+	if (!dir)
+		return 0;
+	MemSet(dir, 0, 512);
+	BlkRead(dir, root, 1);
+	for (i = 0; i < 8; i = i + 1)
+	{
+		e = dir + i * 64;
+		if (e[2] && StrCmp(e + 2, name) == 0)
+			return 0;
+	}
+	slot = -1;
+	for (i = 0; i < 8; i = i + 1)
+	{
+		e = dir + i * 64;
+		if (!e[2])
+		{
+			slot = i;
+			break;
+		}
+	}
+	if (slot < 0)
+		return 0;
+	e = dir + slot * 64;
+	MemSet(e, 0, 64);
+	e[0] = 0x20;
+	e[1] = 0x04;
+	MemCpy(e + 2, name, StrLen(name) + 1);
+	w = e + 40;
+	w[0] = blk;
+	w[1] = 0;
+	w[2] = 0;
+	if (!BlkWrite(dir, root, 1))
+		return 0;
+	f = MAlloc(sizeof(CFile));
+	if (!f)
+		return 0;
+	f->blk = blk;
+	f->len = 0;
+	f->pos = 0;
+	f->valid = 1;
+	return f;
+}
+
+I64 FBlkWrite(I64 faddr, I64 buf, I64 len)
+{
+	CFile *f = faddr;
+	if (!f || !f->valid)
+		return 0;
+	if (!BlkWrite(buf, f->blk + f->pos, 1))
+		return 0;
+	f->len = len;
+	f->pos = f->pos + 1;
+	return 1;
+}
+
+I64 FBlkRead(I64 faddr, I64 buf)
+{
+	CFile *f = faddr;
+	if (!f || !f->valid)
+		return 0;
+	if (!BlkRead(buf, f->blk + f->pos, 1))
+		return 0;
+	f->pos = f->pos + 1;
+	return 1;
+}
+
+I64 FSeek(I64 faddr, I64 pos)
+{
+	CFile *f = faddr;
+	if (!f || !f->valid)
+		return 0;
+	if (pos < 0)
+		return 0;
+	f->pos = pos;
+	return 1;
+}
+
+I64 FSize(I64 faddr)
+{
+	CFile *f = faddr;
+	if (!f || !f->valid)
+		return 0;
+	return f->len;
+}
+
+I64 RSCSeekDemo()
+{
+	U8 *data;
+	CFile *f;
+	I64 root, fclus, i, v, sz;
+
+	if (!RSFmt(16, 7))
+		return 0;
+	root = RSAlloc(16, 1);
+	if (root != 2)
+		return 0;
+	fclus = RSAlloc(16, 1);
+	if (fclus != 3)
+		return 0;
+
+	f = FCreate(root, "Seek", fclus);
+	if (!f)
+		return 0;
+	data = MAlloc(512);
+	if (!data)
+		return 0;
+	MemSet(data, 0, 512);
+	MemCpy(data, "Seek", 5);
+	if (!FBlkWrite(f, data, 4))
+		return 0;
+	/* pos is 1 after write; seek back and re-read. */
+	if (!FSeek(f, 0))
+		return 0;
+	MemSet(data, 0, 512);
+	if (!FBlkRead(f, data))
+		return 0;
+	if (StrCmp(data, "Seek") != 0)
+		return 0;
+	if (!FSeek(f, 0))
+		return 0;
+	sz = FSize(f);
+	if (sz != 4)
+		return 0;
+
+	Cls(0x00101820);
+	PrintAt(2, 1, "RSCSeek");
+	PrintAt(2, 3, data);
+	for (i = 0; i < sz; i = i + 1)
+	{
+		v = data[i];
+		FillRect(60 + i * 100, 400 - (v & 63) * 4, 70, (v & 63) * 4 + 8, 0x0040E0C0);
+	}
+	Sleep(1200);
+	Free(0);
+	return sz;
+}
+
+return RSCSeekDemo();

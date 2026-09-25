@@ -1,0 +1,59 @@
+/* Milestone 81–82: MessageGet mask + virtio/UART fallback + InputLite.
+ *
+ * Upstream need: Lattice.ZC —
+ *   MessageGet(&arg1, &arg2, KEY|MS_L|…) waits for matching events;
+ *   interactive input from keyboard/tablet when not scripted.
+ *
+ * Bring-up:
+ *   - `1<<KEY|1<<MS_L` == 36 (<< above |; regression vs left-assoc 96)
+ *   - Scripted queue preferred; mask skips non-matching queued msgs
+ *   - Empty queue → virtio kbd/tablet when present (QEMU/UTM);
+ *     else UART KEY_DOWN when !virtio_kbd (Pi). Never both.
+ *   - QEMU: virtio ready + no pending key → MESSAGE_NULL (serial smokes)
+ *   - return InputLite();  expect 31
+ */
+
+I64 InputLite()
+{
+	I64 a1;
+	I64 a2;
+	I64 m;
+	I64 h;
+	I64 key_mask;
+	I64 full;
+
+	h = 0;
+	key_mask = 1 << MESSAGE_KEY_DOWN;
+	full = 1 << MESSAGE_KEY_DOWN | 1 << MESSAGE_MS_L_DOWN;
+
+	/* Precedence: must be 36, not (((1<<2)|1)<<5)==96. */
+	if (full == 36)
+		h = h + 1;
+
+	/* Empty → MESSAGE_NULL on QEMU (virtio ready, no key; UART skipped). */
+	a1 = 99;
+	a2 = 99;
+	m = MessageGet(&a1, &a2, full);
+	if (m == MESSAGE_NULL && a1 == 0 && a2 == 0)
+		h = h + 2;
+
+	/* Mask filters: L_DOWN queued first but KEY-only mask yields SPACE. */
+	MsgQuePush(MESSAGE_MS_L_DOWN, 10, 20);
+	MsgQuePush(MESSAGE_KEY_DOWN, CH_SPACE, 0);
+	m = MessageGet(&a1, &a2, key_mask);
+	if (m == MESSAGE_KEY_DOWN && a1 == CH_SPACE)
+		h = h + 4;
+
+	/* Queue drained of L_DOWN by skip; empty again. */
+	m = MessageGet(&a1, &a2, full);
+	if (m == MESSAGE_NULL)
+		h = h + 8;
+
+	MsgQuePush(MESSAGE_MS_L_DOWN, 50, 60);
+	m = MessageGet(&a1, &a2, full);
+	if (m == MESSAGE_MS_L_DOWN && a1 == 50 && a2 == 60)
+		h = h + 16;
+	return h;
+}
+
+return InputLite();

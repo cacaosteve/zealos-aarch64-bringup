@@ -1,0 +1,96 @@
+/* Milestone 31: shared RedSea/CFile lib (integration start).
+ *
+ * Built as: lib/RedSeaCFile.ZC + this file (Makefile concat).
+ * Exercises shared FCreate/FBlkWrite/FSeek/FOpen/FSize on a 2-clus file.
+ *
+ * Bring-up deltas:
+ *   - One shared helper copy (not per-demo duplicates)
+ *   - Alloc 2-clus "Lib"; write Hi/OS; seek+read both; FSize → 4
+ *   - return RSCLibDemo();
+ */
+
+I64 RSCLibDemo()
+{
+	U8 *dir;
+	U8 *data;
+	U8 *e;
+	I64 *w;
+	CFile *f;
+	I64 root, fclus, i, v, sz;
+
+	if (!RSFmt(16, 7))
+		return 0;
+	root = RSAlloc(16, 1);
+	if (root != 2)
+		return 0;
+	fclus = RSAlloc(16, 2);
+	if (fclus != 3)
+		return 0;
+
+	f = FCreate(root, "Lib", fclus);
+	if (!f)
+		return 0;
+	data = MAlloc(512);
+	if (!data)
+		return 0;
+	MemSet(data, 0, 512);
+	MemCpy(data, "Hi", 3);
+	if (!FBlkWrite(f, data, 2))
+		return 0;
+	MemSet(data, 0, 512);
+	MemCpy(data, "OS", 3);
+	if (!FBlkWrite(f, data, 2))
+		return 0;
+
+	/* Persist len into dir entry. */
+	dir = MAlloc(512);
+	if (!dir)
+		return 0;
+	BlkRead(dir, root, 1);
+	for (i = 0; i < 8; i = i + 1)
+	{
+		e = dir + i * 64;
+		if (e[2] && StrCmp(e + 2, "Lib") == 0)
+		{
+			w = e + 40;
+			w[1] = f->len;
+			break;
+		}
+	}
+	BlkWrite(dir, root, 1);
+	FClose(f);
+
+	f = FOpen(root, "Lib");
+	if (!f)
+		return 0;
+	sz = FSize(f);
+	if (sz != 4)
+		return 0;
+	MemSet(data, 0, 512);
+	if (!FBlkRead(f, data))
+		return 0;
+	if (StrCmp(data, "Hi") != 0)
+		return 0;
+	v = data[0];
+	if (!FSeek(f, 1))
+		return 0;
+	MemSet(data, 0, 512);
+	if (!FBlkRead(f, data))
+		return 0;
+	if (StrCmp(data, "OS") != 0)
+		return 0;
+	FClose(f);
+
+	Cls(0x00101820);
+	PrintAt(2, 1, "RSCLib");
+	PrintAt(2, 3, "Hi");
+	PrintAt(2, 4, "OS");
+	FillRect(120, 400 - (v & 63) * 4, 100, (v & 63) * 4 + 8, 0x00E08060);
+	v = data[0];
+	FillRect(320, 400 - (v & 63) * 4, 100, (v & 63) * 4 + 8, 0x00E08060);
+	Sleep(1200);
+	Free(0);
+	return sz;
+}
+
+return RSCLibDemo();

@@ -1,0 +1,95 @@
+/* Milestone 17: multi-file directory lookup on RAM disk.
+ *
+ * Upstream shape: RedSea/dir walk + FBlk read by name (no CDrive).
+ *
+ * Bring-up deltas:
+ *   - 32-byte dir entries: name[16] + I64 blk + I64 len
+ *   - DirPut / DirFind; two files; lookup "Zeal" → read payload
+ *   - Returns payload StrLen (4)
+ *   - return DirLook();
+ */
+
+U0 DirPut(I64 dir, I64 slot, I64 name, I64 blk, I64 len)
+{
+	U8 *e;
+	I64 *w;
+
+	e = dir + slot * 32;
+	MemSet(e, 0, 32);
+	MemCpy(e, name, StrLen(name) + 1);
+	w = e;
+	w[2] = blk;
+	w[3] = len;
+}
+
+I64 DirFind(I64 dir, I64 want)
+{
+	I64 i;
+	U8 *e;
+
+	for (i = 0; i < 8; i = i + 1)
+	{
+		e = dir + i * 32;
+		if (e[0] && StrCmp(e, want) == 0)
+			return i;
+	}
+	return -1;
+}
+
+I64 DirLook()
+{
+	U8 *dir;
+	U8 *data;
+	I64 *w;
+	U8 *e;
+	I64 slot, i, s, v, len;
+
+	dir = MAlloc(512);
+	data = MAlloc(512);
+	if (!dir || !data)
+		return 0;
+	MemSet(dir, 0, 512);
+
+	MemSet(data, 0, 512);
+	MemCpy(data, "Hi", 3);
+	BlkWrite(data, 1, 1);
+	DirPut(dir, 0, "Hi", 1, 2);
+
+	MemSet(data, 0, 512);
+	MemCpy(data, "Zeal", 5);
+	BlkWrite(data, 2, 1);
+	DirPut(dir, 1, "Zeal", 2, 4);
+
+	BlkWrite(dir, 0, 1);
+
+	MemSet(dir, 0, 512);
+	BlkRead(dir, 0, 1);
+	slot = DirFind(dir, "Zeal");
+	if (slot < 0)
+		return 0;
+	e = dir + slot * 32;
+	w = e;
+	MemSet(data, 0, 512);
+	if (!BlkRead(data, w[2], 1))
+		return 0;
+	len = w[3];
+	if (StrCmp(data, "Zeal") != 0)
+		return 0;
+
+	Cls(0x00101820);
+	PrintAt(2, 1, "DirLook");
+	PrintAt(2, 3, e);
+	PrintAt(2, 4, data);
+	s = 0;
+	for (i = 0; i < len; i = i + 1)
+	{
+		v = data[i];
+		s = s + v;
+		FillRect(60 + i * 100, 400 - (v & 63) * 4, 70, (v & 63) * 4 + 8, 0x0000C0FF);
+	}
+	Sleep(1200);
+	Free(0);
+	return len;
+}
+
+return DirLook();

@@ -1,0 +1,9 @@
+/* Milestone 38: multi-file HolyC — include a RedSea library, then run.
+ *
+ * Bring-up: preprocessor expands #include "AddLib.ZC" from the disk root
+ * before the HolyC front-end sees the source.
+ */
+
+#include "AddLib.ZC"
+
+return Add(20, 22);

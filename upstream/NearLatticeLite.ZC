@@ -1,0 +1,354 @@
+/* Milestone 109/114/116/117/118/121/122/123/124/126/127/129/130: Lattice-accurate keys compose + NearLatticeLite.
+ *
+ * Upstream need: Lattice.ZC interactive handlers —
+ *   +/- width; all SC_CURSOR_*; 'c' dual color; digits/e;
+ *   SPACE 16x Step with TurtleEnd; '\n' restart; try/catch; full SetMenu;
+ *   full MenuPush; AutoComplete and Win/Doc setup; DrawIt MemCopy HUD;
+ *   angles[35] BracePi table; TurtlePlot w/2-1 mid line;
+ *   inline MessageGet mask; TurtleInit/SetMenu/win_inhibit outside try
+ *
+ * Bring-up:
+ *   - M130: Lattice setup order (init outside try; try wraps the event loop)
+ *   - return NearLatticeLite();  expect 15
+ */
+
+#define ANGLES 35
+#define TURTLE_SPEED_STEP 2.0
+#define TURTLE_SIZE 4
+
+F64 angles[ANGLES] = {
+	-2 * pi / 1,  -2 * pi / 2,  -2 * pi / 3,  -2 * pi / 4, -2 * pi / 5,
+	-2 * pi / 6,  -2 * pi / 8,  -2 * pi / 9,  -2 * pi / 10,
+	-2 * pi / 12, -2 * pi / 15, -2 * pi / 18, -2 * pi / 20,
+	-2 * pi / 24, -2 * pi / 30, -2 * pi / 36, -2 * pi / 40,
+	0,
+	2 * pi / 40, 2 * pi / 36, 2 * pi / 30, 2 * pi / 24,
+	2 * pi / 20, 2 * pi / 18, 2 * pi / 15, 2 * pi / 12,
+	2 * pi / 10, 2 * pi / 9,  2 * pi / 8,  2 * pi / 6,
+	2 * pi / 5,  2 * pi / 4,  2 * pi / 3,  2 * pi / 2, 2 * pi / 1
+};
+
+class Turtle
+{
+	F64 x;
+	F64 y;
+	F64 z;
+	F64 speed;
+	F64 th;
+	F64 w;
+	I64 idx;
+	CColorROPU16 edge;
+	CColorROPU16 middle;
+	Bool ends;
+	Bool first;
+} tt;
+
+U0 TurtlePlot(CDC *dc, Turtle *t, CColorROPU16 edge, CColorROPU16 middle)
+{
+	F64 w;
+
+	w = t->w / 2.0 - 1;
+	if (w < 0)
+		w = 0;
+	dc->color = middle;
+	GrLine3(dc,
+		t->x + w * Cos(t->th + pi / 2), t->y + w * Sin(t->th + pi / 2), t->z,
+		t->x + w * Cos(t->th - pi / 2), t->y + w * Sin(t->th - pi / 2), t->z);
+	w = t->w / 2.0;
+	dc->color = edge;
+	GrPlot3(dc, t->x + w * Cos(t->th + pi / 2), t->y + w * Sin(t->th + pi / 2), t->z);
+	GrPlot3(dc, t->x + w * Cos(t->th - pi / 2), t->y + w * Sin(t->th - pi / 2), t->z);
+}
+
+U0 TurtleMicroMove(Turtle *t, F64 dt)
+{
+	F64 c;
+	F64 s;
+
+	c = Cos(t->th);
+	s = Sin(t->th);
+	t->x = t->x + c * t->speed * dt;
+	t->y = t->y + s * t->speed * dt;
+	t->th = Wrap(t->th + dt * angles[t->idx]);
+}
+
+U0 TurtleEnd(CDC *dc, Turtle *t, CColorROPU16 edge, CColorROPU16 middle, F64 th)
+{
+	F64 r;
+	F64 x;
+	F64 y2;
+	Turtle t2;
+
+	if (r = t->w)
+	{
+		MemCopy(&t2, t, sizeof(Turtle));
+		x = 0;
+		while (TRUE)
+		{
+			t->x = t->x + 1 / r * Cos(th);
+			t->y = t->y + 1 / r * Sin(th);
+			x = x + 1 / r;
+			y2 = r * r - 4 * x * x;
+			if (y2 >= 0)
+			{
+				t->w = Sqrt(y2);
+				TurtlePlot(dc, t, edge, middle);
+			}
+			else
+				break;
+		}
+		MemCopy(t, &t2, sizeof(Turtle));
+	}
+}
+
+U0 TurtleMove(CDC *dc, Turtle *t, CColorROPU16 edge, CColorROPU16 middle)
+{
+	I64 i;
+	I64 l;
+
+	l = 16 * AbsI64(t->w + 1) * AbsI64(t->speed + 1);
+	if (t->ends && t->first)
+		TurtleEnd(dc, t, edge, middle, t->th + pi);
+	t->first = FALSE;
+	for (i = 0; i < l; i++)
+	{
+		TurtleMicroMove(t, 1.0 / l);
+		TurtlePlot(dc, t, edge, middle);
+	}
+	if (t->ends)
+		TurtleEnd(dc, t, edge, middle, t->th);
+}
+
+U0 TurtleInit(Turtle *t)
+{
+	MemSet(t, 0, sizeof(Turtle));
+	t->x = Fs->pix_width >> 1;
+	t->y = Fs->pix_height >> 1;
+	t->z = 5;
+	t->edge = BLACK;
+	t->middle = YELLOW;
+	t->idx = ANGLES / 2;
+	t->first = TRUE;
+	t->ends = TRUE;
+}
+
+U0 SetMenu()
+{
+	I64 i;
+	U8 buf[STR_LEN];
+	CMenuEntry *tmpse;
+
+	for (i = 0; i <= 9; i++)
+	{
+		StrPrint(buf, "Settings/Layer%d", i);
+		if (tmpse = MenuEntryFind(Fs->cur_menu, buf))
+		{
+			if (i == ToI64(tt.z))
+				tmpse->checked = TRUE;
+			else
+				tmpse->checked = FALSE;
+		}
+	}
+	if (tmpse = MenuEntryFind(Fs->cur_menu, "Settings/Ends"))
+	{
+		if (tt.ends)
+			tmpse->checked = TRUE;
+		else
+			tmpse->checked = FALSE;
+	}
+}
+
+U0 DrawIt(CTask *, CDC *dc)
+{
+	Turtle t2;
+
+	MemCopy(&t2, &tt, sizeof(Turtle));
+	GrPrint(dc, 0, 0, "Layer:%f Speed:%f th:%5.1f di:%5.1f Width:%f",
+		tt.z, tt.speed, tt.th * 180 / pi, angles[tt.idx] * 180 / pi, tt.w);
+	TurtleMove(dc, &t2, RED, LTRED);
+	dc->color = LTRED;
+	GrLine(dc,
+		t2.x + TURTLE_SIZE * Cos(t2.th + pi / 2), t2.y + TURTLE_SIZE * Sin(t2.th + pi / 2),
+		t2.x + TURTLE_SIZE * Cos(t2.th - pi / 2), t2.y + TURTLE_SIZE * Sin(t2.th - pi / 2));
+	GrLine(dc,
+		t2.x + TURTLE_SIZE * Cos(t2.th + pi / 2), t2.y + TURTLE_SIZE * Sin(t2.th + pi / 2),
+		t2.x + TURTLE_SIZE * Cos(t2.th), t2.y + TURTLE_SIZE * Sin(t2.th));
+	GrLine(dc,
+		t2.x + TURTLE_SIZE * Cos(t2.th - pi / 2), t2.y + TURTLE_SIZE * Sin(t2.th - pi / 2),
+		t2.x + TURTLE_SIZE * Cos(t2.th), t2.y + TURTLE_SIZE * Sin(t2.th));
+}
+
+I64 NearLatticeLite()
+{
+	CDC *dc;
+	I64 h;
+	I64 arg1;
+	I64 arg2;
+	Bool aim;
+
+	h = 0;
+	aim = FALSE;
+	dc = DCAlias;
+	DCDepthBufAlloc(dc);
+	MenuPush(
+		"File {"
+		"  Abort(,CH_SHIFT_ESC);"
+		"  Exit(,CH_ESC);"
+		"}"
+		"Play {"
+		"  Restart(,'\n');"
+		"  Step(,CH_SPACE);"
+		"  Accelerator(,,SC_CURSOR_UP);"
+		"  Break(,,SC_CURSOR_DOWN);"
+		"  Left(,,SC_CURSOR_LEFT);"
+		"  Right(,,SC_CURSOR_RIGHT);"
+		"}"
+		"Settings {"
+		"  Color(,'c');"
+		"  Wider(,'+');"
+		"  Narrower(,'-');"
+		"  Ends(,'e');"
+		"  Layer0(,'0');"
+		"  Layer1(,'1');"
+		"  Layer2(,'2');"
+		"  Layer3(,'3');"
+		"  Layer4(,'4');"
+		"  Layer5(,'5');"
+		"  Layer6(,'6');"
+		"  Layer7(,'7');"
+		"  Layer8(,'8');"
+		"  Layer9(,'9');"
+		"}"
+		);
+	SettingsPush;
+	AutoComplete;
+	WinBorder;
+	WinMax;
+	DocCursor;
+	DocClear;
+	TurtleInit(&tt);
+	SetMenu;
+	Fs->win_inhibit = WIG_TASK_DEFAULT - WIF_FOCUS_TASK_MENU -
+		WIF_SELF_FOCUS - WIF_SELF_GRAB_SCROLL;
+	Fs->draw_it = &DrawIt;
+	try
+	{
+		Cls(0);
+		MsgQuePush(MESSAGE_MS_L_DOWN, 100, 100);
+		MsgQuePush(MESSAGE_KEY_DOWN, '4', 0);
+		MsgQuePush(MESSAGE_KEY_DOWN, 'e', 0);
+		MsgQuePush(MESSAGE_KEY_DOWN, '+', 0);
+		MsgQuePush(MESSAGE_KEY_DOWN, 0, SC_CURSOR_UP);
+		MsgQuePush(MESSAGE_KEY_DOWN, 'c', 0);
+		MsgQuePush(MESSAGE_KEY_DOWN, CH_SPACE, 0);
+		MsgQuePush(MESSAGE_KEY_DOWN, CH_ESC, 0);
+
+		while (TRUE)
+		{
+			switch (MessageGet(&arg1, &arg2, 1 << MESSAGE_KEY_DOWN | 1 << MESSAGE_MS_L_DOWN |
+				1 << MESSAGE_MS_R_DOWN | 1 << MESSAGE_MS_R_UP | 1 << MESSAGE_MS_MOVE))
+			{
+				case MESSAGE_MS_L_DOWN:
+					tt.first = TRUE;
+					tt.x = arg1;
+					tt.y = arg2;
+					break;
+				case MESSAGE_MS_R_DOWN:
+					aim = TRUE;
+					tt.th = Arg(arg1 - tt.x, arg2 - tt.y);
+					break;
+				case MESSAGE_MS_MOVE:
+					if (aim)
+						tt.th = Arg(arg1 - tt.x, arg2 - tt.y);
+					break;
+				case MESSAGE_MS_R_UP:
+					tt.th = Arg(arg1 - tt.x, arg2 - tt.y);
+					aim = FALSE;
+					break;
+				case MESSAGE_KEY_DOWN:
+					switch (arg1)
+					{
+						case 0:
+							switch (arg2.u8[0])
+							{
+								case SC_CURSOR_LEFT:
+									if (tt.idx)
+										tt.idx--;
+									break;
+								case SC_CURSOR_RIGHT:
+									if (tt.idx < ANGLES - 1)
+										tt.idx++;
+									break;
+								case SC_CURSOR_UP:
+									tt.speed = tt.speed + TURTLE_SPEED_STEP;
+									break;
+								case SC_CURSOR_DOWN:
+									if (tt.speed >= TURTLE_SPEED_STEP)
+										tt.speed = tt.speed - TURTLE_SPEED_STEP;
+									break;
+							}
+							break;
+						case '0'...'9':
+							tt.z = arg1 - '0';
+							SetMenu;
+							break;
+						case 'c':
+							tt.middle = PopUpColor("Mid Color\n\n");
+							tt.edge = PopUpColor("Edge Color\n\n");
+							break;
+						case 'e':
+							tt.ends = !tt.ends;
+							SetMenu;
+							break;
+						case '+':
+							tt.w = tt.w + 1.0;
+							break;
+						case '-':
+							if (tt.w)
+								tt.w = tt.w - 1.0;
+							break;
+						case '\n':
+							DCFill(dc);
+							TurtleInit(&tt);
+							SetMenu;
+							break;
+						case CH_ESC:
+						case CH_SHIFT_ESC:
+							goto lt_done;
+						case CH_SPACE:
+							TurtleMove(dc, &tt, tt.edge, tt.middle);
+							break;
+					}
+					break;
+				case MESSAGE_NULL:
+					goto lt_done;
+			}
+			Refresh;
+		}
+lt_done:
+		MessageGet(,, 1 << MESSAGE_KEY_UP);
+	}
+	catch
+		PutExcept;
+
+	/* '4' + 'e': layer 4, ends FALSE. */
+	if (ToI64(tt.z) == 4 && !tt.ends)
+		h = h + 1;
+	/* '+' width 0→1; Layer4 checked after SetMenu clear. */
+	if (ToI64(tt.w) == 1)
+		h = h + 2;
+	/* CURSOR_UP speed 0→2. */
+	if (ToI64(tt.speed) == 2)
+		h = h + 4;
+	/* 'c' both YELLOW; SPACE cleared first. */
+	if (tt.middle == YELLOW && tt.edge == YELLOW && !tt.first)
+		h = h + 8;
+
+	SettingsPop;
+	DCFill(dc);
+	DCDel(dc);
+	MenuPop;
+	return h;
+}
+
+return NearLatticeLite();

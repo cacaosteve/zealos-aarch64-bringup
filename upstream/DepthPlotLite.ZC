@@ -1,0 +1,32 @@
+/* Milestone 128: GrPlot3 z-test via depth_buf + DepthPlotLite.
+ *
+ * Upstream need: Lattice / GrPrimatives —
+ *   GrPlot3 skips when z is not closer than depth_buf[y*w+x].
+ *
+ * Bring-up:
+ *   - DCDepthBufAlloc fills I32_MAX; GrPlot3 updates per-pixel z
+ *   - return DepthPlotLite();  expect 15
+ */
+
+I64 DepthPlotLite()
+{
+	CDC *dc;
+	I64 h;
+
+	h = 0;
+	dc = DCAlias;
+	DCDepthBufAlloc(dc);
+	Cls(0);
+	dc->color = LTRED;
+	if (GrPlot3(dc, 20, 20, 100))
+		h = h + 1;
+	if (GrPeek(20, 20) == 0x00FF5555)
+		h = h + 2;
+	if (!GrPlot3(dc, 20, 20, 200))
+		h = h + 4;
+	if (GrPlot3(dc, 20, 20, 50))
+		h = h + 8;
+	return h;
+}
+
+return DepthPlotLite();

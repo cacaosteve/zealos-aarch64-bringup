@@ -1,0 +1,39 @@
+/* Milestone 55: #define macros + mixed I64/F64 arith + DefLite.
+ *
+ * Upstream need: Lattice.ZC —
+ *   #define TURTLE_SIZE 4
+ *   #define ANGLES …
+ *   F64 angles[ANGLES] = {…};
+ *   TURTLE_SIZE * Cos(...)
+ *
+ * Bring-up:
+ *   - Object-like #define (nested expand)
+ *   - Mixed I64/F64 * / + - via I2F + HC_SWAP
+ *   - return DefLite();  expect **15**
+ */
+
+#define ANGLES 5
+#define TURTLE_SIZE 4
+#define HALF (ANGLES / 2)
+
+F64 angles[ANGLES] = {0.0, 0.1, 0.2, 0.3, 0.4};
+
+I64 DefLite()
+{
+	F64 x;
+	I64 h;
+
+	x = TURTLE_SIZE * Cos(0.0);
+	h = 0;
+	if (TURTLE_SIZE == 4)
+		h = h + 1;
+	if (HALF == 2)
+		h = h + 2;
+	if (ToI64(angles[2] * 10.0) == 2)
+		h = h + 4;
+	if (ToI64(x) == 4)
+		h = h + 8;
+	return h;
+}
+
+return DefLite();

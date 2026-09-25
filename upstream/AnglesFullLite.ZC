@@ -1,0 +1,75 @@
+/* Milestone 105: Lattice angles[35] table + AnglesFullLite.
+ *
+ * Upstream need: Lattice.ZC —
+ *   #define ANGLES 35
+ *   F64 angles[ANGLES] = { -2*π/n …, 0, … };
+ *
+ * Bring-up:
+ *   - F64[35] file-scope (HC_IR_MAX_GLOBS 32→48); fill via π exprs
+ *   - F64 lit: skip frac digits beyond 9
+ *   - return AnglesFullLite();  expect 15
+ */
+
+#define ANGLES 35
+
+F64 angles[ANGLES] = {0.0};
+
+U0 AnglesFill()
+{
+	angles[0] = -2 * pi / 1;
+	angles[1] = -2 * pi / 2;
+	angles[2] = -2 * pi / 3;
+	angles[3] = -2 * pi / 4;
+	angles[4] = -2 * pi / 5;
+	angles[5] = -2 * pi / 6;
+	angles[6] = -2 * pi / 8;
+	angles[7] = -2 * pi / 9;
+	angles[8] = -2 * pi / 10;
+	angles[9] = -2 * pi / 12;
+	angles[10] = -2 * pi / 15;
+	angles[11] = -2 * pi / 18;
+	angles[12] = -2 * pi / 20;
+	angles[13] = -2 * pi / 24;
+	angles[14] = -2 * pi / 30;
+	angles[15] = -2 * pi / 36;
+	angles[16] = -2 * pi / 40;
+	angles[17] = 0;
+	angles[18] = 2 * pi / 40;
+	angles[19] = 2 * pi / 36;
+	angles[20] = 2 * pi / 30;
+	angles[21] = 2 * pi / 24;
+	angles[22] = 2 * pi / 20;
+	angles[23] = 2 * pi / 18;
+	angles[24] = 2 * pi / 15;
+	angles[25] = 2 * pi / 12;
+	angles[26] = 2 * pi / 10;
+	angles[27] = 2 * pi / 9;
+	angles[28] = 2 * pi / 8;
+	angles[29] = 2 * pi / 6;
+	angles[30] = 2 * pi / 5;
+	angles[31] = 2 * pi / 4;
+	angles[32] = 2 * pi / 3;
+	angles[33] = 2 * pi / 2;
+	angles[34] = 2 * pi / 1;
+}
+
+I64 AnglesFullLite()
+{
+	I64 h;
+	I64 mid;
+
+	h = 0;
+	mid = ANGLES / 2;
+	AnglesFill;
+	if (mid == 17)
+		h = h + 1;
+	if (ToI64(angles[mid] * 1000.0) == 0)
+		h = h + 2;
+	if (ToI64(angles[0] * 100.0) == -628)
+		h = h + 4;
+	if (ToI64(angles[ANGLES - 1] * 100.0) == 628)
+		h = h + 8;
+	return h;
+}
+
+return AnglesFullLite();

@@ -1,0 +1,29 @@
+/* Milestone 119: DCDepthBufAlloc sets CDC.depth_buf + DepthBufLite.
+ *
+ * Upstream need: Lattice.ZC — DCDepthBufAlloc(dc) for GrPlot3 depth.
+ *
+ * Bring-up:
+ *   - Builtin CDC gains depth_buf @8; DCDepthBufAlloc stores stub ptr + returns it
+ *   - return DepthBufLite();  expect 15
+ */
+
+I64 DepthBufLite()
+{
+	CDC *dc;
+	I64 h;
+
+	h = 0;
+	dc = DCAlias;
+	if (dc->depth_buf == 0)
+		h = h + 1;
+	DCDepthBufAlloc(dc);
+	if (dc->depth_buf != 0)
+		h = h + 2;
+	if (DCDepthBufAlloc(dc) != 0)
+		h = h + 4;
+	if (dc->depth_buf != 0)
+		h = h + 8;
+	return h;
+}
+
+return DepthBufLite();

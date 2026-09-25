@@ -1,0 +1,36 @@
+/* Milestone 50: TempleOS pi (0xE3) + theta (0xE9) idents (Lattice charset).
+ *
+ * Upstream need: Demo/Graphics/Lattice.ZC - pi constant; Turtle.theta / dtheta_idx.
+ *
+ * Bring-up deltas:
+ *   - 0xE3 primary -> same F64 as ASCII pi; UTF-8 U+03C0 also accepted
+ *   - 0xE9 allowed in identifiers (theta, dtheta_idx)
+ *   - return TosPiLite();  expect **15**
+ */
+
+class Turtle
+{
+	F64 x, y, é;
+	I64 dé_idx;
+};
+
+I64 TosPiLite()
+{
+	I64 h;
+	Turtle t;
+
+	h = 0;
+	if (ToI64(ã * 1000.0) == 3141)
+		h = h + 1;
+	if (ToI64(Cos(ã) * (-100.0)) == 100)
+		h = h + 2;
+	t.é = ã / 2.0;
+	if (ToI64(t.é * 1000.0) == 1570)
+		h = h + 4;
+	t.dé_idx = 3;
+	if (t.dé_idx == 3)
+		h = h + 8;
+	return h;
+}
+
+return TosPiLite();

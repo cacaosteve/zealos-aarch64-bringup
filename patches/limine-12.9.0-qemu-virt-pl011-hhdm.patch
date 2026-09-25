@@ -1,0 +1,15 @@
+--- a/common/protos/limine.c
++++ b/common/protos/limine.c
+@@ -290,6 +290,12 @@
+         map_pages(pagemap, direct_map_offset + aligned_base, aligned_base, VMM_FLAG_WRITE | VMM_FLAG_FB, aligned_length);
+     }
+ 
++#if defined (__aarch64__)
++    /* QEMU virt MMIO (GIC @0x08000000, PL011 @0x09000000): base-rev>=4 skips RESERVED. */
++    map_pages(pagemap, direct_map_offset + 0x08000000ULL, 0x08000000ULL,
++              VMM_FLAG_WRITE | VMM_FLAG_FB, 0x02000000ULL);
++#endif
++
+     // XXX we do this as a quick and dirty way to switch to the higher half
+ #if defined (__x86_64__) || defined (__i386__)
+     if (base_revision >= 1) {

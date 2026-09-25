@@ -1,0 +1,56 @@
+/* Milestone 83: MessageGet MS_R from virtio tablet + RightLite.
+ *
+ * Upstream need: Lattice.ZC —
+ *   MS_R_DOWN/UP aim turtle via Arg(dx,dy) at pointer.
+ *
+ * Bring-up:
+ *   - Mask 1<<MS_R_DOWN|1<<MS_R_UP == 384 (<< above |)
+ *   - Scripted R_DOWN/R_UP + Arg aim (virtio right btn on QEMU/UTM interactive)
+ *   - return RightLite();  expect 15
+ */
+
+I64 RightLite()
+{
+	I64 a1;
+	I64 a2;
+	I64 m;
+	I64 h;
+	I64 mask;
+	F64 th;
+	F64 x;
+	F64 y;
+
+	h = 0;
+	x = 100.0;
+	y = 200.0;
+	th = 1.0;
+	mask = 1 << MESSAGE_MS_R_DOWN | 1 << MESSAGE_MS_R_UP;
+
+	/* Precedence: 1<<7|1<<8 == 384, not left-assoc mess. */
+	if (mask == 384)
+		h = h + 1;
+
+	/* Empty → MESSAGE_NULL (no right btn edge). */
+	m = MessageGet(&a1, &a2, mask);
+	if (m == MESSAGE_NULL)
+		h = h + 2;
+
+	MsgQuePush(MESSAGE_MS_R_DOWN, 200, 200);
+	MsgQuePush(MESSAGE_MS_R_UP, 300, 200);
+	m = MessageGet(&a1, &a2, mask);
+	if (m == MESSAGE_MS_R_DOWN && a1 == 200 && a2 == 200)
+	{
+		th = Arg(a1 - x, a2 - y);
+		h = h + 4;
+	}
+	m = MessageGet(&a1, &a2, mask);
+	if (m == MESSAGE_MS_R_UP && a1 == 300 && a2 == 200)
+	{
+		th = Arg(a1 - x, a2 - y);
+		if (ToI64(th * 1000.0) == 0)
+			h = h + 8;
+	}
+	return h;
+}
+
+return RightLite();

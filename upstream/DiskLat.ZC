@@ -1,0 +1,167 @@
+/* Milestone 115/118/121/122/125: Lattice compose from RedSea disk + DiskLat.
+ *
+ * Upstream need: runzc-shaped path for a Lattice *Lite (not freeze catalog).
+ *
+ * Bring-up:
+ *   - rs_put_file("DiskLat.ZC") → rs_load_file → hc_run_src
+ *   - Same handlers as WrapLatticeLite (try/catch + '\n' restart)
+ *   - M122: Lattice setup (AutoComplete, WinBorder, WinMax, DocCursor, DocClear, win_inhibit)
+ *   - M125: also smoked as RedSea Lattice.ZC (same body)
+ *   - Freeze catalog unchanged (ephemeral disk file)
+ *   - return DiskLat();  expect 15
+ */
+
+class Turtle
+{
+	F64 x;
+	F64 y;
+	F64 z;
+	F64 w;
+	CColorROPU16 edge;
+	CColorROPU16 middle;
+	Bool ends;
+	Bool first;
+} tt;
+
+U0 TurtleInit(Turtle *t)
+{
+	MemSet(t, 0, sizeof(Turtle));
+	t->x = Fs->pix_width >> 1;
+	t->y = Fs->pix_height >> 1;
+	t->z = 5;
+	t->edge = BLACK;
+	t->middle = YELLOW;
+	t->first = TRUE;
+	t->ends = TRUE;
+}
+
+U0 SetMenu()
+{
+	CMenuEntry *tmpse;
+	U8 buf[STR_LEN];
+
+	StrPrint(buf, "Settings/Layer%d", ToI64(tt.z));
+	if (tmpse = MenuEntryFind(Fs->cur_menu, buf))
+		tmpse->checked = TRUE;
+	if (tmpse = MenuEntryFind(Fs->cur_menu, "Settings/Ends"))
+	{
+		if (tt.ends)
+			tmpse->checked = TRUE;
+		else
+			tmpse->checked = FALSE;
+	}
+}
+
+I64 DiskLat()
+{
+	CDC *dc;
+	I64 h;
+	I64 arg1;
+	I64 arg2;
+	I64 mask;
+
+	h = 0;
+	dc = DCAlias;
+	MenuPush(
+		"File {"
+		"  Abort(,CH_SHIFT_ESC);"
+		"  Exit(,CH_ESC);"
+		"}"
+		"Play {"
+		"  Restart(,'\n');"
+		"  Step(,CH_SPACE);"
+		"  Accelerator(,,SC_CURSOR_UP);"
+		"  Break(,,SC_CURSOR_DOWN);"
+		"  Left(,,SC_CURSOR_LEFT);"
+		"  Right(,,SC_CURSOR_RIGHT);"
+		"}"
+		"Settings {"
+		"  Color(,'c');"
+		"  Wider(,'+');"
+		"  Narrower(,'-');"
+		"  Ends(,'e');"
+		"  Layer0(,'0');"
+		"  Layer1(,'1');"
+		"  Layer2(,'2');"
+		"  Layer3(,'3');"
+		"  Layer4(,'4');"
+		"  Layer5(,'5');"
+		"  Layer6(,'6');"
+		"  Layer7(,'7');"
+		"  Layer8(,'8');"
+		"  Layer9(,'9');"
+		"}"
+		);
+	SettingsPush;
+	AutoComplete;
+	WinBorder;
+	WinMax;
+	DocCursor;
+	DocClear;
+	try
+	{
+		TurtleInit(&tt);
+		SetMenu;
+		Fs->win_inhibit = WIG_TASK_DEFAULT - WIF_FOCUS_TASK_MENU -
+			WIF_SELF_FOCUS - WIF_SELF_GRAB_SCROLL;
+
+		MsgQuePush(MESSAGE_KEY_DOWN, '3', 0);
+		MsgQuePush(MESSAGE_KEY_DOWN, 'e', 0);
+		MsgQuePush(MESSAGE_KEY_DOWN, '+', 0);
+		MsgQuePush(MESSAGE_KEY_DOWN, '\n', 0);
+		MsgQuePush(MESSAGE_KEY_DOWN, CH_ESC, 0);
+
+		mask = 1 << MESSAGE_KEY_DOWN;
+		while (TRUE)
+		{
+			switch (MessageGet(&arg1, &arg2, mask))
+			{
+				case MESSAGE_KEY_DOWN:
+					switch (arg1)
+					{
+						case '0'...'9':
+							tt.z = arg1 - '0';
+							SetMenu;
+							break;
+						case 'e':
+							tt.ends = !tt.ends;
+							SetMenu;
+							break;
+						case '+':
+							tt.w = tt.w + 1.0;
+							break;
+						case '\n':
+							DCFill(dc);
+							TurtleInit(&tt);
+							SetMenu;
+							break;
+						case CH_ESC:
+						case CH_SHIFT_ESC:
+							goto lt_done;
+					}
+					break;
+				case MESSAGE_NULL:
+					goto lt_done;
+			}
+		}
+lt_done:
+		MessageGet(,, 1 << MESSAGE_KEY_UP);
+	}
+	catch
+		PutExcept;
+
+	if (ToI64(tt.z) == 5)
+		h = h + 1;
+	if (tt.ends)
+		h = h + 2;
+	if (ToI64(tt.w) == 0)
+		h = h + 4;
+	if (tt.first && tt.middle == YELLOW)
+		h = h + 8;
+
+	SettingsPop;
+	MenuPop;
+	return h;
+}
+
+return DiskLat();

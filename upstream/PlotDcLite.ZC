@@ -1,0 +1,35 @@
+/* Milestone 88: Lattice GrPlot(dc,x,y) / GrPeek(dc,x,y) + PlotDcLite.
+ *
+ * Upstream need: Lattice.ZC —
+ *   dc->color = …; GrPlot(dc, x, y);  GrPeek(dc, x, y)
+ *
+ * Bring-up:
+ *   - GrPlot(dc,x,y) uses CDC color; GrPlot(x,y,c) bring-up still works
+ *   - GrPeek(dc,x,y) and GrPeek(x,y)
+ *   - return PlotDcLite();  expect 15
+ */
+
+I64 PlotDcLite()
+{
+	CDC *dc;
+	I64 h;
+
+	h = 0;
+	dc = DCAlias;
+	Cls(0);
+
+	dc->color = LTRED;
+	if (GrPlot(dc, 50, 60))
+		h = h + 1;
+	if (GrPeek(dc, 50, 60) == 0x00FF5555)
+		h = h + 2;
+
+	/* Bring-up (x,y,color) path unchanged. */
+	if (GrPlot(10, 11, 0x00AABBCC))
+		h = h + 4;
+	if (GrPeek(10, 11) == 0x00AABBCC)
+		h = h + 8;
+	return h;
+}
+
+return PlotDcLite();

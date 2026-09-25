@@ -1,0 +1,36 @@
+/* Milestone 8: CatPrint / StrPrint / MStrPrint (ZealOS-shaped, ≤2 args).
+ *
+ * Upstream: templeos/ZealOS/src/Kernel/StrPrint.ZC
+ *   CatPrint / StrPrint / MStrPrint — format join on (heap) buffers.
+ *
+ * Bring-up deltas:
+ *   - Fixed arity: CatPrint(dst,fmt,a0,a1) / StrPrint same / MStrPrint(fmt,a0,a1)
+ *   - Specifiers: %d %s %c %X %% only (no F64 / width flags)
+ *   - Char bars for UTM visibility
+ *   - Returns StrLen for smoke
+ *   - return CatFmt();
+ */
+
+I64 CatFmt()
+{
+	U8 *s;
+	I64 n, i, h;
+
+	s = MStrPrint("Zeal-%d/%s", 8, "OS");
+	if (!s)
+		return 0;
+	CatPrint(s, " #%c", 'A', 0);
+
+	Cls(0x00101820);
+	PrintAt(2, 1, s);
+	n = StrLen(s);
+	for (i = 0; i < n; i = i + 1) {
+		h = 30 + (s[i] & 31);
+		FillRect(40 + i * 36, 400 - h, 28, h, 0x00E08020);
+	}
+	Sleep(1200);
+	Free(0);
+	return n;
+}
+
+return CatFmt();

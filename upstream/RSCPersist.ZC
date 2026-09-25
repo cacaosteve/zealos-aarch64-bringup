@@ -1,0 +1,120 @@
+/* Milestone 32: RedSea "Keep" survives a second open (no RSFmt wipe).
+ *
+ * Built as: lib/RedSeaCFile.ZC + this file (Makefile concat).
+ * First run: may FCreate("Keep") on an existing or fresh vol.
+ * Second run: FOpen only — RAM disk must still hold the file.
+ *
+ * Bring-up deltas:
+ *   - RSValid/RSRoot probe boot without wipe
+ *   - Smoke runs this twice in one boot; both return 4
+ *   - return RSCPersistDemo();
+ */
+
+I64 RSCPersistDemo()
+{
+	U8 *br;
+	U8 *dir;
+	U8 *data;
+	U8 *e;
+	U8 *ent;
+	I64 *w;
+	CFile *f;
+	I64 root;
+	I64 fclus;
+	I64 i;
+	I64 sz;
+
+	root = 0;
+	if (RSValid())
+		root = RSRoot();
+	if (!root)
+	{
+		if (!RSFmt(16, 9))
+			return 0;
+		root = RSAlloc(16, 1);
+		if (!root)
+			return 0;
+		br = MAlloc(512);
+		if (!br)
+			return 0;
+		MemSet(br, 0, 512);
+		if (!BlkRead(br, 0, 1))
+			return 0;
+		w = br + 8;
+		w[2] = root;
+		if (!BlkWrite(br, 0, 1))
+			return 0;
+		ent = MAlloc(64);
+		if (!ent)
+			return 0;
+		MemSet(ent, 0, 64);
+		ent[2] = '.';
+		ent[3] = 0;
+		w = ent + 40;
+		w[0] = root;
+		w[1] = 1;
+		if (!BlkWrite(ent, root, 1))
+			return 0;
+	}
+
+	f = FOpen(root, "Keep");
+	if (!f)
+	{
+		fclus = RSAlloc(16, 1);
+		if (!fclus)
+			return 0;
+		f = FCreate(root, "Keep", fclus);
+		if (!f)
+			return 0;
+		data = MAlloc(512);
+		if (!data)
+			return 0;
+		MemSet(data, 0, 512);
+		MemCpy(data, "Keep", 5);
+		if (!FBlkWrite(f, data, 4))
+			return 0;
+		dir = MAlloc(512);
+		if (!dir)
+			return 0;
+		BlkRead(dir, root, 1);
+		for (i = 0; i < 8; i = i + 1)
+		{
+			e = dir + i * 64;
+			if (e[2] && StrCmp(e + 2, "Keep") == 0)
+			{
+				w = e + 40;
+				w[1] = f->len;
+				break;
+			}
+		}
+		BlkWrite(dir, root, 1);
+		FClose(f);
+		f = FOpen(root, "Keep");
+		if (!f)
+			return 0;
+	}
+
+	sz = FSize(f);
+	if (sz != 4)
+		return 0;
+	data = MAlloc(512);
+	if (!data)
+		return 0;
+	MemSet(data, 0, 512);
+	if (!FBlkRead(f, data))
+		return 0;
+	if (StrCmp(data, "Keep") != 0)
+		return 0;
+	FClose(f);
+
+	Cls(0x00101820);
+	PrintAt(2, 1, "RSCPersist");
+	PrintAt(2, 3, "Keep");
+	FillRect(120, 360, 80, 24, 0x00E08060);
+	FillRect(240, 360, 120, 24, 0x00E08060);
+	Sleep(800);
+	Free(0);
+	return sz;
+}
+
+return RSCPersistDemo();

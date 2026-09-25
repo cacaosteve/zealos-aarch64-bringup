@@ -1,0 +1,104 @@
+/* Milestone 14: DolDoc-lite text nodes on the heap.
+ *
+ * Upstream: System/DolDoc CDoc/CDocEntry queue + DocNew/DocPrint shape
+ * (no $$ cmds, wrap, or file IO).
+ *
+ * Bring-up deltas:
+ *   - CDoc / CDocEntry as circular queues (next/last)
+ *   - DocNew + DocPrint(tag) appends StrNew'd TEXT entries
+ *   - Walk/print entries; return sum of StrLen(tags)==7
+ *   - return DocLite();
+ */
+
+class CDoc
+{
+	I64 next;
+	I64 last;
+};
+
+class CDocEntry
+{
+	I64 next;
+	I64 last;
+	I64 tag;
+	I64 type;
+};
+
+U0 QueueInit(I64 head)
+{
+	I64 *h = head;
+	h[0] = head;
+	h[1] = head;
+}
+
+U0 QueueInsert(I64 entry, I64 pred)
+{
+	I64 *e = entry;
+	I64 *p = pred;
+	I64 succ;
+	I64 *s;
+
+	succ = p[0];
+	s = succ;
+	e[0] = succ;
+	e[1] = pred;
+	s[1] = entry;
+	p[0] = entry;
+}
+
+I64 DocNew()
+{
+	CDoc *d = MAlloc(sizeof(CDoc));
+	if (!d)
+		return 0;
+	QueueInit(d);
+	return d;
+}
+
+I64 DocPrint(I64 doc, I64 s)
+{
+	CDoc *d = doc;
+	CDocEntry *e = MAlloc(sizeof(CDocEntry));
+	if (!e)
+		return 0;
+	e->tag = StrNew(s);
+	e->type = 1;
+	QueueInsert(e, d->last);
+	return e;
+}
+
+I64 DocLite()
+{
+	CDoc *doc;
+	CDocEntry *e;
+	I64 p, s, row, n;
+
+	doc = DocNew();
+	if (!doc)
+		return 0;
+	DocPrint(doc, "Zeal");
+	DocPrint(doc, "OS");
+	DocPrint(doc, "!");
+
+	Cls(0x00101820);
+	PrintAt(2, 1, "DocLite");
+	s = 0;
+	row = 3;
+	n = 0;
+	p = doc->next;
+	while (p != doc)
+	{
+		e = p;
+		PrintAt(2, row, e->tag);
+		n = StrLen(e->tag);
+		s = s + n;
+		FillRect(200 + row * 40, 420 - n * 40, 50, n * 40, 0x00E08020);
+		p = e->next;
+		row = row + 1;
+	}
+	Sleep(1200);
+	Free(0);
+	return s;
+}
+
+return DocLite();

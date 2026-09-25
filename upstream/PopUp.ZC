@@ -1,0 +1,108 @@
+/* Milestone 13: PopUp-style deferred Call1 (&Fn + Call1).
+ *
+ * Upstream: KTask.ZC Spawn(fp_start_addr, data) + Job.ZC PopUp — run fn later.
+ *
+ * Bring-up deltas:
+ *   - &Worker → JIT code address
+ *   - Call1(fp, arg) indirect call
+ *   - Queue of CTask {fp,arg}; drain via Call1
+ *   - Returns 4*3 + (10+5) == 27
+ *   - return PopUp();
+ */
+
+class CTask
+{
+	I64 next;
+	I64 last;
+	I64 fp;
+	I64 arg;
+	I64 res;
+};
+
+U0 QueueInit(I64 head)
+{
+	I64 *h = head;
+	h[0] = head;
+	h[1] = head;
+}
+
+U0 QueueInsert(I64 entry, I64 pred)
+{
+	I64 *e = entry;
+	I64 *p = pred;
+	I64 succ;
+	I64 *s;
+
+	succ = p[0];
+	s = succ;
+	e[0] = succ;
+	e[1] = pred;
+	s[1] = entry;
+	p[0] = entry;
+}
+
+U0 QueueRemove(I64 entry)
+{
+	I64 *e = entry;
+	I64 *n;
+	I64 *l;
+
+	n = e[0];
+	l = e[1];
+	n[1] = e[1];
+	l[0] = e[0];
+}
+
+I64 WorkerA(I64 x)
+{
+	return x * 3;
+}
+
+I64 WorkerB(I64 x)
+{
+	return x + 5;
+}
+
+I64 PopUp()
+{
+	CTask ready;
+	CTask *t;
+	I64 s, i;
+
+	QueueInit(&ready);
+
+	t = MAlloc(sizeof(CTask));
+	if (!t)
+		return 0;
+	t->fp = &WorkerA;
+	t->arg = 4;
+	t->res = 0;
+	QueueInsert(t, ready.last);
+
+	t = MAlloc(sizeof(CTask));
+	if (!t)
+		return 0;
+	t->fp = &WorkerB;
+	t->arg = 10;
+	t->res = 0;
+	QueueInsert(t, ready.last);
+
+	Cls(0x00101820);
+	PrintAt(2, 1, "PopUp");
+	s = 0;
+	i = 0;
+	while (ready.next != &ready)
+	{
+		t = ready.next;
+		QueueRemove(t);
+		t->res = Call1(t->fp, t->arg);
+		s = s + t->res;
+		FillRect(80 + i * 160, 400 - t->res * 10, 100, t->res * 10, 0x0000C0FF);
+		i = i + 1;
+	}
+	Sleep(1200);
+	Free(0);
+	return s;
+}
+
+return PopUp();
