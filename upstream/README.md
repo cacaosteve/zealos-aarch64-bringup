@@ -1792,6 +1792,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 153 — Lattice FB teardown + IR mem for DrawIt HUD
+
+| Item | Path |
+|--|--|
+| Gap | UTM post-`disklat`: HUD soup + `Width:nan`; plot left under `>`; stale `Fs->draw_it` |
+| Upstream need | DCFill clears surface; DrawIt Refresh HUD stable; no cross-demo draw_it |
+| Bring-up | `HC_IR_MEM_WORDS` 128→256 (MenuPush strings+angles crushed DrawIt frames); `DCFill`→`fb_clear`; GrPrint wipes HUD band; `g_hc_fs_draw_it=0` around `hc_run_src` |
+| Smoke | check-serial / run-pci; `disklat`/`nearlatticelite` **15**; UTM eyes-on clean FB after demo |
+| Shell | unchanged commands |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).

@@ -810,6 +810,10 @@ static int g_hc_depth_on;
 
 uint64_t hc_builtin_dcfill(uint64_t dc) {
     (void)dc;
+    /* Lattice DCFill — clear virt FB so DiskLat/NearLattice leave a clean surface. */
+    if (g_fb) {
+        fb_clear(0);
+    }
     return 0;
 }
 
@@ -1421,9 +1425,13 @@ uint64_t hc_builtin_printat(uint64_t col, uint64_t row, uint64_t s) {
     return n;
 }
 
-/* Lattice: GrPrint(dc, x, y, fmt) — x/y pixels → 8px cells. */
+/* Lattice: GrPrint(dc, x, y, fmt) — x/y pixels → 8px cells.
+ * Wipe a fixed HUD band first so shorter Refresh lines do not leave digit soup. */
 uint64_t hc_builtin_grprint(uint64_t dc, uint64_t x, uint64_t y, uint64_t fmt) {
     (void)dc;
+    if (g_fb) {
+        fb_fillrect((uint32_t)x, (uint32_t)y, 64u * 8u, 8u, 0);
+    }
     return hc_builtin_printat(x / 8, y / 8, fmt);
 }
 
@@ -2332,7 +2340,9 @@ static int hc_expand_includes(const char *src, char *dst, size_t cap) {
 
 static int hc_run_src(const char *src, uint64_t *out) {
     uint8_t bc[8192]; /* was 4096 — Lattice angles[35] brace init */
+    int rc;
     g_hc_popup_i = 0;
+    g_hc_fs_draw_it = 0; /* M153: no stale Fs->draw_it across demos */
     hc_heap_reset();
     if (hc_expand_includes(src, g_hc_src_exp, sizeof(g_hc_src_exp)) != 0) {
         return -50;
@@ -2341,7 +2351,9 @@ static int hc_run_src(const char *src, uint64_t *out) {
     if (n < 0) {
         return n;
     }
-    return hc_run_bc(bc, (size_t)n, out);
+    rc = hc_run_bc(bc, (size_t)n, out);
+    g_hc_fs_draw_it = 0;
+    return rc;
 }
 
 /* I64 Abs(I64 x) { if (x < 0) return -x; return x; } */

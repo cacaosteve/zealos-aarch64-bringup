@@ -81,7 +81,7 @@ enum {
 #define HC_IR_MAX_DEPTH  16
 #define HC_IR_MAX_LABELS 128 /* was 64 — Lattice nested key/msg switches */
 #define HC_IR_MAX_LOCALS 4   /* register locals x20–x23 (ST_LOCAL/LD_LOCAL) */
-#define HC_IR_MEM_WORDS  128 /* g_hc_mem[] pool: globals then frames */
+#define HC_IR_MEM_WORDS  256 /* was 128 — Lattice MenuPush strings+angles leave <16 words for DrawIt frames */
 #define HC_IR_MAX_NAMES  24  /* was 8 — upstream demos need more locals */
 #define HC_IR_MAX_GLOBS  48  /* was 32 — Lattice angles[35] */
 #define HC_IR_ERR_DEPTH  (-1)
