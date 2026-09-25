@@ -1,14 +1,16 @@
-/* Milestone 109/114/116/117/118/121/122/123/124/126/127/129/130: Lattice-accurate keys compose + NearLatticeLite.
+/* Milestone 109/114/116/117/118/121/122/123/124/126/127/129/130/154: Lattice-accurate keys compose + NearLatticeLite.
  *
  * Upstream need: Lattice.ZC interactive handlers —
  *   +/- width; all SC_CURSOR_*; 'c' dual color; digits/e;
  *   SPACE 16x Step with TurtleEnd; '\n' restart; try/catch; full SetMenu;
  *   full MenuPush; AutoComplete and Win/Doc setup; DrawIt MemCopy HUD;
  *   angles[35] BracePi table; TurtlePlot w/2-1 mid line;
- *   inline MessageGet mask; TurtleInit/SetMenu/win_inhibit outside try
+ *   inline MessageGet mask; TurtleInit/SetMenu/win_inhibit outside try;
+ *   MESSAGE_NULL idle → Refresh (not exit)
  *
  * Bring-up:
  *   - M130: Lattice setup order (init outside try; try wraps the event loop)
+ *   - M154: MESSAGE_NULL → Sleep+Refresh idle (scripted CH_ESC still ends smoke)
  *   - return NearLatticeLite();  expect 15
  */
 
@@ -321,7 +323,9 @@ I64 NearLatticeLite()
 					}
 					break;
 				case MESSAGE_NULL:
-					goto lt_done;
+					/* Lattice idle: keep Refreshing until ESC (scripted or live). */
+					Sleep(1);
+					break;
 			}
 			Refresh;
 		}

@@ -1804,6 +1804,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 154 — Lattice MESSAGE_NULL idle (Sleep+Refresh)
+
+| Item | Path |
+|--|--|
+| Gap | NearLattice/DiskLat treated empty MessageGet as exit (`goto lt_done`) |
+| Upstream need | `Lattice.ZC` idle — NULL → keep looping + Refresh until ESC |
+| Bring-up | `MESSAGE_NULL` → `Sleep(1)` then Refresh; scripted `CH_ESC` still ends smoke (**15**) |
+| Smoke | NearLatticeLite / DiskLat / Lattice.ZC expect **15** |
+| Shell | `nearlatticelite` / `disklat` (ESC still auto-pushed for smoke) |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).

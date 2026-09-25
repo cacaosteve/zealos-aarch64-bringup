@@ -1,4 +1,4 @@
-/* Milestone 115/118/121/122/125/134/136/143/144/145/146/147/149/147: Lattice compose from RedSea + DiskLat.
+/* Milestone 115/118/121/122/125/134/136/143/144/145/146/147/149/154: Lattice compose from RedSea + DiskLat.
  *
  * Upstream need: runzc-shaped path for a Lattice *Lite (not freeze catalog).
  *
@@ -7,6 +7,7 @@
  *   - M146: SC_CURSOR_* speed/idx + TURTLE_SPEED_STEP
  *   - M147: DrawIt + aim/MS_* place
  *   - M149: NearLattice scripted keys + expect bits (no \n wipe)
+ *   - M154: MESSAGE_NULL → Sleep+Refresh idle (ESC exits; scripted CH_ESC still ends smoke)
  *   - Freeze catalog unchanged (ephemeral disk file)
  *   - return DiskLat();  expect 15
  */
@@ -323,7 +324,9 @@ I64 DiskLat()
 					}
 					break;
 				case MESSAGE_NULL:
-					goto lt_done;
+					/* Lattice idle: keep Refreshing until ESC (scripted or live). */
+					Sleep(1);
+					break;
 			}
 			Refresh;
 		}
