@@ -1708,6 +1708,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 146 — DiskLat SC_CURSOR speed/idx
+
+| Item | Path |
+|--|--|
+| Gap | DiskLat MenuPush listed cursors but ignored `arg1==0` scan codes |
+| Upstream need | `Lattice.ZC` LEFT/RIGHT idx; UP/DOWN speed ±TURTLE_SPEED_STEP |
+| Bring-up | DiskLat cursor switch + scripted CURSOR_UP before SPACE; still **15** |
+| Smoke | `hc: Upstream DiskLat` / `Lattice.ZC` (expect 15) |
+| Shell | `disklat` / `lattice` |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).

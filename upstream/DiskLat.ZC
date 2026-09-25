@@ -1,14 +1,16 @@
-/* Milestone 115/118/121/122/125/134/136/143/144/145: Lattice compose from RedSea + DiskLat.
+/* Milestone 115/118/121/122/125/134/136/143/144/145/146: Lattice compose from RedSea + DiskLat.
  *
  * Upstream need: runzc-shaped path for a Lattice *Lite (not freeze catalog).
  *
  * Bring-up:
  *   - M145: rs_fmt_host(128) before put; BracePi + TurtleEnd + TurtleMove SPACE
+ *   - M146: SC_CURSOR_* speed/idx + TURTLE_SPEED_STEP
  *   - Freeze catalog unchanged (ephemeral disk file)
  *   - return DiskLat();  expect 15
  */
 
 #define ANGLES 35
+#define TURTLE_SPEED_STEP 2.0
 
 F64 angles[ANGLES] = {
 	-2 * pi / 1,  -2 * pi / 2,  -2 * pi / 3,  -2 * pi / 4, -2 * pi / 5,
@@ -208,6 +210,7 @@ I64 DiskLat()
 		MsgQuePush(MESSAGE_KEY_DOWN, 'e', 0);
 		MsgQuePush(MESSAGE_KEY_DOWN, '+', 0);
 		MsgQuePush(MESSAGE_KEY_DOWN, '-', 0);
+		MsgQuePush(MESSAGE_KEY_DOWN, 0, SC_CURSOR_UP);
 		MsgQuePush(MESSAGE_KEY_DOWN, CH_SPACE, 0);
 		MsgQuePush(MESSAGE_KEY_DOWN, '\n', 0);
 		MsgQuePush(MESSAGE_KEY_DOWN, 'c', 0);
@@ -220,6 +223,26 @@ I64 DiskLat()
 				case MESSAGE_KEY_DOWN:
 					switch (arg1)
 					{
+						case 0:
+							switch (arg2.u8[0])
+							{
+								case SC_CURSOR_LEFT:
+									if (tt.idx)
+										tt.idx--;
+									break;
+								case SC_CURSOR_RIGHT:
+									if (tt.idx < ANGLES - 1)
+										tt.idx++;
+									break;
+								case SC_CURSOR_UP:
+									tt.speed = tt.speed + TURTLE_SPEED_STEP;
+									break;
+								case SC_CURSOR_DOWN:
+									if (tt.speed >= TURTLE_SPEED_STEP)
+										tt.speed = tt.speed - TURTLE_SPEED_STEP;
+									break;
+							}
+							break;
 						case '0'...'9':
 							tt.z = arg1 - '0';
 							SetMenu;
@@ -232,7 +255,8 @@ I64 DiskLat()
 							tt.w = tt.w + 1.0;
 							break;
 						case '-':
-							tt.w = tt.w - 1.0;
+							if (tt.w)
+								tt.w = tt.w - 1.0;
 							break;
 						case 'c':
 							tt.middle = PopUpColor("Mid Color\n\n");
