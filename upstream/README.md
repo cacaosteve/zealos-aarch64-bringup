@@ -1780,6 +1780,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 152 — UTM-friendly shell banner
+
+| Item | Path |
+|--|--|
+| Gap | Shell printed one mega `cmds:` line that wrapped into unreadable FB soup |
+| Upstream need | readable interactive console on 800×600 UTM FB |
+| Bring-up | short startup hints; `help` leads with UTM freeze + Lattice cmds |
+| Smoke | check-serial / run-pci unchanged |
+| Shell | banner + `help` text only |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).
