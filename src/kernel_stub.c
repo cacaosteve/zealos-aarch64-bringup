@@ -2356,6 +2356,56 @@ static int hc_run_src(const char *src, uint64_t *out) {
     return rc;
 }
 
+/* M155: DiskLat → LatticePlay — drop MsgQuePush scripts for live UTM.
+ * smoke_esc: inject one CH_ESC after Cls so check-serial still terminates. */
+static int hc_lattice_play_src(const char *in, char *out, size_t cap, int smoke_esc) {
+    size_t o = 0;
+    const char *p = in;
+    int saw_cls = 0;
+    if (!in || !out || cap < 8) {
+        return -1;
+    }
+    while (*p) {
+        if (p[0] == 'M' && p[1] == 's' && p[2] == 'g' && p[3] == 'Q' && p[4] == 'u' &&
+            p[5] == 'e' && p[6] == 'P' && p[7] == 'u' && p[8] == 's' && p[9] == 'h') {
+            p += 10;
+            while (*p && *p != ';') {
+                p++;
+            }
+            if (*p == ';') {
+                p++;
+            }
+            while (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n') {
+                p++;
+            }
+            continue;
+        }
+        if (o + 1 >= cap) {
+            return -1;
+        }
+        out[o++] = *p++;
+        /* After Cls(0); optionally seed ESC for automated smoke. */
+        if (smoke_esc && !saw_cls && o >= 7 && out[o - 7] == 'C' && out[o - 6] == 'l' &&
+            out[o - 5] == 's' && out[o - 4] == '(' && out[o - 3] == '0' && out[o - 2] == ')' &&
+            out[o - 1] == ';') {
+            static const char esc[] = "\n\t\tMsgQuePush(MESSAGE_KEY_DOWN, CH_ESC, 0);";
+            size_t el = sizeof(esc) - 1;
+            if (o + el >= cap) {
+                return -1;
+            }
+            for (size_t i = 0; i < el; i++) {
+                out[o++] = esc[i];
+            }
+            saw_cls = 1;
+        }
+    }
+    if (o >= cap) {
+        return -1;
+    }
+    out[o] = 0;
+    return 0;
+}
+
 /* I64 Abs(I64 x) { if (x < 0) return -x; return x; } */
 static int hc_build_abs(uint8_t *bc, size_t cap, int64_t x) {
     size_t n = 0;
@@ -3224,7 +3274,7 @@ static void shell_handle(const char *line, int *done) {
     }
     if (streq(line, "help")) {
         con_puts("UTM freeze: vblk | rspersist | rscatalog | rsdir | runzc | runzc Notes.ZC\n");
-        con_puts("Lattice: nearlatticelite | disklat | lattice | depthplotlite\n");
+        con_puts("Lattice: nearlatticelite | disklat | lattice | latticeplay | depthplotlite\n");
         con_puts("cmds: help|abs|sum|bars|stars|circles|bounce|paint|netofdots|lines|minigr|memsort|globshare|life|cartlite|vec2lite|angleslite|coslite|sqrtlite|arglite|commalite|plot3lite|tospilite|colorlite|turtlelite|filllite|initlite|deflite|printlite|msglite|menulite|findlite|fslite|setuplite|ttlite|buflite|inclite|dclite|linedclite|grflite|movelite|checkedlite|cmplite|forinclite|microlite|movestacklite|endlite|drawitlite|latticelite|looplite|demolite|eventlite|playlite|inputlite|rightlite|cursorlite|uplite|ticklite|framelite|plotdclite|abortlite|aimmovelite|idlelite|layerlite|endslite|speedlite|midlite|livelite|accellite|restartlite|widthlite|bothcolorlite|menufulllite|menubiglite|trylite|stepcountlite|anglesfulllite|braceangleslite|bracepilite|setmenulite|nearlatticelite|f64iflite|wraplatticelite|menulooplite|idxalllite|disklat|lattice|depthbuflite|depthrstlite|depthplotlite|depthlinelite|peekplot|offbmp|heapstr|catfmt|heapque|jobque|jobrun|spawn|popup|doclite|ramblk|namefile|dirlook|dirdel|fopen|fwrite|multiblk|redsea|rsroot|rsfile|rsalloc|rsfree|rsmulti|rscfile|rscwrite|rscseek|rsclib|rspersist|rscatalog|rsdir|rsdel|rsrename|runzc|runzc <file.ZC>|vblk|halt|hc <src>|expr\n");
         con_puts("  hc: Print*/Str*/Mem*/Min/Max/Clamp/Sign/Sqr/Abs/Cnt/CntFrq/HashStr/Mouse*/Rand/Sleep/Gr*/Cls\n");
         con_puts("  hc: KeyHit/GetKey (Esc exits paint loops)\n");
@@ -3953,6 +4003,21 @@ static void shell_handle(const char *line, int *done) {
         con_puts("disklat ok\n");
         return;
     }
+    if (streq(line, "latticeplay")) {
+        char src[8192];
+        uint64_t got = 0;
+        /* Live UTM Lattice: same DiskLat body, no scripted MsgQue — ESC to exit. */
+        if (hc_lattice_play_src(DISKLAT_ZC, src, sizeof(src), 0) != 0) {
+            con_puts("latticeplay build FAIL\n");
+            return;
+        }
+        if (hc_run_src(src, &got) != 0) {
+            con_puts("latticeplay FAIL\n");
+            return;
+        }
+        con_puts("latticeplay ok\n");
+        return;
+    }
     if (streq(line, "lattice")) {
         char src[8192];
         size_t n = 0;
@@ -4667,7 +4732,7 @@ static void shell_run(void) {
     con_puts("\nZealOS aarch64 shell (HolyC-IR exprs)\n");
     /* M152: short FB banner; full cmd list via `help` (800x600 wraps badly). */
     con_puts("type: help | vblk | rscatalog | runzc Notes.ZC | halt\n");
-    con_puts("      hc <src> | bars | paint | nearlatticelite | disklat\n");
+    con_puts("      hc <src> | bars | paint | nearlatticelite | disklat | latticeplay\n");
     con_puts("> ");
     char line[64];
     unsigned len = 0;
@@ -6767,6 +6832,23 @@ static int jit_smoke(void) {
             uart_puts(g_uart, "\n");
         }
         (void)rs_del_file("Lattice.ZC");
+        /* M155: LatticePlay = DiskLat without scripted MsgQue; ESC-only for smoke. */
+        {
+            char src[8192];
+            if (hc_lattice_play_src(DISKLAT_ZC, src, sizeof(src), 1) != 0) {
+                uart_puts(g_uart, "hc: Upstream LatticePlay build FAIL\n");
+                return -247;
+            }
+            if (hc_run_src(src, &got2) != 0) {
+                uart_puts(g_uart, "hc: Upstream LatticePlay FAIL got=");
+                uart_put_u64_hex(g_uart, got2);
+                uart_puts(g_uart, "\n");
+                return -248;
+            }
+            uart_puts(g_uart, "hc: Upstream LatticePlay => ");
+            uart_put_u64_hex(g_uart, got2);
+            uart_puts(g_uart, "\n");
+        }
         if (hc_run_src(DEPTHBUFLITE_ZC, &got2) != 0 || got2 != 15) {
             uart_puts(g_uart, "hc: Upstream DepthBufLite FAIL got=");
             uart_put_u64_hex(g_uart, got2);

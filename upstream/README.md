@@ -1816,6 +1816,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 155 — latticeplay interactive shell (no scripted MsgQue)
+
+| Item | Path |
+|--|--|
+| Gap | `disklat` always auto-drives MsgQue + ESC — no live UTM Lattice play |
+| Upstream need | Lattice.ZC-shaped loop driven by virtio kbd/tablet until ESC |
+| Bring-up | `hc_lattice_play_src` strips `MsgQuePush`; shell `latticeplay`; smoke injects ESC-only |
+| Smoke | `hc: Upstream LatticePlay` (ESC-only terminate) |
+| Shell | `latticeplay` (ESC to exit) |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).
