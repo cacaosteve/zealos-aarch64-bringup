@@ -884,11 +884,12 @@ static int hc_depth_try(int32_t xi, int32_t yi, int32_t zi) {
     return 1;
 }
 
-/* Non-interactive Lattice color picker (M148/M150/M160).
+/* Non-interactive Lattice color picker (M148/M150/M160/M161).
  * HolyC string args to PopUpColor are not yet reliable C pointers here —
  * use Mid/Edge call-pair order (reset each hc_run_src). UART RX clears RSR.
- * M160: paint a small FB swatch so latticeplay 'c' is visible. */
+ * M160: paint FB swatches. M161: latticeplay cycles Mid/Edge pairs after the first. */
 static int g_hc_popup_i;
+static int g_hc_popup_live; /* 1 = latticeplay color cycle; 0 = smoke Mid/Edge lock */
 uint64_t hc_builtin_popupcolor(uint64_t header) {
     (void)header;
     {
@@ -897,8 +898,17 @@ uint64_t hc_builtin_popupcolor(uint64_t header) {
             0x00AA5500u, 0x00AAAAAAu, 0x00555555u, 0x005555FFu, 0x0055FF55u, 0x0055FFFFu,
             0x00FF5555u, 0x00FF55FFu, 0x00FFFF55u, 0x00FFFFFFu,
         };
+        /* Pair 0 stays YELLOW/BLACK for smokes + first latticeplay 'c'. */
+        static const uint8_t mids[] = {14, 4, 9, 10, 12, 11, 13, 2, 5, 15};
+        static const uint8_t edges[] = {0, 15, 0, 15, 0, 0, 0, 15, 0, 0};
         int i = g_hc_popup_i++;
-        uint64_t c = (i & 1) ? 0 : 14; /* Edge BLACK, Mid YELLOW */
+        uint64_t c;
+        if (g_hc_popup_live) {
+            int pair = (i / 2) % (int)(sizeof mids / sizeof mids[0]);
+            c = (i & 1) ? (uint64_t)edges[pair] : (uint64_t)mids[pair];
+        } else {
+            c = (i & 1) ? 0 : 14; /* Edge BLACK, Mid YELLOW */
+        }
         if (g_fb) {
             const char *lab = (i & 1) ? "Edge" : "Mid";
             uint32_t x0 = (i & 1) ? 72u : 8u;
@@ -906,7 +916,7 @@ uint64_t hc_builtin_popupcolor(uint64_t header) {
             uint32_t col = x0 / 8u;
             uint32_t row = (y0 >= 8u ? y0 - 8u : 0u) / 8u;
             int k;
-            fb_fillrect(x0, y0, 56u, 20u, pal[(int)c]);
+            fb_fillrect(x0, y0, 56u, 20u, pal[(int)c & 15]);
             fb_fillrect(x0, y0, 56u, 1u, 0x00E0E0E0u);
             fb_fillrect(x0, y0 + 19u, 56u, 1u, 0x00E0E0E0u);
             fb_fillrect(x0, y0, 1u, 20u, 0x00E0E0E0u);
@@ -2068,6 +2078,7 @@ static int hc_jit_into(const uint8_t *bc, size_t n, uint32_t *out, size_t cap) {
 }
 
 static int hc_run_src(const char *src, uint64_t *out);
+static int hc_run_src_ex(const char *src, uint64_t *out, int popup_live);
 
 /* Forward decl: RedSea load used by #include expansion (defined below). */
 static int rs_load_file(const char *name, char *dst, size_t cap, size_t *out_len);
@@ -2366,20 +2377,28 @@ static int hc_expand_includes(const char *src, char *dst, size_t cap) {
 }
 
 static int hc_run_src(const char *src, uint64_t *out) {
+    return hc_run_src_ex(src, out, 0);
+}
+
+static int hc_run_src_ex(const char *src, uint64_t *out, int popup_live) {
     uint8_t bc[8192]; /* was 4096 — Lattice angles[35] brace init */
     int rc;
     g_hc_popup_i = 0;
+    g_hc_popup_live = popup_live ? 1 : 0;
     g_hc_fs_draw_it = 0; /* M153: no stale Fs->draw_it across demos */
     hc_heap_reset();
     if (hc_expand_includes(src, g_hc_src_exp, sizeof(g_hc_src_exp)) != 0) {
+        g_hc_popup_live = 0;
         return -50;
     }
     int n = hc_front_compile_ex(g_hc_src_exp, bc, sizeof(bc), &g_fn_tbl, g_fn_code, hc_jit_into);
     if (n < 0) {
+        g_hc_popup_live = 0;
         return n;
     }
     rc = hc_run_bc(bc, (size_t)n, out);
     g_hc_fs_draw_it = 0;
+    g_hc_popup_live = 0;
     return rc;
 }
 
@@ -2419,7 +2438,7 @@ static int hc_lattice_play_src(const char *in, char *out, size_t cap, int smoke_
             if (smoke_esc) {
                 inj = "\n\t\tMsgQuePush(MESSAGE_KEY_DOWN, CH_ESC, 0);";
             } else {
-                inj = "\n\t\tGrPrint(dc, 0, 16, \"Esc=exit Enter=restart Space=step\");";
+        inj = "\n\t\tGrPrint(dc, 0, 16, \"Esc=exit Enter=restart Space=step c=color\");";
             }
             el = 0;
             while (inj[el]) {
@@ -4057,7 +4076,7 @@ static void shell_handle(const char *line, int *done) {
             con_puts("latticeplay build FAIL\n");
             return;
         }
-        if (hc_run_src(src, &got) != 0) {
+        if (hc_run_src_ex(src, &got, 1) != 0) {
             con_puts("latticeplay FAIL\n");
             return;
         }

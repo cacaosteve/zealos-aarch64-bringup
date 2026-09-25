@@ -1888,6 +1888,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 161 — latticeplay PopUpColor pair cycle
+
+| Item | Path |
+|--|--|
+| Gap | every `'c'` always Mid=YELLOW Edge=BLACK — no live color variety |
+| Upstream need | Lattice color picks can change across presses |
+| Bring-up | `g_hc_popup_live` via `hc_run_src_ex`; cycle Mid/Edge pairs (pair0 still Y/B); smokes stay locked |
+| Smoke | Mid/Both/NearLattice/DiskLat (**15**) |
+| Shell | `latticeplay` `'c'` cycles colors; hint mentions `c=color` |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).
