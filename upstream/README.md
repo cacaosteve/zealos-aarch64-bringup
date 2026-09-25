@@ -1598,6 +1598,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 137 — WrapLattice full SetMenu + setup order
+
+| Item | Path |
+|--|--|
+| Gap | WrapLatticeLite still used slim MenuPush/SetMenu + init inside `try` |
+| Upstream need | `Lattice.ZC` — full menu + sibling-clear SetMenu; init outside `try` |
+| Bring-up | `WrapLatticeLite.ZC`; still **15** |
+| Smoke | `hc: Upstream WrapLatticeLite` (expect 15) |
+| Shell | `wraplatticelite` |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).

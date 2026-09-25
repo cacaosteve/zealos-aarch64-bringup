@@ -1,11 +1,12 @@
-/* Milestone 111: try/catch + '\n' restart compose + WrapLatticeLite.
+/* Milestone 111/137: try/catch + '\n' restart compose + WrapLatticeLite.
  *
  * Upstream need: Lattice.ZC —
  *   try { … } catch PutExcept;
  *   case '\n': DCFill(dc); TurtleInit(&tt); SetMenu;
+ *   full SetMenu sibling-clear; init outside try
  *
  * Bring-up:
- *   - One scripted loop with try/catch wrap + newline restart
+ *   - M137: full SetMenu + MenuPush + Lattice setup order
  *   - return WrapLatticeLite();  expect 15
  */
 
@@ -36,12 +37,21 @@ U0 TurtleInit(Turtle *t)
 
 U0 SetMenu()
 {
-	CMenuEntry *tmpse;
+	I64 i;
 	U8 buf[STR_LEN];
+	CMenuEntry *tmpse;
 
-	StrPrint(buf, "Settings/Layer%d", ToI64(tt.z));
-	if (tmpse = MenuEntryFind(Fs->cur_menu, buf))
-		tmpse->checked = TRUE;
+	for (i = 0; i <= 9; i++)
+	{
+		StrPrint(buf, "Settings/Layer%d", i);
+		if (tmpse = MenuEntryFind(Fs->cur_menu, buf))
+		{
+			if (i == ToI64(tt.z))
+				tmpse->checked = TRUE;
+			else
+				tmpse->checked = FALSE;
+		}
+	}
 	if (tmpse = MenuEntryFind(Fs->cur_menu, "Settings/Ends"))
 	{
 		if (tt.ends)
@@ -57,17 +67,51 @@ I64 WrapLatticeLite()
 	I64 h;
 	I64 arg1;
 	I64 arg2;
-	I64 mask;
 
 	h = 0;
 	dc = DCAlias;
-	MenuPush("File { Exit(,CH_ESC); }");
+	MenuPush(
+		"File {"
+		"  Abort(,CH_SHIFT_ESC);"
+		"  Exit(,CH_ESC);"
+		"}"
+		"Play {"
+		"  Restart(,'\n');"
+		"  Step(,CH_SPACE);"
+		"  Accelerator(,,SC_CURSOR_UP);"
+		"  Break(,,SC_CURSOR_DOWN);"
+		"  Left(,,SC_CURSOR_LEFT);"
+		"  Right(,,SC_CURSOR_RIGHT);"
+		"}"
+		"Settings {"
+		"  Color(,'c');"
+		"  Wider(,'+');"
+		"  Narrower(,'-');"
+		"  Ends(,'e');"
+		"  Layer0(,'0');"
+		"  Layer1(,'1');"
+		"  Layer2(,'2');"
+		"  Layer3(,'3');"
+		"  Layer4(,'4');"
+		"  Layer5(,'5');"
+		"  Layer6(,'6');"
+		"  Layer7(,'7');"
+		"  Layer8(,'8');"
+		"  Layer9(,'9');"
+		"}"
+		);
 	SettingsPush;
+	AutoComplete;
+	WinBorder;
+	WinMax;
+	DocCursor;
+	DocClear;
+	TurtleInit(&tt);
+	SetMenu;
+	Fs->win_inhibit = WIG_TASK_DEFAULT - WIF_FOCUS_TASK_MENU -
+		WIF_SELF_FOCUS - WIF_SELF_GRAB_SCROLL;
 	try
 	{
-		TurtleInit(&tt);
-		SetMenu;
-
 		/* Mutate, then '\n' restarts, then ESC. */
 		MsgQuePush(MESSAGE_KEY_DOWN, '3', 0);
 		MsgQuePush(MESSAGE_KEY_DOWN, 'e', 0);
@@ -75,10 +119,9 @@ I64 WrapLatticeLite()
 		MsgQuePush(MESSAGE_KEY_DOWN, '\n', 0);
 		MsgQuePush(MESSAGE_KEY_DOWN, CH_ESC, 0);
 
-		mask = 1 << MESSAGE_KEY_DOWN;
 		while (TRUE)
 		{
-			switch (MessageGet(&arg1, &arg2, mask))
+			switch (MessageGet(&arg1, &arg2, 1 << MESSAGE_KEY_DOWN))
 			{
 				case MESSAGE_KEY_DOWN:
 					switch (arg1)
