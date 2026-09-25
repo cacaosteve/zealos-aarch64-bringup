@@ -1768,6 +1768,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 151 — UTM shell FB clear after boot smokes
+
+| Item | Path |
+|--|--|
+| Gap | UTM FB kept bars/lines from jit_smoke under the interactive `>` |
+| Upstream need | clean interactive console surface on virt FB |
+| Bring-up | `shell_run` clears FB + resets text cursor before banner |
+| Smoke | check-serial / run-pci unchanged; UTM eyes-on clean prompt |
+| Shell | unchanged commands |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).
