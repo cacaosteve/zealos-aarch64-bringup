@@ -2360,8 +2360,9 @@ static int hc_run_src(const char *src, uint64_t *out) {
     return rc;
 }
 
-/* M155: DiskLat → LatticePlay — drop MsgQuePush scripts for live UTM.
- * smoke_esc: inject one CH_ESC after Cls so check-serial still terminates. */
+/* M155/M159: DiskLat → LatticePlay — drop MsgQuePush scripts for live UTM.
+ * smoke_esc: inject one CH_ESC after Cls so check-serial still terminates.
+ * live (!smoke_esc): inject a one-line controls hint after Cls. */
 static int hc_lattice_play_src(const char *in, char *out, size_t cap, int smoke_esc) {
     size_t o = 0;
     const char *p = in;
@@ -2388,17 +2389,24 @@ static int hc_lattice_play_src(const char *in, char *out, size_t cap, int smoke_
             return -1;
         }
         out[o++] = *p++;
-        /* After Cls(0); optionally seed ESC for automated smoke. */
-        if (smoke_esc && !saw_cls && o >= 7 && out[o - 7] == 'C' && out[o - 6] == 'l' &&
-            out[o - 5] == 's' && out[o - 4] == '(' && out[o - 3] == '0' && out[o - 2] == ')' &&
-            out[o - 1] == ';') {
-            static const char esc[] = "\n\t\tMsgQuePush(MESSAGE_KEY_DOWN, CH_ESC, 0);";
-            size_t el = sizeof(esc) - 1;
+        if (!saw_cls && o >= 7 && out[o - 7] == 'C' && out[o - 6] == 'l' && out[o - 5] == 's' &&
+            out[o - 4] == '(' && out[o - 3] == '0' && out[o - 2] == ')' && out[o - 1] == ';') {
+            const char *inj;
+            size_t el;
+            if (smoke_esc) {
+                inj = "\n\t\tMsgQuePush(MESSAGE_KEY_DOWN, CH_ESC, 0);";
+            } else {
+                inj = "\n\t\tGrPrint(dc, 0, 16, \"Esc=exit Enter=restart Space=step\");";
+            }
+            el = 0;
+            while (inj[el]) {
+                el++;
+            }
             if (o + el >= cap) {
                 return -1;
             }
             for (size_t i = 0; i < el; i++) {
-                out[o++] = esc[i];
+                out[o++] = inj[i];
             }
             saw_cls = 1;
         }

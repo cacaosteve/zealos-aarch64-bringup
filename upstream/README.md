@@ -1864,6 +1864,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 159 — latticeplay on-screen controls hint
+
+| Item | Path |
+|--|--|
+| Gap | Live `latticeplay` gave no FB reminder of Esc/Enter/Space |
+| Upstream need | readable bring-up cue on virt FB before first input |
+| Bring-up | `hc_lattice_play_src` injects `GrPrint` hint after `Cls` when not smoke |
+| Smoke | LatticePlay ESC-only path unchanged |
+| Shell | `latticeplay` shows hint under HUD line |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).
