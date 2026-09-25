@@ -808,9 +808,11 @@ struct hc_depth_cell {
 static struct hc_depth_cell g_hc_depth_map[HC_DEPTH_MAP];
 static int g_hc_depth_on;
 
-/* PopUpColor state (M148+); painted on FB for latticeplay (M160/M164). */
+/* PopUpColor state (M148+); painted on FB for latticeplay (M160/M164/M165). */
 static int g_hc_popup_i;
 static int g_hc_popup_live;
+static uint8_t g_hc_popup_mid = 14;  /* YELLOW — matches TurtleInit */
+static uint8_t g_hc_popup_edge = 0;  /* BLACK */
 static void hc_popup_paint_swatch(int which, uint64_t c) {
     static const uint32_t pal[16] = {
         0x00000000u, 0x000000AAu, 0x0000AA00u, 0x0000AAAAu, 0x00AA0000u, 0x00AA00AAu,
@@ -836,6 +838,15 @@ static void hc_popup_paint_swatch(int which, uint64_t c) {
     }
 }
 
+/* M165: repaint tracked Mid/Edge so Cls/Refresh keep swatches visible. */
+static void hc_popup_paint_live(void) {
+    if (!g_hc_popup_live) {
+        return;
+    }
+    hc_popup_paint_swatch(0, g_hc_popup_mid);
+    hc_popup_paint_swatch(1, g_hc_popup_edge);
+}
+
 uint64_t hc_builtin_dcfill(uint64_t dc) {
     (void)dc;
     /* Lattice DCFill — clear virt FB so DiskLat/NearLattice leave a clean surface. */
@@ -845,8 +856,9 @@ uint64_t hc_builtin_dcfill(uint64_t dc) {
     /* M164: latticeplay Restart TurtleInit → YELLOW/BLACK; sync picker + swatches. */
     if (g_hc_popup_live) {
         g_hc_popup_i = 0;
-        hc_popup_paint_swatch(0, 14); /* Mid YELLOW */
-        hc_popup_paint_swatch(1, 0);  /* Edge BLACK */
+        g_hc_popup_mid = 14;
+        g_hc_popup_edge = 0;
+        hc_popup_paint_live();
     }
     return 0;
 }
@@ -918,11 +930,12 @@ static int hc_depth_try(int32_t xi, int32_t yi, int32_t zi) {
     return 1;
 }
 
-/* Non-interactive Lattice color picker (M148/M150/M160/M161/M164).
+/* Non-interactive Lattice color picker (M148/M150/M160/M161/M164/M165).
  * HolyC string args to PopUpColor are not yet reliable C pointers here —
  * use Mid/Edge call-pair order (reset each hc_run_src). UART RX clears RSR.
  * M160: paint FB swatches. M161: latticeplay cycles Mid/Edge pairs after the first.
- * M164: DCFill (Restart) resets live picker + default Mid/Edge swatches. */
+ * M164: DCFill (Restart) resets live picker + default Mid/Edge swatches.
+ * M165: track Mid/Edge so Cls/Refresh keep swatches from entry through idle. */
 uint64_t hc_builtin_popupcolor(uint64_t header) {
     (void)header;
     {
@@ -936,6 +949,11 @@ uint64_t hc_builtin_popupcolor(uint64_t header) {
             c = (i & 1) ? (uint64_t)edges[pair] : (uint64_t)mids[pair];
         } else {
             c = (i & 1) ? 0 : 14; /* Edge BLACK, Mid YELLOW */
+        }
+        if (i & 1) {
+            g_hc_popup_edge = (uint8_t)(c & 15);
+        } else {
+            g_hc_popup_mid = (uint8_t)(c & 15);
         }
         hc_popup_paint_swatch(i & 1, c);
         return c;
@@ -1172,6 +1190,8 @@ uint64_t hc_builtin_refresh(void) {
     }
     typedef void (*hc_draw_it_fn)(uint64_t task, uint64_t dc);
     ((hc_draw_it_fn)(uintptr_t)g_hc_fs_draw_it)(0, (uint64_t)(uintptr_t)&g_hc_cdc);
+    /* M165: DrawIt/TurtleMove can cover bottom swatches — keep them on top. */
+    hc_popup_paint_live();
     return 1;
 }
 
@@ -1325,6 +1345,8 @@ uint64_t hc_builtin_grpeek(uint64_t x, uint64_t y) {
 
 uint64_t hc_builtin_cls(uint64_t c) {
     fb_clear((uint32_t)c);
+    /* M165: latticeplay entry Cls — show Mid/Edge before first 'c'. */
+    hc_popup_paint_live();
     return 0;
 }
 
@@ -2398,6 +2420,8 @@ static int hc_run_src_ex(const char *src, uint64_t *out, int popup_live) {
     uint8_t bc[8192]; /* was 4096 — Lattice angles[35] brace init */
     int rc;
     g_hc_popup_i = 0;
+    g_hc_popup_mid = 14;
+    g_hc_popup_edge = 0;
     g_hc_popup_live = popup_live ? 1 : 0;
     g_hc_fs_draw_it = 0; /* M153: no stale Fs->draw_it across demos */
     hc_heap_reset();

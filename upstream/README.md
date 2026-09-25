@@ -1948,6 +1948,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 165 — latticeplay Mid/Edge swatches from entry + Refresh
+
+| Item | Path |
+|--|--|
+| Gap | Swatches only appeared after first `'c'` or Enter; idle `Refresh`/`DrawIt` could cover them |
+| Upstream need | Mid/Edge visible for the whole live session |
+| Bring-up | track Mid/Edge; live `Cls` + `Refresh` re-paint via `hc_popup_paint_live` |
+| Smoke | Mid/Both/DiskLat/LatticePlay unchanged (popup_live=0 on smokes) |
+| Shell | `latticeplay` shows YELLOW/BLACK from start; colors survive idle frames |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).
