@@ -1550,6 +1550,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 133 — STR_LEN SetMenu buffers
+
+| Item | Path |
+|--|--|
+| Gap | NearLattice/DiskLat/Live/Play/SetMenu still used `U8 buf[32]` |
+| Upstream need | `Lattice.ZC` SetMenu — `U8 buf[STR_LEN]` |
+| Bring-up | NearLatticeLite + DiskLat + LiveLite + PlayLite + SetMenuLite |
+| Smoke | existing expects unchanged (**15**) |
+| Shell | unchanged |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).
