@@ -838,13 +838,22 @@ static void hc_popup_paint_swatch(int which, uint64_t c) {
     }
 }
 
-/* M165: repaint tracked Mid/Edge so Cls/Refresh keep swatches visible. */
+/* M165/M166: repaint Mid/Edge + controls hint so Cls/Refresh keep chrome. */
 static void hc_popup_paint_live(void) {
+    static const char hint[] = "Esc=exit Enter=restart Space=step c=color +/-=w";
+    uint32_t i;
     if (!g_hc_popup_live) {
         return;
     }
     hc_popup_paint_swatch(0, g_hc_popup_mid);
     hc_popup_paint_swatch(1, g_hc_popup_edge);
+    /* Same band as GrPrint(dc, 0, 16, …) — idle DrawIt must not bury the cue. */
+    if (g_fb) {
+        fb_fillrect(0, 16u, 64u * 8u, 8u, 0);
+        for (i = 0; hint[i]; i++) {
+            fb_draw_char(i, 2u, hint[i], 0x00E0E0E0u);
+        }
+    }
 }
 
 uint64_t hc_builtin_dcfill(uint64_t dc) {
@@ -2476,7 +2485,7 @@ static int hc_lattice_play_src(const char *in, char *out, size_t cap, int smoke_
             if (smoke_esc) {
                 inj = "\n\t\tMsgQuePush(MESSAGE_KEY_DOWN, CH_ESC, 0);";
             } else {
-        inj = "\n\t\tGrPrint(dc, 0, 16, \"Esc=exit Enter=restart Space=step c=color\");";
+        inj = "\n\t\tGrPrint(dc, 0, 16, \"Esc=exit Enter=restart Space=step c=color +/-=w\");";
             }
             el = 0;
             while (inj[el]) {

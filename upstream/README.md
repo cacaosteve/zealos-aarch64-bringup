@@ -1960,6 +1960,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 166 — latticeplay controls hint on Refresh + width cue
+
+| Item | Path |
+|--|--|
+| Gap | Esc/Enter/Space hint could vanish under idle `DrawIt`; width keys undocumented on FB |
+| Upstream need | controls cue stays readable; `+`/`-` width called out |
+| Bring-up | live `hc_popup_paint_live` re-prints hint; DiskLat/Near/Wrap/`hc_lattice_play_src` add `+/-=w` |
+| Smoke | DiskLat / NearLattice / WrapLatticeLite / LatticePlay still **15** |
+| Shell | `latticeplay` hint survives Refresh; shows `+/-=w` |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).

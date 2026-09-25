@@ -316,7 +316,7 @@ I64 NearLatticeLite()
 							TurtleInit(&tt);
 							SetMenu;
 							/* M162: Enter clears FB — restore live-play controls cue. */
-							GrPrint(dc, 0, 16, "Esc=exit Enter=restart Space=step c=color");
+							GrPrint(dc, 0, 16, "Esc=exit Enter=restart Space=step c=color +/-=w");
 							break;
 						case CH_ESC:
 						case CH_SHIFT_ESC:

@@ -142,7 +142,7 @@ I64 WrapLatticeLite()
 							DCFill(dc);
 							TurtleInit(&tt);
 							SetMenu;
-							GrPrint(dc, 0, 16, "Esc=exit Enter=restart Space=step c=color");
+							GrPrint(dc, 0, 16, "Esc=exit Enter=restart Space=step c=color +/-=w");
 							break;
 						case CH_ESC:
 						case CH_SHIFT_ESC:
