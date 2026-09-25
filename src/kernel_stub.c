@@ -884,15 +884,38 @@ static int hc_depth_try(int32_t xi, int32_t yi, int32_t zi) {
     return 1;
 }
 
-/* Non-interactive Lattice color picker (M148/M150).
+/* Non-interactive Lattice color picker (M148/M150/M160).
  * HolyC string args to PopUpColor are not yet reliable C pointers here —
- * use Mid/Edge call-pair order (reset each hc_run_src). UART RX clears RSR. */
+ * use Mid/Edge call-pair order (reset each hc_run_src). UART RX clears RSR.
+ * M160: paint a small FB swatch so latticeplay 'c' is visible. */
 static int g_hc_popup_i;
 uint64_t hc_builtin_popupcolor(uint64_t header) {
     (void)header;
     {
+        static const uint32_t pal[16] = {
+            0x00000000u, 0x000000AAu, 0x0000AA00u, 0x0000AAAAu, 0x00AA0000u, 0x00AA00AAu,
+            0x00AA5500u, 0x00AAAAAAu, 0x00555555u, 0x005555FFu, 0x0055FF55u, 0x0055FFFFu,
+            0x00FF5555u, 0x00FF55FFu, 0x00FFFF55u, 0x00FFFFFFu,
+        };
         int i = g_hc_popup_i++;
-        return (i & 1) ? 0 : 14; /* Edge BLACK, Mid YELLOW */
+        uint64_t c = (i & 1) ? 0 : 14; /* Edge BLACK, Mid YELLOW */
+        if (g_fb) {
+            const char *lab = (i & 1) ? "Edge" : "Mid";
+            uint32_t x0 = (i & 1) ? 72u : 8u;
+            uint32_t y0 = (uint32_t)g_fb_h > 40u ? (uint32_t)g_fb_h - 28u : 8u;
+            uint32_t col = x0 / 8u;
+            uint32_t row = (y0 >= 8u ? y0 - 8u : 0u) / 8u;
+            int k;
+            fb_fillrect(x0, y0, 56u, 20u, pal[(int)c]);
+            fb_fillrect(x0, y0, 56u, 1u, 0x00E0E0E0u);
+            fb_fillrect(x0, y0 + 19u, 56u, 1u, 0x00E0E0E0u);
+            fb_fillrect(x0, y0, 1u, 20u, 0x00E0E0E0u);
+            fb_fillrect(x0 + 55u, y0, 1u, 20u, 0x00E0E0E0u);
+            for (k = 0; lab[k]; k++) {
+                fb_draw_char(col + (uint32_t)k, row, lab[k], 0x00E0E0E0u);
+            }
+        }
+        return c;
     }
 }
 

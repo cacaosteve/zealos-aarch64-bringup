@@ -83,7 +83,7 @@ enum {
 #define HC_IR_MAX_LOCALS 4   /* register locals x20–x23 (ST_LOCAL/LD_LOCAL) */
 #define HC_IR_MEM_WORDS  256 /* was 128 — Lattice MenuPush strings+angles leave <16 words for DrawIt frames */
 #define HC_IR_MAX_NAMES  24  /* was 8 — upstream demos need more locals */
-#define HC_IR_MAX_GLOBS  48  /* was 32 — Lattice angles[35] */
+#define HC_IR_MAX_GLOBS  64  /* was 48 — Lattice angles[35]+Turtle headroom */
 #define HC_IR_ERR_DEPTH  (-1)
 #define HC_IR_ERR_OP     (-2)
 #define HC_IR_ERR_SPACE  (-3)

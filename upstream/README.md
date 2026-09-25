@@ -1876,6 +1876,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 160 — PopUpColor FB swatch + glob headroom
+
+| Item | Path |
+|--|--|
+| Gap | latticeplay `'c'` picked Mid/Edge with no FB feedback; `HC_IR_MAX_GLOBS` tight at 48 |
+| Upstream need | visible color pick cue; room for more file-scope words |
+| Bring-up | `PopUpColor` draws Mid/Edge swatches at FB bottom; `HC_IR_MAX_GLOBS` 48→64 |
+| Smoke | Mid/Both/NearLattice/DiskLat (**15**); check-serial green |
+| Shell | `latticeplay` `'c'` shows swatches |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).
