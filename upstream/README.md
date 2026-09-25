@@ -1912,6 +1912,30 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 162 — Restart restores latticeplay controls hint
+
+| Item | Path |
+|--|--|
+| Gap | Enter/`Restart` `DCFill` wiped the Esc/Enter/Space hint |
+| Upstream need | controls cue survives Lattice Restart |
+| Bring-up | DiskLat/NearLattice/Wrap Restart `GrPrint` hint after TurtleInit |
+| Smoke | DiskLat / NearLattice / WrapLatticeLite **15** |
+| Shell | `latticeplay` Enter keeps the hint visible |
+
+Freeze catalog unchanged.
+
+## Milestone 163 — DiskLat source load buffer 8K→16K
+
+| Item | Path |
+|--|--|
+| Gap | M162 grew `DiskLat.ZC` past 8192 bytes → RedSea load FAIL |
+| Upstream need | room for Lattice compose source on disk path |
+| Bring-up | `g_hc_zc_src[16384]` for disklat/lattice/latticeplay/smoke loads |
+| Smoke | DiskLat / Lattice.ZC / LatticePlay green again |
+| Shell | unchanged |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).

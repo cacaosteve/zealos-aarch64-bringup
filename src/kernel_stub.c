@@ -2085,6 +2085,7 @@ static int rs_load_file(const char *name, char *dst, size_t cap, size_t *out_len
 static size_t str_len(const char *s);
 
 static char g_hc_src_exp[16384];
+static char g_hc_zc_src[16384]; /* M163: DiskLat.ZC grew past 8K */
 static char g_hc_src_mid[16384];
 
 #define HC_MAX_MACROS 24
@@ -4045,7 +4046,6 @@ static void shell_handle(const char *line, int *done) {
         return;
     }
     if (streq(line, "disklat")) {
-        char src[8192];
         size_t n = 0;
         uint64_t got = 0;
         if (rs_fmt_host(128, 7) != 0) {
@@ -4056,11 +4056,11 @@ static void shell_handle(const char *line, int *done) {
             con_puts("disklat put FAIL\n");
             return;
         }
-        if (rs_load_file("DiskLat.ZC", src, sizeof(src), &n) != 0) {
+        if (rs_load_file("DiskLat.ZC", g_hc_zc_src, sizeof(g_hc_zc_src), &n) != 0) {
             con_puts("disklat load FAIL\n");
             return;
         }
-        if (hc_run_src(src, &got) != 0 || got != 15) {
+        if (hc_run_src(g_hc_zc_src, &got) != 0 || got != 15) {
             con_puts("disklat FAIL\n");
             return;
         }
@@ -4069,14 +4069,13 @@ static void shell_handle(const char *line, int *done) {
         return;
     }
     if (streq(line, "latticeplay")) {
-        char src[8192];
         uint64_t got = 0;
         /* Live UTM Lattice: same DiskLat body, no scripted MsgQue — ESC to exit. */
-        if (hc_lattice_play_src(DISKLAT_ZC, src, sizeof(src), 0) != 0) {
+        if (hc_lattice_play_src(DISKLAT_ZC, g_hc_zc_src, sizeof(g_hc_zc_src), 0) != 0) {
             con_puts("latticeplay build FAIL\n");
             return;
         }
-        if (hc_run_src_ex(src, &got, 1) != 0) {
+        if (hc_run_src_ex(g_hc_zc_src, &got, 1) != 0) {
             con_puts("latticeplay FAIL\n");
             return;
         }
@@ -4085,7 +4084,6 @@ static void shell_handle(const char *line, int *done) {
         return;
     }
     if (streq(line, "lattice")) {
-        char src[8192];
         size_t n = 0;
         uint64_t got = 0;
         if (rs_fmt_host(128, 7) != 0) {
@@ -4096,11 +4094,11 @@ static void shell_handle(const char *line, int *done) {
             con_puts("lattice put FAIL\n");
             return;
         }
-        if (rs_load_file("Lattice.ZC", src, sizeof(src), &n) != 0) {
+        if (rs_load_file("Lattice.ZC", g_hc_zc_src, sizeof(g_hc_zc_src), &n) != 0) {
             con_puts("lattice load FAIL\n");
             return;
         }
-        if (hc_run_src(src, &got) != 0 || got != 15) {
+        if (hc_run_src(g_hc_zc_src, &got) != 0 || got != 15) {
             con_puts("lattice FAIL\n");
             return;
         }
@@ -6855,13 +6853,12 @@ static int jit_smoke(void) {
             return -236;
         }
         {
-            char src[8192];
             size_t n = 0;
-            if (rs_load_file("DiskLat.ZC", src, sizeof(src), &n) != 0) {
+            if (rs_load_file("DiskLat.ZC", g_hc_zc_src, sizeof(g_hc_zc_src), &n) != 0) {
                 uart_puts(g_uart, "hc: Upstream DiskLat load FAIL\n");
                 return -237;
             }
-            if (hc_run_src(src, &got2) != 0 || got2 != 15) {
+            if (hc_run_src(g_hc_zc_src, &got2) != 0 || got2 != 15) {
                 uart_puts(g_uart, "hc: Upstream DiskLat FAIL got=");
                 uart_put_u64_hex(g_uart, got2);
                 uart_puts(g_uart, "\n");
@@ -6882,13 +6879,12 @@ static int jit_smoke(void) {
             return -241;
         }
         {
-            char src[8192];
             size_t n = 0;
-            if (rs_load_file("Lattice.ZC", src, sizeof(src), &n) != 0) {
+            if (rs_load_file("Lattice.ZC", g_hc_zc_src, sizeof(g_hc_zc_src), &n) != 0) {
                 uart_puts(g_uart, "hc: Upstream Lattice.ZC load FAIL\n");
                 return -242;
             }
-            if (hc_run_src(src, &got2) != 0 || got2 != 15) {
+            if (hc_run_src(g_hc_zc_src, &got2) != 0 || got2 != 15) {
                 uart_puts(g_uart, "hc: Upstream Lattice.ZC FAIL got=");
                 uart_put_u64_hex(g_uart, got2);
                 uart_puts(g_uart, "\n");
@@ -6901,12 +6897,11 @@ static int jit_smoke(void) {
         (void)rs_del_file("Lattice.ZC");
         /* M155: LatticePlay = DiskLat without scripted MsgQue; ESC-only for smoke. */
         {
-            char src[8192];
-            if (hc_lattice_play_src(DISKLAT_ZC, src, sizeof(src), 1) != 0) {
+            if (hc_lattice_play_src(DISKLAT_ZC, g_hc_zc_src, sizeof(g_hc_zc_src), 1) != 0) {
                 uart_puts(g_uart, "hc: Upstream LatticePlay build FAIL\n");
                 return -247;
             }
-            if (hc_run_src(src, &got2) != 0) {
+            if (hc_run_src(g_hc_zc_src, &got2) != 0) {
                 uart_puts(g_uart, "hc: Upstream LatticePlay FAIL got=");
                 uart_put_u64_hex(g_uart, got2);
                 uart_puts(g_uart, "\n");
