@@ -15,7 +15,7 @@ I64 CheckedLite()
 {
 	CMenuEntry *tmpse;
 	I64 h;
-	U8 buf[32];
+	U8 buf[STR_LEN];
 
 	h = 0;
 	StrPrint(buf, "Settings/Layer%d", 3);

@@ -17,7 +17,7 @@ class Turtle
 U0 SetMenu()
 {
 	CMenuEntry *tmpse;
-	U8 buf[32];
+	U8 buf[STR_LEN];
 
 	/* Single stub entry: set Ends first, Layer last so checked sticks. */
 	if (tmpse = MenuEntryFind(Fs->cur_menu, "Settings/Ends"))
@@ -40,7 +40,7 @@ I64 LayerLite()
 	I64 h;
 	I64 mask;
 	CMenuEntry *tmpse;
-	U8 buf[32];
+	U8 buf[STR_LEN];
 
 	h = 0;
 	tt.z = 0.0;

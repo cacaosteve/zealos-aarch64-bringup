@@ -17,7 +17,7 @@ class Turtle
 U0 SetMenu()
 {
 	I64 i;
-	U8 buf[32];
+	U8 buf[STR_LEN];
 	CMenuEntry *tmpse;
 
 	for (i = 0; i <= 9; i++)
@@ -44,7 +44,7 @@ I64 MenuFullLite()
 {
 	I64 h;
 	CMenuEntry *tmpse;
-	U8 buf[32];
+	U8 buf[STR_LEN];
 
 	h = 0;
 	tt.z = 5;

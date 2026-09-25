@@ -37,7 +37,7 @@ U0 TurtleInit(Turtle *t)
 U0 SetMenu()
 {
 	CMenuEntry *tmpse;
-	U8 buf[32];
+	U8 buf[STR_LEN];
 
 	StrPrint(buf, "Settings/Layer%d", ToI64(tt.z));
 	if (tmpse = MenuEntryFind(Fs->cur_menu, buf))
