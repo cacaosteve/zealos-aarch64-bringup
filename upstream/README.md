@@ -1622,6 +1622,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 139 — Frame/Restart/Ends/Layer full SetMenu
+
+| Item | Path |
+|--|--|
+| Gap | Frame/Restart/Ends/Layer still used slim single-layer SetMenu |
+| Upstream need | `Lattice.ZC` SetMenu — clear sibling Layer0–9 checked flags |
+| Bring-up | those *Lites → full for-loop SetMenu; expects unchanged (**15**) |
+| Smoke | existing expects unchanged |
+| Shell | unchanged |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).
