@@ -1,4 +1,4 @@
-/* Milestone 115/118/121/122/125/134/136: Lattice compose from RedSea disk + DiskLat.
+/* Milestone 115/118/121/122/125/134/136/143: Lattice compose from RedSea disk + DiskLat.
  *
  * Upstream need: runzc-shaped path for a Lattice *Lite (not freeze catalog).
  *
@@ -9,6 +9,7 @@
  *   - M125: also smoked as RedSea Lattice.ZC (same body)
  *   - M134: full SetMenu sibling-clear + TurtleInit/SetMenu/win_inhibit outside try
  *   - M136: DCDepthBufAlloc + scripted 'c' dual PopUpColor
+ *   - M143: RedSea load buf 8K; Lattice Narrower '-' handler
  *   - Freeze catalog unchanged (ephemeral disk file)
  *   - return DiskLat();  expect 15
  */
@@ -118,6 +119,7 @@ I64 DiskLat()
 		MsgQuePush(MESSAGE_KEY_DOWN, '3', 0);
 		MsgQuePush(MESSAGE_KEY_DOWN, 'e', 0);
 		MsgQuePush(MESSAGE_KEY_DOWN, '+', 0);
+		MsgQuePush(MESSAGE_KEY_DOWN, '-', 0);
 		MsgQuePush(MESSAGE_KEY_DOWN, '\n', 0);
 		MsgQuePush(MESSAGE_KEY_DOWN, 'c', 0);
 		MsgQuePush(MESSAGE_KEY_DOWN, CH_ESC, 0);
@@ -139,6 +141,9 @@ I64 DiskLat()
 							break;
 						case '+':
 							tt.w = tt.w + 1.0;
+							break;
+						case '-':
+							tt.w = tt.w - 1.0;
 							break;
 						case 'c':
 							tt.middle = PopUpColor("Mid Color\n\n");

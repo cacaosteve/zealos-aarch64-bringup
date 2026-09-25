@@ -1670,6 +1670,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 143 — DiskLat load 8K + Narrower `-`
+
+| Item | Path |
+|--|--|
+| Gap | RedSea DiskLat/Lattice load capped at 4K; DiskLat lacked `'/'` — lacked `'-'` |
+| Upstream need | headroom toward NearLattice; Lattice Wider/Narrower `'+'`/`'-'` |
+| Bring-up | load buf **8192**; DiskLat `case '-'`; still **15** |
+| Smoke | `hc: Upstream DiskLat` / `Lattice.ZC` (expect 15) |
+| Shell | `disklat` / `lattice` |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).

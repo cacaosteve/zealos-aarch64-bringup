@@ -3859,7 +3859,7 @@ static void shell_handle(const char *line, int *done) {
         return;
     }
     if (streq(line, "disklat")) {
-        char src[4096];
+        char src[8192];
         size_t n = 0;
         uint64_t got = 0;
         if (rs_put_file("DiskLat.ZC", DISKLAT_ZC, str_len(DISKLAT_ZC)) != 0) {
@@ -3878,7 +3878,7 @@ static void shell_handle(const char *line, int *done) {
         return;
     }
     if (streq(line, "lattice")) {
-        char src[4096];
+        char src[8192];
         size_t n = 0;
         uint64_t got = 0;
         if (rs_put_file("Lattice.ZC", DISKLAT_ZC, str_len(DISKLAT_ZC)) != 0) {
@@ -6631,7 +6631,7 @@ static int jit_smoke(void) {
             return -236;
         }
         {
-            char src[4096];
+            char src[8192];
             size_t n = 0;
             if (rs_load_file("DiskLat.ZC", src, sizeof(src), &n) != 0) {
                 uart_puts(g_uart, "hc: Upstream DiskLat load FAIL\n");
@@ -6654,7 +6654,7 @@ static int jit_smoke(void) {
             return -241;
         }
         {
-            char src[4096];
+            char src[8192];
             size_t n = 0;
             if (rs_load_file("Lattice.ZC", src, sizeof(src), &n) != 0) {
                 uart_puts(g_uart, "hc: Upstream Lattice.ZC load FAIL\n");
