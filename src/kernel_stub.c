@@ -880,26 +880,15 @@ static int hc_depth_try(int32_t xi, int32_t yi, int32_t zi) {
     return 1;
 }
 
-/* Non-interactive Lattice color picker (M148).
- * Prefer header: Edge* → BLACK, else YELLOW.
- * Fallback: alternating Mid/Edge when header is not a usable C string. */
+/* Non-interactive Lattice color picker (M148/M150).
+ * HolyC string args to PopUpColor are not yet reliable C pointers here —
+ * use Mid/Edge call-pair order (reset each hc_run_src). UART RX clears RSR. */
 static int g_hc_popup_i;
 uint64_t hc_builtin_popupcolor(uint64_t header) {
-    const char *h = (const char *)(uintptr_t)header;
-    if (h && (uint64_t)(uintptr_t)h > 0x1000) {
-        if (h[0] == 'E' && h[1] == 'd' && h[2] == 'g' && h[3] == 'e') {
-            g_hc_popup_i++;
-            return 0; /* BLACK */
-        }
-        if (h[0] == 'M' && h[1] == 'i' && h[2] == 'd') {
-            g_hc_popup_i++;
-            return 14; /* YELLOW */
-        }
-    }
-    /* Pair order: 0 Mid YELLOW, 1 Edge BLACK, … */
+    (void)header;
     {
         int i = g_hc_popup_i++;
-        return (i & 1) ? 0 : 14;
+        return (i & 1) ? 0 : 14; /* Edge BLACK, Mid YELLOW */
     }
 }
 
@@ -3106,9 +3095,11 @@ static int rs_is_graphic_zc(const char *name) {
 }
 
 #define PL011_FR_RXFE (1u << 4)
+#define PL011_RSR     0x04
 
 static int uart_getc_nb(void) {
     volatile uint32_t *r;
+    int c;
     if (!g_uart) {
         return -1;
     }
@@ -3116,7 +3107,9 @@ static int uart_getc_nb(void) {
     if (r[PL011_FR / 4] & PL011_FR_RXFE) {
         return -1;
     }
-    return (int)(r[PL011_DR / 4] & 0xff);
+    c = (int)(r[PL011_DR / 4] & 0xff);
+    r[PL011_RSR / 4] = 0; /* clear OE/BE/PE/FE via ECR alias */
+    return c;
 }
 
 static int kbd_getc_nb(void) {

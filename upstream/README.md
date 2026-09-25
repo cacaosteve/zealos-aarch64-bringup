@@ -1756,6 +1756,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 150 — UART RX RSR clear + PopUpColor pair reset
+
+| Item | Path |
+|--|--|
+| Gap | PL011 RX left RSR sticky; PopUpColor pair index leaked across `hc_run_src` |
+| Upstream need | clean UART RX for Pi USB-TTL; stable Mid/Edge PopUpColor pairs |
+| Bring-up | `uart_getc_nb` clears RSR/ECR; `g_hc_popup_i` reset per run (pair Mid/Edge) |
+| Smoke | Mid/Both/NearLattice/DiskLat (**15**); check-serial green |
+| Shell | unchanged |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).

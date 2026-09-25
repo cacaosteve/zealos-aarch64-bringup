@@ -68,7 +68,8 @@ Acceptance:
 - **PI-DIAG-4 accepted (2026-09-23):** Device-map of GICD/GICC — cyan IRQ ticks + white;
   FB text `GICv2 IRQ OK`.
 - **Shell entry accepted (2026-09-23):** after IRQ OK, FB shows `ZealOS aarch64 shell`
-  and the cmd list. Next: UART RX (`help`/`halt` on USB-TTL @ 115200).
+  and the cmd list. Next: prove UART RX on hardware (`help`/`halt` on USB-TTL @ 115200).
+  Soft (M150): `uart_getc_nb` clears RSR/ECR after each DR; RXE already on.
 ## SD card layout
 
 FAT32 (MBR type `0xEF` recommended by pftf):
