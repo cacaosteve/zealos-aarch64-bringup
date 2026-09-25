@@ -97,6 +97,7 @@ I64 RestartLite()
 			case MESSAGE_KEY_DOWN:
 				switch (a1)
 				{
+					case '\r':
 					case '\n':
 						DCFill(dc);
 						TurtleInit(&tt);

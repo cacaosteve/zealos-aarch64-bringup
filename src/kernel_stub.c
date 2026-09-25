@@ -970,6 +970,10 @@ uint64_t hc_builtin_messageget(uint64_t p_arg1, uint64_t p_arg2, uint64_t mask) 
     } else if ((mask & HC_MSG_BIT(2)) && !virtio_kbd_ready()) {
         int c = uart_getc_nb();
         if (c >= 0) {
+            /* Serial Enter is often CR; Lattice Restart is '\n'. */
+            if (c == '\r') {
+                c = '\n';
+            }
             hc_msg_store_outs(p_arg1, p_arg2, (uint64_t)(int64_t)c, 0);
             return 2;
         }

@@ -137,6 +137,7 @@ I64 WrapLatticeLite()
 						case '+':
 							tt.w = tt.w + 1.0;
 							break;
+						case '\r':
 						case '\n':
 							DCFill(dc);
 							TurtleInit(&tt);

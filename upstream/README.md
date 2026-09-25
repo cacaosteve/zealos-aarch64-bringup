@@ -1852,6 +1852,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 158 — Enter → Lattice Restart (`\n`)
+
+| Item | Path |
+|--|--|
+| Gap | virtio Enter emitted `\r`; Lattice `Restart(,'\n')` / `case '\n'` never matched on UTM |
+| Upstream need | Enter restarts turtle like Lattice.ZC |
+| Bring-up | virtio KEY_ENTER → `\n`; UART MessageGet CR→LF; DiskLat/NearLattice/RestartLite accept `\r`/`\n` |
+| Smoke | RestartLite / DiskLat / NearLattice **15**; check-serial green |
+| Shell | `latticeplay` Enter = Restart |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).
