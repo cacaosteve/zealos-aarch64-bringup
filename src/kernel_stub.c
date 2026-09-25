@@ -3265,6 +3265,15 @@ static void tablet_cursor_tick(void) {
     g_tab_cy = y;
 }
 
+/* M157: after Lattice/graphics demos, match shell_run dark FB (not DCFill black). */
+static void shell_fb_ready(void) {
+    if (g_fb) {
+        fb_clear(0x00101820u);
+        g_fb_cx = 0;
+        g_fb_cy = 0;
+    }
+}
+
 static void shell_handle(const char *line, int *done) {
     while (*line == ' ' || *line == '\t') {
         line++;
@@ -3941,6 +3950,7 @@ static void shell_handle(const char *line, int *done) {
             con_puts("nearlatticelite FAIL\n");
             return;
         }
+        shell_fb_ready();
         con_puts("nearlatticelite ok\n");
         return;
     }
@@ -4000,6 +4010,7 @@ static void shell_handle(const char *line, int *done) {
             con_puts("disklat FAIL\n");
             return;
         }
+        shell_fb_ready();
         con_puts("disklat ok\n");
         return;
     }
@@ -4015,6 +4026,7 @@ static void shell_handle(const char *line, int *done) {
             con_puts("latticeplay FAIL\n");
             return;
         }
+        shell_fb_ready();
         con_puts("latticeplay ok\n");
         return;
     }
@@ -4039,6 +4051,7 @@ static void shell_handle(const char *line, int *done) {
             return;
         }
         (void)rs_del_file("Lattice.ZC");
+        shell_fb_ready();
         con_puts("lattice ok\n");
         return;
     }

@@ -1840,6 +1840,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 157 — shell FB restore after Lattice demos
+
+| Item | Path |
+|--|--|
+| Gap | `DCFill` leaves pure black; UTM `>` after `disklat`/`latticeplay` sat on black |
+| Upstream need | handoff back to interactive console surface |
+| Bring-up | `shell_fb_ready` → same dark clear as `shell_run` after nearlatticelite/disklat/lattice/latticeplay |
+| Smoke | check-serial unchanged |
+| Shell | Lattice cmds restore FB before `ok` |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).
