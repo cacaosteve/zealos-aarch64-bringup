@@ -58,7 +58,7 @@ I64 BothColorLite()
 lt_done:
 	if (tt.middle == YELLOW)
 		h = h + 2;
-	if (tt.edge == YELLOW)
+	if (tt.edge == BLACK)
 		h = h + 4;
 	/* Reset and re-pick via 'c'. */
 	tt.middle = CYAN;
@@ -69,7 +69,7 @@ lt_done:
 		tt.middle = PopUpColor("Mid Color\n\n");
 		tt.edge = PopUpColor("Edge Color\n\n");
 	}
-	if (tt.middle == YELLOW && tt.edge == YELLOW)
+	if (tt.middle == YELLOW && tt.edge == BLACK)
 		h = h + 8;
 	return h;
 }

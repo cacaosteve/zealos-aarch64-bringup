@@ -38,7 +38,7 @@ uint64_t hc_builtin_dcfill(uint64_t dc);  /* Lattice DCFill(dc) stub */
 uint64_t hc_builtin_dcdel(uint64_t dc);   /* Lattice DCDel(dc) stub */
 uint64_t hc_builtin_dcdepthbufalloc(uint64_t dc); /* Lattice DCDepthBufAlloc stub */
 uint64_t hc_builtin_dcdepthbufreset(uint64_t dc); /* Lattice DCDepthBufReset stub */
-uint64_t hc_builtin_popupcolor(uint64_t header);  /* Lattice PopUpColor → YELLOW */
+uint64_t hc_builtin_popupcolor(uint64_t header);  /* Lattice PopUpColor Mid→YELLOW Edge→BLACK */
 uint64_t hc_builtin_messageget(uint64_t p_arg1, uint64_t p_arg2, uint64_t mask);
 uint64_t hc_builtin_msgquepush(uint64_t type, uint64_t a1, uint64_t a2); /* bring-up seed */
 uint64_t hc_builtin_menupush(uint64_t s); /* Lattice MenuPush stub */

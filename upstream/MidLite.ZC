@@ -5,7 +5,7 @@
  *   case 'C': tt.edge = PopUpColor(…);
  *
  * Bring-up:
- *   - Scripted KEY 'c'/'C' via MessageGet; PopUpColor → YELLOW
+ *   - Scripted KEY 'c'/'C' via MessageGet; PopUpColor Mid→YELLOW Edge→BLACK
  *   - return MidLite();  expect 15
  */
 
@@ -60,7 +60,7 @@ I64 MidLite()
 lt_done:
 	if (tt.middle == YELLOW)
 		h = h + 2;
-	if (tt.edge == YELLOW)
+	if (tt.edge == BLACK)
 		h = h + 4;
 	/* Re-pick middle after reset. */
 	tt.middle = CYAN;

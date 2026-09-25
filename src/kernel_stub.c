@@ -880,10 +880,27 @@ static int hc_depth_try(int32_t xi, int32_t yi, int32_t zi) {
     return 1;
 }
 
-/* Non-interactive: Lattice color picker → YELLOW. */
+/* Non-interactive Lattice color picker (M148).
+ * Prefer header: Edge* → BLACK, else YELLOW.
+ * Fallback: alternating Mid/Edge when header is not a usable C string. */
+static int g_hc_popup_i;
 uint64_t hc_builtin_popupcolor(uint64_t header) {
-    (void)header;
-    return 14;
+    const char *h = (const char *)(uintptr_t)header;
+    if (h && (uint64_t)(uintptr_t)h > 0x1000) {
+        if (h[0] == 'E' && h[1] == 'd' && h[2] == 'g' && h[3] == 'e') {
+            g_hc_popup_i++;
+            return 0; /* BLACK */
+        }
+        if (h[0] == 'M' && h[1] == 'i' && h[2] == 'd') {
+            g_hc_popup_i++;
+            return 14; /* YELLOW */
+        }
+    }
+    /* Pair order: 0 Mid YELLOW, 1 Edge BLACK, … */
+    {
+        int i = g_hc_popup_i++;
+        return (i & 1) ? 0 : 14;
+    }
 }
 
 /* Scripted MessageGet queue for Lattice while(TRUE) event-loop smokes. */
@@ -2326,6 +2343,7 @@ static int hc_expand_includes(const char *src, char *dst, size_t cap) {
 
 static int hc_run_src(const char *src, uint64_t *out) {
     uint8_t bc[8192]; /* was 4096 — Lattice angles[35] brace init */
+    g_hc_popup_i = 0;
     hc_heap_reset();
     if (hc_expand_includes(src, g_hc_src_exp, sizeof(g_hc_src_exp)) != 0) {
         return -50;

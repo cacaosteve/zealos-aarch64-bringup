@@ -341,7 +341,7 @@ lt_done:
 	if (ToI64(tt.speed) == 2)
 		h = h + 4;
 	/* 'c' both YELLOW; SPACE cleared first. */
-	if (tt.middle == YELLOW && tt.edge == YELLOW && !tt.first)
+	if (tt.middle == YELLOW && tt.edge == BLACK && !tt.first)
 		h = h + 8;
 
 	SettingsPop;
