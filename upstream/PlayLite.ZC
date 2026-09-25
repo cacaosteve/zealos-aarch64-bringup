@@ -216,8 +216,11 @@ I64 PlayLite()
 				}
 				break;
 			case MESSAGE_NULL:
-				goto lt_done;
+				/* Lattice idle: Sleep+Refresh until ESC (scripted CH_ESC ends smoke). */
+				Sleep(1);
+				break;
 		}
+		Refresh;
 	}
 lt_done:
 	if (ToI64(tt.y) == 300 && ToI64(tt.th * 1000.0) == 0)

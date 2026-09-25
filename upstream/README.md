@@ -1828,6 +1828,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 156 — MESSAGE_NULL idle in remaining compose *Lites
+
+| Item | Path |
+|--|--|
+| Gap | Demo/Frame/Live/Play/WrapLattice *Lites still exited on empty MessageGet |
+| Upstream need | same Lattice idle as NearLattice/DiskLat (M154) |
+| Bring-up | `Sleep(1)` + continue; Demo/Play also Refresh each turn; scripted CH_ESC ends smoke |
+| Smoke | DemoLite / FrameLite / LiveLite / PlayLite / WrapLatticeLite expect **15** |
+| Shell | unchanged |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).

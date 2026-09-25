@@ -148,7 +148,9 @@ I64 WrapLatticeLite()
 					}
 					break;
 				case MESSAGE_NULL:
-					goto lt_done;
+					/* Lattice idle: Sleep until ESC (scripted CH_ESC ends smoke). */
+					Sleep(1);
+					break;
 			}
 		}
 lt_done:
