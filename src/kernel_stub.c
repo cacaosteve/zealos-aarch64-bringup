@@ -808,11 +808,45 @@ struct hc_depth_cell {
 static struct hc_depth_cell g_hc_depth_map[HC_DEPTH_MAP];
 static int g_hc_depth_on;
 
+/* PopUpColor state (M148+); painted on FB for latticeplay (M160/M164). */
+static int g_hc_popup_i;
+static int g_hc_popup_live;
+static void hc_popup_paint_swatch(int which, uint64_t c) {
+    static const uint32_t pal[16] = {
+        0x00000000u, 0x000000AAu, 0x0000AA00u, 0x0000AAAAu, 0x00AA0000u, 0x00AA00AAu,
+        0x00AA5500u, 0x00AAAAAAu, 0x00555555u, 0x005555FFu, 0x0055FF55u, 0x0055FFFFu,
+        0x00FF5555u, 0x00FF55FFu, 0x00FFFF55u, 0x00FFFFFFu,
+    };
+    const char *lab = which ? "Edge" : "Mid";
+    uint32_t x0 = which ? 72u : 8u;
+    uint32_t y0 = (uint32_t)g_fb_h > 40u ? (uint32_t)g_fb_h - 28u : 8u;
+    uint32_t col = x0 / 8u;
+    uint32_t row = (y0 >= 8u ? y0 - 8u : 0u) / 8u;
+    int k;
+    if (!g_fb) {
+        return;
+    }
+    fb_fillrect(x0, y0, 56u, 20u, pal[(int)c & 15]);
+    fb_fillrect(x0, y0, 56u, 1u, 0x00E0E0E0u);
+    fb_fillrect(x0, y0 + 19u, 56u, 1u, 0x00E0E0E0u);
+    fb_fillrect(x0, y0, 1u, 20u, 0x00E0E0E0u);
+    fb_fillrect(x0 + 55u, y0, 1u, 20u, 0x00E0E0E0u);
+    for (k = 0; lab[k]; k++) {
+        fb_draw_char(col + (uint32_t)k, row, lab[k], 0x00E0E0E0u);
+    }
+}
+
 uint64_t hc_builtin_dcfill(uint64_t dc) {
     (void)dc;
     /* Lattice DCFill — clear virt FB so DiskLat/NearLattice leave a clean surface. */
     if (g_fb) {
         fb_clear(0);
+    }
+    /* M164: latticeplay Restart TurtleInit → YELLOW/BLACK; sync picker + swatches. */
+    if (g_hc_popup_live) {
+        g_hc_popup_i = 0;
+        hc_popup_paint_swatch(0, 14); /* Mid YELLOW */
+        hc_popup_paint_swatch(1, 0);  /* Edge BLACK */
     }
     return 0;
 }
@@ -884,20 +918,14 @@ static int hc_depth_try(int32_t xi, int32_t yi, int32_t zi) {
     return 1;
 }
 
-/* Non-interactive Lattice color picker (M148/M150/M160/M161).
+/* Non-interactive Lattice color picker (M148/M150/M160/M161/M164).
  * HolyC string args to PopUpColor are not yet reliable C pointers here —
  * use Mid/Edge call-pair order (reset each hc_run_src). UART RX clears RSR.
- * M160: paint FB swatches. M161: latticeplay cycles Mid/Edge pairs after the first. */
-static int g_hc_popup_i;
-static int g_hc_popup_live; /* 1 = latticeplay color cycle; 0 = smoke Mid/Edge lock */
+ * M160: paint FB swatches. M161: latticeplay cycles Mid/Edge pairs after the first.
+ * M164: DCFill (Restart) resets live picker + default Mid/Edge swatches. */
 uint64_t hc_builtin_popupcolor(uint64_t header) {
     (void)header;
     {
-        static const uint32_t pal[16] = {
-            0x00000000u, 0x000000AAu, 0x0000AA00u, 0x0000AAAAu, 0x00AA0000u, 0x00AA00AAu,
-            0x00AA5500u, 0x00AAAAAAu, 0x00555555u, 0x005555FFu, 0x0055FF55u, 0x0055FFFFu,
-            0x00FF5555u, 0x00FF55FFu, 0x00FFFF55u, 0x00FFFFFFu,
-        };
         /* Pair 0 stays YELLOW/BLACK for smokes + first latticeplay 'c'. */
         static const uint8_t mids[] = {14, 4, 9, 10, 12, 11, 13, 2, 5, 15};
         static const uint8_t edges[] = {0, 15, 0, 15, 0, 0, 0, 15, 0, 0};
@@ -909,22 +937,7 @@ uint64_t hc_builtin_popupcolor(uint64_t header) {
         } else {
             c = (i & 1) ? 0 : 14; /* Edge BLACK, Mid YELLOW */
         }
-        if (g_fb) {
-            const char *lab = (i & 1) ? "Edge" : "Mid";
-            uint32_t x0 = (i & 1) ? 72u : 8u;
-            uint32_t y0 = (uint32_t)g_fb_h > 40u ? (uint32_t)g_fb_h - 28u : 8u;
-            uint32_t col = x0 / 8u;
-            uint32_t row = (y0 >= 8u ? y0 - 8u : 0u) / 8u;
-            int k;
-            fb_fillrect(x0, y0, 56u, 20u, pal[(int)c & 15]);
-            fb_fillrect(x0, y0, 56u, 1u, 0x00E0E0E0u);
-            fb_fillrect(x0, y0 + 19u, 56u, 1u, 0x00E0E0E0u);
-            fb_fillrect(x0, y0, 1u, 20u, 0x00E0E0E0u);
-            fb_fillrect(x0 + 55u, y0, 1u, 20u, 0x00E0E0E0u);
-            for (k = 0; lab[k]; k++) {
-                fb_draw_char(col + (uint32_t)k, row, lab[k], 0x00E0E0E0u);
-            }
-        }
+        hc_popup_paint_swatch(i & 1, c);
         return c;
     }
 }

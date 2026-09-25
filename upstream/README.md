@@ -1936,6 +1936,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 164 — latticeplay Restart syncs PopUpColor + swatches
+
+| Item | Path |
+|--|--|
+| Gap | Enter/`DCFill` left color cycle mid-palette while TurtleInit reset to YELLOW/BLACK |
+| Upstream need | Restart restores default Mid/Edge visually and in the picker |
+| Bring-up | live `DCFill` resets `g_hc_popup_i` and paints Mid/Edge swatches; shared `hc_popup_paint_swatch` |
+| Smoke | Mid/Both/DiskLat unchanged (popup_live=0) |
+| Shell | `latticeplay` Enter resets colors + swatches |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).
