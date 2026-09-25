@@ -122,7 +122,37 @@ I64 LatticeLite()
 	h = 0;
 	dc = DCAlias;
 	DCDepthBufAlloc(dc);
-	MenuPush("File { Abort(,CH_SHIFT_ESC); Exit(,CH_ESC); }");
+	MenuPush(
+		"File {"
+		"  Abort(,CH_SHIFT_ESC);"
+		"  Exit(,CH_ESC);"
+		"}"
+		"Play {"
+		"  Restart(,'
+');"
+		"  Step(,CH_SPACE);"
+		"  Accelerator(,,SC_CURSOR_UP);"
+		"  Break(,,SC_CURSOR_DOWN);"
+		"  Left(,,SC_CURSOR_LEFT);"
+		"  Right(,,SC_CURSOR_RIGHT);"
+		"}"
+		"Settings {"
+		"  Color(,'c');"
+		"  Wider(,'+');"
+		"  Narrower(,'-');"
+		"  Ends(,'e');"
+		"  Layer0(,'0');"
+		"  Layer1(,'1');"
+		"  Layer2(,'2');"
+		"  Layer3(,'3');"
+		"  Layer4(,'4');"
+		"  Layer5(,'5');"
+		"  Layer6(,'6');"
+		"  Layer7(,'7');"
+		"  Layer8(,'8');"
+		"  Layer9(,'9');"
+		"}"
+		);
 	SettingsPush;
 	AutoComplete;
 	WinBorder;

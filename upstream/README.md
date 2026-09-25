@@ -1634,6 +1634,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 140 — full Lattice MenuPush on compose *Lites
+
+| Item | Path |
+|--|--|
+| Gap | Live/Play/Frame/Demo/LatticeLite still used slim File-only MenuPush |
+| Upstream need | `Lattice.ZC` File/Play/Settings MenuPush |
+| Bring-up | those *Lites → MenuBig-sized MenuPush; expects unchanged (**15**) |
+| Smoke | existing expects unchanged |
+| Shell | unchanged |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).
