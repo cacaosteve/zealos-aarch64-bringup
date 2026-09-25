@@ -1,11 +1,12 @@
-/* Milestone 115/118/121/122/125/134/136/143/144/145/146/147/147: Lattice compose from RedSea + DiskLat.
+/* Milestone 115/118/121/122/125/134/136/143/144/145/146/147/149/147: Lattice compose from RedSea + DiskLat.
  *
  * Upstream need: runzc-shaped path for a Lattice *Lite (not freeze catalog).
  *
  * Bring-up:
  *   - M145: rs_fmt_host(128) before put; BracePi + TurtleEnd + TurtleMove SPACE
  *   - M146: SC_CURSOR_* speed/idx + TURTLE_SPEED_STEP
- *   - M147: DrawIt + aim/MS_* place (before \n restart)
+ *   - M147: DrawIt + aim/MS_* place
+ *   - M149: NearLattice scripted keys + expect bits (no \n wipe)
  *   - Freeze catalog unchanged (ephemeral disk file)
  *   - return DiskLat();  expect 15
  */
@@ -236,14 +237,12 @@ I64 DiskLat()
 		MsgQuePush(MESSAGE_MS_L_DOWN, 100, 100);
 		MsgQuePush(MESSAGE_MS_R_DOWN, 140, 100);
 		MsgQuePush(MESSAGE_MS_R_UP, 140, 100);
-		MsgQuePush(MESSAGE_KEY_DOWN, '3', 0);
+		MsgQuePush(MESSAGE_KEY_DOWN, '4', 0);
 		MsgQuePush(MESSAGE_KEY_DOWN, 'e', 0);
 		MsgQuePush(MESSAGE_KEY_DOWN, '+', 0);
-		MsgQuePush(MESSAGE_KEY_DOWN, '-', 0);
 		MsgQuePush(MESSAGE_KEY_DOWN, 0, SC_CURSOR_UP);
-		MsgQuePush(MESSAGE_KEY_DOWN, CH_SPACE, 0);
-		MsgQuePush(MESSAGE_KEY_DOWN, '\n', 0);
 		MsgQuePush(MESSAGE_KEY_DOWN, 'c', 0);
+		MsgQuePush(MESSAGE_KEY_DOWN, CH_SPACE, 0);
 		MsgQuePush(MESSAGE_KEY_DOWN, CH_ESC, 0);
 
 		while (TRUE)
@@ -334,16 +333,19 @@ lt_done:
 	catch
 		PutExcept;
 
-	if (ToI64(tt.z) == 5)
+	/* NearLattice-shaped expect: '4'+'e', '+', CURSOR_UP, 'c', SPACE. */
+	if (ToI64(tt.z) == 4 && !tt.ends)
 		h = h + 1;
-	if (tt.ends)
+	if (ToI64(tt.w) == 1)
 		h = h + 2;
-	if (ToI64(tt.w) == 0)
+	if (ToI64(tt.speed) == 2)
 		h = h + 4;
-	if (tt.first && tt.middle == YELLOW)
+	if (tt.middle == YELLOW && tt.edge == BLACK && !tt.first)
 		h = h + 8;
 
 	SettingsPop;
+	DCFill(dc);
+	DCDel(dc);
 	MenuPop;
 	return h;
 }

@@ -1732,15 +1732,27 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
-## Milestone 148 — Demo/LatticeLite Lattice Win/Doc setup
+## Milestone 148 — header-aware PopUpColor (Mid/Edge)
 
 | Item | Path |
 |--|--|
-| Gap | DemoLite/LatticeLite skipped `AutoComplete`/`Win*`/`Doc*`/`win_inhibit` |
-| Upstream need | `Lattice.ZC` setup before the event loop |
-| Bring-up | those *Lites — Lattice setup sequence; still **15** |
-| Smoke | existing expects unchanged |
+| Gap | `PopUpColor` always returned YELLOW; Lattice Mid vs Edge headers ignored |
+| Upstream need | distinct mid/edge picks from PopUpColor headers |
+| Bring-up | Mid→YELLOW, Edge→BLACK (header or pair order; reset per `hc_run_src`) |
+| Smoke | MidLite / BothColorLite / NearLatticeLite (expect 15) |
 | Shell | unchanged |
+
+Freeze catalog unchanged.
+
+## Milestone 149 — DiskLat NearLattice script + expect parity
+
+| Item | Path |
+|--|--|
+| Gap | DiskLat scripted `\n` wipe; expect bits lagged NearLattice |
+| Upstream need | same key path + checks as NearLatticeLite compose |
+| Bring-up | DiskLat NearLattice MsgQue + expect; DCFill/DCDel teardown; **15** |
+| Smoke | `hc: Upstream DiskLat` / `Lattice.ZC` (expect 15) |
+| Shell | `disklat` / `lattice` |
 
 Freeze catalog unchanged.
 
