@@ -88,14 +88,28 @@ U0 TurtleInit(Turtle *t)
 
 U0 SetMenu()
 {
-	CMenuEntry *tmpse;
+	I64 i;
 	U8 buf[STR_LEN];
+	CMenuEntry *tmpse;
 
-	StrPrint(buf, "Settings/Layer%d", 5);
-	if (tmpse = MenuEntryFind(Fs->cur_menu, buf))
-		tmpse->checked = TRUE;
+	for (i = 0; i <= 9; i++)
+	{
+		StrPrint(buf, "Settings/Layer%d", i);
+		if (tmpse = MenuEntryFind(Fs->cur_menu, buf))
+		{
+			if (i == ToI64(tt.z))
+				tmpse->checked = TRUE;
+			else
+				tmpse->checked = FALSE;
+		}
+	}
 	if (tmpse = MenuEntryFind(Fs->cur_menu, "Settings/Ends"))
-		tmpse->checked = FALSE;
+	{
+		if (tt.ends)
+			tmpse->checked = TRUE;
+		else
+			tmpse->checked = FALSE;
+	}
 }
 
 U0 DrawIt(CTask *, CDC *dc)

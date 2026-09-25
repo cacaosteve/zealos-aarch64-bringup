@@ -1610,6 +1610,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 138 — Live/Play full SetMenu sibling-clear
+
+| Item | Path |
+|--|--|
+| Gap | LiveLite/PlayLite SetMenu still only checked the current layer |
+| Upstream need | `Lattice.ZC` SetMenu — clear sibling Layer0–9 checked flags |
+| Bring-up | `LiveLite.ZC` + `PlayLite.ZC` full for-loop SetMenu; still **15** |
+| Smoke | existing Live/Play expects unchanged (**15**) |
+| Shell | unchanged |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).
