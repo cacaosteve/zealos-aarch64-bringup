@@ -11,6 +11,7 @@
  * Bring-up:
  *   - M130: Lattice setup order (init outside try; try wraps the event loop)
  *   - M154: MESSAGE_NULL → Sleep+Refresh idle (scripted CH_ESC still ends smoke)
+ *   - M162: Restart GrPrint controls hint
  *   - return NearLatticeLite();  expect 15
  */
 
@@ -314,6 +315,8 @@ I64 NearLatticeLite()
 							DCFill(dc);
 							TurtleInit(&tt);
 							SetMenu;
+							/* M162: Enter clears FB — restore live-play controls cue. */
+							GrPrint(dc, 0, 16, "Esc=exit Enter=restart Space=step c=color");
 							break;
 						case CH_ESC:
 						case CH_SHIFT_ESC:

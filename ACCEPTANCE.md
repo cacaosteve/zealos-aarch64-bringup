@@ -82,6 +82,7 @@ Restart VM; repeat `rspersist`, `rsdir`, `runzc Notes.ZC` (persist-safe seeds).
 - M159: `latticeplay` prints a short Esc/Enter/Space hint on the FB after Cls.
 - M160: `latticeplay` `'c'` shows Mid/Edge color swatches at the bottom of the FB.
 - M161: `latticeplay` `'c'` cycles Mid/Edge color pairs (first press still YELLOW/BLACK).
+- M162: `latticeplay` Enter/Restart re-prints the Esc/Enter/Space/c hint after DCFill.
 - Freeze checklist still: `vblk`, `rspersist`, `rscatalog`, `runzc` UseAdd/Notes/MemSort (same as QEMU `run-pci`).
 
 ## Notes

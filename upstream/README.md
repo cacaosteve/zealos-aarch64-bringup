@@ -1900,6 +1900,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 162 — Restart restores latticeplay controls hint
+
+| Item | Path |
+|--|--|
+| Gap | Enter/`Restart` `DCFill` wiped the Esc/Enter/Space hint |
+| Upstream need | controls cue survives Lattice Restart |
+| Bring-up | DiskLat/NearLattice/Wrap Restart `GrPrint` hint after TurtleInit |
+| Smoke | DiskLat / NearLattice / WrapLatticeLite **15** |
+| Shell | `latticeplay` Enter keeps the hint visible |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).
