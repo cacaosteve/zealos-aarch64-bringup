@@ -1562,6 +1562,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 134 — DiskLat full SetMenu + setup order
+
+| Item | Path |
+|--|--|
+| Gap | DiskLat still used slim SetMenu + init inside `try` |
+| Upstream need | `Lattice.ZC` — sibling-clear SetMenu; init outside `try` |
+| Bring-up | `DiskLat.ZC` (+ RedSea `Lattice.ZC` alias); still **15** |
+| Smoke | `hc: Upstream DiskLat` / `Lattice.ZC` (expect 15) |
+| Shell | `disklat` / `lattice` |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).

@@ -1,4 +1,4 @@
-/* Milestone 115/118/121/122/125: Lattice compose from RedSea disk + DiskLat.
+/* Milestone 115/118/121/122/125/134: Lattice compose from RedSea disk + DiskLat.
  *
  * Upstream need: runzc-shaped path for a Lattice *Lite (not freeze catalog).
  *
@@ -7,6 +7,7 @@
  *   - Same handlers as WrapLatticeLite (try/catch + '\n' restart)
  *   - M122: Lattice setup (AutoComplete, WinBorder, WinMax, DocCursor, DocClear, win_inhibit)
  *   - M125: also smoked as RedSea Lattice.ZC (same body)
+ *   - M134: full SetMenu sibling-clear + TurtleInit/SetMenu/win_inhibit outside try
  *   - Freeze catalog unchanged (ephemeral disk file)
  *   - return DiskLat();  expect 15
  */
@@ -37,12 +38,21 @@ U0 TurtleInit(Turtle *t)
 
 U0 SetMenu()
 {
-	CMenuEntry *tmpse;
+	I64 i;
 	U8 buf[STR_LEN];
+	CMenuEntry *tmpse;
 
-	StrPrint(buf, "Settings/Layer%d", ToI64(tt.z));
-	if (tmpse = MenuEntryFind(Fs->cur_menu, buf))
-		tmpse->checked = TRUE;
+	for (i = 0; i <= 9; i++)
+	{
+		StrPrint(buf, "Settings/Layer%d", i);
+		if (tmpse = MenuEntryFind(Fs->cur_menu, buf))
+		{
+			if (i == ToI64(tt.z))
+				tmpse->checked = TRUE;
+			else
+				tmpse->checked = FALSE;
+		}
+	}
 	if (tmpse = MenuEntryFind(Fs->cur_menu, "Settings/Ends"))
 	{
 		if (tt.ends)
@@ -58,7 +68,6 @@ I64 DiskLat()
 	I64 h;
 	I64 arg1;
 	I64 arg2;
-	I64 mask;
 
 	h = 0;
 	dc = DCAlias;
@@ -98,23 +107,21 @@ I64 DiskLat()
 	WinMax;
 	DocCursor;
 	DocClear;
+	TurtleInit(&tt);
+	SetMenu;
+	Fs->win_inhibit = WIG_TASK_DEFAULT - WIF_FOCUS_TASK_MENU -
+		WIF_SELF_FOCUS - WIF_SELF_GRAB_SCROLL;
 	try
 	{
-		TurtleInit(&tt);
-		SetMenu;
-		Fs->win_inhibit = WIG_TASK_DEFAULT - WIF_FOCUS_TASK_MENU -
-			WIF_SELF_FOCUS - WIF_SELF_GRAB_SCROLL;
-
 		MsgQuePush(MESSAGE_KEY_DOWN, '3', 0);
 		MsgQuePush(MESSAGE_KEY_DOWN, 'e', 0);
 		MsgQuePush(MESSAGE_KEY_DOWN, '+', 0);
 		MsgQuePush(MESSAGE_KEY_DOWN, '\n', 0);
 		MsgQuePush(MESSAGE_KEY_DOWN, CH_ESC, 0);
 
-		mask = 1 << MESSAGE_KEY_DOWN;
 		while (TRUE)
 		{
-			switch (MessageGet(&arg1, &arg2, mask))
+			switch (MessageGet(&arg1, &arg2, 1 << MESSAGE_KEY_DOWN))
 			{
 				case MESSAGE_KEY_DOWN:
 					switch (arg1)
