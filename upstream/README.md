@@ -1586,6 +1586,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 136 — DiskLat depth_buf + dual PopUpColor
+
+| Item | Path |
+|--|--|
+| Gap | DiskLat skipped `DCDepthBufAlloc` and Lattice `'c'` dual color |
+| Upstream need | `Lattice.ZC` — depth_buf for GrPlot3; `'c'` → mid+edge PopUpColor |
+| Bring-up | `DiskLat.ZC` (+ `Lattice.ZC` alias); scripted `'c'`; still **15** |
+| Smoke | `hc: Upstream DiskLat` / `Lattice.ZC` (expect 15) |
+| Shell | `disklat` / `lattice` |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).
