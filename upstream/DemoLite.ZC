@@ -136,8 +136,7 @@ I64 DemoLite()
 		"  Exit(,CH_ESC);"
 		"}"
 		"Play {"
-		"  Restart(,'
-');"
+		"  Restart(,'\n');"
 		"  Step(,CH_SPACE);"
 		"  Accelerator(,,SC_CURSOR_UP);"
 		"  Break(,,SC_CURSOR_DOWN);"

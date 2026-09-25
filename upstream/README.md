@@ -1646,6 +1646,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 141 — fix MenuPush Restart `\n` escape in *Lites
+
+| Item | Path |
+|--|--|
+| Gap | M140 MenuPush wrote a real newline inside `Restart(,'…')` strings |
+| Upstream need | `Lattice.ZC` — `Restart(,'\n')` as backslash-n in source |
+| Bring-up | Live/Play/Frame/Demo/LatticeLite Restart strings fixed |
+| Smoke | existing expects unchanged (**15**) |
+| Shell | unchanged |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).
