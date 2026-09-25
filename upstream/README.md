@@ -1682,6 +1682,20 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 144 — DiskLat TurtleMove + SPACE (slim angles)
+
+| Item | Path |
+|--|--|
+| Gap | DiskLat MenuPush listed Step but had no TurtleMove / CH_SPACE |
+| Upstream need | `Lattice.ZC` SPACE → TurtleMove (16× formula + plot) |
+| Bring-up | DiskLat TurtlePlot/MicroMove/Move; SPACE before `
+`; ANGLES=3 (RedSea free-clus cap) |
+| Smoke | `hc: Upstream DiskLat` / `Lattice.ZC` (expect 15) |
+| Shell | `disklat` / `lattice` |
+
+Freeze catalog unchanged.
+
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).
