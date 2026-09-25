@@ -1972,6 +1972,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 167 — DiskLat DrawIt HUD `di` (Lattice parity)
+
+| Item | Path |
+|--|--|
+| Gap | DiskLat HUD omitted `di` while NearLattice/Lattice print `angles[idx]` degrees |
+| Upstream need | `Lattice.ZC` `GrPrint(… th … di … Width …)` |
+| Bring-up | DiskLat DrawIt → five-field HUD with `angles[tt.idx] * 180 / pi` |
+| Smoke | DiskLat / Lattice.ZC / LatticePlay still **15** |
+| Shell | `latticeplay` HUD shows Layer/Speed/th/di/Width |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).

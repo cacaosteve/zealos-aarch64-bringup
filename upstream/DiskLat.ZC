@@ -10,6 +10,7 @@
  *   - M154: MESSAGE_NULL → Sleep+Refresh idle (ESC exits; scripted CH_ESC still ends smoke)
  *   - M162: Restart GrPrint controls hint (latticeplay Enter)
  *   - M166: hint includes +/-=w; live Refresh re-paints hint with swatches
+ *   - M167: DrawIt HUD includes di (angles[idx]) like NearLattice/Lattice
  *   - Freeze catalog unchanged (ephemeral disk file)
  *   - return DiskLat();  expect 15
  */
@@ -166,8 +167,8 @@ U0 DrawIt(CTask *, CDC *dc)
 	Turtle t2;
 
 	MemCopy(&t2, &tt, sizeof(Turtle));
-	GrPrint(dc, 0, 0, "Layer:%f Speed:%f th:%5.1f Width:%f",
-		tt.z, tt.speed, tt.th * 180 / pi, tt.w);
+	GrPrint(dc, 0, 0, "Layer:%f Speed:%f th:%5.1f di:%5.1f Width:%f",
+		tt.z, tt.speed, tt.th * 180 / pi, angles[tt.idx] * 180 / pi, tt.w);
 	TurtleMove(dc, &t2, RED, LTRED);
 	dc->color = LTRED;
 	GrLine(dc,
