@@ -1658,6 +1658,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 142 — Lattice Win/Doc setup on Live/Play/Frame
+
+| Item | Path |
+|--|--|
+| Gap | Live/Play/Frame skipped `AutoComplete`/`Win*`/`Doc*`/`win_inhibit` |
+| Upstream need | `Lattice.ZC` setup before the event loop |
+| Bring-up | those *Lites — Lattice setup sequence; still **15** |
+| Smoke | existing expects unchanged |
+| Shell | unchanged |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).
