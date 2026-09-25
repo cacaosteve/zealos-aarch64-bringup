@@ -1,17 +1,26 @@
-/* Milestone 115/118/121/122/125/134/136/143/144: Lattice compose from RedSea + DiskLat.
+/* Milestone 115/118/121/122/125/134/136/143/144/145: Lattice compose from RedSea + DiskLat.
  *
  * Upstream need: runzc-shaped path for a Lattice *Lite (not freeze catalog).
  *
  * Bring-up:
- *   - rs_put_file → rs_load_file → hc_run_src (8K load; RedSea put still ≤~7K / free clus)
- *   - M144: TurtlePlot/MicroMove/Move + scripted CH_SPACE (before '\n'); slim ANGLES=3
+ *   - M145: rs_fmt_host(128) before put; BracePi + TurtleEnd + TurtleMove SPACE
  *   - Freeze catalog unchanged (ephemeral disk file)
  *   - return DiskLat();  expect 15
  */
 
-#define ANGLES 3
+#define ANGLES 35
 
-F64 angles[ANGLES] = {0, 0, 0};
+F64 angles[ANGLES] = {
+	-2 * pi / 1,  -2 * pi / 2,  -2 * pi / 3,  -2 * pi / 4, -2 * pi / 5,
+	-2 * pi / 6,  -2 * pi / 8,  -2 * pi / 9,  -2 * pi / 10,
+	-2 * pi / 12, -2 * pi / 15, -2 * pi / 18, -2 * pi / 20,
+	-2 * pi / 24, -2 * pi / 30, -2 * pi / 36, -2 * pi / 40,
+	0,
+	2 * pi / 40, 2 * pi / 36, 2 * pi / 30, 2 * pi / 24,
+	2 * pi / 20, 2 * pi / 18, 2 * pi / 15, 2 * pi / 12,
+	2 * pi / 10, 2 * pi / 9,  2 * pi / 8,  2 * pi / 6,
+	2 * pi / 5,  2 * pi / 4,  2 * pi / 3,  2 * pi / 2, 2 * pi / 1
+};
 
 class Turtle
 {
@@ -57,18 +66,51 @@ U0 TurtleMicroMove(Turtle *t, F64 dt)
 	t->th = Wrap(t->th + dt * angles[t->idx]);
 }
 
+U0 TurtleEnd(CDC *dc, Turtle *t, CColorROPU16 edge, CColorROPU16 middle, F64 th)
+{
+	F64 r;
+	F64 x;
+	F64 y2;
+	Turtle t2;
+
+	if (r = t->w)
+	{
+		MemCopy(&t2, t, sizeof(Turtle));
+		x = 0;
+		while (TRUE)
+		{
+			t->x = t->x + 1 / r * Cos(th);
+			t->y = t->y + 1 / r * Sin(th);
+			x = x + 1 / r;
+			y2 = r * r - 4 * x * x;
+			if (y2 >= 0)
+			{
+				t->w = Sqrt(y2);
+				TurtlePlot(dc, t, edge, middle);
+			}
+			else
+				break;
+		}
+		MemCopy(t, &t2, sizeof(Turtle));
+	}
+}
+
 U0 TurtleMove(CDC *dc, Turtle *t, CColorROPU16 edge, CColorROPU16 middle)
 {
 	I64 i;
 	I64 l;
 
 	l = 16 * AbsI64(t->w + 1) * AbsI64(t->speed + 1);
+	if (t->ends && t->first)
+		TurtleEnd(dc, t, edge, middle, t->th + pi);
 	t->first = FALSE;
 	for (i = 0; i < l; i++)
 	{
 		TurtleMicroMove(t, 1.0 / l);
 		TurtlePlot(dc, t, edge, middle);
 	}
+	if (t->ends)
+		TurtleEnd(dc, t, edge, middle, t->th);
 }
 
 U0 TurtleInit(Turtle *t)

@@ -1696,6 +1696,18 @@ Freeze catalog unchanged.
 Freeze catalog unchanged.
 
 
+## Milestone 145 — RedSea 128-clus fmt + DiskLat BracePi TurtleEnd
+
+| Item | Path |
+|--|--|
+| Gap | 16-clus smoke volume + `nclus≤14` blocked BracePi DiskLat put |
+| Upstream need | room for NearLattice-sized RedSea Lattice.ZC |
+| Bring-up | RAM disk 128; `rs_fmt_host(128)` before DiskLat/Lattice put; nclus≤120; BracePi+End |
+| Smoke | `hc: Upstream DiskLat` / `Lattice.ZC` (expect 15) |
+| Shell | `disklat` / `lattice` |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).

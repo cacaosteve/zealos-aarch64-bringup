@@ -1848,9 +1848,9 @@ uint64_t hc_builtin_call1(uint64_t fp, uint64_t a0) {
     return ((uint64_t(*)(uint64_t))(uintptr_t)fp)(a0);
 }
 
-/* 16 × 512-byte RAM disk (fallback). When virtio-blk is ready, Blk* hit the image. */
+/* 128 × 512-byte RAM disk (fallback; matches PCI/UTM RedSea 64KiB). When virtio-blk is ready, Blk* hit the image. */
 #define HC_RAM_BLK_SIZE 512u
-#define HC_RAM_N_BLKS   16u
+#define HC_RAM_N_BLKS   128u
 static uint8_t g_ram_dsk[HC_RAM_N_BLKS * HC_RAM_BLK_SIZE] __attribute__((aligned(16)));
 
 uint64_t hc_builtin_blkwrite(uint64_t buf, uint64_t blk, uint64_t count) {
@@ -2652,6 +2652,49 @@ static int rs_load_file(const char *name, char *dst, size_t cap, size_t *out_len
     return 0;
 }
 
+/* Host RSFmt — boot+bitmap; free data clus 2..sects-1 (M145). */
+static int rs_fmt_host(uint64_t sects, int64_t uid) {
+    uint8_t br[512];
+    uint8_t map[512];
+    uint8_t z[512];
+    int64_t *w;
+    unsigned i;
+
+    if (sects < 4 || sects > 128) {
+        return -1;
+    }
+    for (i = 0; i < 512; i++) {
+        br[i] = 0;
+        map[i] = 0;
+        z[i] = 0;
+    }
+    br[3] = 0x88;
+    w = (int64_t *)(br + 8);
+    w[0] = 0;
+    w[1] = (int64_t)sects;
+    w[2] = 2; /* root clus */
+    w[3] = 1; /* bitmap sects */
+    w[4] = uid;
+    br[510] = 0x55;
+    br[511] = 0xAA;
+    if (!hc_builtin_blkwrite((uint64_t)(uintptr_t)br, 0, 1)) {
+        return -2;
+    }
+    map[0] = 0x07; /* clus 0 boot, 1 bitmap, 2 root reserved */
+    if (!hc_builtin_blkwrite((uint64_t)(uintptr_t)map, 1, 1)) {
+        return -3;
+    }
+    if (!hc_builtin_blkwrite((uint64_t)(uintptr_t)z, 2, 1)) {
+        return -4;
+    }
+    for (i = 3; i < (unsigned)sects; i++) {
+        if (!hc_builtin_blkwrite((uint64_t)(uintptr_t)z, i, 1)) {
+            return -5;
+        }
+    }
+    return 0;
+}
+
 /* Write/overwrite a contiguous multi-clus RedSea root file. */
 static int rs_put_file(const char *name, const char *src, size_t len) {
     uint8_t br[512];
@@ -2671,7 +2714,7 @@ static int rs_put_file(const char *name, const char *src, size_t len) {
         return -1;
     }
     nclus = (len + 511) / 512;
-    if (nclus < 1 || nclus > 14) {
+    if (nclus < 1 || nclus > 120) {
         return -1;
     }
     if (rs_read_root(br, dir, &root, &sects) != 0) {
@@ -2693,29 +2736,33 @@ static int rs_put_file(const char *name, const char *src, size_t len) {
         if (!hc_builtin_blkread((uint64_t)(uintptr_t)map, 1, 1)) {
             return -7;
         }
-        fblk = 0;
-        for (i = 0; i + (unsigned)nclus <= (unsigned)sects; i++) {
-            int ok = 1;
-            for (j = 0; j < (unsigned)nclus; j++) {
-                unsigned b = i + j;
-                unsigned m = 1u << (b & 7);
-                if (map[b >> 3] & m) {
-                    ok = 0;
-                    break;
-                }
-            }
-            if (ok) {
+        {
+            int found = 0;
+            fblk = 0;
+            for (i = 0; i + (unsigned)nclus <= (unsigned)sects; i++) {
+                int ok = 1;
                 for (j = 0; j < (unsigned)nclus; j++) {
                     unsigned b = i + j;
                     unsigned m = 1u << (b & 7);
-                    map[b >> 3] = (uint8_t)(map[b >> 3] | m);
+                    if (map[b >> 3] & m) {
+                        ok = 0;
+                        break;
+                    }
                 }
-                fblk = i;
-                break;
+                if (ok) {
+                    for (j = 0; j < (unsigned)nclus; j++) {
+                        unsigned b = i + j;
+                        unsigned m = 1u << (b & 7);
+                        map[b >> 3] = (uint8_t)(map[b >> 3] | m);
+                    }
+                    fblk = i;
+                    found = 1;
+                    break;
+                }
             }
-        }
-        if (!fblk) {
-            return -8;
+            if (!found) {
+                return -8;
+            }
         }
         if (!hc_builtin_blkwrite((uint64_t)(uintptr_t)map, 1, 1)) {
             return -9;
@@ -3862,6 +3909,10 @@ static void shell_handle(const char *line, int *done) {
         char src[8192];
         size_t n = 0;
         uint64_t got = 0;
+        if (rs_fmt_host(128, 7) != 0) {
+            con_puts("disklat fmt FAIL\n");
+            return;
+        }
         if (rs_put_file("DiskLat.ZC", DISKLAT_ZC, str_len(DISKLAT_ZC)) != 0) {
             con_puts("disklat put FAIL\n");
             return;
@@ -3881,6 +3932,10 @@ static void shell_handle(const char *line, int *done) {
         char src[8192];
         size_t n = 0;
         uint64_t got = 0;
+        if (rs_fmt_host(128, 7) != 0) {
+            con_puts("lattice fmt FAIL\n");
+            return;
+        }
         if (rs_put_file("Lattice.ZC", DISKLAT_ZC, str_len(DISKLAT_ZC)) != 0) {
             con_puts("lattice put FAIL\n");
             return;
@@ -6625,7 +6680,11 @@ static int jit_smoke(void) {
             return -144;
         }
         uart_puts(g_uart, "hc: Upstream rsdel ok\n");
-        /* M115: Lattice compose from RedSea (ephemeral; not freeze catalog). */
+        /* M115/M145: Lattice compose from RedSea (ephemeral; not freeze catalog). */
+        if (rs_fmt_host(128, 7) != 0) {
+            uart_puts(g_uart, "hc: Upstream DiskLat fmt FAIL\n");
+            return -245;
+        }
         if (rs_put_file("DiskLat.ZC", DISKLAT_ZC, str_len(DISKLAT_ZC)) != 0) {
             uart_puts(g_uart, "hc: Upstream DiskLat put FAIL\n");
             return -236;
@@ -6649,6 +6708,10 @@ static int jit_smoke(void) {
         }
         (void)rs_del_file("DiskLat.ZC");
         /* M125: same compose under Lattice.ZC name (runzc-shaped; not freeze catalog). */
+        if (rs_fmt_host(128, 7) != 0) {
+            uart_puts(g_uart, "hc: Upstream Lattice.ZC fmt FAIL\n");
+            return -246;
+        }
         if (rs_put_file("Lattice.ZC", DISKLAT_ZC, str_len(DISKLAT_ZC)) != 0) {
             uart_puts(g_uart, "hc: Upstream Lattice.ZC put FAIL\n");
             return -241;
