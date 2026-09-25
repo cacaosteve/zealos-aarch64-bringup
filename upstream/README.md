@@ -1984,6 +1984,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 168 — latticeplay place/aim/ends hint line
+
+| Item | Path |
+|--|--|
+| Gap | tablet place/aim and `'e'` ends were on-menu only; UTM eyes-on had no FB cue |
+| Upstream need | discoverable MS_L / MS_R / Ends controls |
+| Bring-up | second hint at y=24 in live paint + DiskLat/Near/Wrap/`hc_lattice_play_src` |
+| Smoke | DiskLat / NearLattice / WrapLatticeLite / LatticePlay still **15** |
+| Shell | `latticeplay` shows L-click/R-drag/`e=ends` under the Esc line |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).

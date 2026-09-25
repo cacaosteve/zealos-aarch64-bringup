@@ -11,6 +11,7 @@
  *   - M162: Restart GrPrint controls hint (latticeplay Enter)
  *   - M166: hint includes +/-=w; live Refresh re-paints hint with swatches
  *   - M167: DrawIt HUD includes di (angles[idx]) like NearLattice/Lattice
+ *   - M168: second controls line — L-click place / R-drag aim / e=ends
  *   - Freeze catalog unchanged (ephemeral disk file)
  *   - return DiskLat();  expect 15
  */
@@ -321,8 +322,9 @@ I64 DiskLat()
 							DCFill(dc);
 							TurtleInit(&tt);
 							SetMenu;
-							/* M162: Enter clears FB — restore live-play controls cue. */
+							/* M162/M166/M168: Enter clears FB — restore live-play controls cues. */
 							GrPrint(dc, 0, 16, "Esc=exit Enter=restart Space=step c=color +/-=w");
+							GrPrint(dc, 0, 24, "L-click=place R-drag=aim e=ends");
 							break;
 						case CH_ESC:
 						case CH_SHIFT_ESC:
