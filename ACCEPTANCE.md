@@ -103,6 +103,7 @@ Restart VM; repeat `rspersist`, `rsdir`, `runzc Notes.ZC` (persist-safe seeds).
 - M180: Lattice idle `Sleep(16)` (~60 Hz) instead of `Sleep(1)` so UTM/`latticeplay` is not Refresh-bound at ~1 kHz.
 - M181: `Sleep` peeks virtio kbd/tablet (and UART RX on Pi) about every 1 ms and returns early so idle `Sleep(16)` does not add up to ~16 ms input lag.
 - M182: `StockLat.ZC` — near-verbatim stock `Demo/Graphics/Lattice.ZC` (TempleOS π/θ glyphs, `U0` helpers, setup stubs) scripted SPACE+ESC → **15**. Interactive `latticeplay` remains DiskLat-shaped (idle Sleep, head erase).
+- M183: DiskLat/`latticeplay` Turtle fields use stock `θ` / `dθ_idx` names (and HUD labels), matching StockLat.
 - **Scope:** QEMU/`disklat`/`LatticePlay` exercise DiskLat-shaped compose source, **not** stock ZealOS `Demo/Graphics/Lattice.ZC` with original behavior. Live place/aim/step/restart/colors need an eyes-on UTM pass after `make utm`.
 - Freeze checklist still: `vblk`, `rspersist`, `rscatalog`, `runzc` UseAdd/Notes/MemSort (same as QEMU `run-pci`).
 

@@ -2152,6 +2152,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 183 — DiskLat stock θ / dθ_idx names
+
+| Item | Path |
+|--|--|
+| Gap | DiskLat/`latticeplay` still used ASCII `th` / `idx` while stock Lattice uses TempleOS `θ` / `dθ_idx` |
+| Upstream need | same Turtle field names as `Demo/Graphics/Lattice.ZC` |
+| Bring-up | DiskLat members + HUD labels → `θ` / `dθ_idx` (0xE9); HeadMark/TurtleEnd params stay local `th` |
+| Smoke | DiskLat / Lattice.ZC / LatticePlay / StockLat still **15** |
+| Shell | `latticeplay` HUD shows stock-shaped θ/dθ labels |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).
