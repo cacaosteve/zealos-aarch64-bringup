@@ -2068,6 +2068,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 175 — Cls resets depth buffer
+
+| Item | Path |
+|--|--|
+| Gap | latticeplay entry `Cls` cleared FB but not the sparse depth map |
+| Upstream need | first strokes after entry match Restart cleanliness |
+| Bring-up | shared `hc_depth_map_clear`; `Cls` + `DCFill` both clear when depth is on |
+| Smoke | DiskLat / Depth* / Lattice.ZC / LatticePlay still **15** |
+| Shell | `latticeplay` first Space after entry not occluded by leftover z |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).

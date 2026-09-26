@@ -18,6 +18,7 @@
  *   - M172: erase prior head with BLACK GrLines (FillRect punched Space strokes)
  *   - M173: skip head erase/redraw when pose unchanged (idle Refresh)
  *   - M174: DCFill resets depth_buf (Restart stale z occlusion)
+ *   - M175: Cls resets depth_buf like DCFill (latticeplay entry)
  *   - Freeze catalog unchanged (ephemeral disk file)
  *   - return DiskLat();  expect 15
  */

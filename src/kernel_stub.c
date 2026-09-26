@@ -864,14 +864,24 @@ static void hc_popup_paint_live(void) {
     }
 }
 
+static void hc_depth_map_clear(void) {
+    int i;
+    for (i = 0; i < HC_DEPTH_MAP; i++) {
+        g_hc_depth_map[i].x = 0xFFFFu;
+        g_hc_depth_map[i].y = 0xFFFFu;
+        g_hc_depth_map[i].z = (int32_t)0x7fffffff;
+    }
+}
+
 uint64_t hc_builtin_dcfill(uint64_t dc) {
+    (void)dc;
     /* Lattice DCFill — clear virt FB so DiskLat/NearLattice leave a clean surface. */
     if (g_fb) {
         fb_clear(0);
     }
     /* M174: Restart must not keep stale z cells from prior strokes. */
-    if (dc && g_hc_depth_on) {
-        (void)hc_builtin_dcdepthbufreset(dc);
+    if (g_hc_depth_on) {
+        hc_depth_map_clear();
     }
     /* M164: latticeplay Restart TurtleInit → YELLOW/BLACK; sync picker + swatches. */
     if (g_hc_popup_live) {
@@ -890,7 +900,6 @@ uint64_t hc_builtin_dcdel(uint64_t dc) {
 
 uint64_t hc_builtin_dcdepthbufreset(uint64_t dc) {
     struct hc_cdc *d;
-    int i;
 
     if (!dc) {
         return 0;
@@ -899,11 +908,7 @@ uint64_t hc_builtin_dcdepthbufreset(uint64_t dc) {
     if (!d->depth_buf) {
         return 0;
     }
-    for (i = 0; i < HC_DEPTH_MAP; i++) {
-        g_hc_depth_map[i].x = 0xFFFFu;
-        g_hc_depth_map[i].y = 0xFFFFu;
-        g_hc_depth_map[i].z = (int32_t)0x7fffffff;
-    }
+    hc_depth_map_clear();
     return d->depth_buf;
 }
 
@@ -1365,6 +1370,10 @@ uint64_t hc_builtin_grpeek(uint64_t x, uint64_t y) {
 
 uint64_t hc_builtin_cls(uint64_t c) {
     fb_clear((uint32_t)c);
+    /* M175: latticeplay entry Cls — same stale-z clear as DCFill. */
+    if (g_hc_depth_on) {
+        hc_depth_map_clear();
+    }
     /* M165: latticeplay entry Cls — show Mid/Edge before first 'c'. */
     hc_popup_paint_live();
     return 0;
