@@ -4,6 +4,7 @@
  *
  * Bring-up:
  *   - Source from YDE/ZealOS Lattice.ZC (ISO-8859 TempleOS charset)
+ *   - M197: Lattice() entry wrapper; stockplay help matches latticeplay controls line
  *   - M196: Cls(0)+head_on=0 at try entry (stockplay clean FB like latticeplay)
  *   - M195: Restart accepts CR and re-prints controls GrPrint (stockplay Enter)
  *   - M194: DrawIt HeadMark + pose skip (no idle TurtleMove; Space/Restart clear head_on)
@@ -359,4 +360,10 @@ lt_done:
 	return 15;
 }
 
-return LatticeSmoke();
+/* M197: stock Demo/Graphics/Lattice.ZC entry name (bring-up keeps I64 expect). */
+I64 Lattice()
+{
+	return LatticeSmoke();
+}
+
+return Lattice();

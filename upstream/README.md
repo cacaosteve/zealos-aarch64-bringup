@@ -2320,6 +2320,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 197 — stockplay controls cue parity + Lattice()
+
+| Item | Path |
+|--|--|
+| Gap | `stockplay` help/entry lines were shorter than `latticeplay`; StockLat lacked stock `Lattice()` name |
+| Upstream need | same discovery cues; stock entry name |
+| Bring-up | matching help/entry one-liners; `Lattice()` → `LatticeSmoke` |
+| Smoke | StockLat still **15** via `return Lattice()` |
+| Shell | `help` / `stockplay` show full controls |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).

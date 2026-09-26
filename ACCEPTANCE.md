@@ -117,6 +117,7 @@ Restart VM; repeat `rspersist`, `rsdir`, `runzc Notes.ZC` (persist-safe seeds).
 - M194: StockLat DrawIt uses DiskLat-style `HeadMark` + pose skip (no idle TurtleMove / LTRED ghosts); Space/Restart clear `head_on`.
 - M195: StockLat Restart accepts `\r`/`\n` and re-prints controls GrPrint (stockplay Enter parity with latticeplay).
 - M196: StockLat `Cls(0)` + `head_on=0` at try entry; play-src injects after `Cls` (same as DiskLat) so stockplay starts on a clean FB.
+- M197: `stockplay` help/entry cues match `latticeplay` controls one-liner; StockLat `Lattice()` wrapper → LatticeSmoke.
 - **Scope:** QEMU/`disklat`/`LatticePlay` exercise DiskLat-shaped compose source, **not** stock ZealOS `Demo/Graphics/Lattice.ZC` with original behavior. Live `stockplay` softens idle DrawIt (M193–M194) but still ≠ DiskLat/latticeplay. Place/aim/step/restart/colors need an eyes-on UTM pass after `make utm`.
 - Freeze checklist still: `vblk`, `rspersist`, `rscatalog`, `runzc` UseAdd/Notes/MemSort (same as QEMU `run-pci`).
 
