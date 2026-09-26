@@ -2044,6 +2044,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 173 — skip idle head redraw when pose unchanged
+
+| Item | Path |
+|--|--|
+| Gap | every idle `Refresh` erased+redrew the head even when `tt` pose was still |
+| Upstream need | quieter live view; less BLACK thrash on the path |
+| Bring-up | compare `ToI64` x/y/`th*1000`; only `HeadMark` when pose changes; HUD always updates |
+| Smoke | DiskLat / NearLattice / Lattice.ZC / LatticePlay still **15** |
+| Shell | `latticeplay` idle updates HUD without re-stroking the head |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).

@@ -183,11 +183,19 @@ U0 SetMenu()
 U0 DrawIt(CTask *, CDC *dc)
 {
 	Turtle t2;
+	I64 nx;
+	I64 ny;
+	I64 nth;
 
 	MemCopy(&t2, &tt, sizeof(Turtle));
 	GrPrint(dc, 0, 0, "Layer:%f Speed:%f th:%5.1f di:%5.1f Width:%f",
 		tt.z, tt.speed, tt.th * 180 / pi, angles[tt.idx] * 180 / pi, tt.w);
-	/* M170–M172: no TurtleMove; erase prior head with BLACK GrLines. */
+	/* M170–M173: no TurtleMove; head only when pose changes (idle Refresh skips). */
+	nx = ToI64(t2.x);
+	ny = ToI64(t2.y);
+	nth = ToI64(t2.th * 1000);
+	if (head_on && ToI64(head_x) == nx && ToI64(head_y) == ny && ToI64(head_th * 1000) == nth)
+		return;
 	if (head_on)
 		HeadMark(dc, head_x, head_y, head_th, BLACK);
 	HeadMark(dc, t2.x, t2.y, t2.th, LTRED);
