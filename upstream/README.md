@@ -2404,6 +2404,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 204 — PopUpColor Mid/Edge via header string
+
+| Item | Path |
+|--|--|
+| Gap | `PopUpColor` ignored the HolyC string and used call odd/even — Edge-first returned YELLOW |
+| Upstream need | Lattice `"Mid Color"` / `"Edge Color"` headers select role |
+| Bring-up | parse `Mid`/`Edge` prefix from `g_hc_mem` string; fallback to call parity |
+| Smoke | `PopUpColor("Edge…")` → **0**; `PopUpColor("Mid…")` → **14**; BothColorLite still **15** |
+| Shell | `latticeplay`/`stockplay` `'c'` unchanged when Mid then Edge |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).

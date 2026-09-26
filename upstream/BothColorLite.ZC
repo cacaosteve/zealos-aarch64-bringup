@@ -6,6 +6,7 @@
  *     tt.edge   = PopUpColor("Edge Color\n\n");
  *
  * Bring-up:
+ *   - M204: PopUpColor header Mid/Edge selects role (not call order alone)
  *   - One KEY 'c' updates both middle and edge (unlike MidLite 'c'/'C')
  *   - return BothColorLite();  expect 15
  */

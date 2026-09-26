@@ -990,34 +990,48 @@ static int hc_depth_try(int32_t xi, int32_t yi, int32_t zi) {
     return 1;
 }
 
-/* Non-interactive Lattice color picker (M148/M150/M160/M161/M164/M165).
- * HolyC string args to PopUpColor are not yet reliable C pointers here —
- * use Mid/Edge call-pair order (reset each hc_run_src). UART RX clears RSR.
- * M160: paint FB swatches. M161: latticeplay cycles Mid/Edge pairs after the first.
- * M164: DCFill (Restart) resets live picker + default Mid/Edge swatches.
+/* Non-interactive Lattice color picker (M148/M150/M160/M161/M164/M165/M204).
+ * M204: HolyC string header in g_hc_mem — "Mid…" vs "Edge…" selects role
+ * (fallback: call-pair odd/even). Live cycles Mid/Edge pairs after the first.
+ * M160: paint FB swatches. M164: DCFill resets picker + default Mid/Edge.
  * M165: track Mid/Edge so Cls/Refresh keep swatches from entry through idle. */
 uint64_t hc_builtin_popupcolor(uint64_t header) {
-    (void)header;
-    {
-        /* Pair 0 stays YELLOW/BLACK for smokes + first latticeplay 'c'. */
-        static const uint8_t mids[] = {14, 4, 9, 10, 12, 11, 13, 2, 5, 15};
-        static const uint8_t edges[] = {0, 15, 0, 15, 0, 0, 0, 15, 0, 0};
-        int i = g_hc_popup_i++;
-        uint64_t c;
-        if (g_hc_popup_live) {
-            int pair = (i / 2) % (int)(sizeof mids / sizeof mids[0]);
-            c = (i & 1) ? (uint64_t)edges[pair] : (uint64_t)mids[pair];
-        } else {
-            c = (i & 1) ? 0 : 14; /* Edge BLACK, Mid YELLOW */
+    const char *h = (const char *)(uintptr_t)header;
+    int is_edge;
+    int i;
+    uint64_t c;
+    /* Pair 0 stays YELLOW/BLACK for smokes + first latticeplay 'c'. */
+    static const uint8_t mids[] = {14, 4, 9, 10, 12, 11, 13, 2, 5, 15};
+    static const uint8_t edges[] = {0, 15, 0, 15, 0, 0, 0, 15, 0, 0};
+    /* Prefer header text when it looks like a C string in g_hc_mem / ROM. */
+    is_edge = -1;
+    if (h) {
+        uintptr_t p = (uintptr_t)h;
+        if (p > 0x1000ull) {
+            if (h[0] == 'E' && h[1] == 'd' && h[2] == 'g' && h[3] == 'e') {
+                is_edge = 1;
+            } else if (h[0] == 'M' && h[1] == 'i' && h[2] == 'd') {
+                is_edge = 0;
+            }
         }
-        if (i & 1) {
-            g_hc_popup_edge = (uint8_t)(c & 15);
-        } else {
-            g_hc_popup_mid = (uint8_t)(c & 15);
-        }
-        hc_popup_paint_swatch(i & 1, c);
-        return c;
     }
+    i = g_hc_popup_i++;
+    if (is_edge < 0) {
+        is_edge = i & 1;
+    }
+    if (g_hc_popup_live) {
+        int pair = (i / 2) % (int)(sizeof mids / sizeof mids[0]);
+        c = is_edge ? (uint64_t)edges[pair] : (uint64_t)mids[pair];
+    } else {
+        c = is_edge ? 0ull : 14ull; /* Edge BLACK, Mid YELLOW */
+    }
+    if (is_edge) {
+        g_hc_popup_edge = (uint8_t)(c & 15);
+    } else {
+        g_hc_popup_mid = (uint8_t)(c & 15);
+    }
+    hc_popup_paint_swatch(is_edge, c);
+    return c;
 }
 
 /* Scripted MessageGet queue for Lattice while(TRUE) event-loop smokes. */
@@ -6470,6 +6484,25 @@ static int jit_smoke(void) {
             return -222;
         }
         uart_puts(g_uart, "hc: Upstream BothColorLite => ");
+        uart_put_u64_hex(g_uart, got2);
+        uart_puts(g_uart, "\n");
+        /* M204: header string selects Edge/Mid (Edge-first must be BLACK, not YELLOW). */
+        if (hc_run_src("return PopUpColor(\"Edge Color\\n\\n\");", &got2) != 0 || got2 != 0) {
+            uart_puts(g_uart, "hc: PopUpColor Edge FAIL got=");
+            uart_put_u64_hex(g_uart, got2);
+            uart_puts(g_uart, "\n");
+            return -254;
+        }
+        uart_puts(g_uart, "hc: PopUpColor Edge => ");
+        uart_put_u64_hex(g_uart, got2);
+        uart_puts(g_uart, "\n");
+        if (hc_run_src("return PopUpColor(\"Mid Color\\n\\n\");", &got2) != 0 || got2 != 14) {
+            uart_puts(g_uart, "hc: PopUpColor Mid FAIL got=");
+            uart_put_u64_hex(g_uart, got2);
+            uart_puts(g_uart, "\n");
+            return -255;
+        }
+        uart_puts(g_uart, "hc: PopUpColor Mid => ");
         uart_put_u64_hex(g_uart, got2);
         uart_puts(g_uart, "\n");
         if (hc_run_src(MENUFULLLITE_ZC, &got2) != 0 || got2 != 15) {

@@ -65,7 +65,7 @@ Bridge notes: [AIWNIOS.md](AIWNIOS.md). Milestone ladder: [upstream/README.md](u
 
 | Track | Status |
 |--|--|
-| QEMU/UTM virt | **Regression freeze** M33–M39 (`Notes.ZC` / DocLib `#include`) still the bar — see ACCEPTANCE.md. **Lattice compose** continued on top (M151–M199) + **M200–M203** PL011 RX/`uartrx`, shell idle Sleep, post-demo depth clear, StockLat MESSAGE_NULL. Scripted QEMU ≠ live UTM keyboard/tablet proof. |
+| QEMU/UTM virt | **Regression freeze** M33–M39 (`Notes.ZC` / DocLib `#include`) still the bar — see ACCEPTANCE.md. **Lattice compose** continued on top (M151–M199) + **M200–M204** PL011 RX/`uartrx`, shell idle, depth clear, StockLat NULL, PopUpColor Mid/Edge headers. Scripted QEMU ≠ live UTM keyboard/tablet proof. |
 | Pi 4B UEFI | PI-DIAG-1..4 + **shell entry on FB** accepted (2026-09-23). **UART RX:** use `uartrx` on USB–TTL @ 115200 after `make pi-sd` (M200 prep). No virtio/RedSea disk on Pi yet ([PI4.md](PI4.md)). |
 
 ## Next
