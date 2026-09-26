@@ -20,8 +20,9 @@
  *   - M174: DCFill resets depth_buf (Restart stale z occlusion)
  *   - M175: Cls resets depth_buf like DCFill (latticeplay entry)
  *   - M176: after Space, head_on=0 so DrawIt skips BLACK erase of old head
+ *   - M177: Lattice() entry wrapper (stock name); return Lattice()
  *   - Freeze catalog unchanged (ephemeral disk file)
- *   - return DiskLat();  expect 15
+ *   - return Lattice();  expect 15
  */
 
 #define ANGLES 35
@@ -398,4 +399,10 @@ lt_done:
 	return h;
 }
 
-return DiskLat();
+/* M177: stock Demo/Graphics/Lattice.ZC entry name (bring-up keeps I64 expect). */
+I64 Lattice()
+{
+	return DiskLat();
+}
+
+return Lattice();

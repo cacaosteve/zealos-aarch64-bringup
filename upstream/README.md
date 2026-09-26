@@ -2092,6 +2092,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 177 — stock `Lattice()` entry name
+
+| Item | Path |
+|--|--|
+| Gap | compose file only exposed `DiskLat()` while upstream ends with `Lattice;` |
+| Upstream need | `Demo/Graphics/Lattice.ZC` entry symbol |
+| Bring-up | `I64 Lattice(){return DiskLat();}` + `return Lattice();` (I64 expect retained) |
+| Smoke | DiskLat / Lattice.ZC / LatticePlay still **15** |
+| Shell | `lattice` / `disklat` / `latticeplay` unchanged |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).
