@@ -125,6 +125,7 @@ Restart VM; repeat `rspersist`, `rsdir`, `runzc Notes.ZC` (persist-safe seeds).
 - M202: `shell_fb_ready` clears Lattice depth after demos; `uartrx` waits with `Sleep(1)` (not a hot spin).
 - M203: StockLat `MESSAGE_NULL` idle case (DiskLat parity); `hc_run_src_ex` clears depth on exit; shell banner lists `uartrx`.
 - M204: `PopUpColor` uses `"Mid…"` / `"Edge…"` header strings (g_hc_mem); Edge-first smoke → BLACK; Mid → YELLOW.
+- M205: live `PopUpColor` paints the header first word above the Mid/Edge swatch (eyes-on `'c'` cue).
 - **Scope:** QEMU/`disklat`/`LatticePlay` exercise DiskLat-shaped compose source, **not** stock ZealOS `Demo/Graphics/Lattice.ZC` with original behavior. Live `stockplay` softens idle DrawIt (M193–M194) but still ≠ DiskLat/latticeplay. Place/aim/step/restart/colors need an eyes-on UTM pass after `make utm`.
 - Freeze checklist still: `vblk`, `rspersist`, `rscatalog`, `runzc` UseAdd/Notes/MemSort (same as QEMU `run-pci`).
 

@@ -2416,6 +2416,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 205 — live PopUpColor header word on FB
+
+| Item | Path |
+|--|--|
+| Gap | Mid/Edge swatches had no cue that the M204 header path selected Mid vs Edge |
+| Upstream need | eyes-on `'c'` feedback on `latticeplay`/`stockplay` |
+| Bring-up | paint first word of header above the swatch just updated |
+| Smoke | PopUpColor Edge/Mid + BothColorLite unchanged |
+| Shell | `'c'` shows Mid/Edge word above bottom swatches |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).

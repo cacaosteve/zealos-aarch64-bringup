@@ -1031,6 +1031,18 @@ uint64_t hc_builtin_popupcolor(uint64_t header) {
         g_hc_popup_mid = (uint8_t)(c & 15);
     }
     hc_popup_paint_swatch(is_edge, c);
+    /* M205: live — show first word of header above the swatch just painted. */
+    if (g_hc_popup_live && g_fb && h && (uintptr_t)h > 0x1000ull && h[0]) {
+        uint32_t x0 = is_edge ? 72u : 8u;
+        uint32_t y0 = (uint32_t)g_fb_h > 40u ? (uint32_t)g_fb_h - 28u : 8u;
+        uint32_t col = x0 / 8u;
+        uint32_t row = (y0 >= 16u ? y0 - 16u : 0u) / 8u;
+        int k;
+        fb_fillrect(x0, row * 8u, 64u, 8u, 0);
+        for (k = 0; h[k] && h[k] != '\n' && h[k] != ' ' && k < 8; k++) {
+            fb_draw_char(col + (uint32_t)k, row, h[k], 0x00E0E0E0u);
+        }
+    }
     return c;
 }
 
