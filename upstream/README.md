@@ -1996,6 +1996,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 169 — latticeplay arrows/layer hint line
+
+| Item | Path |
+|--|--|
+| Gap | cursor di/speed and digit layers lived only in MenuPush |
+| Upstream need | discoverable SC_CURSOR_* / `'0'...'9'` on FB |
+| Bring-up | third hint at y=32: `arrows=di/speed 0-9=layer` |
+| Smoke | DiskLat / NearLattice / WrapLatticeLite / LatticePlay still **15** |
+| Shell | `latticeplay` shows arrows/layer cue under place/aim line |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).

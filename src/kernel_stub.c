@@ -838,24 +838,28 @@ static void hc_popup_paint_swatch(int which, uint64_t c) {
     }
 }
 
-/* M165–M168: repaint Mid/Edge + controls hints so Cls/Refresh keep chrome. */
+/* M165–M169: repaint Mid/Edge + controls hints so Cls/Refresh keep chrome. */
 static void hc_popup_paint_live(void) {
     static const char hint[] = "Esc=exit Enter=restart Space=step c=color +/-=w";
     static const char hint2[] = "L-click=place R-drag=aim e=ends";
+    static const char hint3[] = "arrows=di/speed 0-9=layer";
     uint32_t i;
     if (!g_hc_popup_live) {
         return;
     }
     hc_popup_paint_swatch(0, g_hc_popup_mid);
     hc_popup_paint_swatch(1, g_hc_popup_edge);
-    /* Bands match GrPrint(dc, 0, 16/24, …) — idle DrawIt must not bury the cues. */
+    /* Bands match GrPrint(dc, 0, 16/24/32, …) — idle DrawIt must not bury the cues. */
     if (g_fb) {
-        fb_fillrect(0, 16u, 64u * 8u, 16u, 0);
+        fb_fillrect(0, 16u, 64u * 8u, 24u, 0);
         for (i = 0; hint[i]; i++) {
             fb_draw_char(i, 2u, hint[i], 0x00E0E0E0u);
         }
         for (i = 0; hint2[i]; i++) {
             fb_draw_char(i, 3u, hint2[i], 0x00E0E0E0u);
+        }
+        for (i = 0; hint3[i]; i++) {
+            fb_draw_char(i, 4u, hint3[i], 0x00E0E0E0u);
         }
     }
 }
@@ -2490,7 +2494,8 @@ static int hc_lattice_play_src(const char *in, char *out, size_t cap, int smoke_
                 inj = "\n\t\tMsgQuePush(MESSAGE_KEY_DOWN, CH_ESC, 0);";
             } else {
         inj = "\n\t\tGrPrint(dc, 0, 16, \"Esc=exit Enter=restart Space=step c=color +/-=w\");"
-              "\n\t\tGrPrint(dc, 0, 24, \"L-click=place R-drag=aim e=ends\");";
+              "\n\t\tGrPrint(dc, 0, 24, \"L-click=place R-drag=aim e=ends\");"
+              "\n\t\tGrPrint(dc, 0, 32, \"arrows=di/speed 0-9=layer\");";
             }
             el = 0;
             while (inj[el]) {
