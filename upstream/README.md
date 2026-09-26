@@ -2116,6 +2116,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 179 — latticeplay prints controls on entry
+
+| Item | Path |
+|--|--|
+| Gap | controls lived in `help` / on-FB hints; serial window saw only `latticeplay ok` after exit |
+| Upstream need | cue before the live loop for UTM Terminal 1 |
+| Bring-up | `con_puts` controls line immediately before `hc_run_src_ex(..., popup_live=1)` |
+| Smoke | LatticePlay smoke unchanged (no shell cmd path) |
+| Shell | `latticeplay` shows controls, then runs until Esc |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).

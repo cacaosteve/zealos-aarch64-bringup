@@ -4145,6 +4145,8 @@ static void shell_handle(const char *line, int *done) {
             con_puts("latticeplay build FAIL\n");
             return;
         }
+        /* M179: serial/FB shell cue before the live loop (UTM Terminal 1). */
+        con_puts("latticeplay: Esc Enter Space c +/- e | L-click place | R-drag aim | arrows | 0-9\n");
         if (hc_run_src_ex(g_hc_zc_src, &got, 1) != 0) {
             con_puts("latticeplay FAIL\n");
             return;
