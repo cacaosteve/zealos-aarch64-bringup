@@ -2104,6 +2104,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 178 — help lists latticeplay controls
+
+| Item | Path |
+|--|--|
+| Gap | `help` named `latticeplay` but not the Esc/tablet/key map for eyes-on |
+| Upstream need | discoverable live Lattice controls from the shell |
+| Bring-up | `help` one-liner for Esc/Enter/Space/c/+/-/e, L-click, R-drag, arrows, 0-9 |
+| Smoke | unchanged (`help` text only) |
+| Shell | `help` then `latticeplay` for UTM acceptance |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).
