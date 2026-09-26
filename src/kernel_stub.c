@@ -41,6 +41,7 @@
 #include "commalite_zc.h"
 #include "plot3lite_zc.h"
 #include "tospilite_zc.h"
+#include "tosutf8lite_zc.h"
 #include "colorlite_zc.h"
 #include "turtlelite_zc.h"
 #include "filllite_zc.h"
@@ -2504,6 +2505,25 @@ static int hc_expand_includes(const char *src, char *dst, size_t cap) {
     }
     if (hc_expand_macros(g_hc_src_mid, dst, cap) != 0) {
         return -1;
+    }
+    /* M192: UTF-8 θ (U+03B8=CE B8) / π (U+03C0=CF 80) → TempleOS 0xE9 / 0xE3. */
+    {
+        char *r = dst;
+        char *w = dst;
+        while (*r) {
+            unsigned char a = (unsigned char)r[0];
+            unsigned char b = (unsigned char)r[1];
+            if (a == 0xceu && b == 0xb8u) {
+                *w++ = (char)0xe9;
+                r += 2;
+            } else if (a == 0xcfu && b == 0x80u) {
+                *w++ = (char)0xe3;
+                r += 2;
+            } else {
+                *w++ = *r++;
+            }
+        }
+        *w = 0;
     }
     return 0;
 }
@@ -5916,6 +5936,15 @@ static int jit_smoke(void) {
             return -172;
         }
         uart_puts(g_uart, "hc: Upstream TosPiLite => ");
+        uart_put_u64_hex(g_uart, got2);
+        uart_puts(g_uart, "\n");
+        if (hc_run_src(TOSUTF8LITE_ZC, &got2) != 0 || got2 != 15) {
+            uart_puts(g_uart, "hc: Upstream TosUtf8Lite FAIL got=");
+            uart_put_u64_hex(g_uart, got2);
+            uart_puts(g_uart, "\n");
+            return -252;
+        }
+        uart_puts(g_uart, "hc: Upstream TosUtf8Lite => ");
         uart_put_u64_hex(g_uart, got2);
         uart_puts(g_uart, "\n");
         if (hc_run_src(COLORLITE_ZC, &got2) != 0 || got2 != 63) {

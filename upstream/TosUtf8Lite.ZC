@@ -1,0 +1,36 @@
+/* Milestone 192: UTF-8 θ/π fold to TempleOS 0xE9/0xE3 before compile.
+ *
+ * Upstream need: modern editors save Lattice.ZC as UTF-8, not ISO-8859 TempleOS.
+ *
+ * Bring-up:
+ *   - hc_expand_includes maps U+03B8→0xE9, U+03C0→0xE3
+ *   - same semantics as TosPiLite
+ *   - return TosUtf8Lite();  expect 15
+ */
+
+class Turtle
+{
+	F64 x, y, θ;
+	I64 dθ_idx;
+};
+
+I64 TosUtf8Lite()
+{
+	I64 h;
+	Turtle t;
+
+	h = 0;
+	if (ToI64(π * 1000.0) == 3141)
+		h = h + 1;
+	if (ToI64(Cos(π) * (-100.0)) == 100)
+		h = h + 2;
+	t.θ = π / 2.0;
+	if (ToI64(t.θ * 1000.0) == 1570)
+		h = h + 4;
+	t.dθ_idx = 3;
+	if (t.dθ_idx == 3)
+		h = h + 8;
+	return h;
+}
+
+return TosUtf8Lite();

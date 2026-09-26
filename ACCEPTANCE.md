@@ -112,6 +112,7 @@ Restart VM; repeat `rspersist`, `rsdir`, `runzc Notes.ZC` (persist-safe seeds).
 - M189: live `MessageGet` (`g_hc_popup_live`) interruptible `Sleep(16)` before NULL; DiskLat/compose NULL handlers only `Refresh` (smokes stay immediate-NULL).
 - M190: `stockplay` — live StockLat (MsgQue stripped, `popup_live`); StockLat `Refresh` after switch; StockPlay smoke ESC-only.
 - M191: `stockplay` injects the same FB controls GrPrint cues as `latticeplay`; chrome/Restart hints say `dθ/speed` (TempleOS 0xE9).
+- M192: UTF-8 `θ`/`π` (U+03B8/U+03C0) folded to TempleOS `0xE9`/`0xE3` on compile; fixed UTF-8 π bytes (`CF 80`); `TosUtf8Lite` → **15**.
 - **Scope:** QEMU/`disklat`/`LatticePlay` exercise DiskLat-shaped compose source, **not** stock ZealOS `Demo/Graphics/Lattice.ZC` with original behavior. Live place/aim/step/restart/colors need an eyes-on UTM pass after `make utm`.
 - Freeze checklist still: `vblk`, `rspersist`, `rscatalog`, `runzc` UseAdd/Notes/MemSort (same as QEMU `run-pci`).
 

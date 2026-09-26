@@ -1044,8 +1044,8 @@ static int hcf_parse_prim(struct hc_front *f) {
         f->expr_f64 = 1;
         return 0;
     }
-    /* UTF-8 π (U+03C0) for modern editors of Lattice-shaped sources. */
-    if ((unsigned char)f->p[0] == 0xce && (unsigned char)f->p[1] == 0xb0) {
+    /* UTF-8 π (U+03C0 = CF 80) for modern editors of Lattice-shaped sources. */
+    if ((unsigned char)f->p[0] == 0xcf && (unsigned char)f->p[1] == 0x80) {
         f->p += 2;
         if (hcf_imm(f, 0x400921fb54442d18ULL) < 0) {
             return -1;

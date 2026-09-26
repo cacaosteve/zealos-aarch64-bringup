@@ -2260,6 +2260,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 192 — UTF-8 θ/π fold to TempleOS charset
+
+| Item | Path |
+|--|--|
+| Gap | modern UTF-8 Lattice sources use U+03B8/U+03C0; frontend only had TempleOS `0xE9`/`0xE3` (+ wrong UTF-8 π bytes `CE B0`) |
+| Upstream need | edit Lattice in UTF-8 editors; same idents/constants as TempleOS |
+| Bring-up | `hc_expand_includes` maps `CE B8`→`0xE9`, `CF 80`→`0xE3`; fix prim UTF-8 π; `TosUtf8Lite.ZC` |
+| Smoke | `hc: Upstream TosUtf8Lite` (expect 15) |
+| Shell | UTF-8 `.ZC` via `hc` / `runzc` folds before compile |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).
