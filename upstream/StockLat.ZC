@@ -4,6 +4,7 @@
  *
  * Bring-up:
  *   - Source from YDE/ZealOS Lattice.ZC (ISO-8859 TempleOS charset)
+ *   - M203: MESSAGE_NULL idle case (MessageGet yield + Refresh; DiskLat parity)
  *   - M199: help summary lists stocklat/stockplay
  *   - M198: shell stocklat runs scripted StockLat (SPACE+ESC expect 15)
  *   - M197: Lattice() entry wrapper; stockplay help matches latticeplay controls line
@@ -346,6 +347,10 @@ I64 LatticeSmoke()
 							head_on = FALSE;
 							break;
 					}
+					break;
+				case MESSAGE_NULL:
+					/* M203: MessageGet yields ~60 Hz; Refresh below (DiskLat parity). */
+					break;
 			}
 			/* M190: WinMgr-shaped paint (stock has no Refresh; bring-up needs it). */
 			Refresh;

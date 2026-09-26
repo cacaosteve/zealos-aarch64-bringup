@@ -2392,6 +2392,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 203 — StockLat MESSAGE_NULL + depth on hc_run exit
+
+| Item | Path |
+|--|--|
+| Gap | StockLat lacked explicit `MESSAGE_NULL` (DiskLat has it); depth could linger if a cmd skipped `shell_fb_ready` |
+| Upstream need | stockplay idle matches DiskLat event shape; safer post-demo FB |
+| Bring-up | StockLat `MESSAGE_NULL` + KEY_DOWN `break`; `hc_run_src_ex` clears depth; banner lists `uartrx` |
+| Smoke | StockLat / StockPlay still **15** |
+| Shell | `stockplay` idle path explicit; `uartrx` on type: line |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).

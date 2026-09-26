@@ -123,6 +123,7 @@ Restart VM; repeat `rspersist`, `rsdir`, `runzc Notes.ZC` (persist-safe seeds).
 - M200: PL011 `RXE` enable + FIFO drain before shell (`pl011_rx_prep`); `uartrx` waits ~2s for one RX byte (Pi USB-TTL); check-serial `hc: uart RX idle OK`.
 - M201: interactive shell idle uses `Sleep(1)` (peeks UART/virtio) instead of a busy-spin.
 - M202: `shell_fb_ready` clears Lattice depth after demos; `uartrx` waits with `Sleep(1)` (not a hot spin).
+- M203: StockLat `MESSAGE_NULL` idle case (DiskLat parity); `hc_run_src_ex` clears depth on exit; shell banner lists `uartrx`.
 - **Scope:** QEMU/`disklat`/`LatticePlay` exercise DiskLat-shaped compose source, **not** stock ZealOS `Demo/Graphics/Lattice.ZC` with original behavior. Live `stockplay` softens idle DrawIt (M193–M194) but still ≠ DiskLat/latticeplay. Place/aim/step/restart/colors need an eyes-on UTM pass after `make utm`.
 - Freeze checklist still: `vblk`, `rspersist`, `rscatalog`, `runzc` UseAdd/Notes/MemSort (same as QEMU `run-pci`).
 

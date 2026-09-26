@@ -2570,6 +2570,12 @@ static int hc_run_src_ex(const char *src, uint64_t *out, int popup_live) {
     rc = hc_run_bc(bc, (size_t)n, out);
     g_hc_fs_draw_it = 0;
     g_hc_popup_live = 0;
+    /* M203: demos that skip shell_fb_ready still drop depth for the next paint. */
+    if (g_hc_depth_on) {
+        hc_depth_map_clear();
+        g_hc_depth_on = 0;
+    }
+    g_hc_cdc.depth_buf = 0;
     return rc;
 }
 
@@ -5075,7 +5081,7 @@ static void shell_run(void) {
     }
     con_puts("\nZealOS aarch64 shell (HolyC-IR exprs)\n");
     /* M152: short FB banner; full cmd list via `help` (800x600 wraps badly). */
-    con_puts("type: help | vblk | rscatalog | runzc Notes.ZC | halt\n");
+    con_puts("type: help | vblk | rscatalog | runzc Notes.ZC | uartrx | halt\n");
     con_puts("      hc <src> | bars | paint | nearlatticelite | disklat | latticeplay | stocklat | stockplay\n");
     con_puts("> ");
     char line[64];
