@@ -2248,6 +2248,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 191 — stockplay FB controls + dθ hint labels
+
+| Item | Path |
+|--|--|
+| Gap | stockplay live inject was comment-only; chrome still said `di/speed` after θ rename |
+| Upstream need | same on-FB controls discovery for stockplay; stock `dθ` naming in cues |
+| Bring-up | stockplay injects GrPrint trio; `hc_popup_paint_live` + DiskLat/Near Restart hints use `dθ` (0xE9) |
+| Smoke | LatticePlay / StockPlay unchanged |
+| Shell | `stockplay` / `latticeplay` show matching FB cues |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).

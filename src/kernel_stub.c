@@ -854,11 +854,12 @@ static void hc_popup_paint_swatch(int which, uint64_t c) {
     }
 }
 
-/* M165–M169: repaint Mid/Edge + controls hints so Cls/Refresh keep chrome. */
+/* M165–M169/M191: repaint Mid/Edge + controls hints so Cls/Refresh keep chrome. */
 static void hc_popup_paint_live(void) {
+    /* TempleOS 0xE9 = θ (M184 glyph); match stock Lattice HUD naming. */
     static const char hint[] = "Esc=exit Enter=restart Space=step c=color +/-=w";
     static const char hint2[] = "L-click=place R-drag=aim e=ends";
-    static const char hint3[] = "arrows=di/speed 0-9=layer";
+    static const char hint3[] = "arrows=d\xe9/speed 0-9=layer";
     uint32_t i;
     if (!g_hc_popup_live) {
         return;
@@ -2535,13 +2536,18 @@ static int hc_run_src_ex(const char *src, uint64_t *out, int popup_live) {
     return rc;
 }
 
-/* M155/M159/M190: DiskLat/StockLat → live play — drop MsgQuePush scripts.
+/* M155/M159/M190/M191: DiskLat/StockLat → live play — drop MsgQuePush scripts.
  * smoke_esc: inject one CH_ESC after Cls or DCDepthBufAlloc so check-serial ends.
- * live (!smoke_esc): inject controls hint after Cls (DiskLat); StockLat has no Cls. */
+ * live (!smoke_esc): inject controls GrPrint after Cls (DiskLat) or DepthBufAlloc (StockLat). */
 static int hc_lattice_play_src(const char *in, char *out, size_t cap, int smoke_esc) {
     size_t o = 0;
     const char *p = in;
     int saw_inj = 0;
+    /* Shared live chrome; 0xE9 = θ in arrows line (M191). */
+    static const char live_hints[] =
+        "\n\t\tGrPrint(dc, 0, 16, \"Esc=exit Enter=restart Space=step c=color +/-=w\");"
+        "\n\t\tGrPrint(dc, 0, 24, \"L-click=place R-drag=aim e=ends\");"
+        "\n\t\tGrPrint(dc, 0, 32, \"arrows=d\xe9/speed 0-9=layer\");";
     if (!in || !out || cap < 8) {
         return -1;
     }
@@ -2575,9 +2581,7 @@ static int hc_lattice_play_src(const char *in, char *out, size_t cap, int smoke_
             if (smoke_esc) {
                 inj = "\n\t\tMsgQuePush(MESSAGE_KEY_DOWN, CH_ESC, 0);";
             } else {
-                inj = "\n\t\tGrPrint(dc, 0, 16, \"Esc=exit Enter=restart Space=step c=color +/-=w\");"
-                      "\n\t\tGrPrint(dc, 0, 24, \"L-click=place R-drag=aim e=ends\");"
-                      "\n\t\tGrPrint(dc, 0, 32, \"arrows=di/speed 0-9=layer\");";
+                inj = live_hints;
             }
             while (inj[el]) {
                 el++;
@@ -2603,7 +2607,10 @@ static int hc_lattice_play_src(const char *in, char *out, size_t cap, int smoke_
             if (smoke_esc) {
                 inj = "\n\tMsgQuePush(MESSAGE_KEY_DOWN, CH_ESC, 0);";
             } else {
-                inj = "\n\t/* stockplay live: Esc exits; DrawIt TurtleMoves each Refresh (stock). */";
+                /* Same cues as latticeplay; tabs match StockLat indent after DepthBufAlloc. */
+                inj = "\n\tGrPrint(dc, 0, 16, \"Esc=exit Enter=restart Space=step c=color +/-=w\");"
+                      "\n\tGrPrint(dc, 0, 24, \"L-click=place R-drag=aim e=ends\");"
+                      "\n\tGrPrint(dc, 0, 32, \"arrows=d\xe9/speed 0-9=layer\");";
             }
             while (inj[el]) {
                 el++;
@@ -3503,7 +3510,7 @@ static void shell_handle(const char *line, int *done) {
         con_puts("UTM freeze: vblk | rspersist | rscatalog | rsdir | runzc | runzc Notes.ZC\n");
         con_puts("Lattice: nearlatticelite | disklat | lattice | latticeplay | stockplay | depthplotlite\n");
         /* M178: eyes-on controls without reading MenuPush / DiskLat source. */
-        con_puts("  latticeplay: Esc Enter Space c +/- e | L-click place | R-drag aim | arrows di/speed | 0-9 layer\n");
+        con_puts("  latticeplay: Esc Enter Space c +/- e | L-click place | R-drag aim | arrows dth/speed | 0-9 layer\n");
         con_puts("  stockplay: live StockLat (stock DrawIt TurtleMove/Refresh; Esc exits)\n");
         con_puts("cmds: help|abs|sum|bars|stars|circles|bounce|paint|netofdots|lines|minigr|memsort|globshare|life|cartlite|vec2lite|angleslite|coslite|sqrtlite|arglite|commalite|plot3lite|tospilite|colorlite|turtlelite|filllite|initlite|deflite|printlite|msglite|menulite|findlite|fslite|setuplite|ttlite|buflite|inclite|dclite|linedclite|grflite|movelite|checkedlite|cmplite|forinclite|microlite|movestacklite|endlite|drawitlite|latticelite|looplite|demolite|eventlite|playlite|inputlite|rightlite|cursorlite|uplite|ticklite|framelite|plotdclite|abortlite|aimmovelite|idlelite|layerlite|endslite|speedlite|midlite|livelite|accellite|restartlite|widthlite|bothcolorlite|menufulllite|menubiglite|trylite|stepcountlite|anglesfulllite|braceangleslite|bracepilite|setmenulite|nearlatticelite|f64iflite|wraplatticelite|menulooplite|idxalllite|disklat|lattice|depthbuflite|depthrstlite|depthplotlite|depthlinelite|peekplot|offbmp|heapstr|catfmt|heapque|jobque|jobrun|spawn|popup|doclite|ramblk|namefile|dirlook|dirdel|fopen|fwrite|multiblk|redsea|rsroot|rsfile|rsalloc|rsfree|rsmulti|rscfile|rscwrite|rscseek|rsclib|rspersist|rscatalog|rsdir|rsdel|rsrename|runzc|runzc <file.ZC>|vblk|halt|hc <src>|expr\n");
         con_puts("  hc: Print*/Str*/Mem*/Min/Max/Clamp/Sign/Sqr/Abs/Cnt/CntFrq/HashStr/Mouse*/Rand/Sleep/Gr*/Cls\n");
@@ -4242,7 +4249,7 @@ static void shell_handle(const char *line, int *done) {
             return;
         }
         /* M179: serial/FB shell cue before the live loop (UTM Terminal 1). */
-        con_puts("latticeplay: Esc Enter Space c +/- e | L-click place | R-drag aim | arrows | 0-9\n");
+        con_puts("latticeplay: Esc Enter Space c +/- e | L-click place | R-drag aim | arrows dth/speed | 0-9\n");
         if (hc_run_src_ex(g_hc_zc_src, &got, 1) != 0) {
             con_puts("latticeplay FAIL\n");
             return;

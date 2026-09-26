@@ -22,6 +22,7 @@
  *   - M176: after Space, head_on=0 so DrawIt skips BLACK erase of old head
  *   - M177: Lattice() entry wrapper (stock name); return Lattice()
  *   - M180: MESSAGE_NULL idle Sleep(16) (~60 Hz) instead of Sleep(1)
+ *   - M191: controls hint arrows=dé/speed
  *   - M189: MessageGet Sleep(16) before NULL; idle Refresh only
  *   - M184: FB draws 0xE3/0xE9 as pi/theta glyphs (HUD readable)
  *   - M183: Turtle.é / dé_idx + HUD labels (stock Lattice field names)
@@ -367,7 +368,7 @@ I64 DiskLat()
 							/* M162/M166/M168/M169: Enter clears FB â€” restore live-play controls cues. */
 							GrPrint(dc, 0, 16, "Esc=exit Enter=restart Space=step c=color +/-=w");
 							GrPrint(dc, 0, 24, "L-click=place R-drag=aim e=ends");
-							GrPrint(dc, 0, 32, "arrows=di/speed 0-9=layer");
+							GrPrint(dc, 0, 32, "arrows=dé/speed 0-9=layer");
 							break;
 						case CH_ESC:
 						case CH_SHIFT_ESC:
