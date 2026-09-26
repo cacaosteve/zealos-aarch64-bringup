@@ -2020,6 +2020,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 171 — DrawIt erases prior LTRED head
+
+| Item | Path |
+|--|--|
+| Gap | place/aim moved `tt` while prior head GrLines stayed on FB |
+| Upstream need | single live head marker |
+| Bring-up | `head_x`/`head_y`/`head_on` + `FillRect` erase before redraw; clear on Cls/Restart |
+| Smoke | DiskLat / NearLattice / Lattice.ZC / LatticePlay still **15** |
+| Shell | `latticeplay` L-click / R-drag leave one head, not a trail of ghosts |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).
