@@ -94,6 +94,7 @@ Restart VM; repeat `rspersist`, `rsdir`, `runzc Notes.ZC` (persist-safe seeds).
 - M171: DrawIt erases the previous LTRED head before redraw so place/aim do not leave ghost markers.
 - M172: head erase uses BLACK GrLines (not `FillRect`) so Space strokes near the turtle are not punched out.
 - M173: DrawIt skips head erase/redraw when x/y/th unchanged so idle Refresh does not thrash BLACK/LTRED over the path.
+- M174: `DCFill` (Enter/Restart) resets the depth buffer so new strokes are not occluded by stale z cells.
 - **Scope:** QEMU/`disklat`/`LatticePlay` exercise DiskLat-shaped compose source, **not** stock ZealOS `Demo/Graphics/Lattice.ZC` with original behavior. Live place/aim/step/restart/colors need an eyes-on UTM pass after `make utm`.
 - Freeze checklist still: `vblk`, `rspersist`, `rscatalog`, `runzc` UseAdd/Notes/MemSort (same as QEMU `run-pci`).
 

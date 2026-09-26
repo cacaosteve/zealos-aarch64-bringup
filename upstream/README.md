@@ -2056,6 +2056,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 174 — DCFill resets depth buffer
+
+| Item | Path |
+|--|--|
+| Gap | Enter/`DCFill` cleared pixels but left sparse `depth_buf` cells from prior plots |
+| Upstream need | Restart draws new strokes without stale z occlusion |
+| Bring-up | `hc_builtin_dcfill` → `DCDepthBufReset` when depth is active |
+| Smoke | DiskLat / Depth* / Lattice.ZC / LatticePlay still **15** |
+| Shell | `latticeplay` Enter then Space paints cleanly over the cleared surface |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).

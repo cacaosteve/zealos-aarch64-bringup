@@ -865,10 +865,13 @@ static void hc_popup_paint_live(void) {
 }
 
 uint64_t hc_builtin_dcfill(uint64_t dc) {
-    (void)dc;
     /* Lattice DCFill — clear virt FB so DiskLat/NearLattice leave a clean surface. */
     if (g_fb) {
         fb_clear(0);
+    }
+    /* M174: Restart must not keep stale z cells from prior strokes. */
+    if (dc && g_hc_depth_on) {
+        (void)hc_builtin_dcdepthbufreset(dc);
     }
     /* M164: latticeplay Restart TurtleInit → YELLOW/BLACK; sync picker + swatches. */
     if (g_hc_popup_live) {
