@@ -2556,9 +2556,9 @@ static int hc_run_src_ex(const char *src, uint64_t *out, int popup_live) {
     return rc;
 }
 
-/* M155/M159/M190/M191: DiskLat/StockLat → live play — drop MsgQuePush scripts.
+/* M155/M159/M190/M191/M193: DiskLat/StockLat → live play — drop MsgQuePush scripts.
  * smoke_esc: inject one CH_ESC after Cls or DCDepthBufAlloc so check-serial ends.
- * live (!smoke_esc): inject controls GrPrint after Cls (DiskLat) or DepthBufAlloc (StockLat). */
+ * live (!smoke_esc): inject controls GrPrint; strip DrawIt idle TurtleMove (M193, stock). */
 static int hc_lattice_play_src(const char *in, char *out, size_t cap, int smoke_esc) {
     size_t o = 0;
     const char *p = in;
@@ -2585,6 +2585,26 @@ static int hc_lattice_play_src(const char *in, char *out, size_t cap, int smoke_
                 p++;
             }
             continue;
+        }
+        /* M193: live stockplay — drop DrawIt preview TurtleMove (keep Space Step). */
+        if (!smoke_esc && p[0] == 'T' && p[1] == 'u' && p[2] == 'r' && p[3] == 't' &&
+            p[4] == 'l' && p[5] == 'e' && p[6] == 'M' && p[7] == 'o' && p[8] == 'v' &&
+            p[9] == 'e' && p[10] == '(') {
+            const char *q = p + 11;
+            /* TurtleMove(dc, &t2, RED, LTRED); — DrawIt only */
+            if (q[0] == 'd' && q[1] == 'c' && q[2] == ',' && q[3] == ' ' && q[4] == '&' &&
+                q[5] == 't' && q[6] == '2' && q[7] == ',' && q[8] == ' ' && q[9] == 'R' &&
+                q[10] == 'E' && q[11] == 'D' && q[12] == ',' && q[13] == ' ' && q[14] == 'L' &&
+                q[15] == 'T' && q[16] == 'R' && q[17] == 'E' && q[18] == 'D' && q[19] == ')') {
+                p = q + 20;
+                if (*p == ';') {
+                    p++;
+                }
+                while (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n') {
+                    p++;
+                }
+                continue;
+            }
         }
         if (o + 1 >= cap) {
             return -1;
@@ -3531,7 +3551,7 @@ static void shell_handle(const char *line, int *done) {
         con_puts("Lattice: nearlatticelite | disklat | lattice | latticeplay | stockplay | depthplotlite\n");
         /* M178: eyes-on controls without reading MenuPush / DiskLat source. */
         con_puts("  latticeplay: Esc Enter Space c +/- e | L-click place | R-drag aim | arrows dth/speed | 0-9 layer\n");
-        con_puts("  stockplay: live StockLat (stock DrawIt TurtleMove/Refresh; Esc exits)\n");
+        con_puts("  stockplay: live StockLat (soft DrawIt; Esc exits)\n");
         con_puts("cmds: help|abs|sum|bars|stars|circles|bounce|paint|netofdots|lines|minigr|memsort|globshare|life|cartlite|vec2lite|angleslite|coslite|sqrtlite|arglite|commalite|plot3lite|tospilite|colorlite|turtlelite|filllite|initlite|deflite|printlite|msglite|menulite|findlite|fslite|setuplite|ttlite|buflite|inclite|dclite|linedclite|grflite|movelite|checkedlite|cmplite|forinclite|microlite|movestacklite|endlite|drawitlite|latticelite|looplite|demolite|eventlite|playlite|inputlite|rightlite|cursorlite|uplite|ticklite|framelite|plotdclite|abortlite|aimmovelite|idlelite|layerlite|endslite|speedlite|midlite|livelite|accellite|restartlite|widthlite|bothcolorlite|menufulllite|menubiglite|trylite|stepcountlite|anglesfulllite|braceangleslite|bracepilite|setmenulite|nearlatticelite|f64iflite|wraplatticelite|menulooplite|idxalllite|disklat|lattice|depthbuflite|depthrstlite|depthplotlite|depthlinelite|peekplot|offbmp|heapstr|catfmt|heapque|jobque|jobrun|spawn|popup|doclite|ramblk|namefile|dirlook|dirdel|fopen|fwrite|multiblk|redsea|rsroot|rsfile|rsalloc|rsfree|rsmulti|rscfile|rscwrite|rscseek|rsclib|rspersist|rscatalog|rsdir|rsdel|rsrename|runzc|runzc <file.ZC>|vblk|halt|hc <src>|expr\n");
         con_puts("  hc: Print*/Str*/Mem*/Min/Max/Clamp/Sign/Sqr/Abs/Cnt/CntFrq/HashStr/Mouse*/Rand/Sleep/Gr*/Cls\n");
         con_puts("  hc: KeyHit/GetKey (Esc exits paint loops)\n");
@@ -4285,7 +4305,7 @@ static void shell_handle(const char *line, int *done) {
             con_puts("stockplay build FAIL\n");
             return;
         }
-        con_puts("stockplay: Esc Enter Space c +/- e | place/aim | stock DrawIt (heavier)\n");
+        con_puts("stockplay: Esc Enter Space c +/- e | place/aim | soft DrawIt (Esc exits)\n");
         if (hc_run_src_ex(g_hc_zc_src, &got, 1) != 0) {
             con_puts("stockplay FAIL\n");
             return;

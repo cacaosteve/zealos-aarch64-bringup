@@ -4,10 +4,11 @@
  *
  * Bring-up:
  *   - Source from YDE/ZealOS Lattice.ZC (ISO-8859 TempleOS charset)
+ *   - M193: stockplay live strips DrawIt TurtleMove(dc,&t2,RED,LTRED) (Space Step kept)
  *   - M191: stockplay injects same FB controls GrPrint as latticeplay
  *   - M190: Refresh after switch (stockplay); MsgQue stripped for live
  *   - LatticeSmoke: MsgQue SPACE+ESC; return 15 (not interactive U0 Lattice)
- *   - Still not latticeplay: stock DrawIt TurtleMoves every Refresh; no MESSAGE_NULL idle
+ *   - StockLat smoke keeps stock DrawIt; stockplay live softens idle TurtleMove (M193)
  *   - Freeze catalog unchanged
  */
 

@@ -2272,6 +2272,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 193 — stockplay soft DrawIt (no idle TurtleMove)
+
+| Item | Path |
+|--|--|
+| Gap | live `stockplay` kept stock DrawIt `TurtleMove` every Refresh → heavy UTM idle |
+| Upstream need | usable stock-shaped session; Space Step still draws |
+| Bring-up | `hc_lattice_play_src` live strips `TurtleMove(dc, &t2, RED, LTRED);`; smoke keeps it |
+| Smoke | StockPlay (ESC) still green; StockLat scripted unchanged |
+| Shell | `stockplay` idle quieter like `latticeplay` |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).
