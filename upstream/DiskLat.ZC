@@ -19,6 +19,7 @@
  *   - M173: skip head erase/redraw when pose unchanged (idle Refresh)
  *   - M174: DCFill resets depth_buf (Restart stale z occlusion)
  *   - M175: Cls resets depth_buf like DCFill (latticeplay entry)
+ *   - M176: after Space, head_on=0 so DrawIt skips BLACK erase of old head
  *   - Freeze catalog unchanged (ephemeral disk file)
  *   - return DiskLat();  expect 15
  */
@@ -348,6 +349,8 @@ I64 DiskLat()
 							break;
 						case CH_SPACE:
 							TurtleMove(dc, &tt, tt.edge, tt.middle);
+							/* M176: stroke covered the old head — don't BLACK-erase it. */
+							head_on = FALSE;
 							break;
 						case '\r':
 						case '\n':

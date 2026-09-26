@@ -351,6 +351,8 @@ I64 NearLatticeLite()
 							goto lt_done;
 						case CH_SPACE:
 							TurtleMove(dc, &tt, tt.edge, tt.middle);
+							/* M176: stroke covered the old head — don't BLACK-erase it. */
+							head_on = FALSE;
 							break;
 					}
 					break;

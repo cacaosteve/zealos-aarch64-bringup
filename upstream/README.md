@@ -2080,6 +2080,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 176 — Space skips BLACK erase of old head
+
+| Item | Path |
+|--|--|
+| Gap | after `TurtleMove`, DrawIt BLACK-erased the prior head and notched the new stroke |
+| Upstream need | step path stays intact under the moving marker |
+| Bring-up | `head_on = FALSE` after `CH_SPACE`; next DrawIt only paints the new LTRED head |
+| Smoke | DiskLat / NearLattice / Lattice.ZC / LatticePlay still **15** |
+| Shell | `latticeplay` Space no longer leaves a black bite at the step origin |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).
