@@ -2356,6 +2356,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 200 — PL011 RX prep + uartrx
+
+| Item | Path |
+|--|--|
+| Gap | Pi shell had TX-oriented enable; RX FIFO/RSR not drained before input; no RX probe cmd |
+| Upstream need | prove USB-TTL RX @ 115200 (`help`/`halt`) |
+| Bring-up | `pl011_enable_txrx` + `pl011_rx_prep` before shell; `uartrx` (~2s wait); smoke `hc: uart RX idle OK` |
+| Smoke | empty FIFO after prep on QEMU virt |
+| Shell | `uartrx` on Pi / virt serial |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).

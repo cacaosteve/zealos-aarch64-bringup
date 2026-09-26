@@ -65,11 +65,11 @@ Bridge notes: [AIWNIOS.md](AIWNIOS.md). Milestone ladder: [upstream/README.md](u
 
 | Track | Status |
 |--|--|
-| QEMU/UTM virt | **Regression freeze** M33–M39 (`Notes.ZC` / DocLib `#include`) still the bar — see ACCEPTANCE.md. **Lattice compose** continued on top (M151–M199: FB teardown, `latticeplay`/`stockplay`/`stocklat`, controls cues, DrawIt head, depth reset, `Lattice()` entry, ~60 Hz idle, interruptible Sleep, stock `StockLat` smoke, stock `θ`/`dθ_idx` names, FB π/θ glyphs, MessageGet yield, UTF-8 θ/π fold, soft stockplay DrawIt/HeadMark, stock Enter/CR Restart, stock Cls entry). Scripted QEMU ≠ live UTM keyboard/tablet proof. |
-| Pi 4B UEFI | PI-DIAG-1..4 + **shell entry on FB** accepted (2026-09-23). **UART RX not yet proven** on hardware (`help`/`halt` via USB–TTL). No virtio/RedSea disk on Pi yet ([PI4.md](PI4.md)). |
+| QEMU/UTM virt | **Regression freeze** M33–M39 (`Notes.ZC` / DocLib `#include`) still the bar — see ACCEPTANCE.md. **Lattice compose** continued on top (M151–M199) + **M200** PL011 RX prep/`uartrx`. Scripted QEMU ≠ live UTM keyboard/tablet proof. |
+| Pi 4B UEFI | PI-DIAG-1..4 + **shell entry on FB** accepted (2026-09-23). **UART RX:** use `uartrx` on USB–TTL @ 115200 after `make pi-sd` (M200 prep). No virtio/RedSea disk on Pi yet ([PI4.md](PI4.md)). |
 
 ## Next
 
-1. UTM eyes-on after `make utm`: freeze checklist + `latticeplay` (place/aim/step/restart/colors/Esc)
-2. Pi: prove UART RX on USB–TTL @ 115200, then native storage / keyboard path
+1. UTM eyes-on after `make utm`: freeze checklist + `latticeplay`/`stockplay` (place/aim/step/restart/colors/Esc)
+2. Pi: prove UART RX — `uartrx` then `help`/`halt` on USB–TTL @ 115200; then native storage / keyboard path
 3. HCRT host stubs only after IR gap shrinks; DT-based discovery before other ARM64 boards

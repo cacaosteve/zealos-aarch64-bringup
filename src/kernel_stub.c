@@ -131,9 +131,11 @@
 #include "runzc_zc.h"
 
 #define PL011_DR      0x00
+#define PL011_RSR     0x04 /* write clears OE/BE/PE/FE (ECR alias) */
 #define PL011_FR      0x18
 #define PL011_CR      0x30
 #define PL011_FR_TXFF (1u << 5)
+#define PL011_FR_RXFE (1u << 4)
 #define PL011_FR_BUSY (1u << 3)
 #define PL011_UARTEN  (1u << 0)
 #define PL011_TXE     (1u << 8)
@@ -216,9 +218,8 @@ static void uart_write(volatile uint8_t *uart, char c) {
     r[PL011_DR / 4] = (uint32_t)(uint8_t)c;
 }
 
-/* Enable TX without touching baud (keep UEFI/firmware divisor). */
-#if defined(ZEAL_PI_DIAG) || defined(ZEAL_FORCE_PI4)
-static void pl011_enable_tx(volatile uint8_t *uart) {
+/* Enable TX+RX without touching baud (keep UEFI/firmware divisor). */
+static void pl011_enable_txrx(volatile uint8_t *uart) {
     volatile uint32_t *r;
     uint32_t cr;
     if (!uart) {
@@ -230,6 +231,22 @@ static void pl011_enable_tx(volatile uint8_t *uart) {
     r[PL011_CR / 4] = cr;
 }
 
+/* M200: ensure RXE, drain stale FIFO, clear RSR — Pi USB-TTL and virt serial. */
+static void pl011_rx_prep(void) {
+    volatile uint32_t *r;
+    unsigned n = 0;
+    if (!g_uart || g_uart_dead) {
+        return;
+    }
+    pl011_enable_txrx(g_uart);
+    r = (volatile uint32_t *)(uintptr_t)g_uart;
+    while (!(r[PL011_FR / 4] & PL011_FR_RXFE) && n++ < 64u) {
+        (void)r[PL011_DR / 4];
+    }
+    r[PL011_RSR / 4] = 0;
+}
+
+#if defined(ZEAL_PI_DIAG) || defined(ZEAL_FORCE_PI4)
 static void uart_flush(volatile uint8_t *uart) {
     unsigned spin = 0;
     volatile uint32_t *r;
@@ -2117,7 +2134,7 @@ static int hc_input_pending_for_sleep(void) {
         }
     } else if (g_uart) {
         volatile uint32_t *r = (volatile uint32_t *)(uintptr_t)g_uart;
-        /* PL011_FR_RXFE — defined later with uart_getc_nb; peek without consume. */
+        /* PL011_FR_RXFE — peek without consume. */
         if (!(r[PL011_FR / 4] & (1u << 4))) {
             return 1;
         }
@@ -3392,9 +3409,6 @@ static int rs_is_graphic_zc(const char *name) {
     return e && e->graphic;
 }
 
-#define PL011_FR_RXFE (1u << 4)
-#define PL011_RSR     0x04
-
 static int uart_getc_nb(void) {
     volatile uint32_t *r;
     int c;
@@ -3524,11 +3538,52 @@ static void shell_handle(const char *line, int *done) {
         con_puts("  latticeplay: Esc Enter Space c +/- e | L-click place | R-drag aim | arrows dth/speed | 0-9 layer\n");
         con_puts("  stockplay: Esc Enter Space c +/- e | L-click place | R-drag aim | arrows dth/speed | 0-9 layer\n");
         con_puts("  stocklat: scripted StockLat SPACE+ESC smoke (expect 15)\n");
-        con_puts("cmds: help|abs|sum|bars|stars|circles|bounce|paint|netofdots|lines|minigr|memsort|globshare|life|cartlite|vec2lite|angleslite|coslite|sqrtlite|arglite|commalite|plot3lite|tospilite|colorlite|turtlelite|filllite|initlite|deflite|printlite|msglite|menulite|findlite|fslite|setuplite|ttlite|buflite|inclite|dclite|linedclite|grflite|movelite|checkedlite|cmplite|forinclite|microlite|movestacklite|endlite|drawitlite|latticelite|looplite|demolite|eventlite|playlite|inputlite|rightlite|cursorlite|uplite|ticklite|framelite|plotdclite|abortlite|aimmovelite|idlelite|layerlite|endslite|speedlite|midlite|livelite|accellite|restartlite|widthlite|bothcolorlite|menufulllite|menubiglite|trylite|stepcountlite|anglesfulllite|braceangleslite|bracepilite|setmenulite|nearlatticelite|f64iflite|wraplatticelite|menulooplite|idxalllite|disklat|lattice|depthbuflite|depthrstlite|depthplotlite|depthlinelite|peekplot|offbmp|heapstr|catfmt|heapque|jobque|jobrun|spawn|popup|doclite|ramblk|namefile|dirlook|dirdel|fopen|fwrite|multiblk|redsea|rsroot|rsfile|rsalloc|rsfree|rsmulti|rscfile|rscwrite|rscseek|rsclib|rspersist|rscatalog|rsdir|rsdel|rsrename|runzc|runzc <file.ZC>|vblk|halt|hc <src>|expr\n");
+        con_puts("Pi/serial: uartrx — wait ~2s for one PL011 RX byte (USB-TTL @ 115200)\n");
+        con_puts("cmds: help|abs|sum|bars|stars|circles|bounce|paint|netofdots|lines|minigr|memsort|globshare|life|cartlite|vec2lite|angleslite|coslite|sqrtlite|arglite|commalite|plot3lite|tospilite|colorlite|turtlelite|filllite|initlite|deflite|printlite|msglite|menulite|findlite|fslite|setuplite|ttlite|buflite|inclite|dclite|linedclite|grflite|movelite|checkedlite|cmplite|forinclite|microlite|movestacklite|endlite|drawitlite|latticelite|looplite|demolite|eventlite|playlite|inputlite|rightlite|cursorlite|uplite|ticklite|framelite|plotdclite|abortlite|aimmovelite|idlelite|layerlite|endslite|speedlite|midlite|livelite|accellite|restartlite|widthlite|bothcolorlite|menufulllite|menubiglite|trylite|stepcountlite|anglesfulllite|braceangleslite|bracepilite|setmenulite|nearlatticelite|f64iflite|wraplatticelite|menulooplite|idxalllite|disklat|lattice|depthbuflite|depthrstlite|depthplotlite|depthlinelite|peekplot|offbmp|heapstr|catfmt|heapque|jobque|jobrun|spawn|popup|doclite|ramblk|namefile|dirlook|dirdel|fopen|fwrite|multiblk|redsea|rsroot|rsfile|rsalloc|rsfree|rsmulti|rscfile|rscwrite|rscseek|rsclib|rspersist|rscatalog|rsdir|rsdel|rsrename|runzc|runzc <file.ZC>|vblk|uartrx|halt|hc <src>|expr\n");
         con_puts("  hc: Print*/Str*/Mem*/Min/Max/Clamp/Sign/Sqr/Abs/Cnt/CntFrq/HashStr/Mouse*/Rand/Sleep/Gr*/Cls\n");
         con_puts("  hc: KeyHit/GetKey (Esc exits paint loops)\n");
         con_puts("  netofdots/lines/minigr/memsort/globshare/life/cartlite/vec2lite/angleslite/coslite/sqrtlite/arglite/commalite/peekplot/offbmp/heapstr/catfmt/heapque/jobque/jobrun/spawn/popup/doclite/ramblk/namefile/dirlook/dirdel/fopen/fwrite/multiblk/redsea/rsroot/rsfile/rsalloc/rsfree/rsmulti/rscfile/rscwrite/rscseek/rsclib/rspersist/runzc/vblk: upstream ZealOS demos\n");
         con_puts("  tablet: click/drag; HolyC paint via Mouse*; latticeplay place/aim\n");
+        return;
+    }
+    if (streq(line, "uartrx")) {
+        /* M200: Pi USB-TTL RX proof — wait ~2s for one byte after RX prep. */
+        uint64_t frq = 0, t0 = 0, now = 0;
+        int c = -1;
+        pl011_rx_prep();
+        con_puts("uartrx: send one byte @ 115200 (2s)...\n");
+        __asm__ volatile("mrs %0, cntfrq_el0" : "=r"(frq));
+        if (frq == 0) {
+            frq = 62500000;
+        }
+        __asm__ volatile("mrs %0, cntpct_el0" : "=r"(t0));
+        do {
+            c = uart_getc_nb();
+            if (c >= 0) {
+                break;
+            }
+            __asm__ volatile("mrs %0, cntpct_el0" : "=r"(now));
+        } while ((now - t0) < frq * 2ull);
+        if (c < 0) {
+            con_puts("uartrx timeout (no RX)\n");
+            return;
+        }
+        con_puts("uartrx got 0x");
+        {
+            char hx[3];
+            const char *dig = "0123456789abcdef";
+            hx[0] = dig[(c >> 4) & 15];
+            hx[1] = dig[c & 15];
+            hx[2] = 0;
+            con_puts(hx);
+        }
+        if (c >= 32 && c < 127) {
+            con_puts(" '");
+            con_write((char)c);
+            con_puts("'\n");
+        } else {
+            con_puts("\n");
+        }
         return;
     }
     if (streq(line, "halt") || streq(line, "quit")) {
@@ -5002,6 +5057,8 @@ static void shell_handle(const char *line, int *done) {
 static void shell_run(void) {
     /* Interactive by default: no auto-script, no timeout.
      * Automated demos belong in jit_smoke / make run-serial kill, not here. */
+    /* M200: RXE + drain before input (Pi USB-TTL / virt serial). */
+    pl011_rx_prep();
     /* M151: wipe FB smoke residue (bars/lines) so UTM shows a clean shell. */
     if (g_fb) {
         fb_clear(0x00101820u);
@@ -5052,6 +5109,14 @@ static int jit_smoke(void) {
     uint8_t bc[80];
     size_t n = 0;
     uint64_t got = 0;
+
+    /* M200: PL011 RX path — enable/drain then idle (empty FIFO). */
+    pl011_rx_prep();
+    if (uart_getc_nb() >= 0) {
+        uart_puts(g_uart, "hc: uart RX idle FAIL\n");
+        return -253;
+    }
+    uart_puts(g_uart, "hc: uart RX idle OK\n");
 
     /* Aiwnios-shaped BL relative call (a64_emit slice). */
     {
@@ -7525,7 +7590,7 @@ void kernel_entry(const struct zeal_handoff *h) {
 
             if (fr_ok && dr_ok) {
                 g_uart_dead = 0;
-                pl011_enable_tx(g_uart);
+                pl011_enable_txrx(g_uart);
                 uart_puts(g_uart, "\nhello from EL");
                 uart_write(g_uart, (char)('0' + (int)h->boot_el));
                 uart_puts(g_uart, " (PI-DIAG-2)\n");
@@ -7683,6 +7748,7 @@ void kernel_entry(const struct zeal_handoff *h) {
                                     __asm__ volatile("msr daifset, #2");
                                     __asm__ volatile("msr cntp_ctl_el0, %0" ::"r"(0ull));
                                     __asm__ volatile("isb");
+                                    pl011_rx_prep();
                                     shell_run();
                                     for (;;) {
                                         __asm__ volatile("wfi");

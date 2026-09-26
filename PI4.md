@@ -16,8 +16,8 @@ Native firmware+DTB is a fallback only if UEFI on the board is unusable.
 
 | Track | Goal |
 |--|--|
-| **UTM / QEMU virt** | ZealOS *compatibility* ladder (HolyC, RedSea, Lattice compose through M199). M33–M39 freeze bar + eyes-on Lattice notes in ACCEPTANCE.md. Not “full ZealOS” yet; `latticeplay` (DiskLat) ≠ `stockplay` (StockLat body, soft HeadMark DrawIt); `stocklat` = scripted StockLat. |
-| **Pi 4B UEFI** | First *physical* platform: boot/timer/IRQ + FB shell **reached**; prove UART RX next, then SD/USB/GPU. |
+| **UTM / QEMU virt** | ZealOS *compatibility* ladder (HolyC, RedSea, Lattice compose through M199; M200 PL011 RX prep). M33–M39 freeze bar + eyes-on Lattice notes in ACCEPTANCE.md. Not “full ZealOS” yet; `latticeplay` (DiskLat) ≠ `stockplay` (StockLat body, soft HeadMark DrawIt); `stocklat` = scripted StockLat. |
+| **Pi 4B UEFI** | First *physical* platform: boot/timer/IRQ + FB shell **reached**; M200 `uartrx` / RX prep for USB-TTL @ 115200; then SD/USB/GPU. |
 
 Virtio drivers do **not** apply on the Pi. Need BCM2711 UART, GICv2, and later SD/display.
 
@@ -106,8 +106,8 @@ Shared above that: HolyC front-end, JIT, RedSea/CFile APIs, demos.
 3. **Serial hello (PI-DIAG-2)** — **accepted**.
 4. **Soft CNTP (PI-DIAG-3)** — **accepted**.
 5. **GICv2 + CNTP IRQ (PI-DIAG-4)** — **accepted** (Device-map FF window).
-6. **Serial/FB shell** — **reached** (banner + cmd list after IRQ OK). Prove UART RX
-   next (`help`/`halt` via USB-TTL); virtio/RedSea disk cmds N/A on Pi yet.
+6. **Serial/FB shell** — **reached** (banner + cmd list after IRQ OK). **M200:** `pl011_rx_prep` +
+   `uartrx` for USB-TTL @ 115200; still need hardware eyes-on (`uartrx` then `help`/`halt`).
 7. **Storage / input / display** — after serial input is usable.
 
 ## Non-goals (for now)
