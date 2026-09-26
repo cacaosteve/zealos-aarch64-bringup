@@ -106,6 +106,7 @@ Restart VM; repeat `rspersist`, `rsdir`, `runzc Notes.ZC` (persist-safe seeds).
 - M183: DiskLat/`latticeplay` Turtle fields use stock `θ` / `dθ_idx` names (and HUD labels), matching StockLat.
 - M184: FB `GrPrint` draws TempleOS `0xE3`/`0xE9` as π/θ glyphs (was `?` on the ASCII-only font).
 - M185: NearLatticeLite Turtle fields/HUD also use stock `θ` / `dθ_idx` (DiskLat parity).
+- M186: DemoLite/PlayLite/FrameLite/LiveLite Turtle fields/HUD use stock `θ` / `dθ_idx`.
 - **Scope:** QEMU/`disklat`/`LatticePlay` exercise DiskLat-shaped compose source, **not** stock ZealOS `Demo/Graphics/Lattice.ZC` with original behavior. Live place/aim/step/restart/colors need an eyes-on UTM pass after `make utm`.
 - Freeze checklist still: `vblk`, `rspersist`, `rscatalog`, `runzc` UseAdd/Notes/MemSort (same as QEMU `run-pci`).
 

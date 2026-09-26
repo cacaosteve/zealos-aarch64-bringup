@@ -16,7 +16,7 @@ Native firmware+DTB is a fallback only if UEFI on the board is unusable.
 
 | Track | Goal |
 |--|--|
-| **UTM / QEMU virt** | ZealOS *compatibility* ladder (HolyC, RedSea, Lattice compose through M185). M33–M39 freeze bar + eyes-on Lattice notes in ACCEPTANCE.md. Not “full ZealOS” yet; DiskLat/`latticeplay` ≠ stock interactive `Lattice.ZC` (StockLat proves compile+scripted path). |
+| **UTM / QEMU virt** | ZealOS *compatibility* ladder (HolyC, RedSea, Lattice compose through M186). M33–M39 freeze bar + eyes-on Lattice notes in ACCEPTANCE.md. Not “full ZealOS” yet; DiskLat/`latticeplay` ≠ stock interactive `Lattice.ZC` (StockLat proves compile+scripted path). |
 | **Pi 4B UEFI** | First *physical* platform: boot/timer/IRQ + FB shell **reached**; prove UART RX next, then SD/USB/GPU. |
 
 Virtio drivers do **not** apply on the Pi. Need BCM2711 UART, GICv2, and later SD/display.

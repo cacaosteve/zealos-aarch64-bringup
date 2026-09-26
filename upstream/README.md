@@ -2188,6 +2188,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 186 — Demo/Play/Frame/Live stock θ / dθ_idx
+
+| Item | Path |
+|--|--|
+| Gap | idle compose *Lites still used ASCII `th` / `idx` after DiskLat/NearLattice |
+| Upstream need | same Turtle field names across Lattice compose ladder |
+| Bring-up | DemoLite, PlayLite, FrameLite, LiveLite → `θ` / `dθ_idx` + HUD |
+| Smoke | those *Lites still **15** |
+| Shell | demolite/playlite/… HUD matches stock labels |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).
