@@ -199,8 +199,8 @@ I64 DemoLite()
 				}
 				break;
 			case MESSAGE_NULL:
-				/* Lattice idle: Sleep+Refresh until ESC (scripted CH_ESC ends smoke). */
-				Sleep(1);
+				/* Lattice idle: ~60 Hz Sleep+Refresh (M180). */
+				Sleep(16);
 				break;
 		}
 		Refresh;

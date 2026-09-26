@@ -100,6 +100,7 @@ Restart VM; repeat `rspersist`, `rsdir`, `runzc Notes.ZC` (persist-safe seeds).
 - M177: compose exposes stock `Lattice()` entry (wrapper around `DiskLat`); RedSea `Lattice.ZC` / smokes still expect **15**.
 - M178: `help` lists `latticeplay` controls (Esc/Enter/Space/c/+/-/e, place/aim, arrows, layers).
 - M179: `latticeplay` prints the same controls line on entry (serial/FB shell) before the live loop.
+- M180: Lattice idle `Sleep(16)` (~60 Hz) instead of `Sleep(1)` so UTM/`latticeplay` is not Refresh-bound at ~1 kHz.
 - **Scope:** QEMU/`disklat`/`LatticePlay` exercise DiskLat-shaped compose source, **not** stock ZealOS `Demo/Graphics/Lattice.ZC` with original behavior. Live place/aim/step/restart/colors need an eyes-on UTM pass after `make utm`.
 - Freeze checklist still: `vblk`, `rspersist`, `rscatalog`, `runzc` UseAdd/Notes/MemSort (same as QEMU `run-pci`).
 

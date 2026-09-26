@@ -152,8 +152,8 @@ I64 WrapLatticeLite()
 					}
 					break;
 				case MESSAGE_NULL:
-					/* Lattice idle: Sleep until ESC (scripted CH_ESC ends smoke). */
-					Sleep(1);
+					/* Lattice idle: ~60 Hz (M180). */
+					Sleep(16);
 					break;
 			}
 		}

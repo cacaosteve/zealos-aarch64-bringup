@@ -357,8 +357,8 @@ I64 NearLatticeLite()
 					}
 					break;
 				case MESSAGE_NULL:
-					/* Lattice idle: keep Refreshing until ESC (scripted or live). */
-					Sleep(1);
+					/* Lattice idle: ~60 Hz Refresh (M180). */
+					Sleep(16);
 					break;
 			}
 			Refresh;

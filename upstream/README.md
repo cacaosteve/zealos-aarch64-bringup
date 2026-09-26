@@ -2128,6 +2128,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 180 — Lattice idle ~60 Hz Sleep
+
+| Item | Path |
+|--|--|
+| Gap | `MESSAGE_NULL` used `Sleep(1)` → ~1000 Refresh/s on live `latticeplay` |
+| Upstream need | usable live session without burning the UTM host |
+| Bring-up | DiskLat/Near/Wrap/Demo/Play/Frame/Live → `Sleep(16)`; keys/tablet still wake `MessageGet` |
+| Smoke | compose *Lites / DiskLat / LatticePlay still **15** |
+| Shell | `latticeplay` idle quieter; aim/step still event-driven |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).

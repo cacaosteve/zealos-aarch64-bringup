@@ -21,6 +21,7 @@
  *   - M175: Cls resets depth_buf like DCFill (latticeplay entry)
  *   - M176: after Space, head_on=0 so DrawIt skips BLACK erase of old head
  *   - M177: Lattice() entry wrapper (stock name); return Lattice()
+ *   - M180: MESSAGE_NULL idle Sleep(16) (~60 Hz) instead of Sleep(1)
  *   - Freeze catalog unchanged (ephemeral disk file)
  *   - return Lattice();  expect 15
  */
@@ -370,8 +371,8 @@ I64 DiskLat()
 					}
 					break;
 				case MESSAGE_NULL:
-					/* Lattice idle: keep Refreshing until ESC (scripted or live). */
-					Sleep(1);
+					/* Lattice idle: ~60 Hz Refresh (M180: was Sleep(1) and burned host CPU). */
+					Sleep(16);
 					break;
 			}
 			Refresh;
