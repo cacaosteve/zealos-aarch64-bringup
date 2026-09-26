@@ -3515,13 +3515,19 @@ static void tablet_cursor_tick(void) {
     g_tab_cy = y;
 }
 
-/* M157: after Lattice/graphics demos, match shell_run dark FB (not DCFill black). */
+/* M157/M202: after Lattice/graphics demos, match shell_run dark FB (not DCFill black). */
 static void shell_fb_ready(void) {
     if (g_fb) {
         fb_clear(0x00101820u);
         g_fb_cx = 0;
         g_fb_cy = 0;
     }
+    /* M202: Lattice depth must not occlude later shell paint/bars. */
+    if (g_hc_depth_on) {
+        hc_depth_map_clear();
+        g_hc_depth_on = 0;
+    }
+    g_hc_cdc.depth_buf = 0;
 }
 
 static void shell_handle(const char *line, int *done) {
@@ -3562,6 +3568,8 @@ static void shell_handle(const char *line, int *done) {
             if (c >= 0) {
                 break;
             }
+            /* M202: same Sleep peek as shell idle (not a hot cntpct spin). */
+            (void)hc_builtin_sleep(1);
             __asm__ volatile("mrs %0, cntpct_el0" : "=r"(now));
         } while ((now - t0) < frq * 2ull);
         if (c < 0) {

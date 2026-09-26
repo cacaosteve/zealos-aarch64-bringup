@@ -2380,6 +2380,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 202 — post-demo depth clear + quiet uartrx
+
+| Item | Path |
+|--|--|
+| Gap | after `latticeplay`/`stockplay` Esc, `g_hc_depth_on` stayed set; `uartrx` hot-spun on CNTP |
+| Upstream need | clean shell paint after Lattice; quieter RX probe |
+| Bring-up | `shell_fb_ready` clears depth map/`depth_buf`; `uartrx` uses `Sleep(1)` |
+| Smoke | check-serial green (depthplot still **15**) |
+| Shell | Esc from live Lattice then `bars`/`paint` not z-occluded |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).
