@@ -443,6 +443,15 @@ static int virtio_kbd_msg_nb(uint8_t *type, uint64_t *a1, uint64_t *a2) {
     return vk_msg_pop(type, a1, a2);
 }
 
+/* Peek: poll DMA into msg ring without consuming (Sleep wake). */
+static int virtio_kbd_msg_pending(void) {
+    if (!g_vk.ready) {
+        return 0;
+    }
+    vk_poll();
+    return g_vk_mh != g_vk_mt;
+}
+
 static int virtio_kbd_ready(void) {
     return g_vk.ready;
 }

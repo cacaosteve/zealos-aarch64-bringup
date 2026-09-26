@@ -2084,8 +2084,40 @@ uint64_t hc_builtin_rand(void) {
     return x * 0x2545F4914F6CDD1Dull;
 }
 
+/* Peek only — do not update MessageGet edge/xy state (else edges are lost). */
+static int hc_input_pending_for_sleep(void) {
+    if (g_hc_msg_head != g_hc_msg_tail) {
+        return 1;
+    }
+    if (virtio_kbd_ready()) {
+        if (virtio_kbd_msg_pending()) {
+            return 1;
+        }
+    } else if (g_uart) {
+        volatile uint32_t *r = (volatile uint32_t *)(uintptr_t)g_uart;
+        /* PL011_FR_RXFE — defined later with uart_getc_nb; peek without consume. */
+        if (!(r[PL011_FR / 4] & (1u << 4))) {
+            return 1;
+        }
+    }
+    if (virtio_tablet_ready() && g_fb) {
+        uint32_t x = 0, y = 0;
+        int btns = virtio_tablet_buttons();
+        (void)virtio_tablet_xy((uint32_t)g_fb_w, (uint32_t)g_fb_h, &x, &y);
+        int btn = btns & 1;
+        int rbtn = (btns & 2) ? 1 : 0;
+        if (btn != g_hc_msg_btn_prev || rbtn != g_hc_msg_rbtn_prev) {
+            return 1;
+        }
+        if (g_hc_msg_have_xy && (x != g_hc_msg_last_x || y != g_hc_msg_last_y)) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 uint64_t hc_builtin_sleep(uint64_t ms) {
-    uint64_t frq = 0, t0 = 0, now = 0;
+    uint64_t frq = 0, t0 = 0, now = 0, next_poll = 0;
     __asm__ volatile("mrs %0, cntfrq_el0" : "=r"(frq));
     if (frq == 0) {
         frq = 62500000;
@@ -2093,10 +2125,24 @@ uint64_t hc_builtin_sleep(uint64_t ms) {
     if (ms > 5000) {
         ms = 5000;
     }
+    if (ms == 0) {
+        return 0;
+    }
     uint64_t ticks = (frq / 1000ull) * ms;
+    uint64_t poll_every = frq / 1000ull; /* ~1 ms between input peeks */
+    if (poll_every == 0) {
+        poll_every = 1;
+    }
     __asm__ volatile("mrs %0, cntpct_el0" : "=r"(t0));
+    next_poll = t0;
     do {
         __asm__ volatile("mrs %0, cntpct_el0" : "=r"(now));
+        if (now >= next_poll) {
+            if (hc_input_pending_for_sleep()) {
+                break;
+            }
+            next_poll = now + poll_every;
+        }
     } while (now - t0 < ticks);
     return ms;
 }

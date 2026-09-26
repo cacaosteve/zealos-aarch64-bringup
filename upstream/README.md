@@ -2134,7 +2134,7 @@ Freeze catalog unchanged.
 |--|--|
 | Gap | `MESSAGE_NULL` used `Sleep(1)` → ~1000 Refresh/s on live `latticeplay` |
 | Upstream need | usable live session without burning the UTM host |
-| Bring-up | DiskLat/Near/Wrap/Demo/Play/Frame/Live → `Sleep(16)`; keys/tablet still wake `MessageGet` |
+| Bring-up | DiskLat/Near/Wrap/Demo/Play/Frame/Live → `Sleep(16)`; Sleep wakes early on pending virtio/UART/tablet (M181) |
 | Smoke | compose *Lites / DiskLat / LatticePlay still **15** |
 | Shell | `latticeplay` idle quieter; aim/step still event-driven |
 
