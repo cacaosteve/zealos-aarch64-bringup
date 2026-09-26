@@ -4,6 +4,7 @@
  *
  * Bring-up:
  *   - Source from YDE/ZealOS Lattice.ZC (ISO-8859 TempleOS charset)
+ *   - M190: Refresh after switch (stockplay); MsgQue stripped for live
  *   - LatticeSmoke: MsgQue SPACE+ESC; return 15 (not interactive U0 Lattice)
  *   - Still not latticeplay: stock DrawIt TurtleMoves every Refresh; no MESSAGE_NULL idle
  *   - Freeze catalog unchanged
@@ -303,6 +304,8 @@ I64 LatticeSmoke()
 							break;
 					}
 			}
+			/* M190: WinMgr-shaped paint (stock has no Refresh; bring-up needs it). */
+			Refresh;
 		}
 lt_done:
 		MessageGet(,, 1 << MESSAGE_KEY_UP);

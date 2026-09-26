@@ -2535,13 +2535,13 @@ static int hc_run_src_ex(const char *src, uint64_t *out, int popup_live) {
     return rc;
 }
 
-/* M155/M159: DiskLat → LatticePlay — drop MsgQuePush scripts for live UTM.
- * smoke_esc: inject one CH_ESC after Cls so check-serial still terminates.
- * live (!smoke_esc): inject a one-line controls hint after Cls. */
+/* M155/M159/M190: DiskLat/StockLat → live play — drop MsgQuePush scripts.
+ * smoke_esc: inject one CH_ESC after Cls or DCDepthBufAlloc so check-serial ends.
+ * live (!smoke_esc): inject controls hint after Cls (DiskLat); StockLat has no Cls. */
 static int hc_lattice_play_src(const char *in, char *out, size_t cap, int smoke_esc) {
     size_t o = 0;
     const char *p = in;
-    int saw_cls = 0;
+    int saw_inj = 0;
     if (!in || !out || cap < 8) {
         return -1;
     }
@@ -2564,18 +2564,21 @@ static int hc_lattice_play_src(const char *in, char *out, size_t cap, int smoke_
             return -1;
         }
         out[o++] = *p++;
-        if (!saw_cls && o >= 7 && out[o - 7] == 'C' && out[o - 6] == 'l' && out[o - 5] == 's' &&
+        if (saw_inj) {
+            continue;
+        }
+        /* DiskLat: Cls(0); */
+        if (o >= 7 && out[o - 7] == 'C' && out[o - 6] == 'l' && out[o - 5] == 's' &&
             out[o - 4] == '(' && out[o - 3] == '0' && out[o - 2] == ')' && out[o - 1] == ';') {
             const char *inj;
-            size_t el;
+            size_t el = 0;
             if (smoke_esc) {
                 inj = "\n\t\tMsgQuePush(MESSAGE_KEY_DOWN, CH_ESC, 0);";
             } else {
-        inj = "\n\t\tGrPrint(dc, 0, 16, \"Esc=exit Enter=restart Space=step c=color +/-=w\");"
-              "\n\t\tGrPrint(dc, 0, 24, \"L-click=place R-drag=aim e=ends\");"
-              "\n\t\tGrPrint(dc, 0, 32, \"arrows=di/speed 0-9=layer\");";
+                inj = "\n\t\tGrPrint(dc, 0, 16, \"Esc=exit Enter=restart Space=step c=color +/-=w\");"
+                      "\n\t\tGrPrint(dc, 0, 24, \"L-click=place R-drag=aim e=ends\");"
+                      "\n\t\tGrPrint(dc, 0, 32, \"arrows=di/speed 0-9=layer\");";
             }
-            el = 0;
             while (inj[el]) {
                 el++;
             }
@@ -2585,7 +2588,33 @@ static int hc_lattice_play_src(const char *in, char *out, size_t cap, int smoke_
             for (size_t i = 0; i < el; i++) {
                 out[o++] = inj[i];
             }
-            saw_cls = 1;
+            saw_inj = 1;
+            continue;
+        }
+        /* StockLat: DCDepthBufAlloc(dc); — no Cls in stock body. */
+        if (o >= 20 && out[o - 20] == 'D' && out[o - 19] == 'C' && out[o - 18] == 'D' &&
+            out[o - 17] == 'e' && out[o - 16] == 'p' && out[o - 15] == 't' && out[o - 14] == 'h' &&
+            out[o - 13] == 'B' && out[o - 12] == 'u' && out[o - 11] == 'f' && out[o - 10] == 'A' &&
+            out[o - 9] == 'l' && out[o - 8] == 'l' && out[o - 7] == 'o' && out[o - 6] == 'c' &&
+            out[o - 5] == '(' && out[o - 4] == 'd' && out[o - 3] == 'c' && out[o - 2] == ')' &&
+            out[o - 1] == ';') {
+            const char *inj;
+            size_t el = 0;
+            if (smoke_esc) {
+                inj = "\n\tMsgQuePush(MESSAGE_KEY_DOWN, CH_ESC, 0);";
+            } else {
+                inj = "\n\t/* stockplay live: Esc exits; DrawIt TurtleMoves each Refresh (stock). */";
+            }
+            while (inj[el]) {
+                el++;
+            }
+            if (o + el >= cap) {
+                return -1;
+            }
+            for (size_t i = 0; i < el; i++) {
+                out[o++] = inj[i];
+            }
+            saw_inj = 1;
         }
     }
     if (o >= cap) {
@@ -3472,9 +3501,10 @@ static void shell_handle(const char *line, int *done) {
     }
     if (streq(line, "help")) {
         con_puts("UTM freeze: vblk | rspersist | rscatalog | rsdir | runzc | runzc Notes.ZC\n");
-        con_puts("Lattice: nearlatticelite | disklat | lattice | latticeplay | depthplotlite\n");
+        con_puts("Lattice: nearlatticelite | disklat | lattice | latticeplay | stockplay | depthplotlite\n");
         /* M178: eyes-on controls without reading MenuPush / DiskLat source. */
         con_puts("  latticeplay: Esc Enter Space c +/- e | L-click place | R-drag aim | arrows di/speed | 0-9 layer\n");
+        con_puts("  stockplay: live StockLat (stock DrawIt TurtleMove/Refresh; Esc exits)\n");
         con_puts("cmds: help|abs|sum|bars|stars|circles|bounce|paint|netofdots|lines|minigr|memsort|globshare|life|cartlite|vec2lite|angleslite|coslite|sqrtlite|arglite|commalite|plot3lite|tospilite|colorlite|turtlelite|filllite|initlite|deflite|printlite|msglite|menulite|findlite|fslite|setuplite|ttlite|buflite|inclite|dclite|linedclite|grflite|movelite|checkedlite|cmplite|forinclite|microlite|movestacklite|endlite|drawitlite|latticelite|looplite|demolite|eventlite|playlite|inputlite|rightlite|cursorlite|uplite|ticklite|framelite|plotdclite|abortlite|aimmovelite|idlelite|layerlite|endslite|speedlite|midlite|livelite|accellite|restartlite|widthlite|bothcolorlite|menufulllite|menubiglite|trylite|stepcountlite|anglesfulllite|braceangleslite|bracepilite|setmenulite|nearlatticelite|f64iflite|wraplatticelite|menulooplite|idxalllite|disklat|lattice|depthbuflite|depthrstlite|depthplotlite|depthlinelite|peekplot|offbmp|heapstr|catfmt|heapque|jobque|jobrun|spawn|popup|doclite|ramblk|namefile|dirlook|dirdel|fopen|fwrite|multiblk|redsea|rsroot|rsfile|rsalloc|rsfree|rsmulti|rscfile|rscwrite|rscseek|rsclib|rspersist|rscatalog|rsdir|rsdel|rsrename|runzc|runzc <file.ZC>|vblk|halt|hc <src>|expr\n");
         con_puts("  hc: Print*/Str*/Mem*/Min/Max/Clamp/Sign/Sqr/Abs/Cnt/CntFrq/HashStr/Mouse*/Rand/Sleep/Gr*/Cls\n");
         con_puts("  hc: KeyHit/GetKey (Esc exits paint loops)\n");
@@ -4219,6 +4249,22 @@ static void shell_handle(const char *line, int *done) {
         }
         shell_fb_ready();
         con_puts("latticeplay ok\n");
+        return;
+    }
+    if (streq(line, "stockplay")) {
+        uint64_t got = 0;
+        /* M190: near-verbatim stock Lattice, no MsgQue; live MessageGet yield. */
+        if (hc_lattice_play_src(STOCKLAT_ZC, g_hc_zc_src, sizeof(g_hc_zc_src), 0) != 0) {
+            con_puts("stockplay build FAIL\n");
+            return;
+        }
+        con_puts("stockplay: Esc Enter Space c +/- e | place/aim | stock DrawIt (heavier)\n");
+        if (hc_run_src_ex(g_hc_zc_src, &got, 1) != 0) {
+            con_puts("stockplay FAIL\n");
+            return;
+        }
+        shell_fb_ready();
+        con_puts("stockplay ok\n");
         return;
     }
     if (streq(line, "lattice")) {
@@ -7059,6 +7105,22 @@ static int jit_smoke(void) {
         uart_puts(g_uart, "hc: Upstream StockLat => ");
         uart_put_u64_hex(g_uart, got2);
         uart_puts(g_uart, "\n");
+        /* M190: StockPlay = StockLat without MsgQue; ESC-only smoke. */
+        {
+            if (hc_lattice_play_src(STOCKLAT_ZC, g_hc_zc_src, sizeof(g_hc_zc_src), 1) != 0) {
+                uart_puts(g_uart, "hc: Upstream StockPlay build FAIL\n");
+                return -250;
+            }
+            if (hc_run_src_ex(g_hc_zc_src, &got2, 1) != 0) {
+                uart_puts(g_uart, "hc: Upstream StockPlay FAIL got=");
+                uart_put_u64_hex(g_uart, got2);
+                uart_puts(g_uart, "\n");
+                return -251;
+            }
+            uart_puts(g_uart, "hc: Upstream StockPlay => ");
+            uart_put_u64_hex(g_uart, got2);
+            uart_puts(g_uart, "\n");
+        }
         if (hc_run_src(DEPTHBUFLITE_ZC, &got2) != 0 || got2 != 15) {
             uart_puts(g_uart, "hc: Upstream DepthBufLite FAIL got=");
             uart_put_u64_hex(g_uart, got2);

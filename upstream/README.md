@@ -2236,6 +2236,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 190 — stockplay (live StockLat)
+
+| Item | Path |
+|--|--|
+| Gap | StockLat only smoked with scripted MsgQue; no live UTM path for stock DrawIt |
+| Upstream need | eyes-on stock `Lattice.ZC` body (TurtleMove each Refresh) |
+| Bring-up | `stockplay` shell; play-src inject after `DCDepthBufAlloc`; StockLat `Refresh` after switch; StockPlay ESC smoke |
+| Smoke | `hc: Upstream StockPlay` (live flag + ESC) |
+| Shell | `stockplay` then Esc; heavier than `latticeplay` |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).
