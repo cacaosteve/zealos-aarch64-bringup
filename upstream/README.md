@@ -2032,6 +2032,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 172 — head erase via BLACK GrLines
+
+| Item | Path |
+|--|--|
+| Gap | M171 `FillRect` head erase punched holes in nearby Space strokes |
+| Upstream need | move head without damaging the lattice path |
+| Bring-up | `HeadMark` helper; erase with BLACK GrLines at saved `head_th`; DiskLat/NearLattice |
+| Smoke | DiskLat / NearLattice / Lattice.ZC / LatticePlay still **15** |
+| Shell | `latticeplay` place/aim/step keeps strokes under the moving head |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).

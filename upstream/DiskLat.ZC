@@ -15,6 +15,7 @@
  *   - M169: third controls line — arrows di/speed / 0-9 layer
  *   - M170: DrawIt HUD+head only (no idle TurtleMove preview flood)
  *   - M171: DrawIt erases prior LTRED head before redraw (no place/aim ghosts)
+ *   - M172: erase prior head with BLACK GrLines (FillRect punched Space strokes)
  *   - Freeze catalog unchanged (ephemeral disk file)
  *   - return DiskLat();  expect 15
  */
@@ -50,9 +51,24 @@ class Turtle
 	Bool first;
 } tt;
 
-I64 head_x;
-I64 head_y;
+F64 head_x;
+F64 head_y;
+F64 head_th;
 Bool head_on;
+
+U0 HeadMark(CDC *dc, F64 x, F64 y, F64 th, CColorROPU16 c)
+{
+	dc->color = c;
+	GrLine(dc,
+		x + TURTLE_SIZE * Cos(th + pi / 2), y + TURTLE_SIZE * Sin(th + pi / 2),
+		x + TURTLE_SIZE * Cos(th - pi / 2), y + TURTLE_SIZE * Sin(th - pi / 2));
+	GrLine(dc,
+		x + TURTLE_SIZE * Cos(th + pi / 2), y + TURTLE_SIZE * Sin(th + pi / 2),
+		x + TURTLE_SIZE * Cos(th), y + TURTLE_SIZE * Sin(th));
+	GrLine(dc,
+		x + TURTLE_SIZE * Cos(th - pi / 2), y + TURTLE_SIZE * Sin(th - pi / 2),
+		x + TURTLE_SIZE * Cos(th), y + TURTLE_SIZE * Sin(th));
+}
 
 U0 TurtlePlot(CDC *dc, Turtle *t, CColorROPU16 edge, CColorROPU16 middle)
 {
@@ -177,22 +193,13 @@ U0 DrawIt(CTask *, CDC *dc)
 	MemCopy(&t2, &tt, sizeof(Turtle));
 	GrPrint(dc, 0, 0, "Layer:%f Speed:%f th:%5.1f di:%5.1f Width:%f",
 		tt.z, tt.speed, tt.th * 180 / pi, angles[tt.idx] * 180 / pi, tt.w);
-	/* M170: no TurtleMove here — idle Refresh must not accumulate preview strokes.
-	 * M171: erase prior LTRED head so place/aim does not leave ghosts. */
+	/* M170: no TurtleMove. M171/M172: erase prior head with BLACK GrLines (not FillRect). */
 	if (head_on)
-		FillRect(head_x - 12, head_y - 12, 24, 24, BLACK);
-	dc->color = LTRED;
-	GrLine(dc,
-		t2.x + TURTLE_SIZE * Cos(t2.th + pi / 2), t2.y + TURTLE_SIZE * Sin(t2.th + pi / 2),
-		t2.x + TURTLE_SIZE * Cos(t2.th - pi / 2), t2.y + TURTLE_SIZE * Sin(t2.th - pi / 2));
-	GrLine(dc,
-		t2.x + TURTLE_SIZE * Cos(t2.th + pi / 2), t2.y + TURTLE_SIZE * Sin(t2.th + pi / 2),
-		t2.x + TURTLE_SIZE * Cos(t2.th), t2.y + TURTLE_SIZE * Sin(t2.th));
-	GrLine(dc,
-		t2.x + TURTLE_SIZE * Cos(t2.th - pi / 2), t2.y + TURTLE_SIZE * Sin(t2.th - pi / 2),
-		t2.x + TURTLE_SIZE * Cos(t2.th), t2.y + TURTLE_SIZE * Sin(t2.th));
-	head_x = ToI64(t2.x);
-	head_y = ToI64(t2.y);
+		HeadMark(dc, head_x, head_y, head_th, BLACK);
+	HeadMark(dc, t2.x, t2.y, t2.th, LTRED);
+	head_x = t2.x;
+	head_y = t2.y;
+	head_th = t2.th;
 	head_on = TRUE;
 }
 

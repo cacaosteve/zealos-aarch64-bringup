@@ -65,7 +65,7 @@ Bridge notes: [AIWNIOS.md](AIWNIOS.md). Milestone ladder: [upstream/README.md](u
 
 | Track | Status |
 |--|--|
-| QEMU/UTM virt | **Regression freeze** M33–M39 (`Notes.ZC` / DocLib `#include`) still the bar — see ACCEPTANCE.md. **Lattice compose** continued on top (M151–M171: FB teardown, `latticeplay`, PopUpColor swatches, controls hints, DrawIt head without idle flood/ghosts). Scripted QEMU ≠ live UTM keyboard/tablet proof. |
+| QEMU/UTM virt | **Regression freeze** M33–M39 (`Notes.ZC` / DocLib `#include`) still the bar — see ACCEPTANCE.md. **Lattice compose** continued on top (M151–M172: FB teardown, `latticeplay`, PopUpColor swatches, controls hints, DrawIt head without idle flood/ghosts/holes). Scripted QEMU ≠ live UTM keyboard/tablet proof. |
 | Pi 4B UEFI | PI-DIAG-1..4 + **shell entry on FB** accepted (2026-09-23). **UART RX not yet proven** on hardware (`help`/`halt` via USB–TTL). No virtio/RedSea disk on Pi yet ([PI4.md](PI4.md)). |
 
 ## Next
