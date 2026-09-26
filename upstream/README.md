@@ -2284,6 +2284,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 194 — StockLat DrawIt HeadMark (no aim ghosts)
+
+| Item | Path |
+|--|--|
+| Gap | after M193 soft strip, stock DrawIt still LTRED-GrLined every Refresh without erase → aim ghosts |
+| Upstream need | stockplay aim/place head like `latticeplay` (BLACK erase + pose skip) |
+| Bring-up | StockLat `HeadMark`/`head_on`; DrawIt pose skip; Space/Restart clear `head_on` |
+| Smoke | StockLat / StockPlay still **15** |
+| Shell | `stockplay` aim no longer leaves LTRED wedges |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).
