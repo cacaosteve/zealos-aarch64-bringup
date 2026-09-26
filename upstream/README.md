@@ -2212,6 +2212,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 188 — TurtleLite TempleOS θ
+
+| Item | Path |
+|--|--|
+| Gap | TurtleLite still used ASCII `theta` while the rest of the ladder uses TempleOS `0xE9` |
+| Upstream need | `Turtle.θ` from the earliest MicroMove smoke |
+| Bring-up | TurtleLite `theta` → `θ` |
+| Smoke | TurtleLite still **15** |
+| Shell | `turtlelite` unchanged |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).

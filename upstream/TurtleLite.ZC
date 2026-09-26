@@ -5,7 +5,7 @@
  *   CDC *dc = DCAlias;
  *
  * Bring-up deltas:
- *   - ASCII theta (not TempleOS theta); no CDC/GrPlot yet
+ *   - M188: TempleOS é (was ASCII theta); no CDC/GrPlot yet
  *   - One member per decl (comma class members already in CommaLite)
  *   - MicroMove returns I64; local checks instead of interactive loop
  *   - return TurtleLite();  expect **15**
@@ -16,15 +16,15 @@ class Turtle
 	F64 x;
 	F64 y;
 	F64 speed;
-	F64 theta;
+	F64 é;
 };
 
 I64 MicroMove(Turtle *t, F64 dt)
 {
 	F64 c;
 	F64 s;
-	c = Cos(t->theta);
-	s = Sin(t->theta);
+	c = Cos(t->é);
+	s = Sin(t->é);
 	t->x = t->x + c * t->speed * dt;
 	t->y = t->y + s * t->speed * dt;
 	return 0;
@@ -39,7 +39,7 @@ I64 TurtleLite()
 	t.x = 0.0;
 	t.y = 0.0;
 	t.speed = 1.0;
-	t.theta = 0.0;
+	t.é = 0.0;
 	dc = DCAlias;
 	MicroMove(&t, 0.1);
 
