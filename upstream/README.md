@@ -2368,6 +2368,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 201 — shell idle Sleep(1)
+
+| Item | Path |
+|--|--|
+| Gap | `shell_run` busy-spun when `kbd_getc_nb` empty (hot idle on UTM/Pi) |
+| Upstream need | quieter shell; early wake via M181 Sleep peek |
+| Bring-up | `Sleep(1)` on empty input |
+| Smoke | check-serial unchanged (non-interactive) |
+| Shell | lower idle CPU; UART/virtio still wake promptly |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).

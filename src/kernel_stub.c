@@ -5077,6 +5077,8 @@ static void shell_run(void) {
         int c = kbd_getc_nb();
         tablet_cursor_tick();
         if (c < 0) {
+            /* M201: yield ~1 ms (Sleep peeks UART/virtio) instead of busy-spin. */
+            (void)hc_builtin_sleep(1);
             continue;
         }
         if (c == '\r' || c == '\n') {
