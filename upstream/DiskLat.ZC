@@ -13,6 +13,7 @@
  *   - M167: DrawIt HUD includes di (angles[idx]) like NearLattice/Lattice
  *   - M168: second controls line — L-click place / R-drag aim / e=ends
  *   - M169: third controls line — arrows di/speed / 0-9 layer
+ *   - M170: DrawIt HUD+head only (no idle TurtleMove preview flood)
  *   - Freeze catalog unchanged (ephemeral disk file)
  *   - return DiskLat();  expect 15
  */
@@ -171,7 +172,8 @@ U0 DrawIt(CTask *, CDC *dc)
 	MemCopy(&t2, &tt, sizeof(Turtle));
 	GrPrint(dc, 0, 0, "Layer:%f Speed:%f th:%5.1f di:%5.1f Width:%f",
 		tt.z, tt.speed, tt.th * 180 / pi, angles[tt.idx] * 180 / pi, tt.w);
-	TurtleMove(dc, &t2, RED, LTRED);
+	/* M170: no TurtleMove here — idle Refresh must not accumulate preview strokes
+	 * (bring-up has no WinMgr double-buffer). Head marker tracks current tt. */
 	dc->color = LTRED;
 	GrLine(dc,
 		t2.x + TURTLE_SIZE * Cos(t2.th + pi / 2), t2.y + TURTLE_SIZE * Sin(t2.th + pi / 2),

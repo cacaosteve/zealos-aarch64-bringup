@@ -168,7 +168,7 @@ U0 DrawIt(CTask *, CDC *dc)
 	MemCopy(&t2, &tt, sizeof(Turtle));
 	GrPrint(dc, 0, 0, "Layer:%f Speed:%f th:%5.1f di:%5.1f Width:%f",
 		tt.z, tt.speed, tt.th * 180 / pi, angles[tt.idx] * 180 / pi, tt.w);
-	TurtleMove(dc, &t2, RED, LTRED);
+	/* M170: no TurtleMove here — idle Refresh must not accumulate preview strokes. */
 	dc->color = LTRED;
 	GrLine(dc,
 		t2.x + TURTLE_SIZE * Cos(t2.th + pi / 2), t2.y + TURTLE_SIZE * Sin(t2.th + pi / 2),

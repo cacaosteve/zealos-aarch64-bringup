@@ -2008,6 +2008,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 170 — DrawIt without idle TurtleMove flood
+
+| Item | Path |
+|--|--|
+| Gap | DiskLat/NearLattice `DrawIt` called `TurtleMove` every `Refresh`; idle `MESSAGE_NULL` flooded FB with RED preview strokes (no WinMgr back-buffer) |
+| Upstream need | usable live Lattice view; Space still steps via event path |
+| Bring-up | compose DrawIt → HUD + LTRED head only; `DrawItLite`/`TickLite` keep TurtleMove for peeks |
+| Smoke | DiskLat / NearLattice / Lattice.ZC / LatticePlay still **15** |
+| Shell | `latticeplay` idle no longer paints accumulating red paths |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).
