@@ -358,10 +358,25 @@ static void fb_draw_char(uint32_t col, uint32_t row, char ch, uint32_t fg) {
     if (!g_fb) {
         return;
     }
-    if (ch < 32 || ch > 127) {
-        ch = '?';
+    /* TempleOS Lattice HUD uses 0xE3=π and 0xE9=θ (M184); ASCII font is 0x20..0x7F. */
+    static const uint8_t glyph_pi[8] = {
+        0x00, 0x7e, 0x5a, 0x5a, 0x5a, 0x5a, 0x5a, 0x00
+    };
+    static const uint8_t glyph_theta[8] = {
+        0x3c, 0x66, 0x60, 0x7c, 0x60, 0x66, 0x3c, 0x00
+    };
+    unsigned char u = (unsigned char)ch;
+    const uint8_t *glyph;
+    if (u == 0xe3) {
+        glyph = glyph_pi;
+    } else if (u == 0xe9) {
+        glyph = glyph_theta;
+    } else if (u < 32 || u > 127) {
+        u = (unsigned char)'?';
+        glyph = g_font8[u - 32];
+    } else {
+        glyph = g_font8[u - 32];
     }
-    const uint8_t *glyph = g_font8[ch - 32];
     uint32_t x0 = col * 8;
     uint32_t y0 = row * 8;
     for (uint32_t r = 0; r < 8; r++) {

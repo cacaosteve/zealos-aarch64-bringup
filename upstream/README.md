@@ -2164,6 +2164,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 184 — FB π/θ glyphs for Lattice HUD
+
+| Item | Path |
+|--|--|
+| Gap | ASCII-only `fb_draw_char` mapped TempleOS `0xE3`/`0xE9` to `?`, so DiskLat HUD after M183 showed `?:` / `d?:` |
+| Upstream need | readable stock-shaped Layer/Speed/θ/dθ HUD on UTM FB |
+| Bring-up | `fb_draw_char` draws 8×8 π/θ bitmaps for `0xE3`/`0xE9` |
+| Smoke | unchanged (DrawIt HUD is eyes-on) |
+| Shell | `latticeplay` HUD labels render as π/θ-ish glyphs |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).

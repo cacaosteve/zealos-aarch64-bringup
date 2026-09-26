@@ -22,6 +22,7 @@
  *   - M176: after Space, head_on=0 so DrawIt skips BLACK erase of old head
  *   - M177: Lattice() entry wrapper (stock name); return Lattice()
  *   - M180: MESSAGE_NULL idle Sleep(16) (~60 Hz) instead of Sleep(1)
+ *   - M184: FB draws 0xE3/0xE9 as pi/theta glyphs (HUD readable)
  *   - M183: Turtle.é / dé_idx + HUD labels (stock Lattice field names)
  *   - M181: Sleep peeks virtio/UART/tablet and wakes early (no up-to-16ms input lag)
  *   - Freeze catalog unchanged (ephemeral disk file)
