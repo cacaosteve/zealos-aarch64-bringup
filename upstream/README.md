@@ -2344,6 +2344,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 199 — help summary lists stocklat/stockplay
+
+| Item | Path |
+|--|--|
+| Gap | top-level help one-liner still stopped at `latticeplay` |
+| Upstream need | discover `stocklat` / `stockplay` without Lattice subsection |
+| Bring-up | help summary includes both |
+| Smoke | unchanged |
+| Shell | `help` shows stock cmds |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).

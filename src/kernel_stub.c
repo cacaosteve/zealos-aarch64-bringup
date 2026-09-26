@@ -5011,7 +5011,7 @@ static void shell_run(void) {
     con_puts("\nZealOS aarch64 shell (HolyC-IR exprs)\n");
     /* M152: short FB banner; full cmd list via `help` (800x600 wraps badly). */
     con_puts("type: help | vblk | rscatalog | runzc Notes.ZC | halt\n");
-    con_puts("      hc <src> | bars | paint | nearlatticelite | disklat | latticeplay\n");
+    con_puts("      hc <src> | bars | paint | nearlatticelite | disklat | latticeplay | stocklat | stockplay\n");
     con_puts("> ");
     char line[64];
     unsigned len = 0;
