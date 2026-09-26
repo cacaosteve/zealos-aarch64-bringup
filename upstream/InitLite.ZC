@@ -6,6 +6,7 @@
  *   t->y = Fs->pix_height >> 1;
  *   t->edge = BLACK; t->middle = YELLOW; t->first = TRUE;
  *
+ *   - M187: Turtle.é / dé_idx (stock Lattice names)
  * Bring-up deltas:
  *   - Fs->pix_width / pix_height from framebuffer
  *   - I64 RHS auto-promoted via I2F when storing to F64
@@ -19,7 +20,7 @@ class Turtle
 	F64 z;
 	I64 edge;
 	I64 middle;
-	I64 idx;
+	I64 dé_idx;
 	Bool first;
 };
 
@@ -31,7 +32,7 @@ I64 TurtleInit(Turtle *t)
 	t->z = 5;
 	t->edge = BLACK;
 	t->middle = YELLOW;
-	t->idx = 4;
+	t->dé_idx = 4;
 	t->first = TRUE;
 	return 0;
 }

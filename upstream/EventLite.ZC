@@ -4,6 +4,7 @@
  *   MS_L_DOWN â†’ tt.x/y; MS_R_* â†’ Arg aim;
  *   KEY arg1==0 â†’ SC_CURSOR_*; 'e' ends; '0'...'9' layer; ESC
  *
+ *   - M187: Turtle.é / dé_idx (stock Lattice names)
  * Bring-up:
  *   - Scripted MsgQuePush mouse + scancode + 'e' + layer + ESC
  *   - return EventLite();  expect 15
@@ -16,8 +17,8 @@ class Turtle
 	F64 x;
 	F64 y;
 	F64 z;
-	F64 th;
-	I64 idx;
+	F64 é;
+	I64 dé_idx;
 	Bool ends;
 	Bool first;
 } tt;
@@ -35,8 +36,8 @@ I64 EventLite()
 	tt.x = 0.0;
 	tt.y = 0.0;
 	tt.z = 0.0;
-	tt.th = 1.0;
-	tt.idx = 1;
+	tt.é = 1.0;
+	tt.dé_idx = 1;
 	tt.ends = FALSE;
 	tt.first = FALSE;
 
@@ -62,10 +63,10 @@ I64 EventLite()
 				break;
 			case MESSAGE_MS_R_DOWN:
 				aim = TRUE;
-				tt.th = Arg(arg1 - tt.x, arg2 - tt.y);
+				tt.é = Arg(arg1 - tt.x, arg2 - tt.y);
 				break;
 			case MESSAGE_MS_R_UP:
-				tt.th = Arg(arg1 - tt.x, arg2 - tt.y);
+				tt.é = Arg(arg1 - tt.x, arg2 - tt.y);
 				aim = FALSE;
 				break;
 			case MESSAGE_KEY_DOWN:
@@ -74,13 +75,13 @@ I64 EventLite()
 					case 0:
 						if (arg2.u8[0] == SC_CURSOR_RIGHT)
 						{
-							if (tt.idx < ANGLES - 1)
-								tt.idx++;
+							if (tt.dé_idx < ANGLES - 1)
+								tt.dé_idx++;
 						}
 						if (arg2.u8[0] == SC_CURSOR_LEFT)
 						{
-							if (tt.idx)
-								tt.idx--;
+							if (tt.dé_idx)
+								tt.dé_idx--;
 						}
 						break;
 					case '0'...'9':
@@ -102,9 +103,9 @@ I64 EventLite()
 lt_done:
 	if (tt.first && ToI64(tt.x) == 100 && ToI64(tt.y) == 200)
 		h = h + 1;
-	if (ToI64(tt.th * 1000.0) == 0)
+	if (ToI64(tt.é * 1000.0) == 0)
 		h = h + 2;
-	if (tt.idx == 2)
+	if (tt.dé_idx == 2)
 		h = h + 4;
 	if (tt.ends && ToI64(tt.z) == 3)
 		h = h + 8;

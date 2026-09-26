@@ -3,6 +3,7 @@
  * Upstream need: Lattice.ZC â€”
  *   MS_R_DOWN aim=TRUE; MS_MOVE while aim â†’ Arg; MS_R_UP aim=FALSE
  *
+ *   - M187: Turtle.é / dé_idx (stock Lattice names)
  * Bring-up:
  *   - Mask includes MESSAGE_MS_MOVE
  *   - Scripted R_DOWN â†’ MOVE â†’ R_UP; MOVE after up ignored
@@ -13,7 +14,7 @@ class Turtle
 {
 	F64 x;
 	F64 y;
-	F64 th;
+	F64 é;
 } tt;
 
 I64 AimMoveLite()
@@ -32,7 +33,7 @@ I64 AimMoveLite()
 	th_move = 0.0;
 	tt.x = 100.0;
 	tt.y = 200.0;
-	tt.th = 1.0;
+	tt.é = 1.0;
 
 	mask = 1 << MESSAGE_MS_MOVE | 1 << MESSAGE_MS_R_DOWN |
 		1 << MESSAGE_MS_R_UP;
@@ -53,18 +54,18 @@ I64 AimMoveLite()
 		{
 			case MESSAGE_MS_R_DOWN:
 				aim = TRUE;
-				tt.th = Arg(arg1 - tt.x, arg2 - tt.y);
+				tt.é = Arg(arg1 - tt.x, arg2 - tt.y);
 				break;
 			case MESSAGE_MS_MOVE:
 				if (aim)
 				{
-					tt.th = Arg(arg1 - tt.x, arg2 - tt.y);
-					th_move = tt.th;
+					tt.é = Arg(arg1 - tt.x, arg2 - tt.y);
+					th_move = tt.é;
 					moves = moves + 1;
 				}
 				break;
 			case MESSAGE_MS_R_UP:
-				tt.th = Arg(arg1 - tt.x, arg2 - tt.y);
+				tt.é = Arg(arg1 - tt.x, arg2 - tt.y);
 				aim = FALSE;
 				break;
 			case MESSAGE_NULL:
@@ -79,7 +80,7 @@ lt_done:
 	if (ToI64(th_move * 1000.0) == ToI64(-pi / 2 * 1000.0))
 		h = h + 4;
 	/* Final th from R_UP still -Ï€/2; post-aim MOVE ignored. */
-	if (!aim && ToI64(tt.th * 1000.0) == ToI64(-pi / 2 * 1000.0))
+	if (!aim && ToI64(tt.é * 1000.0) == ToI64(-pi / 2 * 1000.0))
 		h = h + 8;
 	return h;
 }

@@ -8,6 +8,7 @@
  *     dc->color = LTRED; GrLine(dc, â€¦) Ã—3;
  *   }
  *
+ *   - M187: Turtle.é / dé_idx (stock Lattice names)
  * Bring-up:
  *   - Global tt + MemCopy into DrawIt local
  *   - GrPrint HUD (%f Ã—5) + TurtleMove + head GrLines
@@ -26,9 +27,9 @@ class Turtle
 	F64 y;
 	F64 z;
 	F64 speed;
-	F64 th;
+	F64 é;
 	F64 w;
-	I64 idx;
+	I64 dé_idx;
 	Bool ends;
 	Bool first;
 } tt;
@@ -42,12 +43,12 @@ U0 TurtlePlot(CDC *dc, Turtle *t, CColorROPU16 edge, CColorROPU16 middle)
 		w = 0;
 	dc->color = middle;
 	GrLine3(dc,
-		t->x + w * Cos(t->th + pi / 2), t->y + w * Sin(t->th + pi / 2), t->z,
-		t->x + w * Cos(t->th - pi / 2), t->y + w * Sin(t->th - pi / 2), t->z);
+		t->x + w * Cos(t->é + pi / 2), t->y + w * Sin(t->é + pi / 2), t->z,
+		t->x + w * Cos(t->é - pi / 2), t->y + w * Sin(t->é - pi / 2), t->z);
 	w = t->w / 2.0;
 	dc->color = edge;
-	GrPlot3(dc, t->x + w * Cos(t->th + pi / 2), t->y + w * Sin(t->th + pi / 2), t->z);
-	GrPlot3(dc, t->x + w * Cos(t->th - pi / 2), t->y + w * Sin(t->th - pi / 2), t->z);
+	GrPlot3(dc, t->x + w * Cos(t->é + pi / 2), t->y + w * Sin(t->é + pi / 2), t->z);
+	GrPlot3(dc, t->x + w * Cos(t->é - pi / 2), t->y + w * Sin(t->é - pi / 2), t->z);
 }
 
 U0 TurtleMicroMove(Turtle *t, F64 dt)
@@ -55,11 +56,11 @@ U0 TurtleMicroMove(Turtle *t, F64 dt)
 	F64 c;
 	F64 s;
 
-	c = Cos(t->th);
-	s = Sin(t->th);
+	c = Cos(t->é);
+	s = Sin(t->é);
 	t->x = t->x + c * t->speed * dt;
 	t->y = t->y + s * t->speed * dt;
-	t->th = Wrap(t->th + dt * angles[t->idx]);
+	t->é = Wrap(t->é + dt * angles[t->dé_idx]);
 }
 
 U0 TurtleMove(CDC *dc, Turtle *t, CColorROPU16 edge, CColorROPU16 middle)
@@ -82,18 +83,18 @@ U0 DrawIt(CTask *, CDC *dc)
 
 	MemCopy(&t2, &tt, sizeof(Turtle));
 	GrPrint(dc, 0, 0, "L:%f S:%f T:%5.1f D:%5.1f W:%f",
-		tt.z, tt.speed, tt.th * 180 / pi, angles[tt.idx] * 180 / pi, tt.w);
+		tt.z, tt.speed, tt.é * 180 / pi, angles[tt.dé_idx] * 180 / pi, tt.w);
 	TurtleMove(dc, &t2, RED, LTRED);
 	dc->color = LTRED;
 	GrLine(dc,
-		t2.x + TURTLE_SIZE * Cos(t2.th + pi / 2), t2.y + TURTLE_SIZE * Sin(t2.th + pi / 2),
-		t2.x + TURTLE_SIZE * Cos(t2.th - pi / 2), t2.y + TURTLE_SIZE * Sin(t2.th - pi / 2));
+		t2.x + TURTLE_SIZE * Cos(t2.é + pi / 2), t2.y + TURTLE_SIZE * Sin(t2.é + pi / 2),
+		t2.x + TURTLE_SIZE * Cos(t2.é - pi / 2), t2.y + TURTLE_SIZE * Sin(t2.é - pi / 2));
 	GrLine(dc,
-		t2.x + TURTLE_SIZE * Cos(t2.th + pi / 2), t2.y + TURTLE_SIZE * Sin(t2.th + pi / 2),
-		t2.x + TURTLE_SIZE * Cos(t2.th), t2.y + TURTLE_SIZE * Sin(t2.th));
+		t2.x + TURTLE_SIZE * Cos(t2.é + pi / 2), t2.y + TURTLE_SIZE * Sin(t2.é + pi / 2),
+		t2.x + TURTLE_SIZE * Cos(t2.é), t2.y + TURTLE_SIZE * Sin(t2.é));
 	GrLine(dc,
-		t2.x + TURTLE_SIZE * Cos(t2.th - pi / 2), t2.y + TURTLE_SIZE * Sin(t2.th - pi / 2),
-		t2.x + TURTLE_SIZE * Cos(t2.th), t2.y + TURTLE_SIZE * Sin(t2.th));
+		t2.x + TURTLE_SIZE * Cos(t2.é - pi / 2), t2.y + TURTLE_SIZE * Sin(t2.é - pi / 2),
+		t2.x + TURTLE_SIZE * Cos(t2.é), t2.y + TURTLE_SIZE * Sin(t2.é));
 }
 
 I64 DrawItLite()
@@ -108,9 +109,9 @@ I64 DrawItLite()
 	tt.y = 100.0;
 	tt.z = 5.0;
 	tt.speed = 40.0;
-	tt.th = 0.0;
+	tt.é = 0.0;
 	tt.w = 12.0;
-	tt.idx = 0;
+	tt.dé_idx = 0;
 	tt.ends = FALSE;
 	tt.first = TRUE;
 

@@ -5,6 +5,7 @@
  *   if (t->ends && t->first) TurtleEnd(...);
  *   U0 TurtleEnd â€” while(TRUE) semicircle + MemCopy restore
  *
+ *   - M187: Turtle.é / dé_idx (stock Lattice names)
  * Bring-up:
  *   - AbsI64(F64) via F2I then Abs
  *   - TurtleEnd (assign-as-expr if(r=t->w), while/break, Sqrt)
@@ -22,9 +23,9 @@ class Turtle
 	F64 y;
 	F64 z;
 	F64 speed;
-	F64 th;
+	F64 é;
 	F64 w;
-	I64 idx;
+	I64 dé_idx;
 	Bool ends;
 	Bool first;
 };
@@ -38,12 +39,12 @@ U0 TurtlePlot(CDC *dc, Turtle *t, CColorROPU16 edge, CColorROPU16 middle)
 		w = 0;
 	dc->color = middle;
 	GrLine3(dc,
-		t->x + w * Cos(t->th + pi / 2), t->y + w * Sin(t->th + pi / 2), t->z,
-		t->x + w * Cos(t->th - pi / 2), t->y + w * Sin(t->th - pi / 2), t->z);
+		t->x + w * Cos(t->é + pi / 2), t->y + w * Sin(t->é + pi / 2), t->z,
+		t->x + w * Cos(t->é - pi / 2), t->y + w * Sin(t->é - pi / 2), t->z);
 	w = t->w / 2.0;
 	dc->color = edge;
-	GrPlot3(dc, t->x + w * Cos(t->th + pi / 2), t->y + w * Sin(t->th + pi / 2), t->z);
-	GrPlot3(dc, t->x + w * Cos(t->th - pi / 2), t->y + w * Sin(t->th - pi / 2), t->z);
+	GrPlot3(dc, t->x + w * Cos(t->é + pi / 2), t->y + w * Sin(t->é + pi / 2), t->z);
+	GrPlot3(dc, t->x + w * Cos(t->é - pi / 2), t->y + w * Sin(t->é - pi / 2), t->z);
 }
 
 U0 TurtleMicroMove(Turtle *t, F64 dt)
@@ -51,11 +52,11 @@ U0 TurtleMicroMove(Turtle *t, F64 dt)
 	F64 c;
 	F64 s;
 
-	c = Cos(t->th);
-	s = Sin(t->th);
+	c = Cos(t->é);
+	s = Sin(t->é);
 	t->x = t->x + c * t->speed * dt;
 	t->y = t->y + s * t->speed * dt;
-	t->th = Wrap(t->th + dt * angles[t->idx]);
+	t->é = Wrap(t->é + dt * angles[t->dé_idx]);
 }
 
 U0 TurtleEnd(CDC *dc, Turtle *t, CColorROPU16 edge, CColorROPU16 middle, F64 th)
@@ -95,7 +96,7 @@ U0 TurtleMove(CDC *dc, Turtle *t, CColorROPU16 edge, CColorROPU16 middle)
 	/* Lattice uses 16*; keep small for smoke. AbsI64(F64) is the gap. */
 	l = 2 * AbsI64(t->w + 1) * AbsI64(t->speed + 1);
 	if (t->ends && t->first)
-		TurtleEnd(dc, t, edge, middle, t->th + pi);
+		TurtleEnd(dc, t, edge, middle, t->é + pi);
 	t->first = FALSE;
 	for (i = 0; i < l; i++)
 	{
@@ -103,7 +104,7 @@ U0 TurtleMove(CDC *dc, Turtle *t, CColorROPU16 edge, CColorROPU16 middle)
 		TurtlePlot(dc, t, edge, middle);
 	}
 	if (t->ends)
-		TurtleEnd(dc, t, edge, middle, t->th);
+		TurtleEnd(dc, t, edge, middle, t->é);
 }
 
 I64 EndLite()
@@ -125,9 +126,9 @@ I64 EndLite()
 	t.y = 100.0;
 	t.z = 0.0;
 	t.speed = 1.0;
-	t.th = 0.0;
+	t.é = 0.0;
 	t.w = 4.0;
-	t.idx = 0;
+	t.dé_idx = 0;
 	t.ends = TRUE;
 	t.first = TRUE;
 

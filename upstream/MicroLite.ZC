@@ -3,9 +3,10 @@
  * Upstream need: Lattice.ZC â€”
  *   U0 TurtleMicroMove(Turtle *t, F64 dt) { â€¦ Cos/Sin/Wrap/angles â€¦ }
  *
+ *   - M187: Turtle.é / dé_idx (stock Lattice names)
  * Bring-up:
  *   - Fn names up to 23 chars (TurtleMicroMove)
- *   - Cos/Sin/Wrap + angles[t->idx] + for i++
+ *   - Cos/Sin/Wrap + angles[t->dé_idx] + for i++
  *   - return MicroLite();  expect 15
  */
 
@@ -18,8 +19,8 @@ class Turtle
 	F64 x;
 	F64 y;
 	F64 speed;
-	F64 th;
-	I64 idx;
+	F64 é;
+	I64 dé_idx;
 };
 
 I64 TurtleMicroMove(Turtle *t, F64 dt)
@@ -27,11 +28,11 @@ I64 TurtleMicroMove(Turtle *t, F64 dt)
 	F64 c;
 	F64 s;
 
-	c = Cos(t->th);
-	s = Sin(t->th);
+	c = Cos(t->é);
+	s = Sin(t->é);
 	t->x = t->x + c * t->speed * dt;
 	t->y = t->y + s * t->speed * dt;
-	t->th = Wrap(t->th + dt * angles[t->idx]);
+	t->é = Wrap(t->é + dt * angles[t->dé_idx]);
 	return 0;
 }
 
@@ -48,8 +49,8 @@ I64 MicroLite()
 	t.x = 0.0;
 	t.y = 0.0;
 	t.speed = 10.0;
-	t.th = 0.0;
-	t.idx = 0;
+	t.é = 0.0;
+	t.dé_idx = 0;
 	p = &t;
 
 	TurtleMicroMove(p, 1.0);
@@ -63,7 +64,7 @@ I64 MicroLite()
 	if (ToI64(t.x) == 10)
 		h = h + 4;
 
-	t.th = 0.0;
+	t.é = 0.0;
 	t.speed = 5.0;
 	TurtleMicroMove(p, 2.0);
 	if (ToI64(t.x) == 20)

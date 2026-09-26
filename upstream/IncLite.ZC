@@ -4,6 +4,7 @@
  *   tt.w++;  tt.speed += STEP;  if (tt.dÃ©_idx) tt.dÃ©_idx--;
  *   if (r = t->w) { ... }
  *
+ *   - M187: Turtle.é / dé_idx (stock Lattice names)
  * Bring-up:
  *   - obj.m++ / obj.m-- / ptr->m++ / ptr->m-- (I64 and F64)
  *   - assign-as-expr for p->m = e / o.m = e
@@ -14,7 +15,7 @@ class Turtle
 {
 	F64 w;
 	F64 speed;
-	I64 idx;
+	I64 dé_idx;
 	Bool ends;
 };
 
@@ -27,7 +28,7 @@ I64 IncLite()
 
 	t.w = 1.0;
 	t.speed = 2.0;
-	t.idx = 3;
+	t.dé_idx = 3;
 	t.ends = 1;
 	p = &t;
 
@@ -35,8 +36,8 @@ I64 IncLite()
 	t.w++;
 	if (ToI64(t.w) == 2)
 		h = h + 1;
-	t.idx--;
-	if (t.idx == 2)
+	t.dé_idx--;
+	if (t.dé_idx == 2)
 		h = h + 2;
 	p->speed += 3.0;
 	if (ToI64(t.speed) == 5)

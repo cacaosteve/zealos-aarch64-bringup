@@ -5,6 +5,7 @@
  *     SC_CURSOR_LEFT/RIGHT â†’ idx; UP/DOWN â†’ speed;
  *   }
  *
+ *   - M187: Turtle.é / dé_idx (stock Lattice names)
  * Bring-up:
  *   - One MessageGet key switch with all four cursors (NearLattice had UP/DOWN only)
  *   - return IdxAllLite();  expect 15
@@ -15,7 +16,7 @@
 
 class Turtle
 {
-	I64 idx;
+	I64 dé_idx;
 	F64 speed;
 } tt;
 
@@ -27,7 +28,7 @@ I64 IdxAllLite()
 	I64 mask;
 
 	h = 0;
-	tt.idx = 1;
+	tt.dé_idx = 1;
 	tt.speed = 40.0;
 	mask = 1 << MESSAGE_KEY_DOWN;
 
@@ -49,12 +50,12 @@ I64 IdxAllLite()
 						switch (arg2.u8[0])
 						{
 							case SC_CURSOR_LEFT:
-								if (tt.idx)
-									tt.idx--;
+								if (tt.dé_idx)
+									tt.dé_idx--;
 								break;
 							case SC_CURSOR_RIGHT:
-								if (tt.idx < ANGLES - 1)
-									tt.idx++;
+								if (tt.dé_idx < ANGLES - 1)
+									tt.dé_idx++;
 								break;
 							case SC_CURSOR_UP:
 								tt.speed = tt.speed + TURTLE_SPEED_STEP;
@@ -76,32 +77,32 @@ I64 IdxAllLite()
 	}
 lt_done:
 	/* RIGHT RIGHT LEFT: 1 â†’ 2 â†’ 3 â†’ 2. */
-	if (tt.idx == 2)
+	if (tt.dé_idx == 2)
 		h = h + 1;
 	/* UP DOWN: 40 â†’ 42 â†’ 40. */
 	if (ToI64(tt.speed) == 40)
 		h = h + 2;
 	/* Floor idx at 0. */
-	tt.idx = 0;
+	tt.dé_idx = 0;
 	MsgQuePush(MESSAGE_KEY_DOWN, 0, SC_CURSOR_LEFT);
 	if (MessageGet(&arg1, &arg2, mask) == MESSAGE_KEY_DOWN &&
 	    arg1 == 0 && arg2.u8[0] == SC_CURSOR_LEFT)
 	{
-		if (tt.idx)
-			tt.idx--;
+		if (tt.dé_idx)
+			tt.dé_idx--;
 	}
-	if (tt.idx == 0)
+	if (tt.dé_idx == 0)
 		h = h + 4;
 	/* Cap idx at ANGLES-1. */
-	tt.idx = ANGLES - 1;
+	tt.dé_idx = ANGLES - 1;
 	MsgQuePush(MESSAGE_KEY_DOWN, 0, SC_CURSOR_RIGHT);
 	if (MessageGet(&arg1, &arg2, mask) == MESSAGE_KEY_DOWN &&
 	    arg1 == 0 && arg2.u8[0] == SC_CURSOR_RIGHT)
 	{
-		if (tt.idx < ANGLES - 1)
-			tt.idx++;
+		if (tt.dé_idx < ANGLES - 1)
+			tt.dé_idx++;
 	}
-	if (tt.idx == ANGLES - 1)
+	if (tt.dé_idx == ANGLES - 1)
 		h = h + 8;
 	return h;
 }

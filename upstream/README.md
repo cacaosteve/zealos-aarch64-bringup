@@ -2200,6 +2200,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 187 — remaining turtle *Lites stock θ / dθ_idx
+
+| Item | Path |
+|--|--|
+| Gap | DrawIt/End/Event/Micro/Move*/AimMove/StepCount/Tick/Lattice/IdxAll/Inc/Init/Right still used ASCII `th` / `idx` |
+| Upstream need | TempleOS `θ` / `dθ_idx` across the Lattice compose ladder |
+| Bring-up | those *Lites renamed; RightLite local angle uses `θ`; CursorLite keeps local `idx` |
+| Smoke | affected *Lites still **15** |
+| Shell | unchanged |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).

@@ -6,10 +6,11 @@
  *   tt.ends = !tt.ends;
  *   goto lt_done;
  *
+ *   - M187: Turtle.é / dé_idx (stock Lattice names)
  * Bring-up:
  *   - MemCopy/sizeof(class) struct blob
  *   - Bool member not-assign
- *   - global F64 angles[i] / angles[t->idx]
+ *   - global F64 angles[i] / angles[t->dé_idx]
  *   - goto label inside fn
  *   - return MoveLite();  expect 15
  */
@@ -21,7 +22,7 @@ F64 angles[ANGLES] = {1.0, 2.0, 3.0, 4.0};
 class Turtle
 {
 	F64 w;
-	I64 idx;
+	I64 dé_idx;
 	Bool ends;
 };
 
@@ -34,23 +35,23 @@ I64 MoveLite()
 
 	h = 0;
 	t.w = 5.0;
-	t.idx = 2;
+	t.dé_idx = 2;
 	t.ends = 1;
 	p = &t;
 
 	MemCopy(&t2, &t, sizeof(Turtle));
-	if (ToI64(t2.w) == 5 && t2.idx == 2 && t2.ends)
+	if (ToI64(t2.w) == 5 && t2.dé_idx == 2 && t2.ends)
 		h = h + 1;
 
 	t.ends = !t.ends;
 	if (!t.ends)
 		h = h + 2;
 
-	if (ToI64(angles[t.idx]) == 3)
+	if (ToI64(angles[t.dé_idx]) == 3)
 		h = h + 4;
 
-	t.idx = 1;
-	if (ToI64(angles[p->idx] * 2.0) == 4)
+	t.dé_idx = 1;
+	if (ToI64(angles[p->dé_idx] * 2.0) == 4)
 		h = h + 8;
 
 	goto done;
