@@ -4,6 +4,7 @@
  *
  * Bring-up:
  *   - Source from YDE/ZealOS Lattice.ZC (ISO-8859 TempleOS charset)
+ *   - M198: shell stocklat runs scripted StockLat (SPACE+ESC expect 15)
  *   - M197: Lattice() entry wrapper; stockplay help matches latticeplay controls line
  *   - M196: Cls(0)+head_on=0 at try entry (stockplay clean FB like latticeplay)
  *   - M195: Restart accepts CR and re-prints controls GrPrint (stockplay Enter)

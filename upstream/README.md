@@ -2332,6 +2332,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 198 — shell stocklat (scripted StockLat)
+
+| Item | Path |
+|--|--|
+| Gap | StockLat only via check-serial / `stockplay`; no `disklat`-shaped shell smoke |
+| Upstream need | quick stock SPACE+ESC from UTM serial without live loop |
+| Bring-up | `stocklat` → `hc_run_src(STOCKLAT_ZC)` expect **15**; help lists it |
+| Smoke | same as Upstream StockLat |
+| Shell | `stocklat` → `stocklat ok` |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).

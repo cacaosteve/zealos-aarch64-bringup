@@ -3519,10 +3519,11 @@ static void shell_handle(const char *line, int *done) {
     }
     if (streq(line, "help")) {
         con_puts("UTM freeze: vblk | rspersist | rscatalog | rsdir | runzc | runzc Notes.ZC\n");
-        con_puts("Lattice: nearlatticelite | disklat | lattice | latticeplay | stockplay | depthplotlite\n");
+        con_puts("Lattice: nearlatticelite | disklat | lattice | latticeplay | stocklat | stockplay | depthplotlite\n");
         /* M178: eyes-on controls without reading MenuPush / DiskLat source. */
         con_puts("  latticeplay: Esc Enter Space c +/- e | L-click place | R-drag aim | arrows dth/speed | 0-9 layer\n");
         con_puts("  stockplay: Esc Enter Space c +/- e | L-click place | R-drag aim | arrows dth/speed | 0-9 layer\n");
+        con_puts("  stocklat: scripted StockLat SPACE+ESC smoke (expect 15)\n");
         con_puts("cmds: help|abs|sum|bars|stars|circles|bounce|paint|netofdots|lines|minigr|memsort|globshare|life|cartlite|vec2lite|angleslite|coslite|sqrtlite|arglite|commalite|plot3lite|tospilite|colorlite|turtlelite|filllite|initlite|deflite|printlite|msglite|menulite|findlite|fslite|setuplite|ttlite|buflite|inclite|dclite|linedclite|grflite|movelite|checkedlite|cmplite|forinclite|microlite|movestacklite|endlite|drawitlite|latticelite|looplite|demolite|eventlite|playlite|inputlite|rightlite|cursorlite|uplite|ticklite|framelite|plotdclite|abortlite|aimmovelite|idlelite|layerlite|endslite|speedlite|midlite|livelite|accellite|restartlite|widthlite|bothcolorlite|menufulllite|menubiglite|trylite|stepcountlite|anglesfulllite|braceangleslite|bracepilite|setmenulite|nearlatticelite|f64iflite|wraplatticelite|menulooplite|idxalllite|disklat|lattice|depthbuflite|depthrstlite|depthplotlite|depthlinelite|peekplot|offbmp|heapstr|catfmt|heapque|jobque|jobrun|spawn|popup|doclite|ramblk|namefile|dirlook|dirdel|fopen|fwrite|multiblk|redsea|rsroot|rsfile|rsalloc|rsfree|rsmulti|rscfile|rscwrite|rscseek|rsclib|rspersist|rscatalog|rsdir|rsdel|rsrename|runzc|runzc <file.ZC>|vblk|halt|hc <src>|expr\n");
         con_puts("  hc: Print*/Str*/Mem*/Min/Max/Clamp/Sign/Sqr/Abs/Cnt/CntFrq/HashStr/Mouse*/Rand/Sleep/Gr*/Cls\n");
         con_puts("  hc: KeyHit/GetKey (Esc exits paint loops)\n");
@@ -4250,6 +4251,17 @@ static void shell_handle(const char *line, int *done) {
         }
         shell_fb_ready();
         con_puts("disklat ok\n");
+        return;
+    }
+    if (streq(line, "stocklat")) {
+        uint64_t got = 0;
+        /* M198: scripted StockLat smoke from the shell (no live MessageGet). */
+        if (hc_run_src(STOCKLAT_ZC, &got) != 0 || got != 15) {
+            con_puts("stocklat FAIL\n");
+            return;
+        }
+        shell_fb_ready();
+        con_puts("stocklat ok\n");
         return;
     }
     if (streq(line, "latticeplay")) {
