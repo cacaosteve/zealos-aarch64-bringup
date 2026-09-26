@@ -104,6 +104,7 @@
 #include "menulooplite_zc.h"
 #include "idxalllite_zc.h"
 #include "disklat_zc.h"
+#include "stocklat_zc.h"
 #include "depthbuflite_zc.h"
 #include "depthrstlite_zc.h"
 #include "depthplotlite_zc.h"
@@ -7029,6 +7030,16 @@ static int jit_smoke(void) {
             uart_put_u64_hex(g_uart, got2);
             uart_puts(g_uart, "\n");
         }
+        /* M182: stock Demo/Graphics/Lattice.ZC shape (θ/dθ_idx glyphs; scripted Esc). */
+        if (hc_run_src(STOCKLAT_ZC, &got2) != 0 || got2 != 15) {
+            uart_puts(g_uart, "hc: Upstream StockLat FAIL got=");
+            uart_put_u64_hex(g_uart, got2);
+            uart_puts(g_uart, "\n");
+            return -249;
+        }
+        uart_puts(g_uart, "hc: Upstream StockLat => ");
+        uart_put_u64_hex(g_uart, got2);
+        uart_puts(g_uart, "\n");
         if (hc_run_src(DEPTHBUFLITE_ZC, &got2) != 0 || got2 != 15) {
             uart_puts(g_uart, "hc: Upstream DepthBufLite FAIL got=");
             uart_put_u64_hex(g_uart, got2);

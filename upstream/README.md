@@ -2140,6 +2140,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 182 — stock Lattice.ZC smoke (StockLat)
+
+| Item | Path |
+|--|--|
+| Gap | DiskLat-shaped compose never proved near-verbatim stock `Demo/Graphics/Lattice.ZC` |
+| Upstream need | TempleOS `0xE3`/`0xE9` glyphs, `U0` turtle helpers, setup stubs, stock `DrawIt`/`Lattice` body |
+| Bring-up | `upstream/StockLat.ZC` from YDE/ZealOS Lattice; `LatticeSmoke` + MsgQue SPACE/ESC → **15** |
+| Smoke | `hc: Upstream StockLat` (expect 15) |
+| Shell | interactive live path remains `latticeplay` (DiskLat); StockLat is compile/script proof only |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).
