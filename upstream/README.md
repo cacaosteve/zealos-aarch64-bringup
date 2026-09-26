@@ -2296,6 +2296,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 195 — StockLat Restart CR + controls restore
+
+| Item | Path |
+|--|--|
+| Gap | StockLat Restart only `\n`; Enter-as-CR and post-DCFill cue wipe on stockplay |
+| Upstream need | same Enter restart as `latticeplay` / DiskLat |
+| Bring-up | `case '\r':` fallthrough; GrPrint trio after Restart |
+| Smoke | StockLat / StockPlay still **15** |
+| Shell | `stockplay` Enter restarts + cues return |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).

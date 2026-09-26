@@ -4,6 +4,7 @@
  *
  * Bring-up:
  *   - Source from YDE/ZealOS Lattice.ZC (ISO-8859 TempleOS charset)
+ *   - M195: Restart accepts CR and re-prints controls GrPrint (stockplay Enter)
  *   - M194: DrawIt HeadMark + pose skip (no idle TurtleMove; Space/Restart clear head_on)
  *   - M193: stockplay live strips DrawIt TurtleMove(dc,&t2,RED,LTRED) (Space Step kept)
  *   - M191: stockplay injects same FB controls GrPrint as latticeplay
@@ -316,11 +317,16 @@ I64 LatticeSmoke()
 								tt.w--;
 							break;
 
+						case '\r':
 						case '\n':
 							DCFill(dc);
 							TurtleInit(&tt);
 							head_on = FALSE;
 							SetMenu;
+							/* M195: Enter may be CR; restore cues (live also via DCFill chrome). */
+							GrPrint(dc, 0, 16, "Esc=exit Enter=restart Space=step c=color +/-=w");
+							GrPrint(dc, 0, 24, "L-click=place R-drag=aim e=ends");
+							GrPrint(dc, 0, 32, "arrows=dé/speed 0-9=layer");
 							break;
 
 						case CH_ESC:
