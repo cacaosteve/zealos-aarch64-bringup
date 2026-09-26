@@ -2308,6 +2308,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 196 — StockLat Cls entry (clean stockplay FB)
+
+| Item | Path |
+|--|--|
+| Gap | stockplay had no `Cls(0)`; inject after `DCDepthBufAlloc` before DocClear left shell soup / cue order odd |
+| Upstream need | same clean entry as `latticeplay` |
+| Bring-up | StockLat `Cls(0)` + `head_on=0` at try; play-src inject only after `Cls` |
+| Smoke | StockPlay ESC inject after Cls; StockLat still **15** |
+| Shell | `stockplay` starts on clear FB with cues |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).

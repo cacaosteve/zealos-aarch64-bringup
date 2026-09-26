@@ -4,6 +4,7 @@
  *
  * Bring-up:
  *   - Source from YDE/ZealOS Lattice.ZC (ISO-8859 TempleOS charset)
+ *   - M196: Cls(0)+head_on=0 at try entry (stockplay clean FB like latticeplay)
  *   - M195: Restart accepts CR and re-prints controls GrPrint (stockplay Enter)
  *   - M194: DrawIt HeadMark + pose skip (no idle TurtleMove; Space/Restart clear head_on)
  *   - M193: stockplay live strips DrawIt TurtleMove(dc,&t2,RED,LTRED) (Space Step kept)
@@ -241,6 +242,9 @@ I64 LatticeSmoke()
 	Fs->draw_it		= &DrawIt;
 	try
 	{
+		/* M196: clear FB like DiskLat before live/idle Refresh. */
+		Cls(0);
+		head_on = FALSE;
 		while (TRUE)
 		{
 			switch (MessageGet(&arg1, &arg2, 1 << MESSAGE_KEY_DOWN  | 1 << MESSAGE_MS_L_DOWN|

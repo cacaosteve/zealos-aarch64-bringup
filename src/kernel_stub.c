@@ -2556,9 +2556,9 @@ static int hc_run_src_ex(const char *src, uint64_t *out, int popup_live) {
     return rc;
 }
 
-/* M155/M159/M190/M191/M193: DiskLat/StockLat → live play — drop MsgQuePush scripts.
- * smoke_esc: inject one CH_ESC after Cls or DCDepthBufAlloc so check-serial ends.
- * live (!smoke_esc): inject controls GrPrint; strip DrawIt idle TurtleMove (M193, stock). */
+/* M155/M159/M190/M191/M193/M196: DiskLat/StockLat → live play — drop MsgQuePush scripts.
+ * smoke_esc: inject one CH_ESC after Cls so check-serial ends.
+ * live (!smoke_esc): inject controls GrPrint after Cls; strip idle TurtleMove (M193, stock). */
 static int hc_lattice_play_src(const char *in, char *out, size_t cap, int smoke_esc) {
     size_t o = 0;
     const char *p = in;
@@ -2613,7 +2613,7 @@ static int hc_lattice_play_src(const char *in, char *out, size_t cap, int smoke_
         if (saw_inj) {
             continue;
         }
-        /* DiskLat: Cls(0); */
+        /* DiskLat + StockLat (M196): Cls(0); */
         if (o >= 7 && out[o - 7] == 'C' && out[o - 6] == 'l' && out[o - 5] == 's' &&
             out[o - 4] == '(' && out[o - 3] == '0' && out[o - 2] == ')' && out[o - 1] == ';') {
             const char *inj;
@@ -2622,35 +2622,6 @@ static int hc_lattice_play_src(const char *in, char *out, size_t cap, int smoke_
                 inj = "\n\t\tMsgQuePush(MESSAGE_KEY_DOWN, CH_ESC, 0);";
             } else {
                 inj = live_hints;
-            }
-            while (inj[el]) {
-                el++;
-            }
-            if (o + el >= cap) {
-                return -1;
-            }
-            for (size_t i = 0; i < el; i++) {
-                out[o++] = inj[i];
-            }
-            saw_inj = 1;
-            continue;
-        }
-        /* StockLat: DCDepthBufAlloc(dc); — no Cls in stock body. */
-        if (o >= 20 && out[o - 20] == 'D' && out[o - 19] == 'C' && out[o - 18] == 'D' &&
-            out[o - 17] == 'e' && out[o - 16] == 'p' && out[o - 15] == 't' && out[o - 14] == 'h' &&
-            out[o - 13] == 'B' && out[o - 12] == 'u' && out[o - 11] == 'f' && out[o - 10] == 'A' &&
-            out[o - 9] == 'l' && out[o - 8] == 'l' && out[o - 7] == 'o' && out[o - 6] == 'c' &&
-            out[o - 5] == '(' && out[o - 4] == 'd' && out[o - 3] == 'c' && out[o - 2] == ')' &&
-            out[o - 1] == ';') {
-            const char *inj;
-            size_t el = 0;
-            if (smoke_esc) {
-                inj = "\n\tMsgQuePush(MESSAGE_KEY_DOWN, CH_ESC, 0);";
-            } else {
-                /* Same cues as latticeplay; tabs match StockLat indent after DepthBufAlloc. */
-                inj = "\n\tGrPrint(dc, 0, 16, \"Esc=exit Enter=restart Space=step c=color +/-=w\");"
-                      "\n\tGrPrint(dc, 0, 24, \"L-click=place R-drag=aim e=ends\");"
-                      "\n\tGrPrint(dc, 0, 32, \"arrows=d\xe9/speed 0-9=layer\");";
             }
             while (inj[el]) {
                 el++;
