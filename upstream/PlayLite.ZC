@@ -217,8 +217,7 @@ I64 PlayLite()
 				}
 				break;
 			case MESSAGE_NULL:
-				/* Lattice idle: ~60 Hz Sleep+Refresh (M180). */
-				Sleep(16);
+				/* M189: MessageGet yields ~60 Hz; Refresh below. */
 				break;
 		}
 		Refresh;

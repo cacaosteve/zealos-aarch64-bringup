@@ -358,8 +358,7 @@ I64 NearLatticeLite()
 					}
 					break;
 				case MESSAGE_NULL:
-					/* Lattice idle: ~60 Hz Refresh (M180). */
-					Sleep(16);
+					/* M189: MessageGet yields ~60 Hz; Refresh below. */
 					break;
 			}
 			Refresh;

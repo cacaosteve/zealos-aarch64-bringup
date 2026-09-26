@@ -2224,6 +2224,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 189 — MessageGet yields before MESSAGE_NULL
+
+| Item | Path |
+|--|--|
+| Gap | `latticeplay` idle slept in HolyC *and* could busy-spin on stock-shaped loops |
+| Upstream need | WinMgr-shaped wait (~60 Hz) inside live `MessageGet` |
+| Bring-up | `g_hc_popup_live` → interruptible `Sleep(16)` then NULL; DiskLat/Near/Demo/Play/Frame/Live/Wrap NULL cases Refresh only |
+| Smoke | empty-queue NULL still immediate (no live flag); **15** |
+| Shell | `latticeplay` idle paced in `MessageGet`; stock interactive needs live flag too |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).

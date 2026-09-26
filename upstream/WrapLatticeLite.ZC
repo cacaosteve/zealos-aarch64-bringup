@@ -152,8 +152,7 @@ I64 WrapLatticeLite()
 					}
 					break;
 				case MESSAGE_NULL:
-					/* Lattice idle: ~60 Hz (M180). */
-					Sleep(16);
+					/* M189: MessageGet yields ~60 Hz (no Refresh in this Lite). */
 					break;
 			}
 		}

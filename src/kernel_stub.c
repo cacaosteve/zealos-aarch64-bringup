@@ -1122,6 +1122,10 @@ uint64_t hc_builtin_messageget(uint64_t p_arg1, uint64_t p_arg2, uint64_t mask) 
     }
 
     hc_msg_store_outs(p_arg1, p_arg2, 0, 0);
+    /* M189: live latticeplay/stock-shaped sessions yield ~60 Hz; smokes stay snappy. */
+    if (g_hc_popup_live) {
+        (void)hc_builtin_sleep(16);
+    }
     return 0; /* MESSAGE_NULL */
 }
 
