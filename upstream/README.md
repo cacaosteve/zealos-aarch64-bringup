@@ -2176,6 +2176,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 185 — NearLatticeLite stock θ / dθ_idx
+
+| Item | Path |
+|--|--|
+| Gap | NearLatticeLite still used ASCII `th` / `idx` after DiskLat M183 |
+| Upstream need | compose *Lite field names match stock Lattice / DiskLat |
+| Bring-up | NearLatticeLite members + HUD → `θ` / `dθ_idx` |
+| Smoke | NearLatticeLite still **15** |
+| Shell | `nearlatticelite` HUD matches `latticeplay` labels |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).
