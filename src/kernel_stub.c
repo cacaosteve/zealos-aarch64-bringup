@@ -842,11 +842,43 @@ struct hc_depth_cell {
 static struct hc_depth_cell g_hc_depth_map[HC_DEPTH_MAP];
 static int g_hc_depth_on;
 
-/* PopUpColor state (M148+); painted on FB for latticeplay (M160/M164/M165). */
+/* PopUpColor state (M148+); painted on FB for latticeplay (M160/M164/M165/M205/M206). */
 static int g_hc_popup_i;
 static int g_hc_popup_live;
 static uint8_t g_hc_popup_mid = 14;  /* YELLOW — matches TurtleInit */
 static uint8_t g_hc_popup_edge = 0;  /* BLACK */
+/* M206: first word of last Mid/Edge PopUpColor header (survives Refresh). */
+static char g_hc_popup_mid_title[9];
+static char g_hc_popup_edge_title[9];
+
+static void hc_popup_store_title(int is_edge, const char *h) {
+    char *dst = is_edge ? g_hc_popup_edge_title : g_hc_popup_mid_title;
+    int k;
+    if (!h || !h[0]) {
+        return;
+    }
+    for (k = 0; h[k] && h[k] != '\n' && h[k] != ' ' && k < 8; k++) {
+        dst[k] = h[k];
+    }
+    dst[k] = 0;
+}
+
+static void hc_popup_paint_title(int which) {
+    const char *lab = which ? g_hc_popup_edge_title : g_hc_popup_mid_title;
+    uint32_t x0 = which ? 72u : 8u;
+    uint32_t y0 = (uint32_t)g_fb_h > 40u ? (uint32_t)g_fb_h - 28u : 8u;
+    uint32_t col = x0 / 8u;
+    uint32_t row = (y0 >= 16u ? y0 - 16u : 0u) / 8u;
+    int k;
+    if (!g_fb || !lab[0]) {
+        return;
+    }
+    fb_fillrect(x0, row * 8u, 64u, 8u, 0);
+    for (k = 0; lab[k] && k < 8; k++) {
+        fb_draw_char(col + (uint32_t)k, row, lab[k], 0x00E0E0E0u);
+    }
+}
+
 static void hc_popup_paint_swatch(int which, uint64_t c) {
     static const uint32_t pal[16] = {
         0x00000000u, 0x000000AAu, 0x0000AA00u, 0x0000AAAAu, 0x00AA0000u, 0x00AA00AAu,
@@ -870,6 +902,7 @@ static void hc_popup_paint_swatch(int which, uint64_t c) {
     for (k = 0; lab[k]; k++) {
         fb_draw_char(col + (uint32_t)k, row, lab[k], 0x00E0E0E0u);
     }
+    hc_popup_paint_title(which);
 }
 
 /* M165–M169/M191: repaint Mid/Edge + controls hints so Cls/Refresh keep chrome. */
@@ -923,6 +956,8 @@ uint64_t hc_builtin_dcfill(uint64_t dc) {
         g_hc_popup_i = 0;
         g_hc_popup_mid = 14;
         g_hc_popup_edge = 0;
+        g_hc_popup_mid_title[0] = 0;
+        g_hc_popup_edge_title[0] = 0;
         hc_popup_paint_live();
     }
     return 0;
@@ -1031,17 +1066,10 @@ uint64_t hc_builtin_popupcolor(uint64_t header) {
         g_hc_popup_mid = (uint8_t)(c & 15);
     }
     hc_popup_paint_swatch(is_edge, c);
-    /* M205: live — show first word of header above the swatch just painted. */
-    if (g_hc_popup_live && g_fb && h && (uintptr_t)h > 0x1000ull && h[0]) {
-        uint32_t x0 = is_edge ? 72u : 8u;
-        uint32_t y0 = (uint32_t)g_fb_h > 40u ? (uint32_t)g_fb_h - 28u : 8u;
-        uint32_t col = x0 / 8u;
-        uint32_t row = (y0 >= 16u ? y0 - 16u : 0u) / 8u;
-        int k;
-        fb_fillrect(x0, row * 8u, 64u, 8u, 0);
-        for (k = 0; h[k] && h[k] != '\n' && h[k] != ' ' && k < 8; k++) {
-            fb_draw_char(col + (uint32_t)k, row, h[k], 0x00E0E0E0u);
-        }
+    /* M205/M206: store + paint header word (Refresh via paint_swatch keeps it). */
+    if (g_hc_popup_live && h && (uintptr_t)h > 0x1000ull && h[0]) {
+        hc_popup_store_title(is_edge, h);
+        hc_popup_paint_title(is_edge);
     }
     return c;
 }
@@ -2581,6 +2609,8 @@ static int hc_run_src_ex(const char *src, uint64_t *out, int popup_live) {
     g_hc_popup_i = 0;
     g_hc_popup_mid = 14;
     g_hc_popup_edge = 0;
+    g_hc_popup_mid_title[0] = 0;
+    g_hc_popup_edge_title[0] = 0;
     g_hc_popup_live = popup_live ? 1 : 0;
     g_hc_fs_draw_it = 0; /* M153: no stale Fs->draw_it across demos */
     hc_heap_reset();

@@ -2428,6 +2428,18 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 206 — persist PopUpColor title words across Refresh
+
+| Item | Path |
+|--|--|
+| Gap | M205 titles vanished on next idle Refresh (`paint_live` only redrew swatches) |
+| Upstream need | Mid/Edge cue stays visible while aiming/idle |
+| Bring-up | store `g_hc_popup_*_title`; `paint_swatch` repaints titles; clear on Restart/`hc_run` |
+| Smoke | PopUpColor Edge/Mid unchanged |
+| Shell | `'c'` then idle Refresh keeps Mid/Edge words |
+
+Freeze catalog unchanged.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).
