@@ -231,6 +231,57 @@ U8 Drive2Letter(CDrive *drive=NULL)
     if (drive) {}
     return 'C';
 }
+// KeyDev.ZC StdOut chain. RawPutChar is the text-console sink until DolDoc
+// registers DocPutKey. Ctrl-Alt handlers are inert stubs until WinMgr/Debug.
+CKeyDevGlobals keydev;
+CKbdStateGlobals kbd;
+I64 sys_ctrl_alt_flags = 0;
+extern U0 Puts(U8 *text);
+U0 RawPutChar(I64 ch)
+{
+    U8 buf[2];
+
+    if (!ch)
+        return;
+    buf[0] = ch;
+    buf[1] = 0;
+    Puts(buf);
+}
+U8 *Caller(I64 num=1)
+{
+    if (num) {}
+    return NULL;
+}
+U0 BptS(U8 *addr=NULL, CTask *task=NULL)
+{
+    if (addr) {}
+    if (task) {}
+}
+Bool Mute(Bool val=FALSE)
+{
+    return val;
+}
+Bool IsMute()
+{
+    return FALSE;
+}
+U0 User(U8 *fmt=NULL, ...)
+{
+    if (fmt) {}
+}
+U0 LFBFlush()
+{
+}
+// Minimal text/CPU stand-ins referenced by Ctrl-Alt hooks in KeyDevInit.
+// Gs() is host-bound to bootstrap_gs; CCPU layout only needs idle_task here.
+class CBootstrapTextGlbls
+{
+    U8 *font;
+    U8 *aux_font;
+    Bool is_fb_busy;
+};
+CBootstrapTextGlbls text;
+CTask *sys_winmgr_task = NULL;
 // Portable character input from SerialDev/Message.ZC. CharScan retains its
 // down-then-up contract; UART bytes are treated as a synthetic press/release.
 I64 CharScan()

@@ -1,0 +1,27 @@
+// Smoke checks for unchanged Kernel/KeyDev.ZC after Message+Job load.
+I64 TaskOriginalKeyDevChecks()
+{
+    // Force raw-mode so KDRawPutKey/KDRawPutS accept characters.
+    Fs->display_flags &= ~(1 << DISPLAYf_NOT_RAW);
+    if (!IsRaw)
+        return 1;
+
+    KeyDevInit;
+
+    PutKey('Z', 0);
+    PutS("eal");
+    PutChars('O' | 'S' << 8);
+
+    // Multi-star funptr table must index the heap allocation, not smash
+    // adjacent CKeyDevGlobals fields (ctrl_alt_no_shift_descs at +72).
+    if (!keydev.fp_ctrl_alt_cbs)
+        return 2;
+    if (!keydev.fp_ctrl_alt_cbs['C' - 'A'])
+        return 3;
+    if (!keydev.ctrl_alt_no_shift_descs)
+        return 4;
+    if (!keydev.ctrl_alt_no_shift_descs['C' - 'A'])
+        return 5;
+
+    return 42;
+}

@@ -2899,7 +2899,11 @@ CHashClass *PrsType(CCmpCtrl *ccmp, CHashClass *base, char **name,
     fun[0] = A_CALLOC(sizeof(CHashFun), NULL);
     fun[0]->base.flags |= CLSF_FUNPTR;
     fun[0]->return_class = base + star_cnt;
-    fun[0]->base.raw_type = RT_FUNC;
+    /* star_cnt2==1 is a callable funptr (RT_FUNC). star_cnt2>1 is a pointer
+     * to funptr(s), e.g. KeyDev's U0 (**fp_ctrl_alt_cbs)(I64). Typing those
+     * as RT_FUNC made OptPassExpandPtrs drop the load, so fp[i] wrote into
+     * the struct member slot instead of the heap table. */
+    fun[0]->base.raw_type = star_cnt2 > 1 ? RT_PTR : RT_FUNC;
     fun[0]->base.sz = sizeof(void *);
     fun[0]->base.ptr_star_cnt = star_cnt2;
     PrsFunArgs(ccmp, *fun);
@@ -3802,6 +3806,12 @@ int64_t AssignRawTypeToNode(CCmpCtrl *ccmp, CRPN *rpn) {
       goto no_dim;
     if (!rpn->ic_dim->next) {
     no_dim:
+      /* Funptrs are CHashFun objects; ic_class-1 would use the wrong stride.
+       * Indexing/deref of U0 (**fp)(I64) still yields a function pointer. */
+      if (((CRPN *)rpn->base.next)->ic_class->flags & CLSF_FUNPTR) {
+        rpn->ic_class = ((CRPN *)rpn->base.next)->ic_class;
+        return rpn->raw_type = RT_FUNC;
+      }
       rpn->ic_class = ((CRPN *)rpn->base.next)->ic_class - 1;
     } else {
       rpn->ic_dim = rpn->ic_dim->next;
@@ -3976,6 +3986,12 @@ int64_t AssignRawTypeToNode(CCmpCtrl *ccmp, CRPN *rpn) {
     if (ICFwd(rpn->base.next)->ic_dim) {
       rpn->ic_class = ICFwd(rpn->base.next)->ic_class;
       rpn->ic_dim = ICFwd(rpn->base.next)->ic_dim->next;
+    } else if (ICFwd(rpn->base.next)->ic_class->flags & CLSF_FUNPTR) {
+      /* Same funptr stride issue as IC_DEREF; KeyDev indexes
+       * keydev.fp_ctrl_alt_cbs[ch] where the member is U0 (**)(I64). */
+      rpn->ic_class = ICFwd(rpn->base.next)->ic_class;
+      rpn->ic_fun = ICFwd(rpn->base.next)->ic_fun;
+      return rpn->raw_type = RT_FUNC;
     } else
       rpn->ic_class = ICFwd(rpn->base.next)->ic_class - 1;
     rpn->ic_fun = ICFwd(rpn->base.next)->ic_fun;

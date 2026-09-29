@@ -184,6 +184,10 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 # TaskText Spawns InputFilterTask from SerialDev/Message.ZC.
                 command('zload /Kernel/SerialDev/Message.ZC',
                         'zc: loaded /Kernel/SerialDev/Message.ZC')
+            if args.probe_module == '/Kernel/KeyDev.ZC':
+                command('zload /Kernel/SerialDev/Message.ZC',
+                        'zc: loaded /Kernel/SerialDev/Message.ZC')
+                command('zload /Kernel/Job.ZC', 'zc: loaded /Kernel/Job.ZC')
             guest.stdin.write(('zload '+args.probe_module+'\r').encode())
             guest.stdin.flush()
             result = until(b'\n> ')
@@ -223,6 +227,13 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 command('zload /Tests/TaskOriginalJob.ZC',
                         'zc: loaded /Tests/TaskOriginalJob.ZC')
                 command('zcall TaskOriginalJobChecks',
+                        'zc => 0x000000000000002a')
+            if args.probe_module == '/Kernel/KeyDev.ZC':
+                if 'zc: loaded /Kernel/KeyDev.ZC' not in result:
+                    raise RuntimeError('unchanged KeyDev.ZC did not load')
+                command('zload /Tests/TaskOriginalKeyDev.ZC',
+                        'zc: loaded /Tests/TaskOriginalKeyDev.ZC')
+                command('zcall TaskOriginalKeyDevChecks',
                         'zc => 0x000000000000002a')
             raise SystemExit(0)
         if args.probe_task_jobs:

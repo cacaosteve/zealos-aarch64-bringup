@@ -34,6 +34,13 @@ Port changes:
 - Reject FS/GS accesses: task segment semantics are not implemented here.
 - Emit declaration-time stores for complete one-dimensional local scalar array
   brace initializers, so values can come from the current call frame.
+- Do not use `ic_class-1` / `ic_class[-1]` on function-pointer types: those are
+  single `CHashFun` objects, not the `CHashClass` star array. Indexing
+  `U0 (**fp)(I64)` (as in KeyDev's ctrl-alt table) keeps `RT_FUNC` and uses
+  the funptr's own pointer width.
+- Type multi-star funptrs (`(**fp)(...)`) as `RT_PTR` so member loads are
+  kept; only single-star funptrs stay `RT_FUNC`. Otherwise `fp[i]` writes at
+  the member's address and smashes adjacent globals.
 
 The freestanding C support and host API are in `src/zc/`. See
 `COMPATIBILITY.md` for the tested scope and deliberate runtime limitations.

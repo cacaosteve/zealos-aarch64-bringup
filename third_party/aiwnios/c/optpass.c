@@ -21,6 +21,9 @@ static int64_t PtrWidthOfRPN(CRPN *rpn) {
     if (rpn->ic_dim->next)
       r *= rpn->ic_dim->next->total_cnt;
     r *= rpn->ic_class->sz;
+  } else if (rpn->ic_class->flags & CLSF_FUNPTR) {
+    /* Funptrs are CHashFun, not a CHashClass star array — never use [-1]. */
+    r *= rpn->ic_class->sz;
   } else
     r *= rpn->ic_class[-1].sz;
 

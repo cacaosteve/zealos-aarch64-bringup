@@ -548,6 +548,12 @@ static int64_t host_fs(int64_t *a) {
         zc_fail("current guest task is unavailable");
     return (int64_t)(uintptr_t)p;
 }
+/* CCPU stand-in for KeyDev Ctrl-Alt hooks; only idle_task is consulted. */
+static uint8_t guest_cpu[512];
+static int64_t host_gs(int64_t *a) {
+    (void)a;
+    return (int64_t)(uintptr_t)guest_cpu;
+}
 static int64_t host_sys_try(int64_t *a) {
     (void)a;
     if (!guest_task_bound || guest_fibers[guest_current].state != GUEST_RUNNABLE)
@@ -2023,6 +2029,10 @@ static int64_t host_lbequal(int64_t *a) {
     return !!(__atomic_fetch_and(bit_byte(a), (unsigned char)~mask,
                                  __ATOMIC_SEQ_CST) & mask);
 }
+static int64_t host_bequal(int64_t *a) {
+    /* Non-locked BEqual; same bit math as LBEqual on this single-CPU bridge. */
+    return host_lbequal(a);
+}
 /* The x86 RFLAGS interrupt-enable bit is the only flag the cooperative
  * ARM64 task bridge can preserve. Do not expose ARM DAIF bits as x86 flags. */
 static int64_t host_rflags_get(int64_t *a) {
@@ -2134,6 +2144,12 @@ static int64_t host_to_i64(int64_t *a) {
 static int64_t host_abs_i64(int64_t *a) {
     /* KernelB declares AbsI64 as _intern IC_ABS_I64; Aiwnios has no that opcode. */
     return a[0] < 0 ? -a[0] : a[0];
+}
+static int64_t host_to_upper(int64_t *a) {
+    int64_t ch = a[0] & 0xff;
+    if (ch >= 'a' && ch <= 'z')
+        ch = ch - 'a' + 'A';
+    return ch;
 }
 static int task_field(CHashClass *cls, const char *name, int64_t size, int64_t expected_off) {
     CMemberLst *m = MemberFind((char *)name, cls);
@@ -2258,12 +2274,14 @@ static void bind_guest_task(void) {
     set_guest_task(guest_fibers[0].words);
     guest_task_bound = 1;
     PrsBindCSymbol("Fs", host_fs, 0);
+    PrsBindCSymbol("Gs", host_gs, 0);
     PrsBindCSymbol("mp_count", &guest_mp_count, 0);
     PrsBindCSymbol("sys_focus_task", &guest_focus_task, 0);
     PrsBindCSymbol("Bt", host_bt, 2);
     PrsBindCSymbol("LBts", host_lbts, 2);
     PrsBindCSymbol("LBtr", host_lbtr, 2);
     PrsBindCSymbol("LBEqual", host_lbequal, 3);
+    PrsBindCSymbol("BEqual", host_bequal, 3);
     PrsBindCSymbol("QueueInit", host_queue_init, 1);
     PrsBindCSymbol("QueueInsert", host_queue_insert, 2);
     PrsBindCSymbol("QueueInsertRev", host_queue_insert_rev, 2);
@@ -2274,6 +2292,8 @@ static void bind_guest_task(void) {
     PrsBindCSymbol("ToF64", host_to_f64, 1);
     PrsBindCSymbol("ToI64", host_to_i64, 1);
     PrsBindCSymbol("AbsI64", host_abs_i64, 1);
+    PrsBindCSymbol("ToUpper", host_to_upper, 1);
+    PrsBindCSymbol("SwapI64", host_swap, 2);
     PrsBindCSymbol("sys_semas", guest_sys_semas, 0);
 }
 

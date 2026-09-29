@@ -1699,3 +1699,32 @@ ZealOS live distribution or installer.
   Job probe path for eyes-on confirmation. This replaces host
   `TaskExe`/`JobsHandler` when the module is loaded; interrupt-driven input
   and full `KTask`/`Sched` remain later work.
+
+## Unchanged `KeyDev.ZC`
+
+- The unchanged pinned `Kernel/KeyDev.ZC` loads after `KernelA.HH`,
+  `KernelB.HH`, `SerialDev/Message.ZC`, and `Job.ZC`. Bootstrap supplies the
+  `keydev` / `kbd` globals, `RawPutChar`, and inert `Caller` / `BptS` /
+  `Mute` / `User` / `LFBFlush` / `text` / `sys_winmgr_task` stand-ins used by
+  Ctrl-Alt hooks. Host bindings already cover `SwapI64`, `ToUpper`, and
+  `BEqual`.
+- Compiling KeyDev required compiler port fixes for multi-star function
+  pointers such as `U0 (**fp_ctrl_alt_cbs)(I64)`: do not use `ic_class-1`
+  (wrong stride vs `CHashFun`), keep `RT_FUNC` for indexed elements, use the
+  funptr size in `PtrWidthOfRPN`, and type `ptr_star_cnt > 1` as `RT_PTR` so
+  the member load is not dropped (otherwise `fp[i]` writes at the member
+  slot and smashes adjacent `CKeyDevGlobals` fields).
+- The disposable probe loads Message, Job, then KeyDev, then
+  `TaskOriginalKeyDevChecks`: `KeyDevInit`, raw-mode `PutKey`/`PutS`/
+  `PutChars`, and a `CtrlAltCBSet` funptr-table write. It returns `0x2a`.
+- The focused probe and full ISO and PCI compatibility suites passed.
+  `check-upstream.py` and `make pi-diag` passed. `git diff --check` is clean
+  aside from blank context lines inside `PORT.patch`. Pi hardware was not
+  retested. `make utm` refreshed ZealosAarch64Hello while preserving RedSea
+  SHA-256
+  `f216648875bf18c1eb122e4ad80cb8a85242e74619e424f9e9d6daac4de8d666` and both
+  native source banks. A post-refresh disk/config copy is under
+  `build/utm-before-original-keydev-20260928/`. Start the VM in UTM and run the
+  KeyDev probe path for eyes-on confirmation. DolDoc `DocPutKey` registration
+  and interrupt-driven input remain later work; this slice replaces the bridge
+  text `PutKey` once the module is loaded.
