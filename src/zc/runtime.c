@@ -116,6 +116,9 @@ struct guest_fiber {
     int source_job_active;
     uint64_t irq_flags_stack[8];
     unsigned irq_flags_depth;
+    /* Live IF bit while this fiber is descheduled. Job.ZC may Yield under
+     * PUSHFD/CLI; each fiber keeps its own mask across cooperative switches. */
+    uint64_t irq_flags_live;
     int64_t last_polled_key_code;
     struct guest_active_job *active_jobs;
     struct guest_exception *except_top, *except_caught;
@@ -141,6 +144,10 @@ static struct guest_counts {
 } guest_counts;
 _Static_assert(offsetof(struct guest_counts, time_stamp_freq) == 16 &&
                sizeof(struct guest_counts) == 48, "pinned counts layout");
+/* KernelB: CSema sys_semas[SEMA_SEMAS_NUM]; each CSema is one cache line. */
+#define GUEST_SEMA_NUM 21
+#define GUEST_SEMA_STRIDE 128
+static uint8_t guest_sys_semas[GUEST_SEMA_NUM * GUEST_SEMA_STRIDE];
 /* Pinned KernelB.HH exposes this as SYS_FOCUS_TASK. NULL preserves the
  * bootstrap convention that the task actively scanning owns device input. */
 static void *guest_focus_task;
@@ -654,6 +661,8 @@ static struct guest_fiber *guest_popup_child(struct guest_fiber *parent) {
         ? child : NULL;
 }
 static int64_t host_task_yield(int64_t *a);
+static int64_t host_rflags_get(int64_t *a);
+static int64_t host_rflags_set(int64_t *a);
 static int64_t host_jobs_handler(int64_t *a);
 static uint64_t counter_now(void);
 static int64_t poll_guest_keys(void);
@@ -829,8 +838,13 @@ static unsigned next_guest(unsigned from) {
 }
 static void enter_guest(unsigned next) __attribute__((noreturn));
 static void enter_guest(unsigned next) {
-    if (next != guest_current && guest_fibers[guest_current].irq_flags_depth)
-        zc_fail("task switch with saved interrupt flags is unsupported");
+    if (next != guest_current) {
+        struct guest_fiber *cur = &guest_fibers[guest_current];
+        struct guest_fiber *nxt = &guest_fibers[next];
+        cur->irq_flags_live = (uint64_t)host_rflags_get(NULL);
+        int64_t restore = (int64_t)nxt->irq_flags_live;
+        host_rflags_set(&restore);
+    }
     guest_current = next;
     Fs = next ? &guest_fibers[next].compiler_task : &task;
     set_guest_task(guest_fibers[next].words);
@@ -901,6 +915,7 @@ static void init_guest_fiber(unsigned i, void *parent, const char *name) {
     *(void **)(words + guest_code_heap_off) = heap;
     memcpy(heap + guest_heap_sig_off, "HcSV", 4);
     *(void **)(heap + guest_heap_task_off) = words;
+    f->irq_flags_live = 1u << 9; /* IF enabled until CLI/RFlagsSet. */
     if (i) {
         struct guest_fiber *parent_fiber = parent ? find_guest_task(parent) : NULL;
         CTask *parent_compiler = parent_fiber && parent_fiber != &guest_fibers[0]
@@ -2116,6 +2131,10 @@ static int64_t host_to_i64(int64_t *a) {
         zc_fail("ToI64 argument is not a finite I64 value");
     return (int64_t)value;
 }
+static int64_t host_abs_i64(int64_t *a) {
+    /* KernelB declares AbsI64 as _intern IC_ABS_I64; Aiwnios has no that opcode. */
+    return a[0] < 0 ? -a[0] : a[0];
+}
 static int task_field(CHashClass *cls, const char *name, int64_t size, int64_t expected_off) {
     CMemberLst *m = MemberFind((char *)name, cls);
     int64_t count = m && m->dim.total_cnt > 0 ? m->dim.total_cnt : 1;
@@ -2254,6 +2273,8 @@ static void bind_guest_task(void) {
     PrsBindCSymbol("TSCGet", host_tsc, 0);
     PrsBindCSymbol("ToF64", host_to_f64, 1);
     PrsBindCSymbol("ToI64", host_to_i64, 1);
+    PrsBindCSymbol("AbsI64", host_abs_i64, 1);
+    PrsBindCSymbol("sys_semas", guest_sys_semas, 0);
 }
 
 static int64_t execute_source_result(const char *path, const char *src,
@@ -2352,61 +2373,104 @@ static int64_t host_exe_print(int64_t *a) {
     f->source_job_active--;
     return result;
 }
+static int64_t host_print(int64_t *a);
+/* Bounded text formatter shared by Print and StrPrintJoin. Supports the
+ * markers and codes used by Message.ZC CharGet and Job.ZC PopUp/XTalk helpers. */
+static size_t format_text(char *output, size_t capacity, const char *format,
+                          int64_t argc, const int64_t *argv) {
+    size_t used = 0;
+    int64_t arg = 0;
+    if (!format || argc < 0 || argc > 64 || (argc && !argv))
+        zc_fail("format arguments are invalid");
+#define FMT_BYTE(ch) do { \
+    if (used == capacity - 1) zc_fail("formatted text exceeds buffer"); \
+    output[used++] = (char)(ch); \
+} while (0)
+    for (size_t i = 0;;) {
+        if (!format[i]) break;
+        if (format[i] == '$' && format[i + 1] == '$') {
+            /* Text console has no DolDoc style state; drop $$...$$ markers. */
+            i += 2;
+            while (format[i] && !(format[i] == '$' && format[i + 1] == '$'))
+                i++;
+            if (format[i] == '$' && format[i + 1] == '$')
+                i += 2;
+            continue;
+        }
+        if (format[i] != '%') {
+            FMT_BYTE(format[i++]);
+            continue;
+        }
+        if (!format[i + 1])
+            zc_fail("format ends with percent");
+        char code = format[i + 1];
+        i += 2;
+        if (code == '%') {
+            FMT_BYTE('%');
+            continue;
+        }
+        if (code != 'c' && code != 'C' && code != 's' && code != 'd')
+            zc_fail("format code is unsupported");
+        if (arg >= argc)
+            zc_fail("format needs another argument");
+        if (code == 'c' || code == 'C') {
+            /* ZealOS %c/%C print the nonzero bytes of a packed I64 value. */
+            uint64_t packed = (uint64_t)argv[arg++];
+            for (unsigned byte = 0; byte < 8; byte++) {
+                unsigned char ch = (unsigned char)(packed >> (byte * 8));
+                if (!ch) break;
+                FMT_BYTE(ch);
+            }
+        } else if (code == 's') {
+            const char *s = (const char *)(uintptr_t)argv[arg++];
+            if (!s) zc_fail("format %s argument is null");
+            for (size_t j = 0; s[j]; j++)
+                FMT_BYTE(s[j]);
+        } else {
+            int64_t value = argv[arg++];
+            char digits[32];
+            size_t n = 0;
+            uint64_t mag;
+            if (value < 0) {
+                FMT_BYTE('-');
+                mag = (uint64_t)(-(value + 1)) + 1;
+            } else
+                mag = (uint64_t)value;
+            do {
+                digits[n++] = (char)('0' + (mag % 10));
+                mag /= 10;
+            } while (mag && n < sizeof(digits));
+            while (n)
+                FMT_BYTE(digits[--n]);
+        }
+    }
+#undef FMT_BYTE
+    output[used] = 0;
+    return used;
+}
+static int64_t host_str_print_join(int64_t *a) {
+    char *dst = (char *)(uintptr_t)a[0];
+    const char *format = (const char *)(uintptr_t)a[1];
+    int64_t argc = a[2];
+    const int64_t *argv = (const int64_t *)(uintptr_t)a[3];
+    char stack[4097];
+    size_t used = format_text(stack, sizeof(stack), format, argc, argv);
+    if (!dst) {
+        CHeapCtrl *owner = guest_task_bound ? &guest_fibers[guest_current].heap_owner
+                                            : &data_heap;
+        dst = __AIWNIOS_MAlloc((int64_t)used + 1, owner);
+        if (!dst)
+            zc_fail("StrPrintJoin allocation failed");
+    }
+    memcpy(dst, stack, used + 1);
+    return (int64_t)(uintptr_t)dst;
+}
 static int64_t host_print(int64_t *a) {
     const char *format = (const char *)(uintptr_t)a[0];
     int64_t argc = a[1];
     const int64_t *argv = (const int64_t *)(uintptr_t)a[2];
     char output[4097];
-    size_t used = 0;
-    int64_t arg = 0;
-    if (!format || argc < 0 || argc > 64 || (argc && !argv))
-        zc_fail("Print arguments are invalid");
-#define PRINT_BYTE(ch) do { \
-    if (used == sizeof(output) - 1) zc_fail("Print output exceeds 4096 bytes"); \
-    output[used++] = (char)(ch); \
-} while (0)
-    for (size_t i = 0;;) {
-        if (i >= sizeof(output) - 1)
-            zc_fail("Print format exceeds 4096 bytes");
-        if (!format[i]) break;
-        if (!strncmp(format + i, "$$PT$$", 6) ||
-            !strncmp(format + i, "$$FG$$", 6)) {
-            i += 6; /* Text console has no DolDoc style state. */
-            continue;
-        }
-        if (format[i] != '%') {
-            PRINT_BYTE(format[i++]);
-            continue;
-        }
-        if (i + 1 >= sizeof(output) - 1 || !format[i + 1])
-            zc_fail("Print format ends with percent");
-        char code = format[i + 1];
-        i += 2;
-        if (code == '%') {
-            PRINT_BYTE('%');
-            continue;
-        }
-        if (code != 'c' && code != 's')
-            zc_fail("Print format is unsupported");
-        if (arg >= argc)
-            zc_fail("Print format needs another argument");
-        if (code == 'c') {
-            /* ZealOS %c prints the nonzero bytes of its packed I64 value. */
-            uint64_t packed = (uint64_t)argv[arg++];
-            for (unsigned byte = 0; byte < 8; byte++) {
-                unsigned char ch = (unsigned char)(packed >> (byte * 8));
-                if (!ch) break;
-                PRINT_BYTE(ch);
-            }
-        } else {
-            const char *s = (const char *)(uintptr_t)argv[arg++];
-            if (!s) zc_fail("Print %s argument is null");
-            for (size_t j = 0; j <= sizeof(output) - 1 && s[j]; j++)
-                PRINT_BYTE(s[j]);
-        }
-    }
-#undef PRINT_BYTE
-    output[used] = 0;
+    format_text(output, sizeof(output), format, argc, argv);
     zc_output(output);
     return 0;
 }
@@ -2443,6 +2507,7 @@ static int load_inner(const char *path) {
         PrsBindCSymbol("throw", host_guest_throw, 2);
         PrsBindCSymbol("ExePrint", host_exe_print, 2);
         PrsBindCSymbol("Print", host_print, 3);
+        PrsBindCSymbol("StrPrintJoin", host_str_print_join, 4);
         PrsBindCSymbol("PutKey", host_put_key, 2);
         PrsBindCSymbol("StrLen", host_str_len, 1);
         PrsBindCSymbol("counts", &guest_counts, 0);

@@ -1,0 +1,47 @@
+// Smoke checks for unchanged Kernel/Job.ZC after Message.ZC is loaded.
+I64 original_job_value;
+
+U0 OriginalJobServer(U8 *data)
+{
+    while (TRUE) {
+        JobsHandler(0);
+        FlushMessages;
+        LBts(&Fs->task_flags, TASKf_IDLE);
+        LBts(&Fs->task_flags, TASKf_AWAITING_MESSAGE);
+        Yield;
+    }
+}
+
+I64 TaskOriginalJobChecks()
+{
+    CTask *server = Spawn(&OriginalJobServer);
+    CJob *job;
+    I64 result = 0;
+
+    if (!server)
+        return 1;
+    if (TaskExe(server, Fs, NULL, 0))
+        return 2;
+
+    job = TaskExe(server, Fs, "original_job_value=40+2; 40+2;", 0);
+    if (!job)
+        return 3;
+    if (JobResGet(job) != 42)
+        return 4;
+    if (original_job_value != 42)
+        return 5;
+    if (!JobResScan(NULL, &result) && result)
+        return 6;
+
+    job = TaskExe(server, Fs, "original_job_value=17;",
+                  1 << JOBf_FREE_ON_COMPLETE);
+    if (!job)
+        return 7;
+    TaskWait(server);
+    if (original_job_value != 17)
+        return 8;
+
+    if (!Kill(server) || TaskValidate(server))
+        return 9;
+    return 42;
+}

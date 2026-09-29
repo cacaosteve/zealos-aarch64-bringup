@@ -9,6 +9,10 @@
 // in this single-CPU bridge. Saving state across a task switch is rejected.
 #define PUSHFD RFlagsPush();
 #define POPFD RFlagsPop();
+// Job.ZC spins with PAUSE while a job-control lock is held. On this
+// single-CPU cooperative bridge the lock is only contended by the same
+// task, so a spin hint is enough; do not Yield under CLI.
+#define PAUSE ;
 extern U0 RFlagsPush();
 extern U0 RFlagsPop();
 // Poll the current virtio/UART key reader and queue its events for the focus
@@ -154,6 +158,79 @@ U0 StrCopy(U8 *dest, U8 *source)
 {
     MemCopy(dest, source, BootstrapStrLen(source) + 1);
 }
+// Pinned Job.ZC allocates jobs on the System heap. Until Mem/MAllocFree.ZC
+// loads, map those helpers onto the current task heap used by MAlloc.
+U8 *CAlloc(I64 size)
+{
+    U8 *result = MAlloc(size);
+    if (result)
+        MemSet(result, 0, size);
+    return result;
+}
+U8 *SysCAlloc(I64 size)
+{
+    return CAlloc(size);
+}
+U8 *SysStrNew(U8 *buf)
+{
+    return StrNew(buf);
+}
+U8 *MAllocIdent(U8 *src)
+{
+    I64 size;
+    U8 *result;
+
+    if (!src)
+        return NULL;
+    size = MSize(src);
+    result = MAlloc(size);
+    MemCopy(result, src, size);
+    return result;
+}
+U8 *SysMAllocIdent(U8 *src)
+{
+    return MAllocIdent(src);
+}
+// Job.ZC's TaskMessage may record macros when SEMA_RECORD_MACRO is set.
+// Recording is absent here; keep empty placeholders so the unchanged source
+// type-checks. sys_semas itself is host-bound to a zeroed array.
+CTask *sys_macro_task = NULL;
+CJob sys_macro_head;
+U0 BootstrapJobGlbls()
+{
+    QueueInit(&sys_macro_head);
+}
+BootstrapJobGlbls;
+// Job.ZC's PopUpPrint/XTalk helpers need these KernelC-shaped string APIs.
+extern U8 *StrPrintJoin(U8 *dst, U8 *format, I64 argc, I64 *argv);
+U8 *MStrPrint(U8 *format, ...)
+{
+    return StrPrintJoin(NULL, format, argc, argv);
+}
+Bool IsSingleUser()
+{
+    return FALSE;
+}
+// Root stands in for Adam's sys_task until the upstream kernel starts.
+CTask *sys_task = Fs;
+U8 *ExtDefault(U8 *filename, U8 *extension)
+{
+    I64 i = 0;
+    if (!filename)
+        return StrNew("");
+    while (filename[i])
+    {
+        if (filename[i] == '.')
+            return StrNew(filename);
+        i++;
+    }
+    return MStrPrint("%s.%s", filename, extension);
+}
+U8 Drive2Letter(CDrive *drive=NULL)
+{
+    if (drive) {}
+    return 'C';
+}
 // Portable character input from SerialDev/Message.ZC. CharScan retains its
 // down-then-up contract; UART bytes are treated as a synthetic press/release.
 I64 CharScan()
@@ -216,7 +293,7 @@ extern I64 JobResGet(CJob *request=NULL);
 // Code-only bootstrap for pinned Job.ZC's PopUp path. ServerCmdLine and its
 // Doc/window loop are not loaded yet; this server only dispatches jobs.
 // Synchronous callers give the child keyboard focus until the source returns.
-U0 PopupBridgeServer(U8 *data)
+U0 ServerCmdLine(U8 *data)
 {
     while (TRUE) {
         JobsHandler(0);
@@ -237,7 +314,7 @@ I64 PopUp(U8 *buf, CTask *parent=NULL, CTask **_pu_task=NULL)
     // The cooperative bridge can wait only for the calling task's job.
     if (!buf || parent && parent != Fs)
         return 0;
-    task = Spawn(&PopupBridgeServer, NULL, "Server", -1, parent);
+    task = Spawn(&ServerCmdLine, NULL, "Server", -1, parent);
     if (!task)
         return 0;
     if (!parent) {

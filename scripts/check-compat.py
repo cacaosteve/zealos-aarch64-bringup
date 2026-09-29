@@ -180,6 +180,10 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         if args.probe_module:
             command('zload /Kernel/KernelA.HH', 'zc: loaded /Kernel/KernelA.HH')
             command('zload /Kernel/KernelB.HH', 'zc: loaded /Kernel/KernelB.HH')
+            if args.probe_module == '/Kernel/Job.ZC':
+                # TaskText Spawns InputFilterTask from SerialDev/Message.ZC.
+                command('zload /Kernel/SerialDev/Message.ZC',
+                        'zc: loaded /Kernel/SerialDev/Message.ZC')
             guest.stdin.write(('zload '+args.probe_module+'\r').encode())
             guest.stdin.flush()
             result = until(b'\n> ')
@@ -213,6 +217,13 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 command_after_marker_key('zcall TaskStringTruncateLive',
                                          'truncate input ready', b'abcd\r\n',
                                          'zc => 0x000000000000002a')
+            if args.probe_module == '/Kernel/Job.ZC':
+                if 'zc: loaded /Kernel/Job.ZC' not in result:
+                    raise RuntimeError('unchanged Job.ZC did not load')
+                command('zload /Tests/TaskOriginalJob.ZC',
+                        'zc: loaded /Tests/TaskOriginalJob.ZC')
+                command('zcall TaskOriginalJobChecks',
+                        'zc => 0x000000000000002a')
             raise SystemExit(0)
         if args.probe_task_jobs:
             command('zload /Kernel/KernelA.HH', 'zc: loaded /Kernel/KernelA.HH')

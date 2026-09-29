@@ -1669,3 +1669,33 @@ ZealOS live distribution or installer.
   file. The VM disk was backed up under
   `build/utm-before-original-keyget-20260928/`; SHA-256 checks after refresh
   confirmed that RedSea and both source banks were preserved.
+
+## Unchanged `Job.ZC`
+
+- The unchanged pinned `Kernel/Job.ZC` loads after `KernelA.HH`, `KernelB.HH`,
+  and `SerialDev/Message.ZC`. `TaskText` needs Message's `InputFilterTask`.
+  Bootstrap helpers supply `SysCAlloc` / `SysStrNew` / `SysMAllocIdent`, a
+  single-CPU `PAUSE` spin, `ServerCmdLine` (job-dispatching popup server),
+  `sys_macro_task` / `sys_macro_head`, `sys_task`, `IsSingleUser`,
+  `ExtDefault`, and `Drive2Letter`. Host bindings cover `AbsI64`, zeroed
+  `sys_semas`, and a bounded `StrPrintJoin` shared with `Print` (`%s`/`%c`/
+  `%C`/`%d`/`%%`, DolDoc `$$…$$` markers stripped).
+- Cooperative task switches now save and restore each fiber's live IF bit, so
+  pinned `TaskWait` can `Yield` under `PUSHFD`/`CLI` the way the x86 path
+  does. Bridge-only `TaskExeChecks` still encode host flag restrictions
+  (for example rejecting `JOBf_HIGHEST_PRIORITY`); they are not run against
+  the original module.
+- The disposable probe loads Message then Job, then
+  `TaskOriginalJobChecks`: null `TaskExe` rejection, source execution through
+  guest `JobsHandler`/`JobResGet`, and `FREE_ON_COMPLETE` + `TaskWait`. It
+  returns `0x2a`.
+- The focused probe and full ISO and PCI compatibility suites passed.
+  `check-upstream.py`, `make pi-diag`, and `git diff --check` passed. Pi
+  hardware was not retested. `make utm` refreshed ZealosAarch64Hello while
+  preserving RedSea SHA-256
+  `f216648875bf18c1eb122e4ad80cb8a85242e74619e424f9e9d6daac4de8d666` and both
+  native source banks. A post-refresh disk/config copy is under
+  `build/utm-before-original-job-20260928/`. Start the VM in UTM and run the
+  Job probe path for eyes-on confirmation. This replaces host
+  `TaskExe`/`JobsHandler` when the module is loaded; interrupt-driven input
+  and full `KTask`/`Sched` remain later work.
