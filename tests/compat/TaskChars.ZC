@@ -1,0 +1,26 @@
+// Portable character-input subset from pinned SerialDev/Message.ZC.
+I64 TaskCharQueueChecks()
+{
+    I64 sc = 0;
+
+    if (CharScan())
+        return 1;
+    MessagePost(Fs, MESSAGE_KEY_DOWN, 'A', 0x1e);
+    MessagePost(Fs, MESSAGE_KEY_UP, 'A', 0x1e);
+    if (CharScan() != 'A')
+        return 2;
+    MessagePost(Fs, MESSAGE_KEY_DOWN, 0, 0x48);
+    MessagePost(Fs, MESSAGE_KEY_DOWN, 'B', 0x30);
+    if (CharGet(&sc, FALSE) != 'B' || sc != 0x30)
+        return 3;
+    return 42;
+}
+
+I64 TaskCharLive()
+{
+    I64 ch = 0;
+    Puts("char scan ready\n");
+    while (!(ch = CharScan()))
+        Yield;
+    return ch;
+}

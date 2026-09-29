@@ -1,0 +1,63 @@
+// A cooperative TaskWait subset against the pinned Job.ZC signature.
+I64 idle_stage, queue_stage;
+I64 pending_job;
+
+U0 IdleServer(U8 *data)
+{
+    CTask *self = Fs;
+    idle_stage = 1;
+    Yield;
+    LBts(&self->task_flags, TASKf_IDLE);
+    idle_stage = 2;
+    Yield;
+    LBts(&self->task_flags, TASKf_CMD_LINE_PROMPT);
+    idle_stage = 3;
+    Yield;
+    LBtr(&self->task_flags, TASKf_IDLE);
+    idle_stage = 4;
+}
+
+U0 QueueServer(U8 *data)
+{
+    CTask *self = Fs;
+    self->server_ctrl.next_waiting = &pending_job;
+    LBts(&self->task_flags, TASKf_IDLE);
+    queue_stage = 1;
+    Yield;
+    self->server_ctrl.next_waiting = &self->server_ctrl;
+    queue_stage = 2;
+    Yield;
+}
+
+I64 TaskIdleChecks()
+{
+    CTask *task;
+    TaskWait;
+    TaskWait(Fs, TRUE);
+    task = Spawn(&IdleServer);
+    if (!task || task->last_input_filter_task != task ||
+        task->server_ctrl.next_waiting != &task->server_ctrl)
+        return 1;
+    TaskWait(task);
+    if (idle_stage != 2 || !TaskValidate(task))
+        return 2;
+    TaskWait(task, TRUE);
+    if (idle_stage != 3 || !Bt(&task->task_flags, TASKf_CMD_LINE_PROMPT))
+        return 3;
+    if (ZcTaskRun != 1 || idle_stage != 4 || TaskValidate(task))
+        return 4;
+    TaskWait(task);
+    task = Spawn(&QueueServer);
+    TaskWait(task);
+    if (queue_stage != 2 || !TaskValidate(task) || ZcTaskRun != 1)
+        return 5;
+    return 42;
+}
+
+I64 TaskIdleDeadlockChecks()
+{
+    CTask *task = Spawn(&IdleServer);
+    Suspend(task, TRUE);
+    TaskWait(task);
+    return 0;
+}

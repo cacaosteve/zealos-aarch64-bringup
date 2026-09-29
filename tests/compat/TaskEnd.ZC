@@ -1,0 +1,227 @@
+// Pinned CTask.task_end_cb and the child Exit / TaskEndNow lifecycle.
+I64 end_seen, end_after, end_error, end_started;
+CTask *end_expected;
+
+U0 EndCallback()
+{
+    if (Fs != end_expected || !TaskValidate(Fs) ||
+        Fs->data_heap->used_u8s < 16)
+        end_error = 1;
+    end_seen++;
+    Sleep(2); // The callback runs on the dying task's own stack.
+}
+
+U0 EndExitCallback()
+{
+    EndCallback;
+    Exit; // Must not invoke this callback again or skip task teardown.
+    end_after++;
+}
+
+U0 EndReturnWorker(U8 *data)
+{
+    MAlloc(16);
+    end_expected = Fs;
+    Fs->task_end_cb = &EndCallback;
+    end_started++;
+}
+
+U0 EndExitWorker(U8 *data)
+{
+    MAlloc(16);
+    end_expected = Fs;
+    Fs->task_end_cb = &EndCallback;
+    end_started++;
+    Exit;
+    end_after++;
+}
+
+U0 EndNowWorker(U8 *data)
+{
+    MAlloc(16);
+    end_expected = Fs;
+    Fs->task_end_cb = &EndCallback;
+    end_started++;
+    TaskEndNow;
+    end_after++;
+}
+
+U0 EndCallbackExitWorker(U8 *data)
+{
+    MAlloc(16);
+    end_expected = Fs;
+    Fs->task_end_cb = &EndExitCallback;
+    end_started++;
+}
+
+U0 EndKillWorker(U8 *data)
+{
+    MAlloc(16);
+    end_expected = Fs;
+    Fs->task_end_cb = &EndCallback;
+    end_started++;
+    Sleep(1000);
+    end_after++;
+}
+
+U0 EndJobServer(U8 *data)
+{
+    MAlloc(16);
+    end_expected = Fs;
+    Fs->task_end_cb = &EndCallback;
+    end_started++;
+    LBts(&Fs->task_flags, TASKf_AWAITING_MESSAGE);
+    Yield;
+    JobsHandler(0);
+    end_after++;
+}
+
+I64 TaskEndChecks()
+{
+    CTask *child;
+    end_seen = end_after = end_error = end_started = 0;
+    child = Spawn(&EndReturnWorker);
+    if (!child || ZcTaskRun != 1 || TaskValidate(child) ||
+        end_seen != 1 || end_started != 1 || end_error ||
+        child->data_heap->used_u8s)
+        return 1;
+    child = Spawn(&EndExitWorker);
+    if (!child || ZcTaskRun != 1 || TaskValidate(child) ||
+        end_seen != 2 || end_started != 2 || end_after || end_error)
+        return 2;
+    child = Spawn(&EndNowWorker);
+    if (!child || ZcTaskRun != 1 || TaskValidate(child) ||
+        end_seen != 3 || end_started != 3 || end_after || end_error)
+        return 3;
+    child = Spawn(&EndCallbackExitWorker);
+    if (!child || ZcTaskRun != 1 || TaskValidate(child) ||
+        end_seen != 4 || end_started != 4 || end_after || end_error)
+        return 4;
+    return 42;
+}
+
+// Parent code/heap stays live until every descendant callback completes.
+I64 family_order, family_error, family_started, family_after;
+CTask *family_parent, *family_child, *family_grand;
+
+U0 FamilyEnd()
+{
+    if (!TaskValidate(Fs) || Fs->data_heap->used_u8s < 16)
+        family_error = 1;
+    if (Fs == family_parent) {
+        if (family_order != 0) family_error = 2;
+    } else if (Fs == family_child) {
+        if (family_order != 1) family_error = 3;
+    } else if (Fs == family_grand) {
+        if (family_order != 2) family_error = 4;
+    } else
+        family_error = 5;
+    family_order++;
+    Sleep(2);
+}
+
+U0 FamilyGrand(U8 *data)
+{
+    MAlloc(16);
+    family_grand = Fs;
+    Fs->task_end_cb = &FamilyEnd;
+    family_started++;
+    Sleep(1000);
+    family_after++;
+}
+
+U0 FamilyChild(U8 *data)
+{
+    MAlloc(16);
+    family_child = Fs;
+    Fs->task_end_cb = &FamilyEnd;
+    if (!Spawn(&FamilyGrand, NULL, "Grand", -1, Fs)) family_error = 6;
+    family_started++;
+    Sleep(1000);
+    family_after++;
+}
+
+U0 FamilyParent(U8 *data)
+{
+    MAlloc(16);
+    family_parent = Fs;
+    Fs->task_end_cb = &FamilyEnd;
+    if (!Spawn(&FamilyChild, NULL, "Child", -1, Fs)) family_error = 7;
+    family_started++;
+    Sleep(1000);
+    family_after++;
+}
+
+I64 TaskFamilyEndChecks()
+{
+    CTask *parent;
+    family_order = family_error = family_started = family_after = 0;
+    family_parent = family_child = family_grand = NULL;
+    parent = Spawn(&FamilyParent);
+    if (!parent) return 1;
+    Yield;
+    if (family_started != 3 || family_error ||
+        !TaskValidate(family_child) || !TaskValidate(family_grand))
+        return 2;
+    if (!Kill(parent, FALSE)) return 3;
+    DeathWait(&parent);
+    if (family_order != 3) return 100 + family_order;
+    if (family_after) return 5;
+    if (family_error) return 6 + family_error;
+    if (TaskValidate(parent) || TaskValidate(family_child) ||
+        TaskValidate(family_grand)) return 16;
+    if (parent->data_heap->used_u8s || family_child->data_heap->used_u8s ||
+        family_grand->data_heap->used_u8s) return 17;
+    return 42;
+}
+
+I64 TaskKillCallbackChecks()
+{
+    CTask *child;
+    end_seen = end_after = end_error = end_started = 0;
+    child = Spawn(&EndKillWorker);
+    if (!child)
+        return 1;
+    Yield; // Install callback and park in Sleep before killing the child.
+    if (end_started != 1 || !TaskValidate(child) || Suspend(child, TRUE))
+        return 2;
+    if (!Kill(child) || end_seen != 1 ||
+        Bt(&child->task_flags, TASKf_KILL_TASK))
+        return 3;
+    DeathWait(&child);
+    if (TaskValidate(child) || end_after || end_error || end_seen != 1 ||
+        child->data_heap->used_u8s)
+        return 4;
+    child = Spawn(&EndKillWorker);
+    if (!child)
+        return 5;
+    Yield;
+    if (end_started != 2 || !Kill(child, FALSE) ||
+        !TaskValidate(child) ||
+        !Bt(&child->task_flags, TASKf_KILL_TASK))
+        return 6;
+    DeathWait(&child);
+    if (TaskValidate(child) || end_after || end_error || end_seen != 2)
+        return 7;
+    return 42;
+}
+
+I64 TaskJobEndCallbackChecks()
+{
+    CTask *child;
+    CJob *job;
+    end_seen = end_after = end_error = end_started = 0;
+    child = Spawn(&EndJobServer);
+    if (!child)
+        return 1;
+    Yield;
+    if (end_started != 1 || !TaskValidate(child))
+        return 2;
+    job = TaskExe(child, Fs, "42;", 1 << JOBf_EXIT_ON_COMPLETE);
+    if (!job || JobResGet(job) != 42)
+        return 3;
+    DeathWait(&child);
+    if (TaskValidate(child) || end_seen != 1 || end_after || end_error)
+        return 4;
+    return 42;
+}

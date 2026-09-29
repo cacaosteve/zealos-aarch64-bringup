@@ -1,0 +1,27 @@
+// The pinned InputFilterTask/Job.ZC source-job call shape.
+I64 task_exe_print_filter_value;
+
+I64 TaskExePrintChecks()
+{
+    CJob *job;
+
+    ExePrint("%s", "I64 TaskExePrintValue(){return 40;}");
+    if (ExePrint("%s", "TaskExePrintValue()+2;") != 42 ||
+        Fs->answer != 42 || Fs->answer_type != RT_I64)
+        return 1;
+
+    job = TaskExe(Fs, Fs,
+                  "ExePrint(\"%s\", \"TaskExePrintValue()+2;\");", 0);
+    if (!job || JobsHandler(0) != 1 || JobResGet(job) != 42)
+        return 2;
+
+    task_exe_print_filter_value = 0;
+    if (!TaskText(Fs, NULL,
+                  "task_exe_print_filter_value=ExePrint(\"%s\", \"TaskExePrintValue()+2;\");",
+                  0))
+        return 3;
+    TaskWait(Fs);
+    if (task_exe_print_filter_value != 42)
+        return 4;
+    return 42;
+}

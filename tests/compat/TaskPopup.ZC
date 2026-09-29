@@ -1,0 +1,36 @@
+// Code-only PopUp bootstrap: source runs in a child and leaves no live link.
+I64 popup_bridge_value;
+I64 popup_focus_seen;
+
+I64 PopupBridgeChecks()
+{
+    CTask *child = NULL;
+
+    popup_bridge_value = 0;
+    if (PopUp("popup_bridge_value=40; 42;", Fs, &child) != 42 ||
+        child || popup_bridge_value != 40 || Fs->popup_task)
+        return 1;
+
+    if (PopUp("popup_bridge_value=43;", NULL, &child) || !child)
+        return 2;
+    if (ZcTaskRun != 1 || TaskValidate(child) || popup_bridge_value != 43)
+        return 3;
+    if (PopUp("PopUp(\"41;\",Fs)+1;", Fs) != 42 || Fs->popup_task)
+        return 4;
+    MessagePost(Fs, MESSAGE_CMD, 42, 0);
+    if (PopUp("I64 arg=0; MessageGet(&arg,NULL,1<<MESSAGE_CMD); arg;", Fs) != 42 ||
+        Fs->popup_task || MessageScan(NULL, NULL, 1 << MESSAGE_CMD))
+        return 5;
+    return 42;
+}
+
+I64 PopupLiveKey()
+{
+    I64 ch;
+    popup_focus_seen = 0;
+    ch = PopUp("popup_focus_seen=sys_focus_task==Fs; "
+               "Puts(\"popup key ready\\n\"); KeyGet;", Fs);
+    if (!popup_focus_seen || Fs->popup_task || sys_focus_task != Fs)
+        return 0;
+    return ch;
+}

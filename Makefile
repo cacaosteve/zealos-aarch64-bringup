@@ -37,9 +37,14 @@ CFLAGS_KERNEL := -target aarch64-unknown-none-elf \
 	-fno-stack-protector -fno-stack-check -fPIE \
 	-ffunction-sections -fdata-sections \
 	-mcpu=generic -march=armv8-a+nofp+nosimd -mgeneral-regs-only \
-	-mno-outline-atomics -mcmodel=tiny -mbranch-protection=none \
+	-mno-outline-atomics -mcmodel=small -mbranch-protection=none \
 	-O2 -Wall -Wextra \
 	-I$(ROOT)/src
+
+# The Pi diagnostic includes the full embedded upstream catalog and its JIT
+# buffers. Keep it PIE, but use ADRP-based small-model addressing: tiny-model
+# ADR references can exceed their +/-1 MiB range as the image grows.
+CFLAGS_KERNEL_PI := $(CFLAGS_KERNEL) -mcmodel=small
 
 # Cos/Sin Taylor helpers: same ABI/PIE, but allow FP (kernel_stub stays +nofp).
 CFLAGS_F64MATH := -target aarch64-unknown-none-elf \
@@ -47,7 +52,7 @@ CFLAGS_F64MATH := -target aarch64-unknown-none-elf \
 	-fno-stack-protector -fno-stack-check -fPIE \
 	-ffunction-sections -fdata-sections \
 	-mcpu=generic -march=armv8-a \
-	-mno-outline-atomics -mcmodel=tiny -mbranch-protection=none \
+	-mno-outline-atomics -mcmodel=small -mbranch-protection=none \
 	-O2 -Wall -Wextra \
 	-I$(ROOT)/src
 
@@ -74,13 +79,18 @@ FW_VARS_IN ?= /opt/homebrew/share/qemu/edk2-arm-vars.fd
 FW_VARS    := $(BUILD)/edk2-vars.fd
 
 ESP_START_SECTOR := 2048
-# 64MiB = 131072 sectors. GPT backup uses the final 34 LBAs (32 PTE + header).
-# RedSea (PCI/UTM) is 128 sectors immediately before that backup region.
-# EFI ends at RedSea_base-1 so the three regions never overlap.
-DISK_SECTS       := 131072
+# 128MiB boot image. The legacy RedSea window stays at its original LBA,
+# allowing UTM refreshes to preserve all existing files byte-for-byte.
+DISK_SECTS       := 262144
 GPT_BACKUP_SECTS := 34
 RS_SECTS         := 128
-RS_LBA_BASE      := $(shell echo $$(($(DISK_SECTS) - $(GPT_BACKUP_SECTS) - $(RS_SECTS) + 1)))
+RS_LBA_BASE      := 130911
+SRC_LBA_BASE     := 131039
+SRC_SECTS        := 65536
+SRC_END_SECTOR   := $(shell echo $$(($(SRC_LBA_BASE) + $(SRC_SECTS) - 1)))
+SRC_SHADOW_LBA   := 196575
+SRC_SHADOW_SECTS := 65536
+SRC_SHADOW_END   := $(shell echo $$(($(SRC_SHADOW_LBA) + $(SRC_SHADOW_SECTS) - 1)))
 ESP_END_SECTOR   := $(shell echo $$(($(RS_LBA_BASE) - 1)))
 ESP_SECTORS      := $(shell echo $$(($(ESP_END_SECTOR) - $(ESP_START_SECTOR) + 1)))
 
@@ -88,13 +98,16 @@ ESP_SECTORS      := $(shell echo $$(($(ESP_END_SECTOR) - $(ESP_START_SECTOR) + 1
 
 all: $(BOOT) $(KERNEL) iso esp
 
+include src/zc/build.mk
+KERNEL_OBJS += $(ZC_OBJS)
+
 $(BUILD):
 	mkdir -p $@
 
 $(BUILD)/zealbooter.o: src/zealbooter.c src/handoff.h src/elf64.h src/plat_pi4.h src/mmio_map.h src/linker-booter.ld | $(BUILD)
 	$(CLANG) $(CFLAGS) -c src/zealbooter.c -o $@
 
-$(BUILD)/kernel_stub.o: src/kernel_stub.c src/handoff.h src/hc_ir.h src/hc_front.h src/a64_emit.h src/fb_font.h src/virtio_kbd.h src/virtio_tablet.h src/virtio_blk.h src/disk_layout.h src/mmio_map.h $(BUILD)/netofdots_zc.h $(BUILD)/lines_zc.h $(BUILD)/minigr_zc.h $(BUILD)/memsort_zc.h $(BUILD)/peekplot_zc.h $(BUILD)/offbmp_zc.h $(BUILD)/heapstr_zc.h $(BUILD)/catfmt_zc.h $(BUILD)/heapque_zc.h $(BUILD)/jobque_zc.h $(BUILD)/jobrun_zc.h $(BUILD)/taskspawn_zc.h $(BUILD)/popup_zc.h $(BUILD)/doclite_zc.h $(BUILD)/doclib_zc.h $(BUILD)/notes_zc.h $(BUILD)/globshare_zc.h $(BUILD)/life_zc.h $(BUILD)/cartlite_zc.h $(BUILD)/vec2lite_zc.h $(BUILD)/angleslite_zc.h $(BUILD)/coslite_zc.h $(BUILD)/sqrtlite_zc.h $(BUILD)/arglite_zc.h $(BUILD)/commalite_zc.h $(BUILD)/plot3lite_zc.h $(BUILD)/tospilite_zc.h $(BUILD)/tosutf8lite_zc.h $(BUILD)/colorlite_zc.h $(BUILD)/turtlelite_zc.h $(BUILD)/filllite_zc.h $(BUILD)/initlite_zc.h $(BUILD)/deflite_zc.h $(BUILD)/printlite_zc.h $(BUILD)/msglite_zc.h $(BUILD)/menulite_zc.h $(BUILD)/findlite_zc.h $(BUILD)/fslite_zc.h $(BUILD)/setuplite_zc.h $(BUILD)/ttlite_zc.h $(BUILD)/buflite_zc.h $(BUILD)/inclite_zc.h $(BUILD)/dclite_zc.h $(BUILD)/linedclite_zc.h $(BUILD)/grflite_zc.h $(BUILD)/movelite_zc.h $(BUILD)/checkedlite_zc.h $(BUILD)/cmplite_zc.h $(BUILD)/forinclite_zc.h $(BUILD)/microlite_zc.h $(BUILD)/movestacklite_zc.h $(BUILD)/endlite_zc.h $(BUILD)/drawitlite_zc.h $(BUILD)/latticelite_zc.h $(BUILD)/looplite_zc.h $(BUILD)/demolite_zc.h $(BUILD)/eventlite_zc.h $(BUILD)/playlite_zc.h $(BUILD)/inputlite_zc.h $(BUILD)/rightlite_zc.h $(BUILD)/cursorlite_zc.h $(BUILD)/uplite_zc.h $(BUILD)/ticklite_zc.h $(BUILD)/framelite_zc.h $(BUILD)/plotdclite_zc.h $(BUILD)/abortlite_zc.h $(BUILD)/aimmovelite_zc.h $(BUILD)/idlelite_zc.h $(BUILD)/layerlite_zc.h $(BUILD)/endslite_zc.h $(BUILD)/speedlite_zc.h $(BUILD)/midlite_zc.h $(BUILD)/livelite_zc.h $(BUILD)/accellite_zc.h $(BUILD)/restartlite_zc.h $(BUILD)/widthlite_zc.h $(BUILD)/bothcolorlite_zc.h $(BUILD)/menufulllite_zc.h $(BUILD)/menubiglite_zc.h $(BUILD)/trylite_zc.h $(BUILD)/stepcountlite_zc.h $(BUILD)/anglesfulllite_zc.h $(BUILD)/braceangleslite_zc.h $(BUILD)/bracepilite_zc.h $(BUILD)/setmenulite_zc.h $(BUILD)/nearlatticelite_zc.h $(BUILD)/f64iflite_zc.h $(BUILD)/wraplatticelite_zc.h $(BUILD)/menulooplite_zc.h $(BUILD)/idxalllite_zc.h $(BUILD)/disklat_zc.h $(BUILD)/stocklat_zc.h $(BUILD)/depthbuflite_zc.h $(BUILD)/depthrstlite_zc.h $(BUILD)/depthplotlite_zc.h $(BUILD)/depthlinelite_zc.h $(BUILD)/ramblk_zc.h $(BUILD)/namefile_zc.h $(BUILD)/dirlook_zc.h $(BUILD)/dirdel_zc.h $(BUILD)/fopen_zc.h $(BUILD)/fwrite_zc.h $(BUILD)/multiblk_zc.h $(BUILD)/redsea_zc.h $(BUILD)/rsroot_zc.h $(BUILD)/rsfile_zc.h $(BUILD)/rsalloc_zc.h $(BUILD)/rsfree_zc.h $(BUILD)/rsmulti_zc.h $(BUILD)/rscfile_zc.h $(BUILD)/rscwrite_zc.h $(BUILD)/rscseek_zc.h $(BUILD)/rsclib_zc.h $(BUILD)/rspersist_zc.h $(BUILD)/runzc_zc.h | $(BUILD)
+$(BUILD)/kernel_stub.o: src/kernel_stub.c src/zc/runtime.h Makefile src/handoff.h src/hc_ir.h src/hc_front.h src/a64_emit.h src/fb_font.h src/virtio_kbd.h src/virtio_tablet.h src/virtio_blk.h src/zc_source_store.h src/zc_source_editor.h src/disk_layout.h src/mmio_map.h $(BUILD)/netofdots_zc.h $(BUILD)/lines_zc.h $(BUILD)/minigr_zc.h $(BUILD)/memsort_zc.h $(BUILD)/peekplot_zc.h $(BUILD)/offbmp_zc.h $(BUILD)/heapstr_zc.h $(BUILD)/catfmt_zc.h $(BUILD)/heapque_zc.h $(BUILD)/jobque_zc.h $(BUILD)/jobrun_zc.h $(BUILD)/taskspawn_zc.h $(BUILD)/popup_zc.h $(BUILD)/doclite_zc.h $(BUILD)/doclib_zc.h $(BUILD)/notes_zc.h $(BUILD)/globshare_zc.h $(BUILD)/life_zc.h $(BUILD)/cartlite_zc.h $(BUILD)/vec2lite_zc.h $(BUILD)/angleslite_zc.h $(BUILD)/coslite_zc.h $(BUILD)/sqrtlite_zc.h $(BUILD)/arglite_zc.h $(BUILD)/commalite_zc.h $(BUILD)/plot3lite_zc.h $(BUILD)/tospilite_zc.h $(BUILD)/tosutf8lite_zc.h $(BUILD)/colorlite_zc.h $(BUILD)/turtlelite_zc.h $(BUILD)/filllite_zc.h $(BUILD)/initlite_zc.h $(BUILD)/deflite_zc.h $(BUILD)/printlite_zc.h $(BUILD)/msglite_zc.h $(BUILD)/menulite_zc.h $(BUILD)/findlite_zc.h $(BUILD)/fslite_zc.h $(BUILD)/setuplite_zc.h $(BUILD)/ttlite_zc.h $(BUILD)/buflite_zc.h $(BUILD)/inclite_zc.h $(BUILD)/dclite_zc.h $(BUILD)/linedclite_zc.h $(BUILD)/grflite_zc.h $(BUILD)/movelite_zc.h $(BUILD)/checkedlite_zc.h $(BUILD)/cmplite_zc.h $(BUILD)/forinclite_zc.h $(BUILD)/microlite_zc.h $(BUILD)/movestacklite_zc.h $(BUILD)/endlite_zc.h $(BUILD)/drawitlite_zc.h $(BUILD)/latticelite_zc.h $(BUILD)/looplite_zc.h $(BUILD)/demolite_zc.h $(BUILD)/eventlite_zc.h $(BUILD)/playlite_zc.h $(BUILD)/inputlite_zc.h $(BUILD)/rightlite_zc.h $(BUILD)/cursorlite_zc.h $(BUILD)/uplite_zc.h $(BUILD)/ticklite_zc.h $(BUILD)/framelite_zc.h $(BUILD)/plotdclite_zc.h $(BUILD)/abortlite_zc.h $(BUILD)/aimmovelite_zc.h $(BUILD)/idlelite_zc.h $(BUILD)/layerlite_zc.h $(BUILD)/endslite_zc.h $(BUILD)/speedlite_zc.h $(BUILD)/midlite_zc.h $(BUILD)/livelite_zc.h $(BUILD)/accellite_zc.h $(BUILD)/restartlite_zc.h $(BUILD)/widthlite_zc.h $(BUILD)/bothcolorlite_zc.h $(BUILD)/menufulllite_zc.h $(BUILD)/menubiglite_zc.h $(BUILD)/trylite_zc.h $(BUILD)/stepcountlite_zc.h $(BUILD)/anglesfulllite_zc.h $(BUILD)/braceangleslite_zc.h $(BUILD)/bracepilite_zc.h $(BUILD)/setmenulite_zc.h $(BUILD)/nearlatticelite_zc.h $(BUILD)/f64iflite_zc.h $(BUILD)/wraplatticelite_zc.h $(BUILD)/menulooplite_zc.h $(BUILD)/idxalllite_zc.h $(BUILD)/disklat_zc.h $(BUILD)/stocklat_zc.h $(BUILD)/depthbuflite_zc.h $(BUILD)/depthrstlite_zc.h $(BUILD)/depthplotlite_zc.h $(BUILD)/depthlinelite_zc.h $(BUILD)/ramblk_zc.h $(BUILD)/namefile_zc.h $(BUILD)/dirlook_zc.h $(BUILD)/dirdel_zc.h $(BUILD)/fopen_zc.h $(BUILD)/fwrite_zc.h $(BUILD)/multiblk_zc.h $(BUILD)/redsea_zc.h $(BUILD)/rsroot_zc.h $(BUILD)/rsfile_zc.h $(BUILD)/rsalloc_zc.h $(BUILD)/rsfree_zc.h $(BUILD)/rsmulti_zc.h $(BUILD)/rscfile_zc.h $(BUILD)/rscwrite_zc.h $(BUILD)/rscseek_zc.h $(BUILD)/rsclib_zc.h $(BUILD)/rspersist_zc.h $(BUILD)/runzc_zc.h | $(BUILD)
 	$(CLANG) $(CFLAGS_KERNEL) -I$(BUILD) -c src/kernel_stub.c -o $@
 
 $(BUILD)/netofdots_zc.h: upstream/NetOfDots.ZC scripts/embed-zc.py | $(BUILD)
@@ -400,24 +413,25 @@ $(KERNEL): $(KERNEL_OBJS) src/linker-kernel.ld
 $(BUILD)/zealbooter-pi.o: src/zealbooter.c src/handoff.h src/elf64.h src/plat_pi4.h src/mmio_map.h src/linker-booter.ld | $(BUILD)
 	$(CLANG) $(CFLAGS) $(CFLAGS_PI) -c src/zealbooter.c -o $@
 
-$(BUILD)/kernel_stub-pi.o: src/kernel_stub.c src/handoff.h src/hc_ir.h src/hc_front.h src/a64_emit.h src/fb_font.h src/virtio_kbd.h src/virtio_tablet.h src/virtio_blk.h src/disk_layout.h src/mmio_map.h $(BUILD)/netofdots_zc.h $(BUILD)/lines_zc.h $(BUILD)/minigr_zc.h $(BUILD)/memsort_zc.h $(BUILD)/peekplot_zc.h $(BUILD)/offbmp_zc.h $(BUILD)/heapstr_zc.h $(BUILD)/catfmt_zc.h $(BUILD)/heapque_zc.h $(BUILD)/jobque_zc.h $(BUILD)/jobrun_zc.h $(BUILD)/taskspawn_zc.h $(BUILD)/popup_zc.h $(BUILD)/doclite_zc.h $(BUILD)/doclib_zc.h $(BUILD)/notes_zc.h $(BUILD)/globshare_zc.h $(BUILD)/life_zc.h $(BUILD)/cartlite_zc.h $(BUILD)/vec2lite_zc.h $(BUILD)/angleslite_zc.h $(BUILD)/coslite_zc.h $(BUILD)/sqrtlite_zc.h $(BUILD)/arglite_zc.h $(BUILD)/commalite_zc.h $(BUILD)/plot3lite_zc.h $(BUILD)/tospilite_zc.h $(BUILD)/tosutf8lite_zc.h $(BUILD)/colorlite_zc.h $(BUILD)/turtlelite_zc.h $(BUILD)/filllite_zc.h $(BUILD)/initlite_zc.h $(BUILD)/deflite_zc.h $(BUILD)/printlite_zc.h $(BUILD)/msglite_zc.h $(BUILD)/menulite_zc.h $(BUILD)/findlite_zc.h $(BUILD)/fslite_zc.h $(BUILD)/setuplite_zc.h $(BUILD)/ttlite_zc.h $(BUILD)/buflite_zc.h $(BUILD)/inclite_zc.h $(BUILD)/dclite_zc.h $(BUILD)/linedclite_zc.h $(BUILD)/grflite_zc.h $(BUILD)/movelite_zc.h $(BUILD)/checkedlite_zc.h $(BUILD)/cmplite_zc.h $(BUILD)/forinclite_zc.h $(BUILD)/microlite_zc.h $(BUILD)/movestacklite_zc.h $(BUILD)/endlite_zc.h $(BUILD)/drawitlite_zc.h $(BUILD)/latticelite_zc.h $(BUILD)/looplite_zc.h $(BUILD)/demolite_zc.h $(BUILD)/eventlite_zc.h $(BUILD)/playlite_zc.h $(BUILD)/inputlite_zc.h $(BUILD)/rightlite_zc.h $(BUILD)/cursorlite_zc.h $(BUILD)/uplite_zc.h $(BUILD)/ticklite_zc.h $(BUILD)/framelite_zc.h $(BUILD)/plotdclite_zc.h $(BUILD)/abortlite_zc.h $(BUILD)/aimmovelite_zc.h $(BUILD)/idlelite_zc.h $(BUILD)/layerlite_zc.h $(BUILD)/endslite_zc.h $(BUILD)/speedlite_zc.h $(BUILD)/midlite_zc.h $(BUILD)/livelite_zc.h $(BUILD)/accellite_zc.h $(BUILD)/restartlite_zc.h $(BUILD)/widthlite_zc.h $(BUILD)/bothcolorlite_zc.h $(BUILD)/menufulllite_zc.h $(BUILD)/menubiglite_zc.h $(BUILD)/trylite_zc.h $(BUILD)/stepcountlite_zc.h $(BUILD)/anglesfulllite_zc.h $(BUILD)/braceangleslite_zc.h $(BUILD)/bracepilite_zc.h $(BUILD)/setmenulite_zc.h $(BUILD)/nearlatticelite_zc.h $(BUILD)/f64iflite_zc.h $(BUILD)/wraplatticelite_zc.h $(BUILD)/menulooplite_zc.h $(BUILD)/idxalllite_zc.h $(BUILD)/disklat_zc.h $(BUILD)/stocklat_zc.h $(BUILD)/depthbuflite_zc.h $(BUILD)/depthrstlite_zc.h $(BUILD)/depthplotlite_zc.h $(BUILD)/depthlinelite_zc.h $(BUILD)/ramblk_zc.h $(BUILD)/namefile_zc.h $(BUILD)/dirlook_zc.h $(BUILD)/dirdel_zc.h $(BUILD)/fopen_zc.h $(BUILD)/fwrite_zc.h $(BUILD)/multiblk_zc.h $(BUILD)/redsea_zc.h $(BUILD)/rsroot_zc.h $(BUILD)/rsfile_zc.h $(BUILD)/rsalloc_zc.h $(BUILD)/rsfree_zc.h $(BUILD)/rsmulti_zc.h $(BUILD)/rscfile_zc.h $(BUILD)/rscwrite_zc.h $(BUILD)/rscseek_zc.h $(BUILD)/rsclib_zc.h $(BUILD)/rspersist_zc.h $(BUILD)/runzc_zc.h | $(BUILD)
-	$(CLANG) $(CFLAGS_KERNEL) $(CFLAGS_PI) -I$(BUILD) -c src/kernel_stub.c -o $@
+$(BUILD)/kernel_stub-pi.o: src/kernel_stub.c src/zc/runtime.h Makefile src/handoff.h src/hc_ir.h src/hc_front.h src/a64_emit.h src/fb_font.h src/virtio_kbd.h src/virtio_tablet.h src/virtio_blk.h src/zc_source_store.h src/zc_source_editor.h src/disk_layout.h src/mmio_map.h $(BUILD)/netofdots_zc.h $(BUILD)/lines_zc.h $(BUILD)/minigr_zc.h $(BUILD)/memsort_zc.h $(BUILD)/peekplot_zc.h $(BUILD)/offbmp_zc.h $(BUILD)/heapstr_zc.h $(BUILD)/catfmt_zc.h $(BUILD)/heapque_zc.h $(BUILD)/jobque_zc.h $(BUILD)/jobrun_zc.h $(BUILD)/taskspawn_zc.h $(BUILD)/popup_zc.h $(BUILD)/doclite_zc.h $(BUILD)/doclib_zc.h $(BUILD)/notes_zc.h $(BUILD)/globshare_zc.h $(BUILD)/life_zc.h $(BUILD)/cartlite_zc.h $(BUILD)/vec2lite_zc.h $(BUILD)/angleslite_zc.h $(BUILD)/coslite_zc.h $(BUILD)/sqrtlite_zc.h $(BUILD)/arglite_zc.h $(BUILD)/commalite_zc.h $(BUILD)/plot3lite_zc.h $(BUILD)/tospilite_zc.h $(BUILD)/tosutf8lite_zc.h $(BUILD)/colorlite_zc.h $(BUILD)/turtlelite_zc.h $(BUILD)/filllite_zc.h $(BUILD)/initlite_zc.h $(BUILD)/deflite_zc.h $(BUILD)/printlite_zc.h $(BUILD)/msglite_zc.h $(BUILD)/menulite_zc.h $(BUILD)/findlite_zc.h $(BUILD)/fslite_zc.h $(BUILD)/setuplite_zc.h $(BUILD)/ttlite_zc.h $(BUILD)/buflite_zc.h $(BUILD)/inclite_zc.h $(BUILD)/dclite_zc.h $(BUILD)/linedclite_zc.h $(BUILD)/grflite_zc.h $(BUILD)/movelite_zc.h $(BUILD)/checkedlite_zc.h $(BUILD)/cmplite_zc.h $(BUILD)/forinclite_zc.h $(BUILD)/microlite_zc.h $(BUILD)/movestacklite_zc.h $(BUILD)/endlite_zc.h $(BUILD)/drawitlite_zc.h $(BUILD)/latticelite_zc.h $(BUILD)/looplite_zc.h $(BUILD)/demolite_zc.h $(BUILD)/eventlite_zc.h $(BUILD)/playlite_zc.h $(BUILD)/inputlite_zc.h $(BUILD)/rightlite_zc.h $(BUILD)/cursorlite_zc.h $(BUILD)/uplite_zc.h $(BUILD)/ticklite_zc.h $(BUILD)/framelite_zc.h $(BUILD)/plotdclite_zc.h $(BUILD)/abortlite_zc.h $(BUILD)/aimmovelite_zc.h $(BUILD)/idlelite_zc.h $(BUILD)/layerlite_zc.h $(BUILD)/endslite_zc.h $(BUILD)/speedlite_zc.h $(BUILD)/midlite_zc.h $(BUILD)/livelite_zc.h $(BUILD)/accellite_zc.h $(BUILD)/restartlite_zc.h $(BUILD)/widthlite_zc.h $(BUILD)/bothcolorlite_zc.h $(BUILD)/menufulllite_zc.h $(BUILD)/menubiglite_zc.h $(BUILD)/trylite_zc.h $(BUILD)/stepcountlite_zc.h $(BUILD)/anglesfulllite_zc.h $(BUILD)/braceangleslite_zc.h $(BUILD)/bracepilite_zc.h $(BUILD)/setmenulite_zc.h $(BUILD)/nearlatticelite_zc.h $(BUILD)/f64iflite_zc.h $(BUILD)/wraplatticelite_zc.h $(BUILD)/menulooplite_zc.h $(BUILD)/idxalllite_zc.h $(BUILD)/disklat_zc.h $(BUILD)/stocklat_zc.h $(BUILD)/depthbuflite_zc.h $(BUILD)/depthrstlite_zc.h $(BUILD)/depthplotlite_zc.h $(BUILD)/depthlinelite_zc.h $(BUILD)/ramblk_zc.h $(BUILD)/namefile_zc.h $(BUILD)/dirlook_zc.h $(BUILD)/dirdel_zc.h $(BUILD)/fopen_zc.h $(BUILD)/fwrite_zc.h $(BUILD)/multiblk_zc.h $(BUILD)/redsea_zc.h $(BUILD)/rsroot_zc.h $(BUILD)/rsfile_zc.h $(BUILD)/rsalloc_zc.h $(BUILD)/rsfree_zc.h $(BUILD)/rsmulti_zc.h $(BUILD)/rscfile_zc.h $(BUILD)/rscwrite_zc.h $(BUILD)/rscseek_zc.h $(BUILD)/rsclib_zc.h $(BUILD)/rspersist_zc.h $(BUILD)/runzc_zc.h | $(BUILD)
+	$(CLANG) $(CFLAGS_KERNEL_PI) $(CFLAGS_PI) -I$(BUILD) -c src/kernel_stub.c -o $@
 
 $(BOOT_PI): $(BUILD)/zealbooter-pi.o src/linker-booter.ld
 	$(CLANG) $(CFLAGS) $(CFLAGS_PI) $(LDFLAGS_BOOT) $(BUILD)/zealbooter-pi.o -o $@
 
-$(KERNEL_PI): $(BUILD)/kernel_stub-pi.o $(BUILD)/vectors.o src/linker-kernel.ld
-	$(CLANG) $(CFLAGS_KERNEL) $(CFLAGS_PI) $(LDFLAGS_KERNEL) $(BUILD)/kernel_stub-pi.o $(BUILD)/hc_f64math.o $(BUILD)/vectors.o -o $@
+$(KERNEL_PI): $(BUILD)/kernel_stub-pi.o $(BUILD)/hc_f64math.o $(BUILD)/vectors.o src/linker-kernel.ld
+	$(CLANG) $(CFLAGS_KERNEL_PI) $(CFLAGS_PI) $(LDFLAGS_KERNEL) $(BUILD)/kernel_stub-pi.o $(BUILD)/hc_f64math.o $(BUILD)/vectors.o -o $@
 
 pi-diag: $(BOOT_PI) $(KERNEL_PI)
 
 # UEFI CD image (Limine-recommended aarch64 path)
-iso: $(BOOT) $(KERNEL) $(DEMO_BC)
+iso: $(BOOT) $(KERNEL) $(DEMO_BC) $(BUILD)/sources.tar
 	rm -rf $(BUILD)/iso_root
 	mkdir -p $(BUILD)/iso_root/boot/limine $(BUILD)/iso_root/EFI/BOOT
 	cp -f $(BOOT) $(BUILD)/iso_root/boot/zealbooter.elf
 	cp -f $(KERNEL) $(BUILD)/iso_root/boot/kernel.elf
 	cp -f $(DEMO_BC) $(BUILD)/iso_root/boot/demo.hcbc
+	cp -f $(BUILD)/sources.tar $(BUILD)/iso_root/boot/
 	cp -f $(ESP_DIR)/limine.conf $(BUILD)/iso_root/boot/limine/limine.conf
 	cp -f $(LIMINE_BIN)/limine-uefi-cd.bin $(BUILD)/iso_root/boot/limine/
 	cp -f $(LIMINE_BIN)/BOOTAA64.EFI $(BUILD)/iso_root/EFI/BOOT/
@@ -428,7 +442,7 @@ iso: $(BOOT) $(KERNEL) $(DEMO_BC)
 		$(BUILD)/iso_root -o $(ISO)
 	@echo "ISO: $(ISO)"
 
-$(ESP_FAT): $(BOOT) $(KERNEL) $(DEMO_BC) $(ESP_DIR)/limine.conf | $(BUILD)
+$(ESP_FAT): $(BOOT) $(KERNEL) $(DEMO_BC) $(BUILD)/sources.tar $(ESP_DIR)/limine.conf | $(BUILD)
 	mkdir -p $(ESP_DIR)/EFI/BOOT $(ESP_DIR)/boot
 	cp -f $(LIMINE_BIN)/BOOTAA64.EFI $(ESP_DIR)/EFI/BOOT/BOOTAA64.EFI
 	cp -f $(BOOT) $(ESP_DIR)/boot/zealbooter.elf
@@ -441,15 +455,19 @@ $(ESP_FAT): $(BOOT) $(KERNEL) $(DEMO_BC) $(ESP_DIR)/limine.conf | $(BUILD)
 	mcopy -i $(ESP_FAT) $(ESP_DIR)/boot/zealbooter.elf ::/boot/
 	mcopy -i $(ESP_FAT) $(ESP_DIR)/boot/kernel.elf ::/boot/
 	mcopy -i $(ESP_FAT) $(DEMO_BC) ::/boot/
+	mcopy -i $(ESP_FAT) $(BUILD)/sources.tar ::/boot/
 	mcopy -i $(ESP_FAT) $(ESP_DIR)/limine.conf ::/limine.conf
 
 esp: $(ESP_FAT)
 	rm -f $(DISK_IMG)
-	truncate -s 64M $(DISK_IMG)
+	truncate -s $$(($(DISK_SECTS)*512)) $(DISK_IMG)
 	$(SGDISK) -o $(DISK_IMG)
 	$(SGDISK) -n 1:$(ESP_START_SECTOR):$(ESP_END_SECTOR) -t 1:ef00 -c 1:'EFI System' $(DISK_IMG)
+	$(SGDISK) -a 1 -n 2:$(SRC_LBA_BASE):$(SRC_END_SECTOR) -t 2:8300 -c 2:'ZealOS Source' $(DISK_IMG)
+	$(SGDISK) -a 1 -n 3:$(SRC_SHADOW_LBA):$(SRC_SHADOW_END) -t 3:8300 -c 3:'ZealOS Source Shadow' $(DISK_IMG)
 	dd if=$(ESP_FAT) of=$(DISK_IMG) bs=512 seek=$(ESP_START_SECTOR) conv=notrunc status=none
-	@echo "GPT disk: $(DISK_IMG) (ESP $(ESP_START_SECTOR)-$(ESP_END_SECTOR), RedSea LBA $(RS_LBA_BASE)+$(RS_SECTS))"
+	python3 scripts/source-volume.py seed $(DISK_IMG) $(BUILD)/sources.tar
+	@echo "GPT disk: $(DISK_IMG) (ESP $(ESP_START_SECTOR)-$(ESP_END_SECTOR), RedSea LBA $(RS_LBA_BASE)+$(RS_SECTS), Source banks $(SRC_LBA_BASE)+$(SRC_SECTS) and $(SRC_SHADOW_LBA)+$(SRC_SHADOW_SECTS))"
 
 $(FW_VARS): | $(BUILD)
 	cp -f $(FW_VARS_IN) $(FW_VARS)

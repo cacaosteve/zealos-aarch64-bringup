@@ -1,3 +1,6 @@
+#ifndef ZEAL_PI_DIAG
+#include "zc/runtime.h"
+#endif
 /*
  * Exception + GICv3 + CNTP timer bring-up for QEMU virt @ EL1.
  */
@@ -13,6 +16,9 @@
 #include "virtio_kbd.h"
 #include "virtio_tablet.h"
 #include "virtio_blk.h"
+#ifndef ZEAL_PI_DIAG
+#include "zc_source_store.h"
+#endif
 #include "disk_layout.h"
 #include "netofdots_zc.h"
 #include "lines_zc.h"
@@ -429,6 +435,29 @@ static void fb_putc(char ch) {
             g_fb_cy = 0;
         }
     }
+}
+
+/* Shell line editing emits BS-space-BS for terminal serials. The framebuffer
+ * is a direct-pixel console, so erase the preceding cell explicitly instead
+ * of painting the control bytes as visible glyphs. */
+static void con_backspace(void) {
+    if (g_uart) {
+        uart_write(g_uart, '\b');
+        uart_write(g_uart, ' ');
+        uart_write(g_uart, '\b');
+    }
+    if (!g_fb) {
+        return;
+    }
+    if (g_fb_cx) {
+        g_fb_cx--;
+    } else if (g_fb_cy) {
+        g_fb_cy--;
+        g_fb_cx = g_fb_cols ? g_fb_cols - 1 : 0;
+    } else {
+        return;
+    }
+    fb_fillrect(g_fb_cx * 8, g_fb_cy * 8, 8, 8, 0x00101820u);
 }
 
 static void con_write(char c) {
@@ -2992,7 +3021,7 @@ static int rs_load_file(const char *name, char *dst, size_t cap, size_t *out_len
     uint8_t dir[512];
     uint8_t data[512];
     uint64_t root = 0;
-    uint64_t fblk = 0;
+    uint64_t fblk = 0, sects = 0;
     uint64_t flen = 0;
     uint64_t off;
     uint64_t blk;
@@ -3001,13 +3030,14 @@ static int rs_load_file(const char *name, char *dst, size_t cap, size_t *out_len
     if (!name || !dst || cap < 2) {
         return -1;
     }
-    if (rs_read_root(br, dir, &root, NULL) != 0) {
+    if (rs_read_root(br, dir, &root, &sects) != 0) {
         return -2;
     }
     if (rs_find_slot(dir, name, &fblk, &flen) < 0) {
         return -6;
     }
-    if (!fblk || flen == 0 || flen + 1 > cap) {
+    if (fblk < 3 || flen == 0 || flen >= cap ||
+        fblk > sects || (flen + 511) / 512 > sects - fblk) {
         return -6;
     }
     off = 0;
@@ -3079,121 +3109,91 @@ static int rs_fmt_host(uint64_t sects, int64_t uid) {
     return 0;
 }
 
-/* Write/overwrite a contiguous multi-clus RedSea root file. */
+/* Write or replace one contiguous root file. A growing overwrite reserves a
+ * different run, writes its bytes, then switches the directory entry. It never
+ * extends a file into an unallocated neighbour's blocks. Smaller overwrites
+ * use the existing run; they release trailing clusters after updating length. */
 static int rs_put_file(const char *name, const char *src, size_t len) {
-    uint8_t br[512];
-    uint8_t map[512];
-    uint8_t dir[512];
-    uint8_t data[512];
-    uint64_t root = 0;
-    uint64_t sects = 16;
-    uint64_t nclus;
-    uint64_t fblk = 0;
-    int64_t slot = -1;
-    int existing;
+    uint8_t br[512], map[512], old_map[512], dir[512], data[512];
+    uint64_t root = 0, sects = 0, fblk = 0, old_blk = 0, old_len = 0;
+    uint64_t nclus, old_nclus = 0;
+    int slot = -1, existing, new_run;
     unsigned i, j;
     int64_t *w;
 
-    if (!name || !src || len == 0 || str_len(name) > 37) {
+    if (!name || !src || !len || str_len(name) > 37 || len > 65536) {
         return -1;
     }
     nclus = (len + 511) / 512;
-    if (nclus < 1 || nclus > 120) {
-        return -1;
-    }
-    if (rs_read_root(br, dir, &root, &sects) != 0) {
+    if (rs_read_root(br, dir, &root, &sects) != 0 || sects < 4 || sects > 128) {
         return -2;
     }
-    existing = rs_find_slot(dir, name, &fblk, NULL);
-    for (i = 0; i < 8; i++) {
-        if (!dir[i * 64 + 2] && slot < 0) {
-            slot = (int64_t)i;
-        }
+    if (!hc_builtin_blkread((uint64_t)(uintptr_t)map, 1, 1)) {
+        return -7;
     }
-    if (existing < 0) {
-        if (slot < 0) {
-            return -6;
-        }
-        for (i = 0; i < 512; i++) {
-            map[i] = 0;
-        }
-        if (!hc_builtin_blkread((uint64_t)(uintptr_t)map, 1, 1)) {
-            return -7;
-        }
-        {
-            int found = 0;
-            fblk = 0;
-            for (i = 0; i + (unsigned)nclus <= (unsigned)sects; i++) {
-                int ok = 1;
-                for (j = 0; j < (unsigned)nclus; j++) {
-                    unsigned b = i + j;
-                    unsigned m = 1u << (b & 7);
-                    if (map[b >> 3] & m) {
-                        ok = 0;
-                        break;
-                    }
-                }
-                if (ok) {
-                    for (j = 0; j < (unsigned)nclus; j++) {
-                        unsigned b = i + j;
-                        unsigned m = 1u << (b & 7);
-                        map[b >> 3] = (uint8_t)(map[b >> 3] | m);
-                    }
-                    fblk = i;
-                    found = 1;
-                    break;
-                }
+    for (i = 0; i < 512; i++) old_map[i] = map[i];
+    existing = rs_find_slot(dir, name, &old_blk, &old_len);
+    if (existing >= 0) {
+        old_nclus = (old_len + 511) / 512;
+        if (!old_len || old_blk < 3 || old_blk + old_nclus > sects) return -3;
+        slot = existing;
+    } else {
+        for (i = 0; i < 8; i++) if (!dir[i * 64 + 2]) { slot = (int)i; break; }
+        if (slot < 0) return -6;
+    }
+    new_run = existing < 0 || nclus > old_nclus;
+    if (new_run) {
+        int found = 0;
+        for (i = 3; i + nclus <= sects; i++) {
+            int free_run = 1;
+            for (j = 0; j < nclus; j++) {
+                unsigned b = i + j;
+                if (map[b >> 3] & (1u << (b & 7))) { free_run = 0; break; }
             }
-            if (!found) {
-                return -8;
-            }
+            if (free_run) { fblk = i; found = 1; break; }
         }
-        if (!hc_builtin_blkwrite((uint64_t)(uintptr_t)map, 1, 1)) {
-            return -9;
-        }
-        {
-            uint8_t *e = dir + (unsigned)slot * 64;
-            size_t nlen = str_len(name);
-            for (i = 0; i < 64; i++) {
-                e[i] = 0;
-            }
-            e[0] = 0x20;
-            e[1] = 0x04;
-            for (i = 0; i <= nlen; i++) {
-                e[2 + i] = (uint8_t)name[i];
-            }
-            w = (int64_t *)(e + 40);
-            w[0] = (int64_t)fblk;
-            w[1] = (int64_t)len;
-            w[2] = 0;
-        }
-        if (!hc_builtin_blkwrite((uint64_t)(uintptr_t)dir, root, 1)) {
-            return -10;
+        if (!found) return -8;
+        for (j = 0; j < nclus; j++) {
+            unsigned b = (unsigned)fblk + j;
+            map[b >> 3] = (uint8_t)(map[b >> 3] | (1u << (b & 7)));
         }
     } else {
-        uint8_t *e = dir + (unsigned)existing * 64;
-        w = (int64_t *)(e + 40);
-        w[1] = (int64_t)len;
-        if (!hc_builtin_blkwrite((uint64_t)(uintptr_t)dir, root, 1)) {
-            return -11;
-        }
+        fblk = old_blk;
     }
 
-    for (j = 0; j < (unsigned)nclus; j++) {
-        size_t off = (size_t)j * 512;
-        size_t chunk = len - off;
-        if (chunk > 512) {
-            chunk = 512;
+    for (j = 0; j < nclus; j++) {
+        size_t off = (size_t)j * 512, chunk = len - off;
+        if (chunk > 512) chunk = 512;
+        for (i = 0; i < 512; i++) data[i] = 0;
+        for (i = 0; i < chunk; i++) data[i] = (uint8_t)src[off + i];
+        if (!hc_builtin_blkwrite((uint64_t)(uintptr_t)data, fblk + j, 1)) return -12;
+    }
+    if (new_run && !hc_builtin_blkwrite((uint64_t)(uintptr_t)map, 1, 1)) return -9;
+    {
+        uint8_t *e = dir + (unsigned)slot * 64;
+        if (existing < 0) {
+            size_t nlen = str_len(name);
+            for (i = 0; i < 64; i++) e[i] = 0;
+            e[0] = 0x20; e[1] = 0x04;
+            for (i = 0; i <= nlen; i++) e[2 + i] = (uint8_t)name[i];
         }
-        for (i = 0; i < 512; i++) {
-            data[i] = 0;
+        w = (int64_t *)(e + 40);
+        w[0] = (int64_t)fblk;
+        w[1] = (int64_t)len;
+        w[2] = 0;
+    }
+    if (!hc_builtin_blkwrite((uint64_t)(uintptr_t)dir, root, 1)) {
+        if (new_run) (void)hc_builtin_blkwrite((uint64_t)(uintptr_t)old_map, 1, 1);
+        return -10;
+    }
+    if (existing >= 0 && (new_run || nclus < old_nclus)) {
+        uint64_t first = new_run ? old_blk : old_blk + nclus;
+        uint64_t count = new_run ? old_nclus : old_nclus - nclus;
+        for (j = 0; j < count; j++) {
+            unsigned b = (unsigned)(first + j);
+            map[b >> 3] = (uint8_t)(map[b >> 3] & ~(1u << (b & 7)));
         }
-        for (i = 0; i < (unsigned)chunk; i++) {
-            data[i] = (uint8_t)src[off + i];
-        }
-        if (!hc_builtin_blkwrite((uint64_t)(uintptr_t)data, fblk + j, 1)) {
-            return -12;
-        }
+        if (!hc_builtin_blkwrite((uint64_t)(uintptr_t)map, 1, 1)) return -13;
     }
     return 0;
 }
@@ -3215,6 +3215,24 @@ static int rs_file_exists(const char *name, uint64_t *out_len) {
     }
     return 1;
 }
+
+#ifndef ZEAL_PI_DIAG
+/* The native compiler's disk: provider must never fall back to the boot RAM disk. */
+static int zc_read_redsea(const char *name, char *dst, size_t cap, size_t *out_len) {
+    struct zss_entry entry;
+    int found = zss_find(name, &entry, NULL, NULL);
+    if (found == 1) return zss_read(&entry, dst, cap, out_len);
+    if (found == -1 || found == -3) return -1;
+    /* The old eight-entry RedSea catalog stays readable during migration. */
+    uint64_t len = 0;
+    if (!virtio_blk_ready() || str_len(name) > 37 ||
+        !rs_file_exists(name, &len) || !len || len > 65536)
+        return -1;
+    if (out_len) *out_len = (size_t)len;
+    if (!dst) return 0;
+    return rs_load_file(name, dst, cap, out_len);
+}
+#endif
 
 static int rs_put_file_if_absent(const char *name, const char *src, size_t len) {
     uint64_t elen = 0;
@@ -3379,37 +3397,95 @@ static const struct rs_catalog_ent *rs_catalog_lookup(const char *name) {
     return NULL;
 }
 
-static int rs_name_kept(const char *name) {
-    if (!name || !*name) {
-        return 1;
-    }
-    if (str_ieq(name, ".") || str_ieq(name, "..") || str_ieq(name, "Keep") ||
-        str_ieq(name, "Hi.ZC")) {
-        return 1;
-    }
-    return rs_catalog_lookup(name) != NULL;
-}
+static int rs_seed_catalog(void);
 
-/* Delete one root file that is not part of the freeze catalog (old demos). */
+/* Delete one known bring-up demo when making room for the freeze catalog.
+ * Never evict an arbitrary user file just because the small root is full. */
 static int rs_evict_one_stale(void) {
     uint8_t br[512];
     uint8_t dir[512];
     uint64_t root = 0;
+    static const char *const legacy[] = {
+        "DiskLat.ZC", "Lattice.ZC", "NetOfDots.ZC", "Lines.ZC"
+    };
     unsigned i;
 
     if (rs_read_root(br, dir, &root, NULL) != 0) {
         return -1;
     }
-    for (i = 0; i < 8; i++) {
-        uint8_t *e = dir + i * 64;
-        if (!e[2]) {
-            continue;
-        }
-        if (!rs_name_kept((const char *)(e + 2))) {
-            return rs_del_file((const char *)(e + 2));
+    for (i = 0; i < sizeof(legacy) / sizeof(legacy[0]); i++) {
+        if (rs_file_exists(legacy[i], NULL)) {
+            return rs_del_file(legacy[i]);
         }
     }
     return -1;
+}
+
+static unsigned rs_root_used(const uint8_t *dir) {
+    unsigned i, used = 0;
+    for (i = 0; i < 8; i++) {
+        if (dir[i * 64 + 2]) {
+            used++;
+        }
+    }
+    return used;
+}
+
+/* Missing entries needed to run the frozen catalog and persistence smokes. */
+static unsigned rs_freeze_missing(void) {
+    unsigned i, missing = 0;
+    for (i = 0; i < sizeof(g_rs_catalog) / sizeof(g_rs_catalog[0]); i++) {
+        if (!rs_file_exists(g_rs_catalog[i].name, NULL)) {
+            missing++;
+        }
+    }
+    if (!rs_file_exists("Keep", NULL)) {
+        missing++;
+    }
+    if (!rs_file_exists("Hi.ZC", NULL)) {
+        missing++;
+    }
+    return missing;
+}
+
+/* Prepare a valid RedSea volume for the freeze acceptance sequence. The
+ * volume has only eight root slots, so old bring-up demos may need to go if
+ * both Keep and Hi.ZC are absent. Only the four named, reproducible demos
+ * above are candidates; unknown files are preserved and cause a clean error. */
+static int rs_prepare_freeze_catalog(void) {
+    uint8_t br[512];
+    uint8_t dir[512];
+    uint64_t root = 0;
+    unsigned used, missing;
+    unsigned tries = 0;
+    unsigned i;
+
+    /* A blank/unformatted volume is left for RSCPersist/RunZC to initialize. */
+    if (rs_read_root(br, dir, &root, NULL) != 0) {
+        return 1;
+    }
+    for (;;) {
+        used = rs_root_used(dir);
+        missing = rs_freeze_missing();
+        if (used + missing <= 8) {
+            break;
+        }
+        if (tries++ >= 4 || rs_evict_one_stale() != 0 ||
+            rs_read_root(br, dir, &root, NULL) != 0) {
+            return -1;
+        }
+    }
+    if (rs_seed_catalog() != 0) {
+        return -1;
+    }
+    /* rs_seed_catalog is intentionally best-effort for older callers. The
+     * freeze path needs a stronger guarantee before it reports success. */
+    for (i = 0; i < sizeof(g_rs_catalog) / sizeof(g_rs_catalog[0]); i++) {
+        if (!rs_file_exists(g_rs_catalog[i].name, NULL)) {
+            return -1;
+        }
+    }
+    return 0;
 }
 
 /* Best-effort seed: evict stale (non-catalog) files if the root is full.
@@ -3486,13 +3562,70 @@ static int uart_getc_nb(void) {
     return c;
 }
 
+/* UTM's serial terminal sends Return as CRLF. A shell command ends on CR,
+ * then an immediately-entered zcall must not see its trailing LF as a key.
+ * Keep raw UART reads unchanged for diagnostics and binary transfers. */
+static int uart_text_getc_nb(void) {
+    static int after_cr;
+    for (;;) {
+        int c = uart_getc_nb();
+        if (c < 0)
+            return -1;
+        if (after_cr) {
+            after_cr = 0;
+            if (c == '\n')
+                continue;
+        }
+        after_cr = c == '\r';
+        return c;
+    }
+}
+
 static int kbd_getc_nb(void) {
     int c = virtio_kbd_getc_nb();
     if (c >= 0) {
         return c;
     }
-    return uart_getc_nb();
+    return uart_text_getc_nb();
 }
+
+#ifndef ZEAL_PI_DIAG
+/* A zcall owns the input stream until it returns. Shell keystrokes have a
+ * parallel virtio message record; discard those old records on handoff. */
+static int zc_uart_release_pending;
+static uint64_t zc_uart_release_char;
+static void zc_key_reset(void) {
+    uint8_t type;
+    uint64_t arg1, arg2;
+    zc_uart_release_pending = 0;
+    while (virtio_kbd_msg_nb(&type, &arg1, &arg2)) {}
+    while (virtio_kbd_getc_nb() >= 0) {}
+}
+
+static int zc_key_read(uint8_t *type, uint64_t *arg1, uint64_t *arg2) {
+    if (zc_uart_release_pending) {
+        zc_uart_release_pending = 0;
+        *type = 3;
+        *arg1 = zc_uart_release_char;
+        *arg2 = 0;
+        return 1;
+    }
+    if (virtio_kbd_msg_nb(type, arg1, arg2)) {
+        if (*type == 2 && *arg1 > 0 && *arg1 < 256)
+            (void)virtio_kbd_getc_nb(); /* same down event in shell char ring */
+        return 1;
+    }
+    int c = uart_text_getc_nb();
+    if (c < 0)
+        return 0;
+    *type = 2; /* UART has no physical key-up or scan-code data. */
+    *arg1 = (uint64_t)(c == '\r' ? '\n' : c);
+    *arg2 = 0;
+    zc_uart_release_char = *arg1;
+    zc_uart_release_pending = 1;
+    return 1;
+}
+#endif
 
 static int g_key_pending = -1;
 
@@ -3592,6 +3725,174 @@ static void shell_fb_ready(void) {
     g_hc_cdc.depth_buf = 0;
 }
 
+#ifndef ZEAL_PI_DIAG
+static void zc_print_result(int64_t result) {
+    char buf[20] = "0x";
+    const char *hex = "0123456789abcdef";
+    for (unsigned i = 0; i < 16; i++)
+        buf[2+i] = hex[((uint64_t)result >> ((15-i)*4)) & 15];
+    buf[18] = '\n'; buf[19] = 0;
+    con_puts("zc => "); con_puts(buf);
+}
+static void zc_print_decimal(uint64_t value) {
+    char buf[21];
+    unsigned n = 0;
+    do { buf[n++] = (char)('0' + value % 10); value /= 10; } while (value);
+    while (n) con_write(buf[--n]);
+}
+
+/* zrecv uses the PL011 serial channel exclusively. Each 128-byte payload is
+ * sent as one hex line; acknowledgement keeps the tiny UART FIFO from being
+ * overrun by a host paste and makes a broken transfer visible. */
+#define ZRECV_CHUNK 128u
+static int zrecv_hex(int c) {
+    if (c >= '0' && c <= '9') return c - '0';
+    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+    if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+    return -1;
+}
+static int zrecv_getc(uint64_t deadline) {
+    for (;;) {
+        int c = uart_getc_nb();
+        if (c >= 0) return c;
+        uint64_t now;
+        __asm__ volatile("mrs %0, cntpct_el0" : "=r"(now));
+        if ((int64_t)(now - deadline) >= 0) return -1;
+        (void)hc_builtin_sleep(1);
+    }
+}
+static int zrecv_chunk(uint8_t *dst, unsigned length, uint64_t ticks) {
+    uint64_t now;
+    __asm__ volatile("mrs %0, cntpct_el0" : "=r"(now));
+    uint64_t deadline = now + ticks;
+    int c;
+    do { c = zrecv_getc(deadline); } while (c == '\r' || c == '\n');
+    if (c < 0) return -2;
+    for (unsigned i = 0; i < length; i++) {
+        int hi = zrecv_hex(c);
+        int lo = zrecv_hex(zrecv_getc(deadline));
+        if (hi < 0 || lo < 0) return -1;
+        dst[i] = (uint8_t)((hi << 4) | lo);
+        c = zrecv_getc(deadline);
+        if (c < 0) return -2;
+        if (i + 1 < length && zrecv_hex(c) < 0) return -1;
+    }
+    return c == '\r' || c == '\n' ? 0 : -1;
+}
+static int zrecv_args(const char *p, char name[ZSS_MAX_NAME + 1],
+                      uint32_t *length, uint32_t *crc) {
+    unsigned n = 0;
+    while (*p == ' ') p++;
+    while (*p && *p != ' ' && *p != '\t') {
+        if (n == ZSS_MAX_NAME) return -1;
+        name[n++] = *p++;
+    }
+    name[n] = 0;
+    if (!zss_name_ok(name, NULL)) return -1;
+    while (*p == ' ' || *p == '\t') p++;
+    if (*p < '0' || *p > '9') return -1;
+    uint32_t size = 0;
+    while (*p >= '0' && *p <= '9') {
+        unsigned digit = (unsigned)(*p++ - '0');
+        if (size > (ZSS_MAX_FILE - digit) / 10u) return -1;
+        size = size * 10u + digit;
+    }
+    if (!size) return -1;
+    while (*p == ' ' || *p == '\t') p++;
+    uint32_t checksum = 0;
+    for (unsigned i = 0; i < 8; i++) {
+        if (!*p) return -1;
+        int digit = zrecv_hex(*p++);
+        if (digit < 0) return -1;
+        checksum = (checksum << 4) | (uint32_t)digit;
+    }
+    while (*p == ' ' || *p == '\t') p++;
+    if (*p) return -1;
+    *length = size;
+    *crc = checksum;
+    return 0;
+}
+static void zrecv_serial(const char *args) {
+    char name[ZSS_MAX_NAME + 1];
+    uint32_t length, checksum;
+    struct zss_stream stream;
+    uint8_t bytes[ZRECV_CHUNK];
+    if (zrecv_args(args, name, &length, &checksum)) {
+        con_puts("zrecv: use zrecv Name.ZC <bytes> <crc32-8hex>\n"); return;
+    }
+    if (!g_uart) { con_puts("zrecv: serial unavailable\n"); return; }
+    int status = zss_stream_begin(&stream, name, length, checksum);
+    if (status) {
+        con_puts(status == -2 ? "zrecv: native source partition unavailable\n" :
+                 status == -3 ? "zrecv: source partition full\n" :
+                                "zrecv: invalid name or source volume\n");
+        return;
+    }
+    /* A UTM Terminal 1 user may paste chunks by hand; allow enough time to
+     * locate the next line while still recovering from an abandoned upload. */
+    uint64_t ticks = hc_builtin_cntfrq() * 120u;
+    con_puts("zrecv: ready bytes="); zc_print_decimal(length);
+    con_puts(" chunk=128\n");
+    while (stream.written < length) {
+        unsigned n = length - stream.written;
+        if (n > ZRECV_CHUNK) n = ZRECV_CHUNK;
+        int read = zrecv_chunk(bytes, n, ticks);
+        if (read) {
+            con_puts(read == -2 ? "zrecv: timeout; old file intact\n" :
+                                  "zrecv: malformed chunk; old file intact\n");
+            return;
+        }
+        if (zss_stream_write(&stream, bytes, n)) {
+            con_puts("zrecv: disk write failed\n"); return;
+        }
+        con_puts("zrecv: ack "); zc_print_decimal(stream.written); con_puts("\n");
+    }
+    status = zss_stream_finish(&stream);
+    if (status) {
+        con_puts(status == -4 ? "zrecv: checksum mismatch; old file intact\n" :
+                              "zrecv: disk write failed\n");
+        return;
+    }
+    con_puts("zrecv: saved "); con_puts(name);
+    con_puts(" bytes="); zc_print_decimal(length); con_puts("\n");
+}
+static void zss_shell_list(void) {
+    uint8_t header[512];
+    uint32_t tail = 0, records = 0, shown = 0;
+    int scan = zss_find(NULL, NULL, &tail, &records);
+    if (scan < 0) {
+        con_puts(scan == -2 ? "zls: native source partition unavailable\n" :
+                              "zls: damaged source catalog\n");
+        return;
+    }
+    for (uint32_t pos = 1; pos < tail;) {
+        struct zss_entry entry, latest;
+        char name[ZSS_MAX_NAME + 1];
+        int deleted;
+        if (!zss_sector_read(pos, header) ||
+            zss_decode_record(header, pos, &entry, name, &deleted)) {
+            con_puts("zls: damaged source catalog\n"); return;
+        }
+        pos += 1u + entry.blocks;
+        if (deleted) continue;
+        int current = zss_find(name, &latest, NULL, NULL);
+        if (current == 1 && latest.header_sector == entry.header_sector) {
+            con_puts(name); con_puts(" bytes=");
+            zc_print_decimal(entry.length); con_puts("\n");
+            shown++;
+        } else if (current == -1 || current == -2) {
+            con_puts("zls: damaged source catalog\n"); return;
+        }
+    }
+    con_puts("zls: n="); zc_print_decimal(shown);
+    con_puts(" records="); zc_print_decimal(records);
+    con_puts(" sectors="); zc_print_decimal(tail);
+    con_puts("/"); zc_print_decimal(g_zss_sectors);
+    con_puts("\n");
+}
+#include "zc_source_editor.h"
+#endif
+
 static void shell_handle(const char *line, int *done) {
     while (*line == ' ' || *line == '\t') {
         line++;
@@ -3599,7 +3900,142 @@ static void shell_handle(const char *line, int *done) {
     if (*line == '\0') {
         return;
     }
+#ifndef ZEAL_PI_DIAG
+    if (g_zedit.active) { zedit_handle(line); return; }
+    if (line[0]=='z' && line[1]=='e' && line[2]=='d' && line[3]=='i' &&
+        line[4]=='t' && line[5]==' ') { zedit_start(line+6); return; }
+    if (streq(line, "zcheck")) { (void)zc_selftest(); return; }
+    if (streq(line, "zstatus")) { zc_status(); return; }
+    if (streq(line, "zreset")) { zc_init(0, 0, 0); return; }
+    if (streq(line, "zvol")) {
+        if (zss_available()) {
+            con_puts("zvol: source partition ready bank=");
+            con_puts(g_zss_base == ZEAL_SRC_LBA_BASE ? "A" : "B");
+            con_puts(" generation="); zc_print_decimal(g_zss_generation);
+            con_puts(g_vb.flush_supported ? " flush=yes" : " flush=no");
+            con_puts("\n");
+        } else con_puts("zvol: source partition unavailable (legacy RedSea only)\n");
+        return;
+    }
+    if (streq(line, "zgc")) {
+        uint32_t before, after, kept;
+        int status = zss_compact(&before, &after, &kept);
+        if (status) {
+            con_puts(status == -2 ? "zgc: native source partition unavailable\n" :
+                     status == -3 ? "zgc: live source does not fit inactive bank\n" :
+                     status == -4 ? "zgc: shadow bank or virtio flush unavailable\n" :
+                     status == -5 ? "zgc: new bank written but flush failed; verify before further writes\n" :
+                                    "zgc: source damaged or disk I/O failed; old bank remains active\n");
+        } else {
+            con_puts("zgc: OK sectors="); zc_print_decimal(before);
+            con_puts("->"); zc_print_decimal(after);
+            con_puts(" records="); zc_print_decimal(kept);
+            con_puts(" bank="); con_puts(g_zss_base == ZEAL_SRC_LBA_BASE ? "A" : "B");
+            con_puts("\n");
+        }
+        return;
+    }
+    if (streq(line, "zls")) { zss_shell_list(); return; }
+    if (line[0]=='z' && line[1]=='r' && line[2]=='m' && line[3]==' ') {
+        const char *name = line + 4;
+        int status = zss_delete(name);
+        if (status) {
+            con_puts(status == -2 ? "zrm: native source partition unavailable\n" :
+                     status == -3 ? "zrm: source partition full\n" :
+                     status == -4 ? "zrm: missing source\n" :
+                                    "zrm: invalid path or source catalog\n");
+        } else {
+            con_puts("zrm: deleted "); con_puts(name); con_puts("\n");
+        }
+        return;
+    }
+    if (line[0]=='z' && line[1]=='r' && line[2]=='e' && line[3]=='c' &&
+        line[4]=='v' && line[5]==' ') {
+        zrecv_serial(line + 6); return;
+    }
+    if (line[0]=='z' && line[1]=='v' && line[2]=='e' && line[3]=='r' &&
+        line[4]=='i' && line[5]=='f' && line[6]=='y' && line[7]==' ') {
+        struct zss_entry entry;
+        const char *name = line + 8;
+        if (zss_find(name, &entry, NULL, NULL) != 1 || zss_verify(&entry) != 0) {
+            con_puts("zverify: missing or damaged source\n"); return;
+        }
+        con_puts("zverify: OK bytes=");
+        zc_print_decimal(entry.length);
+        con_puts("\n");
+        return;
+    }
+    if (line[0]=='z' && line[1]=='p' && line[2]=='u' && line[3]=='t' && line[4]==' ') {
+        const char *p = line + 5;
+        char name[96], body[512];
+        size_t nn = 0, bn = 0;
+        uint8_t br[512], dir[512];
+        while (*p == ' ') p++;
+        while (*p && *p != ' ' && *p != '\t' && nn < sizeof(name)-1) {
+            char c = *p++;
+            if (!((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
+                  (c >= '0' && c <= '9') || c == '.' || c == '_' ||
+                  c == '-' || c == '/')) {
+                con_puts("zput: invalid filename\n"); return;
+            }
+            name[nn++] = c;
+        }
+        if (!nn || (*p != ' ' && *p != '\t')) {
+            con_puts("zput: use zput Name.ZC <source>\n"); return;
+        }
+        name[nn] = 0;
+        if (!zss_name_ok(name, NULL)) {
+            con_puts("zput: invalid source path\n"); return;
+        }
+        while (*p == ' ' || *p == '\t') p++;
+        while (*p && bn < sizeof(body)-1) {
+            if (p[0] == '\\' && p[1] == 'n') { body[bn++] = '\n'; p += 2; }
+            else if (p[0] == '\\' && p[1] == '\\') { body[bn++] = '\\'; p += 2; }
+            else body[bn++] = *p++;
+        }
+        if (!bn || *p) { con_puts("zput: source empty or too long\n"); return; }
+        body[bn] = 0;
+        if (!virtio_blk_ready()) { con_puts("zput: persistent disk unavailable\n"); return; }
+        if (zss_available()) {
+            int err = zss_put(name, body, bn);
+            if (err) {
+                con_puts(err == -3 ? "zput: source partition full\n" :
+                                       "zput: source partition write failed\n");
+                return;
+            }
+            con_puts("zput: saved "); con_puts(name); con_puts("\n");
+            return;
+        }
+        int needs_native = nn > 37;
+        for (size_t i = 0; i < nn; i++) if (name[i] == '/') needs_native = 1;
+        if (needs_native) {
+            con_puts("zput: path needs native source partition\n"); return;
+        }
+        if (rs_read_root(br, dir, NULL, NULL) != 0) {
+            con_puts("zput: RedSea unformatted; run rspersist first\n"); return;
+        }
+        int err = rs_put_file(name, body, bn);
+        if (err) { con_puts("zput: RedSea write failed (full or I/O error)\n"); return; }
+        con_puts("zput: saved "); con_puts(name); con_puts("\n");
+        return;
+    }
+    if (line[0]=='z' && line[1]=='c' && line[2]==' ') {
+        if (!zc_exec(line+3)) con_puts("zc: executed\n");
+        return;
+    }
+    if (line[0]=='z' && line[1]=='l' && line[2]=='o' && line[3]=='a' && line[4]=='d' && line[5]==' ') {
+        (void)zc_load(line+6); return;
+    }
+    if (line[0]=='z' && line[1]=='c' && line[2]=='a' && line[3]=='l' && line[4]=='l' && line[5]==' ') {
+        int64_t result;
+        if (!zc_call(line+6, &result)) zc_print_result(result);
+        return;
+    }
+#endif
     if (streq(line, "help")) {
+#ifndef ZEAL_PI_DIAG
+        con_puts("Native compiler: zcheck | zvol | zls | zgc | zedit <path> | zrm <path> | zverify <path> | zload /path.ZC | zput Name.ZC <source> | zrecv Name.ZC <bytes> <crc32> | zload disk:Name.ZC | zc <source> | zcall Function | zstatus | zreset\n");
+#endif
         con_puts("UTM freeze: vblk | rspersist | rscatalog | rsdir | runzc | runzc Notes.ZC\n");
         con_puts("Lattice: nearlatticelite | disklat | lattice | latticeplay | stocklat | stockplay | depthplotlite\n");
         /* M178: eyes-on controls without reading MenuPush / DiskLat source. */
@@ -4781,6 +5217,10 @@ static void shell_handle(const char *line, int *done) {
     }
     if (streq(line, "rspersist")) {
         uint64_t got = 0;
+        if (rs_prepare_freeze_catalog() < 0) {
+            con_puts("rspersist prep FAIL (root full; unknown files preserved)\n");
+            return;
+        }
         if (hc_run_src(RSCPERSIST_ZC, &got) != 0 || got != 4) {
             con_puts("rspersist FAIL\n");
             return;
@@ -4798,8 +5238,13 @@ static void shell_handle(const char *line, int *done) {
         return;
     }
     if (streq(line, "rscatalog")) {
-        if (rs_seed_catalog() != 0) {
-            con_puts("rscatalog FAIL (no RedSea volume)\n");
+        int prep = rs_prepare_freeze_catalog();
+        if (prep != 0) {
+            if (prep > 0) {
+                con_puts("rscatalog FAIL (no RedSea volume)\n");
+                return;
+            }
+            con_puts("rscatalog FAIL (root full; unknown files preserved)\n");
             return;
         }
         con_puts("rscatalog ok\n");
@@ -4856,6 +5301,10 @@ static void shell_handle(const char *line, int *done) {
             }
         }
 
+        if (rs_prepare_freeze_catalog() < 0) {
+            con_puts("runzc prep FAIL (root full; unknown files preserved)\n");
+            return;
+        }
         if (hc_run_src(RUNZC_ZC, &got) != 0 || got != 10) {
             con_puts("runzc seed FAIL\n");
             return;
@@ -5139,11 +5588,22 @@ static void shell_run(void) {
     /* M152: short FB banner; full cmd list via `help` (800x600 wraps badly). */
     con_puts("type: help | vblk | rscatalog | runzc Notes.ZC | uartrx | halt\n");
     con_puts("      hc <src> | bars | paint | nearlatticelite | disklat | latticeplay | stocklat | stockplay\n");
+#ifndef ZEAL_PI_DIAG
+    con_puts("native: zcheck | zload /Kernel/QuickSort.ZC | zc <source> | zstatus\n");
+#endif
     con_puts("> ");
-    char line[64];
+    char line[512];
     unsigned len = 0;
     int done = 0;
     while (!done) {
+#ifndef ZEAL_PI_DIAG
+        zc_idle_step();
+        if (zc_focus_owns_input()) {
+            tablet_cursor_tick();
+            (void)hc_builtin_sleep(1);
+            continue;
+        }
+#endif
         int c = kbd_getc_nb();
         tablet_cursor_tick();
         if (c < 0) {
@@ -5158,7 +5618,11 @@ static void shell_run(void) {
                 shell_handle(line, &done);
             }
             if (!done) {
+#ifndef ZEAL_PI_DIAG
+                con_puts(g_zedit.active ? "edit> " : "> ");
+#else
                 con_puts("> ");
+#endif
             }
             len = 0;
             continue;
@@ -5166,7 +5630,7 @@ static void shell_run(void) {
         if (c == 0x7f || c == 0x08) {
             if (len) {
                 len--;
-                con_puts("\b \b");
+                con_backspace();
             }
             continue;
         }
@@ -7247,6 +7711,123 @@ static int jit_smoke(void) {
             uart_put_u64_hex(g_uart, got2);
             uart_puts(g_uart, "\n");
         }
+        /* Regress the preserved UTM layout: a legacy DiskLat file occupies
+         * blocks 3..18, leaving the freeze catalog above block 18. The
+         * persistence demos must allocate using the volume's 128-block size,
+         * retain the legacy file, and create Keep/Hi.ZC in later free blocks. */
+        if (rs_seed_catalog() != 0 ||
+            !rs_file_exists("DiskLat.ZC", NULL) ||
+            !rs_file_exists("MemSort.ZC", NULL)) {
+            uart_puts(g_uart, "hc: Upstream RSPreserve fixture FAIL\n");
+            return -249;
+        }
+        if (hc_run_src(RSCPERSIST_ZC, &got2) != 0 || got2 != 4 ||
+            hc_run_src(RSCPERSIST_ZC, &got2) != 0 || got2 != 4) {
+            uart_puts(g_uart, "hc: Upstream RSPreserve Keep FAIL got=");
+            uart_put_u64_hex(g_uart, got2);
+            uart_puts(g_uart, "\n");
+            return -250;
+        }
+        if (hc_run_src(RUNZC_ZC, &got2) != 0 || got2 != 10) {
+            uart_puts(g_uart, "hc: Upstream RSPreserve Hi.ZC FAIL got=");
+            uart_put_u64_hex(g_uart, got2);
+            uart_puts(g_uart, "\n");
+            return -251;
+        }
+        if (!rs_file_exists("DiskLat.ZC", NULL) ||
+            !rs_file_exists("Keep", NULL) ||
+            !rs_file_exists("Hi.ZC", NULL)) {
+            uart_puts(g_uart, "hc: Upstream RSPreserve data lost\n");
+            return -252;
+        }
+        uart_puts(g_uart, "hc: Upstream RSPreserve high alloc => 0x4\n");
+
+        /* Model the older on-disk root: '.', DiskLat, then all five catalog
+         * files. Keep+Hi need two slots, so preparation may remove only the
+         * named legacy demo and must retain every catalog file. */
+        if (rs_fmt_host(128, 8) != 0) {
+            uart_puts(g_uart, "hc: Upstream RSPreserve slots fmt FAIL\n");
+            return -253;
+        }
+        {
+            uint8_t rootdir[512];
+            int64_t *w;
+            unsigned i;
+            for (i = 0; i < sizeof(rootdir); i++) {
+                rootdir[i] = 0;
+            }
+            rootdir[2] = '.';
+            w = (int64_t *)(rootdir + 40);
+            w[0] = 2;
+            w[1] = 1;
+            if (!hc_builtin_blkwrite((uint64_t)(uintptr_t)rootdir, 2, 1)) {
+                uart_puts(g_uart, "hc: Upstream RSPreserve dot FAIL\n");
+                return -254;
+            }
+        }
+        if (rs_put_file("DiskLat.ZC", DISKLAT_ZC, str_len(DISKLAT_ZC)) != 0 ||
+            rs_seed_catalog() != 0 || !rs_file_exists("DiskLat.ZC", NULL)) {
+            uart_puts(g_uart, "hc: Upstream RSPreserve slots fixture FAIL\n");
+            return -255;
+        }
+        if (rs_prepare_freeze_catalog() != 0 ||
+            rs_file_exists("DiskLat.ZC", NULL) ||
+            !rs_file_exists("MemSort.ZC", NULL)) {
+            uart_puts(g_uart, "hc: Upstream RSPreserve migration FAIL\n");
+            return -256;
+        }
+        if (hc_run_src(RSCPERSIST_ZC, &got2) != 0 || got2 != 4 ||
+            hc_run_src(RSCPERSIST_ZC, &got2) != 0 || got2 != 4 ||
+            hc_run_src(RUNZC_ZC, &got2) != 0 || got2 != 10) {
+            uart_puts(g_uart, "hc: Upstream RSPreserve slots smokes FAIL got=");
+            uart_put_u64_hex(g_uart, got2);
+            uart_puts(g_uart, "\n");
+            return -257;
+        }
+        if (rs_file_exists("DiskLat.ZC", NULL) ||
+            !rs_file_exists("AddLib.ZC", NULL) ||
+            !rs_file_exists("UseAdd.ZC", NULL) ||
+            !rs_file_exists("DocLib.ZC", NULL) ||
+            !rs_file_exists("Notes.ZC", NULL) ||
+            !rs_file_exists("MemSort.ZC", NULL) ||
+            !rs_file_exists("Keep", NULL) || !rs_file_exists("Hi.ZC", NULL)) {
+            uart_puts(g_uart, "hc: Upstream RSPreserve slots data FAIL\n");
+            return -258;
+        }
+        uart_puts(g_uart, "hc: Upstream RSPreserve root slots => 0x4\n");
+
+        /* A non-demo file must survive when the root cannot reserve Keep and
+         * Hi.ZC after catalog seeding. Preparation should refuse, not delete. */
+        if (rs_fmt_host(128, 9) != 0) {
+            uart_puts(g_uart, "hc: Upstream RSPreserve unknown fmt FAIL\n");
+            return -259;
+        }
+        {
+            uint8_t rootdir[512];
+            int64_t *w;
+            unsigned i;
+            for (i = 0; i < sizeof(rootdir); i++) {
+                rootdir[i] = 0;
+            }
+            rootdir[2] = '.';
+            w = (int64_t *)(rootdir + 40);
+            w[0] = 2;
+            w[1] = 1;
+            if (!hc_builtin_blkwrite((uint64_t)(uintptr_t)rootdir, 2, 1) ||
+                rs_put_file("User.ZC", "return 9;", 9) != 0 ||
+                rs_seed_catalog() != 0) {
+                uart_puts(g_uart, "hc: Upstream RSPreserve unknown fixture FAIL\n");
+                return -260;
+            }
+        }
+        if (rs_prepare_freeze_catalog() >= 0 ||
+            !rs_file_exists("User.ZC", NULL) ||
+            !rs_file_exists("AddLib.ZC", NULL) ||
+            !rs_file_exists("MemSort.ZC", NULL)) {
+            uart_puts(g_uart, "hc: Upstream RSPreserve unknown data FAIL\n");
+            return -261;
+        }
+        uart_puts(g_uart, "hc: Upstream RSPreserve unknown preserved => 0x1\n");
         (void)rs_del_file("DiskLat.ZC");
         /* M125: same compose under Lattice.ZC name (runzc-shaped; not freeze catalog). */
         if (rs_fmt_host(128, 7) != 0) {
@@ -7435,6 +8016,40 @@ static int jit_smoke(void) {
         uart_puts(g_uart, "\n");
     }
 
+    {
+        char grown[700], readback[701];
+        size_t n = 0;
+        unsigned i;
+        for (i = 0; i < sizeof(grown); i++) grown[i] = (char)('A' + i % 26);
+        if (rs_fmt_host(16, 0x5a) != 0 ||
+            rs_put_file("Grow.ZC", grown, 400) != 0 ||
+            rs_put_file("Guard.ZC", "keep", 4) != 0 ||
+            rs_put_file("Grow.ZC", grown, sizeof(grown)) != 0 ||
+            rs_load_file("Guard.ZC", readback, sizeof(readback), &n) != 0 ||
+            n != 4 || !streq(readback, "keep") ||
+            rs_load_file("Grow.ZC", readback, sizeof(readback), &n) != 0 ||
+            n != sizeof(grown)) {
+            uart_puts(g_uart, "hc: RedSea safe grow FAIL\n");
+            return -201;
+        }
+        for (i = 0; i < sizeof(grown); i++) {
+            if (grown[i] != readback[i]) {
+                uart_puts(g_uart, "hc: RedSea safe grow FAIL\n");
+                return -202;
+            }
+        }
+        if (rs_fmt_host(6, 0x5b) != 0 ||
+            rs_put_file("Base.ZC", grown, 400) != 0 ||
+            rs_put_file("Guard.ZC", "keep", 4) != 0 ||
+            rs_put_file("Base.ZC", grown, sizeof(grown)) != -8 ||
+            rs_load_file("Base.ZC", readback, sizeof(readback), &n) != 0 || n != 400 ||
+            rs_load_file("Guard.ZC", readback, sizeof(readback), &n) != 0 ||
+            n != 4 || !streq(readback, "keep")) {
+            uart_puts(g_uart, "hc: RedSea full-grow rollback FAIL\n");
+            return -203;
+        }
+        uart_puts(g_uart, "hc: RedSea safe grow OK\n");
+    }
     uart_puts(g_uart, "hc IR OK (front+host)\n");
     return 0;
 }
@@ -8003,6 +8618,10 @@ void kernel_entry(const struct zeal_handoff *h) {
             uart_put_u64_hex(g_uart, virtio_blk_capacity());
             uart_puts(g_uart, g_vb.xport == VB_XPORT_PCI ? " pci\n" : " mmio\n");
             uart_puts(g_uart, "virtio-blk: rw OK\n");
+#ifndef ZEAL_PI_DIAG
+            uart_puts(g_uart, zss_available() ? "source-volume: ready\n" :
+                                              "source-volume: none\n");
+#endif
         } else {
             uart_puts(g_uart, "virtio-blk: none (RAM Blk* only) dbg=");
             uart_put_u64_hex(g_uart, (uint64_t)(uint32_t)g_vb_pci_dbg);
@@ -8011,6 +8630,12 @@ void kernel_entry(const struct zeal_handoff *h) {
     }
 
     bc_module_run(h);
+#ifndef ZEAL_PI_DIAG
+    zc_set_source_reader(zc_read_redsea);
+    zc_set_key_reader(zc_key_read, zc_key_reset);
+    if (h->revision >= 3 && h->size >= sizeof(*h))
+        zc_init((void *)(uintptr_t)h->sources_virt, h->sources_size, con_puts);
+#endif
     shell_run();
 
     uart_puts(g_uart, "tablet clicks=");

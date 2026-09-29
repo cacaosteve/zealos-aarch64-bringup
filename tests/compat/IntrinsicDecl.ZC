@@ -1,0 +1,1 @@
+_intern IC_BSF I64 Bsf(I64 bit_field_val);

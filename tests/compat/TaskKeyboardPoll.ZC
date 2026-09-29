@@ -1,0 +1,25 @@
+// Message.ZC's debugger polling calls, routed to the ARM64 virtio/UART reader.
+I64 TaskKeyboardPollLive()
+{
+    I64 code, ch = 0, sc = 0;
+    I64 deadline = TSCGet + counts.time_stamp_freq * 3;
+
+    Puts("keyboard poll ready\n");
+    while (TSCGet < deadline)
+    {
+        PUSHFD
+        CLI
+        KbdMouseHandler(TRUE, FALSE);
+        code = KbdMessagesQueue;
+        POPFD
+        if (code && MessageScan(&ch, &sc, 1 << MESSAGE_KEY_DOWN) == MESSAGE_KEY_DOWN)
+        {
+            // UART supplies a synthetic release in the same poll. Leave the
+            // shell queue clear for the following independent checks.
+            MessageScan(NULL, NULL, 1 << MESSAGE_KEY_UP);
+            return ch;
+        }
+        Yield;
+    }
+    return 0;
+}

@@ -1,0 +1,36 @@
+// Loaded AFTER /Kernel/QuickSort.ZC, in an independent compiler invocation.
+// The upstream routines, types and generated code remain in the session.
+I64 sort_runs=0;
+class SortRecord { I64 key; I64 payload; };
+I64 CompareValue(I64 a,I64 b) {return (a>b)-(a<b);}
+I64 CompareRef(I64 *a,I64 *b) {return CompareValue(*a,*b);}
+I64 CompareRecord(SortRecord *a,SortRecord *b) {return CompareValue(a->key,b->key);}
+
+I64 SortChecks()
+{
+    I64 a[14];
+    a[0]=123456;a[1]=9;a[2]=-3;a[3]=7;a[4]=0;a[5]=-3;a[6]=22;a[7]=1;a[8]=8;a[9]=4;a[10]=99;a[11]=-12;a[12]=3;a[13]=654321;
+    I64 i,ok=0;
+    QuickSortI64(a+1,12,&CompareValue);
+    for(i=2;i<=12;i++) if(a[i-1]>a[i])return -1;
+    if(a[1]==-12 && a[12]==99)ok|=1;
+    SortRecord r[12];
+    for(i=0;i<12;i++){r[i].key=11-i;r[i].payload=(11-i)*17;}
+    QuickSort(r,12,sizeof(SortRecord),&CompareRecord);
+    for(i=0;i<12;i++)if(r[i].key!=i || r[i].payload!=i*17)return -2;
+    ok|=2;
+    I64 b[7];
+    b[0]=8;b[1]=2;b[2]=-1;b[3]=8;b[4]=5;b[5]=0;b[6]=-7;
+    QuickSort(b,7,sizeof(I64),&CompareRef);
+    for(i=1;i<7;i++)if(b[i-1]>b[i])return -3;
+    if(b[0]==-7 && b[6]==8)ok|=4;
+    QuickSortI64(NULL,0,&CompareValue);
+    QuickSortI64(a,1,&CompareValue);
+    if(a[0]==123456)ok|=8;
+    if(a[0]==123456 && a[13]==654321)ok|=16;
+    sort_runs++;
+    if(sort_runs>0)ok|=32;
+    return ok;
+}
+
+I64 NextRun() {return ++sort_runs;}

@@ -1,0 +1,92 @@
+// Pinned MultiProc.ZC JobQueue signature on one cooperative CPU-0 executive.
+I64 job_call_count, job_call_task_num;
+
+I64 JobCall(U8 *data)
+{
+    I64 *value = data;
+    job_call_count++;
+    job_call_task_num = Fs->task_num;
+    return *value + 2;
+}
+
+U0 JobHold(U8 *data)
+{
+    Yield;
+}
+
+I64 job_coop_stage, job_coop_seen;
+
+U0 JobCoopWorker(U8 *data)
+{
+    job_coop_seen = job_coop_stage;
+}
+
+I64 JobCoopYield(U8 *data)
+{
+    job_coop_stage = 1;
+    Suspend(data, FALSE);
+    Yield;
+    if (job_coop_stage != 1 || job_coop_seen != 1)
+        return 1;
+    return 42;
+}
+
+I64 JobCoopSleep(U8 *data)
+{
+    job_coop_stage = 1;
+    Suspend(data, FALSE);
+    Sleep(5);
+    if (job_coop_stage != 1 || job_coop_seen != 1)
+        return 1;
+    return 42;
+}
+
+I64 TaskJobQueueCoopChecks()
+{
+    CTask *worker;
+    CJob *job;
+    job_coop_stage = job_coop_seen = 0;
+    worker = Spawn(&JobCoopWorker);
+    if (!worker) return 1;
+    Suspend(worker);
+    if (!IsSuspended(worker)) return 1;
+    job = JobQueue(&JobCoopYield, worker, 0, 0);
+    if (!job || JobResGet(job) != 42 || TaskValidate(worker)) return 2;
+    job_coop_stage = job_coop_seen = 0;
+    worker = Spawn(&JobCoopWorker);
+    if (!worker) return 3;
+    Suspend(worker);
+    if (!IsSuspended(worker)) return 3;
+    job = JobQueue(&JobCoopSleep, worker, 0, 0);
+    if (!job || JobResGet(job) != 42 || TaskValidate(worker)) return 4;
+    return 42;
+}
+
+I64 TaskJobQueueChecks()
+{
+    I64 value = 40;
+    CJob *job, *free_job;
+    CTask *children[4];
+    I64 i;
+    if (mp_count != 1 || JobQueue(&JobCall, &value) ||
+        JobQueue(&JobCall, &value, 1, 0) ||
+        JobQueue(&JobCall, &value, 0, 0, JOBT_SPAWN_TASK))
+        return 1;
+    job = JobQueue(&JobCall, &value, 0, 0);
+    if (!job) return 21;
+    if (job->job_code != JOBT_CALL) return 22;
+    if (job->fun_arg != &value) return 24;
+    if (JobResScan(job)) return 25;
+    if (JobResGet(job) != 42 || job_call_count != 1 ||
+        !job_call_task_num || job_call_task_num == Fs->task_num)
+        return 3;
+    free_job = JobQueue(&JobCall, &value, 0);
+    if (!free_job || ZcTaskRun || job_call_count != 2 || JobResScan(free_job))
+        return 4;
+    for (i = 0; i < 4; i++)
+        if (!(children[i] = Spawn(&JobHold))) return 5;
+    if (Spawn(&JobHold)) return 6;
+    for (i = 0; i < 4; i++)
+        if (!Kill(children[i])) return 7;
+    return 42;
+}

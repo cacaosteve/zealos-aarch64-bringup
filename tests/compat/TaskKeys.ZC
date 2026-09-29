@@ -1,0 +1,134 @@
+// Pinned SerialDev/Message.ZC KeyScan/KeyGet signatures over task messages.
+I64 key_child_stage, key_child_value, key_child_scan;
+
+U0 KeyChild(U8 *data)
+{
+    key_child_stage = 1;
+    key_child_value = KeyGet(&key_child_scan);
+    key_child_stage = 2;
+}
+
+I64 TaskKeyChecks()
+{
+    I64 ch = 9, sc = 9;
+    CTask *child;
+    if (KeyScan(&ch, &sc) || ch || sc)
+        return 1;
+    MessagePost(Fs, MESSAGE_MS_MOVE, 3, 4);
+    MessagePost(Fs, MESSAGE_KEY_DOWN, 'A', 0x1e);
+    if (!KeyScan(&ch, &sc) || ch != 'A' || sc != 0x1e ||
+        MessageScan)
+        return 2;
+    MessagePost(Fs, MESSAGE_KEY_DOWN, 'B', 0x30);
+    if (KeyGet(&sc) != 'B' || sc != 0x30)
+        return 3;
+    child = Spawn(&KeyChild);
+    if (!child || ZcTaskRun != -2 || key_child_stage != 1 ||
+        !TaskValidate(child))
+        return 4;
+    MessagePost(child, MESSAGE_KEY_DOWN, 'C', 0x2e);
+    if (ZcTaskRun != 1 || key_child_stage != 2 ||
+        key_child_value != 'C' || key_child_scan != 0x2e ||
+        TaskValidate(child))
+        return 5;
+    return 42;
+}
+
+I64 TaskLiveKey()
+{
+    return KeyGet;
+}
+
+I64 TaskLiveMessage()
+{
+    I64 ch = 0, sc = 0;
+    if (MessageGet(&ch, &sc, 1 << MESSAGE_KEY_DOWN) != MESSAGE_KEY_DOWN)
+        return 0;
+    return ch;
+}
+
+I64 TaskLiveScan()
+{
+    I64 ch = 0, sc = 0;
+    if (MessageScan(&ch, &sc, 1 << MESSAGE_KEY_DOWN) != MESSAGE_KEY_DOWN)
+        return 0;
+    return ch;
+}
+
+I64 focused_child_stage, focused_child_value;
+
+U0 FocusedKeyChild(U8 *data)
+{
+    I64 ch = 0;
+    focused_child_stage = 1;
+    if (MessageGet(&ch, NULL, 1 << MESSAGE_KEY_DOWN) == MESSAGE_KEY_DOWN)
+        focused_child_value = ch;
+    focused_child_stage = 2;
+}
+
+I64 TaskFocusKillChecks()
+{
+    CTask *child = Spawn(&FocusedKeyChild);
+    if (!child)
+        return 1;
+    sys_focus_task = child;
+    if (!Kill(child) || TaskValidate(child) || sys_focus_task)
+        return 2;
+    return 42;
+}
+
+I64 TaskLiveFocus()
+{
+    CTask *child;
+    focused_child_stage = focused_child_value = 0;
+    child = Spawn(&FocusedKeyChild);
+    if (!child)
+        return 0;
+    Yield; // Let the child park in MessageGet before any device input arrives.
+    if (focused_child_stage != 1 || !TaskValidate(child))
+        return 0;
+    sys_focus_task = child;
+    Puts("focus ready\n");
+    while (TaskValidate(child))
+        Yield;
+    if (focused_child_stage != 2 || sys_focus_task)
+        return 0;
+    return focused_child_value;
+}
+
+CTask *background_key_task;
+
+I64 TaskBackgroundKeyStart()
+{
+    key_child_stage = key_child_value = 0;
+    background_key_task = Spawn(&KeyChild);
+    if (!background_key_task)
+        return 1;
+    return 42;
+}
+
+I64 TaskBackgroundKeyCleanup()
+{
+    if (key_child_stage != 1 || key_child_value ||
+        !TaskValidate(background_key_task) || !Kill(background_key_task))
+        return 1;
+    return 42;
+}
+
+I64 TaskBackgroundFocusStart()
+{
+    focused_child_stage = focused_child_value = 0;
+    background_key_task = Spawn(&FocusedKeyChild);
+    if (!background_key_task)
+        return 1;
+    sys_focus_task = background_key_task;
+    return 42;
+}
+
+I64 TaskBackgroundFocusChecks()
+{
+    if (focused_child_stage != 2 || focused_child_value != 'g' ||
+        TaskValidate(background_key_task) || sys_focus_task)
+        return 1;
+    return 42;
+}

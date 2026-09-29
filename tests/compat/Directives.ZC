@@ -1,0 +1,9 @@
+public class DirectiveLayout {
+    U16i word;
+    U8i byte;
+};
+#assert sizeof(DirectiveLayout) == 3
+#define ∞ 42
+I64 DirectiveChecks() {
+    return ∞ + sizeof(DirectiveLayout);
+}

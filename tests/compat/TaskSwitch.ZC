@@ -1,0 +1,69 @@
+// Runs after unchanged KernelA.HH, KernelB.HH, and KMathB.ZC.
+I64 switch_log[4], switch_count, task_error;
+CTask *switch_root;
+
+I64 TaskWorkerA()
+{
+    CTask *self = Fs;
+    F64 value = Pow10I64(1) + 0.25;
+    if (self->addr != self || self->parent_task != switch_root ||
+        self->task_signature != TASK_SIGNATURE_VAL || self->task_num != 1)
+        task_error = 1;
+    Seed(123);
+    switch_log[switch_count] = 1;
+    switch_count++;
+    ZcTaskYield;
+    if (Fs != self || self->rand_seed == 0 || value != 10.25)
+        task_error = 2;
+    switch_log[switch_count] = 3;
+    switch_count++;
+    ZcTaskYield;
+    if (Fs != self || value != 10.25)
+        task_error = 3;
+    return 11;
+}
+
+I64 TaskWorkerB()
+{
+    CTask *self = Fs;
+    F64 value = Pow10I64(2) + 0.5;
+    if (self->addr != self || self->parent_task != switch_root ||
+        self->task_signature != TASK_SIGNATURE_VAL || self->task_num != 2)
+        task_error = 4;
+    Seed(456);
+    switch_log[switch_count] = 2;
+    switch_count++;
+    ZcTaskYield;
+    if (Fs != self || self->rand_seed == 0 || value != 100.5)
+        task_error = 5;
+    switch_log[switch_count] = 4;
+    switch_count++;
+    ZcTaskYield;
+    if (Fs != self || value != 100.5)
+        task_error = 6;
+    return 22;
+}
+
+I64 TaskSwitchChecks()
+{
+    CTask *root = Fs;
+    I64 a, b;
+    switch_root = root;
+    Seed(99);
+    if (ZcTaskSpawn(NULL) != -1 || ZcTaskResult(7) != -1)
+        return 1;
+    a = ZcTaskSpawn(&TaskWorkerA);
+    b = ZcTaskSpawn(&TaskWorkerB);
+    if (a != 1 || b != 2 || ZcTaskResult(a) != -1)
+        return 2;
+    if (ZcTaskRun != 2 || ZcTaskRun != 0)
+        return 3;
+    if (Fs != root || root->addr != root || root->rand_seed != 99 || task_error)
+        return 4 + task_error;
+    if (switch_count != 4 || switch_log[0] != 1 || switch_log[1] != 2 ||
+        switch_log[2] != 3 || switch_log[3] != 4)
+        return 11;
+    if (ZcTaskResult(a) != 11 || ZcTaskResult(b) != 22)
+        return 12;
+    return 42;
+}

@@ -1,0 +1,68 @@
+// Exercise unchanged Message.ZC key waits and bootstrap line input.
+I64 TaskOriginalKeyGetLive()
+{
+    Puts("key get ready\n");
+    if (KeyGet(, FALSE, FALSE) == 'q')
+        return 42;
+    return 1;
+}
+
+I64 TaskOriginalCharGetLive()
+{
+    Puts("char get ready\n");
+    if (CharGet(, FALSE, FALSE) == 'r')
+        return 42;
+    return 1;
+}
+
+I64 TaskStringInputLive()
+{
+    U8 *answer;
+    I64 ok;
+
+    Puts("line input ready\n");
+    answer = StrGet("Type: %s ", "keep");
+    ok = answer[0] == 'a' && answer[1] == 'c' && !answer[2];
+    Free(answer);
+    if (ok)
+        return 42;
+    return 1;
+}
+
+I64 TaskStringDefaultLive()
+{
+    U8 *answer;
+    I64 ok;
+
+    Puts("default input ready\n");
+    answer = StrGet(, "keep");
+    ok = answer[0] == 'k' && answer[1] == 'e' &&
+         answer[2] == 'e' && answer[3] == 'p' && !answer[4];
+    Free(answer);
+    if (ok)
+        return 42;
+    return 1;
+}
+
+I64 TaskStringFixedLive()
+{
+    U8 buf[4] = {0, 0, 0, 0};
+
+    Puts("fixed input ready\n");
+    if (StrNGet(buf, 4, TRUE) == 2 &&
+        buf[0] == 'x' && buf[1] == 'y' && !buf[2])
+        return 42;
+    return 1;
+}
+
+I64 TaskStringTruncateLive()
+{
+    U8 buf[4] = {0, 0, 0, 0};
+
+    Puts("truncate input ready\n");
+    if (StrNGet(buf, 4, TRUE) == 3 &&
+        buf[0] == 'a' && buf[1] == 'b' &&
+        buf[2] == 'c' && !buf[3])
+        return 42;
+    return 1;
+}

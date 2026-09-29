@@ -1,0 +1,13 @@
+#if 0
+class WrongBranch {
+    I64 wrong;
+};
+#else
+class ConditionalClass {
+    U32i value;
+};
+#endif
+#assert sizeof(ConditionalClass) == 4
+I64 ConditionalClassChecks() {
+    return sizeof(ConditionalClass);
+}

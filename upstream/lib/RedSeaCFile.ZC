@@ -1,6 +1,7 @@
 /* Shared RedSea + CFile helpers (concat before demos).
  * Milestone 31+: one copy of RSFmt/RSAlloc/FCreate/FOpen/FBlk/FSeek/FSize.
- * No CDrive yet; 16-blk RAM disk; RSFmt wipes data blks for re-run safety.
+ * No CDrive yet; read the volume size from its boot block so callers work on
+ * both the 16-blk RAM smoke volume and the 128-blk UTM volume.
  */
 
 class CFile
@@ -261,4 +262,24 @@ I64 RSRoot()
 		return 0;
 	w = br + 8;
 	return w[2];
+}
+
+I64 RSVolumeSects()
+{
+	U8 *br;
+	I64 *w;
+
+	br = MAlloc(512);
+	if (!br)
+		return 0;
+	MemSet(br, 0, 512);
+	if (!BlkRead(br, 0, 1))
+		return 0;
+	if (br[3] != 0x88 || br[510] != 0x55 || br[511] != 0xAA)
+		return 0;
+	w = br + 8;
+	/* Root may be 0 in the short interval after RSFmt and before RSAlloc. */
+	if (w[1] < 4 || w[1] > 128)
+		return 0;
+	return w[1];
 }

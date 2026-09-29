@@ -1,0 +1,81 @@
+// Cooperative lifecycle subset after KernelA/KernelB and TaskBridge.
+I64 life_started, life_finished, life_error;
+I64 life_parent_started, life_parent_resumed, life_child_started;
+I64 life_self_started, life_self_returned;
+U8 life_data;
+CTask *life_child;
+
+U0 LifeWorker(U8 *data)
+{
+    CTask *self = Fs;
+    U8 *buf = MAlloc(24);
+    life_started++;
+    buf[0] = data[0];
+    Yield;
+    if (Fs != self || buf[0] != 9 || !TaskValidate(self))
+        life_error = 1;
+    life_finished++;
+}
+
+U0 LifeSelf(U8 *data)
+{
+    MAlloc(32);
+    life_self_started++;
+    Kill(Fs);
+    life_self_returned++;
+}
+
+U0 LifeChild(U8 *data)
+{
+    life_child_started++;
+}
+
+U0 LifeParent(U8 *data)
+{
+    life_child = Spawn(&LifeChild, NULL, "Child", -1, Fs);
+    if (!life_child || Suspend(life_child, TRUE) || !IsSuspended(life_child))
+        life_error = 2;
+    life_parent_started++;
+    Yield;
+    life_parent_resumed++;
+}
+
+I64 TaskLifecycleChecks()
+{
+    CTask *task, *root = Fs;
+    life_data = 9;
+    if (Suspend(root) || IsSuspended(root) || Kill(root))
+        return 1;
+    task = Spawn(&LifeWorker, &life_data);
+    if (!TaskValidate(task) || Suspend(task, TRUE) ||
+        !IsSuspended(task) || !Suspend(task, TRUE) ||
+        !Bt(&task->task_flags, TASKf_SUSPENDED))
+        return 2;
+    Yield;
+    if (life_started || ZcTaskRun != -2 || !TaskValidate(task))
+        return 3;
+    if (!Suspend(task, FALSE) || IsSuspended(task) ||
+        Bt(&task->task_flags, TASKf_SUSPENDED))
+        return 4;
+    if (ZcTaskRun != 1 || life_started != 1 || life_finished != 1 ||
+        life_error || TaskValidate(task) || Kill(task) || IsSuspended(task))
+        return 5;
+    task = Spawn(&LifeSelf);
+    if (!task || ZcTaskRun != 1 || life_self_started != 1 ||
+        life_self_returned || TaskValidate(task) ||
+        task->data_heap->used_u8s)
+        return 6;
+    task = Spawn(&LifeParent);
+    Yield;
+    if (!TaskValidate(task) || !TaskValidate(life_child) ||
+        !IsSuspended(life_child) || life_parent_started != 1 ||
+        life_parent_resumed || life_child_started || life_error)
+        return 7;
+    if (Kill(task, TRUE, TRUE) || !TaskValidate(task) || !Kill(task) ||
+        TaskValidate(task) || TaskValidate(life_child) ||
+        life_parent_resumed || life_child_started)
+        return 8;
+    if (ZcTaskRun || Fs != root || root->data_heap->used_u8s)
+        return 9;
+    return 42;
+}

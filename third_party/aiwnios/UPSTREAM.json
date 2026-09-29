@@ -1,0 +1,26 @@
+{
+  "repository": "https://github.com/aiwnios/Aiwnios.git",
+  "commit": "e155e87a4a4ddae4cd7f25685d9db8869fd45a40",
+  "files": {
+    "LICENSE": "c4f9e642fb174c3e3bcbc69c32cc5f73439b2f8051af5c03476e351a56d88009",
+    "c/lex.c": "1edbdddf9c7eaccbebe645230b68540e0ed82c66665b444654408166f00f48be",
+    "c/parser.c": "444942753284eaeebb02b57eb6e6c9fe3208c74bea3497dbc8d462245079f8cc",
+    "c/optpass.c": "0e2999fab954c063ebcd1e61174d1657dd915b264a6cd5112558c95af16facac",
+    "c/hash.c": "6842bb1892100887510a2c63c5c4404a1b47a15f1b92ba3abe896e0593ac8d48",
+    "c/cque.c": "e99407357b4e09f7a7bb29cf01e68fe40d251e1e8426602daff6b69164fada7a",
+    "c/ffi_gen.c": "9c8b65b2e8dae30d012042a4f7d12d9895f3310072113c4448cd8e3041025073",
+    "c/arm64_asm.c": "2f56a6c87db0da474da76126ef99f41faaadd02cdac4bba8c9611da318ad7eeb",
+    "c/arm_backend.c": "f5deebad3e82369ce442b7813e89892e0000436073731821eef3b5067928ca0c",
+    "c/aiwn_asm.h": "f407dbf361b6fffc1e74bee4201f3b3b605cde88e0760d2d52ec771984c54050",
+    "c/aiwn_arm.h": "e94652d782397f67b78e34d6c444fb97a6acbd033c7ec90d92538fa32d00ecb5",
+    "c/aiwn_except.h": "e7cd1d4586c6d9885c2c49e9c23c7fdc55af64f4a6184c632f461d726c4150d9",
+    "c/aiwn_fs.h": "60a77669fadb085e82ec332e10e3152e21b46d21ace9f477396150046e9524a9",
+    "c/aiwn_hash.h": "0d496ad63f39f663196fb3673d83ba2e82a813943ce36d125af875fe2f6680b6",
+    "c/aiwn_lexparser.h": "6fd5e11c21cf944935b2c4852c53c8a6edfbc40d68e266721c2433711cc70cc6",
+    "c/aiwn_mem.h": "7a6c6fb57675b55fd196d85c6096878ee086705f90cb6a51c79085705f90a64b",
+    "c/aiwn_multic.h": "45d69f7041bc32ad0c072ef2a204b3ca2e70d726b85fd37e8736d962a61cab2a",
+    "c/aiwn_que.h": "6bc4be42810e732d8e2ecd9038ff5008262803274f6eba62bb0f9bad61b125cd",
+    "c/aiwn_bytecode.h": "7a0475551bc80275b264b1a2e8c49f2b58efe571ba6d527081460708c7607dfa",
+    "asm/ffi_call_tos_aarch64.s": "5480d78326e2090f60222653c7da98fcb1e3e580ce2d6985c9a88458db03146f"
+  }
+}

@@ -63,6 +63,113 @@ runzc MemSort.ZC
 
 Restart VM; repeat `rspersist`, `rsdir`, `runzc Notes.ZC` (persist-safe seeds).
 
+## Native compiler and writable source
+
+The full compiler has a separate session and source loader. In the UTM app,
+run `zcheck` and expect `zc: upstream QuickSort + persistent modules OK`.
+On the refreshed 128 MiB UTM image, try:
+
+```text
+zvol
+zverify Kernel/KernelA.HH
+zls
+zput App/Native.ZC I64 DiskValue(){return 42;}
+zload disk:App/Native.ZC
+zcall DiskValue
+```
+
+Expect `zvol: source partition ready bank=A generation=0` on a new disk,
+`zverify: OK bytes=113880`, and `0x2a`. An existing disk may report bank B
+or a later generation after `zgc`.
+Restart the VM, repeat the last two commands, and expect the
+same value. `make check-compat` and `make check-compat-pci` perform this reboot
+gate on disposable disks and additionally check a disk-backed relative include.
+The native source partition does not use RedSea root slots, so all eight
+existing UTM RedSea files can remain. The shell input still limits `zput` to
+one short line. For a larger file on a running VM, use
+`python3 scripts/send-zc.py /path/to/Module.ZC Home/Module.ZC --emit` and paste
+the printed lines in UTM Terminal 1, waiting for each `zrecv: ack` before the
+next line. A raw TTY or PTY can use `--serial DEVICE` for automatic sending.
+The stopped-VM `scripts/source-volume.py put` importer also remains available.
+For an in-guest edit, run `zedit App/EditorCheck.ZC`, then at `edit>` enter
+`a I64 EditorCheck(){return 42;}`, `p 1 1`, and `wq`. Run
+`zload disk:App/EditorCheck.ZC` and `zcall EditorCheck`; expect `0x2a`.
+Reopen it with `zedit App/EditorCheck.ZC` to check existing-file edits.
+To exercise source cleanup on a disposable name, run
+`zput App/RemoveMe.ZC I64 RemoveMe(){return 7;}`, `zrm App/RemoveMe.ZC`,
+then `zverify App/RemoveMe.ZC`; the last command must report missing source.
+`zls` must omit the deleted name. After stopping UTM, run
+`python3 scripts/source-volume.py compact /path/to/VM/Data/Omarchy-QEMU.raw`
+to reclaim obsolete source records;
+it retains deletions that mask legacy RedSea names. Start UTM again and repeat
+the native load/reboot checks.
+
+For in-guest reclamation, run `zls`, `zgc`, then `zls` again. The second
+sector count should be no larger, and `zvol` should show the other bank and
+one higher generation. Reboot and verify the same bank, source files and
+deletion results. The host compactor remains useful for an offline copy.
+
+The unchanged upstream declaration headers are an additional compiler check:
+
+```text
+zreset
+zload /Tests/MathTable.ZC
+zcall MathTableChecks
+zload /Kernel/KernelA.HH
+zload /Kernel/KernelB.HH
+zload /Tests/HeaderCopy.ZC
+zcall HeaderCopyChecks
+zload /Kernel/KMathB.ZC
+zload /Tests/TaskMath.ZC
+zcall TaskMathChecks
+zload /Tests/TaskSwitch.ZC
+zcall TaskSwitchChecks
+zload /Tests/SpawnBridge.ZC
+zcall SpawnBridgeChecks
+zload /Tests/TaskLifecycle.ZC
+zcall TaskLifecycleChecks
+zload /Tests/TaskWait.ZC
+zcall TaskWaitChecks
+zload /Tests/TaskIdle.ZC
+zcall TaskIdleChecks
+zload /Tests/TaskMessages.ZC
+zcall TaskMessageChecks
+zload /Tests/TaskJobs.ZC
+zcall TaskExeChecks
+zcall TaskExeLifecycleChecks
+zcall TaskExeFocusChecks
+zload /Tests/TaskMessageJobs.ZC
+zcall TaskMessageJobsChecks
+zload /Tests/TaskKeys.ZC
+zcall TaskKeyChecks
+zcall TaskFocusKillChecks
+zload /Tests/TaskJobQueue.ZC
+zcall TaskJobQueueChecks
+zload /Tests/TaskSpawnQueue.ZC
+zcall TaskSpawnQueueChecks
+```
+
+Expect each check to return `0x2a`. This validates declaration parsing,
+`KernelA` layout checks, the compatible `MemCopy` binding, task-local math,
+cooperative switching, default `Spawn`, suspend/kill lifecycle behavior,
+task-pointer waits, idle/prompt readiness, cooperative message delivery, and
+queued source execution through both `JobsHandler` and `MessageGet`, caller
+wake, return of focus to an eligible master after a source job, one-shot
+server exit, and CPU-0
+function-call jobs and queued CPU-0 task creation. `KeyScan`/`KeyGet` and
+key-masked `MessageScan`/`MessageGet` consume live input through task messages.
+In the UTM app, `zcall TaskLiveKey` then type `k` in the framebuffer window;
+expect `0x6b` in Terminal 1. Run `zcall TaskLiveMessage`, then type `m` in the
+framebuffer; expect `0x6d`. The QEMU compatibility suites also check
+`TaskLiveScan` with serial input. `TaskFocusKillChecks` should return `0x2a`.
+Run `zcall TaskLiveFocus`, wait for `focus ready`, then type `f` in the
+framebuffer; the focused child should wake and Terminal 1 should show `0x66`.
+Source jobs still use the shared bootstrap
+compiler.
+Most x86-only `_intern` operations and unresolved `_extern`
+symbols remain unavailable. Run `zreset` afterward before loading other
+programs into a clean session.
+
 **Status:** M33–M39 UTM freeze bar **accepted** (including `Notes.ZC` from PCI RedSea + `#include`). Pi remains a separate track ([PI4.md](PI4.md)).
 
 **Re-pass 2026-09-23:** `make utm` refreshed; QEMU `run-pci` scripted checklist green (vblk, rspersist `0x4`, catalog/rsdir, `runzc` UseAdd/`0x2a`, MemSort/`0x10`, Notes on disk, compiler 4/0/8); second boot persist OK. UTM `ZealosAarch64Hello` started with synced disk — interactive FB/`Notes` + keyboard still eyes-on in the UTM app (`utmctl attach` not implemented).
@@ -137,3 +244,25 @@ Restart VM; repeat `rspersist`, `rsdir`, `runzc Notes.ZC` (persist-safe seeds).
 - Catalog seed is **best-effort** (full root from an older UTM image no longer blocks `rsdir` / `runzc`).
 - QEMU: `make run-serial` / `make run-pci`.
 - Pi: `make pi-sd` → `build/pi-esp/` — do not install Pi-diag ELFs into UTM.
+
+## Native compiler session (additional gate)
+
+Keep the frozen checks above. After a compiler/runtime refresh, also run:
+
+```text
+zcheck
+zc I64 Answer(){return 6*7;}
+zcall Answer
+zstatus
+```
+
+Expect `zc: upstream QuickSort + persistent modules OK`, result `0x2a`, and
+`ready=1 failed=0`. The `zcheck` reset only discards the new compiler session;
+it does not format RedSea. Native-session globals persist until reset/reboot,
+not on disk. See [COMPATIBILITY.md](COMPATIBILITY.md).
+
+2026-09-26: native `zcheck` passed in the refreshed UTM framebuffer window
+(`ready=1 failed=0 modules=5`). Source-pin verification, ISO and PCI guest harnesses
+passed. RedSea bytes were verified unchanged across the image refresh. Fast
+computer-automation typing lost characters; individual keystrokes completed the
+check. This entry does not renew the full mouse/Notes/graphics acceptance.

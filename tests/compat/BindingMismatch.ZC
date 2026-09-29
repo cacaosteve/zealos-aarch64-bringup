@@ -1,0 +1,6 @@
+_intern IC_SWAP_I64 U0 SwapI64(I64 *left, I64 *right);
+I64 RejectedSwap() {
+    I64 a = 1, b = 2;
+    SwapI64(&a, &b);
+    return a;
+}

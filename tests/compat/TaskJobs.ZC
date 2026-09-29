@@ -1,0 +1,261 @@
+// Bounded TaskExe/JobsHandler bridge using pinned CJob queue/result fields.
+I64 job_processed, job_seen_task_num, job_value, job_exit_continued;
+
+U0 JobServer(U8 *data)
+{
+    while (TRUE) {
+        job_processed += JobsHandler(0);
+        FlushMessages;
+        LBts(&Fs->task_flags, TASKf_IDLE);
+        LBts(&Fs->task_flags, TASKf_AWAITING_MESSAGE);
+        Yield;
+    }
+}
+
+U0 JobExitServer(U8 *data)
+{
+    LBts(&Fs->task_flags, TASKf_AWAITING_MESSAGE);
+    Yield;
+    JobsHandler(0);
+    job_exit_continued = 1;
+}
+
+I64 source_coop_stage, source_coop_seen;
+CTask *source_coop_worker;
+
+U0 SourceCoopWorker(U8 *data)
+{
+    CJob *job = TaskExe(Fs, Fs, "source_coop_seen=source_coop_stage; 42;", 0);
+    if (!job || JobsHandler(0) != 1 || JobResGet(job) != 42)
+        source_coop_seen = -1;
+}
+
+I64 TaskSourceCoopChecks()
+{
+    CTask *server = Spawn(&JobServer);
+    CJob *job;
+    if (!server || ZcTaskRun != -2)
+        return 1;
+
+    source_coop_stage = source_coop_seen = 0;
+    source_coop_worker = Spawn(&SourceCoopWorker);
+    if (!source_coop_worker) return 2;
+    Suspend(source_coop_worker);
+    job = TaskExe(server, Fs,
+                  "source_coop_stage=1; Suspend(source_coop_worker,FALSE); Yield; source_coop_seen+41;", 0);
+    if (!job || JobResGet(job) != 42 || TaskValidate(source_coop_worker))
+        return 3;
+
+    source_coop_stage = source_coop_seen = 0;
+    source_coop_worker = Spawn(&SourceCoopWorker);
+    if (!source_coop_worker) return 4;
+    Suspend(source_coop_worker);
+    job = TaskExe(server, Fs,
+                  "source_coop_stage=1; Suspend(source_coop_worker,FALSE); Sleep(5); source_coop_seen+41;", 0);
+    if (!job || JobResGet(job) != 42 || TaskValidate(source_coop_worker))
+        return 5;
+
+    source_coop_stage = source_coop_seen = 0;
+    source_coop_worker = Spawn(&SourceCoopWorker);
+    if (!source_coop_worker) return 6;
+    Suspend(source_coop_worker);
+    if (!TaskText(Fs, NULL,
+                  "source_coop_stage=1; Suspend(source_coop_worker,FALSE); Yield; source_coop_seen+=41;", 0))
+        return 7;
+    TaskWait(Fs);
+    if (source_coop_seen != 42 || TaskValidate(source_coop_worker) ||
+        !Kill(server) || TaskValidate(server))
+        return 8;
+    return 42;
+}
+
+CJob *nested_source_job;
+I64 nested_source_seen;
+
+I64 TaskNestedSourceChecks()
+{
+    CTask *server = Spawn(&JobServer);
+    CJob *outer;
+    if (!server || ZcTaskRun != -2)
+        return 1;
+    nested_source_seen = 0;
+    outer = TaskExe(server, Fs,
+        "nested_source_job=TaskExe(Fs,Fs,\"nested_source_seen=40+2; Sleep(5); nested_source_seen;\",0); "
+        "JobsHandler(0); JobResGet(nested_source_job);", 0);
+    if (!outer || JobResGet(outer) != 42 || nested_source_seen != 42 ||
+        !Kill(server) || TaskValidate(server))
+        return 2;
+    nested_source_seen = 0;
+    if (!TaskText(Fs, NULL,
+        "nested_source_job=TaskExe(Fs,Fs,\"nested_source_seen=42;\",0); "
+        "JobsHandler(0); nested_source_seen=JobResGet(nested_source_job);", 0))
+        return 3;
+    TaskWait(Fs);
+    if (nested_source_seen != 42 || Fs->next_input_filter_task != Fs)
+        return 4;
+    return 42;
+}
+
+I64 source_exit_seen, source_exit_after;
+
+U0 SourceExitEnd()
+{
+    source_exit_seen++;
+    Exit;
+    source_exit_after++;
+}
+
+I64 TaskSourceExitChecks()
+{
+    CTask *server;
+    CJob *job;
+
+    source_exit_seen = source_exit_after = job_value = 0;
+    server = Spawn(&JobServer);
+    if (!server || ZcTaskRun != -2) return 1;
+    server->task_end_cb = &SourceExitEnd;
+    job = TaskExe(server, Fs, "job_value=31; Exit; job_value=99;", 0);
+    if (!job || JobResGet(job) != 0 || job_value != 31 ||
+        source_exit_seen != 1 || source_exit_after || TaskValidate(server))
+        return 2;
+
+    server = Spawn(&JobServer);
+    if (!server || ZcTaskRun != -2) return 3;
+    job = TaskExe(server, NULL, "job_value=37; TaskEndNow;", 0);
+    if (!job || JobResGet(job) != 0 || job_value != 37 || TaskValidate(server))
+        return 4;
+
+    server = Spawn(&JobServer);
+    if (!server || ZcTaskRun != -2) return 5;
+    job = TaskExe(server, Fs,
+        "nested_source_job=TaskExe(Fs,Fs,\"job_value=41; Exit;\",0); "
+        "JobsHandler(0); job_value=99;", 0);
+    if (!job || JobResGet(job) != 0 || job_value != 41 || TaskValidate(server))
+        return 6;
+
+    job_value = 0;
+    server = Spawn(&JobServer);
+    if (!server || ZcTaskRun != -2) return 9;
+    job = TaskExe(server, Fs, "job_value=47; Sleep(1000); job_value=99;", 0);
+    Yield;
+    if (!job || job_value != 47 || !Kill(server, FALSE) ||
+        JobResGet(job) != 0 || TaskValidate(server) || job_value != 47)
+        return 10;
+
+    job_value = 0;
+    if (!TaskText(Fs, NULL, "job_value=42; Exit; job_value=99;", 0))
+        return 7;
+    TaskWait(Fs);
+    if (job_value != 42 || Fs->next_input_filter_task != Fs)
+        return 8;
+    return 42;
+}
+
+I64 TaskExeChecks()
+{
+    CTask *server = Spawn(&JobServer), *exit_server;
+    CJob *job;
+    I64 result = 99;
+    if (!server || ZcTaskRun != -2 ||
+        !Bt(&server->task_flags, TASKf_IDLE) ||
+        !Bt(&server->task_flags, TASKf_AWAITING_MESSAGE))
+        return 1;
+    if (TaskExe(server, Fs, NULL, 0) ||
+        TaskExe(server, Fs, "1;", 1 << JOBf_HIGHEST_PRIORITY))
+        return 2;
+
+    job = TaskExe(server, Fs, "job_seen_task_num=Fs->task_num; 40+2;", 0);
+    if (!job || job->job_code != JOBT_EXE_STR ||
+        JobResScan(job, &result) || result)
+        return 3;
+    TaskWait(server);
+    if (job_processed != 1) return 41;
+    if (job_seen_task_num != server->task_num) return 42;
+    if (!Bt(&job->flags, JOBf_DONE)) return 43;
+    if (JobResGet(job) != 42) return 44;
+
+    job = TaskExe(server, Fs, "job_value=13;", 0);
+    if (!job || JobResGet(job) != 13 || job_value != 13 || job_processed != 2)
+        return 5;
+    job = TaskExe(server, Fs, "job_value=17;", 1 << JOBf_FREE_ON_COMPLETE);
+    TaskWait(server);
+    if (!job || job_value != 17 || job_processed != 3 || JobResScan(job))
+        return 6;
+
+    job = TaskExe(server, NULL, "job_value=21;", 0);
+    TaskWait(server);
+    if (!job || !JobResScan(job, &result) || result != 21 ||
+        job_value != 21 || job_processed != 4)
+        return 7;
+    if (!Kill(server) || TaskValidate(server) || ZcTaskRun)
+        return 8;
+    return 42;
+}
+
+I64 TaskExeLifecycleChecks()
+{
+    CTask *server = Spawn(&JobServer), *exit_server;
+    CJob *job;
+    I64 result = 0;
+    if (!server || ZcTaskRun != -2)
+        return 1;
+    job = TaskExe(server, Fs, "job_value=31;", 1 << JOBf_WAKE_MASTER);
+    if (!job || job_value != 31 || !Bt(&job->flags, JOBf_DONE) ||
+        !JobResScan(job, &result) || result != 31)
+        return 2;
+    if (TaskExe(server, server, "1;", 1 << JOBf_WAKE_MASTER))
+        return 3;
+    Kill(server);
+
+    exit_server = Spawn(&JobExitServer);
+    if (!exit_server)
+        return 4;
+    job = TaskExe(exit_server, Fs, "job_value=37;",
+                  1 << JOBf_EXIT_ON_COMPLETE);
+    if (!job || JobResGet(job) != 37 || job_value != 37 ||
+        TaskValidate(exit_server) || job_exit_continued)
+        return 5;
+
+    exit_server = Spawn(&JobExitServer);
+    if (!exit_server)
+        return 6;
+    job = TaskExe(exit_server, NULL, "job_value=41;",
+                  1 << JOBf_EXIT_ON_COMPLETE | 1 << JOBf_FREE_ON_COMPLETE);
+    if (!job || ZcTaskRun != 1 || TaskValidate(exit_server) ||
+        job_value != 41 || JobResScan(job) || job_exit_continued)
+        return 7;
+    return 42;
+}
+
+I64 TaskExeFocusChecks()
+{
+    CTask *server = Spawn(&JobServer);
+    CJob *job;
+    if (!server || ZcTaskRun != -2)
+        return 1;
+    sys_focus_task = server;
+    job = TaskExe(server, Fs, "job_value=42;", 1 << JOBf_FOCUS_MASTER);
+    if (!job || sys_focus_task != server || JobResGet(job) != 42 ||
+        sys_focus_task != Fs)
+        return 2;
+
+    LBts(&Fs->win_inhibit, WIf_SELF_FOCUS);
+    sys_focus_task = server;
+    job = TaskExe(server, Fs, "job_value=43;", 1 << JOBf_FOCUS_MASTER);
+    if (!job || JobResGet(job) != 43 || sys_focus_task != server)
+        return 3;
+    LBtr(&Fs->win_inhibit, WIf_SELF_FOCUS);
+
+    job = TaskExe(server, Fs, "job_value=44;",
+                  1 << JOBf_WAKE_MASTER | 1 << JOBf_FOCUS_MASTER);
+    if (!job || job_value != 44 || sys_focus_task != Fs ||
+        JobResGet(job) != 44)
+        return 4;
+    job = TaskExe(server, NULL, "job_value=45;", 1 << JOBf_FOCUS_MASTER);
+    if (!job || JobResGet(job) != 45 || sys_focus_task != Fs)
+        return 5;
+    if (!Kill(server) || sys_focus_task != Fs)
+        return 6;
+    sys_focus_task = NULL;
+    return 42;
+}

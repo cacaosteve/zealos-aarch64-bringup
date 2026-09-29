@@ -1,0 +1,5 @@
+#define "Char/Operations"
+#define CATEGORY_VALUE 7
+I64 DefineCategoryChecks() {
+    return CATEGORY_VALUE;
+}

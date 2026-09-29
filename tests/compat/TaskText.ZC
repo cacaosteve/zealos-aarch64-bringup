@@ -1,0 +1,283 @@
+// Pinned TaskText job and one-shot input-filter behavior.
+I64 text_value, text_seen;
+
+U0 TextIdleServer(U8 *data)
+{
+    while (TRUE) {
+        LBts(&Fs->task_flags, TASKf_IDLE);
+        LBts(&Fs->task_flags, TASKf_AWAITING_MESSAGE);
+        Yield;
+    }
+}
+
+U0 TextCompilerServer(U8 *data)
+{
+    while (TRUE) {
+        JobsHandler(0);
+        LBts(&Fs->task_flags, TASKf_IDLE);
+        LBts(&Fs->task_flags, TASKf_AWAITING_MESSAGE);
+        Yield;
+    }
+}
+
+I64 ParentScope()
+{
+    return 11;
+}
+
+I64 TaskCompilerScopeChecks()
+{
+    CTask *server;
+    CJob *definition, *call, *shadow, *shadow_call, *callback_def,
+         *callback_reject, *root_call;
+    I64 call_result;
+
+    text_value = 40;
+    server = Spawn(&TextCompilerServer);
+    if (!server || ZcTaskRun != -2)
+        return 1;
+    definition = TaskExe(server, Fs,
+                         "I64 ChildOnly(){text_value+=2; return 42;}", 0);
+    call = TaskExe(server, Fs, "ChildOnly();", 0);
+    shadow = TaskExe(server, Fs, "I64 ParentScope(){return 22;}", 0);
+    shadow_call = TaskExe(server, Fs, "ParentScope();", 0);
+    callback_def = TaskExe(server, Fs,
+                           "I64 ChildCallback(U8 *data){return 13;}", 0);
+    callback_reject = TaskExe(server, Fs,
+                              "JobQueue(&ChildCallback,NULL,0,0)==NULL;", 0);
+    if (!definition || !call || !shadow || !shadow_call ||
+        !callback_def || !callback_reject)
+        return 2;
+    call_result = JobResGet(call);
+    JobResGet(definition);
+    if (JobResGet(shadow_call) != 22)
+        return 5;
+    JobResGet(shadow);
+    if (JobResGet(callback_reject) != 1)
+        return 7;
+    JobResGet(callback_def);
+    if (text_value != 42)
+        return 100 + text_value;
+    if (call_result != 42)
+        return 200 + call_result;
+    if (!Kill(server) || TaskValidate(server))
+        return 4;
+    root_call = TaskExe(Fs, Fs, "ParentScope();", 0);
+    if (!root_call || JobsHandler(0) != 1 || JobResGet(root_call) != 11)
+        return 6;
+    return 42;
+}
+
+I64 TaskAnswerChecks()
+{
+    CTask *server;
+    CJob *job;
+    I64 old_answer = Fs->answer;
+    U8 old_answer_type = Fs->answer_type;
+    F64 old_answer_time = Fs->answer_time;
+    Bool old_new_answer = Fs->new_answer;
+
+    Fs->answer = 99;
+    Fs->answer_type = RT_U0;
+    Fs->answer_time = -1.0;
+    Fs->new_answer = FALSE;
+    server = Spawn(&TextCompilerServer);
+    if (!server)
+        return 1;
+    server->answer_time = -1.0;
+    job = TaskExe(server, Fs, "6; Fs->answer+36;", 0);
+    if (!job || JobResGet(job) != 42 || server->answer != 42 ||
+        server->answer_type != RT_I64 || server->answer_time < 0.0 ||
+        !server->new_answer || Fs->answer != 99 || Fs->new_answer ||
+        Fs->answer_time != -1.0)
+        return 2;
+    job = TaskExe(server, Fs, "&text_value;", 0);
+    if (!job || JobResGet(job) != &text_value ||
+        server->answer_type != RT_PTR)
+        return 7;
+    job = TaskExe(server, Fs, "1.5;", 0);
+    if (!job || JobResGet(job) != 0x3ff8000000000000 ||
+        server->answer_type != RT_F64 ||
+        server->answer != 0x3ff8000000000000)
+        return 8;
+    if (!Kill(server))
+        return 3;
+
+    job = TaskExe(Fs, Fs, "7; Fs->answer+35;", 0);
+    if (!job || JobsHandler(0) != 1 || JobResGet(job) != 42 ||
+        Fs->answer != 42 || Fs->answer_type != RT_I64 ||
+        Fs->answer_time < 0.0 || !Fs->new_answer)
+        return 4;
+
+    text_value = 0;
+    text_seen = 0;
+    if (!TaskText(Fs, NULL,
+                  "5; text_seen=Fs->answer_type; text_value=Fs->answer+32;", 0))
+        return 5;
+    TaskWait(Fs);
+    if (text_value != 42)
+        return 61;
+    if (text_seen != RT_I64)
+        return 62;
+    if (Fs->answer != 42)
+        return 63;
+    Fs->answer = old_answer;
+    Fs->answer_type = old_answer_type;
+    Fs->answer_time = old_answer_time;
+    Fs->new_answer = old_new_answer;
+    return 42;
+}
+
+I64 ShellAnswerReset()
+{
+    Fs->answer = 99;
+    Fs->answer_type = RT_U0;
+    Fs->answer_time = -1.0;
+    Fs->new_answer = FALSE;
+    return 42;
+}
+
+I64 ShellIntegerAnswerChecks()
+{
+    if (Fs->answer != 42 || Fs->answer_type != RT_I64 ||
+        Fs->answer_time < 0.0 || !Fs->new_answer)
+        return 1;
+    return 42;
+}
+
+I64 ShellFloatAnswerChecks()
+{
+    if (Fs->answer != 0x3ff8000000000000 ||
+        Fs->answer_type != RT_F64 || Fs->answer_time < 0.0 ||
+        !Fs->new_answer)
+        return 1;
+    return 42;
+}
+
+I64 TaskTextChecks()
+{
+    CTask *filter, *server;
+    CJob *job, *second, *exe;
+    I64 a = 0, b = 0;
+
+    if (TaskText(Fs, Fs, NULL, 0) ||
+        TaskText(Fs, Fs, "1;", 1 << JOBf_WAKE_MASTER) ||
+        TaskText(NULL, Fs, "1;", 0))
+        return 1;
+    job = TaskText(Fs, Fs, "text_seen=Fs->task_num; text_value=73;", 0);
+    filter = Fs->last_input_filter_task;
+    if (!job || job->job_code != JOBT_TEXT_INPUT ||
+        job->master_task != Fs || filter == Fs ||
+        Fs->next_input_filter_task != filter ||
+        !Bt(&Fs->task_flags, TASKf_FILTER_INPUT) ||
+        !Bt(&filter->task_flags, TASKf_INPUT_FILTER_TASK) ||
+        job->ctrl != &filter->server_ctrl)
+        return 2;
+    MessagePost(Fs, 30, 12, 34);
+    exe = TaskExe(filter, Fs, "text_value=100; 42;", 0);
+    if (!exe || exe->job_code != JOBT_EXE_STR ||
+        exe->ctrl != &filter->server_ctrl)
+        return 21;
+    second = TaskText(Fs, NULL, "text_value+=5;", 0);
+    if (!second || Fs->last_input_filter_task != filter ||
+        second->ctrl != &filter->server_ctrl)
+        return 3;
+    TaskWait(Fs);
+    if (TaskValidate(filter) || Fs->last_input_filter_task != Fs ||
+        Fs->next_input_filter_task != Fs ||
+        Bt(&Fs->task_flags, TASKf_FILTER_INPUT) ||
+        text_value != 105 || !text_seen || JobResGet(exe) != 42)
+        return 4;
+    if (MessageScan(&a, &b, 1 << 30) != 30 || a != 12 || b != 34)
+        return 5;
+
+    server = Spawn(&TextIdleServer);
+    if (!server || ZcTaskRun != -2)
+        return 6;
+    job = TaskText(server, Fs, "text_value=91;", 0);
+    if (!job || server->last_input_filter_task == server)
+        return 7;
+    TaskWait(server);
+    if (text_value != 91 || server->last_input_filter_task != server ||
+        Bt(&server->task_flags, TASKf_FILTER_INPUT))
+        return 8;
+
+    job = TaskText(server, Fs, "text_value=99;", 0);
+    filter = server->last_input_filter_task;
+    if (!job || !Kill(server) || TaskValidate(server) ||
+        TaskValidate(filter) || text_value != 91 || ZcTaskRun)
+        return 9;
+    return 42;
+}
+
+I64 TaskTextRecycleChecks()
+{
+    I64 i;
+
+    text_value = 0;
+    for (i = 0; i < 130; i++) {
+        if (!TaskText(Fs, NULL, "text_value++;", 0))
+            return 1;
+        TaskWait(Fs);
+    }
+    if (text_value != 130 || Fs->last_input_filter_task != Fs)
+        return 2;
+    return 42;
+}
+
+I64 TaskTextPriorityChecks()
+{
+    CTask *first, *second, *server;
+    CJob *job;
+    I64 high = 1 << JOBf_HIGHEST_PRIORITY, first_num;
+
+    text_value = 0;
+    job = TaskText(Fs, Fs, "text_value=1;", 0);
+    first = Fs->last_input_filter_task;
+    if (!job || first == Fs)
+        return 1;
+    first_num = first->task_num;
+    job = TaskText(Fs, Fs, "text_value=text_value*10+2;", high);
+    second = Fs->last_input_filter_task;
+    if (!job || text_value != 1 || second == Fs ||
+        second->task_num <= first_num || job->flags != high)
+        return 2;
+    TaskWait(Fs);
+    if (text_value != 12 || TaskValidate(second) ||
+        Fs->last_input_filter_task != Fs)
+        return 3;
+
+    job = TaskText(Fs, NULL, "text_value=text_value*10+3;", high);
+    if (!job || job->flags != high)
+        return 4;
+    TaskWait(Fs);
+    if (text_value != 123)
+        return 5;
+
+    server = Spawn(&TextIdleServer);
+    if (!server || ZcTaskRun != -2 ||
+        !TaskText(server, Fs, "text_value=4;", 0))
+        return 6;
+    first = server->last_input_filter_task;
+    first_num = first->task_num;
+    job = TaskText(server, Fs, "text_value=5;", high);
+    second = server->last_input_filter_task;
+    if (!job || text_value != 4 || second == server ||
+        second->task_num <= first_num || job->flags != high)
+        return 7;
+    TaskWait(server);
+    if (text_value != 5 || server->last_input_filter_task != server ||
+        !Kill(server) || ZcTaskRun)
+        return 8;
+    return 42;
+}
+
+I64 TaskTextKillParentChecks()
+{
+    CTask *server = Spawn(&TextIdleServer);
+    if (!server || ZcTaskRun != -2 ||
+        !TaskText(server, Fs, "Kill(Fs->parent_task);", 0))
+        return 1;
+    TaskWait(server);
+    return 2; // The active filter must reject killing its server.
+}

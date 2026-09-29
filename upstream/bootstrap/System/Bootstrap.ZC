@@ -1,0 +1,28 @@
+// Bootstrap API surface, not a replacement for the full KernelA/KernelB.
+// Primitive aliases are local scaffolding; upstream QuickSort is unchanged.
+#define U8 U8i
+#define I8 I8i
+#define U16 U16i
+#define I16 I16i
+#define U32 U32i
+#define I32 I32i
+#define U64 U64i
+#define I64 I64i
+#define Bool U8i
+#define NULL 0
+#define TRUE 1
+#define FALSE 0
+extern U8 *MAlloc(I64 size);
+extern U0 Free(U8 *ptr);
+extern I64 MSize(U8 *ptr);
+extern U8 *MemCopy(U8 *dst,U8 *src,I64 count);
+extern U8 *MemSet(U8 *dst,I64 byte,I64 count);
+extern I64 SwapI64(I64 *a,I64 *b);
+extern U0 Puts(U8 *text);
+// Temporary cooperative task bridge. These are not ZealOS Spawn/Yield APIs.
+extern I64 ZcTaskSpawn(I64 (*entry)());
+extern I64 ZcTaskYield();
+extern I64 ZcTaskRun();
+extern I64 ZcTaskResult(I64 task_num);
+// Temporary ARM64 bootstrap binding for the table initialized by upstream KMain.
+extern F64 *pow10_I64;

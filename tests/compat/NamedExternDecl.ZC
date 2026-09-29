@@ -1,0 +1,2 @@
+_extern REMOTE_PROC I64 NamedExtern(I64 x);
+_extern REMOTE_DATA I64 named_extern_data;

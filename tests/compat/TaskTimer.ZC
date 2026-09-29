@@ -1,0 +1,90 @@
+// Cooperative Sleep over the ARM generic timer and pinned task signatures.
+I64 timer_phase;
+
+U0 TimerWorker(U8 *data)
+{
+    timer_phase = 1;
+    Sleep(8);
+    timer_phase = 2;
+}
+
+U0 TimerLongWorker(U8 *data)
+{
+    timer_phase = 1;
+    Sleep(500);
+    timer_phase = 2;
+}
+
+I64 TaskTimerChecks()
+{
+    CTask *worker;
+    I64 start = TSCGet;
+
+    Sleep(2);
+    if (TSCGet <= start)
+        return 1;
+    timer_phase = 0;
+    worker = Spawn(&TimerWorker);
+    if (!worker)
+        return 2;
+    Sleep(1);
+    if (timer_phase != 1 || !TaskValidate(worker))
+        return 3;
+    DeathWait(&worker);
+    if (timer_phase != 2 || TaskValidate(worker))
+        return 4;
+    return 42;
+}
+
+I64 TaskTimerRunChecks()
+{
+    CTask *worker;
+    timer_phase = 0;
+    worker = Spawn(&TimerWorker);
+    if (!worker || ZcTaskRun != 1 || timer_phase != 2 ||
+        TaskValidate(worker))
+        return 1;
+    return 42;
+}
+
+I64 TaskTimerSuspendChecks()
+{
+    CTask *worker;
+    timer_phase = 0;
+    worker = Spawn(&TimerLongWorker);
+    if (!worker)
+        return 1;
+    Sleep(1);
+    if (timer_phase != 1 || Suspend(worker, TRUE) || ZcTaskRun != -2)
+        return 2;
+    if (!Kill(worker) || timer_phase != 1)
+        return 3;
+    return 42;
+}
+
+I64 TaskTimerJobChecks()
+{
+    CJob *job = TaskExe(Fs, Fs, "Sleep(2); 42;", 0);
+    if (!job || JobsHandler(0) != 1 || JobResGet(job) != 42)
+        return 1;
+    return 42;
+}
+
+CTask *timer_background_task;
+
+I64 TaskTimerBackgroundStart()
+{
+    timer_phase = 0;
+    timer_background_task = Spawn(&TimerWorker);
+    if (!timer_background_task || timer_phase != 0)
+        return 1;
+    return 42;
+}
+
+I64 TaskTimerBackgroundChecks()
+{
+    // This function does not Yield: the worker must have run at the shell.
+    if (timer_phase != 2 || TaskValidate(timer_background_task))
+        return 1;
+    return 42;
+}

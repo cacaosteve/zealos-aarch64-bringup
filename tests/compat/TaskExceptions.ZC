@@ -1,0 +1,118 @@
+// Guest exception pads must survive nested calls and unwind only this task.
+U0 TaskExceptionThrower(I64 ch)
+{
+    throw(ch);
+}
+
+I64 TaskExceptionChecks()
+{
+    I64 result = 0;
+
+    try {
+        result = 40;
+    } catch {
+        result = 1;
+        Fs->catch_except = TRUE;
+    }
+    if (result != 40)
+        return 1;
+
+    try {
+        TaskExceptionThrower('Oops');
+        result = 2;
+    } catch {
+        if (Fs->except_ch == 'Oops')
+            result = 41;
+        Fs->catch_except = TRUE;
+    }
+    if (result != 41)
+        return 2;
+
+    try {
+        try {
+            TaskExceptionThrower('Nest');
+        } catch {
+            // Deliberately leave this uncaught; EndCatch must rethrow.
+            result = 3;
+        }
+    } catch {
+        if (Fs->except_ch == 'Nest')
+            result = 42;
+        Fs->catch_except = TRUE;
+    }
+    return result;
+}
+
+I64 TaskExceptionBareChecks()
+{
+    I64 result = 0;
+    try
+        result = 42;
+    catch
+        Fs->catch_except = TRUE;
+    return result;
+}
+
+I64 TaskExceptionCatchNestedChecks()
+{
+    I64 result = 0;
+    try {
+        throw('Outer');
+    } catch {
+        if (Fs->except_ch == 'Outer') {
+            Fs->catch_except = TRUE;
+            try {
+                throw('Inner');
+            } catch {
+                if (Fs->except_ch == 'Inner')
+                    result = 42;
+                Fs->catch_except = TRUE;
+            }
+            if (Fs->except_ch != 'Outer' || !Fs->catch_except)
+                result = 1;
+        }
+    }
+    return result;
+}
+
+I64 task_except_fiber_sum, task_except_fiber_error;
+U8 task_except_first, task_except_second;
+
+U0 TaskExceptionFiber(U8 *data)
+{
+    CTask *self = Fs;
+    I64 code = data[0];
+    try {
+        Yield;
+        throw(code);
+    } catch {
+        if (Fs != self || Fs->except_ch != code)
+            task_except_fiber_error = 1;
+        else
+            task_except_fiber_sum += code;
+        Fs->catch_except = TRUE;
+    }
+}
+
+I64 TaskExceptionFiberChecks()
+{
+    CTask *a, *b;
+    I64 before = Fs->data_heap->used_u8s;
+    I64 i;
+
+    for (i = 0; i < 16; i++)
+        if (TaskExceptionChecks() != 42 || TaskExceptionCatchNestedChecks() != 42)
+            return 1;
+    if (Fs->data_heap->used_u8s != before)
+        return 2;
+
+    task_except_first = 17;
+    task_except_second = 25;
+    task_except_fiber_sum = task_except_fiber_error = 0;
+    a = Spawn(&TaskExceptionFiber, &task_except_first);
+    b = Spawn(&TaskExceptionFiber, &task_except_second);
+    if (!a || !b || ZcTaskRun != 2 || task_except_fiber_error ||
+        task_except_fiber_sum != 42 || TaskValidate(a) || TaskValidate(b))
+        return 3;
+    return 42;
+}

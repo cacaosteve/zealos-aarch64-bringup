@@ -1,0 +1,1 @@
+I64 BadRemoteData() { return named_extern_data; }

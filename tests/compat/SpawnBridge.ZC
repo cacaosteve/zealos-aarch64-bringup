@@ -1,0 +1,75 @@
+// Runs after the original KernelA/KernelB declarations and the local bridge.
+I64 spawn_trace[4], spawn_count, spawn_error;
+U8 spawn_first, spawn_second;
+CTask *spawn_root;
+
+U0 SpawnWorker(U8 *data)
+{
+    CTask *self = Fs;
+    U8 *buf = MAlloc(24);
+    I64 value = data[0];
+    if (!TaskValidate(self) || self->parent_task != spawn_root ||
+        self->data_heap->mem_task != self ||
+        self->data_heap->hc_signature != HEAP_CTRL_SIGNATURE_VAL ||
+        self->data_heap->used_u8s < 24 || !buf)
+        spawn_error = 1;
+    buf[0] = value;
+    spawn_trace[spawn_count] = value;
+    spawn_count++;
+    Yield;
+    if (Fs != self || buf[0] != value || self->data_heap->used_u8s < 24)
+        spawn_error = 2;
+    data[0] = value + 10;
+    spawn_trace[spawn_count] = value + 10;
+    spawn_count++;
+    // The task heap must reclaim buf when this function returns.
+}
+
+U0 SpawnEmpty(U8 *data)
+{
+    spawn_count++;
+}
+
+I64 SpawnBridgeChecks()
+{
+    CTask *a, *b, *root = Fs;
+    I64 last_num;
+    U8 *root_buf;
+    spawn_root = root;
+    spawn_first = 1;
+    spawn_second = 2;
+    if (!TaskValidate(root) || Spawn(&SpawnWorker, NULL, "Bad", 0))
+        return 1;
+    root_buf = MAlloc(16);
+    if (!root_buf || root->data_heap->used_u8s < 16)
+        return 2;
+    a = Spawn(&SpawnWorker, &spawn_first, "Alpha");
+    b = Spawn(&SpawnWorker, &spawn_second, "Beta");
+    if (!TaskValidate(a) || !TaskValidate(b) || a == b ||
+        a->parent_task != root || b->parent_task != root ||
+        a->data_heap == b->data_heap || a->data_heap == root->data_heap ||
+        a->task_name[0] != 'A' || b->task_name[0] != 'B')
+        return 3;
+    if (ZcTaskRun != 2 || spawn_error || Fs != root)
+        return 4 + spawn_error;
+    if (TaskValidate(a) || TaskValidate(b) ||
+        a->data_heap->used_u8s || b->data_heap->used_u8s ||
+        root->data_heap->used_u8s < 16)
+        return 7;
+    if (spawn_first != 11 || spawn_second != 12 || spawn_count != 4 ||
+        spawn_trace[0] != 1 || spawn_trace[1] != 2 ||
+        spawn_trace[2] != 11 || spawn_trace[3] != 12)
+        return 8;
+    last_num = b->task_num;
+    Free(root_buf);
+    if (root->data_heap->used_u8s)
+        return 9;
+    // Completed slots can be reused, while the four-live-task bound holds.
+    a = Spawn(&SpawnEmpty);
+    if (!a || a->task_num <= last_num || !Spawn(&SpawnEmpty) ||
+        !Spawn(&SpawnEmpty) || !Spawn(&SpawnEmpty) || Spawn(&SpawnEmpty))
+        return 10;
+    if (ZcTaskRun != 4 || spawn_count != 8)
+        return 11;
+    return 42;
+}

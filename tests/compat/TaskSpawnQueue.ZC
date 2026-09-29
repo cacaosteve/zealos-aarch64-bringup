@@ -1,0 +1,61 @@
+// Pinned MultiProc.ZC SpawnQueue result and CJob spawned_task on CPU 0.
+I64 spawn_queue_seen, spawn_queue_arg, spawn_queue_task_num;
+
+U0 SpawnQueueWorker(U8 *data)
+{
+    I64 *value = data;
+    spawn_queue_seen++;
+    spawn_queue_arg = *value;
+    spawn_queue_task_num = Fs->task_num;
+}
+
+U0 SpawnQueueHold(U8 *data)
+{
+    Yield;
+}
+
+I64 TaskSpawnQueueChecks()
+{
+    I64 value = 42;
+    CTask *child, *parent, *nested, *full[4];
+    CJob *job;
+    I64 i;
+    if (SpawnQueue(&SpawnQueueWorker, &value, "Wrong", 1) ||
+        SpawnQueue(&SpawnQueueWorker, &value, "Wrong", 0, NULL, 1024) ||
+        SpawnQueue(&SpawnQueueWorker, &value, "Wrong", 0, NULL, 0, 0))
+        return 1;
+    child = SpawnQueue(&SpawnQueueWorker, &value, "Queued", 0);
+    if (!TaskValidate(child) || child->parent_task != Fs ||
+        child->task_name[0] != 'Q' || spawn_queue_seen)
+        return 2;
+    if (ZcTaskRun != 1 || TaskValidate(child) || spawn_queue_seen != 1 ||
+        spawn_queue_arg != 42 || spawn_queue_task_num != child->task_num)
+        return 3;
+    job = JobQueue(&SpawnQueueWorker, &value, 0, 1 << JOBf_ADD_TO_QUE,
+                   JOBT_SPAWN_TASK, "Direct", Fs);
+    if (!job || job->job_code != JOBT_SPAWN_TASK ||
+        job->spawned_task || JobResScan(job))
+        return 4;
+    while (!Bt(&job->flags, JOBf_DONE)) Yield;
+    child = job->spawned_task;
+    if (!TaskValidate(child) || child->parent_task != Fs ||
+        child->task_name[0] != 'D' || !JobResScan(job))
+        return 5;
+    if (ZcTaskRun != 1 || spawn_queue_seen != 2)
+        return 6;
+    parent = Spawn(&SpawnQueueHold);
+    if (!TaskValidate(parent)) return 7;
+    nested = SpawnQueue(&SpawnQueueWorker, &value, "Nested", 0, parent);
+    if (!TaskValidate(nested) || nested->parent_task != parent ||
+        !Kill(parent) || TaskValidate(nested))
+        return 8;
+    for (i = 0; i < 4; i++) {
+        full[i] = Spawn(&SpawnQueueHold);
+        if (!TaskValidate(full[i])) return 9;
+        Suspend(full[i]);
+    }
+    if (SpawnQueue(&SpawnQueueWorker, &value, "Full", 0)) return 10;
+    for (i = 0; i < 4; i++)
+        if (!Kill(full[i])) return 11;
+    return 42;
+}

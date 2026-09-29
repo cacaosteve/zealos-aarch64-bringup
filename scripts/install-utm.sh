@@ -4,7 +4,8 @@
 # Clone quirks this script handles:
 #   - Resolve by utmctl UUID (folder name may still be the clone's).
 #   - Keep the clone's Drive Identifier / ImageName so UTM Start works.
-#   - Overwrite that image file with build/disk.img (Zeal ESP contents).
+#   - Overwrite that image file with build/disk.img (Zeal GPT/ESP contents).
+#   - Preserve the legacy RedSea window and both native source banks.
 #   - QEMU.AdditionalArguments must be an argv *array*, not a string.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -72,8 +73,10 @@ cfg.setdefault("Information", {})["Name"] = "$VM_NAME"
 cfg["Information"]["Notes"] = (
     "ZealOS aarch64 Limine bring-up. Disk image bytes are our ESP; "
     "filename may still be Omarchy-QEMU.raw from the UTM clone. "
-    "RedSea lives at LBA 130911 (128 sectors) before the GPT backup; "
-    "make utm preserves that range. QEMU harness also has MMIO redsea.img."
+    "RedSea stays at LBA 130911 (128 sectors); the native source partition "
+    "starts at LBA 131039; shadow bank starts at 196575 (65536 sectors each). "
+    "make utm preserves all three ranges. "
+    "QEMU ISO harness also has MMIO redsea.img."
 )
 
 # Preserve existing disk slot identity (UTM caches drive ids from the clone).
@@ -106,16 +109,35 @@ data = dest / "Data"
 data.mkdir(exist_ok=True)
 target = data / img_name
 
-# Preserve RedSea window (LBA 130911, 128 sectors) across ESP refresh.
-# Must match src/disk_layout.h / Makefile RS_LBA_BASE + RS_SECTS.
+# Preserve RedSea and both native-source banks across GPT refresh.
+# Must match src/disk_layout.h and the Makefile layout constants.
 RS_LBA_BASE = 130911
 RS_SECTS = 128
 RS_BYTES = RS_SECTS * 512
+SRC_LBA_BASE = 131039
+SRC_SECTS = 65536
+SRC_BYTES = SRC_SECTS * 512
+SHADOW_LBA_BASE = 196575
+SHADOW_BYTES = SRC_BYTES
 old_rs = None
+old_source = None
+old_shadow = None
 if target.is_file() and target.stat().st_size >= (RS_LBA_BASE + RS_SECTS) * 512:
     with open(target, "rb") as f:
         f.seek(RS_LBA_BASE * 512)
         old_rs = f.read(RS_BYTES)
+        if target.stat().st_size >= (SRC_LBA_BASE + SRC_SECTS) * 512:
+            f.seek(SRC_LBA_BASE * 512)
+            candidate = f.read(SRC_BYTES)
+            if len(candidate) == SRC_BYTES and candidate[:8] == b"ZCSRC001":
+                old_source = candidate
+            elif len(candidate) == SRC_BYTES and candidate[:8] == b"ZCSRC002":
+                old_source = candidate
+        if target.stat().st_size >= (SHADOW_LBA_BASE + SRC_SECTS) * 512:
+            f.seek(SHADOW_LBA_BASE * 512)
+            candidate = f.read(SHADOW_BYTES)
+            if len(candidate) == SHADOW_BYTES and candidate[:8] == b"ZCSRC002":
+                old_shadow = candidate
 
 shutil.copyfile(disk_src, target)
 if old_rs and len(old_rs) == RS_BYTES:
@@ -125,9 +147,21 @@ if old_rs and len(old_rs) == RS_BYTES:
     print(f"RedSea preserved @ LBA {RS_LBA_BASE} ({RS_BYTES} bytes)")
 else:
     print(f"RedSea @ LBA {RS_LBA_BASE}: fresh (zeros)")
+if old_source is not None:
+    with open(target, "r+b") as f:
+        f.seek(SRC_LBA_BASE * 512)
+        f.write(old_source)
+    print(f"Native source preserved @ LBA {SRC_LBA_BASE} ({SRC_BYTES} bytes)")
+else:
+    print(f"Native source @ LBA {SRC_LBA_BASE}: seeded from image")
+if old_shadow is not None:
+    with open(target, "r+b") as f:
+        f.seek(SHADOW_LBA_BASE * 512)
+        f.write(old_shadow)
+    print(f"Native source shadow preserved @ LBA {SHADOW_LBA_BASE} ({SHADOW_BYTES} bytes)")
 
 # Convenience second name for humans / older scripts
-shutil.copyfile(disk_src, data / "zealos-esp.raw")
+shutil.copyfile(target, data / "zealos-esp.raw")
 
 sys = cfg.setdefault("System", {})
 sys["Architecture"] = "aarch64"
@@ -187,6 +221,6 @@ PY
 "$UTMCTL" list | grep -E "UUID|$VM_NAME" || true
 echo
 echo "One VM: $VM_NAME. Start it in UTM (or: utmctl start $VM_NAME)"
-echo "Serial: utmctl attach $VM_NAME"
+echo "Serial: UTM Window → $VM_NAME (Terminal 1) (utmctl attach is not implemented)"
 echo "Expect: Limine → ZealBooter → shell '>'  (not Omarchy)"
 echo "UTM freeze M33–M39: rscatalog; runzc UseAdd/Notes/MemSort (see ACCEPTANCE.md)."

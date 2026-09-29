@@ -1,0 +1,32 @@
+// Pinned SerialDev/Message.ZC dispatches current-task jobs in MessageScan.
+I64 message_job_stage, message_job_value, message_job_code, message_job_arg;
+
+U0 MessageJobReceiver(U8 *data)
+{
+    I64 arg = 0;
+    message_job_stage = 1;
+    message_job_code = MessageGet(&arg, NULL, 1 << MESSAGE_KEY_DOWN);
+    message_job_arg = arg;
+    message_job_stage = 2;
+}
+
+I64 TaskMessageJobsChecks()
+{
+    CTask *server = Spawn(&MessageJobReceiver);
+    CJob *job;
+    if (!server || ZcTaskRun != -2 || message_job_stage != 1)
+        return 1;
+    job = TaskExe(server, Fs, "message_job_value=40;", 0);
+    if (!job || MessageScan(NULL, NULL, ~1, server) ||
+        FlushMessages(server) || message_job_value)
+        return 4;
+    if (JobResGet(job) != 40 || message_job_value != 40 ||
+        message_job_stage != 1 || !TaskValidate(server))
+        return 2;
+    MessagePost(server, MESSAGE_KEY_DOWN, 2, 0);
+    if (ZcTaskRun != 1 || TaskValidate(server) ||
+        message_job_stage != 2 || message_job_code != MESSAGE_KEY_DOWN ||
+        message_job_arg != 2)
+        return 3;
+    return 42;
+}

@@ -1,0 +1,12 @@
+class LayoutCursor {
+    U8i first;
+    ;$$ = ($$ + 15) & -16;
+    U64i aligned;
+#assert $$ == 24
+    $$ = 64;
+};
+#assert sizeof(LayoutCursor) == 64
+#assert offset(LayoutCursor.aligned) == 16
+I64 LayoutCursorChecks() {
+    return sizeof(LayoutCursor) + offset(LayoutCursor.aligned);
+}

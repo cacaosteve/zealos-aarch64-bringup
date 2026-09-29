@@ -37,7 +37,7 @@ struct zeal_handoff {
     uint64_t magic0;
     uint64_t magic1;
     uint32_t size; /* sizeof(struct zeal_handoff) */
-    uint32_t revision; /* 1 */
+    uint32_t revision; /* 3; extensions are appended */
     uint32_t bootloader_id; /* ZEAL_BL_* */
     uint32_t flags;
     uint64_t hhdm_offset;
@@ -54,4 +54,7 @@ struct zeal_handoff {
     uint64_t bc_virt; /* optional HolyC bytecode module (Limine ptr) */
     uint64_t bc_size;
     struct zeal_mem_entry mem[ZEAL_MEM_MAX];
+    /* revision >= 3; appended to retain rev2 memory-map layout */
+    uint64_t sources_virt;
+    uint64_t sources_size;
 };

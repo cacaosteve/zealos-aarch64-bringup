@@ -1,0 +1,11 @@
+I64 MathTableChecks() {
+    if (pow10_I64[1] <= 0.0 || pow10_I64[1] >= pow10_I64[2])
+        return 1;
+    if (pow10_I64[308] >= pow10_I64[309] || pow10_I64[309] != 1.0)
+        return 2;
+    if (pow10_I64[310] != 10.0 || pow10_I64[311] != 100.0)
+        return 3;
+    if (pow10_I64[617] <= pow10_I64[616])
+        return 4;
+    return 42;
+}

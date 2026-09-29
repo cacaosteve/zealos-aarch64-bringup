@@ -1,0 +1,2 @@
+I64 ImportTarget() { return 7; }
+_import ImportTarget I64 ImportAlias();

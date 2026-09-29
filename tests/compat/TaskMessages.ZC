@@ -1,0 +1,150 @@
+// Pinned Job.ZC and SerialDev/Message.ZC signatures, cooperative bridge.
+I64 msg_stage, msg_code1, msg_code2, msg_arg1, msg_arg2;
+
+U0 MessageReceiver(U8 *data)
+{
+    I64 a = 0, b = 0;
+    msg_stage = 1;
+    msg_code1 = MessageGet(&a, &b, 1 << MESSAGE_KEY_DOWN);
+    msg_arg1 = a;
+    msg_arg2 = b;
+    msg_stage = 2;
+    msg_code2 = MessageGet(&a, &b, 1 << MESSAGE_KEY_UP);
+    msg_stage = 3;
+}
+
+U0 MessageIdleReceiver(U8 *data)
+{
+    MessageGet;
+    LBts(&Fs->task_flags, TASKf_IDLE);
+    Yield;
+}
+
+I64 TaskMessageChecks()
+{
+    CTask *receiver, *idle;
+    CJob *job;
+    I64 a = 9, b = 9;
+    if (MessageScan(&a, &b) || a || b)
+        return 1;
+    receiver = Spawn(&MessageReceiver);
+    if (!receiver || ZcTaskRun != -2 || msg_stage != 1 ||
+        !Bt(&receiver->task_flags, TASKf_IDLE))
+        return 2;
+    MessagePost(receiver, MESSAGE_MS_MOVE, 11, 12);
+    MessagePost(receiver, MESSAGE_KEY_DOWN, 42, 7);
+    MessagePost(receiver, MESSAGE_KEY_UP, 42, 7);
+    if (Bt(&receiver->task_flags, TASKf_IDLE) ||
+        receiver->server_ctrl.next_waiting == &receiver->server_ctrl ||
+        ZcTaskRun != 1 || msg_stage != 3 ||
+        msg_code1 != MESSAGE_KEY_DOWN || msg_code2 != MESSAGE_KEY_UP ||
+        msg_arg1 != 42 || msg_arg2 != 7)
+        return 3;
+    job = TaskMessage(Fs, NULL, MESSAGE_KEY_DOWN_UP, 53, 8, 0);
+    if (!job || job->job_code != JOBT_MESSAGE ||
+        job->message_code != MESSAGE_KEY_DOWN ||
+        job->aux1 != 53 || job->aux2 != 8 ||
+        job->master_task || FlushMessages != 2)
+        return 4;
+    Message(MESSAGE_KEY_DOWN, 17, 19);
+    if (MessageScan(&a, &b) != MESSAGE_KEY_DOWN || a != 17 || b != 19 ||
+        MessageScan)
+        return 5;
+    idle = Spawn(&MessageIdleReceiver);
+    if (!idle || ZcTaskRun != -2 || !Bt(&idle->task_flags, TASKf_IDLE))
+        return 6;
+    MessagePostWait(idle, MESSAGE_CMD, 1, 2);
+    if (!TaskValidate(idle) || !Bt(&idle->task_flags, TASKf_IDLE) ||
+        idle->server_ctrl.next_waiting != &idle->server_ctrl || ZcTaskRun != 1)
+        return 7;
+    receiver = Spawn(&MessageReceiver);
+    Suspend(receiver, TRUE);
+    MessagePost(receiver, MESSAGE_KEY_DOWN, 1, 2);
+    if (!Kill(receiver))
+        return 8;
+    receiver = Spawn(&MessageReceiver);
+    if (!receiver || receiver->server_ctrl.next_waiting != &receiver->server_ctrl ||
+        MessageScan(NULL, NULL, ~1, receiver))
+        return 9;
+    Kill(receiver);
+    return 42;
+}
+
+I64 TaskMessageDeadlockChecks()
+{
+    // No task can produce a command; keyboard input cannot satisfy this mask.
+    MessageGet(NULL, NULL, 1 << MESSAGE_CMD);
+    return 0;
+}
+
+I64 popup_stage, popup_code, popup_arg;
+
+U0 PopupMessageReceiver(U8 *data)
+{
+    I64 arg = 0;
+    popup_stage = 1;
+    popup_code = MessageGet(&arg, NULL, 1 << MESSAGE_CMD);
+    popup_arg = arg;
+    popup_stage = 2;
+}
+
+I64 PopupMessageChecks()
+{
+    CTask *child = Spawn(&PopupMessageReceiver);
+    I64 arg = 0;
+    if (!child)
+        return 1;
+    if (Bt(&Fs->task_flags, TASKf_FILTER_INPUT))
+        return 6;
+    // An ordinary child must not consume its parent's queue.
+    MessagePost(Fs, MESSAGE_CMD, 7, 0);
+    if (MessageScan(NULL, NULL, 1 << MESSAGE_CMD, child) ||
+        MessageScan(&arg, NULL, 1 << MESSAGE_CMD) != MESSAGE_CMD || arg != 7)
+        return 2;
+
+    Fs->popup_task = child;
+    if (ZcTaskRun != -2 || popup_stage != 1 ||
+        !Bt(&child->task_flags, TASKf_IDLE))
+        return 3;
+    // Pinned Job.ZC rejects direct jobs while the parent's popup is active.
+    if (TaskMessage(Fs, NULL, MESSAGE_CMD, 9, 0, 0) ||
+        TaskExe(Fs, NULL, "1;", 0) || TaskText(Fs, NULL, "1;", 0) ||
+        MessageScan(NULL, NULL, 1 << MESSAGE_CMD, child))
+        return 7;
+    LBts(&child->task_flags, TASKf_AWAITING_MESSAGE);
+    // A filtering parent can still receive a bypassed message for its popup.
+    LBts(&Fs->task_flags, TASKf_FILTER_INPUT);
+    MessagePost(Fs, MESSAGE_CMD, 42, 0, 1 << JOBf_DONT_FILTER);
+    LBtr(&Fs->task_flags, TASKf_FILTER_INPUT);
+    if (Bt(&child->task_flags, TASKf_AWAITING_MESSAGE) ||
+        ZcTaskRun != 1 || popup_stage != 2 ||
+        popup_code != MESSAGE_CMD || popup_arg != 42)
+        return 4;
+    if (Fs->popup_task || MessageScan(NULL, NULL, 1 << MESSAGE_CMD) ||
+        TaskValidate(child))
+        return 5;
+    return 42;
+}
+
+I64 TaskKeyDescriptionChecks()
+{
+    U32 original = Fs->win_inhibit;
+    I64 ch = 9, scan = 9, result = 42;
+
+    // Pinned MessageScan discards descriptive key events when inhibited.
+    Fs->win_inhibit = original | WIF_SELF_KEY_DESC;
+    MessagePost(Fs, MESSAGE_KEY_DOWN, 'D', SCF_KEY_DESC | 0x20);
+    if (MessageScan(&ch, &scan, 1 << MESSAGE_KEY_DOWN) || ch || scan)
+        result = 1;
+    MessagePost(Fs, MESSAGE_KEY_DOWN, 'E', 0x21);
+    if (!KeyScan(&ch, &scan) || ch != 'E' || scan != 0x21)
+        result = 2;
+
+    Fs->win_inhibit = original & ~WIF_SELF_KEY_DESC;
+    MessagePost(Fs, MESSAGE_KEY_DOWN, 'F', SCF_KEY_DESC | 0x21);
+    if (!KeyScan(&ch, &scan) || ch != 'F' || scan != (SCF_KEY_DESC | 0x21))
+        result = 3;
+    Fs->win_inhibit = original;
+    FlushMessages;
+    return result;
+}

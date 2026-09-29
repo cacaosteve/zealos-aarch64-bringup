@@ -1,0 +1,31 @@
+// KernelB's RFlagsGet/Set interrupt-enable subset on ARM64.
+I64 TaskIRQFlagsChecks()
+{
+    I64 saved = RFlagsGet;
+    I64 failure = 0;
+
+    RFlagsSet(saved | 1 << 9);
+    if (!(RFlagsGet & 1 << 9))
+        failure = 1;
+    CLI
+    if (RFlagsGet & 1 << 9)
+        failure = 2;
+    RFlagsSet(saved);
+    if ((RFlagsGet ^ saved) & 1 << 9)
+        failure = 3;
+    PUSHFD
+    CLI
+    if (RFlagsGet & 1 << 9)
+        failure = 4;
+    PUSHFD
+    RFlagsSet(saved | 1 << 9);
+    POPFD
+    if (RFlagsGet & 1 << 9)
+        failure = 5;
+    POPFD
+    if ((RFlagsGet ^ saved) & 1 << 9)
+        failure = 6;
+    if (failure)
+        return failure;
+    return 42;
+}

@@ -19,6 +19,7 @@ I64 RunZCSeed()
 	I64 *w;
 	CFile *f;
 	I64 root;
+	I64 sects;
 	I64 fclus;
 	I64 i;
 	I64 sz;
@@ -26,11 +27,15 @@ I64 RunZCSeed()
 	root = 0;
 	if (RSValid())
 		root = RSRoot();
+	sects = RSVolumeSects();
 	if (!root)
 	{
 		if (!RSFmt(16, 9))
 			return 0;
-		root = RSAlloc(16, 1);
+		sects = RSVolumeSects();
+		if (!sects)
+			return 0;
+		root = RSAlloc(sects, 1);
 		if (!root)
 			return 0;
 		br = MAlloc(512);
@@ -55,11 +60,13 @@ I64 RunZCSeed()
 		if (!BlkWrite(ent, root, 1))
 			return 0;
 	}
+	if (!sects)
+		return 0;
 
 	f = FOpen(root, "Hi.ZC");
 	if (!f)
 	{
-		fclus = RSAlloc(16, 1);
+		fclus = RSAlloc(sects, 1);
 		if (!fclus)
 			return 0;
 		f = FCreate(root, "Hi.ZC", fclus);

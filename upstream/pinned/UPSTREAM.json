@@ -1,0 +1,16 @@
+{
+  "repository": "https://github.com/Zeal-Operating-System/ZealOS",
+  "commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "files": {
+    "src/Kernel/Job.ZC": "712893a3ff33df3f862baea1ec5624c9dfb9e167d696e6a6d9b7c2dabb66181b",
+    "src/Kernel/KMathB.ZC": "1d249c72ef21eb75eb492f6aaa8cd3885ef085635a06bab8c26af55ced10ba33",
+    "src/Kernel/KTask.ZC": "35d8f62c20b25e1661fb1bfa28315feac13b86fcce34e3a684b049a66e06b2ea",
+    "src/Kernel/KernelA.HH": "46b9c59333fdec591861c904ee9bfbb3200f00b657161cc3c2f09c50d798fe37",
+    "src/Kernel/KernelB.HH": "a6d4983a8a12d95d3e4644f4dc854d05bffe3a5990fa1351c2a8cd56251e7472",
+    "src/Kernel/MultiProc.ZC": "2eb0b6035bfce13a015b73e26c15ecad395f4cf442ce9b8f19cd00814f56f387",
+    "src/Kernel/QuickSort.ZC": "605b5cbc600a92ce17858174d077e045b747675eedbaea965df147273bf6fdda",
+    "src/Kernel/Sched.ZC": "fb9c25e6ad76dbfd8cd79ea1f7defda37c21253216e51eff9bc43167c37bec4f",
+    "src/Kernel/SerialDev/Message.ZC": "041a9fecf89822455ce82aca70c489b4c90be36d11718a5f961e1846dc2b2585"
+  },
+  "changes": []
+}

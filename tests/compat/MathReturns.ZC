@@ -1,0 +1,28 @@
+F64 ClampThree(F64 d, F64 lo, F64 hi) {
+    if (d < lo)
+        return lo;
+    if (d > hi)
+        return hi;
+    return d;
+}
+
+F64 MinThree(F64 a, F64 b) {
+    if (a <= b)
+        return a;
+    else
+        return b;
+}
+
+F64 MaxThree(F64 a, F64 b) {
+    if (a >= b)
+        return a;
+    else
+        return b;
+}
+
+I64 MathReturnChecks() {
+    return (ClampThree(9.0, 2.0, 6.0) == 6.0)
+        + 2 * (ClampThree(1.0, 2.0, 6.0) == 2.0)
+        + 4 * (MinThree(3.0, 4.0) == 3.0)
+        + 8 * (MaxThree(3.0, 4.0) == 4.0);
+}

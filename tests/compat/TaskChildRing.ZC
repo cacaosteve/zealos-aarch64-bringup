@@ -1,0 +1,70 @@
+// KTask.ZC / Sched.ZC parent-child sentinel and sibling-link behavior.
+CTask *child_ring_nested;
+I64 child_ring_parent_ok;
+
+CTask *ChildRingHead(CTask *task)
+{
+    return (&task->next_child_task)(U8 *) - offset(CTask.next_sibling_task);
+}
+
+U0 ChildRingPark(U8 *data)
+{
+    while (TRUE) {
+        LBts(&Fs->task_flags, TASKf_IDLE);
+        Yield;
+    }
+}
+
+U0 ChildRingParent(U8 *data)
+{
+    CTask *self = Fs, *head = ChildRingHead(self);
+    child_ring_nested = Spawn(&ChildRingPark, NULL, "Nested", -1, self);
+    child_ring_parent_ok = child_ring_nested &&
+        self->next_child_task == child_ring_nested &&
+        self->last_child_task == child_ring_nested &&
+        child_ring_nested->next_sibling_task == head &&
+        child_ring_nested->last_sibling_task == head;
+    while (TRUE) Yield;
+}
+
+I64 TaskChildRingChecks()
+{
+    CTask *root = Fs, *head = ChildRingHead(root), *a, *b, *c, *parent;
+    if (root->next_child_task != head || root->last_child_task != head)
+        return 1;
+    a = Spawn(&ChildRingPark, NULL, "First");
+    b = Spawn(&ChildRingPark, NULL, "Second");
+    if (!a || !b || root->next_child_task != b ||
+        root->last_child_task != a || b->last_sibling_task != head ||
+        b->next_sibling_task != a || a->last_sibling_task != b ||
+        a->next_sibling_task != head)
+        return 2;
+    if (!Kill(b) || root->next_child_task != a ||
+        root->last_child_task != a || a->last_sibling_task != head ||
+        a->next_sibling_task != head)
+        return 3;
+    if (!Kill(a) || root->next_child_task != head ||
+        root->last_child_task != head)
+        return 4;
+    c = Spawn(&ChildRingPark, NULL, "Reuse");
+    if (!c || c != a || root->next_child_task != c ||
+        root->last_child_task != c || !Kill(c) ||
+        root->next_child_task != head || root->last_child_task != head)
+        return 5;
+
+    child_ring_nested = NULL;
+    child_ring_parent_ok = 0;
+    parent = Spawn(&ChildRingParent, NULL, "Parent");
+    if (!parent || root->next_child_task != parent)
+        return 6;
+    Yield;
+    if (!child_ring_parent_ok || !TaskValidate(child_ring_nested) ||
+        root->next_child_task != parent || root->last_child_task != parent ||
+        child_ring_nested->parent_task != parent)
+        return 7;
+    if (!Kill(parent) || TaskValidate(parent) ||
+        TaskValidate(child_ring_nested) || root->next_child_task != head ||
+        root->last_child_task != head)
+        return 8;
+    return 42;
+}

@@ -1,0 +1,9 @@
+// Bare HolyC string statements use Print's (format, argc, argv) ABI.
+I64 TaskPrintChecks()
+{
+    U8 *dynamic_format = " %s\n";
+    "$$PT$$%c$$FG$$", 'A';
+    " %s %% %c\n", "text", 'BC';
+    "" dynamic_format, "tail";
+    return 42;
+}

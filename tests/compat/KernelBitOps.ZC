@@ -1,0 +1,15 @@
+// KernelB.HH locked bit operations used by SerialDev/Message.ZC.
+I64 KernelBitOpsChecks()
+{
+    U64 bits = 0;
+
+    if (LBEqual(&bits, 40, TRUE) || !Bt(&bits, 40) ||
+        !LBEqual(&bits, 40, TRUE) || !LBEqual(&bits, 40, FALSE) ||
+        Bt(&bits, 40) || LBEqual(&bits, 40, FALSE))
+        return 1;
+    if (LBEqual(&bits, 0, TRUE) || LBEqual(&bits, 63, TRUE) ||
+        !Bt(&bits, 0) || !Bt(&bits, 63) ||
+        !LBEqual(&bits, 0, FALSE) || !LBEqual(&bits, 63, FALSE) || bits)
+        return 2;
+    return 42;
+}

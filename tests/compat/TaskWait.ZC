@@ -1,0 +1,78 @@
+// Cooperative BirthWait/DeathWait over the pinned KTask signatures.
+I64 wait_target_steps, wait_death_done, wait_birth_done, wait_publish_done;
+I64 birth_old_num, birth_seen_num;
+CTask *wait_target, *birth_slot;
+
+U0 WaitTarget(U8 *data)
+{
+    wait_target_steps++;
+    Yield;
+    wait_target_steps++;
+}
+
+U0 WaitDeath(U8 *data)
+{
+    DeathWait(&wait_target);
+    wait_death_done++;
+}
+
+U0 WaitBirth(U8 *data)
+{
+    birth_seen_num = BirthWait(&birth_slot, birth_old_num);
+    wait_birth_done++;
+}
+
+U0 WaitPublish(U8 *data)
+{
+    birth_slot = Spawn(&WaitTarget);
+    wait_publish_done++;
+}
+
+I64 TaskWaitChecks()
+{
+    CTask *old, *waiter, *publisher;
+    wait_target = Spawn(&WaitTarget);
+    DeathWait(&wait_target);
+    if (TaskValidate(wait_target) || wait_target_steps != 2)
+        return 1;
+
+    wait_target = Spawn(&WaitTarget);
+    waiter = Spawn(&WaitDeath);
+    if (!waiter || ZcTaskRun != 2 || wait_death_done != 1 ||
+        TaskValidate(wait_target) || TaskValidate(waiter))
+        return 2;
+
+    wait_target = Spawn(&WaitTarget);
+    Suspend(wait_target, TRUE);
+    waiter = Spawn(&WaitDeath);
+    if (!waiter || ZcTaskRun != -2 || wait_death_done != 1 ||
+        !TaskValidate(waiter))
+        return 3;
+    if (!Kill(wait_target) || ZcTaskRun != 1 || wait_death_done != 2 ||
+        TaskValidate(waiter))
+        return 4;
+
+    old = Spawn(&WaitTarget);
+    Suspend(old, TRUE);
+    birth_slot = old;
+    birth_old_num = old->task_num;
+    if (BirthWait(&birth_slot) != birth_old_num)
+        return 5;
+    waiter = Spawn(&WaitBirth);
+    publisher = Spawn(&WaitPublish);
+    if (!waiter || !publisher || ZcTaskRun != -2 ||
+        wait_birth_done != 1 || wait_publish_done != 1 ||
+        birth_seen_num <= birth_old_num)
+        return 5;
+    if (!Kill(old) || ZcTaskRun || TaskValidate(old))
+        return 6;
+    return 42;
+}
+
+I64 TaskWaitDeadlockChecks()
+{
+    CTask *task = Spawn(&WaitTarget);
+    Suspend(task, TRUE);
+    DeathWait(&task);
+    return 0;
+}

@@ -1,0 +1,269 @@
+// ARM64 bootstrap bindings for the single-CPU, cooperative subset of the
+// signatures in pinned Kernel/KTask.ZC and Kernel/Sched.ZC. The original
+// x86 assembly scheduler and task startup are not loaded here.
+// Pinned Message.ZC spells the x86 interrupt-mask instruction without a
+// semicolon. Preserve its queue critical section through the IF bit mapping.
+// RFlagsGet/Set expose only that bit on ARM64, not the full x86 flags word.
+#define CLI RFlagsSet(RFlagsGet & ~(1 << 9));
+// The x86 PUSHFD/POPFD pairs in pinned modules only need IF preservation
+// in this single-CPU bridge. Saving state across a task switch is rejected.
+#define PUSHFD RFlagsPush();
+#define POPFD RFlagsPop();
+extern U0 RFlagsPush();
+extern U0 RFlagsPop();
+// Poll the current virtio/UART key reader and queue its events for the focus
+// task. PS/2 mouse polling is outside this bridge.
+extern U0 KbdMouseHandler(Bool poll_kbd, Bool poll_mouse);
+extern I64 KbdMessagesQueue();
+// ARM64 exception pads are private to each cooperative guest task. The
+// compiler emits AIWNIOS_SetJmp(SysTry()) for HolyC try/catch.
+extern U8 *SysTry();
+extern U0 SysUntry();
+extern U0 EndCatch();
+extern I64 AIWNIOS_SetJmp(U8 *pad);
+extern U0 throw(I64 ch=0, Bool no_log=FALSE);
+// The initial ExePrint bridge accepts the source-job form used by pinned
+// InputFilterTask and Job.ZC: ExePrint("%s", source). Other formats remain
+// compiler-runtime work.
+extern I64 ExePrint(U8 *format, U8 *source);
+// Aiwnios lowers bare string statements to Print(format, argc, argv).
+// The bridge renders a bounded text subset until ZealOS StrPrintJoin/Doc
+// output is available. Styling markers used by CharGet are stripped.
+extern U0 Print(U8 *format, ...);
+// KeyDev.ZC normally routes PutKey through a chain of output devices.
+// Until that chain is loaded, the bridge sends printable ASCII to its text
+// output and honors the task's DISPLAYf_SILENT flag.
+extern U0 PutKey(I64 ch=0, I64 sc=0);
+// KMisc.ZC defines IsRaw from DISPLAYf_NOT_RAW. Boot into the current
+// text/Doc-style console mode and retain this flag across child tasks.
+Bool IsRaw()
+{
+    return !(Fs->display_flags & (1 << DISPLAYf_NOT_RAW));
+}
+// The raw-cursor cadence in Message.ZC divides TSCGet by this frequency.
+// The bridge fills it from the ARM generic timer's CNTFRQ_EL0.
+extern CCountsGlobals counts;
+// No ZealOS debugger task or PS/2 polling loop is present in this build.
+Bool IsDebugMode()
+{
+    return FALSE;
+}
+extern CTask *Spawn(U0 (*fp_start_addr)(U8 *data), U8 *data=NULL,
+                    U8 *task_name=NULL, I64 target_cpu=-1,
+                    CTask *parent=NULL, I64 stack_size=0,
+                    I64 flags=1 << JOBf_ADD_TO_QUE);
+extern U0 Yield();
+// The single-CPU task ring supports Sched.ZC's focus cycle. It changes
+// sys_focus_task but has no window stacking or automatic key chord yet.
+extern U0 TaskFocusNext();
+// Cooperative generic-timer wait. Other ready tasks run until mS elapses;
+// parsing and code emission remain non-switching.
+extern U0 Sleep(I64 mS);
+// The native bridge exits a child on its own stack, running task_end_cb once
+// before reclaiming its task-owned allocations. The root shell cannot exit.
+extern U0 Exit();
+extern U0 TaskEndNow();
+extern Bool TaskValidate(CTask *task);
+extern Bool Suspend(CTask *task=NULL, Bool state=TRUE);
+extern Bool IsSuspended(CTask *task=NULL);
+extern Bool Kill(CTask *task, Bool wait=TRUE, Bool just_break=FALSE);
+extern I64 BirthWait(CTask **_task, I64 task_num=-1);
+extern U0 DeathWait(CTask **_task, Bool send_exit=FALSE);
+extern U0 TaskWait(CTask *task=NULL, Bool cmd_line_prompt=FALSE);
+// Queue and consume messages using the pinned Job.ZC/SerialDev/Message.ZC API.
+extern U0 JobDel(CJob *job);
+extern CJob *TaskMessage(CTask *server, CTask *master, I64 message_code,
+                         I64 arg1, I64 arg2, I64 flags);
+extern U0 MessagePost(CTask *task, I64 message_code, I64 arg1, I64 arg2,
+                      I64 flags=0);
+extern U0 MessagePostWait(CTask *task, I64 message_code, I64 arg1, I64 arg2,
+                          I64 flags=0);
+extern U0 Message(I64 message_code, I64 arg1, I64 arg2, I64 flags=0);
+extern I64 MessageScan(I64 *_arg1=NULL, I64 *_arg2=NULL, I64 mask=~1,
+                       CTask *task=NULL);
+extern I64 MessageGet(I64 *_arg1=NULL, I64 *_arg2=NULL, I64 mask=~1,
+                      CTask *task=NULL);
+extern I64 FlushMessages(CTask *task=NULL);
+// SerialDev/Message.ZC key API over queued messages. Without explicit focus,
+// device input belongs to the task scanning its queue. KernelB.HH's
+// sys_focus_task redirects it to a live focused task, including a parked child.
+// Raw-cursor display is not bound yet.
+extern Bool KeyScan(I64 *_ch=NULL, I64 *_scan_code=NULL, Bool echo=FALSE);
+extern I64 KeyGet(I64 *_scan_code=NULL, Bool echo=FALSE,
+                  Bool raw_cursor=FALSE);
+// Before DolDoc takes over fp_getstr2, pinned KDebug.SysGetStr2 reads a
+// 512-byte line with StrNGet(..., FALSE) and returns a heap copy. Keep the
+// same input ownership contract on the current task's heap.
+U8 *BootstrapGetStr2(I64 flags=0)
+{
+    U8 buf[512], erase[4] = {CH_BACKSPACE, ' ', CH_BACKSPACE, 0}, *result;
+    I64 ch, used = 0;
+
+    while (TRUE)
+    {
+        // KeyGet marks this task as awaiting input and yields. The native
+        // scheduler pumps virtio/UART bytes into its message queue there.
+        ch = KeyGet(, FALSE, FALSE);
+        if (ch == '\n' || ch == '\r')
+        {
+            Puts("\n");
+            break;
+        }
+        else if (ch == CH_BACKSPACE)
+        {
+            if (used)
+            {
+                used--;
+                Puts(erase);
+            }
+        }
+        else if (ch >= 32 && ch < 127 && used < 511)
+        {
+            buf[used++] = ch;
+            PutKey(ch);
+        }
+    }
+    buf[used] = 0;
+    result = MAlloc(used + 1);
+    MemCopy(result, buf, used + 1);
+    return result;
+}
+U8 *(*fp_getstr2)(I64 flags=0) = &BootstrapGetStr2;
+// These string primitives are needed by StrGet/StrNGet in Message.ZC until
+// their original kernel implementation is loaded.
+I64 BootstrapStrLen(U8 *source)
+{
+    I64 length = 0;
+    while (source[length])
+        length++;
+    return length;
+}
+U8 *StrNew(U8 *source)
+{
+    I64 bytes = 1;
+    if (source)
+        bytes = BootstrapStrLen(source) + 1;
+    U8 *result = MAlloc(bytes);
+    if (source)
+        MemCopy(result, source, bytes);
+    else
+        *result = 0;
+    return result;
+}
+U0 StrCopy(U8 *dest, U8 *source)
+{
+    MemCopy(dest, source, BootstrapStrLen(source) + 1);
+}
+// Portable character input from SerialDev/Message.ZC. CharScan retains its
+// down-then-up contract; UART bytes are treated as a synthetic press/release.
+I64 CharScan()
+{
+    I64 arg1a, arg2a, arg1b, arg2b;
+
+    if (!MessageScan(&arg1a, &arg2a, 1 << MESSAGE_KEY_DOWN) || !arg1a)
+        return 0;
+    else
+        do MessageGet(&arg1b, &arg2b, 1 << MESSAGE_KEY_UP);
+        while (!arg1b);
+
+    return arg1a;
+}
+
+// Full upstream echo formatting depends on Doc/IsRaw; the bootstrap echoes
+// printable characters through the existing KeyGet text output.
+I64 CharGet(I64 *_scan_code=NULL, Bool echo=TRUE, Bool raw_cursor=FALSE)
+{
+    I64 ch;
+
+    do ch = KeyGet(_scan_code, echo, raw_cursor);
+    while (!ch);
+    return ch;
+}
+// A bounded TaskExe subset runs source in the recipient's inherited compiler
+// symbol table when it calls JobsHandler. WAKE_MASTER waits for the
+// calling master; FOCUS_MASTER restores focus after completion unless the
+// master inhibits self-focus; EXIT_ON_COMPLETE ends a child server. Each
+// executed statement updates that task's answer, answer_type, answer_time,
+// and new_answer fields. Timing covers the compiled statement's execution.
+// Yield and Sleep may switch tasks from emitted code; parsing and emission
+// still run without switching. Emitted source may dispatch nested jobs on
+// its own task. Exit in emitted source ends a child and publishes zero for
+// an in-flight canceled TaskExe result. Compiler-time dispatch and executive
+// callback exit remain unsupported.
+extern CJob *TaskExe(CTask *server, CTask *master, U8 *data, I64 flags);
+// A bounded TaskText path creates one temporary input filter for a server,
+// executes queued source in that filter's inherited compiler symbol table,
+// and restores queued messages to the server. HIGHEST_PRIORITY waits for the
+// current filter and starts a fresh one. The filter also dispatches TaskExe
+// jobs between text jobs. Its statements update the filter's answer state.
+// Concurrent/nested filters and the Doc StdIn runtime are absent.
+extern CJob *TaskText(CTask *server, CTask *master, U8 *data, I64 flags);
+// Pinned MultiProc.ZC signatures. This single-CPU bridge accepts CPU 0
+// callback and default queued-spawn jobs through one cooperative executive.
+// Precompiled callbacks may Yield or Sleep on the executive fiber.
+extern CJob *JobQueue(I64 (*fp_addr)(U8 *data), U8 *data=NULL,
+                      I64 target_cpu=1, I64 flags=1 << JOBf_FREE_ON_COMPLETE,
+                      I64 job_code=JOBT_CALL, U8 *aux_str=NULL,
+                      I64 aux1=0, I64 aux2=0);
+extern CTask *SpawnQueue(U0 (*fp_addr)(U8 *data), U8 *data=NULL,
+                        U8 *task_name=NULL, I64 target_cpu,
+                        CTask *parent=NULL, I64 stack_size=0,
+                        I64 flags=1 << JOBf_ADD_TO_QUE);
+extern I64 JobsHandler(I64 run_flags, CTask *task=NULL);
+extern Bool JobResScan(CJob *request=NULL, I64 *_res=NULL);
+extern I64 JobResGet(CJob *request=NULL);
+
+// Code-only bootstrap for pinned Job.ZC's PopUp path. ServerCmdLine and its
+// Doc/window loop are not loaded yet; this server only dispatches jobs.
+// Synchronous callers give the child keyboard focus until the source returns.
+U0 PopupBridgeServer(U8 *data)
+{
+    while (TRUE) {
+        JobsHandler(0);
+        LBts(&Fs->task_flags, TASKf_IDLE);
+        LBts(&Fs->task_flags, TASKf_AWAITING_MESSAGE);
+        Yield;
+    }
+}
+
+I64 PopUp(U8 *buf, CTask *parent=NULL, CTask **_pu_task=NULL)
+{
+    CTask *task;
+    CJob *job;
+    I64 res = 0;
+
+    if (_pu_task)
+        *_pu_task = NULL;
+    // The cooperative bridge can wait only for the calling task's job.
+    if (!buf || parent && parent != Fs)
+        return 0;
+    task = Spawn(&PopupBridgeServer, NULL, "Server", -1, parent);
+    if (!task)
+        return 0;
+    if (!parent) {
+        job = TaskExe(task, NULL, buf,
+                      1 << JOBf_EXIT_ON_COMPLETE | 1 << JOBf_FREE_ON_COMPLETE);
+        if (!job)
+            Kill(task);
+        else if (_pu_task)
+            *_pu_task = task;
+        return 0;
+    }
+
+    Fs->popup_task = task;
+    // A synchronous popup owns live input until JOBf_FOCUS_MASTER returns it.
+    sys_focus_task = task;
+    job = TaskExe(task, parent, buf,
+                  1 << JOBf_WAKE_MASTER | 1 << JOBf_FOCUS_MASTER);
+    if (!job && !Bt(&parent->win_inhibit, WIf_SELF_FOCUS))
+        sys_focus_task = parent;
+    if (_pu_task)
+        *_pu_task = task;
+    if (job)
+        JobResScan(job, &res);
+    Fs->popup_task = NULL;
+    Kill(task);
+    if (_pu_task)
+        *_pu_task = NULL;
+    return res;
+}

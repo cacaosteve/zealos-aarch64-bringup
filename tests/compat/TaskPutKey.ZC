@@ -1,0 +1,29 @@
+// The bootstrap's text-output subset of pinned KeyDev.ZC PutKey.
+I64 TaskPutKeyChecks()
+{
+    I64 ch = 0, sc = 0;
+    U32 old_display = Fs->display_flags;
+
+    if (IsRaw)
+        return 2;
+    Fs->display_flags &= ~(1 << DISPLAYf_NOT_RAW);
+    if (!IsRaw)
+        return 3;
+    Fs->display_flags = old_display;
+    if (!counts.time_stamp_freq ||
+        counts.time_stamp_freq != counts.time_stamp_freq_initial)
+        return 4;
+    if (ToI64(3.9) != 3 || ToI64(-3.9) != -3 ||
+        ToI64(ToF64(42)) != 42)
+        return 5;
+    if (IsDebugMode)
+        return 6;
+    PutKey('<');
+    MessagePost(Fs, MESSAGE_KEY_DOWN, '>', 0x34);
+    if (!KeyScan(&ch, &sc, TRUE) || ch != '>' || sc != 0x34)
+        return 1;
+    Fs->display_flags |= 1 << DISPLAYf_SILENT;
+    PutKey('~');
+    Fs->display_flags = old_display;
+    return 42;
+}

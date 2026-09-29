@@ -1,0 +1,78 @@
+// Bounded Sched.ZC task-order and focus cycle over live cooperative tasks.
+I64 focus_ring_ready, focus_ring_owner, focus_ring_value;
+U8 focus_ring_first = 1, focus_ring_second = 2;
+
+U0 FocusRingChild(U8 *data)
+{
+    I64 ch = 0;
+    focus_ring_ready |= data[0];
+    if (MessageGet(&ch, NULL, 1 << MESSAGE_KEY_DOWN) == MESSAGE_KEY_DOWN) {
+        focus_ring_owner = data[0];
+        focus_ring_value = ch;
+    }
+}
+
+I64 TaskFocusRingChecks()
+{
+    CTask *root = Fs, *a, *b, *c;
+    sys_focus_task = NULL;
+    if (root->next_task != root || root->last_task != root)
+        return 1;
+    a = Spawn(&FocusRingChild, &focus_ring_first);
+    b = Spawn(&FocusRingChild, &focus_ring_second);
+    if (!a || !b || root->next_task != a || a->last_task != root ||
+        a->next_task != b || b->last_task != a || b->next_task != root ||
+        root->last_task != b)
+        return 2;
+    TaskFocusNext;
+    if (sys_focus_task != a) return 3;
+    LBts(&b->win_inhibit, WIf_SELF_FOCUS);
+    TaskFocusNext;
+    if (sys_focus_task != root) return 4;
+    TaskFocusNext;
+    if (sys_focus_task != a) return 5;
+    LBtr(&b->win_inhibit, WIf_SELF_FOCUS);
+    if (!Kill(a) || sys_focus_task || root->next_task != b ||
+        b->last_task != root || b->next_task != root || root->last_task != b)
+        return 6;
+    TaskFocusNext;
+    if (sys_focus_task != b) return 7;
+    if (!Kill(b) || sys_focus_task || root->next_task != root ||
+        root->last_task != root)
+        return 8;
+    c = Spawn(&FocusRingChild, &focus_ring_first);
+    if (!c || c != a || root->next_task != c || root->last_task != c ||
+        c->next_task != root || c->last_task != root || !Kill(c) ||
+        root->next_task != root || root->last_task != root)
+        return 9;
+    TaskFocusNext;
+    if (sys_focus_task != root) return 10;
+    LBts(&root->win_inhibit, WIf_SELF_FOCUS);
+    TaskFocusNext;
+    if (sys_focus_task) return 11;
+    LBtr(&root->win_inhibit, WIf_SELF_FOCUS);
+    sys_focus_task = NULL;
+    return 42;
+}
+
+I64 TaskFocusRingLive()
+{
+    CTask *root = Fs;
+    CTask *a, *b;
+    focus_ring_ready = focus_ring_owner = focus_ring_value = 0;
+    a = Spawn(&FocusRingChild, &focus_ring_first);
+    b = Spawn(&FocusRingChild, &focus_ring_second);
+    if (!a || !b) return 0;
+    Yield;
+    if (focus_ring_ready != 3) return 0;
+    sys_focus_task = NULL;
+    TaskFocusNext;
+    TaskFocusNext;
+    if (sys_focus_task != b) return 0;
+    Puts("focus ring ready\n");
+    while (TaskValidate(b)) Yield;
+    if (focus_ring_owner != 2 || sys_focus_task || root->next_task != a ||
+        a->next_task != root || !Kill(a) || root->next_task != root)
+        return 0;
+    return focus_ring_value;
+}

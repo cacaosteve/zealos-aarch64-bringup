@@ -1,0 +1,9 @@
+I64 HeaderCopyChecks() {
+    U8 *src = MAlloc(1), *dst = MAlloc(1);
+    src[0] = 42;
+    MemCopy(dst, src, 1);
+    I64 result = dst[0];
+    Free(src);
+    Free(dst);
+    return result;
+}

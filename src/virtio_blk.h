@@ -1,7 +1,8 @@
 /*
  * virtio-blk: MMIO (QEMU virtio-blk-device) or PCI (UTM virtio-blk-pci).
  * UTM strips -drive from AdditionalArguments, so the boot disk's PCI blk
- * is the only persist path there — RedSea lives in the last 128 sectors.
+ * is the only persist path there. RedSea keeps its original 128-sector window;
+ * absolute I/O also reaches the separate native source partition.
  */
 #pragma once
 
@@ -48,6 +49,8 @@
 #define VB_DESC_F_WRITE     2u
 #define VB_T_IN             0u
 #define VB_T_OUT            1u
+#define VB_T_FLUSH          4u
+#define VB_F_FLUSH          (1u << 9)
 #define VB_QSIZE            8u
 #define VB_SECT             512u
 #define VB_RS_SECTS         ZEAL_RS_SECTS
@@ -78,9 +81,11 @@ struct vb_dev {
     uint8_t *data;
     uint16_t avail_idx;
     uint64_t capacity; /* sectors visible to Blk* (≤ VB_RS_SECTS) */
+    uint64_t full_capacity; /* complete backing device, for the source partition */
     uint64_t lba_base; /* added to sector for PCI boot-disk tail */
     uint64_t phys;
     int ready;
+    int flush_supported;
 };
 
 __attribute__((aligned(4096))) static uint8_t g_vb_dma[16384];
@@ -251,6 +256,7 @@ static int vb_init_mmio(volatile uint32_t *best, uint32_t best_ver, uint64_t bes
     }
 
     g_vb.capacity = vb_cfg_capacity(best);
+    g_vb.full_capacity = g_vb.capacity;
     if (g_vb.capacity < 16) {
         vb_rw(best, VB_REG_STATUS, 0);
         return 0;
@@ -456,7 +462,7 @@ static int vb_init_pci(uint64_t hhdm) {
 
     {
         volatile uint8_t *common, *notify, *devcfg;
-        uint32_t nmult;
+        uint32_t nmult, features0;
         uint64_t full_cap, dp, ap, up;
         uint16_t qmax;
         unsigned i;
@@ -492,13 +498,16 @@ static int vb_init_pci(uint64_t hhdm) {
 
         vb_pci_w8(common + 20, VB_S_ACK);
         vb_pci_w8(common + 20, VB_S_ACK | VB_S_DRIVER);
-        /* Negotiate VIRTIO_F_VERSION_1 only (bit 0 of feature page 1). */
+        /* Keep the optional virtio-blk FLUSH feature for ordered source-bank
+         * commits. VERSION_1 is bit 0 of feature page 1. */
+        vb_pci_w32(common + 0, 0);
+        features0 = vb_pci_r32(common + 4);
         vb_pci_w32(common + 0, 1);
         (void)vb_pci_r32(common + 4);
         vb_pci_w32(common + 8, 1);
         vb_pci_w32(common + 12, 1);
         vb_pci_w32(common + 8, 0);
-        vb_pci_w32(common + 12, 0);
+        vb_pci_w32(common + 12, features0 & VB_F_FLUSH);
         vb_pci_w8(common + 20, VB_S_ACK | VB_S_DRIVER | VB_S_FEATURES_OK);
         if ((vb_r8(common + 20) & VB_S_FEATURES_OK) == 0) {
             g_vb_pci_dbg = 9;
@@ -546,9 +555,11 @@ static int vb_init_pci(uint64_t hhdm) {
         g_vb.ver = 2;
         g_vb.phys = PCI_ECAM_PHYS;
         g_vb.avail_idx = 0;
+        g_vb.full_capacity = full_cap;
+        g_vb.flush_supported = (features0 & VB_F_FLUSH) != 0;
         if (full_cap > VB_RS_SECTS) {
-            /* Prefer explicit layout on our 64MiB GPT image; else end-relative. */
-            if (full_cap == ZEAL_DISK_SECTS) {
+            /* Keep the original RedSea LBA on both 64MiB and 128MiB images. */
+            if (full_cap == ZEAL_DISK_SECTS || full_cap == ZEAL_OLD_DISK_SECTS) {
                 g_vb.lba_base = VB_RS_LBA_BASE;
             } else if (full_cap > ZEAL_GPT_BACKUP_SECTS + VB_RS_SECTS) {
                 g_vb.lba_base = full_cap - ZEAL_GPT_BACKUP_SECTS - VB_RS_SECTS + 1;
@@ -600,6 +611,7 @@ static int virtio_blk_init(uint64_t hhdm) {
     g_vb_hhdm = hhdm;
     g_vb.ready = 0;
     g_vb.capacity = 0;
+    g_vb.full_capacity = 0;
     g_vb.lba_base = 0;
     g_vb.avail_idx = 0;
     g_vb.xport = VB_XPORT_MMIO;
@@ -682,7 +694,7 @@ static void vb_notify(void) {
     }
 }
 
-static int virtio_blk_rw_sector(uint64_t sector, void *buf, int write) {
+static int virtio_blk_rw_sector(uint64_t sector, void *buf, int write, int absolute) {
     struct vb_dev *d = &g_vb;
     uint8_t *hdr;
     uint16_t cur, next, ring;
@@ -691,13 +703,14 @@ static int virtio_blk_rw_sector(uint64_t sector, void *buf, int write) {
     uint64_t host_lba;
 
     /* Allow probe while bringing the device up (ready not set yet). */
-    if ((!d->ready && !d->mmio && !d->pci_common) || !buf || sector >= d->capacity) {
+    if ((!d->ready && !d->mmio && !d->pci_common) || !buf ||
+        sector >= (absolute ? d->full_capacity : d->capacity)) {
         return 0;
     }
     if (d->capacity == 0) {
         return 0;
     }
-    host_lba = d->lba_base + sector;
+    host_lba = absolute ? sector : d->lba_base + sector;
 
     hdr = d->hdr;
     vb_w32(hdr, write ? VB_T_OUT : VB_T_IN);
@@ -765,11 +778,46 @@ static int virtio_blk_rw_sector(uint64_t sector, void *buf, int write) {
     return 1;
 }
 
+/* Complete all earlier writes on the PCI boot disk before publishing a new
+ * source-bank superblock. A device without VIRTIO_BLK_F_FLUSH cannot provide
+ * this ordering, so the source compactor refuses to switch banks on it. */
+static int virtio_blk_flush_abs(void) {
+    struct vb_dev *d = &g_vb;
+    if (!d->ready || d->xport != VB_XPORT_PCI || !d->flush_supported) return 0;
+    uint8_t *hdr = d->hdr;
+    vb_w32(hdr, VB_T_FLUSH);
+    vb_w32(hdr + 4, 0);
+    vb_w64(hdr + 8, 0);
+    hdr[16] = 0xff;
+    vb_desc(d->desc, vb_v2p(hdr), 16, VB_DESC_F_NEXT, 1);
+    vb_desc(d->desc + 16, vb_v2p(hdr + 16), 1, VB_DESC_F_WRITE, 0);
+    uint16_t cur = d->avail_idx, next = (uint16_t)(cur + 1);
+    vb_w16(d->avail + 4 + (cur % VB_QSIZE) * 2, 0);
+    vb_dsb();
+    d->avail_idx = next;
+    vb_w16(d->avail + 2, next);
+    __asm__ volatile("dc cvac, %0" : : "r"(d->desc) : "memory");
+    __asm__ volatile("dc cvac, %0" : : "r"(d->avail) : "memory");
+    __asm__ volatile("dc cvac, %0" : : "r"(hdr) : "memory");
+    vb_dsb();
+    vb_notify();
+    for (uint64_t spin = 0; spin < 20000000ull; spin++) {
+        __asm__ volatile("dc civac, %0" : : "r"(d->used) : "memory");
+        vb_dsb();
+        if (vb_r16((volatile uint8_t *)d->used + 2) == next) {
+            __asm__ volatile("dc civac, %0" : : "r"(hdr) : "memory");
+            vb_dsb();
+            return vb_r8((volatile uint8_t *)hdr + 16) == 0;
+        }
+    }
+    return 0;
+}
+
 static int virtio_blk_read(void *buf, uint64_t sector, uint64_t count) {
     uint64_t i;
     uint8_t *p = (uint8_t *)buf;
     for (i = 0; i < count; i++) {
-        g_vb_last_rw = virtio_blk_rw_sector(sector + i, p + i * VB_SECT, 0);
+        g_vb_last_rw = virtio_blk_rw_sector(sector + i, p + i * VB_SECT, 0, 0);
         if (g_vb_last_rw != 1) {
             return 0;
         }
@@ -782,7 +830,7 @@ static int virtio_blk_write(const void *buf, uint64_t sector, uint64_t count) {
     const uint8_t *p = (const uint8_t *)buf;
     for (i = 0; i < count; i++) {
         g_vb_last_rw =
-            virtio_blk_rw_sector(sector + i, (void *)(uintptr_t)(p + i * VB_SECT), 1);
+            virtio_blk_rw_sector(sector + i, (void *)(uintptr_t)(p + i * VB_SECT), 1, 0);
         if (g_vb_last_rw != 1) {
             return 0;
         }
@@ -792,4 +840,14 @@ static int virtio_blk_write(const void *buf, uint64_t sector, uint64_t count) {
 
 static int virtio_blk_write_dbg(const void *buf, uint64_t sector, uint64_t count) {
     return virtio_blk_write(buf, sector, count);
+}
+
+static int virtio_blk_read_abs(void *buf, uint64_t sector) {
+    if (!g_vb.ready || g_vb.xport != VB_XPORT_PCI) return 0;
+    return virtio_blk_rw_sector(sector, buf, 0, 1) == 1;
+}
+
+static int virtio_blk_write_abs(const void *buf, uint64_t sector) {
+    if (!g_vb.ready || g_vb.xport != VB_XPORT_PCI) return 0;
+    return virtio_blk_rw_sector(sector, (void *)(uintptr_t)buf, 1, 1) == 1;
 }

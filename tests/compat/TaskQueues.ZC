@@ -1,0 +1,33 @@
+// KernelB circular-queue intrinsics and a detached native CJob.
+I64 TaskQueueChecks()
+{
+    CQueue head, a, b, c;
+    CJob *job;
+
+    QueueInit(&head);
+    if (head.next != &head || head.last != &head)
+        return 1;
+    QueueInsert(&a, &head);
+    QueueInsertRev(&b, &head);
+    QueueInsert(&c, &a);
+    if (head.next != &a || a.next != &c || c.next != &b ||
+        b.next != &head || head.last != &b || b.last != &c)
+        return 2;
+    QueueRemove(&c);
+    if (a.next != &b || b.last != &a)
+        return 3;
+    QueueRemove(&a);
+    QueueRemove(&b);
+    if (head.next != &head || head.last != &head)
+        return 4;
+
+    job = TaskMessage(Fs, NULL, MESSAGE_CMD, 7, 8, 0);
+    if (!job || Fs->server_ctrl.next_waiting != job)
+        return 5;
+    QueueRemove(job);
+    if (Fs->server_ctrl.next_waiting != &Fs->server_ctrl.next_waiting ||
+        Fs->server_ctrl.last_waiting != &Fs->server_ctrl.next_waiting)
+        return 6;
+    JobDel(job);
+    return 42;
+}

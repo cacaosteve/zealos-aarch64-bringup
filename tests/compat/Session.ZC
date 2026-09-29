@@ -1,0 +1,25 @@
+#include "Shared.HH"
+I64 SessionChecks()
+{
+    I64 ok=0;
+    if(sort_runs==2)ok|=1;
+    U8 *large=MAlloc(131072);
+    large[0]=7;large[131071]=19;
+    if(MSize(large)==131072 && large[0]+large[131071]==26)ok|=2;
+    Free(NULL);
+    if(large[0]==7 && large[131071]==19)ok|=4;
+    U8 *a=MAlloc(32),*b=MAlloc(64),*c=MAlloc(96);
+    a[0]=11;b[0]=22;c[0]=33;
+    Free(b);Free(a);
+    U8 *d=MAlloc(112);
+    d[111]=44;
+    if(c[0]==33 && d[111]==44)ok|=8;
+    Free(c);Free(d);Free(large);
+    F64 x=Multiply(3.0);
+    if(x==7.5 && Multiply(4.0,1.5)==6.0)ok|=16;
+    SharedRecord s;
+    s.count=0xFFFFFFFF;s.count++;s.flags=3;s.value=99;
+    if(sizeof(U32)==4 && sizeof(SharedRecord)==16 && s.count==0 && s.value==99)ok|=32;
+    if(CompareValue(12,7)==1 && 1<2<3 && !(1<4<3))ok|=64;
+    return ok;
+}

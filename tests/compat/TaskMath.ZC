@@ -1,0 +1,36 @@
+// Runs after unchanged KernelA.HH, KernelB.HH, and KMathB.ZC.
+I64 TaskMathChecks()
+{
+    CTask *t = Fs;
+    U32 bits = 0;
+    I64 first;
+    F64 unit;
+
+    if (t->addr != t || t->task_signature != TASK_SIGNATURE_VAL)
+        return 1;
+    if (LBts(&bits, 14) || !Bt(&bits, 14) || !LBts(&bits, 14) ||
+        bits != 1 << 14)
+        return 2;
+    if (!LBtr(&bits, 14) || Bt(&bits, 14) || LBtr(&bits, 14))
+        return 3;
+    if (Seed(123) != 123 || t->rand_seed != 123 ||
+        t->task_flags != 1 << TASKf_NONTIMER_RAND ||
+        !Bt(&t->task_flags, TASKf_NONTIMER_RAND))
+        return 4;
+    first = RandI64;
+    Seed(123);
+    if (first != RandI64)
+        return 5;
+    unit = Rand;
+    if (unit < 0.0 || unit >= 1.0)
+        return 6;
+    if (Pow10I64(0) != 1.0 || Pow10I64(2) != 100.0 ||
+        ToF64(-3) != -3.0)
+        return 7;
+    Seed(0);
+    if (Bt(&t->task_flags, TASKf_NONTIMER_RAND))
+        return 8;
+    if (Fs != t)
+        return 9;
+    return 42;
+}

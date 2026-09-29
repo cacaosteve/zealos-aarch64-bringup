@@ -560,7 +560,7 @@ void kmain(void) {
     g_handoff.magic0 = ZEAL_HANDOFF_MAGIC_0;
     g_handoff.magic1 = ZEAL_HANDOFF_MAGIC_1;
     g_handoff.size = (uint32_t)sizeof(g_handoff);
-    g_handoff.revision = 2;
+    g_handoff.revision = 3;
     g_handoff.bootloader_id = ZEAL_BL_LIMINE;
     g_handoff.flags = is_pi ? ZEAL_FLAG_PLAT_PI4 : 0;
     g_handoff.hhdm_offset = hhdm;
@@ -637,6 +637,11 @@ void kmain(void) {
 
     if (is_pi) {
         fb_bar(260, 276, 0x80, 0x80, 0x20); /* olive = loading ELF */
+    }
+    if (module_request.response->module_count >= 3) {
+        struct limine_file *sources = module_request.response->modules[2];
+        g_handoff.sources_virt = (uint64_t)(uintptr_t)sources->address;
+        g_handoff.sources_size = sources->size;
     }
     kernel_entry_fn entry = load_kernel_elf(uart, hhdm, mod->address, mod->size);
     if (!entry) {

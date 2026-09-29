@@ -1,0 +1,695 @@
+--- a/c/lex.c
++++ b/c/lex.c
+@@ -9,11 +9,19 @@
+ #include <stdint.h>
+ #include <stdio.h>
+ #include <string.h>
++/* Freestanding decimal conversion: count integer decimal digits exactly,
++ * avoiding a libm log10 dependency in the lexer. */
++static double LexDecimalScale(uint64_t value, int64_t zeros) {
++  double scale = 0.1;
++  while (value >= 10) { value /= 10; scale *= 0.1; }
++  while (zeros-- > 0) scale *= 0.1;
++  return scale;
++}
+ char *LexSrcLink(CLexer *lex, void *task) {
+   char buf[STR_LEN];
+   if (!lex->file)
+     return NULL;
+-  sprintf(buf, "%s:%d:%d", lex->file->filename, lex->file->ln + 1,
++  snprintf(buf, sizeof(buf), "%s:%d:%d", lex->file->filename, lex->file->ln + 1,
+           lex->file->col + 1);
+   return A_STRDUP(buf, task);
+ }
+@@ -34,7 +42,7 @@
+   if (!lex->file)
+     return 0;
+   // We terminate the silly sauces with 0 as per ASCII nul character
+-  if (ret = lex->file->text[lex->file->pos]) {
++  if (ret = (unsigned char)lex->file->text[lex->file->pos]) {
+     lex->file->pos++;
+     if (ret == 5 || ret == '\r') // TempleOS cursor charactor
+       goto enter;
+@@ -65,7 +73,7 @@
+   va_list lst;
+   char buffer[STR_LEN];
+   va_start(lst, fmt);
+-  vsprintf(buffer, fmt, lst);
++  vsnprintf(buffer, sizeof(buffer), fmt, lst);
+   va_end(lst);
+   if (lex->file) {
+     fprintf(AIWNIOS_OSTREAM, "ERR %s:%d:%d %s", lex->file->filename,
+@@ -80,7 +88,7 @@
+   va_list lst;
+   char buffer[STR_LEN];
+   va_start(lst, fmt);
+-  vsprintf(buffer, fmt, lst);
++  vsnprintf(buffer, sizeof(buffer), fmt, lst);
+   va_end(lst);
+   if (lex->file) {
+     fprintf(AIWNIOS_OSTREAM, "WARN %s:%d:%d %s\n", lex->file->filename,
+@@ -267,6 +275,11 @@
+   case '`':
+     return lex->cur_tok = '`';
+     break;
++  case '$':
++    if (LexAdvChr(lex) == '$')
++      return lex->cur_tok = TK_LAYOUT_OFF;
++    LexErr(lex, "Expected '$$' for a class layout offset.");
++    return lex->cur_tok = ERR;
+   case ';':
+     return lex->cur_tok = ';';
+     break;
+@@ -340,7 +353,7 @@
+       fin_f64:
+         if (decimal) {
+           lex->flt =
+-              integer + decimal * pow(10, -zeros - 1 - floor(log10(decimal)));
++              integer + decimal * LexDecimalScale(decimal, zeros);
+         } else
+           lex->flt = integer;
+         lex->flt *= pow(10, exponet);
+@@ -582,6 +595,7 @@
+   case '@':
+   case 'a' ... 'z':
+   case 'A' ... 'Z':
++  case 0x80 ... 0xff: /* UTF-8 identifier bytes in upstream ZealC. */
+     lex->flags |= LEXF_USE_LAST_CHAR;
+     for (;;) {
+       switch (chr1 = LexAdvChr(lex)) {
+@@ -591,6 +605,7 @@
+       case 'a' ... 'z':
+       case 'A' ... 'Z':
+       case '0' ... '9':
++      case 0x80 ... 0xff:
+         if (idx + 1 >= STR_LEN) {
+           LexErr(lex, "Name is too long.");
+           return lex->cur_tok = ERR;
+@@ -640,9 +655,31 @@
+         LexWarn(lex, "AIWN ignore's #help_index's ignored by the C side");
+         goto re_enter;
+       } else if (!strcmp(lex->string, "assert")) {
+-        LexWarn(lex, "AIWN ignore's #assert's and other JIT shennangins");
++        /* ZealOS uses these to enforce structure layouts. Skipping them
++         * would silently accept an incompatible ARM64 ABI. */
++        lex->flags |= LEXF_UNTIL_NEWLINE;
++        CCmpCtrl *cc = CmpCtrlNew(lex);
++        int64_t ret = 0;
++        char *code;
++        CodeCtrlPush(cc);
++        Lex(lex);
++        if (!ParseExpr(cc, 0) || lex->cur_tok != '\n')
++          LexErr(lex, "Expected a constant expression for #assert.");
++        CRPN *rtrn = A_CALLOC(sizeof(CRPN), 0);
++        rtrn->type = IC_RET;
++        QueIns(rtrn, cc->code_ctrl->ir_code);
++        code = Compile(cc, NULL, NULL, NULL);
++        if (!code)
++          LexErr(lex, "Could not compile #assert expression.");
++        ret = FFI_CALL_TOS_0(code);
++        A_FREE(code);
++        CodeCtrlPop(cc);
++        CmpCtrlDel(cc);
++        if (!ret)
++          LexErr(lex, "#assert failed.");
+         goto re_enter;
+       } else if (!strcmp(lex->string, "if")) {
++        old_flags = lex->flags;
+         lex->flags |= LEXF_UNTIL_NEWLINE;
+         CCmpCtrl *cc = CmpCtrlNew(lex);
+         char *code;
+@@ -662,6 +699,7 @@
+         CmpCtrlDel(cc);
+         if (ret)
+           goto re_enter;
++        in_else = 0;
+         goto if_fail;
+       } else if (!strcmp(lex->string, "ifaot")) {
+         // AIWN will only AOT compile for you,the JIT will be
+@@ -756,11 +794,11 @@
+           actual_file = actual_file->last;
+         }
+         if (actual_file) {
+-          if (actual_file->dir) {
++          if (actual_file->dir && lex->string[0] != '/') {
+             int64_t len =
+                 snprintf(NULL, 0, "%s/%s", actual_file->dir, lex->string);
+             char buf[len + 1];
+-            sprintf(buf, "%s/%s", actual_file->dir, lex->string);
++            snprintf(buf, sizeof(buf), "%s/%s", actual_file->dir, lex->string);
+             dir = __AIWNIOS_StrDup(buf, NULL);
+             *strrchr(dir, '/') = 0;
+             f = fopen(buf, "rb");
+@@ -798,12 +836,19 @@
+         lex->file = new_file;
+         goto re_enter;
+       } else if (!strcmp(lex->string, "define")) {
++        old_flags = lex->flags;
+         lex->flags |= LEXF_NO_EXPAND;
+-        if (TK_NAME != Lex(lex)) {
++        int64_t define_tok = Lex(lex);
++        lex->flags = old_flags;
++        /* ZealOS also uses #define "Help/Category" as metadata. */
++        if (define_tok == TK_STR) {
++          LexSkipTillNewLine(lex);
++          goto re_enter;
++        }
++        if (define_tok != TK_NAME) {
+           LexErr(lex, "Expected a name for #define.");
+           return lex->cur_tok = ERR;
+         }
+-        lex->flags &= ~LEXF_NO_EXPAND;
+         strcpy(macro_name, lex->string);
+         strcpy(lex->string, "");
+         define = A_CALLOC(sizeof(CHashDefineStr), NULL);
+@@ -861,8 +906,7 @@
+ }
+ 
+ CLexer *LexerNew(char *filename, char *text) {
+-  static int init;
+-  if (!init) {
++  if (!HashFind("if", Fs->hash_table, HTT_KEYWORD, 1)) {
+     struct {
+       char *name;
+       int64_t tok;
+@@ -925,7 +969,6 @@
+       kw->tk = kws[i].tok;
+       HashAdd(kw, Fs->hash_table);
+     }
+-    init = 1;
+   }
+   CLexer *new = A_CALLOC(sizeof(CLexer), NULL);
+   new->hc = HeapCtrlInit(NULL, Fs, 0);
+--- a/c/parser.c
++++ b/c/parser.c
+@@ -1986,6 +1986,11 @@
+       }
+       goto fin;
+       break;
++    case TK_LAYOUT_OFF:
++      if (!ccmp->lex->layout_off)
++        ParseErr(ccmp, "'$$' is only supported inside a class layout.");
++      ccmp->lex->integer = *ccmp->lex->layout_off;
++      /* Fall through: the current class offset is an integer expression. */
+     case TK_I64:
+       binop_before = 0;
+       prec = -2;
+@@ -2038,7 +2043,10 @@
+           ic->global_var = global_var;
+           if (ccmp->lex->cur_tok != '(') {
+             // If IC_ADDR_OF comes before,dont do an implicit call
+-            if (stk_ptr && ic_stk[stk_ptr - 1] == IC_ADDR_OF) {
++            /* &Fs names the function, but &Fs->field addresses a member of
++             * the implicit no-argument call's result. */
++            if (stk_ptr && ic_stk[stk_ptr - 1] == IC_ADDR_OF &&
++                ccmp->lex->cur_tok != TK_ARROW) {
+               // Do nothing
+               if (ic->global_var->base.type & HTF_EXTERN)
+                 ParseWarn(ccmp, "Can't address of extern symbol");
+@@ -2319,20 +2327,22 @@
+   va_list lst;
+   va_start(lst, fmt);
+   char buf[STR_LEN];
+-  vsprintf(buf, fmt, lst);
++  vsnprintf(buf, sizeof(buf), fmt, lst);
+   va_end(lst);
+-  fprintf(AIWNIOS_OSTREAM, "WARN:%s:%d:%d %s\n", ctrl->lex->file->filename,
+-          ctrl->lex->file->ln + 1, ctrl->lex->file->col + 1, buf);
++  fprintf(AIWNIOS_OSTREAM, "WARN:%s:%d:%d %s\n", ctrl->lex->file ? ctrl->lex->file->filename : "<eof>",
++          ctrl->lex->file ? ctrl->lex->file->ln + 1 : 0,
++          ctrl->lex->file ? ctrl->lex->file->col + 1 : 0, buf);
+ }
+ 
+ int64_t ParseErr(CCmpCtrl *ctrl, char *fmt, ...) {
+   va_list lst;
+   va_start(lst, fmt);
+   char buf[STR_LEN];
+-  vsprintf(buf, fmt, lst);
++  vsnprintf(buf, sizeof(buf), fmt, lst);
+   va_end(lst);
+-  fprintf(AIWNIOS_OSTREAM, "ERR:%s:%d:%d %s\n", ctrl->lex->file->filename,
+-          ctrl->lex->file->ln + 1, ctrl->lex->file->col + 1, buf);
++  fprintf(AIWNIOS_OSTREAM, "ERR:%s:%d:%d %s\n", ctrl->lex->file ? ctrl->lex->file->filename : "<eof>",
++          ctrl->lex->file ? ctrl->lex->file->ln + 1 : 0,
++          ctrl->lex->file ? ctrl->lex->file->col + 1 : 0, buf);
+   throw(*(int64_t *)"Prs\0\0\0\0\0");
+ }
+ 
+@@ -2433,6 +2443,11 @@
+     Lex(ccmp->lex);
+   }
+ not_label:
++  /* ZealC's public modifier controls symbol visibility in object modules.
++   * The freestanding session has one global symbol table, so declarations
++   * remain visible without emitting a separate export record. */
++  if (PrsKw(ccmp, TK_KW_PUBLIC) && ccmp->cur_fun)
++    ParseErr(ccmp, "public declarations must be at file scope.");
+   if (found_label) {
+     QueIns(rpn, ccmp->code_ctrl->ir_code);
+     if (!PrsStmt(ccmp)) {
+@@ -2515,6 +2530,18 @@
+     if (ccmp->lex->cur_tok != TK_NAME)
+       ParseErr(ccmp, "Expected a extern name.");
+     import_name = A_STRDUP(ccmp->lex->string, NULL);
++    Lex(ccmp->lex);
++    goto prs_global;
++  } else if (PrsKw(ccmp, TK_KW__INTERN)) {
++    /* An intrinsic name describes compiler semantics, not an executable
++     * x86 address. Keep its declaration visible, but unbound on ARM64. */
++    if (ccmp->cur_fun)
++      ParseErr(ccmp, "_intern declarations must be at file scope.");
++    flags = PRSF_INTRINSIC;
++    if (ccmp->lex->cur_tok != TK_NAME)
++      ParseErr(ccmp, "Expected an intrinsic name after _intern.");
++    import_name = A_STRDUP(ccmp->lex->string, NULL);
++    Lex(ccmp->lex);
+     goto prs_global;
+   } else if (PrsKw(ccmp, TK_KW_IMPORT)) {
+     flags = PRSF_IMPORT;
+@@ -2524,6 +2551,7 @@
+     if (ccmp->lex->cur_tok != TK_NAME)
+       ParseErr(ccmp, "Expected a import name.");
+     import_name = A_STRDUP(ccmp->lex->string, NULL);
++    Lex(ccmp->lex);
+     goto prs_global;
+   }
+   if (PrsKw(ccmp, TK_KW_STATIC)) {
+@@ -2579,22 +2607,31 @@
+     if (!rpn->global_var)
+       ParseErr(ccmp, "'Print' function doesnt exist yet.");
+     QueIns(rpn, ccmp->code_ctrl->ir_code);
+-    (rpn = A_CALLOC(sizeof(CRPN), NULL))->type = IC_STR;
+-    for (misc = ccmp->code_ctrl->code_misc->next;
+-         ccmp->code_ctrl->code_misc != misc; misc = misc->base.next) {
+-      if (misc->type == CMT_STRING)
+-        if (misc->str_len == ccmp->lex->str_len)
+-          if (0 == memcmp(misc->str, string, str_len)) {
+-            goto found_str;
+-          }
+-    }
+-    misc = CodeMiscNew(ccmp, CMT_STRING);
+-    misc->str_len = str_len;
+-    misc->str = string;
+-  found_str:
+-    rpn->code_misc = misc;
++    if (!*string) {
++      /* ZealC's "" prefix takes the next expression as the format string:
++       * "" prompt, value; is Print(prompt, value). */
++      A_FREE(string);
++      if (!ParseExpr(ccmp, PEF_NO_COMMA))
++        ParseErr(ccmp, "Expected a format expression after empty string.");
++    } else {
++      (rpn = A_CALLOC(sizeof(CRPN), NULL))->type = IC_STR;
++      for (misc = ccmp->code_ctrl->code_misc->next;
++           ccmp->code_ctrl->code_misc != misc; misc = misc->base.next) {
++        if (misc->type == CMT_STRING)
++          if (misc->str_len == str_len)
++            if (0 == memcmp(misc->str, string, str_len)) {
++              A_FREE(string);
++              goto found_str;
++            }
++      }
++      misc = CodeMiscNew(ccmp, CMT_STRING);
++      misc->str_len = str_len;
++      misc->str = string;
++    found_str:
++      rpn->code_misc = misc;
++      QueIns(rpn, ccmp->code_ctrl->ir_code);
++    }
+     argc = 1;
+-    QueIns(rpn, ccmp->code_ctrl->ir_code);
+     for (;;) {
+       switch (ccmp->lex->cur_tok) {
+         break;
+@@ -2955,6 +2992,65 @@
+   Lex(ccmp->lex);
+   return write_to;
+ }
++
++/* Emit stores at the declaration, so expressions and repeated calls use the
++ * current frame. The bootstrap extension is limited to one scalar dimension;
++ * the existing static/global initializer parser handles aggregate layouts. */
++static void PrsLocalArrayInit(CCmpCtrl *ccmp, CMemberLst *lst) {
++  CArrayDim *dim = lst->dim.next;
++  CRPN *rpn;
++  int64_t i;
++  if (!dim || dim->next || lst->member_class->raw_type < RT_I8i ||
++      lst->member_class->raw_type > RT_F64)
++    ParseErr(ccmp, "Local brace initializer requires a 1D scalar array.");
++  Lex(ccmp->lex); /* '{' */
++  for (i = 0; i < dim->cnt; i++) {
++    *(rpn = A_CALLOC(sizeof(CRPN), NULL)) = (CRPN){
++        .type = IC_LOCAL, .local_mem = lst};
++    QueIns(rpn, ccmp->code_ctrl->ir_code);
++    *(rpn = A_CALLOC(sizeof(CRPN), NULL)) = (CRPN){
++        .type = IC_I64, .integer = i};
++    QueIns(rpn, ccmp->code_ctrl->ir_code);
++    (rpn = A_CALLOC(sizeof(CRPN), NULL))->type = IC_ARRAY_ACC;
++    QueIns(rpn, ccmp->code_ctrl->ir_code);
++    if (!ParseExpr(ccmp, PEF_NO_COMMA))
++      ParseErr(ccmp, "Expected a local array element.");
++    (rpn = A_CALLOC(sizeof(CRPN), NULL))->type = IC_EQ;
++    QueIns(rpn, ccmp->code_ctrl->ir_code);
++    if (ccmp->lex->cur_tok == ',')
++      Lex(ccmp->lex);
++    else if (i + 1 != dim->cnt)
++      ParseErr(ccmp, "Expected another local array element.");
++  }
++  if (ccmp->lex->cur_tok != '}')
++    ParseErr(ccmp, "Expected '}' after local array initializer.");
++  Lex(ccmp->lex);
++}
++static int PrsSameCallType(CHashClass *a, CHashClass *b) {
++  if (a == b)
++    return 1;
++  /* KernelA's U8/I64 unions deliberately replace the bootstrap primitive
++   * aliases. They are different type objects but retain the same scalar ABI. */
++  return a && b && a->raw_type >= RT_I8i && a->raw_type <= RT_F64 &&
++         a->raw_type == b->raw_type && a->sz == b->sz &&
++         a->ptr_star_cnt == b->ptr_star_cnt;
++}
++static int PrsSameFunctionABI(CHashFun *a, CHashFun *b) {
++  CMemberLst *am = a->base.members_lst, *bm = b->base.members_lst;
++  if (a->argc != b->argc ||
++      !PrsSameCallType(a->return_class, b->return_class) ||
++      ((a->base.flags ^ b->base.flags) & CLSF_VARGS))
++    return 0;
++  for (int64_t i = 0; i < a->argc; i++) {
++    if (!am || !bm ||
++        !PrsSameCallType(am->member_class, bm->member_class) ||
++        am->dim.total_cnt != bm->dim.total_cnt)
++      return 0;
++    am = am->next;
++    bm = bm->next;
++  }
++  return 1;
++}
+ int64_t PrsDecl(CCmpCtrl *ccmp, CHashClass *base, CHashClass *add_to,
+                 int64_t *is_func_decl, int64_t flags, char *import_name) {
+   if (is_func_decl)
+@@ -3010,20 +3106,40 @@
+ #endif
+                    .return_class = cls};
+     HashAdd(fun, Fs->hash_table);
+-    if (flags & (PRSF_EXTERN | PRSF__EXTERN)) {
++    if (flags & (PRSF_EXTERN | PRSF__EXTERN | PRSF_INTRINSIC)) {
+       fun->base.base.type |= HTF_EXTERN;
++      if (flags & PRSF_INTRINSIC)
++        fun->base.base.type |= HTF_INTRINSIC;
+     } else if (flags & (PRSF_IMPORT | PRSF__IMPORT)) {
+       fun->base.base.type |= HTF_IMPORT;
+     }
+   found_fun:
+-    if (flags & (PRSF__EXTERN | PRSF__IMPORT)) {
++    if (flags & (PRSF__EXTERN | PRSF__IMPORT | PRSF_INTRINSIC)) {
+       fun->import_name = A_STRDUP(import_name, NULL);
+     }
+     is_fun = 1;
+     PrsFunArgs(ccmp, fun);
++    if (flags & (PRSF_EXTERN | PRSF__EXTERN | PRSF_INTRINSIC)) {
++      /* A full upstream header can redeclare a bootstrap host API. Carry a
++       * binding forward only when the complete call ABI agrees. */
++      for (int64_t inst = 2;; inst++) {
++        CHashFun *old = HashFind(name, Fs->hash_table, HTT_FUN, inst);
++        if (!old)
++          break;
++        if (!(old->base.base.type & HTF_EXTERN) && old->fun_ptr &&
++            old->fun_ptr != DoNothing && old->fun_ptr != INVALID_PTR &&
++            PrsSameFunctionABI(fun, old)) {
++          fun->fun_ptr = old->fun_ptr;
++          fun->base.base.type &= ~(HTF_EXTERN | HTF_INTRINSIC);
++          break;
++        }
++      }
++    }
+   }
+   if (is_fun) {
+-    if (fun->base.base.type & (HTF_EXTERN | HTF_IMPORT)) {
++    if ((flags & (PRSF_EXTERN | PRSF__EXTERN | PRSF_IMPORT |
++                  PRSF__IMPORT | PRSF_INTRINSIC)) ||
++        (fun->base.base.type & (HTF_EXTERN | HTF_IMPORT))) {
+       if (ccmp->lex->cur_tok == '{') {
+         ParseErr(ccmp, "Function body on a extern/import.");
+         return 0;
+@@ -3051,8 +3167,10 @@
+     ccmp->cur_fun->base.base.type |= HTF_EXTERN;
+     ccmp->cur_fun->fun_ptr = Compile(ccmp, NULL, NULL, NULL);
+     ccmp->cur_fun->base.base.type &= ~HTF_EXTERN;
+-    if (extern_fun = HashFind(name, Fs->hash_table, HTT_FUN,
+-                              2)) { // Pick 2nd EXTERN(?) function
++    /* A child task may shadow a parent's name. Resolve only declarations
++     * from this task so its code cannot be installed in the parent table. */
++    if (extern_fun = HashSingleTableFind(name, Fs->hash_table, HTT_FUN,
++                                         2)) { // Pick 2nd EXTERN(?) function
+       extern_fun->fun_ptr = ccmp->cur_fun->fun_ptr;
+     }
+     if (ccmp->cur_fun->base.base.str)
+@@ -3063,6 +3181,8 @@
+       *is_func_decl = 1;
+     goto ret;
+   }
++  if (flags & PRSF_INTRINSIC)
++    ParseErr(ccmp, "_intern requires a function declaration.");
+   if (add_to) {
+     if (flags & PRSF_STATIC)
+       lst->flags |= MLF_STATIC;
+@@ -3114,14 +3234,20 @@
+       }
+     } else if (add_to) { // TODO is a local???
+       Lex(ccmp->lex);
+-      *(rpn = A_CALLOC(sizeof(CRPN), NULL)) = (CRPN){
+-          .type = IC_LOCAL,
+-          .local_mem = lst,
+-      };
+-      QueIns(rpn, ccmp->code_ctrl->ir_code);
+-      ParseExpr(ccmp, PEF_NO_COMMA);
+-      (rpn = A_CALLOC(sizeof(CRPN), NULL))->type = IC_EQ;
+-      QueIns(rpn, ccmp->code_ctrl->ir_code);
++      if (ccmp->lex->cur_tok == '{') {
++        if (!ccmp->cur_fun || !lst->dim.next)
++          ParseErr(ccmp, "Brace initializer requires a local array.");
++        PrsLocalArrayInit(ccmp, lst);
++      } else {
++        *(rpn = A_CALLOC(sizeof(CRPN), NULL)) = (CRPN){
++            .type = IC_LOCAL,
++            .local_mem = lst,
++        };
++        QueIns(rpn, ccmp->code_ctrl->ir_code);
++        ParseExpr(ccmp, PEF_NO_COMMA);
++        (rpn = A_CALLOC(sizeof(CRPN), NULL))->type = IC_EQ;
++        QueIns(rpn, ccmp->code_ctrl->ir_code);
++      }
+     }
+   }
+   if (!add_to && lst->str) {
+@@ -3136,7 +3262,7 @@
+     glbl_var->fun_ptr = lst->fun_ptr;
+     lst->fun_ptr = NULL; // We steal this
+     // lst will be Free'd at ret
+-    if (!(flags & PRSF_EXTERN))
++    if (!(flags & (PRSF_EXTERN | PRSF__EXTERN)))
+       glbl_var->data_addr =
+           A_CALLOC(glbl_var->var_class->sz * glbl_var->dim.total_cnt, NULL);
+     if (flags & PRSF_IMPORT) {
+@@ -3170,13 +3296,13 @@
+     }
+     HashAdd(glbl_var, Fs->hash_table);
+   found_glbl:
+-    if (!(flags & PRSF_EXTERN)) {
+-      if (extern_glbl = HashFind(glbl_var->base.str, Fs->hash_table,
+-                                 HTT_GLBL_VAR, 2)) { // Pick 2nd EXTERN(?) Var
++    if (!(flags & (PRSF_EXTERN | PRSF__EXTERN))) {
++      if (extern_glbl = HashSingleTableFind(glbl_var->base.str, Fs->hash_table,
++                                            HTT_GLBL_VAR, 2)) { // Pick 2nd EXTERN(?) Var
+         extern_glbl->data_addr = glbl_var->data_addr;
+       }
+     }
+-    if (!(flags & PRSF_EXTERN))
++    if (!(flags & (PRSF_EXTERN | PRSF__EXTERN)))
+       SysSymImportsResolve(glbl_var->base.str, 0);
+     if (ccmp->lex->cur_tok == '=') {
+       Lex(ccmp->lex);
+@@ -3508,6 +3634,13 @@
+   got_fun:
+     if (!fun)
+       ParseErr(ccmp, "Invalid type to call."); // TODO add type name
++    if ((fun->base.base.type & (HTF_INTRINSIC | HTF_EXTERN)) ==
++        (HTF_INTRINSIC | HTF_EXTERN))
++      ParseErr(ccmp, "AArch64 intrinsic '%s' (%s) is not implemented.",
++               fun->base.base.str, fun->import_name);
++    if ((fun->base.base.type & HTF_EXTERN) && fun->import_name)
++      ParseErr(ccmp, "AArch64 external '%s' (%s) is not bound.",
++               fun->base.base.str, fun->import_name);
+     if (arg > fun->argc && !(fun->base.flags & CLSF_VARGS)) {
+       ParseErr(ccmp, "Excess arguments for function");
+     }
+@@ -3545,6 +3678,10 @@
+     break;
+   case IC_GLOBAL:
+     if (rpn->global_var->base.type & HTT_GLBL_VAR) {
++      if ((rpn->global_var->base.type & HTF_EXTERN) &&
++          !rpn->global_var->data_addr)
++        ParseErr(ccmp, "AArch64 external data '%s' is not bound.",
++                 rpn->global_var->base.str);
+       rpn->ic_class = rpn->global_var->var_class;
+       rpn->ic_dim = rpn->global_var->dim.next;
+       rpn->ic_fun = rpn->global_var->fun_ptr;
+@@ -3909,9 +4046,11 @@
+ static void PrsMembers(CCmpCtrl *cctrl, CHashClass *bungis, int64_t flags,
+                        int64_t *off) {
+   int64_t is_func, union_end;
++  int64_t *old_layout_off = cctrl->lex->layout_off;
+   CMemberLst *last_m, *base_class;
+   union_end = *off;
+   if (cctrl->lex->cur_tok == '{') {
++    cctrl->lex->layout_off = off;
+     Lex(cctrl->lex);
+     while (cctrl->lex->cur_tok != '}') {
+       if (cctrl->lex->cur_tok == ';') {
+@@ -3920,10 +4059,24 @@
+         if (cctrl->lex->cur_tok == '{') {
+           PrsMembers(cctrl, bungis, flags | PRSF_UNION, off);
+         }
++      } else if (cctrl->lex->cur_tok == TK_LAYOUT_OFF) {
++        if (flags & PRSF_UNION)
++          ParseErr(cctrl, "'$$' assignment in a union is not supported.");
++        Lex(cctrl->lex);
++        if (cctrl->lex->cur_tok != '=')
++          ParseErr(cctrl, "Expected '=' after '$$'.");
++        Lex(cctrl->lex);
++        int64_t new_off = PrsI64(cctrl);
++        if (new_off < 0 || new_off > (1LL << 30))
++          ParseErr(cctrl, "Class layout offset out of range.");
++        if (cctrl->lex->cur_tok != ';')
++          ParseErr(cctrl, "Expected ';' after '$$' assignment.");
++        *off = new_off;
++        Lex(cctrl->lex);
+       } else if (cctrl->lex->cur_tok == TK_NAME) {
+         base_class = HashFind(cctrl->lex->string, Fs->hash_table, HTT_CLASS, 1);
+         if (!base_class)
+-          goto exp_member;
++          ParseErr(cctrl, "Unknown member type '%s'.", cctrl->lex->string);
+         //
+         // Here's the deal,I store the last member in last_m,once I find the
+         // members I assign their offsets
+@@ -3983,6 +4136,7 @@
+         return;
+       }
+     }
++    cctrl->lex->layout_off = old_layout_off;
+     Lex(cctrl->lex);
+   }
+   if (flags & PRSF_UNION)
+@@ -4043,6 +4197,8 @@
+       HashAdd(bungis, Fs->hash_table);
+   PrsMembers(cctrl, bungis, flags, &off); // This consumes '{'
+   // Compute size
++  if (bungis->sz < off)
++    bungis->sz = off;
+   for (last_m = bungis->members_lst; last_m; last_m = last_m->next) {
+     if (bungis->sz < (off = last_m->off +
+                             last_m->member_class->sz * last_m->dim.total_cnt)) {
+@@ -4417,6 +4573,13 @@
+             *exit_misc = CodeMiscNew(cctrl, CMT_LABEL);
+   if (!PrsKw(cctrl, TK_KW_TRY))
+     return 0;
++#if defined(ZEAL_FREESTANDING) && !defined(ZEAL_GUEST_EXCEPTIONS)
++  ParseErr(cctrl, "Guest try/catch runtime is not implemented.");
++#endif
++#ifdef ZEAL_GUEST_EXCEPTIONS
++  if (!HashFind("SysTry", Fs->hash_table, HTT_FUN, 1))
++    ParseErr(cctrl, "Guest try/catch requires the task bridge.");
++#endif
+   // AIWNIOS_SetJmp(SysTry())
+   *(rpn = A_CALLOC(sizeof(CRPN), NULL)) = (CRPN){
+       .type = IC_GLOBAL,
+--- a/c/optpass.c
++++ b/c/optpass.c
+@@ -475,6 +475,12 @@
+         MulComConstsI642(cctrl, rpn, rpn->type, 1, 1);
+     }
+   }
++}
++
++/* Relational chains must reach the backend intact. Folding their inner
++ * comparison turns a<b<c into (a<b)<c and silently changes HolyC semantics. */
++static int IsRelational(int64_t type) {
++  return type == IC_LT || type == IC_GT || type == IC_LE || type == IC_GE;
+ }
+ 
+ void OptPassConstFold(CCmpCtrl *cctrl) {
+@@ -505,6 +511,11 @@
+   changed = 0;
+   for (rpn = cctrl->code_ctrl->ir_code->next;
+        cctrl->code_ctrl->ir_code != rpn;) {
++    if (IsRelational(rpn->type) &&
++        IsRelational(((CRPN *)ICFwd(rpn->base.next))->type)) {
++      rpn = ICFwd(rpn);
++      continue;
++    }
+     switch (rpn->type) {
+       break;
+     case IC_TO_BOOL:
+--- a/c/arm_backend.c
++++ b/c/arm_backend.c
+@@ -4473,6 +4473,9 @@
+     break;
+   case IC_GS:
+   case IC_FS: {
++#ifdef ZEAL_FREESTANDING
++    ParseErr(cctrl, "FS/GS task access is not implemented in this runtime.");
++#endif
+     next = rpn->base.next;
+     if (next->type != IC_RELOC && next->type != IC_I64) {
+       printf("Expected a relocation at IC_FS,aborting(Contact nrootcoauto for "
+@@ -5162,6 +5165,9 @@
+       cctrl->backend_user_data2 = 0;
+       cctrl->backend_user_data3 = 0;
+       r = forwards[cnt];
++      /* A root has no parent IR instruction. Leaving the previous root here
++       * writes register-use bits through a stale pointer on later functions. */
++      cctrl->cur_rpn = NULL;
+       PushTmpDepthFirst(cctrl, r, 0);
+       PopTmp(cctrl, r);
+       r->res.mode = MD_NULL;
+--- a/c/aiwn_hash.h
++++ b/c/aiwn_hash.h
+@@ -35,6 +35,7 @@
+ #define HTT_IMPORT_SYS_SYM  0x80
+ #define HTT_EXPORT_SYS_SYM  0x100
+ #define HTT_IMPORT_SYS_SYM2 0x200 // See arm_loader.c
++#define HTF_INTRINSIC       0x400 // Declared ZealC _intern; needs an ARM64 binding.
+ 
+ typedef struct CHash {
+   struct CHash *next;
+--- a/c/aiwn_lexparser.h
++++ b/c/aiwn_lexparser.h
+@@ -40,9 +40,11 @@
+   int64_t flags, cur_char;
+   int64_t cur_tok;
+   struct CHeapCtrl *hc;
++  int64_t *layout_off; /* Current class byte offset for ZealC $$. */
+ } CLexer;
+ typedef enum {
+   TK_I64 = 0x100,
++  TK_LAYOUT_OFF,
+   TK_F64,
+   TK_NAME,
+   TK_STR,
+@@ -224,6 +226,7 @@
+ #define PRSF_IMPORT   0x20
+ #define PRSF__IMPORT  0x40
+ #define PRSF_STATIC   0x80
++#define PRSF_INTRINSIC 0x100
+ enum {
+   IC_GOTO,
+   IC_SQR,
+@@ -567,7 +570,7 @@
+ #  define AIWNIOS_TMP_FREG_START 3
+ #  define AIWNIOS_TMP_FREG_CNT   (5 - 3 + 1)
+ #  define AIWNIOS_FREG_CNT       (15 - 6 + 1)
+-#elif (defined(__OpenBSD__) || defined(__NetBSD__) || defined(__linux__) || defined(__FreeBSD__)) &&  \
++#elif (defined(ZEAL_FREESTANDING) || defined(__OpenBSD__) || defined(__NetBSD__) || defined(__linux__) || defined(__FreeBSD__)) &&  \
+     (defined(_M_ARM64) || defined(__aarch64__))
+ #  define AIWNIOS_IREG_START     19
+ #  define AIWNIOS_IREG_CNT       (27 - 19 + 1)
