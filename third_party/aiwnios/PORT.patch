@@ -371,7 +371,95 @@ diff -ruN a/c/optpass.c b/c/optpass.c
 diff -ruN a/c/parser.c b/c/parser.c
 --- a/c/parser.c	2026-09-29 18:48:09
 +++ b/c/parser.c	2026-09-29 18:48:09
-@@ -1986,6 +1986,11 @@
+@@ -1689,25 +1689,68 @@
+     szo:
+       if (ccmp->lex->cur_tok == '(') {
+         Lex(ccmp->lex);
+-        if (ccmp->lex->cur_tok != TK_NAME)
+-          ParseErr(ccmp, "Expected a typename.");
+-        if (!(tc_class =
+-                  HashFind(ccmp->lex->string, Fs->hash_table, HTT_CLASS, 1)))
+-          ParseErr(ccmp, "Expected a typename.");
+-        Lex(ccmp->lex);
+-        tc_class = PrsType(ccmp, tc_class, NULL, NULL, &dummy_dim);
+-        arg = tc_class->sz * dummy_dim.total_cnt;
+-        if (dummy_dim.next)
+-          ArrayDimDel(dummy_dim.next);
+-        (ic = A_CALLOC(sizeof(CRPN), NULL))->type = type = IC_I64;
+-        QueInit(&ic->base);
+-        ic->integer = arg;
+-        QueIns(ic, ccmp->code_ctrl->ir_code);
+-        if (ccmp->lex->cur_tok != ')')
+-          ParseErr(ccmp, "Expected a ')'.");
+-        Lex(ccmp->lex);
+-        binop_before = 0;
+-        goto next;
++        /* Type form: sizeof(Type) / sizeof(Type *). Expression form:
++         * sizeof(expr) — ZealOS DocInit uses sizeof(doldoc.member). */
++        if (ccmp->lex->cur_tok == TK_NAME &&
++            (tc_class =
++                 HashFind(ccmp->lex->string, Fs->hash_table, HTT_CLASS, 1))) {
++          Lex(ccmp->lex);
++          tc_class = PrsType(ccmp, tc_class, NULL, NULL, &dummy_dim);
++          arg = tc_class->sz * dummy_dim.total_cnt;
++          if (dummy_dim.next)
++            ArrayDimDel(dummy_dim.next);
++          (ic = A_CALLOC(sizeof(CRPN), NULL))->type = type = IC_I64;
++          QueInit(&ic->base);
++          ic->integer = arg;
++          QueIns(ic, ccmp->code_ctrl->ir_code);
++          if (ccmp->lex->cur_tok != ')')
++            ParseErr(ccmp, "Expected a ')'.");
++          Lex(ccmp->lex);
++          binop_before = 0;
++          goto next;
++        }
++        {
++          CRPN *sizeof_saved = ccmp->code_ctrl->ir_code->next;
++          CMemberLst *sizeof_ml = NULL;
++          CHashGlblVar *sizeof_gv = NULL;
++          CArrayDim *sizeof_dim = NULL;
++          CHashClass *sizeof_cls = NULL;
++          if (!ParseExpr(ccmp, PEF_NO_COMMA))
++            ParseErr(ccmp, "Expected a sizeof expression.");
++          if (ccmp->lex->cur_tok != ')')
++            ParseErr(ccmp, "Expected a ')'.");
++          Lex(ccmp->lex);
++          ic2 = ccmp->code_ctrl->ir_code->next;
++          /* Capture union fields before AssignRawTypeToNode can clobber them. */
++          if (ic2->type == IC_DOT || ic2->type == IC_ARROW ||
++              ic2->type == IC_LOCAL)
++            sizeof_ml = ic2->local_mem;
++          else if (ic2->type == IC_GLOBAL)
++            sizeof_gv = ic2->global_var;
++          AssignRawTypeToNode(ccmp, ic2);
++          sizeof_cls = ic2->ic_class;
++          sizeof_dim = ic2->ic_dim;
++          if (sizeof_ml)
++            arg = sizeof_ml->member_class->sz * sizeof_ml->dim.total_cnt;
++          else if (sizeof_gv)
++            arg = sizeof_gv->var_class->sz * sizeof_gv->dim.total_cnt;
++          else if (sizeof_dim && sizeof_cls)
++            arg = sizeof_cls->sz * sizeof_dim->total_cnt;
++          else if (sizeof_cls)
++            arg = sizeof_cls->sz;
++          else
++            arg = 0;
++          if (arg <= 0 || arg > (int64_t)0x1000000)
++            ParseErr(ccmp, "sizeof expression size is invalid.");
++          while (ccmp->code_ctrl->ir_code->next != sizeof_saved)
++            ICFree(ccmp->code_ctrl->ir_code->next);
++          (ic = A_CALLOC(sizeof(CRPN), NULL))->type = type = IC_I64;
++          QueInit(&ic->base);
++          ic->integer = arg;
++          QueIns(ic, ccmp->code_ctrl->ir_code);
++          binop_before = 0;
++          goto next;
++        }
+       } else if (ccmp->lex->cur_tok == TK_NAME) {
+         if (!(tc_class =
+                   HashFind(ccmp->lex->string, Fs->hash_table, HTT_CLASS, 1)))
+@@ -1986,6 +2029,11 @@
        }
        goto fin;
        break;
@@ -383,7 +471,7 @@ diff -ruN a/c/parser.c b/c/parser.c
      case TK_I64:
        binop_before = 0;
        prec = -2;
-@@ -2038,7 +2043,10 @@
+@@ -2038,7 +2086,10 @@
            ic->global_var = global_var;
            if (ccmp->lex->cur_tok != '(') {
              // If IC_ADDR_OF comes before,dont do an implicit call
@@ -395,7 +483,7 @@ diff -ruN a/c/parser.c b/c/parser.c
                // Do nothing
                if (ic->global_var->base.type & HTF_EXTERN)
                  ParseWarn(ccmp, "Can't address of extern symbol");
-@@ -2319,20 +2327,22 @@
+@@ -2319,20 +2370,22 @@
    va_list lst;
    va_start(lst, fmt);
    char buf[STR_LEN];
@@ -424,7 +512,7 @@ diff -ruN a/c/parser.c b/c/parser.c
    throw(*(int64_t *)"Prs\0\0\0\0\0");
  }
  
-@@ -2433,6 +2443,11 @@
+@@ -2433,6 +2486,11 @@
      Lex(ccmp->lex);
    }
  not_label:
@@ -436,7 +524,7 @@ diff -ruN a/c/parser.c b/c/parser.c
    if (found_label) {
      QueIns(rpn, ccmp->code_ctrl->ir_code);
      if (!PrsStmt(ccmp)) {
-@@ -2515,7 +2530,19 @@
+@@ -2515,7 +2573,19 @@
      if (ccmp->lex->cur_tok != TK_NAME)
        ParseErr(ccmp, "Expected a extern name.");
      import_name = A_STRDUP(ccmp->lex->string, NULL);
@@ -456,7 +544,7 @@ diff -ruN a/c/parser.c b/c/parser.c
    } else if (PrsKw(ccmp, TK_KW_IMPORT)) {
      flags = PRSF_IMPORT;
      goto prs_global;
-@@ -2524,6 +2551,7 @@
+@@ -2524,6 +2594,7 @@
      if (ccmp->lex->cur_tok != TK_NAME)
        ParseErr(ccmp, "Expected a import name.");
      import_name = A_STRDUP(ccmp->lex->string, NULL);
@@ -464,7 +552,7 @@ diff -ruN a/c/parser.c b/c/parser.c
      goto prs_global;
    }
    if (PrsKw(ccmp, TK_KW_STATIC)) {
-@@ -2579,22 +2607,31 @@
+@@ -2579,22 +2650,31 @@
      if (!rpn->global_var)
        ParseErr(ccmp, "'Print' function doesnt exist yet.");
      QueIns(rpn, ccmp->code_ctrl->ir_code);
@@ -510,7 +598,7 @@ diff -ruN a/c/parser.c b/c/parser.c
      for (;;) {
        switch (ccmp->lex->cur_tok) {
          break;
-@@ -2862,7 +2899,11 @@
+@@ -2862,7 +2942,11 @@
      fun[0] = A_CALLOC(sizeof(CHashFun), NULL);
      fun[0]->base.flags |= CLSF_FUNPTR;
      fun[0]->return_class = base + star_cnt;
@@ -523,7 +611,7 @@ diff -ruN a/c/parser.c b/c/parser.c
      fun[0]->base.sz = sizeof(void *);
      fun[0]->base.ptr_star_cnt = star_cnt2;
      PrsFunArgs(ccmp, *fun);
-@@ -2955,6 +2996,65 @@
+@@ -2955,6 +3039,65 @@
    Lex(ccmp->lex);
    return write_to;
  }
@@ -589,7 +677,7 @@ diff -ruN a/c/parser.c b/c/parser.c
  int64_t PrsDecl(CCmpCtrl *ccmp, CHashClass *base, CHashClass *add_to,
                  int64_t *is_func_decl, int64_t flags, char *import_name) {
    if (is_func_decl)
-@@ -3010,20 +3110,40 @@
+@@ -3010,20 +3153,40 @@
  #endif
                     .return_class = cls};
      HashAdd(fun, Fs->hash_table);
@@ -633,7 +721,7 @@ diff -ruN a/c/parser.c b/c/parser.c
        if (ccmp->lex->cur_tok == '{') {
          ParseErr(ccmp, "Function body on a extern/import.");
          return 0;
-@@ -3051,8 +3171,10 @@
+@@ -3051,8 +3214,10 @@
      ccmp->cur_fun->base.base.type |= HTF_EXTERN;
      ccmp->cur_fun->fun_ptr = Compile(ccmp, NULL, NULL, NULL);
      ccmp->cur_fun->base.base.type &= ~HTF_EXTERN;
@@ -646,7 +734,7 @@ diff -ruN a/c/parser.c b/c/parser.c
        extern_fun->fun_ptr = ccmp->cur_fun->fun_ptr;
      }
      if (ccmp->cur_fun->base.base.str)
-@@ -3063,6 +3185,8 @@
+@@ -3063,6 +3228,8 @@
        *is_func_decl = 1;
      goto ret;
    }
@@ -655,7 +743,7 @@ diff -ruN a/c/parser.c b/c/parser.c
    if (add_to) {
      if (flags & PRSF_STATIC)
        lst->flags |= MLF_STATIC;
-@@ -3114,14 +3238,20 @@
+@@ -3114,14 +3281,20 @@
        }
      } else if (add_to) { // TODO is a local???
        Lex(ccmp->lex);
@@ -684,7 +772,7 @@ diff -ruN a/c/parser.c b/c/parser.c
      }
    }
    if (!add_to && lst->str) {
-@@ -3136,7 +3266,7 @@
+@@ -3136,7 +3309,7 @@
      glbl_var->fun_ptr = lst->fun_ptr;
      lst->fun_ptr = NULL; // We steal this
      // lst will be Free'd at ret
@@ -693,7 +781,7 @@ diff -ruN a/c/parser.c b/c/parser.c
        glbl_var->data_addr =
            A_CALLOC(glbl_var->var_class->sz * glbl_var->dim.total_cnt, NULL);
      if (flags & PRSF_IMPORT) {
-@@ -3170,13 +3300,13 @@
+@@ -3170,13 +3343,13 @@
      }
      HashAdd(glbl_var, Fs->hash_table);
    found_glbl:
@@ -711,7 +799,7 @@ diff -ruN a/c/parser.c b/c/parser.c
        SysSymImportsResolve(glbl_var->base.str, 0);
      if (ccmp->lex->cur_tok == '=') {
        Lex(ccmp->lex);
-@@ -3508,6 +3638,13 @@
+@@ -3508,6 +3681,13 @@
    got_fun:
      if (!fun)
        ParseErr(ccmp, "Invalid type to call."); // TODO add type name
@@ -725,7 +813,7 @@ diff -ruN a/c/parser.c b/c/parser.c
      if (arg > fun->argc && !(fun->base.flags & CLSF_VARGS)) {
        ParseErr(ccmp, "Excess arguments for function");
      }
-@@ -3545,6 +3682,10 @@
+@@ -3545,6 +3725,10 @@
      break;
    case IC_GLOBAL:
      if (rpn->global_var->base.type & HTT_GLBL_VAR) {
@@ -736,7 +824,7 @@ diff -ruN a/c/parser.c b/c/parser.c
        rpn->ic_class = rpn->global_var->var_class;
        rpn->ic_dim = rpn->global_var->dim.next;
        rpn->ic_fun = rpn->global_var->fun_ptr;
-@@ -3665,6 +3806,12 @@
+@@ -3665,6 +3849,12 @@
        goto no_dim;
      if (!rpn->ic_dim->next) {
      no_dim:
@@ -749,7 +837,7 @@ diff -ruN a/c/parser.c b/c/parser.c
        rpn->ic_class = ((CRPN *)rpn->base.next)->ic_class - 1;
      } else {
        rpn->ic_dim = rpn->ic_dim->next;
-@@ -3839,6 +3986,12 @@
+@@ -3839,6 +4029,12 @@
      if (ICFwd(rpn->base.next)->ic_dim) {
        rpn->ic_class = ICFwd(rpn->base.next)->ic_class;
        rpn->ic_dim = ICFwd(rpn->base.next)->ic_dim->next;
@@ -762,7 +850,7 @@ diff -ruN a/c/parser.c b/c/parser.c
      } else
        rpn->ic_class = ICFwd(rpn->base.next)->ic_class - 1;
      rpn->ic_fun = ICFwd(rpn->base.next)->ic_fun;
-@@ -3909,9 +4062,11 @@
+@@ -3909,9 +4105,11 @@
  static void PrsMembers(CCmpCtrl *cctrl, CHashClass *bungis, int64_t flags,
                         int64_t *off) {
    int64_t is_func, union_end;
@@ -774,7 +862,7 @@ diff -ruN a/c/parser.c b/c/parser.c
      Lex(cctrl->lex);
      while (cctrl->lex->cur_tok != '}') {
        if (cctrl->lex->cur_tok == ';') {
-@@ -3920,10 +4075,24 @@
+@@ -3920,10 +4118,24 @@
          if (cctrl->lex->cur_tok == '{') {
            PrsMembers(cctrl, bungis, flags | PRSF_UNION, off);
          }
@@ -800,7 +888,7 @@ diff -ruN a/c/parser.c b/c/parser.c
          //
          // Here's the deal,I store the last member in last_m,once I find the
          // members I assign their offsets
-@@ -3983,6 +4152,7 @@
+@@ -3983,6 +4195,7 @@
          return;
        }
      }
@@ -808,7 +896,7 @@ diff -ruN a/c/parser.c b/c/parser.c
      Lex(cctrl->lex);
    }
    if (flags & PRSF_UNION)
-@@ -4043,6 +4213,8 @@
+@@ -4043,6 +4256,8 @@
        HashAdd(bungis, Fs->hash_table);
    PrsMembers(cctrl, bungis, flags, &off); // This consumes '{'
    // Compute size
@@ -817,7 +905,7 @@ diff -ruN a/c/parser.c b/c/parser.c
    for (last_m = bungis->members_lst; last_m; last_m = last_m->next) {
      if (bungis->sz < (off = last_m->off +
                              last_m->member_class->sz * last_m->dim.total_cnt)) {
-@@ -4417,6 +4589,13 @@
+@@ -4417,6 +4632,13 @@
              *exit_misc = CodeMiscNew(cctrl, CMT_LABEL);
    if (!PrsKw(cctrl, TK_KW_TRY))
      return 0;

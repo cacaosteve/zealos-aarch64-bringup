@@ -1,0 +1,26 @@
+// Smoke: unchanged DocInit fills doldoc.hash and default TX flags.
+I64 TaskOriginalDocInitChecks()
+{
+    CHashGeneric *tmph;
+
+    if (!doldoc.hash)
+        return 1;
+    tmph = HashFind("TX", doldoc.hash, DHT_DOC_CMD);
+    if (!tmph || tmph->user_data0 != DOCT_TEXT)
+        return 2;
+    tmph = HashFind("CM", doldoc.hash, DHT_DOC_CMD);
+    if (!tmph || tmph->user_data0 != DOCT_CURSOR_MOVEMENT)
+        return 3;
+    tmph = HashFind("T", doldoc.hash, DHT_DOC_FLAG);
+    if (!tmph || tmph->user_data0 != DOCEf_TAG)
+        return 4;
+    if (!Bt(&doldoc.default_de_flags[DOCT_TEXT], DOCEf_TAG))
+        return 5;
+    if (!Bt(doldoc.clean_scan_codes, SC_CURSOR_RIGHT))
+        return 6;
+    if (!Define("ST_DOC_CMDS"))
+        return 7;
+    if (StrCompare(DefineSub(0, "ST_DOC_CMDS"), "TX"))
+        return 8;
+    return 42;
+}

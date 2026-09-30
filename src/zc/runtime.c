@@ -165,6 +165,7 @@ static int64_t guest_end_cb_off;
 static int64_t guest_input_filter_off, guest_next_filter_off, guest_server_ctrl_off;
 static int64_t guest_heap_sig_off, guest_heap_used_off, guest_heap_task_off;
 static int64_t guest_except_ch_off, guest_catch_except_off;
+static int64_t guest_hash_table_off;
 static int guest_task_bound;
 static int64_t execute_source_result(const char *path, const char *src,
                                      int return_expr, int record_answer);
@@ -235,8 +236,14 @@ static void sync_guest_heap(CHeapCtrl *owner) {
     }
 }
 void *__AIWNIOS_MAlloc(int64_t count, void *t) {
-    if (count < 0 || (uint64_t)count > DATA_BYTES)
-        zc_fail("allocation size out of range");
+    if (count < 0 || (uint64_t)count > DATA_BYTES) {
+        static char msg[96];
+        snprintf(msg, sizeof(msg),
+                 "allocation size out of range (%lld)%s",
+                 (long long)count,
+                 ((uint64_t)count >> 48) == 0xfff8ull ? " nan-bits" : "");
+        zc_fail(msg);
+    }
     CHeapCtrl *owner = heap_for(t);
     unsigned a = owner->is_code_heap ? 1 : 0;
     size_t n = ((size_t)count + 15) & ~(size_t)15;
@@ -538,6 +545,19 @@ static int64_t host_swap(int64_t *a) {
     *x = *y;
     *y = v;
     return v;
+}
+/* GenFFIBinding passes X0 = argv[]; raw CHash* APIs must not be bound directly. */
+static int64_t host_hash_table_new(int64_t *a) {
+    return (int64_t)(uintptr_t)HashTableNew(a[0], (void *)(uintptr_t)a[1]);
+}
+static int64_t host_hash_find(int64_t *a) {
+    return (int64_t)(uintptr_t)HashFind((char *)(uintptr_t)a[0],
+                                        (CHashTable *)(uintptr_t)a[1], a[2],
+                                        a[3]);
+}
+static int64_t host_hash_add(int64_t *a) {
+    HashAdd((CHash *)(uintptr_t)a[0], (CHashTable *)(uintptr_t)a[1]);
+    return 0;
 }
 static void set_guest_task(void *p) {
     __asm__ volatile("msr tpidr_el1, %0\n\tisb" : : "r"(p) : "memory");
@@ -922,6 +942,9 @@ static void init_guest_fiber(unsigned i, void *parent, const char *name) {
     *(int64_t *)(words + guest_number_off) = i ? (int64_t)++guest_task_serial : 0;
     *(void **)(words + guest_data_heap_off) = heap;
     *(void **)(words + guest_code_heap_off) = heap;
+    /* Guest DEFINE/FramePtr tables are separate from the Aiwnios compiler
+     * hash. HashTableNew's CHash/CHashTable layout matches ZealOS. */
+    *(void **)(words + guest_hash_table_off) = HashTableNew(1024, NULL);
     memcpy(heap + guest_heap_sig_off, "HcSV", 4);
     *(void **)(heap + guest_heap_task_off) = words;
     f->irq_flags_live = 1u << 9; /* IF enabled until CLI/RFlagsSet. */
@@ -2029,6 +2052,16 @@ static int64_t host_lbtc(int64_t *a) {
     unsigned char mask = (unsigned char)(1u << ((uint64_t)a[1] & 7));
     return !!(__atomic_fetch_xor(bit_byte(a), mask, __ATOMIC_SEQ_CST) & mask);
 }
+static int64_t host_bts(int64_t *a) {
+    /* Non-locked Bts; same bit math as LBts on this single-CPU bridge. */
+    return host_lbts(a);
+}
+static int64_t host_btr(int64_t *a) {
+    return host_lbtr(a);
+}
+static int64_t host_btc(int64_t *a) {
+    return host_lbtc(a);
+}
 static int64_t host_lbequal(int64_t *a) {
     unsigned char mask = (unsigned char)(1u << ((uint64_t)a[1] & 7));
     if (a[2])
@@ -2210,6 +2243,7 @@ static void bind_guest_task(void) {
         !task_field(cls, "task_end_cb", 8, -1) ||
         !task_field(cls, "except_ch", 8, -1) ||
         !task_field(cls, "catch_except", 1, -1) ||
+        !task_field(cls, "hash_table", 8, -1) ||
         !task_field(heap, "hc_signature", 4, 8) ||
         !task_field(heap, "used_u8s", 8, -1) ||
         !task_field(heap, "mem_task", 8, -1))
@@ -2264,6 +2298,7 @@ static void bind_guest_task(void) {
     guest_end_cb_off = MemberFind("task_end_cb", cls)->off;
     guest_except_ch_off = MemberFind("except_ch", cls)->off;
     guest_catch_except_off = MemberFind("catch_except", cls)->off;
+    guest_hash_table_off = MemberFind("hash_table", cls)->off;
     guest_heap_sig_off = MemberFind("hc_signature", heap)->off;
     guest_heap_used_off = MemberFind("used_u8s", heap)->off;
     guest_heap_task_off = MemberFind("mem_task", heap)->off;
@@ -2290,6 +2325,9 @@ static void bind_guest_task(void) {
     PrsBindCSymbol("mp_count", &guest_mp_count, 0);
     PrsBindCSymbol("sys_focus_task", &guest_focus_task, 0);
     PrsBindCSymbol("Bt", host_bt, 2);
+    PrsBindCSymbol("Bts", host_bts, 2);
+    PrsBindCSymbol("Btr", host_btr, 2);
+    PrsBindCSymbol("Btc", host_btc, 2);
     PrsBindCSymbol("LBts", host_lbts, 2);
     PrsBindCSymbol("LBtr", host_lbtr, 2);
     PrsBindCSymbol("LBtc", host_lbtc, 2);
@@ -2579,6 +2617,11 @@ static int load_inner(const char *path) {
         PrsBindCSymbol("JobsHandler", host_jobs_handler, 2);
         PrsBindCSymbol("JobResScan", host_job_res_scan, 2);
         PrsBindCSymbol("JobResGet", host_job_res_get, 1);
+        /* ZealOS CHash/CHashTable layout matches Aiwnios; guest DEFINE entries
+         * use ZealOS HTT_* bits on the guest Fs->hash_table. */
+        PrsBindCSymbol("HashTableNew", host_hash_table_new, 2);
+        PrsBindCSymbol("HashFind", host_hash_find, 4);
+        PrsBindCSymbol("HashAdd", host_hash_add, 2);
     }
     free(src);
     loaded_modules++;

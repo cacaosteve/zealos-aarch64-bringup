@@ -1689,25 +1689,68 @@ next:
     szo:
       if (ccmp->lex->cur_tok == '(') {
         Lex(ccmp->lex);
-        if (ccmp->lex->cur_tok != TK_NAME)
-          ParseErr(ccmp, "Expected a typename.");
-        if (!(tc_class =
-                  HashFind(ccmp->lex->string, Fs->hash_table, HTT_CLASS, 1)))
-          ParseErr(ccmp, "Expected a typename.");
-        Lex(ccmp->lex);
-        tc_class = PrsType(ccmp, tc_class, NULL, NULL, &dummy_dim);
-        arg = tc_class->sz * dummy_dim.total_cnt;
-        if (dummy_dim.next)
-          ArrayDimDel(dummy_dim.next);
-        (ic = A_CALLOC(sizeof(CRPN), NULL))->type = type = IC_I64;
-        QueInit(&ic->base);
-        ic->integer = arg;
-        QueIns(ic, ccmp->code_ctrl->ir_code);
-        if (ccmp->lex->cur_tok != ')')
-          ParseErr(ccmp, "Expected a ')'.");
-        Lex(ccmp->lex);
-        binop_before = 0;
-        goto next;
+        /* Type form: sizeof(Type) / sizeof(Type *). Expression form:
+         * sizeof(expr) — ZealOS DocInit uses sizeof(doldoc.member). */
+        if (ccmp->lex->cur_tok == TK_NAME &&
+            (tc_class =
+                 HashFind(ccmp->lex->string, Fs->hash_table, HTT_CLASS, 1))) {
+          Lex(ccmp->lex);
+          tc_class = PrsType(ccmp, tc_class, NULL, NULL, &dummy_dim);
+          arg = tc_class->sz * dummy_dim.total_cnt;
+          if (dummy_dim.next)
+            ArrayDimDel(dummy_dim.next);
+          (ic = A_CALLOC(sizeof(CRPN), NULL))->type = type = IC_I64;
+          QueInit(&ic->base);
+          ic->integer = arg;
+          QueIns(ic, ccmp->code_ctrl->ir_code);
+          if (ccmp->lex->cur_tok != ')')
+            ParseErr(ccmp, "Expected a ')'.");
+          Lex(ccmp->lex);
+          binop_before = 0;
+          goto next;
+        }
+        {
+          CRPN *sizeof_saved = ccmp->code_ctrl->ir_code->next;
+          CMemberLst *sizeof_ml = NULL;
+          CHashGlblVar *sizeof_gv = NULL;
+          CArrayDim *sizeof_dim = NULL;
+          CHashClass *sizeof_cls = NULL;
+          if (!ParseExpr(ccmp, PEF_NO_COMMA))
+            ParseErr(ccmp, "Expected a sizeof expression.");
+          if (ccmp->lex->cur_tok != ')')
+            ParseErr(ccmp, "Expected a ')'.");
+          Lex(ccmp->lex);
+          ic2 = ccmp->code_ctrl->ir_code->next;
+          /* Capture union fields before AssignRawTypeToNode can clobber them. */
+          if (ic2->type == IC_DOT || ic2->type == IC_ARROW ||
+              ic2->type == IC_LOCAL)
+            sizeof_ml = ic2->local_mem;
+          else if (ic2->type == IC_GLOBAL)
+            sizeof_gv = ic2->global_var;
+          AssignRawTypeToNode(ccmp, ic2);
+          sizeof_cls = ic2->ic_class;
+          sizeof_dim = ic2->ic_dim;
+          if (sizeof_ml)
+            arg = sizeof_ml->member_class->sz * sizeof_ml->dim.total_cnt;
+          else if (sizeof_gv)
+            arg = sizeof_gv->var_class->sz * sizeof_gv->dim.total_cnt;
+          else if (sizeof_dim && sizeof_cls)
+            arg = sizeof_cls->sz * sizeof_dim->total_cnt;
+          else if (sizeof_cls)
+            arg = sizeof_cls->sz;
+          else
+            arg = 0;
+          if (arg <= 0 || arg > (int64_t)0x1000000)
+            ParseErr(ccmp, "sizeof expression size is invalid.");
+          while (ccmp->code_ctrl->ir_code->next != sizeof_saved)
+            ICFree(ccmp->code_ctrl->ir_code->next);
+          (ic = A_CALLOC(sizeof(CRPN), NULL))->type = type = IC_I64;
+          QueInit(&ic->base);
+          ic->integer = arg;
+          QueIns(ic, ccmp->code_ctrl->ir_code);
+          binop_before = 0;
+          goto next;
+        }
       } else if (ccmp->lex->cur_tok == TK_NAME) {
         if (!(tc_class =
                   HashFind(ccmp->lex->string, Fs->hash_table, HTT_CLASS, 1)))

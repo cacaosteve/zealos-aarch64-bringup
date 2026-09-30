@@ -1777,7 +1777,20 @@ ZealOS live distribution or installer.
   Bootstrap stubs cover `Ed*CB`, `DocDataFormat`, `MenuFile`, `WinScrollsInit`,
   `ac`, and the unused TermRightClick helpers until DocEd/Menu/Win load.
   `ParseDollarCmd` is a temporary TX/CM/DA/FG/BG recognizer (full `CDocEntry`)
-  until DocPlain/DocInit + CompCtrl load.
+  until DocPlain replaces it; DocInit now fills `doldoc.hash`.
 - `TaskOriginalDocTermChecks` runs `DocTermNew`, confirms put/display/border
   docs, registers KDDoc handlers, and `DocPrint`/`PutS` into the term doc
   (`0x2a`). Real dollar-cmd parsing, menus, and Adam remain later work; Aiwnios strings now collapse `$$` to `$` like ZealOS so DocBorderNew formats reach DocPutS.
+
+## Unchanged DolDoc `DocInit` + doldoc.hash
+
+- The unchanged pinned `System/DolDoc/DocInit.ZC` loads after DocTerm.
+  Bootstrap supplies `DefineListLoad`/`HashDefineListAdd`, `ST_COLORS` via
+  `BootstrapDefinesLoad`, and a minimal `CompCtrlNew`/`Lex`/`ParseDocFlags`
+  so DocInit can fill `doldoc.hash` and default entry flags.
+- Guest `HashTableNew`/`HashFind`/`HashAdd` are argv-style FFI wrappers
+  (Aiwnios `GenFFIBinding` passes `int64_t *argv`, not native C arity).
+  Aiwnios also accepts `sizeof(doldoc.member)` for DocInit's `MemSet`s.
+- `TaskOriginalDocInitChecks` confirms `TX`/`CM`/`T` hash entries, TX tag
+  flag, cursor-right clean scan, and `ST_DOC_CMDS` DefineSub (`0x2a`).
+  Full DocPlain/`ParseDollarCmd` and Adam remain later work.

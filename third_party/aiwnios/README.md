@@ -46,6 +46,8 @@ Port changes:
   `RT_PTR`. Leaving it `RT_FUNC` made the ARM backend skip the load, so
   `doc->user_put_s` was always the member address and `DocPrintPartial`
   called it.
+- Accept ZealOS `sizeof(expr)` (not only `sizeof(Type)`), including member
+  array sizes such as `sizeof(doldoc.default_de_flags)` in DocInit.
 
 The freestanding C support and host API are in `src/zc/`. See
 `COMPATIBILITY.md` for the tested scope and deliberate runtime limitations.

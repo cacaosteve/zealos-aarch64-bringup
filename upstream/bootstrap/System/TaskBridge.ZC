@@ -311,6 +311,10 @@ Bool BreakUnlock(CTask *task=NULL)
     return res;
 }
 // MakeDoc.ZC owns the real doldoc tables; zeroed defaults let DocNew compile.
+// DHT_* hash types live in MakeDoc.ZC on ZealOS; expose them for DocInit.
+#define DHT_DOC_CMD 		1
+#define DHT_DOC_FLAG		2
+#define DHT_COLOR 			4
 class CDolDocGlobals
 {
     CHashTable	*hash;
@@ -322,6 +326,257 @@ class CDolDocGlobals
                  clean_scan_codes			[4];
     I32			 default_type_flags			[DOCT_TYPES_NUM];
 } doldoc;
+// Aiwnios Hash* match ZealOS CHash/CHashTable; bound after TaskBridge loads.
+extern CHashTable *HashTableNew(I64 size, CTask *mem_task=NULL);
+extern CHash *HashFind(U8 *needle_str, CHashTable *haystack_table,
+                       I64 mask, I64 instance=1);
+extern U0 HashAdd(CHash *tmph, CHashTable *table);
+U0 UndefinedDefine(U8 *dname)
+{
+    Print(ST_ERR_ST "Undefined Define: '%s'.\n", dname);
+    throw('UndefDef');
+}
+CHashDefineStr *DefineLoad(U8 *dname, U8 *st, I64 caller_num=1)
+{
+    CHashDefineStr *tmph;
+
+    if (caller_num) {}
+    /* Avoid sizeof(CHashDefineStr): Aiwnios class sz can be garbage. */
+    tmph = CAlloc(0x80);
+    tmph->type = HTT_DEFINE_STR;
+    tmph->str = StrNew(dname);
+    tmph->data = StrNew(st);
+    tmph->count = -1;
+    tmph->src_link = StrNew("AD:");
+    HashAdd(tmph, Fs->hash_table);
+    return tmph;
+}
+CHashDefineStr *DefineListLoad(U8 *dname, U8 *list)
+{
+    I64 count = 0, nbytes;
+    U8 *ptr, **idx;
+    CHashDefineStr *tmph = CAlloc(0x80);
+
+    tmph->type = HTT_DEFINE_STR;
+    tmph->str = StrNew(dname);
+    tmph->src_link = StrNew("AD:");
+    ptr = list;
+    while (*ptr)
+    {
+        if (*ptr != '@')
+            count++;
+        while (*ptr++);
+    }
+    nbytes = ptr - list;
+    nbytes++;
+    if (nbytes <= 0 || nbytes > 0x100000)
+    {
+        Print("DefineListLoad bad nbytes\n");
+        return NULL;
+    }
+    tmph->data = MAlloc(nbytes);
+    MemCopy(tmph->data, list, nbytes);
+    tmph->count = count;
+    idx = tmph->sub_idx = MAlloc(count * 8);
+    ptr = list;
+    while (*ptr)
+    {
+        if (*ptr != '@')
+            *idx++ = ptr;
+        while (*ptr++);
+    }
+    HashAdd(tmph, Fs->hash_table);
+    return tmph;
+}
+U8 *Define(U8 *dname)
+{
+    CHashDefineStr *tmph;
+
+    if (tmph = HashFind(dname, Fs->hash_table, HTT_DEFINE_STR))
+        return tmph->data;
+    else if (dname)
+        UndefinedDefine(dname);
+    else
+        return NULL;
+}
+U8 *DefineSub(I64 sub, U8 *dname)
+{
+    CHashDefineStr *tmph;
+
+    if (tmph = HashFind(dname, Fs->hash_table, HTT_DEFINE_STR))
+    {
+        if (0 <= sub < tmph->count)
+            return tmph->sub_idx[sub];
+        else
+            return NULL;
+    }
+    else if (dname)
+        UndefinedDefine(dname);
+    else
+        return NULL;
+}
+I64 DefineCount(U8 *dname)
+{
+    CHashDefineStr *tmph;
+
+    if (tmph = HashFind(dname, Fs->hash_table, HTT_DEFINE_STR))
+        return tmph->count;
+    else if (dname)
+        UndefinedDefine(dname);
+    else
+        return -1;
+}
+I64 HashListAdd(U8 *list, I64 type, CHashTable *table)
+{
+    I64 i = 0;
+    CHashGeneric *tmph;
+
+    if (list)
+    {
+        while (*list)
+        {
+            if (*list == '@')
+                list++;
+            else
+                i++;
+            /* Avoid sizeof(CHashGeneric): Aiwnios class sz can be garbage. */
+            tmph = CAlloc(0x40);
+            tmph->user_data0 = i - 1;
+            tmph->str = StrNew(list);
+            tmph->type = type;
+            HashAdd(tmph, table);
+            while (*list++);
+        }
+    }
+    return i;
+}
+I64 HashDefineListAdd(U8 *dname, I64 type, CHashTable *table)
+{
+    CHashDefineStr *tmph;
+
+    if (tmph = HashFind(dname, Fs->hash_table, HTT_DEFINE_STR))
+        return HashListAdd(tmph->data, type, table);
+    else
+        return 0;
+}
+I64 BootstrapDefinesLoad()
+{//ST_COLORS for DocInit color hash; other SysDefinesLoad lists later.
+    DefineListLoad("ST_COLORS",
+                   "BLACK\0BLUE\0GREEN\0CYAN\0"
+                   "RED\0PURPLE\0BROWN\0LTGRAY\0DKGRAY\0LTBLUE\0LTGREEN\0"
+                   "LTCYAN\0LTRED\0LTPURPLE\0YELLOW\0WHITE\0");
+    return 0;
+}
+// Minimal CompCtrl/Lex so DocInit can parse default flag strings. Full
+// Compiler/Lex.ZC remains later work.
+CCompCtrl *CompCtrlNew(U8 *buf=NULL, I64 flags=0, U8 *filename=NULL)
+{
+    /* Aiwnios sizeof(CCompCtrl) is not trustworthy yet (class sz garbage);
+     * 64KiB covers the KernelA layout and our Lex stub fields. */
+    CCompCtrl *cc = CAlloc(0x10000);
+
+    QueueInit(cc);
+    cc->flags = flags;
+    cc->htc.hash_mask = HTG_TYPE_MASK - HTT_IMPORT_SYS_SYM;
+    cc->htc.define_hash_table = cc->htc.hash_table_list =
+        cc->htc.global_hash_table = cc->htc.local_hash_table = Fs->hash_table;
+    cc->cur_buf_ptr = buf;
+    if (filename) {}
+    return cc;
+}
+U0 CompCtrlDel(CCompCtrl *cc)
+{
+    if (!cc)
+        return;
+    Free(cc->cur_str);
+    Free(cc);
+}
+I64 Lex(CCompCtrl *cc)
+{//Tokenize identifiers and + - ; for DocInit / ParseDocFlags.
+    U8 *ptr, buf[STR_LEN];
+    I64 i, ch;
+
+    if (!cc)
+        return 0;
+    Free(cc->cur_str);
+    cc->cur_str = NULL;
+    ptr = cc->cur_buf_ptr;
+    if (!ptr)
+        return cc->token = TK_EOF;
+    while (*ptr == CH_SPACE || *ptr == '\t' || *ptr == '\r' || *ptr == '\n')
+        ptr++;
+    cc->cur_buf_ptr = ptr;
+    if (!*ptr)
+        return cc->token = TK_EOF;
+    ch = *ptr;
+    if (ch == '+' || ch == '-' || ch == ';')
+    {
+        cc->cur_buf_ptr = ptr + 1;
+        return cc->token = ch;
+    }
+    if ('A' <= ch <= 'Z' || 'a' <= ch <= 'z' || ch == '_')
+    {
+        i = 0;
+        while ('A' <= *ptr <= 'Z' || 'a' <= *ptr <= 'z' ||
+               '0' <= *ptr <= '9' || *ptr == '_')
+        {
+            if (i < STR_LEN - 1)
+                buf[i++] = *ptr;
+            ptr++;
+        }
+        buf[i] = 0;
+        cc->cur_buf_ptr = ptr;
+        cc->cur_str = StrNew(buf);
+        cc->cur_str_len = i + 1;
+        return cc->token = TK_IDENT;
+    }
+    cc->cur_buf_ptr = ptr + 1;
+    return cc->token = ch;
+}
+I64 ParseDocFlagSingle(CCompCtrl *cc, I64 *_de_flags, U32 *_type, Bool turn_on)
+{//DocPlain subset used by DocInit default-flag parse.
+    I64 res = -1;
+    CHashGeneric *tmph;
+
+    if (cc->token == TK_IDENT &&
+        (tmph = HashFind(cc->cur_str, doldoc.hash, DHT_DOC_FLAG)))
+    {
+        res = tmph->user_data0;
+        if (res < 64)
+        {
+            BEqual(_de_flags, res, turn_on);
+            switch (res)
+            {
+                case DOCEf_BLINK:
+                case DOCEf_INVERT:
+                case DOCEf_UNDERLINE:
+                case DOCEf_SEL:
+                    BEqual(_type, res, turn_on);
+                    break;
+            }
+        }
+        Lex(cc);
+    }
+    return res;
+}
+I64 ParseDocFlags(CCompCtrl *cc, I64 *_de_flags, U32 *_type)
+{
+    I64 res = -1;
+    Bool turn_on;
+
+    while (TRUE)
+    {
+        if (cc->token == '+')
+            turn_on = TRUE;
+        else if (cc->token == '-')
+            turn_on = FALSE;
+        else
+            break;
+        Lex(cc);
+        res = ParseDocFlagSingle(cc, _de_flags, _type, turn_on);
+    }
+    return res;
+}
 // KDebug.ZC RawPrint flashes a message; bridge sends it to the text console.
 U0 RawPrint(I64 mS=100, U8 *format=NULL, ...)
 {
@@ -922,7 +1177,7 @@ CDocEntry *ParseDollarCmd(CDoc *doc, U8 *st)
     U8 *q, *tag = NULL;
     I64 type = DOCT_ERROR, len = 0;
 
-    // Lightweight stand-in until DocPlain/DocInit + CompCtrl load. Recognize
+    // Lightweight stand-in until DocPlain uses doldoc.hash. Recognize
     // the DocBorderNew cmds and a trailing ,"tag" so TX entries get real tags.
     if (!doc)
         return NULL;

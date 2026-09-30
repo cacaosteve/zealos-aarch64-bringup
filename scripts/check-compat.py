@@ -179,7 +179,12 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             raise SystemExit(0)
         if args.probe_module:
             command('zload /Kernel/KernelA.HH', 'zc: loaded /Kernel/KernelA.HH')
-            command('zload /Kernel/KernelB.HH', 'zc: loaded /Kernel/KernelB.HH')
+            guest.stdin.write(b'zload /Kernel/KernelB.HH\r')
+            guest.stdin.flush()
+            kb = until(b'\n> ')
+            print('KERNELB LOAD\n'+kb, flush=True)
+            if 'zc: loaded /Kernel/KernelB.HH' not in kb:
+                raise RuntimeError('KernelB.HH did not load')
             if args.probe_module == '/Kernel/Job.ZC':
                 # TaskText Spawns InputFilterTask from SerialDev/Message.ZC.
                 command('zload /Kernel/SerialDev/Message.ZC',
@@ -192,6 +197,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                                          '/System/DolDoc/DocPutS.ZC',
                                          '/System/DolDoc/DocDblBuf.ZC',
                                          '/System/DolDoc/DocTerm.ZC',
+                                         '/System/DolDoc/DocInit.ZC',
                                          '/System/DolDoc/DocNew.ZC',
                                          '/System/DolDoc/DocBin.ZC'):
                 command('zload /Kernel/SerialDev/Message.ZC',
@@ -202,27 +208,37 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                                          '/System/DolDoc/DocPutKey.ZC',
                                          '/System/DolDoc/DocPutS.ZC',
                                          '/System/DolDoc/DocDblBuf.ZC',
-                                         '/System/DolDoc/DocTerm.ZC'):
+                                         '/System/DolDoc/DocTerm.ZC',
+                                         '/System/DolDoc/DocInit.ZC'):
                 command('zload /System/DolDoc/DocBin.ZC',
                         'zc: loaded /System/DolDoc/DocBin.ZC')
             if args.probe_module in ('/System/DolDoc/DocPutKey.ZC',
                                          '/System/DolDoc/DocPutS.ZC',
                                          '/System/DolDoc/DocDblBuf.ZC',
-                                         '/System/DolDoc/DocTerm.ZC'):
+                                         '/System/DolDoc/DocTerm.ZC',
+                                         '/System/DolDoc/DocInit.ZC'):
                 command('zload /System/DolDoc/DocNew.ZC',
                         'zc: loaded /System/DolDoc/DocNew.ZC')
             if args.probe_module in ('/System/DolDoc/DocPutS.ZC',
                                          '/System/DolDoc/DocDblBuf.ZC',
-                                         '/System/DolDoc/DocTerm.ZC'):
+                                         '/System/DolDoc/DocTerm.ZC',
+                                         '/System/DolDoc/DocInit.ZC'):
                 command('zload /System/DolDoc/DocPutKey.ZC',
                         'zc: loaded /System/DolDoc/DocPutKey.ZC')
             if args.probe_module in ('/System/DolDoc/DocDblBuf.ZC',
-                                         '/System/DolDoc/DocTerm.ZC'):
+                                         '/System/DolDoc/DocTerm.ZC',
+                                         '/System/DolDoc/DocInit.ZC'):
                 command('zload /System/DolDoc/DocPutS.ZC',
                         'zc: loaded /System/DolDoc/DocPutS.ZC')
-            if args.probe_module == '/System/DolDoc/DocTerm.ZC':
+            if args.probe_module in ('/System/DolDoc/DocTerm.ZC',
+                                         '/System/DolDoc/DocInit.ZC'):
                 command('zload /System/DolDoc/DocDblBuf.ZC',
                         'zc: loaded /System/DolDoc/DocDblBuf.ZC')
+            if args.probe_module == '/System/DolDoc/DocInit.ZC':
+                command('zload /System/DolDoc/DocTerm.ZC',
+                        'zc: loaded /System/DolDoc/DocTerm.ZC')
+                command('zcall BootstrapDefinesLoad',
+                        'zc => 0x0000000000000000')
             guest.stdin.write(('zload '+args.probe_module+'\r').encode())
             guest.stdin.flush()
             result = until(b'\n> ')
@@ -299,6 +315,13 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 command('zload /Tests/TaskOriginalDocTerm.ZC',
                         'zc: loaded /Tests/TaskOriginalDocTerm.ZC')
                 command('zcall TaskOriginalDocTermChecks',
+                        'zc => 0x000000000000002a')
+            if args.probe_module == '/System/DolDoc/DocInit.ZC':
+                if 'zc: loaded /System/DolDoc/DocInit.ZC' not in result:
+                    raise RuntimeError('unchanged DocInit.ZC did not load')
+                command('zload /Tests/TaskOriginalDocInit.ZC',
+                        'zc: loaded /Tests/TaskOriginalDocInit.ZC')
+                command('zcall TaskOriginalDocInitChecks',
                         'zc => 0x000000000000002a')
             raise SystemExit(0)
         if args.probe_task_jobs:
