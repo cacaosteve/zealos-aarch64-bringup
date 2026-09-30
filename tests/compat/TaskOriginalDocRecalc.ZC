@@ -1,6 +1,7 @@
 // Smoke coordinate math and a plain-text layout pass from unchanged DocRecalc.ZC.
 extern I64 ZcFbTextCellsDrawn();
 extern I64 ZcFbTextPixel(I64 x, I64 y);
+extern I64 ZcFbTextFlush();
 I64 TaskOriginalDocRecalcChecks()
 {
     CDoc *doc;
@@ -104,6 +105,14 @@ I64 TaskOriginalDocRecalcChecks()
         Fs->display_flags = old_display_flags;
         return 83;
     }
+    old_text_cells = ZcFbTextCellsDrawn();
+    if (!TextLenAttr(Fs, 3, 3, 1, 0x4e00) ||
+        ZcFbTextCellsDrawn() != old_text_cells ||
+        ZcFbTextPixel(25, 24) != 0x00ffffff)
+    {
+        Fs->display_flags = old_display_flags;
+        return 95;
+    }
     if (TextChar(Fs, FALSE, 80, 3, 0x0e00 | 'B'))
     {
         Fs->display_flags = old_display_flags;
@@ -158,6 +167,17 @@ I64 TaskOriginalDocRecalcChecks()
     {
         Fs->display_flags = old_display_flags;
         return 92;
+    }
+    TextRect(3, 3, 3, 3, 0x4000);
+    if (ZcFbTextPixel(25, 24) != 0x00aa0000)
+    {
+        Fs->display_flags = old_display_flags;
+        return 93;
+    }
+    if (ZcFbTextFlush() <= 0 || ZcFbTextPixel(25, 24) != 0x00aa0000)
+    {
+        Fs->display_flags = old_display_flags;
+        return 94;
     }
     old_text_cells = ZcFbTextCellsDrawn();
     if (!DocRecalc(doc, RECALCt_TO_SCREEN))

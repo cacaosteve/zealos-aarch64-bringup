@@ -35,5 +35,7 @@ extern Bool ZcFbTextChar(I64 x, I64 y, U32 cell, Bool allow_border,
                          I64 left_right, I64 top_bottom);
 extern I64 ZcFbTextFill(I64 x, I64 y, I64 len, U32 attr,
                         I64 left_right, I64 top_bottom);
+extern I64 ZcFbTextRect(I64 left, I64 right, I64 top, I64 bottom, U32 cell);
+extern I64 ZcFbTextFlush();
 // Temporary ARM64 bootstrap binding for the table initialized by upstream KMain.
 extern F64 *pow10_I64;

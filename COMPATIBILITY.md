@@ -1845,10 +1845,12 @@ ZealOS live distribution or installer.
 - The text bridge clips spans, single cells, and blank attributed-cell fills to
   task bounds, applies task scroll, and maps the packed 16-color
   foreground/background attributes. `TextChar` honors the one-cell border
-  allowance and static invert/selection/underline flags. These operations
-  draw into the current framebuffer directly; they are not yet ZealOS's
-  `gr.text_base`/double-buffered text layer. `TextBorder` now draws the
-  upstream CP437 single- and double-line box glyphs through `TextChar`. WinMgr
-  remains a stand-in. Source matching, forms/data formatting, sprites/depth
-  buffers, music state, cursor interaction, and multi-window rendering remain
-  unaccepted.
+  allowance and static invert/selection/underline flags. Writes are mirrored
+  into a bounded 512-by-512 packed-cell plane; `TextLenAttr` preserves existing
+  nonblank cells, `TextRect` updates a clipped rectangle, and `ZcFbTextFlush`
+  redraws valid cells from the plane. Writes still present immediately to keep
+  the bootstrap shell responsive; this is not yet ZealOS's per-task
+  `gr.text_base`/window compositor. `TextBorder` draws the upstream CP437
+  single- and double-line glyphs through `TextChar`. WinMgr remains a stand-in.
+  Source matching, forms/data formatting, sprites/depth buffers, music state,
+  cursor interaction, and multi-window rendering remain unaccepted.

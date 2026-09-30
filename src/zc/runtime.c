@@ -18,9 +18,12 @@ extern int64_t zeal_fb_text_pixel(int64_t x, int64_t y);
 extern int64_t zeal_fb_text_char(int64_t x, int64_t y, uint32_t cell,
                                  int allow_border, uint32_t left_right,
                                  uint32_t top_bottom);
-extern uint64_t zeal_fb_text_fill(int64_t x, int64_t y, int64_t len,
-                                  uint32_t attr, uint32_t left_right,
-                                  uint32_t top_bottom);
+extern int64_t zeal_fb_text_fill(int64_t x, int64_t y, int64_t len,
+                                 uint32_t attr, uint32_t left_right,
+                                 uint32_t top_bottom);
+extern uint64_t zeal_fb_text_rect(int64_t left, int64_t right, int64_t top,
+                                  int64_t bottom, uint32_t cell);
+extern uint64_t zeal_fb_text_flush(void);
 
 /* Separate arenas from legacy hc_* so its per-demo reset cannot invalidate
  * modules loaded here. Both use splitting/coalescing and arbitrary-order Free. */
@@ -593,6 +596,13 @@ static int64_t host_fb_text_char(int64_t *a) {
 static int64_t host_fb_text_fill(int64_t *a) {
     return zeal_fb_text_fill(a[0], a[1], a[2], (uint32_t)a[3],
                              (uint32_t)a[4], (uint32_t)a[5]);
+}
+static int64_t host_fb_text_rect(int64_t *a) {
+    return (int64_t)zeal_fb_text_rect(a[0], a[1], a[2], a[3], (uint32_t)a[4]);
+}
+static int64_t host_fb_text_flush(int64_t *a) {
+    (void)a;
+    return (int64_t)zeal_fb_text_flush();
 }
 static void set_guest_task(void *p) {
     __asm__ volatile("msr tpidr_el1, %0\n\tisb" : : "r"(p) : "memory");
@@ -2825,7 +2835,9 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
                     {"ZcFbTextCellsDrawn", host_fb_text_cells_drawn, 0},
                     {"ZcFbTextPixel", host_fb_text_pixel, 2},
                     {"ZcFbTextChar", host_fb_text_char, 6},
-                    {"ZcFbTextFill", host_fb_text_fill, 6}};
+                    {"ZcFbTextFill", host_fb_text_fill, 6},
+                    {"ZcFbTextRect", host_fb_text_rect, 5},
+                    {"ZcFbTextFlush", host_fb_text_flush, 0}};
     for (size_t i = 0; i < sizeof(bindings) / sizeof(*bindings); i++)
         PrsBindCSymbol((char *)bindings[i].name, (void *)bindings[i].fn, bindings[i].arity);
     __clear_cache(code_arena, code_arena + sizeof(code_arena));

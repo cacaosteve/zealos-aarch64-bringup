@@ -141,6 +141,8 @@
 #define PL011_FR      0x18
 #define PL011_CR      0x30
 #define PL011_FR_TXFF (1u << 5)
+#define ZEAL_TEXT_MAX_COLS 512u
+#define ZEAL_TEXT_MAX_ROWS 512u
 #define PL011_FR_RXFE (1u << 4)
 #define PL011_FR_BUSY (1u << 3)
 #define PL011_UARTEN  (1u << 0)
@@ -205,6 +207,18 @@ static uint32_t g_fb_bpp;
 static uint32_t g_fb_cx, g_fb_cy;
 static uint32_t g_fb_cols, g_fb_rows;
 static uint64_t g_zc_text_cells_drawn;
+/* Bounded ZealOS-style text plane. The framebuffer remains the visible target,
+ * while these cells are the source for redraws and blank-cell attributes. */
+static uint32_t g_fb_text_cells[ZEAL_TEXT_MAX_COLS * ZEAL_TEXT_MAX_ROWS];
+static uint8_t g_fb_text_valid[ZEAL_TEXT_MAX_COLS * ZEAL_TEXT_MAX_ROWS];
+
+static const uint32_t g_text_palette[16] = {
+    0x00000000u, 0x000000aau, 0x0000aa00u, 0x0000aaaau,
+    0x00aa0000u, 0x00aa00aau, 0x00aa5500u, 0x00aaaaaau,
+    0x00555555u, 0x005555ffu, 0x0055ff55u, 0x0055ffffu,
+    0x00ff5555u, 0x00ff55ffu, 0x00ffff55u, 0x00ffffffu,
+};
+static void fb_text_buffer_reset(void);
 
 /* BCM2711 PL011 wants 32-bit MMIO; QEMU virt accepts it too. */
 static void uart_write(volatile uint8_t *uart, char c) {
@@ -374,6 +388,7 @@ static void fb_clear(uint32_t bgr) {
     if (!g_fb) {
         return;
     }
+    fb_text_buffer_reset();
     fb_fillrect(0, 0, (uint32_t)g_fb_w, (uint32_t)g_fb_h, bgr);
     g_fb_cx = 0;
     g_fb_cy = 0;
@@ -414,18 +429,35 @@ static void fb_draw_char(uint32_t col, uint32_t row, char ch, uint32_t fg) {
     }
 }
 
-/* Draw a ZealOS packed text span directly into the bootstrap framebuffer.
- * ZealOS stores the VGA-style foreground in attr[3:0] and background in
- * attr[7:4], with the character in byte zero of each U32 cell. */
+/* Present packed ZealOS text cells from the bounded text-cell plane. */
+static void fb_text_present_cell(uint32_t col, uint32_t row, uint32_t packed) {
+    uint32_t colors = (packed >> 8) & 0xffu;
+    uint32_t fg, bg;
+    unsigned char ch = (unsigned char)packed;
+    if (!g_fb || col >= g_fb_cols || row >= g_fb_rows)
+        return;
+    if (packed & (0x20000000u | 0x40000000u))
+        colors ^= 0xffu;
+    fg = g_text_palette[colors & 15u];
+    bg = g_text_palette[(colors >> 4) & 15u];
+    fb_fillrect(col * 8u, row * 8u, 8u, 8u, bg);
+    if (ch >= 32)
+        fb_draw_char(col, row, (char)ch, fg);
+    if (packed & 0x80000000u)
+        fb_fillrect(col * 8u, row * 8u + 7u, 8u, 1u, fg);
+}
+
+static void fb_text_buffer_reset(void) {
+    size_t count = (size_t)ZEAL_TEXT_MAX_COLS * ZEAL_TEXT_MAX_ROWS;
+    for (size_t i = 0; i < count; i++) {
+        g_fb_text_cells[i] = 0;
+        g_fb_text_valid[i] = 0;
+    }
+}
+
 uint64_t zeal_fb_text_span(int64_t x, int64_t y, int64_t len, uint32_t attr,
                            const void *data, int mode, int64_t left,
                            int64_t right, int64_t top, int64_t bottom) {
-    static const uint32_t palette[16] = {
-        0x00000000u, 0x000000aau, 0x0000aa00u, 0x0000aaaau,
-        0x00aa0000u, 0x00aa00aau, 0x00aa5500u, 0x00aaaaaau,
-        0x00555555u, 0x005555ffu, 0x0055ff55u, 0x0055ffffu,
-        0x00ff5555u, 0x00ff55ffu, 0x00ffff55u, 0x00ffffffu,
-    };
     uint64_t drawn = 0;
     if (!g_fb || (mode != 0 && mode != 1) || len <= 0 ||
         y < top || y > bottom || y < 0 ||
@@ -435,9 +467,6 @@ uint64_t zeal_fb_text_span(int64_t x, int64_t y, int64_t len, uint32_t attr,
         len = 4096;
     if (x > INT64_MAX - len || x > right || x + len <= left)
         return 0;
-    uint64_t colors = (attr >> 8) & 0xffu;
-    uint32_t fg = palette[colors & 15u];
-    uint32_t bg = palette[(colors >> 4) & 15u];
     for (int64_t i = 0; i < len; i++) {
         int64_t col = x + i;
         if (col < left || col > right || col < 0 || (uint64_t)col >= g_fb_cols)
@@ -450,16 +479,14 @@ uint64_t zeal_fb_text_span(int64_t x, int64_t y, int64_t len, uint32_t attr,
             packed = ((const uint32_t *)data)[i];
             ch = (unsigned char)packed;
         }
-        uint32_t cell_colors = (packed >> 8) & 0xffu;
-        if (mode == 1 && (packed & (0x20000000u | 0x40000000u)))
-            cell_colors ^= 0xffu;
-        uint32_t cell_fg = mode == 1 ? palette[cell_colors & 15u] : fg;
-        uint32_t cell_bg = mode == 1 ? palette[(cell_colors >> 4) & 15u] : bg;
-        fb_fillrect((uint32_t)col * 8u, (uint32_t)y * 8u, 8u, 8u, cell_bg);
-        if (ch >= 32)
-            fb_draw_char((uint32_t)col, (uint32_t)y, (char)ch, cell_fg);
-        if (mode == 1 && (packed & 0x80000000u))
-            fb_fillrect((uint32_t)col * 8u, (uint32_t)y * 8u + 7u, 8u, 1u, cell_fg);
+        packed = (packed & 0xffffff00u) | ch;
+        if ((uint64_t)col < ZEAL_TEXT_MAX_COLS &&
+            (uint64_t)y < ZEAL_TEXT_MAX_ROWS) {
+            size_t index = (size_t)y * ZEAL_TEXT_MAX_COLS + (size_t)col;
+            g_fb_text_cells[index] = packed;
+            g_fb_text_valid[index] = 1;
+        }
+        fb_text_present_cell((uint32_t)col, (uint32_t)y, packed);
         drawn++;
     }
     g_zc_text_cells_drawn += drawn;
@@ -493,15 +520,86 @@ int64_t zeal_fb_text_char(int64_t x, int64_t y, uint32_t cell,
                              left, right, top, bottom) == 1;
 }
 
-uint64_t zeal_fb_text_fill(int64_t x, int64_t y, int64_t len, uint32_t attr,
-                           uint32_t left_right, uint32_t top_bottom) {
-    static const uint8_t blank_cells[4096] = {0};
+int64_t zeal_fb_text_fill(int64_t x, int64_t y, int64_t len, uint32_t attr,
+                          uint32_t left_right, uint32_t top_bottom) {
     int64_t left = left_right & 0xffffu;
     int64_t right = left_right >> 16;
     int64_t top = top_bottom & 0xffffu;
     int64_t bottom = top_bottom >> 16;
-    return zeal_fb_text_span(x, y, len, attr, blank_cells, 0,
-                             left, right, top, bottom);
+    uint64_t drawn = 0;
+    if (!g_fb || len <= 0 || y < top || y > bottom || y < 0 ||
+        (uint64_t)y >= g_fb_rows)
+        return -1;
+    if (len > 4096)
+        len = 4096;
+    if (x > INT64_MAX - len || x > right || x + len <= left)
+        return -1;
+    for (int64_t i = 0; i < len; i++) {
+        int64_t col = x + i;
+        uint32_t packed = attr & 0xffffff00u;
+        size_t index;
+        if (col < left || col > right || col < 0 ||
+            (uint64_t)col >= g_fb_cols ||
+            (uint64_t)col >= ZEAL_TEXT_MAX_COLS ||
+            (uint64_t)y >= ZEAL_TEXT_MAX_ROWS)
+            continue;
+        index = (size_t)y * ZEAL_TEXT_MAX_COLS + (size_t)col;
+        if (g_fb_text_valid[index] &&
+            (g_fb_text_cells[index] & 0xffu) != 0)
+            continue;
+        g_fb_text_cells[index] = packed;
+        g_fb_text_valid[index] = 1;
+        fb_text_present_cell((uint32_t)col, (uint32_t)y, packed);
+        drawn++;
+    }
+    g_zc_text_cells_drawn += drawn;
+    return (int64_t)drawn;
+}
+
+uint64_t zeal_fb_text_rect(int64_t left, int64_t right, int64_t top,
+                           int64_t bottom, uint32_t cell) {
+    uint64_t drawn = 0;
+    if (!g_fb || !g_fb_cols || !g_fb_rows || left > right || top > bottom)
+        return 0;
+    if (left < 0) left = 0;
+    if (top < 0) top = 0;
+    if (right >= g_fb_cols) right = g_fb_cols - 1;
+    if (bottom >= g_fb_rows) bottom = g_fb_rows - 1;
+    if (left > right || top > bottom)
+        return 0;
+    for (int64_t row = top; row <= bottom; row++) {
+        for (int64_t col = left; col <= right; col++) {
+            uint32_t packed = cell;
+            if ((uint64_t)col < ZEAL_TEXT_MAX_COLS &&
+                (uint64_t)row < ZEAL_TEXT_MAX_ROWS) {
+                size_t index = (size_t)row * ZEAL_TEXT_MAX_COLS + (size_t)col;
+                g_fb_text_cells[index] = packed;
+                g_fb_text_valid[index] = 1;
+            }
+            fb_text_present_cell((uint32_t)col, (uint32_t)row, packed);
+            drawn++;
+        }
+    }
+    g_zc_text_cells_drawn += drawn;
+    return drawn;
+}
+
+uint64_t zeal_fb_text_flush(void) {
+    uint64_t drawn = 0;
+    uint32_t rows = g_fb_rows < ZEAL_TEXT_MAX_ROWS ? g_fb_rows : ZEAL_TEXT_MAX_ROWS;
+    uint32_t cols = g_fb_cols < ZEAL_TEXT_MAX_COLS ? g_fb_cols : ZEAL_TEXT_MAX_COLS;
+    if (!g_fb)
+        return 0;
+    for (uint32_t row = 0; row < rows; row++) {
+        for (uint32_t col = 0; col < cols; col++) {
+            size_t index = (size_t)row * ZEAL_TEXT_MAX_COLS + col;
+            if (!g_fb_text_valid[index])
+                continue;
+            fb_text_present_cell(col, row, g_fb_text_cells[index]);
+            drawn++;
+        }
+    }
+    return drawn;
 }
 
 static void fb_putc(char ch) {
@@ -579,6 +677,7 @@ static void fb_init_ex(const struct zeal_handoff *h, int clear) {
     g_fb_bpp = h->fb_bpp;
     g_fb_cols = (uint32_t)(g_fb_w / 8);
     g_fb_rows = (uint32_t)(g_fb_h / 8);
+    fb_text_buffer_reset();
     if (clear) {
         fb_clear(0x00101820u);
     } else {

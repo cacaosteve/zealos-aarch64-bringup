@@ -1552,7 +1552,7 @@ Bool TextLenAttr(CTask *task, I64 x, I64 y, I64 len, I64 attr)
     return ZcFbTextFill(task->win_left + x + (task->scroll_x >> 3),
                         task->win_top + y + (task->scroll_y >> 3), len, attr,
                         task->win_left | task->win_right << 16,
-                        task->win_top | task->win_bottom << 16) > 0;
+                        task->win_top | task->win_bottom << 16) >= 0;
 }
 U0 TextBorder(CTask *task, I64 x1, I64 x2, I64 y1, I64 y2, U8 color, Bool solid)
 {//CP437 border glyphs match text.border_chars initialized by upstream KMain.
@@ -1587,6 +1587,12 @@ U0 TextBorder(CTask *task, I64 x1, I64 x2, I64 y1, I64 y2, U8 color, Bool solid)
         TextChar(task, TRUE, x1 - 1, i, vert | attr);
         TextChar(task, TRUE, x2 + 1, i, vert | attr);
     }
+}
+U0 TextRect(I64 left, I64 right, I64 top, I64 bottom, I64 cell)
+{//Update the shared bounded text-cell plane and present the clipped rectangle.
+    if (left > right || top > bottom)
+        return;
+    ZcFbTextRect(left, right, top, bottom, cell);
 }
 U0 WinHorz(I64 left, I64 right, CTask *task)
 {
