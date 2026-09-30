@@ -1806,3 +1806,14 @@ ZealOS live distribution or installer.
 - `TaskOriginalDocPlainChecks` exercises real `ParseDollarCmd` for `TX` tags,
   `CM+LE+RE` flags, `FG,RED`, and `DocPrint("$$TX,\"Yo\"$$")` (`0x2a`).
   Adam and remaining DolDoc (DocForm/DocFile/DocRecalc) remain later work.
+
+## Unchanged DolDoc `DocRecalcLib` + cursor helpers
+
+- The unchanged pinned `System/DolDoc/DocRecalcLib.ZC` loads after DocPlain.
+  Bootstrap adds `TextChar`/`WinScrollNull`/`WinScrollRestore`/`DriveTextAttrGet`
+  stubs and extends `text` for `DocClear`. Host binds `SqrI64`/`EndianU64`.
+  Mid-function `#assert` drains like mid-switch; `*array` member deref works
+  for `*doc->filename.name`.
+- `TaskOriginalDocRecalcLibChecks` exercises `DocTop`/`DocBottom`/`DocCenter`,
+  collapse/max/cursor/scroll, and `SqrI64`/`EndianU64` (`0x2a`). Full
+  `DocRecalc`/`DocHighlight` and Adam remain later work.

@@ -3205,7 +3205,9 @@ int64_t PrsDecl(CCmpCtrl *ccmp, CHashClass *base, CHashClass *add_to,
       }
     }
     CodeCtrlPush(ccmp);
+    aiwnios_fun_depth++;
     PrsScope(ccmp);
+    aiwnios_fun_depth--;
     //
     // Here's the deal. The function will stay "extern" so if it call's
     // itself a CMT_RELOC_U64 will be made and the function address will be
@@ -3839,26 +3841,30 @@ int64_t AssignRawTypeToNode(CCmpCtrl *ccmp, CRPN *rpn) {
     break;
   case IC_DEREF:
     AssignRawTypeToNode(ccmp, rpn->base.next);
+    /* Array members (e.g. CEdFileName.name[256]) are not pointers but may be
+     * dereferenced as the first element — DocUpdateTaskDocs drive letter. */
+    rpn->ic_dim = ((CRPN *)rpn->base.next)->ic_dim;
+    rpn->ic_fun = ((CRPN *)rpn->base.next)->ic_fun;
+    if (rpn->ic_dim) {
+      if (rpn->ic_dim->next) {
+        rpn->ic_dim = rpn->ic_dim->next;
+        rpn->ic_class = ((CRPN *)rpn->base.next)->ic_class;
+      } else {
+        rpn->ic_dim = NULL;
+        rpn->ic_class = ((CRPN *)rpn->base.next)->ic_class;
+      }
+      rpn->raw_type = rpn->ic_class->raw_type;
+      return rpn->raw_type;
+    }
     if (!((CRPN *)rpn->base.next)->ic_class->ptr_star_cnt) {
       ParseErr(ccmp, "Can't derefernce a non-pointer/array.");
       return 0;
     }
-    rpn->ic_dim = ((CRPN *)rpn->base.next)->ic_dim;
-    rpn->ic_fun = ((CRPN *)rpn->base.next)->ic_fun;
-    if (!rpn->ic_dim)
-      goto no_dim;
-    if (!rpn->ic_dim->next) {
-    no_dim:
-      /* Funptrs are CHashFun objects; ic_class-1 would use the wrong stride.
-       * Indexing/deref of U0 (**fp)(I64) still yields a function pointer. */
-      if (((CRPN *)rpn->base.next)->ic_class->flags & CLSF_FUNPTR) {
-        rpn->ic_class = ((CRPN *)rpn->base.next)->ic_class;
-        return rpn->raw_type = RT_FUNC;
-      }
-      rpn->ic_class = ((CRPN *)rpn->base.next)->ic_class - 1;
-    } else {
-      rpn->ic_dim = rpn->ic_dim->next;
+    if (((CRPN *)rpn->base.next)->ic_class->flags & CLSF_FUNPTR) {
+      rpn->ic_class = ((CRPN *)rpn->base.next)->ic_class;
+      return rpn->raw_type = RT_FUNC;
     }
+    rpn->ic_class = ((CRPN *)rpn->base.next)->ic_class - 1;
     rpn->raw_type = rpn->ic_class->raw_type;
     return rpn->raw_type;
     break;
@@ -4317,6 +4323,7 @@ typedef struct CSwitchCase {
   CCodeMisc *label;
 } CSwitchCase;
 int64_t aiwnios_switch_depth;
+int64_t aiwnios_fun_depth;
 int64_t PrsSwitch(CCmpCtrl *cctrl) {
   if (!PrsKw(cctrl, TK_KW_SWITCH))
     return 0;

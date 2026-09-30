@@ -1,0 +1,32 @@
+// Smoke: unchanged DocRecalcLib cursor helpers on a live put_doc.
+I64 TaskOriginalDocRecalcLibChecks()
+{
+	CDoc *doc;
+	CDocEntry *entry;
+
+	doc = DocNew;
+	if (!doc || doc->doc_signature != DOC_SIGNATURE_VAL)
+		return 1;
+	Fs->put_doc = Fs->display_doc = doc;
+	DocPrint(doc, "A");
+	DocPrint(doc, "B");
+	DocTop(doc);
+	entry = doc->cur_entry;
+	if (entry == doc || entry->type_u8 != DOCT_TEXT)
+		return 2;
+	if (!entry->tag || entry->tag[0] != 'A')
+		return 3;
+	DocBottom(doc);
+	if (doc->cur_entry != doc)
+		return 4;
+	DocCenter(doc);
+	DocCollapse(TRUE, doc);
+	DocMax(1000);
+	if (SqrI64(6) != 36)
+		return 5;
+	if (EndianU64(0x0123456789ABCDEF) != 0xEFCDAB8967452301)
+		return 6;
+	DocCursor(ON, doc);
+	DocScroll(ON, doc);
+	return 42;
+}

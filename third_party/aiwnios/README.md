@@ -20,10 +20,12 @@ Port changes:
 - Accept UTF-8 identifier bytes used in upstream source and consume file-scope
   `public` declarations in the single global symbol table.
 - Evaluate `#assert` and fail a module when its layout expression is false.
-  Mid-switch `#assert` (DocPlain) only drains the line: nesting CmpCtrl on the
-  shared lexer there turns the next `case` into an ordinary name.
+  Mid-switch or mid-function `#assert` (DocPlain / DocRecalcLib) only drains
+  the line: nesting CmpCtrl on the shared lexer there turns the next keyword
+  into an ordinary name.
 - Bounds-check unbounded `switch [expr]` jump tables (out-of-range → default).
   DocPlain's `switch [type]` has holes below the first case (e.g. `DOCT_TEXT`).
+- Allow `*array` on 1D members (DocRecalcLib `*doc->filename.name` drive letter).
 - Support class-scoped `$$` layout offsets, including member placement and
   trailing class size; reject negative or oversized offsets.
 - Restore preprocessor branch state for false `#if` conditions and accept

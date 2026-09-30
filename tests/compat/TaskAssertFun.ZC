@@ -1,0 +1,7 @@
+#define AX_W 8
+#define AX_H 8
+I64 TaskAssertFunChecks()
+{
+#assert AX_W == AX_H
+	return 42;
+}

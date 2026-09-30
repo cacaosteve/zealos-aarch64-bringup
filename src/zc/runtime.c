@@ -2070,6 +2070,17 @@ static int64_t host_bsr(int64_t *a) {
     uint64_t v = (uint64_t)a[0];
     return v ? (int64_t)(63 - __builtin_clzll(v)) : -1;
 }
+static int64_t host_sqr_i64(int64_t *a) {
+    int64_t i = a[0];
+    return i * i;
+}
+static int64_t host_endian_u64(int64_t *a) {
+    uint64_t v = (uint64_t)a[0];
+    v = ((v & 0x00000000FFFFFFFFull) << 32) | ((v & 0xFFFFFFFF00000000ull) >> 32);
+    v = ((v & 0x0000FFFF0000FFFFull) << 16) | ((v & 0xFFFF0000FFFF0000ull) >> 16);
+    v = ((v & 0x00FF00FF00FF00FFull) << 8) | ((v & 0xFF00FF00FF00FF00ull) >> 8);
+    return (int64_t)v;
+}
 static int64_t host_lbequal(int64_t *a) {
     unsigned char mask = (unsigned char)(1u << ((uint64_t)a[1] & 7));
     if (a[2])
@@ -2338,6 +2349,8 @@ static void bind_guest_task(void) {
     PrsBindCSymbol("Btc", host_btc, 2);
     PrsBindCSymbol("Bsf", host_bsf, 1);
     PrsBindCSymbol("Bsr", host_bsr, 1);
+    PrsBindCSymbol("SqrI64", host_sqr_i64, 1);
+    PrsBindCSymbol("EndianU64", host_endian_u64, 1);
     PrsBindCSymbol("StrLen", host_str_len, 1);
     PrsBindCSymbol("LBts", host_lbts, 2);
     PrsBindCSymbol("LBtr", host_lbtr, 2);

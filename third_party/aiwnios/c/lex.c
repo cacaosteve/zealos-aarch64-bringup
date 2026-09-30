@@ -11,6 +11,9 @@
 #include <string.h>
 /* Freestanding decimal conversion: count integer decimal digits exactly,
  * avoiding a libm log10 dependency in the lexer. */
+/* Declared in aiwn_lexparser.h; parser.c owns the definitions. */
+extern int64_t aiwnios_switch_depth;
+extern int64_t aiwnios_fun_depth;
 static double LexDecimalScale(uint64_t value, int64_t zeros) {
   double scale = 0.1;
   while (value >= 10) { value /= 10; scale *= 0.1; }
@@ -703,9 +706,9 @@ re_enter:;
         }
         goto re_enter;
       } else if (!strcmp(lex->string, "assert")) {
-        /* ZealOS layout checks. Nested CmpCtrl on this shared lexer mid-switch
-         * (DocPlain) makes the next `case` an ordinary name — drain only then. */
-        if (aiwnios_switch_depth) {
+        /* Nested CmpCtrl on the shared lexer mid-switch or mid-function
+         * (DocPlain / DocRecalcLib) turns the next keyword into a name. */
+        if (aiwnios_switch_depth || aiwnios_fun_depth) {
           int64_t c;
           while ((c = LexAdvChr(lex)) && c != '\n' && c != ERR)
             ;

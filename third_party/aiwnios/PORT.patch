@@ -1,5 +1,5 @@
---- a/c/aiwn_hash.h	2026-09-29 20:40:37
-+++ b/c/aiwn_hash.h	2026-09-29 20:40:37
+--- a/c/aiwn_hash.h	2026-09-29 20:54:03
++++ b/c/aiwn_hash.h	2026-09-29 20:54:03
 @@ -35,6 +35,7 @@
  #define HTT_IMPORT_SYS_SYM  0x80
  #define HTT_EXPORT_SYS_SYM  0x100
@@ -8,8 +8,8 @@
  
  typedef struct CHash {
    struct CHash *next;
---- a/c/aiwn_lexparser.h	2026-09-29 20:40:37
-+++ b/c/aiwn_lexparser.h	2026-09-29 20:40:37
+--- a/c/aiwn_lexparser.h	2026-09-29 20:54:03
++++ b/c/aiwn_lexparser.h	2026-09-29 20:54:03
 @@ -40,9 +40,11 @@
    int64_t flags, cur_char;
    int64_t cur_tok;
@@ -39,15 +39,17 @@
      (defined(_M_ARM64) || defined(__aarch64__))
  #  define AIWNIOS_IREG_START     19
  #  define AIWNIOS_IREG_CNT       (27 - 19 + 1)
-@@ -767,3 +770,6 @@
+@@ -767,3 +770,8 @@
  
  void CacheRPNArgs(CCmpCtrl *cctrl);
  extern int64_t DolDocDumpIR(char *to, int64_t, CRPN *);
 +/* Non-zero while PrsSwitch is active: #assert must not nest a CmpCtrl on the
 + * shared lexer or the following `case` is seen as an ordinary name. */
 +extern int64_t aiwnios_switch_depth;
---- a/c/arm_backend.c	2026-09-29 20:40:37
-+++ b/c/arm_backend.c	2026-09-29 20:40:37
++/* Non-zero while parsing a function body: same #assert nesting hazard. */
++extern int64_t aiwnios_fun_depth;
+--- a/c/arm_backend.c	2026-09-29 20:54:03
++++ b/c/arm_backend.c	2026-09-29 20:54:03
 @@ -3258,30 +3258,17 @@
      break;
      break;
@@ -121,14 +123,17 @@
        PushTmpDepthFirst(cctrl, r, 0);
        PopTmp(cctrl, r);
        r->res.mode = MD_NULL;
---- a/c/lex.c	2026-09-29 20:40:37
-+++ b/c/lex.c	2026-09-29 20:40:37
-@@ -9,11 +9,19 @@
+--- a/c/lex.c	2026-09-29 20:54:03
++++ b/c/lex.c	2026-09-29 20:54:03
+@@ -9,11 +9,22 @@
  #include <stdint.h>
  #include <stdio.h>
  #include <string.h>
 +/* Freestanding decimal conversion: count integer decimal digits exactly,
 + * avoiding a libm log10 dependency in the lexer. */
++/* Declared in aiwn_lexparser.h; parser.c owns the definitions. */
++extern int64_t aiwnios_switch_depth;
++extern int64_t aiwnios_fun_depth;
 +static double LexDecimalScale(uint64_t value, int64_t zeros) {
 +  double scale = 0.1;
 +  while (value >= 10) { value /= 10; scale *= 0.1; }
@@ -144,7 +149,7 @@
            lex->file->col + 1);
    return A_STRDUP(buf, task);
  }
-@@ -34,7 +42,7 @@
+@@ -34,7 +45,7 @@
    if (!lex->file)
      return 0;
    // We terminate the silly sauces with 0 as per ASCII nul character
@@ -153,7 +158,7 @@
      lex->file->pos++;
      if (ret == 5 || ret == '\r') // TempleOS cursor charactor
        goto enter;
-@@ -65,7 +73,7 @@
+@@ -65,7 +76,7 @@
    va_list lst;
    char buffer[STR_LEN];
    va_start(lst, fmt);
@@ -162,7 +167,7 @@
    va_end(lst);
    if (lex->file) {
      fprintf(AIWNIOS_OSTREAM, "ERR %s:%d:%d %s", lex->file->filename,
-@@ -80,7 +88,7 @@
+@@ -80,7 +91,7 @@
    va_list lst;
    char buffer[STR_LEN];
    va_start(lst, fmt);
@@ -171,7 +176,7 @@
    va_end(lst);
    if (lex->file) {
      fprintf(AIWNIOS_OSTREAM, "WARN %s:%d:%d %s\n", lex->file->filename,
-@@ -141,6 +149,16 @@
+@@ -141,6 +152,16 @@
    int64_t idx, chr1, hex;
    for (idx = 0;;) {
      switch (chr1 = LexAdvChr(lex)) {
@@ -188,7 +193,7 @@
      case '\\':
        switch (chr1 = LexAdvChr(lex)) {
          break;
-@@ -267,6 +285,11 @@
+@@ -267,6 +288,11 @@
    case '`':
      return lex->cur_tok = '`';
      break;
@@ -200,7 +205,7 @@
    case ';':
      return lex->cur_tok = ';';
      break;
-@@ -340,7 +363,7 @@
+@@ -340,7 +366,7 @@
        fin_f64:
          if (decimal) {
            lex->flt =
@@ -209,7 +214,7 @@
          } else
            lex->flt = integer;
          lex->flt *= pow(10, exponet);
-@@ -582,6 +605,7 @@
+@@ -582,6 +608,7 @@
    case '@':
    case 'a' ... 'z':
    case 'A' ... 'Z':
@@ -217,7 +222,7 @@
      lex->flags |= LEXF_USE_LAST_CHAR;
      for (;;) {
        switch (chr1 = LexAdvChr(lex)) {
-@@ -591,6 +615,7 @@
+@@ -591,6 +618,7 @@
        case 'a' ... 'z':
        case 'A' ... 'Z':
        case '0' ... '9':
@@ -225,7 +230,7 @@
          if (idx + 1 >= STR_LEN) {
            LexErr(lex, "Name is too long.");
            return lex->cur_tok = ERR;
-@@ -632,17 +657,83 @@
+@@ -632,17 +660,83 @@
    case '#':
      if (TK_NAME == Lex(lex)) {
        if (!strcmp(lex->string, "help_file")) {
@@ -278,9 +283,9 @@
          goto re_enter;
        } else if (!strcmp(lex->string, "assert")) {
 -        LexWarn(lex, "AIWN ignore's #assert's and other JIT shennangins");
-+        /* ZealOS layout checks. Nested CmpCtrl on this shared lexer mid-switch
-+         * (DocPlain) makes the next `case` an ordinary name — drain only then. */
-+        if (aiwnios_switch_depth) {
++        /* Nested CmpCtrl on the shared lexer mid-switch or mid-function
++         * (DocPlain / DocRecalcLib) turns the next keyword into a name. */
++        if (aiwnios_switch_depth || aiwnios_fun_depth) {
 +          int64_t c;
 +          while ((c = LexAdvChr(lex)) && c != '\n' && c != ERR)
 +            ;
@@ -312,7 +317,7 @@
          lex->flags |= LEXF_UNTIL_NEWLINE;
          CCmpCtrl *cc = CmpCtrlNew(lex);
          char *code;
-@@ -662,6 +753,7 @@
+@@ -662,6 +756,7 @@
          CmpCtrlDel(cc);
          if (ret)
            goto re_enter;
@@ -320,7 +325,7 @@
          goto if_fail;
        } else if (!strcmp(lex->string, "ifaot")) {
          // AIWN will only AOT compile for you,the JIT will be
-@@ -756,11 +848,11 @@
+@@ -756,11 +851,11 @@
            actual_file = actual_file->last;
          }
          if (actual_file) {
@@ -334,7 +339,7 @@
              dir = __AIWNIOS_StrDup(buf, NULL);
              *strrchr(dir, '/') = 0;
              f = fopen(buf, "rb");
-@@ -798,12 +890,19 @@
+@@ -798,12 +893,19 @@
          lex->file = new_file;
          goto re_enter;
        } else if (!strcmp(lex->string, "define")) {
@@ -356,7 +361,7 @@
          strcpy(macro_name, lex->string);
          strcpy(lex->string, "");
          define = A_CALLOC(sizeof(CHashDefineStr), NULL);
-@@ -861,8 +960,7 @@
+@@ -861,8 +963,7 @@
  }
  
  CLexer *LexerNew(char *filename, char *text) {
@@ -366,7 +371,7 @@
      struct {
        char *name;
        int64_t tok;
-@@ -925,7 +1023,6 @@
+@@ -925,7 +1026,6 @@
        kw->tk = kws[i].tok;
        HashAdd(kw, Fs->hash_table);
      }
@@ -374,8 +379,8 @@
    }
    CLexer *new = A_CALLOC(sizeof(CLexer), NULL);
    new->hc = HeapCtrlInit(NULL, Fs, 0);
---- a/c/optpass.c	2026-09-29 20:40:37
-+++ b/c/optpass.c	2026-09-29 20:40:37
+--- a/c/optpass.c	2026-09-29 20:54:03
++++ b/c/optpass.c	2026-09-29 20:54:03
 @@ -21,6 +21,9 @@
      if (rpn->ic_dim->next)
        r *= rpn->ic_dim->next->total_cnt;
@@ -429,8 +434,8 @@
      switch (rpn->type) {
        break;
      case IC_TO_BOOL:
---- a/c/parser.c	2026-09-29 20:40:37
-+++ b/c/parser.c	2026-09-29 20:40:37
+--- a/c/parser.c	2026-09-29 20:54:03
++++ b/c/parser.c	2026-09-29 20:54:03
 @@ -1689,25 +1689,68 @@
      szo:
        if (ccmp->lex->cur_tok == '(') {
@@ -781,7 +786,17 @@
        if (ccmp->lex->cur_tok == '{') {
          ParseErr(ccmp, "Function body on a extern/import.");
          return 0;
-@@ -3051,8 +3214,10 @@
+@@ -3042,7 +3205,9 @@
+       }
+     }
+     CodeCtrlPush(ccmp);
++    aiwnios_fun_depth++;
+     PrsScope(ccmp);
++    aiwnios_fun_depth--;
+     //
+     // Here's the deal. The function will stay "extern" so if it call's
+     // itself a CMT_RELOC_U64 will be made and the function address will be
+@@ -3051,8 +3216,10 @@
      ccmp->cur_fun->base.base.type |= HTF_EXTERN;
      ccmp->cur_fun->fun_ptr = Compile(ccmp, NULL, NULL, NULL);
      ccmp->cur_fun->base.base.type &= ~HTF_EXTERN;
@@ -794,7 +809,7 @@
        extern_fun->fun_ptr = ccmp->cur_fun->fun_ptr;
      }
      if (ccmp->cur_fun->base.base.str)
-@@ -3063,6 +3228,8 @@
+@@ -3063,6 +3230,8 @@
        *is_func_decl = 1;
      goto ret;
    }
@@ -803,7 +818,7 @@
    if (add_to) {
      if (flags & PRSF_STATIC)
        lst->flags |= MLF_STATIC;
-@@ -3114,14 +3281,20 @@
+@@ -3114,14 +3283,20 @@
        }
      } else if (add_to) { // TODO is a local???
        Lex(ccmp->lex);
@@ -832,7 +847,7 @@
      }
    }
    if (!add_to && lst->str) {
-@@ -3136,7 +3309,7 @@
+@@ -3136,7 +3311,7 @@
      glbl_var->fun_ptr = lst->fun_ptr;
      lst->fun_ptr = NULL; // We steal this
      // lst will be Free'd at ret
@@ -841,7 +856,7 @@
        glbl_var->data_addr =
            A_CALLOC(glbl_var->var_class->sz * glbl_var->dim.total_cnt, NULL);
      if (flags & PRSF_IMPORT) {
-@@ -3170,13 +3343,13 @@
+@@ -3170,13 +3345,13 @@
      }
      HashAdd(glbl_var, Fs->hash_table);
    found_glbl:
@@ -859,7 +874,7 @@
        SysSymImportsResolve(glbl_var->base.str, 0);
      if (ccmp->lex->cur_tok == '=') {
        Lex(ccmp->lex);
-@@ -3508,6 +3681,13 @@
+@@ -3508,6 +3683,13 @@
    got_fun:
      if (!fun)
        ParseErr(ccmp, "Invalid type to call."); // TODO add type name
@@ -873,7 +888,7 @@
      if (arg > fun->argc && !(fun->base.flags & CLSF_VARGS)) {
        ParseErr(ccmp, "Excess arguments for function");
      }
-@@ -3545,6 +3725,10 @@
+@@ -3545,6 +3727,10 @@
      break;
    case IC_GLOBAL:
      if (rpn->global_var->base.type & HTT_GLBL_VAR) {
@@ -884,20 +899,47 @@
        rpn->ic_class = rpn->global_var->var_class;
        rpn->ic_dim = rpn->global_var->dim.next;
        rpn->ic_fun = rpn->global_var->fun_ptr;
-@@ -3665,6 +3849,12 @@
-       goto no_dim;
-     if (!rpn->ic_dim->next) {
-     no_dim:
-+      /* Funptrs are CHashFun objects; ic_class-1 would use the wrong stride.
-+       * Indexing/deref of U0 (**fp)(I64) still yields a function pointer. */
-+      if (((CRPN *)rpn->base.next)->ic_class->flags & CLSF_FUNPTR) {
+@@ -3655,20 +3841,30 @@
+     break;
+   case IC_DEREF:
+     AssignRawTypeToNode(ccmp, rpn->base.next);
++    /* Array members (e.g. CEdFileName.name[256]) are not pointers but may be
++     * dereferenced as the first element — DocUpdateTaskDocs drive letter. */
++    rpn->ic_dim = ((CRPN *)rpn->base.next)->ic_dim;
++    rpn->ic_fun = ((CRPN *)rpn->base.next)->ic_fun;
++    if (rpn->ic_dim) {
++      if (rpn->ic_dim->next) {
++        rpn->ic_dim = rpn->ic_dim->next;
 +        rpn->ic_class = ((CRPN *)rpn->base.next)->ic_class;
-+        return rpn->raw_type = RT_FUNC;
++      } else {
++        rpn->ic_dim = NULL;
++        rpn->ic_class = ((CRPN *)rpn->base.next)->ic_class;
 +      }
-       rpn->ic_class = ((CRPN *)rpn->base.next)->ic_class - 1;
-     } else {
-       rpn->ic_dim = rpn->ic_dim->next;
-@@ -3839,6 +4029,12 @@
++      rpn->raw_type = rpn->ic_class->raw_type;
++      return rpn->raw_type;
++    }
+     if (!((CRPN *)rpn->base.next)->ic_class->ptr_star_cnt) {
+       ParseErr(ccmp, "Can't derefernce a non-pointer/array.");
+       return 0;
+     }
+-    rpn->ic_dim = ((CRPN *)rpn->base.next)->ic_dim;
+-    rpn->ic_fun = ((CRPN *)rpn->base.next)->ic_fun;
+-    if (!rpn->ic_dim)
+-      goto no_dim;
+-    if (!rpn->ic_dim->next) {
+-    no_dim:
+-      rpn->ic_class = ((CRPN *)rpn->base.next)->ic_class - 1;
+-    } else {
+-      rpn->ic_dim = rpn->ic_dim->next;
++    if (((CRPN *)rpn->base.next)->ic_class->flags & CLSF_FUNPTR) {
++      rpn->ic_class = ((CRPN *)rpn->base.next)->ic_class;
++      return rpn->raw_type = RT_FUNC;
+     }
++    rpn->ic_class = ((CRPN *)rpn->base.next)->ic_class - 1;
+     rpn->raw_type = rpn->ic_class->raw_type;
+     return rpn->raw_type;
+     break;
+@@ -3839,6 +4035,12 @@
      if (ICFwd(rpn->base.next)->ic_dim) {
        rpn->ic_class = ICFwd(rpn->base.next)->ic_class;
        rpn->ic_dim = ICFwd(rpn->base.next)->ic_dim->next;
@@ -910,7 +952,7 @@
      } else
        rpn->ic_class = ICFwd(rpn->base.next)->ic_class - 1;
      rpn->ic_fun = ICFwd(rpn->base.next)->ic_fun;
-@@ -3909,9 +4105,11 @@
+@@ -3909,9 +4111,11 @@
  static void PrsMembers(CCmpCtrl *cctrl, CHashClass *bungis, int64_t flags,
                         int64_t *off) {
    int64_t is_func, union_end;
@@ -922,7 +964,7 @@
      Lex(cctrl->lex);
      while (cctrl->lex->cur_tok != '}') {
        if (cctrl->lex->cur_tok == ';') {
-@@ -3920,10 +4118,24 @@
+@@ -3920,10 +4124,24 @@
          if (cctrl->lex->cur_tok == '{') {
            PrsMembers(cctrl, bungis, flags | PRSF_UNION, off);
          }
@@ -948,7 +990,7 @@
          //
          // Here's the deal,I store the last member in last_m,once I find the
          // members I assign their offsets
-@@ -3983,6 +4195,7 @@
+@@ -3983,6 +4201,7 @@
          return;
        }
      }
@@ -956,7 +998,7 @@
      Lex(cctrl->lex);
    }
    if (flags & PRSF_UNION)
-@@ -4043,6 +4256,8 @@
+@@ -4043,6 +4262,8 @@
        HashAdd(bungis, Fs->hash_table);
    PrsMembers(cctrl, bungis, flags, &off); // This consumes '{'
    // Compute size
@@ -965,15 +1007,16 @@
    for (last_m = bungis->members_lst; last_m; last_m = last_m->next) {
      if (bungis->sz < (off = last_m->off +
                              last_m->member_class->sz * last_m->dim.total_cnt)) {
-@@ -4101,6 +4316,7 @@
+@@ -4101,6 +4322,8 @@
    int64_t val;
    CCodeMisc *label;
  } CSwitchCase;
 +int64_t aiwnios_switch_depth;
++int64_t aiwnios_fun_depth;
  int64_t PrsSwitch(CCmpCtrl *cctrl) {
    if (!PrsKw(cctrl, TK_KW_SWITCH))
      return 0;
-@@ -4113,6 +4329,7 @@
+@@ -4113,6 +4336,7 @@
    int64_t k_low = INT_MAX, k_hi = INT_MIN, last, lo, hi, idx;
    old_break_to = cctrl->code_ctrl->break_to;
    cctrl->code_ctrl->break_to = lb_exit;
@@ -981,7 +1024,7 @@
    //
    // When we encounter the start: block,we enter a secret function call
    // So when we `break` or we implictly break by hitting the first sub-switch
-@@ -4134,12 +4351,14 @@
+@@ -4134,12 +4358,14 @@
      //
      if (!ParseExpr(cctrl, 0)) {
        ParseErr(cctrl, "Expected an expression.");
@@ -996,7 +1039,7 @@
        return 0;
      } else
        Lex(cctrl->lex);
-@@ -4147,6 +4366,7 @@
+@@ -4147,6 +4373,7 @@
      Lex(cctrl->lex);
      if (!ParseExpr(cctrl, 0)) {
        ParseErr(cctrl, "Expected an expression.");
@@ -1004,7 +1047,7 @@
        return 0;
      }
      (switch_ir = A_CALLOC(sizeof(CRPN), NULL))->type = IC_BOUNDED_SWITCH;
-@@ -4155,12 +4375,14 @@
+@@ -4155,12 +4382,14 @@
      // start,(cond),end,BOUNDED_SWITCH
      if (cctrl->lex->cur_tok != ')') {
        ParseErr(cctrl, "Expected a ')'.");
@@ -1019,7 +1062,7 @@
      return 0;
    } else
      Lex(cctrl->lex);
-@@ -4241,6 +4463,7 @@
+@@ -4241,6 +4470,7 @@
            Lex(cctrl->lex);
          } else {
            ParseErr(cctrl, "Expected a ':'.");
@@ -1027,7 +1070,7 @@
            return 0;
          }
        }
-@@ -4251,6 +4474,7 @@
+@@ -4251,6 +4481,7 @@
        }
        if (cctrl->lex->cur_tok != ':') {
          ParseErr(cctrl, "Expected a ':'.");
@@ -1035,7 +1078,7 @@
          return 0;
        }
        lb_dft->flags |= CMF_DEFINED;
-@@ -4268,6 +4492,7 @@
+@@ -4268,6 +4499,7 @@
      } else if (PrsKw(cctrl, TK_KW_START)) {
        if (cctrl->lex->cur_tok != ':') {
          ParseErr(cctrl, "Expected a ':'.");
@@ -1043,7 +1086,7 @@
          return 0;
        } else
          Lex(cctrl->lex);
-@@ -4293,6 +4518,7 @@
+@@ -4293,6 +4525,7 @@
      } else if (PrsKw(cctrl, TK_KW_END)) {
        if (subs.base.last == &subs) {
          ParseErr(cctrl, "Unexpected 'end' statement.");
@@ -1051,7 +1094,7 @@
          return 0;
        }
        QueRem(tmpss = subs.base.last);
-@@ -4309,6 +4535,7 @@
+@@ -4309,6 +4542,7 @@
        A_FREE(tmpss);
        if (cctrl->lex->cur_tok != ':') {
          ParseErr(cctrl, "Expected a ':'.");
@@ -1059,7 +1102,7 @@
          return 0;
        } else
          Lex(cctrl->lex);
-@@ -4317,6 +4544,7 @@
+@@ -4317,6 +4551,7 @@
        goto add_stmt;
      } else {
        ParseErr(cctrl, "Expected a statement.");
@@ -1067,7 +1110,7 @@
        return 0;
      }
    }
-@@ -4362,6 +4590,7 @@
+@@ -4362,6 +4597,7 @@
      switch_ir->code_misc = jmp_tab;
    }
    cctrl->flags = old_flags;
@@ -1075,7 +1118,7 @@
    return 1;
  }
  static void __PrsBindCSymbol(char *name, void *ptr, int64_t naked,
-@@ -4417,6 +4646,13 @@
+@@ -4417,6 +4653,13 @@
              *exit_misc = CodeMiscNew(cctrl, CMT_LABEL);
    if (!PrsKw(cctrl, TK_KW_TRY))
      return 0;

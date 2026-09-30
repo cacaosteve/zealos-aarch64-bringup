@@ -199,6 +199,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                                          '/System/DolDoc/DocTerm.ZC',
                                          '/System/DolDoc/DocInit.ZC',
                                          '/System/DolDoc/DocPlain.ZC',
+                                         '/System/DolDoc/DocRecalcLib.ZC',
                                          '/System/DolDoc/DocNew.ZC',
                                          '/System/DolDoc/DocBin.ZC'):
                 command('zload /Kernel/SerialDev/Message.ZC',
@@ -211,7 +212,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                                          '/System/DolDoc/DocDblBuf.ZC',
                                          '/System/DolDoc/DocTerm.ZC',
                                          '/System/DolDoc/DocInit.ZC',
-                                         '/System/DolDoc/DocPlain.ZC'):
+                                         '/System/DolDoc/DocPlain.ZC',
+                                         '/System/DolDoc/DocRecalcLib.ZC'):
                 command('zload /System/DolDoc/DocBin.ZC',
                         'zc: loaded /System/DolDoc/DocBin.ZC')
             if args.probe_module in ('/System/DolDoc/DocPutKey.ZC',
@@ -219,36 +221,45 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                                          '/System/DolDoc/DocDblBuf.ZC',
                                          '/System/DolDoc/DocTerm.ZC',
                                          '/System/DolDoc/DocInit.ZC',
-                                         '/System/DolDoc/DocPlain.ZC'):
+                                         '/System/DolDoc/DocPlain.ZC',
+                                         '/System/DolDoc/DocRecalcLib.ZC'):
                 command('zload /System/DolDoc/DocNew.ZC',
                         'zc: loaded /System/DolDoc/DocNew.ZC')
             if args.probe_module in ('/System/DolDoc/DocPutS.ZC',
                                          '/System/DolDoc/DocDblBuf.ZC',
                                          '/System/DolDoc/DocTerm.ZC',
                                          '/System/DolDoc/DocInit.ZC',
-                                         '/System/DolDoc/DocPlain.ZC'):
+                                         '/System/DolDoc/DocPlain.ZC',
+                                         '/System/DolDoc/DocRecalcLib.ZC'):
                 command('zload /System/DolDoc/DocPutKey.ZC',
                         'zc: loaded /System/DolDoc/DocPutKey.ZC')
             if args.probe_module in ('/System/DolDoc/DocDblBuf.ZC',
                                          '/System/DolDoc/DocTerm.ZC',
                                          '/System/DolDoc/DocInit.ZC',
-                                         '/System/DolDoc/DocPlain.ZC'):
+                                         '/System/DolDoc/DocPlain.ZC',
+                                         '/System/DolDoc/DocRecalcLib.ZC'):
                 command('zload /System/DolDoc/DocPutS.ZC',
                         'zc: loaded /System/DolDoc/DocPutS.ZC')
             if args.probe_module in ('/System/DolDoc/DocTerm.ZC',
                                          '/System/DolDoc/DocInit.ZC',
-                                         '/System/DolDoc/DocPlain.ZC'):
+                                         '/System/DolDoc/DocPlain.ZC',
+                                         '/System/DolDoc/DocRecalcLib.ZC'):
                 command('zload /System/DolDoc/DocDblBuf.ZC',
                         'zc: loaded /System/DolDoc/DocDblBuf.ZC')
             if args.probe_module in ('/System/DolDoc/DocInit.ZC',
-                                         '/System/DolDoc/DocPlain.ZC'):
+                                         '/System/DolDoc/DocPlain.ZC',
+                                         '/System/DolDoc/DocRecalcLib.ZC'):
                 command('zload /System/DolDoc/DocTerm.ZC',
                         'zc: loaded /System/DolDoc/DocTerm.ZC')
                 command('zcall BootstrapDefinesLoad',
                         'zc => 0x0000000000000000')
-            if args.probe_module == '/System/DolDoc/DocPlain.ZC':
+            if args.probe_module in ('/System/DolDoc/DocPlain.ZC',
+                                         '/System/DolDoc/DocRecalcLib.ZC'):
                 command('zload /System/DolDoc/DocInit.ZC',
                         'zc: loaded /System/DolDoc/DocInit.ZC')
+            if args.probe_module == '/System/DolDoc/DocRecalcLib.ZC':
+                command('zload /System/DolDoc/DocPlain.ZC',
+                        'zc: loaded /System/DolDoc/DocPlain.ZC')
             guest.stdin.write(('zload '+args.probe_module+'\r').encode())
             guest.stdin.flush()
             result = until(b'\n> ')
@@ -339,6 +350,13 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 command('zload /Tests/TaskOriginalDocPlain.ZC',
                         'zc: loaded /Tests/TaskOriginalDocPlain.ZC')
                 command('zcall TaskOriginalDocPlainChecks',
+                        'zc => 0x000000000000002a')
+            if args.probe_module == '/System/DolDoc/DocRecalcLib.ZC':
+                if 'zc: loaded /System/DolDoc/DocRecalcLib.ZC' not in result:
+                    raise RuntimeError('unchanged DocRecalcLib.ZC did not load')
+                command('zload /Tests/TaskOriginalDocRecalcLib.ZC',
+                        'zc: loaded /Tests/TaskOriginalDocRecalcLib.ZC')
+                command('zcall TaskOriginalDocRecalcLibChecks',
                         'zc => 0x000000000000002a')
             raise SystemExit(0)
         if args.probe_task_jobs:
@@ -549,6 +567,9 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             command('zload /Tests/TaskAssertSwitch.ZC',
                     'zc: loaded /Tests/TaskAssertSwitch.ZC')
             command('zcall TaskAssertSwitchChecks', 'zc => 0x000000000000002a')
+            command('zload /Tests/TaskAssertFun.ZC',
+                    'zc: loaded /Tests/TaskAssertFun.ZC')
+            command('zcall TaskAssertFunChecks', 'zc => 0x000000000000002a')
             command('zload /Tests/TaskUnboundedSwitch.ZC',
                     'zc: loaded /Tests/TaskUnboundedSwitch.ZC')
             command('zcall TaskUnboundedSwitchChecks', 'zc => 0x000000000000002a')

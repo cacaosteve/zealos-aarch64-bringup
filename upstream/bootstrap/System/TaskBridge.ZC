@@ -1418,9 +1418,45 @@ class CBootstrapTextGlbls
     U8 *font;
     U8 *aux_font;
     Bool is_fb_busy;
+    I64 raw_col;
+    U32 *fb_alias;
+    I64 buffer_size;
 };
 CBootstrapTextGlbls text;
 CTask *sys_winmgr_task = NULL;
+Bool TextChar(CTask *task, Bool allow_border=FALSE, I64 x=0, I64 y=0, I64 d=0)
+{//Stub until GrTextBase; DocBorderListDraw only.
+    if (task) {}
+    if (allow_border) {}
+    if (x) {}
+    if (y) {}
+    if (d) {}
+    return FALSE;
+}
+U0 WinScrollNull(CTask *task, CD3I64 *s)
+{
+    if (!task || !s)
+        return;
+    s->x = task->scroll_x;
+    s->y = task->scroll_y;
+    s->z = task->scroll_z;
+    task->scroll_x = 0;
+    task->scroll_y = 0;
+    task->scroll_z = 0;
+}
+U0 WinScrollRestore(CTask *task, CD3I64 *s)
+{
+    if (!task || !s)
+        return;
+    task->scroll_x = s->x;
+    task->scroll_y = s->y;
+    task->scroll_z = s->z;
+}
+U8 DriveTextAttrGet(U8 drv_let=0)
+{//Stub border attr until BlkDev DriveTextAttrGet.
+    if (drv_let) {}
+    return WHITE << 4 | BLUE;
+}
 // Portable character input from SerialDev/Message.ZC. CharScan retains its
 // down-then-up contract; UART bytes are treated as a synthetic press/release.
 I64 CharScan()
