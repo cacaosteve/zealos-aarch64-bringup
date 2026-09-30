@@ -12,18 +12,23 @@
 extern uint64_t zeal_fb_text_span(int64_t x, int64_t y, int64_t len,
                                   uint32_t attr, const void *data, int mode,
                                   int64_t left, int64_t right,
-                                  int64_t top, int64_t bottom);
+                                  int64_t top, int64_t bottom,
+                                  uint32_t *text_base, int64_t stride);
 extern uint64_t zeal_fb_text_cells_drawn(void);
 extern int64_t zeal_fb_text_pixel(int64_t x, int64_t y);
 extern int64_t zeal_fb_text_char(int64_t x, int64_t y, uint32_t cell,
                                  int allow_border, uint32_t left_right,
-                                 uint32_t top_bottom);
+                                 uint32_t top_bottom, uint32_t *text_base,
+                                 int64_t stride);
 extern int64_t zeal_fb_text_fill(int64_t x, int64_t y, int64_t len,
                                  uint32_t attr, uint32_t left_right,
-                                 uint32_t top_bottom);
+                                 uint32_t top_bottom, uint32_t *text_base,
+                                 int64_t stride);
 extern uint64_t zeal_fb_text_rect(int64_t left, int64_t right, int64_t top,
-                                  int64_t bottom, uint32_t cell);
-extern uint64_t zeal_fb_text_flush(void);
+                                  int64_t bottom, uint32_t cell,
+                                  uint32_t *text_base, int64_t stride);
+extern uint64_t zeal_fb_text_flush(uint32_t *text_base, int64_t stride,
+                                   int64_t rows);
 
 /* Separate arenas from legacy hc_* so its per-demo reset cannot invalidate
  * modules loaded here. Both use splitting/coalescing and arbitrary-order Free. */
@@ -193,8 +198,10 @@ extern uint64_t zeal_fb_task_text_write(unsigned slot, int64_t left,
                                          const char *text);
 extern uint64_t zeal_fb_task_text_compose(unsigned slot, int64_t left,
                                            int64_t right, int64_t top,
-                                           int64_t bottom);
-extern uint64_t zeal_fb_shell_text_compose(void);
+                                           int64_t bottom, uint32_t *text_base,
+                                           int64_t stride);
+extern uint64_t zeal_fb_shell_text_compose(uint32_t *text_base,
+                                            int64_t stride);
 static void guest_task_text_output(const char *text);
 static int64_t execute_source_result(const char *path, const char *src,
                                      int return_expr, int record_answer);
@@ -603,12 +610,33 @@ static int64_t host_hash_add(int64_t *a) {
     HashAdd((CHash *)(uintptr_t)a[0], (CHashTable *)(uintptr_t)a[1]);
     return 0;
 }
+static uint32_t *guest_text_plane(int64_t address, int64_t stride,
+                                  int64_t rows) {
+    uintptr_t p = (uintptr_t)address;
+    size_t bytes;
+    int in_data, in_code;
+    if (!p || p % _Alignof(uint32_t) || stride <= 0 || stride > 512 ||
+        rows <= 0 || rows > 512 ||
+        (uint64_t)stride * (uint64_t)rows > SIZE_MAX / sizeof(uint32_t))
+        return NULL;
+    bytes = (size_t)stride * (size_t)rows * sizeof(uint32_t);
+    if (p > UINTPTR_MAX - bytes)
+        return NULL;
+    in_data = p >= (uintptr_t)data_arena &&
+              p + bytes <= (uintptr_t)data_arena + sizeof(data_arena);
+    in_code = p >= (uintptr_t)code_arena &&
+              p + bytes <= (uintptr_t)code_arena + sizeof(code_arena);
+    return in_data || in_code ? (uint32_t *)p : NULL;
+}
 static int64_t host_fb_text_span(int64_t *a) {
     uint32_t lr = (uint32_t)a[6], tb = (uint32_t)a[7];
+    uint32_t *plane = guest_text_plane(a[8], a[9], 75);
+    if (!plane || a[9] != 100)
+        return 0;
     return (int64_t)zeal_fb_text_span(a[0], a[1], a[2], (uint32_t)a[3],
                                       (const void *)(uintptr_t)a[4], (int)a[5],
                                       lr & 0xffffu, lr >> 16,
-                                      tb & 0xffffu, tb >> 16);
+                                      tb & 0xffffu, tb >> 16, plane, a[9]);
 }
 static int64_t host_fb_text_cells_drawn(int64_t *a) {
     (void)a;
@@ -618,19 +646,31 @@ static int64_t host_fb_text_pixel(int64_t *a) {
     return zeal_fb_text_pixel(a[0], a[1]);
 }
 static int64_t host_fb_text_char(int64_t *a) {
+    uint32_t *plane = guest_text_plane(a[6], a[7], 75);
+    if (!plane || a[7] != 100)
+        return 0;
     return zeal_fb_text_char(a[0], a[1], (uint32_t)a[2], (int)a[3],
-                             (uint32_t)a[4], (uint32_t)a[5]);
+                             (uint32_t)a[4], (uint32_t)a[5], plane, a[7]);
 }
 static int64_t host_fb_text_fill(int64_t *a) {
+    uint32_t *plane = guest_text_plane(a[6], a[7], 75);
+    if (!plane || a[7] != 100)
+        return -1;
     return zeal_fb_text_fill(a[0], a[1], a[2], (uint32_t)a[3],
-                             (uint32_t)a[4], (uint32_t)a[5]);
+                             (uint32_t)a[4], (uint32_t)a[5], plane, a[7]);
 }
 static int64_t host_fb_text_rect(int64_t *a) {
-    return (int64_t)zeal_fb_text_rect(a[0], a[1], a[2], a[3], (uint32_t)a[4]);
+    uint32_t *plane = guest_text_plane(a[5], a[6], 75);
+    if (!plane || a[6] != 100)
+        return 0;
+    return (int64_t)zeal_fb_text_rect(a[0], a[1], a[2], a[3],
+                                      (uint32_t)a[4], plane, a[6]);
 }
 static int64_t host_fb_text_flush(int64_t *a) {
-    (void)a;
-    return (int64_t)zeal_fb_text_flush();
+    uint32_t *plane = guest_text_plane(a[0], a[1], a[2]);
+    if (!plane || a[1] != 100 || a[2] != 75)
+        return 0;
+    return (int64_t)zeal_fb_text_flush(plane, a[1], a[2]);
 }
 static void set_guest_task(void *p) {
     __asm__ volatile("msr tpidr_el1, %0\n\tisb" : : "r"(p) : "memory");
@@ -1287,7 +1327,8 @@ static struct guest_fiber *find_guest_task(void *task) {
 }
 static int64_t host_fb_task_text_compose(int64_t *a) {
     struct guest_fiber *f = find_guest_task((void *)(uintptr_t)a[0]);
-    if (!f)
+    uint32_t *plane = guest_text_plane(a[1], a[2], 75);
+    if (!f || !plane || a[2] != 100)
         return 0;
     unsigned char *task = (unsigned char *)f->words;
     return (int64_t)zeal_fb_task_text_compose(
@@ -1295,11 +1336,13 @@ static int64_t host_fb_task_text_compose(int64_t *a) {
         *(int64_t *)(task + guest_win_left_off),
         *(int64_t *)(task + guest_win_right_off),
         *(int64_t *)(task + guest_win_top_off),
-        *(int64_t *)(task + guest_win_bottom_off));
+        *(int64_t *)(task + guest_win_bottom_off), plane, a[2]);
 }
 static int64_t host_fb_shell_text_compose(int64_t *a) {
-    (void)a;
-    return (int64_t)zeal_fb_shell_text_compose();
+    uint32_t *plane = guest_text_plane(a[0], a[1], 75);
+    if (!plane || a[1] != 100)
+        return 0;
+    return (int64_t)zeal_fb_shell_text_compose(plane, a[1]);
 }
 static int focused_key_wait_pending(void) {
     struct guest_fiber *focus = find_guest_task(guest_focus_task);
@@ -2896,15 +2939,15 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
                     {"Puts", host_puts, 1}, {"ZcTaskSpawn", host_task_spawn, 1},
                     {"ZcTaskYield", host_task_yield, 0}, {"ZcTaskRun", host_task_run, 0},
                     {"ZcTaskResult", host_task_result, 1},
-                    {"ZcFbTextSpan", host_fb_text_span, 8},
+                    {"ZcFbTextSpan", host_fb_text_span, 10},
                     {"ZcFbTextCellsDrawn", host_fb_text_cells_drawn, 0},
                     {"ZcFbTextPixel", host_fb_text_pixel, 2},
-                    {"ZcFbTextChar", host_fb_text_char, 6},
-                    {"ZcFbTextFill", host_fb_text_fill, 6},
-                    {"ZcFbTextRect", host_fb_text_rect, 5},
-                    {"ZcFbTextFlush", host_fb_text_flush, 0},
-                    {"ZcFbTaskTextCompose", host_fb_task_text_compose, 1},
-                    {"ZcFbShellTextCompose", host_fb_shell_text_compose, 0}};
+                    {"ZcFbTextChar", host_fb_text_char, 8},
+                    {"ZcFbTextFill", host_fb_text_fill, 8},
+                    {"ZcFbTextRect", host_fb_text_rect, 7},
+                    {"ZcFbTextFlush", host_fb_text_flush, 3},
+                    {"ZcFbTaskTextCompose", host_fb_task_text_compose, 3},
+                    {"ZcFbShellTextCompose", host_fb_shell_text_compose, 2}};
     for (size_t i = 0; i < sizeof(bindings) / sizeof(*bindings); i++)
         PrsBindCSymbol((char *)bindings[i].name, (void *)bindings[i].fn, bindings[i].arity);
     __clear_cache(code_arena, code_arena + sizeof(code_arena));

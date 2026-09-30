@@ -28,16 +28,20 @@ extern I64 ZcTaskResult(I64 task_num);
 // Direct text-cell output for the freestanding framebuffer bridge. These
 // names must exist before native host symbols are bound during zc_init.
 extern I64 ZcFbTextSpan(I64 x, I64 y, I64 len, I64 attr, U8 *data,
-                        I64 mode, I64 left_right, I64 top_bottom);
+                        I64 mode, I64 left_right, I64 top_bottom,
+                        U32 *text_base, I64 stride);
 extern I64 ZcFbTextCellsDrawn();
 extern I64 ZcFbTextPixel(I64 x, I64 y);
 extern Bool ZcFbTextChar(I64 x, I64 y, U32 cell, Bool allow_border,
-                         I64 left_right, I64 top_bottom);
+                         I64 left_right, I64 top_bottom,
+                         U32 *text_base, I64 stride);
 extern I64 ZcFbTextFill(I64 x, I64 y, I64 len, U32 attr,
-                        I64 left_right, I64 top_bottom);
-extern I64 ZcFbTextRect(I64 left, I64 right, I64 top, I64 bottom, U32 cell);
-extern I64 ZcFbTextFlush();
-extern I64 ZcFbTaskTextCompose(I64 task);
-extern I64 ZcFbShellTextCompose();
+                        I64 left_right, I64 top_bottom,
+                        U32 *text_base, I64 stride);
+extern I64 ZcFbTextRect(I64 left, I64 right, I64 top, I64 bottom, U32 cell,
+                        U32 *text_base, I64 stride);
+extern I64 ZcFbTextFlush(U32 *text_base, I64 stride, I64 rows);
+extern I64 ZcFbTaskTextCompose(I64 task, U32 *text_base, I64 stride);
+extern I64 ZcFbShellTextCompose(U32 *text_base, I64 stride);
 // Temporary ARM64 bootstrap binding for the table initialized by upstream KMain.
 extern F64 *pow10_I64;

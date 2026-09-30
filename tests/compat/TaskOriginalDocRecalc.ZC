@@ -1,8 +1,6 @@
 // Smoke coordinate math and a plain-text layout pass from unchanged DocRecalc.ZC.
 extern I64 ZcFbTextCellsDrawn();
 extern I64 ZcFbTextPixel(I64 x, I64 y);
-extern I64 ZcFbTextFlush();
-extern I64 ZcFbShellTextCompose();
 
 U0 WindowRedrawPark(U8 *data)
 {
@@ -201,11 +199,24 @@ I64 TaskOriginalDocRecalcChecks()
         Fs->display_flags = old_display_flags;
         return 93;
     }
-    if (ZcFbTextFlush() <= 0 || ZcFbTextPixel(25, 24) != 0x00aa0000)
+    if (ZcFbTextFlush(gr.text_base, 100, 75) <= 0 ||
+        ZcFbTextPixel(25, 24) != 0x00aa0000)
     {
         Fs->display_flags = old_display_flags;
         return 94;
     }
+    // Upstream GrTextBase assembly writes packed cells directly through
+    // gr.text_base. Verify the guest-owned plane is what the framebuffer flush
+    // presents, independent of the TextChar/TextRect host entry points.
+    gr.text_base[60 * 100 + 90] = 0x4f20;
+    if (ZcFbTextFlush(gr.text_base, 100, 75) <= 0 ||
+        ZcFbTextPixel(720, 480) != 0x00aa0000)
+    {
+        Fs->display_flags = old_display_flags;
+        return 103;
+    }
+    gr.text_base[60 * 100 + 90] = 0x0800;
+    ZcFbTextFlush(gr.text_base, 100, 75);
     old_text_cells = ZcFbTextCellsDrawn();
     if (!DocRecalc(doc, RECALCt_TO_SCREEN))
     {
@@ -280,7 +291,7 @@ I64 TaskOriginalDocRecalcChecks()
         Fs->text_attr = old_text_attr;
         return 101;
     }
-    if (!ZcFbShellTextCompose())
+    if (!ZcFbShellTextCompose(gr.text_base, 100))
     {
         Kill(overlap);
         Fs->display_flags = old_display_flags;

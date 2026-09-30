@@ -16,7 +16,8 @@
 extern U0 RFlagsPush();
 extern U0 RFlagsPop();
 extern I64 ZcFbTextSpan(I64 x, I64 y, I64 len, I64 attr, U8 *data,
-                        I64 mode, I64 left_right, I64 top_bottom);
+                        I64 mode, I64 left_right, I64 top_bottom,
+                        U32 *text_base, I64 stride);
 extern I64 ZcFbTextCellsDrawn();
 // Poll the current virtio/UART key reader and queue its events for the focus
 // task. PS/2 mouse polling is outside this bridge.
@@ -1322,12 +1323,15 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
 // Minimal graphics globals for parsing DolDoc layout; these are not a screen/window manager.
 #define TEXT_COLS 100 // Current bootstrap framebuffer: 800x600 at 8x8 text cells.
 #define TEXT_ROWS 75
+// Compact ZealOS-compatible packed-cell plane addressed through gr.text_base.
+U32 bootstrap_text_base[TEXT_COLS * TEXT_ROWS];
 class CBootstrapGraphicsGlobals
 {
     CDC *dc2;
     U8 *empty_sprite;
     U32 *text_base;
 } gr;
+gr.text_base = bootstrap_text_base;
 // Minimal timing state for DocRecalc's refresh throttle; WinMgr is not bootstrapped.
 CWinMgrGlobals winmgr;
 // Music playback is not part of the bootstrap; DocRecalc only tracks its current song tag.
@@ -1521,7 +1525,8 @@ Bool TextChar(CTask *task, Bool allow_border=FALSE, I64 x=0, I64 y=0, I64 d=0)
                         task->win_top + y + (task->scroll_y >> 3), d,
                         allow_border,
                         task->win_left | task->win_right << 16,
-                        task->win_top | task->win_bottom << 16);
+                        task->win_top | task->win_bottom << 16,
+                        gr.text_base, TEXT_COLS);
 }
 Bool TextLenStr(CTask *task, I64 x, I64 y, I64 len, I64 attr, U8 *str)
 {
@@ -1530,7 +1535,8 @@ Bool TextLenStr(CTask *task, I64 x, I64 y, I64 len, I64 attr, U8 *str)
     return ZcFbTextSpan(task->win_left + x + (task->scroll_x >> 3),
                         task->win_top + y + (task->scroll_y >> 3), len, attr, str, 0,
                         task->win_left | task->win_right << 16,
-                        task->win_top | task->win_bottom << 16) > 0;
+                        task->win_top | task->win_bottom << 16,
+                        gr.text_base, TEXT_COLS) > 0;
 }
 U0 StrPrint(U8 *dst, U8 *format, ...)
 {
@@ -1544,7 +1550,8 @@ Bool TextLenAttrStr(CTask *task, I64 x, I64 y, I64 len, U32 *str)
     return ZcFbTextSpan(task->win_left + x + (task->scroll_x >> 3),
                         task->win_top + y + (task->scroll_y >> 3), len, 0,
                         str, 1, task->win_left | task->win_right << 16,
-                        task->win_top | task->win_bottom << 16) > 0;
+                        task->win_top | task->win_bottom << 16,
+                        gr.text_base, TEXT_COLS) > 0;
 }
 Bool TextLenAttr(CTask *task, I64 x, I64 y, I64 len, I64 attr)
 {//Direct framebuffer equivalent for empty attributed cells (e.g. line-tail fill).
@@ -1553,7 +1560,8 @@ Bool TextLenAttr(CTask *task, I64 x, I64 y, I64 len, I64 attr)
     return ZcFbTextFill(task->win_left + x + (task->scroll_x >> 3),
                         task->win_top + y + (task->scroll_y >> 3), len, attr,
                         task->win_left | task->win_right << 16,
-                        task->win_top | task->win_bottom << 16) >= 0;
+                        task->win_top | task->win_bottom << 16,
+                        gr.text_base, TEXT_COLS) >= 0;
 }
 U0 TextBorder(CTask *task, I64 x1, I64 x2, I64 y1, I64 y2, U8 color, Bool solid)
 {//CP437 border glyphs match text.border_chars initialized by upstream KMain.
@@ -1590,10 +1598,10 @@ U0 TextBorder(CTask *task, I64 x1, I64 x2, I64 y1, I64 y2, U8 color, Bool solid)
     }
 }
 U0 TextRect(I64 left, I64 right, I64 top, I64 bottom, I64 cell)
-{//Update the shared bounded text-cell plane and present the clipped rectangle.
+{//Update gr.text_base and present the clipped rectangle through the ARM64 host.
     if (left > right || top > bottom)
         return;
-    ZcFbTextRect(left, right, top, bottom, cell);
+    ZcFbTextRect(left, right, top, bottom, cell, gr.text_base, TEXT_COLS);
 }
 Bool bootstrap_batch_redraw = FALSE;
 U0 GrUpdateTaskWin(CTask *task)
@@ -1608,9 +1616,9 @@ U0 GrUpdateTaskWin(CTask *task)
              task->win_top, task->win_bottom, task->text_attr << 8);
     if (!(task->win_inhibit & (1 << WIf_SELF_DOC)))
         DocUpdateTaskDocs(task);
-    ZcFbTaskTextCompose(task);
+    ZcFbTaskTextCompose(task, gr.text_base, TEXT_COLS);
     if (!bootstrap_batch_redraw)
-        ZcFbTextFlush();
+        ZcFbTextFlush(gr.text_base, TEXT_COLS, TEXT_ROWS);
 }
 U0 GrUpdateTasks()
 {//Bounded one-CPU window-ring refresh, drawn in ZealOS task/z order.
@@ -1624,7 +1632,7 @@ U0 GrUpdateTasks()
         return;
 
     TextRect(0, TEXT_COLS - 1, 0, TEXT_ROWS - 1, 0x0800);
-    ZcFbShellTextCompose;
+    ZcFbShellTextCompose(gr.text_base, TEXT_COLS);
     bootstrap_batch_redraw = TRUE;
     task = root;
     do
@@ -1638,7 +1646,7 @@ U0 GrUpdateTasks()
     }
     while (task && task != root && visited < 64);
     bootstrap_batch_redraw = FALSE;
-    ZcFbTextFlush();
+    ZcFbTextFlush(gr.text_base, TEXT_COLS, TEXT_ROWS);
 }
 U0 WinDerivedValsUpdate(CTask *task)
 {

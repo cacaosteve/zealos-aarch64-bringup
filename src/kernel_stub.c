@@ -143,6 +143,8 @@
 #define PL011_FR_TXFF (1u << 5)
 #define ZEAL_TEXT_MAX_COLS 512u
 #define ZEAL_TEXT_MAX_ROWS 512u
+#define ZEAL_TEXT_PLANE_COLS 100u
+#define ZEAL_TEXT_PLANE_ROWS 75u
 #define PL011_FR_RXFE (1u << 4)
 #define PL011_FR_BUSY (1u << 3)
 #define PL011_UARTEN  (1u << 0)
@@ -467,7 +469,8 @@ static void fb_text_buffer_reset(void) {
 
 uint64_t zeal_fb_text_span(int64_t x, int64_t y, int64_t len, uint32_t attr,
                            const void *data, int mode, int64_t left,
-                           int64_t right, int64_t top, int64_t bottom) {
+                           int64_t right, int64_t top, int64_t bottom,
+                           uint32_t *text_base, int64_t stride) {
     uint64_t drawn = 0;
     if (!g_fb || (mode != 0 && mode != 1) || len <= 0 ||
         y < top || y > bottom || y < 0 ||
@@ -496,6 +499,9 @@ uint64_t zeal_fb_text_span(int64_t x, int64_t y, int64_t len, uint32_t attr,
             g_fb_text_cells[index] = packed;
             g_fb_text_valid[index] = 1;
         }
+        if (text_base && stride > col && (uint64_t)col < ZEAL_TEXT_PLANE_COLS &&
+            (uint64_t)y < ZEAL_TEXT_PLANE_ROWS)
+            text_base[(size_t)y * (size_t)stride + (size_t)col] = packed;
         fb_text_present_cell((uint32_t)col, (uint32_t)y, packed);
         drawn++;
     }
@@ -518,7 +524,8 @@ int64_t zeal_fb_text_pixel(int64_t x, int64_t y) {
 
 int64_t zeal_fb_text_char(int64_t x, int64_t y, uint32_t cell,
                           int allow_border, uint32_t left_right,
-                          uint32_t top_bottom) {
+                          uint32_t top_bottom, uint32_t *text_base,
+                          int64_t stride) {
     int64_t left = left_right & 0xffffu;
     int64_t right = left_right >> 16;
     int64_t top = top_bottom & 0xffffu;
@@ -530,11 +537,12 @@ int64_t zeal_fb_text_char(int64_t x, int64_t y, uint32_t cell,
         bottom++;
     }
     return zeal_fb_text_span(x, y, 1, cell, &cell, 1,
-                             left, right, top, bottom) == 1;
+                             left, right, top, bottom, text_base, stride) == 1;
 }
 
 int64_t zeal_fb_text_fill(int64_t x, int64_t y, int64_t len, uint32_t attr,
-                          uint32_t left_right, uint32_t top_bottom) {
+                          uint32_t left_right, uint32_t top_bottom,
+                          uint32_t *text_base, int64_t stride) {
     int64_t left = left_right & 0xffffu;
     int64_t right = left_right >> 16;
     int64_t top = top_bottom & 0xffffu;
@@ -562,6 +570,9 @@ int64_t zeal_fb_text_fill(int64_t x, int64_t y, int64_t len, uint32_t attr,
             continue;
         g_fb_text_cells[index] = packed;
         g_fb_text_valid[index] = 1;
+        if (text_base && stride > col && (uint64_t)col < ZEAL_TEXT_PLANE_COLS &&
+            (uint64_t)y < ZEAL_TEXT_PLANE_ROWS)
+            text_base[(size_t)y * (size_t)stride + (size_t)col] = packed;
         fb_text_present_cell((uint32_t)col, (uint32_t)y, packed);
         drawn++;
     }
@@ -570,7 +581,8 @@ int64_t zeal_fb_text_fill(int64_t x, int64_t y, int64_t len, uint32_t attr,
 }
 
 uint64_t zeal_fb_text_rect(int64_t left, int64_t right, int64_t top,
-                           int64_t bottom, uint32_t cell) {
+                           int64_t bottom, uint32_t cell,
+                           uint32_t *text_base, int64_t stride) {
     uint64_t drawn = 0;
     if (!g_fb || !g_fb_cols || !g_fb_rows || left > right || top > bottom)
         return 0;
@@ -578,6 +590,10 @@ uint64_t zeal_fb_text_rect(int64_t left, int64_t right, int64_t top,
     if (top < 0) top = 0;
     if (right >= g_fb_cols) right = g_fb_cols - 1;
     if (bottom >= g_fb_rows) bottom = g_fb_rows - 1;
+    if (text_base) {
+        if (right >= ZEAL_TEXT_PLANE_COLS) right = ZEAL_TEXT_PLANE_COLS - 1;
+        if (bottom >= ZEAL_TEXT_PLANE_ROWS) bottom = ZEAL_TEXT_PLANE_ROWS - 1;
+    }
     if (left > right || top > bottom)
         return 0;
     for (int64_t row = top; row <= bottom; row++) {
@@ -589,6 +605,9 @@ uint64_t zeal_fb_text_rect(int64_t left, int64_t right, int64_t top,
                 g_fb_text_cells[index] = packed;
                 g_fb_text_valid[index] = 1;
             }
+            if (text_base && stride > col && (uint64_t)col < ZEAL_TEXT_PLANE_COLS &&
+                (uint64_t)row < ZEAL_TEXT_PLANE_ROWS)
+                text_base[(size_t)row * (size_t)stride + (size_t)col] = packed;
             fb_text_present_cell((uint32_t)col, (uint32_t)row, packed);
             drawn++;
         }
@@ -597,17 +616,24 @@ uint64_t zeal_fb_text_rect(int64_t left, int64_t right, int64_t top,
     return drawn;
 }
 
-uint64_t zeal_fb_text_flush(void) {
+uint64_t zeal_fb_text_flush(uint32_t *text_base, int64_t stride, int64_t rows) {
     uint64_t drawn = 0;
-    uint32_t rows = g_fb_rows < ZEAL_TEXT_MAX_ROWS ? g_fb_rows : ZEAL_TEXT_MAX_ROWS;
+    uint32_t visible_rows = g_fb_rows < ZEAL_TEXT_MAX_ROWS ? g_fb_rows : ZEAL_TEXT_MAX_ROWS;
     uint32_t cols = g_fb_cols < ZEAL_TEXT_MAX_COLS ? g_fb_cols : ZEAL_TEXT_MAX_COLS;
-    if (!g_fb)
+    if (!g_fb || !text_base || stride <= 0 || stride > ZEAL_TEXT_PLANE_COLS ||
+        rows <= 0 || rows > ZEAL_TEXT_PLANE_ROWS)
         return 0;
-    for (uint32_t row = 0; row < rows; row++) {
+    if ((int64_t)visible_rows > rows)
+        visible_rows = (uint32_t)rows;
+    if (cols > (uint64_t)stride)
+        cols = (uint32_t)stride;
+    if (visible_rows > ZEAL_TEXT_PLANE_ROWS)
+        visible_rows = ZEAL_TEXT_PLANE_ROWS;
+    for (uint32_t row = 0; row < visible_rows; row++) {
         for (uint32_t col = 0; col < cols; col++) {
             size_t index = (size_t)row * ZEAL_TEXT_MAX_COLS + col;
-            if (!g_fb_text_valid[index])
-                continue;
+            g_fb_text_cells[index] = text_base[(size_t)row * (size_t)stride + col];
+            g_fb_text_valid[index] = 1;
             fb_text_present_cell(col, row, g_fb_text_cells[index]);
             drawn++;
         }
@@ -746,25 +772,40 @@ uint64_t zeal_fb_task_text_write(unsigned slot, int64_t left, int64_t right,
 }
 
 uint64_t zeal_fb_task_text_compose(unsigned slot, int64_t left, int64_t right,
-                                   int64_t top, int64_t bottom) {
+                                   int64_t top, int64_t bottom,
+                                   uint32_t *text_base, int64_t stride) {
     if (slot >= FB_TASK_TEXT_SLOTS ||
         !fb_task_text_bounds(left, right, top, bottom))
         return 0;
     int64_t width = right - left + 1, height = bottom - top + 1;
     if (width > ZEAL_TEXT_MAX_COLS || height > ZEAL_TEXT_MAX_ROWS)
         return 0;
-    return fb_task_text_present(slot, left, top, width, height);
+    uint64_t drawn = fb_task_text_present(slot, left, top, width, height);
+    if (text_base && stride > right && stride <= ZEAL_TEXT_PLANE_COLS) {
+        for (int64_t y = 0; y < height; y++) {
+            for (int64_t x = 0; x < width; x++) {
+                if ((uint64_t)(top + y) >= ZEAL_TEXT_PLANE_ROWS ||
+                    (uint64_t)(left + x) >= ZEAL_TEXT_PLANE_COLS)
+                    continue;
+                size_t local = (size_t)y * ZEAL_TEXT_MAX_COLS + (size_t)x;
+                if (g_fb_task_text_valid[slot][local])
+                    text_base[(size_t)(top + y) * (size_t)stride + (size_t)(left + x)] =
+                        g_fb_task_text[slot][local];
+            }
+        }
+    }
+    return drawn;
 }
 
-uint64_t zeal_fb_shell_text_compose(void) {
-    int64_t cols = g_fb_cols < ZEAL_TEXT_MAX_COLS
-        ? g_fb_cols : ZEAL_TEXT_MAX_COLS;
-    int64_t rows = g_fb_rows < ZEAL_TEXT_MAX_ROWS
-        ? g_fb_rows : ZEAL_TEXT_MAX_ROWS;
+uint64_t zeal_fb_shell_text_compose(uint32_t *text_base, int64_t stride) {
+    int64_t cols = g_fb_cols < ZEAL_TEXT_PLANE_COLS
+        ? g_fb_cols : ZEAL_TEXT_PLANE_COLS;
+    int64_t rows = g_fb_rows < ZEAL_TEXT_PLANE_ROWS
+        ? g_fb_rows : ZEAL_TEXT_PLANE_ROWS;
     if (!cols || !rows)
         return 0;
     return zeal_fb_task_text_compose(FB_SHELL_TEXT_SLOT, 0, cols - 1,
-                                     0, rows - 1);
+                                     0, rows - 1, text_base, stride);
 }
 
 static void fb_putc(char ch) {

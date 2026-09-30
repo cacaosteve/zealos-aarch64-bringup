@@ -1854,8 +1854,12 @@ ZealOS live distribution or installer.
   task's glyph survives an overlapping redraw. Serial output remains mirrored.
   `TextLenStr` and `TextLenAttrStr` now preserve upstream `Bool` results, and
   `WinHorz`/`WinVert` apply upstream edge normalization and update the task's
-  pixel extents. The same probe checks partial/full left clipping and a resized
-  overlapping task.
+  pixel extents. `gr.text_base` now points at a guest-owned packed `U32` cell
+  plane sized to the current 100x75 text grid. Text helpers plus retained task
+  and shell overlays update that array, and flush presents from it; the probe
+  directly writes a packed cell through `gr.text_base` and checks the rendered
+  background. The same probe checks partial/full left clipping, a resized
+  overlapping task, retained text, and direct plane presentation.
   The C bootstrap shell also keeps a separate retained text buffer; a full
   task redraw composes that shell buffer first, then draws visible task windows
   over it. Its normal writes remain immediate. `TextBorder` draws the upstream
@@ -1866,6 +1870,7 @@ ZealOS live distribution or installer.
   in its back-to-front order, then presents the composed cell plane; an
   overlapping two-task smoke verifies that the later task covers the earlier
   one. The renderer still lacks draw callbacks, controls, the uncovered-window
-  bitmap, and upstream `gr.text_base` semantics. Source matching, forms/data
+  bitmap, and upstream display/compositor globals beyond packed-cell
+  `gr.text_base`. Source matching, forms/data
   formatting, sprites/depth buffers, music state, and cursor interaction remain
   unaccepted.
