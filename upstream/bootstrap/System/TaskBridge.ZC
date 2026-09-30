@@ -1513,13 +1513,14 @@ class CBootstrapTextGlbls
 CBootstrapTextGlbls text;
 CTask *sys_winmgr_task = NULL;
 Bool TextChar(CTask *task, Bool allow_border=FALSE, I64 x=0, I64 y=0, I64 d=0)
-{//Stub until GrTextBase; DocBorderListDraw only.
-    if (task) {}
-    if (allow_border) {}
-    if (x) {}
-    if (y) {}
-    if (d) {}
-    return FALSE;
+{//Single-cell framebuffer path; border mode permits the adjacent outer row/column.
+    if (!task)
+        return FALSE;
+    return ZcFbTextChar(task->win_left + x + (task->scroll_x >> 3),
+                        task->win_top + y + (task->scroll_y >> 3), d,
+                        allow_border,
+                        task->win_left | task->win_right << 16,
+                        task->win_top | task->win_bottom << 16);
 }
 U0 TextLenStr(CTask *task, I64 x, I64 y, I64 len, I64 attr, U8 *str)
 {

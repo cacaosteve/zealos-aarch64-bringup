@@ -31,5 +31,7 @@ extern I64 ZcFbTextSpan(I64 x, I64 y, I64 len, I64 attr, U8 *data,
                         I64 mode, I64 left_right, I64 top_bottom);
 extern I64 ZcFbTextCellsDrawn();
 extern I64 ZcFbTextPixel(I64 x, I64 y);
+extern Bool ZcFbTextChar(I64 x, I64 y, U32 cell, Bool allow_border,
+                         I64 left_right, I64 top_bottom);
 // Temporary ARM64 bootstrap binding for the table initialized by upstream KMain.
 extern F64 *pow10_I64;

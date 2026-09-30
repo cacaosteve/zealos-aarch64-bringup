@@ -451,11 +451,15 @@ uint64_t zeal_fb_text_span(int64_t x, int64_t y, int64_t len, uint32_t attr,
             ch = (unsigned char)packed;
         }
         uint32_t cell_colors = (packed >> 8) & 0xffu;
+        if (mode == 1 && (packed & (0x20000000u | 0x40000000u)))
+            cell_colors ^= 0xffu;
         uint32_t cell_fg = mode == 1 ? palette[cell_colors & 15u] : fg;
         uint32_t cell_bg = mode == 1 ? palette[(cell_colors >> 4) & 15u] : bg;
         fb_fillrect((uint32_t)col * 8u, (uint32_t)y * 8u, 8u, 8u, cell_bg);
         if (ch >= 32)
             fb_draw_char((uint32_t)col, (uint32_t)y, (char)ch, cell_fg);
+        if (mode == 1 && (packed & 0x80000000u))
+            fb_fillrect((uint32_t)col * 8u, (uint32_t)y * 8u + 7u, 8u, 1u, cell_fg);
         drawn++;
     }
     g_zc_text_cells_drawn += drawn;
@@ -470,6 +474,23 @@ int64_t zeal_fb_text_pixel(int64_t x, int64_t y) {
     if (x < INT32_MIN || x > INT32_MAX || y < INT32_MIN || y > INT32_MAX)
         return -1;
     return fb_peek((int32_t)x, (int32_t)y);
+}
+
+int64_t zeal_fb_text_char(int64_t x, int64_t y, uint32_t cell,
+                          int allow_border, uint32_t left_right,
+                          uint32_t top_bottom) {
+    int64_t left = left_right & 0xffffu;
+    int64_t right = left_right >> 16;
+    int64_t top = top_bottom & 0xffffu;
+    int64_t bottom = top_bottom >> 16;
+    if (allow_border) {
+        left--;
+        right++;
+        top--;
+        bottom++;
+    }
+    return zeal_fb_text_span(x, y, 1, cell, &cell, 1,
+                             left, right, top, bottom) == 1;
 }
 
 static void fb_putc(char ch) {

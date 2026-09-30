@@ -94,6 +94,27 @@ I64 TaskOriginalDocRecalcChecks()
         Fs->display_flags = old_display_flags;
         return 81;
     }
+    if (!TextChar(Fs, FALSE, 3, 3, 0x0f00 | 'T'))
+    {
+        Fs->display_flags = old_display_flags;
+        return 82;
+    }
+    if (ZcFbTextPixel(25, 24) != 0x00ffffff)
+    {
+        Fs->display_flags = old_display_flags;
+        return 83;
+    }
+    if (TextChar(Fs, FALSE, 80, 3, 0x0e00 | 'B'))
+    {
+        Fs->display_flags = old_display_flags;
+        return 84;
+    }
+    if (!TextChar(Fs, TRUE, 80, 3, 0x0e00 | 'B') ||
+        ZcFbTextPixel(641, 24) != 0x00ffff55)
+    {
+        Fs->display_flags = old_display_flags;
+        return 85;
+    }
     old_text_cells = ZcFbTextCellsDrawn();
     if (!DocRecalc(doc, RECALCt_TO_SCREEN))
     {
