@@ -331,6 +331,12 @@ extern CHashTable *HashTableNew(I64 size, CTask *mem_task=NULL);
 extern CHash *HashFind(U8 *needle_str, CHashTable *haystack_table,
                        I64 mask, I64 instance=1);
 extern U0 HashAdd(CHash *tmph, CHashTable *table);
+I64 HashTypeNum(CHash *tmph)
+{//Hash type index used by upstream DocHighlight's color table.
+    if (tmph)
+        return Bsf(tmph->type & HTG_TYPE_MASK);
+    return -1;
+}
 U0 UndefinedDefine(U8 *dname)
 {
     Print(ST_ERR_ST "Undefined Define: '%s'.\n", dname);
@@ -1292,8 +1298,24 @@ U0 BootstrapGodGlbls()
     MemSet(&god, 0, sizeof(CGodGlobals));
 }
 BootstrapGodGlbls;
-// StrA.ZC char bitmaps required by DocPutKey/DocPutS before StrA loads.
-U32 char_bmp_printable[16] =
+// StrA.ZC char bitmaps required by DocHighlight/DocPutKey/DocPutS before StrA loads.
+U32 char_bmp_alpha_numeric[16] =
+{
+    0, 0x03FF0000, 0x87FFFFFF, 0x07FFFFFE,
+    0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF,
+    0, 0, 0, 0, 0, 0, 0, 0
+},
+char_bmp_dec_numeric[16] =
+{
+    0, 0x03FF0000, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0
+},
+char_bmp_hex_numeric[16] =
+{
+    0, 0x03FF0000, 0x7E, 0x7E,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+},
+char_bmp_printable[16] =
 {
     0x80002600, 0xFFFFFFFF, 0xFFFFFFFF, 0x7FFFFFFF,
     0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF,
