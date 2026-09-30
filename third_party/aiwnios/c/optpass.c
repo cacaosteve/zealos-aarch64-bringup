@@ -344,12 +344,15 @@ void OptPassExpandPtrs(CCmpCtrl *cctrl) {
       new3->raw_type = RT_I64i;
       QueIns(new3, new2);
       rpn->type = IC_DEREF;
-      rpn->raw_type = raw_type;
+      /* Funptr members are stored pointers. RT_FUNC on this DEREF made the
+       * backend skip the load (treating (*fp) as a no-op), so doc->user_put_s
+       * read as the member address and DocPrintPartial always called it. */
+      rpn->raw_type = raw_type == RT_FUNC ? RT_PTR : raw_type;
       break;
     case IC_ARROW:
       new = A_CALLOC(sizeof(CRPN), cctrl->hc);
       new->type = IC_DEREF;
-      new->raw_type = rpn->raw_type;
+      new->raw_type = rpn->raw_type == RT_FUNC ? RT_PTR : rpn->raw_type;
       new->ic_fun = rpn->ic_fun;
       new->ic_dim = rpn->ic_dim;
       new2 = A_CALLOC(sizeof(CRPN), cctrl->hc);

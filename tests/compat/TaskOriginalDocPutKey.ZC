@@ -1,18 +1,32 @@
-// Smoke: live put_doc StdOut via DocNew + DocPrint + KeyDevAdd.
-// PutS→KDDocPutS→DocPrintPartial still traps on this bridge (follow-up).
+// Smoke: live put_doc StdOut via DocNew + DocPrint + PutS/DocPrintPartial.
 I64 TaskOriginalDocPutKeyChecks()
 {
     CDoc *doc;
     CDocEntry *entry;
     CKeyDevEntry *tmp;
+    I64 v;
 
     KeyDevInit;
     doc = DocNew;
     if (!doc || doc->doc_signature != DOC_SIGNATURE_VAL)
         return 1;
+
+    // Funptr members must load the stored pointer. Typing them RT_FUNC made
+    // OptPassExpandPtrs drop IC_DEREF, so user_put_s read as &member (always
+    // non-NULL) and DocPrintPartial called that address.
+    (&doc->user_put_s)(I64 *)[0] = 0x3333;
+    v = doc->user_put_s(I64);
+    if (v != 0x3333)
+        return 10;
+    (&doc->left_click_link)(I64 *)[0] = 0x4444;
+    v = doc->left_click_link(I64);
+    if (v != 0x4444)
+        return 11;
+
     doc->user_put_data = NULL;
     doc->user_put_key = NULL;
     doc->user_put_s = NULL;
+    doc->left_click_link = NULL;
     Fs->put_doc = Fs->display_doc = doc;
     if (DocPut != doc)
         return 2;
@@ -42,5 +56,17 @@ I64 TaskOriginalDocPutKeyChecks()
         return 8;
     if (DocPut->head.next->tag[0] != 'H')
         return 9;
-    return 42;
+
+    // PutS → KDDocPutS → DocPrintPartial must append without trapping on the
+    // NULL user_put_s funptr member load.
+    PutS("!");
+    entry = doc->head.next;
+    if (entry->type_u8 != DOCT_TEXT || !entry->tag)
+        return 12;
+    if (entry->tag[0] == 'H' && entry->tag[1] == 'i' && entry->tag[2] == '!')
+        return 42;
+    if (entry->next != doc && entry->next->type_u8 == DOCT_TEXT &&
+        entry->next->tag && entry->next->tag[0] == '!')
+        return 42;
+    return 13;
 }

@@ -41,6 +41,10 @@ Port changes:
 - Type multi-star funptrs (`(**fp)(...)`) as `RT_PTR` so member loads are
   kept; only single-star funptrs stay `RT_FUNC`. Otherwise `fp[i]` writes at
   the member's address and smashes adjacent globals.
+- When expanding `.`/`->` of an `RT_FUNC` member, emit the load `IC_DEREF` as
+  `RT_PTR`. Leaving it `RT_FUNC` made the ARM backend skip the load, so
+  `doc->user_put_s` was always the member address and `DocPrintPartial`
+  called it.
 
 The freestanding C support and host API are in `src/zc/`. See
 `COMPATIBILITY.md` for the tested scope and deliberate runtime limitations.

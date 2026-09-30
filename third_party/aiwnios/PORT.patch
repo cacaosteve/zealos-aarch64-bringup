@@ -1,6 +1,6 @@
 diff -ruN a/c/aiwn_hash.h b/c/aiwn_hash.h
---- a/c/aiwn_hash.h	2026-09-29 17:10:43
-+++ b/c/aiwn_hash.h	2026-09-29 17:10:43
+--- a/c/aiwn_hash.h	2026-09-29 18:20:34
++++ b/c/aiwn_hash.h	2026-09-29 18:20:34
 @@ -35,6 +35,7 @@
  #define HTT_IMPORT_SYS_SYM  0x80
  #define HTT_EXPORT_SYS_SYM  0x100
@@ -10,8 +10,8 @@ diff -ruN a/c/aiwn_hash.h b/c/aiwn_hash.h
  typedef struct CHash {
    struct CHash *next;
 diff -ruN a/c/aiwn_lexparser.h b/c/aiwn_lexparser.h
---- a/c/aiwn_lexparser.h	2026-09-29 17:10:43
-+++ b/c/aiwn_lexparser.h	2026-09-29 17:10:43
+--- a/c/aiwn_lexparser.h	2026-09-29 18:20:34
++++ b/c/aiwn_lexparser.h	2026-09-29 18:20:34
 @@ -40,9 +40,11 @@
    int64_t flags, cur_char;
    int64_t cur_tok;
@@ -42,8 +42,8 @@ diff -ruN a/c/aiwn_lexparser.h b/c/aiwn_lexparser.h
  #  define AIWNIOS_IREG_START     19
  #  define AIWNIOS_IREG_CNT       (27 - 19 + 1)
 diff -ruN a/c/arm_backend.c b/c/arm_backend.c
---- a/c/arm_backend.c	2026-09-29 17:10:43
-+++ b/c/arm_backend.c	2026-09-29 17:10:43
+--- a/c/arm_backend.c	2026-09-29 18:20:34
++++ b/c/arm_backend.c	2026-09-29 18:20:34
 @@ -4473,6 +4473,9 @@
      break;
    case IC_GS:
@@ -65,8 +65,8 @@ diff -ruN a/c/arm_backend.c b/c/arm_backend.c
        PopTmp(cctrl, r);
        r->res.mode = MD_NULL;
 diff -ruN a/c/lex.c b/c/lex.c
---- a/c/lex.c	2026-09-29 17:10:43
-+++ b/c/lex.c	2026-09-29 17:10:43
+--- a/c/lex.c	2026-09-29 18:20:34
++++ b/c/lex.c	2026-09-29 18:20:33
 @@ -9,11 +9,19 @@
  #include <stdint.h>
  #include <stdio.h>
@@ -296,8 +296,8 @@ diff -ruN a/c/lex.c b/c/lex.c
    CLexer *new = A_CALLOC(sizeof(CLexer), NULL);
    new->hc = HeapCtrlInit(NULL, Fs, 0);
 diff -ruN a/c/optpass.c b/c/optpass.c
---- a/c/optpass.c	2026-09-29 17:10:43
-+++ b/c/optpass.c	2026-09-29 17:10:43
+--- a/c/optpass.c	2026-09-29 18:20:34
++++ b/c/optpass.c	2026-09-29 18:20:33
 @@ -21,6 +21,9 @@
      if (rpn->ic_dim->next)
        r *= rpn->ic_dim->next->total_cnt;
@@ -308,7 +308,25 @@ diff -ruN a/c/optpass.c b/c/optpass.c
    } else
      r *= rpn->ic_class[-1].sz;
  
-@@ -477,6 +480,12 @@
+@@ -341,12 +344,15 @@
+       new3->raw_type = RT_I64i;
+       QueIns(new3, new2);
+       rpn->type = IC_DEREF;
+-      rpn->raw_type = raw_type;
++      /* Funptr members are stored pointers. RT_FUNC on this DEREF made the
++       * backend skip the load (treating (*fp) as a no-op), so doc->user_put_s
++       * read as the member address and DocPrintPartial always called it. */
++      rpn->raw_type = raw_type == RT_FUNC ? RT_PTR : raw_type;
+       break;
+     case IC_ARROW:
+       new = A_CALLOC(sizeof(CRPN), cctrl->hc);
+       new->type = IC_DEREF;
+-      new->raw_type = rpn->raw_type;
++      new->raw_type = rpn->raw_type == RT_FUNC ? RT_PTR : rpn->raw_type;
+       new->ic_fun = rpn->ic_fun;
+       new->ic_dim = rpn->ic_dim;
+       new2 = A_CALLOC(sizeof(CRPN), cctrl->hc);
+@@ -477,6 +483,12 @@
    }
  }
  
@@ -321,7 +339,7 @@ diff -ruN a/c/optpass.c b/c/optpass.c
  void OptPassConstFold(CCmpCtrl *cctrl) {
  #define SET_AB                                                                 \
    if (next->type == IC_F64)                                                    \
-@@ -505,6 +514,11 @@
+@@ -505,6 +517,11 @@
    changed = 0;
    for (rpn = cctrl->code_ctrl->ir_code->next;
         cctrl->code_ctrl->ir_code != rpn;) {
@@ -334,8 +352,8 @@ diff -ruN a/c/optpass.c b/c/optpass.c
        break;
      case IC_TO_BOOL:
 diff -ruN a/c/parser.c b/c/parser.c
---- a/c/parser.c	2026-09-29 17:10:43
-+++ b/c/parser.c	2026-09-29 17:10:43
+--- a/c/parser.c	2026-09-29 18:20:34
++++ b/c/parser.c	2026-09-29 18:20:33
 @@ -1986,6 +1986,11 @@
        }
        goto fin;

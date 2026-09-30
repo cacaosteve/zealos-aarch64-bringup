@@ -1713,7 +1713,9 @@ ZealOS live distribution or installer.
   (wrong stride vs `CHashFun`), keep `RT_FUNC` for indexed elements, use the
   funptr size in `PtrWidthOfRPN`, and type `ptr_star_cnt > 1` as `RT_PTR` so
   the member load is not dropped (otherwise `fp[i]` writes at the member
-  slot and smashes adjacent `CKeyDevGlobals` fields).
+  slot and smashes adjacent `CKeyDevGlobals` fields). A later fix emits
+  `.`/`->` loads of `RT_FUNC` members as `RT_PTR` so the backend actually
+  loads the stored pointer (`doc->user_put_s` / KeyDev `put_key`).
 - The disposable probe loads Message, Job, then KeyDev, then
   `TaskOriginalKeyDevChecks`: `KeyDevInit`, raw-mode `PutKey`/`PutS`/
   `PutChars`, and a `CtrlAltCBSet` funptr-table write. It returns `0x2a`.
@@ -1763,9 +1765,8 @@ ZealOS live distribution or installer.
 - The unchanged pinned `System/DolDoc/DocDblBuf.ZC` loads after DocPutS and
   replaces the bridge `DocPut` with the upstream put/display/border helpers.
 - Bootstrap `Raw(Bool)` clears `DISPLAYf_NOT_RAW` so KDRaw handlers stop
-  consuming StdOut. The disposable smoke creates `DocNew`, assigns
-  `Fs->put_doc`/`display_doc`, registers `KDDocPutKey`/`KDDocPutS`, and
-  `DocPrint`s `"Hi"` into the live document (`0x2a`).
-- `PutS` → `KDDocPutS` → `DocPrintPartial` still traps on this bridge (empty
-  docs and append path); use `DocPrint`/`DocPutS` until that is fixed. Adam /
-  `DocTermNew` remain later work.
+  consuming StdOut. The disposable smoke creates `DocNew`, checks funptr
+  member loads (`user_put_s` / `left_click_link`), assigns
+  `Fs->put_doc`/`display_doc`, registers `KDDocPutKey`/`KDDocPutS`,
+  `DocPrint`s `"Hi"`, then `PutS("!")` through `KDDocPutS`/`DocPrintPartial`
+  (`0x2a`). Adam / `DocTermNew` remain later work.
