@@ -1283,8 +1283,22 @@ U0 FindWiz()
 {
 }
 // One framebuffer is shared by this bootstrap shell, so cross-window DC aliasing is identity.
+CDC bootstrap_graphics_dc;
 CDC *DCAlias(CDC *dc, CTask *task=NULL)
 {
+    if (!task)
+        task = Fs;
+    if (!dc)
+        dc = &bootstrap_graphics_dc;
+    dc->width = ZcFbScreenWidth();
+    dc->width_internal = dc->width & ~7;
+    dc->height = ZcFbScreenHeight();
+    dc->flags = DCF_SCREEN_BITMAP;
+    dc->win_task = task;
+    dc->dc_signature = DCS_SIGNATURE_VAL;
+    dc->color.c0.color = WHITE;
+    dc->color.c0.rop = ROPB_MONO;
+    dc->depth_buf = NULL;
     return dc;
 }
 U0 DCReset(CDC *dc)
@@ -1327,10 +1341,13 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
 U32 bootstrap_text_base[TEXT_COLS * TEXT_ROWS];
 class CBootstrapGraphicsGlobals
 {
+    CDC *dc;
     CDC *dc2;
     U8 *empty_sprite;
     U32 *text_base;
 } gr;
+gr.dc = &bootstrap_graphics_dc;
+gr.dc2 = &bootstrap_graphics_dc;
 gr.text_base = bootstrap_text_base;
 // Minimal timing state for DocRecalc's refresh throttle; WinMgr is not bootstrapped.
 CWinMgrGlobals winmgr;
@@ -1604,6 +1621,89 @@ U0 TextRect(I64 left, I64 right, I64 top, I64 bottom, I64 cell)
     ZcFbTextRect(left, right, top, bottom, cell, gr.text_base, TEXT_COLS);
 }
 Bool bootstrap_batch_redraw = FALSE;
+U0 WinDerivedValsUpdate(CTask *task)
+{
+    if (!task)
+        task = Fs;
+    if (!task)
+        return;
+    task->win_width = task->win_right - task->win_left + 1;
+    task->win_height = task->win_bottom - task->win_top + 1;
+    task->pix_left = FONT_WIDTH * task->win_left;
+    task->pix_right = FONT_WIDTH * (task->win_right + 1) - 1;
+    task->pix_width = task->pix_right - task->pix_left + 1;
+    task->pix_top = FONT_HEIGHT * task->win_top;
+    task->pix_bottom = FONT_HEIGHT * (task->win_bottom + 1) - 1;
+    task->pix_height = task->pix_bottom - task->pix_top + 1;
+}
+Bool GrPlot(CDC *dc=gr.dc, I64 x=0, I64 y=0)
+{
+    CTask *task;
+    I64 left, top, right, bottom;
+    if (!dc)
+        return FALSE;
+    task = dc->win_task;
+    if (dc->flags & DCF_SCREEN_BITMAP)
+    {
+        if (!task)
+            return FALSE;
+        WinDerivedValsUpdate(task);
+        left = task->pix_left;
+        top = task->pix_top;
+        right = task->pix_right;
+        bottom = task->pix_bottom;
+        x += left + task->scroll_x;
+        y += top + task->scroll_y;
+    }
+    else
+    {
+        left = top = 0;
+        right = dc->width - 1;
+        bottom = dc->height - 1;
+    }
+    return ZcFbGraphPlot(x, y, dc->color.c0 & 0xff,
+                         left, top, right, bottom);
+}
+Bool GrLine(CDC *dc=gr.dc, I64 x1=0, I64 y1=0, I64 x2=0, I64 y2=0,
+            I64 step=1, I64 start=0)
+{
+    CTask *task;
+    I64 left, top, right, bottom;
+    if (!dc || step < 1 || start < 0)
+        return FALSE;
+    task = dc->win_task;
+    if (dc->flags & DCF_SCREEN_BITMAP)
+    {
+        if (!task)
+            return FALSE;
+        WinDerivedValsUpdate(task);
+        left = task->pix_left;
+        top = task->pix_top;
+        right = task->pix_right;
+        bottom = task->pix_bottom;
+        x1 += left + task->scroll_x;
+        x2 += left + task->scroll_x;
+        y1 += top + task->scroll_y;
+        y2 += top + task->scroll_y;
+    }
+    else
+    {
+        left = top = 0;
+        right = dc->width - 1;
+        bottom = dc->height - 1;
+    }
+    return ZcFbGraphLine(x1, y1, x2, y2, dc->color.c0 & 0xff,
+                         step, start, left, top, right, bottom);
+}
+U0 GrDrawTaskCallback(CTask *task)
+{
+    CDC *dc;
+    if (!task || !TaskValidate(task) || !task->draw_it)
+        return;
+    dc = DCAlias(gr.dc2, task);
+    task->draw_it(task, dc);
+    DCDel(dc);
+}
 U0 GrUpdateTaskWin(CTask *task)
 {//Single-task bootstrap redraw: border, cell clear, DolDoc, then plane flush.
     if (!task || !TaskValidate(task))
@@ -1618,7 +1718,10 @@ U0 GrUpdateTaskWin(CTask *task)
         DocUpdateTaskDocs(task);
     ZcFbTaskTextCompose(task, gr.text_base, TEXT_COLS);
     if (!bootstrap_batch_redraw)
+    {
         ZcFbTextFlush(gr.text_base, TEXT_COLS, TEXT_ROWS);
+        GrDrawTaskCallback(task);
+    }
 }
 U0 GrUpdateTasks()
 {//Bounded one-CPU window-ring refresh, drawn in ZealOS task/z order.
@@ -1647,21 +1750,21 @@ U0 GrUpdateTasks()
     while (task && task != root && visited < 64);
     bootstrap_batch_redraw = FALSE;
     ZcFbTextFlush(gr.text_base, TEXT_COLS, TEXT_ROWS);
-}
-U0 WinDerivedValsUpdate(CTask *task)
-{
-    if (!task)
-        task = Fs;
-    if (!task)
-        return;
-    task->win_width = task->win_right - task->win_left + 1;
-    task->win_height = task->win_bottom - task->win_top + 1;
-    task->pix_left = FONT_WIDTH * task->win_left;
-    task->pix_right = FONT_WIDTH * (task->win_right + 1) - 1;
-    task->pix_width = task->pix_right - task->pix_left + 1;
-    task->pix_top = FONT_HEIGHT * task->win_top;
-    task->pix_bottom = FONT_HEIGHT * (task->win_bottom + 1) - 1;
-    task->pix_height = task->pix_bottom - task->pix_top + 1;
+    // The upstream screen pass invokes CDC draw callbacks after text has been
+    // composited. Keep this second pass so the full-plane text flush cannot
+    // erase callback pixels from earlier windows.
+    visited = 0;
+    task = root;
+    do
+    {
+        if (!TaskValidate(task))
+            break;
+        if (task->display_flags & (1 << DISPLAYf_SHOW))
+            GrDrawTaskCallback(task);
+        task = task->next_task;
+        visited++;
+    }
+    while (task && task != root && visited < 64);
 }
 Bool WinHorz(I64 left, I64 right, CTask *task=NULL)
 {

@@ -10,6 +10,20 @@ U0 WindowRedrawPark(U8 *data)
         ZcTaskYield;
 }
 
+I64 window_draw_calls = 0;
+
+U0 WindowDrawSmoke(CTask *task, CDC *dc)
+{
+    window_draw_calls++;
+    if (task)
+    {
+        dc->color.c0.color = RED;
+        dc->color.c0.rop = ROPB_MONO;
+        GrPlot(dc, 10, 10);
+        GrLine(dc, 12, 10, 17, 10, 1, 0);
+    }
+}
+
 I64 TaskOriginalDocRecalcChecks()
 {
     CDoc *doc;
@@ -264,9 +278,19 @@ I64 TaskOriginalDocRecalcChecks()
     overlap->display_flags = (1 << DISPLAYf_SHOW) | (1 << DISPLAYf_NO_BORDER);
     overlap->win_inhibit |= 1 << WIF_SELF_DOC;
     overlap->text_attr = 0x20;
+    overlap->draw_it = &WindowDrawSmoke;
+    window_draw_calls = 0;
     old_text_cells = ZcFbTextCellsDrawn();
     ZcTaskYield;
     GrUpdateTasks;
+    if (!window_draw_calls)
+    {
+        Kill(overlap);
+        Fs->display_flags = old_display_flags;
+        Fs->win_inhibit = old_win_inhibit;
+        Fs->text_attr = old_text_attr;
+        return 109;
+    }
     if (ZcFbTextCellsDrawn() < old_text_cells + 80 * 25 + 20 * 10 + 4)
     {
         Kill(overlap);
@@ -290,6 +314,30 @@ I64 TaskOriginalDocRecalcChecks()
         Fs->win_inhibit = old_win_inhibit;
         Fs->text_attr = old_text_attr;
         return 101;
+    }
+    if (ZcFbTextPixel(90, 90) != 0x00aa0000)
+    {
+        Kill(overlap);
+        Fs->display_flags = old_display_flags;
+        Fs->win_inhibit = old_win_inhibit;
+        Fs->text_attr = old_text_attr;
+        return 106;
+    }
+    if (ZcFbTextPixel(96, 90) != 0x00aa0000)
+    {
+        Kill(overlap);
+        Fs->display_flags = old_display_flags;
+        Fs->win_inhibit = old_win_inhibit;
+        Fs->text_attr = old_text_attr;
+        return 107;
+    }
+    if (ZcFbTextPixel(94, 90) != 0x00aa0000)
+    {
+        Kill(overlap);
+        Fs->display_flags = old_display_flags;
+        Fs->win_inhibit = old_win_inhibit;
+        Fs->text_attr = old_text_attr;
+        return 108;
     }
     if (!ZcFbShellTextCompose(gr.text_base, 100))
     {

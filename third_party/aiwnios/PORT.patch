@@ -1199,3 +1199,49 @@
 +extern int64_t aiwnios_switch_depth;
 +/* Non-zero while parsing a function body: same #assert nesting hazard. */
 +extern int64_t aiwnios_fun_depth;
+--- a/c/ffi_gen.c
++++ b/c/ffi_gen.c
+@@ -124,20 +124,30 @@
+   int32_t *Xblob = A_MALLOC(8 * 21 + arity * 4, Fs->code_heap), ptr = 0;
+   int32_t *blob = MemGetWritePtr(Xblob); // OpenBSD sexy mapping
+   int64_t arg, fill;
+-  int64_t pop = 0, pad = 0;
++  int64_t pop = 0, pad = 0, stack_size = 0;
+   int old = SetWriteNP(0);
+-  if (arity & 1)
+-    arity++, pad = 8;
+-  if (arity)
+-    ;
+-  blob[ptr++] = ARM_subImmX(31, 31, pop = (arity < 8 ? arity : 8) * 8);
+-  for (arg = 0; arg < arity - !!pad; arg++) {
+-    if (arg >= 8)
+-      break;
+-    blob[ptr++] = ARM_strRegImmX(arg, 31, arg * 8 + pad);
+-  }
+-  blob[ptr++] =
+-      ARM_addImmX(0, 31, pad); // 31 is stack pointer,0 is 1st argument
++  if (arity <= 8) {
++    if (arity & 1)
++      arity++, pad = 8;
++    blob[ptr++] = ARM_subImmX(31, 31, pop = arity * 8);
++    for (arg = 0; arg < arity - !!pad; arg++)
++      blob[ptr++] = ARM_strRegImmX(arg, 31, arg * 8 + pad);
++    blob[ptr++] = ARM_addImmX(0, 31, pad);
++  } else {
++    // AAPCS64 passes arguments 0..7 in x0..x7 and the rest on the
++    // caller's stack. Build one contiguous int64_t[] for the C host shim.
++    // Keep SP 16-byte aligned and read stack arguments relative to the
++    // original SP (new SP + stack_size).
++    stack_size = ((arity + 1) & ~1) * 8;
++    blob[ptr++] = ARM_subImmX(31, 31, pop = stack_size);
++    for (arg = 0; arg < 8; arg++)
++      blob[ptr++] = ARM_strRegImmX(arg, 31, arg * 8);
++    for (arg = 8; arg < arity; arg++) {
++      blob[ptr++] = ARM_ldrRegImmX(9, 31, stack_size + (arg - 8) * 8);
++      blob[ptr++] = ARM_strRegImmX(9, 31, arg * 8);
++    }
++    blob[ptr++] = ARM_movRegX(0, 31);
++  }
+   blob[ptr++] = ARM_stpPreImmX(29, 30, 31, -16);
+   blob[ptr++] = ARM_movRegX(29, 31);
+   fill = ptr;

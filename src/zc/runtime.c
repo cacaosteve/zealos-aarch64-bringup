@@ -29,6 +29,14 @@ extern uint64_t zeal_fb_text_rect(int64_t left, int64_t right, int64_t top,
                                   uint32_t *text_base, int64_t stride);
 extern uint64_t zeal_fb_text_flush(uint32_t *text_base, int64_t stride,
                                    int64_t rows);
+extern uint64_t zeal_fb_graph_plot(int64_t x, int64_t y, uint32_t color,
+                                   int64_t left, int64_t top,
+                                   int64_t right, int64_t bottom);
+extern uint64_t zeal_fb_graph_line(int64_t x0, int64_t y0,
+                                   int64_t x1, int64_t y1, uint32_t color,
+                                   int64_t step, int64_t start,
+                                   int64_t left, int64_t top,
+                                   int64_t right, int64_t bottom);
 
 /* Separate arenas from legacy hc_* so its per-demo reset cannot invalidate
  * modules loaded here. Both use splitting/coalescing and arbitrary-order Free. */
@@ -191,6 +199,7 @@ static int64_t guest_except_ch_off, guest_catch_except_off;
 static int64_t guest_hash_table_off;
 static int guest_task_bound;
 extern uint64_t zeal_fb_text_cols(void), zeal_fb_text_rows(void);
+extern uint64_t zeal_fb_screen_width(void), zeal_fb_screen_height(void);
 extern void zeal_fb_task_text_reset(unsigned slot);
 extern uint64_t zeal_fb_task_text_write(unsigned slot, int64_t left,
                                          int64_t right, int64_t top,
@@ -671,6 +680,23 @@ static int64_t host_fb_text_flush(int64_t *a) {
     if (!plane || a[1] != 100 || a[2] != 75)
         return 0;
     return (int64_t)zeal_fb_text_flush(plane, a[1], a[2]);
+}
+static int64_t host_fb_graph_plot(int64_t *a) {
+    return (int64_t)zeal_fb_graph_plot(a[0], a[1], (uint32_t)a[2],
+                                       a[3], a[4], a[5], a[6]);
+}
+static int64_t host_fb_graph_line(int64_t *a) {
+    return (int64_t)zeal_fb_graph_line(a[0], a[1], a[2], a[3],
+                                       (uint32_t)a[4], a[5], a[6],
+                                       a[7], a[8], a[9], a[10]);
+}
+static int64_t host_fb_screen_width(int64_t *a) {
+    (void)a;
+    return (int64_t)zeal_fb_screen_width();
+}
+static int64_t host_fb_screen_height(int64_t *a) {
+    (void)a;
+    return (int64_t)zeal_fb_screen_height();
 }
 static void set_guest_task(void *p) {
     __asm__ volatile("msr tpidr_el1, %0\n\tisb" : : "r"(p) : "memory");
@@ -2946,6 +2972,10 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
                     {"ZcFbTextFill", host_fb_text_fill, 8},
                     {"ZcFbTextRect", host_fb_text_rect, 7},
                     {"ZcFbTextFlush", host_fb_text_flush, 3},
+                    {"ZcFbGraphPlot", host_fb_graph_plot, 7},
+                    {"ZcFbGraphLine", host_fb_graph_line, 11},
+                    {"ZcFbScreenWidth", host_fb_screen_width, 0},
+                    {"ZcFbScreenHeight", host_fb_screen_height, 0},
                     {"ZcFbTaskTextCompose", host_fb_task_text_compose, 3},
                     {"ZcFbShellTextCompose", host_fb_shell_text_compose, 2}};
     for (size_t i = 0; i < sizeof(bindings) / sizeof(*bindings); i++)

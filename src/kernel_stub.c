@@ -515,6 +515,8 @@ uint64_t zeal_fb_text_cells_drawn(void) {
 
 uint64_t zeal_fb_text_cols(void) { return g_fb_cols; }
 uint64_t zeal_fb_text_rows(void) { return g_fb_rows; }
+uint64_t zeal_fb_screen_width(void) { return g_fb_w; }
+uint64_t zeal_fb_screen_height(void) { return g_fb_h; }
 
 int64_t zeal_fb_text_pixel(int64_t x, int64_t y) {
     if (x < INT32_MIN || x > INT32_MAX || y < INT32_MIN || y > INT32_MAX)
@@ -1793,6 +1795,52 @@ uint64_t hc_builtin_sqr(uint64_t x) {
 uint64_t hc_builtin_putpixel(uint64_t x, uint64_t y, uint64_t c) {
     fb_putpixel((uint32_t)x, (uint32_t)y, (uint32_t)c);
     return 0;
+}
+
+static uint32_t zeal_graphics_color(uint32_t color) {
+    return color < 16 ? g_text_palette[color] : color & 0x00ffffffu;
+}
+
+uint64_t zeal_fb_graph_plot(int64_t x, int64_t y, uint32_t color,
+                            int64_t left, int64_t top,
+                            int64_t right, int64_t bottom) {
+    if (!g_fb || x < left || x > right || y < top || y > bottom ||
+        x < 0 || y < 0 || (uint64_t)x >= g_fb_w || (uint64_t)y >= g_fb_h)
+        return 0;
+    fb_putpixel((uint32_t)x, (uint32_t)y, zeal_graphics_color(color));
+    return 1;
+}
+
+uint64_t zeal_fb_graph_line(int64_t x0, int64_t y0, int64_t x1, int64_t y1,
+                            uint32_t color, int64_t step, int64_t start,
+                            int64_t left, int64_t top,
+                            int64_t right, int64_t bottom) {
+    int64_t dx, sx, dy, sy, err, i = 0;
+    uint64_t plotted = 0;
+    if (!g_fb || step < 1 || start < 0 ||
+        x0 < -8192 || x0 > (int64_t)g_fb_w + 8192 ||
+        x1 < -8192 || x1 > (int64_t)g_fb_w + 8192 ||
+        y0 < -8192 || y0 > (int64_t)g_fb_h + 8192 ||
+        y1 < -8192 || y1 > (int64_t)g_fb_h + 8192)
+        return 0;
+    dx = x0 < x1 ? x1 - x0 : x0 - x1;
+    sx = x0 < x1 ? 1 : -1;
+    dy = y0 < y1 ? y0 - y1 : y1 - y0;
+    sy = y0 < y1 ? 1 : -1;
+    err = dx + dy;
+    for (;;) {
+        if (i >= start && (i - start) % step == 0 &&
+            zeal_fb_graph_plot(x0, y0, color, left, top, right, bottom))
+            plotted++;
+        if (x0 == x1 && y0 == y1)
+            break;
+        int64_t e2 = err * 2;
+        if (e2 >= dy) { err += dy; x0 += sx; }
+        if (e2 <= dx) { err += dx; y0 += sy; }
+        if (++i > 16384)
+            break;
+    }
+    return plotted != 0;
 }
 
 /* ZealOS GrPlot(dc,x,y) or bring-up GrPlot(x,y,color).

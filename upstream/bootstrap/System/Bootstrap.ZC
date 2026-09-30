@@ -32,6 +32,13 @@ extern I64 ZcFbTextSpan(I64 x, I64 y, I64 len, I64 attr, U8 *data,
                         U32 *text_base, I64 stride);
 extern I64 ZcFbTextCellsDrawn();
 extern I64 ZcFbTextPixel(I64 x, I64 y);
+extern I64 ZcFbScreenWidth();
+extern I64 ZcFbScreenHeight();
+extern Bool ZcFbGraphPlot(I64 x, I64 y, U32 color,
+                         I64 left, I64 top, I64 right, I64 bottom);
+extern Bool ZcFbGraphLine(I64 x0, I64 y0, I64 x1, I64 y1, U32 color,
+                         I64 step, I64 start,
+                         I64 left, I64 top, I64 right, I64 bottom);
 extern Bool ZcFbTextChar(I64 x, I64 y, U32 cell, Bool allow_border,
                          I64 left_right, I64 top_bottom,
                          U32 *text_base, I64 stride);
