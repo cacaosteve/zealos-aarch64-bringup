@@ -1728,3 +1728,20 @@ ZealOS live distribution or installer.
   KeyDev probe path for eyes-on confirmation. DolDoc `DocPutKey` registration
   and interrupt-driven input remain later work; this slice replaces the bridge
   text `PutKey` once the module is loaded.
+
+## Unchanged DolDoc `DocBin` / `DocNew` / `DocPutKey`
+
+- The unchanged pinned `System/DolDoc/DocBin.ZC`, `DocNew.ZC`, and
+  `DocPutKey.ZC` load after `KernelA.HH`, `KernelB.HH`, `SerialDev/Message.ZC`,
+  `Job.ZC`, and `KeyDev.ZC` (DocNew after DocBin; DocPutKey after DocNew).
+- Bootstrap closes the DocBin↔DocNew cycle with stub `DocLock`/`DocUnlock`/
+  `DocRead`/`DocDel`/`DocTop`, supplies `StrLastRemove`/`StrOcc`/`StrLastOcc`/
+  bounded `Str2I64`, `StrCompare`, `RawPrint`, `BreakLock`/`BreakUnlock`,
+  `DocPut`, zeroed `doldoc`, `blkdev.tmp_filename`, and `EdLeftClickLink`.
+  Host binds `MSize2` (aliased to requested `MSize`) and `LBtc`. DocPutKey
+  also needs thin stubs for edit/clip/God/AC/Win helpers and
+  `char_bmp_printable` until those modules load.
+- Disposable probes confirm each module prints `zc: loaded …`. KeyDev
+  regression still returns `0x2a`. `KeyDevAdd(&KDDocPutKey, …)` registration
+  and a live put_doc remain later work; interrupt-driven input is still out of
+  scope.

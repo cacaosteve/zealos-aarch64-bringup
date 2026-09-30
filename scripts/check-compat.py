@@ -188,6 +188,20 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 command('zload /Kernel/SerialDev/Message.ZC',
                         'zc: loaded /Kernel/SerialDev/Message.ZC')
                 command('zload /Kernel/Job.ZC', 'zc: loaded /Kernel/Job.ZC')
+            if args.probe_module in ('/System/DolDoc/DocPutKey.ZC',
+                                         '/System/DolDoc/DocNew.ZC',
+                                         '/System/DolDoc/DocBin.ZC'):
+                command('zload /Kernel/SerialDev/Message.ZC',
+                        'zc: loaded /Kernel/SerialDev/Message.ZC')
+                command('zload /Kernel/Job.ZC', 'zc: loaded /Kernel/Job.ZC')
+                command('zload /Kernel/KeyDev.ZC', 'zc: loaded /Kernel/KeyDev.ZC')
+            if args.probe_module in ('/System/DolDoc/DocNew.ZC',
+                                         '/System/DolDoc/DocPutKey.ZC'):
+                command('zload /System/DolDoc/DocBin.ZC',
+                        'zc: loaded /System/DolDoc/DocBin.ZC')
+            if args.probe_module == '/System/DolDoc/DocPutKey.ZC':
+                command('zload /System/DolDoc/DocNew.ZC',
+                        'zc: loaded /System/DolDoc/DocNew.ZC')
             guest.stdin.write(('zload '+args.probe_module+'\r').encode())
             guest.stdin.flush()
             result = until(b'\n> ')
@@ -235,6 +249,15 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                         'zc: loaded /Tests/TaskOriginalKeyDev.ZC')
                 command('zcall TaskOriginalKeyDevChecks',
                         'zc => 0x000000000000002a')
+            if args.probe_module == '/System/DolDoc/DocBin.ZC':
+                if 'zc: loaded /System/DolDoc/DocBin.ZC' not in result:
+                    raise RuntimeError('unchanged DocBin.ZC did not load')
+            if args.probe_module == '/System/DolDoc/DocNew.ZC':
+                if 'zc: loaded /System/DolDoc/DocNew.ZC' not in result:
+                    raise RuntimeError('unchanged DocNew.ZC did not load')
+            if args.probe_module == '/System/DolDoc/DocPutKey.ZC':
+                if 'zc: loaded /System/DolDoc/DocPutKey.ZC' not in result:
+                    raise RuntimeError('unchanged DocPutKey.ZC did not load')
             raise SystemExit(0)
         if args.probe_task_jobs:
             command('zload /Kernel/KernelA.HH', 'zc: loaded /Kernel/KernelA.HH')

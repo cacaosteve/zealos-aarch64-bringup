@@ -511,7 +511,10 @@ size_t fread(void *d, size_t w, size_t n, FILE *f) {
 }
 
 static int64_t host_malloc(int64_t *a) {
+    /* ZealOS MAlloc(size, mem_task=NULL). Task-specific heaps are not wired
+     * yet; ignore mem_task and allocate on the current fiber/data heap. */
     CHeapCtrl *owner = guest_task_bound ? &guest_fibers[guest_current].heap_owner : &data_heap;
+    (void)a[1];
     return (int64_t)(uintptr_t)__AIWNIOS_MAlloc(a[0], owner);
 }
 static int64_t host_free(int64_t *a) {
@@ -2022,6 +2025,10 @@ static int64_t host_lbtr(int64_t *a) {
     unsigned char mask = (unsigned char)(1u << ((uint64_t)a[1] & 7));
     return !!(__atomic_fetch_and(bit_byte(a), (unsigned char)~mask, __ATOMIC_SEQ_CST) & mask);
 }
+static int64_t host_lbtc(int64_t *a) {
+    unsigned char mask = (unsigned char)(1u << ((uint64_t)a[1] & 7));
+    return !!(__atomic_fetch_xor(bit_byte(a), mask, __ATOMIC_SEQ_CST) & mask);
+}
 static int64_t host_lbequal(int64_t *a) {
     unsigned char mask = (unsigned char)(1u << ((uint64_t)a[1] & 7));
     if (a[2])
@@ -2280,6 +2287,7 @@ static void bind_guest_task(void) {
     PrsBindCSymbol("Bt", host_bt, 2);
     PrsBindCSymbol("LBts", host_lbts, 2);
     PrsBindCSymbol("LBtr", host_lbtr, 2);
+    PrsBindCSymbol("LBtc", host_lbtc, 2);
     PrsBindCSymbol("LBEqual", host_lbequal, 3);
     PrsBindCSymbol("BEqual", host_bequal, 3);
     PrsBindCSymbol("QueueInit", host_queue_init, 1);
@@ -2698,7 +2706,9 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
         const char *name;
         int64_t (*fn)(int64_t *);
         int arity;
-    } bindings[] = {{"MAlloc", host_malloc, 1}, {"Free", host_free, 1},  {"MSize", host_msize, 1},
+    } bindings[] = {{"MAlloc", host_malloc, 2}, {"Free", host_free, 1},  {"MSize", host_msize, 1},
+                    /* MSize2 is ZealOS internal size; alias requested size for now. */
+                    {"MSize2", host_msize, 1},
                     {"MemCopy", host_copy, 3},  {"MemSet", host_set, 3}, {"SwapI64", host_swap, 2},
                     {"Puts", host_puts, 1}, {"ZcTaskSpawn", host_task_spawn, 1},
                     {"ZcTaskYield", host_task_yield, 0}, {"ZcTaskRun", host_task_run, 0},

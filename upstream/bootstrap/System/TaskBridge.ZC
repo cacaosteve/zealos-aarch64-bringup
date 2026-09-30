@@ -142,12 +142,12 @@ I64 BootstrapStrLen(U8 *source)
         length++;
     return length;
 }
-U8 *StrNew(U8 *source)
+U8 *StrNew(U8 *source, CTask *mem_task=NULL)
 {
     I64 bytes = 1;
     if (source)
         bytes = BootstrapStrLen(source) + 1;
-    U8 *result = MAlloc(bytes);
+    U8 *result = MAlloc(bytes, mem_task);
     if (source)
         MemCopy(result, source, bytes);
     else
@@ -160,9 +160,9 @@ U0 StrCopy(U8 *dest, U8 *source)
 }
 // Pinned Job.ZC allocates jobs on the System heap. Until Mem/MAllocFree.ZC
 // loads, map those helpers onto the current task heap used by MAlloc.
-U8 *CAlloc(I64 size)
+U8 *CAlloc(I64 size, CTask *mem_task=NULL)
 {
-    U8 *result = MAlloc(size);
+    U8 *result = MAlloc(size, mem_task);
     if (result)
         MemSet(result, 0, size);
     return result;
@@ -175,7 +175,7 @@ U8 *SysStrNew(U8 *buf)
 {
     return StrNew(buf);
 }
-U8 *MAllocIdent(U8 *src)
+U8 *MAllocIdent(U8 *src, CTask *mem_task=NULL)
 {
     I64 size;
     U8 *result;
@@ -183,7 +183,7 @@ U8 *MAllocIdent(U8 *src)
     if (!src)
         return NULL;
     size = MSize(src);
-    result = MAlloc(size);
+    result = MAlloc(size, mem_task);
     MemCopy(result, src, size);
     return result;
 }
@@ -272,6 +272,593 @@ U0 User(U8 *fmt=NULL, ...)
 U0 LFBFlush()
 {
 }
+// DolDoc StdOut document. Until DocDblBuf.ZC loads, report no put_doc.
+CDoc *DocPut(CTask *task=NULL)
+{
+    CDoc *res;
+
+    if (!task)
+        task = Fs;
+    if (Bt(&task->task_flags, TASKf_INPUT_FILTER_TASK))
+        task = task->parent_task;
+    if ((res = task->put_doc) && res->doc_signature == DOC_SIGNATURE_VAL)
+        return res;
+    return NULL;
+}
+// DocNew.ZC DocLock uses these around exclusive doc ownership. Pending breaks
+// are not delivered until a debugger/Ctrl-Alt-C path exists.
+Bool BreakLock(CTask *task=NULL)
+{
+    if (!task)
+        task = Fs;
+    return !LBts(&task->task_flags, TASKf_BREAK_LOCKED);
+}
+Bool BreakUnlock(CTask *task=NULL)
+{
+    Bool res;
+
+    if (!task)
+        task = Fs;
+    res = LBtr(&task->task_flags, TASKf_BREAK_LOCKED);
+    LBtr(&task->task_flags, TASKf_PENDING_BREAK);
+    return res;
+}
+// MakeDoc.ZC owns the real doldoc tables; zeroed defaults let DocNew compile.
+class CDolDocGlobals
+{
+    CHashTable	*hash;
+    I64			 default_de_flags			[DOCT_TYPES_NUM],
+                 type_flags_nontag_invis	[(DOCT_TYPES_NUM + 63) / 64],
+                 type_flags_form 			[(DOCT_TYPES_NUM + 63) / 64],
+                 type_flags_data 			[(DOCT_TYPES_NUM + 63) / 64],
+                 type_flags_chk_dup			[(DOCT_TYPES_NUM + 63) / 64],
+                 clean_scan_codes			[4];
+    I32			 default_type_flags			[DOCT_TYPES_NUM];
+} doldoc;
+// KDebug.ZC RawPrint flashes a message; bridge sends it to the text console.
+U0 RawPrint(I64 mS=100, U8 *format=NULL, ...)
+{
+    if (mS) {}
+    if (format)
+        Print(format);
+}
+I64 StrCompare(U8 *s1, U8 *s2)
+{
+    I64 i = 0;
+
+    if (!s1)
+        s1 = "";
+    if (!s2)
+        s2 = "";
+    while (s1[i] && s1[i] == s2[i])
+        i++;
+    return s1[i] - s2[i];
+}
+// DocNew.ZC owns the real DocLock/DocUnlock; stubs break the DocBin↔DocNew
+// load cycle until both modules are present.
+Bool DocLock(CDoc *doc)
+{
+    if (!doc)
+        return FALSE;
+    if (!Bt(&doc->locked_flags, DOClf_LOCKED) || doc->owning_task != Fs)
+    {
+        while (LBts(&doc->locked_flags, DOClf_LOCKED))
+            Yield;
+        if (doc->owning_task != Fs)
+            LBEqual(&doc->flags, DOCf_BREAK_UNLOCKED, BreakLock(Fs));
+        doc->owning_task = Fs;
+        return TRUE;
+    }
+    return FALSE;
+}
+Bool DocUnlock(CDoc *doc)
+{
+    Bool unlock_break;
+
+    if (!doc)
+        return FALSE;
+    if (Bt(&doc->locked_flags, DOClf_LOCKED) && doc->owning_task == Fs)
+    {
+        doc->owning_task = NULL;
+        unlock_break = Bt(&doc->flags, DOCf_BREAK_UNLOCKED);
+        LBtr(&doc->locked_flags, DOClf_LOCKED);
+        if (unlock_break)
+            BreakUnlock(Fs);
+        return TRUE;
+    }
+    return FALSE;
+}
+// StrA helpers used by DocBinPtrReset before Kernel/StrA.ZC loads.
+I64 StrOcc(U8 *src, I64 ch)
+{
+    I64 i = 0;
+
+    if (!src)
+        return 0;
+    while (*src)
+        if (*src++ == ch)
+            i++;
+    return i;
+}
+U8 *StrLastOcc(U8 *src, U8 *marker)
+{
+    I64 ch;
+    U8 *res = NULL;
+
+    if (!src || !marker)
+        return NULL;
+    while (ch = *src++)
+        if (StrOcc(marker, ch))
+            res = src - 1;
+    return res;
+}
+U8 *StrLastRemove(U8 *src, U8 *marker, U8 *dst=NULL)
+{
+    U8 *ptr;
+
+    if (!src)
+        return dst;
+    if (ptr = StrLastOcc(src, marker))
+    {
+        if (dst)
+            StrCopy(dst, ptr + 1);
+        *ptr = 0;
+    }
+    else
+    {
+        if (dst)
+            StrCopy(dst, src);
+        *src = 0;
+    }
+    return dst;
+}
+// Bounded Str2I64 for DocBin tag/num suffixes; full StrScan.ZC comes later.
+I64 Str2I64(U8 *st, I64 radix=10, U8 **_end_ptr=NULL)
+{
+    Bool neg = FALSE;
+    I64 ch, res = 0, digit;
+
+    if (!st || radix < 2 || radix > 36)
+    {
+        if (_end_ptr)
+            *_end_ptr = st;
+        return 0;
+    }
+    while (*st == ' ' || *st == '\t')
+        st++;
+    if (*st == '+' || *st == '-')
+        neg = *st++ == '-';
+    if (*st == '0')
+    {
+        st++;
+        ch = *st;
+        if (ch == 'x' || ch == 'X')
+        {
+            radix = 16;
+            st++;
+        }
+        else if (ch == 'b' || ch == 'B')
+        {
+            radix = 2;
+            st++;
+        }
+        else if (ch == 'o' || ch == 'O')
+        {
+            radix = 8;
+            st++;
+        }
+        else if (ch == 'd' || ch == 'D')
+        {
+            radix = 10;
+            st++;
+        }
+        else
+            st--;
+    }
+    while (ch = *st)
+    {
+        if ('0' <= ch <= '9')
+            digit = ch - '0';
+        else if ('A' <= ch <= 'Z')
+            digit = ch - 'A' + 10;
+        else if ('a' <= ch <= 'z')
+            digit = ch - 'a' + 10;
+        else
+            break;
+        if (digit >= radix)
+            break;
+        res = res * radix + digit;
+        st++;
+    }
+    if (_end_ptr)
+        *_end_ptr = st;
+    if (neg)
+        return -res;
+    return res;
+}
+// DocFile.ZC / DocNew.ZC own these; stubs close the DocBin compile cycle.
+CDoc *DocRead(U8 *name=NULL, I64 flags=0)
+{
+    if (name) {}
+    if (flags) {}
+    return NULL;
+}
+U0 DocDel(CDoc *doc)
+{
+    if (doc) {}
+}
+// DocRecalcLib.ZC owns DocTop; stub cursor home without FormFwd/Recalc.
+U0 DocTop(CDoc *doc=NULL)
+{
+    if (!doc && !(doc = DocPut))
+        return;
+    doc->cur_entry = doc->head.next;
+    doc->cur_col = doc->cur_entry->min_col;
+    doc->x = 0;
+    doc->y = 0;
+    doc->line_start_col = 0;
+    doc->top_line_num = 0;
+}
+// BlkDev globals and DocTerm link hook used by DocNew before those modules load.
+CBlkDevGlobals blkdev;
+U0 BootstrapBlkDevGlbls()
+{
+    blkdev.tmp_filename = SysStrNew("~/Tmp.DD");
+}
+BootstrapBlkDevGlbls;
+I64 EdLeftClickLink(CDoc *doc, CDocEntry *doc_e)
+{
+    if (doc) {}
+    if (doc_e) {}
+    return 0;
+}
+// Thin DocPutKey dependency stubs until DolDoc/God/AC/Win modules load.
+Bool DocCaptureUndo(CDoc *doc, Bool force=FALSE)
+{
+    if (doc) {}
+    if (force) {}
+    return FALSE;
+}
+U0 DocUndoRestore(CDoc *doc)
+{
+    if (doc) {}
+}
+U0 DocCollapse(Bool collapse=TRUE, CDoc *doc=NULL)
+{
+    if (collapse) {}
+    if (doc) {}
+}
+U0 DocEntryToggle(CDoc *doc)
+{
+    if (doc) {}
+}
+U0 DocFlagsToggle(CDoc *doc, I64 tog_flags)
+{
+    if (doc) {}
+    if (tog_flags) {}
+}
+U0 DocFormBwd(CDoc *doc, Bool giveup=FALSE)
+{
+    if (doc) {}
+    if (giveup) {}
+}
+U0 DocFormFwd(CDoc *doc, Bool giveup=FALSE)
+{
+    if (doc) {}
+    if (giveup) {}
+}
+U8 *DocEntryLink(CDoc *doc, CDocEntry *doc_e)
+{
+    if (doc) {}
+    if (doc_e) {}
+    return NULL;
+}
+U8 *DocLinkFile(U8 *str)
+{
+    if (str) {}
+    return NULL;
+}
+I64 DocMenu(CDoc *m, I64 dof_flags=0)
+{
+    if (m) {}
+    if (dof_flags) {}
+    return 0;
+}
+U0 DocPrint(CDoc *doc=NULL, U8 *format=NULL, ...)
+{
+    if (doc) {}
+    if (format) {}
+}
+U0 DocPrintPartial(CDoc *doc=NULL, U8 *format=NULL, ...)
+{
+    if (doc) {}
+    if (format) {}
+}
+Bool DocWrite(CDoc *doc, Bool prompt=FALSE)
+{
+    if (doc) {}
+    if (prompt) {}
+    return FALSE;
+}
+U0 EdCharIns(I64 ch, I64 sc, CDoc *doc)
+{
+    if (ch) {}
+    if (sc) {}
+    if (doc) {}
+}
+U0 EdCharDel(CDoc *doc)
+{
+    if (doc) {}
+}
+U0 EdLineDown(CDoc *doc, I64 sc=I64_MIN)
+{
+    if (doc) {}
+    if (sc) {}
+}
+U0 EdLineUp(CDoc *doc, I64 sc=I64_MIN)
+{
+    if (doc) {}
+    if (sc) {}
+}
+U0 EdLineDel(CDoc *doc)
+{
+    if (doc) {}
+}
+U0 EdCursorLeft(CDoc *doc, I64 sc=I64_MIN)
+{
+    if (doc) {}
+    if (sc) {}
+}
+U0 EdCursorRight(CDoc *doc, I64 sc=I64_MIN)
+{
+    if (doc) {}
+    if (sc) {}
+}
+U0 EdFindNext(CDoc *doc)
+{
+    if (doc) {}
+}
+Bool EdFindPaired(CDoc *doc, U8 plus, U8 minus, Bool forward,
+                  Bool abort_on_dbl_colon=FALSE)
+{
+    if (doc) {}
+    if (plus) {}
+    if (minus) {}
+    if (forward) {}
+    if (abort_on_dbl_colon) {}
+    return FALSE;
+}
+I64 EdFindReplace(CDoc *doc)
+{
+    if (doc) {}
+    return 0;
+}
+U0 EdGoToLine(CDoc *doc)
+{
+    if (doc) {}
+}
+U0 EdCodeTools(CDoc *doc)
+{
+    if (doc) {}
+}
+U0 EdMacroUtil()
+{
+}
+U0 PlaySysMacro(I64 n=1)
+{
+    if (n) {}
+}
+U0 EdSpriteEd(CDoc *doc)
+{
+    if (doc) {}
+}
+U0 EdSpriteIns(CDoc *doc)
+{
+    if (doc) {}
+}
+Bool Ed(U8 *link_st=NULL, I64 edf_dof_flags=0)
+{
+    if (link_st) {}
+    if (edf_dof_flags) {}
+    return FALSE;
+}
+U0 ClipCopy(CDoc *doc)
+{
+    if (doc) {}
+}
+U0 ClipCut(CDoc *doc)
+{
+    if (doc) {}
+}
+U0 ClipPaste(CDoc *doc)
+{
+    if (doc) {}
+}
+Bool AutoComplete(Bool val=OFF)
+{
+    return val;
+}
+U0 ACDDef(I64 n, CTask *parent=NULL)
+{
+    if (n) {}
+    if (parent) {}
+}
+U0 ACDFillin(I64 n)
+{
+    if (n) {}
+}
+U0 ACFillIn(I64 n)
+{
+    if (n) {}
+}
+U0 ACMan(I64 n, CTask *parent_task=NULL)
+{
+    if (n) {}
+    if (parent_task) {}
+}
+U8 *Char2KeyName(I64 ch, Bool include_ctrl=TRUE)
+{
+    if (ch) {}
+    if (include_ctrl) {}
+    return StrNew("");
+}
+CDirContext *DirContextNew(U8 *mask, Bool make_mask=FALSE,
+                           Bool make_dirs=FALSE, Bool no_warn=FALSE)
+{
+    if (mask) {}
+    if (make_mask) {}
+    if (make_dirs) {}
+    if (no_warn) {}
+    return NULL;
+}
+U0 DirContextDel(CDirContext *dirc, Bool restore=TRUE)
+{
+    if (dirc) {}
+    if (restore) {}
+}
+U8 *DirFile(U8 *dirname, U8 *name=NULL, U8 *ext=NULL)
+{
+    if (dirname) {}
+    if (name) {}
+    if (ext) {}
+    return NULL;
+}
+Bool FileFind(U8 *filename, CDirEntry *_de=NULL, I64 fuf_flags=0)
+{
+    if (filename) {}
+    if (_de) {}
+    if (fuf_flags) {}
+    return FALSE;
+}
+U8 *FileNameAbs(U8 *filename, I64 fuf_flags=0)
+{
+    if (filename) {}
+    if (fuf_flags) {}
+    return NULL;
+}
+U0 GodBitsInsert(I64 num_bits, I64 bit_field)
+{
+    if (num_bits) {}
+    if (bit_field) {}
+}
+I64 KbdMouseEventTime()
+{
+    return 0;
+}
+U0 GodDoodle(U8 *hex=NULL)
+{
+    if (hex) {}
+}
+U0 GodSong()
+{
+}
+U0 GodBiblePassage(I64 num_lines=20)
+{
+    if (num_lines) {}
+}
+U0 GodWord(I64 bits=17)
+{
+    if (bits) {}
+}
+U0 FifoU8Flush(CFifoU8 *f)
+{
+    if (f) {}
+}
+Bool PopUpCancelOk(U8 *header=NULL, U8 *footer=NULL)
+{
+    if (header) {}
+    if (footer) {}
+    return FALSE;
+}
+Bool PopUpOk(U8 *header=NULL, U8 *footer=NULL)
+{
+    if (header) {}
+    if (footer) {}
+    return TRUE;
+}
+I64 PopUpFile(U8 *filename, Bool warn_ext=TRUE, CTask *parent=NULL,
+              CTask **_pu_task=NULL)
+{
+    if (filename) {}
+    if (warn_ext) {}
+    if (parent) {}
+    if (_pu_task) {}
+    return 0;
+}
+U8 *PopUpPickDir()
+{
+    return NULL;
+}
+U8 *PopUpPickFile()
+{
+    return NULL;
+}
+I64 Run(U8 *filename, I64 mem_task=NULL)
+{
+    if (filename) {}
+    if (mem_task) {}
+    return 0;
+}
+I64 SysFile(U8 *filename, Bool warn_ext=TRUE)
+{
+    if (filename) {}
+    if (warn_ext) {}
+    return 0;
+}
+U0 SysMacroStripKey(CJob *macro_head, I64 arg1, I64 arg2)
+{
+    if (macro_head) {}
+    if (arg1) {}
+    if (arg2) {}
+}
+Bool WinBorder(Bool val=OFF, CTask *task=NULL)
+{
+    if (val) {}
+    if (task) {}
+    return val;
+}
+CBlkDev *DriveIsWritable(U8 drv_let=0, Bool except=FALSE)
+{
+    if (drv_let) {}
+    if (except) {}
+    return NULL;
+}
+U0 EdInsWidgetWiz()
+{
+}
+U0 FileMgr()
+{
+}
+U0 FindWiz()
+{
+}
+// GodExterns.ZC globals used by DocPutKey F7 handlers.
+#define GOD_BAD_BITS	4
+#define GOD_GOOD_BITS	24
+class CGodGlobals
+{
+    U8		**words,
+            *word_file_mask;
+    I64		 word_fuf_flags,
+             word_count;
+    CFifoU8	*fifo;
+    U8		*doodle_dc;
+    I64		 doodle_ch;
+    CFifoU8	*doodle_fifo;
+    Bool	 doodle_done;
+} god;
+U0 BootstrapGodGlbls()
+{
+    MemSet(&god, 0, sizeof(CGodGlobals));
+}
+BootstrapGodGlbls;
+// StrA.ZC char bitmaps; printable is required by DocPutKey before StrA loads.
+U32 char_bmp_printable[16] =
+{
+    0x80002600, 0xFFFFFFFF, 0xFFFFFFFF, 0x7FFFFFFF,
+    0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF,
+    0, 0, 0, 0, 0, 0, 0, 0
+};
 // Minimal text/CPU stand-ins referenced by Ctrl-Alt hooks in KeyDevInit.
 // Gs() is host-bound to bootstrap_gs; CCPU layout only needs idle_task here.
 class CBootstrapTextGlbls
