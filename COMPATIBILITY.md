@@ -1757,3 +1757,15 @@ ZealOS live distribution or installer.
   &KDDocPutKey, &KDDocPutS, 0x80000000, TRUE)` and confirms the entry is
   queued at that priority (`0x2a`). A live `put_doc` StdOut path and Adam
   remain later work.
+
+## Unchanged DolDoc `DocDblBuf` + live `put_doc`
+
+- The unchanged pinned `System/DolDoc/DocDblBuf.ZC` loads after DocPutS and
+  replaces the bridge `DocPut` with the upstream put/display/border helpers.
+- Bootstrap `Raw(Bool)` clears `DISPLAYf_NOT_RAW` so KDRaw handlers stop
+  consuming StdOut. The disposable smoke creates `DocNew`, assigns
+  `Fs->put_doc`/`display_doc`, registers `KDDocPutKey`/`KDDocPutS`, and
+  `DocPrint`s `"Hi"` into the live document (`0x2a`).
+- `PutS` → `KDDocPutS` → `DocPrintPartial` still traps on this bridge (empty
+  docs and append path); use `DocPrint`/`DocPutS` until that is fixed. Adam /
+  `DocTermNew` remain later work.

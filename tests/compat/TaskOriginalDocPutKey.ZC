@@ -1,21 +1,46 @@
-// Smoke: register unchanged KDDocPutKey/KDDocPutS on the KeyDev chain.
+// Smoke: live put_doc StdOut via DocNew + DocPrint + KeyDevAdd.
+// PutS→KDDocPutS→DocPrintPartial still traps on this bridge (follow-up).
 I64 TaskOriginalDocPutKeyChecks()
 {
-    CKeyDevEntry *entry, *tmp;
+    CDoc *doc;
+    CDocEntry *entry;
+    CKeyDevEntry *tmp;
 
     KeyDevInit;
-    entry = KeyDevAdd(&KDDocPutKey, &KDDocPutS, 0x80000000, TRUE);
-    if (!entry)
+    doc = DocNew;
+    if (!doc || doc->doc_signature != DOC_SIGNATURE_VAL)
         return 1;
-    if (entry->priority != 0x80000000)
+    doc->user_put_data = NULL;
+    doc->user_put_key = NULL;
+    doc->user_put_s = NULL;
+    Fs->put_doc = Fs->display_doc = doc;
+    if (DocPut != doc)
         return 2;
-    // Walk the put_key queue for the registered priority.
+    Raw(OFF);
+    if (IsRaw)
+        return 3;
+    if (!KeyDevAdd(&KDDocPutKey, &KDDocPutS, 0x80000000, TRUE))
+        return 4;
     tmp = keydev.put_key_head.next;
     while (tmp != &keydev.put_key_head)
     {
-        if (tmp == entry)
-            return 42;
+        if (tmp->priority == 0x80000000)
+            break;
         tmp = tmp->next;
     }
-    return 3;
+    if (tmp == &keydev.put_key_head)
+        return 5;
+
+    // DocPrint → DocPutS is the empty-doc StdOut path MakeDoc eventually needs.
+    DocPrint(doc, "Hi");
+    entry = doc->head.next;
+    if (entry == doc)
+        return 6;
+    if (entry->type_u8 != DOCT_TEXT)
+        return 7;
+    if (!entry->tag || entry->tag[0] != 'H' || entry->tag[1] != 'i')
+        return 8;
+    if (DocPut->head.next->tag[0] != 'H')
+        return 9;
+    return 42;
 }

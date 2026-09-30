@@ -15,7 +15,8 @@
     "src/System/DolDoc/DocBin.ZC": "fa839e325468dd9620f297986d93011fbf957aa7e39975dd0368c7bb08abaa8a",
     "src/System/DolDoc/DocNew.ZC": "c766c2ee0f15895d2ef85de6e9105e69c423b9bee52e315c28dc3727bad23770",
     "src/System/DolDoc/DocPutKey.ZC": "8d8b3ac197a72684a44fa3729d702fd7eacabf7e11c14e863f9cb8b80c606ae3",
-    "src/System/DolDoc/DocPutS.ZC": "a621903949d94fb28cb93de999306ce13a6698e1546d094819a7170171adb7d4"
+    "src/System/DolDoc/DocPutS.ZC": "a621903949d94fb28cb93de999306ce13a6698e1546d094819a7170171adb7d4",
+    "src/System/DolDoc/DocDblBuf.ZC": "c8c9573b766ba7b213f8c19d8fe36dbbc22fec1017b860050d565845ae940148"
   },
   "changes": []
 }

@@ -44,6 +44,13 @@ Bool IsRaw()
 {
     return !(Fs->display_flags & (1 << DISPLAYf_NOT_RAW));
 }
+// KMisc.ZC Raw toggles BLACK & WHITE direct-screen mode. LFBFlush is a no-op
+// on this bridge and is defined later; the flag alone switches PutKey/PutS off
+// the KDRaw handlers.
+Bool Raw(Bool val)
+{
+    return !LBEqual(&Fs->display_flags, DISPLAYf_NOT_RAW, !val);
+}
 // The raw-cursor cadence in Message.ZC divides TSCGet by this frequency.
 // The bridge fills it from the ARM generic timer's CNTFRQ_EL0.
 extern CCountsGlobals counts;
