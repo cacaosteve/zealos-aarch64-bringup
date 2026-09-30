@@ -1852,14 +1852,16 @@ ZealOS live distribution or installer.
   `PutKey` output now also goes into a bounded per-task text buffer and is
   replayed inside that task's window during redraw; the smoke verifies a child
   task's glyph survives an overlapping redraw. Serial output remains mirrored.
-  The C bootstrap shell still writes directly to the framebuffer and is not
-  yet backed by a task document or retained task cells. `TextBorder` draws the upstream CP437
-  single- and double-line glyphs through `TextChar`. A bootstrap
+  The C bootstrap shell also keeps a separate retained text buffer; a full
+  task redraw composes that shell buffer first, then draws visible task windows
+  over it. Its normal writes remain immediate. `TextBorder` draws the upstream
+  CP437 single- and double-line glyphs through `TextChar`. A bootstrap
   `GrUpdateTaskWin` clears one task's cell rectangle, draws its border, and
   asks `DocUpdateTaskDocs` to recalculate its DolDocs. `GrUpdateTasks` clears
   one frame and redraws up to 64 visible tasks by walking the ZealOS task ring
   in its back-to-front order, then presents the composed cell plane; an
   overlapping two-task smoke verifies that the later task covers the earlier
   one. The renderer still lacks draw callbacks, controls, the uncovered-window
-  bitmap, and upstream `gr.text_base` semantics. Source matching, forms/data formatting,
-  sprites/depth buffers, music state, and cursor interaction remain unaccepted.
+  bitmap, and upstream `gr.text_base` semantics. Source matching, forms/data
+  formatting, sprites/depth buffers, music state, and cursor interaction remain
+  unaccepted.

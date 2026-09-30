@@ -1624,6 +1624,7 @@ U0 GrUpdateTasks()
         return;
 
     TextRect(0, TEXT_COLS - 1, 0, TEXT_ROWS - 1, 0x0800);
+    ZcFbShellTextCompose;
     bootstrap_batch_redraw = TRUE;
     task = root;
     do

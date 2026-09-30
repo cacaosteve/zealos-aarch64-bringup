@@ -2,6 +2,7 @@
 extern I64 ZcFbTextCellsDrawn();
 extern I64 ZcFbTextPixel(I64 x, I64 y);
 extern I64 ZcFbTextFlush();
+extern I64 ZcFbShellTextCompose();
 
 U0 WindowRedrawPark(U8 *data)
 {
@@ -63,6 +64,7 @@ I64 TaskOriginalDocRecalcChecks()
     Fs->win_top = 0; Fs->win_bottom = 24;
     Fs->win_width = 80; Fs->win_height = 25;
     Fs->scroll_x = Fs->scroll_y = 0;
+    TextRect(0, 79, 0, 24, 0x0800);
     entry->de_flags = DOCEF_TAG;
     doc->flags |= DOCF_PLAIN_TEXT;
     if (!DocRecalc(doc, RECALCt_NORMAL))
@@ -255,6 +257,14 @@ I64 TaskOriginalDocRecalcChecks()
         Fs->win_inhibit = old_win_inhibit;
         Fs->text_attr = old_text_attr;
         return 101;
+    }
+    if (!ZcFbShellTextCompose())
+    {
+        Kill(overlap);
+        Fs->display_flags = old_display_flags;
+        Fs->win_inhibit = old_win_inhibit;
+        Fs->text_attr = old_text_attr;
+        return 102;
     }
     if (!Kill(overlap))
     {

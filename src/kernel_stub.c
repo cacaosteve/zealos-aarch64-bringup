@@ -214,7 +214,8 @@ static uint8_t g_fb_text_valid[ZEAL_TEXT_MAX_COLS * ZEAL_TEXT_MAX_ROWS];
 /* Retained character output for the small cooperative guest-task bridge.
  * Cells are task-local so a z-order redraw can restore them after clearing
  * the shared text plane. */
-#define FB_TASK_TEXT_SLOTS 6
+#define FB_TASK_TEXT_SLOTS 7
+#define FB_SHELL_TEXT_SLOT 6
 #define FB_TASK_TEXT_CELLS (ZEAL_TEXT_MAX_COLS * ZEAL_TEXT_MAX_ROWS)
 static uint32_t g_fb_task_text[FB_TASK_TEXT_SLOTS][FB_TASK_TEXT_CELLS];
 static uint8_t g_fb_task_text_valid[FB_TASK_TEXT_SLOTS][FB_TASK_TEXT_CELLS];
@@ -621,8 +622,9 @@ static int fb_task_text_bounds(int64_t left, int64_t right, int64_t top,
            right < ZEAL_TEXT_MAX_COLS && bottom < ZEAL_TEXT_MAX_ROWS;
 }
 
-static void fb_task_text_present(unsigned slot, int64_t left, int64_t top,
-                                 int64_t width, int64_t height) {
+static uint64_t fb_task_text_present(unsigned slot, int64_t left, int64_t top,
+                                     int64_t width, int64_t height) {
+    uint64_t drawn = 0;
     for (int64_t y = 0; y < height; y++) {
         for (int64_t x = 0; x < width; x++) {
             size_t local = (size_t)y * ZEAL_TEXT_MAX_COLS + (size_t)x;
@@ -635,8 +637,10 @@ static void fb_task_text_present(unsigned slot, int64_t left, int64_t top,
             g_fb_text_valid[index] = 1;
             fb_text_present_cell((uint32_t)col, (uint32_t)row, cell);
             g_zc_text_cells_drawn++;
+            drawn++;
         }
     }
+    return drawn;
 }
 
 void zeal_fb_task_text_reset(unsigned slot) {
@@ -749,14 +753,29 @@ uint64_t zeal_fb_task_text_compose(unsigned slot, int64_t left, int64_t right,
     int64_t width = right - left + 1, height = bottom - top + 1;
     if (width > ZEAL_TEXT_MAX_COLS || height > ZEAL_TEXT_MAX_ROWS)
         return 0;
-    fb_task_text_present(slot, left, top, width, height);
-    return 1;
+    return fb_task_text_present(slot, left, top, width, height);
+}
+
+uint64_t zeal_fb_shell_text_compose(void) {
+    int64_t cols = g_fb_cols < ZEAL_TEXT_MAX_COLS
+        ? g_fb_cols : ZEAL_TEXT_MAX_COLS;
+    int64_t rows = g_fb_rows < ZEAL_TEXT_MAX_ROWS
+        ? g_fb_rows : ZEAL_TEXT_MAX_ROWS;
+    if (!cols || !rows)
+        return 0;
+    return zeal_fb_task_text_compose(FB_SHELL_TEXT_SLOT, 0, cols - 1,
+                                     0, rows - 1);
 }
 
 static void fb_putc(char ch) {
     if (!g_fb) {
         return;
     }
+    char cell[2] = {ch, 0};
+    (void)zeal_fb_task_text_write(FB_SHELL_TEXT_SLOT, 0,
+        g_fb_cols < ZEAL_TEXT_MAX_COLS ? g_fb_cols - 1 : ZEAL_TEXT_MAX_COLS - 1,
+        0, g_fb_rows < ZEAL_TEXT_MAX_ROWS ? g_fb_rows - 1 : ZEAL_TEXT_MAX_ROWS - 1,
+        0x0f, cell);
     if (ch == '\n') {
         g_fb_cx = 0;
         if (++g_fb_cy >= g_fb_rows) {
@@ -789,6 +808,10 @@ static void con_backspace(void) {
     if (!g_fb) {
         return;
     }
+    (void)zeal_fb_task_text_write(FB_SHELL_TEXT_SLOT, 0,
+        g_fb_cols < ZEAL_TEXT_MAX_COLS ? g_fb_cols - 1 : ZEAL_TEXT_MAX_COLS - 1,
+        0, g_fb_rows < ZEAL_TEXT_MAX_ROWS ? g_fb_rows - 1 : ZEAL_TEXT_MAX_ROWS - 1,
+        0x0f, "\b");
     if (g_fb_cx) {
         g_fb_cx--;
     } else if (g_fb_cy) {

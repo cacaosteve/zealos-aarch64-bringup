@@ -194,6 +194,7 @@ extern uint64_t zeal_fb_task_text_write(unsigned slot, int64_t left,
 extern uint64_t zeal_fb_task_text_compose(unsigned slot, int64_t left,
                                            int64_t right, int64_t top,
                                            int64_t bottom);
+extern uint64_t zeal_fb_shell_text_compose(void);
 static void guest_task_text_output(const char *text);
 static int64_t execute_source_result(const char *path, const char *src,
                                      int return_expr, int record_answer);
@@ -1295,6 +1296,10 @@ static int64_t host_fb_task_text_compose(int64_t *a) {
         *(int64_t *)(task + guest_win_right_off),
         *(int64_t *)(task + guest_win_top_off),
         *(int64_t *)(task + guest_win_bottom_off));
+}
+static int64_t host_fb_shell_text_compose(int64_t *a) {
+    (void)a;
+    return (int64_t)zeal_fb_shell_text_compose();
 }
 static int focused_key_wait_pending(void) {
     struct guest_fiber *focus = find_guest_task(guest_focus_task);
@@ -2898,7 +2903,8 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
                     {"ZcFbTextFill", host_fb_text_fill, 6},
                     {"ZcFbTextRect", host_fb_text_rect, 5},
                     {"ZcFbTextFlush", host_fb_text_flush, 0},
-                    {"ZcFbTaskTextCompose", host_fb_task_text_compose, 1}};
+                    {"ZcFbTaskTextCompose", host_fb_task_text_compose, 1},
+                    {"ZcFbShellTextCompose", host_fb_shell_text_compose, 0}};
     for (size_t i = 0; i < sizeof(bindings) / sizeof(*bindings); i++)
         PrsBindCSymbol((char *)bindings[i].name, (void *)bindings[i].fn, bindings[i].arity);
     __clear_cache(code_arena, code_arena + sizeof(code_arena));
