@@ -1836,11 +1836,11 @@ ZealOS live distribution or installer.
 - The unchanged 1,543-line `System/DolDoc/DocRecalc.ZC` is pinned from the
   same ZealOS revision and included in the read-only source bundle. It now
   loads unchanged in the guest after the current DolDoc dependency sequence.
-  `TaskOriginalDocRecalcChecks` exercises two `DocRecalcXY` alignment cases and
-  the backward-movement flag, returning `0x2a`.
-- This is only the pure coordinate helper. Full `DocRecalc` execution still
-  needs real WinMgr timing, framebuffer text measurement/drawing, file matching,
-  forms/data formatting, sprite/depth-buffer operations, and music state.
-  `TaskBridge.ZC` currently has explicitly temporary stand-ins for several of
-  those symbols so the unchanged source can compile; the main renderer and
-  multi-window behavior are not accepted.
+  `TaskOriginalDocRecalcChecks` exercises two `DocRecalcXY` alignment cases,
+  the backward-movement flag, and a real `DocRecalc` normal-mode layout of a
+  one-character text entry; it verifies the entry and document bounds and
+  returns `0x2a`.
+- This pass does not draw to the framebuffer. `TaskBridge.ZC` still has
+  temporary text drawing and WinMgr stand-ins, and source matching, forms/data
+  formatting, sprites/depth buffers, music state, cursor interaction, and
+  multi-window rendering remain unaccepted.

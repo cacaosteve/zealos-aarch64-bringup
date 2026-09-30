@@ -1,10 +1,12 @@
-// Smoke the pure coordinate pass from unchanged DocRecalc.ZC.
+// Smoke coordinate math and a plain-text layout pass from unchanged DocRecalc.ZC.
 I64 TaskOriginalDocRecalcChecks()
 {
     CDoc *doc;
     CDocEntry *entry;
-    I64 x, y;
+    I64 x, y, old_left, old_right, old_top, old_bottom;
+    I64 old_width, old_height, old_scroll_x, old_scroll_y;
 
+    DocInit;
     doc = DocNew;
     if (!doc || doc->doc_signature != DOC_SIGNATURE_VAL)
         return 1;
@@ -13,6 +15,10 @@ I64 TaskOriginalDocRecalcChecks()
     entry = doc->head.next;
     if (entry == doc)
         return 2;
+    if (entry->type_u8 != DOCT_TEXT || !entry->tag || entry->tag[0] != 'x')
+        return 8;
+    if (!(entry->de_flags & DOCEF_TAG))
+        return 9;
 
     entry->de_flags = DOCEF_MARGIN_REL_X | DOCEF_LEFT_X | DOCEF_TOP_Y;
     x = 0;
@@ -29,5 +35,34 @@ I64 TaskOriginalDocRecalcChecks()
         return 4;
     if (!(doc->flags & DOCF_BWD_MOVEMENT))
         return 5;
+
+    // Run unchanged DocRecalc through a plain-text layout pass. NORMAL
+    // exercises layout without invoking framebuffer or cursor APIs.
+    old_left = Fs->win_left; old_right = Fs->win_right;
+    old_top = Fs->win_top; old_bottom = Fs->win_bottom;
+    old_width = Fs->win_width; old_height = Fs->win_height;
+    old_scroll_x = Fs->scroll_x; old_scroll_y = Fs->scroll_y;
+    Fs->win_left = 0; Fs->win_right = 79;
+    Fs->win_top = 0; Fs->win_bottom = 24;
+    Fs->win_width = 80; Fs->win_height = 25;
+    Fs->scroll_x = Fs->scroll_y = 0;
+    entry->de_flags = DOCEF_TAG;
+    doc->flags |= DOCF_PLAIN_TEXT;
+    if (!DocRecalc(doc, RECALCt_NORMAL))
+        return 6;
+    if (entry->x != 0)
+        return 71;
+    if (entry->y != 0)
+        return 72;
+    if (doc->min_x != 0)
+        return 73;
+    if (doc->min_y != 0)
+        return 74;
+    if (doc->max_x < 1)
+        return 75;
+    Fs->win_left = old_left; Fs->win_right = old_right;
+    Fs->win_top = old_top; Fs->win_bottom = old_bottom;
+    Fs->win_width = old_width; Fs->win_height = old_height;
+    Fs->scroll_x = old_scroll_x; Fs->scroll_y = old_scroll_y;
     return 42;
 }
