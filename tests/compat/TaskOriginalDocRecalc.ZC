@@ -146,6 +146,20 @@ I64 TaskOriginalDocRecalcChecks()
         return 90;
     }
     old_text_cells = ZcFbTextCellsDrawn();
+    TextBorder(Fs, 5, 7, 5, 6, 0x0e, FALSE);
+    if (ZcFbTextCellsDrawn() != old_text_cells + 14)
+    {
+        Fs->display_flags = old_display_flags;
+        return 91;
+    }
+    old_text_cells = ZcFbTextCellsDrawn();
+    TextBorder(Fs, 5, 7, 5, 6, 0x0e, TRUE);
+    if (ZcFbTextCellsDrawn() != old_text_cells + 14)
+    {
+        Fs->display_flags = old_display_flags;
+        return 92;
+    }
+    old_text_cells = ZcFbTextCellsDrawn();
     if (!DocRecalc(doc, RECALCt_TO_SCREEN))
     {
         Fs->display_flags = old_display_flags;

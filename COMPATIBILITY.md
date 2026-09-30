@@ -1847,7 +1847,8 @@ ZealOS live distribution or installer.
   foreground/background attributes. `TextChar` honors the one-cell border
   allowance and static invert/selection/underline flags. These operations
   draw into the current framebuffer directly; they are not yet ZealOS's
-  `gr.text_base`/double-buffered text layer. `TextBorder` and WinMgr remain
-  stand-ins. Source matching, forms/data formatting, sprites/depth buffers,
-  music state, cursor interaction, and multi-window rendering remain
+  `gr.text_base`/double-buffered text layer. `TextBorder` now draws the
+  upstream CP437 single- and double-line box glyphs through `TextChar`. WinMgr
+  remains a stand-in. Source matching, forms/data formatting, sprites/depth
+  buffers, music state, cursor interaction, and multi-window rendering remain
   unaccepted.
