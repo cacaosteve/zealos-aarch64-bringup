@@ -1852,6 +1852,10 @@ ZealOS live distribution or installer.
   `PutKey` output now also goes into a bounded per-task text buffer and is
   replayed inside that task's window during redraw; the smoke verifies a child
   task's glyph survives an overlapping redraw. Serial output remains mirrored.
+  `TextLenStr` and `TextLenAttrStr` now preserve upstream `Bool` results, and
+  `WinHorz`/`WinVert` apply upstream edge normalization and update the task's
+  pixel extents. The same probe checks partial/full left clipping and a resized
+  overlapping task.
   The C bootstrap shell also keeps a separate retained text buffer; a full
   task redraw composes that shell buffer first, then draws visible task windows
   over it. Its normal writes remain immediate. `TextBorder` draws the upstream

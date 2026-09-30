@@ -1523,28 +1523,28 @@ Bool TextChar(CTask *task, Bool allow_border=FALSE, I64 x=0, I64 y=0, I64 d=0)
                         task->win_left | task->win_right << 16,
                         task->win_top | task->win_bottom << 16);
 }
-U0 TextLenStr(CTask *task, I64 x, I64 y, I64 len, I64 attr, U8 *str)
+Bool TextLenStr(CTask *task, I64 x, I64 y, I64 len, I64 attr, U8 *str)
 {
     if (!task || !str || len <= 0)
-        return;
-    ZcFbTextSpan(task->win_left + x + (task->scroll_x >> 3),
-                 task->win_top + y + (task->scroll_y >> 3), len, attr, str, 0,
-                 task->win_left | task->win_right << 16,
-                 task->win_top | task->win_bottom << 16);
+        return FALSE;
+    return ZcFbTextSpan(task->win_left + x + (task->scroll_x >> 3),
+                        task->win_top + y + (task->scroll_y >> 3), len, attr, str, 0,
+                        task->win_left | task->win_right << 16,
+                        task->win_top | task->win_bottom << 16) > 0;
 }
 U0 StrPrint(U8 *dst, U8 *format, ...)
 {
     if (dst)
         dst[0] = 0;
 }
-U0 TextLenAttrStr(CTask *task, I64 x, I64 y, I64 len, U32 *str)
+Bool TextLenAttrStr(CTask *task, I64 x, I64 y, I64 len, U32 *str)
 {
     if (!task || !str || len <= 0)
-        return;
-    ZcFbTextSpan(task->win_left + x + (task->scroll_x >> 3),
-                 task->win_top + y + (task->scroll_y >> 3), len, 0,
-                 str, 1, task->win_left | task->win_right << 16,
-                 task->win_top | task->win_bottom << 16);
+        return FALSE;
+    return ZcFbTextSpan(task->win_left + x + (task->scroll_x >> 3),
+                        task->win_top + y + (task->scroll_y >> 3), len, 0,
+                        str, 1, task->win_left | task->win_right << 16,
+                        task->win_top | task->win_bottom << 16) > 0;
 }
 Bool TextLenAttr(CTask *task, I64 x, I64 y, I64 len, I64 attr)
 {//Direct framebuffer equivalent for empty attributed cells (e.g. line-tail fill).
@@ -1640,11 +1640,98 @@ U0 GrUpdateTasks()
     bootstrap_batch_redraw = FALSE;
     ZcFbTextFlush();
 }
-U0 WinHorz(I64 left, I64 right, CTask *task)
+U0 WinDerivedValsUpdate(CTask *task)
 {
+    if (!task)
+        task = Fs;
+    if (!task)
+        return;
+    task->win_width = task->win_right - task->win_left + 1;
+    task->win_height = task->win_bottom - task->win_top + 1;
+    task->pix_left = FONT_WIDTH * task->win_left;
+    task->pix_right = FONT_WIDTH * (task->win_right + 1) - 1;
+    task->pix_width = task->pix_right - task->pix_left + 1;
+    task->pix_top = FONT_HEIGHT * task->win_top;
+    task->pix_bottom = FONT_HEIGHT * (task->win_bottom + 1) - 1;
+    task->pix_height = task->pix_bottom - task->pix_top + 1;
 }
-U0 WinVert(I64 top, I64 bottom, CTask *task)
+Bool WinHorz(I64 left, I64 right, CTask *task=NULL)
 {
+    I64 d = right - left;
+    if (!task)
+        task = Fs;
+    if (!TaskValidate(task))
+        return FALSE;
+    if (d < 0)
+        d = 0;
+    if (left >= TEXT_COLS)
+    {
+        left = TEXT_COLS - 1;
+        right = left + d;
+    }
+    if (right < 0)
+    {
+        right = 0;
+        left = right - d;
+    }
+    if (left > right)
+    {
+        if (left > 0)
+            right = left;
+        else
+            left = right;
+    }
+    PUSHFD
+    CLI
+    if (task->win_left != left || task->win_right != right)
+    {
+        task->win_left = left;
+        task->win_right = right;
+        WinDerivedValsUpdate(task);
+        POPFD
+        return TRUE;
+    }
+    POPFD
+    return FALSE;
+}
+Bool WinVert(I64 top, I64 bottom, CTask *task=NULL)
+{
+    I64 d = bottom - top;
+    if (!task)
+        task = Fs;
+    if (!TaskValidate(task))
+        return FALSE;
+    if (d < 0)
+        d = 0;
+    if (top >= TEXT_ROWS)
+    {
+        top = TEXT_ROWS - 1;
+        bottom = top + d;
+    }
+    if (bottom <= 0)
+    {
+        bottom = 1;
+        top = bottom - d;
+    }
+    if (top > bottom)
+    {
+        if (top >= 0)
+            bottom = top;
+        else
+            top = bottom;
+    }
+    PUSHFD
+    CLI
+    if (task->win_top != top || task->win_bottom != bottom)
+    {
+        task->win_top = top;
+        task->win_bottom = bottom;
+        WinDerivedValsUpdate(task);
+        POPFD
+        return TRUE;
+    }
+    POPFD
+    return FALSE;
 }
 U0 WinScrollNull(CTask *task, CD3I64 *s)
 {

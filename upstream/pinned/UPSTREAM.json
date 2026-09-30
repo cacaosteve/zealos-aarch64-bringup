@@ -2,6 +2,7 @@
   "repository": "https://github.com/Zeal-Operating-System/ZealOS",
   "commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
   "files": {
+    "src/Kernel/Display.ZC": "ed49f65321f39edeeacd342da5c0836588e438435d67194ee49eb741fdc5c727",
     "src/Kernel/Job.ZC": "712893a3ff33df3f862baea1ec5624c9dfb9e167d696e6a6d9b7c2dabb66181b",
     "src/Kernel/KMathB.ZC": "1d249c72ef21eb75eb492f6aaa8cd3885ef085635a06bab8c26af55ced10ba33",
     "src/Kernel/KTask.ZC": "35d8f62c20b25e1661fb1bfa28315feac13b86fcce34e3a684b049a66e06b2ea",
@@ -13,16 +14,24 @@
     "src/Kernel/Sched.ZC": "fb9c25e6ad76dbfd8cd79ea1f7defda37c21253216e51eff9bc43167c37bec4f",
     "src/Kernel/SerialDev/Message.ZC": "041a9fecf89822455ce82aca70c489b4c90be36d11718a5f961e1846dc2b2585",
     "src/System/DolDoc/DocBin.ZC": "fa839e325468dd9620f297986d93011fbf957aa7e39975dd0368c7bb08abaa8a",
+    "src/System/DolDoc/DocDblBuf.ZC": "c8c9573b766ba7b213f8c19d8fe36dbbc22fec1017b860050d565845ae940148",
+    "src/System/DolDoc/DocHighlight.ZC": "8c5ecbb367f59d2d8ce1e2673c22796e655bacb01dd3771b7474be1807fa3b80",
+    "src/System/DolDoc/DocInit.ZC": "559c5e3ab13908a58dbccca89df3f7a2b979dbf3d20e8ca41d8b7df1d8ff69d7",
     "src/System/DolDoc/DocNew.ZC": "c766c2ee0f15895d2ef85de6e9105e69c423b9bee52e315c28dc3727bad23770",
+    "src/System/DolDoc/DocPlain.ZC": "504fe11c55a49820103d58202b73eaf907f16f6d10ba2471d08a95cc4f89bbde",
     "src/System/DolDoc/DocPutKey.ZC": "8d8b3ac197a72684a44fa3729d702fd7eacabf7e11c14e863f9cb8b80c606ae3",
     "src/System/DolDoc/DocPutS.ZC": "a621903949d94fb28cb93de999306ce13a6698e1546d094819a7170171adb7d4",
-    "src/System/DolDoc/DocDblBuf.ZC": "c8c9573b766ba7b213f8c19d8fe36dbbc22fec1017b860050d565845ae940148",
-    "src/System/DolDoc/DocTerm.ZC": "1c75278926832c7460b58cf1b88e843cd9b9628c42805fe2a83ce861b4641081",
-    "src/System/DolDoc/DocInit.ZC": "559c5e3ab13908a58dbccca89df3f7a2b979dbf3d20e8ca41d8b7df1d8ff69d7",
-    "src/System/DolDoc/DocPlain.ZC": "504fe11c55a49820103d58202b73eaf907f16f6d10ba2471d08a95cc4f89bbde",
+    "src/System/DolDoc/DocRecalc.ZC": "b26ac3f2402711fa867214d38fc3456ed44afa3fc83f4124758c92835b985758",
     "src/System/DolDoc/DocRecalcLib.ZC": "9c9358d5231de546b18f017e44e59f370f800b94fba672cb3b0331724646198c",
-    "src/System/DolDoc/DocHighlight.ZC": "8c5ecbb367f59d2d8ce1e2673c22796e655bacb01dd3771b7474be1807fa3b80",
-    "src/System/DolDoc/DocRecalc.ZC": "b26ac3f2402711fa867214d38fc3456ed44afa3fc83f4124758c92835b985758"
+    "src/System/DolDoc/DocTerm.ZC": "1c75278926832c7460b58cf1b88e843cd9b9628c42805fe2a83ce861b4641081",
+    "src/System/Gr/Gr.HH": "7ba721b5ea45efb885a43dcdca91d5ef78e32d94c5853bb6d5af974d60b22a15",
+    "src/System/Gr/GrAsm.ZC": "72de1d8394c4f7ab71cda83ee247a6dd4eaae86d8d87452cbf371d6396c19be7",
+    "src/System/Gr/GrGlobals.ZC": "74ecf2417eea32f89af1f575a4522c44801506dd651b4bdd193051732fe61ace",
+    "src/System/Gr/GrScreen.ZC": "92e814c13c830932be98d3c6ace518edeb3cd89b92fc65ed0cf5b14a4e849186",
+    "src/System/Gr/GrTextBase.ZC": "532f1ff9e44f07952adbf49d4733d6ae9699b519b9544c938839940f5d02f966",
+    "src/System/Gr/MakeGr.ZC": "0519937e1f43cc3634252bd5a6ea39997934f4a6c913a994a3ce8d2c0ca73bbd",
+    "src/System/Win.ZC": "5366052a69f2c0cd5fe035210d89b22b71c1ebf596462b4fa9a9451db605c540",
+    "src/System/WinMgr.ZC": "9dc78a33cd27921260667b7273f9869816e6de58f4cc7b04773f7840b9fcd79d"
   },
   "changes": []
 }

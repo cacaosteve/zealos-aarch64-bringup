@@ -3,6 +3,10 @@
 Progress is measured by running **ZealOS / ZealC sources** with minimal rewrite,
 not by growing bring-up-only demos.
 
+The native graphics/window-manager source map and current port boundary are in
+[`GRAPHICS-PORT.md`](GRAPHICS-PORT.md); the referenced original graphics files
+are hash-pinned under `pinned/`.
+
 ## Milestone 1 — application (done)
 
 | Item | Path |

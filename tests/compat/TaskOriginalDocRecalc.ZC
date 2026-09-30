@@ -94,6 +94,13 @@ I64 TaskOriginalDocRecalcChecks()
         Fs->display_flags = old_display_flags;
         return 80;
     }
+    if (!TextLenStr(Fs, -1, 4, 2, WHITE << 8, "AB") ||
+        TextLenStr(Fs, -3, 4, 2, WHITE << 8, "AB") ||
+        ZcFbTextPixel(1, 32) != 0x00ffffff || ZcFbTextPixel(0, 32) != 0)
+    {
+        Fs->display_flags = old_display_flags;
+        return 103;
+    }
     old_text_cells = ZcFbTextCellsDrawn();
     attr_cells[0] = 0x0e00 | 'A';
     attr_cells[1] = 0x0400 | 'B';
@@ -102,6 +109,13 @@ I64 TaskOriginalDocRecalcChecks()
     {
         Fs->display_flags = old_display_flags;
         return 79;
+    }
+    if (!TextLenAttrStr(Fs, -1, 5, 2, attr_cells) ||
+        TextLenAttrStr(Fs, -3, 5, 2, attr_cells) ||
+        ZcFbTextPixel(1, 40) != 0x00aa0000)
+    {
+        Fs->display_flags = old_display_flags;
+        return 104;
     }
     if (ZcFbTextPixel(33, 18) != 0x00ffff55)
     {
@@ -225,9 +239,17 @@ I64 TaskOriginalDocRecalcChecks()
     Fs->display_flags = (1 << DISPLAYf_SHOW) | (1 << DISPLAYf_NO_BORDER);
     Fs->win_inhibit |= 1 << WIF_SELF_DOC;
     Fs->text_attr = 0x40;
-    overlap->win_left = 10; overlap->win_right = 29;
-    overlap->win_top = 10; overlap->win_bottom = 19;
-    overlap->win_width = 20; overlap->win_height = 10;
+    if (!WinHorz(10, 29, overlap) || !WinVert(10, 19, overlap) ||
+        overlap->win_width != 20 || overlap->win_height != 10 ||
+        overlap->pix_left != 80 || overlap->pix_right != 239 ||
+        overlap->pix_top != 80 || overlap->pix_bottom != 159)
+    {
+        Kill(overlap);
+        Fs->display_flags = old_display_flags;
+        Fs->win_inhibit = old_win_inhibit;
+        Fs->text_attr = old_text_attr;
+        return 105;
+    }
     overlap->display_flags = (1 << DISPLAYf_SHOW) | (1 << DISPLAYf_NO_BORDER);
     overlap->win_inhibit |= 1 << WIF_SELF_DOC;
     overlap->text_attr = 0x20;
