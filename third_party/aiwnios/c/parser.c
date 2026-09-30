@@ -2960,14 +2960,16 @@ CHashClass *PrsType(CCmpCtrl *ccmp, CHashClass *base, char **name,
 //  array's data directy
 //
 char *PrsArray(CCmpCtrl *ccmp, CHashClass *base, CArrayDim *dim,
-               char *write_to) {
+               char *write_to, int allow_implicit_open) {
   CMemberLst *cur_mem;
   int64_t i, cap, ptr_width = base->sz;
   char *string;
   if (dim)
     if (dim->next)
       ptr_width *= dim->next->total_cnt;
-  if (ccmp->lex->cur_tok != '{') {
+  if (ccmp->lex->cur_tok == '{') {
+    Lex(ccmp->lex);
+  } else if (!(dim && allow_implicit_open)) {
     if (dim) {
       if (base->raw_type == RT_U8i && ccmp->lex->cur_tok == TK_STR) {
         cap = dim->cnt;
@@ -3004,12 +3006,11 @@ char *PrsArray(CCmpCtrl *ccmp, CHashClass *base, CArrayDim *dim,
       }
     }
     return write_to + ptr_width;
-  } else
-    Lex(ccmp->lex);
+  }
   if (dim) {
     cap = dim->cnt;
     for (i = 0; i != cap; i++) {
-      write_to = PrsArray(ccmp, base, dim->next, write_to);
+      write_to = PrsArray(ccmp, base, dim->next, write_to, 0);
       if (ccmp->lex->cur_tok != ',') {
         if (i + 1 == cap) {
           // I64 arr[3]={1,2,3,};
@@ -3022,7 +3023,7 @@ char *PrsArray(CCmpCtrl *ccmp, CHashClass *base, CArrayDim *dim,
   } else {
     for (cur_mem = base->members_lst; cur_mem; cur_mem = cur_mem->next) {
       PrsArray(ccmp, cur_mem->member_class, cur_mem->dim.next,
-               write_to + cur_mem->off);
+               write_to + cur_mem->off, 0);
       if (ccmp->lex->cur_tok != ',') {
         if (!cur_mem->next) {
           // class {I64 a,b,c;}={1,2,3,};
@@ -3279,7 +3280,8 @@ int64_t PrsDecl(CCmpCtrl *ccmp, CHashClass *base, CHashClass *add_to,
       static_array: // Also applies to classes
         lst->static_bytes =
             A_CALLOC(lst->dim.total_cnt * lst->member_class->sz, NULL);
-        PrsArray(ccmp, lst->member_class, lst->dim.next, lst->static_bytes);
+        PrsArray(ccmp, lst->member_class, lst->dim.next, lst->static_bytes,
+                 !(flags & PRSF_FUN_ARGS) && ccmp->lex->cur_tok != '{');
       }
     } else if (add_to) { // TODO is a local???
       Lex(ccmp->lex);
@@ -3355,9 +3357,9 @@ int64_t PrsDecl(CCmpCtrl *ccmp, CHashClass *base, CHashClass *add_to,
       SysSymImportsResolve(glbl_var->base.str, 0);
     if (ccmp->lex->cur_tok == '=') {
       Lex(ccmp->lex);
-      if (ccmp->lex->cur_tok == '{') {
+      if (ccmp->lex->cur_tok == '{' || glbl_var->dim.next) {
         PrsArray(ccmp, glbl_var->var_class, glbl_var->dim.next,
-                 glbl_var->data_addr);
+                 glbl_var->data_addr, ccmp->lex->cur_tok != '{');
       } else {
         *(rpn = A_CALLOC(sizeof(CRPN), NULL)) = (CRPN){
             .type = IC_GLOBAL,

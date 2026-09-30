@@ -40,6 +40,9 @@ Port changes:
 - Reject FS/GS accesses: task segment semantics are not implemented here.
 - Emit declaration-time stores for complete one-dimensional local scalar array
   brace initializers, so values can come from the current call frame.
+- Accept ZealOS file-scope array lists that omit the opening brace while still
+  requiring the upstream closing brace; nested aggregate initializers retain
+  the normal brace rules.
 - Do not use `ic_class-1` / `ic_class[-1]` on function-pointer types: those are
   single `CHashFun` objects, not the `CHashClass` star array. Indexing
   `U0 (**fp)(I64)` (as in KeyDev's ctrl-alt table) keeps `RT_FUNC` and uses

@@ -1,0 +1,33 @@
+// Smoke the pure coordinate pass from unchanged DocRecalc.ZC.
+I64 TaskOriginalDocRecalcChecks()
+{
+    CDoc *doc;
+    CDocEntry *entry;
+    I64 x, y;
+
+    doc = DocNew;
+    if (!doc || doc->doc_signature != DOC_SIGNATURE_VAL)
+        return 1;
+    Fs->put_doc = Fs->display_doc = doc;
+    DocPrint(doc, "x");
+    entry = doc->head.next;
+    if (entry == doc)
+        return 2;
+
+    entry->de_flags = DOCEF_MARGIN_REL_X | DOCEF_LEFT_X | DOCEF_TOP_Y;
+    x = 0;
+    y = 5;
+    DocRecalcXY(doc, entry, 3, 0, 40, 20, 2, 38, 7, 5, &x, &y);
+    if (x != 2 || y != 5)
+        return 3;
+
+    entry->de_flags = DOCEF_RIGHT_X;
+    x = 0;
+    y = 5;
+    DocRecalcXY(doc, entry, 3, 0, 40, 20, 2, 38, 7, 5, &x, &y);
+    if (x != 44 || y != 5)
+        return 4;
+    if (!(doc->flags & DOCF_BWD_MOVEMENT))
+        return 5;
+    return 42;
+}

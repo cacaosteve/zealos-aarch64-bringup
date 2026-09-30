@@ -1,0 +1,123 @@
+// Smoke unchanged DocHighlight syntax colors and state across source chunks.
+I64 TaskOriginalDocHighlightArgProbe(U32 *out, U8 *src, I64 len, I64 attr)
+{
+    out[0] = src[0] + len + attr;
+    return 42;
+}
+
+I64 TaskOriginalDocHighlightControlProbe(I64 state, I64 len)
+{
+    I64 count = 0;
+    switch [state]
+    {
+        case DOCSS_NORMAL:
+            while (len)
+            {
+                count++;
+                len--;
+            }
+            return count;
+    }
+    return 0;
+}
+
+I64 TaskOriginalDocHighlightChecks()
+{
+    CDoc *doc;
+    CDocEntry *doc_e;
+    U32 *colored;
+    U32 *arg_probe;
+    U8 *src;
+    I64 i, attr;
+
+    doc = DocNew;
+    if (!doc || doc->doc_signature != DOC_SIGNATURE_VAL)
+        return 1;
+    Fs->put_doc = Fs->display_doc = doc;
+    DocPrint(doc, "seed");
+    doc_e = doc->head.next;
+    if (doc_e == doc)
+        return 2;
+    doc_e->settings.state = DOCSS_NORMAL;
+    if (doc_e->settings.state != DOCSS_NORMAL)
+        return 80;
+    src = MAlloc(8);
+    if (!src)
+        return 3;
+
+    src[0] = '4'; src[1] = '2'; src[2] = 0;
+    if (src[0] != '4' || src[1] != '2')
+        return 81;
+    arg_probe = MAlloc(sizeof(U32));
+    if (!arg_probe)
+        return 82;
+    if (TaskOriginalDocHighlightArgProbe(arg_probe, src, 2, 0) != 42 ||
+        arg_probe[0] != '4' + 2)
+        return 83;
+    Free(arg_probe);
+    if (TaskOriginalDocHighlightControlProbe(DOCSS_NORMAL, 2) != 2)
+        return 84;
+    attr = DOC_COLOR_NUMBER << 8;
+    colored = DocHighlight(doc_e, src, 2, 0);
+    if (!colored)
+        return 4;
+    if (colored[0] != '4' + attr)
+        return 5;
+    if (colored[1] != '2' + attr)
+        return 6;
+    if (colored[2])
+        return 7;
+    Free(colored);
+
+    src[0] = 'x'; src[1] = 'q'; src[2] = 'z';
+    src[3] = 'z'; src[4] = 'y'; src[5] = 0;
+    colored = DocHighlight(doc_e, src, 5, 0x1234);
+    if (!colored || colored[0] != 'x' + 0x1234 || colored[4] != 'y' + 0x1234 || colored[5])
+        return 4;
+    Free(colored);
+
+    src[0] = '/'; src[1] = '*'; src[2] = 'x';
+    src[3] = '/'; src[4] = '*'; src[5] = 0;
+    colored = DocHighlight(doc_e, src, 5, 0);
+    if (!colored)
+        return 5;
+    attr = DOC_COLOR_COMMENT << 8;
+    for (i = 0; i < 5; i++)
+        if (colored[i] != src[i] + attr)
+            return 6;
+    if (doc_e->settings.state != DOCSS_COMMENT || doc_e->settings.comment_depth != 2)
+        return 7;
+    Free(colored);
+    src[0] = 'y'; src[1] = '*'; src[2] = '/';
+    src[3] = 'z'; src[4] = '*'; src[5] = '/'; src[6] = 0;
+    colored = DocHighlight(doc_e, src, 6, 0);
+    if (!colored)
+        return 8;
+    for (i = 0; i < 6; i++)
+        if (colored[i] != src[i] + attr)
+            return 9;
+    if (doc_e->settings.state != DOCSS_NORMAL || doc_e->settings.comment_depth)
+        return 10;
+    Free(colored);
+
+    src[0] = '"'; src[1] = 'a'; src[2] = 0;
+    colored = DocHighlight(doc_e, src, 2, 0);
+    if (!colored)
+        return 11;
+    attr = DOC_COLOR_STR << 8;
+    if (colored[0] != '"' + attr || colored[1] != 'a' + attr ||
+        doc_e->settings.state != DOCSS_DBL_QUOTE)
+        return 12;
+    Free(colored);
+    src[0] = 'b'; src[1] = '"'; src[2] = 0;
+    colored = DocHighlight(doc_e, src, 2, 0);
+    if (!colored)
+        return 13;
+    attr = DOC_COLOR_CHAR_CONST << 8;
+    if (colored[0] != 'b' + attr || colored[1] != '"' + attr ||
+        doc_e->settings.state != DOCSS_NORMAL)
+        return 14;
+    Free(colored);
+    Free(src);
+    return 42;
+}

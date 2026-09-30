@@ -1278,6 +1278,63 @@ U0 FileMgr()
 U0 FindWiz()
 {
 }
+// One framebuffer is shared by this bootstrap shell, so cross-window DC aliasing is identity.
+CDC *DCAlias(CDC *dc, CTask *task=NULL)
+{
+    return dc;
+}
+U0 DCReset(CDC *dc)
+{
+}
+U0 DCDel(CDC *dc)
+{
+}
+U0 DCDepthBufAlloc(CDC *dc)
+{
+}
+I64 SpriteTypeMask(U8 *sprite)
+{
+    return 0;
+}
+U0 Mat4x4IdentEqu(I64 *matrix)
+{
+}
+U0 Mat4x4RotX(I64 *matrix, F64 angle)
+{
+}
+U0 Mat4x4RotY(I64 *matrix, F64 angle)
+{
+}
+U0 Mat4x4RotZ(I64 *matrix, F64 angle)
+{
+}
+U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
+{
+}
+#define SPT_FLOOD_FILL 0
+#define SPT_FLOOD_FILL_NOT 1
+#define SPT_MESH 2
+#define SPT_SHIFTABLE_MESH 3
+#define SPT_TYPES_NUM 4 // Placeholder ordinals for the absent sprite subsystem.
+// Minimal graphics globals for parsing DolDoc layout; these are not a screen/window manager.
+#define TEXT_COLS 100 // Current bootstrap framebuffer: 800x600 at 8x8 text cells.
+#define TEXT_ROWS 75
+class CBootstrapGraphicsGlobals
+{
+    CDC *dc2;
+    U8 *empty_sprite;
+    U32 *text_base;
+} gr;
+// Minimal timing state for DocRecalc's refresh throttle; WinMgr is not bootstrapped.
+CWinMgrGlobals winmgr;
+// Music playback is not part of the bootstrap; DocRecalc only tracks its current song tag.
+class CBootstrapMusicGlobals
+{
+    U8 *cur_song;
+} music;
+U0 MusicSettingsReset()
+{
+}
 // GodExterns.ZC globals used by DocPutKey F7 handlers.
 #define GOD_BAD_BITS	4
 #define GOD_GOOD_BITS	24
@@ -1298,6 +1355,10 @@ U0 BootstrapGodGlbls()
     MemSet(&god, 0, sizeof(CGodGlobals));
 }
 BootstrapGodGlbls;
+// Temporary clock base for DocRecalc; refreshed from the platform timer later.
+F64 tS = 0;
+// Bootstrap blink phase; the periodic platform timer is not wired into ZC yet.
+Bool Blink = TRUE;
 // StrA.ZC char bitmaps required by DocHighlight/DocPutKey/DocPutS before StrA loads.
 U32 char_bmp_alpha_numeric[16] =
 {
@@ -1339,6 +1400,8 @@ char_bmp_safe_dollar[16] =
     0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF,
     0, 0, 0, 0, 0, 0, 0, 0
 };
+// Layout-only alias; real StrA will supply its own displayability bitmap.
+U32 *char_bmp_displayable = char_bmp_printable;
 // StrA / DocGet / DocRecalc helpers used by DocPutS before those modules load.
 U8 *StrUtil(U8 *_src, I64 flags)
 {
@@ -1454,6 +1517,29 @@ Bool TextChar(CTask *task, Bool allow_border=FALSE, I64 x=0, I64 y=0, I64 d=0)
     if (y) {}
     if (d) {}
     return FALSE;
+}
+U0 TextLenStr(CTask *task, I64 x, I64 y, I64 len, I64 attr, U8 *str)
+{
+}
+U0 StrPrint(U8 *dst, U8 *format, ...)
+{
+    if (dst)
+        dst[0] = 0;
+}
+U0 TextLenAttrStr(CTask *task, I64 x, I64 y, I64 len, U32 *str)
+{
+}
+U0 TextLenAttr(CTask *task, I64 x, I64 y, I64 len, I64 attr)
+{
+}
+U0 TextBorder(CTask *task, I64 x1, I64 x2, I64 y1, I64 y2, U8 color, Bool solid)
+{
+}
+U0 WinHorz(I64 left, I64 right, CTask *task)
+{
+}
+U0 WinVert(I64 top, I64 bottom, CTask *task)
+{
 }
 U0 WinScrollNull(CTask *task, CD3I64 *s)
 {

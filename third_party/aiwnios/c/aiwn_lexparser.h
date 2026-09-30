@@ -444,7 +444,7 @@ extern char *Compile(struct CCmpCtrl *cctrl, int64_t *sz, char **dbg_info,
 void ICFree(CRPN *ic);
 CHashClass *PrsClassNew();
 char *PrsArray(CCmpCtrl *ccmp, CHashClass *base, CArrayDim *dim,
-               char *write_to);
+               char *write_to, int allow_implicit_open);
 int64_t PrsFunArgs(CCmpCtrl *ccmp, CHashFun *fun);
 int64_t PrsArrayDim(CCmpCtrl *ccmp, CArrayDim *to);
 double PrsF64(CCmpCtrl *ccmp);

@@ -1815,5 +1815,32 @@ ZealOS live distribution or installer.
   Mid-function `#assert` drains like mid-switch; `*array` member deref works
   for `*doc->filename.name`.
 - `TaskOriginalDocRecalcLibChecks` exercises `DocTop`/`DocBottom`/`DocCenter`,
-  collapse/max/cursor/scroll, and `SqrI64`/`EndianU64` (`0x2a`). Full
-  `DocRecalc`/`DocHighlight` and Adam remain later work.
+  collapse/max/cursor/scroll, and `SqrI64`/`EndianU64` (`0x2a`).
+
+## Unchanged DolDoc `DocHighlight`
+
+- The unchanged pinned `System/DolDoc/DocHighlight.ZC` loads after DocRecalcLib.
+  Its file-scope color table uses ZealC's omitted-opening-brace array syntax;
+  the imported Aiwnios parser now accepts that form for global arrays while
+  still requiring the closing brace. `check-upstream.py` verifies the port
+  patch against the pinned Aiwnios originals and confirms the ZealOS source
+  hashes remain unchanged.
+- `TaskOriginalDocHighlightChecks` is a diagnostic smoke for numeric/fallback
+  colors and comment/string state across chunks. The module loads, but the
+  smoke currently fails at the first numeric output word (zero instead of the
+  expected colored `4`). Four-argument and switch/loop control probes pass, so
+  `DocHighlight` runtime behavior is not accepted yet.
+
+## Upstream `DocRecalc` source target
+
+- The unchanged 1,543-line `System/DolDoc/DocRecalc.ZC` is pinned from the
+  same ZealOS revision and included in the read-only source bundle. It now
+  loads unchanged in the guest after the current DolDoc dependency sequence.
+  `TaskOriginalDocRecalcChecks` exercises two `DocRecalcXY` alignment cases and
+  the backward-movement flag, returning `0x2a`.
+- This is only the pure coordinate helper. Full `DocRecalc` execution still
+  needs real WinMgr timing, framebuffer text measurement/drawing, file matching,
+  forms/data formatting, sprite/depth-buffer operations, and music state.
+  `TaskBridge.ZC` currently has explicitly temporary stand-ins for several of
+  those symbols so the unchanged source can compile; the main renderer and
+  multi-window behavior are not accepted.
