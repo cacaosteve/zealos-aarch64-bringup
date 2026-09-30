@@ -1769,4 +1769,15 @@ ZealOS live distribution or installer.
   member loads (`user_put_s` / `left_click_link`), assigns
   `Fs->put_doc`/`display_doc`, registers `KDDocPutKey`/`KDDocPutS`,
   `DocPrint`s `"Hi"`, then `PutS("!")` through `KDDocPutS`/`DocPrintPartial`
-  (`0x2a`). Adam / `DocTermNew` remain later work.
+  (`0x2a`).
+
+## Unchanged DolDoc `DocTerm` + `DocTermNew`
+
+- The unchanged pinned `System/DolDoc/DocTerm.ZC` loads after DocDblBuf.
+  Bootstrap stubs cover `Ed*CB`, `DocDataFormat`, `MenuFile`, `WinScrollsInit`,
+  `ac`, and the unused TermRightClick helpers until DocEd/Menu/Win load.
+  `ParseDollarCmd` returns a DOCT_ERROR entry so `DocBorderNew` dollar cmds do
+  not NULL-deref before DocPlain/DocInit.
+- `TaskOriginalDocTermChecks` runs `DocTermNew`, confirms put/display/border
+  docs, registers KDDoc handlers, and `DocPrint`/`PutS` into the term doc
+  (`0x2a`). Real dollar-cmd parsing, menus, and Adam remain later work; Aiwnios strings now collapse `$$` to `$` like ZealOS so DocBorderNew formats reach DocPutS.

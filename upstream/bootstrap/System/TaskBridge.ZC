@@ -519,6 +519,14 @@ I64 EdLeftClickLink(CDoc *doc, CDocEntry *doc_e)
     if (doc_e) {}
     return 0;
 }
+// Forward stand-in so DocTermNew can take &TermRightClickLink before the
+// real definition later in DocTerm.ZC (Aiwnios has no same-file forward ref).
+I64 TermRightClickLink(CDoc *doc, CDocEntry *doc_e)
+{
+    if (doc) {}
+    if (doc_e) {}
+    return 0;
+}
 // Thin DocPutKey dependency stubs until DolDoc/God/AC/Win modules load.
 Bool DocCaptureUndo(CDoc *doc, Bool force=FALSE)
 {
@@ -910,9 +918,16 @@ U8 *StrUtil(U8 *_src, I64 flags)
 }
 CDocEntry *ParseDollarCmd(CDoc *doc, U8 *st)
 {
-    if (doc) {}
+    CDocEntry *doc_e;
+
+    // Until DocPlain/DocInit load, invent a full-sized ERROR entry so DocPrint
+    // dollar cmds (DocBorderNew) can set tag_cb/user_data without smashing.
+    if (!doc)
+        return NULL;
     if (st) {}
-    return NULL;
+    doc_e = CAlloc(sizeof(CDocEntry), doc->mem_task);
+    doc_e->type = DOCT_ERROR | doc->settings_head.default_text_attr << 8;
+    return doc_e;
 }
 U8 *DocScanLine(CDoc *doc, CDocEntry *doc_e, I64 *cur_col=NULL,
                 CDocEntry **_do_e_end=NULL)
@@ -1056,4 +1071,173 @@ I64 PopUp(U8 *buf, CTask *parent=NULL, CTask **_pu_task=NULL)
     if (_pu_task)
         *_pu_task = NULL;
     return res;
+}
+// DocTerm.ZC / DocBorderNew dependency stubs until DocEd/DocForm/Menu/Win load.
+CAutoCompleteGlobals ac;
+U8 *EdFilterCB(CDoc *, CDocEntry *doc_e, CTask *mem_task)
+{
+    if (doc_e) {}
+    if (mem_task) {}
+    return StrNew(" ", mem_task);
+}
+U8 *EdOverStrikeCB(CDoc *, CDocEntry *doc_e, CTask *mem_task)
+{
+    if (doc_e) {}
+    if (mem_task) {}
+    return StrNew(" ", mem_task);
+}
+U8 *EdDollarCB(CDoc *, CDocEntry *doc_e, CTask *mem_task)
+{
+    if (doc_e) {}
+    if (mem_task) {}
+    return StrNew(" ", mem_task);
+}
+U8 *EdMoreCB(CDoc *, CDocEntry *doc_e, CTask *mem_task)
+{
+    if (doc_e) {}
+    if (mem_task) {}
+    return StrNew("     ", mem_task);
+}
+U8 *EdDollarTypeCB(CDoc *, CDocEntry *doc_e, CTask *mem_task)
+{
+    if (doc_e) {}
+    if (mem_task) {}
+    return StrNew(" ", mem_task);
+}
+U0 DocDataFormat(CDoc *doc, CDocEntry *doc_e, I64 d=DOCM_CANCEL)
+{
+    if (doc) {}
+    if (doc_e) {}
+    if (d) {}
+}
+CMenu *MenuFile(U8 *filename, I64 flags=0, CTask *task=NULL)
+{
+    if (filename) {}
+    if (flags) {}
+    if (task) {}
+    return NULL;
+}
+U0 WinScrollsInit(CTask *task)
+{
+    if (task) {}
+}
+U0 DocBottom(CDoc *doc=NULL)
+{
+    if (!doc && !(doc = DocPut))
+        return;
+    doc->cur_entry = doc->head.last;
+    if (doc->cur_entry == doc)
+        doc->cur_entry = doc->head.next;
+    doc->cur_col = doc->cur_entry->max_col;
+}
+I64 PopUpMenu(CDoc *doc, I64 dof_flags=0)
+{
+    if (doc) {}
+    if (dof_flags) {}
+    return DOCM_CANCEL;
+}
+I64 PopUpEd(U8 *filename=NULL, CTask *parent=NULL, CTask **_pu_task=NULL)
+{
+    if (filename) {}
+    if (parent) {}
+    if (_pu_task)
+        *_pu_task = NULL;
+    return 0;
+}
+Bool PopUpCancelOk(U8 *header=NULL, U8 *footer=NULL)
+{
+    if (header) {}
+    if (footer) {}
+    return FALSE;
+}
+Bool FilesFindMatch(U8 *_test_name, U8 *files_find_mask, I64 fuf_flags=0)
+{
+    if (_test_name) {}
+    if (files_find_mask) {}
+    if (fuf_flags) {}
+    return FALSE;
+}
+U8 *FileExtDot(U8 *src)
+{
+    U8 *ptr;
+
+    if (!src)
+        return NULL;
+    ptr = src + BootstrapStrLen(src);
+    while (ptr > src)
+    {
+        ptr--;
+        if (*ptr == '.')
+            return ptr;
+        if (*ptr == '/' || *ptr == ':')
+            break;
+    }
+    return NULL;
+}
+U0 WinZBufUpdate()
+{
+}
+I64 ExeFile(U8 *filename, I64 ccf_flags=0)
+{
+    if (filename) {}
+    if (ccf_flags) {}
+    return 0;
+}
+I64 SysFile(U8 *filename, Bool warn_ext=TRUE)
+{
+    if (filename) {}
+    if (warn_ext) {}
+    return 0;
+}
+Bool DocForm(U8 *_d, U8 *class_name=NULL, I64 dof_flags=0,
+             U8 *header=NULL, U8 *footer=NULL)
+{
+    if (_d) {}
+    if (class_name) {}
+    if (dof_flags) {}
+    if (header) {}
+    if (footer) {}
+    return FALSE;
+}
+Bool Copy(U8 *src_files_find_mask, U8 *dst_files_find_mask=".")
+{
+    if (src_files_find_mask) {}
+    if (dst_files_find_mask) {}
+    return FALSE;
+}
+Bool Move(U8 *f1, U8 *f2)
+{
+    if (f1) {}
+    if (f2) {}
+    return FALSE;
+}
+I64 Del(U8 *files_find_mask, Bool make_mask=FALSE, Bool del_dir=FALSE,
+        Bool print_message=TRUE)
+{
+    if (files_find_mask) {}
+    if (make_mask) {}
+    if (del_dir) {}
+    if (print_message) {}
+    return 0;
+}
+Bool Type(U8 *filename, I64 trailing_new_lines=1)
+{
+    if (filename) {}
+    if (trailing_new_lines) {}
+    return FALSE;
+}
+U8 MountFile(U8 *filename)
+{
+    if (filename) {}
+    return 0;
+}
+Bool Plain(U8 *filename, I64 edf_dof_flags=0)
+{
+    if (filename) {}
+    if (edf_dof_flags) {}
+    return FALSE;
+}
+U0 InFile(U8 *filename)
+{
+    if (filename) {}
 }

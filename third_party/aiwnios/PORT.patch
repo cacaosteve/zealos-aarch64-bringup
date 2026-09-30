@@ -1,6 +1,6 @@
 diff -ruN a/c/aiwn_hash.h b/c/aiwn_hash.h
---- a/c/aiwn_hash.h	2026-09-29 18:20:34
-+++ b/c/aiwn_hash.h	2026-09-29 18:20:34
+--- a/c/aiwn_hash.h	2026-09-29 18:48:09
++++ b/c/aiwn_hash.h	2026-09-29 18:48:09
 @@ -35,6 +35,7 @@
  #define HTT_IMPORT_SYS_SYM  0x80
  #define HTT_EXPORT_SYS_SYM  0x100
@@ -10,8 +10,8 @@ diff -ruN a/c/aiwn_hash.h b/c/aiwn_hash.h
  typedef struct CHash {
    struct CHash *next;
 diff -ruN a/c/aiwn_lexparser.h b/c/aiwn_lexparser.h
---- a/c/aiwn_lexparser.h	2026-09-29 18:20:34
-+++ b/c/aiwn_lexparser.h	2026-09-29 18:20:34
+--- a/c/aiwn_lexparser.h	2026-09-29 18:48:09
++++ b/c/aiwn_lexparser.h	2026-09-29 18:48:09
 @@ -40,9 +40,11 @@
    int64_t flags, cur_char;
    int64_t cur_tok;
@@ -42,8 +42,8 @@ diff -ruN a/c/aiwn_lexparser.h b/c/aiwn_lexparser.h
  #  define AIWNIOS_IREG_START     19
  #  define AIWNIOS_IREG_CNT       (27 - 19 + 1)
 diff -ruN a/c/arm_backend.c b/c/arm_backend.c
---- a/c/arm_backend.c	2026-09-29 18:20:34
-+++ b/c/arm_backend.c	2026-09-29 18:20:34
+--- a/c/arm_backend.c	2026-09-29 18:48:09
++++ b/c/arm_backend.c	2026-09-29 18:48:09
 @@ -4473,6 +4473,9 @@
      break;
    case IC_GS:
@@ -65,8 +65,8 @@ diff -ruN a/c/arm_backend.c b/c/arm_backend.c
        PopTmp(cctrl, r);
        r->res.mode = MD_NULL;
 diff -ruN a/c/lex.c b/c/lex.c
---- a/c/lex.c	2026-09-29 18:20:34
-+++ b/c/lex.c	2026-09-29 18:20:33
+--- a/c/lex.c	2026-09-29 18:48:09
++++ b/c/lex.c	2026-09-29 18:48:09
 @@ -9,11 +9,19 @@
  #include <stdint.h>
  #include <stdio.h>
@@ -115,7 +115,24 @@ diff -ruN a/c/lex.c b/c/lex.c
    va_end(lst);
    if (lex->file) {
      fprintf(AIWNIOS_OSTREAM, "WARN %s:%d:%d %s\n", lex->file->filename,
-@@ -267,6 +275,11 @@
+@@ -141,6 +149,16 @@
+   int64_t idx, chr1, hex;
+   for (idx = 0;;) {
+     switch (chr1 = LexAdvChr(lex)) {
++    case '$':
++      /* ZealOS/TempleOS strings encode a literal '$' as "$$". */
++      if (LexAdvChr(lex) == '$') {
++        chr1 = '$';
++        goto ins;
++      }
++      lex->flags |= LEXF_USE_LAST_CHAR;
++      chr1 = '$';
++      goto ins;
++      break;
+     case '\\':
+       switch (chr1 = LexAdvChr(lex)) {
+         break;
+@@ -267,6 +285,11 @@
    case '`':
      return lex->cur_tok = '`';
      break;
@@ -127,7 +144,7 @@ diff -ruN a/c/lex.c b/c/lex.c
    case ';':
      return lex->cur_tok = ';';
      break;
-@@ -340,7 +353,7 @@
+@@ -340,7 +363,7 @@
        fin_f64:
          if (decimal) {
            lex->flt =
@@ -136,7 +153,7 @@ diff -ruN a/c/lex.c b/c/lex.c
          } else
            lex->flt = integer;
          lex->flt *= pow(10, exponet);
-@@ -582,6 +595,7 @@
+@@ -582,6 +605,7 @@
    case '@':
    case 'a' ... 'z':
    case 'A' ... 'Z':
@@ -144,7 +161,7 @@ diff -ruN a/c/lex.c b/c/lex.c
      lex->flags |= LEXF_USE_LAST_CHAR;
      for (;;) {
        switch (chr1 = LexAdvChr(lex)) {
-@@ -591,6 +605,7 @@
+@@ -591,6 +615,7 @@
        case 'a' ... 'z':
        case 'A' ... 'Z':
        case '0' ... '9':
@@ -152,7 +169,7 @@ diff -ruN a/c/lex.c b/c/lex.c
          if (idx + 1 >= STR_LEN) {
            LexErr(lex, "Name is too long.");
            return lex->cur_tok = ERR;
-@@ -632,17 +647,77 @@
+@@ -632,17 +657,77 @@
    case '#':
      if (TK_NAME == Lex(lex)) {
        if (!strcmp(lex->string, "help_file")) {
@@ -233,7 +250,7 @@ diff -ruN a/c/lex.c b/c/lex.c
          lex->flags |= LEXF_UNTIL_NEWLINE;
          CCmpCtrl *cc = CmpCtrlNew(lex);
          char *code;
-@@ -662,6 +737,7 @@
+@@ -662,6 +747,7 @@
          CmpCtrlDel(cc);
          if (ret)
            goto re_enter;
@@ -241,7 +258,7 @@ diff -ruN a/c/lex.c b/c/lex.c
          goto if_fail;
        } else if (!strcmp(lex->string, "ifaot")) {
          // AIWN will only AOT compile for you,the JIT will be
-@@ -756,11 +832,11 @@
+@@ -756,11 +842,11 @@
            actual_file = actual_file->last;
          }
          if (actual_file) {
@@ -255,7 +272,7 @@ diff -ruN a/c/lex.c b/c/lex.c
              dir = __AIWNIOS_StrDup(buf, NULL);
              *strrchr(dir, '/') = 0;
              f = fopen(buf, "rb");
-@@ -798,12 +874,19 @@
+@@ -798,12 +884,19 @@
          lex->file = new_file;
          goto re_enter;
        } else if (!strcmp(lex->string, "define")) {
@@ -277,7 +294,7 @@ diff -ruN a/c/lex.c b/c/lex.c
          strcpy(macro_name, lex->string);
          strcpy(lex->string, "");
          define = A_CALLOC(sizeof(CHashDefineStr), NULL);
-@@ -861,8 +944,7 @@
+@@ -861,8 +954,7 @@
  }
  
  CLexer *LexerNew(char *filename, char *text) {
@@ -287,7 +304,7 @@ diff -ruN a/c/lex.c b/c/lex.c
      struct {
        char *name;
        int64_t tok;
-@@ -925,7 +1007,6 @@
+@@ -925,7 +1017,6 @@
        kw->tk = kws[i].tok;
        HashAdd(kw, Fs->hash_table);
      }
@@ -296,8 +313,8 @@ diff -ruN a/c/lex.c b/c/lex.c
    CLexer *new = A_CALLOC(sizeof(CLexer), NULL);
    new->hc = HeapCtrlInit(NULL, Fs, 0);
 diff -ruN a/c/optpass.c b/c/optpass.c
---- a/c/optpass.c	2026-09-29 18:20:34
-+++ b/c/optpass.c	2026-09-29 18:20:33
+--- a/c/optpass.c	2026-09-29 18:48:09
++++ b/c/optpass.c	2026-09-29 18:48:09
 @@ -21,6 +21,9 @@
      if (rpn->ic_dim->next)
        r *= rpn->ic_dim->next->total_cnt;
@@ -352,8 +369,8 @@ diff -ruN a/c/optpass.c b/c/optpass.c
        break;
      case IC_TO_BOOL:
 diff -ruN a/c/parser.c b/c/parser.c
---- a/c/parser.c	2026-09-29 18:20:34
-+++ b/c/parser.c	2026-09-29 18:20:33
+--- a/c/parser.c	2026-09-29 18:48:09
++++ b/c/parser.c	2026-09-29 18:48:09
 @@ -1986,6 +1986,11 @@
        }
        goto fin;

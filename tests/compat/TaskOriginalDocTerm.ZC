@@ -1,0 +1,40 @@
+// Smoke: DocTermNew installs put/display/border docs for StdOut.
+I64 TaskOriginalDocTermChecks()
+{
+    CDoc *doc;
+    CDocEntry *entry;
+
+    KeyDevInit;
+    DocTermNew;
+    doc = DocPut;
+    if (!doc || doc->doc_signature != DOC_SIGNATURE_VAL)
+        return 1;
+    if (Fs->display_doc != doc)
+        return 2;
+    if (!Fs->border_doc || Fs->border_doc->doc_signature != DOC_SIGNATURE_VAL)
+        return 3;
+    if (doc->desc != 'Term')
+        return 4;
+    if (IsRaw)
+        return 5;
+    if (!KeyDevAdd(&KDDocPutKey, &KDDocPutS, 0x80000000, TRUE))
+        return 6;
+
+    DocPrint(doc, "Hi");
+    entry = doc->head.next;
+    if (entry == doc || entry->type_u8 != DOCT_TEXT)
+        return 7;
+    if (!entry->tag || entry->tag[0] != 'H' || entry->tag[1] != 'i')
+        return 8;
+
+    PutS("!");
+    entry = doc->head.next;
+    if (!entry->tag)
+        return 9;
+    if (entry->tag[0] == 'H' && entry->tag[1] == 'i' && entry->tag[2] == '!')
+        return 42;
+    if (entry->next != doc && entry->next->type_u8 == DOCT_TEXT &&
+        entry->next->tag && entry->next->tag[0] == '!')
+        return 42;
+    return 10;
+}

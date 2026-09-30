@@ -38,6 +38,7 @@ Port changes:
   single `CHashFun` objects, not the `CHashClass` star array. Indexing
   `U0 (**fp)(I64)` (as in KeyDev's ctrl-alt table) keeps `RT_FUNC` and uses
   the funptr's own pointer width.
+- Collapse `$$` to `$` in string/char literals (ZealOS dollar escape).
 - Type multi-star funptrs (`(**fp)(...)`) as `RT_PTR` so member loads are
   kept; only single-star funptrs stay `RT_FUNC`. Otherwise `fp[i]` writes at
   the member's address and smashes adjacent globals.

@@ -149,6 +149,16 @@ static int64_t LexString(CLexer *lex, int64_t till) {
   int64_t idx, chr1, hex;
   for (idx = 0;;) {
     switch (chr1 = LexAdvChr(lex)) {
+    case '$':
+      /* ZealOS/TempleOS strings encode a literal '$' as "$$". */
+      if (LexAdvChr(lex) == '$') {
+        chr1 = '$';
+        goto ins;
+      }
+      lex->flags |= LEXF_USE_LAST_CHAR;
+      chr1 = '$';
+      goto ins;
+      break;
     case '\\':
       switch (chr1 = LexAdvChr(lex)) {
         break;

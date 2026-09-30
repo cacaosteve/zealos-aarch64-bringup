@@ -2152,6 +2152,11 @@ static int64_t host_abs_i64(int64_t *a) {
     /* KernelB declares AbsI64 as _intern IC_ABS_I64; Aiwnios has no that opcode. */
     return a[0] < 0 ? -a[0] : a[0];
 }
+static int64_t host_to_bool(int64_t *a) {
+    /* KernelB declares ToBool as _intern IC_TO_BOOL; bind host until call sites
+     * lower to the IC_TO_BOOL opcode. */
+    return a[0] != 0;
+}
 static int64_t host_to_upper(int64_t *a) {
     int64_t ch = a[0] & 0xff;
     if (ch >= 'a' && ch <= 'z')
@@ -2300,6 +2305,7 @@ static void bind_guest_task(void) {
     PrsBindCSymbol("ToF64", host_to_f64, 1);
     PrsBindCSymbol("ToI64", host_to_i64, 1);
     PrsBindCSymbol("AbsI64", host_abs_i64, 1);
+    PrsBindCSymbol("ToBool", host_to_bool, 1);
     PrsBindCSymbol("ToUpper", host_to_upper, 1);
     PrsBindCSymbol("SwapI64", host_swap, 2);
     PrsBindCSymbol("sys_semas", guest_sys_semas, 0);
