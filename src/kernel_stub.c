@@ -204,6 +204,7 @@ static uint64_t g_fb_w, g_fb_h, g_fb_pitch;
 static uint32_t g_fb_bpp;
 static uint32_t g_fb_cx, g_fb_cy;
 static uint32_t g_fb_cols, g_fb_rows;
+static uint64_t g_zc_text_cells_drawn;
 
 /* BCM2711 PL011 wants 32-bit MMIO; QEMU virt accepts it too. */
 static void uart_write(volatile uint8_t *uart, char c) {
@@ -411,6 +412,64 @@ static void fb_draw_char(uint32_t col, uint32_t row, char ch, uint32_t fg) {
             }
         }
     }
+}
+
+/* Draw a ZealOS packed text span directly into the bootstrap framebuffer.
+ * ZealOS stores the VGA-style foreground in attr[3:0] and background in
+ * attr[7:4], with the character in byte zero of each U32 cell. */
+uint64_t zeal_fb_text_span(int64_t x, int64_t y, int64_t len, uint32_t attr,
+                           const void *data, int mode, int64_t left,
+                           int64_t right, int64_t top, int64_t bottom) {
+    static const uint32_t palette[16] = {
+        0x00000000u, 0x000000aau, 0x0000aa00u, 0x0000aaaau,
+        0x00aa0000u, 0x00aa00aau, 0x00aa5500u, 0x00aaaaaau,
+        0x00555555u, 0x005555ffu, 0x0055ff55u, 0x0055ffffu,
+        0x00ff5555u, 0x00ff55ffu, 0x00ffff55u, 0x00ffffffu,
+    };
+    uint64_t drawn = 0;
+    if (!g_fb || (mode != 0 && mode != 1) || len <= 0 ||
+        y < top || y > bottom || y < 0 ||
+        (uint64_t)y >= g_fb_rows)
+        return 0;
+    if (len > 4096)
+        len = 4096;
+    if (x > INT64_MAX - len || x > right || x + len <= left)
+        return 0;
+    uint64_t colors = (attr >> 8) & 0xffu;
+    uint32_t fg = palette[colors & 15u];
+    uint32_t bg = palette[(colors >> 4) & 15u];
+    for (int64_t i = 0; i < len; i++) {
+        int64_t col = x + i;
+        if (col < left || col > right || col < 0 || (uint64_t)col >= g_fb_cols)
+            continue;
+        uint32_t packed = (uint32_t)attr;
+        unsigned char ch = ' ';
+        if (mode == 0 && data)
+            ch = ((const unsigned char *)data)[i];
+        else if (mode == 1 && data) {
+            packed = ((const uint32_t *)data)[i];
+            ch = (unsigned char)packed;
+        }
+        uint32_t cell_colors = (packed >> 8) & 0xffu;
+        uint32_t cell_fg = mode == 1 ? palette[cell_colors & 15u] : fg;
+        uint32_t cell_bg = mode == 1 ? palette[(cell_colors >> 4) & 15u] : bg;
+        fb_fillrect((uint32_t)col * 8u, (uint32_t)y * 8u, 8u, 8u, cell_bg);
+        if (ch >= 32)
+            fb_draw_char((uint32_t)col, (uint32_t)y, (char)ch, cell_fg);
+        drawn++;
+    }
+    g_zc_text_cells_drawn += drawn;
+    return drawn;
+}
+
+uint64_t zeal_fb_text_cells_drawn(void) {
+    return g_zc_text_cells_drawn;
+}
+
+int64_t zeal_fb_text_pixel(int64_t x, int64_t y) {
+    if (x < INT32_MIN || x > INT32_MAX || y < INT32_MIN || y > INT32_MAX)
+        return -1;
+    return fb_peek((int32_t)x, (int32_t)y);
 }
 
 static void fb_putc(char ch) {

@@ -1,10 +1,14 @@
 // Smoke coordinate math and a plain-text layout pass from unchanged DocRecalc.ZC.
+extern I64 ZcFbTextCellsDrawn();
+extern I64 ZcFbTextPixel(I64 x, I64 y);
 I64 TaskOriginalDocRecalcChecks()
 {
     CDoc *doc;
     CDocEntry *entry;
     I64 x, y, old_left, old_right, old_top, old_bottom;
     I64 old_width, old_height, old_scroll_x, old_scroll_y;
+    I64 old_display_flags, old_text_cells;
+    U32 attr_cells[2];
 
     DocInit;
     doc = DocNew;
@@ -42,6 +46,7 @@ I64 TaskOriginalDocRecalcChecks()
     old_top = Fs->win_top; old_bottom = Fs->win_bottom;
     old_width = Fs->win_width; old_height = Fs->win_height;
     old_scroll_x = Fs->scroll_x; old_scroll_y = Fs->scroll_y;
+    old_display_flags = Fs->display_flags;
     Fs->win_left = 0; Fs->win_right = 79;
     Fs->win_top = 0; Fs->win_bottom = 24;
     Fs->win_width = 80; Fs->win_height = 25;
@@ -60,6 +65,47 @@ I64 TaskOriginalDocRecalcChecks()
         return 74;
     if (doc->max_x < 1)
         return 75;
+    // TO_SCREEN must reach the real bootstrap framebuffer text primitive.
+    // Suppress border/cursor work so this isolates plain DolDoc text output.
+    old_text_cells = ZcFbTextCellsDrawn();
+    Fs->display_flags |= 1 << DISPLAYf_NO_BORDER;
+    TextLenStr(Fs, 1, 2, 1, WHITE << 8, "T");
+    if (ZcFbTextCellsDrawn() <= old_text_cells)
+    {
+        Fs->display_flags = old_display_flags;
+        return 78;
+    }
+    if (ZcFbTextPixel(9, 16) != 0x00ffffff || ZcFbTextPixel(8, 16) != 0)
+    {
+        Fs->display_flags = old_display_flags;
+        return 80;
+    }
+    old_text_cells = ZcFbTextCellsDrawn();
+    attr_cells[0] = 0x0e00 | 'A';
+    attr_cells[1] = 0x0400 | 'B';
+    TextLenAttrStr(Fs, 4, 2, 2, attr_cells);
+    if (ZcFbTextCellsDrawn() < old_text_cells + 2)
+    {
+        Fs->display_flags = old_display_flags;
+        return 79;
+    }
+    if (ZcFbTextPixel(33, 18) != 0x00ffff55)
+    {
+        Fs->display_flags = old_display_flags;
+        return 81;
+    }
+    old_text_cells = ZcFbTextCellsDrawn();
+    if (!DocRecalc(doc, RECALCt_TO_SCREEN))
+    {
+        Fs->display_flags = old_display_flags;
+        return 76;
+    }
+    if (ZcFbTextCellsDrawn() <= old_text_cells)
+    {
+        Fs->display_flags = old_display_flags;
+        return 77;
+    }
+    Fs->display_flags = old_display_flags;
     Fs->win_left = old_left; Fs->win_right = old_right;
     Fs->win_top = old_top; Fs->win_bottom = old_bottom;
     Fs->win_width = old_width; Fs->win_height = old_height;

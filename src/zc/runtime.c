@@ -9,6 +9,13 @@
 #include <stdlib.h>
 #include <string.h>
 
+extern uint64_t zeal_fb_text_span(int64_t x, int64_t y, int64_t len,
+                                  uint32_t attr, const void *data, int mode,
+                                  int64_t left, int64_t right,
+                                  int64_t top, int64_t bottom);
+extern uint64_t zeal_fb_text_cells_drawn(void);
+extern int64_t zeal_fb_text_pixel(int64_t x, int64_t y);
+
 /* Separate arenas from legacy hc_* so its per-demo reset cannot invalidate
  * modules loaded here. Both use splitting/coalescing and arbitrary-order Free. */
 #define DATA_BYTES (16u * 1024u * 1024u)
@@ -558,6 +565,20 @@ static int64_t host_hash_find(int64_t *a) {
 static int64_t host_hash_add(int64_t *a) {
     HashAdd((CHash *)(uintptr_t)a[0], (CHashTable *)(uintptr_t)a[1]);
     return 0;
+}
+static int64_t host_fb_text_span(int64_t *a) {
+    uint32_t lr = (uint32_t)a[6], tb = (uint32_t)a[7];
+    return (int64_t)zeal_fb_text_span(a[0], a[1], a[2], (uint32_t)a[3],
+                                      (const void *)(uintptr_t)a[4], (int)a[5],
+                                      lr & 0xffffu, lr >> 16,
+                                      tb & 0xffffu, tb >> 16);
+}
+static int64_t host_fb_text_cells_drawn(int64_t *a) {
+    (void)a;
+    return (int64_t)zeal_fb_text_cells_drawn();
+}
+static int64_t host_fb_text_pixel(int64_t *a) {
+    return zeal_fb_text_pixel(a[0], a[1]);
 }
 static void set_guest_task(void *p) {
     __asm__ volatile("msr tpidr_el1, %0\n\tisb" : : "r"(p) : "memory");
@@ -2785,7 +2806,10 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
                     {"MemCopy", host_copy, 3},  {"MemSet", host_set, 3}, {"SwapI64", host_swap, 2},
                     {"Puts", host_puts, 1}, {"ZcTaskSpawn", host_task_spawn, 1},
                     {"ZcTaskYield", host_task_yield, 0}, {"ZcTaskRun", host_task_run, 0},
-                    {"ZcTaskResult", host_task_result, 1}};
+                    {"ZcTaskResult", host_task_result, 1},
+                    {"ZcFbTextSpan", host_fb_text_span, 8},
+                    {"ZcFbTextCellsDrawn", host_fb_text_cells_drawn, 0},
+                    {"ZcFbTextPixel", host_fb_text_pixel, 2}};
     for (size_t i = 0; i < sizeof(bindings) / sizeof(*bindings); i++)
         PrsBindCSymbol((char *)bindings[i].name, (void *)bindings[i].fn, bindings[i].arity);
     __clear_cache(code_arena, code_arena + sizeof(code_arena));

@@ -15,6 +15,9 @@
 #define PAUSE ;
 extern U0 RFlagsPush();
 extern U0 RFlagsPop();
+extern I64 ZcFbTextSpan(I64 x, I64 y, I64 len, I64 attr, U8 *data,
+                        I64 mode, I64 left_right, I64 top_bottom);
+extern I64 ZcFbTextCellsDrawn();
 // Poll the current virtio/UART key reader and queue its events for the focus
 // task. PS/2 mouse polling is outside this bridge.
 extern U0 KbdMouseHandler(Bool poll_kbd, Bool poll_mouse);
@@ -1520,6 +1523,12 @@ Bool TextChar(CTask *task, Bool allow_border=FALSE, I64 x=0, I64 y=0, I64 d=0)
 }
 U0 TextLenStr(CTask *task, I64 x, I64 y, I64 len, I64 attr, U8 *str)
 {
+    if (!task || !str || len <= 0)
+        return;
+    ZcFbTextSpan(task->win_left + x + (task->scroll_x >> 3),
+                 task->win_top + y + (task->scroll_y >> 3), len, attr, str, 0,
+                 task->win_left | task->win_right << 16,
+                 task->win_top | task->win_bottom << 16);
 }
 U0 StrPrint(U8 *dst, U8 *format, ...)
 {
@@ -1528,6 +1537,12 @@ U0 StrPrint(U8 *dst, U8 *format, ...)
 }
 U0 TextLenAttrStr(CTask *task, I64 x, I64 y, I64 len, U32 *str)
 {
+    if (!task || !str || len <= 0)
+        return;
+    ZcFbTextSpan(task->win_left + x + (task->scroll_x >> 3),
+                 task->win_top + y + (task->scroll_y >> 3), len, 0,
+                 str, 1, task->win_left | task->win_right << 16,
+                 task->win_top | task->win_bottom << 16);
 }
 U0 TextLenAttr(CTask *task, I64 x, I64 y, I64 len, I64 attr)
 {

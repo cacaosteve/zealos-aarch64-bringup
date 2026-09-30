@@ -25,5 +25,11 @@ extern I64 ZcTaskSpawn(I64 (*entry)());
 extern I64 ZcTaskYield();
 extern I64 ZcTaskRun();
 extern I64 ZcTaskResult(I64 task_num);
+// Direct text-cell output for the freestanding framebuffer bridge. These
+// names must exist before native host symbols are bound during zc_init.
+extern I64 ZcFbTextSpan(I64 x, I64 y, I64 len, I64 attr, U8 *data,
+                        I64 mode, I64 left_right, I64 top_bottom);
+extern I64 ZcFbTextCellsDrawn();
+extern I64 ZcFbTextPixel(I64 x, I64 y);
 // Temporary ARM64 bootstrap binding for the table initialized by upstream KMain.
 extern F64 *pow10_I64;

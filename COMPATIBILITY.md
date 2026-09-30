@@ -1838,9 +1838,14 @@ ZealOS live distribution or installer.
   loads unchanged in the guest after the current DolDoc dependency sequence.
   `TaskOriginalDocRecalcChecks` exercises two `DocRecalcXY` alignment cases,
   the backward-movement flag, and a real `DocRecalc` normal-mode layout of a
-  one-character text entry; it verifies the entry and document bounds and
-  returns `0x2a`.
-- This pass does not draw to the framebuffer. `TaskBridge.ZC` still has
-  temporary text drawing and WinMgr stand-ins, and source matching, forms/data
-  formatting, sprites/depth buffers, music state, cursor interaction, and
-  multi-window rendering remain unaccepted.
+  one-character text entry; it verifies the entry and document bounds. It also
+  runs the unchanged screen-recalc path through framebuffer-backed
+  `TextLenStr` and verifies plain and per-cell attributed text spans are
+  emitted; the full smoke returns `0x2a`.
+- The text bridge clips spans to task bounds, applies task scroll, and maps the
+  packed 16-color foreground/background attributes. It draws into the current
+  framebuffer directly; it is not yet ZealOS's `gr.text_base`/double-buffered
+  text layer. `TextChar`, `TextLenAttr`, `TextBorder`, and WinMgr remain
+  stand-ins. Source matching, forms/data formatting, sprites/depth buffers,
+  music state, cursor interaction, and multi-window rendering remain
+  unaccepted.
