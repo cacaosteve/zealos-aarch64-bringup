@@ -21,6 +21,23 @@ I64 TaskOriginalDocHighlightControlProbe(I64 state, I64 len)
     return 0;
 }
 
+I64 TaskOriginalDocHighlightStateReadProbe(CDocEntry *entry)
+{
+    CDocSettings *settings = &entry->settings;
+    return settings->state;
+}
+
+I64 TaskOriginalDocHighlightStateProbe(CDocEntry *entry)
+{
+    CDocSettings *settings = &entry->settings;
+    switch [settings->state]
+    {
+        case DOCSS_NORMAL:
+            return 123;
+    }
+    return 456;
+}
+
 I64 TaskOriginalDocHighlightChecks()
 {
     CDoc *doc;
@@ -41,6 +58,10 @@ I64 TaskOriginalDocHighlightChecks()
     doc_e->settings.state = DOCSS_NORMAL;
     if (doc_e->settings.state != DOCSS_NORMAL)
         return 80;
+    if (TaskOriginalDocHighlightStateReadProbe(doc_e) != DOCSS_NORMAL)
+        return 88;
+    if (TaskOriginalDocHighlightStateProbe(doc_e) != 123)
+        return 87;
     src = MAlloc(8);
     if (!src)
         return 3;
@@ -48,6 +69,9 @@ I64 TaskOriginalDocHighlightChecks()
     src[0] = '4'; src[1] = '2'; src[2] = 0;
     if (src[0] != '4' || src[1] != '2')
         return 81;
+    if (!Bt(char_bmp_alpha_numeric, '4') || !Bt(char_bmp_dec_numeric, '4') ||
+        Bt(char_bmp_dec_numeric, 'x'))
+        return 85;
     arg_probe = MAlloc(sizeof(U32));
     if (!arg_probe)
         return 82;

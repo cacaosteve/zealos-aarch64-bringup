@@ -1826,10 +1826,10 @@ ZealOS live distribution or installer.
   patch against the pinned Aiwnios originals and confirms the ZealOS source
   hashes remain unchanged.
 - `TaskOriginalDocHighlightChecks` is a diagnostic smoke for numeric/fallback
-  colors and comment/string state across chunks. The module loads, but the
-  smoke currently fails at the first numeric output word (zero instead of the
-  expected colored `4`). Four-argument and switch/loop control probes pass, so
-  `DocHighlight` runtime behavior is not accepted yet.
+  colors and comment/string state across chunks. An ARM64 backend fix now
+  materializes switch selectors before jump-table dispatch; this covers the
+  byte-sized `s->state` selector used by unchanged DocHighlight. The complete
+  smoke returns `0x2a`.
 
 ## Upstream `DocRecalc` source target
 

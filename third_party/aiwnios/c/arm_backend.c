@@ -3267,8 +3267,10 @@ static int64_t __OptPassFinal(CCmpCtrl *cctrl, CRPN *rpn, char *bin,
       PushTmpDepthFirst(cctrl, next2, 0);
       PopTmp(cctrl, next2);
     }
-    if (rpn->type == IC_BOUNDED_SWITCH)
-      code_off = __OptPassFinal(cctrl, next2, bin, code_off);
+    // Both switch forms need the operand materialized. In particular, an
+    // unbounded switch over a byte-sized struct member otherwise keeps an
+    // address-mode result and compares the wrong value.
+    code_off = __OptPassFinal(cctrl, next2, bin, code_off);
     tmp.raw_type = RT_I64i;
     tmp.mode = MD_REG;
     tmp.reg = 0;

@@ -25,6 +25,9 @@ Port changes:
   into an ordinary name.
 - Bounds-check unbounded `switch [expr]` jump tables (out-of-range → default).
   DocPlain's `switch [type]` has holes below the first case (e.g. `DOCT_TEXT`).
+  Materialize bounded and unbounded switch selectors before dispatch; otherwise
+  an unbounded switch on a byte-sized struct member (DocHighlight's `s->state`)
+  compared the address-mode operand instead of the state value.
 - Allow `*array` on 1D members (DocRecalcLib `*doc->filename.name` drive letter).
 - Support class-scoped `$$` layout offsets, including member placement and
   trailing class size; reject negative or oversized offsets.

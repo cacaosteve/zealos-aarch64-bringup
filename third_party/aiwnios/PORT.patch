@@ -1067,7 +1067,7 @@
      case IC_TO_BOOL:
 --- a/c/arm_backend.c
 +++ b/c/arm_backend.c
-@@ -3258,30 +3258,17 @@
+@@ -3258,29 +3258,18 @@
      break;
      break;
    case IC_UNBOUNDED_SWITCH:
@@ -1097,13 +1097,13 @@
        PushTmpDepthFirst(cctrl, next2, 0);
        PopTmp(cctrl, next2);
      }
--    code_off = __OptPassFinal(cctrl, next2, bin, code_off);
-+    if (rpn->type == IC_BOUNDED_SWITCH)
-+      code_off = __OptPassFinal(cctrl, next2, bin, code_off);
++    // Both switch forms need the operand materialized. In particular, an
++    // unbounded switch over a byte-sized struct member otherwise keeps an
++    // address-mode result and compares the wrong value.
+     code_off = __OptPassFinal(cctrl, next2, bin, code_off);
      tmp.raw_type = RT_I64i;
      tmp.mode = MD_REG;
-     tmp.reg = 0;
-@@ -3294,7 +3281,6 @@
+@@ -3294,7 +3283,6 @@
      AIWNIOS_ADD_CODE(ARM_cmpRegX(tmp.reg, 2));
      fail2_addr = bin + code_off;
      AIWNIOS_ADD_CODE(ARM_bcc(ARM_GT, 0));
@@ -1111,7 +1111,7 @@
      //
      // See LAMA snail
      //
-@@ -3315,7 +3301,7 @@
+@@ -3315,7 +3303,7 @@
      AIWNIOS_ADD_CODE(ARM_ldrRegRegShiftX(MIR(cctrl, tmp.reg), 2, tmp.reg));
      // Load the function base address
      AIWNIOS_ADD_CODE(ARM_br(tmp.reg));
@@ -1120,7 +1120,7 @@
        ref = CodeMiscAddRef(rpn->code_misc->dft_lab, fail1_addr);
        ref->patch_cond_br = ARM_bcc;
        ref->user_data1 = ARM_LT;
-@@ -4473,6 +4459,9 @@
+@@ -4473,6 +4461,9 @@
      break;
    case IC_GS:
    case IC_FS: {
@@ -1130,7 +1130,7 @@
      next = rpn->base.next;
      if (next->type != IC_RELOC && next->type != IC_I64) {
        printf("Expected a relocation at IC_FS,aborting(Contact nrootcoauto for "
-@@ -5162,6 +5151,9 @@
+@@ -5162,6 +5153,9 @@
        cctrl->backend_user_data2 = 0;
        cctrl->backend_user_data3 = 0;
        r = forwards[cnt];
