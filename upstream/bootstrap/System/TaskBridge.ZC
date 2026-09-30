@@ -1595,6 +1595,7 @@ U0 TextRect(I64 left, I64 right, I64 top, I64 bottom, I64 cell)
         return;
     ZcFbTextRect(left, right, top, bottom, cell);
 }
+Bool bootstrap_batch_redraw = FALSE;
 U0 GrUpdateTaskWin(CTask *task)
 {//Single-task bootstrap redraw: border, cell clear, DolDoc, then plane flush.
     if (!task || !TaskValidate(task))
@@ -1607,6 +1608,34 @@ U0 GrUpdateTaskWin(CTask *task)
              task->win_top, task->win_bottom, task->text_attr << 8);
     if (!(task->win_inhibit & (1 << WIf_SELF_DOC)))
         DocUpdateTaskDocs(task);
+    if (!bootstrap_batch_redraw)
+        ZcFbTextFlush();
+}
+U0 GrUpdateTasks()
+{//Bounded one-CPU window-ring refresh, drawn in ZealOS task/z order.
+    CTask *root, *task;
+    I64 visited = 0;
+
+    root = sys_winmgr_task;
+    if (!root)
+        root = sys_task;
+    if (!root || !TaskValidate(root))
+        return;
+
+    TextRect(0, TEXT_COLS - 1, 0, TEXT_ROWS - 1, 0x0800);
+    bootstrap_batch_redraw = TRUE;
+    task = root;
+    do
+    {
+        if (!TaskValidate(task))
+            break;
+        if (task->display_flags & (1 << DISPLAYf_SHOW))
+            GrUpdateTaskWin(task);
+        task = task->next_task;
+        visited++;
+    }
+    while (task && task != root && visited < 64);
+    bootstrap_batch_redraw = FALSE;
     ZcFbTextFlush();
 }
 U0 WinHorz(I64 left, I64 right, CTask *task)

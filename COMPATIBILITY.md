@@ -1852,9 +1852,11 @@ ZealOS live distribution or installer.
   the bootstrap shell responsive; this is not yet ZealOS's per-task
   `gr.text_base`/window compositor. `TextBorder` draws the upstream CP437
   single- and double-line glyphs through `TextChar`. A bootstrap
-  `GrUpdateTaskWin` now clears one task's cell rectangle, draws its border,
-  asks `DocUpdateTaskDocs` to recalculate its DolDocs, and flushes the plane.
-  It does not yet run draw callbacks or controls, and the WinMgr task walk,
-  z-order, and per-task backing planes remain stand-ins. Source matching,
-  forms/data formatting, sprites/depth buffers, music state, cursor
-  interaction, and multi-window rendering remain unaccepted.
+  `GrUpdateTaskWin` clears one task's cell rectangle, draws its border, and
+  asks `DocUpdateTaskDocs` to recalculate its DolDocs. `GrUpdateTasks` clears
+  one frame and redraws up to 64 visible tasks by walking the ZealOS task ring
+  in its back-to-front order, then presents the composed cell plane; an
+  overlapping two-task smoke verifies that the later task covers the earlier
+  one. The renderer still lacks draw callbacks, controls, the uncovered-window
+  bitmap, and per-task backing planes. Source matching, forms/data formatting,
+  sprites/depth buffers, music state, and cursor interaction remain unaccepted.
