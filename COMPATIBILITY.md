@@ -1745,3 +1745,15 @@ ZealOS live distribution or installer.
   regression still returns `0x2a`. `KeyDevAdd(&KDDocPutKey, …)` registration
   and a live put_doc remain later work; interrupt-driven input is still out of
   scope.
+
+## Unchanged DolDoc `DocPutS` + `KeyDevAdd(KDDocPutKey)`
+
+- The unchanged pinned `System/DolDoc/DocPutS.ZC` loads after DocPutKey. Extra
+  bootstrap helpers cover `StrUtil`, `ParseDollarCmd`, `DocScanLine`,
+  `DocRecalc`, `Busy`, and the remaining `char_bmp_*` tables DocPutS reads.
+  Aiwnios `#help_index` now drains ZealOS `"…"\` newline `"…"` continuations
+  instead of faulting on `\`.
+- After DocPutS loads, `TaskOriginalDocPutKeyChecks` runs `KeyDevAdd(
+  &KDDocPutKey, &KDDocPutS, 0x80000000, TRUE)` and confirms the entry is
+  queued at that priority (`0x2a`). A live `put_doc` StdOut path and Adam
+  remain later work.

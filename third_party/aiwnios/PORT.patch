@@ -1,5 +1,6 @@
---- a/c/aiwn_hash.h
-+++ b/c/aiwn_hash.h
+diff -ruN a/c/aiwn_hash.h b/c/aiwn_hash.h
+--- a/c/aiwn_hash.h	2026-09-29 17:10:43
++++ b/c/aiwn_hash.h	2026-09-29 17:10:43
 @@ -35,6 +35,7 @@
  #define HTT_IMPORT_SYS_SYM  0x80
  #define HTT_EXPORT_SYS_SYM  0x100
@@ -8,8 +9,9 @@
  
  typedef struct CHash {
    struct CHash *next;
---- a/c/aiwn_lexparser.h
-+++ b/c/aiwn_lexparser.h
+diff -ruN a/c/aiwn_lexparser.h b/c/aiwn_lexparser.h
+--- a/c/aiwn_lexparser.h	2026-09-29 17:10:43
++++ b/c/aiwn_lexparser.h	2026-09-29 17:10:43
 @@ -40,9 +40,11 @@
    int64_t flags, cur_char;
    int64_t cur_tok;
@@ -39,8 +41,9 @@
      (defined(_M_ARM64) || defined(__aarch64__))
  #  define AIWNIOS_IREG_START     19
  #  define AIWNIOS_IREG_CNT       (27 - 19 + 1)
---- a/c/arm_backend.c
-+++ b/c/arm_backend.c
+diff -ruN a/c/arm_backend.c b/c/arm_backend.c
+--- a/c/arm_backend.c	2026-09-29 17:10:43
++++ b/c/arm_backend.c	2026-09-29 17:10:43
 @@ -4473,6 +4473,9 @@
      break;
    case IC_GS:
@@ -61,8 +64,9 @@
        PushTmpDepthFirst(cctrl, r, 0);
        PopTmp(cctrl, r);
        r->res.mode = MD_NULL;
---- a/c/lex.c
-+++ b/c/lex.c
+diff -ruN a/c/lex.c b/c/lex.c
+--- a/c/lex.c	2026-09-29 17:10:43
++++ b/c/lex.c	2026-09-29 17:10:43
 @@ -9,11 +9,19 @@
  #include <stdint.h>
  #include <stdio.h>
@@ -148,8 +152,56 @@
          if (idx + 1 >= STR_LEN) {
            LexErr(lex, "Name is too long.");
            return lex->cur_tok = ERR;
-@@ -640,9 +655,31 @@
+@@ -632,17 +647,77 @@
+   case '#':
+     if (TK_NAME == Lex(lex)) {
+       if (!strcmp(lex->string, "help_file")) {
+-        Lex(lex); // Go past string
+         LexWarn(lex, "AIWN ignore's #help_file's ignored by the C side");
++        /* Drain "..." and ZealOS "..."\ newline "..." continuations. */
++        for (;;) {
++          int64_t c;
++          do
++            c = LexAdvChr(lex);
++          while (c == ' ' || c == '\t' || c == '\r' || c == '\n');
++          if (c == '"') {
++            lex->flags |= LEXF_USE_LAST_CHAR;
++            if (Lex(lex) != TK_STR)
++              return lex->cur_tok = ERR;
++            continue;
++          }
++          if (c == '\\')
++            continue;
++          if (c == ERR)
++            return ERR;
++          if (c)
++            lex->flags |= LEXF_USE_LAST_CHAR;
++          break;
++        }
+         goto re_enter;
+       } else if (!strcmp(lex->string, "help_index")) {
+-        Lex(lex); // Go past string
          LexWarn(lex, "AIWN ignore's #help_index's ignored by the C side");
++        /* Drain "..." and ZealOS "..."\ newline "..." continuations. */
++        for (;;) {
++          int64_t c;
++          do
++            c = LexAdvChr(lex);
++          while (c == ' ' || c == '\t' || c == '\r' || c == '\n');
++          if (c == '"') {
++            lex->flags |= LEXF_USE_LAST_CHAR;
++            if (Lex(lex) != TK_STR)
++              return lex->cur_tok = ERR;
++            continue;
++          }
++          if (c == '\\')
++            continue;
++          if (c == ERR)
++            return ERR;
++          if (c)
++            lex->flags |= LEXF_USE_LAST_CHAR;
++          break;
++        }
          goto re_enter;
        } else if (!strcmp(lex->string, "assert")) {
 -        LexWarn(lex, "AIWN ignore's #assert's and other JIT shennangins");
@@ -181,7 +233,7 @@
          lex->flags |= LEXF_UNTIL_NEWLINE;
          CCmpCtrl *cc = CmpCtrlNew(lex);
          char *code;
-@@ -662,6 +699,7 @@
+@@ -662,6 +737,7 @@
          CmpCtrlDel(cc);
          if (ret)
            goto re_enter;
@@ -189,7 +241,7 @@
          goto if_fail;
        } else if (!strcmp(lex->string, "ifaot")) {
          // AIWN will only AOT compile for you,the JIT will be
-@@ -756,11 +794,11 @@
+@@ -756,11 +832,11 @@
            actual_file = actual_file->last;
          }
          if (actual_file) {
@@ -203,7 +255,7 @@
              dir = __AIWNIOS_StrDup(buf, NULL);
              *strrchr(dir, '/') = 0;
              f = fopen(buf, "rb");
-@@ -798,12 +836,19 @@
+@@ -798,12 +874,19 @@
          lex->file = new_file;
          goto re_enter;
        } else if (!strcmp(lex->string, "define")) {
@@ -225,7 +277,7 @@
          strcpy(macro_name, lex->string);
          strcpy(lex->string, "");
          define = A_CALLOC(sizeof(CHashDefineStr), NULL);
-@@ -861,8 +906,7 @@
+@@ -861,8 +944,7 @@
  }
  
  CLexer *LexerNew(char *filename, char *text) {
@@ -235,7 +287,7 @@
      struct {
        char *name;
        int64_t tok;
-@@ -925,7 +969,6 @@
+@@ -925,7 +1007,6 @@
        kw->tk = kws[i].tok;
        HashAdd(kw, Fs->hash_table);
      }
@@ -243,8 +295,9 @@
    }
    CLexer *new = A_CALLOC(sizeof(CLexer), NULL);
    new->hc = HeapCtrlInit(NULL, Fs, 0);
---- a/c/optpass.c
-+++ b/c/optpass.c
+diff -ruN a/c/optpass.c b/c/optpass.c
+--- a/c/optpass.c	2026-09-29 17:10:43
++++ b/c/optpass.c	2026-09-29 17:10:43
 @@ -21,6 +21,9 @@
      if (rpn->ic_dim->next)
        r *= rpn->ic_dim->next->total_cnt;
@@ -255,19 +308,19 @@
    } else
      r *= rpn->ic_class[-1].sz;
  
-@@ -475,6 +478,12 @@
-         MulComConstsI642(cctrl, rpn, rpn->type, 1, 1);
-     }
+@@ -477,6 +480,12 @@
    }
-+}
-+
+ }
+ 
 +/* Relational chains must reach the backend intact. Folding their inner
 + * comparison turns a<b<c into (a<b)<c and silently changes HolyC semantics. */
 +static int IsRelational(int64_t type) {
 +  return type == IC_LT || type == IC_GT || type == IC_LE || type == IC_GE;
- }
- 
++}
++
  void OptPassConstFold(CCmpCtrl *cctrl) {
+ #define SET_AB                                                                 \
+   if (next->type == IC_F64)                                                    \
 @@ -505,6 +514,11 @@
    changed = 0;
    for (rpn = cctrl->code_ctrl->ir_code->next;
@@ -280,8 +333,9 @@
      switch (rpn->type) {
        break;
      case IC_TO_BOOL:
---- a/c/parser.c
-+++ b/c/parser.c
+diff -ruN a/c/parser.c b/c/parser.c
+--- a/c/parser.c	2026-09-29 17:10:43
++++ b/c/parser.c	2026-09-29 17:10:43
 @@ -1986,6 +1986,11 @@
        }
        goto fin;

@@ -647,12 +647,50 @@ re_enter:;
   case '#':
     if (TK_NAME == Lex(lex)) {
       if (!strcmp(lex->string, "help_file")) {
-        Lex(lex); // Go past string
         LexWarn(lex, "AIWN ignore's #help_file's ignored by the C side");
+        /* Drain "..." and ZealOS "..."\ newline "..." continuations. */
+        for (;;) {
+          int64_t c;
+          do
+            c = LexAdvChr(lex);
+          while (c == ' ' || c == '\t' || c == '\r' || c == '\n');
+          if (c == '"') {
+            lex->flags |= LEXF_USE_LAST_CHAR;
+            if (Lex(lex) != TK_STR)
+              return lex->cur_tok = ERR;
+            continue;
+          }
+          if (c == '\\')
+            continue;
+          if (c == ERR)
+            return ERR;
+          if (c)
+            lex->flags |= LEXF_USE_LAST_CHAR;
+          break;
+        }
         goto re_enter;
       } else if (!strcmp(lex->string, "help_index")) {
-        Lex(lex); // Go past string
         LexWarn(lex, "AIWN ignore's #help_index's ignored by the C side");
+        /* Drain "..." and ZealOS "..."\ newline "..." continuations. */
+        for (;;) {
+          int64_t c;
+          do
+            c = LexAdvChr(lex);
+          while (c == ' ' || c == '\t' || c == '\r' || c == '\n');
+          if (c == '"') {
+            lex->flags |= LEXF_USE_LAST_CHAR;
+            if (Lex(lex) != TK_STR)
+              return lex->cur_tok = ERR;
+            continue;
+          }
+          if (c == '\\')
+            continue;
+          if (c == ERR)
+            return ERR;
+          if (c)
+            lex->flags |= LEXF_USE_LAST_CHAR;
+          break;
+        }
         goto re_enter;
       } else if (!strcmp(lex->string, "assert")) {
         /* ZealOS uses these to enforce structure layouts. Skipping them

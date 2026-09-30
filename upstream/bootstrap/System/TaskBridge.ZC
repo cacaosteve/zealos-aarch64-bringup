@@ -852,13 +852,81 @@ U0 BootstrapGodGlbls()
     MemSet(&god, 0, sizeof(CGodGlobals));
 }
 BootstrapGodGlbls;
-// StrA.ZC char bitmaps; printable is required by DocPutKey before StrA loads.
+// StrA.ZC char bitmaps required by DocPutKey/DocPutS before StrA loads.
 U32 char_bmp_printable[16] =
 {
     0x80002600, 0xFFFFFFFF, 0xFFFFFFFF, 0x7FFFFFFF,
     0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF,
     0, 0, 0, 0, 0, 0, 0, 0
+},
+char_bmp_zero_cr_nl_cursor[16] =
+{
+    0x00002421, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+},
+char_bmp_zero_tab_cr_nl_cursor[16] =
+{
+    0x00002621, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+},
+char_bmp_zero_tab_cr_nl_cursor_dollar[16] =
+{
+    0x00002621, 0x10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+},
+char_bmp_safe_dollar[16] =
+{
+    0x80000000, 0xFFFFFFEF, 0xFFFFFFFF, 0x7FFFFFFF,
+    0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF,
+    0, 0, 0, 0, 0, 0, 0, 0
 };
+// StrA / DocGet / DocRecalc helpers used by DocPutS before those modules load.
+U8 *StrUtil(U8 *_src, I64 flags)
+{
+    U8 *src = _src, *dst = _src;
+    I64 ch;
+
+    if (!_src)
+        return NULL;
+    if (flags & SUF_REM_LEADING)
+        while (*src == ' ' || *src == '\t')
+            src++;
+    while (ch = *src++)
+    {
+        if (ch == ' ' || ch == '\t')
+        {
+            if (!(flags & SUF_REM_SPACES))
+                *dst++ = ch;
+        }
+        else if (!(flags & SUF_REM_CTRL_CHARS) || ch >= CH_SPACE)
+            *dst++ = ch;
+    }
+    *dst = 0;
+    return _src;
+}
+CDocEntry *ParseDollarCmd(CDoc *doc, U8 *st)
+{
+    if (doc) {}
+    if (st) {}
+    return NULL;
+}
+U8 *DocScanLine(CDoc *doc, CDocEntry *doc_e, I64 *cur_col=NULL,
+                CDocEntry **_do_e_end=NULL)
+{
+    if (doc) {}
+    if (doc_e) {}
+    if (cur_col) {}
+    if (_do_e_end)
+        *_do_e_end = NULL;
+    return NULL;
+}
+Bool DocRecalc(CDoc *doc, I64 recalc_flags=0)
+{
+    if (doc) {}
+    if (recalc_flags) {}
+    return FALSE;
+}
+U0 Busy(I64 us)
+{
+    if (us) {}
+}
 // Minimal text/CPU stand-ins referenced by Ctrl-Alt hooks in KeyDevInit.
 // Gs() is host-bound to bootstrap_gs; CCPU layout only needs idle_task here.
 class CBootstrapTextGlbls

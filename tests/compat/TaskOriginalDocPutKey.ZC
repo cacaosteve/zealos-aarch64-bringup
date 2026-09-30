@@ -1,0 +1,21 @@
+// Smoke: register unchanged KDDocPutKey/KDDocPutS on the KeyDev chain.
+I64 TaskOriginalDocPutKeyChecks()
+{
+    CKeyDevEntry *entry, *tmp;
+
+    KeyDevInit;
+    entry = KeyDevAdd(&KDDocPutKey, &KDDocPutS, 0x80000000, TRUE);
+    if (!entry)
+        return 1;
+    if (entry->priority != 0x80000000)
+        return 2;
+    // Walk the put_key queue for the registered priority.
+    tmp = keydev.put_key_head.next;
+    while (tmp != &keydev.put_key_head)
+    {
+        if (tmp == entry)
+            return 42;
+        tmp = tmp->next;
+    }
+    return 3;
+}
