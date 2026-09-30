@@ -3,6 +3,7 @@ I64 TaskOriginalDocTermChecks()
 {
     CDoc *doc;
     CDocEntry *entry;
+    I64 saw_cm = FALSE, saw_tx = FALSE;
 
     KeyDevInit;
     DocTermNew;
@@ -17,6 +18,17 @@ I64 TaskOriginalDocTermChecks()
         return 4;
     if (IsRaw)
         return 5;
+    entry = Fs->border_doc->head.next;
+    while (entry != Fs->border_doc)
+    {
+        if (entry->type_u8 == DOCT_CURSOR_MOVEMENT)
+            saw_cm = TRUE;
+        if (entry->type_u8 == DOCT_TEXT)
+            saw_tx = TRUE;
+        entry = entry->next;
+    }
+    if (!saw_cm || !saw_tx)
+        return 11;
     if (!KeyDevAdd(&KDDocPutKey, &KDDocPutS, 0x80000000, TRUE))
         return 6;
 

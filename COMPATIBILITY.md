@@ -1776,8 +1776,8 @@ ZealOS live distribution or installer.
 - The unchanged pinned `System/DolDoc/DocTerm.ZC` loads after DocDblBuf.
   Bootstrap stubs cover `Ed*CB`, `DocDataFormat`, `MenuFile`, `WinScrollsInit`,
   `ac`, and the unused TermRightClick helpers until DocEd/Menu/Win load.
-  `ParseDollarCmd` returns a DOCT_ERROR entry so `DocBorderNew` dollar cmds do
-  not NULL-deref before DocPlain/DocInit.
+  `ParseDollarCmd` is a temporary TX/CM/DA/FG/BG recognizer (full `CDocEntry`)
+  until DocPlain/DocInit + CompCtrl load.
 - `TaskOriginalDocTermChecks` runs `DocTermNew`, confirms put/display/border
   docs, registers KDDoc handlers, and `DocPrint`/`PutS` into the term doc
   (`0x2a`). Real dollar-cmd parsing, menus, and Adam remain later work; Aiwnios strings now collapse `$$` to `$` like ZealOS so DocBorderNew formats reach DocPutS.

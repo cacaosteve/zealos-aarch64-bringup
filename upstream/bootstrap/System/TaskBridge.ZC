@@ -919,14 +919,51 @@ U8 *StrUtil(U8 *_src, I64 flags)
 CDocEntry *ParseDollarCmd(CDoc *doc, U8 *st)
 {
     CDocEntry *doc_e;
+    U8 *q, *tag = NULL;
+    I64 type = DOCT_ERROR, len = 0;
 
-    // Until DocPlain/DocInit load, invent a full-sized ERROR entry so DocPrint
-    // dollar cmds (DocBorderNew) can set tag_cb/user_data without smashing.
+    // Lightweight stand-in until DocPlain/DocInit + CompCtrl load. Recognize
+    // the DocBorderNew cmds and a trailing ,"tag" so TX entries get real tags.
     if (!doc)
         return NULL;
-    if (st) {}
+    if (st)
+    {
+        if (st[0] == 'T' && st[1] == 'X')
+            type = DOCT_TEXT;
+        else if (st[0] == 'C' && st[1] == 'M')
+            type = DOCT_CURSOR_MOVEMENT;
+        else if (st[0] == 'D' && st[1] == 'A')
+            type = DOCT_DATA;
+        else if (st[0] == 'F' && st[1] == 'G')
+            type = DOCT_FOREGROUND;
+        else if (st[0] == 'B' && st[1] == 'G')
+            type = DOCT_BACKGROUND;
+        else if (st[0] == 'F' && st[1] == 'D')
+            type = DOCT_DEFAULT_FOREGROUND;
+        else if (st[0] == 'B' && st[1] == 'D')
+            type = DOCT_DEFAULT_BACKGROUND;
+        q = st;
+        while (*q && !(*q == ',' && q[1] == '"'))
+            q++;
+        if (*q == ',' && q[1] == '"')
+        {
+            q += 2;
+            tag = q;
+            while (*q && *q != '"')
+                q++;
+            len = q - tag;
+        }
+    }
     doc_e = CAlloc(sizeof(CDocEntry), doc->mem_task);
-    doc_e->type = DOCT_ERROR | doc->settings_head.default_text_attr << 8;
+    doc_e->type = type | doc->settings_head.default_text_attr << 8;
+    if (type == DOCT_TEXT && tag && len >= 0)
+    {
+        doc_e->tag = MAlloc(len + 1, doc->mem_task);
+        if (len)
+            MemCopy(doc_e->tag, tag, len);
+        doc_e->tag[len] = 0;
+        doc_e->max_col = len;
+    }
     return doc_e;
 }
 U8 *DocScanLine(CDoc *doc, CDocEntry *doc_e, I64 *cur_col=NULL,
