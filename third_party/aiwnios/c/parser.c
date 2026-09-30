@@ -4316,6 +4316,7 @@ typedef struct CSwitchCase {
   int64_t val;
   CCodeMisc *label;
 } CSwitchCase;
+int64_t aiwnios_switch_depth;
 int64_t PrsSwitch(CCmpCtrl *cctrl) {
   if (!PrsKw(cctrl, TK_KW_SWITCH))
     return 0;
@@ -4328,6 +4329,7 @@ int64_t PrsSwitch(CCmpCtrl *cctrl) {
   int64_t k_low = INT_MAX, k_hi = INT_MIN, last, lo, hi, idx;
   old_break_to = cctrl->code_ctrl->break_to;
   cctrl->code_ctrl->break_to = lb_exit;
+  aiwnios_switch_depth++;
   //
   // When we encounter the start: block,we enter a secret function call
   // So when we `break` or we implictly break by hitting the first sub-switch
@@ -4349,12 +4351,14 @@ int64_t PrsSwitch(CCmpCtrl *cctrl) {
     //
     if (!ParseExpr(cctrl, 0)) {
       ParseErr(cctrl, "Expected an expression.");
+      aiwnios_switch_depth--;
       return 0;
     }
     (switch_ir = A_CALLOC(sizeof(CRPN), NULL))->type = IC_UNBOUNDED_SWITCH;
     QueIns(switch_ir, cctrl->code_ctrl->ir_code);
     if (cctrl->lex->cur_tok != ']') {
       ParseErr(cctrl, "Expected a ']'.");
+      aiwnios_switch_depth--;
       return 0;
     } else
       Lex(cctrl->lex);
@@ -4362,6 +4366,7 @@ int64_t PrsSwitch(CCmpCtrl *cctrl) {
     Lex(cctrl->lex);
     if (!ParseExpr(cctrl, 0)) {
       ParseErr(cctrl, "Expected an expression.");
+      aiwnios_switch_depth--;
       return 0;
     }
     (switch_ir = A_CALLOC(sizeof(CRPN), NULL))->type = IC_BOUNDED_SWITCH;
@@ -4370,12 +4375,14 @@ int64_t PrsSwitch(CCmpCtrl *cctrl) {
     // start,(cond),end,BOUNDED_SWITCH
     if (cctrl->lex->cur_tok != ')') {
       ParseErr(cctrl, "Expected a ')'.");
+      aiwnios_switch_depth--;
       return 0;
     } else
       Lex(cctrl->lex);
   }
   if (cctrl->lex->cur_tok != '{') {
     ParseErr(cctrl, "Expected a '{'.");
+    aiwnios_switch_depth--;
     return 0;
   } else
     Lex(cctrl->lex);
@@ -4456,6 +4463,7 @@ int64_t PrsSwitch(CCmpCtrl *cctrl) {
           Lex(cctrl->lex);
         } else {
           ParseErr(cctrl, "Expected a ':'.");
+          aiwnios_switch_depth--;
           return 0;
         }
       }
@@ -4466,6 +4474,7 @@ int64_t PrsSwitch(CCmpCtrl *cctrl) {
       }
       if (cctrl->lex->cur_tok != ':') {
         ParseErr(cctrl, "Expected a ':'.");
+        aiwnios_switch_depth--;
         return 0;
       }
       lb_dft->flags |= CMF_DEFINED;
@@ -4483,6 +4492,7 @@ int64_t PrsSwitch(CCmpCtrl *cctrl) {
     } else if (PrsKw(cctrl, TK_KW_START)) {
       if (cctrl->lex->cur_tok != ':') {
         ParseErr(cctrl, "Expected a ':'.");
+        aiwnios_switch_depth--;
         return 0;
       } else
         Lex(cctrl->lex);
@@ -4508,6 +4518,7 @@ int64_t PrsSwitch(CCmpCtrl *cctrl) {
     } else if (PrsKw(cctrl, TK_KW_END)) {
       if (subs.base.last == &subs) {
         ParseErr(cctrl, "Unexpected 'end' statement.");
+        aiwnios_switch_depth--;
         return 0;
       }
       QueRem(tmpss = subs.base.last);
@@ -4524,6 +4535,7 @@ int64_t PrsSwitch(CCmpCtrl *cctrl) {
       A_FREE(tmpss);
       if (cctrl->lex->cur_tok != ':') {
         ParseErr(cctrl, "Expected a ':'.");
+        aiwnios_switch_depth--;
         return 0;
       } else
         Lex(cctrl->lex);
@@ -4532,6 +4544,7 @@ int64_t PrsSwitch(CCmpCtrl *cctrl) {
       goto add_stmt;
     } else {
       ParseErr(cctrl, "Expected a statement.");
+      aiwnios_switch_depth--;
       return 0;
     }
   }
@@ -4577,6 +4590,7 @@ ret:
     switch_ir->code_misc = jmp_tab;
   }
   cctrl->flags = old_flags;
+  aiwnios_switch_depth--;
   return 1;
 }
 static void __PrsBindCSymbol(char *name, void *ptr, int64_t naked,

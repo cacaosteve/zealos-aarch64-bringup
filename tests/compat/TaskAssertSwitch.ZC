@@ -1,0 +1,19 @@
+#define AX_ERR 42
+#define AX_NUM 43
+I64 TaskAssertSwitchChecks()
+{
+	I64 i = 0, r = 0;
+	switch [i]
+	{
+		case 0:
+			r = 1;
+			break;
+#assert AX_ERR == AX_NUM - 1
+		case 1:
+			r = 2;
+			break;
+	}
+	if (r == 1)
+		return 42;
+	return r;
+}

@@ -18,7 +18,8 @@
     "src/System/DolDoc/DocPutS.ZC": "a621903949d94fb28cb93de999306ce13a6698e1546d094819a7170171adb7d4",
     "src/System/DolDoc/DocDblBuf.ZC": "c8c9573b766ba7b213f8c19d8fe36dbbc22fec1017b860050d565845ae940148",
     "src/System/DolDoc/DocTerm.ZC": "1c75278926832c7460b58cf1b88e843cd9b9628c42805fe2a83ce861b4641081",
-    "src/System/DolDoc/DocInit.ZC": "559c5e3ab13908a58dbccca89df3f7a2b979dbf3d20e8ca41d8b7df1d8ff69d7"
+    "src/System/DolDoc/DocInit.ZC": "559c5e3ab13908a58dbccca89df3f7a2b979dbf3d20e8ca41d8b7df1d8ff69d7",
+    "src/System/DolDoc/DocPlain.ZC": "504fe11c55a49820103d58202b73eaf907f16f6d10ba2471d08a95cc4f89bbde"
   },
   "changes": []
 }

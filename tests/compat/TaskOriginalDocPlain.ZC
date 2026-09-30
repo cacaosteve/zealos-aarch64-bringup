@@ -1,0 +1,36 @@
+// Smoke: unchanged DocPlain ParseDollarCmd via doldoc.hash.
+I64 TaskOriginalDocPlainChecks()
+{
+	CDoc *doc;
+	CDocEntry *entry;
+
+	doc = DocNew;
+	if (!doc || doc->doc_signature != DOC_SIGNATURE_VAL)
+		return 1;
+	entry = ParseDollarCmd(doc, "TX,\"Hi\"");
+	if (!entry || entry->type_u8 != DOCT_TEXT)
+		return 2;
+	if (!entry->tag || StrCompare(entry->tag, "Hi"))
+		return 3;
+	// CM defaults include LE+RE; supply expressions like DocBorder does.
+	entry = ParseDollarCmd(doc, "CM,1,2");
+	if (!entry || entry->type_u8 != DOCT_CURSOR_MOVEMENT)
+		return 4;
+	if (entry->left_exp != 1 || entry->right_exp != 2)
+		return 5;
+	entry = ParseDollarCmd(doc, "FG,RED");
+	if (!entry || entry->type_u8 != DOCT_FOREGROUND)
+		return 6;
+	if (entry->attr != RED)
+		return 7;
+	// DocPrint collapses $$ → $ then DocPutS → ParseDollarCmd.
+	DocPrint(doc, "$$TX,\"Yo\"$$");
+	entry = doc->head.next;
+	while (entry != doc)
+	{
+		if (entry->type_u8 == DOCT_TEXT && entry->tag && !StrCompare(entry->tag, "Yo"))
+			return 42;
+		entry = entry->next;
+	}
+	return 8;
+}

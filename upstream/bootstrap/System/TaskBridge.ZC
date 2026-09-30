@@ -426,6 +426,57 @@ I64 DefineCount(U8 *dname)
     else
         return -1;
 }
+I64 ListMatch(U8 *needle, U8 *haystack_list, I64 flags=0)
+{//-2 ambiguous, -1 not found. DocPlain RT= via DefineMatch.
+    I64 sub = 0, res = -1;
+    U8 *ptr;
+    Bool exact_match = FALSE;
+
+    if (!haystack_list)
+        return -1;
+    while (*haystack_list)
+    {
+        if (*haystack_list == '@')
+        {
+            sub--;
+            haystack_list++;
+        }
+        ptr = needle;
+        if (flags & LMF_IGNORE_CASE)
+            while (*ptr && ToUpper(*ptr) == ToUpper(*haystack_list))
+            {
+                ptr++;
+                haystack_list++;
+            }
+        else
+            while (*ptr && *ptr == *haystack_list)
+            {
+                ptr++;
+                haystack_list++;
+            }
+        if (!*ptr)
+        {
+            if (!*haystack_list)
+                return sub;
+            else if (res != -1)
+            {
+                if (!exact_match)
+                    res = -2;
+            }
+            else if (!(flags & LMF_EXACT))
+                res = sub;
+        }
+        while (*haystack_list)
+            haystack_list++;
+        haystack_list++;
+        sub++;
+    }
+    return res;
+}
+I64 DefineMatch(U8 *needle, U8 *haystack_list_dname, I64 flags=0)
+{
+    return ListMatch(needle, Define(haystack_list_dname), flags);
+}
 I64 HashListAdd(U8 *list, I64 type, CHashTable *table)
 {
     I64 i = 0;
@@ -460,11 +511,14 @@ I64 HashDefineListAdd(U8 *dname, I64 type, CHashTable *table)
         return 0;
 }
 I64 BootstrapDefinesLoad()
-{//ST_COLORS for DocInit color hash; other SysDefinesLoad lists later.
+{//ST_COLORS for DocInit; ST_RAW_TYPES for DocPlain RT= tags.
     DefineListLoad("ST_COLORS",
                    "BLACK\0BLUE\0GREEN\0CYAN\0"
                    "RED\0PURPLE\0BROWN\0LTGRAY\0DKGRAY\0LTBLUE\0LTGREEN\0"
                    "LTCYAN\0LTRED\0LTPURPLE\0YELLOW\0WHITE\0");
+    DefineListLoad("ST_RAW_TYPES",
+                   " \0 \0I0\0U0\0I8\0U8\0I16\0U16\0I32\0U32\0I64\0U64\0"
+                   "F32\0UF32\0F64\0UF64\0");
     return 0;
 }
 // Minimal CompCtrl/Lex so DocInit can parse default flag strings. Full
@@ -492,9 +546,9 @@ U0 CompCtrlDel(CCompCtrl *cc)
     Free(cc);
 }
 I64 Lex(CCompCtrl *cc)
-{//Tokenize identifiers and + - ; for DocInit / ParseDocFlags.
+{//Tokenize idents, strings, ints, and punctuation for DocInit/DocPlain.
     U8 *ptr, buf[STR_LEN];
-    I64 i, ch;
+    I64 i, ch, n;
 
     if (!cc)
         return 0;
@@ -509,10 +563,43 @@ I64 Lex(CCompCtrl *cc)
     if (!*ptr)
         return cc->token = TK_EOF;
     ch = *ptr;
-    if (ch == '+' || ch == '-' || ch == ';')
+    if (ch == '+' || ch == '-' || ch == ';' || ch == ',' || ch == '=' ||
+        ch == '(' || ch == ')')
     {
         cc->cur_buf_ptr = ptr + 1;
         return cc->token = ch;
+    }
+    if (ch == '"')
+    {
+        ptr++;
+        i = 0;
+        while (*ptr && *ptr != '"')
+        {
+            if (*ptr == '\\' && ptr[1])
+                ptr++;
+            if (i < STR_LEN - 1)
+                buf[i++] = *ptr;
+            ptr++;
+        }
+        if (*ptr == '"')
+            ptr++;
+        buf[i] = 0;
+        cc->cur_buf_ptr = ptr;
+        cc->cur_str = StrNew(buf);
+        cc->cur_str_len = i + 1;
+        return cc->token = TK_STR;
+    }
+    if ('0' <= ch <= '9')
+    {
+        n = 0;
+        while ('0' <= *ptr <= '9')
+        {
+            n = n * 10 + *ptr - '0';
+            ptr++;
+        }
+        cc->cur_buf_ptr = ptr;
+        cc->cur_i64 = n;
+        return cc->token = TK_I64;
     }
     if ('A' <= ch <= 'Z' || 'a' <= ch <= 'z' || ch == '_')
     {
@@ -532,6 +619,70 @@ I64 Lex(CCompCtrl *cc)
     }
     cc->cur_buf_ptr = ptr + 1;
     return cc->token = ch;
+}
+U8 *LexExtStr(CCompCtrl *cc, I64 *_size=NULL, Bool lex_next=TRUE)
+{//Combine adjacent TK_STR tokens; DocPlain tag args.
+    U8 *st;
+    I64 len;
+
+    if (!cc || cc->token != TK_STR)
+    {
+        if (_size)
+            *_size = 0;
+        return NULL;
+    }
+    st = cc->cur_str;
+    len = cc->cur_str_len;
+    cc->cur_str = NULL;
+    if (lex_next)
+        Lex(cc);
+    while (cc->token == TK_STR)
+    {
+        st = MStrPrint("%s%s", st, cc->cur_str);
+        Free(cc->cur_str);
+        cc->cur_str = NULL;
+        Lex(cc);
+        len = BootstrapStrLen(st) + 1;
+    }
+    if (_size)
+        *_size = len;
+    return st;
+}
+I64 LexExpressionI64(CCompCtrl *cc)
+{//Stub: decimal I64, doldoc color name, or define; full ParseExp later.
+    I64 res = 0, neg = 1;
+    U8 *name;
+    CHashGeneric *tmph;
+
+    if (!cc)
+        return 0;
+    if (cc->token == '-')
+    {
+        neg = -1;
+        Lex(cc);
+    }
+    else if (cc->token == '+')
+        Lex(cc);
+    if (cc->token == TK_I64)
+    {
+        res = cc->cur_i64;
+        Lex(cc);
+    }
+    else if (cc->token == TK_IDENT)
+    {
+        name = cc->cur_str;
+        if (name && doldoc.hash &&
+            (tmph = HashFind(name, doldoc.hash, DHT_COLOR)))
+            res = tmph->user_data0;
+        else if (name && HashFind(name, Fs->hash_table, HTT_DEFINE_STR))
+            res = 0;
+        Lex(cc);
+    }
+    return res * neg;
+}
+I64 LexExpression(CCompCtrl *cc)
+{
+    return LexExpressionI64(cc);
 }
 I64 ParseDocFlagSingle(CCompCtrl *cc, I64 *_de_flags, U32 *_type, Bool turn_on)
 {//DocPlain subset used by DocInit default-flag parse.
@@ -653,6 +804,25 @@ U8 *StrLastOcc(U8 *src, U8 *marker)
         if (StrOcc(marker, ch))
             res = src - 1;
     return res;
+}
+U8 *StrMatch(U8 *needle, U8 *haystack_str)
+{//Scan for needle in haystack; DocPlain aux_str ':' width.
+    I64 i;
+
+    if (!needle || !haystack_str)
+        return NULL;
+    if (!*needle)
+        return haystack_str;
+    while (*haystack_str)
+    {
+        i = 0;
+        while (needle[i] && haystack_str[i] == needle[i])
+            i++;
+        if (!needle[i])
+            return haystack_str;
+        haystack_str++;
+    }
+    return NULL;
 }
 U8 *StrLastRemove(U8 *src, U8 *marker, U8 *dst=NULL)
 {
@@ -1401,6 +1571,29 @@ U0 DocDataFormat(CDoc *doc, CDocEntry *doc_e, I64 d=DOCM_CANCEL)
     if (doc) {}
     if (doc_e) {}
     if (d) {}
+}
+U0 DocDataScan(CDoc *doc, CDocEntry *doc_e)
+{//Stub until DocForm; DocPlain list tags call this after parse.
+    if (doc) {}
+    if (doc_e) {}
+}
+U8 *DocSave(CDoc *doc, I64 *_size=NULL)
+{//Stub until DocFile; DocFlagsToggle round-trips via DocLoad.
+    if (doc) {}
+    if (_size)
+        *_size = 0;
+    return StrNew("");
+}
+U0 DocLoad(CDoc *doc, U8 *src2, I64 size)
+{
+    if (doc) {}
+    if (src2) {}
+    if (size) {}
+}
+U0 DocCenter(CDoc *doc=NULL, I64 recalc_flags=0)
+{
+    if (doc) {}
+    if (recalc_flags) {}
 }
 CMenu *MenuFile(U8 *filename, I64 flags=0, CTask *task=NULL)
 {

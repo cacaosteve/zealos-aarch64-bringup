@@ -1776,11 +1776,12 @@ ZealOS live distribution or installer.
 - The unchanged pinned `System/DolDoc/DocTerm.ZC` loads after DocDblBuf.
   Bootstrap stubs cover `Ed*CB`, `DocDataFormat`, `MenuFile`, `WinScrollsInit`,
   `ac`, and the unused TermRightClick helpers until DocEd/Menu/Win load.
-  `ParseDollarCmd` is a temporary TX/CM/DA/FG/BG recognizer (full `CDocEntry`)
-  until DocPlain replaces it; DocInit now fills `doldoc.hash`.
+  `ParseDollarCmd` is replaced by unchanged DocPlain after DocInit; earlier
+  modules still use the TaskBridge TX/CM/DA stand-in. DocInit fills `doldoc.hash`.
 - `TaskOriginalDocTermChecks` runs `DocTermNew`, confirms put/display/border
   docs, registers KDDoc handlers, and `DocPrint`/`PutS` into the term doc
-  (`0x2a`). Real dollar-cmd parsing, menus, and Adam remain later work; Aiwnios strings now collapse `$$` to `$` like ZealOS so DocBorderNew formats reach DocPutS.
+  (`0x2a`). Menus and Adam remain later work; Aiwnios strings now collapse `$$`
+  to `$` like ZealOS so DocBorderNew formats reach DocPutS.
 
 ## Unchanged DolDoc `DocInit` + doldoc.hash
 
@@ -1793,4 +1794,15 @@ ZealOS live distribution or installer.
   Aiwnios also accepts `sizeof(doldoc.member)` for DocInit's `MemSet`s.
 - `TaskOriginalDocInitChecks` confirms `TX`/`CM`/`T` hash entries, TX tag
   flag, cursor-right clean scan, and `ST_DOC_CMDS` DefineSub (`0x2a`).
-  Full DocPlain/`ParseDollarCmd` and Adam remain later work.
+
+## Unchanged DolDoc `DocPlain` + dollar ParseDollarCmd
+
+- The unchanged pinned `System/DolDoc/DocPlain.ZC` loads after DocInit.
+  Mid-switch `#assert` drains without nesting CmpCtrl (Aiwnios
+  `aiwnios_switch_depth`). Unbounded `switch [type]` now bounds-checks so
+  holes like `DOCT_TEXT` take the default path. Bootstrap adds `StrMatch`,
+  `ListMatch`/`DefineMatch`, `ST_RAW_TYPES`, and thin
+  `DocDataScan`/`DocSave`/`DocLoad`/`DocCenter` stubs.
+- `TaskOriginalDocPlainChecks` exercises real `ParseDollarCmd` for `TX` tags,
+  `CM+LE+RE` flags, `FG,RED`, and `DocPrint("$$TX,\"Yo\"$$")` (`0x2a`).
+  Adam and remaining DolDoc (DocForm/DocFile/DocRecalc) remain later work.

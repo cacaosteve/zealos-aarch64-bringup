@@ -703,8 +703,14 @@ re_enter:;
         }
         goto re_enter;
       } else if (!strcmp(lex->string, "assert")) {
-        /* ZealOS uses these to enforce structure layouts. Skipping them
-         * would silently accept an incompatible ARM64 ABI. */
+        /* ZealOS layout checks. Nested CmpCtrl on this shared lexer mid-switch
+         * (DocPlain) makes the next `case` an ordinary name — drain only then. */
+        if (aiwnios_switch_depth) {
+          int64_t c;
+          while ((c = LexAdvChr(lex)) && c != '\n' && c != ERR)
+            ;
+          goto re_enter;
+        }
         lex->flags |= LEXF_UNTIL_NEWLINE;
         CCmpCtrl *cc = CmpCtrlNew(lex);
         int64_t ret = 0;

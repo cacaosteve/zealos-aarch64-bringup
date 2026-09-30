@@ -770,3 +770,6 @@ CRPN *__HC_ICAdd_GetVargsPtr(CCodeCtrl *cc);
 
 void CacheRPNArgs(CCmpCtrl *cctrl);
 extern int64_t DolDocDumpIR(char *to, int64_t, CRPN *);
+/* Non-zero while PrsSwitch is active: #assert must not nest a CmpCtrl on the
+ * shared lexer or the following `case` is seen as an ordinary name. */
+extern int64_t aiwnios_switch_depth;

@@ -3258,30 +3258,17 @@ static int64_t __OptPassFinal(CCmpCtrl *cctrl, CRPN *rpn, char *bin,
     break;
     break;
   case IC_UNBOUNDED_SWITCH:
-    //
-    // Load poop into tmp,then we continue the sexyness as normal
-    //
-    // Also make sure X1 has lo bound(See IC_BOUNDED_SWITCH)
-    //
-    next2 = ICArgN(rpn, 0);
-    {
-      PushTmpDepthFirst(cctrl, next2, 0);
-      PopTmp(cctrl, next2);
-    }
-    tmp.raw_type = RT_I64i;
-    tmp.mode = MD_REG;
-    tmp.reg = 0;
-    code_off = ICMov(cctrl, &tmp, &next2->res, bin, code_off);
-    code_off = __ICMoveI64(cctrl, 1, rpn->code_misc->lo, bin, code_off); // X1
-    goto jmp_tab_sexy;
-    break;
+    // ZealOS DocPlain uses switch [type] with holes (e.g. DOCT_TEXT=0 while
+    // cases start at DOCT_PAGE_LEN). Out-of-range must take the default label
+    // like a bounded switch; indexing the table raw faults.
   case IC_BOUNDED_SWITCH:
     next2 = ICArgN(rpn, 0);
     {
       PushTmpDepthFirst(cctrl, next2, 0);
       PopTmp(cctrl, next2);
     }
-    code_off = __OptPassFinal(cctrl, next2, bin, code_off);
+    if (rpn->type == IC_BOUNDED_SWITCH)
+      code_off = __OptPassFinal(cctrl, next2, bin, code_off);
     tmp.raw_type = RT_I64i;
     tmp.mode = MD_REG;
     tmp.reg = 0;
@@ -3294,7 +3281,6 @@ static int64_t __OptPassFinal(CCmpCtrl *cctrl, CRPN *rpn, char *bin,
     AIWNIOS_ADD_CODE(ARM_cmpRegX(tmp.reg, 2));
     fail2_addr = bin + code_off;
     AIWNIOS_ADD_CODE(ARM_bcc(ARM_GT, 0));
-  jmp_tab_sexy:
     //
     // See LAMA snail
     //
@@ -3315,7 +3301,7 @@ static int64_t __OptPassFinal(CCmpCtrl *cctrl, CRPN *rpn, char *bin,
     AIWNIOS_ADD_CODE(ARM_ldrRegRegShiftX(MIR(cctrl, tmp.reg), 2, tmp.reg));
     // Load the function base address
     AIWNIOS_ADD_CODE(ARM_br(tmp.reg));
-    if (rpn->type == IC_BOUNDED_SWITCH && cctrl->code_ctrl->final_pass) {
+    if (cctrl->code_ctrl->final_pass) {
       ref = CodeMiscAddRef(rpn->code_misc->dft_lab, fail1_addr);
       ref->patch_cond_br = ARM_bcc;
       ref->user_data1 = ARM_LT;

@@ -1,0 +1,36 @@
+// Unbounded switch holes (DocPlain DOCT_TEXT=0) must take the default path.
+I64 TaskUnboundedSwitchChecks()
+{
+	I64 i = 0, r = 0;
+
+	switch [i]
+	{
+		case 9:
+			r = 9;
+			break;
+		case 15:
+			r = 15;
+			break;
+		case 42:
+			r = 42;
+			break;
+	}
+	if (r)
+		return 1;
+	i = 15;
+	switch [i]
+	{
+		case 9:
+			r = 9;
+			break;
+		case 15:
+			r = 15;
+			break;
+		case 42:
+			r = 42;
+			break;
+	}
+	if (r != 15)
+		return 2;
+	return 42;
+}

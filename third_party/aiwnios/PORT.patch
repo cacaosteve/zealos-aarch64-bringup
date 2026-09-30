@@ -1,6 +1,5 @@
-diff -ruN a/c/aiwn_hash.h b/c/aiwn_hash.h
---- a/c/aiwn_hash.h	2026-09-29 18:48:09
-+++ b/c/aiwn_hash.h	2026-09-29 18:48:09
+--- a/c/aiwn_hash.h	2026-09-29 20:40:37
++++ b/c/aiwn_hash.h	2026-09-29 20:40:37
 @@ -35,6 +35,7 @@
  #define HTT_IMPORT_SYS_SYM  0x80
  #define HTT_EXPORT_SYS_SYM  0x100
@@ -9,9 +8,8 @@ diff -ruN a/c/aiwn_hash.h b/c/aiwn_hash.h
  
  typedef struct CHash {
    struct CHash *next;
-diff -ruN a/c/aiwn_lexparser.h b/c/aiwn_lexparser.h
---- a/c/aiwn_lexparser.h	2026-09-29 18:48:09
-+++ b/c/aiwn_lexparser.h	2026-09-29 18:48:09
+--- a/c/aiwn_lexparser.h	2026-09-29 20:40:37
++++ b/c/aiwn_lexparser.h	2026-09-29 20:40:37
 @@ -40,9 +40,11 @@
    int64_t flags, cur_char;
    int64_t cur_tok;
@@ -41,10 +39,69 @@ diff -ruN a/c/aiwn_lexparser.h b/c/aiwn_lexparser.h
      (defined(_M_ARM64) || defined(__aarch64__))
  #  define AIWNIOS_IREG_START     19
  #  define AIWNIOS_IREG_CNT       (27 - 19 + 1)
-diff -ruN a/c/arm_backend.c b/c/arm_backend.c
---- a/c/arm_backend.c	2026-09-29 18:48:09
-+++ b/c/arm_backend.c	2026-09-29 18:48:09
-@@ -4473,6 +4473,9 @@
+@@ -767,3 +770,6 @@
+ 
+ void CacheRPNArgs(CCmpCtrl *cctrl);
+ extern int64_t DolDocDumpIR(char *to, int64_t, CRPN *);
++/* Non-zero while PrsSwitch is active: #assert must not nest a CmpCtrl on the
++ * shared lexer or the following `case` is seen as an ordinary name. */
++extern int64_t aiwnios_switch_depth;
+--- a/c/arm_backend.c	2026-09-29 20:40:37
++++ b/c/arm_backend.c	2026-09-29 20:40:37
+@@ -3258,30 +3258,17 @@
+     break;
+     break;
+   case IC_UNBOUNDED_SWITCH:
+-    //
+-    // Load poop into tmp,then we continue the sexyness as normal
+-    //
+-    // Also make sure X1 has lo bound(See IC_BOUNDED_SWITCH)
+-    //
+-    next2 = ICArgN(rpn, 0);
+-    {
+-      PushTmpDepthFirst(cctrl, next2, 0);
+-      PopTmp(cctrl, next2);
+-    }
+-    tmp.raw_type = RT_I64i;
+-    tmp.mode = MD_REG;
+-    tmp.reg = 0;
+-    code_off = ICMov(cctrl, &tmp, &next2->res, bin, code_off);
+-    code_off = __ICMoveI64(cctrl, 1, rpn->code_misc->lo, bin, code_off); // X1
+-    goto jmp_tab_sexy;
+-    break;
++    // ZealOS DocPlain uses switch [type] with holes (e.g. DOCT_TEXT=0 while
++    // cases start at DOCT_PAGE_LEN). Out-of-range must take the default label
++    // like a bounded switch; indexing the table raw faults.
+   case IC_BOUNDED_SWITCH:
+     next2 = ICArgN(rpn, 0);
+     {
+       PushTmpDepthFirst(cctrl, next2, 0);
+       PopTmp(cctrl, next2);
+     }
+-    code_off = __OptPassFinal(cctrl, next2, bin, code_off);
++    if (rpn->type == IC_BOUNDED_SWITCH)
++      code_off = __OptPassFinal(cctrl, next2, bin, code_off);
+     tmp.raw_type = RT_I64i;
+     tmp.mode = MD_REG;
+     tmp.reg = 0;
+@@ -3294,7 +3281,6 @@
+     AIWNIOS_ADD_CODE(ARM_cmpRegX(tmp.reg, 2));
+     fail2_addr = bin + code_off;
+     AIWNIOS_ADD_CODE(ARM_bcc(ARM_GT, 0));
+-  jmp_tab_sexy:
+     //
+     // See LAMA snail
+     //
+@@ -3315,7 +3301,7 @@
+     AIWNIOS_ADD_CODE(ARM_ldrRegRegShiftX(MIR(cctrl, tmp.reg), 2, tmp.reg));
+     // Load the function base address
+     AIWNIOS_ADD_CODE(ARM_br(tmp.reg));
+-    if (rpn->type == IC_BOUNDED_SWITCH && cctrl->code_ctrl->final_pass) {
++    if (cctrl->code_ctrl->final_pass) {
+       ref = CodeMiscAddRef(rpn->code_misc->dft_lab, fail1_addr);
+       ref->patch_cond_br = ARM_bcc;
+       ref->user_data1 = ARM_LT;
+@@ -4473,6 +4459,9 @@
      break;
    case IC_GS:
    case IC_FS: {
@@ -54,7 +111,7 @@ diff -ruN a/c/arm_backend.c b/c/arm_backend.c
      next = rpn->base.next;
      if (next->type != IC_RELOC && next->type != IC_I64) {
        printf("Expected a relocation at IC_FS,aborting(Contact nrootcoauto for "
-@@ -5162,6 +5165,9 @@
+@@ -5162,6 +5151,9 @@
        cctrl->backend_user_data2 = 0;
        cctrl->backend_user_data3 = 0;
        r = forwards[cnt];
@@ -64,9 +121,8 @@ diff -ruN a/c/arm_backend.c b/c/arm_backend.c
        PushTmpDepthFirst(cctrl, r, 0);
        PopTmp(cctrl, r);
        r->res.mode = MD_NULL;
-diff -ruN a/c/lex.c b/c/lex.c
---- a/c/lex.c	2026-09-29 18:48:09
-+++ b/c/lex.c	2026-09-29 18:48:09
+--- a/c/lex.c	2026-09-29 20:40:37
++++ b/c/lex.c	2026-09-29 20:40:37
 @@ -9,11 +9,19 @@
  #include <stdint.h>
  #include <stdio.h>
@@ -169,7 +225,7 @@ diff -ruN a/c/lex.c b/c/lex.c
          if (idx + 1 >= STR_LEN) {
            LexErr(lex, "Name is too long.");
            return lex->cur_tok = ERR;
-@@ -632,17 +657,77 @@
+@@ -632,17 +657,83 @@
    case '#':
      if (TK_NAME == Lex(lex)) {
        if (!strcmp(lex->string, "help_file")) {
@@ -222,8 +278,14 @@ diff -ruN a/c/lex.c b/c/lex.c
          goto re_enter;
        } else if (!strcmp(lex->string, "assert")) {
 -        LexWarn(lex, "AIWN ignore's #assert's and other JIT shennangins");
-+        /* ZealOS uses these to enforce structure layouts. Skipping them
-+         * would silently accept an incompatible ARM64 ABI. */
++        /* ZealOS layout checks. Nested CmpCtrl on this shared lexer mid-switch
++         * (DocPlain) makes the next `case` an ordinary name — drain only then. */
++        if (aiwnios_switch_depth) {
++          int64_t c;
++          while ((c = LexAdvChr(lex)) && c != '\n' && c != ERR)
++            ;
++          goto re_enter;
++        }
 +        lex->flags |= LEXF_UNTIL_NEWLINE;
 +        CCmpCtrl *cc = CmpCtrlNew(lex);
 +        int64_t ret = 0;
@@ -250,7 +312,7 @@ diff -ruN a/c/lex.c b/c/lex.c
          lex->flags |= LEXF_UNTIL_NEWLINE;
          CCmpCtrl *cc = CmpCtrlNew(lex);
          char *code;
-@@ -662,6 +747,7 @@
+@@ -662,6 +753,7 @@
          CmpCtrlDel(cc);
          if (ret)
            goto re_enter;
@@ -258,7 +320,7 @@ diff -ruN a/c/lex.c b/c/lex.c
          goto if_fail;
        } else if (!strcmp(lex->string, "ifaot")) {
          // AIWN will only AOT compile for you,the JIT will be
-@@ -756,11 +842,11 @@
+@@ -756,11 +848,11 @@
            actual_file = actual_file->last;
          }
          if (actual_file) {
@@ -272,7 +334,7 @@ diff -ruN a/c/lex.c b/c/lex.c
              dir = __AIWNIOS_StrDup(buf, NULL);
              *strrchr(dir, '/') = 0;
              f = fopen(buf, "rb");
-@@ -798,12 +884,19 @@
+@@ -798,12 +890,19 @@
          lex->file = new_file;
          goto re_enter;
        } else if (!strcmp(lex->string, "define")) {
@@ -294,7 +356,7 @@ diff -ruN a/c/lex.c b/c/lex.c
          strcpy(macro_name, lex->string);
          strcpy(lex->string, "");
          define = A_CALLOC(sizeof(CHashDefineStr), NULL);
-@@ -861,8 +954,7 @@
+@@ -861,8 +960,7 @@
  }
  
  CLexer *LexerNew(char *filename, char *text) {
@@ -304,7 +366,7 @@ diff -ruN a/c/lex.c b/c/lex.c
      struct {
        char *name;
        int64_t tok;
-@@ -925,7 +1017,6 @@
+@@ -925,7 +1023,6 @@
        kw->tk = kws[i].tok;
        HashAdd(kw, Fs->hash_table);
      }
@@ -312,9 +374,8 @@ diff -ruN a/c/lex.c b/c/lex.c
    }
    CLexer *new = A_CALLOC(sizeof(CLexer), NULL);
    new->hc = HeapCtrlInit(NULL, Fs, 0);
-diff -ruN a/c/optpass.c b/c/optpass.c
---- a/c/optpass.c	2026-09-29 18:48:09
-+++ b/c/optpass.c	2026-09-29 18:48:09
+--- a/c/optpass.c	2026-09-29 20:40:37
++++ b/c/optpass.c	2026-09-29 20:40:37
 @@ -21,6 +21,9 @@
      if (rpn->ic_dim->next)
        r *= rpn->ic_dim->next->total_cnt;
@@ -368,9 +429,8 @@ diff -ruN a/c/optpass.c b/c/optpass.c
      switch (rpn->type) {
        break;
      case IC_TO_BOOL:
-diff -ruN a/c/parser.c b/c/parser.c
---- a/c/parser.c	2026-09-29 18:48:09
-+++ b/c/parser.c	2026-09-29 18:48:09
+--- a/c/parser.c	2026-09-29 20:40:37
++++ b/c/parser.c	2026-09-29 20:40:37
 @@ -1689,25 +1689,68 @@
      szo:
        if (ccmp->lex->cur_tok == '(') {
@@ -905,7 +965,117 @@ diff -ruN a/c/parser.c b/c/parser.c
    for (last_m = bungis->members_lst; last_m; last_m = last_m->next) {
      if (bungis->sz < (off = last_m->off +
                              last_m->member_class->sz * last_m->dim.total_cnt)) {
-@@ -4417,6 +4632,13 @@
+@@ -4101,6 +4316,7 @@
+   int64_t val;
+   CCodeMisc *label;
+ } CSwitchCase;
++int64_t aiwnios_switch_depth;
+ int64_t PrsSwitch(CCmpCtrl *cctrl) {
+   if (!PrsKw(cctrl, TK_KW_SWITCH))
+     return 0;
+@@ -4113,6 +4329,7 @@
+   int64_t k_low = INT_MAX, k_hi = INT_MIN, last, lo, hi, idx;
+   old_break_to = cctrl->code_ctrl->break_to;
+   cctrl->code_ctrl->break_to = lb_exit;
++  aiwnios_switch_depth++;
+   //
+   // When we encounter the start: block,we enter a secret function call
+   // So when we `break` or we implictly break by hitting the first sub-switch
+@@ -4134,12 +4351,14 @@
+     //
+     if (!ParseExpr(cctrl, 0)) {
+       ParseErr(cctrl, "Expected an expression.");
++      aiwnios_switch_depth--;
+       return 0;
+     }
+     (switch_ir = A_CALLOC(sizeof(CRPN), NULL))->type = IC_UNBOUNDED_SWITCH;
+     QueIns(switch_ir, cctrl->code_ctrl->ir_code);
+     if (cctrl->lex->cur_tok != ']') {
+       ParseErr(cctrl, "Expected a ']'.");
++      aiwnios_switch_depth--;
+       return 0;
+     } else
+       Lex(cctrl->lex);
+@@ -4147,6 +4366,7 @@
+     Lex(cctrl->lex);
+     if (!ParseExpr(cctrl, 0)) {
+       ParseErr(cctrl, "Expected an expression.");
++      aiwnios_switch_depth--;
+       return 0;
+     }
+     (switch_ir = A_CALLOC(sizeof(CRPN), NULL))->type = IC_BOUNDED_SWITCH;
+@@ -4155,12 +4375,14 @@
+     // start,(cond),end,BOUNDED_SWITCH
+     if (cctrl->lex->cur_tok != ')') {
+       ParseErr(cctrl, "Expected a ')'.");
++      aiwnios_switch_depth--;
+       return 0;
+     } else
+       Lex(cctrl->lex);
+   }
+   if (cctrl->lex->cur_tok != '{') {
+     ParseErr(cctrl, "Expected a '{'.");
++    aiwnios_switch_depth--;
+     return 0;
+   } else
+     Lex(cctrl->lex);
+@@ -4241,6 +4463,7 @@
+           Lex(cctrl->lex);
+         } else {
+           ParseErr(cctrl, "Expected a ':'.");
++          aiwnios_switch_depth--;
+           return 0;
+         }
+       }
+@@ -4251,6 +4474,7 @@
+       }
+       if (cctrl->lex->cur_tok != ':') {
+         ParseErr(cctrl, "Expected a ':'.");
++        aiwnios_switch_depth--;
+         return 0;
+       }
+       lb_dft->flags |= CMF_DEFINED;
+@@ -4268,6 +4492,7 @@
+     } else if (PrsKw(cctrl, TK_KW_START)) {
+       if (cctrl->lex->cur_tok != ':') {
+         ParseErr(cctrl, "Expected a ':'.");
++        aiwnios_switch_depth--;
+         return 0;
+       } else
+         Lex(cctrl->lex);
+@@ -4293,6 +4518,7 @@
+     } else if (PrsKw(cctrl, TK_KW_END)) {
+       if (subs.base.last == &subs) {
+         ParseErr(cctrl, "Unexpected 'end' statement.");
++        aiwnios_switch_depth--;
+         return 0;
+       }
+       QueRem(tmpss = subs.base.last);
+@@ -4309,6 +4535,7 @@
+       A_FREE(tmpss);
+       if (cctrl->lex->cur_tok != ':') {
+         ParseErr(cctrl, "Expected a ':'.");
++        aiwnios_switch_depth--;
+         return 0;
+       } else
+         Lex(cctrl->lex);
+@@ -4317,6 +4544,7 @@
+       goto add_stmt;
+     } else {
+       ParseErr(cctrl, "Expected a statement.");
++      aiwnios_switch_depth--;
+       return 0;
+     }
+   }
+@@ -4362,6 +4590,7 @@
+     switch_ir->code_misc = jmp_tab;
+   }
+   cctrl->flags = old_flags;
++  aiwnios_switch_depth--;
+   return 1;
+ }
+ static void __PrsBindCSymbol(char *name, void *ptr, int64_t naked,
+@@ -4417,6 +4646,13 @@
              *exit_misc = CodeMiscNew(cctrl, CMT_LABEL);
    if (!PrsKw(cctrl, TK_KW_TRY))
      return 0;

@@ -2062,6 +2062,14 @@ static int64_t host_btr(int64_t *a) {
 static int64_t host_btc(int64_t *a) {
     return host_lbtc(a);
 }
+static int64_t host_bsf(int64_t *a) {
+    uint64_t v = (uint64_t)a[0];
+    return v ? (int64_t)__builtin_ctzll(v) : -1;
+}
+static int64_t host_bsr(int64_t *a) {
+    uint64_t v = (uint64_t)a[0];
+    return v ? (int64_t)(63 - __builtin_clzll(v)) : -1;
+}
 static int64_t host_lbequal(int64_t *a) {
     unsigned char mask = (unsigned char)(1u << ((uint64_t)a[1] & 7));
     if (a[2])
@@ -2328,6 +2336,9 @@ static void bind_guest_task(void) {
     PrsBindCSymbol("Bts", host_bts, 2);
     PrsBindCSymbol("Btr", host_btr, 2);
     PrsBindCSymbol("Btc", host_btc, 2);
+    PrsBindCSymbol("Bsf", host_bsf, 1);
+    PrsBindCSymbol("Bsr", host_bsr, 1);
+    PrsBindCSymbol("StrLen", host_str_len, 1);
     PrsBindCSymbol("LBts", host_lbts, 2);
     PrsBindCSymbol("LBtr", host_lbtr, 2);
     PrsBindCSymbol("LBtc", host_lbtc, 2);
