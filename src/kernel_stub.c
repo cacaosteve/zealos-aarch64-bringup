@@ -211,6 +211,15 @@ static uint64_t g_zc_text_cells_drawn;
  * while these cells are the source for redraws and blank-cell attributes. */
 static uint32_t g_fb_text_cells[ZEAL_TEXT_MAX_COLS * ZEAL_TEXT_MAX_ROWS];
 static uint8_t g_fb_text_valid[ZEAL_TEXT_MAX_COLS * ZEAL_TEXT_MAX_ROWS];
+/* Retained character output for the small cooperative guest-task bridge.
+ * Cells are task-local so a z-order redraw can restore them after clearing
+ * the shared text plane. */
+#define FB_TASK_TEXT_SLOTS 6
+#define FB_TASK_TEXT_CELLS (ZEAL_TEXT_MAX_COLS * ZEAL_TEXT_MAX_ROWS)
+static uint32_t g_fb_task_text[FB_TASK_TEXT_SLOTS][FB_TASK_TEXT_CELLS];
+static uint8_t g_fb_task_text_valid[FB_TASK_TEXT_SLOTS][FB_TASK_TEXT_CELLS];
+static uint16_t g_fb_task_text_x[FB_TASK_TEXT_SLOTS];
+static uint16_t g_fb_task_text_y[FB_TASK_TEXT_SLOTS];
 
 static const uint32_t g_text_palette[16] = {
     0x00000000u, 0x000000aau, 0x0000aa00u, 0x0000aaaau,
@@ -497,6 +506,9 @@ uint64_t zeal_fb_text_cells_drawn(void) {
     return g_zc_text_cells_drawn;
 }
 
+uint64_t zeal_fb_text_cols(void) { return g_fb_cols; }
+uint64_t zeal_fb_text_rows(void) { return g_fb_rows; }
+
 int64_t zeal_fb_text_pixel(int64_t x, int64_t y) {
     if (x < INT32_MIN || x > INT32_MAX || y < INT32_MIN || y > INT32_MAX)
         return -1;
@@ -600,6 +612,145 @@ uint64_t zeal_fb_text_flush(void) {
         }
     }
     return drawn;
+}
+
+static int fb_task_text_bounds(int64_t left, int64_t right, int64_t top,
+                               int64_t bottom) {
+    return g_fb && left >= 0 && top >= 0 && left <= right && top <= bottom &&
+           right < (int64_t)g_fb_cols && bottom < (int64_t)g_fb_rows &&
+           right < ZEAL_TEXT_MAX_COLS && bottom < ZEAL_TEXT_MAX_ROWS;
+}
+
+static void fb_task_text_present(unsigned slot, int64_t left, int64_t top,
+                                 int64_t width, int64_t height) {
+    for (int64_t y = 0; y < height; y++) {
+        for (int64_t x = 0; x < width; x++) {
+            size_t local = (size_t)y * ZEAL_TEXT_MAX_COLS + (size_t)x;
+            if (!g_fb_task_text_valid[slot][local])
+                continue;
+            int64_t col = left + x, row = top + y;
+            size_t index = (size_t)row * ZEAL_TEXT_MAX_COLS + (size_t)col;
+            uint32_t cell = g_fb_task_text[slot][local];
+            g_fb_text_cells[index] = cell;
+            g_fb_text_valid[index] = 1;
+            fb_text_present_cell((uint32_t)col, (uint32_t)row, cell);
+            g_zc_text_cells_drawn++;
+        }
+    }
+}
+
+void zeal_fb_task_text_reset(unsigned slot) {
+    if (slot >= FB_TASK_TEXT_SLOTS)
+        return;
+    for (size_t i = 0; i < FB_TASK_TEXT_CELLS; i++) {
+        g_fb_task_text[slot][i] = 0;
+        g_fb_task_text_valid[slot][i] = 0;
+    }
+    g_fb_task_text_x[slot] = g_fb_task_text_y[slot] = 0;
+}
+
+uint64_t zeal_fb_task_text_write(unsigned slot, int64_t left, int64_t right,
+                                 int64_t top, int64_t bottom, uint32_t attr,
+                                 const char *text) {
+    uint64_t written = 0;
+    int64_t width, height;
+    if (slot >= FB_TASK_TEXT_SLOTS || !text ||
+        !fb_task_text_bounds(left, right, top, bottom))
+        return 0;
+    width = right - left + 1;
+    height = bottom - top + 1;
+    if (width > ZEAL_TEXT_MAX_COLS || height > ZEAL_TEXT_MAX_ROWS)
+        return 0;
+    for (size_t n = 0; text[n] && n < 4096; n++) {
+        unsigned char ch = (unsigned char)text[n];
+        if (ch == '\r') {
+            g_fb_task_text_x[slot] = 0;
+            continue;
+        }
+        if (ch == '\n') {
+            g_fb_task_text_x[slot] = 0;
+            if (++g_fb_task_text_y[slot] >= height) {
+                for (int64_t y = 1; y < height; y++) {
+                    size_t dst = (size_t)(y - 1) * ZEAL_TEXT_MAX_COLS;
+                    size_t src = (size_t)y * ZEAL_TEXT_MAX_COLS;
+                    for (int64_t x = 0; x < width; x++) {
+                        g_fb_task_text[slot][dst + x] =
+                            g_fb_task_text[slot][src + x];
+                        g_fb_task_text_valid[slot][dst + x] =
+                            g_fb_task_text_valid[slot][src + x];
+                    }
+                }
+                size_t last = (size_t)(height - 1) * ZEAL_TEXT_MAX_COLS;
+                for (int64_t x = 0; x < width; x++) {
+                    g_fb_task_text[slot][last + x] = 0;
+                    g_fb_task_text_valid[slot][last + x] = 0;
+                }
+                g_fb_task_text_y[slot] = (uint16_t)(height - 1);
+                fb_task_text_present(slot, left, top, width, height);
+            }
+            continue;
+        }
+        if (ch == '\b') {
+            if (g_fb_task_text_x[slot])
+                g_fb_task_text_x[slot]--;
+            else if (g_fb_task_text_y[slot]) {
+                g_fb_task_text_y[slot]--;
+                g_fb_task_text_x[slot] = (uint16_t)(width - 1);
+            }
+            ch = ' ';
+        }
+        if (ch < 32)
+            continue;
+        if (g_fb_task_text_x[slot] >= width) {
+            g_fb_task_text_x[slot] = 0;
+            if (++g_fb_task_text_y[slot] >= height) {
+                g_fb_task_text_y[slot] = (uint16_t)(height - 1);
+                for (int64_t y = 1; y < height; y++) {
+                    size_t dst = (size_t)(y - 1) * ZEAL_TEXT_MAX_COLS;
+                    size_t src = (size_t)y * ZEAL_TEXT_MAX_COLS;
+                    for (int64_t x = 0; x < width; x++) {
+                        g_fb_task_text[slot][dst + x] =
+                            g_fb_task_text[slot][src + x];
+                        g_fb_task_text_valid[slot][dst + x] =
+                            g_fb_task_text_valid[slot][src + x];
+                    }
+                }
+                size_t last = (size_t)(height - 1) * ZEAL_TEXT_MAX_COLS;
+                for (int64_t x = 0; x < width; x++) {
+                    g_fb_task_text[slot][last + x] = 0;
+                    g_fb_task_text_valid[slot][last + x] = 0;
+                }
+                fb_task_text_present(slot, left, top, width, height);
+            }
+        }
+        size_t local = (size_t)g_fb_task_text_y[slot] * ZEAL_TEXT_MAX_COLS +
+                       g_fb_task_text_x[slot];
+        uint32_t cell = ((attr & 0xffu) << 8) | ch;
+        g_fb_task_text[slot][local] = cell;
+        g_fb_task_text_valid[slot][local] = 1;
+        size_t index = (size_t)(top + g_fb_task_text_y[slot]) * ZEAL_TEXT_MAX_COLS +
+                       (size_t)(left + g_fb_task_text_x[slot]);
+        g_fb_text_cells[index] = cell;
+        g_fb_text_valid[index] = 1;
+        fb_text_present_cell((uint32_t)(left + g_fb_task_text_x[slot]),
+                             (uint32_t)(top + g_fb_task_text_y[slot]), cell);
+        g_zc_text_cells_drawn++;
+        g_fb_task_text_x[slot]++;
+        written++;
+    }
+    return written;
+}
+
+uint64_t zeal_fb_task_text_compose(unsigned slot, int64_t left, int64_t right,
+                                   int64_t top, int64_t bottom) {
+    if (slot >= FB_TASK_TEXT_SLOTS ||
+        !fb_task_text_bounds(left, right, top, bottom))
+        return 0;
+    int64_t width = right - left + 1, height = bottom - top + 1;
+    if (width > ZEAL_TEXT_MAX_COLS || height > ZEAL_TEXT_MAX_ROWS)
+        return 0;
+    fb_task_text_present(slot, left, top, width, height);
+    return 1;
 }
 
 static void fb_putc(char ch) {

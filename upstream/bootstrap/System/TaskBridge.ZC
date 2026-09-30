@@ -1608,6 +1608,7 @@ U0 GrUpdateTaskWin(CTask *task)
              task->win_top, task->win_bottom, task->text_attr << 8);
     if (!(task->win_inhibit & (1 << WIf_SELF_DOC)))
         DocUpdateTaskDocs(task);
+    ZcFbTaskTextCompose(task);
     if (!bootstrap_batch_redraw)
         ZcFbTextFlush();
 }

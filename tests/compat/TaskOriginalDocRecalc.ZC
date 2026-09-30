@@ -5,6 +5,8 @@ extern I64 ZcFbTextFlush();
 
 U0 WindowRedrawPark(U8 *data)
 {
+    Puts("K");
+    Print("P");
     while (TRUE)
         ZcTaskYield;
 }
@@ -228,8 +230,9 @@ I64 TaskOriginalDocRecalcChecks()
     overlap->win_inhibit |= 1 << WIF_SELF_DOC;
     overlap->text_attr = 0x20;
     old_text_cells = ZcFbTextCellsDrawn();
+    ZcTaskYield;
     GrUpdateTasks;
-    if (ZcFbTextCellsDrawn() < old_text_cells + 80 * 25 + 20 * 10)
+    if (ZcFbTextCellsDrawn() < old_text_cells + 80 * 25 + 20 * 10 + 4)
     {
         Kill(overlap);
         Fs->display_flags = old_display_flags;
@@ -245,7 +248,7 @@ I64 TaskOriginalDocRecalcChecks()
         Fs->text_attr = old_text_attr;
         return 100;
     }
-    if (ZcFbTextPixel(81, 81) != 0x0000aa00)
+    if (ZcFbTextPixel(81, 80) != 0)
     {
         Kill(overlap);
         Fs->display_flags = old_display_flags;

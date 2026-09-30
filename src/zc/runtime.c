@@ -169,6 +169,8 @@ static uint8_t guest_sys_semas[GUEST_SEMA_NUM * GUEST_SEMA_STRIDE];
 static void *guest_focus_task;
 static int64_t guest_parent_off, guest_number_off, guest_name_off, guest_flags_off;
 static int64_t guest_display_flags_off;
+static int64_t guest_win_left_off, guest_win_right_off;
+static int64_t guest_win_top_off, guest_win_bottom_off, guest_text_attr_off;
 static int64_t guest_next_task_off, guest_last_task_off;
 static int64_t guest_next_sibling_off, guest_last_sibling_off;
 static int64_t guest_next_child_off, guest_last_child_off;
@@ -183,6 +185,16 @@ static int64_t guest_heap_sig_off, guest_heap_used_off, guest_heap_task_off;
 static int64_t guest_except_ch_off, guest_catch_except_off;
 static int64_t guest_hash_table_off;
 static int guest_task_bound;
+extern uint64_t zeal_fb_text_cols(void), zeal_fb_text_rows(void);
+extern void zeal_fb_task_text_reset(unsigned slot);
+extern uint64_t zeal_fb_task_text_write(unsigned slot, int64_t left,
+                                         int64_t right, int64_t top,
+                                         int64_t bottom, uint32_t attr,
+                                         const char *text);
+extern uint64_t zeal_fb_task_text_compose(unsigned slot, int64_t left,
+                                           int64_t right, int64_t top,
+                                           int64_t bottom);
+static void guest_task_text_output(const char *text);
 static int64_t execute_source_result(const char *path, const char *src,
                                      int return_expr, int record_answer);
 extern void __clear_cache(void *, void *);
@@ -553,8 +565,23 @@ static int64_t host_set(int64_t *a) {
     return (int64_t)(uintptr_t)memset((void *)(uintptr_t)a[0], (int)a[1], (size_t)a[2]);
 }
 static int64_t host_puts(int64_t *a) {
-    zc_output((void *)(uintptr_t)a[0]);
+    const char *text = (const char *)(uintptr_t)a[0];
+    zc_output((void *)text);
+    guest_task_text_output(text);
     return 0;
+}
+static void guest_task_text_output(const char *text) {
+    if (!guest_task_bound || !text || guest_current >= GUEST_TASKS ||
+        guest_fibers[guest_current].state != GUEST_RUNNABLE)
+        return;
+    unsigned char *task = (unsigned char *)guest_fibers[guest_current].words;
+    int64_t left = *(int64_t *)(task + guest_win_left_off);
+    int64_t right = *(int64_t *)(task + guest_win_right_off);
+    int64_t top = *(int64_t *)(task + guest_win_top_off);
+    int64_t bottom = *(int64_t *)(task + guest_win_bottom_off);
+    uint32_t attr = *(uint8_t *)(task + guest_text_attr_off);
+    (void)zeal_fb_task_text_write(guest_current, left, right, top, bottom,
+                                  attr, text);
 }
 static int64_t host_swap(int64_t *a) {
     int64_t *x = (void *)(uintptr_t)a[0], *y = (void *)(uintptr_t)a[1], v = *x;
@@ -979,6 +1006,15 @@ static void init_guest_fiber(unsigned i, void *parent, const char *name) {
     *(uint32_t *)(words + guest_display_flags_off) = parent
         ? *(uint32_t *)((unsigned char *)parent + guest_display_flags_off)
         : (1u << 1); /* DISPLAYf_NOT_RAW */
+    uint64_t cols = zeal_fb_text_cols(), rows = zeal_fb_text_rows();
+    if (!cols || cols > 512) cols = 100;
+    if (!rows || rows > 512) rows = 75;
+    *(int64_t *)(words + guest_win_left_off) = 0;
+    *(int64_t *)(words + guest_win_right_off) = (int64_t)cols - 1;
+    *(int64_t *)(words + guest_win_top_off) = 0;
+    *(int64_t *)(words + guest_win_bottom_off) = (int64_t)rows - 1;
+    *(uint8_t *)(words + guest_text_attr_off) = 0x0f;
+    zeal_fb_task_text_reset(i);
     unsigned char *ctrl = words + guest_server_ctrl_off;
     *(void **)(ctrl + 0) = ctrl;
     *(void **)(ctrl + 8) = ctrl;
@@ -1247,6 +1283,18 @@ static struct guest_fiber *find_guest_task(void *task) {
         if (guest_fibers[i].words == task && guest_fibers[i].state == GUEST_RUNNABLE)
             return &guest_fibers[i];
     return NULL;
+}
+static int64_t host_fb_task_text_compose(int64_t *a) {
+    struct guest_fiber *f = find_guest_task((void *)(uintptr_t)a[0]);
+    if (!f)
+        return 0;
+    unsigned char *task = (unsigned char *)f->words;
+    return (int64_t)zeal_fb_task_text_compose(
+        (unsigned)(f - guest_fibers),
+        *(int64_t *)(task + guest_win_left_off),
+        *(int64_t *)(task + guest_win_right_off),
+        *(int64_t *)(task + guest_win_top_off),
+        *(int64_t *)(task + guest_win_bottom_off));
 }
 static int focused_key_wait_pending(void) {
     struct guest_fiber *focus = find_guest_task(guest_focus_task);
@@ -1599,6 +1647,7 @@ static int64_t host_put_key(int64_t *a) {
     if (a[0] >= 32 && a[0] < 127) {
         char shown[2] = {(char)a[0], 0};
         zc_output(shown);
+        guest_task_text_output(shown);
     }
     return 0;
 }
@@ -2298,6 +2347,11 @@ static void bind_guest_task(void) {
         !task_field(cls, "server_ctrl", 40, -1) ||
         !task_field(cls, "task_num", 8, -1) ||
         !task_field(cls, "task_name", 32, -1) ||
+        !task_field(cls, "win_left", 8, -1) ||
+        !task_field(cls, "win_right", 8, -1) ||
+        !task_field(cls, "win_top", 8, -1) ||
+        !task_field(cls, "win_bottom", 8, -1) ||
+        !task_field(cls, "text_attr", 1, -1) ||
         !task_field(cls, "code_heap", 8, -1) ||
         !task_field(cls, "data_heap", 8, -1) ||
         !task_field(cls, "answer", 8, -1) ||
@@ -2352,6 +2406,11 @@ static void bind_guest_task(void) {
     guest_name_off = MemberFind("task_name", cls)->off;
     guest_flags_off = MemberFind("task_flags", cls)->off;
     guest_display_flags_off = MemberFind("display_flags", cls)->off;
+    guest_win_left_off = MemberFind("win_left", cls)->off;
+    guest_win_right_off = MemberFind("win_right", cls)->off;
+    guest_win_top_off = MemberFind("win_top", cls)->off;
+    guest_win_bottom_off = MemberFind("win_bottom", cls)->off;
+    guest_text_attr_off = MemberFind("text_attr", cls)->off;
     guest_win_inhibit_off = MemberFind("win_inhibit", cls)->off;
     guest_data_heap_off = MemberFind("data_heap", cls)->off;
     guest_code_heap_off = MemberFind("code_heap", cls)->off;
@@ -2613,6 +2672,7 @@ static int64_t host_print(int64_t *a) {
     char output[4097];
     format_text(output, sizeof(output), format, argc, argv);
     zc_output(output);
+    guest_task_text_output(output);
     return 0;
 }
 static int execute_source(const char *path, const char *src) {
@@ -2837,7 +2897,8 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
                     {"ZcFbTextChar", host_fb_text_char, 6},
                     {"ZcFbTextFill", host_fb_text_fill, 6},
                     {"ZcFbTextRect", host_fb_text_rect, 5},
-                    {"ZcFbTextFlush", host_fb_text_flush, 0}};
+                    {"ZcFbTextFlush", host_fb_text_flush, 0},
+                    {"ZcFbTaskTextCompose", host_fb_task_text_compose, 1}};
     for (size_t i = 0; i < sizeof(bindings) / sizeof(*bindings); i++)
         PrsBindCSymbol((char *)bindings[i].name, (void *)bindings[i].fn, bindings[i].arity);
     __clear_cache(code_arena, code_arena + sizeof(code_arena));

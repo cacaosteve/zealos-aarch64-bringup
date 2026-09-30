@@ -1848,9 +1848,12 @@ ZealOS live distribution or installer.
   allowance and static invert/selection/underline flags. Writes are mirrored
   into a bounded 512-by-512 packed-cell plane; `TextLenAttr` preserves existing
   nonblank cells, `TextRect` updates a clipped rectangle, and `ZcFbTextFlush`
-  redraws valid cells from the plane. Writes still present immediately to keep
-  the bootstrap shell responsive; this is not yet ZealOS's per-task
-  `gr.text_base`/window compositor. `TextBorder` draws the upstream CP437
+  redraws valid cells from the plane. Guest `Puts`, `Print`, and printable
+  `PutKey` output now also goes into a bounded per-task text buffer and is
+  replayed inside that task's window during redraw; the smoke verifies a child
+  task's glyph survives an overlapping redraw. Serial output remains mirrored.
+  The C bootstrap shell still writes directly to the framebuffer and is not
+  yet backed by a task document or retained task cells. `TextBorder` draws the upstream CP437
   single- and double-line glyphs through `TextChar`. A bootstrap
   `GrUpdateTaskWin` clears one task's cell rectangle, draws its border, and
   asks `DocUpdateTaskDocs` to recalculate its DolDocs. `GrUpdateTasks` clears
@@ -1858,5 +1861,5 @@ ZealOS live distribution or installer.
   in its back-to-front order, then presents the composed cell plane; an
   overlapping two-task smoke verifies that the later task covers the earlier
   one. The renderer still lacks draw callbacks, controls, the uncovered-window
-  bitmap, and per-task backing planes. Source matching, forms/data formatting,
+  bitmap, and upstream `gr.text_base` semantics. Source matching, forms/data formatting,
   sprites/depth buffers, music state, and cursor interaction remain unaccepted.
