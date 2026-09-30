@@ -1512,6 +1512,7 @@ class CBootstrapTextGlbls
 };
 CBootstrapTextGlbls text;
 CTask *sys_winmgr_task = NULL;
+extern U0 DocUpdateTaskDocs(CTask *task);
 Bool TextChar(CTask *task, Bool allow_border=FALSE, I64 x=0, I64 y=0, I64 d=0)
 {//Single-cell framebuffer path; border mode permits the adjacent outer row/column.
     if (!task)
@@ -1593,6 +1594,20 @@ U0 TextRect(I64 left, I64 right, I64 top, I64 bottom, I64 cell)
     if (left > right || top > bottom)
         return;
     ZcFbTextRect(left, right, top, bottom, cell);
+}
+U0 GrUpdateTaskWin(CTask *task)
+{//Single-task bootstrap redraw: border, cell clear, DolDoc, then plane flush.
+    if (!task || !TaskValidate(task))
+        return;
+    if (!(task->display_flags & (1 << DISPLAYf_NO_BORDER)))
+        TextBorder(Fs, task->win_left, task->win_right,
+                   task->win_top, task->win_bottom,
+                   task->border_attr, task == sys_focus_task);
+    TextRect(task->win_left, task->win_right,
+             task->win_top, task->win_bottom, task->text_attr << 8);
+    if (!(task->win_inhibit & (1 << WIf_SELF_DOC)))
+        DocUpdateTaskDocs(task);
+    ZcFbTextFlush();
 }
 U0 WinHorz(I64 left, I64 right, CTask *task)
 {

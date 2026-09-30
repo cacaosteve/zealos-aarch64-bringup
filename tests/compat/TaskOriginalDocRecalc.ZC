@@ -190,6 +190,13 @@ I64 TaskOriginalDocRecalcChecks()
         Fs->display_flags = old_display_flags;
         return 77;
     }
+    old_text_cells = ZcFbTextCellsDrawn();
+    GrUpdateTaskWin(Fs);
+    if (ZcFbTextCellsDrawn() < old_text_cells + 80 * 25)
+    {
+        Fs->display_flags = old_display_flags;
+        return 96;
+    }
     Fs->display_flags = old_display_flags;
     Fs->win_left = old_left; Fs->win_right = old_right;
     Fs->win_top = old_top; Fs->win_bottom = old_bottom;
