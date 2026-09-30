@@ -7,7 +7,7 @@ I64 TaskOriginalDocRecalcChecks()
     CDocEntry *entry;
     I64 x, y, old_left, old_right, old_top, old_bottom;
     I64 old_width, old_height, old_scroll_x, old_scroll_y;
-    I64 old_display_flags, old_text_cells;
+    I64 old_display_flags, old_text_cells, outside_pixel;
     U32 attr_cells[2];
 
     DocInit;
@@ -114,6 +114,36 @@ I64 TaskOriginalDocRecalcChecks()
     {
         Fs->display_flags = old_display_flags;
         return 85;
+    }
+    old_text_cells = ZcFbTextCellsDrawn();
+    if (!TextLenAttr(Fs, 10, 3, 3, 0x4e00) ||
+        ZcFbTextCellsDrawn() != old_text_cells + 3 ||
+        ZcFbTextPixel(80, 24) != 0x00aa0000)
+    {
+        Fs->display_flags = old_display_flags;
+        return 86;
+    }
+    old_text_cells = ZcFbTextCellsDrawn();
+    outside_pixel = ZcFbTextPixel(648, 24);
+    if (!TextLenAttr(Fs, 79, 3, 3, 0x4e00))
+    {
+        Fs->display_flags = old_display_flags;
+        return 87;
+    }
+    if (ZcFbTextCellsDrawn() != old_text_cells + 1)
+    {
+        Fs->display_flags = old_display_flags;
+        return 88;
+    }
+    if (ZcFbTextPixel(632, 24) != 0x00aa0000)
+    {
+        Fs->display_flags = old_display_flags;
+        return 89;
+    }
+    if (ZcFbTextPixel(648, 24) != outside_pixel)
+    {
+        Fs->display_flags = old_display_flags;
+        return 90;
     }
     old_text_cells = ZcFbTextCellsDrawn();
     if (!DocRecalc(doc, RECALCt_TO_SCREEN))

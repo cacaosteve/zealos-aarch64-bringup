@@ -1842,11 +1842,12 @@ ZealOS live distribution or installer.
   runs the unchanged screen-recalc path through framebuffer-backed
   `TextLenStr` and verifies plain and per-cell attributed text spans are
   emitted; the full smoke returns `0x2a`.
-- The text bridge clips spans and single cells to task bounds, applies task
-  scroll, and maps the packed 16-color foreground/background attributes.
-  `TextChar` honors the one-cell border allowance and static invert/selection/
-  underline flags. It draws into the current framebuffer directly; it is not
-  yet ZealOS's `gr.text_base`/double-buffered text layer. `TextLenAttr`,
-  `TextBorder`, and WinMgr remain stand-ins. Source matching, forms/data
-  formatting, sprites/depth buffers, music state, cursor interaction, and
-  multi-window rendering remain unaccepted.
+- The text bridge clips spans, single cells, and blank attributed-cell fills to
+  task bounds, applies task scroll, and maps the packed 16-color
+  foreground/background attributes. `TextChar` honors the one-cell border
+  allowance and static invert/selection/underline flags. These operations
+  draw into the current framebuffer directly; they are not yet ZealOS's
+  `gr.text_base`/double-buffered text layer. `TextBorder` and WinMgr remain
+  stand-ins. Source matching, forms/data formatting, sprites/depth buffers,
+  music state, cursor interaction, and multi-window rendering remain
+  unaccepted.

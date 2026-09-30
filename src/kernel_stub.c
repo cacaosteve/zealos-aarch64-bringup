@@ -493,6 +493,17 @@ int64_t zeal_fb_text_char(int64_t x, int64_t y, uint32_t cell,
                              left, right, top, bottom) == 1;
 }
 
+uint64_t zeal_fb_text_fill(int64_t x, int64_t y, int64_t len, uint32_t attr,
+                           uint32_t left_right, uint32_t top_bottom) {
+    static const uint8_t blank_cells[4096] = {0};
+    int64_t left = left_right & 0xffffu;
+    int64_t right = left_right >> 16;
+    int64_t top = top_bottom & 0xffffu;
+    int64_t bottom = top_bottom >> 16;
+    return zeal_fb_text_span(x, y, len, attr, blank_cells, 0,
+                             left, right, top, bottom);
+}
+
 static void fb_putc(char ch) {
     if (!g_fb) {
         return;
