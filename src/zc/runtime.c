@@ -9,6 +9,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+extern void hc_fmt_f64_bits(char **dp, uint64_t bits, int prec);
+
 extern uint64_t zeal_fb_text_span(int64_t x, int64_t y, int64_t len,
                                   uint32_t attr, const void *data, int mode,
                                   int64_t left, int64_t right,
@@ -181,6 +183,17 @@ static struct guest_counts {
 } guest_counts;
 _Static_assert(offsetof(struct guest_counts, time_stamp_freq) == 16 &&
                sizeof(struct guest_counts) == 48, "pinned counts layout");
+/* KernelB's pinned CProgress layout; populated independently by graphics
+ * compatibility tests until the native progress service is ported. */
+struct guest_progress {
+    int64_t val, max;
+    double t0, tf;
+    uint8_t desc[48];
+};
+static struct guest_progress guest_progresses[4];
+_Static_assert(offsetof(struct guest_progress, desc) == 32 &&
+               sizeof(struct guest_progress) == 80,
+               "pinned CProgress layout");
 /* KernelB: CSema sys_semas[SEMA_SEMAS_NUM]; each CSema is one cache line. */
 #define GUEST_SEMA_NUM 21
 #define GUEST_SEMA_STRIDE 128
@@ -2517,6 +2530,7 @@ static void bind_guest_task(void) {
     guest_heap_used_off = MemberFind("used_u8s", heap)->off;
     guest_heap_task_off = MemberFind("mem_task", heap)->off;
     memset(guest_fibers, 0, sizeof(guest_fibers));
+    memset(guest_progresses, 0, sizeof(guest_progresses));
     guest_current = guest_completed = 0;
     guest_task_serial = 0;
     guest_job_count = 0;
@@ -2538,6 +2552,7 @@ static void bind_guest_task(void) {
     PrsBindCSymbol("Gs", host_gs, 0);
     PrsBindCSymbol("mp_count", &guest_mp_count, 0);
     PrsBindCSymbol("sys_focus_task", &guest_focus_task, 0);
+    PrsBindCSymbol("sys_progresses", guest_progresses, 0);
     PrsBindCSymbol("Bt", host_bt, 2);
     PrsBindCSymbol("Bts", host_bts, 2);
     PrsBindCSymbol("Btr", host_btr, 2);
@@ -2666,7 +2681,7 @@ static int64_t host_exe_print(int64_t *a) {
 }
 static int64_t host_print(int64_t *a);
 /* Bounded text formatter shared by Print and StrPrintJoin. Supports the
- * markers and codes used by Message.ZC CharGet and Job.ZC PopUp/XTalk helpers. */
+ * markers and codes used by Message.ZC, Job.ZC, and upstream progress UI. */
 static size_t format_text(char *output, size_t capacity, const char *format,
                           int64_t argc, const int64_t *argv) {
     size_t used = 0;
@@ -2694,13 +2709,33 @@ static size_t format_text(char *output, size_t capacity, const char *format,
         }
         if (!format[i + 1])
             zc_fail("format ends with percent");
-        char code = format[i + 1];
-        i += 2;
+        size_t spec = i + 1;
+        int precision = 1;
+        int has_precision = 0;
+        /* ZealOS formats commonly use %0.3f. Width is parsed and ignored
+         * for now; precision controls the emitted fractional digits. */
+        while (format[spec] >= '0' && format[spec] <= '9')
+            spec++;
+        if (format[spec] == '.') {
+            has_precision = 1;
+            precision = 0;
+            spec++;
+            while (format[spec] >= '0' && format[spec] <= '9') {
+                if (precision < 100)
+                    precision = precision * 10 + (format[spec] - '0');
+                spec++;
+            }
+        }
+        char code = format[spec];
+        if (!code)
+            zc_fail("format ends with incomplete conversion");
+        i = spec + 1;
         if (code == '%') {
             FMT_BYTE('%');
             continue;
         }
-        if (code != 'c' && code != 'C' && code != 's' && code != 'd')
+        if (code != 'c' && code != 'C' && code != 's' && code != 'd' &&
+            code != 'f' && code != 'F')
             zc_fail("format code is unsupported");
         if (arg >= argc)
             zc_fail("format needs another argument");
@@ -2717,6 +2752,14 @@ static size_t format_text(char *output, size_t capacity, const char *format,
             if (!s) zc_fail("format %s argument is null");
             for (size_t j = 0; s[j]; j++)
                 FMT_BYTE(s[j]);
+        } else if (code == 'f' || code == 'F') {
+            char number[64];
+            char *end = number;
+            hc_fmt_f64_bits(&end, (uint64_t)argv[arg++],
+                            has_precision ? precision : 1);
+            *end = 0;
+            for (const char *p = number; *p; p++)
+                FMT_BYTE(*p);
         } else {
             int64_t value = argv[arg++];
             char digits[32];

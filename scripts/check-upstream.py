@@ -19,4 +19,18 @@ manifest = json.loads((zeal/'UPSTREAM.json').read_text())
 for name, expected in manifest['files'].items():
     if hashlib.sha256((zeal/name.removeprefix('src/')).read_bytes()).hexdigest() != expected:
         raise SystemExit(f'ZealOS original hash mismatch: {name}')
-print('PASS pinned Aiwnios originals + documented patch; unchanged ZealOS source files')
+win_source = (zeal/'System/Win.ZC').read_text()
+win_fixture = (root/'tests/compat/WinProgressBars.ZC').read_text()
+start = win_source.index('U0 DrawProgressBars(CDC *dc)')
+brace = win_source.index('{', start)
+depth = 0
+for index in range(brace, len(win_source)):
+    depth += (win_source[index] == '{') - (win_source[index] == '}')
+    if depth == 0:
+        end = index + 1
+        break
+else:
+    raise SystemExit('Could not find upstream DrawProgressBars body')
+if win_source[start:end] not in win_fixture:
+    raise SystemExit('WinProgressBars compatibility fixture drifted from pinned source')
+print('PASS pinned Aiwnios originals + documented patch; unchanged ZealOS files; Win progress draw fixture')

@@ -47,8 +47,11 @@ screen dimensions. The initial graphics surface supports palette/RGB
 `GrPlot`, filled `GrRect`, solid `GrLine`, and transparent 8x8 `GrPrint` text,
 translated by task pixel origin and scroll and clipped to that task's pixel
 rectangle. `GrPrint` uses the bootstrap formatter's current `%%`, `%c`/`%C`,
-`%s`, and `%d` subset. These cover basic geometry and labels used by upstream
-progress drawing, but do not port CDC allocation/lifetime, the full
+`%s`, `%d`, and `%f` subset. `MStrPrint` supports the same formats with
+floating-point precision (including upstream `%fs` elapsed-time labels); the
+compatibility probe runs the unchanged `DrawProgressBars` body. These cover
+basic geometry and labels used by upstream progress drawing, but do not port
+CDC allocation/lifetime, the full
 formatter/font system, general raster operations, sprites, controls,
 z-buffering, or redraw of newly uncovered windows.
 

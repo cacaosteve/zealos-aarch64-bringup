@@ -357,6 +357,15 @@ I64 TaskOriginalDocRecalcChecks()
         Fs->text_attr = old_text_attr;
         return 111;
     }
+    x = WinProgressBarsChecks(overlap);
+    if (x != 42)
+    {
+        Kill(overlap);
+        Fs->display_flags = old_display_flags;
+        Fs->win_inhibit = old_win_inhibit;
+        Fs->text_attr = old_text_attr;
+        return x;
+    }
     if (!ZcFbShellTextCompose(gr.text_base, 100))
     {
         Kill(overlap);

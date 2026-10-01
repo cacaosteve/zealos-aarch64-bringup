@@ -394,6 +394,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             if args.probe_module == '/System/DolDoc/DocRecalc.ZC':
                 if 'zc: loaded /System/DolDoc/DocRecalc.ZC' not in result:
                     raise RuntimeError('unchanged DocRecalc.ZC did not load')
+                command('zload /Tests/WinProgressBars.ZC',
+                        'zc: loaded /Tests/WinProgressBars.ZC')
                 command('zload /Tests/TaskOriginalDocRecalc.ZC',
                         'zc: loaded /Tests/TaskOriginalDocRecalc.ZC')
                 command('zcall TaskOriginalDocRecalcChecks',

@@ -1,0 +1,125 @@
+#define GR_WIDTH 800
+#define GR_HEIGHT 600
+
+#define PROGRESS_BAR_HEIGHT 20
+#define PROGRESS_BAR_WIDTH (3 * GR_WIDTH / 4)
+U0 DrawProgressBars(CDC *dc)
+{
+	I64 i, j, k, n, m;
+	U8 *st, *st2;
+
+	for (i = 0; i < PROGRESS_BARS_NUM; i++)
+	{
+		if (m = sys_progresses[i].max)
+		{
+			dc->color = BLACK;
+			GrRect(dc,	(GR_WIDTH - PROGRESS_BAR_WIDTH) / 2,
+						(GR_HEIGHT -(PROGRESS_BARS_NUM * 2 - 1 - i * 4) * PROGRESS_BAR_HEIGHT) / 2,
+						PROGRESS_BAR_WIDTH, PROGRESS_BAR_HEIGHT);
+
+			dc->color = LTGREEN;
+			n = sys_progresses[i].val;
+			if (n>m)
+				n = m;
+			GrRect(dc,	(GR_WIDTH - PROGRESS_BAR_WIDTH) / 2 + 2,
+						(GR_HEIGHT - (PROGRESS_BARS_NUM * 2 - 1 - i * 4) * PROGRESS_BAR_HEIGHT) / 2 + 2,
+						n * (PROGRESS_BAR_WIDTH - 4) / m,
+						PROGRESS_BAR_HEIGHT - 4);
+
+			if (m>1)
+			{
+				dc->color = BLACK;
+				k = m - 1;
+				if (k > 19) k = 19;
+				for (j = 0; j <= k; j++)
+					GrLine(dc,	(GR_WIDTH - PROGRESS_BAR_WIDTH) / 2 + 1 + j * (PROGRESS_BAR_WIDTH - 4) / ToF64(k + 1),
+								(GR_HEIGHT - (PROGRESS_BARS_NUM * 2 - 1 - i * 4) * PROGRESS_BAR_HEIGHT) / 2 + 4,
+								(GR_WIDTH - PROGRESS_BAR_WIDTH) / 2 + 1 + j * (PROGRESS_BAR_WIDTH - 4) / ToF64(k + 1),
+								(GR_HEIGHT - (PROGRESS_BARS_NUM * 2 - 3 - i * 4) * PROGRESS_BAR_HEIGHT) / 2 - 4);
+			}
+
+			dc->color = GREEN;
+			if (*sys_progresses[i].desc)
+				st = StrNew(sys_progresses[i].desc);
+			else
+				st = MStrPrint("%d/%d", n, m);
+			if (sys_progresses[i].t0)
+			{
+				st2 = MStrPrint("%s %fs", st, tS - sys_progresses[i].t0);
+				Free(st);
+			}
+			else
+				st2 = st;
+			if (sys_progresses[i].tf)
+			{
+				st = MStrPrint("%s/%fs", st2, sys_progresses[i].tf);
+				Free(st2);
+			}
+			else
+				st = st2;
+			GrPrint(dc, (GR_WIDTH - FONT_WIDTH * StrLen(st)) / 2, (GR_HEIGHT - FONT_HEIGHT -
+						(PROGRESS_BARS_NUM * 2 - 2 - i * 4) * PROGRESS_BAR_HEIGHT) / 2, "%s", st);
+			Free(st);
+		}
+	}
+}
+CTask *win_progress_smoke_task;
+U0 WinProgressBarsTaskDraw(CTask *task, CDC *dc)
+{
+    if (task == win_progress_smoke_task)
+        DrawProgressBars(dc);
+}
+I64 WinProgressBarsChecks(CTask *task)
+{
+    I64 i, old_left, old_right, old_top, old_bottom, old_inhibit;
+    F64 old_time;
+    U8 *formatted;
+    if (!task || !TaskValidate(task))
+        return 119;
+    formatted = MStrPrint("%0.3f", 1.25);
+    if (StrLen(formatted) != 5 || formatted[0] != '1' ||
+        formatted[1] != '.' || formatted[2] != '2' ||
+        formatted[3] != '5' || formatted[4] != '0')
+    {
+        Free(formatted);
+        return 123;
+    }
+    Free(formatted);
+    old_left = task->win_left; old_right = task->win_right;
+    old_top = task->win_top; old_bottom = task->win_bottom;
+    old_inhibit = task->win_inhibit;
+    old_time = tS;
+    for (i = 0; i < PROGRESS_BARS_NUM; i++)
+    {
+        sys_progresses[i].val = 0;
+        sys_progresses[i].max = 0;
+        sys_progresses[i].t0 = 0;
+        sys_progresses[i].tf = 0;
+        sys_progresses[i].desc[0] = 0;
+    }
+    sys_progresses[0].val = 2;
+    sys_progresses[0].max = 4;
+    sys_progresses[0].t0 = 1.25;
+    tS = 2.5;
+    task->win_inhibit |= 1 << WIF_SELF_DOC;
+    task->draw_it = &WinProgressBarsTaskDraw;
+    win_progress_smoke_task = task;
+    WinHorz(0, TEXT_COLS - 1, task);
+    WinVert(0, TEXT_ROWS - 1, task);
+    GrUpdateTasks;
+    tS = old_time;
+    win_progress_smoke_task = NULL;
+    task->draw_it = NULL;
+    task->win_inhibit = old_inhibit;
+    WinHorz(old_left, old_right, task);
+    WinVert(old_top, old_bottom, task);
+    if (ZcFbTextPixel(120, 240) != 0x0055ff55)
+        return 120;
+    if (ZcFbTextPixel(401, 240) != 0)
+        return 121;
+    // The elapsed-time branch formats 1.25 seconds as "1.3s" (the
+    // ZealOS default %f precision), so the centered "2/4 1.3s" starts at 368.
+    if (ZcFbTextPixel(370, 236) != 0x0000aa00)
+        return 122;
+    return 42;
+}
