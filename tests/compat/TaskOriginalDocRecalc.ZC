@@ -22,6 +22,7 @@ U0 WindowDrawSmoke(CTask *task, CDC *dc)
         GrPlot(dc, 10, 10);
         GrRect(dc, 20, 10, 3, 2);
         GrLine(dc, 12, 10, 17, 10, 1, 0);
+        GrPrint(dc, 40, 10, "%s", "A");
     }
 }
 
@@ -347,6 +348,14 @@ I64 TaskOriginalDocRecalcChecks()
         Fs->win_inhibit = old_win_inhibit;
         Fs->text_attr = old_text_attr;
         return 110;
+    }
+    if (ZcFbTextPixel(123, 90) != 0x00aa0000)
+    {
+        Kill(overlap);
+        Fs->display_flags = old_display_flags;
+        Fs->win_inhibit = old_win_inhibit;
+        Fs->text_attr = old_text_attr;
+        return 111;
     }
     if (!ZcFbShellTextCompose(gr.text_base, 100))
     {

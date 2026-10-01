@@ -36,6 +36,10 @@ extern uint64_t zeal_fb_graph_rect(int64_t x, int64_t y,
                                    int64_t width, int64_t height,
                                    uint32_t color, int64_t left, int64_t top,
                                    int64_t right, int64_t bottom);
+extern uint64_t zeal_fb_graph_text(int64_t x, int64_t y, uint32_t color,
+                                   int64_t left, int64_t top,
+                                   int64_t right, int64_t bottom,
+                                   const char *text);
 extern uint64_t zeal_fb_graph_line(int64_t x0, int64_t y0,
                                    int64_t x1, int64_t y1, uint32_t color,
                                    int64_t step, int64_t start,
@@ -692,6 +696,11 @@ static int64_t host_fb_graph_plot(int64_t *a) {
 static int64_t host_fb_graph_rect(int64_t *a) {
     return (int64_t)zeal_fb_graph_rect(a[0], a[1], a[2], a[3],
                                        (uint32_t)a[4], a[5], a[6], a[7], a[8]);
+}
+static int64_t host_fb_graph_text(int64_t *a) {
+    return (int64_t)zeal_fb_graph_text(a[0], a[1], (uint32_t)a[2],
+                                       a[3], a[4], a[5], a[6],
+                                       (const char *)(uintptr_t)a[7]);
 }
 static int64_t host_fb_graph_line(int64_t *a) {
     return (int64_t)zeal_fb_graph_line(a[0], a[1], a[2], a[3],
@@ -2982,6 +2991,7 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
                     {"ZcFbTextFlush", host_fb_text_flush, 3},
                     {"ZcFbGraphPlot", host_fb_graph_plot, 7},
                     {"ZcFbGraphRect", host_fb_graph_rect, 9},
+                    {"ZcFbGraphText", host_fb_graph_text, 8},
                     {"ZcFbGraphLine", host_fb_graph_line, 11},
                     {"ZcFbScreenWidth", host_fb_screen_width, 0},
                     {"ZcFbScreenHeight", host_fb_screen_height, 0},

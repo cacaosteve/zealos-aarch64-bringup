@@ -1692,6 +1692,31 @@ Bool GrRect(CDC *dc=gr.dc, I64 x=0, I64 y=0, I64 width=0, I64 height=0)
     return ZcFbGraphRect(x, y, width, height, dc->color.c0 & 0xff,
                          left, top, right, bottom);
 }
+U0 GrPrint(CDC *dc=gr.dc, I64 x=0, I64 y=0, U8 *format, ...)
+{
+    CTask *task;
+    U8 *text;
+    I64 left, top, right, bottom;
+    if (!dc || !format || !(dc->flags & DCF_SCREEN_BITMAP))
+        return;
+    task = dc->win_task;
+    if (!task)
+        return;
+    WinDerivedValsUpdate(task);
+    left = task->pix_left;
+    top = task->pix_top;
+    right = task->pix_right;
+    bottom = task->pix_bottom;
+    x += left + task->scroll_x;
+    y += top + task->scroll_y;
+    text = StrPrintJoin(NULL, format, argc, argv);
+    if (text)
+    {
+        ZcFbGraphText(x, y, dc->color.c0 & 0xff,
+                      left, top, right, bottom, text);
+        Free(text);
+    }
+}
 Bool GrLine(CDC *dc=gr.dc, I64 x1=0, I64 y1=0, I64 x2=0, I64 y2=0,
             I64 step=1, I64 start=0)
 {

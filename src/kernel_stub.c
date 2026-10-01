@@ -1839,6 +1839,61 @@ uint64_t zeal_fb_graph_rect(int64_t x, int64_t y, int64_t width, int64_t height,
     return 1;
 }
 
+uint64_t zeal_fb_graph_text(int64_t x, int64_t y, uint32_t color,
+                            int64_t left, int64_t top,
+                            int64_t right, int64_t bottom, const char *text) {
+    static const uint8_t glyph_pi[8] = {
+        0x00, 0x7e, 0x5a, 0x5a, 0x5a, 0x5a, 0x5a, 0x00
+    };
+    static const uint8_t glyph_theta[8] = {
+        0x3c, 0x66, 0x60, 0x7c, 0x60, 0x66, 0x3c, 0x00
+    };
+    int64_t origin_x = x;
+    uint64_t drawn = 0;
+    if (!g_fb || !text || x < -8192 || x > (int64_t)g_fb_w + 8192 ||
+        y < -8192 || y > (int64_t)g_fb_h + 8192)
+        return 0;
+    color = zeal_graphics_color(color);
+    for (size_t i = 0; text[i] && i < 4096; i++) {
+        unsigned char ch = (unsigned char)text[i];
+        const uint8_t *glyph;
+        if (ch == '\n') {
+            x = origin_x;
+            y += 8;
+            continue;
+        }
+        if (ch == '\r')
+            continue;
+        if (ch == '\t') {
+            x += 32;
+            continue;
+        }
+        if (ch == 0xe3)
+            glyph = glyph_pi;
+        else if (ch == 0xe9)
+            glyph = glyph_theta;
+        else {
+            if (ch < 32 || ch > 127)
+                ch = '?';
+            glyph = g_font8[ch - 32];
+        }
+        for (int64_t row = 0; row < 8; row++) {
+            uint8_t bits = glyph[row];
+            for (int64_t col = 0; col < 8; col++) {
+                int64_t px = x + col, py = y + row;
+                if ((bits & (0x80u >> col)) && px >= left && px <= right &&
+                    py >= top && py <= bottom && px >= 0 && py >= 0 &&
+                    (uint64_t)px < g_fb_w && (uint64_t)py < g_fb_h) {
+                    fb_putpixel((uint32_t)px, (uint32_t)py, color);
+                    drawn++;
+                }
+            }
+        }
+        x += 8;
+    }
+    return drawn;
+}
+
 uint64_t zeal_fb_graph_line(int64_t x0, int64_t y0, int64_t x1, int64_t y1,
                             uint32_t color, int64_t step, int64_t start,
                             int64_t left, int64_t top,
