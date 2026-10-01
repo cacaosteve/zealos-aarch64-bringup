@@ -63,17 +63,12 @@ U0 DrawProgressBars(CDC *dc)
 		}
 	}
 }
-CTask *win_progress_smoke_task;
-U0 WinProgressBarsTaskDraw(CTask *task, CDC *dc)
-{
-    if (task == win_progress_smoke_task)
-        DrawProgressBars(dc);
-}
 I64 WinProgressBarsChecks(CTask *task)
 {
-    I64 i, old_left, old_right, old_top, old_bottom, old_inhibit;
+    I64 i, old_scroll_x;
     F64 old_time;
     U8 *formatted;
+    U0 (*old_final_screen_update)(CDC *dc);
     if (!task || !TaskValidate(task))
         return 119;
     formatted = MStrPrint("%0.3f", 1.25);
@@ -85,10 +80,9 @@ I64 WinProgressBarsChecks(CTask *task)
         return 123;
     }
     Free(formatted);
-    old_left = task->win_left; old_right = task->win_right;
-    old_top = task->win_top; old_bottom = task->win_bottom;
-    old_inhibit = task->win_inhibit;
     old_time = tS;
+    old_scroll_x = Fs->scroll_x;
+    old_final_screen_update = gr.fp_final_screen_update;
     for (i = 0; i < PROGRESS_BARS_NUM; i++)
     {
         sys_progresses[i].val = 0;
@@ -101,18 +95,13 @@ I64 WinProgressBarsChecks(CTask *task)
     sys_progresses[0].max = 4;
     sys_progresses[0].t0 = 1.25;
     tS = 2.5;
-    task->win_inhibit |= 1 << WIF_SELF_DOC;
-    task->draw_it = &WinProgressBarsTaskDraw;
-    win_progress_smoke_task = task;
-    WinHorz(0, TEXT_COLS - 1, task);
-    WinVert(0, TEXT_ROWS - 1, task);
+    // A final screen overlay must ignore the owning task's local scroll.
+    Fs->scroll_x = 16;
+    gr.fp_final_screen_update = &DrawProgressBars;
     GrUpdateTasks;
+    gr.fp_final_screen_update = old_final_screen_update;
     tS = old_time;
-    win_progress_smoke_task = NULL;
-    task->draw_it = NULL;
-    task->win_inhibit = old_inhibit;
-    WinHorz(old_left, old_right, task);
-    WinVert(old_top, old_bottom, task);
+    Fs->scroll_x = old_scroll_x;
     if (ZcFbTextPixel(120, 240) != 0x0055ff55)
         return 120;
     if (ZcFbTextPixel(401, 240) != 0)

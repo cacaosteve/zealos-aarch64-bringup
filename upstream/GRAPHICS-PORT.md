@@ -12,7 +12,7 @@ implementations can be compared against the x86 source without editing it.
 | `Kernel/Display.ZC` | Raw text output and task pixel/window geometry | Limine framebuffer replaces boot-time mode discovery; `WinDerivedValsUpdate` is ported in `TaskBridge.ZC` |
 | `System/Gr/GrGlobals.ZC` | `gr.text_base`, screen DCs, and compositor state | Bootstrap `gr.text_base` now points to a compact guest-owned `U32[100*75]` plane; upstream DCs and compositor state are not initialized |
 | `System/Gr/GrTextBase.ZC` | `TextChar`, text spans/fills, and borders; the hot primitives are x86 assembly | ARM64 bridge primitives update `gr.text_base` and the framebuffer; a QEMU smoke proves direct packed-cell writes through the pointer are presented |
-| `System/Gr/GrScreen.ZC` | Per-task redraw, controls, draw callbacks, z-buffer, and final screen update | Visible task `draw_it` callbacks run in z-order through a task-bound screen CDC; `GrPlot`, filled `GrRect`, solid `GrLine`, and basic formatted `GrPrint` draw into the clipped framebuffer. Controls and uncovered-window/z-buffer composition remain unported |
+| `System/Gr/GrScreen.ZC` | Per-task redraw, controls, draw callbacks, z-buffer, and final screen update | Visible task `draw_it` callbacks run in z-order through a task-bound screen CDC; the final screen callback runs afterward with `DCF_ON_TOP`. `GrPlot`, filled `GrRect`, solid `GrLine`, and basic formatted `GrPrint` draw into the clipped framebuffer or full-screen overlay. Controls and uncovered-window/z-buffer composition remain unported |
 | `System/Win.ZC` | Window geometry, focus, and tiling operations | `WinHorz`/`WinVert` normalization and derived pixel geometry are ported; focus, tiling, and z-order callbacks are incomplete |
 | `System/WinMgr.ZC` | Refresh loop, mouse routing, move/resize, and window-manager task | Pinned for reference; the ARM64 build has no upstream WinMgr task yet |
 | `System/Gr/MakeGr.ZC` | Graphics module include order | Reference only; its complete dependency set is not loaded by the bring-up runtime |
@@ -54,6 +54,12 @@ basic geometry and labels used by upstream progress drawing, but do not port
 CDC allocation/lifetime, the full
 formatter/font system, general raster operations, sprites, controls,
 z-buffering, or redraw of newly uncovered windows.
+
+After task callbacks, `GrUpdateTasks` invokes the optional
+`gr.fp_final_screen_update` callback with `DCF_ON_TOP`. Graphics calls through
+that CDC use screen coordinates and the full framebuffer clip, matching the
+final overlay stage in upstream `GrUpdateScreen`. The progress-bar probe now
+uses this route rather than attaching `DrawProgressBars` to a task.
 
 These calls also exposed an AArch64 Aiwnios host-FFI gap: arguments after x0–x7
 were not copied from the caller stack into the host shim's contiguous argument
