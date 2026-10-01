@@ -52,6 +52,8 @@ extern I64 ZcFbTextFill(I64 x, I64 y, I64 len, U32 attr,
 extern I64 ZcFbTextRect(I64 left, I64 right, I64 top, I64 bottom, U32 cell,
                         U32 *text_base, I64 stride);
 extern I64 ZcFbTextFlush(U32 *text_base, I64 stride, I64 rows);
+extern I64 ZcFbTextFlushRect(U32 *text_base, I64 stride, I64 left, I64 right,
+                             I64 top, I64 bottom);
 extern I64 ZcFbTaskTextCompose(I64 task, U32 *text_base, I64 stride);
 extern I64 ZcFbShellTextCompose(U32 *text_base, I64 stride);
 // Temporary ARM64 bootstrap binding for the table initialized by upstream KMain.

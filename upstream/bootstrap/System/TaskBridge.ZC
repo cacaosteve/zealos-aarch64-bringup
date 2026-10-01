@@ -1621,7 +1621,6 @@ U0 TextRect(I64 left, I64 right, I64 top, I64 bottom, I64 cell)
         return;
     ZcFbTextRect(left, right, top, bottom, cell, gr.text_base, TEXT_COLS);
 }
-Bool bootstrap_batch_redraw = FALSE;
 U0 WinDerivedValsUpdate(CTask *task)
 {
     if (!task)
@@ -1768,7 +1767,7 @@ U0 GrDrawTaskCallback(CTask *task)
     DCDel(dc);
 }
 U0 GrUpdateTaskWin(CTask *task)
-{//Single-task bootstrap redraw: border, cell clear, DolDoc, then plane flush.
+{//Redraw one window's text and graphics as one z-ordered layer.
     if (!task || !TaskValidate(task))
         return;
     if (!(task->display_flags & (1 << DISPLAYf_NO_BORDER)))
@@ -1780,11 +1779,9 @@ U0 GrUpdateTaskWin(CTask *task)
     if (!(task->win_inhibit & (1 << WIf_SELF_DOC)))
         DocUpdateTaskDocs(task);
     ZcFbTaskTextCompose(task, gr.text_base, TEXT_COLS);
-    if (!bootstrap_batch_redraw)
-    {
-        ZcFbTextFlush(gr.text_base, TEXT_COLS, TEXT_ROWS);
-        GrDrawTaskCallback(task);
-    }
+    ZcFbTextFlushRect(gr.text_base, TEXT_COLS, task->win_left,
+                      task->win_right, task->win_top, task->win_bottom);
+    GrDrawTaskCallback(task);
 }
 U0 GrUpdateTasks()
 {//Bounded one-CPU window-ring refresh, drawn in ZealOS task/z order.
@@ -1799,7 +1796,6 @@ U0 GrUpdateTasks()
 
     TextRect(0, TEXT_COLS - 1, 0, TEXT_ROWS - 1, 0x0800);
     ZcFbShellTextCompose(gr.text_base, TEXT_COLS);
-    bootstrap_batch_redraw = TRUE;
     task = root;
     do
     {
@@ -1807,23 +1803,6 @@ U0 GrUpdateTasks()
             break;
         if (task->display_flags & (1 << DISPLAYf_SHOW))
             GrUpdateTaskWin(task);
-        task = task->next_task;
-        visited++;
-    }
-    while (task && task != root && visited < 64);
-    bootstrap_batch_redraw = FALSE;
-    ZcFbTextFlush(gr.text_base, TEXT_COLS, TEXT_ROWS);
-    // The upstream screen pass invokes CDC draw callbacks after text has been
-    // composited. Keep this second pass so the full-plane text flush cannot
-    // erase callback pixels from earlier windows.
-    visited = 0;
-    task = root;
-    do
-    {
-        if (!TaskValidate(task))
-            break;
-        if (task->display_flags & (1 << DISPLAYf_SHOW))
-            GrDrawTaskCallback(task);
         task = task->next_task;
         visited++;
     }

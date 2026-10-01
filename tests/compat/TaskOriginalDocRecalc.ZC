@@ -26,11 +26,22 @@ U0 WindowDrawSmoke(CTask *task, CDC *dc)
     }
 }
 
+U0 WindowParentUnderlay(CTask *task, CDC *dc)
+{
+    if (task)
+    {
+        dc->color.c0.color = RED;
+        dc->color.c0.rop = ROPB_MONO;
+        GrPlot(dc, 90, 100);
+    }
+}
+
 I64 TaskOriginalDocRecalcChecks()
 {
     CDoc *doc;
     CDocEntry *entry;
     CTask *overlap;
+    U0 (*old_root_draw)(CTask *task, CDC *dc);
     I64 x, y, old_left, old_right, old_top, old_bottom;
     I64 old_width, old_height, old_scroll_x, old_scroll_y;
     I64 old_display_flags, old_win_inhibit, old_text_attr;
@@ -281,10 +292,13 @@ I64 TaskOriginalDocRecalcChecks()
     overlap->win_inhibit |= 1 << WIF_SELF_DOC;
     overlap->text_attr = 0x20;
     overlap->draw_it = &WindowDrawSmoke;
+    old_root_draw = Fs->draw_it;
+    Fs->draw_it = &WindowParentUnderlay;
     window_draw_calls = 0;
     old_text_cells = ZcFbTextCellsDrawn();
     ZcTaskYield;
     GrUpdateTasks;
+    Fs->draw_it = old_root_draw;
     if (!window_draw_calls)
     {
         Kill(overlap);
@@ -356,6 +370,16 @@ I64 TaskOriginalDocRecalcChecks()
         Fs->win_inhibit = old_win_inhibit;
         Fs->text_attr = old_text_attr;
         return 111;
+    }
+    // The child's green blank-cell background must cover a graphic pixel
+    // drawn earlier by the parent in their overlapping area.
+    if (ZcFbTextPixel(90, 100) != 0x0000aa00)
+    {
+        Kill(overlap);
+        Fs->display_flags = old_display_flags;
+        Fs->win_inhibit = old_win_inhibit;
+        Fs->text_attr = old_text_attr;
+        return 112;
     }
     x = WinProgressBarsChecks(overlap);
     if (x != 42)
