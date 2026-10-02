@@ -51,7 +51,7 @@ I64 TaskOriginalDocRecalcChecks()
     CDoc *doc;
     CDocEntry *entry;
     CTask *overlap;
-    CCtrl *old_ctrl_head, *old_ctrl_tail;
+    CCtrl *old_ctrl_head, *old_ctrl_tail, *hscroll, *vscroll;
     U0 (*old_root_draw)(CTask *task, CDC *dc);
     I64 x, y, old_left, old_right, old_top, old_bottom;
     I64 old_width, old_height, old_scroll_x, old_scroll_y;
@@ -437,6 +437,92 @@ I64 TaskOriginalDocRecalcChecks()
         Fs->win_inhibit = old_win_inhibit;
         Fs->text_attr = old_text_attr;
         return x;
+    }
+    overlap->horz_scroll.min = overlap->vert_scroll.min = 0;
+    overlap->horz_scroll.max = overlap->vert_scroll.max = 100;
+    overlap->horz_scroll.pos = overlap->vert_scroll.pos = 25;
+    WinScrollsInit(overlap);
+    hscroll = CtrlFindUnique(overlap, CTRLT_WIN_HSCROLL);
+    vscroll = CtrlFindUnique(overlap, CTRLT_WIN_VSCROLL);
+    if (!hscroll)
+    {
+        Kill(overlap);
+        Fs->display_flags = old_display_flags;
+        Fs->win_inhibit = old_win_inhibit;
+        Fs->text_attr = old_text_attr;
+        return 116;
+    }
+    if (!vscroll)
+    {
+        Kill(overlap);
+        Fs->display_flags = old_display_flags;
+        Fs->win_inhibit = old_win_inhibit;
+        Fs->text_attr = old_text_attr;
+        return 120;
+    }
+    if (hscroll->left != 44 || hscroll->right != 51 ||
+        hscroll->top != 88 || hscroll->bottom != 95 ||
+        vscroll->left != 168 || vscroll->right != 175 ||
+        vscroll->top != 24 || vscroll->bottom != 31)
+    {
+        Kill(overlap);
+        Fs->display_flags = old_display_flags;
+        Fs->win_inhibit = old_win_inhibit;
+        Fs->text_attr = old_text_attr;
+        return 118;
+    }
+    if (hscroll->screen_left != 116 || hscroll->screen_top != 160 ||
+        vscroll->screen_left != 240 || vscroll->screen_top != 96 ||
+        !CtrlInside(hscroll, 116, 160) || CtrlInside(hscroll, 124, 160))
+    {
+        Kill(overlap);
+        Fs->display_flags = old_display_flags;
+        Fs->win_inhibit = old_win_inhibit;
+        Fs->text_attr = old_text_attr;
+        return 119;
+    }
+    overlap->display_flags = 1 << DISPLAYf_SHOW;
+    DrawCtrls(overlap);
+    if (ZcFbTextPixel(116, 160) != 0)
+    {
+        Kill(overlap);
+        Fs->display_flags = old_display_flags;
+        Fs->win_inhibit = old_win_inhibit;
+        Fs->text_attr = old_text_attr;
+        return 121;
+    }
+    if (ZcFbTextPixel(118, 162) != 0x00ffffff)
+    {
+        Kill(overlap);
+        Fs->display_flags = old_display_flags;
+        Fs->win_inhibit = old_win_inhibit;
+        Fs->text_attr = old_text_attr;
+        return 122;
+    }
+    LeftClickHWinScroll(hscroll, 14, 0, TRUE);
+    if (overlap->horz_scroll.pos != 6 ||
+        !(overlap->horz_scroll.flags & (1 << WSSf_SET_TO_POS)) ||
+        !(hscroll->flags & CTRLF_CLICKED))
+    {
+        Kill(overlap);
+        Fs->display_flags = old_display_flags;
+        Fs->win_inhibit = old_win_inhibit;
+        Fs->text_attr = old_text_attr;
+        return 123;
+    }
+    LeftClickHWinScroll(hscroll, 14, 0, FALSE);
+    LeftClickVWinScroll(vscroll, 0, 14, TRUE);
+    WheelChangeWinScroll(vscroll, 5);
+    if ((hscroll->flags & CTRLF_CLICKED) ||
+        overlap->vert_scroll.pos != 18 ||
+        !(overlap->vert_scroll.flags & (1 << WSSf_SET_TO_POS)) ||
+        !(vscroll->flags & CTRLF_CLICKED))
+    {
+        Kill(overlap);
+        Fs->display_flags = old_display_flags;
+        Fs->win_inhibit = old_win_inhibit;
+        Fs->text_attr = old_text_attr;
+        return 124;
     }
     if (!ZcFbShellTextCompose(gr.text_base, 100))
     {

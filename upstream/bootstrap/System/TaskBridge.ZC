@@ -1352,6 +1352,7 @@ class CBootstrapGraphicsGlobals
     U16 *win_z_buf;
     U16 *win_uncovered_bitmap;
     I64 highest_uncovered;
+    I64 pan_text_x, pan_text_y;
     U0 (*fp_final_screen_update)(CDC *dc);
 } gr;
 gr.dc = &bootstrap_graphics_dc;
@@ -1630,6 +1631,7 @@ U0 TextRect(I64 left, I64 right, I64 top, I64 bottom, I64 cell)
         return;
     ZcFbTextRect(left, right, top, bottom, cell, gr.text_base, TEXT_COLS);
 }
+extern U0 BootstrapCtrlsUpdate(CTask *task);
 U0 WinDerivedValsUpdate(CTask *task)
 {
     if (!task)
@@ -1766,6 +1768,209 @@ Bool GrLine(CDC *dc=gr.dc, I64 x1=0, I64 y1=0, I64 x2=0, I64 y2=0,
     return ZcFbGraphLine(x1, y1, x2, y2, dc->color.c0 & 0xff,
                          step, start, left, top, right, bottom);
 }
+#define WIN_SCROLL_SIZE 8
+#define WIN_SCROLL_BORDER_BONUS 4
+public CCtrl *CtrlFindUnique(CTask *task, I64 type)
+{//Return the first control of a type in a task's circular list.
+    CCtrl *head, *ctrl;
+    I64 visited = 0;
+    if (!task || !(ctrl = task->next_ctrl))
+        return NULL;
+    head = &task->next_ctrl;
+    while (ctrl && ctrl != head && visited++ < 64)
+    {
+        if (ctrl->type == type)
+            return ctrl;
+        ctrl = ctrl->next;
+    }
+    return NULL;
+}
+Bool CtrlInsideRect(CCtrl *ctrl, I64 x, I64 y)
+{//Test screen coordinates against a control's derived bounds.
+    if (!ctrl)
+        return FALSE;
+    return x >= ctrl->screen_left && x <= ctrl->screen_right &&
+           y >= ctrl->screen_top && y <= ctrl->screen_bottom;
+}
+public Bool CtrlInside(CCtrl *ctrl, I64 x, I64 y)
+{
+    if (!ctrl || !(ctrl->flags & CTRLF_SHOW))
+        return FALSE;
+    if (ctrl->inside_ctrl)
+        return ctrl->inside_ctrl(ctrl, x, y);
+    return CtrlInsideRect(ctrl, x, y);
+}
+U0 WinDerivedScrollValsUpdate(CCtrl *ctrl)
+{
+    CWinScroll *scroll;
+    I64 range, low_color;
+    if (!ctrl || !ctrl->win_task || !(scroll = ctrl->state))
+        return;
+    if (scroll->max < scroll->min)
+        scroll->max = scroll->min;
+    if (scroll->pos < scroll->min)
+        scroll->pos = scroll->min;
+    if (scroll->pos > scroll->max)
+        scroll->pos = scroll->max;
+    low_color = ctrl->win_task->border_attr & 0x0f;
+    scroll->color = low_color | (low_color ^ 0x0f) << 4;
+    range = scroll->max - scroll->min;
+    if (!range)
+        range = 1;
+    if (ctrl->type == CTRLT_WIN_HSCROLL)
+    {
+        ctrl->left = gr.pan_text_x + FONT_WIDTH - WIN_SCROLL_BORDER_BONUS +
+                     (scroll->pos - scroll->min) * ctrl->win_task->pix_width / range;
+        ctrl->right = ctrl->left + WIN_SCROLL_SIZE - 1;
+        ctrl->top = gr.pan_text_y + FONT_HEIGHT + ctrl->win_task->pix_height;
+        ctrl->bottom = ctrl->top + WIN_SCROLL_SIZE - 1;
+    }
+    else if (ctrl->type == CTRLT_WIN_VSCROLL)
+    {
+        ctrl->left = gr.pan_text_x + FONT_WIDTH + ctrl->win_task->pix_width;
+        ctrl->right = ctrl->left + WIN_SCROLL_SIZE - 1;
+        ctrl->top = gr.pan_text_y + FONT_HEIGHT - WIN_SCROLL_BORDER_BONUS +
+                    (scroll->pos - scroll->min) * ctrl->win_task->pix_height / range;
+        ctrl->bottom = ctrl->top + WIN_SCROLL_SIZE - 1;
+    }
+}
+U0 BootstrapCtrlsUpdate(CTask *task)
+{
+    CCtrl *ctrl;
+    I64 visited = 0;
+    if (!task || !(ctrl = task->next_ctrl))
+        return;
+    while (ctrl && ctrl != &task->next_ctrl && visited++ < 64)
+    {
+        if (ctrl->update_derived_vals)
+            ctrl->update_derived_vals(ctrl);
+        if (ctrl->flags & CTRLF_BORDER)
+        {
+            ctrl->screen_left = gr.pan_text_x + task->pix_left + ctrl->left - FONT_WIDTH;
+            ctrl->screen_right = gr.pan_text_x + task->pix_left + ctrl->right - FONT_WIDTH;
+            ctrl->screen_top = gr.pan_text_y + task->pix_top + ctrl->top - FONT_HEIGHT;
+            ctrl->screen_bottom = gr.pan_text_y + task->pix_top + ctrl->bottom - FONT_HEIGHT;
+        }
+        else
+        {
+            ctrl->screen_left = gr.pan_text_x + task->pix_left + ctrl->left;
+            ctrl->screen_right = gr.pan_text_x + task->pix_left + ctrl->right;
+            ctrl->screen_top = gr.pan_text_y + task->pix_top + ctrl->top;
+            ctrl->screen_bottom = gr.pan_text_y + task->pix_top + ctrl->bottom;
+        }
+        ctrl = ctrl->next;
+    }
+}
+U0 DrawWinScroll(CDC *dc, CCtrl *ctrl)
+{
+    CWinScroll *scroll;
+    I64 base, shade, swap;
+    if (!dc || !ctrl || !(scroll = ctrl->state))
+        return;
+    base = scroll->color & 0x0f;
+    shade = (scroll->color >> 4) & 0x0f;
+    if (ctrl->flags & CTRLF_CLICKED)
+    {
+        swap = base;
+        base = shade;
+        shade = swap;
+    }
+    dc->color.c0.color = base;
+    dc->color.c0.rop = ROPB_MONO;
+    GrRect(dc, ctrl->left, ctrl->top,
+           ctrl->right - ctrl->left + 1, ctrl->bottom - ctrl->top + 1);
+    dc->color.c0.color = shade;
+    GrRect(dc, ctrl->left + 2, ctrl->top + 2,
+           ctrl->right - ctrl->left - 3, ctrl->bottom - ctrl->top - 3);
+}
+U0 LeftClickHWinScroll(CCtrl *ctrl, I64 x, I64 y, Bool down)
+{
+    CWinScroll *scroll;
+    I64 range;
+    if (!ctrl || !(scroll = ctrl->state) || !ctrl->win_task)
+        return;
+    range = ctrl->win_task->pix_width + 2 * WIN_SCROLL_BORDER_BONUS - WIN_SCROLL_SIZE;
+    if (range < 1)
+        range = 1;
+    scroll->flags |= 1 << WSSf_SET_TO_POS;
+    scroll->pos = ((x - (FONT_WIDTH - WIN_SCROLL_BORDER_BONUS)) *
+                   (scroll->max - scroll->min + 1) + range / 2) / range + scroll->min;
+    if (down)
+        ctrl->flags |= CTRLF_CLICKED;
+    else
+        ctrl->flags &= ~CTRLF_CLICKED;
+    WinDerivedScrollValsUpdate(ctrl);
+}
+U0 LeftClickVWinScroll(CCtrl *ctrl, I64 x, I64 y, Bool down)
+{
+    CWinScroll *scroll;
+    I64 range;
+    if (!ctrl || !(scroll = ctrl->state) || !ctrl->win_task)
+        return;
+    range = ctrl->win_task->pix_height + 2 * WIN_SCROLL_BORDER_BONUS - WIN_SCROLL_SIZE;
+    if (range < 1)
+        range = 1;
+    scroll->flags |= 1 << WSSf_SET_TO_POS;
+    scroll->pos = ((y - (FONT_HEIGHT - WIN_SCROLL_BORDER_BONUS)) *
+                   (scroll->max - scroll->min + 1) + range / 2) / range + scroll->min;
+    if (down)
+        ctrl->flags |= CTRLF_CLICKED;
+    else
+        ctrl->flags &= ~CTRLF_CLICKED;
+    WinDerivedScrollValsUpdate(ctrl);
+}
+U0 WheelChangeWinScroll(CCtrl *ctrl, I64 delta)
+{
+    CWinScroll *scroll;
+    if (!ctrl || !(scroll = ctrl->state))
+        return;
+    scroll->flags |= 1 << WSSf_SET_TO_POS;
+    scroll->pos += delta;
+    WinDerivedScrollValsUpdate(ctrl);
+}
+U0 WinScrollsInit(CTask *task=NULL)
+{
+    CCtrl *ctrl;
+    if (!task)
+        task = Fs;
+    if (!task)
+        return;
+    if (!task->next_ctrl && !task->last_ctrl)
+        task->next_ctrl = task->last_ctrl = &task->next_ctrl;
+    else if (!task->next_ctrl || !task->last_ctrl)
+        return;
+    if (!CtrlFindUnique(task, CTRLT_WIN_HSCROLL))
+    {
+        ctrl = CAlloc(sizeof(CCtrl), task);
+        if (!ctrl)
+            return;
+        ctrl->win_task = task;
+        ctrl->flags = CTRLF_SHOW | CTRLF_BORDER | CTRLF_CAPTURE_LEFT_MS;
+        ctrl->type = CTRLT_WIN_HSCROLL;
+        ctrl->state = &task->horz_scroll;
+        ctrl->update_derived_vals = &WinDerivedScrollValsUpdate;
+        ctrl->draw_it = &DrawWinScroll;
+        ctrl->left_click = &LeftClickHWinScroll;
+        QueueInsert(ctrl, task->last_ctrl);
+    }
+    if (!CtrlFindUnique(task, CTRLT_WIN_VSCROLL))
+    {
+        ctrl = CAlloc(sizeof(CCtrl), task);
+        if (!ctrl)
+            return;
+        ctrl->win_task = task;
+        ctrl->flags = CTRLF_SHOW | CTRLF_BORDER | CTRLF_CAPTURE_LEFT_MS;
+        ctrl->type = CTRLT_WIN_VSCROLL;
+        ctrl->state = &task->vert_scroll;
+        ctrl->update_derived_vals = &WinDerivedScrollValsUpdate;
+        ctrl->draw_it = &DrawWinScroll;
+        ctrl->left_click = &LeftClickVWinScroll;
+        ctrl->wheel_chg = &WheelChangeWinScroll;
+        QueueInsert(ctrl, task->last_ctrl);
+    }
+    WinDerivedValsUpdate(task);
+    BootstrapCtrlsUpdate(task);
+}
 U0 GrDrawTaskCallback(CTask *task)
 {
     CDC *dc;
@@ -1779,7 +1984,9 @@ U0 DrawCtrls(CTask *task)
 {//Run visible per-task control draw callbacks in list order.
     CCtrl *head, *ctrl;
     CDC *dc;
-    I64 saved_scroll_x, saved_scroll_y, visited = 0;
+    I64 saved_scroll_x, saved_scroll_y, saved_left, saved_right;
+    I64 saved_top, saved_bottom, visited = 0;
+    Bool border;
 
     if (!task || !TaskValidate(task))
         return;
@@ -1798,7 +2005,33 @@ U0 DrawCtrls(CTask *task)
         if (!ctrl || visited++ >= 64)
             break;
         if ((ctrl->flags & CTRLF_SHOW) && ctrl->draw_it)
-            ctrl->draw_it(dc, ctrl);
+        {
+            border = ctrl->flags & CTRLF_BORDER;
+            if (!border || !(task->display_flags & (1 << DISPLAYf_NO_BORDER)))
+            {
+                if (border)
+                {
+                    saved_left = task->win_left;
+                    saved_right = task->win_right;
+                    saved_top = task->win_top;
+                    saved_bottom = task->win_bottom;
+                    task->win_left--;
+                    task->win_right++;
+                    task->win_top--;
+                    task->win_bottom++;
+                    WinDerivedValsUpdate(task);
+                }
+                ctrl->draw_it(dc, ctrl);
+                if (border)
+                {
+                    task->win_left = saved_left;
+                    task->win_right = saved_right;
+                    task->win_top = saved_top;
+                    task->win_bottom = saved_bottom;
+                    WinDerivedValsUpdate(task);
+                }
+            }
+        }
         ctrl = ctrl->next;
     }
     while (ctrl != head);
@@ -1822,7 +2055,8 @@ U0 GrUpdateTaskWin(CTask *task)
     ZcFbTextFlushRect(gr.text_base, TEXT_COLS, task->win_left,
                       task->win_right, task->win_top, task->win_bottom);
     GrDrawTaskCallback(task);
-    DrawCtrls(task);
+    if (TaskValidate(task))
+        DrawCtrls(task);
 }
 extern U0 WinZBufUpdate();
 extern Bool BootstrapWinIsUncovered(CTask *task);
@@ -1894,6 +2128,7 @@ Bool WinHorz(I64 left, I64 right, CTask *task=NULL)
         task->win_left = left;
         task->win_right = right;
         WinDerivedValsUpdate(task);
+        BootstrapCtrlsUpdate(task);
         POPFD
         return TRUE;
     }
@@ -1933,6 +2168,7 @@ Bool WinVert(I64 top, I64 bottom, CTask *task=NULL)
         task->win_top = top;
         task->win_bottom = bottom;
         WinDerivedValsUpdate(task);
+        BootstrapCtrlsUpdate(task);
         POPFD
         return TRUE;
     }
@@ -2143,10 +2379,6 @@ CMenu *MenuFile(U8 *filename, I64 flags=0, CTask *task=NULL)
     if (flags) {}
     if (task) {}
     return NULL;
-}
-U0 WinScrollsInit(CTask *task)
-{
-    if (task) {}
 }
 U0 DocBottom(CDoc *doc=NULL)
 {

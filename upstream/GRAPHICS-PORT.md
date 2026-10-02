@@ -12,7 +12,7 @@ implementations can be compared against the x86 source without editing it.
 | `Kernel/Display.ZC` | Raw text output and task pixel/window geometry | Limine framebuffer replaces boot-time mode discovery; `WinDerivedValsUpdate` is ported in `TaskBridge.ZC` |
 | `System/Gr/GrGlobals.ZC` | `gr.text_base`, screen DCs, and compositor state | Bootstrap `gr.text_base` now points to a compact guest-owned `U32[100*75]` plane; upstream DCs and compositor state are not initialized |
 | `System/Gr/GrTextBase.ZC` | `TextChar`, text spans/fills, and borders; the hot primitives are x86 assembly | ARM64 bridge primitives update `gr.text_base` and the framebuffer; a QEMU smoke proves direct packed-cell writes through the pointer are presented |
-| `System/Gr/GrScreen.ZC` | Per-task redraw, controls, draw callbacks, z-buffer, and final screen update | A bounded 100x75 cell z-buffer marks windows with any visible cells; each marked window's text, task `draw_it`, and visible control `draw_it` callbacks render in task-ring order. The final screen callback runs afterward with `DCF_ON_TOP`. Built-in controls and pixel-level z-buffer composition remain unported |
+| `System/Gr/GrScreen.ZC` | Per-task redraw, controls, draw callbacks, z-buffer, and final screen update | A bounded 100x75 cell z-buffer marks windows with any visible cells; each marked window's text, task `draw_it`, and visible control `draw_it` callbacks render in task-ring order. The final screen callback runs afterward with `DCF_ON_TOP`. View-angle controls and pixel-level z-buffer composition remain unported |
 | `System/Win.ZC` | Window geometry, focus, and tiling operations | `WinHorz`/`WinVert` normalization and derived pixel geometry are ported; focus, tiling, and z-order callbacks are incomplete |
 | `System/WinMgr.ZC` | Refresh loop, mouse routing, move/resize, and window-manager task | Pinned for reference; the ARM64 build has no upstream WinMgr task yet |
 | `System/Gr/MakeGr.ZC` | Graphics module include order | Reference only; its complete dependency set is not loaded by the bring-up runtime |
@@ -56,14 +56,18 @@ floating-point precision (including upstream `%fs` elapsed-time labels); the
 compatibility probe runs the unchanged `DrawProgressBars` body. These cover
 basic geometry and labels used by upstream progress drawing, but do not port
 CDC allocation/lifetime, the full formatter/font system, general raster
-operations, sprites, built-in controls, pixel-level z-buffer composition, or
+operations, sprites, view-angle controls, pixel-level z-buffer composition, or
 optimized damage-region redraw.
 
 `DrawCtrls` now walks a task's circular control list in list order, invokes the
 draw callback on visible controls, skips hidden controls, and temporarily clears
 the task's document scroll so controls remain fixed to the window. Traversal is
-bounded to 64 entries. Border controls, built-in scrollbar/view-angle controls,
-control input routing, and control-derived geometry are still unported.
+bounded to 64 entries. `CtrlsUpdate`-style derived geometry and rectangle hit
+testing are ported; `WinScrollsInit` creates horizontal and vertical controls,
+whose thumb geometry, drawing, click, and wheel callbacks are covered by the
+QEMU probe. Border clipping is handled by temporarily expanding the task bounds.
+The WinMgr mouse loop does not dispatch these callbacks yet, and view-angle
+controls remain unported.
 
 After window callbacks, `GrUpdateTasks` invokes the optional
 `gr.fp_final_screen_update` callback with `DCF_ON_TOP`. Graphics calls through
@@ -79,7 +83,7 @@ call exercises that path in the QEMU compatibility probe.
 
 ## Remaining graphics path
 
-The next substantive graphics work is control-derived geometry and built-in
+The next substantive graphics work is WinMgr mouse dispatch and view-angle
 controls, wallpaper, and broader CDC operations. Then connect `WinMgr.ZC` to
 the cooperative task runtime. `Kernel/Display.ZC`'s
 framebuffer writes can target the Limine-provided framebuffer, but x86 assembly
