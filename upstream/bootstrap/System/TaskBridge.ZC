@@ -1775,6 +1775,37 @@ U0 GrDrawTaskCallback(CTask *task)
     task->draw_it(task, dc);
     DCDel(dc);
 }
+U0 DrawCtrls(CTask *task)
+{//Run visible per-task control draw callbacks in list order.
+    CCtrl *head, *ctrl;
+    CDC *dc;
+    I64 saved_scroll_x, saved_scroll_y, visited = 0;
+
+    if (!task || !TaskValidate(task))
+        return;
+    head = &task->next_ctrl;
+    ctrl = task->next_ctrl;
+    if (!ctrl || ctrl == head)
+        return;
+
+    // Upstream controls are fixed to the window while document text scrolls.
+    saved_scroll_x = task->scroll_x;
+    saved_scroll_y = task->scroll_y;
+    task->scroll_x = task->scroll_y = 0;
+    dc = DCAlias(gr.dc2, task);
+    do
+    {
+        if (!ctrl || visited++ >= 64)
+            break;
+        if ((ctrl->flags & CTRLF_SHOW) && ctrl->draw_it)
+            ctrl->draw_it(dc, ctrl);
+        ctrl = ctrl->next;
+    }
+    while (ctrl != head);
+    DCDel(dc);
+    task->scroll_x = saved_scroll_x;
+    task->scroll_y = saved_scroll_y;
+}
 U0 GrUpdateTaskWin(CTask *task)
 {//Redraw one window's text and graphics as one z-ordered layer.
     if (!task || !TaskValidate(task))
@@ -1791,6 +1822,7 @@ U0 GrUpdateTaskWin(CTask *task)
     ZcFbTextFlushRect(gr.text_base, TEXT_COLS, task->win_left,
                       task->win_right, task->win_top, task->win_bottom);
     GrDrawTaskCallback(task);
+    DrawCtrls(task);
 }
 extern U0 WinZBufUpdate();
 extern Bool BootstrapWinIsUncovered(CTask *task);

@@ -11,6 +11,16 @@ U0 WindowRedrawPark(U8 *data)
 }
 
 I64 window_draw_calls = 0;
+I64 window_control_draw_calls = 0;
+CCtrl window_test_control;
+
+U0 WindowControlDraw(CDC *dc, CCtrl *ctrl)
+{
+    window_control_draw_calls++;
+    dc->color.c0.color = RED;
+    dc->color.c0.rop = ROPB_MONO;
+    GrPlot(dc, ctrl->left, ctrl->top);
+}
 
 U0 WindowDrawSmoke(CTask *task, CDC *dc)
 {
@@ -41,6 +51,7 @@ I64 TaskOriginalDocRecalcChecks()
     CDoc *doc;
     CDocEntry *entry;
     CTask *overlap;
+    CCtrl *old_ctrl_head, *old_ctrl_tail;
     U0 (*old_root_draw)(CTask *task, CDC *dc);
     I64 x, y, old_left, old_right, old_top, old_bottom;
     I64 old_width, old_height, old_scroll_x, old_scroll_y;
@@ -261,6 +272,43 @@ I64 TaskOriginalDocRecalcChecks()
     {
         Fs->display_flags = old_display_flags;
         return 96;
+    }
+
+    // The generic control pass draws visible callbacks without applying the
+    // document scroll, and ignores hidden controls.
+    old_ctrl_head = Fs->next_ctrl;
+    old_ctrl_tail = Fs->last_ctrl;
+    window_test_control.next = &Fs->next_ctrl;
+    window_test_control.last = &Fs->next_ctrl;
+    window_test_control.win_task = Fs;
+    window_test_control.flags = CTRLF_SHOW;
+    window_test_control.left = 32;
+    window_test_control.top = 32;
+    window_test_control.draw_it = &WindowControlDraw;
+    Fs->next_ctrl = Fs->last_ctrl = &window_test_control;
+    Fs->scroll_x = 5;
+    Fs->scroll_y = 6;
+    window_control_draw_calls = 0;
+    DrawCtrls(Fs);
+    if (window_control_draw_calls != 1 ||
+        ZcFbTextPixel(32, 32) != 0x00aa0000 ||
+        Fs->scroll_x != 5 || Fs->scroll_y != 6)
+    {
+        Fs->next_ctrl = old_ctrl_head;
+        Fs->last_ctrl = old_ctrl_tail;
+        Fs->scroll_x = Fs->scroll_y = 0;
+        Fs->display_flags = old_display_flags;
+        return 114;
+    }
+    window_test_control.flags = 0;
+    DrawCtrls(Fs);
+    Fs->next_ctrl = old_ctrl_head;
+    Fs->last_ctrl = old_ctrl_tail;
+    Fs->scroll_x = Fs->scroll_y = 0;
+    if (window_control_draw_calls != 1)
+    {
+        Fs->display_flags = old_display_flags;
+        return 115;
     }
 
     // GrUpdateTasks must redraw a complete visible task ring in z order.
