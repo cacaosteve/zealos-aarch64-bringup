@@ -1800,6 +1800,55 @@ public Bool CtrlInside(CCtrl *ctrl, I64 x, I64 y)
         return ctrl->inside_ctrl(ctrl, x, y);
     return CtrlInsideRect(ctrl, x, y);
 }
+public Bool CtrlDispatchLeftClick(CTask *task, I64 screen_x, I64 screen_y,
+                                  Bool down)
+{//Dispatch one left-button edge using WinMgr's screen-to-task coordinates.
+    CCtrl *head, *ctrl, *target = NULL;
+    I64 left, top, visited = 0;
+    if (!task || !TaskValidate(task) || !(ctrl = task->next_ctrl))
+        return FALSE;
+    head = &task->next_ctrl;
+    while (ctrl && ctrl != head && visited++ < 64)
+    {
+        if (ctrl->left_click &&
+            ((!down && (ctrl->flags & CTRLF_CLICKED)) ||
+             CtrlInside(ctrl, screen_x, screen_y)))
+        {
+            target = ctrl;
+            break;
+        }
+        ctrl = ctrl->next;
+    }
+    if (!target)
+        return FALSE;
+    left = gr.pan_text_x + task->pix_left;
+    top = gr.pan_text_y + task->pix_top;
+    if (target->flags & CTRLF_BORDER)
+    {
+        left -= FONT_WIDTH;
+        top -= FONT_HEIGHT;
+    }
+    target->left_click(target, screen_x - left, screen_y - top, down);
+    return TRUE;
+}
+public Bool CtrlDispatchWheel(CTask *task, I64 delta)
+{//WinMgr routes wheel changes to the focused task's first wheel control.
+    CCtrl *head, *ctrl;
+    I64 visited = 0;
+    if (!task || !TaskValidate(task) || !(ctrl = task->next_ctrl))
+        return FALSE;
+    head = &task->next_ctrl;
+    while (ctrl && ctrl != head && visited++ < 64)
+    {
+        if ((ctrl->flags & CTRLF_SHOW) && ctrl->wheel_chg)
+        {
+            ctrl->wheel_chg(ctrl, delta);
+            return TRUE;
+        }
+        ctrl = ctrl->next;
+    }
+    return FALSE;
+}
 U0 WinDerivedScrollValsUpdate(CCtrl *ctrl)
 {
     CWinScroll *scroll;

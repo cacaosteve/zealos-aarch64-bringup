@@ -65,9 +65,12 @@ the task's document scroll so controls remain fixed to the window. Traversal is
 bounded to 64 entries. `CtrlsUpdate`-style derived geometry and rectangle hit
 testing are ported; `WinScrollsInit` creates horizontal and vertical controls,
 whose thumb geometry, drawing, click, and wheel callbacks are covered by the
-QEMU probe. Border clipping is handled by temporarily expanding the task bounds.
-The WinMgr mouse loop does not dispatch these callbacks yet, and view-angle
-controls remain unported.
+QEMU probe. Bounded `CtrlDispatchLeftClick` and `CtrlDispatchWheel` helpers now
+route explicit screen-coordinate events to those callbacks, including
+border-origin translation and release to a clicked control. Border clipping is
+handled by temporarily expanding the task bounds. The WinMgr mouse loop does
+not call these helpers yet, so UTM mouse interaction with controls is not
+claimed. View-angle controls remain unported.
 
 After window callbacks, `GrUpdateTasks` invokes the optional
 `gr.fp_final_screen_update` callback with `DCF_ON_TOP`. Graphics calls through
