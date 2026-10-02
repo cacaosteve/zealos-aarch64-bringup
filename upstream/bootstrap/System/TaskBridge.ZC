@@ -1339,17 +1339,26 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
 #define TEXT_ROWS 75
 // Compact ZealOS-compatible packed-cell plane addressed through gr.text_base.
 U32 bootstrap_text_base[TEXT_COLS * TEXT_ROWS];
+#define BOOTSTRAP_WIN_MAX 64
+U16 bootstrap_win_z_buf[TEXT_COLS * TEXT_ROWS];
+U16 bootstrap_win_uncovered[(BOOTSTRAP_WIN_MAX + 15) / 16];
+U32 bootstrap_win_uncovered_cells[BOOTSTRAP_WIN_MAX];
 class CBootstrapGraphicsGlobals
 {
     CDC *dc;
     CDC *dc2;
     U8 *empty_sprite;
     U32 *text_base;
+    U16 *win_z_buf;
+    U16 *win_uncovered_bitmap;
+    I64 highest_uncovered;
     U0 (*fp_final_screen_update)(CDC *dc);
 } gr;
 gr.dc = &bootstrap_graphics_dc;
 gr.dc2 = &bootstrap_graphics_dc;
 gr.text_base = bootstrap_text_base;
+gr.win_z_buf = bootstrap_win_z_buf;
+gr.win_uncovered_bitmap = bootstrap_win_uncovered;
 // Minimal timing state for DocRecalc's refresh throttle; WinMgr is not bootstrapped.
 CWinMgrGlobals winmgr;
 // Music playback is not part of the bootstrap; DocRecalc only tracks its current song tag.
@@ -1783,6 +1792,8 @@ U0 GrUpdateTaskWin(CTask *task)
                       task->win_right, task->win_top, task->win_bottom);
     GrDrawTaskCallback(task);
 }
+extern U0 WinZBufUpdate();
+extern Bool BootstrapWinIsUncovered(CTask *task);
 U0 GrUpdateTasks()
 {//Bounded one-CPU window-ring refresh, drawn in ZealOS task/z order.
     CTask *root, *task;
@@ -1796,12 +1807,14 @@ U0 GrUpdateTasks()
 
     TextRect(0, TEXT_COLS - 1, 0, TEXT_ROWS - 1, 0x0800);
     ZcFbShellTextCompose(gr.text_base, TEXT_COLS);
+    WinZBufUpdate();
     task = root;
     do
     {
         if (!TaskValidate(task))
             break;
-        if (task->display_flags & (1 << DISPLAYf_SHOW))
+        if ((task->display_flags & (1 << DISPLAYf_SHOW)) &&
+            BootstrapWinIsUncovered(task))
             GrUpdateTaskWin(task);
         task = task->next_task;
         visited++;
@@ -2157,7 +2170,76 @@ U8 *FileExtDot(U8 *src)
     return NULL;
 }
 U0 WinZBufUpdate()
+{//Build the ARM64 cell z-buffer and bitmap of windows with visible cells.
+    CTask *root, *task;
+    I64 visited = 0, z_count = 0, left, right, top, bottom, x, y, index, i;
+    U16 old_z, z;
+
+    MemSet(gr.win_z_buf, 0, TEXT_COLS * TEXT_ROWS * sizeof(U16));
+    MemSet(gr.win_uncovered_bitmap, 0,
+           (BOOTSTRAP_WIN_MAX + 15) / 16 * sizeof(U16));
+    MemSet(bootstrap_win_uncovered_cells, 0,
+           BOOTSTRAP_WIN_MAX * sizeof(U32));
+    gr.highest_uncovered = 0;
+
+    root = sys_winmgr_task;
+    if (!root)
+        root = sys_task;
+    if (!root || !TaskValidate(root))
+        return;
+    task = root;
+    do
+    {
+        if (!TaskValidate(task))
+            break;
+        task->win_z_num = 0;
+        if ((task->display_flags & (1 << DISPLAYf_SHOW)) &&
+            z_count < BOOTSTRAP_WIN_MAX)
+        {
+            z = ++z_count;
+            task->win_z_num = z;
+            left = task->win_left;
+            right = task->win_right;
+            top = task->win_top;
+            bottom = task->win_bottom;
+            if (left < 0) left = 0;
+            if (top < 0) top = 0;
+            if (right >= TEXT_COLS) right = TEXT_COLS - 1;
+            if (bottom >= TEXT_ROWS) bottom = TEXT_ROWS - 1;
+            for (y = top; y <= bottom; y++)
+            {
+                for (x = left; x <= right; x++)
+                {
+                    index = y * TEXT_COLS + x;
+                    old_z = gr.win_z_buf[index];
+                    if (old_z && old_z <= BOOTSTRAP_WIN_MAX &&
+                        bootstrap_win_uncovered_cells[old_z - 1])
+                        bootstrap_win_uncovered_cells[old_z - 1]--;
+                    gr.win_z_buf[index] = z;
+                    bootstrap_win_uncovered_cells[z - 1]++;
+                }
+            }
+        }
+        task = task->next_task;
+        visited++;
+    }
+    while (task && task != root && visited < BOOTSTRAP_WIN_MAX);
+
+    for (i = 0; i < z_count; i++)
+    {
+        if (bootstrap_win_uncovered_cells[i])
+        {
+            gr.win_uncovered_bitmap[i / 16] |= 1 << (i % 16);
+            gr.highest_uncovered = i + 1;
+        }
+    }
+}
+Bool BootstrapWinIsUncovered(CTask *task)
 {
+    I64 z;
+    if (!task || !(z = task->win_z_num) || z > BOOTSTRAP_WIN_MAX)
+        return FALSE;
+    return gr.win_uncovered_bitmap[(z - 1) / 16] & (1 << ((z - 1) % 16));
 }
 I64 ExeFile(U8 *filename, I64 ccf_flags=0)
 {

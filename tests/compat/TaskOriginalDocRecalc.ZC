@@ -405,6 +405,16 @@ I64 TaskOriginalDocRecalcChecks()
         Fs->text_attr = old_text_attr;
         return 99;
     }
+    Fs->draw_it = &WindowParentUnderlay;
+    GrUpdateTasks;
+    Fs->draw_it = old_root_draw;
+    if (ZcFbTextPixel(90, 100) != 0x00aa0000)
+    {
+        Fs->display_flags = old_display_flags;
+        Fs->win_inhibit = old_win_inhibit;
+        Fs->text_attr = old_text_attr;
+        return 113;
+    }
     Fs->display_flags = old_display_flags;
     Fs->win_inhibit = old_win_inhibit;
     Fs->text_attr = old_text_attr;
