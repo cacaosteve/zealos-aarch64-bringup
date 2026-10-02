@@ -2160,6 +2160,7 @@ U0 GrUpdateTaskWin(CTask *task)
 }
 extern U0 WinZBufUpdate();
 extern Bool BootstrapWinIsUncovered(CTask *task);
+I64 bootstrap_winmgr_ticks = 0;
 U0 GrUpdateTasks()
 {//Bounded one-CPU window-ring refresh, drawn in ZealOS task/z order.
     CTask *root, *task;
@@ -2196,6 +2197,11 @@ U0 GrUpdateTasks()
         dc->flags |= DCF_ON_TOP;
         (*gr.fp_final_screen_update)(dc);
     }
+}
+public U0 BootstrapWinMgrTick()
+{//One host-idle frame: poll tablet controls and redraw the task ring.
+    bootstrap_winmgr_ticks++;
+    GrUpdateTasks();
 }
 Bool WinHorz(I64 left, I64 right, CTask *task=NULL)
 {

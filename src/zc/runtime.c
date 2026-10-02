@@ -179,6 +179,8 @@ static int guest_task_exe_active;
  * precompiled callback may park on its own fiber stack and resume later. */
 static int guest_job_call_active;
 static int guest_background_dispatch;
+static unsigned guest_idle_frame_divider;
+static CHashFun *guest_winmgr_tick_fun;
 static int64_t guest_mp_count = 1;
 static struct guest_counts {
     int64_t jiffies, timer, time_stamp_freq, time_stamp_kHz_freq;
@@ -2967,8 +2969,7 @@ int zc_call(const char *name, int64_t *out) {
 }
 void zc_idle_step(void) {
     if (!ready || failed || !guest_task_bound || guest_current ||
-        guest_task_exe_active ||
-        (!guest_focus_task && !next_guest(0)))
+        guest_task_exe_active)
         return;
     guarded = 1;
     if (setjmp(guard)) {
@@ -2976,9 +2977,27 @@ void zc_idle_step(void) {
         guarded = 0;
         return;
     }
-    guest_background_dispatch = 1;
-    (void)host_task_yield(NULL);
-    guest_background_dispatch = 0;
+    if (guest_focus_task || next_guest(0)) {
+        guest_background_dispatch = 1;
+        (void)host_task_yield(NULL);
+        guest_background_dispatch = 0;
+    }
+    // The interactive shell sleeps about 1 ms between polls. Refreshing each
+    // 16 idle steps gives ZealC window controls an input/render loop without
+    // consuming one of the guest's limited cooperative task slots.
+    if (++guest_idle_frame_divider >= 16) {
+        guest_idle_frame_divider = 0;
+        if (!guest_winmgr_tick_fun) {
+            guest_winmgr_tick_fun = (CHashFun *)HashFind(
+                "BootstrapWinMgrTick", Fs->hash_table, HTT_FUN, 1);
+        }
+        if (guest_winmgr_tick_fun && guest_winmgr_tick_fun->fun_ptr &&
+            !guest_winmgr_tick_fun->argc &&
+            !(guest_winmgr_tick_fun->base.base.type & HTF_EXTERN)) {
+            set_guest_task(guest_fibers[0].words);
+            FFI_CALL_TOS_0(guest_winmgr_tick_fun->fun_ptr);
+        }
+    }
     guarded = 0;
 }
 int zc_focus_owns_input(void) {
@@ -3000,6 +3019,8 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
     guest_task_exe_active = 0;
     guest_job_call_active = 0;
     guest_background_dispatch = 0;
+    guest_idle_frame_divider = 0;
+    guest_winmgr_tick_fun = NULL;
     guest_focus_task = NULL;
     memset(guest_fibers, 0, sizeof(guest_fibers));
     set_guest_task(NULL);

@@ -59,6 +59,9 @@ I64 TaskOriginalDocRecalcChecks()
     I64 old_text_cells, outside_pixel;
     U32 attr_cells[2];
 
+    if (bootstrap_winmgr_ticks <= 0)
+        return 125;
+
     DocInit;
     doc = DocNew;
     if (!doc || doc->doc_signature != DOC_SIGNATURE_VAL)

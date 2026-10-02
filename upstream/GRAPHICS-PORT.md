@@ -14,7 +14,7 @@ implementations can be compared against the x86 source without editing it.
 | `System/Gr/GrTextBase.ZC` | `TextChar`, text spans/fills, and borders; the hot primitives are x86 assembly | ARM64 bridge primitives update `gr.text_base` and the framebuffer; a QEMU smoke proves direct packed-cell writes through the pointer are presented |
 | `System/Gr/GrScreen.ZC` | Per-task redraw, controls, draw callbacks, z-buffer, and final screen update | A bounded 100x75 cell z-buffer marks windows with any visible cells; each marked window's text, task `draw_it`, and visible control `draw_it` callbacks render in task-ring order. The final screen callback runs afterward with `DCF_ON_TOP`. View-angle controls and pixel-level z-buffer composition remain unported |
 | `System/Win.ZC` | Window geometry, focus, and tiling operations | `WinHorz`/`WinVert` normalization and derived pixel geometry are ported; focus, tiling, and z-order callbacks are incomplete |
-| `System/WinMgr.ZC` | Refresh loop, mouse routing, move/resize, and window-manager task | Pinned for reference; the ARM64 build has no upstream WinMgr task yet |
+| `System/WinMgr.ZC` | Refresh loop, mouse routing, move/resize, and window-manager task | The shell idle pump calls a minimal ZealC refresh/input tick after KernelB loads; the full upstream WinMgr task remains unported |
 | `System/Gr/MakeGr.ZC` | Graphics module include order | Reference only; its complete dependency set is not loaded by the bring-up runtime |
 
 ## First source-backed slice
@@ -71,9 +71,11 @@ border-origin translation and release to a clicked control. The tablet bridge
 now provides one packed coordinate/button sample, and `GrUpdateTasks` polls it
 for left-button press, held drag, and release on the focused task. The QEMU
 probe feeds synthetic samples through that same state path and checks a
-captured scrollbar drag. This is refresh-driven: there is still no autonomous
-WinMgr refresh/input task, right-button routing, or tablet wheel support.
-View-angle controls remain unported.
+captured scrollbar drag. The shell's cooperative idle pump invokes
+`BootstrapWinMgrTick` every 16 idle polls after the ZealOS task layer loads; it
+needs no extra guest task slot. Window move/resize/focus routing, right-button
+controls, and tablet wheel support remain unported. View-angle controls remain
+unported.
 
 After window callbacks, `GrUpdateTasks` invokes the optional
 `gr.fp_final_screen_update` callback with `DCF_ON_TOP`. Graphics calls through
@@ -89,9 +91,9 @@ call exercises that path in the QEMU compatibility probe.
 
 ## Remaining graphics path
 
-The next substantive graphics work is WinMgr mouse dispatch and view-angle
-controls, wallpaper, and broader CDC operations. Then connect `WinMgr.ZC` to
-the cooperative task runtime. `Kernel/Display.ZC`'s
+The next substantive graphics work is full WinMgr mouse dispatch and
+move/resize/focus, view-angle controls, wallpaper, and broader CDC operations.
+`Kernel/Display.ZC`'s
 framebuffer writes can target the Limine-provided framebuffer, but x86 assembly
 in `GrTextBase.ZC` and `GrAsm.ZC` must stay behind the ARM64 bridge or be
 replaced with architecture-neutral ZealC.
