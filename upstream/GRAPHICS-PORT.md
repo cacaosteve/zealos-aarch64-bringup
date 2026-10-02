@@ -65,12 +65,15 @@ the task's document scroll so controls remain fixed to the window. Traversal is
 bounded to 64 entries. `CtrlsUpdate`-style derived geometry and rectangle hit
 testing are ported; `WinScrollsInit` creates horizontal and vertical controls,
 whose thumb geometry, drawing, click, and wheel callbacks are covered by the
-QEMU probe. Bounded `CtrlDispatchLeftClick` and `CtrlDispatchWheel` helpers now
+QEMU probe. Bounded `CtrlDispatchLeftClick` and `CtrlDispatchWheel` helpers
 route explicit screen-coordinate events to those callbacks, including
-border-origin translation and release to a clicked control. Border clipping is
-handled by temporarily expanding the task bounds. The WinMgr mouse loop does
-not call these helpers yet, so UTM mouse interaction with controls is not
-claimed. View-angle controls remain unported.
+border-origin translation and release to a clicked control. The tablet bridge
+now provides one packed coordinate/button sample, and `GrUpdateTasks` polls it
+for left-button press, held drag, and release on the focused task. The QEMU
+probe feeds synthetic samples through that same state path and checks a
+captured scrollbar drag. This is refresh-driven: there is still no autonomous
+WinMgr refresh/input task, right-button routing, or tablet wheel support.
+View-angle controls remain unported.
 
 After window callbacks, `GrUpdateTasks` invokes the optional
 `gr.fp_final_screen_update` callback with `DCF_ON_TOP`. Graphics calls through

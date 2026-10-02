@@ -22,6 +22,8 @@ extern I64 ZcFbTextCellsDrawn();
 // Poll the current virtio/UART key reader and queue its events for the focus
 // task. PS/2 mouse polling is outside this bridge.
 extern U0 KbdMouseHandler(Bool poll_kbd, Bool poll_mouse);
+// Packed virtio tablet sample: x[15:0], y[31:16], buttons[39:32].
+extern I64 ZcTabletSample();
 extern I64 KbdMessagesQueue();
 // ARM64 exception pads are private to each cooperative guest task. The
 // compiler emits AIWNIOS_SetJmp(SysTry()) for HolyC try/catch.
@@ -1808,9 +1810,27 @@ public Bool CtrlDispatchLeftClick(CTask *task, I64 screen_x, I64 screen_y,
     if (!task || !TaskValidate(task) || !(ctrl = task->next_ctrl))
         return FALSE;
     head = &task->next_ctrl;
+    if (down)
+    {
+        // Captured controls continue receiving held-button samples after
+        // the thumb moves away from the original hit rectangle.
+        while (ctrl && ctrl != head && visited++ < 64)
+        {
+            if (ctrl->left_click &&
+                (ctrl->flags & CTRLF_CAPTURE_LEFT_MS) &&
+                (ctrl->flags & CTRLF_CLICKED))
+            {
+                target = ctrl;
+                break;
+            }
+            ctrl = ctrl->next;
+        }
+        ctrl = task->next_ctrl;
+        visited = 0;
+    }
     while (ctrl && ctrl != head && visited++ < 64)
     {
-        if (ctrl->left_click &&
+        if (!target && ctrl->left_click &&
             ((!down && (ctrl->flags & CTRLF_CLICKED)) ||
              CtrlInside(ctrl, screen_x, screen_y)))
         {
@@ -1830,6 +1850,37 @@ public Bool CtrlDispatchLeftClick(CTask *task, I64 screen_x, I64 screen_y,
     }
     target->left_click(target, screen_x - left, screen_y - top, down);
     return TRUE;
+}
+I64 bootstrap_mouse_last_buttons = 0;
+Bool bootstrap_mouse_sampled = FALSE;
+public Bool BootstrapCtrlInputSample(CTask *task, I64 sample)
+{//Feed one packed absolute tablet sample into the focused task's controls.
+    I64 x = sample & 0xffff;
+    I64 y = (sample >> 16) & 0xffff;
+    I64 buttons = (sample >> 32) & 0xff;
+    Bool handled = FALSE;
+    if (sample < 0 || !task || !TaskValidate(task))
+        return FALSE;
+    if (!bootstrap_mouse_sampled)
+    {
+        bootstrap_mouse_last_buttons = buttons;
+        bootstrap_mouse_sampled = TRUE;
+        return FALSE;
+    }
+    if (buttons & 1)
+        handled |= CtrlDispatchLeftClick(task, x, y, TRUE);
+    else if (bootstrap_mouse_last_buttons & 1)
+        handled |= CtrlDispatchLeftClick(task, x, y, FALSE);
+    bootstrap_mouse_last_buttons = buttons;
+    return handled;
+}
+U0 BootstrapCtrlInputPoll()
+{//Poll UTM's absolute tablet and route left-button samples to the focused task.
+    CTask *task;
+    task = Fs;
+    if (TaskValidate(sys_focus_task))
+        task = sys_focus_task;
+    BootstrapCtrlInputSample(task, ZcTabletSample());
 }
 public Bool CtrlDispatchWheel(CTask *task, I64 delta)
 {//WinMgr routes wheel changes to the focused task's first wheel control.
@@ -2119,6 +2170,8 @@ U0 GrUpdateTasks()
         root = sys_task;
     if (!root || !TaskValidate(root))
         return;
+
+    BootstrapCtrlInputPoll();
 
     TextRect(0, TEXT_COLS - 1, 0, TEXT_ROWS - 1, 0x0800);
     ZcFbShellTextCompose(gr.text_base, TEXT_COLS);

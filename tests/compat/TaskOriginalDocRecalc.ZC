@@ -499,8 +499,12 @@ I64 TaskOriginalDocRecalcChecks()
         Fs->text_attr = old_text_attr;
         return 122;
     }
-    if (!CtrlDispatchLeftClick(overlap, hscroll->screen_left,
-                               hscroll->screen_top, TRUE) ||
+    // The sampled-input layer sees a baseline, a press, held movement, then
+    // release. A captured scrollbar must continue tracking outside its thumb.
+    BootstrapCtrlInputSample(overlap, 0);
+    if (!BootstrapCtrlInputSample(overlap,
+            hscroll->screen_left | (hscroll->screen_top << 16) |
+            (1 << 32)) ||
         overlap->horz_scroll.pos != 25 ||
         !(overlap->horz_scroll.flags & (1 << WSSf_SET_TO_POS)) ||
         !(hscroll->flags & CTRLF_CLICKED))
@@ -511,10 +515,13 @@ I64 TaskOriginalDocRecalcChecks()
         Fs->text_attr = old_text_attr;
         return 123;
     }
-    if (!CtrlDispatchLeftClick(overlap, hscroll->screen_left,
-                               hscroll->screen_top, FALSE) ||
+    if (!BootstrapCtrlInputSample(overlap,
+            (hscroll->screen_left + 32) | (hscroll->screen_top << 16) |
+            (1 << 32)) || overlap->horz_scroll.pos <= 25 ||
+        !BootstrapCtrlInputSample(overlap,
+            (hscroll->screen_left + 32) | (hscroll->screen_top << 16)) ||
         !CtrlDispatchLeftClick(overlap, vscroll->screen_left,
-                               vscroll->screen_top, TRUE) ||
+                              vscroll->screen_top, TRUE) ||
         !CtrlDispatchWheel(overlap, 5) ||
         (hscroll->flags & CTRLF_CLICKED) ||
         overlap->vert_scroll.pos != 30 ||

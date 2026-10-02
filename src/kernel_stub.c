@@ -2716,6 +2716,19 @@ uint64_t hc_builtin_mousebtn(void) {
     return (uint64_t)virtio_tablet_buttons();
 }
 
+/* Stable, single-poll tablet snapshot for the ZealC task/window bridge. */
+int64_t zc_tablet_sample(void) {
+    uint32_t x = 0, y = 0;
+    int buttons = 0;
+    if (!virtio_tablet_ready() || !g_fb) {
+        return -1;
+    }
+    (void)virtio_tablet_sample((uint32_t)g_fb_w, (uint32_t)g_fb_h,
+                               &x, &y, &buttons);
+    return (int64_t)x | ((int64_t)y << 16) |
+           ((int64_t)(buttons & 0xff) << 32);
+}
+
 /* Tablet abs deltas (call MouseDX then MouseDY for a paired sample). */
 static int32_t g_mouse_last_x = -1, g_mouse_last_y = -1;
 static int32_t g_mouse_dx, g_mouse_dy;

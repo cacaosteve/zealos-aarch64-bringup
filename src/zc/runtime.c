@@ -50,6 +50,7 @@ extern uint64_t zeal_fb_graph_line(int64_t x0, int64_t y0,
                                    int64_t step, int64_t start,
                                    int64_t left, int64_t top,
                                    int64_t right, int64_t bottom);
+extern int64_t zc_tablet_sample(void);
 
 /* Separate arenas from legacy hc_* so its per-demo reset cannot invalidate
  * modules loaded here. Both use splitting/coalescing and arbitrary-order Free. */
@@ -1743,6 +1744,10 @@ static int64_t host_kbd_mouse_handler(int64_t *a) {
         ? poll_guest_keys() : 0;
     return 0;
 }
+static int64_t host_zc_tablet_sample(int64_t *a) {
+    (void)a;
+    return zc_tablet_sample();
+}
 static int64_t host_kbd_messages_queue(int64_t *a) {
     (void)a;
     struct guest_fiber *f = &guest_fibers[guest_current];
@@ -2858,6 +2863,7 @@ static int load_inner(const char *path) {
         PrsBindCSymbol("RFlagsPush", host_rflags_push, 0);
         PrsBindCSymbol("RFlagsPop", host_rflags_pop, 0);
         PrsBindCSymbol("KbdMouseHandler", host_kbd_mouse_handler, 2);
+        PrsBindCSymbol("ZcTabletSample", host_zc_tablet_sample, 0);
         PrsBindCSymbol("KbdMessagesQueue", host_kbd_messages_queue, 0);
         PrsBindCSymbol("Spawn", host_spawn, 7);
         PrsBindCSymbol("Yield", host_task_yield, 0);

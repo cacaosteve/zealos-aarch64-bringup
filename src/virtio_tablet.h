@@ -177,7 +177,8 @@ static void virtio_tablet_poll(void) {
     vt_notify(d);
 }
 
-static int virtio_tablet_xy(uint32_t fb_w, uint32_t fb_h, uint32_t *ox, uint32_t *oy) {
+static int virtio_tablet_sample(uint32_t fb_w, uint32_t fb_h,
+                                uint32_t *ox, uint32_t *oy, int *buttons) {
     if (!g_vt.ready || fb_w < 2 || fb_h < 2) {
         return 0;
     }
@@ -194,9 +195,17 @@ static int virtio_tablet_xy(uint32_t fb_w, uint32_t fb_h, uint32_t *ox, uint32_t
     }
     *ox = x;
     *oy = y;
+    if (buttons) {
+        *buttons = g_vt.buttons;
+    }
     int moved = g_vt.moved;
     g_vt.moved = 0;
     return moved || 1;
+}
+
+static int virtio_tablet_xy(uint32_t fb_w, uint32_t fb_h,
+                            uint32_t *ox, uint32_t *oy) {
+    return virtio_tablet_sample(fb_w, fb_h, ox, oy, NULL);
 }
 
 static uint64_t virtio_tablet_mmio_phys(void) {
