@@ -361,6 +361,38 @@ static void handoff_reserve_kernel(struct zeal_handoff *h) {
     }
 }
 
+/* Reserve eight HHDM-backed 4KiB pages for the kernel's early MMIO tables. */
+static int handoff_reserve_pt_pool(struct zeal_handoff *h) {
+    const uint64_t pool_size = 8ull * 4096ull;
+    for (uint32_t i = 0; i < h->mem_count; i++) {
+        struct zeal_mem_entry *entry = &h->mem[i];
+        uint64_t end, pool_end, base;
+        if (entry->type != ZEAL_MEM_USABLE || entry->length < pool_size + 4096ull)
+            continue;
+        end = entry->base + entry->length;
+        if (end < entry->base)
+            continue;
+        pool_end = end & ~0xfffull;
+        base = pool_end - pool_size;
+        if (base < entry->base + 4096ull ||
+            h->mem_count + (pool_end < end ? 2u : 1u) > ZEAL_MEM_MAX)
+            continue;
+        entry->length = base - entry->base;
+        h->mem[h->mem_count].base = base;
+        h->mem[h->mem_count].length = pool_size;
+        h->mem[h->mem_count].type = ZEAL_MEM_PAGETABLE;
+        h->mem_count++;
+        if (pool_end < end) {
+            h->mem[h->mem_count].base = pool_end;
+            h->mem[h->mem_count].length = end - pool_end;
+            h->mem[h->mem_count].type = ZEAL_MEM_USABLE;
+            h->mem_count++;
+        }
+        return 0;
+    }
+    return -1;
+}
+
 static void icache_flush(void *addr, uint64_t size) {
     uintptr_t start = (uintptr_t)addr & ~63ull;
     uintptr_t end = ((uintptr_t)addr + size + 63) & ~63ull;
@@ -653,6 +685,9 @@ void kmain(void) {
     }
 
     handoff_reserve_kernel(&g_handoff);
+    if (handoff_reserve_pt_pool(&g_handoff) != 0) {
+        uart_puts(uart, "warning: no reserved page-table pool\n");
+    }
     uart_puts(uart, "kernel phys=");
     uart_put_u64_hex(uart, g_kernel_phys);
     uart_puts(uart, " size=");

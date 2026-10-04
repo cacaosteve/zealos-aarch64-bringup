@@ -15,6 +15,7 @@ typedef struct CMemberLst {
   char *str;
 #define MLF_STATIC        1
 #define MLF_DFT_AVAILABLE 2
+#define MLF_LASTCLASS     4
   int64_t off, reg, use_cnt, flags;
   union {
     int64_t dft_val;

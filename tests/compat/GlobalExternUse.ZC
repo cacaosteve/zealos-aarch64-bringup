@@ -1,0 +1,6 @@
+extern I64 guest_global_link_probe;
+
+I64 GlobalExternLinkChecks()
+{
+    return guest_global_link_probe;
+}

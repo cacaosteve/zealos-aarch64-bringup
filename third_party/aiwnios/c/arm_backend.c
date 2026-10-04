@@ -158,6 +158,7 @@ static void SetKeepTmps(CRPN *rpn) {
       right->res.keep_in_tmp = 1;
     break;
   case IC_SQR:
+  case IC_SQRT:
   case IC_POS:
     goto unop;
     break;
@@ -1671,6 +1672,7 @@ static int64_t SpillsTmpRegs(CRPN *rpn) {
     return SpillsTmpRegs(rpn->base.next);
     break;
   case IC_SQR:
+  case IC_SQRT:
   case IC_POS:
     goto unop;
     break;
@@ -3194,6 +3196,21 @@ static int64_t __OptPassFinal(CCmpCtrl *cctrl, CRPN *rpn, char *bin,
           ICMov(cctrl, &rpn->res, &tmp, bin, code_off); // Move tmp into result.
     }
     break;
+  case IC_SQRT:
+    next = ICArgN(rpn, 0);
+    code_off = __OptPassFinal(cctrl, next, bin, code_off);
+    code_off = PutICArgIntoReg(cctrl, &next->res, RT_F64, 0, bin,
+                               code_off); // Fallback to reg 0
+    if (rpn->res.mode == MD_REG) {
+      AIWNIOS_ADD_CODE(ARM_fsqrtReg(rpn->res.reg, next->res.reg));
+    } else {
+      tmp.mode = MD_REG;
+      tmp.raw_type = RT_F64;
+      tmp.reg = MFR(cctrl, 0);
+      AIWNIOS_ADD_CODE(ARM_fsqrtReg(tmp.reg, next->res.reg));
+      code_off = ICMov(cctrl, &rpn->res, &tmp, bin, code_off);
+    }
+    break;
   case IC_NAME:
     abort();
     break;
@@ -3708,13 +3725,13 @@ static int64_t __OptPassFinal(CCmpCtrl *cctrl, CRPN *rpn, char *bin,
         into_reg = 8;
       if (cctrl->code_ctrl->final_pass) {
         i = ARM_adrX(MIR(cctrl, into_reg),
-                     (char *)rpn->integer - (bin + code_off));
+                     (char *)next->integer - (bin + code_off));
         if (i != ARM_ERR_INV_OFF) {
           AIWNIOS_ADD_CODE(i);
           goto restore_reg;
         }
       }
-      code_off = __ICMoveI64(cctrl, into_reg, rpn->integer, bin, code_off);
+      code_off = __ICMoveI64(cctrl, into_reg, next->integer, bin, code_off);
       goto restore_reg;
     case IC_GLOBAL:
     get_glbl_ptr:
@@ -4806,6 +4823,9 @@ static int64_t PushTmpDepthFirst(CCmpCtrl *cctrl, CRPN *r, int64_t spilled) {
     goto unop;
     break;
   case IC_NEG:
+    goto unop;
+    break;
+  case IC_SQRT:
     goto unop;
     break;
   case IC_POS:

@@ -4,6 +4,7 @@
 #include <math.h>
 #include <stddef.h>
 #include <stdlib.h>
+#include <string.h>
 
 static int64_t IsConst(CRPN *rpn) {
   switch (rpn->type) {
@@ -35,6 +36,8 @@ static void FixFunArgs(CCmpCtrl *cctrl, CRPN *rpn) {
   CRPN *rpn2 = rpn->base.next, *ic, *last;
   CHashFun *ic_fun;
   CMemberLst *arg, *args_lst_rev;
+  CHashClass *last_class;
+  CCodeMisc *misc;
   for (cnt = 0; cnt != rpn->length; cnt++)
     rpn2 = ICFwd(rpn2);
   AssignRawTypeToNode(cctrl, rpn2);
@@ -49,7 +52,21 @@ static void FixFunArgs(CCmpCtrl *cctrl, CRPN *rpn) {
       break;
     rpn2 = ICArgN(rpn, rpn->length - cnt - 1); // REVERSE polish notation
     if (rpn2->type == IC_NOP) {
-      if (arg->member_class->raw_type == RT_F64) {
+      if (arg->flags & MLF_LASTCLASS) {
+        if (cnt == 0)
+          ParseErr(cctrl, "lastclass default requires a preceding argument.");
+        last_class = arg->last->member_class;
+        /* Pointer class entries share the base class name only at star 0. */
+        last_class -= last_class->ptr_star_cnt;
+        if (!last_class || !last_class->base.str)
+          ParseErr(cctrl, "lastclass default cannot infer the preceding argument type.");
+        misc = CodeMiscNew(cctrl, CMT_STRING);
+        misc->str = A_STRDUP(last_class->base.str, cctrl->hc);
+        misc->str_len = strlen(misc->str) + 1;
+        rpn2->type = IC_STR;
+        rpn2->code_misc = misc;
+        AssignRawTypeToNode(cctrl, rpn2);
+      } else if (arg->member_class->raw_type == RT_F64) {
         rpn2->type = IC_F64;
         rpn2->flt = ((double *)&arg->dft_val)[0];
         AssignRawTypeToNode(cctrl, rpn2);
@@ -81,7 +98,20 @@ static void FixFunArgs(CCmpCtrl *cctrl, CRPN *rpn) {
   for (; cnt < cnt2; cnt++) {
     ic = A_CALLOC(sizeof(CRPN), cctrl->hc);
     rpn->length++;
-    if (arg->member_class->raw_type == RT_F64) {
+    if (arg->flags & MLF_LASTCLASS) {
+      if (!arg->last)
+        ParseErr(cctrl, "lastclass default requires a preceding argument.");
+      last_class = arg->last->member_class;
+      last_class -= last_class->ptr_star_cnt;
+      if (!last_class->base.str)
+        ParseErr(cctrl, "lastclass default cannot infer the preceding argument type.");
+      misc = CodeMiscNew(cctrl, CMT_STRING);
+      misc->str = A_STRDUP(last_class->base.str, cctrl->hc);
+      misc->str_len = strlen(misc->str) + 1;
+      ic->type = IC_STR;
+      ic->code_misc = misc;
+      AssignRawTypeToNode(cctrl, ic);
+    } else if (arg->member_class->raw_type == RT_F64) {
       ic->type = IC_F64;
       ic->flt = ((double *)&arg->dft_val)[0];
       AssignRawTypeToNode(cctrl, ic);

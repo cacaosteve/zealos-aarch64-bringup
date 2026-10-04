@@ -43,7 +43,16 @@ if [[ -z "${UUID:-}" ]]; then
   exit 1
 fi
 
-DEST="$(python3 - <<PY
+EXPECTED_DEST="$DOCS/$VM_NAME.utm"
+if [[ -f "$EXPECTED_DEST/config.plist" ]] && python3 - "$EXPECTED_DEST/config.plist" "$UUID" <<'PY'
+import pathlib, plistlib, sys
+config = plistlib.loads(pathlib.Path(sys.argv[1]).read_bytes())
+sys.exit(0 if config.get("Information", {}).get("UUID", "").upper() == sys.argv[2].upper() else 1)
+PY
+then
+  DEST="$EXPECTED_DEST"
+else
+  DEST="$(python3 - <<PY
 import plistlib, pathlib
 want = "$UUID".upper()
 docs = pathlib.Path("$DOCS")
@@ -53,7 +62,8 @@ for d in docs.glob("*.utm"):
         print(d)
         break
 PY
-)"
+  )"
+fi
 if [[ -z "$DEST" || ! -d "$DEST" ]]; then
   echo "could not resolve .utm for $UUID" >&2
   exit 1
@@ -61,7 +71,7 @@ fi
 echo "Resolved $VM_NAME → $DEST"
 
 python3 - <<PY
-import plistlib, pathlib, shutil, uuid as uuidlib
+import plistlib, pathlib, shutil, subprocess, sys, uuid as uuidlib
 
 dest = pathlib.Path("$DEST")
 disk_src = pathlib.Path("$DISK_IMG")
@@ -159,6 +169,12 @@ if old_shadow is not None:
         f.seek(SHADOW_LBA_BASE * 512)
         f.write(old_shadow)
     print(f"Native source shadow preserved @ LBA {SHADOW_LBA_BASE} ({SHADOW_BYTES} bytes)")
+
+# Preserve guest edits and deletion masks, while adding newly bundled upstream
+# and test files that are absent from the existing source volume.
+root = pathlib.Path("$ROOT")
+subprocess.run([sys.executable, str(root / "scripts/source-volume.py"),
+                "merge", str(target), str(root / "build/sources.tar")], check=True)
 
 # Convenience second name for humans / older scripts
 shutil.copyfile(target, data / "zealos-esp.raw")

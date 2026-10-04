@@ -1,0 +1,15 @@
+I64 HashDefineBridgeChecks()
+{
+    CHashGeneric *entry;
+
+    DefinePrint("BRIDGE_DEFINE", "value=%d", 42);
+    if (StrCompare(Define("BRIDGE_DEFINE"), "value=42"))
+        return 1;
+    entry = HashPublic("BRIDGE_DEFINE", HTT_DEFINE_STR);
+    if (!entry || !(entry->type & HTF_PUBLIC))
+        return 2;
+    if (HashPublic("BRIDGE_DEFINE", HTT_DEFINE_STR, FALSE) != entry ||
+        (entry->type & HTF_PUBLIC))
+        return 3;
+    return 42;
+}

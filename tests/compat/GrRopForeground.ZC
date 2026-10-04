@@ -1,0 +1,173 @@
+extern U0 GrRopEquU8NoClipping(I64 ch, U8 *dst, I64 width_internal);
+extern U0 GrUpdateTextFG();
+extern U0 GrUpdateScreen32();
+extern U0 GrPaletteGet(CBGR24 *palette);
+extern U0 GrPaletteSet(CBGR24 *palette);
+
+I64 GrRopForegroundChecks()
+{
+	U8 pixels[8 * 12];
+	U8 *glyphs = text.font(U8 *);
+	I64 i, x, y;
+	U8 a_rows[8] = {0x18, 0x3c, 0x66, 0x66, 0x7e, 0x66, 0x66, 0x00};
+
+	for (i = 0; i < 8 * 12; i++)
+		pixels[i] = 0x5a;
+	if (!glyphs || glyphs['A' * 8] != a_rows[0])
+		return 1;
+	GrRopEquU8NoClipping(0x00000341, pixels, 12);
+	for (y = 0; y < 8; y++)
+	{
+		for (x = 0; x < 8; x++)
+		{
+			U8 expected = 0x5a;
+			if (a_rows[y] & (0x80 >> x))
+				expected = 0x03;
+			if (pixels[y * 12 + x] != expected)
+				return 2;
+		}
+		for (x = 8; x < 12; x++)
+			if (pixels[y * 12 + x] != 0x5a)
+				return 3;
+	}
+	// A zero glyph is transparent, while underline forces the bottom row.
+	for (i = 0; i < 8 * 12; i++)
+		pixels[i] = 0x5a;
+	GrRopEquU8NoClipping(0x80000320, pixels, 12);
+	for (y = 0; y < 7; y++)
+		for (x = 0; x < 8; x++)
+			if (pixels[y * 12 + x] != 0x5a)
+				return 4;
+	for (x = 0; x < 8; x++)
+		if (pixels[7 * 12 + x] != 0x03)
+			return 5;
+	for (y = 0; y < 8; y++)
+		for (x = 8; x < 12; x++)
+			if (pixels[y * 12 + x] != 0x5a)
+				return 6;
+	return 42;
+}
+
+I64 GrUpdateTextFGChecks()
+{
+	U32 plane[100 * 75];
+	I64 colors[256];
+	CDC test_dc;
+	U8 *body = MAlloc(800 * 600);
+	U32 *saved_plane = gr.text_base;
+	CDC *saved_dc = gr.dc2;
+	I64 *saved_colors = gr.to_8_colors;
+	I64 saved_pan_x = gr.pan_text_x, saved_pan_y = gr.pan_text_y;
+	Bool saved_hide_col = gr.hide_col, saved_hide_row = gr.hide_row;
+	Bool saved_blink = Blink;
+	I64 i, changed = 0, first = -1;
+	if (!body)
+		return 1;
+	for (i = 0; i < 800 * 600; i++)
+		body[i] = 0x5a;
+	for (i = 0; i < 100 * 75; i++)
+		plane[i] = 0;
+	for (i = 0; i < 256; i++)
+		colors[i] = ((i >> 4) & 0x0f) * 0x0101010101010101;
+	gr.text_base = plane;
+	gr.to_8_colors = colors;
+	gr.dc2 = &test_dc;
+	test_dc.body = body;
+	test_dc.width = 800;
+	test_dc.width_internal = 800;
+	test_dc.height = 600;
+	gr.pan_text_x = 0;
+	gr.pan_text_y = 0;
+	gr.hide_col = FALSE;
+	gr.hide_row = FALSE;
+	Blink = FALSE;
+	plane[102] = 0x0000c341;
+	GrUpdateTextFG;
+	for (i = 0; i < 800 * 600; i++)
+		if (body[i] != 0x5a)
+		{
+			if (first < 0)
+				first = i;
+			changed++;
+		}
+	gr.text_base = saved_plane;
+	gr.dc2 = saved_dc;
+	gr.to_8_colors = saved_colors;
+	gr.pan_text_x = saved_pan_x;
+	gr.pan_text_y = saved_pan_y;
+	gr.hide_col = saved_hide_col;
+	gr.hide_row = saved_hide_row;
+	Blink = saved_blink;
+	Free(body);
+	if (first != 6419 || changed != 28)
+		return 1000 + changed;
+	return 42;
+}
+
+I64 GrUpdateScreen32Checks()
+{
+	I64 pixel_count = 800 * 600, i;
+	U8 *pixels = MAlloc(pixel_count);
+	U8 *screen_cache = MAlloc(pixel_count);
+	U32 *raw = MAlloc(pixel_count * sizeof(U32));
+	U32 *alias = MAlloc(pixel_count * sizeof(U32));
+	CBGR24 saved_palette[COLORS_NUM], test_palette[COLORS_NUM];
+	CDC test_dc;
+	CDC *saved_dc = gr.dc2;
+	U8 *saved_cache = gr.screen_cache;
+	I64 saved_zoom = gr.screen_zoom;
+	U32 *saved_raw = text.raw_screen, *saved_alias = text.fb_alias;
+	U64 saved_buffer_size = text.buffer_size;
+	U64 saved_pitch = sys_framebuffer_pidth;
+	U32 expected;
+	if (!pixels || !screen_cache || !raw || !alias)
+		return 1;
+	GrPaletteGet(saved_palette);
+	for (i = 0; i < COLORS_NUM; i++)
+		test_palette[i] = 0;
+	test_palette[3] = 0x00123456;
+	GrPaletteSet(test_palette);
+	for (i = 0; i < pixel_count; i++)
+	{
+		pixels[i] = 0;
+		screen_cache[i] = 0;
+		raw[i] = 0;
+		alias[i] = 0xdeadbeef;
+	}
+	pixels[0] = 3;
+	test_dc.body = pixels;
+	test_dc.width = 800;
+	test_dc.width_internal = 800;
+	test_dc.height = 600;
+	gr.dc2 = &test_dc;
+	gr.screen_cache = screen_cache;
+	gr.screen_zoom = 1;
+	text.raw_screen = raw;
+	text.fb_alias = alias;
+	text.buffer_size = pixel_count * sizeof(U32);
+	sys_framebuffer_pidth = 800;
+	expected = gr_palette[3];
+	GrUpdateScreen32;
+	gr.dc2 = saved_dc;
+	gr.screen_cache = saved_cache;
+	gr.screen_zoom = saved_zoom;
+	text.raw_screen = saved_raw;
+	text.fb_alias = saved_alias;
+	text.buffer_size = saved_buffer_size;
+	sys_framebuffer_pidth = saved_pitch;
+	GrPaletteSet(saved_palette);
+	if (raw[0] != expected || alias[0] != expected ||
+			alias[1] != 0xdeadbeef)
+	{
+		Free(alias);
+		Free(raw);
+		Free(screen_cache);
+		Free(pixels);
+		return 2;
+	}
+	Free(alias);
+	Free(raw);
+	Free(screen_cache);
+	Free(pixels);
+	return 42;
+}

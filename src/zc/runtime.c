@@ -3,13 +3,32 @@
 #include "aiwn_hash.h"
 #include "aiwn_lexparser.h"
 #include "aiwn_mem.h"
+#include "../fb_font.h"
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+/* ZealOS KernelA.HH currently defines EXT_EXTS_NUM as five. Keep a stable
+ * pointer/table pair for its kernel-owned function dispatch slots; guest
+ * modules populate these slots as they load. */
+static void *guest_ext_entries[5];
+static void **guest_ext_table = guest_ext_entries;
+static uint64_t guest_fb_width, guest_fb_height, guest_fb_pitch;
+static uint64_t guest_fb_bpp;
+static uint64_t guest_text_globals[16];
+/* The first graphics slice uses the kernel's compact 8x8 ASCII font as the
+ * guest CTextGlobals.font table. Entries are U64 so unchanged ZealOS code can
+ * index text.font[character] with its original ABI. */
+static uint64_t guest_gr_font[256];
+static uint64_t guest_gr_colors[256];
+static int guest_gr_tables_ready;
+static void *guest_fp_set_std_palette;
+
 extern void hc_fmt_f64_bits(char **dp, uint64_t bits, int prec);
+extern uint64_t hc_builtin_exp(uint64_t xbits);
+extern uint64_t hc_builtin_sqrt(uint64_t xbits);
 
 extern uint64_t zeal_fb_text_span(int64_t x, int64_t y, int64_t len,
                                   uint32_t attr, const void *data, int mode,
@@ -182,6 +201,11 @@ static int guest_background_dispatch;
 static unsigned guest_idle_frame_divider;
 static CHashFun *guest_winmgr_tick_fun;
 static int64_t guest_mp_count = 1;
+static void *guest_cpu_structs;
+static void *guest_kbd_state;
+static void *guest_autocomplete_state;
+static void *guest_task_being_screen_updated;
+static void *guest_screencast_state;
 static struct guest_counts {
     int64_t jiffies, timer, time_stamp_freq, time_stamp_kHz_freq;
     int64_t time_stamp_freq_initial;
@@ -197,6 +221,9 @@ struct guest_progress {
     uint8_t desc[48];
 };
 static struct guest_progress guest_progresses[4];
+/* KernelB exposes the elapsed-time origin of each progress bar separately
+ * from its CProgress record; Win.ZC reads these when saving progress timing. */
+static double guest_progress_t0[4];
 _Static_assert(offsetof(struct guest_progress, desc) == 32 &&
                sizeof(struct guest_progress) == 80,
                "pinned CProgress layout");
@@ -227,6 +254,7 @@ static int64_t guest_hash_table_off;
 static int guest_task_bound;
 extern uint64_t zeal_fb_text_cols(void), zeal_fb_text_rows(void);
 extern uint64_t zeal_fb_screen_width(void), zeal_fb_screen_height(void);
+extern uint64_t zeal_fb_pitch_bytes(void), zeal_fb_bits_per_pixel(void);
 extern void zeal_fb_task_text_reset(unsigned slot);
 extern uint64_t zeal_fb_task_text_write(unsigned slot, int64_t left,
                                          int64_t right, int64_t top,
@@ -596,6 +624,25 @@ static int64_t host_malloc(int64_t *a) {
     (void)a[1];
     return (int64_t)(uintptr_t)__AIWNIOS_MAlloc(a[0], owner);
 }
+static int64_t host_sqrt(int64_t *a) {
+    return (int64_t)hc_builtin_sqrt((uint64_t)a[0]);
+}
+static int64_t host_exp(int64_t *a) {
+    return (int64_t)hc_builtin_exp((uint64_t)a[0]);
+}
+/* Option() controls compiler/runtime diagnostics in ZealOS. The ARM64
+ * compiler currently has no matching option state; accept the call so
+ * upstream modules can bracket declarations with compatible syntax. */
+static int64_t host_option(int64_t *a) {
+    (void)a;
+    return 0;
+}
+static int64_t host_calloc(int64_t *a) {
+    /* CAlloc is the zero-filled sibling of MAlloc; the task selector is
+     * accepted for ABI compatibility while this runtime uses its active heap. */
+    CHeapCtrl *owner = guest_task_bound ? &guest_fibers[guest_current].heap_owner : &data_heap;
+    return (int64_t)(uintptr_t)__AIWNIOS_CAlloc(a[0], owner);
+}
 static int64_t host_free(int64_t *a) {
     free((void *)(uintptr_t)a[0]);
     return 0;
@@ -605,8 +652,119 @@ static int64_t host_copy(int64_t *a) {
     return (int64_t)(uintptr_t)memcpy((void *)(uintptr_t)a[0], (void *)(uintptr_t)a[1],
                                       (size_t)a[2]);
 }
+/* ARM64 replacement for GrAsm.ZC's _DC_BLOT_COLOR4. Each U64 in the source
+ * holds eight packed 4-bit pixels. The destination stores one byte per eight
+ * pixels in each of four color bitplanes; the cache avoids rewriting unchanged
+ * groups. */
+static int64_t host_dc_blot_color4(int64_t *a) {
+    uint8_t *dst = (uint8_t *)(uintptr_t)a[0];
+    uint64_t *img = (uint64_t *)(uintptr_t)a[1];
+    uint64_t *cache = (uint64_t *)(uintptr_t)a[2];
+    if (a[3] < 0 || (uint64_t)a[3] > SIZE_MAX / 4 ||
+        (a[3] && (!dst || !img || !cache)))
+        return -1;
+    size_t count = (size_t)a[3];
+    for (size_t i = 0; i < count; i++) {
+        uint64_t pixels = img[i];
+        if (pixels == cache[i])
+            continue;
+        cache[i] = pixels;
+        for (unsigned plane = 0; plane < 4; plane++) {
+            uint8_t packed = 0;
+            for (unsigned pixel = 0; pixel < 8; pixel++)
+                packed |= (uint8_t)(((pixels >> (pixel * 8 + plane)) & 1) << pixel);
+            dst[(size_t)plane * count + i] = packed;
+        }
+    }
+    return 0;
+}
+/* ARM64 replacement for GrAsm.ZC's x86 GrRopEquU8NoClipping. The original
+ * lookup tables expand one glyph bit into an eight-pixel mask and one text
+ * attribute into eight copies of a palette index. This scalar version keeps
+ * the same row-stride/transparent-foreground behavior without x86 assembly. */
+static int64_t host_gr_rop_equ_u8_no_clipping(int64_t *a) {
+    uint64_t packed = (uint64_t)a[0];
+    uint8_t *dst = (uint8_t *)(uintptr_t)a[1];
+    int64_t stride = a[2];
+    if (!dst || stride <= 0 || stride > (1 << 24))
+        return -1;
+
+    unsigned ch = (unsigned)(packed & 0xffu);
+    uint8_t fg = (uint8_t)guest_gr_colors[(packed >> 8) & 0xffu];
+    const uint8_t *rows = (const uint8_t *)&guest_gr_font[ch];
+    int underline = (packed & 0x80000000u) != 0;
+    for (unsigned y = 0; y < 8; y++) {
+        uint8_t bits = rows[y];
+        if (underline && y == 7)
+            bits = 0xff;
+        if (!bits)
+            continue;
+        for (unsigned x = 0; x < 8; x++)
+            if (bits & (0x80u >> x))
+                dst[(size_t)y * (size_t)stride + x] = fg;
+    }
+    return 0;
+}
+
+static void init_guest_gr_tables(void) {
+    if (guest_gr_tables_ready)
+        return;
+    for (unsigned ch = 0; ch < 256; ch++) {
+        unsigned font_ch = ch;
+        if (font_ch < 32) {
+            guest_gr_font[ch] = 0;
+            continue;
+        }
+        if (font_ch > 127)
+            font_ch = '?';
+        memcpy(&guest_gr_font[ch], g_font8[font_ch - 32], 8);
+    }
+    /* GrUpdateTextFG masks the attribute to the low foreground nibble before
+     * calling GrRopEquU8NoClipping. The renderer's
+     * intermediate surface is palette-indexed; foreground-only stores use
+     * that four-bit color until GrInit/display palette setup is ported. */
+    for (unsigned attr = 0; attr < 256; attr++)
+        guest_gr_colors[attr] = attr & 0x0f;
+    guest_gr_tables_ready = 1;
+}
+static int64_t host_compare(int64_t *a) {
+    if (a[2] < 0)
+        return 0;
+    return memcmp((const void *)(uintptr_t)a[0],
+                  (const void *)(uintptr_t)a[1], (size_t)a[2]);
+}
+static int64_t host_define_mirror(int64_t *a) {
+    const char *name = (const char *)(uintptr_t)a[0];
+    const char *value = (const char *)(uintptr_t)a[1];
+    CHashDefineStr *define;
+    if (!name || !value)
+        return 0;
+    define = (CHashDefineStr *)HashFind((char *)name, Fs->hash_table,
+                                         HTT_DEFINE_STR, 1);
+    if (define) {
+        A_FREE(define->data);
+        define->data = A_STRDUP((char *)value, NULL);
+    } else {
+        define = A_CALLOC(sizeof(*define), NULL);
+        define->base.str = A_STRDUP((char *)name, NULL);
+        define->base.type = HTT_DEFINE_STR;
+        define->data = A_STRDUP((char *)value, NULL);
+        HashAdd(&define->base, Fs->hash_table);
+    }
+    return 0;
+}
 static int64_t host_set(int64_t *a) {
     return (int64_t)(uintptr_t)memset((void *)(uintptr_t)a[0], (int)a[1], (size_t)a[2]);
+}
+static int64_t host_memset_u32(int64_t *a) {
+    uint32_t *dst = (uint32_t *)(uintptr_t)a[0];
+    uint32_t value = (uint32_t)a[1];
+    int64_t count = a[2];
+    if (count < 0 || (uint64_t)count > SIZE_MAX / sizeof(*dst))
+        return 0;
+    for (int64_t i = 0; i < count; i++)
+        dst[i] = value;
+    return (int64_t)(uintptr_t)dst;
 }
 static int64_t host_puts(int64_t *a) {
     const char *text = (const char *)(uintptr_t)a[0];
@@ -1134,7 +1292,7 @@ static void init_guest_fiber(unsigned i, void *parent, const char *name) {
     *(void **)(words + guest_code_heap_off) = heap;
     /* Guest DEFINE/FramePtr tables are separate from the Aiwnios compiler
      * hash. HashTableNew's CHash/CHashTable layout matches ZealOS. */
-    *(void **)(words + guest_hash_table_off) = HashTableNew(1024, NULL);
+    *(void **)(words + guest_hash_table_off) = HashTableNew(1024, &f->heap_owner);
     memcpy(heap + guest_heap_sig_off, "HcSV", 4);
     *(void **)(heap + guest_heap_task_off) = words;
     f->irq_flags_live = 1u << 9; /* IF enabled until CLI/RFlagsSet. */
@@ -2288,6 +2446,34 @@ static int64_t host_sqr_i64(int64_t *a) {
     int64_t i = a[0];
     return i * i;
 }
+static int64_t host_dist_sqr_i64(int64_t *a) {
+    /* Graphics coordinates are framebuffer-bounded in this port. Keep the
+     * calculation in unsigned space to avoid C signed-overflow UB. */
+    int64_t dx, dy;
+    if (__builtin_sub_overflow(a[0], a[2], &dx) ||
+        __builtin_sub_overflow(a[1], a[3], &dy))
+        return INT64_MAX;
+    uint64_t ax = dx < 0 ? (uint64_t)(-(dx + 1)) + 1 : (uint64_t)dx;
+    uint64_t ay = dy < 0 ? (uint64_t)(-(dy + 1)) + 1 : (uint64_t)dy;
+    if (ax && ax > UINT32_MAX) return INT64_MAX;
+    if (ay && ay > UINT32_MAX) return INT64_MAX;
+    uint64_t xx = ax * ax, yy = ay * ay;
+    if (xx > INT64_MAX - yy) return INT64_MAX;
+    return (int64_t)(xx + yy);
+}
+static int64_t host_clamp_i64(int64_t *a) {
+    return a[0] < a[1] ? a[1] : a[0] > a[2] ? a[2] : a[0];
+}
+static int64_t host_swap_u16(int64_t *a) {
+    uint16_t *x = (uint16_t *)(uintptr_t)a[0];
+    uint16_t *y = (uint16_t *)(uintptr_t)a[1];
+    if (x && y) {
+        uint16_t value = *x;
+        *x = *y;
+        *y = value;
+    }
+    return 0;
+}
 static int64_t host_endian_u64(int64_t *a) {
     uint64_t v = (uint64_t)a[0];
     v = ((v & 0x00000000FFFFFFFFull) << 32) | ((v & 0xFFFFFFFF00000000ull) >> 32);
@@ -2350,6 +2536,29 @@ static uint64_t counter_now(void) {
     uint64_t ticks;
     __asm__ volatile("mrs %0, cntpct_el0" : "=r"(ticks));
     return ticks;
+}
+static int64_t host_monotonic_ns(int64_t *a) {
+    (void)a;
+    uint64_t frequency;
+    __asm__ volatile("mrs %0, cntfrq_el0" : "=r"(frequency));
+    if (!frequency)
+        zc_fail("generic timer frequency unavailable");
+    uint64_t ticks = counter_now();
+    uint64_t seconds = ticks / frequency;
+    uint64_t remainder = ticks % frequency;
+    if (seconds > (uint64_t)INT64_MAX / 1000000000ULL)
+        zc_fail("monotonic clock overflow");
+    uint64_t ns = seconds * 1000000000ULL +
+        remainder * 1000000000ULL / frequency;
+    if (ns > (uint64_t)INT64_MAX)
+        zc_fail("monotonic clock overflow");
+    return (int64_t)ns;
+}
+static int64_t host_timer_seconds_bits(int64_t *a) {
+    double seconds = (double)host_monotonic_ns(a) * 0.000000001;
+    uint64_t bits;
+    memcpy(&bits, &seconds, sizeof(bits));
+    return (int64_t)bits;
 }
 static int64_t host_sleep(int64_t *a) {
     if (a[0] <= 0)
@@ -2547,6 +2756,7 @@ static void bind_guest_task(void) {
     guest_heap_task_off = MemberFind("mem_task", heap)->off;
     memset(guest_fibers, 0, sizeof(guest_fibers));
     memset(guest_progresses, 0, sizeof(guest_progresses));
+    memset(guest_progress_t0, 0, sizeof(guest_progress_t0));
     guest_current = guest_completed = 0;
     guest_task_serial = 0;
     guest_job_count = 0;
@@ -2569,6 +2779,10 @@ static void bind_guest_task(void) {
     PrsBindCSymbol("mp_count", &guest_mp_count, 0);
     PrsBindCSymbol("sys_focus_task", &guest_focus_task, 0);
     PrsBindCSymbol("sys_progresses", guest_progresses, 0);
+    PrsBindCSymbol("progress1_t0", &guest_progress_t0[0], 0);
+    PrsBindCSymbol("progress2_t0", &guest_progress_t0[1], 0);
+    PrsBindCSymbol("progress3_t0", &guest_progress_t0[2], 0);
+    PrsBindCSymbol("progress4_t0", &guest_progress_t0[3], 0);
     PrsBindCSymbol("Bt", host_bt, 2);
     PrsBindCSymbol("Bts", host_bts, 2);
     PrsBindCSymbol("Btr", host_btr, 2);
@@ -2590,6 +2804,7 @@ static void bind_guest_task(void) {
     PrsBindCSymbol("RFlagsGet", host_rflags_get, 0);
     PrsBindCSymbol("RFlagsSet", host_rflags_set, 1);
     PrsBindCSymbol("TSCGet", host_tsc, 0);
+    PrsBindCSymbol("ZcMonotonicNs", host_monotonic_ns, 0);
     PrsBindCSymbol("ToF64", host_to_f64, 1);
     PrsBindCSymbol("ToI64", host_to_i64, 1);
     PrsBindCSymbol("AbsI64", host_abs_i64, 1);
@@ -2717,6 +2932,13 @@ static size_t format_text(char *output, size_t capacity, const char *format,
                 i++;
             if (format[i] == '$' && format[i + 1] == '$')
                 i += 2;
+            continue;
+        }
+        /* Aiwnios string decoding can normalize doubled DolDoc delimiters
+         * from source text to single-dollar tags before calling Print. */
+        if (!strncmp(format + i, "$PT$", 4) ||
+            !strncmp(format + i, "$FG$", 4)) {
+            i += 4;
             continue;
         }
         if (format[i] != '%') {
@@ -2847,13 +3069,99 @@ static int load_inner(const char *path) {
         return -1;
     }
     execute_source(path, src);
+    if (!strcmp(path, "/Kernel/KernelC.HH")) {
+        /* counts is declared here, not in KernelB.HH; bind after declaration
+         * so the generic extern-data binder can resolve the symbol. */
+        PrsBindCSymbol("counts", &guest_counts, 0);
+        PrsBindCSymbol("tS", host_timer_seconds_bits, 0);
+        CHashClass *kbd = (CHashClass *)HashFind("CKbdStateGlobals",
+                                                  Fs->hash_table, HTT_CLASS, 1);
+        if (!kbd || kbd->sz <= 0 || kbd->sz > (1 << 20))
+            zc_fail("invalid CKbdStateGlobals layout");
+        guest_kbd_state = calloc(1, kbd->sz);
+        if (!guest_kbd_state)
+            zc_fail("keyboard compatibility storage allocation failed");
+        PrsBindCSymbol("kbd", guest_kbd_state, 0);
+        CHashClass *autocomplete = (CHashClass *)HashFind(
+            "CAutoCompleteGlobals", Fs->hash_table, HTT_CLASS, 1);
+        if (!autocomplete || autocomplete->sz <= 0 || autocomplete->sz > (1 << 20))
+            zc_fail("invalid CAutoCompleteGlobals layout");
+        guest_autocomplete_state = calloc(1, autocomplete->sz);
+        if (!guest_autocomplete_state)
+            zc_fail("autocomplete compatibility storage allocation failed");
+        PrsBindCSymbol("ac", guest_autocomplete_state, 0);
+        PrsBindCSymbol("sys_task_being_screen_updated",
+                       &guest_task_being_screen_updated, 0);
+        CHashClass *screencast = (CHashClass *)HashFind(
+            "CScreenCastGlobals", Fs->hash_table, HTT_CLASS, 1);
+        if (!screencast || screencast->sz <= 0 || screencast->sz > (1 << 20))
+            zc_fail("invalid CScreenCastGlobals layout");
+        guest_screencast_state = calloc(1, screencast->sz);
+        if (!guest_screencast_state)
+            zc_fail("screencast compatibility storage allocation failed");
+        PrsBindCSymbol("screencast", guest_screencast_state, 0);
+        PrsBindCSymbol("fp_set_std_palette", &guest_fp_set_std_palette, 0);
+        CHashClass *text = (CHashClass *)HashFind("CTextGlobals", Fs->hash_table,
+                                                   HTT_CLASS, 1);
+        if (!text || text->sz < 48 ||
+            !task_field(text, "rows", 8, 32) ||
+            !task_field(text, "cols", 8, 40))
+            zc_fail("pinned CTextGlobals layout mismatch");
+        guest_text_globals[4] = guest_fb_height / 8;
+        guest_text_globals[5] = guest_fb_width / 8;
+        init_guest_gr_tables();
+        guest_text_globals[6] = (uint64_t)(uintptr_t)guest_gr_font;
+        PrsBindCSymbol("text", guest_text_globals, 0);
+        /* KernelC redeclares the bootstrap heap calls with ZealOS's real
+         * CTask* parameter types and _MALLOC/_FREE import names. Rebind
+         * after those declarations so the ARM backend sees callable host
+         * implementations instead of unresolved x86 import labels. */
+    PrsBindCSymbol("MAlloc", host_malloc, 2);
+        PrsBindCSymbol("CAlloc", host_calloc, 2);
+        PrsBindCSymbol("Free", host_free, 1);
+        PrsBindCSymbol("MSize", host_msize, 1);
+        PrsBindCSymbol("MSize2", host_msize, 1);
+    }
     if (!strcmp(path, "/Kernel/KernelB.HH")) {
         bind_guest_task();
+        CHashClass *cpu = (CHashClass *)HashFind("CCPU", Fs->hash_table,
+                                                  HTT_CLASS, 1);
+        if (!cpu || cpu->sz <= 0 || cpu->sz > (1 << 20))
+            zc_fail("invalid CCPU layout");
+        guest_cpu_structs = calloc(128, cpu->sz);
+        if (!guest_cpu_structs)
+            zc_fail("CCPU compatibility storage allocation failed");
+        PrsBindCSymbol("cpu_structs", &guest_cpu_structs, 0);
+        PrsBindCSymbol("ext", &guest_ext_table, 0);
+        /* KernelB exposes the firmware framebuffer contract to ZealOS source. */
+        guest_fb_width = zeal_fb_screen_width();
+        guest_fb_height = zeal_fb_screen_height();
+        guest_fb_pitch = zeal_fb_pitch_bytes();
+        guest_fb_bpp = zeal_fb_bits_per_pixel();
+        PrsBindCSymbol("sys_framebuffer_width", &guest_fb_width, 0);
+        PrsBindCSymbol("sys_framebuffer_height", &guest_fb_height, 0);
+        PrsBindCSymbol("sys_framebuffer_pitch", &guest_fb_pitch, 0);
+        PrsBindCSymbol("sys_framebuffer_bpp", &guest_fb_bpp, 0);
         if (load_inner("/System/TaskBridge.ZC"))
             zc_fail("task bridge source missing");
-        PrsBindCSymbol("SysTry", host_sys_try, 0);
-        PrsBindCSymbol("SysUntry", host_sys_untry, 0);
-        PrsBindCSymbol("EndCatch", host_end_catch, 0);
+        PrsBindCSymbol("Option", host_option, 2);
+        PrsBindCSymbol("DistSqrI64", host_dist_sqr_i64, 4);
+        PrsBindCSymbol("SwapU16", host_swap_u16, 2);
+        PrsBindCSymbol("ClampI64", host_clamp_i64, 3);
+        PrsBindCSymbol("ZcDefineMirror", host_define_mirror, 2);
+        /* The bridge declares counts for KernelB-stage task tests. KernelC
+         * later rebinds the same object after its own declaration is loaded. */
+        PrsBindCSymbol("counts", &guest_counts, 0);
+        PrsBindCSymbol("MemCompare", host_compare, 3);
+        PrsBindCSymbol("MemCopy", host_copy, 3);
+        PrsBindCSymbol("MemSet", host_set, 3);
+        PrsBindCSymbol("MemSetU32", host_memset_u32, 3);
+        PrsBindCSymbol("Sqrt", host_sqrt, 1);
+        PrsBindCSymbol("Exp", host_exp, 1);
+        PrsBindCSymbol("ZcMonotonicNs", host_monotonic_ns, 0);
+        PrsBindCSymbol("ZcTryEnter", host_sys_try, 0);
+        PrsBindCSymbol("ZcTryLeave", host_sys_untry, 0);
+        PrsBindCSymbol("ZcTryCatchEnd", host_end_catch, 0);
         PrsBindCSymbolNaked("AIWNIOS_SetJmp", zc_setjmp, 1);
         PrsBindCSymbol("throw", host_guest_throw, 2);
         PrsBindCSymbol("ExePrint", host_exe_print, 2);
@@ -2861,7 +3169,6 @@ static int load_inner(const char *path) {
         PrsBindCSymbol("StrPrintJoin", host_str_print_join, 4);
         PrsBindCSymbol("PutKey", host_put_key, 2);
         PrsBindCSymbol("StrLen", host_str_len, 1);
-        PrsBindCSymbol("counts", &guest_counts, 0);
         PrsBindCSymbol("RFlagsPush", host_rflags_push, 0);
         PrsBindCSymbol("RFlagsPop", host_rflags_pop, 0);
         PrsBindCSymbol("KbdMouseHandler", host_kbd_mouse_handler, 2);
@@ -3013,6 +3320,11 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
     if (output)
         output_cb = output;
     ready = failed = loaded_modules = 0;
+    /* A lexer exception can longjmp out of #assert while the Aiwnios parser
+     * depth counters are nonzero. zreset starts a new compiler session, so
+     * discard that abandoned parse state before loading the bootstrap again. */
+    aiwnios_switch_depth = 0;
+    aiwnios_fun_depth = 0;
     guest_task_bound = 0;
     guest_current = guest_completed = 0;
     guest_job_count = 0;
@@ -3054,11 +3366,15 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
         const char *name;
         int64_t (*fn)(int64_t *);
         int arity;
-    } bindings[] = {{"MAlloc", host_malloc, 2}, {"Free", host_free, 1},  {"MSize", host_msize, 1},
+    } bindings[] = {{"MAlloc", host_malloc, 2}, {"CAlloc", host_calloc, 2},
+                    {"Free", host_free, 1},  {"MSize", host_msize, 1},
                     /* MSize2 is ZealOS internal size; alias requested size for now. */
                     {"MSize2", host_msize, 1},
                     {"MemCopy", host_copy, 3},  {"MemSet", host_set, 3}, {"SwapI64", host_swap, 2},
-                    {"Puts", host_puts, 1}, {"ZcTaskSpawn", host_task_spawn, 1},
+                    {"DCBlotColor4", host_dc_blot_color4, 4},
+                    {"GrRopEquU8NoClipping", host_gr_rop_equ_u8_no_clipping, 3},
+                    {"Puts", host_puts, 1},
+                    {"ZcTaskSpawn", host_task_spawn, 1},
                     {"ZcTaskYield", host_task_yield, 0}, {"ZcTaskRun", host_task_run, 0},
                     {"ZcTaskResult", host_task_result, 1},
                     {"ZcFbTextSpan", host_fb_text_span, 10},

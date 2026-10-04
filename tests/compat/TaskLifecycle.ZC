@@ -43,6 +43,7 @@ U0 LifeParent(U8 *data)
 I64 TaskLifecycleChecks()
 {
     CTask *task, *root = Fs;
+    I64 root_used_before = root->data_heap->used_u8s;
     life_data = 9;
     if (Suspend(root) || IsSuspended(root) || Kill(root))
         return 1;
@@ -75,7 +76,8 @@ I64 TaskLifecycleChecks()
         TaskValidate(task) || TaskValidate(life_child) ||
         life_parent_resumed || life_child_started)
         return 8;
-    if (ZcTaskRun || Fs != root || root->data_heap->used_u8s)
+    if (ZcTaskRun || Fs != root ||
+        root->data_heap->used_u8s != root_used_before)
         return 9;
     return 42;
 }

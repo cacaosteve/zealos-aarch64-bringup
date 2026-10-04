@@ -2444,6 +2444,185 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 207 — right-click control dispatch
+
+| Item | Path |
+|--|--|
+| Gap | Tablet right-button state reached `MessageGet`, but the window bridge did not call `CCtrl.right_click` |
+| Upstream need | `WinMgr.ZC` dispatches right down/held/up to visible controls and honors `CTRLF_CAPTURE_RIGHT_MS` |
+| Bring-up | `CtrlDispatchRightClick` plus packed tablet-sample routing to the focused task |
+| Smoke | `TaskOriginalDocRecalcChecks` verifies right press, captured held movement outside the control, and release |
+| Shell | UTM/QEMU window controls can respond through their upstream right-click callbacks |
+
+Freeze catalog unchanged.
+
+## Milestone 208 — control input inhibit flags
+
+| Item | Path |
+|--|--|
+| Gap | Control dispatch ignored the task and focus-task inhibit bits honored by `WinMgr.ZC` |
+| Upstream need | `WIf_SELF_CTRLS` blocks a task's controls; `WIf_FOCUS_TASK_CTRLS` blocks control input while set on the focused task |
+| Bring-up | Shared `BootstrapWinCtrlsAllowed` gate for left-click, right-click, and wheel dispatch |
+| Smoke | `TaskOriginalDocRecalcChecks` verifies both flags suppress all three dispatch paths |
+| Shell | Inhibited ZealOS windows no longer react to tablet control input |
+
+Freeze catalog unchanged.
+
+## Milestone 209 — tablet wheel input
+
+| Item | Path |
+|--|--|
+| Gap | The VirtIO tablet path discarded `EV_REL/REL_WHEEL`, so the existing `wheel_chg` bridge could only be exercised synthetically |
+| Upstream need | `WinMgr.ZC` sends focused-task wheel motion to the first control with a `wheel_chg` callback |
+| Bring-up | Accumulate signed wheel steps in the tablet driver, pack them with each snapshot, and dispatch them to the focused task |
+| Smoke | `TaskOriginalDocRecalcChecks` verifies immediate positive and negative packed deltas, including the first post-reset sample |
+| Shell | UTM mouse-wheel movement can drive upstream scrollbar wheel callbacks when the VirtIO tablet reports `REL_WHEEL` |
+
+Freeze catalog unchanged.
+
+## Milestone 210 — upstream window geometry normalization
+
+| Item | Path |
+|--|--|
+| Gap | Captured drags used local clamps and treated the left edge as a resize handle instead of using upstream `WinHorz`/`WinVert` behavior |
+| Upstream need | `WinMgr.ZC` translates from the left frame edge at fixed width; `WinHorz`/`WinVert` preserve one-cell minimums and normalize screen-edge cases |
+| Bring-up | Route drag geometry through the native window helpers and match left-edge horizontal movement |
+| Smoke | `TaskOriginalDocRecalcChecks` covers fixed-width left-edge movement, corner resize, and one-cell minimum width/height |
+| Shell | UTM left-border dragging moves the window horizontally; resizing cannot collapse it below one cell |
+
+Freeze catalog unchanged.
+
+## Milestone 211 — focused-task border inhibition
+
+| Item | Path |
+|--|--|
+| Gap | Border hit testing honored `WIf_SELF_BORDER` but missed `WIf_FOCUS_TASK_BORDER` on the focused task |
+| Upstream need | `WinMgr.ZC` suppresses title actions and move/resize interactions when the focused task inhibits borders |
+| Bring-up | Share the self/focused-task border gate across title-button and drag/resize classification and activation |
+| Smoke | `TaskOriginalDocRecalcChecks` sets the focus-task flag on a different task and verifies title, move, and resize paths are blocked |
+| Shell | A focused window can disable border actions consistently across the desktop |
+
+Freeze catalog unchanged.
+
+## Milestone 212 — tablet clicks place the DolDoc cursor
+
+| Item | Path |
+|--|--|
+| Gap | A body click focused/raised the window but did not position its document cursor |
+| Upstream need | `WinMgr.ZC` maps pointer pixels through window origin and scroll into DolDoc coordinates, then resets document scrolling |
+| Bring-up | Port the `WinCursorPosSet` mapping into the ARM64 task bridge and honor `WIf_SELF_MS_L` / `WIf_FOCUS_TASK_MS_L` |
+| Smoke | `TaskOriginalDocRecalcChecks` verifies scrolled pixel-to-cell cursor mapping and scroll reset |
+| Shell | Clicking inside a source or text document moves its cursor to the pointed-to cell |
+
+Freeze catalog unchanged.
+
+## Milestone 213 — DolDoc click release actions
+
+| Item | Path |
+|--|--|
+| Gap | Document clicks moved the cursor but did not provide pressed-border feedback or activate clickable entries on release |
+| Upstream need | `WinMgr.ZC` clears entry borders and sends Space for left-clickable entries or Enter for right-clickable entries |
+| Bring-up | Capture document body clicks, preserve left-button border feedback, and route release keys through the task message queue |
+| Smoke | `TaskOriginalDocRecalcChecks` verifies solid-border press/release and left/right action-key selection |
+| Shell | Links and callback entries respond to a tablet click after cursor placement |
+
+Freeze catalog unchanged.
+
+## Milestone 214 — route tablet motion to the focused task
+
+| Item | Path |
+|--|--|
+| Gap | The packed tablet bridge handled button and wheel changes but did not send upstream mouse-move messages to guest tasks |
+| Upstream need | `WinQueueIPMessages` posts `MESSAGE_MS_MOVE` with task-relative coordinates whenever the pointer moves |
+| Bring-up | Track absolute tablet position and queue one move message per changed sample for the current focus, adjusted for window origin and scroll |
+| Smoke | `TaskOriginalDocRecalcChecks` checks move-message code and translated coordinates |
+| Shell | Focused ZealC tasks can consume pointer movement through the standard message queue |
+
+Freeze catalog unchanged.
+
+## Milestone 215 — ordinary tablet button messages
+
+| Item | Path |
+|--|--|
+| Gap | Tablet presses drove window controls and DolDoc actions but did not reach ordinary ZealC message-loop tasks |
+| Upstream need | `WinQueueIPMessages` queues left/right down and up transitions with task-relative coordinates |
+| Bring-up | Queue immediate down/up messages for single-click inhibit mode; otherwise delay one click for the upstream double-click interval |
+| Smoke | `TaskOriginalDocRecalcChecks` validates all four message codes and scrolled client coordinates |
+| Shell | ZealC tasks receive UTM tablet button transitions; the double-click interval is 175 ms |
+
+Freeze catalog unchanged.
+
+## Milestone 216 — double-click message synthesis
+
+| Item | Path |
+|--|--|
+| Gap | Ordinary tablet messages were dropped for tasks that use upstream double-click handling |
+| Upstream need | `WinQueueIPMessages` delays a click, then emits either single-click or `MESSAGE_MS_*_D_*` transitions |
+| Bring-up | Use the ARM generic counter for monotonic nanoseconds; hold first-click coordinates and synthesize left/right single or double messages after 175 ms |
+| Smoke | `TaskOriginalDocRecalcChecks` tests delayed single-click coordinates and right-button double-click transitions with deterministic timestamps |
+| Limits | Window-control actions still act on physical transitions; task focus is sampled when delayed messages are emitted |
+
+Freeze catalog unchanged.
+
+## Milestone 217 — DolDoc click versus double-click actions
+
+| Item | Path |
+|--|--|
+| Gap | DolDoc entries activated on button release before the double-click interval could resolve |
+| Upstream need | `WinMgr.ZC` waits for the click result, sends Space/Enter for a single click, and Escape/Shift-Escape for a double click |
+| Bring-up | Keep a body-click capture until the single/double timer resolves, then send the matching key and clear pressed-border feedback |
+| Smoke | `TaskOriginalDocRecalcChecks` exercises delayed single-click activation and double-click Escape dispatch through `BootstrapCtrlInputSampleAt` |
+| Limits | Window controls and title/resize actions remain immediate on physical transitions |
+
+Freeze catalog unchanged.
+
+## Milestone 218 — DolDoc pointer-action dispatch regression
+
+| Item | Path |
+|--|--|
+| Gap | The click timer and key mapping had unit checks, but no smoke traversed the completed input-sample path that sends a DolDoc action |
+| Bring-up | Exercise left single-click Space, right single-click Enter, and left/right double-click Escape/Shift-Escape dispatch, including clearing the pressed-entry border |
+| Smoke | `TaskOriginalDocRecalcChecks` runs deterministic samples through `BootstrapCtrlInputSampleAt` and checks the queued task messages |
+| Limits | This is a QEMU regression check; live UTM tablet behavior still needs an app run |
+
+Freeze catalog unchanged.
+
+## Milestone 219 — shell framebuffer scroll and clear
+
+| Item | Path |
+|--|--|
+| Gap | Long shell output wrapped the direct-pixel cursor to row zero while the retained shell text plane scrolled, and screen clears left old shell cells available for recomposition |
+| Bring-up | Keep the cursor clamped to the text plane's last row, rely on the retained text writer for cell drawing, and reset the shell text slot on full-screen clear |
+| Smoke | In UTM, run `help`, then `zload /Kernel/KernelA.HH`; the header load should finish with `zc: loaded /Kernel/KernelA.HH`, retain the newest warning lines, and leave the prompt usable |
+| Acceptance | User confirmed the long interactive `help` / `KernelA.HH` load in UTM scrolls cleanly, keeps the newest warning lines, and leaves the prompt usable. |
+
+Freeze catalog unchanged.
+
+## Milestone 220 — window and control redraw callbacks
+
+| Item | Path |
+|--|--|
+| Gap | The live two-window fixture could start without proving the compositor invoked guest draw callbacks |
+| Bring-up | Count calls to both task `draw_it` callbacks and the visible control `draw_it` callback during a real `GrUpdateTasks` pass |
+| Smoke | `WindowDragLiveRenderChecks` returns `0x2a` only after all three callbacks run |
+| Limits | QEMU verifies callback dispatch; physical UTM still needs the visual move/resize/right-click/wheel pass in `ACCEPTANCE.md` |
+
+Freeze catalog unchanged.
+
+## Open compatibility probe — `/System/Win.ZC`
+
+The source probe loads pinned `KernelC.HH`, `Externs.ZC`, and `Gr.HH` before compiling unchanged `Win.ZC`. Graphics dimensions and mouse globals are probe fixtures; `DrawMenu` and `GrScaleZoom` are compile-only stubs for subsystems whose full bootstrap is not loaded, and `WinFinalUpdate` is not executed. The raw ARM generic-timer binding and a standalone F64 clock expression are smoke-tested before the Win load.
+
+The native runtime now binds ZealOS's five-slot `ext` dispatch table to stable native storage. The probe compiles the unchanged `Win.ZC`, then checks that its file-scope initializers installed both `WinToTop` and `WinFocus` in the matching slots. This proves the module loads and its dispatch registrations work; it does not yet start the full window manager or validate interactive window behavior. The fixture remains explicit about its uninitialized kernel globals and compile-only menu/zoom stubs.
+
+The source-ordered graphics probe now loads unchanged `GrDC.ZC`, `GrBitMap.ZC`, `Win.ZC`, and `WinMgr.ZC`. This required bridging ZealOS runtime defines into Aiwnios's compiler dictionary, binding the framebuffer/depth-buffer primitives, and supplying ARM-safe helpers for `Sqrt`, `DistSqrI64`, `SwapU16`, and `ClampI64`. The bridge's `IsPixCovered0` compares each task's z number against the existing cell z-buffer, with a smoke for covered/uncovered cases. `WinZBufUpdate` rebuilds that bounded cell z-buffer; `GrSetUpTables` remains a no-op because the full graphics-table initializer is not ported.
+
+Guest `try/catch` now calls uniquely named `ZcTryEnter`/`ZcTryLeave`/`ZcTryCatchEnd` hooks. ZealOS's `KernelC.HH` declares a different native `SysTry(start_label, skip_label)` ABI, so using `SysTry` for both had caused the full manager's `try` block to compile as a call with a missing argument. The focused probe loads `KernelC.HH`, reruns `TaskExceptionChecks`, compiles unchanged `Win.ZC`, then compiles unchanged `WinMgr.ZC`; the complete PCI compatibility suite also passes.
+
+The parser now resolves a later guest `extern` global to an earlier guest definition when scalar types have a matching ABI, aggregate types are identical, and array dimensions match. `GlobalExternLinkChecks` covers this across separately loaded modules; this lets declarations such as `Externs.ZC`'s `winmgr` refer to storage already supplied by the task bridge. The ARM64 math runtime implements ZealOS's `_EXP` import, and the bootstrap `LowPass1` follows the unchanged `MathODE.ZC` formula. Named HolyC `reg RSI`/`reg R13`/`reg RCX` hints parse as nonbinding allocation hints on ARM64, alongside ordinary `reg bit_shift` locals. The source bundle now applies a guarded ARM64 overlay to unchanged `GrScreen.ZC`: its `GrUpdateTextBG` x86 register loop is replaced by the tested `ZcGrTextBGStore` helper. The AArch64 runtime also implements and tests `DCBlotColor4`'s cached four-bitplane conversion. `make check-grscreen` compiles the translated file and tests both graphics primitives in the guest. Pinned source remains byte-identical. The full unchanged 758-line `MathODE.ZC` is pinned but currently causes a guest data abort while compiling, so only the low-pass helper is in the bootstrap path.
+
+This is a compile/load milestone, not a running desktop. The manager task has not been started: the menu task, music playback, full graphics-table and pixel-level z-buffer setup, remaining `GrAsm` routines, and surrounding boot/task initialization still need porting or real implementations before its main loop can run safely. Interactive window creation, focus, move/resize, and stacking remain unverified.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).

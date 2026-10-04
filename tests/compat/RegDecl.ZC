@@ -1,0 +1,10 @@
+I64 RegDeclChecks()
+{
+    I64 reg RSI *dst = NULL;
+    I64 reg R13 value = 42;
+    I64 reg RCX another = 0;
+
+    dst = &value;
+    another = *dst;
+    return another;
+}

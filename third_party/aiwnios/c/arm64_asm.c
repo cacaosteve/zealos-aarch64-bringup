@@ -846,6 +846,11 @@ int64_t ARM_fmovReg(int64_t d, int64_t s) {
   return FpDataProc1Reg(0, 0, 1, 0, d, s);
 }
 
+int64_t ARM_fsqrtReg(int64_t d, int64_t s) {
+  /* FSQRT Dd, Dn. */
+  return 0x1e61c000 | (s << 5) | d;
+}
+
 int64_t ARM_fcmp(int64_t a, int64_t b) {
   return FpComp(0, 0, 1, 0, 0, a, b);
 }

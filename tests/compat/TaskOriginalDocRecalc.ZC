@@ -12,6 +12,12 @@ U0 WindowRedrawPark(U8 *data)
 
 I64 window_draw_calls = 0;
 I64 window_control_draw_calls = 0;
+I64 window_right_down_calls = 0;
+I64 window_right_up_calls = 0;
+I64 window_right_first_x = 0;
+I64 window_right_first_y = 0;
+I64 window_right_last_x = 0;
+I64 window_right_last_y = 0;
 CCtrl window_test_control;
 
 U0 WindowControlDraw(CDC *dc, CCtrl *ctrl)
@@ -20,6 +26,27 @@ U0 WindowControlDraw(CDC *dc, CCtrl *ctrl)
     dc->color.c0.color = RED;
     dc->color.c0.rop = ROPB_MONO;
     GrPlot(dc, ctrl->left, ctrl->top);
+}
+
+U0 WindowRightClick(CCtrl *ctrl, I64 x, I64 y, Bool down)
+{
+    window_right_last_x = x;
+    window_right_last_y = y;
+    if (down)
+    {
+        if (!window_right_down_calls)
+        {
+            window_right_first_x = x;
+            window_right_first_y = y;
+        }
+        window_right_down_calls++;
+        ctrl->flags |= CTRLF_CLICKED;
+    }
+    else
+    {
+        window_right_up_calls++;
+        ctrl->flags &= ~CTRLF_CLICKED;
+    }
 }
 
 U0 WindowDrawSmoke(CTask *task, CDC *dc)
@@ -46,17 +73,301 @@ U0 WindowParentUnderlay(CTask *task, CDC *dc)
     }
 }
 
+I64 BootstrapMouseClickTimingChecks(CTask *task, I64 screen_x, I64 screen_y)
+{
+    CJob *job;
+    I64 result = 0, old_inhibit, old_left_result, old_right_result;
+    I64 old_left_deadline, old_left_x, old_left_y;
+    I64 old_right_deadline, old_right_x, old_right_y;
+    Bool old_left_double, old_left_down_sent;
+    Bool old_right_double, old_right_down_sent;
+
+    if (task->server_ctrl.next_waiting != &task->server_ctrl)
+        return 6;
+    old_inhibit = task->win_inhibit;
+    old_left_deadline = bootstrap_left_click_deadline_ns;
+    old_left_x = bootstrap_left_click_x;
+    old_left_y = bootstrap_left_click_y;
+    old_left_double = bootstrap_left_click_double;
+    old_left_down_sent = bootstrap_left_click_down_sent;
+    old_left_result = bootstrap_left_click_result;
+    old_right_deadline = bootstrap_right_click_deadline_ns;
+    old_right_x = bootstrap_right_click_x;
+    old_right_y = bootstrap_right_click_y;
+    old_right_double = bootstrap_right_click_double;
+    old_right_down_sent = bootstrap_right_click_down_sent;
+    old_right_result = bootstrap_right_click_result;
+    task->win_inhibit &= ~((1 << WIf_FOCUS_TASK_MS_L_D) |
+                           (1 << WIf_FOCUS_TASK_MS_R_D));
+    bootstrap_left_click_deadline_ns = 0;
+    bootstrap_left_click_x = bootstrap_left_click_y = 0;
+    bootstrap_left_click_double = bootstrap_left_click_down_sent = FALSE;
+    bootstrap_left_click_result = BOOTSTRAP_MOUSE_CLICK_PENDING;
+    bootstrap_right_click_deadline_ns = 0;
+    bootstrap_right_click_x = bootstrap_right_click_y = 0;
+    bootstrap_right_click_double = bootstrap_right_click_down_sent = FALSE;
+    bootstrap_right_click_result = BOOTSTRAP_MOUSE_CLICK_PENDING;
+
+    BootstrapWinMouseClickInput(task, 1, TRUE, screen_x, screen_y, 100);
+    BootstrapWinMouseClickInput(task, 1, FALSE, screen_x, screen_y, 200);
+    if (task->server_ctrl.next_waiting != &task->server_ctrl)
+        result = 1;
+    BootstrapWinMouseClickTimer(task, 175000101, 0, screen_x + 3, screen_y + 4);
+    if (!result && bootstrap_left_click_result != BOOTSTRAP_MOUSE_CLICK_SINGLE)
+        result = 7;
+    job = task->server_ctrl.next_waiting;
+    if (!result && (job == &task->server_ctrl ||
+        job->job_code != JOBT_MESSAGE ||
+        job->message_code != MESSAGE_MS_L_DOWN ||
+        job->aux1 != screen_x - gr.pan_text_x - task->pix_left - task->scroll_x ||
+        job->aux2 != screen_y - gr.pan_text_y - task->pix_top - task->scroll_y))
+        result = 2;
+    if (job != &task->server_ctrl)
+    {
+        QueueRemove(job);
+        JobDel(job);
+    }
+    job = task->server_ctrl.next_waiting;
+    if (!result && (job == &task->server_ctrl ||
+        job->job_code != JOBT_MESSAGE || job->message_code != MESSAGE_MS_L_UP ||
+        job->aux1 != screen_x + 3 - gr.pan_text_x - task->pix_left - task->scroll_x ||
+        job->aux2 != screen_y + 4 - gr.pan_text_y - task->pix_top - task->scroll_y))
+        result = 3;
+    if (job != &task->server_ctrl)
+    {
+        QueueRemove(job);
+        JobDel(job);
+    }
+
+    BootstrapWinMouseClickInput(task, 2, TRUE, screen_x, screen_y, 1000000000);
+    BootstrapWinMouseClickInput(task, 2, FALSE, screen_x, screen_y, 1010000000);
+    BootstrapWinMouseClickInput(task, 2, TRUE, screen_x + 8, screen_y + 16,
+                                1050000000);
+    BootstrapWinMouseClickTimer(task, 1050000001, 2,
+                                screen_x + 8, screen_y + 16);
+    job = task->server_ctrl.next_waiting;
+    if (!result && (job == &task->server_ctrl ||
+        job->job_code != JOBT_MESSAGE ||
+        job->message_code != MESSAGE_MS_R_D_DOWN ||
+        job->aux1 != screen_x + 8 - gr.pan_text_x - task->pix_left - task->scroll_x ||
+        job->aux2 != screen_y + 16 - gr.pan_text_y - task->pix_top - task->scroll_y))
+        result = 4;
+    if (job != &task->server_ctrl)
+    {
+        QueueRemove(job);
+        JobDel(job);
+    }
+    BootstrapWinMouseClickInput(task, 2, FALSE, screen_x + 10, screen_y + 18,
+                                1060000000);
+    BootstrapWinMouseClickTimer(task, 1060000001, 0,
+                                screen_x + 10, screen_y + 18);
+    if (!result && bootstrap_right_click_result != BOOTSTRAP_MOUSE_CLICK_DOUBLE)
+        result = 8;
+    job = task->server_ctrl.next_waiting;
+    if (!result && (job == &task->server_ctrl ||
+        job->job_code != JOBT_MESSAGE || job->message_code != MESSAGE_MS_R_D_UP ||
+        job->aux1 != screen_x + 10 - gr.pan_text_x - task->pix_left - task->scroll_x ||
+        job->aux2 != screen_y + 18 - gr.pan_text_y - task->pix_top - task->scroll_y))
+        result = 5;
+    if (job != &task->server_ctrl)
+    {
+        QueueRemove(job);
+        JobDel(job);
+    }
+
+    task->win_inhibit = old_inhibit;
+    bootstrap_left_click_deadline_ns = old_left_deadline;
+    bootstrap_left_click_x = old_left_x;
+    bootstrap_left_click_y = old_left_y;
+    bootstrap_left_click_double = old_left_double;
+    bootstrap_left_click_down_sent = old_left_down_sent;
+    bootstrap_left_click_result = old_left_result;
+    bootstrap_right_click_deadline_ns = old_right_deadline;
+    bootstrap_right_click_x = old_right_x;
+    bootstrap_right_click_y = old_right_y;
+    bootstrap_right_click_double = old_right_double;
+    bootstrap_right_click_down_sent = old_right_down_sent;
+    bootstrap_right_click_result = old_right_result;
+    if (!result && (BootstrapDocMouseDoubleReleaseKey(1) != CH_ESC ||
+        BootstrapDocMouseDoubleReleaseKey(2) != CH_SHIFT_ESC))
+        result = 9;
+    if (result)
+        return result;
+    return 42;
+}
+
+I64 BootstrapDocClickDispatchChecks(CTask *task, CDoc *doc,
+                                    CDocEntry *entry, I64 screen_x,
+                                    I64 screen_y)
+{//Exercise the delayed document-click completion path through tablet input.
+    CTask *old_focus, *old_doc_task;
+    CJob *job;
+    CDocEntry *old_cur_entry;
+    I64 old_inhibit, old_buttons, old_x, old_y, old_doc_button;
+    I64 old_entry_flags;
+    I64 old_left_deadline, old_left_x, old_left_y, old_left_result;
+    I64 old_right_deadline, old_right_x, old_right_y, old_right_result;
+    Bool old_sampled, old_left_double, old_left_down_sent;
+    Bool old_right_double, old_right_down_sent;
+    I64 result = 0;
+
+    if (!TaskValidate(task) || !doc || doc->doc_signature != DOC_SIGNATURE_VAL ||
+        !entry || task->server_ctrl.next_waiting != &task->server_ctrl)
+        return 1;
+    old_focus = sys_focus_task;
+    old_inhibit = task->win_inhibit;
+    old_buttons = bootstrap_mouse_last_buttons;
+    old_sampled = bootstrap_mouse_sampled;
+    old_x = bootstrap_mouse_last_x;
+    old_y = bootstrap_mouse_last_y;
+    old_doc_task = bootstrap_doc_mouse_task;
+    old_doc_button = bootstrap_doc_mouse_button;
+    old_left_deadline = bootstrap_left_click_deadline_ns;
+    old_left_x = bootstrap_left_click_x;
+    old_left_y = bootstrap_left_click_y;
+    old_left_double = bootstrap_left_click_double;
+    old_left_down_sent = bootstrap_left_click_down_sent;
+    old_left_result = bootstrap_left_click_result;
+    old_right_deadline = bootstrap_right_click_deadline_ns;
+    old_right_x = bootstrap_right_click_x;
+    old_right_y = bootstrap_right_click_y;
+    old_right_double = bootstrap_right_click_double;
+    old_right_down_sent = bootstrap_right_click_down_sent;
+    old_right_result = bootstrap_right_click_result;
+    old_cur_entry = doc->cur_entry;
+    old_entry_flags = entry->de_flags;
+
+    sys_focus_task = task;
+    task->win_inhibit &= ~((1 << WIf_SELF_MS_L) |
+                           (1 << WIf_SELF_MS_R) |
+                           (1 << WIf_FOCUS_TASK_MS_L) |
+                           (1 << WIf_FOCUS_TASK_MS_R));
+    doc->cur_entry = entry;
+    entry->de_flags |= DOCEF_HAS_BORDER | DOCEF_LINK | DOCEF_LEFT_CB |
+                       DOCEF_RIGHT_CB;
+    bootstrap_mouse_sampled = TRUE;
+    bootstrap_mouse_last_x = screen_x;
+    bootstrap_mouse_last_y = screen_y;
+
+    BootstrapDocMousePress(doc);
+    bootstrap_mouse_last_buttons = 1;
+    bootstrap_doc_mouse_task = task;
+    bootstrap_doc_mouse_button = 1;
+    bootstrap_left_click_deadline_ns = 0;
+    bootstrap_left_click_result = BOOTSTRAP_MOUSE_CLICK_SINGLE;
+    BootstrapCtrlInputSampleAt(task, screen_x | (screen_y << 16), 1000);
+    job = task->server_ctrl.next_waiting;
+    if (job == &task->server_ctrl || job->job_code != JOBT_MESSAGE ||
+        job->message_code != MESSAGE_KEY_DOWN || job->aux1 != CH_SPACE)
+        result = 2;
+    if (job != &task->server_ctrl)
+    {
+        QueueRemove(job);
+        JobDel(job);
+    }
+
+    bootstrap_mouse_last_buttons = 2;
+    bootstrap_doc_mouse_task = task;
+    bootstrap_doc_mouse_button = 2;
+    bootstrap_right_click_deadline_ns = 0;
+    bootstrap_right_click_result = BOOTSTRAP_MOUSE_CLICK_SINGLE;
+    if (!result)
+        BootstrapCtrlInputSampleAt(task, screen_x | (screen_y << 16), 1500);
+    job = task->server_ctrl.next_waiting;
+    if (!result && (job == &task->server_ctrl ||
+        job->job_code != JOBT_MESSAGE || job->message_code != MESSAGE_KEY_DOWN))
+        result = 4;
+    else if (!result && job->aux1 != '\n')
+        result = 6;
+    if (job != &task->server_ctrl)
+    {
+        QueueRemove(job);
+        JobDel(job);
+    }
+
+    BootstrapDocMousePress(doc);
+    bootstrap_mouse_last_buttons = 1;
+    bootstrap_doc_mouse_task = task;
+    bootstrap_doc_mouse_button = 1;
+    bootstrap_left_click_deadline_ns = 0;
+    bootstrap_left_click_result = BOOTSTRAP_MOUSE_CLICK_DOUBLE;
+    if (!result)
+        BootstrapCtrlInputSampleAt(task, screen_x | (screen_y << 16), 2000);
+    job = task->server_ctrl.next_waiting;
+    if (!result && (job == &task->server_ctrl ||
+        job->job_code != JOBT_MESSAGE || job->message_code != MESSAGE_KEY_DOWN ||
+        job->aux1 != CH_ESC || (entry->de_flags & DOCEF_SOLID_BORDER)))
+        result = 3;
+    if (job != &task->server_ctrl)
+    {
+        QueueRemove(job);
+        JobDel(job);
+    }
+
+    BootstrapDocMousePress(doc);
+    bootstrap_mouse_last_buttons = 2;
+    bootstrap_doc_mouse_task = task;
+    bootstrap_doc_mouse_button = 2;
+    bootstrap_right_click_deadline_ns = 0;
+    bootstrap_right_click_result = BOOTSTRAP_MOUSE_CLICK_DOUBLE;
+    if (!result)
+        BootstrapCtrlInputSampleAt(task, screen_x | (screen_y << 16), 3000);
+    job = task->server_ctrl.next_waiting;
+    if (!result && (job == &task->server_ctrl ||
+        job->job_code != JOBT_MESSAGE || job->message_code != MESSAGE_KEY_DOWN ||
+        job->aux1 != CH_SHIFT_ESC || (entry->de_flags & DOCEF_SOLID_BORDER)))
+        result = 5;
+    if (job != &task->server_ctrl)
+    {
+        QueueRemove(job);
+        JobDel(job);
+    }
+
+    task->win_inhibit = old_inhibit;
+    doc->cur_entry = old_cur_entry;
+    entry->de_flags = old_entry_flags;
+    bootstrap_mouse_last_buttons = old_buttons;
+    bootstrap_mouse_sampled = old_sampled;
+    bootstrap_mouse_last_x = old_x;
+    bootstrap_mouse_last_y = old_y;
+    bootstrap_doc_mouse_task = old_doc_task;
+    bootstrap_doc_mouse_button = old_doc_button;
+    bootstrap_left_click_deadline_ns = old_left_deadline;
+    bootstrap_left_click_x = old_left_x;
+    bootstrap_left_click_y = old_left_y;
+    bootstrap_left_click_double = old_left_double;
+    bootstrap_left_click_down_sent = old_left_down_sent;
+    bootstrap_left_click_result = old_left_result;
+    bootstrap_right_click_deadline_ns = old_right_deadline;
+    bootstrap_right_click_x = old_right_x;
+    bootstrap_right_click_y = old_right_y;
+    bootstrap_right_click_double = old_right_double;
+    bootstrap_right_click_down_sent = old_right_down_sent;
+    bootstrap_right_click_result = old_right_result;
+    sys_focus_task = old_focus;
+    if (result)
+        return result;
+    return 42;
+}
+
 I64 TaskOriginalDocRecalcChecks()
 {
-    CDoc *doc;
-    CDocEntry *entry;
-    CTask *overlap;
+    CDoc *doc, *cursor_result;
+    CDocEntry *entry, *old_cur_entry;
+    CTask *overlap, *stack_top, *stack_root, *old_focus_task, *focus_hit;
+    CTask *cursor_old_focus;
+    CJob *mouse_move_job, *mouse_button_job;
     CCtrl *old_ctrl_head, *old_ctrl_tail, *hscroll, *vscroll;
     U0 (*old_root_draw)(CTask *task, CDC *dc);
     I64 x, y, old_left, old_right, old_top, old_bottom;
     I64 old_width, old_height, old_scroll_x, old_scroll_y;
     I64 old_display_flags, old_win_inhibit, old_text_attr;
     I64 old_text_cells, outside_pixel;
+    I64 old_doc_x, old_doc_y, old_doc_flags, old_entry_flags, mouse_action;
+    I64 old_doc_scroll_x, old_doc_scroll_y;
+    I64 old_doc_scroll_z, cursor_line_start, cursor_top_line;
+    I64 right_press_ok, right_held_ok, right_release_ok;
+    I64 self_ctrls_blocked, focus_ctrls_blocked, old_overlap_inhibit;
     U32 attr_cells[2];
 
     if (bootstrap_winmgr_ticks <= 0)
@@ -102,6 +413,7 @@ I64 TaskOriginalDocRecalcChecks()
     Fs->win_left = 0; Fs->win_right = 79;
     Fs->win_top = 0; Fs->win_bottom = 24;
     Fs->win_width = 80; Fs->win_height = 25;
+    WinDerivedValsUpdate(Fs);
     Fs->scroll_x = Fs->scroll_y = 0;
     TextRect(0, 79, 0, 24, 0x0800);
     entry->de_flags = DOCEF_TAG;
@@ -276,6 +588,137 @@ I64 TaskOriginalDocRecalcChecks()
         Fs->display_flags = old_display_flags;
         return 96;
     }
+    // A tablet click in the document body must map through document scroll
+    // offsets, update the DolDoc cursor, then return the task to unscrolled
+    // display coordinates as WinMgr does.
+    old_doc_x = doc->x;
+    old_doc_y = doc->y;
+    old_doc_flags = doc->flags;
+    old_doc_scroll_x = Fs->scroll_x;
+    old_doc_scroll_y = Fs->scroll_y;
+    old_doc_scroll_z = Fs->scroll_z;
+    cursor_line_start = doc->line_start_col;
+    cursor_top_line = doc->top_line_num;
+    cursor_old_focus = sys_focus_task;
+    Fs->scroll_x = 5;
+    Fs->scroll_y = 6;
+    doc->flags &= ~DOCF_DONT_SHOW;
+    x = gr.pan_text_x + Fs->pix_left + 3 * FONT_WIDTH + 1;
+    y = gr.pan_text_y + Fs->pix_top + 2 * FONT_HEIGHT + 1;
+    if (x < gr.pan_text_x + Fs->pix_left ||
+        x > gr.pan_text_x + Fs->pix_right ||
+        y < gr.pan_text_y + Fs->pix_top ||
+        y > gr.pan_text_y + Fs->pix_bottom)
+    {
+        doc->flags = old_doc_flags;
+        Fs->scroll_x = old_doc_scroll_x;
+        Fs->scroll_y = old_doc_scroll_y;
+        Fs->scroll_z = old_doc_scroll_z;
+        sys_focus_task = cursor_old_focus;
+        Fs->display_flags = old_display_flags;
+        return 150;
+    }
+    cursor_result = BootstrapWinCursorPosSet(Fs, x, y, TRUE);
+    if (cursor_result != doc)
+    {
+        doc->x = old_doc_x;
+        doc->y = old_doc_y;
+        doc->flags = old_doc_flags;
+        Fs->scroll_x = old_doc_scroll_x;
+        Fs->scroll_y = old_doc_scroll_y;
+        Fs->scroll_z = old_doc_scroll_z;
+        sys_focus_task = cursor_old_focus;
+        Fs->display_flags = old_display_flags;
+        return 144;
+    }
+    if (doc->doc_signature != DOC_SIGNATURE_VAL)
+    {
+        doc->x = old_doc_x;
+        doc->y = old_doc_y;
+        doc->flags = old_doc_flags;
+        Fs->scroll_x = old_doc_scroll_x;
+        Fs->scroll_y = old_doc_scroll_y;
+        Fs->scroll_z = old_doc_scroll_z;
+        sys_focus_task = cursor_old_focus;
+        Fs->display_flags = old_display_flags;
+        return 148;
+    }
+    if (doc->x != cursor_line_start + 2)
+    {
+        doc->x = old_doc_x;
+        doc->y = old_doc_y;
+        doc->flags = old_doc_flags;
+        Fs->scroll_x = old_doc_scroll_x;
+        Fs->scroll_y = old_doc_scroll_y;
+        Fs->scroll_z = old_doc_scroll_z;
+        sys_focus_task = cursor_old_focus;
+        Fs->display_flags = old_display_flags;
+        return 145;
+    }
+    if (doc->y != cursor_top_line + 1)
+    {
+        doc->x = old_doc_x;
+        doc->y = old_doc_y;
+        doc->flags = old_doc_flags;
+        Fs->scroll_x = old_doc_scroll_x;
+        Fs->scroll_y = old_doc_scroll_y;
+        Fs->scroll_z = old_doc_scroll_z;
+        sys_focus_task = cursor_old_focus;
+        Fs->display_flags = old_display_flags;
+        return 146;
+    }
+    if (Fs->scroll_x || Fs->scroll_y || Fs->scroll_z)
+    {
+        doc->x = old_doc_x;
+        doc->y = old_doc_y;
+        doc->flags = old_doc_flags;
+        Fs->scroll_x = old_doc_scroll_x;
+        Fs->scroll_y = old_doc_scroll_y;
+        Fs->scroll_z = old_doc_scroll_z;
+        sys_focus_task = cursor_old_focus;
+        Fs->display_flags = old_display_flags;
+        return 147;
+    }
+    doc->x = old_doc_x;
+    doc->y = old_doc_y;
+    doc->flags = old_doc_flags;
+    DocRecalc(doc, RECALCt_FIND_CURSOR);
+    Fs->scroll_x = old_doc_scroll_x;
+    Fs->scroll_y = old_doc_scroll_y;
+    Fs->scroll_z = old_doc_scroll_z;
+    sys_focus_task = cursor_old_focus;
+    old_cur_entry = doc->cur_entry;
+    old_entry_flags = entry->de_flags;
+    doc->cur_entry = entry;
+    entry->de_flags |= DOCEF_HAS_BORDER | DOCEF_LINK | DOCEF_LEFT_CB |
+                       DOCEF_RIGHT_CB;
+    BootstrapDocMousePress(doc);
+    mouse_action = BootstrapDocMouseReleaseKey(doc, 1);
+    if (mouse_action != CH_SPACE || (entry->de_flags & DOCEF_SOLID_BORDER))
+    {
+        doc->cur_entry = old_cur_entry;
+        entry->de_flags = old_entry_flags;
+        Fs->display_flags = old_display_flags;
+        return 151;
+    }
+    mouse_action = BootstrapDocMouseReleaseKey(doc, 2);
+    if (mouse_action != '\n')
+    {
+        doc->cur_entry = old_cur_entry;
+        entry->de_flags = old_entry_flags;
+        Fs->display_flags = old_display_flags;
+        return 152;
+    }
+    entry->de_flags = old_entry_flags;
+    doc->cur_entry = old_cur_entry;
+    mouse_action = BootstrapDocClickDispatchChecks(Fs, doc, entry,
+        gr.pan_text_x + Fs->pix_left + 24,
+        gr.pan_text_y + Fs->pix_top + 16);
+    if (mouse_action != 42)
+    {
+        Fs->display_flags = old_display_flags;
+        return 159;
+    }
 
     // The generic control pass draws visible callbacks without applying the
     // document scroll, and ignores hidden controls.
@@ -341,8 +784,382 @@ I64 TaskOriginalDocRecalcChecks()
     }
     overlap->display_flags = (1 << DISPLAYf_SHOW) | (1 << DISPLAYf_NO_BORDER);
     overlap->win_inhibit |= 1 << WIF_SELF_DOC;
+    overlap->win_inhibit &= ~(1 << WIf_SELF_FOCUS);
     overlap->text_attr = 0x20;
     overlap->draw_it = &WindowDrawSmoke;
+    old_focus_task = sys_focus_task;
+    stack_top = Spawn(&WindowRedrawPark, NULL, "ClickStackTop");
+    if (!stack_top)
+    {
+        Kill(overlap);
+        Fs->display_flags = old_display_flags;
+        Fs->win_inhibit = old_win_inhibit;
+        Fs->text_attr = old_text_attr;
+        return 127;
+    }
+    stack_top->display_flags = (1 << DISPLAYf_SHOW) | (1 << DISPLAYf_NO_BORDER);
+    stack_top->win_inhibit &= ~(1 << WIf_SELF_FOCUS);
+    stack_top->win_inhibit |= 1 << WIF_SELF_DOC;
+    stack_root = sys_winmgr_task;
+    if (!stack_root)
+        stack_root = sys_task;
+    if (!WinHorz(10, 14, stack_top) || !WinVert(10, 14, stack_top))
+    {
+        sys_focus_task = old_focus_task;
+        Kill(stack_top);
+        Kill(overlap);
+        Fs->display_flags = old_display_flags;
+        Fs->win_inhibit = old_win_inhibit;
+        Fs->text_attr = old_text_attr;
+        return 128;
+    }
+    focus_hit = BootstrapWinClickFocus(gr.pan_text_x + overlap->pix_right - 1,
+                                       gr.pan_text_y + overlap->pix_top + 1);
+    if (focus_hit != overlap)
+    {
+        sys_focus_task = old_focus_task;
+        Kill(stack_top);
+        Kill(overlap);
+        Fs->display_flags = old_display_flags;
+        Fs->win_inhibit = old_win_inhibit;
+        Fs->text_attr = old_text_attr;
+        if (!focus_hit) return 140;
+        if (focus_hit == Fs) return 141;
+        if (focus_hit == stack_top) return 142;
+        return 143;
+    }
+    if (sys_focus_task != overlap)
+    {
+        sys_focus_task = old_focus_task;
+        Kill(stack_top);
+        Kill(overlap);
+        Fs->display_flags = old_display_flags;
+        Fs->win_inhibit = old_win_inhibit;
+        Fs->text_attr = old_text_attr;
+        return 130;
+    }
+    if (stack_root->last_task != overlap || overlap->next_task != stack_root)
+    {
+        sys_focus_task = old_focus_task;
+        Kill(stack_top);
+        Kill(overlap);
+        Fs->display_flags = old_display_flags;
+        Fs->win_inhibit = old_win_inhibit;
+        Fs->text_attr = old_text_attr;
+        return 131;
+    }
+    // Motion samples reach the focused task as upstream MESSAGE_MS_MOVE
+    // events, with coordinates relative to its scrolled client origin.
+    bootstrap_mouse_sampled = FALSE;
+    x = gr.pan_text_x + overlap->pix_left + 24;
+    y = gr.pan_text_y + overlap->pix_top + 16;
+    BootstrapCtrlInputSample(overlap, x | (y << 16));
+    BootstrapCtrlInputSample(overlap, (x + 8) | ((y + 16) << 16));
+    mouse_move_job = overlap->server_ctrl.next_waiting;
+    if (mouse_move_job == &overlap->server_ctrl ||
+        mouse_move_job->job_code != JOBT_MESSAGE ||
+        mouse_move_job->message_code != MESSAGE_MS_MOVE ||
+        mouse_move_job->aux1 != 32 || mouse_move_job->aux2 != 32)
+    {
+        if (mouse_move_job != &overlap->server_ctrl)
+        {
+            QueueRemove(mouse_move_job);
+            JobDel(mouse_move_job);
+        }
+        bootstrap_mouse_sampled = FALSE;
+        sys_focus_task = old_focus_task;
+        Kill(stack_top);
+        Kill(overlap);
+        Fs->display_flags = old_display_flags;
+        Fs->win_inhibit = old_win_inhibit;
+        Fs->text_attr = old_text_attr;
+        return 153;
+    }
+    QueueRemove(mouse_move_job);
+    JobDel(mouse_move_job);
+    bootstrap_mouse_sampled = FALSE;
+    // Ordinary tablet button transitions reach the focused task's message
+    // queue with coordinates relative to its scrolled client area.
+    old_overlap_inhibit = overlap->win_inhibit;
+    overlap->win_inhibit |= 1 << WIf_FOCUS_TASK_MS_L_D;
+    x = gr.pan_text_x + overlap->pix_left + 24;
+    y = gr.pan_text_y + overlap->pix_top + 16;
+    BootstrapCtrlInputSample(overlap, x | (y << 16));
+    BootstrapCtrlInputSample(overlap, x | (y << 16) | (1 << 32));
+    mouse_button_job = overlap->server_ctrl.next_waiting;
+    if (mouse_button_job == &overlap->server_ctrl ||
+        mouse_button_job->job_code != JOBT_MESSAGE ||
+        mouse_button_job->message_code != MESSAGE_MS_L_DOWN ||
+        mouse_button_job->aux1 != 24 || mouse_button_job->aux2 != 16)
+    {
+        if (mouse_button_job != &overlap->server_ctrl)
+        {
+            QueueRemove(mouse_button_job);
+            JobDel(mouse_button_job);
+        }
+        bootstrap_mouse_sampled = FALSE;
+        sys_focus_task = old_focus_task;
+        Kill(stack_top);
+        Kill(overlap);
+        Fs->display_flags = old_display_flags;
+        Fs->win_inhibit = old_win_inhibit;
+        Fs->text_attr = old_text_attr;
+        return 154;
+    }
+    QueueRemove(mouse_button_job);
+    JobDel(mouse_button_job);
+    BootstrapCtrlInputSample(overlap, x | (y << 16));
+    mouse_button_job = overlap->server_ctrl.next_waiting;
+    if (mouse_button_job == &overlap->server_ctrl ||
+        mouse_button_job->job_code != JOBT_MESSAGE ||
+        mouse_button_job->message_code != MESSAGE_MS_L_UP ||
+        mouse_button_job->aux1 != 24 || mouse_button_job->aux2 != 16)
+    {
+        if (mouse_button_job != &overlap->server_ctrl)
+        {
+            QueueRemove(mouse_button_job);
+            JobDel(mouse_button_job);
+        }
+        bootstrap_mouse_sampled = FALSE;
+        sys_focus_task = old_focus_task;
+        Kill(stack_top);
+        Kill(overlap);
+        Fs->display_flags = old_display_flags;
+        Fs->win_inhibit = old_win_inhibit;
+        Fs->text_attr = old_text_attr;
+        return 155;
+    }
+    QueueRemove(mouse_button_job);
+    JobDel(mouse_button_job);
+    overlap->win_inhibit = old_overlap_inhibit;
+    mouse_action = BootstrapMouseClickTimingChecks(overlap,
+        gr.pan_text_x + overlap->pix_left + 24,
+        gr.pan_text_y + overlap->pix_top + 16);
+    if (mouse_action != 42)
+    {
+        sys_focus_task = old_focus_task;
+        Kill(stack_top);
+        Kill(overlap);
+        Fs->display_flags = old_display_flags;
+        Fs->win_inhibit = old_win_inhibit;
+        Fs->text_attr = old_text_attr;
+        return 158;
+    }
+    bootstrap_mouse_sampled = FALSE;
+    overlap->win_inhibit |= 1 << WIf_FOCUS_TASK_MS_R_D;
+    BootstrapCtrlInputSample(overlap, x | (y << 16));
+    BootstrapCtrlInputSample(overlap, x | (y << 16) | (2 << 32));
+    mouse_button_job = overlap->server_ctrl.next_waiting;
+    if (mouse_button_job == &overlap->server_ctrl ||
+        mouse_button_job->job_code != JOBT_MESSAGE ||
+        mouse_button_job->message_code != MESSAGE_MS_R_DOWN ||
+        mouse_button_job->aux1 != 24 || mouse_button_job->aux2 != 16)
+    {
+        if (mouse_button_job != &overlap->server_ctrl)
+        {
+            QueueRemove(mouse_button_job);
+            JobDel(mouse_button_job);
+        }
+        bootstrap_mouse_sampled = FALSE;
+        sys_focus_task = old_focus_task;
+        Kill(stack_top);
+        Kill(overlap);
+        Fs->display_flags = old_display_flags;
+        Fs->win_inhibit = old_win_inhibit;
+        Fs->text_attr = old_text_attr;
+        return 156;
+    }
+    QueueRemove(mouse_button_job);
+    JobDel(mouse_button_job);
+    BootstrapCtrlInputSample(overlap, x | (y << 16));
+    mouse_button_job = overlap->server_ctrl.next_waiting;
+    if (mouse_button_job == &overlap->server_ctrl ||
+        mouse_button_job->job_code != JOBT_MESSAGE ||
+        mouse_button_job->message_code != MESSAGE_MS_R_UP ||
+        mouse_button_job->aux1 != 24 || mouse_button_job->aux2 != 16)
+    {
+        if (mouse_button_job != &overlap->server_ctrl)
+        {
+            QueueRemove(mouse_button_job);
+            JobDel(mouse_button_job);
+        }
+        bootstrap_mouse_sampled = FALSE;
+        sys_focus_task = old_focus_task;
+        Kill(stack_top);
+        Kill(overlap);
+        Fs->display_flags = old_display_flags;
+        Fs->win_inhibit = old_win_inhibit;
+        Fs->text_attr = old_text_attr;
+        return 157;
+    }
+    QueueRemove(mouse_button_job);
+    JobDel(mouse_button_job);
+    overlap->win_inhibit = old_overlap_inhibit;
+    bootstrap_mouse_sampled = FALSE;
+    // Exercise the same geometry capture helpers used by tablet input. The
+    // title bar moves the window, and the lower-right frame resizes it.
+    stack_top->display_flags = 1 << DISPLAYf_SHOW;
+    if (!WinHorz(40, 54, stack_top) || !WinVert(30, 39, stack_top))
+    {
+        sys_focus_task = old_focus_task;
+        Kill(stack_top);
+        Kill(overlap);
+        Fs->display_flags = old_display_flags;
+        Fs->win_inhibit = old_win_inhibit;
+        Fs->text_attr = old_text_attr;
+        return 132;
+    }
+    // The focused task can suppress border interactions on a different
+    // window. Exercise both title-button and drag/resize hit paths.
+    sys_focus_task = Fs;
+    Fs->win_inhibit |= (1 << WIf_FOCUS_TASK_BORDER) |
+                       (1 << WIf_FOCUS_TASK_MS_L);
+    x = gr.pan_text_x + stack_top->win_left * FONT_WIDTH + 1;
+    y = gr.pan_text_y + (stack_top->win_top - 1) * FONT_HEIGHT + 1;
+    if (BootstrapWinTitleButtonKind(stack_top, stack_top->win_left,
+                                    stack_top->win_top - 1) ||
+        BootstrapWinDragKind(stack_top, stack_top->win_left + 5,
+                             stack_top->win_top - 1) ||
+        BootstrapWinDragKind(stack_top, stack_top->win_right + 1,
+                             stack_top->win_bottom + 1) ||
+        BootstrapWinMouseAllowed(stack_top, Fs, WIf_SELF_MS_L,
+                                 WIf_FOCUS_TASK_MS_L) ||
+        BootstrapWinTitleButtonBegin(stack_top, x, y) ||
+        BootstrapWinDragBegin(stack_top,
+            gr.pan_text_x + (stack_top->win_left + 5) * FONT_WIDTH + 1,
+            gr.pan_text_y + (stack_top->win_top - 1) * FONT_HEIGHT + 1))
+    {
+        BootstrapWinDragEnd();
+        Fs->win_inhibit = old_win_inhibit;
+        sys_focus_task = overlap;
+        Kill(stack_top);
+        Kill(overlap);
+        Fs->display_flags = old_display_flags;
+        Fs->text_attr = old_text_attr;
+        return 138;
+    }
+    Fs->win_inhibit = old_win_inhibit;
+    sys_focus_task = overlap;
+    x = gr.pan_text_x + (stack_top->win_left + 5) * FONT_WIDTH + 1;
+    y = gr.pan_text_y + (stack_top->win_top - 1) * FONT_HEIGHT + 1;
+    old_left = stack_top->win_left;
+    old_top = stack_top->win_top;
+    if (!BootstrapWinDragBegin(stack_top, x, y) ||
+        !BootstrapWinDragUpdate(x + 2 * FONT_WIDTH, y + FONT_HEIGHT) ||
+        stack_top->win_left != old_left + 2 ||
+        stack_top->win_top != old_top + 1)
+    {
+        BootstrapWinDragEnd();
+        sys_focus_task = old_focus_task;
+        Kill(stack_top);
+        Kill(overlap);
+        Fs->display_flags = old_display_flags;
+        Fs->win_inhibit = old_win_inhibit;
+        Fs->text_attr = old_text_attr;
+        return 133;
+    }
+    BootstrapWinDragEnd();
+    // The upstream left-frame path translates horizontally at a fixed
+    // width. It is not a left-edge resize handle.
+    x = gr.pan_text_x + (stack_top->win_left - 1) * FONT_WIDTH + 1;
+    y = gr.pan_text_y + (stack_top->win_top + 4) * FONT_HEIGHT + 1;
+    old_left = stack_top->win_left;
+    old_right = stack_top->win_right;
+    old_top = stack_top->win_top;
+    if (!BootstrapWinDragBegin(stack_top, x, y) ||
+        !BootstrapWinDragUpdate(x + 2 * FONT_WIDTH, y + 5 * FONT_HEIGHT) ||
+        stack_top->win_left != old_left + 2 ||
+        stack_top->win_right != old_right + 2 ||
+        stack_top->win_top != old_top || stack_top->win_width != 15)
+    {
+        BootstrapWinDragEnd();
+        sys_focus_task = old_focus_task;
+        Kill(stack_top);
+        Kill(overlap);
+        Fs->display_flags = old_display_flags;
+        Fs->win_inhibit = old_win_inhibit;
+        Fs->text_attr = old_text_attr;
+        return 136;
+    }
+    BootstrapWinDragEnd();
+    old_right = stack_top->win_right;
+    old_bottom = stack_top->win_bottom;
+    x = gr.pan_text_x + (old_right + 1) * FONT_WIDTH + 1;
+    y = gr.pan_text_y + (old_bottom + 1) * FONT_HEIGHT + 1;
+    if (!BootstrapWinDragBegin(stack_top, x, y) ||
+        !BootstrapWinDragUpdate(x + FONT_WIDTH, y + FONT_HEIGHT) ||
+        stack_top->win_right != old_right + 1 ||
+        stack_top->win_bottom != old_bottom + 1 ||
+        stack_top->win_width != 16 || stack_top->win_height != 11)
+    {
+        BootstrapWinDragEnd();
+        sys_focus_task = old_focus_task;
+        Kill(stack_top);
+        Kill(overlap);
+        Fs->display_flags = old_display_flags;
+        Fs->win_inhibit = old_win_inhibit;
+        Fs->text_attr = old_text_attr;
+        return 134;
+    }
+    BootstrapWinDragEnd();
+    // WinHorz/WinVert enforce upstream one-cell minimums when a captured
+    // resize crosses past its fixed edge.
+    old_left = stack_top->win_left;
+    old_right = stack_top->win_right;
+    old_top = stack_top->win_top;
+    old_bottom = stack_top->win_bottom;
+    x = gr.pan_text_x + (old_right + 1) * FONT_WIDTH + 1;
+    y = gr.pan_text_y + (old_bottom + 1) * FONT_HEIGHT + 1;
+    if (!BootstrapWinDragBegin(stack_top, x, y) ||
+        !BootstrapWinDragUpdate(gr.pan_text_x + 1, gr.pan_text_y + 1) ||
+        stack_top->win_left != old_left || stack_top->win_right != old_left ||
+        stack_top->win_top != old_top || stack_top->win_bottom != old_top ||
+        stack_top->win_width != 1 || stack_top->win_height != 1)
+    {
+        BootstrapWinDragEnd();
+        sys_focus_task = old_focus_task;
+        Kill(stack_top);
+        Kill(overlap);
+        Fs->display_flags = old_display_flags;
+        Fs->win_inhibit = old_win_inhibit;
+        Fs->text_attr = old_text_attr;
+        return 137;
+    }
+    BootstrapWinDragEnd();
+    WinHorz(old_left, old_left + 14, stack_top);
+    WinVert(old_top, old_top + 9, stack_top);
+    bootstrap_mouse_drag_task = NULL;
+    bootstrap_mouse_drag_kind = 0;
+    bootstrap_mouse_last_buttons = 0;
+    bootstrap_mouse_sampled = FALSE;
+    x = gr.pan_text_x + (stack_top->win_left + 5) * FONT_WIDTH + 1;
+    y = gr.pan_text_y + (stack_top->win_top - 1) * FONT_HEIGHT + 1;
+    old_left = stack_top->win_left;
+    old_top = stack_top->win_top;
+    BootstrapCtrlInputSample(stack_top, x | (y << 16));
+    if (!BootstrapCtrlInputSample(stack_top, x | (y << 16) | (1 << 32)) ||
+        !BootstrapCtrlInputSample(stack_top,
+            (x + FONT_WIDTH) | ((y + FONT_HEIGHT) << 16) | (1 << 32)) ||
+        stack_top->win_left != old_left + 1 ||
+        stack_top->win_top != old_top + 1 ||
+        !BootstrapCtrlInputSample(stack_top,
+            (x + FONT_WIDTH) | ((y + FONT_HEIGHT) << 16)))
+    {
+        BootstrapWinDragEnd();
+        sys_focus_task = old_focus_task;
+        Kill(stack_top);
+        Kill(overlap);
+        Fs->display_flags = old_display_flags;
+        Fs->win_inhibit = old_win_inhibit;
+        Fs->text_attr = old_text_attr;
+        return 135;
+    }
+    bootstrap_mouse_sampled = FALSE;
+    bootstrap_mouse_last_buttons = 0;
+    bootstrap_mouse_drag_task = NULL;
+    bootstrap_mouse_drag_kind = 0;
+    sys_focus_task = old_focus_task;
+    Kill(stack_top);
     old_root_draw = Fs->draw_it;
     Fs->draw_it = &WindowParentUnderlay;
     window_draw_calls = 0;
@@ -504,6 +1321,11 @@ I64 TaskOriginalDocRecalcChecks()
     }
     // The sampled-input layer sees a baseline, a press, held movement, then
     // release. A captured scrollbar must continue tracking outside its thumb.
+    BootstrapWinDragEnd();
+    bootstrap_mouse_drag_task = NULL;
+    bootstrap_mouse_drag_kind = 0;
+    bootstrap_mouse_last_buttons = 0;
+    bootstrap_mouse_sampled = FALSE;
     BootstrapCtrlInputSample(overlap, 0);
     if (!BootstrapCtrlInputSample(overlap,
             hscroll->screen_left | (hscroll->screen_top << 16) |
@@ -537,6 +1359,114 @@ I64 TaskOriginalDocRecalcChecks()
         Fs->text_attr = old_text_attr;
         return 124;
     }
+    // Captured right-click controls keep receiving held samples outside the
+    // hit rectangle and receive one matching release callback.
+    CtrlDispatchLeftClick(overlap, vscroll->screen_left,
+                          vscroll->screen_top, FALSE);
+    vscroll->right_click = &WindowRightClick;
+    vscroll->flags |= CTRLF_CAPTURE_RIGHT_MS;
+    window_right_down_calls = window_right_up_calls = 0;
+    bootstrap_mouse_last_buttons = 0;
+    bootstrap_mouse_sampled = FALSE;
+    if (sys_winmgr_task)
+        BootstrapWinRaise(overlap, sys_winmgr_task);
+    else
+    BootstrapWinRaise(overlap, sys_task);
+    sys_focus_task = overlap;
+    x = vscroll->screen_left;
+    y = vscroll->screen_top;
+    BootstrapCtrlInputSample(overlap, x | (y << 16));
+    right_press_ok = BootstrapCtrlInputSample(overlap,
+        x | (y << 16) | (2 << 32));
+    right_held_ok = BootstrapCtrlInputSample(overlap,
+        (x + 32) | ((y + 32) << 16) | (2 << 32));
+    right_release_ok = BootstrapCtrlInputSample(overlap,
+        (x + 32) | ((y + 32) << 16));
+    if (!right_press_ok || !right_held_ok || !right_release_ok ||
+        window_right_down_calls != 2 || window_right_up_calls != 1 ||
+        window_right_last_x - window_right_first_x != 32 ||
+        window_right_last_y - window_right_first_y != 32 ||
+        (vscroll->flags & CTRLF_CLICKED))
+    {
+        vscroll->right_click = NULL;
+        vscroll->flags &= ~(CTRLF_CAPTURE_RIGHT_MS | CTRLF_CLICKED);
+        bootstrap_mouse_sampled = FALSE;
+        bootstrap_mouse_last_buttons = 0;
+        Kill(overlap);
+        Fs->display_flags = old_display_flags;
+        Fs->win_inhibit = old_win_inhibit;
+        Fs->text_attr = old_text_attr;
+        if (!right_press_ok) return 126;
+        if (!right_held_ok) return 127;
+        if (!right_release_ok) return 128;
+        if (window_right_down_calls != 2 || window_right_up_calls != 1)
+            return 132;
+        if (window_right_last_x - window_right_first_x != 32 ||
+            window_right_last_y - window_right_first_y != 32)
+            return 133;
+        return 134;
+    }
+    // The packed tablet snapshot carries a signed one-byte wheel delta. The
+    // first sample after reset must still deliver wheel motion immediately.
+    bootstrap_mouse_sampled = FALSE;
+    old_scroll_y = overlap->vert_scroll.pos;
+    if (!BootstrapCtrlInputSample(overlap,
+            vscroll->screen_left | (vscroll->screen_top << 16) |
+            (3 << 40)) || overlap->vert_scroll.pos != old_scroll_y + 3 ||
+        !BootstrapCtrlInputSample(overlap,
+            vscroll->screen_left | (vscroll->screen_top << 16) |
+            (0xff << 40)) || overlap->vert_scroll.pos != old_scroll_y + 2)
+    {
+        vscroll->right_click = NULL;
+        vscroll->flags &= ~(CTRLF_CAPTURE_RIGHT_MS | CTRLF_CLICKED);
+        bootstrap_mouse_sampled = FALSE;
+        bootstrap_mouse_last_buttons = 0;
+        Kill(overlap);
+        Fs->display_flags = old_display_flags;
+        Fs->win_inhibit = old_win_inhibit;
+        Fs->text_attr = old_text_attr;
+        return 131;
+    }
+    // Both upstream inhibit bits gate all control input, including wheel and
+    // right-click dispatch. Exercise the focus-task bit from a different task
+    // than the control owner to match WinMgr's two-task policy.
+    old_overlap_inhibit = overlap->win_inhibit;
+    overlap->win_inhibit |= 1 << WIf_SELF_CTRLS;
+    self_ctrls_blocked =
+        !CtrlDispatchLeftClick(overlap, vscroll->screen_left,
+                               vscroll->screen_top, TRUE) &&
+        !CtrlDispatchRightClick(overlap, vscroll->screen_left,
+                                vscroll->screen_top, TRUE) &&
+        !CtrlDispatchWheel(overlap, 5);
+    overlap->win_inhibit = old_overlap_inhibit;
+    sys_focus_task = Fs;
+    Fs->win_inhibit |= 1 << WIf_FOCUS_TASK_CTRLS;
+    focus_ctrls_blocked =
+        !CtrlDispatchLeftClick(overlap, vscroll->screen_left,
+                               vscroll->screen_top, TRUE) &&
+        !CtrlDispatchRightClick(overlap, vscroll->screen_left,
+                                vscroll->screen_top, TRUE) &&
+        !CtrlDispatchWheel(overlap, 5);
+    Fs->win_inhibit = old_win_inhibit;
+    sys_focus_task = overlap;
+    if (!self_ctrls_blocked || !focus_ctrls_blocked ||
+        window_right_down_calls != 2 || window_right_up_calls != 1)
+    {
+        vscroll->right_click = NULL;
+        vscroll->flags &= ~(CTRLF_CAPTURE_RIGHT_MS | CTRLF_CLICKED);
+        bootstrap_mouse_sampled = FALSE;
+        bootstrap_mouse_last_buttons = 0;
+        sys_focus_task = old_focus_task;
+        Kill(overlap);
+        Fs->display_flags = old_display_flags;
+        Fs->win_inhibit = old_win_inhibit;
+        Fs->text_attr = old_text_attr;
+        return 130;
+    }
+    vscroll->right_click = NULL;
+    vscroll->flags &= ~(CTRLF_CAPTURE_RIGHT_MS | CTRLF_CLICKED);
+    bootstrap_mouse_sampled = FALSE;
+    bootstrap_mouse_last_buttons = 0;
     if (!ZcFbShellTextCompose(gr.text_base, 100))
     {
         Kill(overlap);

@@ -15,6 +15,14 @@
 #define PAUSE ;
 extern U0 RFlagsPush();
 extern U0 RFlagsPop();
+// Option currently only suppresses header-mismatch diagnostics in the
+// upstream graphics module; the bootstrap compiler accepts it as a no-op.
+extern U0 Option(I64 option, I64 value);
+extern I64 DistSqrI64(I64 x0, I64 y0, I64 x1, I64 y1);
+// KernelC normally owns this timer-frequency global. Bind the same guest
+// storage during the KernelB task bridge so keyboard/task tests can use it
+// before KernelC is loaded.
+extern CCountsGlobals counts;
 extern I64 ZcFbTextSpan(I64 x, I64 y, I64 len, I64 attr, U8 *data,
                         I64 mode, I64 left_right, I64 top_bottom,
                         U32 *text_base, I64 stride);
@@ -22,14 +30,27 @@ extern I64 ZcFbTextCellsDrawn();
 // Poll the current virtio/UART key reader and queue its events for the focus
 // task. PS/2 mouse polling is outside this bridge.
 extern U0 KbdMouseHandler(Bool poll_kbd, Bool poll_mouse);
-// Packed virtio tablet sample: x[15:0], y[31:16], buttons[39:32].
+// Packed tablet sample: x[15:0], y[31:16], buttons[39:32], wheel s8[47:40].
 extern I64 ZcTabletSample();
+extern I64 ZcMonotonicNs();
+extern F64 Exp(F64 x);
+// Bootstrap subset of upstream MathODE.ZC; the unchanged full ODE module is
+// pinned but currently triggers a compiler/runtime fault while loading.
+F64 LowPass1(F64 a, F64 y0, F64 y, F64 dt=1.0)
+{
+    F64 decay = Exp(-a * dt);
+    return y0 * decay + y * (1.0 - decay);
+}
 extern I64 KbdMessagesQueue();
+extern Bool CtrlDispatchWheel(CTask *task, I64 delta);
+extern Bool WinHorz(I64 left, I64 right, CTask *task = NULL);
+extern Bool WinVert(I64 top, I64 bottom, CTask *task = NULL);
 // ARM64 exception pads are private to each cooperative guest task. The
-// compiler emits AIWNIOS_SetJmp(SysTry()) for HolyC try/catch.
-extern U8 *SysTry();
-extern U0 SysUntry();
-extern U0 EndCatch();
+// compiler emits AIWNIOS_SetJmp(ZcTryEnter()) for guest try/catch. These
+// names intentionally avoid ZealOS's native SysTry(start_label, skip_label).
+extern U8 *ZcTryEnter();
+extern U0 ZcTryLeave();
+extern U0 ZcTryCatchEnd();
 extern I64 AIWNIOS_SetJmp(U8 *pad);
 extern U0 throw(I64 ch=0, Bool no_log=FALSE);
 // The initial ExePrint bridge accepts the source-job form used by pinned
@@ -70,8 +91,8 @@ extern CTask *Spawn(U0 (*fp_start_addr)(U8 *data), U8 *data=NULL,
                     CTask *parent=NULL, I64 stack_size=0,
                     I64 flags=1 << JOBf_ADD_TO_QUE);
 extern U0 Yield();
-// The single-CPU task ring supports Sched.ZC's focus cycle. It changes
-// sys_focus_task but has no window stacking or automatic key chord yet.
+// The single-CPU task ring supports Sched.ZC's focus cycle. Click selection
+// now raises eligible windows through this same shared ring.
 extern U0 TaskFocusNext();
 // Cooperative generic-timer wait. Other ready tasks run until mS elapses;
 // parsing and code emission remain non-switching.
@@ -87,6 +108,7 @@ extern Bool Kill(CTask *task, Bool wait=TRUE, Bool just_break=FALSE);
 extern I64 BirthWait(CTask **_task, I64 task_num=-1);
 extern U0 DeathWait(CTask **_task, Bool send_exit=FALSE);
 extern U0 TaskWait(CTask *task=NULL, Bool cmd_line_prompt=FALSE);
+extern CDoc *DocDisplay(CTask *task=NULL);
 // Queue and consume messages using the pinned Job.ZC/SerialDev/Message.ZC API.
 extern U0 JobDel(CJob *job);
 extern CJob *TaskMessage(CTask *server, CTask *master, I64 message_code,
@@ -348,6 +370,7 @@ U0 UndefinedDefine(U8 *dname)
     Print(ST_ERR_ST "Undefined Define: '%s'.\n", dname);
     throw('UndefDef');
 }
+extern U0 ZcDefineMirror(U8 *dname, U8 *st);
 CHashDefineStr *DefineLoad(U8 *dname, U8 *st, I64 caller_num=1)
 {
     CHashDefineStr *tmph;
@@ -361,7 +384,31 @@ CHashDefineStr *DefineLoad(U8 *dname, U8 *st, I64 caller_num=1)
     tmph->count = -1;
     tmph->src_link = StrNew("AD:");
     HashAdd(tmph, Fs->hash_table);
+    ZcDefineMirror(dname, st);
     return tmph;
+}
+U0 DefinePrint(U8 *dname, U8 *format, ...)
+{// KernelC's DefinePrint stores the formatted string in the task define table.
+    U8 *buf = StrPrintJoin(NULL, format, argc, argv);
+
+    DefineLoad(dname, buf, 2);
+    Free(buf);
+}
+// HashPublic's runtime effect needed by the bootstrapped source loader: expose
+// an existing hash entry to later compiler passes. Source-link bookkeeping
+// stays in the full ZealOS compiler and is not yet implemented by this bridge.
+CHashGeneric *HashPublic(U8 *name, I64 mask, Bool val=TRUE)
+{
+    CHashGeneric *entry = HashFind(name, Fs->hash_table, mask);
+
+    if (entry)
+    {
+        if (val)
+            entry->type |= HTF_PUBLIC;
+        else
+            entry->type &= ~HTF_PUBLIC;
+    }
+    return entry;
 }
 CHashDefineStr *DefineListLoad(U8 *dname, U8 *list)
 {
@@ -1356,22 +1403,60 @@ class CBootstrapGraphicsGlobals
     I64 highest_uncovered;
     I64 pan_text_x, pan_text_y;
     U0 (*fp_final_screen_update)(CDC *dc);
+    U0 (*fp_draw_mouse)(CDC *dc, I64 x, I64 y);
+    U0 (*fp_draw_grab_mouse)(CDC *dc, I64 x, I64 y, Bool closed);
+    I64 screen_zoom, sx, sy;
+    Bool continuous_scroll;
 } gr;
 gr.dc = &bootstrap_graphics_dc;
 gr.dc2 = &bootstrap_graphics_dc;
 gr.text_base = bootstrap_text_base;
 gr.win_z_buf = bootstrap_win_z_buf;
 gr.win_uncovered_bitmap = bootstrap_win_uncovered;
+Bool IsPixCovered0(CTask *task, I64 x, I64 y)
+{//Match GrAsm.ZC's cell z-buffer comparison; coordinates are pixel units.
+    I64 cell_x = x / 8, cell_y = y / 8;
+    if (!task || x < 0 || y < 0 || cell_x >= TEXT_COLS || cell_y >= TEXT_ROWS)
+        return FALSE;
+    return task->win_z_num < gr.win_z_buf[cell_y * TEXT_COLS + cell_x];
+}
 // Minimal timing state for DocRecalc's refresh throttle; WinMgr is not bootstrapped.
 CWinMgrGlobals winmgr;
 // Music playback is not part of the bootstrap; DocRecalc only tracks its current song tag.
 class CBootstrapMusicGlobals
 {
     U8 *cur_song;
+    CTask *cur_song_task;
 } music;
+U0 CurSongTask() {}
 U0 MusicSettingsReset()
 {
 }
+// Menu/input startup has not created a dedicated menu task in the bootstrap.
+CTask *MenuTask;
+// The full kernel's SystemTask sets these run-level flags during startup.
+I64 sys_run_level;
+I64 MenuEntryWidth(CMenuEntry *entry)
+{
+    I64 width;
+    CMenuEntry *sub;
+    if (!entry)
+        return 1;
+    width = StrLen(entry->name);
+    sub = entry->sub;
+    while (sub)
+    {
+        I64 sub_width = StrLen(sub->name);
+        if (sub_width > width)
+            width = sub_width;
+        sub = sub->next;
+    }
+    return width + 1;
+}
+// The real implementations allocate the ZealOS screen/z-buffer tables and
+// reap dead kernel tasks. WinMgr is compile-load tested, not started, yet.
+U0 GrSetUpTables() {}
+U0 TaskKillDying() {}
 // GodExterns.ZC globals used by DocPutKey F7 handlers.
 #define GOD_BAD_BITS	4
 #define GOD_GOOD_BITS	24
@@ -1802,12 +1887,22 @@ public Bool CtrlInside(CCtrl *ctrl, I64 x, I64 y)
         return ctrl->inside_ctrl(ctrl, x, y);
     return CtrlInsideRect(ctrl, x, y);
 }
+public Bool BootstrapWinCtrlsAllowed(CTask *task)
+{//Match WinMgr's SELF_CTRLS and FOCUS_TASK_CTRLS gates.
+    if (!task || !TaskValidate(task) ||
+        (task->win_inhibit & (1 << WIf_SELF_CTRLS)))
+        return FALSE;
+    if (TaskValidate(sys_focus_task) &&
+        (sys_focus_task->win_inhibit & (1 << WIf_FOCUS_TASK_CTRLS)))
+        return FALSE;
+    return TRUE;
+}
 public Bool CtrlDispatchLeftClick(CTask *task, I64 screen_x, I64 screen_y,
                                   Bool down)
 {//Dispatch one left-button edge using WinMgr's screen-to-task coordinates.
     CCtrl *head, *ctrl, *target = NULL;
     I64 left, top, visited = 0;
-    if (!task || !TaskValidate(task) || !(ctrl = task->next_ctrl))
+    if (!BootstrapWinCtrlsAllowed(task) || !(ctrl = task->next_ctrl))
         return FALSE;
     head = &task->next_ctrl;
     if (down)
@@ -1851,28 +1946,849 @@ public Bool CtrlDispatchLeftClick(CTask *task, I64 screen_x, I64 screen_y,
     target->left_click(target, screen_x - left, screen_y - top, down);
     return TRUE;
 }
+public Bool CtrlDispatchRightClick(CTask *task, I64 screen_x, I64 screen_y,
+                                   Bool down)
+{//Dispatch one right-button sample using WinMgr's screen-to-task coordinates.
+    CCtrl *head, *ctrl, *target = NULL;
+    I64 left, top, visited = 0;
+    if (!BootstrapWinCtrlsAllowed(task) || !(ctrl = task->next_ctrl))
+        return FALSE;
+    head = &task->next_ctrl;
+    if (down)
+    {
+        // A captured control continues tracking after the pointer leaves it.
+        while (ctrl && ctrl != head && visited++ < 64)
+        {
+            if (ctrl->right_click &&
+                (ctrl->flags & CTRLF_CAPTURE_RIGHT_MS) &&
+                (ctrl->flags & CTRLF_CLICKED))
+            {
+                target = ctrl;
+                break;
+            }
+            ctrl = ctrl->next;
+        }
+        ctrl = task->next_ctrl;
+        visited = 0;
+    }
+    while (ctrl && ctrl != head && visited++ < 64)
+    {
+        if (!target && ctrl->right_click &&
+            ((!down && (ctrl->flags & CTRLF_CLICKED)) ||
+             CtrlInside(ctrl, screen_x, screen_y)))
+        {
+            target = ctrl;
+            break;
+        }
+        ctrl = ctrl->next;
+    }
+    if (!target)
+        return FALSE;
+    left = gr.pan_text_x + task->pix_left;
+    top = gr.pan_text_y + task->pix_top;
+    if (target->flags & CTRLF_BORDER)
+    {
+        left -= FONT_WIDTH;
+        top -= FONT_HEIGHT;
+    }
+    target->right_click(target, screen_x - left, screen_y - top, down);
+    return TRUE;
+}
 I64 bootstrap_mouse_last_buttons = 0;
 Bool bootstrap_mouse_sampled = FALSE;
-public Bool BootstrapCtrlInputSample(CTask *task, I64 sample)
+I64 bootstrap_mouse_last_x = -1;
+I64 bootstrap_mouse_last_y = -1;
+#define BOOTSTRAP_DRAG_MOVE 1
+#define BOOTSTRAP_DRAG_LEFT 2
+#define BOOTSTRAP_DRAG_RIGHT 3
+#define BOOTSTRAP_DRAG_BOTTOM 4
+#define BOOTSTRAP_DRAG_BOTTOM_RIGHT 5
+#define BOOTSTRAP_TITLE_MENU 1
+#define BOOTSTRAP_TITLE_CLOSE 2
+CTask *bootstrap_mouse_drag_task = NULL;
+I64 bootstrap_mouse_drag_kind = 0;
+I64 bootstrap_mouse_drag_start_x = 0, bootstrap_mouse_drag_start_y = 0;
+I64 bootstrap_mouse_drag_left = 0, bootstrap_mouse_drag_right = 0;
+I64 bootstrap_mouse_drag_top = 0, bootstrap_mouse_drag_bottom = 0;
+CTask *bootstrap_title_button_task = NULL;
+I64 bootstrap_title_button_kind = 0;
+CTask *bootstrap_doc_mouse_task = NULL;
+I64 bootstrap_doc_mouse_button = 0;
+I64 bootstrap_left_click_deadline_ns = 0;
+I64 bootstrap_left_click_x = 0, bootstrap_left_click_y = 0;
+Bool bootstrap_left_click_double = FALSE;
+Bool bootstrap_left_click_down_sent = FALSE;
+I64 bootstrap_left_click_result = 0;
+I64 bootstrap_right_click_deadline_ns = 0;
+I64 bootstrap_right_click_x = 0, bootstrap_right_click_y = 0;
+Bool bootstrap_right_click_double = FALSE;
+Bool bootstrap_right_click_down_sent = FALSE;
+I64 bootstrap_right_click_result = 0;
+#define BOOTSTRAP_MOUSE_CLICK_PENDING 0
+#define BOOTSTRAP_MOUSE_CLICK_SINGLE 1
+#define BOOTSTRAP_MOUSE_CLICK_DOUBLE 2
+#define BOOTSTRAP_MOUSE_DBL_TIME_NS 175000000
+
+U0 BootstrapWinQueueMouseButton(CTask *task, I64 message_code,
+                                I64 screen_x, I64 screen_y)
+{//Queue one ordinary mouse transition with upstream client-area coordinates.
+    if (!TaskValidate(task))
+        return;
+    TaskMessage(task, NULL, message_code,
+        screen_x - gr.pan_text_x - task->pix_left - task->scroll_x,
+        screen_y - gr.pan_text_y - task->pix_top - task->scroll_y, 0);
+}
+U0 BootstrapWinMouseClickTimer(CTask *task, I64 now_ns, I64 buttons,
+                                I64 screen_x, I64 screen_y)
+{//Release delayed single clicks or synthesize double-click messages.
+    I64 code, event_x, event_y;
+    if (!TaskValidate(task))
+        return;
+    if (bootstrap_left_click_deadline_ns &&
+        now_ns > bootstrap_left_click_deadline_ns)
+    {
+        code = MESSAGE_MS_L_DOWN;
+        if (!bootstrap_left_click_down_sent)
+        {
+            if (bootstrap_left_click_double)
+            {
+                code = MESSAGE_MS_L_D_DOWN;
+                event_x = screen_x;
+                event_y = screen_y;
+            }
+            else
+            {
+                event_x = bootstrap_left_click_x;
+                event_y = bootstrap_left_click_y;
+            }
+            BootstrapWinQueueMouseButton(task, code, event_x, event_y);
+            bootstrap_left_click_down_sent = TRUE;
+        }
+        if (!(buttons & 1))
+        {
+            code = MESSAGE_MS_L_UP;
+            if (bootstrap_left_click_double)
+                code = MESSAGE_MS_L_D_UP;
+            BootstrapWinQueueMouseButton(task, code, screen_x, screen_y);
+            if (bootstrap_left_click_double)
+                bootstrap_left_click_result = BOOTSTRAP_MOUSE_CLICK_DOUBLE;
+            else
+                bootstrap_left_click_result = BOOTSTRAP_MOUSE_CLICK_SINGLE;
+            bootstrap_left_click_deadline_ns = 0;
+            bootstrap_left_click_double = FALSE;
+            bootstrap_left_click_down_sent = FALSE;
+        }
+    }
+    if (bootstrap_right_click_deadline_ns &&
+        now_ns > bootstrap_right_click_deadline_ns)
+    {
+        if (!bootstrap_right_click_down_sent)
+        {
+            code = MESSAGE_MS_R_DOWN;
+            event_x = bootstrap_right_click_x;
+            event_y = bootstrap_right_click_y;
+            if (bootstrap_right_click_double)
+            {
+                code = MESSAGE_MS_R_D_DOWN;
+                event_x = screen_x;
+                event_y = screen_y;
+            }
+            BootstrapWinQueueMouseButton(task, code, event_x, event_y);
+            bootstrap_right_click_down_sent = TRUE;
+        }
+        if (!(buttons & 2))
+        {
+            code = MESSAGE_MS_R_UP;
+            if (bootstrap_right_click_double)
+                code = MESSAGE_MS_R_D_UP;
+            BootstrapWinQueueMouseButton(task, code, screen_x, screen_y);
+            if (bootstrap_right_click_double)
+                bootstrap_right_click_result = BOOTSTRAP_MOUSE_CLICK_DOUBLE;
+            else
+                bootstrap_right_click_result = BOOTSTRAP_MOUSE_CLICK_SINGLE;
+            bootstrap_right_click_deadline_ns = 0;
+            bootstrap_right_click_double = FALSE;
+            bootstrap_right_click_down_sent = FALSE;
+        }
+    }
+}
+U0 BootstrapWinMouseClickInput(CTask *task, I64 button, Bool down,
+                                I64 screen_x, I64 screen_y, I64 now_ns)
+{//Delay ordinary clicks unless this task requests immediate single-click mode.
+    I64 inhibit;
+    I64 *deadline, *saved_x, *saved_y;
+    Bool *is_double, *down_sent;
+    if (!TaskValidate(task))
+        return;
+    if (button == 1)
+    {
+        inhibit = WIf_FOCUS_TASK_MS_L_D;
+        deadline = &bootstrap_left_click_deadline_ns;
+        saved_x = &bootstrap_left_click_x;
+        saved_y = &bootstrap_left_click_y;
+        is_double = &bootstrap_left_click_double;
+        down_sent = &bootstrap_left_click_down_sent;
+    }
+    else
+    {
+        inhibit = WIf_FOCUS_TASK_MS_R_D;
+        deadline = &bootstrap_right_click_deadline_ns;
+        saved_x = &bootstrap_right_click_x;
+        saved_y = &bootstrap_right_click_y;
+        is_double = &bootstrap_right_click_double;
+        down_sent = &bootstrap_right_click_down_sent;
+    }
+    if (!*deadline && Bt(&task->win_inhibit, inhibit))
+    {
+        if (button == 1)
+        {
+            if (down)
+                BootstrapWinQueueMouseButton(task, MESSAGE_MS_L_DOWN,
+                                             screen_x, screen_y);
+            else
+                BootstrapWinQueueMouseButton(task, MESSAGE_MS_L_UP,
+                                             screen_x, screen_y);
+            if (down)
+                bootstrap_left_click_result = BOOTSTRAP_MOUSE_CLICK_PENDING;
+            else
+                bootstrap_left_click_result = BOOTSTRAP_MOUSE_CLICK_SINGLE;
+        }
+        else
+        {
+            if (down)
+                BootstrapWinQueueMouseButton(task, MESSAGE_MS_R_DOWN,
+                                             screen_x, screen_y);
+            else
+                BootstrapWinQueueMouseButton(task, MESSAGE_MS_R_UP,
+                                             screen_x, screen_y);
+            if (down)
+                bootstrap_right_click_result = BOOTSTRAP_MOUSE_CLICK_PENDING;
+            else
+                bootstrap_right_click_result = BOOTSTRAP_MOUSE_CLICK_SINGLE;
+        }
+        return;
+    }
+    if (!down)
+        return;
+    if (!*deadline)
+    {
+        *deadline = now_ns + BOOTSTRAP_MOUSE_DBL_TIME_NS;
+        *saved_x = screen_x;
+        *saved_y = screen_y;
+        *is_double = FALSE;
+        *down_sent = FALSE;
+        if (button == 1)
+            bootstrap_left_click_result = BOOTSTRAP_MOUSE_CLICK_PENDING;
+        else
+            bootstrap_right_click_result = BOOTSTRAP_MOUSE_CLICK_PENDING;
+    }
+    else
+    {
+        *deadline = now_ns;
+        *saved_x = screen_x;
+        *saved_y = screen_y;
+        *is_double = TRUE;
+        *down_sent = FALSE;
+        if (button == 1)
+            bootstrap_left_click_result = BOOTSTRAP_MOUSE_CLICK_PENDING;
+        else
+            bootstrap_right_click_result = BOOTSTRAP_MOUSE_CLICK_PENDING;
+    }
+}
+U0 BootstrapWinRaise(CTask *task, CTask *root)
+{//Move one live task to the top of the shared scheduler/window ring.
+    CTask *previous, *next, *tail;
+    if (!task || !root || !TaskValidate(task) || !TaskValidate(root))
+        return;
+    PUSHFD
+    CLI
+    if (task != root)
+    {
+        previous = task->last_task;
+        next = task->next_task;
+        if (!previous || !next || previous->next_task != task ||
+            next->last_task != task)
+        {
+            POPFD
+            return;
+        }
+        if (task != root->last_task)
+        {
+            previous->next_task = next;
+            next->last_task = previous;
+            tail = root->last_task;
+            if (tail && tail->next_task == root)
+            {
+                task->last_task = tail;
+                task->next_task = root;
+                tail->next_task = task;
+                root->last_task = task;
+            }
+            else
+            {
+                // Restore the original position if the ring head was invalid.
+                task->last_task = previous;
+                task->next_task = next;
+                previous->next_task = task;
+                next->last_task = task;
+            }
+        }
+    }
+    if (!(task->win_inhibit & (1 << WIf_SELF_FOCUS)))
+        sys_focus_task = task;
+    POPFD
+}
+public CTask *BootstrapWinClickFocus(I64 screen_x, I64 screen_y)
+{//Focus and raise the topmost shown window under one screen-pixel point.
+    CTask *root, *task, *target = NULL;
+    CCtrl *head, *ctrl;
+    I64 visited = 0, left, top, right, bottom, ctrl_visited;
+    root = sys_winmgr_task;
+    if (!root)
+        root = sys_task;
+    if (!root || !TaskValidate(root))
+        return NULL;
+    task = root;
+    do
+    {
+        if (!TaskValidate(task))
+            break;
+        if (task->display_flags & (1 << DISPLAYf_SHOW))
+        {
+            left = gr.pan_text_x + task->pix_left;
+            top = gr.pan_text_y + task->pix_top;
+            right = gr.pan_text_x + task->pix_right;
+            bottom = gr.pan_text_y + task->pix_bottom;
+            if (!(task->display_flags & (1 << DISPLAYf_NO_BORDER)))
+            {
+                left -= FONT_WIDTH;
+                right += FONT_WIDTH;
+                top -= FONT_HEIGHT;
+                bottom += FONT_HEIGHT;
+            }
+            if (screen_x >= left && screen_x <= right &&
+                screen_y >= top && screen_y <= bottom)
+                target = task; // Later ring entries are visually on top.
+            // Scrollbars and other controls can live just outside the task's
+            // client rectangle. Treat their visible hit boxes as part of the
+            // owning window so a click does not fall through to its parent.
+            head = &task->next_ctrl;
+            ctrl = task->next_ctrl;
+            ctrl_visited = 0;
+            while (ctrl && ctrl != head && ctrl_visited++ < 64)
+            {
+                if ((ctrl->flags & CTRLF_SHOW) && CtrlInside(ctrl, screen_x,
+                                                             screen_y))
+                    target = task;
+                ctrl = ctrl->next;
+            }
+        }
+        task = task->next_task;
+        visited++;
+    }
+    while (task && task != root && visited < BOOTSTRAP_WIN_MAX);
+    if (target)
+    {
+        BootstrapWinRaise(target, root);
+        return target;
+    }
+    return NULL;
+}
+Bool BootstrapWinMouseAllowed(CTask *task, CTask *focus_task,
+                              I64 self_inhibit, I64 focus_inhibit)
+{//Match WinMgr's per-button self and focused-task mouse gates.
+    if (!task || !TaskValidate(task) ||
+        (task->win_inhibit & (1 << self_inhibit)))
+        return FALSE;
+    if (TaskValidate(focus_task) &&
+        (focus_task->win_inhibit & (1 << focus_inhibit)))
+        return FALSE;
+    return TRUE;
+}
+public CDoc *BootstrapWinCursorPosSet(CTask *task, I64 mouse_x, I64 mouse_y,
+                                      Bool set_cursor=TRUE)
+{//ARM64 bridge for WinMgr's DolDoc mouse-to-cursor mapping.
+    CDoc *doc, *locked_doc;
+    Bool unlock;
+    I64 x0, y0;
+    CTask *root;
+    if (!task)
+        task = Fs;
+    if (!TaskValidate(task) || mouse_x < gr.pan_text_x + task->pix_left ||
+        mouse_x > gr.pan_text_x + task->pix_right ||
+        mouse_y < gr.pan_text_y + task->pix_top ||
+        mouse_y > gr.pan_text_y + task->pix_bottom)
+        return NULL;
+    doc = DocDisplay(task);
+    if (doc && (doc->flags & DOCF_DONT_SHOW))
+        doc = NULL;
+    else if (doc && set_cursor)
+    {
+        locked_doc = doc;
+        unlock = DocLock(locked_doc);
+        if (locked_doc->doc_signature != DOC_SIGNATURE_VAL)
+            doc = NULL;
+        else
+        {
+            x0 = locked_doc->line_start_col;
+            y0 = locked_doc->top_line_num;
+            DocRecalc(locked_doc, RECALCF_HAS_CURSOR);
+            locked_doc->x = (mouse_x - gr.pan_text_x - task->pix_left -
+                             task->scroll_x) / FONT_WIDTH + x0;
+            locked_doc->y = (mouse_y - gr.pan_text_y - task->pix_top -
+                             task->scroll_y) / FONT_HEIGHT + y0;
+            DocRecalc(locked_doc, RECALCt_FIND_CURSOR);
+            task->scroll_x = 0;
+            task->scroll_y = 0;
+            task->scroll_z = 0;
+        }
+        if (unlock)
+            DocUnlock(locked_doc);
+    }
+    root = sys_winmgr_task;
+    if (!root)
+        root = sys_task;
+    BootstrapWinRaise(task, root);
+    return doc;
+}
+U0 BootstrapDocMousePress(CDoc *doc)
+{//Show the upstream solid border on the entry pressed by the left button.
+    Bool unlock;
+    CDocEntry *entry;
+    if (!doc || doc->doc_signature != DOC_SIGNATURE_VAL)
+        return;
+    unlock = DocLock(doc);
+    if (doc->doc_signature == DOC_SIGNATURE_VAL)
+    {
+        entry = doc->cur_entry;
+        if (entry && entry != doc && (entry->de_flags & DOCEF_HAS_BORDER))
+            entry->de_flags |= DOCEF_SOLID_BORDER;
+    }
+    if (unlock)
+        DocUnlock(doc);
+}
+I64 BootstrapDocMouseReleaseKey(CDoc *doc, I64 button)
+{//Return the key WinMgr sends for a single click on the current DocEntry.
+    Bool unlock;
+    CDocEntry *entry;
+    I64 key = 0;
+    if (!doc || doc->doc_signature != DOC_SIGNATURE_VAL)
+        return 0;
+    unlock = DocLock(doc);
+    if (doc->doc_signature == DOC_SIGNATURE_VAL)
+    {
+        entry = doc->cur_entry;
+        if (entry && entry != doc)
+        {
+            if (button == 0 || button == 1)
+            {
+                if (entry->de_flags & DOCEF_HAS_BORDER)
+                    entry->de_flags &= ~DOCEF_SOLID_BORDER;
+                if (button == 1 && entry->de_flags &
+                    (DOCEF_TREE | DOCEF_LIST | DOCEF_LINK |
+                    DOCEF_CHECK_COLLAPSABLE | DOCEF_LEFT_CB |
+                    DOCEF_LEFT_MACRO | DOCEF_LEFT_EXP))
+                    key = CH_SPACE;
+            }
+            else if (button == 2 &&
+                (entry->de_flags & (DOCEF_LINK | DOCEF_RIGHT_CB |
+                                    DOCEF_RIGHT_MACRO | DOCEF_RIGHT_EXP)))
+                key = '\n';
+        }
+    }
+    if (unlock)
+        DocUnlock(doc);
+    return key;
+}
+I64 BootstrapDocMouseDoubleReleaseKey(I64 button)
+{//Match WinMgr's Escape actions after a completed double-click on a DolDoc.
+    if (button == 1)
+        return CH_ESC;
+    if (button == 2)
+        return CH_SHIFT_ESC;
+    return 0;
+}
+Bool BootstrapWinBorderAllowed(CTask *task)
+{//Match WinMgr's self-border and focused-task border inhibit gates.
+    if (!task || !TaskValidate(task) ||
+        (task->win_inhibit & (1 << WIf_SELF_BORDER)))
+        return FALSE;
+    if (TaskValidate(sys_focus_task) &&
+        (sys_focus_task->win_inhibit & (1 << WIf_FOCUS_TASK_BORDER)))
+        return FALSE;
+    return TRUE;
+}
+I64 BootstrapWinTitleButtonKind(CTask *task, I64 cell_x, I64 cell_y)
+{//Classify the upstream task-menu and close bands on a bordered title row.
+    if (!BootstrapWinBorderAllowed(task) ||
+        !(task->display_flags & (1 << DISPLAYf_SHOW)) ||
+        (task->display_flags & (1 << DISPLAYf_NO_BORDER)) ||
+        cell_y != task->win_top - 1)
+        return 0;
+    if (cell_x >= task->win_left && cell_x < task->win_left + 4)
+        return BOOTSTRAP_TITLE_MENU;
+    if (cell_x >= task->win_right - 2 && cell_x <= task->win_right)
+        return BOOTSTRAP_TITLE_CLOSE;
+    return 0;
+}
+public Bool BootstrapWinTitleButtonActivate(CTask *task, I64 kind)
+{//Match pinned WinMgr.ZC's title-row key and close actions.
+    if (!BootstrapWinBorderAllowed(task))
+        return FALSE;
+    if (kind == BOOTSTRAP_TITLE_MENU)
+        TaskMessage(task, NULL, MESSAGE_KEY_DOWN, CH_CTRLM,
+                    0x43200000432, 0);
+    else if (kind == BOOTSTRAP_TITLE_CLOSE)
+    {
+        if (DocPut(task))
+            TaskMessage(task, NULL, MESSAGE_KEY_DOWN, CH_SHIFT_ESC, 0, 0);
+        else
+            Kill(task, FALSE);
+    }
+    else
+        return FALSE;
+    return TRUE;
+}
+public Bool BootstrapWinTitleButtonBegin(CTask *task, I64 screen_x,
+                                          I64 screen_y)
+{//Capture a task-menu or close press until its matching release.
+    I64 cell_x, cell_y, kind;
+    if (!task || !TaskValidate(task))
+        return FALSE;
+    cell_x = (screen_x - gr.pan_text_x) / FONT_WIDTH;
+    cell_y = (screen_y - gr.pan_text_y) / FONT_HEIGHT;
+    kind = BootstrapWinTitleButtonKind(task, cell_x, cell_y);
+    if (!kind)
+        return FALSE;
+    bootstrap_title_button_task = task;
+    bootstrap_title_button_kind = kind;
+    return TRUE;
+}
+public Bool BootstrapWinTitleButtonEnd(I64 screen_x, I64 screen_y)
+{//Activate only if release remains in the pressed title-button band.
+    CTask *task = bootstrap_title_button_task;
+    I64 kind = bootstrap_title_button_kind;
+    I64 cell_x, cell_y;
+    bootstrap_title_button_task = NULL;
+    bootstrap_title_button_kind = 0;
+    if (!task || !TaskValidate(task) || !kind)
+        return FALSE;
+    cell_x = (screen_x - gr.pan_text_x) / FONT_WIDTH;
+    cell_y = (screen_y - gr.pan_text_y) / FONT_HEIGHT;
+    if (BootstrapWinTitleButtonKind(task, cell_x, cell_y) != kind)
+        return FALSE;
+    return BootstrapWinTitleButtonActivate(task, kind);
+}
+I64 BootstrapWinDragKind(CTask *task, I64 cell_x, I64 cell_y)
+{//Classify upstream WinMgr title and resize-border hit zones.
+    if (!BootstrapWinBorderAllowed(task) ||
+        !(task->display_flags & (1 << DISPLAYf_SHOW)) ||
+        (task->display_flags & (1 << DISPLAYf_NO_BORDER)))
+        return 0;
+    if (cell_y == task->win_top - 1 &&
+        task->win_left - 1 <= cell_x && cell_x <= task->win_right + 1)
+    {
+        // Keep the upstream task-menu/close bands out of move capture.
+        if (task->win_left + 4 <= cell_x && cell_x <= task->win_right - 2)
+            return BOOTSTRAP_DRAG_MOVE;
+        return 0;
+    }
+    if (cell_x == task->win_right + 1 && cell_y == task->win_bottom + 1)
+        return BOOTSTRAP_DRAG_BOTTOM_RIGHT;
+    if (cell_x == task->win_left - 1 &&
+        task->win_top <= cell_y && cell_y <= task->win_bottom)
+        return BOOTSTRAP_DRAG_LEFT;
+    if (cell_x == task->win_right + 1 &&
+        task->win_top <= cell_y && cell_y <= task->win_bottom)
+        return BOOTSTRAP_DRAG_RIGHT;
+    if (cell_y == task->win_bottom + 1 &&
+        task->win_left <= cell_x && cell_x <= task->win_right)
+        return BOOTSTRAP_DRAG_BOTTOM;
+    return 0;
+}
+public Bool BootstrapWinDragBegin(CTask *task, I64 screen_x, I64 screen_y)
+{//Capture a title-bar move or visible resize edge on left-button press.
+    I64 cell_x, cell_y, kind;
+    if (!task || !TaskValidate(task))
+        return FALSE;
+    cell_x = (screen_x - gr.pan_text_x) / FONT_WIDTH;
+    cell_y = (screen_y - gr.pan_text_y) / FONT_HEIGHT;
+    kind = BootstrapWinDragKind(task, cell_x, cell_y);
+    if (!kind)
+        return FALSE;
+    bootstrap_mouse_drag_task = task;
+    bootstrap_mouse_drag_kind = kind;
+    bootstrap_mouse_drag_start_x = cell_x;
+    bootstrap_mouse_drag_start_y = cell_y;
+    bootstrap_mouse_drag_left = task->win_left;
+    bootstrap_mouse_drag_right = task->win_right;
+    bootstrap_mouse_drag_top = task->win_top;
+    bootstrap_mouse_drag_bottom = task->win_bottom;
+    return TRUE;
+}
+public Bool BootstrapWinDragUpdate(I64 screen_x, I64 screen_y)
+{//Apply one held-button sample using the drag's original window geometry.
+    CTask *task = bootstrap_mouse_drag_task;
+    I64 cell_x, cell_y, dx, dy, left, right, top, bottom, width, height;
+    if (!task || !TaskValidate(task) || !bootstrap_mouse_drag_kind)
+    {
+        bootstrap_mouse_drag_task = NULL;
+        bootstrap_mouse_drag_kind = 0;
+        return FALSE;
+    }
+    cell_x = (screen_x - gr.pan_text_x) / FONT_WIDTH;
+    cell_y = (screen_y - gr.pan_text_y) / FONT_HEIGHT;
+    dx = cell_x - bootstrap_mouse_drag_start_x;
+    dy = cell_y - bootstrap_mouse_drag_start_y;
+    left = bootstrap_mouse_drag_left;
+    right = bootstrap_mouse_drag_right;
+    top = bootstrap_mouse_drag_top;
+    bottom = bootstrap_mouse_drag_bottom;
+    width = right - left + 1;
+    height = bottom - top + 1;
+    if (bootstrap_mouse_drag_kind == BOOTSTRAP_DRAG_MOVE)
+    {
+        left += dx;
+        top += dy;
+        right = left + width - 1;
+        bottom = top + height - 1;
+    }
+    else if (bootstrap_mouse_drag_kind == BOOTSTRAP_DRAG_LEFT)
+    {
+        // Upstream WinMgr moves the left frame horizontally without changing
+        // the window width.
+        left += dx;
+        right = left + width - 1;
+    }
+    else if (bootstrap_mouse_drag_kind == BOOTSTRAP_DRAG_RIGHT ||
+             bootstrap_mouse_drag_kind == BOOTSTRAP_DRAG_BOTTOM_RIGHT)
+    {
+        right += dx;
+        if (right < left) right = left;
+    }
+    if (bootstrap_mouse_drag_kind == BOOTSTRAP_DRAG_BOTTOM ||
+        bootstrap_mouse_drag_kind == BOOTSTRAP_DRAG_BOTTOM_RIGHT)
+    {
+        bottom += dy;
+        if (bottom < top) bottom = top;
+    }
+    else if (bootstrap_mouse_drag_kind == BOOTSTRAP_DRAG_LEFT)
+    {
+        top = bootstrap_mouse_drag_top;
+        bottom = bootstrap_mouse_drag_bottom;
+    }
+    else if (bootstrap_mouse_drag_kind == BOOTSTRAP_DRAG_RIGHT)
+    {
+        top = bootstrap_mouse_drag_top;
+        bottom = bootstrap_mouse_drag_bottom;
+    }
+    WinHorz(left, right, task);
+    WinVert(top, bottom, task);
+    return TRUE;
+}
+public U0 BootstrapWinDragEnd()
+{//Release the captured window after button-up.
+    bootstrap_mouse_drag_task = NULL;
+    bootstrap_mouse_drag_kind = 0;
+}
+public Bool BootstrapCtrlInputSampleAt(CTask *task, I64 sample, I64 now_ns)
 {//Feed one packed absolute tablet sample into the focused task's controls.
+    CDoc *doc;
+    CTask *mouse_focus_before;
     I64 x = sample & 0xffff;
     I64 y = (sample >> 16) & 0xffff;
     I64 buttons = (sample >> 32) & 0xff;
+    I64 wheel = (sample >> 40) & 0xff;
     Bool handled = FALSE;
+    if (wheel & 0x80)
+        wheel -= 0x100;
     if (sample < 0 || !task || !TaskValidate(task))
         return FALSE;
     if (!bootstrap_mouse_sampled)
     {
         bootstrap_mouse_last_buttons = buttons;
+        bootstrap_mouse_last_x = x;
+        bootstrap_mouse_last_y = y;
         bootstrap_mouse_sampled = TRUE;
+        if (wheel)
+            return CtrlDispatchWheel(task, wheel);
         return FALSE;
     }
+    BootstrapWinMouseClickTimer(sys_focus_task, now_ns, buttons, x, y);
+    if (x != bootstrap_mouse_last_x || y != bootstrap_mouse_last_y)
+    {
+        CTask *mouse_task = sys_focus_task;
+        if (TaskValidate(mouse_task))
+            TaskMessage(mouse_task, NULL, MESSAGE_MS_MOVE,
+                x - gr.pan_text_x - mouse_task->pix_left -
+                    mouse_task->scroll_x,
+                y - gr.pan_text_y - mouse_task->pix_top -
+                    mouse_task->scroll_y, 0);
+        bootstrap_mouse_last_x = x;
+        bootstrap_mouse_last_y = y;
+    }
+    if (!(buttons & 1) && (bootstrap_mouse_last_buttons & 1))
+        BootstrapWinMouseClickInput(sys_focus_task, 1, FALSE, x, y, now_ns);
+    if (!(buttons & 2) && (bootstrap_mouse_last_buttons & 2))
+        BootstrapWinMouseClickInput(sys_focus_task, 2, FALSE, x, y, now_ns);
+    if (wheel)
+        handled |= CtrlDispatchWheel(task, wheel);
+    if ((buttons & 1) && !(bootstrap_mouse_last_buttons & 1))
+    {
+        CTask *mouse_focus_before = sys_focus_task;
+        CTask *clicked = BootstrapWinClickFocus(x, y);
+        if (clicked)
+        {
+            task = clicked;
+            BootstrapWinMouseClickInput(sys_focus_task, 1, TRUE, x, y, now_ns);
+            // Visible controls can extend into the window border. Give an
+            // actual control hit priority over frame resizing in that area.
+            if (CtrlDispatchLeftClick(clicked, x, y, TRUE))
+            {
+                bootstrap_mouse_last_buttons = buttons;
+                return TRUE;
+            }
+            if (BootstrapWinTitleButtonBegin(clicked, x, y))
+            {
+                bootstrap_mouse_last_buttons = buttons;
+                return TRUE;
+            }
+            if (BootstrapWinDragBegin(clicked, x, y))
+            {
+                bootstrap_mouse_last_buttons = buttons;
+                return BootstrapWinDragUpdate(x, y);
+            }
+            if (BootstrapWinMouseAllowed(clicked, mouse_focus_before,
+                                         WIf_SELF_MS_L,
+                                         WIf_FOCUS_TASK_MS_L) &&
+                (doc = BootstrapWinCursorPosSet(clicked, x, y, TRUE)))
+            {
+                BootstrapDocMousePress(doc);
+                bootstrap_doc_mouse_task = clicked;
+                bootstrap_doc_mouse_button = 1;
+                bootstrap_mouse_last_buttons = buttons;
+                return TRUE;
+            }
+        }
+        else
+            BootstrapWinMouseClickInput(sys_focus_task, 1, TRUE, x, y, now_ns);
+    }
+    if (bootstrap_mouse_drag_task)
+    {
+        if (buttons & 1)
+            handled = BootstrapWinDragUpdate(x, y);
+        else
+        {
+            BootstrapWinDragEnd();
+            handled = TRUE;
+        }
+        bootstrap_mouse_last_buttons = buttons;
+        return handled;
+    }
+    if (bootstrap_title_button_task)
+    {
+        if (buttons & 1)
+            handled = TRUE;
+        else
+            handled = BootstrapWinTitleButtonEnd(x, y);
+        bootstrap_mouse_last_buttons = buttons;
+        return handled;
+    }
+    if (bootstrap_doc_mouse_task)
+    {
+        I64 button = bootstrap_doc_mouse_button;
+        if (buttons & button)
+        {
+            bootstrap_mouse_last_buttons = buttons;
+            return TRUE;
+        }
+        if (button == 1 && bootstrap_left_click_deadline_ns)
+        {
+            bootstrap_mouse_last_buttons = buttons;
+            return TRUE;
+        }
+        if (button == 2 && bootstrap_right_click_deadline_ns)
+        {
+            bootstrap_mouse_last_buttons = buttons;
+            return TRUE;
+        }
+        task = bootstrap_doc_mouse_task;
+        bootstrap_doc_mouse_task = NULL;
+        bootstrap_doc_mouse_button = 0;
+        if (TaskValidate(task))
+        {
+            I64 self_mouse_inhibit, focus_mouse_inhibit, click_result;
+            if (button == 1)
+            {
+                self_mouse_inhibit = WIf_SELF_MS_L;
+                focus_mouse_inhibit = WIf_FOCUS_TASK_MS_L;
+                click_result = bootstrap_left_click_result;
+                bootstrap_left_click_result = BOOTSTRAP_MOUSE_CLICK_PENDING;
+            }
+            else
+            {
+                self_mouse_inhibit = WIf_SELF_MS_R;
+                focus_mouse_inhibit = WIf_FOCUS_TASK_MS_R;
+                click_result = bootstrap_right_click_result;
+                bootstrap_right_click_result = BOOTSTRAP_MOUSE_CLICK_PENDING;
+            }
+            doc = BootstrapWinCursorPosSet(task, x, y, FALSE);
+            if (doc && BootstrapWinMouseAllowed(task, sys_focus_task,
+                self_mouse_inhibit, focus_mouse_inhibit))
+            {
+                I64 key;
+                if (click_result == BOOTSTRAP_MOUSE_CLICK_DOUBLE)
+                {
+                    BootstrapDocMouseReleaseKey(doc, 0);
+                    key = BootstrapDocMouseDoubleReleaseKey(button);
+                }
+                else
+                    key = BootstrapDocMouseReleaseKey(doc, button);
+                if (key)
+                    TaskMessage(task, NULL, MESSAGE_KEY_DOWN, key, 0, 0);
+            }
+            else if (button == 1)
+                BootstrapDocMouseReleaseKey(DocDisplay(task), 0);
+        }
+        bootstrap_mouse_last_buttons = buttons;
+        return TRUE;
+    }
+    if ((buttons & 2) && !(bootstrap_mouse_last_buttons & 2))
+    {
+        mouse_focus_before = sys_focus_task;
+        BootstrapWinMouseClickInput(sys_focus_task, 2, TRUE, x, y, now_ns);
+        if (CtrlDispatchRightClick(task, x, y, TRUE))
+        {
+            bootstrap_mouse_last_buttons = buttons;
+            return TRUE;
+        }
+        if (BootstrapWinMouseAllowed(task, mouse_focus_before,
+                                     WIf_SELF_MS_R,
+                                     WIf_FOCUS_TASK_MS_R) &&
+            (doc = BootstrapWinCursorPosSet(task, x, y, TRUE)))
+        {
+            bootstrap_doc_mouse_task = task;
+            bootstrap_doc_mouse_button = 2;
+            bootstrap_mouse_last_buttons = buttons;
+            return TRUE;
+        }
+        bootstrap_mouse_last_buttons = buttons;
+        return FALSE;
+    }
+    if (buttons & 2)
+        handled |= CtrlDispatchRightClick(task, x, y, TRUE);
+    else if (bootstrap_mouse_last_buttons & 2)
+        handled |= CtrlDispatchRightClick(task, x, y, FALSE);
     if (buttons & 1)
         handled |= CtrlDispatchLeftClick(task, x, y, TRUE);
     else if (bootstrap_mouse_last_buttons & 1)
         handled |= CtrlDispatchLeftClick(task, x, y, FALSE);
     bootstrap_mouse_last_buttons = buttons;
     return handled;
+}
+public Bool BootstrapCtrlInputSample(CTask *task, I64 sample)
+{//Use the ARM generic timer as the monotonic input clock.
+    return BootstrapCtrlInputSampleAt(task, sample, ZcMonotonicNs());
 }
 U0 BootstrapCtrlInputPoll()
 {//Poll UTM's absolute tablet and route left-button samples to the focused task.
@@ -1886,7 +2802,7 @@ public Bool CtrlDispatchWheel(CTask *task, I64 delta)
 {//WinMgr routes wheel changes to the focused task's first wheel control.
     CCtrl *head, *ctrl;
     I64 visited = 0;
-    if (!task || !TaskValidate(task) || !(ctrl = task->next_ctrl))
+    if (!BootstrapWinCtrlsAllowed(task) || !(ctrl = task->next_ctrl))
         return FALSE;
     head = &task->next_ctrl;
     while (ctrl && ctrl != head && visited++ < 64)
@@ -2199,7 +3115,7 @@ U0 GrUpdateTasks()
     }
 }
 public U0 BootstrapWinMgrTick()
-{//One host-idle frame: poll tablet controls and redraw the task ring.
+{//One host-idle frame: route tablet clicks and redraw the task ring.
     bootstrap_winmgr_ticks++;
     GrUpdateTasks();
 }

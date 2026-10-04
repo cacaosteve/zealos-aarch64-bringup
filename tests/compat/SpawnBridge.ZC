@@ -33,13 +33,14 @@ U0 SpawnEmpty(U8 *data)
 I64 SpawnBridgeChecks()
 {
     CTask *a, *b, *root = Fs;
-    I64 last_num;
+    I64 last_num, root_used_before;
     U8 *root_buf;
     spawn_root = root;
     spawn_first = 1;
     spawn_second = 2;
     if (!TaskValidate(root) || Spawn(&SpawnWorker, NULL, "Bad", 0))
         return 1;
+    root_used_before = root->data_heap->used_u8s;
     root_buf = MAlloc(16);
     if (!root_buf || root->data_heap->used_u8s < 16)
         return 2;
@@ -62,7 +63,7 @@ I64 SpawnBridgeChecks()
         return 8;
     last_num = b->task_num;
     Free(root_buf);
-    if (root->data_heap->used_u8s)
+    if (root->data_heap->used_u8s != root_used_before)
         return 9;
     // Completed slots can be reused, while the four-live-task bound holds.
     a = Spawn(&SpawnEmpty);

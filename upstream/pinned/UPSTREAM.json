@@ -24,6 +24,7 @@
     "src/System/DolDoc/DocRecalc.ZC": "b26ac3f2402711fa867214d38fc3456ed44afa3fc83f4124758c92835b985758",
     "src/System/DolDoc/DocRecalcLib.ZC": "9c9358d5231de546b18f017e44e59f370f800b94fba672cb3b0331724646198c",
     "src/System/DolDoc/DocTerm.ZC": "1c75278926832c7460b58cf1b88e843cd9b9628c42805fe2a83ce861b4641081",
+    "src/System/Externs.ZC": "86efcbcd66ccbf9c7ca3ab95f20bbe89b9e856822191ef86dd2759cc44a972c7",
     "src/System/Gr/Gr.HH": "7ba721b5ea45efb885a43dcdca91d5ef78e32d94c5853bb6d5af974d60b22a15",
     "src/System/Gr/GrAsm.ZC": "72de1d8394c4f7ab71cda83ee247a6dd4eaae86d8d87452cbf371d6396c19be7",
     "src/System/Gr/GrGlobals.ZC": "74ecf2417eea32f89af1f575a4522c44801506dd651b4bdd193051732fe61ace",
@@ -31,7 +32,14 @@
     "src/System/Gr/GrTextBase.ZC": "532f1ff9e44f07952adbf49d4733d6ae9699b519b9544c938839940f5d02f966",
     "src/System/Gr/MakeGr.ZC": "0519937e1f43cc3634252bd5a6ea39997934f4a6c913a994a3ce8d2c0ca73bbd",
     "src/System/Win.ZC": "5366052a69f2c0cd5fe035210d89b22b71c1ebf596462b4fa9a9451db605c540",
-    "src/System/WinMgr.ZC": "9dc78a33cd27921260667b7273f9869816e6de58f4cc7b04773f7840b9fcd79d"
+    "src/System/WinMgr.ZC": "9dc78a33cd27921260667b7273f9869816e6de58f4cc7b04773f7840b9fcd79d",
+    "src/Kernel/KernelC.HH": "f714d67b9f765ee78af178d72bb69ba9d4e61f4c37180bbf62f6073e28a71a9d",
+    "src/System/Gr/GrDC.ZC": "2cad8acf77325b0305917e63355f043df40c8caeeb6490f171eb20e915543942",
+    "src/System/Gr/GrExterns.ZC": "6ac171b2b62cf3d49b068aca3803fcea9e3ac947a851fceb2ea13930f73086b0",
+    "src/System/Gr/GrInitA.ZC": "677a339f7d1679c4ad71f7e0af31f88d3cf0b777c472dda7dbde050a55c6fbde",
+    "src/System/Gr/GrPalette.ZC": "e965b1e93cdbf59cd1a57f395e2c6566ede00bbd49ce3e9b56e4b05f1dd508ba",
+    "src/System/Gr/GrBitMap.ZC": "3599a84836aa89f7488f354012fb82b81d879b33df634fd8bc5fbed64540f8ff",
+    "src/System/Math/MathODE.ZC": "24a0d15370a9b5f42b894ed4ae44852f262325593bcac3c5bc9795d68b0e0c5c"
   },
   "changes": []
 }

@@ -1,0 +1,7 @@
+// Compile-only declaration for the compositor dependency absent from this
+// probe. It loads WinMgr to test source/backend compatibility, but doesn't run it.
+extern U0 GrUpdateScreen();
+extern U0 GrRopEquU8NoClipping(I64 ch, U8 *dst, I64 width_internal);
+extern U0 DCBlotColor4(U8 *dst, I64 *img, I64 *img_cache, I64 count);
+extern U0 ODEsUpdate(CTask *task);
+F64 ode_alloced_factor = 0.75;

@@ -1,6 +1,6 @@
 /*
- * virtio-input tablet (ABS_X/ABS_Y) over virtio-mmio.
- * Polled; scales absolute axes into FB pixel coords.
+ * virtio-input tablet (ABS_X/ABS_Y, buttons, REL_WHEEL) over virtio-mmio.
+ * Polled; scales absolute axes into FB pixel coords and accumulates wheel steps.
  */
 #pragma once
 
@@ -47,9 +47,11 @@
 #define VT_CFG_ABS_INFO     0x12u
 #define VT_EV_ABS_T         0x03u
 #define VT_EV_ABS           0x03u
+#define VT_EV_REL           0x02u
 #define VT_EV_KEY           0x01u
 #define VT_BTN_LEFT         0x110u
 #define VT_BTN_RIGHT        0x111u
+#define VT_REL_WHEEL        0x08u
 #define VT_ABS_X            0x00u
 #define VT_ABS_Y            0x01u
 #define VT_QSIZE            8u
@@ -70,6 +72,7 @@ struct vt_dev {
     uint16_t avail_idx;
     int32_t abs_x, abs_y;
     int32_t max_x, max_y;
+    int32_t wheel;
     int ready;
     int moved;
     int buttons;
@@ -142,6 +145,15 @@ static void vt_handle(struct vt_dev *d, struct vt_event ev) {
         }
         return;
     }
+    if (ev.type == VT_EV_REL) {
+        if (ev.code == VT_REL_WHEEL) {
+            int32_t next = d->wheel + (int32_t)ev.value;
+            if (next > 127) next = 127;
+            if (next < -128) next = -128;
+            d->wheel = next;
+        }
+        return;
+    }
     if (ev.type != VT_EV_ABS) {
         return;
     }
@@ -178,7 +190,8 @@ static void virtio_tablet_poll(void) {
 }
 
 static int virtio_tablet_sample(uint32_t fb_w, uint32_t fb_h,
-                                uint32_t *ox, uint32_t *oy, int *buttons) {
+                                uint32_t *ox, uint32_t *oy, int *buttons,
+                                int *wheel) {
     if (!g_vt.ready || fb_w < 2 || fb_h < 2) {
         return 0;
     }
@@ -198,6 +211,10 @@ static int virtio_tablet_sample(uint32_t fb_w, uint32_t fb_h,
     if (buttons) {
         *buttons = g_vt.buttons;
     }
+    if (wheel) {
+        *wheel = g_vt.wheel;
+        g_vt.wheel = 0;
+    }
     int moved = g_vt.moved;
     g_vt.moved = 0;
     return moved || 1;
@@ -205,7 +222,7 @@ static int virtio_tablet_sample(uint32_t fb_w, uint32_t fb_h,
 
 static int virtio_tablet_xy(uint32_t fb_w, uint32_t fb_h,
                             uint32_t *ox, uint32_t *oy) {
-    return virtio_tablet_sample(fb_w, fb_h, ox, oy, NULL);
+    return virtio_tablet_sample(fb_w, fb_h, ox, oy, NULL, NULL);
 }
 
 static uint64_t virtio_tablet_mmio_phys(void) {

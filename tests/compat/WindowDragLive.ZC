@@ -1,0 +1,240 @@
+// Interactive UTM check for bordered-window focus, title buttons, move, and resize.
+// Load this source, call WindowDragLiveStart, then WindowDragLiveStop when done.
+CTask *window_drag_live_a;
+CTask *window_drag_live_b;
+CCtrl window_drag_live_right_control;
+I64 window_drag_live_right_down;
+I64 window_drag_live_wheel_delta;
+I64 window_drag_live_draw_a_count;
+I64 window_drag_live_draw_b_count;
+I64 window_drag_live_control_draw_count;
+
+U0 WindowDragLivePark(U8 *data)
+{
+    while (TRUE)
+        ZcTaskYield;
+}
+
+U0 WindowDragLiveDrawA(CTask *task, CDC *dc)
+{
+    if (!task)
+        return;
+    window_drag_live_draw_a_count++;
+    TextLenStr(task, 2, 4, 21, 0x0F, "WINDOW A - drag title");
+    TextLenStr(task, 2, 6, 25, 0x0F, "Resize lower-right corner");
+}
+
+U0 WindowDragLiveDrawB(CTask *task, CDC *dc)
+{
+    if (!task)
+        return;
+    window_drag_live_draw_b_count++;
+    TextLenStr(task, 2, 4, 24, 0x0F, "WINDOW B - click to raise");
+    TextLenStr(task, 2, 6, 25, 0x0F, "Resize lower-right corner");
+    TextLenStr(task, 2, 8, 31, 0x0F, "Right-click / wheel the box below");
+}
+
+U0 WindowDragLiveRightClick(CCtrl *ctrl, I64 x, I64 y, Bool down)
+{
+    if (x || y) {}
+    if (down)
+    {
+        if (!(ctrl->flags & CTRLF_CLICKED))
+            window_drag_live_right_down++;
+        ctrl->flags |= CTRLF_CLICKED;
+    }
+    else
+        ctrl->flags &= ~CTRLF_CLICKED;
+}
+
+U0 WindowDragLiveWheel(CCtrl *ctrl, I64 delta)
+{
+    if (!ctrl)
+        return;
+    window_drag_live_wheel_delta += delta;
+}
+
+U0 WindowDragLiveRightDraw(CDC *dc, CCtrl *ctrl)
+{
+    if (!dc || !ctrl)
+        return;
+    window_drag_live_control_draw_count++;
+    if (ctrl->flags & CTRLF_CLICKED)
+        dc->color.c0.color = GREEN;
+    else if (window_drag_live_wheel_delta > 0)
+        dc->color.c0.color = CYAN;
+    else if (window_drag_live_wheel_delta < 0)
+        dc->color.c0.color = PURPLE;
+    else
+        dc->color.c0.color = YELLOW;
+    dc->color.c0.rop = ROPB_MONO;
+    GrRect(dc, ctrl->left, ctrl->top,
+           ctrl->right - ctrl->left + 1,
+           ctrl->bottom - ctrl->top + 1);
+}
+
+I64 WindowDragLiveStop()
+{
+    if (sys_focus_task == window_drag_live_a ||
+        sys_focus_task == window_drag_live_b)
+        sys_focus_task = Fs;
+    if (TaskValidate(window_drag_live_a))
+        Kill(window_drag_live_a);
+    if (TaskValidate(window_drag_live_b))
+        Kill(window_drag_live_b);
+    window_drag_live_a = NULL;
+    window_drag_live_b = NULL;
+    window_drag_live_right_control.win_task = NULL;
+    window_drag_live_right_control.next = NULL;
+    window_drag_live_right_control.last = NULL;
+    return 0;
+}
+
+I64 WindowDragLiveStart()
+{
+    if (TaskValidate(window_drag_live_a) || TaskValidate(window_drag_live_b))
+        return 0;
+    window_drag_live_a = Spawn(&WindowDragLivePark, NULL, "WinDragLiveA");
+    if (!window_drag_live_a)
+        return 0;
+    window_drag_live_b = Spawn(&WindowDragLivePark, NULL, "WinDragLiveB");
+    if (!window_drag_live_b)
+    {
+        Kill(window_drag_live_a);
+        window_drag_live_a = NULL;
+        return 0;
+    }
+    window_drag_live_a->display_flags = 1 << DISPLAYf_SHOW;
+    window_drag_live_b->display_flags = 1 << DISPLAYf_SHOW;
+    window_drag_live_a->win_inhibit |= 1 << WIf_SELF_DOC;
+    window_drag_live_b->win_inhibit |= 1 << WIf_SELF_DOC;
+    window_drag_live_a->win_inhibit &= ~(1 << WIf_SELF_BORDER);
+    window_drag_live_b->win_inhibit &= ~(1 << WIf_SELF_BORDER);
+    window_drag_live_a->draw_it = &WindowDragLiveDrawA;
+    window_drag_live_b->draw_it = &WindowDragLiveDrawB;
+    if (!WinHorz(15, 54, window_drag_live_a) ||
+        !WinVert(10, 29, window_drag_live_a) ||
+        !WinHorz(38, 77, window_drag_live_b) ||
+        !WinVert(20, 39, window_drag_live_b))
+    {
+        WindowDragLiveStop();
+        return 0;
+    }
+    window_drag_live_right_down = 0;
+    window_drag_live_wheel_delta = 0;
+    window_drag_live_right_control.next = &window_drag_live_b->next_ctrl;
+    window_drag_live_right_control.last = &window_drag_live_b->next_ctrl;
+    window_drag_live_right_control.win_task = window_drag_live_b;
+    window_drag_live_right_control.flags = CTRLF_SHOW | CTRLF_CAPTURE_RIGHT_MS;
+    window_drag_live_right_control.left = 2 * FONT_WIDTH;
+    window_drag_live_right_control.right = 20 * FONT_WIDTH;
+    window_drag_live_right_control.top = 10 * FONT_HEIGHT;
+    window_drag_live_right_control.bottom = 13 * FONT_HEIGHT;
+    window_drag_live_right_control.right_click = &WindowDragLiveRightClick;
+    window_drag_live_right_control.wheel_chg = &WindowDragLiveWheel;
+    window_drag_live_right_control.draw_it = &WindowDragLiveRightDraw;
+    window_drag_live_b->next_ctrl = window_drag_live_b->last_ctrl =
+        &window_drag_live_right_control;
+    GrUpdateTasks;
+    return 42;
+}
+
+I64 WindowDragLiveRenderChecks()
+{//Require the real task and control callbacks to run during a compositor pass.
+    I64 draw_a_before, draw_b_before, control_before;
+
+    if (!TaskValidate(window_drag_live_a) || !TaskValidate(window_drag_live_b))
+        return 1;
+    draw_a_before = window_drag_live_draw_a_count;
+    draw_b_before = window_drag_live_draw_b_count;
+    control_before = window_drag_live_control_draw_count;
+    GrUpdateTasks;
+    if (window_drag_live_draw_a_count <= draw_a_before ||
+        window_drag_live_draw_b_count <= draw_b_before ||
+        window_drag_live_control_draw_count <= control_before)
+        return 2;
+    return 42;
+}
+
+I64 WindowDragLiveButtonChecks()
+{
+    CTask *menu_task, *close_task, *old_focus = sys_focus_task;
+    I64 x, y, result = 0;
+
+    menu_task = Spawn(&WindowDragLivePark, NULL, "WinButtonMenu");
+    close_task = Spawn(&WindowDragLivePark, NULL, "WinButtonClose");
+    if (!menu_task || !close_task)
+    {
+        if (TaskValidate(menu_task))
+            Kill(menu_task);
+        if (TaskValidate(close_task))
+            Kill(close_task);
+        return 1;
+    }
+    menu_task->display_flags = 1 << DISPLAYf_SHOW;
+    close_task->display_flags = 1 << DISPLAYf_SHOW;
+    menu_task->win_inhibit |= 1 << WIf_SELF_DOC;
+    close_task->win_inhibit |= 1 << WIf_SELF_DOC;
+    menu_task->win_inhibit &= ~(1 << WIf_SELF_BORDER);
+    close_task->win_inhibit &= ~(1 << WIf_SELF_BORDER);
+    menu_task->win_inhibit &= ~(1 << WIf_FOCUS_TASK_BORDER);
+    close_task->win_inhibit &= ~(1 << WIf_FOCUS_TASK_BORDER);
+    WinHorz(12, 36, menu_task);
+    WinVert(12, 30, menu_task);
+    WinHorz(42, 66, close_task);
+    WinVert(12, 30, close_task);
+
+    x = gr.pan_text_x + (menu_task->win_left + 1) * FONT_WIDTH;
+    y = gr.pan_text_y + (menu_task->win_top - 1) * FONT_HEIGHT;
+    if (sys_winmgr_task)
+        BootstrapWinRaise(menu_task, sys_winmgr_task);
+    else
+        BootstrapWinRaise(menu_task, sys_task);
+    sys_focus_task = menu_task;
+    if (BootstrapWinTitleButtonKind(menu_task, menu_task->win_left + 1,
+                                    menu_task->win_top - 1) != 1 ||
+        !BootstrapWinTitleButtonBegin(menu_task, x, y) ||
+        BootstrapWinTitleButtonEnd(x + 8 * FONT_WIDTH, y) ||
+        MessageScan(NULL, NULL, 1 << MESSAGE_KEY_DOWN, menu_task))
+    {
+        result = 2;
+        goto done;
+    }
+    // Exercise the same packed tablet press/release path UTM uses.
+    BootstrapCtrlInputSample(menu_task, x | (y << 16));
+    BootstrapCtrlInputSample(menu_task, x | (y << 16) | (1 << 32));
+    BootstrapCtrlInputSample(menu_task, x | (y << 16));
+    if (menu_task->server_ctrl.next_waiting == &menu_task->server_ctrl)
+    {
+        result = 32;
+        goto done;
+    }
+    x = gr.pan_text_x + (close_task->win_right - 1) * FONT_WIDTH;
+    y = gr.pan_text_y + (close_task->win_top - 1) * FONT_HEIGHT;
+    if (sys_winmgr_task)
+        BootstrapWinRaise(close_task, sys_winmgr_task);
+    else
+        BootstrapWinRaise(close_task, sys_task);
+    sys_focus_task = close_task;
+    if (BootstrapWinTitleButtonKind(close_task, close_task->win_right - 1,
+                                    close_task->win_top - 1) != 2)
+    {
+        result = 4;
+        goto done;
+    }
+    BootstrapCtrlInputSample(close_task, x | (y << 16) | (1 << 32));
+    BootstrapCtrlInputSample(close_task, x | (y << 16));
+    if (TaskValidate(close_task) &&
+        !Bt(&close_task->task_flags, TASKf_KILL_TASK))
+        result = 4;
+
+done:
+    sys_focus_task = old_focus;
+    if (TaskValidate(menu_task))
+        Kill(menu_task);
+    if (TaskValidate(close_task))
+        Kill(close_task);
+    bootstrap_title_button_task = NULL;
+    bootstrap_title_button_kind = 0;
+    return result;
+}

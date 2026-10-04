@@ -231,6 +231,7 @@ static const uint32_t g_text_palette[16] = {
     0x00ff5555u, 0x00ff55ffu, 0x00ffff55u, 0x00ffffffu,
 };
 static void fb_text_buffer_reset(void);
+void zeal_fb_task_text_reset(unsigned slot);
 
 /* BCM2711 PL011 wants 32-bit MMIO; QEMU virt accepts it too. */
 static void uart_write(volatile uint8_t *uart, char c) {
@@ -401,6 +402,7 @@ static void fb_clear(uint32_t bgr) {
         return;
     }
     fb_text_buffer_reset();
+    zeal_fb_task_text_reset(FB_SHELL_TEXT_SLOT);
     fb_fillrect(0, 0, (uint32_t)g_fb_w, (uint32_t)g_fb_h, bgr);
     g_fb_cx = 0;
     g_fb_cy = 0;
@@ -517,6 +519,8 @@ uint64_t zeal_fb_text_cols(void) { return g_fb_cols; }
 uint64_t zeal_fb_text_rows(void) { return g_fb_rows; }
 uint64_t zeal_fb_screen_width(void) { return g_fb_w; }
 uint64_t zeal_fb_screen_height(void) { return g_fb_h; }
+uint64_t zeal_fb_pitch_bytes(void) { return g_fb_pitch; }
+uint64_t zeal_fb_bits_per_pixel(void) { return g_fb_bpp; }
 
 int64_t zeal_fb_text_pixel(int64_t x, int64_t y) {
     if (x < INT32_MIN || x > INT32_MAX || y < INT32_MIN || y > INT32_MAX)
@@ -700,6 +704,92 @@ static uint64_t fb_task_text_present(unsigned slot, int64_t left, int64_t top,
     return drawn;
 }
 
+/* The shell owns the full framebuffer. Scrolling it by re-rasterizing every
+ * retained glyph is needlessly expensive for warning-heavy source loads, so
+ * move the already-rendered pixels up one text row and paint only the new
+ * bottom row. Smaller task text regions keep the general redraw path. */
+static int fb_shell_text_scroll_pixels(int64_t width, int64_t height) {
+    uint32_t pxb;
+    uint64_t bytes, pixel_rows;
+    if (!g_fb || width != (int64_t)g_fb_cols || height != (int64_t)g_fb_rows ||
+        (g_fb_bpp != 24 && g_fb_bpp != 32))
+        return 0;
+    pxb = (g_fb_bpp + 7) / 8;
+    bytes = (uint64_t)width * 8 * pxb;
+    pixel_rows = (uint64_t)height * 8;
+    if (pixel_rows <= 8 || bytes > g_fb_pitch)
+        return 0;
+    for (uint64_t y = 0; y < pixel_rows - 8; y++) {
+        volatile uint8_t *dst = g_fb + y * g_fb_pitch;
+        volatile uint8_t *src = g_fb + (y + 8) * g_fb_pitch;
+        for (uint64_t x = 0; x < bytes; x++)
+            dst[x] = src[x];
+    }
+    fb_fillrect(0, (uint32_t)(pixel_rows - 8), (uint32_t)(width * 8), 8,
+                0x00101820u);
+    return 1;
+}
+
+static uint64_t fb_task_text_present_row(unsigned slot, int64_t left,
+                                         int64_t top, int64_t width,
+                                         int64_t local_row) {
+    uint64_t drawn = 0;
+    for (int64_t x = 0; x < width; x++) {
+        size_t local = (size_t)local_row * ZEAL_TEXT_MAX_COLS + (size_t)x;
+        if (!g_fb_task_text_valid[slot][local])
+            continue;
+        int64_t col = left + x, row = top + local_row;
+        size_t index = (size_t)row * ZEAL_TEXT_MAX_COLS + (size_t)col;
+        uint32_t cell = g_fb_task_text[slot][local];
+        g_fb_text_cells[index] = cell;
+        g_fb_text_valid[index] = 1;
+        fb_text_present_cell((uint32_t)col, (uint32_t)row, cell);
+        g_zc_text_cells_drawn++;
+        drawn++;
+    }
+    return drawn;
+}
+
+static void fb_task_text_scroll(unsigned slot, int64_t left, int64_t top,
+                                int64_t width, int64_t height) {
+    for (int64_t y = 1; y < height; y++) {
+        size_t dst = (size_t)(y - 1) * ZEAL_TEXT_MAX_COLS;
+        size_t src = (size_t)y * ZEAL_TEXT_MAX_COLS;
+        for (int64_t x = 0; x < width; x++) {
+            g_fb_task_text[slot][dst + x] = g_fb_task_text[slot][src + x];
+            g_fb_task_text_valid[slot][dst + x] =
+                g_fb_task_text_valid[slot][src + x];
+        }
+    }
+    size_t last = (size_t)(height - 1) * ZEAL_TEXT_MAX_COLS;
+    for (int64_t x = 0; x < width; x++) {
+        g_fb_task_text[slot][last + x] = 0;
+        g_fb_task_text_valid[slot][last + x] = 0;
+    }
+    if (slot == FB_SHELL_TEXT_SLOT && left == 0 && top == 0 &&
+        fb_shell_text_scroll_pixels(width, height)) {
+        for (int64_t y = 1; y < height; y++) {
+            size_t dst = (size_t)(y - 1) * ZEAL_TEXT_MAX_COLS;
+            size_t src = (size_t)y * ZEAL_TEXT_MAX_COLS;
+            for (int64_t x = 0; x < width; x++) {
+                g_fb_text_cells[dst + x] = g_fb_text_cells[src + x];
+                g_fb_text_valid[dst + x] = g_fb_text_valid[src + x];
+            }
+        }
+        size_t global_last = (size_t)(height - 1) * ZEAL_TEXT_MAX_COLS;
+        for (int64_t x = 0; x < width; x++) {
+            g_fb_text_cells[global_last + x] = 0;
+            g_fb_text_valid[global_last + x] = 0;
+        }
+        (void)fb_task_text_present_row(slot, left, top, width, height - 1);
+    } else {
+        if (slot == FB_SHELL_TEXT_SLOT && left == 0 && top == 0)
+            fb_fillrect(0, (uint32_t)((height - 1) * 8),
+                        (uint32_t)(width * 8), 8, 0x00101820u);
+        (void)fb_task_text_present(slot, left, top, width, height);
+    }
+}
+
 void zeal_fb_task_text_reset(unsigned slot) {
     if (slot >= FB_TASK_TEXT_SLOTS)
         return;
@@ -731,23 +821,8 @@ uint64_t zeal_fb_task_text_write(unsigned slot, int64_t left, int64_t right,
         if (ch == '\n') {
             g_fb_task_text_x[slot] = 0;
             if (++g_fb_task_text_y[slot] >= height) {
-                for (int64_t y = 1; y < height; y++) {
-                    size_t dst = (size_t)(y - 1) * ZEAL_TEXT_MAX_COLS;
-                    size_t src = (size_t)y * ZEAL_TEXT_MAX_COLS;
-                    for (int64_t x = 0; x < width; x++) {
-                        g_fb_task_text[slot][dst + x] =
-                            g_fb_task_text[slot][src + x];
-                        g_fb_task_text_valid[slot][dst + x] =
-                            g_fb_task_text_valid[slot][src + x];
-                    }
-                }
-                size_t last = (size_t)(height - 1) * ZEAL_TEXT_MAX_COLS;
-                for (int64_t x = 0; x < width; x++) {
-                    g_fb_task_text[slot][last + x] = 0;
-                    g_fb_task_text_valid[slot][last + x] = 0;
-                }
+                fb_task_text_scroll(slot, left, top, width, height);
                 g_fb_task_text_y[slot] = (uint16_t)(height - 1);
-                fb_task_text_present(slot, left, top, width, height);
             }
             continue;
         }
@@ -766,22 +841,7 @@ uint64_t zeal_fb_task_text_write(unsigned slot, int64_t left, int64_t right,
             g_fb_task_text_x[slot] = 0;
             if (++g_fb_task_text_y[slot] >= height) {
                 g_fb_task_text_y[slot] = (uint16_t)(height - 1);
-                for (int64_t y = 1; y < height; y++) {
-                    size_t dst = (size_t)(y - 1) * ZEAL_TEXT_MAX_COLS;
-                    size_t src = (size_t)y * ZEAL_TEXT_MAX_COLS;
-                    for (int64_t x = 0; x < width; x++) {
-                        g_fb_task_text[slot][dst + x] =
-                            g_fb_task_text[slot][src + x];
-                        g_fb_task_text_valid[slot][dst + x] =
-                            g_fb_task_text_valid[slot][src + x];
-                    }
-                }
-                size_t last = (size_t)(height - 1) * ZEAL_TEXT_MAX_COLS;
-                for (int64_t x = 0; x < width; x++) {
-                    g_fb_task_text[slot][last + x] = 0;
-                    g_fb_task_text_valid[slot][last + x] = 0;
-                }
-                fb_task_text_present(slot, left, top, width, height);
+                fb_task_text_scroll(slot, left, top, width, height);
             }
         }
         size_t local = (size_t)g_fb_task_text_y[slot] * ZEAL_TEXT_MAX_COLS +
@@ -840,31 +900,35 @@ uint64_t zeal_fb_shell_text_compose(uint32_t *text_base, int64_t stride) {
 }
 
 static void fb_putc(char ch) {
+    uint32_t cols, rows;
     if (!g_fb) {
         return;
     }
+    cols = g_fb_cols < ZEAL_TEXT_MAX_COLS ? g_fb_cols : ZEAL_TEXT_MAX_COLS;
+    rows = g_fb_rows < ZEAL_TEXT_MAX_ROWS ? g_fb_rows : ZEAL_TEXT_MAX_ROWS;
+    if (!cols || !rows)
+        return;
     char cell[2] = {ch, 0};
-    (void)zeal_fb_task_text_write(FB_SHELL_TEXT_SLOT, 0,
-        g_fb_cols < ZEAL_TEXT_MAX_COLS ? g_fb_cols - 1 : ZEAL_TEXT_MAX_COLS - 1,
-        0, g_fb_rows < ZEAL_TEXT_MAX_ROWS ? g_fb_rows - 1 : ZEAL_TEXT_MAX_ROWS - 1,
-        0x0f, cell);
+    (void)zeal_fb_task_text_write(FB_SHELL_TEXT_SLOT, 0, cols - 1,
+                                  0, rows - 1, 0x0f, cell);
     if (ch == '\n') {
         g_fb_cx = 0;
-        if (++g_fb_cy >= g_fb_rows) {
-            g_fb_cy = 0;
-        }
+        if (g_fb_cy + 1 < rows)
+            g_fb_cy++;
+        else
+            g_fb_cy = rows - 1;
         return;
     }
     if (ch == '\r') {
         g_fb_cx = 0;
         return;
     }
-    fb_draw_char(g_fb_cx, g_fb_cy, ch, 0x00E0E0E0u);
-    if (++g_fb_cx >= g_fb_cols) {
+    if (++g_fb_cx >= cols) {
         g_fb_cx = 0;
-        if (++g_fb_cy >= g_fb_rows) {
-            g_fb_cy = 0;
-        }
+        if (g_fb_cy + 1 < rows)
+            g_fb_cy++;
+        else
+            g_fb_cy = rows - 1;
     }
 }
 
@@ -2723,10 +2787,12 @@ int64_t zc_tablet_sample(void) {
     if (!virtio_tablet_ready() || !g_fb) {
         return -1;
     }
+    int wheel = 0;
     (void)virtio_tablet_sample((uint32_t)g_fb_w, (uint32_t)g_fb_h,
-                               &x, &y, &buttons);
+                               &x, &y, &buttons, &wheel);
     return (int64_t)x | ((int64_t)y << 16) |
-           ((int64_t)(buttons & 0xff) << 32);
+           ((int64_t)(buttons & 0xff) << 32) |
+           ((int64_t)(wheel & 0xff) << 40);
 }
 
 /* Tablet abs deltas (call MouseDX then MouseDY for a paired sample). */
@@ -4613,6 +4679,8 @@ static void shell_handle(const char *line, int *done) {
     if (streq(line, "help")) {
 #ifndef ZEAL_PI_DIAG
         con_puts("Native compiler: zcheck | zvol | zls | zgc | zedit <path> | zrm <path> | zverify <path> | zload /path.ZC | zput Name.ZC <source> | zrecv Name.ZC <bytes> <crc32> | zload disk:Name.ZC | zc <source> | zcall Function | zstatus | zreset\n");
+        con_puts("Window test order: zreset -> zload /Kernel/KernelA.HH -> zload /Kernel/KernelB.HH\n");
+        con_puts("  -> zload /Tests/WindowDragLive.ZC -> zcall WindowDragLiveStart; stop: zcall WindowDragLiveStop\n");
 #endif
         con_puts("UTM freeze: vblk | rspersist | rscatalog | rsdir | runzc | runzc Notes.ZC\n");
         con_puts("Lattice: nearlatticelite | disklat | lattice | latticeplay | stocklat | stockplay | depthplotlite\n");
@@ -8761,18 +8829,17 @@ void kernel_entry(const struct zeal_handoff *h) {
         __asm__ volatile("msr cpacr_el1, %0\n\tisb" ::"r"(cpacr));
     }
 
-    /* Page-table pool in usable RAM (HHDM), not kernel PIE .bss. */
+    /* Consume the explicit page-table reservation from the Limine handoff. */
     {
         uint64_t pool = 0;
         for (uint32_t i = 0; i < h->mem_count; i++) {
-            if (h->mem[i].type != ZEAL_MEM_USABLE || h->mem[i].length < 0x10000ull) {
+            if (h->mem[i].type != ZEAL_MEM_PAGETABLE ||
+                h->mem[i].length != 8ull * 4096ull ||
+                (h->mem[i].base & 0xfffull)) {
                 continue;
             }
-            uint64_t end = h->mem[i].base + h->mem[i].length;
-            uint64_t cand = (end - 0x8000ull) & ~0xfffull;
-            if (cand >= h->mem[i].base + 0x1000ull) {
-                pool = cand;
-            }
+            pool = h->mem[i].base;
+            break;
         }
         if (pool) {
             mmio_pt_set_pool(pool);

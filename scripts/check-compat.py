@@ -8,13 +8,21 @@ p.add_argument('--quick', action='store_true', help='only compiler integration g
 p.add_argument('--probe-upstream', action='store_true', help='check current full-header/subsystem compiler results')
 p.add_argument('--probe-module', metavar='ARCHIVE_PATH',
                help='load an unchanged upstream source after KernelA/B in a disposable guest')
+p.add_argument('--probe-winmgr', action='store_true',
+               help='also try the unchanged WinMgr.ZC load with a short timeout after Win.ZC')
+p.add_argument('--probe-grscreen', action='store_true',
+               help='also load unchanged GrScreen.ZC after the WinMgr probe setup')
 p.add_argument('--probe-task-jobs', action='store_true', help='check CPU-0 callback jobs after loading pinned task headers')
+p.add_argument('--probe-window-buttons', action='store_true', help='check live task-window title buttons in a disposable guest')
 p.add_argument('--probe-source', type=pathlib.Path, action='append',
                help='load a host source file from the disposable PCI source partition')
 args = p.parse_args()
 if args.probe_source and not args.pci:
     p.error('--probe-source requires --pci')
-log_path = ROOT / 'build' / ('check-module-probe.log' if args.probe_module else
+if args.probe_grscreen and not args.probe_winmgr:
+    p.error('--probe-grscreen requires --probe-winmgr')
+log_path = ROOT / 'build' / ('check-window-buttons.log' if args.probe_window_buttons else
+                             'check-module-probe.log' if args.probe_module else
                              'check-upstream-probe.log' if args.probe_upstream else
                              'check-compat-pci.log' if args.pci else 'check-compat.log')
 with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('wb') as log:
@@ -54,14 +62,16 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 data = os.read(guest.stdout.fileno(), 65536)
                 if not data: raise RuntimeError('guest exited')
                 buf.extend(data); log.write(data); log.flush()
-                if b'sync: ESR=' in buf and marker not in buf:
+                fault_start = buf.find(b'sync: ESR=')
+                if (fault_start >= 0 and b'\n' in buf[fault_start:] and
+                        marker not in buf):
                     raise RuntimeError('guest synchronous fault\n'+buf[-2000:].decode(errors='replace'))
         end = buf.index(marker)+len(marker)
         result = bytes(buf[:end]); del buf[:end]
         return result.decode(errors='replace')
-    def command(line, expected):
+    def command(line, expected, timeout=120):
         guest.stdin.write((line+'\r').encode()); guest.stdin.flush()
-        result = until(b'\n> ')
+        result = until(b'\n> ', timeout=timeout)
         if expected not in result: raise RuntimeError(f'{line}: missing {expected!r}\n{result}')
         print(f'PASS {line}: {expected}', flush=True)
         return result
@@ -177,6 +187,33 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 print('SOURCE PROBE '+str(source)+'\n'+until(b'\n> '), flush=True)
                 command('zreset', 'native compiler ready')
             raise SystemExit(0)
+        if args.probe_module == '/System/Win.ZC' and args.probe_winmgr:
+            command('zload /Tests/GlobalExternDef.ZC',
+                    'zc: loaded /Tests/GlobalExternDef.ZC')
+            command('zload /Tests/GlobalExternUse.ZC',
+                    'zc: loaded /Tests/GlobalExternUse.ZC')
+            command('zcall GlobalExternLinkChecks',
+                    'zc => 0x000000000000002a')
+        if args.probe_window_buttons:
+            command('zload /Kernel/KernelA.HH', 'zc: loaded /Kernel/KernelA.HH')
+            command('zload /Kernel/KernelB.HH', 'zc: loaded /Kernel/KernelB.HH')
+            command('zload /Kernel/SerialDev/Message.ZC',
+                    'zc: loaded /Kernel/SerialDev/Message.ZC')
+            command('zload /Kernel/Job.ZC', 'zc: loaded /Kernel/Job.ZC')
+            command('zload /Kernel/KeyDev.ZC', 'zc: loaded /Kernel/KeyDev.ZC')
+            command('zload /Tests/WindowDragLive.ZC',
+                    'zc: loaded /Tests/WindowDragLive.ZC')
+            command('zcall WindowDragLiveButtonChecks',
+                    'zc => 0x0000000000000000')
+            result = command('zcall WindowDragLiveStart',
+                             'zc => 0x000000000000002a')
+            if 'unresolved external call' in result:
+                raise RuntimeError('window redraw hit an unresolved external call:\n'+result)
+            command('zcall WindowDragLiveRenderChecks',
+                    'zc => 0x000000000000002a')
+            command('zcall WindowDragLiveStop',
+                    'zc => 0x0000000000000000')
+            raise SystemExit(0)
         if args.probe_module:
             command('zload /Kernel/KernelA.HH', 'zc: loaded /Kernel/KernelA.HH')
             guest.stdin.write(b'zload /Kernel/KernelB.HH\r')
@@ -185,6 +222,79 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             print('KERNELB LOAD\n'+kb, flush=True)
             if 'zc: loaded /Kernel/KernelB.HH' not in kb:
                 raise RuntimeError('KernelB.HH did not load')
+            if args.probe_module == '/System/Win.ZC':
+                command('zload /Tests/ExpCheck.ZC',
+                        'zc: loaded /Tests/ExpCheck.ZC')
+                command('zcall ExpCheck',
+                        'zc => 0x000000000000002a')
+                command('zload /Tests/LowPassCheck.ZC',
+                        'zc: loaded /Tests/LowPassCheck.ZC')
+                command('zcall LowPassCheck',
+                        'zc => 0x000000000000002a')
+                command('zload /Tests/RegDecl.ZC',
+                        'zc: loaded /Tests/RegDecl.ZC')
+                command('zcall RegDeclChecks',
+                        'zc => 0x000000000000002a')
+                command('zload /Tests/HashDefineBridge.ZC',
+                        'zc: loaded /Tests/HashDefineBridge.ZC')
+                command('zcall HashDefineBridgeChecks',
+                        'zc => 0x000000000000002a')
+            if args.probe_module == '/System/Win.ZC':
+                command('zload /Kernel/KernelC.HH',
+                        'zc: loaded /Kernel/KernelC.HH')
+                # KernelC.HH declares native SysTry(start_label, skip_label).
+                # Guest try/catch must keep using its private bridge ABI after
+                # that declaration enters the compiler symbol table.
+                command('zload /Tests/TaskExceptions.ZC',
+                        'zc: loaded /Tests/TaskExceptions.ZC')
+                command('zcall TaskExceptionChecks',
+                        'zc => 0x000000000000002a')
+                command('zload /Tests/GrSqrtCheck.ZC',
+                        'zc: loaded /Tests/GrSqrtCheck.ZC')
+                command('zcall GrSqrtCheck',
+                        'zc => 0x0000000000000001')
+                command('zload /Tests/WinMouseState.ZC',
+                        'zc: loaded /Tests/WinMouseState.ZC')
+                command('zcall WinCAllocCheck',
+                        'zc => 0x0000000000000001')
+                command('zcall WinTimeCheck',
+                        'zc => 0x0000000000000001')
+                command('zcall WinF64Check',
+                        'zc => 0x0000000000000001')
+                command('zcall WinF64ClockCheck',
+                        'zc => 0x0000000000000001')
+                command('zload /Tests/WinMgrParseProbe.ZC',
+                        'zc: loaded /Tests/WinMgrParseProbe.ZC', timeout=15)
+                command('zcall WinMgrParseProbe',
+                        'zc => 0x000000000000002a', timeout=15)
+                command('zload /Tests/LastClass.ZC',
+                        'zc: loaded /Tests/LastClass.ZC')
+                command('zcall LastClassChecks',
+                        'zc => 0x000000000000002a')
+                command('zload /System/Externs.ZC',
+                        'zc: loaded /System/Externs.ZC')
+                command('zload /System/Gr/GrInitA.ZC',
+                        'zc: loaded /System/Gr/GrInitA.ZC')
+                command('zload /System/Gr/Gr.HH',
+                        'zc: loaded /System/Gr/Gr.HH')
+                command('zload /System/Gr/GrExterns.ZC',
+                        'zc: loaded /System/Gr/GrExterns.ZC')
+                command('zload /System/Gr/GrGlobals.ZC',
+                        'zc: loaded /System/Gr/GrGlobals.ZC')
+                command('zload /Tests/GrGlobalsProbe.ZC',
+                        'zc: loaded /Tests/GrGlobalsProbe.ZC')
+                command('zcall GrGlobalsProbe',
+                        'zc => 0x000000000000002a')
+                # TaskBridge provides the ARM text-plane implementations for
+                # the x86-assembly-only GrTextBase/GrAsm modules.
+                command('zload /System/Gr/GrPalette.ZC',
+                        'zc: loaded /System/Gr/GrPalette.ZC')
+                command('zload /System/Gr/GrDC.ZC',
+                        'zc: loaded /System/Gr/GrDC.ZC', timeout=30)
+                command('zload /System/Gr/GrBitMap.ZC',
+                        'zc: loaded /System/Gr/GrBitMap.ZC', timeout=30)
+                command('zcall GrGlobalsProbe',
+                        'zc => 0x000000000000002a')
             if args.probe_module == '/System/DolDoc/DocRecalc.ZC':
                 command('zload /Kernel/SerialDev/Message.ZC',
                         'zc: loaded /Kernel/SerialDev/Message.ZC')
@@ -290,6 +400,40 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             guest.stdin.flush()
             result = until(b'\n> ')
             print('MODULE PROBE '+args.probe_module+'\n'+result, flush=True)
+            if f'zc: loaded {args.probe_module}' not in result:
+                raise RuntimeError(f'unchanged module did not load: {args.probe_module}\n'+result)
+            if args.probe_module == '/System/Win.ZC':
+                if args.probe_grscreen:
+                    command('zload /Tests/GrAsmColor4.ZC',
+                            'zc: loaded /Tests/GrAsmColor4.ZC')
+                    command('zcall GrAsmColor4Checks',
+                            'zc => 0x000000000000002a')
+                command('zcall WinExtTableCheck',
+                        'zc => 0x0000000000000001')
+                if args.probe_winmgr:
+                    command('zload /Tests/WinMgrProbeDeps.ZC',
+                            'zc: loaded /Tests/WinMgrProbeDeps.ZC')
+                    command('zload /System/WinMgr.ZC',
+                            'zc: loaded /System/WinMgr.ZC', timeout=15)
+                    if args.probe_grscreen:
+                        guest.stdin.write(b'zload /System/Gr/GrScreen.ZC\r')
+                        guest.stdin.flush()
+                        result = until(b'\n> ', timeout=30)
+                        if 'zc: loaded /System/Gr/GrScreen.ZC' not in result:
+                            raise RuntimeError('ARM64-translated GrScreen did not compile:\n'+result)
+                        print('PASS ARM64-translated GrScreen compiles', flush=True)
+                        command('zload /Tests/GrScreenTextBG.ZC',
+                                'zc: loaded /Tests/GrScreenTextBG.ZC')
+                        command('zcall GrScreenTextBGChecks',
+                                'zc => 0x000000000000002a')
+                        command('zload /Tests/GrRopForeground.ZC',
+                                'zc: loaded /Tests/GrRopForeground.ZC')
+                        command('zcall GrRopForegroundChecks',
+                                'zc => 0x000000000000002a')
+                        command('zcall GrUpdateTextFGChecks',
+                                'zc => 0x000000000000002a')
+                        command('zcall GrUpdateScreen32Checks',
+                                'zc => 0x000000000000002a')
             if args.probe_module == '/Kernel/SerialDev/Message.ZC':
                 if 'zc: loaded /Kernel/SerialDev/Message.ZC' not in result:
                     raise RuntimeError('unchanged Message.ZC did not load')
@@ -400,6 +544,18 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                         'zc: loaded /Tests/TaskOriginalDocRecalc.ZC')
                 command('zcall TaskOriginalDocRecalcChecks',
                         'zc => 0x000000000000002a')
+                command('zload /Tests/WindowDragLive.ZC',
+                        'zc: loaded /Tests/WindowDragLive.ZC')
+                command('zcall WindowDragLiveButtonChecks',
+                        'zc => 0x0000000000000000')
+                result = command('zcall WindowDragLiveStart',
+                                 'zc => 0x000000000000002a')
+                if 'unresolved external call' in result:
+                    raise RuntimeError('WindowDragLive redraw hit an unresolved external call:\n'+result)
+                command('zcall WindowDragLiveRenderChecks',
+                        'zc => 0x000000000000002a')
+                command('zcall WindowDragLiveStop',
+                        'zc => 0x0000000000000000')
             raise SystemExit(0)
         if args.probe_task_jobs:
             command('zload /Kernel/KernelA.HH', 'zc: loaded /Kernel/KernelA.HH')

@@ -328,7 +328,7 @@ oracle are needed before broad language compatibility can be claimed.
   or `JOBf_FREE_ON_COMPLETE` flags, and the default queued `SpawnQueue` path;
   SMP remains absent.
   The bridge uses fixed 64 KiB stacks and has no timer preemption, SMP, full
-  upstream `Spawn`/scheduler modes, or guest `try/catch` runtime.
+  upstream `Spawn`/scheduler modes, or the full ZealOS task scheduler.
   Native `KeyGet` and key-masked root `MessageGet` block for a real key; a child
   named by `sys_focus_task` can park and wake on a real device key. Without
   explicit focus, the task scanning its own queue owns device input. This is
@@ -365,7 +365,10 @@ oracle are needed before broad language compatibility can be claimed.
   host importer also accepts large files. This is bootstrap storage, not a
   general filesystem or editor. The 64 KiB/eight-entry RedSea volume
   remains for legacy demos. Full Doc/Gr APIs, Adam startup, kernel rebuild
-  and installation remain unimplemented.
+  and installation remain unimplemented. The framebuffer shell keeps a
+  retained text plane and scrolls long output there; verify long `help` and
+  source-load output in UTM because serial-only checks cannot catch console
+  redraw errors.
 
 ## Next substantial work
 
@@ -1467,8 +1470,10 @@ ZealOS live distribution or installer.
   `try/catch` reports that the task bridge is required instead of compiling
   calls through missing symbols. The reversible Aiwnios port patch records
   this change; the pinned ZealOS sources remain byte-for-byte unchanged.
-- `SysTry`, `SysUntry`, `throw`, and `EndCatch` use private exception pads on
-  each cooperative guest task. The emitted `AIWNIOS_SetJmp` calls the
+- `ZcTryEnter`, `ZcTryLeave`, and `ZcTryCatchEnd` use private exception pads on
+  each cooperative guest task. They intentionally avoid ZealOS's native
+  `SysTry(start_label, skip_label)` declaration from `KernelC.HH`. The emitted
+  `AIWNIOS_SetJmp` calls the
   existing ARM64 context primitive; a throw unwinds to the matching catch,
   records `Fs->except_ch`, and lets `Fs->catch_except` consume or rethrow it.
   Nested catches restore the outer catch state. Compiler errors still take
@@ -1478,8 +1483,39 @@ ZealOS live distribution or installer.
   `TaskExceptionCatchNestedChecks` covers a catch inside another catch; and
   `TaskExceptionFiberChecks` checks repeated heap reclamation plus two tasks
   catching their own throws after yielding.
+- The Win graphics probe loads `KernelC.HH` before `TaskExceptions.ZC`, then
+  runs `TaskExceptionChecks` again. It also compiles the unchanged
+  `System/Win.ZC` and `System/WinMgr.ZC`. This guards against the native
+  two-label `SysTry` declaration shadowing the compiler's guest exception
+  hook. Compiling `WinMgr.ZC` does not start its task or prove the interactive
+  manager works.
+- Guest `extern` data declarations now link to a previously defined guest
+  global when scalar types have a matching ABI, aggregate types are identical,
+  and array dimensions match. `GlobalExternLinkChecks` verifies that behavior
+  across separately loaded source modules. This is needed for unchanged
+  ZealOS declarations such as `Externs.ZC`'s `winmgr`.
+- The ARM64 F64 runtime now implements ZealOS's `_EXP` import with a
+  freestanding range-reduced exponential, and `ExpCheck` covers representative
+  positive, negative, zero, and larger inputs. The bridge's `LowPass1` follows
+  the unchanged upstream `MathODE.ZC` formula and has numerical smoke coverage.
+- HolyC `reg <x86-register>` annotations are accepted on locals and treated as
+  allocation hints only; the ARM64 backend assigns registers itself. `RegDeclChecks`
+  verifies named `RSI`/`R13`/`RCX` annotations while preserving ordinary
+  `reg bit_shift` declarations in the graphics sources.
+- The pinned, unchanged `System/Math/MathODE.ZC` has been added to the source
+  volume. Loading the full 758-line ODE module currently triggers a synchronous
+  guest data abort during compilation, so it is not yet part of the passing
+  source sequence. For `GrScreen`, the ARM64 source bundle now translates its
+  one `GrUpdateTextBG` x86 store loop into the tested `ZcGrTextBGStore` helper;
+  `make check-grscreen` compiles that bundle version and checks all eight row
+  writes, stride padding, color bytes, and next-cell offset in the guest. The
+  AArch64 runtime also implements `DCBlotColor4`, with a guest check for packed
+  pixel bit order and cache behavior. The pinned upstream file remains
+  byte-identical. The active manager probe still uses a compile-only
+  `GrUpdateScreen` declaration, and the manager is not started; `GrAsm` routines
+  beyond this blitter and full display initialization remain unported.
 - This is a bounded exception path. Returning directly from inside an active
-  `try` does not yet emit `SysUntry`, and the original x86 `CExcept` queue
+  `try` does not yet emit `ZcTryLeave`, and the original x86 `CExcept` queue
   fields are not exposed through `CTask`. An uncaught guest throw fails the
   native compiler session. The complete unchanged `SerialDev/Message.ZC`
   probe has advanced beyond `try/catch` and now stops at its undeclared
@@ -1874,3 +1910,40 @@ ZealOS live distribution or installer.
   `gr.text_base`. Source matching, forms/data
   formatting, sprites/depth buffers, music state, and cursor interaction remain
   unaccepted.
+
+## Tablet button messages
+
+- Tablet samples now queue `MESSAGE_MS_L_DOWN` / `MESSAGE_MS_L_UP` and
+  `MESSAGE_MS_R_DOWN` / `MESSAGE_MS_R_UP` to the focused task, using its
+  scrolled client-area coordinates. Single-click inhibit flags bypass the
+  double-click delay; normal mode delays singles and synthesizes
+  `MESSAGE_MS_L_D_*` / `MESSAGE_MS_R_D_*` after a second press within the
+  upstream 175 ms interval.
+- `TaskOriginalDocRecalcChecks` synthesizes both button transitions and checks
+  their message codes and coordinates, including deterministic delayed-single
+  and right-double sequences. Window/control actions still respond to the
+  physical button transitions without this message delay. DolDoc entry actions
+  wait for the click classification; double-click release maps to Escape or
+  Shift-Escape as in upstream WinMgr. The regression calls the tablet input
+  sample path and verifies queued Space for a left single click, Enter for a
+  right single click, Escape for a left double click, Shift-Escape for a right
+  double click, and cleared pressed-entry borders.
+
+## ARM64 foreground glyph rasterizer
+
+- `GrRopEquU8NoClipping`, the x86 assembly foreground glyph operation, now has
+  an AArch64 scalar host implementation. It reads `text.font`, applies the
+  low foreground color nibble to set glyph bits, leaves unset pixels alone,
+  respects the destination row stride, and renders the underline scanline.
+- `GrRopForegroundChecks` validates the `A` glyph, stride padding, transparent
+  glyph pixels, and underline. `GrUpdateTextFGChecks` runs the unchanged
+  foreground text loop against a temporary 800x600 paletted CDC and verifies
+  its 28 changed pixels at the expected location. Both return `0x2a` in
+  `make check-grscreen`. `GrUpdateScreen32Checks` also runs unchanged
+  `GrUpdateScreen32` with temporary palette/raw/cache/alias buffers and verifies
+  palette conversion plus changed-pixel presentation and unchanged-pixel
+  preservation. This does not yet prove full `GrUpdateScreen` on the Limine
+  framebuffer: real `gr.dc1`/`gr.dc_cache` state and the hardware framebuffer
+  alias are not initialized together. The next graphics integration step is
+  binding that alias to Limine's framebuffer and joining this pipeline to the
+  task compositor.

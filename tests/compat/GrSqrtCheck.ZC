@@ -1,0 +1,17 @@
+I64 GrSqrtCheck()
+{
+    U32 values[2];
+    U16 old_z = gr.win_z_buf[0];
+    U16 old_task_z = Fs->win_z_num;
+    F64 root = Sqrt(81.0);
+    MemSetU32(values, 7, 2);
+    gr.win_z_buf[0] = 2;
+    Fs->win_z_num = 1;
+    Bool covered = IsPixCovered0(Fs, 0, 0);
+    Fs->win_z_num = 2;
+    Bool same_layer = IsPixCovered0(Fs, 0, 0);
+    gr.win_z_buf[0] = old_z;
+    Fs->win_z_num = old_task_z;
+    return root == 9.0 && values[0] == 7 && values[1] == 7 &&
+           covered && !same_layer;
+}

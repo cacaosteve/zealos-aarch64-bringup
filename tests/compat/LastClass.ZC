@@ -1,0 +1,44 @@
+class CLastClassProbe
+{
+    I64 value;
+};
+
+I64 LastClassU8(U8 *value, U8 *name=lastclass)
+{
+    // The KernelA bootstrap macro expands U8 to the compiler's U8i class.
+    if (name[0] == 'U' && name[1] == '8' && name[2] == 'i' && !name[3])
+        return 42;
+    return 0;
+}
+
+I64 LastClassStruct(CLastClassProbe *value, U8 *name=lastclass)
+{
+    if (name[0] == 'C' && name[1] == 'L' && name[2] == 'a' &&
+        name[3] == 's' && name[4] == 't' && name[5] == 'C' &&
+        name[6] == 'l' && name[7] == 'a' && name[8] == 's' &&
+        name[9] == 's' && name[10] == 'P' && name[11] == 'r' &&
+        name[12] == 'o' && name[13] == 'b' && name[14] == 'e' &&
+        !name[15])
+        return 42;
+    return 0;
+}
+
+I64 LastClassExplicit(U8 *value, U8 *name=lastclass)
+{
+    if (name[0] == 'e' && name[1] == 'x' && name[2] == 'p' &&
+        name[3] == 'l' && name[4] == 'i' && name[5] == 'c' &&
+        name[6] == 'i' && name[7] == 't' && !name[8])
+        return 42;
+    return 0;
+}
+
+I64 LastClassChecks()
+{
+    if (LastClassU8(NULL) != 42)
+        return 1;
+    if (LastClassStruct(NULL) != 42)
+        return 2;
+    if (LastClassExplicit(NULL, "explicit") != 42)
+        return 3;
+    return 42;
+}

@@ -89,7 +89,20 @@
          } else
            lex->flt = integer;
          lex->flt *= pow(10, exponet);
-@@ -582,6 +608,7 @@
+@@ -459,6 +485,12 @@
+       }
+       return lex->cur_tok = TK_DOT_DOT_DOT;
+       break;
++    case '0' ... '9':
++      /* ZealOS writes fractional constants such as .25. Reuse the decimal
++       * scanner used after an integer part, with that part equal to zero. */
++      integer = 0;
++      lex->flags |= LEXF_USE_LAST_CHAR;
++      goto decimal_chk;
+     default:
+       lex->flags |= LEXF_USE_LAST_CHAR;
+       return lex->cur_tok = '.';
+@@ -582,6 +614,7 @@
    case '@':
    case 'a' ... 'z':
    case 'A' ... 'Z':
@@ -97,7 +110,7 @@
      lex->flags |= LEXF_USE_LAST_CHAR;
      for (;;) {
        switch (chr1 = LexAdvChr(lex)) {
-@@ -591,6 +618,7 @@
+@@ -591,6 +624,7 @@
        case 'a' ... 'z':
        case 'A' ... 'Z':
        case '0' ... '9':
@@ -105,7 +118,7 @@
          if (idx + 1 >= STR_LEN) {
            LexErr(lex, "Name is too long.");
            return lex->cur_tok = ERR;
-@@ -632,17 +660,83 @@
+@@ -632,17 +666,83 @@
    case '#':
      if (TK_NAME == Lex(lex)) {
        if (!strcmp(lex->string, "help_file")) {
@@ -192,7 +205,7 @@
          lex->flags |= LEXF_UNTIL_NEWLINE;
          CCmpCtrl *cc = CmpCtrlNew(lex);
          char *code;
-@@ -662,6 +756,7 @@
+@@ -662,6 +762,7 @@
          CmpCtrlDel(cc);
          if (ret)
            goto re_enter;
@@ -200,7 +213,7 @@
          goto if_fail;
        } else if (!strcmp(lex->string, "ifaot")) {
          // AIWN will only AOT compile for you,the JIT will be
-@@ -756,11 +851,11 @@
+@@ -756,11 +857,11 @@
            actual_file = actual_file->last;
          }
          if (actual_file) {
@@ -214,7 +227,7 @@
              dir = __AIWNIOS_StrDup(buf, NULL);
              *strrchr(dir, '/') = 0;
              f = fopen(buf, "rb");
-@@ -798,12 +893,19 @@
+@@ -798,12 +899,19 @@
          lex->file = new_file;
          goto re_enter;
        } else if (!strcmp(lex->string, "define")) {
@@ -236,7 +249,7 @@
          strcpy(macro_name, lex->string);
          strcpy(lex->string, "");
          define = A_CALLOC(sizeof(CHashDefineStr), NULL);
-@@ -861,8 +963,7 @@
+@@ -861,8 +969,7 @@
  }
  
  CLexer *LexerNew(char *filename, char *text) {
@@ -246,17 +259,48 @@
      struct {
        char *name;
        int64_t tok;
-@@ -925,7 +1026,6 @@
+@@ -925,7 +1032,16 @@
        kw->tk = kws[i].tok;
        HashAdd(kw, Fs->hash_table);
      }
 -    init = 1;
++  }
++  /* A bootstrapped lexer may already have installed the core keyword table
++   * before this port adds HolyC-specific tokens. Install lastclass even when
++   * the existing table makes the bulk initialization above unnecessary. */
++  if (!HashFind("lastclass", Fs->hash_table, HTT_KEYWORD, 1)) {
++    CHashKeyword *kw = A_CALLOC(sizeof(*kw), NULL);
++    kw->base.type = HTT_KEYWORD;
++    kw->base.str = A_STRDUP("lastclass", NULL);
++    kw->tk = TK_KW_LASTCLASS;
++    HashAdd(kw, Fs->hash_table);
    }
    CLexer *new = A_CALLOC(sizeof(CLexer), NULL);
    new->hc = HeapCtrlInit(NULL, Fs, 0);
 --- a/c/parser.c
 +++ b/c/parser.c
-@@ -1689,25 +1689,68 @@
+@@ -136,6 +136,20 @@
+ int64_t PrsReturn(CCmpCtrl *ccmp);
+ int64_t ParseErr(CCmpCtrl *ctrl, char *fmt, ...);
+ int64_t PrsTry(CCmpCtrl *cctrl); // YES
++static int PrsIsX86RegisterName(const char *name) {
++  static const char *registers[] = {
++      "RAX", "RBX", "RCX", "RDX", "RSI", "RDI", "RBP", "RSP",
++      "R8",  "R9",  "R10", "R11", "R12", "R13", "R14", "R15",
++      "EAX", "EBX", "ECX", "EDX", "ESI", "EDI", "EBP", "ESP",
++      "AX",  "BX",  "CX",  "DX",  "SI",  "DI",  "BP",  "SP",
++      "AL",  "BL",  "CL",  "DL",  "AH",  "BH",  "CH",  "DH"};
++  size_t i;
++  for (i = 0; i < sizeof(registers) / sizeof(registers[0]); i++)
++    if (!strcmp(name, registers[i]))
++      return 1;
++  return 0;
++}
++
+ int64_t PrsDecl(CCmpCtrl *ccmp, CHashClass *base, CHashClass *add_to,
+                 int64_t *is_func_decl, int64_t flags, char *import_name);
+ int64_t PrsSwitch(CCmpCtrl *cctrl);
+@@ -1689,25 +1703,68 @@
      szo:
        if (ccmp->lex->cur_tok == '(') {
          Lex(ccmp->lex);
@@ -344,7 +388,7 @@
        } else if (ccmp->lex->cur_tok == TK_NAME) {
          if (!(tc_class =
                    HashFind(ccmp->lex->string, Fs->hash_table, HTT_CLASS, 1)))
-@@ -1986,6 +2029,11 @@
+@@ -1986,6 +2043,11 @@
        }
        goto fin;
        break;
@@ -356,7 +400,7 @@
      case TK_I64:
        binop_before = 0;
        prec = -2;
-@@ -2038,7 +2086,10 @@
+@@ -2038,7 +2100,10 @@
            ic->global_var = global_var;
            if (ccmp->lex->cur_tok != '(') {
              // If IC_ADDR_OF comes before,dont do an implicit call
@@ -368,7 +412,7 @@
                // Do nothing
                if (ic->global_var->base.type & HTF_EXTERN)
                  ParseWarn(ccmp, "Can't address of extern symbol");
-@@ -2319,20 +2370,22 @@
+@@ -2319,20 +2384,22 @@
    va_list lst;
    va_start(lst, fmt);
    char buf[STR_LEN];
@@ -397,7 +441,14 @@
    throw(*(int64_t *)"Prs\0\0\0\0\0");
  }
  
-@@ -2433,6 +2486,11 @@
+@@ -2427,12 +2494,22 @@
+     rpn->code_misc->flags |= CMF_DEFINED;
+     Lex(ccmp->lex);
+     if (ccmp->lex->cur_tok != ':') {
+-      ParseErr(ccmp, "Expected a ':'.");
++      ParseErr(ccmp, "Expected ':' after label candidate '%s'.", rpn->code_misc->str);
+       return 0;
+     }
      Lex(ccmp->lex);
    }
  not_label:
@@ -406,10 +457,15 @@
 +   * remain visible without emitting a separate export record. */
 +  if (PrsKw(ccmp, TK_KW_PUBLIC) && ccmp->cur_fun)
 +    ParseErr(ccmp, "public declarations must be at file scope.");
++  /* TempleOS argpop/noargpop select x86 stack cleanup conventions. AArch64
++   * uses the platform ABI's fixed caller/callee rules, so retain source
++   * compatibility while treating these declarations as ordinary functions. */
++  if (PrsKw(ccmp, TK_KW_ARGPOP) || PrsKw(ccmp, TK_KW_NOARGPOP))
++    return PrsStmt(ccmp);
    if (found_label) {
      QueIns(rpn, ccmp->code_ctrl->ir_code);
      if (!PrsStmt(ccmp)) {
-@@ -2515,6 +2573,18 @@
+@@ -2515,6 +2592,18 @@
      if (ccmp->lex->cur_tok != TK_NAME)
        ParseErr(ccmp, "Expected a extern name.");
      import_name = A_STRDUP(ccmp->lex->string, NULL);
@@ -428,7 +484,7 @@
      goto prs_global;
    } else if (PrsKw(ccmp, TK_KW_IMPORT)) {
      flags = PRSF_IMPORT;
-@@ -2524,6 +2594,7 @@
+@@ -2524,6 +2613,7 @@
      if (ccmp->lex->cur_tok != TK_NAME)
        ParseErr(ccmp, "Expected a import name.");
      import_name = A_STRDUP(ccmp->lex->string, NULL);
@@ -436,7 +492,7 @@
      goto prs_global;
    }
    if (PrsKw(ccmp, TK_KW_STATIC)) {
-@@ -2579,22 +2650,31 @@
+@@ -2579,22 +2669,31 @@
      if (!rpn->global_var)
        ParseErr(ccmp, "'Print' function doesnt exist yet.");
      QueIns(rpn, ccmp->code_ctrl->ir_code);
@@ -483,7 +539,37 @@
      for (;;) {
        switch (ccmp->lex->cur_tok) {
          break;
-@@ -2862,7 +2942,11 @@
+@@ -2781,7 +2880,10 @@
+       Lex(ccmp->lex);
+       PrsDecl(ccmp, cls, fun, NULL, PRSF_FUN_ARGS, NULL);
+       fun->argc++;
+-      if (ccmp->lex->cur_tok == ',') {
++      /* ZealOS uses ';' as a parameter separator in a small number of
++       * declarations (for example StrPrintHex); it has the same ARM64
++       * function-signature meaning as a comma. */
++      if (ccmp->lex->cur_tok == ',' || ccmp->lex->cur_tok == ';') {
+         Lex(ccmp->lex);
+         continue;
+       } else if (ccmp->lex->cur_tok == ')') {
+@@ -2826,6 +2928,17 @@
+                     CHashFun **fun, CArrayDim *dim) {
+   int64_t star_cnt = 0, star_cnt2 = 0;
+   int64_t is_func_ptr = 0;
++  /* ZealOS often writes `I64 reg RSI value`, attaching the x86 register
++   * constraint after the base type. Accept the annotation for source
++   * compatibility; the ARM64 backend allocates the local normally. */
++  if (ccmp->cur_fun && PrsKw(ccmp, TK_KW_REG)) {
++    if (ccmp->lex->cur_tok == TK_I64 || ccmp->lex->cur_tok == TK_NAME)
++      Lex(ccmp->lex);
++    else
++      ParseErr(ccmp, "Expected an x86 register name after 'reg'.");
++  } else if (ccmp->cur_fun) {
++    PrsKw(ccmp, TK_KW_NOREG);
++  }
+   if (name)
+     *name = NULL;
+   if (fun)
+@@ -2862,7 +2975,11 @@
      fun[0] = A_CALLOC(sizeof(CHashFun), NULL);
      fun[0]->base.flags |= CLSF_FUNPTR;
      fun[0]->return_class = base + star_cnt;
@@ -496,7 +582,7 @@
      fun[0]->base.sz = sizeof(void *);
      fun[0]->base.ptr_star_cnt = star_cnt2;
      PrsFunArgs(ccmp, *fun);
-@@ -2876,14 +2960,16 @@
+@@ -2876,14 +2993,16 @@
  //  array's data directy
  //
  char *PrsArray(CCmpCtrl *ccmp, CHashClass *base, CArrayDim *dim,
@@ -515,7 +601,7 @@
      if (dim) {
        if (base->raw_type == RT_U8i && ccmp->lex->cur_tok == TK_STR) {
          cap = dim->cnt;
-@@ -2920,12 +3006,11 @@
+@@ -2920,12 +3039,11 @@
        }
      }
      return write_to + ptr_width;
@@ -530,7 +616,7 @@
        if (ccmp->lex->cur_tok != ',') {
          if (i + 1 == cap) {
            // I64 arr[3]={1,2,3,};
-@@ -2938,7 +3023,7 @@
+@@ -2938,7 +3056,7 @@
    } else {
      for (cur_mem = base->members_lst; cur_mem; cur_mem = cur_mem->next) {
        PrsArray(ccmp, cur_mem->member_class, cur_mem->dim.next,
@@ -539,11 +625,10 @@
        if (ccmp->lex->cur_tok != ',') {
          if (!cur_mem->next) {
            // class {I64 a,b,c;}={1,2,3,};
-@@ -2954,6 +3039,65 @@
-     ParseErr(ccmp, "Expected a '}'.");
+@@ -2955,11 +3073,92 @@
    Lex(ccmp->lex);
    return write_to;
-+}
+ }
 +
 +/* Emit stores at the declaration, so expressions and repeated calls use the
 + * current frame. The bootstrap extension is limited to one scalar dimension;
@@ -582,10 +667,32 @@
 +  if (a == b)
 +    return 1;
 +  /* KernelA's U8/I64 unions deliberately replace the bootstrap primitive
-+   * aliases. They are different type objects but retain the same scalar ABI. */
-+  return a && b && a->raw_type >= RT_I8i && a->raw_type <= RT_F64 &&
++   * aliases. Opaque pointers may likewise be redeclared as U8* in the small
++   * bootstrap API; both spellings retain the same AArch64 pointer ABI. */
++  return a && b &&
++         ((a->raw_type >= RT_I8i && a->raw_type <= RT_F64) ||
++          a->raw_type == RT_PTR) &&
 +         a->raw_type == b->raw_type && a->sz == b->sz &&
 +         a->ptr_star_cnt == b->ptr_star_cnt;
++}
++static int PrsSameArrayDim(CArrayDim *a, CArrayDim *b) {
++  while (a && b) {
++    if (a->cnt != b->cnt)
++      return 0;
++    a = a->next;
++    b = b->next;
++  }
++  return !a && !b;
++}
++static int PrsSameGlobalType(CHashClass *a, CHashClass *b) {
++  if (a == b)
++    return 1;
++  /* A same-sized aggregate is not necessarily layout-compatible. Only
++   * scalar and pointer globals may use the looser call-ABI equivalence. */
++  if (a && b && a->raw_type == RT_PTR && b->raw_type == RT_PTR &&
++      !a->ptr_star_cnt && !b->ptr_star_cnt)
++    return 0;
++  return PrsSameCallType(a, b);
 +}
 +static int PrsSameFunctionABI(CHashFun *a, CHashFun *b) {
 +  CMemberLst *am = a->base.members_lst, *bm = b->base.members_lst;
@@ -602,10 +709,33 @@
 +    bm = bm->next;
 +  }
 +  return 1;
- }
++}
  int64_t PrsDecl(CCmpCtrl *ccmp, CHashClass *base, CHashClass *add_to,
                  int64_t *is_func_decl, int64_t flags, char *import_name) {
-@@ -3010,20 +3154,40 @@
+   if (is_func_decl)
+     *is_func_decl = 0;
+-  int64_t reg = REG_MAYBE, is_fun = 0, used = 0, tmpi;
++  int64_t reg = REG_MAYBE, is_fun = 0, used = 0, tmpi, inst;
+   CArrayDim dim;
+   CHashClass *cls;
+   CMemberLst *lst, *bungis;
+@@ -2973,8 +3172,13 @@
+       reg = REG_NONE;
+     else if (PrsKw(ccmp, TK_KW_REG)) {
+       reg = REG_ALLOC;
+-      if (ccmp->lex->cur_tok == TK_I64) {
+-        reg = ccmp->lex->integer;
++      if (ccmp->lex->cur_tok == TK_I64 ||
++          (ccmp->lex->cur_tok == TK_NAME &&
++           PrsIsX86RegisterName(ccmp->lex->string))) {
++        /* x86 source may spell either a numeric HolyC register ID or a name
++         * such as RSI. The named register is accepted but not imposed on ARM. */
++        if (ccmp->lex->cur_tok == TK_I64)
++          reg = ccmp->lex->integer;
+         Lex(ccmp->lex);
+       }
+     }
+@@ -3010,20 +3214,40 @@
  #endif
                     .return_class = cls};
      HashAdd(fun, Fs->hash_table);
@@ -649,7 +779,7 @@
        if (ccmp->lex->cur_tok == '{') {
          ParseErr(ccmp, "Function body on a extern/import.");
          return 0;
-@@ -3042,7 +3206,9 @@
+@@ -3042,7 +3266,9 @@
        }
      }
      CodeCtrlPush(ccmp);
@@ -659,7 +789,7 @@
      //
      // Here's the deal. The function will stay "extern" so if it call's
      // itself a CMT_RELOC_U64 will be made and the function address will be
-@@ -3051,8 +3217,10 @@
+@@ -3051,8 +3277,10 @@
      ccmp->cur_fun->base.base.type |= HTF_EXTERN;
      ccmp->cur_fun->fun_ptr = Compile(ccmp, NULL, NULL, NULL);
      ccmp->cur_fun->base.base.type &= ~HTF_EXTERN;
@@ -672,7 +802,7 @@
        extern_fun->fun_ptr = ccmp->cur_fun->fun_ptr;
      }
      if (ccmp->cur_fun->base.base.str)
-@@ -3063,6 +3231,8 @@
+@@ -3063,6 +3291,8 @@
        *is_func_decl = 1;
      goto ret;
    }
@@ -681,7 +811,41 @@
    if (add_to) {
      if (flags & PRSF_STATIC)
        lst->flags |= MLF_STATIC;
-@@ -3110,18 +3280,25 @@
+@@ -3076,7 +3306,9 @@
+     if ((flags & PRSF_FUN_ARGS) || (flags & PRSF_STATIC)) {
+       Lex(ccmp->lex);
+       lst->flags |= MLF_DFT_AVAILABLE;
+-      if (!lst->dim.next) {
++      if ((flags & PRSF_FUN_ARGS) && PrsKw(ccmp, TK_KW_LASTCLASS)) {
++        lst->flags |= MLF_LASTCLASS;
++      } else if (!lst->dim.next) {
+         switch (lst->member_class->raw_type) {
+           break;
+         case RT_U8i:
+@@ -3087,8 +3319,21 @@
+         case RT_I32i:
+         case RT_U64i:
+         case RT_I64i:
++        case RT_FUNC: // func ptr
++          tmpi = lst->dft_val = PrsI64(ccmp);
++          if (flags & PRSF_STATIC) {
++            lst->static_bytes = A_CALLOC(8, NULL);
++            *(int64_t *)lst->static_bytes = tmpi;
++          }
++          break;
+         case RT_PTR:
+-        case RT_FUNC: // func ptr
++          /* Aggregate class values share RT_PTR with actual pointers.
++           * They have no pointer stars and own a member list; static class
++           * initializers must take the recursive layout path below. */
++          if ((flags & PRSF_STATIC) &&
++              !lst->member_class->ptr_star_cnt &&
++              lst->member_class->members_lst)
++            goto static_array;
+           tmpi = lst->dft_val = PrsI64(ccmp);
+           if (flags & PRSF_STATIC) {
+             lst->static_bytes = A_CALLOC(8, NULL);
+@@ -3110,18 +3355,25 @@
        static_array: // Also applies to classes
          lst->static_bytes =
              A_CALLOC(lst->dim.total_cnt * lst->member_class->sz, NULL);
@@ -716,7 +880,7 @@
      }
    }
    if (!add_to && lst->str) {
-@@ -3136,7 +3313,7 @@
+@@ -3136,7 +3388,7 @@
      glbl_var->fun_ptr = lst->fun_ptr;
      lst->fun_ptr = NULL; // We steal this
      // lst will be Free'd at ret
@@ -725,14 +889,32 @@
        glbl_var->data_addr =
            A_CALLOC(glbl_var->var_class->sz * glbl_var->dim.total_cnt, NULL);
      if (flags & PRSF_IMPORT) {
-@@ -3170,19 +3347,19 @@
+@@ -3170,19 +3422,37 @@
      }
      HashAdd(glbl_var, Fs->hash_table);
    found_glbl:
 -    if (!(flags & PRSF_EXTERN)) {
 -      if (extern_glbl = HashFind(glbl_var->base.str, Fs->hash_table,
 -                                 HTT_GLBL_VAR, 2)) { // Pick 2nd EXTERN(?) Var
-+    if (!(flags & (PRSF_EXTERN | PRSF__EXTERN))) {
++    if (flags & (PRSF_EXTERN | PRSF__EXTERN)) {
++      /* Resolve an extern declaration against an earlier guest global when
++       * the declared object layout agrees. Upstream modules commonly
++       * redeclare globals supplied by the task bridge (for example `winmgr`). */
++      for (inst = 2;; inst++) {
++        extern_glbl = (CHashGlblVar *)HashSingleTableFind(
++            glbl_var->base.str, Fs->hash_table, HTT_GLBL_VAR, inst);
++        if (!extern_glbl)
++          break;
++        if (!(extern_glbl->base.type & HTF_EXTERN) && extern_glbl->data_addr &&
++            PrsSameGlobalType(glbl_var->var_class, extern_glbl->var_class) &&
++            glbl_var->dim.total_cnt == extern_glbl->dim.total_cnt &&
++            PrsSameArrayDim(glbl_var->dim.next, extern_glbl->dim.next)) {
++          glbl_var->data_addr = extern_glbl->data_addr;
++          glbl_var->base.type &= ~HTF_EXTERN;
++          break;
++        }
++      }
++    } else {
 +      if (extern_glbl = HashSingleTableFind(glbl_var->base.str, Fs->hash_table,
 +                                            HTT_GLBL_VAR, 2)) { // Pick 2nd EXTERN(?) Var
          extern_glbl->data_addr = glbl_var->data_addr;
@@ -751,21 +933,45 @@
        } else {
          *(rpn = A_CALLOC(sizeof(CRPN), NULL)) = (CRPN){
              .type = IC_GLOBAL,
-@@ -3508,6 +3685,13 @@
+@@ -3508,6 +3778,17 @@
    got_fun:
      if (!fun)
        ParseErr(ccmp, "Invalid type to call."); // TODO add type name
 +    if ((fun->base.base.type & (HTF_INTRINSIC | HTF_EXTERN)) ==
-+        (HTF_INTRINSIC | HTF_EXTERN))
++            (HTF_INTRINSIC | HTF_EXTERN) &&
++        !(fun->import_name && (!strcmp(fun->import_name, "IC_SQRT") ||
++                               !strcmp(fun->import_name, "IC_SWAP_U16"))))
 +      ParseErr(ccmp, "AArch64 intrinsic '%s' (%s) is not implemented.",
 +               fun->base.base.str, fun->import_name);
-+    if ((fun->base.base.type & HTF_EXTERN) && fun->import_name)
++    if ((fun->base.base.type & HTF_EXTERN) && fun->import_name &&
++        !(fun->import_name && (!strcmp(fun->import_name, "IC_SQRT") ||
++                               !strcmp(fun->import_name, "IC_SWAP_U16"))))
 +      ParseErr(ccmp, "AArch64 external '%s' (%s) is not bound.",
 +               fun->base.base.str, fun->import_name);
      if (arg > fun->argc && !(fun->base.flags & CLSF_VARGS)) {
        ParseErr(ccmp, "Excess arguments for function");
      }
-@@ -3545,6 +3729,10 @@
+@@ -3519,7 +3800,8 @@
+       rpn = ICArgN(orig_rpn, orig_rpn->length - arg - 1);
+       if (rpn->type == IC_NOP)
+         if (!(mlst->flags & MLF_DFT_AVAILABLE)) {
+-          ParseErr(ccmp, "No default value for argument %d.", arg);
++          ParseErr(ccmp, "No default value for argument %d of '%s'.", arg,
++                   fun->base.base.str);
+         }
+       mlst = mlst->next;
+     }
+@@ -3527,7 +3809,8 @@
+       if (fun->base.flags & CLSF_VARGS && arg >= fun->argc - 2)
+         break;
+       if (!(mlst->flags & MLF_DFT_AVAILABLE)) {
+-        ParseErr(ccmp, "No default value for argument %d.", arg);
++        ParseErr(ccmp, "No default value for argument %d of '%s'.", arg,
++                 fun->base.base.str);
+       }
+       mlst = mlst->next;
+     }
+@@ -3545,6 +3828,10 @@
      break;
    case IC_GLOBAL:
      if (rpn->global_var->base.type & HTT_GLBL_VAR) {
@@ -776,7 +982,7 @@
        rpn->ic_class = rpn->global_var->var_class;
        rpn->ic_dim = rpn->global_var->dim.next;
        rpn->ic_fun = rpn->global_var->fun_ptr;
-@@ -3655,20 +3843,30 @@
+@@ -3655,20 +3942,30 @@
      break;
    case IC_DEREF:
      AssignRawTypeToNode(ccmp, rpn->base.next);
@@ -817,7 +1023,7 @@
      rpn->raw_type = rpn->ic_class->raw_type;
      return rpn->raw_type;
      break;
-@@ -3839,6 +4037,12 @@
+@@ -3839,6 +4136,12 @@
      if (ICFwd(rpn->base.next)->ic_dim) {
        rpn->ic_class = ICFwd(rpn->base.next)->ic_class;
        rpn->ic_dim = ICFwd(rpn->base.next)->ic_dim->next;
@@ -830,7 +1036,7 @@
      } else
        rpn->ic_class = ICFwd(rpn->base.next)->ic_class - 1;
      rpn->ic_fun = ICFwd(rpn->base.next)->ic_fun;
-@@ -3909,9 +4113,11 @@
+@@ -3909,9 +4212,11 @@
  static void PrsMembers(CCmpCtrl *cctrl, CHashClass *bungis, int64_t flags,
                         int64_t *off) {
    int64_t is_func, union_end;
@@ -842,7 +1048,7 @@
      Lex(cctrl->lex);
      while (cctrl->lex->cur_tok != '}') {
        if (cctrl->lex->cur_tok == ';') {
-@@ -3920,10 +4126,24 @@
+@@ -3920,10 +4225,24 @@
          if (cctrl->lex->cur_tok == '{') {
            PrsMembers(cctrl, bungis, flags | PRSF_UNION, off);
          }
@@ -868,7 +1074,7 @@
          //
          // Here's the deal,I store the last member in last_m,once I find the
          // members I assign their offsets
-@@ -3983,6 +4203,7 @@
+@@ -3983,6 +4302,7 @@
          return;
        }
      }
@@ -876,7 +1082,7 @@
      Lex(cctrl->lex);
    }
    if (flags & PRSF_UNION)
-@@ -4043,6 +4264,8 @@
+@@ -4043,6 +4363,8 @@
        HashAdd(bungis, Fs->hash_table);
    PrsMembers(cctrl, bungis, flags, &off); // This consumes '{'
    // Compute size
@@ -885,7 +1091,7 @@
    for (last_m = bungis->members_lst; last_m; last_m = last_m->next) {
      if (bungis->sz < (off = last_m->off +
                              last_m->member_class->sz * last_m->dim.total_cnt)) {
-@@ -4101,6 +4324,8 @@
+@@ -4101,6 +4423,8 @@
    int64_t val;
    CCodeMisc *label;
  } CSwitchCase;
@@ -894,7 +1100,7 @@
  int64_t PrsSwitch(CCmpCtrl *cctrl) {
    if (!PrsKw(cctrl, TK_KW_SWITCH))
      return 0;
-@@ -4113,6 +4338,7 @@
+@@ -4113,6 +4437,7 @@
    int64_t k_low = INT_MAX, k_hi = INT_MIN, last, lo, hi, idx;
    old_break_to = cctrl->code_ctrl->break_to;
    cctrl->code_ctrl->break_to = lb_exit;
@@ -902,7 +1108,7 @@
    //
    // When we encounter the start: block,we enter a secret function call
    // So when we `break` or we implictly break by hitting the first sub-switch
-@@ -4134,12 +4360,14 @@
+@@ -4134,12 +4459,14 @@
      //
      if (!ParseExpr(cctrl, 0)) {
        ParseErr(cctrl, "Expected an expression.");
@@ -917,7 +1123,7 @@
        return 0;
      } else
        Lex(cctrl->lex);
-@@ -4147,6 +4375,7 @@
+@@ -4147,6 +4474,7 @@
      Lex(cctrl->lex);
      if (!ParseExpr(cctrl, 0)) {
        ParseErr(cctrl, "Expected an expression.");
@@ -925,7 +1131,7 @@
        return 0;
      }
      (switch_ir = A_CALLOC(sizeof(CRPN), NULL))->type = IC_BOUNDED_SWITCH;
-@@ -4155,12 +4384,14 @@
+@@ -4155,12 +4483,14 @@
      // start,(cond),end,BOUNDED_SWITCH
      if (cctrl->lex->cur_tok != ')') {
        ParseErr(cctrl, "Expected a ')'.");
@@ -940,7 +1146,7 @@
      return 0;
    } else
      Lex(cctrl->lex);
-@@ -4241,6 +4472,7 @@
+@@ -4241,6 +4571,7 @@
            Lex(cctrl->lex);
          } else {
            ParseErr(cctrl, "Expected a ':'.");
@@ -948,7 +1154,7 @@
            return 0;
          }
        }
-@@ -4251,6 +4483,7 @@
+@@ -4251,6 +4582,7 @@
        }
        if (cctrl->lex->cur_tok != ':') {
          ParseErr(cctrl, "Expected a ':'.");
@@ -956,7 +1162,7 @@
          return 0;
        }
        lb_dft->flags |= CMF_DEFINED;
-@@ -4268,6 +4501,7 @@
+@@ -4268,6 +4600,7 @@
      } else if (PrsKw(cctrl, TK_KW_START)) {
        if (cctrl->lex->cur_tok != ':') {
          ParseErr(cctrl, "Expected a ':'.");
@@ -964,7 +1170,7 @@
          return 0;
        } else
          Lex(cctrl->lex);
-@@ -4293,6 +4527,7 @@
+@@ -4293,6 +4626,7 @@
      } else if (PrsKw(cctrl, TK_KW_END)) {
        if (subs.base.last == &subs) {
          ParseErr(cctrl, "Unexpected 'end' statement.");
@@ -972,7 +1178,7 @@
          return 0;
        }
        QueRem(tmpss = subs.base.last);
-@@ -4309,6 +4544,7 @@
+@@ -4309,6 +4643,7 @@
        A_FREE(tmpss);
        if (cctrl->lex->cur_tok != ':') {
          ParseErr(cctrl, "Expected a ':'.");
@@ -980,7 +1186,7 @@
          return 0;
        } else
          Lex(cctrl->lex);
-@@ -4317,6 +4553,7 @@
+@@ -4317,6 +4652,7 @@
        goto add_stmt;
      } else {
        ParseErr(cctrl, "Expected a statement.");
@@ -988,7 +1194,7 @@
        return 0;
      }
    }
-@@ -4362,6 +4599,7 @@
+@@ -4362,6 +4698,7 @@
      switch_ir->code_misc = jmp_tab;
    }
    cctrl->flags = old_flags;
@@ -996,23 +1202,69 @@
    return 1;
  }
  static void __PrsBindCSymbol(char *name, void *ptr, int64_t naked,
-@@ -4417,6 +4655,13 @@
+@@ -4417,7 +4754,15 @@
              *exit_misc = CodeMiscNew(cctrl, CMT_LABEL);
    if (!PrsKw(cctrl, TK_KW_TRY))
      return 0;
+-  // AIWNIOS_SetJmp(SysTry())
 +#if defined(ZEAL_FREESTANDING) && !defined(ZEAL_GUEST_EXCEPTIONS)
 +  ParseErr(cctrl, "Guest try/catch runtime is not implemented.");
 +#endif
 +#ifdef ZEAL_GUEST_EXCEPTIONS
-+  if (!HashFind("SysTry", Fs->hash_table, HTT_FUN, 1))
++  if (!HashFind("ZcTryEnter", Fs->hash_table, HTT_FUN, 1))
 +    ParseErr(cctrl, "Guest try/catch requires the task bridge.");
 +#endif
-   // AIWNIOS_SetJmp(SysTry())
++  // AIWNIOS_SetJmp(ZcTryEnter()). Keep these hooks distinct from ZealOS's
++  // native SysTry(start_label, skip_label), declared by KernelC.HH.
    *(rpn = A_CALLOC(sizeof(CRPN), NULL)) = (CRPN){
        .type = IC_GLOBAL,
+       .global_var = HashFind("AIWNIOS_SetJmp", Fs->hash_table, HTT_FUN, 1),
+@@ -4425,7 +4770,7 @@
+   QueIns(rpn, cctrl->code_ctrl->ir_code);
+   *(rpn = A_CALLOC(sizeof(CRPN), NULL)) = (CRPN){
+       .type = IC_GLOBAL,
+-      .global_var = HashFind("SysTry", Fs->hash_table, HTT_FUN, 1),
++      .global_var = HashFind("ZcTryEnter", Fs->hash_table, HTT_FUN, 1),
+   };
+   QueIns(rpn, cctrl->code_ctrl->ir_code);
+   (rpn = A_CALLOC(sizeof(CRPN), NULL))->type = IC_CALL;
+@@ -4442,10 +4787,10 @@
+   QueIns(rpn, cctrl->code_ctrl->ir_code);
+   // See below note
+   PrsStmt(cctrl);
+-  // We will call SysUntry if we succesful got through the try block
++  // We leave the guest exception pad if we successfully got through the try block.
+   *(rpn = A_CALLOC(sizeof(CRPN), NULL)) = (CRPN){
+       .type = IC_GLOBAL,
+-      .global_var = HashFind("SysUntry", Fs->hash_table, HTT_FUN, 1),
++      .global_var = HashFind("ZcTryLeave", Fs->hash_table, HTT_FUN, 1),
+   };
+   QueIns(rpn, cctrl->code_ctrl->ir_code);
+   (rpn = A_CALLOC(sizeof(CRPN), NULL))->type = IC_CALL;
+@@ -4466,10 +4811,10 @@
+   QueIns(rpn, cctrl->code_ctrl->ir_code);
+   // Our catch block
+   PrsStmt(cctrl);
+-  // Call EndCatch
++  // Finish the guest catch.
+   *(rpn = A_CALLOC(sizeof(CRPN), NULL)) = (CRPN){
+       .type = IC_GLOBAL,
+-      .global_var = HashFind("EndCatch", Fs->hash_table, HTT_FUN, 1),
++      .global_var = HashFind("ZcTryCatchEnd", Fs->hash_table, HTT_FUN, 1),
+   };
+   QueIns(rpn, cctrl->code_ctrl->ir_code);
+   (rpn = A_CALLOC(sizeof(CRPN), NULL))->type = IC_CALL;
 --- a/c/optpass.c
 +++ b/c/optpass.c
-@@ -20,6 +20,9 @@
+@@ -4,6 +4,7 @@
+ #include <math.h>
+ #include <stddef.h>
+ #include <stdlib.h>
++#include <string.h>
+ 
+ static int64_t IsConst(CRPN *rpn) {
+   switch (rpn->type) {
+@@ -20,6 +21,9 @@
    if (rpn->ic_dim) {
      if (rpn->ic_dim->next)
        r *= rpn->ic_dim->next->total_cnt;
@@ -1022,7 +1274,61 @@
      r *= rpn->ic_class->sz;
    } else
      r *= rpn->ic_class[-1].sz;
-@@ -341,12 +344,15 @@
+@@ -32,6 +36,8 @@
+   CRPN *rpn2 = rpn->base.next, *ic, *last;
+   CHashFun *ic_fun;
+   CMemberLst *arg, *args_lst_rev;
++  CHashClass *last_class;
++  CCodeMisc *misc;
+   for (cnt = 0; cnt != rpn->length; cnt++)
+     rpn2 = ICFwd(rpn2);
+   AssignRawTypeToNode(cctrl, rpn2);
+@@ -46,7 +52,21 @@
+       break;
+     rpn2 = ICArgN(rpn, rpn->length - cnt - 1); // REVERSE polish notation
+     if (rpn2->type == IC_NOP) {
+-      if (arg->member_class->raw_type == RT_F64) {
++      if (arg->flags & MLF_LASTCLASS) {
++        if (cnt == 0)
++          ParseErr(cctrl, "lastclass default requires a preceding argument.");
++        last_class = arg->last->member_class;
++        /* Pointer class entries share the base class name only at star 0. */
++        last_class -= last_class->ptr_star_cnt;
++        if (!last_class || !last_class->base.str)
++          ParseErr(cctrl, "lastclass default cannot infer the preceding argument type.");
++        misc = CodeMiscNew(cctrl, CMT_STRING);
++        misc->str = A_STRDUP(last_class->base.str, cctrl->hc);
++        misc->str_len = strlen(misc->str) + 1;
++        rpn2->type = IC_STR;
++        rpn2->code_misc = misc;
++        AssignRawTypeToNode(cctrl, rpn2);
++      } else if (arg->member_class->raw_type == RT_F64) {
+         rpn2->type = IC_F64;
+         rpn2->flt = ((double *)&arg->dft_val)[0];
+         AssignRawTypeToNode(cctrl, rpn2);
+@@ -78,7 +98,20 @@
+   for (; cnt < cnt2; cnt++) {
+     ic = A_CALLOC(sizeof(CRPN), cctrl->hc);
+     rpn->length++;
+-    if (arg->member_class->raw_type == RT_F64) {
++    if (arg->flags & MLF_LASTCLASS) {
++      if (!arg->last)
++        ParseErr(cctrl, "lastclass default requires a preceding argument.");
++      last_class = arg->last->member_class;
++      last_class -= last_class->ptr_star_cnt;
++      if (!last_class->base.str)
++        ParseErr(cctrl, "lastclass default cannot infer the preceding argument type.");
++      misc = CodeMiscNew(cctrl, CMT_STRING);
++      misc->str = A_STRDUP(last_class->base.str, cctrl->hc);
++      misc->str_len = strlen(misc->str) + 1;
++      ic->type = IC_STR;
++      ic->code_misc = misc;
++      AssignRawTypeToNode(cctrl, ic);
++    } else if (arg->member_class->raw_type == RT_F64) {
+       ic->type = IC_F64;
+       ic->flt = ((double *)&arg->dft_val)[0];
+       AssignRawTypeToNode(cctrl, ic);
+@@ -341,12 +374,15 @@
        new3->raw_type = RT_I64i;
        QueIns(new3, new2);
        rpn->type = IC_DEREF;
@@ -1040,7 +1346,7 @@
        new->ic_fun = rpn->ic_fun;
        new->ic_dim = rpn->ic_dim;
        new2 = A_CALLOC(sizeof(CRPN), cctrl->hc);
-@@ -477,6 +483,12 @@
+@@ -477,6 +513,12 @@
    }
  }
  
@@ -1053,7 +1359,7 @@
  void OptPassConstFold(CCmpCtrl *cctrl) {
  #define SET_AB                                                                 \
    if (next->type == IC_F64)                                                    \
-@@ -505,6 +517,11 @@
+@@ -505,6 +547,11 @@
    changed = 0;
    for (rpn = cctrl->code_ctrl->ir_code->next;
         cctrl->code_ctrl->ir_code != rpn;) {
@@ -1065,9 +1371,107 @@
      switch (rpn->type) {
        break;
      case IC_TO_BOOL:
+--- a/c/ffi_gen.c
++++ b/c/ffi_gen.c
+@@ -124,20 +124,30 @@
+   int32_t *Xblob = A_MALLOC(8 * 21 + arity * 4, Fs->code_heap), ptr = 0;
+   int32_t *blob = MemGetWritePtr(Xblob); // OpenBSD sexy mapping
+   int64_t arg, fill;
+-  int64_t pop = 0, pad = 0;
++  int64_t pop = 0, pad = 0, stack_size = 0;
+   int old = SetWriteNP(0);
+-  if (arity & 1)
+-    arity++, pad = 8;
+-  if (arity)
+-    ;
+-  blob[ptr++] = ARM_subImmX(31, 31, pop = (arity < 8 ? arity : 8) * 8);
+-  for (arg = 0; arg < arity - !!pad; arg++) {
+-    if (arg >= 8)
+-      break;
+-    blob[ptr++] = ARM_strRegImmX(arg, 31, arg * 8 + pad);
+-  }
+-  blob[ptr++] =
+-      ARM_addImmX(0, 31, pad); // 31 is stack pointer,0 is 1st argument
++  if (arity <= 8) {
++    if (arity & 1)
++      arity++, pad = 8;
++    blob[ptr++] = ARM_subImmX(31, 31, pop = arity * 8);
++    for (arg = 0; arg < arity - !!pad; arg++)
++      blob[ptr++] = ARM_strRegImmX(arg, 31, arg * 8 + pad);
++    blob[ptr++] = ARM_addImmX(0, 31, pad);
++  } else {
++    // AAPCS64 passes arguments 0..7 in x0..x7 and the rest on the
++    // caller's stack. Build one contiguous int64_t[] for the C host shim.
++    // Keep SP 16-byte aligned and read stack arguments relative to the
++    // original SP (new SP + stack_size).
++    stack_size = ((arity + 1) & ~1) * 8;
++    blob[ptr++] = ARM_subImmX(31, 31, pop = stack_size);
++    for (arg = 0; arg < 8; arg++)
++      blob[ptr++] = ARM_strRegImmX(arg, 31, arg * 8);
++    for (arg = 8; arg < arity; arg++) {
++      blob[ptr++] = ARM_ldrRegImmX(9, 31, stack_size + (arg - 8) * 8);
++      blob[ptr++] = ARM_strRegImmX(9, 31, arg * 8);
++    }
++    blob[ptr++] = ARM_movRegX(0, 31);
++  }
+   blob[ptr++] = ARM_stpPreImmX(29, 30, 31, -16);
+   blob[ptr++] = ARM_movRegX(29, 31);
+   fill = ptr;
+--- a/c/arm64_asm.c
++++ b/c/arm64_asm.c
+@@ -846,6 +846,11 @@
+   return FpDataProc1Reg(0, 0, 1, 0, d, s);
+ }
+ 
++int64_t ARM_fsqrtReg(int64_t d, int64_t s) {
++  /* FSQRT Dd, Dn. */
++  return 0x1e61c000 | (s << 5) | d;
++}
++
+ int64_t ARM_fcmp(int64_t a, int64_t b) {
+   return FpComp(0, 0, 1, 0, 0, a, b);
+ }
 --- a/c/arm_backend.c
 +++ b/c/arm_backend.c
-@@ -3258,29 +3258,18 @@
+@@ -158,6 +158,7 @@
+       right->res.keep_in_tmp = 1;
+     break;
+   case IC_SQR:
++  case IC_SQRT:
+   case IC_POS:
+     goto unop;
+     break;
+@@ -1671,6 +1672,7 @@
+     return SpillsTmpRegs(rpn->base.next);
+     break;
+   case IC_SQR:
++  case IC_SQRT:
+   case IC_POS:
+     goto unop;
+     break;
+@@ -3194,6 +3196,21 @@
+           ICMov(cctrl, &rpn->res, &tmp, bin, code_off); // Move tmp into result.
+     }
+     break;
++  case IC_SQRT:
++    next = ICArgN(rpn, 0);
++    code_off = __OptPassFinal(cctrl, next, bin, code_off);
++    code_off = PutICArgIntoReg(cctrl, &next->res, RT_F64, 0, bin,
++                               code_off); // Fallback to reg 0
++    if (rpn->res.mode == MD_REG) {
++      AIWNIOS_ADD_CODE(ARM_fsqrtReg(rpn->res.reg, next->res.reg));
++    } else {
++      tmp.mode = MD_REG;
++      tmp.raw_type = RT_F64;
++      tmp.reg = MFR(cctrl, 0);
++      AIWNIOS_ADD_CODE(ARM_fsqrtReg(tmp.reg, next->res.reg));
++      code_off = ICMov(cctrl, &rpn->res, &tmp, bin, code_off);
++    }
++    break;
+   case IC_NAME:
+     abort();
+     break;
+@@ -3258,29 +3275,18 @@
      break;
      break;
    case IC_UNBOUNDED_SWITCH:
@@ -1103,7 +1507,7 @@
      code_off = __OptPassFinal(cctrl, next2, bin, code_off);
      tmp.raw_type = RT_I64i;
      tmp.mode = MD_REG;
-@@ -3294,7 +3283,6 @@
+@@ -3294,7 +3300,6 @@
      AIWNIOS_ADD_CODE(ARM_cmpRegX(tmp.reg, 2));
      fail2_addr = bin + code_off;
      AIWNIOS_ADD_CODE(ARM_bcc(ARM_GT, 0));
@@ -1111,7 +1515,7 @@
      //
      // See LAMA snail
      //
-@@ -3315,7 +3303,7 @@
+@@ -3315,7 +3320,7 @@
      AIWNIOS_ADD_CODE(ARM_ldrRegRegShiftX(MIR(cctrl, tmp.reg), 2, tmp.reg));
      // Load the function base address
      AIWNIOS_ADD_CODE(ARM_br(tmp.reg));
@@ -1120,7 +1524,23 @@
        ref = CodeMiscAddRef(rpn->code_misc->dft_lab, fail1_addr);
        ref->patch_cond_br = ARM_bcc;
        ref->user_data1 = ARM_LT;
-@@ -4473,6 +4461,9 @@
+@@ -3720,13 +3725,13 @@
+         into_reg = 8;
+       if (cctrl->code_ctrl->final_pass) {
+         i = ARM_adrX(MIR(cctrl, into_reg),
+-                     (char *)rpn->integer - (bin + code_off));
++                     (char *)next->integer - (bin + code_off));
+         if (i != ARM_ERR_INV_OFF) {
+           AIWNIOS_ADD_CODE(i);
+           goto restore_reg;
+         }
+       }
+-      code_off = __ICMoveI64(cctrl, into_reg, rpn->integer, bin, code_off);
++      code_off = __ICMoveI64(cctrl, into_reg, next->integer, bin, code_off);
+       goto restore_reg;
+     case IC_GLOBAL:
+     get_glbl_ptr:
+@@ -4473,6 +4478,9 @@
      break;
    case IC_GS:
    case IC_FS: {
@@ -1130,7 +1550,17 @@
      next = rpn->base.next;
      if (next->type != IC_RELOC && next->type != IC_I64) {
        printf("Expected a relocation at IC_FS,aborting(Contact nrootcoauto for "
-@@ -5162,6 +5153,9 @@
+@@ -4817,6 +4825,9 @@
+   case IC_NEG:
+     goto unop;
+     break;
++  case IC_SQRT:
++    goto unop;
++    break;
+   case IC_POS:
+   case IC_SQR:
+     goto unop;
+@@ -5162,6 +5173,9 @@
        cctrl->backend_user_data2 = 0;
        cctrl->backend_user_data3 = 0;
        r = forwards[cnt];
@@ -1140,9 +1570,27 @@
        PushTmpDepthFirst(cctrl, r, 0);
        PopTmp(cctrl, r);
        r->res.mode = MD_NULL;
+--- a/c/aiwn_arm.h
++++ b/c/aiwn_arm.h
+@@ -84,6 +84,7 @@
+ int64_t ARM_fcmp(int64_t a, int64_t b);
+ int64_t ARM_fmovReg(int64_t d, int64_t s);
+ int64_t ARM_fnegReg(int64_t d, int64_t s);
++int64_t ARM_fsqrtReg(int64_t d, int64_t s);
+ int64_t ARM_strRegImmF64(int64_t r, int64_t n, uint64_t off);
+ int64_t ARM_ldrRegImmF64(int64_t r, int64_t n, uint64_t off);
+ int64_t ARM_ldpPostImmX(int64_t r, int64_t r2, int64_t b, int64_t off);
 --- a/c/aiwn_hash.h
 +++ b/c/aiwn_hash.h
-@@ -35,6 +35,7 @@
+@@ -15,6 +15,7 @@
+   char *str;
+ #define MLF_STATIC        1
+ #define MLF_DFT_AVAILABLE 2
++#define MLF_LASTCLASS     4
+   int64_t off, reg, use_cnt, flags;
+   union {
+     int64_t dft_val;
+@@ -35,6 +36,7 @@
  #define HTT_IMPORT_SYS_SYM  0x80
  #define HTT_EXPORT_SYS_SYM  0x100
  #define HTT_IMPORT_SYS_SYM2 0x200 // See arm_loader.c
@@ -1199,49 +1647,3 @@
 +extern int64_t aiwnios_switch_depth;
 +/* Non-zero while parsing a function body: same #assert nesting hazard. */
 +extern int64_t aiwnios_fun_depth;
---- a/c/ffi_gen.c
-+++ b/c/ffi_gen.c
-@@ -124,20 +124,30 @@
-   int32_t *Xblob = A_MALLOC(8 * 21 + arity * 4, Fs->code_heap), ptr = 0;
-   int32_t *blob = MemGetWritePtr(Xblob); // OpenBSD sexy mapping
-   int64_t arg, fill;
--  int64_t pop = 0, pad = 0;
-+  int64_t pop = 0, pad = 0, stack_size = 0;
-   int old = SetWriteNP(0);
--  if (arity & 1)
--    arity++, pad = 8;
--  if (arity)
--    ;
--  blob[ptr++] = ARM_subImmX(31, 31, pop = (arity < 8 ? arity : 8) * 8);
--  for (arg = 0; arg < arity - !!pad; arg++) {
--    if (arg >= 8)
--      break;
--    blob[ptr++] = ARM_strRegImmX(arg, 31, arg * 8 + pad);
--  }
--  blob[ptr++] =
--      ARM_addImmX(0, 31, pad); // 31 is stack pointer,0 is 1st argument
-+  if (arity <= 8) {
-+    if (arity & 1)
-+      arity++, pad = 8;
-+    blob[ptr++] = ARM_subImmX(31, 31, pop = arity * 8);
-+    for (arg = 0; arg < arity - !!pad; arg++)
-+      blob[ptr++] = ARM_strRegImmX(arg, 31, arg * 8 + pad);
-+    blob[ptr++] = ARM_addImmX(0, 31, pad);
-+  } else {
-+    // AAPCS64 passes arguments 0..7 in x0..x7 and the rest on the
-+    // caller's stack. Build one contiguous int64_t[] for the C host shim.
-+    // Keep SP 16-byte aligned and read stack arguments relative to the
-+    // original SP (new SP + stack_size).
-+    stack_size = ((arity + 1) & ~1) * 8;
-+    blob[ptr++] = ARM_subImmX(31, 31, pop = stack_size);
-+    for (arg = 0; arg < 8; arg++)
-+      blob[ptr++] = ARM_strRegImmX(arg, 31, arg * 8);
-+    for (arg = 8; arg < arity; arg++) {
-+      blob[ptr++] = ARM_ldrRegImmX(9, 31, stack_size + (arg - 8) * 8);
-+      blob[ptr++] = ARM_strRegImmX(9, 31, arg * 8);
-+    }
-+    blob[ptr++] = ARM_movRegX(0, 31);
-+  }
-   blob[ptr++] = ARM_stpPreImmX(29, 30, 31, -16);
-   blob[ptr++] = ARM_movRegX(29, 31);
-   fill = ptr;

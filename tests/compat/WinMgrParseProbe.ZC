@@ -1,0 +1,15 @@
+// Focused compile/runtime probe for constructs at the start of upstream
+// WinQueueIPMessages. The full manager has many globals and long callbacks;
+// keep this fixture small so parser and timer failures stay distinguishable.
+I64 WinMgrParseProbe()
+{
+    static CD3I64 single_mouse = {0, 0, 0};
+    single_mouse.x = 40;
+    single_mouse.y = 2;
+    F64 time = tS;
+    F64 quarter = .25;
+    if (single_mouse.x + single_mouse.y == 42 &&
+        time > -1.0 && quarter > 0.2 && quarter < 0.3)
+        return 42;
+    return 0;
+}

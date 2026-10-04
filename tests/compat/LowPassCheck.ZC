@@ -1,0 +1,14 @@
+I64 LowPassCheck()
+{
+    F64 value = LowPass1(1.0, 0.0, 1.0, 1.0);
+    F64 slow = LowPass1(0.1, 0.75, 0.3, 0.02);
+    F64 default_dt = LowPass1(1.0, 2.0, 4.0);
+
+    if (value < 0.632119 || value > 0.632122)
+        return 0;
+    if (slow < 0.74909 || slow > 0.74911)
+        return 0;
+    if (default_dt < 3.26423 || default_dt > 3.26425)
+        return 0;
+    return 42;
+}

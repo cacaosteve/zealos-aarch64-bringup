@@ -1,0 +1,30 @@
+extern U0 DCBlotColor4(U8 *dst, I64 *img, I64 *img_cache, I64 count);
+
+I64 GrAsmColor4Checks()
+{
+	U8 output[4];
+	I64 image[1], cache[1];
+	I64 i;
+	image[0] = 0x4020100804020100;
+	cache[0] = 0;
+	for (i = 0; i < 4; i++)
+		output[i] = 0xA5;
+	DCBlotColor4(output, image, cache, 1);
+	if (output[0] != 0x02 || output[1] != 0x04 ||
+			output[2] != 0x08 || output[3] != 0x10)
+		return 1;
+	if (cache[0] != image[0])
+		return 2;
+	for (i = 0; i < 4; i++)
+		output[i] = 0xA5;
+	DCBlotColor4(output, image, cache, 1);
+	for (i = 0; i < 4; i++)
+		if (output[i] != 0xA5)
+			return 3;
+	image[0] = 0x0F;
+	DCBlotColor4(output, image, cache, 1);
+	if (output[0] != 1 || output[1] != 1 ||
+			output[2] != 1 || output[3] != 1 || cache[0] != image[0])
+		return 4;
+	return 42;
+}

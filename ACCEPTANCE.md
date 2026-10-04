@@ -38,6 +38,39 @@ hc I64 f(I64 x){return x+1;}I64 a=5;return f(2)+a;
 
 Expect **4**, **0**, **8**.
 
+5. To check real window input, reset the compiler after a failed load, then
+   load the upstream declarations and the visual test in this order:
+   In the UTM PCI VM, native source files live on the source partition and use
+   the `disk:` prefix. (`/Kernel/...` is the RedSea/QEMU path.) Run `make utm`
+   once after adding a bundled source file; refresh preserves guest edits and
+   deletion masks while adding files missing from the existing source bank.
+
+```text
+zreset
+zload disk:Kernel/KernelA.HH
+zload disk:Kernel/KernelB.HH
+zload disk:Kernel/SerialDev/Message.ZC
+zload disk:Kernel/Job.ZC
+zload disk:Kernel/KeyDev.ZC
+zload disk:Tests/WindowDragLive.ZC
+zcall WindowDragLiveButtonChecks
+zcall WindowDragLiveStart
+zcall WindowDragLiveRenderChecks
+```
+
+   Click each bordered window to raise it, drag the middle of its title bar to
+   move it, drag the left frame edge to move it horizontally, and drag the
+   lower-right frame corner to resize it. In Window B,
+   right-click the control box; it should turn green while held. With Window B
+   focused, scroll the wheel: positive deltas turn it cyan and negative deltas
+   turn it purple when UTM reports `REL_WHEEL`. The
+   first four
+   title cells post the upstream task-menu command; the right title cells close
+   a window with no document. The button regression should return `0`, and the
+   render check should return `0x2a`; the
+   parked demo tasks do not render a task menu. Finish with
+   `zcall WindowDragLiveStop`.
+
 ## Checklist — RedSea disk story (freeze)
 
 ```text

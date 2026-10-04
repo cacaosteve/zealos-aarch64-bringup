@@ -1,0 +1,25 @@
+I64 GrScreenTextBGChecks()
+{
+	U8 buffer[144];
+	U8 *p;
+	U64 color = 0x8877665544332211;
+	I64 i, row, col;
+	for (i = 0; i < 144; i++)
+		buffer[i] = 0xA5;
+	p = ZcGrTextBGStore(buffer + 3, 16, color);
+	if (p - (buffer + 3) != 112)
+		return 1;
+	p += -7 * 16 + 8;
+	if (p - buffer != 11)
+		return 2;
+	for (row = 0; row < 8; row++)
+	{
+		for (col = 0; col < 8; col++)
+			if (buffer[3 + row * 16 + col] != ((color >> (col * 8)) & 0xFF))
+				return 3;
+		for (col = 8; col < 16; col++)
+			if (buffer[3 + row * 16 + col] != 0xA5)
+				return 4;
+	}
+	return 42;
+}

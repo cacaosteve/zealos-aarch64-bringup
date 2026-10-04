@@ -28,13 +28,17 @@ $(BUILD)/zc/ffi.o: third_party/aiwnios/asm/ffi_call_tos_aarch64.s | $(BUILD)/zc
 zc-objects: $(ZC_VENDOR_OBJS)
 
 ZC_SOURCES := $(shell find upstream/pinned upstream/bootstrap tests/compat -type f)
-$(BUILD)/sources.tar: $(ZC_SOURCES) third_party/aiwnios/LICENSE scripts/build-source-bundle.py | $(BUILD)
+$(BUILD)/sources.tar: $(ZC_SOURCES) third_party/aiwnios/LICENSE scripts/build-source-bundle.py scripts/arm64_source.py scripts/check-arm64-source.py upstream/arm64/GrScreen.md | $(BUILD)
 	python3 scripts/build-source-bundle.py $@
 
-.PHONY: check-upstream check-compat check-compat-pci
+.PHONY: check-upstream check-compat check-compat-pci check-grscreen
 check-upstream:
 	python3 scripts/check-upstream.py
 check-compat: check-upstream iso
 	QEMU="$(QEMU)" QEMU_VIRT="$(QEMU_VIRT)" FW_CODE="$(FW_CODE)" FW_VARS_IN="$(FW_VARS_IN)" python3 scripts/check-compat.py
 check-compat-pci: check-upstream esp
+	python3 scripts/check-arm64-source.py
 	QEMU="$(QEMU)" QEMU_VIRT="$(QEMU_VIRT)" FW_CODE="$(FW_CODE)" FW_VARS_IN="$(FW_VARS_IN)" python3 scripts/check-compat.py --pci
+check-grscreen: check-upstream esp
+	python3 scripts/check-arm64-source.py
+	QEMU="$(QEMU)" QEMU_VIRT="$(QEMU_VIRT)" FW_CODE="$(FW_CODE)" FW_VARS_IN="$(FW_VARS_IN)" python3 scripts/check-compat.py --pci --probe-module /System/Win.ZC --probe-winmgr --probe-grscreen

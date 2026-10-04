@@ -1,0 +1,4 @@
+// The probe loads Win.ZC without booting GrGlobals.ZC. Provide the framebuffer
+// dimensions that the UTM/QEMU ramfb profile currently reports.
+#define GR_WIDTH 800
+#define GR_HEIGHT 600

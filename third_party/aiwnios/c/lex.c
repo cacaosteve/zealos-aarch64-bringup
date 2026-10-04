@@ -485,6 +485,12 @@ re_enter:;
       }
       return lex->cur_tok = TK_DOT_DOT_DOT;
       break;
+    case '0' ... '9':
+      /* ZealOS writes fractional constants such as .25. Reuse the decimal
+       * scanner used after an integer part, with that part equal to zero. */
+      integer = 0;
+      lex->flags |= LEXF_USE_LAST_CHAR;
+      goto decimal_chk;
     default:
       lex->flags |= LEXF_USE_LAST_CHAR;
       return lex->cur_tok = '.';
@@ -1026,6 +1032,16 @@ CLexer *LexerNew(char *filename, char *text) {
       kw->tk = kws[i].tok;
       HashAdd(kw, Fs->hash_table);
     }
+  }
+  /* A bootstrapped lexer may already have installed the core keyword table
+   * before this port adds HolyC-specific tokens. Install lastclass even when
+   * the existing table makes the bulk initialization above unnecessary. */
+  if (!HashFind("lastclass", Fs->hash_table, HTT_KEYWORD, 1)) {
+    CHashKeyword *kw = A_CALLOC(sizeof(*kw), NULL);
+    kw->base.type = HTT_KEYWORD;
+    kw->base.str = A_STRDUP("lastclass", NULL);
+    kw->tk = TK_KW_LASTCLASS;
+    HashAdd(kw, Fs->hash_table);
   }
   CLexer *new = A_CALLOC(sizeof(CLexer), NULL);
   new->hc = HeapCtrlInit(NULL, Fs, 0);

@@ -1,0 +1,12 @@
+I64 GrGlobalsProbe()
+{
+    if (StrCompare(Define("GR_WIDTH"), "800"))
+        return 1;
+    if (StrCompare(Define("GR_HEIGHT"), "600"))
+        return 2;
+    if (StrCompare(Define("TEXT_COLS"), "100"))
+        return 3;
+    if (StrCompare(Define("TEXT_ROWS"), "75"))
+        return 4;
+    return 42;
+}

@@ -14,7 +14,7 @@ recursion, callbacks, shared symbols, F64 and reclaimable allocations.
 ```sh
 make check-compat       # disposable ISO guest + old boot regressions
 make check-compat-pci   # disposable UTM-shaped GPT/PCI disk guest
-make utm               # refresh VM, preserving RedSea and native source
+make utm               # refresh VM, preserving RedSea/source edits and adding new bundled files
 ```
 
 At the UTM prompt, run `zcheck`. Expected: `zc: upstream QuickSort + persistent

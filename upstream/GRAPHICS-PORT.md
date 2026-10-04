@@ -12,9 +12,9 @@ implementations can be compared against the x86 source without editing it.
 | `Kernel/Display.ZC` | Raw text output and task pixel/window geometry | Limine framebuffer replaces boot-time mode discovery; `WinDerivedValsUpdate` is ported in `TaskBridge.ZC` |
 | `System/Gr/GrGlobals.ZC` | `gr.text_base`, screen DCs, and compositor state | Bootstrap `gr.text_base` now points to a compact guest-owned `U32[100*75]` plane; upstream DCs and compositor state are not initialized |
 | `System/Gr/GrTextBase.ZC` | `TextChar`, text spans/fills, and borders; the hot primitives are x86 assembly | ARM64 bridge primitives update `gr.text_base` and the framebuffer; a QEMU smoke proves direct packed-cell writes through the pointer are presented |
-| `System/Gr/GrScreen.ZC` | Per-task redraw, controls, draw callbacks, z-buffer, and final screen update | A bounded 100x75 cell z-buffer marks windows with any visible cells; each marked window's text, task `draw_it`, and visible control `draw_it` callbacks render in task-ring order. The final screen callback runs afterward with `DCF_ON_TOP`. View-angle controls and pixel-level z-buffer composition remain unported |
-| `System/Win.ZC` | Window geometry, focus, and tiling operations | `WinHorz`/`WinVert` normalization and derived pixel geometry are ported; focus, tiling, and z-order callbacks are incomplete |
-| `System/WinMgr.ZC` | Refresh loop, mouse routing, move/resize, and window-manager task | The shell idle pump calls a minimal ZealC refresh/input tick after KernelB loads; the full upstream WinMgr task remains unported |
+| `System/Gr/GrScreen.ZC` | Per-task redraw, controls, draw callbacks, z-buffer, and final screen update | The ARM64 source overlay compiles `GrUpdateTextBG` by replacing its x86 eight-row store loop with a tested stride-aware helper. AArch64 runtime bindings cover `DCBlotColor4` and the scalar `GrRopEquU8NoClipping` foreground-glyph rasterizer. The latter has a guest regression for glyph bits, stride, transparency, and underline; full `GrUpdateTextFG` presentation still needs initialized ZealOS display state. A bounded 100x75 cell z-buffer marks windows with any visible cells; each marked window's text, task `draw_it`, and visible control `draw_it` callbacks render in task-ring order. The final screen callback runs afterward with `DCF_ON_TOP`. View-angle controls, other `GrAsm` routines, and pixel-level z-buffer composition remain unported |
+| `System/Win.ZC` | Window geometry, focus, and tiling operations | `WinHorz`/`WinVert`, derived geometry, bounded click focus/raise, title-bar move, and frame resize are ported; tiling and complete focus policies remain incomplete |
+| `System/WinMgr.ZC` | Refresh loop, mouse routing, move/resize, and window-manager task | The shell idle pump routes tablet clicks to the topmost shown window/control, captures title-bar move and frame-resize drags, and redraws the task ring; the full upstream WinMgr task remains unported |
 | `System/Gr/MakeGr.ZC` | Graphics module include order | Reference only; its complete dependency set is not loaded by the bring-up runtime |
 
 ## First source-backed slice
@@ -69,13 +69,58 @@ QEMU probe. Bounded `CtrlDispatchLeftClick` and `CtrlDispatchWheel` helpers
 route explicit screen-coordinate events to those callbacks, including
 border-origin translation and release to a clicked control. The tablet bridge
 now provides one packed coordinate/button sample, and `GrUpdateTasks` polls it
-for left-button press, held drag, and release on the focused task. The QEMU
-probe feeds synthetic samples through that same state path and checks a
-captured scrollbar drag. The shell's cooperative idle pump invokes
+for left-button press, held drag, and release. A new press hit-tests shown task
+rectangles and visible control bounds, raises the topmost owner in the shared
+task/window ring, and assigns focus when allowed; control bounds also keep
+scrollbars just beyond a client rectangle from falling through to a parent.
+Title-bar drags move bordered windows, the left frame edge moves them
+horizontally at fixed width as upstream does, and the right, bottom, and
+lower-right frame edges resize them while the pointer is captured. Drag updates
+now pass through the same `WinHorz`/`WinVert` normalization as upstream, keeping
+dimensions at least one cell and applying the original screen-edge rules. The
+QEMU probe checks focus/raise on overlapping windows, title and left-edge
+movement, corner resize, one-cell minimum sizing, and a captured scrollbar
+drag. The shell's
+cooperative idle pump invokes
 `BootstrapWinMgrTick` every 16 idle polls after the ZealOS task layer loads; it
-needs no extra guest task slot. Window move/resize/focus routing, right-button
-controls, and tablet wheel support remain unported. View-angle controls remain
-unported.
+needs no extra guest task slot. Right-button control callbacks now follow the
+same hit testing and `CTRLF_CAPTURE_RIGHT_MS` held/release behavior as pinned
+`WinMgr.ZC`; the task regression exercises captured movement beyond the
+control bounds. `WIf_SELF_CTRLS` and `WIf_FOCUS_TASK_CTRLS` now gate left-click,
+right-click, and wheel dispatch as in upstream WinMgr. VirtIO `REL_WHEEL`
+steps now flow through the packed tablet sample into the focused task's wheel
+control, including signed up/down deltas. Border hit testing and title actions
+honor both `WIf_SELF_BORDER` on the target task and `WIf_FOCUS_TASK_BORDER` on
+the focused task, matching the corresponding `WinMgr.ZC` gates. The remaining
+upstream focus policies are unported. Body clicks now use the pinned
+`WinCursorPosSet` coordinate mapping, including document scroll offsets and
+the `WIf_SELF_MS_L` / `WIf_FOCUS_TASK_MS_L` gates. Body clicks now capture
+through button release, flash bordered entries while pressed, and send Space
+or Enter for the upstream left/right clickable entry flags. Full drag
+selection remains unported.
+Pointer movement now also reaches the focused task as `MESSAGE_MS_MOVE`, with
+coordinates translated to that task's scrolled client area. Button messages
+use those same translated coordinates. Tasks that request single-click mode
+receive immediate down/up messages; other tasks receive delayed single-click
+or synthesized `MESSAGE_MS_*_D_*` events using ZealOS's 175 ms interval.
+DolDoc body clicks wait for that interval before activating an entry; a double
+click sends the upstream Escape or Shift-Escape action instead. Window controls
+continue to react to the physical button transitions.
+The first four title cells post the upstream
+Ctrl-M task-menu key; the last three post Shift-Esc to a task with a document
+or kill a task without one. These release-triggered actions match pinned
+`WinMgr.ZC`.
+View-angle controls remain unported.
+
+`/Tests/WindowDragLive.ZC` provides two overlapping bordered windows for a
+manual UTM check. Load `KernelA.HH`, `KernelB.HH`, `Message.ZC`, `Job.ZC`, and
+`KeyDev.ZC` before the fixture. `WindowDragLiveButtonChecks` covers the packed
+tablet press/release route, task-menu queueing, and no-document close in QEMU;
+`WindowDragLiveStart` provides the visible focus/raise, title movement, corner
+resize, right-click capture (the control box turns green while held), and
+close-button check with the real tablet. Its parked demo tasks do not draw a
+task menu. Call `WindowDragLiveStop` to close any remaining test windows. The
+automated check cannot replace the interactive UTM check.
 
 After window callbacks, `GrUpdateTasks` invokes the optional
 `gr.fp_final_screen_update` callback with `DCF_ON_TOP`. Graphics calls through
@@ -89,10 +134,33 @@ array. The ARM64 FFI bridge now gathers those stack-passed arguments for
 bindings with more than eight parameters; the eleven-argument clipped line
 call exercises that path in the QEMU compatibility probe.
 
+## Foreground glyph rasterizer
+
+`GrRopEquU8NoClipping` is now an AArch64 scalar host binding for the pinned
+x86 routine. It reads the guest's 256-entry `text.font` table, maps the masked
+foreground nibble to the interim palette-index surface, writes only set glyph
+bits, preserves destination pixels under transparent bits, and forces the
+bottom scanline for `ATTRF_UNDERLINE`. Its guest checks cover the `A` glyph,
+row stride/padding, transparent spaces, and underline. The current table is
+seeded from the bring-up's compact 8x8 font; it is not ZealOS's full font set.
+
+`GrUpdateTextFGChecks` also runs the unchanged foreground loop against a
+temporarily initialized 800x600 paletted CDC. It verifies the exact changed
+pixel span for one text cell and returns `0x2a`. This validates source-to-CDC
+foreground composition, not full-screen presentation. `GrUpdateScreen32Checks`
+also runs unchanged `GrUpdateScreen32` against temporary palette, raw-screen,
+cache, and 32-bit alias buffers. It confirms palette conversion, changed-pixel
+copy, and unchanged-pixel preservation. These are guest-allocated test
+surfaces; the framebuffer alias is not yet the Limine framebuffer. Upstream
+`gr.dc1`, `gr.dc_cache`, zoom/pan surfaces, and the real framebuffer alias are
+not initialized as one coherent screen pipeline. The next slice is to bind
+that alias to the Limine framebuffer and connect the full `GrUpdateScreen`
+sequence without having its presentation overwrite task-bridge drawing.
+
 ## Remaining graphics path
 
-The next substantive graphics work is full WinMgr mouse dispatch and
-move/resize/focus, view-angle controls, wallpaper, and broader CDC operations.
+The next substantive graphics work is remaining WinMgr input behavior,
+view-angle controls, wallpaper, and broader CDC operations.
 `Kernel/Display.ZC`'s
 framebuffer writes can target the Limine-provided framebuffer, but x86 assembly
 in `GrTextBase.ZC` and `GrAsm.ZC` must stay behind the ARM64 bridge or be

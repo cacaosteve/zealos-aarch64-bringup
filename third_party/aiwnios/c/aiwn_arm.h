@@ -84,6 +84,7 @@ int64_t ARM_sdivRegX(int64_t d, int64_t n, int64_t m);
 int64_t ARM_fcmp(int64_t a, int64_t b);
 int64_t ARM_fmovReg(int64_t d, int64_t s);
 int64_t ARM_fnegReg(int64_t d, int64_t s);
+int64_t ARM_fsqrtReg(int64_t d, int64_t s);
 int64_t ARM_strRegImmF64(int64_t r, int64_t n, uint64_t off);
 int64_t ARM_ldrRegImmF64(int64_t r, int64_t n, uint64_t off);
 int64_t ARM_ldpPostImmX(int64_t r, int64_t r2, int64_t b, int64_t off);

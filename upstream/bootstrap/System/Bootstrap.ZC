@@ -13,11 +13,19 @@
 #define TRUE 1
 #define FALSE 0
 extern U8 *MAlloc(I64 size, I64 mem_task=NULL);
+extern U8 *CAlloc(I64 size, I64 mem_task=NULL);
+extern I64 ZcMonotonicNs();
+F64 tS()
+{
+    return ZcMonotonicNs() / 1000000000.0;
+}
 extern U0 Free(U8 *ptr);
 extern I64 MSize(U8 *ptr);
 extern I64 MSize2(U8 *ptr);
 extern U8 *MemCopy(U8 *dst,U8 *src,I64 count);
 extern U8 *MemSet(U8 *dst,I64 byte,I64 count);
+extern U0 DCBlotColor4(U8 *dst, I64 *img, I64 *img_cache, I64 count);
+extern U0 GrRopEquU8NoClipping(I64 ch, U8 *dst, I64 width_internal);
 extern I64 SwapI64(I64 *a,I64 *b);
 extern U0 Puts(U8 *text);
 // Temporary cooperative task bridge. These are not ZealOS Spawn/Yield APIs.

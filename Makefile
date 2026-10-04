@@ -18,6 +18,7 @@ LIMINE_BIN := $(ROOT)/third_party/limine-binary
 LIMINE_INC := $(ROOT)/third_party/limine-12.9.0/limine-protocol/include
 
 CLANG    ?= /opt/homebrew/opt/llvm/bin/clang
+HOST_CC  ?= $(CLANG)
 LLD_FLAG := -fuse-ld=lld
 SGDISK   ?= /opt/homebrew/bin/sgdisk
 
@@ -94,7 +95,7 @@ SRC_SHADOW_END   := $(shell echo $$(($(SRC_SHADOW_LBA) + $(SRC_SHADOW_SECTS) - 1
 ESP_END_SECTOR   := $(shell echo $$(($(RS_LBA_BASE) - 1)))
 ESP_SECTORS      := $(shell echo $$(($(ESP_END_SECTOR) - $(ESP_START_SECTOR) + 1)))
 
-.PHONY: all clean esp iso run run-serial check-serial run-iso utm pi-sd pi-diag
+.PHONY: all clean esp iso run run-serial check-serial check-page-tables run-iso utm pi-sd pi-diag
 
 all: $(BOOT) $(KERNEL) iso esp
 
@@ -510,7 +511,11 @@ run-serial: iso $(FW_VARS) $(RS_IMG)
 		-name zealos-aarch64-hello
 
 # Boot until "hc IR OK"; fail make if jit_smoke reported FAIL (no shell hang).
-check-serial: iso $(FW_VARS) $(RS_IMG)
+check-page-tables: | $(BUILD)
+	$(HOST_CC) -std=c11 -Wall -Wextra -Wno-unused-function tests/mmio_map_test.c -o $(BUILD)/mmio-map-test
+	$(BUILD)/mmio-map-test
+
+check-serial: check-page-tables iso $(FW_VARS) $(RS_IMG)
 	@rm -f $(BUILD)/check-serial.log
 	@( $(QEMU) $(QEMU_VIRT) \
 		$(QEMU_FW) \

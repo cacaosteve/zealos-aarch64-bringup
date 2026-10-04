@@ -1,0 +1,61 @@
+// Zeroed storage for the compile-only Win.ZC probe. The full kernel normally
+// provides these globals from Kernel/KGlobals.ZC; this probe does not start
+// the mouse subsystem or execute Win.ZC callbacks.
+CMouseStateGlobals mouse, mouse_last;
+CGridGlobals mouse_grid;
+CMouseHardStateGlobals mouse_hard, mouse_hard_last;
+CMenuEntry *sys_cur_submenu_entry;
+CTask *sys_winmgr_task;
+
+// The real KeyDev.ZC callback registry is intentionally outside this probe.
+U0 CtrlAltCBSet(U8 ch, U0 (*fp_handler)(I64 sc), U8 *no_shift_desc=NULL,
+                U8 *shift_desc=NULL, Bool in_irq=FALSE)
+{
+}
+
+// DrawMenu normally comes from the full menu subsystem, which this focused
+// Win.ZC parser probe does not load. WinFinalUpdate is not executed here.
+U0 DrawMenu(CDC *dc)
+{
+}
+
+// GrScaleZoom is defined in GrScreen.ZC, whose file-scope setup currently
+// requires the full graphics bootstrap. This compile-only probe never calls it.
+U0 GrScaleZoom(F64 scale)
+{
+}
+
+I64 WinCAllocCheck()
+{
+    return CAlloc(8) != NULL;
+}
+
+I64 WinTimeCheck()
+{
+    return ZcMonotonicNs() > 0;
+}
+
+F64 WinF64One()
+{
+    return 1.0;
+}
+
+F64 WinF64FromClock()
+{
+    return ZcMonotonicNs() * 0.000000001;
+}
+
+I64 WinF64Check()
+{
+    return WinF64One > 0;
+}
+
+I64 WinF64ClockCheck()
+{
+    return WinF64FromClock > 0;
+}
+
+I64 WinExtTableCheck()
+{
+    return ext[EXT_WIN_TO_TOP] != NULL && ext[EXT_WIN_FOCUS] != NULL;
+}

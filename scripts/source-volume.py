@@ -186,6 +186,34 @@ def compact(disk):
           f'{old_tail} -> {pos}/{SECTORS} sectors used')
 
 
+def merge(disk, bundle_path):
+    """Append missing bundled files without replacing edits or tombstones."""
+    with disk.open('r+b') as f:
+        pos, files, deleted_names = scan(f, with_deleted=True)
+        added = 0
+        with tarfile.open(bundle_path) as bundle:
+            members = sorted((m for m in bundle.getmembers()
+                              if m.isfile() and m.name.endswith(('.ZC', '.HH'))),
+                             key=lambda m: m.name)
+            for member in members:
+                name = member.name
+                valid_name(name)
+                # Existing records may contain local edits. Tombstones are
+                # deliberate masks and must not be undone by a refreshed image.
+                if name in files or name in deleted_names:
+                    continue
+                data = bundle.extractfile(member).read()
+                record_pos = pos
+                pos = append(f, pos, name, data)
+                files[name] = (record_pos, len(data), zlib.crc32(data))
+                added += 1
+        f.flush()
+        os.fsync(f.fileno())
+    print(f'Source partition: merged {added} new files; '
+          f'{len(files)} live, {len(deleted_names)} deleted, '
+          f'{pos}/{SECTORS} sectors used')
+
+
 p = argparse.ArgumentParser(description=__doc__)
 sub = p.add_subparsers(dest='command', required=True)
 seed = sub.add_parser('seed', help='format and seed a newly built GPT image')
@@ -202,12 +230,17 @@ delete.add_argument('disk', type=pathlib.Path)
 delete.add_argument('name')
 repack = sub.add_parser('compact', help='reclaim old source records (VM stopped)')
 repack.add_argument('disk', type=pathlib.Path)
+merge_parser = sub.add_parser('merge', help='add missing bundled files without replacing local files')
+merge_parser.add_argument('disk', type=pathlib.Path)
+merge_parser.add_argument('bundle', type=pathlib.Path)
 args = p.parse_args()
 if args.disk.stat().st_size < (START + SECTORS) * SECTOR:
     p.error('disk image is too small for the source partition')
 
 if args.command == 'compact':
     compact(args.disk)
+elif args.command == 'merge':
+    merge(args.disk, args.bundle)
 else:
     with args.disk.open('r+b' if args.command != 'inspect' else 'rb') as f:
         if args.command == 'seed':

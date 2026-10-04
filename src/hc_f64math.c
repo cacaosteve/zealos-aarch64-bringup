@@ -9,7 +9,9 @@
 #define HC_PI 3.14159265358979323846
 #define HC_TWO_PI (2.0 * HC_PI)
 #define HC_HALF_PI (0.5 * HC_PI)
+#define HC_LN2 0.69314718055994530942
 #define HC_QNAN_BITS 0x7ff8000000000000ULL
+#define HC_INF_BITS 0x7ff0000000000000ULL
 
 static double hc_bits_to_d(uint64_t b) {
     union {
@@ -36,6 +38,46 @@ static int hc_exp_bits(double x) {
     } v;
     v.d = x;
     return (int)((v.u >> 52) & 0x7ff);
+}
+
+/* Freestanding Exp implementation for ZealOS's _EXP import. Reduce by ln(2),
+ * evaluate a Taylor series on a small interval, then scale by powers of two.
+ * The result is IEEE-754 rounded by the target F64 operations. */
+uint64_t hc_builtin_exp(uint64_t xbits) {
+    double x = hc_bits_to_d(xbits);
+    double r, term = 1.0, sum = 1.0;
+    int k, i;
+    if (hc_exp_bits(x) == 0x7ff) {
+        if (x != x)
+            return HC_QNAN_BITS;
+        return x > 0.0 ? HC_INF_BITS : 0;
+    }
+    if (x > 709.7827128933839731)
+        return HC_INF_BITS;
+    if (x < -745.1332191019411084)
+        return 0;
+    k = (int)(x / HC_LN2);
+    r = x - (double)k * HC_LN2;
+    if (r > HC_LN2 * 0.5) {
+        r -= HC_LN2;
+        k++;
+    } else if (r < -HC_LN2 * 0.5) {
+        r += HC_LN2;
+        k--;
+    }
+    for (i = 1; i <= 20; i++) {
+        term *= r / (double)i;
+        sum += term;
+    }
+    while (k > 0) {
+        sum *= 2.0;
+        k--;
+    }
+    while (k < 0) {
+        sum *= 0.5;
+        k++;
+    }
+    return hc_d_to_bits(sum);
 }
 
 /* Reduce to [-pi, pi]. Non-finite or |x| >= 2^20 → quiet NaN. */

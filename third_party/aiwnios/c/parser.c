@@ -136,6 +136,20 @@ int64_t PrsGoto(CCmpCtrl *ccmp);
 int64_t PrsReturn(CCmpCtrl *ccmp);
 int64_t ParseErr(CCmpCtrl *ctrl, char *fmt, ...);
 int64_t PrsTry(CCmpCtrl *cctrl); // YES
+static int PrsIsX86RegisterName(const char *name) {
+  static const char *registers[] = {
+      "RAX", "RBX", "RCX", "RDX", "RSI", "RDI", "RBP", "RSP",
+      "R8",  "R9",  "R10", "R11", "R12", "R13", "R14", "R15",
+      "EAX", "EBX", "ECX", "EDX", "ESI", "EDI", "EBP", "ESP",
+      "AX",  "BX",  "CX",  "DX",  "SI",  "DI",  "BP",  "SP",
+      "AL",  "BL",  "CL",  "DL",  "AH",  "BH",  "CH",  "DH"};
+  size_t i;
+  for (i = 0; i < sizeof(registers) / sizeof(registers[0]); i++)
+    if (!strcmp(name, registers[i]))
+      return 1;
+  return 0;
+}
+
 int64_t PrsDecl(CCmpCtrl *ccmp, CHashClass *base, CHashClass *add_to,
                 int64_t *is_func_decl, int64_t flags, char *import_name);
 int64_t PrsSwitch(CCmpCtrl *cctrl);
@@ -2480,7 +2494,7 @@ label_loop:
     rpn->code_misc->flags |= CMF_DEFINED;
     Lex(ccmp->lex);
     if (ccmp->lex->cur_tok != ':') {
-      ParseErr(ccmp, "Expected a ':'.");
+      ParseErr(ccmp, "Expected ':' after label candidate '%s'.", rpn->code_misc->str);
       return 0;
     }
     Lex(ccmp->lex);
@@ -2491,6 +2505,11 @@ not_label:
    * remain visible without emitting a separate export record. */
   if (PrsKw(ccmp, TK_KW_PUBLIC) && ccmp->cur_fun)
     ParseErr(ccmp, "public declarations must be at file scope.");
+  /* TempleOS argpop/noargpop select x86 stack cleanup conventions. AArch64
+   * uses the platform ABI's fixed caller/callee rules, so retain source
+   * compatibility while treating these declarations as ordinary functions. */
+  if (PrsKw(ccmp, TK_KW_ARGPOP) || PrsKw(ccmp, TK_KW_NOARGPOP))
+    return PrsStmt(ccmp);
   if (found_label) {
     QueIns(rpn, ccmp->code_ctrl->ir_code);
     if (!PrsStmt(ccmp)) {
@@ -2861,7 +2880,10 @@ int64_t PrsFunArgs(CCmpCtrl *ccmp, CHashFun *fun) {
       Lex(ccmp->lex);
       PrsDecl(ccmp, cls, fun, NULL, PRSF_FUN_ARGS, NULL);
       fun->argc++;
-      if (ccmp->lex->cur_tok == ',') {
+      /* ZealOS uses ';' as a parameter separator in a small number of
+       * declarations (for example StrPrintHex); it has the same ARM64
+       * function-signature meaning as a comma. */
+      if (ccmp->lex->cur_tok == ',' || ccmp->lex->cur_tok == ';') {
         Lex(ccmp->lex);
         continue;
       } else if (ccmp->lex->cur_tok == ')') {
@@ -2906,6 +2928,17 @@ CHashClass *PrsType(CCmpCtrl *ccmp, CHashClass *base, char **name,
                     CHashFun **fun, CArrayDim *dim) {
   int64_t star_cnt = 0, star_cnt2 = 0;
   int64_t is_func_ptr = 0;
+  /* ZealOS often writes `I64 reg RSI value`, attaching the x86 register
+   * constraint after the base type. Accept the annotation for source
+   * compatibility; the ARM64 backend allocates the local normally. */
+  if (ccmp->cur_fun && PrsKw(ccmp, TK_KW_REG)) {
+    if (ccmp->lex->cur_tok == TK_I64 || ccmp->lex->cur_tok == TK_NAME)
+      Lex(ccmp->lex);
+    else
+      ParseErr(ccmp, "Expected an x86 register name after 'reg'.");
+  } else if (ccmp->cur_fun) {
+    PrsKw(ccmp, TK_KW_NOREG);
+  }
   if (name)
     *name = NULL;
   if (fun)
@@ -3078,10 +3111,32 @@ static int PrsSameCallType(CHashClass *a, CHashClass *b) {
   if (a == b)
     return 1;
   /* KernelA's U8/I64 unions deliberately replace the bootstrap primitive
-   * aliases. They are different type objects but retain the same scalar ABI. */
-  return a && b && a->raw_type >= RT_I8i && a->raw_type <= RT_F64 &&
+   * aliases. Opaque pointers may likewise be redeclared as U8* in the small
+   * bootstrap API; both spellings retain the same AArch64 pointer ABI. */
+  return a && b &&
+         ((a->raw_type >= RT_I8i && a->raw_type <= RT_F64) ||
+          a->raw_type == RT_PTR) &&
          a->raw_type == b->raw_type && a->sz == b->sz &&
          a->ptr_star_cnt == b->ptr_star_cnt;
+}
+static int PrsSameArrayDim(CArrayDim *a, CArrayDim *b) {
+  while (a && b) {
+    if (a->cnt != b->cnt)
+      return 0;
+    a = a->next;
+    b = b->next;
+  }
+  return !a && !b;
+}
+static int PrsSameGlobalType(CHashClass *a, CHashClass *b) {
+  if (a == b)
+    return 1;
+  /* A same-sized aggregate is not necessarily layout-compatible. Only
+   * scalar and pointer globals may use the looser call-ABI equivalence. */
+  if (a && b && a->raw_type == RT_PTR && b->raw_type == RT_PTR &&
+      !a->ptr_star_cnt && !b->ptr_star_cnt)
+    return 0;
+  return PrsSameCallType(a, b);
 }
 static int PrsSameFunctionABI(CHashFun *a, CHashFun *b) {
   CMemberLst *am = a->base.members_lst, *bm = b->base.members_lst;
@@ -3103,7 +3158,7 @@ int64_t PrsDecl(CCmpCtrl *ccmp, CHashClass *base, CHashClass *add_to,
                 int64_t *is_func_decl, int64_t flags, char *import_name) {
   if (is_func_decl)
     *is_func_decl = 0;
-  int64_t reg = REG_MAYBE, is_fun = 0, used = 0, tmpi;
+  int64_t reg = REG_MAYBE, is_fun = 0, used = 0, tmpi, inst;
   CArrayDim dim;
   CHashClass *cls;
   CMemberLst *lst, *bungis;
@@ -3117,8 +3172,13 @@ int64_t PrsDecl(CCmpCtrl *ccmp, CHashClass *base, CHashClass *add_to,
       reg = REG_NONE;
     else if (PrsKw(ccmp, TK_KW_REG)) {
       reg = REG_ALLOC;
-      if (ccmp->lex->cur_tok == TK_I64) {
-        reg = ccmp->lex->integer;
+      if (ccmp->lex->cur_tok == TK_I64 ||
+          (ccmp->lex->cur_tok == TK_NAME &&
+           PrsIsX86RegisterName(ccmp->lex->string))) {
+        /* x86 source may spell either a numeric HolyC register ID or a name
+         * such as RSI. The named register is accepted but not imposed on ARM. */
+        if (ccmp->lex->cur_tok == TK_I64)
+          reg = ccmp->lex->integer;
         Lex(ccmp->lex);
       }
     }
@@ -3246,7 +3306,9 @@ int64_t PrsDecl(CCmpCtrl *ccmp, CHashClass *base, CHashClass *add_to,
     if ((flags & PRSF_FUN_ARGS) || (flags & PRSF_STATIC)) {
       Lex(ccmp->lex);
       lst->flags |= MLF_DFT_AVAILABLE;
-      if (!lst->dim.next) {
+      if ((flags & PRSF_FUN_ARGS) && PrsKw(ccmp, TK_KW_LASTCLASS)) {
+        lst->flags |= MLF_LASTCLASS;
+      } else if (!lst->dim.next) {
         switch (lst->member_class->raw_type) {
           break;
         case RT_U8i:
@@ -3257,8 +3319,21 @@ int64_t PrsDecl(CCmpCtrl *ccmp, CHashClass *base, CHashClass *add_to,
         case RT_I32i:
         case RT_U64i:
         case RT_I64i:
-        case RT_PTR:
         case RT_FUNC: // func ptr
+          tmpi = lst->dft_val = PrsI64(ccmp);
+          if (flags & PRSF_STATIC) {
+            lst->static_bytes = A_CALLOC(8, NULL);
+            *(int64_t *)lst->static_bytes = tmpi;
+          }
+          break;
+        case RT_PTR:
+          /* Aggregate class values share RT_PTR with actual pointers.
+           * They have no pointer stars and own a member list; static class
+           * initializers must take the recursive layout path below. */
+          if ((flags & PRSF_STATIC) &&
+              !lst->member_class->ptr_star_cnt &&
+              lst->member_class->members_lst)
+            goto static_array;
           tmpi = lst->dft_val = PrsI64(ccmp);
           if (flags & PRSF_STATIC) {
             lst->static_bytes = A_CALLOC(8, NULL);
@@ -3347,7 +3422,25 @@ int64_t PrsDecl(CCmpCtrl *ccmp, CHashClass *base, CHashClass *add_to,
     }
     HashAdd(glbl_var, Fs->hash_table);
   found_glbl:
-    if (!(flags & (PRSF_EXTERN | PRSF__EXTERN))) {
+    if (flags & (PRSF_EXTERN | PRSF__EXTERN)) {
+      /* Resolve an extern declaration against an earlier guest global when
+       * the declared object layout agrees. Upstream modules commonly
+       * redeclare globals supplied by the task bridge (for example `winmgr`). */
+      for (inst = 2;; inst++) {
+        extern_glbl = (CHashGlblVar *)HashSingleTableFind(
+            glbl_var->base.str, Fs->hash_table, HTT_GLBL_VAR, inst);
+        if (!extern_glbl)
+          break;
+        if (!(extern_glbl->base.type & HTF_EXTERN) && extern_glbl->data_addr &&
+            PrsSameGlobalType(glbl_var->var_class, extern_glbl->var_class) &&
+            glbl_var->dim.total_cnt == extern_glbl->dim.total_cnt &&
+            PrsSameArrayDim(glbl_var->dim.next, extern_glbl->dim.next)) {
+          glbl_var->data_addr = extern_glbl->data_addr;
+          glbl_var->base.type &= ~HTF_EXTERN;
+          break;
+        }
+      }
+    } else {
       if (extern_glbl = HashSingleTableFind(glbl_var->base.str, Fs->hash_table,
                                             HTT_GLBL_VAR, 2)) { // Pick 2nd EXTERN(?) Var
         extern_glbl->data_addr = glbl_var->data_addr;
@@ -3686,10 +3779,14 @@ int64_t AssignRawTypeToNode(CCmpCtrl *ccmp, CRPN *rpn) {
     if (!fun)
       ParseErr(ccmp, "Invalid type to call."); // TODO add type name
     if ((fun->base.base.type & (HTF_INTRINSIC | HTF_EXTERN)) ==
-        (HTF_INTRINSIC | HTF_EXTERN))
+            (HTF_INTRINSIC | HTF_EXTERN) &&
+        !(fun->import_name && (!strcmp(fun->import_name, "IC_SQRT") ||
+                               !strcmp(fun->import_name, "IC_SWAP_U16"))))
       ParseErr(ccmp, "AArch64 intrinsic '%s' (%s) is not implemented.",
                fun->base.base.str, fun->import_name);
-    if ((fun->base.base.type & HTF_EXTERN) && fun->import_name)
+    if ((fun->base.base.type & HTF_EXTERN) && fun->import_name &&
+        !(fun->import_name && (!strcmp(fun->import_name, "IC_SQRT") ||
+                               !strcmp(fun->import_name, "IC_SWAP_U16"))))
       ParseErr(ccmp, "AArch64 external '%s' (%s) is not bound.",
                fun->base.base.str, fun->import_name);
     if (arg > fun->argc && !(fun->base.flags & CLSF_VARGS)) {
@@ -3703,7 +3800,8 @@ int64_t AssignRawTypeToNode(CCmpCtrl *ccmp, CRPN *rpn) {
       rpn = ICArgN(orig_rpn, orig_rpn->length - arg - 1);
       if (rpn->type == IC_NOP)
         if (!(mlst->flags & MLF_DFT_AVAILABLE)) {
-          ParseErr(ccmp, "No default value for argument %d.", arg);
+          ParseErr(ccmp, "No default value for argument %d of '%s'.", arg,
+                   fun->base.base.str);
         }
       mlst = mlst->next;
     }
@@ -3711,7 +3809,8 @@ int64_t AssignRawTypeToNode(CCmpCtrl *ccmp, CRPN *rpn) {
       if (fun->base.flags & CLSF_VARGS && arg >= fun->argc - 2)
         break;
       if (!(mlst->flags & MLF_DFT_AVAILABLE)) {
-        ParseErr(ccmp, "No default value for argument %d.", arg);
+        ParseErr(ccmp, "No default value for argument %d of '%s'.", arg,
+                 fun->base.base.str);
       }
       mlst = mlst->next;
     }
@@ -4659,10 +4758,11 @@ int64_t PrsTry(CCmpCtrl *cctrl) {
   ParseErr(cctrl, "Guest try/catch runtime is not implemented.");
 #endif
 #ifdef ZEAL_GUEST_EXCEPTIONS
-  if (!HashFind("SysTry", Fs->hash_table, HTT_FUN, 1))
+  if (!HashFind("ZcTryEnter", Fs->hash_table, HTT_FUN, 1))
     ParseErr(cctrl, "Guest try/catch requires the task bridge.");
 #endif
-  // AIWNIOS_SetJmp(SysTry())
+  // AIWNIOS_SetJmp(ZcTryEnter()). Keep these hooks distinct from ZealOS's
+  // native SysTry(start_label, skip_label), declared by KernelC.HH.
   *(rpn = A_CALLOC(sizeof(CRPN), NULL)) = (CRPN){
       .type = IC_GLOBAL,
       .global_var = HashFind("AIWNIOS_SetJmp", Fs->hash_table, HTT_FUN, 1),
@@ -4670,7 +4770,7 @@ int64_t PrsTry(CCmpCtrl *cctrl) {
   QueIns(rpn, cctrl->code_ctrl->ir_code);
   *(rpn = A_CALLOC(sizeof(CRPN), NULL)) = (CRPN){
       .type = IC_GLOBAL,
-      .global_var = HashFind("SysTry", Fs->hash_table, HTT_FUN, 1),
+      .global_var = HashFind("ZcTryEnter", Fs->hash_table, HTT_FUN, 1),
   };
   QueIns(rpn, cctrl->code_ctrl->ir_code);
   (rpn = A_CALLOC(sizeof(CRPN), NULL))->type = IC_CALL;
@@ -4687,10 +4787,10 @@ int64_t PrsTry(CCmpCtrl *cctrl) {
   QueIns(rpn, cctrl->code_ctrl->ir_code);
   // See below note
   PrsStmt(cctrl);
-  // We will call SysUntry if we succesful got through the try block
+  // We leave the guest exception pad if we successfully got through the try block.
   *(rpn = A_CALLOC(sizeof(CRPN), NULL)) = (CRPN){
       .type = IC_GLOBAL,
-      .global_var = HashFind("SysUntry", Fs->hash_table, HTT_FUN, 1),
+      .global_var = HashFind("ZcTryLeave", Fs->hash_table, HTT_FUN, 1),
   };
   QueIns(rpn, cctrl->code_ctrl->ir_code);
   (rpn = A_CALLOC(sizeof(CRPN), NULL))->type = IC_CALL;
@@ -4711,10 +4811,10 @@ int64_t PrsTry(CCmpCtrl *cctrl) {
   QueIns(rpn, cctrl->code_ctrl->ir_code);
   // Our catch block
   PrsStmt(cctrl);
-  // Call EndCatch
+  // Finish the guest catch.
   *(rpn = A_CALLOC(sizeof(CRPN), NULL)) = (CRPN){
       .type = IC_GLOBAL,
-      .global_var = HashFind("EndCatch", Fs->hash_table, HTT_FUN, 1),
+      .global_var = HashFind("ZcTryCatchEnd", Fs->hash_table, HTT_FUN, 1),
   };
   QueIns(rpn, cctrl->code_ctrl->ir_code);
   (rpn = A_CALLOC(sizeof(CRPN), NULL))->type = IC_CALL;

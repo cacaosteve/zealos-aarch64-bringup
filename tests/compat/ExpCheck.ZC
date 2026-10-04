@@ -1,0 +1,16 @@
+I64 ExpCheck()
+{
+    F64 one = Exp(1.0);
+    F64 neg_one = Exp(-1.0);
+    F64 large = Exp(10.0);
+
+    if (Exp(0.0) < 0.999999 || Exp(0.0) > 1.000001)
+        return 0;
+    if (one < 2.71827 || one > 2.71829)
+        return 0;
+    if (neg_one < 0.36787 || neg_one > 0.36789)
+        return 0;
+    if (large < 22026.4 || large > 22026.6)
+        return 0;
+    return 42;
+}

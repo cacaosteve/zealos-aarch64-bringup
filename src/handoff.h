@@ -23,6 +23,7 @@
 /* Bootloader reclaimable: not free until kernel finishes handoff/boot services. */
 #define ZEAL_MEM_RECLAIM  8
 #define ZEAL_MEM_KERNEL   9 /* loaded kernel image (reserved for runtime) */
+#define ZEAL_MEM_PAGETABLE 10 /* boot-reserved 4KiB translation-table pool */
 
 #define ZEAL_MEM_MAX 256
 

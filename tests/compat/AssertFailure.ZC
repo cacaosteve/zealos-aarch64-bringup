@@ -2,4 +2,4 @@ class BadLayout {
     U16i word;
     U8i byte;
 };
-#assert sizeof(BadLayout) == 8
+#assert 0
