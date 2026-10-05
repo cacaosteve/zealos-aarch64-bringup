@@ -2615,14 +2615,14 @@ Freeze catalog unchanged.
 |--|--|
 | Gap | The bootstrap and later upstream graphics load each allocate their own non-`extern` `gr` global; the idle tick was reading the bootstrap copy and missed the final CDC callback installed by `Win.ZC` |
 | Bring-up | Resolve the newest `gr` from the active hash table, use the shared framebuffer CDC for the final overlay, and fall back to `sys_task` when `sys_winmgr_task` is stale |
-| Smoke | `GrScreenFinalUpdateChecks` sets the later global's callback, calls `BootstrapWinMgrTick`, and verifies the callback and screen-space pixel |
-| Limits | Verifies the guest callback path under QEMU; the full `WinFinalUpdate` cursor overlay still depends on the remaining mouse and screen initialization |
+| Smoke | `GrScreenFinalUpdateChecks` verifies the callback and screen-space pixel, then stages two frames with `mouse_grid.coord` off/on and checks that unchanged `WinFinalUpdate` changes its coordinate-overlay pixels |
+| Limits | Verifies the coordinate overlay path under QEMU; physical mouse motion and cursor drawing still need the full mouse/display initialization |
 
 Freeze catalog unchanged.
 
 ## Open compatibility probe — `/System/Win.ZC`
 
-The source probe loads pinned `KernelC.HH`, `Externs.ZC`, and `Gr.HH` before compiling unchanged `Win.ZC`. Graphics dimensions and mouse globals are probe fixtures; `DrawMenu` and `GrScaleZoom` are compile-only stubs for subsystems whose full bootstrap is not loaded. `GrScreenFinalUpdateChecks` executes `WinFinalUpdate` once through the bridge CDC with menu, progress, and cursor state disabled, then checks a visible guest overlay callback. The raw ARM generic-timer binding and a standalone F64 clock expression are smoke-tested before the Win load.
+The source probe loads pinned `KernelC.HH`, `Externs.ZC`, and `Gr.HH` before compiling unchanged `Win.ZC`. Graphics dimensions and mouse globals are probe fixtures; `DrawMenu` and `GrScaleZoom` are compile-only stubs for subsystems whose full bootstrap is not loaded. `GrScreenFinalUpdateChecks` executes `WinFinalUpdate` through the staged idle-frame path, confirms the fixture's `mouse_grid.coord` toggles the real coordinate-text overlay, then checks a separate visible guest overlay callback. Physical mouse motion and cursor drawing still need the full mouse/display initialization. The raw ARM generic-timer binding and a standalone F64 clock expression are smoke-tested before the Win load.
 
 The native runtime now binds ZealOS's five-slot `ext` dispatch table to stable native storage. The probe compiles the unchanged `Win.ZC`, then checks that its file-scope initializers installed both `WinToTop` and `WinFocus` in the matching slots. This proves the module loads and its dispatch registrations work; it does not yet start the full window manager or validate interactive window behavior. The fixture remains explicit about its uninitialized kernel globals and compile-only menu/zoom stubs.
 

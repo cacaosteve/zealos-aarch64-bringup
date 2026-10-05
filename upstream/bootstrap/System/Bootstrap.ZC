@@ -43,6 +43,7 @@ extern I64 ZcFbTextPixel(I64 x, I64 y);
 extern I64 ZcDocUpdateTaskDocs(U8 *task);
 extern class CGrGlobals;
 extern CGrGlobals *ZcActiveGrGlobals();
+extern Bool ZcTaskFrameRun();
 extern I64 ZcFbScreenWidth();
 extern I64 ZcFbScreenHeight();
 extern Bool ZcFbGraphPlot(I64 x, I64 y, U32 color,

@@ -859,6 +859,10 @@ static int64_t guest_task_frame_run(void) {
     FFI_CALL_TOS_0(guest_winmgr_tick_fun->fun_ptr);
     return zeal_fb_task_frame_end() != 0;
 }
+static int64_t host_task_frame_run(int64_t *a) {
+    (void)a;
+    return guest_task_frame_run();
+}
 static int64_t host_doc_update_task_docs(int64_t *a) {
     CHashFun *fun = (CHashFun *)HashFind(
         "DocUpdateTaskDocs", Fs->hash_table, HTT_FUN, 1);
@@ -3440,6 +3444,7 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
                     {"ZcTaskSpawn", host_task_spawn, 1},
                     {"ZcTaskYield", host_task_yield, 0}, {"ZcTaskRun", host_task_run, 0},
                     {"ZcTaskResult", host_task_result, 1},
+                    {"ZcTaskFrameRun", host_task_frame_run, 0},
                     {"ZcFbTextSpan", host_fb_text_span, 10},
                     {"ZcFbTextCellsDrawn", host_fb_text_cells_drawn, 0},
                     {"ZcFbTextPixel", host_fb_text_pixel, 2},

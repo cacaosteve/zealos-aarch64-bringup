@@ -135,7 +135,12 @@ early `gr` and later `GrGlobals.ZC`'s `gr` are distinct even though they share a
 name and layout. The tick also falls back to `sys_task` if `sys_winmgr_task` is
 stale. `GrScreenFinalUpdateChecks` sets the later graphics global's callback,
 runs `BootstrapWinMgrTick`, and verifies the callback receives the bridge CDC
-and writes its screen-space pixel after composition.
+and writes its screen-space pixel after composition. The same smoke renders
+two staged frames through the normal idle-frame wrapper, toggles
+`mouse_grid.coord`, and checks that the real `WinFinalUpdate` coordinate text
+changes the pixels in its screen-space overlay region. This confirms the
+fixture's mouse-grid storage is shared with the unchanged Win callback; it
+does not yet exercise physical mouse motion or cursor drawing.
 
 These calls also exposed an AArch64 Aiwnios host-FFI gap: arguments after x0–x7
 were not copied from the caller stack into the host shim's contiguous argument

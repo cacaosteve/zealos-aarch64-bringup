@@ -2,6 +2,7 @@
 // after composing task windows, with screen-space CDC state.
 I64 gr_screen_final_update_calls;
 U8 gr_screen_final_update_old_pixel;
+U8 gr_screen_final_update_overlay_off[FONT_WIDTH * 10 * FONT_HEIGHT];
 
 U0 GrScreenFinalUpdateProbe(CDC *dc)
 {
@@ -14,6 +15,8 @@ U0 GrScreenFinalUpdateProbe(CDC *dc)
 I64 GrScreenFinalUpdateChecks()
 {
     U0 (*old_final_update)(CDC *dc);
+    I64 old_coord, old_mouse_x, old_mouse_y;
+    I64 x, y, i, overlay_x, overlay_y;
 
     if (!TaskValidate(sys_winmgr_task) && !TaskValidate(sys_task))
         return 3;
@@ -38,5 +41,49 @@ I64 GrScreenFinalUpdateChecks()
     if (bootstrap_graphics_pixels[599 * 800 + 799] != 15)
         return 2;
     bootstrap_graphics_pixels[599 * 800 + 799] = gr_screen_final_update_old_pixel;
+
+    // Direct zcall has no staged framebuffer transaction. Render both states
+    // through the idle compositor's frame wrapper and verify the actual
+    // WinFinalUpdate coordinate text changes the composed pixels.
+    old_coord = mouse_grid.coord;
+    old_mouse_x = mouse.pos.x;
+    old_mouse_y = mouse.pos.y;
+    overlay_x = GR_WIDTH - FONT_WIDTH * 10;
+    overlay_y = FONT_HEIGHT * 3;
+    mouse.pos.x = 123;
+    mouse.pos.y = 234;
+    mouse_grid.coord = FALSE;
+    if (!ZcTaskFrameRun())
+    {
+        mouse_grid.coord = old_coord;
+        mouse.pos.x = old_mouse_x;
+        mouse.pos.y = old_mouse_y;
+        return 5;
+    }
+    for (y = 0, i = 0; y < FONT_HEIGHT; y++)
+        for (x = 0; x < FONT_WIDTH * 10; x++, i++)
+            gr_screen_final_update_overlay_off[i] =
+                bootstrap_graphics_pixels[(overlay_y + y) * 800 + overlay_x + x];
+    mouse_grid.coord = TRUE;
+    if (!ZcTaskFrameRun())
+    {
+        mouse_grid.coord = old_coord;
+        mouse.pos.x = old_mouse_x;
+        mouse.pos.y = old_mouse_y;
+        return 6;
+    }
+    for (y = 0, i = 0; y < FONT_HEIGHT; y++)
+        for (x = 0; x < FONT_WIDTH * 10; x++, i++)
+            if (gr_screen_final_update_overlay_off[i] !=
+                bootstrap_graphics_pixels[(overlay_y + y) * 800 + overlay_x + x])
+            {
+                mouse_grid.coord = old_coord;
+                mouse.pos.x = old_mouse_x;
+                mouse.pos.y = old_mouse_y;
+                return 7;
+            }
+    mouse_grid.coord = old_coord;
+    mouse.pos.x = old_mouse_x;
+    mouse.pos.y = old_mouse_y;
     return 42;
 }
