@@ -2622,7 +2622,7 @@ Freeze catalog unchanged.
 
 ## Open compatibility probe — `/System/Win.ZC`
 
-The source probe loads pinned `KernelC.HH`, `Externs.ZC`, and `Gr.HH` before compiling unchanged `Win.ZC`. Graphics dimensions and mouse globals are probe fixtures; `DrawMenu` and `GrScaleZoom` are compile-only stubs for subsystems whose full bootstrap is not loaded, and `WinFinalUpdate` is not executed. The raw ARM generic-timer binding and a standalone F64 clock expression are smoke-tested before the Win load.
+The source probe loads pinned `KernelC.HH`, `Externs.ZC`, and `Gr.HH` before compiling unchanged `Win.ZC`. Graphics dimensions and mouse globals are probe fixtures; `DrawMenu` and `GrScaleZoom` are compile-only stubs for subsystems whose full bootstrap is not loaded. `GrScreenFinalUpdateChecks` executes `WinFinalUpdate` once through the bridge CDC with menu, progress, and cursor state disabled, then checks a visible guest overlay callback. The raw ARM generic-timer binding and a standalone F64 clock expression are smoke-tested before the Win load.
 
 The native runtime now binds ZealOS's five-slot `ext` dispatch table to stable native storage. The probe compiles the unchanged `Win.ZC`, then checks that its file-scope initializers installed both `WinToTop` and `WinFocus` in the matching slots. This proves the module loads and its dispatch registrations work; it does not yet start the full window manager or validate interactive window behavior. The fixture remains explicit about its uninitialized kernel globals and compile-only menu/zoom stubs.
 

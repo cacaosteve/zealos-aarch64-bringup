@@ -18,6 +18,13 @@ I64 GrScreenFinalUpdateChecks()
     if (!TaskValidate(sys_winmgr_task) && !TaskValidate(sys_task))
         return 3;
     old_final_update = gr.fp_final_screen_update;
+    if (!old_final_update)
+        return 8;
+    // Win.ZC's file-scope initializer installs WinFinalUpdate in the later
+    // graphics global. Exercise that real callback once before substituting
+    // the pixel probe below. This also checks that its current no-menu,
+    // no-progress, no-cursor state can run against the bridge CDC.
+    BootstrapWinMgrTick();
     gr_screen_final_update_old_pixel = bootstrap_graphics_pixels[599 * 800 + 799];
     gr_screen_final_update_calls = 0;
     gr.fp_final_screen_update = &GrScreenFinalUpdateProbe;
