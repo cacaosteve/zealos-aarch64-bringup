@@ -1942,8 +1942,12 @@ ZealOS live distribution or installer.
   `make check-grscreen`. `GrUpdateScreen32Checks` also runs unchanged
   `GrUpdateScreen32` with temporary palette/raw/cache/alias buffers and verifies
   palette conversion plus changed-pixel presentation and unchanged-pixel
-  preservation. This does not yet prove full `GrUpdateScreen` on the Limine
-  framebuffer: real `gr.dc1`/`gr.dc_cache` state and the hardware framebuffer
-  alias are not initialized together. The next graphics integration step is
-  binding that alias to Limine's framebuffer and joining this pipeline to the
-  task compositor.
+  preservation. KernelB now exposes the Limine HHDM address as
+  `sys_framebuffer_addr` and initializes `text.fb_alias`; the
+  `GrUpdateScreen32LimineChecks` smoke runs the unchanged presenter against the
+  real QEMU ramfb and confirms the pixel via framebuffer readback before
+  restoring it. The full `GrUpdateScreen` path remains unverified: upstream
+  `gr.dc1`/`gr.dc_cache` and zoom/pan surfaces are not initialized together,
+  while task graphics still draw directly to the framebuffer. The next step is
+  to move task drawing to the compositor surface, then initialize and exercise
+  the complete upstream refresh path.

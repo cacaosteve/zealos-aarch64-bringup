@@ -3,6 +3,7 @@ extern U0 GrUpdateTextFG();
 extern U0 GrUpdateScreen32();
 extern U0 GrPaletteGet(CBGR24 *palette);
 extern U0 GrPaletteSet(CBGR24 *palette);
+extern I64 ZcFbTextPixel(I64 x, I64 y);
 
 I64 GrRopForegroundChecks()
 {
@@ -169,5 +170,78 @@ I64 GrUpdateScreen32Checks()
 	Free(raw);
 	Free(screen_cache);
 	Free(pixels);
+	return 42;
+}
+
+I64 GrUpdateScreen32LimineChecks()
+{
+	I64 pixel_count = 800 * 600, i;
+	I64 pitch_pixels = sys_framebuffer_pitch / 4;
+	U8 *pixels = MAlloc(pixel_count);
+	U8 *screen_cache = MAlloc(pixel_count);
+	U32 *raw = MAlloc(pitch_pixels * 600 * sizeof(U32));
+	U32 *saved_pixel;
+	CBGR24 saved_palette[COLORS_NUM], test_palette[COLORS_NUM];
+	CDC test_dc;
+	CDC *saved_dc = gr.dc2;
+	U8 *saved_cache = gr.screen_cache;
+	I64 saved_zoom = gr.screen_zoom;
+	U32 *saved_raw = text.raw_screen, *saved_alias = text.fb_alias;
+	U32 original_pixel;
+	U64 saved_buffer_size = text.buffer_size;
+	U64 saved_pitch = sys_framebuffer_pidth;
+	I64 observed;
+	U32 expected;
+	if (!sys_framebuffer_addr || sys_framebuffer_bpp != 32 ||
+			sys_framebuffer_width != 800 || sys_framebuffer_height != 600 ||
+			pitch_pixels < 800 || !pixels || !screen_cache || !raw)
+		return 1;
+	saved_pixel = text.fb_alias;
+	if (!saved_pixel || saved_pixel != sys_framebuffer_addr)
+		return 2;
+	// Preserve the visible boot text while exercising one real Limine pixel.
+	original_pixel = saved_pixel[0];
+	for (i = 0; i < COLORS_NUM; i++)
+		test_palette[i] = 0;
+	test_palette[3] = 0x00123456;
+	GrPaletteGet(saved_palette);
+	GrPaletteSet(test_palette);
+	for (i = 0; i < pixel_count; i++)
+	{
+		pixels[i] = 0;
+		screen_cache[i] = 0;
+	}
+	for (i = 0; i < pitch_pixels * 600; i++)
+		raw[i] = 0;
+	pixels[0] = 3;
+	test_dc.body = pixels;
+	test_dc.width = 800;
+	test_dc.width_internal = 800;
+	test_dc.height = 600;
+	gr.dc2 = &test_dc;
+	gr.screen_cache = screen_cache;
+	gr.screen_zoom = 1;
+	text.raw_screen = raw;
+	text.fb_alias = sys_framebuffer_addr;
+	text.buffer_size = pitch_pixels * 600 * sizeof(U32);
+	sys_framebuffer_pidth = pitch_pixels;
+	expected = gr_palette[3];
+	GrUpdateScreen32;
+	observed = ZcFbTextPixel(0, 0);
+	// Restore the one pixel immediately; this smoke must not alter the UI.
+	saved_pixel[0] = original_pixel;
+	gr.dc2 = saved_dc;
+	gr.screen_cache = saved_cache;
+	gr.screen_zoom = saved_zoom;
+	text.raw_screen = saved_raw;
+	text.fb_alias = saved_alias;
+	text.buffer_size = saved_buffer_size;
+	sys_framebuffer_pidth = saved_pitch;
+	GrPaletteSet(saved_palette);
+	Free(raw);
+	Free(screen_cache);
+	Free(pixels);
+	if (observed != (expected & 0x00ffffff))
+		return 3;
 	return 42;
 }

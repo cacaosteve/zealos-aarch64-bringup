@@ -521,6 +521,7 @@ uint64_t zeal_fb_screen_width(void) { return g_fb_w; }
 uint64_t zeal_fb_screen_height(void) { return g_fb_h; }
 uint64_t zeal_fb_pitch_bytes(void) { return g_fb_pitch; }
 uint64_t zeal_fb_bits_per_pixel(void) { return g_fb_bpp; }
+uint64_t zeal_fb_address(void) { return (uint64_t)(uintptr_t)g_fb; }
 
 int64_t zeal_fb_text_pixel(int64_t x, int64_t y) {
     if (x < INT32_MIN || x > INT32_MAX || y < INT32_MIN || y > INT32_MAX)

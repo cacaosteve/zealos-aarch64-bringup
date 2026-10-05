@@ -150,12 +150,21 @@ pixel span for one text cell and returns `0x2a`. This validates source-to-CDC
 foreground composition, not full-screen presentation. `GrUpdateScreen32Checks`
 also runs unchanged `GrUpdateScreen32` against temporary palette, raw-screen,
 cache, and 32-bit alias buffers. It confirms palette conversion, changed-pixel
-copy, and unchanged-pixel preservation. These are guest-allocated test
-surfaces; the framebuffer alias is not yet the Limine framebuffer. Upstream
-`gr.dc1`, `gr.dc_cache`, zoom/pan surfaces, and the real framebuffer alias are
-not initialized as one coherent screen pipeline. The next slice is to bind
-that alias to the Limine framebuffer and connect the full `GrUpdateScreen`
-sequence without having its presentation overwrite task-bridge drawing.
+copy, and unchanged-pixel preservation. KernelB now exports Limine's HHDM
+framebuffer address as `sys_framebuffer_addr` and seeds `text.fb_alias` with
+that address; the native source also receives the real dimensions, byte pitch,
+and pixel format. `GrUpdateScreen32LimineChecks` invokes unchanged
+`GrUpdateScreen32` against the actual framebuffer, checks the written pixel
+through the kernel readback path, then restores that pixel. This is covered by
+`make check-grscreen` on QEMU's Limine-provided ramfb.
+
+This proves the final 32-bit presenter can reach the real surface, but not the
+full `GrUpdateScreen` sequence. Upstream `gr.dc1`, `gr.dc_cache`, and
+zoom/pan surfaces are not initialized together. The task bridge also currently
+draws task graphics directly to the framebuffer, so a full upstream redraw
+could overwrite that output. The next integration step is to move task drawing
+onto the compositor's offscreen surface and initialize the upstream screen
+surfaces as one pipeline before enabling periodic full-frame presentation.
 
 ## Remaining graphics path
 

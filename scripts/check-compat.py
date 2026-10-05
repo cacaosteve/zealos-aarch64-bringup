@@ -434,6 +434,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                                 'zc => 0x000000000000002a')
                         command('zcall GrUpdateScreen32Checks',
                                 'zc => 0x000000000000002a')
+                        command('zcall GrUpdateScreen32LimineChecks',
+                                'zc => 0x000000000000002a')
             if args.probe_module == '/Kernel/SerialDev/Message.ZC':
                 if 'zc: loaded /Kernel/SerialDev/Message.ZC' not in result:
                     raise RuntimeError('unchanged Message.ZC did not load')

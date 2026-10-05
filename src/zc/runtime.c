@@ -15,7 +15,7 @@
  * modules populate these slots as they load. */
 static void *guest_ext_entries[5];
 static void **guest_ext_table = guest_ext_entries;
-static uint64_t guest_fb_width, guest_fb_height, guest_fb_pitch;
+static uint64_t guest_fb_addr, guest_fb_width, guest_fb_height, guest_fb_pitch;
 static uint64_t guest_fb_bpp;
 static uint64_t guest_text_globals[16];
 /* The first graphics slice uses the kernel's compact 8x8 ASCII font as the
@@ -255,6 +255,7 @@ static int guest_task_bound;
 extern uint64_t zeal_fb_text_cols(void), zeal_fb_text_rows(void);
 extern uint64_t zeal_fb_screen_width(void), zeal_fb_screen_height(void);
 extern uint64_t zeal_fb_pitch_bytes(void), zeal_fb_bits_per_pixel(void);
+extern uint64_t zeal_fb_address(void);
 extern void zeal_fb_task_text_reset(unsigned slot);
 extern uint64_t zeal_fb_task_text_write(unsigned slot, int64_t left,
                                          int64_t right, int64_t top,
@@ -3138,6 +3139,13 @@ static int load_inner(const char *path) {
         guest_fb_height = zeal_fb_screen_height();
         guest_fb_pitch = zeal_fb_pitch_bytes();
         guest_fb_bpp = zeal_fb_bits_per_pixel();
+        guest_fb_addr = zeal_fb_address();
+        guest_text_globals[3] = guest_fb_addr;
+        guest_text_globals[4] = guest_fb_height / 8;
+        guest_text_globals[5] = guest_fb_width / 8;
+        guest_text_globals[8] = (guest_fb_pitch / 4) * guest_fb_height;
+        guest_text_globals[9] = guest_text_globals[8] * sizeof(uint32_t);
+        PrsBindCSymbol("sys_framebuffer_addr", &guest_fb_addr, 0);
         PrsBindCSymbol("sys_framebuffer_width", &guest_fb_width, 0);
         PrsBindCSymbol("sys_framebuffer_height", &guest_fb_height, 0);
         PrsBindCSymbol("sys_framebuffer_pitch", &guest_fb_pitch, 0);
