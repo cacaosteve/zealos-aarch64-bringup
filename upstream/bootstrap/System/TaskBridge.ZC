@@ -1784,6 +1784,42 @@ Bool GrPlot(CDC *dc=gr.dc, I64 x=0, I64 y=0)
     return ZcFbGraphPlot(x, y, dc->color.c0 & 0xff,
                          left, top, right, bottom);
 }
+I64 bootstrap_mouse_draw_calls = 0;
+U0 BootstrapDrawMouse(CDC *dc, I64 x, I64 y)
+{//Small software pointer for the absolute VirtIO tablet; clipped by GrPlot.
+    I64 old_color, row, col;
+    if (!dc)
+        return;
+    bootstrap_mouse_draw_calls++;
+    old_color = dc->color.c0;
+    // Draw a compact arrow with a dark outline and a bright interior. This is
+    // deliberately independent of ZealOS's PS/2 cursor sprite/hardware path.
+    dc->color.c0 = 0;
+    for (row = 0; row < 9; row++)
+        for (col = 0; col <= row; col++)
+            if (col == 0 || col == row || row == 8)
+                GrPlot(dc, x + col, y + row);
+    for (row = 1; row < 8; row++)
+        for (col = 1; col < row; col++)
+        {
+            dc->color.c0 = 15;
+            GrPlot(dc, x + col, y + row);
+            dc->color.c0 = 0;
+        }
+    // Short shaft makes the shape recognizable at the bring-up's 8-bit scale.
+    for (row = 8; row < 13; row++)
+        for (col = 3; col < 7; col++)
+            if (col == 3 || col == 6 || row == 12)
+                GrPlot(dc, x + col, y + row);
+    for (row = 9; row < 12; row++)
+        for (col = 4; col < 6; col++)
+        {
+            dc->color.c0 = 15;
+            GrPlot(dc, x + col, y + row);
+            dc->color.c0 = 0;
+        }
+    dc->color.c0 = old_color;
+}
 Bool GrRect(CDC *dc=gr.dc, I64 x=0, I64 y=0, I64 width=0, I64 height=0)
 {
     CTask *task;
@@ -3144,6 +3180,8 @@ U0 BootstrapGrUpdateTasks()
     active_gr = ZcActiveGrGlobals();
     if (!active_gr)
         active_gr = &gr;
+    if (!active_gr->fp_draw_mouse)
+        active_gr->fp_draw_mouse = &BootstrapDrawMouse;
     if (active_gr->fp_final_screen_update)
     {
         CDC *dc = DCAlias(&bootstrap_graphics_dc, NULL);

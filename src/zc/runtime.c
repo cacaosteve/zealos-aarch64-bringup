@@ -891,9 +891,24 @@ static CMemberLst *guest_class_member(CHashClass *cls, const char *name) {
     return cls && cls->base_class ? guest_class_member(cls->base_class, name)
                                   : NULL;
 }
+static int guest_store_i64_member(void *data, CHashClass *cls,
+                                  CMemberLst *member, int64_t value) {
+    int64_t size;
+    if (!data || !cls || !member || !member->member_class ||
+        member->off < 0 || member->off > cls->sz)
+        return 0;
+    size = member->member_class->sz;
+    if (size <= 0 || size > (int64_t)sizeof(value) ||
+        member->off > cls->sz - size)
+        return 0;
+    memcpy((uint8_t *)data + member->off, &value, (size_t)size);
+    return 1;
+}
 static int64_t host_mouse_state_update(int64_t *a) {
     CHashGlblVar *global;
+    CHashGlblVar *hard_global;
     CMemberLst *pos, *pos_x, *pos_y, *pos_text, *text_x, *text_y, *timestamp;
+    CMemberLst *installed;
     CHashClass *cls, *pos_cls, *text_cls;
     int64_t pos_x_off, pos_y_off, text_x_off, text_y_off;
     uint8_t *data;
@@ -936,6 +951,13 @@ static int64_t host_mouse_state_update(int64_t *a) {
     *(int64_t *)(data + text_x_off) = a[2];
     *(int64_t *)(data + text_y_off) = a[3];
     *(int64_t *)(data + timestamp->off) = a[4];
+    hard_global = (CHashGlblVar *)HashFind("mouse_hard", Fs->hash_table,
+                                           HTT_GLBL_VAR, 1);
+    if (hard_global && hard_global->data_addr) {
+        installed = guest_class_member(hard_global->var_class, "installed");
+        guest_store_i64_member(hard_global->data_addr,
+                               hard_global->var_class, installed, 1);
+    }
     return 1;
 }
 static int64_t host_fb_text_span(int64_t *a) {

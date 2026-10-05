@@ -40,6 +40,7 @@ I64 WinMousePointerStateCheck()
     I64 old_x = mouse.pos.x, old_y = mouse.pos.y;
     I64 old_text_x = mouse.pos_text.x, old_text_y = mouse.pos_text.y;
     I64 old_timestamp = mouse.timestamp;
+    Bool old_installed = mouse_hard.installed;
     I64 x = 123, y = 234;
 
     if (!TaskValidate(sys_task))
@@ -48,13 +49,14 @@ I64 WinMousePointerStateCheck()
     if (mouse.pos.x != x || mouse.pos.y != y ||
         mouse.pos_text.x != (x - gr.pan_text_x) >> 3 ||
         mouse.pos_text.y != (y - gr.pan_text_y) >> 3 ||
-        mouse.timestamp <= 0)
+        mouse.timestamp <= 0 || !mouse_hard.installed)
     {
         mouse.pos.x = old_x;
         mouse.pos.y = old_y;
         mouse.pos_text.x = old_text_x;
         mouse.pos_text.y = old_text_y;
         mouse.timestamp = old_timestamp;
+        mouse_hard.installed = old_installed;
         return 2;
     }
     mouse.pos.x = old_x;
@@ -62,6 +64,7 @@ I64 WinMousePointerStateCheck()
     mouse.pos_text.x = old_text_x;
     mouse.pos_text.y = old_text_y;
     mouse.timestamp = old_timestamp;
+    mouse_hard.installed = old_installed;
     return 42;
 }
 

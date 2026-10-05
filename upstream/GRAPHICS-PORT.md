@@ -108,9 +108,11 @@ click sends the upstream Escape or Shift-Escape action instead. Window controls
 continue to react to the physical button transitions.
 Each valid absolute-tablet sample now updates the active ZealOS `mouse.pos`,
 `mouse.pos_text`, and timestamp fields through the current guest-global layout.
-The unchanged `WinFinalUpdate` coordinate overlay therefore reports the live
-virtual pointer location. The bridge still lacks a software cursor callback,
-so no guest-drawn pointer is visible yet.
+and marks the virtual pointer device installed. The unchanged `WinFinalUpdate`
+coordinate overlay therefore reports the live virtual pointer location. Its
+normal `DrawMouse` path reaches a bootstrap software arrow in the final screen
+overlay. The cursor is an interim black-and-white shape rather than the
+upstream hardware cursor sprite or grab-scroll cursor.
 The first four title cells post the upstream
 Ctrl-M task-menu key; the last three post Shift-Esc to a task with a document
 or kill a task without one. These release-triggered actions match pinned
@@ -143,9 +145,10 @@ runs `BootstrapWinMgrTick`, and verifies the callback receives the bridge CDC
 and writes its screen-space pixel after composition. The same smoke renders
 two staged frames through the normal idle-frame wrapper, toggles
 `mouse_grid.coord`, and checks that the real `WinFinalUpdate` coordinate text
-changes the pixels in its screen-space overlay region. This confirms the
-fixture's mouse-grid storage is shared with the unchanged Win callback; it
-does not yet exercise physical mouse motion or cursor drawing.
+changes the pixels in its screen-space overlay region. It also verifies the
+unchanged Win callback invokes the software pointer and checks the pointer
+against actual Limine framebuffer pixels. Real UTM pointer appearance and
+positioning remain an interactive acceptance check.
 
 These calls also exposed an AArch64 Aiwnios host-FFI gap: arguments after x0–x7
 were not copied from the caller stack into the host shim's contiguous argument

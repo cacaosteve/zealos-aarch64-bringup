@@ -3,6 +3,16 @@
 I64 gr_screen_final_update_calls;
 U8 gr_screen_final_update_old_pixel;
 U8 gr_screen_final_update_overlay_off[FONT_WIDTH * 10 * FONT_HEIGHT];
+U32 gr_screen_cursor_off[13 * 13];
+
+U0 GrScreenNoCursorProbe(CDC *dc)
+{
+}
+
+U0 GrScreenCursorProbe(CDC *dc)
+{
+    BootstrapDrawMouse(dc, 123, 234);
+}
 
 U0 GrScreenFinalUpdateProbe(CDC *dc)
 {
@@ -15,8 +25,11 @@ U0 GrScreenFinalUpdateProbe(CDC *dc)
 I64 GrScreenFinalUpdateChecks()
 {
     U0 (*old_final_update)(CDC *dc);
-    I64 old_coord, old_mouse_x, old_mouse_y;
-    I64 x, y, i, overlay_x, overlay_y;
+    I64 old_coord, old_mouse_x, old_mouse_y, old_draw_calls;
+    I64 x, y, i, overlay_x, overlay_y, changed;
+    U32 *screen;
+    I64 pitch;
+    Bool old_mouse_show, old_mouse_installed;
 
     if (!TaskValidate(sys_winmgr_task) && !TaskValidate(sys_task))
         return 3;
@@ -48,6 +61,10 @@ I64 GrScreenFinalUpdateChecks()
     old_coord = mouse_grid.coord;
     old_mouse_x = mouse.pos.x;
     old_mouse_y = mouse.pos.y;
+    screen = sys_framebuffer_addr;
+    pitch = sys_framebuffer_pitch / 4;
+    if (!screen || sys_framebuffer_bpp != 32 || pitch < 800)
+        return 13;
     overlay_x = GR_WIDTH - FONT_WIDTH * 10;
     overlay_y = FONT_HEIGHT * 3;
     mouse.pos.x = 123;
@@ -85,5 +102,57 @@ I64 GrScreenFinalUpdateChecks()
     mouse_grid.coord = old_coord;
     mouse.pos.x = old_mouse_x;
     mouse.pos.y = old_mouse_y;
+
+    // Check the unchanged Win callback invokes our virtual mouse renderer.
+    old_mouse_show = mouse.show;
+    old_mouse_installed = mouse_hard.installed;
+    mouse_hard.installed = TRUE;
+    mouse.show = TRUE;
+    old_draw_calls = bootstrap_mouse_draw_calls;
+    if (!ZcTaskFrameRun())
+    {
+        mouse.show = old_mouse_show;
+        mouse_hard.installed = old_mouse_installed;
+        return 8;
+    }
+    if (bootstrap_mouse_draw_calls == old_draw_calls)
+    {
+        mouse.show = old_mouse_show;
+        mouse_hard.installed = old_mouse_installed;
+        return 14;
+    }
+    mouse.show = old_mouse_show;
+    mouse_hard.installed = old_mouse_installed;
+
+    // Isolate this fixed-position draw from live tablet polling and verify
+    // pixels on the Limine framebuffer after the staged frame is presented.
+    gr.fp_final_screen_update = &GrScreenNoCursorProbe;
+    if (!ZcTaskFrameRun())
+    {
+        gr.fp_final_screen_update = old_final_update;
+        return 8;
+    }
+    for (y = 0, i = 0; y < 13; y++)
+        for (x = 0; x < 13; x++, i++)
+            gr_screen_cursor_off[i] =
+                screen[(234 + y) * pitch + 123 + x];
+    gr.fp_final_screen_update = &GrScreenCursorProbe;
+    if (!ZcTaskFrameRun())
+    {
+        gr.fp_final_screen_update = old_final_update;
+        return 9;
+    }
+    changed = 0;
+    for (y = 0, i = 0; y < 13; y++)
+        for (x = 0; x < 13; x++, i++)
+            if (gr_screen_cursor_off[i] !=
+                screen[(234 + y) * pitch + 123 + x])
+                changed++;
+    gr.fp_final_screen_update = old_final_update;
+    if (changed < 20)
+    {
+        return 100 + changed;
+    }
+    ZcTaskFrameRun();
     return 42;
 }

@@ -2627,13 +2627,24 @@ Freeze catalog unchanged.
 | Gap | Tablet coordinates drove hit testing and dragging, but unchanged ZealOS code read stale `mouse.pos` and `mouse.pos_text` values |
 | Bring-up | Resolve the current `mouse` global at sample time and update pixel coordinates, pan-adjusted text coordinates, and timestamp from each valid absolute sample |
 | Smoke | `WinMousePointerStateCheck` feeds a known sample through the real tablet bridge and verifies all three state fields |
-| Limits | Mouse state and coordinate text now follow the pointer; ZealOS software cursor drawing still needs an initialized draw callback and cursor asset |
+| Limits | Mouse state and coordinate text follow the pointer; the small software arrow is not the upstream hardware cursor or grab-scroll sprite |
+
+Freeze catalog unchanged.
+
+## Milestone 223 — draw the virtual tablet pointer in the final overlay
+
+| Item | Path |
+|--|--|
+| Gap | Unchanged `WinFinalUpdate` called `DrawMouse`, but `gr.fp_draw_mouse` had no ARM64 implementation and staged frames discarded direct framebuffer writes |
+| Bring-up | Install a compact software arrow callback on the active graphics global; render it through `GrPlot` in the staged final overlay; mark `mouse_hard.installed` when the tablet provides a valid sample |
+| Smoke | `GrScreenFinalUpdateChecks` proves the unchanged Win callback reaches the software renderer and compares hidden/shown pixels on Limine's real framebuffer |
+| Limits | Interim high-contrast pointer only; no upstream cursor asset, drag-scroll cursor, cursor shape switching, or manual UTM acceptance yet |
 
 Freeze catalog unchanged.
 
 ## Open compatibility probe — `/System/Win.ZC`
 
-The source probe loads pinned `KernelC.HH`, `Externs.ZC`, and `Gr.HH` before compiling unchanged `Win.ZC`. Graphics dimensions and mouse globals are probe fixtures; `DrawMenu` and `GrScaleZoom` are compile-only stubs for subsystems whose full bootstrap is not loaded. `GrScreenFinalUpdateChecks` executes `WinFinalUpdate` through the staged idle-frame path, confirms the fixture's `mouse_grid.coord` toggles the real coordinate-text overlay, then checks a separate visible guest overlay callback. Physical mouse motion and cursor drawing still need the full mouse/display initialization. The raw ARM generic-timer binding and a standalone F64 clock expression are smoke-tested before the Win load.
+The source probe loads pinned `KernelC.HH`, `Externs.ZC`, and `Gr.HH` before compiling unchanged `Win.ZC`. Graphics dimensions and mouse globals are probe fixtures; `DrawMenu` and `GrScaleZoom` are compile-only stubs for subsystems whose full bootstrap is not loaded. `GrScreenFinalUpdateChecks` executes `WinFinalUpdate` through the staged idle-frame path, confirms the fixture's `mouse_grid.coord` toggles the real coordinate-text overlay, checks a separate visible guest overlay callback, and verifies the software arrow against Limine framebuffer pixels. Physical tablet samples are covered by `WinMousePointerStateCheck`; manual UTM pointer acceptance is still pending. The raw ARM generic-timer binding and a standalone F64 clock expression are smoke-tested before the Win load.
 
 The native runtime now binds ZealOS's five-slot `ext` dispatch table to stable native storage. The probe compiles the unchanged `Win.ZC`, then checks that its file-scope initializers installed both `WinToTop` and `WinFocus` in the matching slots. This proves the module loads and its dispatch registrations work; it does not yet start the full window manager or validate interactive window behavior. The fixture remains explicit about its uninitialized kernel globals and compile-only menu/zoom stubs.
 
