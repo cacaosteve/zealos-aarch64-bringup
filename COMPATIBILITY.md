@@ -1898,16 +1898,20 @@ ZealOS live distribution or installer.
   overlapping task, retained text, and direct plane presentation.
   The C bootstrap shell also keeps a separate retained text buffer; a full
   task redraw composes that shell buffer first, then draws visible task windows
-  over it. Its normal writes remain immediate. `TextBorder` draws the upstream
+  over it. Its normal writes remain immediate. During the periodic task refresh,
+  the guest CDC points at an 800x600 indexed surface. Host-backed framebuffer
+  primitives and CDC byte writes compose into that shared surface, which is
+  presented to Limine's framebuffer when the refresh completes. The surface
+  clears to black and uses the 16-color text palette; arbitrary 8-bit CDC color
+  semantics and the full upstream display pipeline remain unsupported.
+  `TextBorder` draws the upstream
   CP437 single- and double-line glyphs through `TextChar`. A bootstrap
   `GrUpdateTaskWin` clears one task's cell rectangle, draws its border, and
   asks `DocUpdateTaskDocs` to recalculate its DolDocs. `GrUpdateTasks` clears
   one frame and redraws up to 64 visible tasks by walking the ZealOS task ring
-  in its back-to-front order, then presents the composed cell plane; an
-  overlapping two-task smoke verifies that the later task covers the earlier
-  one. The renderer still lacks draw callbacks, controls, the uncovered-window
-  bitmap, and upstream display/compositor globals beyond packed-cell
-  `gr.text_base`. Source matching, forms/data
+  in its back-to-front order; an overlapping two-task smoke verifies that the
+  later task covers the earlier one. The full upstream display/cache/zoom/pan
+  pipeline and source matching, forms/data
   formatting, sprites/depth buffers, music state, and cursor interaction remain
   unaccepted.
 

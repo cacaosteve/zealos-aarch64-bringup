@@ -206,6 +206,10 @@ static uint64_t g_fb_guard[2];
 static volatile uint8_t *g_fb;
 static uint64_t g_fb_w, g_fb_h, g_fb_pitch;
 static uint32_t g_fb_bpp;
+/* Optional indexed offscreen target used while the ZealOS task bridge builds
+ * one frame. Framebuffer primitives keep their direct path outside that scope. */
+static uint8_t *g_fb_render_surface;
+static uint64_t g_fb_render_stride, g_fb_render_rows;
 static uint32_t g_fb_cx, g_fb_cy;
 static uint32_t g_fb_cols, g_fb_rows;
 static uint64_t g_zc_text_cells_drawn;
@@ -232,6 +236,27 @@ static const uint32_t g_text_palette[16] = {
 };
 static void fb_text_buffer_reset(void);
 void zeal_fb_task_text_reset(unsigned slot);
+
+static uint8_t fb_nearest_palette_index(uint32_t bgr) {
+    uint32_t r = (bgr >> 16) & 0xffu;
+    uint32_t g = (bgr >> 8) & 0xffu;
+    uint32_t b = bgr & 0xffu;
+    uint64_t best_distance = UINT64_MAX;
+    uint8_t best = 0;
+    for (uint8_t i = 0; i < 16; i++) {
+        uint32_t p = g_text_palette[i];
+        int32_t dr = (int32_t)r - (int32_t)((p >> 16) & 0xffu);
+        int32_t dg = (int32_t)g - (int32_t)((p >> 8) & 0xffu);
+        int32_t db = (int32_t)b - (int32_t)(p & 0xffu);
+        uint64_t distance = (uint64_t)(dr * dr) + (uint64_t)(dg * dg) +
+                            (uint64_t)(db * db);
+        if (distance < best_distance) {
+            best_distance = distance;
+            best = i;
+        }
+    }
+    return best;
+}
 
 /* BCM2711 PL011 wants 32-bit MMIO; QEMU virt accepts it too. */
 static void uart_write(volatile uint8_t *uart, char c) {
@@ -339,6 +364,12 @@ static void fb_putpixel(uint32_t x, uint32_t y, uint32_t bgr) {
     if (!g_fb || x >= g_fb_w || y >= g_fb_h) {
         return;
     }
+    if (g_fb_render_surface) {
+        if (x < g_fb_render_stride && y < g_fb_render_rows)
+            g_fb_render_surface[(uint64_t)y * g_fb_render_stride + x] =
+                fb_nearest_palette_index(bgr);
+        return;
+    }
     uint32_t pxb = (g_fb_bpp + 7) / 8;
     volatile uint8_t *p = g_fb + (uint64_t)y * g_fb_pitch + (uint64_t)x * pxb;
     if (pxb >= 3) {
@@ -377,6 +408,15 @@ static void fb_fillrect(uint32_t x0, uint32_t y0, uint32_t w, uint32_t h, uint32
     }
     if (y0 + h > g_fb_h) {
         h = (uint32_t)(g_fb_h - y0);
+    }
+    if (g_fb_render_surface) {
+        uint8_t color = fb_nearest_palette_index(bgr);
+        for (uint32_t y = 0; y < h; y++) {
+            uint64_t row = (uint64_t)(y0 + y) * g_fb_render_stride + x0;
+            for (uint32_t x = 0; x < w; x++)
+                g_fb_render_surface[row + x] = color;
+        }
+        return;
     }
     uint32_t pxb = (g_fb_bpp + 7) / 8;
     if (pxb == 4) {
@@ -522,6 +562,44 @@ uint64_t zeal_fb_screen_height(void) { return g_fb_h; }
 uint64_t zeal_fb_pitch_bytes(void) { return g_fb_pitch; }
 uint64_t zeal_fb_bits_per_pixel(void) { return g_fb_bpp; }
 uint64_t zeal_fb_address(void) { return (uint64_t)(uintptr_t)g_fb; }
+
+uint64_t zeal_fb_task_frame_begin(uint8_t *surface, uint64_t stride,
+                                  uint64_t rows) {
+    if (!g_fb || !surface || stride < g_fb_w || rows < g_fb_h ||
+        stride > 16384 || rows > 16384 || stride > UINT64_MAX / rows)
+        return 0;
+    g_fb_render_surface = surface;
+    g_fb_render_stride = stride;
+    g_fb_render_rows = rows;
+    /* ZealOS uses black as the base layer; text and task windows are composed
+     * over it in the same order as the bridge's task-ring traversal. */
+    for (uint64_t y = 0; y < g_fb_h; y++) {
+        uint8_t *row = surface + y * stride;
+        for (uint64_t x = 0; x < g_fb_w; x++)
+            row[x] = 0;
+    }
+    return 1;
+}
+
+void zeal_fb_task_frame_cancel(void) {
+    g_fb_render_surface = NULL;
+    g_fb_render_stride = g_fb_render_rows = 0;
+}
+
+uint64_t zeal_fb_task_frame_end(void) {
+    uint8_t *surface = g_fb_render_surface;
+    uint64_t stride = g_fb_render_stride, rows = g_fb_render_rows;
+    if (!g_fb || !surface)
+        return 0;
+    zeal_fb_task_frame_cancel();
+    for (uint64_t y = 0; y < g_fb_h && y < rows; y++) {
+        const uint8_t *src = surface + y * stride;
+        for (uint64_t x = 0; x < g_fb_w; x++)
+            fb_putpixel((uint32_t)x, (uint32_t)y,
+                        g_text_palette[src[x] & 0x0fu]);
+    }
+    return g_fb_w * g_fb_h;
+}
 
 int64_t zeal_fb_text_pixel(int64_t x, int64_t y) {
     if (x < INT32_MIN || x > INT32_MAX || y < INT32_MIN || y > INT32_MAX)

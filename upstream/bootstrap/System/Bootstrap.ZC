@@ -40,6 +40,7 @@ extern I64 ZcFbTextSpan(I64 x, I64 y, I64 len, I64 attr, U8 *data,
                         U32 *text_base, I64 stride);
 extern I64 ZcFbTextCellsDrawn();
 extern I64 ZcFbTextPixel(I64 x, I64 y);
+extern I64 ZcDocUpdateTaskDocs(U8 *task);
 extern I64 ZcFbScreenWidth();
 extern I64 ZcFbScreenHeight();
 extern Bool ZcFbGraphPlot(I64 x, I64 y, U32 color,

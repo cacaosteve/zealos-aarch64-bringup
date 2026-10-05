@@ -200,6 +200,7 @@ static int guest_job_call_active;
 static int guest_background_dispatch;
 static unsigned guest_idle_frame_divider;
 static CHashFun *guest_winmgr_tick_fun;
+static void set_guest_task(void *p);
 static int64_t guest_mp_count = 1;
 static void *guest_cpu_structs;
 static void *guest_kbd_state;
@@ -256,6 +257,10 @@ extern uint64_t zeal_fb_text_cols(void), zeal_fb_text_rows(void);
 extern uint64_t zeal_fb_screen_width(void), zeal_fb_screen_height(void);
 extern uint64_t zeal_fb_pitch_bytes(void), zeal_fb_bits_per_pixel(void);
 extern uint64_t zeal_fb_address(void);
+extern uint64_t zeal_fb_task_frame_begin(uint8_t *surface, uint64_t stride,
+                                          uint64_t rows);
+extern uint64_t zeal_fb_task_frame_end(void);
+extern void zeal_fb_task_frame_cancel(void);
 extern void zeal_fb_task_text_reset(unsigned slot);
 extern uint64_t zeal_fb_task_text_write(unsigned slot, int64_t left,
                                          int64_t right, int64_t top,
@@ -822,6 +827,46 @@ static uint32_t *guest_text_plane(int64_t address, int64_t stride,
     in_code = p >= (uintptr_t)code_arena &&
               p + bytes <= (uintptr_t)code_arena + sizeof(code_arena);
     return in_data || in_code ? (uint32_t *)p : NULL;
+}
+static uint8_t *guest_graphics_surface(void) {
+    CHashGlblVar *global = (CHashGlblVar *)HashFind(
+        "bootstrap_graphics_pixels", Fs->hash_table, HTT_GLBL_VAR, 1);
+    uintptr_t p;
+    size_t bytes = 800u * 600u;
+    if (!global || !global->data_addr)
+        return NULL;
+    p = (uintptr_t)global->data_addr;
+    if (p > UINTPTR_MAX - bytes)
+        return NULL;
+    if ((p >= (uintptr_t)data_arena &&
+         p + bytes <= (uintptr_t)data_arena + sizeof(data_arena)) ||
+        (p >= (uintptr_t)code_arena &&
+         p + bytes <= (uintptr_t)code_arena + sizeof(code_arena)))
+        return (uint8_t *)p;
+    return NULL;
+}
+static int64_t guest_task_frame_run(void) {
+    uint8_t *surface = guest_graphics_surface();
+    if (!guest_winmgr_tick_fun)
+        guest_winmgr_tick_fun = (CHashFun *)HashFind(
+            "BootstrapWinMgrTick", Fs->hash_table, HTT_FUN, 1);
+    if (!surface || !guest_winmgr_tick_fun ||
+        !guest_winmgr_tick_fun->fun_ptr || guest_winmgr_tick_fun->argc ||
+        (guest_winmgr_tick_fun->base.base.type & HTF_EXTERN) ||
+        !zeal_fb_task_frame_begin(surface, 800, 600))
+        return 0;
+    set_guest_task(guest_fibers[0].words);
+    FFI_CALL_TOS_0(guest_winmgr_tick_fun->fun_ptr);
+    return zeal_fb_task_frame_end() != 0;
+}
+static int64_t host_doc_update_task_docs(int64_t *a) {
+    CHashFun *fun = (CHashFun *)HashFind(
+        "DocUpdateTaskDocs", Fs->hash_table, HTT_FUN, 1);
+    if (!fun || !fun->fun_ptr || fun->argc != 1 ||
+        (fun->base.base.type & HTF_EXTERN))
+        return 0;
+    (void)FFI_CALL_TOS_1(fun->fun_ptr, a[0]);
+    return 1;
 }
 static int64_t host_fb_text_span(int64_t *a) {
     uint32_t lr = (uint32_t)a[6], tb = (uint32_t)a[7];
@@ -3289,6 +3334,7 @@ void zc_idle_step(void) {
     guarded = 1;
     if (setjmp(guard)) {
         guest_background_dispatch = 0;
+        zeal_fb_task_frame_cancel();
         guarded = 0;
         return;
     }
@@ -3309,8 +3355,7 @@ void zc_idle_step(void) {
         if (guest_winmgr_tick_fun && guest_winmgr_tick_fun->fun_ptr &&
             !guest_winmgr_tick_fun->argc &&
             !(guest_winmgr_tick_fun->base.base.type & HTF_EXTERN)) {
-            set_guest_task(guest_fibers[0].words);
-            FFI_CALL_TOS_0(guest_winmgr_tick_fun->fun_ptr);
+            (void)guest_task_frame_run();
         }
     }
     guarded = 0;
@@ -3392,6 +3437,7 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
                     {"ZcFbTextFill", host_fb_text_fill, 8},
                     {"ZcFbTextRect", host_fb_text_rect, 7},
                     {"ZcFbTextFlush", host_fb_text_flush, 3},
+                    {"ZcDocUpdateTaskDocs", host_doc_update_task_docs, 1},
                     {"ZcFbTextFlushRect", host_fb_text_flush_rect, 6},
                     {"ZcFbGraphPlot", host_fb_graph_plot, 7},
                     {"ZcFbGraphRect", host_fb_graph_rect, 9},

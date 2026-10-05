@@ -27,6 +27,7 @@ extern I64 ZcFbTextSpan(I64 x, I64 y, I64 len, I64 attr, U8 *data,
                         I64 mode, I64 left_right, I64 top_bottom,
                         U32 *text_base, I64 stride);
 extern I64 ZcFbTextCellsDrawn();
+extern I64 ZcFbTextFlush(U32 *text_base, I64 stride, I64 rows);
 // Poll the current virtio/UART key reader and queue its events for the focus
 // task. PS/2 mouse polling is outside this bridge.
 extern U0 KbdMouseHandler(Bool poll_kbd, Bool poll_mouse);
@@ -1332,7 +1333,14 @@ U0 FindWiz()
 {
 }
 // One framebuffer is shared by this bootstrap shell, so cross-window DC aliasing is identity.
+// The bootstrap framebuffer is 800x600; keep this storage independent of the
+// text-plane constants declared below so the forward CDC stub can use it.
+U8 bootstrap_graphics_pixels[800 * 600];
 CDC bootstrap_graphics_dc;
+bootstrap_graphics_dc.body = bootstrap_graphics_pixels;
+bootstrap_graphics_dc.width = 800;
+bootstrap_graphics_dc.width_internal = 800;
+bootstrap_graphics_dc.height = 600;
 CDC *DCAlias(CDC *dc, CTask *task=NULL)
 {
     if (!task)
@@ -1631,7 +1639,8 @@ class CBootstrapTextGlbls
 };
 CBootstrapTextGlbls text;
 CTask *sys_winmgr_task = NULL;
-extern U0 DocUpdateTaskDocs(CTask *task);
+// Doc recalculation may load after the task bridge. The host thunk resolves
+// the guest function at call time and safely skips it until it is defined.
 Bool TextChar(CTask *task, Bool allow_border=FALSE, I64 x=0, I64 y=0, I64 d=0)
 {//Single-cell framebuffer path; border mode permits the adjacent outer row/column.
     if (!task)
@@ -3066,7 +3075,7 @@ U0 GrUpdateTaskWin(CTask *task)
     TextRect(task->win_left, task->win_right,
              task->win_top, task->win_bottom, task->text_attr << 8);
     if (!(task->win_inhibit & (1 << WIf_SELF_DOC)))
-        DocUpdateTaskDocs(task);
+        ZcDocUpdateTaskDocs(task);
     ZcFbTaskTextCompose(task, gr.text_base, TEXT_COLS);
     ZcFbTextFlushRect(gr.text_base, TEXT_COLS, task->win_left,
                       task->win_right, task->win_top, task->win_bottom);
@@ -3092,6 +3101,7 @@ U0 GrUpdateTasks()
 
     TextRect(0, TEXT_COLS - 1, 0, TEXT_ROWS - 1, 0x0800);
     ZcFbShellTextCompose(gr.text_base, TEXT_COLS);
+    ZcFbTextFlush(gr.text_base, TEXT_COLS, TEXT_ROWS);
     WinZBufUpdate();
     task = root;
     do

@@ -160,11 +160,17 @@ through the kernel readback path, then restores that pixel. This is covered by
 
 This proves the final 32-bit presenter can reach the real surface, but not the
 full `GrUpdateScreen` sequence. Upstream `gr.dc1`, `gr.dc_cache`, and
-zoom/pan surfaces are not initialized together. The task bridge also currently
-draws task graphics directly to the framebuffer, so a full upstream redraw
-could overwrite that output. The next integration step is to move task drawing
-onto the compositor's offscreen surface and initialize the upstream screen
-surfaces as one pipeline before enabling periodic full-frame presentation.
+zoom/pan surfaces are not initialized together. The shell's periodic task
+refresh now renders host-backed text and drawing primitives into a shared
+800x600 indexed CDC surface, then presents that composed frame to the Limine
+framebuffer. CDC byte writes and host-backed framebuffer primitives share the
+surface. The staging path quantizes host colors to the current 16-color text
+palette and clears to black each frame; arbitrary 8-bit CDC color semantics are
+not preserved. This is not yet the full upstream `GrUpdateScreen` compositor or
+a guarantee that arbitrary graphics DCs are presented. The next integration
+step is to initialize the upstream display, cache, and alias surfaces as one
+pipeline and route those DC operations through it before claiming full-frame
+compatibility.
 
 ## Remaining graphics path
 
