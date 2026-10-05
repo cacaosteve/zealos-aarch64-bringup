@@ -34,6 +34,8 @@ extern U0 KbdMouseHandler(Bool poll_kbd, Bool poll_mouse);
 // Packed tablet sample: x[15:0], y[31:16], buttons[39:32], wheel s8[47:40].
 extern I64 ZcTabletSample();
 extern I64 ZcMonotonicNs();
+extern Bool ZcMouseStateUpdate(I64 x, I64 y, I64 text_x, I64 text_y,
+                               I64 now_ns);
 extern F64 Exp(F64 x);
 // Bootstrap subset of upstream MathODE.ZC; the unchanged full ODE module is
 // pinned but currently triggers a compiler/runtime fault while loading.
@@ -2624,6 +2626,11 @@ public Bool BootstrapCtrlInputSampleAt(CTask *task, I64 sample, I64 now_ns)
         wheel -= 0x100;
     if (sample < 0 || !task || !TaskValidate(task))
         return FALSE;
+    // Keep ZealOS's current mouse global synchronized as well as routing the
+    // tablet coordinates into the compatibility window manager. Resolve it
+    // at runtime because upstream modules may provide a newer global object.
+    ZcMouseStateUpdate(x, y, (x - gr.pan_text_x) >> 3,
+                       (y - gr.pan_text_y) >> 3, now_ns);
     if (!bootstrap_mouse_sampled)
     {
         bootstrap_mouse_last_buttons = buttons;

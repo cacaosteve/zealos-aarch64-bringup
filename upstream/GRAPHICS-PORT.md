@@ -106,6 +106,11 @@ or synthesized `MESSAGE_MS_*_D_*` events using ZealOS's 175 ms interval.
 DolDoc body clicks wait for that interval before activating an entry; a double
 click sends the upstream Escape or Shift-Escape action instead. Window controls
 continue to react to the physical button transitions.
+Each valid absolute-tablet sample now updates the active ZealOS `mouse.pos`,
+`mouse.pos_text`, and timestamp fields through the current guest-global layout.
+The unchanged `WinFinalUpdate` coordinate overlay therefore reports the live
+virtual pointer location. The bridge still lacks a software cursor callback,
+so no guest-drawn pointer is visible yet.
 The first four title cells post the upstream
 Ctrl-M task-menu key; the last three post Shift-Esc to a task with a document
 or kill a task without one. These release-triggered actions match pinned

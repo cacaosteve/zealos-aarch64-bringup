@@ -2620,6 +2620,17 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 222 — keep ZealOS mouse globals in sync with the virtual tablet
+
+| Item | Path |
+|--|--|
+| Gap | Tablet coordinates drove hit testing and dragging, but unchanged ZealOS code read stale `mouse.pos` and `mouse.pos_text` values |
+| Bring-up | Resolve the current `mouse` global at sample time and update pixel coordinates, pan-adjusted text coordinates, and timestamp from each valid absolute sample |
+| Smoke | `WinMousePointerStateCheck` feeds a known sample through the real tablet bridge and verifies all three state fields |
+| Limits | Mouse state and coordinate text now follow the pointer; ZealOS software cursor drawing still needs an initialized draw callback and cursor asset |
+
+Freeze catalog unchanged.
+
 ## Open compatibility probe — `/System/Win.ZC`
 
 The source probe loads pinned `KernelC.HH`, `Externs.ZC`, and `Gr.HH` before compiling unchanged `Win.ZC`. Graphics dimensions and mouse globals are probe fixtures; `DrawMenu` and `GrScaleZoom` are compile-only stubs for subsystems whose full bootstrap is not loaded. `GrScreenFinalUpdateChecks` executes `WinFinalUpdate` through the staged idle-frame path, confirms the fixture's `mouse_grid.coord` toggles the real coordinate-text overlay, then checks a separate visible guest overlay callback. Physical mouse motion and cursor drawing still need the full mouse/display initialization. The raw ARM generic-timer binding and a standalone F64 clock expression are smoke-tested before the Win load.

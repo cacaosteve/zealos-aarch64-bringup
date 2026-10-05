@@ -44,6 +44,8 @@ extern I64 ZcDocUpdateTaskDocs(U8 *task);
 extern class CGrGlobals;
 extern CGrGlobals *ZcActiveGrGlobals();
 extern Bool ZcTaskFrameRun();
+extern Bool ZcMouseStateUpdate(I64 x, I64 y, I64 text_x, I64 text_y,
+                               I64 now_ns);
 extern I64 ZcFbScreenWidth();
 extern I64 ZcFbScreenHeight();
 extern Bool ZcFbGraphPlot(I64 x, I64 y, U32 color,

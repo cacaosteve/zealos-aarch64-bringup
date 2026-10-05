@@ -135,7 +135,7 @@ I64 WindowDragLiveStart()
     window_drag_live_right_control.draw_it = &WindowDragLiveRightDraw;
     window_drag_live_b->next_ctrl = window_drag_live_b->last_ctrl =
         &window_drag_live_right_control;
-    GrUpdateTasks;
+    BootstrapGrUpdateTasks();
     return 42;
 }
 
@@ -148,7 +148,7 @@ I64 WindowDragLiveRenderChecks()
     draw_a_before = window_drag_live_draw_a_count;
     draw_b_before = window_drag_live_draw_b_count;
     control_before = window_drag_live_control_draw_count;
-    GrUpdateTasks;
+    BootstrapGrUpdateTasks();
     if (window_drag_live_draw_a_count <= draw_a_before ||
         window_drag_live_draw_b_count <= draw_b_before ||
         window_drag_live_control_draw_count <= control_before)

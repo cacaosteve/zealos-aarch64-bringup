@@ -255,6 +255,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                         'zc => 0x0000000000000001')
                 command('zload /Tests/WinMouseState.ZC',
                         'zc: loaded /Tests/WinMouseState.ZC')
+                command('zcall WinMousePointerStateCheck',
+                        'zc => 0x000000000000002a')
                 command('zcall WinCAllocCheck',
                         'zc => 0x0000000000000001')
                 command('zcall WinTimeCheck',

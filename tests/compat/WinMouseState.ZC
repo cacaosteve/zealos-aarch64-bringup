@@ -35,6 +35,36 @@ I64 WinTimeCheck()
     return ZcMonotonicNs() > 0;
 }
 
+I64 WinMousePointerStateCheck()
+{//The virtual tablet must update ZealOS's shared absolute mouse coordinates.
+    I64 old_x = mouse.pos.x, old_y = mouse.pos.y;
+    I64 old_text_x = mouse.pos_text.x, old_text_y = mouse.pos_text.y;
+    I64 old_timestamp = mouse.timestamp;
+    I64 x = 123, y = 234;
+
+    if (!TaskValidate(sys_task))
+        return 1;
+    BootstrapCtrlInputSample(sys_task, x | (y << 16));
+    if (mouse.pos.x != x || mouse.pos.y != y ||
+        mouse.pos_text.x != (x - gr.pan_text_x) >> 3 ||
+        mouse.pos_text.y != (y - gr.pan_text_y) >> 3 ||
+        mouse.timestamp <= 0)
+    {
+        mouse.pos.x = old_x;
+        mouse.pos.y = old_y;
+        mouse.pos_text.x = old_text_x;
+        mouse.pos_text.y = old_text_y;
+        mouse.timestamp = old_timestamp;
+        return 2;
+    }
+    mouse.pos.x = old_x;
+    mouse.pos.y = old_y;
+    mouse.pos_text.x = old_text_x;
+    mouse.pos_text.y = old_text_y;
+    mouse.timestamp = old_timestamp;
+    return 42;
+}
+
 F64 WinF64One()
 {
     return 1.0;

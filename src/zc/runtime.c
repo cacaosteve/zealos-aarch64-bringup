@@ -882,6 +882,62 @@ static int64_t host_active_gr_globals(int64_t *a) {
                ? (int64_t)(uintptr_t)global->data_addr
                : 0;
 }
+static CMemberLst *guest_class_member(CHashClass *cls, const char *name) {
+    for (CMemberLst *member = cls ? cls->members_lst : NULL; member;
+         member = member->next) {
+        if (member->str && !strcmp(member->str, name))
+            return member;
+    }
+    return cls && cls->base_class ? guest_class_member(cls->base_class, name)
+                                  : NULL;
+}
+static int64_t host_mouse_state_update(int64_t *a) {
+    CHashGlblVar *global;
+    CMemberLst *pos, *pos_x, *pos_y, *pos_text, *text_x, *text_y, *timestamp;
+    CHashClass *cls, *pos_cls, *text_cls;
+    int64_t pos_x_off, pos_y_off, text_x_off, text_y_off;
+    uint8_t *data;
+    if (!Fs || !Fs->hash_table)
+        return 0;
+    global = (CHashGlblVar *)HashFind("mouse", Fs->hash_table,
+                                      HTT_GLBL_VAR, 1);
+    if (!global || !global->data_addr)
+        return 0;
+    pos = guest_class_member(global->var_class, "pos");
+    pos_text = guest_class_member(global->var_class, "pos_text");
+    timestamp = guest_class_member(global->var_class, "timestamp");
+    pos_x = pos ? guest_class_member(pos->member_class, "x") : NULL;
+    pos_y = pos ? guest_class_member(pos->member_class, "y") : NULL;
+    text_x = pos_text ? guest_class_member(pos_text->member_class, "x") : NULL;
+    text_y = pos_text ? guest_class_member(pos_text->member_class, "y") : NULL;
+    if (!pos_x || !pos_y || !text_x || !text_y || !timestamp)
+        return 0;
+    cls = global->var_class;
+    pos_cls = pos ? pos->member_class : NULL;
+    text_cls = pos_text ? pos_text->member_class : NULL;
+    if (!cls || !pos_cls || !text_cls || pos->off < 0 || pos_text->off < 0 ||
+        timestamp->off < 0 || pos_cls->sz < (int64_t)sizeof(int64_t) * 2 ||
+        text_cls->sz < (int64_t)sizeof(int64_t) * 2 ||
+        pos->off > cls->sz - pos_cls->sz ||
+        pos_text->off > cls->sz - text_cls->sz ||
+        timestamp->off > cls->sz - (int64_t)sizeof(int64_t) ||
+        pos_x->off < 0 || pos_x->off > pos_cls->sz - (int64_t)sizeof(int64_t) ||
+        pos_y->off < 0 || pos_y->off > pos_cls->sz - (int64_t)sizeof(int64_t) ||
+        text_x->off < 0 || text_x->off > text_cls->sz - (int64_t)sizeof(int64_t) ||
+        text_y->off < 0 || text_y->off > text_cls->sz - (int64_t)sizeof(int64_t))
+        return 0;
+    pos_x_off = pos->off + pos_x->off;
+    pos_y_off = pos->off + pos_y->off;
+    text_x_off = pos_text->off + text_x->off;
+    text_y_off = pos_text->off + text_y->off;
+    data = global->data_addr;
+    *(int64_t *)(data + pos_x_off) = a[0];
+    *(int64_t *)(data + pos_y_off) = a[1];
+    *(int64_t *)(data + text_x_off) = a[2];
+    *(int64_t *)(data + text_y_off) = a[3];
+    *(int64_t *)(data + timestamp->off) = a[4];
+    return 1;
+}
 static int64_t host_fb_text_span(int64_t *a) {
     uint32_t lr = (uint32_t)a[6], tb = (uint32_t)a[7];
     uint32_t *plane = guest_text_plane(a[8], a[9], 75);
@@ -3445,6 +3501,7 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
                     {"ZcTaskYield", host_task_yield, 0}, {"ZcTaskRun", host_task_run, 0},
                     {"ZcTaskResult", host_task_result, 1},
                     {"ZcTaskFrameRun", host_task_frame_run, 0},
+                    {"ZcMouseStateUpdate", host_mouse_state_update, 5},
                     {"ZcFbTextSpan", host_fb_text_span, 10},
                     {"ZcFbTextCellsDrawn", host_fb_text_cells_drawn, 0},
                     {"ZcFbTextPixel", host_fb_text_pixel, 2},
