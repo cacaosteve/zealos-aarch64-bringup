@@ -128,6 +128,15 @@ that CDC use screen coordinates and the full framebuffer clip, matching the
 final overlay stage in upstream `GrUpdateScreen`. The progress-bar probe now
 uses this route rather than attaching `DrawProgressBars` to a task.
 
+The idle WinMgr bridge resolves the newest `gr` global through a small native
+hash-table binding before invoking that optional callback. HolyC creates a new
+storage object for each non-`extern` global definition, so the bootstrap's
+early `gr` and later `GrGlobals.ZC`'s `gr` are distinct even though they share a
+name and layout. The tick also falls back to `sys_task` if `sys_winmgr_task` is
+stale. `GrScreenFinalUpdateChecks` sets the later graphics global's callback,
+runs `BootstrapWinMgrTick`, and verifies the callback receives the bridge CDC
+and writes its screen-space pixel after composition.
+
 These calls also exposed an AArch64 Aiwnios host-FFI gap: arguments after x0–x7
 were not copied from the caller stack into the host shim's contiguous argument
 array. The ARM64 FFI bridge now gathers those stack-passed arguments for

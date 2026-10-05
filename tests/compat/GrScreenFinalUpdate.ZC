@@ -1,0 +1,35 @@
+// Verify that the bootstrap WinMgr tick runs the optional screen overlay
+// after composing task windows, with screen-space CDC state.
+I64 gr_screen_final_update_calls;
+U8 gr_screen_final_update_old_pixel;
+
+U0 GrScreenFinalUpdateProbe(CDC *dc)
+{
+    gr_screen_final_update_calls++;
+    if (!dc || !dc->body || dc->width_internal != 800 || dc->height != 600)
+        return;
+    dc->body[599 * 800 + 799] = 15;
+}
+
+I64 GrScreenFinalUpdateChecks()
+{
+    U0 (*old_final_update)(CDC *dc);
+
+    if (!TaskValidate(sys_winmgr_task) && !TaskValidate(sys_task))
+        return 3;
+    old_final_update = gr.fp_final_screen_update;
+    gr_screen_final_update_old_pixel = bootstrap_graphics_pixels[599 * 800 + 799];
+    gr_screen_final_update_calls = 0;
+    gr.fp_final_screen_update = &GrScreenFinalUpdateProbe;
+    if (gr.fp_final_screen_update != &GrScreenFinalUpdateProbe)
+        return 4;
+    BootstrapWinMgrTick();
+    gr.fp_final_screen_update = old_final_update;
+
+    if (gr_screen_final_update_calls != 1)
+        return 1;
+    if (bootstrap_graphics_pixels[599 * 800 + 799] != 15)
+        return 2;
+    bootstrap_graphics_pixels[599 * 800 + 799] = gr_screen_final_update_old_pixel;
+    return 42;
+}

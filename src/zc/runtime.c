@@ -868,6 +868,16 @@ static int64_t host_doc_update_task_docs(int64_t *a) {
     (void)FFI_CALL_TOS_1(fun->fun_ptr, a[0]);
     return 1;
 }
+static int64_t host_active_gr_globals(int64_t *a) {
+    CHashGlblVar *global;
+    (void)a;
+    if (!Fs || !Fs->hash_table)
+        return 0;
+    global = (CHashGlblVar *)HashFind("gr", Fs->hash_table, HTT_GLBL_VAR, 1);
+    return global && global->data_addr
+               ? (int64_t)(uintptr_t)global->data_addr
+               : 0;
+}
 static int64_t host_fb_text_span(int64_t *a) {
     uint32_t lr = (uint32_t)a[6], tb = (uint32_t)a[7];
     uint32_t *plane = guest_text_plane(a[8], a[9], 75);
@@ -3438,6 +3448,7 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
                     {"ZcFbTextRect", host_fb_text_rect, 7},
                     {"ZcFbTextFlush", host_fb_text_flush, 3},
                     {"ZcDocUpdateTaskDocs", host_doc_update_task_docs, 1},
+                    {"ZcActiveGrGlobals", host_active_gr_globals, 0},
                     {"ZcFbTextFlushRect", host_fb_text_flush_rect, 6},
                     {"ZcFbGraphPlot", host_fb_graph_plot, 7},
                     {"ZcFbGraphRect", host_fb_graph_rect, 9},

@@ -2609,6 +2609,17 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 221 — bind the idle overlay to active graphics globals
+
+| Item | Path |
+|--|--|
+| Gap | The bootstrap and later upstream graphics load each allocate their own non-`extern` `gr` global; the idle tick was reading the bootstrap copy and missed the final CDC callback installed by `Win.ZC` |
+| Bring-up | Resolve the newest `gr` from the active hash table, use the shared framebuffer CDC for the final overlay, and fall back to `sys_task` when `sys_winmgr_task` is stale |
+| Smoke | `GrScreenFinalUpdateChecks` sets the later global's callback, calls `BootstrapWinMgrTick`, and verifies the callback and screen-space pixel |
+| Limits | Verifies the guest callback path under QEMU; the full `WinFinalUpdate` cursor overlay still depends on the remaining mouse and screen initialization |
+
+Freeze catalog unchanged.
+
 ## Open compatibility probe — `/System/Win.ZC`
 
 The source probe loads pinned `KernelC.HH`, `Externs.ZC`, and `Gr.HH` before compiling unchanged `Win.ZC`. Graphics dimensions and mouse globals are probe fixtures; `DrawMenu` and `GrScaleZoom` are compile-only stubs for subsystems whose full bootstrap is not loaded, and `WinFinalUpdate` is not executed. The raw ARM generic-timer binding and a standalone F64 clock expression are smoke-tested before the Win load.

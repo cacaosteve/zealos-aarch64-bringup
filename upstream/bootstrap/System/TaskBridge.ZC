@@ -1400,22 +1400,33 @@ U32 bootstrap_text_base[TEXT_COLS * TEXT_ROWS];
 U16 bootstrap_win_z_buf[TEXT_COLS * TEXT_ROWS];
 U16 bootstrap_win_uncovered[(BOOTSTRAP_WIN_MAX + 15) / 16];
 U32 bootstrap_win_uncovered_cells[BOOTSTRAP_WIN_MAX];
-class CBootstrapGraphicsGlobals
+public class CGrGlobals
 {
-    CDC *dc;
-    CDC *dc2;
-    U8 *empty_sprite;
-    U32 *text_base;
-    U16 *win_z_buf;
-    U16 *win_uncovered_bitmap;
-    I64 highest_uncovered;
-    I64 pan_text_x, pan_text_y;
-    U0 (*fp_final_screen_update)(CDC *dc);
-    U0 (*fp_draw_mouse)(CDC *dc, I64 x, I64 y);
-    U0 (*fp_draw_grab_mouse)(CDC *dc, I64 x, I64 y, Bool closed);
-    I64 screen_zoom, sx, sy;
-    Bool continuous_scroll;
+	// Keep the exact layout of upstream CGrGlobals in
+	// pinned/System/Gr/GrGlobals.ZC so the active source global can be viewed
+	// through this type. HolyC allocates separate storage for each definition.
+	I64 *to_8_bits, *to_8_colors;
+	CDC *screen_image, *dc, *dc1, *dc2, *dc_cache, *zoomed_dc;
+	U32 *text_base;
+	U16 *win_z_buf;
+	CHashTable *sprite_hash;
+	U16 *win_uncovered_bitmap;
+	I64 highest_uncovered;
+	I64 pan_text_x, pan_text_y;
+	U0 (*fp_final_screen_update)(CDC *dc);
+	U0 (*fp_wall_paper)(CTask *task);
+	U0 (*fp_draw_mouse)(CDC *dc, I64 x, I64 y);
+	U0 (*fp_draw_grab_mouse)(CDC *dc, I64 x, I64 y, Bool closed);
+	U8 *empty_sprite;
+	CDC *pen_brushes[64], *collision_pen_brushes[64];
+	CDC *even_pen_brushes[64], *odd_pen_brushes[64];
+	I8 circle_lo[64][64], circle_hi[64][64];
+	U8 *screen_zoom_tables[9], *screen_cache;
+	I64 screen_zoom, sx, sy;
+	Bool continuous_scroll;
+	Bool hide_row, hide_col;
 } gr;
+extern CGrGlobals *ZcActiveGrGlobals();
 gr.dc = &bootstrap_graphics_dc;
 gr.dc2 = &bootstrap_graphics_dc;
 gr.text_base = bootstrap_text_base;
@@ -3086,13 +3097,17 @@ U0 GrUpdateTaskWin(CTask *task)
 extern U0 WinZBufUpdate();
 extern Bool BootstrapWinIsUncovered(CTask *task);
 I64 bootstrap_winmgr_ticks = 0;
-U0 GrUpdateTasks()
+U0 BootstrapGrUpdateTasks()
 {//Bounded one-CPU window-ring refresh, drawn in ZealOS task/z order.
     CTask *root, *task;
+    CGrGlobals *active_gr;
     I64 visited = 0;
 
     root = sys_winmgr_task;
-    if (!root)
+    // A stale manager pointer can survive while the bootstrap root task is
+    // valid. Fall back on validation failure as well as NULL, or the whole
+    // frame (including its final CDC overlay) is silently skipped.
+    if (!TaskValidate(root))
         root = sys_task;
     if (!root || !TaskValidate(root))
         return;
@@ -3116,18 +3131,23 @@ U0 GrUpdateTasks()
     }
     while (task && task != root && visited < 64);
     // Match GrUpdateScreen's final overlay stage: run after the window draw
-    // callbacks with DCF_ON_TOP and screen-space coordinates.
-    if (gr.fp_final_screen_update)
+    // callbacks with DCF_ON_TOP and screen-space coordinates. The bootstrap
+    // and later source modules each define non-extern `gr` storage, so resolve
+    // the newest source global from the active task's hash table.
+    active_gr = ZcActiveGrGlobals();
+    if (!active_gr)
+        active_gr = &gr;
+    if (active_gr->fp_final_screen_update)
     {
-        CDC *dc = DCAlias(gr.dc2, NULL);
+        CDC *dc = DCAlias(&bootstrap_graphics_dc, NULL);
         dc->flags |= DCF_ON_TOP;
-        (*gr.fp_final_screen_update)(dc);
+        (*active_gr->fp_final_screen_update)(dc);
     }
 }
 public U0 BootstrapWinMgrTick()
 {//One host-idle frame: route tablet clicks and redraw the task ring.
     bootstrap_winmgr_ticks++;
-    GrUpdateTasks();
+    BootstrapGrUpdateTasks();
 }
 Bool WinHorz(I64 left, I64 right, CTask *task=NULL)
 {
