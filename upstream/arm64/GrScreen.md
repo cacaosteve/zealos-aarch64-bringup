@@ -36,11 +36,15 @@ palette only when no palette has been selected yet. The presenter call is
 guarded by framebuffer dimensions, pitch, and pixel format. The QEMU regression
 requires both source text passes and the source presenter to run during a live
 frame, then checks the resulting cursor pixels. If the source graphics modules
-are not loaded, startup keeps the existing bootstrap renderer. The native
-AArch64 runtime also binds `DCBlotColor4`, the packed-pixel to four-bitplane
-conversion used by the remaining upstream `GrUpdateScreen` path; its guest
-smoke checks bit ordering, cache updates, and that an unchanged cached group
-leaves the destination untouched.
+are not loaded, startup keeps the existing bootstrap renderer. The AArch64
+frame now allocates ZealOS-shaped `dc1` and `dc_cache` surfaces. After the
+source 32-bit presenter, its `DCBlotColor4` host implementation converts the
+finished 8-bit `dc2` into four one-bit planes and updates the packed-group
+cache. The graphics smoke verifies that this stage ran and that the cache
+matches the composed frame; the focused converter smoke also checks bit
+ordering and that unchanged groups leave the destination untouched. These
+planes are currently a compatibility surface, not the firmware framebuffer's
+scanout format.
 
 This is a bundle-time architecture port, not a change to the pinned upstream
 file and not an x86 instruction emulator. The live frame still uses the bounded
@@ -54,9 +58,9 @@ the CPU0 task ring with a 64-task safety bound and calls upstream
 the integrator call through an optional host bridge. The QEMU smoke supplies a
 small test integrator and verifies the wrapper visits the root task. This does
 not yet load or execute ZealOS's `MathODE` subsystem or model additional CPUs.
-Remaining graphics work includes initializing the `dc1`/`dc_cache` planar
-stage and zoom surfaces, and reconciling the display driver's 32-bit framebuffer
-with ZealOS's legacy planar output.
+Remaining graphics work includes upstream zoom surfaces and `GrZoomInScreen`,
+then deciding how legacy planar output should coexist with the display driver's
+32-bit framebuffer.
 The x86 build continues to use the original source. The guest source archive
 includes this note at `/PORTS/ARM64/GrScreen.md` so the substitution is
 discoverable.

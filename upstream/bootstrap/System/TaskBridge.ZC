@@ -1339,17 +1339,31 @@ U0 FindWiz()
 // text-plane constants declared below so the forward CDC stub can use it.
 U8 bootstrap_graphics_pixels[800 * 600];
 CDC bootstrap_graphics_dc;
+// ZealOS's legacy DCBlotColor4 output is four one-bit planes, one byte per
+// eight pixels in each plane. Its cache holds one packed U64 per eight pixels.
+U8 bootstrap_planar_pixels[800 * 600 / 2];
+U64 bootstrap_planar_cache[800 * 600 / 8];
+CDC bootstrap_planar_dc, bootstrap_planar_cache_dc;
 U32 bootstrap_present_raw[800 * 600];
 U8 bootstrap_present_cache[800 * 600];
 U64 bootstrap_text_colors[16];
 I64 bootstrap_gr_text_updates = 0;
 I64 bootstrap_gr_screen_updates = 0;
+I64 bootstrap_gr_planar_updates = 0;
 Bool bootstrap_present_cache_ready = FALSE;
 Bool bootstrap_present_ready = FALSE;
 bootstrap_graphics_dc.body = bootstrap_graphics_pixels;
 bootstrap_graphics_dc.width = 800;
 bootstrap_graphics_dc.width_internal = 800;
 bootstrap_graphics_dc.height = 600;
+bootstrap_planar_dc.body = bootstrap_planar_pixels;
+bootstrap_planar_dc.width = 800;
+bootstrap_planar_dc.width_internal = 800;
+bootstrap_planar_dc.height = 600;
+bootstrap_planar_cache_dc.body = bootstrap_planar_cache(U8 *);
+bootstrap_planar_cache_dc.width = 800;
+bootstrap_planar_cache_dc.width_internal = 800;
+bootstrap_planar_cache_dc.height = 600;
 CDC *DCAlias(CDC *dc, CTask *task=NULL)
 {
     if (!task)
@@ -3151,6 +3165,7 @@ extern Bool ZcGrScreenUpdate();
 extern Bool ZcGrUpdateTaskWin(CTask *task);
 extern Bool ZcODEsUpdate(CTask *task);
 extern Bool ZcGrUpdateTaskODEs(CTask *task);
+extern U0 DCBlotColor4(U8 *dst, I64 *img, I64 *img_cache, I64 count);
 I64 bootstrap_winmgr_ticks = 0;
 I64 bootstrap_upstream_window_updates = 0;
 I64 bootstrap_upstream_ode_updates = 0;
@@ -3181,6 +3196,8 @@ U0 BootstrapGrUpdateTasks()
     // Bind the upstream rasterizers to the bootstrap frame surface.
     // Task/window draws already target this same CDC through DCAlias.
     active_gr->dc2 = &bootstrap_graphics_dc;
+    active_gr->dc1 = &bootstrap_planar_dc;
+    active_gr->dc_cache = &bootstrap_planar_cache_dc;
     active_gr->text_base = bootstrap_text_base;
     active_gr->to_8_colors = bootstrap_text_colors;
     active_gr->screen_zoom = 1;
@@ -3257,8 +3274,21 @@ public U0 BootstrapWinMgrTick()
 }
 U0 BootstrapGrPresent()
 {//Run the upstream palette-to-framebuffer pass after the bootstrap surface blit.
+    CGrGlobals *active_gr = ZcActiveGrGlobals();
+    if (!active_gr)
+        active_gr = &gr;
     if (bootstrap_present_ready && ZcGrScreenUpdate())
         bootstrap_gr_screen_updates++;
+    if (bootstrap_present_ready && active_gr->dc1 && active_gr->dc1->body &&
+        active_gr->dc2 && active_gr->dc2->body && active_gr->dc_cache &&
+        active_gr->dc_cache->body)
+    {
+        DCBlotColor4(active_gr->dc1->body,
+                     active_gr->dc2->body(I64 *),
+                     active_gr->dc_cache->body(I64 *),
+                     800 * 600 >> 3);
+        bootstrap_gr_planar_updates++;
+    }
 }
 Bool WinHorz(I64 left, I64 right, CTask *task=NULL)
 {

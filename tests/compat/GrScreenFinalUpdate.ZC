@@ -2,6 +2,7 @@
 // after composing task windows, with screen-space CDC state.
 extern I64 bootstrap_gr_text_updates;
 extern I64 bootstrap_gr_screen_updates;
+extern I64 bootstrap_gr_planar_updates;
 extern I64 bootstrap_upstream_ode_updates;
 I64 gr_screen_final_update_calls;
 I64 gr_screen_ode_update_calls;
@@ -41,8 +42,10 @@ I64 GrScreenFinalUpdateChecks()
 {
     U0 (*old_final_update)(CDC *dc);
     CTask *paint_task;
+    CGrGlobals *frame_gr;
     I64 old_coord, old_mouse_x, old_mouse_y, old_draw_calls;
-    I64 old_text_updates, old_screen_updates, old_window_updates, old_ode_updates;
+    I64 old_text_updates, old_screen_updates, old_planar_updates;
+    I64 old_window_updates, old_ode_updates;
     I64 old_window_display_flags;
     I64 x, y, i, overlay_x, overlay_y, changed;
     U32 *screen;
@@ -97,6 +100,7 @@ I64 GrScreenFinalUpdateChecks()
     paint_task->display_flags |= 1 << DISPLAYf_SHOW;
     old_text_updates = bootstrap_gr_text_updates;
     old_screen_updates = bootstrap_gr_screen_updates;
+    old_planar_updates = bootstrap_gr_planar_updates;
     old_window_updates = bootstrap_upstream_window_updates;
     old_ode_updates = bootstrap_upstream_ode_updates;
     if (!ZcTaskFrameRun())
@@ -142,6 +146,24 @@ I64 GrScreenFinalUpdateChecks()
         mouse.pos.x = old_mouse_x;
         mouse.pos.y = old_mouse_y;
         return 16;
+    }
+    if (bootstrap_gr_planar_updates != old_planar_updates + 1)
+    {
+        mouse_grid.coord = old_coord;
+        mouse.pos.x = old_mouse_x;
+        mouse.pos.y = old_mouse_y;
+        return 21;
+    }
+    frame_gr = ZcActiveGrGlobals();
+    if (!frame_gr || !frame_gr->dc1 || !frame_gr->dc1->body ||
+        !frame_gr->dc_cache || !frame_gr->dc_cache->body ||
+        frame_gr->dc_cache->body(I64 *)[0] !=
+            *(frame_gr->dc2->body(I64 *)))
+    {
+        mouse_grid.coord = old_coord;
+        mouse.pos.x = old_mouse_x;
+        mouse.pos.y = old_mouse_y;
+        return 22;
     }
     for (y = 0, i = 0; y < FONT_HEIGHT; y++)
         for (x = 0; x < FONT_WIDTH * 10; x++, i++)
