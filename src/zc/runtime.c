@@ -863,6 +863,24 @@ static int64_t host_task_frame_run(int64_t *a) {
     (void)a;
     return guest_task_frame_run();
 }
+static int64_t host_gr_text_update(int64_t *a) {
+    CHashFun *background, *foreground;
+    (void)a;
+    if (!Fs || !Fs->hash_table)
+        return 0;
+    background = (CHashFun *)HashFind("GrUpdateTextBG", Fs->hash_table,
+                                     HTT_FUN, 1);
+    foreground = (CHashFun *)HashFind("GrUpdateTextFG", Fs->hash_table,
+                                      HTT_FUN, 1);
+    if (!background || !background->fun_ptr || background->argc ||
+        (background->base.base.type & HTF_EXTERN) ||
+        !foreground || !foreground->fun_ptr || foreground->argc ||
+        (foreground->base.base.type & HTF_EXTERN))
+        return 0;
+    FFI_CALL_TOS_0(background->fun_ptr);
+    FFI_CALL_TOS_0(foreground->fun_ptr);
+    return 1;
+}
 static int64_t host_doc_update_task_docs(int64_t *a) {
     CHashFun *fun = (CHashFun *)HashFind(
         "DocUpdateTaskDocs", Fs->hash_table, HTT_FUN, 1);
@@ -3289,6 +3307,7 @@ static int load_inner(const char *path) {
         PrsBindCSymbol("sys_framebuffer_bpp", &guest_fb_bpp, 0);
         if (load_inner("/System/TaskBridge.ZC"))
             zc_fail("task bridge source missing");
+        PrsBindCSymbol("ZcGrTextUpdate", host_gr_text_update, 0);
         PrsBindCSymbol("Option", host_option, 2);
         PrsBindCSymbol("DistSqrI64", host_dist_sqr_i64, 4);
         PrsBindCSymbol("SwapU16", host_swap_u16, 2);

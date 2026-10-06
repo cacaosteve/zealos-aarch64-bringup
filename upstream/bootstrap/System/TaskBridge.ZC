@@ -1339,6 +1339,8 @@ U0 FindWiz()
 // text-plane constants declared below so the forward CDC stub can use it.
 U8 bootstrap_graphics_pixels[800 * 600];
 CDC bootstrap_graphics_dc;
+U64 bootstrap_text_colors[16];
+I64 bootstrap_gr_text_updates = 0;
 bootstrap_graphics_dc.body = bootstrap_graphics_pixels;
 bootstrap_graphics_dc.width = 800;
 bootstrap_graphics_dc.width_internal = 800;
@@ -3139,12 +3141,13 @@ U0 GrUpdateTaskWin(CTask *task)
 }
 extern U0 WinZBufUpdate();
 extern Bool BootstrapWinIsUncovered(CTask *task);
+extern Bool ZcGrTextUpdate();
 I64 bootstrap_winmgr_ticks = 0;
 U0 BootstrapGrUpdateTasks()
 {//Bounded one-CPU window-ring refresh, drawn in ZealOS task/z order.
     CTask *root, *task;
     CGrGlobals *active_gr;
-    I64 visited = 0;
+    I64 visited = 0, i;
 
     root = sys_winmgr_task;
     // A stale manager pointer can survive while the bootstrap root task is
@@ -3157,9 +3160,25 @@ U0 BootstrapGrUpdateTasks()
 
     BootstrapCtrlInputPoll();
 
+    active_gr = ZcActiveGrGlobals();
+    if (!active_gr)
+        active_gr = &gr;
+    for (i = 0; i < 16; i++)
+        bootstrap_text_colors[i] = i * 0x0101010101010101;
+    if (active_gr != &gr)
+    {
+        // Bind the upstream text rasterizers to the bootstrap frame surface.
+        // Task/window draws already target this same CDC through DCAlias.
+        active_gr->dc2 = &bootstrap_graphics_dc;
+        active_gr->text_base = bootstrap_text_base;
+        active_gr->to_8_colors = bootstrap_text_colors;
+    }
     TextRect(0, TEXT_COLS - 1, 0, TEXT_ROWS - 1, 0x0800);
     ZcFbShellTextCompose(gr.text_base, TEXT_COLS);
-    ZcFbTextFlush(gr.text_base, TEXT_COLS, TEXT_ROWS);
+    if (active_gr != &gr && ZcGrTextUpdate())
+        bootstrap_gr_text_updates++;
+    else
+        ZcFbTextFlush(gr.text_base, TEXT_COLS, TEXT_ROWS);
     WinZBufUpdate();
     task = root;
     do
@@ -3177,9 +3196,6 @@ U0 BootstrapGrUpdateTasks()
     // callbacks with DCF_ON_TOP and screen-space coordinates. The bootstrap
     // and later source modules each define non-extern `gr` storage, so resolve
     // the newest source global from the active task's hash table.
-    active_gr = ZcActiveGrGlobals();
-    if (!active_gr)
-        active_gr = &gr;
     if (!active_gr->fp_draw_mouse)
         active_gr->fp_draw_mouse = &BootstrapDrawMouse;
     if (active_gr->fp_final_screen_update)

@@ -18,16 +18,23 @@ glyph over its expected background. Run that extended QEMU check with
 `make check-grscreen-full`; the regular `make check-grscreen` remains the
 shorter graphics regression.
 
-The native AArch64 runtime also binds `DCBlotColor4`, the packed-pixel to
-four-bitplane conversion used at the end of `GrUpdateScreen`. Its guest smoke
-checks bit ordering, cache updates, and that an unchanged cached group leaves
-the destination untouched.
+When `GrScreen.ZC` is loaded, the bootstrap frame now binds its active graphics
+globals to the shared 8-bit frame CDC and text plane, then runs the unchanged
+`GrUpdateTextBG` and `GrUpdateTextFG` before drawing task windows. If those
+upstream functions are not loaded yet, startup keeps the existing text
+fallback. `GrScreenFinalUpdateChecks` verifies the live frame invoked the
+upstream text passes and retained overlay behavior. The native AArch64 runtime
+also binds `DCBlotColor4`, the packed-pixel to four-bitplane conversion used at
+the end of `GrUpdateScreen`; its guest smoke checks bit ordering, cache updates,
+and that an unchanged cached group leaves the destination untouched.
 
 This is a bundle-time architecture port, not a change to the pinned upstream
-file and not an x86 instruction emulator. Although the background pass is now
-verified end-to-end on a temporary CDC, `GrUpdateTextBG` and `GrUpdateTextFG`
-are still not called by the live frame loop. Upstream `gr.dc1`, `gr.dc_cache`,
-zoom/pan surfaces, and direct task drawing must be reconciled before enabling
-the compositor refresh path. The x86 build continues to use the original
-source. The guest source archive includes this note at
-`/PORTS/ARM64/GrScreen.md` so the substitution is discoverable.
+file and not an x86 instruction emulator. The live frame uses the upstream
+text passes but still presents through the bootstrap palette renderer; it does
+not yet run upstream `GrUpdateScreen32` or the complete `GrUpdateScreen` path.
+The remaining graphics integration is to initialize `text.raw_screen`,
+`gr.screen_cache`, `gr.dc1`, `gr.dc_cache`, and zoom surfaces, then route the
+shared frame through the ZealOS presenter. Task-window traversal also remains
+the bounded bootstrap bridge rather than full upstream `GrUpdateTasks`. The x86
+build continues to use the original source. The guest source archive includes
+this note at `/PORTS/ARM64/GrScreen.md` so the substitution is discoverable.
