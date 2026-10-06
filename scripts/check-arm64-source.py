@@ -15,7 +15,8 @@ assert 'U8 *ZcGrTextBGStore(U8 *dst, I64 stride, U64 color)' in text
 assert 'for (row = 0; row < 8; row++)' in text
 assert 'if (row < 7)' in text
 assert 'row_dst += stride;' in text
-assert 'dst = ZcGrTextBGStore(dst(U8 *), w1, c);' in text
+assert text.count('*dst(U64 *) = c;') == 8
+assert text.count('dst(U8 *) += w1;') == 7
 assert 'dst(U8 *) += w2;' in text
 assert 'MOV U64 [RSI], R13' not in text
 assert 'ADD RSI, R12' not in text

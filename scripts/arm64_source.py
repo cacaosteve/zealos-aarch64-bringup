@@ -33,7 +33,21 @@ def translate_grscreen(source: bytes) -> bytes:
         )
     indent = matches[0].group("indent")
     replacement = (
-        f"{indent}dst = ZcGrTextBGStore(dst(U8 *), w1, c);\n"
+        f"{indent}*dst(U64 *) = c;\n"
+        f"{indent}dst(U8 *) += w1;\n"
+        f"{indent}*dst(U64 *) = c;\n"
+        f"{indent}dst(U8 *) += w1;\n"
+        f"{indent}*dst(U64 *) = c;\n"
+        f"{indent}dst(U8 *) += w1;\n"
+        f"{indent}*dst(U64 *) = c;\n"
+        f"{indent}dst(U8 *) += w1;\n"
+        f"{indent}*dst(U64 *) = c;\n"
+        f"{indent}dst(U8 *) += w1;\n"
+        f"{indent}*dst(U64 *) = c;\n"
+        f"{indent}dst(U8 *) += w1;\n"
+        f"{indent}*dst(U64 *) = c;\n"
+        f"{indent}dst(U8 *) += w1;\n"
+        f"{indent}*dst(U64 *) = c;\n"
         f"{indent}dst(U8 *) += w2;\n"
     )
     function = """U8 *ZcGrTextBGStore(U8 *dst, I64 stride, U64 color)
