@@ -27,8 +27,10 @@ U0 GrScreenFinalUpdateProbe(CDC *dc)
 I64 GrScreenFinalUpdateChecks()
 {
     U0 (*old_final_update)(CDC *dc);
+    CTask *paint_task;
     I64 old_coord, old_mouse_x, old_mouse_y, old_draw_calls;
-    I64 old_text_updates, old_screen_updates;
+    I64 old_text_updates, old_screen_updates, old_window_updates;
+    I64 old_window_display_flags;
     I64 x, y, i, overlay_x, overlay_y, changed;
     U32 *screen;
     I64 pitch;
@@ -73,14 +75,31 @@ I64 GrScreenFinalUpdateChecks()
     mouse.pos.x = 123;
     mouse.pos.y = 234;
     mouse_grid.coord = FALSE;
+    paint_task = sys_winmgr_task;
+    if (!TaskValidate(paint_task))
+        paint_task = sys_task;
+    if (!TaskValidate(paint_task))
+        return 17;
+    old_window_display_flags = paint_task->display_flags;
+    paint_task->display_flags |= 1 << DISPLAYf_SHOW;
     old_text_updates = bootstrap_gr_text_updates;
     old_screen_updates = bootstrap_gr_screen_updates;
+    old_window_updates = bootstrap_upstream_window_updates;
     if (!ZcTaskFrameRun())
     {
+        paint_task->display_flags = old_window_display_flags;
         mouse_grid.coord = old_coord;
         mouse.pos.x = old_mouse_x;
         mouse.pos.y = old_mouse_y;
         return 5;
+    }
+    paint_task->display_flags = old_window_display_flags;
+    if (bootstrap_upstream_window_updates <= old_window_updates)
+    {
+        mouse_grid.coord = old_coord;
+        mouse.pos.x = old_mouse_x;
+        mouse.pos.y = old_mouse_y;
+        return 18;
     }
     if (bootstrap_gr_text_updates != old_text_updates + 1)
     {

@@ -23,11 +23,12 @@ globals to the shared 8-bit frame CDC and text plane, then runs the unchanged
 `GrUpdateTextBG` and `GrUpdateTextFG` before drawing task windows. After the
 bounded bootstrap z-order walk selects a visible, uncovered task, it now calls
 the upstream `GrUpdateTaskWin` when that source function is loaded; startup
-falls back to the bootstrap window painter until then. The headless regression
-has no visible window eligible for that call, so it validates the overall frame
-and presenter while actual upstream per-window painting remains an interactive
-UTM acceptance check. After the
-bootstrap blit, the native AArch64 frame runner also calls the unchanged
+falls back to the bootstrap window painter until then. The ARM64 overlay routes
+the upstream `DocUpdateTaskDocs` call through the optional DolDoc bridge, so
+the painter remains safe before that library is loaded and dispatches to the
+real source function when available. The headless regression temporarily shows
+a valid root task and requires the upstream painter counter to advance. After
+the bootstrap blit, the native AArch64 frame runner also calls the unchanged
 `GrUpdateScreen32` on the live 800x600x32 framebuffer. It binds a raw 32-bit
 conversion buffer and the 8-bit screen cache, and uses ZealOS's standard
 palette only when no palette has been selected yet. The presenter call is

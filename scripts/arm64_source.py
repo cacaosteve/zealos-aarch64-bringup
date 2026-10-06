@@ -14,12 +14,14 @@ _TEXT_BG_X86 = re.compile(
 
 
 def translate_grscreen(source: bytes) -> bytes:
-    """Replace GrUpdateTextBG's x86 register loop with equivalent HolyC.
+    """Apply the narrow AArch64 compatibility overlay to GrScreen.ZC.
 
     The source is pinned and remains byte-for-byte unchanged on disk. This
     guarded overlay is applied only to the AArch64 boot source bundle. It
-    intentionally requires the exact eight-store/seven-stride sequence so an
-    upstream change cannot be silently mis-translated.
+    requires the exact text-background assembly and task-doc call sites so an
+    upstream change cannot be silently mis-translated. The task-doc call goes
+    through the optional runtime bridge because the full DolDoc library may
+    not have been loaded yet.
     """
     try:
         text = source.decode("utf-8")
@@ -31,6 +33,9 @@ def translate_grscreen(source: bytes) -> bytes:
             "expected exactly one GrScreen text-background x86 store loop; "
             f"found {len(matches)}"
         )
+    doc_call = "DocUpdateTaskDocs(task);"
+    if text.count(doc_call) != 1:
+        raise ValueError("expected exactly one GrUpdateTaskWin task-doc call")
     indent = matches[0].group("indent")
     replacement = (
         f"{indent}cell_dst = dst(U8 *);\n"
@@ -70,4 +75,6 @@ def translate_grscreen(source: bytes) -> bytes:
         "\tU8\t\t\t*dst2 = dst, *cell_dst;",
         1,
     )
-    return replaced.replace(marker, function + marker, 1).encode("utf-8")
+    replaced = replaced.replace(marker, function + marker, 1)
+    replaced = replaced.replace(doc_call, "ZcDocUpdateTaskDocs(task);", 1)
+    return replaced.encode("utf-8")

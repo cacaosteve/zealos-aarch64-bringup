@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Verify the guarded AArch64 source overlay for pinned GrScreen.ZC."""
 from pathlib import Path
+import re
 import sys
 
 from arm64_source import translate_grscreen
@@ -20,6 +21,8 @@ assert 'for (j = 0; j < FONT_HEIGHT; j++)' in text
 assert '*cell_dst(U64 *) = c;' in text
 assert 'cell_dst += w1;' in text
 assert 'dst(U8 *) += 7 * w1;' in text
+assert text.count('ZcDocUpdateTaskDocs(task);') == 1
+assert not re.search(r'(?<!Zc)DocUpdateTaskDocs\(task\);', text)
 assert text.count('dst(U8 *) += w2;') >= 2
 assert 'MOV U64 [RSI], R13' not in text
 assert 'ADD RSI, R12' not in text
@@ -30,5 +33,12 @@ except ValueError:
     pass
 else:
     raise AssertionError('overlay accepted a changed x86 instruction sequence')
+
+try:
+    translate_grscreen(source.replace(b'DocUpdateTaskDocs(task);', b'OtherDocs(task);'))
+except ValueError:
+    pass
+else:
+    raise AssertionError('overlay accepted a changed task-doc call')
 
 print('PASS guarded ARM64 GrScreen source overlay', flush=True)
