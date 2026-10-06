@@ -3149,8 +3149,11 @@ extern Bool BootstrapWinIsUncovered(CTask *task);
 extern Bool ZcGrTextUpdate();
 extern Bool ZcGrScreenUpdate();
 extern Bool ZcGrUpdateTaskWin(CTask *task);
+extern Bool ZcODEsUpdate(CTask *task);
+extern Bool ZcGrUpdateTaskODEs(CTask *task);
 I64 bootstrap_winmgr_ticks = 0;
 I64 bootstrap_upstream_window_updates = 0;
+I64 bootstrap_upstream_ode_updates = 0;
 U0 BootstrapGrUpdateTasks()
 {//Bounded one-CPU window-ring refresh, drawn in ZealOS task/z order.
     CTask *root, *task;
@@ -3215,6 +3218,13 @@ U0 BootstrapGrUpdateTasks()
         visited++;
     }
     while (task && task != root && visited < 64);
+    // The host compatibility registry currently models exactly CPU0. The
+    // runtime bridge keeps this upstream wrapper dormant until MathODE's
+    // integrator is loaded.
+    if (mp_count == 1 && cpu_structs &&
+        TaskValidate(cpu_structs[0].executive_task) &&
+        ZcGrUpdateTaskODEs(cpu_structs[0].executive_task))
+        bootstrap_upstream_ode_updates++;
     // Match GrUpdateScreen's final overlay stage: run after the window draw
     // callbacks with DCF_ON_TOP and screen-space coordinates. The bootstrap
     // and later source modules each define non-extern `gr` storage, so resolve

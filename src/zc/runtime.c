@@ -242,6 +242,7 @@ static int64_t guest_win_top_off, guest_win_bottom_off, guest_text_attr_off;
 static int64_t guest_next_task_off, guest_last_task_off;
 static int64_t guest_next_sibling_off, guest_last_sibling_off;
 static int64_t guest_next_child_off, guest_last_child_off;
+static int64_t guest_next_ode_off, guest_last_ode_off;
 static int64_t guest_popup_off;
 static int64_t guest_win_inhibit_off;
 static int64_t guest_data_heap_off, guest_code_heap_off;
@@ -956,6 +957,38 @@ static int64_t host_gr_update_task_win(int64_t *a) {
     FFI_CALL_TOS_1(draw->fun_ptr, a[0]);
     return 1;
 }
+static int64_t host_ode_update_task(int64_t *a) {
+    CHashFun *update;
+    if (!Fs || !Fs->hash_table || !a[0])
+        return 0;
+    update = (CHashFun *)HashFind("ODEsUpdate", Fs->hash_table, HTT_FUN, 1);
+    if (!update || !update->fun_ptr || update->argc != 1 ||
+        (update->base.base.type & HTF_EXTERN))
+        return 0;
+    FFI_CALL_TOS_1(update->fun_ptr, a[0]);
+    return 1;
+}
+static int64_t host_gr_update_task_odes(int64_t *a) {
+    CHashFun *update;
+    CHashFun *ode_update;
+    if (!Fs || !Fs->hash_table || !a[0])
+        return 0;
+    /* GrScreen may be loaded before MathODE. Its ODE wrapper cannot run until
+     * the source integrator exists; calling the wrapper early resolves its
+     * optional bridge from an incomplete source graph. */
+    ode_update = (CHashFun *)HashFind("ODEsUpdate", Fs->hash_table,
+                                      HTT_FUN, 1);
+    if (!ode_update || !ode_update->fun_ptr || ode_update->argc != 1 ||
+        (ode_update->base.base.type & HTF_EXTERN))
+        return 0;
+    update = (CHashFun *)HashFind("GrUpdateTaskODEs", Fs->hash_table,
+                                  HTT_FUN, 1);
+    if (!update || !update->fun_ptr || update->argc != 1 ||
+        (update->base.base.type & HTF_EXTERN))
+        return 0;
+    FFI_CALL_TOS_1(update->fun_ptr, a[0]);
+    return 1;
+}
 static int64_t host_doc_update_task_docs(int64_t *a) {
     CHashFun *fun = (CHashFun *)HashFind(
         "DocUpdateTaskDocs", Fs->hash_table, HTT_FUN, 1);
@@ -1145,7 +1178,8 @@ static int64_t host_fs(int64_t *a) {
 static uint8_t guest_cpu[512];
 static int64_t host_gs(int64_t *a) {
     (void)a;
-    return (int64_t)(uintptr_t)guest_cpu;
+    return (int64_t)(uintptr_t)(guest_cpu_structs ? guest_cpu_structs
+                                                  : guest_cpu);
 }
 static int64_t host_sys_try(int64_t *a) {
     (void)a;
@@ -1501,6 +1535,8 @@ static void init_guest_fiber(unsigned i, void *parent, const char *name) {
     *(void **)(words + guest_parent_off) = parent;
     *(void **)(words + guest_input_filter_off) = words;
     *(void **)(words + guest_next_filter_off) = words;
+    *(void **)(words + guest_next_ode_off) = words + guest_next_ode_off;
+    *(void **)(words + guest_last_ode_off) = words + guest_next_ode_off;
     *(uint32_t *)(words + guest_display_flags_off) = parent
         ? *(uint32_t *)((unsigned char *)parent + guest_display_flags_off)
         : (1u << 1); /* DISPLAYf_NOT_RAW */
@@ -2904,6 +2940,8 @@ static void bind_guest_task(void) {
         !task_field(cls, "popup_task", 8, -1) ||
         !task_field(cls, "last_input_filter_task", 8, -1) ||
         !task_field(cls, "next_input_filter_task", 8, -1) ||
+        !task_field(cls, "next_ode", 8, -1) ||
+        !task_field(cls, "last_ode", 8, -1) ||
         !task_field(cls, "server_ctrl", 40, -1) ||
         !task_field(cls, "task_num", 8, -1) ||
         !task_field(cls, "task_name", 32, -1) ||
@@ -2961,6 +2999,8 @@ static void bind_guest_task(void) {
     guest_popup_off = MemberFind("popup_task", cls)->off;
     guest_input_filter_off = MemberFind("last_input_filter_task", cls)->off;
     guest_next_filter_off = MemberFind("next_input_filter_task", cls)->off;
+    guest_next_ode_off = MemberFind("next_ode", cls)->off;
+    guest_last_ode_off = MemberFind("last_ode", cls)->off;
     guest_server_ctrl_off = MemberFind("server_ctrl", cls)->off;
     guest_number_off = MemberFind("task_num", cls)->off;
     guest_name_off = MemberFind("task_name", cls)->off;
@@ -3359,9 +3399,22 @@ static int load_inner(const char *path) {
                                                   HTT_CLASS, 1);
         if (!cpu || cpu->sz <= 0 || cpu->sz > (1 << 20))
             zc_fail("invalid CCPU layout");
+        CMemberLst *cpu_addr = MemberFind("addr", cpu);
+        CMemberLst *cpu_num = MemberFind("num", cpu);
+        CMemberLst *cpu_exec = MemberFind("executive_task", cpu);
+        if (!task_field(cpu, "addr", 8, 0) ||
+            !task_field(cpu, "num", 8, 8) ||
+            !task_field(cpu, "executive_task", 8, -1) ||
+            !task_field(cpu, "idle_task", 8, -1) ||
+            !cpu_addr || !cpu_num || !cpu_exec)
+            zc_fail("pinned CCPU layout mismatch");
         guest_cpu_structs = calloc(128, cpu->sz);
         if (!guest_cpu_structs)
             zc_fail("CCPU compatibility storage allocation failed");
+        *(void **)guest_cpu_structs = guest_cpu_structs;
+        *(int64_t *)((unsigned char *)guest_cpu_structs + cpu_num->off) = 0;
+        *(void **)((unsigned char *)guest_cpu_structs + cpu_exec->off) =
+            guest_fibers[0].words;
         PrsBindCSymbol("cpu_structs", &guest_cpu_structs, 0);
         PrsBindCSymbol("ext", &guest_ext_table, 0);
         /* KernelB exposes the firmware framebuffer contract to ZealOS source. */
@@ -3385,6 +3438,8 @@ static int load_inner(const char *path) {
         PrsBindCSymbol("ZcGrTextUpdate", host_gr_text_update, 0);
         PrsBindCSymbol("ZcGrScreenUpdate", host_gr_screen_update, 0);
         PrsBindCSymbol("ZcGrUpdateTaskWin", host_gr_update_task_win, 1);
+        PrsBindCSymbol("ZcODEsUpdate", host_ode_update_task, 1);
+        PrsBindCSymbol("ZcGrUpdateTaskODEs", host_gr_update_task_odes, 1);
         PrsBindCSymbol("Option", host_option, 2);
         PrsBindCSymbol("DistSqrI64", host_dist_sqr_i64, 4);
         PrsBindCSymbol("SwapU16", host_swap_u16, 2);

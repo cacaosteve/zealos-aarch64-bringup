@@ -2,7 +2,8 @@
 
 The pinned ZealOS source stays unchanged under `upstream/pinned/`. When the
 read-only source bundle is built for this AArch64 kernel, the bundle builder
-applies a guarded source overlay to `GrUpdateTextBG`'s x86 inline assembly.
+applies guarded overlays to `GrUpdateTextBG`'s x86 inline assembly and the
+optional `ODEsUpdate` call in `GrUpdateTaskODEs`.
 
 The original loop writes the 64-bit background color for eight glyph scanlines,
 advancing by `width_internal` between rows, then uses its `w2` adjustment to
@@ -45,14 +46,17 @@ This is a bundle-time architecture port, not a change to the pinned upstream
 file and not an x86 instruction emulator. The live frame still uses the bounded
 bootstrap window traversal and its framebuffer blit before the source 32-bit
 presenter; it does not yet run the complete upstream `GrUpdateScreen` sequence
-or upstream `GrUpdateTasks`. Before importing the latter, the task runtime must
-populate `cpu_structs[0].executive_task` and initialize each task's self-linked
-ODE list: the current compatibility allocator creates zeroed `CCPU` storage,
-while upstream `GrUpdateTaskODEs` expects a valid ODE sentinel. The next kernel
-prerequisite is therefore a real single-core task/ODE registry with guarded
-initialization and tests. Graphics work after that includes initializing the
-`dc1`/`dc_cache` planar stage and zoom surfaces, and reconciling the display
-driver's 32-bit framebuffer with ZealOS's legacy planar output.
+or upstream `GrUpdateTasks`. The task runtime now provides a single-core CPU0
+record whose executive task is the root task, and initializes every live
+task's `next_ode`/`last_ode` as an empty self-linked list. The runtime calls
+upstream `GrUpdateTaskODEs` for that CPU0 task only after `ODEsUpdate` is loaded;
+the ARM64 overlay routes the integrator call through an optional host bridge.
+The QEMU smoke supplies a small test integrator and verifies the wrapper
+receives the root task. This does not yet load or execute ZealOS's `MathODE`
+subsystem, nor does it traverse all CPU/task ODE lists as upstream does.
+Remaining graphics work includes initializing the `dc1`/`dc_cache` planar
+stage and zoom surfaces, and reconciling the display driver's 32-bit framebuffer
+with ZealOS's legacy planar output.
 The x86 build continues to use the original source. The guest source archive
 includes this note at `/PORTS/ARM64/GrScreen.md` so the substitution is
 discoverable.

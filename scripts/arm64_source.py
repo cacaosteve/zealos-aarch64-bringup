@@ -18,10 +18,10 @@ def translate_grscreen(source: bytes) -> bytes:
 
     The source is pinned and remains byte-for-byte unchanged on disk. This
     guarded overlay is applied only to the AArch64 boot source bundle. It
-    requires the exact text-background assembly and task-doc call sites so an
-    upstream change cannot be silently mis-translated. The task-doc call goes
-    through the optional runtime bridge because the full DolDoc library may
-    not have been loaded yet.
+    requires the exact text-background assembly and optional subsystem call
+    sites so an upstream change cannot be silently mis-translated. The task-doc
+    and ODE calls go through runtime bridges because DolDoc and MathODE may not
+    have been loaded yet.
     """
     try:
         text = source.decode("utf-8")
@@ -36,6 +36,9 @@ def translate_grscreen(source: bytes) -> bytes:
     doc_call = "DocUpdateTaskDocs(task);"
     if text.count(doc_call) != 1:
         raise ValueError("expected exactly one GrUpdateTaskWin task-doc call")
+    ode_call = "ODEsUpdate(task);"
+    if text.count(ode_call) != 1:
+        raise ValueError("expected exactly one GrUpdateTaskODEs integrator call")
     indent = matches[0].group("indent")
     replacement = (
         f"{indent}cell_dst = dst(U8 *);\n"
@@ -77,4 +80,5 @@ def translate_grscreen(source: bytes) -> bytes:
     )
     replaced = replaced.replace(marker, function + marker, 1)
     replaced = replaced.replace(doc_call, "ZcDocUpdateTaskDocs(task);", 1)
+    replaced = replaced.replace(ode_call, "ZcODEsUpdate(task);", 1)
     return replaced.encode("utf-8")

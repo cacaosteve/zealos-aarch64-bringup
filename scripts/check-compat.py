@@ -227,6 +227,10 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             if 'zc: loaded /Kernel/KernelB.HH' not in kb:
                 raise RuntimeError('KernelB.HH did not load')
             if args.probe_module == '/System/Win.ZC':
+                command('zload /Tests/TaskOdeRegistry.ZC',
+                        'zc: loaded /Tests/TaskOdeRegistry.ZC')
+                command('zcall TaskOdeRegistryChecks',
+                        'zc => 0x000000000000002a')
                 command('zload /Tests/ExpCheck.ZC',
                         'zc: loaded /Tests/ExpCheck.ZC')
                 command('zcall ExpCheck',

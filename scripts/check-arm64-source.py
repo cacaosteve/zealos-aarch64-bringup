@@ -23,6 +23,8 @@ assert 'cell_dst += w1;' in text
 assert 'dst(U8 *) += 7 * w1;' in text
 assert text.count('ZcDocUpdateTaskDocs(task);') == 1
 assert not re.search(r'(?<!Zc)DocUpdateTaskDocs\(task\);', text)
+assert text.count('ZcODEsUpdate(task);') == 1
+assert not re.search(r'(?<!Zc)ODEsUpdate\(task\);', text)
 assert text.count('dst(U8 *) += w2;') >= 2
 assert 'MOV U64 [RSI], R13' not in text
 assert 'ADD RSI, R12' not in text
@@ -40,5 +42,12 @@ except ValueError:
     pass
 else:
     raise AssertionError('overlay accepted a changed task-doc call')
+
+try:
+    translate_grscreen(source.replace(b'ODEsUpdate(task);', b'OtherODE(task);'))
+except ValueError:
+    pass
+else:
+    raise AssertionError('overlay accepted a changed ODE update call')
 
 print('PASS guarded ARM64 GrScreen source overlay', flush=True)

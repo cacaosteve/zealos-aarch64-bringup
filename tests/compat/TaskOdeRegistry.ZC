@@ -1,0 +1,34 @@
+// Verify the single-core executive task and each live CTask's empty ODE list.
+extern I64 mp_count;
+extern CCPU *cpu_structs;
+
+U0 TaskOdeRegistryChild(U8 *data)
+{
+    if (data) {}
+}
+
+I64 TaskOdeRegistryChecks()
+{
+    CTask *task = Fs, *child;
+
+    if (mp_count != 1 || !cpu_structs)
+        return 1;
+    if (cpu_structs[0].addr != &cpu_structs[0] || cpu_structs[0].num != 0)
+        return 2;
+    if (cpu_structs[0].executive_task != task)
+        return 3;
+    if (task->next_ode != &task->next_ode ||
+        task->last_ode != &task->next_ode)
+        return 4;
+    child = Spawn(&TaskOdeRegistryChild);
+    if (!child)
+        return 5;
+    if (child->next_ode != &child->next_ode ||
+        child->last_ode != &child->next_ode)
+        return 6;
+    Yield();
+    if (child->next_ode != &child->next_ode ||
+        child->last_ode != &child->next_ode)
+        return 7;
+    return 42;
+}

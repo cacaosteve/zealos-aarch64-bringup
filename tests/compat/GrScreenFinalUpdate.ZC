@@ -2,7 +2,10 @@
 // after composing task windows, with screen-space CDC state.
 extern I64 bootstrap_gr_text_updates;
 extern I64 bootstrap_gr_screen_updates;
+extern I64 bootstrap_upstream_ode_updates;
 I64 gr_screen_final_update_calls;
+I64 gr_screen_ode_update_calls;
+CTask *gr_screen_ode_last_task;
 U8 gr_screen_final_update_old_pixel;
 U8 gr_screen_final_update_overlay_off[FONT_WIDTH * 10 * FONT_HEIGHT];
 U32 gr_screen_cursor_off[13 * 13];
@@ -24,12 +27,21 @@ U0 GrScreenFinalUpdateProbe(CDC *dc)
     dc->body[599 * 800 + 799] = 15;
 }
 
+// Stand in for MathODE during this focused graphics test. The production
+// integrator is loaded later; GrScreen's source wrapper must stay dormant
+// until this function exists, then dispatch here through the host bridge.
+U0 ODEsUpdate(CTask *task)
+{
+    gr_screen_ode_update_calls++;
+    gr_screen_ode_last_task = task;
+}
+
 I64 GrScreenFinalUpdateChecks()
 {
     U0 (*old_final_update)(CDC *dc);
     CTask *paint_task;
     I64 old_coord, old_mouse_x, old_mouse_y, old_draw_calls;
-    I64 old_text_updates, old_screen_updates, old_window_updates;
+    I64 old_text_updates, old_screen_updates, old_window_updates, old_ode_updates;
     I64 old_window_display_flags;
     I64 x, y, i, overlay_x, overlay_y, changed;
     U32 *screen;
@@ -85,6 +97,7 @@ I64 GrScreenFinalUpdateChecks()
     old_text_updates = bootstrap_gr_text_updates;
     old_screen_updates = bootstrap_gr_screen_updates;
     old_window_updates = bootstrap_upstream_window_updates;
+    old_ode_updates = bootstrap_upstream_ode_updates;
     if (!ZcTaskFrameRun())
     {
         paint_task->display_flags = old_window_display_flags;
@@ -100,6 +113,21 @@ I64 GrScreenFinalUpdateChecks()
         mouse.pos.x = old_mouse_x;
         mouse.pos.y = old_mouse_y;
         return 18;
+    }
+    if (bootstrap_upstream_ode_updates <= old_ode_updates)
+    {
+        mouse_grid.coord = old_coord;
+        mouse.pos.x = old_mouse_x;
+        mouse.pos.y = old_mouse_y;
+        return 19;
+    }
+    if (!gr_screen_ode_update_calls ||
+        gr_screen_ode_last_task != cpu_structs[0].executive_task)
+    {
+        mouse_grid.coord = old_coord;
+        mouse.pos.x = old_mouse_x;
+        mouse.pos.y = old_mouse_y;
+        return 20;
     }
     if (bootstrap_gr_text_updates != old_text_updates + 1)
     {
