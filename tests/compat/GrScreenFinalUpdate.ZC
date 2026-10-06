@@ -6,6 +6,8 @@ extern I64 bootstrap_gr_planar_updates;
 extern I64 bootstrap_upstream_ode_updates;
 extern I64 bootstrap_upstream_gr_update_tasks;
 extern I64 bootstrap_upstream_gr_update_screen;
+extern U16 bootstrap_win_z_buf[TEXT_COLS * TEXT_ROWS];
+extern U16 bootstrap_win_uncovered[(BOOTSTRAP_WIN_MAX + 15) / 16];
 extern Bool BootstrapCanUseUpstreamGrUpdateTasks();
 extern Bool ZcWinMouseUpdate();
 I64 gr_screen_final_update_calls;
@@ -266,6 +268,8 @@ I64 GrScreenFinalUpdateChecks()
     frame_gr = ZcActiveGrGlobals();
     if (!frame_gr || !frame_gr->dc1 || !frame_gr->dc1->body ||
         !frame_gr->dc_cache || !frame_gr->dc_cache->body ||
+        frame_gr->win_z_buf != bootstrap_win_z_buf ||
+        frame_gr->win_uncovered_bitmap != bootstrap_win_uncovered ||
         frame_gr->dc_cache->body(I64 *)[0] !=
             *(frame_gr->dc2->body(I64 *)))
     {

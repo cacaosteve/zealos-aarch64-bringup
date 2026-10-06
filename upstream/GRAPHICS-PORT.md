@@ -196,7 +196,9 @@ not preserved. The full source `GrUpdateScreen` sequence now runs with
 bridge-staged `dc1`, `dc2`, cache, zoom, and raw-screen surfaces; its text and
 final-overlay path passes with framebuffer-console output visible and serial
 output enabled. Upstream-owned CDC allocation/lifetime and the full palette and
-pixel-z-buffer semantics are not implemented. The unchanged 2x zoom scaler is
+pixel-z-buffer semantics are not implemented. Each active source `gr` global is
+explicitly bound to the bridge's bounded window z-buffer and uncovered-window
+bitmap before source task traversal. The unchanged 2x zoom scaler is
 covered both directly and through full-frame output against Limine framebuffer
 pixels. `GrScaleZoom` is also called directly and its pointer-preserving
 scale/offset update is verified against the tablet transform. Each bridge frame

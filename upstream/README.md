@@ -2686,6 +2686,17 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 228 — bind source graphics globals to window z tables
+
+| Item | Path |
+|--|--|
+| Gap | Later ZealOS `gr` storage could have null window visibility-table pointers even though the bridge had initialized its own bounded z-buffer and uncovered-window bitmap |
+| Bring-up | Bind both source frame paths to the bridge tables before source window traversal or full-screen composition |
+| Smoke | `GrScreenFinalUpdateChecks` verifies the active source `gr` points at the live z-buffer and visibility bitmap after task-frame composition |
+| Limits | This supplies the bounded bridge tables; ZealOS's full graphics initializer, native table allocations, and pixel-level z-buffer remain unported |
+
+Freeze catalog unchanged.
+
 ## Open compatibility probe — `/System/Win.ZC`
 
 The source probe loads pinned `KernelC.HH`, `Externs.ZC`, and `Gr.HH` before compiling unchanged `Win.ZC`. Graphics dimensions and mouse globals are probe fixtures; `DrawMenu` and the initial `GrScaleZoom` definition are compile-time fixtures until unchanged `GrScreen.ZC` is loaded later in the probe. `GrScreenFinalUpdateChecks` executes `WinFinalUpdate` through the staged idle-frame path, confirms the fixture's `mouse_grid.coord` toggles the real coordinate-text overlay, checks a separate visible guest overlay callback, verifies the software arrow against Limine framebuffer pixels, and exercises `WinMouseUpdate`'s edge recentering through the runtime dispatch. Physical tablet samples are covered by `WinMousePointerStateCheck`; manual UTM pointer acceptance is still pending. The raw ARM generic-timer binding and a standalone F64 clock expression are smoke-tested before the Win load.

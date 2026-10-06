@@ -1463,6 +1463,14 @@ gr.dc2 = &bootstrap_graphics_dc;
 gr.text_base = bootstrap_text_base;
 gr.win_z_buf = bootstrap_win_z_buf;
 gr.win_uncovered_bitmap = bootstrap_win_uncovered;
+U0 BootstrapBindGrTaskTables(CGrGlobals *active_gr)
+{//Give each later source gr global the bridge's bounded window z tables.
+    if (!active_gr)
+        return;
+    active_gr->win_z_buf = bootstrap_win_z_buf;
+    active_gr->win_uncovered_bitmap = bootstrap_win_uncovered;
+}
+
 Bool IsPixCovered0(CTask *task, I64 x, I64 y)
 {//Match GrAsm.ZC's cell z-buffer comparison; coordinates are pixel units.
     I64 cell_x = x / 8, cell_y = y / 8;
@@ -3259,6 +3267,7 @@ Bool BootstrapTryUpstreamGrUpdateScreen()
     active_gr = ZcActiveGrGlobals();
     if (!active_gr)
         active_gr = &gr;
+    BootstrapBindGrTaskTables(active_gr);
     bootstrap_present_ready = FALSE;
     for (i = 0; i < 16; i++)
         bootstrap_text_colors[i] = i * 0x0101010101010101;
@@ -3330,6 +3339,7 @@ U0 BootstrapGrUpdateTasks()
     active_gr = ZcActiveGrGlobals();
     if (!active_gr)
         active_gr = &gr;
+    BootstrapBindGrTaskTables(active_gr);
     bootstrap_present_ready = FALSE;
     for (i = 0; i < 16; i++)
         bootstrap_text_colors[i] = i * 0x0101010101010101;
