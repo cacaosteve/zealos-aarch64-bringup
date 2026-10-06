@@ -2752,13 +2752,24 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 234 — initialize the compositor's startup tables
+
+| Item | Path |
+|--|--|
+| Gap | `WinMgrTask` calls `GrSetUpTables` before the first z-buffer rebuild, but the bridge implementation was empty |
+| Bring-up | Bind the active source `gr` to the bounded z-buffer and visibility bitmap, then clear those arrays and their per-window coverage counts |
+| Smoke | `GrSetUpTablesSourceChecks` verifies pointer binding and clearing at both ends of the z-buffer, then calls source `WinZBufUpdate` to rebuild live task visibility |
+| Limits | Only compositor z/visibility state is prepared; the original planar, brush, sprite, zoom, and screen-cache tables are still unported |
+
+Freeze catalog unchanged.
+
 ## Open compatibility probe — `/System/Win.ZC`
 
 The source probe loads pinned `KernelC.HH`, `Externs.ZC`, and `Gr.HH` before compiling unchanged `Win.ZC`. Graphics dimensions and mouse globals are probe fixtures; `DrawMenu` and the initial `GrScaleZoom` definition are compile-time fixtures until unchanged `GrScreen.ZC` is loaded later in the probe. `GrScreenFinalUpdateChecks` executes `WinFinalUpdate` through the staged idle-frame path, confirms the fixture's `mouse_grid.coord` toggles the real coordinate-text overlay, checks a separate visible guest overlay callback, verifies the software arrow against Limine framebuffer pixels, and exercises `WinMouseUpdate`'s edge recentering through the runtime dispatch. Physical tablet samples are covered by `WinMousePointerStateCheck`; manual UTM pointer acceptance is still pending. The raw ARM generic-timer binding and a standalone F64 clock expression are smoke-tested before the Win load.
 
 The native runtime now binds ZealOS's five-slot `ext` dispatch table to stable native storage. The probe compiles the unchanged `Win.ZC`, then checks that its file-scope initializers installed both `WinToTop` and `WinFocus` in the matching slots. This proves the module loads and its dispatch registrations work; it does not yet start the full window manager or validate interactive window behavior. The fixture remains explicit about its uninitialized kernel globals and compile-only menu/zoom stubs.
 
-The source-ordered graphics probe now loads unchanged `GrDC.ZC`, `GrBitMap.ZC`, `Win.ZC`, and `WinMgr.ZC`. This required bridging ZealOS runtime defines into Aiwnios's compiler dictionary, binding the framebuffer/depth-buffer primitives, and supplying ARM-safe helpers for `Sqrt`, `DistSqrI64`, `SwapU16`, and `ClampI64`. The bridge's `IsPixCovered0` compares each task's z number against the existing cell z-buffer, with a smoke for covered/uncovered cases. `WinZBufUpdate` rebuilds that bounded cell z-buffer; `GrSetUpTables` remains a no-op because the full graphics-table initializer is not ported.
+The source-ordered graphics probe now loads unchanged `GrDC.ZC`, `GrBitMap.ZC`, `Win.ZC`, and `WinMgr.ZC`. This required bridging ZealOS runtime defines into Aiwnios's compiler dictionary, binding the framebuffer/depth-buffer primitives, and supplying ARM-safe helpers for `Sqrt`, `DistSqrI64`, `SwapU16`, and `ClampI64`. The bridge's `IsPixCovered0` compares each task's z number against the existing cell z-buffer, with a smoke for covered/uncovered cases. `WinZBufUpdate` rebuilds that bounded cell z-buffer; the bridge's `GrSetUpTables` now initializes its z/visibility tables, while planar, brush, sprite, zoom, and screen-cache tables remain unported.
 
 Guest `try/catch` now calls uniquely named `ZcTryEnter`/`ZcTryLeave`/`ZcTryCatchEnd` hooks. ZealOS's `KernelC.HH` declares a different native `SysTry(start_label, skip_label)` ABI, so using `SysTry` for both had caused the full manager's `try` block to compile as a call with a missing argument. The focused probe loads `KernelC.HH`, reruns `TaskExceptionChecks`, compiles unchanged `Win.ZC`, then compiles unchanged `WinMgr.ZC`; the complete PCI compatibility suite also passes.
 

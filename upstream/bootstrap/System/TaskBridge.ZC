@@ -1537,9 +1537,24 @@ I64 MenuEntryWidth(CMenuEntry *entry)
     }
     return width + 1;
 }
-// The real implementations allocate the ZealOS screen/z-buffer tables and
-// reap dead kernel tasks. WinMgr is compile-load tested, not started, yet.
-U0 GrSetUpTables() {}
+// The full ZealOS table builder also prepares planar, sprite, brush and zoom
+// tables that are not ported yet. The window compositor's required z/visibility
+// tables are backed by bounded bridge storage and can be initialized here.
+U0 GrSetUpTables()
+{
+    CGrGlobals *active_gr = ZcActiveGrGlobals();
+
+    if (!active_gr)
+        active_gr = &gr;
+    BootstrapBindGrTaskTables(active_gr);
+    MemSet(bootstrap_win_z_buf, 0, sizeof(bootstrap_win_z_buf));
+    MemSet(bootstrap_win_uncovered, 0, sizeof(bootstrap_win_uncovered));
+    MemSet(bootstrap_win_uncovered_cells, 0,
+           sizeof(bootstrap_win_uncovered_cells));
+    active_gr->highest_uncovered = 0;
+}
+// Dead-task reaping still requires the kernel scheduler's lifecycle queues.
+// WinMgr is compile-load tested, not started, yet.
 U0 TaskKillDying() {}
 // GodExterns.ZC globals used by DocPutKey F7 handlers.
 #define GOD_BAD_BITS	4

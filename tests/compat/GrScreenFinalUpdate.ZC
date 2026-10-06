@@ -236,6 +236,32 @@ I64 WinMgrSleepSourcePassChecks()
     return ok ? 0x2a : 0;
 }
 
+I64 GrSetUpTablesSourceChecks()
+{
+    CGrGlobals *active_gr = ZcActiveGrGlobals();
+    Bool ok;
+
+    if (!active_gr)
+        return 0;
+    bootstrap_win_z_buf[0] = 0x5a5a;
+    bootstrap_win_z_buf[TEXT_COLS * TEXT_ROWS - 1] = 0x5a5a;
+    bootstrap_win_uncovered[0] = 0xffff;
+    bootstrap_win_uncovered_cells[0] = 1;
+    active_gr->highest_uncovered = 1;
+    GrSetUpTables();
+    ok = active_gr->win_z_buf == bootstrap_win_z_buf &&
+         active_gr->win_uncovered_bitmap == bootstrap_win_uncovered &&
+         active_gr->highest_uncovered == 0 &&
+         bootstrap_win_z_buf[0] == 0 &&
+         bootstrap_win_z_buf[TEXT_COLS * TEXT_ROWS - 1] == 0 &&
+         bootstrap_win_uncovered[0] == 0 &&
+         bootstrap_win_uncovered_cells[0] == 0;
+    // Rebuild the state from the current task ring as WinMgrTask does after
+    // GrSetUpTables, so later compositor checks see normal window visibility.
+    WinZBufUpdate();
+    return ok ? 0x2a : 0;
+}
+
 // Stand in for MathODE during this focused graphics test. The production
 // integrator is loaded later; GrScreen's source wrapper must stay dormant
 // until this function exists, then dispatch here through the host bridge.
@@ -281,6 +307,8 @@ I64 GrScreenFinalUpdateChecks()
     BootstrapWinMgrTick();
     if (WinMgrTimingSourceChecks() != 0x2a)
         return 32;
+    if (GrSetUpTablesSourceChecks() != 0x2a)
+        return 34;
     if (WinMgrSleepSourcePassChecks() != 0x2a)
         return 33;
     gr_screen_final_update_old_pixel = bootstrap_graphics_pixels[599 * 800 + 799];
