@@ -14,11 +14,15 @@ p.add_argument('--probe-grscreen', action='store_true',
                help='also load unchanged GrScreen.ZC after the WinMgr probe setup')
 p.add_argument('--probe-fulltext', action='store_true',
                help='run an opt-in full GrUpdateTextBG framebuffer diagnostic')
+p.add_argument('--probe-fulltext-visible', action='store_true',
+               help='run the full-frame text diagnostic with framebuffer console visible')
 p.add_argument('--probe-task-jobs', action='store_true', help='check CPU-0 callback jobs after loading pinned task headers')
 p.add_argument('--probe-window-buttons', action='store_true', help='check live task-window title buttons in a disposable guest')
 p.add_argument('--probe-source', type=pathlib.Path, action='append',
                help='load a host source file from the disposable PCI source partition')
 args = p.parse_args()
+if args.probe_fulltext_visible:
+    args.probe_fulltext = True
 if args.probe_source and not args.pci:
     p.error('--probe-source requires --pci')
 if args.probe_grscreen and not args.probe_winmgr:
@@ -180,6 +184,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         if re.search(r'hc IR FAIL|(?:Upstream|Front) [^\r\n]* FAIL', boot):
             raise RuntimeError('legacy regressions')
         print('PASS boot and legacy regression markers', flush=True)
+        command('zcall BootstrapCanUseUpstreamGrUpdateTasks',
+                'zc => 0x0000000000000001')
         command('zcall ZcTaskFrameRun', 'zc => 0x0000000000000001')
         command('zc I64 GrSourceTaskFrameChecks(){return bootstrap_upstream_gr_update_tasks>0;}',
                 'zc: executed')
@@ -464,8 +470,9 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                         command('zcall GrScreenFinalUpdateChecks',
                                 'zc => 0x000000000000002a')
                         if args.probe_fulltext:
-                            command('fbquiet',
-                                    'fbconsole: quiet (serial output remains enabled)')
+                            if not args.probe_fulltext_visible:
+                                command('fbquiet',
+                                        'fbconsole: quiet (serial output remains enabled)')
                             command('zload /Tests/GrScreenTextFrame.ZC',
                                     'zc: loaded /Tests/GrScreenTextFrame.ZC')
                             command('zcall GrScreenTextFrameChecks',

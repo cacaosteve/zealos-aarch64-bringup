@@ -12,7 +12,7 @@ implementations can be compared against the x86 source without editing it.
 | `Kernel/Display.ZC` | Raw text output and task pixel/window geometry | Limine framebuffer replaces boot-time mode discovery; `WinDerivedValsUpdate` is ported in `TaskBridge.ZC` |
 | `System/Gr/GrGlobals.ZC` | `gr.text_base`, screen DCs, and compositor state | Bootstrap `gr.text_base` now points to a compact guest-owned `U32[100*75]` plane; upstream DCs and compositor state are not initialized |
 | `System/Gr/GrTextBase.ZC` | `TextChar`, text spans/fills, and borders; the hot primitives are x86 assembly | ARM64 bridge primitives update `gr.text_base` and the framebuffer; a QEMU smoke proves direct packed-cell writes through the pointer are presented |
-| `System/Gr/GrScreen.ZC` | Per-task redraw, controls, draw callbacks, z-buffer, and final screen update | The guarded ARM64 source overlay expands the x86 eight-row background store loop into eight typed stores in line; the stride helper is tested separately. AArch64 runtime bindings cover `DCBlotColor4` and the scalar `GrRopEquU8NoClipping` foreground-glyph rasterizer. The latter has a guest regression for glyph bits, stride, transparency, and underline. The bridge now dispatches unchanged `GrUpdateTasks` once both one-CPU task rings validate; the regression suite verifies that its source-path counter advances. The bootstrap framebuffer CDC carries the signature required by upstream `DCAlias`, and startup loads `KMathB.ZC` for the compositor's `Clamp` call. `GrUpdateTextBG`/`GrUpdateTextFG` are not yet part of the live frame loop: a disposable full-frame probe raised a synchronous exception while the framebuffer console drew the diagnostic following the background pass (`ELR` at `fb_draw_char`, `FAR=0`); its cause remains isolated from the task-update fix, so profiling and display-state validation remain before enabling those text passes. A bounded 100x75 cell z-buffer marks windows with any visible cells; each marked window's text, task `draw_it`, and visible control `draw_it` callbacks render in task-ring order. The final screen callback runs afterward with `DCF_ON_TOP`. View-angle controls, other `GrAsm` routines, and pixel-level z-buffer composition remain unported |
+| `System/Gr/GrScreen.ZC` | Per-task redraw, controls, draw callbacks, z-buffer, and final screen update | The guarded ARM64 source overlay expands the x86 eight-row background store loop into eight typed stores in line; the stride helper is tested separately. AArch64 runtime bindings cover `DCBlotColor4` and the scalar `GrRopEquU8NoClipping` foreground-glyph rasterizer, with regressions for glyph bits, stride, transparency, and underline. Once the one-CPU task rings validate, the bridge dispatches unchanged `GrUpdateScreen`, which runs `GrUpdateTasks` and the source text passes; startup loads `KMathB.ZC` for its `Clamp` call. The staged full-frame text smoke passes with framebuffer-console output visible and serial output enabled. A bounded 100x75 cell z-buffer marks windows with any visible cells; each marked window's text, task `draw_it`, and visible control `draw_it` callbacks render in task-ring order. The final screen callback runs afterward with `DCF_ON_TOP`. View-angle controls, other `GrAsm` routines, and pixel-level z-buffer composition remain unported |
 | `System/Win.ZC` | Window geometry, focus, and tiling operations | `WinHorz`/`WinVert`, derived geometry, bounded click focus/raise, title-bar move, and frame resize are ported; tiling and complete focus policies remain incomplete |
 | `System/WinMgr.ZC` | Refresh loop, mouse routing, move/resize, and window-manager task | The shell idle pump routes tablet clicks to the topmost shown window/control, captures title-bar move and frame-resize drags, and redraws the task ring; the full upstream WinMgr task remains unported |
 | `System/Gr/MakeGr.ZC` | Graphics module include order | Reference only; its complete dependency set is not loaded by the bring-up runtime |
@@ -188,11 +188,11 @@ refresh now renders host-backed text and drawing primitives into a shared
 framebuffer. CDC byte writes and host-backed framebuffer primitives share the
 surface. The staging path quantizes host colors to the current 16-color text
 palette and clears to black each frame; arbitrary 8-bit CDC color semantics are
-not preserved. This is not yet the full upstream `GrUpdateScreen` compositor or
-a guarantee that arbitrary graphics DCs are presented. The next integration
-step is to initialize the upstream display, cache, and alias surfaces as one
-pipeline and route those DC operations through it before claiming full-frame
-compatibility.
+not preserved. The validated path can now run upstream `GrUpdateScreen` with
+the bootstrap's staged surfaces, but those surfaces still do not share full
+upstream CDC allocation, cache, palette, and pixel-z-buffer semantics. Mixed
+framebuffer-console and source-frame rendering also remains unverified with
+console output visible.
 
 ## Remaining graphics path
 
