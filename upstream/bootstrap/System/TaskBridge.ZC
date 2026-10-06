@@ -3125,7 +3125,7 @@ U0 DrawCtrls(CTask *task)
     task->scroll_x = saved_scroll_x;
     task->scroll_y = saved_scroll_y;
 }
-U0 GrUpdateTaskWin(CTask *task)
+U0 BootstrapDrawTaskWin(CTask *task)
 {//Redraw one window's text and graphics as one z-ordered layer.
     if (!task || !TaskValidate(task))
         return;
@@ -3148,7 +3148,9 @@ extern U0 WinZBufUpdate();
 extern Bool BootstrapWinIsUncovered(CTask *task);
 extern Bool ZcGrTextUpdate();
 extern Bool ZcGrScreenUpdate();
+extern Bool ZcGrUpdateTaskWin(CTask *task);
 I64 bootstrap_winmgr_ticks = 0;
+I64 bootstrap_upstream_window_updates = 0;
 U0 BootstrapGrUpdateTasks()
 {//Bounded one-CPU window-ring refresh, drawn in ZealOS task/z order.
     CTask *root, *task;
@@ -3203,7 +3205,12 @@ U0 BootstrapGrUpdateTasks()
             break;
         if ((task->display_flags & (1 << DISPLAYf_SHOW)) &&
             BootstrapWinIsUncovered(task))
-            GrUpdateTaskWin(task);
+        {
+            if (ZcGrUpdateTaskWin(task))
+                bootstrap_upstream_window_updates++;
+            else
+                BootstrapDrawTaskWin(task);
+        }
         task = task->next_task;
         visited++;
     }

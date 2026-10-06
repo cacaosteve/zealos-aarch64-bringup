@@ -21,6 +21,12 @@ shorter graphics regression.
 When `GrScreen.ZC` is loaded, the bootstrap frame binds its active graphics
 globals to the shared 8-bit frame CDC and text plane, then runs the unchanged
 `GrUpdateTextBG` and `GrUpdateTextFG` before drawing task windows. After the
+bounded bootstrap z-order walk selects a visible, uncovered task, it now calls
+the upstream `GrUpdateTaskWin` when that source function is loaded; startup
+falls back to the bootstrap window painter until then. The headless regression
+has no visible window eligible for that call, so it validates the overall frame
+and presenter while actual upstream per-window painting remains an interactive
+UTM acceptance check. After the
 bootstrap blit, the native AArch64 frame runner also calls the unchanged
 `GrUpdateScreen32` on the live 800x600x32 framebuffer. It binds a raw 32-bit
 conversion buffer and the 8-bit screen cache, and uses ZealOS's standard

@@ -944,6 +944,18 @@ static int64_t host_gr_screen_update(int64_t *a) {
     FFI_CALL_TOS_0(update->fun_ptr);
     return 1;
 }
+static int64_t host_gr_update_task_win(int64_t *a) {
+    CHashFun *draw;
+    if (!Fs || !Fs->hash_table || !a[0])
+        return 0;
+    draw = (CHashFun *)HashFind("GrUpdateTaskWin", Fs->hash_table,
+                                HTT_FUN, 1);
+    if (!draw || !draw->fun_ptr || draw->argc != 1 ||
+        (draw->base.base.type & HTF_EXTERN))
+        return 0;
+    FFI_CALL_TOS_1(draw->fun_ptr, a[0]);
+    return 1;
+}
 static int64_t host_doc_update_task_docs(int64_t *a) {
     CHashFun *fun = (CHashFun *)HashFind(
         "DocUpdateTaskDocs", Fs->hash_table, HTT_FUN, 1);
@@ -3372,6 +3384,7 @@ static int load_inner(const char *path) {
             zc_fail("task bridge source missing");
         PrsBindCSymbol("ZcGrTextUpdate", host_gr_text_update, 0);
         PrsBindCSymbol("ZcGrScreenUpdate", host_gr_screen_update, 0);
+        PrsBindCSymbol("ZcGrUpdateTaskWin", host_gr_update_task_win, 1);
         PrsBindCSymbol("Option", host_option, 2);
         PrsBindCSymbol("DistSqrI64", host_dist_sqr_i64, 4);
         PrsBindCSymbol("SwapU16", host_swap_u16, 2);
