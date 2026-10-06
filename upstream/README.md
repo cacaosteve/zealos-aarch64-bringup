@@ -2642,6 +2642,17 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 224 — zoomed source frame reaches the framebuffer
+
+| Item | Path |
+|--|--|
+| Gap | `GrZoomInScreen` had a direct scaler regression, but the full source compositor/presenter had not been exercised with zoom enabled |
+| Bring-up | Enable 2x on the active source graphics global, run a complete staged frame, and compare selected Limine framebuffer pixels with the source zoom CDC and palette |
+| Smoke | `GrScreenFinalUpdateChecks` verifies the zoomed output and restores zoom/pan state |
+| Limits | Live pointer-centered zoom controls, non-default pan, zoom-cache presentation, and view-angle controls remain open |
+
+Freeze catalog unchanged.
+
 ## Open compatibility probe — `/System/Win.ZC`
 
 The source probe loads pinned `KernelC.HH`, `Externs.ZC`, and `Gr.HH` before compiling unchanged `Win.ZC`. Graphics dimensions and mouse globals are probe fixtures; `DrawMenu` and `GrScaleZoom` are compile-only stubs for subsystems whose full bootstrap is not loaded. `GrScreenFinalUpdateChecks` executes `WinFinalUpdate` through the staged idle-frame path, confirms the fixture's `mouse_grid.coord` toggles the real coordinate-text overlay, checks a separate visible guest overlay callback, and verifies the software arrow against Limine framebuffer pixels. Physical tablet samples are covered by `WinMousePointerStateCheck`; manual UTM pointer acceptance is still pending. The raw ARM generic-timer binding and a standalone F64 clock expression are smoke-tested before the Win load.

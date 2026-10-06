@@ -12,7 +12,7 @@ implementations can be compared against the x86 source without editing it.
 | `Kernel/Display.ZC` | Raw text output and task pixel/window geometry | Limine framebuffer replaces boot-time mode discovery; `WinDerivedValsUpdate` is ported in `TaskBridge.ZC` |
 | `System/Gr/GrGlobals.ZC` | `gr.text_base`, screen DCs, and compositor state | Bootstrap `gr.text_base` now points to a compact guest-owned `U32[100*75]` plane; upstream DCs and compositor state are not initialized |
 | `System/Gr/GrTextBase.ZC` | `TextChar`, text spans/fills, and borders; the hot primitives are x86 assembly | ARM64 bridge primitives update `gr.text_base` and the framebuffer; a QEMU smoke proves direct packed-cell writes through the pointer are presented |
-| `System/Gr/GrScreen.ZC` | Per-task redraw, controls, draw callbacks, z-buffer, and final screen update | The guarded ARM64 source overlay expands the x86 eight-row background store loop into eight typed stores in line; the stride helper is tested separately. AArch64 runtime bindings cover `DCBlotColor4` and the scalar `GrRopEquU8NoClipping` foreground-glyph rasterizer, with regressions for glyph bits, stride, transparency, and underline. Once the one-CPU task rings validate, the bridge dispatches unchanged `GrUpdateScreen`, which runs `GrUpdateTasks` and the source text passes; startup loads `KMathB.ZC` for its `Clamp` call. The staged full-frame text smoke passes with framebuffer-console output visible and serial output enabled. A bounded 100x75 cell z-buffer marks windows with any visible cells; each marked window's text, task `draw_it`, and visible control `draw_it` callbacks render in task-ring order. The final screen callback runs afterward with `DCF_ON_TOP`. View-angle controls, other `GrAsm` routines, and pixel-level z-buffer composition remain unported |
+| `System/Gr/GrScreen.ZC` | Per-task redraw, controls, draw callbacks, z-buffer, and final screen update | The guarded ARM64 source overlay expands the x86 eight-row background store loop into eight typed stores in line; the stride helper is tested separately. AArch64 runtime bindings cover `DCBlotColor4` and the scalar `GrRopEquU8NoClipping` foreground-glyph rasterizer, with regressions for glyph bits, stride, transparency, and underline. Once the one-CPU task rings validate, the bridge dispatches unchanged `GrUpdateScreen`, which runs `GrUpdateTasks` and the source text passes; startup loads `KMathB.ZC` for its `Clamp` call. The staged full-frame text smoke passes with framebuffer-console output visible and serial output enabled. A bounded 100x75 cell z-buffer marks windows with any visible cells; each marked window's text, task `draw_it`, and visible control `draw_it` callbacks render in task-ring order. The final screen callback runs afterward with `DCF_ON_TOP`. Source zoom scaling is now checked end to end through the compositor and Limine framebuffer at 2x. View-angle controls, other `GrAsm` routines, and complete graphics-table initialization remain unported |
 | `System/Win.ZC` | Window geometry, focus, and tiling operations | `WinHorz`/`WinVert`, derived geometry, bounded click focus/raise, title-bar move, and frame resize are ported; tiling and complete focus policies remain incomplete |
 | `System/WinMgr.ZC` | Refresh loop, mouse routing, move/resize, and window-manager task | The shell idle pump routes tablet clicks to the topmost shown window/control, captures title-bar move and frame-resize drags, and redraws the task ring; the full upstream WinMgr task remains unported |
 | `System/Gr/MakeGr.ZC` | Graphics module include order | Reference only; its complete dependency set is not loaded by the bring-up runtime |
@@ -180,25 +180,39 @@ and pixel format. `GrUpdateScreen32LimineChecks` invokes unchanged
 through the kernel readback path, then restores that pixel. This is covered by
 `make check-grscreen` on QEMU's Limine-provided ramfb.
 
-This proves the final 32-bit presenter can reach the real surface, but not the
-full `GrUpdateScreen` sequence. Upstream `gr.dc1`, `gr.dc_cache`, and
-zoom/pan surfaces are not initialized together. The shell's periodic task
-refresh now renders host-backed text and drawing primitives into a shared
+The shell's periodic task refresh renders host-backed text and drawing
+primitives into a shared
 800x600 indexed CDC surface, then presents that composed frame to the Limine
 framebuffer. CDC byte writes and host-backed framebuffer primitives share the
 surface. The staging path quantizes host colors to the current 16-color text
 palette and clears to black each frame; arbitrary 8-bit CDC color semantics are
-not preserved. The validated path can now run upstream `GrUpdateScreen` with
-the bootstrap's staged surfaces, but those surfaces still do not share full
-upstream CDC allocation, cache, palette, and pixel-z-buffer semantics. Mixed
-framebuffer-console and source-frame rendering also remains unverified with
-console output visible.
+not preserved. The full source `GrUpdateScreen` sequence now runs with
+bridge-staged `dc1`, `dc2`, cache, zoom, and raw-screen surfaces; its text and
+final-overlay path passes with framebuffer-console output visible and serial
+output enabled. Upstream-owned CDC allocation/lifetime and the full palette and
+pixel-z-buffer semantics are not implemented. The unchanged 2x zoom scaler is
+covered both directly and through full-frame output against Limine framebuffer
+pixels. Live pointer-centered zoom controls, non-default pan, and the full zoom
+interaction path still need acceptance testing.
 
 ## Remaining graphics path
 
-The next substantive graphics work is remaining WinMgr input behavior,
-view-angle controls, wallpaper, and broader CDC operations.
+The next substantive graphics work is starting the actual upstream WinMgr task
+against initialized menu, mouse, timing, and task-ring state. The shell currently
+provides the refresh/input loop in a bounded bridge. View-angle controls,
+wallpaper, and broader CDC operations also remain open.
 `Kernel/Display.ZC`'s
 framebuffer writes can target the Limine-provided framebuffer, but x86 assembly
 in `GrTextBase.ZC` and `GrAsm.ZC` must stay behind the ARM64 bridge or be
 replaced with architecture-neutral ZealC.
+
+## Milestone 224 — zoomed source frame reaches the framebuffer
+
+| Item | Path |
+|--|--|
+| Gap | `GrZoomInScreen` had a direct scaler regression, but the full source compositor/presenter had not been exercised with zoom enabled |
+| Bring-up | Enable 2x on the active source graphics global, run the complete staged frame, and compare selected Limine pixels with the source zoom CDC and palette |
+| Smoke | `GrScreenFinalUpdateChecks` verifies zoomed framebuffer output and restores zoom/pan state |
+| Limits | Live pointer-centered zoom controls, non-default pan, zoom-cache presentation, and view-angle controls remain open |
+
+Freeze catalog unchanged.

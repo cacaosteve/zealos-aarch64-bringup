@@ -213,6 +213,48 @@ I64 GrScreenFinalUpdateChecks()
                 mouse.pos.y = old_mouse_y;
                 return 7;
             }
+
+    // Exercise the entire source compositor/presenter with upstream zoom
+    // enabled, then compare visible Limine pixels with its zoom CDC plane.
+    frame_gr = ZcActiveGrGlobals();
+    if (!frame_gr || !frame_gr->zoomed_dc || !frame_gr->zoomed_dc->body)
+    {
+        mouse_grid.coord = old_coord;
+        mouse.pos.x = old_mouse_x;
+        mouse.pos.y = old_mouse_y;
+        return 27;
+    }
+    old_screen_zoom = frame_gr->screen_zoom;
+    old_screen_sx = frame_gr->sx;
+    old_screen_sy = frame_gr->sy;
+    frame_gr->screen_zoom = 2;
+    frame_gr->sx = frame_gr->sy = 0;
+    if (!ZcTaskFrameRun())
+    {
+        frame_gr->screen_zoom = old_screen_zoom;
+        frame_gr->sx = old_screen_sx;
+        frame_gr->sy = old_screen_sy;
+        mouse_grid.coord = old_coord;
+        mouse.pos.x = old_mouse_x;
+        mouse.pos.y = old_mouse_y;
+        return 28;
+    }
+    if (screen[0] != gr_palette[frame_gr->zoomed_dc->body[0]] ||
+        screen[1] != gr_palette[frame_gr->zoomed_dc->body[1]] ||
+        screen[800] != gr_palette[frame_gr->zoomed_dc->body[800]] ||
+        screen[801] != gr_palette[frame_gr->zoomed_dc->body[801]])
+    {
+        frame_gr->screen_zoom = old_screen_zoom;
+        frame_gr->sx = old_screen_sx;
+        frame_gr->sy = old_screen_sy;
+        mouse_grid.coord = old_coord;
+        mouse.pos.x = old_mouse_x;
+        mouse.pos.y = old_mouse_y;
+        return 29;
+    }
+    frame_gr->screen_zoom = old_screen_zoom;
+    frame_gr->sx = old_screen_sx;
+    frame_gr->sy = old_screen_sy;
     mouse_grid.coord = old_coord;
     mouse.pos.x = old_mouse_x;
     mouse.pos.y = old_mouse_y;
