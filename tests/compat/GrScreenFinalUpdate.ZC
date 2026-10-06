@@ -150,6 +150,60 @@ I64 WinMgrTimingSourceChecks()
     return ok ? 0x2a : 0;
 }
 
+I64 WinMgrSleepSourcePassChecks()
+{
+    CWinMgrGlobals *active_winmgr;
+    CWinMgrTimingGlobals *timing;
+    I64 old_jiffies, old_last_total, old_last_idle, old_count;
+    F64 old_last_calc, old_delta, old_idle_factor;
+    F64 old_fps, old_refresh, old_mouse_speed, old_zoom;
+    Bool old_pump;
+    Bool ok;
+
+    active_winmgr = ZcActiveWinMgrGlobals();
+    if (!active_winmgr || !active_winmgr->t || !cpu_structs || mp_count != 1)
+        return 0;
+    timing = active_winmgr->t;
+    old_jiffies = counts.jiffies;
+    old_last_total = timing->last_total_jiffies;
+    old_last_idle = timing->last_idle_pt_hits[0];
+    old_count = timing->calc_idle_count;
+    old_last_calc = timing->last_calc_idle_time;
+    old_delta = timing->calc_idle_delta_time;
+    old_idle_factor = cpu_structs[0].idle_factor;
+    old_fps = active_winmgr->fps;
+    old_refresh = active_winmgr->last_refresh_tS;
+    old_mouse_speed = mouse.speed;
+    old_zoom = gr.screen_zoom;
+    old_pump = Bt(&sys_semas[SEMA_JUST_PUMP_MESSAGES], 0);
+
+    // Keep this source WinMgrSleep pass bounded: its semaphore suppresses the
+    // refresh, redraw and SleepUntil tail while still exercising time, idle,
+    // FIFO flush, and source WinMouseUpdate.
+    gr.screen_zoom = 1;
+    LBts(&sys_semas[SEMA_JUST_PUMP_MESSAGES], 0);
+    WinMgrSleep(TRUE);
+    ok = active_winmgr->fps >= 1 && active_winmgr->last_refresh_tS > 0 &&
+         timing->calc_idle_count == old_count + 1;
+
+    if (old_pump)
+        LBts(&sys_semas[SEMA_JUST_PUMP_MESSAGES], 0);
+    else
+        LBtr(&sys_semas[SEMA_JUST_PUMP_MESSAGES], 0);
+    counts.jiffies = old_jiffies;
+    timing->last_total_jiffies = old_last_total;
+    timing->last_idle_pt_hits[0] = old_last_idle;
+    timing->calc_idle_count = old_count;
+    timing->last_calc_idle_time = old_last_calc;
+    timing->calc_idle_delta_time = old_delta;
+    cpu_structs[0].idle_factor = old_idle_factor;
+    active_winmgr->fps = old_fps;
+    active_winmgr->last_refresh_tS = old_refresh;
+    mouse.speed = old_mouse_speed;
+    gr.screen_zoom = old_zoom;
+    return ok ? 0x2a : 0;
+}
+
 // Stand in for MathODE during this focused graphics test. The production
 // integrator is loaded later; GrScreen's source wrapper must stay dormant
 // until this function exists, then dispatch here through the host bridge.
@@ -195,6 +249,8 @@ I64 GrScreenFinalUpdateChecks()
     BootstrapWinMgrTick();
     if (WinMgrTimingSourceChecks() != 0x2a)
         return 32;
+    if (WinMgrSleepSourcePassChecks() != 0x2a)
+        return 33;
     gr_screen_final_update_old_pixel = bootstrap_graphics_pixels[599 * 800 + 799];
     gr_screen_final_update_calls = 0;
     gr.fp_final_screen_update = &GrScreenFinalUpdateProbe;

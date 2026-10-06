@@ -2715,7 +2715,18 @@ Freeze catalog unchanged.
 | Gap | A seeded `winmgr.t` pointer was not yet proven usable by ZealOS's source timing routine |
 | Bring-up | Exercise unchanged `WinCalcIdles` with controlled jiffy and idle-hit deltas, then restore the CPU and timing counters |
 | Smoke | `GrScreenFinalUpdateChecks` verifies source counter snapshots, calculation count, elapsed-time gate, and idle-factor update |
-| Limits | The timing calculation is verified, but the full source `WinMgrSleep` and `WinMgrTask` loops remain inactive |
+| Limits | A bounded `WinMgrSleep(TRUE)` pass is now exercised with the pump-only semaphore set; the normal refresh/sleep tail and `WinMgrTask` loop remain inactive |
+
+Freeze catalog unchanged.
+
+## Milestone 231 — exercise a bounded source WinMgr sleep pass
+
+| Item | Path |
+|--|--|
+| Gap | Source `WinMgrSleep` had not run because its timer and FIFO services were unresolved, and the ordinary path can redraw and sleep indefinitely in the harness |
+| Bring-up | Bind `TimeCal` to the host monotonic jiffy clock and implement the pinned `CFifoI64` flush semantics; set `SEMA_JUST_PUMP_MESSAGES` for one direct source pass |
+| Smoke | `GrScreenFinalUpdateChecks` calls unchanged `WinMgrSleep(TRUE)` and checks its timing update while restoring the semaphore, manager counters, CPU idle factor, mouse speed, and zoom state |
+| Limits | This is a one-pass source routine check with no focused task or queued keyboard FIFO; it does not launch `WinMgrTask`, poll hardware, redraw, or sleep |
 
 Freeze catalog unchanged.
 

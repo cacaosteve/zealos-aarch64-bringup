@@ -2927,6 +2927,22 @@ static int64_t host_timer_seconds_bits(int64_t *a) {
     memcpy(&bits, &seconds, sizeof(bits));
     return (int64_t)bits;
 }
+static int64_t host_time_cal(int64_t *a) {
+    (void)a;
+    /* The source WinMgr only needs a monotonic jiffy count here. tS and the
+     * calibrated counter frequency are already supplied by the host clock. */
+    guest_counts.jiffies = host_monotonic_ns(NULL) / 1000000;
+    return guest_counts.jiffies;
+}
+static int64_t host_fifo_i64_flush(int64_t *a) {
+    /* Pinned CFifoI64 is {buf, mask, in_ptr, out_ptr}. Upstream flushes by
+     * advancing the consumer to the producer; a null FIFO is a valid empty
+     * keyboard state during early bring-up. */
+    int64_t *fifo = (int64_t *)(uintptr_t)a[0];
+    if (fifo)
+        fifo[3] = fifo[2];
+    return 0;
+}
 static int64_t host_sleep(int64_t *a) {
     if (a[0] <= 0)
         return guest_task_exe_active
@@ -3454,6 +3470,8 @@ static int load_inner(const char *path) {
          * so the generic extern-data binder can resolve the symbol. */
         PrsBindCSymbol("counts", &guest_counts, 0);
         PrsBindCSymbol("tS", host_timer_seconds_bits, 0);
+        PrsBindCSymbol("TimeCal", host_time_cal, 0);
+        PrsBindCSymbol("FifoI64Flush", host_fifo_i64_flush, 1);
         CHashClass *kbd = (CHashClass *)HashFind("CKbdStateGlobals",
                                                   Fs->hash_table, HTT_CLASS, 1);
         if (!kbd || kbd->sz <= 0 || kbd->sz > (1 << 20))
