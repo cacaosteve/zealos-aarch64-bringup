@@ -174,11 +174,12 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         boot = until(b'\n> ')
         for marker in ('hc IR OK (front+host)', 'virtio-blk: rw OK',
                        'zc: native compiler ready',
-                       'zc: upstream ZealOS graphics ready'):
+                       'zc: upstream ZealOS graphics sources loaded'):
             if marker not in boot: raise RuntimeError(f'boot missing {marker}\n{boot[-4000:]}')
         if re.search(r'hc IR FAIL|(?:Upstream|Front) [^\r\n]* FAIL', boot):
             raise RuntimeError('legacy regressions')
         print('PASS boot and legacy regression markers', flush=True)
+        command('zcall ZcTaskFrameRun', 'zc => 0x0000000000000001')
         command('zreset', 'zc: native compiler ready')
         command('zvol', 'zvol: source partition ready' if args.pci else
                          'zvol: source partition unavailable')

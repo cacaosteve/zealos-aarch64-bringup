@@ -3173,6 +3173,7 @@ extern Bool ZcGrUpdateTasks();
 extern Bool ZcGrUpdateTaskWin(CTask *task);
 extern Bool ZcODEsUpdate(CTask *task);
 extern Bool ZcGrUpdateTaskODEs(CTask *task);
+extern F64 LowPass1(F64 a, F64 y0, F64 y, F64 dt=1.0);
 extern U0 DCBlotColor4(U8 *dst, I64 *img, I64 *img_cache, I64 count);
 extern U0 GrUpdateScreen();
 extern U0 GrRopEquU8NoClipping(I64 ch, U8 *dst, I64 width_internal);

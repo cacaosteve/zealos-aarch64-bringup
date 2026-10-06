@@ -637,6 +637,23 @@ static int64_t host_sqrt(int64_t *a) {
 static int64_t host_exp(int64_t *a) {
     return (int64_t)hc_builtin_exp((uint64_t)a[0]);
 }
+static double host_f64_from_bits(uint64_t bits) {
+    double value;
+    memcpy(&value, &bits, sizeof(value));
+    return value;
+}
+static int64_t host_low_pass1(int64_t *a) {
+    double alpha = host_f64_from_bits((uint64_t)a[0]);
+    double y0 = host_f64_from_bits((uint64_t)a[1]);
+    double y = host_f64_from_bits((uint64_t)a[2]);
+    double dt = host_f64_from_bits((uint64_t)a[3]);
+    double decay = host_f64_from_bits(
+        hc_builtin_exp((uint64_t)(int64_t)(-alpha * dt)));
+    double result = y0 * decay + y * (1.0 - decay);
+    uint64_t bits;
+    memcpy(&bits, &result, sizeof(bits));
+    return (int64_t)bits;
+}
 /* Option() controls compiler/runtime diagnostics in ZealOS. The ARM64
  * compiler currently has no matching option state; accept the call so
  * upstream modules can bracket declarations with compatible syntax. */
@@ -3396,6 +3413,8 @@ static int load_inner(const char *path) {
         return -1;
     }
     execute_source(path, src);
+    if (!strcmp(path, "/System/TaskBridge.ZC"))
+        PrsBindCSymbol("LowPass1", host_low_pass1, 4);
     if (!strcmp(path, "/Kernel/KernelC.HH")) {
         /* counts is declared here, not in KernelB.HH; bind after declaration
          * so the generic extern-data binder can resolve the symbol. */
@@ -3790,11 +3809,11 @@ int zc_start_graphics(void) {
      * bootstrap session is expected to enter here before guest_task_bound. */
     if (!ready || failed)
         return -1;
-    zc_output("zc: initializing upstream ZealOS graphics\n");
+    zc_output("zc: loading upstream ZealOS graphics sources\n");
     guarded = 1;
     if (setjmp(guard)) {
         guarded = 0;
-        zc_output("zc: upstream graphics init failed; returning to bootstrap shell\n");
+        zc_output("zc: upstream graphics source load failed; returning to bootstrap shell\n");
         zc_init(archive, archive_len, output);
         return -1;
     }
@@ -3823,7 +3842,7 @@ int zc_start_graphics(void) {
     if (!*(void **)winmgr_task->data_addr)
         *(void **)winmgr_task->data_addr = *(void **)system_task->data_addr;
     guarded = 0;
-    zc_output("zc: upstream ZealOS graphics ready\n");
+    zc_output("zc: upstream ZealOS graphics sources loaded\n");
     return 0;
 }
 void zc_status(void) {
