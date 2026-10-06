@@ -1084,6 +1084,19 @@ static int64_t host_active_mouse_globals(int64_t *a) {
                ? (int64_t)(uintptr_t)global->data_addr
                : 0;
 }
+static int64_t host_win_mouse_update(int64_t *a) {
+    CHashFun *update;
+    (void)a;
+    if (!Fs || !Fs->hash_table)
+        return 0;
+    update = (CHashFun *)HashFind("WinMouseUpdate", Fs->hash_table,
+                                  HTT_FUN, 1);
+    if (!update || !update->fun_ptr || update->argc ||
+        (update->base.base.type & HTF_EXTERN))
+        return 0;
+    FFI_CALL_TOS_0(update->fun_ptr);
+    return 1;
+}
 static CMemberLst *guest_class_member(CHashClass *cls, const char *name) {
     for (CMemberLst *member = cls ? cls->members_lst : NULL; member;
          member = member->next) {
@@ -3525,6 +3538,7 @@ static int load_inner(const char *path) {
         if (load_inner("/System/TaskBridge.ZC"))
             zc_fail("task bridge source missing");
         PrsBindCSymbol("ZcGrTextUpdate", host_gr_text_update, 0);
+        PrsBindCSymbol("ZcWinMouseUpdate", host_win_mouse_update, 0);
         PrsBindCSymbol("ZcGrScreenUpdate", host_gr_screen_update, 0);
         PrsBindCSymbol("ZcGrScreenFullUpdate", host_gr_screen_full_update, 0);
         PrsBindCSymbol("ZcGrUpdateTasks", host_gr_update_tasks, 0);

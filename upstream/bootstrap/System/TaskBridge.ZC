@@ -3185,6 +3185,7 @@ U0 BootstrapDrawTaskWin(CTask *task)
 extern U0 WinZBufUpdate();
 extern Bool BootstrapWinIsUncovered(CTask *task);
 extern Bool ZcGrTextUpdate();
+extern Bool ZcWinMouseUpdate();
 extern Bool ZcGrScreenUpdate();
 extern Bool ZcGrScreenFullUpdate();
 extern Bool ZcGrUpdateTasks();
@@ -3254,6 +3255,7 @@ Bool BootstrapTryUpstreamGrUpdateScreen()
         sys_framebuffer_bpp != 32)
         return FALSE;
     BootstrapCtrlInputPoll();
+    ZcWinMouseUpdate();
     active_gr = ZcActiveGrGlobals();
     if (!active_gr)
         active_gr = &gr;
@@ -3323,6 +3325,7 @@ U0 BootstrapGrUpdateTasks()
         return;
 
     BootstrapCtrlInputPoll();
+    ZcWinMouseUpdate();
 
     active_gr = ZcActiveGrGlobals();
     if (!active_gr)

@@ -7,6 +7,7 @@ extern I64 bootstrap_upstream_ode_updates;
 extern I64 bootstrap_upstream_gr_update_tasks;
 extern I64 bootstrap_upstream_gr_update_screen;
 extern Bool BootstrapCanUseUpstreamGrUpdateTasks();
+extern Bool ZcWinMouseUpdate();
 I64 gr_screen_final_update_calls;
 I64 gr_screen_ode_update_calls;
 Bool gr_screen_ode_root_seen;
@@ -70,6 +71,45 @@ I64 GrScreenZoomTransformChecks()
     return ok ? 0x2a : 0;
 }
 
+I64 GrScreenMouseEdgeChecks()
+{//The unchanged WinMouseUpdate recenters a zoomed view at pointer edges.
+    I64 old_zoom = gr.screen_zoom, old_sx = gr.sx, old_sy = gr.sy;
+    I64 old_ox = mouse.offset.x, old_oy = mouse.offset.y, old_oz = mouse.offset.z;
+    F64 old_scale_x = mouse.scale.x, old_scale_y = mouse.scale.y;
+    F64 old_scale_z = mouse.scale.z, old_speed = mouse.speed;
+    Bool old_has_wheel = mouse.has_wheel;
+    Bool old_installed = mouse_hard.installed;
+    Bool old_event = mouse_hard.event, old_hard_wheel = mouse_hard.has_wheel;
+    Bool ok;
+
+    gr.screen_zoom = 2;
+    gr.sx = gr.sy = 0;
+    mouse.pos.x = 796;
+    mouse.pos.y = 300;
+    mouse.speed = 1.0;
+    mouse_hard.installed = TRUE;
+    mouse_hard.event = FALSE;
+    mouse_hard.has_wheel = TRUE;
+    ok = ZcWinMouseUpdate() && gr.sx == 400 &&
+         mouse.speed < 1.0 && mouse.speed > 0.9 && mouse.has_wheel;
+
+    gr.screen_zoom = old_zoom;
+    gr.sx = old_sx;
+    gr.sy = old_sy;
+    mouse.offset.x = old_ox;
+    mouse.offset.y = old_oy;
+    mouse.offset.z = old_oz;
+    mouse.scale.x = old_scale_x;
+    mouse.scale.y = old_scale_y;
+    mouse.scale.z = old_scale_z;
+    mouse.speed = old_speed;
+    mouse.has_wheel = old_has_wheel;
+    mouse_hard.installed = old_installed;
+    mouse_hard.event = old_event;
+    mouse_hard.has_wheel = old_hard_wheel;
+    return ok ? 0x2a : 0;
+}
+
 // Stand in for MathODE during this focused graphics test. The production
 // integrator is loaded later; GrScreen's source wrapper must stay dormant
 // until this function exists, then dispatch here through the host bridge.
@@ -105,6 +145,8 @@ I64 GrScreenFinalUpdateChecks()
         return 8;
     if (GrScreenZoomTransformChecks() != 0x2a)
         return 30;
+    if (GrScreenMouseEdgeChecks() != 0x2a)
+        return 31;
     // Win.ZC's file-scope initializer installs WinFinalUpdate in the later
     // graphics global. Exercise that real callback once before substituting
     // the pixel probe below. This also checks that its current no-menu,
