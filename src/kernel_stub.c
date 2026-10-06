@@ -209,6 +209,7 @@ static uint32_t g_fb_bpp;
 /* Optional indexed offscreen target used while the ZealOS task bridge builds
  * one frame. Framebuffer primitives keep their direct path outside that scope. */
 static uint8_t *g_fb_render_surface;
+static uint32_t *g_fb_render_rgba;
 static uint64_t g_fb_render_stride, g_fb_render_rows;
 static uint32_t g_fb_cx, g_fb_cy;
 static uint32_t g_fb_cols, g_fb_rows;
@@ -564,12 +565,14 @@ uint64_t zeal_fb_pitch_bytes(void) { return g_fb_pitch; }
 uint64_t zeal_fb_bits_per_pixel(void) { return g_fb_bpp; }
 uint64_t zeal_fb_address(void) { return (uint64_t)(uintptr_t)g_fb; }
 
-uint64_t zeal_fb_task_frame_begin(uint8_t *surface, uint64_t stride,
-                                  uint64_t rows) {
+uint64_t zeal_fb_task_frame_begin(uint8_t *surface, uint32_t *rgba,
+                                  uint64_t stride, uint64_t rows) {
     if (!g_fb || !surface || stride < g_fb_w || rows < g_fb_h ||
-        stride > 16384 || rows > 16384 || stride > UINT64_MAX / rows)
+        stride > 16384 || rows > 16384 || stride > UINT64_MAX / rows ||
+        !rgba || stride > UINT64_MAX / sizeof(*rgba))
         return 0;
     g_fb_render_surface = surface;
+    g_fb_render_rgba = rgba;
     g_fb_render_stride = stride;
     g_fb_render_rows = rows;
     /* ZealOS uses black as the base layer; text and task windows are composed
@@ -578,26 +581,47 @@ uint64_t zeal_fb_task_frame_begin(uint8_t *surface, uint64_t stride,
         uint8_t *row = surface + y * stride;
         for (uint64_t x = 0; x < g_fb_w; x++)
             row[x] = 0;
+        if (g_fb_bpp == 32 && g_fb_pitch >= g_fb_w * sizeof(uint32_t)) {
+            uint32_t *rgba_row = rgba + y * stride;
+            const volatile uint32_t *fb_row = (const volatile uint32_t *)
+                (g_fb + y * g_fb_pitch);
+            for (uint64_t x = 0; x < g_fb_w; x++)
+                rgba_row[x] = fb_row[x];
+        }
     }
     return 1;
 }
 
 void zeal_fb_task_frame_cancel(void) {
     g_fb_render_surface = NULL;
+    g_fb_render_rgba = NULL;
     g_fb_render_stride = g_fb_render_rows = 0;
 }
 
-uint64_t zeal_fb_task_frame_end(void) {
+uint64_t zeal_fb_task_frame_end(uint64_t use_rgba) {
     uint8_t *surface = g_fb_render_surface;
+    uint32_t *rgba = g_fb_render_rgba;
     uint64_t stride = g_fb_render_stride, rows = g_fb_render_rows;
-    if (!g_fb || !surface)
+    if (!g_fb || !surface || !rgba ||
+        (use_rgba && (g_fb_bpp != 32 ||
+                      g_fb_pitch < g_fb_w * sizeof(uint32_t)))) {
+        zeal_fb_task_frame_cancel();
         return 0;
+    }
     zeal_fb_task_frame_cancel();
     for (uint64_t y = 0; y < g_fb_h && y < rows; y++) {
-        const uint8_t *src = surface + y * stride;
-        for (uint64_t x = 0; x < g_fb_w; x++)
-            fb_putpixel((uint32_t)x, (uint32_t)y,
-                        g_text_palette[src[x] & 0x0fu]);
+        if (use_rgba) {
+            const uint32_t *src = rgba + y * stride;
+            volatile uint32_t *dst = (volatile uint32_t *)
+                (g_fb + y * g_fb_pitch);
+            for (uint64_t x = 0; x < g_fb_w; x++)
+                dst[x] = src[x];
+        } else {
+            const uint8_t *src = surface + y * stride;
+            for (uint64_t x = 0; x < g_fb_w; x++)
+                fb_putpixel((uint32_t)x, (uint32_t)y,
+                            g_text_palette[src[x] & 0x0fu]);
+        }
     }
     return g_fb_w * g_fb_h;
 }

@@ -258,9 +258,9 @@ extern uint64_t zeal_fb_text_cols(void), zeal_fb_text_rows(void);
 extern uint64_t zeal_fb_screen_width(void), zeal_fb_screen_height(void);
 extern uint64_t zeal_fb_pitch_bytes(void), zeal_fb_bits_per_pixel(void);
 extern uint64_t zeal_fb_address(void);
-extern uint64_t zeal_fb_task_frame_begin(uint8_t *surface, uint64_t stride,
-                                          uint64_t rows);
-extern uint64_t zeal_fb_task_frame_end(void);
+extern uint64_t zeal_fb_task_frame_begin(uint8_t *surface, uint32_t *rgba,
+                                         uint64_t stride, uint64_t rows);
+extern uint64_t zeal_fb_task_frame_end(uint64_t use_rgba);
 extern void zeal_fb_task_frame_cancel(void);
 extern void zeal_fb_task_text_reset(unsigned slot);
 extern uint64_t zeal_fb_task_text_write(unsigned slot, int64_t left,
@@ -846,20 +846,43 @@ static uint8_t *guest_graphics_surface(void) {
         return (uint8_t *)p;
     return NULL;
 }
+static uint32_t *guest_graphics_rgba_surface(void) {
+    CHashGlblVar *global = (CHashGlblVar *)HashFind(
+        "bootstrap_present_raw", Fs->hash_table, HTT_GLBL_VAR, 1);
+    uintptr_t p;
+    size_t bytes = 800u * 600u * sizeof(uint32_t);
+    if (!global || !global->data_addr)
+        return NULL;
+    p = (uintptr_t)global->data_addr;
+    if (p > UINTPTR_MAX - bytes)
+        return NULL;
+    if ((p >= (uintptr_t)data_arena &&
+         p + bytes <= (uintptr_t)data_arena + sizeof(data_arena)) ||
+        (p >= (uintptr_t)code_arena &&
+         p + bytes <= (uintptr_t)code_arena + sizeof(code_arena)))
+        return (uint32_t *)p;
+    return NULL;
+}
+static int guest_source_full_screen_active(void) {
+    CHashGlblVar *global = (CHashGlblVar *)HashFind(
+        "bootstrap_gr_fullscreen_active", Fs->hash_table, HTT_GLBL_VAR, 1);
+    return global && global->data_addr && *(uint64_t *)global->data_addr;
+}
 static int64_t guest_task_frame_run(void) {
     uint8_t *surface = guest_graphics_surface();
+    uint32_t *rgba = guest_graphics_rgba_surface();
     uint64_t presented;
     if (!guest_winmgr_tick_fun)
         guest_winmgr_tick_fun = (CHashFun *)HashFind(
             "BootstrapWinMgrTick", Fs->hash_table, HTT_FUN, 1);
-    if (!surface || !guest_winmgr_tick_fun ||
+    if (!surface || !rgba || !guest_winmgr_tick_fun ||
         !guest_winmgr_tick_fun->fun_ptr || guest_winmgr_tick_fun->argc ||
         (guest_winmgr_tick_fun->base.base.type & HTF_EXTERN) ||
-        !zeal_fb_task_frame_begin(surface, 800, 600))
+        !zeal_fb_task_frame_begin(surface, rgba, 800, 600))
         return 0;
     set_guest_task(guest_fibers[0].words);
     FFI_CALL_TOS_0(guest_winmgr_tick_fun->fun_ptr);
-    presented = zeal_fb_task_frame_end() != 0;
+    presented = zeal_fb_task_frame_end(guest_source_full_screen_active()) != 0;
     if (presented) {
         CHashFun *present = (CHashFun *)HashFind(
             "BootstrapGrPresent", Fs->hash_table, HTT_FUN, 1);
@@ -963,6 +986,19 @@ static int64_t host_gr_update_tasks(int64_t *a) {
     if (!Fs || !Fs->hash_table)
         return 0;
     update = (CHashFun *)HashFind("GrUpdateTasks", Fs->hash_table,
+                                  HTT_FUN, 1);
+    if (!update || !update->fun_ptr || update->argc ||
+        (update->base.base.type & HTF_EXTERN))
+        return 0;
+    FFI_CALL_TOS_0(update->fun_ptr);
+    return 1;
+}
+static int64_t host_gr_screen_full_update(int64_t *a) {
+    CHashFun *update;
+    (void)a;
+    if (!Fs || !Fs->hash_table)
+        return 0;
+    update = (CHashFun *)HashFind("GrUpdateScreen", Fs->hash_table,
                                   HTT_FUN, 1);
     if (!update || !update->fun_ptr || update->argc ||
         (update->base.base.type & HTF_EXTERN))
@@ -3450,6 +3486,7 @@ static int load_inner(const char *path) {
             zc_fail("task bridge source missing");
         PrsBindCSymbol("ZcGrTextUpdate", host_gr_text_update, 0);
         PrsBindCSymbol("ZcGrScreenUpdate", host_gr_screen_update, 0);
+        PrsBindCSymbol("ZcGrScreenFullUpdate", host_gr_screen_full_update, 0);
         PrsBindCSymbol("ZcGrUpdateTasks", host_gr_update_tasks, 0);
         PrsBindCSymbol("ZcGrUpdateTaskWin", host_gr_update_task_win, 1);
         PrsBindCSymbol("ZcODEsUpdate", host_ode_update_task, 1);

@@ -3168,6 +3168,7 @@ extern U0 WinZBufUpdate();
 extern Bool BootstrapWinIsUncovered(CTask *task);
 extern Bool ZcGrTextUpdate();
 extern Bool ZcGrScreenUpdate();
+extern Bool ZcGrScreenFullUpdate();
 extern Bool ZcGrUpdateTasks();
 extern Bool ZcGrUpdateTaskWin(CTask *task);
 extern Bool ZcODEsUpdate(CTask *task);
@@ -3177,6 +3178,8 @@ I64 bootstrap_winmgr_ticks = 0;
 I64 bootstrap_upstream_window_updates = 0;
 I64 bootstrap_upstream_ode_updates = 0;
 I64 bootstrap_upstream_gr_update_tasks = 0;
+I64 bootstrap_upstream_gr_update_screen = 0;
+Bool bootstrap_gr_fullscreen_active = FALSE;
 I64 BootstrapTaskRingCount(CTask *root)
 {//Return the ring size only for a valid, closed ring of at most 64 tasks.
     CTask *task = root;
@@ -3200,6 +3203,69 @@ Bool BootstrapCanUseUpstreamGrUpdateTasks()
         BootstrapTaskRingCount(sys_winmgr_task) < 1 ||
         BootstrapTaskRingCount(cpu_structs[0].executive_task) < 1)
         return FALSE;
+    return TRUE;
+}
+Bool BootstrapTryUpstreamGrUpdateScreen()
+{//Use the unchanged full compositor only when its buffers and task graph are live.
+    CGrGlobals *active_gr;
+    CTask *task;
+    I64 i, window_count = 0, ode_count;
+    if (!BootstrapCanUseUpstreamGrUpdateTasks() ||
+        sys_framebuffer_width != 800 || sys_framebuffer_height != 600 ||
+        sys_framebuffer_pitch != 800 * sizeof(U32) ||
+        sys_framebuffer_bpp != 32)
+        return FALSE;
+    BootstrapCtrlInputPoll();
+    active_gr = ZcActiveGrGlobals();
+    if (!active_gr)
+        active_gr = &gr;
+    bootstrap_present_ready = FALSE;
+    for (i = 0; i < 16; i++)
+        bootstrap_text_colors[i] = i * 0x0101010101010101;
+    bootstrap_present_ready = TRUE;
+    active_gr->dc = &bootstrap_graphics_dc;
+    active_gr->dc2 = &bootstrap_graphics_dc;
+    active_gr->dc1 = &bootstrap_planar_dc;
+    active_gr->dc_cache = &bootstrap_planar_cache_dc;
+    active_gr->zoomed_dc = &bootstrap_zoom_dc;
+    active_gr->text_base = bootstrap_text_base;
+    active_gr->to_8_colors = bootstrap_text_colors;
+    if (active_gr->screen_zoom < 1 || active_gr->screen_zoom > 8)
+        active_gr->screen_zoom = 1;
+    active_gr->screen_cache = bootstrap_present_cache;
+    text.raw_screen = bootstrap_present_raw;
+    // During this transaction GrUpdateScreen32 writes changed pixels to the
+    // staged RGBA plane; the host publishes that plane only after the frame.
+    text.fb_alias = bootstrap_present_raw;
+    text.buffer_size = sys_framebuffer_pitch * sys_framebuffer_height;
+    text.is_fb_busy = FALSE;
+    if (!bootstrap_present_cache_ready)
+    {
+        MemSet(bootstrap_present_cache, 0xFF, 800 * 600);
+        bootstrap_present_cache_ready = TRUE;
+    }
+    ZcFbShellTextCompose(gr.text_base, TEXT_COLS);
+    WinZBufUpdate();
+    task = sys_winmgr_task;
+    for (i = 0; i < 64; i++)
+    {
+        if ((task->display_flags & (1 << DISPLAYf_SHOW)) &&
+            BootstrapWinIsUncovered(task))
+            window_count++;
+        task = task->next_task;
+        if (task == sys_winmgr_task)
+            break;
+    }
+    ode_count = BootstrapTaskRingCount(cpu_structs[0].executive_task);
+    if (!ZcGrScreenFullUpdate())
+        return FALSE;
+    bootstrap_gr_fullscreen_active = TRUE;
+    bootstrap_upstream_gr_update_screen++;
+    bootstrap_gr_screen_updates++;
+    bootstrap_gr_planar_updates++;
+    bootstrap_upstream_gr_update_tasks++;
+    bootstrap_upstream_window_updates += window_count;
+    bootstrap_upstream_ode_updates += ode_count;
     return TRUE;
 }
 U0 BootstrapGrUpdateTasks()
@@ -3337,11 +3403,16 @@ U0 BootstrapGrUpdateTasks()
 public U0 BootstrapWinMgrTick()
 {//One host-idle frame: route tablet clicks and redraw the task ring.
     bootstrap_winmgr_ticks++;
+    bootstrap_gr_fullscreen_active = FALSE;
+    if (BootstrapTryUpstreamGrUpdateScreen())
+        return;
     BootstrapGrUpdateTasks();
 }
 U0 BootstrapGrPresent()
 {//Run the upstream palette-to-framebuffer pass after the bootstrap surface blit.
     CGrGlobals *active_gr = ZcActiveGrGlobals();
+    if (bootstrap_gr_fullscreen_active)
+        return;
     if (!active_gr)
         active_gr = &gr;
     if (bootstrap_present_ready && ZcGrScreenUpdate())
