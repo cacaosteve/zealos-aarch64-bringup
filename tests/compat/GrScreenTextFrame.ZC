@@ -1,4 +1,5 @@
 extern U0 GrUpdateTextBG();
+extern U0 GrUpdateTextFG();
 
 I64 GrScreenTextFrameChecks()
 {
@@ -13,7 +14,8 @@ I64 GrScreenTextFrameChecks()
 	I64 saved_pan_x = gr.pan_text_x, saved_pan_y = gr.pan_text_y;
 	Bool saved_hide_col = gr.hide_col, saved_hide_row = gr.hide_row;
 	Bool saved_blink = Blink;
-	I64 i, result = 42;
+	U8 glyph_rows[8] = {0x18, 0x3c, 0x66, 0x66, 0x7e, 0x66, 0x66, 0x00};
+	I64 i, x, y, expected, result = 42;
 	if (!allocation)
 		return 1;
 	body = allocation + 64;
@@ -23,6 +25,7 @@ I64 GrScreenTextFrameChecks()
 		body[i] = 0x5a;
 	for (i = 0; i < TEXT_COLS * TEXT_ROWS; i++)
 		plane[i] = 0x00002020;
+	plane[102] = 0x0000c341;
 	for (i = 0; i < 16; i++)
 		colors[i] = i * 0x0101010101010101;
 	gr.text_base = plane;
@@ -36,13 +39,26 @@ I64 GrScreenTextFrameChecks()
 	gr.hide_col = gr.hide_row = FALSE;
 	Blink = FALSE;
 	GrUpdateTextBG;
+	GrUpdateTextFG;
 	if (allocation[0] != 0xa5 || allocation[63] != 0xa5 ||
 		allocation[64 + GR_WIDTH * GR_HEIGHT] != 0xa5 ||
 		allocation[127 + GR_WIDTH * GR_HEIGHT] != 0xa5)
 		result = 2;
-	for (i = 0; i < GR_WIDTH * GR_HEIGHT; i++)
-		if (body[i] != 2)
-			result = 3;
+	for (y = 0; y < GR_HEIGHT; y++)
+	{
+		for (x = 0; x < GR_WIDTH; x++)
+		{
+			expected = 2;
+			if (8 <= y < 16 && 16 <= x < 24)
+			{
+				expected = 12;
+				if (glyph_rows[y - 8] & (0x80 >> (x - 16)))
+					expected = 3;
+			}
+			if (body[y * GR_WIDTH + x] != expected)
+				result = 3;
+		}
+	}
 	gr.text_base = saved_plane;
 	gr.dc2 = saved_dc;
 	gr.to_8_colors = saved_colors;

@@ -11,9 +11,10 @@ overlay recognizes that exact x86 instruction sequence and emits a typed
 scanline loop while preserving the original `w2` adjustment. A full-frame
 canary test caught and fixed a double-advance in the first inline expansion:
 it skipped every other glyph cell. `/Tests/GrScreenTextBG.ZC` exercises the
-stride helper, and `/Tests/GrScreenTextFrame.ZC` runs the translated
-`GrUpdateTextBG` on a temporary 800x600 buffer, checks both canary regions, and
-verifies every output pixel. Run that extended QEMU check with
+stride helper, and `/Tests/GrScreenTextFrame.ZC` runs the translated background
+pass followed by the unchanged foreground glyph pass on a temporary 800x600
+buffer. It checks both canary regions and every pixel, including the foreground
+glyph over its expected background. Run that extended QEMU check with
 `make check-grscreen-full`; the regular `make check-grscreen` remains the
 shorter graphics regression.
 
