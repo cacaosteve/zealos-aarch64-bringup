@@ -2954,6 +2954,12 @@ static int64_t host_to_upper(int64_t *a) {
         ch = ch - 'a' + 'A';
     return ch;
 }
+static int64_t host_ctrl_alt_cb_set(int64_t *a) {
+    /* Startup can register window hotkeys before the native key-device
+     * dispatcher exists. Registration is intentionally inert at this stage. */
+    (void)a;
+    return 0;
+}
 static int task_field(CHashClass *cls, const char *name, int64_t size, int64_t expected_off) {
     CMemberLst *m = MemberFind((char *)name, cls);
     int64_t count = m && m->dim.total_cnt > 0 ? m->dim.total_cnt : 1;
@@ -3130,6 +3136,7 @@ static void bind_guest_task(void) {
     PrsBindCSymbol("AbsI64", host_abs_i64, 1);
     PrsBindCSymbol("ToBool", host_to_bool, 1);
     PrsBindCSymbol("ToUpper", host_to_upper, 1);
+    PrsBindCSymbol("CtrlAltCBSet", host_ctrl_alt_cb_set, 5);
     PrsBindCSymbol("SwapI64", host_swap, 2);
     PrsBindCSymbol("sys_semas", guest_sys_semas, 0);
 }
@@ -3441,6 +3448,10 @@ static int load_inner(const char *path) {
         PrsBindCSymbol("Free", host_free, 1);
         PrsBindCSymbol("MSize", host_msize, 1);
         PrsBindCSymbol("MSize2", host_msize, 1);
+        /* KernelC declares keyboard shortcut registration after KernelB has
+         * bound the guest task bridge. Keep early Win.ZC initialization from
+         * dispatching into the unresolved-symbol sentinel. */
+        PrsBindCSymbol("CtrlAltCBSet", host_ctrl_alt_cb_set, 5);
     }
     if (!strcmp(path, "/Kernel/KernelB.HH")) {
         bind_guest_task();
@@ -3750,6 +3761,70 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
     ready = 1;
     guarded = 0;
     zc_output("zc: native compiler ready (persistent session)\n");
+}
+int zc_start_graphics(void) {
+    static const char *const modules[] = {
+        "/Kernel/KernelA.HH",
+        "/Kernel/KernelB.HH",
+        "/Kernel/KernelC.HH",
+        "/System/TaskBridge.ZC",
+        "/System/Externs.ZC",
+        "/System/Gr/GrInitA.ZC",
+        "/System/Gr/Gr.HH",
+        "/System/Gr/GrExterns.ZC",
+        "/System/Gr/GrGlobals.ZC",
+        "/System/Gr/GrPalette.ZC",
+        "/System/Gr/GrDC.ZC",
+        "/System/Gr/GrBitMap.ZC",
+        "/System/Win.ZC",
+        "/System/WinMgr.ZC",
+        "/System/Gr/GrScreen.ZC",
+    };
+    const unsigned char *archive = source_archive;
+    size_t archive_len = archive_size;
+    zc_output_fn output = output_cb;
+    CHashGlblVar *winmgr_task;
+    CHashGlblVar *system_task;
+
+    /* KernelA/B bind the guest CTask model while these modules load, so the
+     * bootstrap session is expected to enter here before guest_task_bound. */
+    if (!ready || failed)
+        return -1;
+    zc_output("zc: initializing upstream ZealOS graphics\n");
+    guarded = 1;
+    if (setjmp(guard)) {
+        guarded = 0;
+        zc_output("zc: upstream graphics init failed; returning to bootstrap shell\n");
+        zc_init(archive, archive_len, output);
+        return -1;
+    }
+    for (size_t i = 0; i < sizeof(modules) / sizeof(*modules); i++) {
+        if (load_inner(modules[i])) {
+            guarded = 0;
+            zc_output("zc: upstream graphics source missing; returning to bootstrap shell\n");
+            zc_init(archive, archive_len, output);
+            return -1;
+        }
+    }
+    winmgr_task = (CHashGlblVar *)HashFind("sys_winmgr_task", Fs->hash_table,
+                                           HTT_GLBL_VAR, 1);
+    system_task = (CHashGlblVar *)HashFind("sys_task", Fs->hash_table,
+                                           HTT_GLBL_VAR, 1);
+    if (!winmgr_task || !winmgr_task->data_addr ||
+        !system_task || !system_task->data_addr ||
+        !*(void **)system_task->data_addr) {
+        guarded = 0;
+        zc_output("zc: upstream graphics task root unavailable; returning to bootstrap shell\n");
+        zc_init(archive, archive_len, output);
+        return -1;
+    }
+    /* WinMgrTask is not spawned yet. Give its unchanged renderer the existing
+     * shell task ring until the real WinMgr task lifecycle is brought up. */
+    if (!*(void **)winmgr_task->data_addr)
+        *(void **)winmgr_task->data_addr = *(void **)system_task->data_addr;
+    guarded = 0;
+    zc_output("zc: upstream ZealOS graphics ready\n");
+    return 0;
 }
 void zc_status(void) {
     size_t used[2] = {0}, blocks[2] = {0};
