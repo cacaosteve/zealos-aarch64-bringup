@@ -1358,6 +1358,7 @@ bootstrap_graphics_dc.body = bootstrap_graphics_pixels;
 bootstrap_graphics_dc.width = 800;
 bootstrap_graphics_dc.width_internal = 800;
 bootstrap_graphics_dc.height = 600;
+bootstrap_graphics_dc.dc_signature = DCS_SIGNATURE_VAL;
 bootstrap_zoom_dc.body = bootstrap_zoom_pixels;
 bootstrap_zoom_dc.width = 800;
 bootstrap_zoom_dc.width_internal = 800;
@@ -1468,7 +1469,7 @@ Bool IsPixCovered0(CTask *task, I64 x, I64 y)
         return FALSE;
     return task->win_z_num < gr.win_z_buf[cell_y * TEXT_COLS + cell_x];
 }
-// Minimal timing state for DocRecalc's refresh throttle; WinMgr is not bootstrapped.
+// Early refresh state used by the bridge until WinMgrTask is running.
 CWinMgrGlobals winmgr;
 // Music playback is not part of the bootstrap; DocRecalc only tracks its current song tag.
 class CBootstrapMusicGlobals
@@ -3173,7 +3174,6 @@ extern Bool ZcGrUpdateTasks();
 extern Bool ZcGrUpdateTaskWin(CTask *task);
 extern Bool ZcODEsUpdate(CTask *task);
 extern Bool ZcGrUpdateTaskODEs(CTask *task);
-extern F64 LowPass1(F64 a, F64 y0, F64 y, F64 dt=1.0);
 extern U0 DCBlotColor4(U8 *dst, I64 *img, I64 *img_cache, I64 count);
 extern U0 GrUpdateScreen();
 extern U0 GrRopEquU8NoClipping(I64 ch, U8 *dst, I64 width_internal);
@@ -3219,7 +3219,7 @@ I64 BootstrapTaskRingCount(CTask *root)
 }
 Bool BootstrapCanUseUpstreamGrUpdateTasks()
 {//The pinned routine has unbounded rings; call only with a complete one-CPU graph.
-    if (mp_count != 1 || !cpu_structs || winmgr.fps < 1.0 ||
+    if (mp_count != 1 || !cpu_structs ||
         !TaskValidate(sys_winmgr_task) ||
         BootstrapTaskRingCount(sys_winmgr_task) < 1 ||
         BootstrapTaskRingCount(cpu_structs[0].executive_task) < 1)

@@ -3786,6 +3786,7 @@ int zc_start_graphics(void) {
         "/Kernel/KernelA.HH",
         "/Kernel/KernelB.HH",
         "/Kernel/KernelC.HH",
+        "/Kernel/KMathB.ZC",
         "/System/TaskBridge.ZC",
         "/System/Externs.ZC",
         "/System/Gr/GrInitA.ZC",
