@@ -1505,10 +1505,14 @@ ZealOS live distribution or installer.
 - The pinned, unchanged `System/Math/MathODE.ZC` has been added to the source
   volume. Loading the full 758-line ODE module currently triggers a synchronous
   guest data abort during compilation, so it is not yet part of the passing
-  source sequence. For `GrScreen`, the ARM64 source bundle now translates its
-  one `GrUpdateTextBG` x86 store loop into the tested `ZcGrTextBGStore` helper;
-  `make check-grscreen` compiles that bundle version and checks all eight row
-  writes, stride padding, color bytes, and next-cell offset in the guest. The
+  source sequence. For `GrScreen`, the ARM64 source bundle expands its one
+  `GrUpdateTextBG` x86 store loop into eight inline typed stores; a separate
+  helper check covers row writes, stride padding, color bytes, and next-cell
+  offset in the guest. A disposable full-frame probe raised a synchronous
+  exception while the framebuffer console drew the diagnostic immediately
+  after the background pass (`ELR` at `fb_draw_char`, `FAR=0`). This does not
+  isolate whether the pass damaged console state or the fault arose earlier, so
+  the source pass remains outside the live frame loop. The
   AArch64 runtime also implements `DCBlotColor4`, with a guest check for packed
   pixel bit order and cache behavior. The pinned upstream file remains
   byte-identical. The active manager probe still uses a compile-only

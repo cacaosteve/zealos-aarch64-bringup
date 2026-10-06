@@ -23,9 +23,13 @@ the destination untouched.
 
 This is a bundle-time architecture port, not a change to the pinned upstream
 file and not an x86 instruction emulator. The full `GrUpdateTextBG` and
-`GrUpdateTextFG` pass is still not called by the live frame loop: an opt-in
-synchronous frame experiment failed to return in the QEMU regression and was
-removed. The next step is to isolate and profile that call path, then finish the
-required ZealOS display-global initialization before enabling it. The x86 build
-continues to use the original source. The guest source archive includes this note at
-`/PORTS/ARM64/GrScreen.md` so the substitution is discoverable.
+`GrUpdateTextFG` pass is still not called by the live frame loop. A disposable
+full-frame probe reached the diagnostic print immediately after the background
+pass, then raised a synchronous exception while the framebuffer console was
+drawing that print's first character (`ELR` resolved to `fb_draw_char`, `FAR`
+was zero). That does not yet distinguish a damaged framebuffer-console state
+from a fault in the preceding pass, so the live path remains disabled. The next
+step is to isolate the side effect and verify the display surfaces before
+enabling it. The x86 build continues to use the original source. The guest
+source archive includes this note at `/PORTS/ARM64/GrScreen.md` so the
+substitution is discoverable.
