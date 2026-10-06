@@ -3168,6 +3168,7 @@ extern U0 WinZBufUpdate();
 extern Bool BootstrapWinIsUncovered(CTask *task);
 extern Bool ZcGrTextUpdate();
 extern Bool ZcGrScreenUpdate();
+extern Bool ZcGrUpdateTasks();
 extern Bool ZcGrUpdateTaskWin(CTask *task);
 extern Bool ZcODEsUpdate(CTask *task);
 extern Bool ZcGrUpdateTaskODEs(CTask *task);
@@ -3175,11 +3176,38 @@ extern U0 DCBlotColor4(U8 *dst, I64 *img, I64 *img_cache, I64 count);
 I64 bootstrap_winmgr_ticks = 0;
 I64 bootstrap_upstream_window_updates = 0;
 I64 bootstrap_upstream_ode_updates = 0;
+I64 bootstrap_upstream_gr_update_tasks = 0;
+I64 BootstrapTaskRingCount(CTask *root)
+{//Return the ring size only for a valid, closed ring of at most 64 tasks.
+    CTask *task = root;
+    I64 count = 0;
+    if (!root)
+        return -1;
+    do
+    {
+        if (!TaskValidate(task) || count >= 64)
+            return -1;
+        task = task->next_task;
+        count++;
+    }
+    while (task && task != root);
+    return task == root ? count : -1;
+}
+Bool BootstrapCanUseUpstreamGrUpdateTasks()
+{//The pinned routine has unbounded rings; call only with a complete one-CPU graph.
+    if (mp_count != 1 || !cpu_structs || winmgr.fps < 1.0 ||
+        !TaskValidate(sys_winmgr_task) ||
+        BootstrapTaskRingCount(sys_winmgr_task) < 1 ||
+        BootstrapTaskRingCount(cpu_structs[0].executive_task) < 1)
+        return FALSE;
+    return TRUE;
+}
 U0 BootstrapGrUpdateTasks()
 {//Bounded one-CPU window-ring refresh, drawn in ZealOS task/z order.
     CTask *root, *task, *ode_root;
     CGrGlobals *active_gr;
     I64 visited = 0, ode_visited = 0, i;
+    I64 window_count = 0, ode_count = 0, source_ready;
 
     root = sys_winmgr_task;
     // A stale manager pointer can survive while the bootstrap root task is
@@ -3226,48 +3254,79 @@ U0 BootstrapGrUpdateTasks()
     else
         ZcFbTextFlush(gr.text_base, TEXT_COLS, TEXT_ROWS);
     WinZBufUpdate();
-    task = root;
-    do
-    {
-        if (!TaskValidate(task))
-            break;
-        if ((task->display_flags & (1 << DISPLAYf_SHOW)) &&
-            BootstrapWinIsUncovered(task))
-        {
-            if (ZcGrUpdateTaskWin(task))
-                bootstrap_upstream_window_updates++;
-            else
-                BootstrapDrawTaskWin(task);
-        }
-        task = task->next_task;
-        visited++;
-    }
-    while (task && task != root && visited < 64);
-    // Match the upstream per-CPU executive-task ring on our one modeled CPU.
-    // The runtime bridge keeps the source wrapper dormant until MathODE loads.
-    if (mp_count == 1 && cpu_structs &&
-        TaskValidate(cpu_structs[0].executive_task))
-    {
-        ode_root = task = cpu_structs[0].executive_task;
-        do
-        {
-            if (!TaskValidate(task))
-                break;
-            if (ZcGrUpdateTaskODEs(task))
-                bootstrap_upstream_ode_updates++;
-            if (!TaskValidate(task))
-                break;
-            task = task->next_task;
-            ode_visited++;
-        }
-        while (task && task != ode_root && ode_visited < 64);
-    }
     // Match GrUpdateScreen's final overlay stage: run after the window draw
     // callbacks with DCF_ON_TOP and screen-space coordinates. The bootstrap
     // and later source modules each define non-extern `gr` storage, so resolve
     // the newest source global from the active task's hash table.
     if (!active_gr->fp_draw_mouse)
         active_gr->fp_draw_mouse = &BootstrapDrawMouse;
+
+    // Prefer ZealOS's own window/ODE traversal after WinMgr has initialized.
+    // The early bootstrap still uses bounded local loops because its WinMgr
+    // timing state and source GrUpdateTasks may not exist yet.
+    source_ready = BootstrapCanUseUpstreamGrUpdateTasks();
+    if (source_ready)
+    {
+        task = sys_winmgr_task;
+        for (i = 0; i < 64; i++)
+        {
+            if ((task->display_flags & (1 << DISPLAYf_SHOW)) &&
+                BootstrapWinIsUncovered(task))
+                window_count++;
+            task = task->next_task;
+            if (task == sys_winmgr_task)
+                break;
+        }
+        ode_count = BootstrapTaskRingCount(cpu_structs[0].executive_task);
+        source_ready = ZcGrUpdateTasks();
+        if (source_ready)
+        {
+            bootstrap_upstream_window_updates += window_count;
+            bootstrap_upstream_ode_updates += ode_count;
+            bootstrap_upstream_gr_update_tasks++;
+        }
+    }
+    if (!source_ready)
+    {
+        // Bounded visible window traversal, drawn in ZealOS task/z order.
+        visited = 0;
+        task = root;
+        do
+        {
+            if (!TaskValidate(task))
+                break;
+            if ((task->display_flags & (1 << DISPLAYf_SHOW)) &&
+                BootstrapWinIsUncovered(task))
+            {
+                if (ZcGrUpdateTaskWin(task))
+                    bootstrap_upstream_window_updates++;
+                else
+                    BootstrapDrawTaskWin(task);
+            }
+            task = task->next_task;
+            visited++;
+        }
+        while (task && task != root && visited < 64);
+        // Match the upstream per-CPU executive-task ring on our one modeled CPU.
+        // The runtime bridge keeps the source wrapper dormant until MathODE loads.
+        if (mp_count == 1 && cpu_structs &&
+            TaskValidate(cpu_structs[0].executive_task))
+        {
+            ode_root = task = cpu_structs[0].executive_task;
+            do
+            {
+                if (!TaskValidate(task))
+                    break;
+                if (ZcGrUpdateTaskODEs(task))
+                    bootstrap_upstream_ode_updates++;
+                if (!TaskValidate(task))
+                    break;
+                task = task->next_task;
+                ode_visited++;
+            }
+            while (task && task != ode_root && ode_visited < 64);
+        }
+    }
     if (active_gr->fp_final_screen_update)
     {
         CDC *dc = DCAlias(&bootstrap_graphics_dc, NULL);

@@ -4,6 +4,7 @@ extern I64 bootstrap_gr_text_updates;
 extern I64 bootstrap_gr_screen_updates;
 extern I64 bootstrap_gr_planar_updates;
 extern I64 bootstrap_upstream_ode_updates;
+extern I64 bootstrap_upstream_gr_update_tasks;
 I64 gr_screen_final_update_calls;
 I64 gr_screen_ode_update_calls;
 Bool gr_screen_ode_root_seen;
@@ -46,6 +47,7 @@ I64 GrScreenFinalUpdateChecks()
     I64 old_coord, old_mouse_x, old_mouse_y, old_draw_calls;
     I64 old_text_updates, old_screen_updates, old_planar_updates;
     I64 old_window_updates, old_ode_updates;
+    I64 old_source_task_updates;
     I64 old_window_display_flags;
     I64 old_screen_zoom, old_screen_sx, old_screen_sy;
     I64 x, y, i, overlay_x, overlay_y, changed;
@@ -104,6 +106,7 @@ I64 GrScreenFinalUpdateChecks()
     old_planar_updates = bootstrap_gr_planar_updates;
     old_window_updates = bootstrap_upstream_window_updates;
     old_ode_updates = bootstrap_upstream_ode_updates;
+    old_source_task_updates = bootstrap_upstream_gr_update_tasks;
     if (!ZcTaskFrameRun())
     {
         paint_task->display_flags = old_window_display_flags;
@@ -126,6 +129,13 @@ I64 GrScreenFinalUpdateChecks()
         mouse.pos.x = old_mouse_x;
         mouse.pos.y = old_mouse_y;
         return 19;
+    }
+    if (bootstrap_upstream_gr_update_tasks <= old_source_task_updates)
+    {
+        mouse_grid.coord = old_coord;
+        mouse.pos.x = old_mouse_x;
+        mouse.pos.y = old_mouse_y;
+        return 25;
     }
     if (!gr_screen_ode_update_calls || !gr_screen_ode_root_seen)
     {
