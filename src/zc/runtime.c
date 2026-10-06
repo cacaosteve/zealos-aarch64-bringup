@@ -2943,6 +2943,14 @@ static int64_t host_fifo_i64_flush(int64_t *a) {
         fifo[3] = fifo[2];
     return 0;
 }
+static int64_t host_sleep_until(int64_t *a) {
+    /* Source timeouts are expressed in the host-backed 1 kHz jiffy domain.
+     * This single-core bring-up runtime has no guest scheduler to block on, so
+     * wait against the ARM generic timer and refresh the visible jiffy count. */
+    while (guest_counts.jiffies < a[0])
+        guest_counts.jiffies = host_monotonic_ns(NULL) / 1000000;
+    return 0;
+}
 static int64_t host_sleep(int64_t *a) {
     if (a[0] <= 0)
         return guest_task_exe_active
@@ -3472,6 +3480,7 @@ static int load_inner(const char *path) {
         PrsBindCSymbol("tS", host_timer_seconds_bits, 0);
         PrsBindCSymbol("TimeCal", host_time_cal, 0);
         PrsBindCSymbol("FifoI64Flush", host_fifo_i64_flush, 1);
+        PrsBindCSymbol("SleepUntil", host_sleep_until, 1);
         CHashClass *kbd = (CHashClass *)HashFind("CKbdStateGlobals",
                                                   Fs->hash_table, HTT_CLASS, 1);
         if (!kbd || kbd->sz <= 0 || kbd->sz > (1 << 20))

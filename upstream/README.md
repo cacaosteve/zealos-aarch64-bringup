@@ -2715,7 +2715,7 @@ Freeze catalog unchanged.
 | Gap | A seeded `winmgr.t` pointer was not yet proven usable by ZealOS's source timing routine |
 | Bring-up | Exercise unchanged `WinCalcIdles` with controlled jiffy and idle-hit deltas, then restore the CPU and timing counters |
 | Smoke | `GrScreenFinalUpdateChecks` verifies source counter snapshots, calculation count, elapsed-time gate, and idle-factor update |
-| Limits | A bounded `WinMgrSleep(TRUE)` pass is now exercised with the pump-only semaphore set; the normal refresh/sleep tail and `WinMgrTask` loop remain inactive |
+| Limits | A bounded `WinMgrSleep(TRUE)` pass is exercised, and a separate smoke now runs one ordinary refresh; the `WinMgrTask` loop remains inactive |
 
 Freeze catalog unchanged.
 
@@ -2726,7 +2726,7 @@ Freeze catalog unchanged.
 | Gap | Source `WinMgrSleep` had not run because its timer and FIFO services were unresolved, and the ordinary path can redraw and sleep indefinitely in the harness |
 | Bring-up | Bind `TimeCal` to the host monotonic jiffy clock and implement the pinned `CFifoI64` flush semantics; set `SEMA_JUST_PUMP_MESSAGES` for one direct source pass |
 | Smoke | `GrScreenFinalUpdateChecks` calls unchanged `WinMgrSleep(TRUE)` and checks its timing update while restoring the semaphore, manager counters, CPU idle factor, mouse speed, and zoom state |
-| Limits | This is a one-pass source routine check with no focused task or queued keyboard FIFO; it does not launch `WinMgrTask`, poll hardware, redraw, or sleep |
+| Limits | The flush pass has no queued keyboard FIFO; the ordinary focused-task message path is covered separately. This does not launch `WinMgrTask` or poll hardware |
 
 Freeze catalog unchanged.
 
@@ -2737,7 +2737,18 @@ Freeze catalog unchanged.
 | Gap | The pump-only smoke covered `WinMgrSleep(TRUE)`'s FIFO-flush branch but not its regular focused-task message path |
 | Bring-up | Run a second bounded pass through `WinMgrSleep(FALSE)` with the valid root task temporarily focused and its control list made an empty self-linked list |
 | Smoke | `GrScreenFinalUpdateChecks` reaches `KbdMessagesQueue`, source control hit testing, `WinQueueIPMessages`, and `WinMouseUpdate`; it restores focus, task flags, control link, timing counters, and pump semaphore |
-| Limits | The focus task has no controls or pending messages; this does not start the manager task, deliver interactive input, or run the refresh/sleep tail |
+| Limits | The focus task has no controls or pending messages; interactive input and the manager task remain untested |
+
+Freeze catalog unchanged.
+
+## Milestone 233 — run one ordinary WinMgr refresh cycle
+
+| Item | Path |
+|--|--|
+| Gap | The source refresh tail still depended on `SleepUntil`, and the earlier pump-only passes intentionally skipped redraw and sleep |
+| Bring-up | Bind `SleepUntil` to the ARM generic timer and run one source `WinMgrSleep(FALSE)` with the next refresh deadline seeded one frame ahead |
+| Smoke | `GrScreenFinalUpdateChecks` verifies `GrUpdateScreen` completes, `winmgr.updates` advances once, and the refresh semaphore is cleared on return |
+| Limits | One controlled refresh is proven; recurring scheduling, real menu startup, live input delivery, full table initialization, and `WinMgrTask` remain open |
 
 Freeze catalog unchanged.
 
