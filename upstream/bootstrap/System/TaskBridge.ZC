@@ -1339,6 +1339,8 @@ U0 FindWiz()
 // text-plane constants declared below so the forward CDC stub can use it.
 U8 bootstrap_graphics_pixels[800 * 600];
 CDC bootstrap_graphics_dc;
+U8 bootstrap_zoom_pixels[800 * 600];
+CDC bootstrap_zoom_dc;
 // ZealOS's legacy DCBlotColor4 output is four one-bit planes, one byte per
 // eight pixels in each plane. Its cache holds one packed U64 per eight pixels.
 U8 bootstrap_planar_pixels[800 * 600 / 2];
@@ -1356,6 +1358,10 @@ bootstrap_graphics_dc.body = bootstrap_graphics_pixels;
 bootstrap_graphics_dc.width = 800;
 bootstrap_graphics_dc.width_internal = 800;
 bootstrap_graphics_dc.height = 600;
+bootstrap_zoom_dc.body = bootstrap_zoom_pixels;
+bootstrap_zoom_dc.width = 800;
+bootstrap_zoom_dc.width_internal = 800;
+bootstrap_zoom_dc.height = 600;
 bootstrap_planar_dc.body = bootstrap_planar_pixels;
 bootstrap_planar_dc.width = 800;
 bootstrap_planar_dc.width_internal = 800;
@@ -3198,9 +3204,11 @@ U0 BootstrapGrUpdateTasks()
     active_gr->dc2 = &bootstrap_graphics_dc;
     active_gr->dc1 = &bootstrap_planar_dc;
     active_gr->dc_cache = &bootstrap_planar_cache_dc;
+    active_gr->zoomed_dc = &bootstrap_zoom_dc;
     active_gr->text_base = bootstrap_text_base;
     active_gr->to_8_colors = bootstrap_text_colors;
-    active_gr->screen_zoom = 1;
+    if (active_gr->screen_zoom < 1 || active_gr->screen_zoom > 8)
+        active_gr->screen_zoom = 1;
     active_gr->screen_cache = bootstrap_present_cache;
     text.raw_screen = bootstrap_present_raw;
     text.fb_alias = sys_framebuffer_addr;

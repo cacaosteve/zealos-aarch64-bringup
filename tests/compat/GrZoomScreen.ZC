@@ -1,0 +1,41 @@
+// Exercise the unchanged upstream integer zoom pass on a full screen image.
+U8 gr_zoom_screen_source[800 * 600];
+U8 gr_zoom_screen_output[800 * 600];
+
+I64 GrZoomScreenChecks()
+{
+    CDC source_dc, zoom_dc;
+    CDC *old_dc = gr.dc2, *old_zoom = gr.zoomed_dc;
+    I64 old_zoom_factor = gr.screen_zoom, old_sx = gr.sx, old_sy = gr.sy;
+    I64 x, y, i;
+
+    source_dc.body = gr_zoom_screen_source;
+    source_dc.width = source_dc.width_internal = 800;
+    source_dc.height = 600;
+    zoom_dc.body = gr_zoom_screen_output;
+    zoom_dc.width = zoom_dc.width_internal = 800;
+    zoom_dc.height = 600;
+    for (y = 0; y < 600; y++)
+        for (x = 0; x < 800; x++)
+            gr_zoom_screen_source[y * 800 + x] = (x + 3 * y) & 0xFF;
+    for (i = 0; i < 800 * 600; i++)
+        gr_zoom_screen_output[i] = 0xA5;
+
+    gr.dc2 = &source_dc;
+    gr.zoomed_dc = &zoom_dc;
+    gr.screen_zoom = 2;
+    gr.sx = gr.sy = 0;
+    GrZoomInScreen;
+
+    gr.dc2 = old_dc;
+    gr.zoomed_dc = old_zoom;
+    gr.screen_zoom = old_zoom_factor;
+    gr.sx = old_sx;
+    gr.sy = old_sy;
+    for (y = 0; y < 600; y++)
+        for (x = 0; x < 800; x++)
+            if (gr_zoom_screen_output[y * 800 + x] !=
+                gr_zoom_screen_source[(y / 2) * 800 + x / 2])
+                return 1;
+    return 42;
+}

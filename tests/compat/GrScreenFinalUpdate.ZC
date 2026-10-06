@@ -47,6 +47,7 @@ I64 GrScreenFinalUpdateChecks()
     I64 old_text_updates, old_screen_updates, old_planar_updates;
     I64 old_window_updates, old_ode_updates;
     I64 old_window_display_flags;
+    I64 old_screen_zoom, old_screen_sx, old_screen_sy;
     I64 x, y, i, overlay_x, overlay_y, changed;
     U32 *screen;
     I64 pitch;
@@ -241,6 +242,35 @@ I64 GrScreenFinalUpdateChecks()
     {
         return 100 + changed;
     }
+    // Exercise the actual task-frame presenter at 2x. The previous smoke
+    // checks the source zoom routine in isolation; this confirms the live
+    // graphics globals retain zoom state and point at the bootstrap surface.
+    frame_gr = ZcActiveGrGlobals();
+    old_screen_zoom = frame_gr->screen_zoom;
+    old_screen_sx = frame_gr->sx;
+    old_screen_sy = frame_gr->sy;
+    frame_gr->screen_zoom = 2;
+    frame_gr->sx = frame_gr->sy = 0;
+    if (!ZcTaskFrameRun())
+    {
+        frame_gr->screen_zoom = old_screen_zoom;
+        frame_gr->sx = old_screen_sx;
+        frame_gr->sy = old_screen_sy;
+        return 23;
+    }
+    for (y = 0; y < 8; y++)
+        for (x = 0; x < 8; x++)
+            if (frame_gr->zoomed_dc->body[y * 800 + x] !=
+                frame_gr->dc2->body[(y / 2) * 800 + x / 2])
+            {
+                frame_gr->screen_zoom = old_screen_zoom;
+                frame_gr->sx = old_screen_sx;
+                frame_gr->sy = old_screen_sy;
+                return 24;
+            }
+    frame_gr->screen_zoom = old_screen_zoom;
+    frame_gr->sx = old_screen_sx;
+    frame_gr->sy = old_screen_sy;
     ZcTaskFrameRun();
     return 42;
 }

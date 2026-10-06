@@ -44,7 +44,12 @@ cache. The graphics smoke verifies that this stage ran and that the cache
 matches the composed frame; the focused converter smoke also checks bit
 ordering and that unchanged groups leave the destination untouched. These
 planes are currently a compatibility surface, not the firmware framebuffer's
-scanout format.
+scanout format. The frame also owns a full-size zoom surface and preserves
+valid `screen_zoom`/pan state instead of forcing zoom back to 1 each frame. The
+unchanged `GrUpdateScreen32` therefore runs upstream `GrZoomInScreen` when
+zoomed. `/Tests/GrZoomScreen.ZC` checks every pixel of the 2x nearest-neighbor
+result, and the live graphics smoke checks that the frame binds and uses this
+zoom surface.
 
 This is a bundle-time architecture port, not a change to the pinned upstream
 file and not an x86 instruction emulator. The live frame still uses the bounded
@@ -58,9 +63,9 @@ the CPU0 task ring with a 64-task safety bound and calls upstream
 the integrator call through an optional host bridge. The QEMU smoke supplies a
 small test integrator and verifies the wrapper visits the root task. This does
 not yet load or execute ZealOS's `MathODE` subsystem or model additional CPUs.
-Remaining graphics work includes upstream zoom surfaces and `GrZoomInScreen`,
-then deciding how legacy planar output should coexist with the display driver's
-32-bit framebuffer.
+Remaining graphics work includes connecting native input gestures to the
+upstream zoom controls and deciding how legacy planar output should coexist
+with the display driver's 32-bit framebuffer.
 The x86 build continues to use the original source. The guest source archive
 includes this note at `/PORTS/ARM64/GrScreen.md` so the substitution is
 discoverable.
