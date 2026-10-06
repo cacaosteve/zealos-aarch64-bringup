@@ -10,6 +10,7 @@ extern U16 bootstrap_win_z_buf[TEXT_COLS * TEXT_ROWS];
 extern U16 bootstrap_win_uncovered[(BOOTSTRAP_WIN_MAX + 15) / 16];
 extern Bool BootstrapCanUseUpstreamGrUpdateTasks();
 extern Bool ZcWinMouseUpdate();
+extern CWinMgrGlobals *ZcActiveWinMgrGlobals();
 I64 gr_screen_final_update_calls;
 I64 gr_screen_ode_update_calls;
 Bool gr_screen_ode_root_seen;
@@ -127,6 +128,7 @@ I64 GrScreenFinalUpdateChecks()
     U0 (*old_final_update)(CDC *dc);
     CTask *paint_task;
     CGrGlobals *frame_gr;
+    CWinMgrGlobals *frame_winmgr;
     I64 old_coord, old_mouse_x, old_mouse_y, old_draw_calls;
     I64 old_text_updates, old_screen_updates, old_planar_updates;
     I64 old_window_updates, old_ode_updates;
@@ -266,8 +268,10 @@ I64 GrScreenFinalUpdateChecks()
         return 21;
     }
     frame_gr = ZcActiveGrGlobals();
+    frame_winmgr = ZcActiveWinMgrGlobals();
     if (!frame_gr || !frame_gr->dc1 || !frame_gr->dc1->body ||
         !frame_gr->dc_cache || !frame_gr->dc_cache->body ||
+        !frame_winmgr || !frame_winmgr->t || frame_winmgr->fps <= 0 ||
         frame_gr->win_z_buf != bootstrap_win_z_buf ||
         frame_gr->win_uncovered_bitmap != bootstrap_win_uncovered ||
         frame_gr->dc_cache->body(I64 *)[0] !=

@@ -211,9 +211,12 @@ path still need UTM acceptance.
 
 ## Remaining graphics path
 
-The next substantive graphics work is starting the actual upstream WinMgr task
-against initialized menu, mouse, timing, and task-ring state. The shell currently
-provides the refresh/input loop in a bounded bridge. View-angle controls,
+The active source `winmgr` timing pointer is now initialized lazily from the
+bridge before each frame, with CPU idle counters and refresh timestamps seeded
+once. This removes the null timing-state prerequisite, but does not start the
+actual upstream WinMgr task. The shell still provides the refresh/input loop in
+a bounded bridge. Starting WinMgr needs menu startup and more of its surrounding
+task services. View-angle controls,
 wallpaper, and broader CDC operations also remain open.
 `Kernel/Display.ZC`'s
 framebuffer writes can target the Limine-provided framebuffer, but x86 assembly

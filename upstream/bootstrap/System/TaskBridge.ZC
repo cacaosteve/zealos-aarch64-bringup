@@ -37,6 +37,7 @@ extern I64 ZcMonotonicNs();
 extern Bool ZcMouseStateUpdate(I64 x, I64 y, I64 text_x, I64 text_y,
                                I64 now_ns);
 extern CMouseStateGlobals *ZcActiveMouseGlobals();
+extern CWinMgrGlobals *ZcActiveWinMgrGlobals();
 extern F64 Exp(F64 x);
 // Bootstrap subset of upstream MathODE.ZC; the unchanged full ODE module is
 // pinned but currently triggers a compiler/runtime fault while loading.
@@ -1480,6 +1481,31 @@ Bool IsPixCovered0(CTask *task, I64 x, I64 y)
 }
 // Early refresh state used by the bridge until WinMgrTask is running.
 CWinMgrGlobals winmgr;
+CWinMgrTimingGlobals bootstrap_winmgr_timing;
+U0 BootstrapWinMgrTimingInit()
+{//Seed the active source manager's timer state before future manager startup.
+    CWinMgrGlobals *active_winmgr = ZcActiveWinMgrGlobals();
+    CWinMgrTimingGlobals *timing;
+    I64 i;
+    if (!active_winmgr)
+        active_winmgr = &winmgr;
+    if (active_winmgr->t)
+        return;
+    active_winmgr->t = &bootstrap_winmgr_timing;
+    timing = active_winmgr->t;
+    timing->last_calc_idle_time = tS;
+    timing->calc_idle_delta_time = 0;
+    timing->calc_idle_count = 0;
+    if (cpu_structs && mp_count > 0)
+    {
+        timing->last_total_jiffies = cpu_structs[0].total_jiffies;
+        for (i = 0; i < mp_count && i < MP_PROCESSORS_NUM; i++)
+            timing->last_idle_pt_hits[i] = cpu_structs[i].idle_pt_hits;
+    }
+    active_winmgr->fps = WINMGR_FPS;
+    active_winmgr->last_refresh_tS = tS;
+    active_winmgr->ideal_refresh_tS = tS;
+}
 // Music playback is not part of the bootstrap; DocRecalc only tracks its current song tag.
 class CBootstrapMusicGlobals
 {
@@ -3264,6 +3290,7 @@ Bool BootstrapTryUpstreamGrUpdateScreen()
         return FALSE;
     BootstrapCtrlInputPoll();
     ZcWinMouseUpdate();
+    BootstrapWinMgrTimingInit();
     active_gr = ZcActiveGrGlobals();
     if (!active_gr)
         active_gr = &gr;
@@ -3335,6 +3362,7 @@ U0 BootstrapGrUpdateTasks()
 
     BootstrapCtrlInputPoll();
     ZcWinMouseUpdate();
+    BootstrapWinMgrTimingInit();
 
     active_gr = ZcActiveGrGlobals();
     if (!active_gr)

@@ -2697,6 +2697,17 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 229 — seed source WinMgr timing state
+
+| Item | Path |
+|--|--|
+| Gap | Loading unchanged `Win.ZC` creates active `winmgr` storage with a null timing pointer, which prevents `WinCalcIdles` and the real manager loop from running safely |
+| Bring-up | Lazily bind a stable timing record to the active source `winmgr` and seed idle counters, FPS, and refresh timestamps before bridge frames |
+| Smoke | `GrScreenFinalUpdateChecks` verifies the active source timing pointer and refresh rate after a composed frame |
+| Limits | This initializes manager timing state; menu startup, source WinMgr task services, and actually scheduling `WinMgrTask` remain open |
+
+Freeze catalog unchanged.
+
 ## Open compatibility probe — `/System/Win.ZC`
 
 The source probe loads pinned `KernelC.HH`, `Externs.ZC`, and `Gr.HH` before compiling unchanged `Win.ZC`. Graphics dimensions and mouse globals are probe fixtures; `DrawMenu` and the initial `GrScaleZoom` definition are compile-time fixtures until unchanged `GrScreen.ZC` is loaded later in the probe. `GrScreenFinalUpdateChecks` executes `WinFinalUpdate` through the staged idle-frame path, confirms the fixture's `mouse_grid.coord` toggles the real coordinate-text overlay, checks a separate visible guest overlay callback, verifies the software arrow against Limine framebuffer pixels, and exercises `WinMouseUpdate`'s edge recentering through the runtime dispatch. Physical tablet samples are covered by `WinMousePointerStateCheck`; manual UTM pointer acceptance is still pending. The raw ARM generic-timer binding and a standalone F64 clock expression are smoke-tested before the Win load.
