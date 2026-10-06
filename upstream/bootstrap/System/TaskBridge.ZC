@@ -36,6 +36,7 @@ extern I64 ZcTabletSample();
 extern I64 ZcMonotonicNs();
 extern Bool ZcMouseStateUpdate(I64 x, I64 y, I64 text_x, I64 text_y,
                                I64 now_ns);
+extern CMouseStateGlobals *ZcActiveMouseGlobals();
 extern F64 Exp(F64 x);
 // Bootstrap subset of upstream MathODE.ZC; the unchanged full ODE module is
 // pinned but currently triggers a compiler/runtime fault while loading.
@@ -2681,8 +2682,10 @@ public Bool BootstrapCtrlInputSampleAt(CTask *task, I64 sample, I64 now_ns)
 {//Feed one packed absolute tablet sample into the focused task's controls.
     CDoc *doc;
     CTask *mouse_focus_before;
+    CMouseStateGlobals *active_mouse;
     I64 x = sample & 0xffff;
     I64 y = (sample >> 16) & 0xffff;
+    F64 scale_x, scale_y;
     I64 buttons = (sample >> 32) & 0xff;
     I64 wheel = (sample >> 40) & 0xff;
     Bool handled = FALSE;
@@ -2690,6 +2693,20 @@ public Bool BootstrapCtrlInputSampleAt(CTask *task, I64 sample, I64 now_ns)
         wheel -= 0x100;
     if (sample < 0 || !task || !TaskValidate(task))
         return FALSE;
+    active_mouse = ZcActiveMouseGlobals();
+    if (!active_mouse)
+        active_mouse = &mouse;
+    scale_x = active_mouse->scale.x;
+    scale_y = active_mouse->scale.y;
+    // MouseUpdate normally applies these transforms to hardware coordinates.
+    // The absolute VirtIO tablet bypasses MouseUpdate, so preserve ZealOS's
+    // pointer-centered zoom mapping here. Zeroed early globals mean identity.
+    if (scale_x <= 0 || scale_x > 64)
+        scale_x = 1.0;
+    if (scale_y <= 0 || scale_y > 64)
+        scale_y = 1.0;
+    x = ToI64(x * scale_x + active_mouse->offset.x);
+    y = ToI64(y * scale_y + active_mouse->offset.y);
     // Keep ZealOS's current mouse global synchronized as well as routing the
     // tablet coordinates into the compatibility window manager. Resolve it
     // at runtime because upstream modules may provide a newer global object.

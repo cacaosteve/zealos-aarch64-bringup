@@ -1074,6 +1074,16 @@ static int64_t host_active_gr_globals(int64_t *a) {
                ? (int64_t)(uintptr_t)global->data_addr
                : 0;
 }
+static int64_t host_active_mouse_globals(int64_t *a) {
+    CHashGlblVar *global;
+    (void)a;
+    if (!Fs || !Fs->hash_table)
+        return 0;
+    global = (CHashGlblVar *)HashFind("mouse", Fs->hash_table, HTT_GLBL_VAR, 1);
+    return global && global->data_addr
+               ? (int64_t)(uintptr_t)global->data_addr
+               : 0;
+}
 static CMemberLst *guest_class_member(CHashClass *cls, const char *name) {
     for (CMemberLst *member = cls ? cls->members_lst : NULL; member;
          member = member->next) {
@@ -3765,6 +3775,7 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
                     {"ZcFbTextFlush", host_fb_text_flush, 3},
                     {"ZcDocUpdateTaskDocs", host_doc_update_task_docs, 1},
                     {"ZcActiveGrGlobals", host_active_gr_globals, 0},
+                    {"ZcActiveMouseGlobals", host_active_mouse_globals, 0},
                     {"ZcFbTextFlushRect", host_fb_text_flush_rect, 6},
                     {"ZcFbGraphPlot", host_fb_graph_plot, 7},
                     {"ZcFbGraphRect", host_fb_graph_rect, 9},

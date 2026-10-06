@@ -106,9 +106,10 @@ or synthesized `MESSAGE_MS_*_D_*` events using ZealOS's 175 ms interval.
 DolDoc body clicks wait for that interval before activating an entry; a double
 click sends the upstream Escape or Shift-Escape action instead. Window controls
 continue to react to the physical button transitions.
-Each valid absolute-tablet sample now updates the active ZealOS `mouse.pos`,
-`mouse.pos_text`, and timestamp fields through the current guest-global layout.
-and marks the virtual pointer device installed. The unchanged `WinFinalUpdate`
+Each valid absolute-tablet sample now applies the active ZealOS mouse scale and
+offset (including the transform maintained by `GrScaleZoom`), then updates the
+current guest-global `mouse.pos`, `mouse.pos_text`, and timestamp fields. It
+also marks the virtual pointer device installed. The unchanged `WinFinalUpdate`
 coordinate overlay therefore reports the live virtual pointer location. Its
 normal `DrawMouse` path reaches a bootstrap software arrow in the final screen
 overlay. The cursor is an interim black-and-white shape rather than the
@@ -118,6 +119,11 @@ Ctrl-M task-menu key; the last three post Shift-Esc to a task with a document
 or kill a task without one. These release-triggered actions match pinned
 `WinMgr.ZC`.
 View-angle controls remain unported.
+
+The tablet bridge resolves the active `mouse` global before applying scale and
+offset, so modules that redeclare the source global still share the current
+zoom transform. `WinMousePointerStateCheck` verifies a deterministic scaled
+sample rather than only the identity mapping.
 
 `/Tests/WindowDragLive.ZC` provides two overlapping bordered windows for a
 manual UTM check. Load `KernelA.HH`, `KernelB.HH`, `Message.ZC`, `Job.ZC`, and

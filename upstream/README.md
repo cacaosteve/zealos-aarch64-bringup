@@ -2653,6 +2653,17 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 225 — transform tablet input through ZealOS mouse state
+
+| Item | Path |
+|--|--|
+| Gap | Absolute VirtIO tablet coordinates bypassed the scale/offset transform that ZealOS updates when zoom changes |
+| Bring-up | Resolve the active guest `mouse` global and apply its scale and offset before pointer state, hit testing, and message routing |
+| Smoke | `WinMousePointerStateCheck` feeds a non-identity transform and verifies the guest mouse coordinates and timestamp |
+| Limits | Full interactive zoom controls and pointer-centered pan still need acceptance; the transform itself is covered |
+
+Freeze catalog unchanged.
+
 ## Open compatibility probe — `/System/Win.ZC`
 
 The source probe loads pinned `KernelC.HH`, `Externs.ZC`, and `Gr.HH` before compiling unchanged `Win.ZC`. Graphics dimensions and mouse globals are probe fixtures; `DrawMenu` and `GrScaleZoom` are compile-only stubs for subsystems whose full bootstrap is not loaded. `GrScreenFinalUpdateChecks` executes `WinFinalUpdate` through the staged idle-frame path, confirms the fixture's `mouse_grid.coord` toggles the real coordinate-text overlay, checks a separate visible guest overlay callback, and verifies the software arrow against Limine framebuffer pixels. Physical tablet samples are covered by `WinMousePointerStateCheck`; manual UTM pointer acceptance is still pending. The raw ARM generic-timer binding and a standalone F64 clock expression are smoke-tested before the Win load.

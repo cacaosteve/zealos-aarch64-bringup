@@ -36,16 +36,25 @@ I64 WinTimeCheck()
 }
 
 I64 WinMousePointerStateCheck()
-{//The virtual tablet must update ZealOS's shared absolute mouse coordinates.
+{//The virtual tablet must update transformed ZealOS mouse coordinates.
     I64 old_x = mouse.pos.x, old_y = mouse.pos.y;
     I64 old_text_x = mouse.pos_text.x, old_text_y = mouse.pos_text.y;
     I64 old_timestamp = mouse.timestamp;
+    I64 old_offset_x = mouse.offset.x, old_offset_y = mouse.offset.y;
+    F64 old_scale_x = mouse.scale.x, old_scale_y = mouse.scale.y;
+    Bool old_sampled = bootstrap_mouse_sampled;
+    I64 old_buttons = bootstrap_mouse_last_buttons;
+    I64 old_last_x = bootstrap_mouse_last_x, old_last_y = bootstrap_mouse_last_y;
     Bool old_installed = mouse_hard.installed;
-    I64 x = 123, y = 234;
+    I64 raw_x = 100, raw_y = 200;
+    I64 x = 150, y = 200;
 
     if (!TaskValidate(sys_task))
         return 1;
-    BootstrapCtrlInputSample(sys_task, x | (y << 16));
+    mouse.scale.x = mouse.scale.y = 0.5;
+    mouse.offset.x = mouse.offset.y = 100;
+    bootstrap_mouse_sampled = FALSE;
+    BootstrapCtrlInputSample(sys_task, raw_x | (raw_y << 16));
     if (mouse.pos.x != x || mouse.pos.y != y ||
         mouse.pos_text.x != (x - gr.pan_text_x) >> 3 ||
         mouse.pos_text.y != (y - gr.pan_text_y) >> 3 ||
@@ -56,6 +65,14 @@ I64 WinMousePointerStateCheck()
         mouse.pos_text.x = old_text_x;
         mouse.pos_text.y = old_text_y;
         mouse.timestamp = old_timestamp;
+        mouse.offset.x = old_offset_x;
+        mouse.offset.y = old_offset_y;
+        mouse.scale.x = old_scale_x;
+        mouse.scale.y = old_scale_y;
+        bootstrap_mouse_sampled = old_sampled;
+        bootstrap_mouse_last_buttons = old_buttons;
+        bootstrap_mouse_last_x = old_last_x;
+        bootstrap_mouse_last_y = old_last_y;
         mouse_hard.installed = old_installed;
         return 2;
     }
@@ -64,6 +81,14 @@ I64 WinMousePointerStateCheck()
     mouse.pos_text.x = old_text_x;
     mouse.pos_text.y = old_text_y;
     mouse.timestamp = old_timestamp;
+    mouse.offset.x = old_offset_x;
+    mouse.offset.y = old_offset_y;
+    mouse.scale.x = old_scale_x;
+    mouse.scale.y = old_scale_y;
+    bootstrap_mouse_sampled = old_sampled;
+    bootstrap_mouse_last_buttons = old_buttons;
+    bootstrap_mouse_last_x = old_last_x;
+    bootstrap_mouse_last_y = old_last_y;
     mouse_hard.installed = old_installed;
     return 42;
 }
