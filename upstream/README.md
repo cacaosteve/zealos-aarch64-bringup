@@ -2730,6 +2730,17 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 232 — exercise the source window-manager event branch
+
+| Item | Path |
+|--|--|
+| Gap | The pump-only smoke covered `WinMgrSleep(TRUE)`'s FIFO-flush branch but not its regular focused-task message path |
+| Bring-up | Run a second bounded pass through `WinMgrSleep(FALSE)` with the valid root task temporarily focused and its control list made an empty self-linked list |
+| Smoke | `GrScreenFinalUpdateChecks` reaches `KbdMessagesQueue`, source control hit testing, `WinQueueIPMessages`, and `WinMouseUpdate`; it restores focus, task flags, control link, timing counters, and pump semaphore |
+| Limits | The focus task has no controls or pending messages; this does not start the manager task, deliver interactive input, or run the refresh/sleep tail |
+
+Freeze catalog unchanged.
+
 ## Open compatibility probe — `/System/Win.ZC`
 
 The source probe loads pinned `KernelC.HH`, `Externs.ZC`, and `Gr.HH` before compiling unchanged `Win.ZC`. Graphics dimensions and mouse globals are probe fixtures; `DrawMenu` and the initial `GrScaleZoom` definition are compile-time fixtures until unchanged `GrScreen.ZC` is loaded later in the probe. `GrScreenFinalUpdateChecks` executes `WinFinalUpdate` through the staged idle-frame path, confirms the fixture's `mouse_grid.coord` toggles the real coordinate-text overlay, checks a separate visible guest overlay callback, verifies the software arrow against Limine framebuffer pixels, and exercises `WinMouseUpdate`'s edge recentering through the runtime dispatch. Physical tablet samples are covered by `WinMousePointerStateCheck`; manual UTM pointer acceptance is still pending. The raw ARM generic-timer binding and a standalone F64 clock expression are smoke-tested before the Win load.

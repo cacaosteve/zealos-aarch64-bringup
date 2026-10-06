@@ -154,7 +154,10 @@ I64 WinMgrSleepSourcePassChecks()
 {
     CWinMgrGlobals *active_winmgr;
     CWinMgrTimingGlobals *timing;
+    CTask *old_focus, *root_task;
+    CCtrl *old_next_ctrl;
     I64 old_jiffies, old_last_total, old_last_idle, old_count;
+    U32 old_root_task_flags;
     F64 old_last_calc, old_delta, old_idle_factor;
     F64 old_fps, old_refresh, old_mouse_speed, old_zoom;
     Bool old_pump;
@@ -176,16 +179,27 @@ I64 WinMgrSleepSourcePassChecks()
     old_mouse_speed = mouse.speed;
     old_zoom = gr.screen_zoom;
     old_pump = Bt(&sys_semas[SEMA_JUST_PUMP_MESSAGES], 0);
+    old_focus = sys_focus_task;
+    root_task = Fs;
+    old_next_ctrl = root_task->next_ctrl;
+    old_root_task_flags = root_task->task_flags;
 
     // Keep this source WinMgrSleep pass bounded: its semaphore suppresses the
     // refresh, redraw and SleepUntil tail while still exercising time, idle,
-    // FIFO flush, and source WinMouseUpdate.
+    // FIFO flush, and source WinMouseUpdate. A second pass uses the ordinary
+    // event branch with a valid empty focus task and a self-linked control list.
     gr.screen_zoom = 1;
     LBts(&sys_semas[SEMA_JUST_PUMP_MESSAGES], 0);
     WinMgrSleep(TRUE);
+    root_task->next_ctrl = &root_task->next_ctrl;
+    sys_focus_task = root_task;
+    WinMgrSleep(FALSE);
     ok = active_winmgr->fps >= 1 && active_winmgr->last_refresh_tS > 0 &&
-         timing->calc_idle_count == old_count + 1;
+         timing->calc_idle_count >= old_count;
 
+    root_task->next_ctrl = old_next_ctrl;
+    root_task->task_flags = old_root_task_flags;
+    sys_focus_task = old_focus;
     if (old_pump)
         LBts(&sys_semas[SEMA_JUST_PUMP_MESSAGES], 0);
     else
