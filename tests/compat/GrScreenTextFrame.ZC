@@ -1,0 +1,57 @@
+extern U0 GrUpdateTextBG();
+
+I64 GrScreenTextFrameChecks()
+{
+	U32 plane[TEXT_COLS * TEXT_ROWS];
+	I64 colors[16];
+	CDC test_dc;
+	U8 *allocation = MAlloc(GR_WIDTH * GR_HEIGHT + 128);
+	U8 *body;
+	U32 *saved_plane = gr.text_base;
+	CDC *saved_dc = gr.dc2;
+	I64 *saved_colors = gr.to_8_colors;
+	I64 saved_pan_x = gr.pan_text_x, saved_pan_y = gr.pan_text_y;
+	Bool saved_hide_col = gr.hide_col, saved_hide_row = gr.hide_row;
+	Bool saved_blink = Blink;
+	I64 i, result = 42;
+	if (!allocation)
+		return 1;
+	body = allocation + 64;
+	for (i = 0; i < 64; i++)
+		allocation[i] = allocation[64 + GR_WIDTH * GR_HEIGHT + i] = 0xa5;
+	for (i = 0; i < GR_WIDTH * GR_HEIGHT; i++)
+		body[i] = 0x5a;
+	for (i = 0; i < TEXT_COLS * TEXT_ROWS; i++)
+		plane[i] = 0x00002020;
+	for (i = 0; i < 16; i++)
+		colors[i] = i * 0x0101010101010101;
+	gr.text_base = plane;
+	gr.to_8_colors = colors;
+	gr.dc2 = &test_dc;
+	test_dc.body = body;
+	test_dc.width = GR_WIDTH;
+	test_dc.width_internal = GR_WIDTH;
+	test_dc.height = GR_HEIGHT;
+	gr.pan_text_x = gr.pan_text_y = 0;
+	gr.hide_col = gr.hide_row = FALSE;
+	Blink = FALSE;
+	GrUpdateTextBG;
+	if (allocation[0] != 0xa5 || allocation[63] != 0xa5 ||
+		allocation[64 + GR_WIDTH * GR_HEIGHT] != 0xa5 ||
+		allocation[127 + GR_WIDTH * GR_HEIGHT] != 0xa5)
+		result = 2;
+	for (i = 0; i < GR_WIDTH * GR_HEIGHT; i++)
+		if (body[i] != 2)
+			result = 3;
+	gr.text_base = saved_plane;
+	gr.dc2 = saved_dc;
+	gr.to_8_colors = saved_colors;
+	gr.pan_text_x = saved_pan_x;
+	gr.pan_text_y = saved_pan_y;
+	gr.hide_col = saved_hide_col;
+	gr.hide_row = saved_hide_row;
+	Blink = saved_blink;
+	// Disposable QEMU: retain the buffer so a damaged heap header cannot hide
+	// whether the source pass itself returned cleanly.
+	return result;
+}

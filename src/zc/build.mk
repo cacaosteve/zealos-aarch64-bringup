@@ -31,7 +31,7 @@ ZC_SOURCES := $(shell find upstream/pinned upstream/bootstrap tests/compat -type
 $(BUILD)/sources.tar: $(ZC_SOURCES) third_party/aiwnios/LICENSE scripts/build-source-bundle.py scripts/arm64_source.py scripts/check-arm64-source.py upstream/arm64/GrScreen.md | $(BUILD)
 	python3 scripts/build-source-bundle.py $@
 
-.PHONY: check-upstream check-compat check-compat-pci check-grscreen
+.PHONY: check-upstream check-compat check-compat-pci check-grscreen check-grscreen-full
 check-upstream:
 	python3 scripts/check-upstream.py
 check-compat: check-upstream iso
@@ -42,3 +42,6 @@ check-compat-pci: check-upstream esp
 check-grscreen: check-upstream esp
 	python3 scripts/check-arm64-source.py
 	QEMU="$(QEMU)" QEMU_VIRT="$(QEMU_VIRT)" FW_CODE="$(FW_CODE)" FW_VARS_IN="$(FW_VARS_IN)" python3 scripts/check-compat.py --pci --probe-module /System/Win.ZC --probe-winmgr --probe-grscreen
+check-grscreen-full: check-upstream esp
+	python3 scripts/check-arm64-source.py
+	QEMU="$(QEMU)" QEMU_VIRT="$(QEMU_VIRT)" FW_CODE="$(FW_CODE)" FW_VARS_IN="$(FW_VARS_IN)" python3 scripts/check-compat.py --pci --probe-module /System/Win.ZC --probe-winmgr --probe-grscreen --probe-fulltext

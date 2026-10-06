@@ -12,6 +12,8 @@ p.add_argument('--probe-winmgr', action='store_true',
                help='also try the unchanged WinMgr.ZC load with a short timeout after Win.ZC')
 p.add_argument('--probe-grscreen', action='store_true',
                help='also load unchanged GrScreen.ZC after the WinMgr probe setup')
+p.add_argument('--probe-fulltext', action='store_true',
+               help='run an opt-in full GrUpdateTextBG framebuffer diagnostic')
 p.add_argument('--probe-task-jobs', action='store_true', help='check CPU-0 callback jobs after loading pinned task headers')
 p.add_argument('--probe-window-buttons', action='store_true', help='check live task-window title buttons in a disposable guest')
 p.add_argument('--probe-source', type=pathlib.Path, action='append',
@@ -21,6 +23,8 @@ if args.probe_source and not args.pci:
     p.error('--probe-source requires --pci')
 if args.probe_grscreen and not args.probe_winmgr:
     p.error('--probe-grscreen requires --probe-winmgr')
+if args.probe_fulltext and not args.probe_grscreen:
+    p.error('--probe-fulltext requires --probe-grscreen')
 log_path = ROOT / 'build' / ('check-window-buttons.log' if args.probe_window_buttons else
                              'check-module-probe.log' if args.probe_module else
                              'check-upstream-probe.log' if args.probe_upstream else
@@ -436,12 +440,20 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                                 'zc => 0x000000000000002a')
                         command('zcall GrUpdateScreen32Checks',
                                 'zc => 0x000000000000002a')
-                        command('zcall GrUpdateScreen32LimineChecks',
-                                'zc => 0x000000000000002a')
+                        if not args.probe_fulltext:
+                            command('zcall GrUpdateScreen32LimineChecks',
+                                    'zc => 0x000000000000002a')
                         command('zload /Tests/GrScreenFinalUpdate.ZC',
                                 'zc: loaded /Tests/GrScreenFinalUpdate.ZC')
                         command('zcall GrScreenFinalUpdateChecks',
                                 'zc => 0x000000000000002a')
+                        if args.probe_fulltext:
+                            command('fbquiet',
+                                    'fbconsole: quiet (serial output remains enabled)')
+                            command('zload /Tests/GrScreenTextFrame.ZC',
+                                    'zc: loaded /Tests/GrScreenTextFrame.ZC')
+                            command('zcall GrScreenTextFrameChecks',
+                                    'zc => 0x000000000000002a', timeout=60)
             if args.probe_module == '/Kernel/SerialDev/Message.ZC':
                 if 'zc: loaded /Kernel/SerialDev/Message.ZC' not in result:
                     raise RuntimeError('unchanged Message.ZC did not load')

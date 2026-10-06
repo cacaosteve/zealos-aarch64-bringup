@@ -33,22 +33,15 @@ def translate_grscreen(source: bytes) -> bytes:
         )
     indent = matches[0].group("indent")
     replacement = (
-        f"{indent}*dst(U64 *) = c;\n"
-        f"{indent}dst(U8 *) += w1;\n"
-        f"{indent}*dst(U64 *) = c;\n"
-        f"{indent}dst(U8 *) += w1;\n"
-        f"{indent}*dst(U64 *) = c;\n"
-        f"{indent}dst(U8 *) += w1;\n"
-        f"{indent}*dst(U64 *) = c;\n"
-        f"{indent}dst(U8 *) += w1;\n"
-        f"{indent}*dst(U64 *) = c;\n"
-        f"{indent}dst(U8 *) += w1;\n"
-        f"{indent}*dst(U64 *) = c;\n"
-        f"{indent}dst(U8 *) += w1;\n"
-        f"{indent}*dst(U64 *) = c;\n"
-        f"{indent}dst(U8 *) += w1;\n"
-        f"{indent}*dst(U64 *) = c;\n"
-        f"{indent}dst(U8 *) += w2;\n"
+        f"{indent}cell_dst = dst(U8 *);\n"
+        f"{indent}for (j = 0; j < FONT_HEIGHT; j++)\n"
+        f"{indent}{{\n"
+        f"{indent}\t*cell_dst(U64 *) = c;\n"
+        f"{indent}\tcell_dst += w1;\n"
+        f"{indent}}}\n"
+        # The original source's following dst += w2 remains in place. Position
+        # dst at scanline 7 here so that w2 returns it to the next cell on row 0.
+        f"{indent}dst(U8 *) += 7 * w1;\n"
     )
     function = """U8 *ZcGrTextBGStore(U8 *dst, I64 stride, U64 color)
 {
@@ -69,4 +62,12 @@ def translate_grscreen(source: bytes) -> bytes:
         raise ValueError("expected exactly one GrUpdateTextBG definition")
     replaced = (text[:matches[0].start()] + replacement +
                 text[matches[0].end():])
+    function_marker = "\tU8\t\t\t*dst2 = dst;"
+    if replaced.count(function_marker) != 1:
+        raise ValueError("expected exactly one GrUpdateTextBG destination setup")
+    replaced = replaced.replace(
+        function_marker,
+        "\tU8\t\t\t*dst2 = dst, *cell_dst;",
+        1,
+    )
     return replaced.replace(marker, function + marker, 1).encode("utf-8")

@@ -212,6 +212,7 @@ static uint8_t *g_fb_render_surface;
 static uint64_t g_fb_render_stride, g_fb_render_rows;
 static uint32_t g_fb_cx, g_fb_cy;
 static uint32_t g_fb_cols, g_fb_rows;
+static volatile uint32_t g_fb_console_quiet;
 static uint64_t g_zc_text_cells_drawn;
 /* Bounded ZealOS-style text plane. The framebuffer remains the visible target,
  * while these cells are the source for redraws and blank-cell attributes. */
@@ -980,7 +981,7 @@ uint64_t zeal_fb_shell_text_compose(uint32_t *text_base, int64_t stride) {
 
 static void fb_putc(char ch) {
     uint32_t cols, rows;
-    if (!g_fb) {
+    if (!g_fb || g_fb_console_quiet) {
         return;
     }
     cols = g_fb_cols < ZEAL_TEXT_MAX_COLS ? g_fb_cols : ZEAL_TEXT_MAX_COLS;
@@ -4754,10 +4755,20 @@ static void shell_handle(const char *line, int *done) {
         if (!zc_call(line+6, &result)) zc_print_result(result);
         return;
     }
+    if (streq(line, "fbquiet")) {
+        g_fb_console_quiet = 1;
+        con_puts("fbconsole: quiet (serial output remains enabled)\n");
+        return;
+    }
+    if (streq(line, "fbshow")) {
+        g_fb_console_quiet = 0;
+        con_puts("fbconsole: visible\n");
+        return;
+    }
 #endif
     if (streq(line, "help")) {
 #ifndef ZEAL_PI_DIAG
-        con_puts("Native compiler: zcheck | zvol | zls | zgc | zedit <path> | zrm <path> | zverify <path> | zload /path.ZC | zput Name.ZC <source> | zrecv Name.ZC <bytes> <crc32> | zload disk:Name.ZC | zc <source> | zcall Function | zstatus | zreset\n");
+        con_puts("Native compiler: zcheck | zvol | zls | zgc | zedit <path> | zrm <path> | zverify <path> | zload /path.ZC | zput Name.ZC <source> | zrecv Name.ZC <bytes> <crc32> | zload disk:Name.ZC | zc <source> | zcall Function | zstatus | zreset | fbquiet | fbshow\n");
         con_puts("Window test order: zreset -> zload /Kernel/KernelA.HH -> zload /Kernel/KernelB.HH\n");
         con_puts("  -> zload /Tests/WindowDragLive.ZC -> zcall WindowDragLiveStart; stop: zcall WindowDragLiveStop\n");
 #endif
