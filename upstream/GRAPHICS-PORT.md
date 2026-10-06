@@ -198,8 +198,10 @@ final-overlay path passes with framebuffer-console output visible and serial
 output enabled. Upstream-owned CDC allocation/lifetime and the full palette and
 pixel-z-buffer semantics are not implemented. The unchanged 2x zoom scaler is
 covered both directly and through full-frame output against Limine framebuffer
-pixels. Live pointer-centered zoom controls, non-default pan, and the full zoom
-interaction path still need acceptance testing.
+pixels. `GrScaleZoom` is also called directly and its pointer-preserving
+scale/offset update is verified against the tablet transform. Live
+pointer-centered zoom controls, non-default pan, and the full zoom interaction
+path still need acceptance testing.
 
 ## Remaining graphics path
 

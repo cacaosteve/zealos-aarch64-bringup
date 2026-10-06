@@ -31,6 +31,45 @@ U0 GrScreenFinalUpdateProbe(CDC *dc)
     dc->body[599 * 800 + 799] = 15;
 }
 
+I64 GrScreenZoomTransformChecks()
+{//GrScaleZoom must preserve the pointer through mouse scale/offset updates.
+    I64 old_zoom = gr.screen_zoom, old_sx = gr.sx, old_sy = gr.sy;
+    I64 old_x = mouse.pos.x, old_y = mouse.pos.y, old_z = mouse.pos.z;
+    I64 old_ox = mouse.offset.x, old_oy = mouse.offset.y, old_oz = mouse.offset.z;
+    F64 old_scale_x = mouse.scale.x, old_scale_y = mouse.scale.y;
+    F64 old_scale_z = mouse.scale.z;
+    Bool ok;
+
+    gr.screen_zoom = 2;
+    gr.sx = gr.sy = 0;
+    mouse.pos.x = 400;
+    mouse.pos.y = 300;
+    mouse.pos.z = 10;
+    mouse.offset.x = 20;
+    mouse.offset.y = 40;
+    mouse.offset.z = 4;
+    mouse.scale.x = mouse.scale.y = mouse.scale.z = 1.0;
+    GrScaleZoom(2.0);
+    ok = gr.screen_zoom == 4 && mouse.scale.x == 0.5 &&
+         mouse.scale.y == 0.5 && mouse.scale.z == 0.5 &&
+         mouse.offset.x == 210 && mouse.offset.y == 170 &&
+         mouse.offset.z == 7;
+
+    gr.screen_zoom = old_zoom;
+    gr.sx = old_sx;
+    gr.sy = old_sy;
+    mouse.pos.x = old_x;
+    mouse.pos.y = old_y;
+    mouse.pos.z = old_z;
+    mouse.offset.x = old_ox;
+    mouse.offset.y = old_oy;
+    mouse.offset.z = old_oz;
+    mouse.scale.x = old_scale_x;
+    mouse.scale.y = old_scale_y;
+    mouse.scale.z = old_scale_z;
+    return ok ? 0x2a : 0;
+}
+
 // Stand in for MathODE during this focused graphics test. The production
 // integrator is loaded later; GrScreen's source wrapper must stay dormant
 // until this function exists, then dispatch here through the host bridge.
@@ -64,6 +103,8 @@ I64 GrScreenFinalUpdateChecks()
     old_final_update = gr.fp_final_screen_update;
     if (!old_final_update)
         return 8;
+    if (GrScreenZoomTransformChecks() != 0x2a)
+        return 30;
     // Win.ZC's file-scope initializer installs WinFinalUpdate in the later
     // graphics global. Exercise that real callback once before substituting
     // the pixel probe below. This also checks that its current no-menu,
