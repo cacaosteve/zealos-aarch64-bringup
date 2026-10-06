@@ -1,6 +1,7 @@
 // Verify that the bootstrap WinMgr tick runs the optional screen overlay
 // after composing task windows, with screen-space CDC state.
 extern I64 bootstrap_gr_text_updates;
+extern I64 bootstrap_gr_screen_updates;
 I64 gr_screen_final_update_calls;
 U8 gr_screen_final_update_old_pixel;
 U8 gr_screen_final_update_overlay_off[FONT_WIDTH * 10 * FONT_HEIGHT];
@@ -27,7 +28,7 @@ I64 GrScreenFinalUpdateChecks()
 {
     U0 (*old_final_update)(CDC *dc);
     I64 old_coord, old_mouse_x, old_mouse_y, old_draw_calls;
-    I64 old_text_updates;
+    I64 old_text_updates, old_screen_updates;
     I64 x, y, i, overlay_x, overlay_y, changed;
     U32 *screen;
     I64 pitch;
@@ -73,6 +74,7 @@ I64 GrScreenFinalUpdateChecks()
     mouse.pos.y = 234;
     mouse_grid.coord = FALSE;
     old_text_updates = bootstrap_gr_text_updates;
+    old_screen_updates = bootstrap_gr_screen_updates;
     if (!ZcTaskFrameRun())
     {
         mouse_grid.coord = old_coord;
@@ -86,6 +88,13 @@ I64 GrScreenFinalUpdateChecks()
         mouse.pos.x = old_mouse_x;
         mouse.pos.y = old_mouse_y;
         return 15;
+    }
+    if (bootstrap_gr_screen_updates != old_screen_updates + 1)
+    {
+        mouse_grid.coord = old_coord;
+        mouse.pos.x = old_mouse_x;
+        mouse.pos.y = old_mouse_y;
+        return 16;
     }
     for (y = 0, i = 0; y < FONT_HEIGHT; y++)
         for (x = 0; x < FONT_WIDTH * 10; x++, i++)

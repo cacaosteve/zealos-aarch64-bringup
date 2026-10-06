@@ -1339,8 +1339,13 @@ U0 FindWiz()
 // text-plane constants declared below so the forward CDC stub can use it.
 U8 bootstrap_graphics_pixels[800 * 600];
 CDC bootstrap_graphics_dc;
+U32 bootstrap_present_raw[800 * 600];
+U8 bootstrap_present_cache[800 * 600];
 U64 bootstrap_text_colors[16];
 I64 bootstrap_gr_text_updates = 0;
+I64 bootstrap_gr_screen_updates = 0;
+Bool bootstrap_present_cache_ready = FALSE;
+Bool bootstrap_present_ready = FALSE;
 bootstrap_graphics_dc.body = bootstrap_graphics_pixels;
 bootstrap_graphics_dc.width = 800;
 bootstrap_graphics_dc.width_internal = 800;
@@ -1645,12 +1650,12 @@ U0 Busy(I64 us)
 // Gs() is host-bound to bootstrap_gs; CCPU layout only needs idle_task here.
 class CBootstrapTextGlbls
 {
-    U8 *font;
-    U8 *aux_font;
+    I64 raw_col, raw_flags;
+    U32 *raw_screen, *fb_alias;
+    I64 rows, cols;
+    U64 *font, *aux_font, screen_size, buffer_size;
+    U8 border_chars[16];
     Bool is_fb_busy;
-    I64 raw_col;
-    U32 *fb_alias;
-    I64 buffer_size;
 };
 CBootstrapTextGlbls text;
 CTask *sys_winmgr_task = NULL;
@@ -3142,6 +3147,7 @@ U0 GrUpdateTaskWin(CTask *task)
 extern U0 WinZBufUpdate();
 extern Bool BootstrapWinIsUncovered(CTask *task);
 extern Bool ZcGrTextUpdate();
+extern Bool ZcGrScreenUpdate();
 I64 bootstrap_winmgr_ticks = 0;
 U0 BootstrapGrUpdateTasks()
 {//Bounded one-CPU window-ring refresh, drawn in ZealOS task/z order.
@@ -3163,15 +3169,25 @@ U0 BootstrapGrUpdateTasks()
     active_gr = ZcActiveGrGlobals();
     if (!active_gr)
         active_gr = &gr;
+    bootstrap_present_ready = FALSE;
     for (i = 0; i < 16; i++)
         bootstrap_text_colors[i] = i * 0x0101010101010101;
-    if (active_gr != &gr)
+    bootstrap_present_ready = TRUE;
+    // Bind the upstream rasterizers to the bootstrap frame surface.
+    // Task/window draws already target this same CDC through DCAlias.
+    active_gr->dc2 = &bootstrap_graphics_dc;
+    active_gr->text_base = bootstrap_text_base;
+    active_gr->to_8_colors = bootstrap_text_colors;
+    active_gr->screen_zoom = 1;
+    active_gr->screen_cache = bootstrap_present_cache;
+    text.raw_screen = bootstrap_present_raw;
+    text.fb_alias = sys_framebuffer_addr;
+    text.buffer_size = sys_framebuffer_pitch * sys_framebuffer_height;
+    text.is_fb_busy = FALSE;
+    if (!bootstrap_present_cache_ready)
     {
-        // Bind the upstream text rasterizers to the bootstrap frame surface.
-        // Task/window draws already target this same CDC through DCAlias.
-        active_gr->dc2 = &bootstrap_graphics_dc;
-        active_gr->text_base = bootstrap_text_base;
-        active_gr->to_8_colors = bootstrap_text_colors;
+        MemSet(bootstrap_present_cache, 0xFF, 800 * 600);
+        bootstrap_present_cache_ready = TRUE;
     }
     TextRect(0, TEXT_COLS - 1, 0, TEXT_ROWS - 1, 0x0800);
     ZcFbShellTextCompose(gr.text_base, TEXT_COLS);
@@ -3209,6 +3225,11 @@ public U0 BootstrapWinMgrTick()
 {//One host-idle frame: route tablet clicks and redraw the task ring.
     bootstrap_winmgr_ticks++;
     BootstrapGrUpdateTasks();
+}
+U0 BootstrapGrPresent()
+{//Run the upstream palette-to-framebuffer pass after the bootstrap surface blit.
+    if (bootstrap_present_ready && ZcGrScreenUpdate())
+        bootstrap_gr_screen_updates++;
 }
 Bool WinHorz(I64 left, I64 right, CTask *task=NULL)
 {

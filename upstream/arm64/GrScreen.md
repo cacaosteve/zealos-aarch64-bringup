@@ -18,23 +18,29 @@ glyph over its expected background. Run that extended QEMU check with
 `make check-grscreen-full`; the regular `make check-grscreen` remains the
 shorter graphics regression.
 
-When `GrScreen.ZC` is loaded, the bootstrap frame now binds its active graphics
+When `GrScreen.ZC` is loaded, the bootstrap frame binds its active graphics
 globals to the shared 8-bit frame CDC and text plane, then runs the unchanged
-`GrUpdateTextBG` and `GrUpdateTextFG` before drawing task windows. If those
-upstream functions are not loaded yet, startup keeps the existing text
-fallback. `GrScreenFinalUpdateChecks` verifies the live frame invoked the
-upstream text passes and retained overlay behavior. The native AArch64 runtime
-also binds `DCBlotColor4`, the packed-pixel to four-bitplane conversion used at
-the end of `GrUpdateScreen`; its guest smoke checks bit ordering, cache updates,
-and that an unchanged cached group leaves the destination untouched.
+`GrUpdateTextBG` and `GrUpdateTextFG` before drawing task windows. After the
+bootstrap blit, the native AArch64 frame runner also calls the unchanged
+`GrUpdateScreen32` on the live 800x600x32 framebuffer. It binds a raw 32-bit
+conversion buffer and the 8-bit screen cache, and uses ZealOS's standard
+palette only when no palette has been selected yet. The presenter call is
+guarded by framebuffer dimensions, pitch, and pixel format. The QEMU regression
+requires both source text passes and the source presenter to run during a live
+frame, then checks the resulting cursor pixels. If the source graphics modules
+are not loaded, startup keeps the existing bootstrap renderer. The native
+AArch64 runtime also binds `DCBlotColor4`, the packed-pixel to four-bitplane
+conversion used by the remaining upstream `GrUpdateScreen` path; its guest
+smoke checks bit ordering, cache updates, and that an unchanged cached group
+leaves the destination untouched.
 
 This is a bundle-time architecture port, not a change to the pinned upstream
-file and not an x86 instruction emulator. The live frame uses the upstream
-text passes but still presents through the bootstrap palette renderer; it does
-not yet run upstream `GrUpdateScreen32` or the complete `GrUpdateScreen` path.
-The remaining graphics integration is to initialize `text.raw_screen`,
-`gr.screen_cache`, `gr.dc1`, `gr.dc_cache`, and zoom surfaces, then route the
-shared frame through the ZealOS presenter. Task-window traversal also remains
-the bounded bootstrap bridge rather than full upstream `GrUpdateTasks`. The x86
-build continues to use the original source. The guest source archive includes
-this note at `/PORTS/ARM64/GrScreen.md` so the substitution is discoverable.
+file and not an x86 instruction emulator. The live frame still uses the bounded
+bootstrap window traversal and its framebuffer blit before the source 32-bit
+presenter; it does not yet run the complete upstream `GrUpdateScreen` sequence
+or upstream `GrUpdateTasks`. Remaining work includes replacing that traversal,
+initializing the `dc1`/`dc_cache` planar stage and zoom surfaces, and reconciling
+the display driver's 32-bit framebuffer with ZealOS's legacy planar output.
+The x86 build continues to use the original source. The guest source archive
+includes this note at `/PORTS/ARM64/GrScreen.md` so the substitution is
+discoverable.

@@ -847,6 +847,7 @@ static uint8_t *guest_graphics_surface(void) {
 }
 static int64_t guest_task_frame_run(void) {
     uint8_t *surface = guest_graphics_surface();
+    uint64_t presented;
     if (!guest_winmgr_tick_fun)
         guest_winmgr_tick_fun = (CHashFun *)HashFind(
             "BootstrapWinMgrTick", Fs->hash_table, HTT_FUN, 1);
@@ -857,7 +858,15 @@ static int64_t guest_task_frame_run(void) {
         return 0;
     set_guest_task(guest_fibers[0].words);
     FFI_CALL_TOS_0(guest_winmgr_tick_fun->fun_ptr);
-    return zeal_fb_task_frame_end() != 0;
+    presented = zeal_fb_task_frame_end() != 0;
+    if (presented) {
+        CHashFun *present = (CHashFun *)HashFind(
+            "BootstrapGrPresent", Fs->hash_table, HTT_FUN, 1);
+        if (present && present->fun_ptr && !present->argc &&
+            !(present->base.base.type & HTF_EXTERN))
+            FFI_CALL_TOS_0(present->fun_ptr);
+    }
+    return presented;
 }
 static int64_t host_task_frame_run(int64_t *a) {
     (void)a;
@@ -879,6 +888,60 @@ static int64_t host_gr_text_update(int64_t *a) {
         return 0;
     FFI_CALL_TOS_0(background->fun_ptr);
     FFI_CALL_TOS_0(foreground->fun_ptr);
+    return 1;
+}
+static int64_t host_gr_screen_update(int64_t *a) {
+    CHashFun *update;
+    CHashFun *palette_set;
+    CHashGlblVar *raw_screen;
+    CHashGlblVar *standard_palette;
+    CHashGlblVar *palette;
+    (void)a;
+    if (!Fs || !Fs->hash_table || !guest_fb_addr || guest_fb_width != 800 ||
+        guest_fb_height != 600 || guest_fb_pitch != 800 * sizeof(uint32_t) ||
+        guest_fb_bpp != 32)
+        return 0;
+    raw_screen = (CHashGlblVar *)HashFind(
+        "bootstrap_present_raw", Fs->hash_table, HTT_GLBL_VAR, 1);
+    if (!raw_screen || !raw_screen->data_addr)
+        return 0;
+    /* KernelA's CTextGlobals is host-bound; TaskBridge also has a private
+     * bootstrap text object. Point the canonical upstream globals at the
+     * validated bootstrap conversion buffer and current Limine framebuffer. */
+    guest_text_globals[2] = (uint64_t)(uintptr_t)raw_screen->data_addr;
+    guest_text_globals[3] = guest_fb_addr;
+    guest_text_globals[9] = guest_fb_pitch * guest_fb_height;
+    {
+        palette_set = (CHashFun *)HashFind("GrPaletteSet", Fs->hash_table,
+                                           HTT_FUN, 1);
+        standard_palette = (CHashGlblVar *)HashFind(
+            "gr32_palette_std", Fs->hash_table, HTT_GLBL_VAR, 1);
+        palette = (CHashGlblVar *)HashFind("gr_palette", Fs->hash_table,
+                                           HTT_GLBL_VAR, 1);
+        if (!palette || !palette->data_addr)
+            return 0;
+        /* Keep an already-selected ZealOS palette; supply the normal palette
+         * only when the incremental startup path has left it all-zero. */
+        uint32_t *colors = (uint32_t *)palette->data_addr;
+        int has_color = 0;
+        for (size_t i = 0; i < 16; i++)
+            has_color |= colors[i] != 0;
+        if (!has_color) {
+            if (!palette_set || !palette_set->fun_ptr ||
+                palette_set->argc != 1 ||
+                (palette_set->base.base.type & HTF_EXTERN) ||
+                !standard_palette || !standard_palette->data_addr)
+                return 0;
+            FFI_CALL_TOS_1(palette_set->fun_ptr,
+                           (int64_t)(uintptr_t)standard_palette->data_addr);
+        }
+    }
+    update = (CHashFun *)HashFind("GrUpdateScreen32", Fs->hash_table,
+                                  HTT_FUN, 1);
+    if (!update || !update->fun_ptr || update->argc ||
+        (update->base.base.type & HTF_EXTERN))
+        return 0;
+    FFI_CALL_TOS_0(update->fun_ptr);
     return 1;
 }
 static int64_t host_doc_update_task_docs(int64_t *a) {
@@ -3308,6 +3371,7 @@ static int load_inner(const char *path) {
         if (load_inner("/System/TaskBridge.ZC"))
             zc_fail("task bridge source missing");
         PrsBindCSymbol("ZcGrTextUpdate", host_gr_text_update, 0);
+        PrsBindCSymbol("ZcGrScreenUpdate", host_gr_screen_update, 0);
         PrsBindCSymbol("Option", host_option, 2);
         PrsBindCSymbol("DistSqrI64", host_dist_sqr_i64, 4);
         PrsBindCSymbol("SwapU16", host_swap_u16, 2);
