@@ -48,12 +48,12 @@ bootstrap window traversal and its framebuffer blit before the source 32-bit
 presenter; it does not yet run the complete upstream `GrUpdateScreen` sequence
 or upstream `GrUpdateTasks`. The task runtime now provides a single-core CPU0
 record whose executive task is the root task, and initializes every live
-task's `next_ode`/`last_ode` as an empty self-linked list. The runtime calls
-upstream `GrUpdateTaskODEs` for that CPU0 task only after `ODEsUpdate` is loaded;
-the ARM64 overlay routes the integrator call through an optional host bridge.
-The QEMU smoke supplies a small test integrator and verifies the wrapper
-receives the root task. This does not yet load or execute ZealOS's `MathODE`
-subsystem, nor does it traverse all CPU/task ODE lists as upstream does.
+task's `next_ode`/`last_ode` as an empty self-linked list. The runtime now walks
+the CPU0 task ring with a 64-task safety bound and calls upstream
+`GrUpdateTaskODEs` only after `ODEsUpdate` is loaded; the ARM64 overlay routes
+the integrator call through an optional host bridge. The QEMU smoke supplies a
+small test integrator and verifies the wrapper visits the root task. This does
+not yet load or execute ZealOS's `MathODE` subsystem or model additional CPUs.
 Remaining graphics work includes initializing the `dc1`/`dc_cache` planar
 stage and zoom surfaces, and reconciling the display driver's 32-bit framebuffer
 with ZealOS's legacy planar output.

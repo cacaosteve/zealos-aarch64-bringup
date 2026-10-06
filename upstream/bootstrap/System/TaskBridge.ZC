@@ -3156,9 +3156,9 @@ I64 bootstrap_upstream_window_updates = 0;
 I64 bootstrap_upstream_ode_updates = 0;
 U0 BootstrapGrUpdateTasks()
 {//Bounded one-CPU window-ring refresh, drawn in ZealOS task/z order.
-    CTask *root, *task;
+    CTask *root, *task, *ode_root;
     CGrGlobals *active_gr;
-    I64 visited = 0, i;
+    I64 visited = 0, ode_visited = 0, i;
 
     root = sys_winmgr_task;
     // A stale manager pointer can survive while the bootstrap root task is
@@ -3218,13 +3218,25 @@ U0 BootstrapGrUpdateTasks()
         visited++;
     }
     while (task && task != root && visited < 64);
-    // The host compatibility registry currently models exactly CPU0. The
-    // runtime bridge keeps this upstream wrapper dormant until MathODE's
-    // integrator is loaded.
+    // Match the upstream per-CPU executive-task ring on our one modeled CPU.
+    // The runtime bridge keeps the source wrapper dormant until MathODE loads.
     if (mp_count == 1 && cpu_structs &&
-        TaskValidate(cpu_structs[0].executive_task) &&
-        ZcGrUpdateTaskODEs(cpu_structs[0].executive_task))
-        bootstrap_upstream_ode_updates++;
+        TaskValidate(cpu_structs[0].executive_task))
+    {
+        ode_root = task = cpu_structs[0].executive_task;
+        do
+        {
+            if (!TaskValidate(task))
+                break;
+            if (ZcGrUpdateTaskODEs(task))
+                bootstrap_upstream_ode_updates++;
+            if (!TaskValidate(task))
+                break;
+            task = task->next_task;
+            ode_visited++;
+        }
+        while (task && task != ode_root && ode_visited < 64);
+    }
     // Match GrUpdateScreen's final overlay stage: run after the window draw
     // callbacks with DCF_ON_TOP and screen-space coordinates. The bootstrap
     // and later source modules each define non-extern `gr` storage, so resolve
