@@ -11,6 +11,7 @@ extern U16 bootstrap_win_uncovered[(BOOTSTRAP_WIN_MAX + 15) / 16];
 extern Bool BootstrapCanUseUpstreamGrUpdateTasks();
 extern Bool ZcWinMouseUpdate();
 extern CWinMgrGlobals *ZcActiveWinMgrGlobals();
+extern U0 WinCalcIdles();
 I64 gr_screen_final_update_calls;
 I64 gr_screen_ode_update_calls;
 Bool gr_screen_ode_root_seen;
@@ -113,6 +114,42 @@ I64 GrScreenMouseEdgeChecks()
     return ok ? 0x2a : 0;
 }
 
+I64 WinMgrTimingSourceChecks()
+{//Run the unchanged idle calculator against seeded source timing state.
+    CWinMgrGlobals *active_winmgr = ZcActiveWinMgrGlobals();
+    CWinMgrTimingGlobals *timing;
+    I64 old_last_total, old_last_idle, old_count;
+    F64 old_last_calc, old_delta, old_idle_factor;
+    Bool ok;
+    if (!active_winmgr || !active_winmgr->t || !cpu_structs || mp_count != 1)
+        return 0;
+    timing = active_winmgr->t;
+    old_last_total = timing->last_total_jiffies;
+    old_last_idle = timing->last_idle_pt_hits[0];
+    old_count = timing->calc_idle_count;
+    old_last_calc = timing->last_calc_idle_time;
+    old_delta = timing->calc_idle_delta_time;
+    old_idle_factor = cpu_structs[0].idle_factor;
+
+    timing->last_total_jiffies = cpu_structs[0].total_jiffies - 1;
+    timing->last_idle_pt_hits[0] = cpu_structs[0].idle_pt_hits - 1;
+    timing->last_calc_idle_time = tS - 10.0;
+    WinCalcIdles();
+    ok = timing->calc_idle_count == old_count + 1 &&
+         timing->calc_idle_delta_time > 0.25 &&
+         timing->last_total_jiffies == cpu_structs[0].total_jiffies &&
+         timing->last_idle_pt_hits[0] == cpu_structs[0].idle_pt_hits &&
+         cpu_structs[0].idle_factor > 0.9;
+
+    timing->last_total_jiffies = old_last_total;
+    timing->last_idle_pt_hits[0] = old_last_idle;
+    timing->calc_idle_count = old_count;
+    timing->last_calc_idle_time = old_last_calc;
+    timing->calc_idle_delta_time = old_delta;
+    cpu_structs[0].idle_factor = old_idle_factor;
+    return ok ? 0x2a : 0;
+}
+
 // Stand in for MathODE during this focused graphics test. The production
 // integrator is loaded later; GrScreen's source wrapper must stay dormant
 // until this function exists, then dispatch here through the host bridge.
@@ -156,6 +193,8 @@ I64 GrScreenFinalUpdateChecks()
     // the pixel probe below. This also checks that its current no-menu,
     // no-progress, no-cursor state can run against the bridge CDC.
     BootstrapWinMgrTick();
+    if (WinMgrTimingSourceChecks() != 0x2a)
+        return 32;
     gr_screen_final_update_old_pixel = bootstrap_graphics_pixels[599 * 800 + 799];
     gr_screen_final_update_calls = 0;
     gr.fp_final_screen_update = &GrScreenFinalUpdateProbe;

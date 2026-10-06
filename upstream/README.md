@@ -2708,6 +2708,17 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 230 — run source idle calculation against initialized state
+
+| Item | Path |
+|--|--|
+| Gap | A seeded `winmgr.t` pointer was not yet proven usable by ZealOS's source timing routine |
+| Bring-up | Exercise unchanged `WinCalcIdles` with controlled jiffy and idle-hit deltas, then restore the CPU and timing counters |
+| Smoke | `GrScreenFinalUpdateChecks` verifies source counter snapshots, calculation count, elapsed-time gate, and idle-factor update |
+| Limits | The timing calculation is verified, but the full source `WinMgrSleep` and `WinMgrTask` loops remain inactive |
+
+Freeze catalog unchanged.
+
 ## Open compatibility probe — `/System/Win.ZC`
 
 The source probe loads pinned `KernelC.HH`, `Externs.ZC`, and `Gr.HH` before compiling unchanged `Win.ZC`. Graphics dimensions and mouse globals are probe fixtures; `DrawMenu` and the initial `GrScaleZoom` definition are compile-time fixtures until unchanged `GrScreen.ZC` is loaded later in the probe. `GrScreenFinalUpdateChecks` executes `WinFinalUpdate` through the staged idle-frame path, confirms the fixture's `mouse_grid.coord` toggles the real coordinate-text overlay, checks a separate visible guest overlay callback, verifies the software arrow against Limine framebuffer pixels, and exercises `WinMouseUpdate`'s edge recentering through the runtime dispatch. Physical tablet samples are covered by `WinMousePointerStateCheck`; manual UTM pointer acceptance is still pending. The raw ARM generic-timer binding and a standalone F64 clock expression are smoke-tested before the Win load.
