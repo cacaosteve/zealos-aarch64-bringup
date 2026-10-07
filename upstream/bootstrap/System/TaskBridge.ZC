@@ -1464,6 +1464,15 @@ gr.dc2 = &bootstrap_graphics_dc;
 gr.text_base = bootstrap_text_base;
 gr.win_z_buf = bootstrap_win_z_buf;
 gr.win_uncovered_bitmap = bootstrap_win_uncovered;
+U0 BootstrapGrContextInit()
+{//Attach the active upstream gr global to the single bootstrap framebuffer.
+    CGrGlobals *active_gr = ZcActiveGrGlobals();
+
+    if (!active_gr)
+        active_gr = &gr;
+    active_gr->dc = &bootstrap_graphics_dc;
+    active_gr->dc2 = &bootstrap_graphics_dc;
+}
 U0 BootstrapBindGrTaskTables(CGrGlobals *active_gr)
 {//Give each later source gr global the bridge's bounded window z tables.
     if (!active_gr)
@@ -1848,6 +1857,20 @@ U0 TaskDerivedValsUpdate(CTask *task=NULL, Bool update_z_buf=TRUE)
     if (update_z_buf && Bt(&task->display_flags, DISPLAYf_SHOW) &&
         gr.win_z_buf && gr.win_uncovered_bitmap)
         WinZBufUpdate();
+}
+Bool WinInside(I64 x, I64 y, CTask *task=NULL, I64 border=0)
+{//Match Kernel/Display.ZC's pixel hit-test for a visible task window.
+    if (!task)
+        task = Fs;
+    if (TaskValidate(task) && Bt(&task->display_flags, DISPLAYf_SHOW))
+    {
+        if (Bt(&task->display_flags, DISPLAYf_NO_BORDER))
+            border = 0;
+        if (task->pix_left - border <= x <= task->pix_right + border &&
+            task->pix_top - border <= y <= task->pix_bottom + border)
+            return TRUE;
+    }
+    return FALSE;
 }
 Bool GrPlot(CDC *dc=gr.dc, I64 x=0, I64 y=0)
 {

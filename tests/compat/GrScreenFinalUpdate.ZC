@@ -260,6 +260,61 @@ I64 GrSetUpTablesSourceChecks()
     return 0;
 }
 
+I64 BootstrapGrContextInitChecks()
+{//The source-defined gr global starts zeroed until graphics init runs.
+    CGrGlobals *active_gr = ZcActiveGrGlobals();
+
+    if (!active_gr)
+        return 1;
+    active_gr->dc = active_gr->dc2 = NULL;
+    BootstrapGrContextInit();
+    if (active_gr->dc != &bootstrap_graphics_dc ||
+        active_gr->dc2 != &bootstrap_graphics_dc ||
+        !active_gr->dc->body ||
+        active_gr->dc->dc_signature != DCS_SIGNATURE_VAL)
+        return 0;
+    return 0x2a;
+}
+
+I64 WinInsideBridgeChecks()
+{//Match the unchanged Kernel/Display.ZC boundary and border rules.
+    CTask *task = Fs;
+    I64 old_flags, old_left, old_right, old_top, old_bottom, result = 0;
+
+    if (!TaskValidate(task))
+        return 1;
+    old_flags = task->display_flags;
+    old_left = task->pix_left;
+    old_right = task->pix_right;
+    old_top = task->pix_top;
+    old_bottom = task->pix_bottom;
+    task->display_flags |= 1 << DISPLAYf_SHOW;
+    task->display_flags &= ~(1 << DISPLAYf_NO_BORDER);
+    task->pix_left = 100;
+    task->pix_right = 199;
+    task->pix_top = 200;
+    task->pix_bottom = 299;
+    if (!WinInside(100, 200, task) || !WinInside(199, 299, task))
+        result = 2;
+    else if (WinInside(99, 200, task) ||
+             !WinInside(99, 200, task, FONT_WIDTH))
+        result = 3;
+    task->display_flags |= 1 << DISPLAYf_NO_BORDER;
+    if (!result && WinInside(99, 200, task, FONT_WIDTH))
+        result = 4;
+    task->display_flags &= ~(1 << DISPLAYf_SHOW);
+    if (!result && WinInside(100, 200, task))
+        result = 5;
+    task->display_flags = old_flags;
+    task->pix_left = old_left;
+    task->pix_right = old_right;
+    task->pix_top = old_top;
+    task->pix_bottom = old_bottom;
+    if (result)
+        return result;
+    return 0x2a;
+}
+
 I64 TaskDerivedValsUpdateChecks()
 {//The graphics bridge exposes the unchanged kernel derived-window contract.
     CTask *task = Fs;
@@ -323,6 +378,10 @@ I64 GrScreenFinalUpdateChecks()
     // Check the source WinMgr sleep/refresh path before the zoom transform.
     if (WinMgrSleepSourcePassChecks() != 0x2a)
         return 33;
+    if (BootstrapGrContextInitChecks() != 0x2a)
+        return 36;
+    if (WinInsideBridgeChecks() != 0x2a)
+        return 37;
     if (TaskDerivedValsUpdateChecks() != 0x2a)
         return 35;
     sleep_source_result = GrScreenZoomTransformChecks();

@@ -16,6 +16,8 @@ p.add_argument('--probe-fulltext', action='store_true',
                help='run an opt-in full GrUpdateTextBG framebuffer diagnostic')
 p.add_argument('--probe-fulltext-visible', action='store_true',
                help='run the full-frame text diagnostic with framebuffer console visible')
+p.add_argument('--probe-live-winmgr', action='store_true',
+               help='start WinMgrTask and verify its first refresh and RLf_WINMGR marker')
 p.add_argument('--probe-task-jobs', action='store_true', help='check CPU-0 callback jobs after loading pinned task headers')
 p.add_argument('--probe-window-buttons', action='store_true', help='check live task-window title buttons in a disposable guest')
 p.add_argument('--probe-source', type=pathlib.Path, action='append',
@@ -29,7 +31,10 @@ if args.probe_grscreen and not args.probe_winmgr:
     p.error('--probe-grscreen requires --probe-winmgr')
 if args.probe_fulltext and not args.probe_grscreen:
     p.error('--probe-fulltext requires --probe-grscreen')
+if args.probe_live_winmgr and not args.probe_grscreen:
+    p.error('--probe-live-winmgr requires --probe-grscreen')
 log_path = ROOT / 'build' / ('check-window-buttons.log' if args.probe_window_buttons else
+                             'check-winmgr-live.log' if args.probe_live_winmgr else
                              'check-module-probe.log' if args.probe_module else
                              'check-upstream-probe.log' if args.probe_upstream else
                              'check-compat-pci.log' if args.pci else 'check-compat.log')
@@ -490,6 +495,11 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                                 'zc => 0x000000000000002a')
                         command('zcall GrScreenFinalUpdateChecks',
                                 'zc => 0x000000000000002a')
+                        if args.probe_live_winmgr:
+                            command('zload /Tests/WinMgrStart.ZC',
+                                    'zc: loaded /Tests/WinMgrStart.ZC')
+                            command('zcall WinMgrStartChecks',
+                                    'zc => 0x000000000000002a', timeout=30)
                         if args.probe_fulltext:
                             if not args.probe_fulltext_visible:
                                 command('fbquiet',

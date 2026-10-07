@@ -1,0 +1,23 @@
+I64 WinMgrStartChecks()
+{
+    CTask *root = Fs, *manager;
+    CWinMgrGlobals *active_winmgr = ZcActiveWinMgrGlobals();
+    I64 updates_before;
+
+    BootstrapGrContextInit();
+    if (!TaskValidate(root) || sys_task != root || !gr.dc || !active_winmgr)
+        return 1;
+    updates_before = active_winmgr->updates;
+    sys_winmgr_task = root;
+    manager = Spawn(&WinMgrTask, NULL, "Window Manager", -1, root);
+    if (!TaskValidate(manager))
+        return 2;
+    sys_winmgr_task = manager;
+    Yield;
+    // One cooperative start must reach the real first refresh and sleep point.
+    if (active_winmgr->updates <= updates_before)
+        return 3;
+    if (!Bt(&sys_run_level, RLf_WINMGR))
+        return 4;
+    return 0x2a;
+}

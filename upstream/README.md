@@ -2774,6 +2774,39 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 236 — initialize the active graphics context
+
+| Item | Path |
+|--|--|
+| Gap | Loading the pinned `GrGlobals.ZC` creates the source `gr` global with zeroed CDC pointers; the bridge's earlier bootstrap `gr` object is not the active source global |
+| Bring-up | `BootstrapGrContextInit` attaches the active source `gr.dc` and `gr.dc2` to the bootstrap framebuffer |
+| Smoke | `BootstrapGrContextInitChecks` clears those fields, runs initialization, and checks both pointers plus the framebuffer body and signature |
+| Limits | This initializes only two display-context pointers; it is not wired into the actual kernel startup sequence, and menu, music, complete graphics tables, and task startup still need real initialization |
+
+Freeze catalog unchanged.
+
+## Milestone 237 — start the unchanged window-manager task to its run-level marker
+
+| Item | Path |
+|--|--|
+| Gap | The first live `WinMgrTask` attempt reached its first graphics access with the active source `gr.dc` unset and aborted |
+| Bring-up | The disposable live-start probe calls `BootstrapGrContextInit`, starts the unchanged `WinMgrTask` with `Spawn`, and yields once |
+| Smoke | `WinMgrStartChecks` confirms task creation, its first refresh, and the `RLf_WINMGR` marker; `make check-grscreen` runs this gate |
+| Limits | A separate follow-up attempt that allowed the guest timer to wake the manager hit a synchronous null-address abort in the next loop pass; that later pass is still under investigation |
+
+Freeze catalog unchanged.
+
+## Milestone 238 — implement ZealOS window pixel hit testing
+
+| Item | Path |
+|--|--|
+| Gap | The live manager's normal task scan calls `WinInside`, from `Kernel/Display.ZC`, which is not loaded in the focused graphics probe |
+| Bring-up | `TaskBridge.ZC` now provides the unchanged visibility, border, and inclusive pixel-boundary rules |
+| Smoke | `WinInsideBridgeChecks` covers inclusive edges, optional border expansion, no-border windows, and hidden tasks |
+| Limits | This is only the hit-test helper; the manager's later-loop null abort remains open, and this does not validate interaction or a complete desktop |
+
+Freeze catalog unchanged.
+
 ## Open compatibility probe — `/System/Win.ZC`
 
 The source probe loads pinned `KernelC.HH`, `Externs.ZC`, and `Gr.HH` before compiling unchanged `Win.ZC`. Graphics dimensions and mouse globals are probe fixtures; `DrawMenu` and the initial `GrScaleZoom` definition are compile-time fixtures until unchanged `GrScreen.ZC` is loaded later in the probe. `GrScreenFinalUpdateChecks` executes `WinFinalUpdate` through the staged idle-frame path, confirms the fixture's `mouse_grid.coord` toggles the real coordinate-text overlay, checks a separate visible guest overlay callback, verifies the software arrow against Limine framebuffer pixels, and exercises `WinMouseUpdate`'s edge recentering through the runtime dispatch. Physical tablet samples are covered by `WinMousePointerStateCheck`; manual UTM pointer acceptance is still pending. The raw ARM generic-timer binding and a standalone F64 clock expression are smoke-tested before the Win load.
@@ -2786,7 +2819,7 @@ Guest `try/catch` now calls uniquely named `ZcTryEnter`/`ZcTryLeave`/`ZcTryCatch
 
 The parser now resolves a later guest `extern` global to an earlier guest definition when scalar types have a matching ABI, aggregate types are identical, and array dimensions match. `GlobalExternLinkChecks` covers this across separately loaded modules; this lets declarations such as `Externs.ZC`'s `winmgr` refer to storage already supplied by the task bridge. The ARM64 math runtime implements ZealOS's `_EXP` import, and the bootstrap `LowPass1` follows the unchanged `MathODE.ZC` formula. Named HolyC `reg RSI`/`reg R13`/`reg RCX` hints parse as nonbinding allocation hints on ARM64, alongside ordinary `reg bit_shift` locals. The source bundle now applies a guarded ARM64 overlay to unchanged `GrScreen.ZC`: its `GrUpdateTextBG` x86 register loop expands to eight inline typed stores per character. The AArch64 runtime also implements and tests `DCBlotColor4`'s cached four-bitplane conversion. `python3 scripts/check-compat.py --pci --probe-module /System/Win.ZC --probe-winmgr --probe-grscreen` compiles the translated file and passes the background-store helper, foreground text pass, and frame-finalization checks in the guest. The opt-in `--probe-fulltext-visible` path now passes the staged full-frame text smoke with framebuffer-console and serial output both enabled. Pinned source remains byte-identical. The full unchanged 758-line `MathODE.ZC` is pinned but currently causes a guest data abort while compiling, so only the low-pass helper is in the bootstrap path.
 
-This is a compile/load milestone, not a running desktop. The manager task has not completed a successful live startup: menu startup, music playback, planar/brush/sprite/zoom/screen-cache tables, remaining `GrAsm` routines, and surrounding boot/task initialization still need porting or real implementations before its main loop can run safely. The task-geometry bridge is implemented and tested. The live-start probe now confirms `Spawn` remains bound after `KernelC.HH` redeclares its callback signature, but the first manager yield data-aborts because `gr.dc` is still null. Initialize the graphics context and the manager's required tables before attempting a live startup again. Interactive window creation, focus, move/resize, and stacking remain unverified.
+This remains a bring-up probe, not a running desktop. The task-geometry bridge, active source `gr.dc`/`gr.dc2` bootstrap attachment, and pixel hit-test helper are implemented and tested. The disposable live-start probe starts the unchanged `WinMgrTask`, observes its initial refresh, and verifies `RLf_WINMGR`. Allowing the guest timer to wake the manager for a later loop pass currently produces a synchronous null-address abort, so recurring manager behavior remains the next active issue. Menu startup, music playback, planar/brush/sprite/zoom/screen-cache tables, remaining `GrAsm` routines, and normal boot/task initialization still need porting or real implementations. Interactive window creation, focus, move/resize, and stacking remain unverified.
 
 ## Acceptance
 
