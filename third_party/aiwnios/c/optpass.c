@@ -356,7 +356,8 @@ void OptPassExpandPtrs(CCmpCtrl *cctrl) {
       total_off = rpn->local_mem->off;
       for (; a->type == IC_DOT; a = b) {
         b = a->base.next;
-        raw_type = a->raw_type;
+        /* Keep the final member type. Intermediate members may be aggregate
+         * classes (raw_type U0), even when the leaf is F64 or an integer. */
         total_off += a->local_mem->off;
         ICFree(a);
       }

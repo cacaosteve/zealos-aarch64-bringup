@@ -1954,8 +1954,11 @@ ZealOS live distribution or installer.
   `sys_framebuffer_addr` and initializes `text.fb_alias`; the
   `GrUpdateScreen32LimineChecks` smoke runs the unchanged presenter against the
   real QEMU ramfb and confirms the pixel via framebuffer readback before
-  restoring it. The full `GrUpdateScreen` path remains unverified: upstream
-  `gr.dc1`/`gr.dc_cache` and zoom/pan surfaces are not initialized together,
-  while task graphics still draw directly to the framebuffer. The next step is
-  to move task drawing to the compositor surface, then initialize and exercise
-  the complete upstream refresh path.
+  restoring it. During a valid one-CPU compositor frame, the bridge stages the
+  upstream graphics globals and calls the unchanged full `GrUpdateScreen`
+  routine. `GrScreenFinalUpdateChecks` verifies that the upstream screen and
+  task update counters advance, then checks the composed and zoomed pixels on
+  the Limine framebuffer. A direct shell call outside that initialized frame
+  is deliberately guarded and is not a valid test of the refresh path. The
+  remaining work is broader than this smoke: full palette/planar semantics,
+  CDC allocation and lifetime, and normal interactive window-manager startup.

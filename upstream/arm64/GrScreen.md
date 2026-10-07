@@ -19,6 +19,14 @@ glyph over its expected background. Run that extended QEMU check with
 `make check-grscreen-full`; the regular `make check-grscreen` remains the
 shorter graphics regression.
 
+The freestanding Aiwnios backend now preserves the leaf type while flattening
+nested member paths. This matters for upstream zoom handling, where
+`mouse.scale.x` is an `F64` inside two aggregate structs; losing the leaf type
+generated an invalid store even though the member offsets were correct. The
+`NestedF64Member` compiler regression and the `GrScaleZoom` transform check
+cover this path. The full text-frame probe also runs the same live framebuffer
+alias setup check as the shorter graphics probe before exercising the frame.
+
 When `GrScreen.ZC` is loaded, the bootstrap frame binds its active graphics
 globals to the shared 8-bit frame CDC and text plane, then runs the unchanged
 `GrUpdateTextBG` and `GrUpdateTextFG` before drawing task windows. After the
@@ -52,10 +60,14 @@ result, and the live graphics smoke checks that the frame binds and uses this
 zoom surface.
 
 This is a bundle-time architecture port, not a change to the pinned upstream
-file and not an x86 instruction emulator. The live frame still uses the bounded
-bootstrap window traversal and its framebuffer blit before the source 32-bit
-presenter; it does not yet run the complete upstream `GrUpdateScreen` sequence
-or upstream `GrUpdateTasks`. The task runtime now provides a single-core CPU0
+file and not an x86 instruction emulator. Once the one-CPU task rings validate,
+the live frame stages the upstream graphics globals and dispatches the
+unchanged full `GrUpdateScreen` sequence, including `GrUpdateTasks`, text
+composition, the final overlay, and the source presenter. The bounded bootstrap
+window traversal remains the fallback when the source prerequisites are not
+ready. The source refresh is covered from inside that initialized frame; a
+direct shell call to `GrUpdateScreen` is not a valid smoke because it bypasses
+the frame setup. The task runtime now provides a single-core CPU0
 record whose executive task is the root task, and initializes every live
 task's `next_ode`/`last_ode` as an empty self-linked list. The runtime now walks
 the CPU0 task ring with a 64-task safety bound and calls upstream

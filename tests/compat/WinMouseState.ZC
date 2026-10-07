@@ -1,10 +1,6 @@
-// Zeroed storage for the compile-only Win.ZC probe. The full kernel normally
-// provides these globals from Kernel/KGlobals.ZC; this probe does not start
-// the mouse subsystem or execute Win.ZC callbacks.
-CMouseStateGlobals mouse, mouse_last;
-CGridGlobals mouse_grid;
-CMouseHardStateGlobals mouse_hard, mouse_hard_last;
-CMenuEntry *sys_cur_submenu_entry;
+// TaskBridge supplies the zeroed mouse globals before its input helpers load.
+// This probe uses that shared storage without starting the mouse subsystem.
+extern CMouseStateGlobals *ZcActiveMouseGlobals();
 CTask *sys_winmgr_task;
 
 // The real KeyDev.ZC callback registry is intentionally outside this probe.
@@ -19,11 +15,8 @@ U0 DrawMenu(CDC *dc)
 {
 }
 
-// GrScaleZoom is defined in GrScreen.ZC, whose file-scope setup currently
-// requires the full graphics bootstrap. This compile-only probe never calls it.
-U0 GrScaleZoom(F64 scale)
-{
-}
+// GrScaleZoom is defined by GrScreen.ZC later in the source load order.
+extern U0 GrScaleZoom(F64 scale);
 
 I64 WinCAllocCheck()
 {
@@ -47,35 +40,21 @@ I64 WinMousePointerStateCheck()
     I64 old_last_x = bootstrap_mouse_last_x, old_last_y = bootstrap_mouse_last_y;
     Bool old_installed = mouse_hard.installed;
     I64 raw_x = 100, raw_y = 200;
-    I64 x = 150, y = 200;
+    I64 x = 200, y = 300;
+    Bool active_same;
+    Bool ok;
 
     if (!TaskValidate(sys_task))
         return 1;
-    mouse.scale.x = mouse.scale.y = 0.5;
-    mouse.offset.x = mouse.offset.y = 100;
+    mouse.offset.x = 100;
+    mouse.offset.y = 100;
+    active_same = ZcActiveMouseGlobals() == &mouse;
     bootstrap_mouse_sampled = FALSE;
     BootstrapCtrlInputSample(sys_task, raw_x | (raw_y << 16));
-    if (mouse.pos.x != x || mouse.pos.y != y ||
-        mouse.pos_text.x != (x - gr.pan_text_x) >> 3 ||
-        mouse.pos_text.y != (y - gr.pan_text_y) >> 3 ||
-        mouse.timestamp <= 0 || !mouse_hard.installed)
-    {
-        mouse.pos.x = old_x;
-        mouse.pos.y = old_y;
-        mouse.pos_text.x = old_text_x;
-        mouse.pos_text.y = old_text_y;
-        mouse.timestamp = old_timestamp;
-        mouse.offset.x = old_offset_x;
-        mouse.offset.y = old_offset_y;
-        mouse.scale.x = old_scale_x;
-        mouse.scale.y = old_scale_y;
-        bootstrap_mouse_sampled = old_sampled;
-        bootstrap_mouse_last_buttons = old_buttons;
-        bootstrap_mouse_last_x = old_last_x;
-        bootstrap_mouse_last_y = old_last_y;
-        mouse_hard.installed = old_installed;
-        return 2;
-    }
+    ok = active_same && mouse.pos.x == x && mouse.pos.y == y &&
+         mouse.pos_text.x == (x - gr.pan_text_x) >> 3 &&
+         mouse.pos_text.y == (y - gr.pan_text_y) >> 3 &&
+         mouse.timestamp > 0 && mouse_hard.installed;
     mouse.pos.x = old_x;
     mouse.pos.y = old_y;
     mouse.pos_text.x = old_text_x;
@@ -90,7 +69,9 @@ I64 WinMousePointerStateCheck()
     bootstrap_mouse_last_x = old_last_x;
     bootstrap_mouse_last_y = old_last_y;
     mouse_hard.installed = old_installed;
-    return 42;
+    if (ok)
+        return 42;
+    return 2;
 }
 
 F64 WinF64One()

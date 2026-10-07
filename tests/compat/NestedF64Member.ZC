@@ -1,0 +1,26 @@
+class NestedF64Leaf {
+    F64 value;
+};
+
+class NestedF64Root {
+    I64 prefix;
+    NestedF64Leaf leaf;
+};
+
+#assert offset(NestedF64Root.leaf) == 8
+#assert sizeof(NestedF64Root) == 16
+
+NestedF64Root nested_f64_global;
+
+I64 NestedF64MemberChecks()
+{
+    NestedF64Root local;
+
+    nested_f64_global.leaf.value = 0.625;
+    local.leaf.value = 0.3125;
+    if (nested_f64_global.leaf.value != 0.625)
+        return 0;
+    if (local.leaf.value != 0.3125)
+        return 0;
+    return 0x2a;
+}

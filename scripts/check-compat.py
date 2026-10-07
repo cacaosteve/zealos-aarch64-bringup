@@ -206,6 +206,16 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 command('zreset', 'native compiler ready')
             raise SystemExit(0)
         if args.probe_module == '/System/Win.ZC' and args.probe_winmgr:
+            command('zload /Tests/NestedF64Member.ZC',
+                    'zc: loaded /Tests/NestedF64Member.ZC')
+            command('zcall NestedF64MemberChecks',
+                    'zc => 0x000000000000002a')
+            command('zload /Tests/DeferredExternUse.ZC',
+                    'zc: loaded /Tests/DeferredExternUse.ZC')
+            command('zload /Tests/DeferredExternDef.ZC',
+                    'zc: loaded /Tests/DeferredExternDef.ZC')
+            command('zcall DeferredExternCaller',
+                    'zc => 0x000000000000002a')
             command('zload /Tests/GlobalExternDef.ZC',
                     'zc: loaded /Tests/GlobalExternDef.ZC')
             command('zload /Tests/GlobalExternUse.ZC',
@@ -440,6 +450,10 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     command('zload /System/WinMgr.ZC',
                             'zc: loaded /System/WinMgr.ZC', timeout=15)
                     if args.probe_grscreen:
+                        command('zload /Tests/ODEsUpdateStub.ZC',
+                                'zc: loaded /Tests/ODEsUpdateStub.ZC')
+                        command('zcall ODEsUpdateStubCheck',
+                                'zc => 0x000000000000002a')
                         guest.stdin.write(b'zload /System/Gr/GrScreen.ZC\r')
                         guest.stdin.flush()
                         result = until(b'\n> ', timeout=30)
@@ -462,11 +476,12 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                                 'zc: loaded /Tests/GrZoomScreen.ZC')
                         command('zcall GrZoomScreenChecks',
                                 'zc => 0x000000000000002a')
-                        if not args.probe_fulltext:
-                            command('zcall GrUpdateScreen32LimineChecks',
-                                    'zc => 0x000000000000002a')
+                        command('zcall GrUpdateScreen32LimineChecks',
+                                'zc => 0x000000000000002a')
                         command('zload /Tests/GrScreenFinalUpdate.ZC',
                                 'zc: loaded /Tests/GrScreenFinalUpdate.ZC')
+                        command('zcall GrScreenZoomTransformChecks',
+                                'zc => 0x000000000000002a')
                         command('zcall GrScreenFinalUpdateChecks',
                                 'zc => 0x000000000000002a')
                         if args.probe_fulltext:
@@ -674,6 +689,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             command('zcall TaskTimerRunChecks', 'zc => 0x000000000000002a')
             command('zcall TaskTimerSuspendChecks', 'zc => 0x000000000000002a')
             command('zcall TaskTimerJobChecks', 'zc => 0x000000000000002a')
+            command('zcall TaskSleepUntilChecks', 'zc => 0x000000000000002a')
             command('zload /Tests/TaskText.ZC', 'zc: loaded /Tests/TaskText.ZC')
             command('zcall TaskAnswerChecks', 'zc => 0x000000000000002a')
             command('zcall TaskTextChecks', 'zc => 0x000000000000002a')
@@ -874,6 +890,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             command('zcall TaskTimerRunChecks', 'zc => 0x000000000000002a')
             command('zcall TaskTimerSuspendChecks', 'zc => 0x000000000000002a')
             command('zcall TaskTimerJobChecks', 'zc => 0x000000000000002a')
+            command('zcall TaskSleepUntilChecks', 'zc => 0x000000000000002a')
             command('zload /Tests/TaskText.ZC', 'zc: loaded /Tests/TaskText.ZC')
             command('zcall TaskAnswerChecks', 'zc => 0x000000000000002a')
             command('zcall TaskTextChecks', 'zc => 0x000000000000002a')

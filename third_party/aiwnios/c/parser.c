@@ -3162,7 +3162,7 @@ int64_t PrsDecl(CCmpCtrl *ccmp, CHashClass *base, CHashClass *add_to,
   CArrayDim dim;
   CHashClass *cls;
   CMemberLst *lst, *bungis;
-  CHashFun *fun, *extern_fun;
+  CHashFun *fun;
   CHashGlblVar *glbl_var, *import_var, *extern_glbl;
   CRPN *rpn;
   char *name;
@@ -3277,11 +3277,21 @@ int64_t PrsDecl(CCmpCtrl *ccmp, CHashClass *base, CHashClass *add_to,
     ccmp->cur_fun->base.base.type |= HTF_EXTERN;
     ccmp->cur_fun->fun_ptr = Compile(ccmp, NULL, NULL, NULL);
     ccmp->cur_fun->base.base.type &= ~HTF_EXTERN;
-    /* A child task may shadow a parent's name. Resolve only declarations
-     * from this task so its code cannot be installed in the parent table. */
-    if (extern_fun = HashSingleTableFind(name, Fs->hash_table, HTT_FUN,
-                                         2)) { // Pick 2nd EXTERN(?) function
-      extern_fun->fun_ptr = ccmp->cur_fun->fun_ptr;
+    /* A later source unit may define an earlier extern declaration. Patch
+     * every matching declaration in this task so imports created before the
+     * definition resolve to the implementation, including when an older
+     * declaration is the first hash-table match. Keep overloads isolated by
+     * requiring the complete ABI to match. */
+    for (int64_t inst = 1;; inst++) {
+      CHashFun *decl = HashFind(name, Fs->hash_table, HTT_FUN, inst);
+      if (!decl)
+        break;
+      if (decl != ccmp->cur_fun &&
+          (decl->base.base.type & HTF_EXTERN) &&
+          PrsSameFunctionABI(decl, ccmp->cur_fun)) {
+        decl->fun_ptr = ccmp->cur_fun->fun_ptr;
+        decl->base.base.type &= ~(HTF_EXTERN | HTF_INTRINSIC);
+      }
     }
     if (ccmp->cur_fun->base.base.str)
       SysSymImportsResolve(ccmp->cur_fun->base.base.str, 0);
@@ -4715,7 +4725,8 @@ static void __PrsBindCSymbol(char *name, void *ptr, int64_t naked,
         abort();
       }
       if (!fun->fun_ptr || fun->fun_ptr == &DoNothing ||
-          fun->fun_ptr == INVALID_PTR) {
+          fun->fun_ptr == INVALID_PTR ||
+          (fun->base.base.type & HTF_EXTERN)) {
         fun->base.base.type &= ~HTF_EXTERN;
         if (naked)
           fun->fun_ptr = GenFFIBindingNaked(ptr, arity);

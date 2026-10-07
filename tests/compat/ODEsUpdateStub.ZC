@@ -1,0 +1,16 @@
+// Load before GrScreen.ZC, whose source wrapper calls ODEsUpdate directly.
+I64 gr_screen_ode_update_calls;
+Bool gr_screen_ode_root_seen;
+
+U0 ODEsUpdate(CTask *task)
+{
+    gr_screen_ode_update_calls++;
+    if (cpu_structs && task == cpu_structs[0].executive_task)
+        gr_screen_ode_root_seen = TRUE;
+}
+
+I64 ODEsUpdateStubCheck()
+{
+    ODEsUpdate(NULL);
+    return 42;
+}

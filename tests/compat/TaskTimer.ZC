@@ -1,4 +1,5 @@
 // Cooperative Sleep over the ARM generic timer and pinned task signatures.
+extern U0 SleepUntil(I64 wake_jiffy);
 I64 timer_phase;
 
 U0 TimerWorker(U8 *data)
@@ -12,6 +13,12 @@ U0 TimerLongWorker(U8 *data)
 {
     timer_phase = 1;
     Sleep(500);
+    timer_phase = 2;
+}
+
+U0 TimerUntilWorker(U8 *data)
+{
+    Sleep(2);
     timer_phase = 2;
 }
 
@@ -67,6 +74,24 @@ I64 TaskTimerJobChecks()
     CJob *job = TaskExe(Fs, Fs, "Sleep(2); 42;", 0);
     if (!job || JobsHandler(0) != 1 || JobResGet(job) != 42)
         return 1;
+    return 42;
+}
+
+I64 TaskSleepUntilChecks()
+{
+    CTask *worker;
+    I64 deadline;
+    timer_phase = 0;
+    worker = Spawn(&TimerUntilWorker);
+    if (!worker)
+        return 1;
+    deadline = ZcMonotonicNs() / 1000000 + 12;
+    SleepUntil(deadline);
+    if (counts.jiffies < deadline || timer_phase != 2)
+        return 2;
+    DeathWait(&worker);
+    if (TaskValidate(worker))
+        return 3;
     return 42;
 }
 

@@ -1,0 +1,6 @@
+extern I64 DeferredExternAnswer();
+
+I64 DeferredExternCaller()
+{
+    return DeferredExternAnswer();
+}

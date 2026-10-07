@@ -212,6 +212,7 @@ static struct guest_counts {
     int64_t time_stamp_freq_initial;
     uint8_t time_stamp_calibrated;
 } guest_counts;
+static uint64_t guest_tS_bits;
 _Static_assert(offsetof(struct guest_counts, time_stamp_freq) == 16 &&
                sizeof(struct guest_counts) == 48, "pinned counts layout");
 /* KernelB's pinned CProgress layout; populated independently by graphics
@@ -651,6 +652,23 @@ static int64_t host_low_pass1(int64_t *a) {
         hc_builtin_exp((uint64_t)(int64_t)(-alpha * dt)));
     double result = y0 * decay + y * (1.0 - decay);
     uint64_t bits;
+    memcpy(&bits, &result, sizeof(bits));
+    return (int64_t)bits;
+}
+static int64_t host_clamp_f64(int64_t *a) {
+    double value = host_f64_from_bits((uint64_t)a[0]);
+    double lo = host_f64_from_bits((uint64_t)a[1]);
+    double hi = host_f64_from_bits((uint64_t)a[2]);
+    uint64_t bits;
+    value = value < lo ? lo : value > hi ? hi : value;
+    memcpy(&bits, &value, sizeof(bits));
+    return (int64_t)bits;
+}
+static int64_t host_max_f64(int64_t *a) {
+    double left = host_f64_from_bits((uint64_t)a[0]);
+    double right = host_f64_from_bits((uint64_t)a[1]);
+    uint64_t bits;
+    double result = left > right ? left : right;
     memcpy(&bits, &result, sizeof(bits));
     return (int64_t)bits;
 }
@@ -2925,12 +2943,13 @@ static int64_t host_timer_seconds_bits(int64_t *a) {
     double seconds = (double)host_monotonic_ns(a) * 0.000000001;
     uint64_t bits;
     memcpy(&bits, &seconds, sizeof(bits));
+    guest_tS_bits = bits;
     return (int64_t)bits;
 }
 static int64_t host_time_cal(int64_t *a) {
     (void)a;
-    /* The source WinMgr only needs a monotonic jiffy count here. tS and the
-     * calibrated counter frequency are already supplied by the host clock. */
+    /* Source TimeCal updates both the millisecond jiffy count and F64 tS. */
+    (void)host_timer_seconds_bits(NULL);
     guest_counts.jiffies = host_monotonic_ns(NULL) / 1000000;
     return guest_counts.jiffies;
 }
@@ -2944,11 +2963,39 @@ static int64_t host_fifo_i64_flush(int64_t *a) {
     return 0;
 }
 static int64_t host_sleep_until(int64_t *a) {
-    /* Source timeouts are expressed in the host-backed 1 kHz jiffy domain.
-     * This single-core bring-up runtime has no guest scheduler to block on, so
-     * wait against the ARM generic timer and refresh the visible jiffy count. */
-    while (guest_counts.jiffies < a[0])
-        guest_counts.jiffies = host_monotonic_ns(NULL) / 1000000;
+    uint64_t frequency;
+    uint64_t milliseconds, seconds, ticks, deadline;
+    int64_t now_jiffies = host_monotonic_ns(NULL) / 1000000;
+    guest_counts.jiffies = now_jiffies;
+    if (a[0] <= now_jiffies)
+        return 0;
+    milliseconds = (uint64_t)(a[0] - now_jiffies);
+    __asm__ volatile("mrs %0, cntfrq_el0" : "=r"(frequency));
+    if (!frequency)
+        zc_fail("generic timer frequency unavailable");
+    seconds = milliseconds / 1000;
+    if (seconds > (uint64_t)INT64_MAX / frequency)
+        zc_fail("SleepUntil deadline too far away");
+    ticks = seconds * frequency + (milliseconds % 1000) * frequency / 1000;
+    if (ticks > (uint64_t)INT64_MAX)
+        zc_fail("SleepUntil deadline too far away");
+    deadline = counter_now() + ticks;
+    if (guest_task_exe_active) {
+        /* Source compilation cannot yield while the shared compiler is active. */
+        while ((int64_t)(counter_now() - deadline) < 0)
+            __asm__ volatile("yield");
+    } else {
+        struct guest_fiber *self = &guest_fibers[guest_current];
+        self->wait_deadline = deadline;
+        self->wait_kind = GUEST_WAIT_TIMER;
+        while (!wait_ready(self)) {
+            (void)host_task_yield(NULL);
+            guest_counts.jiffies = host_monotonic_ns(NULL) / 1000000;
+            __asm__ volatile("yield");
+        }
+        self->wait_kind = GUEST_WAIT_NONE;
+    }
+    guest_counts.jiffies = host_monotonic_ns(NULL) / 1000000;
     return 0;
 }
 static int64_t host_sleep(int64_t *a) {
@@ -3471,16 +3518,29 @@ static int load_inner(const char *path) {
         return -1;
     }
     execute_source(path, src);
-    if (!strcmp(path, "/System/TaskBridge.ZC"))
+    if (!strcmp(path, "/System/TaskBridge.ZC")) {
         PrsBindCSymbol("LowPass1", host_low_pass1, 4);
+        /* These functions were pre-registered before TaskBridge introduced
+         * their extern declarations, so bind them again now that the symbols
+         * and relocation slots exist. */
+        PrsBindCSymbol("ZcMouseStateUpdate", host_mouse_state_update, 5);
+        PrsBindCSymbol("ZcActiveGrGlobals", host_active_gr_globals, 0);
+        PrsBindCSymbol("ZcActiveMouseGlobals", host_active_mouse_globals, 0);
+        PrsBindCSymbol("ZcActiveWinMgrGlobals", host_active_winmgr_globals, 0);
+    }
+    /* Source units can introduce fresh extern declarations after KernelC.HH
+     * has been parsed. Rebind the timer hook after each unit so those calls
+     * resolve to the same host implementation as the kernel declaration. */
+    PrsBindCSymbol("SleepUntil", host_sleep_until, 1);
+    PrsBindCSymbol("Clamp", host_clamp_f64, 3);
+    PrsBindCSymbol("Max", host_max_f64, 2);
     if (!strcmp(path, "/Kernel/KernelC.HH")) {
         /* counts is declared here, not in KernelB.HH; bind after declaration
          * so the generic extern-data binder can resolve the symbol. */
         PrsBindCSymbol("counts", &guest_counts, 0);
-        PrsBindCSymbol("tS", host_timer_seconds_bits, 0);
+        PrsBindCSymbol("tS", &guest_tS_bits, 0);
         PrsBindCSymbol("TimeCal", host_time_cal, 0);
         PrsBindCSymbol("FifoI64Flush", host_fifo_i64_flush, 1);
-        PrsBindCSymbol("SleepUntil", host_sleep_until, 1);
         CHashClass *kbd = (CHashClass *)HashFind("CKbdStateGlobals",
                                                   Fs->hash_table, HTT_CLASS, 1);
         if (!kbd || kbd->sz <= 0 || kbd->sz > (1 << 20))

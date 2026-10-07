@@ -2727,6 +2727,12 @@ public U0 BootstrapWinDragEnd()
     bootstrap_mouse_drag_task = NULL;
     bootstrap_mouse_drag_kind = 0;
 }
+// Define the early mouse globals before input helpers reference them. HolyC
+// source modules are compiled in order, so a later definition is not visible
+// to BootstrapCtrlInputSampleAt during the initial module load.
+CMouseStateGlobals mouse, mouse_last;
+CMouseHardStateGlobals mouse_hard, mouse_hard_last;
+
 public Bool BootstrapCtrlInputSampleAt(CTask *task, I64 sample, I64 now_ns)
 {//Feed one packed absolute tablet sample into the focused task's controls.
     CDoc *doc;
@@ -3248,15 +3254,13 @@ extern U0 ODEsUpdate(CTask *task);
 // These are the early source-runtime storage objects. Device input is wired
 // separately; the initialized records let upstream window/graphics modules
 // compile and render safely before the full mouse subsystem is started.
-CMouseStateGlobals mouse, mouse_last;
 CGridGlobals mouse_grid;
-CMouseHardStateGlobals mouse_hard, mouse_hard_last;
 CMenuEntry *sys_cur_submenu_entry;
 // Menu rendering and zoom initialization belong to later native subsystems.
 // Keep the early frame path linkable; these hooks are replaced when those
 // subsystems are loaded.
 U0 DrawMenu(CDC *dc) {}
-U0 GrScaleZoom(F64 scale) {}
+extern U0 GrScaleZoom(F64 scale);
 // The source renderer budgets optional MathODE work; the real integrator is
 // loaded later, so keep a valid default until its subsystem is initialized.
 F64 ode_alloced_factor = 0.75;

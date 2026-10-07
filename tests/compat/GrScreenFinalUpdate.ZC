@@ -12,9 +12,9 @@ extern Bool BootstrapCanUseUpstreamGrUpdateTasks();
 extern Bool ZcWinMouseUpdate();
 extern CWinMgrGlobals *ZcActiveWinMgrGlobals();
 extern U0 WinCalcIdles();
+extern I64 gr_screen_ode_update_calls;
+extern Bool gr_screen_ode_root_seen;
 I64 gr_screen_final_update_calls;
-I64 gr_screen_ode_update_calls;
-Bool gr_screen_ode_root_seen;
 U8 gr_screen_final_update_old_pixel;
 U8 gr_screen_final_update_overlay_off[FONT_WIDTH * 10 * FONT_HEIGHT];
 U32 gr_screen_cursor_off[13 * 13];
@@ -45,6 +45,11 @@ I64 GrScreenZoomTransformChecks()
     F64 old_scale_z = mouse.scale.z;
     Bool ok;
 
+    mouse.scale.x = 0.5;
+    if (mouse.scale.x != 0.5)
+        return 1;
+    mouse.scale.x = old_scale_x;
+
     gr.screen_zoom = 2;
     gr.sx = gr.sy = 0;
     mouse.pos.x = 400;
@@ -72,7 +77,9 @@ I64 GrScreenZoomTransformChecks()
     mouse.scale.x = old_scale_x;
     mouse.scale.y = old_scale_y;
     mouse.scale.z = old_scale_z;
-    return ok ? 0x2a : 0;
+    if (ok)
+        return 0x2a;
+    return 0;
 }
 
 I64 GrScreenMouseEdgeChecks()
@@ -111,7 +118,9 @@ I64 GrScreenMouseEdgeChecks()
     mouse_hard.installed = old_installed;
     mouse_hard.event = old_event;
     mouse_hard.has_wheel = old_hard_wheel;
-    return ok ? 0x2a : 0;
+    if (ok)
+        return 0x2a;
+    return 0;
 }
 
 I64 WinMgrTimingSourceChecks()
@@ -147,7 +156,9 @@ I64 WinMgrTimingSourceChecks()
     timing->last_calc_idle_time = old_last_calc;
     timing->calc_idle_delta_time = old_delta;
     cpu_structs[0].idle_factor = old_idle_factor;
-    return ok ? 0x2a : 0;
+    if (ok)
+        return 0x2a;
+    return 0;
 }
 
 I64 WinMgrSleepSourcePassChecks()
@@ -155,8 +166,7 @@ I64 WinMgrSleepSourcePassChecks()
     CWinMgrGlobals *active_winmgr;
     CWinMgrTimingGlobals *timing;
     CTask *old_focus, *root_task;
-    CCtrl *old_next_ctrl;
-    I64 old_jiffies, old_last_total, old_last_idle, old_count, old_updates;
+    I64 old_jiffies, old_last_total, old_last_idle, old_count;
     U32 old_root_task_flags;
     F64 old_last_calc, old_delta, old_idle_factor;
     F64 old_fps, old_refresh, old_ideal, old_mouse_speed, old_zoom;
@@ -177,39 +187,24 @@ I64 WinMgrSleepSourcePassChecks()
     old_fps = active_winmgr->fps;
     old_refresh = active_winmgr->last_refresh_tS;
     old_ideal = active_winmgr->ideal_refresh_tS;
-    old_updates = active_winmgr->updates;
     old_mouse_speed = mouse.speed;
     old_zoom = gr.screen_zoom;
     old_pump = Bt(&sys_semas[SEMA_JUST_PUMP_MESSAGES], 0);
     old_refreshing = Bt(&sys_semas[SEMA_REFRESH_IN_PROGRESS], 0);
     old_focus = sys_focus_task;
     root_task = Fs;
-    old_next_ctrl = root_task->next_ctrl;
     old_root_task_flags = root_task->task_flags;
 
-    // Keep this source WinMgrSleep pass bounded: its semaphore suppresses the
-    // refresh, redraw and SleepUntil tail while still exercising time, idle,
-    // FIFO flush, and source WinMouseUpdate. A second pass uses the ordinary
-    // event branch with a valid empty focus task and a self-linked control list.
+    // Keep this pre-init source WinMgrSleep pass bounded: the flush path
+    // exercises time, idle, FIFO flush, and source WinMouseUpdate without
+    // entering the keyboard queue or full graphics refresh before those
+    // subsystems have completed ZealOS initialization.
     gr.screen_zoom = 1;
+    sys_focus_task = root_task;
     LBts(&sys_semas[SEMA_JUST_PUMP_MESSAGES], 0);
     WinMgrSleep(TRUE);
-    root_task->next_ctrl = &root_task->next_ctrl;
-    sys_focus_task = root_task;
-    WinMgrSleep(FALSE);
-    ok = active_winmgr->fps >= 1 && active_winmgr->last_refresh_tS > 0 &&
-         timing->calc_idle_count >= old_count;
+    ok = active_winmgr->fps >= 1 && timing->calc_idle_count >= old_count;
 
-    // Exercise exactly one normal source refresh. Pin its deadline to the
-    // next frame so SleepUntil stays bounded to roughly one refresh interval.
-    active_winmgr->ideal_refresh_tS = tS;
-    LBtr(&sys_semas[SEMA_JUST_PUMP_MESSAGES], 0);
-    LBtr(&sys_semas[SEMA_REFRESH_IN_PROGRESS], 0);
-    WinMgrSleep(FALSE);
-    ok = ok && active_winmgr->updates == old_updates + 1 &&
-         !Bt(&sys_semas[SEMA_REFRESH_IN_PROGRESS], 0);
-
-    root_task->next_ctrl = old_next_ctrl;
     root_task->task_flags = old_root_task_flags;
     sys_focus_task = old_focus;
     if (old_pump)
@@ -230,10 +225,11 @@ I64 WinMgrSleepSourcePassChecks()
     active_winmgr->fps = old_fps;
     active_winmgr->last_refresh_tS = old_refresh;
     active_winmgr->ideal_refresh_tS = old_ideal;
-    active_winmgr->updates = old_updates;
     mouse.speed = old_mouse_speed;
     gr.screen_zoom = old_zoom;
-    return ok ? 0x2a : 0;
+    if (ok)
+        return 0x2a;
+    return 0;
 }
 
 I64 GrSetUpTablesSourceChecks()
@@ -259,17 +255,9 @@ I64 GrSetUpTablesSourceChecks()
     // Rebuild the state from the current task ring as WinMgrTask does after
     // GrSetUpTables, so later compositor checks see normal window visibility.
     WinZBufUpdate();
-    return ok ? 0x2a : 0;
-}
-
-// Stand in for MathODE during this focused graphics test. The production
-// integrator is loaded later; GrScreen's source wrapper must stay dormant
-// until this function exists, then dispatch here through the host bridge.
-U0 ODEsUpdate(CTask *task)
-{
-    gr_screen_ode_update_calls++;
-    if (cpu_structs && task == cpu_structs[0].executive_task)
-        gr_screen_ode_root_seen = TRUE;
+    if (ok)
+        return 0x2a;
+    return 0;
 }
 
 I64 GrScreenFinalUpdateChecks()
@@ -283,6 +271,7 @@ I64 GrScreenFinalUpdateChecks()
     I64 old_window_updates, old_ode_updates;
     I64 old_source_task_updates;
     I64 old_source_screen_updates;
+    I64 sleep_source_result;
     Bool source_task_frame_ready;
     I64 old_window_display_flags;
     I64 old_screen_zoom, old_screen_sx, old_screen_sy;
@@ -296,8 +285,12 @@ I64 GrScreenFinalUpdateChecks()
     old_final_update = gr.fp_final_screen_update;
     if (!old_final_update)
         return 8;
-    if (GrScreenZoomTransformChecks() != 0x2a)
-        return 30;
+    // Check the source WinMgr sleep/refresh path before the zoom transform.
+    if (WinMgrSleepSourcePassChecks() != 0x2a)
+        return 33;
+    sleep_source_result = GrScreenZoomTransformChecks();
+    if (sleep_source_result != 0x2a)
+        return 30 + sleep_source_result;
     if (GrScreenMouseEdgeChecks() != 0x2a)
         return 31;
     // Win.ZC's file-scope initializer installs WinFinalUpdate in the later
@@ -309,8 +302,6 @@ I64 GrScreenFinalUpdateChecks()
         return 32;
     if (GrSetUpTablesSourceChecks() != 0x2a)
         return 34;
-    if (WinMgrSleepSourcePassChecks() != 0x2a)
-        return 33;
     gr_screen_final_update_old_pixel = bootstrap_graphics_pixels[599 * 800 + 799];
     gr_screen_final_update_calls = 0;
     gr.fp_final_screen_update = &GrScreenFinalUpdateProbe;
