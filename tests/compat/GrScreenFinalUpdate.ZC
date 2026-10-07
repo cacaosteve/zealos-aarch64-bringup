@@ -260,6 +260,41 @@ I64 GrSetUpTablesSourceChecks()
     return 0;
 }
 
+I64 TaskDerivedValsUpdateChecks()
+{//The graphics bridge exposes the unchanged kernel derived-window contract.
+    CTask *task = Fs;
+    I64 old_win_width = task->win_width, old_win_height = task->win_height;
+    I64 old_pix_left = task->pix_left, old_pix_right = task->pix_right;
+    I64 old_pix_top = task->pix_top, old_pix_bottom = task->pix_bottom;
+    I64 old_pix_width = task->pix_width, old_pix_height = task->pix_height;
+    Bool ok;
+
+    task->win_width = task->win_height = -1;
+    task->pix_left = task->pix_right = task->pix_top = task->pix_bottom = -1;
+    task->pix_width = task->pix_height = -1;
+    TaskDerivedValsUpdate(task, FALSE);
+    ok = task->win_width == task->win_right - task->win_left + 1 &&
+         task->win_height == task->win_bottom - task->win_top + 1 &&
+         task->pix_left == FONT_WIDTH * task->win_left &&
+         task->pix_right == FONT_WIDTH * (task->win_right + 1) - 1 &&
+         task->pix_top == FONT_HEIGHT * task->win_top &&
+         task->pix_bottom == FONT_HEIGHT * (task->win_bottom + 1) - 1 &&
+         task->pix_width == task->pix_right - task->pix_left + 1 &&
+         task->pix_height == task->pix_bottom - task->pix_top + 1;
+
+    task->win_width = old_win_width;
+    task->win_height = old_win_height;
+    task->pix_left = old_pix_left;
+    task->pix_right = old_pix_right;
+    task->pix_top = old_pix_top;
+    task->pix_bottom = old_pix_bottom;
+    task->pix_width = old_pix_width;
+    task->pix_height = old_pix_height;
+    if (ok)
+        return 0x2a;
+    return 0;
+}
+
 I64 GrScreenFinalUpdateChecks()
 {
     U0 (*old_final_update)(CDC *dc);
@@ -288,6 +323,8 @@ I64 GrScreenFinalUpdateChecks()
     // Check the source WinMgr sleep/refresh path before the zoom transform.
     if (WinMgrSleepSourcePassChecks() != 0x2a)
         return 33;
+    if (TaskDerivedValsUpdateChecks() != 0x2a)
+        return 35;
     sleep_source_result = GrScreenZoomTransformChecks();
     if (sleep_source_result != 0x2a)
         return 30 + sleep_source_result;

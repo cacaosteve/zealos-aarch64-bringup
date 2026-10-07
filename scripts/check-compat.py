@@ -274,6 +274,12 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             if args.probe_module == '/System/Win.ZC':
                 command('zload /Kernel/KernelC.HH',
                         'zc: loaded /Kernel/KernelC.HH')
+                # KernelC redeclares Spawn with a callback function-pointer
+                # parameter. Keep the task bridge binding across that ABI match.
+                command('zload /Tests/SpawnBridge.ZC',
+                        'zc: loaded /Tests/SpawnBridge.ZC')
+                command('zcall SpawnBridgeChecks',
+                        'zc => 0x000000000000002a')
                 # KernelC.HH declares native SysTry(start_label, skip_label).
                 # Guest try/catch must keep using its private bridge ABI after
                 # that declaration enters the compiler symbol table.

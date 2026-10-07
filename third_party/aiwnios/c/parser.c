@@ -3107,17 +3107,24 @@ static void PrsLocalArrayInit(CCmpCtrl *ccmp, CMemberLst *lst) {
     ParseErr(ccmp, "Expected '}' after local array initializer.");
   Lex(ccmp->lex);
 }
-static int PrsSameCallType(CHashClass *a, CHashClass *b) {
+static int PrsSameFunctionABIDepth(CHashFun *a, CHashFun *b, int depth);
+static int PrsSameCallTypeDepth(CHashClass *a, CHashClass *b, int depth) {
   if (a == b)
     return 1;
+  if (!a || !b || depth > 32 || a->raw_type != b->raw_type ||
+      a->sz != b->sz || a->ptr_star_cnt != b->ptr_star_cnt)
+    return 0;
+  if (a->raw_type == RT_FUNC && b->raw_type == RT_FUNC &&
+      (a->flags & CLSF_FUNPTR) && (b->flags & CLSF_FUNPTR))
+    return PrsSameFunctionABIDepth((CHashFun *)a, (CHashFun *)b, depth + 1);
   /* KernelA's U8/I64 unions deliberately replace the bootstrap primitive
    * aliases. Opaque pointers may likewise be redeclared as U8* in the small
    * bootstrap API; both spellings retain the same AArch64 pointer ABI. */
-  return a && b &&
-         ((a->raw_type >= RT_I8i && a->raw_type <= RT_F64) ||
-          a->raw_type == RT_PTR) &&
-         a->raw_type == b->raw_type && a->sz == b->sz &&
-         a->ptr_star_cnt == b->ptr_star_cnt;
+  return (a->raw_type >= RT_I8i && a->raw_type <= RT_F64) ||
+         a->raw_type == RT_PTR;
+}
+static int PrsSameCallType(CHashClass *a, CHashClass *b) {
+  return PrsSameCallTypeDepth(a, b, 0);
 }
 static int PrsSameArrayDim(CArrayDim *a, CArrayDim *b) {
   while (a && b) {
@@ -3138,21 +3145,24 @@ static int PrsSameGlobalType(CHashClass *a, CHashClass *b) {
     return 0;
   return PrsSameCallType(a, b);
 }
-static int PrsSameFunctionABI(CHashFun *a, CHashFun *b) {
+static int PrsSameFunctionABIDepth(CHashFun *a, CHashFun *b, int depth) {
   CMemberLst *am = a->base.members_lst, *bm = b->base.members_lst;
   if (a->argc != b->argc ||
-      !PrsSameCallType(a->return_class, b->return_class) ||
+      !PrsSameCallTypeDepth(a->return_class, b->return_class, depth) ||
       ((a->base.flags ^ b->base.flags) & CLSF_VARGS))
     return 0;
   for (int64_t i = 0; i < a->argc; i++) {
     if (!am || !bm ||
-        !PrsSameCallType(am->member_class, bm->member_class) ||
+        !PrsSameCallTypeDepth(am->member_class, bm->member_class, depth) ||
         am->dim.total_cnt != bm->dim.total_cnt)
       return 0;
     am = am->next;
     bm = bm->next;
   }
   return 1;
+}
+static int PrsSameFunctionABI(CHashFun *a, CHashFun *b) {
+  return PrsSameFunctionABIDepth(a, b, 0);
 }
 int64_t PrsDecl(CCmpCtrl *ccmp, CHashClass *base, CHashClass *add_to,
                 int64_t *is_func_decl, int64_t flags, char *import_name) {

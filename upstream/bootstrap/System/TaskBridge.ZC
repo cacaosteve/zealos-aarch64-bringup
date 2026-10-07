@@ -1819,6 +1819,7 @@ U0 TextRect(I64 left, I64 right, I64 top, I64 bottom, I64 cell)
     ZcFbTextRect(left, right, top, bottom, cell, gr.text_base, TEXT_COLS);
 }
 extern U0 BootstrapCtrlsUpdate(CTask *task);
+extern U0 WinZBufUpdate();
 U0 WinDerivedValsUpdate(CTask *task)
 {
     if (!task)
@@ -1833,6 +1834,20 @@ U0 WinDerivedValsUpdate(CTask *task)
     task->pix_top = FONT_HEIGHT * task->win_top;
     task->pix_bottom = FONT_HEIGHT * (task->win_bottom + 1) - 1;
     task->pix_height = task->pix_bottom - task->pix_top + 1;
+}
+U0 TaskDerivedValsUpdate(CTask *task=NULL, Bool update_z_buf=TRUE)
+{//Single-CPU bridge equivalent of Kernel/KTask.ZC's derived task update.
+    if (!task)
+        task = Fs;
+    if (!TaskValidate(task))
+        return;
+    WinDerivedValsUpdate(task);
+    BootstrapCtrlsUpdate(task);
+    // This bridge has no semaphore worker; rebuild the software z-buffer
+    // directly when a visible task's geometry can affect the next frame.
+    if (update_z_buf && Bt(&task->display_flags, DISPLAYf_SHOW) &&
+        gr.win_z_buf && gr.win_uncovered_bitmap)
+        WinZBufUpdate();
 }
 Bool GrPlot(CDC *dc=gr.dc, I64 x=0, I64 y=0)
 {
