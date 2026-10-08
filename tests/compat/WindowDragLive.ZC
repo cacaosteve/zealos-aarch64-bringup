@@ -4,7 +4,9 @@ extern Bool ZcTaskFrameRun();
 extern I64 ZcFbTextPixel(I64 x, I64 y);
 extern Bool TextLenStr(CTask *task, I64 x, I64 y, I64 len, I64 attr, U8 *str);
 extern U0 BootstrapDrawTaskWin(CTask *task);
+extern U0 BootstrapMouseHardSample(I64 sample, I64 now_ns);
 extern CWinMgrGlobals *ZcActiveWinMgrGlobals();
+extern I64 ZcMonotonicNs();
 CTask *window_drag_live_a;
 CTask *window_drag_live_b;
 CCtrl window_drag_live_right_control;
@@ -235,9 +237,12 @@ I64 WindowDragLiveRenderChecks()
 }
 
 I64 WindowDragLiveManagerChecks()
-{//Verify the CDC control while the scheduled ZealOS window manager is active.
+{//Verify live source control drawing and input through WinMgrTask.
     CWinMgrGlobals *active_winmgr = ZcActiveWinMgrGlobals();
-    I64 updates_before, result;
+    CTask *old_focus = sys_focus_task;
+    I64 updates_before, result, x, y;
+    F64 old_scale_x = mouse.scale.x, old_scale_y = mouse.scale.y;
+    I64 old_offset_x = mouse.offset.x, old_offset_y = mouse.offset.y;
 
     if (!TaskValidate(sys_winmgr_task) || sys_winmgr_task == Fs ||
         !Bt(&sys_run_level, RLf_WINMGR) || !active_winmgr)
@@ -250,6 +255,43 @@ I64 WindowDragLiveManagerChecks()
         result = 3;
     else
         result = WindowDragLiveRenderChecks();
+
+    if (!result)
+    {
+        // Exercise the unchanged source manager's control branches using the
+        // same hard-mouse record that WinMouseUpdate consumes on its wake.
+        mouse.scale.x = mouse.scale.y = 1.0;
+        mouse.offset.x = mouse.offset.y = 0;
+        sys_focus_task = window_drag_live_b;
+        x = window_drag_live_right_control.screen_left +
+            (window_drag_live_right_control.screen_right -
+             window_drag_live_right_control.screen_left) / 2;
+        y = window_drag_live_right_control.screen_top +
+            (window_drag_live_right_control.screen_bottom -
+             window_drag_live_right_control.screen_top) / 2;
+        BootstrapMouseHardSample(x | (y << 16), ZcMonotonicNs());
+        Sleep(50);
+        BootstrapMouseHardSample(x | (y << 16) | (2 << 32), ZcMonotonicNs());
+        Sleep(50);
+        if (window_drag_live_right_down != 1 ||
+            !(window_drag_live_right_control.flags & CTRLF_CLICKED))
+            result = 20;
+        BootstrapMouseHardSample(x | (y << 16), ZcMonotonicNs());
+        Sleep(50);
+        if (!result &&
+            (window_drag_live_right_control.flags & CTRLF_CLICKED))
+            result = 21;
+        BootstrapMouseHardSample(x | (y << 16) | (1 << 40), ZcMonotonicNs());
+        Sleep(50);
+        if (!result && window_drag_live_wheel_delta != 1)
+            result = 22;
+        BootstrapMouseHardSample(x | (y << 16), ZcMonotonicNs());
+        mouse.scale.x = old_scale_x;
+        mouse.scale.y = old_scale_y;
+        mouse.offset.x = old_offset_x;
+        mouse.offset.y = old_offset_y;
+    }
+    sys_focus_task = old_focus;
     WindowDragLiveStop();
     return result;
 }
