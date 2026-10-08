@@ -2865,9 +2865,9 @@ Freeze catalog unchanged.
 | Item | Path |
 |--|--|
 | Gap | The unchanged `WinMgrTask` passed live QEMU probes but normal boot only loaded its sources; there was no safe way to start it while keeping the host shell available |
-| Bring-up | Add an idempotent `BootstrapWinMgrStart` task-bridge entry point and expose it as the opt-in `winmgr` shell command; it spawns the unchanged manager, yields until its first refresh/sleep, and leaves serial shell input active |
-| Smoke | `WinMgrStartChecks` now uses the same startup entry point; `python3 scripts/check-compat.py --pci` invokes `winmgr` twice in a booted PCI guest and confirms startup plus idempotence, while `--probe-live-winmgr --probe-live-winmgr-wake` continues to pass |
-| Limits | The command does not initialize the full ZealOS desktop or create normal application tasks. Manual UTM acceptance is still needed to confirm the framebuffer and tablet behave with the source manager running; restart the VM to return to the bridge-only session |
+| Bring-up | Add idempotent `BootstrapWinMgrStart`/`BootstrapWinMgrStop` task-bridge entry points as the `winmgr` and `winmgrstop` shell commands. Start spawns the unchanged manager and yields until its first refresh/sleep while serial shell input remains active; stop retires the manager and returns refresh ownership to the bootstrap framebuffer pump |
+| Smoke | `WinMgrStartChecks` uses the same startup path; `python3 scripts/check-compat.py --pci` starts twice, stops, restarts, and stops the manager in a booted PCI guest. The focused `--probe-live-winmgr --probe-live-winmgr-wake` checks continue to cover source-manager refresh and timer wake behavior |
+| Limits | The commands do not initialize the full ZealOS desktop or create normal application tasks. Manual UTM acceptance is still needed to confirm the framebuffer and tablet behave with the source manager running; `winmgrstop` returns to the bridge-only session |
 
 ## Open compatibility probe — `/System/Win.ZC`
 

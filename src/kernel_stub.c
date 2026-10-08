@@ -4700,6 +4700,13 @@ static void shell_handle(const char *line, int *done) {
             con_puts("winmgr: start failed; check serial diagnostics or reboot\n");
         return;
     }
+    if (streq(line, "winmgrstop")) {
+        if (!zc_stop_winmgr())
+            con_puts("winmgr: stopped; bootstrap framebuffer pump resumed\n");
+        else
+            con_puts("winmgr: stop failed; restart the VM to reset the session\n");
+        return;
+    }
     if (streq(line, "zvol")) {
         if (zss_available()) {
             con_puts("zvol: source partition ready bank=");
@@ -4837,7 +4844,7 @@ static void shell_handle(const char *line, int *done) {
 #endif
     if (streq(line, "help")) {
 #ifndef ZEAL_PI_DIAG
-        con_puts("Native compiler: zcheck | zvol | zls | zgc | zedit <path> | zrm <path> | zverify <path> | zload /path.ZC | zput Name.ZC <source> | zrecv Name.ZC <bytes> <crc32> | zload disk:Name.ZC | zc <source> | zcall Function | zstatus | zreset | winmgr | fbquiet | fbshow\n");
+        con_puts("Native compiler: zcheck | zvol | zls | zgc | zedit <path> | zrm <path> | zverify <path> | zload /path.ZC | zput Name.ZC <source> | zrecv Name.ZC <bytes> <crc32> | zload disk:Name.ZC | zc <source> | zcall Function | zstatus | zreset | winmgr | winmgrstop | fbquiet | fbshow\n");
         con_puts("Window test order: zreset -> zload /Kernel/KernelA.HH -> zload /Kernel/KernelB.HH\n");
         con_puts("  -> zload /Tests/WindowDragLive.ZC -> zcall WindowDragLiveStart; stop: zcall WindowDragLiveStop\n");
 #endif

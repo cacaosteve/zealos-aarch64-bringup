@@ -203,6 +203,12 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 'winmgr: upstream Window Manager running; shell remains on serial')
         command('winmgr',
                 'winmgr: upstream Window Manager running; shell remains on serial')
+        command('winmgrstop',
+                'winmgr: stopped; bootstrap framebuffer pump resumed')
+        command('winmgr',
+                'winmgr: upstream Window Manager running; shell remains on serial')
+        command('winmgrstop',
+                'winmgr: stopped; bootstrap framebuffer pump resumed')
         command('zreset', 'zc: native compiler ready')
         command('zvol', 'zvol: source partition ready' if args.pci else
                          'zvol: source partition unavailable')

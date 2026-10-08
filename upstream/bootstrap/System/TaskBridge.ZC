@@ -1765,6 +1765,29 @@ I64 BootstrapWinMgrStart()
         return 3;
     return 0x2a;
 }
+I64 BootstrapWinMgrStop()
+{//Return ownership to the shell's bootstrap frame pump for UTM diagnostics.
+    CTask *root = sys_task, *manager = sys_winmgr_task;
+    if (!TaskValidate(root) || Fs != root)
+        return 1;
+    if (!TaskValidate(manager) || manager == root)
+    {
+        sys_winmgr_task = root;
+        LBtr(&sys_run_level, RLf_WINMGR);
+        return 0x2a;
+    }
+    // The source KTask Kill intentionally protects sys_winmgr_task. This
+    // bootstrap runtime binds Kill to its synchronous guest-task teardown, so
+    // move the ring sentinel first and then retire the parked manager fiber.
+    sys_winmgr_task = root;
+    if (!Kill(manager, TRUE, FALSE))
+    {
+        sys_winmgr_task = manager;
+        return 2;
+    }
+    LBtr(&sys_run_level, RLf_WINMGR);
+    return 0x2a;
+}
 // Doc recalculation may load after the task bridge. The host thunk resolves
 // the guest function at call time and safely skips it until it is defined.
 Bool TextChar(CTask *task, Bool allow_border=FALSE, I64 x=0, I64 y=0, I64 d=0)

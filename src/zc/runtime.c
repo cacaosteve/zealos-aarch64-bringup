@@ -4054,6 +4054,12 @@ int zc_start_winmgr(void) {
         return -1;
     return result == 0x2a ? 0 : -1;
 }
+int zc_stop_winmgr(void) {
+    int64_t result = 0;
+    if (!ready || failed || zc_call("BootstrapWinMgrStop", &result) != 0)
+        return -1;
+    return result == 0x2a ? 0 : -1;
+}
 void zc_status(void) {
     size_t used[2] = {0}, blocks[2] = {0};
     for (unsigned a = 0; a < 2; a++)
