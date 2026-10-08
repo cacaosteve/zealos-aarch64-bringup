@@ -44,6 +44,14 @@ Expect **4**, **0**, **8**.
    the `disk:` prefix. (`/Kernel/...` is the RedSea/QEMU path.) Run `make utm`
    once after adding a bundled source file; refresh preserves guest edits and
    deletion masks while adding files missing from the existing source bank.
+   If an existing bundled file has changed, `make utm` keeps its older guest
+   copy. Stop the VM and replace that entry explicitly, for example:
+
+   ```sh
+   python3 scripts/source-volume.py put \
+     /path/to/ZealosAarch64Hello.utm/Data/Omarchy-QEMU.raw \
+     tests/compat/WindowDragLive.ZC Tests/WindowDragLive.ZC
+   ```
 
 ```text
 zreset
