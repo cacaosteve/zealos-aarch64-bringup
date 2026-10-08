@@ -1353,11 +1353,13 @@ CDC bootstrap_planar_dc, bootstrap_planar_cache_dc;
 U32 bootstrap_present_raw[800 * 600];
 U8 bootstrap_present_cache[800 * 600];
 U64 bootstrap_text_colors[16];
+U64 bootstrap_text_bits[256];
 I64 bootstrap_gr_text_updates = 0;
 I64 bootstrap_gr_screen_updates = 0;
 I64 bootstrap_gr_planar_updates = 0;
 Bool bootstrap_present_cache_ready = FALSE;
 Bool bootstrap_present_ready = FALSE;
+Bool bootstrap_gr_packed_tables_ready = FALSE;
 bootstrap_graphics_dc.body = bootstrap_graphics_pixels;
 bootstrap_graphics_dc.width = 800;
 bootstrap_graphics_dc.width_internal = 800;
@@ -1481,6 +1483,44 @@ U0 BootstrapBindGrTaskTables(CGrGlobals *active_gr)
     active_gr->win_z_buf = bootstrap_win_z_buf;
     active_gr->win_uncovered_bitmap = bootstrap_win_uncovered;
 }
+U0 BootstrapGrPackedTablesInit(CGrGlobals *active_gr)
+{//Build the packed 8-pixel masks needed by unchanged GrRect/GrBitMap routines.
+    I64 i, bit;
+    U64 mask;
+    if (!active_gr)
+        return;
+    if (!bootstrap_gr_packed_tables_ready)
+    {
+        for (i = 0; i < 16; i++)
+            bootstrap_text_colors[i] = i * 0x0101010101010101;
+        for (i = 0; i < 256; i++)
+        {
+            mask = 0;
+            for (bit = 0; bit < 8; bit++)
+                if (i & (1 << bit))
+                    mask |= 0xFF << (8 * bit);
+            bootstrap_text_bits[i] = mask;
+        }
+        bootstrap_gr_packed_tables_ready = TRUE;
+    }
+    active_gr->to_8_bits = bootstrap_text_bits;
+    active_gr->to_8_colors = bootstrap_text_colors;
+}
+I64 BootstrapGrPackedTablesChecks()
+{//Verify the active source graphics global has valid 8-pixel lookup tables.
+    CGrGlobals *active_gr = ZcActiveGrGlobals();
+    if (!active_gr)
+        return 0;
+    BootstrapGrPackedTablesInit(active_gr);
+    if (active_gr->to_8_bits != bootstrap_text_bits ||
+        active_gr->to_8_colors != bootstrap_text_colors ||
+        bootstrap_text_bits[0x01] != 0x00000000000000FF ||
+        bootstrap_text_bits[0x55] != 0x00FF00FF00FF00FF ||
+        bootstrap_text_bits[0x80] != 0xFF00000000000000 ||
+        bootstrap_text_colors[14] != 0x0E0E0E0E0E0E0E0E)
+        return 0;
+    return 0x2a;
+}
 
 Bool IsPixCovered0(CTask *task, I64 x, I64 y)
 {//Match GrAsm.ZC's cell z-buffer comparison; coordinates are pixel units.
@@ -1556,6 +1596,7 @@ U0 GrSetUpTables()
 
     if (!active_gr)
         active_gr = &gr;
+    BootstrapGrPackedTablesInit(active_gr);
     BootstrapBindGrTaskTables(active_gr);
     MemSet(bootstrap_win_z_buf, 0, sizeof(bootstrap_win_z_buf));
     MemSet(bootstrap_win_uncovered, 0, sizeof(bootstrap_win_uncovered));
@@ -3535,10 +3576,9 @@ Bool BootstrapTryUpstreamGrUpdateScreen()
     active_gr = ZcActiveGrGlobals();
     if (!active_gr)
         active_gr = &gr;
+    BootstrapGrPackedTablesInit(active_gr);
     BootstrapBindGrTaskTables(active_gr);
     bootstrap_present_ready = FALSE;
-    for (i = 0; i < 16; i++)
-        bootstrap_text_colors[i] = i * 0x0101010101010101;
     bootstrap_present_ready = TRUE;
     active_gr->dc = &bootstrap_graphics_dc;
     active_gr->dc2 = &bootstrap_graphics_dc;
@@ -3546,7 +3586,6 @@ Bool BootstrapTryUpstreamGrUpdateScreen()
     active_gr->dc_cache = &bootstrap_planar_cache_dc;
     active_gr->zoomed_dc = &bootstrap_zoom_dc;
     active_gr->text_base = bootstrap_text_base;
-    active_gr->to_8_colors = bootstrap_text_colors;
     if (active_gr->screen_zoom < 1 || active_gr->screen_zoom > 8)
         active_gr->screen_zoom = 1;
     active_gr->screen_cache = bootstrap_present_cache;
@@ -3610,8 +3649,7 @@ U0 BootstrapGrUpdateTasks()
         active_gr = &gr;
     BootstrapBindGrTaskTables(active_gr);
     bootstrap_present_ready = FALSE;
-    for (i = 0; i < 16; i++)
-        bootstrap_text_colors[i] = i * 0x0101010101010101;
+    BootstrapGrPackedTablesInit(active_gr);
     bootstrap_present_ready = TRUE;
     // Bind the upstream rasterizers to the bootstrap frame surface.
     // Task/window draws already target this same CDC through DCAlias.
@@ -3621,7 +3659,6 @@ U0 BootstrapGrUpdateTasks()
     active_gr->dc_cache = &bootstrap_planar_cache_dc;
     active_gr->zoomed_dc = &bootstrap_zoom_dc;
     active_gr->text_base = bootstrap_text_base;
-    active_gr->to_8_colors = bootstrap_text_colors;
     if (active_gr->screen_zoom < 1 || active_gr->screen_zoom > 8)
         active_gr->screen_zoom = 1;
     active_gr->screen_cache = bootstrap_present_cache;

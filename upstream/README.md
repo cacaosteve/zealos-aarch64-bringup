@@ -2874,9 +2874,18 @@ Freeze catalog unchanged.
 | Item | Path |
 |--|--|
 | Gap | Starting `WinMgrTask` had no visible interactive fixture, so UTM acceptance could not distinguish a live frame/input path from a shell that merely remained responsive |
-| Bring-up | Add `windowdemo`/`windowdemostop`: load the source-backed `WindowDragLive` fixture without its CDC control, render two bordered tasks through the bounded bootstrap frame/input path, and keep a safe stop path. The helper temporarily selects bridge frames while this boot mode lacks the complete ZealOS CDC/control initialization |
-| Smoke | `python3 scripts/check-compat.py --pci --quick` launches the demo, forces a task redraw, checks both fixture draw callbacks, stops it, then continues the compiler and persistent-source gates |
-| Limits | The fixture is a bridge-backed acceptance demo, not normal desktop startup. In UTM, type `windowdemo`, verify the two windows and try title-bar drag, click-to-raise, and corner resize; type `windowdemostop` to return to the shell. The custom control and full source compositor remain separate open work |
+| Bring-up | Add `windowdemo`/`windowdemostop`: load the source-backed `WindowDragLive` fixture, render two bordered tasks through the bounded bootstrap frame/input path, and keep a safe stop path |
+| Smoke | See Milestone 246 for source-compositor rendering and the control CDC pixel check |
+| Limits | The fixture is a bridge-backed window-manager acceptance demo, not normal desktop startup. In UTM, type `windowdemo`, verify both windows and try title-bar drag, click-to-raise, and corner resize; type `windowdemostop` to return to the shell. The custom control and full source compositor remain separate work |
+
+## Milestone 246 — initialize packed color masks for source CDC drawing
+
+| Item | Path |
+|--|--|
+| Gap | Unchanged `GrRect` faults when the active source graphics global has a null `to_8_bits` lookup table; the control fixture exposed this during source-compositor drawing |
+| Bring-up | Initialize and bind the 256-entry one-bit-to-eight-pixel mask table and the 16-entry repeated-color table for every active source `gr` global |
+| Smoke | `BootstrapGrPackedTablesChecks` checks representative masks/colors; `python3 scripts/check-compat.py --pci --probe-window-buttons` exercises the source `GrRect` CDC path and verifies the drawn control pixel. The `--quick` suite checks table initialization and the safe bridge-backed `windowdemo` lifecycle |
+| Limits | The bridge table covers the current 8-bit staged surface and basic `GrRect` path; it does not initialize the remaining planar, brush, sprite, and full palette tables. Repeated source-control output in the live manager session is not yet stable; manual UTM pointer acceptance is still required |
 
 ## Open compatibility probe — `/System/Win.ZC`
 

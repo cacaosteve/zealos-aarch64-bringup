@@ -209,6 +209,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 'winmgr: upstream Window Manager running; shell remains on serial')
         command('winmgrstop',
                 'winmgr: stopped; bootstrap framebuffer pump resumed')
+        command('zcall BootstrapGrPackedTablesChecks',
+                'zc => 0x000000000000002a')
         command('windowdemo',
                 'windowdemo: two ZealOS windows running on bootstrap input/frame pump')
         command('zcall WindowDragLiveBasicRenderChecks',
