@@ -40,8 +40,9 @@ Expect **4**, **0**, **8**.
 
 5. To check real window input, reset the compiler after a failed load, then
    load the upstream declarations and the visual test in this order:
-   In the UTM PCI VM, native source files live on the source partition and use
-   the `disk:` prefix. (`/Kernel/...` is the RedSea/QEMU path.) Run `make utm`
+   The kernel modules must use their canonical `/Kernel/...` paths so the
+   guest installs the ARM64 task bindings when `KernelB.HH` loads. Use `disk:`
+   for the test source stored on the UTM source partition. Run `make utm`
    once after adding a bundled source file; refresh preserves guest edits and
    deletion masks while adding files missing from the existing source bank.
    If an existing bundled file has changed, `make utm` keeps its older guest
@@ -55,11 +56,11 @@ Expect **4**, **0**, **8**.
 
 ```text
 zreset
-zload disk:Kernel/KernelA.HH
-zload disk:Kernel/KernelB.HH
-zload disk:Kernel/SerialDev/Message.ZC
-zload disk:Kernel/Job.ZC
-zload disk:Kernel/KeyDev.ZC
+zload /Kernel/KernelA.HH
+zload /Kernel/KernelB.HH
+zload /Kernel/SerialDev/Message.ZC
+zload /Kernel/Job.ZC
+zload /Kernel/KeyDev.ZC
 zload disk:Tests/WindowDragLive.ZC
 zcall WindowDragLiveButtonChecks
 zcall WindowDragLiveStart
