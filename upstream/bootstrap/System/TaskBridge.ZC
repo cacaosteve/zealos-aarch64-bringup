@@ -40,6 +40,7 @@ extern Bool ZcMouseButtonsUpdate(Bool left, Bool right);
 extern U0 BootstrapMouseHardSample(I64 sample, I64 now_ns);
 extern CMouseStateGlobals *ZcActiveMouseGlobals();
 extern CWinMgrGlobals *ZcActiveWinMgrGlobals();
+extern U0 ZcSetWinMgrTask(CTask *task);
 extern F64 Exp(F64 x);
 // Bootstrap subset of upstream MathODE.ZC; the unchanged full ODE module is
 // pinned but currently triggers a compiler/runtime fault while loading.
@@ -1434,7 +1435,9 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
 U32 bootstrap_text_base[TEXT_COLS * TEXT_ROWS];
 #define BOOTSTRAP_WIN_MAX 64
 U16 bootstrap_win_z_buf[TEXT_COLS * TEXT_ROWS];
-U16 bootstrap_win_uncovered[(BOOTSTRAP_WIN_MAX + 15) / 16];
+// ZealOS's GrUpdateTasks tests bitmap bit `win_z_num` directly; bit zero is
+// reserved, so the bridge needs one extra bit beyond the window count.
+U16 bootstrap_win_uncovered[(BOOTSTRAP_WIN_MAX + 16) / 16];
 U32 bootstrap_win_uncovered_cells[BOOTSTRAP_WIN_MAX];
 public class CGrGlobals
 {
@@ -1794,13 +1797,19 @@ I64 BootstrapWinMgrStart()
     // inserts the new manager. Yield once so the real source task reaches its
     // first WinMgrSleep before returning control to the host shell.
     sys_winmgr_task = root;
+    // Runtime-loaded source units can leave an older `sys_winmgr_task` hash
+    // cell in the manager's compiled references. Synchronize the active
+    // ZealOS global as well as this bridge unit's slot before WinMgrTask runs.
+    ZcSetWinMgrTask(root);
     manager = Spawn(&WinMgrTask, NULL, "Window Manager", -1, root);
     if (!TaskValidate(manager))
     {
         sys_winmgr_task = root;
+        ZcSetWinMgrTask(root);
         return 2;
     }
     sys_winmgr_task = manager;
+    ZcSetWinMgrTask(manager);
     Yield;
     if (!TaskValidate(manager) || sys_winmgr_task != manager)
         return 3;
@@ -1814,6 +1823,7 @@ I64 BootstrapWinMgrStop()
     if (!TaskValidate(manager) || manager == root)
     {
         sys_winmgr_task = root;
+        ZcSetWinMgrTask(root);
         LBtr(&sys_run_level, RLf_WINMGR);
         return 0x2a;
     }
@@ -1821,9 +1831,11 @@ I64 BootstrapWinMgrStop()
     // bootstrap runtime binds Kill to its synchronous guest-task teardown, so
     // move the ring sentinel first and then retire the parked manager fiber.
     sys_winmgr_task = root;
+    ZcSetWinMgrTask(root);
     if (!Kill(manager, TRUE, FALSE))
     {
         sys_winmgr_task = manager;
+        ZcSetWinMgrTask(manager);
         return 2;
     }
     LBtr(&sys_run_level, RLf_WINMGR);
@@ -4133,7 +4145,7 @@ U0 WinZBufUpdate()
 
     MemSet(gr.win_z_buf, 0, TEXT_COLS * TEXT_ROWS * sizeof(U16));
     MemSet(gr.win_uncovered_bitmap, 0,
-           (BOOTSTRAP_WIN_MAX + 15) / 16 * sizeof(U16));
+           (BOOTSTRAP_WIN_MAX + 16) / 16 * sizeof(U16));
     MemSet(bootstrap_win_uncovered_cells, 0,
            BOOTSTRAP_WIN_MAX * sizeof(U32));
     gr.highest_uncovered = 0;
@@ -4185,7 +4197,7 @@ U0 WinZBufUpdate()
     {
         if (bootstrap_win_uncovered_cells[i])
         {
-            gr.win_uncovered_bitmap[i / 16] |= 1 << (i % 16);
+            gr.win_uncovered_bitmap[(i + 1) / 16] |= 1 << ((i + 1) % 16);
             gr.highest_uncovered = i + 1;
         }
     }
@@ -4195,7 +4207,7 @@ Bool BootstrapWinIsUncovered(CTask *task)
     I64 z;
     if (!task || !(z = task->win_z_num) || z > BOOTSTRAP_WIN_MAX)
         return FALSE;
-    return gr.win_uncovered_bitmap[(z - 1) / 16] & (1 << ((z - 1) % 16));
+    return gr.win_uncovered_bitmap[z / 16] & (1 << (z % 16));
 }
 I64 ExeFile(U8 *filename, I64 ccf_flags=0)
 {

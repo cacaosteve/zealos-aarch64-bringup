@@ -20,6 +20,8 @@ p.add_argument('--probe-live-winmgr', action='store_true',
                help='start WinMgrTask and verify its first refresh and RLf_WINMGR marker')
 p.add_argument('--probe-live-winmgr-wake', action='store_true',
                help='after the first refresh, leave the manager running through its timer wake')
+p.add_argument('--probe-live-window-control', action='store_true',
+               help='verify source CDC control rendering while WinMgrTask remains active')
 p.add_argument('--probe-task-jobs', action='store_true', help='check CPU-0 callback jobs after loading pinned task headers')
 p.add_argument('--probe-window-buttons', action='store_true', help='check live task-window title buttons in a disposable guest')
 p.add_argument('--probe-source', type=pathlib.Path, action='append',
@@ -37,7 +39,13 @@ if args.probe_live_winmgr and not args.probe_grscreen:
     p.error('--probe-live-winmgr requires --probe-grscreen')
 if args.probe_live_winmgr_wake and not args.probe_live_winmgr:
     p.error('--probe-live-winmgr-wake requires --probe-live-winmgr')
-log_path = ROOT / 'build' / ('check-window-buttons.log' if args.probe_window_buttons else
+if args.probe_live_window_control and not (
+        args.probe_module == '/System/Win.ZC' and args.probe_winmgr and
+        args.probe_grscreen and args.probe_live_winmgr):
+    p.error('--probe-live-window-control requires --probe-module /System/Win.ZC '
+            '--probe-winmgr --probe-grscreen --probe-live-winmgr')
+log_path = ROOT / 'build' / ('check-live-window-control.log' if args.probe_live_window_control else
+                             'check-window-buttons.log' if args.probe_window_buttons else
                              'check-winmgr-live.log' if args.probe_live_winmgr else
                              'check-module-probe.log' if args.probe_module else
                              'check-upstream-probe.log' if args.probe_upstream else
@@ -530,6 +538,11 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                                     'zc => 0x000000000000002a')
                             command('zcall WinMgrStartChecks',
                                     'zc => 0x000000000000002a', timeout=30)
+                            if args.probe_live_window_control:
+                                command('zload /Tests/WindowDragLive.ZC',
+                                        'zc: loaded /Tests/WindowDragLive.ZC')
+                                command('zcall WindowDragLiveManagerChecks',
+                                        'zc => 0x000000000000002a', timeout=30)
                             command('zcall WinMgrMousePipelineChecks',
                                     'zc => 0x000000000000002a', timeout=30)
                             command('zcall WinMgrSourceDragChecks',

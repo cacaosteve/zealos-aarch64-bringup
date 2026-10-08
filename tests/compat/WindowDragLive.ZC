@@ -4,6 +4,7 @@ extern Bool ZcTaskFrameRun();
 extern I64 ZcFbTextPixel(I64 x, I64 y);
 extern Bool TextLenStr(CTask *task, I64 x, I64 y, I64 len, I64 attr, U8 *str);
 extern U0 BootstrapDrawTaskWin(CTask *task);
+extern CWinMgrGlobals *ZcActiveWinMgrGlobals();
 CTask *window_drag_live_a;
 CTask *window_drag_live_b;
 CCtrl window_drag_live_right_control;
@@ -15,6 +16,7 @@ I64 window_drag_live_control_draw_count;
 I64 window_drag_live_control_pixel;
 I64 window_drag_live_control_dc_matches;
 I64 window_drag_live_presented_pixel;
+I64 window_drag_live_start_reason;
 
 U0 WindowDragLivePark(U8 *data)
 {
@@ -110,16 +112,24 @@ I64 WindowDragLiveStop()
 
 I64 WindowDragLiveStartInternal(Bool with_control)
 {
+    window_drag_live_start_reason = 0;
     if (TaskValidate(window_drag_live_a) || TaskValidate(window_drag_live_b))
+    {
+        window_drag_live_start_reason = 1;
         return 0;
+    }
     window_drag_live_a = Spawn(&WindowDragLivePark, NULL, "WinDragLiveA");
     if (!window_drag_live_a)
+    {
+        window_drag_live_start_reason = 2;
         return 0;
+    }
     window_drag_live_b = Spawn(&WindowDragLivePark, NULL, "WinDragLiveB");
     if (!window_drag_live_b)
     {
         Kill(window_drag_live_a);
         window_drag_live_a = NULL;
+        window_drag_live_start_reason = 3;
         return 0;
     }
     window_drag_live_a->display_flags = 1 << DISPLAYf_SHOW;
@@ -135,6 +145,7 @@ I64 WindowDragLiveStartInternal(Bool with_control)
         !WinHorz(38, 77, window_drag_live_b) ||
         !WinVert(20, 39, window_drag_live_b))
     {
+        window_drag_live_start_reason = 4;
         WindowDragLiveStop();
         return 0;
     }
@@ -208,14 +219,39 @@ I64 WindowDragLiveRenderChecks()
         window_drag_live_b->pix_top + window_drag_live_right_control.top +
             (window_drag_live_right_control.bottom -
              window_drag_live_right_control.top) / 2);
-    if (window_drag_live_draw_a_count <= draw_a_before ||
-        window_drag_live_draw_b_count <= draw_b_before ||
-        window_drag_live_control_draw_count <= control_before ||
-        !window_drag_live_control_dc_matches ||
-        window_drag_live_control_pixel != YELLOW ||
-        window_drag_live_presented_pixel != 0x00FFFF55)
-        return 2;
+    if (window_drag_live_draw_a_count <= draw_a_before)
+        return 4;
+    if (window_drag_live_draw_b_count <= draw_b_before)
+        return 5;
+    if (window_drag_live_control_draw_count <= control_before)
+        return 6;
+    if (!window_drag_live_control_dc_matches)
+        return 7;
+    if (window_drag_live_control_pixel != YELLOW)
+        return 8;
+    if (window_drag_live_presented_pixel != 0x00FFFF55)
+        return 9;
     return 42;
+}
+
+I64 WindowDragLiveManagerChecks()
+{//Verify the CDC control while the scheduled ZealOS window manager is active.
+    CWinMgrGlobals *active_winmgr = ZcActiveWinMgrGlobals();
+    I64 updates_before, result;
+
+    if (!TaskValidate(sys_winmgr_task) || sys_winmgr_task == Fs ||
+        !Bt(&sys_run_level, RLf_WINMGR) || !active_winmgr)
+        return 1;
+    if (WindowDragLiveStart() != 42)
+        return 10 + window_drag_live_start_reason;
+    updates_before = active_winmgr->updates;
+    Sleep(50);
+    if (active_winmgr->updates <= updates_before)
+        result = 3;
+    else
+        result = WindowDragLiveRenderChecks();
+    WindowDragLiveStop();
+    return result;
 }
 
 I64 WindowDragLiveButtonChecks()

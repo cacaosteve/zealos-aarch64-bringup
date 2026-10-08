@@ -7,7 +7,7 @@ extern I64 bootstrap_upstream_ode_updates;
 extern I64 bootstrap_upstream_gr_update_tasks;
 extern I64 bootstrap_upstream_gr_update_screen;
 extern U16 bootstrap_win_z_buf[TEXT_COLS * TEXT_ROWS];
-extern U16 bootstrap_win_uncovered[(BOOTSTRAP_WIN_MAX + 15) / 16];
+extern U16 bootstrap_win_uncovered[(BOOTSTRAP_WIN_MAX + 16) / 16];
 extern Bool BootstrapCanUseUpstreamGrUpdateTasks();
 extern Bool ZcWinMouseUpdate();
 extern CWinMgrGlobals *ZcActiveWinMgrGlobals();

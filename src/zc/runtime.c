@@ -1151,6 +1151,17 @@ static int64_t host_active_winmgr_globals(int64_t *a) {
                ? (int64_t)(uintptr_t)global->data_addr
                : 0;
 }
+static int64_t host_set_winmgr_task(int64_t *a) {
+    CHashGlblVar *global;
+    if (!Fs || !Fs->hash_table)
+        return 0;
+    global = (CHashGlblVar *)HashFind("sys_winmgr_task", Fs->hash_table,
+                                     HTT_GLBL_VAR, 1);
+    if (!global || !global->data_addr)
+        return 0;
+    *(void **)global->data_addr = (void *)(uintptr_t)a[0];
+    return 1;
+}
 static int64_t host_win_mouse_update(int64_t *a) {
     CHashFun *update;
     (void)a;
@@ -3601,6 +3612,7 @@ static int load_inner(const char *path) {
         PrsBindCSymbol("ZcActiveGrGlobals", host_active_gr_globals, 0);
         PrsBindCSymbol("ZcActiveMouseGlobals", host_active_mouse_globals, 0);
         PrsBindCSymbol("ZcActiveWinMgrGlobals", host_active_winmgr_globals, 0);
+        PrsBindCSymbol("ZcSetWinMgrTask", host_set_winmgr_task, 1);
     }
     /* Source units can introduce fresh extern declarations after KernelC.HH
      * has been parsed. Rebind the timer hook after each unit so those calls
@@ -3969,6 +3981,7 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
                     {"ZcActiveGrGlobals", host_active_gr_globals, 0},
                     {"ZcActiveMouseGlobals", host_active_mouse_globals, 0},
                     {"ZcActiveWinMgrGlobals", host_active_winmgr_globals, 0},
+                    {"ZcSetWinMgrTask", host_set_winmgr_task, 1},
                     {"ZcFbTextFlushRect", host_fb_text_flush_rect, 6},
                     {"ZcFbGraphPlot", host_fb_graph_plot, 7},
                     {"ZcFbGraphRect", host_fb_graph_rect, 9},

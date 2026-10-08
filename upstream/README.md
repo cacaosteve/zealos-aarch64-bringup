@@ -2885,7 +2885,16 @@ Freeze catalog unchanged.
 | Gap | Unchanged `GrRect` faults when the active source graphics global has a null `to_8_bits` lookup table; the control fixture exposed this during source-compositor drawing |
 | Bring-up | Initialize and bind the 256-entry one-bit-to-eight-pixel mask table and the 16-entry repeated-color table for every active source `gr` global |
 | Smoke | `BootstrapGrPackedTablesChecks` checks representative masks/colors; `python3 scripts/check-compat.py --pci --probe-window-buttons` exercises the source `GrRect` CDC path and verifies the drawn control pixel. The `--quick` suite checks table initialization and the safe bridge-backed `windowdemo` lifecycle |
-| Limits | The bridge table covers the current 8-bit staged surface and basic `GrRect` path; it does not initialize the remaining planar, brush, sprite, and full palette tables. Repeated source-control output in the live manager session is not yet stable; manual UTM pointer acceptance is still required |
+| Limits | The bridge table covers the current 8-bit staged surface and basic `GrRect` path; it does not initialize the remaining planar, brush, sprite, and full palette tables. Manual UTM pointer acceptance is still required |
+
+## Milestone 247 — render source CDC controls with WinMgrTask active
+
+| Item | Path |
+|--|--|
+| Gap | Source CDC controls drew in an isolated fixture, but drawing their callbacks repeatedly while the scheduled source window manager owned refresh had not been verified |
+| Bring-up | Synchronize the active ZealOS `sys_winmgr_task` global when the bridge starts/stops `WinMgrTask`; align the bridge's uncovered-window bitmap with upstream `GrUpdateTasks`, which indexes by z number and reserves bit zero |
+| Smoke | `WindowDragLiveManagerChecks` starts two fixture windows with the source manager running, waits for a manager refresh, then verifies both task draw callbacks, the right-control callback, its active CDC, the control pixel, and the presented framebuffer pixel. `python3 scripts/check-compat.py --pci --probe-module /System/Win.ZC --probe-winmgr --probe-grscreen --probe-live-winmgr --probe-live-window-control` passes; `--quick` and the standalone `--probe-window-buttons` regressions also pass |
+| Limits | This is a deterministic QEMU test with synthetic windows, not normal ZealOS desktop startup or manual UTM pointer acceptance. Full graphics-table initialization and ordinary application/window lifecycle remain open |
 
 ## Open compatibility probe — `/System/Win.ZC`
 
