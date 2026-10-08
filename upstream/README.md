@@ -2932,6 +2932,15 @@ Freeze catalog unchanged.
 | Smoke | The focused source WinMgr probe passes all focus/raise, movement, resize, captured-control, right-click, and wheel checks using the same submission path |
 | Limits | This confirms source-side routing under QEMU with synthetic samples; physical UTM tablet and mouse acceptance remains outstanding |
 
+## Milestone 252 — verify source-manager cursor presentation
+
+| Item | Path |
+|--|--|
+| Gap | The cursor had framebuffer checks in the bridge-driven frame smoke, but no live probe proved the unchanged `WinMgrTask` presented it after consuming a tablet event |
+| Bring-up | Extend `WindowDragLiveManagerChecks` to submit an absolute tablet position while the source manager is active and check both its cursor draw callback and a known white cursor pixel in the Limine framebuffer |
+| Smoke | `python3 scripts/check-compat.py --pci --probe-module /System/Win.ZC --probe-winmgr --probe-grscreen --probe-live-winmgr --probe-live-window-control` passes the cursor check together with source-window draw, control, and input checks |
+| Limits | This proves the interim software cursor is presented in the live QEMU manager path. Physical UTM cursor placement and appearance still require an interactive UTM check; hardware sprites and grab-scroll cursor remain unported |
+
 ## Open compatibility probe — `/System/Win.ZC`
 
 The source probe loads pinned `KernelC.HH`, `Externs.ZC`, and `Gr.HH` before compiling unchanged `Win.ZC`. Graphics dimensions and mouse globals are probe fixtures; `DrawMenu` and the initial `GrScaleZoom` definition are compile-time fixtures until unchanged `GrScreen.ZC` is loaded later in the probe. `GrScreenFinalUpdateChecks` executes `WinFinalUpdate` through the staged idle-frame path, confirms the fixture's `mouse_grid.coord` toggles the real coordinate-text overlay, checks a separate visible guest overlay callback, verifies the software arrow against Limine framebuffer pixels, and exercises `WinMouseUpdate`'s edge recentering through the runtime dispatch. `WinMousePointerStateCheck` covers transformed tablet coordinates and `WinMouseHardStateCheck` covers the source mouse-state ABI; manual UTM pointer acceptance is still pending. The raw ARM generic-timer binding and a standalone F64 clock expression are smoke-tested before the Win load.

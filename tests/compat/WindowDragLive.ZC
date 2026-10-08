@@ -2,6 +2,7 @@
 // Load this source, call WindowDragLiveStart, then WindowDragLiveStop when done.
 extern Bool ZcTaskFrameRun();
 extern I64 ZcFbTextPixel(I64 x, I64 y);
+extern I64 bootstrap_mouse_draw_calls;
 extern Bool TextLenStr(CTask *task, I64 x, I64 y, I64 len, I64 attr, U8 *str);
 extern U0 BootstrapDrawTaskWin(CTask *task);
 extern Bool BootstrapCtrlInputSubmit(CTask *task, I64 sample, I64 now_ns);
@@ -240,9 +241,10 @@ I64 WindowDragLiveManagerChecks()
 {//Verify live source control drawing and input through WinMgrTask.
     CWinMgrGlobals *active_winmgr = ZcActiveWinMgrGlobals();
     CTask *old_focus = sys_focus_task;
-    I64 updates_before, result, x, y;
+    I64 updates_before, result, x, y, cursor_draws_before;
     F64 old_scale_x = mouse.scale.x, old_scale_y = mouse.scale.y;
     I64 old_offset_x = mouse.offset.x, old_offset_y = mouse.offset.y;
+    Bool old_mouse_show = mouse.show;
 
     if (!TaskValidate(sys_winmgr_task) || sys_winmgr_task == Fs ||
         !Bt(&sys_run_level, RLf_WINMGR) || !active_winmgr)
@@ -255,6 +257,24 @@ I64 WindowDragLiveManagerChecks()
         result = 3;
     else
         result = WindowDragLiveRenderChecks();
+
+    if (!result)
+    {
+        // Confirm the source manager's final-overlay callback presents the
+        // software tablet cursor above its composed windows, not just that
+        // the bridge can draw a cursor in an isolated frame smoke.
+        mouse.scale.x = mouse.scale.y = 1.0;
+        mouse.offset.x = mouse.offset.y = 0;
+        mouse.show = TRUE;
+        cursor_draws_before = bootstrap_mouse_draw_calls;
+        BootstrapCtrlInputSubmit(window_drag_live_b,
+                                 760 | (540 << 16), ZcMonotonicNs());
+        Sleep(50);
+        if (bootstrap_mouse_draw_calls <= cursor_draws_before)
+            result = 19;
+        else if (ZcFbTextPixel(761, 542) != 0x00FFFFFF)
+            result = 23;
+    }
 
     if (!result)
     {
@@ -291,11 +311,12 @@ I64 WindowDragLiveManagerChecks()
             result = 22;
         BootstrapCtrlInputSubmit(window_drag_live_b, x | (y << 16),
                                  ZcMonotonicNs());
-        mouse.scale.x = old_scale_x;
-        mouse.scale.y = old_scale_y;
-        mouse.offset.x = old_offset_x;
-        mouse.offset.y = old_offset_y;
     }
+    mouse.scale.x = old_scale_x;
+    mouse.scale.y = old_scale_y;
+    mouse.offset.x = old_offset_x;
+    mouse.offset.y = old_offset_y;
+    mouse.show = old_mouse_show;
     sys_focus_task = old_focus;
     WindowDragLiveStop();
     return result;
