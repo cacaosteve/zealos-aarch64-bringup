@@ -2949,6 +2949,14 @@ Freeze catalog unchanged.
 | Bring-up | While `windowdemo` owns focus, consume only Ctrl+C from the VirtIO keyboard character ring and stop the fixture; preserve other queued characters for the focused ZealOS task |
 | Smoke | Existing `windowdemo` lifecycle and live-window-control regressions; UTM acceptance: start `windowdemo`, verify the windows display, then press Ctrl+C and confirm the shell prompt returns |
 
+## Milestone 254 — identify UTM window-demo startup failures
+
+| Item | Path |
+|--|--|
+| Gap | The UTM shell collapsed manager, frame-path, fixture-load, fixture-start, and manager-restart failures into one generic message |
+| Bring-up | Report the failing startup stage in the native runtime while preserving cleanup of the bridge frame path and fixture tasks |
+| Smoke | The focused PCI graphics/window-manager compatibility suite still starts and stops `windowdemo`; live UTM acceptance records any stage diagnostic if fixture startup fails |
+
 ## Open compatibility probe — `/System/Win.ZC`
 
 The source probe loads pinned `KernelC.HH`, `Externs.ZC`, and `Gr.HH` before compiling unchanged `Win.ZC`. Graphics dimensions and mouse globals are probe fixtures; `DrawMenu` and the initial `GrScaleZoom` definition are compile-time fixtures until unchanged `GrScreen.ZC` is loaded later in the probe. `GrScreenFinalUpdateChecks` executes `WinFinalUpdate` through the staged idle-frame path, confirms the fixture's `mouse_grid.coord` toggles the real coordinate-text overlay, checks a separate visible guest overlay callback, verifies the software arrow against Limine framebuffer pixels, and exercises `WinMouseUpdate`'s edge recentering through the runtime dispatch. `WinMousePointerStateCheck` covers transformed tablet coordinates and `WinMouseHardStateCheck` covers the source mouse-state ABI; manual UTM pointer acceptance is still pending. The raw ARM generic-timer binding and a standalone F64 clock expression are smoke-tested before the Win load.

@@ -4083,12 +4083,17 @@ int zc_start_window_demo(void) {
         zc_output("windowdemo: already loaded; stop it before restarting\n");
         return -1;
     }
-    if (zc_stop_winmgr() != 0)
+    if (zc_stop_winmgr() != 0) {
+        zc_output("windowdemo: could not stop the source window manager\n");
         return -1;
-    if (zc_call("BootstrapFrameUseBridge", &result) != 0 || result != 0x2a)
+    }
+    if (zc_call("BootstrapFrameUseBridge", &result) != 0 || result != 0x2a) {
+        zc_output("windowdemo: could not select the framebuffer bridge\n");
         return -1;
+    }
     if (zc_load("/Tests/WindowDragLive.ZC") != 0) {
         (void)zc_call("BootstrapFrameUseSource", NULL);
+        zc_output("windowdemo: could not load the WindowDragLive fixture\n");
         return -1;
     }
     window_demo_loaded = 1;
@@ -4096,14 +4101,14 @@ int zc_start_window_demo(void) {
         (void)zc_call("WindowDragLiveStop", NULL);
         (void)zc_call("BootstrapFrameUseSource", NULL);
         window_demo_loaded = 0;
-        zc_output("windowdemo: fixture start failed\n");
+        zc_output("windowdemo: WindowDragLiveStart failed\n");
         return -1;
     }
     if (zc_start_winmgr() != 0) {
         (void)zc_call("WindowDragLiveStop", NULL);
         (void)zc_call("BootstrapFrameUseSource", NULL);
         window_demo_loaded = 0;
-        zc_output("windowdemo: manager start failed; fixture stopped\n");
+        zc_output("windowdemo: source window manager restart failed; fixture stopped\n");
         return -1;
     }
     return 0;

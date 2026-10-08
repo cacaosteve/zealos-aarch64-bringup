@@ -134,7 +134,9 @@ resize, right-click capture (the control box turns green while held), and
 close-button check with the real tablet. Its parked demo tasks do not draw a
 task menu. The UTM shell accepts `Ctrl+C` as an escape while this demo has
 keyboard focus; `windowdemostop` also stops it when the shell has focus. The
-automated check cannot replace the interactive UTM check.
+automated check cannot replace the interactive UTM check. If startup fails,
+the shell reports whether it failed to stop the manager, select the bridge
+frame path, load/start the fixture, or restart the source manager.
 
 After window callbacks, `GrUpdateTasks` invokes the optional
 `gr.fp_final_screen_update` callback with `DCF_ON_TOP`. Graphics calls through
