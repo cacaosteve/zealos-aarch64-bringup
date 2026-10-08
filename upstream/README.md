@@ -2857,7 +2857,7 @@ Freeze catalog unchanged.
 |--|--|
 | Gap | The live probe delivered tablet state to `WinMgrTask`, but its title-bar path calls ZealOS `WinToTop`, which needs scheduler task-ring primitives and a valid per-CPU `CTask.gs` pointer |
 | Bring-up | Add the pinned `TaskQueueIns`/`TaskQueueRemove` ring operations, initialize the synthetic root task's `gs` from `cpu_structs`, inherit it on `Spawn` as `KTask.ZC` does, then inject press/move/release samples at visible window borders |
-| Smoke | `WinMgrSourceDragChecks` checks a click on an exposed title-bar segment raises/focuses a partially covered task, moves it by two text cells, and resizes its lower-right corner by three columns and two rows; the PCI graphics/window-manager probe passes |
+| Smoke | `WinMgrSourceDragChecks` checks that an exposed title-bar click raises/focuses a partially covered task, moves it by two text cells, resizes its lower-right corner by three columns and two rows, and delivers a captured control's press/release callbacks after the pointer leaves its bounds; the PCI graphics/window-manager probe passes |
 | Limits | This is deterministic synthetic input in the QEMU harness. Manual UTM pointer acceptance, normal boot-time window/task initialization, and broader interactive desktop behavior remain open |
 
 ## Open compatibility probe — `/System/Win.ZC`

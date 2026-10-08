@@ -109,6 +109,26 @@ I64 WinMgrMousePipelineChecks()
     return 0x2a;
 }
 
+I64 winmgr_live_ctrl_down_count, winmgr_live_ctrl_up_count;
+
+U0 WinMgrLiveCtrlClick(CCtrl *ctrl, I64 x, I64 y, Bool down)
+{
+    if (!ctrl)
+        return;
+    if (x || y) {}
+    if (down)
+    {
+        if (!(ctrl->flags & CTRLF_CLICKED))
+            winmgr_live_ctrl_down_count++;
+        ctrl->flags |= CTRLF_CLICKED;
+    }
+    else
+    {
+        winmgr_live_ctrl_up_count++;
+        ctrl->flags &= ~CTRLF_CLICKED;
+    }
+}
+
 U0 WinMgrDragPark(U8 *data)
 {
     while (TRUE)
@@ -133,6 +153,7 @@ I64 WinMgrSourceDragChecks()
     Bool old_hard_left = mouse_hard.bttns[0], old_hard_right = mouse_hard.bttns[1];
     Bool old_hard_event = mouse_hard.event, old_hard_installed = mouse_hard.installed;
     Bool old_hard_wheel = mouse_hard.has_wheel;
+    CCtrl live_ctrl;
     I64 old_left, old_top, old_right, old_bottom, x, y, result = 0;
 
     drag_task = Spawn(&WinMgrDragPark, NULL, "WinMgrDragProbe");
@@ -234,6 +255,45 @@ I64 WinMgrSourceDragChecks()
         if (drag_task->win_right != old_right + 3 ||
             drag_task->win_bottom != old_bottom + 2)
             result = 9;
+    }
+    if (!result)
+    {
+        MemSet(&live_ctrl, 0, sizeof(CCtrl));
+        live_ctrl.next = live_ctrl.last = &drag_task->next_ctrl;
+        live_ctrl.win_task = drag_task;
+        live_ctrl.flags = CTRLF_SHOW | CTRLF_CAPTURE_LEFT_MS;
+        live_ctrl.left = 2 * FONT_WIDTH;
+        live_ctrl.right = 8 * FONT_WIDTH;
+        live_ctrl.top = 3 * FONT_HEIGHT;
+        live_ctrl.bottom = 6 * FONT_HEIGHT;
+        live_ctrl.left_click = &WinMgrLiveCtrlClick;
+        live_ctrl.screen_left = gr.pan_text_x + drag_task->pix_left + live_ctrl.left;
+        live_ctrl.screen_right = gr.pan_text_x + drag_task->pix_left + live_ctrl.right;
+        live_ctrl.screen_top = gr.pan_text_y + drag_task->pix_top + live_ctrl.top;
+        live_ctrl.screen_bottom = gr.pan_text_y + drag_task->pix_top + live_ctrl.bottom;
+        drag_task->next_ctrl = drag_task->last_ctrl = &live_ctrl;
+        winmgr_live_ctrl_down_count = winmgr_live_ctrl_up_count = 0;
+        x = (live_ctrl.screen_left + live_ctrl.screen_right) / 2;
+        y = (live_ctrl.screen_top + live_ctrl.screen_bottom) / 2;
+        BootstrapMouseHardSample(x | (y << 16) | (1 << 32), ZcMonotonicNs());
+        Sleep(50);
+        if (winmgr_live_ctrl_down_count != 1)
+            result = 10;
+        // Captured controls must keep receiving the held-button path after
+        // the pointer leaves their original hit rectangle.
+        BootstrapMouseHardSample((x + 12 * FONT_WIDTH) |
+                                 ((y + 10 * FONT_HEIGHT) << 16) | (1 << 32),
+                                 ZcMonotonicNs());
+        Sleep(50);
+        BootstrapMouseHardSample((x + 12 * FONT_WIDTH) |
+                                 ((y + 10 * FONT_HEIGHT) << 16),
+                                 ZcMonotonicNs());
+        Sleep(50);
+        if (!result && (winmgr_live_ctrl_down_count != 1 ||
+                        winmgr_live_ctrl_up_count != 1))
+            result = 11;
+        drag_task->next_ctrl = drag_task->last_ctrl = &drag_task->next_ctrl;
+        live_ctrl.next = live_ctrl.last = NULL;
     }
 
 done:
