@@ -2840,6 +2840,17 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
+## Milestone 242 — consume tablet events in the source WinMgr task
+
+| Item | Path |
+|--|--|
+| Gap | The hard-mouse adapter and the unchanged `WinMouseUpdate` contract passed separate checks, but no probe showed the scheduled source manager consuming a pending device event |
+| Bring-up | The live-manager fixture injects one packed absolute-tablet sample after `WinMgrTask` starts and lets the real timer wake run `WinMouseUpdate` |
+| Smoke | `WinMgrMousePipelineChecks` verifies the event is consumed, scaled/offset coordinates and wheel state reach ZealOS mouse globals, and the left-button state is applied; `make esp && python3 scripts/check-compat.py --pci --probe-module /System/Win.ZC --probe-winmgr --probe-grscreen --probe-live-winmgr --probe-live-winmgr-wake` passes |
+| Limits | This proves one source-manager input update, not focus/stacking or window movement driven by a physical UTM click; normal desktop initialization and the full manager input loop remain incomplete |
+
+Freeze catalog unchanged.
+
 ## Open compatibility probe — `/System/Win.ZC`
 
 The source probe loads pinned `KernelC.HH`, `Externs.ZC`, and `Gr.HH` before compiling unchanged `Win.ZC`. Graphics dimensions and mouse globals are probe fixtures; `DrawMenu` and the initial `GrScaleZoom` definition are compile-time fixtures until unchanged `GrScreen.ZC` is loaded later in the probe. `GrScreenFinalUpdateChecks` executes `WinFinalUpdate` through the staged idle-frame path, confirms the fixture's `mouse_grid.coord` toggles the real coordinate-text overlay, checks a separate visible guest overlay callback, verifies the software arrow against Limine framebuffer pixels, and exercises `WinMouseUpdate`'s edge recentering through the runtime dispatch. `WinMousePointerStateCheck` covers transformed tablet coordinates and `WinMouseHardStateCheck` covers the source mouse-state ABI; manual UTM pointer acceptance is still pending. The raw ARM generic-timer binding and a standalone F64 clock expression are smoke-tested before the Win load.

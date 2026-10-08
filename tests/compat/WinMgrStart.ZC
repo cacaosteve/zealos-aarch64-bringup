@@ -39,6 +39,76 @@ I64 WinMgrStartChecks()
     return 0x2a;
 }
 
+I64 WinMgrMousePipelineChecks()
+{//A timer-woken source manager must consume the real hard-mouse event record.
+    I64 old_hard_x = mouse_hard.pos.x, old_hard_y = mouse_hard.pos.y;
+    I64 old_hard_z = mouse_hard.pos.z, old_hard_timestamp = mouse_hard.timestamp;
+    F64 old_hard_speed = mouse_hard.speed;
+    Bool old_hard_left = mouse_hard.bttns[0], old_hard_right = mouse_hard.bttns[1];
+    Bool old_hard_event = mouse_hard.event;
+    Bool old_hard_installed = mouse_hard.installed;
+    Bool old_hard_wheel = mouse_hard.has_wheel;
+    I64 old_x = mouse.pos.x, old_y = mouse.pos.y, old_z = mouse.pos.z;
+    I64 old_px = mouse.presnap.x, old_py = mouse.presnap.y;
+    I64 old_pz = mouse.presnap.z, old_timestamp = mouse.timestamp;
+    I64 old_scan_code = kbd.scan_code;
+    I64 old_ox = mouse.offset.x, old_oy = mouse.offset.y, old_oz = mouse.offset.z;
+    F64 old_sx = mouse.scale.x, old_sy = mouse.scale.y, old_sz = mouse.scale.z;
+    Bool old_left = mouse.lb, old_right = mouse.rb;
+    Bool old_mouse_wheel = mouse.has_wheel, old_snap = mouse_grid.snap;
+    I64 result = 0;
+
+    mouse.scale.x = 2.0;
+    mouse.scale.y = 1.5;
+    mouse.scale.z = 1.0;
+    mouse.offset.x = 7;
+    mouse.offset.y = -4;
+    mouse.offset.z = 0;
+    mouse_grid.snap = FALSE;
+    mouse_hard.pos.z = 0;
+    BootstrapMouseHardSample(100 | (200 << 16) | (1 << 32) | (2 << 40),
+                             ZcMonotonicNs());
+    Sleep(50);
+    if (mouse_hard.event)
+        result = 2;
+    else if (mouse.pos.x != 207 || mouse.pos.y != 296 || mouse.pos.z != 2)
+        result = 3;
+    else if (!mouse.lb || mouse.rb || !mouse.has_wheel)
+        result = 4;
+
+    mouse_hard.pos.x = old_hard_x;
+    mouse_hard.pos.y = old_hard_y;
+    mouse_hard.pos.z = old_hard_z;
+    mouse_hard.timestamp = old_hard_timestamp;
+    mouse_hard.speed = old_hard_speed;
+    mouse_hard.bttns[0] = old_hard_left;
+    mouse_hard.bttns[1] = old_hard_right;
+    mouse_hard.event = old_hard_event;
+    mouse_hard.installed = old_hard_installed;
+    mouse_hard.has_wheel = old_hard_wheel;
+    mouse.pos.x = old_x;
+    mouse.pos.y = old_y;
+    mouse.pos.z = old_z;
+    mouse.presnap.x = old_px;
+    mouse.presnap.y = old_py;
+    mouse.presnap.z = old_pz;
+    mouse.timestamp = old_timestamp;
+    mouse.offset.x = old_ox;
+    mouse.offset.y = old_oy;
+    mouse.offset.z = old_oz;
+    mouse.scale.x = old_sx;
+    mouse.scale.y = old_sy;
+    mouse.scale.z = old_sz;
+    mouse.lb = old_left;
+    mouse.rb = old_right;
+    mouse.has_wheel = old_mouse_wheel;
+    mouse_grid.snap = old_snap;
+    kbd.scan_code = old_scan_code;
+    if (result)
+        return result;
+    return 0x2a;
+}
+
 I64 WinMgrTimingStateChecks()
 {
     CWinMgrGlobals *active_winmgr = ZcActiveWinMgrGlobals();
