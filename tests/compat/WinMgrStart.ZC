@@ -133,7 +133,7 @@ I64 WinMgrSourceDragChecks()
     Bool old_hard_left = mouse_hard.bttns[0], old_hard_right = mouse_hard.bttns[1];
     Bool old_hard_event = mouse_hard.event, old_hard_installed = mouse_hard.installed;
     Bool old_hard_wheel = mouse_hard.has_wheel;
-    I64 old_left, old_top, x, y, result = 0;
+    I64 old_left, old_top, old_right, old_bottom, x, y, result = 0;
 
     drag_task = Spawn(&WinMgrDragPark, NULL, "WinMgrDragProbe");
     cover_task = Spawn(&WinMgrDragPark, NULL, "WinMgrDragCover");
@@ -214,6 +214,27 @@ I64 WinMgrSourceDragChecks()
     if (!result && (drag_task->win_left != old_left + 2 ||
                     drag_task->win_top != old_top + 2))
         result = 6;
+    if (!result)
+    {
+        // The unchanged WinMgr has a dedicated lower-right resize branch.
+        old_right = drag_task->win_right;
+        old_bottom = drag_task->win_bottom;
+        x = (old_right + 1) * FONT_WIDTH;
+        y = (old_bottom + 1) * FONT_HEIGHT;
+        BootstrapMouseHardSample(x | (y << 16) | (1 << 32), ZcMonotonicNs());
+        Sleep(50);
+        BootstrapMouseHardSample((x + 3 * FONT_WIDTH) |
+                                 ((y + 2 * FONT_HEIGHT) << 16) | (1 << 32),
+                                 ZcMonotonicNs());
+        Sleep(50);
+        BootstrapMouseHardSample((x + 3 * FONT_WIDTH) |
+                                 ((y + 2 * FONT_HEIGHT) << 16),
+                                 ZcMonotonicNs());
+        Sleep(50);
+        if (drag_task->win_right != old_right + 3 ||
+            drag_task->win_bottom != old_bottom + 2)
+            result = 9;
+    }
 
 done:
     // Always release the source manager's drag loop before destroying its task.

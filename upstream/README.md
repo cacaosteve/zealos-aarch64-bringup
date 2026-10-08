@@ -2851,13 +2851,13 @@ Freeze catalog unchanged.
 
 Freeze catalog unchanged.
 
-## Milestone 243 — exercise source-manager title-bar drag and raise
+## Milestone 243 — exercise source-manager focus, drag, and resize
 
 | Item | Path |
 |--|--|
 | Gap | The live probe delivered tablet state to `WinMgrTask`, but its title-bar path calls ZealOS `WinToTop`, which needs scheduler task-ring primitives and a valid per-CPU `CTask.gs` pointer |
-| Bring-up | Add the pinned `TaskQueueIns`/`TaskQueueRemove` ring operations, initialize the synthetic root task's `gs` from `cpu_structs`, inherit it on `Spawn` as `KTask.ZC` does, then inject press/move/release samples at a visible title bar |
-| Smoke | `WinMgrSourceDragChecks` requires the source manager to focus/raise the task and move it by two text cells; `make esp && python3 scripts/check-compat.py --pci --probe-module /System/Win.ZC --probe-winmgr --probe-grscreen --probe-live-winmgr --probe-live-winmgr-wake` passes |
+| Bring-up | Add the pinned `TaskQueueIns`/`TaskQueueRemove` ring operations, initialize the synthetic root task's `gs` from `cpu_structs`, inherit it on `Spawn` as `KTask.ZC` does, then inject press/move/release samples at visible window borders |
+| Smoke | `WinMgrSourceDragChecks` checks a click on an exposed title-bar segment raises/focuses a partially covered task, moves it by two text cells, and resizes its lower-right corner by three columns and two rows; the PCI graphics/window-manager probe passes |
 | Limits | This is deterministic synthetic input in the QEMU harness. Manual UTM pointer acceptance, normal boot-time window/task initialization, and broader interactive desktop behavior remain open |
 
 ## Open compatibility probe — `/System/Win.ZC`
