@@ -272,6 +272,7 @@ static uint8_t guest_sys_semas[GUEST_SEMA_NUM * GUEST_SEMA_STRIDE];
  * bootstrap convention that the task actively scanning owns device input. */
 static void *guest_focus_task;
 static int64_t guest_parent_off, guest_number_off, guest_name_off, guest_flags_off;
+static int64_t guest_gs_off;
 static int64_t guest_display_flags_off;
 static int64_t guest_win_left_off, guest_win_right_off;
 static int64_t guest_win_top_off, guest_win_bottom_off, guest_text_attr_off;
@@ -1713,6 +1714,9 @@ static void init_guest_fiber(unsigned i, void *parent, const char *name) {
     *(void **)(words + guest_next_ctrl_off) = words + guest_next_ctrl_off;
     *(void **)(words + guest_last_ctrl_off) = words + guest_next_ctrl_off;
     *(void **)(words + guest_parent_off) = parent;
+    if (parent && guest_gs_off >= 0)
+        *(void **)(words + guest_gs_off) =
+            *(void **)((unsigned char *)parent + guest_gs_off);
     *(void **)(words + guest_input_filter_off) = words;
     *(void **)(words + guest_next_filter_off) = words;
     *(void **)(words + guest_next_ode_off) = words + guest_next_ode_off;
@@ -3170,6 +3174,7 @@ static void bind_guest_task(void) {
         !task_field(cls, "display_flags", 4, 28) ||
         !task_field(cls, "rand_seed", 8, -1) ||
         !task_field(cls, "parent_task", 8, -1) ||
+        !task_field(cls, "gs", 8, -1) ||
         !task_field(cls, "next_task", 8, -1) ||
         !task_field(cls, "last_task", 8, -1) ||
         !task_field(cls, "next_sibling_task", 8, -1) ||
@@ -3226,6 +3231,7 @@ static void bind_guest_task(void) {
         !task_field(counts, "time_stamp_calibrated", 1, 40))
         zc_fail("pinned counts layout mismatch");
     guest_parent_off = MemberFind("parent_task", cls)->off;
+    guest_gs_off = MemberFind("gs", cls)->off;
     guest_next_task_off = MemberFind("next_task", cls)->off;
     guest_last_task_off = MemberFind("last_task", cls)->off;
     guest_next_sibling_off = MemberFind("next_sibling_task", cls)->off;
@@ -3682,6 +3688,10 @@ static int load_inner(const char *path) {
         *(int64_t *)((unsigned char *)guest_cpu_structs + cpu_num->off) = 0;
         *(void **)((unsigned char *)guest_cpu_structs + cpu_exec->off) =
             guest_fibers[0].words;
+        // MultiProc.ZC assigns sys_task->gs = cpu_structs before it spawns
+        // normal tasks; KTask.ZC then copies parent->gs into each child.
+        *(void **)((unsigned char *)guest_fibers[0].words + guest_gs_off) =
+            guest_cpu_structs;
         PrsBindCSymbol("cpu_structs", &guest_cpu_structs, 0);
         PrsBindCSymbol("ext", &guest_ext_table, 0);
         /* KernelB exposes the firmware framebuffer contract to ZealOS source. */

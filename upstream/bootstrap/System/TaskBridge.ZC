@@ -1859,6 +1859,40 @@ U0 TaskDerivedValsUpdate(CTask *task=NULL, Bool update_z_buf=TRUE)
         gr.win_z_buf && gr.win_uncovered_bitmap)
         WinZBufUpdate();
 }
+U0 TaskQueueIns(CTask *task, CTask *pred=NULL)
+{//Mirror the pinned scheduler's doubly-linked task-ring insertion.
+    CTask *last;
+    if (!task)
+        return;
+    if (!pred)
+        pred = Fs;
+    if (!TaskValidate(pred) || !TaskValidate(pred->last_task))
+        return;
+    PUSHFD
+    CLI
+    last = pred->last_task;
+    last->next_task = pred->last_task = task;
+    task->last_task = last;
+    task->next_task = pred;
+    POPFD
+}
+U0 TaskQueueRemove(CTask *task)
+{//Mirror the pinned scheduler's doubly-linked task-ring removal.
+    CTask *next, *last;
+    if (!TaskValidate(task) || !TaskValidate(task->next_task) ||
+        !TaskValidate(task->last_task))
+        return;
+    PUSHFD
+    CLI
+    next = task->next_task;
+    last = task->last_task;
+    if (last->next_task == task && next->last_task == task)
+    {
+        last->next_task = next;
+        next->last_task = last;
+    }
+    POPFD
+}
 Bool WinInside(I64 x, I64 y, CTask *task=NULL, I64 border=0)
 {//Match Kernel/Display.ZC's pixel hit-test for a visible task window.
     if (!task)

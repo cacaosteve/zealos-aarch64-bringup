@@ -109,6 +109,155 @@ I64 WinMgrMousePipelineChecks()
     return 0x2a;
 }
 
+U0 WinMgrDragPark(U8 *data)
+{
+    while (TRUE)
+        ZcTaskYield;
+}
+
+I64 WinMgrSourceDragChecks()
+{//Drive an actual title-bar drag through unchanged WinMgrTask and WinMouseUpdate.
+    CTask *drag_task, *cover_task, *old_focus = sys_focus_task;
+    I64 old_x = mouse.pos.x, old_y = mouse.pos.y, old_z = mouse.pos.z;
+    I64 old_text_x = mouse.pos_text.x, old_text_y = mouse.pos_text.y;
+    I64 old_px = mouse.presnap.x, old_py = mouse.presnap.y;
+    I64 old_pz = mouse.presnap.z, old_mouse_timestamp = mouse.timestamp;
+    I64 old_scan_code = kbd.scan_code;
+    I64 old_ox = mouse.offset.x, old_oy = mouse.offset.y;
+    F64 old_sx = mouse.scale.x, old_sy = mouse.scale.y;
+    Bool old_snap = mouse_grid.snap, old_left = mouse.lb, old_right = mouse.rb;
+    Bool old_mouse_wheel = mouse.has_wheel;
+    I64 old_hard_x = mouse_hard.pos.x, old_hard_y = mouse_hard.pos.y;
+    I64 old_hard_z = mouse_hard.pos.z, old_hard_timestamp = mouse_hard.timestamp;
+    F64 old_hard_speed = mouse_hard.speed;
+    Bool old_hard_left = mouse_hard.bttns[0], old_hard_right = mouse_hard.bttns[1];
+    Bool old_hard_event = mouse_hard.event, old_hard_installed = mouse_hard.installed;
+    Bool old_hard_wheel = mouse_hard.has_wheel;
+    I64 old_left, old_top, x, y, result = 0;
+
+    drag_task = Spawn(&WinMgrDragPark, NULL, "WinMgrDragProbe");
+    cover_task = Spawn(&WinMgrDragPark, NULL, "WinMgrDragCover");
+    if (!TaskValidate(drag_task) || !TaskValidate(cover_task))
+    {
+        if (TaskValidate(drag_task))
+            Kill(drag_task);
+        if (TaskValidate(cover_task))
+            Kill(cover_task);
+        return 1;
+    }
+    if (!cpu_structs || !cpu_structs[0].addr)
+    {
+        Kill(drag_task);
+        Kill(cover_task);
+        return 2;
+    }
+    if (drag_task->gs != cpu_structs[0].addr ||
+        cover_task->gs != cpu_structs[0].addr)
+    {
+        Kill(drag_task);
+        Kill(cover_task);
+        return 8;
+    }
+    drag_task->display_flags = 1 << DISPLAYf_SHOW;
+    cover_task->display_flags = 1 << DISPLAYf_SHOW;
+    drag_task->win_inhibit |= 1 << WIf_SELF_DOC;
+    cover_task->win_inhibit |= 1 << WIf_SELF_DOC;
+    drag_task->win_inhibit &= ~(1 << WIf_SELF_BORDER);
+    cover_task->win_inhibit &= ~(1 << WIf_SELF_BORDER);
+    drag_task->win_inhibit &= ~(1 << WIf_FOCUS_TASK_BORDER);
+    cover_task->win_inhibit &= ~(1 << WIf_FOCUS_TASK_BORDER);
+    if (!WinHorz(15, 34, drag_task) || !WinVert(10, 24, drag_task))
+    {
+        result = 3;
+        goto done;
+    }
+    if (!WinHorz(25, 44, cover_task) || !WinVert(10, 24, cover_task))
+    {
+        result = 4;
+        goto done;
+    }
+    if (Fs->last_task != cover_task)
+    {
+        result = 7;
+        goto done;
+    }
+    old_left = drag_task->win_left;
+    old_top = drag_task->win_top;
+    // Use exact cell coordinates so input conversion and the source manager's
+    // title-bar hit test agree without depending on host pointer state.
+    mouse.scale.x = mouse.scale.y = 1.0;
+    mouse.offset.x = mouse.offset.y = 0;
+    mouse_grid.snap = FALSE;
+    mouse_hard.pos.z = 0;
+    // Leave the source manager in an unpressed state before beginning the
+    // drag; this also drains a press left by an earlier probe.
+    BootstrapMouseHardSample(mouse.pos.x | (mouse.pos.y << 16),
+                             ZcMonotonicNs());
+    Sleep(50);
+    // The cover overlaps the right half of this title. Clicking the exposed
+    // left portion must make the source manager raise and focus drag_task.
+    x = (old_left + 5) * FONT_WIDTH;
+    y = (old_top - 1) * FONT_HEIGHT;
+    BootstrapMouseHardSample(x | (y << 16) | (1 << 32), ZcMonotonicNs());
+    Sleep(50);
+    if (sys_focus_task != drag_task || sys_winmgr_task->last_task != drag_task)
+        result = 5;
+    // Move the still-held pointer by two text cells in each direction.
+    BootstrapMouseHardSample((x + 2 * FONT_WIDTH) |
+                             ((y + 2 * FONT_HEIGHT) << 16) | (1 << 32),
+                             ZcMonotonicNs());
+    Sleep(50);
+    BootstrapMouseHardSample((x + 2 * FONT_WIDTH) |
+                             ((y + 2 * FONT_HEIGHT) << 16),
+                             ZcMonotonicNs());
+    Sleep(50);
+    if (!result && (drag_task->win_left != old_left + 2 ||
+                    drag_task->win_top != old_top + 2))
+        result = 6;
+
+done:
+    // Always release the source manager's drag loop before destroying its task.
+    BootstrapMouseHardSample(mouse.pos.x | (mouse.pos.y << 16),
+                             ZcMonotonicNs());
+    Sleep(50);
+    sys_focus_task = old_focus;
+    if (TaskValidate(drag_task))
+        Kill(drag_task);
+    if (TaskValidate(cover_task))
+        Kill(cover_task);
+    mouse.pos.x = old_x;
+    mouse.pos.y = old_y;
+    mouse.pos.z = old_z;
+    mouse.pos_text.x = old_text_x;
+    mouse.pos_text.y = old_text_y;
+    mouse.presnap.x = old_px;
+    mouse.presnap.y = old_py;
+    mouse.presnap.z = old_pz;
+    mouse.timestamp = old_mouse_timestamp;
+    mouse.offset.x = old_ox;
+    mouse.offset.y = old_oy;
+    mouse.scale.x = old_sx;
+    mouse.scale.y = old_sy;
+    mouse_grid.snap = old_snap;
+    mouse.lb = old_left;
+    mouse.rb = old_right;
+    mouse.has_wheel = old_mouse_wheel;
+    mouse_hard.pos.x = old_hard_x;
+    mouse_hard.pos.y = old_hard_y;
+    mouse_hard.pos.z = old_hard_z;
+    mouse_hard.timestamp = old_hard_timestamp;
+    mouse_hard.speed = old_hard_speed;
+    mouse_hard.bttns[0] = old_hard_left;
+    mouse_hard.bttns[1] = old_hard_right;
+    mouse_hard.event = old_hard_event;
+    mouse_hard.installed = old_hard_installed;
+    mouse_hard.has_wheel = old_hard_wheel;
+    kbd.scan_code = old_scan_code;
+    if (result)
+        return result;
+    return 0x2a;
+}
+
 I64 WinMgrTimingStateChecks()
 {
     CWinMgrGlobals *active_winmgr = ZcActiveWinMgrGlobals();

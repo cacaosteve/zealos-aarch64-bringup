@@ -514,6 +514,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                                     'zc => 0x000000000000002a', timeout=30)
                             command('zcall WinMgrMousePipelineChecks',
                                     'zc => 0x000000000000002a', timeout=30)
+                            command('zcall WinMgrSourceDragChecks',
+                                    'zc => 0x000000000000002a', timeout=30)
                             if args.probe_live_winmgr_wake:
                                 # Optional deeper probe; the regular acceptance
                                 # gate verifies startup/first refresh only.
