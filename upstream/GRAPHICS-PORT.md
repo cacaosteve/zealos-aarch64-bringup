@@ -211,15 +211,15 @@ path still need UTM acceptance.
 
 ## Remaining graphics path
 
-The active source `winmgr` timing pointer is now initialized lazily from the
-bridge before each frame, with CPU idle counters and refresh timestamps seeded
-once. This removes the null timing-state prerequisite, but does not start the
-actual upstream WinMgr task. The shell still provides the refresh/input loop in
-a bounded bridge. The source `WinCalcIdles` now has a deterministic smoke against
-that state, including its guarded counter snapshot and idle-factor calculation.
-Starting WinMgr needs menu startup and more of its surrounding task services.
-View-angle controls,
-wallpaper, and broader CDC operations also remain open.
+The active source `winmgr` timing pointer is initialized lazily from the bridge
+before each frame, with CPU idle counters and refresh timestamps seeded once.
+The source `WinCalcIdles` has a deterministic smoke against that state,
+including its guarded counter snapshot and idle-factor calculation. The
+unchanged upstream `WinMgrTask` can now be started and stopped on demand through
+the shell bridge; the bootstrap still owns the initial shell and framebuffer
+pump. Turning this into the normal desktop startup path requires menu startup
+and more surrounding task services. View-angle controls, wallpaper, and broader
+CDC operations also remain open.
 `Kernel/Display.ZC`'s
 framebuffer writes can target the Limine-provided framebuffer, but x86 assembly
 in `GrTextBase.ZC` and `GrAsm.ZC` must stay behind the ARM64 bridge or be
