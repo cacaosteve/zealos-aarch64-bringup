@@ -209,6 +209,12 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 'winmgr: upstream Window Manager running; shell remains on serial')
         command('winmgrstop',
                 'winmgr: stopped; bootstrap framebuffer pump resumed')
+        command('windowdemo',
+                'windowdemo: two ZealOS windows running on bootstrap input/frame pump')
+        command('zcall WindowDragLiveBasicRenderChecks',
+                'zc => 0x000000000000002a')
+        command('windowdemostop',
+                'windowdemo: stopped; bootstrap shell display resumed')
         command('zreset', 'zc: native compiler ready')
         command('zvol', 'zvol: source partition ready' if args.pci else
                          'zvol: source partition unavailable')

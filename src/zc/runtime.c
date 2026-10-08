@@ -98,6 +98,7 @@ static size_t archive_size;
 static zc_source_read_fn disk_reader;
 static jmp_buf guard;
 static int guarded, ready, failed;
+static int window_demo_loaded;
 
 const char *zc_debug_function_for_pc(uintptr_t pc, uintptr_t *offset) {
     CHashTable *table;
@@ -3896,6 +3897,7 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
     if (output)
         output_cb = output;
     ready = failed = loaded_modules = 0;
+    window_demo_loaded = 0;
     /* A lexer exception can longjmp out of #assert while the Aiwnios parser
      * depth counters are nonzero. zreset starts a new compiler session, so
      * discard that abandoned parse state before loading the bootstrap again. */
@@ -4059,6 +4061,50 @@ int zc_stop_winmgr(void) {
     if (!ready || failed || zc_call("BootstrapWinMgrStop", &result) != 0)
         return -1;
     return result == 0x2a ? 0 : -1;
+}
+int zc_start_window_demo(void) {
+    int64_t result = 0;
+    if (!ready || failed)
+        return -1;
+    if (window_demo_loaded) {
+        zc_output("windowdemo: already loaded; stop it before restarting\n");
+        return -1;
+    }
+    if (zc_stop_winmgr() != 0)
+        return -1;
+    if (zc_call("BootstrapFrameUseBridge", &result) != 0 || result != 0x2a)
+        return -1;
+    if (zc_load("/Tests/WindowDragLive.ZC") != 0) {
+        (void)zc_call("BootstrapFrameUseSource", NULL);
+        return -1;
+    }
+    window_demo_loaded = 1;
+    if (zc_call("WindowDragLiveBasicStart", &result) != 0 || result != 0x2a) {
+        (void)zc_call("WindowDragLiveStop", NULL);
+        (void)zc_call("BootstrapFrameUseSource", NULL);
+        window_demo_loaded = 0;
+        zc_output("windowdemo: fixture start failed\n");
+        return -1;
+    }
+    if (zc_start_winmgr() != 0) {
+        (void)zc_call("WindowDragLiveStop", NULL);
+        (void)zc_call("BootstrapFrameUseSource", NULL);
+        window_demo_loaded = 0;
+        zc_output("windowdemo: manager start failed; fixture stopped\n");
+        return -1;
+    }
+    return 0;
+}
+int zc_stop_window_demo(void) {
+    if (!window_demo_loaded)
+        return 0;
+    int failed_stop = zc_call("WindowDragLiveStop", NULL) != 0;
+    if (zc_call("BootstrapFrameUseSource", NULL) != 0)
+        failed_stop = 1;
+    if (zc_stop_winmgr() != 0)
+        failed_stop = 1;
+    window_demo_loaded = 0;
+    return failed_stop ? -1 : 0;
 }
 void zc_status(void) {
     size_t used[2] = {0}, blocks[2] = {0};

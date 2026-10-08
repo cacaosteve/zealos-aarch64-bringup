@@ -3498,6 +3498,17 @@ I64 BootstrapTaskRingCount(CTask *root)
         return count;
     return -1;
 }
+Bool bootstrap_force_bridge_frames;
+I64 BootstrapFrameUseBridge()
+{
+    bootstrap_force_bridge_frames = TRUE;
+    return 0x2a;
+}
+I64 BootstrapFrameUseSource()
+{
+    bootstrap_force_bridge_frames = FALSE;
+    return 0x2a;
+}
 Bool BootstrapCanUseUpstreamGrUpdateTasks()
 {//The pinned routine has unbounded rings; call only with a complete one-CPU graph.
     if (mp_count != 1 || !cpu_structs ||
@@ -3512,7 +3523,8 @@ Bool BootstrapTryUpstreamGrUpdateScreen()
     CGrGlobals *active_gr;
     CTask *task;
     I64 i, window_count = 0, ode_count;
-    if (!BootstrapCanUseUpstreamGrUpdateTasks() ||
+    if (bootstrap_force_bridge_frames ||
+        !BootstrapCanUseUpstreamGrUpdateTasks() ||
         sys_framebuffer_width != 800 || sys_framebuffer_height != 600 ||
         sys_framebuffer_pitch != 800 * sizeof(U32) ||
         sys_framebuffer_bpp != 32)
@@ -3639,7 +3651,8 @@ U0 BootstrapGrUpdateTasks()
     // Prefer ZealOS's own window/ODE traversal after WinMgr has initialized.
     // The early bootstrap still uses bounded local loops because its WinMgr
     // timing state and source GrUpdateTasks may not exist yet.
-    source_ready = BootstrapCanUseUpstreamGrUpdateTasks();
+    source_ready = !bootstrap_force_bridge_frames &&
+                   BootstrapCanUseUpstreamGrUpdateTasks();
     if (source_ready)
     {
         task = sys_winmgr_task;
@@ -3673,7 +3686,7 @@ U0 BootstrapGrUpdateTasks()
             if ((task->display_flags & (1 << DISPLAYf_SHOW)) &&
                 BootstrapWinIsUncovered(task))
             {
-                if (ZcGrUpdateTaskWin(task))
+                if (!bootstrap_force_bridge_frames && ZcGrUpdateTaskWin(task))
                     bootstrap_upstream_window_updates++;
                 else
                     BootstrapDrawTaskWin(task);

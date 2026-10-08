@@ -3,6 +3,7 @@
 extern Bool ZcTaskFrameRun();
 extern I64 ZcFbTextPixel(I64 x, I64 y);
 extern Bool TextLenStr(CTask *task, I64 x, I64 y, I64 len, I64 attr, U8 *str);
+extern U0 BootstrapDrawTaskWin(CTask *task);
 CTask *window_drag_live_a;
 CTask *window_drag_live_b;
 CCtrl window_drag_live_right_control;
@@ -107,7 +108,7 @@ I64 WindowDragLiveStop()
     return 0;
 }
 
-I64 WindowDragLiveStart()
+I64 WindowDragLiveStartInternal(Bool with_control)
 {
     if (TaskValidate(window_drag_live_a) || TaskValidate(window_drag_live_b))
         return 0;
@@ -141,20 +142,51 @@ I64 WindowDragLiveStart()
     window_drag_live_wheel_delta = 0;
     window_drag_live_control_pixel = -1;
     window_drag_live_control_dc_matches = FALSE;
-    window_drag_live_right_control.next = &window_drag_live_b->next_ctrl;
-    window_drag_live_right_control.last = &window_drag_live_b->next_ctrl;
-    window_drag_live_right_control.win_task = window_drag_live_b;
-    window_drag_live_right_control.flags = CTRLF_SHOW | CTRLF_CAPTURE_RIGHT_MS;
-    window_drag_live_right_control.left = 2 * FONT_WIDTH;
-    window_drag_live_right_control.right = 20 * FONT_WIDTH;
-    window_drag_live_right_control.top = 10 * FONT_HEIGHT;
-    window_drag_live_right_control.bottom = 13 * FONT_HEIGHT;
-    window_drag_live_right_control.right_click = &WindowDragLiveRightClick;
-    window_drag_live_right_control.wheel_chg = &WindowDragLiveWheel;
-    window_drag_live_right_control.draw_it = &WindowDragLiveRightDraw;
-    window_drag_live_b->next_ctrl = window_drag_live_b->last_ctrl =
-        &window_drag_live_right_control;
+    if (with_control)
+    {
+        window_drag_live_right_control.next = &window_drag_live_b->next_ctrl;
+        window_drag_live_right_control.last = &window_drag_live_b->next_ctrl;
+        window_drag_live_right_control.win_task = window_drag_live_b;
+        window_drag_live_right_control.flags = CTRLF_SHOW | CTRLF_CAPTURE_RIGHT_MS;
+        window_drag_live_right_control.left = 2 * FONT_WIDTH;
+        window_drag_live_right_control.right = 20 * FONT_WIDTH;
+        window_drag_live_right_control.top = 10 * FONT_HEIGHT;
+        window_drag_live_right_control.bottom = 13 * FONT_HEIGHT;
+        window_drag_live_right_control.right_click = &WindowDragLiveRightClick;
+        window_drag_live_right_control.wheel_chg = &WindowDragLiveWheel;
+        window_drag_live_right_control.draw_it = &WindowDragLiveRightDraw;
+        window_drag_live_b->next_ctrl = window_drag_live_b->last_ctrl =
+            &window_drag_live_right_control;
+    }
     BootstrapGrUpdateTasks();
+    return 42;
+}
+I64 WindowDragLiveStart()
+{
+    return WindowDragLiveStartInternal(TRUE);
+}
+I64 WindowDragLiveBasicStart()
+{//Use the bordered windows without the CDC control probe for the UTM smoke.
+    I64 result = WindowDragLiveStartInternal(FALSE);
+    if (result == 42)
+    {
+        BootstrapDrawTaskWin(window_drag_live_a);
+        BootstrapDrawTaskWin(window_drag_live_b);
+    }
+    return result;
+}
+I64 WindowDragLiveBasicRenderChecks()
+{//Check the visible task callbacks without entering the uninitialized control CDC path.
+    I64 draw_a_before, draw_b_before;
+    if (!TaskValidate(window_drag_live_a) || !TaskValidate(window_drag_live_b))
+        return 1;
+    draw_a_before = window_drag_live_draw_a_count;
+    draw_b_before = window_drag_live_draw_b_count;
+    BootstrapDrawTaskWin(window_drag_live_a);
+    BootstrapDrawTaskWin(window_drag_live_b);
+    if (window_drag_live_draw_a_count <= draw_a_before ||
+        window_drag_live_draw_b_count <= draw_b_before)
+        return 2;
     return 42;
 }
 

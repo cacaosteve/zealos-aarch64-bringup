@@ -2869,6 +2869,15 @@ Freeze catalog unchanged.
 | Smoke | `WinMgrStartChecks` uses the same startup path; `python3 scripts/check-compat.py --pci` starts twice, stops, restarts, and stops the manager in a booted PCI guest. The focused `--probe-live-winmgr --probe-live-winmgr-wake` checks continue to cover source-manager refresh and timer wake behavior |
 | Limits | The commands do not initialize the full ZealOS desktop or create normal application tasks. Manual UTM acceptance is still needed to confirm the framebuffer and tablet behave with the source manager running; `winmgrstop` returns to the bridge-only session |
 
+## Milestone 245 — run a visible two-window UTM fixture
+
+| Item | Path |
+|--|--|
+| Gap | Starting `WinMgrTask` had no visible interactive fixture, so UTM acceptance could not distinguish a live frame/input path from a shell that merely remained responsive |
+| Bring-up | Add `windowdemo`/`windowdemostop`: load the source-backed `WindowDragLive` fixture without its CDC control, render two bordered tasks through the bounded bootstrap frame/input path, and keep a safe stop path. The helper temporarily selects bridge frames while this boot mode lacks the complete ZealOS CDC/control initialization |
+| Smoke | `python3 scripts/check-compat.py --pci --quick` launches the demo, forces a task redraw, checks both fixture draw callbacks, stops it, then continues the compiler and persistent-source gates |
+| Limits | The fixture is a bridge-backed acceptance demo, not normal desktop startup. In UTM, type `windowdemo`, verify the two windows and try title-bar drag, click-to-raise, and corner resize; type `windowdemostop` to return to the shell. The custom control and full source compositor remain separate open work |
+
 ## Open compatibility probe — `/System/Win.ZC`
 
 The source probe loads pinned `KernelC.HH`, `Externs.ZC`, and `Gr.HH` before compiling unchanged `Win.ZC`. Graphics dimensions and mouse globals are probe fixtures; `DrawMenu` and the initial `GrScaleZoom` definition are compile-time fixtures until unchanged `GrScreen.ZC` is loaded later in the probe. `GrScreenFinalUpdateChecks` executes `WinFinalUpdate` through the staged idle-frame path, confirms the fixture's `mouse_grid.coord` toggles the real coordinate-text overlay, checks a separate visible guest overlay callback, verifies the software arrow against Limine framebuffer pixels, and exercises `WinMouseUpdate`'s edge recentering through the runtime dispatch. `WinMousePointerStateCheck` covers transformed tablet coordinates and `WinMouseHardStateCheck` covers the source mouse-state ABI; manual UTM pointer acceptance is still pending. The raw ARM generic-timer binding and a standalone F64 clock expression are smoke-tested before the Win load.

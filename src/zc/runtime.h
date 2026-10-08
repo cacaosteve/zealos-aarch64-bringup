@@ -18,6 +18,10 @@ int zc_start_graphics(void);
 int zc_start_winmgr(void);
 /* Stop that task and resume bootstrap-owned framebuffer refreshes. */
 int zc_stop_winmgr(void);
+/* Load and run the interactive source-backed two-window UTM fixture. */
+int zc_start_window_demo(void);
+/* Stop the fixture windows and return to the bootstrap shell display. */
+int zc_stop_window_demo(void);
 int zc_load(const char *path);
 int zc_exec(const char *source);
 int zc_call(const char *name, int64_t *result);

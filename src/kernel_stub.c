@@ -4692,7 +4692,25 @@ static void shell_handle(const char *line, int *done) {
         line[4]=='t' && line[5]==' ') { zedit_start(line+6); return; }
     if (streq(line, "zcheck")) { (void)zc_selftest(); return; }
     if (streq(line, "zstatus")) { zc_status(); return; }
-    if (streq(line, "zreset")) { zc_init(0, 0, 0); return; }
+    if (streq(line, "zreset")) {
+        (void)zc_stop_window_demo();
+        zc_init(0, 0, 0);
+        return;
+    }
+    if (streq(line, "windowdemo")) {
+        if (!zc_start_window_demo())
+            con_puts("windowdemo: two ZealOS windows running on bootstrap input/frame pump; drag title bars, click to raise, resize corners; stop with windowdemostop\n");
+        else
+            con_puts("windowdemo: failed; check serial diagnostics or use zreset\n");
+        return;
+    }
+    if (streq(line, "windowdemostop")) {
+        if (!zc_stop_window_demo())
+            con_puts("windowdemo: stopped; bootstrap shell display resumed\n");
+        else
+            con_puts("windowdemo: stop failed; use zreset to discard the session\n");
+        return;
+    }
     if (streq(line, "winmgr")) {
         if (!zc_start_winmgr())
             con_puts("winmgr: upstream Window Manager running; shell remains on serial\n");
@@ -4844,9 +4862,10 @@ static void shell_handle(const char *line, int *done) {
 #endif
     if (streq(line, "help")) {
 #ifndef ZEAL_PI_DIAG
-        con_puts("Native compiler: zcheck | zvol | zls | zgc | zedit <path> | zrm <path> | zverify <path> | zload /path.ZC | zput Name.ZC <source> | zrecv Name.ZC <bytes> <crc32> | zload disk:Name.ZC | zc <source> | zcall Function | zstatus | zreset | winmgr | winmgrstop | fbquiet | fbshow\n");
+        con_puts("Native compiler: zcheck | zvol | zls | zgc | zedit <path> | zrm <path> | zverify <path> | zload /path.ZC | zput Name.ZC <source> | zrecv Name.ZC <bytes> <crc32> | zload disk:Name.ZC | zc <source> | zcall Function | zstatus | zreset | winmgr | winmgrstop | windowdemo | windowdemostop | fbquiet | fbshow\n");
         con_puts("Window test order: zreset -> zload /Kernel/KernelA.HH -> zload /Kernel/KernelB.HH\n");
         con_puts("  -> zload /Tests/WindowDragLive.ZC -> zcall WindowDragLiveStart; stop: zcall WindowDragLiveStop\n");
+        con_puts("UTM window demo: windowdemo (drag/raise/resize) | windowdemostop\n");
 #endif
         con_puts("UTM freeze: vblk | rspersist | rscatalog | rsdir | runzc | runzc Notes.ZC\n");
         con_puts("Lattice: nearlatticelite | disklat | lattice | latticeplay | stocklat | stockplay | depthplotlite\n");
