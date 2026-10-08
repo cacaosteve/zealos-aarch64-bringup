@@ -2,11 +2,16 @@ I64 WinMgrStartChecks()
 {
     CTask *root = Fs, *manager;
     CWinMgrGlobals *active_winmgr = ZcActiveWinMgrGlobals();
-    I64 updates_before;
+    I64 updates_before, old_width;
 
     BootstrapGrContextInit();
     if (!TaskValidate(root) || sys_task != root || !gr.dc || !active_winmgr)
         return 1;
+    if (!cpu_structs || mp_count != 1 || !cpu_structs[0].addr)
+        return 5;
+    if (root->next_ctrl != &root->next_ctrl ||
+        root->last_ctrl != &root->next_ctrl)
+        return 6;
     updates_before = active_winmgr->updates;
     sys_winmgr_task = root;
     manager = Spawn(&WinMgrTask, NULL, "Window Manager", -1, root);
@@ -19,5 +24,48 @@ I64 WinMgrStartChecks()
         return 3;
     if (!Bt(&sys_run_level, RLf_WINMGR))
         return 4;
+    // The manager's post-sleep task scan recalculates derived window geometry.
+    // Poison one cached field, then park the shell through a timer wake.
+    old_width = root->win_width;
+    root->win_width = -999;
+    Sleep(50);
+    if (root->win_width != root->win_right - root->win_left + 1)
+    {
+        root->win_width = old_width;
+        return 7;
+    }
+    if (active_winmgr->updates <= updates_before + 1)
+        return 8;
+    return 0x2a;
+}
+
+I64 WinMgrTimingStateChecks()
+{
+    CWinMgrGlobals *active_winmgr = ZcActiveWinMgrGlobals();
+    if (!active_winmgr || !active_winmgr->t)
+        return 1;
+    if (!cpu_structs || !cpu_structs[0].addr)
+        return 2;
+    return 0x2a;
+}
+
+U0 WinMgrCalcIdleChild(I64 unused)
+{
+    WinCalcIdles;
+}
+
+I64 WinMgrCalcIdleChildChecks()
+{
+    CTask *child = Spawn(&WinMgrCalcIdleChild, NULL, "CalcIdleProbe", -1, Fs);
+    if (!TaskValidate(child))
+        return 1;
+    Yield;
+    return 0x2a;
+}
+
+I64 WinMgrKeyboardStateChecks()
+{
+    if (kbd.scan_code_fifo)
+        return 1;
     return 0x2a;
 }

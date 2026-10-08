@@ -36,6 +36,8 @@ extern I64 ZcTabletSample();
 extern I64 ZcMonotonicNs();
 extern Bool ZcMouseStateUpdate(I64 x, I64 y, I64 text_x, I64 text_y,
                                I64 now_ns);
+extern Bool ZcMouseButtonsUpdate(Bool left, Bool right);
+extern U0 BootstrapMouseHardSample(I64 sample, I64 now_ns);
 extern CMouseStateGlobals *ZcActiveMouseGlobals();
 extern CWinMgrGlobals *ZcActiveWinMgrGlobals();
 extern F64 Exp(F64 x);
@@ -1470,7 +1472,6 @@ U0 BootstrapGrContextInit()
 
     if (!active_gr)
         active_gr = &gr;
-    active_gr->dc = &bootstrap_graphics_dc;
     active_gr->dc2 = &bootstrap_graphics_dc;
 }
 U0 BootstrapBindGrTaskTables(CGrGlobals *active_gr)
@@ -2994,10 +2995,18 @@ public Bool BootstrapCtrlInputSample(CTask *task, I64 sample)
 U0 BootstrapCtrlInputPoll()
 {//Poll UTM's absolute tablet and route left-button samples to the focused task.
     CTask *task;
+    I64 sample, now_ns;
     task = Fs;
     if (TaskValidate(sys_focus_task))
         task = sys_focus_task;
-    BootstrapCtrlInputSample(task, ZcTabletSample());
+    sample = ZcTabletSample();
+    if (sample < 0)
+        return;
+    now_ns = ZcMonotonicNs();
+    BootstrapCtrlInputSampleAt(task, sample, now_ns);
+    // Keep the same sample available to the unchanged WinMouseUpdate path.
+    // The bootstrap hit-test remains useful before the source WinMgr is live.
+    BootstrapMouseHardSample(sample, now_ns);
 }
 public Bool CtrlDispatchWheel(CTask *task, I64 delta)
 {//WinMgr routes wheel changes to the focused task's first wheel control.
@@ -3190,15 +3199,24 @@ U0 WinScrollsInit(CTask *task=NULL)
 }
 U0 GrDrawTaskCallback(CTask *task)
 {
+    CGrGlobals *active_gr;
     CDC *dc;
     if (!task || !TaskValidate(task) || !task->draw_it)
         return;
-    dc = DCAlias(gr.dc2, task);
+    // Later upstream units each own a separate `gr` global.  The task-window
+    // renderer can therefore call this bridge with its CDC on the newest
+    // source global while TaskBridge's lexical `gr` still names bootstrap
+    // storage.  Resolve the same active graphics state used by the compositor.
+    active_gr = ZcActiveGrGlobals();
+    if (!active_gr)
+        active_gr = &gr;
+    dc = DCAlias(active_gr->dc2, task);
     task->draw_it(task, dc);
     DCDel(dc);
 }
 U0 DrawCtrls(CTask *task)
 {//Run visible per-task control draw callbacks in list order.
+    CGrGlobals *active_gr;
     CCtrl *head, *ctrl;
     CDC *dc;
     I64 saved_scroll_x, saved_scroll_y, saved_left, saved_right;
@@ -3216,7 +3234,10 @@ U0 DrawCtrls(CTask *task)
     saved_scroll_x = task->scroll_x;
     saved_scroll_y = task->scroll_y;
     task->scroll_x = task->scroll_y = 0;
-    dc = DCAlias(gr.dc2, task);
+    active_gr = ZcActiveGrGlobals();
+    if (!active_gr)
+        active_gr = &gr;
+    dc = DCAlias(active_gr->dc2, task);
     do
     {
         if (!ctrl || visited++ >= 64)
@@ -3294,6 +3315,75 @@ extern U0 ODEsUpdate(CTask *task);
 // compile and render safely before the full mouse subsystem is started.
 CGridGlobals mouse_grid;
 CMenuEntry *sys_cur_submenu_entry;
+U0 MouseUpdate(I64 x, I64 y, I64 z, Bool l, Bool r)
+{//ARM64 bootstrap equivalent of Kernel/SerialDev/Mouse.ZC's state update.
+    F64 scale_x = mouse.scale.x, scale_y = mouse.scale.y;
+    F64 scale_z = mouse.scale.z;
+    I64 cols = text.cols, rows = text.rows;
+    if (scale_x <= 0 || scale_x > 64) scale_x = 1.0;
+    if (scale_y <= 0 || scale_y > 64) scale_y = 1.0;
+    if (scale_z <= 0 || scale_z > 64) scale_z = 1.0;
+    mouse.presnap.x = ToI64(scale_x * x) + mouse.offset.x;
+    mouse.presnap.y = ToI64(scale_y * y) + mouse.offset.y;
+    mouse.presnap.z = ToI64(scale_z * z) + mouse.offset.z;
+    if (mouse_grid.snap)
+    {
+        if (mouse_grid.x > 0)
+            mouse.pos.x = ToI64(mouse.presnap.x / mouse_grid.x) * mouse_grid.x + mouse_grid.x_offset;
+        else
+            mouse.pos.x = mouse.presnap.x;
+        if (mouse_grid.y > 0)
+            mouse.pos.y = ToI64(mouse.presnap.y / mouse_grid.y) * mouse_grid.y + mouse_grid.y_offset;
+        else
+            mouse.pos.y = mouse.presnap.y;
+        if (mouse_grid.z > 0)
+            mouse.pos.z = ToI64(mouse.presnap.z / mouse_grid.z) * mouse_grid.z + mouse_grid.z_offset;
+        else
+            mouse.pos.z = mouse.presnap.z;
+    }
+    else
+    {
+        mouse.pos.x = mouse.presnap.x;
+        mouse.pos.y = mouse.presnap.y;
+        mouse.pos.z = mouse.presnap.z;
+    }
+    if (mouse.pos.x < 0) mouse.pos.x = 0;
+    if (mouse.pos.y < 0) mouse.pos.y = 0;
+    if (sys_framebuffer_width > 0 && mouse.pos.x >= sys_framebuffer_width)
+        mouse.pos.x = sys_framebuffer_width - 1;
+    if (sys_framebuffer_height > 0 && mouse.pos.y >= sys_framebuffer_height)
+        mouse.pos.y = sys_framebuffer_height - 1;
+    mouse.pos_text.x = mouse.pos.x / FONT_WIDTH;
+    mouse.pos_text.y = mouse.pos.y / FONT_HEIGHT;
+    if (cols > 0 && mouse.pos_text.x >= cols)
+    {
+        mouse.pos_text.x = cols - 1;
+        mouse.pos.x = cols * FONT_WIDTH - 1;
+    }
+    if (rows > 0 && mouse.pos_text.y >= rows)
+    {
+        mouse.pos_text.y = rows - 1;
+        mouse.pos.y = rows * FONT_HEIGHT - 1;
+    }
+    mouse.lb = l;
+    mouse.rb = r;
+    ZcMouseButtonsUpdate(mouse.lb, mouse.rb);
+}
+public U0 BootstrapMouseHardSample(I64 sample, I64 now_ns)
+{//Adapt one absolute tablet sample to ZealOS's CMouseHardStateGlobals contract.
+    I64 wheel = (sample >> 40) & 0xff;
+    if (wheel & 0x80)
+        wheel -= 0x100;
+    mouse_hard.pos.x = sample & 0xffff;
+    mouse_hard.pos.y = (sample >> 16) & 0xffff;
+    mouse_hard.pos.z += wheel;
+    mouse_hard.bttns[0] = (sample >> 32) & 1;
+    mouse_hard.bttns[1] = (sample >> 32) & 2;
+    mouse_hard.has_wheel = TRUE;
+    mouse_hard.timestamp = now_ns;
+    mouse_hard.event = TRUE;
+    mouse_hard.installed = TRUE;
+}
 // Menu rendering and zoom initialization belong to later native subsystems.
 // Keep the early frame path linkable; these hooks are replaced when those
 // subsystems are loaded.
@@ -3431,6 +3521,7 @@ U0 BootstrapGrUpdateTasks()
     bootstrap_present_ready = TRUE;
     // Bind the upstream rasterizers to the bootstrap frame surface.
     // Task/window draws already target this same CDC through DCAlias.
+    active_gr->dc = &bootstrap_graphics_dc;
     active_gr->dc2 = &bootstrap_graphics_dc;
     active_gr->dc1 = &bootstrap_planar_dc;
     active_gr->dc_cache = &bootstrap_planar_cache_dc;

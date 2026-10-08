@@ -18,6 +18,8 @@ p.add_argument('--probe-fulltext-visible', action='store_true',
                help='run the full-frame text diagnostic with framebuffer console visible')
 p.add_argument('--probe-live-winmgr', action='store_true',
                help='start WinMgrTask and verify its first refresh and RLf_WINMGR marker')
+p.add_argument('--probe-live-winmgr-wake', action='store_true',
+               help='after the first refresh, leave the manager running through its timer wake')
 p.add_argument('--probe-task-jobs', action='store_true', help='check CPU-0 callback jobs after loading pinned task headers')
 p.add_argument('--probe-window-buttons', action='store_true', help='check live task-window title buttons in a disposable guest')
 p.add_argument('--probe-source', type=pathlib.Path, action='append',
@@ -33,6 +35,8 @@ if args.probe_fulltext and not args.probe_grscreen:
     p.error('--probe-fulltext requires --probe-grscreen')
 if args.probe_live_winmgr and not args.probe_grscreen:
     p.error('--probe-live-winmgr requires --probe-grscreen')
+if args.probe_live_winmgr_wake and not args.probe_live_winmgr:
+    p.error('--probe-live-winmgr-wake requires --probe-live-winmgr')
 log_path = ROOT / 'build' / ('check-window-buttons.log' if args.probe_window_buttons else
                              'check-winmgr-live.log' if args.probe_live_winmgr else
                              'check-module-probe.log' if args.probe_module else
@@ -300,6 +304,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                         'zc: loaded /Tests/WinMouseState.ZC')
                 command('zcall WinMousePointerStateCheck',
                         'zc => 0x000000000000002a')
+                command('zcall WinMouseHardStateCheck',
+                        'zc => 0x000000000000002a')
                 command('zcall WinCAllocCheck',
                         'zc => 0x0000000000000001')
                 command('zcall WinTimeCheck',
@@ -498,8 +504,28 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                         if args.probe_live_winmgr:
                             command('zload /Tests/WinMgrStart.ZC',
                                     'zc: loaded /Tests/WinMgrStart.ZC')
+                            command('zcall WinMgrTimingStateChecks',
+                                    'zc => 0x000000000000002a')
+                            command('zcall WinMgrKeyboardStateChecks',
+                                    'zc => 0x000000000000002a')
+                            command('zcall WinMgrCalcIdleChildChecks',
+                                    'zc => 0x000000000000002a')
                             command('zcall WinMgrStartChecks',
                                     'zc => 0x000000000000002a', timeout=30)
+                            if args.probe_live_winmgr_wake:
+                                # Optional deeper probe; the regular acceptance
+                                # gate verifies startup/first refresh only.
+                                deadline = time.monotonic() + .5
+                                while time.monotonic() < deadline:
+                                    if select.select([guest.stdout], [], [], .05)[0]:
+                                        data = os.read(guest.stdout.fileno(), 65536)
+                                        if not data:
+                                            raise RuntimeError('guest exited after WinMgr start')
+                                        buf.extend(data); log.write(data); log.flush()
+                                        fault_at = buf.find(b'sync: ESR=')
+                                        if fault_at >= 0 and b'\n' in buf[fault_at:]:
+                                            raise RuntimeError('WinMgr fault after timer wake\n' +
+                                                               buf[-2000:].decode(errors='replace'))
                         if args.probe_fulltext:
                             if not args.probe_fulltext_visible:
                                 command('fbquiet',

@@ -1,5 +1,8 @@
 // Interactive UTM check for bordered-window focus, title buttons, move, and resize.
 // Load this source, call WindowDragLiveStart, then WindowDragLiveStop when done.
+extern Bool ZcTaskFrameRun();
+extern I64 ZcFbTextPixel(I64 x, I64 y);
+extern Bool TextLenStr(CTask *task, I64 x, I64 y, I64 len, I64 attr, U8 *str);
 CTask *window_drag_live_a;
 CTask *window_drag_live_b;
 CCtrl window_drag_live_right_control;
@@ -8,6 +11,9 @@ I64 window_drag_live_wheel_delta;
 I64 window_drag_live_draw_a_count;
 I64 window_drag_live_draw_b_count;
 I64 window_drag_live_control_draw_count;
+I64 window_drag_live_control_pixel;
+I64 window_drag_live_control_dc_matches;
+I64 window_drag_live_presented_pixel;
 
 U0 WindowDragLivePark(U8 *data)
 {
@@ -71,6 +77,17 @@ U0 WindowDragLiveRightDraw(CDC *dc, CCtrl *ctrl)
     GrRect(dc, ctrl->left, ctrl->top,
            ctrl->right - ctrl->left + 1,
            ctrl->bottom - ctrl->top + 1);
+    window_drag_live_control_dc_matches = dc->win_task == ctrl->win_task;
+    window_drag_live_control_pixel = -1;
+    if (dc->body && dc->width_internal > 0)
+    {
+        I64 x = ctrl->win_task->pix_left + ctrl->left +
+                (ctrl->right - ctrl->left) / 2;
+        I64 y = ctrl->win_task->pix_top + ctrl->top +
+                (ctrl->bottom - ctrl->top) / 2;
+        if (x >= 0 && x < dc->width_internal && y >= 0 && y < dc->height)
+            window_drag_live_control_pixel = dc->body[y * dc->width_internal + x];
+    }
 }
 
 I64 WindowDragLiveStop()
@@ -122,6 +139,8 @@ I64 WindowDragLiveStart()
     }
     window_drag_live_right_down = 0;
     window_drag_live_wheel_delta = 0;
+    window_drag_live_control_pixel = -1;
+    window_drag_live_control_dc_matches = FALSE;
     window_drag_live_right_control.next = &window_drag_live_b->next_ctrl;
     window_drag_live_right_control.last = &window_drag_live_b->next_ctrl;
     window_drag_live_right_control.win_task = window_drag_live_b;
@@ -140,7 +159,7 @@ I64 WindowDragLiveStart()
 }
 
 I64 WindowDragLiveRenderChecks()
-{//Require the real task and control callbacks to run during a compositor pass.
+{//Require a presented task frame and a painted control pixel on its CDC.
     I64 draw_a_before, draw_b_before, control_before;
 
     if (!TaskValidate(window_drag_live_a) || !TaskValidate(window_drag_live_b))
@@ -148,10 +167,21 @@ I64 WindowDragLiveRenderChecks()
     draw_a_before = window_drag_live_draw_a_count;
     draw_b_before = window_drag_live_draw_b_count;
     control_before = window_drag_live_control_draw_count;
-    BootstrapGrUpdateTasks();
+    if (!ZcTaskFrameRun())
+        return 3;
+    window_drag_live_presented_pixel = ZcFbTextPixel(
+        window_drag_live_b->pix_left + window_drag_live_right_control.left +
+            (window_drag_live_right_control.right -
+             window_drag_live_right_control.left) / 2,
+        window_drag_live_b->pix_top + window_drag_live_right_control.top +
+            (window_drag_live_right_control.bottom -
+             window_drag_live_right_control.top) / 2);
     if (window_drag_live_draw_a_count <= draw_a_before ||
         window_drag_live_draw_b_count <= draw_b_before ||
-        window_drag_live_control_draw_count <= control_before)
+        window_drag_live_control_draw_count <= control_before ||
+        !window_drag_live_control_dc_matches ||
+        window_drag_live_control_pixel != YELLOW ||
+        window_drag_live_presented_pixel != 0x00FFFF55)
         return 2;
     return 42;
 }

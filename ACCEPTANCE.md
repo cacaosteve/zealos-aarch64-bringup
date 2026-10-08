@@ -71,6 +71,12 @@ zcall WindowDragLiveRenderChecks
    parked demo tasks do not render a task menu. Finish with
    `zcall WindowDragLiveStop`.
 
+`make check-window-buttons` runs the same live draw/control probe in the
+headless UTM-shaped QEMU guest. It checks that the control callback draws the
+expected pixel, the frame is presented, and the framebuffer reports yellow at
+that pixel. It does not replace the interactive UTM check for window visibility
+and pointer input.
+
 ## Checklist — RedSea disk story (freeze)
 
 ```text

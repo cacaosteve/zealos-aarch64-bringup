@@ -19,6 +19,8 @@ int zc_exec(const char *source);
 int zc_call(const char *name, int64_t *result);
 /* Give one cooperative guest task an opportunity to run while the shell idles. */
 void zc_idle_step(void);
+/* Best-effort name for a PC in the current session's generated code arena. */
+const char *zc_debug_function_for_pc(uintptr_t pc, uintptr_t *offset);
 /* Packed absolute tablet sample for ZealC window-control polling, or -1. */
 int64_t zc_tablet_sample(void);
 /* True while a live child owns input; the shell must not read device keys. */

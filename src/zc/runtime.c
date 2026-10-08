@@ -98,6 +98,41 @@ static size_t archive_size;
 static zc_source_read_fn disk_reader;
 static jmp_buf guard;
 static int guarded, ready, failed;
+
+const char *zc_debug_function_for_pc(uintptr_t pc, uintptr_t *offset) {
+    CHashTable *table;
+    CHashFun *best = NULL;
+    uintptr_t best_pc = 0;
+    uintptr_t code_lo = (uintptr_t)code_arena;
+    uintptr_t code_hi = code_lo + sizeof(code_arena);
+    if (offset)
+        *offset = 0;
+    if (!Fs || pc < code_lo || pc >= code_hi)
+        return NULL;
+    for (table = Fs->hash_table; table; table = table->next) {
+        int64_t i;
+        if (!table->body || table->mask < 0 || table->mask > 65535)
+            continue;
+        for (i = 0; i <= table->mask; ++i) {
+            CHash *entry;
+            for (entry = table->body[i]; entry; entry = entry->next) {
+                if ((entry->type & HTT_FUN) &&
+                    ((CHashFun *)entry)->fun_ptr) {
+                    uintptr_t start = (uintptr_t)((CHashFun *)entry)->fun_ptr;
+                    if (start >= code_lo && start <= pc && start > best_pc) {
+                        best = (CHashFun *)entry;
+                        best_pc = start;
+                    }
+                }
+            }
+        }
+    }
+    if (!best)
+        return NULL;
+    if (offset)
+        *offset = pc - best_pc;
+    return best->base.base.str;
+}
 static size_t loaded_modules;
 static FILE files[16];
 /* Kernel/KMain.ZC builds this table before KMathB is used. The current
@@ -243,6 +278,7 @@ static int64_t guest_win_top_off, guest_win_bottom_off, guest_text_attr_off;
 static int64_t guest_next_task_off, guest_last_task_off;
 static int64_t guest_next_sibling_off, guest_last_sibling_off;
 static int64_t guest_next_child_off, guest_last_child_off;
+static int64_t guest_next_ctrl_off, guest_last_ctrl_off;
 static int64_t guest_next_ode_off, guest_last_ode_off;
 static int64_t guest_popup_off;
 static int64_t guest_win_inhibit_off;
@@ -1204,6 +1240,30 @@ static int64_t host_mouse_state_update(int64_t *a) {
     }
     return 1;
 }
+static int64_t host_mouse_buttons_update(int64_t *a) {
+    CHashGlblVar *global;
+    CMemberLst *scan_code;
+    int64_t value;
+    if (!Fs || !Fs->hash_table)
+        return 0;
+    global = (CHashGlblVar *)HashFind("kbd", Fs->hash_table,
+                                     HTT_GLBL_VAR, 1);
+    if (!global || !global->data_addr || !global->var_class ||
+        global->var_class->sz < (int64_t)sizeof(value))
+        return 0;
+    scan_code = guest_class_member(global->var_class, "scan_code");
+    if (!scan_code || scan_code->off < 0 ||
+        scan_code->off > global->var_class->sz - (int64_t)sizeof(value))
+        return 0;
+    memcpy(&value, (uint8_t *)global->data_addr + scan_code->off,
+           sizeof(value));
+    value = (a[0] ? (int64_t)((uint64_t)value | (1ull << 16))
+                  : (int64_t)((uint64_t)value & ~(1ull << 16)));
+    value = (a[1] ? (int64_t)((uint64_t)value | (1ull << 17))
+                  : (int64_t)((uint64_t)value & ~(1ull << 17)));
+    return guest_store_i64_member(global->data_addr, global->var_class,
+                                  scan_code, value);
+}
 static int64_t host_fb_text_span(int64_t *a) {
     uint32_t lr = (uint32_t)a[6], tb = (uint32_t)a[7];
     uint32_t *plane = guest_text_plane(a[8], a[9], 75);
@@ -1650,6 +1710,8 @@ static void init_guest_fiber(unsigned i, void *parent, const char *name) {
     void *child_head = guest_child_head(words);
     *(void **)(words + guest_next_child_off) = child_head;
     *(void **)(words + guest_last_child_off) = child_head;
+    *(void **)(words + guest_next_ctrl_off) = words + guest_next_ctrl_off;
+    *(void **)(words + guest_last_ctrl_off) = words + guest_next_ctrl_off;
     *(void **)(words + guest_parent_off) = parent;
     *(void **)(words + guest_input_filter_off) = words;
     *(void **)(words + guest_next_filter_off) = words;
@@ -3114,6 +3176,8 @@ static void bind_guest_task(void) {
         !task_field(cls, "last_sibling_task", 8, -1) ||
         !task_field(cls, "next_child_task", 8, -1) ||
         !task_field(cls, "last_child_task", 8, -1) ||
+        !task_field(cls, "next_ctrl", 8, -1) ||
+        !task_field(cls, "last_ctrl", 8, -1) ||
         !task_field(cls, "popup_task", 8, -1) ||
         !task_field(cls, "last_input_filter_task", 8, -1) ||
         !task_field(cls, "next_input_filter_task", 8, -1) ||
@@ -3168,6 +3232,8 @@ static void bind_guest_task(void) {
     guest_last_sibling_off = MemberFind("last_sibling_task", cls)->off;
     guest_next_child_off = MemberFind("next_child_task", cls)->off;
     guest_last_child_off = MemberFind("last_child_task", cls)->off;
+    guest_next_ctrl_off = MemberFind("next_ctrl", cls)->off;
+    guest_last_ctrl_off = MemberFind("last_ctrl", cls)->off;
     if (guest_next_child_off < guest_next_sibling_off ||
         guest_last_child_off - guest_next_child_off !=
         guest_last_sibling_off - guest_next_sibling_off ||
@@ -3524,6 +3590,7 @@ static int load_inner(const char *path) {
          * their extern declarations, so bind them again now that the symbols
          * and relocation slots exist. */
         PrsBindCSymbol("ZcMouseStateUpdate", host_mouse_state_update, 5);
+        PrsBindCSymbol("ZcMouseButtonsUpdate", host_mouse_buttons_update, 2);
         PrsBindCSymbol("ZcActiveGrGlobals", host_active_gr_globals, 0);
         PrsBindCSymbol("ZcActiveMouseGlobals", host_active_mouse_globals, 0);
         PrsBindCSymbol("ZcActiveWinMgrGlobals", host_active_winmgr_globals, 0);
@@ -3878,6 +3945,7 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
                     {"ZcTaskResult", host_task_result, 1},
                     {"ZcTaskFrameRun", host_task_frame_run, 0},
                     {"ZcMouseStateUpdate", host_mouse_state_update, 5},
+                    {"ZcMouseButtonsUpdate", host_mouse_buttons_update, 2},
                     {"ZcFbTextSpan", host_fb_text_span, 10},
                     {"ZcFbTextCellsDrawn", host_fb_text_cells_drawn, 0},
                     {"ZcFbTextPixel", host_fb_text_pixel, 2},

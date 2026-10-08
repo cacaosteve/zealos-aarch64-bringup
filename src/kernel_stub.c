@@ -1320,7 +1320,6 @@ static void uart_put_hex_raw(volatile uint8_t *uart, uint64_t v) {
 }
 
 void exc_handle_sync(uint64_t *frame) {
-    (void)frame;
     uint64_t esr, elr, far;
     __asm__ volatile("mrs %0, esr_el1" : "=r"(esr));
     __asm__ volatile("mrs %0, elr_el1" : "=r"(elr));
@@ -1360,6 +1359,45 @@ void exc_handle_sync(uint64_t *frame) {
         uart_put_hex_raw(g_uart, elr);
         uart_puts(g_uart, " FAR=");
         uart_put_hex_raw(g_uart, far);
+        /* The exception entry saves x29/x30 at these fixed frame slots. Keep
+         * them in the fatal report so synchronous faults can be traced back
+         * through the AArch64 caller chain without a debugger. */
+        if (frame) {
+            uart_puts(g_uart, " FP=");
+            uart_put_hex_raw(g_uart, frame[29]);
+            uart_puts(g_uart, " LR=");
+            uart_put_hex_raw(g_uart, frame[30]);
+            uart_puts(g_uart, " X2=");
+            uart_put_hex_raw(g_uart, frame[2]);
+            uart_puts(g_uart, " X0=");
+            uart_put_hex_raw(g_uart, frame[0]);
+            uart_puts(g_uart, " X1=");
+            uart_put_hex_raw(g_uart, frame[1]);
+            uart_puts(g_uart, " X3=");
+            uart_put_hex_raw(g_uart, frame[3]);
+        }
+        if (frame) {
+            uintptr_t offset = 0;
+            const char *name = zc_debug_function_for_pc((uintptr_t)elr,
+                                                         &offset);
+            if (name) {
+                uart_puts(g_uart, " INSN=");
+                uart_put_hex_raw(g_uart,
+                    *(volatile const uint32_t *)(uintptr_t)elr);
+                if (offset >= 128) {
+                    uart_puts(g_uart, " PREV=");
+                    for (int i = 32; i >= 1; --i) {
+                        uart_put_hex_raw(g_uart,
+                            *(volatile const uint32_t *)(uintptr_t)(elr - 4 * i));
+                        uart_write(g_uart, ',');
+                    }
+                }
+                uart_puts(g_uart, " FUNC=");
+                uart_puts(g_uart, name);
+                uart_puts(g_uart, "+");
+                uart_put_hex_raw(g_uart, offset);
+            }
+        }
         uart_puts(g_uart, "\n");
     }
     for (;;) {
