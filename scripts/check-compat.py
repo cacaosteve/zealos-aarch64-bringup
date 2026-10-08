@@ -221,6 +221,13 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 'zc => 0x000000000000002a')
         command('windowdemo',
                 'windowdemo: source WinMgr running with two windows and a CDC control')
+        # Keep the manager alive across its first idle-driven redraw. The
+        # start command can succeed even if a later task/window callback
+        # still reaches an unresolved ZealC external.
+        time.sleep(.1)
+        result = command('zstatus', 'failed=0')
+        if 'unresolved external call' in result:
+            raise RuntimeError('windowdemo idle redraw hit an unresolved external call:\n'+result)
         command('zcall WindowDragLiveBasicRenderChecks',
                 'zc => 0x000000000000002a')
         command('windowdemostop',
@@ -272,6 +279,13 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                              'zc => 0x000000000000002a')
             if 'unresolved external call' in result:
                 raise RuntimeError('window redraw hit an unresolved external call:\n'+result)
+            # windowdemo's first redraw occurs on a later idle frame, after
+            # WindowDragLiveStart has returned to the shell. Exercise that
+            # same path before the immediate render/stop checks can mask it.
+            time.sleep(.1)
+            result = command('zstatus', 'failed=0')
+            if 'unresolved external call' in result:
+                raise RuntimeError('background window redraw hit an unresolved external call:\n'+result)
             command('zcall WindowDragLiveRenderChecks',
                     'zc => 0x000000000000002a')
             command('zcall WindowDragLiveStop',

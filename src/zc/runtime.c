@@ -357,7 +357,18 @@ void AIWNIOS_throw(uint64_t code) {
     (void)code;
     zc_fail("compile failed; use zreset to discard the session");
 }
-void DoNothing(void) { zc_fail("unresolved external call"); }
+void DoNothing(void) {
+    uintptr_t return_pc = (uintptr_t)__builtin_return_address(0);
+    uintptr_t offset = 0;
+    const char *function = zc_debug_function_for_pc(return_pc, &offset);
+    if (function)
+        printf("zc: unresolved external call from %s+0x%lx\n", function,
+               (unsigned long)offset);
+    else
+        printf("zc: unresolved external call from pc=0x%lx\n",
+               (unsigned long)return_pc);
+    zc_fail("unresolved external call");
+}
 
 static void arena_init(unsigned i, void *p, size_t size) {
     arenas[i] = p;
