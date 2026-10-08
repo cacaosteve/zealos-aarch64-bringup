@@ -132,7 +132,8 @@ tablet press/release route, task-menu queueing, and no-document close in QEMU;
 `WindowDragLiveStart` provides the visible focus/raise, title movement, corner
 resize, right-click capture (the control box turns green while held), and
 close-button check with the real tablet. Its parked demo tasks do not draw a
-task menu. Call `WindowDragLiveStop` to close any remaining test windows. The
+task menu. The UTM shell accepts `Ctrl+C` as an escape while this demo has
+keyboard focus; `windowdemostop` also stops it when the shell has focus. The
 automated check cannot replace the interactive UTM check.
 
 After window callbacks, `GrUpdateTasks` invokes the optional

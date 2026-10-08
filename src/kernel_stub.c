@@ -4699,7 +4699,7 @@ static void shell_handle(const char *line, int *done) {
     }
     if (streq(line, "windowdemo")) {
         if (!zc_start_window_demo())
-            con_puts("windowdemo: source WinMgr running with two windows and a CDC control; drag/raise/resize; stop with windowdemostop\n");
+            con_puts("windowdemo: source WinMgr running with two windows and a CDC control; drag/raise/resize; Ctrl+C returns to shell\n");
         else
             con_puts("windowdemo: failed; check serial diagnostics or use zreset\n");
         return;
@@ -4865,7 +4865,7 @@ static void shell_handle(const char *line, int *done) {
         con_puts("Native compiler: zcheck | zvol | zls | zgc | zedit <path> | zrm <path> | zverify <path> | zload /path.ZC | zput Name.ZC <source> | zrecv Name.ZC <bytes> <crc32> | zload disk:Name.ZC | zc <source> | zcall Function | zstatus | zreset | winmgr | winmgrstop | windowdemo | windowdemostop | fbquiet | fbshow\n");
         con_puts("Window test order: zreset -> zload /Kernel/KernelA.HH -> zload /Kernel/KernelB.HH\n");
         con_puts("  -> zload /Tests/WindowDragLive.ZC -> zcall WindowDragLiveStart; stop: zcall WindowDragLiveStop\n");
-        con_puts("UTM window demo: windowdemo (drag/raise/resize) | windowdemostop\n");
+        con_puts("UTM window demo: windowdemo (drag/raise/resize; Ctrl+C exits) | windowdemostop\n");
 #endif
         con_puts("UTM freeze: vblk | rspersist | rscatalog | rsdir | runzc | runzc Notes.ZC\n");
         con_puts("Lattice: nearlatticelite | disklat | lattice | latticeplay | stocklat | stockplay | depthplotlite\n");
@@ -6430,6 +6430,16 @@ static void shell_run(void) {
 #ifndef ZEAL_PI_DIAG
         zc_idle_step();
         if (zc_focus_owns_input()) {
+            /* A focused demo owns normal keys, but keep a keyboard escape so
+             * the UTM window-manager smoke can always return to the shell. */
+            if (zc_window_demo_active() && virtio_kbd_take_ctrl_c()) {
+                if (zc_stop_window_demo() == 0)
+                    con_puts("\nwindowdemo: stopped with Ctrl+C; shell input resumed\n> ");
+                else
+                    con_puts("\nwindowdemo: Ctrl+C teardown reported an error; shell input resumed\n> ");
+                len = 0;
+                continue;
+            }
             tablet_cursor_tick();
             (void)hc_builtin_sleep(1);
             continue;

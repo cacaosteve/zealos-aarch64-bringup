@@ -4120,6 +4120,9 @@ int zc_stop_window_demo(void) {
     window_demo_loaded = 0;
     return failed_stop ? -1 : 0;
 }
+int zc_window_demo_active(void) {
+    return window_demo_loaded;
+}
 void zc_status(void) {
     size_t used[2] = {0}, blocks[2] = {0};
     for (unsigned a = 0; a < 2; a++)

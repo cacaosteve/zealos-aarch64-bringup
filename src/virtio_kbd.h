@@ -437,6 +437,28 @@ static int virtio_kbd_getc_nb(void) {
     return vk_ring_pop();
 }
 
+/* Consume only the UTM demo's Ctrl+C escape, preserving ordinary queued keys
+ * for the focused ZealOS task's GetKey path. */
+static int virtio_kbd_take_ctrl_c(void) {
+    vk_poll();
+    for (unsigned i = g_vk_rt; i != g_vk_rh; i = (i + 1) % sizeof(g_vk_ring)) {
+        if (g_vk_ring[i] == 3) {
+            unsigned j = i;
+            unsigned next;
+            for (;;) {
+                next = (j + 1) % sizeof(g_vk_ring);
+                if (next == g_vk_rh)
+                    break;
+                g_vk_ring[j] = g_vk_ring[next];
+                j = next;
+            }
+            g_vk_rh = (g_vk_rh + sizeof(g_vk_ring) - 1) % sizeof(g_vk_ring);
+            return 1;
+        }
+    }
+    return 0;
+}
+
 /* Lattice MessageGet: typed KEY_DOWN/KEY_UP with ASCII or SC_CURSOR_* args. */
 static int virtio_kbd_msg_nb(uint8_t *type, uint64_t *a1, uint64_t *a2) {
     vk_poll();

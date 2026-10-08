@@ -2941,6 +2941,14 @@ Freeze catalog unchanged.
 | Smoke | `python3 scripts/check-compat.py --pci --probe-module /System/Win.ZC --probe-winmgr --probe-grscreen --probe-live-winmgr --probe-live-window-control` passes the cursor check together with source-window draw, control, and input checks |
 | Limits | This proves the interim software cursor is presented in the live QEMU manager path. Physical UTM cursor placement and appearance still require an interactive UTM check; hardware sprites and grab-scroll cursor remain unported |
 
+## Milestone 253 — Ctrl+C escape from the focused UTM window demo
+
+| Item | Path |
+|--|--|
+| Gap | Focusing a source window paused shell key polling, making the advertised `windowdemostop` command unreachable from the guest keyboard |
+| Bring-up | While `windowdemo` owns focus, consume only Ctrl+C from the VirtIO keyboard character ring and stop the fixture; preserve other queued characters for the focused ZealOS task |
+| Smoke | Existing `windowdemo` lifecycle and live-window-control regressions; UTM acceptance: start `windowdemo`, verify the windows display, then press Ctrl+C and confirm the shell prompt returns |
+
 ## Open compatibility probe — `/System/Win.ZC`
 
 The source probe loads pinned `KernelC.HH`, `Externs.ZC`, and `Gr.HH` before compiling unchanged `Win.ZC`. Graphics dimensions and mouse globals are probe fixtures; `DrawMenu` and the initial `GrScaleZoom` definition are compile-time fixtures until unchanged `GrScreen.ZC` is loaded later in the probe. `GrScreenFinalUpdateChecks` executes `WinFinalUpdate` through the staged idle-frame path, confirms the fixture's `mouse_grid.coord` toggles the real coordinate-text overlay, checks a separate visible guest overlay callback, verifies the software arrow against Limine framebuffer pixels, and exercises `WinMouseUpdate`'s edge recentering through the runtime dispatch. `WinMousePointerStateCheck` covers transformed tablet coordinates and `WinMouseHardStateCheck` covers the source mouse-state ABI; manual UTM pointer acceptance is still pending. The raw ARM generic-timer binding and a standalone F64 clock expression are smoke-tested before the Win load.

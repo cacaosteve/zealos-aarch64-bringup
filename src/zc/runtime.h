@@ -22,6 +22,8 @@ int zc_stop_winmgr(void);
 int zc_start_window_demo(void);
 /* Stop the fixture windows and return to the bootstrap shell display. */
 int zc_stop_window_demo(void);
+/* True only while the interactive two-window fixture owns guest tasks. */
+int zc_window_demo_active(void);
 int zc_load(const char *path);
 int zc_exec(const char *source);
 int zc_call(const char *name, int64_t *result);
