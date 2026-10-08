@@ -174,7 +174,8 @@ if old_shadow is not None:
 # and test files that are absent from the existing source volume.
 root = pathlib.Path("$ROOT")
 subprocess.run([sys.executable, str(root / "scripts/source-volume.py"),
-                "merge", str(target), str(root / "build/sources.tar")], check=True)
+                "merge", str(target), str(root / "build/sources.tar"),
+                "--replace", "Tests/WindowDragLive.ZC"], check=True)
 
 # Convenience second name for humans / older scripts
 shutil.copyfile(target, data / "zealos-esp.raw")

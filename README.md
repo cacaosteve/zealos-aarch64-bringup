@@ -17,6 +17,10 @@ make check-compat-pci   # disposable UTM-shaped GPT/PCI disk guest
 make utm               # refresh VM, preserving RedSea/source edits and adding new bundled files
 ```
 
+The UTM refresh also updates the repository-owned
+`Tests/WindowDragLive.ZC` fixture so its ABI stays in sync with the kernel;
+other existing guest source files remain untouched.
+
 At the UTM prompt, run `zcheck`. Expected: `zc: upstream QuickSort + persistent
 modules OK`. Use `zc` for declarations/statements, `zload` for a source file in the
 boot archive, `zcall` for a no-argument integer function, and `zreset` to discard

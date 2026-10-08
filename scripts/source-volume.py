@@ -186,11 +186,12 @@ def compact(disk):
           f'{old_tail} -> {pos}/{SECTORS} sectors used')
 
 
-def merge(disk, bundle_path):
-    """Append missing bundled files without replacing edits or tombstones."""
+def merge(disk, bundle_path, replace_names=()):
+    """Append missing files and explicitly selected refreshed bundle files."""
+    replace_names = set(replace_names)
     with disk.open('r+b') as f:
         pos, files, deleted_names = scan(f, with_deleted=True)
-        added = 0
+        added = replaced = 0
         with tarfile.open(bundle_path) as bundle:
             members = sorted((m for m in bundle.getmembers()
                               if m.isfile() and m.name.endswith(('.ZC', '.HH'))),
@@ -199,17 +200,28 @@ def merge(disk, bundle_path):
                 name = member.name
                 valid_name(name)
                 # Existing records may contain local edits. Tombstones are
-                # deliberate masks and must not be undone by a refreshed image.
-                if name in files or name in deleted_names:
+                # deliberate masks and must not be undone unless a caller
+                # explicitly marks a repository-owned file for refresh.
+                refresh = name in replace_names
+                if (name in files or name in deleted_names) and not refresh:
                     continue
                 data = bundle.extractfile(member).read()
+                checksum = zlib.crc32(data)
+                if refresh and name in files:
+                    _, old_length, old_checksum = files[name]
+                    if old_length == len(data) and old_checksum == checksum:
+                        continue
                 record_pos = pos
                 pos = append(f, pos, name, data)
-                files[name] = (record_pos, len(data), zlib.crc32(data))
-                added += 1
+                files[name] = (record_pos, len(data), checksum)
+                deleted_names.discard(name)
+                if refresh:
+                    replaced += 1
+                else:
+                    added += 1
         f.flush()
         os.fsync(f.fileno())
-    print(f'Source partition: merged {added} new files; '
+    print(f'Source partition: merged {added} new files, refreshed {replaced}; '
           f'{len(files)} live, {len(deleted_names)} deleted, '
           f'{pos}/{SECTORS} sectors used')
 
@@ -230,9 +242,11 @@ delete.add_argument('disk', type=pathlib.Path)
 delete.add_argument('name')
 repack = sub.add_parser('compact', help='reclaim old source records (VM stopped)')
 repack.add_argument('disk', type=pathlib.Path)
-merge_parser = sub.add_parser('merge', help='add missing bundled files without replacing local files')
+merge_parser = sub.add_parser('merge', help='add missing bundled files; optionally refresh selected files')
 merge_parser.add_argument('disk', type=pathlib.Path)
 merge_parser.add_argument('bundle', type=pathlib.Path)
+merge_parser.add_argument('--replace', action='append', default=[],
+                          help='refresh this bundled source path even if it exists or is deleted')
 args = p.parse_args()
 if args.disk.stat().st_size < (START + SECTORS) * SECTOR:
     p.error('disk image is too small for the source partition')
@@ -240,7 +254,7 @@ if args.disk.stat().st_size < (START + SECTORS) * SECTOR:
 if args.command == 'compact':
     compact(args.disk)
 elif args.command == 'merge':
-    merge(args.disk, args.bundle)
+    merge(args.disk, args.bundle, args.replace)
 else:
     with args.disk.open('r+b' if args.command != 'inspect' else 'rb') as f:
         if args.command == 'seed':
