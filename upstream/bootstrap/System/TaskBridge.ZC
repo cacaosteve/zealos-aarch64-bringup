@@ -1472,7 +1472,7 @@ U0 BootstrapGrContextInit()
 
     if (!active_gr)
         active_gr = &gr;
-    active_gr->dc2 = &bootstrap_graphics_dc;
+    active_gr->dc = active_gr->dc2 = &bootstrap_graphics_dc;
 }
 U0 BootstrapBindGrTaskTables(CGrGlobals *active_gr)
 {//Give each later source gr global the bridge's bounded window z tables.
