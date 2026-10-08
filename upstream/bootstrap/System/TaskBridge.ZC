@@ -38,6 +38,7 @@ extern Bool ZcMouseStateUpdate(I64 x, I64 y, I64 text_x, I64 text_y,
                                I64 now_ns);
 extern Bool ZcMouseButtonsUpdate(Bool left, Bool right);
 extern U0 BootstrapMouseHardSample(I64 sample, I64 now_ns);
+extern Bool BootstrapCtrlInputSubmit(CTask *task, I64 sample, I64 now_ns);
 extern CMouseStateGlobals *ZcActiveMouseGlobals();
 extern CWinMgrGlobals *ZcActiveWinMgrGlobals();
 extern U0 ZcSetWinMgrTask(CTask *task);
@@ -3138,10 +3139,7 @@ U0 BootstrapCtrlInputPoll()
     if (sample < 0)
         return;
     now_ns = ZcMonotonicNs();
-    BootstrapCtrlInputSampleAt(task, sample, now_ns);
-    // Keep the same sample available to the unchanged WinMouseUpdate path.
-    // The bootstrap hit-test remains useful before the source WinMgr is live.
-    BootstrapMouseHardSample(sample, now_ns);
+    BootstrapCtrlInputSubmit(task, sample, now_ns);
 }
 public Bool CtrlDispatchWheel(CTask *task, I64 delta)
 {//WinMgr routes wheel changes to the focused task's first wheel control.
@@ -3160,6 +3158,24 @@ public Bool CtrlDispatchWheel(CTask *task, I64 delta)
         ctrl = ctrl->next;
     }
     return FALSE;
+}
+Bool BootstrapSourceWinMgrActive()
+{//Do not send tablet events through both bridge and source-manager dispatch.
+    return Bt(&sys_run_level, RLf_WINMGR) && TaskValidate(sys_task) &&
+           TaskValidate(sys_winmgr_task) && sys_winmgr_task != sys_task;
+}
+public Bool BootstrapCtrlInputSubmit(CTask *task, I64 sample, I64 now_ns)
+{//Queue raw tablet state; only the bridge routes input before WinMgr is live.
+    if (sample < 0 || !TaskValidate(task))
+        return FALSE;
+    if (BootstrapSourceWinMgrActive())
+        BootstrapMouseHardSample(sample, now_ns);
+    else
+    {
+        BootstrapCtrlInputSampleAt(task, sample, now_ns);
+        BootstrapMouseHardSample(sample, now_ns);
+    }
+    return TRUE;
 }
 U0 WinDerivedScrollValsUpdate(CCtrl *ctrl)
 {
