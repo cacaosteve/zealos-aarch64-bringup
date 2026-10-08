@@ -1,3 +1,5 @@
+extern Bool BootstrapCtrlInputSubmit(CTask *task, I64 sample, I64 now_ns);
+
 I64 WinMgrStartChecks()
 {
     CTask *root = Fs, *manager;
@@ -211,23 +213,26 @@ I64 WinMgrSourceDragChecks()
     mouse_hard.pos.z = 0;
     // Leave the source manager in an unpressed state before beginning the
     // drag; this also drains a press left by an earlier probe.
-    BootstrapMouseHardSample(mouse.pos.x | (mouse.pos.y << 16),
+    BootstrapCtrlInputSubmit(drag_task, mouse.pos.x | (mouse.pos.y << 16),
                              ZcMonotonicNs());
     Sleep(50);
     // The cover overlaps the right half of this title. Clicking the exposed
     // left portion must make the source manager raise and focus drag_task.
     x = (old_left + 5) * FONT_WIDTH;
     y = (old_top - 1) * FONT_HEIGHT;
-    BootstrapMouseHardSample(x | (y << 16) | (1 << 32), ZcMonotonicNs());
+    BootstrapCtrlInputSubmit(drag_task, x | (y << 16) | (1 << 32),
+                             ZcMonotonicNs());
     Sleep(50);
     if (sys_focus_task != drag_task || sys_winmgr_task->last_task != drag_task)
         result = 5;
     // Move the still-held pointer by two text cells in each direction.
-    BootstrapMouseHardSample((x + 2 * FONT_WIDTH) |
+    BootstrapCtrlInputSubmit(drag_task,
+                             (x + 2 * FONT_WIDTH) |
                              ((y + 2 * FONT_HEIGHT) << 16) | (1 << 32),
                              ZcMonotonicNs());
     Sleep(50);
-    BootstrapMouseHardSample((x + 2 * FONT_WIDTH) |
+    BootstrapCtrlInputSubmit(drag_task,
+                             (x + 2 * FONT_WIDTH) |
                              ((y + 2 * FONT_HEIGHT) << 16),
                              ZcMonotonicNs());
     Sleep(50);
@@ -241,13 +246,16 @@ I64 WinMgrSourceDragChecks()
         old_bottom = drag_task->win_bottom;
         x = (old_right + 1) * FONT_WIDTH;
         y = (old_bottom + 1) * FONT_HEIGHT;
-        BootstrapMouseHardSample(x | (y << 16) | (1 << 32), ZcMonotonicNs());
+        BootstrapCtrlInputSubmit(drag_task, x | (y << 16) | (1 << 32),
+                                 ZcMonotonicNs());
         Sleep(50);
-        BootstrapMouseHardSample((x + 3 * FONT_WIDTH) |
+        BootstrapCtrlInputSubmit(drag_task,
+                                 (x + 3 * FONT_WIDTH) |
                                  ((y + 2 * FONT_HEIGHT) << 16) | (1 << 32),
                                  ZcMonotonicNs());
         Sleep(50);
-        BootstrapMouseHardSample((x + 3 * FONT_WIDTH) |
+        BootstrapCtrlInputSubmit(drag_task,
+                                 (x + 3 * FONT_WIDTH) |
                                  ((y + 2 * FONT_HEIGHT) << 16),
                                  ZcMonotonicNs());
         Sleep(50);
@@ -274,17 +282,20 @@ I64 WinMgrSourceDragChecks()
         winmgr_live_ctrl_down_count = winmgr_live_ctrl_up_count = 0;
         x = (live_ctrl.screen_left + live_ctrl.screen_right) / 2;
         y = (live_ctrl.screen_top + live_ctrl.screen_bottom) / 2;
-        BootstrapMouseHardSample(x | (y << 16) | (1 << 32), ZcMonotonicNs());
+        BootstrapCtrlInputSubmit(drag_task, x | (y << 16) | (1 << 32),
+                                 ZcMonotonicNs());
         Sleep(50);
         if (winmgr_live_ctrl_down_count != 1)
             result = 10;
         // Captured controls must keep receiving the held-button path after
         // the pointer leaves their original hit rectangle.
-        BootstrapMouseHardSample((x + 12 * FONT_WIDTH) |
+        BootstrapCtrlInputSubmit(drag_task,
+                                 (x + 12 * FONT_WIDTH) |
                                  ((y + 10 * FONT_HEIGHT) << 16) | (1 << 32),
                                  ZcMonotonicNs());
         Sleep(50);
-        BootstrapMouseHardSample((x + 12 * FONT_WIDTH) |
+        BootstrapCtrlInputSubmit(drag_task,
+                                 (x + 12 * FONT_WIDTH) |
                                  ((y + 10 * FONT_HEIGHT) << 16),
                                  ZcMonotonicNs());
         Sleep(50);
@@ -297,7 +308,7 @@ I64 WinMgrSourceDragChecks()
 
 done:
     // Always release the source manager's drag loop before destroying its task.
-    BootstrapMouseHardSample(mouse.pos.x | (mouse.pos.y << 16),
+    BootstrapCtrlInputSubmit(drag_task, mouse.pos.x | (mouse.pos.y << 16),
                              ZcMonotonicNs());
     Sleep(50);
     sys_focus_task = old_focus;

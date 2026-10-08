@@ -2923,6 +2923,15 @@ Freeze catalog unchanged.
 | Smoke | `WindowDragLiveManagerChecks` drives neutral, right-click down/up, and wheel samples through the same submit helper while the scheduled source manager consumes them; the focused live-window-control probe passes |
 | Limits | QEMU exercises the ownership split with synthetic input. Manual UTM testing remains needed to confirm UTM tablet behavior and that title-bar drag/click-to-raise operate cleanly without duplicate bridge handling |
 
+## Milestone 251 — cover drag and resize through the single-dispatch path
+
+| Item | Path |
+|--|--|
+| Gap | The source-manager focus/drag/resize probe still injected directly into `mouse_hard`, bypassing the new input-ownership decision used by the live UTM pump |
+| Bring-up | Route synthetic focus, title drag, resize, and captured-control samples through `BootstrapCtrlInputSubmit` while the source manager is active |
+| Smoke | The focused source WinMgr probe passes all focus/raise, movement, resize, captured-control, right-click, and wheel checks using the same submission path |
+| Limits | This confirms source-side routing under QEMU with synthetic samples; physical UTM tablet and mouse acceptance remains outstanding |
+
 ## Open compatibility probe — `/System/Win.ZC`
 
 The source probe loads pinned `KernelC.HH`, `Externs.ZC`, and `Gr.HH` before compiling unchanged `Win.ZC`. Graphics dimensions and mouse globals are probe fixtures; `DrawMenu` and the initial `GrScaleZoom` definition are compile-time fixtures until unchanged `GrScreen.ZC` is loaded later in the probe. `GrScreenFinalUpdateChecks` executes `WinFinalUpdate` through the staged idle-frame path, confirms the fixture's `mouse_grid.coord` toggles the real coordinate-text overlay, checks a separate visible guest overlay callback, verifies the software arrow against Limine framebuffer pixels, and exercises `WinMouseUpdate`'s edge recentering through the runtime dispatch. `WinMousePointerStateCheck` covers transformed tablet coordinates and `WinMouseHardStateCheck` covers the source mouse-state ABI; manual UTM pointer acceptance is still pending. The raw ARM generic-timer binding and a standalone F64 clock expression are smoke-tested before the Win load.
