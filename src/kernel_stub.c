@@ -4699,7 +4699,7 @@ static void shell_handle(const char *line, int *done) {
     }
     if (streq(line, "windowdemo")) {
         if (!zc_start_window_demo())
-            con_puts("windowdemo: two ZealOS windows running on bootstrap input/frame pump; drag title bars, click to raise, resize corners; stop with windowdemostop\n");
+            con_puts("windowdemo: source WinMgr running with two windows and a CDC control; drag/raise/resize; stop with windowdemostop\n");
         else
             con_puts("windowdemo: failed; check serial diagnostics or use zreset\n");
         return;

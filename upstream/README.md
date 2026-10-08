@@ -2876,7 +2876,7 @@ Freeze catalog unchanged.
 | Gap | Starting `WinMgrTask` had no visible interactive fixture, so UTM acceptance could not distinguish a live frame/input path from a shell that merely remained responsive |
 | Bring-up | Add `windowdemo`/`windowdemostop`: load the source-backed `WindowDragLive` fixture, render two bordered tasks through the bounded bootstrap frame/input path, and keep a safe stop path |
 | Smoke | See Milestone 246 for source-compositor rendering and the control CDC pixel check |
-| Limits | The fixture is a bridge-backed window-manager acceptance demo, not normal desktop startup. In UTM, type `windowdemo`, verify both windows and try title-bar drag, click-to-raise, and corner resize; type `windowdemostop` to return to the shell. The custom control and full source compositor remain separate work |
+| Limits | The fixture remains separate from normal desktop startup. Milestone 248 switches its interactive path to the source compositor; see that milestone for the UTM check. |
 
 ## Milestone 246 — initialize packed color masks for source CDC drawing
 
@@ -2895,6 +2895,15 @@ Freeze catalog unchanged.
 | Bring-up | Synchronize the active ZealOS `sys_winmgr_task` global when the bridge starts/stops `WinMgrTask`; align the bridge's uncovered-window bitmap with upstream `GrUpdateTasks`, which indexes by z number and reserves bit zero |
 | Smoke | `WindowDragLiveManagerChecks` starts two fixture windows with the source manager running, waits for a manager refresh, then verifies both task draw callbacks, the right-control callback, its active CDC, the control pixel, and the presented framebuffer pixel. `python3 scripts/check-compat.py --pci --probe-module /System/Win.ZC --probe-winmgr --probe-grscreen --probe-live-winmgr --probe-live-window-control` passes; `--quick` and the standalone `--probe-window-buttons` regressions also pass |
 | Limits | This is a deterministic QEMU test with synthetic windows, not normal ZealOS desktop startup or manual UTM pointer acceptance. Full graphics-table initialization and ordinary application/window lifecycle remain open |
+
+## Milestone 248 — expose live source CDC drawing in the UTM window demo
+
+| Item | Path |
+|--|--|
+| Gap | The UTM-facing `windowdemo` still selected the bootstrap-only draw callbacks, so the source CDC control covered by Milestone 247 was not visible for hands-on testing |
+| Bring-up | Make `windowdemo` use the full source fixture with its CDC control while `WinMgrTask` owns periodic redraw; stop the manager before destroying fixture tasks to avoid a refresh/teardown race |
+| Smoke | The `--quick` PCI flow starts and stops `windowdemo`; the focused live-manager probe covers source callback, CDC, and framebuffer pixels. In UTM, type `windowdemo`, try title-bar drag, click-to-raise, corner resize, and the yellow control; then type `windowdemostop` |
+| Limits | UTM pointer acceptance is still pending. This remains a purpose-built fixture rather than ordinary ZealOS desktop/menu/task startup; remaining graphics tables and broad application lifecycle are not complete |
 
 ## Open compatibility probe — `/System/Win.ZC`
 

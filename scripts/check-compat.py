@@ -220,7 +220,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         command('zcall BootstrapGrPackedTablesChecks',
                 'zc => 0x000000000000002a')
         command('windowdemo',
-                'windowdemo: two ZealOS windows running on bootstrap input/frame pump')
+                'windowdemo: source WinMgr running with two windows and a CDC control')
         command('zcall WindowDragLiveBasicRenderChecks',
                 'zc => 0x000000000000002a')
         command('windowdemostop',

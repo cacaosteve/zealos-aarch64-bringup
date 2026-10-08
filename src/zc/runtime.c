@@ -4092,7 +4092,7 @@ int zc_start_window_demo(void) {
         return -1;
     }
     window_demo_loaded = 1;
-    if (zc_call("WindowDragLiveBasicStart", &result) != 0 || result != 0x2a) {
+    if (zc_call("WindowDragLiveStart", &result) != 0 || result != 0x2a) {
         (void)zc_call("WindowDragLiveStop", NULL);
         (void)zc_call("BootstrapFrameUseSource", NULL);
         window_demo_loaded = 0;
@@ -4111,10 +4111,11 @@ int zc_start_window_demo(void) {
 int zc_stop_window_demo(void) {
     if (!window_demo_loaded)
         return 0;
-    int failed_stop = zc_call("WindowDragLiveStop", NULL) != 0;
-    if (zc_call("BootstrapFrameUseSource", NULL) != 0)
+    /* Stop the periodic source renderer before tearing down its task windows. */
+    int failed_stop = zc_stop_winmgr() != 0;
+    if (zc_call("WindowDragLiveStop", NULL) != 0)
         failed_stop = 1;
-    if (zc_stop_winmgr() != 0)
+    if (zc_call("BootstrapFrameUseSource", NULL) != 0)
         failed_stop = 1;
     window_demo_loaded = 0;
     return failed_stop ? -1 : 0;
