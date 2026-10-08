@@ -14,6 +14,8 @@ void zc_set_source_reader(zc_source_read_fn read);
 void zc_init(const void *archive, size_t size, zc_output_fn output);
 /* Load the pinned ZealOS kernel/window/graphics source for normal UTM boot. */
 int zc_start_graphics(void);
+/* Start the loaded upstream WinMgrTask once, leaving the bootstrap shell active. */
+int zc_start_winmgr(void);
 int zc_load(const char *path);
 int zc_exec(const char *source);
 int zc_call(const char *name, int64_t *result);

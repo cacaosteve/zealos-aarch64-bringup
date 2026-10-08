@@ -4048,6 +4048,12 @@ int zc_start_graphics(void) {
     zc_output("zc: upstream ZealOS graphics sources loaded\n");
     return 0;
 }
+int zc_start_winmgr(void) {
+    int64_t result = 0;
+    if (!ready || failed || zc_call("BootstrapWinMgrStart", &result) != 0)
+        return -1;
+    return result == 0x2a ? 0 : -1;
+}
 void zc_status(void) {
     size_t used[2] = {0}, blocks[2] = {0};
     for (unsigned a = 0; a < 2; a++)

@@ -4693,6 +4693,13 @@ static void shell_handle(const char *line, int *done) {
     if (streq(line, "zcheck")) { (void)zc_selftest(); return; }
     if (streq(line, "zstatus")) { zc_status(); return; }
     if (streq(line, "zreset")) { zc_init(0, 0, 0); return; }
+    if (streq(line, "winmgr")) {
+        if (!zc_start_winmgr())
+            con_puts("winmgr: upstream Window Manager running; shell remains on serial\n");
+        else
+            con_puts("winmgr: start failed; check serial diagnostics or reboot\n");
+        return;
+    }
     if (streq(line, "zvol")) {
         if (zss_available()) {
             con_puts("zvol: source partition ready bank=");
@@ -4830,7 +4837,7 @@ static void shell_handle(const char *line, int *done) {
 #endif
     if (streq(line, "help")) {
 #ifndef ZEAL_PI_DIAG
-        con_puts("Native compiler: zcheck | zvol | zls | zgc | zedit <path> | zrm <path> | zverify <path> | zload /path.ZC | zput Name.ZC <source> | zrecv Name.ZC <bytes> <crc32> | zload disk:Name.ZC | zc <source> | zcall Function | zstatus | zreset | fbquiet | fbshow\n");
+        con_puts("Native compiler: zcheck | zvol | zls | zgc | zedit <path> | zrm <path> | zverify <path> | zload /path.ZC | zput Name.ZC <source> | zrecv Name.ZC <bytes> <crc32> | zload disk:Name.ZC | zc <source> | zcall Function | zstatus | zreset | winmgr | fbquiet | fbshow\n");
         con_puts("Window test order: zreset -> zload /Kernel/KernelA.HH -> zload /Kernel/KernelB.HH\n");
         con_puts("  -> zload /Tests/WindowDragLive.ZC -> zcall WindowDragLiveStart; stop: zcall WindowDragLiveStop\n");
 #endif

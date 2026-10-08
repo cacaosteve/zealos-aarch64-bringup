@@ -1740,6 +1740,31 @@ class CBootstrapTextGlbls
 };
 CBootstrapTextGlbls text;
 CTask *sys_winmgr_task = NULL;
+extern U0 WinMgrTask(I64 arg);
+I64 BootstrapWinMgrStart()
+{//Start the unchanged source manager on the cooperative ARM64 task bridge.
+    CTask *root = Fs, *manager;
+    if (!TaskValidate(root) || sys_task != root)
+        return 1;
+    if (TaskValidate(sys_winmgr_task) && sys_winmgr_task != root)
+        return 0x2a;
+
+    // WinMgrTask uses sys_winmgr_task as the task-ring sentinel while Spawn
+    // inserts the new manager. Yield once so the real source task reaches its
+    // first WinMgrSleep before returning control to the host shell.
+    sys_winmgr_task = root;
+    manager = Spawn(&WinMgrTask, NULL, "Window Manager", -1, root);
+    if (!TaskValidate(manager))
+    {
+        sys_winmgr_task = root;
+        return 2;
+    }
+    sys_winmgr_task = manager;
+    Yield;
+    if (!TaskValidate(manager) || sys_winmgr_task != manager)
+        return 3;
+    return 0x2a;
+}
 // Doc recalculation may load after the task bridge. The host thunk resolves
 // the guest function at call time and safely skips it until it is defined.
 Bool TextChar(CTask *task, Bool allow_border=FALSE, I64 x=0, I64 y=0, I64 d=0)

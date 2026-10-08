@@ -199,6 +199,10 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         command('zc I64 GrSourceTaskFrameChecks(){return bootstrap_upstream_gr_update_tasks>0;}',
                 'zc: executed')
         command('zcall GrSourceTaskFrameChecks', 'zc => 0x0000000000000001')
+        command('winmgr',
+                'winmgr: upstream Window Manager running; shell remains on serial')
+        command('winmgr',
+                'winmgr: upstream Window Manager running; shell remains on serial')
         command('zreset', 'zc: native compiler ready')
         command('zvol', 'zvol: source partition ready' if args.pci else
                          'zvol: source partition unavailable')

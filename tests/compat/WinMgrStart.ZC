@@ -13,12 +13,11 @@ I64 WinMgrStartChecks()
         root->last_ctrl != &root->next_ctrl)
         return 6;
     updates_before = active_winmgr->updates;
-    sys_winmgr_task = root;
-    manager = Spawn(&WinMgrTask, NULL, "Window Manager", -1, root);
-    if (!TaskValidate(manager))
+    if (BootstrapWinMgrStart() != 0x2a)
         return 2;
-    sys_winmgr_task = manager;
-    Yield;
+    manager = sys_winmgr_task;
+    if (!TaskValidate(manager) || manager == root)
+        return 2;
     // One cooperative start must reach the real first refresh and sleep point.
     if (active_winmgr->updates <= updates_before)
         return 3;
