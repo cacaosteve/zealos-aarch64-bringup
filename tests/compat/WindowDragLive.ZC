@@ -39,8 +39,8 @@ U0 WindowDragLiveDrawA(CTask *task, CDC *dc)
     if (!task)
         return;
     window_drag_live_draw_a_count++;
-    TextLenStr(task, 2, 4, 21, 0x0F, "WINDOW A - drag title");
-    TextLenStr(task, 2, 6, 25, 0x0F, "Resize lower-right corner");
+    TextLenStr(task, 2, 4, 21, WHITE << 8, "WINDOW A - drag title");
+    TextLenStr(task, 2, 6, 25, WHITE << 8, "Resize lower-right corner");
 }
 
 U0 WindowDragLiveDrawB(CTask *task, CDC *dc)
@@ -48,9 +48,9 @@ U0 WindowDragLiveDrawB(CTask *task, CDC *dc)
     if (!task)
         return;
     window_drag_live_draw_b_count++;
-    TextLenStr(task, 2, 4, 24, 0x0F, "WINDOW B - click to raise");
-    TextLenStr(task, 2, 6, 25, 0x0F, "Resize lower-right corner");
-    TextLenStr(task, 2, 8, 31, 0x0F, "Right-click / wheel the box below");
+    TextLenStr(task, 2, 4, 24, WHITE << 8, "WINDOW B - click to raise");
+    TextLenStr(task, 2, 6, 25, WHITE << 8, "Resize lower-right corner");
+    TextLenStr(task, 2, 8, 31, WHITE << 8, "Right-click / wheel the box below");
 }
 
 U0 WindowDragLiveRightClick(CCtrl *ctrl, I64 x, I64 y, Bool down)
@@ -255,6 +255,16 @@ I64 WindowDragLiveRenderChecks()
         return 8;
     if (window_drag_live_presented_pixel != 0x00FFFF55)
         return 9;
+    // The W in each first label has its top-left glyph pixel set. Check the
+    // rendered framebuffer so black-on-black text attributes cannot pass.
+    if (ZcFbTextPixel((window_drag_live_a->win_left + 2) * FONT_WIDTH,
+                      (window_drag_live_a->win_top + 4) * FONT_HEIGHT) !=
+        0x00FFFFFF)
+        return 12;
+    if (ZcFbTextPixel((window_drag_live_b->win_left + 2) * FONT_WIDTH,
+                      (window_drag_live_b->win_top + 4) * FONT_HEIGHT) !=
+        0x00FFFFFF)
+        return 13;
     return 42;
 }
 
