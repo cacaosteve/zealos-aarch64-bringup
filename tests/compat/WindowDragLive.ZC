@@ -351,6 +351,27 @@ I64 WindowDragLiveQueueDrainChecks()
     return 42;
 }
 
+I64 WindowDragLiveCursorNoDocChecks()
+{//Cursor hit-testing must work before the DolDoc display module is loaded.
+    CTask *task = window_drag_live_b;
+    CTask *old_focus = sys_focus_task;
+    CDoc *old_doc;
+    I64 x, y, result;
+    if (!TaskValidate(task))
+        return 1;
+    old_doc = task->display_doc;
+    task->display_doc = NULL;
+    x = gr.pan_text_x + task->pix_left + FONT_WIDTH;
+    y = gr.pan_text_y + task->pix_top + FONT_HEIGHT;
+    if (BootstrapWinCursorPosSet(task, x, y, TRUE))
+        result = 2;
+    else
+        result = 42;
+    task->display_doc = old_doc;
+    sys_focus_task = old_focus;
+    return result;
+}
+
 I64 WindowDragLiveButtonChecks()
 {
     CTask *menu_task, *close_task, *old_focus = sys_focus_task;

@@ -117,7 +117,6 @@ extern Bool Kill(CTask *task, Bool wait=TRUE, Bool just_break=FALSE);
 extern I64 BirthWait(CTask **_task, I64 task_num=-1);
 extern U0 DeathWait(CTask **_task, Bool send_exit=FALSE);
 extern U0 TaskWait(CTask *task=NULL, Bool cmd_line_prompt=FALSE);
-extern CDoc *DocDisplay(CTask *task=NULL);
 // Queue and consume messages using the pinned Job.ZC/SerialDev/Message.ZC API.
 extern U0 JobDel(CJob *job);
 extern CJob *TaskMessage(CTask *server, CTask *master, I64 message_code,
@@ -326,6 +325,20 @@ CDoc *DocPut(CTask *task=NULL)
     if (Bt(&task->task_flags, TASKf_INPUT_FILTER_TASK))
         task = task->parent_task;
     if ((res = task->put_doc) && res->doc_signature == DOC_SIGNATURE_VAL)
+        return res;
+    return NULL;
+}
+// DolDoc's double-buffer module is not part of the graphics-only startup set.
+// WinMgr cursor hit-testing still asks for the active display document, so
+// provide the same task-field lookup here instead of leaving an unresolved
+// extern until the full DolDoc subsystem is loaded.
+CDoc *DocDisplay(CTask *task=NULL)
+{
+    CDoc *res;
+
+    if (!task)
+        task = Fs;
+    if ((res = task->display_doc) && res->doc_signature == DOC_SIGNATURE_VAL)
         return res;
     return NULL;
 }

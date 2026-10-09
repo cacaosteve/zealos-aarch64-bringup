@@ -223,6 +223,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 'windowdemo: source WinMgr running with two windows and a CDC control')
         command('zcall WindowDragLiveQueueDrainChecks',
                 'zc => 0x000000000000002a')
+        command('zcall WindowDragLiveCursorNoDocChecks',
+                'zc => 0x000000000000002a')
         # Keep the manager alive across its first idle-driven redraw. The
         # start command can succeed even if a later task/window callback
         # still reaches an unresolved ZealC external.
