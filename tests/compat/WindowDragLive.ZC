@@ -23,8 +23,15 @@ I64 window_drag_live_start_reason;
 
 U0 WindowDragLivePark(U8 *data)
 {
+    // WindowManager routes pointer events to the focused task. A task that
+    // only yields leaves every move in its CJob queue, eventually exhausting
+    // the bring-up runtime's bounded queue during normal UTM dragging.
     while (TRUE)
+    {
+        while (MessageScan(NULL, NULL, ~1))
+            ;
         ZcTaskYield;
+    }
 }
 
 U0 WindowDragLiveDrawA(CTask *task, CDC *dc)
@@ -320,6 +327,28 @@ I64 WindowDragLiveManagerChecks()
     sys_focus_task = old_focus;
     WindowDragLiveStop();
     return result;
+}
+
+I64 WindowDragLiveQueueDrainChecks()
+{//Verify focused demo tasks consume routed pointer events during idle.
+    CTask *old_focus = sys_focus_task;
+    I64 i;
+    if (!TaskValidate(window_drag_live_b))
+        return 1;
+    sys_focus_task = window_drag_live_b;
+    for (i = 0; i < 256; i++)
+    {
+        if (!TaskMessage(window_drag_live_b, NULL, MESSAGE_MS_MOVE,
+                         i, i, 0))
+        {
+            sys_focus_task = old_focus;
+            return 2;
+        }
+        Yield;
+    }
+    Yield;
+    sys_focus_task = old_focus;
+    return 42;
 }
 
 I64 WindowDragLiveButtonChecks()
