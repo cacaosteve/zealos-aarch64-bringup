@@ -150,15 +150,19 @@ I64 WindowDragLiveStartInternal(Bool with_control)
     window_drag_live_b->win_inhibit &= ~(1 << WIf_SELF_BORDER);
     window_drag_live_a->draw_it = &WindowDragLiveDrawA;
     window_drag_live_b->draw_it = &WindowDragLiveDrawB;
-    if (!WinHorz(15, 54, window_drag_live_a) ||
-        !WinVert(10, 29, window_drag_live_a) ||
-        !WinHorz(38, 77, window_drag_live_b) ||
-        !WinVert(20, 39, window_drag_live_b))
-    {
-        window_drag_live_start_reason = 4;
-        WindowDragLiveStop();
-        return 0;
-    }
+    // This interaction fixture writes the exact geometry directly so its
+    // compositing test remains independent of the not-yet-verified upstream
+    // window-placement ABI path.
+    window_drag_live_a->win_left = 15;
+    window_drag_live_a->win_right = 54;
+    window_drag_live_a->win_top = 10;
+    window_drag_live_a->win_bottom = 29;
+    WinDerivedValsUpdate(window_drag_live_a);
+    window_drag_live_b->win_left = 38;
+    window_drag_live_b->win_right = 77;
+    window_drag_live_b->win_top = 20;
+    window_drag_live_b->win_bottom = 39;
+    WinDerivedValsUpdate(window_drag_live_b);
     window_drag_live_right_down = 0;
     window_drag_live_wheel_delta = 0;
     window_drag_live_control_pixel = -1;
@@ -217,6 +221,16 @@ I64 WindowDragLiveRenderChecks()
 
     if (!TaskValidate(window_drag_live_a) || !TaskValidate(window_drag_live_b))
         return 1;
+    if (window_drag_live_a->win_left != 15 ||
+        window_drag_live_a->win_right != 54 ||
+        window_drag_live_a->win_top != 10 ||
+        window_drag_live_a->win_bottom != 29)
+        return 10;
+    if (window_drag_live_b->win_left != 38 ||
+        window_drag_live_b->win_right != 77 ||
+        window_drag_live_b->win_top != 20 ||
+        window_drag_live_b->win_bottom != 39)
+        return 11;
     draw_a_before = window_drag_live_draw_a_count;
     draw_b_before = window_drag_live_draw_b_count;
     control_before = window_drag_live_control_draw_count;

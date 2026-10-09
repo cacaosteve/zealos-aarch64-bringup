@@ -5,6 +5,8 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 p = argparse.ArgumentParser()
 p.add_argument('--pci', action='store_true')
 p.add_argument('--quick', action='store_true', help='only compiler integration gate')
+p.add_argument('--window-frame-only', action='store_true',
+               help='stop after the window demo frame diagnostic')
 p.add_argument('--probe-upstream', action='store_true', help='check current full-header/subsystem compiler results')
 p.add_argument('--probe-module', metavar='ARCHIVE_PATH',
                help='load an unchanged upstream source after KernelA/B in a disposable guest')
@@ -234,6 +236,12 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             raise RuntimeError('windowdemo idle redraw hit an unresolved external call:\n'+result)
         command('zcall WindowDragLiveBasicRenderChecks',
                 'zc => 0x000000000000002a')
+        command('zcall WindowDragLiveRenderChecks',
+                'zc => 0x000000000000002a')
+        if args.window_frame_only:
+            command('windowdemostop',
+                    'windowdemo: stopped; bootstrap shell display resumed')
+            raise SystemExit(0)
         command('windowdemostop',
                 'windowdemo: stopped; bootstrap shell display resumed')
         command('zreset', 'zc: native compiler ready')

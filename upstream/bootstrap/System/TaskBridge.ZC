@@ -3736,7 +3736,8 @@ U0 BootstrapGrUpdateTasks()
         task = sys_winmgr_task;
         for (i = 0; i < 64; i++)
         {
-            if ((task->display_flags & (1 << DISPLAYf_SHOW)) &&
+            if (task != sys_task && task != sys_winmgr_task &&
+                (task->display_flags & (1 << DISPLAYf_SHOW)) &&
                 BootstrapWinIsUncovered(task))
                 window_count++;
             task = task->next_task;
@@ -3761,7 +3762,8 @@ U0 BootstrapGrUpdateTasks()
         {
             if (!TaskValidate(task))
                 break;
-            if ((task->display_flags & (1 << DISPLAYf_SHOW)) &&
+            if (task != sys_task && task != sys_winmgr_task &&
+                (task->display_flags & (1 << DISPLAYf_SHOW)) &&
                 BootstrapWinIsUncovered(task))
             {
                 if (!bootstrap_force_bridge_frames && ZcGrUpdateTaskWin(task))
@@ -4190,7 +4192,12 @@ U0 WinZBufUpdate()
         if (!TaskValidate(task))
             break;
         task->win_z_num = 0;
-        if ((task->display_flags & (1 << DISPLAYf_SHOW)) &&
+        // sys_task owns the shell text plane, which is already composed as
+        // the frame background. Treating its inherited full-screen geometry
+        // as a normal window gives it the highest ring z and hides every
+        // spawned task window behind the shell during the manager refresh.
+        if (task != sys_task && task != sys_winmgr_task &&
+            (task->display_flags & (1 << DISPLAYf_SHOW)) &&
             z_count < BOOTSTRAP_WIN_MAX)
         {
             z = ++z_count;
