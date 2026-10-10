@@ -61,6 +61,56 @@ U0 SpriteEllipse0(CDC *dc, I64 cx, I64 cy, I64 rx, I64 ry)
     }
 }
 
+I64 SpriteRotatedRect0(CDC *dc, I64 x, I64 y, I32 x1, I32 y1,
+        I32 x2, I32 y2, U64 angle_bits, I64 pixel_limit)
+{
+    I64 rect_x, rect_y, width, height, area, swap;
+
+    // Promote before subtraction so adversarial I32 endpoints cannot
+    // overflow while forming the dimensions.
+    width = x2;
+    width -= x1;
+    height = y2;
+    height -= y1;
+    if (width <= 0 || width > 4096 || height <= 0 || height > 4096)
+        return -1;
+    area = width * height;
+    if (area > pixel_limit)
+        return -1;
+
+    // The upstream angle is radians. Handle exact IEEE encodings for
+    // cardinal orientations without a lossy floating transform.
+    rect_x = x1;
+    rect_y = y1;
+    if (angle_bits == 0x3FF921FB54442D18 ||
+            angle_bits == 0xC002D97C7F3321D2)
+    {
+        rect_y -= width;
+        swap = width;
+        width = height;
+        height = swap;
+    }
+    else if (angle_bits == 0xBFF921FB54442D18 ||
+            angle_bits == 0x4002D97C7F3321D2)
+    {
+        rect_x -= height;
+        swap = width;
+        width = height;
+        height = swap;
+    }
+    else if (angle_bits == 0x400921FB54442D18 ||
+            angle_bits == 0xC00921FB54442D18)
+    {
+        rect_x -= width;
+        rect_y -= height;
+    }
+    else if (angle_bits != 0)
+        return -1;
+
+    GrRect(dc, x + rect_x, y + rect_y, width, height);
+    return area;
+}
+
 U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
 {
     I64 row, col, stride, old_color, old_x, old_y, size, records, pixel_budget;
@@ -105,21 +155,18 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
                            width, height);
             size = 32;
         }
-        else if (type == 13) // SPT_ROTATED_RECT, zero-angle subset
+        else if (type == 13) // SPT_ROTATED_RECT, bounded cardinal subset
         {
             MemCopy(&x1, sprite + 4, sizeof(I32));
             MemCopy(&y1, sprite + 8, sizeof(I32));
             MemCopy(&x2, sprite + 12, sizeof(I32));
             MemCopy(&y2, sprite + 16, sizeof(I32));
             MemCopy(&rect_angle_bits, sprite + 24, sizeof(U64));
-            width = x2 - x1;
-            height = y2 - y1;
-            if (rect_angle_bits != 0 || width <= 0 || width > 4096 ||
-                    height <= 0 || height > 4096 ||
-                    width * height > 480000 - pixel_budget)
+            size = SpriteRotatedRect0(dc, x + old_x, y + old_y, x1, y1,
+                    x2, y2, rect_angle_bits, 480000 - pixel_budget);
+            if (size < 0)
                 break;
-            pixel_budget += width * height;
-            GrRect(dc, x + old_x + x1, y + old_y + y1, width, height);
+            pixel_budget += size;
             size = 32;
         }
         else if (type == 1) // SPT_COLOR (one-byte foreground color)
