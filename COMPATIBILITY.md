@@ -1914,10 +1914,15 @@ ZealOS live distribution or installer.
   asks `DocUpdateTaskDocs` to recalculate its DolDocs. `GrUpdateTasks` clears
   one frame and redraws up to 64 visible tasks by walking the ZealOS task ring
   in its back-to-front order; an overlapping two-task smoke verifies that the
-  later task covers the earlier one. The full upstream display/cache/zoom/pan
-  pipeline and source matching, forms/data
-  formatting, sprites/depth buffers, music state, and cursor interaction remain
-  unaccepted.
+  later task covers the earlier one. The bridge now initializes the source
+  `CGrGlobals` packed-bit and all-256-value color lookup tables, circle bounds,
+  normal/collision/even/odd pen-brush CDCs, zoom expansion tables, and bounded
+  window z/visibility tables. Circle bounds use layout-derived flat pointers
+  because nested inline-array member access currently faults in the ARM64
+  compiler. QEMU checks validate table contents and actual pen-brush pixels;
+  the live source WinMgr startup, draw, mouse, and window-control checks pass.
+  Arbitrary indexed-color palette behavior, full planar semantics, sprite and
+  depth-buffer paths, music state, and automatic desktop startup remain open.
 
 ## Tablet button messages
 
