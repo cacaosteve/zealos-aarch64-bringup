@@ -3038,6 +3038,15 @@ Freeze catalog unchanged.
 | Smoke | Extend `GrDC2SpriteChecks` with two packed eastward PolyPt moves and assert the start, midpoint, and endpoint pixels; full PCI graphics/window-manager compatibility suite passes |
 | Limits | The record stream has no byte length; the remaining 3D, spline, transform, text, and unsupported sprite records still need implementation |
 
+## Milestone 264 — plot bounded axis-aligned sprite ellipses
+
+| Item | Path |
+|--|--|
+| Gap | `SPT_ELLIPSE` records stopped the ARM64 sprite interpreter |
+| Bring-up | Move the sprite interpreter and raster helpers into a separate bootstrap graphics module, then add midpoint rasterization for ellipses with radii up to 4096 and angle exactly zero; reject rotated or out-of-range records and charge their bounded work to the per-sprite budget |
+| Smoke | Add a separate `GrSpriteEllipseChecks` framebuffer smoke for horizontal and vertical extrema and an untouched center; full PCI graphics/window-manager compatibility probe passes |
+| Limits | Rotated ellipses, exact upstream trigonometric stepping, and all other unsupported sprite records remain open |
+
 ## Open compatibility probe — `/System/Win.ZC`
 
 The source probe loads pinned `KernelC.HH`, `Externs.ZC`, and `Gr.HH` before compiling unchanged `Win.ZC`. Graphics dimensions and mouse globals are probe fixtures; `DrawMenu` and the initial `GrScaleZoom` definition are compile-time fixtures until unchanged `GrScreen.ZC` is loaded later in the probe. `GrScreenFinalUpdateChecks` executes `WinFinalUpdate` through the staged idle-frame path, confirms the fixture's `mouse_grid.coord` toggles the real coordinate-text overlay, checks a separate visible guest overlay callback, verifies the software arrow against Limine framebuffer pixels, and exercises `WinMouseUpdate`'s edge recentering through the runtime dispatch. `WinMousePointerStateCheck` covers transformed tablet coordinates and `WinMouseHardStateCheck` covers the source mouse-state ABI; manual UTM acceptance confirms the software pointer and window-demo mouse interaction. The raw ARM generic-timer binding and a standalone F64 clock expression are smoke-tested before the Win load.

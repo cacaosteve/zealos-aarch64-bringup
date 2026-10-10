@@ -3736,6 +3736,8 @@ static int load_inner(const char *path) {
         PrsBindCSymbol("sys_framebuffer_bpp", &guest_fb_bpp, 0);
         if (load_inner("/System/TaskBridge.ZC"))
             zc_fail("task bridge source missing");
+        if (load_inner("/System/Gr/SpriteRaster.ZC"))
+            zc_fail("sprite raster bridge source missing");
         PrsBindCSymbol("ZcGrTextUpdate", host_gr_text_update, 0);
         PrsBindCSymbol("ZcWinMouseUpdate", host_win_mouse_update, 0);
         PrsBindCSymbol("ZcGrScreenUpdate", host_gr_screen_update, 0);

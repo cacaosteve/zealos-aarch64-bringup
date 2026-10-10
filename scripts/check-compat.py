@@ -400,6 +400,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                         'zc: loaded /Tests/GrSpriteBridge.ZC')
                 command('zcall GrDC2SpriteChecks',
                         'zc => 0x000000000000002a')
+                command('zcall GrSpriteEllipseChecks',
+                        'zc => 0x000000000000002a')
                 command('zload /System/Gr/GrBitMap.ZC',
                         'zc: loaded /System/Gr/GrBitMap.ZC', timeout=30)
                 command('zload /Tests/GrDCLifecycle.ZC',

@@ -268,3 +268,48 @@ I64 GrDC2SpriteChecks()
         return 18;
     return 42;
 }
+
+// Keep the larger ellipse probe in its own frame: the older sprite smoke
+// already exercises a wide mix of locals and records on the bootstrap ABI.
+I64 GrSpriteEllipseChecks()
+{
+    CDC *plot_dc;
+    U8 *records;
+    U8 record_type;
+    I32 x, y, width, height;
+    U64 angle_bits;
+    I64 ellipse_color;
+
+    plot_dc = DCNew(800, 600);
+    if (!plot_dc)
+        return 1;
+    plot_dc->color.c0 = 12;
+    records = CAlloc(33);
+    if (!records)
+        return 2;
+    record_type = SPT_ELLIPSE;
+    MemCopy(records, &record_type, sizeof(U8));
+    x = 40;
+    y = 20;
+    width = 4;
+    height = 2;
+    MemCopy(records + 4, &x, sizeof(I32));
+    MemCopy(records + 8, &y, sizeof(I32));
+    MemCopy(records + 12, &width, sizeof(I32));
+    MemCopy(records + 16, &height, sizeof(I32));
+    angle_bits = 0;
+    MemCopy(records + 24, &angle_bits, sizeof(U64));
+    if (SpriteTypeMask(records) != (1 << SPT_ELLIPSE))
+        return 3;
+    Sprite3(plot_dc, 400, 300, 0, records);
+    ellipse_color = gr_palette[12] & 0x00FFFFFF;
+    if (ZcFbTextPixel(436, 320) != ellipse_color ||
+            ZcFbTextPixel(444, 320) != ellipse_color ||
+            ZcFbTextPixel(440, 318) != ellipse_color ||
+            ZcFbTextPixel(440, 322) != ellipse_color ||
+            ZcFbTextPixel(440, 320) == ellipse_color)
+        return 4;
+    Free(records);
+    DCDel(plot_dc);
+    return 42;
+}
