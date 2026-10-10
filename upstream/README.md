@@ -2993,6 +2993,15 @@ Freeze catalog unchanged.
 | Smoke | Extend `GrDC2SpriteChecks` with multi-record color/flood-fill sequences and variable polyline, POLYPT, spline, text, mesh, and shiftable-mesh records; full PCI graphics/window-manager compatibility probe passes |
 | Limits | `SpriteTypeMask` has no byte-length parameter in the upstream API, so callers must still provide a readable, well-formed sprite buffer. Sprite plotting and graphics lookup-table initialization remain unfinished |
 
+## Milestone 259 — plot CDC bitmap sprites on the ARM framebuffer
+
+| Item | Path |
+|--|--|
+| Gap | `DocGR` could convert a CDC into a bitmap sprite, but the bootstrap `Sprite3` stub discarded it |
+| Bring-up | Implement the `SPT_BITMAP` subset of `Sprite3` for `DC2Sprite` output. It reads the upstream 20-byte header and padded rows, plots through the normal clipped `GrPlot` path, bounds dimensions/pixel count, and restores the caller's foreground color |
+| Smoke | `GrDC2SpriteChecks` sends a converted CDC through `Sprite3` and verifies the destination color is restored; the full PCI graphics/window-manager suite passes |
+| Limits | This is only the bitmap record path emitted by `DC2Sprite`; drawing, text, mesh, transforms, multi-record interpretation, and pixel-visible UTM acceptance remain open |
+
 ## Open compatibility probe — `/System/Win.ZC`
 
 The source probe loads pinned `KernelC.HH`, `Externs.ZC`, and `Gr.HH` before compiling unchanged `Win.ZC`. Graphics dimensions and mouse globals are probe fixtures; `DrawMenu` and the initial `GrScaleZoom` definition are compile-time fixtures until unchanged `GrScreen.ZC` is loaded later in the probe. `GrScreenFinalUpdateChecks` executes `WinFinalUpdate` through the staged idle-frame path, confirms the fixture's `mouse_grid.coord` toggles the real coordinate-text overlay, checks a separate visible guest overlay callback, verifies the software arrow against Limine framebuffer pixels, and exercises `WinMouseUpdate`'s edge recentering through the runtime dispatch. `WinMousePointerStateCheck` covers transformed tablet coordinates and `WinMouseHardStateCheck` covers the source mouse-state ABI; manual UTM acceptance confirms the software pointer and window-demo mouse interaction. The raw ARM generic-timer binding and a standalone F64 clock expression are smoke-tested before the Win load.

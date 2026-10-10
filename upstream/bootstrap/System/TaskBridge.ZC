@@ -1442,8 +1442,43 @@ U0 Mat4x4RotY(I64 *matrix, F64 angle)
 U0 Mat4x4RotZ(I64 *matrix, F64 angle)
 {
 }
+extern Bool GrPlot(CDC *dc, I64 x, I64 y);
 U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
 {
+    I64 row, col, stride, old_color;
+    I32 sprite_x, sprite_y, width, height;
+    U8 type, pixel;
+
+    if (!dc || dc->dc_signature != DCS_SIGNATURE_VAL || !sprite ||
+            x < -1073741824 || x > 1073741824 ||
+            y < -1073741824 || y > 1073741824)
+        return;
+    MemCopy(&type, sprite, sizeof(U8));
+    type &= 0x7F;
+    // DC2Sprite currently emits one bitmap record followed by SPT_END. Draw
+    // that stable subset here; the full source Sprite3 opcode interpreter is
+    // still being ported. GrPlot keeps normal window clipping and presentation.
+    if (type != 23) // SPT_BITMAP
+        return;
+    MemCopy(&sprite_x, sprite + 4, sizeof(I32));
+    MemCopy(&sprite_y, sprite + 8, sizeof(I32));
+    MemCopy(&width, sprite + 12, sizeof(I32));
+    MemCopy(&height, sprite + 16, sizeof(I32));
+    if (width <= 0 || width > 4096 || height <= 0 || height > 4096)
+        return;
+    stride = (width + 7) & ~7;
+    // A guest call per pixel is intentionally bounded to one bootstrap frame.
+    if (stride * height > 480000)
+        return;
+    old_color = dc->color.c0;
+    for (row = 0; row < height; row++)
+        for (col = 0; col < width; col++)
+        {
+            MemCopy(&pixel, sprite + 20 + row * stride + col, sizeof(U8));
+            dc->color.c0 = pixel;
+            GrPlot(dc, x + sprite_x + col, y + sprite_y + row);
+        }
+    dc->color.c0 = old_color;
 }
 #define SPT_FLOOD_FILL 0
 #define SPT_FLOOD_FILL_NOT 1

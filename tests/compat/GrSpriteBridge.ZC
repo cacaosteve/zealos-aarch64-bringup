@@ -4,6 +4,7 @@ I64 GrDC2SpriteChecks()
     CDC *odd_dc;
     U8 *bytes;
     U8 *records;
+    CDC *plot_dc;
     I64 i;
     U8 actual, bitmap_type;
     U8 invalid_type;
@@ -38,6 +39,14 @@ I64 GrDC2SpriteChecks()
     MemCopy(&actual, bytes + 20 + 32, sizeof(U8));
     if (actual != SPT_END)
         return 4;
+    plot_dc = DCNew(16, 2);
+    if (!plot_dc)
+        return 4;
+    plot_dc->color.c0 = 7;
+    Sprite3(plot_dc, 0, 0, 0, bytes);
+    if (plot_dc->color.c0 != 7)
+        return 4;
+    DCDel(plot_dc);
     invalid_type = SPT_TYPES_NUM;
     MemCopy(bytes, &invalid_type, sizeof(U8));
     if (SpriteTypeMask(bytes) != (1 << SPT_TYPES_NUM))
