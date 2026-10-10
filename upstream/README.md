@@ -3074,6 +3074,15 @@ Freeze catalog unchanged.
 | Smoke | Extend `GrSpriteRotatedRectChecks` with positive/negative quarter turns, a half turn, edge pixels, and rejection of an arbitrary angle; full PCI graphics/window-manager compatibility probe passes |
 | Limits | Non-cardinal angles still stop interpretation; transformed clipping and general floating-point matrix support remain open |
 
+## Milestone 268 — rotate bounded sprite ellipses at cardinal angles
+
+| Item | Path |
+|--|--|
+| Gap | The ellipse rasterizer rejected every nonzero rotation, including quarter turns that only exchange its horizontal and vertical radii |
+| Bring-up | Accept the exact IEEE-754 encodings of ±π/2, π, and ±3π/2; swap radii for quarter turns while retaining the same bounded midpoint raster and work budget |
+| Smoke | Extend `GrSpriteEllipseChecks` with a quarter-turned ellipse's extrema and arbitrary-angle rejection; full PCI graphics/window-manager compatibility probe passes |
+| Limits | Non-cardinal ellipse angles remain unsupported; general floating-point matrix transforms remain open |
+
 ## Open compatibility probe — `/System/Win.ZC`
 
 The source probe loads pinned `KernelC.HH`, `Externs.ZC`, and `Gr.HH` before compiling unchanged `Win.ZC`. Graphics dimensions and mouse globals are probe fixtures; `DrawMenu` and the initial `GrScaleZoom` definition are compile-time fixtures until unchanged `GrScreen.ZC` is loaded later in the probe. `GrScreenFinalUpdateChecks` executes `WinFinalUpdate` through the staged idle-frame path, confirms the fixture's `mouse_grid.coord` toggles the real coordinate-text overlay, checks a separate visible guest overlay callback, verifies the software arrow against Limine framebuffer pixels, and exercises `WinMouseUpdate`'s edge recentering through the runtime dispatch. `WinMousePointerStateCheck` covers transformed tablet coordinates and `WinMouseHardStateCheck` covers the source mouse-state ABI; manual UTM acceptance confirms the software pointer and window-demo mouse interaction. The raw ARM generic-timer binding and a standalone F64 clock expression are smoke-tested before the Win load.

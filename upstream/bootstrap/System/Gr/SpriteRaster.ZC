@@ -1,6 +1,5 @@
 // Bounded axis-aligned sprite ellipse rasterizer for the ARM64 bootstrap.
-// The upstream sprite record stores x/y radii and a rotation angle; the
-// caller currently accepts only angle zero.
+// The caller maps exact cardinal rotations to swapped radii.
 U0 SpriteEllipse0(CDC *dc, I64 cx, I64 cy, I64 rx, I64 ry)
 {
     I64 rx2, ry2, px, py, dx, dy, decision;
@@ -139,15 +138,27 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
         type &= 0x7F; // SPG_TYPE_MASK
         if (!type) // SPT_END
             break;
-        if (type == 15) // SPT_ELLIPSE, axis-aligned subset
+        if (type == 15) // SPT_ELLIPSE, bounded cardinal-angle subset
         {
             MemCopy(&x1, sprite + 4, sizeof(I32));
             MemCopy(&y1, sprite + 8, sizeof(I32));
             MemCopy(&width, sprite + 12, sizeof(I32));
             MemCopy(&height, sprite + 16, sizeof(I32));
             MemCopy(&ellipse_angle_bits, sprite + 24, sizeof(U64));
+            if (ellipse_angle_bits == 0x3FF921FB54442D18 ||
+                    ellipse_angle_bits == 0xBFF921FB54442D18 ||
+                    ellipse_angle_bits == 0x4002D97C7F3321D2 ||
+                    ellipse_angle_bits == 0xC002D97C7F3321D2)
+            {
+                size = width;
+                width = height;
+                height = size;
+            }
+            else if (ellipse_angle_bits != 0 &&
+                    ellipse_angle_bits != 0x400921FB54442D18 &&
+                    ellipse_angle_bits != 0xC00921FB54442D18)
+                break;
             if (width < 0 || width > 4096 || height < 0 || height > 4096 ||
-                    ellipse_angle_bits != 0 ||
                     8 * (width + height + 1) > 480000 - pixel_budget)
                 break;
             pixel_budget += 8 * (width + height + 1);

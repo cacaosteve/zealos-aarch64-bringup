@@ -309,6 +309,28 @@ I64 GrSpriteEllipseChecks()
             ZcFbTextPixel(440, 322) != ellipse_color ||
             ZcFbTextPixel(440, 320) == ellipse_color)
         return 4;
+
+    // A quarter-turn swaps the radii around the unchanged center.
+    x = 80;
+    MemCopy(records + 4, &x, sizeof(I32));
+    angle_bits = 0x3FF921FB54442D18;
+    MemCopy(records + 24, &angle_bits, sizeof(U64));
+    Sprite3(plot_dc, 400, 300, 0, records);
+    if (ZcFbTextPixel(478, 320) != ellipse_color ||
+            ZcFbTextPixel(482, 320) != ellipse_color ||
+            ZcFbTextPixel(480, 316) != ellipse_color ||
+            ZcFbTextPixel(480, 324) != ellipse_color ||
+            ZcFbTextPixel(480, 320) == ellipse_color)
+        return 5;
+
+    // Preserve fail-closed behavior for angles between cardinal directions.
+    x = 100;
+    MemCopy(records + 4, &x, sizeof(I32));
+    angle_bits = 0x3FF0000000000000;
+    MemCopy(records + 24, &angle_bits, sizeof(U64));
+    Sprite3(plot_dc, 400, 300, 0, records);
+    if (ZcFbTextPixel(504, 320) == ellipse_color)
+        return 6;
     Free(records);
     DCDel(plot_dc);
     return 42;
