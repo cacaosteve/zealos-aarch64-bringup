@@ -122,6 +122,40 @@ I64 GrDCRoundTripChecks()
 	return 42;
 }
 
+I64 GrDCCustomPaletteRoundTripChecks()
+{
+	CDC *dc, *loaded;
+	U8 *saved;
+	I64 base_size, size, loaded_size;
+	U8 palette_red;
+
+	dc = DCNew(8, 1);
+	if (!dc)
+		return 1;
+	saved = DCSave(dc, &base_size);
+	if (!saved)
+		return 2;
+	Free(saved);
+	palette_red = dc->palette[3].r ^ 0x5A;
+	dc->palette[3].r = palette_red;
+	dc->body[0] = 7;
+	saved = DCSave(dc, &size);
+	if (!saved || size != base_size + COLORS_NUM * sizeof(CBGR24))
+		return 3;
+	loaded_size = 0;
+	loaded = DCLoad(saved, &loaded_size);
+	if (!loaded || loaded_size != size ||
+			!(loaded->flags & DCF_PALETTE) ||
+			loaded->palette[3].r != palette_red || loaded->body[0] != 7)
+		return 4;
+	DCDel(loaded);
+	Free(saved);
+	if (dc->palette[3].r != palette_red || dc->body[0] != 7)
+		return 5;
+	DCDel(dc);
+	return 42;
+}
+
 I64 GrDCPixelOpsChecks()
 {
 	CDC *dc;

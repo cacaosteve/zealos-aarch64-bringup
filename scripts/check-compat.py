@@ -404,6 +404,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                         'zc => 0x000000000000002a')
                 command('zcall GrDCRoundTripChecks',
                         'zc => 0x000000000000002a')
+                command('zcall GrDCCustomPaletteRoundTripChecks',
+                        'zc => 0x000000000000002a')
                 command('zcall GrDCPixelOpsChecks',
                         'zc => 0x000000000000002a')
                 command('zcall GrGlobalsProbe',
