@@ -110,6 +110,41 @@ I64 SpriteRotatedRect0(CDC *dc, I64 x, I64 y, I32 x1, I32 y1,
     return area;
 }
 
+Bool SpriteArrow0(CDC *dc, I64 x, I64 y, I64 x1, I64 y1,
+        I64 x2, I64 y2, I64 *pixel_budget)
+{
+    I64 dx, dy, dy_abs, length_sqr, line_steps, head_x, head_y;
+    F64 arrow_scale;
+    dx = x2 - x1;
+    dy = y2 - y1;
+    if (dx < -1073741824 || dx > 1073741824 ||
+            dy < -1073741824 || dy > 1073741824)
+        return FALSE;
+    length_sqr = dx * dx + dy * dy;
+    line_steps = dx;
+    if (line_steps < 0) line_steps = -line_steps;
+    dy_abs = dy;
+    if (dy_abs < 0) dy_abs = -dy_abs;
+    if (dy_abs > line_steps)
+        line_steps = dy_abs;
+    line_steps++;
+    if (length_sqr > 16384 * 16384 ||
+            3 * line_steps > 480000 - *pixel_budget)
+        return FALSE;
+    *pixel_budget += 3 * line_steps;
+    if (!dx && !dy)
+        return TRUE;
+    arrow_scale = 2.75 * dc->thick / Sqrt(ToF64(length_sqr));
+    head_x = x2 - dx * arrow_scale + dy * arrow_scale + 0.5;
+    head_y = y2 - dy * arrow_scale - dx * arrow_scale + 0.5;
+    GrLine(dc, x + x1, y + y1, x + x2, y + y2);
+    GrLine(dc, x + head_x, y + head_y, x + x2, y + y2);
+    head_x = x2 - dx * arrow_scale - dy * arrow_scale + 0.5;
+    head_y = y2 - dy * arrow_scale + dx * arrow_scale + 0.5;
+    GrLine(dc, x + head_x, y + head_y, x + x2, y + y2);
+    return TRUE;
+}
+
 U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
 {
     I64 row, col, stride, old_color, old_thick, old_x, old_y, size, records, pixel_budget;
@@ -228,6 +263,17 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
             MemCopy(&y2, sprite + 16, sizeof(I32));
             GrLine(dc, x + old_x + x1, y + old_y + y1,
                        x + old_x + x2, y + old_y + y2);
+            size = 20;
+        }
+        else if (type == 26) // SPT_ARROW, bounded 2D GrArrow3 equivalent
+        {
+            MemCopy(&x1, sprite + 4, sizeof(I32));
+            MemCopy(&y1, sprite + 8, sizeof(I32));
+            MemCopy(&x2, sprite + 12, sizeof(I32));
+            MemCopy(&y2, sprite + 16, sizeof(I32));
+            if (!SpriteArrow0(dc, x + old_x, y + old_y,
+                    x1, y1, x2, y2, &pixel_budget))
+                break;
             size = 20;
         }
         else if (type == 12) // SPT_RECT

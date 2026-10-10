@@ -391,6 +391,46 @@ I64 GrSpriteDitherChecks()
     return 42;
 }
 
+
+I64 GrSpriteArrowChecks()
+{
+    CDC *plot_dc;
+    U8 *records;
+    U8 arrow_type;
+    I32 x1, y1, x2, y2;
+    I64 arrow_color;
+
+    plot_dc = DCNew(800, 600);
+    if (!plot_dc)
+        return 1;
+    plot_dc->color.c0 = 14;
+    records = CAlloc(21);
+    if (!records)
+        return 2;
+    arrow_type = SPT_ARROW;
+    MemCopy(records, &arrow_type, sizeof(U8));
+    x1 = 0;
+    y1 = 0;
+    x2 = 16;
+    y2 = 0;
+    MemCopy(records + 4, &x1, sizeof(I32));
+    MemCopy(records + 8, &y1, sizeof(I32));
+    MemCopy(records + 12, &x2, sizeof(I32));
+    MemCopy(records + 16, &y2, sizeof(I32));
+    if (SpriteTypeMask(records) != (1 << SPT_ARROW))
+        return 3;
+    Sprite3(plot_dc, 400, 300, 0, records);
+    arrow_color = gr_palette[14] & 0x00FFFFFF;
+    if (ZcFbTextPixel(408, 300) != arrow_color ||
+            ZcFbTextPixel(416, 300) != arrow_color ||
+            ZcFbTextPixel(413, 298) != arrow_color ||
+            ZcFbTextPixel(413, 303) != arrow_color)
+        return 4;
+    Free(records);
+    DCDel(plot_dc);
+    return 42;
+}
+
 I64 GrSpriteThickChecks()
 {
     CDC *plot_dc;

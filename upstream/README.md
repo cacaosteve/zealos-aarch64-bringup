@@ -3110,6 +3110,15 @@ Freeze catalog unchanged.
 | Smoke | Extend `GrSpriteDitherChecks` to transition from a two-color checkerboard to a solid color and verify both the transition pixel and full CDC color restoration |
 | Limits | Probability dithering and non-plot framebuffer paths remain unsupported by the bootstrap renderer |
 
+## Milestone 272 — draw 2D sprite arrows
+
+| Item | Path |
+|--|--|
+| Gap | `SPT_ARROW` records were recognized by the size scanner but stopped sprite playback |
+| Bring-up | Draw the shaft and two CDC-thickness-scaled arrowhead strokes using the upstream 2.75-width geometry, with bounded vector lengths |
+| Smoke | Add `GrSpriteArrowChecks` for shaft, tip, and both arrowhead arms on the framebuffer |
+| Limits | The bootstrap bridge supports 2D arrows; transformed and symmetry-aware `GrArrow3` behavior remains open |
+
 ## Open compatibility probe — `/System/Win.ZC`
 
 The source probe loads pinned `KernelC.HH`, `Externs.ZC`, and `Gr.HH` before compiling unchanged `Win.ZC`. Graphics dimensions and mouse globals are probe fixtures; `DrawMenu` and the initial `GrScaleZoom` definition are compile-time fixtures until unchanged `GrScreen.ZC` is loaded later in the probe. `GrScreenFinalUpdateChecks` executes `WinFinalUpdate` through the staged idle-frame path, confirms the fixture's `mouse_grid.coord` toggles the real coordinate-text overlay, checks a separate visible guest overlay callback, verifies the software arrow against Limine framebuffer pixels, and exercises `WinMouseUpdate`'s edge recentering through the runtime dispatch. `WinMousePointerStateCheck` covers transformed tablet coordinates and `WinMouseHardStateCheck` covers the source mouse-state ABI; manual UTM acceptance confirms the software pointer and window-demo mouse interaction. The raw ARM generic-timer binding and a standalone F64 clock expression are smoke-tested before the Win load.
