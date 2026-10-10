@@ -431,6 +431,82 @@ I64 GrSpriteArrowChecks()
     return 42;
 }
 
+I64 GrSpritePolygonChecks()
+{
+    CDC *plot_dc;
+    U8 *records;
+    U8 polygon_type;
+    I32 cx, cy, rx, ry, sides;
+    U64 angle_bits;
+    I64 polygon_color, debug, px, py;
+
+    plot_dc = DCNew(800, 600);
+    if (!plot_dc)
+        return 1;
+    plot_dc->color.c0 = 13;
+    if (ToI64(ZcSinF64(pi / 2.0) * 100.0) != 100)
+        return 20;
+    if (ToI64(ZcCosF64(0.0) * 100.0) != 100)
+        return 21;
+    records = CAlloc(41);
+    if (!records)
+        return 2;
+    polygon_type = SPT_POLYGON;
+    MemCopy(records, &polygon_type, sizeof(U8));
+    cx = 300;
+    cy = 200;
+    rx = 8;
+    ry = 6;
+    sides = 4;
+    angle_bits = 0;
+    MemCopy(records + 4, &cx, sizeof(I32));
+    MemCopy(records + 8, &cy, sizeof(I32));
+    MemCopy(records + 12, &rx, sizeof(I32));
+    MemCopy(records + 16, &ry, sizeof(I32));
+    MemCopy(records + 24, &angle_bits, sizeof(U64));
+    MemCopy(records + 32, &sides, sizeof(I32));
+    if (SpriteTypeMask(records) != (1 << SPT_POLYGON))
+        return 3;
+    // Clear the small sample area so earlier framebuffer contents cannot
+    // make a missing edge or a filled center look like a pass.
+    plot_dc->color.c0 = 0;
+    for (py = 484; py <= 516; py++)
+        for (px = 684; px <= 716; px++)
+            GrPlot(plot_dc, px, py);
+    plot_dc->color.c0 = 13;
+    Sprite3(plot_dc, 400, 300, 0, records);
+    polygon_color = gr_palette[13] & 0x00FFFFFF;
+    // A four-sided regular polygon starts at +X and follows the configured
+    // elliptical radii. Check each vertex and one point along an edge.
+    debug = 0;
+    if (ZcFbTextPixel(708, 500) != polygon_color) debug |= 1;
+    if (ZcFbTextPixel(700, 506) != polygon_color) debug |= 2;
+    if (ZcFbTextPixel(692, 500) != polygon_color) debug |= 4;
+    if (ZcFbTextPixel(700, 494) != polygon_color) debug |= 8;
+    if (ZcFbTextPixel(706, 498) != polygon_color) debug |= 16;
+    if (ZcFbTextPixel(700, 500) == polygon_color) debug |= 32;
+    if (debug) return 40 + debug;
+
+    // A quarter turn moves the first vertex from the right edge to the top.
+    cx = 360;
+    angle_bits = 0x3FF921FB54442D18;
+    MemCopy(records + 4, &cx, sizeof(I32));
+    MemCopy(records + 24, &angle_bits, sizeof(U64));
+    plot_dc->color.c0 = 0;
+    for (py = 484; py <= 516; py++)
+        for (px = 744; px <= 776; px++)
+            GrPlot(plot_dc, px, py);
+    plot_dc->color.c0 = 13;
+    Sprite3(plot_dc, 400, 300, 0, records);
+    if (ZcFbTextPixel(760, 492) != polygon_color ||
+            ZcFbTextPixel(754, 500) != polygon_color ||
+            ZcFbTextPixel(760, 500) == polygon_color)
+        return 5;
+    Free(records);
+    DCDel(plot_dc);
+    return 42;
+}
+
 I64 GrSpriteThickChecks()
 {
     CDC *plot_dc;

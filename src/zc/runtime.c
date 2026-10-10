@@ -29,6 +29,8 @@ static void *guest_fp_set_std_palette;
 extern void hc_fmt_f64_bits(char **dp, uint64_t bits, int prec);
 extern uint64_t hc_builtin_exp(uint64_t xbits);
 extern uint64_t hc_builtin_sqrt(uint64_t xbits);
+extern uint64_t hc_builtin_cos(uint64_t xbits);
+extern uint64_t hc_builtin_sin(uint64_t xbits);
 
 extern uint64_t zeal_fb_text_span(int64_t x, int64_t y, int64_t len,
                                   uint32_t attr, const void *data, int mode,
@@ -686,6 +688,12 @@ static int64_t host_sqrt(int64_t *a) {
 }
 static int64_t host_exp(int64_t *a) {
     return (int64_t)hc_builtin_exp((uint64_t)a[0]);
+}
+static int64_t host_sin_f64(int64_t *a) {
+    return (int64_t)hc_builtin_sin((uint64_t)a[0]);
+}
+static int64_t host_cos_f64(int64_t *a) {
+    return (int64_t)hc_builtin_cos((uint64_t)a[0]);
 }
 static double host_f64_from_bits(uint64_t bits) {
     double value;
@@ -3760,6 +3768,8 @@ static int load_inner(const char *path) {
         PrsBindCSymbol("MemSetU32", host_memset_u32, 3);
         PrsBindCSymbol("Sqrt", host_sqrt, 1);
         PrsBindCSymbol("Exp", host_exp, 1);
+        PrsBindCSymbol("ZcSinF64", host_sin_f64, 1);
+        PrsBindCSymbol("ZcCosF64", host_cos_f64, 1);
         PrsBindCSymbol("ZcMonotonicNs", host_monotonic_ns, 0);
         PrsBindCSymbol("ZcTryEnter", host_sys_try, 0);
         PrsBindCSymbol("ZcTryLeave", host_sys_untry, 0);
