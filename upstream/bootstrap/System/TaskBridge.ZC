@@ -1448,6 +1448,8 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
 // Minimal graphics globals for parsing DolDoc layout; these are not a screen/window manager.
 #define TEXT_COLS 100 // Current bootstrap framebuffer: 800x600 at 8x8 text cells.
 #define TEXT_ROWS 75
+extern CDC *DCNew(I64 width, I64 height, CTask *task=NULL, Bool null_bitmap=FALSE);
+extern Bool GrPlot0(CDC *dc, I64 x, I64 y);
 // Compact ZealOS-compatible packed-cell plane addressed through gr.text_base.
 U32 bootstrap_text_base[TEXT_COLS * TEXT_ROWS];
 #define BOOTSTRAP_WIN_MAX 64
@@ -1539,6 +1541,71 @@ I64 BootstrapGrCircleBoundsChecks()
     if (circle_lo[1 * 64] != -1 || circle_hi[1 * 64] != 0 ||
         circle_lo[7 * 64 + 3] != -4 || circle_hi[7 * 64 + 3] != 0 ||
         circle_lo[63 * 64 + 31] != -32 || circle_hi[63 * 64 + 31] != 0)
+        return 0;
+    return 0x2a;
+}
+// Track which source global owns the pen CDC tables so GrSetUpTables is safe
+// when the persistent compiler session loads a fresh CGrGlobals definition.
+CGrGlobals *bootstrap_gr_pen_tables_owner;
+U0 BootstrapGrPenTablesInit(CGrGlobals *active_gr)
+{//Build ZealOS's normal, collision, even, and odd brush CDCs once per gr global.
+    CDC *dc;
+    I64 i, k, x, y, rr;
+    if (!active_gr || bootstrap_gr_pen_tables_owner == active_gr)
+        return;
+    for (i = 0; i < 64; i++)
+    {
+        k = i + 1;
+        rr = k * k;
+        dc = DCNew(i, i);
+        active_gr->pen_brushes[i] = dc;
+        dc->color = COLOR_MONO;
+        for (y = 1; y < k; y++)
+            for (x = 1; x < k; x++)
+                if (SqrI64(y * 2 - k) + SqrI64(x * 2 - k) < rr)
+                    GrPlot0(dc, x - 1, y - 1);
+
+        dc = DCNew(i, i);
+        active_gr->collision_pen_brushes[i] = dc;
+        dc->color = COLOR_INVALID;
+        for (y = 1; y < k; y++)
+            for (x = 1; x < k; x++)
+                if (SqrI64(y * 2 - k) + SqrI64(x * 2 - k) < rr)
+                    GrPlot0(dc, x - 1, y - 1);
+
+        dc = DCNew(i, i);
+        active_gr->even_pen_brushes[i] = dc;
+        dc->color = COLOR_MONO;
+        for (y = 1; y < k; y++)
+            for (x = 1; x < k; x++)
+                if (!(((x - 1) ^ (y - 1)) & 1) &&
+                    SqrI64(y * 2 - k) + SqrI64(x * 2 - k) < rr)
+                    GrPlot0(dc, x - 1, y - 1);
+
+        dc = DCNew(i, i);
+        active_gr->odd_pen_brushes[i] = dc;
+        dc->color = COLOR_MONO;
+        for (y = 1; y < k; y++)
+            for (x = 1; x < k; x++)
+                if (((x - 1) ^ (y - 1)) & 1 &&
+                    SqrI64(y * 2 - k) + SqrI64(x * 2 - k) < rr)
+                    GrPlot0(dc, x - 1, y - 1);
+    }
+    bootstrap_gr_pen_tables_owner = active_gr;
+}
+I64 BootstrapGrPenTablesChecks()
+{//Verify the active upstream graphics global received all four brush families.
+    CGrGlobals *active_gr = ZcActiveGrGlobals();
+    if (!active_gr)
+        return 0;
+    BootstrapGrPenTablesInit(active_gr);
+    if (!active_gr->pen_brushes[1] ||
+        !active_gr->collision_pen_brushes[1] ||
+        !active_gr->even_pen_brushes[1] || !active_gr->odd_pen_brushes[1] ||
+        active_gr->pen_brushes[7]->width != 7 ||
+        active_gr->collision_pen_brushes[7]->color != COLOR_INVALID ||
+        active_gr->even_pen_brushes[7]->color != COLOR_MONO ||
+        active_gr->odd_pen_brushes[7]->dc_signature != DCS_SIGNATURE_VAL)
         return 0;
     return 0x2a;
 }
@@ -1714,6 +1781,7 @@ U0 GrSetUpTables()
         active_gr = &gr;
     BootstrapGrPackedTablesInit(active_gr);
     BootstrapGrCircleBoundsInit(active_gr);
+    BootstrapGrPenTablesInit(active_gr);
     BootstrapBindGrTaskTables(active_gr);
     MemSet(bootstrap_win_z_buf, 0, sizeof(bootstrap_win_z_buf));
     MemSet(bootstrap_win_uncovered, 0, sizeof(bootstrap_win_uncovered));
