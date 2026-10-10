@@ -373,3 +373,67 @@ I64 GrSpriteRotatedRectChecks()
     DCDel(plot_dc);
     return 42;
 }
+
+// The existing CDC-to-sprite check validated bitmap bytes, not their plotted
+// result. Keep playback isolated to assert padded-row handling and state.
+I64 GrSpriteBitmapChecks()
+{
+    CDC *plot_dc;
+    U8 *records;
+    U8 record_type;
+    I32 x, y, width, height;
+    I64 expected12, expected4, expected7, expected2, expected14, expected9;
+    I64 expected0;
+
+    plot_dc = DCNew(800, 600);
+    if (!plot_dc)
+        return 1;
+    plot_dc->color.c0 = 6;
+    records = CAlloc(37); // 20-byte header + two 8-byte rows + SPT_END
+    if (!records)
+        return 2;
+    record_type = SPT_BITMAP;
+    MemCopy(records, &record_type, sizeof(U8));
+    x = 10;
+    y = 20;
+    width = 3;
+    height = 2;
+    MemCopy(records + 4, &x, sizeof(I32));
+    MemCopy(records + 8, &y, sizeof(I32));
+    MemCopy(records + 12, &width, sizeof(I32));
+    MemCopy(records + 16, &height, sizeof(I32));
+    // Make padding conspicuous: only the first three bytes in each row are
+    // pixels; the remaining five bytes belong to the eight-byte row stride.
+    records[20] = 12;
+    records[21] = 4;
+    records[22] = 7;
+    records[23] = records[24] = records[25] = records[26] = records[27] = 15;
+    records[28] = 2;
+    records[29] = 14;
+    records[30] = 9;
+    records[31] = records[32] = records[33] = records[34] = records[35] = 15;
+    if (SpriteTypeMask(records) != (1 << SPT_BITMAP))
+        return 3;
+    Sprite3(plot_dc, 400, 300, 0, records);
+    expected12 = gr_palette[12] & 0x00FFFFFF;
+    expected4 = gr_palette[4] & 0x00FFFFFF;
+    expected7 = gr_palette[7] & 0x00FFFFFF;
+    expected2 = gr_palette[2] & 0x00FFFFFF;
+    expected14 = gr_palette[14] & 0x00FFFFFF;
+    expected9 = gr_palette[9] & 0x00FFFFFF;
+    expected0 = gr_palette[0] & 0x00FFFFFF;
+    if (plot_dc->color.c0 != 6 ||
+            ZcFbTextPixel(410, 320) != expected12 ||
+            ZcFbTextPixel(411, 320) != expected4 ||
+            ZcFbTextPixel(412, 320) != expected7 ||
+            ZcFbTextPixel(410, 321) != expected2 ||
+            ZcFbTextPixel(411, 321) != expected14 ||
+            ZcFbTextPixel(412, 321) != expected9 ||
+            ZcFbTextPixel(413, 320) != expected0 ||
+            ZcFbTextPixel(413, 321) != expected0)
+        return 4;
+
+    Free(records);
+    DCDel(plot_dc);
+    return 42;
+}

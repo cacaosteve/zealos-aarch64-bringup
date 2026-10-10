@@ -3056,6 +3056,15 @@ Freeze catalog unchanged.
 | Smoke | Add a separate `GrSpriteRotatedRectChecks` framebuffer smoke for filled interior/bounds, unchanged CDC color, and rejection of nonzero angles; run the full PCI graphics/window-manager compatibility probe |
 | Limits | Nonzero rotations remain unsupported; rectangle limits are safety bounds for this bootstrap implementation, and other unsupported sprite records still stop interpretation |
 
+## Milestone 266 — verify sprite bitmap playback
+
+| Item | Path |
+|--|--|
+| Gap | `SPT_BITMAP` serialization had byte-layout checks, but no framebuffer check of the sprite interpreter's padded-row playback |
+| Bring-up | Add a separate playback smoke for two offset rows, six distinct palette values, ignored row padding, and restoration of the caller's CDC color |
+| Smoke | `GrSpriteBitmapChecks` passes in the full PCI graphics/window-manager compatibility probe |
+| Limits | This validates the current bounded 8-bit bitmap subset; transformations, alternative raster operations, and other unsupported sprite records remain open |
+
 ## Open compatibility probe — `/System/Win.ZC`
 
 The source probe loads pinned `KernelC.HH`, `Externs.ZC`, and `Gr.HH` before compiling unchanged `Win.ZC`. Graphics dimensions and mouse globals are probe fixtures; `DrawMenu` and the initial `GrScaleZoom` definition are compile-time fixtures until unchanged `GrScreen.ZC` is loaded later in the probe. `GrScreenFinalUpdateChecks` executes `WinFinalUpdate` through the staged idle-frame path, confirms the fixture's `mouse_grid.coord` toggles the real coordinate-text overlay, checks a separate visible guest overlay callback, verifies the software arrow against Limine framebuffer pixels, and exercises `WinMouseUpdate`'s edge recentering through the runtime dispatch. `WinMousePointerStateCheck` covers transformed tablet coordinates and `WinMouseHardStateCheck` covers the source mouse-state ABI; manual UTM acceptance confirms the software pointer and window-demo mouse interaction. The raw ARM generic-timer binding and a standalone F64 clock expression are smoke-tested before the Win load.

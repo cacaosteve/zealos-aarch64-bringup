@@ -404,6 +404,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                         'zc => 0x000000000000002a')
                 command('zcall GrSpriteRotatedRectChecks',
                         'zc => 0x000000000000002a')
+                command('zcall GrSpriteBitmapChecks',
+                        'zc => 0x000000000000002a')
                 command('zload /System/Gr/GrBitMap.ZC',
                         'zc: loaded /System/Gr/GrBitMap.ZC', timeout=30)
                 command('zload /Tests/GrDCLifecycle.ZC',
