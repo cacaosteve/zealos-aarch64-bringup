@@ -1973,5 +1973,6 @@ ZealOS live distribution or installer.
   and depth-buffer copies, plus depth-buffer initialization, reset, and safe
   copy deletion. `GrDCRoundTripChecks` saves and reloads an indexed CDC in
   memory, verifying dimensions, pixels, signature, and a fresh identity
-  matrix. Remaining work includes broader CDC operation coverage and
-  automatic desktop startup.
+  matrix. `GrDCPixelOpsChecks` verifies the upstream fill, clear, color-change,
+  and mono operations against the allocated indexed bitmap. Remaining work
+  includes broader CDC operation coverage and automatic desktop startup.

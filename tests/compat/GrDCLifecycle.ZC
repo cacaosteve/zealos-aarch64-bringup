@@ -121,3 +121,43 @@ I64 GrDCRoundTripChecks()
 	DCDel(dc);
 	return 42;
 }
+
+I64 GrDCPixelOpsChecks()
+{
+	CDC *dc;
+	I64 i, changed;
+
+	dc = DCNew(16, 2);
+	if (!dc)
+		return 1;
+	DCFill(dc, 5);
+	for (i = 0; i < 32; i++)
+		if (dc->body[i] != 5)
+			return 2;
+	changed = DCColorChange(dc, 5, 2);
+	if (changed != 32)
+		return 3;
+	for (i = 0; i < 32; i++)
+		if (dc->body[i] != 2)
+			return 4;
+	DCClear(dc);
+	for (i = 0; i < 32; i++)
+		if (dc->body[i])
+			return 5;
+	for (i = 0; i < 32; i++)
+		if (i & 1)
+			dc->body[i] = 4;
+		else
+			dc->body[i] = 6;
+	DCMono(dc, 4, 1, 3);
+	for (i = 0; i < 32; i++)
+		if (i & 1)
+		{
+			if (dc->body[i] != 1)
+				return 6;
+		}
+		else if (dc->body[i] != 3)
+			return 6;
+	DCDel(dc);
+	return 42;
+}
