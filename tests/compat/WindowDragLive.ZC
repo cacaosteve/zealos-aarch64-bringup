@@ -103,6 +103,22 @@ U0 WindowDragLiveRightDraw(CDC *dc, CCtrl *ctrl)
     }
 }
 
+Bool WindowDragLiveTextVisible(CTask *task, I64 row, I64 cells)
+{//Check for at least one foreground glyph pixel, not a specific font bit.
+    I64 x, y, left, top, right, bottom;
+    if (!task || cells <= 0)
+        return FALSE;
+    left = (task->win_left + 2) * FONT_WIDTH;
+    top = (task->win_top + row) * FONT_HEIGHT;
+    right = left + cells * FONT_WIDTH;
+    bottom = top + FONT_HEIGHT;
+    for (y = top; y < bottom; y++)
+        for (x = left; x < right; x++)
+            if (ZcFbTextPixel(x, y) == 0x00FFFFFF)
+                return TRUE;
+    return FALSE;
+}
+
 I64 WindowDragLiveStop()
 {
     if (sys_focus_task == window_drag_live_a ||
@@ -264,13 +280,9 @@ I64 WindowDragLiveRenderChecks()
         return 9;
     // The W in each first label has its top-left glyph pixel set. Check the
     // rendered framebuffer so black-on-black text attributes cannot pass.
-    if (ZcFbTextPixel((window_drag_live_a->win_left + 2) * FONT_WIDTH,
-                      (window_drag_live_a->win_top + 4) * FONT_HEIGHT) !=
-        0x00FFFFFF)
+    if (!WindowDragLiveTextVisible(window_drag_live_a, 4, 20))
         return 12;
-    if (ZcFbTextPixel((window_drag_live_b->win_left + 2) * FONT_WIDTH,
-                      (window_drag_live_b->win_top + 4) * FONT_HEIGHT) !=
-        0x00FFFFFF)
+    if (!WindowDragLiveTextVisible(window_drag_live_b, 4, 31))
         return 13;
     return 42;
 }

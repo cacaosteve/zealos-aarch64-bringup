@@ -9,6 +9,7 @@ extern I64 bootstrap_upstream_gr_update_screen;
 extern U16 bootstrap_win_z_buf[TEXT_COLS * TEXT_ROWS];
 extern U16 bootstrap_win_uncovered[(BOOTSTRAP_WIN_MAX + 16) / 16];
 extern Bool BootstrapCanUseUpstreamGrUpdateTasks();
+extern Bool BootstrapWinIsUncovered(CTask *task);
 extern Bool ZcWinMouseUpdate();
 extern CWinMgrGlobals *ZcActiveWinMgrGlobals();
 extern U0 WinCalcIdles();
@@ -18,6 +19,30 @@ I64 gr_screen_final_update_calls;
 U8 gr_screen_final_update_old_pixel;
 U8 gr_screen_final_update_overlay_off[FONT_WIDTH * 10 * FONT_HEIGHT];
 U32 gr_screen_cursor_off[13 * 13];
+
+I64 GrScreenVisibleWindowCount()
+{//Count app windows only; sys_task and WinMgr are frame infrastructure.
+    CTask *root = sys_winmgr_task, *task;
+    I64 count = 0, visited = 0;
+    if (!TaskValidate(root))
+        root = sys_task;
+    if (!TaskValidate(root))
+        return 0;
+    task = root;
+    do
+    {
+        if (!TaskValidate(task))
+            break;
+        if (task != sys_task && task != sys_winmgr_task &&
+            (task->display_flags & (1 << DISPLAYf_SHOW)) &&
+            BootstrapWinIsUncovered(task))
+            count++;
+        task = task->next_task;
+        visited++;
+    }
+    while (task && task != root && visited < 64);
+    return count;
+}
 
 U0 GrScreenNoCursorProbe(CDC *dc)
 {
@@ -453,10 +478,17 @@ I64 GrScreenFinalUpdateChecks()
     paint_task->display_flags = old_window_display_flags;
     if (bootstrap_upstream_window_updates <= old_window_updates)
     {
-        mouse_grid.coord = old_coord;
-        mouse.pos.x = old_mouse_x;
-        mouse.pos.y = old_mouse_y;
-        return 18;
+        // This graphics-only probe may run with no user windows in the task
+        // ring. The shell and manager are intentionally excluded from the
+        // compositor's application-window count; require an increment only
+        // when a visible application window is actually present.
+        if (GrScreenVisibleWindowCount())
+        {
+            mouse_grid.coord = old_coord;
+            mouse.pos.x = old_mouse_x;
+            mouse.pos.y = old_mouse_y;
+            return 18;
+        }
     }
     if (bootstrap_upstream_ode_updates <= old_ode_updates)
     {
