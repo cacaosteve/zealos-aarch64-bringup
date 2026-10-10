@@ -1530,6 +1530,7 @@ I64 BootstrapGrPackedTablesChecks()
         return 0;
     return 0x2a;
 }
+extern U0 PaletteSetStd(Bool persistent=TRUE);
 U0 BootstrapGrContextInit()
 {//Attach upstream graphics globals to the initialized bootstrap surfaces.
     CGrGlobals *active_gr = ZcActiveGrGlobals();
@@ -1551,6 +1552,7 @@ U0 BootstrapGrContextInit()
         active_gr->screen_zoom = 1;
     BootstrapGrPackedTablesInit(active_gr);
     BootstrapBindGrTaskTables(active_gr);
+    PaletteSetStd();
     if (!bootstrap_present_cache_ready)
     {
         MemSet(bootstrap_present_cache, 0xFF, 800 * 600);

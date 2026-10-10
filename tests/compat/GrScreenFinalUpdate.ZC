@@ -15,6 +15,7 @@ extern U8 bootstrap_present_cache[800 * 600];
 extern U64 bootstrap_text_bits[256], bootstrap_text_colors[16];
 extern Bool bootstrap_present_cache_ready, bootstrap_present_ready;
 extern U0 BootstrapGrContextInit();
+extern U0 PaletteSetStd(Bool persistent=TRUE);
 extern Bool BootstrapCanUseUpstreamGrUpdateTasks();
 extern Bool BootstrapWinIsUncovered(CTask *task);
 extern Bool ZcWinMouseUpdate();
@@ -330,6 +331,10 @@ I64 BootstrapGrContextInitChecks()
         active_gr->dc1->dc_signature != DCS_SIGNATURE_VAL ||
         active_gr->dc_cache->dc_signature != DCS_SIGNATURE_VAL ||
         active_gr->zoomed_dc->dc_signature != DCS_SIGNATURE_VAL)
+        return 0;
+    if (gr_palette[0].b != 0 || gr_palette[0].g != 0 || gr_palette[0].r != 0 ||
+        gr_palette[15].b != 0xFF || gr_palette[15].g != 0xFF ||
+        gr_palette[15].r != 0xFF)
         return 0;
     return 0x2a;
 }
