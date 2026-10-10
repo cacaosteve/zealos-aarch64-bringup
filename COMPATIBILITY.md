@@ -1513,8 +1513,9 @@ ZealOS live distribution or installer.
   after the background pass (`ELR` at `fb_draw_char`, `FAR=0`). This does not
   isolate whether the pass damaged console state or the fault arose earlier, so
   the source pass remains outside the live frame loop. The
-  AArch64 runtime also implements `DCBlotColor4`, with a guest check for packed
-  pixel bit order and cache behavior. The pinned upstream file remains
+  AArch64 runtime also implements `DCBlotColor4`, with guest checks for packed
+  pixel bit order, three-group plane layout, and changed/unchanged cache groups.
+  The pinned upstream file remains
   byte-identical. The active manager probe still uses a compile-only
   `GrUpdateScreen` declaration, and the manager is not started; `GrAsm` routines
   beyond this blitter and full display initialization remain unported.
