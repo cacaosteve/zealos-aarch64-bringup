@@ -3083,6 +3083,15 @@ Freeze catalog unchanged.
 | Smoke | Extend `GrSpriteEllipseChecks` with a quarter-turned ellipse's extrema and arbitrary-angle rejection; full PCI graphics/window-manager compatibility probe passes |
 | Limits | Non-cardinal ellipse angles remain unsupported; general floating-point matrix transforms remain open |
 
+## Milestone 269 — render deterministic sprite dither colors
+
+| Item | Path |
+|--|--|
+| Gap | `SPT_DITHER_COLOR` records were sized by the sprite scanner but stopped interpretation, and the bootstrap framebuffer plot path ignored the CDC's checkerboard dither flag |
+| Bring-up | Decode the packed color pair into the CDC color state and make `GrPlot` choose the second color on the upstream checkerboard parity while preserving clipping and color restoration |
+| Smoke | Add `GrSpriteDitherChecks` for both alternating palette colors and restored CDC foreground; run the full PCI graphics/window-manager compatibility probe |
+| Limits | Probability dithering and non-plot framebuffer paths remain unsupported by the bootstrap renderer |
+
 ## Open compatibility probe — `/System/Win.ZC`
 
 The source probe loads pinned `KernelC.HH`, `Externs.ZC`, and `Gr.HH` before compiling unchanged `Win.ZC`. Graphics dimensions and mouse globals are probe fixtures; `DrawMenu` and the initial `GrScaleZoom` definition are compile-time fixtures until unchanged `GrScreen.ZC` is loaded later in the probe. `GrScreenFinalUpdateChecks` executes `WinFinalUpdate` through the staged idle-frame path, confirms the fixture's `mouse_grid.coord` toggles the real coordinate-text overlay, checks a separate visible guest overlay callback, verifies the software arrow against Limine framebuffer pixels, and exercises `WinMouseUpdate`'s edge recentering through the runtime dispatch. `WinMousePointerStateCheck` covers transformed tablet coordinates and `WinMouseHardStateCheck` covers the source mouse-state ABI; manual UTM acceptance confirms the software pointer and window-demo mouse interaction. The raw ARM generic-timer binding and a standalone F64 clock expression are smoke-tested before the Win load.

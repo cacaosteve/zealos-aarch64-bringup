@@ -2214,6 +2214,7 @@ Bool GrPlot(CDC *dc=gr.dc, I64 x=0, I64 y=0)
 {
     CTask *task;
     I64 left, top, right, bottom;
+    U8 color;
     if (!dc)
         return FALSE;
     task = dc->win_task;
@@ -2235,7 +2236,13 @@ Bool GrPlot(CDC *dc=gr.dc, I64 x=0, I64 y=0)
         right = dc->width - 1;
         bottom = dc->height - 1;
     }
-    return ZcFbGraphPlot(x, y, dc->color.c0 & 0xff,
+    color = dc->color.c0 & 0xff;
+    // Match upstream GrPlot0's checkerboard DITHER mode. Probability
+    // dithering remains a separate unsupported path in this framebuffer
+    // bridge; sprite dither-color records use the deterministic flag.
+    if ((dc->color.c1.rop & 0x40) && ((x ^ y) & 1))
+        color = dc->color.c1 & 0xff;
+    return ZcFbGraphPlot(x, y, color,
                          left, top, right, bottom);
 }
 I64 bootstrap_mouse_draw_calls = 0;
