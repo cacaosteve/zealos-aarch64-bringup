@@ -2,6 +2,21 @@
 // The caller maps exact cardinal rotations to swapped radii.
 extern F64 ZcSinF64(F64 angle);
 extern F64 ZcCosF64(F64 angle);
+extern I64 GrPutS(CDC *dc, I64 x, I64 y, U8 *s);
+
+I64 SpriteTextSize0(U8 *sprite)
+{
+    I64 scan_pos;
+    U8 ch;
+
+    for (scan_pos = 12; scan_pos < 4108; scan_pos++)
+    {
+        MemCopy(&ch, sprite + scan_pos, sizeof(U8));
+        if (!ch)
+            return scan_pos + 1;
+    }
+    return -1;
+}
 
 U0 SpriteEllipse0(CDC *dc, I64 cx, I64 cy, I64 rx, I64 ry)
 {
@@ -275,6 +290,7 @@ I64 SpritePolygon0(CDC *dc, I64 x, I64 y, I32 cx, I32 cy,
 U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
 {
     I64 row, col, stride, old_color, old_thick, old_x, old_y, size, records, pixel_budget;
+    I64 text_len;
     I64 circle_x, circle_y, circle_err;
     I64 poly_i, poly_x1, poly_y1, poly_dx, poly_dy, poly_work, poly_total;
     I64 line_x, line_y, line_dx, line_dy, line_sx, line_sy;
@@ -613,6 +629,21 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
                                y + old_y + sprite_y + row);
                 }
             size = 20 + stride * height;
+        }
+        else if (type == 27) // SPT_TEXT, bounded upstream GrPutS path
+        {
+            MemCopy(&x1, sprite + 4, sizeof(I32));
+            MemCopy(&y1, sprite + 8, sizeof(I32));
+            size = SpriteTextSize0(sprite);
+            if (size < 13 || size > 4108)
+                break;
+            text_len = size - 13; // exclude x/y and the terminating NUL
+            // GrPutChar can touch at most one 8x8 glyph per input byte.
+            // Reserve the full worst case before allowing any writes.
+            if (text_len > 4095 || 64 * text_len > 480000 - pixel_budget)
+                break;
+            pixel_budget += 64 * text_len;
+            GrPutS(dc, x + old_x + x1, y + old_y + y1, sprite + 12);
         }
         else
             break; // Unported variable-sized record: do not guess its length.

@@ -1,0 +1,47 @@
+I64 GrSpriteTextChecks()
+{
+	CDC expected_dc, actual_dc;
+	U8 *expected, *actual, *records;
+	U8 record_type;
+	I32 x, y;
+	I64 i;
+	if (!text.font)
+		return 1;
+	expected = MAlloc(64 * 32);
+	actual = MAlloc(64 * 32);
+	records = CAlloc(17);
+	if (!expected || !actual || !records)
+		return 2;
+	for (i = 0; i < 64 * 32; i++)
+		expected[i] = actual[i] = 0x5a;
+	MemSet(&expected_dc, 0, sizeof(CDC));
+	MemSet(&actual_dc, 0, sizeof(CDC));
+	expected_dc.body = expected;
+	actual_dc.body = actual;
+	expected_dc.width = actual_dc.width = 64;
+	expected_dc.width_internal = actual_dc.width_internal = 64;
+	expected_dc.height = actual_dc.height = 32;
+	expected_dc.dc_signature = actual_dc.dc_signature = DCS_SIGNATURE_VAL;
+	expected_dc.color.c0.color = actual_dc.color.c0.color = 3;
+	expected_dc.color.c0.rop = actual_dc.color.c0.rop = ROPB_MONO;
+	GrSetUpTables();
+	GrPutS(&expected_dc, 8, 8, "A\nB");
+	record_type = SPT_TEXT;
+	MemCopy(records, &record_type, sizeof(U8));
+	x = 5;
+	y = 4;
+	MemCopy(records + 4, &x, sizeof(I32));
+	MemCopy(records + 8, &y, sizeof(I32));
+	records[12] = 'A';
+	records[13] = '\n';
+	records[14] = 'B';
+	// records[15] is the text terminator; records[16] is SPT_END.
+	Sprite3(&actual_dc, 3, 4, 0, records);
+	for (i = 0; i < 64 * 32; i++)
+		if (expected[i] != actual[i])
+			return 3;
+	Free(records);
+	Free(actual);
+	Free(expected);
+	return 0x2a;
+}
