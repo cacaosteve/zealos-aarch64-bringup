@@ -1369,12 +1369,15 @@ U32 bootstrap_present_raw[800 * 600];
 U8 bootstrap_present_cache[800 * 600];
 U64 bootstrap_text_colors[16];
 U64 bootstrap_text_bits[256];
+// Match GrSetUpTables' per-zoom allocated byte expansion tables.
+U8 *bootstrap_screen_zoom_tables[9];
 I64 bootstrap_gr_text_updates = 0;
 I64 bootstrap_gr_screen_updates = 0;
 I64 bootstrap_gr_planar_updates = 0;
 Bool bootstrap_present_cache_ready = FALSE;
 Bool bootstrap_present_ready = FALSE;
 Bool bootstrap_gr_packed_tables_ready = FALSE;
+Bool bootstrap_gr_zoom_tables_ready = FALSE;
 bootstrap_graphics_dc.body = bootstrap_graphics_pixels;
 bootstrap_graphics_dc.width = 800;
 bootstrap_graphics_dc.width_internal = 800;
@@ -1531,6 +1534,32 @@ I64 BootstrapGrPackedTablesChecks()
     return 0x2a;
 }
 extern U0 PaletteSetStd(Bool persistent=TRUE);
+U0 BootstrapGrZoomTablesInit(CGrGlobals *active_gr)
+{//Build the upstream 1..8 pixel expansion tables once, then bind them per CGrGlobals.
+    I64 i, j, k, l, m;
+    if (!active_gr)
+        return;
+    if (!bootstrap_gr_zoom_tables_ready)
+    {
+        for (i = 1; i <= 8; i++)
+        {
+            bootstrap_screen_zoom_tables[i] = MAlloc(256 * i);
+            for (j = 0; j < 256; j++)
+            {
+                m = 0;
+                for (k = 0; k < 8; k++)
+                    if (Bt(&j, k))
+                        for (l = 0; l < i; l++)
+                            Bts(&m, l + k * i);
+                for (l = 0; l < i; l++)
+                    bootstrap_screen_zoom_tables[i][j + l * 256] = m.u8[l];
+            }
+        }
+        bootstrap_gr_zoom_tables_ready = TRUE;
+    }
+    for (i = 1; i <= 8; i++)
+        active_gr->screen_zoom_tables[i] = bootstrap_screen_zoom_tables[i];
+}
 U0 BootstrapGrContextInit()
 {//Attach upstream graphics globals to the initialized bootstrap surfaces.
     CGrGlobals *active_gr = ZcActiveGrGlobals();
@@ -1551,6 +1580,7 @@ U0 BootstrapGrContextInit()
     if (active_gr->screen_zoom < 1 || active_gr->screen_zoom > 8)
         active_gr->screen_zoom = 1;
     BootstrapGrPackedTablesInit(active_gr);
+    BootstrapGrZoomTablesInit(active_gr);
     BootstrapBindGrTaskTables(active_gr);
     PaletteSetStd();
     if (!bootstrap_present_cache_ready)
