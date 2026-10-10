@@ -35,3 +35,35 @@ U8 *DC2Sprite(CDC *dc)
     // CAlloc leaves the trailing SPT_END byte zeroed.
     return sprite;
 }
+
+I64 SpriteTypeMask(U8 *elems)
+{
+    I64 result = 0, records = 0, size, type;
+    I32 width, height;
+    U8 *p = elems;
+    U8 raw_type;
+
+    if (!p)
+        return 1 << SPT_TYPES_NUM;
+    while (records < 65536) {
+        records++;
+        MemCopy(&raw_type, p, sizeof(U8));
+        type = raw_type & SPG_TYPE_MASK;
+        if (!type)
+            return result;
+        if (type >= SPT_TYPES_NUM)
+            return 1 << SPT_TYPES_NUM;
+        result |= 1 << type;
+        // The first consumer is DocGR's CDC bitmap record. Other sprite
+        // opcodes are rejected until their variable-size encodings are ported.
+        if (type != SPT_BITMAP)
+            return 1 << SPT_TYPES_NUM;
+        MemCopy(&width, p + 12, sizeof(I32));
+        MemCopy(&height, p + 16, sizeof(I32));
+        if (width < 0 || width > I32_MAX - 7 || height < 0)
+            return 1 << SPT_TYPES_NUM;
+        size = 20 + ((width + 7) & ~7) * height;
+        p += size;
+    }
+    return 1 << SPT_TYPES_NUM;
+}

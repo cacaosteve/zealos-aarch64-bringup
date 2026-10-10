@@ -5,6 +5,7 @@ I64 GrDC2SpriteChecks()
     U8 *bytes;
     I64 i;
     U8 actual, bitmap_type;
+    U8 invalid_type;
     I32 x, y, width, height;
     I64 row;
 
@@ -23,6 +24,8 @@ I64 GrDC2SpriteChecks()
     MemCopy(&height, bytes + 16, sizeof(I32));
     if (bitmap_type != 23 || x || y || width != 16 || height != 2)
         return 2;
+    if (SpriteTypeMask(bytes) != (1 << SPT_BITMAP))
+        return 2;
     for (i = 0; i < 32; i++) {
         MemCopy(&actual, bytes + 20 + i, sizeof(U8));
         if (actual != (i ^ 0x5A))
@@ -31,6 +34,11 @@ I64 GrDC2SpriteChecks()
     MemCopy(&actual, bytes + 20 + 32, sizeof(U8));
     if (actual != SPT_END)
         return 4;
+    invalid_type = SPT_TYPES_NUM;
+    MemCopy(bytes, &invalid_type, sizeof(U8));
+    if (SpriteTypeMask(bytes) != (1 << SPT_TYPES_NUM))
+        return 4;
+    MemCopy(bytes, &bitmap_type, sizeof(U8));
     Free(bytes);
     DCDel(dc);
     odd_dc = DCNew(13, 2);

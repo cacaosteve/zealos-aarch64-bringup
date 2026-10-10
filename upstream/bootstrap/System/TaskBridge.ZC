@@ -1430,10 +1430,6 @@ I64 *Mat4x4New(I64 *src, CTask *mem_task=NULL)
         MemSet(res, 0, 16 * sizeof(I64));
     return res;
 }
-I64 SpriteTypeMask(U8 *sprite)
-{
-    return 0;
-}
 U0 Mat4x4IdentEqu(I64 *matrix)
 {
 }

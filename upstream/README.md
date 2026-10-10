@@ -2980,9 +2980,9 @@ Freeze catalog unchanged.
 | Item | Path |
 |--|--|
 | Gap | Upstream `DocGR` calls `DC2Sprite`, but the ARM64 bootstrap left the symbol unresolved |
-| Bring-up | Add a source-compatible `DC2Sprite` bridge after `Gr.HH` is loaded. It serializes the unchanged bitmap sprite record, copies the CDC's padded pixel rows, and appends the zero `SPT_END` record |
-| Smoke | `GrDC2SpriteChecks` verifies type, origin, dimensions, all pixel bytes, end marker, and null-input behavior; the complete PCI graphics/window-manager compatibility probe passes |
-| Limits | The bridge supports CDC-to-bitmap conversion only. The broader sprite-record size/type-mask/plot subsystem and graphics table initialization remain unfinished |
+| Bring-up | Add `DC2Sprite` and a bounded bitmap-record `SpriteTypeMask` after `Gr.HH` is loaded. The converter serializes the unchanged bitmap record and pads rows to the sprite format; unsupported opcodes are rejected instead of being walked with a guessed size |
+| Smoke | `GrDC2SpriteChecks` verifies aligned and partial-width row contents, the bitmap type mask, invalid-type reporting, end marker, and null-input behavior; the complete PCI graphics/window-manager compatibility probe passes |
+| Limits | Other valid sprite opcodes still need their upstream record-size rules before `SpriteTypeMask` can scan them; sprite rendering/plotting and graphics lookup-table initialization remain unfinished |
 
 ## Open compatibility probe — `/System/Win.ZC`
 
