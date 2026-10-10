@@ -49,7 +49,7 @@ I64 GrDC2SpriteChecks()
     DCDel(plot_dc);
     // Common fixed-size sprite operations can be streamed together. Exercise
     // foreground changes, point and line records, and caller-state restoration.
-    records = CAlloc(67);
+    records = CAlloc(83);
     record_type = SPT_COLOR;
     MemCopy(records, &record_type, sizeof(U8));
     actual = 12;
@@ -86,9 +86,17 @@ I64 GrDC2SpriteChecks()
     MemCopy(records + 54, &y, sizeof(I32));
     MemCopy(records + 58, &width, sizeof(I32));
     MemCopy(records + 62, &height, sizeof(I32));
+    record_type = SPT_CIRCLE;
+    MemCopy(records + 66, &record_type, sizeof(U8));
+    x = 8;
+    y = 1;
+    width = 1;
+    MemCopy(records + 70, &x, sizeof(I32));
+    MemCopy(records + 74, &y, sizeof(I32));
+    MemCopy(records + 78, &width, sizeof(I32));
     if (SpriteTypeMask(records) !=
             ((1 << SPT_COLOR) + (1 << SPT_SHIFT) + (1 << SPT_PT) +
-             (1 << SPT_LINE) + (1 << SPT_RECT)))
+             (1 << SPT_LINE) + (1 << SPT_RECT) + (1 << SPT_CIRCLE)))
         return 4;
     plot_dc = DCNew(16, 2);
     if (!plot_dc)

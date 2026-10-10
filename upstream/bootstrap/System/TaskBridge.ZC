@@ -1449,7 +1449,8 @@ extern Bool GrRect(CDC *dc, I64 x, I64 y, I64 width, I64 height);
 U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
 {
     I64 row, col, stride, old_color, old_x, old_y, size, records, pixel_budget;
-    I32 sprite_x, sprite_y, width, height, x1, y1, x2, y2;
+    I64 circle_x, circle_y, circle_err;
+    I32 sprite_x, sprite_y, width, height, x1, y1, x2, y2, radius;
     U8 type, pixel;
 
     if (!dc || dc->dc_signature != DCS_SIGNATURE_VAL || !sprite ||
@@ -1507,6 +1508,43 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
             MemCopy(&y2, sprite + 16, sizeof(I32));
             GrRect(dc, x + old_x + x1, y + old_y + y1, x2 - x1, y2 - y1);
             size = 20;
+        }
+        else if (type == 14) // SPT_CIRCLE
+        {
+            MemCopy(&x1, sprite + 4, sizeof(I32));
+            MemCopy(&y1, sprite + 8, sizeof(I32));
+            MemCopy(&radius, sprite + 12, sizeof(I32));
+            if (radius < 0 || radius > 4096 || 8 * radius > 480000 - pixel_budget)
+                break;
+            // Bounded integer midpoint raster; GrPlot applies the active CDC
+            // clipping and framebuffer path for every symmetric point.
+            pixel_budget += 8 * radius;
+            if (radius)
+            {
+                circle_x = radius;
+                circle_y = 0;
+                circle_err = 1 - radius;
+                while (circle_x >= circle_y)
+                {
+                    GrPlot(dc, x + old_x + x1 + circle_x, y + old_y + y1 + circle_y);
+                    GrPlot(dc, x + old_x + x1 + circle_y, y + old_y + y1 + circle_x);
+                    GrPlot(dc, x + old_x + x1 - circle_y, y + old_y + y1 + circle_x);
+                    GrPlot(dc, x + old_x + x1 - circle_x, y + old_y + y1 + circle_y);
+                    GrPlot(dc, x + old_x + x1 - circle_x, y + old_y + y1 - circle_y);
+                    GrPlot(dc, x + old_x + x1 - circle_y, y + old_y + y1 - circle_x);
+                    GrPlot(dc, x + old_x + x1 + circle_y, y + old_y + y1 - circle_x);
+                    GrPlot(dc, x + old_x + x1 + circle_x, y + old_y + y1 - circle_y);
+                    circle_y++;
+                    if (circle_err < 0)
+                        circle_err += 2 * circle_y + 1;
+                    else
+                    {
+                        circle_x--;
+                        circle_err += 2 * (circle_y - circle_x) + 1;
+                    }
+                }
+            }
+            size = 16;
         }
         else if (type == 23) // SPT_BITMAP
         {
