@@ -3101,6 +3101,15 @@ Freeze catalog unchanged.
 | Smoke | Add `GrSpriteThickChecks` for a three-pixel horizontal stroke, adjacent clear rows, and restored pen width; tighten dither smoke to verify complete color-state restoration |
 | Limits | Thick stroke geometry is axis-offset for the bootstrap bridge; scaling through arbitrary CDC matrices and thick points or curves remains open |
 
+## Milestone 271 — restore solid sprite color after dithering
+
+| Item | Path |
+|--|--|
+| Gap | `SPT_COLOR` replaced only the foreground byte, so a prior `SPT_DITHER_COLOR` left deterministic dithering active for later solid-color records |
+| Bring-up | Match upstream color-mask semantics: replace both color bytes, clear the deterministic dither flag for `SPT_COLOR`, and preserve unrelated color/ROP state |
+| Smoke | Extend `GrSpriteDitherChecks` to transition from a two-color checkerboard to a solid color and verify both the transition pixel and full CDC color restoration |
+| Limits | Probability dithering and non-plot framebuffer paths remain unsupported by the bootstrap renderer |
+
 ## Open compatibility probe — `/System/Win.ZC`
 
 The source probe loads pinned `KernelC.HH`, `Externs.ZC`, and `Gr.HH` before compiling unchanged `Win.ZC`. Graphics dimensions and mouse globals are probe fixtures; `DrawMenu` and the initial `GrScaleZoom` definition are compile-time fixtures until unchanged `GrScreen.ZC` is loaded later in the probe. `GrScreenFinalUpdateChecks` executes `WinFinalUpdate` through the staged idle-frame path, confirms the fixture's `mouse_grid.coord` toggles the real coordinate-text overlay, checks a separate visible guest overlay callback, verifies the software arrow against Limine framebuffer pixels, and exercises `WinMouseUpdate`'s edge recentering through the runtime dispatch. `WinMousePointerStateCheck` covers transformed tablet coordinates and `WinMouseHardStateCheck` covers the source mouse-state ABI; manual UTM acceptance confirms the software pointer and window-demo mouse interaction. The raw ARM generic-timer binding and a standalone F64 clock expression are smoke-tested before the Win load.

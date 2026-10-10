@@ -340,7 +340,7 @@ I64 GrSpriteDitherChecks()
 {
     CDC *plot_dc;
     U8 *records;
-    U8 dither_type, point_type;
+    U8 dither_type, point_type, color_type, solid_color;
     U16 dither_colors;
     I32 x, y;
     I64 color0, color1, old_color;
@@ -349,11 +349,13 @@ I64 GrSpriteDitherChecks()
     if (!plot_dc)
         return 1;
     plot_dc->color.c0 = 12;
-    records = CAlloc(29);
+    records = CAlloc(43);
     if (!records)
         return 2;
     dither_type = SPT_DITHER_COLOR;
     point_type = SPT_PT;
+    color_type = SPT_COLOR;
+    solid_color = 7;
     dither_colors = 0x0905; // first color 5, second color 9
     MemCopy(records, &dither_type, sizeof(U8));
     MemCopy(records + 2, &dither_colors, sizeof(U16));
@@ -366,8 +368,14 @@ I64 GrSpriteDitherChecks()
     x = 2;
     MemCopy(records + 20, &x, sizeof(I32));
     MemCopy(records + 24, &y, sizeof(I32));
+    MemCopy(records + 28, &color_type, sizeof(U8));
+    MemCopy(records + 29, &solid_color, sizeof(U8));
+    MemCopy(records + 30, &point_type, sizeof(U8));
+    x = 3;
+    MemCopy(records + 34, &x, sizeof(I32));
+    MemCopy(records + 38, &y, sizeof(I32));
     if (SpriteTypeMask(records) !=
-            ((1 << SPT_DITHER_COLOR) + (1 << SPT_PT)))
+            ((1 << SPT_DITHER_COLOR) + (1 << SPT_PT) + (1 << SPT_COLOR)))
         return 3;
     old_color = plot_dc->color;
     Sprite3(plot_dc, 400, 300, 0, records);
@@ -375,6 +383,7 @@ I64 GrSpriteDitherChecks()
     color1 = gr_palette[9] & 0x00FFFFFF;
     if (ZcFbTextPixel(401, 301) != color0 ||
             ZcFbTextPixel(402, 301) != color1 ||
+            ZcFbTextPixel(403, 301) != (gr_palette[7] & 0x00FFFFFF) ||
             plot_dc->color != old_color)
         return 4;
     Free(records);

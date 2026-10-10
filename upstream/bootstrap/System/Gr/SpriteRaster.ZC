@@ -184,7 +184,7 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
         else if (type == 1) // SPT_COLOR (one-byte foreground color)
         {
             MemCopy(&pixel, sprite + 1, sizeof(U8));
-            dc->color.c0 = pixel;
+            dc->color = (dc->color & ~(0x40000000 | 0x00FF00FF)) | pixel;
             size = 2;
         }
         else if (type == 2) // SPT_DITHER_COLOR (checkerboard pair)
@@ -193,8 +193,8 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
             // byte, second color in the high byte. GrPlot handles the
             // deterministic ROPBF_DITHER checkerboard mode.
             MemCopy(&width, sprite + 2, sizeof(U16));
-            dc->color = 0x40000000 | (width & 0xFF) |
-                    ((width & 0xFF00) << 8);
+            dc->color = (dc->color & ~0x00FF00FF) | 0x40000000 |
+                    (width & 0xFF) | ((width & 0xFF00) << 8);
             size = 4;
         }
         else if (type == 3) // SPT_THICK
