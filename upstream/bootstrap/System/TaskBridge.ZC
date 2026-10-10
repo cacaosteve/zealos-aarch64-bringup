@@ -1605,7 +1605,14 @@ I64 BootstrapGrPenTablesChecks()
         active_gr->pen_brushes[7]->width != 7 ||
         active_gr->collision_pen_brushes[7]->color != COLOR_INVALID ||
         active_gr->even_pen_brushes[7]->color != COLOR_MONO ||
-        active_gr->odd_pen_brushes[7]->dc_signature != DCS_SIGNATURE_VAL)
+        active_gr->odd_pen_brushes[7]->dc_signature != DCS_SIGNATURE_VAL ||
+        active_gr->pen_brushes[8]->body[4 * 8 + 4] != COLOR_MONO ||
+        active_gr->pen_brushes[8]->body[0] != 0 ||
+        active_gr->collision_pen_brushes[8]->body[4 * 8 + 4] != COLOR_INVALID ||
+        active_gr->even_pen_brushes[8]->body[3 * 8 + 3] != COLOR_MONO ||
+        active_gr->even_pen_brushes[8]->body[4 * 8 + 3] != 0 ||
+        active_gr->odd_pen_brushes[8]->body[3 * 8 + 3] != 0 ||
+        active_gr->odd_pen_brushes[8]->body[4 * 8 + 3] != COLOR_MONO)
         return 0;
     return 0x2a;
 }
@@ -1771,9 +1778,9 @@ I64 MenuEntryWidth(CMenuEntry *entry)
     }
     return width + 1;
 }
-// The full ZealOS table builder also prepares planar, sprite, brush and zoom
-// tables that are not ported yet. The window compositor's required z/visibility
-// tables are backed by bounded bridge storage and can be initialized here.
+// The window compositor's z/visibility tables, plus the source graphics brush
+// tables, are backed by bounded bridge storage and initialized here. Upstream
+// planar and sprite-hash tables remain outside this screen path.
 U0 GrSetUpTables()
 {
     CGrGlobals *active_gr = ZcActiveGrGlobals();
