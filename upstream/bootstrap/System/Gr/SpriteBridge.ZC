@@ -36,10 +36,92 @@ U8 *DC2Sprite(CDC *dc)
     return sprite;
 }
 
+I64 SpriteElemSize(U8 *p, I64 type)
+{
+    I64 size;
+    I32 a, b;
+    U8 ch;
+
+    // These sizes follow SpriteElemSize in upstream System/Gr/SpriteNew.ZC.
+    // Read packed fields with MemCopy: several records are not naturally
+    // aligned, and the guest compiler must not synthesize unaligned loads.
+    if (type == SPT_COLOR)
+        return 2;
+    if (type == SPT_DITHER_COLOR)
+        return 4;
+    if (type == SPT_THICK)
+        return 8;
+    if (type == SPT_PLANAR_SYMMETRY)
+        return 20;
+    if (type == SPT_TRANSFORM_ON || type == SPT_TRANSFORM_OFF)
+        return 1;
+    if (type == SPT_SHIFT || type == SPT_PT ||
+            type == SPT_FLOOD_FILL || type == SPT_FLOOD_FILL_NOT)
+        return 12;
+    if (type == SPT_LINE || type == SPT_RECT || type == SPT_ARROW)
+        return 20;
+    if (type == SPT_ROTATED_RECT)
+        return 32;
+    if (type == SPT_CIRCLE)
+        return 16;
+    if (type == SPT_ELLIPSE)
+        return 32;
+    if (type == SPT_POLYGON)
+        return 40;
+    if (type == SPT_POLYLINE || type == SPT_BSPLINE2 ||
+            type == SPT_BSPLINE2_CLOSED || type == SPT_BSPLINE3 ||
+            type == SPT_BSPLINE3_CLOSED) {
+        MemCopy(&a, p + 4, sizeof(I32));
+        if (a < 0 || a > 1048576)
+            return -1;
+        if (type == SPT_POLYLINE)
+            return 8 + a * 8;
+        return 8 + a * 12;
+    }
+    if (type == SPT_POLYPT) {
+        MemCopy(&a, p + 4, sizeof(I32));
+        if (a < 0 || a > 1048576)
+            return -1;
+        return 16 + (a * 3 + 7) / 8;
+    }
+    if (type == SPT_BITMAP) {
+        MemCopy(&a, p + 12, sizeof(I32));
+        MemCopy(&b, p + 16, sizeof(I32));
+        if (a < 0 || a > I32_MAX - 7 || b < 0 || b > 1048576)
+            return -1;
+        return 20 + ((a + 7) & ~7) * b;
+    }
+    if (type == SPT_MESH || type == SPT_SHIFTABLE_MESH) {
+        if (type == SPT_MESH) {
+            MemCopy(&a, p + 4, sizeof(I32));
+            MemCopy(&b, p + 8, sizeof(I32));
+            size = 12;
+        } else {
+            MemCopy(&a, p + 16, sizeof(I32));
+            MemCopy(&b, p + 20, sizeof(I32));
+            size = 24;
+        }
+        if (a < 0 || a > 1048576 || b < 0 || b > 1048576)
+            return -1;
+        return size + a * 12 + b * 16;
+    }
+    if (type == SPT_TEXT || type == SPT_TEXT_BOX ||
+            type == SPT_TEXT_DIAMOND) {
+        size = 12;
+        while (size < 1048588) {
+            MemCopy(&ch, p + size, sizeof(U8));
+            size++;
+            if (!ch)
+                return size;
+        }
+        return -1;
+    }
+    return -1;
+}
+
 I64 SpriteTypeMask(U8 *elems)
 {
     I64 result = 0, records = 0, size, type;
-    I32 width, height;
     U8 *p = elems;
     U8 raw_type;
 
@@ -53,16 +135,10 @@ I64 SpriteTypeMask(U8 *elems)
             return result;
         if (type >= SPT_TYPES_NUM)
             return 1 << SPT_TYPES_NUM;
+        size = SpriteElemSize(p, type);
+        if (size < 1 || size > 16777216)
+            return 1 << SPT_TYPES_NUM;
         result |= 1 << type;
-        // The first consumer is DocGR's CDC bitmap record. Other sprite
-        // opcodes are rejected until their variable-size encodings are ported.
-        if (type != SPT_BITMAP)
-            return 1 << SPT_TYPES_NUM;
-        MemCopy(&width, p + 12, sizeof(I32));
-        MemCopy(&height, p + 16, sizeof(I32));
-        if (width < 0 || width > I32_MAX - 7 || height < 0)
-            return 1 << SPT_TYPES_NUM;
-        size = 20 + ((width + 7) & ~7) * height;
         p += size;
     }
     return 1 << SPT_TYPES_NUM;

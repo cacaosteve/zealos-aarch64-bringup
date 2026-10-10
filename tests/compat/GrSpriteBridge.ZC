@@ -3,9 +3,13 @@ I64 GrDC2SpriteChecks()
     CDC *dc;
     CDC *odd_dc;
     U8 *bytes;
+    U8 *records;
     I64 i;
     U8 actual, bitmap_type;
     U8 invalid_type;
+    U8 record_type;
+    U8 text_char;
+    I32 record_count;
     I32 x, y, width, height;
     I64 row;
 
@@ -66,7 +70,82 @@ I64 GrDC2SpriteChecks()
         return 9;
     Free(bytes);
     DCDel(odd_dc);
-    if (DC2Sprite(NULL))
+
+    // Fixed-size flood-fill record followed by the end marker.
+    records = CAlloc(13);
+    record_type = SPT_FLOOD_FILL;
+    MemCopy(records, &record_type, sizeof(U8));
+    if (SpriteTypeMask(records) != (1 << SPT_FLOOD_FILL))
         return 10;
+    Free(records);
+
+    // The scanner must continue across multiple short fixed-size records.
+    records = CAlloc(5);
+    record_type = SPT_COLOR;
+    MemCopy(records, &record_type, sizeof(U8));
+    MemCopy(records + 2, &record_type, sizeof(U8));
+    if (SpriteTypeMask(records) != (1 << SPT_COLOR))
+        return 11;
+    Free(records);
+
+    // POLYLINE has an I32 point count and an eight-byte point payload.
+    records = CAlloc(17);
+    record_type = SPT_POLYLINE;
+    record_count = 1;
+    MemCopy(records, &record_type, sizeof(U8));
+    MemCopy(records + 4, &record_count, sizeof(I32));
+    if (SpriteTypeMask(records) != (1 << SPT_POLYLINE))
+        return 12;
+    Free(records);
+
+    // POLYPT packs three-bit point codes; one point occupies one payload byte.
+    records = CAlloc(18);
+    record_type = SPT_POLYPT;
+    MemCopy(records, &record_type, sizeof(U8));
+    MemCopy(records + 4, &record_count, sizeof(I32));
+    if (SpriteTypeMask(records) != (1 << SPT_POLYPT))
+        return 13;
+    Free(records);
+
+    // Spline point payloads are three I32 values per point.
+    records = CAlloc(21);
+    record_type = SPT_BSPLINE2;
+    MemCopy(records, &record_type, sizeof(U8));
+    MemCopy(records + 4, &record_count, sizeof(I32));
+    if (SpriteTypeMask(records) != (1 << SPT_BSPLINE2))
+        return 14;
+    Free(records);
+
+    // Text records end at their null-terminated string, then resume scanning.
+    records = CAlloc(17);
+    record_type = SPT_TEXT;
+    MemCopy(records, &record_type, sizeof(U8));
+    text_char = 'x';
+    MemCopy(records + 12, &text_char, sizeof(U8));
+    record_type = SPT_COLOR;
+    MemCopy(records + 14, &record_type, sizeof(U8));
+    if (SpriteTypeMask(records) != ((1 << SPT_TEXT) + (1 << SPT_COLOR)))
+        return 15;
+    Free(records);
+
+    // Both mesh encodings carry 12-byte vertices and 16-byte triangle records.
+    records = CAlloc(41);
+    record_type = SPT_MESH;
+    MemCopy(records, &record_type, sizeof(U8));
+    MemCopy(records + 4, &record_count, sizeof(I32));
+    MemCopy(records + 8, &record_count, sizeof(I32));
+    if (SpriteTypeMask(records) != (1 << SPT_MESH))
+        return 16;
+    Free(records);
+    records = CAlloc(53);
+    record_type = SPT_SHIFTABLE_MESH;
+    MemCopy(records, &record_type, sizeof(U8));
+    MemCopy(records + 16, &record_count, sizeof(I32));
+    MemCopy(records + 20, &record_count, sizeof(I32));
+    if (SpriteTypeMask(records) != (1 << SPT_SHIFTABLE_MESH))
+        return 17;
+    Free(records);
+    if (DC2Sprite(NULL))
+        return 18;
     return 42;
 }
