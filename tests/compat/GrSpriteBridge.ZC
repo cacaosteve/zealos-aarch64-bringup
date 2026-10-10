@@ -47,6 +47,58 @@ I64 GrDC2SpriteChecks()
     if (plot_dc->color.c0 != 7)
         return 4;
     DCDel(plot_dc);
+    // Common fixed-size sprite operations can be streamed together. Exercise
+    // foreground changes, point and line records, and caller-state restoration.
+    records = CAlloc(67);
+    record_type = SPT_COLOR;
+    MemCopy(records, &record_type, sizeof(U8));
+    actual = 12;
+    MemCopy(records + 1, &actual, sizeof(U8));
+    record_type = SPT_SHIFT;
+    MemCopy(records + 2, &record_type, sizeof(U8));
+    x = 1;
+    y = 0;
+    MemCopy(records + 6, &x, sizeof(I32));
+    MemCopy(records + 10, &y, sizeof(I32));
+    record_type = SPT_PT;
+    MemCopy(records + 14, &record_type, sizeof(U8));
+    x = 2;
+    y = 1;
+    MemCopy(records + 18, &x, sizeof(I32));
+    MemCopy(records + 22, &y, sizeof(I32));
+    record_type = SPT_LINE;
+    MemCopy(records + 26, &record_type, sizeof(U8));
+    x = 1;
+    y = 0;
+    width = 8;
+    height = 1;
+    MemCopy(records + 30, &x, sizeof(I32));
+    MemCopy(records + 34, &y, sizeof(I32));
+    MemCopy(records + 38, &width, sizeof(I32));
+    MemCopy(records + 42, &height, sizeof(I32));
+    record_type = SPT_RECT;
+    MemCopy(records + 46, &record_type, sizeof(U8));
+    x = 3;
+    y = 0;
+    width = 6;
+    height = 2;
+    MemCopy(records + 50, &x, sizeof(I32));
+    MemCopy(records + 54, &y, sizeof(I32));
+    MemCopy(records + 58, &width, sizeof(I32));
+    MemCopy(records + 62, &height, sizeof(I32));
+    if (SpriteTypeMask(records) !=
+            ((1 << SPT_COLOR) + (1 << SPT_SHIFT) + (1 << SPT_PT) +
+             (1 << SPT_LINE) + (1 << SPT_RECT)))
+        return 4;
+    plot_dc = DCNew(16, 2);
+    if (!plot_dc)
+        return 4;
+    plot_dc->color.c0 = 7;
+    Sprite3(plot_dc, 0, 0, 0, records);
+    if (plot_dc->color.c0 != 7)
+        return 4;
+    DCDel(plot_dc);
+    Free(records);
     invalid_type = SPT_TYPES_NUM;
     MemCopy(bytes, &invalid_type, sizeof(U8));
     if (SpriteTypeMask(bytes) != (1 << SPT_TYPES_NUM))

@@ -3000,7 +3000,16 @@ Freeze catalog unchanged.
 | Gap | `DocGR` could convert a CDC into a bitmap sprite, but the bootstrap `Sprite3` stub discarded it |
 | Bring-up | Implement the `SPT_BITMAP` subset of `Sprite3` for `DC2Sprite` output. It reads the upstream 20-byte header and padded rows, plots through the normal clipped `GrPlot` path, bounds dimensions/pixel count, and restores the caller's foreground color |
 | Smoke | `GrDC2SpriteChecks` sends a converted CDC through `Sprite3` and verifies the destination color is restored; the full PCI graphics/window-manager suite passes |
-| Limits | This is only the bitmap record path emitted by `DC2Sprite`; drawing, text, mesh, transforms, multi-record interpretation, and pixel-visible UTM acceptance remain open |
+| Limits | This is only the bitmap record path emitted by `DC2Sprite`; text, mesh, transforms, other opcodes, and pixel-visible UTM acceptance remain open |
+
+## Milestone 260 — interpret common 2D sprite records
+
+| Item | Path |
+|--|--|
+| Gap | The first `Sprite3` bridge only plotted a bitmap record and ignored a sprite's normal color, shift, point, line, and rectangle operations |
+| Bring-up | Add bounded record-stream handling for `SPT_COLOR`, `SPT_SHIFT`, `SPT_PT`, `SPT_LINE`, `SPT_RECT`, and `SPT_BITMAP`; dispatch drawing through clipped `GrPlot`, `GrLine`, and `GrRect`, restore the caller's foreground color, and stop safely at unsupported opcodes |
+| Smoke | Extend `GrDC2SpriteChecks` with a multi-record color/shift/point/line/rectangle sprite; full PCI graphics/window-manager compatibility suite passes |
+| Limits | The interpreter does not yet handle dither/thickness, transforms, arrows, circles, polygons, text, flood fills, mesh, or other records. Since upstream `Sprite3` has no byte-length argument, malformed buffers cannot be fully validated; the record count and bitmap work are bounded |
 
 ## Open compatibility probe — `/System/Win.ZC`
 
