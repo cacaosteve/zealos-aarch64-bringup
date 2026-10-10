@@ -1966,5 +1966,8 @@ ZealOS live distribution or installer.
   task update counters advance, then checks the composed and zoomed pixels on
   the Limine framebuffer. A direct shell call outside that initialized frame
   is deliberately guarded and is not a valid test of the refresh path. The
-  remaining work is broader than this smoke: full palette/planar semantics,
-  general CDC allocation/lifetime coverage, and automatic desktop startup.
+  `GrDCLifecycleChecks` also exercises the unchanged upstream `DCNew`,
+  `DCAlias`, `DCDel`, and `DCSize`: allocated dimensions and identity matrix,
+  alias bitmap sharing with an independent matrix, safe alias deletion, and
+  null-bitmap cleanup. Remaining work includes broader CDC operations such as
+  copy/depth-buffer ownership and automatic desktop startup.

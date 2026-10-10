@@ -1,0 +1,41 @@
+I64 GrDCLifecycleChecks()
+{
+	CDC *dc, *alias, *null_dc;
+	dc = DCNew(13, 3);
+	if (!dc || dc->dc_signature != DCS_SIGNATURE_VAL ||
+			dc->width != 13 || dc->width_internal != 8 || dc->height != 3 ||
+			!dc->body || dc->r[0 * 4 + 0].i32[1] != 1 ||
+			dc->r[1 * 4 + 1].i32[1] != 1 ||
+			dc->r[2 * 4 + 2].i32[1] != 1 ||
+			dc->r[3 * 4 + 3].i32[1] != 1)
+		return 1;
+	if (dc->body[0] || dc->body[23] || DCSize(dc) <= 0)
+		return 2;
+
+	dc->body[0] = 0x5A;
+	dc->body[23] = 0xA5;
+	alias = DCAlias(dc);
+	if (!alias || alias == dc || alias->dc_signature != DCS_SIGNATURE_VAL ||
+			!(alias->flags & DCF_ALIAS) || alias->alias != dc ||
+			alias->body != dc->body || alias->r == dc->r ||
+			alias->mem_task != Fs || alias->win_task != Fs ||
+			alias->body[0] != 0x5A || alias->body[23] != 0xA5)
+		return 3;
+	alias->body[7] = 0xC3;
+	if (dc->body[7] != 0xC3)
+		return 4;
+	DCDel(alias);
+	if (dc->dc_signature != DCS_SIGNATURE_VAL || dc->body[0] != 0x5A ||
+			dc->body[7] != 0xC3 || dc->body[23] != 0xA5)
+		return 5;
+
+	null_dc = DCNew(8, 2, NULL, TRUE);
+	if (!null_dc || null_dc->dc_signature != DCS_SIGNATURE_VAL ||
+			null_dc->body || !(null_dc->flags & DCF_DONT_DRAW))
+		return 6;
+	DCDel(null_dc);
+	if (dc->dc_signature != DCS_SIGNATURE_VAL || dc->body[7] != 0xC3)
+		return 7;
+	DCDel(dc);
+	return 42;
+}
