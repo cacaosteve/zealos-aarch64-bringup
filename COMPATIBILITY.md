@@ -1966,4 +1966,4 @@ ZealOS live distribution or installer.
   the Limine framebuffer. A direct shell call outside that initialized frame
   is deliberately guarded and is not a valid test of the refresh path. The
   remaining work is broader than this smoke: full palette/planar semantics,
-  CDC allocation and lifetime, and normal interactive window-manager startup.
+  general CDC allocation/lifetime coverage, and automatic desktop startup.
