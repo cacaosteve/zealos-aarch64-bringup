@@ -120,22 +120,26 @@ I64 GrUpdateScreen32Checks()
 	U32 *saved_raw = text.raw_screen, *saved_alias = text.fb_alias;
 	U64 saved_buffer_size = text.buffer_size;
 	U64 saved_pitch = sys_framebuffer_pidth;
-	U32 expected;
 	if (!pixels || !screen_cache || !raw || !alias)
 		return 1;
 	GrPaletteGet(saved_palette);
+	// ZealOS CDC pixels are 4-bit palette indices. Exercise the full valid
+	// range, including indices 8-15, against a palette distinct from defaults.
 	for (i = 0; i < COLORS_NUM; i++)
-		test_palette[i] = 0;
-	test_palette[3] = 0x00123456;
+		test_palette[i] = 0x00123400 + i;
 	GrPaletteSet(test_palette);
 	for (i = 0; i < pixel_count; i++)
 	{
 		pixels[i] = 0;
-		screen_cache[i] = 0;
+		if (i < COLORS_NUM)
+			screen_cache[i] = 0xFF;
+		else
+			screen_cache[i] = 0;
 		raw[i] = 0;
 		alias[i] = 0xdeadbeef;
 	}
-	pixels[0] = 3;
+	for (i = 0; i < COLORS_NUM; i++)
+		pixels[i] = i;
 	test_dc.body = pixels;
 	test_dc.width = 800;
 	test_dc.width_internal = 800;
@@ -147,7 +151,6 @@ I64 GrUpdateScreen32Checks()
 	text.fb_alias = alias;
 	text.buffer_size = pixel_count * sizeof(U32);
 	sys_framebuffer_pidth = 800;
-	expected = gr_palette[3];
 	GrUpdateScreen32;
 	gr.dc2 = saved_dc;
 	gr.screen_cache = saved_cache;
@@ -156,16 +159,26 @@ I64 GrUpdateScreen32Checks()
 	text.fb_alias = saved_alias;
 	text.buffer_size = saved_buffer_size;
 	sys_framebuffer_pidth = saved_pitch;
-	GrPaletteSet(saved_palette);
-	if (raw[0] != expected || alias[0] != expected ||
-			alias[1] != 0xdeadbeef)
+	for (i = 0; i < COLORS_NUM; i++)
+		if (raw[i] != test_palette[i] || alias[i] != test_palette[i])
+		{
+			GrPaletteSet(saved_palette);
+			Free(alias);
+			Free(raw);
+			Free(screen_cache);
+			Free(pixels);
+			return 2;
+		}
+	if (alias[COLORS_NUM] != 0xdeadbeef)
 	{
+		GrPaletteSet(saved_palette);
 		Free(alias);
 		Free(raw);
 		Free(screen_cache);
 		Free(pixels);
 		return 2;
 	}
+	GrPaletteSet(saved_palette);
 	Free(alias);
 	Free(raw);
 	Free(screen_cache);
@@ -187,11 +200,10 @@ I64 GrUpdateScreen32LimineChecks()
 	U8 *saved_cache = gr.screen_cache;
 	I64 saved_zoom = gr.screen_zoom;
 	U32 *saved_raw = text.raw_screen, *saved_alias = text.fb_alias;
-	U32 original_pixel;
+	U32 original_pixels[COLORS_NUM];
 	U64 saved_buffer_size = text.buffer_size;
 	U64 saved_pitch = sys_framebuffer_pidth;
 	I64 observed;
-	U32 expected;
 	if (!sys_framebuffer_addr || sys_framebuffer_bpp != 32 ||
 			sys_framebuffer_width != 800 || sys_framebuffer_height != 600 ||
 			pitch_pixels < 800 || !pixels || !screen_cache || !raw)
@@ -199,21 +211,26 @@ I64 GrUpdateScreen32LimineChecks()
 	saved_pixel = text.fb_alias;
 	if (!saved_pixel || saved_pixel != sys_framebuffer_addr)
 		return 2;
-	// Preserve the visible boot text while exercising one real Limine pixel.
-	original_pixel = saved_pixel[0];
-	for (i = 0; i < COLORS_NUM; i++)
-		test_palette[i] = 0;
-	test_palette[3] = 0x00123456;
+	// Preserve the visible boot text while exercising one real Limine scanline.
 	GrPaletteGet(saved_palette);
+	// Use distinct colors to detect truncation or an incomplete upper palette.
+	for (i = 0; i < COLORS_NUM; i++)
+	{
+		test_palette[i] = 0x00654300 + i;
+		original_pixels[i] = saved_pixel[i];
+	}
 	GrPaletteSet(test_palette);
 	for (i = 0; i < pixel_count; i++)
 	{
 		pixels[i] = 0;
 		screen_cache[i] = 0;
 	}
+	for (i = 0; i < COLORS_NUM; i++)
+		screen_cache[i] = 0xFF;
 	for (i = 0; i < pitch_pixels * 600; i++)
 		raw[i] = 0;
-	pixels[0] = 3;
+	for (i = 0; i < COLORS_NUM; i++)
+		pixels[i] = i;
 	test_dc.body = pixels;
 	test_dc.width = 800;
 	test_dc.width_internal = 800;
@@ -225,11 +242,14 @@ I64 GrUpdateScreen32LimineChecks()
 	text.fb_alias = sys_framebuffer_addr;
 	text.buffer_size = pitch_pixels * 600 * sizeof(U32);
 	sys_framebuffer_pidth = pitch_pixels;
-	expected = gr_palette[3];
 	GrUpdateScreen32;
-	observed = ZcFbTextPixel(0, 0);
-	// Restore the one pixel immediately; this smoke must not alter the UI.
-	saved_pixel[0] = original_pixel;
+	observed = 0;
+	for (i = 0; i < COLORS_NUM; i++)
+		if (ZcFbTextPixel(i, 0) != (gr_palette[i] & 0x00ffffff))
+			observed = TRUE;
+	// Restore the tested scanline immediately; this smoke must not alter the UI.
+	for (i = 0; i < COLORS_NUM; i++)
+		saved_pixel[i] = original_pixels[i];
 	gr.dc2 = saved_dc;
 	gr.screen_cache = saved_cache;
 	gr.screen_zoom = saved_zoom;
@@ -241,7 +261,7 @@ I64 GrUpdateScreen32LimineChecks()
 	Free(raw);
 	Free(screen_cache);
 	Free(pixels);
-	if (observed != (expected & 0x00ffffff))
+	if (observed)
 		return 3;
 	return 42;
 }
