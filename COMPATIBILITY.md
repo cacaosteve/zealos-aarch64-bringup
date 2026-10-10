@@ -1976,5 +1976,6 @@ ZealOS live distribution or installer.
   matrix. `GrDCCustomPaletteRoundTripChecks` verifies the optional palette
   payload and palette flag in the saved image. `GrDCPixelOpsChecks` verifies
   the upstream fill, clear, color-change, and mono operations against the
-  allocated indexed bitmap. Remaining work includes broader CDC operation
-  coverage and automatic desktop startup.
+  allocated indexed bitmap. `GrDCTransformChecks` exercises the unchanged
+  fixed-point matrix transform and CDC translation callback. Remaining work
+  includes broader CDC operation coverage and automatic desktop startup.
