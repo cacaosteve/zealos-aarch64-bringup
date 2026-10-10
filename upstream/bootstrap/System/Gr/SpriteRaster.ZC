@@ -4,6 +4,28 @@ extern F64 ZcSinF64(F64 angle);
 extern F64 ZcCosF64(F64 angle);
 extern I64 GrPutS(CDC *dc, I64 x, I64 y, U8 *s);
 
+I64 SpriteCeilF64(F64 value)
+{
+    I64 integer_value = ToI64(value);
+    if (ToF64(integer_value) < value)
+        integer_value++;
+    return integer_value;
+}
+
+I64 SpriteMaxI64(I64 a, I64 b)
+{
+    if (a > b)
+        return a;
+    return b;
+}
+
+I64 SpriteAbsI64(I64 value)
+{
+    if (value < 0)
+        return -value;
+    return value;
+}
+
 I64 SpriteTextSize0(U8 *sprite)
 {
     I64 scan_pos;
@@ -16,6 +38,182 @@ I64 SpriteTextSize0(U8 *sprite)
             return scan_pos + 1;
     }
     return -1;
+}
+
+I64 SpriteTextBox0(CDC *dc, I64 x, I64 y, U8 *s, I64 text_len,
+        I64 pixel_limit)
+{
+    I64 i, width, width_max, height, work;
+    U8 ch;
+
+    width = width_max = 0;
+    height = 8;
+    for (i = 0; i < text_len; i++)
+    {
+        ch = s[i];
+        if (ch == '\t')
+            width = (width + 8 + 63) & ~63;
+        else if (ch == '\n')
+        {
+            if (width > width_max)
+                width_max = width;
+            width = 0;
+            height += 8;
+        }
+        else
+            width += 8;
+    }
+    if (width > width_max)
+        width_max = width;
+    // Text is bounded to 8x8 work per source byte. Add an upper bound for
+    // the two horizontal and two vertical border strokes before drawing.
+    work = 64 * text_len + 2 * (width_max + 5) + 2 * (height + 5);
+    if (work > pixel_limit)
+        return -1;
+    GrPutS(dc, x, y, s);
+    GrLine(dc, x - 2, y - 2, x + width_max + 2, y - 2);
+    GrLine(dc, x - 2, y + height + 2, x + width_max + 2, y + height + 2);
+    GrLine(dc, x - 2, y - 2, x - 2, y + height + 2);
+    GrLine(dc, x + width_max + 2, y - 2, x + width_max + 2,
+            y + height + 2);
+    return work;
+}
+
+I64 SpriteTextDiamond0(CDC *dc, I64 x, I64 y, U8 *s, I64 text_len,
+        I64 pixel_limit)
+{
+    I64 i, line_start, line_end, line_count, line_y, dx, dy;
+    I64 dx_old, dy_old, width, work;
+    F64 slope;
+    U8 *copy, saved, ch;
+
+    copy = MAlloc(text_len + 1);
+    if (!copy)
+        return -1;
+    line_count = 1;
+    for (i = 0; i < text_len; i++)
+    {
+        ch = s[i];
+        if (ch == '\r' || ch == '\t')
+            ch = ' ';
+        if (ch == '\n')
+            line_count++;
+        copy[i] = ch;
+    }
+    copy[text_len] = 0;
+
+    dx = 9; // FONT_WIDTH + upstream default border (2)
+    dy = (8 + 2 + 8 * line_count) >> 1;
+    line_start = 0;
+    line_y = y - ((8 * line_count) >> 1);
+    while (line_start <= text_len)
+    {
+        line_end = line_start;
+        while (line_end < text_len && copy[line_end] != '\n')
+            line_end++;
+        i = line_start;
+        while (i < line_end && copy[i] == ' ')
+            i++;
+        width = line_end;
+        while (width > i && copy[width - 1] == ' ')
+            width--;
+        width = ((width - i) * 8) >> 1;
+        if (width)
+        {
+            width += 2;
+            do
+            {
+                dx_old = dx;
+                dy_old = dy;
+                slope = ToF64(dx) / dy;
+                if (slope < 1.0 / 2.75)
+                {
+                    dy = SpriteMaxI64(dy, SpriteCeilF64(2.75 * dx));
+                    slope = 1.0 / 2.75;
+                }
+                else if (slope > 2.75)
+                {
+                    dy = SpriteMaxI64(dy, SpriteCeilF64(dx / 2.75));
+                    slope = 2.75;
+                }
+                dx = SpriteMaxI64(dx, width + SpriteCeilF64(slope *
+                        SpriteAbsI64(line_y - y)));
+                dx = SpriteMaxI64(dx, width + SpriteCeilF64(slope *
+                        SpriteAbsI64(line_y + 8 - y)));
+            }
+            while (dx != dx_old || dy != dy_old);
+        }
+        line_y += 8;
+        if (line_end == text_len)
+            break;
+        line_start = line_end + 1;
+    }
+    work = 64 * text_len + 4 * (dx + dy + 1);
+    if (work > pixel_limit)
+    {
+        Free(copy);
+        return -1;
+    }
+    // Work was preflighted from bounded input geometry. Render the text and
+    // four outline segments only after the complete record passes that bound.
+    dx = 9;
+    dy = (8 + 2 + 8 * line_count) >> 1;
+    // Recompute the final diamond dimensions without drawing text yet.
+    line_start = 0;
+    line_y = y - ((8 * line_count) >> 1);
+    while (line_start <= text_len)
+    {
+        line_end = line_start;
+        while (line_end < text_len && copy[line_end] != '\n')
+            line_end++;
+        i = line_start;
+        while (i < line_end && copy[i] == ' ')
+            i++;
+        width = line_end;
+        while (width > i && copy[width - 1] == ' ')
+            width--;
+        width = ((width - i) * 8) >> 1;
+        if (width)
+        {
+            width += 2;
+            do
+            {
+                dx_old = dx;
+                dy_old = dy;
+                slope = ToF64(dx) / dy;
+                if (slope < 1.0 / 2.75)
+                {
+                    dy = SpriteMaxI64(dy, SpriteCeilF64(2.75 * dx));
+                    slope = 1.0 / 2.75;
+                }
+                else if (slope > 2.75)
+                {
+                    dy = SpriteMaxI64(dy, SpriteCeilF64(dx / 2.75));
+                    slope = 2.75;
+                }
+                dx = SpriteMaxI64(dx, width + SpriteCeilF64(slope *
+                        SpriteAbsI64(line_y - y)));
+                dx = SpriteMaxI64(dx, width + SpriteCeilF64(slope *
+                        SpriteAbsI64(line_y + 8 - y)));
+            }
+            while (dx != dx_old || dy != dy_old);
+        }
+        saved = copy[line_end];
+        copy[line_end] = 0;
+        if (width)
+            GrPutS(dc, x - (width - 2), line_y, copy + i);
+        copy[line_end] = saved;
+        line_y += 8;
+        if (line_end == text_len)
+            break;
+        line_start = line_end + 1;
+    }
+    GrLine(dc, x, y - dy, x + dx, y);
+    GrLine(dc, x + dx, y, x, y + dy);
+    GrLine(dc, x, y + dy, x - dx, y);
+    GrLine(dc, x - dx, y, x, y - dy);
+    Free(copy);
+    return work;
 }
 
 U0 SpriteEllipse0(CDC *dc, I64 cx, I64 cy, I64 rx, I64 ry)
@@ -630,7 +828,7 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
                 }
             size = 20 + stride * height;
         }
-        else if (type == 27) // SPT_TEXT, bounded upstream GrPutS path
+        else if (type == 27 || type == 28 || type == 29)
         {
             MemCopy(&x1, sprite + 4, sizeof(I32));
             MemCopy(&y1, sprite + 8, sizeof(I32));
@@ -642,8 +840,31 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
             // Reserve the full worst case before allowing any writes.
             if (text_len > 4095 || 64 * text_len > 480000 - pixel_budget)
                 break;
-            pixel_budget += 64 * text_len;
-            GrPutS(dc, x + old_x + x1, y + old_y + y1, sprite + 12);
+            if (type == 27) // SPT_TEXT
+            {
+                pixel_budget += 64 * text_len;
+                GrPutS(dc, x + old_x + x1, y + old_y + y1, sprite + 12);
+            }
+            else if (type == 28) // SPT_TEXT_BOX
+            {
+                size = SpriteTextBox0(dc, x + old_x + x1,
+                        y + old_y + y1, sprite + 12, text_len,
+                        480000 - pixel_budget);
+                if (size < 0)
+                    break;
+                pixel_budget += size;
+                size = text_len + 13;
+            }
+            else // SPT_TEXT_DIAMOND
+            {
+                size = SpriteTextDiamond0(dc, x + old_x + x1,
+                        y + old_y + y1, sprite + 12, text_len,
+                        480000 - pixel_budget);
+                if (size < 0)
+                    break;
+                pixel_budget += size;
+                size = text_len + 13;
+            }
         }
         else
             break; // Unported variable-sized record: do not guess its length.

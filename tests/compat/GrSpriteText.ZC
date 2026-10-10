@@ -40,6 +40,46 @@ I64 GrSpriteTextChecks()
 	for (i = 0; i < 64 * 32; i++)
 		if (expected[i] != actual[i])
 			return 3;
+	for (i = 0; i < 64 * 32; i++)
+		expected[i] = actual[i] = 0x5a;
+	MemSet(records, 0, 17);
+	record_type = SPT_TEXT_BOX;
+	MemCopy(records, &record_type, sizeof(U8));
+	x = 5;
+	y = 4;
+	MemCopy(records + 4, &x, sizeof(I32));
+	MemCopy(records + 8, &y, sizeof(I32));
+	records[12] = 'A';
+	records[13] = '\n';
+	records[14] = 'B';
+	GrPutS(&expected_dc, 8, 8, "A\nB");
+	GrLine(&expected_dc, 6, 6, 18, 6);
+	GrLine(&expected_dc, 6, 26, 18, 26);
+	GrLine(&expected_dc, 6, 6, 6, 26);
+	GrLine(&expected_dc, 18, 6, 18, 26);
+	Sprite3(&actual_dc, 3, 4, 0, records);
+	for (i = 0; i < 64 * 32; i++)
+		if (expected[i] != actual[i])
+			return 4;
+	for (i = 0; i < 64 * 32; i++)
+		expected[i] = actual[i] = 0x5a;
+	MemSet(records, 0, 17);
+	record_type = SPT_TEXT_DIAMOND;
+	MemCopy(records, &record_type, sizeof(U8));
+	x = 25;
+	y = 12;
+	MemCopy(records + 4, &x, sizeof(I32));
+	MemCopy(records + 8, &y, sizeof(I32));
+	records[12] = 'A';
+	GrPutS(&expected_dc, 24, 12, "A");
+	GrLine(&expected_dc, 28, 7, 38, 16);
+	GrLine(&expected_dc, 38, 16, 28, 25);
+	GrLine(&expected_dc, 28, 25, 18, 16);
+	GrLine(&expected_dc, 18, 16, 28, 7);
+	Sprite3(&actual_dc, 3, 4, 0, records);
+	for (i = 0; i < 64 * 32; i++)
+		if (expected[i] != actual[i])
+			return 5;
 	Free(records);
 	Free(actual);
 	Free(expected);
