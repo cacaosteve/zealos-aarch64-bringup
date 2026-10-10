@@ -1485,14 +1485,6 @@ gr.dc2 = &bootstrap_graphics_dc;
 gr.text_base = bootstrap_text_base;
 gr.win_z_buf = bootstrap_win_z_buf;
 gr.win_uncovered_bitmap = bootstrap_win_uncovered;
-U0 BootstrapGrContextInit()
-{//Attach the active upstream gr global to the single bootstrap framebuffer.
-    CGrGlobals *active_gr = ZcActiveGrGlobals();
-
-    if (!active_gr)
-        active_gr = &gr;
-    active_gr->dc = active_gr->dc2 = &bootstrap_graphics_dc;
-}
 U0 BootstrapBindGrTaskTables(CGrGlobals *active_gr)
 {//Give each later source gr global the bridge's bounded window z tables.
     if (!active_gr)
@@ -1537,6 +1529,34 @@ I64 BootstrapGrPackedTablesChecks()
         bootstrap_text_colors[14] != 0x0E0E0E0E0E0E0E0E)
         return 0;
     return 0x2a;
+}
+U0 BootstrapGrContextInit()
+{//Attach upstream graphics globals to the initialized bootstrap surfaces.
+    CGrGlobals *active_gr = ZcActiveGrGlobals();
+
+    if (!active_gr)
+        active_gr = &gr;
+    bootstrap_graphics_dc.dc_signature = DCS_SIGNATURE_VAL;
+    bootstrap_planar_dc.dc_signature = DCS_SIGNATURE_VAL;
+    bootstrap_planar_cache_dc.dc_signature = DCS_SIGNATURE_VAL;
+    bootstrap_zoom_dc.dc_signature = DCS_SIGNATURE_VAL;
+    active_gr->screen_image = &bootstrap_graphics_dc;
+    active_gr->dc = active_gr->dc2 = &bootstrap_graphics_dc;
+    active_gr->dc1 = &bootstrap_planar_dc;
+    active_gr->dc_cache = &bootstrap_planar_cache_dc;
+    active_gr->zoomed_dc = &bootstrap_zoom_dc;
+    active_gr->text_base = bootstrap_text_base;
+    active_gr->screen_cache = bootstrap_present_cache;
+    if (active_gr->screen_zoom < 1 || active_gr->screen_zoom > 8)
+        active_gr->screen_zoom = 1;
+    BootstrapGrPackedTablesInit(active_gr);
+    BootstrapBindGrTaskTables(active_gr);
+    if (!bootstrap_present_cache_ready)
+    {
+        MemSet(bootstrap_present_cache, 0xFF, 800 * 600);
+        bootstrap_present_cache_ready = TRUE;
+    }
+    bootstrap_present_ready = TRUE;
 }
 
 Bool IsPixCovered0(CTask *task, I64 x, I64 y)
@@ -1622,7 +1642,6 @@ U0 GrSetUpTables()
     active_gr->highest_uncovered = 0;
 }
 // Dead-task reaping still requires the kernel scheduler's lifecycle queues.
-// WinMgr is compile-load tested, not started, yet.
 U0 TaskKillDying() {}
 // GodExterns.ZC globals used by DocPutKey F7 handlers.
 #define GOD_BAD_BITS	4
@@ -1806,6 +1825,11 @@ I64 BootstrapWinMgrStart()
         return 1;
     if (TaskValidate(sys_winmgr_task) && sys_winmgr_task != root)
         return 0x2a;
+
+    // Source WinMgrTask calls GrSetUpTables before its first refresh. Bind the
+    // display surfaces and packed tables before creating that task so startup
+    // has a complete graphics context from its first source-side call.
+    BootstrapGrContextInit();
 
     // WinMgrTask uses sys_winmgr_task as the task-ring sentinel while Spawn
     // inserts the new manager. Yield once so the real source task reaches its

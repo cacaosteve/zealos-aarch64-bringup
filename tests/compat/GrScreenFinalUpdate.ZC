@@ -8,6 +8,13 @@ extern I64 bootstrap_upstream_gr_update_tasks;
 extern I64 bootstrap_upstream_gr_update_screen;
 extern U16 bootstrap_win_z_buf[TEXT_COLS * TEXT_ROWS];
 extern U16 bootstrap_win_uncovered[(BOOTSTRAP_WIN_MAX + 16) / 16];
+extern CDC bootstrap_graphics_dc, bootstrap_planar_dc;
+extern CDC bootstrap_planar_cache_dc, bootstrap_zoom_dc;
+extern U32 bootstrap_text_base[TEXT_COLS * TEXT_ROWS];
+extern U8 bootstrap_present_cache[800 * 600];
+extern U64 bootstrap_text_bits[256], bootstrap_text_colors[16];
+extern Bool bootstrap_present_cache_ready, bootstrap_present_ready;
+extern U0 BootstrapGrContextInit();
 extern Bool BootstrapCanUseUpstreamGrUpdateTasks();
 extern Bool BootstrapWinIsUncovered(CTask *task);
 extern Bool ZcWinMouseUpdate();
@@ -286,17 +293,43 @@ I64 GrSetUpTablesSourceChecks()
 }
 
 I64 BootstrapGrContextInitChecks()
-{//The source-defined gr global starts zeroed until graphics init runs.
+{//A source manager must see its full bounded display context before first draw.
     CGrGlobals *active_gr = ZcActiveGrGlobals();
 
     if (!active_gr)
         return 1;
-    active_gr->dc = active_gr->dc2 = NULL;
+    active_gr->screen_image = active_gr->dc = active_gr->dc1 = NULL;
+    active_gr->dc2 = active_gr->dc_cache = active_gr->zoomed_dc = NULL;
+    active_gr->text_base = NULL;
+    active_gr->screen_cache = NULL;
+    active_gr->to_8_bits = active_gr->to_8_colors = NULL;
+    active_gr->win_z_buf = NULL;
+    active_gr->win_uncovered_bitmap = NULL;
+    active_gr->screen_zoom = 0;
+    bootstrap_present_cache[0] = 0;
+    bootstrap_present_cache_ready = FALSE;
+    bootstrap_present_ready = FALSE;
     BootstrapGrContextInit();
-    if (active_gr->dc != &bootstrap_graphics_dc ||
+    if (active_gr->screen_image != &bootstrap_graphics_dc ||
+        active_gr->dc != &bootstrap_graphics_dc ||
+        active_gr->dc1 != &bootstrap_planar_dc ||
         active_gr->dc2 != &bootstrap_graphics_dc ||
+        active_gr->dc_cache != &bootstrap_planar_cache_dc ||
+        active_gr->zoomed_dc != &bootstrap_zoom_dc ||
+        active_gr->text_base != bootstrap_text_base ||
+        active_gr->screen_cache != bootstrap_present_cache ||
+        active_gr->to_8_bits != bootstrap_text_bits ||
+        active_gr->to_8_colors != bootstrap_text_colors ||
+        active_gr->win_z_buf != bootstrap_win_z_buf ||
+        active_gr->win_uncovered_bitmap != bootstrap_win_uncovered ||
+        active_gr->screen_zoom != 1 ||
+        !bootstrap_present_cache_ready || !bootstrap_present_ready ||
+        bootstrap_present_cache[0] != 0xFF ||
         !active_gr->dc->body ||
-        active_gr->dc->dc_signature != DCS_SIGNATURE_VAL)
+        active_gr->dc->dc_signature != DCS_SIGNATURE_VAL ||
+        active_gr->dc1->dc_signature != DCS_SIGNATURE_VAL ||
+        active_gr->dc_cache->dc_signature != DCS_SIGNATURE_VAL ||
+        active_gr->zoomed_dc->dc_signature != DCS_SIGNATURE_VAL)
         return 0;
     return 0x2a;
 }
