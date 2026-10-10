@@ -39,3 +39,47 @@ I64 GrDCLifecycleChecks()
 	DCDel(dc);
 	return 42;
 }
+
+I64 GrDCCopyChecks()
+{
+	CDC *dc, *copy;
+	I32 *depth;
+
+	dc = DCNew(16, 2);
+	if (!dc || !dc->body || !dc->r)
+		return 1;
+	dc->body[3] = 0x44;
+	dc->body[31] = 0x99;
+	dc->r[1].i32[1] = 2;
+	depth = DCDepthBufAlloc(dc);
+	if (!depth || depth != dc->depth_buf || depth[0] != I32_MAX ||
+			depth[31] != I32_MAX)
+		return 2;
+	depth[0] = 123;
+	if (DCDepthBufReset(dc) != depth || depth[0] != I32_MAX ||
+			depth[31] != I32_MAX)
+		return 3;
+	depth[0] = 0x12345678;
+	depth[31] = 0x76543210;
+
+	copy = DCCopy(dc);
+	if (!copy || copy == dc || copy->dc_signature != DCS_SIGNATURE_VAL ||
+			copy->body == dc->body || copy->r == dc->r ||
+			copy->depth_buf == dc->depth_buf || copy->body[3] != 0x44 ||
+			copy->body[31] != 0x99 || copy->r[1].i32[1] != 2 ||
+			copy->depth_buf[0] != 0x12345678 ||
+			copy->depth_buf[31] != 0x76543210 || DCSize(copy) <= 0)
+		return 4;
+	copy->body[3] = 0xAA;
+	copy->r[1].i32[1] = 3;
+	copy->depth_buf[0] = 0x55;
+	if (dc->body[3] != 0x44 || dc->r[1].i32[1] != 2 ||
+			dc->depth_buf[0] != 0x12345678)
+		return 5;
+	DCDel(copy);
+	if (dc->dc_signature != DCS_SIGNATURE_VAL || dc->body[31] != 0x99 ||
+			dc->depth_buf[31] != 0x76543210)
+		return 6;
+	DCDel(dc);
+	return 42;
+}

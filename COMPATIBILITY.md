@@ -1969,5 +1969,7 @@ ZealOS live distribution or installer.
   `GrDCLifecycleChecks` also exercises the unchanged upstream `DCNew`,
   `DCAlias`, `DCDel`, and `DCSize`: allocated dimensions and identity matrix,
   alias bitmap sharing with an independent matrix, safe alias deletion, and
-  null-bitmap cleanup. Remaining work includes broader CDC operations such as
-  copy/depth-buffer ownership and automatic desktop startup.
+  null-bitmap cleanup. `GrDCCopyChecks` verifies independent bitmap, matrix,
+  and depth-buffer copies, plus depth-buffer initialization, reset, and safe
+  copy deletion. Remaining work includes broader CDC operation coverage and
+  automatic desktop startup.

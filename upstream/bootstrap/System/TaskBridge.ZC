@@ -1421,6 +1421,15 @@ U0 DCDel(CDC *dc)
 U0 DCDepthBufAlloc(CDC *dc)
 {
 }
+I64 *Mat4x4New(I64 *src, CTask *mem_task=NULL)
+{
+    I64 *res = MAlloc(16 * sizeof(I64), mem_task);
+    if (src)
+        MemCopy(res, src, 16 * sizeof(I64));
+    else
+        MemSet(res, 0, 16 * sizeof(I64));
+    return res;
+}
 I64 SpriteTypeMask(U8 *sprite)
 {
     return 0;
