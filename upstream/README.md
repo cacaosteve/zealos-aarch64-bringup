@@ -3047,6 +3047,15 @@ Freeze catalog unchanged.
 | Smoke | Add a separate `GrSpriteEllipseChecks` framebuffer smoke for horizontal and vertical extrema and an untouched center; full PCI graphics/window-manager compatibility probe passes |
 | Limits | Rotated ellipses, exact upstream trigonometric stepping, and all other unsupported sprite records remain open |
 
+## Milestone 265 — plot bounded zero-angle rotated rectangles
+
+| Item | Path |
+|--|--|
+| Gap | `SPT_ROTATED_RECT` records stopped the ARM64 sprite interpreter, including the axis-aligned case where no rotation math is needed |
+| Bring-up | Accept fixed-size rotated-rectangle records only when the stored angle is exactly zero, dimensions are positive and at most 4096, and filled area fits the remaining per-sprite work budget; route the accepted subset through the CDC rectangle renderer |
+| Smoke | Add a separate `GrSpriteRotatedRectChecks` framebuffer smoke for filled interior/bounds, unchanged CDC color, and rejection of nonzero angles; run the full PCI graphics/window-manager compatibility probe |
+| Limits | Nonzero rotations remain unsupported; rectangle limits are safety bounds for this bootstrap implementation, and other unsupported sprite records still stop interpretation |
+
 ## Open compatibility probe — `/System/Win.ZC`
 
 The source probe loads pinned `KernelC.HH`, `Externs.ZC`, and `Gr.HH` before compiling unchanged `Win.ZC`. Graphics dimensions and mouse globals are probe fixtures; `DrawMenu` and the initial `GrScaleZoom` definition are compile-time fixtures until unchanged `GrScreen.ZC` is loaded later in the probe. `GrScreenFinalUpdateChecks` executes `WinFinalUpdate` through the staged idle-frame path, confirms the fixture's `mouse_grid.coord` toggles the real coordinate-text overlay, checks a separate visible guest overlay callback, verifies the software arrow against Limine framebuffer pixels, and exercises `WinMouseUpdate`'s edge recentering through the runtime dispatch. `WinMousePointerStateCheck` covers transformed tablet coordinates and `WinMouseHardStateCheck` covers the source mouse-state ABI; manual UTM acceptance confirms the software pointer and window-demo mouse interaction. The raw ARM generic-timer binding and a standalone F64 clock expression are smoke-tested before the Win load.

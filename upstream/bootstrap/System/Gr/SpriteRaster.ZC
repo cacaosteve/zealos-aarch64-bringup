@@ -70,7 +70,7 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
     I64 line_err, line_e2;
     I64 polypt_bit, polypt_code;
     I32 sprite_x, sprite_y, width, height, x1, y1, x2, y2, radius, poly_count;
-    U64 ellipse_angle_bits;
+    U64 ellipse_angle_bits, rect_angle_bits;
     U8 type, pixel;
 
     if (!dc || dc->dc_signature != DCS_SIGNATURE_VAL || !sprite ||
@@ -103,6 +103,23 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
             pixel_budget += 8 * (width + height + 1);
             SpriteEllipse0(dc, x + old_x + x1, y + old_y + y1,
                            width, height);
+            size = 32;
+        }
+        else if (type == 13) // SPT_ROTATED_RECT, zero-angle subset
+        {
+            MemCopy(&x1, sprite + 4, sizeof(I32));
+            MemCopy(&y1, sprite + 8, sizeof(I32));
+            MemCopy(&x2, sprite + 12, sizeof(I32));
+            MemCopy(&y2, sprite + 16, sizeof(I32));
+            MemCopy(&rect_angle_bits, sprite + 24, sizeof(U64));
+            width = x2 - x1;
+            height = y2 - y1;
+            if (rect_angle_bits != 0 || width <= 0 || width > 4096 ||
+                    height <= 0 || height > 4096 ||
+                    width * height > 480000 - pixel_budget)
+                break;
+            pixel_budget += width * height;
+            GrRect(dc, x + old_x + x1, y + old_y + y1, width, height);
             size = 32;
         }
         else if (type == 1) // SPT_COLOR (one-byte foreground color)

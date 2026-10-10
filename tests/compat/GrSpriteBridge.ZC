@@ -313,3 +313,63 @@ I64 GrSpriteEllipseChecks()
     DCDel(plot_dc);
     return 42;
 }
+
+// Keep the fixed-size rotated rectangle record isolated from the broader
+// sprite smoke so its angle and filled-area bounds are easy to diagnose.
+I64 GrSpriteRotatedRectChecks()
+{
+    CDC *plot_dc;
+    U8 *records;
+    U8 record_type;
+    I32 x1, y1, x2, y2;
+    U64 angle_bits;
+    I64 rect_color;
+
+    plot_dc = DCNew(800, 600);
+    if (!plot_dc)
+        return 1;
+    plot_dc->color.c0 = 12;
+    records = CAlloc(33);
+    if (!records)
+        return 2;
+    record_type = SPT_ROTATED_RECT;
+    MemCopy(records, &record_type, sizeof(U8));
+    x1 = 20;
+    y1 = 30;
+    x2 = 25;
+    y2 = 34;
+    MemCopy(records + 4, &x1, sizeof(I32));
+    MemCopy(records + 8, &y1, sizeof(I32));
+    MemCopy(records + 12, &x2, sizeof(I32));
+    MemCopy(records + 16, &y2, sizeof(I32));
+    angle_bits = 0;
+    MemCopy(records + 24, &angle_bits, sizeof(U64));
+    if (SpriteTypeMask(records) != (1 << SPT_ROTATED_RECT))
+        return 3;
+    Sprite3(plot_dc, 400, 300, 0, records);
+    rect_color = gr_palette[12] & 0x00FFFFFF;
+    if (plot_dc->color.c0 != 12 ||
+            ZcFbTextPixel(420, 330) != rect_color ||
+            ZcFbTextPixel(424, 333) != rect_color ||
+            ZcFbTextPixel(425, 333) == rect_color)
+        return 4;
+
+    // Nonzero angles are still rejected before they can alter the frame.
+    x1 = 40;
+    y1 = 30;
+    x2 = 45;
+    y2 = 34;
+    MemCopy(records + 4, &x1, sizeof(I32));
+    MemCopy(records + 8, &y1, sizeof(I32));
+    MemCopy(records + 12, &x2, sizeof(I32));
+    MemCopy(records + 16, &y2, sizeof(I32));
+    angle_bits = 0x3FF0000000000000;
+    MemCopy(records + 24, &angle_bits, sizeof(U64));
+    Sprite3(plot_dc, 400, 300, 0, records);
+    if (ZcFbTextPixel(440, 330) == rect_color)
+        return 5;
+
+    Free(records);
+    DCDel(plot_dc);
+    return 42;
+}
