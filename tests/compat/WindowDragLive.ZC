@@ -39,7 +39,7 @@ U0 WindowDragLiveDrawA(CTask *task, CDC *dc)
     if (!task)
         return;
     window_drag_live_draw_a_count++;
-    TextLenStr(task, 2, 4, 21, WHITE << 8, "WINDOW A - drag title");
+    TextLenStr(task, 2, 4, 30, WHITE << 8, "WINDOW A - drag top border");
     TextLenStr(task, 2, 6, 25, WHITE << 8, "Resize lower-right corner");
 }
 
@@ -48,7 +48,7 @@ U0 WindowDragLiveDrawB(CTask *task, CDC *dc)
     if (!task)
         return;
     window_drag_live_draw_b_count++;
-    TextLenStr(task, 2, 4, 24, WHITE << 8, "WINDOW B - click to raise");
+    TextLenStr(task, 2, 4, 31, WHITE << 8, "WINDOW B - click to raise");
     TextLenStr(task, 2, 6, 25, WHITE << 8, "Resize lower-right corner");
     TextLenStr(task, 2, 8, 31, WHITE << 8, "Right-click / wheel the box below");
 }
@@ -144,6 +144,10 @@ I64 WindowDragLiveStartInternal(Bool with_control)
     }
     window_drag_live_a->display_flags = 1 << DISPLAYf_SHOW;
     window_drag_live_b->display_flags = 1 << DISPLAYf_SHOW;
+    // Make the upstream border/title drag band visible in the UTM smoke.
+    // Without this, the hit target exists but looks like empty background.
+    window_drag_live_a->border_attr = WHITE;
+    window_drag_live_b->border_attr = CYAN;
     window_drag_live_a->win_inhibit |= 1 << WIf_SELF_DOC;
     window_drag_live_b->win_inhibit |= 1 << WIf_SELF_DOC;
     window_drag_live_a->win_inhibit &= ~(1 << WIf_SELF_BORDER);
@@ -231,6 +235,9 @@ I64 WindowDragLiveRenderChecks()
         window_drag_live_b->win_top != 20 ||
         window_drag_live_b->win_bottom != 39)
         return 11;
+    if (window_drag_live_a->border_attr != WHITE ||
+        window_drag_live_b->border_attr != CYAN)
+        return 14;
     draw_a_before = window_drag_live_draw_a_count;
     draw_b_before = window_drag_live_draw_b_count;
     control_before = window_drag_live_control_draw_count;
