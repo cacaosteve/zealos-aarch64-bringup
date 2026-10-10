@@ -3017,7 +3017,7 @@ Freeze catalog unchanged.
 |--|--|
 | Gap | `SPT_CIRCLE` records stopped the ARM64 sprite interpreter |
 | Bring-up | Add a radius-limited midpoint circle path through clipped `GrPlot`, with per-sprite plotting work included in the interpreter budget |
-| Smoke | Extend `GrDC2SpriteChecks` with a circle in a multi-record stream; full PCI graphics/window-manager suite passes |
+| Smoke | Extend `GrDC2SpriteChecks` with a circle in a multi-record stream and assert its cardinal pixels while the center remains clear; full PCI graphics/window-manager suite passes |
 | Limits | Midpoint rasterization is a functional 2D subset, not yet pixel-identical to upstream `Circle`'s fixed-point trigonometric stepping; transforms, thick pens, dither, and other unsupported opcodes remain open |
 
 ## Open compatibility probe — `/System/Win.ZC`
