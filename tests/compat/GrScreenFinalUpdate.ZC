@@ -12,7 +12,7 @@ extern CDC bootstrap_graphics_dc, bootstrap_planar_dc;
 extern CDC bootstrap_planar_cache_dc, bootstrap_zoom_dc;
 extern U32 bootstrap_text_base[TEXT_COLS * TEXT_ROWS];
 extern U8 bootstrap_present_cache[800 * 600];
-extern U64 bootstrap_text_bits[256], bootstrap_text_colors[16];
+extern U64 bootstrap_text_bits[256], bootstrap_text_colors[256];
 extern Bool bootstrap_present_cache_ready, bootstrap_present_ready;
 extern I64 BootstrapGrCircleBoundsChecks();
 extern I64 BootstrapGrPenTablesChecks();

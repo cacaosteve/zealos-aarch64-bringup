@@ -1367,7 +1367,7 @@ U64 bootstrap_planar_cache[800 * 600 / 8];
 CDC bootstrap_planar_dc, bootstrap_planar_cache_dc;
 U32 bootstrap_present_raw[800 * 600];
 U8 bootstrap_present_cache[800 * 600];
-U64 bootstrap_text_colors[16];
+U64 bootstrap_text_colors[256];
 U64 bootstrap_text_bits[256];
 // Match GrSetUpTables' per-zoom allocated byte expansion tables.
 U8 *bootstrap_screen_zoom_tables[9];
@@ -1617,7 +1617,7 @@ U0 BootstrapGrPackedTablesInit(CGrGlobals *active_gr)
         return;
     if (!bootstrap_gr_packed_tables_ready)
     {
-        for (i = 0; i < 16; i++)
+        for (i = 0; i < 256; i++)
             bootstrap_text_colors[i] = i * 0x0101010101010101;
         for (i = 0; i < 256; i++)
         {
@@ -1643,7 +1643,8 @@ I64 BootstrapGrPackedTablesChecks()
         bootstrap_text_bits[0x01] != 0x00000000000000FF ||
         bootstrap_text_bits[0x55] != 0x00FF00FF00FF00FF ||
         bootstrap_text_bits[0x80] != 0xFF00000000000000 ||
-        bootstrap_text_colors[14] != 0x0E0E0E0E0E0E0E0E)
+        bootstrap_text_colors[14] != 0x0E0E0E0E0E0E0E0E ||
+        bootstrap_text_colors[0xA5] != 0xA5A5A5A5A5A5A5A5)
         return 0;
     return 0x2a;
 }
