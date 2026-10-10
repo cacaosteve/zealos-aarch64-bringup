@@ -1,0 +1,64 @@
+I64 GrDC2SpriteChecks()
+{
+    CDC *dc;
+    CDC *odd_dc;
+    U8 *bytes;
+    I64 i;
+    U8 actual, bitmap_type;
+    I32 x, y, width, height;
+    I64 row;
+
+    dc = DCNew(16, 2);
+    if (!dc || !dc->body)
+        return 1;
+    for (i = 0; i < 32; i++)
+        dc->body[i] = i ^ 0x5A;
+    bytes = DC2Sprite(dc);
+    if (!bytes)
+        return 2;
+    MemCopy(&bitmap_type, bytes, sizeof(U8));
+    MemCopy(&x, bytes + 4, sizeof(I32));
+    MemCopy(&y, bytes + 8, sizeof(I32));
+    MemCopy(&width, bytes + 12, sizeof(I32));
+    MemCopy(&height, bytes + 16, sizeof(I32));
+    if (bitmap_type != 23 || x || y || width != 16 || height != 2)
+        return 2;
+    for (i = 0; i < 32; i++) {
+        MemCopy(&actual, bytes + 20 + i, sizeof(U8));
+        if (actual != (i ^ 0x5A))
+            return 3;
+    }
+    MemCopy(&actual, bytes + 20 + 32, sizeof(U8));
+    if (actual != SPT_END)
+        return 4;
+    Free(bytes);
+    DCDel(dc);
+    odd_dc = DCNew(13, 2);
+    if (!odd_dc || !odd_dc->body || odd_dc->width_internal != 8)
+        return 5;
+    for (i = 0; i < 16; i++)
+        odd_dc->body[i] = i + 1;
+    bytes = DC2Sprite(odd_dc);
+    if (!bytes)
+        return 6;
+    for (row = 0; row < 2; row++) {
+        for (i = 0; i < 8; i++) {
+            MemCopy(&actual, bytes + 20 + row * 16 + i, sizeof(U8));
+            if (actual != (row * 8 + i + 1))
+                return 7;
+        }
+        for (i = 8; i < 16; i++) {
+            MemCopy(&actual, bytes + 20 + row * 16 + i, sizeof(U8));
+            if (actual)
+                return 8;
+        }
+    }
+    MemCopy(&actual, bytes + 20 + 32, sizeof(U8));
+    if (actual != SPT_END)
+        return 9;
+    Free(bytes);
+    DCDel(odd_dc);
+    if (DC2Sprite(NULL))
+        return 10;
+    return 42;
+}

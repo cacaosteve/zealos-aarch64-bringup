@@ -380,6 +380,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                         'zc: loaded /System/Gr/GrInitA.ZC')
                 command('zload /System/Gr/Gr.HH',
                         'zc: loaded /System/Gr/Gr.HH')
+                command('zload /System/Gr/SpriteBridge.ZC',
+                        'zc: loaded /System/Gr/SpriteBridge.ZC')
                 command('zload /System/Gr/GrExterns.ZC',
                         'zc: loaded /System/Gr/GrExterns.ZC')
                 command('zload /System/Gr/GrGlobals.ZC',
@@ -394,6 +396,10 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                         'zc: loaded /System/Gr/GrPalette.ZC')
                 command('zload /System/Gr/GrDC.ZC',
                         'zc: loaded /System/Gr/GrDC.ZC', timeout=30)
+                command('zload /Tests/GrSpriteBridge.ZC',
+                        'zc: loaded /Tests/GrSpriteBridge.ZC')
+                command('zcall GrDC2SpriteChecks',
+                        'zc => 0x000000000000002a')
                 command('zload /System/Gr/GrBitMap.ZC',
                         'zc: loaded /System/Gr/GrBitMap.ZC', timeout=30)
                 command('zload /Tests/GrDCLifecycle.ZC',

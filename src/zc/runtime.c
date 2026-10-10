@@ -4019,6 +4019,7 @@ int zc_start_graphics(void) {
         "/System/Externs.ZC",
         "/System/Gr/GrInitA.ZC",
         "/System/Gr/Gr.HH",
+        "/System/Gr/SpriteBridge.ZC",
         "/System/Gr/GrExterns.ZC",
         "/System/Gr/GrGlobals.ZC",
         "/System/Gr/GrPalette.ZC",

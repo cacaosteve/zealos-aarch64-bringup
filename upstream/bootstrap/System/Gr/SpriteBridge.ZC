@@ -1,0 +1,37 @@
+// ARM64 implementation of the upstream CDC-to-sprite conversion.
+// Gr.HH keeps the concrete sprite-record classes private, so this bridge
+// writes the stable ZealOS bitmap-record byte layout directly.
+U8 *DC2Sprite(CDC *dc)
+{
+    U8 *sprite;
+    I64 sprite_stride, copy_width, row;
+    U8 bitmap_type;
+    I32 zero;
+
+    if (!dc || dc->dc_signature != DCS_SIGNATURE_VAL || !dc->body ||
+            dc->width <= 0 || dc->width > I32_MAX - 7 || dc->height <= 0 ||
+            dc->width_internal <= 0)
+        return NULL;
+    // Sprite bitmap rows are padded up to eight pixels. The bootstrap CDC
+    // currently rounds width_internal down, so copy each available row into
+    // a zero-filled sprite row instead of treating the source as contiguous.
+    sprite_stride = (dc->width + 7) & ~7;
+    copy_width = dc->width_internal;
+    if (copy_width > sprite_stride)
+        copy_width = sprite_stride;
+    sprite = CAlloc(20 + sprite_stride * dc->height + 1);
+    if (!sprite)
+        return NULL;
+    bitmap_type = 23; // SPT_BITMAP
+    MemCopy(sprite, &bitmap_type, sizeof(U8));
+    zero = 0;
+    MemCopy(sprite + 4, &zero, sizeof(I32));
+    MemCopy(sprite + 8, &zero, sizeof(I32));
+    MemCopy(sprite + 12, &dc->width, sizeof(I32));
+    MemCopy(sprite + 16, &dc->height, sizeof(I32));
+    for (row = 0; row < dc->height; row++)
+        MemCopy(sprite + 20 + row * sprite_stride,
+                dc->body + row * dc->width_internal, copy_width);
+    // CAlloc leaves the trailing SPT_END byte zeroed.
+    return sprite;
+}

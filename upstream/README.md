@@ -2975,6 +2975,15 @@ Freeze catalog unchanged.
 | Smoke | `BootstrapGrContextInitChecks` verifies black and white entries in the active source `gr_palette`; the full PCI live-manager, wake, window-control, input, and drag/resize probe passes |
 | Limits | Standard palette selection does not implement other palette modes, hardware palette programming, complete graphics-table setup, or normal menu/desktop startup |
 
+## Milestone 257 — convert a CDC into a ZealOS bitmap sprite
+
+| Item | Path |
+|--|--|
+| Gap | Upstream `DocGR` calls `DC2Sprite`, but the ARM64 bootstrap left the symbol unresolved |
+| Bring-up | Add a source-compatible `DC2Sprite` bridge after `Gr.HH` is loaded. It serializes the unchanged bitmap sprite record, copies the CDC's padded pixel rows, and appends the zero `SPT_END` record |
+| Smoke | `GrDC2SpriteChecks` verifies type, origin, dimensions, all pixel bytes, end marker, and null-input behavior; the complete PCI graphics/window-manager compatibility probe passes |
+| Limits | The bridge supports CDC-to-bitmap conversion only. The broader sprite-record size/type-mask/plot subsystem and graphics table initialization remain unfinished |
+
 ## Open compatibility probe — `/System/Win.ZC`
 
 The source probe loads pinned `KernelC.HH`, `Externs.ZC`, and `Gr.HH` before compiling unchanged `Win.ZC`. Graphics dimensions and mouse globals are probe fixtures; `DrawMenu` and the initial `GrScaleZoom` definition are compile-time fixtures until unchanged `GrScreen.ZC` is loaded later in the probe. `GrScreenFinalUpdateChecks` executes `WinFinalUpdate` through the staged idle-frame path, confirms the fixture's `mouse_grid.coord` toggles the real coordinate-text overlay, checks a separate visible guest overlay callback, verifies the software arrow against Limine framebuffer pixels, and exercises `WinMouseUpdate`'s edge recentering through the runtime dispatch. `WinMousePointerStateCheck` covers transformed tablet coordinates and `WinMouseHardStateCheck` covers the source mouse-state ABI; manual UTM acceptance confirms the software pointer and window-demo mouse interaction. The raw ARM generic-timer binding and a standalone F64 clock expression are smoke-tested before the Win load.
