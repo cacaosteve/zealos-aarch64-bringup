@@ -1971,5 +1971,7 @@ ZealOS live distribution or installer.
   alias bitmap sharing with an independent matrix, safe alias deletion, and
   null-bitmap cleanup. `GrDCCopyChecks` verifies independent bitmap, matrix,
   and depth-buffer copies, plus depth-buffer initialization, reset, and safe
-  copy deletion. Remaining work includes broader CDC operation coverage and
+  copy deletion. `GrDCRoundTripChecks` saves and reloads an indexed CDC in
+  memory, verifying dimensions, pixels, signature, and a fresh identity
+  matrix. Remaining work includes broader CDC operation coverage and
   automatic desktop startup.

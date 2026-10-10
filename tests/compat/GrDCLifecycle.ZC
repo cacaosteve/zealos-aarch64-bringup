@@ -83,3 +83,41 @@ I64 GrDCCopyChecks()
 	DCDel(dc);
 	return 42;
 }
+
+I64 GrDCRoundTripChecks()
+{
+	CDC *dc, *loaded;
+	U8 *saved;
+	I64 size, loaded_size;
+
+	dc = DCNew(16, 2);
+	if (!dc)
+		return 1;
+	dc->body[0] = 1;
+	dc->body[7] = 7;
+	dc->body[16] = 9;
+	dc->body[31] = 15;
+	saved = DCSave(dc, &size);
+	if (!saved || size <= 32)
+		return 2;
+	loaded_size = 0;
+	loaded = DCLoad(saved, &loaded_size);
+	if (!loaded || loaded->dc_signature != DCS_SIGNATURE_VAL ||
+			loaded->width != 16 || loaded->width_internal != 16 ||
+			loaded->height != 2 || !loaded->body || !loaded->r ||
+			loaded->body[0] != 1 || loaded->body[7] != 7 ||
+			loaded->body[16] != 9 || loaded->body[31] != 15 ||
+			loaded_size != size || loaded->r[0].i32[1] != 1 ||
+			loaded->r[5].i32[1] != 1 || loaded->r[10].i32[1] != 1 ||
+			loaded->r[15].i32[1] != 1)
+		return 3;
+	loaded->body[7] = 0xCC;
+	if (dc->body[7] != 7)
+		return 4;
+	DCDel(loaded);
+	Free(saved);
+	if (dc->dc_signature != DCS_SIGNATURE_VAL || dc->body[7] != 7)
+		return 5;
+	DCDel(dc);
+	return 42;
+}
