@@ -1453,6 +1453,7 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
     I64 poly_i, poly_x1, poly_y1, poly_dx, poly_dy, poly_work, poly_total;
     I64 line_x, line_y, line_dx, line_dy, line_sx, line_sy;
     I64 line_err, line_e2;
+    I64 polypt_bit, polypt_code;
     I32 sprite_x, sprite_y, width, height, x1, y1, x2, y2, radius, poly_count;
     U8 type, pixel;
 
@@ -1636,6 +1637,44 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
                 }
             }
             size = 8 + poly_count * 8;
+        }
+        else if (type == 9) // SPT_POLYPT
+        {
+            MemCopy(&poly_count, sprite + 4, sizeof(I32));
+            if (poly_count < 0 ||
+                    poly_count >= 480000 - pixel_budget)
+                break;
+            MemCopy(&poly_x1, sprite + 8, sizeof(I32));
+            MemCopy(&poly_y1, sprite + 12, sizeof(I32));
+            // The upstream record stores a start point and then `num`
+            // packed 3-bit moves in NW,N,NE,W,E,SW,S,SE order.
+            pixel_budget += poly_count + 1;
+            size = 16 + (3 * poly_count + 7) / 8;
+            poly_count *= 3;
+            GrPlot(dc, x + old_x + poly_x1, y + old_y + poly_y1);
+            polypt_bit = 0;
+            while (polypt_bit < poly_count)
+            {
+                MemCopy(&pixel, sprite + 16 + polypt_bit / 8, sizeof(U8));
+                polypt_code = pixel >> (polypt_bit & 7);
+                if ((polypt_bit & 7) > 5)
+                {
+                    MemCopy(&pixel, sprite + 17 + polypt_bit / 8,
+                            sizeof(U8));
+                    polypt_code |= pixel << (8 - (polypt_bit & 7));
+                }
+                polypt_code &= 7;
+                if (polypt_code == 0 || polypt_code == 3 || polypt_code == 5)
+                    poly_x1--;
+                else if (polypt_code == 2 || polypt_code == 4 || polypt_code == 7)
+                    poly_x1++;
+                if (polypt_code <= 2)
+                    poly_y1--;
+                else if (polypt_code >= 5)
+                    poly_y1++;
+                polypt_bit += 3;
+                GrPlot(dc, x + old_x + poly_x1, y + old_y + poly_y1);
+            }
         }
         else if (type == 23) // SPT_BITMAP
         {
