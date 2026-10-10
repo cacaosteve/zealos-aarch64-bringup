@@ -2347,7 +2347,7 @@ Bool GrLine(CDC *dc=gr.dc, I64 x1=0, I64 y1=0, I64 x2=0, I64 y2=0,
             I64 step=1, I64 start=0)
 {
     CTask *task;
-    I64 left, top, right, bottom;
+    I64 left, top, right, bottom, thick, line_shift, dx, dy, line_step;
     if (!dc || step < 1 || start < 0)
         return FALSE;
     task = dc->win_task;
@@ -2371,8 +2371,45 @@ Bool GrLine(CDC *dc=gr.dc, I64 x1=0, I64 y1=0, I64 x2=0, I64 y2=0,
         right = dc->width - 1;
         bottom = dc->height - 1;
     }
-    return ZcFbGraphLine(x1, y1, x2, y2, dc->color.c0 & 0xff,
-                         step, start, left, top, right, bottom);
+    thick = dc->thick;
+    if (thick <= 1)
+        return ZcFbGraphLine(x1, y1, x2, y2, dc->color.c0 & 0xff,
+                             step, start, left, top, right, bottom);
+    // Keep the bootstrap line path bounded. ZealOS's normal GrLine3 applies
+    // CDC pen thickness; use parallel clipped lines along the narrow axis.
+    if (thick > 64)
+        return FALSE;
+    dx = x2 - x1;
+    dy = y2 - y1;
+    if (dx < 0) dx = -dx;
+    if (dy < 0) dy = -dy;
+    for (line_step = 0; line_step < thick; line_step++)
+    {
+        line_shift = line_step - (thick - 1) / 2;
+        if (dx >= dy)
+        {
+            y1 += line_shift;
+            y2 += line_shift;
+        }
+        else
+        {
+            x1 += line_shift;
+            x2 += line_shift;
+        }
+        ZcFbGraphLine(x1, y1, x2, y2, dc->color.c0 & 0xff,
+                step, start, left, top, right, bottom);
+        if (dx >= dy)
+        {
+            y1 -= line_shift;
+            y2 -= line_shift;
+        }
+        else
+        {
+            x1 -= line_shift;
+            x2 -= line_shift;
+        }
+    }
+    return TRUE;
 }
 #define WIN_SCROLL_SIZE 8
 #define WIN_SCROLL_BORDER_BONUS 4

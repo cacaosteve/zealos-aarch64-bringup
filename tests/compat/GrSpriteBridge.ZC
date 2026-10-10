@@ -343,7 +343,7 @@ I64 GrSpriteDitherChecks()
     U8 dither_type, point_type;
     U16 dither_colors;
     I32 x, y;
-    I64 color0, color1;
+    I64 color0, color1, old_color;
 
     plot_dc = DCNew(800, 600);
     if (!plot_dc)
@@ -369,12 +369,59 @@ I64 GrSpriteDitherChecks()
     if (SpriteTypeMask(records) !=
             ((1 << SPT_DITHER_COLOR) + (1 << SPT_PT)))
         return 3;
+    old_color = plot_dc->color;
     Sprite3(plot_dc, 400, 300, 0, records);
     color0 = gr_palette[5] & 0x00FFFFFF;
     color1 = gr_palette[9] & 0x00FFFFFF;
     if (ZcFbTextPixel(401, 301) != color0 ||
             ZcFbTextPixel(402, 301) != color1 ||
-            plot_dc->color.c0 != 12)
+            plot_dc->color != old_color)
+        return 4;
+    Free(records);
+    DCDel(plot_dc);
+    return 42;
+}
+
+I64 GrSpriteThickChecks()
+{
+    CDC *plot_dc;
+    U8 *records;
+    U8 thick_type, line_type;
+    I32 thickness, x1, y1, x2, y2;
+    I64 line_color;
+
+    plot_dc = DCNew(800, 600);
+    if (!plot_dc)
+        return 1;
+    plot_dc->color.c0 = 14;
+    records = CAlloc(29);
+    if (!records)
+        return 2;
+    thick_type = SPT_THICK;
+    line_type = SPT_LINE;
+    thickness = 3;
+    MemCopy(records, &thick_type, sizeof(U8));
+    MemCopy(records + 4, &thickness, sizeof(I32));
+    MemCopy(records + 8, &line_type, sizeof(U8));
+    x1 = 1;
+    y1 = 1;
+    x2 = 5;
+    y2 = 1;
+    MemCopy(records + 12, &x1, sizeof(I32));
+    MemCopy(records + 16, &y1, sizeof(I32));
+    MemCopy(records + 20, &x2, sizeof(I32));
+    MemCopy(records + 24, &y2, sizeof(I32));
+    if (SpriteTypeMask(records) !=
+            ((1 << SPT_THICK) + (1 << SPT_LINE)))
+        return 3;
+    Sprite3(plot_dc, 400, 300, 0, records);
+    line_color = gr_palette[14] & 0x00FFFFFF;
+    if (ZcFbTextPixel(403, 300) != line_color ||
+            ZcFbTextPixel(403, 301) != line_color ||
+            ZcFbTextPixel(403, 302) != line_color ||
+            ZcFbTextPixel(403, 299) == line_color ||
+            ZcFbTextPixel(403, 303) == line_color ||
+            plot_dc->thick != 1)
         return 4;
     Free(records);
     DCDel(plot_dc);

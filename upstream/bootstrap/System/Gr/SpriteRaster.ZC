@@ -112,7 +112,7 @@ I64 SpriteRotatedRect0(CDC *dc, I64 x, I64 y, I32 x1, I32 y1,
 
 U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
 {
-    I64 row, col, stride, old_color, old_x, old_y, size, records, pixel_budget;
+    I64 row, col, stride, old_color, old_thick, old_x, old_y, size, records, pixel_budget;
     I64 circle_x, circle_y, circle_err;
     I64 poly_i, poly_x1, poly_y1, poly_dx, poly_dy, poly_work, poly_total;
     I64 line_x, line_y, line_dx, line_dy, line_sx, line_sy;
@@ -126,7 +126,8 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
             x < -1073741824 || x > 1073741824 ||
             y < -1073741824 || y > 1073741824)
         return;
-    old_color = dc->color.c0;
+    old_color = dc->color;
+    old_thick = dc->thick;
     old_x = old_y = 0;
     records = 0;
     pixel_budget = 0;
@@ -195,6 +196,14 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
             dc->color = 0x40000000 | (width & 0xFF) |
                     ((width & 0xFF00) << 8);
             size = 4;
+        }
+        else if (type == 3) // SPT_THICK
+        {
+            MemCopy(&radius, sprite + 4, sizeof(I32));
+            if (radius < 1 || radius > 64)
+                break;
+            dc->thick = radius;
+            size = 8;
         }
         else if (type == 7) // SPT_SHIFT
         {
@@ -420,5 +429,6 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
             break; // Unported variable-sized record: do not guess its length.
         sprite += size;
     }
-    dc->color.c0 = old_color;
+    dc->color = old_color;
+    dc->thick = old_thick;
 }
