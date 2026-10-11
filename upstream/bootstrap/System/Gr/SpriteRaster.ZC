@@ -467,10 +467,10 @@ I64 SpriteBezierRaster0(CDC *dc, I64 ox, I64 oy, CD3I32 *points,
 }
 
 I64 SpriteBSpline0(CDC *dc, I64 ox, I64 oy, U8 *sprite, I64 type,
-        I64 pixel_limit)
+        Bool transform_enabled, I64 z, I64 pixel_limit)
 {
     I64 count, closed, order, control_count, i, j, axis, coord;
-    I64 work, total_work, raster_work;
+    I64 work, total_work, raster_work, screen_x, screen_y;
     I32 count32;
     CD3I32 *input, *control;
 
@@ -513,7 +513,23 @@ I64 SpriteBSpline0(CDC *dc, I64 ox, I64 oy, U8 *sprite, I64 type,
             return -1;
         }
         input[i].z = 0;
+        if (transform_enabled)
+        {
+            if (!SpriteTransformPoint0(dc, TRUE, ox + input[i].x,
+                    oy + input[i].y, z, &screen_x, &screen_y) ||
+                    screen_x < -1048576 || screen_x > 1048576 ||
+                    screen_y < -1048576 || screen_y > 1048576)
+            {
+                Free(control);
+                Free(input);
+                return -1;
+            }
+            input[i].x = screen_x;
+            input[i].y = screen_y;
+        }
     }
+    if (transform_enabled)
+        ox = oy = 0;
 
     if (order == 2 && !closed)
     {
@@ -1471,7 +1487,7 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
             if (poly_count < 3 || poly_count > 64)
                 break;
             size = SpriteBSpline0(dc, x + old_x, y + old_y, sprite, type,
-                    480000 - pixel_budget);
+                    transform_enabled, z, 480000 - pixel_budget);
             if (size < 0)
                 break;
             pixel_budget += size;

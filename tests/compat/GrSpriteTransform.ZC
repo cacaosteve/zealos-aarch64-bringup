@@ -8,9 +8,10 @@ I64 GrSpriteTransformChecks()
     I32 x, y;
     U64 angle;
     I64 i, color;
+    CD3I32 point;
 
     dc = DCNew(800, 600);
-    records = CAlloc(401);
+    records = CAlloc(491);
     if (!dc || !records || !dc->r || !dc->transform)
         return 1;
     dc->color.c0 = 12;
@@ -205,6 +206,32 @@ I64 GrSpriteTransformChecks()
     MemCopy(records + 395, &y, sizeof(I32));
     MemCopy(records + 399, &pixel, sizeof(U8));
 
+    type = SPT_TRANSFORM_ON;
+    MemCopy(records + 400, &type, sizeof(U8));
+    type = SPT_BSPLINE2;
+    MemCopy(records + 401, &type, sizeof(U8));
+    x = 3;
+    MemCopy(records + 405, &x, sizeof(I32));
+    point.x = 10; point.y = 20; point.z = 0;
+    MemCopy(records + 409, &point, sizeof(CD3I32));
+    point.x = 20; point.y = 10;
+    MemCopy(records + 421, &point, sizeof(CD3I32));
+    point.x = 30; point.y = 20;
+    MemCopy(records + 433, &point, sizeof(CD3I32));
+
+    type = SPT_TRANSFORM_OFF;
+    MemCopy(records + 445, &type, sizeof(U8));
+    type = SPT_BSPLINE2;
+    MemCopy(records + 446, &type, sizeof(U8));
+    x = 3;
+    MemCopy(records + 450, &x, sizeof(I32));
+    point.x = 10; point.y = 20;
+    MemCopy(records + 454, &point, sizeof(CD3I32));
+    point.x = 20; point.y = 10;
+    MemCopy(records + 466, &point, sizeof(CD3I32));
+    point.x = 30; point.y = 20;
+    MemCopy(records + 478, &point, sizeof(CD3I32));
+
     color = gr_palette[12] & 0x00FFFFFF;
     Sprite3(dc, dc->x, dc->y, dc->z, records);
     if (ZcFbTextPixel(593, 453) != color ||
@@ -225,7 +252,11 @@ I64 GrSpriteTransformChecks()
             ZcFbTextPixel(600, 441) != color ||
             ZcFbTextPixel(599, 441) != color ||
             ZcFbTextPixel(620, 440) != color ||
-            ZcFbTextPixel(621, 441) != color)
+            ZcFbTextPixel(621, 441) != color ||
+            ZcFbTextPixel(590, 440) != color ||
+            ZcFbTextPixel(590, 460) != color ||
+            ZcFbTextPixel(620, 450) != color ||
+            ZcFbTextPixel(640, 450) != color)
         return 2;
     if (ZcFbTextPixel(585, 445) == color)
         return 3;
