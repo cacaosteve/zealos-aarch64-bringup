@@ -7,11 +7,11 @@ I64 GrSpriteTransformChecks()
     U8 type, pixel;
     I32 x, y;
     U64 angle;
-    I64 i, color;
+    I64 i, color, glyph_row, glyph_col, scan_i, scan_j;
     CD3I32 point;
 
     dc = DCNew(800, 600);
-    records = CAlloc(607);
+    records = CAlloc(637);
     if (!dc || !records || !dc->r || !dc->transform)
         return 1;
     dc->color.c0 = 12;
@@ -285,6 +285,34 @@ I64 GrSpriteTransformChecks()
     MemCopy(records + 598, &pixel, sizeof(U8));
     MemCopy(records + 599, &pixel, sizeof(U8));
 
+    type = SPT_TRANSFORM_ON;
+    MemCopy(records + 606, &type, sizeof(U8));
+    type = SPT_TEXT;
+    MemCopy(records + 607, &type, sizeof(U8));
+    x = 120; y = 60;
+    MemCopy(records + 611, &x, sizeof(I32));
+    MemCopy(records + 615, &y, sizeof(I32));
+    records[619] = 'A';
+
+    type = SPT_TRANSFORM_OFF;
+    MemCopy(records + 621, &type, sizeof(U8));
+    type = SPT_TEXT;
+    MemCopy(records + 622, &type, sizeof(U8));
+    x = 120; y = 60;
+    MemCopy(records + 626, &x, sizeof(I32));
+    MemCopy(records + 630, &y, sizeof(I32));
+    records[634] = 'A';
+
+    glyph_row = glyph_col = -1;
+    for (scan_i = 0; scan_i < FONT_HEIGHT && glyph_row < 0; scan_i++)
+        for (scan_j = 0; scan_j < FONT_WIDTH; scan_j++)
+            if (Bt(text.font(U8 *) + FONT_HEIGHT * 'A' + scan_i, scan_j))
+            {
+                glyph_row = scan_i;
+                glyph_col = scan_j;
+                break;
+            }
+
     color = gr_palette[12] & 0x00FFFFFF;
     Sprite3(dc, dc->x, dc->y, dc->z, records);
     if (ZcFbTextPixel(593, 453) != color ||
@@ -323,6 +351,10 @@ I64 GrSpriteTransformChecks()
             ZcFbTextPixel(710, 481) != color ||
             ZcFbTextPixel(711, 481) != color)
         return 2;
+    if (glyph_row < 0 || ZcFbTextPixel(550 - glyph_row,
+            550 + glyph_col) != color ||
+            ZcFbTextPixel(730 + glyph_col, 490 + glyph_row) != color)
+        return 5;
     if (ZcFbTextPixel(585, 445) == color)
         return 3;
     if (dc->flags & DCF_TRANSFORMATION)
