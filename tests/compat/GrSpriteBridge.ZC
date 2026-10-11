@@ -323,13 +323,15 @@ I64 GrSpriteEllipseChecks()
             ZcFbTextPixel(480, 320) == ellipse_color)
         return 5;
 
-    // Preserve fail-closed behavior for angles between cardinal directions.
+    // An arbitrary angle rotates the ellipse outline around its center.
     x = 100;
     MemCopy(records + 4, &x, sizeof(I32));
     angle_bits = 0x3FF0000000000000;
     MemCopy(records + 24, &angle_bits, sizeof(U64));
     Sprite3(plot_dc, 400, 300, 0, records);
-    if (ZcFbTextPixel(504, 320) == ellipse_color)
+    if (ZcFbTextPixel(502, 317) != ellipse_color ||
+            ZcFbTextPixel(498, 323) != ellipse_color ||
+            ZcFbTextPixel(504, 320) == ellipse_color)
         return 6;
     Free(records);
     DCDel(plot_dc);
