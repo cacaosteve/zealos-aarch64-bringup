@@ -1,4 +1,5 @@
 extern I64 ZcFbTextPixel(I64 x, I64 y);
+extern I64 ZcFbGraphColor(I64 color);
 
 I64 GrSpriteTransformChecks()
 {
@@ -11,7 +12,7 @@ I64 GrSpriteTransformChecks()
     CD3I32 point;
 
     dc = DCNew(800, 600);
-    records = CAlloc(667);
+    records = CAlloc(681);
     if (!dc || !records || !dc->r || !dc->transform)
         return 1;
     dc->color.c0 = 12;
@@ -321,6 +322,16 @@ I64 GrSpriteTransformChecks()
     MemCopy(records + 660, &y, sizeof(I32));
     records[664] = 'A';
 
+    // Fill coordinates follow the active transform, while the fill remains
+    // connected in the destination framebuffer's pixel space.
+    type = SPT_TRANSFORM_ON;
+    MemCopy(records + 667, &type, sizeof(U8));
+    type = SPT_FLOOD_FILL;
+    MemCopy(records + 668, &type, sizeof(U8));
+    x = 100; y = 200;
+    MemCopy(records + 672, &x, sizeof(I32));
+    MemCopy(records + 676, &y, sizeof(I32));
+
     glyph_row = glyph_col = -1;
     for (scan_i = 0; scan_i < FONT_HEIGHT && glyph_row < 0; scan_i++)
         for (scan_j = 0; scan_j < FONT_WIDTH; scan_j++)
@@ -384,6 +395,29 @@ I64 GrSpriteTransformChecks()
             ZcFbTextPixel(480, 589) != color ||
             ZcFbTextPixel(484 - glyph_row, 596 + glyph_col) != color)
         return 6;
+    dc->color.c0 = 15;
+    for (scan_i = 409; scan_i <= 413; scan_i++)
+    {
+        GrPlot(dc, scan_i, 529);
+        GrPlot(dc, scan_i, 533);
+    }
+    for (scan_i = 530; scan_i <= 532; scan_i++)
+    {
+        GrPlot(dc, 409, scan_i);
+        GrPlot(dc, 413, scan_i);
+    }
+    dc->color.c0 = 0;
+    for (scan_i = 410; scan_i <= 412; scan_i++)
+        for (scan_j = 530; scan_j <= 532; scan_j++)
+            GrPlot(dc, scan_i, scan_j);
+    dc->color.c0 = 15;
+    GrPlot(dc, 100, 200);
+    dc->color.c0 = 12;
+    Sprite3(dc, 0, 0, 0, records + 667);
+    if (ZcFbTextPixel(411, 531) != ZcFbGraphColor(12) ||
+            ZcFbTextPixel(409, 530) != ZcFbGraphColor(15) ||
+            ZcFbTextPixel(100, 200) != ZcFbGraphColor(15))
+        return 7;
     if (ZcFbTextPixel(585, 445) == color)
         return 3;
     if (dc->flags & DCF_TRANSFORMATION)

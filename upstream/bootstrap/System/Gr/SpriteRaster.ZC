@@ -1470,8 +1470,13 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
         {
             MemCopy(&x1, sprite + 4, sizeof(I32));
             MemCopy(&y1, sprite + 8, sizeof(I32));
-            size = SpriteFloodFill0(dc, x + old_x + x1, y + old_y + y1,
-                    type == 22, 480000 - pixel_budget);
+            if (SpriteTransformPoint0(dc, transform_enabled,
+                    x + old_x + x1, y + old_y + y1, z,
+                    &screen_x1, &screen_y1))
+                size = SpriteFloodFill0(dc, screen_x1, screen_y1, type == 22,
+                        480000 - pixel_budget);
+            else
+                size = 0;
             if (size < 0 || size > 480000 - pixel_budget)
                 break;
             pixel_budget += size;
