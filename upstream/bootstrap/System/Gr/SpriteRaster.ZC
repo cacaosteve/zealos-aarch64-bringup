@@ -1432,14 +1432,26 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
             {
                 MemCopy(&poly_x1, sprite + 8, sizeof(I32));
                 MemCopy(&poly_y1, sprite + 12, sizeof(I32));
+                if (!SpriteTransformPoint0(dc, transform_enabled,
+                        x + old_x + poly_x1, y + old_y + poly_y1, z,
+                        &screen_x1, &screen_y1))
+                    poly_total = -1;
                 // Validate segment work before drawing so a bad later segment
                 // cannot leave a partially rendered record behind.
-                for (poly_i = 1; poly_i < poly_count; poly_i++)
+                for (poly_i = 1; poly_i < poly_count && poly_total >= 0;
+                        poly_i++)
                 {
                     MemCopy(&x2, sprite + 8 + poly_i * 8, sizeof(I32));
                     MemCopy(&y2, sprite + 12 + poly_i * 8, sizeof(I32));
-                    poly_dx = x2 - poly_x1;
-                    poly_dy = y2 - poly_y1;
+                    if (!SpriteTransformPoint0(dc, transform_enabled,
+                            x + old_x + x2, y + old_y + y2, z,
+                            &screen_x2, &screen_y2))
+                    {
+                        poly_total = -1;
+                        break;
+                    }
+                    poly_dx = screen_x2 - screen_x1;
+                    poly_dy = screen_y2 - screen_y1;
                     if (poly_dx < 0) poly_dx = -poly_dx;
                     if (poly_dy < 0) poly_dy = -poly_dy;
                     if (poly_dx > poly_dy)
@@ -1455,6 +1467,8 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
                     poly_total += poly_work;
                     poly_x1 = x2;
                     poly_y1 = y2;
+                    screen_x1 = screen_x2;
+                    screen_y1 = screen_y2;
                 }
                 if (poly_total < 0)
                     break;
@@ -1465,13 +1479,23 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
                 {
                     MemCopy(&x2, sprite + 8 + poly_i * 8, sizeof(I32));
                     MemCopy(&y2, sprite + 12 + poly_i * 8, sizeof(I32));
+                    if (!SpriteTransformPoint0(dc, transform_enabled,
+                            x + old_x + poly_x1, y + old_y + poly_y1, z,
+                            &screen_x1, &screen_y1) ||
+                            !SpriteTransformPoint0(dc, transform_enabled,
+                            x + old_x + x2, y + old_y + y2, z,
+                            &screen_x2, &screen_y2))
+                    {
+                        poly_total = -1;
+                        break;
+                    }
                     // Use the CDC point path as SPT_PT and circles do. GrLine
                     // has not yet passed equivalent bootstrap framebuffer
                     // checks; this Bresenham loop uses the validated work.
-                    line_x = poly_x1;
-                    line_y = poly_y1;
-                    line_dx = x2 - poly_x1;
-                    line_dy = y2 - poly_y1;
+                    line_x = screen_x1;
+                    line_y = screen_y1;
+                    line_dx = screen_x2 - screen_x1;
+                    line_dy = screen_y2 - screen_y1;
                     line_sx = 1;
                     line_sy = 1;
                     if (line_dx < 0)
@@ -1488,9 +1512,8 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
                     line_err = line_dx + line_dy;
                     while (TRUE)
                     {
-                        GrPlot(dc, x + old_x + line_x,
-                                   y + old_y + line_y);
-                        if (line_x == x2 && line_y == y2)
+                        GrPlot(dc, line_x, line_y);
+                        if (line_x == screen_x2 && line_y == screen_y2)
                             break;
                         line_e2 = 2 * line_err;
                         if (line_e2 >= line_dy)

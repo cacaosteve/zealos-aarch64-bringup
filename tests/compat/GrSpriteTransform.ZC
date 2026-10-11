@@ -9,7 +9,7 @@ I64 GrSpriteTransformChecks()
     I64 i, color;
 
     dc = DCNew(800, 600);
-    records = CAlloc(101);
+    records = CAlloc(151);
     if (!dc || !records || !dc->r || !dc->transform)
         return 1;
     dc->color.c0 = 12;
@@ -77,6 +77,32 @@ I64 GrSpriteTransformChecks()
     x = 5;
     MemCopy(records + 96, &x, sizeof(I32));
 
+    type = SPT_TRANSFORM_ON;
+    MemCopy(records + 100, &type, sizeof(U8));
+    type = SPT_POLYLINE;
+    MemCopy(records + 101, &type, sizeof(U8));
+    x = 2;
+    MemCopy(records + 105, &x, sizeof(I32));
+    x = 10; y = 10;
+    MemCopy(records + 109, &x, sizeof(I32));
+    MemCopy(records + 113, &y, sizeof(I32));
+    x = 30; y = 10;
+    MemCopy(records + 117, &x, sizeof(I32));
+    MemCopy(records + 121, &y, sizeof(I32));
+
+    type = SPT_TRANSFORM_OFF;
+    MemCopy(records + 125, &type, sizeof(U8));
+    type = SPT_POLYLINE;
+    MemCopy(records + 126, &type, sizeof(U8));
+    x = 2;
+    MemCopy(records + 130, &x, sizeof(I32));
+    x = 10; y = 10;
+    MemCopy(records + 134, &x, sizeof(I32));
+    MemCopy(records + 138, &y, sizeof(I32));
+    x = 30; y = 10;
+    MemCopy(records + 142, &x, sizeof(I32));
+    MemCopy(records + 146, &y, sizeof(I32));
+
     color = gr_palette[12] & 0x00FFFFFF;
     Sprite3(dc, dc->x, dc->y, dc->z, records);
     if (ZcFbTextPixel(593, 453) != color ||
@@ -84,7 +110,9 @@ I64 GrSpriteTransformChecks()
             ZcFbTextPixel(575, 445) != color ||
             ZcFbTextPixel(625, 465) != color ||
             ZcFbTextPixel(575, 460) != color ||
-            ZcFbTextPixel(645, 460) != color)
+            ZcFbTextPixel(645, 460) != color ||
+            ZcFbTextPixel(600, 450) != color ||
+            ZcFbTextPixel(630, 440) != color)
         return 2;
     if (ZcFbTextPixel(585, 445) == color)
         return 3;
