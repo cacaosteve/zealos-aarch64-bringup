@@ -420,6 +420,10 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                         'zc: loaded /Tests/GrSpriteText.ZC')
                 command('zcall GrSpriteTextChecks',
                         'zc => 0x000000000000002a')
+                command('zload /Tests/GrSpriteSpline.ZC',
+                        'zc: loaded /Tests/GrSpriteSpline.ZC')
+                command('zcall GrSpriteSplineChecks',
+                        'zc => 0x000000000000002a')
                 command('zload /Tests/GrDCLifecycle.ZC',
                         'zc: loaded /Tests/GrDCLifecycle.ZC')
                 command('zcall GrDCLifecycleChecks',

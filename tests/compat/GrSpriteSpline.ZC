@@ -1,0 +1,87 @@
+I64 GrSpriteSplineCountPixels(I64 left, I64 top, I64 width, I64 height,
+		I64 color)
+{
+	I64 x, y, count;
+	count = 0;
+	for (y = 0; y < height; y++)
+		for (x = 0; x < width; x++)
+			if (ZcFbTextPixel(left + x, top + y) == color)
+				count++;
+	return count;
+}
+
+U0 GrSpriteSplineFill(CDC *dc, I64 left, I64 top, I64 width, I64 height,
+		I64 color)
+{
+	I64 x, y, old_color;
+	old_color = dc->color.c0.color;
+	dc->color.c0.color = color;
+	for (y = 0; y < height; y++)
+		for (x = 0; x < width; x++)
+			GrPlot(dc, left + x, top + y);
+	dc->color.c0.color = old_color;
+}
+
+I64 GrSpriteSplineChecks()
+{
+	CDC dc;
+	U8 *records;
+	U8 record_type;
+	I32 count, x, y, z;
+	I64 changed;
+
+	records = CAlloc(8 + 3 * 12 + 1);
+	if (!records)
+		return 1;
+	MemSet(&dc, 0, sizeof(CDC));
+	dc.width = dc.width_internal = 800;
+	dc.height = 600;
+	dc.dc_signature = DCS_SIGNATURE_VAL;
+	dc.color.c0.color = 12;
+	dc.color.c0.rop = ROPB_MONO;
+	dc.thick = 1;
+	for (record_type = SPT_BSPLINE2;
+			record_type <= SPT_BSPLINE3_CLOSED; record_type++)
+	{
+		GrSpriteSplineFill(&dc, 100, 100, 64, 48, 0);
+		dc.color.c0.color = 12;
+		MemSet(records, 0, 8 + 3 * 12 + 1);
+		MemCopy(records, &record_type, sizeof(U8));
+		count = 3;
+		MemCopy(records + 4, &count, sizeof(I32));
+		x = 4; y = 20; z = 0;
+		MemCopy(records + 8, &x, sizeof(I32));
+		MemCopy(records + 12, &y, sizeof(I32));
+		MemCopy(records + 16, &z, sizeof(I32));
+		x = 16; y = 4; z = 0;
+		MemCopy(records + 20, &x, sizeof(I32));
+		MemCopy(records + 24, &y, sizeof(I32));
+		MemCopy(records + 28, &z, sizeof(I32));
+		x = 28; y = 20; z = 0;
+		MemCopy(records + 32, &x, sizeof(I32));
+		MemCopy(records + 36, &y, sizeof(I32));
+		MemCopy(records + 40, &z, sizeof(I32));
+		Sprite3(&dc, 100, 100, 0, records);
+		changed = GrSpriteSplineCountPixels(100, 100, 64, 48,
+				gr_palette[12] & 0x00FFFFFF);
+		if (changed < 12)
+			return 51;
+		if ((record_type == SPT_BSPLINE2 || record_type == SPT_BSPLINE3) &&
+				(ZcFbTextPixel(104, 120) != (gr_palette[12] & 0x00FFFFFF) ||
+				 ZcFbTextPixel(128, 120) != (gr_palette[12] & 0x00FFFFFF)))
+			return 6;
+	}
+	GrSpriteSplineFill(&dc, 100, 100, 64, 48, 0);
+	dc.color.c0.color = 12;
+	MemSet(records, 0, 8 + 3 * 12 + 1);
+	record_type = SPT_BSPLINE2;
+	MemCopy(records, &record_type, sizeof(U8));
+	count = 2;
+	MemCopy(records + 4, &count, sizeof(I32));
+	Sprite3(&dc, 100, 100, 0, records);
+	if (GrSpriteSplineCountPixels(100, 100, 64, 48,
+			gr_palette[12] & 0x00FFFFFF))
+		return 7;
+	Free(records);
+	return 0x2a;
+}
