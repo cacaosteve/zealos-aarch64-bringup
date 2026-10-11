@@ -3119,6 +3119,15 @@ Freeze catalog unchanged.
 | Smoke | Add `GrSpriteArrowChecks` for shaft, tip, and both arrowhead arms on the framebuffer |
 | Limits | The bootstrap bridge supports 2D arrows; transformed and symmetry-aware `GrArrow3` behavior remains open |
 
+## Milestone 273 — interpolate depth across sprite meshes
+
+| Item | Path |
+|--|--|
+| Gap | `SPT_MESH` and `SPT_SHIFTABLE_MESH` drew filled triangles without updating the CDC depth buffer, so triangle overlap depended on record order |
+| Bring-up | Interpolate vertex Z along each scanline and send bounded spans through upstream `GrHLine`, retaining its normal clipping and depth test; declare the source API early enough for the bootstrap raster bridge |
+| Smoke | Extend `GrSpriteSymmetryChecks` to cover ordinary 2D fallback without a depth buffer, flat near/far overlap, a sloped triangle's interpolated interior depth, and Z scaling through the CDC transform; full PCI compatibility passes |
+| Limits | The bounded scanline path covers the current mesh subset; pixel-identical parity with upstream mesh rasterization and broader 3D clipping remain open |
+
 ## Open compatibility probe — `/System/Win.ZC`
 
 The source probe loads pinned `KernelC.HH`, `Externs.ZC`, and `Gr.HH` before compiling unchanged `Win.ZC`. Graphics dimensions and mouse globals are probe fixtures; `DrawMenu` and the initial `GrScaleZoom` definition are compile-time fixtures until unchanged `GrScreen.ZC` is loaded later in the probe. `GrScreenFinalUpdateChecks` executes `WinFinalUpdate` through the staged idle-frame path, confirms the fixture's `mouse_grid.coord` toggles the real coordinate-text overlay, checks a separate visible guest overlay callback, verifies the software arrow against Limine framebuffer pixels, and exercises `WinMouseUpdate`'s edge recentering through the runtime dispatch. `WinMousePointerStateCheck` covers transformed tablet coordinates and `WinMouseHardStateCheck` covers the source mouse-state ABI; manual UTM acceptance confirms the software pointer and window-demo mouse interaction. The raw ARM generic-timer binding and a standalone F64 clock expression are smoke-tested before the Win load.
