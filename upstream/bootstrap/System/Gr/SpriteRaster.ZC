@@ -155,6 +155,15 @@ Bool SpriteTransformPoint0(CDC *dc, Bool enabled, I64 x, I64 y, I64 z,
     return TRUE;
 }
 
+U0 SpritePlotTransform0(CDC *dc, Bool enabled, I64 x, I64 y, I64 z)
+{//Plot one sprite raster point after applying the active CDC transform.
+    I64 screen_x, screen_y;
+
+    if (SpriteTransformPoint0(dc, enabled, x, y, z,
+            &screen_x, &screen_y))
+        GrPlot(dc, screen_x, screen_y);
+}
+
 I64 SpriteTextSize0(U8 *sprite)
 {
     I64 scan_pos;
@@ -1365,14 +1374,30 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
                 circle_err = 1 - radius;
                 while (circle_x >= circle_y)
                 {
-                    GrPlot(dc, x + old_x + x1 + circle_x, y + old_y + y1 + circle_y);
-                    GrPlot(dc, x + old_x + x1 + circle_y, y + old_y + y1 + circle_x);
-                    GrPlot(dc, x + old_x + x1 - circle_y, y + old_y + y1 + circle_x);
-                    GrPlot(dc, x + old_x + x1 - circle_x, y + old_y + y1 + circle_y);
-                    GrPlot(dc, x + old_x + x1 - circle_x, y + old_y + y1 - circle_y);
-                    GrPlot(dc, x + old_x + x1 - circle_y, y + old_y + y1 - circle_x);
-                    GrPlot(dc, x + old_x + x1 + circle_y, y + old_y + y1 - circle_x);
-                    GrPlot(dc, x + old_x + x1 + circle_x, y + old_y + y1 - circle_y);
+                    SpritePlotTransform0(dc, transform_enabled,
+                            x + old_x + x1 + circle_x,
+                            y + old_y + y1 + circle_y, z);
+                    SpritePlotTransform0(dc, transform_enabled,
+                            x + old_x + x1 + circle_y,
+                            y + old_y + y1 + circle_x, z);
+                    SpritePlotTransform0(dc, transform_enabled,
+                            x + old_x + x1 - circle_y,
+                            y + old_y + y1 + circle_x, z);
+                    SpritePlotTransform0(dc, transform_enabled,
+                            x + old_x + x1 - circle_x,
+                            y + old_y + y1 + circle_y, z);
+                    SpritePlotTransform0(dc, transform_enabled,
+                            x + old_x + x1 - circle_x,
+                            y + old_y + y1 - circle_y, z);
+                    SpritePlotTransform0(dc, transform_enabled,
+                            x + old_x + x1 - circle_y,
+                            y + old_y + y1 - circle_x, z);
+                    SpritePlotTransform0(dc, transform_enabled,
+                            x + old_x + x1 + circle_y,
+                            y + old_y + y1 - circle_x, z);
+                    SpritePlotTransform0(dc, transform_enabled,
+                            x + old_x + x1 + circle_x,
+                            y + old_y + y1 - circle_y, z);
                     circle_y++;
                     if (circle_err < 0)
                         circle_err += 2 * circle_y + 1;
