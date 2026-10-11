@@ -5,7 +5,7 @@ I64 GrSpriteSymmetryChecks()
     CDC *dc;
     U8 *records;
     U8 type;
-    I32 x1, y1, x2, y2, sides;
+    I32 x1, y1, x2, y2, sides, z1, z2, z3;
     U8 move_code;
     I64 color, scan_x, scan_y, source_pixel, mirror_pixel, spline_pixels;
 
@@ -261,6 +261,125 @@ I64 GrSpriteSymmetryChecks()
     Sprite3(dc, 400, 300, 5, records);
     if (dc->depth_buf[320 * dc->width_internal + 420] != 30)
         return 18;
+
+    // Adjacent triangles must cover the shared diagonal without leaving
+    // depth-buffer holes in the interior of their combined rectangle.
+    MemSet(records, 0, 246);
+    type = SPT_MESH;
+    MemCopy(records, &type, sizeof(U8));
+    sides = 4;
+    MemCopy(records + 4, &sides, sizeof(I32));
+    sides = 2;
+    MemCopy(records + 8, &sides, sizeof(I32));
+    x1 = 200; y1 = 200; z1 = 60;
+    MemCopy(records + 12, &x1, sizeof(I32));
+    MemCopy(records + 16, &y1, sizeof(I32));
+    MemCopy(records + 20, &z1, sizeof(I32));
+    x1 = 230; y1 = 200;
+    MemCopy(records + 24, &x1, sizeof(I32));
+    MemCopy(records + 28, &y1, sizeof(I32));
+    MemCopy(records + 32, &z1, sizeof(I32));
+    x1 = 230; y1 = 230;
+    MemCopy(records + 36, &x1, sizeof(I32));
+    MemCopy(records + 40, &y1, sizeof(I32));
+    MemCopy(records + 44, &z1, sizeof(I32));
+    x1 = 200; y1 = 230;
+    MemCopy(records + 48, &x1, sizeof(I32));
+    MemCopy(records + 52, &y1, sizeof(I32));
+    MemCopy(records + 56, &z1, sizeof(I32));
+    sides = 12;
+    MemCopy(records + 60, &sides, sizeof(I32));
+    sides = 0;
+    MemCopy(records + 64, &sides, sizeof(I32));
+    sides = 1;
+    MemCopy(records + 68, &sides, sizeof(I32));
+    sides = 2;
+    MemCopy(records + 72, &sides, sizeof(I32));
+    sides = 12;
+    MemCopy(records + 76, &sides, sizeof(I32));
+    sides = 0;
+    MemCopy(records + 80, &sides, sizeof(I32));
+    sides = 2;
+    MemCopy(records + 84, &sides, sizeof(I32));
+    sides = 3;
+    MemCopy(records + 88, &sides, sizeof(I32));
+    for (scan_y = 501; scan_y < 530; scan_y++)
+        for (scan_x = 601; scan_x < 630; scan_x++)
+            dc->depth_buf[scan_y * dc->width_internal + scan_x] = I32_MAX;
+    Sprite3(dc, 400, 300, 0, records);
+    for (scan_y = 501; scan_y < 530; scan_y++)
+        for (scan_x = 601; scan_x < 630; scan_x++)
+            if (dc->depth_buf[scan_y * dc->width_internal + scan_x] != 60)
+                return 20;
+
+    // Horizontal clipping must advance the interpolated depth at x=0.
+    MemSet(records, 0, 246);
+    type = SPT_MESH;
+    MemCopy(records, &type, sizeof(U8));
+    sides = 3;
+    MemCopy(records + 4, &sides, sizeof(I32));
+    sides = 1;
+    MemCopy(records + 8, &sides, sizeof(I32));
+    x1 = -20; y1 = 0; z1 = 100;
+    MemCopy(records + 12, &x1, sizeof(I32));
+    MemCopy(records + 16, &y1, sizeof(I32));
+    MemCopy(records + 20, &z1, sizeof(I32));
+    x1 = 20; y1 = 0; z2 = 200;
+    MemCopy(records + 24, &x1, sizeof(I32));
+    MemCopy(records + 28, &y1, sizeof(I32));
+    MemCopy(records + 32, &z2, sizeof(I32));
+    x1 = 20; y1 = 40; z3 = 300;
+    MemCopy(records + 36, &x1, sizeof(I32));
+    MemCopy(records + 40, &y1, sizeof(I32));
+    MemCopy(records + 44, &z3, sizeof(I32));
+    sides = 12;
+    MemCopy(records + 48, &sides, sizeof(I32));
+    sides = 0;
+    MemCopy(records + 52, &sides, sizeof(I32));
+    sides = 1;
+    MemCopy(records + 56, &sides, sizeof(I32));
+    sides = 2;
+    MemCopy(records + 60, &sides, sizeof(I32));
+    dc->depth_buf[110 * dc->width_internal] = I32_MAX;
+    Sprite3(dc, 0, 100, 0, records);
+    source_pixel = dc->depth_buf[110 * dc->width_internal];
+    if (source_pixel < 173 || source_pixel > 177)
+        return 21;
+
+    // A triangle crossing the top edge must retain the original edge depth
+    // slopes when its visible scanlines begin at y=0.
+    MemSet(records, 0, 246);
+    type = SPT_MESH;
+    MemCopy(records, &type, sizeof(U8));
+    sides = 3;
+    MemCopy(records + 4, &sides, sizeof(I32));
+    sides = 1;
+    MemCopy(records + 8, &sides, sizeof(I32));
+    x1 = 100; y1 = -20; z1 = 100;
+    MemCopy(records + 12, &x1, sizeof(I32));
+    MemCopy(records + 16, &y1, sizeof(I32));
+    MemCopy(records + 20, &z1, sizeof(I32));
+    x1 = 140; y1 = -20; z2 = 200;
+    MemCopy(records + 24, &x1, sizeof(I32));
+    MemCopy(records + 28, &y1, sizeof(I32));
+    MemCopy(records + 32, &z2, sizeof(I32));
+    x1 = 100; y1 = 20; z3 = 300;
+    MemCopy(records + 36, &x1, sizeof(I32));
+    MemCopy(records + 40, &y1, sizeof(I32));
+    MemCopy(records + 44, &z3, sizeof(I32));
+    sides = 12;
+    MemCopy(records + 48, &sides, sizeof(I32));
+    sides = 0;
+    MemCopy(records + 52, &sides, sizeof(I32));
+    sides = 1;
+    MemCopy(records + 56, &sides, sizeof(I32));
+    sides = 2;
+    MemCopy(records + 60, &sides, sizeof(I32));
+    dc->depth_buf[0 * dc->width_internal + 110] = I32_MAX;
+    Sprite3(dc, 0, 0, 0, records);
+    source_pixel = dc->depth_buf[110];
+    if (source_pixel < 223 || source_pixel > 227)
+        return 22;
 
     // Shiftable meshes add their own xyz origin before the CDC transform.
     MemSet(records, 0, 246);
