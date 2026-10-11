@@ -640,7 +640,7 @@ I64 GrSpriteRotatedRectChecks()
             ZcFbTextPixel(499, 359) != rect_color)
         return 7;
 
-    // Arbitrary angles remain rejected before they can alter the frame.
+    // A non-cardinal angle rotates and fills the actual quadrilateral.
     x1 = 40;
     y1 = 50;
     x2 = 45;
@@ -652,7 +652,8 @@ I64 GrSpriteRotatedRectChecks()
     angle_bits = 0x3FF0000000000000;
     MemCopy(records + 24, &angle_bits, sizeof(U64));
     Sprite3(plot_dc, 400, 300, 0, records);
-    if (ZcFbTextPixel(440, 350) == rect_color)
+    if (ZcFbTextPixel(443, 349) != rect_color ||
+            ZcFbTextPixel(439, 350) == rect_color)
         return 8;
 
     Free(records);

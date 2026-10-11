@@ -12,7 +12,7 @@ I64 GrSpriteTransformChecks()
     CD3I32 point;
 
     dc = DCNew(800, 600);
-    records = CAlloc(681);
+    records = CAlloc(715);
     if (!dc || !records || !dc->r || !dc->transform)
         return 1;
     dc->color.c0 = 12;
@@ -332,6 +332,19 @@ I64 GrSpriteTransformChecks()
     MemCopy(records + 672, &x, sizeof(I32));
     MemCopy(records + 676, &y, sizeof(I32));
 
+    type = SPT_TRANSFORM_ON;
+    MemCopy(records + 681, &type, sizeof(U8));
+    type = SPT_ROTATED_RECT;
+    MemCopy(records + 682, &type, sizeof(U8));
+    x = 50; y = 100;
+    MemCopy(records + 686, &x, sizeof(I32));
+    MemCopy(records + 690, &y, sizeof(I32));
+    x = 55; y = 104;
+    MemCopy(records + 694, &x, sizeof(I32));
+    MemCopy(records + 698, &y, sizeof(I32));
+    angle = 0x3FF0000000000000; // 1 radian
+    MemCopy(records + 706, &angle, sizeof(U64));
+
     glyph_row = glyph_col = -1;
     for (scan_i = 0; scan_i < FONT_HEIGHT && glyph_row < 0; scan_i++)
         for (scan_j = 0; scan_j < FONT_WIDTH; scan_j++)
@@ -418,6 +431,10 @@ I64 GrSpriteTransformChecks()
             ZcFbTextPixel(409, 530) != ZcFbGraphColor(15) ||
             ZcFbTextPixel(100, 200) != ZcFbGraphColor(15))
         return 7;
+    Sprite3(dc, 0, 0, 0, records + 681);
+    if (ZcFbTextPixel(511, 483) != color ||
+            ZcFbTextPixel(510, 479) == color)
+        return 8;
     if (ZcFbTextPixel(585, 445) == color)
         return 3;
     if (dc->flags & DCF_TRANSFORMATION)

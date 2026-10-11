@@ -16,6 +16,13 @@ I64 SpriteCeilF64(F64 value)
     return integer_value;
 }
 
+I64 SpriteRoundF64(F64 value)
+{
+    if (value < 0)
+        return ToI64(value - 0.5);
+    return ToI64(value + 0.5);
+}
+
 I64 SpriteMaxI64(I64 a, I64 b)
 {
     if (a > b)
@@ -874,6 +881,9 @@ I64 SpriteRotatedRect0(CDC *dc, I64 x, I64 y, I32 x1, I32 y1,
         I64 pixel_limit)
 {
     I64 rect_x, rect_y, width, height, area, swap;
+    I64 px[4], py[4], screen_x[4], screen_y[4];
+    I64 i, j, min_x, min_y, max_x, max_y;
+    F64 angle, sin_angle, cos_angle;
 
     // Promote before subtraction so adversarial I32 endpoints cannot
     // overflow while forming the dimensions.
@@ -887,8 +897,8 @@ I64 SpriteRotatedRect0(CDC *dc, I64 x, I64 y, I32 x1, I32 y1,
     if (area > pixel_limit)
         return -1;
 
-    // The upstream angle is radians. Handle exact IEEE encodings for
-    // cardinal orientations without a lossy floating transform.
+    // Preserve exact cardinal bounds, and use the upstream radians angle
+    // for all other orientations.
     rect_x = x1;
     rect_y = y1;
     if (angle_bits == 0x3FF921FB54442D18 ||
@@ -914,7 +924,57 @@ I64 SpriteRotatedRect0(CDC *dc, I64 x, I64 y, I32 x1, I32 y1,
         rect_y -= height;
     }
     else if (angle_bits != 0)
-        return -1;
+    {
+        MemCopy(&angle, &angle_bits, sizeof(F64));
+        if (angle != angle || angle < -1000000.0 || angle > 1000000.0)
+            return -1;
+        sin_angle = ZcSinF64(angle);
+        cos_angle = ZcCosF64(angle);
+
+        px[0] = x + x1;
+        py[0] = y + y1;
+        px[1] = px[0] + SpriteRoundF64(cos_angle * width);
+        py[1] = py[0] - SpriteRoundF64(sin_angle * width);
+        px[2] = px[1] + SpriteRoundF64(sin_angle * height);
+        py[2] = py[1] + SpriteRoundF64(cos_angle * height);
+        px[3] = px[0] + SpriteRoundF64(sin_angle * height);
+        py[3] = py[0] + SpriteRoundF64(cos_angle * height);
+
+        for (i = 0; i < 4; i++)
+            if (!SpriteTransformPoint0(dc, transform_enabled,
+                    px[i], py[i], z, &screen_x[i], &screen_y[i]) ||
+                    SpriteAbsI64(screen_x[i]) > 1000000 ||
+                    SpriteAbsI64(screen_y[i]) > 1000000)
+                return -1;
+
+        min_x = max_x = screen_x[0];
+        min_y = max_y = screen_y[0];
+        for (i = 1; i < 4; i++)
+        {
+            if (screen_x[i] < min_x) min_x = screen_x[i];
+            if (screen_x[i] > max_x) max_x = screen_x[i];
+            if (screen_y[i] < min_y) min_y = screen_y[i];
+            if (screen_y[i] > max_y) max_y = screen_y[i];
+        }
+        if (min_x < 0) min_x = 0;
+        if (min_y < 0) min_y = 0;
+        if (max_x >= dc->width) max_x = dc->width - 1;
+        if (max_y >= dc->height) max_y = dc->height - 1;
+        if (min_x > max_x || min_y > max_y)
+            return 0;
+        if (max_x - min_x + 1 > pixel_limit /
+                (max_y - min_y + 1))
+            return -1;
+        area = (max_x - min_x + 1) * (max_y - min_y + 1);
+        for (i = 0; i < 4; i++)
+        {
+            j = (i + 1) & 3;
+            GrLine(dc, screen_x[i], screen_y[i],
+                    screen_x[j], screen_y[j]);
+        }
+        SpriteFillQuad0(dc, screen_x, screen_y);
+        return area;
+    }
 
     if (transform_enabled)
         SpriteRectTransform0(dc, x + rect_x, y + rect_y,
