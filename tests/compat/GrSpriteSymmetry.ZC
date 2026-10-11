@@ -7,7 +7,7 @@ I64 GrSpriteSymmetryChecks()
     U8 type;
     I32 x1, y1, x2, y2, sides, z1, z2, z3;
     U8 move_code;
-    I64 color, scan_x, scan_y, source_pixel, mirror_pixel, spline_pixels;
+    I64 i, color, scan_x, scan_y, source_pixel, mirror_pixel, spline_pixels;
 
     dc = DCNew(800, 600);
     records = CAlloc(246);
@@ -119,11 +119,15 @@ I64 GrSpriteSymmetryChecks()
             ZcFbTextPixel(590, 350) != color ||
             ZcFbTextPixel(560, 350) != color)
         return 3;
-    if (ZcFbTextPixel(420, 360) != color ||
-            ZcFbTextPixel(580, 360) != color ||
-            ZcFbTextPixel(570, 370) != color ||
-            ZcFbTextPixel(440, 380) != color ||
-            ZcFbTextPixel(560, 380) != color)
+    if (ZcFbTextPixel(420, 360) != color)
+        return 4;
+    if (ZcFbTextPixel(580, 360) != color)
+        return 4;
+    if (ZcFbTextPixel(570, 370) != color)
+        return 4;
+    if (ZcFbTextPixel(439, 379) != color)
+        return 4;
+    if (ZcFbTextPixel(561, 379) != color)
         return 4;
     if (ZcFbTextPixel(440, 400) != color ||
             ZcFbTextPixel(560, 400) != color)
@@ -134,8 +138,9 @@ I64 GrSpriteSymmetryChecks()
     if (ZcFbTextPixel(442, 480) != color ||
             ZcFbTextPixel(558, 480) != color)
         return 7;
-    if (ZcFbTextPixel(430, 520) != color ||
-            ZcFbTextPixel(570, 520) != color)
+    if (ZcFbTextPixel(430, 520) != color)
+        return 8;
+    if (ZcFbTextPixel(570, 520) != color)
         return 8;
     if (ZcFbTextPixel(420, 560) != color ||
             ZcFbTextPixel(580, 560) != color ||

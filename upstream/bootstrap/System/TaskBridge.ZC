@@ -1557,10 +1557,10 @@ I64 BootstrapMat4x4Checks()
     Mat4x4RotY(matrix, 1.5707963267948966);
     if (matrix[1] < 0x100000000 - epsilon ||
         matrix[1] > 0x100000000 + epsilon ||
-        matrix[4] < 0x100000000 - epsilon ||
-        matrix[4] > 0x100000000 + epsilon ||
-        matrix[10] < 0x100000000 - epsilon ||
-        matrix[10] > 0x100000000 + epsilon)
+        matrix[6] > -0x100000000 + epsilon ||
+        matrix[6] < -0x100000000 - epsilon ||
+        matrix[8] > -0x100000000 + epsilon ||
+        matrix[8] < -0x100000000 - epsilon)
         return 5;
     return 0x2a;
 }

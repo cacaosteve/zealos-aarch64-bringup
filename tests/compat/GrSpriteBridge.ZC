@@ -425,7 +425,7 @@ I64 GrSpriteArrowChecks()
     arrow_color = gr_palette[14] & 0x00FFFFFF;
     if (ZcFbTextPixel(408, 300) != arrow_color ||
             ZcFbTextPixel(416, 300) != arrow_color ||
-            ZcFbTextPixel(413, 298) != arrow_color ||
+            ZcFbTextPixel(414, 298) != arrow_color ||
             ZcFbTextPixel(413, 303) != arrow_color)
         return 4;
     Free(records);
