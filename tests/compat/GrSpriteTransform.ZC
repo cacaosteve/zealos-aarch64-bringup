@@ -1,0 +1,52 @@
+extern I64 ZcFbTextPixel(I64 x, I64 y);
+
+I64 GrSpriteTransformChecks()
+{
+    CDC *dc;
+    U8 *records;
+    U8 type;
+    I32 x, y;
+    I64 i, color;
+
+    dc = DCNew(800, 600);
+    records = CAlloc(27);
+    if (!dc || !records || !dc->r || !dc->transform)
+        return 1;
+    dc->color.c0 = 12;
+    dc->x = 610;
+    dc->y = 430;
+    dc->z = 0;
+    for (i = 0; i < 16; i++)
+        dc->r[i] = 0;
+    dc->r[1] = -0x100000000; // 90-degree turn about Z.
+    dc->r[4] = 0x100000000;
+    dc->r[10] = 0x100000000;
+    dc->r[15] = 0x100000000;
+
+    type = SPT_TRANSFORM_ON;
+    MemCopy(records, &type, sizeof(U8));
+    type = SPT_PT;
+    MemCopy(records + 1, &type, sizeof(U8));
+    x = 23; y = 17;
+    MemCopy(records + 5, &x, sizeof(I32));
+    MemCopy(records + 9, &y, sizeof(I32));
+
+    type = SPT_TRANSFORM_OFF;
+    MemCopy(records + 13, &type, sizeof(U8));
+    type = SPT_PT;
+    MemCopy(records + 14, &type, sizeof(U8));
+    MemCopy(records + 18, &x, sizeof(I32));
+    MemCopy(records + 22, &y, sizeof(I32));
+
+    color = gr_palette[12] & 0x00FFFFFF;
+    Sprite3(dc, dc->x, dc->y, dc->z, records);
+    if (ZcFbTextPixel(593, 453) != color ||
+            ZcFbTextPixel(633, 447) != color)
+        return 2;
+    if (dc->flags & DCF_TRANSFORMATION)
+        return 3;
+
+    DCDel(dc);
+    Free(records);
+    return 0x2a;
+}

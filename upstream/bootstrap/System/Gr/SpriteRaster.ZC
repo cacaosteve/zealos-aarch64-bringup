@@ -134,6 +134,20 @@ U0 SpriteMirrorRect0(CDC *dc, I64 left, I64 top, I64 right, I64 bottom,
     }
 }
 
+Bool SpriteTransformPoint0(CDC *dc, Bool enabled, I64 x, I64 y, I64 z,
+        I64 *screen_x, I64 *screen_y)
+{//Use the CDC's upstream transform callback when sprite transform mode is on.
+    if (enabled)
+    {
+        if (!dc->transform)
+            return FALSE;
+        (*dc->transform)(dc, &x, &y, &z);
+    }
+    *screen_x = x;
+    *screen_y = y;
+    return TRUE;
+}
+
 I64 SpriteTextSize0(U8 *sprite)
 {
     I64 scan_pos;
@@ -1021,7 +1035,8 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
 {
     I64 row, col, stride, old_color, old_thick, old_x, old_y, size, records, pixel_budget;
     I64 symmetry_x1, symmetry_y1, symmetry_x2, symmetry_y2;
-    Bool symmetry_enabled;
+    I64 old_flags, screen_x1, screen_y1, screen_x2, screen_y2;
+    Bool symmetry_enabled, transform_enabled;
     I64 text_len;
     I64 circle_x, circle_y, circle_err;
     I64 poly_i, poly_x1, poly_y1, poly_dx, poly_dy, poly_work, poly_total;
@@ -1038,6 +1053,8 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
         return;
     old_color = dc->color;
     old_thick = dc->thick;
+    old_flags = dc->flags;
+    transform_enabled = dc->flags & DCF_TRANSFORMATION;
     old_x = old_y = 0;
     symmetry_x1 = symmetry_y1 = symmetry_x2 = symmetry_y2 = 0;
     symmetry_enabled = FALSE;
@@ -1139,16 +1156,40 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
             MemCopy(&y1, sprite + 8, sizeof(I32));
             MemCopy(&x2, sprite + 12, sizeof(I32));
             MemCopy(&y2, sprite + 16, sizeof(I32));
-            symmetry_x1 = x + x1;
-            symmetry_y1 = y + y1;
-            symmetry_x2 = x + x2;
-            symmetry_y2 = y + y2;
-            symmetry_enabled = SpriteAbsI64(symmetry_x1) <= 1000000 &&
+            symmetry_enabled = SpriteTransformPoint0(dc, transform_enabled,
+                    x + x1, y + y1, z, &symmetry_x1, &symmetry_y1) &&
+                    SpriteTransformPoint0(dc, transform_enabled,
+                    x + x2, y + y2, z, &symmetry_x2, &symmetry_y2) &&
+                    SpriteAbsI64(symmetry_x1) <= 1000000 &&
                     SpriteAbsI64(symmetry_y1) <= 1000000 &&
                     SpriteAbsI64(symmetry_x2) <= 1000000 &&
                     SpriteAbsI64(symmetry_y2) <= 1000000 &&
                     (symmetry_x1 != symmetry_x2 || symmetry_y1 != symmetry_y2);
             size = 20;
+        }
+        else if (type == 5) // SPT_TRANSFORM_ON
+        {
+            if (!transform_enabled)
+            {
+                x -= dc->x;
+                y -= dc->y;
+                z -= dc->z;
+            }
+            transform_enabled = TRUE;
+            dc->flags |= DCF_TRANSFORMATION;
+            size = 1;
+        }
+        else if (type == 6) // SPT_TRANSFORM_OFF
+        {
+            if (transform_enabled)
+            {
+                x += dc->x;
+                y += dc->y;
+                z += dc->z;
+            }
+            transform_enabled = FALSE;
+            dc->flags &= ~DCF_TRANSFORMATION;
+            size = 1;
         }
         else if (type == 7) // SPT_SHIFT
         {
@@ -1162,15 +1203,19 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
         {
             MemCopy(&x1, sprite + 4, sizeof(I32));
             MemCopy(&y1, sprite + 8, sizeof(I32));
-            GrPlot(dc, x + old_x + x1, y + old_y + y1);
-            if (symmetry_enabled)
+            if (SpriteTransformPoint0(dc, transform_enabled,
+                    x + old_x + x1, y + old_y + y1, z,
+                    &screen_x1, &screen_y1))
             {
-                I64 mirror_x, mirror_y;
-                if (SpriteMirrorPoint0(symmetry_x1, symmetry_y1,
-                        symmetry_x2, symmetry_y2,
-                        x + old_x + x1, y + old_y + y1,
-                        &mirror_x, &mirror_y))
-                    GrPlot(dc, mirror_x, mirror_y);
+                GrPlot(dc, screen_x1, screen_y1);
+                if (symmetry_enabled)
+                {
+                    I64 mirror_x, mirror_y;
+                    if (SpriteMirrorPoint0(symmetry_x1, symmetry_y1,
+                            symmetry_x2, symmetry_y2,
+                            screen_x1, screen_y1, &mirror_x, &mirror_y))
+                        GrPlot(dc, mirror_x, mirror_y);
+                }
             }
             size = 12;
         }
@@ -1191,12 +1236,20 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
             MemCopy(&y1, sprite + 8, sizeof(I32));
             MemCopy(&x2, sprite + 12, sizeof(I32));
             MemCopy(&y2, sprite + 16, sizeof(I32));
-            GrLine(dc, x + old_x + x1, y + old_y + y1,
-                       x + old_x + x2, y + old_y + y2);
-            if (symmetry_enabled)
-                SpriteMirrorLine0(dc, x + old_x + x1, y + old_y + y1,
-                        x + old_x + x2, y + old_y + y2,
-                        symmetry_x1, symmetry_y1, symmetry_x2, symmetry_y2);
+            if (SpriteTransformPoint0(dc, transform_enabled,
+                    x + old_x + x1, y + old_y + y1, z,
+                    &screen_x1, &screen_y1) &&
+                    SpriteTransformPoint0(dc, transform_enabled,
+                    x + old_x + x2, y + old_y + y2, z,
+                    &screen_x2, &screen_y2))
+            {
+                GrLine(dc, screen_x1, screen_y1, screen_x2, screen_y2);
+                if (symmetry_enabled)
+                    SpriteMirrorLine0(dc, screen_x1, screen_y1,
+                            screen_x2, screen_y2,
+                            symmetry_x1, symmetry_y1,
+                            symmetry_x2, symmetry_y2);
+            }
             size = 20;
         }
         else if (type == 26) // SPT_ARROW, bounded 2D GrArrow3 equivalent
@@ -1479,4 +1532,6 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
     }
     dc->color = old_color;
     dc->thick = old_thick;
+    dc->flags = dc->flags & ~(DCF_SYMMETRY | DCF_TRANSFORMATION) |
+            old_flags & (DCF_SYMMETRY | DCF_TRANSFORMATION);
 }
