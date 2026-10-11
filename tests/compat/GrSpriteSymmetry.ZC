@@ -158,8 +158,6 @@ I64 GrSpriteSymmetryChecks()
 
     // Mesh records share the symmetry and transform path, but store indexed
     // 3D vertices followed by 16-byte color/index triangles.
-    if (!DCDepthBufAlloc(dc))
-        return 12;
     MemSet(records, 0, 246);
     type = SPT_MESH;
     MemCopy(records, &type, sizeof(U8));
@@ -193,6 +191,9 @@ I64 GrSpriteSymmetryChecks()
     if (ZcFbTextPixel(420, 320) == source_pixel ||
             ZcFbTextPixel(580, 320) == mirror_pixel)
         return 13;
+    if (!DCDepthBufAlloc(dc))
+        return 12;
+    Sprite3(dc, 400, 300, 0, records);
     if (dc->depth_buf[320 * dc->width_internal + 420] != 300)
         return 14;
     x2 = 100;
