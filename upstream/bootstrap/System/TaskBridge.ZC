@@ -1450,11 +1450,56 @@ extern Bool GrRect(CDC *dc, I64 x, I64 y, I64 width, I64 height);
 extern I64 GrHLine(CDC *dc, I64 x1, I64 x2, I64 y, I64 z1, I64 z2);
 extern U0 SpriteEllipse0(CDC *dc, I64 cx, I64 cy, I64 rx, I64 ry);
 
-#define SPT_FLOOD_FILL 0
-#define SPT_FLOOD_FILL_NOT 1
-#define SPT_MESH 2
-#define SPT_SHIFTABLE_MESH 3
-#define SPT_TYPES_NUM 4 // Placeholder ordinals for the absent sprite subsystem.
+#define SPT_END 0
+#define SPT_COLOR 1
+#define SPT_DITHER_COLOR 2
+#define SPT_THICK 3
+#define SPT_PLANAR_SYMMETRY 4
+#define SPT_TRANSFORM_ON 5
+#define SPT_TRANSFORM_OFF 6
+#define SPT_SHIFT 7
+#define SPT_PT 8
+#define SPT_POLYPT 9
+#define SPT_LINE 10
+#define SPT_POLYLINE 11
+#define SPT_RECT 12
+#define SPT_ROTATED_RECT 13
+#define SPT_CIRCLE 14
+#define SPT_ELLIPSE 15
+#define SPT_POLYGON 16
+#define SPT_BSPLINE2 17
+#define SPT_BSPLINE2_CLOSED 18
+#define SPT_BSPLINE3 19
+#define SPT_BSPLINE3_CLOSED 20
+#define SPT_FLOOD_FILL 21
+#define SPT_FLOOD_FILL_NOT 22
+#define SPT_BITMAP 23
+#define SPT_MESH 24
+#define SPT_SHIFTABLE_MESH 25
+#define SPT_ARROW 26
+#define SPT_TEXT 27
+#define SPT_TEXT_BOX 28
+#define SPT_TEXT_DIAMOND 29
+#define SPT_TYPES_NUM 30
+I64 BootstrapSpriteOpcodeChecks()
+{//Keep early bootstrap opcodes byte-for-byte aligned with pinned Gr.HH.
+    if (SPT_END != 0 || SPT_COLOR != 1 || SPT_DITHER_COLOR != 2 ||
+            SPT_THICK != 3 || SPT_PLANAR_SYMMETRY != 4 ||
+            SPT_TRANSFORM_ON != 5 || SPT_TRANSFORM_OFF != 6 ||
+            SPT_SHIFT != 7 || SPT_PT != 8 || SPT_POLYPT != 9 ||
+            SPT_LINE != 10 || SPT_POLYLINE != 11 || SPT_RECT != 12 ||
+            SPT_ROTATED_RECT != 13 || SPT_CIRCLE != 14 ||
+            SPT_ELLIPSE != 15 || SPT_POLYGON != 16 ||
+            SPT_BSPLINE2 != 17 || SPT_BSPLINE2_CLOSED != 18 ||
+            SPT_BSPLINE3 != 19 || SPT_BSPLINE3_CLOSED != 20 ||
+            SPT_FLOOD_FILL != 21 || SPT_FLOOD_FILL_NOT != 22 ||
+            SPT_BITMAP != 23 || SPT_MESH != 24 ||
+            SPT_SHIFTABLE_MESH != 25 || SPT_ARROW != 26 ||
+            SPT_TEXT != 27 || SPT_TEXT_BOX != 28 ||
+            SPT_TEXT_DIAMOND != 29 || SPT_TYPES_NUM != 30)
+        return 1;
+    return 0x2a;
+}
 // Minimal graphics globals for parsing DolDoc layout; these are not a screen/window manager.
 #define TEXT_COLS 100 // Current bootstrap framebuffer: 800x600 at 8x8 text cells.
 #define TEXT_ROWS 75

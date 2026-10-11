@@ -3137,6 +3137,15 @@ Freeze catalog unchanged.
 | Smoke | Extend `BootstrapGrContextInitChecks` to verify the empty sprite and representative `End`, `Mesh`, and `Arrow` hash entries; `python3 scripts/check-compat.py --pci` passes |
 | Limits | Sprite table initialization is covered; complete upstream graphics startup and byte-identical replacement for the original resource-backed empty sprite remain open |
 
+## Milestone 275 — align bootstrap sprite opcode numbers with ZealOS
+
+| Item | Path |
+|--|--|
+| Gap | Early bootstrap code exposed a four-entry placeholder sprite opcode range even though pinned `Gr.HH` defines 30 record types, leaving startup-time scanners with a different ABI from source-loaded graphics |
+| Bring-up | Replace the placeholder with all 30 upstream `SPT_*` values and add a runtime guard that checks each opcode and `SPT_TYPES_NUM` against the pinned numbering |
+| Smoke | `check-compat.py --pci` calls `BootstrapSpriteOpcodeChecks` during the boot integration path and passes alongside the graphics and PCI persistence checks |
+| Limits | Opcode numbering now matches source; unsupported sprite record behavior and the remaining upstream graphics tables still need implementation |
+
 ## Open compatibility probe — `/System/Win.ZC`
 
 The source probe loads pinned `KernelC.HH`, `Externs.ZC`, and `Gr.HH` before compiling unchanged `Win.ZC`. Graphics dimensions and mouse globals are probe fixtures; `DrawMenu` and the initial `GrScaleZoom` definition are compile-time fixtures until unchanged `GrScreen.ZC` is loaded later in the probe. `GrScreenFinalUpdateChecks` executes `WinFinalUpdate` through the staged idle-frame path, confirms the fixture's `mouse_grid.coord` toggles the real coordinate-text overlay, checks a separate visible guest overlay callback, verifies the software arrow against Limine framebuffer pixels, and exercises `WinMouseUpdate`'s edge recentering through the runtime dispatch. `WinMousePointerStateCheck` covers transformed tablet coordinates and `WinMouseHardStateCheck` covers the source mouse-state ABI; manual UTM acceptance confirms the software pointer and window-demo mouse interaction. The raw ARM generic-timer binding and a standalone F64 clock expression are smoke-tested before the Win load.
