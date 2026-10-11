@@ -1433,15 +1433,136 @@ I64 *Mat4x4New(I64 *src, CTask *mem_task=NULL)
 }
 U0 Mat4x4IdentEqu(I64 *matrix)
 {
+    if (!matrix)
+        return;
+    MemSet(matrix, 0, 16 * sizeof(I64));
+    matrix[0] = 0x100000000;
+    matrix[5] = 0x100000000;
+    matrix[10] = 0x100000000;
+    matrix[15] = 0x100000000;
+}
+extern F64 ZcSinF64(F64 angle);
+extern F64 ZcCosF64(F64 angle);
+I64 BootstrapMat4x4Fixed(F64 value)
+{
+    return ToI64(value * 4294967296.0);
+}
+F64 BootstrapMat4x4Float(I64 value)
+{
+    return ToF64(value) / 4294967296.0;
+}
+U0 BootstrapMat4x4Mul(I64 *dst, I64 *left, I64 *right)
+{
+    I64 i, j, k;
+    I64 result[16];
+    F64 sum;
+    if (!dst || !left || !right)
+        return;
+    // Compute through F64: multiplying two Q32.32 coefficients as I64
+    // overflows before the required 32-bit rescale can be applied.
+    for (i = 0; i < 4; i++)
+        for (j = 0; j < 4; j++)
+        {
+            sum = 0.0;
+            for (k = 0; k < 4; k++)
+                sum += BootstrapMat4x4Float(left[i * 4 + k]) *
+                       BootstrapMat4x4Float(right[k * 4 + j]);
+            result[i * 4 + j] = BootstrapMat4x4Fixed(sum);
+        }
+    MemCopy(dst, result, sizeof(result));
 }
 U0 Mat4x4RotX(I64 *matrix, F64 angle)
 {
+    I64 rotation[16], result[16];
+    I64 cosine, sine;
+    if (!matrix)
+        return;
+    cosine = BootstrapMat4x4Fixed(ZcCosF64(angle));
+    sine = BootstrapMat4x4Fixed(ZcSinF64(angle));
+    Mat4x4IdentEqu(rotation);
+    rotation[5] = cosine;
+    rotation[6] = -sine;
+    rotation[9] = sine;
+    rotation[10] = cosine;
+    BootstrapMat4x4Mul(result, rotation, matrix);
+    MemCopy(matrix, result, sizeof(result));
 }
 U0 Mat4x4RotY(I64 *matrix, F64 angle)
 {
+    I64 rotation[16], result[16];
+    I64 cosine, sine;
+    if (!matrix)
+        return;
+    cosine = BootstrapMat4x4Fixed(ZcCosF64(angle));
+    sine = BootstrapMat4x4Fixed(ZcSinF64(angle));
+    Mat4x4IdentEqu(rotation);
+    rotation[0] = cosine;
+    rotation[2] = sine;
+    rotation[8] = -sine;
+    rotation[10] = cosine;
+    BootstrapMat4x4Mul(result, rotation, matrix);
+    MemCopy(matrix, result, sizeof(result));
 }
 U0 Mat4x4RotZ(I64 *matrix, F64 angle)
 {
+    I64 rotation[16], result[16];
+    I64 cosine, sine;
+    if (!matrix)
+        return;
+    cosine = BootstrapMat4x4Fixed(ZcCosF64(angle));
+    sine = BootstrapMat4x4Fixed(ZcSinF64(angle));
+    Mat4x4IdentEqu(rotation);
+    rotation[0] = cosine;
+    rotation[1] = -sine;
+    rotation[4] = sine;
+    rotation[5] = cosine;
+    BootstrapMat4x4Mul(result, rotation, matrix);
+    MemCopy(matrix, result, sizeof(result));
+}
+I64 BootstrapMat4x4Checks()
+{
+    I64 matrix[16], epsilon = 4096;
+    Mat4x4IdentEqu(matrix);
+    if (matrix[0] != 0x100000000 || matrix[5] != 0x100000000 ||
+        matrix[10] != 0x100000000 || matrix[15] != 0x100000000 ||
+        matrix[1] || matrix[2] || matrix[3] || matrix[4] || matrix[6] ||
+        matrix[7] || matrix[8] || matrix[9] || matrix[11] || matrix[12] ||
+        matrix[13] || matrix[14])
+        return 1;
+    Mat4x4RotX(matrix, 1.5707963267948966);
+    if (matrix[5] > epsilon || matrix[5] < -epsilon ||
+        matrix[6] > -0x100000000 + epsilon ||
+        matrix[6] < -0x100000000 - epsilon ||
+        matrix[9] < 0x100000000 - epsilon ||
+        matrix[9] > 0x100000000 + epsilon)
+        return 2;
+    Mat4x4IdentEqu(matrix);
+    Mat4x4RotY(matrix, 1.5707963267948966);
+    if (matrix[0] > epsilon || matrix[0] < -epsilon ||
+        matrix[2] < 0x100000000 - epsilon ||
+        matrix[2] > 0x100000000 + epsilon ||
+        matrix[8] > -0x100000000 + epsilon ||
+        matrix[8] < -0x100000000 - epsilon)
+        return 3;
+    Mat4x4IdentEqu(matrix);
+    Mat4x4RotZ(matrix, 1.5707963267948966);
+    if (matrix[0] > epsilon || matrix[0] < -epsilon ||
+        matrix[1] > -0x100000000 + epsilon ||
+        matrix[1] < -0x100000000 - epsilon ||
+        matrix[4] < 0x100000000 - epsilon ||
+        matrix[4] > 0x100000000 + epsilon)
+        return 4;
+    Mat4x4IdentEqu(matrix);
+    Mat4x4RotX(matrix, 1.5707963267948966);
+    Mat4x4RotY(matrix, 1.5707963267948966);
+    if (matrix[1] < 0x100000000 - epsilon ||
+        matrix[1] > 0x100000000 + epsilon ||
+        matrix[4] < 0x100000000 - epsilon ||
+        matrix[4] > 0x100000000 + epsilon ||
+        matrix[10] < 0x100000000 - epsilon ||
+        matrix[10] > 0x100000000 + epsilon)
+        return 5;
+    return 0x2a;
 }
 extern Bool GrPlot(CDC *dc, I64 x, I64 y);
 extern Bool GrLine(CDC *dc, I64 x1, I64 y1, I64 x2, I64 y2,

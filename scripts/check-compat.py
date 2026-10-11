@@ -205,6 +205,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         print('PASS boot and legacy regression markers', flush=True)
         command('zcall BootstrapSpriteOpcodeChecks',
                 'zc => 0x000000000000002a')
+        command('zcall BootstrapMat4x4Checks',
+                'zc => 0x000000000000002a')
         command('zcall BootstrapCanUseUpstreamGrUpdateTasks',
                 'zc => 0x0000000000000001')
         command('zcall ZcTaskFrameRun', 'zc => 0x0000000000000001')

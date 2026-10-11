@@ -2759,7 +2759,7 @@ Freeze catalog unchanged.
 | Gap | `WinMgrTask` calls `GrSetUpTables` before the first z-buffer rebuild, but the bridge implementation was empty |
 | Bring-up | Bind the active source `gr` to the bounded z-buffer and visibility bitmap, then clear those arrays and their per-window coverage counts |
 | Smoke | `GrSetUpTablesSourceChecks` verifies pointer binding and clearing at both ends of the z-buffer, then calls source `WinZBufUpdate` to rebuild live task visibility |
-| Limits | Only compositor z/visibility state is prepared; the original planar, brush, sprite, zoom, and screen-cache tables are still unported |
+| Limits | This milestone initialized compositor z/visibility state only; later milestones add packed-color, zoom/brush, and sprite-opcode tables, while full boot-time graphics initialization remains open |
 
 Freeze catalog unchanged.
 
@@ -2885,7 +2885,7 @@ Freeze catalog unchanged.
 | Gap | Unchanged `GrRect` faults when the active source graphics global has a null `to_8_bits` lookup table; the control fixture exposed this during source-compositor drawing |
 | Bring-up | Initialize and bind the 256-entry one-bit-to-eight-pixel mask table and the 16-entry repeated-color table for every active source `gr` global |
 | Smoke | `BootstrapGrPackedTablesChecks` checks representative masks/colors; `python3 scripts/check-compat.py --pci --probe-window-buttons` exercises the source `GrRect` CDC path and verifies the drawn control pixel. The `--quick` suite checks table initialization and the safe bridge-backed `windowdemo` lifecycle |
-| Limits | The bridge table covers the current 8-bit staged surface and basic `GrRect` path; it does not initialize the remaining planar, brush, sprite, and full palette tables. Manual UTM pointer acceptance is still required |
+| Limits | The packed-color tables cover the current 8-bit staged surface and basic `GrRect` path; they do not reproduce all upstream palette or display initialization. Manual UTM pointer acceptance is still required |
 
 ## Milestone 247 — render source CDC controls with WinMgrTask active
 
@@ -2964,7 +2964,7 @@ Freeze catalog unchanged.
 | Gap | The on-demand source manager could enter its first refresh before the source `gr` global had valid surface pointers, packed color tables, or a screen cache |
 | Bring-up | Expand `BootstrapGrContextInit` to bind the bootstrap framebuffer as screen image and persistent/current DCs, attach the planar/cache/zoom surfaces, text plane, screen cache, packed color and window visibility tables, validate the zoom range, and initialize cache readiness. `BootstrapWinMgrStart` now performs this initialization before spawning `WinMgrTask` |
 | Smoke | `BootstrapGrContextInitChecks` clears the source graphics pointers and cache state, invokes initialization, and checks every bound surface/table, auxiliary CDC signature, cache sentinel, and zoom default; `python3 scripts/check-compat.py --pci --probe-module /System/Win.ZC --probe-winmgr --probe-grscreen --probe-live-winmgr --probe-live-winmgr-wake --probe-live-window-control` passes |
-| Limits | These are bounded bootstrap surfaces and tables, not the complete ZealOS graphics initialization: brush/sprite/zoom lookup tables, normal menu/music startup, ordinary application creation, and the full kernel boot path remain open |
+| Limits | These are bounded bootstrap surfaces and tables, not the complete ZealOS graphics initialization: normal menu/music startup, ordinary application creation, and the full kernel boot path remain open |
 
 ## Milestone 256 — select ZealOS's standard palette during graphics startup
 
@@ -2982,7 +2982,7 @@ Freeze catalog unchanged.
 | Gap | Upstream `DocGR` calls `DC2Sprite`, but the ARM64 bootstrap left the symbol unresolved |
 | Bring-up | Add `DC2Sprite` and a bounded bitmap-record `SpriteTypeMask` after `Gr.HH` is loaded. The converter serializes the unchanged bitmap record and pads rows to the sprite format; unsupported opcodes are rejected instead of being walked with a guessed size |
 | Smoke | `GrDC2SpriteChecks` verifies aligned and partial-width row contents, the bitmap type mask, invalid-type reporting, end marker, and null-input behavior; the complete PCI graphics/window-manager compatibility probe passes |
-| Limits | Other valid sprite opcodes still need their upstream record-size rules before `SpriteTypeMask` can scan them; sprite rendering/plotting and graphics lookup-table initialization remain unfinished |
+| Limits | Other valid sprite opcodes still need their upstream record-size rules before `SpriteTypeMask` can scan them; complete upstream sprite rendering remains unfinished |
 
 ## Milestone 258 — scan every ZealOS sprite record type
 
@@ -2991,7 +2991,7 @@ Freeze catalog unchanged.
 | Gap | `SpriteTypeMask` only advanced across bitmap records, so valid upstream color, drawing, text, spline, and mesh records were rejected |
 | Bring-up | Implement the upstream `SpriteElemSize` rules for all 30 sprite opcodes, including variable point/spline/mesh payloads and null-terminated text; reject invalid counts and oversized records before advancing |
 | Smoke | Extend `GrDC2SpriteChecks` with multi-record color/flood-fill sequences and variable polyline, POLYPT, spline, text, mesh, and shiftable-mesh records; full PCI graphics/window-manager compatibility probe passes |
-| Limits | `SpriteTypeMask` has no byte-length parameter in the upstream API, so callers must still provide a readable, well-formed sprite buffer. Sprite plotting and graphics lookup-table initialization remain unfinished |
+| Limits | `SpriteTypeMask` has no byte-length parameter in the upstream API, so callers must still provide a readable, well-formed sprite buffer. Full sprite rendering remains unfinished |
 
 ## Milestone 259 — plot CDC bitmap sprites on the ARM framebuffer
 
@@ -3144,7 +3144,16 @@ Freeze catalog unchanged.
 | Gap | Early bootstrap code exposed a four-entry placeholder sprite opcode range even though pinned `Gr.HH` defines 30 record types, leaving startup-time scanners with a different ABI from source-loaded graphics |
 | Bring-up | Replace the placeholder with all 30 upstream `SPT_*` values and add a runtime guard that checks each opcode and `SPT_TYPES_NUM` against the pinned numbering |
 | Smoke | `check-compat.py --pci` calls `BootstrapSpriteOpcodeChecks` during the boot integration path and passes alongside the graphics and PCI persistence checks |
-| Limits | Opcode numbering now matches source; unsupported sprite record behavior and the remaining upstream graphics tables still need implementation |
+| Limits | Opcode numbering now matches source; unsupported sprite record behavior and complete upstream graphics startup still need implementation |
+
+## Milestone 276 — restore ZealOS fixed-point matrix transforms
+
+| Item | Path |
+|--|--|
+| Gap | The bootstrap exported empty `Mat4x4IdentEqu` and `Mat4x4RotX/Y/Z` stubs, so unchanged 3D graphics consumers could not form or compose the source Q32.32 transforms |
+| Bring-up | Initialize the exact Q32.32 identity matrix and implement X/Y/Z rotations using the ARM-safe F64 sine/cosine bindings; compose through F64 products to avoid overflowing intermediate Q32.32 integer products |
+| Smoke | `BootstrapMat4x4Checks` verifies identity, positive quarter-turn coefficients for all axes, and composition order; `python3 scripts/check-compat.py --pci` exercises it in the guest |
+| Limits | This provides matrix initialization and rotation primitives, not complete 3D clipping, arbitrary transformed sprite rendering, or interactive view-angle controls |
 
 ## Open compatibility probe — `/System/Win.ZC`
 
@@ -3152,13 +3161,13 @@ The source probe loads pinned `KernelC.HH`, `Externs.ZC`, and `Gr.HH` before com
 
 The native runtime now binds ZealOS's five-slot `ext` dispatch table to stable native storage. The probe compiles the unchanged `Win.ZC`, then checks that its file-scope initializers installed both `WinToTop` and `WinFocus` in the matching slots. This proves the module loads and its dispatch registrations work; it does not yet start the full window manager or validate interactive window behavior. The fixture remains explicit about its uninitialized kernel globals and compile-only menu/zoom stubs.
 
-The source-ordered graphics probe now loads unchanged `GrDC.ZC`, `GrBitMap.ZC`, `Win.ZC`, and `WinMgr.ZC`. This required bridging ZealOS runtime defines into Aiwnios's compiler dictionary, binding the framebuffer/depth-buffer primitives, and supplying ARM-safe helpers for `Sqrt`, `DistSqrI64`, `SwapU16`, and `ClampI64`. The bridge's `IsPixCovered0` compares each task's z number against the existing cell z-buffer, with a smoke for covered/uncovered cases. `WinZBufUpdate` rebuilds that bounded cell z-buffer; `GrSetUpTables` initializes z/visibility and packed color tables, and manager startup binds the framebuffer, planar/cache/zoom CDC storage, text plane, and screen cache before its first refresh. It also selects the unchanged ZealOS standard palette; the full planar/brush/sprite/zoom lookup-table initialization remains incomplete.
+The source-ordered graphics probe now loads unchanged `GrDC.ZC`, `GrBitMap.ZC`, `Win.ZC`, and `WinMgr.ZC`. This required bridging ZealOS runtime defines into Aiwnios's compiler dictionary, binding the framebuffer/depth-buffer primitives, and supplying ARM-safe helpers for `Sqrt`, `DistSqrI64`, `SwapU16`, and `ClampI64`. The bridge's `IsPixCovered0` compares each task's z number against the existing cell z-buffer, with a smoke for covered/uncovered cases. `WinZBufUpdate` rebuilds that bounded cell z-buffer; `GrSetUpTables` initializes z/visibility and packed color tables, and manager startup binds the framebuffer, planar/cache/zoom CDC storage, text plane, and screen cache before its first refresh. It also selects the unchanged ZealOS standard palette. The bridge now initializes packed pixel masks, zoom/brush families, and the sprite opcode hash; complete upstream boot-time graphics initialization and other renderer paths remain open.
 
 Guest `try/catch` now calls uniquely named `ZcTryEnter`/`ZcTryLeave`/`ZcTryCatchEnd` hooks. ZealOS's `KernelC.HH` declares a different native `SysTry(start_label, skip_label)` ABI, so using `SysTry` for both had caused the full manager's `try` block to compile as a call with a missing argument. The focused probe loads `KernelC.HH`, reruns `TaskExceptionChecks`, compiles unchanged `Win.ZC`, then compiles unchanged `WinMgr.ZC`; the complete PCI compatibility suite also passes.
 
 The parser now resolves a later guest `extern` global to an earlier guest definition when scalar types have a matching ABI, aggregate types are identical, and array dimensions match. `GlobalExternLinkChecks` covers this across separately loaded modules; this lets declarations such as `Externs.ZC`'s `winmgr` refer to storage already supplied by the task bridge. The ARM64 math runtime implements ZealOS's `_EXP` import, and the bootstrap `LowPass1` follows the unchanged `MathODE.ZC` formula. Named HolyC `reg RSI`/`reg R13`/`reg RCX` hints parse as nonbinding allocation hints on ARM64, alongside ordinary `reg bit_shift` locals. The source bundle now applies a guarded ARM64 overlay to unchanged `GrScreen.ZC`: its `GrUpdateTextBG` x86 register loop expands to eight inline typed stores per character. The AArch64 runtime also implements and tests `DCBlotColor4`'s cached four-bitplane conversion. `python3 scripts/check-compat.py --pci --probe-module /System/Win.ZC --probe-winmgr --probe-grscreen` compiles the translated file and passes the background-store helper, foreground text pass, and frame-finalization checks in the guest. The opt-in `--probe-fulltext-visible` path now passes the staged full-frame text smoke with framebuffer-console and serial output both enabled. Pinned source remains byte-identical. The full unchanged 758-line `MathODE.ZC` is pinned but currently causes a guest data abort while compiling, so only the low-pass helper is in the bootstrap path.
 
-This remains a bring-up probe, not a complete running desktop. The task-geometry bridge, source graphics-context initialization, pixel hit-test helper, guest task control-queue initialization, CPU-pointer inheritance for synthetic tasks, and task-ring insertion/removal are implemented and tested. The disposable live-start probe starts unchanged `WinMgrTask`, verifies a timer-woken scan, consumes a tablet sample through source `WinMouseUpdate`, and drives a synthetic title-bar drag through the source manager to check focus and geometry. The shell can start and stop the manager, but normal boot-time menu/music startup, full planar/brush/sprite/zoom lookup tables, remaining `GrAsm` routines, and ordinary kernel task/application initialization still need porting or real implementations.
+This remains a bring-up probe, not a complete running desktop. The task-geometry bridge, source graphics-context initialization, pixel hit-test helper, guest task control-queue initialization, CPU-pointer inheritance for synthetic tasks, and task-ring insertion/removal are implemented and tested. The disposable live-start probe starts unchanged `WinMgrTask`, verifies a timer-woken scan, consumes a tablet sample through source `WinMouseUpdate`, and drives a synthetic title-bar drag through the source manager to check focus and geometry. The shell can start and stop the manager, but normal boot-time menu/music startup, remaining `GrAsm` routines, and ordinary kernel task/application initialization still need porting or real implementations. Q32.32 identity and X/Y/Z matrix operations are bridged; arbitrary-angle 3D sprite transforms and interactive view-angle controls remain open.
 
 ## Acceptance
 
