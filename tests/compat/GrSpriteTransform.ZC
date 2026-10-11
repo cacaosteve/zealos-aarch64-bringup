@@ -11,7 +11,7 @@ I64 GrSpriteTransformChecks()
     CD3I32 point;
 
     dc = DCNew(800, 600);
-    records = CAlloc(637);
+    records = CAlloc(667);
     if (!dc || !records || !dc->r || !dc->transform)
         return 1;
     dc->color.c0 = 12;
@@ -303,6 +303,24 @@ I64 GrSpriteTransformChecks()
     MemCopy(records + 630, &y, sizeof(I32));
     records[634] = 'A';
 
+    type = SPT_TRANSFORM_ON;
+    MemCopy(records + 636, &type, sizeof(U8));
+    type = SPT_TEXT_BOX;
+    MemCopy(records + 637, &type, sizeof(U8));
+    x = 140; y = 100;
+    MemCopy(records + 641, &x, sizeof(I32));
+    MemCopy(records + 645, &y, sizeof(I32));
+    records[649] = 'A';
+
+    type = SPT_TRANSFORM_ON;
+    MemCopy(records + 651, &type, sizeof(U8));
+    type = SPT_TEXT_DIAMOND;
+    MemCopy(records + 652, &type, sizeof(U8));
+    x = 170; y = 130;
+    MemCopy(records + 656, &x, sizeof(I32));
+    MemCopy(records + 660, &y, sizeof(I32));
+    records[664] = 'A';
+
     glyph_row = glyph_col = -1;
     for (scan_i = 0; scan_i < FONT_HEIGHT && glyph_row < 0; scan_i++)
         for (scan_j = 0; scan_j < FONT_WIDTH; scan_j++)
@@ -355,6 +373,17 @@ I64 GrSpriteTransformChecks()
             550 + glyph_col) != color ||
             ZcFbTextPixel(730 + glyph_col, 490 + glyph_row) != color)
         return 5;
+    if (ZcFbTextPixel(512, 568) != color ||
+            ZcFbTextPixel(512, 580) != color ||
+            ZcFbTextPixel(500, 580) != color ||
+            ZcFbTextPixel(500, 568) != color ||
+            ZcFbTextPixel(510 - glyph_row, 570 + glyph_col) != color ||
+            ZcFbTextPixel(489, 600) != color ||
+            ZcFbTextPixel(480, 611) != color ||
+            ZcFbTextPixel(471, 600) != color ||
+            ZcFbTextPixel(480, 589) != color ||
+            ZcFbTextPixel(484 - glyph_row, 596 + glyph_col) != color)
+        return 6;
     if (ZcFbTextPixel(585, 445) == color)
         return 3;
     if (dc->flags & DCF_TRANSFORMATION)
