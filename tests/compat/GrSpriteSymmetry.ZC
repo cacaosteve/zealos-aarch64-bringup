@@ -9,7 +9,7 @@ I64 GrSpriteSymmetryChecks()
     I64 color;
 
     dc = DCNew(800, 600);
-    records = CAlloc(73);
+    records = CAlloc(121);
     if (!dc || !records)
         return 1;
     dc->color.c0 = 12;
@@ -45,6 +45,23 @@ I64 GrSpriteSymmetryChecks()
     MemCopy(records + 64, &x2, sizeof(I32));
     MemCopy(records + 68, &y2, sizeof(I32));
 
+    // A circle is rasterized once on the source side and once reflected
+    // across the same vertical axis.
+    type = SPT_CIRCLE;
+    MemCopy(records + 72, &type, sizeof(U8));
+    x1 = 30; y1 = 100; x2 = 10;
+    MemCopy(records + 76, &x1, sizeof(I32));
+    MemCopy(records + 80, &y1, sizeof(I32));
+    MemCopy(records + 84, &x2, sizeof(I32));
+
+    type = SPT_ELLIPSE;
+    MemCopy(records + 88, &type, sizeof(U8));
+    x1 = 30; y1 = 140; x2 = 8; y2 = 4;
+    MemCopy(records + 92, &x1, sizeof(I32));
+    MemCopy(records + 96, &y1, sizeof(I32));
+    MemCopy(records + 100, &x2, sizeof(I32));
+    MemCopy(records + 104, &y2, sizeof(I32));
+
     color = gr_palette[12] & 0x00FFFFFF;
     Sprite3(dc, 400, 300, 0, records);
     if (ZcFbTextPixel(420, 330) != color ||
@@ -61,6 +78,12 @@ I64 GrSpriteSymmetryChecks()
             ZcFbTextPixel(440, 380) != color ||
             ZcFbTextPixel(560, 380) != color)
         return 4;
+    if (ZcFbTextPixel(440, 400) != color ||
+            ZcFbTextPixel(560, 400) != color)
+        return 5;
+    if (ZcFbTextPixel(438, 440) != color ||
+            ZcFbTextPixel(562, 440) != color)
+        return 6;
 
     DCDel(dc);
     Free(records);

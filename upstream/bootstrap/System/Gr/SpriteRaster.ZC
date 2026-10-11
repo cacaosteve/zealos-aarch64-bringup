@@ -171,6 +171,20 @@ U0 SpritePlotTransform0(CDC *dc, Bool enabled, I64 x, I64 y, I64 z)
         GrPlot(dc, screen_x, screen_y);
 }
 
+U0 SpritePlotSymTransform0(CDC *dc, Bool enabled, I64 x, I64 y, I64 z,
+        Bool symmetry_enabled, I64 axis_x1, I64 axis_y1,
+        I64 axis_x2, I64 axis_y2)
+{//Plot a transformed sprite sample and its planar reflection, if enabled.
+    I64 screen_x, screen_y, mirror_x, mirror_y;
+
+    if (!SpriteTransformPoint0(dc, enabled, x, y, z, &screen_x, &screen_y))
+        return;
+    GrPlot(dc, screen_x, screen_y);
+    if (symmetry_enabled && SpriteMirrorPoint0(axis_x1, axis_y1,
+            axis_x2, axis_y2, screen_x, screen_y, &mirror_x, &mirror_y))
+        GrPlot(dc, mirror_x, mirror_y);
+}
+
 U0 SpriteRectTransform0(CDC *dc, I64 left, I64 top, I64 right, I64 bottom,
         Bool transform_enabled, I64 z)
 {//Draw an axis-aligned or transformed filled rectangle through its corners.
@@ -808,17 +822,21 @@ I64 SpriteBSpline0(CDC *dc, I64 ox, I64 oy, U8 *sprite, I64 type,
 }
 
 U0 SpriteEllipsePlot0(CDC *dc, I64 cx, I64 cy, I64 px, I64 py,
-        F64 cos_angle, F64 sin_angle, Bool transform_enabled, I64 z)
+        F64 cos_angle, F64 sin_angle, Bool transform_enabled, I64 z,
+        Bool symmetry_enabled, I64 axis_x1, I64 axis_y1,
+        I64 axis_x2, I64 axis_y2)
 {
     I64 x, y;
 
     x = cx + SpriteRoundF64(cos_angle * px + sin_angle * py);
     y = cy + SpriteRoundF64(-sin_angle * px + cos_angle * py);
-    SpritePlotTransform0(dc, transform_enabled, x, y, z);
+    SpritePlotSymTransform0(dc, transform_enabled, x, y, z,
+            symmetry_enabled, axis_x1, axis_y1, axis_x2, axis_y2);
 }
 
 U0 SpriteEllipse0(CDC *dc, I64 cx, I64 cy, I64 rx, I64 ry,
-        F64 angle, Bool transform_enabled, I64 z)
+        F64 angle, Bool transform_enabled, I64 z, Bool symmetry_enabled,
+        I64 axis_x1, I64 axis_y1, I64 axis_x2, I64 axis_y2)
 {
     I64 rx2, ry2, px, py, dx, dy, decision;
     F64 cos_angle, sin_angle;
@@ -828,15 +846,18 @@ U0 SpriteEllipse0(CDC *dc, I64 cx, I64 cy, I64 rx, I64 ry,
 
     if (!rx && !ry)
         SpriteEllipsePlot0(dc, cx, cy, 0, 0, cos_angle, sin_angle,
-                transform_enabled, z);
+                transform_enabled, z, symmetry_enabled, axis_x1, axis_y1,
+                axis_x2, axis_y2);
     else if (!rx)
         for (py = -ry; py <= ry; py++)
             SpriteEllipsePlot0(dc, cx, cy, 0, py, cos_angle, sin_angle,
-                    transform_enabled, z);
+                    transform_enabled, z, symmetry_enabled, axis_x1, axis_y1,
+                    axis_x2, axis_y2);
     else if (!ry)
         for (px = -rx; px <= rx; px++)
             SpriteEllipsePlot0(dc, cx, cy, px, 0, cos_angle, sin_angle,
-                    transform_enabled, z);
+                    transform_enabled, z, symmetry_enabled, axis_x1, axis_y1,
+                    axis_x2, axis_y2);
     else
     {
         rx2 = rx * rx;
@@ -849,13 +870,17 @@ U0 SpriteEllipse0(CDC *dc, I64 cx, I64 cy, I64 rx, I64 ry,
         while (dx < dy)
         {
             SpriteEllipsePlot0(dc, cx, cy, px, py,
-                    cos_angle, sin_angle, transform_enabled, z);
+                    cos_angle, sin_angle, transform_enabled, z,
+                    symmetry_enabled, axis_x1, axis_y1, axis_x2, axis_y2);
             SpriteEllipsePlot0(dc, cx, cy, -px, py,
-                    cos_angle, sin_angle, transform_enabled, z);
+                    cos_angle, sin_angle, transform_enabled, z,
+                    symmetry_enabled, axis_x1, axis_y1, axis_x2, axis_y2);
             SpriteEllipsePlot0(dc, cx, cy, px, -py,
-                    cos_angle, sin_angle, transform_enabled, z);
+                    cos_angle, sin_angle, transform_enabled, z,
+                    symmetry_enabled, axis_x1, axis_y1, axis_x2, axis_y2);
             SpriteEllipsePlot0(dc, cx, cy, -px, -py,
-                    cos_angle, sin_angle, transform_enabled, z);
+                    cos_angle, sin_angle, transform_enabled, z,
+                    symmetry_enabled, axis_x1, axis_y1, axis_x2, axis_y2);
             px++;
             dx += 2 * ry2;
             if (decision < 0)
@@ -872,13 +897,17 @@ U0 SpriteEllipse0(CDC *dc, I64 cx, I64 cy, I64 rx, I64 ry,
         while (py >= 0)
         {
             SpriteEllipsePlot0(dc, cx, cy, px, py,
-                    cos_angle, sin_angle, transform_enabled, z);
+                    cos_angle, sin_angle, transform_enabled, z,
+                    symmetry_enabled, axis_x1, axis_y1, axis_x2, axis_y2);
             SpriteEllipsePlot0(dc, cx, cy, -px, py,
-                    cos_angle, sin_angle, transform_enabled, z);
+                    cos_angle, sin_angle, transform_enabled, z,
+                    symmetry_enabled, axis_x1, axis_y1, axis_x2, axis_y2);
             SpriteEllipsePlot0(dc, cx, cy, px, -py,
-                    cos_angle, sin_angle, transform_enabled, z);
+                    cos_angle, sin_angle, transform_enabled, z,
+                    symmetry_enabled, axis_x1, axis_y1, axis_x2, axis_y2);
             SpriteEllipsePlot0(dc, cx, cy, -px, -py,
-                    cos_angle, sin_angle, transform_enabled, z);
+                    cos_angle, sin_angle, transform_enabled, z,
+                    symmetry_enabled, axis_x1, axis_y1, axis_x2, axis_y2);
             py--;
             dy -= 2 * rx2;
             if (decision > 0)
@@ -1427,7 +1456,9 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
             pixel_budget += 8 * (width + height + 1);
             SpriteEllipse0(dc, x + old_x + x1, y + old_y + y1,
                            width, height, ellipse_angle,
-                           transform_enabled, z);
+                           transform_enabled, z, symmetry_enabled,
+                           symmetry_x1, symmetry_y1,
+                           symmetry_x2, symmetry_y2);
             size = 32;
         }
         else if (type == 13) // SPT_ROTATED_RECT, bounded cardinal subset
@@ -1699,30 +1730,46 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
                 circle_err = 1 - radius;
                 while (circle_x >= circle_y)
                 {
-                    SpritePlotTransform0(dc, transform_enabled,
+                    SpritePlotSymTransform0(dc, transform_enabled,
                             x + old_x + x1 + circle_x,
-                            y + old_y + y1 + circle_y, z);
-                    SpritePlotTransform0(dc, transform_enabled,
+                            y + old_y + y1 + circle_y, z, symmetry_enabled,
+                            symmetry_x1, symmetry_y1,
+                            symmetry_x2, symmetry_y2);
+                    SpritePlotSymTransform0(dc, transform_enabled,
                             x + old_x + x1 + circle_y,
-                            y + old_y + y1 + circle_x, z);
-                    SpritePlotTransform0(dc, transform_enabled,
+                            y + old_y + y1 + circle_x, z, symmetry_enabled,
+                            symmetry_x1, symmetry_y1,
+                            symmetry_x2, symmetry_y2);
+                    SpritePlotSymTransform0(dc, transform_enabled,
                             x + old_x + x1 - circle_y,
-                            y + old_y + y1 + circle_x, z);
-                    SpritePlotTransform0(dc, transform_enabled,
+                            y + old_y + y1 + circle_x, z, symmetry_enabled,
+                            symmetry_x1, symmetry_y1,
+                            symmetry_x2, symmetry_y2);
+                    SpritePlotSymTransform0(dc, transform_enabled,
                             x + old_x + x1 - circle_x,
-                            y + old_y + y1 + circle_y, z);
-                    SpritePlotTransform0(dc, transform_enabled,
+                            y + old_y + y1 + circle_y, z, symmetry_enabled,
+                            symmetry_x1, symmetry_y1,
+                            symmetry_x2, symmetry_y2);
+                    SpritePlotSymTransform0(dc, transform_enabled,
                             x + old_x + x1 - circle_x,
-                            y + old_y + y1 - circle_y, z);
-                    SpritePlotTransform0(dc, transform_enabled,
+                            y + old_y + y1 - circle_y, z, symmetry_enabled,
+                            symmetry_x1, symmetry_y1,
+                            symmetry_x2, symmetry_y2);
+                    SpritePlotSymTransform0(dc, transform_enabled,
                             x + old_x + x1 - circle_y,
-                            y + old_y + y1 - circle_x, z);
-                    SpritePlotTransform0(dc, transform_enabled,
+                            y + old_y + y1 - circle_x, z, symmetry_enabled,
+                            symmetry_x1, symmetry_y1,
+                            symmetry_x2, symmetry_y2);
+                    SpritePlotSymTransform0(dc, transform_enabled,
                             x + old_x + x1 + circle_y,
-                            y + old_y + y1 - circle_x, z);
-                    SpritePlotTransform0(dc, transform_enabled,
+                            y + old_y + y1 - circle_x, z, symmetry_enabled,
+                            symmetry_x1, symmetry_y1,
+                            symmetry_x2, symmetry_y2);
+                    SpritePlotSymTransform0(dc, transform_enabled,
                             x + old_x + x1 + circle_x,
-                            y + old_y + y1 - circle_y, z);
+                            y + old_y + y1 - circle_y, z, symmetry_enabled,
+                            symmetry_x1, symmetry_y1,
+                            symmetry_x2, symmetry_y2);
                     circle_y++;
                     if (circle_err < 0)
                         circle_err += 2 * circle_y + 1;
