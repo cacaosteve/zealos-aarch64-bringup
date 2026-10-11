@@ -2036,6 +2036,10 @@ static uint32_t zeal_graphics_color(uint32_t color) {
     return color < 16 ? g_text_palette[color] : color & 0x00ffffffu;
 }
 
+uint64_t zeal_fb_graph_color(uint32_t color) {
+    return zeal_graphics_color(color);
+}
+
 uint64_t zeal_fb_graph_plot(int64_t x, int64_t y, uint32_t color,
                             int64_t left, int64_t top,
                             int64_t right, int64_t bottom) {

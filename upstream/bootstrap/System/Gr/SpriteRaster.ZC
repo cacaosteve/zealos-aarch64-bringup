@@ -3,6 +3,10 @@
 extern F64 ZcSinF64(F64 angle);
 extern F64 ZcCosF64(F64 angle);
 extern I64 GrPutS(CDC *dc, I64 x, I64 y, U8 *s);
+extern I64 ZcFbTextPixel(I64 x, I64 y);
+extern I64 ZcFbGraphColor(I64 color);
+extern I64 ZcFbScreenWidth();
+extern I64 ZcFbScreenHeight();
 
 I64 SpriteCeilF64(F64 value)
 {
@@ -24,6 +28,110 @@ I64 SpriteAbsI64(I64 value)
     if (value < 0)
         return -value;
     return value;
+}
+
+Bool SpriteMirrorPoint0(I64 x1, I64 y1, I64 x2, I64 y2, I64 x, I64 y,
+        I64 *mirror_x, I64 *mirror_y)
+{//Reflect a 2D point across the symmetry record's line.
+    I64 dx, dy;
+    F64 length2, projection;
+
+    dx = x2 - x1;
+    dy = y2 - y1;
+    if ((!dx && !dy) || SpriteAbsI64(dx) > 1000000 ||
+            SpriteAbsI64(dy) > 1000000 || SpriteAbsI64(x1) > 1000000 ||
+            SpriteAbsI64(y1) > 1000000 || SpriteAbsI64(x) > 1000000 ||
+            SpriteAbsI64(y) > 1000000)
+        return FALSE;
+    length2 = ToF64(dx) * dx + ToF64(dy) * dy;
+    projection = ((ToF64(x - x1) * dx + ToF64(y - y1) * dy) /
+            length2) * 2.0;
+    *mirror_x = ToI64(2.0 * x1 + projection * dx - x);
+    *mirror_y = ToI64(2.0 * y1 + projection * dy - y);
+    return TRUE;
+}
+
+U0 SpriteMirrorLine0(CDC *dc, I64 x1, I64 y1, I64 x2, I64 y2,
+        I64 axis_x1, I64 axis_y1, I64 axis_x2, I64 axis_y2)
+{
+    I64 mx1, my1, mx2, my2;
+
+    if (SpriteMirrorPoint0(axis_x1, axis_y1, axis_x2, axis_y2,
+            x1, y1, &mx1, &my1) &&
+            SpriteMirrorPoint0(axis_x1, axis_y1, axis_x2, axis_y2,
+            x2, y2, &mx2, &my2))
+        GrLine(dc, mx1, my1, mx2, my2);
+}
+
+U0 SpriteMirrorRect0(CDC *dc, I64 left, I64 top, I64 right, I64 bottom,
+        I64 axis_x1, I64 axis_y1, I64 axis_x2, I64 axis_y2)
+{//Rasterize the reflected filled rectangle as a bounded scanline quad.
+    I64 px[4], py[4], crossings[4];
+    I64 i, j, swap, min_y, max_y, min_x, max_x, y, count, x_start, x_end;
+    I64 span_work;
+    F64 cross_x;
+
+    if (!SpriteMirrorPoint0(axis_x1, axis_y1, axis_x2, axis_y2,
+            left, top, &px[0], &py[0]) ||
+            !SpriteMirrorPoint0(axis_x1, axis_y1, axis_x2, axis_y2,
+            right, top, &px[1], &py[1]) ||
+            !SpriteMirrorPoint0(axis_x1, axis_y1, axis_x2, axis_y2,
+            right, bottom, &px[2], &py[2]) ||
+            !SpriteMirrorPoint0(axis_x1, axis_y1, axis_x2, axis_y2,
+            left, bottom, &px[3], &py[3]))
+        return;
+    min_y = max_y = py[0];
+    min_x = max_x = px[0];
+    for (i = 1; i < 4; i++)
+    {
+        if (py[i] < min_y) min_y = py[i];
+        if (py[i] > max_y) max_y = py[i];
+        if (px[i] < min_x) min_x = px[i];
+        if (px[i] > max_x) max_x = px[i];
+    }
+    if (min_y < 0) min_y = 0;
+    if (max_y >= dc->height) max_y = dc->height - 1;
+    if (min_x < 0) min_x = 0;
+    if (max_x >= dc->width) max_x = dc->width - 1;
+    span_work = (max_x - min_x + 1) * (max_y - min_y + 1);
+    if (min_x > max_x || min_y > max_y || span_work > 480000)
+        return;
+    for (y = min_y; y <= max_y; y++)
+    {
+        count = 0;
+        for (i = 0; i < 4; i++)
+        {
+            j = (i + 1) & 3;
+            if ((py[i] <= y && py[j] > y) ||
+                    (py[j] <= y && py[i] > y))
+            {
+                cross_x = ToF64(px[i]) +
+                        ToF64(y - py[i]) * (px[j] - px[i]) /
+                        (py[j] - py[i]);
+                crossings[count++] = ToI64(cross_x);
+            }
+        }
+        if (count >= 2)
+        {
+            for (i = 0; i < count - 1; i++)
+                for (j = i + 1; j < count; j++)
+                    if (crossings[j] < crossings[i])
+                    {
+                        swap = crossings[i];
+                        crossings[i] = crossings[j];
+                        crossings[j] = swap;
+                    }
+            for (i = 0; i + 1 < count; i += 2)
+            {
+                x_start = crossings[i];
+                x_end = crossings[i + 1];
+                if (x_start < min_x) x_start = min_x;
+                if (x_end > max_x) x_end = max_x;
+                if (x_start <= x_end)
+                    GrLine(dc, x_start, y, x_end, y);
+            }
+        }
+    }
 }
 
 I64 SpriteTextSize0(U8 *sprite)
@@ -750,9 +858,170 @@ I64 SpritePolygon0(CDC *dc, I64 x, I64 y, I32 cx, I32 cy,
     return total;
 }
 
+Bool SpriteFloodMatch0(I64 pixel, I64 fill_color, I64 seed_color,
+		Bool not_color)
+{
+	pixel &= 0x00ffffff;
+	if (not_color)
+		return pixel != fill_color;
+	return pixel == seed_color;
+}
+
+I64 SpriteFloodFill0(CDC *dc, I64 seed_x, I64 seed_y, Bool not_color,
+        I64 pixel_limit)
+{//Framebuffer-backed bounded counterpart of GrFloodFill for the ARM64 bridge.
+    I64 origin_x, origin_y, left, top, right, bottom;
+    I64 width, height, area, fill_color, seed_color, index;
+    I64 stack_len, work, run_left, run_right, scan_x, scan_y;
+    I64 x, y, row, old_color;
+    I64 *stack;
+    U8 *visited;
+
+    if (!dc || (dc->flags & DCF_DONT_DRAW) || pixel_limit <= 0)
+        return 0;
+    origin_x = origin_y = 0;
+    left = top = 0;
+    right = dc->width - 1;
+    bottom = dc->height - 1;
+    if ((dc->flags & DCF_SCREEN_BITMAP) && !(dc->flags & DCF_ON_TOP))
+    {
+        if (!dc->win_task)
+            return 0;
+        WinDerivedValsUpdate(dc->win_task);
+        origin_x = dc->win_task->pix_left + dc->win_task->scroll_x;
+        origin_y = dc->win_task->pix_top + dc->win_task->scroll_y;
+        left = dc->win_task->pix_left - origin_x;
+        top = dc->win_task->pix_top - origin_y;
+        right = dc->win_task->pix_right - origin_x;
+        bottom = dc->win_task->pix_bottom - origin_y;
+    }
+    else
+    {
+        if (right >= ZcFbScreenWidth()) right = ZcFbScreenWidth() - 1;
+        if (bottom >= ZcFbScreenHeight()) bottom = ZcFbScreenHeight() - 1;
+    }
+    if (left < 0) left = 0;
+    if (top < 0) top = 0;
+    if (right >= dc->width) right = dc->width - 1;
+    if (bottom >= dc->height) bottom = dc->height - 1;
+    if (left > right || top > bottom || seed_x < left || seed_x > right ||
+            seed_y < top || seed_y > bottom)
+        return 0;
+    width = right - left + 1;
+    height = bottom - top + 1;
+    area = width * height;
+    if (area <= 0 || area > 480000)
+        return 0;
+
+    // The bridge's GrPlot maps an 8-bit palette index to the current RGB
+    // framebuffer. Flood comparisons therefore use the same resolved RGB.
+    fill_color = ZcFbGraphColor(dc->color.c0 & 0xff) & 0x00ffffff;
+    seed_color = ZcFbTextPixel(seed_x + origin_x, seed_y + origin_y) &
+            0x00ffffff;
+    if (seed_color == fill_color)
+        return 0;
+
+    stack = CAlloc(area * sizeof(I64));
+    visited = CAlloc((area + 7) >> 3);
+    if (!stack || !visited)
+    {
+        if (stack) Free(stack);
+        if (visited) Free(visited);
+        return 0;
+    }
+    stack_len = work = 0;
+    index = (seed_y - top) * width + seed_x - left;
+    stack[stack_len++] = index;
+    visited[index >> 3] |= 1 << (index & 7);
+    old_color = dc->color;
+    do
+    {
+        index = stack[--stack_len];
+        y = top + index / width;
+        x = left + index % width;
+        // Expand a seed to its full horizontal span. The seed is already
+        // marked as queued; other cells are marked as they are consumed.
+        run_left = x;
+        while (run_left > left)
+        {
+            index = (y - top) * width + run_left - 1 - left;
+            if (visited[index >> 3] & (1 << (index & 7))) break;
+            if (!SpriteFloodMatch0(
+                    ZcFbTextPixel(run_left - 1 + origin_x, y + origin_y),
+                    fill_color, seed_color, not_color))
+                break;
+            run_left--;
+        }
+        run_right = x;
+        while (run_right < right)
+        {
+            index = (y - top) * width + run_right + 1 - left;
+            if (visited[index >> 3] & (1 << (index & 7))) break;
+            if (!SpriteFloodMatch0(
+                    ZcFbTextPixel(run_right + 1 + origin_x, y + origin_y),
+                    fill_color, seed_color, not_color))
+                break;
+            run_right++;
+        }
+        if (run_right - run_left + 1 > pixel_limit - work)
+            goto fill_done;
+        dc->color = old_color;
+        for (x = run_left; x <= run_right; x++)
+        {
+            index = (y - top) * width + x - left;
+            visited[index >> 3] |= 1 << (index & 7);
+            GrPlot(dc, x, y);
+            work++;
+        }
+        for (row = -1; row <= 1; row += 2)
+        {
+            scan_y = y + row;
+            if (scan_y >= top && scan_y <= bottom)
+            {
+                scan_x = run_left;
+                while (scan_x <= run_right)
+                {
+                    index = (scan_y - top) * width + scan_x - left;
+                    if (!(visited[index >> 3] & (1 << (index & 7))) &&
+                            SpriteFloodMatch0(ZcFbTextPixel(scan_x + origin_x,
+                                    scan_y + origin_y), fill_color, seed_color,
+                                    not_color))
+                    {
+                        if (stack_len >= area)
+                            goto fill_done;
+                        stack[stack_len++] = index;
+                        visited[index >> 3] |= 1 << (index & 7);
+                        scan_x++;
+                        while (scan_x <= run_right)
+                        {
+                            index = (scan_y - top) * width + scan_x - left;
+                            if (visited[index >> 3] & (1 << (index & 7)))
+                                break;
+                            if (!SpriteFloodMatch0(ZcFbTextPixel(
+                                    scan_x + origin_x, scan_y + origin_y),
+                                    fill_color, seed_color, not_color))
+                                break;
+                            scan_x++;
+                        }
+                    }
+                    scan_x++;
+                }
+            }
+        }
+    }
+    while (stack_len && work < pixel_limit);
+fill_done:
+    dc->color = old_color;
+    Free(visited);
+    Free(stack);
+    return work;
+}
+
 U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
 {
     I64 row, col, stride, old_color, old_thick, old_x, old_y, size, records, pixel_budget;
+    I64 symmetry_x1, symmetry_y1, symmetry_x2, symmetry_y2;
+    Bool symmetry_enabled;
     I64 text_len;
     I64 circle_x, circle_y, circle_err;
     I64 poly_i, poly_x1, poly_y1, poly_dx, poly_dy, poly_work, poly_total;
@@ -770,6 +1039,8 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
     old_color = dc->color;
     old_thick = dc->thick;
     old_x = old_y = 0;
+    symmetry_x1 = symmetry_y1 = symmetry_x2 = symmetry_y2 = 0;
+    symmetry_enabled = FALSE;
     records = 0;
     pixel_budget = 0;
     // Sprite3 records are a zero-terminated stream. Keep this first ARM64
@@ -862,6 +1133,23 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
             dc->thick = radius;
             size = 8;
         }
+        else if (type == 4) // SPT_PLANAR_SYMMETRY (2D plane)
+        {
+            MemCopy(&x1, sprite + 4, sizeof(I32));
+            MemCopy(&y1, sprite + 8, sizeof(I32));
+            MemCopy(&x2, sprite + 12, sizeof(I32));
+            MemCopy(&y2, sprite + 16, sizeof(I32));
+            symmetry_x1 = x + x1;
+            symmetry_y1 = y + y1;
+            symmetry_x2 = x + x2;
+            symmetry_y2 = y + y2;
+            symmetry_enabled = SpriteAbsI64(symmetry_x1) <= 1000000 &&
+                    SpriteAbsI64(symmetry_y1) <= 1000000 &&
+                    SpriteAbsI64(symmetry_x2) <= 1000000 &&
+                    SpriteAbsI64(symmetry_y2) <= 1000000 &&
+                    (symmetry_x1 != symmetry_x2 || symmetry_y1 != symmetry_y2);
+            size = 20;
+        }
         else if (type == 7) // SPT_SHIFT
         {
             MemCopy(&x1, sprite + 4, sizeof(I32));
@@ -875,6 +1163,26 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
             MemCopy(&x1, sprite + 4, sizeof(I32));
             MemCopy(&y1, sprite + 8, sizeof(I32));
             GrPlot(dc, x + old_x + x1, y + old_y + y1);
+            if (symmetry_enabled)
+            {
+                I64 mirror_x, mirror_y;
+                if (SpriteMirrorPoint0(symmetry_x1, symmetry_y1,
+                        symmetry_x2, symmetry_y2,
+                        x + old_x + x1, y + old_y + y1,
+                        &mirror_x, &mirror_y))
+                    GrPlot(dc, mirror_x, mirror_y);
+            }
+            size = 12;
+        }
+        else if (type == 21 || type == 22) // SPT_FLOOD_FILL[_NOT]
+        {
+            MemCopy(&x1, sprite + 4, sizeof(I32));
+            MemCopy(&y1, sprite + 8, sizeof(I32));
+            size = SpriteFloodFill0(dc, x + old_x + x1, y + old_y + y1,
+                    type == 22, 480000 - pixel_budget);
+            if (size < 0 || size > 480000 - pixel_budget)
+                break;
+            pixel_budget += size;
             size = 12;
         }
         else if (type == 10) // SPT_LINE
@@ -885,6 +1193,10 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
             MemCopy(&y2, sprite + 16, sizeof(I32));
             GrLine(dc, x + old_x + x1, y + old_y + y1,
                        x + old_x + x2, y + old_y + y2);
+            if (symmetry_enabled)
+                SpriteMirrorLine0(dc, x + old_x + x1, y + old_y + y1,
+                        x + old_x + x2, y + old_y + y2,
+                        symmetry_x1, symmetry_y1, symmetry_x2, symmetry_y2);
             size = 20;
         }
         else if (type == 26) // SPT_ARROW, bounded 2D GrArrow3 equivalent
@@ -905,6 +1217,24 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
             MemCopy(&x2, sprite + 12, sizeof(I32));
             MemCopy(&y2, sprite + 16, sizeof(I32));
             GrRect(dc, x + old_x + x1, y + old_y + y1, x2 - x1, y2 - y1);
+            if (symmetry_enabled)
+            {
+                I64 left, top, right, bottom;
+                left = x + old_x + x1;
+                top = y + old_y + y1;
+                right = x + old_x + x2;
+                bottom = y + old_y + y2;
+                SpriteMirrorLine0(dc, left, top, right, top,
+                        symmetry_x1, symmetry_y1, symmetry_x2, symmetry_y2);
+                SpriteMirrorLine0(dc, right, top, right, bottom,
+                        symmetry_x1, symmetry_y1, symmetry_x2, symmetry_y2);
+                SpriteMirrorLine0(dc, right, bottom, left, bottom,
+                        symmetry_x1, symmetry_y1, symmetry_x2, symmetry_y2);
+                SpriteMirrorLine0(dc, left, bottom, left, top,
+                        symmetry_x1, symmetry_y1, symmetry_x2, symmetry_y2);
+                SpriteMirrorRect0(dc, left, top, right, bottom,
+                        symmetry_x1, symmetry_y1, symmetry_x2, symmetry_y2);
+            }
             size = 20;
         }
         else if (type == 14) // SPT_CIRCLE

@@ -424,6 +424,14 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                         'zc: loaded /Tests/GrSpriteSpline.ZC')
                 command('zcall GrSpriteSplineChecks',
                         'zc => 0x000000000000002a')
+                command('zload /Tests/GrSpriteFloodFill.ZC',
+                        'zc: loaded /Tests/GrSpriteFloodFill.ZC')
+                command('zcall GrSpriteFloodFillChecks',
+                        'zc => 0x000000000000002a')
+                command('zload /Tests/GrSpriteSymmetry.ZC',
+                        'zc: loaded /Tests/GrSpriteSymmetry.ZC')
+                command('zcall GrSpriteSymmetryChecks',
+                        'zc => 0x000000000000002a')
                 command('zload /Tests/GrDCLifecycle.ZC',
                         'zc: loaded /Tests/GrDCLifecycle.ZC')
                 command('zcall GrDCLifecycleChecks',

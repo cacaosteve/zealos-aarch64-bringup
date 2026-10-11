@@ -1,0 +1,76 @@
+extern I64 ZcFbTextPixel(I64 x, I64 y);
+extern I64 ZcFbGraphColor(I64 color);
+
+U0 GrSpriteFloodFillPaint(CDC *dc, I64 left, I64 top, I64 right,
+		I64 bottom, I64 color)
+{
+	I64 x, y, old_color;
+	old_color = dc->color.c0.color;
+	dc->color.c0.color = color;
+	for (y = top; y <= bottom; y++)
+		for (x = left; x <= right; x++)
+			GrPlot(dc, x, y);
+	dc->color.c0.color = old_color;
+}
+
+I64 GrSpriteFloodFillChecks()
+{
+	CDC dc;
+	U8 *records;
+	U8 record_type;
+	I32 x, y;
+
+	records = CAlloc(25);
+	if (!records)
+		return 1;
+	MemSet(&dc, 0, sizeof(CDC));
+	dc.width = dc.width_internal = 800;
+	dc.height = 600;
+	dc.dc_signature = DCS_SIGNATURE_VAL;
+	dc.color.c0.rop = ROPB_MONO;
+	dc.thick = 1;
+
+	// Regular fill must replace only the seed pixel's 4-connected component.
+	GrSpriteFloodFillPaint(&dc, 221, 201, 221, 201, 0);
+	GrSpriteFloodFillPaint(&dc, 200, 200, 219, 211, 0);
+	GrSpriteFloodFillPaint(&dc, 199, 199, 220, 199, 15);
+	GrSpriteFloodFillPaint(&dc, 199, 212, 220, 212, 15);
+	GrSpriteFloodFillPaint(&dc, 199, 200, 199, 211, 15);
+	GrSpriteFloodFillPaint(&dc, 220, 200, 220, 211, 15);
+	dc.color.c0.color = 12;
+	record_type = SPT_FLOOD_FILL;
+	MemCopy(records, &record_type, sizeof(U8));
+	x = 200; y = 200;
+	MemCopy(records + 4, &x, sizeof(I32));
+	MemCopy(records + 8, &y, sizeof(I32));
+
+	// Fill-not-color spreads until it meets pixels already matching the
+	// active paint color. A closed frame protects the outside framebuffer.
+	GrSpriteFloodFillPaint(&dc, 321, 201, 321, 201, 0);
+	GrSpriteFloodFillPaint(&dc, 300, 200, 319, 211, 0);
+	GrSpriteFloodFillPaint(&dc, 299, 199, 320, 199, 12);
+	GrSpriteFloodFillPaint(&dc, 299, 212, 320, 212, 12);
+	GrSpriteFloodFillPaint(&dc, 299, 200, 299, 211, 12);
+	GrSpriteFloodFillPaint(&dc, 320, 200, 320, 211, 12);
+	dc.color.c0.color = 12;
+	record_type = SPT_FLOOD_FILL_NOT;
+	MemCopy(records + 12, &record_type, sizeof(U8));
+	x = 300; y = 200;
+	MemCopy(records + 16, &x, sizeof(I32));
+	MemCopy(records + 20, &y, sizeof(I32));
+	Sprite3(&dc, 0, 0, 0, records);
+	if (ZcFbTextPixel(200, 200) != ZcFbGraphColor(12) ||
+			ZcFbTextPixel(219, 211) != ZcFbGraphColor(12) ||
+			ZcFbTextPixel(199, 199) != ZcFbGraphColor(15) ||
+			ZcFbTextPixel(221, 201) != ZcFbGraphColor(0) ||
+			ZcFbTextPixel(300, 200) != ZcFbGraphColor(12) ||
+			ZcFbTextPixel(319, 211) != ZcFbGraphColor(12) ||
+			ZcFbTextPixel(299, 199) != ZcFbGraphColor(12) ||
+			ZcFbTextPixel(321, 201) != ZcFbGraphColor(0))
+	{
+		Free(records);
+		return 3;
+	}
+	Free(records);
+	return 0x2a;
+}

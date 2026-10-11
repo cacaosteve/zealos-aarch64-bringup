@@ -1,0 +1,68 @@
+extern I64 ZcFbTextPixel(I64 x, I64 y);
+
+I64 GrSpriteSymmetryChecks()
+{
+    CDC *dc;
+    U8 *records;
+    U8 type;
+    I32 x1, y1, x2, y2;
+    I64 color;
+
+    dc = DCNew(800, 600);
+    records = CAlloc(73);
+    if (!dc || !records)
+        return 1;
+    dc->color.c0 = 12;
+
+    // A vertical symmetry axis at x=500 in screen coordinates.
+    type = SPT_PLANAR_SYMMETRY;
+    MemCopy(records, &type, sizeof(U8));
+    x1 = 100; y1 = 0; x2 = 100; y2 = 200;
+    MemCopy(records + 4, &x1, sizeof(I32));
+    MemCopy(records + 8, &y1, sizeof(I32));
+    MemCopy(records + 12, &x2, sizeof(I32));
+    MemCopy(records + 16, &y2, sizeof(I32));
+
+    type = SPT_PT;
+    MemCopy(records + 20, &type, sizeof(U8));
+    x1 = 20; y1 = 30;
+    MemCopy(records + 24, &x1, sizeof(I32));
+    MemCopy(records + 28, &y1, sizeof(I32));
+
+    type = SPT_LINE;
+    MemCopy(records + 32, &type, sizeof(U8));
+    x1 = 10; y1 = 50; x2 = 40; y2 = 50;
+    MemCopy(records + 36, &x1, sizeof(I32));
+    MemCopy(records + 40, &y1, sizeof(I32));
+    MemCopy(records + 44, &x2, sizeof(I32));
+    MemCopy(records + 48, &y2, sizeof(I32));
+
+    type = SPT_RECT;
+    MemCopy(records + 52, &type, sizeof(U8));
+    x1 = 20; y1 = 60; x2 = 40; y2 = 80;
+    MemCopy(records + 56, &x1, sizeof(I32));
+    MemCopy(records + 60, &y1, sizeof(I32));
+    MemCopy(records + 64, &x2, sizeof(I32));
+    MemCopy(records + 68, &y2, sizeof(I32));
+
+    color = gr_palette[12] & 0x00FFFFFF;
+    Sprite3(dc, 400, 300, 0, records);
+    if (ZcFbTextPixel(420, 330) != color ||
+            ZcFbTextPixel(580, 330) != color)
+        return 2;
+    if (ZcFbTextPixel(410, 350) != color ||
+            ZcFbTextPixel(440, 350) != color ||
+            ZcFbTextPixel(590, 350) != color ||
+            ZcFbTextPixel(560, 350) != color)
+        return 3;
+    if (ZcFbTextPixel(420, 360) != color ||
+            ZcFbTextPixel(580, 360) != color ||
+            ZcFbTextPixel(570, 370) != color ||
+            ZcFbTextPixel(440, 380) != color ||
+            ZcFbTextPixel(560, 380) != color)
+        return 4;
+
+    DCDel(dc);
+    Free(records);
+    return 0x2a;
+}
