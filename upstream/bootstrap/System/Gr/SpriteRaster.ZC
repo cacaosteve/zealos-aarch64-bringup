@@ -155,26 +155,20 @@ I64 SpriteTriangleWork0(CDC *dc, I64 *px, I64 *py)
     return (max_x - min_x + 1) * (max_y - min_y + 1);
 }
 
-U0 SpriteFillTriangle0(CDC *dc, I64 *px, I64 *py)
-{//Integer-bounded scanline fill used by the initial ARM64 mesh path.
-    I64 i, j, y, count, min_x, max_x, min_y, max_y, left, right;
-    I64 crossings[3], swap;
-    F64 cross_x;
+U0 SpriteFillTriangle0(CDC *dc, I64 *px, I64 *py, I64 *pz)
+{//Rasterize a triangle with scanline depth interpolation through GrHLine.
+    I64 i, j, y, count, min_y, max_y, left, right, z_left, z_right;
+    F64 crossings[3], depths[3], cross_x, cross_z, swap;
 
-    min_x = max_x = px[0];
     min_y = max_y = py[0];
     for (i = 1; i < 3; i++)
     {
-        if (px[i] < min_x) min_x = px[i];
-        if (px[i] > max_x) max_x = px[i];
         if (py[i] < min_y) min_y = py[i];
         if (py[i] > max_y) max_y = py[i];
     }
-    if (min_x < 0) min_x = 0;
-    if (max_x >= dc->width) max_x = dc->width - 1;
     if (min_y < 0) min_y = 0;
     if (max_y >= dc->height) max_y = dc->height - 1;
-    if (min_x > max_x || min_y > max_y)
+    if (min_y > max_y)
         return;
     for (y = min_y; y <= max_y; y++)
     {
@@ -188,7 +182,11 @@ U0 SpriteFillTriangle0(CDC *dc, I64 *px, I64 *py)
                 cross_x = ToF64(px[i]) +
                         ToF64(y - py[i]) * (px[j] - px[i]) /
                         (py[j] - py[i]);
-                crossings[count++] = ToI64(cross_x);
+                cross_z = ToF64(pz[i]) +
+                        ToF64(y - py[i]) * (pz[j] - pz[i]) /
+                        (py[j] - py[i]);
+                crossings[count] = cross_x;
+                depths[count++] = cross_z;
             }
         }
         if (count >= 2)
@@ -198,13 +196,16 @@ U0 SpriteFillTriangle0(CDC *dc, I64 *px, I64 *py)
                 swap = crossings[0];
                 crossings[0] = crossings[1];
                 crossings[1] = swap;
+                swap = depths[0];
+                depths[0] = depths[1];
+                depths[1] = swap;
             }
-            left = crossings[0];
-            right = crossings[1];
-            if (left < min_x) left = min_x;
-            if (right > max_x) right = max_x;
+            left = ToI64(crossings[0]);
+            right = ToI64(crossings[1]);
+            z_left = ToI64(depths[0]);
+            z_right = ToI64(depths[1]);
             if (left <= right)
-                GrLine(dc, left, y, right, y);
+                GrHLine(dc, left, right, y, z_left, z_right);
         }
     }
 }
@@ -248,7 +249,7 @@ I64 SpriteMesh0(CDC *dc, U8 *sprite, I64 base_x, I64 base_y, I64 base_z,
 {//Read and draw one variable-sized mesh record; return its encoded size.
     I64 vertex_count, tri_count, header_size, size;
     I64 i, j, work, total_work, tx, ty, tz, old_dither;
-    I64 *points, px[3], py[3], mirror_px[3], mirror_py[3];
+    I64 *points, px[3], py[3], pz[3], mirror_px[3], mirror_py[3];
     CD3I32 *mesh_points;
     I32 vx, vy, vz, tri_color, indices[3];
     U8 *vertices, *triangles;
@@ -360,10 +361,13 @@ I64 SpriteMesh0(CDC *dc, U8 *sprite, I64 base_x, I64 base_y, I64 base_z,
             }
         px[0] = points[indices[0] * 2];
         py[0] = points[indices[0] * 2 + 1];
+        pz[0] = mesh_points[indices[0]].z;
         px[1] = points[indices[1] * 2];
         py[1] = points[indices[1] * 2 + 1];
+        pz[1] = mesh_points[indices[1]].z;
         px[2] = points[indices[2] * 2];
         py[2] = points[indices[2] * 2 + 1];
+        pz[2] = mesh_points[indices[2]].z;
         work = SpriteTriangleWork0(dc, px, py);
         if (work < 0 || work > pixel_limit - total_work)
         {
@@ -423,7 +427,7 @@ I64 SpriteMesh0(CDC *dc, U8 *sprite, I64 base_x, I64 base_y, I64 base_z,
                         tri_color);
             else
                 dc->color.c0 = tri_color & 15;
-            SpriteFillTriangle0(dc, mirror_px, mirror_py);
+            SpriteFillTriangle0(dc, mirror_px, mirror_py, pz);
         }
         if (dc->lighting)
             (*dc->lighting)(dc, &mesh_points[indices[0]],
@@ -431,7 +435,7 @@ I64 SpriteMesh0(CDC *dc, U8 *sprite, I64 base_x, I64 base_y, I64 base_z,
                     tri_color);
         else
             dc->color.c0 = tri_color & 15;
-        SpriteFillTriangle0(dc, px, py);
+        SpriteFillTriangle0(dc, px, py, pz);
     }
     dc->color = old_color;
     dc->dither_probability_u16 = old_dither;
