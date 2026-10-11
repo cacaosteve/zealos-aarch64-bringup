@@ -6,10 +6,11 @@ I64 GrSpriteTransformChecks()
     U8 *records;
     U8 type;
     I32 x, y;
+    U64 angle;
     I64 i, color;
 
     dc = DCNew(800, 600);
-    records = CAlloc(151);
+    records = CAlloc(299);
     if (!dc || !records || !dc->r || !dc->transform)
         return 1;
     dc->color.c0 = 12;
@@ -103,6 +104,59 @@ I64 GrSpriteTransformChecks()
     MemCopy(records + 142, &x, sizeof(I32));
     MemCopy(records + 146, &y, sizeof(I32));
 
+    type = SPT_TRANSFORM_ON;
+    MemCopy(records + 150, &type, sizeof(U8));
+    type = SPT_ELLIPSE;
+    MemCopy(records + 151, &type, sizeof(U8));
+    x = 35; y = 30;
+    MemCopy(records + 155, &x, sizeof(I32));
+    MemCopy(records + 159, &y, sizeof(I32));
+    x = 8; y = 4;
+    MemCopy(records + 163, &x, sizeof(I32));
+    MemCopy(records + 167, &y, sizeof(I32));
+    angle = 0;
+    MemCopy(records + 175, &angle, sizeof(U64));
+
+    type = SPT_TRANSFORM_OFF;
+    MemCopy(records + 183, &type, sizeof(U8));
+    type = SPT_ELLIPSE;
+    MemCopy(records + 184, &type, sizeof(U8));
+    x = 40; y = 70;
+    MemCopy(records + 188, &x, sizeof(I32));
+    MemCopy(records + 192, &y, sizeof(I32));
+    x = 8; y = 4;
+    MemCopy(records + 196, &x, sizeof(I32));
+    MemCopy(records + 200, &y, sizeof(I32));
+    MemCopy(records + 208, &angle, sizeof(U64));
+
+    type = SPT_TRANSFORM_ON;
+    MemCopy(records + 216, &type, sizeof(U8));
+    type = SPT_POLYGON;
+    MemCopy(records + 217, &type, sizeof(U8));
+    x = 40; y = 40;
+    MemCopy(records + 221, &x, sizeof(I32));
+    MemCopy(records + 225, &y, sizeof(I32));
+    x = 10; y = 10;
+    MemCopy(records + 229, &x, sizeof(I32));
+    MemCopy(records + 233, &y, sizeof(I32));
+    MemCopy(records + 241, &angle, sizeof(U64));
+    x = 3;
+    MemCopy(records + 249, &x, sizeof(I32));
+
+    type = SPT_TRANSFORM_OFF;
+    MemCopy(records + 257, &type, sizeof(U8));
+    type = SPT_POLYGON;
+    MemCopy(records + 258, &type, sizeof(U8));
+    x = 40; y = 70;
+    MemCopy(records + 262, &x, sizeof(I32));
+    MemCopy(records + 266, &y, sizeof(I32));
+    x = 10; y = 10;
+    MemCopy(records + 270, &x, sizeof(I32));
+    MemCopy(records + 274, &y, sizeof(I32));
+    MemCopy(records + 282, &angle, sizeof(U64));
+    x = 3;
+    MemCopy(records + 290, &x, sizeof(I32));
+
     color = gr_palette[12] & 0x00FFFFFF;
     Sprite3(dc, dc->x, dc->y, dc->z, records);
     if (ZcFbTextPixel(593, 453) != color ||
@@ -112,7 +166,11 @@ I64 GrSpriteTransformChecks()
             ZcFbTextPixel(575, 460) != color ||
             ZcFbTextPixel(645, 460) != color ||
             ZcFbTextPixel(600, 450) != color ||
-            ZcFbTextPixel(630, 440) != color)
+            ZcFbTextPixel(630, 440) != color ||
+            ZcFbTextPixel(580, 473) != color ||
+            ZcFbTextPixel(658, 500) != color ||
+            ZcFbTextPixel(570, 480) != color ||
+            ZcFbTextPixel(660, 500) != color)
         return 2;
     if (ZcFbTextPixel(585, 445) == color)
         return 3;

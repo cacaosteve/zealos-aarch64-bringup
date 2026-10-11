@@ -619,18 +619,19 @@ I64 SpriteBSpline0(CDC *dc, I64 ox, I64 oy, U8 *sprite, I64 type,
     return raster_work;
 }
 
-U0 SpriteEllipse0(CDC *dc, I64 cx, I64 cy, I64 rx, I64 ry)
+U0 SpriteEllipse0(CDC *dc, I64 cx, I64 cy, I64 rx, I64 ry,
+        Bool transform_enabled, I64 z)
 {
     I64 rx2, ry2, px, py, dx, dy, decision;
 
     if (!rx && !ry)
-        GrPlot(dc, cx, cy);
+        SpritePlotTransform0(dc, transform_enabled, cx, cy, z);
     else if (!rx)
         for (py = -ry; py <= ry; py++)
-            GrPlot(dc, cx, cy + py);
+            SpritePlotTransform0(dc, transform_enabled, cx, cy + py, z);
     else if (!ry)
         for (px = -rx; px <= rx; px++)
-            GrPlot(dc, cx + px, cy);
+            SpritePlotTransform0(dc, transform_enabled, cx + px, cy, z);
     else
     {
         rx2 = rx * rx;
@@ -642,10 +643,14 @@ U0 SpriteEllipse0(CDC *dc, I64 cx, I64 cy, I64 rx, I64 ry)
         decision = 4 * ry2 - 4 * rx2 * ry + rx2;
         while (dx < dy)
         {
-            GrPlot(dc, cx + px, cy + py);
-            GrPlot(dc, cx - px, cy + py);
-            GrPlot(dc, cx + px, cy - py);
-            GrPlot(dc, cx - px, cy - py);
+            SpritePlotTransform0(dc, transform_enabled,
+                    cx + px, cy + py, z);
+            SpritePlotTransform0(dc, transform_enabled,
+                    cx - px, cy + py, z);
+            SpritePlotTransform0(dc, transform_enabled,
+                    cx + px, cy - py, z);
+            SpritePlotTransform0(dc, transform_enabled,
+                    cx - px, cy - py, z);
             px++;
             dx += 2 * ry2;
             if (decision < 0)
@@ -661,10 +666,14 @@ U0 SpriteEllipse0(CDC *dc, I64 cx, I64 cy, I64 rx, I64 ry)
                 4 * rx2 * (py - 1) * (py - 1) - 4 * rx2 * ry2;
         while (py >= 0)
         {
-            GrPlot(dc, cx + px, cy + py);
-            GrPlot(dc, cx - px, cy + py);
-            GrPlot(dc, cx + px, cy - py);
-            GrPlot(dc, cx - px, cy - py);
+            SpritePlotTransform0(dc, transform_enabled,
+                    cx + px, cy + py, z);
+            SpritePlotTransform0(dc, transform_enabled,
+                    cx - px, cy + py, z);
+            SpritePlotTransform0(dc, transform_enabled,
+                    cx + px, cy - py, z);
+            SpritePlotTransform0(dc, transform_enabled,
+                    cx - px, cy - py, z);
             py--;
             dy -= 2 * rx2;
             if (decision > 0)
@@ -806,11 +815,13 @@ U0 SpritePolygonLine0(CDC *dc, I64 x1, I64 y1, I64 x2, I64 y2)
 // Bounded regular-polygon outline equivalent for the 2D subset of
 // GrRegPoly3. Vertices use ZealOS's fixed-point recurrence so the angle,
 // ellipse radii, and integer rounding follow RegPoly's established rules.
-I64 SpritePolygon0(CDC *dc, I64 x, I64 y, I32 cx, I32 cy,
-        I32 rx, I32 ry, U64 angle_bits, I32 sides, I64 pixel_limit)
+I64 SpritePolygon0(CDC *dc, I64 x, I64 y, I64 z, Bool transform_enabled,
+        I32 cx, I32 cy, I32 rx, I32 ry, U64 angle_bits, I32 sides,
+        I64 pixel_limit)
 {
     I64 i, x2, y2, x1, y1, px, py, nx, ny, dx, dy, steps, total;
     I64 s1, s2, c, s12, s22, c2;
+    I64 screen_x1, screen_y1, screen_x2, screen_y2;
     F64 angle, angle_step;
 
     if (sides < 3 || sides > 1024 || rx <= 0 || ry <= 0 ||
@@ -834,6 +845,9 @@ I64 SpritePolygon0(CDC *dc, I64 x, I64 y, I32 cx, I32 cy,
     y1 = (s22 * x2 + c2 * (y2 * ry / rx)) >> 24;
     px = cx + (x1 >> 8);
     py = cy + (y1 >> 8);
+    if (!SpriteTransformPoint0(dc, transform_enabled,
+            x + px, y + py, z, &screen_x1, &screen_y1))
+        return -1;
 
     // Preflight every edge before touching the framebuffer. This bounds both
     // the Bresenham work and the total guest plotting cost for the record.
@@ -848,8 +862,11 @@ I64 SpritePolygon0(CDC *dc, I64 x, I64 y, I32 cx, I32 cy,
         y1 = (s22 * x2 + c2 * (y2 * ry / rx)) >> 24;
         nx = cx + (x1 >> 8);
         ny = cy + (y1 >> 8);
-        dx = nx - px;
-        dy = ny - py;
+        if (!SpriteTransformPoint0(dc, transform_enabled,
+                x + nx, y + ny, z, &screen_x2, &screen_y2))
+            return -1;
+        dx = screen_x2 - screen_x1;
+        dy = screen_y2 - screen_y1;
         if (dx < 0) dx = -dx;
         if (dy < 0) dy = -dy;
         if (dx > dy) steps = dx + 1;
@@ -859,6 +876,8 @@ I64 SpritePolygon0(CDC *dc, I64 x, I64 y, I32 cx, I32 cy,
         total += steps;
         px = nx;
         py = ny;
+        screen_x1 = screen_x2;
+        screen_y1 = screen_y2;
     }
 
     // Rebuild the first vertex and rasterize the already-validated edges.
@@ -868,6 +887,9 @@ I64 SpritePolygon0(CDC *dc, I64 x, I64 y, I32 cx, I32 cy,
     y1 = (s22 * x2 + c2 * (y2 * ry / rx)) >> 24;
     px = cx + (x1 >> 8);
     py = cy + (y1 >> 8);
+    if (!SpriteTransformPoint0(dc, transform_enabled,
+            x + px, y + py, z, &screen_x1, &screen_y1))
+        return -1;
     for (i = 0; i < sides; i++)
     {
         x1 = (c * x2 + s1 * y2) >> 24;
@@ -878,12 +900,16 @@ I64 SpritePolygon0(CDC *dc, I64 x, I64 y, I32 cx, I32 cy,
         y1 = (s22 * x2 + c2 * (y2 * ry / rx)) >> 24;
         nx = cx + (x1 >> 8);
         ny = cy + (y1 >> 8);
-        dx = nx - px;
-        dy = ny - py;
+        if (!SpriteTransformPoint0(dc, transform_enabled,
+                x + nx, y + ny, z, &screen_x2, &screen_y2))
+            return -1;
         // x2/y2 retain the unrotated recurrence; draw the transformed edge.
-        SpritePolygonLine0(dc, x + px, y + py, x + nx, y + ny);
+        SpritePolygonLine0(dc, screen_x1, screen_y1,
+                screen_x2, screen_y2);
         px = nx;
         py = ny;
+        screen_x1 = screen_x2;
+        screen_y1 = screen_y2;
     }
     return total;
 }
@@ -1109,7 +1135,7 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
                 break;
             pixel_budget += 8 * (width + height + 1);
             SpriteEllipse0(dc, x + old_x + x1, y + old_y + y1,
-                           width, height);
+                           width, height, transform_enabled, z);
             size = 32;
         }
         else if (type == 13) // SPT_ROTATED_RECT, bounded cardinal subset
@@ -1134,9 +1160,9 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
             MemCopy(&height, sprite + 16, sizeof(I32));
             MemCopy(&ellipse_angle_bits, sprite + 24, sizeof(U64));
             MemCopy(&poly_count, sprite + 32, sizeof(I32));
-            size = SpritePolygon0(dc, x + old_x, y + old_y, x1, y1,
-                    width, height, ellipse_angle_bits, poly_count,
-                    480000 - pixel_budget);
+            size = SpritePolygon0(dc, x + old_x, y + old_y, z,
+                    transform_enabled, x1, y1, width, height,
+                    ellipse_angle_bits, poly_count, 480000 - pixel_budget);
             if (size < 0)
                 break;
             pixel_budget += size;
