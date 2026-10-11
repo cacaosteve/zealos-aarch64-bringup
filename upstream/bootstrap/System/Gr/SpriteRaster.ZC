@@ -1127,7 +1127,8 @@ U0 SpritePolygonLine0(CDC *dc, I64 x1, I64 y1, I64 x2, I64 y2)
 // ellipse radii, and integer rounding follow RegPoly's established rules.
 I64 SpritePolygon0(CDC *dc, I64 x, I64 y, I64 z, Bool transform_enabled,
         I32 cx, I32 cy, I32 rx, I32 ry, U64 angle_bits, I32 sides,
-        I64 pixel_limit)
+        I64 pixel_limit, Bool symmetry_enabled, I64 axis_x1, I64 axis_y1,
+        I64 axis_x2, I64 axis_y2)
 {
     I64 i, x2, y2, x1, y1, px, py, nx, ny, dx, dy, steps, total;
     I64 s1, s2, c, s12, s22, c2;
@@ -1216,6 +1217,10 @@ I64 SpritePolygon0(CDC *dc, I64 x, I64 y, I64 z, Bool transform_enabled,
         // x2/y2 retain the unrotated recurrence; draw the transformed edge.
         SpritePolygonLine0(dc, screen_x1, screen_y1,
                 screen_x2, screen_y2);
+        if (symmetry_enabled)
+            SpriteMirrorLine0(dc, screen_x1, screen_y1,
+                    screen_x2, screen_y2, axis_x1, axis_y1,
+                    axis_x2, axis_y2);
         px = nx;
         py = ny;
         screen_x1 = screen_x2;
@@ -1486,7 +1491,9 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
             MemCopy(&poly_count, sprite + 32, sizeof(I32));
             size = SpritePolygon0(dc, x + old_x, y + old_y, z,
                     transform_enabled, x1, y1, width, height,
-                    ellipse_angle_bits, poly_count, 480000 - pixel_budget);
+                    ellipse_angle_bits, poly_count, 480000 - pixel_budget,
+                    symmetry_enabled, symmetry_x1, symmetry_y1,
+                    symmetry_x2, symmetry_y2);
             if (size < 0)
                 break;
             pixel_budget += size;

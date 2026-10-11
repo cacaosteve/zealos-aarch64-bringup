@@ -5,11 +5,11 @@ I64 GrSpriteSymmetryChecks()
     CDC *dc;
     U8 *records;
     U8 type;
-    I32 x1, y1, x2, y2;
+    I32 x1, y1, x2, y2, sides;
     I64 color;
 
     dc = DCNew(800, 600);
-    records = CAlloc(121);
+    records = CAlloc(161);
     if (!dc || !records)
         return 1;
     dc->color.c0 = 12;
@@ -62,6 +62,15 @@ I64 GrSpriteSymmetryChecks()
     MemCopy(records + 100, &x2, sizeof(I32));
     MemCopy(records + 104, &y2, sizeof(I32));
 
+    type = SPT_POLYGON;
+    MemCopy(records + 120, &type, sizeof(U8));
+    x1 = 30; y1 = 180; x2 = 12; y2 = 8; sides = 4;
+    MemCopy(records + 124, &x1, sizeof(I32));
+    MemCopy(records + 128, &y1, sizeof(I32));
+    MemCopy(records + 132, &x2, sizeof(I32));
+    MemCopy(records + 136, &y2, sizeof(I32));
+    MemCopy(records + 152, &sides, sizeof(I32));
+
     color = gr_palette[12] & 0x00FFFFFF;
     Sprite3(dc, 400, 300, 0, records);
     if (ZcFbTextPixel(420, 330) != color ||
@@ -84,6 +93,9 @@ I64 GrSpriteSymmetryChecks()
     if (ZcFbTextPixel(438, 440) != color ||
             ZcFbTextPixel(562, 440) != color)
         return 6;
+    if (ZcFbTextPixel(442, 480) != color ||
+            ZcFbTextPixel(558, 480) != color)
+        return 7;
 
     DCDel(dc);
     Free(records);
