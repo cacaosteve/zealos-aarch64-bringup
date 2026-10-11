@@ -1906,6 +1906,11 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
                             line_y += line_sy;
                         }
                     }
+                    if (symmetry_enabled)
+                        SpriteMirrorLine0(dc, screen_x1, screen_y1,
+                                screen_x2, screen_y2,
+                                symmetry_x1, symmetry_y1,
+                                symmetry_x2, symmetry_y2);
                     poly_x1 = x2;
                     poly_y1 = y2;
                 }
@@ -1925,8 +1930,10 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
             pixel_budget += poly_count + 1;
             size = 16 + (3 * poly_count + 7) / 8;
             poly_count *= 3;
-            SpritePlotTransform0(dc, transform_enabled,
-                    x + old_x + poly_x1, y + old_y + poly_y1, z);
+            SpritePlotSymTransform0(dc, transform_enabled,
+                    x + old_x + poly_x1, y + old_y + poly_y1, z,
+                    symmetry_enabled, symmetry_x1, symmetry_y1,
+                    symmetry_x2, symmetry_y2);
             polypt_bit = 0;
             while (polypt_bit < poly_count)
             {
@@ -1948,8 +1955,10 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
                 else if (polypt_code >= 5)
                     poly_y1++;
                 polypt_bit += 3;
-                SpritePlotTransform0(dc, transform_enabled,
-                        x + old_x + poly_x1, y + old_y + poly_y1, z);
+                SpritePlotSymTransform0(dc, transform_enabled,
+                        x + old_x + poly_x1, y + old_y + poly_y1, z,
+                        symmetry_enabled, symmetry_x1, symmetry_y1,
+                        symmetry_x2, symmetry_y2);
             }
         }
         else if (type == 23) // SPT_BITMAP

@@ -6,10 +6,11 @@ I64 GrSpriteSymmetryChecks()
     U8 *records;
     U8 type;
     I32 x1, y1, x2, y2, sides;
+    U8 move_code;
     I64 color;
 
     dc = DCNew(800, 600);
-    records = CAlloc(161);
+    records = CAlloc(202);
     if (!dc || !records)
         return 1;
     dc->color.c0 = 12;
@@ -71,6 +72,26 @@ I64 GrSpriteSymmetryChecks()
     MemCopy(records + 136, &y2, sizeof(I32));
     MemCopy(records + 152, &sides, sizeof(I32));
 
+    type = SPT_POLYLINE;
+    MemCopy(records + 160, &type, sizeof(U8));
+    sides = 2;
+    MemCopy(records + 164, &sides, sizeof(I32));
+    x1 = 20; y1 = 220; x2 = 40; y2 = 220;
+    MemCopy(records + 168, &x1, sizeof(I32));
+    MemCopy(records + 172, &y1, sizeof(I32));
+    MemCopy(records + 176, &x2, sizeof(I32));
+    MemCopy(records + 180, &y2, sizeof(I32));
+
+    type = SPT_POLYPT;
+    MemCopy(records + 184, &type, sizeof(U8));
+    sides = 1;
+    MemCopy(records + 188, &sides, sizeof(I32));
+    x1 = 20; y1 = 260;
+    MemCopy(records + 192, &x1, sizeof(I32));
+    MemCopy(records + 196, &y1, sizeof(I32));
+    move_code = 4; // one eastward 3-bit move
+    MemCopy(records + 200, &move_code, sizeof(U8));
+
     color = gr_palette[12] & 0x00FFFFFF;
     Sprite3(dc, 400, 300, 0, records);
     if (ZcFbTextPixel(420, 330) != color ||
@@ -96,6 +117,14 @@ I64 GrSpriteSymmetryChecks()
     if (ZcFbTextPixel(442, 480) != color ||
             ZcFbTextPixel(558, 480) != color)
         return 7;
+    if (ZcFbTextPixel(430, 520) != color ||
+            ZcFbTextPixel(570, 520) != color)
+        return 8;
+    if (ZcFbTextPixel(420, 560) != color ||
+            ZcFbTextPixel(580, 560) != color ||
+            ZcFbTextPixel(421, 560) != color ||
+            ZcFbTextPixel(579, 560) != color)
+        return 9;
 
     DCDel(dc);
     Free(records);
