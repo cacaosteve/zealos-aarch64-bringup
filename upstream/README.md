@@ -3128,6 +3128,15 @@ Freeze catalog unchanged.
 | Smoke | Extend `GrSpriteSymmetryChecks` to cover ordinary 2D fallback without a depth buffer, flat near/far overlap, a sloped triangle's interpolated interior depth, and Z scaling through the CDC transform; full PCI compatibility passes |
 | Limits | The bounded scanline path covers the current mesh subset; pixel-identical parity with upstream mesh rasterization and broader 3D clipping remain open |
 
+## Milestone 274 — initialize sprite opcode tables for source graphics
+
+| Item | Path |
+|--|--|
+| Gap | The graphics bridge initialized display and zoom state but left `gr.sprite_hash` and `gr.empty_sprite` unset, which prevented unchanged sprite consumers from using ZealOS's opcode names and safe empty fallback |
+| Bring-up | Load the pinned sprite element type/code define lists when absent, populate the 512-entry sprite hash with the upstream opcode indices, and bind a zero-terminated no-op sprite as the bootstrap empty sprite |
+| Smoke | Extend `BootstrapGrContextInitChecks` to verify the empty sprite and representative `End`, `Mesh`, and `Arrow` hash entries; `python3 scripts/check-compat.py --pci` passes |
+| Limits | Sprite table initialization is covered; complete upstream graphics startup and byte-identical replacement for the original resource-backed empty sprite remain open |
+
 ## Open compatibility probe — `/System/Win.ZC`
 
 The source probe loads pinned `KernelC.HH`, `Externs.ZC`, and `Gr.HH` before compiling unchanged `Win.ZC`. Graphics dimensions and mouse globals are probe fixtures; `DrawMenu` and the initial `GrScaleZoom` definition are compile-time fixtures until unchanged `GrScreen.ZC` is loaded later in the probe. `GrScreenFinalUpdateChecks` executes `WinFinalUpdate` through the staged idle-frame path, confirms the fixture's `mouse_grid.coord` toggles the real coordinate-text overlay, checks a separate visible guest overlay callback, verifies the software arrow against Limine framebuffer pixels, and exercises `WinMouseUpdate`'s edge recentering through the runtime dispatch. `WinMousePointerStateCheck` covers transformed tablet coordinates and `WinMouseHardStateCheck` covers the source mouse-state ABI; manual UTM acceptance confirms the software pointer and window-demo mouse interaction. The raw ARM generic-timer binding and a standalone F64 clock expression are smoke-tested before the Win load.

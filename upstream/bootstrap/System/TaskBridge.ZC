@@ -1365,6 +1365,7 @@ CDC bootstrap_zoom_dc;
 U8 bootstrap_planar_pixels[800 * 600 / 2];
 U64 bootstrap_planar_cache[800 * 600 / 8];
 CDC bootstrap_planar_dc, bootstrap_planar_cache_dc;
+U8 bootstrap_empty_sprite[1];
 U32 bootstrap_present_raw[800 * 600];
 U8 bootstrap_present_cache[800 * 600];
 U64 bootstrap_text_colors[256];
@@ -1691,6 +1692,35 @@ U0 BootstrapGrZoomTablesInit(CGrGlobals *active_gr)
     for (i = 1; i <= 8; i++)
         active_gr->screen_zoom_tables[i] = bootstrap_screen_zoom_tables[i];
 }
+U0 BootstrapGrSpriteHashInit(CGrGlobals *active_gr)
+{//Build the sprite opcode hash expected by the unchanged ZealOS sprite editor.
+    if (!active_gr)
+        return;
+    if (!HashFind("ST_SPRITE_ELEM_TYPES", Fs->hash_table, HTT_DEFINE_STR))
+        DefineListLoad("ST_SPRITE_ELEM_TYPES",
+                "End\0Color\0Dither Color\0Thick\0Planar Symmetry\0"
+                "Transform On\0Transform Off\0Shift\0Point\0PolyPoint\0"
+                "Line\0PolyLine\0Rect\0Rotated Rect\0Circle\0Ellipse\0"
+                "Polygon\0BSpline2\0BSpline2 Closed\0BSpline3\0"
+                "BSpline3 Closed\0Flood Fill\0Flood Fill Not Color\0"
+                "BitMap\0Mesh\0Shiftable Mesh\0Arrow\0Text\0Text Box\0"
+                "Text Diamond\0");
+    if (!HashFind("ST_SPRITE_ELEM_CODES", Fs->hash_table, HTT_DEFINE_STR))
+        DefineListLoad("ST_SPRITE_ELEM_CODES",
+                "End\0Color\0Color\0Thick\0PlanarSymmetry\0Transform\0"
+                "Transform\0Shift\0Pt\0PolyPt\0Line\0PolyLine\0Rect\0"
+                "Rect\0Circle\0Ellipse\0Polygon\0BSpline2\0BSpline2\0"
+                "BSpline3\0BSpline3\0FloodFill\0FloodFill\0BitMap\0Mesh\0"
+                "Mesh\0Arrow\0Text\0TextBox\0TextDiamond\0");
+    if (!active_gr->sprite_hash)
+    {
+        active_gr->sprite_hash = HashTableNew(512);
+        if (active_gr->sprite_hash)
+            HashDefineListAdd("ST_SPRITE_ELEM_CODES", 1,
+                    active_gr->sprite_hash);
+    }
+    active_gr->empty_sprite = bootstrap_empty_sprite;
+}
 U0 BootstrapGrContextInit()
 {//Attach upstream graphics globals to the initialized bootstrap surfaces.
     CGrGlobals *active_gr = ZcActiveGrGlobals();
@@ -1708,6 +1738,7 @@ U0 BootstrapGrContextInit()
     active_gr->zoomed_dc = &bootstrap_zoom_dc;
     active_gr->text_base = bootstrap_text_base;
     active_gr->screen_cache = bootstrap_present_cache;
+    BootstrapGrSpriteHashInit(active_gr);
     if (active_gr->screen_zoom < 1 || active_gr->screen_zoom > 8)
         active_gr->screen_zoom = 1;
     BootstrapGrPackedTablesInit(active_gr);

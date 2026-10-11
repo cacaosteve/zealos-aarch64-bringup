@@ -298,6 +298,7 @@ I64 GrSetUpTablesSourceChecks()
 I64 BootstrapGrContextInitChecks()
 {//A source manager must see its full bounded display context before first draw.
     CGrGlobals *active_gr = ZcActiveGrGlobals();
+    CHash *sprite_entry;
 
     if (!active_gr)
         return 1;
@@ -305,6 +306,7 @@ I64 BootstrapGrContextInitChecks()
     active_gr->dc2 = active_gr->dc_cache = active_gr->zoomed_dc = NULL;
     active_gr->text_base = NULL;
     active_gr->screen_cache = NULL;
+    active_gr->empty_sprite = NULL;
     active_gr->to_8_bits = active_gr->to_8_colors = NULL;
     active_gr->win_z_buf = NULL;
     active_gr->win_uncovered_bitmap = NULL;
@@ -341,6 +343,22 @@ I64 BootstrapGrContextInitChecks()
         active_gr->dc1->dc_signature != DCS_SIGNATURE_VAL ||
         active_gr->dc_cache->dc_signature != DCS_SIGNATURE_VAL ||
         active_gr->zoomed_dc->dc_signature != DCS_SIGNATURE_VAL)
+        return 0;
+    if (!active_gr->sprite_hash ||
+            active_gr->empty_sprite != bootstrap_empty_sprite ||
+            *active_gr->empty_sprite != 0)
+        return 0;
+    sprite_entry = HashFind("End", active_gr->sprite_hash, HTG_TYPE_MASK);
+    if (!sprite_entry || sprite_entry->type != 1 ||
+            sprite_entry->user_data0 != 0)
+        return 0;
+    sprite_entry = HashFind("Mesh", active_gr->sprite_hash, HTG_TYPE_MASK);
+    if (!sprite_entry || sprite_entry->type != 1 ||
+            sprite_entry->user_data0 < 24 || sprite_entry->user_data0 > 25)
+        return 0;
+    sprite_entry = HashFind("Arrow", active_gr->sprite_hash, HTG_TYPE_MASK);
+    if (!sprite_entry || sprite_entry->type != 1 ||
+            sprite_entry->user_data0 != 26)
         return 0;
     if (gr_palette[0].b != 0 || gr_palette[0].g != 0 || gr_palette[0].r != 0 ||
         gr_palette[15].b != 0xFF || gr_palette[15].g != 0xFF ||
