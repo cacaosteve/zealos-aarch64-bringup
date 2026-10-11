@@ -4,13 +4,13 @@ I64 GrSpriteTransformChecks()
 {
     CDC *dc;
     U8 *records;
-    U8 type;
+    U8 type, pixel;
     I32 x, y;
     U64 angle;
     I64 i, color;
 
     dc = DCNew(800, 600);
-    records = CAlloc(365);
+    records = CAlloc(401);
     if (!dc || !records || !dc->r || !dc->transform)
         return 1;
     dc->color.c0 = 12;
@@ -182,6 +182,29 @@ I64 GrSpriteTransformChecks()
     MemCopy(records + 348, &y, sizeof(I32));
     MemCopy(records + 356, &angle, sizeof(U64));
 
+    type = SPT_TRANSFORM_ON;
+    MemCopy(records + 364, &type, sizeof(U8));
+    type = SPT_POLYPT;
+    MemCopy(records + 365, &type, sizeof(U8));
+    x = 2;
+    MemCopy(records + 369, &x, sizeof(I32));
+    x = 10; y = 10;
+    MemCopy(records + 373, &x, sizeof(I32));
+    MemCopy(records + 377, &y, sizeof(I32));
+    pixel = 4 | (6 << 3); // East, then south.
+    MemCopy(records + 381, &pixel, sizeof(U8));
+
+    type = SPT_TRANSFORM_OFF;
+    MemCopy(records + 382, &type, sizeof(U8));
+    type = SPT_POLYPT;
+    MemCopy(records + 383, &type, sizeof(U8));
+    x = 2;
+    MemCopy(records + 387, &x, sizeof(I32));
+    x = 10; y = 10;
+    MemCopy(records + 391, &x, sizeof(I32));
+    MemCopy(records + 395, &y, sizeof(I32));
+    MemCopy(records + 399, &pixel, sizeof(U8));
+
     color = gr_palette[12] & 0x00FFFFFF;
     Sprite3(dc, dc->x, dc->y, dc->z, records);
     if (ZcFbTextPixel(593, 453) != color ||
@@ -197,7 +220,12 @@ I64 GrSpriteTransformChecks()
             ZcFbTextPixel(570, 480) != color ||
             ZcFbTextPixel(660, 500) != color ||
             ZcFbTextPixel(595, 445) != color ||
-            ZcFbTextPixel(625, 445) != color)
+            ZcFbTextPixel(625, 445) != color ||
+            ZcFbTextPixel(600, 440) != color ||
+            ZcFbTextPixel(600, 441) != color ||
+            ZcFbTextPixel(599, 441) != color ||
+            ZcFbTextPixel(620, 440) != color ||
+            ZcFbTextPixel(621, 441) != color)
         return 2;
     if (ZcFbTextPixel(585, 445) == color)
         return 3;
