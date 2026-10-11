@@ -11,7 +11,7 @@ I64 GrSpriteTransformChecks()
     CD3I32 point;
 
     dc = DCNew(800, 600);
-    records = CAlloc(533);
+    records = CAlloc(607);
     if (!dc || !records || !dc->r || !dc->transform)
         return 1;
     dc->color.c0 = 12;
@@ -254,6 +254,37 @@ I64 GrSpriteTransformChecks()
     MemCopy(records + 524, &x, sizeof(I32));
     MemCopy(records + 528, &y, sizeof(I32));
 
+    type = SPT_TRANSFORM_ON;
+    MemCopy(records + 532, &type, sizeof(U8));
+    type = 23; // SPT_BITMAP
+    MemCopy(records + 533, &type, sizeof(U8));
+    x = 100; y = 50;
+    MemCopy(records + 537, &x, sizeof(I32));
+    MemCopy(records + 541, &y, sizeof(I32));
+    x = 2; y = 2;
+    MemCopy(records + 545, &x, sizeof(I32));
+    MemCopy(records + 549, &y, sizeof(I32));
+    pixel = 12;
+    MemCopy(records + 553, &pixel, sizeof(U8));
+    MemCopy(records + 554, &pixel, sizeof(U8));
+    MemCopy(records + 561, &pixel, sizeof(U8));
+    MemCopy(records + 562, &pixel, sizeof(U8));
+
+    type = SPT_TRANSFORM_OFF;
+    MemCopy(records + 569, &type, sizeof(U8));
+    type = 23; // SPT_BITMAP
+    MemCopy(records + 570, &type, sizeof(U8));
+    x = 100; y = 50;
+    MemCopy(records + 574, &x, sizeof(I32));
+    MemCopy(records + 578, &y, sizeof(I32));
+    x = 2; y = 2;
+    MemCopy(records + 582, &x, sizeof(I32));
+    MemCopy(records + 586, &y, sizeof(I32));
+    MemCopy(records + 590, &pixel, sizeof(U8));
+    MemCopy(records + 591, &pixel, sizeof(U8));
+    MemCopy(records + 598, &pixel, sizeof(U8));
+    MemCopy(records + 599, &pixel, sizeof(U8));
+
     color = gr_palette[12] & 0x00FFFFFF;
     Sprite3(dc, dc->x, dc->y, dc->z, records);
     if (ZcFbTextPixel(593, 453) != color ||
@@ -282,7 +313,15 @@ I64 GrSpriteTransformChecks()
             ZcFbTextPixel(540, 490) != color ||
             ZcFbTextPixel(540, 520) != color ||
             ZcFbTextPixel(670, 500) != color ||
-            ZcFbTextPixel(700, 500) != color)
+            ZcFbTextPixel(700, 500) != color ||
+            ZcFbTextPixel(560, 530) != color ||
+            ZcFbTextPixel(560, 531) != color ||
+            ZcFbTextPixel(559, 530) != color ||
+            ZcFbTextPixel(559, 531) != color ||
+            ZcFbTextPixel(710, 480) != color ||
+            ZcFbTextPixel(711, 480) != color ||
+            ZcFbTextPixel(710, 481) != color ||
+            ZcFbTextPixel(711, 481) != color)
         return 2;
     if (ZcFbTextPixel(585, 445) == color)
         return 3;

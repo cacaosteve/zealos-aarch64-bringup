@@ -1680,8 +1680,9 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
                 {
                     MemCopy(&pixel, sprite + 20 + row * stride + col, sizeof(U8));
                     dc->color.c0 = pixel;
-                    GrPlot(dc, x + old_x + sprite_x + col,
-                               y + old_y + sprite_y + row);
+                    SpritePlotTransform0(dc, transform_enabled,
+                            x + old_x + sprite_x + col,
+                            y + old_y + sprite_y + row, z);
                 }
             size = 20 + stride * height;
         }
