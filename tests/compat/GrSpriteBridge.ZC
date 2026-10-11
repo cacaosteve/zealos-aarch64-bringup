@@ -118,6 +118,15 @@ I64 GrDC2SpriteChecks()
     if (!plot_dc)
         return 41;
     plot_dc->color.c0 = 7;
+    // Clear this sample before Sprite3 so an earlier graphics probe cannot
+    // make the polyline assertions pass with stale framebuffer pixels.
+    plot_dc->color.c0 = 0;
+    GrPlot(plot_dc, 421, 300);
+    GrPlot(plot_dc, 422, 300);
+    GrPlot(plot_dc, 423, 300);
+    GrPlot(plot_dc, 424, 300);
+    GrPlot(plot_dc, 425, 300);
+    plot_dc->color.c0 = 7;
     Sprite3(plot_dc, 400, 300, 0, records);
     circle_color = gr_palette[12] & 0x00FFFFFF;
     if (plot_dc->color.c0 != 7)
