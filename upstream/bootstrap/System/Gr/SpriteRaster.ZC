@@ -578,7 +578,8 @@ I64 SpriteSplineWork0(CD3I32 *points, I64 order)
 }
 
 I64 SpriteBezierRaster0(CDC *dc, I64 ox, I64 oy, CD3I32 *points,
-        I64 order, I64 pixel_limit)
+        I64 order, I64 pixel_limit, Bool symmetry_enabled,
+        I64 axis_x1, I64 axis_y1, I64 axis_x2, I64 axis_y2)
 {
     I64 i, steps, work, px, py, nx, ny;
     I64 scale, denominator, t, nt, a, b, c, d;
@@ -592,7 +593,8 @@ I64 SpriteBezierRaster0(CDC *dc, I64 ox, I64 oy, CD3I32 *points,
         denominator *= scale;
     px = points[0].x;
     py = points[0].y;
-    GrPlot(dc, ox + px, oy + py);
+    SpritePlotSymTransform0(dc, FALSE, ox + px, oy + py, 0,
+            symmetry_enabled, axis_x1, axis_y1, axis_x2, axis_y2);
     for (i = 1; i <= steps; i++)
     {
         t = i * scale / steps;
@@ -622,7 +624,8 @@ I64 SpriteBezierRaster0(CDC *dc, I64 ox, I64 oy, CD3I32 *points,
                      b * (points[2].y - points[0].y) +
                      d * (points[3].y - points[0].y)) / denominator;
         }
-        GrPlot(dc, ox + nx, oy + ny);
+        SpritePlotSymTransform0(dc, FALSE, ox + nx, oy + ny, 0,
+                symmetry_enabled, axis_x1, axis_y1, axis_x2, axis_y2);
         px = nx;
         py = ny;
     }
@@ -631,7 +634,9 @@ I64 SpriteBezierRaster0(CDC *dc, I64 ox, I64 oy, CD3I32 *points,
 }
 
 I64 SpriteBSpline0(CDC *dc, I64 ox, I64 oy, U8 *sprite, I64 type,
-        Bool transform_enabled, I64 z, I64 pixel_limit)
+        Bool transform_enabled, I64 z, I64 pixel_limit,
+        Bool symmetry_enabled, I64 axis_x1, I64 axis_y1,
+        I64 axis_x2, I64 axis_y2)
 {
     I64 count, closed, order, control_count, i, j, axis, coord;
     I64 work, total_work, raster_work, screen_x, screen_y;
@@ -809,7 +814,8 @@ I64 SpriteBSpline0(CDC *dc, I64 ox, I64 oy, U8 *sprite, I64 type,
     for (i = 0; i < control_count - order; i += order)
     {
         work = SpriteBezierRaster0(dc, ox, oy, control + i, order,
-                total_work);
+                total_work, symmetry_enabled, axis_x1, axis_y1,
+                axis_x2, axis_y2);
         if (work < 0)
             break;
         total_work -= work;
@@ -1795,7 +1801,9 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
             if (poly_count < 3 || poly_count > 64)
                 break;
             size = SpriteBSpline0(dc, x + old_x, y + old_y, sprite, type,
-                    transform_enabled, z, 480000 - pixel_budget);
+                    transform_enabled, z, 480000 - pixel_budget,
+                    symmetry_enabled, symmetry_x1, symmetry_y1,
+                    symmetry_x2, symmetry_y2);
             if (size < 0)
                 break;
             pixel_budget += size;
