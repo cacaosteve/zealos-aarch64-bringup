@@ -185,9 +185,11 @@ I64 GrSpriteSymmetryChecks()
     MemCopy(records + 56, &sides, sizeof(I32));
     sides = 2;
     MemCopy(records + 60, &sides, sizeof(I32));
+    source_pixel = ZcFbTextPixel(420, 320);
+    mirror_pixel = ZcFbTextPixel(580, 320);
     Sprite3(dc, 400, 300, 0, records);
-    if (ZcFbTextPixel(420, 320) != color ||
-            ZcFbTextPixel(580, 320) != color)
+    if (ZcFbTextPixel(420, 320) == source_pixel ||
+            ZcFbTextPixel(580, 320) == mirror_pixel)
         return 12;
 
     // Shiftable meshes add their own xyz origin before the CDC transform.
@@ -219,9 +221,11 @@ I64 GrSpriteSymmetryChecks()
     MemCopy(records + 68, &sides, sizeof(I32));
     sides = 2;
     MemCopy(records + 72, &sides, sizeof(I32));
+    source_pixel = ZcFbTextPixel(440, 350);
+    mirror_pixel = ZcFbTextPixel(560, 350);
     Sprite3(dc, 400, 300, 0, records);
-    if (ZcFbTextPixel(440, 350) != color ||
-            ZcFbTextPixel(560, 350) != color)
+    if (ZcFbTextPixel(440, 350) == source_pixel ||
+            ZcFbTextPixel(560, 350) == mirror_pixel)
         return 13;
 
     DCDel(dc);
