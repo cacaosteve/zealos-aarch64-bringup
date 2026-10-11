@@ -164,6 +164,28 @@ U0 SpritePlotTransform0(CDC *dc, Bool enabled, I64 x, I64 y, I64 z)
         GrPlot(dc, screen_x, screen_y);
 }
 
+U0 SpriteRectTransform0(CDC *dc, I64 left, I64 top, I64 right, I64 bottom,
+        Bool transform_enabled, I64 z)
+{//Draw an axis-aligned or transformed filled rectangle through its corners.
+    I64 px[4], py[4], i, j;
+
+    if (!SpriteTransformPoint0(dc, transform_enabled, left, top, z,
+            &px[0], &py[0]) ||
+            !SpriteTransformPoint0(dc, transform_enabled, right, top, z,
+            &px[1], &py[1]) ||
+            !SpriteTransformPoint0(dc, transform_enabled, right, bottom, z,
+            &px[2], &py[2]) ||
+            !SpriteTransformPoint0(dc, transform_enabled, left, bottom, z,
+            &px[3], &py[3]))
+        return;
+    for (i = 0; i < 4; i++)
+    {
+        j = (i + 1) & 3;
+        GrLine(dc, px[i], py[i], px[j], py[j]);
+    }
+    SpriteFillQuad0(dc, px, py);
+}
+
 I64 SpriteTextSize0(U8 *sprite)
 {
     I64 scan_pos;
@@ -689,7 +711,8 @@ U0 SpriteEllipse0(CDC *dc, I64 cx, I64 cy, I64 rx, I64 ry,
 }
 
 I64 SpriteRotatedRect0(CDC *dc, I64 x, I64 y, I32 x1, I32 y1,
-        I32 x2, I32 y2, U64 angle_bits, I64 pixel_limit)
+        I32 x2, I32 y2, U64 angle_bits, Bool transform_enabled, I64 z,
+        I64 pixel_limit)
 {
     I64 rect_x, rect_y, width, height, area, swap;
 
@@ -734,7 +757,12 @@ I64 SpriteRotatedRect0(CDC *dc, I64 x, I64 y, I32 x1, I32 y1,
     else if (angle_bits != 0)
         return -1;
 
-    GrRect(dc, x + rect_x, y + rect_y, width, height);
+    if (transform_enabled)
+        SpriteRectTransform0(dc, x + rect_x, y + rect_y,
+                x + rect_x + width, y + rect_y + height,
+                transform_enabled, z);
+    else
+        GrRect(dc, x + rect_x, y + rect_y, width, height);
     return area;
 }
 
@@ -1146,7 +1174,8 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
             MemCopy(&y2, sprite + 16, sizeof(I32));
             MemCopy(&rect_angle_bits, sprite + 24, sizeof(U64));
             size = SpriteRotatedRect0(dc, x + old_x, y + old_y, x1, y1,
-                    x2, y2, rect_angle_bits, 480000 - pixel_budget);
+                    x2, y2, rect_angle_bits, transform_enabled, z,
+                    480000 - pixel_budget);
             if (size < 0)
                 break;
             pixel_budget += size;
