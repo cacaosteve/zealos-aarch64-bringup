@@ -220,6 +220,47 @@ I64 GrSpriteSymmetryChecks()
     if (dc->depth_buf[320 * dc->width_internal + 420] != 50)
         return 17;
 
+    // Mesh z coordinates must follow the CDC's active 3D transform too.
+    for (i = 0; i < 16; i++)
+        dc->r[i] = 0;
+    dc->r[0] = 0x100000000;
+    dc->r[5] = 0x100000000;
+    dc->r[10] = 2 * 0x100000000;
+    dc->r[15] = 0x100000000;
+    dc->depth_buf[320 * dc->width_internal + 420] = I32_MAX;
+    MemSet(records, 0, 246);
+    type = SPT_TRANSFORM_ON;
+    MemCopy(records, &type, sizeof(U8));
+    type = SPT_MESH;
+    MemCopy(records + 1, &type, sizeof(U8));
+    sides = 3;
+    MemCopy(records + 5, &sides, sizeof(I32));
+    sides = 1;
+    MemCopy(records + 9, &sides, sizeof(I32));
+    x1 = 10; y1 = 10; x2 = 10;
+    MemCopy(records + 13, &x1, sizeof(I32));
+    MemCopy(records + 17, &y1, sizeof(I32));
+    MemCopy(records + 21, &x2, sizeof(I32));
+    x1 = 40; y1 = 10;
+    MemCopy(records + 25, &x1, sizeof(I32));
+    MemCopy(records + 29, &y1, sizeof(I32));
+    MemCopy(records + 33, &x2, sizeof(I32));
+    x1 = 10; y1 = 40;
+    MemCopy(records + 37, &x1, sizeof(I32));
+    MemCopy(records + 41, &y1, sizeof(I32));
+    MemCopy(records + 45, &x2, sizeof(I32));
+    sides = 12;
+    MemCopy(records + 49, &sides, sizeof(I32));
+    sides = 0;
+    MemCopy(records + 53, &sides, sizeof(I32));
+    sides = 1;
+    MemCopy(records + 57, &sides, sizeof(I32));
+    sides = 2;
+    MemCopy(records + 61, &sides, sizeof(I32));
+    Sprite3(dc, 400, 300, 5, records);
+    if (dc->depth_buf[320 * dc->width_internal + 420] != 30)
+        return 18;
+
     // Shiftable meshes add their own xyz origin before the CDC transform.
     MemSet(records, 0, 246);
     type = SPT_SHIFTABLE_MESH;
@@ -254,7 +295,7 @@ I64 GrSpriteSymmetryChecks()
     Sprite3(dc, 400, 300, 0, records);
     if (ZcFbTextPixel(440, 350) == source_pixel ||
             ZcFbTextPixel(560, 350) == mirror_pixel)
-        return 18;
+        return 19;
 
     DCDel(dc);
     Free(records);
