@@ -167,7 +167,7 @@ I64 GrSpriteSymmetryChecks()
     MemCopy(records + 4, &sides, sizeof(I32));
     sides = 1;
     MemCopy(records + 8, &sides, sizeof(I32));
-    x1 = 10; y1 = 10; x2 = 100;
+    x1 = 10; y1 = 10; x2 = 300;
     MemCopy(records + 12, &x1, sizeof(I32));
     MemCopy(records + 16, &y1, sizeof(I32));
     MemCopy(records + 20, &x2, sizeof(I32));
@@ -193,22 +193,32 @@ I64 GrSpriteSymmetryChecks()
     if (ZcFbTextPixel(420, 320) == source_pixel ||
             ZcFbTextPixel(580, 320) == mirror_pixel)
         return 13;
-    if (dc->depth_buf[320 * dc->width_internal + 420] != 100)
+    if (dc->depth_buf[320 * dc->width_internal + 420] != 300)
         return 14;
+    x2 = 100;
+    MemCopy(records + 20, &x2, sizeof(I32));
+    x2 = 200;
+    MemCopy(records + 32, &x2, sizeof(I32));
+    x2 = 300;
+    MemCopy(records + 44, &x2, sizeof(I32));
+    Sprite3(dc, 400, 300, 0, records);
+    source_pixel = dc->depth_buf[320 * dc->width_internal + 420];
+    if (source_pixel < 190 || source_pixel > 210)
+        return 15;
     x2 = 50;
     MemCopy(records + 20, &x2, sizeof(I32));
     MemCopy(records + 32, &x2, sizeof(I32));
     MemCopy(records + 44, &x2, sizeof(I32));
     Sprite3(dc, 400, 300, 0, records);
     if (dc->depth_buf[320 * dc->width_internal + 420] != 50)
-        return 15;
+        return 16;
     x2 = 200;
     MemCopy(records + 20, &x2, sizeof(I32));
     MemCopy(records + 32, &x2, sizeof(I32));
     MemCopy(records + 44, &x2, sizeof(I32));
     Sprite3(dc, 400, 300, 0, records);
     if (dc->depth_buf[320 * dc->width_internal + 420] != 50)
-        return 16;
+        return 17;
 
     // Shiftable meshes add their own xyz origin before the CDC transform.
     MemSet(records, 0, 246);
@@ -244,7 +254,7 @@ I64 GrSpriteSymmetryChecks()
     Sprite3(dc, 400, 300, 0, records);
     if (ZcFbTextPixel(440, 350) == source_pixel ||
             ZcFbTextPixel(560, 350) == mirror_pixel)
-        return 17;
+        return 18;
 
     DCDel(dc);
     Free(records);
