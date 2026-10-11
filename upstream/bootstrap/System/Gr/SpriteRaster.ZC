@@ -783,12 +783,29 @@ I64 SpriteRotatedRect0(CDC *dc, I64 x, I64 y, I32 x1, I32 y1,
 }
 
 Bool SpriteArrow0(CDC *dc, I64 x, I64 y, I64 x1, I64 y1,
-        I64 x2, I64 y2, I64 *pixel_budget)
+        I64 x2, I64 y2, Bool transform_enabled, I64 z,
+        I64 *pixel_budget)
 {
     I64 dx, dy, dy_abs, length_sqr, line_steps, head_x, head_y;
+    I64 start_x, start_y, end_x, end_y;
     F64 arrow_scale;
-    dx = x2 - x1;
-    dy = y2 - y1;
+    if (transform_enabled)
+    {
+        if (!SpriteTransformPoint0(dc, TRUE, x + x1, y + y1, z,
+                &start_x, &start_y) ||
+                !SpriteTransformPoint0(dc, TRUE, x + x2, y + y2, z,
+                &end_x, &end_y))
+            return FALSE;
+    }
+    else
+    {
+        start_x = x + x1;
+        start_y = y + y1;
+        end_x = x + x2;
+        end_y = y + y2;
+    }
+    dx = end_x - start_x;
+    dy = end_y - start_y;
     if (dx < -1073741824 || dx > 1073741824 ||
             dy < -1073741824 || dy > 1073741824)
         return FALSE;
@@ -807,13 +824,13 @@ Bool SpriteArrow0(CDC *dc, I64 x, I64 y, I64 x1, I64 y1,
     if (!dx && !dy)
         return TRUE;
     arrow_scale = 2.75 * dc->thick / Sqrt(ToF64(length_sqr));
-    head_x = x2 - dx * arrow_scale + dy * arrow_scale + 0.5;
-    head_y = y2 - dy * arrow_scale - dx * arrow_scale + 0.5;
-    GrLine(dc, x + x1, y + y1, x + x2, y + y2);
-    GrLine(dc, x + head_x, y + head_y, x + x2, y + y2);
-    head_x = x2 - dx * arrow_scale - dy * arrow_scale + 0.5;
-    head_y = y2 - dy * arrow_scale + dx * arrow_scale + 0.5;
-    GrLine(dc, x + head_x, y + head_y, x + x2, y + y2);
+    head_x = end_x - dx * arrow_scale + dy * arrow_scale + 0.5;
+    head_y = end_y - dy * arrow_scale - dx * arrow_scale + 0.5;
+    GrLine(dc, start_x, start_y, end_x, end_y);
+    GrLine(dc, head_x, head_y, end_x, end_y);
+    head_x = end_x - dx * arrow_scale - dy * arrow_scale + 0.5;
+    head_y = end_y - dy * arrow_scale + dx * arrow_scale + 0.5;
+    GrLine(dc, head_x, head_y, end_x, end_y);
     return TRUE;
 }
 
@@ -1346,7 +1363,8 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
             MemCopy(&x2, sprite + 12, sizeof(I32));
             MemCopy(&y2, sprite + 16, sizeof(I32));
             if (!SpriteArrow0(dc, x + old_x, y + old_y,
-                    x1, y1, x2, y2, &pixel_budget))
+                    x1, y1, x2, y2, transform_enabled, z,
+                    &pixel_budget))
                 break;
             size = 20;
         }
