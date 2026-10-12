@@ -2243,12 +2243,25 @@ I64 BootstrapWinMgrStop()
 }
 // Doc recalculation may load after the task bridge. The host thunk resolves
 // the guest function at call time and safely skips it until it is defined.
+Bool BootstrapWinTextCellVisible(CTask *task, I64 x, I64 y)
+{//Keep text and border cells from a rear window out of a front window.
+    I64 cell_z;
+    if (!task || !gr.win_z_buf || !task->win_z_num ||
+        x < 0 || x >= TEXT_COLS || y < 0 || y >= TEXT_ROWS)
+        return TRUE;
+    cell_z = gr.win_z_buf[y * TEXT_COLS + x];
+    return task->win_z_num >= cell_z;
+}
 Bool TextChar(CTask *task, Bool allow_border=FALSE, I64 x=0, I64 y=0, I64 d=0)
 {//Single-cell framebuffer path; border mode permits the adjacent outer row/column.
+    I64 cell_x, cell_y;
     if (!task)
         return FALSE;
-    return ZcFbTextChar(task->win_left + x + (task->scroll_x >> 3),
-                        task->win_top + y + (task->scroll_y >> 3), d,
+    cell_x = task->win_left + x + (task->scroll_x >> 3);
+    cell_y = task->win_top + y + (task->scroll_y >> 3);
+    if (!BootstrapWinTextCellVisible(task, cell_x, cell_y))
+        return FALSE;
+    return ZcFbTextChar(cell_x, cell_y, d,
                         allow_border,
                         task->win_left | task->win_right << 16,
                         task->win_top | task->win_bottom << 16,

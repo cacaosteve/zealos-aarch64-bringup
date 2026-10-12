@@ -59,6 +59,12 @@ zoomed. `/Tests/GrZoomScreen.ZC` checks every pixel of the 2x nearest-neighbor
 result, and the live graphics smoke checks that the frame binds and uses this
 zoom surface.
 
+The bootstrap `TextChar` bridge now consults the software cell z-buffer before
+presenting a glyph or border cell. This prevents an older window's border,
+which is drawn just outside its body, from leaking into the body of a newer
+overlapping window. `WindowDragLiveRenderChecks` checks front/back text
+visibility, border occlusion, and the CDC control in an overlap.
+
 This is a bundle-time architecture port, not a change to the pinned upstream
 file and not an x86 instruction emulator. Once the one-CPU task rings validate,
 the live frame stages the upstream graphics globals and dispatches the

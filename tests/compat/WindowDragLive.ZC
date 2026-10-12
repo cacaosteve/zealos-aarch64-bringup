@@ -293,6 +293,9 @@ I64 WindowDragLiveRenderChecks()
         return 15;
     b_is_front = window_drag_live_b->win_z_num >
                  window_drag_live_a->win_z_num;
+    if (BootstrapWinTextCellVisible(window_drag_live_b, 40, 20) != b_is_front ||
+        BootstrapWinTextCellVisible(window_drag_live_a, 40, 20) == b_is_front)
+        return 19;
     found = FALSE;
     for (py = y; py < y + FONT_HEIGHT; py++)
         for (px = x; px < x + FONT_WIDTH; px++)
@@ -300,6 +303,33 @@ I64 WindowDragLiveRenderChecks()
                 found = TRUE;
     if (found != b_is_front)
         return 16;
+
+    // B's first label lies inside A's body. Its glyphs must be hidden when A
+    // is the front window and visible when B is the front window.
+    x = (window_drag_live_b->win_left + 2) * FONT_WIDTH;
+    y = (window_drag_live_b->win_top + 4) * FONT_HEIGHT;
+    found = FALSE;
+    for (py = y; py < y + FONT_HEIGHT; py++)
+        for (px = x; px < (window_drag_live_a->win_right + 1) * FONT_WIDTH;
+             px++)
+            if (ZcFbTextPixel(px, py) == 0x00FFFFFF)
+                found = TRUE;
+    if (found != b_is_front)
+        return 17;
+
+    // A's lower border sits just outside A's body, inside B's body and beside
+    // B's yellow control. A rear window's border must not leak through the
+    // front window's filled interior.
+    x = window_drag_live_b->win_left * FONT_WIDTH;
+    y = (window_drag_live_a->win_bottom + 1) * FONT_HEIGHT;
+    found = FALSE;
+    for (py = y; py < y + FONT_HEIGHT; py++)
+        for (px = x; px < (window_drag_live_b->win_left + 2) * FONT_WIDTH;
+             px++)
+            if (ZcFbTextPixel(px, py) == 0x00FFFFFF)
+                found = TRUE;
+    if (found == b_is_front)
+        return 18;
     return 42;
 }
 
