@@ -13,6 +13,29 @@ _TEXT_BG_X86 = re.compile(
 )
 
 
+def translate_winmgr(source: bytes) -> bytes:
+    """Route the source manager's periodic redraw through atomic scanout.
+
+    The upstream manager otherwise calls GrUpdateScreen from WinMgrSleep,
+    bypassing the host's staged framebuffer transaction. Require the exact
+    single call site so source updates cannot silently change its semantics.
+    """
+    try:
+        text = source.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValueError("WinMgr.ZC is not UTF-8") from exc
+    call = "\t\tGrUpdateScreen;"
+    if text.count(call) != 1:
+        raise ValueError(
+            "expected exactly one WinMgrSleep screen refresh call; "
+            f"found {text.count(call)}"
+        )
+    if "ZcTaskFrameRun" in text:
+        raise ValueError("WinMgr.ZC already contains the frame-run hook")
+    text = text.replace(call, "\t\tZcTaskFrameRun;", 1)
+    return text.encode("utf-8")
+
+
 def translate_grscreen(source: bytes) -> bytes:
     """Apply the narrow AArch64 compatibility overlay to GrScreen.ZC.
 

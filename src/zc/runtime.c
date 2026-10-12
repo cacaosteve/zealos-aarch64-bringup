@@ -1003,8 +1003,23 @@ static int64_t guest_task_frame_run(void) {
     return presented;
 }
 static int64_t host_task_frame_run(int64_t *a) {
+    unsigned caller = guest_current;
+    int had_guest_task = guest_task_bound;
     (void)a;
-    return guest_task_frame_run();
+    /* The compositor is rooted in the shell task. When WinMgrSleep calls
+     * into it, switch the scheduler identity and ZealOS TLS together. */
+    if (had_guest_task) {
+        guest_current = 0;
+        Fs = &task;
+        set_guest_task(guest_fibers[0].words);
+    }
+    int64_t presented = guest_task_frame_run();
+    if (had_guest_task && caller < GUEST_TASKS) {
+        guest_current = caller;
+        Fs = caller ? &guest_fibers[caller].compiler_task : &task;
+        set_guest_task(guest_fibers[caller].words);
+    }
+    return presented;
 }
 static int64_t host_gr_text_update(int64_t *a) {
     CHashFun *background, *foreground;

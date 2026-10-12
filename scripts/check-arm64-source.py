@@ -4,7 +4,7 @@ from pathlib import Path
 import re
 import sys
 
-from arm64_source import translate_grscreen
+from arm64_source import translate_grscreen, translate_winmgr
 
 root = Path(__file__).resolve().parent.parent
 source = (root / 'upstream/pinned/System/Gr/GrScreen.ZC').read_bytes()
@@ -50,4 +50,18 @@ except ValueError:
 else:
     raise AssertionError('overlay accepted a changed ODE update call')
 
-print('PASS guarded ARM64 GrScreen source overlay', flush=True)
+winmgr_source = (root / 'upstream/pinned/System/WinMgr.ZC').read_bytes()
+winmgr_translated = translate_winmgr(winmgr_source)
+winmgr_text = winmgr_translated.decode('utf-8')
+assert winmgr_translated != winmgr_source
+assert winmgr_text.count('ZcTaskFrameRun;') == 1
+assert '\t\tGrUpdateScreen;' not in winmgr_text
+
+try:
+    translate_winmgr(winmgr_source.replace(b'GrUpdateScreen;', b'GrUpdateScreen32;', 1))
+except ValueError:
+    pass
+else:
+    raise AssertionError('overlay accepted a changed window-manager refresh call')
+
+print('PASS guarded ARM64 graphics/window-manager source overlays', flush=True)
