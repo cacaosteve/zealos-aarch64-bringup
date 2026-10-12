@@ -3947,7 +3947,11 @@ void zc_idle_step(void) {
             guest_winmgr_tick_fun = (CHashFun *)HashFind(
                 "BootstrapWinMgrTick", Fs->hash_table, HTT_FUN, 1);
         }
-        if (guest_winmgr_tick_fun && guest_winmgr_tick_fun->fun_ptr &&
+        /* The bootstrap shell writes directly to scanout. Until the source
+         * window manager has an application surface to compose, its empty
+         * periodic frame would replace that text with a blank frame. The
+         * live two-window fixture is the current host-driven GUI lifecycle. */
+        if (window_demo_loaded && guest_winmgr_tick_fun && guest_winmgr_tick_fun->fun_ptr &&
             !guest_winmgr_tick_fun->argc &&
             !(guest_winmgr_tick_fun->base.base.type & HTF_EXTERN)) {
             (void)guest_task_frame_run();

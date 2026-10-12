@@ -394,9 +394,13 @@ oracle are needed before broad language compatibility can be claimed.
   selection, and `x` deletion. Existing numbered edit commands remain usable.
   The rebuilt ARM64 image passed the editor regression sequence in the PCI
   compatibility suite, including persistence through compaction and reboot.
-- UTM framebuffer drawing is visible, but the full-screen editor layout has
-  not yet been visually checked there. The two-window overlap artifact remains
-  unresolved and is tracked separately from editor correctness.
+- On 2026-10-12, the UTM serial console confirmed `j`, `k`, and `p 100 20`
+  responded while editing `Kernel/KernelA.HH`, and `q` returned to the shell.
+  The accompanying UTM framebuffer captures were black except for the cursor,
+  including after returning to the shell. Idle graphics frames now run only
+  while the current two-window application fixture is active, preserving the
+  direct framebuffer shell/editor between demos. This needs a fresh UTM visual
+  check; overlap flicker remains unresolved and is tracked separately.
 
 The current boot images are useful delivery artifacts; they are not a finished
 ZealOS live distribution or installer.
