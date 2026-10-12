@@ -237,6 +237,7 @@ I64 WindowDragLiveBasicRenderChecks()
 
 I64 WindowDragLiveRenderChecks()
 {//Require a presented task frame and a painted control pixel on its CDC.
+    I64 x, y, px, py, found, b_is_front;
     if (!TaskValidate(window_drag_live_a) || !TaskValidate(window_drag_live_b))
         return 1;
     if (window_drag_live_a->win_left != 15 ||
@@ -281,6 +282,24 @@ I64 WindowDragLiveRenderChecks()
         return 12;
     if (!WindowDragLiveTextVisible(window_drag_live_b, 4, 31))
         return 13;
+
+    // B's top border is at row 19, inside A's window body (rows 10..29).
+    // The task with the higher z number must own that overlap cell: B's border
+    // is visible when B is in front, and A's opaque background hides it when
+    // A is in front.
+    x = 40 * FONT_WIDTH;
+    y = 19 * FONT_HEIGHT;
+    if (window_drag_live_a->win_z_num == window_drag_live_b->win_z_num)
+        return 15;
+    b_is_front = window_drag_live_b->win_z_num >
+                 window_drag_live_a->win_z_num;
+    found = FALSE;
+    for (py = y; py < y + FONT_HEIGHT; py++)
+        for (px = x; px < x + FONT_WIDTH; px++)
+            if (ZcFbTextPixel(px, py) != 0)
+                found = TRUE;
+    if (found != b_is_front)
+        return 16;
     return 42;
 }
 
