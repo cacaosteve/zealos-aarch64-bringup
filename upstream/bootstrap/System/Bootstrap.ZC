@@ -52,7 +52,9 @@ extern Bool ZcFbGraphPlot(I64 x, I64 y, U32 color,
                          I64 left, I64 top, I64 right, I64 bottom);
 extern I64 ZcFbGraphColor(I64 color);
 extern Bool ZcFbGraphRect(I64 x, I64 y, I64 width, I64 height, U32 color,
-                         I64 left, I64 top, I64 right, I64 bottom);
+                         I64 left, I64 top, I64 right, I64 bottom,
+                         I64 task_z);
+extern U0 ZcFbSetWinZBuffer(U16 *z_buf);
 extern I64 ZcFbGraphText(I64 x, I64 y, U32 color,
                         I64 left, I64 top, I64 right, I64 bottom, U8 *text);
 extern Bool ZcFbGraphLine(I64 x0, I64 y0, I64 x1, I64 y1, U32 color,
@@ -69,7 +71,8 @@ extern I64 ZcFbTextRect(I64 left, I64 right, I64 top, I64 bottom, U32 cell,
 extern I64 ZcFbTextFlush(U32 *text_base, I64 stride, I64 rows);
 extern I64 ZcFbTextFlushRect(U32 *text_base, I64 stride, I64 left, I64 right,
                              I64 top, I64 bottom);
-extern I64 ZcFbTaskTextCompose(I64 task, U32 *text_base, I64 stride);
+extern I64 ZcFbTaskTextCompose(I64 task, U32 *text_base, I64 stride,
+                               U16 *z_buf, I64 task_z);
 extern I64 ZcFbShellTextCompose(U32 *text_base, I64 stride);
 // Temporary ARM64 bootstrap binding for the table initialized by upstream KMain.
 extern F64 *pow10_I64;

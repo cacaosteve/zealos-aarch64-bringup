@@ -6,6 +6,7 @@ extern I64 bootstrap_mouse_draw_calls;
 extern Bool TextLenStr(CTask *task, I64 x, I64 y, I64 len, I64 attr, U8 *str);
 extern U0 BootstrapDrawTaskWin(CTask *task);
 extern Bool BootstrapCtrlInputSubmit(CTask *task, I64 sample, I64 now_ns);
+extern Bool BootstrapWinTextCellVisible(CTask *task, I64 x, I64 y);
 extern CWinMgrGlobals *ZcActiveWinMgrGlobals();
 extern I64 ZcMonotonicNs();
 CTask *window_drag_live_a;
@@ -16,7 +17,6 @@ I64 window_drag_live_wheel_delta;
 I64 window_drag_live_draw_a_count;
 I64 window_drag_live_draw_b_count;
 I64 window_drag_live_control_draw_count;
-I64 window_drag_live_control_pixel;
 I64 window_drag_live_control_dc_matches;
 I64 window_drag_live_presented_pixel;
 I64 window_drag_live_start_reason;
@@ -91,16 +91,6 @@ U0 WindowDragLiveRightDraw(CDC *dc, CCtrl *ctrl)
            ctrl->right - ctrl->left + 1,
            ctrl->bottom - ctrl->top + 1);
     window_drag_live_control_dc_matches = dc->win_task == ctrl->win_task;
-    window_drag_live_control_pixel = -1;
-    if (dc->body && dc->width_internal > 0)
-    {
-        I64 x = ctrl->win_task->pix_left + ctrl->left +
-                (ctrl->right - ctrl->left) / 2;
-        I64 y = ctrl->win_task->pix_top + ctrl->top +
-                (ctrl->bottom - ctrl->top) / 2;
-        if (x >= 0 && x < dc->width_internal && y >= 0 && y < dc->height)
-            window_drag_live_control_pixel = dc->body[y * dc->width_internal + x];
-    }
 }
 
 Bool WindowDragLiveTextVisible(CTask *task, I64 row, I64 cells)
@@ -185,7 +175,6 @@ I64 WindowDragLiveStartInternal(Bool with_control)
     WinDerivedValsUpdate(window_drag_live_b);
     window_drag_live_right_down = 0;
     window_drag_live_wheel_delta = 0;
-    window_drag_live_control_pixel = -1;
     window_drag_live_control_dc_matches = FALSE;
     if (with_control)
     {
@@ -195,8 +184,10 @@ I64 WindowDragLiveStartInternal(Bool with_control)
         window_drag_live_right_control.flags = CTRLF_SHOW | CTRLF_CAPTURE_RIGHT_MS;
         window_drag_live_right_control.left = 2 * FONT_WIDTH;
         window_drag_live_right_control.right = 20 * FONT_WIDTH;
-        window_drag_live_right_control.top = 10 * FONT_HEIGHT;
-        window_drag_live_right_control.bottom = 13 * FONT_HEIGHT;
+        // Put the CDC control in the A/B overlap so the frame test can prove
+        // a rear control is clipped by the same front-window z cell as text.
+        window_drag_live_right_control.top = 6 * FONT_HEIGHT;
+        window_drag_live_right_control.bottom = 9 * FONT_HEIGHT;
         window_drag_live_right_control.right_click = &WindowDragLiveRightClick;
         window_drag_live_right_control.wheel_chg = &WindowDragLiveWheel;
         window_drag_live_right_control.draw_it = &WindowDragLiveRightDraw;
@@ -255,6 +246,10 @@ I64 WindowDragLiveRenderChecks()
         return 14;
     if (!ZcTaskFrameRun())
         return 3;
+    if (window_drag_live_a->win_z_num == window_drag_live_b->win_z_num)
+        return 15;
+    b_is_front = window_drag_live_b->win_z_num >
+                 window_drag_live_a->win_z_num;
     window_drag_live_presented_pixel = ZcFbTextPixel(
         window_drag_live_b->pix_left + window_drag_live_right_control.left +
             (window_drag_live_right_control.right -
@@ -272,9 +267,11 @@ I64 WindowDragLiveRenderChecks()
         return 6;
     if (!window_drag_live_control_dc_matches)
         return 7;
-    if (window_drag_live_control_pixel != YELLOW)
-        return 8;
-    if (window_drag_live_presented_pixel != 0x00FFFF55)
+    if (BootstrapWinTextCellVisible(window_drag_live_b, 49, 27) != b_is_front)
+        return 24;
+    if (b_is_front && window_drag_live_presented_pixel != 0x00FFFF55)
+        return 9;
+    if (!b_is_front && window_drag_live_presented_pixel != 0)
         return 9;
     // The W in each first label has its top-left glyph pixel set. Check the
     // rendered framebuffer so black-on-black text attributes cannot pass.
@@ -289,10 +286,6 @@ I64 WindowDragLiveRenderChecks()
     // A is in front.
     x = 40 * FONT_WIDTH;
     y = 19 * FONT_HEIGHT;
-    if (window_drag_live_a->win_z_num == window_drag_live_b->win_z_num)
-        return 15;
-    b_is_front = window_drag_live_b->win_z_num >
-                 window_drag_live_a->win_z_num;
     if (BootstrapWinTextCellVisible(window_drag_live_b, 40, 20) != b_is_front ||
         BootstrapWinTextCellVisible(window_drag_live_a, 40, 20) == b_is_front)
         return 19;

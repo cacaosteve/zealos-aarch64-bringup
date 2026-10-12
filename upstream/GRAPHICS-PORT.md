@@ -25,6 +25,13 @@ span. `WinHorz` and `WinVert` now follow upstream edge normalization, update
 `CTask` bounds, and recalculate the corresponding character and pixel extents.
 The `TaskOriginalDocRecalc` probe checks partially and fully clipped text spans,
 per-cell attributes, and the derived bounds for an overlapping child window.
+Text span and attributed-fill runs now consult the cell z-buffer as well, so
+draw callbacks cannot repaint glyphs from a rear window through a front one.
+Retained task text replay applies the same visibility test before updating the
+framebuffer or canonical text plane. CDC rectangle primitives now use the same
+cell z-buffer when publishing a staged frame. `WindowDragLiveRenderChecks`
+places the control in the A/B overlap and checks both label and control
+visibility against the current front-window z value.
 
 ## Canonical packed-cell plane
 

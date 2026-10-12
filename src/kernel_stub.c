@@ -211,6 +211,7 @@ static uint32_t g_fb_bpp;
 static uint8_t *g_fb_render_surface;
 static uint32_t *g_fb_render_rgba;
 static uint64_t g_fb_render_stride, g_fb_render_rows;
+static const uint16_t *g_fb_win_z_buf;
 static uint32_t g_fb_cx, g_fb_cy;
 static uint32_t g_fb_cols, g_fb_rows;
 static volatile uint32_t g_fb_console_quiet;
@@ -951,25 +952,34 @@ uint64_t zeal_fb_task_text_write(unsigned slot, int64_t left, int64_t right,
 
 uint64_t zeal_fb_task_text_compose(unsigned slot, int64_t left, int64_t right,
                                    int64_t top, int64_t bottom,
-                                   uint32_t *text_base, int64_t stride) {
+                                   uint32_t *text_base, int64_t stride,
+                                   const uint16_t *z_buf, uint16_t task_z) {
     if (slot >= FB_TASK_TEXT_SLOTS ||
         !fb_task_text_bounds(left, right, top, bottom))
         return 0;
     int64_t width = right - left + 1, height = bottom - top + 1;
     if (width > ZEAL_TEXT_MAX_COLS || height > ZEAL_TEXT_MAX_ROWS)
         return 0;
-    uint64_t drawn = fb_task_text_present(slot, left, top, width, height);
-    if (text_base && stride > right && stride <= ZEAL_TEXT_PLANE_COLS) {
-        for (int64_t y = 0; y < height; y++) {
-            for (int64_t x = 0; x < width; x++) {
-                if ((uint64_t)(top + y) >= ZEAL_TEXT_PLANE_ROWS ||
-                    (uint64_t)(left + x) >= ZEAL_TEXT_PLANE_COLS)
-                    continue;
-                size_t local = (size_t)y * ZEAL_TEXT_MAX_COLS + (size_t)x;
-                if (g_fb_task_text_valid[slot][local])
-                    text_base[(size_t)(top + y) * (size_t)stride + (size_t)(left + x)] =
-                        g_fb_task_text[slot][local];
-            }
+    uint64_t drawn = 0;
+    for (int64_t y = 0; y < height; y++) {
+        for (int64_t x = 0; x < width; x++) {
+            int64_t col = left + x, row = top + y;
+            size_t local = (size_t)y * ZEAL_TEXT_MAX_COLS + (size_t)x;
+            if (!g_fb_task_text_valid[slot][local] ||
+                (z_buf && (!task_z ||
+                 z_buf[(size_t)row * ZEAL_TEXT_MAX_COLS + (size_t)col] > task_z)))
+                continue;
+            uint32_t cell = g_fb_task_text[slot][local];
+            size_t index = (size_t)row * ZEAL_TEXT_MAX_COLS + (size_t)col;
+            g_fb_text_cells[index] = cell;
+            g_fb_text_valid[index] = 1;
+            fb_text_present_cell((uint32_t)col, (uint32_t)row, cell);
+            g_zc_text_cells_drawn++;
+            drawn++;
+            if (text_base && stride > col &&
+                (uint64_t)col < ZEAL_TEXT_PLANE_COLS &&
+                (uint64_t)row < ZEAL_TEXT_PLANE_ROWS)
+                text_base[(size_t)row * (size_t)stride + (size_t)col] = cell;
         }
     }
     return drawn;
@@ -983,7 +993,7 @@ uint64_t zeal_fb_shell_text_compose(uint32_t *text_base, int64_t stride) {
     if (!cols || !rows)
         return 0;
     return zeal_fb_task_text_compose(FB_SHELL_TEXT_SLOT, 0, cols - 1,
-                                     0, rows - 1, text_base, stride);
+                                     0, rows - 1, text_base, stride, NULL, 0);
 }
 
 static void fb_putc(char ch) {
@@ -2023,6 +2033,10 @@ uint64_t zeal_fb_graph_color(uint32_t color) {
     return zeal_graphics_color(color);
 }
 
+void zeal_fb_set_win_z_buffer(const uint16_t *z_buf) {
+    g_fb_win_z_buf = z_buf;
+}
+
 uint64_t zeal_fb_graph_plot(int64_t x, int64_t y, uint32_t color,
                             int64_t left, int64_t top,
                             int64_t right, int64_t bottom) {
@@ -2035,7 +2049,7 @@ uint64_t zeal_fb_graph_plot(int64_t x, int64_t y, uint32_t color,
 
 uint64_t zeal_fb_graph_rect(int64_t x, int64_t y, int64_t width, int64_t height,
                             uint32_t color, int64_t left, int64_t top,
-                            int64_t right, int64_t bottom) {
+                            int64_t right, int64_t bottom, uint16_t task_z) {
     int64_t x0, y0, x1, y1, px, py;
     if (!g_fb || width <= 0 || height <= 0 || width > 16384 || height > 16384)
         return 0;
@@ -2056,8 +2070,15 @@ uint64_t zeal_fb_graph_rect(int64_t x, int64_t y, int64_t width, int64_t height,
         return 0;
     color = zeal_graphics_color(color);
     for (py = y0; py <= y1; py++)
-        for (px = x0; px <= x1; px++)
+        for (px = x0; px <= x1; px++) {
+            if (g_fb_render_surface && g_fb_win_z_buf && task_z) {
+                size_t cell = (size_t)(py / 8) * ZEAL_TEXT_MAX_COLS +
+                              (size_t)(px / 8);
+                if (g_fb_win_z_buf[cell] > task_z)
+                    continue;
+            }
             fb_putpixel((uint32_t)px, (uint32_t)py, color);
+        }
     return 1;
 }
 

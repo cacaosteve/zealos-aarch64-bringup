@@ -2269,13 +2269,30 @@ Bool TextChar(CTask *task, Bool allow_border=FALSE, I64 x=0, I64 y=0, I64 d=0)
 }
 Bool TextLenStr(CTask *task, I64 x, I64 y, I64 len, I64 attr, U8 *str)
 {
+    I64 i, start, cell_x, cell_y;
+    Bool drawn = FALSE;
     if (!task || !str || len <= 0)
         return FALSE;
-    return ZcFbTextSpan(task->win_left + x + (task->scroll_x >> 3),
-                        task->win_top + y + (task->scroll_y >> 3), len, attr, str, 0,
-                        task->win_left | task->win_right << 16,
-                        task->win_top | task->win_bottom << 16,
-                        gr.text_base, TEXT_COLS) > 0;
+    if (len > 4096)
+        len = 4096;
+    cell_x = task->win_left + x + (task->scroll_x >> 3);
+    cell_y = task->win_top + y + (task->scroll_y >> 3);
+    // Send only visible runs. Text spans are commonly emitted by the
+    // upstream draw callbacks and otherwise bypass TextChar's z test.
+    for (i = 0; i < len;)
+    {
+        while (i < len && !BootstrapWinTextCellVisible(task, cell_x + i, cell_y))
+            i++;
+        start = i;
+        while (i < len && BootstrapWinTextCellVisible(task, cell_x + i, cell_y))
+            i++;
+        if (i > start && ZcFbTextSpan(cell_x + start, cell_y, i - start, attr,
+                str + start, 0, task->win_left | task->win_right << 16,
+                task->win_top | task->win_bottom << 16,
+                gr.text_base, TEXT_COLS) > 0)
+            drawn = TRUE;
+    }
+    return drawn;
 }
 U0 StrPrint(U8 *dst, U8 *format, ...)
 {
@@ -2284,23 +2301,53 @@ U0 StrPrint(U8 *dst, U8 *format, ...)
 }
 Bool TextLenAttrStr(CTask *task, I64 x, I64 y, I64 len, U32 *str)
 {
+    I64 i, start, cell_x, cell_y;
+    Bool drawn = FALSE;
     if (!task || !str || len <= 0)
         return FALSE;
-    return ZcFbTextSpan(task->win_left + x + (task->scroll_x >> 3),
-                        task->win_top + y + (task->scroll_y >> 3), len, 0,
-                        str, 1, task->win_left | task->win_right << 16,
-                        task->win_top | task->win_bottom << 16,
-                        gr.text_base, TEXT_COLS) > 0;
+    if (len > 4096)
+        len = 4096;
+    cell_x = task->win_left + x + (task->scroll_x >> 3);
+    cell_y = task->win_top + y + (task->scroll_y >> 3);
+    for (i = 0; i < len;)
+    {
+        while (i < len && !BootstrapWinTextCellVisible(task, cell_x + i, cell_y))
+            i++;
+        start = i;
+        while (i < len && BootstrapWinTextCellVisible(task, cell_x + i, cell_y))
+            i++;
+        if (i > start && ZcFbTextSpan(cell_x + start, cell_y, i - start, 0,
+                str + start, 1, task->win_left | task->win_right << 16,
+                task->win_top | task->win_bottom << 16,
+                gr.text_base, TEXT_COLS) > 0)
+            drawn = TRUE;
+    }
+    return drawn;
 }
 Bool TextLenAttr(CTask *task, I64 x, I64 y, I64 len, I64 attr)
 {//Direct framebuffer equivalent for empty attributed cells (e.g. line-tail fill).
+    I64 i, start, cell_x, cell_y;
+    Bool drawn = FALSE;
     if (!task || len <= 0)
         return FALSE;
-    return ZcFbTextFill(task->win_left + x + (task->scroll_x >> 3),
-                        task->win_top + y + (task->scroll_y >> 3), len, attr,
-                        task->win_left | task->win_right << 16,
-                        task->win_top | task->win_bottom << 16,
-                        gr.text_base, TEXT_COLS) >= 0;
+    if (len > 4096)
+        len = 4096;
+    cell_x = task->win_left + x + (task->scroll_x >> 3);
+    cell_y = task->win_top + y + (task->scroll_y >> 3);
+    for (i = 0; i < len;)
+    {
+        while (i < len && !BootstrapWinTextCellVisible(task, cell_x + i, cell_y))
+            i++;
+        start = i;
+        while (i < len && BootstrapWinTextCellVisible(task, cell_x + i, cell_y))
+            i++;
+        if (i > start && ZcFbTextFill(cell_x + start, cell_y, i - start, attr,
+                task->win_left | task->win_right << 16,
+                task->win_top | task->win_bottom << 16,
+                gr.text_base, TEXT_COLS) >= 0)
+            drawn = TRUE;
+    }
+    return drawn;
 }
 U0 TextBorder(CTask *task, I64 x1, I64 x2, I64 y1, I64 y2, U8 color, Bool solid)
 {//CP437 border glyphs match text.border_chars initialized by upstream KMain.
@@ -2372,6 +2419,12 @@ U0 TaskDerivedValsUpdate(CTask *task=NULL, Bool update_z_buf=TRUE)
     if (update_z_buf && Bt(&task->display_flags, DISPLAYf_SHOW) &&
         gr.win_z_buf && gr.win_uncovered_bitmap)
         WinZBufUpdate();
+}
+I64 BootstrapTaskZ(CTask *task)
+{
+    if (!task)
+        return 0;
+    return task->win_z_num;
 }
 U0 TaskQueueIns(CTask *task, CTask *pred=NULL)
 {//Mirror the pinned scheduler's doubly-linked task-ring insertion.
@@ -2518,7 +2571,7 @@ Bool GrRect(CDC *dc=gr.dc, I64 x=0, I64 y=0, I64 width=0, I64 height=0)
         bottom = dc->height - 1;
     }
     return ZcFbGraphRect(x, y, width, height, dc->color.c0 & 0xff,
-                         left, top, right, bottom);
+                         left, top, right, bottom, BootstrapTaskZ(task));
 }
 U0 GrPrint(CDC *dc=gr.dc, I64 x=0, I64 y=0, U8 *format, ...)
 {
@@ -3896,7 +3949,8 @@ U0 BootstrapDrawTaskWin(CTask *task)
              task->win_top, task->win_bottom, task->text_attr << 8);
     if (!(task->win_inhibit & (1 << WIf_SELF_DOC)))
         ZcDocUpdateTaskDocs(task);
-    ZcFbTaskTextCompose(task, gr.text_base, TEXT_COLS);
+    ZcFbTaskTextCompose(task, gr.text_base, TEXT_COLS,
+                        gr.win_z_buf, task->win_z_num);
     ZcFbTextFlushRect(gr.text_base, TEXT_COLS, task->win_left,
                       task->win_right, task->win_top, task->win_bottom);
     GrDrawTaskCallback(task);
@@ -4680,6 +4734,7 @@ U0 WinZBufUpdate()
             gr.highest_uncovered = i + 1;
         }
     }
+    ZcFbSetWinZBuffer(gr.win_z_buf);
 }
 Bool BootstrapWinIsUncovered(CTask *task)
 {
