@@ -418,6 +418,11 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                         'zc => 0x000000000000002a')
                 command('zcall GrSpriteBitmapChecks',
                         'zc => 0x000000000000002a')
+                # GrRect can take the native probabilistic-dither path;
+                # its random helper is supplied by KMathB, which zreset
+                # removed from the boot-loaded compiler session.
+                command('zload /Kernel/KMathB.ZC',
+                        'zc: loaded /Kernel/KMathB.ZC', timeout=30)
                 command('zload /System/Gr/GrBitMap.ZC',
                         'zc: loaded /System/Gr/GrBitMap.ZC', timeout=30)
                 command('zload /Tests/GrSpriteText.ZC',

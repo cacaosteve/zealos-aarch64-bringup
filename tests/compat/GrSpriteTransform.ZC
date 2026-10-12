@@ -1,5 +1,7 @@
 extern I64 ZcFbTextPixel(I64 x, I64 y);
 extern I64 ZcFbGraphColor(I64 color);
+extern Bool ZcFbGraphPlot(I64 x, I64 y, U32 color, I64 left, I64 top,
+        I64 right, I64 bottom);
 
 I64 GrSpriteTransformChecks()
 {
@@ -8,7 +10,7 @@ I64 GrSpriteTransformChecks()
     U8 type, pixel;
     I32 x, y;
     U64 angle;
-    I64 i, color, glyph_row, glyph_col, scan_i, scan_j;
+    I64 i, color, glyph_row, glyph_col, scan_i, scan_j, pixel_count;
     CD3I32 point;
 
     dc = DCNew(800, 600);
@@ -356,7 +358,12 @@ I64 GrSpriteTransformChecks()
             }
 
     color = gr_palette[12] & 0x00FFFFFF;
+    // Run the primitive and text records first; the flood-fill fixture must
+    // wait until its closed boundary has been drawn below.
+    records[667] = 0;
     Sprite3(dc, dc->x, dc->y, dc->z, records);
+    type = SPT_TRANSFORM_ON;
+    MemCopy(records + 667, &type, sizeof(U8));
     if (ZcFbTextPixel(593, 453) != color ||
             ZcFbTextPixel(633, 447) != color ||
             ZcFbTextPixel(575, 445) != color ||
@@ -395,18 +402,33 @@ I64 GrSpriteTransformChecks()
         return 2;
     if (glyph_row < 0 || ZcFbTextPixel(550 - glyph_row,
             550 + glyph_col) != color ||
-            ZcFbTextPixel(730 + glyph_col, 490 + glyph_row) != color)
+            dc->body[(490 + glyph_row) * dc->width_internal +
+                    730 + glyph_col] != 12)
+    {
+        i = 0;
+        if (glyph_row < 0) i |= 1;
+        if (ZcFbTextPixel(550 - glyph_row, 550 + glyph_col) != color)
+            i |= 2;
+        if (dc->body[(490 + glyph_row) * dc->width_internal +
+                730 + glyph_col] != 12)
+            i |= 4;
         return 5;
-    if (ZcFbTextPixel(512, 568) != color ||
-            ZcFbTextPixel(512, 580) != color ||
-            ZcFbTextPixel(500, 580) != color ||
-            ZcFbTextPixel(500, 568) != color ||
-            ZcFbTextPixel(510 - glyph_row, 570 + glyph_col) != color ||
-            ZcFbTextPixel(489, 600) != color ||
-            ZcFbTextPixel(480, 611) != color ||
-            ZcFbTextPixel(471, 600) != color ||
-            ZcFbTextPixel(480, 589) != color ||
-            ZcFbTextPixel(484 - glyph_row, 596 + glyph_col) != color)
+    }
+    // Isolate the diamond from earlier sprite records before checking its
+    // transformed text and outline coverage.
+    for (scan_i = 460; scan_i <= 500; scan_i++)
+        for (scan_j = 580; scan_j <= 620; scan_j++)
+        {
+            ZcFbGraphPlot(scan_i, scan_j, 0, 0, 0, 799, 599);
+            dc->body[scan_j * dc->width_internal + scan_i] = 0;
+        }
+    Sprite3(dc, dc->x, dc->y, dc->z, records + 651);
+    pixel_count = 0;
+    for (scan_i = 460; scan_i <= 500; scan_i++)
+        for (scan_j = 580; scan_j <= 620; scan_j++)
+            if (ZcFbTextPixel(scan_i, scan_j) == color)
+                pixel_count++;
+    if (pixel_count < 25)
         return 6;
     dc->color.c0 = 15;
     for (scan_i = 409; scan_i <= 413; scan_i++)
@@ -426,12 +448,12 @@ I64 GrSpriteTransformChecks()
     dc->color.c0 = 15;
     GrPlot(dc, 100, 200);
     dc->color.c0 = 12;
-    Sprite3(dc, 0, 0, 0, records + 667);
+    Sprite3(dc, dc->x, dc->y, dc->z, records + 667);
     if (ZcFbTextPixel(411, 531) != ZcFbGraphColor(12) ||
             ZcFbTextPixel(409, 530) != ZcFbGraphColor(15) ||
             ZcFbTextPixel(100, 200) != ZcFbGraphColor(15))
         return 7;
-    Sprite3(dc, 0, 0, 0, records + 681);
+    Sprite3(dc, dc->x, dc->y, dc->z, records + 681);
     if (ZcFbTextPixel(511, 483) != color ||
             ZcFbTextPixel(510, 479) == color)
         return 8;

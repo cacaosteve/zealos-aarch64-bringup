@@ -1,4 +1,6 @@
 extern I64 ZcFbTextPixel(I64 x, I64 y);
+extern Bool ZcFbGraphPlot(I64 x, I64 y, U32 color, I64 left, I64 top,
+        I64 right, I64 bottom);
 
 I64 GrDC2SpriteChecks()
 {
@@ -92,8 +94,8 @@ I64 GrDC2SpriteChecks()
     MemCopy(records + 66, &record_type, sizeof(U8));
     // Keep the circle clear of the point, line, and rectangle above so the
     // framebuffer assertions below isolate this record's four cardinal pixels.
-    x = 13;
-    y = 1;
+    x = 49;
+    y = 50;
     width = 1;
     MemCopy(records + 70, &x, sizeof(I32));
     MemCopy(records + 74, &y, sizeof(I32));
@@ -121,6 +123,10 @@ I64 GrDC2SpriteChecks()
     // Clear this sample before Sprite3 so an earlier graphics probe cannot
     // make the polyline assertions pass with stale framebuffer pixels.
     plot_dc->color.c0 = 0;
+    if (!ZcFbGraphPlot(450, 350, 0, 0, 0, 799, 599))
+        return 49;
+    if (ZcFbTextPixel(450, 350) != 0)
+        return 50;
     GrPlot(plot_dc, 421, 300);
     GrPlot(plot_dc, 422, 300);
     GrPlot(plot_dc, 423, 300);
@@ -131,9 +137,9 @@ I64 GrDC2SpriteChecks()
     circle_color = gr_palette[12] & 0x00FFFFFF;
     if (plot_dc->color.c0 != 7)
         return 42;
-    if (ZcFbTextPixel(413, 301) != circle_color ||
-            ZcFbTextPixel(415, 301) != circle_color ||
-            ZcFbTextPixel(414, 301) == circle_color)
+    if (ZcFbTextPixel(449, 350) != circle_color ||
+            ZcFbTextPixel(451, 350) != circle_color ||
+            ZcFbTextPixel(450, 350) == circle_color)
         return 43;
     if (ZcFbTextPixel(421, 300) != circle_color) return 44;
     if (ZcFbTextPixel(423, 300) != circle_color) return 45;

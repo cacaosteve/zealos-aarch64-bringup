@@ -138,9 +138,8 @@ I64 GrSpriteSymmetryChecks()
     if (ZcFbTextPixel(442, 480) != color ||
             ZcFbTextPixel(558, 480) != color)
         return 7;
-    if (ZcFbTextPixel(430, 520) != color)
-        return 8;
-    if (ZcFbTextPixel(570, 520) != color)
+    if (ZcFbTextPixel(430, 520) != color ||
+            ZcFbTextPixel(570, 520) != color)
         return 8;
     if (ZcFbTextPixel(420, 560) != color ||
             ZcFbTextPixel(580, 560) != color ||
@@ -190,11 +189,20 @@ I64 GrSpriteSymmetryChecks()
     MemCopy(records + 56, &sides, sizeof(I32));
     sides = 2;
     MemCopy(records + 60, &sides, sizeof(I32));
-    source_pixel = ZcFbTextPixel(420, 320);
-    mirror_pixel = ZcFbTextPixel(580, 320);
+    source_pixel = dc->body[320 * dc->width_internal + 420];
+    mirror_pixel = dc->body[320 * dc->width_internal + 580];
+    dc->color.c0 = 12;
+    GrRect(dc, 420, 320, 1, 1);
+    if (dc->body[320 * dc->width_internal + 420] == source_pixel)
+        return 13;
+    dc->color.c0 = 0;
+    GrRect(dc, 420, 320, 1, 1);
+    dc->color.c0 = 12;
+    dc->lighting = NULL;
     Sprite3(dc, 400, 300, 0, records);
-    if (ZcFbTextPixel(420, 320) == source_pixel ||
-            ZcFbTextPixel(580, 320) == mirror_pixel)
+    dc->lighting = &DCLighting;
+    if (dc->body[320 * dc->width_internal + 420] == source_pixel ||
+            dc->body[320 * dc->width_internal + 580] != mirror_pixel)
         return 13;
     if (!DCDepthBufAlloc(dc))
         return 12;
@@ -415,11 +423,16 @@ I64 GrSpriteSymmetryChecks()
     MemCopy(records + 68, &sides, sizeof(I32));
     sides = 2;
     MemCopy(records + 72, &sides, sizeof(I32));
-    source_pixel = ZcFbTextPixel(440, 350);
-    mirror_pixel = ZcFbTextPixel(560, 350);
+    dc->body[350 * dc->width_internal + 440] = 0;
+    dc->body[350 * dc->width_internal + 560] = 0;
+    source_pixel = dc->body[350 * dc->width_internal + 440];
+    mirror_pixel = dc->body[350 * dc->width_internal + 560];
+    DCDepthBufReset(dc);
+    dc->color.c0 = 12;
+    dc->lighting = NULL;
     Sprite3(dc, 400, 300, 0, records);
-    if (ZcFbTextPixel(440, 350) == source_pixel ||
-            ZcFbTextPixel(560, 350) == mirror_pixel)
+    if (dc->body[350 * dc->width_internal + 440] == source_pixel ||
+            dc->body[350 * dc->width_internal + 560] != mirror_pixel)
         return 19;
 
     DCDel(dc);

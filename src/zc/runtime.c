@@ -239,6 +239,9 @@ static int guest_job_call_active;
 static int guest_background_dispatch;
 static unsigned guest_idle_frame_divider;
 static CHashFun *guest_winmgr_tick_fun;
+/* Keep source graphics updates inside the staged framebuffer transaction. */
+static int guest_task_frame_active;
+static int guest_task_frame_rgba_ready;
 static void set_guest_task(void *p);
 static int64_t guest_mp_count = 1;
 static void *guest_cpu_structs;
@@ -964,6 +967,7 @@ static int guest_source_full_screen_active(void) {
 static int64_t guest_task_frame_run(void) {
     uint8_t *surface = guest_graphics_surface();
     uint32_t *rgba = guest_graphics_rgba_surface();
+    CHashFun *present;
     uint64_t presented;
     if (!guest_winmgr_tick_fun)
         guest_winmgr_tick_fun = (CHashFun *)HashFind(
@@ -974,15 +978,21 @@ static int64_t guest_task_frame_run(void) {
         !zeal_fb_task_frame_begin(surface, rgba, 800, 600))
         return 0;
     set_guest_task(guest_fibers[0].words);
+    guest_task_frame_active = 1;
+    guest_task_frame_rgba_ready = 0;
     FFI_CALL_TOS_0(guest_winmgr_tick_fun->fun_ptr);
-    presented = zeal_fb_task_frame_end(guest_source_full_screen_active()) != 0;
-    if (presented) {
-        CHashFun *present = (CHashFun *)HashFind(
-            "BootstrapGrPresent", Fs->hash_table, HTT_FUN, 1);
-        if (present && present->fun_ptr && !present->argc &&
-            !(present->base.base.type & HTF_EXTERN))
-            FFI_CALL_TOS_0(present->fun_ptr);
-    }
+    /* The source incremental screen pass must finish in the staging buffer
+     * before scanout. Running it after frame_end caused visible pixel-by-pixel
+     * updates when overlapping windows changed beneath one another. */
+    present = (CHashFun *)HashFind(
+        "BootstrapGrPresent", Fs->hash_table, HTT_FUN, 1);
+    if (present && present->fun_ptr && !present->argc &&
+        !(present->base.base.type & HTF_EXTERN))
+        FFI_CALL_TOS_0(present->fun_ptr);
+    presented = zeal_fb_task_frame_end(guest_source_full_screen_active() ||
+                                       guest_task_frame_rgba_ready) != 0;
+    guest_task_frame_active = 0;
+    guest_task_frame_rgba_ready = 0;
     return presented;
 }
 static int64_t host_task_frame_run(int64_t *a) {
@@ -1023,10 +1033,12 @@ static int64_t host_gr_screen_update(int64_t *a) {
     if (!raw_screen || !raw_screen->data_addr)
         return 0;
     /* KernelA's CTextGlobals is host-bound; TaskBridge also has a private
-     * bootstrap text object. Point the canonical upstream globals at the
-     * validated bootstrap conversion buffer and current Limine framebuffer. */
+     * bootstrap text object. Convert through the validated staging plane and
+     * keep source scanout writes staged while a host frame is in progress. */
     guest_text_globals[2] = (uint64_t)(uintptr_t)raw_screen->data_addr;
-    guest_text_globals[3] = guest_fb_addr;
+    guest_text_globals[3] = guest_task_frame_active
+        ? (uint64_t)(uintptr_t)raw_screen->data_addr
+        : guest_fb_addr;
     guest_text_globals[9] = guest_fb_pitch * guest_fb_height;
     {
         palette_set = (CHashFun *)HashFind("GrPaletteSet", Fs->hash_table,
@@ -1059,6 +1071,13 @@ static int64_t host_gr_screen_update(int64_t *a) {
         (update->base.base.type & HTF_EXTERN))
         return 0;
     FFI_CALL_TOS_0(update->fun_ptr);
+    /* The upstream globals persist between calls. Restore the physical
+     * framebuffer alias after the staged update so direct diagnostics and
+     * non-frame source calls retain the normal Limine framebuffer contract. */
+    if (guest_task_frame_active) {
+        guest_task_frame_rgba_ready = 1;
+        guest_text_globals[3] = guest_fb_addr;
+    }
     return 1;
 }
 static int64_t host_gr_update_task_win(int64_t *a) {
@@ -3701,6 +3720,10 @@ static int load_inner(const char *path) {
          * bound the guest task bridge. Keep early Win.ZC initialization from
          * dispatching into the unresolved-symbol sentinel. */
         PrsBindCSymbol("CtrlAltCBSet", host_ctrl_alt_cb_set, 5);
+        /* SpriteRaster references CTextGlobals.text.font. Load it only after
+         * KernelC declares and binds that global. */
+        if (load_inner("/System/Gr/SpriteRaster.ZC"))
+            zc_fail("sprite raster bridge source missing");
     }
     if (!strcmp(path, "/Kernel/KernelB.HH")) {
         bind_guest_task();
@@ -3748,8 +3771,6 @@ static int load_inner(const char *path) {
         PrsBindCSymbol("sys_framebuffer_bpp", &guest_fb_bpp, 0);
         if (load_inner("/System/TaskBridge.ZC"))
             zc_fail("task bridge source missing");
-        if (load_inner("/System/Gr/SpriteRaster.ZC"))
-            zc_fail("sprite raster bridge source missing");
         PrsBindCSymbol("ZcGrTextUpdate", host_gr_text_update, 0);
         PrsBindCSymbol("ZcWinMouseUpdate", host_win_mouse_update, 0);
         PrsBindCSymbol("ZcGrScreenUpdate", host_gr_screen_update, 0);

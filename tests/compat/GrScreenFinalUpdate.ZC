@@ -30,6 +30,11 @@ U8 gr_screen_final_update_old_pixel;
 U8 gr_screen_final_update_overlay_off[FONT_WIDTH * 10 * FONT_HEIGHT];
 U32 gr_screen_cursor_off[13 * 13];
 
+class CHashUserDataProbe:CHash
+{
+    I64 user_data0;
+};
+
 I64 GrScreenVisibleWindowCount()
 {//Count app windows only; sys_task and WinMgr are frame infrastructure.
     CTask *root = sys_winmgr_task, *task;
@@ -298,7 +303,7 @@ I64 GrSetUpTablesSourceChecks()
 I64 BootstrapGrContextInitChecks()
 {//A source manager must see its full bounded display context before first draw.
     CGrGlobals *active_gr = ZcActiveGrGlobals();
-    CHash *sprite_entry;
+    CHashUserDataProbe *sprite_entry;
 
     if (!active_gr)
         return 1;
@@ -349,16 +354,19 @@ I64 BootstrapGrContextInitChecks()
             *active_gr->empty_sprite != 0)
         return 0;
     sprite_entry = HashFind("End", active_gr->sprite_hash, HTG_TYPE_MASK);
-    if (!sprite_entry || sprite_entry->type != 1 ||
-            sprite_entry->user_data0 != 0)
+    if (!sprite_entry || sprite_entry->type != 1)
+        return 0;
+    if (sprite_entry->user_data0 != 0)
         return 0;
     sprite_entry = HashFind("Mesh", active_gr->sprite_hash, HTG_TYPE_MASK);
-    if (!sprite_entry || sprite_entry->type != 1 ||
-            sprite_entry->user_data0 < 24 || sprite_entry->user_data0 > 25)
+    if (!sprite_entry || sprite_entry->type != 1)
+        return 0;
+    if (sprite_entry->user_data0 < 24 || sprite_entry->user_data0 > 25)
         return 0;
     sprite_entry = HashFind("Arrow", active_gr->sprite_hash, HTG_TYPE_MASK);
-    if (!sprite_entry || sprite_entry->type != 1 ||
-            sprite_entry->user_data0 != 26)
+    if (!sprite_entry || sprite_entry->type != 1)
+        return 0;
+    if (sprite_entry->user_data0 != 26)
         return 0;
     if (gr_palette[0].b != 0 || gr_palette[0].g != 0 || gr_palette[0].r != 0 ||
         gr_palette[15].b != 0xFF || gr_palette[15].g != 0xFF ||

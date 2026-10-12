@@ -39,13 +39,20 @@ I64 WinMousePointerStateCheck()
     I64 old_buttons = bootstrap_mouse_last_buttons;
     I64 old_last_x = bootstrap_mouse_last_x, old_last_y = bootstrap_mouse_last_y;
     Bool old_installed = mouse_hard.installed;
+    CTask *old_sys_task = sys_task;
     I64 raw_x = 100, raw_y = 200;
     I64 x = 200, y = 300;
     Bool active_same;
     Bool ok;
 
+    // zreset clears the boot-loaded TaskBridge globals from the compiler
+    // session. Rebind the probe to the live compiler task for this call.
+    sys_task = Fs;
     if (!TaskValidate(sys_task))
+    {
+        sys_task = old_sys_task;
         return 1;
+    }
     mouse.offset.x = 100;
     mouse.offset.y = 100;
     active_same = ZcActiveMouseGlobals() == &mouse;
@@ -69,6 +76,7 @@ I64 WinMousePointerStateCheck()
     bootstrap_mouse_last_x = old_last_x;
     bootstrap_mouse_last_y = old_last_y;
     mouse_hard.installed = old_installed;
+    sys_task = old_sys_task;
     if (ok)
         return 42;
     return 2;
