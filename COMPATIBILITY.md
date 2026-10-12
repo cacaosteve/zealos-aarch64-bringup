@@ -352,8 +352,11 @@ oracle are needed before broad language compatibility can be claimed.
   nonfinite remainders explicitly fail. No general math-compatibility claim.
 - The source archive is read-only. The native source store has two 32 MiB
   banks with append-only records, 95-byte paths and a 4 MiB per-file limit.
-  It has no full-screen editor; a filled log reports an error without
-  replacing earlier versions. Guest `zgc` reclaims old versions in the
+  `zedit` presents a fixed full-screen framebuffer source view. `j`/`k` move
+  its selected line; `e <text>`, `n <text>`, and `x` edit, insert before, and
+  delete that line. `p [line [count]]` selects a page, while numbered-line
+  commands remain available. A filled log reports an error without replacing
+  earlier versions. Guest `zgc` reclaims old versions in the
   inactive bank, verifies the copy, flushes it, and commits the new
   superblock last. On virtio disks advertising FLUSH, saves and deletions
   also flush data before publishing a record header and flush the commit.
@@ -372,7 +375,8 @@ oracle are needed before broad language compatibility can be claimed.
 
 ## Next substantial work
 
-1. Add a full-screen editor around the current line-editing workflow. The
+1. Verify the source editor's framebuffer layout and keyboard behavior in UTM;
+   then improve it toward upstream editing semantics. The
    eventual installed system needs a real filesystem
    and installer; the old RedSea demo volume is preserved during this bootstrap
    phase.
@@ -382,6 +386,17 @@ oracle are needed before broad language compatibility can be claimed.
    services needed for Adam and the editor.
 3. Boot the upstream startup sequence using those services. Then support guest
    kernel/compiler builds and an install-to-blank-disk/reboot workflow.
+
+## Recorded validation — editor navigation
+
+- The full-screen `zedit` view now marks a selected source line and supports
+  `j`/`k` navigation, `e <text>` replacement, `n <text>` insertion before the
+  selection, and `x` deletion. Existing numbered edit commands remain usable.
+  The rebuilt ARM64 image passed the editor regression sequence in the PCI
+  compatibility suite, including persistence through compaction and reboot.
+- UTM framebuffer drawing is visible, but the full-screen editor layout has
+  not yet been visually checked there. The two-window overlap artifact remains
+  unresolved and is tracked separately from editor correctness.
 
 The current boot images are useful delivery artifacts; they are not a finished
 ZealOS live distribution or installer.

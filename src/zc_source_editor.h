@@ -5,9 +5,82 @@
 static struct {
     char name[ZSS_MAX_NAME + 1];
     uint32_t length;
+    uint32_t view_first, view_count, cursor_line;
     int active, dirty, existed;
     char text[ZSS_MAX_FILE + 1u];
 } g_zedit;
+
+static uint32_t zedit_lines(void);
+static int zedit_bounds(uint32_t number, uint32_t *start, uint32_t *end);
+
+/* The editor keeps the existing command-based edits, but uses the framebuffer
+ * as a stable full-screen source view. fb_putc updates the retained shell text
+ * plane without sending these redraw bytes to the serial console. */
+static void zedit_fb_puts(const char *text) {
+    while (*text) fb_putc(*text++);
+}
+
+static void zedit_fb_number(uint32_t value) {
+    char digits[10];
+    uint32_t count = 0;
+    do {
+        digits[count++] = (char)('0' + value % 10u);
+        value /= 10u;
+    } while (value && count < sizeof(digits));
+    while (count) fb_putc(digits[--count]);
+}
+
+static void zedit_render(void) {
+    if (!g_fb || !g_zedit.active) return;
+    uint32_t rows = g_fb_rows < ZEAL_TEXT_MAX_ROWS ? g_fb_rows : ZEAL_TEXT_MAX_ROWS;
+    uint32_t cols = g_fb_cols < ZEAL_TEXT_MAX_COLS ? g_fb_cols : ZEAL_TEXT_MAX_COLS;
+    if (rows < 6 || !cols) return;
+
+    uint32_t capacity = rows - 5u;
+    uint32_t lines = zedit_lines();
+    if (!g_zedit.view_first) g_zedit.view_first = 1;
+    if (g_zedit.view_first > lines && lines) g_zedit.view_first = lines;
+    if (g_zedit.view_count > capacity) g_zedit.view_count = capacity;
+    if (!g_zedit.view_count) g_zedit.view_count = capacity;
+
+    fb_clear(0x00101820u);
+    zedit_fb_puts("zedit ");
+    zedit_fb_puts(g_zedit.name);
+    zedit_fb_puts(g_zedit.dirty ? "  [modified]" : "  [saved]");
+    fb_putc('\n');
+
+    uint32_t shown = 0;
+    for (uint32_t number = g_zedit.view_first;
+         number <= lines && shown < g_zedit.view_count; number++, shown++) {
+        uint32_t start, end;
+        if (!zedit_bounds(number, &start, &end)) break;
+        zedit_fb_number(number);
+        zedit_fb_puts(number == g_zedit.cursor_line ? ":> " : ":  ");
+        uint32_t room = cols > 14u ? cols - 14u : 1u;
+        uint32_t copied = 0;
+        for (uint32_t i = start; i < end && g_zedit.text[i] != '\n'; i++) {
+            if (copied == room) {
+                fb_putc('.'); fb_putc('.'); fb_putc('.');
+                break;
+            }
+            fb_putc(g_zedit.text[i]);
+            copied++;
+        }
+        fb_putc('\n');
+    }
+
+    g_fb_cx = 0;
+    g_fb_cy = rows - 3u;
+    zedit_fb_puts("j/k move  e edit  n insert  x delete  p page  w save  q close");
+    g_fb_cx = 0;
+    g_fb_cy = rows - 2u;
+    zedit_fb_puts("view "); zedit_fb_number(g_zedit.view_first);
+    zedit_fb_puts("  lines "); zedit_fb_number(lines);
+    zedit_fb_puts(g_zedit.dirty ? "  unsaved" : "  saved");
+    /* shell_run writes the edit> prompt at this reserved final row. */
+    g_fb_cx = 0;
+    g_fb_cy = rows - 1u;
+}
 
 static uint32_t zedit_lines(void) {
     uint32_t lines = 0;
@@ -124,8 +197,9 @@ static int zedit_save(void) {
 }
 
 static void zedit_help(void) {
-    con_puts("zedit: p [line [count]] | a <text> | i <line> <text> | "
-             "c <line> <text> | d <line> | w | wq | q | q!\n");
+    con_puts("zedit: j/k move | e <text> edit | n <text> insert | x delete | "
+             "p [line [count]] | a <text> | i <line> <text> | c <line> <text> | "
+             "d <line> | w | wq | q | q!\n");
     con_puts("zedit: lines are numbered from 1; p defaults to the first 20\n");
 }
 
@@ -162,13 +236,17 @@ static void zedit_start(const char *name) {
     g_zedit.active = 1;
     g_zedit.dirty = 0;
     g_zedit.existed = found == 1;
+    g_zedit.view_first = 1;
+    g_zedit.view_count = 0;
+    g_zedit.cursor_line = 1;
     con_puts(found == 1 ? "zedit: opened " : "zedit: new ");
     con_puts(name); con_puts(" lines="); zc_print_decimal(zedit_lines());
     con_puts(" bytes="); zc_print_decimal(g_zedit.length); con_puts("\n");
     zedit_help();
+    zedit_render();
 }
 
-static void zedit_handle(const char *line) {
+static void zedit_handle_command(const char *line) {
     if (!line[0] || zss_str_eq(line, "h") || zss_str_eq(line, "help")) {
         zedit_help(); return;
     }
@@ -197,7 +275,69 @@ static void zedit_handle(const char *line) {
             }
             if (*p) { zedit_help(); return; }
         }
+        g_zedit.view_first = first;
+        g_zedit.view_count = count;
+        if (first <= zedit_lines()) g_zedit.cursor_line = first;
         zedit_print(first, count); return;
+    }
+    if (zss_str_eq(line, "j") || zss_str_eq(line, "k")) {
+        uint32_t lines = zedit_lines();
+        if (zss_str_eq(line, "j")) {
+            if (g_zedit.cursor_line < lines) g_zedit.cursor_line++;
+        } else if (g_zedit.cursor_line > 1) {
+            g_zedit.cursor_line--;
+        }
+        uint32_t rows = g_fb_rows < ZEAL_TEXT_MAX_ROWS ? g_fb_rows : ZEAL_TEXT_MAX_ROWS;
+        uint32_t capacity = rows > 5u ? rows - 5u : 1u;
+        uint32_t visible = g_zedit.view_count ? g_zedit.view_count : capacity;
+        if (visible > capacity) visible = capacity;
+        if (g_zedit.cursor_line < g_zedit.view_first)
+            g_zedit.view_first = g_zedit.cursor_line;
+        else if (visible && g_zedit.cursor_line >= g_zedit.view_first + visible)
+            g_zedit.view_first = g_zedit.cursor_line - visible + 1u;
+        con_puts("zedit: cursor line ");
+        zc_print_decimal(g_zedit.cursor_line); con_puts("\n");
+        return;
+    }
+    if (line[0] == 'e' && line[1] == ' ') {
+        uint32_t start, end, body_len = 0;
+        const char *body = line + 2;
+        while (body[body_len]) body_len++;
+        if (!zedit_bounds(g_zedit.cursor_line, &start, &end)) {
+            con_puts("zedit: cursor line out of range\n"); return;
+        }
+        if (zedit_splice(start, end, body, body_len, 0)) {
+            con_puts("zedit: file exceeds 4 MiB\n"); return;
+        }
+        con_puts("zedit: edited line "); zc_print_decimal(g_zedit.cursor_line); con_puts("\n");
+        return;
+    }
+    if (line[0] == 'n' && line[1] == ' ') {
+        uint32_t start, end, body_len = 0;
+        const char *body = line + 2;
+        uint32_t lines = zedit_lines();
+        while (body[body_len]) body_len++;
+        if (g_zedit.cursor_line == lines + 1u) {
+            start = end = g_zedit.length;
+        } else if (!zedit_bounds(g_zedit.cursor_line, &start, &end)) {
+            con_puts("zedit: cursor line out of range\n"); return;
+        }
+        if (zedit_splice(start, start, body, body_len,
+                         g_zedit.cursor_line == lines + 1u)) {
+            con_puts("zedit: file exceeds 4 MiB\n"); return;
+        }
+        con_puts("zedit: inserted line "); zc_print_decimal(g_zedit.cursor_line); con_puts("\n");
+        return;
+    }
+    if (zss_str_eq(line, "x")) {
+        if (zedit_delete_line(g_zedit.cursor_line)) {
+            con_puts("zedit: cursor line out of range\n"); return;
+        }
+        uint32_t lines = zedit_lines();
+        if (g_zedit.cursor_line > lines && lines) g_zedit.cursor_line = lines;
+        if (!lines) g_zedit.cursor_line = 1;
+        con_puts("zedit: deleted selected line\n");
+        return;
     }
     if (line[0] == 'a' && (line[1] == 0 || line[1] == ' ')) {
         const char *body = line[1] ? line + 2 : line + 1;
@@ -218,7 +358,13 @@ static void zedit_handle(const char *line) {
         if (!zedit_number(&p, &number)) { zedit_help(); return; }
         if (command == 'd') {
             if (*p || zedit_delete_line(number)) con_puts("zedit: line out of range\n");
-            else { con_puts("zedit: deleted line "); zc_print_decimal(number); con_puts("\n"); }
+            else {
+                if (number < g_zedit.cursor_line) g_zedit.cursor_line--;
+                uint32_t remaining = zedit_lines();
+                if (!remaining) g_zedit.cursor_line = 1;
+                else if (g_zedit.cursor_line > remaining) g_zedit.cursor_line = remaining;
+                con_puts("zedit: deleted line "); zc_print_decimal(number); con_puts("\n");
+            }
             return;
         }
         if (*p != ' ') { zedit_help(); return; }
@@ -235,8 +381,20 @@ static void zedit_handle(const char *line) {
                          command == 'i' && number == lines + 1u)) {
             con_puts("zedit: file exceeds 4 MiB\n"); return;
         }
+        if (command == 'i' && number <= g_zedit.cursor_line)
+            g_zedit.cursor_line++;
         con_puts(command == 'i' ? "zedit: inserted line " : "zedit: changed line ");
         zc_print_decimal(number); con_puts("\n"); return;
     }
     zedit_help();
+}
+
+static void zedit_handle(const char *line) {
+    zedit_handle_command(line);
+    if (g_zedit.active) {
+        zedit_render();
+    } else if (g_fb) {
+        /* Leave a clean shell canvas after closing the modal editor. */
+        fb_clear(0x00101820u);
+    }
 }
