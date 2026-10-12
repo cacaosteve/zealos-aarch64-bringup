@@ -794,7 +794,8 @@ static int64_t host_gr_rop_equ_u8_no_clipping(int64_t *a) {
 
     unsigned ch = (unsigned)(packed & 0xffu);
     uint8_t fg = (uint8_t)guest_gr_colors[(packed >> 8) & 0xffu];
-    const uint8_t *rows = (const uint8_t *)&guest_gr_font[ch];
+    const uint8_t *rows = ch >= 0x80
+        ? fb_glyph8(ch) : (const uint8_t *)&guest_gr_font[ch];
     int underline = (packed & 0x80000000u) != 0;
     for (unsigned y = 0; y < 8; y++) {
         uint8_t bits = rows[y];

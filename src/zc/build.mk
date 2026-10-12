@@ -16,7 +16,7 @@ $(BUILD)/zc:
 	mkdir -p $@
 $(BUILD)/zc/%.o: third_party/aiwnios/c/%.c $(ZC_HEADERS) src/zc/build.mk | $(BUILD)/zc
 	$(CLANG) $(ZC_FLAGS) -w -Wno-incompatible-pointer-types -Wno-int-conversion -c $< -o $@
-$(BUILD)/zc/runtime.o: src/zc/runtime.c $(ZC_HEADERS) src/zc/build.mk | $(BUILD)/zc
+$(BUILD)/zc/runtime.o: src/zc/runtime.c src/fb_font.h $(ZC_HEADERS) src/zc/build.mk | $(BUILD)/zc
 	$(CLANG) $(ZC_FLAGS) -Wall -Wextra -c $< -o $@
 $(BUILD)/zc/libc.o: src/zc/libc.c $(ZC_HEADERS) src/zc/build.mk | $(BUILD)/zc
 	$(CLANG) $(ZC_FLAGS) -Wall -Wextra -c $< -o $@
