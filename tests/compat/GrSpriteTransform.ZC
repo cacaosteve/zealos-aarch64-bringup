@@ -1,7 +1,7 @@
 extern I64 ZcFbTextPixel(I64 x, I64 y);
 extern I64 ZcFbGraphColor(I64 color);
 extern Bool ZcFbGraphPlot(I64 x, I64 y, U32 color, I64 left, I64 top,
-        I64 right, I64 bottom);
+                         I64 right, I64 bottom, I64 task_z);
 
 I64 GrSpriteTransformChecks()
 {
@@ -419,7 +419,7 @@ I64 GrSpriteTransformChecks()
     for (scan_i = 460; scan_i <= 500; scan_i++)
         for (scan_j = 580; scan_j <= 620; scan_j++)
         {
-            ZcFbGraphPlot(scan_i, scan_j, 0, 0, 0, 799, 599);
+            ZcFbGraphPlot(scan_i, scan_j, 0, 0, 0, 799, 599, 0);
             dc->body[scan_j * dc->width_internal + scan_i] = 0;
         }
     Sprite3(dc, dc->x, dc->y, dc->z, records + 651);

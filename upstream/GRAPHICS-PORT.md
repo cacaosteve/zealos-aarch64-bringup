@@ -200,16 +200,19 @@ The shell's periodic task refresh renders host-backed text and drawing
 primitives into a shared
 800x600 indexed CDC surface, then presents that composed frame to the Limine
 framebuffer. CDC byte writes and host-backed framebuffer primitives share the
-surface. The staging path quantizes host colors to the current 16-color text
-palette and clears to black each frame; arbitrary 8-bit CDC color semantics are
-not preserved. The full source `GrUpdateScreen` sequence now runs with
+surface. Rectangle fills, individual plots, lines, and `GrPrint` now all check
+the owning task's z against the shared 8x8-cell visibility map, whether drawing
+to the staged frame or the direct framebuffer. The staging path quantizes host
+colors to the current 16-color text palette and clears to black each frame;
+arbitrary 8-bit CDC color semantics are not preserved. The full source
+`GrUpdateScreen` sequence now runs with
 bridge-staged `dc1`, `dc2`, cache, zoom, and raw-screen surfaces; its text and
 final-overlay path passes with framebuffer-console output visible and serial
-output enabled. Upstream-owned CDC allocation/lifetime and the full palette and
-pixel-z-buffer semantics are not implemented. Each active source `gr` global is
-explicitly bound to the bridge's bounded window z-buffer and uncovered-window
-bitmap before source task traversal. The unchanged 2x zoom scaler is
-covered both directly and through full-frame output against Limine framebuffer
+output enabled. Upstream-owned CDC allocation/lifetime, full palette semantics,
+and pixel-resolution z-buffering are not implemented. Each active source `gr`
+global is explicitly bound to the bridge's bounded window z-buffer and
+uncovered-window bitmap before source task traversal. The unchanged 2x zoom
+scaler is covered both directly and through full-frame output against Limine framebuffer
 pixels. `GrScaleZoom` is also called directly and its pointer-preserving
 scale/offset update is verified against the tablet transform. Each bridge frame
 now calls unchanged `WinMouseUpdate` after polling the absolute tablet, so source
@@ -247,5 +250,14 @@ replaced with architecture-neutral ZealC.
 | Bring-up | Enable 2x on the active source graphics global, run the complete staged frame, and compare selected Limine pixels with the source zoom CDC and palette |
 | Smoke | `GrScreenFinalUpdateChecks` verifies zoomed framebuffer output and restores zoom/pan state |
 | Limits | Live pointer-centered zoom controls, non-default pan, zoom-cache presentation, and view-angle controls remain open |
+
+## Milestone 225 — CDC drawing uses the window cell z-buffer
+
+| Item | Path |
+|--|--|
+| Gap | Only filled CDC rectangles honored the window z-buffer; plots, lines, and graphics text could paint through a higher window |
+| Bring-up | Pass the owning task's z value through the `GrPlot`, `GrLine`, and `GrPrint` bridges and apply the same 8x8-cell visibility test to each emitted pixel |
+| Smoke | Full `make check-compat-pci` passed, including source window-frame and graphics regressions. A window-frame-only rerun passed after removing exploratory test instrumentation |
+| Limits | Pixel-level z-buffering and the reported intermittent UTM overlap/control flashing remain open pending another visual check |
 
 Freeze catalog unchanged.

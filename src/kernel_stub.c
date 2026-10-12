@@ -2037,11 +2037,22 @@ void zeal_fb_set_win_z_buffer(const uint16_t *z_buf) {
     g_fb_win_z_buf = z_buf;
 }
 
+static int fb_graph_pixel_visible(uint32_t x, uint32_t y, uint16_t task_z) {
+    if (!task_z || !g_fb_win_z_buf)
+        return 1;
+    size_t cell = (size_t)(y / 8) * ZEAL_TEXT_MAX_COLS + (size_t)(x / 8);
+    return cell < ZEAL_TEXT_MAX_COLS * ZEAL_TEXT_MAX_ROWS &&
+           g_fb_win_z_buf[cell] <= task_z;
+}
+
 uint64_t zeal_fb_graph_plot(int64_t x, int64_t y, uint32_t color,
                             int64_t left, int64_t top,
-                            int64_t right, int64_t bottom) {
+                            int64_t right, int64_t bottom,
+                            uint16_t task_z) {
     if (!g_fb || x < left || x > right || y < top || y > bottom ||
         x < 0 || y < 0 || (uint64_t)x >= g_fb_w || (uint64_t)y >= g_fb_h)
+        return 0;
+    if (!fb_graph_pixel_visible((uint32_t)x, (uint32_t)y, task_z))
         return 0;
     fb_putpixel((uint32_t)x, (uint32_t)y, zeal_graphics_color(color));
     return 1;
@@ -2071,12 +2082,8 @@ uint64_t zeal_fb_graph_rect(int64_t x, int64_t y, int64_t width, int64_t height,
     color = zeal_graphics_color(color);
     for (py = y0; py <= y1; py++)
         for (px = x0; px <= x1; px++) {
-            if (g_fb_render_surface && g_fb_win_z_buf && task_z) {
-                size_t cell = (size_t)(py / 8) * ZEAL_TEXT_MAX_COLS +
-                              (size_t)(px / 8);
-                if (g_fb_win_z_buf[cell] > task_z)
-                    continue;
-            }
+            if (!fb_graph_pixel_visible((uint32_t)px, (uint32_t)py, task_z))
+                continue;
             fb_putpixel((uint32_t)px, (uint32_t)py, color);
         }
     return 1;
@@ -2084,7 +2091,8 @@ uint64_t zeal_fb_graph_rect(int64_t x, int64_t y, int64_t width, int64_t height,
 
 uint64_t zeal_fb_graph_text(int64_t x, int64_t y, uint32_t color,
                             int64_t left, int64_t top,
-                            int64_t right, int64_t bottom, const char *text) {
+                            int64_t right, int64_t bottom, const char *text,
+                            uint16_t task_z) {
     int64_t origin_x = x;
     uint64_t drawn = 0;
     if (!g_fb || !text || x < -8192 || x > (int64_t)g_fb_w + 8192 ||
@@ -2112,7 +2120,9 @@ uint64_t zeal_fb_graph_text(int64_t x, int64_t y, uint32_t color,
                 int64_t px = x + col, py = y + row;
                 if ((bits & (0x80u >> col)) && px >= left && px <= right &&
                     py >= top && py <= bottom && px >= 0 && py >= 0 &&
-                    (uint64_t)px < g_fb_w && (uint64_t)py < g_fb_h) {
+                    (uint64_t)px < g_fb_w && (uint64_t)py < g_fb_h &&
+                    fb_graph_pixel_visible((uint32_t)px, (uint32_t)py,
+                                           task_z)) {
                     fb_putpixel((uint32_t)px, (uint32_t)py, color);
                     drawn++;
                 }
@@ -2126,7 +2136,8 @@ uint64_t zeal_fb_graph_text(int64_t x, int64_t y, uint32_t color,
 uint64_t zeal_fb_graph_line(int64_t x0, int64_t y0, int64_t x1, int64_t y1,
                             uint32_t color, int64_t step, int64_t start,
                             int64_t left, int64_t top,
-                            int64_t right, int64_t bottom) {
+                            int64_t right, int64_t bottom,
+                            uint16_t task_z) {
     int64_t dx, sx, dy, sy, err, i = 0;
     uint64_t plotted = 0;
     if (!g_fb || step < 1 || start < 0 ||
@@ -2142,7 +2153,8 @@ uint64_t zeal_fb_graph_line(int64_t x0, int64_t y0, int64_t x1, int64_t y1,
     err = dx + dy;
     for (;;) {
         if (i >= start && (i - start) % step == 0 &&
-            zeal_fb_graph_plot(x0, y0, color, left, top, right, bottom))
+            zeal_fb_graph_plot(x0, y0, color, left, top, right, bottom,
+                               task_z))
             plotted++;
         if (x0 == x1 && y0 == y1)
             break;

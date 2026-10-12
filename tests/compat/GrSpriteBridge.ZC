@@ -1,6 +1,6 @@
 extern I64 ZcFbTextPixel(I64 x, I64 y);
 extern Bool ZcFbGraphPlot(I64 x, I64 y, U32 color, I64 left, I64 top,
-        I64 right, I64 bottom);
+                         I64 right, I64 bottom, I64 task_z);
 
 I64 GrDC2SpriteChecks()
 {
@@ -123,7 +123,7 @@ I64 GrDC2SpriteChecks()
     // Clear this sample before Sprite3 so an earlier graphics probe cannot
     // make the polyline assertions pass with stale framebuffer pixels.
     plot_dc->color.c0 = 0;
-    if (!ZcFbGraphPlot(450, 350, 0, 0, 0, 799, 599))
+    if (!ZcFbGraphPlot(450, 350, 0, 0, 0, 799, 599, 0))
         return 49;
     if (ZcFbTextPixel(450, 350) != 0)
         return 50;
