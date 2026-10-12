@@ -598,13 +598,19 @@ uint64_t zeal_fb_task_frame_end(uint64_t use_rgba) {
             const uint32_t *src = rgba + y * stride;
             volatile uint32_t *dst = (volatile uint32_t *)
                 (g_fb + y * g_fb_pitch);
-            for (uint64_t x = 0; x < g_fb_w; x++)
-                dst[x] = src[x];
+            for (uint64_t x = 0; x < g_fb_w; x++) {
+                uint32_t pixel = src[x];
+                if (dst[x] != pixel)
+                    dst[x] = pixel;
+            }
         } else {
             const uint8_t *src = surface + y * stride;
-            for (uint64_t x = 0; x < g_fb_w; x++)
-                fb_putpixel((uint32_t)x, (uint32_t)y,
-                            g_text_palette[src[x] & 0x0fu]);
+            for (uint64_t x = 0; x < g_fb_w; x++) {
+                uint32_t pixel = g_text_palette[src[x] & 0x0fu];
+                if (fb_peek((int32_t)x, (int32_t)y) !=
+                    (int64_t)(pixel & 0x00ffffffu))
+                    fb_putpixel((uint32_t)x, (uint32_t)y, pixel);
+            }
         }
     }
     return g_fb_w * g_fb_h;

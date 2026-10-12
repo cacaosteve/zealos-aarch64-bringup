@@ -260,4 +260,13 @@ replaced with architecture-neutral ZealC.
 | Smoke | Full `make check-compat-pci` passed, including source window-frame and graphics regressions. A window-frame-only rerun passed after removing exploratory test instrumentation |
 | Limits | Pixel-level z-buffering and the reported intermittent UTM overlap/control flashing remain open pending another visual check |
 
+## Milestone 226 — skip unchanged staged framebuffer pixels
+
+| Item | Path |
+|--|--|
+| Gap | The staged refresh rewrote all 480,000 scanout pixels, even when most pixels were unchanged |
+| Bring-up | Compare staged RGBA or palette-expanded output with the current framebuffer and store only changed pixels |
+| Smoke | Full `make check-compat-pci` passed, including source frame and live window-manager probes |
+| Limits | This reduces writes on the single-buffer UTM scanout but cannot provide atomic frame flips or vblank synchronization |
+
 Freeze catalog unchanged.

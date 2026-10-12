@@ -3155,6 +3155,15 @@ Freeze catalog unchanged.
 | Smoke | `BootstrapMat4x4Checks` verifies identity, positive quarter-turn coefficients for all axes, and composition order; `python3 scripts/check-compat.py --pci` exercises it in the guest |
 | Limits | This provides matrix initialization and rotation primitives, not complete 3D clipping, arbitrary transformed sprite rendering, or interactive view-angle controls |
 
+## Milestone 277 — skip unchanged staged framebuffer pixels
+
+| Item | Path |
+|--|--|
+| Gap | The staged refresh rewrote the entire 800x600 scanout even when only a small portion changed, increasing the chance that a single-buffer display showed a partially copied frame |
+| Bring-up | Compare each completed staged pixel with the current framebuffer and write only changed pixels for both RGBA and indexed presentation |
+| Smoke | `make check-compat-pci` passes, including the full staged source graphics frame and live window-manager checks |
+| Limits | UTM still uses a single scanout framebuffer with no page flip or vblank synchronization, so this reduces writes but does not guarantee elimination of tearing |
+
 ## Open compatibility probe — `/System/Win.ZC`
 
 The source probe loads pinned `KernelC.HH`, `Externs.ZC`, and `Gr.HH` before compiling unchanged `Win.ZC`. Graphics dimensions and mouse globals are probe fixtures; `DrawMenu` and the initial `GrScaleZoom` definition are compile-time fixtures until unchanged `GrScreen.ZC` is loaded later in the probe. `GrScreenFinalUpdateChecks` executes `WinFinalUpdate` through the staged idle-frame path, confirms the fixture's `mouse_grid.coord` toggles the real coordinate-text overlay, checks a separate visible guest overlay callback, verifies the software arrow against Limine framebuffer pixels, and exercises `WinMouseUpdate`'s edge recentering through the runtime dispatch. `WinMousePointerStateCheck` covers transformed tablet coordinates and `WinMouseHardStateCheck` covers the source mouse-state ABI; manual UTM acceptance confirms the software pointer and window-demo mouse interaction. The raw ARM generic-timer binding and a standalone F64 clock expression are smoke-tested before the Win load.
