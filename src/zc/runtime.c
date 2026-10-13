@@ -4102,6 +4102,7 @@ int zc_start_graphics(void) {
         "/System/Win.ZC",
         "/System/WinMgr.ZC",
         "/System/Gr/GrScreen.ZC",
+        "/System/Gr/GrBootBridge.ZC",
     };
     const unsigned char *archive = source_archive;
     size_t archive_len = archive_size;
@@ -4151,6 +4152,11 @@ int zc_start_graphics(void) {
 }
 int zc_start_winmgr(void) {
     int64_t result = 0;
+    if (!ready || failed ||
+        zc_call("BootstrapGrContextFlagsInit", &result) != 0 ||
+        result != 0x2a)
+        return -1;
+    result = 0;
     if (!ready || failed || zc_call("BootstrapWinMgrStart", &result) != 0)
         return -1;
     return result == 0x2a ? 0 : -1;

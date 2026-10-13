@@ -1,0 +1,39 @@
+I64 BootstrapGrContextFlagsInit()
+{//Bring the aliased bootstrap CDCs up with GrInit2's source roles.
+    CGrGlobals *active_gr = ZcActiveGrGlobals();
+
+    if (!active_gr)
+        active_gr = &gr;
+    BootstrapGrContextInit();
+    active_gr = ZcActiveGrGlobals();
+    if (!active_gr)
+        active_gr = &gr;
+    if (!active_gr->dc || !active_gr->dc1 || !active_gr->dc_cache ||
+        !active_gr->zoomed_dc)
+        return 1;
+
+    active_gr->dc->flags |= DCF_SCREEN_BITMAP | DCF_ON_TOP;
+    active_gr->dc1->flags |= DCF_SCREEN_BITMAP;
+    active_gr->dc_cache->flags = 0;
+    active_gr->zoomed_dc->flags |= DCF_SCREEN_BITMAP;
+    return 0x2a;
+}
+I64 BootstrapGrContextFlagsChecks()
+{//Keep the source graphics roles intact for display, overlay, and zoom CDCs.
+    CGrGlobals *active_gr;
+
+    if (BootstrapGrContextFlagsInit() != 0x2a)
+        return 0;
+    active_gr = ZcActiveGrGlobals();
+    if (!active_gr)
+        active_gr = &gr;
+    if (!active_gr->dc || !active_gr->dc1 || !active_gr->dc_cache ||
+        !active_gr->zoomed_dc ||
+        !(active_gr->dc->flags & DCF_SCREEN_BITMAP) ||
+        !(active_gr->dc->flags & DCF_ON_TOP) ||
+        !(active_gr->dc1->flags & DCF_SCREEN_BITMAP) ||
+        active_gr->dc_cache->flags != 0 ||
+        !(active_gr->zoomed_dc->flags & DCF_SCREEN_BITMAP))
+        return 0;
+    return 0x2a;
+}

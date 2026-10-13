@@ -209,6 +209,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 'zc => 0x000000000000002a')
         command('zcall BootstrapCanUseUpstreamGrUpdateTasks',
                 'zc => 0x0000000000000001')
+        command('zcall BootstrapGrContextFlagsChecks',
+                'zc => 0x000000000000002a')
         command('zc I64 GrSourceTaskFrameChecks(){return bootstrap_upstream_gr_update_tasks>0;}',
                 'zc: executed')
         command('winmgr',
