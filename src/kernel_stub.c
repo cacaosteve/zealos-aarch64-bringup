@@ -2946,7 +2946,8 @@ int64_t zc_tablet_sample(void) {
                                &x, &y, &buttons, &wheel);
     return (int64_t)x | ((int64_t)y << 16) |
            ((int64_t)(buttons & 0xff) << 32) |
-           ((int64_t)(wheel & 0xff) << 40);
+           ((int64_t)(wheel & 0xff) << 40) |
+           ((int64_t)virtio_kbd_ctrl_down() << 48);
 }
 
 /* Tablet abs deltas (call MouseDX then MouseDY for a paired sample). */

@@ -88,9 +88,9 @@ frames. The manager is stopped before that test ODE is removed. This focused
 gate leaves the independent framebuffer pixel checks and legacy mouse/drag
 assertions to the ordinary graphics and interaction targets. MathODE's
 multi-CPU derivative workers remain unvalidated.
-Remaining graphics work includes connecting native input gestures to the
-upstream zoom controls and deciding how legacy planar output should coexist
-with the display driver's 32-bit framebuffer.
+Ctrl+wheel input is connected to the upstream zoom controls. Remaining
+graphics work includes deciding how legacy planar output should coexist with
+the display driver's 32-bit framebuffer.
 The x86 build continues to use the original source. The guest source archive
 includes this note at `/PORTS/ARM64/GrScreen.md` so the substitution is
 discoverable.

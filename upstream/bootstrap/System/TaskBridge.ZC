@@ -31,8 +31,11 @@ extern I64 ZcFbTextFlush(U32 *text_base, I64 stride, I64 rows);
 // Poll the current virtio/UART key reader and queue its events for the focus
 // task. PS/2 mouse polling is outside this bridge.
 extern U0 KbdMouseHandler(Bool poll_kbd, Bool poll_mouse);
-// Packed tablet sample: x[15:0], y[31:16], buttons[39:32], wheel s8[47:40].
+// Packed tablet sample: x[15:0], y[31:16], buttons[39:32], wheel s8[47:40],
+// Ctrl-held flag at bit 48.
 extern I64 ZcTabletSample();
+extern U0 GrScaleZoom(F64 scale);
+extern Bool ZcWinMouseUpdate();
 extern I64 ZcMonotonicNs();
 extern Bool ZcMouseStateUpdate(I64 x, I64 y, I64 text_x, I64 text_y,
                                I64 now_ns);
@@ -3648,18 +3651,44 @@ public Bool BootstrapCtrlInputSample(CTask *task, I64 sample)
 {//Use the ARM generic timer as the monotonic input clock.
     return BootstrapCtrlInputSampleAt(task, sample, ZcMonotonicNs());
 }
+I64 bootstrap_ctrl_wheel_zoom_delta = 0;
 U0 BootstrapCtrlInputPoll()
 {//Poll UTM's absolute tablet and route left-button samples to the focused task.
     CTask *task;
-    I64 sample, now_ns;
+    I64 sample, now_ns, wheel;
+    Bool ctrl_down;
     task = Fs;
     if (TaskValidate(sys_focus_task))
         task = sys_focus_task;
     sample = ZcTabletSample();
     if (sample < 0)
+    {
+        ZcWinMouseUpdate();
         return;
+    }
     now_ns = ZcMonotonicNs();
+    ctrl_down = Bt(&sample, 48);
+    sample &= ~(1 << 48);
+    wheel = (sample >> 40) & 0xff;
+    if (wheel & 0x80)
+        wheel -= 0x100;
+    // Ctrl+wheel zooms the source desktop; ordinary wheel remains available
+    // to the focused task's controls.
+    if (ctrl_down && wheel)
+    {
+        if (wheel > 0)
+            bootstrap_ctrl_wheel_zoom_delta = 1;
+        else
+            bootstrap_ctrl_wheel_zoom_delta = -1;
+        sample &= ~(0xff << 40);
+    }
     BootstrapCtrlInputSubmit(task, sample, now_ns);
+    ZcWinMouseUpdate();
+    if (bootstrap_ctrl_wheel_zoom_delta > 0)
+        GrScaleZoom(2.0);
+    else if (bootstrap_ctrl_wheel_zoom_delta < 0)
+        GrScaleZoom(0.5);
+    bootstrap_ctrl_wheel_zoom_delta = 0;
 }
 public Bool CtrlDispatchWheel(CTask *task, I64 delta)
 {//WinMgr routes wheel changes to the focused task's first wheel control.
@@ -3971,7 +4000,6 @@ U0 BootstrapDrawTaskWin(CTask *task)
 extern U0 WinZBufUpdate();
 extern Bool BootstrapWinIsUncovered(CTask *task);
 extern Bool ZcGrTextUpdate();
-extern Bool ZcWinMouseUpdate();
 extern Bool ZcGrScreenUpdate();
 extern Bool ZcGrScreenFullUpdate();
 extern Bool ZcGrUpdateTasks();
@@ -4060,7 +4088,6 @@ public U0 BootstrapMouseHardSample(I64 sample, I64 now_ns)
 // Keep the early frame path linkable; these hooks are replaced when those
 // subsystems are loaded.
 U0 DrawMenu(CDC *dc) {}
-extern U0 GrScaleZoom(F64 scale);
 // The source renderer budgets optional MathODE work; the real integrator is
 // loaded later, so keep a valid default until its subsystem is initialized.
 F64 ode_alloced_factor = 0.75;
@@ -4120,7 +4147,6 @@ Bool BootstrapTryUpstreamGrUpdateScreen()
         sys_framebuffer_bpp != 32)
         return FALSE;
     BootstrapCtrlInputPoll();
-    ZcWinMouseUpdate();
     BootstrapWinMgrTimingInit();
     active_gr = ZcActiveGrGlobals();
     if (!active_gr)
@@ -4190,7 +4216,6 @@ U0 BootstrapGrUpdateTasks()
         return;
 
     BootstrapCtrlInputPoll();
-    ZcWinMouseUpdate();
     BootstrapWinMgrTimingInit();
 
     active_gr = ZcActiveGrGlobals();

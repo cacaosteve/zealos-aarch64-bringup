@@ -478,6 +478,12 @@ static int virtio_kbd_ready(void) {
     return g_vk.ready;
 }
 
+/* Poll before reporting modifier state so gesture readers see current input. */
+static int virtio_kbd_ctrl_down(void) {
+    vk_poll();
+    return g_vk.ready && g_vk.ctrl;
+}
+
 static uint64_t virtio_kbd_mmio_phys(void) {
     if (!g_vk.ready) {
         return 0;
