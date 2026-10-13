@@ -3182,6 +3182,15 @@ Freeze catalog unchanged.
 | Smoke | The PCI boot integration confirms the manager is already live, can be stopped and restarted, and continues to pass the window-demo input/render checks |
 | Limits | This starts the window manager and graphics refresh path; it does not create the normal menu task, launch applications, or complete ZealOS system-task startup |
 
+## Milestone 280 — coalesce queued tablet pointer motion
+
+| Item | Path |
+|--|--|
+| Gap | If a guest task did not consume `MESSAGE_MS_MOVE` promptly, every tablet sample allocated another global guest message job; a held pointer could exhaust the bounded queue and report `guest message queue full` |
+| Bring-up | Replace only the newest queued move for the same recipient/master/flags with the latest coordinates. Any intervening key, button, or other message remains an ordering barrier |
+| Smoke | `TaskMessageMoveCoalesceChecks` posts 512 moves, confirms they occupy one job with the final coordinates, then verifies a key event separates later movement; `make check-compat-pci` passes |
+| Limits | Coalescing applies to consecutive unconsumed motion only; button and key transitions retain every event |
+
 ## Open compatibility probe — `/System/Win.ZC`
 
 The source probe loads pinned `KernelC.HH`, `Externs.ZC`, and `Gr.HH` before compiling unchanged `Win.ZC`. Graphics dimensions and mouse globals are probe fixtures; `DrawMenu` and the initial `GrScaleZoom` definition are compile-time fixtures until unchanged `GrScreen.ZC` is loaded later in the probe. `GrScreenFinalUpdateChecks` executes `WinFinalUpdate` through the staged idle-frame path, confirms the fixture's `mouse_grid.coord` toggles the real coordinate-text overlay, checks a separate visible guest overlay callback, verifies the software arrow against Limine framebuffer pixels, and exercises `WinMouseUpdate`'s edge recentering through the runtime dispatch. `WinMousePointerStateCheck` covers transformed tablet coordinates and `WinMouseHardStateCheck` covers the source mouse-state ABI; manual UTM acceptance confirms the software pointer and window-demo mouse interaction. The raw ARM generic-timer binding and a standalone F64 clock expression are smoke-tested before the Win load.

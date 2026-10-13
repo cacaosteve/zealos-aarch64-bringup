@@ -70,6 +70,35 @@ I64 TaskMessageChecks()
     return 42;
 }
 
+I64 TaskMessageMoveCoalesceChecks()
+{//Consecutive pending pointer moves collapse without crossing key/button events.
+    CJob *move, *again, *first, *key, *last;
+    I64 i;
+    move = TaskMessage(Fs, NULL, MESSAGE_MS_MOVE, 0, 1, 0);
+    if (!move)
+        return 1;
+    for (i = 1; i < 512; i++)
+    {
+        again = TaskMessage(Fs, NULL, MESSAGE_MS_MOVE, i, i + 1, 0);
+        if (again != move)
+            return 2;
+    }
+    if (move->aux1 != 511 || move->aux2 != 512 ||
+        Fs->server_ctrl.next_waiting != move ||
+        Fs->server_ctrl.last_waiting != move)
+        return 3;
+    key = TaskMessage(Fs, NULL, MESSAGE_KEY_DOWN, 65, 30, 0);
+    last = TaskMessage(Fs, NULL, MESSAGE_MS_MOVE, 700, 701, 0);
+    first = Fs->server_ctrl.next_waiting;
+    if (!key || !last || first != move || first->next != key ||
+        key->next != last || Fs->server_ctrl.last_waiting != last ||
+        move->aux1 != 511 || move->aux2 != 512 ||
+        last->aux1 != 700 || last->aux2 != 701)
+        return 4;
+    FlushMessages(Fs);
+    return 42;
+}
+
 I64 TaskMessageDeadlockChecks()
 {
     // No task can produce a command; keyboard input cannot satisfy this mask.

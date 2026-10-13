@@ -158,6 +158,7 @@ static double *pow10_I64_host = pow10_values;
 #define GUEST_STACK_BYTES (64u * 1024u)
 #define GUEST_JOBS_MAX 128u
 #define GUEST_JOB_DEPTH_MAX 8u
+#define GUEST_MESSAGE_MS_MOVE 4
 /* KernelA.HH CJob: keep the queue links and message fields at their original
  * offsets so guest code may inspect the pending queue through CTask. */
 struct guest_job {
@@ -2312,6 +2313,23 @@ static struct guest_job *post_guest_message(void *server_task, void *master,
     if (first_code >= 64 || second_code >= 64)
         zc_fail("message code out of range");
     unsigned needed = code < 0 ? 2 : 1;
+    /* Pointer motion is a latest-state notification, unlike button/key
+     * transitions. If the recipient has not consumed the immediately
+     * preceding move, replace its coordinates instead of allowing high-rate
+     * tablet input to exhaust the bounded shared guest-job pool. Do not scan
+     * past another event: that preserves all input ordering barriers. */
+    if (code == GUEST_MESSAGE_MS_MOVE && needed == 1) {
+        struct guest_job *head = guest_job_head(server);
+        struct guest_job *last = head->last;
+        if (last != head && last->job_code == GUEST_JOBT_MESSAGE &&
+            last->message_code == GUEST_MESSAGE_MS_MOVE &&
+            last->master_task == master && last->flags == flags) {
+            last->aux1 = arg1;
+            last->aux2 = arg2;
+            *guest_flags(server) &= ~(GUEST_IDLE | GUEST_AWAITING_MESSAGE);
+            return last;
+        }
+    }
     if (guest_job_count > GUEST_JOBS_MAX - needed)
         zc_fail("guest message queue full");
     struct guest_job *first = NULL;
