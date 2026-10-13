@@ -213,6 +213,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                        'zc: native compiler ready',
                        'zc: loaded /Kernel/KMathB.ZC',
                        'zc: upstream ZealOS graphics sources loaded',
+                       'zc: boot graphics ODE hooks ready',
                        'zc: source Window Manager started at boot',
                        'zc: graphical terminal started at boot; serial shell remains available'):
             if marker not in boot: raise RuntimeError(f'boot missing {marker}\n{boot[-4000:]}')

@@ -4348,6 +4348,22 @@ int zc_start_graphics(void) {
             return -1;
         }
     }
+    /* Verify the source ODE pipeline in the same compiler hash that loaded
+     * the modules. Later shell calls may run with a task-local Fs/hash table. */
+    const char *const ode_symbols[] = {
+        "ODENew", "ODEsUpdate", "GrUpdateTaskODEs"
+    };
+    for (size_t i = 0; i < sizeof(ode_symbols) / sizeof(*ode_symbols); i++) {
+        CHashFun *fun = (CHashFun *)HashFind((char *)ode_symbols[i],
+                                             Fs->hash_table, HTT_FUN, 1);
+        if (!fun || !fun->fun_ptr || (fun->base.base.type & HTF_EXTERN)) {
+            guarded = 0;
+            zc_output("zc: boot graphics ODE hook missing; returning to bootstrap shell\n");
+            zc_init(archive, archive_len, output);
+            return -1;
+        }
+    }
+    zc_output("zc: boot graphics ODE hooks ready\n");
     winmgr_task = (CHashGlblVar *)HashFind("sys_winmgr_task", Fs->hash_table,
                                            HTT_GLBL_VAR, 1);
     system_task = (CHashGlblVar *)HashFind("sys_task", Fs->hash_table,

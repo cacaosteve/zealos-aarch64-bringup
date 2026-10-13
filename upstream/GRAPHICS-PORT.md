@@ -231,7 +231,9 @@ The source `WinCalcIdles` has a deterministic smoke against that state,
 including its guarded counter snapshot and idle-factor calculation. The
 unchanged upstream `WinMgrTask` now starts as part of boot and can be
 stopped/restarted through the shell bridge; the bootstrap retains the serial
-shell and framebuffer pump as recovery paths. The active ZealOS `sys_winmgr_task` pointer is synchronized with the
+shell and framebuffer pump as recovery paths. MathODE and its source frame
+hooks are loaded and checked before the manager starts. The active ZealOS
+`sys_winmgr_task` pointer is synchronized with the
 bridge when the manager starts/stops. Its uncovered-window bitmap follows the
 source z-index convention (bit zero reserved); a live QEMU probe now verifies
 source CDC control rendering and framebuffer presentation while the manager

@@ -3236,6 +3236,15 @@ Freeze catalog unchanged.
 | Smoke | Three consecutive `make check-compat-pci` boots pass the A/B overlap pixel and MathODE integration checks; `make check-grscreen-ode` verifies a root-task ODE advances across live manager frames |
 | Limits | The source desktop now advances single-core task ODEs; MathODE's multi-CPU derivative workers remain unvalidated |
 
+## Milestone 286 — validate the boot-time ODE frame hooks
+
+| Item | Path |
+|--|--|
+| Gap | Checking source functions from a later shell command can inspect a task-local symbol table and fail to reflect the module set used during graphics startup |
+| Bring-up | Validate the MathODE constructor, integrator, and GrScreen task hook in the module loader's shared symbol table before allowing the source desktop startup to continue; fall back to the serial bootstrap shell if any implementation is absent |
+| Smoke | PCI boot checks require the new `boot graphics ODE hooks ready` marker; `make check-compat-pci`, `make check-grscreen-ode`, and `make check-grscreen-full` pass |
+| Limits | This checks implementation presence at boot; UTM remains the authority for the live display and pointer experience |
+
 ## Open compatibility probe — `/System/Win.ZC`
 
 The source probe loads pinned `KernelC.HH`, `Externs.ZC`, and `Gr.HH` before compiling unchanged `Win.ZC`. Graphics dimensions and mouse globals are probe fixtures; `DrawMenu` and the initial `GrScaleZoom` definition are compile-time fixtures until unchanged `GrScreen.ZC` is loaded later in the probe. `GrScreenFinalUpdateChecks` executes `WinFinalUpdate` through the staged idle-frame path, confirms the fixture's `mouse_grid.coord` toggles the real coordinate-text overlay, checks a separate visible guest overlay callback, verifies the software arrow against Limine framebuffer pixels, and exercises `WinMouseUpdate`'s edge recentering through the runtime dispatch. `WinMousePointerStateCheck` covers transformed tablet coordinates and `WinMouseHardStateCheck` covers the source mouse-state ABI; manual UTM acceptance confirms the software pointer and window-demo mouse interaction. The raw ARM generic-timer binding and a standalone F64 clock expression are smoke-tested before the Win load.
