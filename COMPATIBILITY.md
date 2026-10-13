@@ -403,8 +403,11 @@ oracle are needed before broad language compatibility can be claimed.
   after returning to the shell. Idle graphics frames now run only while the
   current two-window application fixture is active, preserving the direct
   framebuffer shell/editor between demos. On 2026-10-12, the user confirmed the
-  shell display was restored and looked good. Two-window overlap flicker remains
-  unresolved and is tracked separately.
+  shell display was restored and looked good. The user later confirmed the
+  two-window display looked good and reported that the earlier overlap flashing
+  was fixed by the staged source-manager refresh. This is UTM visual acceptance
+  of the demo; general single-framebuffer tearing under arbitrary load remains
+  outside that check.
 
 ## Recorded validation — launching the window fixture from the desktop menu
 
