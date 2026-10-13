@@ -3308,6 +3308,15 @@ Freeze catalog unchanged.
 | Smoke | `make check-compat-pci` passes manager startup, restart, compositor, overlap, and window-demo lifecycle; the new source module loads without the extern-address warning |
 | Limits | UTM visual confirmation of this refreshed boot remains pending; the host was locked during the refresh |
 
+## Milestone 294 — cover Ctrl+wheel desktop zoom input
+
+| Item | Path |
+|--|--|
+| Gap | The UTM tablet path routed Ctrl+wheel to source zoom, but automated checks covered only `GrScaleZoom` itself and not the gesture dispatch |
+| Bring-up | Factor the Ctrl+wheel decision into `BootstrapCtrlWheelZoom`; keep plain wheel for focused controls, and check zoom-in/out against the active source graphics and mouse globals |
+| Smoke | `BootstrapCtrlWheelZoomChecks` verifies plain wheel is not consumed, Ctrl+wheel changes the source zoom between 1x and 2x, and the mouse scale follows both directions; the focused graphics probe passes |
+| Limits | This validates the guest input decision and transform; physical UTM Ctrl+wheel behavior still needs hands-on confirmation |
+
 ## Open compatibility probe — `/System/Win.ZC`
 
 The source probe loads pinned `KernelC.HH`, `Externs.ZC`, and `Gr.HH` before compiling unchanged `Win.ZC`. Graphics dimensions and mouse globals are probe fixtures; `DrawMenu` and the initial `GrScaleZoom` definition are compile-time fixtures until unchanged `GrScreen.ZC` is loaded later in the probe. `GrScreenFinalUpdateChecks` executes `WinFinalUpdate` through the staged idle-frame path, confirms the fixture's `mouse_grid.coord` toggles the real coordinate-text overlay, checks a separate visible guest overlay callback, verifies the software arrow against Limine framebuffer pixels, and exercises `WinMouseUpdate`'s edge recentering through the runtime dispatch. `WinMousePointerStateCheck` covers transformed tablet coordinates and `WinMouseHardStateCheck` covers the source mouse-state ABI; manual UTM acceptance confirms the software pointer and window-demo mouse interaction. The raw ARM generic-timer binding and a standalone F64 clock expression are smoke-tested before the Win load.

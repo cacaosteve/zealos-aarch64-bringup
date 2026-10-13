@@ -229,6 +229,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 'zc => 0x000000000000002a')
         command('zcall BootstrapGuiShellSmoke',
                 'zc => 0x000000000000002a')
+        command('zcall BootstrapCtrlWheelZoomChecks',
+                'zc => 0x000000000000002a')
         if args.probe_gui_terminal:
             command('gtermstop', 'gterm: graphical terminal stopped')
             command('gterm',
@@ -731,6 +733,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                         command('zload /Tests/GrScreenFinalUpdate.ZC',
                                 'zc: loaded /Tests/GrScreenFinalUpdate.ZC')
                         command('zcall GrScreenZoomTransformChecks',
+                                'zc => 0x000000000000002a')
+                        command('zcall BootstrapCtrlWheelZoomChecks',
                                 'zc => 0x000000000000002a')
                         command('zcall BootstrapGrContextInitChecks',
                                 'zc => 0x000000000000002a')

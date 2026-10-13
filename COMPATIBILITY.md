@@ -415,6 +415,17 @@ oracle are needed before broad language compatibility can be claimed.
   `make check-compat-pci` passes. Clicking the item and visually confirming the
   terminal restore still requires UTM input.
 
+## Recorded validation — Ctrl+wheel desktop zoom
+
+- The source desktop now factors the Ctrl+wheel decision into
+  `BootstrapCtrlWheelZoom`. Plain wheel remains routed to focused controls;
+  Ctrl+wheel applies a 2x or 0.5x step through unchanged `GrScaleZoom` after
+  the tablet sample updates the source mouse position.
+- `BootstrapCtrlWheelZoomChecks` verifies that plain wheel does not zoom,
+  Ctrl+wheel moves between 1x and 2x in both directions, and mouse scale
+  follows the zoom. The full PCI compatibility suite and focused graphics
+  probe pass. Physical Ctrl+wheel behavior in UTM remains to be confirmed.
+
 The current boot images are useful delivery artifacts; they are not a finished
 ZealOS live distribution or installer.
 
