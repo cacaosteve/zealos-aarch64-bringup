@@ -1999,3 +1999,17 @@ ZealOS live distribution or installer.
   allocated indexed bitmap. `GrDCTransformChecks` exercises the unchanged
   fixed-point matrix transform and CDC translation callback. Remaining work
   includes broader CDC operation coverage and automatic desktop startup.
+
+## ARM64 MathODE source module
+
+- The PCI compatibility target now loads the pinned `/System/Math/MathODE.ZC`
+  source with `KernelA`, `KernelB`, `KernelC`, and `KMathB`, then checks the
+  unchanged module's `ODENew`/`ODEDel` lifecycle, D3 vector arithmetic, and a
+  Cash–Karp RK5 step against the exponential equation `y'=y`. Host runtime
+  bindings cover the `CD3` imports, while ARM64 compiler support includes
+  defaulted F64 parameters and the F64 `Abs` intrinsic. A guarded source
+  overlay rewrites the bit-test's inline address-of-member argument to an
+  equivalent local pointer because that parser form is still unsupported.
+- The gate does not yet run MathODE from the ordinary desktop update loop or
+  validate its multi-CPU derivative workers; those remain separate runtime
+  integration work.

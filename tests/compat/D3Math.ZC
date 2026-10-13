@@ -68,3 +68,24 @@ I64 MathODECreateCheck()
 	ODEDel(ode);
 	return ok;
 }
+
+U0 MathODEExponential(CMathODE *ode, F64 t, F64 *state, F64 *derivative)
+{
+	derivative[0] = state[0];
+}
+
+I64 MathODERK5Check()
+{
+	CMathODE *ode = ODENew(1);
+	ode->derive = &MathODEExponential;
+	ode->state_internal[0] = 1.0;
+	ode->state_scale[0] = 1.0;
+	ode->DstateDt[0] = 1.0;
+	ode->h = ode->h_min = ode->h_max = 0.01;
+	ODERK5OneStep(ode);
+	I64 result = 1;
+	if (Abs(ode->state_internal[0] - 1.010050167084168) >= 1e-8) result = 2;
+	if (result == 1 && Abs(ode->t - 0.01) >= 1e-12) result = 3;
+	ODEDel(ode);
+	return result;
+}
