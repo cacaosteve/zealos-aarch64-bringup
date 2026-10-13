@@ -159,6 +159,7 @@ I64 BootstrapGuiTerminalSmoke()
     CMenu *menu;
     CMenuEntry *root;
     CMenuEntry *entry;
+    I64 action;
 
     // The normal ARM64 boot already starts this task. In that configuration
     // the smoke confirms boot left a valid terminal instead of trying to
@@ -167,15 +168,24 @@ I64 BootstrapGuiTerminalSmoke()
     {
         menu = bootstrap_gui_terminal_task->cur_menu;
         if (!menu) return 11;
+        if (menu->task != bootstrap_gui_terminal_task) return 18;
         root = menu->sub;
         if (!root) return 12;
+        if (StrCompare(root->name, "OS") || !root->dir) return 19;
         entry = root->sub;
-        if (!entry) return 13;
-        entry = entry->next;
-        if (!entry) return 14;
-        if (entry->message_code != MESSAGE_KEY_UP) return 15;
-        if (entry->arg1 != 2) return 16;
-        if (entry->arg2 != GUI_MENU_ACTION_TAG) return 17;
+        for (action = 1; action <= 4; action++)
+        {
+            if (!entry) return 12 + action;
+            if (entry->message_code != MESSAGE_KEY_UP) return 20 + action;
+            if (entry->arg1 != action) return 24 + action;
+            if (entry->arg2 != GUI_MENU_ACTION_TAG) return 28 + action;
+            if (action == 1 && StrCompare(entry->name, "Help")) return 33;
+            if (action == 2 && StrCompare(entry->name, "Status")) return 34;
+            if (action == 3 && StrCompare(entry->name, "Files")) return 35;
+            if (action == 4 && StrCompare(entry->name, "Disk")) return 36;
+            entry = entry->next;
+        }
+        if (entry) return 37;
         return 0x2a;
     }
     if (BootstrapGuiTerminalStart() != 0x2a ||
