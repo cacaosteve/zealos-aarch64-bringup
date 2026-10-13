@@ -224,6 +224,11 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     'zc => 0x000000000000002a')
             command('zcall BootstrapGuiShellSmoke',
                     'zc => 0x000000000000002a')
+            command('gtermstop', 'gterm: graphical terminal stopped')
+            command('gterm',
+                    'gterm: graphical terminal started; click it to type; Ctrl+C stops it')
+            command('zcall BootstrapGuiTerminalSmoke',
+                    'zc => 0x000000000000002a')
             raise SystemExit(0)
         command('zcall BootstrapSpriteOpcodeChecks',
                 'zc => 0x000000000000002a')

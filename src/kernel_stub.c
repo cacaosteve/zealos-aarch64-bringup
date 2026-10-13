@@ -4521,7 +4521,8 @@ static void tablet_cursor_tick(void) {
     /* Once source WinMgr owns the graphical desktop it draws the software
      * arrow through gr.fp_draw_mouse. Keep this bootstrap marker out of that
      * scanout so it cannot cover the real cursor or leave stale orange pixels. */
-    if (zc_gui_terminal_active() || zc_window_demo_active()) {
+    if (zc_source_winmgr_active() || zc_gui_terminal_active() ||
+        zc_window_demo_active()) {
         g_tab_prev_btn = btn;
         g_tab_cx = x;
         g_tab_cy = y;

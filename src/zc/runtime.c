@@ -308,6 +308,7 @@ static int64_t guest_heap_sig_off, guest_heap_used_off, guest_heap_task_off;
 static int64_t guest_except_ch_off, guest_catch_except_off;
 static int64_t guest_hash_table_off;
 static int guest_task_bound;
+static int source_winmgr_active;
 extern uint64_t zeal_fb_text_cols(void), zeal_fb_text_rows(void);
 extern uint64_t zeal_fb_screen_width(void), zeal_fb_screen_height(void);
 extern uint64_t zeal_fb_pitch_bytes(void), zeal_fb_bits_per_pixel(void);
@@ -4209,6 +4210,7 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
     aiwnios_switch_depth = 0;
     aiwnios_fun_depth = 0;
     guest_task_bound = 0;
+    source_winmgr_active = 0;
     guest_current = guest_completed = 0;
     guest_job_count = 0;
     memset(guest_tracked_jobs, 0, sizeof(guest_tracked_jobs));
@@ -4371,7 +4373,10 @@ int zc_start_winmgr(void) {
     result = 0;
     if (!ready || failed || zc_call("BootstrapWinMgrStart", &result) != 0)
         return -1;
-    return result == 0x2a ? 0 : -1;
+    if (result != 0x2a)
+        return -1;
+    source_winmgr_active = 1;
+    return 0;
 }
 int zc_start_gui_terminal(void) {
     static const char *const modules[] = {
@@ -4394,7 +4399,7 @@ int zc_start_gui_terminal(void) {
         "/System/GuiTerminal.ZC",
     };
     int64_t result = 0;
-    if (!ready || failed || gui_terminal_active)
+    if (!ready || failed || gui_terminal_active || !zc_source_winmgr_active())
         return gui_terminal_active ? 0 : -1;
     if (!gui_terminal_modules_loaded) {
         for (size_t i = 0; i < sizeof(modules) / sizeof(*modules); i++)
@@ -4432,7 +4437,13 @@ int zc_stop_winmgr(void) {
     int64_t result = 0;
     if (!ready || failed || zc_call("BootstrapWinMgrStop", &result) != 0)
         return -1;
-    return result == 0x2a ? 0 : -1;
+    if (result != 0x2a)
+        return -1;
+    source_winmgr_active = 0;
+    return 0;
+}
+int zc_source_winmgr_active(void) {
+    return ready && !failed && source_winmgr_active;
 }
 static int zc_window_demo_restore_terminal(void) {
     if (!window_demo_restore_gui_terminal)

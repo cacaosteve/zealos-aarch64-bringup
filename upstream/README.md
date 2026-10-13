@@ -3206,7 +3206,7 @@ Freeze catalog unchanged.
 |--|--|
 | Gap | The source Window Manager started during boot, but the framebuffer remained an empty desktop until `gterm` was entered on the serial shell |
 | Bring-up | Load the upstream DolDoc terminal modules and spawn a visible interactive terminal task after the manager starts; retain the serial shell and a `gterm` retry path if terminal startup fails |
-| Smoke | PCI boot checks require the graphical-terminal startup marker; the DocTerm probe accepts the already-running boot task without creating a duplicate or stopping it; boot smoke validates the OS menu tree and all four entry codes, while command smoke verifies dispatch to `help`, `zstatus`, `zls`, and `zvol` |
+| Smoke | PCI boot checks require the graphical-terminal startup marker; the DocTerm probe validates the OS menu and command mappings, then stops and restarts the terminal while WinMgr stays active |
 | Limits | This adds a usable terminal window and a small custom OS menu, not ZealOS's full menu tree, startup application set, or complete keyboard/mouse stack; UTM menu selection still needs hands-on acceptance |
 
 ## Milestone 283 — recover the source system-task root during graphics setup
@@ -3222,9 +3222,9 @@ Freeze catalog unchanged.
 
 | Item | Path |
 |--|--|
-| Gap | The bootstrap shell kept painting its orange tablet-position marker over the framebuffer after the source Window Manager had begun drawing its software pointer |
-| Bring-up | Keep the orange marker as a shell-only fallback, but stop painting it while the graphical terminal or window demo is active so the source cursor remains visible without stale overlay pixels |
-| Smoke | `make check-compat-pci` passes the source WinMgr cursor, hit-testing, and live window interaction checks; UTM visual confirmation of the arrow without the orange marker is pending |
+| Gap | The bootstrap shell kept painting its orange tablet-position marker over the framebuffer after the source Window Manager had begun drawing its software pointer, including after the graphical terminal was closed |
+| Bring-up | Keep the orange marker as a shell-only fallback, but stop painting it whenever source WinMgr is active so the source cursor remains visible without stale overlay pixels |
+| Smoke | The PCI compatibility path verifies manager start/stop transitions and passes source WinMgr cursor, hit-testing, and live window interaction checks; UTM visual confirmation of the arrow without the orange marker is pending |
 | Limits | The source software cursor remains a bounded bootstrap arrow; standard ZealOS cursor sprites and other pointer devices are not initialized |
 
 ## Open compatibility probe — `/System/Win.ZC`
