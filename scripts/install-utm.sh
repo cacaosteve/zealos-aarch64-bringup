@@ -176,6 +176,7 @@ root = pathlib.Path("$ROOT")
 subprocess.run([sys.executable, str(root / "scripts/source-volume.py"),
                 "merge", str(target), str(root / "build/sources.tar"),
                 "--replace", "Tests/WindowDragLive.ZC",
+                "--replace", "System/GuiTerminal.ZC",
                 "--replace", "System/WinMgr.ZC"], check=True)
 
 # Convenience second name for humans / older scripts

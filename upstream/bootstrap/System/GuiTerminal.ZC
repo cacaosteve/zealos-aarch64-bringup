@@ -3,6 +3,39 @@
 CTask *bootstrap_gui_terminal_task;
 extern U8 *ZcGuiShellExec(U8 *line);
 
+#define GUI_MENU_ACTION_TAG 0x475549
+
+CMenuEntry *BootstrapGuiTerminalMenuEntry(CTask *task, U8 *name, I64 action)
+{
+    CMenuEntry *entry = CAlloc(sizeof(CMenuEntry), task);
+    StrCopy(entry->name, name);
+    entry->message_code = MESSAGE_KEY_UP;
+    entry->arg1 = action;
+    entry->arg2 = GUI_MENU_ACTION_TAG;
+    return entry;
+}
+
+U0 BootstrapGuiTerminalMenuInstall()
+{
+    CMenu *menu = CAlloc(sizeof(CMenu), Fs);
+    CMenuEntry *root = CAlloc(sizeof(CMenuEntry), Fs);
+    CMenuEntry *entry;
+
+    StrCopy(root->name, "OS");
+    root->dir = TRUE;
+    root->sub = BootstrapGuiTerminalMenuEntry(Fs, "Help", 1);
+    entry = root->sub;
+    entry->next = BootstrapGuiTerminalMenuEntry(Fs, "Status", 2);
+    entry = entry->next;
+    entry->next = BootstrapGuiTerminalMenuEntry(Fs, "Files", 3);
+    entry = entry->next;
+    entry->next = BootstrapGuiTerminalMenuEntry(Fs, "Disk", 4);
+    menu->task = Fs;
+    menu->attr = BLUE << 4 + YELLOW;
+    menu->sub = root;
+    Fs->cur_menu = menu;
+}
+
 U0 BootstrapGuiTerminalTask(U8 *data)
 {
     I64 ch, sc;
@@ -13,9 +46,10 @@ U0 BootstrapGuiTerminalTask(U8 *data)
 
     KeyDevInit;
     DocTermNew;
+    BootstrapGuiTerminalMenuInstall;
     KeyDevAdd(&KDDocPutKey, &KDDocPutS, 0x80000000, TRUE);
     DocPrint(DocPut, "ZealOS ARM64 graphical terminal\n");
-    DocPrint(DocPut, "Click this window, enter a command, and press Return.\n");
+    DocPrint(DocPut, "Use the ZealOS menu or enter a command and press Return.\n");
     DocPrint(DocPut, "The serial shell remains available.\n");
     DocPrint(DocPut, "> ");
 
@@ -44,6 +78,27 @@ U0 BootstrapGuiTerminalTask(U8 *data)
                 else if (ch >= 32 && ch < 127 && command_len < sizeof(command) - 1)
                     command[command_len++] = ch;
                 DocPutKey(DocPut, ch, sc);
+            }
+        }
+        while ((message = MessageScan(&ch, &sc,
+                                     1 << MESSAGE_KEY_UP)) == MESSAGE_KEY_UP)
+        {
+            if (sc == GUI_MENU_ACTION_TAG)
+            {
+                if (ch == 1)
+                    output = ZcGuiShellExec("help");
+                else if (ch == 2)
+                    output = ZcGuiShellExec("zstatus");
+                else if (ch == 3)
+                    output = ZcGuiShellExec("zls");
+                else if (ch == 4)
+                    output = ZcGuiShellExec("zvol");
+                else
+                    output = NULL;
+                if (output)
+                    DocPrint(DocPut, "%s", output);
+                command_len = 0;
+                DocPrint(DocPut, "> ");
             }
         }
         while (MessageScan(NULL, NULL, ~1))
@@ -97,11 +152,28 @@ I64 BootstrapGuiTerminalShow()
 
 I64 BootstrapGuiTerminalSmoke()
 {
+    CMenu *menu;
+    CMenuEntry *root;
+    CMenuEntry *entry;
+
     // The normal ARM64 boot already starts this task. In that configuration
     // the smoke confirms boot left a valid terminal instead of trying to
     // spawn a second one or tearing down the user's interactive window.
     if (TaskValidate(bootstrap_gui_terminal_task))
+    {
+        menu = bootstrap_gui_terminal_task->cur_menu;
+        if (!menu) return 11;
+        root = menu->sub;
+        if (!root) return 12;
+        entry = root->sub;
+        if (!entry) return 13;
+        entry = entry->next;
+        if (!entry) return 14;
+        if (entry->message_code != MESSAGE_KEY_UP) return 15;
+        if (entry->arg1 != 2) return 16;
+        if (entry->arg2 != GUI_MENU_ACTION_TAG) return 17;
         return 0x2a;
+    }
     if (BootstrapGuiTerminalStart() != 0x2a ||
         !TaskValidate(bootstrap_gui_terminal_task))
         return 1;
