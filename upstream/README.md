@@ -3191,6 +3191,15 @@ Freeze catalog unchanged.
 | Smoke | `TaskMessageMoveCoalesceChecks` posts 512 moves, confirms they occupy one job with the final coordinates, verifies key ordering, then fills the 128-job queue with transitions and confirms an additional move is harmlessly dropped; `make check-compat-pci` passes. After refreshing UTM, interactive window move/resize was confirmed working without a queue-full report |
 | Limits | Coalescing applies to consecutive unconsumed motion only; button and key transitions retain every event |
 
+## Milestone 281 — connect Ctrl+wheel to source desktop zoom
+
+| Item | Path |
+|--|--|
+| Gap | `GrScaleZoom` preserved the source pointer transform, but the UTM tablet path forwarded every wheel delta only to focused controls |
+| Bring-up | Pack the current virtio keyboard Ctrl state with the absolute tablet sample; consume Ctrl+wheel for one upstream zoom step after updating the source mouse transform, and preserve plain wheel delivery |
+| Smoke | The ARM64 source archive and kernel build, the full focused QEMU source WinMgr/GrScreen/MathODE checks, and `GrScreenZoomTransformChecks` pass; UTM Ctrl+wheel input remains an interactive acceptance check |
+| Limits | Zoom steps are 2x/0.5x; desktop zoom centering and plain wheel behavior still need confirmation in UTM |
+
 ## Open compatibility probe — `/System/Win.ZC`
 
 The source probe loads pinned `KernelC.HH`, `Externs.ZC`, and `Gr.HH` before compiling unchanged `Win.ZC`. Graphics dimensions and mouse globals are probe fixtures; `DrawMenu` and the initial `GrScaleZoom` definition are compile-time fixtures until unchanged `GrScreen.ZC` is loaded later in the probe. `GrScreenFinalUpdateChecks` executes `WinFinalUpdate` through the staged idle-frame path, confirms the fixture's `mouse_grid.coord` toggles the real coordinate-text overlay, checks a separate visible guest overlay callback, verifies the software arrow against Limine framebuffer pixels, and exercises `WinMouseUpdate`'s edge recentering through the runtime dispatch. `WinMousePointerStateCheck` covers transformed tablet coordinates and `WinMouseHardStateCheck` covers the source mouse-state ABI; manual UTM acceptance confirms the software pointer and window-demo mouse interaction. The raw ARM generic-timer binding and a standalone F64 clock expression are smoke-tested before the Win load.

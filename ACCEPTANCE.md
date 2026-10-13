@@ -80,6 +80,10 @@ zcall WindowDragLiveRenderChecks
    parked demo tasks do not render a task menu. Finish with
    `zcall WindowDragLiveStop`.
 
+   With the source manager active, hold **Ctrl** and scroll up/down over the
+   framebuffer. The desktop should zoom in/out around the pointer; scrolling
+   without Ctrl should continue to reach the focused window's wheel control.
+
 `make check-window-buttons` runs the same live draw/control probe in the
 headless UTM-shaped QEMU guest. It checks that the control callback draws the
 expected pixel, the frame is presented, and the framebuffer reports yellow at

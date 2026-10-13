@@ -218,9 +218,10 @@ scale/offset update is verified against the tablet transform. Each bridge frame
 now calls unchanged `WinMouseUpdate` after polling the absolute tablet, so source
 pointer-edge recentering and wheel-capability synchronization run against the
 active ZealOS globals. The QEMU regression places the pointer at the right edge
-of a 2x view and verifies source pan, velocity decay, and wheel state. Live
-pointer-centered zoom controls, non-default pan, and the full zoom interaction
-path still need UTM acceptance.
+of a 2x view and verifies source pan, velocity decay, and wheel state. Ctrl+wheel
+dispatches to unchanged `GrScaleZoom` after updating the pointer transform, while
+plain wheel remains available to controls. Pointer-centered zoom, non-default
+pan, and the full input gesture still need UTM acceptance.
 
 ## Remaining graphics path
 
