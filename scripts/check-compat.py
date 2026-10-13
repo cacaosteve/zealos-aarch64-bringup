@@ -220,11 +220,11 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         if re.search(r'hc IR FAIL|(?:Upstream|Front) [^\r\n]* FAIL', boot):
             raise RuntimeError('legacy regressions')
         print('PASS boot and legacy regression markers', flush=True)
+        command('zcall BootstrapGuiTerminalSmoke',
+                'zc => 0x000000000000002a')
+        command('zcall BootstrapGuiShellSmoke',
+                'zc => 0x000000000000002a')
         if args.probe_gui_terminal:
-            command('zcall BootstrapGuiTerminalSmoke',
-                    'zc => 0x000000000000002a')
-            command('zcall BootstrapGuiShellSmoke',
-                    'zc => 0x000000000000002a')
             command('gtermstop', 'gterm: graphical terminal stopped')
             command('gterm',
                     'gterm: graphical terminal started; click it to type; Ctrl+C stops it')

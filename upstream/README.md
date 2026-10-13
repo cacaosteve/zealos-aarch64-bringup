@@ -3245,6 +3245,15 @@ Freeze catalog unchanged.
 | Smoke | PCI boot checks require the new `boot graphics ODE hooks ready` marker; `make check-compat-pci`, `make check-grscreen-ode`, and `make check-grscreen-full` pass |
 | Limits | This checks implementation presence at boot; UTM remains the authority for the live display and pointer experience |
 
+## Milestone 287 — recall commands in the boot graphical terminal
+
+| Item | Path |
+|--|--|
+| Gap | The automatically opened DolDoc terminal accepted commands but made users retype the last command when checking status or correcting a typo |
+| Bring-up | Keep one bounded command in the terminal task; Up replaces the current input with it and Down clears the input, while other keys continue through upstream `DocPutKey` |
+| Smoke | `BootstrapGuiTerminalSmoke` checks the bounded buffer replace/clear/reject paths and the installed OS menu; every PCI boot regression also checks terminal and menu startup |
+| Limits | One-command history is scoped to the current graphical terminal task; multi-entry history and persistence remain open |
+
 ## Open compatibility probe — `/System/Win.ZC`
 
 The source probe loads pinned `KernelC.HH`, `Externs.ZC`, and `Gr.HH` before compiling unchanged `Win.ZC`. Graphics dimensions and mouse globals are probe fixtures; `DrawMenu` and the initial `GrScaleZoom` definition are compile-time fixtures until unchanged `GrScreen.ZC` is loaded later in the probe. `GrScreenFinalUpdateChecks` executes `WinFinalUpdate` through the staged idle-frame path, confirms the fixture's `mouse_grid.coord` toggles the real coordinate-text overlay, checks a separate visible guest overlay callback, verifies the software arrow against Limine framebuffer pixels, and exercises `WinMouseUpdate`'s edge recentering through the runtime dispatch. `WinMousePointerStateCheck` covers transformed tablet coordinates and `WinMouseHardStateCheck` covers the source mouse-state ABI; manual UTM acceptance confirms the software pointer and window-demo mouse interaction. The raw ARM generic-timer binding and a standalone F64 clock expression are smoke-tested before the Win load.
