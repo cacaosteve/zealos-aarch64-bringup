@@ -1966,6 +1966,28 @@ static uint32_t hc_dc_rgb(uint64_t dc) {
     return (uint32_t)c;
 }
 
+static uint32_t hc_dc_rgb_at(uint64_t dc, int32_t x, int32_t y) {
+    static const uint32_t pal[16] = {
+        0x00000000u, 0x000000AAu, 0x0000AA00u, 0x0000AAAAu,
+        0x00AA0000u, 0x00AA00AAu, 0x00AA5500u, 0x00AAAAAAu,
+        0x00555555u, 0x005555FFu, 0x0055FF55u, 0x0055FFFFu,
+        0x00FF5555u, 0x00FF55FFu, 0x00FFFF55u, 0x00FFFFFFu,
+    };
+    uint64_t color;
+    uint8_t index;
+
+    if (!dc)
+        return 0x00FFFF00u;
+    color = *(volatile uint64_t *)(uintptr_t)dc;
+    if (color & 0x40000000ull) {
+        index = (uint8_t)((color >> (((x + y) & 1) ? 16 : 0)) & 0xFF);
+        return index < 16 ? pal[index] : (uint32_t)index;
+    }
+    if (color < 16)
+        return pal[(int)color];
+    return (uint32_t)color;
+}
+
 /* Lattice DCAlias(dc=NULL,task=NULL) → shared CDC stub. */
 uint64_t hc_builtin_dcalias(void) {
     return (uint64_t)(uintptr_t)&g_hc_cdc;
@@ -2180,7 +2202,7 @@ uint64_t hc_builtin_grplot(uint64_t a0, uint64_t a1, uint64_t a2) {
     if (a0 > 0xFFFFull) {
         x = a1;
         y = a2;
-        c = hc_dc_rgb(a0);
+        c = hc_dc_rgb_at(a0, (int32_t)a1, (int32_t)a2);
     } else {
         x = a0;
         y = a1;
@@ -2206,7 +2228,7 @@ uint64_t hc_builtin_grplot3(uint64_t dc, uint64_t x, uint64_t y, uint64_t z) {
             return 0;
         }
     }
-    fb_putpixel((uint32_t)xi, (uint32_t)yi, hc_dc_rgb(dc));
+    fb_putpixel((uint32_t)xi, (uint32_t)yi, hc_dc_rgb_at(dc, xi, yi));
     return 1;
 }
 

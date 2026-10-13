@@ -1735,8 +1735,6 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
     I64 text_len;
     I64 circle_x, circle_y, circle_err;
     I64 poly_i, poly_x1, poly_y1, poly_dx, poly_dy, poly_work, poly_total;
-    I64 line_x, line_y, line_dx, line_dy, line_sx, line_sy;
-    I64 line_err, line_e2;
     I64 polypt_bit, polypt_code;
     F64 ellipse_angle;
     I32 sprite_x, sprite_y, width, height, x1, y1, x2, y2, radius, poly_count;
@@ -2208,44 +2206,9 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
                         poly_total = -1;
                         break;
                     }
-                    // Use the CDC point path as SPT_PT and circles do. GrLine
-                    // has not yet passed equivalent bootstrap framebuffer
-                    // checks; this Bresenham loop uses the validated work.
-                    line_x = screen_x1;
-                    line_y = screen_y1;
-                    line_dx = screen_x2 - screen_x1;
-                    line_dy = screen_y2 - screen_y1;
-                    line_sx = 1;
-                    line_sy = 1;
-                    if (line_dx < 0)
-                    {
-                        line_dx = -line_dx;
-                        line_sx = -1;
-                    }
-                    if (line_dy < 0)
-                    {
-                        line_dy = -line_dy;
-                        line_sy = -1;
-                    }
-                    line_dy = -line_dy;
-                    line_err = line_dx + line_dy;
-                    while (TRUE)
-                    {
-                        GrPlot(dc, line_x, line_y);
-                        if (line_x == screen_x2 && line_y == screen_y2)
-                            break;
-                        line_e2 = 2 * line_err;
-                        if (line_e2 >= line_dy)
-                        {
-                            line_err += line_dy;
-                            line_x += line_sx;
-                        }
-                        if (line_e2 <= line_dx)
-                        {
-                            line_err += line_dx;
-                            line_y += line_sy;
-                        }
-                    }
+                    // Segment work is prevalidated above. Use the native CDC
+                    // line rasterizer and reflect the resulting segment.
+                    GrLine(dc, screen_x1, screen_y1, screen_x2, screen_y2);
                     if (symmetry_enabled)
                         SpriteMirrorLine0(dc, screen_x1, screen_y1,
                                 screen_x2, screen_y2,

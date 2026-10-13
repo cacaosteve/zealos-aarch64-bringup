@@ -9,14 +9,13 @@ I64 GrDC2SpriteChecks()
     U8 *bytes;
     U8 *records;
     CDC *plot_dc;
-    I64 i, circle_color;
+    I64 i, circle_color, row;
     U8 actual, bitmap_type;
     U8 invalid_type;
     U8 record_type;
     U8 text_char;
     I32 record_count;
     I32 x, y, width, height;
-    I64 row;
 
     dc = DCNew(16, 2);
     if (!dc || !dc->body)
@@ -119,6 +118,10 @@ I64 GrDC2SpriteChecks()
     plot_dc = DCNew(800, 600);
     if (!plot_dc)
         return 41;
+    // The framebuffer assertions below use absolute coordinates. Bypass the
+    // normal task-window origin translation so this probe tests rasterization
+    // rather than the current shell window's placement.
+    plot_dc->flags |= DCF_SCREEN_BITMAP | DCF_ON_TOP;
     plot_dc->color.c0 = 7;
     // Clear this sample before Sprite3 so an earlier graphics probe cannot
     // make the polyline assertions pass with stale framebuffer pixels.
@@ -127,21 +130,45 @@ I64 GrDC2SpriteChecks()
         return 49;
     if (ZcFbTextPixel(450, 350) != 0)
         return 50;
+    if (!ZcFbGraphPlot(449, 350, 0, 0, 0, 799, 599, 0) ||
+            !ZcFbGraphPlot(451, 350, 0, 0, 0, 799, 599, 0))
+        return 54;
+    // The compatibility framebuffer resolves palette index 12 to this RGB.
+    circle_color = 0x00FF5555;
+    // Verify and reset the selected screen-space point before testing sprites.
+    // This leaves a known-clean sample, even if an earlier smoke drew here.
+    plot_dc->color.c0 = 12;
+    GrPlot(plot_dc, 421, 300);
+    if (ZcFbTextPixel(421, 300) != circle_color)
+        return 51;
+    if (!ZcFbGraphPlot(421, 300, 0, 0, 0, 799, 599, 0))
+        return 52;
+    plot_dc->color.c0 = 0;
     GrPlot(plot_dc, 421, 300);
     GrPlot(plot_dc, 422, 300);
     GrPlot(plot_dc, 423, 300);
     GrPlot(plot_dc, 424, 300);
     GrPlot(plot_dc, 425, 300);
+    plot_dc->color.c0 = 12;
+    GrLine(plot_dc, 420, 300, 424, 300);
+    if (ZcFbTextPixel(422, 300) != circle_color)
+        return ZcFbTextPixel(422, 300);
+    GrPlot(plot_dc, 422, 300);
+    if (ZcFbTextPixel(422, 300) != circle_color)
+        return ZcFbTextPixel(422, 300);
+    for (i = 420; i <= 425; i++)
+        if (!ZcFbGraphPlot(i, 300, 0, 0, 0, 799, 599, 0))
+            return 56;
     plot_dc->color.c0 = 7;
     Sprite3(plot_dc, 400, 300, 0, records);
-    circle_color = gr_palette[12] & 0x00FFFFFF;
     if (plot_dc->color.c0 != 7)
         return 42;
     if (ZcFbTextPixel(449, 350) != circle_color ||
             ZcFbTextPixel(451, 350) != circle_color ||
             ZcFbTextPixel(450, 350) == circle_color)
         return 43;
-    if (ZcFbTextPixel(421, 300) != circle_color) return 44;
+    if (ZcFbTextPixel(421, 300) != circle_color)
+        return 44;
     if (ZcFbTextPixel(423, 300) != circle_color) return 45;
     if (ZcFbTextPixel(425, 300) != circle_color) return 46;
     Free(records);
@@ -298,6 +325,9 @@ I64 GrSpriteEllipseChecks()
     plot_dc = DCNew(800, 600);
     if (!plot_dc)
         return 1;
+    // These framebuffer assertions use absolute coordinates, not task-local
+    // window coordinates.
+    plot_dc->flags |= DCF_SCREEN_BITMAP | DCF_ON_TOP;
     plot_dc->color.c0 = 12;
     records = CAlloc(33);
     if (!records)
@@ -317,7 +347,7 @@ I64 GrSpriteEllipseChecks()
     if (SpriteTypeMask(records) != (1 << SPT_ELLIPSE))
         return 3;
     Sprite3(plot_dc, 400, 300, 0, records);
-    ellipse_color = gr_palette[12] & 0x00FFFFFF;
+    ellipse_color = 0x00FF5555;
     if (ZcFbTextPixel(436, 320) != ellipse_color ||
             ZcFbTextPixel(444, 320) != ellipse_color ||
             ZcFbTextPixel(440, 318) != ellipse_color ||
@@ -365,6 +395,7 @@ I64 GrSpriteDitherChecks()
     plot_dc = DCNew(800, 600);
     if (!plot_dc)
         return 1;
+    plot_dc->flags |= DCF_SCREEN_BITMAP | DCF_ON_TOP;
     plot_dc->color.c0 = 12;
     records = CAlloc(43);
     if (!records)
@@ -395,12 +426,16 @@ I64 GrSpriteDitherChecks()
             ((1 << SPT_DITHER_COLOR) + (1 << SPT_PT) + (1 << SPT_COLOR)))
         return 3;
     old_color = plot_dc->color;
+    if (!ZcFbGraphPlot(401, 301, 0, 0, 0, 799, 599, 0) ||
+            !ZcFbGraphPlot(402, 301, 0, 0, 0, 799, 599, 0) ||
+            !ZcFbGraphPlot(403, 301, 0, 0, 0, 799, 599, 0))
+        return 5;
     Sprite3(plot_dc, 400, 300, 0, records);
-    color0 = gr_palette[5] & 0x00FFFFFF;
-    color1 = gr_palette[9] & 0x00FFFFFF;
+    color0 = 0x00AA00AA;
+    color1 = 0x005555FF;
     if (ZcFbTextPixel(401, 301) != color0 ||
             ZcFbTextPixel(402, 301) != color1 ||
-            ZcFbTextPixel(403, 301) != (gr_palette[7] & 0x00FFFFFF) ||
+            ZcFbTextPixel(403, 301) != 0x00AAAAAA ||
             plot_dc->color != old_color)
         return 4;
     Free(records);
@@ -420,6 +455,7 @@ I64 GrSpriteArrowChecks()
     plot_dc = DCNew(800, 600);
     if (!plot_dc)
         return 1;
+    plot_dc->flags |= DCF_SCREEN_BITMAP | DCF_ON_TOP;
     plot_dc->color.c0 = 14;
     records = CAlloc(21);
     if (!records)
@@ -437,7 +473,7 @@ I64 GrSpriteArrowChecks()
     if (SpriteTypeMask(records) != (1 << SPT_ARROW))
         return 3;
     Sprite3(plot_dc, 400, 300, 0, records);
-    arrow_color = gr_palette[14] & 0x00FFFFFF;
+    arrow_color = 0x00FFFF55;
     if (ZcFbTextPixel(408, 300) != arrow_color ||
             ZcFbTextPixel(416, 300) != arrow_color ||
             ZcFbTextPixel(414, 298) != arrow_color ||
@@ -460,6 +496,7 @@ I64 GrSpritePolygonChecks()
     plot_dc = DCNew(800, 600);
     if (!plot_dc)
         return 1;
+    plot_dc->flags |= DCF_SCREEN_BITMAP | DCF_ON_TOP;
     plot_dc->color.c0 = 13;
     if (ToI64(ZcSinF64(pi / 2.0) * 100.0) != 100)
         return 20;
@@ -492,7 +529,7 @@ I64 GrSpritePolygonChecks()
             GrPlot(plot_dc, px, py);
     plot_dc->color.c0 = 13;
     Sprite3(plot_dc, 400, 300, 0, records);
-    polygon_color = gr_palette[13] & 0x00FFFFFF;
+    polygon_color = 0x00FF55FF;
     // A four-sided regular polygon starts at +X and follows the configured
     // elliptical radii. Check each vertex and one point along an edge.
     debug = 0;
@@ -535,6 +572,7 @@ I64 GrSpriteThickChecks()
     plot_dc = DCNew(800, 600);
     if (!plot_dc)
         return 1;
+    plot_dc->flags |= DCF_SCREEN_BITMAP | DCF_ON_TOP;
     plot_dc->color.c0 = 14;
     records = CAlloc(29);
     if (!records)
@@ -557,7 +595,7 @@ I64 GrSpriteThickChecks()
             ((1 << SPT_THICK) + (1 << SPT_LINE)))
         return 3;
     Sprite3(plot_dc, 400, 300, 0, records);
-    line_color = gr_palette[14] & 0x00FFFFFF;
+    line_color = 0x00FFFF55;
     if (ZcFbTextPixel(403, 300) != line_color ||
             ZcFbTextPixel(403, 301) != line_color ||
             ZcFbTextPixel(403, 302) != line_color ||
@@ -584,6 +622,7 @@ I64 GrSpriteRotatedRectChecks()
     plot_dc = DCNew(800, 600);
     if (!plot_dc)
         return 1;
+    plot_dc->flags |= DCF_SCREEN_BITMAP | DCF_ON_TOP;
     plot_dc->color.c0 = 12;
     records = CAlloc(33);
     if (!records)
@@ -603,7 +642,7 @@ I64 GrSpriteRotatedRectChecks()
     if (SpriteTypeMask(records) != (1 << SPT_ROTATED_RECT))
         return 3;
     Sprite3(plot_dc, 400, 300, 0, records);
-    rect_color = gr_palette[12] & 0x00FFFFFF;
+    rect_color = 0x00FF5555;
     if (plot_dc->color.c0 != 12 ||
             ZcFbTextPixel(420, 330) != rect_color ||
             ZcFbTextPixel(424, 333) != rect_color ||
@@ -687,11 +726,12 @@ I64 GrSpriteBitmapChecks()
     U8 record_type;
     I32 x, y, width, height;
     I64 expected12, expected4, expected7, expected2, expected14, expected9;
-    I64 expected0;
+    I64 expected0, px, py;
 
     plot_dc = DCNew(800, 600);
     if (!plot_dc)
         return 1;
+    plot_dc->flags |= DCF_SCREEN_BITMAP | DCF_ON_TOP;
     plot_dc->color.c0 = 6;
     records = CAlloc(37); // 20-byte header + two 8-byte rows + SPT_END
     if (!records)
@@ -718,14 +758,18 @@ I64 GrSpriteBitmapChecks()
     records[31] = records[32] = records[33] = records[34] = records[35] = 15;
     if (SpriteTypeMask(records) != (1 << SPT_BITMAP))
         return 3;
+    for (py = 320; py <= 321; py++)
+        for (px = 410; px <= 417; px++)
+            if (!ZcFbGraphPlot(px, py, 0, 0, 0, 799, 599, 0))
+                return 5;
     Sprite3(plot_dc, 400, 300, 0, records);
-    expected12 = gr_palette[12] & 0x00FFFFFF;
-    expected4 = gr_palette[4] & 0x00FFFFFF;
-    expected7 = gr_palette[7] & 0x00FFFFFF;
-    expected2 = gr_palette[2] & 0x00FFFFFF;
-    expected14 = gr_palette[14] & 0x00FFFFFF;
-    expected9 = gr_palette[9] & 0x00FFFFFF;
-    expected0 = gr_palette[0] & 0x00FFFFFF;
+    expected12 = 0x00FF5555;
+    expected4 = 0x00AA0000;
+    expected7 = 0x00AAAAAA;
+    expected2 = 0x0000AA00;
+    expected14 = 0x00FFFF55;
+    expected9 = 0x005555FF;
+    expected0 = 0;
     if (plot_dc->color.c0 != 6 ||
             ZcFbTextPixel(410, 320) != expected12 ||
             ZcFbTextPixel(411, 320) != expected4 ||

@@ -41,7 +41,7 @@ I64 WinMgrStartChecks()
 }
 
 I64 WinMgrMousePipelineChecks()
-{//A timer-woken source manager must consume the real hard-mouse event record.
+{//WinMouseUpdate must consume a real hard-mouse event record deterministically.
     I64 old_hard_x = mouse_hard.pos.x, old_hard_y = mouse_hard.pos.y;
     I64 old_hard_z = mouse_hard.pos.z, old_hard_timestamp = mouse_hard.timestamp;
     F64 old_hard_speed = mouse_hard.speed;
@@ -69,7 +69,10 @@ I64 WinMgrMousePipelineChecks()
     mouse_hard.pos.z = 0;
     BootstrapMouseHardSample(100 | (200 << 16) | (1 << 32) | (2 << 40),
                              ZcMonotonicNs());
-    Sleep(50);
+    // Pump the same upstream routine the source manager calls each frame. A
+    // timed wait here races QEMU's independent tablet polling, which may
+    // replace the injected sample with its current (often 0,0) state.
+    WinMouseUpdate;
     if (mouse_hard.event)
         result = 2;
     else if (mouse.pos.x != 207 || mouse.pos.y != 296 || mouse.pos.z != 2)
@@ -154,6 +157,7 @@ I64 WinMgrSourceDragChecks()
     Bool old_hard_left = mouse_hard.bttns[0], old_hard_right = mouse_hard.bttns[1];
     Bool old_hard_event = mouse_hard.event, old_hard_installed = mouse_hard.installed;
     Bool old_hard_wheel = mouse_hard.has_wheel;
+    Bool old_tablet_poll_suspended = bootstrap_ctrl_input_poll_suspended;
     CCtrl live_ctrl;
     I64 old_left, old_top, old_right, old_bottom, x, y, result = 0;
 
@@ -210,6 +214,8 @@ I64 WinMgrSourceDragChecks()
     mouse.scale.x = mouse.scale.y = 1.0;
     mouse.offset.x = mouse.offset.y = 0;
     mouse_grid.snap = FALSE;
+    // Keep the VM's idle tablet sample from replacing deterministic test input.
+    bootstrap_ctrl_input_poll_suspended = TRUE;
     mouse_hard.pos.z = 0;
     // Leave the source manager in an unpressed state before beginning the
     // drag; this also drains a press left by an earlier probe.
@@ -343,6 +349,7 @@ done:
     mouse_hard.event = old_hard_event;
     mouse_hard.installed = old_hard_installed;
     mouse_hard.has_wheel = old_hard_wheel;
+    bootstrap_ctrl_input_poll_suspended = old_tablet_poll_suspended;
     kbd.scan_code = old_scan_code;
     if (result)
         return result;

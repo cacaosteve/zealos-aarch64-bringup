@@ -17,6 +17,7 @@ I64 GrSpriteTransformChecks()
     records = CAlloc(715);
     if (!dc || !records || !dc->r || !dc->transform)
         return 1;
+    dc->flags |= DCF_SCREEN_BITMAP | DCF_ON_TOP;
     dc->color.c0 = 12;
     dc->x = 610;
     dc->y = 430;
@@ -357,7 +358,7 @@ I64 GrSpriteTransformChecks()
                 break;
             }
 
-    color = gr_palette[12] & 0x00FFFFFF;
+    color = 0x00FF5555;
     // Run the primitive and text records first; the flood-fill fixture must
     // wait until its closed boundary has been drawn below.
     records[667] = 0;
@@ -400,20 +401,21 @@ I64 GrSpriteTransformChecks()
             ZcFbTextPixel(710, 481) != color ||
             ZcFbTextPixel(711, 481) != color)
         return 2;
-    if (glyph_row < 0 || ZcFbTextPixel(550 - glyph_row,
-            550 + glyph_col) != color ||
-            dc->body[(490 + glyph_row) * dc->width_internal +
-                    730 + glyph_col] != 12)
-    {
-        i = 0;
-        if (glyph_row < 0) i |= 1;
-        if (ZcFbTextPixel(550 - glyph_row, 550 + glyph_col) != color)
-            i |= 2;
-        if (dc->body[(490 + glyph_row) * dc->width_internal +
-                730 + glyph_col] != 12)
-            i |= 4;
+    if (glyph_row < 0)
         return 5;
-    }
+    if (ZcFbTextPixel(550 - glyph_row, 550 + glyph_col) != color)
+        return 6;
+
+    // Exercise ordinary CDC text in its native body coordinates separately
+    // from screen-bitmap text.  With DCF_SCREEN_BITMAP set, GrPutChar applies
+    // the owning task's pixel origin before indexing dc->body, so the screen
+    // path above is not a valid local-body pixel assertion.
+    dc->flags &= ~DCF_SCREEN_BITMAP;
+    Sprite3(dc, 0, 0, 0, records + 622);
+    if (dc->body[(60 + glyph_row) * dc->width_internal +
+            120 + glyph_col] != 12)
+        return 7;
+    dc->flags |= DCF_SCREEN_BITMAP;
     // Isolate the diamond from earlier sprite records before checking its
     // transformed text and outline coverage.
     for (scan_i = 460; scan_i <= 500; scan_i++)

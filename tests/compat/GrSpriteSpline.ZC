@@ -28,7 +28,7 @@ I64 GrSpriteSplineChecks()
 	U8 *records;
 	U8 record_type;
 	I32 count, x, y, z;
-	I64 changed;
+	I64 changed, spline_color;
 
 	records = CAlloc(8 + 3 * 12 + 1);
 	if (!records)
@@ -40,6 +40,7 @@ I64 GrSpriteSplineChecks()
 	dc.color.c0.color = 12;
 	dc.color.c0.rop = ROPB_MONO;
 	dc.thick = 1;
+	spline_color = 0x00FF5555;
 	for (record_type = SPT_BSPLINE2;
 			record_type <= SPT_BSPLINE3_CLOSED; record_type++)
 	{
@@ -63,12 +64,12 @@ I64 GrSpriteSplineChecks()
 		MemCopy(records + 40, &z, sizeof(I32));
 		Sprite3(&dc, 100, 100, 0, records);
 		changed = GrSpriteSplineCountPixels(100, 100, 64, 48,
-				gr_palette[12] & 0x00FFFFFF);
+				spline_color);
 		if (changed < 12)
 			return 51;
 		if ((record_type == SPT_BSPLINE2 || record_type == SPT_BSPLINE3) &&
-				(ZcFbTextPixel(104, 120) != (gr_palette[12] & 0x00FFFFFF) ||
-				 ZcFbTextPixel(128, 120) != (gr_palette[12] & 0x00FFFFFF)))
+				(ZcFbTextPixel(104, 120) != spline_color ||
+				 ZcFbTextPixel(128, 120) != spline_color))
 			return 6;
 	}
 	GrSpriteSplineFill(&dc, 100, 100, 64, 48, 0);
@@ -80,7 +81,7 @@ I64 GrSpriteSplineChecks()
 	MemCopy(records + 4, &count, sizeof(I32));
 	Sprite3(&dc, 100, 100, 0, records);
 	if (GrSpriteSplineCountPixels(100, 100, 64, 48,
-			gr_palette[12] & 0x00FFFFFF))
+		spline_color))
 		return 7;
 	Free(records);
 	return 0x2a;

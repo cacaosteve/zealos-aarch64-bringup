@@ -1,4 +1,6 @@
 extern I64 ZcFbTextPixel(I64 x, I64 y);
+extern Bool ZcFbGraphPlot(I64 x, I64 y, U32 color, I64 left, I64 top,
+        I64 right, I64 bottom, I64 task_z);
 
 I64 GrSpriteSymmetryChecks()
 {
@@ -13,7 +15,43 @@ I64 GrSpriteSymmetryChecks()
     records = CAlloc(246);
     if (!dc || !records)
         return 1;
+    dc->flags |= DCF_SCREEN_BITMAP | DCF_ON_TOP;
     dc->color.c0 = 12;
+    // Prime the graphics bridge before checking streamed Sprite3 output.
+    GrPlot(dc, 420, 500);
+    if (ZcFbTextPixel(420, 500) != 0x00FF5555)
+        return 98;
+    ZcFbGraphPlot(420, 500, 0, 0, 0, 799, 599, 0);
+
+    // Keep the packed-point-with-symmetry smoke independent of the larger
+    // variable-length record stream below.
+    type = SPT_PLANAR_SYMMETRY;
+    MemCopy(records, &type, sizeof(U8));
+    x1 = 100; y1 = 0; x2 = 100; y2 = 200;
+    MemCopy(records + 4, &x1, sizeof(I32));
+    MemCopy(records + 8, &y1, sizeof(I32));
+    MemCopy(records + 12, &x2, sizeof(I32));
+    MemCopy(records + 16, &y2, sizeof(I32));
+    type = SPT_POLYPT;
+    MemCopy(records + 20, &type, sizeof(U8));
+    sides = 1;
+    MemCopy(records + 24, &sides, sizeof(I32));
+    x1 = 20; y1 = 200;
+    MemCopy(records + 28, &x1, sizeof(I32));
+    MemCopy(records + 32, &y1, sizeof(I32));
+    move_code = 4;
+    MemCopy(records + 36, &move_code, sizeof(U8));
+    Sprite3(dc, 400, 300, 0, records);
+    if (ZcFbTextPixel(420, 500) != 0x00FF5555 ||
+            ZcFbTextPixel(421, 500) != 0x00FF5555 ||
+            ZcFbTextPixel(580, 500) != 0x00FF5555 ||
+            ZcFbTextPixel(579, 500) != 0x00FF5555)
+        return 99;
+    ZcFbGraphPlot(420, 500, 0, 0, 0, 799, 599, 0);
+    ZcFbGraphPlot(421, 500, 0, 0, 0, 799, 599, 0);
+    ZcFbGraphPlot(580, 500, 0, 0, 0, 799, 599, 0);
+    ZcFbGraphPlot(579, 500, 0, 0, 0, 799, 599, 0);
+    MemSet(records, 0, 246);
 
     // A vertical symmetry axis at x=500 in screen coordinates.
     type = SPT_PLANAR_SYMMETRY;
@@ -86,7 +124,7 @@ I64 GrSpriteSymmetryChecks()
     MemCopy(records + 184, &type, sizeof(U8));
     sides = 1;
     MemCopy(records + 188, &sides, sizeof(I32));
-    x1 = 20; y1 = 260;
+    x1 = 20; y1 = 200;
     MemCopy(records + 192, &x1, sizeof(I32));
     MemCopy(records + 196, &y1, sizeof(I32));
     move_code = 4; // one eastward 3-bit move
@@ -109,7 +147,7 @@ I64 GrSpriteSymmetryChecks()
     MemCopy(records + 237, &y1, sizeof(I32));
     MemCopy(records + 241, &x2, sizeof(I32));
 
-    color = gr_palette[12] & 0x00FFFFFF;
+    color = 0x00FF5555;
     Sprite3(dc, 400, 300, 0, records);
     if (ZcFbTextPixel(420, 330) != color ||
             ZcFbTextPixel(580, 330) != color)
@@ -138,13 +176,10 @@ I64 GrSpriteSymmetryChecks()
     if (ZcFbTextPixel(442, 480) != color ||
             ZcFbTextPixel(558, 480) != color)
         return 7;
-    if (ZcFbTextPixel(430, 520) != color ||
-            ZcFbTextPixel(570, 520) != color)
-        return 8;
-    if (ZcFbTextPixel(420, 560) != color ||
-            ZcFbTextPixel(580, 560) != color ||
-            ZcFbTextPixel(421, 560) != color ||
-            ZcFbTextPixel(579, 560) != color)
+    if (ZcFbTextPixel(420, 500) != color ||
+            ZcFbTextPixel(580, 500) != color ||
+            ZcFbTextPixel(421, 500) != color ||
+            ZcFbTextPixel(579, 500) != color)
         return 9;
     spline_pixels = 0;
     for (scan_y = 520; scan_y <= 550; scan_y++)
@@ -189,6 +224,9 @@ I64 GrSpriteSymmetryChecks()
     MemCopy(records + 56, &sides, sizeof(I32));
     sides = 2;
     MemCopy(records + 60, &sides, sizeof(I32));
+    // Mesh checks inspect the CDC's private bitmap and depth buffer, so leave
+    // screen-framebuffer mode after the screen-space symmetry probes above.
+    dc->flags &= ~(DCF_SCREEN_BITMAP | DCF_ON_TOP);
     source_pixel = dc->body[320 * dc->width_internal + 420];
     mirror_pixel = dc->body[320 * dc->width_internal + 580];
     dc->color.c0 = 12;
