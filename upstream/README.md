@@ -3254,6 +3254,15 @@ Freeze catalog unchanged.
 | Smoke | `BootstrapGuiTerminalSmoke` checks the bounded buffer replace/clear/reject paths and the installed OS menu; every PCI boot regression also checks terminal and menu startup |
 | Limits | One-command history is scoped to the current graphical terminal task; multi-entry history and persistence remain open |
 
+## Milestone 288 — exercise graphical terminal history transitions
+
+| Item | Path |
+|--|--|
+| Gap | The history smoke verified the bounded copy helper, but not the same save/recall path used by Return and Up in the interactive terminal |
+| Bring-up | Route command submission and Up through shared history save/recall helpers; keep Down as the existing clear-current-command action |
+| Smoke | `BootstrapGuiTerminalSmoke` now saves `zstatus`, replaces the input with a draft, recalls the saved command, clears the input, and rejects an overlong buffer; every PCI boot regression runs this smoke |
+| Limits | The check validates the shared state transitions but cannot verify UTM key delivery or visible DolDoc editing; hands-on testing remains required |
+
 ## Open compatibility probe — `/System/Win.ZC`
 
 The source probe loads pinned `KernelC.HH`, `Externs.ZC`, and `Gr.HH` before compiling unchanged `Win.ZC`. Graphics dimensions and mouse globals are probe fixtures; `DrawMenu` and the initial `GrScaleZoom` definition are compile-time fixtures until unchanged `GrScreen.ZC` is loaded later in the probe. `GrScreenFinalUpdateChecks` executes `WinFinalUpdate` through the staged idle-frame path, confirms the fixture's `mouse_grid.coord` toggles the real coordinate-text overlay, checks a separate visible guest overlay callback, verifies the software arrow against Limine framebuffer pixels, and exercises `WinMouseUpdate`'s edge recentering through the runtime dispatch. `WinMousePointerStateCheck` covers transformed tablet coordinates and `WinMouseHardStateCheck` covers the source mouse-state ABI; manual UTM acceptance confirms the software pointer and window-demo mouse interaction. The raw ARM generic-timer binding and a standalone F64 clock expression are smoke-tested before the Win load.

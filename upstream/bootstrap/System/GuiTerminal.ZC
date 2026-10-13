@@ -21,6 +21,24 @@ I64 BootstrapGuiTerminalBufferSet(U8 *command, I64 *command_len,
     return 0x2a;
 }
 
+I64 BootstrapGuiTerminalHistorySave(U8 *history, I64 *history_len,
+                                   U8 *command, I64 command_len)
+{
+    if (!command_len)
+        return 0x2a;
+    return BootstrapGuiTerminalBufferSet(history, history_len,
+                                         command, command_len);
+}
+
+I64 BootstrapGuiTerminalHistoryRecall(U8 *command, I64 *command_len,
+                                      U8 *history, I64 history_len)
+{
+    if (!history_len)
+        return 0;
+    return BootstrapGuiTerminalBufferSet(command, command_len,
+                                         history, history_len);
+}
+
 CMenuEntry *BootstrapGuiTerminalMenuEntry(CTask *task, U8 *name, I64 action)
 {
     CMenuEntry *entry = CAlloc(sizeof(CMenuEntry), task);
@@ -94,9 +112,8 @@ U0 BootstrapGuiTerminalTask(U8 *data)
             {
                 DocPutKey(DocPut, ch, sc);
                 command[command_len] = 0;
-                if (command_len)
-                    BootstrapGuiTerminalBufferSet(history, &history_len,
-                                                  command, command_len);
+                BootstrapGuiTerminalHistorySave(history, &history_len,
+                                                command, command_len);
                 output = ZcGuiShellExec(command);
                 if (output)
                     DocPrint(DocPut, "%s", output);
@@ -108,8 +125,8 @@ U0 BootstrapGuiTerminalTask(U8 *data)
             {
                 for (i = 0; i < command_len; i++)
                     DocPutKey(DocPut, 8, 0);
-                BootstrapGuiTerminalBufferSet(command, &command_len,
-                                              history, history_len);
+                BootstrapGuiTerminalHistoryRecall(command, &command_len,
+                                                  history, history_len);
                 for (i = 0; i < command_len; i++)
                     DocPutKey(DocPut, command[i], 0);
             }
@@ -200,7 +217,9 @@ I64 BootstrapGuiTerminalSmoke()
     CMenuEntry *entry;
     I64 action;
     I64 command_len = 0;
+    I64 history_len = 0;
     U8 command[256];
+    U8 history[256];
 
     // The normal ARM64 boot already starts this task. In that configuration
     // the smoke confirms boot left a valid terminal instead of trying to
@@ -209,12 +228,20 @@ I64 BootstrapGuiTerminalSmoke()
     {
         if (BootstrapGuiTerminalBufferSet(command, &command_len,
                                           "zstatus", 7) != 0x2a ||
-            command_len != 7 || StrCompare(command, "zstatus"))
+            BootstrapGuiTerminalHistorySave(history, &history_len,
+                                            command, command_len) != 0x2a ||
+            history_len != 7 || StrCompare(history, "zstatus"))
             return 38;
+        if (BootstrapGuiTerminalBufferSet(command, &command_len,
+                                          "draft", 5) != 0x2a ||
+            BootstrapGuiTerminalHistoryRecall(command, &command_len,
+                                              history, history_len) != 0x2a ||
+            command_len != 7 || StrCompare(command, "zstatus"))
+            return 39;
         if (BootstrapGuiTerminalBufferSet(command, &command_len,
                                           "", 0) != 0x2a ||
             command_len || command[0])
-            return 39;
+            return 41;
         if (BootstrapGuiTerminalBufferSet(command, &command_len,
                                           "x", 256) != 0 || command_len)
             return 40;
