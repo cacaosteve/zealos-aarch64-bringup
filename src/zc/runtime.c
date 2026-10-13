@@ -4435,7 +4435,14 @@ int zc_gui_terminal_active(void) {
 }
 int zc_stop_winmgr(void) {
     int64_t result = 0;
-    if (!ready || failed || zc_call("BootstrapWinMgrStop", &result) != 0)
+    if (!ready || failed)
+        return -1;
+    /* A native-only session has no source graphics modules to call into.
+     * Reset the source-manager flag with each session, and make stop
+     * idempotent so later zreset commands do not look up an absent hook. */
+    if (!source_winmgr_active)
+        return 0;
+    if (zc_call("BootstrapWinMgrStop", &result) != 0)
         return -1;
     if (result != 0x2a)
         return -1;

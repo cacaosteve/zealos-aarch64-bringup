@@ -227,8 +227,8 @@ I64 WindowDragLiveBasicRenderChecks()
 }
 
 I64 WindowDragLiveRenderChecks()
-{//Require a presented task frame and a painted control pixel on its CDC.
-    I64 x, y, px, py, found, b_is_front;
+{//Require stable overlap pixels across consecutive presented task frames.
+    I64 x, y, px, py, found, b_is_front, i;
     if (!TaskValidate(window_drag_live_a) || !TaskValidate(window_drag_live_b))
         return 1;
     if (window_drag_live_a->win_left != 15 ||
@@ -273,6 +273,27 @@ I64 WindowDragLiveRenderChecks()
         return 9;
     if (!b_is_front && window_drag_live_presented_pixel != 0)
         return 9;
+    // The original UTM symptom was intermittent black/yellow alternation in
+    // this overlap. Hold the z-order fixed and ensure unchanged frames retain
+    // the same front-window control pixel instead of only checking one frame.
+    for (i = 0; i < 8; i++)
+    {
+        if (!ZcTaskFrameRun())
+            return 25;
+        window_drag_live_presented_pixel = ZcFbTextPixel(
+            window_drag_live_b->pix_left +
+                window_drag_live_right_control.left +
+                (window_drag_live_right_control.right -
+                 window_drag_live_right_control.left) / 2,
+            window_drag_live_b->pix_top +
+                window_drag_live_right_control.top +
+                (window_drag_live_right_control.bottom -
+                 window_drag_live_right_control.top) / 2);
+        if (b_is_front && window_drag_live_presented_pixel != 0x00FFFF55)
+            return 26;
+        if (!b_is_front && window_drag_live_presented_pixel != 0)
+            return 26;
+    }
     // The W in each first label has its top-left glyph pixel set. Check the
     // rendered framebuffer so black-on-black text attributes cannot pass.
     if (!WindowDragLiveTextVisible(window_drag_live_a, 4, 20))
