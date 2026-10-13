@@ -1,0 +1,66 @@
+// Minimal document-backed terminal used by the ARM64 graphical bootstrap.
+// The serial shell remains available independently through UART.
+CTask *bootstrap_gui_terminal_task;
+
+U0 BootstrapGuiTerminalTask(U8 *data)
+{
+    I64 ch, sc;
+    I64 message;
+
+    KeyDevInit;
+    DocTermNew;
+    KeyDevAdd(&KDDocPutKey, &KDDocPutS, 0x80000000, TRUE);
+    DocPrint(DocPut, "ZealOS ARM64 graphical terminal\n");
+    DocPrint(DocPut, "Click this window, then type.\n");
+    DocPrint(DocPut, "The serial shell remains available.\n");
+
+    while (TRUE)
+    {
+        while ((message = MessageScan(&ch, &sc,
+                                     1 << MESSAGE_KEY_DOWN)) == MESSAGE_KEY_DOWN)
+            DocPutKey(DocPut, ch, sc);
+        while (MessageScan(NULL, NULL, ~1))
+            ;
+        ZcTaskYield;
+    }
+}
+
+I64 BootstrapGuiTerminalStart()
+{
+    CTask *term;
+
+    if (TaskValidate(bootstrap_gui_terminal_task))
+        return 1;
+    term = Spawn(&BootstrapGuiTerminalTask, NULL, "Terminal");
+
+    if (!TaskValidate(term))
+        return 1;
+    bootstrap_gui_terminal_task = term;
+    term->display_flags = 1 << DISPLAYf_SHOW;
+    term->border_attr = CYAN;
+    term->win_left = 4;
+    term->win_right = 70;
+    term->win_top = 4;
+    term->win_bottom = 34;
+    WinDerivedValsUpdate(term);
+    return 0x2a;
+}
+
+I64 BootstrapGuiTerminalStop()
+{
+    if (TaskValidate(bootstrap_gui_terminal_task))
+        Kill(bootstrap_gui_terminal_task);
+    bootstrap_gui_terminal_task = NULL;
+    return 0x2a;
+}
+
+I64 BootstrapGuiTerminalSmoke()
+{
+    if (BootstrapGuiTerminalStart() != 0x2a ||
+        !TaskValidate(bootstrap_gui_terminal_task))
+        return 1;
+    if (BootstrapGuiTerminalStop() != 0x2a ||
+        TaskValidate(bootstrap_gui_terminal_task))
+        return 2;
+    return 0x2a;
+}

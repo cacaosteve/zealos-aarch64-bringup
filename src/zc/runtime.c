@@ -106,6 +106,8 @@ static zc_source_read_fn disk_reader;
 static jmp_buf guard;
 static int guarded, ready, failed;
 static int window_demo_loaded;
+static int gui_terminal_active;
+static int gui_terminal_modules_loaded;
 
 const char *zc_debug_function_for_pc(uintptr_t pc, uintptr_t *offset) {
     CHashTable *table;
@@ -2347,11 +2349,9 @@ static int64_t host_task_yield(int64_t *a) {
         zc_fail("yield during job dispatch is unsupported");
     unsigned me = guest_current;
     struct guest_fiber *self = &guest_fibers[me];
-    /* A focused child may be parked in MessageGet. The original KeyGet also
-     * marks the current task AWAITING_MESSAGE before yielding, even when no
-     * explicit focus exists yet. Feed that task's queue before scheduling. */
-    if (guest_focus_task ||
-        (guest_task_bound && (*guest_flags(self) & GUEST_AWAITING_MESSAGE)))
+    /* Only poll device input for the explicitly focused task. A merely
+     * waiting background task must not steal serial-shell input. */
+    if (guest_focus_task)
         poll_guest_keys();
     int park_server = !me ? 0 : self->wait_kind == GUEST_WAIT_NONE &&
         (*guest_flags(self) & GUEST_AWAITING_MESSAGE) &&
@@ -4145,11 +4145,11 @@ void zc_idle_step(void) {
             guest_winmgr_tick_fun = (CHashFun *)HashFind(
                 "BootstrapWinMgrTick", Fs->hash_table, HTT_FUN, 1);
         }
-        /* The bootstrap shell writes directly to scanout. Until the source
-         * window manager has an application surface to compose, its empty
-         * periodic frame would replace that text with a blank frame. The
-         * live two-window fixture is the current host-driven GUI lifecycle. */
-        if (window_demo_loaded && guest_winmgr_tick_fun && guest_winmgr_tick_fun->fun_ptr &&
+        /* The bootstrap shell writes directly to scanout. Keep the upstream
+         * manager's empty background from replacing it unless an app window
+         * or the diagnostic demo is active. */
+        if ((window_demo_loaded || gui_terminal_active) &&
+            guest_winmgr_tick_fun && guest_winmgr_tick_fun->fun_ptr &&
             !guest_winmgr_tick_fun->argc &&
             !(guest_winmgr_tick_fun->base.base.type & HTF_EXTERN)) {
             (void)guest_task_frame_run();
@@ -4171,6 +4171,8 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
         output_cb = output;
     ready = failed = loaded_modules = 0;
     window_demo_loaded = 0;
+    gui_terminal_active = 0;
+    gui_terminal_modules_loaded = 0;
     /* A lexer exception can longjmp out of #assert while the Aiwnios parser
      * depth counters are nonzero. zreset starts a new compiler session, so
      * discard that abandoned parse state before loading the bootstrap again. */
@@ -4339,6 +4341,61 @@ int zc_start_winmgr(void) {
     if (!ready || failed || zc_call("BootstrapWinMgrStart", &result) != 0)
         return -1;
     return result == 0x2a ? 0 : -1;
+}
+int zc_start_gui_terminal(void) {
+    static const char *const modules[] = {
+        "/Kernel/SerialDev/Message.ZC",
+        "/Kernel/Job.ZC",
+        "/Kernel/KeyDev.ZC",
+        "/System/DolDoc/DocBin.ZC",
+        "/System/DolDoc/DocNew.ZC",
+        "/System/DolDoc/DocPutKey.ZC",
+        "/System/DolDoc/DocPutS.ZC",
+        "/System/DolDoc/DocDblBuf.ZC",
+        "/System/DolDoc/DocTerm.ZC",
+    };
+    static const char *const doc_modules[] = {
+        "/System/DolDoc/DocInit.ZC",
+        "/System/DolDoc/DocPlain.ZC",
+        "/System/DolDoc/DocRecalcLib.ZC",
+        "/System/DolDoc/DocHighlight.ZC",
+        "/System/DolDoc/DocRecalc.ZC",
+        "/System/GuiTerminal.ZC",
+    };
+    int64_t result = 0;
+    if (!ready || failed || gui_terminal_active)
+        return gui_terminal_active ? 0 : -1;
+    if (!gui_terminal_modules_loaded) {
+        for (size_t i = 0; i < sizeof(modules) / sizeof(*modules); i++)
+            if (zc_load(modules[i]) != 0)
+                return -1;
+        if (zc_call("BootstrapDefinesLoad", &result) != 0)
+            return -1;
+        for (size_t i = 0; i < sizeof(doc_modules) / sizeof(*doc_modules); i++)
+            if (zc_load(doc_modules[i]) != 0)
+                return -1;
+        gui_terminal_modules_loaded = 1;
+    }
+    result = 0;
+    if (zc_call("BootstrapGuiTerminalStart", &result) != 0 || result != 0x2a)
+        return -1;
+    /* Keep the serial bootstrap shell available until the user clicks the
+     * graphical terminal. WinMgr may choose a newly spawned task by default. */
+    guest_focus_task = NULL;
+    gui_terminal_active = 1;
+    return 0;
+}
+int zc_stop_gui_terminal(void) {
+    int64_t result = 0;
+    if (!ready || failed || !gui_terminal_active ||
+        zc_call("BootstrapGuiTerminalStop", &result) != 0 || result != 0x2a)
+        return -1;
+    gui_terminal_active = 0;
+    guest_focus_task = NULL;
+    return 0;
+}
+int zc_gui_terminal_active(void) {
+    return gui_terminal_active;
 }
 int zc_stop_winmgr(void) {
     int64_t result = 0;

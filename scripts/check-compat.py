@@ -10,6 +10,8 @@ p.add_argument('--window-frame-only', action='store_true',
 p.add_argument('--probe-upstream', action='store_true', help='check current full-header/subsystem compiler results')
 p.add_argument('--probe-module', metavar='ARCHIVE_PATH',
                help='load an unchanged upstream source after KernelA/B in a disposable guest')
+p.add_argument('--probe-gui-terminal', action='store_true',
+               help='spawn a real DocTerm task under the live source Window Manager')
 p.add_argument('--probe-winmgr', action='store_true',
                help='also try the unchanged WinMgr.ZC load with a short timeout after Win.ZC')
 p.add_argument('--probe-grscreen', action='store_true',
@@ -37,6 +39,9 @@ if args.probe_fulltext_visible:
     args.probe_fulltext = True
 if args.probe_source and not args.pci:
     p.error('--probe-source requires --pci')
+if args.probe_gui_terminal and (
+        not args.pci or args.probe_module != '/System/DolDoc/DocRecalc.ZC'):
+    p.error('--probe-gui-terminal requires --pci --probe-module /System/DolDoc/DocRecalc.ZC')
 if args.probe_grscreen and not args.probe_winmgr:
     p.error('--probe-grscreen requires --probe-winmgr')
 if args.probe_fulltext and not args.probe_grscreen:
@@ -335,6 +340,40 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             print('KERNELB LOAD\n'+kb, flush=True)
             if 'zc: loaded /Kernel/KernelB.HH' not in kb:
                 raise RuntimeError('KernelB.HH did not load')
+            if args.probe_module.startswith('/System/DolDoc/'):
+                # Match normal graphics startup before probing DolDoc. Menu
+                # and document rendering consume these graphics symbols.
+                command('zload /Kernel/KernelC.HH',
+                        'zc: loaded /Kernel/KernelC.HH')
+                command('zload /Kernel/KMathB.ZC',
+                        'zc: loaded /Kernel/KMathB.ZC', timeout=30)
+                command('zload /System/Externs.ZC',
+                        'zc: loaded /System/Externs.ZC')
+                command('zload /System/Gr/GrInitA.ZC',
+                        'zc: loaded /System/Gr/GrInitA.ZC')
+                command('zload /System/Gr/GrGlobals.ZC',
+                        'zc: loaded /System/Gr/GrGlobals.ZC')
+                command('zload /System/Gr/Gr.HH',
+                        'zc: loaded /System/Gr/Gr.HH')
+                command('zload /System/Gr/SpriteBridge.ZC',
+                        'zc: loaded /System/Gr/SpriteBridge.ZC')
+                for graphics_module in ('GrExterns', 'GrPalette', 'GrDC',
+                                        'GrBitMap'):
+                    command(f'zload /System/Gr/{graphics_module}.ZC',
+                            f'zc: loaded /System/Gr/{graphics_module}.ZC')
+                command('zload /System/Menu.ZC',
+                        'zc: loaded /System/Menu.ZC', timeout=15)
+                command('zload /System/Win.ZC',
+                        'zc: loaded /System/Win.ZC', timeout=30)
+                command('zload /System/WinMgr.ZC',
+                        'zc: loaded /System/WinMgr.ZC', timeout=30)
+                command('zload /System/Gr/GrScreen.ZC',
+                        'zc: loaded /System/Gr/GrScreen.ZC', timeout=30)
+                command('zload /System/Gr/GrBootBridge.ZC',
+                        'zc: loaded /System/Gr/GrBootBridge.ZC', timeout=30)
+            if args.probe_module == '/Kernel/KTask.ZC':
+                command('zload /Kernel/KernelC.HH',
+                        'zc: loaded /Kernel/KernelC.HH')
             if args.probe_module == '/System/Math/MathODE.ZC':
                 # MathODE's MP task declarations (MPInt) are in KernelC, and
                 # its default math imports come from KMathB just as at boot.
@@ -571,6 +610,9 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                                          '/System/DolDoc/DocPlain.ZC',
                                          '/System/DolDoc/DocRecalcLib.ZC',
                                          '/System/DolDoc/DocHighlight.ZC'):
+                # DocTermNew creates the shell's File menu, so MenuFile must
+                # be defined before compiling DocTerm (the graphics startup
+                # path already loads Menu.ZC before Window Manager modules).
                 command('zload /System/DolDoc/DocDblBuf.ZC',
                         'zc: loaded /System/DolDoc/DocDblBuf.ZC')
             if args.probe_module in ('/System/DolDoc/DocInit.ZC',
@@ -837,6 +879,22 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             if args.probe_module == '/System/DolDoc/DocRecalc.ZC':
                 if 'zc: loaded /System/DolDoc/DocRecalc.ZC' not in result:
                     raise RuntimeError('unchanged DocRecalc.ZC did not load')
+                if args.probe_gui_terminal:
+                    command('zload /System/GuiTerminal.ZC',
+                            'zc: loaded /System/GuiTerminal.ZC')
+                    command('zcall BootstrapGuiTerminalSmoke',
+                            'zc => 0x000000000000002a')
+                    raise SystemExit(0)
+                command('zload /Tests/WinMgrProbeDeps.ZC',
+                        'zc: loaded /Tests/WinMgrProbeDeps.ZC')
+                command('zload /Tests/ODEsUpdateStub.ZC',
+                        'zc: loaded /Tests/ODEsUpdateStub.ZC')
+                command('zcall ODEsUpdateStubCheck',
+                        'zc => 0x000000000000002a')
+                command('zcall BootstrapGrContextFlagsInit',
+                        'zc => 0x000000000000002a')
+                command('zcall BootstrapWinMgrStart',
+                        'zc => 0x000000000000002a', timeout=30)
                 command('zload /Tests/WinProgressBars.ZC',
                         'zc: loaded /Tests/WinProgressBars.ZC')
                 command('zload /Tests/TaskOriginalDocRecalc.ZC',

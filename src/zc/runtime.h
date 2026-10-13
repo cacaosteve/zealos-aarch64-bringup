@@ -16,6 +16,10 @@ void zc_init(const void *archive, size_t size, zc_output_fn output);
 int zc_start_graphics(void);
 /* Start the loaded upstream WinMgrTask once, leaving the bootstrap shell active. */
 int zc_start_winmgr(void);
+/* Load the upstream DolDoc terminal and show its interactive GUI task. */
+int zc_start_gui_terminal(void);
+int zc_stop_gui_terminal(void);
+int zc_gui_terminal_active(void);
 /* Stop that task and resume bootstrap-owned framebuffer refreshes. */
 int zc_stop_winmgr(void);
 /* Load and run the interactive source-backed two-window UTM fixture. */

@@ -4753,6 +4753,13 @@ static void shell_handle(const char *line, int *done) {
             con_puts("winmgr: start failed; check serial diagnostics or reboot\n");
         return;
     }
+    if (streq(line, "gterm")) {
+        if (!zc_start_gui_terminal())
+            con_puts("gterm: graphical terminal started; click it to type; Ctrl+C stops it\n");
+        else
+            con_puts("gterm: start failed; serial shell remains available\n");
+        return;
+    }
     if (streq(line, "winmgrstop")) {
         if (!zc_stop_winmgr())
             con_puts("winmgr: stopped; bootstrap framebuffer pump resumed\n");
@@ -4897,7 +4904,7 @@ static void shell_handle(const char *line, int *done) {
 #endif
     if (streq(line, "help")) {
 #ifndef ZEAL_PI_DIAG
-        con_puts("Native compiler: zcheck | zvol | zls | zgc | zedit <path> | zrm <path> | zverify <path> | zload /path.ZC | zput Name.ZC <source> | zrecv Name.ZC <bytes> <crc32> | zload disk:Name.ZC | zc <source> | zcall Function | zstatus | zreset | winmgr | winmgrstop | windowdemo | windowdemostop | fbquiet | fbshow\n");
+        con_puts("Native compiler: zcheck | zvol | zls | zgc | zedit <path> | zrm <path> | zverify <path> | zload /path.ZC | zput Name.ZC <source> | zrecv Name.ZC <bytes> <crc32> | zload disk:Name.ZC | zc <source> | zcall Function | zstatus | zreset | winmgr | gterm | winmgrstop | windowdemo | windowdemostop | fbquiet | fbshow\n");
         con_puts("Window test order: zreset -> zload /Kernel/KernelA.HH -> zload /Kernel/KernelB.HH\n");
         con_puts("  -> zload /Tests/WindowDragLive.ZC -> zcall WindowDragLiveStart; stop: zcall WindowDragLiveStop\n");
         con_puts("UTM window demo: windowdemo (drag/raise/resize; Ctrl+C exits) | windowdemostop\n");
@@ -6465,13 +6472,19 @@ static void shell_run(void) {
 #ifndef ZEAL_PI_DIAG
         zc_idle_step();
         if (zc_focus_owns_input()) {
-            /* A focused demo owns normal keys, but keep a keyboard escape so
-             * the UTM window-manager smoke can always return to the shell. */
-            if (zc_window_demo_active() && virtio_kbd_take_ctrl_c()) {
-                if (zc_stop_window_demo() == 0)
-                    con_puts("\nwindowdemo: stopped with Ctrl+C; shell input resumed\n> ");
+            /* A focused GUI task owns normal keys, with Ctrl+C retained as a
+             * keyboard escape to return to the serial bootstrap shell. */
+            if ((zc_window_demo_active() || zc_gui_terminal_active()) &&
+                virtio_kbd_take_ctrl_c()) {
+                if (zc_window_demo_active()) {
+                    if (zc_stop_window_demo() == 0)
+                        con_puts("\nwindowdemo: stopped with Ctrl+C; shell input resumed\n> ");
+                    else
+                        con_puts("\nwindowdemo: Ctrl+C teardown reported an error; shell input resumed\n> ");
+                } else if (zc_stop_gui_terminal() == 0)
+                    con_puts("\ngterm: stopped with Ctrl+C; shell input resumed\n> ");
                 else
-                    con_puts("\nwindowdemo: Ctrl+C teardown reported an error; shell input resumed\n> ");
+                    con_puts("\ngterm: Ctrl+C teardown reported an error; shell input resumed\n> ");
                 len = 0;
                 continue;
             }
@@ -9512,9 +9525,10 @@ void kernel_entry(const struct zeal_handoff *h) {
         zc_init((void *)(uintptr_t)h->sources_virt, h->sources_size, con_puts);
     if (h->revision >= 3 && h->size >= sizeof(*h) &&
         zc_start_graphics() == 0) {
-        if (zc_start_winmgr() == 0)
+        if (zc_start_winmgr() == 0) {
             uart_puts(g_uart, "zc: source Window Manager started at boot\n");
-        else
+            uart_puts(g_uart, "zc: type gterm to open a graphical terminal\n");
+        } else
             con_puts("zc: source Window Manager auto-start failed; use winmgr to retry\n");
     }
 #endif

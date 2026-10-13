@@ -2054,8 +2054,14 @@ char_bmp_safe_dollar[16] =
     0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF,
     0, 0, 0, 0, 0, 0, 0, 0
 };
-// Layout-only alias; real StrA will supply its own displayability bitmap.
-U32 *char_bmp_displayable = char_bmp_printable;
+// KernelC declares this as a 16-word external array. Keep the bridge storage
+// layout identical; a pointer alias fails AArch64 external-data resolution.
+U32 char_bmp_displayable[16] =
+{
+    0x80002600, 0xFFFFFFFF, 0xFFFFFFFF, 0x7FFFFFFF,
+    0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF,
+    0, 0, 0, 0, 0, 0, 0, 0
+};
 // StrA / DocGet / DocRecalc helpers used by DocPutS before those modules load.
 U8 *StrUtil(U8 *_src, I64 flags)
 {
