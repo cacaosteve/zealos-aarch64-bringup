@@ -2005,11 +2005,13 @@ ZealOS live distribution or installer.
 - The PCI compatibility target loads the pinned `/System/Math/MathODE.ZC`
   source with `KernelA`, `KernelB`, `KernelC`, and `KMathB`, then checks the
   module's `ODENew`/`ODEDel` lifecycle, D3 vector arithmetic, and a
-  Cash–Karp RK5 step against the exponential equation `y'=y`. Host runtime
+  Cash–Karp RK5 step plus `ODEsUpdate` on the root task's ODE queue against
+  the exponential equation `y'=y`. Host runtime
   bindings cover the `CD3` imports, while ARM64 compiler support includes
   defaulted F64 parameters and the F64 `Abs` intrinsic. A guarded source
   overlay rewrites the bit-test's inline address-of-member argument to an
   equivalent local pointer because that parser form is still unsupported.
-- The gate does not yet run MathODE from the ordinary desktop update loop or
-  validate its multi-CPU derivative workers; those remain separate runtime
-  integration work.
+- The fixture calls `ODEsUpdate` directly with a real root-task ODE queue; it
+  does not yet run MathODE from an ordinary desktop frame or validate its
+  multi-CPU derivative workers. Those remain separate runtime integration
+  work.

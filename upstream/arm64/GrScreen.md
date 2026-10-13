@@ -80,8 +80,9 @@ the CPU0 task ring with a 64-task safety bound and calls upstream
 `GrUpdateTaskODEs` only after `ODEsUpdate` is loaded; the ARM64 overlay routes
 the integrator call through an optional host bridge. The PCI compatibility gate
 loads the pinned MathODE module and checks its constructor, vector operations,
-and one Cash–Karp RK5 step. The ordinary desktop update loop and MathODE's
-multi-CPU derivative workers remain unvalidated.
+one Cash–Karp RK5 step, and `ODEsUpdate` against the root task's populated ODE
+queue. The ordinary desktop frame and MathODE's multi-CPU derivative workers
+remain unvalidated.
 Remaining graphics work includes connecting native input gestures to the
 upstream zoom controls and deciding how legacy planar output should coexist
 with the display driver's 32-bit framebuffer.

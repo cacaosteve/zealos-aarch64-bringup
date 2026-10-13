@@ -594,7 +594,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 for check in ('D3EquCheck', 'D3NormCheck',
                               'D3ArithmeticCheck', 'D3OperationsCheck',
                               'F64AbsCheck', 'MathODECreateCheck',
-                              'MathODERK5Check'):
+                              'MathODERK5Check',
+                              'MathODEUpdateLoopCheck'):
                     command(f'zcall {check}',
                             'zc => 0x0000000000000001')
             if args.probe_module == '/System/Win.ZC':

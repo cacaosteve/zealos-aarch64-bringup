@@ -89,3 +89,28 @@ I64 MathODERK5Check()
 	ODEDel(ode);
 	return result;
 }
+
+I64 MathODEUpdateLoopCheck()
+{
+	CTask *task = Fs;
+	CMathODE *head = task->next_ode, *ode = ODENew(1);
+	I64 result = 1;
+	ode->derive = &MathODEExponential;
+	ode->state[0] = 1.0;
+	ode->base_t = tS - 0.02;
+	ode->flags |= ODEF_STARTED;
+	ode->next = head;
+	ode->last = head;
+	head->next = ode;
+	head->last = ode;
+	task->last_ode_time = 0;
+	winmgr.fps = 60.0;
+	winmgr.last_ode_time = 0;
+	ODEsUpdate(task);
+	if (ode->t < 0.019) result = 2;
+	if (Abs(ode->state[0] - 1.02020134) > 0.0001) result = 3;
+	head->next = head;
+	head->last = head;
+	ODEDel(ode);
+	return result;
+}
