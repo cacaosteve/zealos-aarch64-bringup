@@ -1954,8 +1954,9 @@ ZealOS live distribution or installer.
   because nested inline-array member access currently faults in the ARM64
   compiler. QEMU checks validate table contents and actual pen-brush pixels;
   the live source WinMgr startup, draw, mouse, and window-control checks pass.
-  Arbitrary indexed-color palette behavior, full planar semantics, sprite and
-  depth-buffer paths, music state, and automatic desktop startup remain open.
+  Arbitrary indexed-color palette behavior, full planar semantics, remaining
+  sprite and depth-buffer paths, music state, and normal upstream menu/task
+  startup remain open.
 
 ## Tablet button messages
 
