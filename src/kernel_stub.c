@@ -6514,11 +6514,12 @@ int64_t zc_gui_shell_exec(int64_t *a) {
         return (int64_t)(uintptr_t)"graphical shell: command is too long\n";
     if (streq(line, "help"))
         return (int64_t)(uintptr_t)
-            "Graphical commands: zstatus | zvol | zls | zgc | zverify <path> | zload <path> | zput <name> <source> | zrm <name> | zc <source> | zcall <function>\n"
+            "Graphical commands: zstatus | zvol | zls | zgc | zverify <path> | zload <path> | zput <name> <source> | zrm <name> | zc <source> | zcall <function> | windowdemo\n"
             "Use the serial shell for the full command set.\n";
     if (!(streq(line, "zstatus") ||
           streq(line, "zvol") || streq(line, "zls") ||
           streq(line, "zgc") ||
+          streq(line, "windowdemo") ||
           str_startswith(line, "zverify ") ||
           str_startswith(line, "zload ") ||
           str_startswith(line, "zcall ") ||

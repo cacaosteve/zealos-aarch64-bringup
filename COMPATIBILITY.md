@@ -406,6 +406,15 @@ oracle are needed before broad language compatibility can be claimed.
   shell display was restored and looked good. Two-window overlap flicker remains
   unresolved and is tracked separately.
 
+## Recorded validation — launching the window fixture from the desktop menu
+
+- The boot graphical terminal's OS menu now includes `Window Demo`. Its exact
+  `windowdemo` command is allowed by the graphical-shell command filter; the
+  existing lifecycle hides the terminal for the demo and restores it when the
+  fixture stops. `BootstrapGuiTerminalSmoke` checks the new menu entry, and
+  `make check-compat-pci` passes. Clicking the item and visually confirming the
+  terminal restore still requires UTM input.
+
 The current boot images are useful delivery artifacts; they are not a finished
 ZealOS live distribution or installer.
 
