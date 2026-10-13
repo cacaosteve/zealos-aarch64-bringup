@@ -215,6 +215,17 @@ static const uint16_t *g_fb_win_z_buf;
 static uint32_t g_fb_cx, g_fb_cy;
 static uint32_t g_fb_cols, g_fb_rows;
 static volatile uint32_t g_fb_console_quiet;
+
+static int fb_console_owned_by_desktop(void) {
+    if (g_fb_console_quiet)
+        return 1;
+#ifndef ZEAL_PI_DIAG
+    return zc_source_winmgr_active() || zc_gui_terminal_active() ||
+           zc_window_demo_active();
+#else
+    return 0;
+#endif
+}
 static uint64_t g_zc_text_cells_drawn;
 /* Bounded ZealOS-style text plane. The framebuffer remains the visible target,
  * while these cells are the source for redraws and blank-cell attributes. */
@@ -1004,7 +1015,7 @@ uint64_t zeal_fb_shell_text_compose(uint32_t *text_base, int64_t stride) {
 
 static void fb_putc(char ch) {
     uint32_t cols, rows;
-    if (!g_fb || g_fb_console_quiet) {
+    if (!g_fb || fb_console_owned_by_desktop()) {
         return;
     }
     cols = g_fb_cols < ZEAL_TEXT_MAX_COLS ? g_fb_cols : ZEAL_TEXT_MAX_COLS;
@@ -1044,7 +1055,7 @@ static void con_backspace(void) {
         uart_write(g_uart, ' ');
         uart_write(g_uart, '\b');
     }
-    if (!g_fb) {
+    if (!g_fb || fb_console_owned_by_desktop()) {
         return;
     }
     (void)zeal_fb_task_text_write(FB_SHELL_TEXT_SLOT, 0,
@@ -4563,7 +4574,7 @@ static void tablet_cursor_tick(void) {
 
 /* M157/M202: after Lattice/graphics demos, match shell_run dark FB (not DCFill black). */
 static void shell_fb_ready(void) {
-    if (g_fb) {
+    if (g_fb && !fb_console_owned_by_desktop()) {
         fb_clear(0x00101820u);
         g_fb_cx = 0;
         g_fb_cy = 0;
@@ -6545,7 +6556,9 @@ static void shell_run(void) {
     /* M200: RXE + drain before input (Pi USB-TTL / virt serial). */
     pl011_rx_prep();
     /* M151: wipe FB smoke residue (bars/lines) so UTM shows a clean shell. */
-    if (g_fb) {
+    /* Boot starts the source desktop before the bootstrap shell. Do not erase
+     * its first frame or paint the serial shell banner over the desktop. */
+    if (g_fb && !fb_console_owned_by_desktop()) {
         fb_clear(0x00101820u);
         g_fb_cx = 0;
         g_fb_cy = 0;
