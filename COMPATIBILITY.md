@@ -2028,3 +2028,17 @@ ZealOS live distribution or installer.
   does not yet run MathODE from an ordinary desktop frame or validate its
   multi-CPU derivative workers. Those remain separate runtime integration
   work.
+
+## Window Manager startup bridge load order
+
+- `BootstrapWinMgrStart` and `BootstrapWinMgrStop` now live in
+  `/System/Gr/WinMgrBoot.ZC`, loaded immediately after the pinned
+  `/System/WinMgr.ZC`. This ensures `&WinMgrTask` refers to the compiled source
+  function rather than its earlier extern declaration in `TaskBridge.ZC`.
+- `make check-compat-pci` passes boot terminal/menu startup, manager
+  start/stop/restart, first compositor presentation, overlapping-window
+  composition, and the live window-demo lifecycle. The fresh module-probe log
+  contains no `Can't address of extern symbol` warning for this startup path.
+- `make utm` refreshed and started `ZealosAarch64Hello`, preserving RedSea and
+  both native source banks while merging the new boot module. The Mac was
+  locked during this run, so visual UTM confirmation remains pending.

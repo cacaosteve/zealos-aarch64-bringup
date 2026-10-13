@@ -2175,68 +2175,6 @@ class CBootstrapTextGlbls
 };
 CBootstrapTextGlbls text;
 CTask *sys_winmgr_task = NULL;
-extern U0 WinMgrTask(I64 arg);
-I64 BootstrapWinMgrStart()
-{//Start the unchanged source manager on the cooperative ARM64 task bridge.
-    CTask *root = Fs, *manager;
-    if (!TaskValidate(root) || sys_task != root)
-        return 1;
-    if (TaskValidate(sys_winmgr_task) && sys_winmgr_task != root)
-        return 0x2a;
-
-    // Source WinMgrTask calls GrSetUpTables before its first refresh. Bind the
-    // display surfaces and packed tables before creating that task so startup
-    // has a complete graphics context from its first source-side call.
-    BootstrapGrContextInit();
-
-    // WinMgrTask uses sys_winmgr_task as the task-ring sentinel while Spawn
-    // inserts the new manager. Yield once so the real source task reaches its
-    // first WinMgrSleep before returning control to the host shell.
-    sys_winmgr_task = root;
-    // Runtime-loaded source units can leave an older `sys_winmgr_task` hash
-    // cell in the manager's compiled references. Synchronize the active
-    // ZealOS global as well as this bridge unit's slot before WinMgrTask runs.
-    ZcSetWinMgrTask(root);
-    manager = Spawn(&WinMgrTask, NULL, "Window Manager", -1, root);
-    if (!TaskValidate(manager))
-    {
-        sys_winmgr_task = root;
-        ZcSetWinMgrTask(root);
-        return 2;
-    }
-    sys_winmgr_task = manager;
-    ZcSetWinMgrTask(manager);
-    Yield;
-    if (!TaskValidate(manager) || sys_winmgr_task != manager)
-        return 3;
-    return 0x2a;
-}
-I64 BootstrapWinMgrStop()
-{//Return ownership to the shell's bootstrap frame pump for UTM diagnostics.
-    CTask *root = sys_task, *manager = sys_winmgr_task;
-    if (!TaskValidate(root) || Fs != root)
-        return 1;
-    if (!TaskValidate(manager) || manager == root)
-    {
-        sys_winmgr_task = root;
-        ZcSetWinMgrTask(root);
-        LBtr(&sys_run_level, RLf_WINMGR);
-        return 0x2a;
-    }
-    // The source KTask Kill intentionally protects sys_winmgr_task. This
-    // bootstrap runtime binds Kill to its synchronous guest-task teardown, so
-    // move the ring sentinel first and then retire the parked manager fiber.
-    sys_winmgr_task = root;
-    ZcSetWinMgrTask(root);
-    if (!Kill(manager, TRUE, FALSE))
-    {
-        sys_winmgr_task = manager;
-        ZcSetWinMgrTask(manager);
-        return 2;
-    }
-    LBtr(&sys_run_level, RLf_WINMGR);
-    return 0x2a;
-}
 // Doc recalculation may load after the task bridge. The host thunk resolves
 // the guest function at call time and safely skips it until it is defined.
 Bool BootstrapWinTextCellVisible(CTask *task, I64 x, I64 y)

@@ -4323,6 +4323,7 @@ int zc_start_graphics(void) {
         "/System/Menu.ZC",
         "/System/Win.ZC",
         "/System/WinMgr.ZC",
+        "/System/Gr/WinMgrBoot.ZC",
         "/System/Gr/GrScreen.ZC",
         "/System/Gr/GrBootBridge.ZC",
     };
