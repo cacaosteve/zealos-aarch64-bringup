@@ -213,7 +213,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                        'zc: native compiler ready',
                        'zc: loaded /Kernel/KMathB.ZC',
                        'zc: upstream ZealOS graphics sources loaded',
-                       'zc: source Window Manager started at boot'):
+                       'zc: source Window Manager started at boot',
+                       'zc: graphical terminal started at boot; serial shell remains available'):
             if marker not in boot: raise RuntimeError(f'boot missing {marker}\n{boot[-4000:]}')
         if re.search(r'hc IR FAIL|(?:Upstream|Front) [^\r\n]* FAIL', boot):
             raise RuntimeError('legacy regressions')

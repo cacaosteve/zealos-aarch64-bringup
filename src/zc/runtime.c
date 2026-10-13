@@ -106,6 +106,7 @@ static zc_source_read_fn disk_reader;
 static jmp_buf guard;
 static int guarded, ready, failed;
 static int window_demo_loaded;
+static int window_demo_restore_gui_terminal;
 static int gui_terminal_active;
 static int gui_terminal_modules_loaded;
 
@@ -237,6 +238,7 @@ static struct guest_fiber guest_fibers[GUEST_TASKS];
 static unsigned guest_current, guest_completed;
 static uint64_t guest_task_serial;
 static unsigned guest_job_count;
+static struct guest_job *guest_tracked_jobs[GUEST_JOBS_MAX];
 /* Parsing and code emission share one CPU and cannot switch tasks. Emitted
  * source code may switch after compilation finishes. */
 static int guest_task_exe_active;
@@ -1758,17 +1760,40 @@ static int64_t host_queue_remove(int64_t *a) {
     entry->next = entry->last = NULL;
     return 0;
 }
+static void guest_job_track(struct guest_job *job) {
+    for (unsigned i = 0; i < GUEST_JOBS_MAX; i++) {
+        if (!guest_tracked_jobs[i]) {
+            guest_tracked_jobs[i] = job;
+            guest_job_count++;
+            return;
+        }
+    }
+    zc_fail("guest tracked job table full");
+}
+static int guest_job_untrack(struct guest_job *job) {
+    for (unsigned i = 0; i < GUEST_JOBS_MAX; i++) {
+        if (guest_tracked_jobs[i] == job) {
+            guest_tracked_jobs[i] = NULL;
+            guest_job_count--;
+            return 1;
+        }
+    }
+    return 0;
+}
 static void guest_job_delete(struct guest_job *job) {
+    (void)guest_job_untrack(job);
     if (job->aux_str)
         __AIWNIOS_Free(job->aux_str);
     __AIWNIOS_Free(job);
-    guest_job_count--;
 }
 static int64_t host_job_del(int64_t *a) {
     struct guest_job *job = (void *)(uintptr_t)a[0];
-    if (!job || job->next || job->last || MSize(job) != sizeof(*job) ||
-        !guest_job_count)
+    if (!job)
+        zc_fail("JobDel requires a job");
+    if (job->next || job->last)
         zc_fail("JobDel requires a detached job");
+    if (MSize(job) != sizeof(*job))
+        zc_fail("JobDel requires a guest job allocation");
     guest_job_delete(job);
     return 0;
 }
@@ -2480,7 +2505,7 @@ static struct guest_job *post_guest_message(void *server_task, void *master,
         job->aux2 = arg2;
         job->master_task = master;
         guest_job_insert(guest_job_head(server), job);
-        guest_job_count++;
+        guest_job_track(job);
         if (!first)
             first = job;
     }
@@ -2794,7 +2819,7 @@ static int64_t host_task_text(int64_t *a) {
     job->aux_str = copy;
     job->master_task = master;
     /* Reserve this job before TaskWait can dispatch and change the queue. */
-    guest_job_count++;
+    guest_job_track(job);
     void *filter_task = *(void **)((unsigned char *)server->words + guest_next_filter_off);
     if ((flags & GUEST_JOBF_HIGHEST_PRIORITY) && filter_task != server_task) {
         int64_t wait[2] = {(int64_t)(uintptr_t)server_task, 0};
@@ -2871,7 +2896,7 @@ static int64_t host_task_exe(int64_t *a) {
     job->aux_str = copy;
     job->master_task = master;
     guest_job_insert(guest_job_head(server), job);
-    guest_job_count++;
+    guest_job_track(job);
     *guest_flags(server) &= ~(GUEST_IDLE | GUEST_AWAITING_MESSAGE);
     if (flags & GUEST_JOBF_WAKE_MASTER) {
         struct guest_fiber *self = &guest_fibers[guest_current];
@@ -2919,7 +2944,7 @@ static int64_t host_job_queue(int64_t *a) {
         job->aux1 = (int64_t)(uintptr_t)parent;
     }
     guest_job_insert(guest_job_head(server), job);
-    guest_job_count++;
+    guest_job_track(job);
     *guest_flags(server) &= ~(GUEST_IDLE | GUEST_AWAITING_MESSAGE);
     return (int64_t)(uintptr_t)job;
 }
@@ -4171,6 +4196,7 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
         output_cb = output;
     ready = failed = loaded_modules = 0;
     window_demo_loaded = 0;
+    window_demo_restore_gui_terminal = 0;
     gui_terminal_active = 0;
     gui_terminal_modules_loaded = 0;
     /* A lexer exception can longjmp out of #assert while the Aiwnios parser
@@ -4181,6 +4207,7 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
     guest_task_bound = 0;
     guest_current = guest_completed = 0;
     guest_job_count = 0;
+    memset(guest_tracked_jobs, 0, sizeof(guest_tracked_jobs));
     guest_task_exe_active = 0;
     guest_job_call_active = 0;
     guest_background_dispatch = 0;
@@ -4403,6 +4430,17 @@ int zc_stop_winmgr(void) {
         return -1;
     return result == 0x2a ? 0 : -1;
 }
+static int zc_window_demo_restore_terminal(void) {
+    if (!window_demo_restore_gui_terminal)
+        return 0;
+    window_demo_restore_gui_terminal = 0;
+    int64_t result = 0;
+    if (zc_call("BootstrapGuiTerminalShow", &result) != 0 || result != 0x2a) {
+        zc_output("windowdemo: graphical terminal could not be shown; type gtermstop then gterm to retry\n");
+        return -1;
+    }
+    return 0;
+}
 int zc_start_window_demo(void) {
     int64_t result = 0;
     if (!ready || failed)
@@ -4411,17 +4449,25 @@ int zc_start_window_demo(void) {
         zc_output("windowdemo: already loaded; stop it before restarting\n");
         return -1;
     }
+    if (gui_terminal_active) {
+        if (zc_call("BootstrapGuiTerminalHide", &result) != 0 || result != 0x2a)
+            return -1;
+        window_demo_restore_gui_terminal = 1;
+    }
     if (zc_stop_winmgr() != 0) {
         zc_output("windowdemo: could not stop the source window manager\n");
+        (void)zc_window_demo_restore_terminal();
         return -1;
     }
     if (zc_call("BootstrapFrameUseBridge", &result) != 0 || result != 0x2a) {
         zc_output("windowdemo: could not select the framebuffer bridge\n");
+        (void)zc_window_demo_restore_terminal();
         return -1;
     }
     if (zc_load("/Tests/WindowDragLive.ZC") != 0) {
         (void)zc_call("BootstrapFrameUseSource", NULL);
         zc_output("windowdemo: could not load the WindowDragLive fixture\n");
+        (void)zc_window_demo_restore_terminal();
         return -1;
     }
     window_demo_loaded = 1;
@@ -4430,6 +4476,7 @@ int zc_start_window_demo(void) {
         (void)zc_call("BootstrapFrameUseSource", NULL);
         window_demo_loaded = 0;
         zc_output("windowdemo: WindowDragLiveStart failed\n");
+        (void)zc_window_demo_restore_terminal();
         return -1;
     }
     if (zc_start_winmgr() != 0) {
@@ -4437,6 +4484,7 @@ int zc_start_window_demo(void) {
         (void)zc_call("BootstrapFrameUseSource", NULL);
         window_demo_loaded = 0;
         zc_output("windowdemo: source window manager restart failed; fixture stopped\n");
+        (void)zc_window_demo_restore_terminal();
         return -1;
     }
     return 0;
@@ -4451,10 +4499,29 @@ int zc_stop_window_demo(void) {
     if (zc_call("BootstrapFrameUseSource", NULL) != 0)
         failed_stop = 1;
     window_demo_loaded = 0;
+    if (zc_window_demo_restore_terminal() != 0)
+        failed_stop = 1;
     return failed_stop ? -1 : 0;
 }
 int zc_window_demo_active(void) {
     return window_demo_loaded;
+}
+int zc_reset_session(void) {
+    if (ready && !failed) {
+        if (window_demo_loaded) {
+            // Do not recreate a terminal task while the compiler session is
+            // being torn down below.
+            window_demo_restore_gui_terminal = 0;
+            if (zc_stop_window_demo() != 0)
+                return -1;
+        }
+        if (gui_terminal_active && zc_stop_gui_terminal() != 0)
+            return -1;
+        if (zc_stop_winmgr() != 0)
+            return -1;
+    }
+    zc_init(NULL, 0, NULL);
+    return ready && !failed ? 0 : -1;
 }
 void zc_status(void) {
     size_t used[2] = {0}, blocks[2] = {0};

@@ -54,8 +54,27 @@ I64 BootstrapGuiTerminalStop()
     return 0x2a;
 }
 
+I64 BootstrapGuiTerminalHide()
+{
+    if (TaskValidate(bootstrap_gui_terminal_task))
+        bootstrap_gui_terminal_task->display_flags &= ~(1 << DISPLAYf_SHOW);
+    return 0x2a;
+}
+
+I64 BootstrapGuiTerminalShow()
+{
+    if (TaskValidate(bootstrap_gui_terminal_task))
+        bootstrap_gui_terminal_task->display_flags |= 1 << DISPLAYf_SHOW;
+    return 0x2a;
+}
+
 I64 BootstrapGuiTerminalSmoke()
 {
+    // The normal ARM64 boot already starts this task. In that configuration
+    // the smoke confirms boot left a valid terminal instead of trying to
+    // spawn a second one or tearing down the user's interactive window.
+    if (TaskValidate(bootstrap_gui_terminal_task))
+        return 0x2a;
     if (BootstrapGuiTerminalStart() != 0x2a ||
         !TaskValidate(bootstrap_gui_terminal_task))
         return 1;

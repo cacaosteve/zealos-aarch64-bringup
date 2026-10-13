@@ -4728,8 +4728,10 @@ static void shell_handle(const char *line, int *done) {
     if (streq(line, "zcheck")) { (void)zc_selftest(); return; }
     if (streq(line, "zstatus")) { zc_status(); return; }
     if (streq(line, "zreset")) {
-        (void)zc_stop_window_demo();
-        zc_init(0, 0, 0);
+        if (!zc_reset_session())
+            con_puts("zc: native compiler ready (persistent session)\n");
+        else
+            con_puts("zreset: could not stop source windows; session was not reset\n");
         return;
     }
     if (streq(line, "windowdemo")) {
@@ -4758,6 +4760,13 @@ static void shell_handle(const char *line, int *done) {
             con_puts("gterm: graphical terminal started; click it to type; Ctrl+C stops it\n");
         else
             con_puts("gterm: start failed; serial shell remains available\n");
+        return;
+    }
+    if (streq(line, "gtermstop")) {
+        if (!zc_stop_gui_terminal())
+            con_puts("gterm: graphical terminal stopped\n");
+        else
+            con_puts("gterm: stop failed\n");
         return;
     }
     if (streq(line, "winmgrstop")) {
@@ -4904,7 +4913,7 @@ static void shell_handle(const char *line, int *done) {
 #endif
     if (streq(line, "help")) {
 #ifndef ZEAL_PI_DIAG
-        con_puts("Native compiler: zcheck | zvol | zls | zgc | zedit <path> | zrm <path> | zverify <path> | zload /path.ZC | zput Name.ZC <source> | zrecv Name.ZC <bytes> <crc32> | zload disk:Name.ZC | zc <source> | zcall Function | zstatus | zreset | winmgr | gterm | winmgrstop | windowdemo | windowdemostop | fbquiet | fbshow\n");
+        con_puts("Native compiler: zcheck | zvol | zls | zgc | zedit <path> | zrm <path> | zverify <path> | zload /path.ZC | zput Name.ZC <source> | zrecv Name.ZC <bytes> <crc32> | zload disk:Name.ZC | zc <source> | zcall Function | zstatus | zreset | winmgr | gterm | gtermstop | winmgrstop | windowdemo | windowdemostop | fbquiet | fbshow\n");
         con_puts("Window test order: zreset -> zload /Kernel/KernelA.HH -> zload /Kernel/KernelB.HH\n");
         con_puts("  -> zload /Tests/WindowDragLive.ZC -> zcall WindowDragLiveStart; stop: zcall WindowDragLiveStop\n");
         con_puts("UTM window demo: windowdemo (drag/raise/resize; Ctrl+C exits) | windowdemostop\n");
@@ -9527,7 +9536,10 @@ void kernel_entry(const struct zeal_handoff *h) {
         zc_start_graphics() == 0) {
         if (zc_start_winmgr() == 0) {
             uart_puts(g_uart, "zc: source Window Manager started at boot\n");
-            uart_puts(g_uart, "zc: type gterm to open a graphical terminal\n");
+            if (zc_start_gui_terminal() == 0)
+                uart_puts(g_uart, "zc: graphical terminal started at boot; serial shell remains available\n");
+            else
+                uart_puts(g_uart, "zc: graphical terminal auto-start failed; type gterm to retry\n");
         } else
             con_puts("zc: source Window Manager auto-start failed; use winmgr to retry\n");
     }

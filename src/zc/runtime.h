@@ -20,6 +20,8 @@ int zc_start_winmgr(void);
 int zc_start_gui_terminal(void);
 int zc_stop_gui_terminal(void);
 int zc_gui_terminal_active(void);
+/* Stop source-backed windows before discarding their compiler/session state. */
+int zc_reset_session(void);
 /* Stop that task and resume bootstrap-owned framebuffer refreshes. */
 int zc_stop_winmgr(void);
 /* Load and run the interactive source-backed two-window UTM fixture. */

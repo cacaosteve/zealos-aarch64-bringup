@@ -3200,6 +3200,15 @@ Freeze catalog unchanged.
 | Smoke | The ARM64 source archive and kernel build, the full focused QEMU source WinMgr/GrScreen/MathODE checks, and `GrScreenZoomTransformChecks` pass; UTM Ctrl+wheel input remains an interactive acceptance check |
 | Limits | Zoom steps are 2x/0.5x; desktop zoom centering and plain wheel behavior still need confirmation in UTM |
 
+## Milestone 282 — open the graphical terminal at boot
+
+| Item | Path |
+|--|--|
+| Gap | The source Window Manager started during boot, but the framebuffer remained an empty desktop until `gterm` was entered on the serial shell |
+| Bring-up | Load the upstream DolDoc terminal modules and spawn a visible interactive terminal task after the manager starts; retain the serial shell and a `gterm` retry path if terminal startup fails |
+| Smoke | PCI boot checks require the graphical-terminal startup marker; the DocTerm probe accepts the already-running boot task without creating a duplicate or stopping it |
+| Limits | This adds a usable terminal window, not the normal ZealOS menu, startup application set, or complete keyboard/mouse stack; UTM must still confirm visible text input after refresh |
+
 ## Open compatibility probe — `/System/Win.ZC`
 
 The source probe loads pinned `KernelC.HH`, `Externs.ZC`, and `Gr.HH` before compiling unchanged `Win.ZC`. Graphics dimensions and mouse globals are probe fixtures; `DrawMenu` and the initial `GrScaleZoom` definition are compile-time fixtures until unchanged `GrScreen.ZC` is loaded later in the probe. `GrScreenFinalUpdateChecks` executes `WinFinalUpdate` through the staged idle-frame path, confirms the fixture's `mouse_grid.coord` toggles the real coordinate-text overlay, checks a separate visible guest overlay callback, verifies the software arrow against Limine framebuffer pixels, and exercises `WinMouseUpdate`'s edge recentering through the runtime dispatch. `WinMousePointerStateCheck` covers transformed tablet coordinates and `WinMouseHardStateCheck` covers the source mouse-state ABI; manual UTM acceptance confirms the software pointer and window-demo mouse interaction. The raw ARM generic-timer binding and a standalone F64 clock expression are smoke-tested before the Win load.
