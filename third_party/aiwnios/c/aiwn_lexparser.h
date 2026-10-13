@@ -348,6 +348,7 @@ enum {
   IC_GS,
   IC_TO_BOOL,
   IC_SQRT,
+  IC_PC_GET, // Runtime $$: address of this instruction in generated code.
   IC_CNT, // MUST BE THE LAST ITEM
 };
 typedef struct CICArg {

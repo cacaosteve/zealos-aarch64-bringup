@@ -2057,3 +2057,23 @@ ZealOS live distribution or installer.
 - `make utm` refreshed and started `ZealosAarch64Hello`, preserving RedSea and
   both native source banks while merging the new boot module. The Mac was
   locked during this run, so visual UTM confirmation remains pending.
+
+## Runtime instruction and task-register reads
+
+- `$$` retains its class-layout byte-offset meaning and now also compiles as a
+  runtime address-of-current-instruction expression. The ARM64 backend emits
+  `ADR` at the expression site, so it reports the generated guest PC rather
+  than a host/compiler address. `RSPGet` and `RBPGet` likewise read SP and FP
+  directly at the call site; helper functions would otherwise capture their
+  own transient frame. `RFlagsGet` maps the ARM64 `DAIF.I` mask to x86's IF bit
+  and reserved bit 1, without leaking architecture-specific DAIF bits. `TSCGet`
+  reads ARM's virtual counter (`CNTVCT_EL0`), preserving the monotonically
+  increasing counter behavior used by ZealOS deadlines and timer scheduling.
+- `KernelStackRegisterChecks` verifies non-null SP/FP/PC results, the
+  architectural four-byte PC alignment, the supported x86 flag subset, and
+  that `TSCGet` advances across guest instructions. The focused task-job probe
+  and the broad upstream compatibility probe pass with these checks.
+- The unchanged `Kernel/KTask.ZC` still cannot load as a complete module: its
+  `#exe` compiler-time option directive and later x86 stack-switching assembly
+  need separate ARM64 implementations. Supporting `$$` does not make those
+  architecture-specific task-context operations portable.

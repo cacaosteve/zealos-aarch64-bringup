@@ -8,6 +8,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+static int64_t ARM_mrsDAIF(int64_t rt) {
+  /* MRS Xt, DAIF */
+  return 0xd53b4220 | rt;
+}
+
+static int64_t ARM_mrsCNTVCT(int64_t rt) {
+  /* MRS Xt, CNTVCT_EL0 */
+  return 0xd53be040 | rt;
+}
 #if defined(__APPLE__)
 #  include <libkern/OSCacheControl.h>
 #endif
@@ -1010,6 +1020,38 @@ static int64_t __ICFCallTOS(CCmpCtrl *cctrl, CRPN *rpn, char *bin,
     }
   }
   rpn2 = ICArgN(rpn, rpn->length);
+  /* ZealOS uses these intrinsics to snapshot the active task's stack frame.
+   * Emit the register read at the call site; a C helper would observe its own
+   * frame and return a pointer that is invalid as soon as the helper returns. */
+  if (rpn2->type == IC_GLOBAL &&
+      (rpn2->global_var->base.type & HTT_FUN)) {
+    CHashFun *fun = (CHashFun *)rpn2->global_var;
+    if (!rpn->length && fun->import_name &&
+        !strcmp(fun->import_name, "IC_RSP_GET")) {
+      AIWNIOS_ADD_CODE(ARM_addImmX(0, ARM_REG_SP, 0));
+      goto after_call;
+    }
+    if (!rpn->length && fun->import_name &&
+        !strcmp(fun->import_name, "IC_RBP_GET")) {
+      AIWNIOS_ADD_CODE(ARM_movRegX(0, ARM_REG_FP));
+      goto after_call;
+    }
+    if (!rpn->length && fun->import_name &&
+        !strcmp(fun->import_name, "IC_RFLAGS_GET")) {
+      /* Preserve x86's reserved bit 1 and IF only; ARM DAIF is not RFLAGS. */
+      AIWNIOS_ADD_CODE(ARM_mrsDAIF(8));
+      AIWNIOS_ADD_CODE(ARM_andsImmX(8, 8, 0x80));
+      AIWNIOS_ADD_CODE(ARM_csetX(0, ARM_EQ));
+      AIWNIOS_ADD_CODE(ARM_lslImmX(0, 0, 9));
+      AIWNIOS_ADD_CODE(ARM_orrImmX(0, 0, 2));
+      goto after_call;
+    }
+    if (!rpn->length && fun->import_name &&
+        !strcmp(fun->import_name, "IC_RDTSC")) {
+      AIWNIOS_ADD_CODE(ARM_mrsCNTVCT(0));
+      goto after_call;
+    }
+  }
   if (rpn2->type == IC_SHORT_ADDR) {
     rpn2->code_misc->addr = code_off + bin;
     BEFORE_CALL;
@@ -2892,6 +2934,20 @@ static int64_t __OptPassFinal(CCmpCtrl *cctrl, CRPN *rpn, char *bin,
       if (rpn->res.keep_in_tmp)
         rpn->res = tmp;
 
+      code_off = ICMov(cctrl, &rpn->res, &tmp, bin, code_off);
+    }
+    break;
+  case IC_PC_GET:
+    /* ARM ADR xN, #0 returns this instruction's guest virtual address. */
+    into_reg = rpn->res.mode == MD_REG ? rpn->res.reg : 8;
+    AIWNIOS_ADD_CODE(ARM_adrX(MIR(cctrl, into_reg), 0));
+    if (rpn->res.mode != MD_REG) {
+      tmp.mode = MD_REG;
+      tmp.raw_type = RT_PTR;
+      tmp.reg = into_reg;
+      rpn->tmp_res = tmp;
+      if (rpn->res.keep_in_tmp)
+        rpn->res = tmp;
       code_off = ICMov(cctrl, &rpn->res, &tmp, bin, code_off);
     }
     break;
@@ -4793,6 +4849,7 @@ static int64_t PushTmpDepthFirst(CCmpCtrl *cctrl, CRPN *r, int64_t spilled) {
   case IC_BASE_PTR:
   case IC_STR:
   case IC_CHR:
+  case IC_PC_GET:
   case IC_FS:
   case IC_GS:
     if (spilled)

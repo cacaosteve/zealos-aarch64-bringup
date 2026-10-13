@@ -488,6 +488,9 @@ CRPN *ICFwd(CRPN *rpn) {
   case IC_I64:
     return rpn->base.next;
     break;
+  case IC_PC_GET:
+    return rpn->base.next;
+    break;
   case __IC_SET_FRAME_SIZE:
   case IC_F64:
     return rpn->base.next;
@@ -2050,10 +2053,19 @@ next:
       goto fin;
       break;
     case TK_LAYOUT_OFF:
-      if (!ccmp->lex->layout_off)
-        ParseErr(ccmp, "'$$' is only supported inside a class layout.");
-      ccmp->lex->integer = *ccmp->lex->layout_off;
-      /* Fall through: the current class offset is an integer expression. */
+      if (ccmp->lex->layout_off) {
+        ccmp->lex->integer = *ccmp->lex->layout_off;
+        /* Fall through: the current class offset is an integer expression. */
+      } else {
+        binop_before = 0;
+        prec = -2;
+        (ic = A_CALLOC(sizeof(CRPN), NULL))->type = type = IC_PC_GET;
+        QueInit(&ic->base);
+        QueIns(ic, ccmp->code_ctrl->ir_code);
+        AssignRawTypeToNode(ccmp, ic);
+        Lex(ccmp->lex);
+        goto next;
+      }
     case TK_I64:
       binop_before = 0;
       prec = -2;
@@ -3813,14 +3825,22 @@ int64_t AssignRawTypeToNode(CCmpCtrl *ccmp, CRPN *rpn) {
         !(fun->import_name && (!strcmp(fun->import_name, "IC_SQRT") ||
                                !strcmp(fun->import_name, "IC_ABS") ||
                                !strcmp(fun->import_name, "IC_SQR") ||
-                               !strcmp(fun->import_name, "IC_SWAP_U16"))))
+                               !strcmp(fun->import_name, "IC_SWAP_U16") ||
+                               !strcmp(fun->import_name, "IC_RDTSC") ||
+                               !strcmp(fun->import_name, "IC_RFLAGS_GET") ||
+                               !strcmp(fun->import_name, "IC_RSP_GET") ||
+                               !strcmp(fun->import_name, "IC_RBP_GET"))))
       ParseErr(ccmp, "AArch64 intrinsic '%s' (%s) is not implemented.",
                fun->base.base.str, fun->import_name);
     if ((fun->base.base.type & HTF_EXTERN) && fun->import_name &&
         !(fun->import_name && (!strcmp(fun->import_name, "IC_SQRT") ||
                                !strcmp(fun->import_name, "IC_ABS") ||
                                !strcmp(fun->import_name, "IC_SQR") ||
-                               !strcmp(fun->import_name, "IC_SWAP_U16"))))
+                               !strcmp(fun->import_name, "IC_SWAP_U16") ||
+                               !strcmp(fun->import_name, "IC_RDTSC") ||
+                               !strcmp(fun->import_name, "IC_RFLAGS_GET") ||
+                               !strcmp(fun->import_name, "IC_RSP_GET") ||
+                               !strcmp(fun->import_name, "IC_RBP_GET"))))
       ParseErr(ccmp, "AArch64 external '%s' (%s) is not bound.",
                fun->base.base.str, fun->import_name);
     if (arg > fun->argc && !(fun->base.flags & CLSF_VARGS)) {
@@ -4153,6 +4173,11 @@ int64_t AssignRawTypeToNode(CCmpCtrl *ccmp, CRPN *rpn) {
     break;
   case IC_I64:
     rpn->raw_type = RT_I64i;
+    goto ret;
+    break;
+  case IC_PC_GET:
+    rpn->ic_class = HashFind("U8i", Fs->hash_table, HTT_CLASS, 1) + 1;
+    rpn->raw_type = RT_PTR;
     goto ret;
     break;
   case IC_F64:

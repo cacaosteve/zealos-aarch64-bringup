@@ -1062,6 +1062,9 @@ loop:
     case IC_I64:
       goto next1;
       break;
+    case IC_PC_GET:
+      goto next1;
+      break;
     case IC_F64:
       goto next1;
       break;
@@ -1133,6 +1136,9 @@ void OptPassRegAlloc(CCmpCtrl *cctrl) {
       }
       break;
     case IC_GLOBAL:
+      continue;
+      break;
+    case IC_PC_GET:
       continue;
       break;
     case IC_NOP:

@@ -1,0 +1,35 @@
+U8 *KernelStackReadSP()
+{
+    return RSPGet;
+}
+
+U8 *KernelStackReadFP()
+{
+    return RBPGet;
+}
+
+U8 *KernelCurrentPCRead()
+{
+    return $$;
+}
+
+I64 KernelStackRegisterChecks()
+{
+    U8 *sp = KernelStackReadSP;
+    U8 *fp = KernelStackReadFP;
+    U8 *pc = KernelCurrentPCRead;
+    I64 flags = RFlagsGet;
+    I64 ticks = TSCGet;
+    I64 i;
+
+    for (i = 0; i < 10000; i++)
+        ;
+
+    if (!sp || !fp || !pc || (pc & 3))
+        return 1;
+    if ((flags & 2) == 0 || (flags & ~0x202))
+        return 2;
+    if (TSCGet <= ticks)
+        return 3;
+    return 0x2a;
+}

@@ -933,6 +933,10 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         if args.probe_task_jobs:
             command('zload /Kernel/KernelA.HH', 'zc: loaded /Kernel/KernelA.HH')
             command('zload /Kernel/KernelB.HH', 'zc: loaded /Kernel/KernelB.HH')
+            command('zload /Tests/KernelStackRegisterChecks.ZC',
+                    'zc: loaded /Tests/KernelStackRegisterChecks.ZC')
+            command('zcall KernelStackRegisterChecks',
+                    'zc => 0x000000000000002a')
             command('zload /Tests/TaskJobs.ZC', 'zc: loaded /Tests/TaskJobs.ZC')
             command('zcall TaskSourceCoopChecks', 'zc => 0x000000000000002a')
             command('zcall TaskNestedSourceChecks', 'zc => 0x000000000000002a')
@@ -944,6 +948,10 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         if args.probe_upstream:
             command('zload /Kernel/KernelA.HH', 'zc: loaded /Kernel/KernelA.HH')
             command('zload /Kernel/KernelB.HH', 'zc: loaded /Kernel/KernelB.HH')
+            command('zload /Tests/KernelStackRegisterChecks.ZC',
+                    'zc: loaded /Tests/KernelStackRegisterChecks.ZC')
+            command('zcall KernelStackRegisterChecks',
+                    'zc => 0x000000000000002a')
             command('zload /Tests/HeaderCopy.ZC', 'zc: loaded /Tests/HeaderCopy.ZC')
             command('zcall HeaderCopyChecks', 'zc => 0x000000000000002a')
             command('zload /Tests/KernelBitOps.ZC', 'zc: loaded /Tests/KernelBitOps.ZC')
