@@ -2330,8 +2330,13 @@ static struct guest_job *post_guest_message(void *server_task, void *master,
             return last;
         }
     }
-    if (guest_job_count > GUEST_JOBS_MAX - needed)
+    if (guest_job_count > GUEST_JOBS_MAX - needed) {
+        /* Motion is replaceable state, so preserve the task and its queued
+         * key/button transitions if unrelated traffic has filled the pool. */
+        if (code == GUEST_MESSAGE_MS_MOVE && needed == 1)
+            return NULL;
         zc_fail("guest message queue full");
+    }
     struct guest_job *first = NULL;
     for (unsigned i = 0; i < needed; i++) {
         struct guest_job *job = __AIWNIOS_CAlloc(sizeof(*job), &data_heap);

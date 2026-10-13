@@ -96,6 +96,17 @@ I64 TaskMessageMoveCoalesceChecks()
         last->aux1 != 700 || last->aux2 != 701)
         return 4;
     FlushMessages(Fs);
+    // Saturation may discard replaceable motion, but must retain transitions.
+    move = TaskMessage(Fs, NULL, MESSAGE_MS_MOVE, 1, 2, 0);
+    if (!move)
+        return 5;
+    for (i = 0; i < 127; i++)
+        if (!TaskMessage(Fs, NULL, MESSAGE_KEY_DOWN, i, 0, 0))
+            return 6;
+    if (TaskMessage(Fs, NULL, MESSAGE_MS_MOVE, 9, 10, 0))
+        return 7;
+    if (FlushMessages(Fs) != 128)
+        return 8;
     return 42;
 }
 

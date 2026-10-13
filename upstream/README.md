@@ -3186,9 +3186,9 @@ Freeze catalog unchanged.
 
 | Item | Path |
 |--|--|
-| Gap | If a guest task did not consume `MESSAGE_MS_MOVE` promptly, every tablet sample allocated another global guest message job; a held pointer could exhaust the bounded queue and report `guest message queue full` |
-| Bring-up | Replace only the newest queued move for the same recipient/master/flags with the latest coordinates. Any intervening key, button, or other message remains an ordering barrier |
-| Smoke | `TaskMessageMoveCoalesceChecks` posts 512 moves, confirms they occupy one job with the final coordinates, then verifies a key event separates later movement; `make check-compat-pci` passes |
+| Gap | If a guest task did not consume `MESSAGE_MS_MOVE` promptly, tablet samples could fill the bounded guest-job queue and report `guest message queue full` |
+| Bring-up | Replace only the newest queued move for the same recipient/master/flags with the latest coordinates. If unrelated events have filled the queue, discard a new move rather than fail; key/button transitions remain ordered and are never discarded |
+| Smoke | `TaskMessageMoveCoalesceChecks` posts 512 moves, confirms they occupy one job with the final coordinates, verifies key ordering, then fills the 128-job queue with transitions and confirms an additional move is harmlessly dropped; `make check-compat-pci` passes |
 | Limits | Coalescing applies to consecutive unconsumed motion only; button and key transitions retain every event |
 
 ## Open compatibility probe — `/System/Win.ZC`
