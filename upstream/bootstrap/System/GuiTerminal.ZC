@@ -1,24 +1,51 @@
 // Minimal document-backed terminal used by the ARM64 graphical bootstrap.
 // The serial shell remains available independently through UART.
 CTask *bootstrap_gui_terminal_task;
+extern U8 *ZcGuiShellExec(U8 *line);
 
 U0 BootstrapGuiTerminalTask(U8 *data)
 {
     I64 ch, sc;
     I64 message;
+    I64 command_len = 0;
+    U8 command[256];
+    U8 *output;
 
     KeyDevInit;
     DocTermNew;
     KeyDevAdd(&KDDocPutKey, &KDDocPutS, 0x80000000, TRUE);
     DocPrint(DocPut, "ZealOS ARM64 graphical terminal\n");
-    DocPrint(DocPut, "Click this window, then type.\n");
+    DocPrint(DocPut, "Click this window, enter a command, and press Return.\n");
     DocPrint(DocPut, "The serial shell remains available.\n");
+    DocPrint(DocPut, "> ");
 
     while (TRUE)
     {
         while ((message = MessageScan(&ch, &sc,
                                      1 << MESSAGE_KEY_DOWN)) == MESSAGE_KEY_DOWN)
-            DocPutKey(DocPut, ch, sc);
+        {
+            if (ch == '\r' || ch == '\n')
+            {
+                DocPutKey(DocPut, ch, sc);
+                command[command_len] = 0;
+                output = ZcGuiShellExec(command);
+                if (output)
+                    DocPrint(DocPut, "%s", output);
+                command_len = 0;
+                DocPrint(DocPut, "> ");
+            }
+            else
+            {
+                if (ch == 8 || ch == 127)
+                {
+                    if (command_len)
+                        command_len--;
+                }
+                else if (ch >= 32 && ch < 127 && command_len < sizeof(command) - 1)
+                    command[command_len++] = ch;
+                DocPutKey(DocPut, ch, sc);
+            }
+        }
         while (MessageScan(NULL, NULL, ~1))
             ;
         ZcTaskYield;
@@ -82,4 +109,12 @@ I64 BootstrapGuiTerminalSmoke()
         TaskValidate(bootstrap_gui_terminal_task))
         return 2;
     return 0x2a;
+}
+
+I64 BootstrapGuiShellSmoke()
+{
+    U8 *output = ZcGuiShellExec("zstatus");
+    if (output && output[0] == 'z')
+        return 0x2a;
+    return 1;
 }

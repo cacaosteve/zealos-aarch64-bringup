@@ -219,6 +219,12 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         if re.search(r'hc IR FAIL|(?:Upstream|Front) [^\r\n]* FAIL', boot):
             raise RuntimeError('legacy regressions')
         print('PASS boot and legacy regression markers', flush=True)
+        if args.probe_gui_terminal:
+            command('zcall BootstrapGuiTerminalSmoke',
+                    'zc => 0x000000000000002a')
+            command('zcall BootstrapGuiShellSmoke',
+                    'zc => 0x000000000000002a')
+            raise SystemExit(0)
         command('zcall BootstrapSpriteOpcodeChecks',
                 'zc => 0x000000000000002a')
         command('zcall BootstrapMat4x4Checks',
@@ -880,12 +886,6 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             if args.probe_module == '/System/DolDoc/DocRecalc.ZC':
                 if 'zc: loaded /System/DolDoc/DocRecalc.ZC' not in result:
                     raise RuntimeError('unchanged DocRecalc.ZC did not load')
-                if args.probe_gui_terminal:
-                    command('zload /System/GuiTerminal.ZC',
-                            'zc: loaded /System/GuiTerminal.ZC')
-                    command('zcall BootstrapGuiTerminalSmoke',
-                            'zc => 0x000000000000002a')
-                    raise SystemExit(0)
                 command('zload /Tests/WinMgrProbeDeps.ZC',
                         'zc: loaded /Tests/WinMgrProbeDeps.ZC')
                 command('zload /Tests/ODEsUpdateStub.ZC',

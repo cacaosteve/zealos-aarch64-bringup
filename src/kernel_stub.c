@@ -1062,7 +1062,27 @@ static void con_backspace(void) {
     fb_fillrect(g_fb_cx * 8, g_fb_cy * 8, 8, 8, 0x00101820u);
 }
 
+#ifndef ZEAL_PI_DIAG
+static char gui_shell_output[8192];
+static size_t gui_shell_output_len;
+static int gui_shell_capture;
+static int gui_shell_truncated;
+static void shell_handle(const char *line, int *done);
+#endif
+
 static void con_write(char c) {
+#ifndef ZEAL_PI_DIAG
+    if (gui_shell_capture) {
+        /* Leave room for an explicit truncation notice. */
+        if (gui_shell_output_len + 32 < sizeof(gui_shell_output)) {
+            gui_shell_output[gui_shell_output_len++] = c;
+            gui_shell_output[gui_shell_output_len] = 0;
+        } else {
+            gui_shell_truncated = 1;
+        }
+        return;
+    }
+#endif
     if (g_uart) {
         if (c == '\n') {
             uart_write(g_uart, '\r');
@@ -4911,6 +4931,7 @@ static void shell_handle(const char *line, int *done) {
         return;
     }
 #endif
+
     if (streq(line, "help")) {
 #ifndef ZEAL_PI_DIAG
         con_puts("Native compiler: zcheck | zvol | zls | zgc | zedit <path> | zrm <path> | zverify <path> | zload /path.ZC | zput Name.ZC <source> | zrecv Name.ZC <bytes> <crc32> | zload disk:Name.ZC | zc <source> | zcall Function | zstatus | zreset | winmgr | gterm | gtermstop | winmgrstop | windowdemo | windowdemostop | fbquiet | fbshow\n");
@@ -6454,6 +6475,59 @@ static void shell_handle(const char *line, int *done) {
         con_puts("?\n");
     }
 }
+
+#ifndef ZEAL_PI_DIAG
+/* Run the same bounded shell commands from the graphical DolDoc terminal.
+ * The terminal is an app task, so destructive/session-control commands and
+ * serial-only transfer/editor flows stay on the serial bootstrap shell. */
+int64_t zc_gui_shell_exec(int64_t *a) {
+    const char *line = (const char *)(uintptr_t)a[0];
+    int done = 0;
+    size_t command_len = 0;
+
+    if (!line)
+        return (int64_t)(uintptr_t)"graphical shell: command is too long\n";
+    while (command_len <= 255 && line[command_len])
+        command_len++;
+    if (command_len > 255)
+        return (int64_t)(uintptr_t)"graphical shell: command is too long\n";
+    if (streq(line, "help"))
+        return (int64_t)(uintptr_t)
+            "Graphical commands: zstatus | zvol | zls | zgc | zverify <path> | zload <path> | zput <name> <source> | zrm <name> | zc <source> | zcall <function>\n"
+            "Use the serial shell for the full command set.\n";
+    if (!(streq(line, "zstatus") ||
+          streq(line, "zvol") || streq(line, "zls") ||
+          streq(line, "zgc") ||
+          str_startswith(line, "zverify ") ||
+          str_startswith(line, "zload ") ||
+          str_startswith(line, "zcall ") ||
+          str_startswith(line, "zput ") ||
+          str_startswith(line, "zrm ") ||
+          str_startswith(line, "zc ")))
+        return (int64_t)(uintptr_t)
+            "graphical shell: use help; this command needs the serial shell\n";
+
+    gui_shell_output_len = 0;
+    gui_shell_output[0] = 0;
+    gui_shell_truncated = 0;
+    gui_shell_capture = 1;
+    shell_handle(line, &done);
+    gui_shell_capture = 0;
+    if (gui_shell_truncated && gui_shell_output_len + 1 < sizeof(gui_shell_output)) {
+        static const char suffix[] = "\n[output truncated]\n";
+        size_t n = sizeof(suffix) - 1;
+        if (n > sizeof(gui_shell_output) - gui_shell_output_len - 1)
+            n = sizeof(gui_shell_output) - gui_shell_output_len - 1;
+        for (size_t i = 0; i < n; i++)
+            gui_shell_output[gui_shell_output_len + i] = suffix[i];
+        gui_shell_output_len += n;
+        gui_shell_output[gui_shell_output_len] = 0;
+    }
+    if (!gui_shell_output_len)
+        return (int64_t)(uintptr_t)"\n";
+    return (int64_t)(uintptr_t)gui_shell_output;
+}
+#endif
 
 static void shell_run(void) {
     /* Interactive by default: no auto-script, no timeout.

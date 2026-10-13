@@ -333,6 +333,7 @@ static void guest_task_text_output(const char *text);
 static int64_t execute_source_result(const char *path, const char *src,
                                      int return_expr, int record_answer);
 extern void __clear_cache(void *, void *);
+extern int64_t zc_gui_shell_exec(int64_t *);
 void zc_fail(const char *s) __attribute__((noreturn));
 
 void zc_output(const char *s) {
@@ -3890,6 +3891,8 @@ static int load_inner(const char *path) {
         PrsBindCSymbol("ZcActiveWinMgrGlobals", host_active_winmgr_globals, 0);
         PrsBindCSymbol("ZcSetWinMgrTask", host_set_winmgr_task, 1);
     }
+    if (!strcmp(path, "/System/GuiTerminal.ZC"))
+        PrsBindCSymbol("ZcGuiShellExec", zc_gui_shell_exec, 1);
     /* Source units can introduce fresh extern declarations after KernelC.HH
      * has been parsed. Rebind the timer hook after each unit so those calls
      * resolve to the same host implementation as the kernel declaration. */
@@ -4037,6 +4040,7 @@ static int load_inner(const char *path) {
         PrsBindCSymbol("throw", host_guest_throw, 2);
         PrsBindCSymbol("ExePrint", host_exe_print, 2);
         PrsBindCSymbol("Print", host_print, 3);
+        PrsBindCSymbol("ZcGuiShellExec", zc_gui_shell_exec, 1);
         PrsBindCSymbol("StrPrintJoin", host_str_print_join, 4);
         PrsBindCSymbol("PutKey", host_put_key, 2);
         PrsBindCSymbol("StrLen", host_str_len, 1);
