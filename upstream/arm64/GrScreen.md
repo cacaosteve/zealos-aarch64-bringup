@@ -78,9 +78,10 @@ record whose executive task is the root task, and initializes every live
 task's `next_ode`/`last_ode` as an empty self-linked list. The runtime now walks
 the CPU0 task ring with a 64-task safety bound and calls upstream
 `GrUpdateTaskODEs` only after `ODEsUpdate` is loaded; the ARM64 overlay routes
-the integrator call through an optional host bridge. The QEMU smoke supplies a
-small test integrator and verifies the wrapper visits the root task. This does
-not yet load or execute ZealOS's `MathODE` subsystem or model additional CPUs.
+the integrator call through an optional host bridge. The PCI compatibility gate
+loads the pinned MathODE module and checks its constructor, vector operations,
+and one Cash–Karp RK5 step. The ordinary desktop update loop and MathODE's
+multi-CPU derivative workers remain unvalidated.
 Remaining graphics work includes connecting native input gestures to the
 upstream zoom controls and deciding how legacy planar output should coexist
 with the display driver's 32-bit framebuffer.

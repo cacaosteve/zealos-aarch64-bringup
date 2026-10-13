@@ -65,8 +65,8 @@ def translate_grscreen(source: bytes) -> bytes:
     guarded overlay is applied only to the AArch64 boot source bundle. It
     requires the exact text-background assembly and optional subsystem call
     sites so an upstream change cannot be silently mis-translated. The task-doc
-    and ODE calls go through runtime bridges because DolDoc and MathODE may not
-    have been loaded yet.
+    and ODE calls go through runtime bridges because these optional modules may
+    not have been loaded when the source window manager first starts.
     """
     try:
         text = source.decode("utf-8")

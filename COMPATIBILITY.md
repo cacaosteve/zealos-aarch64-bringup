@@ -1522,18 +1522,18 @@ ZealOS live distribution or installer.
   allocation hints only; the ARM64 backend assigns registers itself. `RegDeclChecks`
   verifies named `RSI`/`R13`/`RCX` annotations while preserving ordinary
   `reg bit_shift` declarations in the graphics sources.
-- The pinned, unchanged `System/Math/MathODE.ZC` has been added to the source
-  volume. Loading the full 758-line ODE module currently triggers a synchronous
-  guest data abort during compilation, so it is not yet part of the passing
-  source sequence. For `GrScreen`, the ARM64 source bundle expands its one
+- MathODE now loads from the PCI source volume and has guest coverage for its
+  vector ABI, constructor lifecycle, and one RK5 integration step; see
+  [ARM64 MathODE source module](#arm64-mathode-source-module) for the current
+  limits. For `GrScreen`, the ARM64 source bundle expands its one
   `GrUpdateTextBG` x86 store loop into eight inline typed stores; a separate
   helper check covers row writes, stride padding, color bytes, and next-cell
   offset in the guest. A disposable full-frame probe raised a synchronous
   exception while the framebuffer console drew the diagnostic immediately
   after the background pass (`ELR` at `fb_draw_char`, `FAR=0`). This does not
   isolate whether the pass damaged console state or the fault arose earlier, so
-  the source pass remains outside the live frame loop. The
-  AArch64 runtime also implements `DCBlotColor4`, with guest checks for packed
+  the source pass remains outside the live frame loop. The AArch64 runtime also
+  implements `DCBlotColor4`, with guest checks for packed
   pixel bit order, three-group plane layout, and changed/unchanged cache groups.
   The pinned upstream file remains
   byte-identical. The active manager probe still uses a compile-only
@@ -2002,9 +2002,9 @@ ZealOS live distribution or installer.
 
 ## ARM64 MathODE source module
 
-- The PCI compatibility target now loads the pinned `/System/Math/MathODE.ZC`
+- The PCI compatibility target loads the pinned `/System/Math/MathODE.ZC`
   source with `KernelA`, `KernelB`, `KernelC`, and `KMathB`, then checks the
-  unchanged module's `ODENew`/`ODEDel` lifecycle, D3 vector arithmetic, and a
+  module's `ODENew`/`ODEDel` lifecycle, D3 vector arithmetic, and a
   Cash–Karp RK5 step against the exponential equation `y'=y`. Host runtime
   bindings cover the `CD3` imports, while ARM64 compiler support includes
   defaulted F64 parameters and the F64 `Abs` intrinsic. A guarded source
