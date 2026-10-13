@@ -353,10 +353,11 @@ oracle are needed before broad language compatibility can be claimed.
 - The source archive is read-only. The native source store has two 32 MiB
   banks with append-only records, 95-byte paths and a 4 MiB per-file limit.
   `zedit` presents a fixed full-screen framebuffer source view. `j`/`k` move
-  its selected line; `e <text>`, `n <text>`, and `x` edit, insert before, and
-  delete that line. `p [line [count]]` selects a page, while numbered-line
-  commands remain available. A filled log reports an error without replacing
-  earlier versions. Guest `zgc` reclaims old versions in the
+  its selected line; `[`/`]` move by one visible page; `g`/`G` jump to the first
+  or last line. The view follows the selection. `e <text>`, `n <text>`, and
+  `x` edit, insert before, and delete that line. `p [line [count]]` selects a
+  view and numbered-line commands remain available. A filled log reports an
+  error without replacing earlier versions. Guest `zgc` reclaims old versions in the
   inactive bank, verifies the copy, flushes it, and commits the new
   superblock last. On virtio disks advertising FLUSH, saves and deletions
   also flush data before publishing a record header and flush the commit.

@@ -34,10 +34,12 @@ larger file while the VM is stopped. For a running UTM guest, `zrecv` accepts
 larger files as acknowledged serial hex chunks; `scripts/send-zc.py --emit`
 produces lines to paste into Terminal 1. `zls` lists live source files and
 `zrm <path>` hides one; `zgc` reclaims superseded records in the running guest
-using the disk's second source bank. `zedit <path>` opens a guest
-line editor with `p`, `a`, `i`, `c`, `d`, `wq` and `q!` commands; saved files
-load through `zload disk:<path>`. The complete unchanged upstream
-`KernelA.HH` and `KernelB.HH` load as declaration headers in that order.
+using the disk's second source bank. `zedit <path>` opens a guest line editor;
+`j`/`k` move the selected line, `[`/`]` page through the file, and `g`/`G`
+jump to its first or last line. It also supports `p`, `a`, `i`, `c`, `d`, `wq`
+and `q!` commands, as well as numbered-line edits. Saved files load through
+`zload disk:<path>`. The complete unchanged upstream `KernelA.HH` and
+`KernelB.HH` load as declaration headers in that order.
 The unchanged `KMathB.ZC` also loads with ARM64 bindings for task-local `Fs`,
 bit operations, the counter and a powers-of-ten table. A bounded cooperative
 task bridge exposes the default upstream `Spawn` callback signature, `Yield`,
