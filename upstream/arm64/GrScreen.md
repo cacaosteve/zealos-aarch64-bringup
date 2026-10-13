@@ -81,8 +81,13 @@ the CPU0 task ring with a 64-task safety bound and calls upstream
 the integrator call through an optional host bridge. The PCI compatibility gate
 loads the pinned MathODE module and checks its constructor, vector operations,
 one Cash–Karp RK5 step, and `ODEsUpdate` against the root task's populated ODE
-queue. The ordinary desktop frame and MathODE's multi-CPU derivative workers
-remain unvalidated.
+queue. `make check-grscreen-ode` additionally starts the live source Window
+Manager with real MathODE loaded, attaches a root-task ODE, and verifies its
+state advances along the expected exponential trajectory across manager
+frames. The manager is stopped before that test ODE is removed. This focused
+gate leaves the independent framebuffer pixel checks and legacy mouse/drag
+assertions to the ordinary graphics and interaction targets. MathODE's
+multi-CPU derivative workers remain unvalidated.
 Remaining graphics work includes connecting native input gestures to the
 upstream zoom controls and deciding how legacy planar output should coexist
 with the display driver's 32-bit framebuffer.

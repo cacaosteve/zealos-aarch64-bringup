@@ -1,6 +1,7 @@
 // Load before GrScreen.ZC, whose source wrapper calls ODEsUpdate directly.
 I64 gr_screen_ode_update_calls;
 Bool gr_screen_ode_root_seen;
+Bool gr_screen_ode_update_stub_enabled = TRUE;
 
 U0 ODEsUpdate(CTask *task)
 {

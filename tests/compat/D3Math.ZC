@@ -114,3 +114,44 @@ I64 MathODEUpdateLoopCheck()
 	ODEDel(ode);
 	return result;
 }
+
+CMathODE *mathode_frame_ode;
+CTask *mathode_frame_task;
+
+I64 MathODEUpdateFramePrepare()
+{//Attach an ODE before the source Window Manager starts its normal refresh loop.
+	CMathODE *head;
+	mathode_frame_task = Fs;
+	head = mathode_frame_task->next_ode;
+	mathode_frame_ode = ODENew(1);
+	if (!mathode_frame_ode) return 2;
+	mathode_frame_ode->derive = &MathODEExponential;
+	mathode_frame_ode->state[0] = 1.0;
+	mathode_frame_ode->base_t = tS - 0.1;
+	mathode_frame_ode->flags |= ODEF_STARTED;
+	mathode_frame_ode->next = head;
+	mathode_frame_ode->last = head;
+	head->next = mathode_frame_ode;
+	head->last = mathode_frame_ode;
+	return 1;
+}
+
+I64 MathODEUpdateFrameCheck()
+{//The live GrUpdateTasks loop should have advanced the root task's ODE.
+	I64 result = 1;
+	Sleep(100);
+	if (mathode_frame_ode->t < 0.02) result = 2;
+	if (Abs(mathode_frame_ode->state[0] - Exp(mathode_frame_ode->t)) > 0.001)
+		result = 3;
+	return result;
+}
+
+I64 MathODEUpdateFrameCleanup()
+{//Stop the manager before unlinking its root task's live ODE.
+	if (!mathode_frame_ode) return 2;
+	mathode_frame_ode->last->next = mathode_frame_ode->next;
+	mathode_frame_ode->next->last = mathode_frame_ode->last;
+	ODEDel(mathode_frame_ode);
+	mathode_frame_ode = NULL;
+	return 1;
+}

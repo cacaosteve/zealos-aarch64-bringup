@@ -22,6 +22,8 @@ p.add_argument('--probe-live-winmgr', action='store_true',
                help='start WinMgrTask and verify its first refresh and RLf_WINMGR marker')
 p.add_argument('--probe-live-winmgr-wake', action='store_true',
                help='after the first refresh, leave the manager running through its timer wake')
+p.add_argument('--probe-live-winmgr-ode', action='store_true',
+               help='load MathODE before GrScreen and verify a live manager frame advances a task ODE')
 p.add_argument('--probe-live-window-control', action='store_true',
                help='verify source CDC control rendering while WinMgrTask remains active')
 p.add_argument('--probe-task-jobs', action='store_true', help='check CPU-0 callback jobs after loading pinned task headers')
@@ -43,6 +45,11 @@ if args.probe_live_winmgr and not args.probe_grscreen:
     p.error('--probe-live-winmgr requires --probe-grscreen')
 if args.probe_live_winmgr_wake and not args.probe_live_winmgr:
     p.error('--probe-live-winmgr-wake requires --probe-live-winmgr')
+if args.probe_live_winmgr_ode and not (
+        args.probe_module == '/System/Win.ZC' and args.probe_winmgr and
+        args.probe_grscreen and args.probe_live_winmgr):
+    p.error('--probe-live-winmgr-ode requires --probe-module /System/Win.ZC '
+            '--probe-winmgr --probe-grscreen --probe-live-winmgr')
 if args.probe_live_window_control and not (
         args.probe_module == '/System/Win.ZC' and args.probe_winmgr and
         args.probe_grscreen and args.probe_live_winmgr):
@@ -422,22 +429,21 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                         'zc: loaded /System/Gr/GrDC.ZC', timeout=30)
                 command('zload /Tests/GrSpriteBridge.ZC',
                         'zc: loaded /Tests/GrSpriteBridge.ZC')
-                command('zcall GrDC2SpriteChecks',
-                        'zc => 0x000000000000002a')
-                command('zcall GrSpriteEllipseChecks',
-                        'zc => 0x000000000000002a')
-                command('zcall GrSpriteDitherChecks',
-                        'zc => 0x000000000000002a')
-                command('zcall GrSpriteThickChecks',
-                        'zc => 0x000000000000002a')
-                command('zcall GrSpriteArrowChecks',
-                        'zc => 0x000000000000002a')
-                command('zcall GrSpritePolygonChecks',
-                        'zc => 0x000000000000002a')
-                command('zcall GrSpriteRotatedRectChecks',
-                        'zc => 0x000000000000002a')
-                command('zcall GrSpriteBitmapChecks',
-                        'zc => 0x000000000000002a')
+                # This focused probe is about manager-frame MathODE execution.
+                # The ordinary sprite pixel checks run in the regular graphics
+                # target; keep them out of this path so unrelated framebuffer
+                # assertions cannot prevent the manager integration check.
+                if not args.probe_live_winmgr_ode:
+                    for check in ('GrDC2SpriteChecks',
+                                  'GrSpriteEllipseChecks',
+                                  'GrSpriteDitherChecks',
+                                  'GrSpriteThickChecks',
+                                  'GrSpriteArrowChecks',
+                                  'GrSpritePolygonChecks',
+                                  'GrSpriteRotatedRectChecks',
+                                  'GrSpriteBitmapChecks'):
+                        command(f'zcall {check}',
+                                'zc => 0x000000000000002a')
                 # GrRect can take the native probabilistic-dither path;
                 # its random helper is supplied by KMathB, which zreset
                 # removed from the boot-loaded compiler session.
@@ -447,24 +453,29 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                         'zc: loaded /System/Gr/GrBitMap.ZC', timeout=30)
                 command('zload /Tests/GrSpriteText.ZC',
                         'zc: loaded /Tests/GrSpriteText.ZC')
-                command('zcall GrSpriteTextChecks',
-                        'zc => 0x000000000000002a')
+                if not args.probe_live_winmgr_ode:
+                    command('zcall GrSpriteTextChecks',
+                            'zc => 0x000000000000002a')
                 command('zload /Tests/GrSpriteSpline.ZC',
                         'zc: loaded /Tests/GrSpriteSpline.ZC')
-                command('zcall GrSpriteSplineChecks',
-                        'zc => 0x000000000000002a')
+                if not args.probe_live_winmgr_ode:
+                    command('zcall GrSpriteSplineChecks',
+                            'zc => 0x000000000000002a')
                 command('zload /Tests/GrSpriteFloodFill.ZC',
                         'zc: loaded /Tests/GrSpriteFloodFill.ZC')
-                command('zcall GrSpriteFloodFillChecks',
-                        'zc => 0x000000000000002a')
+                if not args.probe_live_winmgr_ode:
+                    command('zcall GrSpriteFloodFillChecks',
+                            'zc => 0x000000000000002a')
                 command('zload /Tests/GrSpriteSymmetry.ZC',
                         'zc: loaded /Tests/GrSpriteSymmetry.ZC')
-                command('zcall GrSpriteSymmetryChecks',
-                        'zc => 0x000000000000002a')
+                if not args.probe_live_winmgr_ode:
+                    command('zcall GrSpriteSymmetryChecks',
+                            'zc => 0x000000000000002a')
                 command('zload /Tests/GrSpriteTransform.ZC',
                         'zc: loaded /Tests/GrSpriteTransform.ZC')
-                command('zcall GrSpriteTransformChecks',
-                        'zc => 0x000000000000002a')
+                if not args.probe_live_winmgr_ode:
+                    command('zcall GrSpriteTransformChecks',
+                            'zc => 0x000000000000002a')
                 command('zload /Tests/GrDCLifecycle.ZC',
                         'zc: loaded /Tests/GrDCLifecycle.ZC')
                 command('zcall GrDCLifecycleChecks',
@@ -607,15 +618,30 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 command('zcall WinExtTableCheck',
                         'zc => 0x0000000000000001')
                 if args.probe_winmgr:
-                    command('zload /Tests/WinMgrProbeDeps.ZC',
-                            'zc: loaded /Tests/WinMgrProbeDeps.ZC')
+                    if args.probe_live_winmgr_ode:
+                        command('zload /System/Math/MathODE.ZC',
+                                'zc: loaded /System/Math/MathODE.ZC', timeout=30)
+                        command('zload /Tests/D3Math.ZC',
+                                'zc: loaded /Tests/D3Math.ZC')
+                        for check in ('D3EquCheck', 'D3NormCheck',
+                                      'D3ArithmeticCheck', 'D3OperationsCheck',
+                                      'F64AbsCheck', 'MathODECreateCheck',
+                                      'MathODERK5Check',
+                                      'MathODEUpdateLoopCheck'):
+                            command(f'zcall {check}',
+                                    'zc => 0x0000000000000001')
+                    deps = ('WinMgrProbeDepsMathODE' if args.probe_live_winmgr_ode
+                            else 'WinMgrProbeDeps')
+                    command(f'zload /Tests/{deps}.ZC',
+                            f'zc: loaded /Tests/{deps}.ZC')
                     command('zload /System/WinMgr.ZC',
                             'zc: loaded /System/WinMgr.ZC', timeout=15)
                     if args.probe_grscreen:
-                        command('zload /Tests/ODEsUpdateStub.ZC',
-                                'zc: loaded /Tests/ODEsUpdateStub.ZC')
-                        command('zcall ODEsUpdateStubCheck',
-                                'zc => 0x000000000000002a')
+                        if not args.probe_live_winmgr_ode:
+                            command('zload /Tests/ODEsUpdateStub.ZC',
+                                    'zc: loaded /Tests/ODEsUpdateStub.ZC')
+                            command('zcall ODEsUpdateStubCheck',
+                                    'zc => 0x000000000000002a')
                         guest.stdin.write(b'zload /System/Gr/GrScreen.ZC\r')
                         guest.stdin.flush()
                         result = until(b'\n> ', timeout=30)
@@ -668,10 +694,21 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                                         'zc: loaded /Tests/WindowDragLive.ZC')
                                 command('zcall WindowDragLiveManagerChecks',
                                         'zc => 0x000000000000002a', timeout=30)
-                            command('zcall WinMgrMousePipelineChecks',
-                                    'zc => 0x000000000000002a', timeout=30)
-                            command('zcall WinMgrSourceDragChecks',
-                                    'zc => 0x000000000000002a', timeout=30)
+                            if not args.probe_live_winmgr_ode:
+                                command('zcall WinMgrMousePipelineChecks',
+                                        'zc => 0x000000000000002a', timeout=30)
+                            if not args.probe_live_winmgr_ode:
+                                command('zcall WinMgrSourceDragChecks',
+                                        'zc => 0x000000000000002a', timeout=30)
+                            if args.probe_live_winmgr_ode:
+                                command('zcall MathODEUpdateFramePrepare',
+                                        'zc => 0x0000000000000001')
+                                command('zcall MathODEUpdateFrameCheck',
+                                        'zc => 0x0000000000000001', timeout=10)
+                                command('winmgrstop',
+                                        'winmgr: stopped; bootstrap framebuffer pump resumed')
+                                command('zcall MathODEUpdateFrameCleanup',
+                                        'zc => 0x0000000000000001')
                             if args.probe_live_winmgr_wake:
                                 # Optional deeper probe; the regular acceptance
                                 # gate verifies startup/first refresh only.

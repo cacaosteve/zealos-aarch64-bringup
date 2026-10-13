@@ -1,0 +1,10 @@
+// Compile-only compositor dependencies; MathODE.ZC is loaded for this probe.
+extern U0 GrUpdateScreen();
+extern U0 GrRopEquU8NoClipping(I64 ch, U8 *dst, I64 width_internal);
+extern U0 DCBlotColor4(U8 *dst, I64 *img, I64 *img_cache, I64 count);
+
+// GrScreenFinalUpdate's legacy fixture normally checks these counters against
+// ODEsUpdateStub. The live MathODE probe uses the real updater instead.
+I64 gr_screen_ode_update_calls;
+Bool gr_screen_ode_root_seen;
+Bool gr_screen_ode_update_stub_enabled;

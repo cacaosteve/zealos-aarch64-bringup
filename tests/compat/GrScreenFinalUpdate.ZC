@@ -25,6 +25,7 @@ extern CWinMgrGlobals *ZcActiveWinMgrGlobals();
 extern U0 WinCalcIdles();
 extern I64 gr_screen_ode_update_calls;
 extern Bool gr_screen_ode_root_seen;
+extern Bool gr_screen_ode_update_stub_enabled;
 I64 gr_screen_final_update_calls;
 U8 gr_screen_final_update_old_pixel;
 U8 gr_screen_final_update_overlay_off[FONT_WIDTH * 10 * FONT_HEIGHT];
@@ -587,7 +588,8 @@ I64 GrScreenFinalUpdateChecks()
         mouse.pos.y = old_mouse_y;
         return 26;
     }
-    if (!gr_screen_ode_update_calls || !gr_screen_ode_root_seen)
+    if (gr_screen_ode_update_stub_enabled &&
+        (!gr_screen_ode_update_calls || !gr_screen_ode_root_seen))
     {
         mouse_grid.coord = old_coord;
         mouse.pos.x = old_mouse_x;
