@@ -247,6 +247,7 @@ static int guest_task_exe_active;
 static int guest_job_call_active;
 static int guest_background_dispatch;
 static unsigned guest_idle_frame_divider;
+static uint64_t guest_task_frame_count;
 static CHashFun *guest_winmgr_tick_fun;
 /* Keep source graphics updates inside the staged framebuffer transaction. */
 static int guest_task_frame_active;
@@ -1137,6 +1138,8 @@ static int64_t guest_task_frame_run(void) {
         FFI_CALL_TOS_0(present->fun_ptr);
     presented = zeal_fb_task_frame_end(guest_source_full_screen_active() ||
                                        guest_task_frame_rgba_ready) != 0;
+    if (presented)
+        guest_task_frame_count++;
     guest_task_frame_active = 0;
     guest_task_frame_rgba_ready = 0;
     return presented;
@@ -4218,6 +4221,7 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
     guest_job_call_active = 0;
     guest_background_dispatch = 0;
     guest_idle_frame_divider = 0;
+    guest_task_frame_count = 0;
     guest_winmgr_tick_fun = NULL;
     guest_focus_task = NULL;
     memset(guest_fibers, 0, sizeof(guest_fibers));
@@ -4576,6 +4580,9 @@ void zc_status(void) {
     printf("zc: ready=%d failed=%d modules=%lu data=%lu/%u code=%lu/%u allocations=%lu\n", ready,
            failed, (unsigned long)loaded_modules, (unsigned long)used[0], DATA_BYTES,
            (unsigned long)used[1], CODE_BYTES, (unsigned long)(blocks[0] + blocks[1]));
+    printf("desktop: winmgr=%d gterm=%d windowdemo=%d presented_frames=%lu\n",
+           source_winmgr_active, gui_terminal_active, window_demo_loaded,
+           (unsigned long)guest_task_frame_count);
 }
 int zc_selftest(void) {
     int64_t result = 0;

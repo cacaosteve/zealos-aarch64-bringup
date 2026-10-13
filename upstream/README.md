@@ -3281,6 +3281,15 @@ Freeze catalog unchanged.
 | Smoke | `BootstrapGuiTerminalSmoke` verifies the fifth menu entry, and the PCI suite checks the graphical terminal and window-demo start/stop lifecycle |
 | Limits | The demo remains a validation app rather than the full ZealOS application/menu system; click-to-launch and terminal restoration still need UTM acceptance |
 
+## Milestone 291 — report live desktop presentation state
+
+| Item | Path |
+|--|--|
+| Gap | `zstatus` reported compiler memory but could not distinguish an initialized desktop from a compositor that had never presented a frame |
+| Bring-up | Count successful staged desktop presentations and report Window Manager, graphical-terminal, window-demo, and presented-frame state with `zstatus` |
+| Smoke | The PCI boot regression requires the boot terminal to report an active manager and terminal with at least one presented framebuffer frame |
+| Limits | A successful guest-side presentation does not confirm that UTM displays the scanout; final display validation still needs the VM window |
+
 ## Open compatibility probe — `/System/Win.ZC`
 
 The source probe loads pinned `KernelC.HH`, `Externs.ZC`, and `Gr.HH` before compiling unchanged `Win.ZC`. Graphics dimensions and mouse globals are probe fixtures; `DrawMenu` and the initial `GrScaleZoom` definition are compile-time fixtures until unchanged `GrScreen.ZC` is loaded later in the probe. `GrScreenFinalUpdateChecks` executes `WinFinalUpdate` through the staged idle-frame path, confirms the fixture's `mouse_grid.coord` toggles the real coordinate-text overlay, checks a separate visible guest overlay callback, verifies the software arrow against Limine framebuffer pixels, and exercises `WinMouseUpdate`'s edge recentering through the runtime dispatch. `WinMousePointerStateCheck` covers transformed tablet coordinates and `WinMouseHardStateCheck` covers the source mouse-state ABI; manual UTM acceptance confirms the software pointer and window-demo mouse interaction. The raw ARM generic-timer binding and a standalone F64 clock expression are smoke-tested before the Win load.

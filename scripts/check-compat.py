@@ -220,6 +220,11 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         if re.search(r'hc IR FAIL|(?:Upstream|Front) [^\r\n]* FAIL', boot):
             raise RuntimeError('legacy regressions')
         print('PASS boot and legacy regression markers', flush=True)
+        desktop = command('zstatus', 'desktop: winmgr=1 gterm=1 windowdemo=0 presented_frames=')
+        frames = re.search(r'desktop: winmgr=1 gterm=1 windowdemo=0 presented_frames=(\d+)', desktop)
+        if not frames or int(frames.group(1)) == 0:
+            raise RuntimeError('boot graphical terminal has not presented a frame:\n' + desktop)
+        print('PASS boot graphical desktop presented a framebuffer frame', flush=True)
         command('zcall BootstrapGuiTerminalSmoke',
                 'zc => 0x000000000000002a')
         command('zcall BootstrapGuiShellSmoke',
