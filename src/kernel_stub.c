@@ -4518,6 +4518,15 @@ static void tablet_cursor_tick(void) {
     uint32_t x, y;
     (void)virtio_tablet_xy((uint32_t)g_fb_w, (uint32_t)g_fb_h, &x, &y);
     int btn = virtio_tablet_buttons();
+    /* Once source WinMgr owns the graphical desktop it draws the software
+     * arrow through gr.fp_draw_mouse. Keep this bootstrap marker out of that
+     * scanout so it cannot cover the real cursor or leave stale orange pixels. */
+    if (zc_gui_terminal_active() || zc_window_demo_active()) {
+        g_tab_prev_btn = btn;
+        g_tab_cx = x;
+        g_tab_cy = y;
+        return;
+    }
     if ((btn & 1) && !(g_tab_prev_btn & 1)) {
         tablet_paint_stamp(x, y, 0x0040C0F0u);
         g_tab_clicks++;

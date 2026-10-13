@@ -3218,6 +3218,15 @@ Freeze catalog unchanged.
 | Smoke | `BootstrapGrContextInitChecks` asserts the root is valid after initialization; `make check-grscreen`, the graphical-terminal/menu smoke, and `make check-compat-pci` pass |
 | Limits | This repairs bootstrap root ownership; normal ZealOS system-task initialization and the full desktop lifecycle remain open |
 
+## Milestone 284 — remove the bootstrap cursor overlay during source desktop use
+
+| Item | Path |
+|--|--|
+| Gap | The bootstrap shell kept painting its orange tablet-position marker over the framebuffer after the source Window Manager had begun drawing its software pointer |
+| Bring-up | Keep the orange marker as a shell-only fallback, but stop painting it while the graphical terminal or window demo is active so the source cursor remains visible without stale overlay pixels |
+| Smoke | `make check-compat-pci` passes the source WinMgr cursor, hit-testing, and live window interaction checks; UTM visual confirmation of the arrow without the orange marker is pending |
+| Limits | The source software cursor remains a bounded bootstrap arrow; standard ZealOS cursor sprites and other pointer devices are not initialized |
+
 ## Open compatibility probe — `/System/Win.ZC`
 
 The source probe loads pinned `KernelC.HH`, `Externs.ZC`, and `Gr.HH` before compiling unchanged `Win.ZC`. Graphics dimensions and mouse globals are probe fixtures; `DrawMenu` and the initial `GrScaleZoom` definition are compile-time fixtures until unchanged `GrScreen.ZC` is loaded later in the probe. `GrScreenFinalUpdateChecks` executes `WinFinalUpdate` through the staged idle-frame path, confirms the fixture's `mouse_grid.coord` toggles the real coordinate-text overlay, checks a separate visible guest overlay callback, verifies the software arrow against Limine framebuffer pixels, and exercises `WinMouseUpdate`'s edge recentering through the runtime dispatch. `WinMousePointerStateCheck` covers transformed tablet coordinates and `WinMouseHardStateCheck` covers the source mouse-state ABI; manual UTM acceptance confirms the software pointer and window-demo mouse interaction. The raw ARM generic-timer binding and a standalone F64 clock expression are smoke-tested before the Win load.
