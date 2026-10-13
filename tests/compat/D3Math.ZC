@@ -57,3 +57,14 @@ I64 F64AbsCheck()
 {
 	return Abs(-2.5) == 2.5;
 }
+
+I64 MathODECreateCheck()
+{
+	CMathODE *ode = ODENew(3);
+	I64 ok = ode && ode->n == 3 && ode->n_internal == 3 &&
+		ode->t_scale == 1.0 && ode->h == 1e-6 &&
+		ode->max_tolerance == 1e-6 && ode->min_tolerance == 1e-6 &&
+		ode->state && ode->array_base;
+	ODEDel(ode);
+	return ok;
+}
