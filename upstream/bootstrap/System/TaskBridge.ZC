@@ -3585,12 +3585,43 @@ public Bool BootstrapCtrlInputSample(CTask *task, I64 sample)
 Bool bootstrap_ctrl_input_poll_suspended;
 public Bool BootstrapCtrlWheelZoom(Bool ctrl_down, I64 wheel)
 {//Match the desktop gesture: Ctrl+wheel zooms; plain wheel belongs to controls.
+    CGrGlobals *active_gr = ZcActiveGrGlobals();
+    I64 current_zoom, target_zoom, step;
+    F64 scale;
+    if (!active_gr)
+        active_gr = &gr;
     if (!ctrl_down || !wheel)
         return FALSE;
+    current_zoom = active_gr->screen_zoom;
+    if (current_zoom < 1) current_zoom = 1;
+    if (current_zoom > 8) current_zoom = 8;
+    target_zoom = current_zoom;
     if (wheel > 0)
-        GrScaleZoom(2.0);
+    {
+        for (step = 0; step < wheel; step++)
+        {
+            if (target_zoom >= 8)
+                break;
+            target_zoom *= 2;
+            if (target_zoom > 8) target_zoom = 8;
+        }
+    }
     else
-        GrScaleZoom(0.5);
+    {
+        for (step = 0; step > wheel; step--)
+        {
+            if (target_zoom <= 1)
+                break;
+            target_zoom /= 2;
+            if (target_zoom < 1) target_zoom = 1;
+        }
+    }
+    if (target_zoom != current_zoom)
+    {
+        scale = target_zoom;
+        scale /= current_zoom;
+        GrScaleZoom(scale);
+    }
     return TRUE;
 }
 public I64 BootstrapCtrlWheelZoomChecks()
@@ -3656,6 +3687,60 @@ public I64 BootstrapCtrlWheelZoomChecks()
         active_mouse->scale.z != 1)
     {
         fail_code = 4;
+        goto fail;
+    }
+    if (!BootstrapCtrlWheelZoom(TRUE, 2))
+    {
+        fail_code = 51;
+        goto fail;
+    }
+    if (active_gr->screen_zoom != 4)
+    {
+        fail_code = 52;
+        goto fail;
+    }
+    if (active_mouse->scale.x < 0.249 || active_mouse->scale.x > 0.251)
+    {
+        fail_code = 531;
+        goto fail;
+    }
+    if (active_mouse->scale.y < 0.249 || active_mouse->scale.y > 0.251)
+    {
+        fail_code = 532;
+        goto fail;
+    }
+    if (active_mouse->scale.z < 0.249 || active_mouse->scale.z > 0.251)
+    {
+        fail_code = 533;
+        goto fail;
+    }
+    if (!BootstrapCtrlWheelZoom(TRUE, -2))
+    {
+        fail_code = 61;
+        goto fail;
+    }
+    if (active_gr->screen_zoom != 1 || active_mouse->scale.x < 0.999 ||
+        active_mouse->scale.x > 1.001 || active_mouse->scale.y < 0.999 ||
+        active_mouse->scale.y > 1.001 || active_mouse->scale.z < 0.999 ||
+        active_mouse->scale.z > 1.001)
+    {
+        fail_code = 62;
+        goto fail;
+    }
+    if (!BootstrapCtrlWheelZoom(TRUE, 127) || active_gr->screen_zoom != 8 ||
+        active_mouse->scale.x < 0.124 || active_mouse->scale.x > 0.126 ||
+        active_mouse->scale.y < 0.124 || active_mouse->scale.y > 0.126 ||
+        active_mouse->scale.z < 0.124 || active_mouse->scale.z > 0.126)
+    {
+        fail_code = 7;
+        goto fail;
+    }
+    if (!BootstrapCtrlWheelZoom(TRUE, -127) || active_gr->screen_zoom != 1 ||
+        active_mouse->scale.x < 0.999 || active_mouse->scale.x > 1.001 ||
+        active_mouse->scale.y < 0.999 || active_mouse->scale.y > 1.001 ||
+        active_mouse->scale.z < 0.999 || active_mouse->scale.z > 1.001)
+    {
+        fail_code = 8;
         goto fail;
     }
 

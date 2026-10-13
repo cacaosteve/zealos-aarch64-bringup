@@ -3313,8 +3313,8 @@ Freeze catalog unchanged.
 | Item | Path |
 |--|--|
 | Gap | The UTM tablet path routed Ctrl+wheel to source zoom, but automated checks covered only `GrScaleZoom` itself and not the gesture dispatch |
-| Bring-up | Factor the Ctrl+wheel decision into `BootstrapCtrlWheelZoom`; keep plain wheel for focused controls, and check zoom-in/out against the active source graphics and mouse globals |
-| Smoke | `BootstrapCtrlWheelZoomChecks` verifies plain wheel is not consumed, Ctrl+wheel changes the source zoom between 1x and 2x, and the mouse scale follows both directions; the focused graphics probe passes |
+| Bring-up | Factor the Ctrl+wheel decision into `BootstrapCtrlWheelZoom`; preserve every accumulated wheel notch, keep plain wheel for focused controls, and clamp work at ZealOS's 1x–8x limits |
+| Smoke | `BootstrapCtrlWheelZoomChecks` verifies plain wheel is not consumed, one- and multi-notch Ctrl+wheel changes source zoom, and both zoom limits preserve the matching mouse scale; the focused graphics probe passes |
 | Limits | This validates the guest input decision and transform; physical UTM Ctrl+wheel behavior still needs hands-on confirmation |
 
 ## Open compatibility probe — `/System/Win.ZC`
