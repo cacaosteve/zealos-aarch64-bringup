@@ -9487,8 +9487,13 @@ void kernel_entry(const struct zeal_handoff *h) {
     zc_set_key_reader(zc_key_read, zc_key_reset);
     if (h->revision >= 3 && h->size >= sizeof(*h))
         zc_init((void *)(uintptr_t)h->sources_virt, h->sources_size, con_puts);
-    if (h->revision >= 3 && h->size >= sizeof(*h))
-        (void)zc_start_graphics();
+    if (h->revision >= 3 && h->size >= sizeof(*h) &&
+        zc_start_graphics() == 0) {
+        if (zc_start_winmgr() == 0)
+            uart_puts(g_uart, "zc: source Window Manager started at boot\n");
+        else
+            con_puts("zc: source Window Manager auto-start failed; use winmgr to retry\n");
+    }
 #endif
     shell_run();
 

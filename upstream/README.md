@@ -3173,6 +3173,15 @@ Freeze catalog unchanged.
 | Smoke | `BootstrapGrContextFlagsChecks` verifies all four role assignments in the PCI boot integration sequence; `make check-compat-pci` passes |
 | Limits | The roles align the bootstrap CDCs with upstream expectations; normal kernel graphics initialization, menu startup, and the full desktop task lifecycle are still incomplete |
 
+## Milestone 279 — start the source window manager during boot
+
+| Item | Path |
+|--|--|
+| Gap | Boot loaded the upstream graphics stack but left its tested source `WinMgrTask` dormant until the user entered `winmgr` |
+| Bring-up | After graphics sources load, run the source manager before entering the serial shell; if it fails, keep the shell available and print a retry hint |
+| Smoke | The PCI boot integration confirms the manager is already live, can be stopped and restarted, and continues to pass the window-demo input/render checks |
+| Limits | This starts the window manager and graphics refresh path; it does not create the normal menu task, launch applications, or complete ZealOS system-task startup |
+
 ## Open compatibility probe — `/System/Win.ZC`
 
 The source probe loads pinned `KernelC.HH`, `Externs.ZC`, and `Gr.HH` before compiling unchanged `Win.ZC`. Graphics dimensions and mouse globals are probe fixtures; `DrawMenu` and the initial `GrScaleZoom` definition are compile-time fixtures until unchanged `GrScreen.ZC` is loaded later in the probe. `GrScreenFinalUpdateChecks` executes `WinFinalUpdate` through the staged idle-frame path, confirms the fixture's `mouse_grid.coord` toggles the real coordinate-text overlay, checks a separate visible guest overlay callback, verifies the software arrow against Limine framebuffer pixels, and exercises `WinMouseUpdate`'s edge recentering through the runtime dispatch. `WinMousePointerStateCheck` covers transformed tablet coordinates and `WinMouseHardStateCheck` covers the source mouse-state ABI; manual UTM acceptance confirms the software pointer and window-demo mouse interaction. The raw ARM generic-timer binding and a standalone F64 clock expression are smoke-tested before the Win load.
