@@ -36,6 +36,19 @@ U0 BootstrapGuiTerminalMenuInstall()
     Fs->cur_menu = menu;
 }
 
+U8 *BootstrapGuiTerminalMenuAction(I64 action)
+{
+    if (action == 1)
+        return ZcGuiShellExec("help");
+    if (action == 2)
+        return ZcGuiShellExec("zstatus");
+    if (action == 3)
+        return ZcGuiShellExec("zls");
+    if (action == 4)
+        return ZcGuiShellExec("zvol");
+    return NULL;
+}
+
 U0 BootstrapGuiTerminalTask(U8 *data)
 {
     I64 ch, sc;
@@ -85,16 +98,7 @@ U0 BootstrapGuiTerminalTask(U8 *data)
         {
             if (sc == GUI_MENU_ACTION_TAG)
             {
-                if (ch == 1)
-                    output = ZcGuiShellExec("help");
-                else if (ch == 2)
-                    output = ZcGuiShellExec("zstatus");
-                else if (ch == 3)
-                    output = ZcGuiShellExec("zls");
-                else if (ch == 4)
-                    output = ZcGuiShellExec("zvol");
-                else
-                    output = NULL;
+                output = BootstrapGuiTerminalMenuAction(ch);
                 if (output)
                     DocPrint(DocPut, "%s", output);
                 command_len = 0;
@@ -185,8 +189,21 @@ I64 BootstrapGuiTerminalSmoke()
 
 I64 BootstrapGuiShellSmoke()
 {
-    U8 *output = ZcGuiShellExec("zstatus");
-    if (output && output[0] == 'z')
-        return 0x2a;
-    return 1;
+    U8 *output;
+
+    output = BootstrapGuiTerminalMenuAction(1);
+    if (!output || output[0] != 'G')
+        return 1;
+    output = BootstrapGuiTerminalMenuAction(2);
+    if (!output || output[0] != 'z')
+        return 2;
+    output = BootstrapGuiTerminalMenuAction(3);
+    if (!output || output[0] != 'K')
+        return 3;
+    output = BootstrapGuiTerminalMenuAction(4);
+    if (!output || output[0] != 'z')
+        return 4;
+    if (BootstrapGuiTerminalMenuAction(5))
+        return 5;
+    return 0x2a;
 }

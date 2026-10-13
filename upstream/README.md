@@ -3206,7 +3206,7 @@ Freeze catalog unchanged.
 |--|--|
 | Gap | The source Window Manager started during boot, but the framebuffer remained an empty desktop until `gterm` was entered on the serial shell |
 | Bring-up | Load the upstream DolDoc terminal modules and spawn a visible interactive terminal task after the manager starts; retain the serial shell and a `gterm` retry path if terminal startup fails |
-| Smoke | PCI boot checks require the graphical-terminal startup marker; the DocTerm probe accepts the already-running boot task without creating a duplicate or stopping it |
+| Smoke | PCI boot checks require the graphical-terminal startup marker; the DocTerm probe accepts the already-running boot task without creating a duplicate or stopping it; the menu smoke verifies that Help, Status, Files, and Disk dispatch to `help`, `zstatus`, `zls`, and `zvol` |
 | Limits | This adds a usable terminal window and a small custom OS menu, not ZealOS's full menu tree, startup application set, or complete keyboard/mouse stack; UTM menu selection still needs hands-on acceptance |
 
 ## Milestone 283 — recover the source system-task root during graphics setup
