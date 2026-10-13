@@ -75,16 +75,15 @@ ready. The source refresh is covered from inside that initialized frame; a
 direct shell call to `GrUpdateScreen` is not a valid smoke because it bypasses
 the frame setup. The task runtime now provides a single-core CPU0
 record whose executive task is the root task, and initializes every live
-task's `next_ode`/`last_ode` as an empty self-linked list. The runtime now walks
-the CPU0 task ring with a 64-task safety bound and calls upstream
-`GrUpdateTaskODEs` only after `ODEsUpdate` is loaded; the ARM64 overlay routes
-the integrator call through an optional host bridge. The PCI compatibility gate
-loads the pinned MathODE module and checks its constructor, vector operations,
-one Cash–Karp RK5 step, and `ODEsUpdate` against the root task's populated ODE
-queue. `make check-grscreen-ode` additionally starts the live source Window
-Manager with real MathODE loaded, attaches a root-task ODE, and verifies its
-state advances along the expected exponential trajectory across manager
-frames. The manager is stopped before that test ODE is removed. This focused
+task's `next_ode`/`last_ode` as an empty self-linked list. It loads the pinned
+MathODE module as part of source graphics startup, so ordinary source manager
+frames can run `GrUpdateTaskODEs`; the runtime walks the CPU0 task ring with a
+64-task safety bound and routes the integrator call through the ARM64 host
+bridge. The PCI compatibility gate checks the module's constructor, vector
+operations, one Cash–Karp RK5 step, and `ODEsUpdate` against the root task's
+populated ODE queue. `make check-grscreen-ode` additionally starts the live
+source Window Manager, attaches a root-task ODE, and verifies its state
+advances along the expected exponential trajectory across manager frames. The manager is stopped before that test ODE is removed. This focused
 gate leaves the independent framebuffer pixel checks and legacy mouse/drag
 assertions to the ordinary graphics and interaction targets. MathODE's
 multi-CPU derivative workers remain unvalidated.

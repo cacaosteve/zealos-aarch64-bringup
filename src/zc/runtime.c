@@ -81,7 +81,7 @@ extern int64_t zc_tablet_sample(void);
 /* Separate arenas from legacy hc_* so its per-demo reset cannot invalidate
  * modules loaded here. Both use splitting/coalescing and arbitrary-order Free. */
 #define DATA_BYTES (16u * 1024u * 1024u)
-#define CODE_BYTES (4u * 1024u * 1024u)
+#define CODE_BYTES (8u * 1024u * 1024u)
 #define BLOCK_MAGIC 0x5a43424c4f434b31ull
 struct block {
     uint64_t magic;
@@ -4304,6 +4304,10 @@ int zc_start_graphics(void) {
         "/Kernel/KMathB.ZC",
         "/System/TaskBridge.ZC",
         "/System/Externs.ZC",
+        /* GrUpdateTaskODEs is part of the normal source frame path. Load its
+         * implementation during boot so task-owned ODEs advance without an
+         * application having to load MathODE.ZC manually. */
+        "/System/Math/MathODE.ZC",
         "/System/Gr/GrInitA.ZC",
         "/System/Gr/Gr.HH",
         "/System/Gr/SpriteBridge.ZC",
