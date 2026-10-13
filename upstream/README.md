@@ -3263,6 +3263,15 @@ Freeze catalog unchanged.
 | Smoke | `BootstrapGuiTerminalSmoke` now saves `zstatus`, replaces the input with a draft, recalls the saved command, clears the input, and rejects an overlong buffer; every PCI boot regression runs this smoke |
 | Limits | The check validates the shared state transitions but cannot verify UTM key delivery or visible DolDoc editing; hands-on testing remains required |
 
+## Milestone 289 — keep graphical terminal edits in sync with DolDoc
+
+| Item | Path |
+|--|--|
+| Gap | The graphical shell appended every printable key to its command buffer, while DolDoc permits moving the insertion point within the line |
+| Bring-up | Track a bounded command cursor and apply printable insertion, Backspace, Delete, Left/Right, Home, and End edits to the same buffer before forwarding recognized keys to `DocPutKey` |
+| Smoke | `BootstrapGuiTerminalSmoke` checks insertion in the middle, cursor movement, Backspace, forward Delete, Home/End, and the 255-character bound; `make check-compat-pci` validates the boot-loaded implementation |
+| Limits | The test checks buffer/cursor state, not actual virtio key delivery or visible editing behavior in UTM |
+
 ## Open compatibility probe — `/System/Win.ZC`
 
 The source probe loads pinned `KernelC.HH`, `Externs.ZC`, and `Gr.HH` before compiling unchanged `Win.ZC`. Graphics dimensions and mouse globals are probe fixtures; `DrawMenu` and the initial `GrScaleZoom` definition are compile-time fixtures until unchanged `GrScreen.ZC` is loaded later in the probe. `GrScreenFinalUpdateChecks` executes `WinFinalUpdate` through the staged idle-frame path, confirms the fixture's `mouse_grid.coord` toggles the real coordinate-text overlay, checks a separate visible guest overlay callback, verifies the software arrow against Limine framebuffer pixels, and exercises `WinMouseUpdate`'s edge recentering through the runtime dispatch. `WinMousePointerStateCheck` covers transformed tablet coordinates and `WinMouseHardStateCheck` covers the source mouse-state ABI; manual UTM acceptance confirms the software pointer and window-demo mouse interaction. The raw ARM generic-timer binding and a standalone F64 clock expression are smoke-tested before the Win load.

@@ -39,6 +39,85 @@ I64 BootstrapGuiTerminalHistoryRecall(U8 *command, I64 *command_len,
                                          history, history_len);
 }
 
+I64 BootstrapGuiTerminalCommandKey(U8 *command, I64 *command_len,
+                                   I64 *command_pos, I64 ch, I64 scan)
+{
+    I64 i;
+    I64 code = scan.u8[0];
+
+    if (!command || !command_len || !command_pos ||
+        *command_len < 0 || *command_len > 255 ||
+        *command_pos < 0 || *command_pos > *command_len)
+        return 0;
+    if (!ch)
+    {
+        if (code == SC_CURSOR_LEFT)
+        {
+            if (*command_pos)
+                (*command_pos)--;
+            else
+                return 2;
+            return 1;
+        }
+        if (code == SC_CURSOR_RIGHT)
+        {
+            if (*command_pos < *command_len)
+                (*command_pos)++;
+            else
+                return 2;
+            return 1;
+        }
+        if (code == SC_HOME)
+        {
+            if (*command_pos)
+                *command_pos = 0;
+            else
+                return 2;
+            return 1;
+        }
+        if (code == SC_END)
+        {
+            if (*command_pos < *command_len)
+                *command_pos = *command_len;
+            else
+                return 2;
+            return 1;
+        }
+        if (code == SC_DELETE)
+        {
+            if (*command_pos >= *command_len)
+                return 2;
+            for (i = *command_pos; i < *command_len; i++)
+                command[i] = command[i + 1];
+            (*command_len)--;
+            return 1;
+        }
+        return 0;
+    }
+    if (ch == 8 || ch == 127)
+    {
+        if (!*command_pos)
+            return 2;
+        for (i = *command_pos - 1; i < *command_len; i++)
+            command[i] = command[i + 1];
+        (*command_len)--;
+        (*command_pos)--;
+        return 1;
+    }
+    if (ch >= 32 && ch < 127)
+    {
+        if (*command_len >= 255)
+            return 2;
+        for (i = *command_len; i >= *command_pos; i--)
+            command[i + 1] = command[i];
+        command[*command_pos] = ch;
+        (*command_len)++;
+        (*command_pos)++;
+        return 1;
+    }
+    return 0;
+}
+
 CMenuEntry *BootstrapGuiTerminalMenuEntry(CTask *task, U8 *name, I64 action)
 {
     CMenuEntry *entry = CAlloc(sizeof(CMenuEntry), task);
@@ -88,18 +167,22 @@ U0 BootstrapGuiTerminalTask(U8 *data)
     I64 ch, sc;
     I64 message;
     I64 command_len = 0;
+    I64 command_pos = 0;
     I64 history_len = 0;
     I64 i;
     U8 command[256];
     U8 history[256];
     U8 *output;
 
+    command[0] = 0;
+    history[0] = 0;
     KeyDevInit;
     DocTermNew;
     BootstrapGuiTerminalMenuInstall;
     KeyDevAdd(&KDDocPutKey, &KDDocPutS, 0x80000000, TRUE);
     DocPrint(DocPut, "ZealOS ARM64 graphical terminal\n");
-    DocPrint(DocPut, "Enter a command; Up recalls the last command, Down clears it.\n");
+    DocPrint(DocPut, "Edit with Left/Right, Home/End, Backspace and Delete.\n");
+    DocPrint(DocPut, "Up recalls the last command; Down clears it.\n");
     DocPrint(DocPut, "The serial shell remains available.\n");
     DocPrint(DocPut, "> ");
 
@@ -110,6 +193,7 @@ U0 BootstrapGuiTerminalTask(U8 *data)
         {
             if (ch == '\r' || ch == '\n')
             {
+                DocPutKey(DocPut, 0, SC_END);
                 DocPutKey(DocPut, ch, sc);
                 command[command_len] = 0;
                 BootstrapGuiTerminalHistorySave(history, &history_len,
@@ -118,35 +202,35 @@ U0 BootstrapGuiTerminalTask(U8 *data)
                 if (output)
                     DocPrint(DocPut, "%s", output);
                 command_len = 0;
+                command_pos = 0;
                 command[0] = 0;
                 DocPrint(DocPut, "> ");
             }
             else if (!ch && sc.u8[0] == SC_CURSOR_UP && history_len)
             {
+                DocPutKey(DocPut, 0, SC_END);
                 for (i = 0; i < command_len; i++)
                     DocPutKey(DocPut, 8, 0);
                 BootstrapGuiTerminalHistoryRecall(command, &command_len,
                                                   history, history_len);
+                command_pos = command_len;
                 for (i = 0; i < command_len; i++)
                     DocPutKey(DocPut, command[i], 0);
             }
             else if (!ch && sc.u8[0] == SC_CURSOR_DOWN)
             {
+                DocPutKey(DocPut, 0, SC_END);
                 for (i = 0; i < command_len; i++)
                     DocPutKey(DocPut, 8, 0);
                 command_len = 0;
+                command_pos = 0;
                 command[0] = 0;
             }
             else
             {
-                if (ch == 8 || ch == 127)
-                {
-                    if (command_len)
-                        command_len--;
-                }
-                else if (ch >= 32 && ch < 127 && command_len < sizeof(command) - 1)
-                    command[command_len++] = ch;
-                DocPutKey(DocPut, ch, sc);
+                if (BootstrapGuiTerminalCommandKey(command, &command_len,
+                                                   &command_pos, ch, sc) == 1)
+                    DocPutKey(DocPut, ch, sc);
             }
         }
         while ((message = MessageScan(&ch, &sc,
@@ -158,6 +242,8 @@ U0 BootstrapGuiTerminalTask(U8 *data)
                 if (output)
                     DocPrint(DocPut, "%s", output);
                 command_len = 0;
+                command_pos = 0;
+                command[0] = 0;
                 DocPrint(DocPut, "> ");
             }
         }
@@ -218,6 +304,7 @@ I64 BootstrapGuiTerminalSmoke()
     I64 action;
     I64 command_len = 0;
     I64 history_len = 0;
+    I64 command_pos = 0;
     U8 command[256];
     U8 history[256];
 
@@ -238,6 +325,33 @@ I64 BootstrapGuiTerminalSmoke()
                                               history, history_len) != 0x2a ||
             command_len != 7 || StrCompare(command, "zstatus"))
             return 39;
+        command_pos = 1;
+        if (BootstrapGuiTerminalCommandKey(command, &command_len,
+                                           &command_pos, 'X', 0) != 1 ||
+            command_len != 8 || command_pos != 2 ||
+            StrCompare(command, "zXstatus"))
+            return 42;
+        if (BootstrapGuiTerminalCommandKey(command, &command_len,
+                                           &command_pos, 0,
+                                           SC_CURSOR_LEFT) != 1 ||
+            command_pos != 1 ||
+            BootstrapGuiTerminalCommandKey(command, &command_len,
+                                           &command_pos, 8, 0) != 1 ||
+            command_len != 7 || command_pos != 0 ||
+            StrCompare(command, "Xstatus"))
+            return 43;
+        if (BootstrapGuiTerminalCommandKey(command, &command_len,
+                                           &command_pos, 0,
+                                           SC_DELETE) != 1 ||
+            command_len != 6 || StrCompare(command, "status"))
+            return 44;
+        if (BootstrapGuiTerminalCommandKey(command, &command_len,
+                                           &command_pos, 0,
+                                           SC_END) != 1 || command_pos != 6 ||
+            BootstrapGuiTerminalCommandKey(command, &command_len,
+                                           &command_pos, 0,
+                                           SC_HOME) != 1 || command_pos != 0)
+            return 45;
         if (BootstrapGuiTerminalBufferSet(command, &command_len,
                                           "", 0) != 0x2a ||
             command_len || command[0])
@@ -245,6 +359,13 @@ I64 BootstrapGuiTerminalSmoke()
         if (BootstrapGuiTerminalBufferSet(command, &command_len,
                                           "x", 256) != 0 || command_len)
             return 40;
+        command_len = 255;
+        command_pos = command_len;
+        command[255] = 0;
+        if (BootstrapGuiTerminalCommandKey(command, &command_len,
+                                           &command_pos, 'x', 0) != 2 ||
+            command_len != 255 || command_pos != 255)
+            return 46;
         menu = bootstrap_gui_terminal_task->cur_menu;
         if (!menu) return 11;
         if (menu->task != bootstrap_gui_terminal_task) return 18;
