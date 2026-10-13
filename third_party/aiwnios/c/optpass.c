@@ -1307,6 +1307,14 @@ void OptPassRegAlloc(CCmpCtrl *cctrl) {
   }
 #else
   for (i = cnt - 1; i >= 0; i--) {
+    /* Keep defaulted floating parameters in their stack slots. The ARM64
+     * function prolog copies them from the incoming argument registers, while
+     * default-argument lowering remains responsible for call-site values. */
+    if (mv[i].m->member_class->raw_type == RT_F64 &&
+        (mv[i].m->flags & MLF_DFT_AVAILABLE)) {
+      mv[i].m->reg = REG_NONE;
+      continue;
+    }
     if (mv[i].m->reg == REG_MAYBE || mv[i].m->reg == REG_ALLOC) {
       if (mv[i].m->member_class->raw_type == RT_F64) {
         if (freg - AIWNIOS_FREG_START < AIWNIOS_FREG_CNT) {

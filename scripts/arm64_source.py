@@ -36,6 +36,28 @@ def translate_winmgr(source: bytes) -> bytes:
     return text.encode("utf-8")
 
 
+def translate_mathode(source: bytes) -> bytes:
+    """Work around a parser failure on inline address-of-member call args.
+
+    The expression is equivalent and the guarded replacement keeps the
+    upstream mirror pristine while compiling the arm64 source volume.
+    """
+    try:
+        text = source.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValueError("MathODE.ZC is not UTF-8") from exc
+    signature = "U0 ODEMPTask(CMathODE *ode)\n{"
+    call = "\t\twhile (!Bt(&ode->mp_not_done_flags, Gs->num))"
+    reset = "\t\tLBtr(&ode->mp_not_done_flags, Gs->num);"
+    if (text.count(signature) != 1 or text.count(call) != 1 or
+            text.count(reset) != 1):
+        raise ValueError("expected the pinned ODEMPTask bit-test expression")
+    text = text.replace(signature, signature + "\n\tU8 *mp_flags = &ode->mp_not_done_flags;", 1)
+    text = text.replace(call, "\t\twhile (!Bt(mp_flags, Gs->num))", 1)
+    text = text.replace(reset, "\t\tLBtr(mp_flags, Gs->num);", 1)
+    return text.encode("utf-8")
+
+
 def translate_grscreen(source: bytes) -> bytes:
     """Apply the narrow AArch64 compatibility overlay to GrScreen.ZC.
 

@@ -28,6 +28,8 @@ p.add_argument('--probe-task-jobs', action='store_true', help='check CPU-0 callb
 p.add_argument('--probe-window-buttons', action='store_true', help='check live task-window title buttons in a disposable guest')
 p.add_argument('--probe-source', type=pathlib.Path, action='append',
                help='load a host source file from the disposable PCI source partition')
+p.add_argument('--probe-source-kernel', action='store_true',
+               help='load KernelA/B and KMathB before each source probe')
 args = p.parse_args()
 if args.probe_fulltext_visible:
     args.probe_fulltext = True
@@ -263,6 +265,13 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             command('zls', 'zls: native source partition unavailable')
         if args.probe_source:
             for i, source in enumerate(args.probe_source):
+                if args.probe_source_kernel:
+                    command('zload /Kernel/KernelA.HH',
+                            'zc: loaded /Kernel/KernelA.HH')
+                    command('zload /Kernel/KernelB.HH',
+                            'zc: loaded /Kernel/KernelB.HH')
+                    command('zload /Kernel/KMathB.ZC',
+                            'zc: loaded /Kernel/KMathB.ZC', timeout=30)
                 guest.stdin.write(f'zload disk:Probe/Source{i}.ZC\r'.encode()); guest.stdin.flush()
                 print('SOURCE PROBE '+str(source)+'\n'+until(b'\n> '), flush=True)
                 command('zreset', 'native compiler ready')
@@ -319,6 +328,13 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             print('KERNELB LOAD\n'+kb, flush=True)
             if 'zc: loaded /Kernel/KernelB.HH' not in kb:
                 raise RuntimeError('KernelB.HH did not load')
+            if args.probe_module == '/System/Math/MathODE.ZC':
+                # MathODE's MP task declarations (MPInt) are in KernelC, and
+                # its default math imports come from KMathB just as at boot.
+                command('zload /Kernel/KernelC.HH',
+                        'zc: loaded /Kernel/KernelC.HH')
+                command('zload /Kernel/KMathB.ZC',
+                        'zc: loaded /Kernel/KMathB.ZC', timeout=30)
             if args.probe_module == '/System/Win.ZC':
                 command('zload /Tests/TaskOdeRegistry.ZC',
                         'zc: loaded /Tests/TaskOdeRegistry.ZC')
@@ -572,6 +588,14 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             print('MODULE PROBE '+args.probe_module+'\n'+result, flush=True)
             if f'zc: loaded {args.probe_module}' not in result:
                 raise RuntimeError(f'unchanged module did not load: {args.probe_module}\n'+result)
+            if args.probe_module == '/System/Math/MathODE.ZC':
+                command('zload /Tests/D3Math.ZC',
+                        'zc: loaded /Tests/D3Math.ZC')
+                for check in ('D3EquCheck', 'D3NormCheck',
+                              'D3ArithmeticCheck', 'D3OperationsCheck',
+                              'F64AbsCheck'):
+                    command(f'zcall {check}',
+                            'zc => 0x0000000000000001')
             if args.probe_module == '/System/Win.ZC':
                 if args.probe_grscreen:
                     command('zload /Tests/GrAsmColor4.ZC',

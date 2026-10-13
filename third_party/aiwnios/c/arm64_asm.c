@@ -842,6 +842,11 @@ int64_t ARM_fnegReg(int64_t d, int64_t s) {
   return FpDataProc1Reg(0, 0, 1, 2, d, s);
 }
 
+int64_t ARM_fabsReg(int64_t d, int64_t s) {
+  /* FABS Dd, Dn. */
+  return 0x1e60c000 | (s << 5) | d;
+}
+
 int64_t ARM_fmovReg(int64_t d, int64_t s) {
   return FpDataProc1Reg(0, 0, 1, 0, d, s);
 }

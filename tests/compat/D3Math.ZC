@@ -1,0 +1,59 @@
+I64 D3EquCheck()
+{
+	CD3 a;
+	D3Equ(&a, 3.0, 4.0, 0.0);
+	return a.x == 3.0 && a.y == 4.0 && a.z == 0.0;
+}
+
+I64 D3NormCheck()
+{
+	CD3 a;
+	D3Equ(&a, 3.0, 4.0, 0.0);
+	return D3Norm(&a) == 5.0;
+}
+
+I64 D3ArithmeticCheck()
+{
+	CD3 a, b, c;
+	D3Equ(&a, 3.0, 4.0, 0.0);
+	D3Zero(&b);
+	D3Sub(&c, &a, &b);
+	D3MulEqu(&c, 2.0);
+	return c.x == 6.0 && c.y == 8.0 && c.z == 0.0;
+}
+
+I64 D3OperationsCheck()
+{
+	CD3 a, b, c, d;
+	D3Equ(&a, 3.0, 4.0, 0.0);
+	D3Equ(&b, 1.0, 2.0, 2.0);
+	D3Copy(&c, &a);
+	if (c.x != 3.0 || c.y != 4.0 || c.z != 0.0) return 2;
+	D3Add(&c, &a, &b);
+	D3SubEqu(&c, &b);
+	D3AddEqu(&c, &b);
+	if (c.x != 4.0 || c.y != 6.0 || c.z != 2.0) return 3;
+	D3Div(&d, &c, 2.0);
+	D3DivEqu(&d, 2.0);
+	if (d.x != 1.0 || d.y != 1.5 || d.z != 0.5) return 4;
+	D3Cross(&d, &a, &b);
+	if (d.x != 8.0 || d.y != -6.0 || d.z != 2.0) return 5;
+	if (D3Dot(&a, &b) != 11.0 || D3NormSqr(&a) != 25.0 ||
+		D3DistSqr(&a, &b) != 12.0) return 6;
+	if (D3Dist(&a, &b) < 3.46 || D3Dist(&a, &b) > 3.47) return 10;
+	D3Copy(&c, &a);
+	D3Unit(&c);
+	if (Abs(c.x - 0.6) > 0.00001 || Abs(c.y - 0.8) > 0.00001 ||
+		c.z != 0.0) return 7;
+	D3Mul(&d, 0.5, &a);
+	D3MulEqu(&d, 2.0);
+	if (d.x != 3.0 || d.y != 4.0 || d.z != 0.0) return 8;
+	D3Zero(&d);
+	if (d.x == 0.0 && d.y == 0.0 && d.z == 0.0) return 1;
+	return 9;
+}
+
+I64 F64AbsCheck()
+{
+	return Abs(-2.5) == 2.5;
+}

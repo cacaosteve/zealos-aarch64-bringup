@@ -159,6 +159,7 @@ static void SetKeepTmps(CRPN *rpn) {
     break;
   case IC_SQR:
   case IC_SQRT:
+  case IC_ABS:
   case IC_POS:
     goto unop;
     break;
@@ -1673,6 +1674,7 @@ static int64_t SpillsTmpRegs(CRPN *rpn) {
     break;
   case IC_SQR:
   case IC_SQRT:
+  case IC_ABS:
   case IC_POS:
     goto unop;
     break;
@@ -3208,6 +3210,21 @@ static int64_t __OptPassFinal(CCmpCtrl *cctrl, CRPN *rpn, char *bin,
       tmp.raw_type = RT_F64;
       tmp.reg = MFR(cctrl, 0);
       AIWNIOS_ADD_CODE(ARM_fsqrtReg(tmp.reg, next->res.reg));
+      code_off = ICMov(cctrl, &rpn->res, &tmp, bin, code_off);
+    }
+    break;
+  case IC_ABS:
+    next = ICArgN(rpn, 0);
+    code_off = __OptPassFinal(cctrl, next, bin, code_off);
+    code_off = PutICArgIntoReg(cctrl, &next->res, RT_F64, 0, bin,
+                               code_off);
+    if (rpn->res.mode == MD_REG) {
+      AIWNIOS_ADD_CODE(ARM_fabsReg(rpn->res.reg, next->res.reg));
+    } else {
+      tmp.mode = MD_REG;
+      tmp.raw_type = RT_F64;
+      tmp.reg = MFR(cctrl, 0);
+      AIWNIOS_ADD_CODE(ARM_fabsReg(tmp.reg, next->res.reg));
       code_off = ICMov(cctrl, &rpn->res, &tmp, bin, code_off);
     }
     break;
@@ -4826,6 +4843,9 @@ static int64_t PushTmpDepthFirst(CCmpCtrl *cctrl, CRPN *r, int64_t spilled) {
     goto unop;
     break;
   case IC_SQRT:
+    goto unop;
+    break;
+  case IC_ABS:
     goto unop;
     break;
   case IC_POS:

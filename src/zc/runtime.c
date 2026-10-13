@@ -711,6 +711,138 @@ static double host_f64_from_bits(uint64_t bits) {
     memcpy(&value, &bits, sizeof(value));
     return value;
 }
+static uint64_t host_f64_to_bits(double value) {
+    uint64_t bits;
+    memcpy(&bits, &value, sizeof(bits));
+    return bits;
+}
+static double host_sqrt_value(double value) {
+    return host_f64_from_bits(hc_builtin_sqrt(host_f64_to_bits(value)));
+}
+/* KernelB's _D3_* imports use a pointer-based CD3 ABI.  The guest compiler's
+ * C-symbol bridge passes each ZealOS word unchanged, including F64 bit
+ * patterns, so keep these adapters word-oriented and preserve aliasing (for
+ * example D3Add(&v, &v, &w)). */
+typedef struct { double x, y, z; } host_cd3;
+static int64_t host_d3_add(int64_t *a) {
+    host_cd3 *out = (host_cd3 *)(uintptr_t)a[0];
+    const host_cd3 *left = (const host_cd3 *)(uintptr_t)a[1];
+    const host_cd3 *right = (const host_cd3 *)(uintptr_t)a[2];
+    double x = left->x + right->x, y = left->y + right->y,
+           z = left->z + right->z;
+    out->x = x; out->y = y; out->z = z;
+    return a[0];
+}
+static int64_t host_d3_add_equ(int64_t *a) {
+    host_cd3 *out = (host_cd3 *)(uintptr_t)a[0];
+    const host_cd3 *right = (const host_cd3 *)(uintptr_t)a[1];
+    out->x += right->x; out->y += right->y; out->z += right->z;
+    return a[0];
+}
+static int64_t host_d3_copy(int64_t *a) {
+    host_cd3 *out = (host_cd3 *)(uintptr_t)a[0];
+    const host_cd3 *in = (const host_cd3 *)(uintptr_t)a[1];
+    double x = in->x, y = in->y, z = in->z;
+    out->x = x; out->y = y; out->z = z;
+    return a[0];
+}
+static int64_t host_d3_cross(int64_t *a) {
+    host_cd3 *out = (host_cd3 *)(uintptr_t)a[0];
+    const host_cd3 *left = (const host_cd3 *)(uintptr_t)a[1];
+    const host_cd3 *right = (const host_cd3 *)(uintptr_t)a[2];
+    double x = left->y * right->z - left->z * right->y;
+    double y = left->z * right->x - left->x * right->z;
+    double z = left->x * right->y - left->y * right->x;
+    out->x = x; out->y = y; out->z = z;
+    return a[0];
+}
+static int64_t host_d3_dist_sqr(int64_t *a) {
+    const host_cd3 *left = (const host_cd3 *)(uintptr_t)a[0];
+    const host_cd3 *right = (const host_cd3 *)(uintptr_t)a[1];
+    double x = left->x - right->x, y = left->y - right->y,
+           z = left->z - right->z;
+    return (int64_t)host_f64_to_bits(x * x + y * y + z * z);
+}
+static int64_t host_d3_dist(int64_t *a) {
+    return (int64_t)host_f64_to_bits(host_sqrt_value(
+        host_f64_from_bits((uint64_t)host_d3_dist_sqr(a))));
+}
+static int64_t host_d3_div(int64_t *a) {
+    host_cd3 *out = (host_cd3 *)(uintptr_t)a[0];
+    const host_cd3 *in = (const host_cd3 *)(uintptr_t)a[1];
+    double divisor = host_f64_from_bits((uint64_t)a[2]);
+    double x = in->x / divisor, y = in->y / divisor, z = in->z / divisor;
+    out->x = x; out->y = y; out->z = z;
+    return a[0];
+}
+static int64_t host_d3_div_equ(int64_t *a) {
+    host_cd3 *out = (host_cd3 *)(uintptr_t)a[0];
+    double divisor = host_f64_from_bits((uint64_t)a[1]);
+    out->x /= divisor; out->y /= divisor; out->z /= divisor;
+    return a[0];
+}
+static int64_t host_d3_dot(int64_t *a) {
+    const host_cd3 *left = (const host_cd3 *)(uintptr_t)a[0];
+    const host_cd3 *right = (const host_cd3 *)(uintptr_t)a[1];
+    return (int64_t)host_f64_to_bits(left->x * right->x +
+                                     left->y * right->y +
+                                     left->z * right->z);
+}
+static int64_t host_d3_equ(int64_t *a) {
+    host_cd3 *out = (host_cd3 *)(uintptr_t)a[0];
+    out->x = host_f64_from_bits((uint64_t)a[1]);
+    out->y = host_f64_from_bits((uint64_t)a[2]);
+    out->z = host_f64_from_bits((uint64_t)a[3]);
+    return a[0];
+}
+static int64_t host_d3_mul(int64_t *a) {
+    host_cd3 *out = (host_cd3 *)(uintptr_t)a[0];
+    double scale = host_f64_from_bits((uint64_t)a[1]);
+    const host_cd3 *in = (const host_cd3 *)(uintptr_t)a[2];
+    double x = scale * in->x, y = scale * in->y, z = scale * in->z;
+    out->x = x; out->y = y; out->z = z;
+    return a[0];
+}
+static int64_t host_d3_mul_equ(int64_t *a) {
+    host_cd3 *out = (host_cd3 *)(uintptr_t)a[0];
+    double scale = host_f64_from_bits((uint64_t)a[1]);
+    out->x *= scale; out->y *= scale; out->z *= scale;
+    return a[0];
+}
+static int64_t host_d3_norm_sqr(int64_t *a) {
+    const host_cd3 *v = (const host_cd3 *)(uintptr_t)a[0];
+    return (int64_t)host_f64_to_bits(v->x * v->x + v->y * v->y + v->z * v->z);
+}
+static int64_t host_d3_norm(int64_t *a) {
+    return (int64_t)host_f64_to_bits(host_sqrt_value(
+        host_f64_from_bits((uint64_t)host_d3_norm_sqr(a))));
+}
+static int64_t host_d3_sub(int64_t *a) {
+    host_cd3 *out = (host_cd3 *)(uintptr_t)a[0];
+    const host_cd3 *left = (const host_cd3 *)(uintptr_t)a[1];
+    const host_cd3 *right = (const host_cd3 *)(uintptr_t)a[2];
+    double x = left->x - right->x, y = left->y - right->y,
+           z = left->z - right->z;
+    out->x = x; out->y = y; out->z = z;
+    return a[0];
+}
+static int64_t host_d3_sub_equ(int64_t *a) {
+    host_cd3 *out = (host_cd3 *)(uintptr_t)a[0];
+    const host_cd3 *right = (const host_cd3 *)(uintptr_t)a[1];
+    out->x -= right->x; out->y -= right->y; out->z -= right->z;
+    return a[0];
+}
+static int64_t host_d3_unit(int64_t *a) {
+    host_cd3 *out = (host_cd3 *)(uintptr_t)a[0];
+    double norm = host_sqrt_value(out->x * out->x + out->y * out->y + out->z * out->z);
+    if (norm != 0) { out->x /= norm; out->y /= norm; out->z /= norm; }
+    return a[0];
+}
+static int64_t host_d3_zero(int64_t *a) {
+    host_cd3 *out = (host_cd3 *)(uintptr_t)a[0];
+    out->x = out->y = out->z = 0;
+    return a[0];
+}
 static int64_t host_low_pass1(int64_t *a) {
     double alpha = host_f64_from_bits((uint64_t)a[0]);
     double y0 = host_f64_from_bits((uint64_t)a[1]);
@@ -3239,6 +3371,10 @@ static int64_t host_abs_i64(int64_t *a) {
     /* KernelB declares AbsI64 as _intern IC_ABS_I64; Aiwnios has no that opcode. */
     return a[0] < 0 ? -a[0] : a[0];
 }
+static int64_t host_abs_f64(int64_t *a) {
+    /* Preserve NaN payloads while applying IEEE-754 absolute value. */
+    return (int64_t)((uint64_t)a[0] & UINT64_C(0x7fffffffffffffff));
+}
 static int64_t host_to_bool(int64_t *a) {
     /* KernelB declares ToBool as _intern IC_TO_BOOL; bind host until call sites
      * lower to the IC_TO_BOOL opcode. */
@@ -3436,6 +3572,25 @@ static void bind_guest_task(void) {
     PrsBindCSymbol("ToF64", host_to_f64, 1);
     PrsBindCSymbol("ToI64", host_to_i64, 1);
     PrsBindCSymbol("AbsI64", host_abs_i64, 1);
+    PrsBindCSymbol("Abs", host_abs_f64, 1);
+    PrsBindCSymbol("D3Add", host_d3_add, 3);
+    PrsBindCSymbol("D3AddEqu", host_d3_add_equ, 2);
+    PrsBindCSymbol("D3Copy", host_d3_copy, 2);
+    PrsBindCSymbol("D3Cross", host_d3_cross, 3);
+    PrsBindCSymbol("D3Dist", host_d3_dist, 2);
+    PrsBindCSymbol("D3DistSqr", host_d3_dist_sqr, 2);
+    PrsBindCSymbol("D3Div", host_d3_div, 3);
+    PrsBindCSymbol("D3DivEqu", host_d3_div_equ, 2);
+    PrsBindCSymbol("D3Dot", host_d3_dot, 2);
+    PrsBindCSymbol("D3Equ", host_d3_equ, 4);
+    PrsBindCSymbol("D3Mul", host_d3_mul, 3);
+    PrsBindCSymbol("D3MulEqu", host_d3_mul_equ, 2);
+    PrsBindCSymbol("D3Norm", host_d3_norm, 1);
+    PrsBindCSymbol("D3NormSqr", host_d3_norm_sqr, 1);
+    PrsBindCSymbol("D3Sub", host_d3_sub, 3);
+    PrsBindCSymbol("D3SubEqu", host_d3_sub_equ, 2);
+    PrsBindCSymbol("D3Unit", host_d3_unit, 1);
+    PrsBindCSymbol("D3Zero", host_d3_zero, 1);
     PrsBindCSymbol("ToBool", host_to_bool, 1);
     PrsBindCSymbol("ToUpper", host_to_upper, 1);
     PrsBindCSymbol("CtrlAltCBSet", host_ctrl_alt_cb_set, 5);

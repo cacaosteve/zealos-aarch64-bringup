@@ -336,6 +336,7 @@ CRPN *ICFwd(CRPN *rpn) {
     break;
   case IC_NEG:
   case IC_SQRT:
+  case IC_ABS:
   unop:
     return ICFwd(rpn->base.next);
     break;
@@ -1515,6 +1516,10 @@ int64_t DolDocDumpIR(char *to, int64_t len, CRPN *rpn) {
     len = AddBytes(to, len, "$PURPLE$SQRT$FD$\n");
     goto unop;
     break;
+  case IC_ABS:
+    len = AddBytes(to, len, "$PURPLE$ABS$FD$\n");
+    goto unop;
+    break;
   case IC_SQR:
     len = AddBytes(to, len, "$PURPLE$SQR$FD$\n");
     goto unop;
@@ -1553,6 +1558,7 @@ static int64_t IsRightAssoc(int64_t ic) {
   case IC_POS:
   case IC_NEG:
   case IC_SQRT:
+  case IC_ABS:
   case IC_EQ:
   case IC_ADD_EQ:
   case IC_SUB_EQ:
@@ -3705,6 +3711,7 @@ int64_t AssignRawTypeToNode(CCmpCtrl *ccmp, CRPN *rpn) {
     return rpn->raw_type;
   switch (rpn->type) {
   case IC_SQRT:
+  case IC_ABS:
     AssignRawTypeToNode(ccmp, ICArgN(rpn, 0));
     rpn->ic_class = HashFind("F64", Fs->hash_table, HTT_CLASS, 1);
     return rpn->raw_type = RT_F64;
@@ -3731,9 +3738,12 @@ int64_t AssignRawTypeToNode(CCmpCtrl *ccmp, CRPN *rpn) {
     return rpn->raw_type = RT_F64;
     break;
   case IC_FS:
+    rpn->ic_class = HashFind("CTask", Fs->hash_table, HTT_CLASS, 1) + 1;
+    return rpn->raw_type = RT_PTR;
+    break;
   case IC_GS:
-    rpn->ic_class = HashFind("I64i", Fs->hash_table, HTT_CLASS, 1);
-    return rpn->raw_type = RT_I64i;
+    rpn->ic_class = HashFind("CCPU", Fs->hash_table, HTT_CLASS, 1) + 1;
+    return rpn->raw_type = RT_PTR;
     break;
   case IC_LOCK: // Lock means "lock *ptr++;",it operates on expressions as a
                 // whole
@@ -3801,11 +3811,15 @@ int64_t AssignRawTypeToNode(CCmpCtrl *ccmp, CRPN *rpn) {
     if ((fun->base.base.type & (HTF_INTRINSIC | HTF_EXTERN)) ==
             (HTF_INTRINSIC | HTF_EXTERN) &&
         !(fun->import_name && (!strcmp(fun->import_name, "IC_SQRT") ||
+                               !strcmp(fun->import_name, "IC_ABS") ||
+                               !strcmp(fun->import_name, "IC_SQR") ||
                                !strcmp(fun->import_name, "IC_SWAP_U16"))))
       ParseErr(ccmp, "AArch64 intrinsic '%s' (%s) is not implemented.",
                fun->base.base.str, fun->import_name);
     if ((fun->base.base.type & HTF_EXTERN) && fun->import_name &&
         !(fun->import_name && (!strcmp(fun->import_name, "IC_SQRT") ||
+                               !strcmp(fun->import_name, "IC_ABS") ||
+                               !strcmp(fun->import_name, "IC_SQR") ||
                                !strcmp(fun->import_name, "IC_SWAP_U16"))))
       ParseErr(ccmp, "AArch64 external '%s' (%s) is not bound.",
                fun->base.base.str, fun->import_name);
@@ -4951,6 +4965,7 @@ void PrsTests() {
     QueIns(rpn, cc->ir_code);                                                  \
     return rpn;                                                                \
   }
+HC_IC_BINDING(HC_ICAdd_Abs, IC_ABS);
 HC_IC_BINDING(HC_ICAdd_Sqr, IC_SQR);
 HC_IC_BINDING(HC_ICAdd_Lock, IC_LOCK);
 HC_IC_BINDING(HC_ICAdd_Pow, IC_POW);

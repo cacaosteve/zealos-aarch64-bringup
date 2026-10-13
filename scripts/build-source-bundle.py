@@ -7,7 +7,7 @@ from pathlib import Path
 import sys
 import tarfile
 
-from arm64_source import translate_grscreen, translate_winmgr
+from arm64_source import translate_grscreen, translate_mathode, translate_winmgr
 
 root = Path(__file__).resolve().parent.parent
 manifest = json.loads((root / 'upstream/pinned/UPSTREAM.json').read_text())
@@ -27,6 +27,11 @@ for name, expected in manifest['files'].items():
             data = translate_winmgr(data)
         except ValueError as exc:
             raise SystemExit(f'ARM64 window-manager overlay no longer applies: {exc}') from exc
+    elif rel == 'System/Math/MathODE.ZC':
+        try:
+            data = translate_mathode(data)
+        except ValueError as exc:
+            raise SystemExit(f'ARM64 MathODE overlay no longer applies: {exc}') from exc
     entries[rel] = data
 for path in sorted((root / 'upstream/bootstrap').rglob('*')):
     if path.is_file():
