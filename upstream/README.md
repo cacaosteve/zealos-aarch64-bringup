@@ -3207,7 +3207,16 @@ Freeze catalog unchanged.
 | Gap | The source Window Manager started during boot, but the framebuffer remained an empty desktop until `gterm` was entered on the serial shell |
 | Bring-up | Load the upstream DolDoc terminal modules and spawn a visible interactive terminal task after the manager starts; retain the serial shell and a `gterm` retry path if terminal startup fails |
 | Smoke | PCI boot checks require the graphical-terminal startup marker; the DocTerm probe accepts the already-running boot task without creating a duplicate or stopping it |
-| Limits | This adds a usable terminal window, not the normal ZealOS menu, startup application set, or complete keyboard/mouse stack; UTM must still confirm visible text input after refresh |
+| Limits | This adds a usable terminal window and a small custom OS menu, not ZealOS's full menu tree, startup application set, or complete keyboard/mouse stack; UTM menu selection still needs hands-on acceptance |
+
+## Milestone 283 — recover the source system-task root during graphics setup
+
+| Item | Path |
+|--|--|
+| Gap | The bridge initialized `sys_task` when its source module loaded, but the loader can retire that temporary task before later graphics probes or startup callbacks use the global |
+| Bring-up | When graphics context setup finds an invalid `sys_task`, rebind it to the current valid task before the source compositor traverses task roots |
+| Smoke | `BootstrapGrContextInitChecks` asserts the root is valid after initialization; `make check-grscreen`, the graphical-terminal/menu smoke, and `make check-compat-pci` pass |
+| Limits | This repairs bootstrap root ownership; normal ZealOS system-task initialization and the full desktop lifecycle remain open |
 
 ## Open compatibility probe — `/System/Win.ZC`
 

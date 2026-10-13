@@ -26,6 +26,7 @@ extern U0 WinCalcIdles();
 extern I64 gr_screen_ode_update_calls;
 extern Bool gr_screen_ode_root_seen;
 extern Bool gr_screen_ode_update_stub_enabled;
+
 I64 gr_screen_final_update_calls;
 U8 gr_screen_final_update_old_pixel;
 U8 gr_screen_final_update_overlay_off[FONT_WIDTH * 10 * FONT_HEIGHT];
@@ -321,6 +322,8 @@ I64 BootstrapGrContextInitChecks()
     bootstrap_present_cache_ready = FALSE;
     bootstrap_present_ready = FALSE;
     BootstrapGrContextInit();
+    if (!TaskValidate(sys_task))
+        return 2;
     if (active_gr->screen_image != &bootstrap_graphics_dc ||
         active_gr->dc != &bootstrap_graphics_dc ||
         active_gr->dc1 != &bootstrap_planar_dc ||
@@ -470,7 +473,7 @@ I64 GrScreenFinalUpdateChecks()
     I64 pitch;
     Bool old_mouse_show, old_mouse_installed;
 
-    if (!TaskValidate(sys_winmgr_task) && !TaskValidate(sys_task))
+    if (!TaskValidate(sys_task))
         return 3;
     old_final_update = gr.fp_final_screen_update;
     if (!old_final_update)

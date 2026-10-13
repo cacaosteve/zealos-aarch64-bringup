@@ -1894,6 +1894,12 @@ U0 BootstrapGrContextInit()
 {//Attach upstream graphics globals to the initialized bootstrap surfaces.
     CGrGlobals *active_gr = ZcActiveGrGlobals();
 
+    // `sys_task` is initialized while this bridge is loaded, but the source
+    // loader can retire that temporary task before graphics startup. Recover
+    // the system root from the current valid task before any renderer path
+    // uses it for window composition or task traversal.
+    if (!TaskValidate(sys_task) && TaskValidate(Fs))
+        sys_task = Fs;
     if (!active_gr)
         active_gr = &gr;
     bootstrap_graphics_dc.dc_signature = DCS_SIGNATURE_VAL;
