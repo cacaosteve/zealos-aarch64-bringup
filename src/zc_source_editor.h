@@ -107,6 +107,21 @@ static int zedit_bounds(uint32_t number, uint32_t *start, uint32_t *end) {
     return 0;
 }
 
+static uint32_t zedit_page_rows(void) {
+    uint32_t rows = g_fb_rows < ZEAL_TEXT_MAX_ROWS ? g_fb_rows : ZEAL_TEXT_MAX_ROWS;
+    return rows > 5u ? rows - 5u : 1u;
+}
+
+static void zedit_reveal_cursor(void) {
+    uint32_t capacity = zedit_page_rows();
+    uint32_t visible = g_zedit.view_count ? g_zedit.view_count : capacity;
+    if (visible > capacity) visible = capacity;
+    if (g_zedit.cursor_line < g_zedit.view_first)
+        g_zedit.view_first = g_zedit.cursor_line;
+    else if (visible && g_zedit.cursor_line >= g_zedit.view_first + visible)
+        g_zedit.view_first = g_zedit.cursor_line - visible + 1u;
+}
+
 /* Replace [start,end) with one input line. At EOF, add a separator if the
  * existing last line has no newline. Move the NUL terminator with the tail. */
 static int zedit_splice(uint32_t start, uint32_t end, const char *body,
@@ -197,7 +212,7 @@ static int zedit_save(void) {
 }
 
 static void zedit_help(void) {
-    con_puts("zedit: j/k move | e <text> edit | n <text> insert | x delete | "
+    con_puts("zedit: j/k move | [/] page | g/G top/bottom | e <text> edit | n <text> insert | x delete | "
              "p [line [count]] | a <text> | i <line> <text> | c <line> <text> | "
              "d <line> | w | wq | q | q!\n");
     con_puts("zedit: lines are numbered from 1; p defaults to the first 20\n");
@@ -280,21 +295,32 @@ static void zedit_handle_command(const char *line) {
         if (first <= zedit_lines()) g_zedit.cursor_line = first;
         zedit_print(first, count); return;
     }
-    if (zss_str_eq(line, "j") || zss_str_eq(line, "k")) {
+    if (zss_str_eq(line, "j") || zss_str_eq(line, "k") ||
+        zss_str_eq(line, "[") || zss_str_eq(line, "]") ||
+        zss_str_eq(line, "g") || zss_str_eq(line, "G")) {
         uint32_t lines = zedit_lines();
         if (zss_str_eq(line, "j")) {
             if (g_zedit.cursor_line < lines) g_zedit.cursor_line++;
-        } else if (g_zedit.cursor_line > 1) {
-            g_zedit.cursor_line--;
+        } else if (zss_str_eq(line, "k")) {
+            if (g_zedit.cursor_line > 1) g_zedit.cursor_line--;
+        } else if (zss_str_eq(line, "[")) {
+            uint32_t step = zedit_page_rows();
+            g_zedit.cursor_line = g_zedit.cursor_line > step ?
+                                  g_zedit.cursor_line - step : 1u;
+        } else if (zss_str_eq(line, "]")) {
+            uint32_t step = zedit_page_rows();
+            if (lines) {
+                uint32_t remaining = lines - g_zedit.cursor_line;
+                g_zedit.cursor_line += step < remaining ? step : remaining;
+            }
+        } else if (zss_str_eq(line, "g")) {
+            g_zedit.cursor_line = 1;
+        } else if (lines) {
+            g_zedit.cursor_line = lines;
         }
-        uint32_t rows = g_fb_rows < ZEAL_TEXT_MAX_ROWS ? g_fb_rows : ZEAL_TEXT_MAX_ROWS;
-        uint32_t capacity = rows > 5u ? rows - 5u : 1u;
-        uint32_t visible = g_zedit.view_count ? g_zedit.view_count : capacity;
-        if (visible > capacity) visible = capacity;
-        if (g_zedit.cursor_line < g_zedit.view_first)
-            g_zedit.view_first = g_zedit.cursor_line;
-        else if (visible && g_zedit.cursor_line >= g_zedit.view_first + visible)
-            g_zedit.view_first = g_zedit.cursor_line - visible + 1u;
+        if (g_zedit.cursor_line > lines && lines) g_zedit.cursor_line = lines;
+        if (!lines) g_zedit.cursor_line = 1;
+        zedit_reveal_cursor();
         con_puts("zedit: cursor line ");
         zc_print_decimal(g_zedit.cursor_line); con_puts("\n");
         return;

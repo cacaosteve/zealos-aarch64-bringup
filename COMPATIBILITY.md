@@ -391,7 +391,9 @@ oracle are needed before broad language compatibility can be claimed.
 
 - The full-screen `zedit` view now marks a selected source line and supports
   `j`/`k` navigation, `e <text>` replacement, `n <text>` insertion before the
-  selection, and `x` deletion. Existing numbered edit commands remain usable.
+  selection, and `x` deletion. `[`/`]` move by one visible page and `g`/`G`
+  jump to the first/last line while keeping the selection in view. Existing
+  numbered edit commands remain usable.
   The rebuilt ARM64 image passed the editor regression sequence in the PCI
   compatibility suite, including persistence through compaction and reboot.
 - On 2026-10-12, the UTM serial console confirmed `j`, `k`, and `p 100 20`
