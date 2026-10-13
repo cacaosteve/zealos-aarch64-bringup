@@ -4,6 +4,11 @@ I64 WinMgrStartChecks()
 {
     CTask *root = Fs, *manager;
     CWinMgrGlobals *active_winmgr = ZcActiveWinMgrGlobals();
+    CTask *old_focus;
+    CMenu *old_root_menu, *old_manager_menu;
+    CMenu menu;
+    CMenu *parsed_menu;
+    CMenuEntry menu_entry, submenu_entry;
     I64 updates_before, old_width;
 
     BootstrapGrContextInit();
@@ -20,6 +25,47 @@ I64 WinMgrStartChecks()
     manager = sys_winmgr_task;
     if (!TaskValidate(manager) || manager == root)
         return 2;
+    // MenuTask must resolve the nearest menu owner from the focused task,
+    // including an owner in its parent chain, as the upstream WinMgr expects.
+    old_focus = sys_focus_task;
+    old_root_menu = root->cur_menu;
+    old_manager_menu = manager->cur_menu;
+    MemSet(&menu, 0, sizeof(CMenu));
+    root->cur_menu = &menu;
+    manager->cur_menu = NULL;
+    sys_focus_task = manager;
+    if (MenuTask() != root)
+    {
+        root->cur_menu = old_root_menu;
+        manager->cur_menu = old_manager_menu;
+        sys_focus_task = old_focus;
+        return 9;
+    }
+    manager->cur_menu = &menu;
+    if (MenuTask() != manager)
+    {
+        root->cur_menu = old_root_menu;
+        manager->cur_menu = old_manager_menu;
+        sys_focus_task = old_focus;
+        return 10;
+    }
+    root->cur_menu = old_root_menu;
+    manager->cur_menu = old_manager_menu;
+    sys_focus_task = old_focus;
+    MemSet(&menu_entry, 0, sizeof(CMenuEntry));
+    MemSet(&submenu_entry, 0, sizeof(CMenuEntry));
+    StrCopy(menu_entry.name, "File");
+    StrCopy(submenu_entry.name, "Longer");
+    menu_entry.sub = &submenu_entry;
+    if (MenuEntryWidth(&menu_entry) != 7)
+        return 11;
+    parsed_menu = MenuNew("File { Open(1); }");
+    if (!parsed_menu || !parsed_menu->sub ||
+        StrCompare(parsed_menu->sub->name, "File") ||
+        !parsed_menu->sub->sub ||
+        StrCompare(parsed_menu->sub->sub->name, "Open"))
+        return 12;
+    MenuDel(parsed_menu);
     // One cooperative start must reach the real first refresh and sleep point.
     if (active_winmgr->updates <= updates_before)
         return 3;

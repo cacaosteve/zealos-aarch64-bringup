@@ -1966,27 +1966,8 @@ U0 CurSongTask() {}
 U0 MusicSettingsReset()
 {
 }
-// Menu/input startup has not created a dedicated menu task in the bootstrap.
-CTask *MenuTask;
 // The full kernel's SystemTask sets these run-level flags during startup.
 I64 sys_run_level;
-I64 MenuEntryWidth(CMenuEntry *entry)
-{
-    I64 width;
-    CMenuEntry *sub;
-    if (!entry)
-        return 1;
-    width = StrLen(entry->name);
-    sub = entry->sub;
-    while (sub)
-    {
-        I64 sub_width = StrLen(sub->name);
-        if (sub_width > width)
-            width = sub_width;
-        sub = sub->next;
-    }
-    return width + 1;
-}
 // The window compositor's z/visibility tables, plus the source graphics brush
 // tables, are backed by bounded bridge storage and initialized here. Upstream
 // planar and sprite-hash tables remain outside this screen path.
@@ -4090,10 +4071,7 @@ public U0 BootstrapMouseHardSample(I64 sample, I64 now_ns)
     mouse_hard.event = TRUE;
     mouse_hard.installed = TRUE;
 }
-// Menu rendering and zoom initialization belong to later native subsystems.
-// Keep the early frame path linkable; these hooks are replaced when those
-// subsystems are loaded.
-U0 DrawMenu(CDC *dc) {}
+// Zoom initialization belongs to a later native subsystem.
 // The source renderer budgets optional MathODE work; the real integrator is
 // loaded later, so keep a valid default until its subsystem is initialized.
 F64 ode_alloced_factor = 0.75;
@@ -4646,13 +4624,6 @@ U0 DocCenter(CDoc *doc=NULL, I64 recalc_flags=0)
 {
     if (doc) {}
     if (recalc_flags) {}
-}
-CMenu *MenuFile(U8 *filename, I64 flags=0, CTask *task=NULL)
-{
-    if (filename) {}
-    if (flags) {}
-    if (task) {}
-    return NULL;
 }
 U0 DocBottom(CDoc *doc=NULL)
 {

@@ -39,7 +39,8 @@
     "src/System/Gr/GrInitA.ZC": "677a339f7d1679c4ad71f7e0af31f88d3cf0b777c472dda7dbde050a55c6fbde",
     "src/System/Gr/GrPalette.ZC": "e965b1e93cdbf59cd1a57f395e2c6566ede00bbd49ce3e9b56e4b05f1dd508ba",
     "src/System/Gr/GrBitMap.ZC": "3599a84836aa89f7488f354012fb82b81d879b33df634fd8bc5fbed64540f8ff",
-    "src/System/Math/MathODE.ZC": "24a0d15370a9b5f42b894ed4ae44852f262325593bcac3c5bc9795d68b0e0c5c"
+    "src/System/Math/MathODE.ZC": "24a0d15370a9b5f42b894ed4ae44852f262325593bcac3c5bc9795d68b0e0c5c",
+    "src/System/Menu.ZC": "7385d9b156a22c3d6e19c9732b6a1311dba5ec8eb112c87993ae461a554d0174"
   },
   "changes": []
 }

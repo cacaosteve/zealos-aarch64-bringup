@@ -634,6 +634,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                             else 'WinMgrProbeDeps')
                     command(f'zload /Tests/{deps}.ZC',
                             f'zc: loaded /Tests/{deps}.ZC')
+                    command('zload /System/Menu.ZC',
+                            'zc: loaded /System/Menu.ZC', timeout=15)
                     command('zload /System/WinMgr.ZC',
                             'zc: loaded /System/WinMgr.ZC', timeout=15)
                     if args.probe_grscreen:

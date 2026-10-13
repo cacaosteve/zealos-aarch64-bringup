@@ -64,4 +64,25 @@ except ValueError:
 else:
     raise AssertionError('overlay accepted a changed window-manager refresh call')
 
+menu_source = (root / 'upstream/pinned/System/Menu.ZC').read_bytes()
+menu_overlay = (root / 'upstream/bootstrap/System/Menu.ZC').read_bytes()
+menu_expected = menu_source
+for old, new in (
+        (b'LexExcept(cc, "Missing \')\' at ");',
+         b'return NULL; // ARM64 bootstrap: reject malformed menu syntax safely.'),
+        (b'LexExcept(cc, "Missing \';\' at");',
+         b'return NULL; // ARM64 bootstrap: reject malformed menu syntax safely.'),
+        (b'LexExcept(cc, "Missing \'}\' at ");',
+         b'return NULL; // ARM64 bootstrap: reject malformed menu syntax safely.'),
+        (b'LexExcept(cc, "Expecting \'{\' at ");',
+         b'return NULL; // ARM64 bootstrap: reject malformed menu syntax safely.'),
+        (b'res = MaxI64(res, StrLen(tmpse->name));',
+         b'if (res < StrLen(tmpse->name))\n            res = StrLen(tmpse->name);')):
+    if menu_expected.count(old) != 1:
+        raise AssertionError(f'menu overlay anchor changed: {old!r}')
+    menu_expected = menu_expected.replace(old, new, 1)
+assert menu_overlay == menu_expected
+runtime = (root / 'src/zc/runtime.c').read_text()
+assert runtime.index('"/System/Menu.ZC"') < runtime.index('"/System/Win.ZC"')
+
 print('PASS guarded ARM64 graphics/window-manager source overlays', flush=True)
