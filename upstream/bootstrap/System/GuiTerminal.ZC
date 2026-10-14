@@ -332,6 +332,27 @@ I64 BootstrapGuiTerminalStop()
     return 0x2a;
 }
 
+I64 BootstrapGuiTerminalWindowState()
+{
+    CTask *term = bootstrap_gui_terminal_task;
+    I64 state = 0;
+
+    if (!TaskValidate(term))
+        return 0;
+    state |= 1;
+    if (Bt(&term->display_flags, DISPLAYf_SHOW))
+        state |= 2;
+    if (term->display_doc)
+        state |= 4;
+    if (term->put_doc)
+        state |= 8;
+    if (term->border_doc)
+        state |= 16;
+    if (term->win_width > 0 && term->win_height > 0)
+        state |= 32;
+    return state;
+}
+
 I64 BootstrapGuiTerminalHide()
 {
     if (TaskValidate(bootstrap_gui_terminal_task))
@@ -459,6 +480,7 @@ I64 BootstrapGuiTerminalSmoke()
             entry = entry->next;
         }
         if (entry) return 37;
+        if (BootstrapGuiTerminalWindowState() != 0x3f) return 52;
         return 0x2a;
     }
     if (BootstrapGuiTerminalStart() != 0x2a ||

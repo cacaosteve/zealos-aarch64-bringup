@@ -5160,6 +5160,7 @@ int zc_reset_session(void) {
 }
 void zc_status(void) {
     size_t used[2] = {0}, blocks[2] = {0};
+    int64_t gui_terminal_window = 0;
     for (unsigned a = 0; a < 2; a++)
         for (struct block *b = arenas[a]; b; b = b->next)
             if (b->used) {
@@ -5172,6 +5173,10 @@ void zc_status(void) {
     printf("desktop: winmgr=%d gterm=%d windowdemo=%d presented_frames=%lu\n",
            source_winmgr_active, gui_terminal_active, window_demo_loaded,
            (unsigned long)guest_task_frame_count);
+    if (gui_terminal_active &&
+        zc_call("BootstrapGuiTerminalWindowState", &gui_terminal_window) == 0)
+        printf("gterm_window=0x%08lx task/show/display_doc/put_doc/border_doc/geometry\n",
+               (unsigned long)gui_terminal_window);
 }
 int zc_selftest(void) {
     int64_t result = 0;

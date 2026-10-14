@@ -238,7 +238,9 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         frames = re.search(r'desktop: winmgr=1 gterm=1 windowdemo=0 presented_frames=(\d+)', desktop)
         if not frames or int(frames.group(1)) == 0:
             raise RuntimeError('boot graphical terminal has not presented a frame:\n' + desktop)
-        print('PASS boot graphical desktop presented a framebuffer frame', flush=True)
+        if 'gterm_window=0x0000003f task/show/display_doc/put_doc/border_doc/geometry' not in desktop:
+            raise RuntimeError('boot graphical terminal window is not fully initialized and visible:\n' + desktop)
+        print('PASS boot graphical terminal window is initialized, visible, and presenting frames', flush=True)
         command('zcall BootstrapGuiTerminalSmoke',
                 'zc => 0x000000000000002a')
         command('zcall BootstrapGuiShellSmoke',
