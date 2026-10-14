@@ -1404,7 +1404,7 @@ Bool FileFind(U8 *filename, CDirEntry *_de=NULL, I64 fuf_flags=0)
         _de->next = NULL;
         _de->parent = NULL;
         _de->sub = NULL;
-        _de->full_name = NULL;
+        _de->full_name = StrNew(filename);
         _de->user_data = 0;
         _de->user_data2 = 0;
         leaf = StrLastOcc(filename, "/\\");

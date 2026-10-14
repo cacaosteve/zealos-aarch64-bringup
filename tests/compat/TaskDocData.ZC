@@ -147,7 +147,8 @@ I64 TaskFileFindDirectoryFilterChecks()
     de.full_name = "stale";
     if (!FileFind("/Tests/TaskDocData.ZC", &de) ||
         StrCompare(de.name, "TaskDocData.ZC") ||
-        de.full_name || de.next || de.parent || de.sub || de.size <= 0 ||
+        !de.full_name || StrCompare(de.full_name, "/Tests/TaskDocData.ZC") ||
+        de.next || de.parent || de.sub || de.size <= 0 ||
         !(de.attr & RS_ATTR_ARCHIVE))
         return 5;
     return 42;

@@ -3333,7 +3333,7 @@ Freeze catalog unchanged.
 | Gap | The new `edit <path>` command reached upstream `Ed()`, but file opening stopped at unimplemented `Silent`, `FileNameCheck`, and `FileFind` bridge functions |
 | Bring-up | Implement task-local silent-state save/restore, conservative filename validation, and source-backed file existence checks through `FileRead`; extend the graphical-terminal smoke to open a small bundled file with `EDF_BAIL` |
 | Smoke | `make check-doced-popup` exercises the real editor entry point without opening a UI and passes; `check-upstream.py`, `check-arm64-source.py`, and `git diff --check` pass |
-| Limits | `FileFind` populates basic file size, archive attributes, and a bounded leaf name; full paths, parent scanning, and directory enumeration remain unimplemented. Interactive typing and saving still need UTM acceptance |
+| Limits | `FileFind` populates a bounded leaf name, full path, file size, and archive attributes; parent scanning and directory enumeration remain unimplemented. Interactive typing and saving still need UTM acceptance |
 
 ## Open compatibility probe — `/System/Win.ZC`
 
@@ -3363,11 +3363,11 @@ been verified through a manual edit-and-reopen cycle.
 
 The source-backed `FileFind` bridge now rejects regular files for
 `FUF_JUST_DIRS`, implements `FUF_JUST_SRC` for `.ZC` and `.HH` paths, and
-populates the bounded leaf name, file size, and archive attribute in
+populates the bounded leaf name, full path, file size, and archive attribute in
 `CDirEntry`. The PCI persistence probe verifies those fields, positive source
 matches, and rejection of a saved `.DD` document under the source filter.
-`full_name`, other file
-categories, parent scanning, and directory enumeration remain unimplemented.
+Other file categories, parent scanning, and directory enumeration remain
+unimplemented.
 
 ## Acceptance
 
