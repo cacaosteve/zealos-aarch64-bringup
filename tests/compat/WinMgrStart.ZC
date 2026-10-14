@@ -177,6 +177,7 @@ I64 WinMgrMousePipelineChecks()
 }
 
 I64 winmgr_live_ctrl_down_count, winmgr_live_ctrl_up_count;
+I64 winmgr_live_ctrl_outside_count;
 
 U0 WinMgrLiveCtrlClick(CCtrl *ctrl, I64 x, I64 y, Bool down)
 {
@@ -187,6 +188,8 @@ U0 WinMgrLiveCtrlClick(CCtrl *ctrl, I64 x, I64 y, Bool down)
     {
         if (!(ctrl->flags & CTRLF_CLICKED))
             winmgr_live_ctrl_down_count++;
+        if (x > ctrl->right || y > ctrl->bottom)
+            winmgr_live_ctrl_outside_count++;
         ctrl->flags |= CTRLF_CLICKED;
     }
     else
@@ -349,6 +352,7 @@ I64 WinMgrSourceDragChecks()
         live_ctrl.screen_bottom = gr.pan_text_y + drag_task->pix_top + live_ctrl.bottom;
         drag_task->next_ctrl = drag_task->last_ctrl = &live_ctrl;
         winmgr_live_ctrl_down_count = winmgr_live_ctrl_up_count = 0;
+        winmgr_live_ctrl_outside_count = 0;
         x = (live_ctrl.screen_left + live_ctrl.screen_right) / 2;
         y = (live_ctrl.screen_top + live_ctrl.screen_bottom) / 2;
         BootstrapCtrlInputSubmit(drag_task, x | (y << 16) | (1 << 32),
@@ -368,8 +372,10 @@ I64 WinMgrSourceDragChecks()
                                  ((y + 10 * FONT_HEIGHT) << 16),
                                  ZcMonotonicNs());
         Sleep(50);
-        if (!result && (winmgr_live_ctrl_down_count != 1 ||
-                        winmgr_live_ctrl_up_count != 1))
+        if (!result && (!winmgr_live_ctrl_down_count ||
+                        !winmgr_live_ctrl_outside_count ||
+                        !winmgr_live_ctrl_up_count ||
+                        (live_ctrl.flags & CTRLF_CLICKED)))
             result = 11;
         drag_task->next_ctrl = drag_task->last_ctrl = &drag_task->next_ctrl;
         live_ctrl.next = live_ctrl.last = NULL;

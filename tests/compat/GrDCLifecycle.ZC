@@ -214,3 +214,37 @@ I64 GrDCTransformChecks()
 	DCDel(dc);
 	return 42;
 }
+
+I64 GrDCDiffChecks()
+{
+	CDC *base, *update, *diff;
+	I64 x, y, result = 42;
+
+	base = DCNew(32, 4);
+	update = DCNew(32, 4);
+	diff = NULL;
+	if (!base || !update)
+	{
+		result = 1;
+		goto done;
+	}
+	diff = DCDiff(base, update);
+	if (diff)
+	{
+		result = 2;
+		goto done;
+	}
+	for (y = 1; y <= 2; y++)
+		for (x = 10; x <= 17; x++)
+			update->body[y * update->width_internal + x] = 9;
+	diff = DCDiff(base, update);
+	if (!diff || diff->x0 != 10 || diff->y0 != 1 ||
+			diff->width != 8 || diff->width_internal != 8 || diff->height != 2 ||
+			diff->body[0] != 9 || diff->body[15] != 9)
+		result = 3;
+	done:
+	DCDel(diff);
+	DCDel(update);
+	DCDel(base);
+	return result;
+}

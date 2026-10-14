@@ -552,6 +552,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                         'zc => 0x000000000000002a')
                 command('zcall GrDCCopyChecks',
                         'zc => 0x000000000000002a')
+                command('zcall GrDCDiffChecks',
+                        'zc => 0x000000000000002a')
                 command('zcall GrDCRoundTripChecks',
                         'zc => 0x000000000000002a')
                 command('zcall GrDCCustomPaletteRoundTripChecks',
@@ -727,6 +729,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                             'zc: loaded /System/Menu.ZC', timeout=15)
                     command('zload /System/WinMgr.ZC',
                             'zc: loaded /System/WinMgr.ZC', timeout=15)
+                    command('zload /System/Gr/WinMgrBoot.ZC',
+                            'zc: loaded /System/Gr/WinMgrBoot.ZC', timeout=15)
                     if args.probe_grscreen:
                         if not args.probe_live_winmgr_ode:
                             command('zload /Tests/ODEsUpdateStub.ZC',

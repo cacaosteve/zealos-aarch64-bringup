@@ -1979,7 +1979,10 @@ ZealOS live distribution or installer.
   window z/visibility tables. Circle bounds use layout-derived flat pointers
   because nested inline-array member access currently faults in the ARM64
   compiler. QEMU checks validate table contents and actual pen-brush pixels;
-  the live source WinMgr startup, draw, mouse, and window-control checks pass.
+  the CDC diff check verifies empty and changed regions, including the
+  extracted region origin and pixels. Live source WinMgr checks cover startup,
+  draw, mouse, title dragging, resizing, and captured-control release after
+  moving the pointer outside the control.
   Arbitrary indexed-color palette behavior, full planar semantics, remaining
   sprite and depth-buffer paths, music state, and normal upstream menu/task
   startup remain open.
