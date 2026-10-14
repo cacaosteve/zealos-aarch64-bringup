@@ -1394,7 +1394,8 @@ Bool BootstrapFileFindTypeMatch(U8 *filename, I64 fuf_flags)
     if (!type_flags)
         return TRUE;
     if ((fuf_flags & FUF_JUST_TXT) &&
-        BootstrapFileFindExtMatch(filename, ".txt"))
+        (BootstrapFileFindExtMatch(filename, ".txt") ||
+         BootstrapFileFindExtMatch(filename, ".TXT")))
         return TRUE;
     if ((fuf_flags & FUF_JUST_DD) &&
         BootstrapFileFindExtMatch(filename, ".DD"))

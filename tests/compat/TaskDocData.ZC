@@ -144,9 +144,16 @@ I64 TaskFileFindDirectoryFilterChecks()
     if (FileFind("/Tests/DocSourceWriteCheck.DD", NULL, FUF_JUST_SRC))
         return 4;
     if (!FileFind("/LICENSE/Aiwnios.txt", NULL, FUF_JUST_TXT) ||
+        !BootstrapFileFindTypeMatch("fixture.TXT", FUF_JUST_TXT) ||
         !FileFind("/Tests/DocSourceWriteCheck.DD", NULL, FUF_JUST_DD) ||
         FileFind("/Tests/TaskDocData.ZC", NULL, FUF_JUST_DD) ||
-        FileFind("/Tests/TaskDocData.ZC", NULL, FUF_JUST_AOT))
+        FileFind("/Tests/TaskDocData.ZC", NULL, FUF_JUST_AOT) ||
+        !BootstrapFileFindTypeMatch("fixture.AOT", FUF_JUST_AOT) ||
+        !BootstrapFileFindTypeMatch("fixture.JIT", FUF_JUST_JIT) ||
+        !BootstrapFileFindTypeMatch("fixture.GR", FUF_JUST_GR) ||
+        !BootstrapFileFindTypeMatch("fixture.ZC",
+            FUF_JUST_SRC | FUF_JUST_DD) ||
+        BootstrapFileFindTypeMatch("fixture.ZC", FUF_JUST_DD))
         return 6;
     de.name[0] = 'x';
     de.full_name = "stale";
