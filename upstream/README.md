@@ -3403,6 +3403,17 @@ file reads, and tombstones mask bundled paths. `zload /path` uses the fresh
 bundle while `zload disk:path` explicitly loads a native source file. Directory enumeration, empty
 directories, and real ZealOS directory records remain unimplemented.
 
+## Milestone — bundled directory enumeration
+
+`FilesFind` now walks the bundled USTAR source archive and returns linked
+`CDirEntry` results for the current directory or recursively. It supports the
+existing filename masks, file/directory filters, type filters, and
+`FUF_SINGLE`; directory entries are inferred from non-empty archive paths.
+The PCI compatibility probe checks current-directory source files, recursive
+matching of `/LICENSE/Aiwnios.txt`, and single-result directory metadata.
+Native writable-volume listing, empty directories, and real RedSea directory
+records still need a filesystem implementation.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).

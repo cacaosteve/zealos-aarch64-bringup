@@ -1053,6 +1053,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                             'zc => 0x000000000000002a')
                     command('zcall TaskFileFindDirectoryFilterChecks',
                             'zc => 0x000000000000002a')
+                    command('zcall TaskFilesFindChecks',
+                            'zc => 0x000000000000002a')
                     command('zput Tests/CallNOnStack.ZC I64 NativeOverlayLoaded(){return 42;}',
                             'zput: saved Tests/CallNOnStack.ZC')
                     command('zload disk:Tests/CallNOnStack.ZC',

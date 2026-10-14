@@ -632,6 +632,63 @@ static const unsigned char *source_find(const char *path, size_t *size) {
     }
     return NULL;
 }
+static int source_file_at(size_t wanted, char *path, size_t path_cap,
+                          size_t *size_out) {
+    size_t index = 0;
+    if (!source_archive || !path || !path_cap)
+        return 0;
+    for (size_t off = 0; off <= archive_size && archive_size - off >= 512;) {
+        const unsigned char *h = source_archive + off;
+        if (!*h)
+            return 0;
+        size_t n, check, name_len = 0, prefix_len = 0;
+        while (name_len < 100 && h[name_len])
+            name_len++;
+        while (prefix_len < 155 && h[345 + prefix_len])
+            prefix_len++;
+        if (name_len == 100 || prefix_len == 155 ||
+            memcmp(h + 257, "ustar", 5) ||
+            octal(h + 124, 12, &n) || octal(h + 148, 8, &check) ||
+            n > archive_size - off - 512)
+            return 0;
+        size_t sum = 0;
+        for (unsigned i = 0; i < 512; i++)
+            sum += i >= 148 && i < 156 ? ' ' : h[i];
+        if (sum != check)
+            return 0;
+        if ((h[156] == '0' || !h[156]) && index++ == wanted) {
+            size_t total_len = name_len + (prefix_len ? prefix_len + 1 : 0);
+            if (total_len + 1 > path_cap)
+                return 0;
+            if (prefix_len) {
+                memcpy(path, h + 345, prefix_len);
+                path[prefix_len] = '/';
+            }
+            memcpy(path + (prefix_len ? prefix_len + 1 : 0), h, name_len);
+            path[total_len] = 0;
+            if (size_out)
+                *size_out = n;
+            return 1;
+        }
+        if (n > SIZE_MAX - 511)
+            return 0;
+        size_t padded = (n + 511) & ~(size_t)511;
+        if (padded > archive_size - off - 512)
+            return 0;
+        off += 512 + padded;
+    }
+    return 0;
+}
+static int64_t host_source_file_at(int64_t *a) {
+    if (a[0] < 0 || a[2] <= 0)
+        return 0;
+    size_t size = 0;
+    int found = source_file_at((size_t)a[0],
+        (char *)(uintptr_t)a[1], (size_t)a[2], &size);
+    if (found && a[3])
+        *(int64_t *)(uintptr_t)a[3] = (int64_t)size;
+    return found;
+}
 static int source_dir_exists(const char *path) {
     char name[128];
     char prefix[130];
@@ -4290,6 +4347,7 @@ static int load_inner(const char *path) {
         PrsBindCSymbol("FileRead", host_file_read, 3);
         PrsBindCSymbol("FileWrite", host_file_write, 5);
         PrsBindCSymbol("ZcSourceDirExists", host_file_dir_exists, 1);
+        PrsBindCSymbol("ZcSourceFileAt", host_source_file_at, 4);
         PrsBindCSymbol("LowPass1", host_low_pass1, 4);
         /* These functions were pre-registered before TaskBridge introduced
          * their extern declarations, so bind them again now that the symbols
