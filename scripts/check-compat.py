@@ -1094,6 +1094,9 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         if args.probe_task_jobs:
             command('zload /Kernel/KernelA.HH', 'zc: loaded /Kernel/KernelA.HH')
             command('zload /Kernel/KernelB.HH', 'zc: loaded /Kernel/KernelB.HH')
+            command('zload /Kernel/KMathB.ZC', 'zc: loaded /Kernel/KMathB.ZC')
+            command('zload /Kernel/KernelC.HH', 'zc: loaded /Kernel/KernelC.HH')
+            command('zload /System/TaskBridge.ZC', 'zc: loaded /System/TaskBridge.ZC')
             command('zload /Tests/KernelStackRegisterChecks.ZC',
                     'zc: loaded /Tests/KernelStackRegisterChecks.ZC')
             command('zcall KernelStackRegisterChecks',
@@ -1105,6 +1108,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             command('zload /Tests/TaskJobQueue.ZC', 'zc: loaded /Tests/TaskJobQueue.ZC')
             command('zcall TaskJobQueueChecks', 'zc => 0x000000000000002a')
             command('zcall TaskJobQueueCoopChecks', 'zc => 0x000000000000002a')
+            command('zload /Tests/TaskPopup.ZC', 'zc: loaded /Tests/TaskPopup.ZC')
+            command('zcall PopupBridgeChecks', 'zc => 0x000000000000002a')
             raise SystemExit(0)
         if args.probe_upstream:
             command('zload /Kernel/KernelA.HH', 'zc: loaded /Kernel/KernelA.HH')

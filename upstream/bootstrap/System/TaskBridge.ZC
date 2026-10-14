@@ -4793,6 +4793,14 @@ I64 PopUp(U8 *buf, CTask *parent=NULL, CTask **_pu_task=NULL)
         *_pu_task = NULL;
     return res;
 }
+I64 PopUpPrint(U8 *format, ...)
+{//Format and execute a synchronous source popup on the current task.
+    U8 *buf = StrPrintJoin(NULL, format, argc, argv);
+    I64 res = PopUp(buf, Fs);
+
+    Free(buf);
+    return res;
+}
 // DocTerm.ZC / DocBorderNew dependency stubs until DocEd/DocForm/Menu/Win load.
 extern CDocEntry *DocPutS(CDoc *doc, U8 *st);
 CAutoCompleteGlobals ac;

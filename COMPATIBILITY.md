@@ -1951,9 +1951,12 @@ ZealOS live distribution or installer.
 - This is source-load coverage, not a complete interactive editor. Dynamic
   expression evaluation is now bridged for DolDoc's `ToI64(%s)` and
   `ToF64(%s)` numeric prompt templates, with a 4096-byte expression bound;
-  `TaskExePrint2Checks` covers integer and floating results. Popup/form paths
-  still use cancel-only or no-op bridge functions, so interactive form/editor
-  support remains incomplete.
+  `TaskExePrint2Checks` covers integer and floating results. `PopUpPrint` now
+  formats source with the upstream `StrPrintJoin` helper and runs it through
+  the synchronous task popup; `TaskPopup.ZC` checks its result, inherited
+  symbol update, and cleanup. This enables the popup execution layer, while
+  interactive form/editor behavior and the remaining form/menu bridge
+  functions are still incomplete.
 
 ## Unchanged DolDoc `DocRecalcLib` + cursor helpers
 
