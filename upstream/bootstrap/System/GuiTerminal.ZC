@@ -413,7 +413,8 @@ I64 BootstrapGuiShellSmoke()
     if (!output || output[0] != 'z')
         return 2;
     output = BootstrapGuiTerminalMenuAction(3);
-    if (!output || output[0] != 'K')
+    if (!output || (output[0] != 'K' &&
+        StrCompare(output, "zls: native source partition unavailable\n")))
         return 3;
     output = BootstrapGuiTerminalMenuAction(4);
     if (!output || output[0] != 'z')

@@ -197,7 +197,7 @@ enum guest_entry {
 enum guest_wait {
     GUEST_WAIT_NONE, GUEST_WAIT_BIRTH, GUEST_WAIT_DEATH,
     GUEST_WAIT_IDLE, GUEST_WAIT_MESSAGE, GUEST_WAIT_SERVER, GUEST_WAIT_JOB,
-    GUEST_WAIT_TIMER
+    GUEST_WAIT_TIMER, GUEST_WAIT_IDLE_TIMEOUT, GUEST_WAIT_MESSAGE_TIMEOUT
 };
 struct guest_exception {
     struct guest_exception *next;
@@ -1714,6 +1714,7 @@ static int64_t host_rflags_get(int64_t *a);
 static int64_t host_rflags_set(int64_t *a);
 static int64_t host_jobs_handler(int64_t *a);
 static uint64_t counter_now(void);
+static uint64_t deadline_after_milliseconds(uint64_t milliseconds);
 static int64_t poll_guest_keys(void);
 static void guest_executive_loop(void) __attribute__((noreturn));
 static void guest_input_filter_loop(void);
@@ -1848,6 +1849,19 @@ static int wait_ready(struct guest_fiber *f) {
         return 1;
     if (f->wait_kind == GUEST_WAIT_TIMER)
         return (int64_t)(counter_now() - f->wait_deadline) >= 0;
+    if (f->wait_kind == GUEST_WAIT_MESSAGE_TIMEOUT) {
+        void *target = *(void **)f->wait_slot;
+        struct guest_fiber *server = find_guest_task(target);
+        if (!valid_guest_task(target))
+            return 1;
+        for (unsigned hops = 0; server && hops < GUEST_TASKS; hops++) {
+            struct guest_job *head = guest_job_head(server);
+            if (head->next != head)
+                return 1;
+            server = guest_popup_parent(server);
+        }
+        return (int64_t)(counter_now() - f->wait_deadline) >= 0;
+    }
     if (f->wait_kind == GUEST_WAIT_JOB) {
         if (!f->wait_target) {
             struct guest_job *head = guest_done_head(f);
@@ -1876,7 +1890,11 @@ static int wait_ready(struct guest_fiber *f) {
         struct guest_fiber *server = find_guest_task(target);
         return !valid || guest_job_head(server)->next != guest_job_head(server);
     }
-    if (f->wait_kind == GUEST_WAIT_IDLE) {
+    if (f->wait_kind == GUEST_WAIT_IDLE ||
+        f->wait_kind == GUEST_WAIT_IDLE_TIMEOUT) {
+        if (f->wait_kind == GUEST_WAIT_IDLE_TIMEOUT &&
+            (int64_t)(counter_now() - f->wait_deadline) >= 0)
+            return 1;
         if (!valid)
             return 1;
         void *filter = *(void **)((unsigned char *)target + guest_input_filter_off);
@@ -1890,9 +1908,11 @@ static int wait_ready(struct guest_fiber *f) {
     return valid && *(int64_t *)((unsigned char *)target + guest_number_off) != f->wait_number;
 }
 static int guest_timer_pending(void) {
-    for (unsigned i = 1; i < GUEST_TASKS; i++)
+    for (unsigned i = 0; i < GUEST_TASKS; i++)
         if (guest_fibers[i].state == GUEST_RUNNABLE &&
-            guest_fibers[i].wait_kind == GUEST_WAIT_TIMER &&
+            (guest_fibers[i].wait_kind == GUEST_WAIT_TIMER ||
+             guest_fibers[i].wait_kind == GUEST_WAIT_IDLE_TIMEOUT ||
+             guest_fibers[i].wait_kind == GUEST_WAIT_MESSAGE_TIMEOUT) &&
             !(*guest_flags(&guest_fibers[i]) & GUEST_SUSPENDED))
             return 1;
     return 0;
@@ -2528,6 +2548,47 @@ static int64_t host_task_wait(int64_t *a) {
     (void)guest_wait(GUEST_WAIT_IDLE, &self->wait_target, !!a[1]);
     return 0;
 }
+static int guest_task_idle(void *target, int cmd_line_prompt) {
+    if (!valid_guest_task(target))
+        return 1;
+    void *filter = *(void **)((unsigned char *)target + guest_input_filter_off);
+    struct guest_fiber *input = find_guest_task(filter);
+    if (filter == guest_fibers[guest_current].words || !input ||
+        !valid_guest_task(filter))
+        return 1;
+    unsigned char *ctrl = (unsigned char *)filter + guest_server_ctrl_off;
+    return *(void **)ctrl == ctrl && (*guest_flags(input) & GUEST_IDLE) &&
+           (!cmd_line_prompt || (*guest_flags(input) & GUEST_CMD_LINE_PROMPT));
+}
+static int64_t host_task_wait_timeout(int64_t *a) {
+    void *target = a[0] ? (void *)(uintptr_t)a[0]
+                        : guest_fibers[guest_current].words;
+    int64_t timeout_ms = a[1];
+    if (timeout_ms < 0)
+        zc_fail("TaskWaitTimeout requires a nonnegative timeout");
+    if (!valid_guest_task(target) || guest_task_idle(target, !!a[2]))
+        return 1;
+    struct guest_fiber *self = &guest_fibers[guest_current];
+    self->wait_target = target;
+    self->wait_slot = &self->wait_target;
+    self->wait_number = !!a[2];
+    self->wait_deadline = deadline_after_milliseconds((uint64_t)timeout_ms);
+    self->wait_kind = GUEST_WAIT_IDLE_TIMEOUT;
+    for (;;) {
+        if (guest_task_idle(target, !!a[2])) {
+            self->wait_kind = GUEST_WAIT_NONE;
+            return 1;
+        }
+        if ((int64_t)(counter_now() - self->wait_deadline) >= 0) {
+            self->wait_kind = GUEST_WAIT_NONE;
+            return 0;
+        }
+        if (!guest_current && !next_guest(0) && !guest_timer_pending())
+            zc_fail("timed task wait cannot progress");
+        (void)host_task_yield(NULL);
+        __asm__ volatile("yield");
+    }
+}
 static struct guest_job *post_guest_message(void *server_task, void *master,
                                             int64_t code, int64_t arg1, int64_t arg2,
                                             int64_t flags) {
@@ -2812,6 +2873,50 @@ static int64_t host_message_get(int64_t *a) {
         server = find_guest_task(task);
         if (!server)
             zc_fail("message target ended while waiting");
+    }
+}
+static int64_t host_message_get_timeout(int64_t *a) {
+    void *task = a[3] ? (void *)(uintptr_t)a[3]
+                      : guest_fibers[guest_current].words;
+    struct guest_fiber *server = find_guest_task(task);
+    int64_t timeout_ms = a[4];
+    int device_key_wait = key_reader && task == guest_fibers[guest_current].words &&
+        ((uint64_t)a[2] & ((1ull << 2) | (1ull << 3)));
+    if (!server)
+        zc_fail("message target unavailable");
+    if (timeout_ms < 0)
+        zc_fail("MessageGetTimeout requires a nonnegative timeout");
+    struct guest_fiber *self = &guest_fibers[guest_current];
+    self->wait_target = task;
+    self->wait_slot = &self->wait_target;
+    self->wait_deadline = deadline_after_milliseconds((uint64_t)timeout_ms);
+    for (;;) {
+        *guest_flags(server) &= ~GUEST_IDLE;
+        int64_t code = host_message_scan(a);
+        if (code) {
+            *guest_flags(server) &= ~GUEST_IDLE;
+            self->wait_kind = GUEST_WAIT_NONE;
+            self->key_wait_active = 0;
+            return code;
+        }
+        *guest_flags(server) |= GUEST_IDLE;
+        if ((int64_t)(counter_now() - self->wait_deadline) >= 0) {
+            self->wait_kind = GUEST_WAIT_NONE;
+            self->key_wait_active = 0;
+            return 0;
+        }
+        self->wait_kind = GUEST_WAIT_MESSAGE_TIMEOUT;
+        self->key_wait_active = device_key_wait;
+        if (!guest_current && !next_guest(0) && !guest_timer_pending() &&
+            !device_key_wait)
+            zc_fail("timed message wait cannot progress");
+        (void)host_task_yield(NULL);
+        self->key_wait_active = 0;
+        server = find_guest_task(task);
+        if (!server) {
+            self->wait_kind = GUEST_WAIT_NONE;
+            zc_fail("message target ended while waiting");
+        }
     }
 }
 static int64_t host_flush_messages(int64_t *a) {
@@ -3339,6 +3444,28 @@ static uint64_t counter_now(void) {
     uint64_t ticks;
     __asm__ volatile("mrs %0, cntpct_el0" : "=r"(ticks));
     return ticks;
+}
+static uint64_t deadline_after_milliseconds(uint64_t milliseconds) {
+    uint64_t frequency, seconds, ticks, remainder, fractional, per_ms;
+    __asm__ volatile("mrs %0, cntfrq_el0" : "=r"(frequency));
+    if (!frequency)
+        zc_fail("generic timer frequency unavailable");
+    seconds = milliseconds / 1000;
+    remainder = milliseconds % 1000;
+    if (seconds > (uint64_t)INT64_MAX / frequency)
+        zc_fail("timed wait duration too long");
+    ticks = seconds * frequency;
+    per_ms = frequency / 1000;
+    if (remainder && per_ms > (UINT64_MAX - ticks) / remainder)
+        zc_fail("timed wait duration too long");
+    fractional = per_ms * remainder +
+        (frequency % 1000) * remainder / 1000;
+    if (fractional > (uint64_t)INT64_MAX - ticks)
+        zc_fail("timed wait duration too long");
+    ticks += fractional;
+    if (!ticks)
+        ticks = 1;
+    return counter_now() + ticks;
 }
 static int64_t host_monotonic_ns(int64_t *a) {
     (void)a;
@@ -4180,6 +4307,7 @@ static int load_inner(const char *path) {
         PrsBindCSymbol("BirthWait", host_birth_wait, 2);
         PrsBindCSymbol("DeathWait", host_death_wait, 2);
         PrsBindCSymbol("TaskWait", host_task_wait, 2);
+        PrsBindCSymbol("ZcTaskWaitTimeout", host_task_wait_timeout, 3);
         PrsBindCSymbol("Sleep", host_sleep, 1);
         PrsBindCSymbol("Exit", host_task_exit, 0);
         PrsBindCSymbol("TaskEndNow", host_task_exit, 0);
@@ -4190,6 +4318,7 @@ static int load_inner(const char *path) {
         PrsBindCSymbol("JobDel", host_job_del, 1);
         PrsBindCSymbol("MessageScan", host_message_scan, 4);
         PrsBindCSymbol("MessageGet", host_message_get, 4);
+        PrsBindCSymbol("ZcMessageGetTimeout", host_message_get_timeout, 5);
         PrsBindCSymbol("FlushMessages", host_flush_messages, 1);
         PrsBindCSymbol("KeyScan", host_key_scan, 3);
         PrsBindCSymbol("KeyGet", host_key_get, 3);

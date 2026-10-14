@@ -38,7 +38,8 @@ Pi is outside this milestone; its diagnostic image does not link this runtime.
   an ARM64-specific KTask source overlay is exercised by a focused module probe.
   A separate `System/TaskBridge.ZC` declares the upstream `Spawn`, `Yield`,
   `TaskValidate`, `Suspend`, `IsSuspended`, `Kill`, `BirthWait`, `DeathWait`,
-  `TaskWait`, `TaskMessage`, `MessagePost`, `MessagePostWait`, `Message`,
+  `TaskWait`, `ZcTaskWaitTimeout`, `TaskMessage`, `MessagePost`,
+  `MessagePostWait`, `Message`,
   `MessageScan`, `MessageGet`, `FlushMessages`, `TaskExe`, `JobQueue`, `SpawnQueue`,
   `JobsHandler`, `JobResScan`, `JobResGet`, `Sleep`, `Exit`, and `TaskEndNow`
   signatures for a bounded, single-CPU cooperative subset.
@@ -196,9 +197,12 @@ callbacks run before their parent's task storage is reclaimed. `ZcTaskRun` repor
 their task-pointer condition changes. A root wait with no runnable producer
 fails the native session explicitly. `TaskWait` follows a task's input-filter
 pointer and waits for an empty server
-queue plus `TASKf_IDLE` (and optionally `TASKf_CMD_LINE_PROMPT`). Each guest
-task starts with self-linked input-filter and empty queue heads. The bridge
-can enqueue up to 128 pinned-layout `CJob` messages across tasks; `MessageScan`
+queue plus `TASKf_IDLE` (and optionally `TASKf_CMD_LINE_PROMPT`). The additive
+`ZcTaskWaitTimeout` bridge call also returns false when a nonnegative
+millisecond deadline expires. `ZcMessageGetTimeout` adds a bounded message wait
+that returns zero on timeout without changing the upstream `MessageGet` API.
+Each guest task starts with self-linked input-filter and empty queue heads. The
+bridge can enqueue up to 128 pinned-layout `CJob` messages across tasks; `MessageScan`
 consumes matching messages and discards excluded codes, while `MessageGet`
 parks until a message arrives. When the current task scans its own queue,
 `MessageScan` polls the device input bridge; a root `MessageGet` with a key
@@ -312,7 +316,9 @@ oracle are needed before broad language compatibility can be claimed.
   is synchronous. With a callback, `Kill(wait=TRUE)` waits until that callback
   starts; the callback may yield before task teardown, as in upstream ZealOS.
   Descendant teardown runs each child's end callback on its own task. There is
-  no message-based exit, timed message/task wait or general wait queue yet.
+  no message-based exit or general-purpose wait queue yet. The explicitly named
+  ARM64 bridge extensions `ZcTaskWaitTimeout` and `ZcMessageGetTimeout` provide
+  bounded cooperative task and message waits.
   A later entry records a bounded cooperative `Sleep`.
   `DeathWait(send_exit=TRUE)` gives a not-yet-started target a cooperative
   slice so it can install its end callback, then requests the supported local
@@ -386,8 +392,8 @@ oracle are needed before broad language compatibility can be claimed.
    eventual installed system needs a real filesystem
    and installer; the old RedSea demo volume is preserved during this bootstrap
    phase.
-2. Extend the cooperative task subset with synchronization, timed message/task waits,
-   full task-local compiler/Doc state and remaining job kinds, then implement
+2. Extend the cooperative task subset with synchronization, full task-local
+   compiler/Doc state and remaining job kinds, then implement
    preemption and the Doc/Gr
    services needed for Adam and the editor.
 3. Boot the upstream startup sequence using those services. Then support guest
@@ -2154,3 +2160,19 @@ ZealOS live distribution or installer.
   block-pool-backed scheduler. The four-child limit, CPU-0-only scheduling,
   64 KiB minimum stack, 2 MiB maximum, and supported queue flags remain bridge
   constraints.
+
+## Recorded validation — bounded task and message waits
+
+- Added ARM64 bridge extensions `ZcTaskWaitTimeout` and
+  `ZcMessageGetTimeout`; the existing upstream `TaskWait` and `MessageGet`
+  declarations and behavior remain unchanged. Deadlines use the guest generic
+  timer, and timed waiters stay eligible for scheduler wakeups.
+- `TaskTimerWaitChecks` covers task timeout against a live worker, waiting for
+  an idle task, waking a timed message wait with a posted message, message
+  timeout, and zero/short empty-queue deadlines. Both `python3
+  scripts/check-compat.py --pci` and the ISO `python3 scripts/check-compat.py`
+  passed. `python3 scripts/check-upstream.py` also passed.
+- The first ISO run exposed a GUI smoke check that assumed a PCI source volume;
+  `BootstrapGuiShellSmoke` now accepts the documented no-source-partition
+  response from its Files menu action. The rebuilt ISO then passed the full
+  compatibility suite.

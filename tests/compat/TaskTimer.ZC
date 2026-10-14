@@ -113,3 +113,57 @@ I64 TaskTimerBackgroundChecks()
         return 1;
     return 42;
 }
+
+I64 timer_wait_code, timer_wait_arg1, timer_wait_arg2;
+
+U0 TimerWaitMessageServer(U8 *data)
+{
+    timer_wait_code = ZcMessageGetTimeout(&timer_wait_arg1,
+                                          &timer_wait_arg2,
+                                          1 << MESSAGE_CMD, Fs, 200);
+}
+
+U0 TimerWaitTimeoutServer(U8 *data)
+{
+    timer_wait_code = ZcMessageGetTimeout(NULL, NULL,
+                                          1 << MESSAGE_CMD, Fs, 5);
+}
+
+I64 TaskTimerWaitChecks()
+{
+    CTask *task;
+    task = Spawn(&TimerLongWorker);
+    if (!task)
+        return 1;
+    Sleep(2);
+    if (ZcTaskWaitTimeout(task, 1, FALSE))
+        return 2;
+    if (!Kill(task))
+        return 3;
+
+    timer_wait_code = timer_wait_arg1 = timer_wait_arg2 = 0;
+    task = Spawn(&TimerWaitMessageServer);
+    if (!task)
+        return 4;
+    Sleep(1);
+    if (!ZcTaskWaitTimeout(task, 100, FALSE))
+        return 5;
+    MessagePost(task, MESSAGE_CMD, 42, 9);
+    DeathWait(&task);
+    if (timer_wait_code != MESSAGE_CMD || timer_wait_arg1 != 42 ||
+        timer_wait_arg2 != 9)
+        return 6;
+
+    timer_wait_code = -1;
+    task = Spawn(&TimerWaitTimeoutServer);
+    if (!task)
+        return 7;
+    DeathWait(&task);
+    if (timer_wait_code)
+        return 8;
+    if (ZcMessageGetTimeout(NULL, NULL, 1 << MESSAGE_CMD, Fs, 0))
+        return 9;
+    if (ZcMessageGetTimeout(NULL, NULL, 1 << MESSAGE_CMD, Fs, 3))
+        return 10;
+    return 42;
+}

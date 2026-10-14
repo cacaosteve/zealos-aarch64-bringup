@@ -120,6 +120,10 @@ extern Bool Kill(CTask *task, Bool wait=TRUE, Bool just_break=FALSE);
 extern I64 BirthWait(CTask **_task, I64 task_num=-1);
 extern U0 DeathWait(CTask **_task, Bool send_exit=FALSE);
 extern U0 TaskWait(CTask *task=NULL, Bool cmd_line_prompt=FALSE);
+// Bounded ARM64 bridge extensions used by timeout integration checks. Keep
+// the upstream TaskWait/MessageGet interfaces unchanged.
+extern Bool ZcTaskWaitTimeout(CTask *task, I64 timeout_ms,
+                              Bool cmd_line_prompt);
 // Queue and consume messages using the pinned Job.ZC/SerialDev/Message.ZC API.
 extern U0 JobDel(CJob *job);
 extern CJob *TaskMessage(CTask *server, CTask *master, I64 message_code,
@@ -133,6 +137,8 @@ extern I64 MessageScan(I64 *_arg1=NULL, I64 *_arg2=NULL, I64 mask=~1,
                        CTask *task=NULL);
 extern I64 MessageGet(I64 *_arg1=NULL, I64 *_arg2=NULL, I64 mask=~1,
                       CTask *task=NULL);
+extern I64 ZcMessageGetTimeout(I64 *_arg1, I64 *_arg2, I64 mask,
+                               CTask *task, I64 timeout_ms);
 extern I64 FlushMessages(CTask *task=NULL);
 // SerialDev/Message.ZC key API over queued messages. Without explicit focus,
 // device input belongs to the task scanning its queue. KernelB.HH's
