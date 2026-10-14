@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Verify the guarded AArch64 source overlay for pinned GrScreen.ZC."""
+"""Verify guarded AArch64 overlays for pinned ZealOS sources."""
 from pathlib import Path
 import re
 import sys
 
-from arm64_source import (translate_grbitmap, translate_grscreen, translate_ktask,
-                          translate_winmgr)
+from arm64_source import (translate_docform, translate_grbitmap, translate_grscreen,
+                          translate_ktask, translate_winmgr)
 
 root = Path(__file__).resolve().parent.parent
 source = (root / 'upstream/pinned/System/Gr/GrScreen.ZC').read_bytes()
@@ -151,6 +151,20 @@ except ValueError:
     pass
 else:
     raise AssertionError('KTask overlay accepted a changed CallStackGrow assembly')
+
+docform_source = (root / 'upstream/pinned/System/DolDoc/DocForm.ZC').read_bytes()
+docform_overlay = translate_docform(docform_source)
+assert docform_overlay != docform_source
+assert docform_overlay.count(b'LBtr(&doc_e->de_flags, DOCEf_DEFAULT_LEN)') == 1
+assert b'LBtr(&doc_e->de_flags, &DOCEf_DEFAULT_LEN)' not in docform_overlay
+try:
+    translate_docform(docform_source.replace(
+        b'LBtr(&doc_e->de_flags, &DOCEf_DEFAULT_LEN)',
+        b'LBtr(&doc_e->de_flags, DOCEf_DEFAULT_LEN)', 1))
+except ValueError:
+    pass
+else:
+    raise AssertionError('DocForm overlay accepted a changed bit-index expression')
 
 menu_source = (root / 'upstream/pinned/System/Menu.ZC').read_bytes()
 menu_overlay = (root / 'upstream/bootstrap/System/Menu.ZC').read_bytes()

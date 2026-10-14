@@ -110,6 +110,25 @@ def translate_mathode(source: bytes) -> bytes:
     return text.encode("utf-8")
 
 
+def translate_docform(source: bytes) -> bytes:
+    """Fix the bit-index argument in the pinned form's DEFAULT_LEN test.
+
+    ZealOS's LBtr primitive takes a flag word and a numeric bit index. This
+    source passes the address of the index constant, which aborts the current
+    compiler. The neighboring DEFAULT_RAW_TYPE call already passes the index.
+    Keep the mirror untouched and require the single expected call site.
+    """
+    try:
+        text = source.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValueError("DocForm.ZC is not UTF-8") from exc
+    bad = "LBtr(&doc_e->de_flags, &DOCEf_DEFAULT_LEN)"
+    good = "LBtr(&doc_e->de_flags, DOCEf_DEFAULT_LEN)"
+    if text.count(bad) != 1 or text.count(good):
+        raise ValueError("expected the pinned DocForm DEFAULT_LEN bit test")
+    return text.replace(bad, good, 1).encode("utf-8")
+
+
 def translate_ktask(source: bytes) -> bytes:
     """Replace KTask's x86 CallStackGrow with the tested AAPCS64 trampoline.
 

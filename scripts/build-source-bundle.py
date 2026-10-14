@@ -7,8 +7,8 @@ from pathlib import Path
 import sys
 import tarfile
 
-from arm64_source import (translate_grbitmap, translate_grscreen, translate_ktask,
-                          translate_mathode, translate_winmgr)
+from arm64_source import (translate_docform, translate_grbitmap, translate_grscreen,
+                          translate_ktask, translate_mathode, translate_winmgr)
 
 root = Path(__file__).resolve().parent.parent
 manifest = json.loads((root / 'upstream/pinned/UPSTREAM.json').read_text())
@@ -38,6 +38,11 @@ for name, expected in manifest['files'].items():
             data = translate_mathode(data)
         except ValueError as exc:
             raise SystemExit(f'ARM64 MathODE overlay no longer applies: {exc}') from exc
+    elif rel == 'System/DolDoc/DocForm.ZC':
+        try:
+            data = translate_docform(data)
+        except ValueError as exc:
+            raise SystemExit(f'ARM64 source overlay no longer applies: {exc}') from exc
     elif rel == 'Kernel/KTask.ZC':
         try:
             data = translate_ktask(data)

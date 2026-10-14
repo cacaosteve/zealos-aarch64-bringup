@@ -1939,15 +1939,19 @@ ZealOS live distribution or installer.
 
 ## DolDoc form/editor source probes
 
-- Pinned unchanged upstream `DocForm.ZC`, `DocEd.ZC`, and `DocRun.ZC` at the
-  same ZealOS revision as the existing DolDoc modules. The native guest loads
-  `DocRun.ZC`; a focused PCI probe verifies the bootstrap `MemberMetaData`
-  lookup against a two-entry metadata list.
-- `DocForm.ZC` still reaches `zc: compiler abort` after its missing helpers are
-  supplied, so the upstream form and editor are not integrated yet.
-  `PopUpPickList` remains an explicit cancel-only bridge until popup windows
-  can accept input. This records the current boundary; it does not claim
-  interactive form/editor support.
+- Pinned unchanged upstream `DocForm.ZC`, `DocEd.ZC`, `DocGet.ZC`, and
+  `DocRun.ZC` at the same ZealOS revision as the existing DolDoc modules. A
+  guarded ARM64 source translation changes the `LBtr` bit argument in
+  `DocForm.ZC` from a pointer expression to the numeric bit index expected by
+  this runtime. The full form module now compiles and loads in the PCI guest
+  probe; `DocGet.ZC` also compiles and loads after the existing DolDoc input
+  and recalculation modules.
+- `DocEd.ZC` remains short of integration: its next missing dependency is
+  `EdLinkConvert` from upstream `DocLink.ZC`. Dynamic expression evaluation
+  (`ExePrint2`) is declared for `DocGet`'s numeric prompt helpers but is not
+  implemented. `PopUpPickList` and `DocEd` remain explicit cancel-only bridge
+  stubs until the remaining link, popup, and editor behavior is wired. These
+  module-load probes do not claim a fully interactive form/editor.
 
 ## Unchanged DolDoc `DocRecalcLib` + cursor helpers
 
