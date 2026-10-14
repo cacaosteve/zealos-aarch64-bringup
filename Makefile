@@ -95,7 +95,7 @@ SRC_SHADOW_END   := $(shell echo $$(($(SRC_SHADOW_LBA) + $(SRC_SHADOW_SECTS) - 1
 ESP_END_SECTOR   := $(shell echo $$(($(RS_LBA_BASE) - 1)))
 ESP_SECTORS      := $(shell echo $$(($(ESP_END_SECTOR) - $(ESP_START_SECTOR) + 1)))
 
-.PHONY: all clean esp iso run run-serial check-serial check-page-tables check-window-buttons run-iso run-pci utm pi-sd pi-diag
+.PHONY: all clean esp iso run run-serial check-serial check-page-tables check-window-buttons check-doced-popup run-iso run-pci utm pi-sd pi-diag
 
 all: $(BOOT) $(KERNEL) iso esp
 
@@ -553,6 +553,10 @@ check-serial: check-page-tables iso $(FW_VARS) $(RS_IMG)
 # Exercise real task/window and control drawing against the UTM PCI machine.
 check-window-buttons: esp
 	python3 scripts/check-compat.py --pci --probe-window-buttons
+
+# Verify upstream DocEd's asynchronous PopUpEd source-launch path.
+check-doced-popup: esp
+	python3 scripts/check-compat.py --pci --probe-module /System/DolDoc/DocEd.ZC
 
 # UTM-shaped path: boot GPT disk via virtio-blk-pci only (no MMIO RedSea).
 # Accepts when serial shows: virtio-blk: OK … pci / virtio-blk: rw OK

@@ -5082,11 +5082,11 @@ I64 PopUpPickList(U8 *list)
 }
 I64 PopUpEd(U8 *filename=NULL, CTask *parent=NULL, CTask **_pu_task=NULL)
 {
-    if (filename) {}
-    if (parent) {}
-    if (_pu_task)
-        *_pu_task = NULL;
-    return 0;
+    U8 *st = MStrPrint("Ed(\"%Q\");", filename);
+    I64 res = PopUp(st, parent, _pu_task);
+
+    Free(st);
+    return res;
 }
 Bool PopUpCancelOk(U8 *header=NULL, U8 *footer=NULL)
 {

@@ -763,6 +763,10 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                             'zc: loaded /System/DolDoc/DocFind.ZC')
                     command('zload /System/DolDoc/DocLink.ZC',
                             'zc: loaded /System/DolDoc/DocLink.ZC')
+                    command('zload /Tests/DocEdPopup.ZC',
+                            'zc: loaded /Tests/DocEdPopup.ZC')
+                    command('zcall DocEdPopupChecks',
+                            'zc => 0x000000000000002a')
             if args.probe_module_override:
                 override_data = args.probe_module_override.read_bytes()
                 upload_source('Probe/ModuleOverride.ZC', override_data)

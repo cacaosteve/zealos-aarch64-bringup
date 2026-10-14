@@ -1,0 +1,26 @@
+// Exercise the unchanged DocEd PopUpEd helper through the ARM64 task bridge.
+I64 DocEdPopupChecks()
+{
+    CTask *child = NULL;
+    CJob *job;
+    CJob *queue_head;
+    I64 result;
+
+    result = PopUpEd("disk:Docs/A.ZC", NULL, &child);
+    if (result) return 10;
+    if (!child) return 11;
+    if (!TaskValidate(child)) return 12;
+
+    queue_head = &child->server_ctrl.next_waiting;
+    job = child->server_ctrl.next_waiting;
+    if (!job || job == queue_head || job->job_code != JOBT_EXE_STR ||
+        StrCompare(job->aux_str, "Ed(\"disk:Docs/A.ZC\");"))
+    {
+        Kill(child);
+        return 2;
+    }
+
+    if (!Kill(child) || TaskValidate(child))
+        return 3;
+    return 0x2a;
+}

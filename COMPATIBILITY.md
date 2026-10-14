@@ -1387,6 +1387,13 @@ ZealOS live distribution or installer.
 - The server dispatches source jobs but does not run upstream `ServerCmdLine`
   or its Doc/window input loop. It leaves parent messages for popup source
   code to read, including through `MessageGet`.
+- The ARM64 bootstrap's `PopUpEd` helper now matches upstream's source launch:
+  it quotes the filename with `%Q`, queues `Ed("…");` through `PopUp`, and
+  returns the detached editor task when requested. `make check-doced-popup`
+  loads the unchanged upstream DocEd dependency chain and verifies the exact
+  source queued for `/Kernel/KernelA.HH`, then tears down the child. This proves
+  launch preparation and task creation; the interactive editor window still
+  needs a live UTM acceptance check.
 - `PopupBridgeChecks` covers synchronous, detached, and nested execution,
   plus a popup source job reading a queued parent message. The ISO upstream
   probe and full ISO/HVF and PCI/HVF suites returned `0x2a` with the pinned
