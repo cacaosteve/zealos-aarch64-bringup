@@ -1921,7 +1921,9 @@ ZealOS live distribution or installer.
   save-load-save round trip. The compatibility probe checks `FileRead` through
   archive-relative and explicit `disk:` paths, a `FileWrite`/`FileRead`
   round-trip, bundled `DocRead`, and writable `DocWrite` on both the PCI source
-  partition and legacy RedSea root volume (`0x2a`).
+  partition and legacy RedSea root volume (`0x2a`). `TaskFileApiPersistChecks`
+  reopens the API test file and can be run after a UTM reboot to verify the
+  source-volume write survived restart.
 - The bootstrap `FilesFindMatch` supports case-insensitive `*` and `?` filename
   masks separated by semicolons, which enables the unchanged DocTerm source,
   DolDoc, and include-file filters. Its filesystem traversal flags remain

@@ -48,6 +48,23 @@ I64 TaskFileApiRoundTripChecks()
     return 42;
 }
 
+I64 TaskFileApiPersistChecks()
+{
+    I64 size, attr;
+    U8 *contents;
+    U8 *expected = "utm file API";
+
+    contents = FileRead("DocApiCheck.DD", &size, &attr);
+    if (!contents || size != 12 || StrCompare(contents, expected))
+    {
+        if (contents)
+            Free(contents);
+        return 1;
+    }
+    Free(contents);
+    return 42;
+}
+
 I64 TaskDocReadChecks()
 {
     CDoc *doc;

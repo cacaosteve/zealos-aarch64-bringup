@@ -938,6 +938,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                             'zc => 0x000000000000002a')
                 command('zcall TaskFileApiRoundTripChecks',
                         'zc => 0x000000000000002a')
+                command('zcall TaskFileApiPersistChecks',
+                        'zc => 0x000000000000002a')
                 command('zcall TaskDocReadChecks',
                         'zc => 0x000000000000002a')
                 command('zcall TaskDocWriteChecks',
