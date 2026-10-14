@@ -28,8 +28,8 @@ extern I64 ZcFbTextSpan(I64 x, I64 y, I64 len, I64 attr, U8 *data,
                         U32 *text_base, I64 stride);
 extern I64 ZcFbTextCellsDrawn();
 extern I64 ZcFbTextFlush(U32 *text_base, I64 stride, I64 rows);
-extern I64 ZcReadFile(U8 *path, U8 *dst, I64 capacity, I64 *size);
-extern I64 ZcWriteFile(U8 *path, U8 *src, I64 size);
+extern U8 *FileRead(U8 *filename, I64 *_size=NULL, I64 *_attr=NULL);
+extern I64 FileWrite(U8 *filename, U8 *fbuf, I64 size, I64 cdt=0, I64 attr=0);
 extern CDoc *DocNew(U8 *filename=NULL, CTask *task=NULL);
 extern U0 DocDel(CDoc *doc);
 extern U0 DocLoad(CDoc *doc, U8 *src, I64 size);
@@ -1009,24 +1009,22 @@ CDoc *DocRead(U8 *name=NULL, I64 flags=0)
 {
     CDoc *doc;
     U8 *contents;
-    I64 size, read_size;
+    I64 size, attr;
 
     if (flags) {}
     if (!name)
         return NULL;
-    size = ZcReadFile(name, NULL, 0, &read_size);
-    if (size <= 0 || size != read_size || size > 16 * 1024 * 1024)
-        return NULL;
-    doc = DocNew(name);
-    if (!doc)
-        return NULL;
-    contents = MAlloc(size, doc->mem_task);
-    if (!contents || ZcReadFile(name, contents, size, &read_size) != size ||
-        read_size != size)
+    contents = FileRead(name, &size, &attr);
+    if (!contents || size <= 0 || size > 16 * 1024 * 1024)
     {
         if (contents)
             Free(contents);
-        DocDel(doc);
+        return NULL;
+    }
+    doc = DocNew(name);
+    if (!doc)
+    {
+        Free(contents);
         return NULL;
     }
     DocLoad(doc, contents, size);
@@ -1142,7 +1140,7 @@ Bool DocWrite(CDoc *doc, Bool prompt=FALSE)
     contents = DocSave(doc, &size);
     if (!contents)
         return FALSE;
-    written = ZcWriteFile(doc->filename.name, contents, size);
+    written = FileWrite(doc->filename.name, contents, size, 0, 0);
     Free(contents);
     return written == size;
 }

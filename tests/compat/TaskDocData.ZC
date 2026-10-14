@@ -1,20 +1,16 @@
 // Smoke the bridge's DolDoc editable-field format/scan round trip.
-extern I64 ZcReadFile(U8 *path, U8 *dst, I64 capacity, I64 *size);
-
 I64 TaskSourceFileReadChecks()
 {
-    I64 size, read_size;
-    U8 contents[4096];
+    I64 size, attr;
+    U8 *contents;
 
-    size = ZcReadFile("/Tests/TaskDocData.ZC", NULL, 0, &read_size);
-    if (size <= 0 || size != read_size || size > 4096)
+    contents = FileRead("disk:Tests/TaskDocData.ZC", &size, &attr);
+    if (!contents || size <= 0 || size > 4096)
         return 1;
-    if (ZcReadFile("/Tests/TaskDocData.ZC", contents, size, &read_size) != size ||
-        read_size != size)
-        return 2;
     if (contents[0] != '/' || contents[1] != '/' || contents[2] != ' ' ||
         contents[3] != 'S' || contents[4] != 'm')
         return 3;
+    Free(contents);
     return 42;
 }
 

@@ -1910,10 +1910,11 @@ ZealOS live distribution or installer.
   `ListMatch`/`DefineMatch`, `ST_RAW_TYPES`, and thin
   plain-text `DocSave`/`DocLoad` bridge routines and a `DocCenter` fallback;
   formatted DolDoc entries and binary blocks still need the upstream DocFile
-  serializer. `DocRead` now reads bundled archive files and falls back to the
-  writable source volume for relative names (or explicit `disk:` paths) into a
-  new document; `DocWrite` saves the plain-text serialization through the
-  native source partition (or a root RedSea file on legacy disks). Save-as
+  serializer. `DocRead` now uses the normal `FileRead` interface to read bundled
+  archive files and fall back to the writable source volume for relative names
+  (or explicit `disk:` paths) into a new document; `DocWrite` uses `FileWrite`
+  to save the plain-text serialization through the native source partition (or
+  a root RedSea file on legacy disks). Save-as
   prompting and upstream DocFile binary blocks are not implemented.
   `TaskDocDataChecks` exercises integer format/scan round-tripping and checkbox
   state synchronization; `TaskDocPlainSaveChecks` verifies a text/newline

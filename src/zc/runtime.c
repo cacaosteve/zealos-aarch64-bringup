@@ -657,42 +657,49 @@ static char *disk_copy(const char *path, size_t *length) {
     *length = n;
     return src;
 }
-static int64_t host_source_file_read(int64_t *a) {
-    const char *path = (const char *)(uintptr_t)a[0];
-    char *dst = (char *)(uintptr_t)a[1];
-    int64_t capacity = a[2];
-    size_t length = 0;
-    const unsigned char *data = NULL;
-    char *owned = NULL;
-
-    if (a[3])
-        *(int64_t *)(uintptr_t)a[3] = 0;
-    if (!path || capacity < 0)
-        return -1;
+static const unsigned char *source_file_find(const char *path, size_t *length,
+                                              char **owned) {
+    const unsigned char *data;
+    *owned = NULL;
+    if (!path)
+        return NULL;
     if (!strncmp(path, "disk:", 5)) {
-        owned = disk_copy(path, &length);
-        data = (const unsigned char *)owned;
-    } else {
-        data = source_find(path, &length);
-        if (!data && path[0] != '/' && strlen(path) <= 95) {
-            char disk_path[101] = "disk:";
-            memcpy(disk_path + 5, path, strlen(path) + 1);
-            owned = disk_copy(disk_path, &length);
-            data = (const unsigned char *)owned;
-        }
+        *owned = disk_copy(path, length);
+        return (const unsigned char *)*owned;
     }
-    if (!data || length > INT64_MAX || (dst && (uint64_t)capacity < length)) {
-        free(owned);
-        return -1;
+    data = source_find(path, length);
+    if (!data && path[0] != '/' && strlen(path) <= 95) {
+        char disk_path[101] = "disk:";
+        memcpy(disk_path + 5, path, strlen(path) + 1);
+        *owned = disk_copy(disk_path, length);
+        data = (const unsigned char *)*owned;
     }
-    if (dst)
-        memcpy(dst, data, length);
-    if (a[3])
-        *(int64_t *)(uintptr_t)a[3] = (int64_t)length;
-    free(owned);
-    return (int64_t)length;
+    return data;
 }
-static int64_t host_source_file_write(int64_t *a) {
+static int64_t host_file_read(int64_t *a) {
+    const char *path = (const char *)(uintptr_t)a[0];
+    size_t length = 0;
+    char *owned = NULL;
+    const unsigned char *data = source_file_find(path, &length, &owned);
+    if (a[1]) *(int64_t *)(uintptr_t)a[1] = 0;
+    if (a[2]) *(int64_t *)(uintptr_t)a[2] = 0;
+    if (!data || length > INT64_MAX || length == SIZE_MAX) {
+        free(owned);
+        return 0;
+    }
+    CHeapCtrl *owner = guest_task_bound ? &guest_fibers[guest_current].heap_owner : &data_heap;
+    char *contents = __AIWNIOS_MAlloc(length + 1, owner);
+    if (!contents) {
+        free(owned);
+        return 0;
+    }
+    memcpy(contents, data, length);
+    contents[length] = 0;
+    if (a[1]) *(int64_t *)(uintptr_t)a[1] = (int64_t)length;
+    free(owned);
+    return (int64_t)(uintptr_t)contents;
+}
+static int64_t host_file_write(int64_t *a) {
     const char *path = (const char *)(uintptr_t)a[0];
     const char *src = (const char *)(uintptr_t)a[1];
     int64_t length = a[2];
@@ -4154,8 +4161,11 @@ static int load_inner(const char *path) {
     }
     execute_source(path, src);
     if (!strcmp(path, "/System/TaskBridge.ZC")) {
-        PrsBindCSymbol("ZcReadFile", host_source_file_read, 4);
-        PrsBindCSymbol("ZcWriteFile", host_source_file_write, 3);
+        /* TaskBridge declares the generic file API before defining DocRead /
+         * DocWrite.  Bind it as soon as those declarations exist, just like
+         * the bridge helpers below, so calls compiled in TaskBridge resolve. */
+        PrsBindCSymbol("FileRead", host_file_read, 3);
+        PrsBindCSymbol("FileWrite", host_file_write, 5);
         PrsBindCSymbol("LowPass1", host_low_pass1, 4);
         /* These functions were pre-registered before TaskBridge introduced
          * their extern declarations, so bind them again now that the symbols
@@ -4182,6 +4192,8 @@ static int load_inner(const char *path) {
     PrsBindCSymbol("Clamp", host_clamp_f64, 3);
     PrsBindCSymbol("Max", host_max_f64, 2);
     if (!strcmp(path, "/Kernel/KernelC.HH")) {
+        PrsBindCSymbol("FileRead", host_file_read, 3);
+        PrsBindCSymbol("FileWrite", host_file_write, 5);
         /* counts is declared here, not in KernelB.HH; bind after declaration
          * so the generic extern-data binder can resolve the symbol. */
         CHashGlblVar *spawned_tasks = (CHashGlblVar *)HashFind(
@@ -4577,8 +4589,6 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
                     {"ZcFbTextFill", host_fb_text_fill, 8},
                     {"ZcFbTextRect", host_fb_text_rect, 7},
                     {"ZcFbTextFlush", host_fb_text_flush, 3},
-                    {"ZcReadFile", host_source_file_read, 4},
-                    {"ZcWriteFile", host_source_file_write, 3},
                     {"ZcDocUpdateTaskDocs", host_doc_update_task_docs, 1},
                     {"ZcActiveGrGlobals", host_active_gr_globals, 0},
                     {"ZcActiveMouseGlobals", host_active_mouse_globals, 0},
