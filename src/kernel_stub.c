@@ -1406,6 +1406,7 @@ void exc_handle_sync(uint64_t *frame) {
             uart_puts(g_uart, " X3=");
             uart_put_hex_raw(g_uart, frame[3]);
         }
+#ifndef ZEAL_PI_DIAG
         if (frame) {
             uintptr_t offset = 0;
             const char *name = zc_debug_function_for_pc((uintptr_t)elr,
@@ -1428,6 +1429,7 @@ void exc_handle_sync(uint64_t *frame) {
                 uart_put_hex_raw(g_uart, offset);
             }
         }
+#endif
         uart_puts(g_uart, "\n");
     }
     for (;;) {
@@ -4532,6 +4534,7 @@ static void tablet_cursor_tick(void) {
     /* Once source WinMgr owns the graphical desktop it draws the software
      * arrow through gr.fp_draw_mouse. Keep this bootstrap marker out of that
      * scanout so it cannot cover the real cursor or leave stale orange pixels. */
+#ifndef ZEAL_PI_DIAG
     if (zc_source_winmgr_active() || zc_gui_terminal_active() ||
         zc_window_demo_active()) {
         g_tab_prev_btn = btn;
@@ -4539,6 +4542,7 @@ static void tablet_cursor_tick(void) {
         g_tab_cy = y;
         return;
     }
+#endif
     if ((btn & 1) && !(g_tab_prev_btn & 1)) {
         tablet_paint_stamp(x, y, 0x0040C0F0u);
         g_tab_clicks++;

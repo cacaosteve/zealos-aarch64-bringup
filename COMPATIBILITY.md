@@ -708,22 +708,27 @@ ZealOS live distribution or installer.
   The refreshed UTM VM was started; its terminal check remains pending because
   the Mac was locked and `utmctl attach` is unavailable.
 - These calls use a cooperative, single-CPU scheduler. Killing a task ends it
-  synchronously and reclaims its descendants; debug-break mode and the root
-  shell task are protected. Full `KTask.ZC`/`Sched.ZC`, task-end callbacks,
-  timed waits, messages and timer preemption remain outside this bootstrap.
+  synchronously and reclaims its descendants; task-end callbacks run once.
+  Debug-break mode and the root shell task are protected. Full
+  `KTask.ZC`/`Sched.ZC`, timed waits, messages and timer preemption remain
+  outside this bootstrap.
 
 ## Recorded validation — cooperative task waits
 
-- `BirthWait` and `DeathWait(send_exit=FALSE)` now use the pinned `KTask.ZC`
-  signatures. A waiting child remains a valid task but is skipped until its
-  task-pointer condition changes. The root wait yields to other runnable
-  children; with no possible producer it reports `task wait cannot progress`
-  and invalidates the native session, which `zreset` recovers. The unsupported
-  `send_exit=TRUE` path reports an error because `XTalk` task-exit handling is absent.
+- `BirthWait` and both `DeathWait` modes use the pinned `KTask.ZC` signatures.
+  A waiting child remains a valid task but is skipped until its task-pointer
+  condition changes. `send_exit=TRUE` uses the existing teardown path to end
+  the target and descendants, running end callbacks before the pointer becomes
+  invalid. This is the bootstrap equivalent of upstream's idle-server
+  `XTalk("Exit;")` request; a general per-task command server is not present.
+  The root wait yields to other runnable children; with no possible producer
+  it reports `task wait cannot progress` and invalidates the native session,
+  which `zreset` recovers.
 - `TaskWaitChecks` returned `0x2a` in the ISO/HVF and PCI/HVF full suites and
   the final PCI upstream probe. It covers default-argument and generation-
   changing `BirthWait`, root/child `DeathWait`, waking a waiter after `Kill`,
-  and the all-blocked scheduler result. `TaskWaitDeadlockChecks` produced the
+  the `send_exit=TRUE` teardown callback, and the all-blocked scheduler result.
+  `TaskWaitDeadlockChecks` produced the
   expected explicit error. `make check-upstream`, `make pi-diag`, and
   `git diff --check` passed.
 - `make utm` refreshed the VM and preserved the RedSea region and both native

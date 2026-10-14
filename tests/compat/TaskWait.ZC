@@ -1,5 +1,6 @@
 // Cooperative BirthWait/DeathWait over the pinned KTask signatures.
 I64 wait_target_steps, wait_death_done, wait_birth_done, wait_publish_done;
+I64 wait_exit_callback_seen;
 I64 birth_old_num, birth_seen_num;
 CTask *wait_target, *birth_slot;
 
@@ -26,6 +27,17 @@ U0 WaitPublish(U8 *data)
 {
     birth_slot = Spawn(&WaitTarget);
     wait_publish_done++;
+}
+
+U0 WaitExitCallback()
+{
+    wait_exit_callback_seen++;
+}
+
+U0 WaitExitTarget(U8 *data)
+{
+    Fs->task_end_cb = &WaitExitCallback;
+    Sleep(1000);
 }
 
 I64 TaskWaitChecks()
@@ -66,6 +78,14 @@ I64 TaskWaitChecks()
         return 5;
     if (!Kill(old) || ZcTaskRun || TaskValidate(old))
         return 6;
+
+    wait_exit_callback_seen = 0;
+    wait_target = Spawn(&WaitExitTarget);
+    if (!wait_target || !TaskValidate(wait_target))
+        return 7;
+    DeathWait(&wait_target, TRUE);
+    if (TaskValidate(wait_target) || wait_exit_callback_seen != 1)
+        return 8;
     return 42;
 }
 

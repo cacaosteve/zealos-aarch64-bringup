@@ -2456,9 +2456,22 @@ static int64_t host_birth_wait(int64_t *a) {
     return guest_wait(GUEST_WAIT_BIRTH, (void *)(uintptr_t)a[0], a[1]);
 }
 static int64_t host_death_wait(int64_t *a) {
-    if (a[1])
-        zc_fail("DeathWait send_exit needs XTalk task-exit protocol");
-    return guest_wait(GUEST_WAIT_DEATH, (void *)(uintptr_t)a[0], 0);
+    void **slot = (void **)(uintptr_t)a[0];
+    if (!slot)
+        zc_fail("DeathWait needs a task-pointer slot");
+    if (a[1]) {
+        void *target = *slot;
+        if (valid_guest_task(target)) {
+            /* Upstream asks the target's idle command server to run Exit;
+             * this bootstrap has no server command loop for every task.
+             * Reuse the task teardown path instead: it runs end callbacks,
+             * kills descendants, and only returns once the target is dead. */
+            int64_t kill_args[3] = {(int64_t)(uintptr_t)target, 1, 0};
+            if (!host_kill(kill_args))
+                zc_fail("DeathWait could not request task exit");
+        }
+    }
+    return guest_wait(GUEST_WAIT_DEATH, slot, 0);
 }
 static int64_t host_task_wait(int64_t *a) {
     void *target = a[0] ? (void *)(uintptr_t)a[0] : guest_fibers[guest_current].words;
