@@ -93,6 +93,9 @@ I64 KTaskKillBridgeChecks()
     if (!TaskValidate(child)) return 1;
     Yield;
     if (KTaskKillStarted != 1 || !TaskValidate(child)) return 2;
-    if (!Kill(child) || TaskValidate(child)) return 3;
+    sys_winmgr_task = child;
+    if (Kill(child) || !TaskValidate(child)) return 3;
+    sys_winmgr_task = NULL;
+    if (!Kill(child) || TaskValidate(child)) return 4;
     return 0x2a;
 }

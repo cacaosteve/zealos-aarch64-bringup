@@ -2088,9 +2088,10 @@ ZealOS live distribution or installer.
   a child through source `Spawn`, waits with source `BirthWait`/`DeathWait`,
   verifies its parent/name and data, pauses and resumes it through source
   `Suspend`/`IsSuspended`, and checks both normal completion and source `Kill`
-  reclamation. Separate checks exercise the ZealOS `Call` primitive and named
-  startup-hook bridge. The probe uses compile-only
-  stubs for heap-control initialization and the interactive lexer. Full
+  reclamation while preserving the Window Manager protection. Separate checks
+  exercise the ZealOS `Call` primitive and named startup-hook bridge. The probe
+  uses compile-only stubs for heap-control initialization and the interactive
+  lexer. Full
   upstream `TaskInit`, its code/data block pools, and custom CPU, stack-size,
   or flags options remain outside this bridge; `Kill`'s debug-break mode is
   not implemented by the host runtime.

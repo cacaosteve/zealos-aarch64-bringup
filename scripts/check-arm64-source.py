@@ -76,6 +76,7 @@ assert 'return ZcSpawn(fp_start_addr, data, task_name, target_cpu, parent,' in k
 assert 'stack_size, flags);' in ktask_overlay
 assert 'return ZcTaskValidate(task);' in ktask_overlay
 assert 'return ZcTaskKill(task, wait, just_break);' in ktask_overlay
+assert 'if (task == sys_winmgr_task)' in ktask_overlay
 assert '0 < task <= I32_MAX' not in ktask_overlay
 assert 'TaskQueueInsChild(task);' not in ktask_overlay
 assert 'MemCopy(task->rsp(U8 *), &data, sizeof(U8 *));' not in ktask_overlay

@@ -163,6 +163,8 @@ argpop I64 CallStackGrow(I64 stack_size_threshold, I64 stack_size,
         raise ValueError("pinned Kill flag/wait path changed")
     text = text[:kill_start] + """Bool Kill(CTask *task, Bool wait=TRUE, Bool just_break=FALSE)
 {
+    if (task == sys_winmgr_task)
+        return FALSE;
     return ZcTaskKill(task, wait, just_break);
 }
 """ + text[kill_end:]
