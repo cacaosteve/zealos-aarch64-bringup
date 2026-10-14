@@ -2185,3 +2185,13 @@ ZealOS live distribution or installer.
   and preserved RedSea plus both native source banks; the VM was started. The
   Mac was locked during the follow-up screen check, so visual UTM boot
   confirmation remains pending.
+
+## Graphical terminal window-arrangement menu
+
+- The boot terminal's OS menu now exposes the unchanged upstream
+  `WinTileHorz`, `WinTileVert`, and `WinTileGrid` operations as horizontal,
+  vertical, and grid arrangement commands. `BootstrapGuiTerminalSmoke` checks
+  the three new menu labels, message tags, and action IDs. The PCI/HVF boot
+  probe loaded the terminal and returned `0x2a` from both terminal and shell
+  menu checks; the boot compositor presented frames. Interactive layout
+  verification remains part of the UTM screen/input check.

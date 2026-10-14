@@ -145,6 +145,15 @@ U0 BootstrapGuiTerminalMenuInstall()
     entry->next = BootstrapGuiTerminalMenuEntry(Fs, "Disk", 4);
     entry = entry->next;
     entry->next = BootstrapGuiTerminalMenuEntry(Fs, "Window Demo", 5);
+    entry = entry->next;
+    entry->next = BootstrapGuiTerminalMenuEntry(
+            Fs, "Tile Windows Horizontally", 6);
+    entry = entry->next;
+    entry->next = BootstrapGuiTerminalMenuEntry(
+            Fs, "Tile Windows Vertically", 7);
+    entry = entry->next;
+    entry->next = BootstrapGuiTerminalMenuEntry(
+            Fs, "Tile Windows as Grid", 8);
     menu->task = Fs;
     menu->attr = BLUE << 4 + YELLOW;
     menu->sub = root;
@@ -161,6 +170,12 @@ U8 *BootstrapGuiTerminalMenuAction(I64 action)
         return ZcGuiShellExec("zls");
     if (action == 4)
         return ZcGuiShellExec("zvol");
+    if (action == 6)
+        WinTileHorz;
+    if (action == 7)
+        WinTileVert;
+    if (action == 8)
+        WinTileGrid;
     return NULL;
 }
 
@@ -377,7 +392,7 @@ I64 BootstrapGuiTerminalSmoke()
         if (!root) return 12;
         if (StrCompare(root->name, "OS") || !root->dir) return 19;
         entry = root->sub;
-        for (action = 1; action <= 5; action++)
+        for (action = 1; action <= 8; action++)
         {
             if (!entry) return 12 + action;
             if (entry->message_code != MESSAGE_KEY_UP) return 20 + action;
@@ -388,6 +403,12 @@ I64 BootstrapGuiTerminalSmoke()
             if (action == 3 && StrCompare(entry->name, "Files")) return 35;
             if (action == 4 && StrCompare(entry->name, "Disk")) return 36;
             if (action == 5 && StrCompare(entry->name, "Window Demo")) return 47;
+            if (action == 6 &&
+                StrCompare(entry->name, "Tile Windows Horizontally")) return 48;
+            if (action == 7 &&
+                StrCompare(entry->name, "Tile Windows Vertically")) return 49;
+            if (action == 8 &&
+                StrCompare(entry->name, "Tile Windows as Grid")) return 50;
             entry = entry->next;
         }
         if (entry) return 37;
