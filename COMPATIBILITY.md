@@ -1979,8 +1979,11 @@ ZealOS live distribution or installer.
   window z/visibility tables. Circle bounds use layout-derived flat pointers
   because nested inline-array member access currently faults in the ARM64
   compiler. QEMU checks validate table contents and actual pen-brush pixels;
-  the CDC diff check verifies empty and changed regions, including the
-  extracted region origin and pixels. Live source WinMgr checks cover startup,
+  the CDC diff check verifies empty and changed regions, including a
+  nonzero-origin, seven-pixel-wide extraction and its padded row stride. A
+  guarded ARM64 `GrBitMap.ZC` overlay copies ordinary CDC rows directly in
+  `DCExt`; the pinned implementation's negative-origin `GrBlot` could write
+  before the tightly allocated result. Live source WinMgr checks cover startup,
   draw, mouse, title dragging, resizing, and captured-control release after
   moving the pointer outside the control.
   Arbitrary indexed-color palette behavior, full planar semantics, remaining
@@ -2053,10 +2056,11 @@ ZealOS live distribution or installer.
   defaulted F64 parameters and the F64 `Abs` intrinsic. A guarded source
   overlay rewrites the bit-test's inline address-of-member argument to an
   equivalent local pointer because that parser form is still unsupported.
-- The fixture calls `ODEsUpdate` directly with a real root-task ODE queue; it
-  does not yet run MathODE from an ordinary desktop frame or validate its
-  multi-CPU derivative workers. Those remain separate runtime integration
-  work.
+- The PCI compatibility target calls `ODEsUpdate` directly with a real
+  root-task ODE queue. `make check-grscreen-ode` also attaches a root-task ODE
+  and verifies its state advances along the expected exponential trajectory
+  across live source Window Manager frames, then stops the manager before
+  cleanup. Multi-CPU derivative workers remain unvalidated.
 
 ## Window Manager startup bridge load order
 
