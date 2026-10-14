@@ -7,7 +7,8 @@ typedef void (*zc_output_fn)(const char *);
 typedef int (*zc_key_event_fn)(uint8_t *type, uint64_t *arg1, uint64_t *arg2);
 typedef void (*zc_key_reset_fn)(void);
 void zc_set_key_reader(zc_key_event_fn read, zc_key_reset_fn reset);
-/* Return 0 and file length. A NULL destination asks for the length only. */
+/* Return 0 and file length; return -3 for a tombstone masking a bundled file.
+ * A NULL destination asks for the length only. */
 typedef int (*zc_source_read_fn)(const char *name, char *dst, size_t cap, size_t *length);
 void zc_set_source_reader(zc_source_read_fn read);
 typedef int (*zc_source_write_fn)(const char *name, const char *src, size_t length);

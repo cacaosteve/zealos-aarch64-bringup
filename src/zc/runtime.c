@@ -686,11 +686,17 @@ static int disk_name(const char *path, char name[128]) {
     }
     return 0;
 }
-static char *disk_copy(const char *path, size_t *length) {
+static char *disk_copy(const char *path, size_t *length, int *tombstoned) {
     char name[128];
     size_t n = 0, got = 0;
-    if (disk_name(path, name) || !disk_reader || disk_reader(name, NULL, 0, &n) || !n ||
-        n > 4u * 1024u * 1024u)
+    if (tombstoned)
+        *tombstoned = 0;
+    if (disk_name(path, name) || !disk_reader)
+        return NULL;
+    int status = disk_reader(name, NULL, 0, &n);
+    if (status == -3 && tombstoned)
+        *tombstoned = 1;
+    if (status || !n || n > 4u * 1024u * 1024u)
         return NULL;
     char *src = malloc(n + 1);
     if (!src || disk_reader(name, src, n + 1, &got) || got != n || memchr(src, 0, n)) {
@@ -704,11 +710,12 @@ static char *disk_copy(const char *path, size_t *length) {
 static const unsigned char *source_file_find(const char *path, size_t *length,
                                               char **owned) {
     const unsigned char *data;
+    int tombstoned = 0;
     *owned = NULL;
     if (!path)
         return NULL;
     if (!strncmp(path, "disk:", 5)) {
-        *owned = disk_copy(path, length);
+        *owned = disk_copy(path, length, NULL);
         return (const unsigned char *)*owned;
     }
     // Absolute ZealOS paths refer to the writable source volume first, then
@@ -717,17 +724,22 @@ static const unsigned char *source_file_find(const char *path, size_t *length,
     if (path[0] == '/' && strlen(path) <= 95) {
         char disk_path[101] = "disk:";
         memcpy(disk_path + 5, path, strlen(path) + 1);
-        *owned = disk_copy(disk_path, length);
+        *owned = disk_copy(disk_path, length, &tombstoned);
         if (*owned)
             return (const unsigned char *)*owned;
+        if (tombstoned)
+            return NULL;
     }
-    data = source_find(path, length);
-    if (!data && path[0] != '/' && strlen(path) <= 95) {
+    if (path[0] != '/' && strlen(path) <= 95) {
         char disk_path[101] = "disk:";
         memcpy(disk_path + 5, path, strlen(path) + 1);
-        *owned = disk_copy(disk_path, length);
-        data = (const unsigned char *)*owned;
+        *owned = disk_copy(disk_path, length, &tombstoned);
+        if (*owned)
+            return (const unsigned char *)*owned;
+        if (tombstoned)
+            return NULL;
     }
+    data = source_find(path, length);
     return data;
 }
 static int64_t host_file_read(int64_t *a) {
@@ -769,10 +781,10 @@ FILE *fopen(const char *path, const char *mode) {
     char *owned = NULL;
     const unsigned char *data;
     if (!strncmp(path, "disk:", 5)) {
-        owned = disk_copy(path, &n);
+        owned = disk_copy(path, &n, NULL);
         data = (const unsigned char *)owned;
     } else {
-        data = source_find(path, &n);
+        data = source_file_find(path, &n, &owned);
     }
     if (!data)
         return NULL;
@@ -4256,15 +4268,17 @@ static int execute_source(const char *path, const char *src) {
 static int load_inner(const char *path) {
     size_t n;
     char *src;
+    char *owned = NULL;
     if (!strncmp(path, "disk:", 5)) {
-        src = disk_copy(path, &n);
+        src = disk_copy(path, &n, NULL);
     } else {
-        const unsigned char *s = source_find(path, &n);
+        const unsigned char *s = source_file_find(path, &n, &owned);
         src = s ? malloc(n + 1) : NULL;
         if (src) {
             memcpy(src, s, n);
             src[n] = 0;
         }
+        free(owned);
     }
     if (!src) {
         printf("zc: source not found: %s\n", path);

@@ -3353,6 +3353,15 @@ Freeze catalog unchanged.
 | Smoke | `TaskFileFindDirectoryFilterChecks` checks `/Tests` directory attributes/name/path and rejects a nonexistent directory; `make check-docfile-persistence` passes |
 | Limits | Directory entry enumeration, empty directories, and directories created only on the writable source volume remain unsupported |
 
+## Milestone 299 — honor native source overlays and tombstones
+
+| Item | Path |
+|--|--|
+| Gap | Absolute source reads and loads could ignore edited native files, and a deleted native copy could fall through to its bundled archive version |
+| Bring-up | Prefer native source records over archive members for absolute and root-relative paths; propagate tombstone status so deleted archive paths stay hidden |
+| Smoke | `TaskFileFindTombstoneChecks` confirms `FileFind` hides a bundled path after its native override is deleted; the PCI test also loads and calls an absolute-path native override; `make check-docfile-persistence` passes |
+| Limits | Current-directory resolution for arbitrary relative paths and directory listing are separate filesystem gaps |
+
 ## Open compatibility probe — `/System/Win.ZC`
 
 The source probe loads pinned `KernelC.HH`, `Externs.ZC`, and `Gr.HH` before compiling unchanged `Win.ZC`. Graphics dimensions and mouse globals are probe fixtures; `DrawMenu` and the initial `GrScaleZoom` definition are compile-time fixtures until unchanged `GrScreen.ZC` is loaded later in the probe. `GrScreenFinalUpdateChecks` executes `WinFinalUpdate` through the staged idle-frame path, confirms the fixture's `mouse_grid.coord` toggles the real coordinate-text overlay, checks a separate visible guest overlay callback, verifies the software arrow against Limine framebuffer pixels, and exercises `WinMouseUpdate`'s edge recentering through the runtime dispatch. `WinMousePointerStateCheck` covers transformed tablet coordinates and `WinMouseHardStateCheck` covers the source mouse-state ABI; manual UTM acceptance confirms the software pointer and window-demo mouse interaction. The raw ARM generic-timer binding and a standalone F64 clock expression are smoke-tested before the Win load.
@@ -3389,8 +3398,9 @@ resolved path. It populates the bounded leaf name, full path, file size, and
 archive attribute in `CDirEntry`. The PCI persistence probe verifies
 metadata, real `.txt`, `.DD`, source-file and parent-directory matches, and
 synthetic suffix and combined-filter cases for `.AOT`, `.JIT`, and `.GR`.
-Directory enumeration, empty directories, and real ZealOS directory records
-remain unimplemented.
+Native source records now override bundled members for absolute and root-relative
+loads, and tombstones mask bundled paths. Directory enumeration, empty
+directories, and real ZealOS directory records remain unimplemented.
 
 ## Acceptance
 

@@ -4076,7 +4076,8 @@ static int zc_read_redsea(const char *name, char *dst, size_t cap, size_t *out_l
     struct zss_entry entry;
     int found = zss_find(name, &entry, NULL, NULL);
     if (found == 1) return zss_read(&entry, dst, cap, out_len);
-    if (found == -1 || found == -3) return -1;
+    if (found == -3) return -3; /* Native tombstone masks the bundled archive. */
+    if (found == -1) return -1;
     /* The old eight-entry RedSea catalog stays readable during migration. */
     uint64_t len = 0;
     if (!virtio_blk_ready() || str_len(name) > 37 ||
