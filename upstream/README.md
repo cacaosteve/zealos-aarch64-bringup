@@ -3378,7 +3378,16 @@ Freeze catalog unchanged.
 | Gap | A nonzero presented-frame count did not prove that the graphical terminal had painted visible pixels; the black-screen report persisted despite healthy task/window metadata |
 | Bring-up | Add `scanout: nonblack_pixels=... of ...` to `zstatus`, counting non-black 32-bit pixels in the actual framebuffer |
 | Smoke | `make check-compat-pci` checks the framebuffer diagnostic format alongside window-state bits and frame count |
-| Limits | The first immediate PCI status can precede the first actual draw; the live UTM pixel count remains the deciding evidence for the black-screen fault |
+| Limits | The first immediate PCI status can precede the first actual draw; boot-time window visibility still requires an eyes-on UTM check |
+
+## Milestone 302 — draw boot windows before the source screen pass
+
+| Item | Path |
+|--|--|
+| Gap | PCI boot frames reached the source screen update with a valid graphical-terminal task, but the uncovered-window bitmap could suppress its window callback, leaving the guest framebuffer black |
+| Bring-up | Draw each shown task through upstream `GrUpdateTaskWin` in task-ring order before `GrUpdateScreen`; preserve per-cell text clipping and the executive-task ODE update pass |
+| Smoke | `make check-compat-pci` requires more than 1,000 non-black framebuffer pixels at boot and continues through the stable overlapping-window render checks |
+| Limits | The refreshed UTM display still needs an eyes-on check; the host PCI suite cannot confirm UTM's live scanout |
 
 ## Open compatibility probe — `/System/Win.ZC`
 
