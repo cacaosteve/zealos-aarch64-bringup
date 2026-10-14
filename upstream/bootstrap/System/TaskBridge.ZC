@@ -1415,9 +1415,79 @@ Bool BootstrapFileFindTypeMatch(U8 *filename, I64 fuf_flags)
         return TRUE;
     return FALSE;
 }
+Bool BootstrapFileFindPath(U8 *filename, I64 fuf_flags, U8 *resolved,
+                           I64 resolved_cap, I64 *size)
+{
+    U8 *contents;
+    U8 candidate[256];
+    U8 *dir, *last;
+    I64 i, j, dir_len, filename_len;
+
+    if (!filename || !*filename || !resolved || resolved_cap < 2)
+        return FALSE;
+    filename_len = StrLen(filename);
+    if (filename_len >= resolved_cap || filename_len >= sizeof(candidate))
+        return FALSE;
+    for (i = 0; i <= filename_len; i++)
+        resolved[i] = filename[i];
+    contents = FileRead(resolved, size);
+    if (contents)
+    {
+        Free(contents);
+        return TRUE;
+    }
+    // Parent lookup only applies to relative names. Disk-qualified and
+    // absolute paths already identify a specific source-volume location.
+    if (!(fuf_flags & FUF_SCAN_PARENTS) || filename[0] == '/' ||
+        StrOcc(filename, ':') || !Fs || !Fs->cur_dir)
+        return FALSE;
+    dir = StrNew(Fs->cur_dir);
+    dir_len = StrLen(dir);
+    while (dir_len)
+    {
+        if (dir_len + filename_len + 2 >= sizeof(candidate) ||
+            dir_len + filename_len + 2 >= resolved_cap)
+            break;
+        for (i = 0; i < dir_len; i++)
+            candidate[i] = dir[i];
+        j = dir_len;
+        if (j && candidate[j - 1] != '/')
+            candidate[j++] = '/';
+        for (i = 0; i <= filename_len; i++)
+            candidate[j + i] = filename[i];
+        contents = FileRead(candidate, size);
+        if (contents)
+        {
+            for (i = 0; candidate[i] && i < resolved_cap - 1; i++)
+                resolved[i] = candidate[i];
+            resolved[i] = 0;
+            Free(contents);
+            Free(dir);
+            return TRUE;
+        }
+        last = StrLastOcc(dir, "/");
+        if (!last)
+            break;
+        if (last == dir)
+        {
+            if (dir_len == 1)
+                break;
+            dir[1] = 0;
+            dir_len = 1;
+        }
+        else
+        {
+            *last = 0;
+            dir_len = StrLen(dir);
+        }
+    }
+    Free(dir);
+    return FALSE;
+}
 Bool FileFind(U8 *filename, CDirEntry *_de=NULL, I64 fuf_flags=0)
 {
-    U8 *contents, *leaf;
+    U8 *leaf;
+    U8 resolved[256];
     I64 filename_len, size;
     if (!filename || !*filename)
         return FALSE;
@@ -1427,23 +1497,22 @@ Bool FileFind(U8 *filename, CDirEntry *_de=NULL, I64 fuf_flags=0)
         return FALSE;
     if (!BootstrapFileFindTypeMatch(filename, fuf_flags))
         return FALSE;
-    contents = FileRead(filename, &size);
-    if (!contents)
+    if (!BootstrapFileFindPath(filename, fuf_flags, resolved,
+                               sizeof(resolved), &size))
         return FALSE;
-    Free(contents);
     if (_de)
     {
         _de->next = NULL;
         _de->parent = NULL;
         _de->sub = NULL;
-        _de->full_name = StrNew(filename);
+        _de->full_name = StrNew(resolved);
         _de->user_data = 0;
         _de->user_data2 = 0;
-        leaf = StrLastOcc(filename, "/\\");
+        leaf = StrLastOcc(resolved, "/\\");
         if (leaf)
             leaf++;
         else
-            leaf = filename;
+            leaf = resolved;
         filename_len = StrLen(leaf);
         if (filename_len >= CDIR_FILENAME_LEN)
             filename_len = CDIR_FILENAME_LEN - 1;
@@ -1458,9 +1527,14 @@ Bool FileFind(U8 *filename, CDirEntry *_de=NULL, I64 fuf_flags=0)
 }
 U8 *FileNameAbs(U8 *filename, I64 fuf_flags=0)
 {
+    U8 resolved[256];
+    I64 size;
     if (!filename)
         return NULL;
-    if (fuf_flags) {}
+    if (fuf_flags & FUF_SCAN_PARENTS)
+        if (BootstrapFileFindPath(filename, fuf_flags, resolved,
+                                  sizeof(resolved), &size))
+            return StrNew(resolved);
     return StrNew(filename);
 }
 U0 GodBitsInsert(I64 num_bits, I64 bit_field)

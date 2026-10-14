@@ -3333,7 +3333,16 @@ Freeze catalog unchanged.
 | Gap | The new `edit <path>` command reached upstream `Ed()`, but file opening stopped at unimplemented `Silent`, `FileNameCheck`, and `FileFind` bridge functions |
 | Bring-up | Implement task-local silent-state save/restore, conservative filename validation, and source-backed file existence checks through `FileRead`; extend the graphical-terminal smoke to open a small bundled file with `EDF_BAIL` |
 | Smoke | `make check-doced-popup` exercises the real editor entry point without opening a UI and passes; `check-upstream.py`, `check-arm64-source.py`, and `git diff --check` pass |
-| Limits | `FileFind` populates bounded leaf name, full path, file size, and archive attributes, and filters `.TXT`/`.txt`, `.DD`, `.ZC`, `.HH`, `.AOT`, `.JIT`, and `.GR`; parent scanning and directory enumeration remain unimplemented. Interactive typing and saving still need UTM acceptance |
+| Limits | `FileFind` populates bounded leaf name, full path, file size, and archive attributes, and filters `.TXT`/`.txt`, `.DD`, `.ZC`, `.HH`, `.AOT`, `.JIT`, and `.GR`; directory enumeration remains unimplemented. Interactive typing and saving still need UTM acceptance |
+
+## Milestone 297 — resolve source files through parent directories
+
+| Item | Path |
+|--|--|
+| Gap | `FileFind` ignored `FUF_SCAN_PARENTS`, so relative DolDoc links could not find a source file above the current directory |
+| Bring-up | Preserve direct lookup, then walk the current directory toward `/` for relative names; return the resolved full path from both `FileFind` and `FileNameAbs` |
+| Smoke | `TaskFileFindDirectoryFilterChecks` sets a nested current directory and verifies both file metadata and absolute-path resolution find `/LICENSE/Aiwnios.txt`; `make check-docfile-persistence` passes |
+| Limits | Directory enumeration and real ZealOS directory records remain unimplemented; only files accessible through the bundled archive or writable source volume can match |
 
 ## Open compatibility probe — `/System/Win.ZC`
 
@@ -3363,12 +3372,14 @@ been verified through a manual edit-and-reopen cycle.
 
 The source-backed `FileFind` bridge now rejects regular files for
 `FUF_JUST_DIRS`, filters `.TXT`/`.txt`, `.DD`, `.ZC`, `.HH`, `.AOT`, `.JIT`,
-and `.GR`, and combines requested type filters as alternatives. It populates
-the bounded leaf name, full path, file size, and archive attribute in
-`CDirEntry`. The PCI persistence probe verifies metadata, real `.txt`, `.DD`,
-and source-file matches, and synthetic suffix and combined-filter cases for
-`.AOT`, `.JIT`, and `.GR`. Parent scanning and directory enumeration remain
-unimplemented.
+and `.GR`, and combines requested type filters as alternatives. With
+`FUF_SCAN_PARENTS`, relative names search the current directory and each
+parent through `/`; both `FileFind` metadata and `FileNameAbs` preserve the
+resolved path. It populates the bounded leaf name, full path, file size, and
+archive attribute in `CDirEntry`. The PCI persistence probe verifies
+metadata, real `.txt`, `.DD`, source-file and parent-directory matches, and
+synthetic suffix and combined-filter cases for `.AOT`, `.JIT`, and `.GR`.
+Directory enumeration and real ZealOS directory records remain unimplemented.
 
 ## Acceptance
 

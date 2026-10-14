@@ -5,7 +5,7 @@ I64 TaskSourceFileReadChecks()
     U8 *contents;
 
     contents = FileRead("/Tests/TaskDocData.ZC", &size, &attr);
-    if (!contents || size <= 0 || size > 8192)
+    if (!contents || size <= 0 || size > 16384)
         return 1;
     if (contents[0] != '/' || contents[1] != '/' || contents[2] != ' ' ||
         contents[3] != 'S' || contents[4] != 'm')
@@ -20,7 +20,7 @@ I64 TaskDiskFileReadChecks()
     U8 *contents;
 
     contents = FileRead("disk:Tests/TaskDocData.ZC", &size, &attr);
-    if (!contents || size <= 0 || size > 8192)
+    if (!contents || size <= 0 || size > 16384)
         return 1;
     if (contents[0] != '/' || contents[1] != '/' || contents[2] != ' ' ||
         contents[3] != 'S' || contents[4] != 'm')
@@ -134,6 +134,8 @@ I64 TaskDocAbsoluteSourceWriteChecks()
 I64 TaskFileFindDirectoryFilterChecks()
 {
     CDirEntry de;
+    U8 *old_cur_dir, *abs_name;
+    I64 result = 42;
 
     if (!FileFind("/Tests/TaskDocData.ZC"))
         return 1;
@@ -163,7 +165,23 @@ I64 TaskFileFindDirectoryFilterChecks()
         de.next || de.parent || de.sub || de.size <= 0 ||
         !(de.attr & RS_ATTR_ARCHIVE))
         return 5;
-    return 42;
+    old_cur_dir = Fs->cur_dir;
+    Fs->cur_dir = StrNew("/LICENSE/subdir");
+    if (!FileFind("Aiwnios.txt", &de, FUF_JUST_FILES | FUF_SCAN_PARENTS) ||
+        StrCompare(de.name, "Aiwnios.txt") || !de.full_name ||
+        StrCompare(de.full_name, "/LICENSE/Aiwnios.txt"))
+        result = 7;
+    if (result == 42)
+    {
+        abs_name = FileNameAbs("Aiwnios.txt", FUF_SCAN_PARENTS);
+        if (!abs_name || StrCompare(abs_name, "/LICENSE/Aiwnios.txt"))
+            result = 8;
+        if (abs_name)
+            Free(abs_name);
+    }
+    Free(Fs->cur_dir);
+    Fs->cur_dir = old_cur_dir;
+    return result;
 }
 
 I64 TaskDocDataChecks()
