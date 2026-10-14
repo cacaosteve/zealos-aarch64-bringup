@@ -24,7 +24,7 @@ I64 TaskDocReadChecks()
     U8 *saved;
     I64 size;
 
-    doc = DocRead("/Tests/TaskDocData.ZC");
+    doc = DocRead("disk:Tests/TaskDocData.ZC");
     if (!doc)
         return 1;
     saved = DocSave(doc, &size);
