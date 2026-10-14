@@ -1379,7 +1379,7 @@ Bool FileNameCheck(U8 *filename)
 }
 Bool FileFind(U8 *filename, CDirEntry *_de=NULL, I64 fuf_flags=0)
 {
-    U8 *contents;
+    U8 *contents, *leaf;
     I64 filename_len, size;
     if (!filename || !*filename)
         return FALSE;
@@ -1407,7 +1407,16 @@ Bool FileFind(U8 *filename, CDirEntry *_de=NULL, I64 fuf_flags=0)
         _de->full_name = NULL;
         _de->user_data = 0;
         _de->user_data2 = 0;
-        _de->name[0] = 0;
+        leaf = StrLastOcc(filename, "/\\");
+        if (leaf)
+            leaf++;
+        else
+            leaf = filename;
+        filename_len = StrLen(leaf);
+        if (filename_len >= CDIR_FILENAME_LEN)
+            filename_len = CDIR_FILENAME_LEN - 1;
+        MemCopy(_de->name, leaf, filename_len);
+        _de->name[filename_len] = 0;
         _de->clus = 0;
         _de->attr = RS_ATTR_ARCHIVE;
         _de->size = size;
