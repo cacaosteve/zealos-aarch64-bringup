@@ -1913,6 +1913,11 @@ ZealOS live distribution or installer.
   serializer. `TaskDocDataChecks` exercises integer format/scan round-tripping
   and checkbox state synchronization, while `TaskDocPlainSaveChecks` verifies
   a text/newline save-load-save round trip (`0x2a`).
+- The bootstrap `FilesFindMatch` supports case-insensitive `*` and `?` filename
+  masks separated by semicolons, which enables the unchanged DocTerm source,
+  DolDoc, and include-file filters. Its filesystem traversal flags remain
+  outside this string-matching helper. `TaskFileMaskChecks` covers alternatives,
+  wildcards, case folding, and rejected extensions (`0x2a`).
 - `TaskOriginalDocPlainChecks` exercises real `ParseDollarCmd` for `TX` tags,
   `CM+LE+RE` flags, `FG,RED`, and `DocPrint("$$TX,\"Yo\"$$")` (`0x2a`).
   Interactive DocForm/DocEd and DocFile/Adam startup remain later work.

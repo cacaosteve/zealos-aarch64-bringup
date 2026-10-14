@@ -75,3 +75,18 @@ I64 TaskDocPlainSaveChecks()
     DocDel(doc);
     return 42;
 }
+
+I64 TaskFileMaskChecks()
+{
+    if (!FilesFindMatch("/Docs/HELLO.ZC", "*.ZC*;*.HH*"))
+        return 1;
+    if (!FilesFindMatch("notes.dd", "*.ZC;*.DD"))
+        return 2;
+    if (!FilesFindMatch("ab.zc", "A?.ZC"))
+        return 3;
+    if (FilesFindMatch("image.png", "*.ZC*;*.HH*;*.DD*"))
+        return 4;
+    if (FilesFindMatch("hello.zc", ""))
+        return 5;
+    return 42;
+}

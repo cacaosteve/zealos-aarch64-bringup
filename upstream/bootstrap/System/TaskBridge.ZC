@@ -5029,11 +5029,71 @@ Bool PopUpCancelOk(U8 *header=NULL, U8 *footer=NULL)
     if (footer) {}
     return FALSE;
 }
-Bool FilesFindMatch(U8 *_test_name, U8 *files_find_mask, I64 fuf_flags=0)
+Bool BootstrapFileMaskOne(U8 *name, U8 *mask)
 {
-    if (_test_name) {}
-    if (files_find_mask) {}
+    I64 ni = 0, mi = 0, star = -1, retry = 0, ch1, ch2;
+
+    while (name[ni])
+    {
+        ch1 = name[ni];
+        ch2 = mask[mi];
+        if (ch1 >= 'a' && ch1 <= 'z')
+            ch1 -= 'a' - 'A';
+        if (ch2 >= 'a' && ch2 <= 'z')
+            ch2 -= 'a' - 'A';
+        if (ch2 == '?' || ch1 == ch2)
+        {
+            ni++;
+            mi++;
+        }
+        else if (mask[mi] == '*')
+        {
+            star = mi++;
+            retry = ni;
+        }
+        else if (star >= 0)
+        {
+            mi = star + 1;
+            ni = ++retry;
+        }
+        else
+            return FALSE;
+    }
+    while (mask[mi] == '*')
+        mi++;
+    return !mask[mi];
+}
+Bool FilesFindMatch(U8 *_test_name, U8 *files_find_mask, I64 fuf_flags=0)
+{//Bounded filename glob subset for DolDoc extension filters; flags are ignored.
+    I64 i, start;
+    U8 *mask;
+
+    if (!_test_name || !files_find_mask)
+        return FALSE;
     if (fuf_flags) {}
+    start = 0;
+    i = 0;
+    while (TRUE)
+    {
+        if (files_find_mask[i] == ';' || !files_find_mask[i])
+        {
+            if (i > start)
+            {
+                mask = StrNew(files_find_mask + start);
+                mask[i - start] = 0;
+                if (BootstrapFileMaskOne(_test_name, mask))
+                {
+                    Free(mask);
+                    return TRUE;
+                }
+                Free(mask);
+            }
+            if (!files_find_mask[i])
+                break;
+            start = i + 1;
+        }
+        i++;
+    }
     return FALSE;
 }
 U8 *FileExtDot(U8 *src)
