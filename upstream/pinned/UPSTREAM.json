@@ -41,7 +41,10 @@
     "src/System/Gr/GrBitMap.ZC": "3599a84836aa89f7488f354012fb82b81d879b33df634fd8bc5fbed64540f8ff",
     "src/System/Math/MathODE.ZC": "24a0d15370a9b5f42b894ed4ae44852f262325593bcac3c5bc9795d68b0e0c5c",
     "src/System/Menu.ZC": "7385d9b156a22c3d6e19c9732b6a1311dba5ec8eb112c87993ae461a554d0174",
-    "src/System/DolDoc/DocFile.ZC": "71a3080321e2f4b2b87bb005a0fdf895ec4382884b2bbc5d4bf60284ce10eeb4"
+    "src/System/DolDoc/DocFile.ZC": "71a3080321e2f4b2b87bb005a0fdf895ec4382884b2bbc5d4bf60284ce10eeb4",
+    "src/System/DolDoc/DocForm.ZC": "414fe9e162b1d843683eb4545af6c213c196fd247933435f1a095b76aabfc687",
+    "src/System/DolDoc/DocEd.ZC": "c918573ac43ad1ec43fa9ce1bf431e25ecef7f32f496710129ba3caa2f9c9754",
+    "src/System/DolDoc/DocRun.ZC": "ea562ef1cbcee752dc123da89a56bf9477adbdae257f72dcde8d384ec152cd50"
   },
   "changes": []
 }

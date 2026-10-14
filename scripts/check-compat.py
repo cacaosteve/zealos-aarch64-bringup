@@ -32,6 +32,8 @@ p.add_argument('--probe-task-jobs', action='store_true', help='check CPU-0 callb
 p.add_argument('--probe-window-buttons', action='store_true', help='check live task-window title buttons in a disposable guest')
 p.add_argument('--probe-source', type=pathlib.Path, action='append',
                help='load a host source file from the disposable PCI source partition')
+p.add_argument('--probe-source-call',
+               help='call this no-argument integer function after each source probe and require 0x2a')
 p.add_argument('--probe-source-kernel', action='store_true',
                help='load KernelA/B and KMathB before each source probe')
 args = p.parse_args()
@@ -318,6 +320,9 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                             'zc: loaded /Kernel/KMathB.ZC', timeout=30)
                 guest.stdin.write(f'zload disk:Probe/Source{i}.ZC\r'.encode()); guest.stdin.flush()
                 print('SOURCE PROBE '+str(source)+'\n'+until(b'\n> '), flush=True)
+                if args.probe_source_call:
+                    command('zcall '+args.probe_source_call,
+                            'zc => 0x000000000000002a')
                 command('zreset', 'native compiler ready')
             raise SystemExit(0)
         if args.probe_module == '/System/Win.ZC' and args.probe_winmgr:
@@ -604,7 +609,9 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                                          '/System/DolDoc/DocHighlight.ZC',
                                          '/System/DolDoc/DocNew.ZC',
                                          '/System/DolDoc/DocBin.ZC',
-                                         '/System/DolDoc/DocFile.ZC'):
+                                         '/System/DolDoc/DocFile.ZC',
+                                         '/System/DolDoc/DocForm.ZC',
+                                         '/System/DolDoc/DocEd.ZC'):
                 command('zload /Kernel/SerialDev/Message.ZC',
                         'zc: loaded /Kernel/SerialDev/Message.ZC')
                 command('zload /Kernel/Job.ZC', 'zc: loaded /Kernel/Job.ZC')
@@ -618,7 +625,9 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                                          '/System/DolDoc/DocPlain.ZC',
                                          '/System/DolDoc/DocRecalcLib.ZC',
                                          '/System/DolDoc/DocHighlight.ZC',
-                                         '/System/DolDoc/DocFile.ZC'):
+                                         '/System/DolDoc/DocFile.ZC',
+                                         '/System/DolDoc/DocForm.ZC',
+                                         '/System/DolDoc/DocEd.ZC'):
                 command('zload /System/DolDoc/DocBin.ZC',
                         'zc: loaded /System/DolDoc/DocBin.ZC')
             if args.probe_module in ('/System/DolDoc/DocPutKey.ZC',
@@ -629,7 +638,9 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                                          '/System/DolDoc/DocPlain.ZC',
                                          '/System/DolDoc/DocRecalcLib.ZC',
                                          '/System/DolDoc/DocHighlight.ZC',
-                                         '/System/DolDoc/DocFile.ZC'):
+                                         '/System/DolDoc/DocFile.ZC',
+                                         '/System/DolDoc/DocForm.ZC',
+                                         '/System/DolDoc/DocEd.ZC'):
                 command('zload /System/DolDoc/DocNew.ZC',
                         'zc: loaded /System/DolDoc/DocNew.ZC')
             if args.probe_module in ('/System/DolDoc/DocPutS.ZC',
@@ -639,7 +650,9 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                                          '/System/DolDoc/DocPlain.ZC',
                                          '/System/DolDoc/DocRecalcLib.ZC',
                                          '/System/DolDoc/DocHighlight.ZC',
-                                         '/System/DolDoc/DocFile.ZC'):
+                                         '/System/DolDoc/DocFile.ZC',
+                                         '/System/DolDoc/DocForm.ZC',
+                                         '/System/DolDoc/DocEd.ZC'):
                 command('zload /System/DolDoc/DocPutKey.ZC',
                         'zc: loaded /System/DolDoc/DocPutKey.ZC')
             if args.probe_module in ('/System/DolDoc/DocDblBuf.ZC',
@@ -648,7 +661,9 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                                          '/System/DolDoc/DocPlain.ZC',
                                          '/System/DolDoc/DocRecalcLib.ZC',
                                          '/System/DolDoc/DocHighlight.ZC',
-                                         '/System/DolDoc/DocFile.ZC'):
+                                         '/System/DolDoc/DocFile.ZC',
+                                         '/System/DolDoc/DocForm.ZC',
+                                         '/System/DolDoc/DocEd.ZC'):
                 command('zload /System/DolDoc/DocPutS.ZC',
                         'zc: loaded /System/DolDoc/DocPutS.ZC')
             if args.probe_module in ('/System/DolDoc/DocTerm.ZC',
@@ -656,7 +671,9 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                                          '/System/DolDoc/DocPlain.ZC',
                                          '/System/DolDoc/DocRecalcLib.ZC',
                                          '/System/DolDoc/DocHighlight.ZC',
-                                         '/System/DolDoc/DocFile.ZC'):
+                                         '/System/DolDoc/DocFile.ZC',
+                                         '/System/DolDoc/DocForm.ZC',
+                                         '/System/DolDoc/DocEd.ZC'):
                 # DocTermNew creates the shell's File menu, so MenuFile must
                 # be defined before compiling DocTerm (the graphics startup
                 # path already loads Menu.ZC before Window Manager modules).
@@ -666,7 +683,9 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                                          '/System/DolDoc/DocPlain.ZC',
                                          '/System/DolDoc/DocRecalcLib.ZC',
                                          '/System/DolDoc/DocHighlight.ZC',
-                                         '/System/DolDoc/DocFile.ZC'):
+                                         '/System/DolDoc/DocFile.ZC',
+                                         '/System/DolDoc/DocForm.ZC',
+                                         '/System/DolDoc/DocEd.ZC'):
                 command('zload /System/DolDoc/DocTerm.ZC',
                         'zc: loaded /System/DolDoc/DocTerm.ZC')
                 command('zcall BootstrapDefinesLoad',
@@ -674,18 +693,24 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             if args.probe_module in ('/System/DolDoc/DocPlain.ZC',
                                          '/System/DolDoc/DocRecalcLib.ZC',
                                          '/System/DolDoc/DocHighlight.ZC',
-                                         '/System/DolDoc/DocFile.ZC'):
+                                         '/System/DolDoc/DocFile.ZC',
+                                         '/System/DolDoc/DocForm.ZC',
+                                         '/System/DolDoc/DocEd.ZC'):
                 command('zload /System/DolDoc/DocInit.ZC',
                         'zc: loaded /System/DolDoc/DocInit.ZC')
             if args.probe_module in ('/System/DolDoc/DocRecalcLib.ZC',
                                      '/System/DolDoc/DocHighlight.ZC',
-                                     '/System/DolDoc/DocFile.ZC'):
+                                     '/System/DolDoc/DocFile.ZC',
+                                         '/System/DolDoc/DocForm.ZC',
+                                         '/System/DolDoc/DocEd.ZC'):
                 command('zload /System/DolDoc/DocPlain.ZC',
                         'zc: loaded /System/DolDoc/DocPlain.ZC')
             if args.probe_module == '/System/DolDoc/DocHighlight.ZC':
                 command('zload /System/DolDoc/DocRecalcLib.ZC',
                         'zc: loaded /System/DolDoc/DocRecalcLib.ZC')
-            if args.probe_module == '/System/DolDoc/DocFile.ZC':
+            if args.probe_module in ('/System/DolDoc/DocFile.ZC',
+                                     '/System/DolDoc/DocForm.ZC',
+                                         '/System/DolDoc/DocEd.ZC'):
                 command('zload /Tests/WinMgrProbeDeps.ZC',
                         'zc: loaded /Tests/WinMgrProbeDeps.ZC')
                 command('zload /Tests/ODEsUpdateStub.ZC',
@@ -700,6 +725,13 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                         'zc: loaded /System/DolDoc/DocHighlight.ZC')
                 command('zload /System/DolDoc/DocRecalc.ZC',
                         'zc: loaded /System/DolDoc/DocRecalc.ZC')
+                if args.probe_module in ('/System/DolDoc/DocForm.ZC',
+                                         '/System/DolDoc/DocEd.ZC'):
+                    command('zload /System/DolDoc/DocRun.ZC',
+                            'zc: loaded /System/DolDoc/DocRun.ZC')
+                if args.probe_module == '/System/DolDoc/DocEd.ZC':
+                    command('zload /System/DolDoc/DocForm.ZC',
+                            'zc: loaded /System/DolDoc/DocForm.ZC')
             guest.stdin.write(('zload '+args.probe_module+'\r').encode())
             guest.stdin.flush()
             result = until(b'\n> ')

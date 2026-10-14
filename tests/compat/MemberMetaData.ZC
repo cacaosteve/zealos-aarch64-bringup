@@ -1,0 +1,21 @@
+// Checks TaskBridge's upstream-compatible CMemberList metadata lookup.
+I64 MemberMetaDataChecks()
+{
+    CMemberList member;
+    CMemberListMeta first, second;
+
+    first.next = &second;
+    first.str = "other";
+    first.user_data = 7;
+    second.next = NULL;
+    second.str = "format";
+    second.user_data = 42;
+    member.meta = &first;
+
+    if (MemberMetaData("format", &member) != 42 ||
+        MemberMetaData("missing", &member) != 0 ||
+        MemberMetaData(NULL, &member) != 0 ||
+        MemberMetaData("format", NULL) != 0)
+        return 0;
+    return 42;
+}

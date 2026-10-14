@@ -4757,6 +4757,29 @@ I64 PopUp(U8 *buf, CTask *parent=NULL, CTask **_pu_task=NULL)
 // DocTerm.ZC / DocBorderNew dependency stubs until DocEd/DocForm/Menu/Win load.
 extern CDocEntry *DocPutS(CDoc *doc, U8 *st);
 CAutoCompleteGlobals ac;
+I64 MemberMetaData(U8 *needle, CMemberList *member)
+{
+    CMemberListMeta *meta;
+
+    if (!needle || !member)
+        return 0;
+    meta = member->meta;
+    while (meta)
+    {
+        if (!StrCompare(meta->str, needle))
+            return meta->user_data;
+        meta = meta->next;
+    }
+    return 0;
+}
+
+CHashClass *OptClassFwd(CHashClass *tmpc)
+{
+    while (tmpc && tmpc->fwd_class)
+        tmpc = tmpc->fwd_class;
+    return tmpc;
+}
+
 U8 *EdFilterCB(CDoc *, CDocEntry *doc_e, CTask *mem_task)
 {
     if (doc_e) {}
@@ -5003,6 +5026,13 @@ I64 PopUpMenu(CDoc *doc, I64 dof_flags=0)
     if (dof_flags) {}
     return DOCM_CANCEL;
 }
+// The source popup-list renderer depends on the not-yet-live popup window
+// input path. Keep its cancellation result explicit until that path is wired.
+I64 PopUpPickList(U8 *list)
+{
+    if (list) {}
+    return DOCM_CANCEL;
+}
 I64 PopUpEd(U8 *filename=NULL, CTask *parent=NULL, CTask **_pu_task=NULL)
 {
     if (filename) {}
@@ -5199,6 +5229,12 @@ Bool DocForm(U8 *_d, U8 *class_name=NULL, I64 dof_flags=0,
     if (dof_flags) {}
     if (header) {}
     if (footer) {}
+    return FALSE;
+}
+Bool DocEd(CDoc *doc, I64 dof_flags=0)
+{
+    if (doc) {}
+    if (dof_flags) {}
     return FALSE;
 }
 Bool Copy(U8 *src_files_find_mask, U8 *dst_files_find_mask=".")

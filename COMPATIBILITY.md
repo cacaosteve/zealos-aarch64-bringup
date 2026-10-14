@@ -1937,6 +1937,18 @@ ZealOS live distribution or installer.
   `CM+LE+RE` flags, `FG,RED`, and `DocPrint("$$TX,\"Yo\"$$")` (`0x2a`).
   Interactive DocForm/DocEd and Adam startup remain later work.
 
+## DolDoc form/editor source probes
+
+- Pinned unchanged upstream `DocForm.ZC`, `DocEd.ZC`, and `DocRun.ZC` at the
+  same ZealOS revision as the existing DolDoc modules. The native guest loads
+  `DocRun.ZC`; a focused PCI probe verifies the bootstrap `MemberMetaData`
+  lookup against a two-entry metadata list.
+- `DocForm.ZC` still reaches `zc: compiler abort` after its missing helpers are
+  supplied, so the upstream form and editor are not integrated yet.
+  `PopUpPickList` remains an explicit cancel-only bridge until popup windows
+  can accept input. This records the current boundary; it does not claim
+  interactive form/editor support.
+
 ## Unchanged DolDoc `DocRecalcLib` + cursor helpers
 
 - The unchanged pinned `System/DolDoc/DocRecalcLib.ZC` loads after DocPlain.
