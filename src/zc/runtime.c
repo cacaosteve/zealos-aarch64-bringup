@@ -107,6 +107,7 @@ static zc_key_reset_fn key_reset;
 static const unsigned char *source_archive;
 static size_t archive_size;
 static zc_source_read_fn disk_reader;
+static zc_source_write_fn disk_writer;
 static jmp_buf guard;
 static int guarded, ready, failed;
 static int window_demo_loaded;
@@ -354,6 +355,7 @@ void zc_output(const char *s) {
         output_cb(s);
 }
 void zc_set_source_reader(zc_source_read_fn read) { disk_reader = read; }
+void zc_set_source_writer(zc_source_write_fn write) { disk_writer = write; }
 void zc_set_key_reader(zc_key_event_fn read, zc_key_reset_fn reset) {
     key_reader = read;
     key_reset = reset;
@@ -683,6 +685,15 @@ static int64_t host_source_file_read(int64_t *a) {
         *(int64_t *)(uintptr_t)a[3] = (int64_t)length;
     free(owned);
     return (int64_t)length;
+}
+static int64_t host_source_file_write(int64_t *a) {
+    const char *path = (const char *)(uintptr_t)a[0];
+    const char *src = (const char *)(uintptr_t)a[1];
+    int64_t length = a[2];
+    if (!path || !src || length <= 0 || !disk_writer ||
+        disk_writer(path, src, (size_t)length))
+        return -1;
+    return length;
 }
 FILE *fopen(const char *path, const char *mode) {
     if (strcmp(mode, "rb") && strcmp(mode, "r"))
@@ -4138,6 +4149,7 @@ static int load_inner(const char *path) {
     execute_source(path, src);
     if (!strcmp(path, "/System/TaskBridge.ZC")) {
         PrsBindCSymbol("ZcReadFile", host_source_file_read, 4);
+        PrsBindCSymbol("ZcWriteFile", host_source_file_write, 3);
         PrsBindCSymbol("LowPass1", host_low_pass1, 4);
         /* These functions were pre-registered before TaskBridge introduced
          * their extern declarations, so bind them again now that the symbols
@@ -4560,6 +4572,7 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
                     {"ZcFbTextRect", host_fb_text_rect, 7},
                     {"ZcFbTextFlush", host_fb_text_flush, 3},
                     {"ZcReadFile", host_source_file_read, 4},
+                    {"ZcWriteFile", host_source_file_write, 3},
                     {"ZcDocUpdateTaskDocs", host_doc_update_task_docs, 1},
                     {"ZcActiveGrGlobals", host_active_gr_globals, 0},
                     {"ZcActiveMouseGlobals", host_active_mouse_globals, 0},

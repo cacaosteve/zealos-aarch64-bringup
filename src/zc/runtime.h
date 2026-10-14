@@ -10,6 +10,8 @@ void zc_set_key_reader(zc_key_event_fn read, zc_key_reset_fn reset);
 /* Return 0 and file length. A NULL destination asks for the length only. */
 typedef int (*zc_source_read_fn)(const char *name, char *dst, size_t cap, size_t *length);
 void zc_set_source_reader(zc_source_read_fn read);
+typedef int (*zc_source_write_fn)(const char *name, const char *src, size_t length);
+void zc_set_source_writer(zc_source_write_fn write);
 /* Read-only source archive. The bytes must stay alive for the session. */
 void zc_init(const void *archive, size_t size, zc_output_fn output);
 /* Load the pinned ZealOS kernel/window/graphics source for normal UTM boot. */

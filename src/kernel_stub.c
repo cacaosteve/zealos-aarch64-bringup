@@ -4086,6 +4086,23 @@ static int zc_read_redsea(const char *name, char *dst, size_t cap, size_t *out_l
     if (!dst) return 0;
     return rs_load_file(name, dst, cap, out_len);
 }
+static int zc_write_source(const char *path, const char *src, size_t len) {
+    const char *name = path;
+    if (!path || !src || !len || len > ZSS_MAX_FILE)
+        return -1;
+    if (str_startswith(name, "disk:"))
+        name += 5;
+    if (!zss_name_ok(name, NULL))
+        return -1;
+    if (zss_available())
+        return zss_put(name, src, len);
+    /* Legacy RedSea only supports a root filename without a directory. */
+    for (const char *p = name; *p; p++)
+        if (*p == '/') return -1;
+    if (len > 65536 || !virtio_blk_ready())
+        return -1;
+    return rs_put_file(name, src, len);
+}
 #endif
 
 static int rs_put_file_if_absent(const char *name, const char *src, size_t len) {
@@ -9631,6 +9648,7 @@ void kernel_entry(const struct zeal_handoff *h) {
     bc_module_run(h);
 #ifndef ZEAL_PI_DIAG
     zc_set_source_reader(zc_read_redsea);
+    zc_set_source_writer(zc_write_source);
     zc_set_key_reader(zc_key_read, zc_key_reset);
     if (h->revision >= 3 && h->size >= sizeof(*h))
         zc_init((void *)(uintptr_t)h->sources_virt, h->sources_size, con_puts);

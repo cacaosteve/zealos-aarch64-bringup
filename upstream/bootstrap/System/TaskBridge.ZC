@@ -29,9 +29,11 @@ extern I64 ZcFbTextSpan(I64 x, I64 y, I64 len, I64 attr, U8 *data,
 extern I64 ZcFbTextCellsDrawn();
 extern I64 ZcFbTextFlush(U32 *text_base, I64 stride, I64 rows);
 extern I64 ZcReadFile(U8 *path, U8 *dst, I64 capacity, I64 *size);
+extern I64 ZcWriteFile(U8 *path, U8 *src, I64 size);
 extern CDoc *DocNew(U8 *filename=NULL, CTask *task=NULL);
 extern U0 DocDel(CDoc *doc);
 extern U0 DocLoad(CDoc *doc, U8 *src, I64 size);
+extern U8 *DocSave(CDoc *doc, I64 *_size=NULL);
 // Poll the current virtio/UART key reader and queue its events for the focus
 // task. PS/2 mouse polling is outside this bridge.
 extern U0 KbdMouseHandler(Bool poll_kbd, Bool poll_mouse);
@@ -1132,9 +1134,17 @@ U0 DocPrintPartial(CDoc *doc=NULL, U8 *format=NULL, ...)
 }
 Bool DocWrite(CDoc *doc, Bool prompt=FALSE)
 {
-    if (doc) {}
-    if (prompt) {}
-    return FALSE;
+    U8 *contents;
+    I64 size, written;
+
+    if (!doc || doc->doc_signature != DOC_SIGNATURE_VAL || prompt)
+        return FALSE;
+    contents = DocSave(doc, &size);
+    if (!contents)
+        return FALSE;
+    written = ZcWriteFile(doc->filename.name, contents, size);
+    Free(contents);
+    return written == size;
 }
 U0 EdCharIns(I64 ch, I64 sc, CDoc *doc)
 {

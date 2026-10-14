@@ -36,6 +36,30 @@ I64 TaskDocReadChecks()
     return 42;
 }
 
+I64 TaskDocWriteChecks()
+{
+    CDoc *doc;
+    U8 *saved;
+    I64 size;
+
+    doc = DocNew("disk:App/DocWriteCheck.DD");
+    if (!doc)
+        return 1;
+    DocLoad(doc, "persisted doc", 13);
+    if (!DocWrite(doc))
+        return 2;
+    DocDel(doc);
+    doc = DocRead("disk:App/DocWriteCheck.DD");
+    if (!doc)
+        return 3;
+    saved = DocSave(doc, &size);
+    if (!saved || size != 13 || StrCompare(saved, "persisted doc"))
+        return 4;
+    Free(saved);
+    DocDel(doc);
+    return 42;
+}
+
 I64 TaskDocDataChecks()
 {
     CDoc *doc;

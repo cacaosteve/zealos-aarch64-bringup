@@ -1910,9 +1910,14 @@ ZealOS live distribution or installer.
   `ListMatch`/`DefineMatch`, `ST_RAW_TYPES`, and thin
   plain-text `DocSave`/`DocLoad` bridge routines and a `DocCenter` fallback;
   formatted DolDoc entries and binary blocks still need the upstream DocFile
-  serializer. `TaskDocDataChecks` exercises integer format/scan round-tripping
-  and checkbox state synchronization, while `TaskDocPlainSaveChecks` verifies
-  a text/newline save-load-save round trip (`0x2a`).
+  serializer. `DocRead` now reads bundled archive files and `disk:` files into
+  a new document; `DocWrite` saves the plain-text serialization through the
+  native source partition (or a root RedSea file on legacy disks). Save-as
+  prompting and upstream DocFile binary blocks are not implemented.
+  `TaskDocDataChecks` exercises integer format/scan round-tripping and checkbox
+  state synchronization; `TaskDocPlainSaveChecks` verifies a text/newline
+  save-load-save round trip; `TaskDocReadChecks` and `TaskDocWriteChecks`
+  check disk-backed read/write round trips (`0x2a`).
 - The bootstrap `FilesFindMatch` supports case-insensitive `*` and `?` filename
   masks separated by semicolons, which enables the unchanged DocTerm source,
   DolDoc, and include-file filters. Its filesystem traversal flags remain
