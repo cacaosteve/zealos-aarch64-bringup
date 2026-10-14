@@ -3932,8 +3932,11 @@ static int load_inner(const char *path) {
     }
     if (!strcmp(path, "/System/GuiTerminal.ZC"))
         PrsBindCSymbol("ZcGuiShellExec", zc_gui_shell_exec, 1);
-    if (!strcmp(path, "/Kernel/KTask.ZC"))
+    if (!strcmp(path, "/Kernel/KTask.ZC")) {
         PrsBindCSymbol("ZcCallExtStr", host_call_ext_str, 1);
+        PrsBindCSymbol("ZcTaskValidate", host_task_validate, 1);
+        PrsBindCSymbol("ZcSpawn", host_spawn, 7);
+    }
     /* Source units can introduce fresh extern declarations after KernelC.HH
      * has been parsed. Rebind the timer hook after each unit so those calls
      * resolve to the same host implementation as the kernel declaration. */
@@ -4309,6 +4312,8 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
         int arity;
     } bindings[] = {{"MAlloc", host_malloc, 2}, {"CAlloc", host_calloc, 2},
                     {"Call", host_call, 1}, {"ZcCallExtStr", host_call_ext_str, 1},
+                    {"ZcTaskValidate", host_task_validate, 1},
+                    {"ZcSpawn", host_spawn, 7},
                     {"Free", host_free, 1},  {"MSize", host_msize, 1},
                     /* MSize2 is ZealOS internal size; alias requested size for now. */
                     {"MSize2", host_msize, 1},

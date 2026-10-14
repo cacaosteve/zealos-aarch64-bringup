@@ -109,14 +109,6 @@ argpop I64 CallStackGrow(I64 stack_size_threshold, I64 stack_size,
     return result;
 }"""
     text = text[:start] + replacement + text[finish:]
-    rsp_data_store = "\t*task->rsp = data;"
-    rsp_data_store_arm64 = "\tMemCopy(task->rsp(U8 *), &data, sizeof(U8 *));"
-    rsp_exit_store = "\t*task->rsp = &Exit;"
-    rsp_exit_store_arm64 = "\tMemCopy(task->rsp(U8 *), &Exit, sizeof(U8 *));"
-    if text.count(rsp_data_store) != 1 or text.count(rsp_exit_store) != 1:
-        raise ValueError("expected the pinned Spawn stack-word stores")
-    text = text.replace(rsp_data_store, rsp_data_store_arm64, 1)
-    text = text.replace(rsp_exit_store, rsp_exit_store_arm64, 1)
     no_warn = "\tno_warn dummy;"
     if text.count(no_warn) != 2:
         raise ValueError("expected the pinned KTask dummy-argument suppressions")
@@ -124,7 +116,13 @@ argpop I64 CallStackGrow(I64 stack_size_threshold, I64 stack_size,
     # upstream ZealC. The compatibility parser does not implement it; removing
     # it has no generated-code effect.
     text = text.replace(no_warn, "\t// ARM64 compiler: no_warn is metadata only.", 2)
-    extstr_decl = "extern I64 ZcCallExtStr(U8 *name);\n"
+    extstr_decl = (
+        "extern I64 ZcCallExtStr(U8 *name);\n"
+        "extern Bool ZcTaskValidate(CTask *task);\n"
+        "extern CTask *ZcSpawn(U0 (*fp_start_addr)(U8 *data), U8 *data=NULL, "
+        "U8 *task_name=NULL, I64 target_cpu=-1, CTask *parent=NULL, "
+        "I64 stack_size=0, I64 flags=1 << JOBf_ADD_TO_QUE);\n"
+    )
     if text.count('CallExtStr("ServerStartUp");') != 1 or \
             text.count('CallExtStr("UserStartUp");') != 1:
         raise ValueError("expected the pinned KTask startup hooks")
@@ -133,9 +131,46 @@ argpop I64 CallStackGrow(I64 stack_size_threshold, I64 stack_size,
                         'ZcCallExtStr("ServerStartUp");', 1)
     text = text.replace('CallExtStr("UserStartUp");',
                         'ZcCallExtStr("UserStartUp");', 1)
+    validate_signature = "Bool TaskValidate(CTask *task)"
+    if text.count(validate_signature) != 1:
+        raise ValueError("expected the pinned TaskValidate signature")
+    validate_start = text.index(validate_signature)
+    validate_end_anchor = "\nI64 BirthWait(CTask **_task, I64 task_num=-1)"
+    if text.count(validate_end_anchor) != 1:
+        raise ValueError("expected the pinned TaskValidate function boundary")
+    validate_end = text.index(validate_end_anchor, validate_start)
+    validate_body = text[validate_start:validate_end]
+    if (validate_body.count("0 < task <= I32_MAX") != 1 or
+            validate_body.count("task->task_signature != TASK_SIGNATURE_VAL") != 1):
+        raise ValueError("pinned TaskValidate pointer/signature checks changed")
+    text = text[:validate_start] + """Bool TaskValidate(CTask *task)
+{
+    return ZcTaskValidate(task);
+}
+""" + text[validate_end:]
     spawn_signature = "CTask *Spawn(U0 (*fp_start_addr)(U8 *data),"
     if text.count(spawn_signature) != 1:
         raise ValueError("expected the pinned Spawn signature")
+    spawn_start = text.index(spawn_signature)
+    spawn_end_anchor = "\nU0 TaskDerivedValsUpdate(CTask *task=NULL, Bool update_z_buf=TRUE)"
+    if text.count(spawn_end_anchor) != 1:
+        raise ValueError("expected the pinned Spawn function boundary")
+    spawn_end = text.index(spawn_end_anchor, spawn_start)
+    spawn_body = text[spawn_start:spawn_end]
+    if (spawn_body.count("TaskInit(task, stack_size);") != 1 or
+            spawn_body.count("TaskQueueInsChild(task);") != 1 or
+            spawn_body.count("*task->rsp = data;") != 1 or
+            spawn_body.count("*task->rsp = &Exit;") != 1):
+        raise ValueError("pinned Spawn initialization or queue path changed")
+    replacement_spawn = """CTask *Spawn(U0 (*fp_start_addr)(U8 *data), U8 *data=NULL,
+             U8 *task_name=NULL, I64 target_cpu=-1, CTask *parent=NULL,
+             I64 stack_size=0, I64 flags=1 << JOBf_ADD_TO_QUE)
+{
+    return ZcSpawn(fp_start_addr, data, task_name, target_cpu, parent,
+                  stack_size, flags);
+}
+"""
+    text = text[:spawn_start] + replacement_spawn + text[spawn_end:]
     return text.encode("utf-8")
 
 

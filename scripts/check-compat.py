@@ -684,6 +684,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                         'zc => 0x000000000000002a')
                 command('zcall KTaskNamedHookChecks',
                         'zc => 0x000000000000002a')
+                command('zcall KTaskSpawnBridgeChecks',
+                        'zc => 0x000000000000002a')
             if args.probe_module == '/System/Math/MathODE.ZC':
                 command('zload /Tests/D3Math.ZC',
                         'zc: loaded /Tests/D3Math.ZC')

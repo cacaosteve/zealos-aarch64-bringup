@@ -34,7 +34,8 @@ Pi is outside this milestone; its diagnostic image does not link this runtime.
   single-task random and math path runs through ARM64 bindings.
 - Unchanged `Kernel/KTask.ZC`, `Kernel/Sched.ZC`, `Kernel/Job.ZC` and
   `Kernel/MultiProc.ZC` are pinned as references for
-  the task API. Their x86 assembly and full kernel dependencies are not loaded.
+  the task API. Their x86 assembly and full kernel dependencies are not loaded;
+  an ARM64-specific KTask source overlay is exercised by a focused module probe.
   A separate `System/TaskBridge.ZC` declares the upstream `Spawn`, `Yield`,
   `TaskValidate`, `Suspend`, `IsSuspended`, `Kill`, `BirthWait`, `DeathWait`,
   `TaskWait`, `TaskMessage`, `MessagePost`, `MessagePostWait`, `Message`,
@@ -2074,19 +2075,23 @@ ZealOS live distribution or installer.
   that `TSCGet` advances across guest instructions. The focused task-job probe
   and the broad upstream compatibility probe pass with these checks.
 - The guarded ARM64 source bundle translates `Kernel/KTask.ZC`'s
-  `CallStackGrow` to use the AAPCS64 stack trampoline, rewrites its two
-  pointer-sized task-stack stores for the ARM64 parser, and removes two
-  warning-only pseudo-statements the parser does not implement. Its named
-  startup hooks use a host bridge for zero-argument source functions.
+  `CallStackGrow` to use the AAPCS64 stack trampoline, routes `TaskValidate`
+  through an ARM64-aware task-record validator, and routes the default
+  `Spawn` configuration through the existing cooperative-fiber runtime. It
+  also removes two warning-only pseudo-statements the parser does not
+  implement. Named startup hooks use a host bridge for zero-argument source
+  functions.
 - The focused PCI/QEMU KTask probe now loads the complete translated module.
   `KTaskCallStackGrowChecks` runs the translated source function on a temporary
   guest-allocated stack with ten integer arguments and verifies its local is
-  far from the caller's stack; separate checks exercise the ZealOS `Call`
-  primitive and the named startup-hook bridge. The probe uses
-  compile-only stubs for the scheduler child queue, heap-control initialization,
-  and interactive lexer. It does not call source `Spawn` or `TaskInit`: their
-  code/data block pools, fixed-area state, and scheduler ownership are not yet
-  integrated with the compatibility runtime's cooperative fibers.
+  far from the caller's stack. `KTaskSpawnBridgeChecks` creates and schedules
+  a child through source `Spawn`, waits with source `BirthWait`/`DeathWait`,
+  verifies its parent/name and data, and checks that a completed child is
+  reclaimed. Separate checks exercise the ZealOS `Call` primitive and named
+  startup-hook bridge. The probe uses compile-only
+  stubs for heap-control initialization and the interactive lexer. Full
+  upstream `TaskInit`, its code/data block pools, and custom CPU, stack-size,
+  or flags options remain outside this bridge.
 
 ## AAPCS64 calls on a caller-owned stack
 
@@ -2103,5 +2108,6 @@ ZealOS live distribution or installer.
   trampoline, and reports its result. The focused PCI/QEMU module probe passes.
 - `CallNOnStackChecks` tests the AAPCS64 trampoline directly, while
   `KTaskCallStackGrowChecks` validates the translated upstream
-  `CallStackGrow` path end to end. Full upstream task creation and scheduling
-  remain unimplemented in the host-backed task runtime.
+  `CallStackGrow` path end to end. Source `Spawn` now covers the default
+  single-CPU task path through host-backed cooperative fibers; full upstream
+  task initialization and scheduler integration remain unimplemented.
