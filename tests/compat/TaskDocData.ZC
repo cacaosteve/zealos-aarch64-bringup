@@ -47,19 +47,28 @@ I64 TaskDocDataChecks()
 I64 TaskDocPlainSaveChecks()
 {
     CDoc *doc, *copy;
-    U8 *saved, *saved_copy;
+    U8 *saved, *saved_copy, *bounded_source;
     I64 size, copy_size;
 
     doc = DocNew;
-    DocPrint(doc, "alpha\nbeta");
+    doc->flags |= DOCF_PLAIN_TEXT | DOCF_PLAIN_TEXT_TABS;
+    DocPrint(doc, "alpha\t$\nbeta");
     saved = DocSave(doc, &size);
-    if (!saved || size != 10 || StrCompare(saved, "alpha\nbeta"))
+    if (!saved)
         return 1;
+    if (size != 12)
+        return 2;
+    if (StrCompare(saved, "alpha\t$\nbeta"))
+        return 3;
     copy = DocNew;
-    DocLoad(copy, saved, size);
+    copy->flags |= DOCF_PLAIN_TEXT | DOCF_PLAIN_TEXT_TABS;
+    bounded_source = MAlloc(size, copy->mem_task);
+    MemCopy(bounded_source, saved, size);
+    DocLoad(copy, bounded_source, size);
+    Free(bounded_source);
     saved_copy = DocSave(copy, &copy_size);
     if (!saved_copy || copy_size != size || StrCompare(saved, saved_copy))
-        return 2;
+        return 4;
     Free(saved_copy);
     Free(saved);
     DocDel(copy);
