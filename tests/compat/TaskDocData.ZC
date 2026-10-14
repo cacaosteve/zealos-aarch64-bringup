@@ -191,8 +191,68 @@ I64 TaskFileFindDirectoryFilterChecks()
 
 I64 TaskFileFindTombstoneChecks()
 {
+    CDirEntry *entries, *de, *next;
+
     if (FileFind("/Tests/CallNOnStack.ZC"))
         return 1;
+    entries = FilesFind("CallNOnStack.ZC", FUF_JUST_FILES);
+    if (entries)
+    {
+        for (de = entries; de; de = next)
+        {
+            next = de->next;
+            Free(de->full_name);
+            Free(de);
+        }
+        return 2;
+    }
+    return 42;
+}
+
+I64 TaskFilesFindNativeOverlayChecks()
+{
+    CDirEntry *entries, *de, *next;
+    U8 *old_cur_dir;
+    I64 count = 0, found = FALSE;
+
+    old_cur_dir = Fs->cur_dir;
+    Fs->cur_dir = StrNew("/Tests");
+    entries = FilesFind("CallNOnStack.ZC", FUF_JUST_FILES);
+    for (de = entries; de; de = de->next)
+    {
+        count++;
+        if (de->full_name &&
+            !StrCompare(de->full_name, "/Tests/CallNOnStack.ZC") &&
+            de->size == StrLen("I64 NativeOverlayLoaded(){return 42;}"))
+            found = TRUE;
+    }
+    for (de = entries; de; de = next)
+    {
+        next = de->next;
+        Free(de->full_name);
+        Free(de);
+    }
+    if (!found || count != 1)
+    {
+        Free(Fs->cur_dir);
+        Fs->cur_dir = old_cur_dir;
+        return 1;
+    }
+    entries = FilesFind("FilesFindOverlayOnly.ZC", FUF_JUST_FILES);
+    found = entries && entries->full_name &&
+        !StrCompare(entries->full_name, "/Tests/FilesFindOverlayOnly.ZC") &&
+        entries->size == StrLen("I64 OverlayOnly(){return 42;}") &&
+        !entries->next;
+    for (de = entries; de; de = next)
+    {
+        next = de->next;
+        Free(de->full_name);
+        Free(de);
+    }
+    Free(Fs->cur_dir);
+    Fs->cur_dir = old_cur_dir;
+    if (!found)
+        return 2;
     return 42;
 }
 
@@ -206,14 +266,28 @@ I64 TaskFilesFindChecks()
     Fs->cur_dir = StrNew("/Tests");
     entries = FilesFind("*.ZC", FUF_JUST_FILES);
     found = FALSE;
+    count = 0;
     for (de = entries; de; de = de->next)
+    {
+        count++;
         if (de->full_name &&
-            !StrCompare(de->full_name, "/Tests/TaskDocData.ZC") &&
-            !StrCompare(de->name, "TaskDocData.ZC") &&
-            (de->attr & RS_ATTR_ARCHIVE) && de->size > 0)
-            found = TRUE;
-    if (!found)
-        result = 1;
+            !StrCompare(de->full_name, "/Tests/TaskDocData.ZC"))
+        {
+            if (StrCompare(de->name, "TaskDocData.ZC"))
+                result = 7;
+            else if (!(de->attr & RS_ATTR_ARCHIVE) || de->size <= 0)
+                result = 8;
+            else
+                found = TRUE;
+        }
+    }
+    if (!found && result == 42)
+    {
+        if (count)
+            result = 9;
+        else
+            result = 1;
+    }
     for (de = entries; de; de = next)
     {
         next = de->next;

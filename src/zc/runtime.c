@@ -12,6 +12,8 @@
 
 int64_t TempleOS_CallNOnStack(uint64_t stack_top, void (*fptr)(),
                               int64_t argc, int64_t *argv);
+extern int zeal_zss_entry_at(uint32_t index, char *name, size_t name_cap,
+                             size_t *size_out);
 
 /* ZealOS KernelA.HH currently defines EXT_EXTS_NUM as five. Keep a stable
  * pointer/table pair for its kernel-owned function dispatch slots; guest
@@ -632,62 +634,127 @@ static const unsigned char *source_find(const char *path, size_t *size) {
     }
     return NULL;
 }
-static int source_file_at(size_t wanted, char *path, size_t path_cap,
-                          size_t *size_out) {
-    size_t index = 0;
-    if (!source_archive || !path || !path_cap)
-        return 0;
-    for (size_t off = 0; off <= archive_size && archive_size - off >= 512;) {
-        const unsigned char *h = source_archive + off;
-        if (!*h)
-            return 0;
-        size_t n, check, name_len = 0, prefix_len = 0;
-        while (name_len < 100 && h[name_len])
-            name_len++;
-        while (prefix_len < 155 && h[345 + prefix_len])
-            prefix_len++;
-        if (name_len == 100 || prefix_len == 155 ||
-            memcmp(h + 257, "ustar", 5) ||
-            octal(h + 124, 12, &n) || octal(h + 148, 8, &check) ||
-            n > archive_size - off - 512)
-            return 0;
-        size_t sum = 0;
-        for (unsigned i = 0; i < 512; i++)
-            sum += i >= 148 && i < 156 ? ' ' : h[i];
-        if (sum != check)
-            return 0;
-        if ((h[156] == '0' || !h[156]) && index++ == wanted) {
-            size_t total_len = name_len + (prefix_len ? prefix_len + 1 : 0);
-            if (total_len + 1 > path_cap)
-                return 0;
-            if (prefix_len) {
-                memcpy(path, h + 345, prefix_len);
-                path[prefix_len] = '/';
-            }
-            memcpy(path + (prefix_len ? prefix_len + 1 : 0), h, name_len);
-            path[total_len] = 0;
-            if (size_out)
-                *size_out = n;
-            return 1;
-        }
-        if (n > SIZE_MAX - 511)
-            return 0;
-        size_t padded = (n + 511) & ~(size_t)511;
-        if (padded > archive_size - off - 512)
-            return 0;
-        off += 512 + padded;
+struct source_list_entry {
+    char path[256];
+    size_t size;
+};
+struct source_overlay_entry {
+    char name[96];
+    size_t size;
+    int status;
+};
+static struct source_list_entry source_list_cache[4096];
+static struct source_overlay_entry source_overlay_cache[4096];
+static size_t source_list_cache_count;
+static size_t source_overlay_cache_count;
+static int source_list_cache_ready;
+static void source_list_cache_add(const char *path, size_t size) {
+    size_t length = strlen(path);
+    if (source_list_cache_count >=
+            sizeof(source_list_cache) / sizeof(source_list_cache[0]) ||
+        length + 1 > sizeof(source_list_cache[0].path))
+        return;
+    struct source_list_entry *entry =
+        &source_list_cache[source_list_cache_count++];
+    memcpy(entry->path, path, length + 1);
+    entry->size = size;
+}
+static void source_list_cache_build(void) {
+    char path[256];
+    size_t size = 0;
+    source_overlay_cache_count = 0;
+    for (uint32_t index = 0;
+         source_overlay_cache_count <
+             sizeof(source_overlay_cache) / sizeof(source_overlay_cache[0]);
+         index++) {
+        char name[96];
+        int status = zeal_zss_entry_at(index, name, sizeof(name), &size);
+        if (!status)
+            break;
+        struct source_overlay_entry *entry =
+            &source_overlay_cache[source_overlay_cache_count++];
+        size_t length = strlen(name);
+        memcpy(entry->name, name, length + 1);
+        entry->size = size;
+        entry->status = status;
     }
-    return 0;
+    source_list_cache_count = 0;
+    if (source_archive) {
+        for (size_t off = 0; off <= archive_size &&
+                             archive_size - off >= 512;) {
+            const unsigned char *h = source_archive + off;
+            if (!*h) break;
+            size_t n, check, name_len = 0, prefix_len = 0;
+            while (name_len < 100 && h[name_len]) name_len++;
+            while (prefix_len < 155 && h[345 + prefix_len]) prefix_len++;
+            if (name_len == 100 || prefix_len == 155 ||
+                memcmp(h + 257, "ustar", 5) ||
+                octal(h + 124, 12, &n) || octal(h + 148, 8, &check) ||
+                n > archive_size - off - 512)
+                break;
+            size_t sum = 0;
+            for (unsigned i = 0; i < 512; i++)
+                sum += i >= 148 && i < 156 ? ' ' : h[i];
+            if (sum != check) break;
+            if (h[156] == '0' || !h[156]) {
+                size_t total_len = name_len + (prefix_len ? prefix_len + 1 : 0);
+                if (total_len + 1 > sizeof(path)) break;
+                if (prefix_len) {
+                    memcpy(path, h + 345, prefix_len);
+                    path[prefix_len] = '/';
+                }
+                memcpy(path + (prefix_len ? prefix_len + 1 : 0), h, name_len);
+                path[total_len] = 0;
+                const char *native_path = path[0] == '/' ? path + 1 : path;
+                int status = 0;
+                size_t native_size = 0;
+                for (size_t i = 0; i < source_overlay_cache_count; i++) {
+                    if (!strcmp(source_overlay_cache[i].name, native_path)) {
+                        status = source_overlay_cache[i].status;
+                        native_size = source_overlay_cache[i].size;
+                        break;
+                    }
+                }
+                if (status != -3) {
+                    size = status == 1 ? native_size : n;
+                    source_list_cache_add(path, size);
+                }
+            }
+            if (n > SIZE_MAX - 511) break;
+            size_t padded = (n + 511) & ~(size_t)511;
+            if (padded > archive_size - off - 512) break;
+            off += 512 + padded;
+        }
+    }
+    for (size_t index = 0; index < source_overlay_cache_count; index++) {
+        const struct source_overlay_entry *overlay =
+            &source_overlay_cache[index];
+        if (overlay->status != 1)
+            continue;
+        size_t native_length = strlen(overlay->name);
+        if (native_length + 1 > sizeof(path)) continue;
+        memcpy(path, overlay->name, native_length + 1);
+        size_t archive_size = 0;
+        if (!source_find(path, &archive_size))
+            source_list_cache_add(path, overlay->size);
+    }
+    source_list_cache_ready = 1;
 }
 static int64_t host_source_file_at(int64_t *a) {
     if (a[0] < 0 || a[2] <= 0)
         return 0;
-    size_t size = 0;
-    int found = source_file_at((size_t)a[0],
-        (char *)(uintptr_t)a[1], (size_t)a[2], &size);
-    if (found && a[3])
-        *(int64_t *)(uintptr_t)a[3] = (int64_t)size;
-    return found;
+    if (a[0] == 0 || !source_list_cache_ready)
+        source_list_cache_build();
+    if ((uint64_t)a[0] >= source_list_cache_count)
+        return 0;
+    const struct source_list_entry *entry = &source_list_cache[a[0]];
+    size_t length = strlen(entry->path);
+    if (length + 1 > (size_t)a[2])
+        return 0;
+    memcpy((char *)(uintptr_t)a[1], entry->path, length + 1);
+    if (a[3])
+        *(int64_t *)(uintptr_t)a[3] = (int64_t)entry->size;
+    return 1;
 }
 static int source_dir_exists(const char *path) {
     char name[128];

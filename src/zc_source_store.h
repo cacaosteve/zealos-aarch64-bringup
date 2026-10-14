@@ -15,6 +15,11 @@
 static uint64_t g_zss_base = ZEAL_SRC_LBA_BASE;
 static uint32_t g_zss_sectors = ZEAL_SRC_SECTS;
 static uint32_t g_zss_generation;
+#define ZSS_CATALOG_CAP 4096u
+struct zss_catalog_item { char name[ZSS_MAX_NAME + 1]; size_t size; int status; };
+static struct zss_catalog_item g_zss_catalog[ZSS_CATALOG_CAP];
+static uint32_t g_zss_catalog_count;
+static int g_zss_catalog_valid;
 
 struct zss_entry {
     uint32_t header_sector, length, checksum, blocks;
@@ -178,6 +183,51 @@ static int zss_find(const char *name, struct zss_entry *out,
     if (out_records) *out_records = records;
     return found;
 }
+/* Enumerate each latest record, including tombstones, so callers can merge
+ * native overrides without performing a disk lookup for every bundled file. */
+static int zss_entry_at(uint32_t wanted, char *name, size_t name_cap,
+                        size_t *size_out) {
+    uint8_t sector[512];
+    char record_name[ZSS_MAX_NAME + 1];
+    uint32_t pos = 1;
+    if (!name || !name_cap || !zss_available()) return 0;
+    if (!g_zss_catalog_valid) {
+        g_zss_catalog_count = 0;
+        while (pos < g_zss_sectors) {
+            struct zss_entry entry;
+            int deleted, empty = 1;
+            if (!zss_sector_read(pos, sector)) return 0;
+            for (unsigned i = 0; i < 512; i++)
+                if (sector[i]) { empty = 0; break; }
+            if (empty) break;
+            if (zss_decode_record(sector, pos, &entry, record_name, &deleted))
+                return 0;
+            uint32_t i;
+            for (i = 0; i < g_zss_catalog_count; i++)
+                if (zss_str_eq(g_zss_catalog[i].name, record_name)) break;
+            if (i == g_zss_catalog_count) {
+                if (g_zss_catalog_count >= ZSS_CATALOG_CAP) return 0;
+                g_zss_catalog_count++;
+            }
+            struct zss_catalog_item *item = &g_zss_catalog[i];
+            size_t length = 0;
+            while (record_name[length]) length++;
+            for (size_t j = 0; j <= length; j++) item->name[j] = record_name[j];
+            item->size = entry.length;
+            item->status = deleted ? -3 : 1;
+            pos += 1u + entry.blocks;
+        }
+        g_zss_catalog_valid = 1;
+    }
+    if (wanted >= g_zss_catalog_count) return 0;
+    struct zss_catalog_item *item = &g_zss_catalog[wanted];
+    size_t length = 0;
+    while (item->name[length]) length++;
+    if (length + 1 > name_cap) return 0;
+    for (size_t i = 0; i <= length; i++) name[i] = item->name[i];
+    if (size_out) *size_out = item->size;
+    return item->status;
+}
 /* 0 deleted, -2 unavailable, -3 full, -4 missing, -1 invalid/I/O. */
 static int zss_delete(const char *name) {
     uint8_t header[512];
@@ -195,6 +245,7 @@ static int zss_delete(const char *name) {
     zss_w32(header + 20, name_len);
     for (unsigned i = 0; i < name_len; i++) header[32 + i] = (uint8_t)name[i];
     if (!zss_sector_write(tail, header)) return -1;
+    g_zss_catalog_valid = 0;
     return g_vb.flush_supported && !virtio_blk_flush_abs() ? -5 : 0;
 }
 static int zss_read(const struct zss_entry *entry, char *dst, size_t cap, size_t *out_len) {
@@ -259,6 +310,7 @@ static int zss_put(const char *name, const char *src, size_t len) {
     zss_w32(sector + 20, name_len);
     for (unsigned i = 0; i < name_len; i++) sector[32 + i] = (uint8_t)name[i];
     if (!zss_sector_write(tail, sector)) return -1;
+    g_zss_catalog_valid = 0;
     return g_vb.flush_supported && !virtio_blk_flush_abs() ? -5 : 0;
 }
 

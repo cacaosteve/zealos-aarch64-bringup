@@ -4776,7 +4776,16 @@ static void zss_shell_list(void) {
     con_puts("/"); zc_print_decimal(g_zss_sectors);
     con_puts("\n");
 }
+int zeal_zss_entry_at(uint32_t index, char *name, size_t name_cap,
+                      size_t *size_out) {
+    return zss_entry_at(index, name, name_cap, size_out);
+}
 #include "zc_source_editor.h"
+#else
+int zeal_zss_entry_at(uint32_t index, char *name, size_t name_cap,
+                      size_t *size_out) {
+    (void)index; (void)name; (void)name_cap; (void)size_out; return 0;
+}
 #endif
 
 static void shell_handle(const char *line, int *done) {

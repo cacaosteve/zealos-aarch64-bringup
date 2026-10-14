@@ -1057,10 +1057,16 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                             'zc => 0x000000000000002a')
                     command('zput Tests/CallNOnStack.ZC I64 NativeOverlayLoaded(){return 42;}',
                             'zput: saved Tests/CallNOnStack.ZC')
+                    command('zput Tests/FilesFindOverlayOnly.ZC I64 OverlayOnly(){return 42;}',
+                            'zput: saved Tests/FilesFindOverlayOnly.ZC')
                     command('zload disk:Tests/CallNOnStack.ZC',
                             'zc: loaded disk:Tests/CallNOnStack.ZC')
                     command('zcall NativeOverlayLoaded',
                             'zc => 0x000000000000002a')
+                    command('zcall TaskFilesFindNativeOverlayChecks',
+                            'zc => 0x000000000000002a')
+                    command('zrm Tests/FilesFindOverlayOnly.ZC',
+                            'zrm: deleted Tests/FilesFindOverlayOnly.ZC')
                     command('zrm Tests/CallNOnStack.ZC',
                             'zrm: deleted Tests/CallNOnStack.ZC')
                     command('zcall TaskFileFindTombstoneChecks',

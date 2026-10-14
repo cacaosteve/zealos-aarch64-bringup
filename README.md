@@ -40,7 +40,10 @@ jump to its first or last line. It also supports `p`, `a`, `i`, `c`, `d`, `wq`
 and `q!` commands, as well as numbered-line edits. Saved files load through
 `zload disk:<path>`. The graphical editor reads absolute `/...` paths from the
 writable source volume before falling back to bundled files, and saves those
-absolute paths to the same persistent volume. The complete unchanged upstream
+absolute paths to the same persistent volume. `FilesFind` returns a merged
+view of bundled and native source files: saved replacements supply their native
+size, saved-only files appear in listings, and tombstoned files are hidden.
+The complete unchanged upstream
 `KernelA.HH` and `KernelB.HH` load as declaration headers in that order.
 The boot terminal's OS menu includes a Window Demo entry that launches the
 two-window move/resize fixture and restores the terminal when the demo stops.
