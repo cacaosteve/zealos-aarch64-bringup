@@ -39,6 +39,55 @@ def translate_winmgr(source: bytes) -> bytes:
     return text.encode("utf-8")
 
 
+def translate_grbitmap(source: bytes) -> bytes:
+    """Extract regular CDC rectangles without negative-destination blitting.
+
+    Pinned DCExt creates a result CDC sized to the requested source rectangle,
+    then calls GrBlot at (-x1, -y1). GrBlot's negative-origin clipping is only
+    valid for a larger/screen destination; for an ordinary tightly-sized CDC
+    the path can address before the result buffer. Keep screen-bitmap handling
+    on the upstream path and copy rows directly for regular CDCs.
+    """
+    try:
+        text = source.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValueError("GrBitMap.ZC is not UTF-8") from exc
+    signature = "public CDC *DCExt(CDC *dc=gr.dc, I64 x1, I64 y1, I64 x2, I64 y2, CTask *task=NULL)"
+    start = text.find(signature)
+    if start < 0 or text.find(signature, start + len(signature)) >= 0:
+        raise ValueError("expected exactly one pinned DCExt definition")
+    end_anchor = "\npublic CDC *DCDiff(CDC *base, CDC *update)"
+    if text.count(end_anchor) != 1:
+        raise ValueError("expected the pinned DCExt/DCDiff boundary")
+    end = text.index(end_anchor, start)
+    body = text[start:end]
+    if (body.count("\tCTask *win_task;") != 1 or
+            body.count("\tGrBlot(res, -x1, -y1, dc);") != 1 or
+            body.count("res = DCNew(x2 - x1 + 1, y2 -y1 + 1, task);") != 1):
+        raise ValueError("pinned DCExt extraction sequence changed")
+    body = body.replace("\tCTask *win_task;",
+                        "\tCTask *win_task;\n\tI64 row, width;", 1)
+    body = body.replace(
+        "\tres = DCNew(x2 - x1 + 1, y2 -y1 + 1, task);",
+        "\twidth = x2 - x1 + 1;\n"
+        "\tres = DCNew((width + 7) & ~7, y2 - y1 + 1, task);\n"
+        "\tres->width = width;",
+        1,
+    )
+    body = body.replace(
+        "\tGrBlot(res, -x1, -y1, dc);",
+        """\tif (dc->flags & DCF_SCREEN_BITMAP)
+		GrBlot(res, -x1, -y1, dc);
+	else
+		for (row = 0; row < res->height; row++)
+			MemCopy(res->body + row * res->width_internal,
+					dc->body + (y1 + row) * dc->width_internal + x1,
+					res->width);""",
+        1,
+    )
+    return (text[:start] + body + text[end:]).encode("utf-8")
+
+
 def translate_mathode(source: bytes) -> bytes:
     """Work around a parser failure on inline address-of-member call args.
 

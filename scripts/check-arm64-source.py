@@ -4,7 +4,8 @@ from pathlib import Path
 import re
 import sys
 
-from arm64_source import translate_grscreen, translate_ktask, translate_winmgr
+from arm64_source import (translate_grbitmap, translate_grscreen, translate_ktask,
+                          translate_winmgr)
 
 root = Path(__file__).resolve().parent.parent
 source = (root / 'upstream/pinned/System/Gr/GrScreen.ZC').read_bytes()
@@ -28,6 +29,28 @@ assert not re.search(r'(?<!Zc)ODEsUpdate\(task\);', text)
 assert text.count('dst(U8 *) += w2;') >= 2
 assert 'MOV U64 [RSI], R13' not in text
 assert 'ADD RSI, R12' not in text
+
+bitmap_source = (root / 'upstream/pinned/System/Gr/GrBitMap.ZC').read_bytes()
+bitmap_overlay = translate_grbitmap(bitmap_source)
+bitmap_text = bitmap_overlay.decode('utf-8')
+assert bitmap_overlay != bitmap_source
+ext_start = bitmap_text.index('public CDC *DCExt(')
+ext_end = bitmap_text.index('\npublic CDC *DCDiff(', ext_start)
+ext_text = bitmap_text[ext_start:ext_end]
+assert 'if (dc->flags & DCF_SCREEN_BITMAP)\n\t\tGrBlot(res, -x1, -y1, dc);' in ext_text
+assert 'for (row = 0; row < res->height; row++)' in ext_text
+assert 'DCNew((width + 7) & ~7, y2 - y1 + 1, task)' in ext_text
+assert 'res->width = width;' in ext_text
+assert 'dc->body + (y1 + row) * dc->width_internal + x1' in ext_text
+assert 'res->width);' in ext_text
+
+try:
+    translate_grbitmap(bitmap_source.replace(b'GrBlot(res, -x1, -y1, dc);',
+                                             b'GrBlot(res, -x1, -y1, image);', 1))
+except ValueError:
+    pass
+else:
+    raise AssertionError('GrBitMap overlay accepted a changed DCExt extraction')
 
 try:
     translate_grscreen(source.replace(b'ADD', b'ADDX', 1))

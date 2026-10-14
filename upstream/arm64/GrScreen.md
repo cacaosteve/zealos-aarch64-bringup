@@ -93,3 +93,14 @@ the display driver's 32-bit framebuffer.
 The x86 build continues to use the original source. The guest source archive
 includes this note at `/PORTS/ARM64/GrScreen.md` so the substitution is
 discoverable.
+
+# DCExt CDC extraction overlay
+
+The ARM64 source bundle also guards a narrow overlay in `GrBitMap.ZC`'s
+`DCExt`. The upstream implementation extracts an ordinary CDC rectangle by
+blitting the whole source at a negative destination origin. That path can write
+before the newly allocated, tightly sized destination. The overlay keeps the
+existing screen-bitmap blit path and copies rows directly for ordinary CDCs.
+`GrDCDiffChecks` exercises a changed region at a nonzero origin and verifies
+the returned origin, dimensions, and boundary pixels; `make check-grscreen-ode`
+runs this alongside the live-manager frame and ODE update integration checks.

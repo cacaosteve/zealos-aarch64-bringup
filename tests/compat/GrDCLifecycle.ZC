@@ -235,12 +235,12 @@ I64 GrDCDiffChecks()
 		goto done;
 	}
 	for (y = 1; y <= 2; y++)
-		for (x = 10; x <= 17; x++)
+		for (x = 10; x <= 16; x++)
 			update->body[y * update->width_internal + x] = 9;
 	diff = DCDiff(base, update);
 	if (!diff || diff->x0 != 10 || diff->y0 != 1 ||
-			diff->width != 8 || diff->width_internal != 8 || diff->height != 2 ||
-			diff->body[0] != 9 || diff->body[15] != 9)
+			diff->width != 7 || diff->width_internal != 8 || diff->height != 2 ||
+			diff->body[0] != 9 || diff->body[14] != 9)
 		result = 3;
 	done:
 	DCDel(diff);
