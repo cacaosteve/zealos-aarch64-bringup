@@ -603,7 +603,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                                          '/System/DolDoc/DocRecalcLib.ZC',
                                          '/System/DolDoc/DocHighlight.ZC',
                                          '/System/DolDoc/DocNew.ZC',
-                                         '/System/DolDoc/DocBin.ZC'):
+                                         '/System/DolDoc/DocBin.ZC',
+                                         '/System/DolDoc/DocFile.ZC'):
                 command('zload /Kernel/SerialDev/Message.ZC',
                         'zc: loaded /Kernel/SerialDev/Message.ZC')
                 command('zload /Kernel/Job.ZC', 'zc: loaded /Kernel/Job.ZC')
@@ -616,7 +617,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                                          '/System/DolDoc/DocInit.ZC',
                                          '/System/DolDoc/DocPlain.ZC',
                                          '/System/DolDoc/DocRecalcLib.ZC',
-                                         '/System/DolDoc/DocHighlight.ZC'):
+                                         '/System/DolDoc/DocHighlight.ZC',
+                                         '/System/DolDoc/DocFile.ZC'):
                 command('zload /System/DolDoc/DocBin.ZC',
                         'zc: loaded /System/DolDoc/DocBin.ZC')
             if args.probe_module in ('/System/DolDoc/DocPutKey.ZC',
@@ -626,7 +628,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                                          '/System/DolDoc/DocInit.ZC',
                                          '/System/DolDoc/DocPlain.ZC',
                                          '/System/DolDoc/DocRecalcLib.ZC',
-                                         '/System/DolDoc/DocHighlight.ZC'):
+                                         '/System/DolDoc/DocHighlight.ZC',
+                                         '/System/DolDoc/DocFile.ZC'):
                 command('zload /System/DolDoc/DocNew.ZC',
                         'zc: loaded /System/DolDoc/DocNew.ZC')
             if args.probe_module in ('/System/DolDoc/DocPutS.ZC',
@@ -635,7 +638,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                                          '/System/DolDoc/DocInit.ZC',
                                          '/System/DolDoc/DocPlain.ZC',
                                          '/System/DolDoc/DocRecalcLib.ZC',
-                                         '/System/DolDoc/DocHighlight.ZC'):
+                                         '/System/DolDoc/DocHighlight.ZC',
+                                         '/System/DolDoc/DocFile.ZC'):
                 command('zload /System/DolDoc/DocPutKey.ZC',
                         'zc: loaded /System/DolDoc/DocPutKey.ZC')
             if args.probe_module in ('/System/DolDoc/DocDblBuf.ZC',
@@ -643,14 +647,16 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                                          '/System/DolDoc/DocInit.ZC',
                                          '/System/DolDoc/DocPlain.ZC',
                                          '/System/DolDoc/DocRecalcLib.ZC',
-                                         '/System/DolDoc/DocHighlight.ZC'):
+                                         '/System/DolDoc/DocHighlight.ZC',
+                                         '/System/DolDoc/DocFile.ZC'):
                 command('zload /System/DolDoc/DocPutS.ZC',
                         'zc: loaded /System/DolDoc/DocPutS.ZC')
             if args.probe_module in ('/System/DolDoc/DocTerm.ZC',
                                          '/System/DolDoc/DocInit.ZC',
                                          '/System/DolDoc/DocPlain.ZC',
                                          '/System/DolDoc/DocRecalcLib.ZC',
-                                         '/System/DolDoc/DocHighlight.ZC'):
+                                         '/System/DolDoc/DocHighlight.ZC',
+                                         '/System/DolDoc/DocFile.ZC'):
                 # DocTermNew creates the shell's File menu, so MenuFile must
                 # be defined before compiling DocTerm (the graphics startup
                 # path already loads Menu.ZC before Window Manager modules).
@@ -659,23 +665,41 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             if args.probe_module in ('/System/DolDoc/DocInit.ZC',
                                          '/System/DolDoc/DocPlain.ZC',
                                          '/System/DolDoc/DocRecalcLib.ZC',
-                                         '/System/DolDoc/DocHighlight.ZC'):
+                                         '/System/DolDoc/DocHighlight.ZC',
+                                         '/System/DolDoc/DocFile.ZC'):
                 command('zload /System/DolDoc/DocTerm.ZC',
                         'zc: loaded /System/DolDoc/DocTerm.ZC')
                 command('zcall BootstrapDefinesLoad',
                         'zc => 0x0000000000000000')
             if args.probe_module in ('/System/DolDoc/DocPlain.ZC',
                                          '/System/DolDoc/DocRecalcLib.ZC',
-                                         '/System/DolDoc/DocHighlight.ZC'):
+                                         '/System/DolDoc/DocHighlight.ZC',
+                                         '/System/DolDoc/DocFile.ZC'):
                 command('zload /System/DolDoc/DocInit.ZC',
                         'zc: loaded /System/DolDoc/DocInit.ZC')
             if args.probe_module in ('/System/DolDoc/DocRecalcLib.ZC',
-                                     '/System/DolDoc/DocHighlight.ZC'):
+                                     '/System/DolDoc/DocHighlight.ZC',
+                                     '/System/DolDoc/DocFile.ZC'):
                 command('zload /System/DolDoc/DocPlain.ZC',
                         'zc: loaded /System/DolDoc/DocPlain.ZC')
             if args.probe_module == '/System/DolDoc/DocHighlight.ZC':
                 command('zload /System/DolDoc/DocRecalcLib.ZC',
                         'zc: loaded /System/DolDoc/DocRecalcLib.ZC')
+            if args.probe_module == '/System/DolDoc/DocFile.ZC':
+                command('zload /Tests/WinMgrProbeDeps.ZC',
+                        'zc: loaded /Tests/WinMgrProbeDeps.ZC')
+                command('zload /Tests/ODEsUpdateStub.ZC',
+                        'zc: loaded /Tests/ODEsUpdateStub.ZC')
+                command('zcall ODEsUpdateStubCheck',
+                        'zc => 0x000000000000002a')
+                command('zcall BootstrapGrContextFlagsInit',
+                        'zc => 0x000000000000002a')
+                command('zload /System/DolDoc/DocRecalcLib.ZC',
+                        'zc: loaded /System/DolDoc/DocRecalcLib.ZC')
+                command('zload /System/DolDoc/DocHighlight.ZC',
+                        'zc: loaded /System/DolDoc/DocHighlight.ZC')
+                command('zload /System/DolDoc/DocRecalc.ZC',
+                        'zc: loaded /System/DolDoc/DocRecalc.ZC')
             guest.stdin.write(('zload '+args.probe_module+'\r').encode())
             guest.stdin.flush()
             result = until(b'\n> ')
@@ -916,9 +940,12 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                         'zc: loaded /Tests/TaskOriginalDocInit.ZC')
                 command('zcall TaskOriginalDocInitChecks',
                         'zc => 0x000000000000002a')
-            if args.probe_module == '/System/DolDoc/DocPlain.ZC':
-                if 'zc: loaded /System/DolDoc/DocPlain.ZC' not in result:
-                    raise RuntimeError('unchanged DocPlain.ZC did not load')
+            if args.probe_module in ('/System/DolDoc/DocPlain.ZC',
+                                     '/System/DolDoc/DocFile.ZC'):
+                expected_loaded_module = args.probe_module
+                if f'zc: loaded {expected_loaded_module}' not in result:
+                    raise RuntimeError(
+                        f'unchanged {expected_loaded_module} did not load')
                 command('zload /Tests/TaskOriginalDocPlain.ZC',
                         'zc: loaded /Tests/TaskOriginalDocPlain.ZC')
                 command('zcall TaskOriginalDocPlainChecks',
@@ -929,6 +956,9 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                         'zc => 0x000000000000002a')
                 command('zcall TaskDocPlainSaveChecks',
                         'zc => 0x000000000000002a')
+                if args.probe_module == '/System/DolDoc/DocFile.ZC':
+                    command('zcall TaskDocFormattedSaveChecks',
+                            'zc => 0x000000000000002a')
                 command('zcall TaskFileMaskChecks',
                         'zc => 0x000000000000002a')
                 command('zcall TaskSourceFileReadChecks',
@@ -936,14 +966,16 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 if args.pci:
                     command('zcall TaskDiskFileReadChecks',
                             'zc => 0x000000000000002a')
-                command('zcall TaskFileApiRoundTripChecks',
-                        'zc => 0x000000000000002a')
-                command('zcall TaskFileApiPersistChecks',
-                        'zc => 0x000000000000002a')
+                if args.pci:
+                    command('zcall TaskFileApiRoundTripChecks',
+                            'zc => 0x000000000000002a')
+                    command('zcall TaskFileApiPersistChecks',
+                            'zc => 0x000000000000002a')
                 command('zcall TaskDocReadChecks',
                         'zc => 0x000000000000002a')
-                command('zcall TaskDocWriteChecks',
-                        'zc => 0x000000000000002a')
+                if args.pci:
+                    command('zcall TaskDocWriteChecks',
+                            'zc => 0x000000000000002a')
             if args.probe_module == '/System/DolDoc/DocRecalcLib.ZC':
                 if 'zc: loaded /System/DolDoc/DocRecalcLib.ZC' not in result:
                     raise RuntimeError('unchanged DocRecalcLib.ZC did not load')

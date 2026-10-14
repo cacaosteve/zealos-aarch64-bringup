@@ -159,7 +159,7 @@ I64 TaskDocPlainSaveChecks()
     I64 size, copy_size;
 
     doc = DocNew;
-    doc->flags |= DOCF_PLAIN_TEXT | DOCF_PLAIN_TEXT_TABS;
+    doc->flags |= DOCF_PLAIN_TEXT | DOCF_PLAIN_TEXT_TABS | DOCF_NO_CURSOR;
     DocPrint(doc, "alpha\t$\nbeta");
     saved = DocSave(doc, &size);
     if (!saved)
@@ -169,7 +169,7 @@ I64 TaskDocPlainSaveChecks()
     if (StrCompare(saved, "alpha\t$\nbeta"))
         return 3;
     copy = DocNew;
-    copy->flags |= DOCF_PLAIN_TEXT | DOCF_PLAIN_TEXT_TABS;
+    copy->flags |= DOCF_PLAIN_TEXT | DOCF_PLAIN_TEXT_TABS | DOCF_NO_CURSOR;
     bounded_source = MAlloc(size, copy->mem_task);
     MemCopy(bounded_source, saved, size);
     DocLoad(copy, bounded_source, size);
@@ -177,6 +177,51 @@ I64 TaskDocPlainSaveChecks()
     saved_copy = DocSave(copy, &copy_size);
     if (!saved_copy || copy_size != size || StrCompare(saved, saved_copy))
         return 4;
+    Free(saved_copy);
+    Free(saved);
+    DocDel(copy);
+    DocDel(doc);
+    return 42;
+}
+
+I64 TaskDocFormattedSaveChecks()
+{
+    CDoc *doc, *copy;
+    CDocEntry *entry;
+    U8 *saved, *saved_copy, *plain;
+    I64 size, copy_size, expected_red = -1;
+    Bool saw_red = FALSE;
+
+    doc = DocNew;
+    doc->flags |= DOCF_NO_CURSOR;
+    DocPutS(doc, "plain $FG,RED$red text$FG,WHITE$ normal");
+    for (entry = doc->head.next; entry != doc; entry = entry->next)
+        if (entry->type_u8 == DOCT_FOREGROUND)
+        {
+            if (expected_red < 0)
+                expected_red = entry->attr;
+            plain = Doc2PlainText(doc, entry);
+            if (!plain)
+                return 4;
+            Free(plain);
+            break;
+        }
+    DocBinsValidate(doc);
+    saved = DocSave(doc, &size);
+    if (!saved || size <= 0)
+        return 1;
+    copy = DocNew;
+    copy->flags |= DOCF_NO_CURSOR;
+    DocLoad(copy, saved, size);
+    for (entry = copy->head.next; entry != copy; entry = entry->next)
+        if (entry->type_u8 == DOCT_FOREGROUND)
+            if (entry->attr == expected_red)
+                saw_red = TRUE;
+    if (!saw_red)
+        return 2;
+    saved_copy = DocSave(copy, &copy_size);
+    if (!saved_copy || size != copy_size || StrCompare(saved, saved_copy))
+        return 3;
     Free(saved_copy);
     Free(saved);
     DocDel(copy);

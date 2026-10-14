@@ -32,8 +32,68 @@ extern U8 *FileRead(U8 *filename, I64 *_size=NULL, I64 *_attr=NULL);
 extern I64 FileWrite(U8 *filename, U8 *fbuf, I64 size, I64 cdt=0, I64 attr=0);
 extern CDoc *DocNew(U8 *filename=NULL, CTask *task=NULL);
 extern U0 DocDel(CDoc *doc);
+extern CDoc *DocRead(U8 *name=NULL, I64 flags=0);
+extern Bool DocWrite(CDoc *doc, Bool prompt=FALSE);
 extern U0 DocLoad(CDoc *doc, U8 *src, I64 size);
 extern U8 *DocSave(CDoc *doc, I64 *_size=NULL);
+// Compiler stream output is only used by DocFile's StreamDoc helper.
+// Runtime callers outside #exe are not wired into the bootstrap compiler.
+extern U0 StreamPrint(U8 *format, ...);
+extern Bool DocGoToLine(CDoc *doc, I64 line);
+extern Bool DocLock(CDoc *doc);
+extern U0 DocUnlock(CDoc *doc);
+extern U8 *StrNew(U8 *source, CTask *mem_task=NULL);
+// DocBin.ZC keeps this helper private upstream, but DocFile.ZC is loaded as a
+// separate guest module here. Export its validation work through the bridge so
+// DocSave can resolve it and binary references are renumbered before writes.
+public U0 DocBinsValidate(CDoc *doc)
+{
+    Bool unlock;
+    CDocBin *bin, *found;
+    CDocEntry *entry, *next;
+    I64 renum_num = 0;
+
+    if (!doc)
+        return;
+    unlock = DocLock(doc);
+    for (bin = doc->bin_head.next; bin != &doc->bin_head; bin = bin->next)
+    {
+        bin->use_count = 0;
+        bin->tmp_use_count = 0;
+        bin->renum_num = -1;
+        Free(bin->tag);
+        bin->tag = NULL;
+    }
+    for (entry = doc->head.next; entry != doc; entry = next)
+    {
+        next = entry->next;
+        if (entry->de_flags & DOCEF_HAS_BIN)
+        {
+            found = doc->bin_head.next;
+            while (found != &doc->bin_head && found->num != entry->bin_num)
+                found = found->next;
+            if (found != &doc->bin_head)
+            {
+                entry->bin_data = found;
+                if (entry->de_flags & DOCEF_BIN_PTR_LINK)
+                    found->tmp_use_count = I32_MAX;
+                if (!found->use_count++)
+                    found->renum_num = ++renum_num;
+                entry->bin_num = found->renum_num;
+                if (!found->tag && entry->de_flags & DOCEF_TAG && entry->tag &&
+                    *entry->tag)
+                    found->tag = StrNew(entry->tag, doc->mem_task);
+            }
+            else
+            {
+                entry->type = entry->de_flags = 0;
+                entry->type_u8 = DOCT_ERROR;
+            }
+        }
+    }
+    if (unlock)
+        DocUnlock(doc);
+}
 // Poll the current virtio/UART key reader and queue its events for the focus
 // task. PS/2 mouse polling is outside this bridge.
 extern U0 KbdMouseHandler(Bool poll_kbd, Bool poll_mouse);
@@ -878,7 +938,7 @@ Bool DocUnlock(CDoc *doc)
     return FALSE;
 }
 // StrA helpers used by DocBinPtrReset before Kernel/StrA.ZC loads.
-I64 StrOcc(U8 *src, I64 ch)
+public I64 StrOcc(U8 *src, I64 ch)
 {
     I64 i = 0;
 
@@ -1004,33 +1064,6 @@ I64 Str2I64(U8 *st, I64 radix=10, U8 **_end_ptr=NULL)
         return -res;
     return res;
 }
-// DocFile.ZC / DocNew.ZC own these; stubs close the DocBin compile cycle.
-CDoc *DocRead(U8 *name=NULL, I64 flags=0)
-{
-    CDoc *doc;
-    U8 *contents;
-    I64 size, attr;
-
-    if (flags) {}
-    if (!name)
-        return NULL;
-    contents = FileRead(name, &size, &attr);
-    if (!contents || size <= 0 || size > 16 * 1024 * 1024)
-    {
-        if (contents)
-            Free(contents);
-        return NULL;
-    }
-    doc = DocNew(name);
-    if (!doc)
-    {
-        Free(contents);
-        return NULL;
-    }
-    DocLoad(doc, contents, size);
-    Free(contents);
-    return doc;
-}
 U0 DocDel(CDoc *doc)
 {
     if (doc) {}
@@ -1129,20 +1162,6 @@ U0 DocPrintPartial(CDoc *doc=NULL, U8 *format=NULL, ...)
 {
     if (doc) {}
     if (format) {}
-}
-Bool DocWrite(CDoc *doc, Bool prompt=FALSE)
-{
-    U8 *contents;
-    I64 size, written;
-
-    if (!doc || doc->doc_signature != DOC_SIGNATURE_VAL || prompt)
-        return FALSE;
-    contents = DocSave(doc, &size);
-    if (!contents)
-        return FALSE;
-    written = FileWrite(doc->filename.name, contents, size, 0, 0);
-    Free(contents);
-    return written == size;
 }
 U0 EdCharIns(I64 ch, I64 sc, CDoc *doc)
 {
@@ -1269,16 +1288,18 @@ U8 *Char2KeyName(I64 ch, Bool include_ctrl=TRUE)
 CDirContext *DirContextNew(U8 *mask, Bool make_mask=FALSE,
                            Bool make_dirs=FALSE, Bool no_warn=FALSE)
 {
-    if (mask) {}
+    if (!mask)
+        return NULL;
     if (make_mask) {}
     if (make_dirs) {}
     if (no_warn) {}
-    return NULL;
+    return CAlloc(sizeof(CDirContext));
 }
 U0 DirContextDel(CDirContext *dirc, Bool restore=TRUE)
 {
-    if (dirc) {}
     if (restore) {}
+    if (dirc)
+        Free(dirc);
 }
 U8 *DirFile(U8 *dirname, U8 *name=NULL, U8 *ext=NULL)
 {
@@ -1296,9 +1317,10 @@ Bool FileFind(U8 *filename, CDirEntry *_de=NULL, I64 fuf_flags=0)
 }
 U8 *FileNameAbs(U8 *filename, I64 fuf_flags=0)
 {
-    if (filename) {}
+    if (!filename)
+        return NULL;
     if (fuf_flags) {}
-    return NULL;
+    return StrNew(filename);
 }
 U0 GodBitsInsert(I64 num_bits, I64 bit_field)
 {
@@ -4960,74 +4982,6 @@ U0 DocDataScan(CDoc *doc, CDocEntry *doc_e)
 				*ptr(I64 *) = d;
 		}
 	}
-}
-U8 *DocSave(CDoc *doc, I64 *_size=NULL)
-{//Plain-text round trip until the full DocFile/bin serializer is available.
-    CDocEntry *doc_e;
-    U8 *res, *dst;
-    I64 count = 1, i;
-    Bool escape_dollars;
-
-    if (!doc || doc->doc_signature != DOC_SIGNATURE_VAL)
-    {
-        if (_size)
-            *_size = 0;
-        return StrNew("");
-    }
-    escape_dollars = !(doc->flags & (DOCF_PLAIN_TEXT | DOCF_PLAIN_TEXT_TABS));
-    for (doc_e = doc->head.next; doc_e != doc; doc_e = doc_e->next)
-    {
-        if (!Bt(doldoc.type_flags_data, doc_e->type_u8) &&
-            doc_e->type_u8 == DOCT_TEXT && doc_e->tag)
-        {
-            count += StrLen(doc_e->tag);
-            if (escape_dollars)
-                for (i = 0; doc_e->tag[i]; i++)
-                    if (doc_e->tag[i] == '$' && doc_e->tag[i + 1] == '$')
-                        count++;
-        }
-        else if (!Bt(doldoc.type_flags_data, doc_e->type_u8) &&
-                 (doc_e->type_u8 == DOCT_NEW_LINE ||
-                  doc_e->type_u8 == DOCT_TAB))
-            count++;
-    }
-    res = MAlloc(count);
-    dst = res;
-    for (doc_e = doc->head.next; doc_e != doc; doc_e = doc_e->next)
-    {
-        if (!Bt(doldoc.type_flags_data, doc_e->type_u8) &&
-            doc_e->type_u8 == DOCT_TEXT && doc_e->tag)
-        {
-            for (i = 0; doc_e->tag[i]; i++)
-            {
-                *dst++ = doc_e->tag[i];
-                if (escape_dollars && doc_e->tag[i] == '$' &&
-                    doc_e->tag[i + 1] == '$')
-                    *dst++ = '$';
-            }
-        }
-        else if (!Bt(doldoc.type_flags_data, doc_e->type_u8) &&
-                 doc_e->type_u8 == DOCT_NEW_LINE)
-            *dst++ = '\n';
-        else if (!Bt(doldoc.type_flags_data, doc_e->type_u8) &&
-                 doc_e->type_u8 == DOCT_TAB)
-            *dst++ = '\t';
-    }
-    *dst = 0;
-    if (_size)
-        *_size = dst - res;
-    return res;
-}
-U0 DocLoad(CDoc *doc, U8 *src2, I64 size)
-{//Load the text portion of a DocSave buffer; binary blocks are not supported.
-    U8 *text;
-    if (!doc || doc->doc_signature != DOC_SIGNATURE_VAL || !src2 || size < 0)
-        return;
-    text = MAlloc(size + 1, doc->mem_task);
-    MemCopy(text, src2, size);
-    text[size] = 0;
-    DocPutS(doc, text);
-    Free(text);
 }
 U0 DocCenter(CDoc *doc=NULL, I64 recalc_flags=0)
 {

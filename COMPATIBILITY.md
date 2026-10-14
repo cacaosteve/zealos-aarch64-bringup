@@ -1903,19 +1903,23 @@ ZealOS live distribution or installer.
 
 ## Unchanged DolDoc `DocPlain` + dollar ParseDollarCmd
 
-- The unchanged pinned `System/DolDoc/DocPlain.ZC` loads after DocInit.
+- The pinned `System/DolDoc/DocPlain.ZC` loads after DocInit through a bootstrap
+  overlay that exports `Doc2PlainText` for separately loaded DocFile routines.
   Mid-switch `#assert` drains without nesting CmpCtrl (Aiwnios
   `aiwnios_switch_depth`). Unbounded `switch [type]` now bounds-checks so
   holes like `DOCT_TEXT` take the default path. Bootstrap adds `StrMatch`,
   `ListMatch`/`DefineMatch`, `ST_RAW_TYPES`, and thin
-  plain-text `DocSave`/`DocLoad` bridge routines and a `DocCenter` fallback;
-  formatted DolDoc entries and binary blocks still need the upstream DocFile
-  serializer. `DocRead` now uses the normal `FileRead` interface to read bundled
-  archive files and fall back to the writable source volume for relative names
-  (or explicit `disk:` paths) into a new document; `DocWrite` uses `FileWrite`
-  to save the plain-text serialization through the native source partition (or
-  a root RedSea file on legacy disks). Save-as
-  prompting and upstream DocFile binary blocks are not implemented.
+  `DocCenter` fallback. The unchanged pinned `System/DolDoc/DocFile.ZC` now
+  supplies `DocLoad`, `DocRead`, `DocSave`, and `DocWrite`; its bootstrap
+  overlay keeps dollar-marker counting local to the module, and TaskBridge
+  exports the upstream binary-reference validation behavior across the staged
+  module boundary. `DocRead` uses `FileRead` for bundled archive files and the
+  writable source volume for relative names (or explicit `disk:` paths), while
+  `DocWrite` persists the upstream serialization through the native source
+  partition (or a root RedSea file on legacy disks). Formatted foreground
+  commands now survive a save-load-save round trip. Binary-block serialization
+  is implemented by the pinned routine but does not yet have a dedicated
+  round-trip test; save-as prompting and interactive DocForm remain unsupported.
   `TaskDocDataChecks` exercises integer format/scan round-tripping and checkbox
   state synchronization; `TaskDocPlainSaveChecks` verifies a text/newline
   save-load-save round trip. The compatibility probe checks `FileRead` through
@@ -1931,7 +1935,7 @@ ZealOS live distribution or installer.
   wildcards, case folding, and rejected extensions (`0x2a`).
 - `TaskOriginalDocPlainChecks` exercises real `ParseDollarCmd` for `TX` tags,
   `CM+LE+RE` flags, `FG,RED`, and `DocPrint("$$TX,\"Yo\"$$")` (`0x2a`).
-  Interactive DocForm/DocEd and DocFile/Adam startup remain later work.
+  Interactive DocForm/DocEd and Adam startup remain later work.
 
 ## Unchanged DolDoc `DocRecalcLib` + cursor helpers
 
