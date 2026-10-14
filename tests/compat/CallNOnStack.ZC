@@ -1,0 +1,101 @@
+U8 CallNOnStackTestStack[32768];
+I64 CallNOnStackSeenSP;
+I64 CallNOnStackYieldStage, CallNOnStackYieldResult;
+
+I64 CallNOnStackSum3(I64 a, I64 b, I64 c)
+{
+    return a + 2 * b + 3 * c;
+}
+
+I64 CallNOnStackSum8(I64 a, I64 b, I64 c, I64 d, I64 e,
+                     I64 f, I64 g, I64 h)
+{
+    return a + 2 * b + 3 * c + 4 * d + 5 * e +
+           6 * f + 7 * g + 8 * h;
+}
+
+I64 CallNOnStackSum10(I64 a, I64 b, I64 c, I64 d, I64 e,
+                        I64 f, I64 g, I64 h, I64 i, I64 j)
+{
+    return a + 2 * b + 3 * c + 4 * d + 5 * e +
+           6 * f + 7 * g + 8 * h + 9 * i + 10 * j;
+}
+
+I64 CallNOnStackSum9(I64 a, I64 b, I64 c, I64 d, I64 e,
+                     I64 f, I64 g, I64 h, I64 i)
+{
+    return a + 2 * b + 3 * c + 4 * d + 5 * e +
+           6 * f + 7 * g + 8 * h + 9 * i;
+}
+
+I64 CallNOnStackStackProbe()
+{
+    I64 local;
+    CallNOnStackSeenSP = &local;
+    return 0x2a;
+}
+
+I64 CallNOnStackYieldTarget()
+{
+    CallNOnStackYieldStage = 1;
+    ZcTaskYield;
+    CallNOnStackYieldStage = 2;
+    return 0x2a;
+}
+
+I64 CallNOnStackYieldWorker()
+{
+    U8 *stack_low = &CallNOnStackTestStack;
+    U8 *stack_top = stack_low + sizeof(CallNOnStackTestStack);
+    CallNOnStackYieldResult = ZcCallNOnStack(stack_low, stack_top,
+                                              &CallNOnStackYieldTarget, 0, NULL);
+    return CallNOnStackYieldResult;
+}
+
+I64 CallNOnStackChecks()
+{
+    I64 args3[3] = {1, 2, 3};
+    I64 args8[8] = {1, 2, 3, 4, 5, 6, 7, 8};
+    I64 args9[9] = {1, 2, 3, 4, 5, 6, 7, 8, 9};
+    I64 args10[10] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+    U8 *stack_low = &CallNOnStackTestStack;
+    U8 *stack_top = stack_low + sizeof(CallNOnStackTestStack);
+    I64 caller_local;
+    I64 caller_sp = &caller_local;
+    I64 res;
+
+    res = ZcCallNOnStack(stack_low, stack_top, &CallNOnStackSum3, 3, args3);
+    if (res != 14)
+        return 1;
+    res = ZcCallNOnStack(stack_low, stack_top, &CallNOnStackSum8, 8, args8);
+    if (res != 204)
+        return 2;
+    res = ZcCallNOnStack(stack_low, stack_top, &CallNOnStackSum9, 9, args9);
+    if (res != 285)
+        return 3;
+    res = ZcCallNOnStack(stack_low, stack_top, &CallNOnStackSum10, 10, args10);
+    if (res != 385)
+        return 4;
+    res = ZcCallNOnStack(stack_low, stack_top,
+                         &CallNOnStackStackProbe, 0, NULL);
+    if (res != 0x2a || CallNOnStackSeenSP < stack_low(I64) ||
+        CallNOnStackSeenSP >= stack_top(I64) ||
+        (caller_sp >= stack_low(I64) && caller_sp < stack_top(I64)))
+        return 5;
+    res = ZcCallNOnStack(stack_low, stack_low + 8,
+                         &CallNOnStackSum10, 10, args10);
+    if (res != -1)
+        return 6;
+    CallNOnStackYieldStage = CallNOnStackYieldResult = 0;
+    I64 task_num = ZcTaskSpawn(&CallNOnStackYieldWorker);
+    if (task_num < 1)
+        return 7;
+    ZcTaskYield;
+    if (CallNOnStackYieldStage != 1)
+        return 8;
+    ZcTaskYield;
+    if (CallNOnStackYieldStage != 2 || CallNOnStackYieldResult != 0x2a ||
+        ZcTaskResult(task_num) != 0x2a)
+        return 9;
+    return 0x2a;
+}

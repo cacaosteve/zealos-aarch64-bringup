@@ -10,6 +10,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+int64_t TempleOS_CallNOnStack(uint64_t stack_top, void (*fptr)(),
+                              int64_t argc, int64_t *argv);
+
 /* ZealOS KernelA.HH currently defines EXT_EXTS_NUM as five. Keep a stable
  * pointer/table pair for its kernel-owned function dispatch slots; guest
  * modules populate these slots as they load. */
@@ -25,6 +28,7 @@ static uint64_t guest_gr_font[256];
 static uint64_t guest_gr_colors[256];
 static int guest_gr_tables_ready;
 static void *guest_fp_set_std_palette;
+static void *guest_fp_update_ctrls;
 
 extern void hc_fmt_f64_bits(char **dp, uint64_t bits, int prec);
 extern uint64_t hc_builtin_exp(uint64_t xbits);
@@ -2245,6 +2249,22 @@ static int64_t host_task_spawn(int64_t *a) {
                                             GUEST_ENTRY_NO_ARG);
     return f ? (int64_t)(f - guest_fibers) : -1;
 }
+static int64_t host_call_n_on_stack(int64_t *a) {
+    uintptr_t stack_low = (uintptr_t)a[0];
+    uintptr_t stack_top = (uintptr_t)a[1] & ~(uintptr_t)15;
+    int64_t argc = a[3];
+    int64_t *argv = (int64_t *)(uintptr_t)a[4];
+    uint64_t spill_bytes;
+    if (!stack_low || stack_top <= stack_low || !a[2] || argc < 0 || argc > 1024 ||
+        (argc && !argv))
+        return -1;
+    spill_bytes = argc > 8 ? (uint64_t)(argc - 8) * 8 : 0;
+    spill_bytes = (spill_bytes + 15) & ~UINT64_C(15);
+    if (stack_top - stack_low < spill_bytes)
+        return -1;
+    return TempleOS_CallNOnStack(stack_top, (void (*)(void))(uintptr_t)a[2],
+                                 argc, argv);
+}
 static struct guest_fiber *find_guest_task(void *task) {
     for (unsigned i = 0; i < GUEST_TASKS; i++)
         if (guest_fibers[i].words == task && guest_fibers[i].state == GUEST_RUNNABLE)
@@ -3861,6 +3881,21 @@ static int64_t host_print(int64_t *a) {
     guest_task_text_output(output);
     return 0;
 }
+static int64_t host_call(int64_t *a) {
+    if (!a[0])
+        return -1;
+    return FFI_CALL_TOS_0((void *)(uintptr_t)a[0]);
+}
+static int64_t host_call_ext_str(int64_t *a) {
+    const char *name = (const char *)(uintptr_t)a[0];
+    CHashFun *fun;
+    if (!name || !Fs || !Fs->hash_table)
+        return -1;
+    fun = (CHashFun *)HashFind((char *)name, Fs->hash_table, HTT_FUN, 1);
+    if (!fun || fun->argc || !fun->fun_ptr || (fun->base.base.type & HTF_EXTERN))
+        return -1;
+    return FFI_CALL_TOS_0(fun->fun_ptr);
+}
 static int execute_source(const char *path, const char *src) {
     (void)execute_source_result(path, src, 0, 0);
     return 0;
@@ -3897,6 +3932,8 @@ static int load_inner(const char *path) {
     }
     if (!strcmp(path, "/System/GuiTerminal.ZC"))
         PrsBindCSymbol("ZcGuiShellExec", zc_gui_shell_exec, 1);
+    if (!strcmp(path, "/Kernel/KTask.ZC"))
+        PrsBindCSymbol("ZcCallExtStr", host_call_ext_str, 1);
     /* Source units can introduce fresh extern declarations after KernelC.HH
      * has been parsed. Rebind the timer hook after each unit so those calls
      * resolve to the same host implementation as the kernel declaration. */
@@ -3906,6 +3943,13 @@ static int load_inner(const char *path) {
     if (!strcmp(path, "/Kernel/KernelC.HH")) {
         /* counts is declared here, not in KernelB.HH; bind after declaration
          * so the generic extern-data binder can resolve the symbol. */
+        CHashGlblVar *spawned_tasks = (CHashGlblVar *)HashFind(
+            "sys_num_spawned_tasks", Fs->hash_table, HTT_GLBL_VAR, 1);
+        if (!spawned_tasks)
+            zc_fail("KernelC task serial declaration missing");
+        PrsBindCSymbol("sys_num_spawned_tasks", &guest_task_serial, 0);
+        if (!spawned_tasks->data_addr)
+            zc_fail("KernelC task serial binding failed");
         PrsBindCSymbol("counts", &guest_counts, 0);
         PrsBindCSymbol("tS", &guest_tS_bits, 0);
         PrsBindCSymbol("TimeCal", host_time_cal, 0);
@@ -3937,6 +3981,10 @@ static int load_inner(const char *path) {
             zc_fail("screencast compatibility storage allocation failed");
         PrsBindCSymbol("screencast", guest_screencast_state, 0);
         PrsBindCSymbol("fp_set_std_palette", &guest_fp_set_std_palette, 0);
+        /* KTask's floating-point control hook is optional, matching the
+         * upstream null check before dispatch. Keep null storage available
+         * to source modules that declare it as extern data. */
+        PrsBindCSymbol("fp_update_ctrls", &guest_fp_update_ctrls, 0);
         CHashClass *text = (CHashClass *)HashFind("CTextGlobals", Fs->hash_table,
                                                    HTT_CLASS, 1);
         if (!text || text->sz < 48 ||
@@ -3968,6 +4016,9 @@ static int load_inner(const char *path) {
     }
     if (!strcmp(path, "/Kernel/KernelB.HH")) {
         bind_guest_task();
+        /* ZealOS's Call invokes a zero-argument JIT entry point. Rebind it
+         * after KernelB declares the _CALL import. */
+        PrsBindCSymbol("Call", host_call, 1);
         CHashClass *cpu = (CHashClass *)HashFind("CCPU", Fs->hash_table,
                                                   HTT_CLASS, 1);
         if (!cpu || cpu->sz <= 0 || cpu->sz > (1 << 20))
@@ -4257,6 +4308,7 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
         int64_t (*fn)(int64_t *);
         int arity;
     } bindings[] = {{"MAlloc", host_malloc, 2}, {"CAlloc", host_calloc, 2},
+                    {"Call", host_call, 1}, {"ZcCallExtStr", host_call_ext_str, 1},
                     {"Free", host_free, 1},  {"MSize", host_msize, 1},
                     /* MSize2 is ZealOS internal size; alias requested size for now. */
                     {"MSize2", host_msize, 1},
@@ -4265,6 +4317,7 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
                     {"GrRopEquU8NoClipping", host_gr_rop_equ_u8_no_clipping, 3},
                     {"Puts", host_puts, 1},
                     {"ZcTaskSpawn", host_task_spawn, 1},
+                    {"ZcCallNOnStack", host_call_n_on_stack, 5},
                     {"ZcTaskYield", host_task_yield, 0}, {"ZcTaskRun", host_task_run, 0},
                     {"ZcTaskResult", host_task_result, 1},
                     {"ZcTaskFrameRun", host_task_frame_run, 0},

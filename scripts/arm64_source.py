@@ -12,6 +12,9 @@ _TEXT_BG_X86 = re.compile(
     r"[ \t]*MOV[ \t]+U64[ \t]+\[RSI\],[ \t]*R13[ \t]*(?:\n|$)"
 )
 
+_KTASK_GROW_BEGIN = "#exe {Option(OPTf_NO_REG_VAR, ON);};"
+_KTASK_GROW_END = "#exe {Option(OPTf_NO_REG_VAR, OFF);};"
+
 
 def translate_winmgr(source: bytes) -> bytes:
     """Route the source manager's periodic redraw through atomic scanout.
@@ -55,6 +58,84 @@ def translate_mathode(source: bytes) -> bytes:
     text = text.replace(signature, signature + "\n\tU8 *mp_flags = &ode->mp_not_done_flags;", 1)
     text = text.replace(call, "\t\twhile (!Bt(mp_flags, Gs->num))", 1)
     text = text.replace(reset, "\t\tLBtr(mp_flags, Gs->num);", 1)
+    return text.encode("utf-8")
+
+
+def translate_ktask(source: bytes) -> bytes:
+    """Replace KTask's x86 CallStackGrow with the tested AAPCS64 trampoline.
+
+    The original function uses lex-ahead #exe options and two x86 stack
+    assembly blocks. Its portable replacement allocates a temporary task-owned
+    stack and forwards the complete variadic integer argument vector through
+    ZcCallNOnStack. The surrounding pinned task source remains unchanged.
+    """
+    try:
+        text = source.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValueError("KTask.ZC is not UTF-8") from exc
+    if text.count(_KTASK_GROW_BEGIN) != 1 or text.count(_KTASK_GROW_END) != 1:
+        raise ValueError("expected the pinned CallStackGrow #exe option pair")
+    start = text.index(_KTASK_GROW_BEGIN)
+    finish = text.index(_KTASK_GROW_END, start) + len(_KTASK_GROW_END)
+    block = text[start:finish]
+    signature = (
+        "argpop I64 CallStackGrow(I64 stack_size_threshold, I64 stack_size, "
+        "/*argpop*/I64 (*fp_addr)(...), ...)"
+    )
+    if block.count(signature) != 1 or block.count("asm {") != 2:
+        raise ValueError("CallStackGrow signature or x86 assembly blocks changed")
+    for anchor in (r"(?m)^\s*LEAVE\s*(?://.*)?$",
+                   r"(?m)^\s*JMP\s+RBX\b",
+                   r"(?m)^\s*IMPORT\s+_FREE;",
+                   r"(?m)^\s*MOV\s+RSP,\s*U64 &rsp2\[RBP\]",
+                   r"(?m)^\s*CALL\s+U64 &fp_addr\[RBP\]"):
+        if not re.search(anchor, block):
+            raise ValueError(f"CallStackGrow assembly anchor changed: {anchor!r}")
+    replacement = """// ARM64: run the variadic target on a temporary task-owned stack.
+argpop I64 CallStackGrow(I64 stack_size_threshold, I64 stack_size,
+                         /*argpop*/I64 (*fp_addr)(...), ...)
+{
+    CTaskStack *tmp;
+    I64 result;
+    if (stack_size <= 0 || !fp_addr)
+        return -1;
+    tmp = TaskStackNew(stack_size, Fs);
+    if (!tmp)
+        return -1;
+    result = ZcCallNOnStack(&tmp->stack_base,
+                            (&tmp->stack_base)(U8 *) + tmp->stack_size,
+                            fp_addr, argc, argv);
+    Free(tmp);
+    return result;
+}"""
+    text = text[:start] + replacement + text[finish:]
+    rsp_data_store = "\t*task->rsp = data;"
+    rsp_data_store_arm64 = "\tMemCopy(task->rsp(U8 *), &data, sizeof(U8 *));"
+    rsp_exit_store = "\t*task->rsp = &Exit;"
+    rsp_exit_store_arm64 = "\tMemCopy(task->rsp(U8 *), &Exit, sizeof(U8 *));"
+    if text.count(rsp_data_store) != 1 or text.count(rsp_exit_store) != 1:
+        raise ValueError("expected the pinned Spawn stack-word stores")
+    text = text.replace(rsp_data_store, rsp_data_store_arm64, 1)
+    text = text.replace(rsp_exit_store, rsp_exit_store_arm64, 1)
+    no_warn = "\tno_warn dummy;"
+    if text.count(no_warn) != 2:
+        raise ValueError("expected the pinned KTask dummy-argument suppressions")
+    # This is a compiler warning directive expressed as a pseudo-variable in
+    # upstream ZealC. The compatibility parser does not implement it; removing
+    # it has no generated-code effect.
+    text = text.replace(no_warn, "\t// ARM64 compiler: no_warn is metadata only.", 2)
+    extstr_decl = "extern I64 ZcCallExtStr(U8 *name);\n"
+    if text.count('CallExtStr("ServerStartUp");') != 1 or \
+            text.count('CallExtStr("UserStartUp");') != 1:
+        raise ValueError("expected the pinned KTask startup hooks")
+    text = extstr_decl + text
+    text = text.replace('CallExtStr("ServerStartUp");',
+                        'ZcCallExtStr("ServerStartUp");', 1)
+    text = text.replace('CallExtStr("UserStartUp");',
+                        'ZcCallExtStr("UserStartUp");', 1)
+    spawn_signature = "CTask *Spawn(U0 (*fp_start_addr)(U8 *data),"
+    if text.count(spawn_signature) != 1:
+        raise ValueError("expected the pinned Spawn signature")
     return text.encode("utf-8")
 
 

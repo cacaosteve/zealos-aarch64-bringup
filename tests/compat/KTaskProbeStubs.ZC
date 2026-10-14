@@ -1,0 +1,31 @@
+// Compile-only stand-ins for globals/functions normally established by
+// KStart64 and the block-pool memory manager. The probe never calls Spawn,
+// TaskInit, or HeapCtrlInit; these cannot substitute for that startup path.
+CBlkPool *sys_code_bp;
+CBlkPool *sys_data_bp;
+CBlkDevGlobals blkdev;
+CTask *sys_task;
+I64 sys_ctrl_alt_flags[1];
+
+// TaskQueueInsChild is defined by Sched.ZC, which is deliberately omitted
+// from this parser probe: loading the scheduler also requires hardware-only
+// external calls. KTask is compiled here, but the probe never calls Spawn.
+U0 TaskQueueInsChild(CTask *task)
+{
+}
+
+// The compatibility runtime owns the shell compiler rather than loading the
+// upstream interactive lexer module. KTask.ZC's command loop is compiled but
+// never called by this module-load probe.
+U8 *LexStatement2Bin(CCompCtrl *cc, I64 *type)
+{
+    return NULL;
+}
+
+CHeapCtrl *HeapCtrlInit(CHeapCtrl *hc=NULL, CTask *task=NULL,
+                        CBlkPool *bp=NULL)
+{
+    return hc;
+}
+
+

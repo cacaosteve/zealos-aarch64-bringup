@@ -30,6 +30,9 @@ extern I64 SwapI64(I64 *a,I64 *b);
 extern U0 Puts(U8 *text);
 // Temporary cooperative task bridge. These are not ZealOS Spawn/Yield APIs.
 extern I64 ZcTaskSpawn(I64 (*entry)());
+// AAPCS64 integer-argument trampoline on a caller-owned stack buffer.
+extern I64 ZcCallNOnStack(U8 *stack_low, U8 *stack_top,
+                          I64 (*fp_addr)(...), I64 argc, I64 *argv);
 extern I64 ZcTaskYield();
 extern I64 ZcTaskRun();
 extern I64 ZcTaskResult(I64 task_num);

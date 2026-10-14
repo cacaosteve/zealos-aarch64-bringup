@@ -286,6 +286,10 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             raise SystemExit(0)
         command('windowdemostop',
                 'windowdemo: stopped; bootstrap shell display resumed')
+        command('zload /Tests/CallNOnStack.ZC',
+                'zc: loaded /Tests/CallNOnStack.ZC')
+        command('zcall CallNOnStackChecks',
+                'zc => 0x000000000000002a')
         command('zreset', 'zc: native compiler ready')
         command('zvol', 'zvol: source partition ready' if args.pci else
                          'zvol: source partition unavailable')
@@ -391,9 +395,6 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                         'zc: loaded /System/Gr/GrScreen.ZC', timeout=30)
                 command('zload /System/Gr/GrBootBridge.ZC',
                         'zc: loaded /System/Gr/GrBootBridge.ZC', timeout=30)
-            if args.probe_module == '/Kernel/KTask.ZC':
-                command('zload /Kernel/KernelC.HH',
-                        'zc: loaded /Kernel/KernelC.HH')
             if args.probe_module == '/System/Math/MathODE.ZC':
                 # MathODE's MP task declarations (MPInt) are in KernelC, and
                 # its default math imports come from KMathB just as at boot.
@@ -401,6 +402,16 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                         'zc: loaded /Kernel/KernelC.HH')
                 command('zload /Kernel/KMathB.ZC',
                         'zc: loaded /Kernel/KMathB.ZC', timeout=30)
+            if args.probe_module == '/Kernel/KTask.ZC':
+                # KTask uses task and job declarations from KernelC and
+                # Job.ZC. The probe supplies a compile-only scheduler stub
+                # because loading Sched.ZC requires hardware-only externals.
+                command('zload /Kernel/KernelC.HH',
+                        'zc: loaded /Kernel/KernelC.HH')
+                command('zload /Kernel/Job.ZC',
+                        'zc: loaded /Kernel/Job.ZC', timeout=30)
+                command('zload /Tests/KTaskProbeStubs.ZC',
+                        'zc: loaded /Tests/KTaskProbeStubs.ZC')
             if args.probe_module == '/System/Win.ZC':
                 command('zload /Tests/TaskOdeRegistry.ZC',
                         'zc: loaded /Tests/TaskOdeRegistry.ZC')
@@ -661,6 +672,18 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             print('MODULE PROBE '+args.probe_module+'\n'+result, flush=True)
             if f'zc: loaded {args.probe_module}' not in result:
                 raise RuntimeError(f'unchanged module did not load: {args.probe_module}\n'+result)
+            if args.probe_module == '/Tests/CallNOnStack.ZC':
+                command('zcall CallNOnStackChecks',
+                        'zc => 0x000000000000002a')
+            if args.probe_module == '/Kernel/KTask.ZC':
+                command('zload /Tests/KTaskCallStackGrow.ZC',
+                        'zc: loaded /Tests/KTaskCallStackGrow.ZC')
+                command('zcall KTaskCallStackGrowChecks',
+                        'zc => 0x000000000000002a')
+                command('zcall KTaskCallBindingChecks',
+                        'zc => 0x000000000000002a')
+                command('zcall KTaskNamedHookChecks',
+                        'zc => 0x000000000000002a')
             if args.probe_module == '/System/Math/MathODE.ZC':
                 command('zload /Tests/D3Math.ZC',
                         'zc: loaded /Tests/D3Math.ZC')

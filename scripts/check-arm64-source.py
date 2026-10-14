@@ -4,7 +4,7 @@ from pathlib import Path
 import re
 import sys
 
-from arm64_source import translate_grscreen, translate_winmgr
+from arm64_source import translate_grscreen, translate_ktask, translate_winmgr
 
 root = Path(__file__).resolve().parent.parent
 source = (root / 'upstream/pinned/System/Gr/GrScreen.ZC').read_bytes()
@@ -63,6 +63,53 @@ except ValueError:
     pass
 else:
     raise AssertionError('overlay accepted a changed window-manager refresh call')
+
+ktask_source = (root / 'upstream/pinned/Kernel/KTask.ZC').read_bytes()
+ktask_overlay = translate_ktask(ktask_source).decode('utf-8')
+assert ktask_overlay != ktask_source.decode('utf-8')
+assert 'result = ZcCallNOnStack(&tmp->stack_base,' in ktask_overlay
+assert 'fp_addr, argc, argv);' in ktask_overlay
+assert 'asm {' not in ktask_overlay
+assert '#exe {Option(OPTf_NO_REG_VAR, ON);};' not in ktask_overlay
+assert '#exe {Option(OPTf_NO_REG_VAR, OFF);};' not in ktask_overlay
+assert '\tMemCopy(task->rsp(U8 *), &data, sizeof(U8 *));' in ktask_overlay
+assert '\tMemCopy(task->rsp(U8 *), &Exit, sizeof(U8 *));' in ktask_overlay
+assert ktask_overlay.count('no_warn dummy;') == 0
+assert ktask_overlay.count('no_warn is metadata only') == 2
+assert ktask_overlay.startswith('extern I64 ZcCallExtStr(U8 *name);\n')
+assert ktask_overlay.count('ZcCallExtStr("ServerStartUp");') == 1
+assert ktask_overlay.count('ZcCallExtStr("UserStartUp");') == 1
+
+try:
+    translate_ktask(ktask_source.replace(
+        b'\t*task->rsp = data;', b'\t*task->rsp = payload;', 1))
+except ValueError:
+    pass
+else:
+    raise AssertionError('KTask overlay accepted a changed Spawn data stack store')
+
+try:
+    translate_ktask(ktask_source.replace(
+        b'\t*task->rsp = &Exit;', b'\t*task->rsp = return_addr;', 1))
+except ValueError:
+    pass
+else:
+    raise AssertionError('KTask overlay accepted a changed Spawn return stack store')
+
+try:
+    translate_ktask(ktask_source.replace(
+        b'\tno_warn dummy;', b'\tno_warn unused;', 1))
+except ValueError:
+    pass
+else:
+    raise AssertionError('KTask overlay accepted a changed warning suppression')
+
+try:
+    translate_ktask(ktask_source.replace(b'LEAVE', b'ENTER', 1))
+except ValueError:
+    pass
+else:
+    raise AssertionError('KTask overlay accepted a changed CallStackGrow assembly')
 
 menu_source = (root / 'upstream/pinned/System/Menu.ZC').read_bytes()
 menu_overlay = (root / 'upstream/bootstrap/System/Menu.ZC').read_bytes()

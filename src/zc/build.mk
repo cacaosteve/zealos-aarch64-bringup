@@ -3,7 +3,7 @@
 ZC_VENDOR := $(ROOT)/third_party/aiwnios/c
 ZC_NAMES := lex parser optpass hash cque ffi_gen arm64_asm arm_backend
 ZC_VENDOR_OBJS := $(addprefix $(BUILD)/zc/,$(addsuffix .o,$(ZC_NAMES)))
-ZC_OBJS := $(ZC_VENDOR_OBJS) $(BUILD)/zc/runtime.o $(BUILD)/zc/libc.o $(BUILD)/zc/context.o $(BUILD)/zc/ffi.o
+ZC_OBJS := $(ZC_VENDOR_OBJS) $(BUILD)/zc/runtime.o $(BUILD)/zc/libc.o $(BUILD)/zc/context.o $(BUILD)/zc/ffi.o $(BUILD)/zc/ffi_call_n_on_stack.o
 ZC_FLAGS := -target aarch64-unknown-none-elf -std=gnu11 -ffreestanding \
     -fno-builtin -fPIE -fno-stack-protector -fno-stack-check \
     -ffunction-sections -fdata-sections -march=armv8-a -mcmodel=small \
@@ -23,6 +23,8 @@ $(BUILD)/zc/libc.o: src/zc/libc.c $(ZC_HEADERS) src/zc/build.mk | $(BUILD)/zc
 $(BUILD)/zc/context.o: src/zc/context.S | $(BUILD)/zc
 	$(CLANG) $(ZC_FLAGS) -c $< -o $@
 $(BUILD)/zc/ffi.o: third_party/aiwnios/asm/ffi_call_tos_aarch64.s | $(BUILD)/zc
+	$(CLANG) -target aarch64-unknown-none-elf -c $< -o $@
+$(BUILD)/zc/ffi_call_n_on_stack.o: src/zc/ffi_call_n_on_stack_aarch64.s | $(BUILD)/zc
 	$(CLANG) -target aarch64-unknown-none-elf -c $< -o $@
 .PHONY: zc-objects
 zc-objects: $(ZC_VENDOR_OBJS)

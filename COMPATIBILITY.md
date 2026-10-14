@@ -2073,7 +2073,35 @@ ZealOS live distribution or installer.
   architectural four-byte PC alignment, the supported x86 flag subset, and
   that `TSCGet` advances across guest instructions. The focused task-job probe
   and the broad upstream compatibility probe pass with these checks.
-- The unchanged `Kernel/KTask.ZC` still cannot load as a complete module: its
-  `#exe` compiler-time option directive and later x86 stack-switching assembly
-  need separate ARM64 implementations. Supporting `$$` does not make those
-  architecture-specific task-context operations portable.
+- The guarded ARM64 source bundle translates `Kernel/KTask.ZC`'s
+  `CallStackGrow` to use the AAPCS64 stack trampoline, rewrites its two
+  pointer-sized task-stack stores for the ARM64 parser, and removes two
+  warning-only pseudo-statements the parser does not implement. Its named
+  startup hooks use a host bridge for zero-argument source functions.
+- The focused PCI/QEMU KTask probe now loads the complete translated module.
+  `KTaskCallStackGrowChecks` runs the translated source function on a temporary
+  guest-allocated stack with ten integer arguments and verifies its local is
+  far from the caller's stack; separate checks exercise the ZealOS `Call`
+  primitive and the named startup-hook bridge. The probe uses
+  compile-only stubs for the scheduler child queue, heap-control initialization,
+  and interactive lexer. It does not call source `Spawn` or `TaskInit`: their
+  code/data block pools, fixed-area state, and scheduler ownership are not yet
+  integrated with the compatibility runtime's cooperative fibers.
+
+## AAPCS64 calls on a caller-owned stack
+
+- The native compiler runtime exposes `ZcCallNOnStack`, an ARM64 trampoline
+  that invokes a guest function with any number of integer arguments on a
+  caller-owned, 16-byte-aligned stack range. It preserves the caller's
+  callee-saved registers and original stack, places arguments beyond the
+  eight AAPCS64 integer registers in the callee's stack area, and rejects
+  invalid function/argument inputs or insufficient spill space.
+- `CallNOnStackChecks` covers zero, three, eight, nine, and ten arguments,
+  stack-spilled arguments, callee local placement, caller-stack preservation,
+  and rejection of an undersized range. A spawned guest fiber also yields
+  from inside the alternate-stack function, resumes there, returns through the
+  trampoline, and reports its result. The focused PCI/QEMU module probe passes.
+- `CallNOnStackChecks` tests the AAPCS64 trampoline directly, while
+  `KTaskCallStackGrowChecks` validates the translated upstream
+  `CallStackGrow` path end to end. Full upstream task creation and scheduling
+  remain unimplemented in the host-backed task runtime.
