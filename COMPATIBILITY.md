@@ -2172,6 +2172,11 @@ ZealOS live distribution or installer.
   timeout, and zero/short empty-queue deadlines. Both `python3
   scripts/check-compat.py --pci` and the ISO `python3 scripts/check-compat.py`
   passed. `python3 scripts/check-upstream.py` also passed.
+- `TaskDocLockChecks` now exercises the bridge's existing cooperative lock
+  handoff: a child yields while the parent owns a DolDoc lock, acquires it after
+  release, and unlocks it before exit. The check passed in both PCI and ISO
+  full suites. This covers the current single-CPU lock path; SMP synchronization
+  and a general wait queue remain future work.
 - The first ISO run exposed a GUI smoke check that assumed a PCI source volume;
   `BootstrapGuiShellSmoke` now accepts the documented no-source-partition
   response from its Files menu action. The rebuilt ISO then passed the full

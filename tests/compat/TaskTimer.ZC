@@ -115,6 +115,7 @@ I64 TaskTimerBackgroundChecks()
 }
 
 I64 timer_wait_code, timer_wait_arg1, timer_wait_arg2;
+I64 doc_lock_child_acquired;
 
 U0 TimerWaitMessageServer(U8 *data)
 {
@@ -127,6 +128,55 @@ U0 TimerWaitTimeoutServer(U8 *data)
 {
     timer_wait_code = ZcMessageGetTimeout(NULL, NULL,
                                           1 << MESSAGE_CMD, Fs, 5);
+}
+
+U0 DocLockContender(U8 *data)
+{
+    CDoc *doc = data;
+    if (DocLock(doc))
+    {
+        doc_lock_child_acquired = TRUE;
+        DocUnlock(doc);
+    }
+}
+
+I64 TaskDocLockChecks()
+{
+    CDoc *doc = CAlloc(sizeof(CDoc));
+    CTask *task;
+
+    doc_lock_child_acquired = FALSE;
+    if (!DocLock(doc))
+        return 1;
+    task = Spawn(&DocLockContender, doc);
+    if (!task)
+    {
+        DocUnlock(doc);
+        Free(doc);
+        return 2;
+    }
+    Sleep(1);
+    if (doc_lock_child_acquired || doc->owning_task != Fs)
+    {
+        DocUnlock(doc);
+        DeathWait(&task);
+        Free(doc);
+        return 3;
+    }
+    if (!DocUnlock(doc))
+    {
+        DeathWait(&task);
+        Free(doc);
+        return 4;
+    }
+    DeathWait(&task);
+    if (!doc_lock_child_acquired || Bt(&doc->locked_flags, DOClf_LOCKED))
+    {
+        Free(doc);
+        return 5;
+    }
+    Free(doc);
+    return 42;
 }
 
 I64 TaskTimerWaitChecks()
