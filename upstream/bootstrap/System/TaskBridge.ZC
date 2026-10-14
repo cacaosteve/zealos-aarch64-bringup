@@ -1,6 +1,7 @@
 // ARM64 bootstrap bindings for the single-CPU, cooperative subset of the
 // signatures in pinned Kernel/KTask.ZC and Kernel/Sched.ZC. The original
 // x86 assembly scheduler and task startup are not loaded here.
+#define BIBLE_FILENAME "::/Misc/Bible.TXT"
 // Pinned Message.ZC spells the x86 interrupt-mask instruction without a
 // semicolon. Preserve its queue critical section through the IF bit mapping.
 // RFlagsGet/Set expose only that bit on ARM64, not the full x86 flags word.
@@ -43,6 +44,41 @@ extern Bool DocGoToLine(CDoc *doc, I64 line);
 extern Bool DocLock(CDoc *doc);
 extern U0 DocUnlock(CDoc *doc);
 extern U8 *StrNew(U8 *source, CTask *mem_task=NULL);
+// ASCII case-insensitive substring search used by the pinned DocFind source.
+// The upstream _STRIMATCH runtime external is not implemented in this
+// AArch64 guest, so the narrow DolDoc search bridge preserves its pointer
+// return contract for ASCII document text.
+U8 *BootstrapStrIMatch(U8 *needle, U8 *haystack)
+{
+    U8 *start, *n, *h, nc, hc;
+
+    if (!needle || !haystack)
+        return NULL;
+    start = haystack;
+    while (TRUE)
+    {
+        n = needle;
+        h = start;
+        while (*n && *h)
+        {
+            nc = *n;
+            hc = *h;
+            if ('a' <= nc <= 'z')
+                nc -= 'a' - 'A';
+            if ('a' <= hc <= 'z')
+                hc -= 'a' - 'A';
+            if (nc != hc)
+                break;
+            n++;
+            h++;
+        }
+        if (!*n)
+            return start;
+        if (!*start)
+            return NULL;
+        start++;
+    }
+}
 // DocBin.ZC keeps this helper private upstream, but DocFile.ZC is loaded as a
 // separate guest module here. Export its validation work through the bridge so
 // DocSave can resolve it and binary references are renumbered before writes.

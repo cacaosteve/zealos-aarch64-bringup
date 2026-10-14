@@ -1,0 +1,16 @@
+I64 BootstrapStrIMatchChecks()
+{
+    U8 *haystack = "ZealOS arm64 DolDoc";
+
+    if (BootstrapStrIMatch("zealos", haystack) != haystack)
+        return 0;
+    if (BootstrapStrIMatch("ARM64", haystack) != haystack + 7)
+        return 0;
+    if (BootstrapStrIMatch("DOC", haystack) != haystack + 16)
+        return 0;
+    if (BootstrapStrIMatch("missing", haystack))
+        return 0;
+    if (BootstrapStrIMatch("", haystack) != haystack)
+        return 0;
+    return 42;
+}

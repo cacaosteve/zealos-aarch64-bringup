@@ -129,6 +129,25 @@ def translate_docform(source: bytes) -> bytes:
     return text.replace(bad, good, 1).encode("utf-8")
 
 
+def translate_docfind(source: bytes) -> bytes:
+    """Adapt DocFind's runtime external and unsupported array sizeof syntax."""
+    try:
+        text = source.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValueError("DocFind.ZC is not UTF-8") from exc
+    old = "StrIMatch(needle, doc_e->tag)"
+    new = "BootstrapStrIMatch(needle, doc_e->tag)"
+    if text.count(old) != 1 or text.count(new):
+        raise ValueError("expected the pinned DocFind StrIMatch call")
+    text = text.replace(old, new, 1)
+    for field in ("find_text", "replace_text"):
+        old = f"sizeof(CEdFindText.{field})"
+        if text.count(old) != 1:
+            raise ValueError(f"expected the pinned DocFind {field} array size")
+        text = text.replace(old, "STR_LEN", 1)
+    return text.encode("utf-8")
+
+
 def translate_ktask(source: bytes) -> bytes:
     """Replace KTask's x86 CallStackGrow with the tested AAPCS64 trampoline.
 

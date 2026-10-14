@@ -750,6 +750,15 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 if args.probe_module == '/System/DolDoc/DocGet.ZC':
                     command('zload /System/DolDoc/DocGet.ZC',
                             'zc: loaded /System/DolDoc/DocGet.ZC')
+                if args.probe_module == '/System/DolDoc/DocEd.ZC':
+                    command('zload /System/DolDoc/DocGet.ZC',
+                            'zc: loaded /System/DolDoc/DocGet.ZC')
+                    command('zload /System/DolDoc/DocChar.ZC',
+                            'zc: loaded /System/DolDoc/DocChar.ZC')
+                    command('zload /System/DolDoc/DocFind.ZC',
+                            'zc: loaded /System/DolDoc/DocFind.ZC')
+                    command('zload /System/DolDoc/DocLink.ZC',
+                            'zc: loaded /System/DolDoc/DocLink.ZC')
             if args.probe_module_override:
                 override_data = args.probe_module_override.read_bytes()
                 upload_source('Probe/ModuleOverride.ZC', override_data)

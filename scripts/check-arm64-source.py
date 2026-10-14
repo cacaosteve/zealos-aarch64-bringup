@@ -4,8 +4,8 @@ from pathlib import Path
 import re
 import sys
 
-from arm64_source import (translate_docform, translate_grbitmap, translate_grscreen,
-                          translate_ktask, translate_winmgr)
+from arm64_source import (translate_docfind, translate_docform, translate_grbitmap,
+                          translate_grscreen, translate_ktask, translate_winmgr)
 
 root = Path(__file__).resolve().parent.parent
 source = (root / 'upstream/pinned/System/Gr/GrScreen.ZC').read_bytes()
@@ -165,6 +165,23 @@ except ValueError:
     pass
 else:
     raise AssertionError('DocForm overlay accepted a changed bit-index expression')
+
+docfind_source = (root / 'upstream/pinned/System/DolDoc/DocFind.ZC').read_bytes()
+docfind_overlay = translate_docfind(docfind_source)
+assert docfind_overlay != docfind_source
+assert docfind_overlay.count(b'BootstrapStrIMatch(needle, doc_e->tag)') == 1
+assert b'= StrIMatch(needle, doc_e->tag)' not in docfind_overlay
+assert docfind_overlay.count(b'STR_LEN') == docfind_source.count(b'STR_LEN') + 2
+assert b'sizeof(CEdFindText.find_text)' not in docfind_overlay
+assert b'sizeof(CEdFindText.replace_text)' not in docfind_overlay
+try:
+    translate_docfind(docfind_source.replace(
+        b'StrIMatch(needle, doc_e->tag)',
+        b'BootstrapStrIMatch(needle, doc_e->tag)', 1))
+except ValueError:
+    pass
+else:
+    raise AssertionError('DocFind overlay accepted a changed call site')
 
 menu_source = (root / 'upstream/pinned/System/Menu.ZC').read_bytes()
 menu_overlay = (root / 'upstream/bootstrap/System/Menu.ZC').read_bytes()
