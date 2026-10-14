@@ -1918,8 +1918,10 @@ ZealOS live distribution or installer.
   prompting and upstream DocFile binary blocks are not implemented.
   `TaskDocDataChecks` exercises integer format/scan round-tripping and checkbox
   state synchronization; `TaskDocPlainSaveChecks` verifies a text/newline
-  save-load-save round trip; `TaskDocReadChecks` and `TaskDocWriteChecks`
-  check disk-backed read/write round trips (`0x2a`).
+  save-load-save round trip. The compatibility probe checks `FileRead` through
+  archive-relative and explicit `disk:` paths, a `FileWrite`/`FileRead`
+  round-trip, bundled `DocRead`, and writable `DocWrite` on both the PCI source
+  partition and legacy RedSea root volume (`0x2a`).
 - The bootstrap `FilesFindMatch` supports case-insensitive `*` and `?` filename
   masks separated by semicolons, which enables the unchanged DocTerm source,
   DolDoc, and include-file filters. Its filesystem traversal flags remain

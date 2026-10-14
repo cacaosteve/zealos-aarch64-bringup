@@ -4,12 +4,46 @@ I64 TaskSourceFileReadChecks()
     I64 size, attr;
     U8 *contents;
 
-    contents = FileRead("disk:Tests/TaskDocData.ZC", &size, &attr);
-    if (!contents || size <= 0 || size > 4096)
+    contents = FileRead("/Tests/TaskDocData.ZC", &size, &attr);
+    if (!contents || size <= 0 || size > 8192)
         return 1;
     if (contents[0] != '/' || contents[1] != '/' || contents[2] != ' ' ||
         contents[3] != 'S' || contents[4] != 'm')
         return 3;
+    Free(contents);
+    return 42;
+}
+
+I64 TaskDiskFileReadChecks()
+{
+    I64 size, attr;
+    U8 *contents;
+
+    contents = FileRead("disk:Tests/TaskDocData.ZC", &size, &attr);
+    if (!contents || size <= 0 || size > 8192)
+        return 1;
+    if (contents[0] != '/' || contents[1] != '/' || contents[2] != ' ' ||
+        contents[3] != 'S' || contents[4] != 'm')
+        return 2;
+    Free(contents);
+    return 42;
+}
+
+I64 TaskFileApiRoundTripChecks()
+{
+    I64 size, attr;
+    U8 *contents;
+    U8 *expected = "utm file API";
+
+    if (FileWrite("DocApiCheck.DD", expected, 12, 0, 0) != 12)
+        return 1;
+    contents = FileRead("disk:DocApiCheck.DD", &size, &attr);
+    if (!contents || size != 12 || StrCompare(contents, expected))
+    {
+        if (contents)
+            Free(contents);
+        return 2;
+    }
     Free(contents);
     return 42;
 }
@@ -20,7 +54,7 @@ I64 TaskDocReadChecks()
     U8 *saved;
     I64 size;
 
-    doc = DocRead("disk:Tests/TaskDocData.ZC");
+    doc = DocRead("/Tests/TaskDocData.ZC");
     if (!doc)
         return 1;
     saved = DocSave(doc, &size);
@@ -38,14 +72,14 @@ I64 TaskDocWriteChecks()
     U8 *saved;
     I64 size;
 
-    doc = DocNew("disk:App/DocWriteCheck.DD");
+    doc = DocNew("disk:DocWriteCheck.DD");
     if (!doc)
         return 1;
     DocLoad(doc, "persisted doc", 13);
     if (!DocWrite(doc))
         return 2;
     DocDel(doc);
-    doc = DocRead("App/DocWriteCheck.DD");
+    doc = DocRead("DocWriteCheck.DD");
     if (!doc)
         return 3;
     saved = DocSave(doc, &size);

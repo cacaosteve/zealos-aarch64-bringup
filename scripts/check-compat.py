@@ -90,7 +90,15 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                                check=True, stdout=subprocess.DEVNULL)
         cmd += ['-drive', f'if=none,format=raw,file={tmp}/disk.img,id=esp', '-device', 'virtio-blk-pci,drive=esp,bootindex=0']
     else:
-        (tmp/'redsea.img').write_bytes(bytes(65536))
+        redsea = bytearray(65536)
+        if args.probe_module == '/System/DolDoc/DocPlain.ZC':
+            # Exercise FileWrite's legacy RedSea fallback on a blank,
+            # formatted root volume, matching rs_fmt_host's on-disk layout.
+            redsea[3] = 0x88
+            struct.pack_into('<5q', redsea, 8, 0, 128, 2, 1, 7)
+            redsea[510:512] = b'\x55\xaa'
+            redsea[512] = 0x07
+        (tmp/'redsea.img').write_bytes(redsea)
         cmd += ['-drive', f'if=none,format=raw,file={tmp}/redsea.img,id=rs', '-device', 'virtio-blk-device,drive=rs', '-drive', f'if=none,file={ROOT}/build/zealos-aarch64-hello.iso,id=cd,media=cdrom,readonly=on', '-device', 'virtio-scsi-pci,id=scsi', '-device', 'scsi-cd,drive=cd,bootindex=0']
     guest = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, bufsize=0)
     buf = bytearray()
@@ -924,6 +932,11 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 command('zcall TaskFileMaskChecks',
                         'zc => 0x000000000000002a')
                 command('zcall TaskSourceFileReadChecks',
+                        'zc => 0x000000000000002a')
+                if args.pci:
+                    command('zcall TaskDiskFileReadChecks',
+                            'zc => 0x000000000000002a')
+                command('zcall TaskFileApiRoundTripChecks',
                         'zc => 0x000000000000002a')
                 command('zcall TaskDocReadChecks',
                         'zc => 0x000000000000002a')
