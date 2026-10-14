@@ -14,6 +14,7 @@ int64_t TempleOS_CallNOnStack(uint64_t stack_top, void (*fptr)(),
                               int64_t argc, int64_t *argv);
 extern int zeal_zss_entry_at(uint32_t index, char *name, size_t name_cap,
                              size_t *size_out);
+extern uint64_t zeal_zss_catalog_revision(void);
 
 /* ZealOS KernelA.HH currently defines EXT_EXTS_NUM as five. Keep a stable
  * pointer/table pair for its kernel-owned function dispatch slots; guest
@@ -648,6 +649,7 @@ static struct source_overlay_entry source_overlay_cache[4096];
 static size_t source_list_cache_count;
 static size_t source_overlay_cache_count;
 static int source_list_cache_ready;
+static uint64_t source_list_cache_revision;
 static void source_list_cache_add(const char *path, size_t size) {
     size_t length = strlen(path);
     if (source_list_cache_count >=
@@ -739,11 +741,18 @@ static void source_list_cache_build(void) {
             source_list_cache_add(path, overlay->size);
     }
     source_list_cache_ready = 1;
+    source_list_cache_revision = zeal_zss_catalog_revision();
+}
+static void source_list_cache_ensure(void) {
+    if (!source_list_cache_ready ||
+        source_list_cache_revision != zeal_zss_catalog_revision())
+        source_list_cache_build();
 }
 static int64_t host_source_file_at(int64_t *a) {
     if (a[0] < 0 || a[2] <= 0)
         return 0;
-    if (a[0] == 0 || !source_list_cache_ready)
+    if (a[0] == 0 || !source_list_cache_ready ||
+        source_list_cache_revision != zeal_zss_catalog_revision())
         source_list_cache_build();
     if ((uint64_t)a[0] >= source_list_cache_count)
         return 0;
@@ -759,8 +768,7 @@ static int64_t host_source_file_at(int64_t *a) {
 static int source_dir_exists(const char *path) {
     char name[128];
     char prefix[130];
-    size_t prefix_len;
-    if (!source_archive || !path || normal_path(path, name))
+    if (!path || normal_path(path, name))
         return 0;
     if (!*name)
         return 1;
@@ -770,31 +778,36 @@ static int source_dir_exists(const char *path) {
     memcpy(prefix, name, name_len);
     prefix[name_len] = '/';
     prefix[name_len + 1] = 0;
-    prefix_len = name_len + 1;
-    for (size_t off = 0; off <= archive_size && archive_size - off >= 512;) {
-        const unsigned char *h = source_archive + off;
-        if (!*h)
-            return 0;
-        size_t n, check;
-        if (!memchr(h, 0, 100) || memcmp(h + 257, "ustar", 5) ||
-            octal(h + 124, 12, &n) || octal(h + 148, 8, &check) ||
-            n > archive_size - off - 512)
-            return 0;
-        size_t sum = 0;
-        for (unsigned i = 0; i < 512; i++)
-            sum += i >= 148 && i < 156 ? ' ' : h[i];
-        if (sum != check)
-            return 0;
-        if ((!strcmp(name, (const char *)h) && h[156] == '5') ||
-            !strncmp((const char *)h, prefix, prefix_len))
-            return 1;
-        if (n > SIZE_MAX - 511)
-            return 0;
-        size_t padded = (n + 511) & ~(size_t)511;
-        if (padded > archive_size - off - 512)
-            return 0;
-        off += 512 + padded;
+    if (source_archive) {
+        for (size_t off = 0; off <= archive_size && archive_size - off >= 512;) {
+            const unsigned char *h = source_archive + off;
+            if (!*h) break;
+            size_t n, check;
+            if (!memchr(h, 0, 100) || memcmp(h + 257, "ustar", 5) ||
+                octal(h + 124, 12, &n) || octal(h + 148, 8, &check) ||
+                n > archive_size - off - 512)
+                break;
+            size_t sum = 0;
+            for (unsigned i = 0; i < 512; i++)
+                sum += i >= 148 && i < 156 ? ' ' : h[i];
+            if (sum != check) break;
+            if (h[156] == '5') {
+                size_t dir_len = strlen((const char *)h);
+                if (!strcmp(name, (const char *)h) ||
+                    (dir_len == name_len + 1 && h[name_len] == '/' &&
+                     !memcmp(name, h, name_len)))
+                    return 1;
+            }
+            if (n > SIZE_MAX - 511) break;
+            size_t padded = (n + 511) & ~(size_t)511;
+            if (padded > archive_size - off - 512) break;
+            off += 512 + padded;
+        }
     }
+    source_list_cache_ensure();
+    for (size_t i = 0; i < source_list_cache_count; i++)
+        if (!strncmp(source_list_cache[i].path, prefix, name_len + 1))
+            return 1;
     return 0;
 }
 static int64_t host_file_dir_exists(int64_t *a) {

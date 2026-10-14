@@ -1059,11 +1059,17 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                             'zput: saved Tests/CallNOnStack.ZC')
                     command('zput Tests/FilesFindOverlayOnly.ZC I64 OverlayOnly(){return 42;}',
                             'zput: saved Tests/FilesFindOverlayOnly.ZC')
+                    command('zput Tests/FilesFindOverlayDir/Nested/Only.ZC I64 NestedOnly(){return 42;}',
+                            'zput: saved Tests/FilesFindOverlayDir/Nested/Only.ZC')
                     command('zload disk:Tests/CallNOnStack.ZC',
                             'zc: loaded disk:Tests/CallNOnStack.ZC')
                     command('zcall NativeOverlayLoaded',
                             'zc => 0x000000000000002a')
                     command('zcall TaskFilesFindNativeOverlayChecks',
+                            'zc => 0x000000000000002a')
+                    command('zrm Tests/FilesFindOverlayDir/Nested/Only.ZC',
+                            'zrm: deleted Tests/FilesFindOverlayDir/Nested/Only.ZC')
+                    command('zcall TaskFilesFindNativeDirTombstoneChecks',
                             'zc => 0x000000000000002a')
                     command('zrm Tests/FilesFindOverlayOnly.ZC',
                             'zrm: deleted Tests/FilesFindOverlayOnly.ZC')
@@ -1517,6 +1523,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             if 'zrecv: saved App/Transfer.ZC' not in result:
                 raise RuntimeError('serial source transfer failed:\n'+result)
             print(f'PASS zrecv App/Transfer.ZC ({len(transferred)} bytes)', flush=True)
+            command('zcall TaskFilesFindNativeStreamChecks',
+                    'zc => 0x000000000000002a')
             wrong = transferred.replace(b'return 42', b'return 13')
             result = upload_source('App/Transfer.ZC', wrong, zlib.crc32(wrong) ^ 1)
             if 'zrecv: checksum mismatch; old file intact' not in result:

@@ -43,6 +43,10 @@ writable source volume before falling back to bundled files, and saves those
 absolute paths to the same persistent volume. `FilesFind` returns a merged
 view of bundled and native source files: saved replacements supply their native
 size, saved-only files appear in listings, and tombstoned files are hidden.
+Nested native-only paths also synthesize their parent directories in recursive
+directory searches, and deleting the last native file removes those synthesized
+directories from the merged view. Serial uploads refresh the same listing cache
+as ordinary saves and deletes.
 The complete unchanged upstream
 `KernelA.HH` and `KernelB.HH` load as declaration headers in that order.
 The boot terminal's OS menu includes a Window Demo entry that launches the

@@ -4780,12 +4780,14 @@ int zeal_zss_entry_at(uint32_t index, char *name, size_t name_cap,
                       size_t *size_out) {
     return zss_entry_at(index, name, name_cap, size_out);
 }
+uint64_t zeal_zss_catalog_revision(void) { return g_zss_catalog_revision; }
 #include "zc_source_editor.h"
 #else
 int zeal_zss_entry_at(uint32_t index, char *name, size_t name_cap,
                       size_t *size_out) {
     (void)index; (void)name; (void)name_cap; (void)size_out; return 0;
 }
+uint64_t zeal_zss_catalog_revision(void) { return 0; }
 #endif
 
 static void shell_handle(const char *line, int *done) {

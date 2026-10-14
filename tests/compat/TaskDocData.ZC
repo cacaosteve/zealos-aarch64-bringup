@@ -249,11 +249,64 @@ I64 TaskFilesFindNativeOverlayChecks()
         Free(de->full_name);
         Free(de);
     }
+    entries = FilesFind("Tests/FilesFindOverlayDir/Nested",
+                        FUF_JUST_DIRS | FUF_RECURSE | FUF_SINGLE);
+    found = entries && entries->full_name &&
+        !StrCompare(entries->full_name,
+                    "/Tests/FilesFindOverlayDir/Nested") && !entries->next;
+    for (de = entries; de; de = next)
+    {
+        next = de->next;
+        Free(de->full_name);
+        Free(de);
+    }
     Free(Fs->cur_dir);
     Fs->cur_dir = old_cur_dir;
     if (!found)
-        return 2;
+        return 3;
     return 42;
+}
+
+I64 TaskFilesFindNativeDirTombstoneChecks()
+{
+    CDirEntry *entries, *de, *next;
+
+    entries = FilesFind("FilesFindOverlayDir", FUF_JUST_DIRS | FUF_SINGLE);
+    if (entries)
+    {
+        for (de = entries; de; de = next)
+        {
+            next = de->next;
+            Free(de->full_name);
+            Free(de);
+        }
+        return 1;
+    }
+    return 42;
+}
+
+I64 TaskFilesFindNativeStreamChecks()
+{
+    CDirEntry *entries, *de, *next;
+    U8 *old_cur_dir;
+    Bool found = FALSE;
+
+    old_cur_dir = Fs->cur_dir;
+    Fs->cur_dir = StrNew("/App");
+    entries = FilesFind("Transfer.ZC", FUF_JUST_FILES);
+    found = entries && entries->full_name &&
+        !StrCompare(entries->full_name, "/App/Transfer.ZC");
+    for (de = entries; de; de = next)
+    {
+        next = de->next;
+        Free(de->full_name);
+        Free(de);
+    }
+    Free(Fs->cur_dir);
+    Fs->cur_dir = old_cur_dir;
+    if (found)
+        return 42;
+    return 1;
 }
 
 I64 TaskFilesFindChecks()

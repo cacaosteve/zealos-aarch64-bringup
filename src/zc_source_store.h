@@ -15,6 +15,7 @@
 static uint64_t g_zss_base = ZEAL_SRC_LBA_BASE;
 static uint32_t g_zss_sectors = ZEAL_SRC_SECTS;
 static uint32_t g_zss_generation;
+static uint64_t g_zss_catalog_revision;
 #define ZSS_CATALOG_CAP 4096u
 struct zss_catalog_item { char name[ZSS_MAX_NAME + 1]; size_t size; int status; };
 static struct zss_catalog_item g_zss_catalog[ZSS_CATALOG_CAP];
@@ -246,6 +247,7 @@ static int zss_delete(const char *name) {
     for (unsigned i = 0; i < name_len; i++) header[32 + i] = (uint8_t)name[i];
     if (!zss_sector_write(tail, header)) return -1;
     g_zss_catalog_valid = 0;
+    g_zss_catalog_revision++;
     return g_vb.flush_supported && !virtio_blk_flush_abs() ? -5 : 0;
 }
 static int zss_read(const struct zss_entry *entry, char *dst, size_t cap, size_t *out_len) {
@@ -311,6 +313,7 @@ static int zss_put(const char *name, const char *src, size_t len) {
     for (unsigned i = 0; i < name_len; i++) sector[32 + i] = (uint8_t)name[i];
     if (!zss_sector_write(tail, sector)) return -1;
     g_zss_catalog_valid = 0;
+    g_zss_catalog_revision++;
     return g_vb.flush_supported && !virtio_blk_flush_abs() ? -5 : 0;
 }
 
@@ -449,5 +452,7 @@ static int zss_stream_finish(struct zss_stream *s) {
     zss_w32(header + 20, s->name_len);
     for (unsigned i = 0; i < s->name_len; i++) header[32 + i] = (uint8_t)s->name[i];
     if (!zss_sector_write(s->tail, header)) return -1;
+    g_zss_catalog_valid = 0;
+    g_zss_catalog_revision++;
     return g_vb.flush_supported && !virtio_blk_flush_abs() ? -5 : 0;
 }
