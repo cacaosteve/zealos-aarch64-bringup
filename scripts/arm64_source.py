@@ -119,6 +119,7 @@ argpop I64 CallStackGrow(I64 stack_size_threshold, I64 stack_size,
     extstr_decl = (
         "extern I64 ZcCallExtStr(U8 *name);\n"
         "extern Bool ZcTaskValidate(CTask *task);\n"
+        "extern Bool ZcTaskKill(CTask *task, Bool wait=TRUE, Bool just_break=FALSE);\n"
         "extern CTask *ZcSpawn(U0 (*fp_start_addr)(U8 *data), U8 *data=NULL, "
         "U8 *task_name=NULL, I64 target_cpu=-1, CTask *parent=NULL, "
         "I64 stack_size=0, I64 flags=1 << JOBf_ADD_TO_QUE);\n"
@@ -148,6 +149,23 @@ argpop I64 CallStackGrow(I64 stack_size_threshold, I64 stack_size,
     return ZcTaskValidate(task);
 }
 """ + text[validate_end:]
+    kill_signature = "Bool Kill(CTask *task, Bool wait=TRUE, Bool just_break=FALSE)"
+    if text.count(kill_signature) != 1:
+        raise ValueError("expected the pinned Kill signature")
+    kill_start = text.index(kill_signature)
+    kill_end_anchor = "\nBool Suspend(CTask *task=NULL, Bool state=TRUE)"
+    if text.count(kill_end_anchor) != 1:
+        raise ValueError("expected the pinned Kill function boundary")
+    kill_end = text.index(kill_end_anchor, kill_start)
+    kill_body = text[kill_start:kill_end]
+    if (kill_body.count("LBts(&task->task_flags, TASKf_KILL_TASK);") != 1 or
+            kill_body.count("while (TaskValidate(task) && Bt(") != 1):
+        raise ValueError("pinned Kill flag/wait path changed")
+    text = text[:kill_start] + """Bool Kill(CTask *task, Bool wait=TRUE, Bool just_break=FALSE)
+{
+    return ZcTaskKill(task, wait, just_break);
+}
+""" + text[kill_end:]
     spawn_signature = "CTask *Spawn(U0 (*fp_start_addr)(U8 *data),"
     if text.count(spawn_signature) != 1:
         raise ValueError("expected the pinned Spawn signature")

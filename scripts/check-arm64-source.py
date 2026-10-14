@@ -75,6 +75,7 @@ assert '#exe {Option(OPTf_NO_REG_VAR, OFF);};' not in ktask_overlay
 assert 'return ZcSpawn(fp_start_addr, data, task_name, target_cpu, parent,' in ktask_overlay
 assert 'stack_size, flags);' in ktask_overlay
 assert 'return ZcTaskValidate(task);' in ktask_overlay
+assert 'return ZcTaskKill(task, wait, just_break);' in ktask_overlay
 assert '0 < task <= I32_MAX' not in ktask_overlay
 assert 'TaskQueueInsChild(task);' not in ktask_overlay
 assert 'MemCopy(task->rsp(U8 *), &data, sizeof(U8 *));' not in ktask_overlay
@@ -84,6 +85,7 @@ assert ktask_overlay.startswith('extern I64 ZcCallExtStr(U8 *name);\n')
 assert ktask_overlay.count('ZcCallExtStr("ServerStartUp");') == 1
 assert ktask_overlay.count('ZcCallExtStr("UserStartUp");') == 1
 assert 'extern Bool ZcTaskValidate(CTask *task);' in ktask_overlay
+assert 'extern Bool ZcTaskKill(CTask *task,' in ktask_overlay
 assert 'extern CTask *ZcSpawn(' in ktask_overlay
 
 try:
@@ -101,6 +103,15 @@ except ValueError:
     pass
 else:
     raise AssertionError('KTask overlay accepted a changed TaskValidate range check')
+
+try:
+    translate_ktask(ktask_source.replace(
+        b'LBts(&task->task_flags, TASKf_KILL_TASK);',
+        b'LBtr(&task->task_flags, TASKf_KILL_TASK);', 1))
+except ValueError:
+    pass
+else:
+    raise AssertionError('KTask overlay accepted a changed Kill flag path')
 
 try:
     translate_ktask(ktask_source.replace(

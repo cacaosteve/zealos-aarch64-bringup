@@ -1,5 +1,6 @@
 I64 KTaskCallStackGrowSeenSP;
 I64 KTaskSpawnValue;
+I64 KTaskKillStarted;
 
 I64 KTaskCallStackGrowSum10(I64 a, I64 b, I64 c, I64 d, I64 e,
                            I64 f, I64 g, I64 h, I64 i, I64 j)
@@ -75,5 +76,23 @@ I64 KTaskSpawnBridgeChecks()
     DeathWait(&child);
     if (KTaskSpawnValue != 42 || TaskValidate(child))
         return 2;
+    return 0x2a;
+}
+
+U0 KTaskKillWorker(U8 *data)
+{
+    KTaskKillStarted = 1;
+    while (TRUE) Yield;
+}
+
+I64 KTaskKillBridgeChecks()
+{
+    CTask *child;
+    KTaskKillStarted = 0;
+    child = Spawn(&KTaskKillWorker);
+    if (!TaskValidate(child)) return 1;
+    Yield;
+    if (KTaskKillStarted != 1 || !TaskValidate(child)) return 2;
+    if (!Kill(child) || TaskValidate(child)) return 3;
     return 0x2a;
 }

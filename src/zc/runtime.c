@@ -3935,6 +3935,7 @@ static int load_inner(const char *path) {
     if (!strcmp(path, "/Kernel/KTask.ZC")) {
         PrsBindCSymbol("ZcCallExtStr", host_call_ext_str, 1);
         PrsBindCSymbol("ZcTaskValidate", host_task_validate, 1);
+        PrsBindCSymbol("ZcTaskKill", host_kill, 3);
         PrsBindCSymbol("ZcSpawn", host_spawn, 7);
     }
     /* Source units can introduce fresh extern declarations after KernelC.HH
@@ -4313,6 +4314,7 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
     } bindings[] = {{"MAlloc", host_malloc, 2}, {"CAlloc", host_calloc, 2},
                     {"Call", host_call, 1}, {"ZcCallExtStr", host_call_ext_str, 1},
                     {"ZcTaskValidate", host_task_validate, 1},
+                    {"ZcTaskKill", host_kill, 3},
                     {"ZcSpawn", host_spawn, 7},
                     {"Free", host_free, 1},  {"MSize", host_msize, 1},
                     /* MSize2 is ZealOS internal size; alias requested size for now. */
