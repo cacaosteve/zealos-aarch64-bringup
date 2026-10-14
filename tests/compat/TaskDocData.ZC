@@ -139,7 +139,12 @@ I64 TaskFileFindDirectoryFilterChecks()
 
     if (!FileFind("/Tests/TaskDocData.ZC"))
         return 1;
-    if (FileFind("/Tests/TaskDocData.ZC", NULL, FUF_JUST_DIRS))
+    if (FileFind("/Tests/TaskDocData.ZC", NULL, FUF_JUST_DIRS) ||
+        !FileFind("/Tests/", &de, FUF_JUST_DIRS) ||
+        !(de.attr & RS_ATTR_DIR) || de.size ||
+        StrCompare(de.name, "Tests") || !de.full_name ||
+        StrCompare(de.full_name, "/Tests") ||
+        FileFind("/NoSuchDirectory", NULL, FUF_JUST_DIRS))
         return 2;
     if (!FileFind("/Tests/TaskDocData.ZC", NULL, FUF_JUST_SRC))
         return 3;

@@ -3344,6 +3344,15 @@ Freeze catalog unchanged.
 | Smoke | `TaskFileFindDirectoryFilterChecks` sets a nested current directory and verifies both file metadata and absolute-path resolution find `/LICENSE/Aiwnios.txt`; `make check-docfile-persistence` passes |
 | Limits | Directory enumeration and real ZealOS directory records remain unimplemented; only files accessible through the bundled archive or writable source volume can match |
 
+## Milestone 298 — recognize bundled source directories
+
+| Item | Path |
+|--|--|
+| Gap | `FUF_JUST_DIRS` always failed because the source archive exposes files but no guest filesystem directory records |
+| Bring-up | Infer non-empty directories from source-archive member paths, support directory metadata in `FileFind`, and retain parent search for directory paths |
+| Smoke | `TaskFileFindDirectoryFilterChecks` checks `/Tests` directory attributes/name/path and rejects a nonexistent directory; `make check-docfile-persistence` passes |
+| Limits | Directory entry enumeration, empty directories, and directories created only on the writable source volume remain unsupported |
+
 ## Open compatibility probe — `/System/Win.ZC`
 
 The source probe loads pinned `KernelC.HH`, `Externs.ZC`, and `Gr.HH` before compiling unchanged `Win.ZC`. Graphics dimensions and mouse globals are probe fixtures; `DrawMenu` and the initial `GrScaleZoom` definition are compile-time fixtures until unchanged `GrScreen.ZC` is loaded later in the probe. `GrScreenFinalUpdateChecks` executes `WinFinalUpdate` through the staged idle-frame path, confirms the fixture's `mouse_grid.coord` toggles the real coordinate-text overlay, checks a separate visible guest overlay callback, verifies the software arrow against Limine framebuffer pixels, and exercises `WinMouseUpdate`'s edge recentering through the runtime dispatch. `WinMousePointerStateCheck` covers transformed tablet coordinates and `WinMouseHardStateCheck` covers the source mouse-state ABI; manual UTM acceptance confirms the software pointer and window-demo mouse interaction. The raw ARM generic-timer binding and a standalone F64 clock expression are smoke-tested before the Win load.
@@ -3370,8 +3379,9 @@ been verified through a manual edit-and-reopen cycle.
 
 ## Milestone — source file filters
 
-The source-backed `FileFind` bridge now rejects regular files for
-`FUF_JUST_DIRS`, filters `.TXT`/`.txt`, `.DD`, `.ZC`, `.HH`, `.AOT`, `.JIT`,
+The source-backed `FileFind` bridge now recognizes non-empty directories
+implied by bundled archive paths for `FUF_JUST_DIRS` and rejects regular files
+for that filter. It filters `.TXT`/`.txt`, `.DD`, `.ZC`, `.HH`, `.AOT`, `.JIT`,
 and `.GR`, and combines requested type filters as alternatives. With
 `FUF_SCAN_PARENTS`, relative names search the current directory and each
 parent through `/`; both `FileFind` metadata and `FileNameAbs` preserve the
@@ -3379,7 +3389,8 @@ resolved path. It populates the bounded leaf name, full path, file size, and
 archive attribute in `CDirEntry`. The PCI persistence probe verifies
 metadata, real `.txt`, `.DD`, source-file and parent-directory matches, and
 synthetic suffix and combined-filter cases for `.AOT`, `.JIT`, and `.GR`.
-Directory enumeration and real ZealOS directory records remain unimplemented.
+Directory enumeration, empty directories, and real ZealOS directory records
+remain unimplemented.
 
 ## Acceptance
 

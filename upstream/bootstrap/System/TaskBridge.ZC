@@ -31,6 +31,7 @@ extern I64 ZcFbTextCellsDrawn();
 extern I64 ZcFbTextFlush(U32 *text_base, I64 stride, I64 rows);
 extern U8 *FileRead(U8 *filename, I64 *_size=NULL, I64 *_attr=NULL);
 extern I64 FileWrite(U8 *filename, U8 *fbuf, I64 size, I64 cdt=0, I64 attr=0);
+extern Bool ZcSourceDirExists(U8 *path);
 extern CDoc *DocNew(U8 *filename=NULL, CTask *task=NULL);
 extern U0 DocDel(CDoc *doc);
 extern CDoc *DocRead(U8 *name=NULL, I64 flags=0);
@@ -1430,11 +1431,23 @@ Bool BootstrapFileFindPath(U8 *filename, I64 fuf_flags, U8 *resolved,
         return FALSE;
     for (i = 0; i <= filename_len; i++)
         resolved[i] = filename[i];
-    contents = FileRead(resolved, size);
-    if (contents)
+    if (fuf_flags & FUF_JUST_DIRS)
     {
-        Free(contents);
-        return TRUE;
+        if (ZcSourceDirExists(resolved))
+        {
+            if (size)
+                *size = 0;
+            return TRUE;
+        }
+    }
+    else
+    {
+        contents = FileRead(resolved, size);
+        if (contents)
+        {
+            Free(contents);
+            return TRUE;
+        }
     }
     // Parent lookup only applies to relative names. Disk-qualified and
     // absolute paths already identify a specific source-volume location.
@@ -1455,15 +1468,31 @@ Bool BootstrapFileFindPath(U8 *filename, I64 fuf_flags, U8 *resolved,
             candidate[j++] = '/';
         for (i = 0; i <= filename_len; i++)
             candidate[j + i] = filename[i];
-        contents = FileRead(candidate, size);
-        if (contents)
+        if (fuf_flags & FUF_JUST_DIRS)
         {
-            for (i = 0; candidate[i] && i < resolved_cap - 1; i++)
-                resolved[i] = candidate[i];
-            resolved[i] = 0;
-            Free(contents);
-            Free(dir);
-            return TRUE;
+            if (ZcSourceDirExists(candidate))
+            {
+                if (size)
+                    *size = 0;
+                for (i = 0; candidate[i] && i < resolved_cap - 1; i++)
+                    resolved[i] = candidate[i];
+                resolved[i] = 0;
+                Free(dir);
+                return TRUE;
+            }
+        }
+        else
+        {
+            contents = FileRead(candidate, size);
+            if (contents)
+            {
+                for (i = 0; candidate[i] && i < resolved_cap - 1; i++)
+                    resolved[i] = candidate[i];
+                resolved[i] = 0;
+                Free(contents);
+                Free(dir);
+                return TRUE;
+            }
         }
         last = StrLastOcc(dir, "/");
         if (!last)
@@ -1492,14 +1521,19 @@ Bool FileFind(U8 *filename, CDirEntry *_de=NULL, I64 fuf_flags=0)
     if (!filename || !*filename)
         return FALSE;
     if (_de) {}
-    // The source bridge has regular files but no directory records.
-    if (fuf_flags & FUF_JUST_DIRS)
+    if ((fuf_flags & FUF_JUST_DIRS) && (fuf_flags & FUF_JUST_FILES))
         return FALSE;
     if (!BootstrapFileFindTypeMatch(filename, fuf_flags))
         return FALSE;
     if (!BootstrapFileFindPath(filename, fuf_flags, resolved,
                                sizeof(resolved), &size))
         return FALSE;
+    if (fuf_flags & FUF_JUST_DIRS)
+    {
+        filename_len = StrLen(resolved);
+        while (filename_len > 1 && resolved[filename_len - 1] == '/')
+            resolved[--filename_len] = 0;
+    }
     if (_de)
     {
         _de->next = NULL;
@@ -1520,6 +1554,8 @@ Bool FileFind(U8 *filename, CDirEntry *_de=NULL, I64 fuf_flags=0)
         _de->name[filename_len] = 0;
         _de->clus = 0;
         _de->attr = RS_ATTR_ARCHIVE;
+        if (fuf_flags & FUF_JUST_DIRS)
+            _de->attr = RS_ATTR_DIR;
         _de->size = size;
         _de->datetime = 0;
     }

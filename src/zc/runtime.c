@@ -632,6 +632,50 @@ static const unsigned char *source_find(const char *path, size_t *size) {
     }
     return NULL;
 }
+static int source_dir_exists(const char *path) {
+    char name[128];
+    char prefix[130];
+    size_t prefix_len;
+    if (!source_archive || !path || normal_path(path, name))
+        return 0;
+    if (!*name)
+        return 1;
+    size_t name_len = strlen(name);
+    if (name_len + 1 >= sizeof(prefix))
+        return 0;
+    memcpy(prefix, name, name_len);
+    prefix[name_len] = '/';
+    prefix[name_len + 1] = 0;
+    prefix_len = name_len + 1;
+    for (size_t off = 0; off <= archive_size && archive_size - off >= 512;) {
+        const unsigned char *h = source_archive + off;
+        if (!*h)
+            return 0;
+        size_t n, check;
+        if (!memchr(h, 0, 100) || memcmp(h + 257, "ustar", 5) ||
+            octal(h + 124, 12, &n) || octal(h + 148, 8, &check) ||
+            n > archive_size - off - 512)
+            return 0;
+        size_t sum = 0;
+        for (unsigned i = 0; i < 512; i++)
+            sum += i >= 148 && i < 156 ? ' ' : h[i];
+        if (sum != check)
+            return 0;
+        if ((!strcmp(name, (const char *)h) && h[156] == '5') ||
+            !strncmp((const char *)h, prefix, prefix_len))
+            return 1;
+        if (n > SIZE_MAX - 511)
+            return 0;
+        size_t padded = (n + 511) & ~(size_t)511;
+        if (padded > archive_size - off - 512)
+            return 0;
+        off += 512 + padded;
+    }
+    return 0;
+}
+static int64_t host_file_dir_exists(int64_t *a) {
+    return source_dir_exists((const char *)(uintptr_t)a[0]);
+}
 static int disk_name(const char *path, char name[128]) {
     if (strncmp(path, "disk:", 5) || normal_path(path + 5, name)) return -1;
     size_t n = strlen(name);
@@ -4233,6 +4277,7 @@ static int load_inner(const char *path) {
          * the bridge helpers below, so calls compiled in TaskBridge resolve. */
         PrsBindCSymbol("FileRead", host_file_read, 3);
         PrsBindCSymbol("FileWrite", host_file_write, 5);
+        PrsBindCSymbol("ZcSourceDirExists", host_file_dir_exists, 1);
         PrsBindCSymbol("LowPass1", host_low_pass1, 4);
         /* These functions were pre-registered before TaskBridge introduced
          * their extern declarations, so bind them again now that the symbols
