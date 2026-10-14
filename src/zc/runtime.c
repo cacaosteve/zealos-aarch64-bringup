@@ -3986,6 +3986,37 @@ static int64_t host_exe_print(int64_t *a) {
     f->source_job_active--;
     return result;
 }
+static int64_t host_exe_print2(int64_t *a) {
+    const char *format = (const char *)(uintptr_t)a[0];
+    const char *expression = (const char *)(uintptr_t)a[1];
+    char source[4160];
+    static const char *const formats[] = {
+        "ToI64(%s);",
+        "ToF64(%s);"
+    };
+    size_t length = 0;
+    int supported = 0;
+
+    if (!format || !expression)
+        zc_fail("ExePrint2 requires a supported format and expression");
+    for (size_t i = 0; i < sizeof(formats) / sizeof(formats[0]); i++) {
+        if (!strcmp(format, formats[i])) {
+            supported = 1;
+            break;
+        }
+    }
+    if (!supported)
+        zc_fail("ExePrint2 format is not supported by the ARM64 bootstrap");
+    while (length <= 4096 && expression[length])
+        length++;
+    if (length > 4096)
+        zc_fail("ExePrint2 expression exceeds 4096 bytes");
+    snprintf(source, sizeof(source), "ToI64(%s);", expression);
+    if (!strcmp(format, "ToF64(%s);"))
+        snprintf(source, sizeof(source), "ToF64(%s);", expression);
+    return host_exe_print((int64_t[]){(int64_t)(uintptr_t)"%s",
+                                       (int64_t)(uintptr_t)source});
+}
 static int64_t host_print(int64_t *a);
 /* Bounded text formatter shared by Print and StrPrintJoin. Supports the
  * markers and codes used by Message.ZC, Job.ZC, and upstream progress UI. */
@@ -4176,6 +4207,7 @@ static int load_inner(const char *path) {
         PrsBindCSymbol("ZcActiveMouseGlobals", host_active_mouse_globals, 0);
         PrsBindCSymbol("ZcActiveWinMgrGlobals", host_active_winmgr_globals, 0);
         PrsBindCSymbol("ZcSetWinMgrTask", host_set_winmgr_task, 1);
+        PrsBindCSymbol("ExePrint2", host_exe_print2, 2);
     }
     if (!strcmp(path, "/System/GuiTerminal.ZC"))
         PrsBindCSymbol("ZcGuiShellExec", zc_gui_shell_exec, 1);
@@ -4347,6 +4379,7 @@ static int load_inner(const char *path) {
         PrsBindCSymbolNaked("AIWNIOS_SetJmp", zc_setjmp, 1);
         PrsBindCSymbol("throw", host_guest_throw, 2);
         PrsBindCSymbol("ExePrint", host_exe_print, 2);
+        PrsBindCSymbol("ExePrint2", host_exe_print2, 2);
         PrsBindCSymbol("Print", host_print, 3);
         PrsBindCSymbol("ZcGuiShellExec", zc_gui_shell_exec, 1);
         PrsBindCSymbol("StrPrintJoin", host_str_print_join, 4);
@@ -4604,7 +4637,9 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
                     {"ZcFbScreenWidth", host_fb_screen_width, 0},
                     {"ZcFbScreenHeight", host_fb_screen_height, 0},
                     {"ZcFbTaskTextCompose", host_fb_task_text_compose, 5},
-                    {"ZcFbShellTextCompose", host_fb_shell_text_compose, 2}};
+                    {"ZcFbShellTextCompose", host_fb_shell_text_compose, 2},
+                    {"ExePrint", host_exe_print, 2},
+                    {"ExePrint2", host_exe_print2, 2}};
     for (size_t i = 0; i < sizeof(bindings) / sizeof(*bindings); i++)
         PrsBindCSymbol((char *)bindings[i].name, (void *)bindings[i].fn, bindings[i].arity);
     __clear_cache(code_arena, code_arena + sizeof(code_arena));

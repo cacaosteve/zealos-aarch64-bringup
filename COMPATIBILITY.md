@@ -1949,9 +1949,11 @@ ZealOS live distribution or installer.
   editor modules. `BootstrapStrIMatchChecks` covers mixed-case matches,
   offsets, misses, and the empty needle (`0x2a`).
 - This is source-load coverage, not a complete interactive editor. Dynamic
-  expression evaluation (`ExePrint2`) remains unimplemented, and popup/form
-  paths still use cancel-only or no-op bridge functions. Those pieces must be
-  wired before claiming interactive form/editor support.
+  expression evaluation is now bridged for DolDoc's `ToI64(%s)` and
+  `ToF64(%s)` numeric prompt templates, with a 4096-byte expression bound;
+  `TaskExePrint2Checks` covers integer and floating results. Popup/form paths
+  still use cancel-only or no-op bridge functions, so interactive form/editor
+  support remains incomplete.
 
 ## Unchanged DolDoc `DocRecalcLib` + cursor helpers
 

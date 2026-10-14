@@ -1,0 +1,21 @@
+extern I64 ExePrint2(U8 *format, U8 *expression);
+
+I64 TaskExePrint2Checks()
+{
+    I64 integer_value;
+    F64 float_value;
+
+    integer_value = ExePrint2("ToI64(%s);", "6*7");
+    if (integer_value != 42 || Fs->answer != 42 ||
+        Fs->answer_type != RT_I64)
+        return 1;
+
+    float_value = ExePrint2("ToF64(%s);", "2.5*4.0")(F64);
+    if (float_value != 10.0 || Fs->answer_type != RT_F64)
+        return 2;
+
+    integer_value = ExePrint2("ToI64(%s);", "7+5");
+    if (integer_value != 12 || Fs->answer != 12)
+        return 3;
+    return 0x2a;
+}

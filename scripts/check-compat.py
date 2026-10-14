@@ -322,6 +322,10 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                             'zc: loaded /Kernel/KernelB.HH')
                     command('zload /Kernel/KMathB.ZC',
                             'zc: loaded /Kernel/KMathB.ZC', timeout=30)
+                    command('zload /Kernel/KernelC.HH',
+                            'zc: loaded /Kernel/KernelC.HH', timeout=30)
+                    command('zload /System/TaskBridge.ZC',
+                            'zc: loaded /System/TaskBridge.ZC', timeout=30)
                 guest.stdin.write(f'zload disk:Probe/Source{i}.ZC\r'.encode()); guest.stdin.flush()
                 print('SOURCE PROBE '+str(source)+'\n'+until(b'\n> '), flush=True)
                 if args.probe_source_call:

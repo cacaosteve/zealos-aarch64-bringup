@@ -171,10 +171,9 @@ extern U0 throw(I64 ch=0, Bool no_log=FALSE);
 // InputFilterTask and Job.ZC: ExePrint("%s", source). Other formats remain
 // compiler-runtime work.
 extern I64 ExePrint(U8 *format, U8 *source);
-// The expression-returning ExePrint2 path is declared for the unchanged
-// DocGet numeric prompt helpers; dynamic expression evaluation is not yet
-// implemented by the bootstrap compiler.
-extern I64 ExePrint2(U8 *format, ...);
+// DolDoc's numeric prompts use these two bounded source templates. The ARM64
+// host bridge evaluates only ToI64(%s) and ToF64(%s), with a 4096-byte input.
+extern I64 ExePrint2(U8 *format, U8 *expression);
 // Aiwnios lowers bare string statements to Print(format, argc, argv).
 // The bridge renders a bounded text subset until ZealOS StrPrintJoin/Doc
 // output is available. Styling markers used by CharGet are stripped.
