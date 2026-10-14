@@ -3333,7 +3333,7 @@ Freeze catalog unchanged.
 | Gap | The new `edit <path>` command reached upstream `Ed()`, but file opening stopped at unimplemented `Silent`, `FileNameCheck`, and `FileFind` bridge functions |
 | Bring-up | Implement task-local silent-state save/restore, conservative filename validation, and source-backed file existence checks through `FileRead`; extend the graphical-terminal smoke to open a small bundled file with `EDF_BAIL` |
 | Smoke | `make check-doced-popup` exercises the real editor entry point without opening a UI and passes; `check-upstream.py`, `check-arm64-source.py`, and `git diff --check` pass |
-| Limits | `FileFind` is an existence probe for source-backed paths and does not yet populate directory entries or implement directory-scan flags; interactive typing and saving still need UTM acceptance |
+| Limits | `FileFind` still does not populate directory entries or scan parents; only the source and directory-only filters are implemented. Interactive typing and saving still need UTM acceptance |
 
 ## Open compatibility probe — `/System/Win.ZC`
 
@@ -3358,6 +3358,14 @@ contents. `TaskDocAbsoluteSourceWriteChecks` exercises the complete create,
 save, and read-back path on the PCI guest. Interactive editing in UTM still
 needs a hands-on keyboard test; the source-backed graphical editor has not yet
 been verified through a manual edit-and-reopen cycle.
+
+## Milestone — source file filters
+
+The source-backed `FileFind` bridge now rejects regular files for
+`FUF_JUST_DIRS` and implements `FUF_JUST_SRC` for `.ZC` and `.HH` paths. The
+PCI persistence probe verifies positive source matches and rejects a saved
+`.DD` document under the source filter. Other file categories, directory
+metadata, parent scanning, and directory enumeration remain unimplemented.
 
 ## Acceptance
 

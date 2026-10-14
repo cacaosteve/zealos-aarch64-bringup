@@ -1380,10 +1380,21 @@ Bool FileNameCheck(U8 *filename)
 Bool FileFind(U8 *filename, CDirEntry *_de=NULL, I64 fuf_flags=0)
 {
     U8 *contents;
+    I64 filename_len;
     if (!filename || !*filename)
         return FALSE;
     if (_de) {}
-    if (fuf_flags) {}
+    // The source bridge has regular files but no directory records.
+    if (fuf_flags & FUF_JUST_DIRS)
+        return FALSE;
+    if (fuf_flags & FUF_JUST_SRC)
+    {
+        filename_len = StrLen(filename);
+        if (filename_len < 3 || filename[filename_len - 3] != '.' ||
+            (StrCompare(filename + filename_len - 3, ".ZC") &&
+             StrCompare(filename + filename_len - 3, ".HH")))
+            return FALSE;
+    }
     contents = FileRead(filename);
     if (!contents)
         return FALSE;

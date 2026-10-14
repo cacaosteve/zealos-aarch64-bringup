@@ -131,6 +131,19 @@ I64 TaskDocAbsoluteSourceWriteChecks()
     return 42;
 }
 
+I64 TaskFileFindDirectoryFilterChecks()
+{
+    if (!FileFind("/Tests/TaskDocData.ZC"))
+        return 1;
+    if (FileFind("/Tests/TaskDocData.ZC", NULL, FUF_JUST_DIRS))
+        return 2;
+    if (!FileFind("/Tests/TaskDocData.ZC", NULL, FUF_JUST_SRC))
+        return 3;
+    if (FileFind("/Tests/DocSourceWriteCheck.DD", NULL, FUF_JUST_SRC))
+        return 4;
+    return 42;
+}
+
 I64 TaskDocDataChecks()
 {
     CDoc *doc;
