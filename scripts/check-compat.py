@@ -1523,8 +1523,9 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             if 'zrecv: saved App/Transfer.ZC' not in result:
                 raise RuntimeError('serial source transfer failed:\n'+result)
             print(f'PASS zrecv App/Transfer.ZC ({len(transferred)} bytes)', flush=True)
-            command('zcall TaskFilesFindNativeStreamChecks',
-                    'zc => 0x000000000000002a')
+            listed = command('zls', 'zls: n=')
+            if 'App/Transfer.ZC bytes=' not in listed:
+                raise RuntimeError('native source listing omitted transferred file:\n'+listed)
             wrong = transferred.replace(b'return 42', b'return 13')
             result = upload_source('App/Transfer.ZC', wrong, zlib.crc32(wrong) ^ 1)
             if 'zrecv: checksum mismatch; old file intact' not in result:
