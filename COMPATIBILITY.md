@@ -1784,7 +1784,7 @@ ZealOS live distribution or installer.
   `sys_macro_task` / `sys_macro_head`, `sys_task`, `IsSingleUser`,
   `ExtDefault`, and `Drive2Letter`. Host bindings cover `AbsI64`, zeroed
   `sys_semas`, and a bounded `StrPrintJoin` shared with `Print` (`%s`/`%c`/
-  `%C`/`%d`/`%%`, DolDoc `$$…$$` markers stripped).
+  `%C`/`%d`/`%x`/`%X`/`%%`, DolDoc `$$…$$` markers stripped).
 - Cooperative task switches now save and restore each fiber's live IF bit, so
   pinned `TaskWait` can `Yield` under `PUSHFD`/`CLI` the way the x86 path
   does. Bridge-only `TaskExeChecks` still encode host flag restrictions

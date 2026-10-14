@@ -4080,7 +4080,7 @@ static size_t format_text(char *output, size_t capacity, const char *format,
             continue;
         }
         if (code != 'c' && code != 'C' && code != 's' && code != 'd' &&
-            code != 'f' && code != 'F')
+            code != 'x' && code != 'X' && code != 'f' && code != 'F')
             zc_fail("format code is unsupported");
         if (arg >= argc)
             zc_fail("format needs another argument");
@@ -4105,6 +4105,19 @@ static size_t format_text(char *output, size_t capacity, const char *format,
             *end = 0;
             for (const char *p = number; *p; p++)
                 FMT_BYTE(*p);
+        } else if (code == 'x' || code == 'X') {
+            static const char lower_digits[] = "0123456789abcdef";
+            static const char upper_digits[] = "0123456789ABCDEF";
+            const char *digits = code == 'X' ? upper_digits : lower_digits;
+            uint64_t value = (uint64_t)argv[arg++];
+            char reversed[16];
+            size_t n = 0;
+            do {
+                reversed[n++] = digits[value & 0xF];
+                value >>= 4;
+            } while (value && n < sizeof(reversed));
+            while (n)
+                FMT_BYTE(reversed[--n]);
         } else {
             int64_t value = argv[arg++];
             char digits[32];

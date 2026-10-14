@@ -15,6 +15,10 @@ I64 PopupBridgeChecks()
         popup_bridge_value != 44 || Fs->popup_task)
         return 6;
 
+    if (PopUpPrint("popup_bridge_value=0x%X; 42;", 0x2C) != 42 ||
+        popup_bridge_value != 44 || Fs->popup_task)
+        return 7;
+
     if (PopUp("popup_bridge_value=43;", NULL, &child) || !child)
         return 2;
     if (ZcTaskRun != 1 || TaskValidate(child) || popup_bridge_value != 43)
