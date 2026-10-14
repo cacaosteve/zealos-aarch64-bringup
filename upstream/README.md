@@ -3371,6 +3371,15 @@ Freeze catalog unchanged.
 | Smoke | `BootstrapGuiTerminalSmoke` asserts the full state; `make check-compat-pci` verifies `0x3f` and nonzero presented frames |
 | Limits | PCI smoke passes, but live UTM still needs an eyes-on `zstatus` after boot to distinguish UTM-specific frame presentation from a guest window-state failure |
 
+## Milestone 301 — count pixels in framebuffer scanout
+
+| Item | Path |
+|--|--|
+| Gap | A nonzero presented-frame count did not prove that the graphical terminal had painted visible pixels; the black-screen report persisted despite healthy task/window metadata |
+| Bring-up | Add `scanout: nonblack_pixels=... of ...` to `zstatus`, counting non-black 32-bit pixels in the actual framebuffer |
+| Smoke | `make check-compat-pci` checks the framebuffer diagnostic format alongside window-state bits and frame count |
+| Limits | The first immediate PCI status can precede the first actual draw; the live UTM pixel count remains the deciding evidence for the black-screen fault |
+
 ## Open compatibility probe — `/System/Win.ZC`
 
 The source probe loads pinned `KernelC.HH`, `Externs.ZC`, and `Gr.HH` before compiling unchanged `Win.ZC`. Graphics dimensions and mouse globals are probe fixtures; `DrawMenu` and the initial `GrScaleZoom` definition are compile-time fixtures until unchanged `GrScreen.ZC` is loaded later in the probe. `GrScreenFinalUpdateChecks` executes `WinFinalUpdate` through the staged idle-frame path, confirms the fixture's `mouse_grid.coord` toggles the real coordinate-text overlay, checks a separate visible guest overlay callback, verifies the software arrow against Limine framebuffer pixels, and exercises `WinMouseUpdate`'s edge recentering through the runtime dispatch. `WinMousePointerStateCheck` covers transformed tablet coordinates and `WinMouseHardStateCheck` covers the source mouse-state ABI; manual UTM acceptance confirms the software pointer and window-demo mouse interaction. The raw ARM generic-timer binding and a standalone F64 clock expression are smoke-tested before the Win load.

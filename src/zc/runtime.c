@@ -329,6 +329,7 @@ extern uint64_t zeal_fb_text_cols(void), zeal_fb_text_rows(void);
 extern uint64_t zeal_fb_screen_width(void), zeal_fb_screen_height(void);
 extern uint64_t zeal_fb_pitch_bytes(void), zeal_fb_bits_per_pixel(void);
 extern uint64_t zeal_fb_address(void);
+extern uint64_t zeal_fb_nonblack_pixels(void);
 extern uint64_t zeal_fb_task_frame_begin(uint8_t *surface, uint32_t *rgba,
                                          uint64_t stride, uint64_t rows);
 extern uint64_t zeal_fb_task_frame_end(uint64_t use_rgba);
@@ -5161,6 +5162,7 @@ int zc_reset_session(void) {
 void zc_status(void) {
     size_t used[2] = {0}, blocks[2] = {0};
     int64_t gui_terminal_window = 0;
+    uint64_t scanout_nonblack = zeal_fb_nonblack_pixels();
     for (unsigned a = 0; a < 2; a++)
         for (struct block *b = arenas[a]; b; b = b->next)
             if (b->used) {
@@ -5177,6 +5179,9 @@ void zc_status(void) {
         zc_call("BootstrapGuiTerminalWindowState", &gui_terminal_window) == 0)
         printf("gterm_window=0x%08lx task/show/display_doc/put_doc/border_doc/geometry\n",
                (unsigned long)gui_terminal_window);
+    printf("scanout: nonblack_pixels=%lu of %lu\n",
+           (unsigned long)scanout_nonblack,
+           (unsigned long)(zeal_fb_screen_width() * zeal_fb_screen_height()));
 }
 int zc_selftest(void) {
     int64_t result = 0;

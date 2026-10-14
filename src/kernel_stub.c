@@ -560,6 +560,19 @@ uint64_t zeal_fb_pitch_bytes(void) { return g_fb_pitch; }
 uint64_t zeal_fb_bits_per_pixel(void) { return g_fb_bpp; }
 uint64_t zeal_fb_address(void) { return (uint64_t)(uintptr_t)g_fb; }
 
+uint64_t zeal_fb_nonblack_pixels(void) {
+    uint64_t count = 0;
+    if (!g_fb || g_fb_bpp != 32 || g_fb_pitch < g_fb_w * sizeof(uint32_t))
+        return 0;
+    for (uint64_t y = 0; y < g_fb_h; y++) {
+        const volatile uint32_t *row =
+            (const volatile uint32_t *)(g_fb + y * g_fb_pitch);
+        for (uint64_t x = 0; x < g_fb_w; x++)
+            count += (row[x] & 0x00ffffffu) != 0;
+    }
+    return count;
+}
+
 uint64_t zeal_fb_task_frame_begin(uint8_t *surface, uint32_t *rgba,
                                   uint64_t stride, uint64_t rows) {
     if (!g_fb || !surface || stride < g_fb_w || rows < g_fb_h ||
