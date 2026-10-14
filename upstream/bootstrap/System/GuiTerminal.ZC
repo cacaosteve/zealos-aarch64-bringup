@@ -179,6 +179,27 @@ U8 *BootstrapGuiTerminalMenuAction(I64 action)
     return NULL;
 }
 
+Bool BootstrapGuiTerminalEditCommand(U8 *command, U8 **path)
+{//Keep the interactive editor inside the guest terminal task, not host shell.
+    if (path)
+        *path = NULL;
+    if (!command || command[0] != 'e' || command[1] != 'd' ||
+        command[2] != 'i' || command[3] != 't' ||
+        (command[4] && command[4] != ' ' && command[4] != '\t'))
+        return FALSE;
+    if (!path)
+        return TRUE;
+    if (!command[4])
+    {
+        *path = command + 4;
+        return TRUE;
+    }
+    *path = command + 5;
+    while (**path == ' ' || **path == '\t')
+        (*path)++;
+    return TRUE;
+}
+
 U0 BootstrapGuiTerminalTask(U8 *data)
 {
     I64 ch, sc;
@@ -189,7 +210,7 @@ U0 BootstrapGuiTerminalTask(U8 *data)
     I64 i;
     U8 command[256];
     U8 history[256];
-    U8 *output;
+    U8 *output, *edit_path;
 
     command[0] = 0;
     history[0] = 0;
@@ -215,9 +236,19 @@ U0 BootstrapGuiTerminalTask(U8 *data)
                 command[command_len] = 0;
                 BootstrapGuiTerminalHistorySave(history, &history_len,
                                                 command, command_len);
-                output = ZcGuiShellExec(command);
-                if (output)
-                    DocPrint(DocPut, "%s", output);
+                if (BootstrapGuiTerminalEditCommand(command, &edit_path))
+                {
+                    if (!*edit_path)
+                        DocPrint(DocPut, "usage: edit <path>\n");
+                    else
+                        Ed(edit_path);
+                }
+                else
+                {
+                    output = ZcGuiShellExec(command);
+                    if (output)
+                        DocPrint(DocPut, "%s", output);
+                }
                 command_len = 0;
                 command_pos = 0;
                 command[0] = 0;
@@ -326,6 +357,7 @@ I64 BootstrapGuiTerminalSmoke()
     I64 command_pos = 0;
     U8 command[256];
     U8 history[256];
+    U8 *edit_path;
 
     // The normal ARM64 boot already starts this task. In that configuration
     // the smoke confirms boot left a valid terminal instead of trying to
@@ -375,6 +407,17 @@ I64 BootstrapGuiTerminalSmoke()
                                           "", 0) != 0x2a ||
             command_len || command[0])
             return 41;
+        StrCopy(command, "edit /Kernel/KernelA.HH");
+        if (!BootstrapGuiTerminalEditCommand(command, &edit_path) ||
+            StrCompare(edit_path, "/Kernel/KernelA.HH"))
+            return 48;
+        StrCopy(command, "editor /Kernel/KernelA.HH");
+        if (BootstrapGuiTerminalEditCommand(command, &edit_path))
+            return 49;
+        StrCopy(command, "edit");
+        if (!BootstrapGuiTerminalEditCommand(command, &edit_path) ||
+            *edit_path)
+            return 50;
         if (BootstrapGuiTerminalBufferSet(command, &command_len,
                                           "x", 256) != 0 || command_len)
             return 40;
