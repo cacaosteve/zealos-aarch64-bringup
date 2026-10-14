@@ -66,6 +66,12 @@ I64 KTaskSpawnBridgeChecks()
     if (child->task_name[0] != 'K') return 13;
     child_num = BirthWait(&child);
     if (child_num != child->task_num) return 14;
+    Suspend(child, TRUE);
+    if (!IsSuspended(child)) return 15;
+    Yield;
+    if (KTaskSpawnValue) return 16;
+    Suspend(child, FALSE);
+    if (IsSuspended(child)) return 17;
     DeathWait(&child);
     if (KTaskSpawnValue != 42 || TaskValidate(child))
         return 2;
