@@ -1953,10 +1953,13 @@ ZealOS live distribution or installer.
   the existing DolDoc modules. Guarded ARM64 source translations fix the
   `DocForm` `LBtr` bit index, route `DocFind`'s unsupported `StrIMatch` external
   through the ASCII `BootstrapStrIMatch` bridge, and replace two unsupported
-  member-array `sizeof` expressions with their `STR_LEN` array size. The guest
-  probe now compiles and loads the full form, input, cursor, find, link, and
-  editor modules. `BootstrapStrIMatchChecks` covers mixed-case matches,
-  offsets, misses, and the empty needle (`0x2a`).
+  member-array `sizeof` expressions with their `STR_LEN` array size. The normal
+  graphical-terminal boot now loads `DocFile` and the full form, input, cursor,
+  find, link, and editor chain before starting the terminal. The PCI boot check
+  confirms the terminal still starts with that chain loaded, and
+  `make check-doced-popup` separately checks `PopUpEd`'s detached task and
+  generated editor command. `BootstrapStrIMatchChecks` covers mixed-case
+  matches, offsets, misses, and the empty needle (`0x2a`).
 - This is source-load coverage, not a complete interactive editor. Dynamic
   expression evaluation is now bridged for DolDoc's `ToI64(%s)` and
   `ToF64(%s)` numeric prompt templates, with a 4096-byte expression bound;

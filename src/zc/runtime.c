@@ -4794,6 +4794,16 @@ int zc_start_gui_terminal(void) {
         "/System/DolDoc/DocRecalcLib.ZC",
         "/System/DolDoc/DocHighlight.ZC",
         "/System/DolDoc/DocRecalc.ZC",
+        /* Make the pinned document/file/editor stack available to the normal
+         * graphical shell instead of leaving Ed as a source-load-only path. */
+        "/System/DolDoc/DocFile.ZC",
+        "/System/DolDoc/DocRun.ZC",
+        "/System/DolDoc/DocForm.ZC",
+        "/System/DolDoc/DocGet.ZC",
+        "/System/DolDoc/DocChar.ZC",
+        "/System/DolDoc/DocFind.ZC",
+        "/System/DolDoc/DocLink.ZC",
+        "/System/DolDoc/DocEd.ZC",
         "/System/GuiTerminal.ZC",
     };
     int64_t result = 0;
