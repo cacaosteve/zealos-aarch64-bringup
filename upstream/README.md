@@ -3357,9 +3357,9 @@ Freeze catalog unchanged.
 
 | Item | Path |
 |--|--|
-| Gap | Absolute source reads and loads could ignore edited native files, and a deleted native copy could fall through to its bundled archive version |
-| Bring-up | Prefer native source records over archive members for absolute and root-relative paths; propagate tombstone status so deleted archive paths stay hidden |
-| Smoke | `TaskFileFindTombstoneChecks` confirms `FileFind` hides a bundled path after its native override is deleted; the PCI test also loads and calls an absolute-path native override; `make check-docfile-persistence` passes |
+| Gap | A deleted native copy could fall through to its bundled archive version, and root-relative file reads ignored native overrides |
+| Bring-up | Prefer native source records for absolute and root-relative file reads; propagate tombstone status so deleted archive paths stay hidden. Keep ordinary `/path` module loads on the current bundled archive; use `disk:` to explicitly load a native source file |
+| Smoke | `TaskFileFindTombstoneChecks` confirms `FileFind` hides a bundled path after its native override is deleted; the PCI test loads and calls a native override through `disk:`; `make check-docfile-persistence` passes |
 | Limits | Current-directory resolution for arbitrary relative paths and directory listing are separate filesystem gaps |
 
 ## Open compatibility probe — `/System/Win.ZC`
@@ -3399,7 +3399,8 @@ archive attribute in `CDirEntry`. The PCI persistence probe verifies
 metadata, real `.txt`, `.DD`, source-file and parent-directory matches, and
 synthetic suffix and combined-filter cases for `.AOT`, `.JIT`, and `.GR`.
 Native source records now override bundled members for absolute and root-relative
-loads, and tombstones mask bundled paths. Directory enumeration, empty
+file reads, and tombstones mask bundled paths. `zload /path` uses the fresh
+bundle while `zload disk:path` explicitly loads a native source file. Directory enumeration, empty
 directories, and real ZealOS directory records remain unimplemented.
 
 ## Acceptance

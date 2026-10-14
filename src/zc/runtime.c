@@ -4268,17 +4268,15 @@ static int execute_source(const char *path, const char *src) {
 static int load_inner(const char *path) {
     size_t n;
     char *src;
-    char *owned = NULL;
     if (!strncmp(path, "disk:", 5)) {
         src = disk_copy(path, &n, NULL);
     } else {
-        const unsigned char *s = source_file_find(path, &n, &owned);
+        const unsigned char *s = source_find(path, &n);
         src = s ? malloc(n + 1) : NULL;
         if (src) {
             memcpy(src, s, n);
             src[n] = 0;
         }
-        free(owned);
     }
     if (!src) {
         printf("zc: source not found: %s\n", path);

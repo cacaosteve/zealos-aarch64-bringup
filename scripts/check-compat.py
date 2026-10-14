@@ -1055,8 +1055,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                             'zc => 0x000000000000002a')
                     command('zput Tests/CallNOnStack.ZC I64 NativeOverlayLoaded(){return 42;}',
                             'zput: saved Tests/CallNOnStack.ZC')
-                    command('zload /Tests/CallNOnStack.ZC',
-                            'zc: loaded /Tests/CallNOnStack.ZC')
+                    command('zload disk:Tests/CallNOnStack.ZC',
+                            'zc: loaded disk:Tests/CallNOnStack.ZC')
                     command('zcall NativeOverlayLoaded',
                             'zc => 0x000000000000002a')
                     command('zrm Tests/CallNOnStack.ZC',
