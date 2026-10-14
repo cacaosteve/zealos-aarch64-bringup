@@ -422,6 +422,19 @@ Bool IsMute()
 {
     return FALSE;
 }
+Bool IsSilent()
+{
+    return Bt(&Fs->display_flags, DISPLAYf_SILENT);
+}
+Bool Silent(Bool val=ON)
+{
+    Bool old = IsSilent();
+    if (val)
+        Bts(&Fs->display_flags, DISPLAYf_SILENT);
+    else
+        Btr(&Fs->display_flags, DISPLAYf_SILENT);
+    return old;
+}
 U0 User(U8 *fmt=NULL, ...)
 {
     if (fmt) {}
@@ -1347,12 +1360,35 @@ U8 *DirFile(U8 *dirname, U8 *name=NULL, U8 *ext=NULL)
     if (ext) {}
     return NULL;
 }
+Bool FileNameCheck(U8 *filename)
+{
+    U8 *ptr = filename;
+    if (!ptr || !*ptr)
+        return FALSE;
+    // KernelC's filesystem checker is not linked into this bootstrap runtime.
+    // Keep the guest-side check conservative while accepting ordinary names.
+    while (*ptr)
+    {
+        if (*ptr < ' ' || *ptr == '/' || *ptr == '\\' || *ptr == ':' ||
+            *ptr == '*' || *ptr == '?' || *ptr == '"' || *ptr == '<' ||
+            *ptr == '>' || *ptr == '|')
+            return FALSE;
+        ptr++;
+    }
+    return TRUE;
+}
 Bool FileFind(U8 *filename, CDirEntry *_de=NULL, I64 fuf_flags=0)
 {
-    if (filename) {}
+    U8 *contents;
+    if (!filename || !*filename)
+        return FALSE;
     if (_de) {}
     if (fuf_flags) {}
-    return FALSE;
+    contents = FileRead(filename);
+    if (!contents)
+        return FALSE;
+    Free(contents);
+    return TRUE;
 }
 U8 *FileNameAbs(U8 *filename, I64 fuf_flags=0)
 {

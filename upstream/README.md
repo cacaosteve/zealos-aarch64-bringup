@@ -3326,6 +3326,15 @@ Freeze catalog unchanged.
 | Smoke | `BootstrapGuiTerminalSmoke` covers valid, empty, and near-match edit commands; `make check-compat-pci` passes with exit 0, and `make check-docfile-persistence` passes plain/formatted save, source/disk read, and file API round-trip checks |
 | Limits | The boot module list includes the editor dependencies, but opening, typing, and saving a document with UTM keyboard input still needs interactive acceptance |
 
+## Milestone 296 — connect the editor to bootstrap file services
+
+| Item | Path |
+|--|--|
+| Gap | The new `edit <path>` command reached upstream `Ed()`, but file opening stopped at unimplemented `Silent`, `FileNameCheck`, and `FileFind` bridge functions |
+| Bring-up | Implement task-local silent-state save/restore, conservative filename validation, and source-backed file existence checks through `FileRead`; extend the graphical-terminal smoke to open a small bundled file with `EDF_BAIL` |
+| Smoke | `make check-doced-popup` exercises the real editor entry point without opening a UI and passes; `check-upstream.py`, `check-arm64-source.py`, and `git diff --check` pass |
+| Limits | `FileFind` is an existence probe for source-backed paths and does not yet populate directory entries or implement directory-scan flags; interactive typing and saving still need UTM acceptance |
+
 ## Open compatibility probe — `/System/Win.ZC`
 
 The source probe loads pinned `KernelC.HH`, `Externs.ZC`, and `Gr.HH` before compiling unchanged `Win.ZC`. Graphics dimensions and mouse globals are probe fixtures; `DrawMenu` and the initial `GrScaleZoom` definition are compile-time fixtures until unchanged `GrScreen.ZC` is loaded later in the probe. `GrScreenFinalUpdateChecks` executes `WinFinalUpdate` through the staged idle-frame path, confirms the fixture's `mouse_grid.coord` toggles the real coordinate-text overlay, checks a separate visible guest overlay callback, verifies the software arrow against Limine framebuffer pixels, and exercises `WinMouseUpdate`'s edge recentering through the runtime dispatch. `WinMousePointerStateCheck` covers transformed tablet coordinates and `WinMouseHardStateCheck` covers the source mouse-state ABI; manual UTM acceptance confirms the software pointer and window-demo mouse interaction. The raw ARM generic-timer binding and a standalone F64 clock expression are smoke-tested before the Win load.

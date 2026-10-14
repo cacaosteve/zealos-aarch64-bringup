@@ -418,6 +418,10 @@ I64 BootstrapGuiTerminalSmoke()
         if (!BootstrapGuiTerminalEditCommand(command, &edit_path) ||
             *edit_path)
             return 50;
+        // Bail mode exercises the real DocEd entry point and source-volume
+        // read path without opening an interactive editor during boot tests.
+        if (!Ed("/Tests/TaskAssertFun.ZC", 0x100))
+            return 51;
         if (BootstrapGuiTerminalBufferSet(command, &command_len,
                                           "x", 256) != 0 || command_len)
             return 40;
