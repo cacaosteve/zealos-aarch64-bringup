@@ -2089,7 +2089,8 @@ ZealOS live distribution or installer.
   verifies its parent/name and data, pauses and resumes it through source
   `Suspend`/`IsSuspended`, and checks both normal completion and source `Kill`
   reclamation while preserving the Window Manager protection. Separate checks
-  exercise the ZealOS `Call` primitive and named startup-hook bridge. The probe
+  exercise its task-end callback exactly once, the ZealOS `Call` primitive,
+  and named startup-hook bridge. The probe
   uses compile-only stubs for heap-control initialization and the interactive
   lexer. Full
   upstream `TaskInit`, its code/data block pools, and custom CPU, stack-size,

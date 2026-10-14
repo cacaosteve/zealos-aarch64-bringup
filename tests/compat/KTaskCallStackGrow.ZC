@@ -1,6 +1,7 @@
 I64 KTaskCallStackGrowSeenSP;
 I64 KTaskSpawnValue;
 I64 KTaskKillStarted;
+I64 KTaskKillCallbackCount;
 
 I64 KTaskCallStackGrowSum10(I64 a, I64 b, I64 c, I64 d, I64 e,
                            I64 f, I64 g, I64 h, I64 i, I64 j)
@@ -85,17 +86,25 @@ U0 KTaskKillWorker(U8 *data)
     while (TRUE) Yield;
 }
 
+U0 KTaskKillEndCallback()
+{
+    KTaskKillCallbackCount++;
+}
+
 I64 KTaskKillBridgeChecks()
 {
     CTask *child;
     KTaskKillStarted = 0;
+    KTaskKillCallbackCount = 0;
     child = Spawn(&KTaskKillWorker);
     if (!TaskValidate(child)) return 1;
     Yield;
     if (KTaskKillStarted != 1 || !TaskValidate(child)) return 2;
+    child->task_end_cb = &KTaskKillEndCallback;
     sys_winmgr_task = child;
     if (Kill(child) || !TaskValidate(child)) return 3;
     sys_winmgr_task = NULL;
-    if (!Kill(child) || TaskValidate(child)) return 4;
+    if (!Kill(child) || TaskValidate(child) || KTaskKillCallbackCount != 1)
+        return 4;
     return 0x2a;
 }
