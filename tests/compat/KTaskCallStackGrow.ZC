@@ -106,6 +106,14 @@ I64 KTaskSpawnBridgeChecks()
     if (KTaskSpawnValue != 625 || !KTaskCallStackGrowSeenSP ||
         TaskValidate(child)) return 6;
 
+    // Exercise the inclusive stack-size ceiling without a deep call chain.
+    KTaskSpawnValue = 0;
+    child = Spawn(&KTaskSpawnWorker, &value, "KTaskStackMax",
+                  -1, parent, 2 * 1024 * 1024, 1 << 8);
+    if (!TaskValidate(child)) return 8;
+    DeathWait(&child);
+    if (KTaskSpawnValue != 42 || TaskValidate(child)) return 9;
+
     // The guest arena intentionally caps task stacks at the upstream default.
     if (Spawn(&KTaskSpawnWorker, NULL, "KTaskStackTooLarge",
               -1, parent, 2 * 1024 * 1024 + 1, 1 << 8)) return 7;

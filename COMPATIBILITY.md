@@ -2131,14 +2131,16 @@ ZealOS live distribution or installer.
 
 - Source `Spawn` now accepts a custom stack size through the pinned argument
   list, up to the upstream 2 MiB default. Stacks larger than the bridge's
-  64 KiB default are allocated from a separate bounded arena owner and retained
-  until that completed fiber slot is reused, avoiding reclamation while the
-  fiber is still executing on its own stack. Requests smaller than 64 KiB use
-  the existing minimum stack; values over 2 MiB are rejected.
+  64 KiB default are allocated under a separate owner in the bounded shared
+  data arena and retained until that completed fiber slot is reused, avoiding
+  reclamation while the fiber is still executing on its own stack. Requests
+  smaller than 64 KiB use the existing minimum stack; values over 2 MiB are
+  rejected.
 - `KTaskSpawnBridgeChecks` recurses through 25 frames each containing a 4 KiB
   local array on a requested 131073-byte stack, validates the result and stack
-  local, and checks that an over-limit request returns `NULL`. The focused
-  PCI/QEMU `/Kernel/KTask.ZC` probe passes with these checks.
+  local, verifies a simple worker completes on an exact 2 MiB stack, and checks
+  that an over-limit request returns `NULL`. The focused PCI/QEMU
+  `/Kernel/KTask.ZC` probe passes with these checks.
 - `SpawnQueue` carries the optional stack size through `CJob.aux2`; its
   compatibility test repeats the deep-stack check through the queued path.
 - This remains the cooperative host-fiber path, not ZealOS `TaskInit` or its
