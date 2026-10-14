@@ -3349,6 +3349,16 @@ The parser now resolves a later guest `extern` global to an earlier guest defini
 
 This remains a bring-up probe, not a complete running desktop. The task-geometry bridge, source graphics-context initialization, pixel hit-test helper, guest task control-queue initialization, CPU-pointer inheritance for synthetic tasks, and task-ring insertion/removal are implemented and tested. The disposable live-start probe starts unchanged `WinMgrTask`, verifies a timer-woken scan, consumes a tablet sample through source `WinMouseUpdate`, and drives a synthetic title-bar drag through the source manager to check focus and geometry. The shell can start and stop the manager, but normal boot-time menu/music startup, remaining `GrAsm` routines, and ordinary kernel task/application initialization still need porting or real implementations. Q32.32 identity and X/Y/Z matrix operations are bridged; arbitrary-angle 3D sprite transforms and interactive view-angle controls remain open.
 
+## Milestone — graphical editor persistence
+
+`DocWrite` can now save absolute ZealOS paths such as `/Tests/...` to the
+writable source volume. Subsequent reads resolve that saved copy before the
+bundled archive, so editing an upstream file does not reopen stale bundled
+contents. `TaskDocAbsoluteSourceWriteChecks` exercises the complete create,
+save, and read-back path on the PCI guest. Interactive editing in UTM still
+needs a hands-on keyboard test; the source-backed graphical editor has not yet
+been verified through a manual edit-and-reopen cycle.
+
 ## Acceptance
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).

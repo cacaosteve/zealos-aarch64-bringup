@@ -4092,6 +4092,8 @@ static int zc_write_source(const char *path, const char *src, size_t len) {
         return -1;
     if (str_startswith(name, "disk:"))
         name += 5;
+    while (*name == '/')
+        name++;
     if (!zss_name_ok(name, NULL))
         return -1;
     if (zss_available())

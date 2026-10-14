@@ -667,6 +667,16 @@ static const unsigned char *source_file_find(const char *path, size_t *length,
         *owned = disk_copy(path, length);
         return (const unsigned char *)*owned;
     }
+    // Absolute ZealOS paths refer to the writable source volume first, then
+    // fall back to the bundled source archive. This lets Ed reopen saved edits
+    // instead of silently displaying the original bundled copy.
+    if (path[0] == '/' && strlen(path) <= 95) {
+        char disk_path[101] = "disk:";
+        memcpy(disk_path + 5, path, strlen(path) + 1);
+        *owned = disk_copy(disk_path, length);
+        if (*owned)
+            return (const unsigned char *)*owned;
+    }
     data = source_find(path, length);
     if (!data && path[0] != '/' && strlen(path) <= 95) {
         char disk_path[101] = "disk:";

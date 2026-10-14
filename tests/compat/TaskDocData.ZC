@@ -107,6 +107,30 @@ I64 TaskDocWriteChecks()
     return 42;
 }
 
+I64 TaskDocAbsoluteSourceWriteChecks()
+{
+    CDoc *doc;
+    I64 size;
+    U8 *contents;
+    U8 *expected = "absolute source edit";
+
+    doc = DocNew("/Tests/DocSourceWriteCheck.DD");
+    if (!doc)
+        return 1;
+    DocLoad(doc, expected, StrLen(expected));
+    DocWrite(doc);
+    DocDel(doc);
+    contents = FileRead("/Tests/DocSourceWriteCheck.DD", &size);
+    if (!contents || size != StrLen(expected) || StrCompare(contents, expected))
+    {
+        if (contents)
+            Free(contents);
+        return 2;
+    }
+    Free(contents);
+    return 42;
+}
+
 I64 TaskDocDataChecks()
 {
     CDoc *doc;

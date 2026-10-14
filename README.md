@@ -38,8 +38,10 @@ using the disk's second source bank. `zedit <path>` opens a guest line editor;
 `j`/`k` move the selected line, `[`/`]` page through the file, and `g`/`G`
 jump to its first or last line. It also supports `p`, `a`, `i`, `c`, `d`, `wq`
 and `q!` commands, as well as numbered-line edits. Saved files load through
-`zload disk:<path>`. The complete unchanged upstream `KernelA.HH` and
-`KernelB.HH` load as declaration headers in that order.
+`zload disk:<path>`. The graphical editor reads absolute `/...` paths from the
+writable source volume before falling back to bundled files, and saves those
+absolute paths to the same persistent volume. The complete unchanged upstream
+`KernelA.HH` and `KernelB.HH` load as declaration headers in that order.
 The boot terminal's OS menu includes a Window Demo entry that launches the
 two-window move/resize fixture and restores the terminal when the demo stops.
 The unchanged `KMathB.ZC` also loads with ARM64 bindings for task-local `Fs`,
