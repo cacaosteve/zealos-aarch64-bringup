@@ -38,7 +38,7 @@ I64 SpawnBridgeChecks()
     spawn_root = root;
     spawn_first = 1;
     spawn_second = 2;
-    if (!TaskValidate(root) || Spawn(&SpawnWorker, NULL, "Bad", 0))
+    if (!TaskValidate(root) || Spawn(&SpawnWorker, NULL, "Bad", 1))
         return 1;
     root_used_before = root->data_heap->used_u8s;
     root_buf = MAlloc(16);

@@ -238,9 +238,10 @@ system has one guest CPU. The auxiliary arguments must retain their defaults.
 `mp_count` reports 1. Precompiled CPU-0 callbacks can yield or sleep
 cooperatively on the executive's stack; they still cannot self-kill or
 recursively dispatch jobs in this bootstrap.
-`Spawn` accepts the default target CPU (`-1`) or explicit CPU 0, with the
-default stack and queue flag. Other CPU IDs, custom stacks and alternate
-flags are rejected. `ZcTaskSpawn`/`ZcTaskYield`/`ZcTaskRun`/`ZcTaskResult` remain
+`Spawn` accepts the default target CPU (`-1`) or explicit CPU 0 and the normal
+queue flag. Its 64 KiB default stack can be overridden up to 2 MiB; requests
+below 64 KiB are rounded up to the bridge's minimum. Other CPU IDs and
+alternate flags are rejected. `ZcTaskSpawn`/`ZcTaskYield`/`ZcTaskRun`/`ZcTaskResult` remain
 temporary test bridges; `ZcTaskRun` pumps cooperative tasks to completion.
 ARM64 atomic byte operations implement
 `Bt`/`LBts`/`LBtr`, the physical counter supplies `TSCGet`, and an F64 host
@@ -313,8 +314,10 @@ oracle are needed before broad language compatibility can be claimed.
   Descendant teardown runs each child's end callback on its own task. There is
   no message-based exit, timed message/task wait or general wait queue yet.
   A later entry records a bounded cooperative `Sleep`.
-  `DeathWait(send_exit=TRUE)` fails explicitly because the `XTalk` task-exit
-  protocol is not implemented. `BirthWait` and `DeathWait` park cooperative tasks; a root
+  `DeathWait(send_exit=TRUE)` gives a not-yet-started target a cooperative
+  slice so it can install its end callback, then requests the supported local
+  teardown path; the full `XTalk` task-exit message protocol is not implemented.
+  `BirthWait` and `DeathWait` park cooperative tasks; a root
   wait that cannot progress fails the native session instead of hanging. It
   also applies to `TaskWait`; a task that has ended or has an invalid input
   filter makes `TaskWait` return, as upstream does. Message delivery is
@@ -875,10 +878,11 @@ ZealOS live distribution or installer.
   of the four app slots, marks its `CJob` done, and returns the resulting
   `CTask *` to the waiting caller. A direct `JobQueue` spawn request exposes
   the same `spawned_task` field before `JobResScan` consumes it.
-- This bridge accepts target CPU 0, the default queue flag, default stack
-  size, and a live parent (root when omitted). It returns `NULL` for unsupported
-  CPU, stack or flag options, and when all app slots are occupied. It has no
-  SMP scheduling or configurable stacks.
+- This bridge accepts target CPU 0, the default queue flag, a live parent
+  (root when omitted), and stack requests through 2 MiB; requests below the
+  64 KiB minimum use that minimum. It returns `NULL` for unsupported CPU,
+  over-limit stack or flag options, and when all app slots are occupied. It
+  has no SMP scheduling.
 - `TaskSpawnQueueChecks` exercises the return pointer, task name and parent,
   callback argument, direct `CJob` result, parent-child cleanup, and the
   four-child capacity limit. The rebuilt ISO and PCI upstream probes returned
@@ -2099,9 +2103,10 @@ ZealOS live distribution or installer.
   exercise its task-end callback exactly once, the ZealOS `Call` primitive,
   and named startup-hook bridge. The probe
   uses compile-only stubs for heap-control initialization and the interactive
-  lexer. Full upstream `TaskInit`, its code/data block pools, and custom stack
-  or flags options remain outside this bridge; other CPU IDs and `Kill`'s
-  debug-break mode are not implemented by the host runtime.
+  lexer. Full upstream `TaskInit` and its code/data block pools remain outside
+  this bridge; alternate flags, other CPU IDs and `Kill`'s debug-break mode are
+  also not implemented by the host runtime. Custom task stacks up to 2 MiB are
+  separately covered by `KTaskSpawnBridgeChecks`.
 
 ## AAPCS64 calls on a caller-owned stack
 
@@ -2118,6 +2123,25 @@ ZealOS live distribution or installer.
   trampoline, and reports its result. The focused PCI/QEMU module probe passes.
 - `CallNOnStackChecks` tests the AAPCS64 trampoline directly, while
   `KTaskCallStackGrowChecks` validates the translated upstream
-  `CallStackGrow` path end to end. Source `Spawn` now covers the default
-  single-CPU task path through host-backed cooperative fibers; full upstream
-  task initialization and scheduler integration remain unimplemented.
+  `CallStackGrow` path end to end. Source `Spawn` covers the single-CPU task
+  path through host-backed cooperative fibers; full upstream task
+  initialization and scheduler integration remain unimplemented.
+
+## Custom stacks in the cooperative Spawn bridge
+
+- Source `Spawn` now accepts a custom stack size through the pinned argument
+  list, up to the upstream 2 MiB default. Stacks larger than the bridge's
+  64 KiB default are allocated from a separate bounded arena owner and retained
+  until that completed fiber slot is reused, avoiding reclamation while the
+  fiber is still executing on its own stack. Requests smaller than 64 KiB use
+  the existing minimum stack; values over 2 MiB are rejected.
+- `KTaskSpawnBridgeChecks` recurses through 25 frames each containing a 4 KiB
+  local array on a requested 128 KiB stack, validates the result and stack
+  local, and checks that an over-limit request returns `NULL`. The focused
+  PCI/QEMU `/Kernel/KTask.ZC` probe passes with these checks.
+- `SpawnQueue` carries the optional stack size through `CJob.aux2`; its
+  compatibility test repeats the deep-stack check through the queued path.
+- This remains the cooperative host-fiber path, not ZealOS `TaskInit` or its
+  block-pool-backed scheduler. The four-child limit, CPU-0-only scheduling,
+  64 KiB minimum stack, 2 MiB maximum, and supported queue flags remain bridge
+  constraints.

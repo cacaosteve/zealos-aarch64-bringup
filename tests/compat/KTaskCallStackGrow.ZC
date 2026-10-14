@@ -3,6 +3,19 @@ I64 KTaskSpawnValue;
 I64 KTaskKillStarted;
 I64 KTaskKillCallbackCount;
 
+I64 KTaskDeepStack(I64 depth)
+{
+    U64 frame[512];
+    frame[0] = depth;
+    frame[511] = depth + 1;
+    if (!depth)
+        KTaskCallStackGrowSeenSP = &frame[0];
+    I64 result = frame[0] + frame[511];
+    if (depth)
+        result += KTaskDeepStack(depth - 1);
+    return result;
+}
+
 I64 KTaskCallStackGrowSum10(I64 a, I64 b, I64 c, I64 d, I64 e,
                            I64 f, I64 g, I64 h, I64 i, I64 j)
 {
@@ -57,6 +70,11 @@ U0 KTaskSpawnWorker(U8 *data)
     KTaskSpawnValue = *value + 10;
 }
 
+U0 KTaskCustomStackWorker(U8 *data)
+{
+    KTaskSpawnValue = KTaskDeepStack(24);
+}
+
 I64 KTaskSpawnBridgeChecks()
 {
     I64 value = 32, child_num;
@@ -77,6 +95,20 @@ I64 KTaskSpawnBridgeChecks()
     DeathWait(&child);
     if (KTaskSpawnValue != 42 || TaskValidate(child))
         return 2;
+
+    // 25 nested 4 KiB frames need more than the bridge's default 64 KiB.
+    KTaskCallStackGrowSeenSP = 0;
+    KTaskSpawnValue = 0;
+    child = Spawn(&KTaskCustomStackWorker, NULL, "KTaskStack128K",
+                  -1, parent, 128 * 1024, 1 << 8);
+    if (!TaskValidate(child)) return 5;
+    DeathWait(&child);
+    if (KTaskSpawnValue != 625 || !KTaskCallStackGrowSeenSP ||
+        TaskValidate(child)) return 6;
+
+    // The guest arena intentionally caps task stacks at the upstream default.
+    if (Spawn(&KTaskSpawnWorker, NULL, "KTaskStackTooLarge",
+              -1, parent, 2 * 1024 * 1024 + 1, 1 << 8)) return 7;
 
     // This UTM bridge has one guest CPU; explicit CPU 0 is supported and
     // retains the caller-selected parent and normal queue flags.

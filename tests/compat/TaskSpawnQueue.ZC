@@ -1,5 +1,17 @@
 // Pinned MultiProc.ZC SpawnQueue result and CJob spawned_task on CPU 0.
 I64 spawn_queue_seen, spawn_queue_arg, spawn_queue_task_num;
+I64 spawn_queue_deep_result;
+
+I64 SpawnQueueDeepStack(I64 depth)
+{
+    I64 frame[512];
+    frame[0] = depth;
+    frame[511] = depth + 1;
+    I64 result = frame[0] + frame[511];
+    if (depth)
+        result += SpawnQueueDeepStack(depth - 1);
+    return result;
+}
 
 U0 SpawnQueueWorker(U8 *data)
 {
@@ -14,6 +26,11 @@ U0 SpawnQueueHold(U8 *data)
     Yield;
 }
 
+U0 SpawnQueueDeepWorker(U8 *data)
+{
+    spawn_queue_deep_result = SpawnQueueDeepStack(24);
+}
+
 I64 TaskSpawnQueueChecks()
 {
     I64 value = 42;
@@ -21,7 +38,8 @@ I64 TaskSpawnQueueChecks()
     CJob *job;
     I64 i;
     if (SpawnQueue(&SpawnQueueWorker, &value, "Wrong", 1) ||
-        SpawnQueue(&SpawnQueueWorker, &value, "Wrong", 0, NULL, 1024) ||
+        SpawnQueue(&SpawnQueueWorker, &value, "Wrong", 0, NULL,
+                   2 * 1024 * 1024 + 1) ||
         SpawnQueue(&SpawnQueueWorker, &value, "Wrong", 0, NULL, 0, 0))
         return 1;
     child = SpawnQueue(&SpawnQueueWorker, &value, "Queued", 0);
@@ -43,6 +61,12 @@ I64 TaskSpawnQueueChecks()
         return 5;
     if (ZcTaskRun != 1 || spawn_queue_seen != 2)
         return 6;
+    spawn_queue_deep_result = 0;
+    child = SpawnQueue(&SpawnQueueDeepWorker, NULL, "DeepQueued", 0,
+                       NULL, 128 * 1024);
+    if (!TaskValidate(child) || child->task_name[0] != 'D') return 12;
+    if (ZcTaskRun != 1 || TaskValidate(child) || spawn_queue_deep_result != 625)
+        return 13;
     parent = Spawn(&SpawnQueueHold);
     if (!TaskValidate(parent)) return 7;
     nested = SpawnQueue(&SpawnQueueWorker, &value, "Nested", 0, parent);

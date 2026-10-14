@@ -84,8 +84,10 @@ I64 TaskWaitChecks()
     if (!wait_target || !TaskValidate(wait_target))
         return 7;
     DeathWait(&wait_target, TRUE);
-    if (TaskValidate(wait_target) || wait_exit_callback_seen != 1)
+    if (TaskValidate(wait_target))
         return 8;
+    if (wait_exit_callback_seen != 1)
+        return 9;
     return 42;
 }
 

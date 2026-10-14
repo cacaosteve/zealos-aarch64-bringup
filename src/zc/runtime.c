@@ -163,6 +163,7 @@ static double *pow10_I64_host = pow10_values;
 #define GUEST_EXECUTIVE 5 /* reserved CPU-0 job server */
 #define GUEST_TASKS 6
 #define GUEST_STACK_BYTES (64u * 1024u)
+#define GUEST_STACK_MAX_BYTES (2u * 1024u * 1024u)
 #define GUEST_JOBS_MAX 128u
 #define GUEST_JOB_DEPTH_MAX 8u
 #define GUEST_MESSAGE_MS_MOVE 4
@@ -214,9 +215,12 @@ struct guest_fiber {
     CHeapCtrl compiler_heap, compiler_code_heap;
     jmp_buf context;
     unsigned char stack[GUEST_STACK_BYTES] __attribute__((aligned(16)));
+    unsigned char *large_stack;
+    size_t stack_size;
     void *entry, *data;
     int64_t result;
     enum guest_state state;
+    unsigned started;
     enum guest_entry entry_kind;
     enum guest_wait wait_kind;
     void *wait_slot;
@@ -239,6 +243,9 @@ struct guest_fiber {
     jmp_buf end_context;
 };
 static struct guest_fiber guest_fibers[GUEST_TASKS];
+/* Custom stacks use a separate owner so finish_guest can reclaim a task's
+ * ordinary heap without freeing the stack it is currently running on. */
+static CHeapCtrl guest_stack_heap;
 static unsigned guest_current, guest_completed;
 static uint64_t guest_task_serial;
 static unsigned guest_job_count;
@@ -2018,21 +2025,38 @@ static void init_guest_fiber(unsigned i, void *parent, const char *name) {
 }
 static void init_guest_context(struct guest_fiber *f) {
     f->context[11] = (uintptr_t)guest_trampoline; /* saved x30 */
-    f->context[12] = (uintptr_t)(f->stack + sizeof(f->stack)); /* saved SP */
+    unsigned char *stack = f->large_stack ? f->large_stack : f->stack;
+    size_t stack_size = f->large_stack ? f->stack_size : sizeof(f->stack);
+    f->context[12] = (uintptr_t)(stack + stack_size); /* saved SP */
     __asm__ volatile("mrs %0, fpcr" : "=r"(f->context[22]));
     __asm__ volatile("mrs %0, fpsr" : "=r"(f->context[23]));
 }
 static struct guest_fiber *new_guest_fiber(void *entry, void *data, void *parent,
-                                           const char *name, enum guest_entry kind) {
+                                           const char *name, enum guest_entry kind,
+                                           size_t stack_size) {
     if (!guest_task_bound ||
         !find_guest_task(parent) ||
         (kind != GUEST_ENTRY_INPUT_FILTER && !code_lives_with_parent(entry, parent)))
         return NULL;
+    /* The saved AArch64 SP must remain 16-byte aligned even when a caller
+     * requests a byte count that is not itself aligned. */
+    if (stack_size > SIZE_MAX - 15)
+        return NULL;
+    stack_size = (stack_size + 15) & ~(size_t)15;
     for (unsigned i = 1; i < GUEST_APP_TASKS; i++) {
         struct guest_fiber *f = &guest_fibers[i];
         if (f->state == GUEST_RUNNABLE)
             continue;
+        /* A finished fiber cannot release its own stack while executing on
+         * it. Slot reuse runs on another fiber, so this is a safe point. */
+        if (f->large_stack)
+            __AIWNIOS_Free(f->large_stack);
         memset(f, 0, sizeof(*f));
+        if (stack_size > GUEST_STACK_BYTES) {
+            f->large_stack = __AIWNIOS_MAlloc((int64_t)stack_size,
+                                               &guest_stack_heap);
+            f->stack_size = stack_size;
+        }
         f->entry = entry;
         f->data = data;
         f->entry_kind = kind;
@@ -2190,6 +2214,7 @@ static void finish_guest(unsigned i, int64_t result) {
     guest_completed++;
 }
 static void end_guest_current(int64_t result) __attribute__((noreturn));
+static int64_t host_task_yield(int64_t *a);
 static void end_guest_current(int64_t result) {
     unsigned me = guest_current;
     struct guest_fiber *f = &guest_fibers[me];
@@ -2229,6 +2254,7 @@ static void end_guest_current(int64_t result) {
 }
 static void guest_trampoline(void) {
     unsigned me = guest_current;
+    guest_fibers[me].started = 1;
     if (guest_fibers[me].entry_kind == GUEST_ENTRY_EXECUTIVE)
         guest_executive_loop();
     if (guest_fibers[me].kill_requested)
@@ -2246,7 +2272,8 @@ static void guest_trampoline(void) {
 static int64_t host_task_spawn(int64_t *a) {
     struct guest_fiber *f = new_guest_fiber((void *)(uintptr_t)a[0], NULL,
                                             guest_fibers[guest_current].words, NULL,
-                                            GUEST_ENTRY_NO_ARG);
+                                            GUEST_ENTRY_NO_ARG,
+                                            GUEST_STACK_BYTES);
     return f ? (int64_t)(f - guest_fibers) : -1;
 }
 static int64_t host_call_n_on_stack(int64_t *a) {
@@ -2332,11 +2359,16 @@ static int64_t host_spawn(int64_t *a) {
     /* UTM exposes one guest CPU, so explicit CPU 0 and the upstream default
      * (-1, any CPU) have identical scheduling semantics here. */
     if (!guest_task_bound || (a[3] != -1 && a[3] != 0) ||
-        a[5] != 0 || a[6] != (1 << 8) ||
+        a[5] < 0 || (uint64_t)a[5] > GUEST_STACK_MAX_BYTES ||
+        a[6] != (1 << 8) ||
         !find_guest_task(parent))
         return 0;
+    size_t stack_size = a[5] ? (size_t)a[5] : GUEST_STACK_BYTES;
+    if (stack_size < GUEST_STACK_BYTES)
+        stack_size = GUEST_STACK_BYTES;
     struct guest_fiber *f = new_guest_fiber(entry, (void *)(uintptr_t)a[1], parent,
-                                            (const char *)(uintptr_t)a[2], GUEST_ENTRY_SPAWN);
+                                            (const char *)(uintptr_t)a[2], GUEST_ENTRY_SPAWN,
+                                            stack_size);
     return (int64_t)(uintptr_t)(f ? f->words : NULL);
 }
 static int64_t host_task_validate(int64_t *a) {
@@ -2464,6 +2496,17 @@ static int64_t host_death_wait(int64_t *a) {
         zc_fail("DeathWait needs a task-pointer slot");
     if (a[1]) {
         void *target = *slot;
+        struct guest_fiber *f = find_guest_task(target);
+        if (f && target != guest_fibers[guest_current].words &&
+            !f->started && !(*guest_flags(f) & GUEST_SUSPENDED)) {
+            /* Give a newly spawned target its first cooperative slice before
+             * requesting exit. This lets its entry install task_end_cb (the
+             * guest equivalent of accepting the upstream EXIT message).
+             * Without it, an immediate DeathWait(TRUE) could synchronously
+             * discard the never-started fiber and skip that callback. */
+            while (f->state == GUEST_RUNNABLE && !f->started)
+                (void)host_task_yield(NULL);
+        }
         if (valid_guest_task(target)) {
             /* Upstream asks the target's idle command server to run Exit;
              * this bootstrap has no server command loop for every task.
@@ -2880,7 +2923,7 @@ static int64_t host_task_text(int64_t *a) {
     struct guest_fiber *filter;
     if (filter_task == server->words) {
         filter = new_guest_fiber(NULL, NULL, server->words, "Input Filter",
-                                 GUEST_ENTRY_INPUT_FILTER);
+                                 GUEST_ENTRY_INPUT_FILTER, GUEST_STACK_BYTES);
         if (!filter) {
             guest_job_delete(job);
             return 0;
@@ -2954,7 +2997,8 @@ static int64_t host_job_queue(int64_t *a) {
     /* Queued callbacks may outlive their submitter. Root-owned code stays
      * live for this compiler session; child-owned code would need pinning. */
     if (!guest_task_bound || code_owner(callback) != &code_heap || a[2] != 0 ||
-        (spawn ? (flags != GUEST_JOBF_ADD_TO_QUE || a[7] ||
+        (spawn ? (flags != GUEST_JOBF_ADD_TO_QUE || a[7] < 0 ||
+                  (uint64_t)a[7] > GUEST_STACK_MAX_BYTES ||
                   !valid_guest_task(parent))
                : (a[4] != GUEST_JOBT_CALL ||
                   (flags & ~(uint64_t)GUEST_JOBF_FREE_ON_COMPLETE) ||
@@ -2983,6 +3027,7 @@ static int64_t host_job_queue(int64_t *a) {
             memcpy(job->aux_str, name, name_len);
         }
         job->aux1 = (int64_t)(uintptr_t)parent;
+        job->aux2 = a[7]; /* SpawnQueue's stack_size travels in CJob.aux2. */
     }
     guest_job_insert(guest_job_head(server), job);
     guest_job_track(job);
@@ -3101,7 +3146,8 @@ static int64_t host_jobs_handler(int64_t *a) {
             struct guest_fiber *child = valid_guest_task((void *)(uintptr_t)job->aux1)
                 ? new_guest_fiber(job->addr, job->fun_arg,
                     (void *)(uintptr_t)job->aux1,
-                    job->aux_str ? job->aux_str : "Unnamed", GUEST_ENTRY_SPAWN)
+                    job->aux_str ? job->aux_str : "Unnamed", GUEST_ENTRY_SPAWN,
+                    job->aux2 ? (size_t)job->aux2 : GUEST_STACK_BYTES)
                 : NULL;
             job->spawned_task = child ? child->words : NULL;
         }
@@ -4300,6 +4346,7 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
     memset(&task, 0, sizeof(task));
     memset(&data_heap, 0, sizeof(data_heap));
     memset(&code_heap, 0, sizeof(code_heap));
+    memset(&guest_stack_heap, 0, sizeof(guest_stack_heap));
     memset(files, 0, sizeof(files));
     arena_init(0, data_arena, sizeof(data_arena));
     arena_init(1, code_arena, sizeof(code_arena));
