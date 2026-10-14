@@ -4079,8 +4079,9 @@ static size_t format_text(char *output, size_t capacity, const char *format,
             FMT_BYTE('%');
             continue;
         }
-        if (code != 'c' && code != 'C' && code != 's' && code != 'd' &&
-            code != 'x' && code != 'X' && code != 'f' && code != 'F')
+        if (code != 'c' && code != 'C' && code != 's' && code != 'Q' &&
+            code != 'd' && code != 'x' && code != 'X' &&
+            code != 'f' && code != 'F')
             zc_fail("format code is unsupported");
         if (arg >= argc)
             zc_fail("format needs another argument");
@@ -4092,11 +4093,23 @@ static size_t format_text(char *output, size_t capacity, const char *format,
                 if (!ch) break;
                 FMT_BYTE(ch);
             }
-        } else if (code == 's') {
+        } else if (code == 's' || code == 'Q') {
             const char *s = (const char *)(uintptr_t)argv[arg++];
             if (!s) zc_fail("format %s argument is null");
-            for (size_t j = 0; s[j]; j++)
-                FMT_BYTE(s[j]);
+            for (size_t j = 0; s[j]; j++) {
+                if (code == 'Q') {
+                    switch (s[j]) {
+                    case '"': FMT_BYTE('\\'); FMT_BYTE('"'); break;
+                    case '\\': FMT_BYTE('\\'); FMT_BYTE('\\'); break;
+                    case '\n': FMT_BYTE('\\'); FMT_BYTE('n'); break;
+                    case '\r': FMT_BYTE('\\'); FMT_BYTE('r'); break;
+                    case '\t': FMT_BYTE('\\'); FMT_BYTE('t'); break;
+                    case '$': FMT_BYTE('$'); FMT_BYTE('$'); break;
+                    default: FMT_BYTE(s[j]); break;
+                    }
+                } else
+                    FMT_BYTE(s[j]);
+            }
         } else if (code == 'f' || code == 'F') {
             char number[64];
             char *end = number;
