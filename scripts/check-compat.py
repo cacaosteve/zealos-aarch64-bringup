@@ -234,14 +234,20 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         if re.search(r'hc IR FAIL|(?:Upstream|Front) [^\r\n]* FAIL', boot):
             raise RuntimeError('legacy regressions')
         print('PASS boot and legacy regression markers', flush=True)
+        # Give the cooperative terminal fiber and source manager at least a
+        # short window to produce a real visible frame before measuring scanout.
+        time.sleep(0.5)
         desktop = command('zstatus', 'desktop: winmgr=1 gterm=1 windowdemo=0 presented_frames=')
         frames = re.search(r'desktop: winmgr=1 gterm=1 windowdemo=0 presented_frames=(\d+)', desktop)
         if not frames or int(frames.group(1)) == 0:
             raise RuntimeError('boot graphical terminal has not presented a frame:\n' + desktop)
         if 'gterm_window=0x0000003f task/show/display_doc/put_doc/border_doc/geometry' not in desktop:
             raise RuntimeError('boot graphical terminal window is not fully initialized and visible:\n' + desktop)
-        if not re.search(r'scanout: nonblack_pixels=\d+ of 480000', desktop):
+        scanout = re.search(r'scanout: nonblack_pixels=(\d+) of 480000', desktop)
+        if not scanout:
             raise RuntimeError('zstatus did not report visible framebuffer pixels:\n' + desktop)
+        if int(scanout.group(1)) < 1000:
+            raise RuntimeError('boot graphical terminal is not painting visible pixels:\n' + desktop)
         print('PASS boot graphical terminal window and framebuffer diagnostics', flush=True)
         command('zcall BootstrapGuiTerminalSmoke',
                 'zc => 0x000000000000002a')

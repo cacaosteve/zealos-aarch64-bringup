@@ -4729,8 +4729,8 @@ Bool BootstrapCanUseUpstreamGrUpdateTasks()
 Bool BootstrapTryUpstreamGrUpdateScreen()
 {//Use the unchanged full compositor only when its buffers and task graph are live.
     CGrGlobals *active_gr;
-    CTask *task;
-    I64 i, window_count = 0, ode_count;
+    CTask *task, *ode_root;
+    I64 i, ode_visited, window_count = 0;
     if (bootstrap_force_bridge_frames ||
         !BootstrapCanUseUpstreamGrUpdateTasks() ||
         sys_framebuffer_width != 800 || sys_framebuffer_height != 600 ||
@@ -4768,17 +4768,38 @@ Bool BootstrapTryUpstreamGrUpdateScreen()
     }
     ZcFbShellTextCompose(gr.text_base, TEXT_COLS);
     WinZBufUpdate();
+    // Draw shown tasks in task-ring order. TextChar still applies per-cell
+    // z-buffer clipping, while avoiding a stale uncovered bitmap suppressing
+    // every task window in this startup compositor path.
     task = sys_winmgr_task;
     for (i = 0; i < 64; i++)
     {
-        if ((task->display_flags & (1 << DISPLAYf_SHOW)) &&
-            BootstrapWinIsUncovered(task))
-            window_count++;
+        if (!TaskValidate(task))
+            break;
+        if (Bt(&task->display_flags, DISPLAYf_SHOW))
+        {
+            if (ZcGrUpdateTaskWin(task))
+                window_count++;
+        }
         task = task->next_task;
         if (task == sys_winmgr_task)
             break;
     }
-    ode_count = BootstrapTaskRingCount(cpu_structs[0].executive_task);
+    // Preserve ZealOS's ODE update stage for every executive task.
+    ode_root = task = cpu_structs[0].executive_task;
+    ode_visited = 0;
+    do
+    {
+        if (!TaskValidate(task))
+            break;
+        if (ZcGrUpdateTaskODEs(task))
+            bootstrap_upstream_ode_updates++;
+        if (!TaskValidate(task))
+            break;
+        task = task->next_task;
+        ode_visited++;
+    }
+    while (task && task != ode_root && ode_visited < 64);
     if (!ZcGrScreenFullUpdate())
         return FALSE;
     bootstrap_gr_fullscreen_active = TRUE;
@@ -4787,7 +4808,6 @@ Bool BootstrapTryUpstreamGrUpdateScreen()
     bootstrap_gr_planar_updates++;
     bootstrap_upstream_gr_update_tasks++;
     bootstrap_upstream_window_updates += window_count;
-    bootstrap_upstream_ode_updates += ode_count;
     return TRUE;
 }
 U0 BootstrapGrUpdateTasks()
