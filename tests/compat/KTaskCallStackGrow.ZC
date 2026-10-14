@@ -99,8 +99,8 @@ I64 KTaskSpawnBridgeChecks()
     // 25 nested 4 KiB frames need more than the bridge's default 64 KiB.
     KTaskCallStackGrowSeenSP = 0;
     KTaskSpawnValue = 0;
-    child = Spawn(&KTaskCustomStackWorker, NULL, "KTaskStack128K",
-                  -1, parent, 128 * 1024, 1 << 8);
+    child = Spawn(&KTaskCustomStackWorker, NULL, "KTaskStackUnaligned",
+                  -1, parent, 131073, 1 << 8);
     if (!TaskValidate(child)) return 5;
     DeathWait(&child);
     if (KTaskSpawnValue != 625 || !KTaskCallStackGrowSeenSP ||

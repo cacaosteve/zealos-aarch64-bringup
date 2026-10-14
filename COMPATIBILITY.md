@@ -2136,7 +2136,7 @@ ZealOS live distribution or installer.
   fiber is still executing on its own stack. Requests smaller than 64 KiB use
   the existing minimum stack; values over 2 MiB are rejected.
 - `KTaskSpawnBridgeChecks` recurses through 25 frames each containing a 4 KiB
-  local array on a requested 128 KiB stack, validates the result and stack
+  local array on a requested 131073-byte stack, validates the result and stack
   local, and checks that an over-limit request returns `NULL`. The focused
   PCI/QEMU `/Kernel/KTask.ZC` probe passes with these checks.
 - `SpawnQueue` carries the optional stack size through `CJob.aux2`; its
