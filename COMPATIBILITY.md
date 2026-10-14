@@ -1936,7 +1936,8 @@ ZealOS live distribution or installer.
   round-trip, bundled `DocRead`, and writable `DocWrite` on both the PCI source
   partition and legacy RedSea root volume (`0x2a`). `TaskFileApiPersistChecks`
   reopens the API test file and can be run after a UTM reboot to verify the
-  source-volume write survived restart.
+  source-volume write survived restart. `make check-docfile-persistence` runs
+  the PCI/QEMU archive, disk read/write, and DolDoc save/reopen checks.
 - The bootstrap `FilesFindMatch` supports case-insensitive `*` and `?` filename
   masks separated by semicolons, which enables the unchanged DocTerm source,
   DolDoc, and include-file filters. Its filesystem traversal flags remain
