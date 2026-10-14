@@ -1380,7 +1380,7 @@ Bool FileNameCheck(U8 *filename)
 Bool FileFind(U8 *filename, CDirEntry *_de=NULL, I64 fuf_flags=0)
 {
     U8 *contents;
-    I64 filename_len;
+    I64 filename_len, size;
     if (!filename || !*filename)
         return FALSE;
     if (_de) {}
@@ -1395,10 +1395,24 @@ Bool FileFind(U8 *filename, CDirEntry *_de=NULL, I64 fuf_flags=0)
              StrCompare(filename + filename_len - 3, ".HH")))
             return FALSE;
     }
-    contents = FileRead(filename);
+    contents = FileRead(filename, &size);
     if (!contents)
         return FALSE;
     Free(contents);
+    if (_de)
+    {
+        _de->next = NULL;
+        _de->parent = NULL;
+        _de->sub = NULL;
+        _de->full_name = NULL;
+        _de->user_data = 0;
+        _de->user_data2 = 0;
+        _de->name[0] = 0;
+        _de->clus = 0;
+        _de->attr = RS_ATTR_ARCHIVE;
+        _de->size = size;
+        _de->datetime = 0;
+    }
     return TRUE;
 }
 U8 *FileNameAbs(U8 *filename, I64 fuf_flags=0)

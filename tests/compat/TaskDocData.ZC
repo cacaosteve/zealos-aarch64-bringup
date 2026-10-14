@@ -133,6 +133,8 @@ I64 TaskDocAbsoluteSourceWriteChecks()
 
 I64 TaskFileFindDirectoryFilterChecks()
 {
+    CDirEntry de;
+
     if (!FileFind("/Tests/TaskDocData.ZC"))
         return 1;
     if (FileFind("/Tests/TaskDocData.ZC", NULL, FUF_JUST_DIRS))
@@ -141,6 +143,12 @@ I64 TaskFileFindDirectoryFilterChecks()
         return 3;
     if (FileFind("/Tests/DocSourceWriteCheck.DD", NULL, FUF_JUST_SRC))
         return 4;
+    de.name[0] = 'x';
+    de.full_name = "stale";
+    if (!FileFind("/Tests/TaskDocData.ZC", &de) || de.name[0] ||
+        de.full_name || de.next || de.parent || de.sub || de.size <= 0 ||
+        !(de.attr & RS_ATTR_ARCHIVE))
+        return 5;
     return 42;
 }
 
