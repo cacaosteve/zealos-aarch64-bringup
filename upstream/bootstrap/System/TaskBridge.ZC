@@ -1377,6 +1377,43 @@ Bool FileNameCheck(U8 *filename)
     }
     return TRUE;
 }
+Bool BootstrapFileFindExtMatch(U8 *filename, U8 *ext)
+{
+    I64 filename_len, ext_len;
+    if (!filename || !ext)
+        return FALSE;
+    filename_len = StrLen(filename);
+    ext_len = StrLen(ext);
+    return filename_len >= ext_len &&
+        !StrCompare(filename + filename_len - ext_len, ext);
+}
+Bool BootstrapFileFindTypeMatch(U8 *filename, I64 fuf_flags)
+{
+    I64 type_flags = fuf_flags & (FUF_JUST_TXT | FUF_JUST_DD |
+        FUF_JUST_SRC | FUF_JUST_AOT | FUF_JUST_JIT | FUF_JUST_GR);
+    if (!type_flags)
+        return TRUE;
+    if ((fuf_flags & FUF_JUST_TXT) &&
+        BootstrapFileFindExtMatch(filename, ".txt"))
+        return TRUE;
+    if ((fuf_flags & FUF_JUST_DD) &&
+        BootstrapFileFindExtMatch(filename, ".DD"))
+        return TRUE;
+    if ((fuf_flags & FUF_JUST_SRC) &&
+        (BootstrapFileFindExtMatch(filename, ".ZC") ||
+         BootstrapFileFindExtMatch(filename, ".HH")))
+        return TRUE;
+    if ((fuf_flags & FUF_JUST_AOT) &&
+        BootstrapFileFindExtMatch(filename, ".AOT"))
+        return TRUE;
+    if ((fuf_flags & FUF_JUST_JIT) &&
+        BootstrapFileFindExtMatch(filename, ".JIT"))
+        return TRUE;
+    if ((fuf_flags & FUF_JUST_GR) &&
+        BootstrapFileFindExtMatch(filename, ".GR"))
+        return TRUE;
+    return FALSE;
+}
 Bool FileFind(U8 *filename, CDirEntry *_de=NULL, I64 fuf_flags=0)
 {
     U8 *contents, *leaf;
@@ -1387,14 +1424,8 @@ Bool FileFind(U8 *filename, CDirEntry *_de=NULL, I64 fuf_flags=0)
     // The source bridge has regular files but no directory records.
     if (fuf_flags & FUF_JUST_DIRS)
         return FALSE;
-    if (fuf_flags & FUF_JUST_SRC)
-    {
-        filename_len = StrLen(filename);
-        if (filename_len < 3 || filename[filename_len - 3] != '.' ||
-            (StrCompare(filename + filename_len - 3, ".ZC") &&
-             StrCompare(filename + filename_len - 3, ".HH")))
-            return FALSE;
-    }
+    if (!BootstrapFileFindTypeMatch(filename, fuf_flags))
+        return FALSE;
     contents = FileRead(filename, &size);
     if (!contents)
         return FALSE;

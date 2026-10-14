@@ -143,6 +143,11 @@ I64 TaskFileFindDirectoryFilterChecks()
         return 3;
     if (FileFind("/Tests/DocSourceWriteCheck.DD", NULL, FUF_JUST_SRC))
         return 4;
+    if (!FileFind("/LICENSE/Aiwnios.txt", NULL, FUF_JUST_TXT) ||
+        !FileFind("/Tests/DocSourceWriteCheck.DD", NULL, FUF_JUST_DD) ||
+        FileFind("/Tests/TaskDocData.ZC", NULL, FUF_JUST_DD) ||
+        FileFind("/Tests/TaskDocData.ZC", NULL, FUF_JUST_AOT))
+        return 6;
     de.name[0] = 'x';
     de.full_name = "stale";
     if (!FileFind("/Tests/TaskDocData.ZC", &de) ||
