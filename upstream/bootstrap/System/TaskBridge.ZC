@@ -4699,6 +4699,7 @@ I64 PopUp(U8 *buf, CTask *parent=NULL, CTask **_pu_task=NULL)
     return res;
 }
 // DocTerm.ZC / DocBorderNew dependency stubs until DocEd/DocForm/Menu/Win load.
+extern CDocEntry *DocPutS(CDoc *doc, U8 *st);
 CAutoCompleteGlobals ac;
 U8 *EdFilterCB(CDoc *, CDocEntry *doc_e, CTask *mem_task)
 {
@@ -4927,17 +4928,72 @@ U0 DocDataScan(CDoc *doc, CDocEntry *doc_e)
 	}
 }
 U8 *DocSave(CDoc *doc, I64 *_size=NULL)
-{//Stub until DocFile; DocFlagsToggle round-trips via DocLoad.
-    if (doc) {}
+{//Plain-text round trip until the full DocFile/bin serializer is available.
+    CDocEntry *doc_e;
+    U8 *res, *dst;
+    I64 count = 1, i;
+    Bool escape_dollars;
+
+    if (!doc || doc->doc_signature != DOC_SIGNATURE_VAL)
+    {
+        if (_size)
+            *_size = 0;
+        return StrNew("");
+    }
+    escape_dollars = !(doc->flags & (DOCF_PLAIN_TEXT | DOCF_PLAIN_TEXT_TABS));
+    for (doc_e = doc->head.next; doc_e != doc; doc_e = doc_e->next)
+    {
+        if (!Bt(doldoc.type_flags_data, doc_e->type_u8) &&
+            doc_e->type_u8 == DOCT_TEXT && doc_e->tag)
+        {
+            count += StrLen(doc_e->tag);
+            if (escape_dollars)
+                for (i = 0; doc_e->tag[i]; i++)
+                    if (doc_e->tag[i] == '$' && doc_e->tag[i + 1] == '$')
+                        count++;
+        }
+        else if (!Bt(doldoc.type_flags_data, doc_e->type_u8) &&
+                 (doc_e->type_u8 == DOCT_NEW_LINE ||
+                  doc_e->type_u8 == DOCT_TAB))
+            count++;
+    }
+    res = MAlloc(count);
+    dst = res;
+    for (doc_e = doc->head.next; doc_e != doc; doc_e = doc_e->next)
+    {
+        if (!Bt(doldoc.type_flags_data, doc_e->type_u8) &&
+            doc_e->type_u8 == DOCT_TEXT && doc_e->tag)
+        {
+            for (i = 0; doc_e->tag[i]; i++)
+            {
+                *dst++ = doc_e->tag[i];
+                if (escape_dollars && doc_e->tag[i] == '$' &&
+                    doc_e->tag[i + 1] == '$')
+                    *dst++ = '$';
+            }
+        }
+        else if (!Bt(doldoc.type_flags_data, doc_e->type_u8) &&
+                 doc_e->type_u8 == DOCT_NEW_LINE)
+            *dst++ = '\n';
+        else if (!Bt(doldoc.type_flags_data, doc_e->type_u8) &&
+                 doc_e->type_u8 == DOCT_TAB)
+            *dst++ = '\t';
+    }
+    *dst = 0;
     if (_size)
-        *_size = 0;
-    return StrNew("");
+        *_size = dst - res;
+    return res;
 }
 U0 DocLoad(CDoc *doc, U8 *src2, I64 size)
-{
-    if (doc) {}
-    if (src2) {}
-    if (size) {}
+{//Load the text portion of a DocSave buffer; binary blocks are not supported.
+    U8 *text;
+    if (!doc || doc->doc_signature != DOC_SIGNATURE_VAL || !src2 || size < 0)
+        return;
+    text = MAlloc(size + 1, doc->mem_task);
+    MemCopy(text, src2, size);
+    text[size] = 0;
+    DocPutS(doc, text);
+    Free(text);
 }
 U0 DocCenter(CDoc *doc=NULL, I64 recalc_flags=0)
 {

@@ -43,3 +43,26 @@ I64 TaskDocDataChecks()
     DocDel(doc);
     return 42;
 }
+
+I64 TaskDocPlainSaveChecks()
+{
+    CDoc *doc, *copy;
+    U8 *saved, *saved_copy;
+    I64 size, copy_size;
+
+    doc = DocNew;
+    DocPrint(doc, "alpha\nbeta");
+    saved = DocSave(doc, &size);
+    if (!saved || size != 10 || StrCompare(saved, "alpha\nbeta"))
+        return 1;
+    copy = DocNew;
+    DocLoad(copy, saved, size);
+    saved_copy = DocSave(copy, &copy_size);
+    if (!saved_copy || copy_size != size || StrCompare(saved, saved_copy))
+        return 2;
+    Free(saved_copy);
+    Free(saved);
+    DocDel(copy);
+    DocDel(doc);
+    return 42;
+}

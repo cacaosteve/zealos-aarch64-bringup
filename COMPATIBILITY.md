@@ -1908,8 +1908,11 @@ ZealOS live distribution or installer.
   `aiwnios_switch_depth`). Unbounded `switch [type]` now bounds-checks so
   holes like `DOCT_TEXT` take the default path. Bootstrap adds `StrMatch`,
   `ListMatch`/`DefineMatch`, `ST_RAW_TYPES`, and thin
-  `DocSave`/`DocLoad`/`DocCenter` stubs. `TaskDocDataChecks` exercises integer
-  format/scan round-tripping and checkbox state synchronization (`0x2a`).
+  plain-text `DocSave`/`DocLoad` bridge routines and a `DocCenter` fallback;
+  formatted DolDoc entries and binary blocks still need the upstream DocFile
+  serializer. `TaskDocDataChecks` exercises integer format/scan round-tripping
+  and checkbox state synchronization, while `TaskDocPlainSaveChecks` verifies
+  a text/newline save-load-save round trip (`0x2a`).
 - `TaskOriginalDocPlainChecks` exercises real `ParseDollarCmd` for `TX` tags,
   `CM+LE+RE` flags, `FG,RED`, and `DocPrint("$$TX,\"Yo\"$$")` (`0x2a`).
   Interactive DocForm/DocEd and DocFile/Adam startup remain later work.
