@@ -238,8 +238,9 @@ system has one guest CPU. The auxiliary arguments must retain their defaults.
 `mp_count` reports 1. Precompiled CPU-0 callbacks can yield or sleep
 cooperatively on the executive's stack; they still cannot self-kill or
 recursively dispatch jobs in this bootstrap.
-The default `Spawn` mode is accepted; CPU targeting, custom stacks and alternate flags
-are rejected. `ZcTaskSpawn`/`ZcTaskYield`/`ZcTaskRun`/`ZcTaskResult` remain
+`Spawn` accepts the default target CPU (`-1`) or explicit CPU 0, with the
+default stack and queue flag. Other CPU IDs, custom stacks and alternate
+flags are rejected. `ZcTaskSpawn`/`ZcTaskYield`/`ZcTaskRun`/`ZcTaskResult` remain
 temporary test bridges; `ZcTaskRun` pumps cooperative tasks to completion.
 ARM64 atomic byte operations implement
 `Bt`/`LBts`/`LBtr`, the physical counter supplies `TSCGet`, and an F64 host
@@ -687,10 +688,10 @@ ZealOS live distribution or installer.
   The UTM refresh preserved RedSea and both native source banks byte-for-byte;
   the previous disk and config are in
   `build/utm-before-spawn-20260926-214321/`. UTM was left running at the shell.
-- This is the default single-CPU cooperative subset. It does not execute
-  upstream `KTask.ZC` or `Sched.ZC`, schedule by timer, or support CPU targeting,
-  alternate flags, custom stacks or SMP. Task cancellation was added in the
-  following lifecycle step.
+- This is the single-CPU cooperative subset. It does not execute upstream
+  `KTask.ZC` or `Sched.ZC`, schedule by timer, support other CPU IDs, alternate
+  flags, custom stacks or SMP. Task cancellation was added in the following
+  lifecycle step.
 
 ## Recorded validation — cooperative task lifecycle
 
@@ -2082,8 +2083,9 @@ ZealOS live distribution or installer.
 - The guarded ARM64 source bundle translates `Kernel/KTask.ZC`'s
   `CallStackGrow` to use the AAPCS64 stack trampoline, routes `TaskValidate`
   through an ARM64-aware task-record validator, and routes the default
-  `Spawn` configuration through the existing cooperative-fiber runtime. It
-  also removes two warning-only pseudo-statements the parser does not
+  single-CPU `Spawn` path through the existing cooperative-fiber runtime,
+  accepting both target CPU -1 and 0. It also removes two warning-only
+  pseudo-statements the parser does not
   implement. Named startup hooks use a host bridge for zero-argument source
   functions.
 - The focused PCI/QEMU KTask probe now loads the complete translated module.
@@ -2097,10 +2099,9 @@ ZealOS live distribution or installer.
   exercise its task-end callback exactly once, the ZealOS `Call` primitive,
   and named startup-hook bridge. The probe
   uses compile-only stubs for heap-control initialization and the interactive
-  lexer. Full
-  upstream `TaskInit`, its code/data block pools, and custom CPU, stack-size,
-  or flags options remain outside this bridge; `Kill`'s debug-break mode is
-  not implemented by the host runtime.
+  lexer. Full upstream `TaskInit`, its code/data block pools, and custom stack
+  or flags options remain outside this bridge; other CPU IDs and `Kill`'s
+  debug-break mode are not implemented by the host runtime.
 
 ## AAPCS64 calls on a caller-owned stack
 

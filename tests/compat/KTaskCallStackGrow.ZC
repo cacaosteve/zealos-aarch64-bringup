@@ -77,6 +77,15 @@ I64 KTaskSpawnBridgeChecks()
     DeathWait(&child);
     if (KTaskSpawnValue != 42 || TaskValidate(child))
         return 2;
+
+    // This UTM bridge has one guest CPU; explicit CPU 0 is supported and
+    // retains the caller-selected parent and normal queue flags.
+    KTaskSpawnValue = 0;
+    child = Spawn(&KTaskSpawnWorker, &value, "KTaskCPU0", 0, parent, 0, 1 << 8);
+    if (!TaskValidate(child) || child->parent_task != parent ||
+        child->task_name[0] != 'K') return 3;
+    DeathWait(&child);
+    if (KTaskSpawnValue != 42 || TaskValidate(child)) return 4;
     return 0x2a;
 }
 

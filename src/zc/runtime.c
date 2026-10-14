@@ -2329,7 +2329,10 @@ static int64_t host_task_focus_next(int64_t *a) {
 static int64_t host_spawn(int64_t *a) {
     void *entry = (void *)(uintptr_t)a[0];
     void *parent = a[4] ? (void *)(uintptr_t)a[4] : guest_fibers[0].words;
-    if (!guest_task_bound || a[3] != -1 || a[5] != 0 || a[6] != (1 << 8) ||
+    /* UTM exposes one guest CPU, so explicit CPU 0 and the upstream default
+     * (-1, any CPU) have identical scheduling semantics here. */
+    if (!guest_task_bound || (a[3] != -1 && a[3] != 0) ||
+        a[5] != 0 || a[6] != (1 << 8) ||
         !find_guest_task(parent))
         return 0;
     struct guest_fiber *f = new_guest_fiber(entry, (void *)(uintptr_t)a[1], parent,
