@@ -923,6 +923,10 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                         'zc => 0x000000000000002a')
                 command('zcall TaskFileMaskChecks',
                         'zc => 0x000000000000002a')
+                command('zcall TaskSourceFileReadChecks',
+                        'zc => 0x000000000000002a')
+                command('zcall TaskDocReadChecks',
+                        'zc => 0x000000000000002a')
             if args.probe_module == '/System/DolDoc/DocRecalcLib.ZC':
                 if 'zc: loaded /System/DolDoc/DocRecalcLib.ZC' not in result:
                     raise RuntimeError('unchanged DocRecalcLib.ZC did not load')

@@ -28,6 +28,10 @@ extern I64 ZcFbTextSpan(I64 x, I64 y, I64 len, I64 attr, U8 *data,
                         U32 *text_base, I64 stride);
 extern I64 ZcFbTextCellsDrawn();
 extern I64 ZcFbTextFlush(U32 *text_base, I64 stride, I64 rows);
+extern I64 ZcReadFile(U8 *path, U8 *dst, I64 capacity, I64 *size);
+extern CDoc *DocNew(U8 *filename=NULL, CTask *task=NULL);
+extern U0 DocDel(CDoc *doc);
+extern U0 DocLoad(CDoc *doc, U8 *src, I64 size);
 // Poll the current virtio/UART key reader and queue its events for the focus
 // task. PS/2 mouse polling is outside this bridge.
 extern U0 KbdMouseHandler(Bool poll_kbd, Bool poll_mouse);
@@ -1001,9 +1005,31 @@ I64 Str2I64(U8 *st, I64 radix=10, U8 **_end_ptr=NULL)
 // DocFile.ZC / DocNew.ZC own these; stubs close the DocBin compile cycle.
 CDoc *DocRead(U8 *name=NULL, I64 flags=0)
 {
-    if (name) {}
+    CDoc *doc;
+    U8 *contents;
+    I64 size, read_size;
+
     if (flags) {}
-    return NULL;
+    if (!name)
+        return NULL;
+    size = ZcReadFile(name, NULL, 0, &read_size);
+    if (size <= 0 || size != read_size || size > 16 * 1024 * 1024)
+        return NULL;
+    doc = DocNew(name);
+    if (!doc)
+        return NULL;
+    contents = MAlloc(size, doc->mem_task);
+    if (!contents || ZcReadFile(name, contents, size, &read_size) != size ||
+        read_size != size)
+    {
+        if (contents)
+            Free(contents);
+        DocDel(doc);
+        return NULL;
+    }
+    DocLoad(doc, contents, size);
+    Free(contents);
+    return doc;
 }
 U0 DocDel(CDoc *doc)
 {

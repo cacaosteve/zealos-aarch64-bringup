@@ -655,6 +655,35 @@ static char *disk_copy(const char *path, size_t *length) {
     *length = n;
     return src;
 }
+static int64_t host_source_file_read(int64_t *a) {
+    const char *path = (const char *)(uintptr_t)a[0];
+    char *dst = (char *)(uintptr_t)a[1];
+    int64_t capacity = a[2];
+    size_t length = 0;
+    const unsigned char *data = NULL;
+    char *owned = NULL;
+
+    if (a[3])
+        *(int64_t *)(uintptr_t)a[3] = 0;
+    if (!path || capacity < 0)
+        return -1;
+    if (!strncmp(path, "disk:", 5)) {
+        owned = disk_copy(path, &length);
+        data = (const unsigned char *)owned;
+    } else {
+        data = source_find(path, &length);
+    }
+    if (!data || length > INT64_MAX || (dst && (uint64_t)capacity < length)) {
+        free(owned);
+        return -1;
+    }
+    if (dst)
+        memcpy(dst, data, length);
+    if (a[3])
+        *(int64_t *)(uintptr_t)a[3] = (int64_t)length;
+    free(owned);
+    return (int64_t)length;
+}
 FILE *fopen(const char *path, const char *mode) {
     if (strcmp(mode, "rb") && strcmp(mode, "r"))
         return NULL;
@@ -4108,6 +4137,7 @@ static int load_inner(const char *path) {
     }
     execute_source(path, src);
     if (!strcmp(path, "/System/TaskBridge.ZC")) {
+        PrsBindCSymbol("ZcReadFile", host_source_file_read, 4);
         PrsBindCSymbol("LowPass1", host_low_pass1, 4);
         /* These functions were pre-registered before TaskBridge introduced
          * their extern declarations, so bind them again now that the symbols
@@ -4529,6 +4559,7 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
                     {"ZcFbTextFill", host_fb_text_fill, 8},
                     {"ZcFbTextRect", host_fb_text_rect, 7},
                     {"ZcFbTextFlush", host_fb_text_flush, 3},
+                    {"ZcReadFile", host_source_file_read, 4},
                     {"ZcDocUpdateTaskDocs", host_doc_update_task_docs, 1},
                     {"ZcActiveGrGlobals", host_active_gr_globals, 0},
                     {"ZcActiveMouseGlobals", host_active_mouse_globals, 0},
