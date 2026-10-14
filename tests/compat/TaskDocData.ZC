@@ -49,7 +49,7 @@ I64 TaskDocWriteChecks()
     if (!DocWrite(doc))
         return 2;
     DocDel(doc);
-    doc = DocRead("disk:App/DocWriteCheck.DD");
+    doc = DocRead("App/DocWriteCheck.DD");
     if (!doc)
         return 3;
     saved = DocSave(doc, &size);

@@ -674,6 +674,12 @@ static int64_t host_source_file_read(int64_t *a) {
         data = (const unsigned char *)owned;
     } else {
         data = source_find(path, &length);
+        if (!data && path[0] != '/' && strlen(path) <= 95) {
+            char disk_path[101] = "disk:";
+            memcpy(disk_path + 5, path, strlen(path) + 1);
+            owned = disk_copy(disk_path, &length);
+            data = (const unsigned char *)owned;
+        }
     }
     if (!data || length > INT64_MAX || (dst && (uint64_t)capacity < length)) {
         free(owned);
