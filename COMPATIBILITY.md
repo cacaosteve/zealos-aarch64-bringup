@@ -2181,3 +2181,7 @@ ZealOS live distribution or installer.
   `BootstrapGuiShellSmoke` now accepts the documented no-source-partition
   response from its Files menu action. The rebuilt ISO then passed the full
   compatibility suite.
+- `make utm` refreshed `ZealosAarch64Hello`, merged the current source bundle,
+  and preserved RedSea plus both native source banks; the VM was started. The
+  Mac was locked during the follow-up screen check, so visual UTM boot
+  confirmation remains pending.
