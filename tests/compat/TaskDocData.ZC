@@ -1,0 +1,45 @@
+// Smoke the bridge's DolDoc editable-field format/scan round trip.
+I64 TaskDocDataChecks()
+{
+    CDoc *doc;
+    CDocEntry *entry;
+    I64 value = 42;
+    I8 checked = 1;
+
+    doc = DocNew;
+    if (!doc)
+        return 1;
+    entry = CAlloc(sizeof(CDocEntry), doc->mem_task);
+    entry->type = DOCT_DATA;
+    entry->de_flags = DOCEF_AUX_STR | DOCEF_DEREF_DATA;
+    entry->raw_type = RT_I64;
+    entry->len = 16;
+    entry->tag = MAlloc(32, doc->mem_task);
+    entry->aux_str = StrNew("%d", doc->mem_task);
+    entry->data = &value;
+    DocDataFormat(doc, entry);
+    if (StrCompare(entry->tag, "42") || entry->max_col != 2)
+        return 2;
+    StrCopy(entry->tag, "123");
+    DocDataScan(doc, entry);
+    if (value != 123)
+        return 3;
+
+    entry->type = DOCT_CHECK_BOX;
+    entry->de_flags = DOCEF_DEREF_DATA;
+    entry->raw_type = RT_I8;
+    entry->data = &checked;
+    DocDataFormat(doc, entry);
+    if (!(entry->de_flags & DOCEF_CHECKED_COLLAPSED))
+        return 4;
+    checked = 0;
+    DocDataScan(doc, entry);
+    if (!checked)
+        return 5;
+
+    Free(entry->aux_str);
+    Free(entry->tag);
+    Free(entry);
+    DocDel(doc);
+    return 42;
+}

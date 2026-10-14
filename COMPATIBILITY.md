@@ -1879,8 +1879,9 @@ ZealOS live distribution or installer.
 ## Unchanged DolDoc `DocTerm` + `DocTermNew`
 
 - The unchanged pinned `System/DolDoc/DocTerm.ZC` loads after DocDblBuf.
-  Bootstrap stubs cover `Ed*CB`, `DocDataFormat`, `MenuFile`, `WinScrollsInit`,
-  `ac`, and the unused TermRightClick helpers until DocEd/Menu/Win load.
+  Bootstrap stubs cover `Ed*CB`, `MenuFile`, `WinScrollsInit`, `ac`, and the
+  unused TermRightClick helpers until DocEd/Menu/Win load. The bridge's
+  `DocDataFormat`/`DocDataScan` now use the upstream field conversion rules.
   `ParseDollarCmd` is replaced by unchanged DocPlain after DocInit; earlier
   modules still use the TaskBridge TX/CM/DA stand-in. DocInit fills `doldoc.hash`.
 - `TaskOriginalDocTermChecks` runs `DocTermNew`, confirms put/display/border
@@ -1907,10 +1908,11 @@ ZealOS live distribution or installer.
   `aiwnios_switch_depth`). Unbounded `switch [type]` now bounds-checks so
   holes like `DOCT_TEXT` take the default path. Bootstrap adds `StrMatch`,
   `ListMatch`/`DefineMatch`, `ST_RAW_TYPES`, and thin
-  `DocDataScan`/`DocSave`/`DocLoad`/`DocCenter` stubs.
+  `DocSave`/`DocLoad`/`DocCenter` stubs. `TaskDocDataChecks` exercises integer
+  format/scan round-tripping and checkbox state synchronization (`0x2a`).
 - `TaskOriginalDocPlainChecks` exercises real `ParseDollarCmd` for `TX` tags,
   `CM+LE+RE` flags, `FG,RED`, and `DocPrint("$$TX,\"Yo\"$$")` (`0x2a`).
-  Adam and remaining DolDoc (DocForm/DocFile/DocRecalc) remain later work.
+  Interactive DocForm/DocEd and DocFile/Adam startup remain later work.
 
 ## Unchanged DolDoc `DocRecalcLib` + cursor helpers
 
