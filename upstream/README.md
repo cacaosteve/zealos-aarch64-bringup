@@ -3389,6 +3389,15 @@ Freeze catalog unchanged.
 | Smoke | `make check-compat-pci` requires more than 1,000 non-black framebuffer pixels at boot and continues through the stable overlapping-window render checks |
 | Limits | The refreshed UTM display still needs an eyes-on check; the host PCI suite cannot confirm UTM's live scanout |
 
+## Milestone 303 — redraw boot terminal DolDoc content through the live compositor
+
+| Item | Path |
+|--|--|
+| Gap | The boot compositor showed a terminal frame with a black interior; its pixel-count diagnostic counted the border and did not prove the terminal document reached scanout |
+| Bring-up | After the normal window draw, explicitly run the loaded DolDoc renderer for the boot graphical terminal; expose a redraw counter and count white text pixels without forcing a redraw |
+| Smoke | `make check-compat-pci` verifies repeated compositor redraws and more than 100 white text pixels in the terminal after normal frame presentation; the current run reports 48 redraws and 2,845 text pixels |
+| Limits | The refreshed UTM VM is running, but its screen still needs eyes-on confirmation after the host unlocks |
+
 ## Open compatibility probe — `/System/Win.ZC`
 
 The source probe loads pinned `KernelC.HH`, `Externs.ZC`, and `Gr.HH` before compiling unchanged `Win.ZC`. Graphics dimensions and mouse globals are probe fixtures; `DrawMenu` and the initial `GrScaleZoom` definition are compile-time fixtures until unchanged `GrScreen.ZC` is loaded later in the probe. `GrScreenFinalUpdateChecks` executes `WinFinalUpdate` through the staged idle-frame path, confirms the fixture's `mouse_grid.coord` toggles the real coordinate-text overlay, checks a separate visible guest overlay callback, verifies the software arrow against Limine framebuffer pixels, and exercises `WinMouseUpdate`'s edge recentering through the runtime dispatch. `WinMousePointerStateCheck` covers transformed tablet coordinates and `WinMouseHardStateCheck` covers the source mouse-state ABI; manual UTM acceptance confirms the software pointer and window-demo mouse interaction. The raw ARM generic-timer binding and a standalone F64 clock expression are smoke-tested before the Win load.
