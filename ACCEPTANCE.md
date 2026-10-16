@@ -27,7 +27,9 @@ The boot graphical terminal is a separate guest window with a smaller command
 set. Click inside it before typing; its `help` lists graphical commands such as
 `zstatus`, `zvol`, `zls`, `zload`, `zcall`, and `edit`. Commands outside that
 set report that they need the serial shell. UTM's **Terminal 1** is the serial
-shell and provides the full command set.
+shell and provides the full command set. The graphical `zstatus` output should
+show `ready=1 failed=0`, `winmgr=1 gterm=1`, a nonzero `presented_frames`, and
+the `gterm_window` / `scanout` diagnostics.
 
 ## Checklist — interactive smoke
 

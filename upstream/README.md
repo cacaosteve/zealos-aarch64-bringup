@@ -3404,7 +3404,7 @@ Freeze catalog unchanged.
 |--|--|
 | Gap | The terminal rendered DolDoc text and passed helper-level key tests, but live UTM input had not been confirmed; the separate Terminal 1 serial shell made the two command surfaces easy to confuse |
 | Bring-up | No input code change was needed: clicking the graphical window gives it keyboard input. Its `help` lists a deliberately bounded command set, while Terminal 1 keeps the full serial shell |
-| Smoke | UTM hands-on check confirms commands and Return appear in the graphical window and `help` prints its graphical command list; the PCI boot/input regressions remain green |
+| Smoke | UTM hands-on check confirms commands and Return appear in the graphical window, `help` prints its graphical command list, and `zstatus` reports the live manager, terminal, frames, and scanout; the PCI boot/input regressions remain green |
 | Limits | This does not yet confirm all editing/navigation keys, the guest editor, or the full ZealOS keyboard/menu stack |
 
 ## Open compatibility probe — `/System/Win.ZC`
