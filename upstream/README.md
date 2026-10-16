@@ -3396,7 +3396,7 @@ Freeze catalog unchanged.
 | Gap | The boot compositor showed a terminal frame with a black interior; its pixel-count diagnostic counted the border and did not prove the terminal document reached scanout |
 | Bring-up | After the normal window draw, explicitly run the loaded DolDoc renderer for the boot graphical terminal; expose a redraw counter and count white text pixels without forcing a redraw |
 | Smoke | `make check-compat-pci` verifies repeated compositor redraws and more than 100 white text pixels in the terminal after normal frame presentation; the current run reports 48 redraws and 2,845 text pixels |
-| Limits | The refreshed UTM VM is running, but its screen still needs eyes-on confirmation after the host unlocks |
+| Limits | UTM eyes-on confirms the boot graphical terminal's text is visible after refresh; a keyboard-input round trip through that window still needs acceptance |
 
 ## Open compatibility probe — `/System/Win.ZC`
 
