@@ -23,6 +23,12 @@ ZealOS aarch64 shell (HolyC-IR exprs)
 >
 ```
 
+The boot graphical terminal is a separate guest window with a smaller command
+set. Click inside it before typing; its `help` lists graphical commands such as
+`zstatus`, `zvol`, `zls`, `zload`, `zcall`, and `edit`. Commands outside that
+set report that they need the serial shell. UTM's **Terminal 1** is the serial
+shell and provides the full command set.
+
 ## Checklist — interactive smoke
 
 1. Boot until `>` stays on screen.

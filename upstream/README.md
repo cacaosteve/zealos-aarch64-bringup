@@ -3396,7 +3396,16 @@ Freeze catalog unchanged.
 | Gap | The boot compositor showed a terminal frame with a black interior; its pixel-count diagnostic counted the border and did not prove the terminal document reached scanout |
 | Bring-up | After the normal window draw, explicitly run the loaded DolDoc renderer for the boot graphical terminal; expose a redraw counter and count white text pixels without forcing a redraw |
 | Smoke | `make check-compat-pci` verifies repeated compositor redraws and more than 100 white text pixels in the terminal after normal frame presentation; the current run reports 48 redraws and 2,845 text pixels |
-| Limits | UTM eyes-on confirms the boot graphical terminal's text is visible after refresh; a keyboard-input round trip through that window still needs acceptance |
+| Limits | UTM eyes-on confirms the boot graphical terminal's text and keyboard command path; other editor keys and graphical editing still need interactive acceptance |
+
+## Milestone 304 — accept keyboard input in the boot graphical terminal
+
+| Item | Path |
+|--|--|
+| Gap | The terminal rendered DolDoc text and passed helper-level key tests, but live UTM input had not been confirmed; the separate Terminal 1 serial shell made the two command surfaces easy to confuse |
+| Bring-up | No input code change was needed: clicking the graphical window gives it keyboard input. Its `help` lists a deliberately bounded command set, while Terminal 1 keeps the full serial shell |
+| Smoke | UTM hands-on check confirms commands and Return appear in the graphical window and `help` prints its graphical command list; the PCI boot/input regressions remain green |
+| Limits | This does not yet confirm all editing/navigation keys, the guest editor, or the full ZealOS keyboard/menu stack |
 
 ## Open compatibility probe — `/System/Win.ZC`
 
