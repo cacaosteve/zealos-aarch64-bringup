@@ -249,6 +249,16 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         if int(scanout.group(1)) < 1000:
             raise RuntimeError('boot graphical terminal is not painting visible pixels:\n' + desktop)
         print('PASS boot graphical terminal window and framebuffer diagnostics', flush=True)
+        redraws = command('zcall BootstrapGuiTerminalRedrawCount', 'zc => 0x')
+        redraw_count = re.search(r'zc => 0x([0-9a-fA-F]+)', redraws)
+        if not redraw_count or int(redraw_count.group(1), 16) == 0:
+            raise RuntimeError('boot compositor has not redrawn the terminal document:\n' + redraws)
+        print(f'PASS boot terminal document redraws: {int(redraw_count.group(1), 16)}', flush=True)
+        visible_text = command('zcall BootstrapGuiTerminalTextPixelCount', 'zc => 0x')
+        text_pixels = re.search(r'zc => 0x([0-9a-fA-F]+)', visible_text)
+        if not text_pixels or int(text_pixels.group(1), 16) < 100:
+            raise RuntimeError('boot graphical terminal has no visible document text pixels:\n' + visible_text)
+        print(f'PASS boot graphical terminal visible text pixels: {int(text_pixels.group(1), 16)}', flush=True)
         command('zcall BootstrapGuiTerminalSmoke',
                 'zc => 0x000000000000002a')
         command('zcall BootstrapGuiShellSmoke',

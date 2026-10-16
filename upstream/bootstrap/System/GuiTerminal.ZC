@@ -1,7 +1,9 @@
 // Minimal document-backed terminal used by the ARM64 graphical bootstrap.
 // The serial shell remains available independently through UART.
 CTask *bootstrap_gui_terminal_task;
+I64 bootstrap_gui_terminal_redraws = 0;
 extern U8 *ZcGuiShellExec(U8 *line);
+extern I64 ZcFbTextPixel(I64 x, I64 y);
 
 #define GUI_MENU_ACTION_TAG 0x475549
 
@@ -351,6 +353,38 @@ I64 BootstrapGuiTerminalWindowState()
     if (term->win_width > 0 && term->win_height > 0)
         state |= 32;
     return state;
+}
+
+I64 BootstrapGuiTerminalRedraw(CTask *task)
+{
+    if (!TaskValidate(task) || !task->display_doc)
+        return 0;
+    if (task->display_doc->win_task != task)
+        return 0;
+    DocRecalc(task->display_doc, RECALCt_TO_SCREEN | RECALCF_HAS_CURSOR);
+    if (task->border_doc && task->border_doc->win_task == task)
+        DocRecalc(task->border_doc, RECALCt_TO_SCREEN);
+    bootstrap_gui_terminal_redraws++;
+    return 0x2a;
+}
+
+I64 BootstrapGuiTerminalRedrawCount()
+{
+    return bootstrap_gui_terminal_redraws;
+}
+
+I64 BootstrapGuiTerminalTextPixelCount()
+{
+    CTask *task = bootstrap_gui_terminal_task;
+    I64 x, y, count = 0;
+
+    if (BootstrapGuiTerminalRedraw(task) != 0x2a)
+        return 0;
+    for (y = task->pix_top; y <= task->pix_bottom; y++)
+        for (x = task->pix_left; x <= task->pix_right; x++)
+            if (ZcFbTextPixel(x, y) == 0x00ffffff)
+                count++;
+    return count;
 }
 
 I64 BootstrapGuiTerminalHide()

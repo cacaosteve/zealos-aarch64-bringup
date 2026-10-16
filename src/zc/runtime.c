@@ -1514,6 +1514,8 @@ static int64_t host_gr_screen_update(int64_t *a) {
 }
 static int64_t host_gr_update_task_win(int64_t *a) {
     CHashFun *draw;
+    CHashFun *redraw;
+    CHashGlblVar *terminal_task;
     if (!Fs || !Fs->hash_table || !a[0])
         return 0;
     draw = (CHashFun *)HashFind("GrUpdateTaskWin", Fs->hash_table,
@@ -1522,6 +1524,21 @@ static int64_t host_gr_update_task_win(int64_t *a) {
         (draw->base.base.type & HTF_EXTERN))
         return 0;
     FFI_CALL_TOS_1(draw->fun_ptr, a[0]);
+    /* The graphics modules are loaded before DolDoc during boot. Keep the
+     * normal GrUpdateTaskWin path, then explicitly run the fully loaded
+     * document renderer for the boot graphical terminal. This makes the
+     * first visible terminal frame independent of early forward stubs. */
+    if (gui_terminal_active) {
+        terminal_task = (CHashGlblVar *)HashFind(
+            "bootstrap_gui_terminal_task", Fs->hash_table, HTT_GLBL_VAR, 1);
+        redraw = (CHashFun *)HashFind("BootstrapGuiTerminalRedraw",
+                                     Fs->hash_table, HTT_FUN, 1);
+        if (terminal_task && terminal_task->data_addr &&
+            *(void **)terminal_task->data_addr == (void *)(uintptr_t)a[0] &&
+            redraw && redraw->fun_ptr && redraw->argc == 1 &&
+            !(redraw->base.base.type & HTF_EXTERN))
+            FFI_CALL_TOS_1(redraw->fun_ptr, a[0]);
+    }
     return 1;
 }
 static int64_t host_gr_update_tasks(int64_t *a) {
