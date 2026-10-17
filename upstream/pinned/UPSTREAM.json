@@ -47,6 +47,7 @@
     "src/System/Gr/MakeGr.ZC": "0519937e1f43cc3634252bd5a6ea39997934f4a6c913a994a3ce8d2c0ca73bbd",
     "src/System/Math/MathODE.ZC": "24a0d15370a9b5f42b894ed4ae44852f262325593bcac3c5bc9795d68b0e0c5c",
     "src/System/Menu.ZC": "7385d9b156a22c3d6e19c9732b6a1311dba5ec8eb112c87993ae461a554d0174",
+    "src/System/TaskSettings.ZC": "bb2a791c817c00b6033d5b911b036a90a817a63bd2022e4bcb966efe4d17589f",
     "src/System/Win.ZC": "5366052a69f2c0cd5fe035210d89b22b71c1ebf596462b4fa9a9451db605c540",
     "src/System/WinMgr.ZC": "9dc78a33cd27921260667b7273f9869816e6de58f4cc7b04773f7840b9fcd79d"
   },

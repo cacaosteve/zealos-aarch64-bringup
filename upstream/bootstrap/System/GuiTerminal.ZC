@@ -229,15 +229,20 @@ Bool BootstrapGuiTerminalEditCommand(U8 *command, U8 **path)
 Bool BootstrapGuiTerminalEditFile(U8 *path)
 {//Use the upstream DolDoc editor while keeping its document in this task.
     CDoc *doc;
+    CTaskSettings *settings;
     Bool result = FALSE;
 
     if (!path || !*path)
+        return FALSE;
+    settings = SettingsPush;
+    if (!settings)
         return FALSE;
     doc = DocRead(path);
     if (!doc || doc->doc_signature != DOC_SIGNATURE_VAL)
     {
         if (doc)
             DocDel(doc);
+        SettingsPop;
         return FALSE;
     }
     doc->desc = 'Edit';
@@ -252,6 +257,7 @@ Bool BootstrapGuiTerminalEditFile(U8 *path)
     DirContextDel(doc->filename.dirc);
     doc->filename.dirc = NULL;
     DocDel(doc);
+    SettingsPop;
     // Shift+Escape successfully closes an opened editor without saving.
     // Only allocation/read failures should be reported as an open failure.
     return TRUE;

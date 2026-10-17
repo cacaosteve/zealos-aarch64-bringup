@@ -17,13 +17,14 @@ make check-compat-pci   # disposable UTM-shaped GPT/PCI disk guest
 make check-gui-workflow # visible typing/cursors + graphical edit/save/run/reboot
 make check-usb-input    # native NEC/QEMU xHCI keyboard, mouse/tablet + recovery
 make check-usb-topology # nested USB2 hubs, repeated reconnects + subtree recovery
+make check-task-settings # upstream application state + task-local directories
 make utm               # refresh VM, preserving RedSea/source edits and adding new bundled files
 ```
 
 The UTM refresh also updates the repository-managed
-`Tests/WindowDragLive.ZC`, `System/GuiTerminal.ZC`, and `System/WinMgr.ZC`
-files so they stay in sync with the kernel; other existing guest source files
-remain untouched.
+`Tests/WindowDragLive.ZC`, `System/GuiTerminal.ZC`, `System/TaskBridge.ZC`, and
+`System/WinMgr.ZC` files so they stay in sync with the kernel; other existing
+guest source files remain untouched.
 
 The kernel now initializes native xHCI input on QEMU virt (UTM's NEC model
 and QEMU xHCI). Keep UTM's normal USB 3.0 setting. A successfully enumerated

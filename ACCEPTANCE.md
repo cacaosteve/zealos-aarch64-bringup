@@ -71,6 +71,31 @@ The live UTM check is separate from QMP injection, which bypasses UTM's host
 keyboard capture. Keep the display adapter and serial mode fixed during this
 gate so input/rendering changes can be compared against the same VM setup.
 
+## Application settings gate
+
+Run `make check-task-settings` on a disposable PCI guest. It boots the
+unchanged upstream TaskSettings module, checks nested window/palette/document
+restoration, and verifies task-local directories and parent-owned allocations
+survive child exit. Relative file writes, loads and includes must work.
+Follow with `make check-gui-workflow` after changing the editor wrapper or text
+state: visible typing and the save/cancel/reopen paths must still pass.
+
+2026-10-17 application-state update: the focused settings gate passed 18
+checks, the full PCI suite passed 354, the ISO suite passed 277, and the NEC
+two-hub/VirtIO recovery workflow passed 157, including edit/save/run/reboot/reopen, twelve keyboard
+reconnects, tablet fallback/reattach and whole-hub recovery.
+The live refreshed UTM guest displayed `help` and its caret before Return,
+reopened `/Tests/GuiAcceptance.ZC` with its function returning 42, and cancelled
+back to the same terminal with Shift+Escape. Its graphical `zstatus` reported
+`ready=1 failed=0`, terminal focus, native USB keyboard/tablet owners, zero
+dropped routed keys and no controller errors. Input capture was released.
+USB 3.0, display and built-in serial settings matched the pre-refresh backup.
+
+If an existing UTM graphical viewer reports “Display output is not active”
+after a completed serial boot, stop only this VM, close its stopped graphical
+window, and start it from UTM Library to create a fresh viewer. That restored
+the display during this update without changing the adapter or other VMs.
+
 ## Native USB input gate
 
 `make check-usb-input` uses disposable QEMU/HVF PCI guests with NEC xHCI
@@ -153,8 +178,8 @@ Expect **4**, **0**, **8**.
    once after adding a bundled source file; refresh preserves guest edits and
    deletion masks while adding files missing from the existing source bank.
    The refresh updates the repository-managed `Tests/WindowDragLive.ZC`,
-   `System/GuiTerminal.ZC`, and `System/WinMgr.ZC` files. For other existing
-   bundled files, `make utm` keeps the older guest copy. Stop the VM and
+   `System/GuiTerminal.ZC`, `System/TaskBridge.ZC`, and `System/WinMgr.ZC` files.
+   For other existing bundled files, `make utm` keeps the older guest copy. Stop the VM and
    replace that entry explicitly, for example:
 
    ```sh

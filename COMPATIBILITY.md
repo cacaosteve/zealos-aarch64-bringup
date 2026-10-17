@@ -2390,3 +2390,56 @@ The goal is normal UTM USB settings and a reusable native USB stack for Pi,
 with one shared OS input path. A USB 2 keyboard or mouse can operate behind
 an xHCI controller; the device's speed and the controller interface are
 different choices.
+
+
+## Upstream application settings and working directories (2026-10-17)
+
+- The normal desktop boot loads the complete unchanged `System/TaskSettings.ZC`
+  from the existing ZealOS pin. The graphical editor brackets its document
+  session with upstream `SettingsPush` / `SettingsPop`, restoring window,
+  document cursor flags, palette, title, callbacks and working directory.
+- Each cooperative task starts with its own allocated current-directory
+  string, inherited by value from its parent. `Cd` validates an existing
+  directory before changing it. `DirCur` returns an owned copy and honors its
+  explicit destination task. `MAlloc` / `CAlloc` now honor live task/heap
+  selectors, so a child can create settings or strings owned by its parent.
+- Relative `FileRead`, `FileWrite`, `FileNameAbs`, directory lookup, interactive
+  includes and `zload` use the calling task's directory. Compiler file includes
+  remain relative to their source file. Explicit `disk:` paths retain their
+  root-relative source-store meaning.
+- TaskBridge now uses the pinned `CTextGlobals` external supplied by the
+  loader, bound to the same storage as KernelC. Its former private zero-filled copy
+  caused GrGlobals to define zero text rows/columns, making the upstream
+  window functions clamp positions to -1. The loader clears shared text
+  pointers on `zreset` before reusing the arenas. No upstream source edit is
+  needed. Startup explicitly selects the standard palette before any
+  application can save its settings.
+- The window-manager task setter synchronizes every retained declaration slot
+  from TaskBridge's staged loads. Earlier compiled hit-testing/render functions
+  could otherwise keep the system task as their ring sentinel and raise or
+  paint the full-screen manager over applications once its geometry was valid.
+  The USB gate clicks the terminal through real pointer input after its desktop
+  button tests and requires terminal keyboard focus before typing.
+- This is still the bootstrap source namespace: paths have no drive letter,
+  `Cd(NULL)` selects `/`, and home expansion, directory creation and real
+  disk/drive contexts remain unavailable. Missing directories fail even with
+  `make_dirs=TRUE`. `Sound(0)` has no audio device to silence; nonzero notes
+  fail explicitly. Autocomplete is not enabled by this integration.
+- `make check-task-settings` exercises directory inheritance/isolation, parent
+  allocation survival after child exit, nested settings restoration with an
+  actual terminal document, relative persistent writes/loads, and includes.
+  The ordinary compatibility gates also run the settings and directory checks
+  before their existing subsystem tests.
+
+The ISO harness now sends focused child-task keys through its existing VirtIO
+keyboard, just like the PCI harness. The earlier serial-popup timeout used
+UART after that channel had intentionally been reserved for the independent
+serial shell; no guest input-routing change was needed.
+
+Validation for this update: 18 focused task-settings checks, 354 full PCI
+checks, 277 full ISO checks, and 157 NEC USB2-hub/VirtIO recovery checks passed. The latter includes
+visible mixed-case typing, window focus, editor persistence across reboot,
+twelve keyboard reconnects, tablet removal/reattach, and hub subtree recovery.
+The live UTM refresh retained input/display/serial configuration, showed
+typing before Return, reopened the saved acceptance source, cancelled back to
+the terminal, and reported zero dropped routed keys or controller errors.

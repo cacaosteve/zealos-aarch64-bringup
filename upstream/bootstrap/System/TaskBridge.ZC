@@ -32,6 +32,7 @@ extern I64 ZcFbTextFlush(U32 *text_base, I64 stride, I64 rows);
 extern U8 *FileRead(U8 *filename, I64 *_size=NULL, I64 *_attr=NULL);
 extern I64 FileWrite(U8 *filename, U8 *fbuf, I64 size, I64 cdt=0, I64 attr=0);
 extern Bool ZcSourceDirExists(U8 *path);
+extern U8 *ZcSourcePath(U8 *path);
 extern Bool ZcSourceFileAt(I64 index, U8 *path, I64 path_cap, I64 *_size);
 extern Bool FilesFindMatch(U8 *test_name, U8 *files_find_mask,
                            I64 fuf_flags=0);
@@ -1425,7 +1426,7 @@ Bool BootstrapFileFindPath(U8 *filename, I64 fuf_flags, U8 *resolved,
 {
     U8 *contents;
     U8 candidate[256];
-    U8 *dir, *last;
+    U8 *dir, *last, *absolute;
     I64 i, j, dir_len, filename_len;
 
     if (!filename || !*filename || !resolved || resolved_cap < 2)
@@ -1433,8 +1434,16 @@ Bool BootstrapFileFindPath(U8 *filename, I64 fuf_flags, U8 *resolved,
     filename_len = StrLen(filename);
     if (filename_len >= resolved_cap || filename_len >= sizeof(candidate))
         return FALSE;
-    for (i = 0; i <= filename_len; i++)
-        resolved[i] = filename[i];
+    absolute = ZcSourcePath(filename);
+    if (!absolute)
+        return FALSE;
+    if (StrLen(absolute) >= resolved_cap)
+    {
+        Free(absolute);
+        return FALSE;
+    }
+    StrCopy(resolved, absolute);
+    Free(absolute);
     if (fuf_flags & FUF_JUST_DIRS)
     {
         if (ZcSourceDirExists(resolved))
@@ -1575,7 +1584,7 @@ U8 *FileNameAbs(U8 *filename, I64 fuf_flags=0)
         if (BootstrapFileFindPath(filename, fuf_flags, resolved,
                                   sizeof(resolved), &size))
             return StrNew(resolved);
-    return StrNew(filename);
+    return ZcSourcePath(filename);
 }
 Bool BootstrapFilesFindAppend(CDirEntry **head, CDirEntry **tail,
                               U8 *full_name, I64 size, Bool is_dir,
@@ -2641,18 +2650,9 @@ U0 Busy(I64 us)
 {
     if (us) {}
 }
-// Minimal text/CPU stand-ins referenced by Ctrl-Alt hooks in KeyDevInit.
-// Gs() is host-bound to bootstrap_gs; CCPU layout only needs idle_task here.
-class CBootstrapTextGlbls
-{
-    I64 raw_col, raw_flags;
-    U32 *raw_screen, *fb_alias;
-    I64 rows, cols;
-    U64 *font, *aux_font, screen_size, buffer_size;
-    U8 border_chars[16];
-    Bool is_fb_busy;
-};
-CBootstrapTextGlbls text;
+// The loader supplies KernelA's text ABI and the same bound object as KernelC
+// before compiling this module. A private zero-filled copy would make
+// GrGlobals compile TEXT_COLS/TEXT_ROWS as zero.
 CTask *sys_winmgr_task = NULL;
 // Doc recalculation may load after the task bridge. The host thunk resolves
 // the guest function at call time and safely skips it until it is defined.

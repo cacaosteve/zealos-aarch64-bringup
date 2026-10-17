@@ -28,6 +28,8 @@ p.add_argument('--probe-gui-keyboard', action='store_true',
                help='inject printable virtio keys and verify the boot graphical terminal receives them')
 p.add_argument('--probe-gui-workflow', action='store_true',
                help='verify visible graphical editing, save/compile/run, and reopen after reboot')
+p.add_argument('--probe-task-settings', action='store_true',
+               help='check upstream application settings and task-local directories at normal desktop boot')
 p.add_argument('--probe-winmgr', action='store_true',
                help='also try the unchanged WinMgr.ZC load with a short timeout after Win.ZC')
 p.add_argument('--probe-grscreen', action='store_true',
@@ -131,8 +133,9 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             platform_args += ['-device', f'usb-tablet,bus=usb.0,port={usb_prefix}3,id=usb-tablet']
     cmd = [os.environ.get('QEMU', 'qemu-system-aarch64')] + platform_args + ['-drive', f'if=pflash,unit=0,format=raw,file={fw},readonly=on', '-drive', f'if=pflash,unit=1,format=raw,file={tmp}/vars.fd', '-serial', 'stdio', '-monitor', 'none', '-display', 'none']
     qmp_path = tmp/'qmp.sock'
-    if args.pci:
-        cmd += ['-qmp', f'unix:{qmp_path},server=on,wait=off']
+    # Both boot shapes have a VirtIO keyboard. Focused guest children receive
+    # device input; UART remains independent for the serial command shell.
+    cmd += ['-qmp', f'unix:{qmp_path},server=on,wait=off']
     if args.pci:
         shutil.copyfile(ROOT/'build/disk.img', tmp/'disk.img')
         # A torn shadow-bank superblock must never supersede the valid A bank.
@@ -302,6 +305,12 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             {'type': 'abs', 'data': {'axis': 'x', 'value': round(x*32767/799)}},
             {'type': 'abs', 'data': {'axis': 'y', 'value': round(y*32767/599)}}]})
     def require_graphical_pointer():
+        # A newly attached tablet starts at zero, while QEMU can retain its
+        # last host absolute position. Force an actual axis change before
+        # checking pixels, as physical mouse motion would after reconnect.
+        if not (args.usb_input and args.usb_pointer == 'mouse'):
+            move_graphical_pointer(600, 440)
+            time.sleep(0.1)
         move_graphical_pointer(640, 480)
         deadline = time.monotonic() + 5
         while True:
@@ -315,6 +324,20 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             time.sleep(0.1)
     def qmp_send_key(qcode):
         qmp_send_keys([qcode])
+    def focus_graphical_terminal():
+        location = command('zc Print("gui_click=%d,%d\\n", '
+            '(bootstrap_gui_terminal_task->pix_left+bootstrap_gui_terminal_task->pix_right)/2, '
+            '(bootstrap_gui_terminal_task->pix_top+bootstrap_gui_terminal_task->pix_bottom)/2);',
+            'gui_click=')
+        point = re.search(r'gui_click=(-?\d+),(-?\d+)', location)
+        if not point:
+            raise RuntimeError('could not read graphical terminal bounds:\n'+location)
+        move_graphical_pointer(int(point.group(1)), int(point.group(2)))
+        for down in (True, False):
+            qmp_command('input-send-event', {'events': [
+                {'type': 'btn', 'data': {'down': down, 'button': 'left'}}]})
+            time.sleep(0.15)
+        command('zstatus', 'keyboard_focus=Terminal')
     def qmp_send_text(text, delay=0.2):
         qcodes = {
             ' ': ('spc',), '/': ('slash',), '.': ('dot',),
@@ -376,10 +399,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         command('zstatus', 'failed=0')
         command('zcall TaskBackgroundKeyCleanup', 'zc => 0x000000000000002a')
         command('zcall TaskBackgroundFocusStart', 'zc => 0x000000000000002a')
-        if args.pci:
-            qmp_send_key('g')
-        else:
-            guest.stdin.write(b'g'); guest.stdin.flush()
+        qmp_send_key('g')
         # Give the idle scheduler time to deliver the focused key and end
         # the child before the next shell command under a slow HVF run.
         time.sleep(.2)
@@ -490,6 +510,21 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         if not text_pixels or int(text_pixels.group(1), 16) < 100:
             raise RuntimeError('boot graphical terminal has no visible document text pixels:\n' + visible_text)
         print(f'PASS boot graphical terminal visible text pixels: {int(text_pixels.group(1), 16)}', flush=True)
+        command('zload /Tests/TaskSettings.ZC', 'zc: loaded /Tests/TaskSettings.ZC')
+        command('zcall TaskCurrentDirectoryChecks', 'zc => 0x000000000000002a')
+        command('zcall TaskSettingsRestoreChecks', 'zc => 0x000000000000002a')
+        command('zcall TaskSettingsDocumentChecks', 'zc => 0x000000000000002a')
+        command('zstatus', 'failed=0')
+        if args.probe_task_settings:
+            # Relative zload uses the caller's directory, while #include is
+            # resolved from the loaded source's directory by the compiler.
+            command('zcall TaskDirectoryFileChecks', 'zc => 0x000000000000002a')
+            command('zc Cd("/Tests");', 'zc: executed')
+            command('zload SettingsCwd.ZC', 'zc: loaded /Tests/SettingsCwd.ZC')
+            command('zcall SettingsCwd', 'zc => 0x000000000000002a')
+            command('zc #include "SettingsCwdValue.HH"', 'zc: executed')
+            command('zc Cd("/");', 'zc: executed')
+            raise SystemExit(0)
         if args.probe_gui_keyboard:
             require_graphical_text('boot-terminal', 'ZealOS ARM64 graphical terminal')
             raw_pattern = r'usb_input:.* key_events=(\d+)' if args.usb_input else r'virtio_keyboard: ready=1 key_events=(\d+)'
@@ -544,6 +579,10 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 if not re.search(r'wheel_events=[1-9]\d*', wheel_status):
                     raise RuntimeError('native USB wheel report was not decoded:\n'+wheel_status)
                 print('PASS native USB left/right/middle press/release and wheel', flush=True)
+                # Pointer/button checks run outside the terminal. The source
+                # manager correctly focuses its background there; select the
+                # application again before asserting application typing.
+                focus_graphical_terminal()
                 fast_command = 'zc I64 UsbFastTyping(){return 42;}'
                 qmp_send_text(fast_command, delay=0.1)
                 require_graphical_text('usb-fast-typing', '> '+fast_command)
@@ -817,6 +856,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                         add_input('usb-tablet', 'usb-tablet', 3)
                         wait_usb('pointer=usb-tablet', devices=count)
                         require_graphical_pointer()
+                        focus_graphical_terminal()
                         print('PASS tablet unplug releases held button, selects mouse, and reattach restores visible pointer', flush=True)
                     if args.usb_hubs:
                         # QEMU removes descendants when their hub is unrealized.
@@ -1793,12 +1833,12 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             command('zcall PopupBridgeChecks', 'zc => 0x000000000000002a')
             command_after_marker_key('zcall PopupLiveKey', 'popup key ready', b'p',
                                      'zc => 0x0000000000000070', delay=.3,
-                                     virtio=args.pci)
+                                     virtio=True)
             command('zload /Tests/TaskFocusRing.ZC', 'zc: loaded /Tests/TaskFocusRing.ZC')
             command('zcall TaskFocusRingChecks', 'zc => 0x000000000000002a')
             command_after_marker_key('zcall TaskFocusRingLive', 'focus ring ready', b'r',
                                      'zc => 0x0000000000000072', delay=.3,
-                                     virtio=args.pci)
+                                     virtio=True)
             command('zload /Tests/TaskChildRing.ZC', 'zc: loaded /Tests/TaskChildRing.ZC')
             command('zcall TaskChildRingChecks', 'zc => 0x000000000000002a')
             command('zload /Tests/TaskJobs.ZC', 'zc: loaded /Tests/TaskJobs.ZC')
@@ -1840,7 +1880,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             checked_background_tasks()
             command_after_marker_key('zcall TaskLiveFocus', 'focus ready', b'f',
                                      'zc => 0x0000000000000066',
-                                     virtio=args.pci)
+                                     virtio=True)
             command('zload /Tests/TaskSpawnQueue.ZC', 'zc: loaded /Tests/TaskSpawnQueue.ZC')
             command('zcall TaskSpawnQueueChecks', 'zc => 0x000000000000002a')
             command('zload /Tests/TaskJobQueue.ZC', 'zc: loaded /Tests/TaskJobQueue.ZC')
@@ -2000,12 +2040,12 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             command('zcall PopupBridgeChecks', 'zc => 0x000000000000002a')
             command_after_marker_key('zcall PopupLiveKey', 'popup key ready', b'p',
                                      'zc => 0x0000000000000070', delay=.3,
-                                     virtio=args.pci)
+                                     virtio=True)
             command('zload /Tests/TaskFocusRing.ZC', 'zc: loaded /Tests/TaskFocusRing.ZC')
             command('zcall TaskFocusRingChecks', 'zc => 0x000000000000002a')
             command_after_marker_key('zcall TaskFocusRingLive', 'focus ring ready', b'r',
                                      'zc => 0x0000000000000072', delay=.3,
-                                     virtio=args.pci)
+                                     virtio=True)
             command('zload /Tests/TaskChildRing.ZC', 'zc: loaded /Tests/TaskChildRing.ZC')
             command('zcall TaskChildRingChecks', 'zc => 0x000000000000002a')
             command('zload /Tests/TaskJobs.ZC', 'zc: loaded /Tests/TaskJobs.ZC')
@@ -2047,7 +2087,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             checked_background_tasks()
             command_after_marker_key('zcall TaskLiveFocus', 'focus ready', b'f',
                                      'zc => 0x0000000000000066',
-                                     virtio=args.pci)
+                                     virtio=True)
             command('zload /Tests/TaskSpawnQueue.ZC', 'zc: loaded /Tests/TaskSpawnQueue.ZC')
             command('zcall TaskSpawnQueueChecks', 'zc => 0x000000000000002a')
             command('zload /Tests/TaskJobQueue.ZC', 'zc: loaded /Tests/TaskJobQueue.ZC')

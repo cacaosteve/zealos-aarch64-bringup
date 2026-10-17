@@ -578,6 +578,11 @@ check-doced-popup: esp
 check-docfile-persistence: esp
 	python3 scripts/check-compat.py --pci --probe-module /System/DolDoc/DocFile.ZC
 
+# Upstream application state and task-local source-volume directories.
+.PHONY: check-task-settings
+check-task-settings: check-upstream esp
+	python3 scripts/check-compat.py --pci --probe-task-settings
+
 # UTM-shaped path: boot GPT disk via virtio-blk-pci only (no MMIO RedSea).
 # Accepts when serial shows: virtio-blk: OK … pci / virtio-blk: rw OK
 run-pci: esp $(FW_VARS)

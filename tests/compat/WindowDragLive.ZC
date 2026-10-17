@@ -269,10 +269,13 @@ I64 WindowDragLiveRenderChecks()
         return 7;
     if (BootstrapWinTextCellVisible(window_drag_live_b, 49, 27) != b_is_front)
         return 24;
-    if (b_is_front && window_drag_live_presented_pixel != 0x00FFFF55)
+    if ((b_is_front && window_drag_live_presented_pixel != 0x00FFFF55) ||
+        (!b_is_front && window_drag_live_presented_pixel != 0))
+    {
+        Print("window overlap: front=%d pixel=%X\n", b_is_front,
+            window_drag_live_presented_pixel);
         return 9;
-    if (!b_is_front && window_drag_live_presented_pixel != 0)
-        return 9;
+    }
     // The original UTM symptom was intermittent black/yellow alternation in
     // this overlap. Hold the z-order fixed and ensure unchanged frames retain
     // the same front-window control pixel instead of only checking one frame.

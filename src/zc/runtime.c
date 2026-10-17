@@ -334,6 +334,7 @@ static int64_t guest_input_filter_off, guest_next_filter_off, guest_server_ctrl_
 static int64_t guest_heap_sig_off, guest_heap_used_off, guest_heap_task_off;
 static int64_t guest_except_ch_off, guest_catch_except_off;
 static int64_t guest_hash_table_off;
+static int64_t guest_cur_dir_off;
 static int guest_task_bound;
 static int source_winmgr_active;
 extern uint64_t zeal_fb_text_cols(void), zeal_fb_text_rows(void);
@@ -596,6 +597,50 @@ static int normal_path(const char *src, char out[128]) {
     out[n] = 0;
     return 0;
 }
+/* The bootstrap source volume has one namespace, without ZealOS drive
+ * letters. Keep compiler archive lookup root-relative; resolve application
+ * paths against the calling task only at the public file API boundary. */
+static const char *guest_current_dir(void) {
+    const char *dir = guest_task_bound
+        ? *(char **)((unsigned char *)guest_fibers[guest_current].words + guest_cur_dir_off)
+        : NULL;
+    return dir ? dir : "/";
+}
+static int guest_path(const char *path, char out[134]) {
+    char joined[256], name[128];
+    if (!path || !*path)
+        return -1;
+    int disk = !strncmp(path, "disk:", 5);
+    const char *src = path + (disk ? 5 : 0);
+    size_t length = strlen(src);
+    if (length >= 128 || strchr(src, ':') || strchr(src, '\\'))
+        return -1;
+    if (!disk && src[0] != '/') {
+        const char *dir = guest_current_dir();
+        size_t dir_len = strlen(dir);
+        if (dir_len + length + 2 > sizeof(joined))
+            return -1;
+        memcpy(joined, dir, dir_len);
+        joined[dir_len] = '/';
+        memcpy(joined + dir_len + 1, src, length + 1);
+        src = joined;
+    }
+    if (normal_path(src, name))
+        return -1;
+    size_t prefix = disk ? 5 : 0;
+    if (disk)
+        memcpy(out, "disk:", prefix);
+    out[prefix] = '/';
+    memcpy(out + prefix + 1, name, strlen(name) + 1);
+    return 0;
+}
+static int64_t host_source_path(int64_t *a) {
+    char path[134];
+    if (guest_path((const char *)(uintptr_t)a[0], path))
+        return 0;
+    CHeapCtrl *owner = guest_task_bound ? &guest_fibers[guest_current].heap_owner : &data_heap;
+    return (int64_t)(uintptr_t)__AIWNIOS_StrDup(path, owner);
+}
 static int octal(const unsigned char *p, size_t n, size_t *out) {
     size_t r = 0;
     int seen = 0;
@@ -823,7 +868,10 @@ static int source_dir_exists(const char *path) {
     return 0;
 }
 static int64_t host_file_dir_exists(int64_t *a) {
-    return source_dir_exists((const char *)(uintptr_t)a[0]);
+    char path[134];
+    if (guest_path((const char *)(uintptr_t)a[0], path))
+        return 0;
+    return source_dir_exists(path + (!strncmp(path, "disk:", 5) ? 5 : 0));
 }
 static int disk_name(const char *path, char name[128]) {
     if (strncmp(path, "disk:", 5) || normal_path(path + 5, name)) return -1;
@@ -870,18 +918,10 @@ static const unsigned char *source_file_find(const char *path, size_t *length,
     // Absolute ZealOS paths refer to the writable source volume first, then
     // fall back to the bundled source archive. This lets Ed reopen saved edits
     // instead of silently displaying the original bundled copy.
-    if (path[0] == '/' && strlen(path) <= 95) {
+    char name[128];
+    if (!normal_path(path, name) && strlen(name) <= 95) {
         char disk_path[101] = "disk:";
-        memcpy(disk_path + 5, path, strlen(path) + 1);
-        *owned = disk_copy(disk_path, length, &tombstoned);
-        if (*owned)
-            return (const unsigned char *)*owned;
-        if (tombstoned)
-            return NULL;
-    }
-    if (path[0] != '/' && strlen(path) <= 95) {
-        char disk_path[101] = "disk:";
-        memcpy(disk_path + 5, path, strlen(path) + 1);
+        memcpy(disk_path + 5, name, strlen(name) + 1);
         *owned = disk_copy(disk_path, length, &tombstoned);
         if (*owned)
             return (const unsigned char *)*owned;
@@ -892,12 +932,14 @@ static const unsigned char *source_file_find(const char *path, size_t *length,
     return data;
 }
 static int64_t host_file_read(int64_t *a) {
-    const char *path = (const char *)(uintptr_t)a[0];
+    char path[134];
     size_t length = 0;
     char *owned = NULL;
-    const unsigned char *data = source_file_find(path, &length, &owned);
     if (a[1]) *(int64_t *)(uintptr_t)a[1] = 0;
     if (a[2]) *(int64_t *)(uintptr_t)a[2] = 0;
+    if (guest_path((const char *)(uintptr_t)a[0], path))
+        return 0;
+    const unsigned char *data = source_file_find(path, &length, &owned);
     if (!data || length > INT64_MAX || length == SIZE_MAX) {
         free(owned);
         return 0;
@@ -915,10 +957,11 @@ static int64_t host_file_read(int64_t *a) {
     return (int64_t)(uintptr_t)contents;
 }
 static int64_t host_file_write(int64_t *a) {
-    const char *path = (const char *)(uintptr_t)a[0];
+    char path[134];
     const char *src = (const char *)(uintptr_t)a[1];
     int64_t length = a[2];
-    if (!path || !src || length <= 0 || !disk_writer ||
+    if (guest_path((const char *)(uintptr_t)a[0], path) ||
+        !src || length <= 0 || !disk_writer ||
         disk_writer(path, src, (size_t)length))
         return -1;
     return length;
@@ -973,12 +1016,23 @@ size_t fread(void *d, size_t w, size_t n, FILE *f) {
     return n;
 }
 
+static CHeapCtrl *guest_allocation_owner(int64_t selector) {
+    if (guest_task_bound) {
+        if (!selector)
+            return &guest_fibers[guest_current].heap_owner;
+        for (unsigned i = 0; i < GUEST_TASKS; i++) {
+            struct guest_fiber *f = &guest_fibers[i];
+            if (f->state == GUEST_RUNNABLE &&
+                ((void *)(uintptr_t)selector == f->words ||
+                 (void *)(uintptr_t)selector == f->heap_words))
+                return &f->heap_owner;
+        }
+        zc_fail("allocation target is not a live guest task or heap");
+    }
+    return &data_heap;
+}
 static int64_t host_malloc(int64_t *a) {
-    /* ZealOS MAlloc(size, mem_task=NULL). Task-specific heaps are not wired
-     * yet; ignore mem_task and allocate on the current fiber/data heap. */
-    CHeapCtrl *owner = guest_task_bound ? &guest_fibers[guest_current].heap_owner : &data_heap;
-    (void)a[1];
-    return (int64_t)(uintptr_t)__AIWNIOS_MAlloc(a[0], owner);
+    return (int64_t)(uintptr_t)__AIWNIOS_MAlloc(a[0], guest_allocation_owner(a[1]));
 }
 static int64_t host_sqrt(int64_t *a) {
     return (int64_t)hc_builtin_sqrt((uint64_t)a[0]);
@@ -1166,10 +1220,7 @@ static int64_t host_option(int64_t *a) {
     return 0;
 }
 static int64_t host_calloc(int64_t *a) {
-    /* CAlloc is the zero-filled sibling of MAlloc; the task selector is
-     * accepted for ABI compatibility while this runtime uses its active heap. */
-    CHeapCtrl *owner = guest_task_bound ? &guest_fibers[guest_current].heap_owner : &data_heap;
-    return (int64_t)(uintptr_t)__AIWNIOS_CAlloc(a[0], owner);
+    return (int64_t)(uintptr_t)__AIWNIOS_CAlloc(a[0], guest_allocation_owner(a[1]));
 }
 static int64_t host_free(int64_t *a) {
     free((void *)(uintptr_t)a[0]);
@@ -1475,9 +1526,8 @@ static int64_t host_gr_screen_update(int64_t *a) {
         "bootstrap_present_raw", Fs->hash_table, HTT_GLBL_VAR, 1);
     if (!raw_screen || !raw_screen->data_addr)
         return 0;
-    /* KernelA's CTextGlobals is host-bound; TaskBridge also has a private
-     * bootstrap text object. Convert through the validated staging plane and
-     * keep source scanout writes staged while a host frame is in progress. */
+    /* Convert through the validated staging plane and keep source scanout
+     * writes staged while a host frame is in progress. */
     guest_text_globals[2] = (uint64_t)(uintptr_t)raw_screen->data_addr;
     guest_text_globals[3] = guest_task_frame_active
         ? (uint64_t)(uintptr_t)raw_screen->data_addr
@@ -1660,14 +1710,21 @@ static int64_t host_active_winmgr_globals(int64_t *a) {
 }
 static int64_t host_set_winmgr_task(int64_t *a) {
     CHashGlblVar *global;
+    int updated = 0;
     if (!Fs || !Fs->hash_table)
         return 0;
-    global = (CHashGlblVar *)HashFind("sys_winmgr_task", Fs->hash_table,
-                                     HTT_GLBL_VAR, 1);
-    if (!global || !global->data_addr)
-        return 0;
-    *(void **)global->data_addr = (void *)(uintptr_t)a[0];
-    return 1;
+    /* TaskBridge is loaded at both KernelC and graphics stages. Functions
+     * retain the data slot present when they were compiled; changing only
+     * the newest slot leaves older hit-testing/frame code using sys_task as
+     * its manager sentinel, so it can raise the background over applications. */
+    for (int64_t instance = 1; (global = (CHashGlblVar *)HashFind(
+             "sys_winmgr_task", Fs->hash_table, HTT_GLBL_VAR, instance)); instance++) {
+        if (global->data_addr) {
+            *(void **)global->data_addr = (void *)(uintptr_t)a[0];
+            updated = 1;
+        }
+    }
+    return updated;
 }
 static int64_t host_win_mouse_update(int64_t *a) {
     CHashFun *update;
@@ -2287,6 +2344,10 @@ static void init_guest_fiber(unsigned i, void *parent, const char *name) {
     *(void **)(words + guest_next_ctrl_off) = words + guest_next_ctrl_off;
     *(void **)(words + guest_last_ctrl_off) = words + guest_next_ctrl_off;
     *(void **)(words + guest_parent_off) = parent;
+    const char *dir = parent
+        ? *(char **)((unsigned char *)parent + guest_cur_dir_off) : NULL;
+    *(char **)(words + guest_cur_dir_off) =
+        __AIWNIOS_StrDup((char *)(dir ? dir : "/"), &f->heap_owner);
     if (parent && guest_gs_off >= 0)
         *(void **)(words + guest_gs_off) =
             *(void **)((unsigned char *)parent + guest_gs_off);
@@ -2610,6 +2671,44 @@ static struct guest_fiber *find_guest_task(void *task) {
         if (guest_fibers[i].words == task && guest_fibers[i].state == GUEST_RUNNABLE)
             return &guest_fibers[i];
     return NULL;
+}
+static int64_t host_cd(int64_t *a) {
+    const char *requested = (const char *)(uintptr_t)a[0];
+    char path[134];
+    if (!guest_task_bound)
+        return 0;
+    if (requested && !*requested)
+        return 1;
+    /* Home and mkdir are not available on the bootstrap source store. NULL
+     * selects its root; a missing directory fails without changing state. */
+    if (guest_path(requested ? requested : "/", path))
+        return 0;
+    const char *dir = path + (!strncmp(path, "disk:", 5) ? 5 : 0);
+    if (!source_dir_exists(dir))
+        return 0;
+    struct guest_fiber *f = &guest_fibers[guest_current];
+    char **current = (char **)((unsigned char *)f->words + guest_cur_dir_off);
+    char *next = __AIWNIOS_StrDup((char *)dir, &f->heap_owner);
+    free(*current);
+    *current = next;
+    return 1;
+}
+static int64_t host_dir_cur(int64_t *a) {
+    struct guest_fiber *task = a[0] ? find_guest_task((void *)(uintptr_t)a[0])
+        : guest_task_bound ? &guest_fibers[guest_current] : NULL;
+    struct guest_fiber *owner = a[1] ? find_guest_task((void *)(uintptr_t)a[1])
+        : guest_task_bound ? &guest_fibers[guest_current] : NULL;
+    if (!task || !owner)
+        return 0;
+    char *dir = *(char **)((unsigned char *)task->words + guest_cur_dir_off);
+    return dir ? (int64_t)(uintptr_t)__AIWNIOS_StrDup(dir, &owner->heap_owner) : 0;
+}
+static int64_t host_sound(int64_t *a) {
+    /* SettingsPop silences the PC speaker. There is no audio device on this
+     * platform yet; do not pretend that nonzero notes can be played. */
+    if (a[0])
+        zc_fail("Sound: audio output is not available on ARM64");
+    return 0;
 }
 static int64_t host_fb_task_text_compose(int64_t *a) {
     struct guest_fiber *f = find_guest_task((void *)(uintptr_t)a[0]);
@@ -4005,6 +4104,7 @@ static void bind_guest_task(void) {
         !task_field(cls, "except_ch", 8, -1) ||
         !task_field(cls, "catch_except", 1, -1) ||
         !task_field(cls, "hash_table", 8, -1) ||
+        !task_field(cls, "cur_dir", 8, -1) ||
         !task_field(heap, "hc_signature", 4, 8) ||
         !task_field(heap, "used_u8s", 8, -1) ||
         !task_field(heap, "mem_task", 8, -1))
@@ -4070,6 +4170,7 @@ static void bind_guest_task(void) {
     guest_except_ch_off = MemberFind("except_ch", cls)->off;
     guest_catch_except_off = MemberFind("catch_except", cls)->off;
     guest_hash_table_off = MemberFind("hash_table", cls)->off;
+    guest_cur_dir_off = MemberFind("cur_dir", cls)->off;
     guest_heap_sig_off = MemberFind("hc_signature", heap)->off;
     guest_heap_used_off = MemberFind("used_u8s", heap)->off;
     guest_heap_task_off = MemberFind("mem_task", heap)->off;
@@ -4165,6 +4266,11 @@ static int64_t execute_source_result(const char *path, const char *src,
         *slash = 0;
     else
         strcpy(dir, !strncmp(path, "disk:", 5) ? "disk:" : ".");
+    if (path[0] == '<') {
+        if (strlen(guest_current_dir()) >= sizeof(dir))
+            zc_fail("current directory is too long");
+        strcpy(dir, guest_current_dir());
+    }
     lex->file->dir = __AIWNIOS_StrDup(dir, NULL);
     CCmpCtrl *cc = CmpCtrlNew(lex);
     cc->flags |= CCF_STRINGS_ON_HEAP;
@@ -4462,15 +4568,18 @@ static int execute_source(const char *path, const char *src) {
     (void)execute_source_result(path, src, 0, 0);
     return 0;
 }
-static int load_inner(const char *path) {
+static int load_inner(const char *path);
+static int load_source_path(const char *path, int merged) {
     size_t n;
     char *src;
     if (!strncmp(path, "disk:", 5)) {
         src = disk_copy(path, &n, NULL);
     } else {
-        const unsigned char *s = source_find(path, &n);
-        src = s ? malloc(n + 1) : NULL;
-        if (src) {
+        char *owned = NULL;
+        const unsigned char *s = merged ? source_file_find(path, &n, &owned)
+                                        : source_find(path, &n);
+        src = owned ? owned : s ? malloc(n + 1) : NULL;
+        if (src && !owned) {
             memcpy(src, s, n);
             src[n] = 0;
         }
@@ -4478,6 +4587,16 @@ static int load_inner(const char *path) {
     if (!src) {
         printf("zc: source not found: %s\n", path);
         return -1;
+    }
+    if (!strcmp(path, "/System/TaskBridge.ZC")) {
+        /* KernelB-only callers need the text declaration before TaskBridge
+         * is compiled. Re-declaring it inside the module creates a fresh,
+         * unbound external slot before its function bodies are emitted. */
+        if (!HashFind("text", Fs->hash_table, HTT_GLBL_VAR, 1))
+            execute_source("<TaskBridge text>", "extern CTextGlobals text;");
+        guest_text_globals[4] = zeal_fb_screen_height() / 8;
+        guest_text_globals[5] = zeal_fb_screen_width() / 8;
+        PrsBindCSymbol("text", guest_text_globals, 0);
     }
     execute_source(path, src);
     if (!strcmp(path, "/System/TaskBridge.ZC")) {
@@ -4491,6 +4610,7 @@ static int load_inner(const char *path) {
         PrsBindCSymbol("FileRead", host_file_read, 3);
         PrsBindCSymbol("FileWrite", host_file_write, 5);
         PrsBindCSymbol("ZcSourceDirExists", host_file_dir_exists, 1);
+        PrsBindCSymbol("ZcSourcePath", host_source_path, 1);
         PrsBindCSymbol("ZcSourceFileAt", host_source_file_at, 4);
         PrsBindCSymbol("LowPass1", host_low_pass1, 4);
         /* These functions were pre-registered before TaskBridge introduced
@@ -4527,6 +4647,9 @@ static int load_inner(const char *path) {
     if (!strcmp(path, "/Kernel/KernelC.HH")) {
         PrsBindCSymbol("FileRead", host_file_read, 3);
         PrsBindCSymbol("FileWrite", host_file_write, 5);
+        PrsBindCSymbol("Cd", host_cd, 2);
+        PrsBindCSymbol("DirCur", host_dir_cur, 2);
+        PrsBindCSymbol("Sound", host_sound, 1);
         /* counts is declared here, not in KernelB.HH; bind after declaration
          * so the generic extern-data binder can resolve the symbol. */
         CHashGlblVar *spawned_tasks = (CHashGlblVar *)HashFind(
@@ -4734,6 +4857,9 @@ static int load_inner(const char *path) {
     printf("zc: loaded %s\n", path);
     return 0;
 }
+static int load_inner(const char *path) {
+    return load_source_path(path, 0);
+}
 int zc_exec(const char *src) {
     if (!ready || failed) {
         zc_output("zc: session unavailable; use zreset\n");
@@ -4754,6 +4880,8 @@ int zc_exec(const char *src) {
     return 0;
 }
 int zc_load(const char *path) {
+    char resolved[134];
+    int relative = path && path[0] != '/' && strncmp(path, "disk:", 5);
     if (!ready || failed) {
         zc_output("zc: session unavailable; use zreset\n");
         return -1;
@@ -4763,7 +4891,17 @@ int zc_load(const char *path) {
         guarded = 0;
         return -1;
     }
-    int r = load_inner(path);
+    if (relative) {
+        if (guest_path(path, resolved)) {
+            guarded = 0;
+            zc_output("zc: invalid source path\n");
+            return -1;
+        }
+        path = resolved;
+    }
+    /* Canonical boot/module paths retain their pinned archive semantics;
+     * relative application loads use the same merged view as FileRead. */
+    int r = load_source_path(path, relative);
     guarded = 0;
     return r;
 }
@@ -4873,6 +5011,9 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
     guest_keyboard_route_last_arg2 = 0;
     guest_winmgr_tick_fun = NULL;
     guest_focus_task = NULL;
+    /* The shared text object can point into the session's staging buffers.
+     * Drop those addresses before reclaiming/reusing the compiler arenas. */
+    memset(guest_text_globals, 0, sizeof(guest_text_globals));
     memset(guest_fibers, 0, sizeof(guest_fibers));
     set_guest_task(NULL);
     memset(&task, 0, sizeof(task));
@@ -5011,6 +5152,10 @@ int zc_start_graphics(void) {
             return -1;
         }
     }
+    /* GrInit's normal startup selects a palette before applications can save
+     * it. The incremental source boot must do that too, rather than relying
+     * on the fallback presenter's lazy initialization of an all-zero palette. */
+    execute_source("<graphics startup>", "PaletteSetStd(FALSE);");
     /* Verify the source ODE pipeline in the same compiler hash that loaded
      * the modules. Later shell calls may run with a task-local Fs/hash table. */
     const char *const ode_symbols[] = {
@@ -5094,6 +5239,7 @@ int zc_start_gui_terminal(void) {
          * EdCharIns/EdCursorLeft/etc. to bootstrap stand-ins. Recompile after
          * their real definitions exist, before installing KDDocPutKey. */
         "/System/DolDoc/DocPutKey.ZC",
+        "/System/TaskSettings.ZC",
         "/System/GuiTerminal.ZC",
     };
     int64_t result = 0;

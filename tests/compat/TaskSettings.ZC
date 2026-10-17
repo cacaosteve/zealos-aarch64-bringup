@@ -1,0 +1,147 @@
+// Actual pinned TaskSettings, running under the normal boot desktop.
+I64 settings_dir_result;
+U8 *settings_export, *settings_export_dir;
+CTaskSettings *settings_export_state;
+
+U0 SettingsDirectoryWorker(U8 *data)
+{
+    U8 *dir = DirCur, *contents;
+    I64 size;
+    settings_dir_result = 1;
+    if (!dir || StrCompare(dir, "/Tests")) return;
+    Free(dir);
+    if (!Cd("../Kernel/./")) return;
+    Yield;
+    contents = FileRead("KernelA.HH", &size);
+    if (!contents || size != 113880) return;
+    Free(contents);
+    dir = DirCur(Fs->parent_task);
+    if (!dir || StrCompare(dir, "/LICENSE")) return;
+    Free(dir);
+    // Both allocations must outlive this child and belong to the parent.
+    settings_export = StrNew("survives child exit", Fs->parent_task);
+    settings_export_dir = DirCur(NULL, Fs->parent_task);
+    settings_export_state = SettingsPush(Fs->parent_task);
+    settings_dir_result = 42;
+}
+
+I64 TaskCurrentDirectoryChecks()
+{
+    U8 *original = DirCur, *absolute;
+    I64 result = 42;
+    CTask *child;
+    if (!original || !Cd("/Tests")) return 1;
+    if (Cd("/MissingDirectory") || Cd("/MissingDirectory", TRUE) ||
+        Cd("~/UnsupportedHome") || Cd("Z:/UnsupportedDrive") ||
+        StrCompare(Fs->cur_dir, "/Tests")) return 2;
+    if (!Cd("") || !Cd("./../Tests//")) return 3;
+    absolute = FileNameAbs("../Kernel/KernelA.HH");
+    if (!absolute || StrCompare(absolute, "/Kernel/KernelA.HH")) return 4;
+    Free(absolute);
+    child = Spawn(&SettingsDirectoryWorker, NULL, "Directory check");
+    if (!child || !Cd("/LICENSE")) return 7;
+    while (TaskValidate(child)) Yield;
+    if (settings_dir_result != 42 || !settings_export || !settings_export_dir ||
+        !settings_export_state || Fs->next_settings != settings_export_state ||
+        StrCompare(settings_export, "survives child exit") ||
+        StrCompare(settings_export_dir, "/Kernel") ||
+        StrCompare(Fs->cur_dir, "/LICENSE"))
+        result = 8;
+    Free(settings_export);
+    Free(settings_export_dir);
+    settings_export = settings_export_dir = NULL;
+    SettingsPop;
+    if (!Cd(original)) result = 9;
+    Free(original);
+    return result;
+}
+
+I64 TaskDirectoryFileChecks()
+{
+    U8 *original = DirCur, *contents;
+    U8 *source = "#include \"SettingsCwdValue.HH\"\n"
+        "I64 SettingsCwd(){return SETTINGS_CWD_VALUE;}\n";
+    U8 *header = "#define SETTINGS_CWD_VALUE 42\n";
+    I64 size;
+    if (!original || !Cd("/Tests")) return 1;
+    if (FileWrite("SettingsCwd.ZC", source, StrLen(source)) != StrLen(source) ||
+        FileWrite("SettingsCwdValue.HH", header, StrLen(header)) != StrLen(header))
+        return 2;
+    contents = FileRead("/Tests/SettingsCwd.ZC", &size);
+    if (!contents || size != StrLen(source) || StrCompare(contents, source))
+        return 3;
+    Free(contents);
+    if (!Cd(original)) return 4;
+    Free(original);
+    return 42;
+}
+
+I64 TaskSettingsRestoreChecks()
+{
+    CTaskSettings *original, *saved, *nested;
+    CDoc *doc = DocPut;
+    CBGR24 palette[COLORS_NUM], expected_palette[COLORS_NUM];
+    I64 result = 42;
+    original = SettingsPush;
+    if (!original || Fs->next_settings != original || !Cd("/Tests")) return 1;
+    WinHorz(3, 62);
+    WinVert(4, 38);
+    Fs->scroll_x = 9; Fs->scroll_y = 17; Fs->scroll_z = 25;
+    Fs->win_inhibit = WIG_USER_TASK_DEFAULT;
+    Fs->text_attr = 0x1e;
+    StrCopy(Fs->task_title, "Saved application state");
+    if (doc) Bts(&doc->flags, DOCf_HIDE_CURSOR);
+    saved = SettingsPush;
+    if (!saved || saved->next != original) return 2;
+    GrPaletteGet(expected_palette);
+    PaletteSetGray(FALSE);
+    if (!Cd("/Kernel")) return 3;
+    WinHorz(7, 45);
+    WinVert(9, 28);
+    Fs->scroll_x = 1; Fs->scroll_y = 2; Fs->scroll_z = 3;
+    Fs->text_attr = 0x2f;
+    StrCopy(Fs->task_title, "Temporary application state");
+    if (doc) Btr(&doc->flags, DOCf_HIDE_CURSOR);
+    nested = SettingsPush;
+    if (!nested || nested->next != saved) return 4;
+    if (nested->left != 7)
+    {
+        Print("settings save: actual=%d saved=%d right=%d/%d\n",
+            Fs->win_left, nested->left, Fs->win_right, nested->right);
+        return 66;
+    }
+    if (!Cd("/LICENSE")) return 5;
+    SettingsPop;
+    if (Fs->next_settings != saved) return 61;
+    if (StrCompare(Fs->cur_dir, "/Kernel")) return 62;
+    if (Fs->text_attr != 0x2f) return 63;
+    if (Fs->win_left != 7) return 64;
+    if (Fs->win_bottom != 28) return 65;
+    SettingsPop;
+    GrPaletteGet(palette);
+    if (Fs->next_settings != original || StrCompare(Fs->cur_dir, "/Tests") ||
+        Fs->win_left != 3 || Fs->win_right != 62 ||
+        Fs->win_top != 4 || Fs->win_bottom != 38 ||
+        Fs->scroll_x != 9 || Fs->scroll_y != 17 || Fs->scroll_z != 25 ||
+        Fs->text_attr != 0x1e || Fs->win_inhibit != WIG_USER_TASK_DEFAULT ||
+        MemCompare(palette, expected_palette, sizeof(palette)) ||
+        StrCompare(Fs->task_title, "Saved application state") ||
+        (doc && !Bt(&doc->flags, DOCf_HIDE_CURSOR)))
+        result = 7;
+    SettingsPop;
+    return result;
+}
+
+I64 settings_document_result;
+U0 SettingsDocumentWorker(U8 *data)
+{
+    DocTermNew;
+    settings_document_result = TaskSettingsRestoreChecks;
+}
+I64 TaskSettingsDocumentChecks()
+{
+    CTask *worker = Spawn(&SettingsDocumentWorker, NULL, "Settings document");
+    if (!worker) return 1;
+    while (TaskValidate(worker)) Yield;
+    return settings_document_result;
+}
