@@ -2545,8 +2545,16 @@ gate retains its original pacing and assertions. The source-list smoke checks
 completion/truncation rather than assuming particular first directory names.
 Source-pin, guarded-overlay, Python syntax and whitespace checks passed.
 
-The live UTM VM remains on its previously accepted image while the Mac is
-locked. After refresh, verify visible typing and use
-`zc ExeFile("/Tests/GuiAcceptance.ZC");` followed by `zcall GuiAcceptance`
-against the previously saved source. This requires a new live UTM check;
-the QMP result does not renew physical host input acceptance.
+The live UTM VM was refreshed to `bc30cc4` from the stopped-VM backup at
+`build/utm-before-source-execute-20261017-154916/` and `utmctl` reports it
+started. SHA-256 comparison confirmed all 163 pre-existing files outside the
+four repository-managed refresh paths unchanged, along with RedSea; deletion
+masks were retained. Five bundled files were added. USB, display, serial,
+network, QEMU and drive settings are unchanged. The detailed preservation
+report is `build/source-execute-utm-backup.json`.
+
+The Mac remains locked, so visual boot and input acceptance are still pending.
+Verify visible typing and use `zc ExeFile("/Tests/GuiAcceptance.ZC");` followed
+by `zcall GuiAcceptance` against the previously saved source. The process's
+started state does not prove a successful graphical boot, and the QMP result
+does not renew physical host input acceptance.
