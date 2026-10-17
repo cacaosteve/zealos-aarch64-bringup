@@ -114,8 +114,10 @@ ran an edited function, rebooted, and reopened its persisted source.
 The refreshed live UTM guest retained USB 3.0, display and serial settings,
 showed `help` before Return, and executed graphical `zstatus` with native
 keyboard/tablet owners, two running controllers, zero quarantined regions
-and zero dropped routed keys. Capture was released. Physical typing and
-dragging on this topology build are awaiting the user's confirmation.
+and zero dropped routed keys. Capture was released. After correcting an
+earlier response about the selected capture button and an unperformed drag
+check, the user confirmed that the refreshed VM interaction works. The
+earlier response is not counted as a separate drag acceptance result.
 
 2026-10-17 live UTM: USB 3.0, display and built-in Terminal 1 settings were
 preserved. The guest reported two running controllers (`error=0`), three
