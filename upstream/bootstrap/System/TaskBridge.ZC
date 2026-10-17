@@ -179,6 +179,8 @@ extern U0 throw(I64 ch=0, Bool no_log=FALSE);
 // InputFilterTask and Job.ZC: ExePrint("%s", source). Other formats remain
 // compiler-runtime work.
 extern I64 ExePrint(U8 *format, U8 *source);
+extern I64 ExePutS(U8 *buf, U8 *filename=NULL, I64 ccf_flags=0,
+                   CLexHashTableContext *htc=NULL);
 // DolDoc's numeric prompts use these two bounded source templates. The ARM64
 // host bridge evaluates only ToI64(%s) and ToF64(%s), with a 4096-byte input.
 extern I64 ExePrint2(U8 *format, U8 *expression);
@@ -381,14 +383,19 @@ CTask *sys_task = Fs;
 U8 *ExtDefault(U8 *filename, U8 *extension)
 {
     I64 i = 0;
+    Bool has_extension = FALSE;
     if (!filename)
         return StrNew("");
     while (filename[i])
     {
-        if (filename[i] == '.')
-            return StrNew(filename);
+        if (filename[i] == '/' || filename[i] == ':')
+            has_extension = FALSE;
+        else if (filename[i] == '.')
+            has_extension = TRUE;
         i++;
     }
+    if (has_extension)
+        return StrNew(filename);
     return MStrPrint("%s.%s", filename, extension);
 }
 U8 Drive2Letter(CDrive *drive=NULL)
@@ -5821,12 +5828,19 @@ Bool BootstrapWinIsUncovered(CTask *task)
         return FALSE;
     return gr.win_uncovered_bitmap[z / 16] & (1 << (z % 16));
 }
-I64 ExeFile(U8 *filename, I64 ccf_flags=0)
-{
-    if (filename) {}
-    if (ccf_flags) {}
-    return 0;
+// Verbatim wrapper from pinned Compiler/CMain.ZC; ExePutS is the ARM64 ABI boundary.
+I64 ExeFile(U8 *name, I64 ccf_flags=0)
+{//JIT Compile and execute a file.
+	I64 res;
+	U8 *name2 = ExtDefault(name, "ZC"), *st = MStrPrint("#include \"%s\";", name2);
+
+	res = ExePutS(st, name, ccf_flags);
+	Free(st);
+	Free(name2);
+
+	return res;
 }
+
 I64 SysFile(U8 *filename, Bool warn_ext=TRUE)
 {
     if (filename) {}

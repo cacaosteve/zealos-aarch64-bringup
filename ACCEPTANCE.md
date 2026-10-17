@@ -85,6 +85,12 @@ lists, task isolation, project-file lookup, and relative links through the
 unchanged upstream `DocLinkCheck`. The graphical editor must reject a missing
 parent directory and return with its saved settings restored.
 
+`make check-source-execute` checks the upstream `ExeFile` wrapper with native
+file compilation, relative includes, nested files, task isolation, cooperative
+execution, and `CCF_JUST_LOAD`. In the graphical terminal, an executable source
+file can be included with `zc ExeFile("/path/Program.ZC");`. It executes in
+the current task, as a command-line include does in upstream ZealOS.
+
 2026-10-17 application-state update: the focused settings gate passed 18
 checks, the full PCI suite passed 354, the ISO suite passed 277, and the NEC
 two-hub/VirtIO recovery workflow passed 157, including edit/save/run/reboot/reopen, twelve keyboard

@@ -746,15 +746,11 @@ I64 BootstrapGuiShellSmoke()
     if (!output || output[0] != 'z')
         return 2;
     output = BootstrapGuiTerminalMenuAction(3);
-    // The native source catalog preserves insertion order. A clean QEMU
-    // image commonly starts with Kernel/, while a long-lived UTM catalog can
-    // start with App/ or Tests/ after user writes and source merges.
-    if (!output ||
-        (output[0] != 'A' && output[0] != 'K' && output[0] != 'S' &&
-         output[0] != 'T' &&
-         StrCompare(output, "zls: native source partition unavailable\n")))
+    // Catalog order depends on bundled directories and subsequent guest
+    // writes. Check the listing's completion marker, not its first filename.
+    if (!output)
         return 3;
-    if (output[0] != 'z' &&
+    if (StrCompare(output, "zls: native source partition unavailable\n") &&
         (!StrMatch("zls: n=", output) ||
          StrMatch("[output truncated]", output)))
         return 9;

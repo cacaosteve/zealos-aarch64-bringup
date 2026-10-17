@@ -1,0 +1,10 @@
+#include "SourceExecuteValue.HH"
+I64 SourceExecutedValue(I64 n)
+{
+    return SOURCE_EXECUTE_VALUE + n;
+}
+source_file_runs++;
+source_file_task = Fs->task_num;
+source_file_stage = 1;
+Yield;
+SourceExecutedValue(2);

@@ -19,6 +19,7 @@ make check-usb-input    # native NEC/QEMU xHCI keyboard, mouse/tablet + recovery
 make check-usb-topology # nested USB2 hubs, repeated reconnects + subtree recovery
 make check-task-settings # upstream application state + task-local directories
 make check-source-context # directory masks + relative document/project files
+make check-source-execute # upstream ExeFile + native task-local file execution
 make utm               # refresh VM, preserving RedSea/source edits and adding new bundled files
 ```
 

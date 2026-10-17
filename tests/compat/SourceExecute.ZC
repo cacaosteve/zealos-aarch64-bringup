@@ -1,0 +1,113 @@
+I64 source_file_runs, source_file_task, source_file_stage, source_file_peer;
+I64 source_file_child_result, source_file_nested;
+I64 source_file_gui_result;
+
+I64 SourceFileGuiResult()
+{
+    return source_file_gui_result;
+}
+
+U0 SourceFilePeer(U8 *data)
+{
+    while (!source_file_stage) Yield;
+    source_file_peer = 42;
+}
+
+I64 SourceFileExecutionChecks()
+{
+    U8 *original = DirCur;
+    CTask *peer;
+    I64 result;
+    if (!original || !Cd("/LICENSE")) return 1;
+    source_file_runs = source_file_stage = source_file_peer = 0;
+    peer = Spawn(&SourceFilePeer);
+    if (!peer) return 2;
+    result = ExeFile("/Tests/SourceExecuteEntry", CCF_CMD_LINE);
+    while (TaskValidate(peer)) Yield;
+    if (result != 42 || source_file_runs != 1 || source_file_peer != 42 ||
+        source_file_task != Fs->task_num || Fs->answer != 42 ||
+        StrCompare(Fs->cur_dir, "/LICENSE"))
+    {
+        Print("file execution: result=%d runs=%d peer=%d task=%d/%d answer=%d dir=%s\n",
+              result, source_file_runs, source_file_peer, source_file_task,
+              Fs->task_num, Fs->answer, Fs->cur_dir);
+        return 3;
+    }
+    // JUST_LOAD compiles definitions without executing top-level statements
+    // or overwriting the previous answer, matching upstream ExeCmdLine.
+    if (ExeFile("/Tests/SourceExecuteEntry.ZC", CCF_JUST_LOAD) != TRUE ||
+        source_file_runs != 1 || Fs->answer != 42) return 4;
+    if (!Cd("/Tests") || ExeFile("SourceExecuteEntry") != 42 ||
+        source_file_runs != 2) return 5;
+    // The filename is a diagnostic label for an in-memory source buffer.
+    // Its initial include must still resolve against this task's directory.
+    if (ExePutS("#include \"SourceExecuteValue.HH\"\nSOURCE_EXECUTE_VALUE+2;",
+                "/LICENSE/DiagnosticLabel") != 42) return 6;
+    if (!Cd(original)) return 7;
+    Free(original);
+    return 42;
+}
+
+U0 SourceFileChild(U8 *data)
+{
+    source_file_child_result = 1;
+    if (ExeFile("SourceExecuteEntry") != 42 ||
+        source_file_task != Fs->task_num ||
+        StrCompare(Fs->cur_dir, "/Tests")) return;
+    source_file_child_result = 42;
+}
+I64 SourceFileTaskChecks()
+{
+    U8 *original = DirCur;
+    CTask *child;
+    if (!original || !Cd("/Tests")) return 1;
+    child = Spawn(&SourceFileChild);
+    if (!child || !Cd("/LICENSE")) return 2;
+    while (TaskValidate(child)) Yield;
+    if (source_file_child_result != 42 ||
+        StrCompare(Fs->cur_dir, "/LICENSE")) return 3;
+    if (!Cd(original)) return 4;
+    Free(original);
+    return 42;
+}
+
+I64 SourceFileNativeChecks()
+{
+    U8 *original = DirCur;
+    U8 *entry = "#include \"Value.HH\"\n"
+        "source_file_nested+=SOURCE_NESTED_VALUE;"
+        "ExeFile(\"disk:Tests/Source.App/Inner/Next\");";
+    U8 *next = "#include \"../Shared.HH\"\n"
+        "source_file_nested+=SOURCE_SHARED_VALUE; 42;";
+    U8 *value = "#define SOURCE_NESTED_VALUE 19\n";
+    U8 *shared = "#define SOURCE_SHARED_VALUE 23\n";
+    if (!original) return 1;
+    if (FileWrite("/Tests/Source.App/Inner/Entry.ZC", entry, StrLen(entry)) != StrLen(entry) ||
+        FileWrite("/Tests/Source.App/Inner/Next.ZC", next, StrLen(next)) != StrLen(next) ||
+        FileWrite("/Tests/Source.App/Inner/Value.HH", value, StrLen(value)) != StrLen(value) ||
+        FileWrite("/Tests/Source.App/Shared.HH", shared, StrLen(shared)) != StrLen(shared))
+        return 2;
+    if (!Cd("/LICENSE")) return 3;
+    source_file_nested = 0;
+    // A dotted directory does not give the Entry filename an extension.
+    if (ExeFile("/Tests/Source.App/Inner/Entry") != 42 || source_file_nested != 42 ||
+        StrCompare(Fs->cur_dir, "/LICENSE")) return 4;
+    if (!Cd("/Tests/Source.App") ||
+        ExeFile("Inner/Entry") != 42 || source_file_nested != 84) return 5;
+    if (!Cd(original)) return 6;
+    Free(original);
+    return 42;
+}
+
+I64 SourceFileOverlayChecks()
+{
+    U8 *changed = "#define SOURCE_EXECUTE_VALUE 41\n";
+    U8 *restored = "#define SOURCE_EXECUTE_VALUE 40\n";
+    if (FileWrite("/Tests/SourceExecuteValue.HH", changed, StrLen(changed)) != StrLen(changed))
+        return 1;
+    if (ExeFile("/Tests/SourceExecuteEntry.ZC") != 43) return 2;
+    if (FileWrite("/Tests/SourceExecuteValue.HH", restored, StrLen(restored)) != StrLen(restored))
+        return 3;
+    if (ExeFile("/Tests/SourceExecuteEntry.ZC") != 42) return 4;
+    return 42;
+}

@@ -13,6 +13,8 @@ Port changes:
 - Select Aiwnios' non-Darwin ARM register convention on freestanding ELF.
 - Initialize keywords per symbol table so a discarded session can restart.
 - Resolve absolute includes without adding the current source directory.
+  Qualified paths (including bootstrap `disk:` paths) also bypass that
+  prefix; a root-level qualified include retains its qualifier for children.
 - Avoid `log10` when reading decimal literals; use integer digit counting.
 - Bound diagnostic and include-path formatting; handle diagnostics at EOF.
 - Preserve relational chains through constant folding (the backend implements
@@ -39,6 +41,9 @@ Port changes:
   of unbound external data.
 - Reset ARM64 emitter instruction tracking for each top-level IR instruction;
   otherwise a stale pointer can overwrite a reused label and crash cleanup.
+  Clear it around the prologue/root-emission boundaries as well: a constant
+  expression's freed IR must not receive FP-register save bits in a later
+  prologue.
 - Reject guest try/catch until its runtime exists.
 - Reject FS/GS accesses: task segment semantics are not implemented here.
 - Emit declaration-time stores for complete one-dimensional local scalar array

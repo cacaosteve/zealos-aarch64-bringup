@@ -213,12 +213,13 @@
          goto if_fail;
        } else if (!strcmp(lex->string, "ifaot")) {
          // AIWN will only AOT compile for you,the JIT will be
-@@ -756,11 +857,11 @@
+@@ -756,11 +857,12 @@
            actual_file = actual_file->last;
          }
          if (actual_file) {
 -          if (actual_file->dir) {
-+          if (actual_file->dir && lex->string[0] != '/') {
++          if (actual_file->dir && lex->string[0] != '/' &&
++              !strchr(lex->string, ':')) {
              int64_t len =
                  snprintf(NULL, 0, "%s/%s", actual_file->dir, lex->string);
              char buf[len + 1];
@@ -227,7 +228,21 @@
              dir = __AIWNIOS_StrDup(buf, NULL);
              *strrchr(dir, '/') = 0;
              f = fopen(buf, "rb");
-@@ -798,12 +899,19 @@
+@@ -770,7 +872,12 @@
+         normal:
+           f = fopen(lex->string, "rb");
+           if (!strrchr(lex->string, '/')) {
+-            dir = __AIWNIOS_StrDup(".", NULL);
++            char *qualifier = strrchr(lex->string, ':');
++            if (qualifier) {
++              dir = __AIWNIOS_StrDup(lex->string, NULL);
++              dir[qualifier - lex->string + 1] = 0;
++            } else
++              dir = __AIWNIOS_StrDup(".", NULL);
+           } else {
+             dir = __AIWNIOS_StrDup(lex->string, NULL);
+             *strrchr(dir, '/') = 0;
+@@ -798,12 +905,19 @@
          lex->file = new_file;
          goto re_enter;
        } else if (!strcmp(lex->string, "define")) {
@@ -249,7 +264,7 @@
          strcpy(macro_name, lex->string);
          strcpy(lex->string, "");
          define = A_CALLOC(sizeof(CHashDefineStr), NULL);
-@@ -861,8 +969,7 @@
+@@ -861,8 +975,7 @@
  }
  
  CLexer *LexerNew(char *filename, char *text) {
@@ -259,7 +274,7 @@
      struct {
        char *name;
        int64_t tok;
-@@ -925,7 +1032,16 @@
+@@ -925,7 +1038,16 @@
        kw->tk = kws[i].tok;
        HashAdd(kw, Fs->hash_table);
      }
@@ -1855,7 +1870,18 @@
      goto unop;
      break;
    case IC_POS:
-@@ -5162,6 +5250,9 @@
+@@ -5155,6 +5243,10 @@
+           obin); // For OpenBSD sexy mapping(see mem.c or ask nroot)
+       code_off = 0;
+     }
++    /* Prologue register saves are outside any source IR node. A prior
++     * constant-expression compilation may have freed cur_rpn; marking its
++     * FP-register bits here would write through that stale pointer. */
++    cctrl->cur_rpn = NULL;
+     code_off = FuncProlog(cctrl, bin, code_off);
+     for (cnt = 0; cnt < cnt2; cnt++) {
+     enter:
+@@ -5162,10 +5254,14 @@
        cctrl->backend_user_data2 = 0;
        cctrl->backend_user_data3 = 0;
        r = forwards[cnt];
@@ -1865,6 +1891,11 @@
        PushTmpDepthFirst(cctrl, r, 0);
        PopTmp(cctrl, r);
        r->res.mode = MD_NULL;
+       code_off = __OptPassFinal(cctrl, r, bin, code_off);
++      cctrl->cur_rpn = NULL;
+       if (IsTerminalInst(r)) {
+         cnt++;
+         for (; cnt < cnt2; cnt++) {
 --- a/c/aiwn_arm.h
 +++ b/c/aiwn_arm.h
 @@ -84,6 +84,8 @@

@@ -588,6 +588,11 @@ check-task-settings: check-upstream esp
 check-source-context: check-upstream esp
 	python3 scripts/check-compat.py --pci --probe-source-context
 
+# Execute source files through the upstream CMain wrapper and native compiler.
+.PHONY: check-source-execute
+check-source-execute: check-upstream esp
+	python3 scripts/check-compat.py --pci --probe-source-execute
+
 # UTM-shaped path: boot GPT disk via virtio-blk-pci only (no MMIO RedSea).
 # Accepts when serial shows: virtio-blk: OK … pci / virtio-blk: rw OK
 run-pci: esp $(FW_VARS)

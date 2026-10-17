@@ -5243,6 +5243,10 @@ char *OptPassFinal(CCmpCtrl *cctrl, int64_t *res_sz, char **dbg_info,
           obin); // For OpenBSD sexy mapping(see mem.c or ask nroot)
       code_off = 0;
     }
+    /* Prologue register saves are outside any source IR node. A prior
+     * constant-expression compilation may have freed cur_rpn; marking its
+     * FP-register bits here would write through that stale pointer. */
+    cctrl->cur_rpn = NULL;
     code_off = FuncProlog(cctrl, bin, code_off);
     for (cnt = 0; cnt < cnt2; cnt++) {
     enter:
@@ -5257,6 +5261,7 @@ char *OptPassFinal(CCmpCtrl *cctrl, int64_t *res_sz, char **dbg_info,
       PopTmp(cctrl, r);
       r->res.mode = MD_NULL;
       code_off = __OptPassFinal(cctrl, r, bin, code_off);
+      cctrl->cur_rpn = NULL;
       if (IsTerminalInst(r)) {
         cnt++;
         for (; cnt < cnt2; cnt++) {

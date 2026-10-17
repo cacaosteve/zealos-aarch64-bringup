@@ -32,6 +32,8 @@ p.add_argument('--probe-task-settings', action='store_true',
                help='check upstream application settings and task-local directories at normal desktop boot')
 p.add_argument('--probe-source-context', action='store_true',
                help='check source-directory masks, project lookup and upstream relative document links')
+p.add_argument('--probe-source-execute', action='store_true',
+               help='check upstream ExeFile through the native compiler, including task-local and nested files')
 p.add_argument('--probe-winmgr', action='store_true',
                help='also try the unchanged WinMgr.ZC load with a short timeout after Win.ZC')
 p.add_argument('--probe-grscreen', action='store_true',
@@ -326,6 +328,10 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             time.sleep(0.1)
     def qmp_send_key(qcode):
         qmp_send_keys([qcode])
+        # send-key acknowledges before its 50 ms release and guest polling.
+        # Separate navigation-probe keystrokes; the explicit ten-char/sec
+        # typing gate still uses qmp_send_keys directly with its own timing.
+        time.sleep(0.1)
     def focus_graphical_terminal():
         location = command('zc Print("gui_click=%d,%d\\n", '
             '(bootstrap_gui_terminal_task->pix_left+bootstrap_gui_terminal_task->pix_right)/2, '
@@ -344,6 +350,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         qcodes = {
             ' ': ('spc',), '/': ('slash',), '.': ('dot',),
             ';': ('semicolon',), ':': ('shift', 'semicolon'), '\n': ('ret',),
+            '"': ('shift', 'apostrophe'), "'": ('apostrophe',),
             '(': ('shift', '9'), ')': ('shift', '0'),
             '{': ('shift', 'bracket_left'), '}': ('shift', 'bracket_right'),
         }
@@ -537,6 +544,15 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             command('zcall SettingsCwd', 'zc => 0x000000000000002a')
             command('zc #include "SettingsCwdValue.HH"', 'zc: executed')
             command('zc Cd("/");', 'zc: executed')
+            raise SystemExit(0)
+        command('zload /Tests/SourceExecute.ZC', 'zc: loaded /Tests/SourceExecute.ZC')
+        command('zcall SourceFileExecutionChecks', 'zc => 0x000000000000002a')
+        command('zcall SourceFileTaskChecks', 'zc => 0x000000000000002a')
+        if args.pci:
+            command('zcall SourceFileNativeChecks', 'zc => 0x000000000000002a')
+            command('zcall SourceFileOverlayChecks', 'zc => 0x000000000000002a')
+        command('zstatus', 'failed=0')
+        if args.probe_source_execute:
             raise SystemExit(0)
         if args.probe_gui_keyboard:
             require_graphical_text('boot-terminal', 'ZealOS ARM64 graphical terminal')
@@ -741,6 +757,18 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     'zc => 0x0000000000000001')
             print('PASS QMP graphical window demo launch/stop restored the terminal and keyboard focus', flush=True)
             if args.probe_gui_workflow:
+                executable = ('I64 GuiSourceFile(){Print("Native file executed");return 42;} '
+                              'source_file_gui_result=GuiSourceFile()*(Fs!=sys_task);')
+                command('zput Tests/GuiExecute.ZC '+executable,
+                        'zput: saved Tests/GuiExecute.ZC')
+                qmp_send_text('zc ExeFile("/Tests/GuiExecute.ZC");')
+                qmp_send_key('ret')
+                executed = require_graphical_text('native-file-executed',
+                                                  'Native file executed')
+                if executed[3].count('Native file executed') != 1:
+                    raise RuntimeError('source-file output was duplicated in the graphical terminal:\n'+executed[3])
+                command('zcall SourceFileGuiResult', 'zc => 0x000000000000002a')
+                print('PASS upstream ExeFile compiled and ran in the graphical terminal task', flush=True)
                 editor_path = '/Tests/GuiBringup.ZC'
                 source = 'I64 GuiBringup(){return 42;}'
                 qmp_send_text('edit '+editor_path)

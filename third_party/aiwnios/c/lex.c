@@ -857,7 +857,8 @@ re_enter:;
           actual_file = actual_file->last;
         }
         if (actual_file) {
-          if (actual_file->dir && lex->string[0] != '/') {
+          if (actual_file->dir && lex->string[0] != '/' &&
+              !strchr(lex->string, ':')) {
             int64_t len =
                 snprintf(NULL, 0, "%s/%s", actual_file->dir, lex->string);
             char buf[len + 1];
@@ -871,7 +872,12 @@ re_enter:;
         normal:
           f = fopen(lex->string, "rb");
           if (!strrchr(lex->string, '/')) {
-            dir = __AIWNIOS_StrDup(".", NULL);
+            char *qualifier = strrchr(lex->string, ':');
+            if (qualifier) {
+              dir = __AIWNIOS_StrDup(lex->string, NULL);
+              dir[qualifier - lex->string + 1] = 0;
+            } else
+              dir = __AIWNIOS_StrDup(".", NULL);
           } else {
             dir = __AIWNIOS_StrDup(lex->string, NULL);
             *strrchr(dir, '/') = 0;

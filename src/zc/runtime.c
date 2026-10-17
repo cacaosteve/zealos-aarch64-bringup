@@ -4254,8 +4254,9 @@ static void bind_guest_task(void) {
     PrsBindCSymbol("sys_semas", guest_sys_semas, 0);
 }
 
-static int64_t execute_source_result(const char *path, const char *src,
-                                     int return_expr, int record_answer) {
+static int64_t execute_source_mode(const char *path, const char *src,
+                                   int return_expr, int record_answer,
+                                   const char *initial_dir, int just_load) {
     CLexer *lex = LexerNew((char *)path, (char *)src);
     lex->file->is_file = 1;
     char dir[128];
@@ -4266,10 +4267,11 @@ static int64_t execute_source_result(const char *path, const char *src,
         *slash = 0;
     else
         strcpy(dir, !strncmp(path, "disk:", 5) ? "disk:" : ".");
-    if (path[0] == '<') {
-        if (strlen(guest_current_dir()) >= sizeof(dir))
+    if (initial_dir || path[0] == '<') {
+        const char *source_dir = initial_dir ? initial_dir : guest_current_dir();
+        if (strlen(source_dir) >= sizeof(dir))
             zc_fail("current directory is too long");
-        strcpy(dir, guest_current_dir());
+        strcpy(dir, source_dir);
     }
     lex->file->dir = __AIWNIOS_StrDup(dir, NULL);
     CCmpCtrl *cc = CmpCtrlNew(lex);
@@ -4279,6 +4281,8 @@ static int64_t execute_source_result(const char *path, const char *src,
     int64_t result = 0;
     while (PrsStmt(cc)) {
         CRPN *first = (CRPN *)cc->code_ctrl->ir_code->next;
+        int has_statement = first != (CRPN *)cc->code_ctrl->ir_code &&
+                            first->type != IC_NOP;
         int64_t raw_type = RT_U0;
         if (record_answer && first != (CRPN *)cc->code_ctrl->ir_code) {
             if (first->type == IC_RET)
@@ -4288,7 +4292,8 @@ static int64_t execute_source_result(const char *path, const char *src,
         }
         /* The Aiwnios file loader discards each top-level expression. ExePrint
          * returns its last value, so give each TaskExe statement a return.
-         * Definition-only statements are emitted as IC_NOP and remain zero. */
+         * Definition-only statements are emitted as IC_NOP and supply no
+         * additional expression result. */
         if (return_expr && cc->code_ctrl->ir_code->next != cc->code_ctrl->ir_code &&
             ((CRPN *)cc->code_ctrl->ir_code->next)->type != IC_NOP) {
             CRPN *ret = __AIWNIOS_CAlloc(sizeof(*ret), NULL);
@@ -4302,12 +4307,19 @@ static int64_t execute_source_result(const char *path, const char *src,
                              guest_fibers[guest_current].source_job_active;
             if (source_job)
                 guest_task_exe_active = 0;
-            result = FFI_CALL_TOS_0(code);
+            /* Aiwnios may attach initialization work to an IC_NOP
+             * declaration, so still execute it. Its otherwise empty RET and
+             * an #include's optional semicolon have no new expression value. */
+            if (!just_load) {
+                int64_t value = FFI_CALL_TOS_0(code);
+                if (!return_expr || has_statement)
+                    result = value;
+            }
             if (source_job)
                 guest_task_exe_active = 1;
             uint64_t end = record_answer ? counter_now() : 0;
             free(code);
-            if (record_answer && guest_task_bound) {
+            if (!just_load && has_statement && record_answer && guest_task_bound) {
                 unsigned char *words = (unsigned char *)guest_fibers[guest_current].words;
                 uint64_t frequency;
                 __asm__ volatile("mrs %0, cntfrq_el0" : "=r"(frequency));
@@ -4331,6 +4343,43 @@ static int64_t execute_source_result(const char *path, const char *src,
     CodeCtrlPop(cc);
     CmpCtrlDel(cc);
     LexerDel(lex);
+    return just_load ? 1 : result;
+}
+static int64_t execute_source_result(const char *path, const char *src,
+                                     int return_expr, int record_answer) {
+    return execute_source_mode(path, src, return_expr, record_answer, NULL, 0);
+}
+static int64_t host_exe_puts(int64_t *a) {
+    const char *source = (const char *)(uintptr_t)a[0];
+    const char *filename = (const char *)(uintptr_t)a[1];
+    char path[134];
+    /* CMain's ExeFile wrapper supplies a short #include string. File contents
+     * are read by the lexer and retain their actual include directories. The
+     * wrapper's filename is a diagnostic label; its initial include resolves
+     * from the calling task's directory, rather than that label's parent. */
+    const int64_t supported = 0x001 | 0x008 | 0x040;
+    if (!guest_task_bound || !source)
+        zc_fail("ExePutS requires source and a guest task");
+    if (a[2] & ~supported)
+        zc_fail("ExePutS compiler flags are not supported by the ARM64 bootstrap");
+    if (a[3])
+        zc_fail("ExePutS hash-table contexts are not supported by the ARM64 bootstrap");
+    if (guest_task_exe_active)
+        zc_fail("ExePutS during compilation is unsupported");
+    size_t length = 0;
+    while (length <= 4096 && source[length])
+        length++;
+    if (length > 4096)
+        zc_fail("ExePutS text exceeds 4096 bytes; use ExeFile for source files");
+    if (filename && guest_path(filename, path))
+        zc_fail("ExePutS filename is invalid");
+    struct guest_fiber *f = &guest_fibers[guest_current];
+    f->source_job_active++;
+    guest_task_exe_active = 1;
+    int64_t result = execute_source_mode(filename ? path : "<ExePutS>",
+        source, 1, 1, guest_current_dir(), !!(a[2] & 0x040));
+    guest_task_exe_active = 0;
+    f->source_job_active--;
     return result;
 }
 static int64_t host_exe_print(int64_t *a) {
@@ -4625,6 +4674,7 @@ static int load_source_path(const char *path, int merged) {
         PrsBindCSymbol("ZcActiveWinMgrGlobals", host_active_winmgr_globals, 0);
         PrsBindCSymbol("ZcSetWinMgrTask", host_set_winmgr_task, 1);
         PrsBindCSymbol("ExePrint2", host_exe_print2, 2);
+        PrsBindCSymbol("ExePutS", host_exe_puts, 4);
     }
     if (!strcmp(path, "/System/GuiTerminal.ZC"))
         PrsBindCSymbol("ZcGuiShellExec", zc_gui_shell_exec, 1);

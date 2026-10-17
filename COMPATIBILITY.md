@@ -2489,3 +2489,64 @@ including those cases and the actual document/link consumers. Source-pin,
 guarded-overlay, Python syntax and whitespace checks passed. The live UTM
 guest was left on the accepted input baseline while the Mac was locked;
 this update has no new live UTM acceptance claim.
+
+## Native source-file execution
+
+`ExeFile` no longer returns a fabricated zero. TaskBridge contains the
+unchanged wrapper from the pinned `Compiler/CMain.ZC`; `check-upstream.py`
+verifies the wrapper against that complete hash-pinned original. The full
+x86 compiler module is not loaded. Its `ExePutS` boundary is implemented by
+the native Aiwnios compiler already used for interactive source and jobs.
+
+The wrapper defaults a filename to `.ZC` and compiles its include in the
+calling task. The wrapper's diagnostic filename does not change the initial
+include directory; included files retain their own directories for further
+includes. Relative names use the caller's directory and the merged native /
+bundled source view. Explicit `disk:` includes bypass directory prefixing
+and retain the qualifier for their own relative includes. Extension lookup
+checks the filename leaf, so a dotted parent directory does not suppress
+the `.ZC` default.
+
+Execution returns the final statement value and updates the task's answer
+state. Emitted code may yield, sleep or invoke another file; parsing/emission
+remain single-CPU critical sections. `CCF_JUST_LOAD` compiles definitions and
+returns TRUE without executing top-level statements or changing the answer.
+The accepted flags are `CCF_CMD_LINE`, `CCF_DONT_FREE_BUF` and `CCF_JUST_LOAD`;
+other flags and explicit hash-table contexts fail rather than being ignored.
+`CCF_CMD_LINE` currently provides call compatibility; upstream compiler metadata
+macros such as `__CMD_LINE__`, `__DIR__` and `__FILE__` are not implemented here.
+The in-memory `ExePutS` buffer is limited to 4096 bytes. Included files use
+the existing source-volume and compiler memory limits.
+
+This is a compiler ABI integration, not the full upstream command server:
+`RunFile` / `LastFun`, compiler-option inheritance, native `CCompCtrl` layout,
+interactive compiler error recovery and upstream startup remain work. A
+compile error still puts the bootstrap session into its existing failed state
+and requires `zreset`; the upstream `ExePutS` Compiler/Break catch is not
+implemented by this bridge. Runtime exception unwinding across a host compiler
+invocation is not established by the file-execution gate.
+
+The additional declarations exposed an ARM emitter bug during the second
+TaskBridge load: `FuncProlog` marked FP-register bits through `cur_rpn` from
+an earlier constant-expression compilation. The freed IR allocation had been
+reused for label metadata, corrupting its patch address. The port patch now
+clears the current IR pointer before each prologue and after each root emission,
+covering both sizing and final passes. This extends the existing per-root reset
+to the emission boundaries outside a source node.
+
+Validation: 26 focused file/context checks, 368 full PCI checks and 286 full
+ISO checks passed. The NEC two-hub/VirtIO recovery workflow passed with 180
+logged checks, including visible execution of a saved file in the graphical
+terminal task, a single copy of its output, editor persistence across reboot,
+twelve keyboard reconnects, tablet fallback/reattach and whole-hub recovery.
+Navigation-only QMP probes now separate their keys so the 50 ms release and
+guest polling can complete; the independent ten-characters-per-second typing
+gate retains its original pacing and assertions. The source-list smoke checks
+completion/truncation rather than assuming particular first directory names.
+Source-pin, guarded-overlay, Python syntax and whitespace checks passed.
+
+The live UTM VM remains on its previously accepted image while the Mac is
+locked. After refresh, verify visible typing and use
+`zc ExeFile("/Tests/GuiAcceptance.ZC");` followed by `zcall GuiAcceptance`
+against the previously saved source. This requires a new live UTM check;
+the QMP result does not renew physical host input acceptance.
