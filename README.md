@@ -14,12 +14,14 @@ recursion, callbacks, shared symbols, F64 and reclaimable allocations.
 ```sh
 make check-compat       # disposable ISO guest + old boot regressions
 make check-compat-pci   # disposable UTM-shaped GPT/PCI disk guest
+make check-gui-workflow # visible typing/cursors + graphical edit/save/run/reboot
 make utm               # refresh VM, preserving RedSea/source edits and adding new bundled files
 ```
 
-The UTM refresh also updates the repository-owned
-`Tests/WindowDragLive.ZC` fixture so its ABI stays in sync with the kernel;
-other existing guest source files remain untouched.
+The UTM refresh also updates the repository-managed
+`Tests/WindowDragLive.ZC`, `System/GuiTerminal.ZC`, and `System/WinMgr.ZC`
+files so they stay in sync with the kernel; other existing guest source files
+remain untouched.
 
 At the UTM prompt, run `zcheck`. Expected: `zc: upstream QuickSort + persistent
 modules OK`. Use `zc` for declarations/statements, `zload` for a source file in the
@@ -140,7 +142,7 @@ Bridge notes: [AIWNIOS.md](AIWNIOS.md). Milestone ladder: [upstream/README.md](u
 
 | Track | Status |
 |--|--|
-| QEMU/UTM virt | **Regression freeze** M33–M39 (`Notes.ZC` / DocLib `#include`) still the bar — see ACCEPTANCE.md. **Lattice compose** continued on top (M151–M199) + **M200–M206** PL011 RX/`uartrx`, shell idle, depth clear, StockLat NULL, PopUpColor Mid/Edge headers + live titles. The UTM framebuffer keyboard now passes shell input and native `KeyGet`; the full mouse/Notes graphics pass remains a separate interactive check. |
+| QEMU/UTM virt | **Regression freeze** M33–M39 (`Notes.ZC` / DocLib `#include`) still the bar — see ACCEPTANCE.md. **Lattice compose** continued on top (M151–M199) + **M200–M206** PL011 RX/`uartrx`, shell idle, depth clear, StockLat NULL, PopUpColor Mid/Edge headers + live titles. Automated QMP tests verify printable keys reach the graphical terminal and native `KeyGet`; the 2026-10-16 UTM check also confirmed the physical keyboard entered and submitted `zstatus` in the graphical terminal. |
 | Pi 4B UEFI | PI-DIAG-1..4 + **shell entry on FB** accepted (2026-09-23). **UART RX:** use `uartrx` on USB–TTL @ 115200 after `make pi-sd` (M200 prep). No virtio/RedSea disk on Pi yet ([PI4.md](PI4.md)). |
 
 ## Earlier platform follow-ups

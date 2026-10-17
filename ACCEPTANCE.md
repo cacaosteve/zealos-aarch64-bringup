@@ -14,7 +14,7 @@ or Pi bring-up. Re-run this list after risky changes; QEMU first, UTM when it ma
 | Name in UTM (only one) | **ZealosAarch64Hello** |
 | Refresh | `make utm` |
 | Start | UTM → ZealosAarch64Hello → Play |
-| Serial | `utmctl attach ZealosAarch64Hello` (if supported) |
+| Serial | UTM built-in Terminal, shown as **ZealosAarch64Hello (Terminal 1)** |
 
 There must be **one** entry. If UTM shows two or Start is greyed out: quit UTM, run `make utm`, reopen. RedSea lives past the ESP; `make utm` preserves that region.
 
@@ -23,13 +23,53 @@ ZealOS aarch64 shell (HolyC-IR exprs)
 >
 ```
 
-The boot graphical terminal is a separate guest window with a smaller command
-set. Click inside it before typing; its `help` lists graphical commands such as
+The boot graphical terminal is a guest window with a smaller command set.
+Click inside it before typing; its `help` lists graphical commands such as
 `zstatus`, `zvol`, `zls`, `zload`, `zcall`, and `edit`. Commands outside that
-set report that they need the serial shell. UTM's **Terminal 1** is the serial
-shell and provides the full command set. The graphical `zstatus` output should
-show `ready=1 failed=0`, `winmgr=1 gterm=1`, a nonzero `presented_frames`, and
-the `gterm_window` / `scanout` diagnostics.
+set report that they need the serial shell. The current installer keeps the
+working UTM 5.0.7 built-in Terminal 1 serial window. This is independent of
+the graphical guest terminal's keyboard and document rendering. The graphical
+`zstatus` output should show
+`ready=1 failed=0`, `winmgr=1 gterm=1`, a nonzero `presented_frames`, and the
+`gterm_window` / `scanout` diagnostics.
+
+If the VM is deliberately configured to use the older Pseudo-TTY fallback,
+query its path after every restart, then connect the Mac Terminal session to
+that path (do not reuse a path from an earlier boot):
+
+```sh
+/Applications/UTM.app/Contents/MacOS/utmctl attach ZealosAarch64Hello
+screen /dev/ttysNNN 115200
+```
+
+On this UTM version, `utmctl attach` prints a warning that attachment is not
+implemented, but still reports the current `PTTY: /dev/ttysNNN`. Use that
+reported path in the `screen` command. For example, the 2026-10-16 live check
+reported `/dev/ttys001`; the earlier `/dev/ttys002` was no longer connected.
+
+## Graphical development gate
+
+Run `make check-gui-workflow` on a disposable PCI guest. It checks framebuffer
+glyphs before Return, a visible insertion caret, tablet-pointer pixels, and
+the graphical edit/save/compile/run/reboot/reopen path. Successful command
+assembly and nonzero key counters alone do not establish visible input.
+Screenshots and decoded text are retained under `build/gui-*.ppm` / `.txt`.
+
+After refreshing the live UTM VM, check the physical input path once:
+
+1. Click the graphical prompt. Type `help` without Return: the letters must
+   appear immediately, with an insertion caret. Move the mouse and confirm
+   its pointer stays visible. Then press Return.
+2. Run `edit /Tests/GuiAcceptance.ZC`, type
+   `I64 GuiAcceptance(){return 42;}`, and press Escape to save and return.
+3. Run `zload disk:Tests/GuiAcceptance.ZC`, then `zcall GuiAcceptance`.
+   Expect `0x000000000000002a`.
+4. Restart and run `edit /Tests/GuiAcceptance.ZC`. The saved source must be
+   visible. Escape saves/exits; Shift+Escape cancels/exits.
+
+The live UTM check is separate from QMP injection, which bypasses UTM's host
+keyboard capture. Keep the display adapter and serial mode fixed during this
+gate so input/rendering changes can be compared against the same VM setup.
 
 ## Checklist — interactive smoke
 
@@ -53,8 +93,10 @@ Expect **4**, **0**, **8**.
    for the test source stored on the UTM source partition. Run `make utm`
    once after adding a bundled source file; refresh preserves guest edits and
    deletion masks while adding files missing from the existing source bank.
-   If an existing bundled file has changed, `make utm` keeps its older guest
-   copy. Stop the VM and replace that entry explicitly, for example:
+   The refresh updates the repository-managed `Tests/WindowDragLive.ZC`,
+   `System/GuiTerminal.ZC`, and `System/WinMgr.ZC` files. For other existing
+   bundled files, `make utm` keeps the older guest copy. Stop the VM and
+   replace that entry explicitly, for example:
 
    ```sh
    python3 scripts/source-volume.py put \
@@ -231,6 +273,19 @@ symbols remain unavailable. Run `zreset` afterward before loading other
 programs into a clean session.
 
 **Status:** M33–M39 UTM freeze bar **accepted** (including `Notes.ZC` from PCI RedSea + `#include`). Pi remains a separate track ([PI4.md](PI4.md)).
+
+**Live UTM check (2026-10-16):** UTM 5.0.7 reported the VM started and assigned
+`/dev/ttys001` for that boot. The serial shell answered `zstatus`; the guest
+reported `winmgr=1`, `gterm=1`, and a nonzero frame count. A later screenshot
+confirmed physical host keyboard input in the graphical terminal: `zstatus`
+was submitted, with 15 virtio events, 15 routed events, 8 graphical-terminal
+key-downs, and zero dropped events. After refreshing the UTM disk, a host-input
+check submitted `zls` and displayed all 164 live files, followed by
+`zls: n=164 records=209 sectors=3880/65536` and a fresh prompt. GUI output now
+uses a 32 KiB capture and formatter-safe chunks rather than truncating at 3.8
+KiB. The QEMU QMP probe forms and submits `help`, `zls`, and an edited `zvol`,
+then checks history recall. Re-query `utmctl attach` after each restart because
+the pseudo-TTY path changes.
 
 **Re-pass 2026-09-23:** `make utm` refreshed; QEMU `run-pci` scripted checklist green (vblk, rspersist `0x4`, catalog/rsdir, `runzc` UseAdd/`0x2a`, MemSort/`0x10`, Notes on disk, compiler 4/0/8); second boot persist OK. UTM `ZealosAarch64Hello` started with synced disk — interactive FB/`Notes` + keyboard still eyes-on in the UTM app (`utmctl attach` not implemented).
 

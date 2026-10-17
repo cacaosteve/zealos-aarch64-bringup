@@ -2255,3 +2255,102 @@ ZealOS live distribution or installer.
   probe loaded the terminal and returned `0x2a` from both terminal and shell
   menu checks; the boot compositor presented frames. Interactive layout
   verification remains part of the UTM screen/input check.
+
+## Visible graphical input and persistent editing
+
+- A fresh PCI/HVF guest reproduced invisible command echo even though key
+  counters and command execution succeeded. Early source calls retained the
+  bootstrap implementations they had compiled against: `DocPutKey` kept empty
+  insertion/navigation functions, `KeyGet` kept bootstrap-console echo, and
+  earlier DolDoc callers kept the empty renderer. The boot sequence now reloads
+  `DocPutKey` after its dependencies, routes graphical echo through the real
+  `KeyDev` device, and forwards early `DocRecalc` calls to the loaded renderer.
+- The staged compositor supplies mouse visibility, its draw callback, a timer
+  blink phase, and a final insertion caret for the focused graphical terminal.
+  The pointer remains the final source overlay, and the caret is clipped to
+  the terminal's visible cells.
+- `make check-gui-workflow` inspects framebuffer glyphs for `> help` before
+  Return and checks both caret and tablet-pointer pixels. It also exercises
+  navigation/history, the upstream editor, and window-demo focus recovery.
+  It types `I64 GuiBringup(){return 42;}` through QMP, confirms visible editor
+  text, saves it, compiles and runs the saved file from the graphical shell,
+  then reboots the disposable guest and confirms the source reopens intact.
+  The complete workflow passed on 2026-10-17. QMP bypasses UTM host capture;
+  live physical input remains a distinct acceptance check.
+
+### Live UTM validation, 2026-10-17
+
+The refreshed UTM 5.0.7 guest visibly displayed `help` before Return and
+executed it. Host key presses through the UTM window then opened
+`edit /Tests/GuiAcceptance.ZC`, visibly entered
+`I64 GuiAcceptance(){return 42;}`, saved it, and ran the saved source through
+`zload disk:Tests/GuiAcceptance.ZC` and `zcall GuiAcceptance`, returning `0x2a`.
+After a real UTM restart, the same file reopened with the saved source intact.
+The full PCI compatibility suite and the focused MathODE probe also passed.
+The VM disk/config backup is under
+`build/utm-graphical-stabilization-20261017-120115/`.
+The final graphical workflow additionally checks that Shift+Escape cancellation
+returns to the shell without a false open-failure message. Its UTM refresh
+preserved 165 live source files, including `Tests/GuiAcceptance.ZC`; the
+pre-refresh disk/config backup is under
+`build/utm-before-editor-cancel-fix-20261017-122614/`.
+The final refreshed UTM guest reopened that source, cancelled without the
+spurious error, and visibly echoed `help` before Return. It was left running
+at that prompt with the original USB/display/serial configuration restored.
+
+Host UI automation did not establish UTM pointer motion. The user subsequently
+confirmed that the physical mouse moves the guest arrow and that the released,
+unselected tablet path works in `windowdemo` (2026-10-17 screenshot). A temporary
+VirtIO-only input configuration did not resolve the automation check and was reverted;
+the VM retains USB 3.0 (XHCI), its VirtIO keyboard/tablet additions, the
+`virtio-ramfb` display, and built-in serial Terminal 1. The guest's QMP tablet
+pixel test also passes. The physical input result confirms usable pointer
+delivery in this VM; it does not establish native guest USB support.
+
+## USB direction: reuse YDE with ARM64 platform hooks
+
+The current guest input drivers are VirtIO MMIO drivers. UTM's USB 3.0 setting
+also creates USB devices, but this ARM64 kernel does not yet initialize xHCI
+or enumerate those devices. USB mouse/tablet support is a controller and HID
+bring-up task in addition to the document-echo regression above.
+
+The local YDE work is relevant and remains untouched:
+
+- `~/github/templeos/ZealOS-yde-mac-mini-2014` contains the Macmini7,1 driver
+  work. `ZealOS-yde-unified-hardware` contains the later generalization.
+- `src/Kernel/Usb/KXhci.ZC` has command/event/transfer rings, multiple-controller
+  ownership, bounded port-reset handling including the NEC model, and polling.
+  `KUsbCore.ZC` supplies enumeration, and `KUsbHid.ZC` handles keyboard usages,
+  relative mice, and absolute tablet descriptors/reports.
+- `src/Kernel/SerialDev/LegacyUsb*` covers the older UHCI/EHCI route. Keep its
+  controller ownership separate from xHCI. `docs/hardware11-2026-09-21.md` and
+  `docs/hardware12-tablet-diag-2026-09-23.md` record an unresolved live UTM
+  seamless-pointer boundary; branch names and host tests do not supersede that
+  acceptance requirement.
+
+Port sequence:
+
+1. Keep the repaired graphical workflow as a regression gate and retain
+   VirtIO/serial recovery input while developing USB.
+2. Introduce explicit platform hooks for PCI configuration/BAR mapping,
+   DMA-visible allocation/address translation, memory ordering, MMIO register
+   access, timeouts, and polling. YDE's x86 page-table PCD writes and use of
+   pointer values as DMA addresses must not be copied directly to ARM64.
+3. Reuse the YDE USB core/HID logic and controller-ring behavior behind those
+   hooks. Prove UTM's actual NEC xHCI input bus first, then QEMU xHCI. Check
+   keyboard press/release/modifiers, relative mouse, absolute tablet, buttons,
+   wheel, focus, and both captured/released host input. Select input ownership
+   explicitly so USB and VirtIO cannot publish duplicate key events.
+4. Add the Pi 4B platform backend for its BCM2711 PCIe host bridge and VL805
+   xHCI controller. Validate firmware handoff, DMA windows/cache behavior,
+   register access widths, and physical keyboard/mouse operation separately.
+   Raspberry Pi's [PCIe driver](https://github.com/raspberrypi/linux/blob/rpi-6.12.y/drivers/pci/controller/pcie-brcmstb.c)
+   and [VL805 firmware documentation](https://github.com/raspberrypi/documentation/blob/master/documentation/asciidoc/computers/raspberry-pi/eeprom-bootloader.adoc)
+   are platform references, not proof of this port working on hardware.
+5. Follow with hubs/hotplug and mass storage. Mac mini-specific trackpad,
+   audio, and other quirks stay scoped to the hardware that needs them.
+
+The goal is normal UTM USB settings and a reusable native USB stack for Pi,
+with one shared OS input path. A USB 2 keyboard or mouse can operate behind
+an xHCI controller; the device's speed and the controller interface are
+different choices.

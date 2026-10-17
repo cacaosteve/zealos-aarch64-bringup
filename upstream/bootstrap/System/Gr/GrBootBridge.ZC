@@ -16,6 +16,10 @@ I64 BootstrapGrContextFlagsInit()
     active_gr->dc1->flags |= DCF_SCREEN_BITMAP;
     active_gr->dc_cache->flags = 0;
     active_gr->zoomed_dc->flags |= DCF_SCREEN_BITMAP;
+    // The full source compositor can run before the fallback frame path,
+    // which used to be the only place that installed the tablet cursor.
+    if (!active_gr->fp_draw_mouse)
+        active_gr->fp_draw_mouse = &BootstrapDrawMouse;
     return 0x2a;
 }
 I64 BootstrapGrContextFlagsChecks()

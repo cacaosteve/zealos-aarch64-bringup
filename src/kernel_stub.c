@@ -20,6 +20,12 @@
 #include "zc_source_store.h"
 #endif
 #include "disk_layout.h"
+
+int zc_virtio_keyboard_ready(void) { return virtio_kbd_ready(); }
+uint64_t zc_virtio_keyboard_event_count(void) { return virtio_kbd_key_event_count(); }
+uint16_t zc_virtio_keyboard_last_code(void) { return virtio_kbd_last_key_code(); }
+uint32_t zc_virtio_keyboard_last_value(void) { return virtio_kbd_last_key_value(); }
+
 #include "netofdots_zc.h"
 #include "lines_zc.h"
 #include "minigr_zc.h"
@@ -1087,10 +1093,14 @@ static void con_backspace(void) {
 }
 
 #ifndef ZEAL_PI_DIAG
-static char gui_shell_output[8192];
+/* `zls` can list the full bundled source catalog, so keep its capture larger
+ * than host_print's single-call formatter limit. GuiTerminal prints this in
+ * bounded chunks rather than passing the whole result to one DocPrint. */
+static char gui_shell_output[32768];
 static size_t gui_shell_output_len;
 static int gui_shell_capture;
 static int gui_shell_truncated;
+static volatile int gui_window_demo_requested;
 static void shell_handle(const char *line, int *done);
 #endif
 
@@ -4502,6 +4512,11 @@ static int zc_key_read(uint8_t *type, uint64_t *arg1, uint64_t *arg2) {
             (void)virtio_kbd_getc_nb(); /* same down event in shell char ring */
         return 1;
     }
+    /* When a GUI task owns the virtio keyboard, leave UART bytes exclusively
+     * to the serial shell. Polling UART here would steal characters from its
+     * independent line editor while the graphical terminal is active. */
+    if (zc_focus_owns_input())
+        return 0;
     int c = uart_text_getc_nb();
     if (c < 0)
         return 0;
@@ -6551,29 +6566,52 @@ static void shell_handle(const char *line, int *done) {
  * serial-only transfer/editor flows stay on the serial bootstrap shell. */
 int64_t zc_gui_shell_exec(int64_t *a) {
     const char *line = (const char *)(uintptr_t)a[0];
+    const char *command = line;
+    char command_buf[256];
     int done = 0;
     size_t command_len = 0;
+    size_t i;
 
     if (!line)
         return (int64_t)(uintptr_t)"graphical shell: command is too long\n";
-    while (command_len <= 255 && line[command_len])
+    while (*command == ' ' || *command == '\t')
+        command++;
+    if (!*command)
+        return (int64_t)(uintptr_t)"";
+    while (command_len <= 255 && command[command_len])
         command_len++;
     if (command_len > 255)
         return (int64_t)(uintptr_t)"graphical shell: command is too long\n";
-    if (streq(line, "help"))
+    while (command_len && (command[command_len - 1] == ' ' ||
+                           command[command_len - 1] == '\t'))
+        command_len--;
+    if (!command_len)
+        return (int64_t)(uintptr_t)"";
+    for (i = 0; i < command_len; i++)
+        command_buf[i] = command[i];
+    command_buf[command_len] = 0;
+    command = command_buf;
+    if (streq(command, "help"))
         return (int64_t)(uintptr_t)
             "Graphical commands: zstatus | zvol | zls | zgc | zverify <path> | zload <path> | zput <name> <source> | zrm <name> | edit <path> | zc <source> | zcall <function> | windowdemo\n"
             "Use the serial shell for the full command set.\n";
-    if (!(streq(line, "zstatus") ||
-          streq(line, "zvol") || streq(line, "zls") ||
-          streq(line, "zgc") ||
-          streq(line, "windowdemo") ||
-          str_startswith(line, "zverify ") ||
-          str_startswith(line, "zload ") ||
-          str_startswith(line, "zcall ") ||
-          str_startswith(line, "zput ") ||
-          str_startswith(line, "zrm ") ||
-          str_startswith(line, "zc ")))
+    if (streq(command, "windowdemo")) {
+        if (zc_window_demo_active() || gui_window_demo_requested)
+            return (int64_t)(uintptr_t)"windowdemo: already running or starting\n";
+        /* Manager teardown mutates the root task ring. Defer it to the
+         * bootstrap shell, then return normally to the terminal's task. */
+        gui_window_demo_requested = 1;
+        return (int64_t)(uintptr_t)"windowdemo: starting; terminal will hide\n";
+    }
+    if (!(streq(command, "zstatus") ||
+          streq(command, "zvol") || streq(command, "zls") ||
+          streq(command, "zgc") ||
+          str_startswith(command, "zverify ") ||
+          str_startswith(command, "zload ") ||
+          str_startswith(command, "zcall ") ||
+          str_startswith(command, "zput ") ||
+          str_startswith(command, "zrm ") ||
+          str_startswith(command, "zc ")))
         return (int64_t)(uintptr_t)
             "graphical shell: use help; this command needs the serial shell\n";
 
@@ -6581,7 +6619,7 @@ int64_t zc_gui_shell_exec(int64_t *a) {
     gui_shell_output[0] = 0;
     gui_shell_truncated = 0;
     gui_shell_capture = 1;
-    shell_handle(line, &done);
+    shell_handle(command, &done);
     gui_shell_capture = 0;
     if (gui_shell_truncated && gui_shell_output_len + 1 < sizeof(gui_shell_output)) {
         static const char suffix[] = "\n[output truncated]\n";
@@ -6624,11 +6662,22 @@ static void shell_run(void) {
     unsigned len = 0;
     int done = 0;
     while (!done) {
+        int gui_has_keyboard = 0;
 #ifndef ZEAL_PI_DIAG
         zc_idle_step();
-        if (zc_focus_owns_input()) {
+        if (gui_window_demo_requested) {
+            gui_window_demo_requested = 0;
+            if (!zc_start_window_demo())
+                con_puts("windowdemo: source WinMgr running with two windows and a CDC control; drag/raise/resize; Ctrl+C returns to shell\n");
+            else
+                con_puts("windowdemo: failed; check serial diagnostics or use zreset\n");
+        }
+        gui_has_keyboard = zc_focus_owns_input();
+        if (gui_has_keyboard) {
             /* A focused GUI task owns normal keys, with Ctrl+C retained as a
-             * keyboard escape to return to the serial bootstrap shell. */
+             * keyboard escape to return to the serial bootstrap shell. The
+             * serial terminal has its own UART stream, so keep polling that
+             * while the VM's virtio keyboard belongs to the GUI. */
             if ((zc_window_demo_active() || zc_gui_terminal_active()) &&
                 virtio_kbd_take_ctrl_c()) {
                 if (zc_window_demo_active()) {
@@ -6643,12 +6692,9 @@ static void shell_run(void) {
                 len = 0;
                 continue;
             }
-            tablet_cursor_tick();
-            (void)hc_builtin_sleep(1);
-            continue;
         }
 #endif
-        int c = kbd_getc_nb();
+        int c = gui_has_keyboard ? uart_text_getc_nb() : kbd_getc_nb();
         tablet_cursor_tick();
         if (c < 0) {
             /* M201: yield ~1 ms (Sleep peeks UART/virtio) instead of busy-spin. */

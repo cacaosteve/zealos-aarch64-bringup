@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Exercise the native compiler inside a disposable QEMU/HVF guest."""
-import argparse, os, pathlib, re, select, shlex, shutil, struct, subprocess, tempfile, time, zlib
+import argparse, json, os, pathlib, re, select, shlex, shutil, socket, struct, subprocess, tempfile, time, zlib
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 p = argparse.ArgumentParser()
 p.add_argument('--pci', action='store_true')
@@ -14,6 +14,10 @@ p.add_argument('--probe-module-override', type=pathlib.Path,
                help='compile this host source after the selected module dependency sequence')
 p.add_argument('--probe-gui-terminal', action='store_true',
                help='spawn a real DocTerm task under the live source Window Manager')
+p.add_argument('--probe-gui-keyboard', action='store_true',
+               help='inject printable virtio keys and verify the boot graphical terminal receives them')
+p.add_argument('--probe-gui-workflow', action='store_true',
+               help='verify visible graphical editing, save/compile/run, and reopen after reboot')
 p.add_argument('--probe-winmgr', action='store_true',
                help='also try the unchanged WinMgr.ZC load with a short timeout after Win.ZC')
 p.add_argument('--probe-grscreen', action='store_true',
@@ -39,6 +43,8 @@ p.add_argument('--probe-source-call',
 p.add_argument('--probe-source-kernel', action='store_true',
                help='load KernelA/B and KMathB before each source probe')
 args = p.parse_args()
+if args.probe_gui_workflow:
+    args.probe_gui_keyboard = True
 if args.probe_module_override and not args.probe_module:
     p.error('--probe-module-override requires --probe-module')
 if args.probe_fulltext_visible:
@@ -48,6 +54,8 @@ if args.probe_source and not args.pci:
 if args.probe_gui_terminal and (
         not args.pci or args.probe_module != '/System/DolDoc/DocRecalc.ZC'):
     p.error('--probe-gui-terminal requires --pci --probe-module /System/DolDoc/DocRecalc.ZC')
+if args.probe_gui_keyboard and not args.pci:
+    p.error('--probe-gui-keyboard requires --pci')
 if args.probe_grscreen and not args.probe_winmgr:
     p.error('--probe-grscreen requires --probe-winmgr')
 if args.probe_fulltext and not args.probe_grscreen:
@@ -78,6 +86,9 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
     shutil.copyfile(os.environ.get('FW_VARS_IN', '/opt/homebrew/share/qemu/edk2-arm-vars.fd'), tmp/'vars.fd')
     platform_args = shlex.split(os.environ.get('QEMU_VIRT', '-machine virt,accel=hvf,gic-version=3 -cpu host -m 512 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device'))
     cmd = [os.environ.get('QEMU', 'qemu-system-aarch64')] + platform_args + ['-drive', f'if=pflash,unit=0,format=raw,file={fw},readonly=on', '-drive', f'if=pflash,unit=1,format=raw,file={tmp}/vars.fd', '-serial', 'stdio', '-monitor', 'none', '-display', 'none']
+    qmp_path = tmp/'qmp.sock'
+    if args.pci:
+        cmd += ['-qmp', f'unix:{qmp_path},server=on,wait=off']
     if args.pci:
         shutil.copyfile(ROOT/'build/disk.img', tmp/'disk.img')
         # A torn shadow-bank superblock must never supersede the valid A bank.
@@ -130,6 +141,142 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         if expected not in result: raise RuntimeError(f'{line}: missing {expected!r}\n{result}')
         print(f'PASS {line}: {expected}', flush=True)
         return result
+    def qmp_command(execute, arguments=None):
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        try:
+            sock.settimeout(5)
+            deadline = time.monotonic() + 10
+            while True:
+                try:
+                    sock.connect(str(qmp_path))
+                    break
+                except (FileNotFoundError, ConnectionRefusedError):
+                    if time.monotonic() >= deadline:
+                        raise RuntimeError('QEMU QMP socket did not become ready')
+                    time.sleep(0.05)
+            stream = sock.makefile('rwb')
+            greeting = json.loads(stream.readline())
+            if 'QMP' not in greeting:
+                raise RuntimeError('invalid QMP greeting: '+repr(greeting))
+            stream.write(b'{"execute":"qmp_capabilities"}\r\n')
+            stream.flush()
+            if 'return' not in json.loads(stream.readline()):
+                raise RuntimeError('QMP capability negotiation failed')
+            request = {'execute': execute}
+            if arguments is not None:
+                request['arguments'] = arguments
+            stream.write((json.dumps(request)+'\r\n').encode())
+            stream.flush()
+            response = json.loads(stream.readline())
+            while 'event' in response:
+                response = json.loads(stream.readline())
+            if 'return' not in response:
+                raise RuntimeError(f'QMP {execute} failed: '+repr(response))
+            stream.close()
+            return response['return']
+        finally:
+            sock.close()
+    def qmp_send_keys(qcodes):
+        qmp_command('send-key', {
+            'keys': [{'type': 'qcode', 'data': qcode} for qcode in qcodes],
+            'hold-time': 50})
+    def graphical_screen(name):
+        # Inspect actual scanout, rather than treating successful command
+        # assembly as proof that the user could see characters while typing.
+        path = ROOT/'build'/f'gui-{name}.ppm'
+        qmp_command('screendump', {'filename': str(path)})
+        ppm = path.read_bytes()
+        header = re.match(rb'P6\s+(\d+)\s+(\d+)\s+255\s', ppm)
+        if not header:
+            raise RuntimeError(f'invalid framebuffer screenshot: {path}')
+        width, height = map(int, header.groups())
+        pixels = ppm[header.end():]
+        if len(pixels) != width * height * 3:
+            raise RuntimeError(f'incomplete framebuffer screenshot: {path}')
+        glyphs = re.findall(r'/\*.*?\*/\s*\{([^}]+)\}',
+                            (ROOT/'src/fb_font.h').read_text(), re.S)[:96]
+        font = {tuple(int(v.strip(), 0) for v in glyph.split(',')): chr(i+32)
+                for i, glyph in enumerate(glyphs)}
+        rows = []
+        # The source planar font starts one scanline below the text cell.
+        for y in range(1, height-7, 8):
+            row = ''
+            for x in range(0, width-7, 8):
+                bits = tuple(sum(0x80 >> col for col in range(8)
+                                 if pixels[((y+r)*width+x+col)*3:
+                                           ((y+r)*width+x+col)*3+3] == b'\xff\xff\xff')
+                             for r in range(8))
+                row += font.get(bits, font.get(tuple(v ^ 255 for v in bits), '?'))
+            rows.append(row.rstrip())
+        text = '\n'.join(rows)
+        path.with_suffix('.txt').write_text(text+'\n')
+        return width, height, pixels, text
+    def require_graphical_text(name, expected):
+        deadline = time.monotonic() + 5
+        while True:
+            screen = graphical_screen(name)
+            if expected in screen[3]:
+                break
+            if time.monotonic() >= deadline:
+                raise RuntimeError(f'graphical scanout is missing {expected!r}; '
+                                   f'see build/gui-{name}.ppm and .txt\n'+screen[3])
+            time.sleep(0.1)
+        print(f'PASS visible graphical text: {expected!r}', flush=True)
+        return screen
+    def white_pixels(screen, x, y, width, height):
+        stride, _, pixels, _ = screen
+        return sum(pixels[((y+r)*stride+x+c)*3:((y+r)*stride+x+c)*3+3]
+                   == b'\xff\xff\xff' for r in range(height) for c in range(width))
+    def require_graphical_caret(screen, line):
+        deadline = time.monotonic() + 3
+        while True:
+            for row, text in enumerate(screen[3].splitlines()):
+                if line in text:
+                    col = text.index(line) + len(line)
+                    if white_pixels(screen, col*8, row*8, 8, 8) >= 8:
+                        print('PASS visible graphical insertion caret', flush=True)
+                        return
+                    break
+            if time.monotonic() >= deadline:
+                break
+            time.sleep(0.1)
+            screen = graphical_screen('typing-before-return')
+        raise RuntimeError('graphical input has no visible insertion caret; '
+                           'see build/gui-typing-before-return.ppm')
+    def move_graphical_pointer(x, y):
+        qmp_command('input-send-event', {'events': [
+            {'type': 'abs', 'data': {'axis': 'x', 'value': round(x*32767/799)}},
+            {'type': 'abs', 'data': {'axis': 'y', 'value': round(y*32767/599)}}]})
+    def require_graphical_pointer():
+        move_graphical_pointer(640, 480)
+        deadline = time.monotonic() + 5
+        while True:
+            screen = graphical_screen('mouse-pointer')
+            if white_pixels(screen, 638, 478, 20, 22) >= 15:
+                print('PASS visible graphical mouse pointer', flush=True)
+                return
+            if time.monotonic() >= deadline:
+                raise RuntimeError('tablet motion has no visible mouse pointer; '
+                                   'see build/gui-mouse-pointer.ppm')
+            time.sleep(0.1)
+    def qmp_send_key(qcode):
+        qmp_send_keys([qcode])
+    def qmp_send_text(text):
+        qcodes = {
+            ' ': ('spc',), '/': ('slash',), '.': ('dot',),
+            ';': ('semicolon',), ':': ('shift', 'semicolon'), '\n': ('ret',),
+            '(': ('shift', '9'), ')': ('shift', '0'),
+            '{': ('shift', 'bracket_left'), '}': ('shift', 'bracket_right'),
+        }
+        for char in text:
+            keys = qcodes.get(char)
+            if keys is None:
+                keys = ('shift', char.lower()) if char.isupper() else (char,)
+            qmp_send_keys(keys)
+            # Keep longer lines below the guest's cooperative input polling
+            # rate; QMP acknowledges injection before the source task consumes
+            # each event, and an early Return can otherwise overtake the tail.
+            time.sleep(0.2)
     def checked_put_key():
         command('zload /Tests/TaskPutKey.ZC', 'zc: loaded /Tests/TaskPutKey.ZC')
         result = command('zcall TaskPutKeyChecks', 'zc => 0x000000000000002a')
@@ -175,7 +322,10 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         command('zstatus', 'failed=0')
         command('zcall TaskBackgroundKeyCleanup', 'zc => 0x000000000000002a')
         command('zcall TaskBackgroundFocusStart', 'zc => 0x000000000000002a')
-        guest.stdin.write(b'g'); guest.stdin.flush()
+        if args.pci:
+            qmp_send_key('g')
+        else:
+            guest.stdin.write(b'g'); guest.stdin.flush()
         # Give the idle scheduler time to deliver the focused key and end
         # the child before the next shell command under a slow HVF run.
         time.sleep(.2)
@@ -189,12 +339,15 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         print(f'PASS {line} + key {key!r}: {expected}', flush=True)
         return result
     def command_after_marker_key(line, marker, key, expected, delay=0,
-                                 terminator=b'\r'):
+                                 terminator=b'\r', virtio=False):
         guest.stdin.write(line.encode()+terminator); guest.stdin.flush()
         before = until(marker.encode())
         if delay:
             time.sleep(delay)
-        guest.stdin.write(key); guest.stdin.flush()
+        if virtio:
+            qmp_send_key(key.decode('ascii'))
+        else:
+            guest.stdin.write(key); guest.stdin.flush()
         result = before + until(b'\n> ')
         if expected not in result: raise RuntimeError(f'{line}: missing {expected!r}\n{result}')
         print(f'PASS {line} after {marker!r} + key {key!r}: {expected}', flush=True)
@@ -238,6 +391,14 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         # short window to produce a real visible frame before measuring scanout.
         time.sleep(0.5)
         desktop = command('zstatus', 'desktop: winmgr=1 gterm=1 windowdemo=0 presented_frames=')
+        if 'keyboard_focus=' not in desktop:
+            raise RuntimeError('zstatus omitted the active guest keyboard-focus task:\n' + desktop)
+        if 'keyboard_focus=Terminal' not in desktop:
+            raise RuntimeError('boot graphical terminal does not own the VM keyboard:\n' + desktop)
+        if 'gui_keyboard: key_events=' not in desktop:
+            raise RuntimeError('zstatus omitted graphical keyboard diagnostics:\n' + desktop)
+        if 'virtio_keyboard: ready=1 key_events=' not in desktop:
+            raise RuntimeError('zstatus omitted low-level virtio keyboard diagnostics:\n' + desktop)
         frames = re.search(r'desktop: winmgr=1 gterm=1 windowdemo=0 presented_frames=(\d+)', desktop)
         if not frames or int(frames.group(1)) == 0:
             raise RuntimeError('boot graphical terminal has not presented a frame:\n' + desktop)
@@ -259,6 +420,211 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         if not text_pixels or int(text_pixels.group(1), 16) < 100:
             raise RuntimeError('boot graphical terminal has no visible document text pixels:\n' + visible_text)
         print(f'PASS boot graphical terminal visible text pixels: {int(text_pixels.group(1), 16)}', flush=True)
+        if args.probe_gui_keyboard:
+            require_graphical_text('boot-terminal', 'ZealOS ARM64 graphical terminal')
+            raw_before = re.search(r'virtio_keyboard: ready=1 key_events=(\d+)', desktop)
+            if not raw_before:
+                raise RuntimeError('could not read low-level virtio keyboard event count:\n' + desktop)
+            before = command('zcall BootstrapGuiTerminalKeyEventCount', 'zc => 0x')
+            before_count = re.search(r'zc => 0x([0-9a-fA-F]+)', before)
+            if not before_count:
+                raise RuntimeError('could not read graphical-terminal key-event count:\n' + before)
+            for key in ('h', 'e', 'l', 'p'):
+                qmp_send_key(key)
+            time.sleep(0.3)
+            typing = require_graphical_text('typing-before-return', '> help')
+            require_graphical_pointer()
+            require_graphical_caret(typing, '> help')
+            qmp_send_key('ret')
+            time.sleep(0.5)
+            after = command('zcall BootstrapGuiTerminalKeyEventCount', 'zc => 0x')
+            after_count = re.search(r'zc => 0x([0-9a-fA-F]+)', after)
+            if not after_count or int(after_count.group(1), 16) < int(before_count.group(1), 16) + 5:
+                raise RuntimeError('printable virtio keys did not reach the boot graphical terminal:\n' + after)
+            raw_after = command('zstatus', 'virtio_keyboard: ready=1 key_events=')
+            raw_count = re.search(r'virtio_keyboard: ready=1 key_events=(\d+)', raw_after)
+            if not raw_count or int(raw_count.group(1)) < int(raw_before.group(1)) + 5:
+                raise RuntimeError('QMP keys did not reach the virtio keyboard device:\n' + raw_after)
+            command('zcall BootstrapGuiTerminalLastCommandIsHelp',
+                    'zc => 0x0000000000000001')
+            last_key = command('zcall BootstrapGuiTerminalLastKeyChar', 'zc => 0x')
+            last_key_value = re.search(r'zc => 0x([0-9a-fA-F]+)', last_key)
+            if not last_key_value or int(last_key_value.group(1), 16) != 10:
+                raise RuntimeError('graphical terminal did not record the Return key after help:\n' + last_key)
+            before_zls = command('zcall BootstrapGuiTerminalKeyEventCount', 'zc => 0x')
+            before_zls_count = re.search(r'zc => 0x([0-9a-fA-F]+)', before_zls)
+            if not before_zls_count:
+                raise RuntimeError('could not read graphical-terminal key count before zls:\n' + before_zls)
+            for key in ('z', 'l', 's', 'ret'):
+                qmp_send_key(key)
+            time.sleep(0.5)
+            after_zls = command('zcall BootstrapGuiTerminalKeyEventCount', 'zc => 0x')
+            after_zls_count = re.search(r'zc => 0x([0-9a-fA-F]+)', after_zls)
+            if (not after_zls_count or
+                    int(after_zls_count.group(1), 16) < int(before_zls_count.group(1), 16) + 4):
+                raise RuntimeError('printable virtio keys did not reach the graphical terminal for zls:\n' + after_zls)
+            command('zcall BootstrapGuiTerminalLastCommandIsZls',
+                    'zc => 0x0000000000000001')
+            command('zcall BootstrapGuiShellSmoke',
+                    'zc => 0x000000000000002a')
+            zls_last_key = command('zcall BootstrapGuiTerminalLastKeyChar', 'zc => 0x')
+            zls_last_key_value = re.search(r'zc => 0x([0-9a-fA-F]+)', zls_last_key)
+            if not zls_last_key_value or int(zls_last_key_value.group(1), 16) != 10:
+                raise RuntimeError('graphical terminal did not record Return after zls:\n' + zls_last_key)
+            before_edit = command('zcall BootstrapGuiTerminalKeyEventCount', 'zc => 0x')
+            before_edit_count = re.search(r'zc => 0x([0-9a-fA-F]+)', before_edit)
+            if not before_edit_count:
+                raise RuntimeError('could not read graphical-terminal key count before editing test:\n' + before_edit)
+            # Type "zvl", move left once, and insert "o" to form zvol.
+            for key in ('z', 'v', 'l', 'left', 'o', 'ret'):
+                qmp_send_key(key)
+            time.sleep(0.5)
+            after_edit = command('zcall BootstrapGuiTerminalKeyEventCount', 'zc => 0x')
+            after_edit_count = re.search(r'zc => 0x([0-9a-fA-F]+)', after_edit)
+            if (not after_edit_count or
+                    int(after_edit_count.group(1), 16) < int(before_edit_count.group(1), 16) + 6):
+                raise RuntimeError('graphical terminal did not receive cursor-editing keys:\n' + after_edit)
+            command('zcall BootstrapGuiTerminalLastCommandIsZvol',
+                    'zc => 0x0000000000000001')
+            before_history = command('zcall BootstrapGuiTerminalKeyEventCount', 'zc => 0x')
+            before_history_count = re.search(r'zc => 0x([0-9a-fA-F]+)', before_history)
+            if not before_history_count:
+                raise RuntimeError('could not read graphical-terminal key count before history test:\n' + before_history)
+            for key in ('up', 'ret'):
+                qmp_send_key(key)
+            time.sleep(0.5)
+            after_history = command('zcall BootstrapGuiTerminalKeyEventCount', 'zc => 0x')
+            after_history_count = re.search(r'zc => 0x([0-9a-fA-F]+)', after_history)
+            if (not after_history_count or
+                    int(after_history_count.group(1), 16) < int(before_history_count.group(1), 16) + 2):
+                raise RuntimeError('graphical terminal did not receive command-history keys:\n' + after_history)
+            command('zcall BootstrapGuiTerminalLastCommandIsZvol',
+                    'zc => 0x0000000000000001')
+            print('PASS QMP printable, cursor-editing, and history keys formed and submitted "help", "zls", and "zvol" in the graphical terminal', flush=True)
+            command('zc I64 GuiEditorFileFindCheck(){return FileFind("/System/DolDoc/DocEd.ZC",NULL,1024)*42;}',
+                    'zc: executed')
+            command('zcall GuiEditorFileFindCheck',
+                    'zc => 0x000000000000002a')
+            command('zc I64 GuiEditorDocReadCheck(){CDoc *d=DocRead("/System/DolDoc/DocEd.ZC");I64 r=1;if(!d)return r;if(d->doc_signature==DOC_SIGNATURE_VAL)r=42;DocDel(d);return r;}',
+                    'zc: executed')
+            command('zcall GuiEditorDocReadCheck',
+                    'zc => 0x000000000000002a')
+            command('zc I64 GuiEditorDocFileEdCheck(){I64 n=1;if(DocFileEd(LK_FILE,"/System/DolDoc/DocEd.ZC",NULL,&n,EDF_BAIL|EDf_BAIL))return 42;return 1;}',
+                    'zc: executed')
+            command('zcall GuiEditorDocFileEdCheck',
+                    'zc => 0x000000000000002a')
+            command('zc I64 GuiEditorEdCheck(){if(Ed("/System/DolDoc/DocEd.ZC",EDF_BAIL|EDf_BAIL))return 42;return 1;}',
+                    'zc: executed')
+            command('zcall GuiEditorEdCheck',
+                    'zc => 0x000000000000002a')
+            editor_command = 'edit /System/DolDoc/DocEd.ZC'
+            qmp_send_text(editor_command)
+            qmp_send_key('ret')
+            # The terminal task enters upstream DocEd() and waits for keys.
+            # Send navigation and Escape through the same virtio path, then
+            # check those keys were consumed by the editor instead of the
+            # terminal command loop and that the terminal accepts input again.
+            time.sleep(0.5)
+            command('zcall BootstrapGuiTerminalLastCommandIsEdit',
+                    'zc => 0x0000000000000001')
+            editor_open = command('zstatus', 'gui_editor_active=')
+            if 'gui_editor_active=1' not in editor_open:
+                raise RuntimeError('GUI editor returned before accepting input:\n' + editor_open)
+            if 'keyboard_focus=Terminal' not in editor_open:
+                raise RuntimeError('GUI editor lost the focused terminal task:\n' + editor_open)
+            editor_scanout = re.search(r'scanout: nonblack_pixels=(\d+) of 480000', editor_open)
+            if not editor_scanout or int(editor_scanout.group(1)) < 1000:
+                raise RuntimeError('GUI editor did not paint visible document pixels:\n' + editor_open)
+            count_while_editing = command(
+                'zcall BootstrapGuiTerminalKeyEventCount', 'zc => 0x')
+            count_while_editing_value = re.search(
+                r'zc => 0x([0-9a-fA-F]+)', count_while_editing)
+            if not count_while_editing_value:
+                raise RuntimeError('could not read graphical-terminal key count while editor was open:\n' + count_while_editing)
+            for key in ('left', 'right', 'esc'):
+                qmp_send_key(key)
+                time.sleep(0.1)
+            time.sleep(0.4)
+            command('zstatus', 'gui_editor_active=0')
+            after_editor = command('zcall BootstrapGuiTerminalKeyEventCount', 'zc => 0x')
+            after_editor_count = re.search(r'zc => 0x([0-9a-fA-F]+)', after_editor)
+            if (not after_editor_count or
+                    int(after_editor_count.group(1), 16) !=
+                    int(count_while_editing_value.group(1), 16)):
+                raise RuntimeError('GUI editor navigation/Escape did not stay in the editor task:\n' + after_editor)
+            for key in ('z', 'l', 's', 'ret'):
+                qmp_send_key(key)
+            time.sleep(0.3)
+            command('zcall BootstrapGuiTerminalLastCommandIsZls',
+                    'zc => 0x0000000000000001')
+            print('PASS QMP GUI editor opened the bundled DocEd source, consumed navigation/Escape keys, and returned to the graphical shell', flush=True)
+            # Exercise the manager transition from the same graphical task
+            # that owns the keyboard. This catches context checks that pass
+            # from the serial shell but reject a valid GUI app task.
+            qmp_send_text('windowdemo')
+            qmp_send_key('ret')
+            time.sleep(0.5)
+            demo_status = command('zstatus',
+                                  'desktop: winmgr=1 gterm=1 windowdemo=1 presented_frames=')
+            if 'failed=0' not in demo_status:
+                raise RuntimeError('graphical window demo left the native compiler failed:\n' + demo_status)
+            command('windowdemostop',
+                    'windowdemo: stopped; bootstrap shell display resumed')
+            restored = command('zstatus',
+                               'desktop: winmgr=1 gterm=1 windowdemo=0 presented_frames=')
+            if 'keyboard_focus=Terminal' not in restored:
+                raise RuntimeError('graphical terminal did not recover keyboard focus after windowdemo:\n' + restored)
+            for key in ('z', 'l', 's', 'ret'):
+                qmp_send_key(key)
+            time.sleep(0.3)
+            command('zcall BootstrapGuiTerminalLastCommandIsZls',
+                    'zc => 0x0000000000000001')
+            print('PASS QMP graphical window demo launch/stop restored the terminal and keyboard focus', flush=True)
+            if args.probe_gui_workflow:
+                editor_path = '/Tests/GuiBringup.ZC'
+                source = 'I64 GuiBringup(){return 42;}'
+                qmp_send_text('edit '+editor_path)
+                qmp_send_key('ret')
+                time.sleep(0.5)
+                command('zstatus', 'gui_editor_active=1')
+                qmp_send_text(source)
+                require_graphical_text('editor-typed-source', source)
+                qmp_send_key('esc')
+                time.sleep(0.5)
+                command('zstatus', 'gui_editor_active=0')
+                qmp_send_text('zload disk:Tests/GuiBringup.ZC')
+                qmp_send_key('ret')
+                require_graphical_text('editor-saved-load',
+                                       'zc: loaded disk:Tests/GuiBringup.ZC')
+                qmp_send_text('zcall GuiBringup')
+                qmp_send_key('ret')
+                require_graphical_text('editor-saved-run',
+                                       'zc => 0x000000000000002a')
+                guest.terminate()
+                try:
+                    guest.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    guest.kill()
+                    guest.wait()
+                guest = subprocess.Popen(cmd, stdin=subprocess.PIPE,
+                                         stdout=subprocess.PIPE,
+                                         stderr=subprocess.STDOUT, bufsize=0)
+                buf.clear()
+                until(b'\n> ')
+                qmp_send_text('edit '+editor_path)
+                qmp_send_key('ret')
+                command('zstatus', 'gui_editor_active=1')
+                require_graphical_text('editor-reopened-after-reboot', source)
+                qmp_send_keys(['shift', 'esc'])
+                time.sleep(0.5)
+                command('zstatus', 'gui_editor_active=0')
+                cancelled = require_graphical_text(
+                    'editor-cancelled-after-reboot',
+                    'The serial shell remains available.')
+                if 'edit: could not open document' in cancelled[3]:
+                    raise RuntimeError('cancelling an open editor reported an open failure')
+                print('PASS graphical edit/save/compile/run/reboot/reopen workflow', flush=True)
+            raise SystemExit(0)
         command('zcall BootstrapGuiTerminalSmoke',
                 'zc => 0x000000000000002a')
         command('zcall BootstrapGuiShellSmoke',
@@ -1212,11 +1578,13 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             command('zload /Tests/TaskPopup.ZC', 'zc: loaded /Tests/TaskPopup.ZC')
             command('zcall PopupBridgeChecks', 'zc => 0x000000000000002a')
             command_after_marker_key('zcall PopupLiveKey', 'popup key ready', b'p',
-                                     'zc => 0x0000000000000070', delay=.3)
+                                     'zc => 0x0000000000000070', delay=.3,
+                                     virtio=args.pci)
             command('zload /Tests/TaskFocusRing.ZC', 'zc: loaded /Tests/TaskFocusRing.ZC')
             command('zcall TaskFocusRingChecks', 'zc => 0x000000000000002a')
             command_after_marker_key('zcall TaskFocusRingLive', 'focus ring ready', b'r',
-                                     'zc => 0x0000000000000072', delay=.3)
+                                     'zc => 0x0000000000000072', delay=.3,
+                                     virtio=args.pci)
             command('zload /Tests/TaskChildRing.ZC', 'zc: loaded /Tests/TaskChildRing.ZC')
             command('zcall TaskChildRingChecks', 'zc => 0x000000000000002a')
             command('zload /Tests/TaskJobs.ZC', 'zc: loaded /Tests/TaskJobs.ZC')
@@ -1257,7 +1625,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             command('zcall TaskFocusKillChecks', 'zc => 0x000000000000002a')
             checked_background_tasks()
             command_after_marker_key('zcall TaskLiveFocus', 'focus ready', b'f',
-                                     'zc => 0x0000000000000066')
+                                     'zc => 0x0000000000000066',
+                                     virtio=args.pci)
             command('zload /Tests/TaskSpawnQueue.ZC', 'zc: loaded /Tests/TaskSpawnQueue.ZC')
             command('zcall TaskSpawnQueueChecks', 'zc => 0x000000000000002a')
             command('zload /Tests/TaskJobQueue.ZC', 'zc: loaded /Tests/TaskJobQueue.ZC')
@@ -1416,11 +1785,13 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             command('zload /Tests/TaskPopup.ZC', 'zc: loaded /Tests/TaskPopup.ZC')
             command('zcall PopupBridgeChecks', 'zc => 0x000000000000002a')
             command_after_marker_key('zcall PopupLiveKey', 'popup key ready', b'p',
-                                     'zc => 0x0000000000000070', delay=.3)
+                                     'zc => 0x0000000000000070', delay=.3,
+                                     virtio=args.pci)
             command('zload /Tests/TaskFocusRing.ZC', 'zc: loaded /Tests/TaskFocusRing.ZC')
             command('zcall TaskFocusRingChecks', 'zc => 0x000000000000002a')
             command_after_marker_key('zcall TaskFocusRingLive', 'focus ring ready', b'r',
-                                     'zc => 0x0000000000000072', delay=.3)
+                                     'zc => 0x0000000000000072', delay=.3,
+                                     virtio=args.pci)
             command('zload /Tests/TaskChildRing.ZC', 'zc: loaded /Tests/TaskChildRing.ZC')
             command('zcall TaskChildRingChecks', 'zc => 0x000000000000002a')
             command('zload /Tests/TaskJobs.ZC', 'zc: loaded /Tests/TaskJobs.ZC')
@@ -1461,7 +1832,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             command('zcall TaskFocusKillChecks', 'zc => 0x000000000000002a')
             checked_background_tasks()
             command_after_marker_key('zcall TaskLiveFocus', 'focus ready', b'f',
-                                     'zc => 0x0000000000000066')
+                                     'zc => 0x0000000000000066',
+                                     virtio=args.pci)
             command('zload /Tests/TaskSpawnQueue.ZC', 'zc: loaded /Tests/TaskSpawnQueue.ZC')
             command('zcall TaskSpawnQueueChecks', 'zc => 0x000000000000002a')
             command('zload /Tests/TaskJobQueue.ZC', 'zc: loaded /Tests/TaskJobQueue.ZC')

@@ -99,6 +99,13 @@ make pi-sd          # builds build/pi-esp/ from current ESP
 
 Shared above that: HolyC front-end, JIT, RedSea/CFile APIs, demos.
 
+For USB, reuse the YDE USB core/HID work through ARM64 platform hooks, first
+proving native input with UTM's default USB 3.0 configuration. Pi 4B then needs
+a separate BCM2711 PCIe/VL805 backend with validated DMA, cache, and MMIO
+handling. The current VirtIO input drivers are the recovery path on `virt`;
+they do not provide physical Pi USB support. See the
+[USB port sequence](COMPATIBILITY.md#usb-direction-reuse-yde-with-arm64-platform-hooks).
+
 ## Code plan (small batches)
 
 1. **Docs + `make pi-sd`** — done.

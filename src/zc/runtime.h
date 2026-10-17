@@ -47,3 +47,7 @@ int64_t zc_tablet_sample(void);
 int zc_focus_owns_input(void);
 int zc_selftest(void);
 void zc_status(void);
+int zc_virtio_keyboard_ready(void);
+uint64_t zc_virtio_keyboard_event_count(void);
+uint16_t zc_virtio_keyboard_last_code(void);
+uint32_t zc_virtio_keyboard_last_value(void);

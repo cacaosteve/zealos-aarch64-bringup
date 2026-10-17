@@ -99,6 +99,9 @@ static unsigned g_vk_rh, g_vk_rt;
 static struct vk_msg g_vk_msg[32];
 static unsigned g_vk_mh, g_vk_mt;
 static uint64_t g_vk_hhdm;
+static uint64_t g_vk_key_event_count;
+static uint16_t g_vk_last_key_code;
+static uint32_t g_vk_last_key_value;
 
 static inline uint32_t vk_rr(volatile uint32_t *m, unsigned off) {
     return m[off / 4];
@@ -226,6 +229,9 @@ static void vk_handle(struct vk_dev *d, struct vk_event ev) {
     if (ev.type != VK_EV_KEY) {
         return;
     }
+    g_vk_key_event_count++;
+    g_vk_last_key_code = ev.code;
+    g_vk_last_key_value = ev.value;
     int pressed = ev.value != 0;
     if (ev.code == VK_KEY_LEFTSHIFT || ev.code == VK_KEY_RIGHTSHIFT) {
         d->shift = pressed ? 1 : 0;
@@ -280,6 +286,9 @@ static int virtio_kbd_init(uint64_t hhdm) {
     g_vk_hhdm = hhdm;
     g_vk.ready = 0;
     g_vk_rh = g_vk_rt = 0;
+    g_vk_key_event_count = 0;
+    g_vk_last_key_code = 0;
+    g_vk_last_key_value = 0;
 
     /* Use last INPUT device (QEMU often places backends in high slots). */
     volatile uint32_t *found = NULL;
@@ -476,6 +485,18 @@ static int virtio_kbd_msg_pending(void) {
 
 static int virtio_kbd_ready(void) {
     return g_vk.ready;
+}
+
+static uint64_t virtio_kbd_key_event_count(void) {
+    return g_vk_key_event_count;
+}
+
+static uint16_t virtio_kbd_last_key_code(void) {
+    return g_vk_last_key_code;
+}
+
+static uint32_t virtio_kbd_last_key_value(void) {
+    return g_vk_last_key_value;
 }
 
 /* Poll before reporting modifier state so gesture readers see current input. */

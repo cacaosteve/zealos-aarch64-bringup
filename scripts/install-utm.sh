@@ -79,6 +79,27 @@ rs_src = pathlib.Path("$RS_IMG")
 cfg_path = dest / "config.plist"
 cfg = plistlib.loads(cfg_path.read_bytes())
 
+# Omarchy's cloned UTM configuration forwards SSH on 127.0.0.1:2222. Keep
+# Zealos on its own stable host port so both VMs can coexist when Omarchy is
+# already running.
+network = cfg.setdefault("Network", [{}])
+if not network:
+    network.append({})
+for adapter in network:
+    forwards = adapter.setdefault("PortForward", [])
+    # Replace every SSH forward so a prior/default 2222 mapping cannot remain
+    # alongside the Zealos mapping and prevent QEMU from starting.
+    adapter["PortForward"] = [
+        rule for rule in forwards
+        if not (rule.get("Protocol") == "TCP" and rule.get("GuestPort") == 22)
+    ]
+    adapter["PortForward"].append({
+        "HostAddress": "127.0.0.1",
+        "HostPort": 2223,
+        "GuestPort": 22,
+        "Protocol": "TCP",
+    })
+
 cfg.setdefault("Information", {})["Name"] = "$VM_NAME"
 cfg["Information"]["Notes"] = (
     "ZealOS aarch64 Limine bring-up. Disk image bytes are our ESP; "

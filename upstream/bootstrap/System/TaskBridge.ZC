@@ -36,6 +36,7 @@ extern Bool ZcSourceFileAt(I64 index, U8 *path, I64 path_cap, I64 *_size);
 extern Bool FilesFindMatch(U8 *test_name, U8 *files_find_mask,
                            I64 fuf_flags=0);
 extern CDoc *DocNew(U8 *filename=NULL, CTask *task=NULL);
+extern Bool ZcDocRecalc(CDoc *doc, I64 recalc_flags);
 extern U0 DocDel(CDoc *doc);
 extern CDoc *DocRead(U8 *name=NULL, I64 flags=0);
 extern Bool DocWrite(CDoc *doc, Bool prompt=FALSE);
@@ -2496,7 +2497,7 @@ U0 BootstrapGodGlbls()
 BootstrapGodGlbls;
 // Temporary clock base for DocRecalc; refreshed from the platform timer later.
 F64 tS = 0;
-// Bootstrap blink phase; the periodic platform timer is not wired into ZC yet.
+// Refreshed from the platform timer by the staged compositor.
 Bool Blink = TRUE;
 // StrA.ZC char bitmaps required by DocHighlight/DocPutKey/DocPutS before StrA loads.
 U32 char_bmp_alpha_numeric[16] =
@@ -2633,9 +2634,8 @@ U8 *DocScanLine(CDoc *doc, CDocEntry *doc_e, I64 *cur_col=NULL,
 }
 Bool DocRecalc(CDoc *doc, I64 recalc_flags=0)
 {
-    if (doc) {}
-    if (recalc_flags) {}
-    return FALSE;
+    // Early DolDoc callers must follow the real renderer once it loads.
+    return ZcDocRecalc(doc, recalc_flags);
 }
 U0 Busy(I64 us)
 {
@@ -3840,6 +3840,12 @@ public U0 BootstrapWinDragEnd()
 // to BootstrapCtrlInputSampleAt during the initial module load.
 CMouseStateGlobals mouse, mouse_last;
 CMouseHardStateGlobals mouse_hard, mouse_hard_last;
+U0 BootstrapMouseGlobalsInit()
+{//MouseInit's visible, unscaled defaults for the VirtIO tablet bridge.
+    mouse.scale.x = mouse.scale.y = mouse.scale.z = 1.0;
+    mouse.show = TRUE;
+}
+BootstrapMouseGlobalsInit;
 
 public Bool BootstrapCtrlInputSampleAt(CTask *task, I64 sample, I64 now_ns)
 {//Feed one packed absolute tablet sample into the focused task's controls.
@@ -4949,6 +4955,7 @@ U0 BootstrapGrUpdateTasks()
 public U0 BootstrapWinMgrTick()
 {//One host-idle frame: route tablet clicks and redraw the task ring.
     bootstrap_winmgr_ticks++;
+    Blink = (ZcMonotonicNs() / 500000000) & 1;
     bootstrap_gr_fullscreen_active = FALSE;
     if (BootstrapTryUpstreamGrUpdateScreen())
         return;

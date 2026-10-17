@@ -2,10 +2,34 @@
 // The serial shell remains available independently through UART.
 CTask *bootstrap_gui_terminal_task;
 I64 bootstrap_gui_terminal_redraws = 0;
+I64 bootstrap_gui_terminal_key_events = 0;
+I64 bootstrap_gui_terminal_last_key_char = 0;
+I64 bootstrap_gui_terminal_last_scan = 0;
+I64 bootstrap_gui_terminal_editor_active = 0;
+I64 bootstrap_gui_terminal_editor_raw = -1;
+U8 bootstrap_gui_terminal_last_command[256];
+U0 (*bootstrap_gui_terminal_final_update)(CDC *dc);
 extern U8 *ZcGuiShellExec(U8 *line);
 extern I64 ZcFbTextPixel(I64 x, I64 y);
 
 #define GUI_MENU_ACTION_TAG 0x475549
+
+U0 BootstrapGuiTerminalPrintOutput(U8 *output)
+{//Keep each DocPrint below the runtime formatter limit for long command output.
+    I64 i = 0;
+    I64 n;
+    U8 chunk[1024];
+
+    if (!output)
+        return;
+    while (output[i])
+    {
+        for (n = 0; n < 1023 && output[i]; n++, i++)
+            chunk[n] = output[i];
+        chunk[n] = 0;
+        DocPrint(DocPut, "%s", chunk);
+    }
+}
 
 I64 BootstrapGuiTerminalBufferSet(U8 *command, I64 *command_len,
                                   U8 *value, I64 value_len)
@@ -202,6 +226,37 @@ Bool BootstrapGuiTerminalEditCommand(U8 *command, U8 **path)
     return TRUE;
 }
 
+Bool BootstrapGuiTerminalEditFile(U8 *path)
+{//Use the upstream DolDoc editor while keeping its document in this task.
+    CDoc *doc;
+    Bool result = FALSE;
+
+    if (!path || !*path)
+        return FALSE;
+    doc = DocRead(path);
+    if (!doc || doc->doc_signature != DOC_SIGNATURE_VAL)
+    {
+        if (doc)
+            DocDel(doc);
+        return FALSE;
+    }
+    doc->desc = 'Edit';
+    if (*doc->filename.name)
+        doc->filename.dirc = DirContextNew(doc->filename.name);
+    // This task is already running under the boot WinMgr redraw pump. Waiting
+    // synchronously for two additional manager refreshes can starve its shell
+    // task on the bootstrap scheduler; let the regular frame path redraw it.
+    result = DocEd(doc, DOF_DONT_WINMGR_SYNC);
+    if (result)
+        DocWrite(doc);
+    DirContextDel(doc->filename.dirc);
+    doc->filename.dirc = NULL;
+    DocDel(doc);
+    // Shift+Escape successfully closes an opened editor without saving.
+    // Only allocation/read failures should be reported as an open failure.
+    return TRUE;
+}
+
 U0 BootstrapGuiTerminalTask(U8 *data)
 {
     I64 ch, sc;
@@ -231,25 +286,41 @@ U0 BootstrapGuiTerminalTask(U8 *data)
         while ((message = MessageScan(&ch, &sc,
                                      1 << MESSAGE_KEY_DOWN)) == MESSAGE_KEY_DOWN)
         {
+            bootstrap_gui_terminal_key_events++;
+            bootstrap_gui_terminal_last_key_char = ch;
+            bootstrap_gui_terminal_last_scan = sc.u8[0];
             if (ch == '\r' || ch == '\n')
             {
                 DocPutKey(DocPut, 0, SC_END);
                 DocPutKey(DocPut, ch, sc);
                 command[command_len] = 0;
-                BootstrapGuiTerminalHistorySave(history, &history_len,
-                                                command, command_len);
-                if (BootstrapGuiTerminalEditCommand(command, &edit_path))
+                // Return on an empty line is a no-op, like the serial shell.
+                // In particular, don't flood the terminal with a command error
+                // when the host has delivered Return but not printable keys.
+                if (command_len)
                 {
-                    if (!*edit_path)
-                        DocPrint(DocPut, "usage: edit <path>\n");
+                    StrCopy(bootstrap_gui_terminal_last_command, command);
+                    BootstrapGuiTerminalHistorySave(history, &history_len,
+                                                    command, command_len);
+                    if (BootstrapGuiTerminalEditCommand(command, &edit_path))
+                    {
+                        if (!*edit_path)
+                            DocPrint(DocPut, "usage: edit <path>\n");
+                        else
+                        {
+                            bootstrap_gui_terminal_editor_raw = IsRaw();
+                            bootstrap_gui_terminal_editor_active = TRUE;
+                            if (!BootstrapGuiTerminalEditFile(edit_path))
+                                DocPrint(DocPut, "edit: could not open document\n");
+                            bootstrap_gui_terminal_editor_active = FALSE;
+                        }
+                    }
                     else
-                        Ed(edit_path);
-                }
-                else
-                {
-                    output = ZcGuiShellExec(command);
-                    if (output)
-                        DocPrint(DocPut, "%s", output);
+                    {
+                        output = ZcGuiShellExec(command);
+                        if (output)
+                            BootstrapGuiTerminalPrintOutput(output);
+                    }
                 }
                 command_len = 0;
                 command_pos = 0;
@@ -278,6 +349,13 @@ U0 BootstrapGuiTerminalTask(U8 *data)
             }
             else
             {
+                // A mouse click inside the terminal can move DolDoc's
+                // insertion cursor away from the command buffer. Re-anchor
+                // it to the current input position before echoing or editing
+                // so captured keyboard input remains visible after focus.
+                DocPutKey(DocPut, 0, SC_END);
+                for (i = command_len; i > command_pos; i--)
+                    DocPutKey(DocPut, 0, SC_CURSOR_LEFT);
                 if (BootstrapGuiTerminalCommandKey(command, &command_len,
                                                    &command_pos, ch, sc) == 1)
                     DocPutKey(DocPut, ch, sc);
@@ -292,7 +370,7 @@ U0 BootstrapGuiTerminalTask(U8 *data)
                 if (ch == 5)
                     output = ZcGuiShellExec("windowdemo");
                 if (output)
-                    DocPrint(DocPut, "%s", output);
+                    BootstrapGuiTerminalPrintOutput(output);
                 command_len = 0;
                 command_pos = 0;
                 command[0] = 0;
@@ -305,9 +383,37 @@ U0 BootstrapGuiTerminalTask(U8 *data)
     }
 }
 
+U0 BootstrapGuiTerminalFinalUpdate(CDC *dc)
+{//Paint the insertion caret after the source compositor's window redraws.
+    CTask *term = bootstrap_gui_terminal_task;
+    CDoc *doc;
+    I64 x, y, old_color;
+
+    if (dc && TaskValidate(term) && term == sys_focus_task &&
+        Bt(&term->display_flags, DISPLAYf_SHOW) &&
+        (doc = term->display_doc) && !(doc->flags & DOCF_HIDE_CURSOR) && !Blink)
+    {
+        x = term->win_left + doc->x - doc->line_start_col + (term->scroll_x >> 3);
+        y = term->win_top + doc->y - doc->top_line_num + (term->scroll_y >> 3);
+        if (term->win_left <= x <= term->win_right &&
+            term->win_top <= y <= term->win_bottom &&
+            BootstrapWinTextCellVisible(term, x, y))
+        {
+            old_color = dc->color.c0;
+            dc->color.c0 = term->text_attr & 15;
+            GrRect(dc, x * FONT_WIDTH, y * FONT_HEIGHT, 2, FONT_HEIGHT);
+            dc->color.c0 = old_color;
+        }
+    }
+    // Preserve the source menu/progress/mouse overlay, with the pointer last.
+    if (bootstrap_gui_terminal_final_update)
+        (*bootstrap_gui_terminal_final_update)(dc);
+}
+
 I64 BootstrapGuiTerminalStart()
 {
     CTask *term;
+    CGrGlobals *active_gr;
 
     if (TaskValidate(bootstrap_gui_terminal_task))
         return 1;
@@ -323,11 +429,24 @@ I64 BootstrapGuiTerminalStart()
     term->win_top = 4;
     term->win_bottom = 34;
     WinDerivedValsUpdate(term);
+    // The graphical display owns the VM keyboard from boot. The serial shell
+    // continues to read its separate UART input path.
+    sys_focus_task = term;
+    active_gr = ZcActiveGrGlobals();
+    if (active_gr && active_gr->fp_final_screen_update != &BootstrapGuiTerminalFinalUpdate)
+    {
+        bootstrap_gui_terminal_final_update = active_gr->fp_final_screen_update;
+        active_gr->fp_final_screen_update = &BootstrapGuiTerminalFinalUpdate;
+    }
     return 0x2a;
 }
 
 I64 BootstrapGuiTerminalStop()
 {
+    CGrGlobals *active_gr = ZcActiveGrGlobals();
+
+    if (active_gr && active_gr->fp_final_screen_update == &BootstrapGuiTerminalFinalUpdate)
+        active_gr->fp_final_screen_update = bootstrap_gui_terminal_final_update;
     if (TaskValidate(bootstrap_gui_terminal_task))
         Kill(bootstrap_gui_terminal_task);
     bootstrap_gui_terminal_task = NULL;
@@ -373,6 +492,63 @@ I64 BootstrapGuiTerminalRedrawCount()
     return bootstrap_gui_terminal_redraws;
 }
 
+I64 BootstrapGuiTerminalKeyEventCount()
+{
+    return bootstrap_gui_terminal_key_events;
+}
+
+I64 BootstrapGuiTerminalEditorActive()
+{
+    return bootstrap_gui_terminal_editor_active;
+}
+
+I64 BootstrapGuiTerminalEditorRaw()
+{
+    return bootstrap_gui_terminal_editor_raw;
+}
+
+
+I64 BootstrapGuiTerminalLastKeyChar()
+{
+    return bootstrap_gui_terminal_last_key_char;
+}
+
+I64 BootstrapGuiTerminalLastScan()
+{
+    return bootstrap_gui_terminal_last_scan;
+}
+
+I64 BootstrapGuiTerminalLastCommandIsHelp()
+{
+    U8 *command = bootstrap_gui_terminal_last_command;
+
+    return command[0] == 'h' && command[1] == 'e' &&
+           command[2] == 'l' && command[3] == 'p' && command[4] == 0;
+}
+
+I64 BootstrapGuiTerminalLastCommandIsZls()
+{
+    U8 *command = bootstrap_gui_terminal_last_command;
+
+    return command[0] == 'z' && command[1] == 'l' &&
+           command[2] == 's' && command[3] == 0;
+}
+
+I64 BootstrapGuiTerminalLastCommandIsZvol()
+{
+    U8 *command = bootstrap_gui_terminal_last_command;
+
+    return command[0] == 'z' && command[1] == 'v' &&
+           command[2] == 'o' && command[3] == 'l' && command[4] == 0;
+}
+
+I64 BootstrapGuiTerminalLastCommandIsEdit()
+{
+    U8 *command = bootstrap_gui_terminal_last_command;
+
+    return BootstrapGuiTerminalEditCommand(command, NULL);
+}
+
 I64 BootstrapGuiTerminalTextPixelCount()
 {
     CTask *task = bootstrap_gui_terminal_task;
@@ -396,8 +572,16 @@ I64 BootstrapGuiTerminalHide()
 
 I64 BootstrapGuiTerminalShow()
 {
-    if (TaskValidate(bootstrap_gui_terminal_task))
+    CTask *term = bootstrap_gui_terminal_task;
+
+    if (TaskValidate(term))
+    {
         bootstrap_gui_terminal_task->display_flags |= 1 << DISPLAYf_SHOW;
+        // Restoring the window also restores its keyboard ownership. The
+        // window-demo path temporarily hands the screen to other tasks; simply
+        // making the terminal visible again leaves focus on the root shell.
+        sys_focus_task = term;
+    }
     return 0x2a;
 }
 
@@ -530,6 +714,15 @@ I64 BootstrapGuiShellSmoke()
 {
     U8 *output;
 
+    output = ZcGuiShellExec("");
+    if (!output || output[0])
+        return 6;
+    output = ZcGuiShellExec(" \thelp \t");
+    if (!output || output[0] != 'G')
+        return 7;
+    output = ZcGuiShellExec(" \tzstatus \t");
+    if (!output || output[0] != 'z' || output[1] != 'c')
+        return 8;
     output = BootstrapGuiTerminalMenuAction(1);
     if (!output || output[0] != 'G')
         return 1;
@@ -537,9 +730,18 @@ I64 BootstrapGuiShellSmoke()
     if (!output || output[0] != 'z')
         return 2;
     output = BootstrapGuiTerminalMenuAction(3);
-    if (!output || (output[0] != 'K' &&
-        StrCompare(output, "zls: native source partition unavailable\n")))
+    // The native source catalog preserves insertion order. A clean QEMU
+    // image commonly starts with Kernel/, while a long-lived UTM catalog can
+    // start with App/ or Tests/ after user writes and source merges.
+    if (!output ||
+        (output[0] != 'A' && output[0] != 'K' && output[0] != 'S' &&
+         output[0] != 'T' &&
+         StrCompare(output, "zls: native source partition unavailable\n")))
         return 3;
+    if (output[0] != 'z' &&
+        (!StrMatch("zls: n=", output) ||
+         StrMatch("[output truncated]", output)))
+        return 9;
     output = BootstrapGuiTerminalMenuAction(4);
     if (!output || output[0] != 'z')
         return 4;

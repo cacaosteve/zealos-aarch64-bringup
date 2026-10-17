@@ -116,6 +116,8 @@ static int guarded, ready, failed;
 static int window_demo_loaded;
 static int window_demo_restore_gui_terminal;
 static int gui_terminal_active;
+static void *guest_keydev_put_key;
+static void *guest_doc_recalc_stub;
 static int gui_terminal_modules_loaded;
 
 const char *zc_debug_function_for_pc(uintptr_t pc, uintptr_t *offset) {
@@ -303,6 +305,15 @@ static uint8_t guest_sys_semas[GUEST_SEMA_NUM * GUEST_SEMA_STRIDE];
 /* Pinned KernelB.HH exposes this as SYS_FOCUS_TASK. NULL preserves the
  * bootstrap convention that the task actively scanning owns device input. */
 static void *guest_focus_task;
+/* Live keyboard routing diagnostics: distinguish device events from events
+ * posted to the focused guest task and consumed by the graphical terminal. */
+static uint64_t guest_keyboard_route_polls;
+static uint64_t guest_keyboard_route_reads;
+static uint64_t guest_keyboard_route_posts;
+static uint64_t guest_keyboard_route_drops;
+static int64_t guest_keyboard_route_last_type;
+static int64_t guest_keyboard_route_last_arg1;
+static int64_t guest_keyboard_route_last_arg2;
 static int64_t guest_parent_off, guest_number_off, guest_name_off, guest_flags_off;
 static int64_t guest_gs_off;
 static int64_t guest_display_flags_off;
@@ -1598,6 +1609,14 @@ static int64_t host_gr_update_task_odes(int64_t *a) {
         return 0;
     FFI_CALL_TOS_1(update->fun_ptr, a[0]);
     return 1;
+}
+static int64_t host_doc_recalc(int64_t *a) {
+    CHashFun *fun = (CHashFun *)HashFind(
+        "DocRecalc", Fs->hash_table, HTT_FUN, 1);
+    if (!fun || !fun->fun_ptr || fun->fun_ptr == guest_doc_recalc_stub ||
+        fun->argc != 2 || (fun->base.base.type & HTF_EXTERN))
+        return 0;
+    return FFI_CALL_TOS_2(fun->fun_ptr, a[0], a[1]);
 }
 static int64_t host_doc_update_task_docs(int64_t *a) {
     CHashFun *fun = (CHashFun *)HashFind(
@@ -3003,6 +3022,7 @@ static int64_t host_message_scan(int64_t *a) {
 static int64_t poll_guest_keys(void) {
     if (!key_reader)
         return 0;
+    guest_keyboard_route_polls++;
     void *task = guest_focus_task;
     /* The shell retains its keyboard while it is idle. Only an explicitly
      * focused child may take device input during background dispatch. */
@@ -3024,11 +3044,20 @@ static int64_t poll_guest_keys(void) {
         uint64_t ch, sc;
         if (!key_reader(&type, &ch, &sc))
             break;
+        guest_keyboard_route_reads++;
+        guest_keyboard_route_last_type = type;
+        guest_keyboard_route_last_arg1 = (int64_t)ch;
+        guest_keyboard_route_last_arg2 = (int64_t)sc;
         if (type != 2 && type != 3)
             continue;
         if (post_guest_message(task, NULL,
                                type, (int64_t)ch, (int64_t)sc, 0))
+        {
+            guest_keyboard_route_posts++;
             last_code = type;
+        }
+        else
+            guest_keyboard_route_drops++;
     }
     return last_code;
 }
@@ -3057,6 +3086,19 @@ static int64_t host_put_key(int64_t *a) {
          (1u << 2)) ||
         ((uint64_t)a[1] & GUEST_SCF_KEY_DESC))
         return 0;
+    /* Message.ZC's KeyGet is compiled before KeyDev.ZC and retains this
+     * bootstrap echo target. Once the graphical task installs its document
+     * device, honor that real output chain (including editor/navigation keys)
+     * instead of sending its input to the hidden bootstrap text console. */
+    if (gui_terminal_active && guest_keydev_put_key) {
+        CHashGlblVar *terminal = (CHashGlblVar *)HashFind(
+            "bootstrap_gui_terminal_task", Fs->hash_table, HTT_GLBL_VAR, 1);
+        if (terminal && terminal->data_addr &&
+            *(void **)terminal->data_addr == guest_fibers[guest_current].words) {
+            FFI_CALL_TOS_2(guest_keydev_put_key, a[0], a[1]);
+            return 0;
+        }
+    }
     if (a[0] >= 32 && a[0] < 127) {
         char shown[2] = {(char)a[0], 0};
         zc_output(shown);
@@ -4439,6 +4481,10 @@ static int load_inner(const char *path) {
     }
     execute_source(path, src);
     if (!strcmp(path, "/System/TaskBridge.ZC")) {
+        CHashFun *recalc = (CHashFun *)HashFind("DocRecalc", Fs->hash_table,
+                                               HTT_FUN, 1);
+        guest_doc_recalc_stub = recalc ? recalc->fun_ptr : NULL;
+        PrsBindCSymbol("ZcDocRecalc", host_doc_recalc, 2);
         /* TaskBridge declares the generic file API before defining DocRead /
          * DocWrite.  Bind it as soon as those declarations exist, just like
          * the bridge helpers below, so calls compiled in TaskBridge resolve. */
@@ -4460,6 +4506,12 @@ static int load_inner(const char *path) {
     }
     if (!strcmp(path, "/System/GuiTerminal.ZC"))
         PrsBindCSymbol("ZcGuiShellExec", zc_gui_shell_exec, 1);
+    if (!strcmp(path, "/Kernel/KeyDev.ZC")) {
+        CHashFun *put = (CHashFun *)HashFind("PutKey", Fs->hash_table, HTT_FUN, 1);
+        if (put && put->fun_ptr && put->argc == 2 &&
+            !(put->base.base.type & HTF_EXTERN))
+            guest_keydev_put_key = put->fun_ptr;
+    }
     if (!strcmp(path, "/Kernel/KTask.ZC")) {
         PrsBindCSymbol("ZcCallExtStr", host_call_ext_str, 1);
         PrsBindCSymbol("ZcTaskValidate", host_task_validate, 1);
@@ -4794,6 +4846,8 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
     window_demo_loaded = 0;
     window_demo_restore_gui_terminal = 0;
     gui_terminal_active = 0;
+    guest_keydev_put_key = NULL;
+    guest_doc_recalc_stub = NULL;
     gui_terminal_modules_loaded = 0;
     /* A lexer exception can longjmp out of #assert while the Aiwnios parser
      * depth counters are nonzero. zreset starts a new compiler session, so
@@ -4810,6 +4864,13 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
     guest_background_dispatch = 0;
     guest_idle_frame_divider = 0;
     guest_task_frame_count = 0;
+    guest_keyboard_route_polls = 0;
+    guest_keyboard_route_reads = 0;
+    guest_keyboard_route_posts = 0;
+    guest_keyboard_route_drops = 0;
+    guest_keyboard_route_last_type = 0;
+    guest_keyboard_route_last_arg1 = 0;
+    guest_keyboard_route_last_arg2 = 0;
     guest_winmgr_tick_fun = NULL;
     guest_focus_task = NULL;
     memset(guest_fibers, 0, sizeof(guest_fibers));
@@ -4872,6 +4933,7 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
                     {"ZcFbTextRect", host_fb_text_rect, 7},
                     {"ZcFbTextFlush", host_fb_text_flush, 3},
                     {"ZcDocUpdateTaskDocs", host_doc_update_task_docs, 1},
+                    {"ZcDocRecalc", host_doc_recalc, 2},
                     {"ZcActiveGrGlobals", host_active_gr_globals, 0},
                     {"ZcActiveMouseGlobals", host_active_mouse_globals, 0},
                     {"ZcActiveWinMgrGlobals", host_active_winmgr_globals, 0},
@@ -5027,6 +5089,11 @@ int zc_start_gui_terminal(void) {
         "/System/DolDoc/DocFind.ZC",
         "/System/DolDoc/DocLink.ZC",
         "/System/DolDoc/DocEd.ZC",
+        /* Direct calls retain the function present at compile time. The
+         * first DocPutKey load breaks DolDoc's dependency cycle, but binds
+         * EdCharIns/EdCursorLeft/etc. to bootstrap stand-ins. Recompile after
+         * their real definitions exist, before installing KDDocPutKey. */
+        "/System/DolDoc/DocPutKey.ZC",
         "/System/GuiTerminal.ZC",
     };
     int64_t result = 0;
@@ -5046,9 +5113,8 @@ int zc_start_gui_terminal(void) {
     result = 0;
     if (zc_call("BootstrapGuiTerminalStart", &result) != 0 || result != 0x2a)
         return -1;
-    /* Keep the serial bootstrap shell available until the user clicks the
-     * graphical terminal. WinMgr may choose a newly spawned task by default. */
-    guest_focus_task = NULL;
+    /* BootstrapGuiTerminalStart assigns VM keyboard focus to the visible
+     * graphical shell. The serial shell remains available through UART. */
     gui_terminal_active = 1;
     return 0;
 }
@@ -5114,12 +5180,14 @@ int zc_start_window_demo(void) {
     }
     if (zc_call("BootstrapFrameUseBridge", &result) != 0 || result != 0x2a) {
         zc_output("windowdemo: could not select the framebuffer bridge\n");
+        (void)zc_start_winmgr();
         (void)zc_window_demo_restore_terminal();
         return -1;
     }
     if (zc_load("/Tests/WindowDragLive.ZC") != 0) {
         (void)zc_call("BootstrapFrameUseSource", NULL);
         zc_output("windowdemo: could not load the WindowDragLive fixture\n");
+        (void)zc_start_winmgr();
         (void)zc_window_demo_restore_terminal();
         return -1;
     }
@@ -5129,6 +5197,7 @@ int zc_start_window_demo(void) {
         (void)zc_call("BootstrapFrameUseSource", NULL);
         window_demo_loaded = 0;
         zc_output("windowdemo: WindowDragLiveStart failed\n");
+        (void)zc_start_winmgr();
         (void)zc_window_demo_restore_terminal();
         return -1;
     }
@@ -5137,6 +5206,7 @@ int zc_start_window_demo(void) {
         (void)zc_call("BootstrapFrameUseSource", NULL);
         window_demo_loaded = 0;
         zc_output("windowdemo: source window manager restart failed; fixture stopped\n");
+        (void)zc_start_winmgr();
         (void)zc_window_demo_restore_terminal();
         return -1;
     }
@@ -5150,6 +5220,8 @@ int zc_stop_window_demo(void) {
     if (zc_call("WindowDragLiveStop", NULL) != 0)
         failed_stop = 1;
     if (zc_call("BootstrapFrameUseSource", NULL) != 0)
+        failed_stop = 1;
+    if (zc_start_winmgr() != 0)
         failed_stop = 1;
     window_demo_loaded = 0;
     if (zc_window_demo_restore_terminal() != 0)
@@ -5179,6 +5251,11 @@ int zc_reset_session(void) {
 void zc_status(void) {
     size_t used[2] = {0}, blocks[2] = {0};
     int64_t gui_terminal_window = 0;
+    int64_t gui_key_events = 0, gui_last_char = 0, gui_last_scan = 0;
+    int64_t gui_editor_active = 0;
+    int64_t gui_editor_raw = -1;
+    struct guest_fiber *keyboard_focus = ready
+        ? find_guest_task(guest_focus_task) : NULL;
     uint64_t scanout_nonblack = zeal_fb_nonblack_pixels();
     for (unsigned a = 0; a < 2; a++)
         for (struct block *b = arenas[a]; b; b = b->next)
@@ -5192,6 +5269,34 @@ void zc_status(void) {
     printf("desktop: winmgr=%d gterm=%d windowdemo=%d presented_frames=%lu\n",
            source_winmgr_active, gui_terminal_active, window_demo_loaded,
            (unsigned long)guest_task_frame_count);
+    printf("keyboard_focus=%s\n", keyboard_focus
+           ? (const char *)((unsigned char *)keyboard_focus->words + guest_name_off)
+           : "none");
+    printf("virtio_keyboard: ready=%d key_events=%lu last_code=%u last_value=%lu\n",
+           zc_virtio_keyboard_ready(),
+           (unsigned long)zc_virtio_keyboard_event_count(),
+           (unsigned)zc_virtio_keyboard_last_code(),
+           (unsigned long)zc_virtio_keyboard_last_value());
+    printf("keyboard_route: polls=%lu read=%lu posted=%lu dropped=%lu last=%ld/%ld/%ld\n",
+           (unsigned long)guest_keyboard_route_polls,
+           (unsigned long)guest_keyboard_route_reads,
+           (unsigned long)guest_keyboard_route_posts,
+           (unsigned long)guest_keyboard_route_drops,
+           (long)guest_keyboard_route_last_type,
+           (long)guest_keyboard_route_last_arg1,
+           (long)guest_keyboard_route_last_arg2);
+    if (gui_terminal_active) {
+        (void)zc_call("BootstrapGuiTerminalKeyEventCount", &gui_key_events);
+        (void)zc_call("BootstrapGuiTerminalLastKeyChar", &gui_last_char);
+        (void)zc_call("BootstrapGuiTerminalLastScan", &gui_last_scan);
+        (void)zc_call("BootstrapGuiTerminalEditorActive", &gui_editor_active);
+        (void)zc_call("BootstrapGuiTerminalEditorRaw", &gui_editor_raw);
+        printf("gui_keyboard: key_events=%ld last_char=%ld last_scan=0x%02lx\n",
+               (long)gui_key_events, (long)gui_last_char,
+               (unsigned long)gui_last_scan);
+        printf("gui_editor_active=%ld raw=%ld\n",
+               (long)gui_editor_active, (long)gui_editor_raw);
+    }
     if (gui_terminal_active &&
         zc_call("BootstrapGuiTerminalWindowState", &gui_terminal_window) == 0)
         printf("gterm_window=0x%08lx task/show/display_doc/put_doc/border_doc/geometry\n",

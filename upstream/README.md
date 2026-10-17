@@ -3403,9 +3403,109 @@ Freeze catalog unchanged.
 | Item | Path |
 |--|--|
 | Gap | The terminal rendered DolDoc text and passed helper-level key tests, but live UTM input had not been confirmed; the separate Terminal 1 serial shell made the two command surfaces easy to confuse |
-| Bring-up | No input code change was needed: clicking the graphical window gives it keyboard input. Its `help` lists a deliberately bounded command set, while Terminal 1 keeps the full serial shell |
-| Smoke | UTM hands-on check confirms commands and Return appear in the graphical window, `help` prints its graphical command list, and `zstatus` reports the live manager, terminal, frames, and scanout; the PCI boot/input regressions remain green |
-| Limits | This does not yet confirm all editing/navigation keys, the guest editor, or the full ZealOS keyboard/menu stack |
+| Bring-up | The graphical shell exposes a bounded command set while the serial shell remains available through the Mac's UTM pseudo-TTY |
+| Smoke | The user's live UTM screenshot shows physical `zstatus` entry and submission, with 15 virtio events routed without drops and eight graphical-terminal key-downs. After refreshing the UTM disk, a host-input test also submitted `zls` and displayed the source-file listing |
+| Limits | This confirms these commands, not the full set of editing/navigation keys or the normal ZealOS keyboard/menu stack |
+
+## Milestone 305 — report the focused guest task
+
+| Item | Path |
+|--|--|
+| Gap | `zstatus` showed that the boot graphical terminal rendered, but could not distinguish keyboard input routed to it from input still owned by the serial shell |
+| Bring-up | Add `keyboard_focus=<task name>` to `zstatus`, resolving the current focused guest task through the runtime task table |
+| Smoke | `make check-compat-pci` checks the new field along with the boot graphical terminal, framebuffer scanout, and existing source-manager regressions |
+| Limits | The 2026-10-16 UTM screenshot confirms physical input is delivered to the focused graphical terminal; broader editor and application key handling remain open |
+
+## Milestone 306 — ignore blank graphical terminal submissions
+
+| Item | Path |
+|--|--|
+| Gap | When only Return reached the graphical terminal, each empty submission printed a command error and obscured the actual keyboard-input problem |
+| Bring-up | Treat empty or whitespace-only graphical shell commands as no-ops in both the source terminal and the C-side command bridge |
+| Smoke | `BootstrapGuiShellSmoke` verifies an empty command produces no output; `make check-compat-pci` passes |
+| Limits | Blank Return submissions are harmless; the 2026-10-16 UTM check now confirms printable command entry and submission |
+
+## Milestone 307 — keep GUI and serial keyboard paths separate
+
+| Item | Path |
+|--|--|
+| Gap | The boot graphical terminal started with no keyboard focus, and trying to force focus stopped the serial shell from accepting its UART input |
+| Bring-up | Give the graphical terminal the VM's virtio keyboard at boot; keep the serial shell polling its UART stream while the GUI is focused, and prevent the GUI's background poll from stealing UART bytes |
+| Smoke | `make check-compat-pci` requires `zstatus` to report `keyboard_focus=Terminal`, confirms serial-shell commands still run over the guest UART, and runs a dedicated QMP keyboard boot that injects `help` plus Return and verifies five key-down events and the assembled command in the graphical terminal |
+| Limits | The 2026-10-16 UTM screenshot confirms host keyboard delivery with Capture Input enabled; other applications still need hands-on input coverage |
+
+## Milestone 308 — expose graphical keyboard diagnostics
+
+| Item | Path |
+|--|--|
+| Gap | `zstatus` reported which task had focus but not whether printable key events reached the graphical terminal, making a host-capture problem hard to distinguish from guest input handling |
+| Bring-up | Report the graphical terminal's key-down count, last character, and last scan code in `zstatus` while the terminal is active |
+| Smoke | `make check-compat-pci` checks the diagnostic field and the QMP keyboard test verifies five received events, a completed `help` command, and Return recorded as the last character |
+| Limits | The live UTM `zstatus` result confirms routed physical events and no drops; full editing and normal ZealOS keyboard/menu behavior remain open |
+
+## Milestone 309 — route serial input around UTM's built-in terminal regression
+
+| Item | Path |
+|--|--|
+| Gap | The host is macOS 26.7.1 with UTM 5.0.3. UTM's built-in serial terminal does not accept typing on this host; this matches [UTM issue #7814](https://github.com/utmapp/UTM/issues/7814), whose workaround uses the macOS Pseudo-TTY serial mode |
+| Bring-up | Switched the VM's serial backend to Pseudo-TTY, fully reloaded UTM, and confirmed QEMU now starts with `-chardev pty,id=term0`; UTM exposed `/dev/ttys002` |
+| Smoke | Connected through the PTY and ran `zstatus`: serial typing works, `keyboard_focus=Terminal`, `gterm=1`, and the current graphical keyboard counters remain `key_events=0` |
+| Live retest | The rebuilt VM boots to the graphical terminal prompt; a later UTM screenshot confirms `zstatus` submission and 15 virtio events routed without drops. The live terminal also shows the full `zls` listing and summary |
+| Bring-up follow-up | Before echoing or editing a key, the terminal now moves DolDoc's insertion cursor to the end of its document and back to the tracked command position. This handles a mouse click that moves the document cursor away from the command line |
+| Diagnostics | `zstatus` now reports raw virtio keyboard event count, last Linux keycode, and press/release value alongside the graphical terminal's received-key count |
+| Smoke | `make check-compat-pci` passes, including QMP checks that printable keys reach both the virtio keyboard device and graphical terminal and submit `help` |
+| Live retest | The 2026-10-16 screenshots confirm physical typing and command submission in the graphical terminal. Earlier failures were before this successful run |
+| Limits | Full editor key coverage and the normal ZealOS keyboard/menu stack remain open |
+
+**Historical live UTM check (2026-10-16, UTM 5.0.7):** the VM renders graphics
+and the serial shell works through the PTTY reported for the current boot.
+`utmctl attach ZealosAarch64Hello` warns that attachment is not implemented but
+prints `PTTY: /dev/ttys001`; `screen /dev/ttys001 115200` reaches the shell, and
+both `zstatus` and `zls` return normally. `zstatus` reports `ready=1`,
+`failed=0`, `winmgr=1`, `gterm=1`, and nonzero presented frames. The earlier
+`/dev/ttys002` path is stale. A later live screenshot shows `zstatus` entered
+and submitted from the graphical prompt: 15 virtio events were routed with no
+drops, and the graphical terminal recorded eight key-downs (the seven command
+characters and Return). After rebuilding and refreshing the UTM disk, a
+host-input check submitted `zls` and showed the full native source-file listing:
+164 files, 209 catalog records, and 3,880 sectors used, followed by the
+catalog summary and a fresh prompt. The GUI now captures up to 32 KiB and
+prints in formatter-safe chunks, so long command results no longer stop at the
+old 3.8 KiB limit. Longer editing, navigation, and application input still
+need interactive acceptance.
+
+## Milestone — visible graphical input and development workflow
+
+The 2026-10-17 framebuffer regression reproduced the missing typing in a fresh
+QEMU guest. Successful `help`/`zstatus` submission in the earlier checks proved
+key delivery and command assembly, but did not prove characters were visible
+before Return. This was a guest bootstrap dependency problem; changing UTM's
+serial backend did not repair it.
+
+`DocPutKey` is recompiled after the real DolDoc insertion/navigation functions
+load. Early `KeyGet` calls forward echo through the loaded `KeyDev` document
+device for the graphical task, and early `DocRecalc` calls resolve the real
+renderer once available. The compositor initializes mouse visibility and its
+draw callback, updates the blink phase from the platform timer, and paints the
+focused terminal's insertion caret in the final overlay.
+
+`make check-gui-workflow` now inspects actual scanout for `> help` before
+Return, caret pixels, and a moved tablet pointer. It verifies graphical
+navigation/history, opening the upstream editor, window-demo focus recovery,
+and a complete graphical edit/save/load/run/reboot/reopen cycle using
+`I64 GuiBringup(){return 42;}`. The PCI/HVF workflow passed on 2026-10-17;
+screenshots and decoded glyphs are retained in `build/gui-*.ppm` and `.txt`.
+This remains the staged cooperative runtime and a graphical shell with a
+bounded command set, rather than the complete ZealOS desktop or self-hosting
+toolchain. Physical UTM input is a separate acceptance step in `ACCEPTANCE.md`.
+
+The 2026-10-17 live UTM check also displayed characters before Return, edited
+and saved `/Tests/GuiAcceptance.ZC`, compiled and ran its function to `0x2a`,
+and reopened the saved source after a VM reboot. The user confirmed physical
+guest-pointer movement and the released tablet path in `windowdemo`. Default
+USB 3.0 and the working built-in serial Terminal 1 remain enabled; the guest
+still consumes VirtIO input. See `COMPATIBILITY.md` for the YDE USB reuse and
+ARM64/Pi platform plan.
 
 ## Open compatibility probe — `/System/Win.ZC`
 
@@ -3419,7 +3519,7 @@ Guest `try/catch` now calls uniquely named `ZcTryEnter`/`ZcTryLeave`/`ZcTryCatch
 
 The parser now resolves a later guest `extern` global to an earlier guest definition when scalar types have a matching ABI, aggregate types are identical, and array dimensions match. `GlobalExternLinkChecks` covers this across separately loaded modules; this lets declarations such as `Externs.ZC`'s `winmgr` refer to storage already supplied by the task bridge. The ARM64 math runtime implements ZealOS's `_EXP` import, and the bootstrap `LowPass1` follows the unchanged `MathODE.ZC` formula. Named HolyC `reg RSI`/`reg R13`/`reg RCX` hints parse as nonbinding allocation hints on ARM64, alongside ordinary `reg bit_shift` locals. The source bundle applies guarded ARM64 overlays to unchanged `GrScreen.ZC` and `MathODE.ZC`: the former expands its `GrUpdateTextBG` x86 register loop to eight inline typed stores per character; the latter rewrites one inline address-of-member bit-test to an equivalent local pointer. The AArch64 runtime implements and tests `DCBlotColor4`'s cached four-bitplane conversion and the MathODE `CD3` ABI plus F64 `Abs`. `make check-compat-pci` loads the complete MathODE module and checks constructor allocation/cleanup, one Cash–Karp RK5 step, and the source `ODEsUpdate` routine on the root task's ODE queue for `y'=y`. The opt-in `--probe-fulltext-visible` path passes the staged full-frame text smoke with framebuffer-console and serial output both enabled. Pinned source remains byte-identical. MathODE is now loaded before the source window manager starts at boot, and `make check-grscreen-ode` verifies its root-task ODE advances across live manager frames; multi-CPU derivative workers remain open.
 
-This remains a bring-up probe, not a complete running desktop. The task-geometry bridge, source graphics-context initialization, pixel hit-test helper, guest task control-queue initialization, CPU-pointer inheritance for synthetic tasks, and task-ring insertion/removal are implemented and tested. The disposable live-start probe starts unchanged `WinMgrTask`, verifies a timer-woken scan, consumes a tablet sample through source `WinMouseUpdate`, and drives a synthetic title-bar drag through the source manager to check focus and geometry. The shell can start and stop the manager, but normal boot-time menu/music startup, remaining `GrAsm` routines, and ordinary kernel task/application initialization still need porting or real implementations. Q32.32 identity and X/Y/Z matrix operations are bridged; arbitrary-angle 3D sprite transforms and interactive view-angle controls remain open.
+This remains a bring-up probe, not a complete running desktop. The task-geometry bridge, source graphics-context initialization, pixel hit-test helper, guest task control-queue initialization, CPU-pointer inheritance for synthetic tasks, and task-ring insertion/removal are implemented and tested. The disposable live-start probe starts unchanged `WinMgrTask`, verifies a timer-woken scan, consumes a tablet sample through source `WinMouseUpdate`, and drives a synthetic title-bar drag through the source manager to check focus and geometry. Every entry point in pinned `GrAsm.ZC` is now covered by a native bridge or source implementation and a focused smoke. The shell can start and stop the manager, but normal ZealOS system-menu/music startup and ordinary kernel task/application initialization still need porting or real implementations. Q32.32 identity and X/Y/Z matrix operations are bridged; arbitrary-angle 3D sprite transforms and interactive view-angle controls remain open.
 
 ## Milestone — graphical editor persistence
 
