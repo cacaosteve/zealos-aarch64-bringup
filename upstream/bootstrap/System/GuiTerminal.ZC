@@ -283,102 +283,104 @@ U0 BootstrapGuiTerminalTask(U8 *data)
 
     while (TRUE)
     {
-        while ((message = MessageScan(&ch, &sc,
-                                     1 << MESSAGE_KEY_DOWN)) == MESSAGE_KEY_DOWN)
+        // MessageScan discards events excluded by its mask. Separate DOWN,
+        // UP and cleanup drains can lose a newly arriving USB key-down in
+        // the UP/cleanup pass. Consume every event once in arrival order.
+        while ((message = MessageScan(&ch, &sc, ~1)) != 0)
         {
-            bootstrap_gui_terminal_key_events++;
-            bootstrap_gui_terminal_last_key_char = ch;
-            bootstrap_gui_terminal_last_scan = sc.u8[0];
-            if (ch == '\r' || ch == '\n')
+            if (message == MESSAGE_KEY_UP)
             {
-                DocPutKey(DocPut, 0, SC_END);
-                DocPutKey(DocPut, ch, sc);
-                command[command_len] = 0;
-                // Return on an empty line is a no-op, like the serial shell.
-                // In particular, don't flood the terminal with a command error
-                // when the host has delivered Return but not printable keys.
-                if (command_len)
+                if (sc == GUI_MENU_ACTION_TAG)
                 {
-                    StrCopy(bootstrap_gui_terminal_last_command, command);
-                    BootstrapGuiTerminalHistorySave(history, &history_len,
-                                                    command, command_len);
-                    if (BootstrapGuiTerminalEditCommand(command, &edit_path))
+                    output = BootstrapGuiTerminalMenuAction(ch);
+                    if (ch == 5)
+                        output = ZcGuiShellExec("windowdemo");
+                    if (output)
+                        BootstrapGuiTerminalPrintOutput(output);
+                    command_len = 0;
+                    command_pos = 0;
+                    command[0] = 0;
+                    DocPrint(DocPut, "> ");
+                }
+            }
+            else if (message == MESSAGE_KEY_DOWN)
+            {
+                bootstrap_gui_terminal_key_events++;
+                bootstrap_gui_terminal_last_key_char = ch;
+                bootstrap_gui_terminal_last_scan = sc.u8[0];
+                if (ch == '\r' || ch == '\n')
+                {
+                    DocPutKey(DocPut, 0, SC_END);
+                    DocPutKey(DocPut, ch, sc);
+                    command[command_len] = 0;
+                    // Return on an empty line is a no-op, like the serial shell.
+                    // In particular, don't flood the terminal with a command error
+                    // when the host has delivered Return but not printable keys.
+                    if (command_len)
                     {
-                        if (!*edit_path)
-                            DocPrint(DocPut, "usage: edit <path>\n");
+                        StrCopy(bootstrap_gui_terminal_last_command, command);
+                        BootstrapGuiTerminalHistorySave(history, &history_len,
+                                                        command, command_len);
+                        if (BootstrapGuiTerminalEditCommand(command, &edit_path))
+                        {
+                            if (!*edit_path)
+                                DocPrint(DocPut, "usage: edit <path>\n");
+                            else
+                            {
+                                bootstrap_gui_terminal_editor_raw = IsRaw();
+                                bootstrap_gui_terminal_editor_active = TRUE;
+                                if (!BootstrapGuiTerminalEditFile(edit_path))
+                                    DocPrint(DocPut, "edit: could not open document\n");
+                                bootstrap_gui_terminal_editor_active = FALSE;
+                            }
+                        }
                         else
                         {
-                            bootstrap_gui_terminal_editor_raw = IsRaw();
-                            bootstrap_gui_terminal_editor_active = TRUE;
-                            if (!BootstrapGuiTerminalEditFile(edit_path))
-                                DocPrint(DocPut, "edit: could not open document\n");
-                            bootstrap_gui_terminal_editor_active = FALSE;
+                            output = ZcGuiShellExec(command);
+                            if (output)
+                                BootstrapGuiTerminalPrintOutput(output);
                         }
                     }
-                    else
-                    {
-                        output = ZcGuiShellExec(command);
-                        if (output)
-                            BootstrapGuiTerminalPrintOutput(output);
-                    }
+                    command_len = 0;
+                    command_pos = 0;
+                    command[0] = 0;
+                    DocPrint(DocPut, "> ");
                 }
-                command_len = 0;
-                command_pos = 0;
-                command[0] = 0;
-                DocPrint(DocPut, "> ");
-            }
-            else if (!ch && sc.u8[0] == SC_CURSOR_UP && history_len)
-            {
-                DocPutKey(DocPut, 0, SC_END);
-                for (i = 0; i < command_len; i++)
-                    DocPutKey(DocPut, 8, 0);
-                BootstrapGuiTerminalHistoryRecall(command, &command_len,
-                                                  history, history_len);
-                command_pos = command_len;
-                for (i = 0; i < command_len; i++)
-                    DocPutKey(DocPut, command[i], 0);
-            }
-            else if (!ch && sc.u8[0] == SC_CURSOR_DOWN)
-            {
-                DocPutKey(DocPut, 0, SC_END);
-                for (i = 0; i < command_len; i++)
-                    DocPutKey(DocPut, 8, 0);
-                command_len = 0;
-                command_pos = 0;
-                command[0] = 0;
-            }
-            else
-            {
-                // A mouse click inside the terminal can move DolDoc's
-                // insertion cursor away from the command buffer. Re-anchor
-                // it to the current input position before echoing or editing
-                // so captured keyboard input remains visible after focus.
-                DocPutKey(DocPut, 0, SC_END);
-                for (i = command_len; i > command_pos; i--)
-                    DocPutKey(DocPut, 0, SC_CURSOR_LEFT);
-                if (BootstrapGuiTerminalCommandKey(command, &command_len,
-                                                   &command_pos, ch, sc) == 1)
-                    DocPutKey(DocPut, ch, sc);
+                else if (!ch && sc.u8[0] == SC_CURSOR_UP && history_len)
+                {
+                    DocPutKey(DocPut, 0, SC_END);
+                    for (i = 0; i < command_len; i++)
+                        DocPutKey(DocPut, 8, 0);
+                    BootstrapGuiTerminalHistoryRecall(command, &command_len,
+                                                      history, history_len);
+                    command_pos = command_len;
+                    for (i = 0; i < command_len; i++)
+                        DocPutKey(DocPut, command[i], 0);
+                }
+                else if (!ch && sc.u8[0] == SC_CURSOR_DOWN)
+                {
+                    DocPutKey(DocPut, 0, SC_END);
+                    for (i = 0; i < command_len; i++)
+                        DocPutKey(DocPut, 8, 0);
+                    command_len = 0;
+                    command_pos = 0;
+                    command[0] = 0;
+                }
+                else
+                {
+                    // A mouse click inside the terminal can move DolDoc's
+                    // insertion cursor away from the command buffer. Re-anchor
+                    // it to the current input position before echoing or editing
+                    // so captured keyboard input remains visible after focus.
+                    DocPutKey(DocPut, 0, SC_END);
+                    for (i = command_len; i > command_pos; i--)
+                        DocPutKey(DocPut, 0, SC_CURSOR_LEFT);
+                    if (BootstrapGuiTerminalCommandKey(command, &command_len,
+                                                       &command_pos, ch, sc) == 1)
+                        DocPutKey(DocPut, ch, sc);
+                }
             }
         }
-        while ((message = MessageScan(&ch, &sc,
-                                     1 << MESSAGE_KEY_UP)) == MESSAGE_KEY_UP)
-        {
-            if (sc == GUI_MENU_ACTION_TAG)
-            {
-                output = BootstrapGuiTerminalMenuAction(ch);
-                if (ch == 5)
-                    output = ZcGuiShellExec("windowdemo");
-                if (output)
-                    BootstrapGuiTerminalPrintOutput(output);
-                command_len = 0;
-                command_pos = 0;
-                command[0] = 0;
-                DocPrint(DocPut, "> ");
-            }
-        }
-        while (MessageScan(NULL, NULL, ~1))
-            ;
         ZcTaskYield;
     }
 }

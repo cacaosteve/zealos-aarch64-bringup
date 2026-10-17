@@ -5277,6 +5277,7 @@ void zc_status(void) {
            (unsigned long)zc_virtio_keyboard_event_count(),
            (unsigned)zc_virtio_keyboard_last_code(),
            (unsigned long)zc_virtio_keyboard_last_value());
+    zc_usb_status();
     printf("keyboard_route: polls=%lu read=%lu posted=%lu dropped=%lu last=%ld/%ld/%ld\n",
            (unsigned long)guest_keyboard_route_polls,
            (unsigned long)guest_keyboard_route_reads,

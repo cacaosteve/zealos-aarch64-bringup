@@ -380,6 +380,8 @@ static void uart_put_u32_dec(volatile uint8_t *uart, uint32_t v) {
     }
 }
 
+#include "usb_input.h"
+
 static void fb_putpixel(uint32_t x, uint32_t y, uint32_t bgr) {
     if (!g_fb || x >= g_fb_w || y >= g_fb_h) {
         return;
@@ -1861,17 +1863,17 @@ uint64_t hc_builtin_messageget(uint64_t p_arg1, uint64_t p_arg2, uint64_t mask) 
     }
 
     /* KEY_DOWN/KEY_UP: virtio typed msgs when present; UART ASCII KEY_DOWN only. */
-    if ((mask & (HC_MSG_BIT(2) | HC_MSG_BIT(3))) && virtio_kbd_ready()) {
+    if ((mask & (HC_MSG_BIT(2) | HC_MSG_BIT(3))) && input_keyboard_ready()) {
         uint8_t t = 0;
         uint64_t a1 = 0, a2 = 0;
-        while (virtio_kbd_msg_nb(&t, &a1, &a2)) {
+        while (input_keyboard_msg_nb(&t, &a1, &a2)) {
             if (mask & HC_MSG_BIT(t)) {
                 hc_msg_store_outs(p_arg1, p_arg2, a1, a2);
                 return t;
             }
             /* Drop events outside mask (same as scripted queue). */
         }
-    } else if ((mask & HC_MSG_BIT(2)) && !virtio_kbd_ready()) {
+    } else if ((mask & HC_MSG_BIT(2)) && !input_keyboard_ready()) {
         int c = uart_getc_nb();
         if (c >= 0) {
             /* Serial Enter is often CR; Lattice Restart is '\n'. */
@@ -1882,10 +1884,10 @@ uint64_t hc_builtin_messageget(uint64_t p_arg1, uint64_t p_arg2, uint64_t mask) 
             return 2;
         }
     }
-    if (virtio_tablet_ready() && g_fb) {
+    if (input_pointer_ready() && g_fb) {
         uint32_t x = 0, y = 0;
-        int btns = virtio_tablet_buttons();
-        (void)virtio_tablet_xy((uint32_t)g_fb_w, (uint32_t)g_fb_h, &x, &y);
+        int btns = input_pointer_buttons();
+        (void)input_pointer_xy((uint32_t)g_fb_w, (uint32_t)g_fb_h, &x, &y);
         int btn = btns & 1;
         int rbtn = (btns & 2) ? 1 : 0;
         int prev = g_hc_msg_btn_prev;
@@ -2991,41 +2993,41 @@ uint64_t hc_builtin_blkread(uint64_t buf, uint64_t blk, uint64_t count) {
 
 uint64_t hc_builtin_mousex(void) {
     uint32_t x = 0, y = 0;
-    if (virtio_tablet_ready() && g_fb) {
-        (void)virtio_tablet_xy((uint32_t)g_fb_w, (uint32_t)g_fb_h, &x, &y);
+    if (input_pointer_ready() && g_fb) {
+        (void)input_pointer_xy((uint32_t)g_fb_w, (uint32_t)g_fb_h, &x, &y);
     }
     return x;
 }
 
 uint64_t hc_builtin_mousey(void) {
     uint32_t x = 0, y = 0;
-    if (virtio_tablet_ready() && g_fb) {
-        (void)virtio_tablet_xy((uint32_t)g_fb_w, (uint32_t)g_fb_h, &x, &y);
+    if (input_pointer_ready() && g_fb) {
+        (void)input_pointer_xy((uint32_t)g_fb_w, (uint32_t)g_fb_h, &x, &y);
     }
     return y;
 }
 
 uint64_t hc_builtin_mousebtn(void) {
-    if (virtio_tablet_ready()) {
-        virtio_tablet_poll();
+    if (input_pointer_ready()) {
+        input_pointer_poll();
     }
-    return (uint64_t)virtio_tablet_buttons();
+    return (uint64_t)input_pointer_buttons();
 }
 
 /* Stable, single-poll tablet snapshot for the ZealC task/window bridge. */
 int64_t zc_tablet_sample(void) {
     uint32_t x = 0, y = 0;
     int buttons = 0;
-    if (!virtio_tablet_ready() || !g_fb) {
+    if (!input_pointer_ready() || !g_fb) {
         return -1;
     }
     int wheel = 0;
-    (void)virtio_tablet_sample((uint32_t)g_fb_w, (uint32_t)g_fb_h,
+    (void)input_pointer_sample((uint32_t)g_fb_w, (uint32_t)g_fb_h,
                                &x, &y, &buttons, &wheel);
     return (int64_t)x | ((int64_t)y << 16) |
            ((int64_t)(buttons & 0xff) << 32) |
            ((int64_t)(wheel & 0xff) << 40) |
-           ((int64_t)virtio_kbd_ctrl_down() << 48);
+           ((int64_t)input_keyboard_ctrl_down() << 48);
 }
 
 /* Tablet abs deltas (call MouseDX then MouseDY for a paired sample). */
@@ -3035,8 +3037,8 @@ static int g_mouse_have_dy;
 
 static void mouse_delta_refresh(void) {
     uint32_t x = 0, y = 0;
-    if (virtio_tablet_ready() && g_fb) {
-        (void)virtio_tablet_xy((uint32_t)g_fb_w, (uint32_t)g_fb_h, &x, &y);
+    if (input_pointer_ready() && g_fb) {
+        (void)input_pointer_xy((uint32_t)g_fb_w, (uint32_t)g_fb_h, &x, &y);
     }
     if (g_mouse_last_x < 0) {
         g_mouse_dx = 0;
@@ -3088,8 +3090,8 @@ static int hc_input_pending_for_sleep(void) {
     if (g_hc_msg_head != g_hc_msg_tail) {
         return 1;
     }
-    if (virtio_kbd_ready()) {
-        if (virtio_kbd_msg_pending()) {
+    if (input_keyboard_ready()) {
+        if (input_keyboard_msg_pending()) {
             return 1;
         }
     } else if (g_uart) {
@@ -3099,10 +3101,10 @@ static int hc_input_pending_for_sleep(void) {
             return 1;
         }
     }
-    if (virtio_tablet_ready() && g_fb) {
+    if (input_pointer_ready() && g_fb) {
         uint32_t x = 0, y = 0;
-        int btns = virtio_tablet_buttons();
-        (void)virtio_tablet_xy((uint32_t)g_fb_w, (uint32_t)g_fb_h, &x, &y);
+        int btns = input_pointer_buttons();
+        (void)input_pointer_xy((uint32_t)g_fb_w, (uint32_t)g_fb_h, &x, &y);
         int btn = btns & 1;
         int rbtn = (btns & 2) ? 1 : 0;
         if (btn != g_hc_msg_btn_prev || rbtn != g_hc_msg_rbtn_prev) {
@@ -4479,7 +4481,7 @@ static int uart_text_getc_nb(void) {
 }
 
 static int kbd_getc_nb(void) {
-    int c = virtio_kbd_getc_nb();
+    int c = input_keyboard_getc_nb();
     if (c >= 0) {
         return c;
     }
@@ -4495,8 +4497,8 @@ static void zc_key_reset(void) {
     uint8_t type;
     uint64_t arg1, arg2;
     zc_uart_release_pending = 0;
-    while (virtio_kbd_msg_nb(&type, &arg1, &arg2)) {}
-    while (virtio_kbd_getc_nb() >= 0) {}
+    while (input_keyboard_msg_nb(&type, &arg1, &arg2)) {}
+    while (input_keyboard_getc_nb() >= 0) {}
 }
 
 static int zc_key_read(uint8_t *type, uint64_t *arg1, uint64_t *arg2) {
@@ -4507,9 +4509,9 @@ static int zc_key_read(uint8_t *type, uint64_t *arg1, uint64_t *arg2) {
         *arg2 = 0;
         return 1;
     }
-    if (virtio_kbd_msg_nb(type, arg1, arg2)) {
+    if (input_keyboard_msg_nb(type, arg1, arg2)) {
         if (*type == 2 && *arg1 > 0 && *arg1 < 256)
-            (void)virtio_kbd_getc_nb(); /* same down event in shell char ring */
+            (void)input_keyboard_getc_nb(); /* same down event in shell char ring */
         return 1;
     }
     /* When a GUI task owns the virtio keyboard, leave UART bytes exclusively
@@ -4573,12 +4575,12 @@ static void tablet_paint_stamp(uint32_t x, uint32_t y, uint32_t bgr) {
 }
 
 static void tablet_cursor_tick(void) {
-    if (!virtio_tablet_ready() || !g_fb) {
+    if (!input_pointer_ready() || !g_fb) {
         return;
     }
     uint32_t x, y;
-    (void)virtio_tablet_xy((uint32_t)g_fb_w, (uint32_t)g_fb_h, &x, &y);
-    int btn = virtio_tablet_buttons();
+    (void)input_pointer_xy((uint32_t)g_fb_w, (uint32_t)g_fb_h, &x, &y);
+    int btn = input_pointer_buttons();
     /* Once source WinMgr owns the graphical desktop it draws the software
      * arrow through gr.fp_draw_mouse. Keep this bootstrap marker out of that
      * scanout so it cannot cover the real cursor or leave stale orange pixels. */
@@ -4653,6 +4655,31 @@ static void zc_print_decimal(uint64_t value) {
     unsigned n = 0;
     do { buf[n++] = (char)('0' + value % 10); value /= 10; } while (value);
     while (n) con_write(buf[--n]);
+}
+
+void zc_usb_status(void) {
+    con_puts("usb_input: controllers="); zc_print_decimal(g_usb.controllers);
+    con_puts(" devices="); zc_print_decimal(g_usb.device_count);
+    con_puts(" keyboard="); con_puts(usb_keyboard_ready() ? "usb" : "virtio/serial");
+    con_puts(" pointer="); con_puts(usb_pointer_ready() ?
+        (g_usb.pointer->kind == 3 ? "usb-tablet" : "usb-mouse") : "virtio");
+    con_puts(" key_events="); zc_print_decimal(g_usb.key_events);
+    con_puts(" pointer_reports="); zc_print_decimal(g_usb.pointer_reports);
+    con_puts(" wheel_events="); zc_print_decimal(g_usb.wheel_events);
+    con_puts(" errors="); zc_print_decimal(g_usb.errors);
+    con_puts(" dma_bytes="); zc_print_decimal(usb_dma_used); con_puts("\n");
+    for (unsigned i = 0; i < g_usb.controllers; i++) {
+        struct usb_hc *hc = &g_usb.hc[i];
+        con_puts("xhci: index="); zc_print_decimal(i);
+        con_puts(" running="); zc_print_decimal(hc->running);
+        con_puts(" error="); zc_print_decimal(hc->error);
+        con_puts(" commands="); zc_print_decimal(hc->command_count);
+        con_puts(" events="); zc_print_decimal(hc->event_count);
+        con_puts(" port_changes="); zc_print_decimal(hc->port_changes);
+        con_puts(" pointer_xy="); zc_print_decimal(g_usb.x);
+        con_puts("/"); zc_print_decimal(g_usb.y);
+        con_puts(" buttons="); zc_print_decimal(g_usb.buttons); con_puts("\n");
+    }
 }
 
 /* zrecv uses the PL011 serial channel exclusively. Each 128-byte payload is
@@ -4831,6 +4858,21 @@ static void shell_handle(const char *line, int *done) {
         line[4]=='t' && line[5]==' ') { zedit_start(line+6); return; }
     if (streq(line, "zcheck")) { (void)zc_selftest(); return; }
     if (streq(line, "zstatus")) { zc_status(); return; }
+    if (streq(line, "usbcheck")) {
+        unsigned checked = 0;
+        for (unsigned i = 0; i < g_usb.controllers; i++) {
+            struct usb_hc *hc = &g_usb.hc[i];
+            if (!hc->running) continue;
+            for (unsigned n = 0; n < USB_TRBS * 3; n++) {
+                if (usb_command(hc, 0, USB_TRB(23)) != USB_CC_OK) {
+                    con_puts("usbcheck: command ring failed\n"); return;
+                }
+            }
+            checked++;
+        }
+        con_puts(checked ? "usbcheck: command/event ring wrap OK\n" : "usbcheck: no running controller\n");
+        return;
+    }
     if (streq(line, "zreset")) {
         if (!zc_reset_session())
             con_puts("zc: native compiler ready (persistent session)\n");
@@ -6679,7 +6721,7 @@ static void shell_run(void) {
              * serial terminal has its own UART stream, so keep polling that
              * while the VM's virtio keyboard belongs to the GUI. */
             if ((zc_window_demo_active() || zc_gui_terminal_active()) &&
-                virtio_kbd_take_ctrl_c()) {
+                input_keyboard_take_ctrl_c()) {
                 if (zc_window_demo_active()) {
                     if (zc_stop_window_demo() == 0)
                         con_puts("\nwindowdemo: stopped with Ctrl+C; shell input resumed\n> ");
@@ -9716,6 +9758,11 @@ void kernel_entry(const struct zeal_handoff *h) {
             uart_put_u64_hex(g_uart, (uint64_t)(uint32_t)g_vb_pci_dbg);
             uart_puts(g_uart, "\n");
         }
+    }
+
+    if (!is_pi) {
+        usb_init(h->hhdm_offset, (unsigned)g_fb_w, (unsigned)g_fb_h, input_usb_key);
+        input_poll();
     }
 
     bc_module_run(h);

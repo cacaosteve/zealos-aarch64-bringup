@@ -71,6 +71,42 @@ The live UTM check is separate from QMP injection, which bypasses UTM's host
 keyboard capture. Keep the display adapter and serial mode fixed during this
 gate so input/rendering changes can be compared against the same VM setup.
 
+## Native USB input gate
+
+`make check-usb-input` uses disposable QEMU/HVF PCI guests with NEC xHCI
+(UTM's default USB 3.0 controller) and QEMU xHCI. USB-only runs omit VirtIO
+input devices. The gate requires enumeration of HID keyboard, relative mouse
+and absolute tablet, visible typing/caret/pointer, button press/release,
+wheel reports, repeated command/event/transfer ring cycling, and the same
+graphical edit/save/run/reboot workflow. A separate run keeps duplicate
+VirtIO input devices, checks that each key-down is delivered once, then
+unplugs the USB keyboard and checks visible VirtIO recovery typing. The HID
+decoder also runs under address/undefined-behavior sanitizers on the host.
+
+In live UTM, preserve USB 3.0 and run `zstatus`. Expect `keyboard=usb`,
+`pointer=usb-tablet`, a running xHCI controller and `errors=0`. Type `help`
+without Return, move the released tablet cursor, click/drag windows, and
+repeat the graphical development gate above. Headless QMP acceptance does
+not establish physical host capture/release behavior in the UTM application.
+Serial Terminal 1 remains available throughout. `usbcheck` is a serial-only
+diagnostic for bounded No-Op command ring cycling.
+
+Scope: root-port HID devices on emulated NEC/QEMU xHCI, polled without MSI.
+Unsupported HID layouts do not claim input. Disconnect/failure releases USB
+ownership and held input, but newly attached devices and hub children are
+not enumerated yet. No Pi or physical USB controller acceptance is implied.
+
+2026-10-17 live UTM: USB 3.0, display and built-in Terminal 1 settings were
+preserved. The guest reported two running controllers (`error=0`), three
+USB devices, `keyboard=usb`, `pointer=usb-tablet`, and parked VirtIO input.
+Host key injection visibly entered the mixed-case
+`edit /Tests/GuiAcceptance.ZC` command, reopened the saved function returning
+42 and cancelled back to the prompt with Shift+Escape. A fresh `zstatus`
+reported zero dropped routed keys. With capture released, the user confirmed
+that the white guest arrow follows the physical mouse and the graphical
+terminal can be dragged by its top border. This accepts the physical UTM
+tablet path separately from QMP injection.
+
 ## Checklist — interactive smoke
 
 1. Boot until `>` stays on screen.

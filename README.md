@@ -1,6 +1,6 @@
 # ZealOS aarch64 bring-up
 
-Limine → ZealBooter → kernel + `demo.hcbc` → HolyC-IR JIT → FB text shell → **virtio keyboard + tablet**
+Limine → ZealBooter → kernel + `demo.hcbc` → HolyC-IR JIT → graphical terminal → **native USB or VirtIO input**
 
 **Not a full ZealOS port.** Two parallel tracks: QEMU/UTM virt (HolyC + RedSea + Lattice compose) and Pi 4B UEFI (boot/timer/IRQ/shell; UART RX still hardware-pending).
 
@@ -15,6 +15,7 @@ recursion, callbacks, shared symbols, F64 and reclaimable allocations.
 make check-compat       # disposable ISO guest + old boot regressions
 make check-compat-pci   # disposable UTM-shaped GPT/PCI disk guest
 make check-gui-workflow # visible typing/cursors + graphical edit/save/run/reboot
+make check-usb-input    # native NEC/QEMU xHCI keyboard, mouse/tablet + recovery
 make utm               # refresh VM, preserving RedSea/source edits and adding new bundled files
 ```
 
@@ -22,6 +23,17 @@ The UTM refresh also updates the repository-managed
 `Tests/WindowDragLive.ZC`, `System/GuiTerminal.ZC`, and `System/WinMgr.ZC`
 files so they stay in sync with the kernel; other existing guest source files
 remain untouched.
+
+The kernel now initializes native xHCI input on QEMU virt (UTM's NEC model
+and QEMU xHCI). Keep UTM's normal USB 3.0 setting. A successfully enumerated
+USB keyboard and pointer take ownership; VirtIO devices remain configured
+as recovery input, with their transports parked while USB is active and
+reinitialized on disconnect/failure. Terminal 1
+serial input stays independent. `zstatus` reports the selected owners, raw
+USB events, controller state and errors; serial `usbcheck` exercises command
+and event ring wraparound. This first USB backend supports boot keyboards
+and unnumbered HID mouse/tablet reports on root ports. Hub enumeration,
+new-device hotplug, USB storage and Pi's PCIe/VL805 backend remain future work.
 
 At the UTM prompt, run `zcheck`. Expected: `zc: upstream QuickSort + persistent
 modules OK`. Use `zc` for declarations/statements, `zload` for a source file in the
@@ -60,7 +72,7 @@ task bridge exposes the default upstream `Spawn` callback signature, `Yield`,
 idle/prompt `TaskWait`, bounded `TaskMessage`/`MessagePost`/`MessageGet`
 delivery, a per-task inherited-symbol `TaskExe`/`JobsHandler` subset with `MessageScan`
 job dispatch, key-aware `MessageScan`/`MessageGet` and `KeyScan`/`KeyGet` over polled
-virtio/serial input, portable `CharScan`/`CharGet` behavior, and the pinned
+USB/VirtIO/serial input, portable `CharScan`/`CharGet` behavior, and the pinned
 `sys_focus_task` pointer for a focused child waiting on a key. It also exposes
 CPU-0 `JobQueue` callbacks and `SpawnQueue` task creation. A reserved executive runs queued jobs; four
 live app child tasks still have their own stacks and allocation owners.
@@ -108,6 +120,7 @@ paint dots=0x0
 | Fast `Cls`/`FillRect` + `GrLine`/`GrHLine`/`GrVLine`/`GrCircle`/`GrFillCircle` | OK |
 | Shell `bars` / `stars` / `circles` / `bounce` / `paint` | OK |
 | virtio keyboard + tablet | OK (QEMU/UTM) |
+| native USB keyboard + mouse/tablet | NEC/QEMU gates; live UTM USB typing/editor and physical released-pointer dragging accepted |
 | RedSea + freeze `runzc` UseAdd/Notes/MemSort | OK (`make check-serial` / `run-pci`; UTM eyes-on in ACCEPTANCE.md) |
 | Lattice compose (`disklat` / `latticeplay`, through M166) | QEMU scripted green; live UTM controls are eyes-on |
 

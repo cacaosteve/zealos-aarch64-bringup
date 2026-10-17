@@ -2309,10 +2309,38 @@ delivery in this VM; it does not establish native guest USB support.
 
 ## USB direction: reuse YDE with ARM64 platform hooks
 
-The current guest input drivers are VirtIO MMIO drivers. UTM's USB 3.0 setting
-also creates USB devices, but this ARM64 kernel does not yet initialize xHCI
-or enumerate those devices. USB mouse/tablet support is a controller and HID
-bring-up task in addition to the document-echo regression above.
+The first native USB backend now initializes the NEC/QEMU PCI xHCI models on
+QEMU virt, enumerates root-port boot keyboards and unnumbered HID relative
+mice/absolute tablets, and feeds the existing graphical input path. VirtIO
+MMIO and independent serial input remain available. USB claims keyboard and
+pointer ownership only after successful enumeration/configuration; the
+VirtIO input transports are reset/parked while USB owns their capability.
+QEMU [activates the VirtIO host handler](https://github.com/qemu/qemu/blob/v10.0.0/hw/input/virtio-input-hid.c)
+at DRIVER_OK, so discarding its events
+alone can starve USB of host keys. Disconnect/failure releases held keys/buttons,
+reinitializes the parked VirtIO queues and returns ownership
+to the recovery path. New-device hotplug and hub children are not implemented.
+
+`src/usb_platform.h` provides width-correct MMIO, explicit HHDM-to-physical
+DMA addresses, cache maintenance/barriers, bounded timer waits, firmware BAR
+mapping and reserved DMA allocation. It is intentionally a QEMU virt root-bus
+backend; it does not configure a physical PCIe bridge or an IOMMU. The driver
+supports two emulated controllers, eight devices, four HID IN endpoints per
+device, 4 KiB controller pages and up to 32 scratchpads. All DMA memory stays
+reserved after failures. `src/usb_xhci.h` adapts YDE's polled ring and
+enumeration behavior; `src/usb_hid.h` isolates bounded report decoding from
+hardware access. Unsupported layouts (including report IDs) are rejected.
+
+The bootstrap graphical terminal now consumes key-down, key-up and menu
+messages in one ordered scan. `MessageScan` discards messages outside its
+mask; the earlier separate key-up/cleanup drains could discard a USB
+key-down arriving between passes. FS/LS interrupt intervals round down to
+the supported power of two so a 10 ms endpoint is serviced at 8 ms.
+
+`make check-usb-input` tests NEC and QEMU models, USB-only input, relative
+mouse/tablet decoding, actual framebuffer typing and cursors, source editing
+and persistence, ring wraparound, duplicate suppression and VirtIO recovery.
+Live UTM physical capture/release and Pi acceptance remain separate gates.
 
 The local YDE work is relevant and remains untouched:
 
@@ -2328,19 +2356,19 @@ The local YDE work is relevant and remains untouched:
   seamless-pointer boundary; branch names and host tests do not supersede that
   acceptance requirement.
 
-Port sequence:
+Port sequence and remaining gates:
 
 1. Keep the repaired graphical workflow as a regression gate and retain
    VirtIO/serial recovery input while developing USB.
-2. Introduce explicit platform hooks for PCI configuration/BAR mapping,
-   DMA-visible allocation/address translation, memory ordering, MMIO register
-   access, timeouts, and polling. YDE's x86 page-table PCD writes and use of
-   pointer values as DMA addresses must not be copied directly to ARM64.
-3. Reuse the YDE USB core/HID logic and controller-ring behavior behind those
-   hooks. Prove UTM's actual NEC xHCI input bus first, then QEMU xHCI. Check
-   keyboard press/release/modifiers, relative mouse, absolute tablet, buttons,
-   wheel, focus, and both captured/released host input. Select input ownership
-   explicitly so USB and VirtIO cannot publish duplicate key events.
+2. The QEMU virt platform hooks and first YDE-derived ring/enumeration/HID
+   adaptation are implemented. YDE's x86 page-table PCD writes and use of
+   pointer values as DMA addresses remain isolated from ARM64.
+3. NEC/QEMU keyboard, relative mouse, tablet, button/wheel, focus and recovery
+   gates exercise the native path. Live UTM mixed-case typing/editor use and
+   the physical released-pointer/drag check were accepted on 2026-10-17.
+   Continue with hub enumeration and new-device hotplug; expand HID reports
+   and lock-key/LED handling beyond the shared US-layout Shift/Ctrl/navigation
+   decoder as needed.
 4. Add the Pi 4B platform backend for its BCM2711 PCIe host bridge and VL805
    xHCI controller. Validate firmware handoff, DMA windows/cache behavior,
    register access widths, and physical keyboard/mouse operation separately.

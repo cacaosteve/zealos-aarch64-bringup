@@ -51,3 +51,4 @@ int zc_virtio_keyboard_ready(void);
 uint64_t zc_virtio_keyboard_event_count(void);
 uint16_t zc_virtio_keyboard_last_code(void);
 uint32_t zc_virtio_keyboard_last_value(void);
+void zc_usb_status(void);

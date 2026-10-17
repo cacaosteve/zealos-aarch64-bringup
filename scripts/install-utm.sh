@@ -214,7 +214,9 @@ qemu = cfg.setdefault("QEMU", {})
 qemu["UEFIBoot"] = True
 qemu["Hypervisor"] = True
 # CRITICAL: must be a list of tokens. A string makes Start unavailable.
-# UTM strips -drive here; kbd/tablet MMIO devices are allowed.
+# UTM strips -drive here; these MMIO devices remain as recovery input.
+# Preserve the normal USB 3.0 configuration: the kernel initializes its NEC
+# xHCI keyboard/tablet and parks VirtIO transports while USB owns input.
 qemu["AdditionalArguments"] = [
     "-machine", "gic-version=3",
     "-device", "virtio-keyboard-device",

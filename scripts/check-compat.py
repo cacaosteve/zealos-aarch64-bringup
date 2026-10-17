@@ -4,6 +4,12 @@ import argparse, json, os, pathlib, re, select, shlex, shutil, socket, struct, s
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 p = argparse.ArgumentParser()
 p.add_argument('--pci', action='store_true')
+p.add_argument('--usb-input', choices=('nec', 'qemu'),
+               help='test native USB HID on NEC (UTM default) or QEMU xHCI, without VirtIO input')
+p.add_argument('--usb-with-virtio', action='store_true',
+               help='retain duplicate VirtIO devices to verify USB ownership suppresses duplicate keys')
+p.add_argument('--usb-pointer', choices=('tablet', 'mouse'), default='tablet',
+               help='native USB pointer layout to accept (default: tablet, also enumerate mouse)')
 p.add_argument('--quick', action='store_true', help='only compiler integration gate')
 p.add_argument('--window-frame-only', action='store_true',
                help='stop after the window demo frame diagnostic')
@@ -43,6 +49,13 @@ p.add_argument('--probe-source-call',
 p.add_argument('--probe-source-kernel', action='store_true',
                help='load KernelA/B and KMathB before each source probe')
 args = p.parse_args()
+if args.usb_input:
+    args.pci = True
+    args.probe_gui_keyboard = True
+if args.usb_with_virtio and not args.usb_input:
+    p.error('--usb-with-virtio requires --usb-input')
+usb_label = (f'{args.usb_input}-{args.usb_pointer}' +
+             ('-virtio' if args.usb_with_virtio else '')) if args.usb_input else None
 if args.probe_gui_workflow:
     args.probe_gui_keyboard = True
 if args.probe_module_override and not args.probe_module:
@@ -74,7 +87,8 @@ if args.probe_live_window_control and not (
         args.probe_grscreen and args.probe_live_winmgr):
     p.error('--probe-live-window-control requires --probe-module /System/Win.ZC '
             '--probe-winmgr --probe-grscreen --probe-live-winmgr')
-log_path = ROOT / 'build' / ('check-live-window-control.log' if args.probe_live_window_control else
+log_path = ROOT / 'build' / (f'check-usb-{usb_label}.log' if args.usb_input else
+                             'check-live-window-control.log' if args.probe_live_window_control else
                              'check-window-buttons.log' if args.probe_window_buttons else
                              'check-winmgr-live.log' if args.probe_live_winmgr else
                              'check-module-probe.log' if args.probe_module else
@@ -85,6 +99,25 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
     fw = os.environ.get('FW_CODE', '/opt/homebrew/share/qemu/edk2-aarch64-code.fd')
     shutil.copyfile(os.environ.get('FW_VARS_IN', '/opt/homebrew/share/qemu/edk2-arm-vars.fd'), tmp/'vars.fd')
     platform_args = shlex.split(os.environ.get('QEMU_VIRT', '-machine virt,accel=hvf,gic-version=3 -cpu host -m 512 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device'))
+    if args.usb_input:
+        if not args.usb_with_virtio:
+            filtered = []
+            i = 0
+            while i < len(platform_args):
+                if (platform_args[i] == '-device' and i + 1 < len(platform_args) and
+                        platform_args[i+1].split(',')[0] in (
+                            'virtio-keyboard-device', 'virtio-tablet-device',
+                            'virtio-keyboard-pci', 'virtio-tablet-pci')):
+                    i += 2
+                else:
+                    filtered.append(platform_args[i]); i += 1
+            platform_args = filtered
+        model = 'nec-usb-xhci' if args.usb_input == 'nec' else 'qemu-xhci'
+        platform_args += ['-device', model+',id=usb',
+                          '-device', 'usb-kbd,bus=usb.0,id=usb-kbd',
+                          '-device', 'usb-mouse,bus=usb.0,id=usb-mouse']
+        if args.usb_pointer == 'tablet':
+            platform_args += ['-device', 'usb-tablet,bus=usb.0,id=usb-tablet']
     cmd = [os.environ.get('QEMU', 'qemu-system-aarch64')] + platform_args + ['-drive', f'if=pflash,unit=0,format=raw,file={fw},readonly=on', '-drive', f'if=pflash,unit=1,format=raw,file={tmp}/vars.fd', '-serial', 'stdio', '-monitor', 'none', '-display', 'none']
     qmp_path = tmp/'qmp.sock'
     if args.pci:
@@ -180,10 +213,13 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         qmp_command('send-key', {
             'keys': [{'type': 'qcode', 'data': qcode} for qcode in qcodes],
             'hold-time': 50})
+    def graphical_path(name):
+        screen_name = f'usb-{usb_label}-{name}' if args.usb_input else name
+        return ROOT/'build'/f'gui-{screen_name}.ppm'
     def graphical_screen(name):
         # Inspect actual scanout, rather than treating successful command
         # assembly as proof that the user could see characters while typing.
-        path = ROOT/'build'/f'gui-{name}.ppm'
+        path = graphical_path(name)
         qmp_command('screendump', {'filename': str(path)})
         ppm = path.read_bytes()
         header = re.match(rb'P6\s+(\d+)\s+(\d+)\s+255\s', ppm)
@@ -219,7 +255,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 break
             if time.monotonic() >= deadline:
                 raise RuntimeError(f'graphical scanout is missing {expected!r}; '
-                                   f'see build/gui-{name}.ppm and .txt\n'+screen[3])
+                                   f'see {graphical_path(name)} and .txt\n'+screen[3])
             time.sleep(0.1)
         print(f'PASS visible graphical text: {expected!r}', flush=True)
         return screen
@@ -242,8 +278,15 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             time.sleep(0.1)
             screen = graphical_screen('typing-before-return')
         raise RuntimeError('graphical input has no visible insertion caret; '
-                           'see build/gui-typing-before-return.ppm')
+                           f'see {graphical_path("typing-before-return")}')
+    pointer_xy = [400, 300]
     def move_graphical_pointer(x, y):
+        if args.usb_input and args.usb_pointer == 'mouse':
+            qmp_command('input-send-event', {'events': [
+                {'type': 'rel', 'data': {'axis': 'x', 'value': x-pointer_xy[0]}},
+                {'type': 'rel', 'data': {'axis': 'y', 'value': y-pointer_xy[1]}}]})
+            pointer_xy[:] = x, y
+            return
         qmp_command('input-send-event', {'events': [
             {'type': 'abs', 'data': {'axis': 'x', 'value': round(x*32767/799)}},
             {'type': 'abs', 'data': {'axis': 'y', 'value': round(y*32767/599)}}]})
@@ -257,11 +300,11 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 return
             if time.monotonic() >= deadline:
                 raise RuntimeError('tablet motion has no visible mouse pointer; '
-                                   'see build/gui-mouse-pointer.ppm')
+                                   f'see {graphical_path("mouse-pointer")}')
             time.sleep(0.1)
     def qmp_send_key(qcode):
         qmp_send_keys([qcode])
-    def qmp_send_text(text):
+    def qmp_send_text(text, delay=0.2):
         qcodes = {
             ' ': ('spc',), '/': ('slash',), '.': ('dot',),
             ';': ('semicolon',), ':': ('shift', 'semicolon'), '\n': ('ret',),
@@ -276,7 +319,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             # Keep longer lines below the guest's cooperative input polling
             # rate; QMP acknowledges injection before the source task consumes
             # each event, and an early Return can otherwise overtake the tail.
-            time.sleep(0.2)
+            time.sleep(delay)
     def checked_put_key():
         command('zload /Tests/TaskPutKey.ZC', 'zc: loaded /Tests/TaskPutKey.ZC')
         result = command('zcall TaskPutKeyChecks', 'zc => 0x000000000000002a')
@@ -397,8 +440,17 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             raise RuntimeError('boot graphical terminal does not own the VM keyboard:\n' + desktop)
         if 'gui_keyboard: key_events=' not in desktop:
             raise RuntimeError('zstatus omitted graphical keyboard diagnostics:\n' + desktop)
-        if 'virtio_keyboard: ready=1 key_events=' not in desktop:
-            raise RuntimeError('zstatus omitted low-level virtio keyboard diagnostics:\n' + desktop)
+        keyboard_diagnostic = 'usb_input:' if args.usb_input else 'virtio_keyboard: ready=1'
+        if keyboard_diagnostic not in desktop:
+            raise RuntimeError('zstatus omitted low-level keyboard diagnostics:\n' + desktop)
+        if args.usb_input:
+            count = 3 if args.usb_pointer == 'tablet' else 2
+            if not re.search(rf'usb_input: controllers=1 devices={count} keyboard=usb pointer=usb-{args.usb_pointer} .* errors=0', desktop):
+                raise RuntimeError('native xHCI/HID did not enumerate all three USB inputs:\n'+desktop)
+            if not args.usb_with_virtio and 'virtio_keyboard: ready=0' not in desktop:
+                raise RuntimeError('USB-only acceptance unexpectedly has a VirtIO keyboard:\n'+desktop)
+            print('PASS native USB controller, keyboard, mouse and tablet enumeration', flush=True)
+            command('usbcheck', 'usbcheck: command/event ring wrap OK')
         frames = re.search(r'desktop: winmgr=1 gterm=1 windowdemo=0 presented_frames=(\d+)', desktop)
         if not frames or int(frames.group(1)) == 0:
             raise RuntimeError('boot graphical terminal has not presented a frame:\n' + desktop)
@@ -422,7 +474,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         print(f'PASS boot graphical terminal visible text pixels: {int(text_pixels.group(1), 16)}', flush=True)
         if args.probe_gui_keyboard:
             require_graphical_text('boot-terminal', 'ZealOS ARM64 graphical terminal')
-            raw_before = re.search(r'virtio_keyboard: ready=1 key_events=(\d+)', desktop)
+            raw_pattern = r'usb_input:.* key_events=(\d+)' if args.usb_input else r'virtio_keyboard: ready=1 key_events=(\d+)'
+            raw_before = re.search(raw_pattern, desktop)
             if not raw_before:
                 raise RuntimeError('could not read low-level virtio keyboard event count:\n' + desktop)
             before = command('zcall BootstrapGuiTerminalKeyEventCount', 'zc => 0x')
@@ -441,12 +494,49 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             after_count = re.search(r'zc => 0x([0-9a-fA-F]+)', after)
             if not after_count or int(after_count.group(1), 16) < int(before_count.group(1), 16) + 5:
                 raise RuntimeError('printable virtio keys did not reach the boot graphical terminal:\n' + after)
-            raw_after = command('zstatus', 'virtio_keyboard: ready=1 key_events=')
-            raw_count = re.search(r'virtio_keyboard: ready=1 key_events=(\d+)', raw_after)
+            raw_after = command('zstatus', keyboard_diagnostic)
+            raw_count = re.search(raw_pattern, raw_after)
             if not raw_count or int(raw_count.group(1)) < int(raw_before.group(1)) + 5:
                 raise RuntimeError('QMP keys did not reach the virtio keyboard device:\n' + raw_after)
             command('zcall BootstrapGuiTerminalLastCommandIsHelp',
                     'zc => 0x0000000000000001')
+            if args.usb_input:
+                # A second input backend must not turn "help" into doubled
+                # letters or add extra key-downs at the OS boundary.
+                if int(after_count.group(1), 16) != int(before_count.group(1), 16) + 5:
+                    raise RuntimeError('USB input published duplicate/missing key-downs:\n'+after)
+                if 'errors=0' not in raw_after or not re.search(r'pointer_reports=[1-9]\d*', raw_after):
+                    raise RuntimeError('USB pointer reports/errors failed:\n'+raw_after)
+                print('PASS USB press/release delivery and exclusive keyboard/pointer ownership', flush=True)
+                for button, mask in (('left', 1), ('right', 2), ('middle', 4)):
+                    qmp_command('input-send-event', {'events': [
+                        {'type': 'btn', 'data': {'down': True, 'button': button}}]})
+                    time.sleep(0.15)
+                    command('zstatus', f'buttons={mask}')
+                    qmp_command('input-send-event', {'events': [
+                        {'type': 'btn', 'data': {'down': False, 'button': button}}]})
+                    time.sleep(0.15)
+                    command('zstatus', 'buttons=0')
+                qmp_command('input-send-event', {'events': [
+                    {'type': 'btn', 'data': {'down': True, 'button': 'wheel-up'}}]})
+                qmp_command('input-send-event', {'events': [
+                    {'type': 'btn', 'data': {'down': False, 'button': 'wheel-up'}}]})
+                time.sleep(0.15)
+                wheel_status = command('zstatus', 'usb_input:')
+                if not re.search(r'wheel_events=[1-9]\d*', wheel_status):
+                    raise RuntimeError('native USB wheel report was not decoded:\n'+wheel_status)
+                print('PASS native USB left/right/middle press/release and wheel', flush=True)
+                fast_command = 'zc I64 UsbFastTyping(){return 42;}'
+                qmp_send_text(fast_command, delay=0.1)
+                require_graphical_text('usb-fast-typing', '> '+fast_command)
+                qmp_send_key('ret')
+                require_graphical_text('usb-fast-submit', 'zc: executed')
+                # Definitions belong to the graphical task's compiler scope.
+                # Invoke it there rather than from the independent UART task.
+                qmp_send_text('zcall UsbFastTyping')
+                qmp_send_key('ret')
+                require_graphical_text('usb-fast-run', 'zc => 0x000000000000002a')
+                print('PASS native USB mixed-case/modifier typing at ten characters per second', flush=True)
             last_key = command('zcall BootstrapGuiTerminalLastKeyChar', 'zc => 0x')
             last_key_value = re.search(r'zc => 0x([0-9a-fA-F]+)', last_key)
             if not last_key_value or int(last_key_value.group(1), 16) != 10:
@@ -612,9 +702,10 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 buf.clear()
                 until(b'\n> ')
                 qmp_send_text('edit '+editor_path)
+                require_graphical_text('editor-reopen-command', '> edit '+editor_path)
                 qmp_send_key('ret')
-                command('zstatus', 'gui_editor_active=1')
                 require_graphical_text('editor-reopened-after-reboot', source)
+                command('zstatus', 'gui_editor_active=1')
                 qmp_send_keys(['shift', 'esc'])
                 time.sleep(0.5)
                 command('zstatus', 'gui_editor_active=0')
@@ -624,6 +715,22 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 if 'edit: could not open document' in cancelled[3]:
                     raise RuntimeError('cancelling an open editor reported an open failure')
                 print('PASS graphical edit/save/compile/run/reboot/reopen workflow', flush=True)
+            if args.usb_input:
+                final_usb = command('zstatus', 'usb_input:')
+                if not re.search(r'usb_input:.* errors=0', final_usb):
+                    raise RuntimeError('USB transfer errors after graphical workflow:\n'+final_usb)
+                print('PASS native USB transfer/event ring cycling without errors', flush=True)
+                if args.usb_with_virtio:
+                    qmp_command('device_del', {'id': 'usb-kbd'})
+                    time.sleep(0.3)
+                    command('zstatus', 'keyboard=virtio/serial')
+                    qmp_send_text('help')
+                    require_graphical_text('virtio-fallback-typing', '> help')
+                    qmp_send_key('ret')
+                    time.sleep(0.3)
+                    command('zcall BootstrapGuiTerminalLastCommandIsHelp',
+                            'zc => 0x0000000000000001')
+                    print('PASS unplugged USB keyboard returns input to VirtIO', flush=True)
             raise SystemExit(0)
         command('zcall BootstrapGuiTerminalSmoke',
                 'zc => 0x000000000000002a')

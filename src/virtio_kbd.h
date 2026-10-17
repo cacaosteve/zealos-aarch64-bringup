@@ -102,6 +102,7 @@ static uint64_t g_vk_hhdm;
 static uint64_t g_vk_key_event_count;
 static uint16_t g_vk_last_key_code;
 static uint32_t g_vk_last_key_value;
+static int g_vk_input_suppressed;
 
 static inline uint32_t vk_rr(volatile uint32_t *m, unsigned off) {
     return m[off / 4];
@@ -163,6 +164,14 @@ static int vk_msg_pop(uint8_t *type, uint64_t *a1, uint64_t *a2) {
 }
 
 static int vk_linux_to_sc(uint16_t code) {
+    switch (code) {
+    case 102: return 0x47; /* Home */
+    case 104: return 0x49; /* Page Up */
+    case 107: return 0x4f; /* End */
+    case 109: return 0x51; /* Page Down */
+    case 110: return 0x52; /* Insert */
+    case 111: return 0x53; /* Delete */
+    }
     if (code == VK_KEY_UP) {
         return (int)VK_SC_CURSOR_UP;
     }
@@ -225,20 +234,17 @@ static void vk_notify(struct vk_dev *d) {
     vk_rw(d->mmio, VK_REG_QUEUE_NOTIFY, 0);
 }
 
-static void vk_handle(struct vk_dev *d, struct vk_event ev) {
-    if (ev.type != VK_EV_KEY) {
-        return;
-    }
-    g_vk_key_event_count++;
-    g_vk_last_key_code = ev.code;
-    g_vk_last_key_value = ev.value;
+/* Shared OS key decoder. USB and VirtIO have independent device counters. */
+static void vk_decode_key(struct vk_dev *d, struct vk_event ev) {
     int pressed = ev.value != 0;
     if (ev.code == VK_KEY_LEFTSHIFT || ev.code == VK_KEY_RIGHTSHIFT) {
-        d->shift = pressed ? 1 : 0;
+        unsigned bit = ev.code == VK_KEY_LEFTSHIFT ? 1 : 2;
+        d->shift = pressed ? d->shift | bit : d->shift & ~bit;
         return;
     }
     if (ev.code == VK_KEY_LEFTCTRL || ev.code == VK_KEY_RIGHTCTRL) {
-        d->ctrl = pressed ? 1 : 0;
+        unsigned bit = ev.code == VK_KEY_LEFTCTRL ? 1 : 2;
+        d->ctrl = pressed ? d->ctrl | bit : d->ctrl & ~bit;
         return;
     }
     int sc = vk_linux_to_sc(ev.code);
@@ -257,6 +263,14 @@ static void vk_handle(struct vk_dev *d, struct vk_event ev) {
     } else {
         vk_msg_push(3, (uint64_t)(int64_t)ch, 0); /* MESSAGE_KEY_UP */
     }
+}
+
+static void vk_handle(struct vk_dev *d, struct vk_event ev) {
+    if (ev.type != VK_EV_KEY) return;
+    g_vk_key_event_count++;
+    g_vk_last_key_code = ev.code;
+    g_vk_last_key_value = ev.value;
+    if (!g_vk_input_suppressed) vk_decode_key(d, ev);
 }
 
 static void vk_poll(void) {
@@ -476,9 +490,6 @@ static int virtio_kbd_msg_nb(uint8_t *type, uint64_t *a1, uint64_t *a2) {
 
 /* Peek: poll DMA into msg ring without consuming (Sleep wake). */
 static int virtio_kbd_msg_pending(void) {
-    if (!g_vk.ready) {
-        return 0;
-    }
     vk_poll();
     return g_vk_mh != g_vk_mt;
 }
@@ -502,7 +513,7 @@ static uint32_t virtio_kbd_last_key_value(void) {
 /* Poll before reporting modifier state so gesture readers see current input. */
 static int virtio_kbd_ctrl_down(void) {
     vk_poll();
-    return g_vk.ready && g_vk.ctrl;
+    return !!g_vk.ctrl;
 }
 
 static uint64_t virtio_kbd_mmio_phys(void) {
