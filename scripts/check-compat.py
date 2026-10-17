@@ -10,6 +10,10 @@ p.add_argument('--usb-with-virtio', action='store_true',
                help='retain duplicate VirtIO devices to verify USB ownership suppresses duplicate keys')
 p.add_argument('--usb-pointer', choices=('tablet', 'mouse'), default='tablet',
                help='native USB pointer layout to accept (default: tablet, also enumerate mouse)')
+p.add_argument('--usb-hubs', type=int, choices=range(6), default=0,
+               help='place native USB inputs behind this many nested USB2 hubs (0-5)')
+p.add_argument('--usb-hotplug', action='store_true',
+               help='exercise keyboard, pointer and hub detach/reattach without reboot')
 p.add_argument('--quick', action='store_true', help='only compiler integration gate')
 p.add_argument('--window-frame-only', action='store_true',
                help='stop after the window demo frame diagnostic')
@@ -54,8 +58,12 @@ if args.usb_input:
     args.probe_gui_keyboard = True
 if args.usb_with_virtio and not args.usb_input:
     p.error('--usb-with-virtio requires --usb-input')
+if (args.usb_hubs or args.usb_hotplug) and not args.usb_input:
+    p.error('--usb-hubs/--usb-hotplug require --usb-input')
 usb_label = (f'{args.usb_input}-{args.usb_pointer}' +
-             ('-virtio' if args.usb_with_virtio else '')) if args.usb_input else None
+             ('-virtio' if args.usb_with_virtio else '') +
+             (f'-hubs{args.usb_hubs}' if args.usb_hubs else '') +
+             ('-hotplug' if args.usb_hotplug else '')) if args.usb_input else None
 if args.probe_gui_workflow:
     args.probe_gui_keyboard = True
 if args.probe_module_override and not args.probe_module:
@@ -113,11 +121,14 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     filtered.append(platform_args[i]); i += 1
             platform_args = filtered
         model = 'nec-usb-xhci' if args.usb_input == 'nec' else 'qemu-xhci'
-        platform_args += ['-device', model+',id=usb',
-                          '-device', 'usb-kbd,bus=usb.0,id=usb-kbd',
-                          '-device', 'usb-mouse,bus=usb.0,id=usb-mouse']
+        platform_args += ['-device', model+',id=usb']
+        for tier in range(args.usb_hubs):
+            platform_args += ['-device', f'usb-hub,bus=usb.0,port={"1."*tier}1,id=usb-hub{tier}']
+        usb_prefix = '1.' * args.usb_hubs
+        platform_args += ['-device', f'usb-kbd,bus=usb.0,port={usb_prefix}1,id=usb-kbd',
+                          '-device', f'usb-mouse,bus=usb.0,port={usb_prefix}2,id=usb-mouse']
         if args.usb_pointer == 'tablet':
-            platform_args += ['-device', 'usb-tablet,bus=usb.0,id=usb-tablet']
+            platform_args += ['-device', f'usb-tablet,bus=usb.0,port={usb_prefix}3,id=usb-tablet']
     cmd = [os.environ.get('QEMU', 'qemu-system-aarch64')] + platform_args + ['-drive', f'if=pflash,unit=0,format=raw,file={fw},readonly=on', '-drive', f'if=pflash,unit=1,format=raw,file={tmp}/vars.fd', '-serial', 'stdio', '-monitor', 'none', '-display', 'none']
     qmp_path = tmp/'qmp.sock'
     if args.pci:
@@ -444,12 +455,19 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         if keyboard_diagnostic not in desktop:
             raise RuntimeError('zstatus omitted low-level keyboard diagnostics:\n' + desktop)
         if args.usb_input:
-            count = 3 if args.usb_pointer == 'tablet' else 2
+            count = (3 if args.usb_pointer == 'tablet' else 2) + args.usb_hubs
             if not re.search(rf'usb_input: controllers=1 devices={count} keyboard=usb pointer=usb-{args.usb_pointer} .* errors=0', desktop):
                 raise RuntimeError('native xHCI/HID did not enumerate all three USB inputs:\n'+desktop)
             if not args.usb_with_virtio and 'virtio_keyboard: ready=0' not in desktop:
                 raise RuntimeError('USB-only acceptance unexpectedly has a VirtIO keyboard:\n'+desktop)
             print('PASS native USB controller, keyboard, mouse and tablet enumeration', flush=True)
+            if args.usb_hubs:
+                if not re.search(rf'usb_topology: hubs={args.usb_hubs} .* rejected=0 quarantined=0', desktop):
+                    raise RuntimeError('USB hub tree was not enumerated:\n'+desktop)
+                route = sum(1 << (4 * tier) for tier in range(args.usb_hubs))
+                if not re.search(rf'usb_device: root=\d+ route={route} depth={args.usb_hubs} .* hub_ports=0', desktop):
+                    raise RuntimeError('USB keyboard route/depth does not match hub topology:\n'+desktop)
+                print(f'PASS native USB enumeration through {args.usb_hubs} nested hubs', flush=True)
             command('usbcheck', 'usbcheck: command/event ring wrap OK')
         frames = re.search(r'desktop: winmgr=1 gterm=1 windowdemo=0 presented_frames=(\d+)', desktop)
         if not frames or int(frames.group(1)) == 0:
@@ -720,17 +738,106 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 if not re.search(r'usb_input:.* errors=0', final_usb):
                     raise RuntimeError('USB transfer errors after graphical workflow:\n'+final_usb)
                 print('PASS native USB transfer/event ring cycling without errors', flush=True)
-                if args.usb_with_virtio:
+                if args.usb_with_virtio or args.usb_hotplug:
+                    dma_before = int(re.search(r'dma_bytes=(\d+)', final_usb).group(1))
+                    if args.usb_hotplug:
+                        qmp_command('input-send-event', {'events': [
+                            {'type': 'key', 'data': {'down': True,
+                             'key': {'type': 'qcode', 'data': 'shift'}}}]})
+                        time.sleep(0.15)
                     qmp_command('device_del', {'id': 'usb-kbd'})
                     time.sleep(0.3)
                     command('zstatus', 'keyboard=virtio/serial')
-                    qmp_send_text('help')
-                    require_graphical_text('virtio-fallback-typing', '> help')
-                    qmp_send_key('ret')
-                    time.sleep(0.3)
-                    command('zcall BootstrapGuiTerminalLastCommandIsHelp',
-                            'zc => 0x0000000000000001')
-                    print('PASS unplugged USB keyboard returns input to VirtIO', flush=True)
+                    if args.usb_hotplug and args.usb_with_virtio:
+                        qmp_command('input-send-event', {'events': [
+                            {'type': 'key', 'data': {'down': False,
+                             'key': {'type': 'qcode', 'data': 'shift'}}}]})
+                    if args.usb_with_virtio:
+                        qmp_send_text('help')
+                        require_graphical_text('virtio-fallback-typing', '> help')
+                        qmp_send_key('ret')
+                        time.sleep(0.3)
+                        command('zcall BootstrapGuiTerminalLastCommandIsHelp',
+                                'zc => 0x0000000000000001')
+                        print('PASS unplugged USB keyboard returns input to VirtIO', flush=True)
+                if args.usb_hotplug:
+                    def wait_usb(expected, devices=None, hubs=None):
+                        deadline = time.monotonic() + 8
+                        while True:
+                            status = command('zstatus', 'usb_input:')
+                            good = expected in status
+                            if devices is not None:
+                                good &= f'controllers=1 devices={devices} ' in status
+                            if hubs is not None:
+                                good &= f'usb_topology: hubs={hubs} ' in status
+                            if good:
+                                if not re.search(r'usb_input:.* errors=0', status) or 'quarantined=0' not in status:
+                                    raise RuntimeError('USB reconnect failed or quarantined DMA:\n'+status)
+                                return status
+                            if time.monotonic() >= deadline:
+                                raise RuntimeError('USB topology did not settle:\n'+status)
+                            time.sleep(0.15)
+                    def add_input(driver, identity, port):
+                        qmp_command('device_add', {'driver': driver, 'id': identity,
+                                                 'bus': 'usb.0', 'port': usb_prefix+str(port)})
+                    count = (3 if args.usb_pointer == 'tablet' else 2) + args.usb_hubs
+                    # More reconnects than device records. Neither slots nor
+                    # reserved DMA may leak, and held Shift must be released.
+                    for cycle in range(12):
+                        add_input('usb-kbd', 'usb-kbd', 1)
+                        status = wait_usb('keyboard=usb', devices=count)
+                        if cycle == 0 and not args.usb_with_virtio:
+                            # No host keyboard handler exists during USB-only
+                            # unplug; deliver physical release after reattach.
+                            qmp_command('input-send-event', {'events': [
+                                {'type': 'key', 'data': {'down': False,
+                                 'key': {'type': 'qcode', 'data': 'shift'}}}]})
+                        if int(re.search(r'dma_bytes=(\d+)', status).group(1)) != dma_before:
+                            raise RuntimeError('USB keyboard reconnect leaked DMA memory:\n'+status)
+                        if cycle in (0, 11):
+                            qmp_send_text('help', delay=0.1)
+                            require_graphical_text(f'usb-reconnect-{cycle}', '> help')
+                            qmp_send_key('ret')
+                            time.sleep(0.2)
+                            command('zcall BootstrapGuiTerminalLastCommandIsHelp', 'zc => 0x0000000000000001')
+                        if cycle != 11:
+                            qmp_command('device_del', {'id': 'usb-kbd'})
+                            wait_usb('keyboard=virtio/serial', devices=count-1)
+                    print('PASS 12 keyboard reconnects reuse DMA and restore visible typing after held-Shift unplug', flush=True)
+                    if args.usb_pointer == 'tablet':
+                        qmp_command('input-send-event', {'events': [
+                            {'type': 'btn', 'data': {'down': True, 'button': 'left'}}]})
+                        time.sleep(0.15)
+                        command('zstatus', 'buttons=1')
+                        qmp_command('device_del', {'id': 'usb-tablet'})
+                        wait_usb('pointer=usb-mouse', devices=count-1)
+                        command('zstatus', 'buttons=0')
+                        qmp_command('input-send-event', {'events': [
+                            {'type': 'btn', 'data': {'down': False, 'button': 'left'}}]})
+                        add_input('usb-tablet', 'usb-tablet', 3)
+                        wait_usb('pointer=usb-tablet', devices=count)
+                        require_graphical_pointer()
+                        print('PASS tablet unplug releases held button, selects mouse, and reattach restores visible pointer', flush=True)
+                    if args.usb_hubs:
+                        # QEMU removes descendants when their hub is unrealized.
+                        qmp_command('device_del', {'id': 'usb-hub0'})
+                        wait_usb('keyboard=virtio/serial', devices=0, hubs=0)
+                        for tier in range(args.usb_hubs):
+                            qmp_command('device_add', {'driver': 'usb-hub',
+                                'id': f'usb-hub{tier}', 'bus': 'usb.0', 'port': '1.'*tier+'1'})
+                        add_input('usb-kbd', 'usb-kbd', 1)
+                        add_input('usb-mouse', 'usb-mouse', 2)
+                        if args.usb_pointer == 'tablet':
+                            add_input('usb-tablet', 'usb-tablet', 3)
+                        status = wait_usb('keyboard=usb', devices=count, hubs=args.usb_hubs)
+                        if int(re.search(r'dma_bytes=(\d+)', status).group(1)) != dma_before:
+                            raise RuntimeError('USB hub tree reconnect leaked DMA memory:\n'+status)
+                        qmp_send_text('help')
+                        require_graphical_text('usb-hub-tree-reconnect', '> help')
+                        qmp_send_key('ret')
+                        time.sleep(0.2)
+                        command('zcall BootstrapGuiTerminalLastCommandIsHelp', 'zc => 0x0000000000000001')
+                        print('PASS hub subtree removal/reattach disables descendants and restores native typing without DMA growth', flush=True)
             raise SystemExit(0)
         command('zcall BootstrapGuiTerminalSmoke',
                 'zc => 0x000000000000002a')

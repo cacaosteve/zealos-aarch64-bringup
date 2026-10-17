@@ -1,7 +1,7 @@
 /* Polled native USB input for QEMU virt / UTM NEC and QEMU xHCI.
  * Ring/enumeration/HID behavior adapted from the public-domain YDE drivers:
  * Kernel/Usb/{KXhci,KUsbCore,KUsbHid}.ZC. ARM64 platform hooks are local.
- * Bounded bootstrap: two root-bus controllers, eight root devices, no hubs.
+ * Bounded bootstrap: two root-bus controllers, eight devices, five hub tiers.
  * Unsupported devices never claim input. Timeouts preserve serial recovery.
  */
 #pragma once
@@ -13,6 +13,8 @@
 #define USB_EPS 4
 #define USB_TRBS 64
 #define USB_EVENTS 256
+#define USB_HUB_PORTS 15
+#define USB_DEVICE_DMA (48u * 1024u)
 #define USB_TRB(t) ((uint32_t)(t) << 10)
 #define USB_CC_OK 1
 #define USB_CC_SHORT 13
@@ -21,12 +23,13 @@ struct usb_trb { uint64_t parameter; uint32_t status, control; };
 struct usb_ring { struct usb_trb *trbs; unsigned enqueue, cycle; };
 struct usb_hc;
 struct usb_dev;
+struct usb_port_state { uint64_t ready_at; unsigned connected, attempted; };
 struct usb_ep {
     struct usb_ring ring;
     uint8_t *report;
     uint64_t pending;
     unsigned dci, packet, interval, interface, protocol, subclass;
-    unsigned kind; /* 1=boot keyboard, 2=relative pointer, 3=tablet */
+    unsigned kind; /* 1=boot keyboard, 2=relative pointer, 3=tablet, 4=hub */
     unsigned report_descriptor_length;
     unsigned active, failed;
     uint8_t previous[8];
@@ -36,11 +39,18 @@ struct usb_ep {
 };
 struct usb_dev {
     struct usb_hc *hc;
+    struct usb_dev *parent;
+    uint8_t *dma;
+    size_t dma_used;
     uint8_t *input_ctx, *device_ctx, *buffer;
     struct usb_ring control_ring;
     struct usb_ep ep[USB_EPS];
     unsigned slot, port, speed, packet0, ep_count, vendor, product;
     unsigned present, configured, failed;
+    unsigned quarantined, route, depth, parent_port, tt_slot, tt_port;
+    unsigned hub_ports, hub_protocol, hub_think, hub_pending;
+    uint64_t hub_rescan_at;
+    struct usb_port_state children[USB_HUB_PORTS];
     uint64_t control_pending, control_data;
     unsigned control_done, control_code, control_actual;
 };
@@ -55,12 +65,14 @@ struct usb_hc {
     uint64_t command_pending;
     unsigned command_done, command_code, command_slot;
     uint64_t event_count, command_count, port_changes;
+    struct usb_port_state root[32];
 };
 static struct {
     struct usb_hc hc[USB_HCS];
     struct usb_dev devices[USB_DEVS];
     struct usb_ep *keyboard, *pointer;
     unsigned controllers, device_count, errors, busy;
+    uint64_t topology_at, attaches, detaches, rejected;
     unsigned width, height;
     int32_t x, y, wheel;
     int buttons;
@@ -73,6 +85,26 @@ static void usb_log(const char *s) { uart_puts(g_uart, s); }
 static void usb_number(unsigned n) { uart_put_u32_dec(g_uart, n); }
 static unsigned usb_le16(const uint8_t *p) { return p[0] | (unsigned)p[1] << 8; }
 static int usb_success(unsigned code) { return code == USB_CC_OK || code == USB_CC_SHORT; }
+
+/* Each record owns a reserved region for its entire lifetime. Reuse is allowed
+ * only after Disable Slot completed and old events were drained. A timeout
+ * quarantines the record; no memory possibly owned by DMA is recycled. */
+static void *usb_dev_alloc(struct usb_dev *d, size_t n, size_t align) {
+    if (align < 256) align = 256;
+    size_t start = (d->dma_used + align - 1) & ~(align - 1);
+    n = (n + 255) & ~(size_t)255;
+    if (!d->dma || start > USB_DEVICE_DMA || n > USB_DEVICE_DMA - start) return NULL;
+    void *p = d->dma + start;
+    d->dma_used = start + n;
+    usb_zero(p, n);
+    usb_dma_sync(p, n, 0);
+    return p;
+}
+static int usb_dev_ring_init(struct usb_dev *d, struct usb_ring *r) {
+    r->trbs = usb_dev_alloc(d, 4096, 4096);
+    r->enqueue = 0; r->cycle = 1;
+    return r->trbs != NULL;
+}
 
 static int usb_ring_init(struct usb_ring *r) {
     r->trbs = usb_dma_alloc(4096, 4096);
@@ -210,7 +242,11 @@ static void usb_events(struct usb_hc *hc) {
                     usb_dma_sync(ep->report, 64, 1);
                     ep->reports++;
                     if (ep->kind == 1) usb_keyboard_report(ep, ep->packet - residue);
-                    else usb_pointer_report(ep, ep->packet - residue);
+                    else if (ep->kind == 4) {
+                        unsigned actual = ep->packet - residue;
+                        for (unsigned k = 0; k < actual && k < 2; k++)
+                            d->hub_pending |= (unsigned)ep->report[k] << (8 * k);
+                    } else usb_pointer_report(ep, ep->packet - residue);
                     usb_interrupt_queue(d, ep);
                 }
             }
@@ -307,15 +343,16 @@ static int usb_address(struct usb_dev *d) {
     if (usb_command(hc, 0, USB_TRB(9)) != USB_CC_OK) return 0;
     d->slot = hc->command_slot;
     if (!d->slot || d->slot > hc->slots) return 0;
-    d->device_ctx = usb_dma_alloc(32 * hc->context_size, 4096);
-    d->input_ctx = usb_dma_alloc(33 * hc->context_size, 4096);
-    d->buffer = usb_dma_alloc(4096, 4096);
-    if (!d->device_ctx || !d->input_ctx || !d->buffer || !usb_ring_init(&d->control_ring)) return 0;
+    d->device_ctx = usb_dev_alloc(d, 32 * hc->context_size, 4096);
+    d->input_ctx = usb_dev_alloc(d, 33 * hc->context_size, 4096);
+    d->buffer = usb_dev_alloc(d, 4096, 4096);
+    if (!d->device_ctx || !d->input_ctx || !d->buffer || !usb_dev_ring_init(d, &d->control_ring)) return 0;
     d->packet0 = d->speed >= 4 ? 512 : d->speed == 3 ? 64 : 8;
     uint32_t *control = usb_input_ctx(d, 0), *slot = usb_input_ctx(d, 1), *ep0 = usb_input_ctx(d, 2);
     control[1] = 3;
-    slot[0] = (1u << 27) | (d->speed << 20);
+    slot[0] = (1u << 27) | (d->speed << 20) | d->route;
     slot[1] = (d->port + 1) << 16;
+    slot[2] = d->tt_slot | (d->tt_port << 8);
     ep0[1] = (3u << 1) | (4u << 3) | (d->packet0 << 16);
     uint64_t ring = usb_dma_addr(d->control_ring.trbs);
     ep0[2] = (uint32_t)ring | 1;
@@ -326,7 +363,7 @@ static int usb_address(struct usb_dev *d) {
     return usb_context_command(d, 11) == USB_CC_OK;
 }
 static int usb_config_parse(struct usb_dev *d, unsigned length) {
-    unsigned interface = 0, protocol = 0, subclass = 0, hid = 0, report_len = 0;
+    unsigned interface = 0, protocol = 0, subclass = 0, hid = 0, hub = 0, report_len = 0;
     for (unsigned pos = 0; pos + 2 <= length;) {
         uint8_t *p = d->buffer + pos;
         unsigned n = p[0], type = p[1];
@@ -335,12 +372,13 @@ static int usb_config_parse(struct usb_dev *d, unsigned length) {
             if (n < 9) return 0;
             interface = p[2];
             hid = p[5] == 3 && p[3] == 0;
+            hub = p[5] == 9 && p[3] == 0;
             subclass = p[6]; protocol = p[7]; report_len = 0;
         } else if (type == 0x21 && hid) {
             if (n < 6 || 6u + 3u * p[5] > n) return 0;
             for (unsigned j = 0; j < p[5]; j++)
                 if (p[6 + 3*j] == 0x22) report_len = usb_le16(p + 7 + 3*j);
-        } else if (type == 5 && hid) {
+        } else if (type == 5 && (hid || hub)) {
             if (n < 7) return 0;
             if ((p[2] & 0x80) && (p[3] & 3) == 3) {
                 unsigned packet = usb_le16(p + 4) & 0x7ff;
@@ -350,6 +388,7 @@ static int usb_config_parse(struct usb_dev *d, unsigned length) {
                 ep->packet = packet; ep->interval = p[6];
                 ep->interface = interface; ep->protocol = protocol;
                 ep->subclass = subclass; ep->report_descriptor_length = report_len;
+                if (hub) ep->kind = 4;
             }
         }
         pos += n;
@@ -374,7 +413,7 @@ static int usb_configure(struct usb_dev *d) {
     for (unsigned j = 0; j < d->ep_count; j++) {
         struct usb_ep *ep = &d->ep[j];
         if (!ep->kind) continue;
-        if (!usb_ring_init(&ep->ring) || !(ep->report = usb_dma_alloc(64, 256))) return 0;
+        if (!usb_dev_ring_init(d, &ep->ring) || !(ep->report = usb_dev_alloc(d, 64, 256))) return 0;
         control[1] |= 1u << ep->dci;
         if (ep->dci > max_dci) max_dci = ep->dci;
         uint32_t *ctx = usb_input_ctx(d, ep->dci + 1);
@@ -385,6 +424,11 @@ static int usb_configure(struct usb_dev *d) {
         ctx[4] = ep->packet | (ep->packet << 16);
     }
     slot[0] = (slot[0] & 0x07ffffff) | (max_dci << 27);
+    if (d->hub_ports) {
+        slot[0] |= 1u << 26; /* hub, single TT (alternate setting zero) */
+        slot[1] = (slot[1] & 0x00ffffff) | (d->hub_ports << 24);
+        slot[2] = (slot[2] & ~(3u << 16)) | (d->hub_think << 16);
+    }
     return usb_context_command(d, 12) == USB_CC_OK;
 }
 static int usb_enumerate(struct usb_dev *d) {
@@ -408,16 +452,31 @@ static int usb_enumerate(struct usb_dev *d) {
     }
     if (usb_control(d, 0x80, 6, 0x100, 0, 18) < 18 || d->buffer[1] != 1) return 0;
     d->vendor = usb_le16(d->buffer + 8); d->product = usb_le16(d->buffer + 10);
-    if (d->buffer[4] == 9) return 0; /* hub tree is a later milestone */
+    unsigned device_class = d->buffer[4];
+    d->hub_protocol = d->buffer[6];
     if (usb_control(d, 0x80, 6, 0x200, 0, 9) < 9 || d->buffer[1] != 2) return 0;
     unsigned total = usb_le16(d->buffer + 2), config = d->buffer[5];
     if (total < 9 || total > 4096 || !config || usb_control(d, 0x80, 6, 0x200, 0, total) != (int)total) return 0;
     if (!usb_config_parse(d, total)) return 0;
+    unsigned hub = device_class == 9;
+    for (unsigned j = 0; j < d->ep_count; j++) hub |= d->ep[j].kind == 4;
+    if (hub) {
+        /* USB 1.x/2.0 hub class. SuperSpeed hubs need a separate descriptor,
+         * depth and link-state path; reject before claiming any endpoints. */
+        if (d->depth >= 5 || d->speed >= 4 ||
+            usb_control(d, 0xa0, 6, 0x2900, 0, 9) < 7 || d->buffer[1] != 0x29)
+            return 0;
+        d->hub_ports = d->buffer[2];
+        d->hub_think = (usb_le16(d->buffer + 3) >> 5) & 3;
+        if (!d->hub_ports || d->hub_ports > USB_HUB_PORTS) return 0;
+    }
     /* Parse before configuring endpoints; unsupported HID layouts stay unowned. */
     unsigned accepted = 0;
     for (unsigned j = 0; j < d->ep_count; j++) {
         struct usb_ep *ep = &d->ep[j];
-        if (ep->subclass == 1 && ep->protocol == 1 && ep->packet >= 8) {
+        if (ep->kind == 4) {
+            if (ep->packet * 8 < d->hub_ports + 1) return 0;
+        } else if (ep->subclass == 1 && ep->protocol == 1 && ep->packet >= 8) {
             ep->kind = 1;
         } else if (ep->report_descriptor_length && ep->report_descriptor_length <= 1024) {
             int n = usb_control(d, 0x81, 6, 0x2200, ep->interface, ep->report_descriptor_length);
@@ -433,17 +492,23 @@ static int usb_enumerate(struct usb_dev *d) {
     for (unsigned j = 0; j < d->ep_count; j++) {
         struct usb_ep *ep = &d->ep[j];
         if (!ep->kind) continue;
-        if (ep->subclass == 1 && usb_control(d, 0x21, 11, ep->kind == 1 ? 0 : 1, ep->interface, 0) != 0) return 0;
+        if (ep->kind != 4 && ep->subclass == 1 && usb_control(d, 0x21, 11, ep->kind == 1 ? 0 : 1, ep->interface, 0) != 0) return 0;
         /* SET_IDLE is advisory for pointers; a STALL cannot be followed by
          * more EP0 requests without endpoint recovery, so omit it here. */
         ep->active = 1;
         if (ep->kind == 1 && !g_usb.keyboard) g_usb.keyboard = ep;
-        if (ep->kind != 1 && (!g_usb.pointer || (g_usb.pointer->kind == 2 && ep->kind == 3))) g_usb.pointer = ep;
+        if ((ep->kind == 2 || ep->kind == 3) && (!g_usb.pointer || (g_usb.pointer->kind == 2 && ep->kind == 3))) g_usb.pointer = ep;
         usb_interrupt_queue(d, ep);
-        usb_log(ep->kind == 1 ? "usb: HID keyboard" : ep->kind == 3 ? "usb: HID tablet" : "usb: HID mouse");
+        usb_log(ep->kind == 4 ? "usb: hub" : ep->kind == 1 ? "usb: HID keyboard" : ep->kind == 3 ? "usb: HID tablet" : "usb: HID mouse");
         usb_log(" port="); usb_number(d->port + 1);
         usb_log(" slot="); usb_number(d->slot);
         usb_log("\n");
+    }
+    if (d->hub_ports) {
+        for (unsigned p = 1; p <= d->hub_ports; p++)
+            if (usb_control(d, 0x23, 3, 8, p, 0) != 0) return 0; /* PORT_POWER */
+        usb_delay(100);
+        d->hub_pending = (1u << (d->hub_ports + 1)) - 1;
     }
     return 1;
 }
@@ -538,6 +603,167 @@ static void usb_release_device(struct usb_dev *d) {
         ep->repeat_usage = 0;
     }
 }
+static void usb_detach(struct usb_dev *d) {
+    if (!d->present) return;
+    /* Children must be disabled before their hub's slot can be reused. */
+    for (unsigned i = 0; i < g_usb.device_count; i++)
+        if (g_usb.devices[i].present && g_usb.devices[i].parent == d)
+            usb_detach(&g_usb.devices[i]);
+    usb_release_device(d);
+    d->present = d->configured = 0;
+    if (d->slot) {
+        if (d->hc->running &&
+            usb_command(d->hc, 0, USB_TRB(10) | d->slot << 24) == USB_CC_OK) {
+            usb_events(d->hc);
+            d->hc->dcbaa[d->slot] = 0;
+            usb_dma_sync(d->hc->dcbaa + d->slot, 8, 0);
+            d->slot = 0;
+        } else d->quarantined = 1;
+    }
+    d->parent = NULL;
+    g_usb.detaches++;
+}
+static void usb_select_owners(void) {
+    if (!usb_keyboard_ready()) g_usb.keyboard = NULL;
+    if (!usb_pointer_ready()) g_usb.pointer = NULL;
+    for (unsigned i = 0; i < g_usb.device_count; i++) {
+        struct usb_dev *d = &g_usb.devices[i];
+        if (!d->present || !d->configured || !d->hc->running) continue;
+        for (unsigned j = 0; j < d->ep_count; j++) {
+            struct usb_ep *ep = &d->ep[j];
+            if (!ep->active) continue;
+            if (ep->kind == 1 && !g_usb.keyboard) g_usb.keyboard = ep;
+            if ((ep->kind == 2 || ep->kind == 3) &&
+                (!g_usb.pointer || (g_usb.pointer->kind == 2 && ep->kind == 3))) {
+                g_usb.pointer = ep;
+                g_usb.buttons = g_usb.wheel = 0;
+            }
+        }
+    }
+}
+static struct usb_dev *usb_child(struct usb_hc *hc, struct usb_dev *parent, unsigned port) {
+    for (unsigned i = 0; i < g_usb.device_count; i++) {
+        struct usb_dev *d = &g_usb.devices[i];
+        if (d->present && d->hc == hc && d->parent == parent &&
+            (parent ? d->parent_port == port : d->port == port)) return d;
+    }
+    return NULL;
+}
+static void usb_attach(struct usb_hc *hc, struct usb_dev *parent,
+                       unsigned port, unsigned speed) {
+    struct usb_dev *d = NULL;
+    for (unsigned i = 0; i < USB_DEVS; i++)
+        if (!g_usb.devices[i].present && !g_usb.devices[i].quarantined) {
+            d = &g_usb.devices[i];
+            if (i >= g_usb.device_count) g_usb.device_count = i + 1;
+            break;
+        }
+    if (!d) { g_usb.rejected++; return; }
+    uint8_t *dma = d->dma;
+    if (!dma) dma = usb_dma_alloc(USB_DEVICE_DMA, 4096);
+    if (!dma) { g_usb.errors++; return; }
+    usb_zero(d, sizeof(*d));
+    d->dma = dma; d->hc = hc; d->parent = parent;
+    d->port = parent ? parent->port : port;
+    d->parent_port = parent ? port : 0;
+    d->speed = speed; d->present = 1;
+    if (parent) {
+        d->route = parent->route | port << (parent->depth * 4);
+        d->depth = parent->depth + 1;
+        /* A LS/FS descendant uses the first upstream high-speed hub's TT,
+         * including when intervening full-speed hubs are present. */
+        if (speed <= 2) {
+            if (parent->speed == 3) { d->tt_slot = parent->slot; d->tt_port = port; }
+            else { d->tt_slot = parent->tt_slot; d->tt_port = parent->tt_port; }
+        }
+    }
+    if (!speed || !usb_enumerate(d)) {
+        usb_log("usb: rejected device root="); usb_number(d->port + 1);
+        usb_log(" route="); usb_number(d->route);
+        usb_log(" control="); usb_number(d->control_code); usb_log("\n");
+        g_usb.rejected++;
+        usb_detach(d);
+    } else g_usb.attaches++;
+}
+static int usb_hub_status(struct usb_dev *hub, unsigned port, uint32_t *status) {
+    if (usb_control(hub, 0xa3, 0, 0, port, 4) != 4) return 0;
+    *status = usb_le16(hub->buffer) | (uint32_t)usb_le16(hub->buffer + 2) << 16;
+    return 1;
+}
+static void usb_port_ack(struct usb_hc *hc, struct usb_dev *hub,
+                          unsigned port, uint32_t status) {
+    if (hub) {
+        for (unsigned bit = 0; bit < 5; bit++)
+            if (status & (1u << (16 + bit)))
+                (void)usb_control(hub, 0x23, 1, 16 + bit, port, 0);
+    } else if (status & (0x7fu << 17)) {
+        usb_w32(hc->op, 0x400 + port * 16, status & ~(2u | (1u << 4) | (1u << 31)));
+    }
+}
+static unsigned usb_hub_reset(struct usb_dev *hub, unsigned port) {
+    if (usb_control(hub, 0x23, 3, 4, port, 0) != 0) return 0;
+    uint64_t end = usb_deadline(1000);
+    uint32_t status = 0;
+    do {
+        usb_delay(10);
+        if (!usb_hub_status(hub, port, &status) || !(status & 1)) return 0;
+        if (!(status & 16) && (status & 2)) {
+            usb_port_ack(hub->hc, hub, port, status);
+            usb_delay(10); /* USB2 reset recovery */
+            return status & (1u << 9) ? 2 : status & (1u << 10) ? 3 : 1;
+        }
+    } while (usb_now() < end);
+    return 0;
+}
+static void usb_scan_port(struct usb_hc *hc, struct usb_dev *hub,
+                          unsigned port, uint32_t status, int boot) {
+    struct usb_port_state *s = hub ? &hub->children[port - 1] : &hc->root[port];
+    struct usb_dev *child = usb_child(hc, hub, port);
+    int connected = !!(status & 1);
+    int changed = !!(status & (1u << (hub ? 16 : 17)));
+    if (child && (!connected || changed)) usb_detach(child);
+    usb_port_ack(hc, hub, port, status);
+    if (!connected) { usb_zero(s, sizeof(*s)); return; }
+    if (!s->connected || changed) {
+        s->connected = 1; s->attempted = 0;
+        s->ready_at = usb_deadline(100); /* debounce without blocking frames */
+    }
+    if (usb_child(hc, hub, port) || s->attempted || (!boot && usb_now() < s->ready_at)) return;
+    s->attempted = 1; /* one attempt per connection, including unsupported devices */
+    unsigned speed = 0;
+    if (hub) speed = usb_hub_reset(hub, port);
+    else if (usb_port_reset(hc, port)) {
+        uint32_t sc = usb_r32(hc->op, 0x400 + port * 16);
+        speed = (sc >> 10) & 15;
+        usb_port_ack(hc, NULL, port, sc);
+    }
+    if (speed) usb_attach(hc, hub, port, speed);
+    else g_usb.rejected++;
+}
+static void usb_scan_topology(int boot) {
+    for (unsigned i = 0; i < g_usb.controllers; i++) {
+        struct usb_hc *hc = &g_usb.hc[i];
+        if (!hc->running) continue;
+        for (unsigned port = 0; port < hc->ports && hc->running; port++)
+            usb_scan_port(hc, NULL, port, usb_r32(hc->op, 0x400 + port * 16), boot);
+    }
+    for (unsigned i = 0; i < g_usb.device_count; i++) {
+        struct usb_dev *hub = &g_usb.devices[i];
+        if (!hub->present || !hub->configured || !hub->hub_ports || !hub->hc->running) continue;
+        unsigned pending = hub->hub_pending;
+        hub->hub_pending = 0;
+        int rescan = boot || usb_now() >= hub->hub_rescan_at;
+        if (rescan) hub->hub_rescan_at = usb_deadline(1000);
+        for (unsigned port = 1; port <= hub->hub_ports; port++) {
+            struct usb_port_state *s = &hub->children[port - 1];
+            if (!rescan && !(pending & (1u << port)) && !(s->connected && !s->attempted)) continue;
+            uint32_t status;
+            if (!usb_hub_status(hub, port, &status)) { hub->failed = 0x103; break; }
+            usb_scan_port(hub->hc, hub, port, status, boot);
+        }
+    }
+    usb_select_owners();
+}
 static void usb_poll(void) {
     if (g_usb.busy) return;
     g_usb.busy = 1;
@@ -549,19 +775,22 @@ static void usb_poll(void) {
         }
         usb_events(hc);
     }
-    /* Handle unplug/failure even though new-device hotplug is not implemented.
-     * Release held keys and pointer buttons before returning to VirtIO. */
+    /* Failures release held input and quarantine memory if Disable Slot cannot
+     * finish. Root/hub disconnects are handled by the topology scan. */
     for (unsigned i = 0; i < g_usb.device_count; i++) {
         struct usb_dev *d = &g_usb.devices[i];
         if (!d->present || !d->configured) continue;
-        int failed = !d->hc->running || !(usb_r32(d->hc->op, 0x400 + d->port * 16) & 1);
+        int failed = !d->hc->running || d->failed;
         for (unsigned j = 0; j < d->ep_count; j++) failed |= d->ep[j].failed != 0;
         if (failed) {
-            usb_release_device(d);
-            d->present = 0;
-            if (d->hc->running) usb_command(d->hc, 0, USB_TRB(10) | d->slot << 24);
+            usb_detach(d);
         }
     }
+    if (usb_now() >= g_usb.topology_at) {
+        g_usb.topology_at = usb_deadline(100);
+        usb_scan_topology(0);
+    }
+    usb_select_owners();
     if (usb_keyboard_ready() && g_usb.keyboard->repeat_usage && usb_now() >= g_usb.keyboard->repeat_at) {
         usb_key(g_usb.keyboard->repeat_usage, 1);
         g_usb.keyboard->repeat_at = usb_deadline(35);
@@ -597,26 +826,12 @@ static void usb_init(uint64_t hhdm, unsigned width, unsigned height,
             usb_log("usb: xHCI running ports="); usb_number(hc->ports);
             usb_log(" slots="); usb_number(hc->slots); usb_log("\n");
             usb_delay(20);
-            for (unsigned port = 0; port < hc->ports && g_usb.device_count < USB_DEVS; port++) {
-                if (!(usb_r32(hc->op, 0x400 + port * 16) & 1)) continue;
-                if (!usb_port_reset(hc, port)) { g_usb.errors++; continue; }
-                struct usb_dev *d = &g_usb.devices[g_usb.device_count++];
-                d->hc = hc; d->port = port;
-                d->speed = (usb_r32(hc->op, 0x400 + port * 16) >> 10) & 15;
-                d->present = 1;
-                if (!d->speed || !usb_enumerate(d)) {
-                    d->failed = d->failed ? d->failed : 1;
-                    /* Disable the slot before abandoning buffers. Never free
-                     * DMA memory which a failed controller might still own. */
-                    if (d->slot && hc->running) usb_command(hc, 0, USB_TRB(10) | d->slot << 24);
-                    usb_release_device(d);
-                    d->present = 0; g_usb.errors++;
-                    usb_log("usb: device unsupported/failed port="); usb_number(port + 1);
-                    usb_log(" control="); usb_number(d->control_code); usb_log("\n");
-                }
-            }
         }
     }
+    g_usb.busy = 1;
+    usb_scan_topology(1);
+    g_usb.topology_at = usb_deadline(100);
+    g_usb.busy = 0;
     usb_log("usb: owners keyboard="); usb_log(usb_keyboard_ready() ? "usb" : "virtio/serial");
     usb_log(" pointer="); usb_log(usb_pointer_ready() ? "usb" : "virtio"); usb_log("\n");
 }

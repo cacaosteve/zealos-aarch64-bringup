@@ -91,10 +91,31 @@ not establish physical host capture/release behavior in the UTM application.
 Serial Terminal 1 remains available throughout. `usbcheck` is a serial-only
 diagnostic for bounded No-Op command ring cycling.
 
-Scope: root-port HID devices on emulated NEC/QEMU xHCI, polled without MSI.
-Unsupported HID layouts do not claim input. Disconnect/failure releases USB
-ownership and held input, but newly attached devices and hub children are
-not enumerated yet. No Pi or physical USB controller acceptance is implied.
+`make check-usb-topology` adds USB2 hub trees (two tiers on NEC, five on
+QEMU), twelve keyboard disconnect/reconnect cycles, held-Shift removal,
+held-button tablet removal with mouse fallback, and whole-subtree detach
+and reattach. It checks visible typing after recovery and constant DMA usage.
+
+Scope: HID input on emulated NEC/QEMU xHCI, polled without MSI. USB 1.x/2.0
+hubs support up to fifteen ports and five tiers within the eight-device
+limit. Unsupported HID layouts and SuperSpeed hubs do not claim input.
+Disconnect/failure releases USB ownership and held input. Safe slot teardown
+allows record/DMA reuse; failed teardown quarantines the region. No Pi or
+physical USB controller acceptance is implied.
+
+2026-10-17 topology gates passed on NEC root ports, NEC with two nested hubs
+and VirtIO recovery, and USB-only QEMU with five nested hubs (all eight device
+records occupied). Each run replaced the keyboard twelve times and checked
+visible typing after recovery without DMA growth. Tablet removal released a
+held button and selected the remaining mouse. Both hub runs removed and
+rebuilt the entire subtree, restored visible typing, and finished with zero
+USB errors or quarantined regions. The NEC hub run also saved, compiled and
+ran an edited function, rebooted, and reopened its persisted source.
+The refreshed live UTM guest retained USB 3.0, display and serial settings,
+showed `help` before Return, and executed graphical `zstatus` with native
+keyboard/tablet owners, two running controllers, zero quarantined regions
+and zero dropped routed keys. Capture was released. Physical typing and
+dragging on this topology build are awaiting the user's confirmation.
 
 2026-10-17 live UTM: USB 3.0, display and built-in Terminal 1 settings were
 preserved. The guest reported two running controllers (`error=0`), three

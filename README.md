@@ -16,6 +16,7 @@ make check-compat       # disposable ISO guest + old boot regressions
 make check-compat-pci   # disposable UTM-shaped GPT/PCI disk guest
 make check-gui-workflow # visible typing/cursors + graphical edit/save/run/reboot
 make check-usb-input    # native NEC/QEMU xHCI keyboard, mouse/tablet + recovery
+make check-usb-topology # nested USB2 hubs, repeated reconnects + subtree recovery
 make utm               # refresh VM, preserving RedSea/source edits and adding new bundled files
 ```
 
@@ -31,9 +32,12 @@ as recovery input, with their transports parked while USB is active and
 reinitialized on disconnect/failure. Terminal 1
 serial input stays independent. `zstatus` reports the selected owners, raw
 USB events, controller state and errors; serial `usbcheck` exercises command
-and event ring wraparound. This first USB backend supports boot keyboards
-and unnumbered HID mouse/tablet reports on root ports. Hub enumeration,
-new-device hotplug, USB storage and Pi's PCIe/VL805 backend remain future work.
+and event ring wraparound. This USB backend supports boot keyboards and
+unnumbered HID mouse/tablet reports on root ports or behind USB 1.x/2.0 hubs.
+Port-change polling debounces new connections, removes hub subtrees, and
+reuses reserved per-device DMA only after successful slot teardown. Limits
+are eight devices, fifteen ports per hub and five hub tiers. SuperSpeed hubs,
+USB storage and Pi's PCIe/VL805 backend remain future work.
 
 At the UTM prompt, run `zcheck`. Expected: `zc: upstream QuickSort + persistent
 modules OK`. Use `zc` for declarations/statements, `zload` for a source file in the

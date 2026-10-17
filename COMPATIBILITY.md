@@ -2319,15 +2319,20 @@ QEMU [activates the VirtIO host handler](https://github.com/qemu/qemu/blob/v10.0
 at DRIVER_OK, so discarding its events
 alone can starve USB of host keys. Disconnect/failure releases held keys/buttons,
 reinitializes the parked VirtIO queues and returns ownership
-to the recovery path. New-device hotplug and hub children are not implemented.
+to the recovery path. Root-port and USB2 hub changes are polled with a 100 ms
+connect debounce; hub interrupt bitmaps trigger scans, backed by a periodic
+status scan. Descendant slots are disabled before removing a hub.
 
 `src/usb_platform.h` provides width-correct MMIO, explicit HHDM-to-physical
 DMA addresses, cache maintenance/barriers, bounded timer waits, firmware BAR
 mapping and reserved DMA allocation. It is intentionally a QEMU virt root-bus
 backend; it does not configure a physical PCIe bridge or an IOMMU. The driver
-supports two emulated controllers, eight devices, four HID IN endpoints per
-device, 4 KiB controller pages and up to 32 scratchpads. All DMA memory stays
-reserved after failures. `src/usb_xhci.h` adapts YDE's polled ring and
+supports two emulated controllers, eight devices, four interrupt IN endpoints per
+device, 4 KiB controller pages and up to 32 scratchpads. A 1 MiB reserved DMA
+arena supplies a 48 KiB region per device record. Disable Slot completion
+and event draining allow that region to be reused on reconnect; uncertain
+teardown quarantines it. Controller-owned allocations remain reserved.
+`src/usb_xhci.h` adapts YDE's polled ring and
 enumeration behavior; `src/usb_hid.h` isolates bounded report decoding from
 hardware access. Unsupported layouts (including report IDs) are rejected.
 
@@ -2366,9 +2371,12 @@ Port sequence and remaining gates:
 3. NEC/QEMU keyboard, relative mouse, tablet, button/wheel, focus and recovery
    gates exercise the native path. Live UTM mixed-case typing/editor use and
    the physical released-pointer/drag check were accepted on 2026-10-17.
-   Continue with hub enumeration and new-device hotplug; expand HID reports
-   and lock-key/LED handling beyond the shared US-layout Shift/Ctrl/navigation
-   decoder as needed.
+   USB 1.x/2.0 hub routing, new-device hotplug, subtree teardown and safe DMA
+   reuse are implemented with a separate topology gate. Hubs are bounded to
+   fifteen ports and five tiers. The first upstream high-speed hub supplies
+   TT routing for LS/FS descendants; physical high-speed TT acceptance is
+   still pending. SuperSpeed hubs and expanded HID reports/lock-key LEDs
+   remain work beyond the shared US-layout Shift/Ctrl/navigation decoder.
 4. Add the Pi 4B platform backend for its BCM2711 PCIe host bridge and VL805
    xHCI controller. Validate firmware handoff, DMA windows/cache behavior,
    register access widths, and physical keyboard/mouse operation separately.

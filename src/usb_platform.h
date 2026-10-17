@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#define USB_DMA_BYTES (512u * 1024u)
+#define USB_DMA_BYTES (1024u * 1024u)
 static uint8_t usb_dma_memory[USB_DMA_BYTES] __attribute__((aligned(4096)));
 static size_t usb_dma_used;
 static uint64_t usb_hhdm, usb_counter_hz;

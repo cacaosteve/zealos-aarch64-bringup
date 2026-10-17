@@ -515,7 +515,7 @@ check-page-tables: | $(BUILD)
 	$(HOST_CC) -std=c11 -Wall -Wextra -Wno-unused-function tests/mmio_map_test.c -o $(BUILD)/mmio-map-test
 	$(BUILD)/mmio-map-test
 
-.PHONY: check-usb-hid check-usb-input
+.PHONY: check-usb-hid check-usb-input check-usb-topology
 check-usb-hid: | $(BUILD)
 	$(HOST_CC) -std=c11 -Wall -Wextra -fsanitize=address,undefined tests/usb_hid_test.c -o $(BUILD)/usb-hid-test
 	$(BUILD)/usb-hid-test
@@ -525,6 +525,11 @@ check-usb-input: check-usb-hid check-upstream esp
 	python3 scripts/check-compat.py --usb-input qemu
 	python3 scripts/check-compat.py --usb-input nec --usb-pointer mouse
 	python3 scripts/check-compat.py --usb-input nec --usb-with-virtio
+
+check-usb-topology: check-usb-hid check-upstream esp
+	python3 scripts/check-compat.py --usb-input nec --usb-with-virtio --usb-hotplug
+	python3 scripts/check-compat.py --usb-input nec --usb-with-virtio --usb-hubs 2 --usb-hotplug --probe-gui-workflow
+	python3 scripts/check-compat.py --usb-input qemu --usb-hubs 5 --usb-hotplug
 
 check-serial: check-page-tables iso $(FW_VARS) $(RS_IMG)
 	@rm -f $(BUILD)/check-serial.log

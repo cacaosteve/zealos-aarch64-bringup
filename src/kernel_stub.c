@@ -4658,8 +4658,14 @@ static void zc_print_decimal(uint64_t value) {
 }
 
 void zc_usb_status(void) {
+    unsigned devices = 0, hubs = 0, quarantined = 0;
+    for (unsigned i = 0; i < g_usb.device_count; i++) {
+        devices += !!g_usb.devices[i].present;
+        hubs += g_usb.devices[i].present && g_usb.devices[i].hub_ports != 0;
+        quarantined += !!g_usb.devices[i].quarantined;
+    }
     con_puts("usb_input: controllers="); zc_print_decimal(g_usb.controllers);
-    con_puts(" devices="); zc_print_decimal(g_usb.device_count);
+    con_puts(" devices="); zc_print_decimal(devices);
     con_puts(" keyboard="); con_puts(usb_keyboard_ready() ? "usb" : "virtio/serial");
     con_puts(" pointer="); con_puts(usb_pointer_ready() ?
         (g_usb.pointer->kind == 3 ? "usb-tablet" : "usb-mouse") : "virtio");
@@ -4668,6 +4674,20 @@ void zc_usb_status(void) {
     con_puts(" wheel_events="); zc_print_decimal(g_usb.wheel_events);
     con_puts(" errors="); zc_print_decimal(g_usb.errors);
     con_puts(" dma_bytes="); zc_print_decimal(usb_dma_used); con_puts("\n");
+    con_puts("usb_topology: hubs="); zc_print_decimal(hubs);
+    con_puts(" attaches="); zc_print_decimal(g_usb.attaches);
+    con_puts(" detaches="); zc_print_decimal(g_usb.detaches);
+    con_puts(" rejected="); zc_print_decimal(g_usb.rejected);
+    con_puts(" quarantined="); zc_print_decimal(quarantined); con_puts("\n");
+    for (unsigned i = 0; i < g_usb.device_count; i++) {
+        struct usb_dev *d = &g_usb.devices[i];
+        if (!d->present) continue;
+        con_puts("usb_device: root="); zc_print_decimal(d->port + 1);
+        con_puts(" route="); zc_print_decimal(d->route);
+        con_puts(" depth="); zc_print_decimal(d->depth);
+        con_puts(" speed="); zc_print_decimal(d->speed);
+        con_puts(" hub_ports="); zc_print_decimal(d->hub_ports); con_puts("\n");
+    }
     for (unsigned i = 0; i < g_usb.controllers; i++) {
         struct usb_hc *hc = &g_usb.hc[i];
         con_puts("xhci: index="); zc_print_decimal(i);

@@ -3574,12 +3574,16 @@ on 2026-10-17 have these SHA-256 hashes:
 | `KXhci.ZC` | `4bc67c3a03826c81e7a17679b8a9704669716aba92c0884d88caef738a741b81` |
 | `KUsbCore.ZC` | `8053b26c436bf409a00152c88b20187fa8ed6b92cc9e03300434ae592183e2e4` |
 | `KUsbHid.ZC` | `4976e40f8cdc8929f0662a57aed40571e97bac1109b2fe88a18d1b5baa2f679a` |
+| `KUsbHub.ZC` | `5211351ca1d5406e7df6867210f274b6ff3a317231763ee0ce26e96aff0b0173` |
 
 YDE's x86 identity/uncached pointers are replaced by explicit ARM64 DMA
 translation, cache maintenance, Device mappings and split 32-bit register
 accesses. References for the emulated register/ring behavior are
 [QEMU's xHCI model](https://github.com/qemu/qemu/blob/v10.0.0/hw/usb/hcd-xhci.c)
 and the [Linux xHCI register definitions](https://github.com/torvalds/linux/blob/v6.12/drivers/usb/host/xhci.h).
+The hub adaptation adds bounded status-change polling, safe descendant
+teardown and reusable device DMA to YDE's initial hub attach/routing logic.
+Tests use QEMU's documented [physical port paths and device hotplug](https://www.qemu.org/docs/master/system/devices/usb.html#physical-port-addressing).
 
 ## Acceptance
 
