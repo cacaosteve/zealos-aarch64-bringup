@@ -247,7 +247,15 @@ Bool BootstrapGuiTerminalEditFile(U8 *path)
     }
     doc->desc = 'Edit';
     if (*doc->filename.name)
+    {
         doc->filename.dirc = DirContextNew(doc->filename.name);
+        if (!doc->filename.dirc)
+        {
+            DocDel(doc);
+            SettingsPop;
+            return FALSE;
+        }
+    }
     // This task is already running under the boot WinMgr redraw pump. Waiting
     // synchronously for two additional manager refreshes can starve its shell
     // task on the bootstrap scheduler; let the regular frame path redraw it.

@@ -30,6 +30,8 @@ p.add_argument('--probe-gui-workflow', action='store_true',
                help='verify visible graphical editing, save/compile/run, and reopen after reboot')
 p.add_argument('--probe-task-settings', action='store_true',
                help='check upstream application settings and task-local directories at normal desktop boot')
+p.add_argument('--probe-source-context', action='store_true',
+               help='check source-directory masks, project lookup and upstream relative document links')
 p.add_argument('--probe-winmgr', action='store_true',
                help='also try the unchanged WinMgr.ZC load with a short timeout after Win.ZC')
 p.add_argument('--probe-grscreen', action='store_true',
@@ -514,7 +516,18 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         command('zcall TaskCurrentDirectoryChecks', 'zc => 0x000000000000002a')
         command('zcall TaskSettingsRestoreChecks', 'zc => 0x000000000000002a')
         command('zcall TaskSettingsDocumentChecks', 'zc => 0x000000000000002a')
+        command('zload /Tests/SourceContext.ZC', 'zc: loaded /Tests/SourceContext.ZC')
+        command('zcall SourceContextMaskChecks', 'zc => 0x000000000000002a')
+        command('zcall SourceContextFailureChecks', 'zc => 0x000000000000002a')
+        command('zcall SourceContextFindChecks', 'zc => 0x000000000000002a')
+        command('zcall SourceContextTaskChecks', 'zc => 0x000000000000002a')
+        command('zcall SourceContextEditorFailureChecks', 'zc => 0x000000000000002a')
+        if args.pci:
+            command('zcall SourceContextProjectChecks', 'zc => 0x000000000000002a')
+            command('zcall SourceContextDocLinkChecks', 'zc => 0x000000000000002a')
         command('zstatus', 'failed=0')
+        if args.probe_source_context:
+            raise SystemExit(0)
         if args.probe_task_settings:
             # Relative zload uses the caller's directory, while #include is
             # resolved from the loaded source's directory by the compiler.

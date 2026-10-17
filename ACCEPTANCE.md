@@ -80,6 +80,11 @@ survive child exit. Relative file writes, loads and includes must work.
 Follow with `make check-gui-workflow` after changing the editor wrapper or text
 state: visible typing and the save/cancel/reopen paths must still pass.
 
+`make check-source-context` checks nested source-directory contexts, mask
+lists, task isolation, project-file lookup, and relative links through the
+unchanged upstream `DocLinkCheck`. The graphical editor must reject a missing
+parent directory and return with its saved settings restored.
+
 2026-10-17 application-state update: the focused settings gate passed 18
 checks, the full PCI suite passed 354, the ISO suite passed 277, and the NEC
 two-hub/VirtIO recovery workflow passed 157, including edit/save/run/reboot/reopen, twelve keyboard

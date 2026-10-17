@@ -33,6 +33,8 @@ extern U8 *FileRead(U8 *filename, I64 *_size=NULL, I64 *_attr=NULL);
 extern I64 FileWrite(U8 *filename, U8 *fbuf, I64 size, I64 cdt=0, I64 attr=0);
 extern Bool ZcSourceDirExists(U8 *path);
 extern U8 *ZcSourcePath(U8 *path);
+extern Bool Cd(U8 *dirname=NULL, Bool make_dirs=FALSE);
+extern U8 *DirCur(CTask *task=NULL, CTask *mem_task=NULL);
 extern Bool ZcSourceFileAt(I64 index, U8 *path, I64 path_cap, I64 *_size);
 extern Bool FilesFindMatch(U8 *test_name, U8 *files_find_mask,
                            I64 fuf_flags=0);
@@ -1343,28 +1345,122 @@ U8 *Char2KeyName(I64 ch, Bool include_ctrl=TRUE)
     if (include_ctrl) {}
     return StrNew("");
 }
-CDirContext *DirContextNew(U8 *mask, Bool make_mask=FALSE,
-                           Bool make_dirs=FALSE, Bool no_warn=FALSE)
-{
-    if (!mask)
-        return NULL;
-    if (make_mask) {}
-    if (make_dirs) {}
-    if (no_warn) {}
-    return CAlloc(sizeof(CDirContext));
-}
 U0 DirContextDel(CDirContext *dirc, Bool restore=TRUE)
 {
-    if (restore) {}
-    if (dirc)
-        Free(dirc);
+    if (!dirc)
+        return;
+    if (restore && dirc->old_dir)
+        Cd(dirc->old_dir);
+    Free(dirc->old_dir);
+    Free(dirc->mask);
+    Free(dirc);
 }
-U8 *DirFile(U8 *dirname, U8 *name=NULL, U8 *ext=NULL)
-{
-    if (dirname) {}
-    if (name) {}
-    if (ext) {}
-    return NULL;
+CDirContext *DirContextNew(U8 *_mask, Bool make_mask=FALSE,
+                           Bool make_dirs=FALSE, Bool no_mask=FALSE)
+{//DiskDirContext semantics for the bootstrap source namespace, without drives.
+    CDirContext *dirc;
+    U8 *clean, *absolute, *last, *alternatives = NULL, *leaf;
+    I64 i, len = 0;
+    Bool directory;
+
+    if (!_mask || StrLen(_mask) > 255)
+        return NULL;
+    clean = StrNew(_mask);
+    // DiskDirContext uses MStrUtil to trim whitespace and remove controls.
+    // That upstream string module is not loaded into this bridge yet.
+    i = 0;
+    while (_mask[i] == ' ' || _mask[i] == '\t')
+        i++;
+    while (_mask[i])
+    {
+        if (_mask[i] >= CH_SPACE)
+            clean[len++] = _mask[i];
+        i++;
+    }
+    while (len && clean[len - 1] == ' ')
+        len--;
+    clean[len] = 0;
+    // Home and ZealOS drive letters need real mounted-drive services.
+    if (clean[0] == '~')
+    {
+        Free(clean);
+        return NULL;
+    }
+    if (!no_mask && (alternatives = StrMatch(";", clean)))
+        *alternatives++ = 0;
+    len = StrLen(clean);
+    directory = no_mask || !len || clean[len - 1] == '/';
+    if (len)
+        absolute = ZcSourcePath(clean);
+    else
+        absolute = DirCur;
+    if (!absolute)
+    {
+        Free(clean);
+        return NULL;
+    }
+    dirc = CAlloc(sizeof(CDirContext));
+    dirc->old_dir = DirCur;
+    dirc->old_dv = dirc->drive = Fs->cur_dv;
+    if (directory)
+        leaf = "";
+    else
+    {
+        // Split before normalization: "." and ".." are masks until the
+        // make_mask directory probe, not components of the parent path.
+        last = StrLastOcc(clean, "/");
+        if (last)
+        {
+            dirc->mask = StrNew(last + 1);
+            if (last == clean || (last == clean + 5 && clean[4] == ':'))
+                last[1] = 0;
+            else
+                *last = 0;
+            Free(absolute);
+            absolute = ZcSourcePath(clean);
+        }
+        else if (StrMatch("disk:", clean) == clean)
+        {
+            dirc->mask = StrNew(clean + 5);
+            absolute[6] = 0;
+        }
+        else
+        {
+            dirc->mask = StrNew(clean);
+            Free(absolute);
+            absolute = DirCur;
+        }
+    }
+    if (!dirc->mask)
+        dirc->mask = StrNew(leaf);
+    if (alternatives)
+    {
+        leaf = MStrPrint("%s;%s", dirc->mask, alternatives);
+        Free(dirc->mask);
+        dirc->mask = leaf;
+    }
+    if (!Cd(absolute, make_dirs))
+    {
+        DirContextDel(dirc);
+        dirc = NULL;
+    }
+    else if (make_mask)
+    {
+        if (!*dirc->mask || Cd(dirc->mask, make_dirs))
+        {
+            Free(dirc->mask);
+            dirc->mask = StrNew("*");
+        }
+    }
+    Free(absolute);
+    Free(clean);
+    return dirc;
+}
+U8 *DirNameAbs(U8 *dirname)
+{//The source namespace has canonical absolute paths, without drive letters.
+    if (dirname && !*dirname)
+        return DirCur;
+    return ZcSourcePath(dirname);
 }
 Bool FileNameCheck(U8 *filename)
 {
@@ -1585,6 +1681,70 @@ U8 *FileNameAbs(U8 *filename, I64 fuf_flags=0)
                                   sizeof(resolved), &size))
             return StrNew(resolved);
     return ZcSourcePath(filename);
+}
+U8 *DirFile(U8 *dirname, U8 *name=NULL, U8 *_extension=NULL)
+{//DiskStrA's upward project-file lookup in the bootstrap source namespace.
+    U8 *dir = DirNameAbs(dirname), *parent, *leaf, *res, *fallback = NULL, *ext;
+    Bool root;
+
+    if (!dir)
+        return NULL;
+    if (_extension && *_extension)
+    {
+        if (*_extension == '.')
+            ext = StrNew(_extension);
+        else
+            ext = MStrPrint(".%s", _extension);
+    }
+    else
+        ext = StrNew("");
+    while (TRUE)
+    {
+        root = !StrCompare(dir, "/") || !StrCompare(dir, "disk:/");
+        parent = StrNew(dir);
+        leaf = StrLastOcc(parent, "/");
+        *leaf++ = 0;
+        if (ZcSourceDirExists(dir))
+        {
+            if (!name && !*ext)
+                res = StrNew(dir);
+            else if (root)
+            {
+                if (name)
+                    res = MStrPrint("%s%s%s", dir, name, ext);
+                else
+                    res = MStrPrint("%s%s", dir, ext);
+            }
+            else if (name)
+                res = MStrPrint("%s/%s%s", dir, name, ext);
+            else
+                res = MStrPrint("%s/%s%s", dir, leaf, ext);
+            if (!fallback)
+                fallback = StrNew(res);
+            if ((!*ext && (!name || !*name)) || FileFind(res))
+            {
+                Free(fallback);
+                Free(parent);
+                Free(dir);
+                Free(ext);
+                return res;
+            }
+            Free(res);
+        }
+        Free(dir);
+        if (root)
+        {
+            Free(parent);
+            break;
+        }
+        if (!*parent)
+            StrCopy(parent, "/");
+        else if (!StrCompare(parent, "disk:"))
+            StrCopy(parent, "disk:/");
+        dir = parent;
+    }
+    Free(ext);
+    return fallback;
 }
 Bool BootstrapFilesFindAppend(CDirEntry **head, CDirEntry **tail,
                               U8 *full_name, I64 size, Bool is_dir,

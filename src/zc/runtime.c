@@ -4611,6 +4611,8 @@ static int load_source_path(const char *path, int merged) {
         PrsBindCSymbol("FileWrite", host_file_write, 5);
         PrsBindCSymbol("ZcSourceDirExists", host_file_dir_exists, 1);
         PrsBindCSymbol("ZcSourcePath", host_source_path, 1);
+        PrsBindCSymbol("Cd", host_cd, 2);
+        PrsBindCSymbol("DirCur", host_dir_cur, 2);
         PrsBindCSymbol("ZcSourceFileAt", host_source_file_at, 4);
         PrsBindCSymbol("LowPass1", host_low_pass1, 4);
         /* These functions were pre-registered before TaskBridge introduced

@@ -1,0 +1,188 @@
+// Exercise contexts through application file/link APIs, not just path strings.
+Bool SourceContextPathIs(U8 *actual, U8 *expected)
+{
+    Bool result = actual && !StrCompare(actual, expected);
+    Free(actual);
+    return result;
+}
+
+I64 SourceContextMaskChecks()
+{
+    U8 *original = DirCur;
+    CDirContext *outer, *inner;
+    if (!original || !Cd("/LICENSE")) return 1;
+    outer = DirContextNew(" \t/Tests/*.ZC;*.HH \r\n", TRUE);
+    if (!outer || StrCompare(outer->old_dir, "/LICENSE") ||
+        StrCompare(outer->mask, "*.ZC;*.HH") ||
+        StrCompare(Fs->cur_dir, "/Tests")) return 2;
+    inner = DirContextNew("../Kernel/KernelA.HH");
+    if (!inner || StrCompare(inner->mask, "KernelA.HH") ||
+        StrCompare(Fs->cur_dir, "/Kernel")) return 3;
+    DirContextDel(inner);
+    if (StrCompare(Fs->cur_dir, "/Tests")) return 4;
+    DirContextDel(outer);
+    if (StrCompare(Fs->cur_dir, "/LICENSE")) return 5;
+    outer = DirContextNew("/Kernel", TRUE);
+    if (!outer || StrCompare(outer->mask, "*") ||
+        StrCompare(Fs->cur_dir, "/Kernel")) return 6;
+    DirContextDel(outer);
+    outer = DirContextNew("/Tests/");
+    if (!outer || *outer->mask || StrCompare(Fs->cur_dir, "/Tests")) return 7;
+    DirContextDel(outer);
+    outer = DirContextNew("/Tests", FALSE, FALSE, TRUE);
+    if (!outer || *outer->mask || StrCompare(Fs->cur_dir, "/Tests")) return 8;
+    DirContextDel(outer, FALSE);
+    if (StrCompare(Fs->cur_dir, "/Tests")) return 9;
+    outer = DirContextNew(".");
+    if (!outer || StrCompare(outer->mask, ".") ||
+        StrCompare(Fs->cur_dir, "/Tests")) return 11;
+    DirContextDel(outer);
+    outer = DirContextNew("/Kernel/..");
+    if (!outer || StrCompare(outer->mask, "..") ||
+        StrCompare(Fs->cur_dir, "/Kernel")) return 12;
+    DirContextDel(outer);
+    if (!Cd(original)) return 10;
+    Free(original);
+    return 42;
+}
+
+I64 SourceContextFailureChecks()
+{
+    U8 *original = DirCur;
+    CDirContext *context;
+    if (!original || !Cd("/Tests")) return 1;
+    if (DirContextNew(NULL) || DirContextNew("/MissingContextDir/File.ZC") ||
+        DirContextNew("/MissingContextDir", FALSE, TRUE, TRUE) ||
+        DirContextNew("~/UnsupportedHome") || DirContextNew("Z:File.ZC") ||
+        DirContextNew("/Tests/*.ZC", FALSE, FALSE, TRUE) ||
+        StrCompare(Fs->cur_dir, "/Tests")) return 2;
+    context = DirContextNew("", TRUE);
+    if (!context || StrCompare(context->mask, "*") ||
+        StrCompare(Fs->cur_dir, "/Tests")) return 3;
+    DirContextDel(context);
+    context = DirContextNew("/NewContextFile.ZC");
+    if (!context || StrCompare(context->mask, "NewContextFile.ZC") ||
+        StrCompare(Fs->cur_dir, "/")) return 4;
+    DirContextDel(context);
+    context = DirContextNew("disk:Tests/TaskSettings.ZC");
+    if (!context || StrCompare(context->mask, "TaskSettings.ZC") ||
+        StrCompare(Fs->cur_dir, "/Tests")) return 5;
+    DirContextDel(context);
+    context = DirContextNew("disk:NewContextFile.ZC");
+    if (!context || StrCompare(context->mask, "NewContextFile.ZC") ||
+        StrCompare(Fs->cur_dir, "/")) return 6;
+    DirContextDel(context);
+    if (!Cd(original)) return 7;
+    Free(original);
+    DirContextDel(NULL);
+    return 42;
+}
+
+I64 SourceContextFindChecks()
+{
+    CDirContext *context = DirContextNew("/Tests/*.ZC;*.HH", TRUE);
+    CDirEntry *entries, *de, *next;
+    Bool found = FALSE;
+    if (!context) return 1;
+    entries = FilesFind(context->mask, FUF_JUST_FILES);
+    for (de = entries; de; de = next)
+    {
+        next = de->next;
+        if (!StrCompare(de->full_name, "/Tests/TaskSettings.ZC"))
+            found = TRUE;
+        Free(de->full_name);
+        Free(de);
+    }
+    DirContextDel(context);
+    if (!found) return 2;
+    if (!SourceContextPathIs(DirFile("/Kernel/KernelA.HH"), "/Kernel") ||
+        !SourceContextPathIs(DirFile("/Kernel", NULL, "PRJ"),
+                             "/Kernel/Kernel.PRJ") ||
+        !SourceContextPathIs(DirFile("/"), "/")) return 3;
+    return 42;
+}
+
+I64 source_context_task_result;
+U0 SourceContextWorker(U8 *data)
+{
+    CDirContext *context = DirContextNew("/Kernel/*.HH", TRUE);
+    source_context_task_result = 1;
+    if (!context || StrCompare(context->old_dir, "/Tests")) return;
+    Yield;
+    if (StrCompare(Fs->cur_dir, "/Kernel") ||
+        !SourceContextPathIs(DirCur(Fs->parent_task), "/LICENSE")) return;
+    DirContextDel(context);
+    if (StrCompare(Fs->cur_dir, "/Tests")) return;
+    source_context_task_result = 42;
+}
+I64 SourceContextTaskChecks()
+{
+    U8 *original = DirCur;
+    CTask *child;
+    if (!original || !Cd("/Tests")) return 1;
+    if (!SourceContextPathIs(DirNameAbs(""), "/Tests")) return 2;
+    child = Spawn(&SourceContextWorker, NULL, "Directory context");
+    if (!child || !Cd("/LICENSE")) return 3;
+    while (TaskValidate(child)) Yield;
+    if (source_context_task_result != 42 ||
+        StrCompare(Fs->cur_dir, "/LICENSE")) return 4;
+    if (!Cd(original)) return 5;
+    Free(original);
+    return 42;
+}
+
+I64 SourceContextProjectChecks()
+{
+    U8 *original = DirCur;
+    if (FileWrite("/Tests/ContextProject/Child/Leaf.ZC", "// leaf\n", 8) != 8 ||
+        FileWrite("/Tests/ContextProject/Load.ZC", "// load\n", 8) != 8 ||
+        FileWrite("/Tests/ContextProject/ContextProject.PRJ", "// proj\n", 8) != 8)
+        return 1;
+    if (!Cd("/Tests/ContextProject/Child")) return 2;
+    if (!SourceContextPathIs(DirFile("Leaf.ZC", "Load", "ZC"),
+                             "/Tests/ContextProject/Load.ZC") ||
+        !SourceContextPathIs(DirFile("Leaf.ZC", NULL, ".PRJ"),
+                             "/Tests/ContextProject/ContextProject.PRJ") ||
+        !SourceContextPathIs(DirFile("Leaf.ZC", "Missing", "ZC"),
+                             "/Tests/ContextProject/Child/Missing.ZC")) return 3;
+    if (StrCompare(Fs->cur_dir, "/Tests/ContextProject/Child")) return 4;
+    if (!Cd(original)) return 5;
+    Free(original);
+    return 42;
+}
+
+I64 SourceContextEditorFailureChecks()
+{
+    U8 *original = DirCur;
+    CTaskSettings *settings = Fs->next_settings;
+    if (BootstrapGuiTerminalEditFile("/MissingContextDir/Unwritable.ZC")) return 1;
+    if (Fs->next_settings != settings ||
+        !SourceContextPathIs(DirCur, original)) return 2;
+    Free(original);
+    return 42;
+}
+
+I64 SourceContextDocLinkChecks()
+{
+    U8 *original = DirCur, *text = "relative document\n", *saved;
+    CDoc *doc;
+    I64 result = 42;
+    if (FileWrite("/Tests/ContextProject/Child/ReadMe.DD", text, StrLen(text)) != StrLen(text) ||
+        FileWrite("/Tests/ContextProject/Child/RelativeSibling.ZC", "// sibling\n", 11) != 11)
+        return 1;
+    if (!Cd("/LICENSE")) return 2;
+    doc = DocRead("/Tests/ContextProject/Child/ReadMe.DD");
+    if (!doc || StrCompare(Fs->cur_dir, "/LICENSE")) return 3;
+    saved = DocSave(doc);
+    if (!saved || StrCompare(saved, text)) return 4;
+    Free(saved);
+    // The unchanged upstream link checker must enter the document's directory,
+    // find its sibling there, and restore this task's unrelated working dir.
+    if (!DocLinkCheck(doc, "FI:RelativeSibling.ZC") ||
+        DocLinkCheck(doc, "FI:MissingRelativeSibling.ZC") ||
+        StrCompare(Fs->cur_dir, "/LICENSE")) result = 5;
+    DocDel(doc);
+    if (!Cd(original)) result = 6;
+    Free(original);
+    return result;
+}

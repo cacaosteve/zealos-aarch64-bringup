@@ -2443,3 +2443,49 @@ twelve keyboard reconnects, tablet removal/reattach, and hub subtree recovery.
 The live UTM refresh retained input/display/serial configuration, showed
 typing before Return, reopened the saved acceptance source, cancelled back to
 the terminal, and reported zero dropped routed keys or controller errors.
+
+## Source-directory contexts (2026-10-17)
+
+The earlier `DirContextNew` only allocated an empty structure, and `DirFile`
+always returned NULL. TaskBridge now adapts the directory/mask behavior of
+upstream [DiskDirContext.ZC](https://github.com/Zeal-Operating-System/ZealOS/blob/eee210f4379ba3d00b47507f336a158eefb2c993/src/Kernel/BlkDev/DiskDirContext.ZC)
+and the project lookup in [DiskStrA.ZC](https://github.com/Zeal-Operating-System/ZealOS/blob/eee210f4379ba3d00b47507f336a158eefb2c993/src/Kernel/BlkDev/DiskStrA.ZC)
+to the bootstrap source namespace. These are bridge implementations, not
+additional unchanged upstream modules.
+
+- Contexts own a copy of the caller's directory, enter the mask's parent,
+  retain semicolon-separated masks, support directory-to-`*` expansion and
+  `no_mask`, and restore/free their state on deletion. `restore=FALSE` keeps
+  the selected directory. A missing parent fails without changing the caller.
+- `DirNameAbs` returns an owned canonical source path; an empty name selects
+  the current directory. `DirFile` strips a filename, searches upward for a
+  named/project file, and returns the nearest default if none exists.
+- The unchanged `DocRead` and `DocLinkCheck` now enter their document's
+  directory. A sibling source link resolves even when the caller started in
+  an unrelated directory, then the caller's directory is restored. The
+  graphical editor refuses to open a file whose parent cannot be entered.
+- The loader binds `Cd` and `DirCur` when TaskBridge's declarations appear,
+  before KernelC is available. This also supports the staged subsystem-load
+  paths used by the compatibility harness.
+
+Mounted ZealOS drives, home expansion and directory creation still require
+the real block/filesystem subsystem. Contexts expose the existing source
+namespace, including its `disk:` spelling; they do not construct a `CDrive`
+or claim a RedSea filesystem. `make_dirs=TRUE` cannot create missing folders.
+The public path normalizer retains its existing 127-byte path limit, and
+directory masks are limited to 255 bytes.
+
+`make check-source-context` exercises the contexts under normal desktop boot,
+including a yielding child task, actual `FilesFind`, project-file lookup,
+document reading/link checking and a failed graphical editor open. The ISO
+and PCI compatibility suites run the applicable checks before their existing
+regressions.
+
+Validation: the PCI suite passed 362 checks, ISO passed 282, and the NEC
+two-hub/VirtIO graphical workflow and reconnect run passed 163. A subsequent
+mask-parser adjustment preserves literal `.` / `..` before directory
+expansion; the final build passed all 20 focused source-context checks,
+including those cases and the actual document/link consumers. Source-pin,
+guarded-overlay, Python syntax and whitespace checks passed. The live UTM
+guest was left on the accepted input baseline while the Mac was locked;
+this update has no new live UTM acceptance claim.
