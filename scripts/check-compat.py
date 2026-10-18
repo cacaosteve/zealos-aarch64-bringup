@@ -50,6 +50,8 @@ p.add_argument('--probe-user-startup', action='store_true',
                help='check original User/UserCmdLine, HomeSys hooks and independent graphical terminals')
 p.add_argument('--probe-user-text', action='store_true',
                help='check User formatted startup and XTalk input-filter delivery to graphical terminals')
+p.add_argument('--probe-home-path', action='store_true',
+               help='check shared HomeSet, home file execution and reboot persistence')
 p.add_argument('--probe-source-exceptions', action='store_true',
                help='check catchable source/file errors, native cleanup and command/job recovery')
 p.add_argument('--probe-winmgr', action='store_true',
@@ -119,7 +121,9 @@ if args.probe_live_window_control and not (
         args.probe_grscreen and args.probe_live_winmgr):
     p.error('--probe-live-window-control requires --probe-module /System/Win.ZC '
             '--probe-winmgr --probe-grscreen --probe-live-winmgr')
-log_path = ROOT / 'build' / (f'check-usb-{usb_label}{"-user-text" if args.probe_user_text else "-user-startup" if args.probe_user_startup else ""}.log' if args.usb_input else
+log_path = ROOT / 'build' / (f'check-usb-{usb_label}{"-home-path" if args.probe_home_path else "-user-text" if args.probe_user_text else "-user-startup" if args.probe_user_startup else ""}.log' if args.usb_input else
+                             'check-home-path-pci.log' if args.probe_home_path and args.pci else
+                             'check-home-path-iso.log' if args.probe_home_path else
                              'check-user-text-pci.log' if args.probe_user_text else
                              'check-user-startup-pci.log' if args.probe_user_startup and args.pci else
                              'check-user-startup-iso.log' if args.probe_user_startup else
@@ -761,6 +765,51 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             command('zcall SourceContextDocLinkChecks', 'zc => 0x000000000000002a')
         command('zstatus', 'failed=0')
         if args.probe_source_context:
+            raise SystemExit(0)
+        command('zload /Tests/HomePath.ZC', 'zc: loaded /Tests/HomePath.ZC')
+        for check in ('ReadChecks', 'ContextChecks', 'TaskChecks'):
+            command('zcall HomePath'+check, 'zc => 0x000000000000002a')
+        if args.pci:
+            command('zcall HomePathFileChecks', 'zc => 0x000000000000002a')
+        if args.probe_home_path:
+            before = command('zstatus', 'failed=0')
+            for _ in range(3):
+                for check in ('ReadChecks', 'ContextChecks', 'TaskChecks'):
+                    command('zcall HomePath'+check, 'zc => 0x000000000000002a')
+            after = command('zstatus', 'failed=0')
+            heap = r'data=([0-9/]+) code=([0-9/]+) allocations=([0-9]+)'
+            if re.search(heap, before).groups() != re.search(heap, after).groups():
+                raise RuntimeError('HomeSet/context/child teardown leaked managed memory')
+            print('PASS home aliases, original HomeSet, directory contexts and shared lifetime', flush=True)
+            if args.probe_gui_keyboard:
+                focus_graphical_terminal()
+                text = 'Print("Home device %d\\n",HomePathReadChecks);'
+                qmp_send_text(text)
+                typed = require_graphical_text('home-path-typing', text)
+                require_graphical_caret(typed, text)
+                qmp_send_key('ret')
+                require_graphical_text('home-path-answer', 'Home device 42')
+            if args.pci:
+                guest.terminate()
+                try:
+                    guest.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    guest.kill(); guest.wait()
+                guest = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                         stderr=subprocess.STDOUT, bufsize=0)
+                buf.clear()
+                until(b'\n> ', timeout=180)
+                command('zload /Tests/HomePath.ZC', 'zc: loaded /Tests/HomePath.ZC')
+                command('zcall HomePathPersistentChecks', 'zc => 0x000000000000002a')
+                if args.probe_gui_keyboard:
+                    focus_graphical_terminal()
+                    qmp_send_text('ExeFile("~/HomePathValue.ZC");')
+                    qmp_send_key('ret')
+                    require_graphical_text('home-path-reopen', 'ExeFile("~/HomePathValue.ZC");')
+                    qmp_send_text('Print("Home reboot %d\\n",HomePathValue);')
+                    qmp_send_key('ret')
+                    require_graphical_text('home-path-reboot-answer', 'Home reboot 42')
+                print('PASS home source save, relative include, task compiler and reboot/reopen', flush=True)
             raise SystemExit(0)
         if args.probe_task_settings:
             # Relative zload uses the caller's directory, while #include is

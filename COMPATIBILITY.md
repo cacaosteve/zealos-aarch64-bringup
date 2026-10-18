@@ -3343,3 +3343,47 @@ diagnostics followed by 42 from `CompilerRecoveryOperandChecks`; the editor
 save/compile/run/reboot/reopen workflow also passes. Logs are
 `build/user-text-{pci,usb,iso,recovery,workflow}.log`. Upstream/overlay integrity,
 Python syntax and whitespace checks pass.
+
+
+## Home paths and saved startup files — 2026-10-18
+
+The source namespace now has a real shared home setting, initially `/Home`.
+`Cd(NULL)` / `Cd;` selects it, while `DirNameAbs(NULL)` selects the calling
+task's current directory. Standalone `~` components expand to home, including
+in `FileRead`, `FileWrite`, `FileFind`, directory contexts, `ExeFile`, and
+compiler includes. `::` and `~:` identify the root of the single source
+volume; arbitrary ZealOS drive letters are still unsupported.
+
+The guarded `System/SourceHome.ZC` extraction retains the pinned
+`Kernel/BlkDev/DiskDirB.ZC` `HomeSet` body: canonicalize, free the previous
+shared string, and replace it with a System-owned copy. A source-store failure
+boundary rejects unrepresentable paths before changing home. The runtime
+reads the actual `blkdev.home_dir` field rather than caching the replaced
+string. Child tasks can change shared home without changing their parent's
+current directory, and the home allocation survives child teardown.
+
+Pinned `Once.ZC` bytes are also bundled as `Home/Once.ZC`, matching the home
+startup file's intended location. Refresh adds it only when absent, preserving
+an existing customized home file. `System/SourceHome.ZC` joins the twelve
+repository-managed refresh paths so its ABI stays synchronized with the
+kernel. No UTM refresh was performed for this milestone.
+
+`make check-home-path` verifies aliases, context restoration, unsupported-path
+recovery, shared home ownership and exact managed-memory reclamation. It
+writes a home source file and relative header, executes them from an unrelated
+current directory, reboots the same disposable source volume, then reopens and
+executes the saved file from the graphical terminal. Scanout checks confirm
+visible input, insertion caret and the distinct `Home reboot 42` result.
+
+The focused gates passed 66 PCI and 69 NEC USB checks, the latter through two
+hubs with duplicate VirtIO devices retained. The complete ISO gate passed 384
+checks. A further 51 focused ISO checks cover the final rejection fixtures.
+The existing XTalk gate passed 31 checks, and the graphical editor workflow
+passed 225, including save/compile/run/reboot/reopen. Logs are
+`build/home-path-{pci,usb,iso,iso-focused,user-text-regression,workflow}.log`.
+
+Full `HomeSys.StartUpTasks` remains disabled. Directory creation, mounted
+ZealOS drives, extension lookup for `#include "Once"`, registry tree execution,
+tips, autocomplete and splash still require their own source/dependency
+bring-up. The running UTM remains on implementation `0034e51`; this milestone
+and the preceding XTalk/parser changes are verified in disposable guests.

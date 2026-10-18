@@ -119,6 +119,23 @@ def extract_home_startup(source: bytes) -> bytes:
             hooks).encode('utf-8')
 
 
+def extract_home_set(source: bytes) -> bytes:
+    """Retain DiskDirB's shared, system-owned home path, without disk drivers."""
+    begin, end = b'U0 HomeSet(U8 *dirname)\n', b'\nBool Cd('
+    if not source.startswith(begin) or source.count(end) != 1:
+        raise ValueError('expected the pinned HomeSet/Cd boundaries')
+    body = source[:source.index(end)]
+    anchor = b'\tdirname = DirNameAbs(dirname);\n'
+    if body.count(anchor) != 1 or body.count(b'blkdev.home_dir = SysStrNew(dirname);') != 1:
+        raise ValueError('pinned HomeSet allocation changed')
+    # The bootstrap path boundary rejects unsupported drive syntax. Preserve
+    # the old home when canonicalization fails instead of storing NULL.
+    guard = (b"\tif (!dirname || *dirname != '/')\n\t{\n"
+             b"\t\tFree(dirname);\n\t\tthrow('HomePath');\n\t}\n")
+    return (b'// Original HomeSet with the source-store path failure boundary.\n' +
+            body.replace(anchor, anchor + guard, 1))
+
+
 def translate_docterm(source: bytes) -> bytes:
     """Evaluate the title length in ZealC before the bounded document lexer."""
     old = 'LEN=STR_LEN-1,A=\\"%%s...\\",SCX=15$$");'

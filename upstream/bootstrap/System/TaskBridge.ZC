@@ -1161,6 +1161,7 @@ CBlkDevGlobals blkdev;
 U0 BootstrapBlkDevGlbls()
 {
     blkdev.tmp_filename = SysStrNew("~/Tmp.DD");
+    blkdev.home_dir = SysStrNew("/Home");
 }
 BootstrapBlkDevGlbls;
 I64 EdLeftClickLink(CDoc *doc, CDocEntry *doc_e)
@@ -1396,12 +1397,6 @@ CDirContext *DirContextNew(U8 *_mask, Bool make_mask=FALSE,
     while (len && clean[len - 1] == ' ')
         len--;
     clean[len] = 0;
-    // Home and ZealOS drive letters need real mounted-drive services.
-    if (clean[0] == '~')
-    {
-        Free(clean);
-        return NULL;
-    }
     if (!no_mask && (alternatives = StrMatch(";", clean)))
         *alternatives++ = 0;
     len = StrLen(clean);
@@ -1474,7 +1469,7 @@ CDirContext *DirContextNew(U8 *_mask, Bool make_mask=FALSE,
 }
 U8 *DirNameAbs(U8 *dirname)
 {//The source namespace has canonical absolute paths, without drive letters.
-    if (dirname && !*dirname)
+    if (!dirname || !*dirname)
         return DirCur;
     return ZcSourcePath(dirname);
 }

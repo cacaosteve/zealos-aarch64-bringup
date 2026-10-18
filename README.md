@@ -29,12 +29,13 @@ make check-system-server # dedicated source System loop + namespace/job ownershi
 make check-user-command # original ExeCmdLine loop, options and error recovery
 make check-user-startup # per-user HomeSys setup and independent graphical terminals
 make check-user-text    # User startup commands + XTalk input delivery and recovery
+make check-home-path    # shared home paths, includes and saved source after reboot
 make utm               # refresh VM, preserving RedSea/source edits and adding new bundled files
 ```
 
 The UTM refresh also updates the repository-managed
 `Tests/WindowDragLive.ZC`, `System/GuiTerminal.ZC`, `System/TaskBridge.ZC`,
-`System/UserTask.ZC`, `System/HomeStartUp.ZC`, `System/SourceDir.ZC`,
+`System/UserTask.ZC`, `System/HomeStartUp.ZC`, `System/SourceDir.ZC`, `System/SourceHome.ZC`,
 `System/DolDoc/DocTerm.ZC`, `System/DolDoc/DocEd.ZC`, `System/WinMgr.ZC`,
 `System/Gr/GrDC.ZC`, and `System/Gr/SpriteRaster.ZC` files
 so they stay in sync with the kernel; other existing guest source files remain

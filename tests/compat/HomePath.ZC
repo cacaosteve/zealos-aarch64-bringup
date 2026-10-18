@@ -1,0 +1,124 @@
+// Shared HomeSet state with task-local Cd and real file/compiler boundaries.
+Bool HomePathIs(U8 *actual, U8 *expected)
+{
+    Bool matches = actual && !StrCompare(actual, expected);
+    Free(actual);
+    return matches;
+}
+
+I64 HomePathReadChecks()
+{
+    U8 *home = StrNew(blkdev.home_dir), *original = DirCur, *a, *b;
+    I64 a_size, b_size, result = 42;
+    HomeSet("/Home");
+    if (!Cd || StrCompare(Fs->cur_dir, "/Home") ||
+        !HomePathIs(FileNameAbs("~/Once.ZC"), "/Home/Once.ZC") ||
+        !HomePathIs(DirNameAbs("~"), "/Home") ||
+        !HomePathIs(DirNameAbs(NULL), "/Home") ||
+        !HomePathIs(DirNameAbs("/Tests/~/../Kernel"), "/Kernel") ||
+        !HomePathIs(DirNameAbs("~/../~/./"), "/Home") ||
+        !HomePathIs(FileNameAbs("~:/Kernel/KernelA.HH"), "/Kernel/KernelA.HH") ||
+        !HomePathIs(DirNameAbs("::"), "/")) result = 1;
+    a = FileRead("~/Once.ZC", &a_size);
+    b = FileRead("/Home/Once.ZC", &b_size);
+    if (!a || !b || a_size != b_size || MemCompare(a, b, a_size))
+        result = 2;
+    Free(a); Free(b);
+    HomeSet(home);
+    if (!Cd(original)) result = 3;
+    Free(home); Free(original);
+    return result;
+}
+
+I64 HomePathContextChecks()
+{
+    U8 *home = StrNew(blkdev.home_dir), *original = DirCur;
+    CDirContext *context;
+    Bool caught = FALSE;
+    I64 result = 42;
+    if (!Cd("/Tests")) return 1;
+    HomeSet(".");
+    if (!Cd("/LICENSE") || !Cd || StrCompare(Fs->cur_dir, "/Tests")) result = 2;
+    context = DirContextNew("~/*.ZC;*.HH", TRUE);
+    if (!context || StrCompare(Fs->cur_dir, "/Tests") ||
+        StrCompare(context->mask, "*.ZC;*.HH")) result = 3;
+    DirContextDel(context);
+    if (!FileFind("~/HomePath.ZC") ||
+        !HomePathIs(FileNameAbs("~/HomePath.ZC", FUF_SCAN_PARENTS), "/Tests/HomePath.ZC"))
+        result = 4;
+    try { HomeSet("Z:/UnsupportedDrive"); }
+    catch
+    {
+        caught = Fs->except_ch == 'HomePath';
+        Fs->catch_except = TRUE;
+    }
+    if (!caught || StrCompare(blkdev.home_dir, "/Tests")) result = 5;
+    caught = FALSE;
+    try { HomeSet("disk:Tests"); }
+    catch
+    {
+        caught = Fs->except_ch == 'HomePath';
+        Fs->catch_except = TRUE;
+    }
+    if (!caught || StrCompare(blkdev.home_dir, "/Tests")) result = 8;
+    HomeSet("/MissingHomeDir");
+    if (Cd || StrCompare(Fs->cur_dir, "/Tests")) result = 9;
+    HomeSet(NULL);
+    if (StrCompare(blkdev.home_dir, "/Tests")) result = 6;
+    HomeSet(home);
+    if (!Cd(original)) result = 7;
+    Free(home); Free(original);
+    return result;
+}
+
+I64 home_path_child_result;
+U0 HomePathChild(U8 *unused)
+{
+    HomeSet("/Kernel");
+    home_path_child_result = 1;
+    if (!Cd || StrCompare(Fs->cur_dir, "/Kernel")) return;
+    Yield;
+    if (!HomePathIs(DirCur(Fs->parent_task), "/LICENSE")) return;
+    home_path_child_result = 42;
+}
+I64 HomePathTaskChecks()
+{
+    U8 *home = StrNew(blkdev.home_dir), *original = DirCur;
+    CTask *child;
+    I64 result = 42;
+    if (!Cd("/LICENSE")) return 1;
+    child = Spawn(&HomePathChild, NULL, "Shared home path");
+    if (!child) return 2;
+    while (TaskValidate(child)) Yield;
+    // Home is global and system-owned; the child's cwd remains private.
+    if (home_path_child_result != 42 || StrCompare(Fs->cur_dir, "/LICENSE") ||
+        StrCompare(blkdev.home_dir, "/Kernel") || !Cd ||
+        !FileFind("~/KernelA.HH")) result = 3;
+    HomeSet(home);
+    if (!Cd(original)) result = 4;
+    Free(home); Free(original);
+    return result;
+}
+
+I64 HomePathPersistentChecks()
+{
+    U8 *original = DirCur;
+    I64 result = 42;
+    if (!Cd("/LICENSE")) return 1;
+    if (ExePutS2("#include \"~/HomePathValue.HH\"\n HOME_PATH_VALUE+2;", "<home include>") != 42)
+        result = 4;
+    ExeFile("~/HomePathValue.ZC");
+    if (ExePutS2("HomePathValue;", "<home value>") != 42 ||
+        StrCompare(Fs->cur_dir, "/LICENSE")) result = 2;
+    if (!Cd(original)) result = 3;
+    Free(original);
+    return result;
+}
+I64 HomePathFileChecks()
+{
+    U8 *header = "#define HOME_PATH_VALUE 40\n";
+    U8 *source = "#include \"HomePathValue.HH\"\nI64 HomePathValue(){return HOME_PATH_VALUE+2;}\n";
+    if (FileWrite("~/HomePathValue.HH", header, StrLen(header)) != StrLen(header) ||
+        FileWrite("~/HomePathValue.ZC", source, StrLen(source)) != StrLen(source)) return 1;
+    return HomePathPersistentChecks;
+}

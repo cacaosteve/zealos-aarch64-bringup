@@ -53,7 +53,7 @@ I64 SourceContextFailureChecks()
     if (!original || !Cd("/Tests")) return 1;
     if (DirContextNew(NULL) || DirContextNew("/MissingContextDir/File.ZC") ||
         DirContextNew("/MissingContextDir", FALSE, TRUE, TRUE) ||
-        DirContextNew("~/UnsupportedHome") || DirContextNew("Z:File.ZC") ||
+        DirContextNew("~/MissingHomeDir/File.ZC") || DirContextNew("Z:File.ZC") ||
         DirContextNew("/Tests/*.ZC", FALSE, FALSE, TRUE) ||
         StrCompare(Fs->cur_dir, "/Tests")) return 2;
     context = DirContextNew("", TRUE);

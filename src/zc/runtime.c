@@ -374,6 +374,7 @@ static int64_t guest_heap_sig_off, guest_heap_used_off, guest_heap_task_off;
 static int64_t guest_except_ch_off, guest_catch_except_off;
 static int64_t guest_hash_table_off;
 static int64_t guest_cur_dir_off;
+static char **guest_home_dir_ptr;
 static int64_t guest_next_cc_off, guest_last_cc_off;
 static int64_t guest_last_fun_off, guest_fun_size, guest_fun_name_off;
 static int64_t guest_fun_type_off, guest_fun_flags_off;
@@ -676,15 +677,28 @@ static const char *guest_current_dir(void) {
         : NULL;
     return dir ? dir : "/";
 }
+static const char *guest_home_suffix(const char *path) {
+    const char *suffix = NULL;
+    for (const char *part = path; *part;) {
+        while (*part == '/') part++;
+        if (*part == '~' && (!part[1] || part[1] == '/')) suffix = part + 1;
+        while (*part && *part != '/') part++;
+    }
+    return suffix;
+}
 static int guest_path(const char *path, char out[134]) {
-    char joined[256], name[128];
+    char joined[256], expanded[256], name[128];
     if (!path || !*path)
         return -1;
     int disk = !strncmp(path, "disk:", 5);
     const char *src = path + (disk ? 5 : 0);
-    /* ZealOS's boot-drive root shorthand names the single source volume.
-     * Other drive letters still require mounted-drive services. */
-    if (!disk && !strncmp(src, "::/", 3)) src += 2;
+    /* Boot/home drive roots both name the sole source volume. This does not
+     * introduce other drive letters or mounted-volume services. */
+    if (!disk && ((!strncmp(src, "::", 2) || !strncmp(src, "~:", 2)) &&
+                  (!src[2] || src[2] == '/'))) {
+        src += 2;
+        if (!*src) src = "/";
+    }
     size_t length = strlen(src);
     if (length >= 128 || strchr(src, ':') || strchr(src, '\\'))
         return -1;
@@ -697,6 +711,20 @@ static int guest_path(const char *path, char out[134]) {
         joined[dir_len] = '/';
         memcpy(joined + dir_len + 1, src, length + 1);
         src = joined;
+    }
+    /* DiskStrA's standalone '~' component resets the path to home, even
+     * after earlier components. HomeSet stores a canonical absolute path in
+     * the real guest blkdev globals; do not cache the string it can replace. */
+    const char *suffix = guest_home_suffix(src);
+    if (suffix) {
+        const char *home = guest_home_dir_ptr ? *guest_home_dir_ptr : NULL;
+        if (!home || *home != '/' || strchr(home, ':') ||
+            strlen(home) + strlen(suffix) + 1 > sizeof(expanded))
+            return -1;
+        size_t home_len = strlen(home);
+        memcpy(expanded, home, home_len);
+        memcpy(expanded + home_len, suffix, strlen(suffix) + 1);
+        src = expanded;
     }
     if (normal_path(src, name))
         return -1;
@@ -1042,6 +1070,14 @@ static int64_t host_file_write(int64_t *a) {
 FILE *fopen(const char *path, const char *mode) {
     if (strcmp(mode, "rb") && strcmp(mode, "r"))
         return NULL;
+    /* The compiler already qualifies ordinary include names against their
+     * source file. Only expand guest home/drive aliases here, so those names
+     * work in #include as well as FileRead/ExeFile without double-joining cwd. */
+    char resolved[134];
+    if (guest_home_suffix(path) || !strncmp(path, "::", 2) || !strncmp(path, "~:", 2)) {
+        if (guest_path(path, resolved)) return NULL;
+        path = resolved;
+    }
     size_t n;
     char *owned = NULL;
     const unsigned char *data;
@@ -2968,9 +3004,9 @@ static int64_t host_cd(int64_t *a) {
         return 0;
     if (requested && !*requested)
         return 1;
-    /* Home and mkdir are not available on the bootstrap source store. NULL
-     * selects its root; a missing directory fails without changing state. */
-    if (guest_path(requested ? requested : "/", path))
+    /* Cd(NULL) selects home, as in DiskDirB. Directory creation is still
+     * unavailable; missing paths fail without changing the current dir. */
+    if (guest_path(requested ? requested : "~", path))
         return 0;
     const char *dir = path + (!strncmp(path, "disk:", 5) ? 5 : 0);
     if (!source_dir_exists(dir))
@@ -5577,6 +5613,15 @@ static int load_source_path(const char *path, int merged, int recover) {
         PrsBindCSymbol("ZcSourcePath", host_source_path, 1);
         PrsBindCSymbol("Cd", host_cd, 2);
         PrsBindCSymbol("DirCur", host_dir_cur, 2);
+        CHashGlblVar *blkdev = (CHashGlblVar *)HashFind(
+            "blkdev", Fs->hash_table, HTT_GLBL_VAR, 1);
+        CHashClass *blkdev_class = (CHashClass *)HashFind(
+            "CBlkDevGlobals", Fs->hash_table, HTT_CLASS, 1);
+        CMemberLst *home = blkdev_class ? MemberFind("home_dir", blkdev_class) : NULL;
+        if (!blkdev || !blkdev->data_addr || !home || home->off < 0 ||
+            home->off + 8 > blkdev_class->sz)
+            zc_fail("pinned home directory globals missing");
+        guest_home_dir_ptr = (char **)((unsigned char *)blkdev->data_addr + home->off);
         PrsBindCSymbol("ZcSourceFileAt", host_source_file_at, 4);
         PrsBindCSymbol("LowPass1", host_low_pass1, 4);
         /* These functions were pre-registered before TaskBridge introduced
@@ -6040,6 +6085,7 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
     gui_terminal_active = 0;
     guest_keydev_put_key = NULL;
     guest_doc_recalc_stub = NULL;
+    guest_home_dir_ptr = NULL;
     gui_terminal_modules_loaded = 0;
     /* A lexer exception can longjmp out of #assert while the Aiwnios parser
      * depth counters are nonzero. zreset starts a new compiler session, so
@@ -6310,6 +6356,7 @@ int zc_start_gui_terminal(void) {
          * KeyDevInit is performed once on root's persistent stack below. */
         "/Kernel/KeyDev.ZC",
         "/System/SourceDir.ZC",
+        "/System/SourceHome.ZC",
         "/System/HomeStartUp.ZC",
         "/System/GuiTerminal.ZC",
     };

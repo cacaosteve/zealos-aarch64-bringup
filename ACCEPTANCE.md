@@ -645,3 +645,17 @@ the documented Aiwnios parser patch. Dedicated compiler recovery (67), ISO
 compatibility (380) and graphical save/compile/run/reboot/reopen workflow (220)
 checks pass. The running UTM bundle remains on `0034e51` for its pending physical
 typing check; these changes have been verified in disposable guests.
+
+
+2026-10-18: shared home paths now pass 66 PCI and 69 native USB checks,
+including visible typing/caret, System-owned HomeSet lifetime, unsupported-path
+recovery without leaks, home file execution and reopening the saved source
+after reboot. The USB shape retains duplicate VirtIO devices and two hubs.
+The ISO compatibility gate passed 384 checks, a focused ISO home gate passed
+51, XTalk regression passed 31, and the graphical editor workflow passed 225
+with save/compile/run/reboot/reopen. Pinned source hashes, HomeSet extraction
+guards, bundle seed integrity, Python/shell syntax and whitespace checks pass.
+Default home is `/Home`; an existing customized `Home/Once.ZC` is preserved on
+refresh. Registry-backed Once execution and full HomeSys startup remain pending.
+The current UTM session was left unchanged on `0034e51`; these results are from
+disposable guests and do not claim a new physical UTM acceptance.

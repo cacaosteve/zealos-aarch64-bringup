@@ -4,7 +4,7 @@ from pathlib import Path
 import re
 import sys
 
-from arm64_source import (extract_home_startup, extract_server_task, extract_user_task, translate_docterm, translate_doced, translate_docfind, translate_docform, translate_docpopup, translate_grbitmap,
+from arm64_source import (extract_home_set, extract_home_startup, extract_server_task, extract_user_task, translate_docterm, translate_doced, translate_docfind, translate_docform, translate_docpopup, translate_grbitmap,
                           translate_grdc, translate_grscreen, translate_ktask, translate_winmgr)
 
 root = Path(__file__).resolve().parent.parent
@@ -124,6 +124,19 @@ assert b'ZcCallExtStr("UserStartUp");' in user_slice
 assert b'CTask *User(U8 *format=NULL, ...)' in user_slice
 assert b'if (!task)\n\t\treturn NULL;' in user_slice
 home_source = (root / 'upstream/pinned/HomeSys.ZC').read_bytes()
+disk_dir = (root / 'upstream/pinned/Kernel/BlkDev/DiskDirB.ZC').read_bytes()
+home_set = extract_home_set(disk_dir)
+original = disk_dir.split(b'\nBool Cd(', 1)[0]
+home_guard = (b"\tif (!dirname || *dirname != '/')\n\t{\n"
+              b"\t\tFree(dirname);\n\t\tthrow('HomePath');\n\t}\n")
+assert original.replace(b'\tdirname = DirNameAbs(dirname);\n',
+                        b'\tdirname = DirNameAbs(dirname);\n' + home_guard) in home_set
+try:
+    extract_home_set(disk_dir.replace(b'SysStrNew(dirname)', b'StrNew(dirname)', 1))
+except ValueError:
+    pass
+else:
+    raise AssertionError('HomeSet extraction accepted a changed allocation owner')
 home_hooks = extract_home_startup(home_source)
 assert b'StartUpTasks;' not in home_hooks
 for name in (b'UserStartUp', b'ServerStartUp'):
