@@ -2699,3 +2699,25 @@ assignment produced 42. Saved-file execution, editor persistence across reboot,
 twelve keyboard reconnects, tablet fallback/reattach and whole-hub recovery
 also passed. Source pins/overlays, Python syntax and whitespace checks passed;
 the Pi diagnostic target built, without new Pi hardware acceptance.
+
+The live UTM image was refreshed from `34ff793` after the stopped-VM backup
+at `build/utm-before-compiler-context-20261017-200440/`. All 170 existing files
+outside the four managed bridge/demo paths and all deletion masks were
+preserved. The two context fixtures and pinned CMisc source were added.
+RedSea retained SHA-256
+`f216648875bf18c1eb122e4ad80cb8a85242e74619e424f9e9d6daac4de8d666`,
+and system/input/display/serial/QEMU/network/drive settings matched the backup.
+The preservation report is `build/compiler-context-utm-backup.json`.
+
+The live graphical option/recovery smoke passed through desktop automation.
+`zc Option(12,1);` persisted decimal-only mode into the next prompt command,
+which rejected `zc I64 ContextAnswer(){return 0x2a;}` with the complete option
+error and a separate recovery message. After `zc Option(12,0);`, the same
+function compiled and `zcall ContextAnswer` returned
+`0x000000000000002a` without restarting. Graphical `zstatus` reported
+`ready=1 failed=0`, `compiler_recovery: errors=1 active=0`, the running desktop
+and terminal focus, and USB keyboard/tablet ownership. Input capture remained
+released. Evidence is preserved in `build/compiler-context-utm-accepted.png`
+and `build/compiler-context-utm-status.png`. This renews automated compiler
+acceptance; the earlier physical native USB typing/pointer/drag acceptance was
+not repeated for this compiler-only update.

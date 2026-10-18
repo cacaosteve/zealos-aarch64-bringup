@@ -528,3 +528,18 @@ not on disk. See [COMPATIBILITY.md](COMPATIBILITY.md).
 passed. RedSea bytes were verified unchanged across the image refresh. Fast
 computer-automation typing lost characters; individual keystrokes completed the
 check. This entry does not renew the full mouse/Notes/graphics acceptance.
+
+2026-10-17: the refreshed UTM graphical terminal passed the compiler-context
+option/recovery smoke through desktop automation. Decimal-only mode persisted
+between prompt commands and rejected a hex constant; disabling it let the same
+function compile, and `zcall ContextAnswer` returned `0x000000000000002a`.
+The option error and recovery message were separately visible, with
+`ready=1 failed=0` and `compiler_recovery: errors=1 active=0` afterward.
+USB keyboard/tablet ownership and released input capture were verified.
+The final build passed 407 PCI, 325 ISO and 225 NEC two-hub/VirtIO graphical
+workflow checks. The stopped-VM refresh preserved all 170 existing files
+outside the four managed bridge/demo paths, deletion masks, RedSea bytes and
+VM settings. See [COMPATIBILITY.md](COMPATIBILITY.md) for scope and evidence.
+This does not establish full compiler/startup compatibility or Pi hardware
+acceptance; physical typing/pointer/drag acceptance remains the earlier native
+USB baseline.
