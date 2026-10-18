@@ -2629,3 +2629,12 @@ hover menu, and maps underscore/equal punctuation to explicit QMP key codes.
 Source-pin/overlay, Python syntax and whitespace checks passed; the Pi
 diagnostic target still builds. This does not establish Pi hardware acceptance
 or the final physical UTM recovery check.
+
+The live UTM image was refreshed from `cd20aad` after a stopped-VM backup at
+`build/utm-before-compiler-recovery-20261017-191450/`. All 168 existing files
+outside the four managed bridge/demo paths and the deletion masks were
+preserved; only the two new recovery fixtures were added. RedSea's SHA-256
+remained `f216648875bf18c1eb122e4ad80cb8a85242e74619e424f9e9d6daac4de8d666`.
+System/input/display/serial/QEMU/network/drive settings matched the backup.
+The VM restarted and input capture was released. The physical malformed-source
+and corrected-function check remains pending.
