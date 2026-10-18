@@ -189,7 +189,7 @@ remain fatal to the session and are checked separately.
 
 2026-10-17 automated recovery validation passed 49 focused checks, 391 full
 PCI checks, 309 full ISO checks and 208 NEC two-hub/VirtIO graphical workflow
-checks. The physical UTM check for this update is to enter malformed source,
+checks. The UTM recovery smoke is to enter malformed source,
 then define and call a corrected function in the same terminal without reset:
 
 ```text
@@ -200,6 +200,11 @@ zcall RecoveryOK
 
 Expect a visible compiler error and fresh prompt after the first line, then
 `zc: executed` and `0x000000000000002a` from the corrected function.
+The refreshed live UTM guest passed this sequence through desktop automation,
+including visible source before Return. Its status remained `ready=1 failed=0`
+with one recovered error, an inactive recovery boundary and terminal focus.
+Physical input was accepted on the earlier native USB baseline and was not
+repeated for this compiler-only update.
 
 ## Checklist — interactive smoke
 

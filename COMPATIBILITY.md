@@ -2628,7 +2628,7 @@ the terminal client before checking its title, dismissing the source manager's
 hover menu, and maps underscore/equal punctuation to explicit QMP key codes.
 Source-pin/overlay, Python syntax and whitespace checks passed; the Pi
 diagnostic target still builds. This does not establish Pi hardware acceptance
-or the final physical UTM recovery check.
+or a new physical-key acceptance.
 
 The live UTM image was refreshed from `cd20aad` after a stopped-VM backup at
 `build/utm-before-compiler-recovery-20261017-191450/`. All 168 existing files
@@ -2636,5 +2636,15 @@ outside the four managed bridge/demo paths and the deletion masks were
 preserved; only the two new recovery fixtures were added. RedSea's SHA-256
 remained `f216648875bf18c1eb122e4ad80cb8a85242e74619e424f9e9d6daac4de8d666`.
 System/input/display/serial/QEMU/network/drive settings matched the backup.
-The VM restarted and input capture was released. The physical malformed-source
-and corrected-function check remains pending.
+The VM restarted and input capture was released.
+
+The live graphical recovery smoke then passed through desktop automation:
+`zc I64 Broken( {` displayed its compiler error and returned to the prompt;
+`zc I64 RecoveryOK(){return 42;}` was visible before Return, compiled, and
+`zcall RecoveryOK` returned `0x000000000000002a` without a reset. Graphical
+`zstatus` reported `ready=1 failed=0`, `compiler_recovery: errors=1 active=0`,
+the running desktop and terminal focus, with USB keyboard/tablet ownership.
+The screenshot is preserved at `build/compiler-recovery-utm-accepted.png`.
+Automation keys reached UTM again during this check. Physical typing and
+pointer/drag acceptance remain the earlier native USB baseline; they were not
+repeated for this compiler-only update.
