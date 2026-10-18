@@ -3081,6 +3081,13 @@ were preserved. The refresh added `System/ServerTask.ZC` and
 `Tests/SystemServer.ZC`. RedSea retained SHA-256
 `f216648875bf18c1eb122e4ad80cb8a85242e74619e424f9e9d6daac4de8d666`.
 The preservation report is `build/system-server-utm-backup.json`.
-`utmctl` reports the refreshed VM started. The Mac is locked, so the live
-graphical boot, physical typing and System-server check are still pending;
-the earlier popup confirmation applies to the previous image.
+The initial live inspection was blocked by the locked Mac. The user's
+2026-10-18 08:27 screenshot now shows the refreshed graphical terminal,
+successful fixture loading and `SystemServerChecks` returning 42.
+`SystemServerErrorChecks` was run twice; both runs emitted the deliberate
+malformed-source diagnostic, returned 42 and recovered the prompt. Visible
+command text, the insertion caret and the guest pointer are present. The
+screenshot is saved in `build/system-server-utm-accepted.png`. This completes
+the requested live System-server/recovery acceptance. A fresh `zstatus`
+read and physical pointer-motion/drag test were not part of this screenshot;
+their existing automated/physical evidence remains as documented above.

@@ -574,8 +574,8 @@ requires its own live check.
 379 ISO, 251 graphics, 314 NEC two-hub/VirtIO graphical workflow, and 37 final
 focused root/graphical checks. UTM was backed up, refreshed and restarted;
 183 existing files outside six managed paths, deletion masks, RedSea and VM
-settings were verified unchanged. The Mac is locked, so live acceptance of
-this image remains pending. In its graphical terminal, run:
+settings were verified unchanged. The user's 08:27 screenshot confirms the
+refreshed graphical terminal completed:
 
 ```text
 zload /Tests/SystemServer.ZC
@@ -583,8 +583,12 @@ zcall SystemServerChecks
 zcall SystemServerErrorChecks
 ```
 
-Expect visible typing and two `0x000000000000002a` results. The second check
-deliberately emits one compiler error; success is its following 42 and a
-usable prompt. `zstatus` should show `system_server: running=1 separate=1`
-and `ready=1 failed=0`. Backup and scope details are in
+`SystemServerChecks` returned `0x000000000000002a`. The user ran
+`SystemServerErrorChecks` twice; each deliberately emitted one compiler
+error, returned the same 42 and left a usable graphical prompt. Command text,
+the insertion caret and guest pointer are visible. The screenshot is saved
+as `build/system-server-utm-accepted.png`. This accepts the live System-server
+and repeated error-recovery checks. Status diagnostics and pointer motion
+retain their automated/earlier physical acceptance; no new `zstatus` output
+or pointer-motion test was supplied here. Backup and scope details are in
 [COMPATIBILITY.md](COMPATIBILITY.md).
