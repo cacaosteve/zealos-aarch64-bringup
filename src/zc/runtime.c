@@ -173,7 +173,8 @@ static double *pow10_I64_host = pow10_values;
  * Spawn, while these fibers still implement only cooperative scheduling. */
 #define GUEST_APP_TASKS 5 /* root plus four user-spawned children */
 #define GUEST_EXECUTIVE 5 /* reserved CPU-0 job server */
-#define GUEST_TASKS 6
+#define GUEST_SYSTEM 6 /* original ServerTaskCont; does not consume an app slot */
+#define GUEST_TASKS 7
 #define GUEST_STACK_BYTES (64u * 1024u)
 #define GUEST_STACK_MAX_BYTES (2u * 1024u * 1024u)
 #define GUEST_JOBS_MAX 128u
@@ -204,7 +205,7 @@ _Static_assert(sizeof(struct guest_job) == 112 &&
 enum guest_state { GUEST_UNUSED, GUEST_RUNNABLE, GUEST_DONE };
 enum guest_entry {
     GUEST_ENTRY_NO_ARG, GUEST_ENTRY_SPAWN, GUEST_ENTRY_EXECUTIVE,
-    GUEST_ENTRY_INPUT_FILTER
+    GUEST_ENTRY_INPUT_FILTER, GUEST_ENTRY_SYSTEM
 };
 enum guest_wait {
     GUEST_WAIT_NONE, GUEST_WAIT_BIRTH, GUEST_WAIT_DEATH,
@@ -1082,6 +1083,13 @@ static CHeapCtrl *guest_allocation_owner(int64_t selector) {
 }
 static int64_t host_malloc(int64_t *a) {
     return (int64_t)(uintptr_t)__AIWNIOS_MAlloc(a[0], guest_allocation_owner(a[1]));
+}
+static int64_t host_system_task(int64_t *a) {
+    (void)a;
+    if (!guest_task_bound)
+        return 0;
+    unsigned i = guest_fibers[GUEST_SYSTEM].state == GUEST_RUNNABLE ? GUEST_SYSTEM : 0;
+    return (int64_t)(uintptr_t)guest_fibers[i].words;
 }
 static int64_t host_sqrt(int64_t *a) {
     return (int64_t)hc_builtin_sqrt((uint64_t)a[0]);
@@ -2588,7 +2596,9 @@ static struct guest_fiber *new_guest_fiber(void *entry, void *data, void *parent
     if (stack_size > SIZE_MAX - 15)
         return NULL;
     stack_size = (stack_size + 15) & ~(size_t)15;
-    for (unsigned i = 1; i < GUEST_APP_TASKS; i++) {
+    unsigned first = kind == GUEST_ENTRY_SYSTEM ? GUEST_SYSTEM : 1;
+    unsigned end = kind == GUEST_ENTRY_SYSTEM ? GUEST_SYSTEM + 1 : GUEST_APP_TASKS;
+    for (unsigned i = first; i < end; i++) {
         struct guest_fiber *f = &guest_fibers[i];
         if (f->state == GUEST_RUNNABLE)
             continue;
@@ -2640,6 +2650,40 @@ static struct guest_fiber *ensure_guest_executive(void) {
     init_guest_fiber(GUEST_EXECUTIVE, guest_fibers[0].words, "Executive");
     init_guest_context(f);
     return f;
+}
+static int64_t host_system_task_start(int64_t *a) {
+    if (!guest_task_bound || guest_current || guest_task_exe_active ||
+        guest_task_frame_active || code_owner((void *)(uintptr_t)a[0]) != &code_heap)
+        return 0;
+    struct guest_fiber *f = &guest_fibers[GUEST_SYSTEM];
+    if (f->state == GUEST_RUNNABLE)
+        return 42;
+    CHashGlblVar *system = (CHashGlblVar *)HashFind("sys_task", task.hash_table,
+                                                   HTT_GLBL_VAR, 1);
+    if (!system || !system->data_addr)
+        return 0;
+    f = new_guest_fiber((void *)(uintptr_t)a[0], NULL, guest_fibers[0].words,
+                       "System", GUEST_ENTRY_SYSTEM, GUEST_STACK_BYTES);
+    if (!f)
+        return 0;
+    /* The bootstrap root already owns the kernel/global namespace inherited
+     * by running tasks. System shares that persistent namespace and compiler
+     * arenas, rather than creating a child-local table invisible to siblings.
+     * Its guest heap, compiler context stack, queues and execution stack are
+     * separate. The system task cannot exit or be killed during this session. */
+    free(f->compiler_task.hash_table->body);
+    free(f->compiler_task.hash_table);
+    f->compiler_task.hash_table = task.hash_table;
+    f->compiler_task.heap = &data_heap;
+    f->compiler_task.code_heap = &code_heap;
+    CHashTable **mirror = (CHashTable **)((unsigned char *)f->words + guest_hash_table_off);
+    free((*mirror)->body);
+    free(*mirror);
+    *mirror = *(CHashTable **)((unsigned char *)guest_fibers[0].words + guest_hash_table_off);
+    *(uint32_t *)((unsigned char *)f->words + guest_win_inhibit_off) = UINT32_MAX;
+    *(uint32_t *)((unsigned char *)f->words + guest_display_flags_off) &= ~(1u << 0);
+    *(void **)system->data_addr = f->words;
+    return 42;
 }
 static void reclaim_guest_heap(CHeapCtrl *owner) {
     for (unsigned a = 0; a < 2; a++)
@@ -2764,8 +2808,8 @@ static int64_t host_task_yield(int64_t *a);
 static void end_guest_current(int64_t result) {
     unsigned me = guest_current;
     struct guest_fiber *f = &guest_fibers[me];
-    if (!me || me == GUEST_EXECUTIVE || f->state != GUEST_RUNNABLE)
-        zc_fail("cannot end root or executive task");
+    if (!me || me == GUEST_EXECUTIVE || me == GUEST_SYSTEM || f->state != GUEST_RUNNABLE)
+        zc_fail("cannot end root, executive or system task");
     if (f->ending) {
         guest_unwind_all();
         longjmp(f->end_context, 1); /* Exit inside a callback resumes teardown. */
@@ -2918,16 +2962,15 @@ static int valid_guest_task(void *task) {
 }
 static int64_t host_task_focus_next(int64_t *a) {
     (void)a;
-    /* Sched.ZC walks next_task from the current focus, or sys_task if
-     * nothing owns focus. Root stands in for sys_task in this bootstrap.
-     * Window stacking (EXT_WIN_TO_TOP) is not present yet. */
+    /* Walk the application ring; the hidden System server inhibits focus.
+     * The CPU executive is outside this ring. */
     void *root = guest_fibers[0].words;
     void *start = valid_guest_task(guest_focus_task) &&
                   guest_focus_task != guest_fibers[GUEST_EXECUTIVE].words
         ? guest_focus_task : root;
     void *task = *(void **)((unsigned char *)start + guest_next_task_off);
     guest_focus_task = NULL;
-    for (unsigned hops = 0; hops < GUEST_APP_TASKS + 1; hops++) {
+    for (unsigned hops = 0; hops < GUEST_TASKS; hops++) {
         if (!valid_guest_task(task) || task == guest_fibers[GUEST_EXECUTIVE].words)
             zc_fail("guest task ring corrupted");
         if (!(*(uint32_t *)((unsigned char *)task + guest_win_inhibit_off) & 1u)) {
@@ -2969,8 +3012,8 @@ static int64_t host_is_suspended(int64_t *a) {
 static int64_t host_suspend(int64_t *a) {
     void *task = a[0] ? (void *)(uintptr_t)a[0] : guest_fibers[guest_current].words;
     struct guest_fiber *f = find_guest_task(task);
-    if (!f || f == &guest_fibers[0])
-        return 0; /* The shell's root context must remain schedulable. */
+    if (!f || f == &guest_fibers[0] || f == &guest_fibers[GUEST_SYSTEM])
+        return 0; /* The shell and system server must remain schedulable. */
     uint32_t *flags = guest_flags(f);
     int64_t old = !!(*flags & GUEST_SUSPENDED);
     if (a[1])
@@ -2981,8 +3024,9 @@ static int64_t host_suspend(int64_t *a) {
 }
 static int64_t host_kill(int64_t *a) {
     struct guest_fiber *f = find_guest_task((void *)(uintptr_t)a[0]);
-    if (!f || f == &guest_fibers[0] || f == &guest_fibers[GUEST_EXECUTIVE] || a[2])
-        return 0; /* Protect shell/executive; debug-break needs an exception runtime. */
+    if (!f || f == &guest_fibers[0] || f == &guest_fibers[GUEST_EXECUTIVE] ||
+        f == &guest_fibers[GUEST_SYSTEM] || a[2])
+        return 0; /* Protect the three session services. */
     unsigned i = (unsigned)(f - guest_fibers);
     if (dispatch_blocks_current()) {
         void *ancestor = guest_fibers[guest_current].words;
@@ -3021,17 +3065,20 @@ static int64_t host_task_yield(int64_t *a) {
         zc_fail("yield during job dispatch is unsupported");
     unsigned me = guest_current;
     struct guest_fiber *self = &guest_fibers[me];
-    /* Root stands in for sys_task while the native serial shell owns its
-     * outer loop. Service queued system source at cooperative boundaries,
-     * including when root is waiting for the child that called Sys. Never
-     * enter the parser while it is compiling. A yielded source body can
-     * service nested requests through the normal bounded job dispatcher. */
-    int serve_system = !me;
+    /* Root's fallback jobs remain available to module-only sessions. The
+     * dedicated source server dispatches its ordinary work in ServerTaskCont;
+     * a yielding system job admits only nested internal Sys requests. Never
+     * enter the parser while it is compiling. */
+    int serve_system = !me || (me == GUEST_SYSTEM &&
+                              (self->source_job_active || self->active_jobs));
     uint32_t was_idle = *guest_flags(self) & GUEST_IDLE;
     if (serve_system) {
         int64_t handle[2] = {0, 0};
         (void)host_jobs_handler_mode(handle, self->source_job_active || self->active_jobs);
-        *guest_flags(self) |= GUEST_IDLE;
+        // Only the module-only root fallback borrows IDLE while yielding.
+        // A real server with an in-flight job must keep TaskWait blocked.
+        if (!me)
+            *guest_flags(self) |= GUEST_IDLE;
     }
     /* Only poll device input for the explicitly focused task. A merely
      * waiting background task must not steal serial-shell input. */
@@ -3067,6 +3114,8 @@ static int64_t host_task_exit(int64_t *a) {
     if (guest_task_exe_active ||
         (guest_job_call_active && guest_current == GUEST_EXECUTIVE))
         zc_fail("Exit during compilation or executive callback is unsupported");
+    if (guest_current == GUEST_SYSTEM)
+        guest_raise(GUEST_EXCEPT_BREAK);
     end_guest_current(0);
 }
 static int64_t guest_wait(enum guest_wait kind, void *slot, int64_t number) {
@@ -3687,7 +3736,8 @@ static int64_t host_task_exe_mode(int64_t *a, int system_request) {
     const char *source = (const char *)(uintptr_t)a[2];
     uint64_t flags = (uint64_t)a[3];
     if (!server || !source ||
-        (!(system_request && server == &guest_fibers[0]) &&
+        (!(system_request && (server == &guest_fibers[0] ||
+                             server == &guest_fibers[GUEST_SYSTEM])) &&
          *(void **)((unsigned char *)server->words + guest_popup_off) &&
          !(*guest_flags(server) & GUEST_FILTER_INPUT)) ||
         (master && !valid_guest_task(master)) ||
@@ -3697,7 +3747,8 @@ static int64_t host_task_exe_mode(int64_t *a, int system_request) {
                              GUEST_JOBF_FREE_ON_COMPLETE)) ||
         ((flags & GUEST_JOBF_WAKE_MASTER) &&
          (master != guest_fibers[guest_current].words || master == server->words)) ||
-        ((flags & GUEST_JOBF_EXIT_ON_COMPLETE) && server == &guest_fibers[0]))
+        ((flags & GUEST_JOBF_EXIT_ON_COMPLETE) &&
+         (server == &guest_fibers[0] || server == &guest_fibers[GUEST_SYSTEM])))
         return 0;
     size_t length = 0;
     while (length <= 4096 && source[length])
@@ -3860,11 +3911,11 @@ static int64_t host_jobs_handler_mode(int64_t *a, int system_only) {
     int64_t count = 0;
     while (head->next != head) {
         struct guest_job *job = head->next;
-        /* Only internal Sys requests bypass root's UI messages. Ordinary
-         * source/callback jobs retain their position behind those messages.
-         * A yielding root job likewise admits only nested system requests. */
-        if (server == &guest_fibers[0] &&
-            (system_only || job->job_code == GUEST_JOBT_MESSAGE)) {
+        /* Nested system requests bypass unrelated jobs/messages while their
+         * enclosing source body yields. Normal server dispatch keeps FIFO.
+         * Root-only sessions retain their UI-message bypass for Sys. */
+        if (system_only || (server == &guest_fibers[0] &&
+                            job->job_code == GUEST_JOBT_MESSAGE)) {
             while (job != head && !(job->flags & GUEST_JOBF_SYSTEM_REQUEST))
                 job = job->next;
             if (job == head)
@@ -3884,7 +3935,9 @@ static int64_t host_jobs_handler_mode(int64_t *a, int system_only) {
         jmp_buf landing;
         dispatch_scope_enter(&dispatch, &landing);
         int raised = setjmp(landing);
-        if (raised) {
+        int service_exit = server == &guest_fibers[GUEST_SYSTEM] &&
+                           (job->flags & GUEST_JOBF_EXIT_ON_COMPLETE);
+        if (raised || service_exit) {
             job->res = 0;
         } else if (job->job_code == GUEST_JOBT_EXE_STR) {
             server->source_job_active++;
@@ -3930,13 +3983,22 @@ static int64_t host_jobs_handler_mode(int64_t *a, int system_only) {
             guest_job_insert(guest_done_head(owner), job);
         }
         count++;
-        if (exit_on_complete)
+        if (exit_on_complete && !service_exit)
             end_guest_current(0);
     }
     return count;
 }
 static int64_t host_jobs_handler(int64_t *a) {
     return host_jobs_handler_mode(a, 0);
+}
+static int64_t host_server_jobs_handler(int64_t *a) {
+    struct guest_unwind flags;
+    guest_unwind_enter(&flags, guest_unwind_flags, NULL);
+    (void)host_rflags_set(a);
+    int64_t args[2] = {a[0], 0};
+    int64_t result = host_jobs_handler_mode(args, 0);
+    guest_unwind_leave(&flags);
+    return result;
 }
 static void guest_executive_loop(void) {
     for (;;) {
@@ -5039,16 +5101,19 @@ static int64_t host_sys(int64_t *a) {
     char source[4097];
     format_text(source, sizeof(source), (const char *)(uintptr_t)a[0],
                 a[1], (const int64_t *)(uintptr_t)a[2], 0);
+    struct guest_fiber *server = guest_fibers[GUEST_SYSTEM].state == GUEST_RUNNABLE
+        ? &guest_fibers[GUEST_SYSTEM] : &guest_fibers[0];
+    int self = server == &guest_fibers[guest_current];
     int64_t request[4] = {
-        (int64_t)(uintptr_t)guest_fibers[0].words,
+        (int64_t)(uintptr_t)server->words,
         (int64_t)(uintptr_t)guest_fibers[guest_current].words,
         (int64_t)(uintptr_t)source,
-        guest_current ? GUEST_JOBF_WAKE_MASTER : 0
+        self ? 0 : GUEST_JOBF_WAKE_MASTER
     };
     int64_t job = host_task_exe_mode(request, 1);
     if (!job)
         return 0;
-    if (!guest_current) {
+    if (self) {
         int64_t handle[2] = {0, 0};
         (void)host_jobs_handler_mode(handle, 1);
     }
@@ -5286,6 +5351,7 @@ static int load_source_path(const char *path, int merged, int recover) {
     if (registered)
         guest_unwind_enter(&load.unwind, source_load_cleanup, NULL);
     if (!strcmp(path, "/System/TaskBridge.ZC")) {
+        PrsBindCSymbol("ZcSystemTask", host_system_task, 0);
         /* KernelB-only callers need the text declaration before TaskBridge
          * is compiled. Re-declaring it inside the module creates a fresh,
          * unbound external slot before its function bodies are emitted. */
@@ -5313,6 +5379,7 @@ static int load_source_path(const char *path, int merged, int recover) {
         PrsBindCSymbol("FileRead", host_file_read, 3);
         PrsBindCSymbol("FileWrite", host_file_write, 5);
         PrsBindCSymbol("ZcSys", host_sys, 3);
+        PrsBindCSymbol("ZcSystemTask", host_system_task, 0);
         PrsBindCSymbol("ZcSourceDirExists", host_file_dir_exists, 1);
         PrsBindCSymbol("ZcSourcePath", host_source_path, 1);
         PrsBindCSymbol("Cd", host_cd, 2);
@@ -5336,6 +5403,10 @@ static int load_source_path(const char *path, int merged, int recover) {
     if (!strcmp(path, "/Kernel/Job.ZC"))
         execute_source("<system execution bridge>",
             "I64 Sys(U8 *format,...){return ZcSys(format,argc,argv);}");
+    if (!strcmp(path, "/System/ServerTask.ZC")) {
+        PrsBindCSymbol("ZcSystemTaskStart", host_system_task_start, 1);
+        PrsBindCSymbol("ZcServerJobsHandler", host_server_jobs_handler, 1);
+    }
     if (!strcmp(path, "/System/GuiTerminal.ZC"))
         PrsBindCSymbol("ZcGuiShellExec", zc_gui_shell_exec, 1);
     if (!strcmp(path, "/Kernel/KeyDev.ZC")) {
@@ -5828,6 +5899,7 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
         int64_t (*fn)(int64_t *);
         int arity;
     } bindings[] = {{"MAlloc", host_malloc, 2}, {"CAlloc", host_calloc, 2},
+                    {"ZcSystemTask", host_system_task, 0},
                     {"Call", host_call, 1}, {"ZcCallExtStr", host_call_ext_str, 1},
                     {"ZcTaskValidate", host_task_validate, 1},
                     {"ZcTaskKill", host_kill, 3},
@@ -6023,6 +6095,7 @@ int zc_start_gui_terminal(void) {
          * their real definitions exist, before installing KDDocPutKey. */
         "/System/DolDoc/DocPutKey.ZC",
         "/System/TaskSettings.ZC",
+        "/System/ServerTask.ZC",
         "/System/GuiTerminal.ZC",
     };
     int64_t result = 0;
@@ -6039,6 +6112,8 @@ int zc_start_gui_terminal(void) {
                 return -1;
         gui_terminal_modules_loaded = 1;
     }
+    if (zc_call("BootstrapSystemTaskStart", &result) != 0 || result != 42)
+        return -1;
     result = 0;
     if (zc_call("BootstrapGuiTerminalStart", &result) != 0 || result != 0x2a)
         return -1;
@@ -6200,6 +6275,13 @@ void zc_status(void) {
     printf("desktop: winmgr=%d gterm=%d windowdemo=%d presented_frames=%lu\n",
            source_winmgr_active, gui_terminal_active, window_demo_loaded,
            (unsigned long)guest_task_frame_count);
+    struct guest_fiber *system_server = &guest_fibers[GUEST_SYSTEM];
+    printf("system_server: running=%d separate=%d idle=%d queued=%d\n",
+           system_server->state == GUEST_RUNNABLE,
+           system_server->state == GUEST_RUNNABLE,
+           system_server->state == GUEST_RUNNABLE && !!(*guest_flags(system_server) & GUEST_IDLE),
+           system_server->state == GUEST_RUNNABLE &&
+               guest_job_head(system_server)->next != guest_job_head(system_server));
     printf("keyboard_focus=%s\n", keyboard_focus
            ? (const char *)((unsigned char *)keyboard_focus->words + guest_name_off)
            : "none");

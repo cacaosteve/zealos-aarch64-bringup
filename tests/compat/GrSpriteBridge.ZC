@@ -207,23 +207,18 @@ I64 GrDC2SpriteChecks()
     Free(bytes);
     DCDel(dc);
     odd_dc = DCNew(13, 2);
-    if (!odd_dc || !odd_dc->body || odd_dc->width_internal != 8)
+    if (!odd_dc || !odd_dc->body || odd_dc->width_internal != 16)
         return 5;
-    for (i = 0; i < 16; i++)
+    for (i = 0; i < 32; i++)
         odd_dc->body[i] = i + 1;
     bytes = DC2Sprite(odd_dc);
     if (!bytes)
         return 6;
     for (row = 0; row < 2; row++) {
-        for (i = 0; i < 8; i++) {
+        for (i = 0; i < 16; i++) {
             MemCopy(&actual, bytes + 20 + row * 16 + i, sizeof(U8));
-            if (actual != (row * 8 + i + 1))
+            if (actual != (row * 16 + i + 1))
                 return 7;
-        }
-        for (i = 8; i < 16; i++) {
-            MemCopy(&actual, bytes + 20 + row * 16 + i, sizeof(U8));
-            if (actual)
-                return 8;
         }
     }
     MemCopy(&actual, bytes + 20 + 32, sizeof(U8));

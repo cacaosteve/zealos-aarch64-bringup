@@ -199,7 +199,9 @@ subprocess.run([sys.executable, str(root / "scripts/source-volume.py"),
                 "--replace", "Tests/WindowDragLive.ZC",
                 "--replace", "System/GuiTerminal.ZC",
                 "--replace", "System/TaskBridge.ZC",
-                "--replace", "System/WinMgr.ZC"], check=True)
+                "--replace", "System/WinMgr.ZC",
+                "--replace", "System/Gr/GrDC.ZC",
+                "--replace", "System/Gr/SpriteRaster.ZC"], check=True)
 
 # Convenience second name for humans / older scripts
 shutil.copyfile(target, data / "zealos-esp.raw")

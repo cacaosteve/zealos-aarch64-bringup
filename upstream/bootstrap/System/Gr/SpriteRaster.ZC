@@ -2147,8 +2147,10 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
             poly_total = 0;
             if (poly_count >= 2)
             {
-                MemCopy(&poly_x1, sprite + 8, sizeof(I32));
-                MemCopy(&poly_y1, sprite + 12, sizeof(I32));
+                MemCopy(&x1, sprite + 8, sizeof(I32));
+                MemCopy(&y1, sprite + 12, sizeof(I32));
+                poly_x1 = x1;
+                poly_y1 = y1;
                 if (!SpriteTransformPoint0(dc, transform_enabled,
                         x + old_x + poly_x1, y + old_y + poly_y1, z,
                         &screen_x1, &screen_y1))
@@ -2190,8 +2192,10 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
                 if (poly_total < 0)
                     break;
                 pixel_budget += poly_total;
-                MemCopy(&poly_x1, sprite + 8, sizeof(I32));
-                MemCopy(&poly_y1, sprite + 12, sizeof(I32));
+                MemCopy(&x1, sprite + 8, sizeof(I32));
+                MemCopy(&y1, sprite + 12, sizeof(I32));
+                poly_x1 = x1;
+                poly_y1 = y1;
                 for (poly_i = 1; poly_i < poly_count; poly_i++)
                 {
                     MemCopy(&x2, sprite + 8 + poly_i * 8, sizeof(I32));
@@ -2226,8 +2230,10 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
             if (poly_count < 0 ||
                     poly_count >= 480000 - pixel_budget)
                 break;
-            MemCopy(&poly_x1, sprite + 8, sizeof(I32));
-            MemCopy(&poly_y1, sprite + 12, sizeof(I32));
+            MemCopy(&x1, sprite + 8, sizeof(I32));
+            MemCopy(&y1, sprite + 12, sizeof(I32));
+            poly_x1 = x1;
+            poly_y1 = y1;
             // The upstream record stores a start point and then `num`
             // packed 3-bit moves in NW,N,NE,W,E,SW,S,SE order.
             pixel_budget += poly_count + 1;

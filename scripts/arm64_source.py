@@ -16,6 +16,32 @@ _KTASK_GROW_BEGIN = "#exe {Option(OPTf_NO_REG_VAR, ON);};"
 _KTASK_GROW_END = "#exe {Option(OPTf_NO_REG_VAR, OFF);};"
 
 
+def extract_server_task(source: bytes) -> bytes:
+    """Load the original server loop before KTask's compiler-dependent loop.
+
+    Keep the control flow intact; route JobsHandler through the native port's
+    compiler/unwind boundary, as required by the existing source-job bridge.
+    """
+    text = source.decode("utf-8")
+    begin = "U0 ServerTaskCont()\n"
+    end = "\nU0 UserTaskCont()\n"
+    if text.count(begin) != 1 or text.count(end) != 1:
+        raise ValueError("expected the pinned server/user loop boundaries")
+    body = text[text.index(begin):text.index(end)]
+    for anchor in ("FlushMessages;", "JobsHandler(old_flags)",
+                   "LBts(&Fs->task_flags, TASKf_IDLE);",
+                   "LBts(&Fs->task_flags, TASKf_AWAITING_MESSAGE);",
+                   "Yield;", "RFlagsSet(old_flags);"):
+        if anchor not in body:
+            raise ValueError(f"pinned ServerTaskCont changed: {anchor}")
+    body = body.replace("JobsHandler(old_flags)", "ZcServerJobsHandler(old_flags)", 1)
+    return ("// Kernel/KTask.ZC server loop with the ARM64 job-dispatch boundary.\n"
+            "extern I64 ZcServerJobsHandler(I64 flags);\n" +
+            body + "\nextern I64 ZcSystemTaskStart(U0 (*entry)());\n"
+            "I64 BootstrapSystemTaskStart()\n"
+            "{\n    return ZcSystemTaskStart(&ServerTaskCont);\n}\n").encode("utf-8")
+
+
 def translate_winmgr(source: bytes) -> bytes:
     """Route the source manager's periodic redraw through atomic scanout.
 
@@ -37,6 +63,19 @@ def translate_winmgr(source: bytes) -> bytes:
         raise ValueError("WinMgr.ZC already contains the frame-run hook")
     text = text.replace(call, "\t\tZcTaskFrameRun;", 1)
     return text.encode("utf-8")
+
+
+def translate_grdc(source: bytes) -> bytes:
+    """Allocate every requested pixel, with rows rounded up to eight bytes.
+
+    The pinned DCNew rounds down instead. Odd-width brush drawing can then
+    write beyond the last row and corrupt the following heap allocation.
+    """
+    old = (b'//\tres->width_internal\t= (width + 7) & ~7;\n'
+           b'\tres->width_internal\t= width & ~7;')
+    if source.count(old) != 1:
+        raise ValueError("expected the pinned DCNew row-stride calculation")
+    return source.replace(old, b'\tres->width_internal\t= (width + 7) & ~7;', 1)
 
 
 def translate_grbitmap(source: bytes) -> bytes:

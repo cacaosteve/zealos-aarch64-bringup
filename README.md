@@ -25,13 +25,15 @@ make check-compiler-context # compiler queues, option inheritance and task isola
 make check-run-file     # task-local LastFun + upstream RunFile with application arguments
 make check-source-exceptions # catchable source/file errors + prompt, job and task cleanup
 make check-system-launch # upstream Sys/SysFile + popup application arguments
+make check-system-server # dedicated source System loop + namespace/job ownership
 make utm               # refresh VM, preserving RedSea/source edits and adding new bundled files
 ```
 
 The UTM refresh also updates the repository-managed
-`Tests/WindowDragLive.ZC`, `System/GuiTerminal.ZC`, `System/TaskBridge.ZC`, and
-`System/WinMgr.ZC` files so they stay in sync with the kernel; other existing
-guest source files remain untouched.
+`Tests/WindowDragLive.ZC`, `System/GuiTerminal.ZC`, `System/TaskBridge.ZC`,
+`System/WinMgr.ZC`, `System/Gr/GrDC.ZC`, and `System/Gr/SpriteRaster.ZC` files
+so they stay in sync with the kernel; other existing guest source files remain
+untouched.
 
 The kernel now initializes native xHCI input on QEMU virt (UTM's NEC model
 and QEMU xHCI). Keep UTM's normal USB 3.0 setting. A successfully enumerated
@@ -88,6 +90,14 @@ USB/VirtIO/serial input, portable `CharScan`/`CharGet` behavior, and the pinned
 `sys_focus_task` pointer for a focused child waiting on a key. It also exposes
 CPU-0 `JobQueue` callbacks and `SpawnQueue` task creation. A reserved executive runs queued jobs; four
 live app child tasks still have their own stacks and allocation owners.
+Desktop boot also starts a separate System task in a reserved slot. Its
+`ServerTaskCont` control flow comes from pinned `KTask.ZC`, with job execution
+routed through the native compiler/unwind dispatcher. `Sys` and `SysFile`
+execute there; the serial shell retains its own root stack and input. System
+shares the persistent kernel namespace, has its own guest heap, directory,
+queues and compiler-context stack, and drains UI messages as upstream does.
+This does not yet replace the graphical bootstrap with `UserTaskCont`: the
+original interactive compiler/lexer interface and home startup remain open.
 The bridge also maintains the upstream-visible runnable-task and parent/child
 task rings, including `TaskFocusNext` selection and child unlink on teardown.
 `TaskMathChecks`,

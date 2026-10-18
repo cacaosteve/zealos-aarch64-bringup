@@ -14,6 +14,8 @@
 #define FALSE 0
 extern U8 *MAlloc(I64 size, I64 mem_task=NULL);
 extern U8 *CAlloc(I64 size, I64 mem_task=NULL);
+// Opaque guest task pointer; available before TaskBridge initializers run.
+extern U8 *ZcSystemTask();
 extern I64 ZcMonotonicNs();
 F64 tS()
 {

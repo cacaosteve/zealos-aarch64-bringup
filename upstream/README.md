@@ -3585,7 +3585,32 @@ The hub adaptation adds bounded status-change polling, safe descendant
 teardown and reusable device DMA to YDE's initial hub attach/routing logic.
 Tests use QEMU's documented [physical port paths and device hotplug](https://www.qemu.org/docs/master/system/devices/usb.html#physical-port-addressing).
 
+## DC bitmap allocation correction
+
+The guarded `GrDC.ZC` overlay rounds `DCNew`'s row stride up to eight bytes.
+The pinned calculation rounds down, allocating fewer pixels than requested.
+Boot's 12-pixel collision brush therefore had only eight pixels per row;
+plotting its last row overwrote the following heap header with `0xff`.
+The changed System-server source layout exposed that existing overwrite.
+The pinned input stays byte-identical. `GrDCUnalignedChecks` draws all pixels
+at widths 1 through 63, checks the allocated extent and a neighboring sentinel,
+then frees each bitmap. The sprite conversion test also checks all 13 visible
+pixels per odd-width row and the serialized padding.
+
 ## Acceptance
+
+The source bundle derives `System/ServerTask.ZC` from the pinned
+`Kernel/KTask.ZC` `ServerTaskCont`/`UserTaskCont` boundary. The server loop's
+only executable substitution is `JobsHandler` to `ZcServerJobsHandler`,
+retaining its message draining, idle/awaiting flags, yielding and interrupt
+restoration. The native hook supplies the compiler recovery and job-ownership
+boundary already used by the ARM64 source executor. `BootstrapSystemTaskStart`
+creates the separate service in a reserved slot and publishes `sys_task`.
+`SysCAlloc`, `SysStrNew` and `SysMAllocIdent` allocate on that service's guest
+heap so original queued jobs survive their submitters. Global compiler names
+remain in the persistent kernel namespace; directories, execution stacks,
+queues and compiler contexts are separate. This extraction does not accept
+the remaining `KTask` startup, interactive compiler loop or `HomeSys`.
 
 - QEMU `make check-serial` must print `hc IR OK` (fails make on `hc IR FAIL`).
 - QEMU `make run-serial` (interactive shell) after green check-serial.

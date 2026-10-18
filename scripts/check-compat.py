@@ -42,6 +42,8 @@ p.add_argument('--probe-run-file', action='store_true',
                help='check task-local LastFun and unchanged RunFile with raw fixed/variadic argument words')
 p.add_argument('--probe-system-launch', action='store_true',
                help='check upstream Sys/SysFile and popup file execution at normal desktop boot')
+p.add_argument('--probe-system-server', action='store_true',
+               help='check the dedicated original ServerTaskCont loop and shared system namespace')
 p.add_argument('--probe-source-exceptions', action='store_true',
                help='check catchable source/file errors, native cleanup and command/job recovery')
 p.add_argument('--probe-winmgr', action='store_true',
@@ -542,6 +544,12 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         if not text_pixels or int(text_pixels.group(1), 16) < 100:
             raise RuntimeError('boot graphical terminal has no visible document text pixels:\n' + visible_text)
         print(f'PASS boot graphical terminal visible text pixels: {int(text_pixels.group(1), 16)}', flush=True)
+        if 'system_server: running=1 separate=1' not in desktop:
+            raise RuntimeError('boot did not start a separate source System server:\n'+desktop)
+        command('zload /Tests/SystemServer.ZC', 'zc: loaded /Tests/SystemServer.ZC')
+        for check in ('Checks', 'ChildChecks', 'ErrorChecks', 'WaitChecks'):
+            command('zcall SystemServer'+check, 'zc => 0x000000000000002a', timeout=20)
+        print('PASS dedicated source System server, shared definitions, task ownership and recovery', flush=True)
         if args.probe_system_launch:
             command('zc Print("Direct %d",Sys("19+23;"));', 'Direct 42')
             command('zc Print("Formatted %d",Sys("%d+%d;",19,23));', 'Formatted 42')
@@ -555,7 +563,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         if re.search(launch_heap, launch_before).groups() != re.search(launch_heap, launch_after).groups():
             raise RuntimeError('system requests leaked managed memory')
         print('PASS system requests complete and restore queues without arena growth', flush=True)
-        if args.probe_system_launch:
+        if args.probe_system_launch or args.probe_system_server:
             if args.probe_gui_keyboard:
                 focus_graphical_terminal()
                 qmp_send_text('zload /Tests/SystemLaunch.ZC'); qmp_send_key('ret')
@@ -565,6 +573,14 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     qmp_send_text('zc Print("  '+label+' %d",SystemLaunch'+check+'());')
                     qmp_send_key('ret')
                     require_graphical_text('launch-private-'+check,label+' 42')
+                if args.probe_system_server:
+                    qmp_send_text('zload /Tests/SystemServer.ZC'); qmp_send_key('ret')
+                    require_graphical_text('server-private-load','zc: loaded /Tests/SystemServer.ZC')
+                    for check,label in (('Checks','Server'), ('ChildChecks','ServerChild'),
+                                        ('ErrorChecks','ServerRecovery'), ('WaitChecks','ServerWait')):
+                        qmp_send_text('zc Print("  '+label+' %d",SystemServer'+check+'());')
+                        qmp_send_key('ret')
+                        require_graphical_text('server-private-'+check,label+' 42')
             raise SystemExit(0)
         command('zload /Tests/TaskSettings.ZC', 'zc: loaded /Tests/TaskSettings.ZC')
         command('zcall TaskCurrentDirectoryChecks', 'zc => 0x000000000000002a')
@@ -974,6 +990,14 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     qmp_send_key('ret')
                     require_graphical_text('system-private-'+check, label+' 42')
                 print('PASS graphical task-owned system/file/popup launch and caller recovery', flush=True)
+                qmp_send_text('zload /Tests/SystemServer.ZC'); qmp_send_key('ret')
+                require_graphical_text('server-private-load', 'zc: loaded /Tests/SystemServer.ZC')
+                for check,label in (('Checks','Server'), ('ChildChecks','ServerChild'),
+                                    ('ErrorChecks','ServerRecovery'), ('WaitChecks','ServerWait')):
+                    qmp_send_text('zc Print("  '+label+' %d",SystemServer'+check+'());')
+                    qmp_send_key('ret')
+                    require_graphical_text('server-private-'+check, label+' 42')
+                print('PASS graphical System server, child-owned source and asynchronous request lifetime', flush=True)
                 qmp_send_text('zload /Tests/SourceExceptions.ZC')
                 qmp_send_key('ret')
                 require_graphical_text('exceptions-private-load', 'zc: loaded /Tests/SourceExceptions.ZC')
@@ -991,7 +1015,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 qmp_send_text('zc Print("  Recovery %d",ExePutS2("40+2;"));')
                 qmp_send_key('ret')
                 recovered_frame = require_graphical_text('exceptions-prompt-recovered', 'Recovery 42')
-                if recovered_frame[3].count('Recovery 42') != 1:
+                if len(re.findall(r'\bRecovery 42', recovered_frame[3])) != 1:
                     raise RuntimeError('graphical command recovery output was duplicated')
                 command('zstatus', 'failed=0')
                 print('PASS graphical source/file throws clean up and accept the next command', flush=True)
@@ -1477,6 +1501,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 command('zload /Tests/GrDCLifecycle.ZC',
                         'zc: loaded /Tests/GrDCLifecycle.ZC')
                 command('zcall GrDCLifecycleChecks',
+                        'zc => 0x000000000000002a')
+                command('zcall GrDCUnalignedChecks',
                         'zc => 0x000000000000002a')
                 command('zcall GrDCCopyChecks',
                         'zc => 0x000000000000002a')

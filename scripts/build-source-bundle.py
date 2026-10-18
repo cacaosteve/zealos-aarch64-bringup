@@ -7,8 +7,8 @@ from pathlib import Path
 import sys
 import tarfile
 
-from arm64_source import (translate_docfind, translate_docform, translate_docpopup, translate_grbitmap,
-                          translate_grscreen, translate_ktask, translate_mathode,
+from arm64_source import (extract_server_task, translate_docfind, translate_docform, translate_docpopup, translate_grbitmap,
+                          translate_grdc, translate_grscreen, translate_ktask, translate_mathode,
                           translate_winmgr)
 
 root = Path(__file__).resolve().parent.parent
@@ -22,6 +22,11 @@ for name, expected in manifest['files'].items():
     if rel == 'System/Gr/GrScreen.ZC':
         try:
             data = translate_grscreen(data)
+        except ValueError as exc:
+            raise SystemExit(f'ARM64 source overlay no longer applies: {exc}') from exc
+    elif rel == 'System/Gr/GrDC.ZC':
+        try:
+            data = translate_grdc(data)
         except ValueError as exc:
             raise SystemExit(f'ARM64 source overlay no longer applies: {exc}') from exc
     elif rel == 'System/Gr/GrBitMap.ZC':
@@ -52,6 +57,7 @@ for name, expected in manifest['files'].items():
         except ValueError as exc:
             raise SystemExit(f'ARM64 source overlay no longer applies: {exc}') from exc
     elif rel == 'Kernel/KTask.ZC':
+        entries['System/ServerTask.ZC'] = extract_server_task(data)
         try:
             data = translate_ktask(data)
         except ValueError as exc:

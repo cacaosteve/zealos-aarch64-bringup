@@ -74,6 +74,9 @@ I64 SystemLaunchFileChecks()
 I64 SystemLaunchQueueChecks()
 {
     I64 value=0;
+    Bool dedicated=!StrCompare(sys_task->task_name,"System");
+    I64 expected_deferred=0, expected_message=73;
+    if (dedicated) {expected_deferred=99;expected_message=0;}
     CJob *other, *deferred;
     if (Sys("FlushMessages; I64 SystemDeferredValue=0;43;")!=43) return 7;
     other=TaskExe(sys_task,Fs,"17;",0);
@@ -82,8 +85,11 @@ I64 SystemLaunchQueueChecks()
     // consumed instead of the new system request's exact result.
     MessagePost(sys_task,MESSAGE_CMD,73,0);
     deferred=TaskExe(sys_task,Fs,"SystemDeferredValue=99;99;",0);
-    if (!deferred || Sys("40+2;")!=42 || Sys("SystemDeferredValue;")!=0) return 2;
-    if (Sys("I64 SystemQueueValue=0; MessageScan(&SystemQueueValue,NULL,1<<MESSAGE_CMD); SystemQueueValue;")!=73) return 3;
+    if (!deferred || Sys("40+2;")!=42 ||
+        Sys("SystemDeferredValue;")!=expected_deferred) return 2;
+    // The original dedicated server intentionally flushes UI messages and
+    // resumes ordinary FIFO work. The root-only fallback preserves messages.
+    if (Sys("I64 SystemQueueValue=0; MessageScan(&SystemQueueValue,NULL,1<<MESSAGE_CMD); SystemQueueValue;")!=expected_message) return 3;
     if (Sys("JobsHandler(RFlagsGet); SystemDeferredValue;")!=99 ||
         !JobResScan(deferred,&value) || value!=99) return 8;
     if (!JobResScan(other,&value) || value!=17) return 4;

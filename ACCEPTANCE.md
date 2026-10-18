@@ -562,3 +562,10 @@ explicitly updated after verifying its prior checksum. See
 [COMPATIBILITY.md](COMPATIBILITY.md) for scope, backups and screenshots.
 Full compiler/startup compatibility, cross-owner code retention and Pi hardware
 acceptance remain work; physical input acceptance is the earlier USB baseline.
+
+2026-10-18: the user physically loaded `/Tests/SystemLaunch.ZC` and ran
+`SystemLaunchPopupChecks` in the refreshed UTM graphical terminal. Typing
+appeared and the result was `0x2a` (42), completing the live system/file/popup
+launch acceptance described in [COMPATIBILITY.md](COMPATIBILITY.md).
+This confirmation precedes the dedicated System-server update; that update
+requires its own live check.

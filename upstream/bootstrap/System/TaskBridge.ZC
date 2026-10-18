@@ -331,8 +331,10 @@ U0 StrCopy(U8 *dest, U8 *source)
 {
     MemCopy(dest, source, BootstrapStrLen(source) + 1);
 }
-// Pinned Job.ZC allocates jobs on the System heap. Until Mem/MAllocFree.ZC
-// loads, map those helpers onto the current task heap used by MAlloc.
+// Pinned Job.ZC jobs and source strings must outlive their submitter. Keep
+// these helpers on sys_task's heap, including after it becomes a separate
+// server. The native task lookup supplies root for module-only sessions,
+// before desktop startup publishes the separate server in sys_task.
 U8 *CAlloc(I64 size, CTask *mem_task=NULL)
 {
     U8 *result = MAlloc(size, mem_task);
@@ -342,11 +344,11 @@ U8 *CAlloc(I64 size, CTask *mem_task=NULL)
 }
 U8 *SysCAlloc(I64 size)
 {
-    return CAlloc(size);
+    return CAlloc(size, ZcSystemTask());
 }
 U8 *SysStrNew(U8 *buf)
 {
-    return StrNew(buf);
+    return StrNew(buf, ZcSystemTask());
 }
 U8 *MAllocIdent(U8 *src, CTask *mem_task=NULL)
 {
@@ -362,7 +364,7 @@ U8 *MAllocIdent(U8 *src, CTask *mem_task=NULL)
 }
 U8 *SysMAllocIdent(U8 *src)
 {
-    return MAllocIdent(src);
+    return MAllocIdent(src, ZcSystemTask());
 }
 // Job.ZC's TaskMessage may record macros when SEMA_RECORD_MACRO is set.
 // Recording is absent here; keep empty placeholders so the unchanged source
@@ -384,7 +386,7 @@ Bool IsSingleUser()
 {
     return FALSE;
 }
-// Root stands in for Adam's sys_task until the upstream kernel starts.
+// Module-only fallback; desktop startup replaces this with ServerTaskCont.
 CTask *sys_task = Fs;
 U8 *ExtDefault(U8 *filename, U8 *extension)
 {

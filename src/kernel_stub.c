@@ -240,8 +240,8 @@ static uint8_t g_fb_text_valid[ZEAL_TEXT_MAX_COLS * ZEAL_TEXT_MAX_ROWS];
 /* Retained character output for the small cooperative guest-task bridge.
  * Cells are task-local so a z-order redraw can restore them after clearing
  * the shared text plane. */
-#define FB_TASK_TEXT_SLOTS 7
-#define FB_SHELL_TEXT_SLOT 6
+#define FB_TASK_TEXT_SLOTS 8
+#define FB_SHELL_TEXT_SLOT 7
 #define FB_TASK_TEXT_CELLS (ZEAL_TEXT_MAX_COLS * ZEAL_TEXT_MAX_ROWS)
 static uint32_t g_fb_task_text[FB_TASK_TEXT_SLOTS][FB_TASK_TEXT_CELLS];
 static uint8_t g_fb_task_text_valid[FB_TASK_TEXT_SLOTS][FB_TASK_TEXT_CELLS];

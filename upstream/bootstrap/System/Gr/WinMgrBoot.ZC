@@ -3,7 +3,10 @@
 I64 BootstrapWinMgrStart()
 {//Start the unchanged source manager on the cooperative ARM64 task bridge.
     CTask *root = Fs, *manager;
-    if (!TaskValidate(root) || sys_task != root)
+    // The bootstrap root owns the manager lifecycle. Once System starts,
+    // it is root's separate child rather than an alias for this same task.
+    if (!TaskValidate(root) || !TaskValidate(sys_task) ||
+        (sys_task != root && sys_task->parent_task != root))
         return 1;
     if (TaskValidate(sys_winmgr_task) && sys_winmgr_task != root)
         return 0x2a;
@@ -36,8 +39,9 @@ I64 BootstrapWinMgrStart()
 
 I64 BootstrapWinMgrStop()
 {//Return ownership to the shell's bootstrap frame pump for diagnostics.
-    CTask *root = sys_task, *manager = sys_winmgr_task;
-    if (!TaskValidate(root) || Fs != root)
+    CTask *root = Fs, *manager = sys_winmgr_task;
+    if (!TaskValidate(root) || !TaskValidate(sys_task) ||
+        (sys_task != root && sys_task->parent_task != root))
         return 1;
     if (!TaskValidate(manager) || manager == root)
     {

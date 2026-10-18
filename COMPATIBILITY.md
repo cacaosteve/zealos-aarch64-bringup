@@ -2996,3 +2996,80 @@ live UTM, including physical typing after restart. A final `zstatus` read was
 not collected from the restarted VM. Pointer capture was left released
 (`Value: 0`). Pointer movement/drag acceptance remains the earlier native USB
 baseline; it was not repeated for this milestone.
+
+## Dedicated System server — 2026-10-18
+
+Normal desktop boot now starts a separate System fiber in a reserved slot,
+retaining all four application child slots and the CPU-0 executive. Its loop
+is extracted from pinned `KTask.ZC`'s `ServerTaskCont`. The guarded overlay
+changes only the `JobsHandler` call to the existing native compiler/unwind
+boundary; message draining, idle/awaiting flags, yielding and interrupt
+restoration stay in the source loop. The serial root remains independent.
+`Sys`/`SysFile` target System, with nested requests and exact result ownership.
+The module-only root fallback remains available after `zreset`.
+
+System shares the persistent kernel compiler namespace so its definitions
+are visible to sibling tasks. Guest allocations, directories, queues,
+execution stacks and compiler-context stacks remain separate. The source
+`SysCAlloc`, `SysStrNew` and `SysMAllocIdent` now allocate on the live System
+heap, preserving queued jobs after a submitting child exits. Kill/Suspend
+and exit-on-completion cannot retire the server; `Exit` inside a request
+returns an unsuccessful job result and leaves the next request usable.
+An in-flight source job stays non-idle across `Yield`, so `TaskWait` cannot
+return while that job is still running. The manager lifecycle guard now
+recognizes System as the serial root's child. The retained shell text plane
+has its own slot beyond the new reserved fiber.
+
+The broader boot checks exposed a pre-existing bitmap overwrite. Pinned
+`DCNew` rounds row widths down to eight pixels, while brush plotting uses
+the requested width. A 12-pixel collision brush allocated 96 bytes and wrote
+past its last row into the following heap header. Per-statement heap checks
+localized the damage to manager startup; correcting the stride allowed the
+debug build to boot and pass both root and graphical System-server checks.
+A guarded `GrDC.ZC` overlay now rounds up; pinned source hashes stay unchanged.
+`GrDCUnalignedChecks` covers widths 1–63 and last-row/last-column writes,
+allocated extents, a neighboring sentinel and cleanup. The odd-width sprite
+test checks the visible 13-pixel rows and serialized padding. UTM refresh
+also updates this managed graphics module to prevent saved source copies
+from retaining the old allocator calculation.
+
+The focused graphics run also caught partial-width packed point reads in
+`Sprite3`: copying four coordinate bytes directly into an I64 left its upper
+half uninitialized. PolyPt and Polyline now read I32 temporaries before signed
+extension to I64. Existing point/symmetry and polyline checks cover those
+paths. UTM refresh updates that managed rasterizer too. The graphical recovery
+assertion matches the whole word `Recovery`, so the new `ServerRecovery`
+label cannot be mistaken for duplicated command output.
+
+`make check-system-server` exercises shared definitions, distinct task
+identity and parentage, interrupt state, directory isolation, protected
+lifecycle, child submissions, asynchronous submitter teardown, compiler and
+runtime errors, and waits across a yielded job. The graphical workflow runs
+the fixture privately in the terminal as well as the existing system/popup
+launch checks. This milestone does not implement the original interactive
+`UserTaskCont` compiler/lexer interface or `HomeSys` startup.
+
+Validation passed: 461 full PCI checks including source-volume compaction and
+reboot persistence, 379 full ISO checks, and 251 focused graphics checks
+including unaligned CDC allocation, packed-point symmetry and manager screen
+updates. Logs are `build/system-server-pci.log`,
+`build/system-server-iso.log` and `build/system-server-graphics.log`.
+Pinned-source hashes, guarded overlays, Python syntax, shell syntax and
+whitespace checks passed. The Pi diagnostic builds; Pi hardware was not
+tested. Temporary whole-heap instrumentation was removed before these gates.
+
+The NEC USB two-hub/VirtIO graphical workflow passed 314 checks: visible
+typing/caret/pointer, window-demo focus recovery, editor save/compile/run and
+reboot/reopen, all system/file/popup launch paths, private System-server
+checks, source exception prompt recovery, twelve keyboard reconnects,
+tablet fallback, and whole-hub detach/reattach without DMA growth.
+Its log is `build/system-server-usb.log`; inspected graphical server results
+are saved in `build/system-server-graphical-accepted.png`.
+
+The final focused PCI/graphical run passed 37 checks with the corrected
+seven-character runtime exception literal (`SrvFail`); the earlier longer
+literal had itself caused a lexer error. Actual runtime throws, CLI throws,
+`Exit`, compiler failure, child requests and yielded waits now all return to
+usable System/terminal contexts. All four private graphical checks and the
+five existing launch paths visibly returned 42. See
+`build/system-server-final-focused.log`.

@@ -1,0 +1,92 @@
+I64 system_server_child_result;
+
+I64 SystemServerChecks()
+{
+    CTask *root=Fs, *server=sys_task;
+    CJob *job;
+    U8 *dir=DirCur;
+    Bool directory_ok;
+    if (!TaskValidate(server) || server==root ||
+        StrCompare(server->task_name,"System") || !server->parent_task)
+        return 1;
+    if (Sys("Fs==sys_task;")!=1 || Sys("RFlagsGet&0x200;")!=0x200 ||
+        Sys("Fs->parent_task==0x%X;",server->parent_task)!=1)
+        return 2;
+    if (Sys("I64 SystemServerPublished(){return 42;} SystemServerPublished;")!=42 ||
+        ExePutS2("SystemServerPublished;")!=42 ||
+        Sys("I64 SystemServerOwner=Fs; SystemServerOwner;")!=server)
+        return 3;
+    // The namespace is global, but the system directory is task-local.
+    directory_ok=Sys("Cd(\"/Tests\");")==1 && Cd("/Kernel") &&
+        Sys("I64 SystemServerDirectory(){U8 *d=DirCur; I64 r=!StrCompare(d,\"/Tests\");Free(d);return r;} SystemServerDirectory;")==1;
+    directory_ok=Sys("Cd(\"/\");")==1 && directory_ok && Cd(dir);
+    Free(dir);
+    if (!directory_ok) return 4;
+    if (Kill(server) || Suspend(server) || IsSuspended(server)) return 5;
+    // The original TaskExe may queue this flag; the service dispatcher must
+    // cancel it without executing the payload or ending the System server.
+    Sys("I64 SystemServerCancelledValue=0;");
+    job=TaskExe(server,Fs,"SystemServerCancelledValue=1;42;",1<<JOBf_EXIT_ON_COMPLETE);
+    if (!job || JobResGet(job) || Sys("SystemServerCancelledValue;") ||
+        Sys("40+2;")!=42) return 7;
+    TaskWait(server);
+    if (!Bt(&server->task_flags,TASKf_IDLE) ||
+        !Bt(&server->task_flags,TASKf_AWAITING_MESSAGE) ||
+        server->server_ctrl.next_waiting!=&server->server_ctrl.next_waiting)
+        return 6;
+    return 42;
+}
+
+U0 SystemServerCaller(U8 *unused)
+{
+    if (unused) {}
+    system_server_child_result=0;
+    if (Sys("Fs==sys_task;")!=1 ||
+        ExePutS2("SystemServerPublished;")!=42) return;
+    system_server_child_result=42;
+}
+U0 SystemServerAsyncCaller(U8 *unused)
+{
+    if (unused) {}
+    // Original Job.ZC queues its copied source on System's heap. It must
+    // remain valid after this submitting child's entire heap is reclaimed.
+    TaskExe(sys_task,NULL,"I64 SystemServerAsyncValue=42;",1<<JOBf_FREE_ON_COMPLETE);
+}
+I64 SystemServerChildChecks()
+{
+    CTask *child=Spawn(&SystemServerCaller,,,,Fs);
+    if (!child) return 1;
+    while (TaskValidate(child)) Yield;
+    if (system_server_child_result!=42 || Sys("40+2;")!=42) return 2;
+    child=Spawn(&SystemServerAsyncCaller,,,,Fs);
+    if (!child) return 3;
+    while (TaskValidate(child)) Yield;
+    TaskWait(sys_task);
+    if (Sys("SystemServerAsyncValue;")!=42) return 4;
+    return 42;
+}
+
+I64 SystemServerErrorChecks()
+{
+    if (Sys("throw('SrvFail');") || Sys("40+2;")!=42 ||
+        Sys("I64 ServerBroken( {") || Sys("40+2;")!=42 ||
+        Sys("Exit;") || Sys("40+2;")!=42 ||
+        Sys("CLI throw('SrvFail');") || Sys("RFlagsGet&0x200;")!=0x200)
+        return 1;
+    return 42;
+}
+
+I64 SystemServerWaitChecks()
+{
+    CJob *job;
+    Sys("I64 SystemServerWaitStage=0;");
+    job=TaskExe(sys_task,Fs,
+        "SystemServerWaitStage=1; Yield; SystemServerWaitStage=2;42;",0);
+    if (!job) return 1;
+    while (!ExePutS2("SystemServerWaitStage;")) Yield;
+    // A queue can be empty while its removed job is still executing. Yield
+    // inside that job must not advertise the dedicated server as idle.
+    TaskWait(sys_task);
+    if (ExePutS2("SystemServerWaitStage;")!=2 || JobResGet(job)!=42) return 2;
+    return 42;
+}

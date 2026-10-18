@@ -12,9 +12,9 @@ U8 *DC2Sprite(CDC *dc)
             dc->width <= 0 || dc->width > I32_MAX - 7 || dc->height <= 0 ||
             dc->width_internal <= 0)
         return NULL;
-    // Sprite bitmap rows are padded up to eight pixels. The bootstrap CDC
-    // currently rounds width_internal down, so copy each available row into
-    // a zero-filled sprite row instead of treating the source as contiguous.
+    // Sprite bitmap rows are padded up to eight pixels. Copy each bounded
+    // source row separately so a CDC with a wider stride does not shift the
+    // next row; unavailable pixels retain the zero-filled sprite background.
     sprite_stride = (dc->width + 7) & ~7;
     copy_width = dc->width_internal;
     if (copy_width > sprite_stride)

@@ -4,8 +4,8 @@ from pathlib import Path
 import re
 import sys
 
-from arm64_source import (translate_docfind, translate_docform, translate_docpopup, translate_grbitmap,
-                          translate_grscreen, translate_ktask, translate_winmgr)
+from arm64_source import (extract_server_task, translate_docfind, translate_docform, translate_docpopup, translate_grbitmap,
+                          translate_grdc, translate_grscreen, translate_ktask, translate_winmgr)
 
 root = Path(__file__).resolve().parent.parent
 source = (root / 'upstream/pinned/System/Gr/GrScreen.ZC').read_bytes()
@@ -29,6 +29,18 @@ assert not re.search(r'(?<!Zc)ODEsUpdate\(task\);', text)
 assert text.count('dst(U8 *) += w2;') >= 2
 assert 'MOV U64 [RSI], R13' not in text
 assert 'ADD RSI, R12' not in text
+
+dc_source = (root / 'upstream/pinned/System/Gr/GrDC.ZC').read_bytes()
+dc_overlay = translate_grdc(dc_source)
+assert dc_overlay != dc_source
+assert b'res->width_internal\t= (width + 7) & ~7;' in dc_overlay
+assert b'res->width_internal\t= width & ~7;' not in dc_overlay
+try:
+    translate_grdc(dc_source.replace(b'width & ~7;', b'width & ~15;', 1))
+except ValueError:
+    pass
+else:
+    raise AssertionError('GrDC overlay accepted a changed row-stride calculation')
 
 bitmap_source = (root / 'upstream/pinned/System/Gr/GrBitMap.ZC').read_bytes()
 bitmap_overlay = translate_grbitmap(bitmap_source)
@@ -88,6 +100,18 @@ else:
     raise AssertionError('overlay accepted a changed window-manager refresh call')
 
 ktask_source = (root / 'upstream/pinned/Kernel/KTask.ZC').read_bytes()
+server_slice = extract_server_task(ktask_source)
+assert (ktask_source.split(b'U0 ServerTaskCont()\n')[1].split(b'\nU0 UserTaskCont()\n')[0]
+        .replace(b'JobsHandler(old_flags)', b'ZcServerJobsHandler(old_flags)', 1)
+        in server_slice)
+assert b'UserTaskCont' not in server_slice
+assert b'return ZcSystemTaskStart(&ServerTaskCont);' in server_slice
+try:
+    extract_server_task(ktask_source.replace(b'JobsHandler(old_flags)', b'JobsHandler(0)', 1))
+except ValueError:
+    pass
+else:
+    raise AssertionError('server extraction accepted a changed dispatch loop')
 ktask_overlay = translate_ktask(ktask_source).decode('utf-8')
 assert ktask_overlay != ktask_source.decode('utf-8')
 assert 'result = ZcCallNOnStack(&tmp->stack_base,' in ktask_overlay

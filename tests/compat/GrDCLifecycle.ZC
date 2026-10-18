@@ -3,7 +3,7 @@ I64 GrDCLifecycleChecks()
 	CDC *dc, *alias, *null_dc;
 	dc = DCNew(13, 3);
 	if (!dc || dc->dc_signature != DCS_SIGNATURE_VAL ||
-			dc->width != 13 || dc->width_internal != 8 || dc->height != 3 ||
+			dc->width != 13 || dc->width_internal != 16 || dc->height != 3 ||
 			!dc->body || dc->r[0 * 4 + 0].i32[1] != 1 ||
 			dc->r[1 * 4 + 1].i32[1] != 1 ||
 			dc->r[2 * 4 + 2].i32[1] != 1 ||
@@ -38,6 +38,31 @@ I64 GrDCLifecycleChecks()
 		return 7;
 	DCDel(dc);
 	return 42;
+}
+
+I64 GrDCUnalignedChecks()
+{//Last-column writes must fit every row, including small brush bitmaps.
+    CDC *dc;
+    U8 *sentinel;
+    I64 width, x, y;
+    for (width = 1; width < 64; width++)
+    {
+        dc = DCNew(width, 12);
+        sentinel = MAlloc(32);
+        MemSet(sentinel, 0xA5, 32);
+        if (dc->width_internal < width || (dc->width_internal & 7) ||
+            MSize(dc->body) != dc->width_internal * dc->height) return 1;
+        dc->color = COLOR_INVALID;
+        for (y = 0; y < dc->height; y++)
+            for (x = 0; x < width; x++) GrPlot0(dc, x, y);
+        for (y = 0; y < dc->height; y++)
+            for (x = 0; x < width; x++)
+                if (dc->body[y * dc->width_internal + x] != COLOR_INVALID) return 2;
+        for (x = 0; x < 32; x++) if (sentinel[x] != 0xA5) return 3;
+        Free(sentinel);
+        DCDel(dc);
+    }
+    return 42;
 }
 
 I64 GrDCCopyChecks()
