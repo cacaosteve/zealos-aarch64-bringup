@@ -1,0 +1,3 @@
+compiler_recovery_committed = 42;
+I64 RecoveryFileGood(){return 42;}
+I64 RecoveryFileBroken( {

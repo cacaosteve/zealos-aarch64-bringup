@@ -113,6 +113,9 @@ static zc_source_read_fn disk_reader;
 static zc_source_write_fn disk_writer;
 static jmp_buf guard;
 static int guarded, ready, failed;
+static jmp_buf compiler_recovery_guard;
+static int compiler_recovery_active;
+static uint64_t compiler_recovery_errors;
 static int window_demo_loaded;
 static int window_demo_restore_gui_terminal;
 static int gui_terminal_active;
@@ -377,6 +380,7 @@ void zc_set_key_reader(zc_key_event_fn read, zc_key_reset_fn reset) {
     key_reset = reset;
 }
 void zc_fail(const char *s) {
+    compiler_recovery_active = 0;
     if (guest_task_bound && guest_fibers[guest_current].irq_flags_depth) {
         struct guest_fiber *f = &guest_fibers[guest_current];
         if (f->irq_flags_stack[0] & (1u << 9))
@@ -404,6 +408,10 @@ void zc_fail(const char *s) {
 }
 void AIWNIOS_throw(uint64_t code) {
     (void)code;
+    if (compiler_recovery_active) {
+        compiler_recovery_active = 0;
+        longjmp(compiler_recovery_guard, 1);
+    }
     zc_fail("compile failed; use zreset to discard the session");
 }
 void DoNothing(void) {
@@ -4254,9 +4262,101 @@ static void bind_guest_task(void) {
     PrsBindCSymbol("sys_semas", guest_sys_semas, 0);
 }
 
+/* Parsing/emission cannot yield. Keep a statement checkpoint outside the
+ * managed heaps: parser failures can leave half-built hash entries, changed
+ * existing externs and freed/reused allocations. Restoring both arenas also
+ * restores those links and import patches. Commit before running emitted
+ * code, so prior statements and other tasks' runtime work are never undone.
+ * This costs 24 MiB of fixed recovery storage; boot module loading does not
+ * take checkpoints. Only one parser can own this buffer on CPU 0. */
+static unsigned char compiler_saved_data[DATA_BYTES] __attribute__((aligned(16)));
+static unsigned char compiler_saved_code[CODE_BYTES] __attribute__((aligned(16)));
+static CTask compiler_saved_task;
+static int compiler_saved_switch_depth, compiler_saved_fun_depth;
+static size_t compiler_saved_bytes[2];
+static uintptr_t compiler_saved_sp;
+static int64_t compiler_saved_heap_used[3 + 3 * GUEST_TASKS];
+static CHeapCtrl *compiler_checkpoint_heap(unsigned i) {
+    if (i == 0) return &data_heap;
+    if (i == 1) return &code_heap;
+    if (i == 2) return &guest_stack_heap;
+    i -= 3;
+    struct guest_fiber *f = &guest_fibers[i / 3];
+    if (i % 3 == 0) return &f->heap_owner;
+    if (i % 3 == 1) return &f->compiler_heap;
+    return &f->compiler_code_heap;
+}
+static void compiler_checkpoint_save(void) {
+    __asm__ volatile("mov %0, sp" : "=r"(compiler_saved_sp));
+    for (unsigned a = 0; a < 2; a++) {
+        size_t span = 0;
+        for (struct block *b = arenas[a]; b; b = b->next)
+            span = (unsigned char *)(b + 1) - (unsigned char *)arenas[a] +
+                   (b->used ? b->size : 0);
+        /* Include every existing block header and live payload. The last
+         * free block's unused tail cannot affect the restored allocation
+         * chain, so copying those bytes serves no recovery purpose. */
+        compiler_saved_bytes[a] = span;
+        memcpy(a ? compiler_saved_code : compiler_saved_data, arenas[a], span);
+    }
+    memcpy(&compiler_saved_task, Fs, sizeof(compiler_saved_task));
+    compiler_saved_switch_depth = aiwnios_switch_depth;
+    compiler_saved_fun_depth = aiwnios_fun_depth;
+    for (unsigned i = 0; i < 3 + 3 * GUEST_TASKS; i++)
+        compiler_saved_heap_used[i] = compiler_checkpoint_heap(i)->used_u8s;
+}
+static void compiler_checkpoint_restore(void) {
+    size_t copied = 0;
+    /* A custom fiber stack is allocated in the data arena. Restoring its
+     * payload would overwrite live native/JIT frames, including this one.
+     * Walk the saved headers, retaining stack contents while restoring all
+     * allocator metadata and compiler/application allocations around them. */
+    for (struct block *b = (struct block *)compiler_saved_data; b;) {
+        size_t offset = (unsigned char *)b - compiler_saved_data;
+        uintptr_t payload_address = (uintptr_t)data_arena + offset + sizeof(*b);
+        int active_stack = compiler_saved_sp >= payload_address &&
+                           compiler_saved_sp - payload_address < b->size;
+        if (b->used && (b->owner == &guest_stack_heap || active_stack)) {
+            size_t payload = offset + sizeof(*b);
+            memcpy(data_arena + copied, compiler_saved_data + copied,
+                   payload - copied);
+            copied = payload + b->size;
+        }
+        b = b->next ? (struct block *)(compiler_saved_data +
+             ((unsigned char *)b->next - data_arena)) : NULL;
+    }
+    memcpy(data_arena + copied, compiler_saved_data + copied,
+           compiler_saved_bytes[0] - copied);
+    memcpy(code_arena, compiler_saved_code, compiler_saved_bytes[1]);
+    memcpy(Fs, &compiler_saved_task, sizeof(compiler_saved_task));
+    aiwnios_switch_depth = compiler_saved_switch_depth;
+    aiwnios_fun_depth = compiler_saved_fun_depth;
+    for (unsigned i = 0; i < 3 + 3 * GUEST_TASKS; i++) {
+        CHeapCtrl *h = compiler_checkpoint_heap(i);
+        h->used_u8s = compiler_saved_heap_used[i];
+        sync_guest_heap(h);
+    }
+    __clear_cache(code_arena, code_arena + sizeof(code_arena));
+}
+static void compiler_source_cleanup(CCmpCtrl *cc, CLexer *lex) {
+    CodeCtrlPop(cc);
+    CmpCtrlDel(cc);
+    /* Includes and macro expansions can belong to Fs's heap rather than
+     * lex->hc. A failed parse has not consumed their normal EOF cleanup. */
+    while (lex->file) {
+        CLexFile *file = lex->file;
+        lex->file = file->last;
+        free(file->text);
+        free(file->dir);
+        free(file->filename);
+        free(file);
+    }
+    LexerDel(lex);
+}
 static int64_t execute_source_mode(const char *path, const char *src,
                                    int return_expr, int record_answer,
-                                   const char *initial_dir, int just_load) {
+                                   const char *initial_dir, int just_load,
+                                   int recover, int *error) {
     CLexer *lex = LexerNew((char *)path, (char *)src);
     lex->file->is_file = 1;
     char dir[128];
@@ -4277,9 +4377,44 @@ static int64_t execute_source_mode(const char *path, const char *src,
     CCmpCtrl *cc = CmpCtrlNew(lex);
     cc->flags |= CCF_STRINGS_ON_HEAP;
     CodeCtrlPush(cc);
-    Lex(lex);
+    int previous_compiling = guest_task_exe_active;
+    int started = 0;
     int64_t result = 0;
-    while (PrsStmt(cc)) {
+    if (error)
+        *error = 0;
+    for (;;) {
+        if (recover) {
+            compiler_checkpoint_save();
+            if (setjmp(compiler_recovery_guard)) {
+                compiler_recovery_active = 0;
+                compiler_checkpoint_restore();
+                guest_task_exe_active = previous_compiling;
+                compiler_source_cleanup(cc, lex);
+                compiler_recovery_errors++;
+                if (error)
+                    *error = 1;
+                zc_output("zc: compile failed; current statement discarded\n");
+                return 0;
+            }
+            compiler_recovery_active = 1;
+        }
+        guest_task_exe_active = 1;
+        if (!started) {
+            Lex(lex);
+            started = 1;
+        }
+        if (!PrsStmt(cc)) {
+            if (lex->cur_tok) {
+                printf("zc: unconsumed token=%ld at %s:%ld:%ld name=%s\n",
+                       (long)lex->cur_tok, lex->file ? lex->file->filename : "<eof>",
+                       lex->file ? (long)lex->file->ln + 1 : 0,
+                       lex->file ? (long)lex->file->col + 1 : 0, lex->string);
+                AIWNIOS_throw(0);
+            }
+            compiler_recovery_active = 0;
+            guest_task_exe_active = previous_compiling;
+            break;
+        }
         CRPN *first = (CRPN *)cc->code_ctrl->ir_code->next;
         int has_statement = first != (CRPN *)cc->code_ctrl->ir_code &&
                             first->type != IC_NOP;
@@ -4301,6 +4436,8 @@ static int64_t execute_source_mode(const char *path, const char *src,
             QueIns((CQue *)ret, cc->code_ctrl->ir_code);
         }
         char *code = Compile(cc, NULL, NULL, NULL);
+        compiler_recovery_active = 0;
+        guest_task_exe_active = previous_compiling;
         if (code) {
             uint64_t start = record_answer ? counter_now() : 0;
             int source_job = guest_task_bound &&
@@ -4333,21 +4470,12 @@ static int64_t execute_source_mode(const char *path, const char *src,
         CodeCtrlPop(cc);
         CodeCtrlPush(cc);
     }
-    if (lex->cur_tok) {
-        printf("zc: unconsumed token=%ld at %s:%ld:%ld name=%s\n",
-               (long)lex->cur_tok, lex->file ? lex->file->filename : "<eof>",
-               lex->file ? (long)lex->file->ln + 1 : 0,
-               lex->file ? (long)lex->file->col + 1 : 0, lex->string);
-        zc_fail("unconsumed source token");
-    }
-    CodeCtrlPop(cc);
-    CmpCtrlDel(cc);
-    LexerDel(lex);
+    compiler_source_cleanup(cc, lex);
     return just_load ? 1 : result;
 }
 static int64_t execute_source_result(const char *path, const char *src,
                                      int return_expr, int record_answer) {
-    return execute_source_mode(path, src, return_expr, record_answer, NULL, 0);
+    return execute_source_mode(path, src, return_expr, record_answer, NULL, 0, 1, NULL);
 }
 static int64_t host_exe_puts(int64_t *a) {
     const char *source = (const char *)(uintptr_t)a[0];
@@ -4377,7 +4505,7 @@ static int64_t host_exe_puts(int64_t *a) {
     f->source_job_active++;
     guest_task_exe_active = 1;
     int64_t result = execute_source_mode(filename ? path : "<ExePutS>",
-        source, 1, 1, guest_current_dir(), !!(a[2] & 0x040));
+        source, 1, 1, guest_current_dir(), !!(a[2] & 0x040), 1, NULL);
     guest_task_exe_active = 0;
     f->source_job_active--;
     return result;
@@ -4614,11 +4742,11 @@ static int64_t host_call_ext_str(int64_t *a) {
     return FFI_CALL_TOS_0(fun->fun_ptr);
 }
 static int execute_source(const char *path, const char *src) {
-    (void)execute_source_result(path, src, 0, 0);
+    (void)execute_source_mode(path, src, 0, 0, NULL, 0, 0, NULL);
     return 0;
 }
 static int load_inner(const char *path);
-static int load_source_path(const char *path, int merged) {
+static int load_source_path(const char *path, int merged, int recover) {
     size_t n;
     char *src;
     if (!strncmp(path, "disk:", 5)) {
@@ -4647,7 +4775,12 @@ static int load_source_path(const char *path, int merged) {
         guest_text_globals[5] = zeal_fb_screen_width() / 8;
         PrsBindCSymbol("text", guest_text_globals, 0);
     }
-    execute_source(path, src);
+    int compile_error = 0;
+    (void)execute_source_mode(path, src, 0, 0, NULL, 0, recover, &compile_error);
+    if (compile_error) {
+        free(src);
+        return -1;
+    }
     if (!strcmp(path, "/System/TaskBridge.ZC")) {
         CHashFun *recalc = (CHashFun *)HashFind("DocRecalc", Fs->hash_table,
                                                HTT_FUN, 1);
@@ -4910,9 +5043,13 @@ static int load_source_path(const char *path, int merged) {
     return 0;
 }
 static int load_inner(const char *path) {
-    return load_source_path(path, 0);
+    return load_source_path(path, 0, 0);
 }
 int zc_exec(const char *src) {
+    if (compiler_recovery_active) {
+        zc_output("zc: source compilation during parsing is unsupported\n");
+        return -1;
+    }
     if (!ready || failed) {
         zc_output("zc: session unavailable; use zreset\n");
         return -1;
@@ -4927,11 +5064,17 @@ int zc_exec(const char *src) {
     /* The bootstrap can compile before KernelA/KernelB bind a guest CTask.
      * Once bound, interactive zc input follows ExeCmdLine's per-statement
      * answer path. Module loads keep their separate load-only path. */
-    (void)execute_source_result("<shell>", src, guest_task_bound, guest_task_bound);
+    int compile_error = 0;
+    (void)execute_source_mode("<shell>", src, guest_task_bound, guest_task_bound,
+                              NULL, 0, 1, &compile_error);
     guarded = 0;
-    return 0;
+    return compile_error ? -1 : 0;
 }
-int zc_load(const char *path) {
+static int zc_load_mode(const char *path, int recover) {
+    if (compiler_recovery_active) {
+        zc_output("zc: source compilation during parsing is unsupported\n");
+        return -1;
+    }
     char resolved[134];
     int relative = path && path[0] != '/' && strncmp(path, "disk:", 5);
     if (!ready || failed) {
@@ -4953,9 +5096,12 @@ int zc_load(const char *path) {
     }
     /* Canonical boot/module paths retain their pinned archive semantics;
      * relative application loads use the same merged view as FileRead. */
-    int r = load_source_path(path, relative);
+    int r = load_source_path(path, relative, recover);
     guarded = 0;
     return r;
+}
+int zc_load(const char *path) {
+    return zc_load_mode(path, 1);
 }
 int zc_call(const char *name, int64_t *out) {
     if (!ready || failed)
@@ -5044,6 +5190,8 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
      * discard that abandoned parse state before loading the bootstrap again. */
     aiwnios_switch_depth = 0;
     aiwnios_fun_depth = 0;
+    compiler_recovery_active = 0;
+    compiler_recovery_errors = 0;
     guest_task_bound = 0;
     source_winmgr_active = 0;
     guest_current = guest_completed = 0;
@@ -5299,12 +5447,12 @@ int zc_start_gui_terminal(void) {
         return gui_terminal_active ? 0 : -1;
     if (!gui_terminal_modules_loaded) {
         for (size_t i = 0; i < sizeof(modules) / sizeof(*modules); i++)
-            if (zc_load(modules[i]) != 0)
+            if (zc_load_mode(modules[i], 0) != 0)
                 return -1;
         if (zc_call("BootstrapDefinesLoad", &result) != 0)
             return -1;
         for (size_t i = 0; i < sizeof(doc_modules) / sizeof(*doc_modules); i++)
-            if (zc_load(doc_modules[i]) != 0)
+            if (zc_load_mode(doc_modules[i], 0) != 0)
                 return -1;
         gui_terminal_modules_loaded = 1;
     }
@@ -5464,6 +5612,8 @@ void zc_status(void) {
     printf("zc: ready=%d failed=%d modules=%lu data=%lu/%u code=%lu/%u allocations=%lu\n", ready,
            failed, (unsigned long)loaded_modules, (unsigned long)used[0], DATA_BYTES,
            (unsigned long)used[1], CODE_BYTES, (unsigned long)(blocks[0] + blocks[1]));
+    printf("compiler_recovery: errors=%lu active=%d\n",
+           (unsigned long)compiler_recovery_errors, compiler_recovery_active);
     printf("desktop: winmgr=%d gterm=%d windowdemo=%d presented_frames=%lu\n",
            source_winmgr_active, gui_terminal_active, window_demo_loaded,
            (unsigned long)guest_task_frame_count);

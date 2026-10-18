@@ -24,9 +24,12 @@
            lex->file->col + 1);
    return A_STRDUP(buf, task);
  }
-@@ -34,7 +45,7 @@
+@@ -32,9 +43,9 @@
+   CLexFile *file = lex->file, *last;
+   int64_t ret;
    if (!lex->file)
-     return 0;
+-    return 0;
++    return lex->cur_char = 0;
    // We terminate the silly sauces with 0 as per ASCII nul character
 -  if (ret = lex->file->text[lex->file->pos]) {
 +  if (ret = (unsigned char)lex->file->text[lex->file->pos]) {
@@ -118,7 +121,22 @@
          if (idx + 1 >= STR_LEN) {
            LexErr(lex, "Name is too long.");
            return lex->cur_tok = ERR;
-@@ -632,17 +666,83 @@
+@@ -610,11 +644,13 @@
+             //   to
+             // --->(at plus)
+             //
+-            lex->file->pos--;
++            if (lex->file)
++              lex->file->pos--;
+             // We dont want to use the last charactor now that we are in a macro
+             lex->flags &= ~LEXF_USE_LAST_CHAR;
+             //
+             new_file = A_MALLOC(sizeof(CLexFile), NULL);
++            new_file->is_file = 0;
+             new_file->dir = NULL;
+             new_file->last = lex->file;
+             new_file->filename = A_STRDUP(define->base.str, NULL);
+@@ -632,17 +668,83 @@
    case '#':
      if (TK_NAME == Lex(lex)) {
        if (!strcmp(lex->string, "help_file")) {
@@ -205,7 +223,7 @@
          lex->flags |= LEXF_UNTIL_NEWLINE;
          CCmpCtrl *cc = CmpCtrlNew(lex);
          char *code;
-@@ -662,6 +762,7 @@
+@@ -662,6 +764,7 @@
          CmpCtrlDel(cc);
          if (ret)
            goto re_enter;
@@ -213,7 +231,7 @@
          goto if_fail;
        } else if (!strcmp(lex->string, "ifaot")) {
          // AIWN will only AOT compile for you,the JIT will be
-@@ -756,11 +857,12 @@
+@@ -756,11 +859,12 @@
            actual_file = actual_file->last;
          }
          if (actual_file) {
@@ -228,7 +246,7 @@
              dir = __AIWNIOS_StrDup(buf, NULL);
              *strrchr(dir, '/') = 0;
              f = fopen(buf, "rb");
-@@ -770,7 +872,12 @@
+@@ -770,7 +874,12 @@
          normal:
            f = fopen(lex->string, "rb");
            if (!strrchr(lex->string, '/')) {
@@ -242,7 +260,7 @@
            } else {
              dir = __AIWNIOS_StrDup(lex->string, NULL);
              *strrchr(dir, '/') = 0;
-@@ -798,12 +905,19 @@
+@@ -798,12 +907,19 @@
          lex->file = new_file;
          goto re_enter;
        } else if (!strcmp(lex->string, "define")) {
@@ -264,9 +282,9 @@
          strcpy(macro_name, lex->string);
          strcpy(lex->string, "");
          define = A_CALLOC(sizeof(CHashDefineStr), NULL);
-@@ -861,8 +975,7 @@
+@@ -861,8 +977,7 @@
  }
- 
+
  CLexer *LexerNew(char *filename, char *text) {
 -  static int init;
 -  if (!init) {
@@ -274,7 +292,7 @@
      struct {
        char *name;
        int64_t tok;
-@@ -925,7 +1038,16 @@
+@@ -925,7 +1040,16 @@
        kw->tk = kws[i].tok;
        HashAdd(kw, Fs->hash_table);
      }

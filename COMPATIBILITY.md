@@ -2519,12 +2519,11 @@ The in-memory `ExePutS` buffer is limited to 4096 bytes. Included files use
 the existing source-volume and compiler memory limits.
 
 This is a compiler ABI integration, not the full upstream command server:
-`RunFile` / `LastFun`, compiler-option inheritance, native `CCompCtrl` layout,
-interactive compiler error recovery and upstream startup remain work. A
-compile error still puts the bootstrap session into its existing failed state
-and requires `zreset`; the upstream `ExePutS` Compiler/Break catch is not
-implemented by this bridge. Runtime exception unwinding across a host compiler
-invocation is not established by the file-execution gate.
+`RunFile` / `LastFun`, compiler-option inheritance, native `CCompCtrl` layout
+and upstream startup remain work. Native compiler-error recovery is described
+below; the full upstream Compiler/Break catch and runtime exception unwinding
+across a host compiler invocation are not established by the file-execution
+gate.
 
 The additional declarations exposed an ARM emitter bug during the second
 TaskBridge load: `FuncProlog` marked FP-register bits through `cur_rpn` from
@@ -2569,3 +2568,64 @@ file-execution gate on the refreshed image. Pointer motion and dragging were
 accepted on the earlier native USB baseline and were not repeated for this
 compiler-only change. Full upstream startup and compiler recovery remain
 outside this accepted file-execution milestone.
+
+## Native compiler-error recovery
+
+Interactive `zc`, application `zload`, `ExePutS` / `ExeFile`, `ExePrint` and
+source jobs now catch native lexer/parser/emitter exceptions at a statement
+boundary. The error remains visible; `zc` / `zload` report failure, while the
+native `ExePutS` boundary returns zero. The session's `failed` bit remains clear
+and the task returns normally to its caller. Successfully compiled/executed
+earlier statements remain committed, including definitions loaded before a
+later statement fails. Internal bootstrap/service module loads retain their
+existing fatal-load behavior.
+
+The synchronous CPU-0 parser checkpoints allocator metadata, live data/code
+arena prefixes, the compiler task, heap counters and parser depth state before
+each parse/emission step. On a compiler exception it restores that state,
+including existing extern/import patches, then frees the restored temporary
+compiler and lexer (including unconsumed include/macro buffers). This removes
+half-built definitions and preserves an older implementation after a failed
+redefinition. Code-cache maintenance follows restoration.
+
+The checkpoint is committed before emitted code runs; runtime execution can
+yield or invoke another file, and another task may then own the shared recovery
+buffer. Parsing/emission cannot switch tasks. Allocated fiber-stack payloads
+and the allocation containing the active native stack pointer are excluded
+from restoration, while their allocator headers are restored. Both ordinary
+fiber stacks and explicitly allocated `CallNOnStack` stacks are exercised.
+Shell compiler entry points reject calls made from code being evaluated during
+parsing, before replacing either recovery guard. This keeps a compile-time
+callback from overwriting the outer statement checkpoint.
+
+Recovery reserves 24 MiB outside the managed arenas. Copies cover live prefixes
+and allocator headers rather than the unused arena tails. The managed 16 MiB
+data and 8 MiB code limits remain unchanged. `zstatus` exposes the number of
+recovered errors and whether the parser recovery boundary is active.
+
+The lexer now clears its lookahead character at EOF, preventing a missing final
+newline from repeating a stale token until the arena is exhausted. Macro
+expansion after the source file has ended no longer dereferences a null file
+stack; malformed strings, comments and directives can reach the recovery path.
+
+This handles compiler exceptions, not arbitrary runtime faults. Allocator
+invariants/exhaustion, unresolved runtime calls and uncaught runtime exceptions
+retain the failed-session behavior. Runtime exception unwinding across an
+`ExePutS` host invocation, general upstream Compiler/Break catch semantics,
+compiler option/metadata integration, preemption and full upstream startup
+remain work. External side effects of code evaluated by the compiler are not
+transactional.
+
+Validation on 2026-10-17: 49 focused recovery checks, 391 full PCI checks,
+309 full ISO checks and 208 NEC two-hub/VirtIO graphical workflow checks
+passed. The recovery gate covers failed redefinitions/classes, EOF assertions,
+missing includes, compiler re-entry, queued source jobs, child tasks, allocated
+stacks and repeated failures without managed-arena growth. The graphical gate
+observed the error text, executed a corrected command in the same terminal,
+then completed saved-file execution, editor persistence, twelve keyboard
+reconnects, tablet fallback/reattach and whole-hub recovery. The driver selects
+the terminal client before checking its title, dismissing the source manager's
+hover menu, and maps underscore/equal punctuation to explicit QMP key codes.
+Source-pin/overlay, Python syntax and whitespace checks passed; the Pi
+diagnostic target still builds. This does not establish Pi hardware acceptance
+or the final physical UTM recovery check.

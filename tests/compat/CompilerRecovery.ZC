@@ -1,0 +1,136 @@
+// Errors must discard only the current compiler statement, leaving this task
+// and its callers usable. Runtime failures are tested separately.
+I64 compiler_recovery_committed, compiler_recovery_child_result;
+I64 compiler_recovery_reentry_blocked;
+
+I64 CompilerRecoveryReentry()
+{
+    U8 *output = ZcGuiShellExec("zc I64 RecoveryMustNotCompile(){return 42;}");
+    if (!StrCompare(output, "zc: source compilation during parsing is unsupported\n"))
+        compiler_recovery_reentry_blocked = 1;
+    return 1;
+}
+
+I64 CompilerRecoveryReentryChecks()
+{
+    compiler_recovery_reentry_blocked = 0;
+    if (ExePutS("I64 recovery_reentry_extent[CompilerRecoveryReentry()]; I64 RecoveryHalf( {") ||
+        !compiler_recovery_reentry_blocked)
+        return 1;
+    if (ExePutS("RecoveryMustNotCompile();"))
+        return 2;
+    return 42;
+}
+
+I64 CompilerRecoveryResult()
+{
+    return compiler_recovery_committed;
+}
+
+I64 CompilerRecoveryChecks()
+{
+    I64 i, caught = 0;
+    for (i = 0; i < 8; i++)
+    {
+        if (ExePutS("I64 RecoveryHalf( {") ||
+            ExePutS("#assert 0") || ExePutS("#assert 0\n") ||
+            ExePutS("#define RECOVERY_EOF_VALUE 42\nRECOVERY_EOF_VALUE") ||
+            ExePutS("\"unterminated") || ExePutS("/* unterminated") ||
+            ExePutS("#include \"/Tests/NoRecoveryFile.HH\""))
+            return 1;
+    }
+    compiler_recovery_committed = 0;
+    if (ExePutS("compiler_recovery_committed=41; I64 RecoveryHalf( {") ||
+        compiler_recovery_committed != 41)
+        return 2;
+    if (ExePutS("I64 RecoveryGood(){return 42;}") ||
+        ExePutS("I64 RecoveryGood(){return MissingRecoveryName;}") ||
+        ExePutS("RecoveryGood();") != 42)
+        return 3;
+    try
+    {
+        if (ExePutS("I64 RecoveryHalf( {"))
+            return 4;
+        throw('After');
+    }
+    catch
+    {
+        if (Fs->except_ch == 'After')
+            caught = 1;
+        Fs->catch_except = TRUE;
+    }
+    if (!caught)
+        return 5;
+    return 42;
+}
+
+I64 CompilerRecoveryLeakChecks()
+{
+    I64 i;
+    for (i = 0; i < 16; i++)
+        if (ExePutS("I64 RecoveryHalf( {") ||
+            ExePutS("#include \"/Tests/NoRecoveryFile.HH\""))
+            return 1;
+    return 42;
+}
+
+I64 CompilerRecoveryJobChecks()
+{
+    CJob *job = TaskExe(Fs, Fs, "I64 RecoveryJobHalf( {", 0);
+    if (!job || JobsHandler(0) != 1 || JobResGet(job) != 0)
+        return 1;
+    job = TaskExe(Fs, Fs, "40+2;", 0);
+    if (!job || JobsHandler(0) != 1 || JobResGet(job) != 42)
+        return 2;
+    return 42;
+}
+
+U0 CompilerRecoveryChild(U8 *unused)
+{
+    CTask *self = Fs;
+    if (unused) {}
+    Yield;
+    if (ExePutS("I64 RecoveryChildHalf( {") || Fs != self)
+        return;
+    Yield;
+    compiler_recovery_child_result = ExePutS("40+2;");
+}
+
+I64 CompilerRecoveryTaskChecks()
+{
+    CTask *child;
+    I64 i, stack_size;
+    for (i = 0; i < 2; i++)
+    {
+        compiler_recovery_child_result = 0;
+        stack_size = 65536;
+        if (i)
+            stack_size = 131072;
+        child = Spawn(&CompilerRecoveryChild, NULL, "Compiler recovery", -1,
+                      NULL, stack_size);
+        if (!child)
+            return 1;
+        while (TaskValidate(child)) Yield;
+        if (compiler_recovery_child_result != 42)
+            return 2;
+    }
+    return 42;
+}
+
+I64 CompilerRecoveryOnStack()
+{
+    if (ExePutS("I64 RecoveryStackHalf( {"))
+        return 1;
+    return ExePutS("40+2;");
+}
+
+I64 CompilerRecoveryStackChecks()
+{
+    U8 *stack = MAlloc(131072);
+    I64 result;
+    if (!stack)
+        return 1;
+    result = ZcCallNOnStack(stack, stack + 131072, &CompilerRecoveryOnStack, 0, NULL);
+    Free(stack);
+    return result;
+}

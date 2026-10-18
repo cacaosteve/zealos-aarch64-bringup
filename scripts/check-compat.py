@@ -34,6 +34,8 @@ p.add_argument('--probe-source-context', action='store_true',
                help='check source-directory masks, project lookup and upstream relative document links')
 p.add_argument('--probe-source-execute', action='store_true',
                help='check upstream ExeFile through the native compiler, including task-local and nested files')
+p.add_argument('--probe-compiler-recovery', action='store_true',
+               help='check statement rollback, continued execution and task-local compiler error recovery')
 p.add_argument('--probe-winmgr', action='store_true',
                help='also try the unchanged WinMgr.ZC load with a short timeout after Win.ZC')
 p.add_argument('--probe-grscreen', action='store_true',
@@ -351,6 +353,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             ' ': ('spc',), '/': ('slash',), '.': ('dot',),
             ';': ('semicolon',), ':': ('shift', 'semicolon'), '\n': ('ret',),
             '"': ('shift', 'apostrophe'), "'": ('apostrophe',),
+            '_': ('shift', 'minus'),
+            '=': ('equal',),
             '(': ('shift', '9'), ')': ('shift', '0'),
             '{': ('shift', 'bracket_left'), '}': ('shift', 'bracket_right'),
         }
@@ -554,7 +558,43 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         command('zstatus', 'failed=0')
         if args.probe_source_execute:
             raise SystemExit(0)
+        command('zload /Tests/CompilerRecovery.ZC', 'zc: loaded /Tests/CompilerRecovery.ZC')
+        command('zc I64 RecoveryStable(){return 42;}', 'zc: executed')
+        command('zc I64 RecoveryStable(){return MissingRecoveryName;}', 'current statement discarded')
+        command('zcall RecoveryStable', 'zc => 0x000000000000002a')
+        command('zc class CRecoveryHalf {I64 value; MissingRecoveryType member;};', 'current statement discarded')
+        command('zc class CRecoveryHalf {I64 value;};', 'zc: executed')
+        command('zc I64 RecoveryClassSize(){return sizeof(CRecoveryHalf)+34;}', 'zc: executed')
+        command('zcall RecoveryClassSize', 'zc => 0x000000000000002a')
+        command('zcall CompilerRecoveryChecks', 'zc => 0x000000000000002a')
+        command('zcall CompilerRecoveryReentryChecks', 'zc => 0x000000000000002a')
+        command('zcall CompilerRecoveryJobChecks', 'zc => 0x000000000000002a')
+        command('zcall CompilerRecoveryTaskChecks', 'zc => 0x000000000000002a')
+        command('zcall CompilerRecoveryStackChecks', 'zc => 0x000000000000002a')
+        command('zcall CompilerRecoveryLeakChecks', 'zc => 0x000000000000002a')
+        before_recovery = command('zstatus', 'failed=0')
+        command('zcall CompilerRecoveryLeakChecks', 'zc => 0x000000000000002a')
+        after_recovery = command('zstatus', 'failed=0')
+        heap_pattern = r'data=([0-9/]+) code=([0-9/]+) allocations=([0-9]+)'
+        if re.search(heap_pattern, before_recovery).groups() != re.search(heap_pattern, after_recovery).groups():
+            raise RuntimeError('repeated compiler failures leaked managed memory')
+        print('PASS compiler errors preserve existing definitions and have no arena growth', flush=True)
+        rejected = command('zload /Tests/CompilerRecoveryFile.ZC', 'current statement discarded')
+        if 'zc: loaded /Tests/CompilerRecoveryFile.ZC' in rejected:
+            raise RuntimeError('failed source load was reported as successful')
+        command('zcall RecoveryFileGood', 'zc => 0x000000000000002a')
+        command('zc ExeFile("/Tests/CompilerRecoveryFile.ZC");', 'current statement discarded')
+        command('zcall RecoveryFileGood', 'zc => 0x000000000000002a')
+        recovered = command('zstatus', 'failed=0')
+        if not re.search(r'compiler_recovery: errors=[1-9][0-9]* active=0', recovered):
+            raise RuntimeError('compiler recovery diagnostics did not return to an inactive boundary')
+        if args.probe_compiler_recovery:
+            raise SystemExit(0)
         if args.probe_gui_keyboard:
+            # The source manager opens its menu when the uninitialized QMP
+            # pointer rests in the top screen row. Select the actual client
+            # before requiring unobscured terminal text or delivering keys.
+            focus_graphical_terminal()
             require_graphical_text('boot-terminal', 'ZealOS ARM64 graphical terminal')
             raw_pattern = r'usb_input:.* key_events=(\d+)' if args.usb_input else r'virtio_keyboard: ready=1 key_events=(\d+)'
             raw_before = re.search(raw_pattern, desktop)
@@ -757,6 +797,18 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     'zc => 0x0000000000000001')
             print('PASS QMP graphical window demo launch/stop restored the terminal and keyboard focus', flush=True)
             if args.probe_gui_workflow:
+                command('zc compiler_recovery_committed=0;', 'zc: executed')
+                qmp_send_text('zc I64 GuiRecoveryBroken( {')
+                qmp_send_key('ret')
+                require_graphical_text('compiler-error', 'current statement discarded')
+                qmp_send_text('zc compiler_recovery_committed=42;')
+                qmp_send_key('ret')
+                require_graphical_text('compiler-recovered', 'zc compiler_recovery_committed=42;')
+                command('zcall CompilerRecoveryResult', 'zc => 0x000000000000002a')
+                resumed_desktop = command('zstatus', 'failed=0')
+                if 'keyboard_focus=Terminal' not in resumed_desktop or 'gterm=1' not in resumed_desktop:
+                    raise RuntimeError('compiler error lost the graphical terminal or its keyboard focus')
+                print('PASS graphical compiler error returned to the prompt and accepted a corrected command', flush=True)
                 executable = ('I64 GuiSourceFile(){Print("Native file executed");return 42;} '
                               'source_file_gui_result=GuiSourceFile()*(Fs!=sys_task);')
                 command('zput Tests/GuiExecute.ZC '+executable,
@@ -1984,7 +2036,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             if re.search(heap, before).groups() != re.search(heap, after).groups():
                 raise RuntimeError('sorting leaked memory')
             command('zc I64 Broken( {', 'compile failed')
-            command('zstatus', 'failed=1')
+            command('zstatus', 'failed=0')
             command('zcheck', 'zc: upstream QuickSort + persistent modules OK')
             command('zc MAlloc(33554432);', 'allocation size out of range')
             command('zstatus', 'failed=1')
@@ -2004,28 +2056,28 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             command('zload /Tests/MathTable.ZC', 'zc: loaded /Tests/MathTable.ZC')
             command('zcall MathTableChecks', 'zc => 0x000000000000002a')
             command('zload /Tests/ClassLayoutReject.ZC', 'Class layout offset out of range')
-            command('zstatus', 'failed=1')
+            command('zstatus', 'failed=0')
             command('zreset', 'native compiler ready')
             command('zload /Tests/NamedExternDecl.ZC', 'zc: loaded /Tests/NamedExternDecl.ZC')
             command('zload /Tests/NamedImportDecl.ZC', 'zc: loaded /Tests/NamedImportDecl.ZC')
             command('zload /Tests/NamedExternCallReject.ZC', "AArch64 external 'NamedExtern' (REMOTE_PROC) is not bound")
-            command('zstatus', 'failed=1')
+            command('zstatus', 'failed=0')
             command('zreset', 'native compiler ready')
             command('zload /Tests/NamedExternDecl.ZC', 'zc: loaded /Tests/NamedExternDecl.ZC')
             command('zload /Tests/NamedExternDataReject.ZC', "AArch64 external data 'named_extern_data' is not bound")
-            command('zstatus', 'failed=1')
+            command('zstatus', 'failed=0')
             command('zreset', 'native compiler ready')
             command('zload /Tests/BindingReuse.ZC', 'zc: loaded /Tests/BindingReuse.ZC')
             command('zcall ReboundCopy', 'zc => 0x000000000000002a')
             command('zload /Tests/BindingMismatch.ZC', "AArch64 intrinsic 'SwapI64' (IC_SWAP_I64) is not implemented")
-            command('zstatus', 'failed=1')
+            command('zstatus', 'failed=0')
             command('zreset', 'native compiler ready')
             command('zload /Tests/IntrinsicDecl.ZC', 'zc: loaded /Tests/IntrinsicDecl.ZC')
             command('zload /Tests/IntrinsicReject.ZC', "AArch64 intrinsic 'Bsf' (IC_BSF) is not implemented")
-            command('zstatus', 'failed=1')
+            command('zstatus', 'failed=0')
             command('zreset', 'native compiler ready')
             command('zload /Tests/AssertFailure.ZC', '#assert failed')
-            command('zstatus', 'failed=1')
+            command('zstatus', 'failed=0')
             command('zreset', 'native compiler ready')
             command('zload /Kernel/KernelA.HH', 'zc: loaded /Kernel/KernelA.HH')
             command('zload /Kernel/KernelB.HH', 'zc: loaded /Kernel/KernelB.HH')

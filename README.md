@@ -20,6 +20,7 @@ make check-usb-topology # nested USB2 hubs, repeated reconnects + subtree recove
 make check-task-settings # upstream application state + task-local directories
 make check-source-context # directory masks + relative document/project files
 make check-source-execute # upstream ExeFile + native task-local file execution
+make check-compiler-recovery # malformed source, statement rollback and task/stack recovery
 make utm               # refresh VM, preserving RedSea/source edits and adding new bundled files
 ```
 

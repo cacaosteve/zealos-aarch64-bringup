@@ -593,6 +593,10 @@ check-source-context: check-upstream esp
 check-source-execute: check-upstream esp
 	python3 scripts/check-compat.py --pci --probe-source-execute
 
+.PHONY: check-compiler-recovery
+check-compiler-recovery: check-upstream esp
+	python3 scripts/check-compat.py --pci --probe-compiler-recovery
+
 # UTM-shaped path: boot GPT disk via virtio-blk-pci only (no MMIO RedSea).
 # Accepts when serial shows: virtio-blk: OK … pci / virtio-blk: rw OK
 run-pci: esp $(FW_VARS)

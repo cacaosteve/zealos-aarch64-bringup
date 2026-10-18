@@ -56,6 +56,10 @@ Port changes:
   `U0 (**fp)(I64)` (as in KeyDev's ctrl-alt table) keeps `RT_FUNC` and uses
   the funptr's own pointer width.
 - Collapse `$$` to `$` in string/char literals (ZealOS dollar escape).
+- Clear the lexer lookahead character at EOF. An unterminated directive must
+  report an error instead of repeatedly reusing the last character. Macro
+  expansion at EOF also tolerates an exhausted file stack and initializes its
+  file-kind field.
 - Type multi-star funptrs (`(**fp)(...)`) as `RT_PTR` so member loads are
   kept; only single-star funptrs stay `RT_FUNC`. Otherwise `fp[i]` writes at
   the member's address and smashes adjacent globals.

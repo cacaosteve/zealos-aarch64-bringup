@@ -177,6 +177,30 @@ fresh prompt and caret. The saved-file execution gate is accepted in live UTM.
 The earlier physical pointer/drag acceptance was not repeated for this
 compiler-only change.
 
+`make check-compiler-recovery` checks failed definitions without losing an
+existing implementation, class and include errors, assertion/EOF failures,
+compiler re-entry rejection, continued execution in source jobs, child tasks
+and on allocated stacks, and repeated
+failures without managed-arena growth. Successful earlier statements in a
+partially failed source file must remain usable. The graphical workflow also
+injects malformed source, observes its error, and executes a corrected command
+while retaining the terminal and its keyboard focus. Runtime allocator failures
+remain fatal to the session and are checked separately.
+
+2026-10-17 automated recovery validation passed 49 focused checks, 391 full
+PCI checks, 309 full ISO checks and 208 NEC two-hub/VirtIO graphical workflow
+checks. The physical UTM check for this update is to enter malformed source,
+then define and call a corrected function in the same terminal without reset:
+
+```text
+zc I64 Broken( {
+zc I64 RecoveryOK(){return 42;}
+zcall RecoveryOK
+```
+
+Expect a visible compiler error and fresh prompt after the first line, then
+`zc: executed` and `0x000000000000002a` from the corrected function.
+
 ## Checklist — interactive smoke
 
 1. Boot until `>` stays on screen.

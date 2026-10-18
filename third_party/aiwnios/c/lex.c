@@ -43,7 +43,7 @@ enter:;
   CLexFile *file = lex->file, *last;
   int64_t ret;
   if (!lex->file)
-    return 0;
+    return lex->cur_char = 0;
   // We terminate the silly sauces with 0 as per ASCII nul character
   if (ret = (unsigned char)lex->file->text[lex->file->pos]) {
     lex->file->pos++;
@@ -644,11 +644,13 @@ re_enter:;
             //   to
             // --->(at plus)
             //
-            lex->file->pos--;
+            if (lex->file)
+              lex->file->pos--;
             // We dont want to use the last charactor now that we are in a macro
             lex->flags &= ~LEXF_USE_LAST_CHAR;
             //
             new_file = A_MALLOC(sizeof(CLexFile), NULL);
+            new_file->is_file = 0;
             new_file->dir = NULL;
             new_file->last = lex->file;
             new_file->filename = A_STRDUP(define->base.str, NULL);
