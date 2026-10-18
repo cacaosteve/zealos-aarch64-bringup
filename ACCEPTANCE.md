@@ -543,3 +543,22 @@ VM settings. See [COMPATIBILITY.md](COMPATIBILITY.md) for scope and evidence.
 This does not establish full compiler/startup compatibility or Pi hardware
 acceptance; physical typing/pointer/drag acceptance remains the earlier native
 USB baseline.
+
+2026-10-17: the refreshed UTM graphical terminal passed application-argument
+execution through desktop automation. After `zload /Tests/RunFile.ZC`,
+`zcall RunFileTaskChecks`, `zcall RunFileChecks` and
+`zcall RunFileNestedChecks` each returned `0x000000000000002a`.
+This covers terminal-owned child code, mixed integer/F64 register/stack
+arguments, default flags, JUST_LOAD and nested/variadic execution. Typing and
+the caret were visible before Return; status afterward showed
+`ready=1 failed=0`, `compiler_recovery: errors=0 active=0`, terminal focus and
+USB keyboard/tablet ownership, with input capture released.
+The native implementation passed 419 full PCI and 337 full ISO checks;
+the expanded NEC two-hub/VirtIO graphical workflow passed 250 checks and the
+final focused gate passed 77. The final stopped-VM refresh preserved all 175
+other files outside the managed bridge/demo paths, deletion masks, RedSea
+bytes and VM settings. Only the newly installed acceptance fixture was
+explicitly updated after verifying its prior checksum. See
+[COMPATIBILITY.md](COMPATIBILITY.md) for scope, backups and screenshots.
+Full compiler/startup compatibility, cross-owner code retention and Pi hardware
+acceptance remain work; physical input acceptance is the earlier USB baseline.

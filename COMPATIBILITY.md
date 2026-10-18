@@ -2793,3 +2793,24 @@ the three RunFile fixtures were added. RedSea retained SHA-256
 `f216648875bf18c1eb122e4ad80cb8a85242e74619e424f9e9d6daac4de8d666`,
 and system/input/display/serial/QEMU/network/drive settings matched the backup.
 The preservation report is `build/run-file-utm-backup.json`.
+
+The final fixture refresh uses `5d2ac53`, with a stopped-VM backup at
+`build/utm-before-run-file-owned-20261017-205151/`. The newly installed
+`Tests/RunFile.ZC` was verified byte-for-byte against `bc0bba7` before replacing
+it with the explicit-parent fixture. All 175 other files outside the managed
+bridge/demo paths, deletion masks, RedSea bytes and VM settings were preserved.
+The fixture's new SHA-256 also matches the repository file. The report is
+`build/run-file-owned-utm-backup.json`; no native runtime change was needed for
+this fixture correction.
+
+The final live UTM smoke passed through desktop automation after loading
+`/Tests/RunFile.ZC` in the graphical terminal. `RunFileTaskChecks`,
+`RunFileChecks` and `RunFileNestedChecks` each returned
+`0x000000000000002a`, covering terminal-owned child code, mixed register/stack
+arguments, omitted flags, JUST_LOAD and nested/variadic execution. Typing and
+the insertion caret were visible before Return. Graphical `zstatus` reported
+`ready=1 failed=0`, `compiler_recovery: errors=0 active=0`, the running desktop,
+terminal focus and USB keyboard/tablet ownership. Input capture was released.
+Evidence is preserved in `build/run-file-utm-accepted.png` and
+`build/run-file-utm-status.png`. Physical typing/pointer/drag acceptance remains
+the earlier native USB baseline and was not repeated for this compiler update.
