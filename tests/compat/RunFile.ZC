@@ -105,7 +105,9 @@ I64 RunFileTaskChecks()
     CTask *child;
     CHashFun *entry;
     run_file_stage=0;
-    child=Spawn(&RunFileChild);
+    // NULL parents use sys_task. This callback belongs to the caller's
+    // compiler heap, so keep its child under that owner, including in the GUI.
+    child=Spawn(&RunFileChild,NULL,"RunFile child",-1,Fs);
     if (!child) return 1;
     while (!run_file_stage) Yield;
     ExePutS("I64 LastParent(){return 42;}");

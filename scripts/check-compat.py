@@ -894,6 +894,19 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     raise RuntimeError('RunFile output was duplicated in the graphical terminal')
                 command('zcall RunFileGuiResult', 'zc => 0x000000000000002a')
                 print('PASS unchanged RunFile forwarded arguments and ran in the graphical terminal task', flush=True)
+                # Load private definitions into the GUI task, rather than
+                # calling root-owned fixtures inherited through its hash chain.
+                qmp_send_text('zload /Tests/RunFile.ZC')
+                qmp_send_key('ret')
+                require_graphical_text('run-file-private-load', 'zc: loaded /Tests/RunFile.ZC')
+                result_line = 'zc => 0x000000000000002a'
+                before_task = graphical_screen('run-file-before-private-task')[3].count(result_line)
+                qmp_send_text('zcall RunFileTaskChecks')
+                qmp_send_key('ret')
+                private_task = require_graphical_text('run-file-private-task', result_line)
+                if private_task[3].count(result_line) != before_task + 1:
+                    raise RuntimeError('graphical task did not complete its private child-function check')
+                print('PASS graphical task-owned code spawns an owned child and keeps LastFun task-local', flush=True)
                 editor_path = '/Tests/GuiBringup.ZC'
                 source = 'I64 GuiBringup(){return 42;}'
                 qmp_send_text('edit '+editor_path)

@@ -2749,6 +2749,12 @@ task cannot replace the current task's choice. A function invoked by LastFun
 may yield or compile/run another file; the most recent definition remains
 current afterward, matching the upstream persistent state.
 
+The task-isolation fixture explicitly passes `Fs` as its Spawn parent, so it
+also works when loaded into the graphical terminal's private compiler heap.
+A NULL Spawn parent retains the upstream system-task default. The existing
+native code-lifetime guard rejects a callback owned by a task outside that
+parent's ancestry; general cross-owner code retention remains unimplemented.
+
 Compiler rollback also restores the prior last-function pointer. This covers
 a statement that completes a function definition before failing later in the
 same statement; its new metadata/code are discarded with the native compiler
@@ -2760,9 +2766,12 @@ this upstream behavior when running a file that defines no new function or
 has a compiler error. Throwing `RunFile2`/`ExeFile2`, full function/type/hash
 metadata and full upstream startup remain work.
 
-Validation: 419 full PCI checks, 337 full ISO checks and 244 NEC two-hub/VirtIO
+Validation: 419 full PCI checks, 337 full ISO checks and 250 NEC two-hub/VirtIO
 graphical workflow checks passed. A final 77-check focused pass also covers
-RunFile's omitted/default compiler-flags argument. The new gates exercise
+RunFile's omitted/default compiler-flags argument and explicit task parent.
+The graphical workflow loads private definitions into the terminal, spawns an
+owned child and verifies task-local LastFun state; its inspected screenshot is
+`build/run-file-graphical-private-task.png`. The new gates exercise
 stable saved function views, prototypes/expressions leaving LastFun unchanged,
 failed redefinitions and partially committed definitions, raw F64 results,
 variadic hidden words, ten mixed register/stack arguments, JUST_LOAD, task
@@ -2776,3 +2785,11 @@ Source-pin/overlay, Python syntax and whitespace checks passed; the Pi
 diagnostic target built, without new Pi hardware or physical-input acceptance.
 Cold boot is measured separately from command timeouts; the integration harness
 allows 180 seconds for full source compilation at startup.
+
+The live UTM image was refreshed from `bc0bba7` after the stopped-VM backup
+at `build/utm-before-run-file-20261017-203818/`. All 173 existing files outside
+the four managed bridge/demo paths and all deletion masks were preserved;
+the three RunFile fixtures were added. RedSea retained SHA-256
+`f216648875bf18c1eb122e4ad80cb8a85242e74619e424f9e9d6daac4de8d666`,
+and system/input/display/serial/QEMU/network/drive settings matched the backup.
+The preservation report is `build/run-file-utm-backup.json`.
