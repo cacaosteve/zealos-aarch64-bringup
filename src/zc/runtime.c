@@ -116,6 +116,9 @@ static int guarded, ready, failed;
 static jmp_buf compiler_recovery_guard;
 static int compiler_recovery_active;
 static uint64_t compiler_recovery_errors;
+static int64_t compiler_recovery_exception;
+#define GUEST_EXCEPT_COMPILER INT64_C(0x72656c69706d6f43)
+#define GUEST_EXCEPT_BREAK INT64_C(0x6b61657242)
 static int window_demo_loaded;
 static int window_demo_restore_gui_terminal;
 static int gui_terminal_active;
@@ -208,13 +211,32 @@ enum guest_wait {
     GUEST_WAIT_IDLE, GUEST_WAIT_MESSAGE, GUEST_WAIT_SERVER, GUEST_WAIT_JOB,
     GUEST_WAIT_TIMER, GUEST_WAIT_IDLE_TIMEOUT, GUEST_WAIT_MESSAGE_TIMEOUT
 };
+struct guest_unwind;
 struct guest_exception {
     struct guest_exception *next;
     struct guest_exception *caught_previous;
     unsigned depth;
     uint8_t previous_catch;
     int64_t previous_ch;
+    struct guest_unwind *unwind;
+    uint64_t irq_flags, irq_stack[8];
+    unsigned irq_depth;
     jmp_buf context;
+};
+/* Native scopes participate in guest exception ordering. A guest catch keeps
+ * scopes active at its SysTry; scopes entered afterward must unwind first.
+ * A landing pad handles cleanup in its own C frame; cleanup-only scopes can
+ * be retired directly while the throwing native frame is still on-stack. */
+struct guest_unwind {
+    struct guest_unwind *previous;
+    struct guest_exception *top, *caught;
+    void (*cleanup)(struct guest_unwind *);
+    jmp_buf *landing;
+    volatile int64_t exception;
+    int64_t previous_ch;
+    uint8_t previous_catch;
+    uint64_t irq_flags, irq_stack[8];
+    unsigned irq_depth;
 };
 struct source_context;
 struct guest_fiber {
@@ -251,6 +273,7 @@ struct guest_fiber {
     int64_t last_polled_key_code;
     struct guest_active_job *active_jobs;
     struct guest_exception *except_top, *except_caught;
+    struct guest_unwind *unwind;
     jmp_buf throw_context;
     jmp_buf end_context;
 };
@@ -376,6 +399,10 @@ extern uint64_t zeal_fb_task_text_compose(unsigned slot, int64_t left,
 extern uint64_t zeal_fb_shell_text_compose(uint32_t *text_base,
                                             int64_t stride);
 static void guest_task_text_output(const char *text);
+static void guest_raise(int64_t code) __attribute__((noreturn));
+static void guest_unwind_all(void);
+static int64_t host_rflags_get(int64_t *a);
+static int64_t host_rflags_set(int64_t *a);
 static int64_t execute_source_result(const char *path, const char *src,
                                      int return_expr, int record_answer);
 extern void __clear_cache(void *, void *);
@@ -422,6 +449,7 @@ void zc_fail(const char *s) {
 void AIWNIOS_throw(uint64_t code) {
     (void)code;
     if (compiler_recovery_active) {
+        compiler_recovery_exception = GUEST_EXCEPT_COMPILER;
         compiler_recovery_active = 0;
         longjmp(compiler_recovery_guard, 1);
     }
@@ -1961,6 +1989,67 @@ static int64_t host_gs(int64_t *a) {
     return (int64_t)(uintptr_t)(guest_cpu_structs ? guest_cpu_structs
                                                   : guest_cpu);
 }
+static void guest_unwind_enter(struct guest_unwind *scope,
+                                void (*cleanup)(struct guest_unwind *),
+                                jmp_buf *landing) {
+    struct guest_fiber *f = &guest_fibers[guest_current];
+    *scope = (struct guest_unwind){
+        .previous = f->unwind, .top = f->except_top, .caught = f->except_caught,
+        .cleanup = cleanup, .landing = landing,
+        .previous_ch = *(int64_t *)((unsigned char *)f->words + guest_except_ch_off),
+        .previous_catch = *(uint8_t *)((unsigned char *)f->words + guest_catch_except_off)
+    };
+    scope->irq_flags = (uint64_t)host_rflags_get(NULL);
+    scope->irq_depth = f->irq_flags_depth;
+    memcpy(scope->irq_stack, f->irq_flags_stack, sizeof(scope->irq_stack));
+    f->unwind = scope;
+}
+static void guest_unwind_flags(struct guest_unwind *scope) {
+    struct guest_fiber *f = &guest_fibers[guest_current];
+    f->irq_flags_depth = scope->irq_depth;
+    memcpy(f->irq_flags_stack, scope->irq_stack, sizeof(scope->irq_stack));
+    int64_t flags = (int64_t)scope->irq_flags;
+    f->irq_flags_live = scope->irq_flags;
+    host_rflags_set(&flags);
+}
+static void guest_unwind_leave(struct guest_unwind *scope) {
+    struct guest_fiber *f = &guest_fibers[guest_current];
+    if (f->unwind != scope)
+        zc_fail("native exception scope order mismatch");
+    /* A scope being abandoned cannot leave pads whose saved stacks belong
+     * to it. Well-formed normal returns already removed these pads. */
+    while (f->except_top != scope->top) {
+        struct guest_exception *pad = f->except_top;
+        if (!pad) zc_fail("native exception scope lost its guest handler");
+        f->except_top = pad->next;
+        free(pad);
+    }
+    while (f->except_caught != scope->caught) {
+        struct guest_exception *pad = f->except_caught;
+        if (!pad) zc_fail("native exception scope lost its outer catch");
+        f->except_caught = pad->caught_previous;
+        free(pad);
+    }
+    f->unwind = scope->previous;
+    if (scope->cleanup)
+        scope->cleanup(scope);
+}
+static void guest_unwind_handled(struct guest_unwind *scope, int64_t code) {
+    struct guest_fiber *f = &guest_fibers[guest_current];
+    *(int64_t *)((unsigned char *)f->words + guest_except_ch_off) =
+        scope->caught ? scope->previous_ch : code;
+    *(uint8_t *)((unsigned char *)f->words + guest_catch_except_off) =
+        scope->caught ? scope->previous_catch : 0;
+}
+static void guest_unwind_abandon(struct guest_unwind *scope) {
+    guest_unwind_leave(scope);
+    guest_unwind_flags(scope);
+}
+static void guest_unwind_all(void) {
+    if (guest_task_bound)
+        while (guest_fibers[guest_current].unwind)
+            guest_unwind_abandon(guest_fibers[guest_current].unwind);
+}
 static int64_t host_sys_try(int64_t *a) {
     (void)a;
     if (!guest_task_bound || guest_fibers[guest_current].state != GUEST_RUNNABLE)
@@ -1973,6 +2062,10 @@ static int64_t host_sys_try(int64_t *a) {
     pad->previous_catch = *(uint8_t *)((unsigned char *)f->words + guest_catch_except_off);
     pad->previous_ch = *(int64_t *)((unsigned char *)f->words + guest_except_ch_off);
     pad->next = f->except_top;
+    pad->unwind = f->unwind;
+    pad->irq_flags = (uint64_t)host_rflags_get(NULL);
+    pad->irq_depth = f->irq_flags_depth;
+    memcpy(pad->irq_stack, f->irq_flags_stack, sizeof(pad->irq_stack));
     f->except_top = pad;
     return (int64_t)(uintptr_t)pad->context;
 }
@@ -1986,9 +2079,27 @@ static int64_t host_sys_untry(int64_t *a) {
     __AIWNIOS_Free(pad);
     return 0;
 }
-static int64_t host_guest_throw(int64_t *a) {
+static void guest_raise(int64_t code) {
     struct guest_fiber *f = &guest_fibers[guest_current];
     struct guest_exception *pad = guest_task_bound ? f->except_top : NULL;
+    struct guest_unwind *target = pad ? pad->unwind : NULL;
+    while (guest_task_bound && f->unwind != target) {
+        struct guest_unwind *scope = f->unwind;
+        if (!scope)
+            zc_fail("guest catch has an abandoned native scope");
+        if (scope->landing) {
+            if (compiler_recovery_active) {
+                /* A preprocessor expression escaped its guest handler.
+                 * Restore the parser checkpoint before freeing its objects. */
+                compiler_recovery_exception = code;
+                compiler_recovery_active = 0;
+                longjmp(compiler_recovery_guard, 1);
+            }
+            scope->exception = code;
+            longjmp(*scope->landing, 1);
+        }
+        guest_unwind_abandon(scope);
+    }
     if (!pad)
         zc_fail("uncaught guest exception");
     /* A catch already unwound past the next handler cannot remain active.
@@ -2001,10 +2112,18 @@ static int64_t host_guest_throw(int64_t *a) {
     f->except_top = pad->next;
     pad->caught_previous = f->except_caught;
     f->except_caught = pad;
-    *(int64_t *)((unsigned char *)f->words + guest_except_ch_off) = a[0];
+    *(int64_t *)((unsigned char *)f->words + guest_except_ch_off) = code;
     *(uint8_t *)((unsigned char *)f->words + guest_catch_except_off) = 0;
     memcpy(f->throw_context, pad->context, sizeof(f->throw_context));
+    f->irq_flags_depth = pad->irq_depth;
+    memcpy(f->irq_flags_stack, pad->irq_stack, sizeof(pad->irq_stack));
+    int64_t flags = (int64_t)pad->irq_flags;
+    f->irq_flags_live = pad->irq_flags;
+    host_rflags_set(&flags);
     longjmp(f->throw_context, 1);
+}
+static int64_t host_guest_throw(int64_t *a) {
+    guest_raise(a[0]);
 }
 static int64_t host_end_catch(int64_t *a) {
     (void)a;
@@ -2593,6 +2712,7 @@ static void finish_guest(unsigned i, int64_t result) {
         cancel_active_job(active->job);
     f->active_jobs = NULL;
     f->except_top = f->except_caught = NULL;
+    f->unwind = NULL;
     guest_jobs_clear(f);
     reclaim_guest_heap(&f->heap_owner);
     if (i) {
@@ -2610,12 +2730,15 @@ static void end_guest_current(int64_t result) {
     struct guest_fiber *f = &guest_fibers[me];
     if (!me || me == GUEST_EXECUTIVE || f->state != GUEST_RUNNABLE)
         zc_fail("cannot end root or executive task");
-    if (f->ending)
+    if (f->ending) {
+        guest_unwind_all();
         longjmp(f->end_context, 1); /* Exit inside a callback resumes teardown. */
+    }
     f->ending = 1;
     f->kill_requested = 0;
     f->wait_kind = GUEST_WAIT_NONE;
     *guest_flags(f) &= ~(GUEST_KILL_TASK | GUEST_SUSPENDED | GUEST_AWAITING_MESSAGE);
+    guest_unwind_all();
     (void)setjmp(f->end_context);
     for (;;) {
         void **slot = (void **)((unsigned char *)f->words + guest_end_cb_off);
@@ -3367,6 +3490,23 @@ static int64_t host_message_self(int64_t *a) {
                        a[0], a[1], a[2], a[3]};
     return host_message_post(post);
 }
+struct dispatch_scope {
+    struct guest_unwind unwind;
+    int compiling, callbacks, source_jobs;
+};
+static void dispatch_scope_cleanup(struct guest_unwind *scope) {
+    struct dispatch_scope *dispatch = (struct dispatch_scope *)scope;
+    guest_task_exe_active = dispatch->compiling;
+    guest_job_call_active = dispatch->callbacks;
+    guest_fibers[guest_current].source_job_active = dispatch->source_jobs;
+    guest_unwind_flags(scope);
+}
+static void dispatch_scope_enter(struct dispatch_scope *dispatch, jmp_buf *landing) {
+    dispatch->compiling = guest_task_exe_active;
+    dispatch->callbacks = guest_job_call_active;
+    dispatch->source_jobs = guest_fibers[guest_current].source_job_active;
+    guest_unwind_enter(&dispatch->unwind, dispatch_scope_cleanup, landing);
+}
 static void guest_input_filter_loop(void) {
     struct guest_fiber *filter = &guest_fibers[guest_current];
     struct guest_job *head = guest_job_head(filter);
@@ -3398,11 +3538,18 @@ static void guest_input_filter_loop(void) {
         *guest_flags(filter) &= ~GUEST_IDLE;
         struct guest_active_job active = {filter->active_jobs, job};
         filter->active_jobs = &active;
-        filter->source_job_active++;
-        guest_task_exe_active = 1;
-        (void)execute_source_result("<TaskText>", job->aux_str, 1, 1);
-        guest_task_exe_active = 0;
-        filter->source_job_active--;
+        struct dispatch_scope dispatch;
+        jmp_buf landing;
+        dispatch_scope_enter(&dispatch, &landing);
+        int raised = setjmp(landing);
+        if (!raised) {
+            filter->source_job_active++;
+            guest_task_exe_active = 1;
+            (void)execute_source_result("<TaskText>", job->aux_str, 1, 1);
+        }
+        guest_unwind_leave(&dispatch.unwind);
+        if (raised)
+            guest_unwind_handled(&dispatch.unwind, dispatch.unwind.exception);
         filter->active_jobs = active.previous;
         guest_job_delete(job);
     }
@@ -3668,7 +3815,13 @@ static int64_t host_jobs_handler(int64_t *a) {
         server->active_jobs = &active;
         job->flags |= GUEST_JOBF_DISPATCHED;
         *guest_flags(server) &= ~GUEST_IDLE;
-        if (job->job_code == GUEST_JOBT_EXE_STR) {
+        struct dispatch_scope dispatch;
+        jmp_buf landing;
+        dispatch_scope_enter(&dispatch, &landing);
+        int raised = setjmp(landing);
+        if (raised) {
+            job->res = 0;
+        } else if (job->job_code == GUEST_JOBT_EXE_STR) {
             server->source_job_active++;
             guest_task_exe_active = 1;
             job->res = execute_source_result("<TaskExe>", job->aux_str, 1, 1);
@@ -3687,6 +3840,9 @@ static int64_t host_jobs_handler(int64_t *a) {
                 : NULL;
             job->spawned_task = child ? child->words : NULL;
         }
+        guest_unwind_leave(&dispatch.unwind);
+        if (raised)
+            guest_unwind_handled(&dispatch.unwind, dispatch.unwind.exception);
         server->active_jobs = active.previous;
         int exit_on_complete = !!(job->flags & GUEST_JOBF_EXIT_ON_COMPLETE);
         struct guest_fiber *master = find_guest_task(job->master_task);
@@ -4463,6 +4619,9 @@ static int compiler_saved_switch_depth, compiler_saved_fun_depth;
 static size_t compiler_saved_bytes[2];
 static uintptr_t compiler_saved_sp;
 static void *compiler_saved_last_fun;
+static struct guest_exception *compiler_saved_except_top, *compiler_saved_except_caught;
+static int64_t compiler_saved_except_ch;
+static uint8_t compiler_saved_catch_except;
 static int64_t compiler_saved_heap_used[3 + 3 * GUEST_TASKS];
 static CHeapCtrl *compiler_checkpoint_heap(unsigned i) {
     if (i == 0) return &data_heap;
@@ -4491,6 +4650,13 @@ static void compiler_checkpoint_save(void) {
     compiler_saved_last_fun = guest_task_bound
         ? *(void **)((unsigned char *)guest_fibers[guest_current].words + guest_last_fun_off)
         : NULL;
+    if (guest_task_bound) {
+        struct guest_fiber *f = &guest_fibers[guest_current];
+        compiler_saved_except_top = f->except_top;
+        compiler_saved_except_caught = f->except_caught;
+        compiler_saved_except_ch = *(int64_t *)((unsigned char *)f->words + guest_except_ch_off);
+        compiler_saved_catch_except = *(uint8_t *)((unsigned char *)f->words + guest_catch_except_off);
+    }
     compiler_saved_switch_depth = aiwnios_switch_depth;
     compiler_saved_fun_depth = aiwnios_fun_depth;
     for (unsigned i = 0; i < 3 + 3 * GUEST_TASKS; i++)
@@ -4523,6 +4689,13 @@ static void compiler_checkpoint_restore(void) {
     if (guest_task_bound)
         *(void **)((unsigned char *)guest_fibers[guest_current].words + guest_last_fun_off) =
             compiler_saved_last_fun;
+    if (guest_task_bound) {
+        struct guest_fiber *f = &guest_fibers[guest_current];
+        f->except_top = compiler_saved_except_top;
+        f->except_caught = compiler_saved_except_caught;
+        *(int64_t *)((unsigned char *)f->words + guest_except_ch_off) = compiler_saved_except_ch;
+        *(uint8_t *)((unsigned char *)f->words + guest_catch_except_off) = compiler_saved_catch_except;
+    }
     aiwnios_switch_depth = compiler_saved_switch_depth;
     aiwnios_fun_depth = compiler_saved_fun_depth;
     for (unsigned i = 0; i < 3 + 3 * GUEST_TASKS; i++) {
@@ -4547,6 +4720,30 @@ static void compiler_source_cleanup(CCmpCtrl *cc, CLexer *lex) {
     }
     LexerDel(lex);
 }
+struct source_execution {
+    struct guest_unwind unwind;
+    CLexer *lex;
+    CCmpCtrl *cc;
+    struct source_context context;
+    char *volatile code;
+    int previous_compiling;
+    int registered;
+};
+static void source_execution_cleanup(struct guest_unwind *scope) {
+    struct source_execution *execution = (struct source_execution *)scope;
+    guest_task_exe_active = execution->previous_compiling;
+    free(execution->code);
+    guest_context_leave(&execution->context);
+    compiler_source_cleanup(execution->cc, execution->lex);
+}
+static void source_execution_leave(struct source_execution *execution) {
+    if (execution->registered)
+        guest_unwind_leave(&execution->unwind);
+    else
+        source_execution_cleanup(&execution->unwind);
+}
+/* recover: 0 = boot/fatal parser, 1 = ExePutS Compiler/Break catch,
+ *          2 = ExePutS2, restoring native parser state before guest rethrow. */
 static int64_t execute_source_mode(const char *path, const char *src,
                                    int return_expr, int record_answer,
                                    const char *initial_dir, int64_t guest_flags, int just_load,
@@ -4571,14 +4768,32 @@ static int64_t execute_source_mode(const char *path, const char *src,
     CCmpCtrl *cc = CmpCtrlNew(lex);
     cc->flags |= CCF_STRINGS_ON_HEAP;
     CodeCtrlPush(cc);
-    struct source_context context;
-    guest_context_enter(&context, lex, !strcmp(path, "<shell>"), guest_flags);
+    struct source_execution execution = {
+        .lex = lex, .cc = cc, .previous_compiling = guest_task_exe_active,
+        .registered = guest_task_bound
+    };
+    guest_context_enter(&execution.context, lex, !strcmp(path, "<shell>"), guest_flags);
     lex->port_fun_complete = guest_function_complete;
     int previous_compiling = guest_task_exe_active;
     int started = 0;
     int64_t result = 0;
     if (error)
         *error = 0;
+    jmp_buf landing;
+    if (execution.registered) {
+        guest_unwind_enter(&execution.unwind, source_execution_cleanup, &landing);
+        if (setjmp(landing)) {
+            int64_t code = execution.unwind.exception;
+            source_execution_leave(&execution);
+            guest_unwind_flags(&execution.unwind);
+            if (recover == 1 && (code == GUEST_EXCEPT_COMPILER || code == GUEST_EXCEPT_BREAK)) {
+                guest_unwind_handled(&execution.unwind, code);
+                if (error) *error = 1;
+                return 0;
+            }
+            guest_raise(code);
+        }
+    }
     for (;;) {
         if (recover) {
             compiler_checkpoint_save();
@@ -4586,14 +4801,20 @@ static int64_t execute_source_mode(const char *path, const char *src,
                 compiler_recovery_active = 0;
                 compiler_checkpoint_restore();
                 guest_task_exe_active = previous_compiling;
-                if (context.mirror)
-                    (*(int64_t *)(context.mirror + guest_cc_errors_off))++;
-                guest_context_leave(&context);
-                compiler_source_cleanup(cc, lex);
+                int64_t code = compiler_recovery_exception;
+                if (execution.context.mirror)
+                    (*(int64_t *)(execution.context.mirror + guest_cc_errors_off))++;
+                source_execution_leave(&execution);
+                if (execution.registered)
+                    guest_unwind_flags(&execution.unwind);
                 compiler_recovery_errors++;
                 if (error)
                     *error = 1;
                 zc_output("zc: compile failed; current statement discarded\n");
+                if (recover == 2 || (code != GUEST_EXCEPT_COMPILER && code != GUEST_EXCEPT_BREAK))
+                    guest_raise(code);
+                if (execution.registered)
+                    guest_unwind_handled(&execution.unwind, code);
                 return 0;
             }
             compiler_recovery_active = 1;
@@ -4638,6 +4859,7 @@ static int64_t execute_source_mode(const char *path, const char *src,
             QueIns((CQue *)ret, cc->code_ctrl->ir_code);
         }
         char *code = Compile(cc, NULL, NULL, NULL);
+        execution.code = code;
         compiler_recovery_active = 0;
         guest_task_exe_active = previous_compiling;
         if (code) {
@@ -4660,6 +4882,7 @@ static int64_t execute_source_mode(const char *path, const char *src,
                 guest_task_exe_active = 1;
             uint64_t end = record_answer ? counter_now() : 0;
             free(code);
+            execution.code = NULL;
             if (!just_load && has_statement && record_answer && guest_task_bound) {
                 unsigned char *words = (unsigned char *)guest_fibers[guest_current].words;
                 uint64_t frequency;
@@ -4674,15 +4897,23 @@ static int64_t execute_source_mode(const char *path, const char *src,
         CodeCtrlPop(cc);
         CodeCtrlPush(cc);
     }
-    guest_context_leave(&context);
-    compiler_source_cleanup(cc, lex);
+    source_execution_leave(&execution);
     return just_load ? 1 : result;
 }
 static int64_t execute_source_result(const char *path, const char *src,
                                      int return_expr, int record_answer) {
     return execute_source_mode(path, src, return_expr, record_answer, NULL, 0, 0, 1, NULL);
 }
-static int64_t host_exe_puts(int64_t *a) {
+struct source_call_scope {
+    struct guest_unwind unwind;
+    int previous_compiling, previous_jobs;
+};
+static void source_call_cleanup(struct guest_unwind *scope) {
+    struct source_call_scope *call = (struct source_call_scope *)scope;
+    guest_task_exe_active = call->previous_compiling;
+    guest_fibers[guest_current].source_job_active = call->previous_jobs;
+}
+static int64_t host_exe_puts_mode(int64_t *a, int throwing) {
     const char *source = (const char *)(uintptr_t)a[0];
     const char *filename = (const char *)(uintptr_t)a[1];
     char path[134];
@@ -4707,66 +4938,39 @@ static int64_t host_exe_puts(int64_t *a) {
     if (filename && guest_path(filename, path))
         zc_fail("ExePutS filename is invalid");
     struct guest_fiber *f = &guest_fibers[guest_current];
+    struct source_call_scope call = {
+        .previous_compiling = guest_task_exe_active,
+        .previous_jobs = f->source_job_active
+    };
+    guest_unwind_enter(&call.unwind, source_call_cleanup, NULL);
     f->source_job_active++;
     guest_task_exe_active = 1;
-    int64_t result = execute_source_mode(filename ? path : "<ExePutS>",
-        source, 1, 1, guest_current_dir(), a[2], !!(a[2] & 0x040), 1, NULL);
-    guest_task_exe_active = 0;
-    f->source_job_active--;
+    int64_t result = execute_source_mode(filename ? path : throwing ? "<ExePutS2>" : "<ExePutS>",
+        source, 1, 1, guest_current_dir(), a[2], !!(a[2] & 0x040), throwing ? 2 : 1, NULL);
+    guest_unwind_leave(&call.unwind);
     return result;
+}
+static int64_t host_exe_puts(int64_t *a) {
+    return host_exe_puts_mode(a, 0);
+}
+static int64_t host_exe_puts2(int64_t *a) {
+    int64_t args[4] = {a[0], a[1], a[2], 0};
+    return host_exe_puts_mode(args, 1);
+}
+static size_t format_text(char *output, size_t capacity, const char *format,
+                          int64_t argc, const int64_t *argv);
+static int64_t host_exe_print_mode(int64_t *a, int throwing) {
+    char source[4097];
+    format_text(source, sizeof(source), (const char *)(uintptr_t)a[0],
+                a[1], (const int64_t *)(uintptr_t)a[2]);
+    int64_t args[4] = {(int64_t)(uintptr_t)source, 0, 0, 0};
+    return host_exe_puts_mode(args, throwing);
 }
 static int64_t host_exe_print(int64_t *a) {
-    const char *format = (const char *)(uintptr_t)a[0];
-    const char *source = (const char *)(uintptr_t)a[1];
-    if (!guest_task_bound || guest_fibers[guest_current].state != GUEST_RUNNABLE)
-        zc_fail("ExePrint requires a guest task");
-    if (!format || strcmp(format, "%s") || !source)
-        zc_fail("ExePrint currently requires \"%s\" and a source string");
-    size_t length = 0;
-    while (length <= 4096 && source[length])
-        length++;
-    if (length > 4096)
-        zc_fail("ExePrint source exceeds 4096 bytes");
-    if (guest_task_exe_active)
-        zc_fail("ExePrint during compilation is unsupported");
-    struct guest_fiber *f = &guest_fibers[guest_current];
-    f->source_job_active++;
-    guest_task_exe_active = 1;
-    int64_t result = execute_source_result("<ExePrint>", source, 1, 1);
-    guest_task_exe_active = 0;
-    f->source_job_active--;
-    return result;
+    return host_exe_print_mode(a, 0);
 }
 static int64_t host_exe_print2(int64_t *a) {
-    const char *format = (const char *)(uintptr_t)a[0];
-    const char *expression = (const char *)(uintptr_t)a[1];
-    char source[4160];
-    static const char *const formats[] = {
-        "ToI64(%s);",
-        "ToF64(%s);"
-    };
-    size_t length = 0;
-    int supported = 0;
-
-    if (!format || !expression)
-        zc_fail("ExePrint2 requires a supported format and expression");
-    for (size_t i = 0; i < sizeof(formats) / sizeof(formats[0]); i++) {
-        if (!strcmp(format, formats[i])) {
-            supported = 1;
-            break;
-        }
-    }
-    if (!supported)
-        zc_fail("ExePrint2 format is not supported by the ARM64 bootstrap");
-    while (length <= 4096 && expression[length])
-        length++;
-    if (length > 4096)
-        zc_fail("ExePrint2 expression exceeds 4096 bytes");
-    snprintf(source, sizeof(source), "ToI64(%s);", expression);
-    if (!strcmp(format, "ToF64(%s);"))
-        snprintf(source, sizeof(source), "ToF64(%s);", expression);
-    return host_exe_print((int64_t[]){(int64_t)(uintptr_t)"%s",
-                                       (int64_t)(uintptr_t)source});
+    return host_exe_print_mode(a, 1);
 }
 static int64_t host_print(int64_t *a);
 /* Bounded text formatter shared by Print and StrPrintJoin. Supports the
@@ -4951,6 +5155,13 @@ static int execute_source(const char *path, const char *src) {
     return 0;
 }
 static int load_inner(const char *path);
+struct source_load_scope {
+    struct guest_unwind unwind;
+    char *source;
+};
+static void source_load_cleanup(struct guest_unwind *scope) {
+    free(((struct source_load_scope *)scope)->source);
+}
 static int load_source_path(const char *path, int merged, int recover) {
     size_t n;
     char *src;
@@ -4970,6 +5181,10 @@ static int load_source_path(const char *path, int merged, int recover) {
         printf("zc: source not found: %s\n", path);
         return -1;
     }
+    struct source_load_scope load = {.source = src};
+    int registered = guest_task_bound;
+    if (registered)
+        guest_unwind_enter(&load.unwind, source_load_cleanup, NULL);
     if (!strcmp(path, "/System/TaskBridge.ZC")) {
         /* KernelB-only callers need the text declaration before TaskBridge
          * is compiled. Re-declaring it inside the module creates a fresh,
@@ -4983,7 +5198,8 @@ static int load_source_path(const char *path, int merged, int recover) {
     int compile_error = 0;
     (void)execute_source_mode(path, src, 0, 0, NULL, 0, 0, recover, &compile_error);
     if (compile_error) {
-        free(src);
+        if (registered) guest_unwind_leave(&load.unwind);
+        else free(src);
         return -1;
     }
     if (!strcmp(path, "/System/TaskBridge.ZC")) {
@@ -5011,8 +5227,9 @@ static int load_source_path(const char *path, int merged, int recover) {
         PrsBindCSymbol("ZcActiveMouseGlobals", host_active_mouse_globals, 0);
         PrsBindCSymbol("ZcActiveWinMgrGlobals", host_active_winmgr_globals, 0);
         PrsBindCSymbol("ZcSetWinMgrTask", host_set_winmgr_task, 1);
-        PrsBindCSymbol("ExePrint2", host_exe_print2, 2);
+        PrsBindCSymbol("ExePrint2", host_exe_print2, 3);
         PrsBindCSymbol("ExePutS", host_exe_puts, 4);
+        PrsBindCSymbol("ExePutS2", host_exe_puts2, 3);
         PrsBindCSymbol("LastFun", host_last_fun, 2);
     }
     if (!strcmp(path, "/System/GuiTerminal.ZC"))
@@ -5192,8 +5409,8 @@ static int load_source_path(const char *path, int merged, int recover) {
         PrsBindCSymbol("ZcTryCatchEnd", host_end_catch, 0);
         PrsBindCSymbolNaked("AIWNIOS_SetJmp", zc_setjmp, 1);
         PrsBindCSymbol("throw", host_guest_throw, 2);
-        PrsBindCSymbol("ExePrint", host_exe_print, 2);
-        PrsBindCSymbol("ExePrint2", host_exe_print2, 2);
+        PrsBindCSymbol("ExePrint", host_exe_print, 3);
+        PrsBindCSymbol("ExePrint2", host_exe_print2, 3);
         PrsBindCSymbol("Print", host_print, 3);
         PrsBindCSymbol("ZcGuiShellExec", zc_gui_shell_exec, 1);
         PrsBindCSymbol("StrPrintJoin", host_str_print_join, 4);
@@ -5242,13 +5459,49 @@ static int load_source_path(const char *path, int merged, int recover) {
         PrsBindCSymbol("HashFind", host_hash_find, 4);
         PrsBindCSymbol("HashAdd", host_hash_add, 2);
     }
-    free(src);
+    if (registered) guest_unwind_leave(&load.unwind);
+    else free(src);
     loaded_modules++;
     printf("zc: loaded %s\n", path);
     return 0;
 }
 static int load_inner(const char *path) {
     return load_source_path(path, 0, 0);
+}
+/* Shell commands are the final recoverable guest-exception boundary. Keep
+ * the native guard from pointing at an abandoned C stack after a guest throw.
+ * Host invariant failures still invalidate the session through zc_fail. */
+struct command_scope {
+    struct guest_unwind unwind;
+    struct guest_fiber *owner;
+};
+static void command_cleanup(struct guest_unwind *scope) {
+    (void)scope;
+    guarded = 0;
+}
+static void command_enter(struct command_scope *command, jmp_buf *landing) {
+    command->owner = guest_task_bound ? &guest_fibers[guest_current] : NULL;
+    if (command->owner)
+        guest_unwind_enter(&command->unwind, command_cleanup, landing);
+}
+static void command_leave(struct command_scope *command) {
+    if (command->owner)
+        guest_unwind_leave(&command->unwind);
+    guarded = 0;
+}
+static int command_exception(struct command_scope *command) {
+    int64_t code = command->unwind.exception;
+    guest_unwind_abandon(&command->unwind);
+    guest_unwind_handled(&command->unwind, code);
+    printf("zc: uncaught guest exception 0x%016lx\n", (unsigned long)code);
+    return -1;
+}
+static void command_failed(struct command_scope *command) {
+    /* zc_fail restored the root task before jumping here. Never walk a
+     * failed parser's scopes, or another fiber's stacks, in that context. */
+    if (command->owner)
+        command->owner->unwind = command->unwind.previous;
+    guarded = 0;
 }
 int zc_exec(const char *src) {
     if (compiler_recovery_active) {
@@ -5259,9 +5512,14 @@ int zc_exec(const char *src) {
         zc_output("zc: session unavailable; use zreset\n");
         return -1;
     }
+    struct command_scope command;
+    jmp_buf landing;
+    command_enter(&command, &landing);
+    if (command.owner && setjmp(landing))
+        return command_exception(&command);
     guarded = 1;
     if (setjmp(guard)) {
-        guarded = 0;
+        command_failed(&command);
         return -1;
     }
     if (key_reset)
@@ -5272,7 +5530,7 @@ int zc_exec(const char *src) {
     int compile_error = 0;
     (void)execute_source_mode("<shell>", src, guest_task_bound, guest_task_bound,
                               NULL, 0x001 | 0x002 | 0x004, 0, 1, &compile_error);
-    guarded = 0;
+    command_leave(&command);
     return compile_error ? -1 : 0;
 }
 static int zc_load_mode(const char *path, int recover) {
@@ -5286,14 +5544,19 @@ static int zc_load_mode(const char *path, int recover) {
         zc_output("zc: session unavailable; use zreset\n");
         return -1;
     }
+    struct command_scope command;
+    jmp_buf landing;
+    command_enter(&command, &landing);
+    if (command.owner && setjmp(landing))
+        return command_exception(&command);
     guarded = 1;
     if (setjmp(guard)) {
-        guarded = 0;
+        command_failed(&command);
         return -1;
     }
     if (relative) {
         if (guest_path(path, resolved)) {
-            guarded = 0;
+            command_leave(&command);
             zc_output("zc: invalid source path\n");
             return -1;
         }
@@ -5302,7 +5565,7 @@ static int zc_load_mode(const char *path, int recover) {
     /* Canonical boot/module paths retain their pinned archive semantics;
      * relative application loads use the same merged view as FileRead. */
     int r = load_source_path(path, relative, recover);
-    guarded = 0;
+    command_leave(&command);
     return r;
 }
 int zc_load(const char *path) {
@@ -5321,9 +5584,14 @@ int zc_call(const char *name, int64_t *out) {
         zc_output("zc: zcall requires an integer return type\n");
         return -1;
     }
+    struct command_scope command;
+    jmp_buf landing;
+    command_enter(&command, &landing);
+    if (command.owner && setjmp(landing))
+        return command_exception(&command);
     guarded = 1;
     if (setjmp(guard)) {
-        guarded = 0;
+        command_failed(&command);
         return -1;
     }
     if (guest_task_bound && !guest_fibers[guest_current].source_context)
@@ -5333,7 +5601,7 @@ int zc_call(const char *name, int64_t *out) {
     int64_t r = FFI_CALL_TOS_0(f->fun_ptr);
     if (out)
         *out = r;
-    guarded = 0;
+    command_leave(&command);
     return 0;
 }
 void zc_idle_step(void) {
@@ -5497,8 +5765,8 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
                     {"ZcFbScreenHeight", host_fb_screen_height, 0},
                     {"ZcFbTaskTextCompose", host_fb_task_text_compose, 5},
                     {"ZcFbShellTextCompose", host_fb_shell_text_compose, 2},
-                    {"ExePrint", host_exe_print, 2},
-                    {"ExePrint2", host_exe_print2, 2}};
+                    {"ExePrint", host_exe_print, 3},
+                    {"ExePrint2", host_exe_print2, 3}};
     for (size_t i = 0; i < sizeof(bindings) / sizeof(*bindings); i++)
         PrsBindCSymbol((char *)bindings[i].name, (void *)bindings[i].fn, bindings[i].arity);
     __clear_cache(code_arena, code_arena + sizeof(code_arena));

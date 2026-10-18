@@ -40,6 +40,8 @@ p.add_argument('--probe-compiler-context', action='store_true',
                help='check guest compiler contexts, option inheritance, restrictions and task isolation')
 p.add_argument('--probe-run-file', action='store_true',
                help='check task-local LastFun and unchanged RunFile with raw fixed/variadic argument words')
+p.add_argument('--probe-source-exceptions', action='store_true',
+               help='check catchable source/file errors, native cleanup and command/job recovery')
 p.add_argument('--probe-winmgr', action='store_true',
                help='also try the unchanged WinMgr.ZC load with a short timeout after Win.ZC')
 p.add_argument('--probe-grscreen', action='store_true',
@@ -359,6 +361,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             ',': ('comma',),
             '"': ('shift', 'apostrophe'), "'": ('apostrophe',),
             '_': ('shift', 'minus'),
+            '%': ('shift', '5'), '+': ('shift', 'equal'),
             '=': ('equal',),
             '(': ('shift', '9'), ')': ('shift', '0'),
             '{': ('shift', 'bracket_left'), '}': ('shift', 'bracket_right'),
@@ -634,6 +637,29 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         print('PASS LastFun/RunFile arguments, task isolation and failed-definition rollback', flush=True)
         if args.probe_run_file:
             raise SystemExit(0)
+        command('zload /Tests/SourceExceptions.ZC', 'zc: loaded /Tests/SourceExceptions.ZC')
+        for check in ('Checks', 'FileChecks', 'NestedChecks', 'JobChecks', 'TaskChecks', 'LeakChecks'):
+            command('zcall SourceException'+check, 'zc => 0x000000000000002a')
+        before_exceptions = command('zstatus', 'failed=0')
+        command('zcall SourceExceptionLeakChecks', 'zc => 0x000000000000002a')
+        after_exceptions = command('zstatus', 'failed=0')
+        if re.search(heap_pattern, before_exceptions).groups() != re.search(heap_pattern, after_exceptions).groups():
+            raise RuntimeError('source exception cleanup leaked managed memory')
+        command('zc ExePutS2("I64 ExceptionHalf( {");', 'current statement discarded')
+        for failing in ("zc throw('Prompt');", 'zcall SourceExceptionThrow',
+                        'zload /Tests/SourceExceptionThrow.ZC'):
+            command(failing, 'zc: uncaught guest exception 0x')
+            command('zcall SourceExceptionValue', 'zc => 0x000000000000002a')
+        before_commands = command('zstatus', 'failed=0')
+        for _ in range(4):
+            command('zload /Tests/SourceExceptionThrow.ZC', 'zc: uncaught guest exception 0x')
+        after_commands = command('zstatus', 'failed=0')
+        if re.search(heap_pattern, before_commands).groups() != re.search(heap_pattern, after_commands).groups():
+            raise RuntimeError('failed public source commands leaked managed memory')
+        command('zstatus', 'failed=0')
+        print('PASS source/file throws restore compiler contexts and queues without arena growth', flush=True)
+        if args.probe_source_exceptions:
+            raise SystemExit(0)
         if args.probe_gui_keyboard:
             # The source manager opens its menu when the uninitialized QMP
             # pointer rests in the top screen row. Select the actual client
@@ -907,6 +933,24 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 if private_task[3].count(result_line) != before_task + 1:
                     raise RuntimeError('graphical task did not complete its private child-function check')
                 print('PASS graphical task-owned code spawns an owned child and keeps LastFun task-local', flush=True)
+                qmp_send_text('zload /Tests/SourceExceptions.ZC')
+                qmp_send_key('ret')
+                require_graphical_text('exceptions-private-load', 'zc: loaded /Tests/SourceExceptions.ZC')
+                for check in ('Checks', 'NestedChecks', 'TaskChecks'):
+                    label = 'Exception '+check+' '
+                    qmp_send_text('zc Print("'+label+'%d",SourceException'+check+'());')
+                    qmp_send_key('ret')
+                    require_graphical_text('exceptions-private-'+check, label+'42')
+                qmp_send_text("zc throw('Prompt');")
+                qmp_send_key('ret')
+                require_graphical_text('exceptions-uncaught', 'zc: uncaught guest exception 0x')
+                qmp_send_text('zc Print("Exception recovery %d",ExePutS2("40+2;"));')
+                qmp_send_key('ret')
+                recovered_frame = require_graphical_text('exceptions-prompt-recovered', 'Exception recovery 42')
+                if recovered_frame[3].count('Exception recovery 42') != 1:
+                    raise RuntimeError('graphical command recovery output was duplicated')
+                command('zstatus', 'failed=0')
+                print('PASS graphical source/file throws clean up and accept the next command', flush=True)
                 editor_path = '/Tests/GuiBringup.ZC'
                 source = 'I64 GuiBringup(){return 42;}'
                 qmp_send_text('edit '+editor_path)

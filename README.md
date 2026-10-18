@@ -23,6 +23,7 @@ make check-source-execute # upstream ExeFile + native task-local file execution
 make check-compiler-recovery # malformed source, statement rollback and task/stack recovery
 make check-compiler-context # compiler queues, option inheritance and task isolation
 make check-run-file     # task-local LastFun + upstream RunFile with application arguments
+make check-source-exceptions # catchable source/file errors + prompt, job and task cleanup
 make utm               # refresh VM, preserving RedSea/source edits and adding new bundled files
 ```
 

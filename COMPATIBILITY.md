@@ -2493,8 +2493,9 @@ this update has no new live UTM acceptance claim.
 ## Native source-file execution
 
 `ExeFile` no longer returns a fabricated zero. TaskBridge contains the
-unchanged wrapper from the pinned `Compiler/CMain.ZC`; `check-upstream.py`
-verifies the wrapper against that complete hash-pinned original. The full
+wrapper from the pinned `Compiler/CMain.ZC`, with the cleanup adaptation
+described under source exceptions below; `check-upstream.py` verifies that
+exact derivation against the complete hash-pinned original. The full
 x86 compiler module is not loaded. Its `ExePutS` boundary is implemented by
 the native Aiwnios compiler already used for interactive source and jobs.
 
@@ -2522,9 +2523,8 @@ This is a compiler ABI integration, not the full upstream command server:
 Compiler contexts/options and `RunFile` / `LastFun` are covered by the later
 sections below. Full native `CCompCtrl` metadata and upstream startup remain
 work. Native compiler-error recovery is described
-below; the full upstream Compiler/Break catch and runtime exception unwinding
-across a host compiler invocation are not established by the file-execution
-gate.
+below. The later source-exception gate covers Compiler/Break handling and
+runtime exception unwinding across a native compiler invocation.
 
 The additional declarations exposed an ARM emitter bug during the second
 TaskBridge load: `FuncProlog` marked FP-register bits through `cur_rpn` from
@@ -2763,8 +2763,8 @@ As in the unchanged upstream wrapper, `CCF_JUST_LOAD` suppresses file-level
 execution but RunFile still invokes its last function. ExeFile's result is
 not a success gate for the following LastFun call; callers must account for
 this upstream behavior when running a file that defines no new function or
-has a compiler error. Throwing `RunFile2`/`ExeFile2`, full function/type/hash
-metadata and full upstream startup remain work.
+has a compiler error. Throwing `RunFile2`/`ExeFile2` are covered below; full
+function/type/hash metadata and full upstream startup remain work.
 
 Validation: 419 full PCI checks, 337 full ISO checks and 250 NEC two-hub/VirtIO
 graphical workflow checks passed. A final 77-check focused pass also covers
@@ -2814,3 +2814,56 @@ terminal focus and USB keyboard/tablet ownership. Input capture was released.
 Evidence is preserved in `build/run-file-utm-accepted.png` and
 `build/run-file-utm-status.png`. Physical typing/pointer/drag acceptance remains
 the earlier native USB baseline and was not repeated for this compiler update.
+
+## Exception-safe source execution (2026-10-17)
+
+`ExePutS2`, `ExePrint2`, `ExeFile2` and `RunFile2` now propagate guest
+exceptions to the calling task's `try`/`catch`. Both formatted-source APIs
+use the upstream variadic format/count/vector ABI. `ExePutS` and `ExePrint`
+handle `Compiler` and `Break` by returning zero; other exceptions propagate.
+Formatted source uses the existing bounded Print formatter and the 4096-byte
+in-memory source limit, rather than claiming all upstream format codes.
+`RunFile2` retains the pinned CMain body and forwards raw application arguments
+through LastFun after `ExeFile2` returns normally.
+
+Native source frames participate in the guest handler order. On a throw,
+temporary code, lexer/include buffers, compiler contexts and job-dispatch
+state are released before reaching a caller outside that invocation. A
+guest handler inside the executing source retains priority. Compiler errors
+first restore the statement checkpoint, then raise `Compiler`; previously
+committed definitions remain available. Throws from preprocessor expressions
+also restore that checkpoint before propagating the original exception.
+Nested catches preserve the outer exception code and handled flag. Guest
+handlers and native cleanup scopes restore their saved interrupt-enable
+state and PUSHFD depth when unwinding.
+
+`ExeFile` and `ExeFile2` add one explicit cleanup catch to their pinned CMain
+bodies. It frees the owned include string and defaulted filename, then
+implicitly rethrows. Their normal execution, directory and return behavior
+remain upstream. The verifier checks the complete original bodies plus this
+exact transformation; the pinned files themselves remain unchanged.
+
+The command boundary catches an escaping guest exception, reports its code
+and returns an error without invalidating the compiler session. Its native
+guard and an owned module-load buffer cannot be stranded by guest longjmp.
+CPU-0 callback/source jobs and input-filter text jobs catch exceptions,
+restore dispatch state and continue, matching their upstream catch behavior;
+a failed result-bearing job publishes zero. Exit unwinds active native source
+frames before task teardown; killing a suspended task reclaims its owned
+compiler/data heaps.
+
+This does not turn native invariant failures into catchable guest errors.
+Unsupported compiler contexts/flags, invalid native API use and fatal host
+guards still require `zreset`. Unhandled exceptions in arbitrary task entry
+functions do not yet have a general supervisor. Returning directly from an
+active guest try/catch remains unsupported: these tests leave the blocks
+normally before returning. Full compiler metadata, mounted ZealOS filesystems
+and upstream startup remain separate bring-up work.
+
+`make check-source-exceptions` checks compiler/runtime exceptions, nested
+contexts/options, file-buffer cleanup, formatted source, raw F64 results,
+preprocessor throws, IRQ state, queued source/callback/text jobs, task-local
+handlers across yields, larger stacks, Exit/Kill and repeated error paths
+without managed-arena growth. The graphical workflow additionally loads
+private test code into the terminal task, verifies catch/recovery checks and
+an uncaught command followed by a successful corrected command.

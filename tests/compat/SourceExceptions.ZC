@@ -1,0 +1,160 @@
+// Never return from an active try/catch: ARM64 still requires its normal end.
+I64 source_except_value, source_except_child, source_except_stage;
+I64 SourceExceptionValue(){return source_except_value;}
+I64 SourceExceptionThrow(){throw('Other'); return 0;}
+
+I64 SourceExceptionChecks()
+{
+    CCompCtrl *outer=Fs->last_cc;
+    CHashFun *last=Fs->last_fun;
+    I64 caught=0, opts=outer->opts;
+    try { ExePutS2("Option(OPTf_DECIMAL_ONLY,ON); I64 ExceptionHalf( {"); }
+    catch { caught=Fs->except_ch; Fs->catch_except=TRUE; }
+    if (caught!='Compiler' || Fs->last_cc!=outer || outer->opts!=opts ||
+        Fs->last_fun!=last) return 1;
+    if (ExePutS("throw('Compiler');") || ExePutS("throw('Break');")) return 2;
+    caught=0;
+    try { ExePutS("Yield; throw('Other');"); }
+    catch { caught=Fs->except_ch; Fs->catch_except=TRUE; }
+    if (caught!='Other' || Fs->last_cc!=outer) return 3;
+    caught=0;
+    try { ExePutS2("#assert SourceExceptionThrow()\n"); }
+    catch { caught=Fs->except_ch; Fs->catch_except=TRUE; }
+    if (caught!='Other' || Fs->last_cc!=outer) return 4;
+    source_except_value=0;
+    if (ExePutS2("try {throw('Inner');} catch {"
+                "source_except_value=42; Fs->catch_except=TRUE;}"
+                "source_except_value;")!=42) return 5;
+    if (ExePrint("%d+%d;",19,23)!=42 ||
+        ExePrint2("%s+%d;","40",2)!=42 ||
+        ToI64(ExePrint2("ToF64(%s);","42")(F64))!=42) return 6;
+    caught=0;
+    try { ExePrint2("%s","I64 ExceptionHalf( {"); }
+    catch { caught=Fs->except_ch; Fs->catch_except=TRUE; }
+    if (caught!='Compiler' || ExePutS2("40+2;")!=42) return 7;
+    return 42;
+}
+
+I64 SourceExceptionFileChecks()
+{
+    I64 caught=0;
+    U8 *dir=DirCur;
+    CCompCtrl *outer=Fs->last_cc;
+    if (RunFile2("/Tests/SourceExceptionEntry",,19,23)!=42) return 1;
+    try { ExeFile2("/Tests/SourceExceptionBroken"); }
+    catch { caught=Fs->except_ch; Fs->catch_except=TRUE; }
+    if (caught!='Compiler') return 2;
+    caught=0;
+    try { ExeFile("/Tests/SourceExceptionThrow"); }
+    catch { caught=Fs->except_ch; Fs->catch_except=TRUE; }
+    if (caught!='Other') return 3;
+    caught=0;
+    try { RunFile2("/Tests/SourceExceptionThrow"); }
+    catch { caught=Fs->except_ch; Fs->catch_except=TRUE; }
+    if (caught!='Other' || Fs->last_cc!=outer || StrCompare(dir,Fs->cur_dir))
+        return 4;
+    Free(dir);
+    return 42;
+}
+
+I64 SourceExceptionNestedChecks()
+{
+    I64 caught=0, nested=0, flags=RFlagsGet;
+    try { throw('Outer'); }
+    catch
+    {
+        try { ExePutS2("throw('Inner');"); }
+        catch { nested=Fs->except_ch=='Inner'; Fs->catch_except=TRUE; }
+        if (nested && Fs->except_ch=='Outer' && !Fs->catch_except)
+            caught=42;
+        Fs->catch_except=TRUE;
+    }
+    if (caught!=42) return 1;
+    caught=0;
+    try { ExePutS2("PUSHFD CLI throw('Flags');"); }
+    catch { caught=Fs->except_ch; Fs->catch_except=TRUE; }
+    if (caught!='Flags' || (RFlagsGet^flags)&(1<<9)) return 2;
+    PUSHFD
+    CLI
+    POPFD
+    if ((RFlagsGet^flags)&(1<<9) || ExePutS2("40+2;")!=42) return 3;
+    return 42;
+}
+
+I64 SourceExceptionLeakChecks()
+{
+    I64 i, caught;
+    for (i=0;i<8;i++)
+    {
+        caught=0;
+        try { ExeFile2("/Tests/SourceExceptionBroken"); }
+        catch { caught=Fs->except_ch; Fs->catch_except=TRUE; }
+        if (caught!='Compiler') return 1;
+        caught=0;
+        try { ExeFile2("/Tests/SourceExceptionThrow"); }
+        catch { caught=Fs->except_ch; Fs->catch_except=TRUE; }
+        if (caught!='Other' || ExePutS("throw('Break');")) return 2;
+    }
+    return 42;
+}
+
+I64 SourceExceptionCallback(U8 *unused)
+{
+    if (unused) {}
+    ExePutS2("Yield; throw('Job');");
+    return 99;
+}
+I64 SourceExceptionJobChecks()
+{
+    CJob *job=TaskExe(Fs,Fs,"Yield; throw('Job');",0);
+    if (!job || JobsHandler(0)!=1 || JobResGet(job)) return 1;
+    job=JobQueue(&SourceExceptionCallback,NULL,0,0);
+    if (!job || JobResGet(job)) return 2;
+    job=TaskExe(Fs,Fs,"40+2;",0);
+    if (!job || JobsHandler(0)!=1 || JobResGet(job)!=42) return 3;
+    source_except_value=0;
+    if (!TaskText(Fs,Fs,"throw('Text'); source_except_value=99;",0) ||
+        !TaskText(Fs,Fs,"source_except_value=42;",0)) return 4;
+    TaskWait(Fs);
+    if (source_except_value!=42 || Fs->last_input_filter_task!=Fs) return 5;
+    return 42;
+}
+
+U0 SourceExceptionChild(U8 *unused)
+{
+    I64 caught=0;
+    if (unused) {}
+    try { ExePutS2("source_except_stage=1; Yield; throw('Child');"); }
+    catch { caught=Fs->except_ch; Fs->catch_except=TRUE; }
+    if (caught=='Child' && ExePutS2("40+2;")==42) source_except_child=42;
+}
+U0 SourceExceptionExit(U8 *unused)
+{
+    if (unused) {}
+    ExePutS2("source_except_stage=1; Yield; Exit;");
+}
+I64 SourceExceptionTaskChecks()
+{
+    CTask *child;
+    I64 i, size;
+    for (i=0;i<3;i++)
+    {
+        source_except_child=source_except_stage=0;
+        size=65536;
+        if (i) size=131072;
+        child=Spawn(&SourceExceptionChild,NULL,"Source throw",-1,Fs,size);
+        if (!child) return 1;
+        while (!source_except_stage) Yield;
+        if (ExePutS2("40+2;")!=42) return 2;
+        while (TaskValidate(child)) Yield;
+        if (source_except_child!=42) return 3;
+        source_except_stage=0;
+        child=Spawn(&SourceExceptionExit,NULL,"Source exit",-1,Fs,size);
+        if (!child) return 4;
+        while (!source_except_stage) Yield;
+        if (i==2) Kill(child);
+        while (TaskValidate(child)) Yield;
+        if (ExePutS2("40+2;")!=42) return 5;
+    }
+    return 42;
+}

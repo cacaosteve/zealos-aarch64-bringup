@@ -184,15 +184,12 @@ extern U0 ZcTryLeave();
 extern U0 ZcTryCatchEnd();
 extern I64 AIWNIOS_SetJmp(U8 *pad);
 extern U0 throw(I64 ch=0, Bool no_log=FALSE);
-// The initial ExePrint bridge accepts the source-job form used by pinned
-// InputFilterTask and Job.ZC: ExePrint("%s", source). Other formats remain
-// compiler-runtime work.
-extern I64 ExePrint(U8 *format, U8 *source);
+// Native formatting/execution boundaries use the upstream variadic ABI.
+extern I64 ExePrint(U8 *format, ...);
 extern I64 ExePutS(U8 *buf, U8 *filename=NULL, I64 ccf_flags=0,
                    CLexHashTableContext *htc=NULL);
-// DolDoc's numeric prompts use these two bounded source templates. The ARM64
-// host bridge evaluates only ToI64(%s) and ToF64(%s), with a 4096-byte input.
-extern I64 ExePrint2(U8 *format, U8 *expression);
+extern I64 ExePutS2(U8 *buf, U8 *filename=NULL, I64 ccf_flags=0);
+extern I64 ExePrint2(U8 *format, ...);
 // Aiwnios lowers bare string statements to Print(format, argc, argv).
 // The bridge renders a bounded text subset until ZealOS StrPrintJoin/Doc
 // output is available. Styling markers used by CharGet are stripped.
@@ -5837,23 +5834,57 @@ Bool BootstrapWinIsUncovered(CTask *task)
         return FALSE;
     return gr.win_uncovered_bitmap[z / 16] & (1 << (z % 16));
 }
-// Verbatim wrapper from pinned Compiler/CMain.ZC; ExePutS is the ARM64 ABI boundary.
+// Pinned CMain wrappers, with an ARM64 cleanup catch around file buffers.
 I64 ExeFile(U8 *name, I64 ccf_flags=0)
 {//JIT Compile and execute a file.
 	I64 res;
 	U8 *name2 = ExtDefault(name, "ZC"), *st = MStrPrint("#include \"%s\";", name2);
 
-	res = ExePutS(st, name, ccf_flags);
+	try
+	{
+		res = ExePutS(st, name, ccf_flags);
+	}
+	catch
+	{
+		Free(st);
+		Free(name2);
+	}
 	Free(st);
 	Free(name2);
 
 	return res;
 }
 
-// Verbatim wrapper from pinned Compiler/CMain.ZC.
 I64 RunFile(U8 *name, I64 ccf_flags=0, ...)
 {//$LK,"ExeFile",A="MN:ExeFile"$() with args using $LK,"LastFun",A="MN:LastFun"$().
 	ExeFile(name, ccf_flags);
+
+	return LastFun(argc, argv);
+}
+
+I64 ExeFile2(U8 *name, I64 ccf_flags=0)
+{//throws exceptions
+	I64 res;
+	U8 *name2 = ExtDefault(name, "ZC"), *st = MStrPrint("#include \"%s\";", name2);
+
+	try
+	{
+		res = ExePutS2(st, name, ccf_flags);
+	}
+	catch
+	{
+		Free(st);
+		Free(name2);
+	}
+	Free(st);
+	Free(name2);
+
+	return res;
+}
+
+I64 RunFile2(U8 *name, I64 ccf_flags=0, ...)
+{//$LK,"ExeFile2",A="MN:ExeFile2"$() with args using $LK,"LastFun",A="MN:LastFun"$(). throws exceptions.
+	ExeFile2(name, ccf_flags);
 
 	return LastFun(argc, argv);
 }
