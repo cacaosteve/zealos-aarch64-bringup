@@ -38,6 +38,8 @@ p.add_argument('--probe-compiler-recovery', action='store_true',
                help='check statement rollback, continued execution and task-local compiler error recovery')
 p.add_argument('--probe-compiler-context', action='store_true',
                help='check guest compiler contexts, option inheritance, restrictions and task isolation')
+p.add_argument('--probe-run-file', action='store_true',
+               help='check task-local LastFun and unchanged RunFile with raw fixed/variadic argument words')
 p.add_argument('--probe-winmgr', action='store_true',
                help='also try the unchanged WinMgr.ZC load with a short timeout after Win.ZC')
 p.add_argument('--probe-grscreen', action='store_true',
@@ -465,7 +467,10 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 raise RuntimeError('zrecv chunk failed:\n'+ack)
         return until(b'\n> ')
     try:
-        boot = until(b'\n> ')
+        # Full cold source compilation includes task-owned compiler metadata.
+        # Keep the longer startup allowance separate from command timeouts.
+        boot_start = time.monotonic()
+        boot = until(b'\n> ', timeout=180)
         for marker in ('hc IR OK (front+host)', 'virtio-blk: rw OK',
                        'zc: native compiler ready',
                        'zc: loaded /Kernel/KMathB.ZC',
@@ -476,7 +481,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             if marker not in boot: raise RuntimeError(f'boot missing {marker}\n{boot[-4000:]}')
         if re.search(r'hc IR FAIL|(?:Upstream|Front) [^\r\n]* FAIL', boot):
             raise RuntimeError('legacy regressions')
-        print('PASS boot and legacy regression markers', flush=True)
+        print(f'PASS boot and legacy regression markers ({time.monotonic()-boot_start:.1f}s)', flush=True)
         # Give the cooperative terminal fiber and source manager at least a
         # short window to produce a real visible frame before measuring scanout.
         time.sleep(0.5)
@@ -612,6 +617,22 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         command('zc 0x2a;', 'zc: executed')
         command('zstatus', 'failed=0')
         if args.probe_compiler_context:
+            raise SystemExit(0)
+        command('zload /Tests/RunFile.ZC', 'zc: loaded /Tests/RunFile.ZC')
+        command('zcall LastFunChecks', 'zc => 0x000000000000002a')
+        command('zcall LastFunRawChecks', 'zc => 0x000000000000002a')
+        command('zcall RunFileChecks', 'zc => 0x000000000000002a')
+        command('zcall RunFileTaskChecks', 'zc => 0x000000000000002a')
+        command('zcall RunFileNestedChecks', 'zc => 0x000000000000002a')
+        command('zcall RunFileJobChecks', 'zc => 0x000000000000002a')
+        command('zcall RunFileLeakChecks', 'zc => 0x000000000000002a')
+        before_run_file = command('zstatus', 'failed=0')
+        command('zcall RunFileLeakChecks', 'zc => 0x000000000000002a')
+        after_run_file = command('zstatus', 'failed=0')
+        if re.search(heap_pattern, before_run_file).groups() != re.search(heap_pattern, after_run_file).groups():
+            raise RuntimeError('failed function definitions leaked last-function metadata')
+        print('PASS LastFun/RunFile arguments, task isolation and failed-definition rollback', flush=True)
+        if args.probe_run_file:
             raise SystemExit(0)
         if args.probe_gui_keyboard:
             # The source manager opens its menu when the uninitialized QMP
@@ -860,6 +881,19 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     raise RuntimeError('source-file output was duplicated in the graphical terminal:\n'+executed[3])
                 command('zcall SourceFileGuiResult', 'zc => 0x000000000000002a')
                 print('PASS upstream ExeFile compiled and ran in the graphical terminal task', flush=True)
+                app_source = ('I64 GuiRunArgs(I64 a,I64 b){'
+                              'run_file_gui_result=(a+b)*(Fs!=sys_task);'
+                              'Print("Native args %d",run_file_gui_result);'
+                              'return run_file_gui_result;}')
+                command('zput Tests/GuiRunArgs.ZC '+app_source,
+                        'zput: saved Tests/GuiRunArgs.ZC')
+                qmp_send_text('zc RunFile("/Tests/GuiRunArgs",0,19,23);')
+                qmp_send_key('ret')
+                app_output = require_graphical_text('native-run-file-args', 'Native args 42')
+                if app_output[3].count('Native args 42') != 1:
+                    raise RuntimeError('RunFile output was duplicated in the graphical terminal')
+                command('zcall RunFileGuiResult', 'zc => 0x000000000000002a')
+                print('PASS unchanged RunFile forwarded arguments and ran in the graphical terminal task', flush=True)
                 editor_path = '/Tests/GuiBringup.ZC'
                 source = 'I64 GuiBringup(){return 42;}'
                 qmp_send_text('edit '+editor_path)

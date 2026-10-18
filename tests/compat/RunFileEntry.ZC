@@ -1,0 +1,12 @@
+// RunFile must call the final definition, not the last top-level expression.
+run_file_loads++;
+I64 RunFileHelper(){return 99;}
+I64 RunFileEntry(I64 a, F64 b, U8 *text, I64 d, I64 e,
+                 I64 f, I64 g, I64 h, F64 i, I64 j)
+{
+    run_file_task = Fs->task_num;
+    Yield;
+    if (StrCompare(text,"args")) return -1;
+    return a+ToI64(b)+d+e+f+g+h+ToI64(i)+j;
+}
+40+2;

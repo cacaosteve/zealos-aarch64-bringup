@@ -1,5 +1,18 @@
 .text
 .global TempleOS_CallNOnStack
+.global TempleOS_CallN
+
+// Aiwnios passes every argument as a raw 64-bit word, including F64 bits.
+// The first eight use X0-X7; the rest occupy successive 8-byte stack slots.
+TempleOS_CallN:
+  stp x19,x20,[sp,-16]!
+  stp x21,x22,[sp,-16]!
+  stp x23,x30,[sp,-16]!
+  mov x19,sp
+  mov x22,x0                 // function pointer
+  mov x20,x1                 // argument count
+  mov x21,x2                 // argument vector
+  b .Lcall_args
 
 // Call a guest function with an arbitrary count of integer-class arguments
 // on a caller-provided, 16-byte-aligned stack. The current stack remains
@@ -15,6 +28,7 @@ TempleOS_CallNOnStack:
   mov x21,x3                 // argument vector
   and x23,x23,#-16
   mov sp,x23
+.Lcall_args:
   cmp x20,#8
   b.ls 2f
   sub x9,x20,#8

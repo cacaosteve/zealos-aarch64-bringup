@@ -1,0 +1,6 @@
+I64 RunFileVariadic(I64 base, ...)
+{
+    I64 i;
+    for (i=0;i<argc;i++) base+=argv[i];
+    return base;
+}

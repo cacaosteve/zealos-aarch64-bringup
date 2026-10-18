@@ -342,6 +342,9 @@ static int64_t guest_except_ch_off, guest_catch_except_off;
 static int64_t guest_hash_table_off;
 static int64_t guest_cur_dir_off;
 static int64_t guest_next_cc_off, guest_last_cc_off;
+static int64_t guest_last_fun_off, guest_fun_size, guest_fun_name_off;
+static int64_t guest_fun_type_off, guest_fun_flags_off;
+static int64_t guest_fun_argc_off, guest_fun_code_off;
 static int64_t guest_cc_size, guest_cc_flags_off, guest_cc_opts_off;
 static int64_t guest_cc_files_off, guest_cc_errors_off;
 static int64_t guest_lex_size, guest_lex_buf_off, guest_lex_ptr_off;
@@ -4075,8 +4078,9 @@ static void bind_guest_task(void) {
     CHashClass *counts = (CHashClass *)HashFind("CCountsGlobals", Fs->hash_table, HTT_CLASS, 1);
     CHashClass *cc = (CHashClass *)HashFind("CCompCtrl", Fs->hash_table, HTT_CLASS, 1);
     CHashClass *lf = (CHashClass *)HashFind("CLexFile", Fs->hash_table, HTT_CLASS, 1);
+    CHashClass *fun_cls = (CHashClass *)HashFind("CHashFun", Fs->hash_table, HTT_CLASS, 1);
     CHashFun *fun = (CHashFun *)HashFind("Fs", Fs->hash_table, HTT_FUN, 1);
-    if (!cls || !heap || !ctrl || !job || !counts || !cc || !lf || !fun || !fun->import_name || strcmp(fun->import_name, "IC_FS") ||
+    if (!cls || !heap || !ctrl || !job || !counts || !cc || !lf || !fun_cls || !fun || !fun->import_name || strcmp(fun->import_name, "IC_FS") ||
         fun->argc || fun->return_class != cls + 1 ||
         cls->sz <= 0 || cls->sz > (int64_t)sizeof(guest_fibers[0].words) ||
         heap->sz <= 0 || heap->sz > (int64_t)sizeof(guest_fibers[0].heap_words) ||
@@ -4122,6 +4126,7 @@ static void bind_guest_task(void) {
         !task_field(cls, "cur_dir", 8, -1) ||
         !task_field(cls, "next_cc", 8, -1) ||
         !task_field(cls, "last_cc", 8, -1) ||
+        !task_field(cls, "last_fun", 8, -1) ||
         !task_field(heap, "hc_signature", 4, 8) ||
         !task_field(heap, "used_u8s", 8, -1) ||
         !task_field(heap, "mem_task", 8, -1))
@@ -4138,6 +4143,20 @@ static void bind_guest_task(void) {
         zc_fail("pinned compiler context layout mismatch");
     guest_next_cc_off = MemberFind("next_cc", cls)->off;
     guest_last_cc_off = MemberFind("last_cc", cls)->off;
+    if (fun_cls->sz < 16 || fun_cls->sz > 1024 ||
+        !task_field(fun_cls, "str", 8, -1) ||
+        !task_field(fun_cls, "type", 4, -1) ||
+        !task_field(fun_cls, "flags", 2, -1) ||
+        !task_field(fun_cls, "arg_count", 4, -1) ||
+        !task_field(fun_cls, "exe_addr", 8, -1))
+        zc_fail("pinned last-function layout mismatch");
+    guest_last_fun_off = MemberFind("last_fun", cls)->off;
+    guest_fun_size = fun_cls->sz;
+    guest_fun_name_off = MemberFind("str", fun_cls)->off;
+    guest_fun_type_off = MemberFind("type", fun_cls)->off;
+    guest_fun_flags_off = MemberFind("flags", fun_cls)->off;
+    guest_fun_argc_off = MemberFind("arg_count", fun_cls)->off;
+    guest_fun_code_off = MemberFind("exe_addr", fun_cls)->off;
     if (guest_last_cc_off != guest_next_cc_off + 8)
         zc_fail("pinned compiler queue sentinel layout mismatch");
     guest_cc_size = cc->sz;
@@ -4297,6 +4316,45 @@ static void bind_guest_task(void) {
     PrsBindCSymbol("sys_semas", guest_sys_semas, 0);
 }
 
+/* Keep the last compiled function in the calling guest task, as COCCompile
+ * does upstream. Aiwnios CHashFun is a different layout: publish a stable,
+ * task-owned pinned-size view with the fields needed by LastFun and callers
+ * inspecting its name/arity/code. The remaining compiler metadata is not
+ * implemented by this view and must not point at incompatible native data. */
+static void guest_function_complete(CHashFun *fun) {
+    if (!guest_task_bound)
+        return;
+    struct guest_fiber *f = &guest_fibers[guest_current];
+    unsigned char *mirror = __AIWNIOS_CAlloc(guest_fun_size, &f->heap_owner);
+    *(char **)(mirror + guest_fun_name_off) = fun->base.base.str;
+    *(uint32_t *)(mirror + guest_fun_type_off) = 0x40; /* pinned HTT_FUN */
+    *(uint16_t *)(mirror + guest_fun_flags_off) =
+        (fun->base.flags & CLSF_VARGS) ? 1u << 14 : 0;
+    *(uint32_t *)(mirror + guest_fun_argc_off) = (uint32_t)fun->argc;
+    *(void **)(mirror + guest_fun_code_off) = fun->fun_ptr;
+    *(void **)((unsigned char *)f->words + guest_last_fun_off) = mirror;
+}
+static int64_t host_last_fun(int64_t *a) {
+    if (!guest_task_bound)
+        return 0;
+    unsigned char *fun = *(unsigned char **)(
+        (unsigned char *)guest_fibers[guest_current].words + guest_last_fun_off);
+    if (!fun)
+        return 0;
+    void *entry = *(void **)(fun + guest_fun_code_off);
+    if (!entry)
+        return 0;
+    if (a[0] < 0 || a[0] > 1024 || (a[0] && !a[1])) {
+        zc_output("LastFun requires 0..1024 raw argument words\n");
+        return 0;
+    }
+    /* Like the pinned assembly, this forwards raw words, not type-converted
+     * values or default arguments. Variadic entries take explicit argc/argv
+     * words. The caller must match the compiled function's ABI. Aiwnios also
+     * returns F64 bits in X0, preserving LastFun's I64 return contract. */
+    return TempleOS_CallN((void (*)(void))entry, a[0], (int64_t *)(uintptr_t)a[1]);
+}
+
 /* Guest CCompCtrl objects retain the pinned layout, while the native parser
  * owns its separate CCmpCtrl. Only the queue, flags, opts, error count and
  * include-file metadata are exposed here; native IR/hash fields are not cast
@@ -4404,6 +4462,7 @@ static CTask compiler_saved_task;
 static int compiler_saved_switch_depth, compiler_saved_fun_depth;
 static size_t compiler_saved_bytes[2];
 static uintptr_t compiler_saved_sp;
+static void *compiler_saved_last_fun;
 static int64_t compiler_saved_heap_used[3 + 3 * GUEST_TASKS];
 static CHeapCtrl *compiler_checkpoint_heap(unsigned i) {
     if (i == 0) return &data_heap;
@@ -4429,6 +4488,9 @@ static void compiler_checkpoint_save(void) {
         memcpy(a ? compiler_saved_code : compiler_saved_data, arenas[a], span);
     }
     memcpy(&compiler_saved_task, Fs, sizeof(compiler_saved_task));
+    compiler_saved_last_fun = guest_task_bound
+        ? *(void **)((unsigned char *)guest_fibers[guest_current].words + guest_last_fun_off)
+        : NULL;
     compiler_saved_switch_depth = aiwnios_switch_depth;
     compiler_saved_fun_depth = aiwnios_fun_depth;
     for (unsigned i = 0; i < 3 + 3 * GUEST_TASKS; i++)
@@ -4458,6 +4520,9 @@ static void compiler_checkpoint_restore(void) {
            compiler_saved_bytes[0] - copied);
     memcpy(code_arena, compiler_saved_code, compiler_saved_bytes[1]);
     memcpy(Fs, &compiler_saved_task, sizeof(compiler_saved_task));
+    if (guest_task_bound)
+        *(void **)((unsigned char *)guest_fibers[guest_current].words + guest_last_fun_off) =
+            compiler_saved_last_fun;
     aiwnios_switch_depth = compiler_saved_switch_depth;
     aiwnios_fun_depth = compiler_saved_fun_depth;
     for (unsigned i = 0; i < 3 + 3 * GUEST_TASKS; i++) {
@@ -4508,6 +4573,7 @@ static int64_t execute_source_mode(const char *path, const char *src,
     CodeCtrlPush(cc);
     struct source_context context;
     guest_context_enter(&context, lex, !strcmp(path, "<shell>"), guest_flags);
+    lex->port_fun_complete = guest_function_complete;
     int previous_compiling = guest_task_exe_active;
     int started = 0;
     int64_t result = 0;
@@ -4947,6 +5013,7 @@ static int load_source_path(const char *path, int merged, int recover) {
         PrsBindCSymbol("ZcSetWinMgrTask", host_set_winmgr_task, 1);
         PrsBindCSymbol("ExePrint2", host_exe_print2, 2);
         PrsBindCSymbol("ExePutS", host_exe_puts, 4);
+        PrsBindCSymbol("LastFun", host_last_fun, 2);
     }
     if (!strcmp(path, "/System/GuiTerminal.ZC"))
         PrsBindCSymbol("ZcGuiShellExec", zc_gui_shell_exec, 1);

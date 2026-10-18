@@ -2519,8 +2519,9 @@ The in-memory `ExePutS` buffer is limited to 4096 bytes. Included files use
 the existing source-volume and compiler memory limits.
 
 This is a compiler ABI integration, not the full upstream command server:
-`RunFile` / `LastFun`, compiler-option inheritance, native `CCompCtrl` layout
-and upstream startup remain work. Native compiler-error recovery is described
+Compiler contexts/options and `RunFile` / `LastFun` are covered by the later
+sections below. Full native `CCompCtrl` metadata and upstream startup remain
+work. Native compiler-error recovery is described
 below; the full upstream Compiler/Break catch and runtime exception unwinding
 across a host compiler invocation are not established by the file-execution
 gate.
@@ -2685,8 +2686,8 @@ implementation. Native IR, parser/hash context, token and code-generation
 fields are not reinterpreted as upstream CCompCtrl fields. Other option bits
 can be stored/read by the upstream API, but their diagnostic and optimization
 effects still need native implementations. Full `#exe` stream semantics,
-LastFun/RunFile, arbitrary hash-table contexts and full upstream startup remain
-work.
+LastFun/RunFile are covered below; arbitrary hash-table contexts and full
+upstream startup remain work.
 
 Validation: 407 full PCI checks, 325 full ISO checks and 225 NEC two-hub/VirtIO
 graphical workflow checks passed on the final build. These include compiler
@@ -2721,3 +2722,57 @@ released. Evidence is preserved in `build/compiler-context-utm-accepted.png`
 and `build/compiler-context-utm-status.png`. This renews automated compiler
 acceptance; the earlier physical native USB typing/pointer/drag acceptance was
 not repeated for this compiler-only update.
+
+
+## Last compiled functions and application arguments (2026-10-17)
+
+TaskBridge now contains the unchanged `RunFile` wrapper from pinned
+`Compiler/CMain.ZC`, checked against that original by the source verifier.
+It executes the file through `ExeFile` and calls the task's last compiled
+function with its argument vector. The x86 `_LAST_FUN` assembly in CMisc is
+replaced by an ARM64 call bridge: the first eight raw words use X0-X7 and
+remaining words use aligned stack storage, matching the native compiler ABI.
+F64 arguments and results preserve their raw bits, as in the upstream API.
+No type conversion or default-argument filling occurs at this raw boundary.
+Variadic entry functions require their explicit hidden `argc`/`argv` words.
+The bridge accepts up to 1024 words and returns zero for an absent function
+or absent executable address.
+
+A successful function definition publishes a task-owned, pinned-size
+`CHashFun` view in `Fs->last_fun`. Its name, function type, variadic flag,
+argument count and executable address are available; native parser/type/debug
+metadata are not cast to the incompatible upstream layout. Previously saved
+function views remain stable when a later definition becomes current.
+Declarations and top-level expressions do not replace the last function.
+Child tasks begin without a last function, and source compilation in another
+task cannot replace the current task's choice. A function invoked by LastFun
+may yield or compile/run another file; the most recent definition remains
+current afterward, matching the upstream persistent state.
+
+Compiler rollback also restores the prior last-function pointer. This covers
+a statement that completes a function definition before failing later in the
+same statement; its new metadata/code are discarded with the native compiler
+allocations. Already committed definitions survive later source errors.
+As in the unchanged upstream wrapper, `CCF_JUST_LOAD` suppresses file-level
+execution but RunFile still invokes its last function. ExeFile's result is
+not a success gate for the following LastFun call; callers must account for
+this upstream behavior when running a file that defines no new function or
+has a compiler error. Throwing `RunFile2`/`ExeFile2`, full function/type/hash
+metadata and full upstream startup remain work.
+
+Validation: 419 full PCI checks, 337 full ISO checks and 244 NEC two-hub/VirtIO
+graphical workflow checks passed. A final 77-check focused pass also covers
+RunFile's omitted/default compiler-flags argument. The new gates exercise
+stable saved function views, prototypes/expressions leaving LastFun unchanged,
+failed redefinitions and partially committed definitions, raw F64 results,
+variadic hidden words, ten mixed register/stack arguments, JUST_LOAD, task
+isolation across yields, nested source execution and queued source jobs.
+Repeated failed definitions restore the previous function without managed-arena
+growth. The graphical scanout showed `Native args 42` from an unchanged RunFile
+call in the terminal task, then completed editing, saved-file execution,
+reboot/reopen, twelve keyboard replacements, tablet recovery and whole-hub
+removal/reattach. The inspected screenshot is `build/run-file-graphical-args.png`.
+Source-pin/overlay, Python syntax and whitespace checks passed; the Pi
+diagnostic target built, without new Pi hardware or physical-input acceptance.
+Cold boot is measured separately from command timeouts; the integration harness
+allows 180 seconds for full source compilation at startup.

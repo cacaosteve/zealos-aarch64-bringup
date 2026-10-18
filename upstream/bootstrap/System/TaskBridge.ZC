@@ -26,6 +26,8 @@ Bool OptionGet(I64 num)
 {//Get state of compiler $LK,"option",A="MN:OPTf_ECHO"$.
 	return Bt(&Fs->last_cc->opts, num);
 }
+// Pinned CMisc's _LAST_FUN assembly is replaced by the native ARM64 ABI bridge.
+extern I64 LastFun(I64 argc, I64 *argv);
 extern I64 DistSqrI64(I64 x0, I64 y0, I64 x1, I64 y1);
 // KernelC normally owns this timer-frequency global. Bind the same guest
 // storage during the KernelB task bridge so keyboard/task tests can use it
@@ -5846,6 +5848,14 @@ I64 ExeFile(U8 *name, I64 ccf_flags=0)
 	Free(name2);
 
 	return res;
+}
+
+// Verbatim wrapper from pinned Compiler/CMain.ZC.
+I64 RunFile(U8 *name, I64 ccf_flags=0, ...)
+{//$LK,"ExeFile",A="MN:ExeFile"$() with args using $LK,"LastFun",A="MN:LastFun"$().
+	ExeFile(name, ccf_flags);
+
+	return LastFun(argc, argv);
 }
 
 I64 SysFile(U8 *filename, Bool warn_ext=TRUE)

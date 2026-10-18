@@ -3323,6 +3323,8 @@ int64_t PrsDecl(CCmpCtrl *ccmp, CHashClass *base, CHashClass *add_to,
     }
     if (ccmp->cur_fun->base.base.str)
       SysSymImportsResolve(ccmp->cur_fun->base.base.str, 0);
+    if (ccmp->lex->port_fun_complete)
+      ccmp->lex->port_fun_complete(ccmp->cur_fun);
     CodeCtrlPop(ccmp);
     ccmp->cur_fun = NULL;
     if (is_func_decl)

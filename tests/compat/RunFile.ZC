@@ -1,0 +1,151 @@
+I64 run_file_loads, run_file_task, run_file_child_result, run_file_stage;
+I64 run_file_gui_result;
+I64 RunFileGuiResult(){return run_file_gui_result;}
+
+I64 LastFunChecks()
+{
+    CHashFun *original=Fs->last_fun, *zero, *other;
+    I64 args[3]={19,23,0};
+    Fs->last_fun=NULL;
+    if (LastFun(0,NULL)) return 1;
+    Fs->last_fun=original;
+    ExePutS("I64 LastZero(){return 42;}");
+    zero=Fs->last_fun;
+    if (!zero || !zero->exe_addr || zero->arg_count ||
+        !(zero->type&HTT_FUN) || StrCompare(zero->str,"LastZero") ||
+        LastFun(0,NULL)!=42) return 2;
+    ExePutS("40+2; I64 last_fun_global=42; extern I64 LastDeclaration(I64 x);");
+    if (Fs->last_fun!=zero || LastFun(0,NULL)!=42) return 3;
+    ExePutS("I64 LastOther(){return 43;}");
+    other=Fs->last_fun;
+    if (other==zero || LastFun(0,NULL)!=43 || StrCompare(zero->str,"LastZero")) return 4;
+    Fs->last_fun=zero;
+    if (LastFun(0,NULL)!=42) return 5;
+    Fs->last_fun=other;
+    if (ExePutS("I64 LastOther(){return MissingLastName;}") ||
+        Fs->last_fun!=other || LastFun(0,NULL)!=43) return 6;
+    // The callback can publish a completed function before the rest of this
+    // statement fails. Rollback must restore both the mirror and last_fun.
+    if (ExePutS("{I64 LastPartial(){return 99;} MissingLastName;}") ||
+        Fs->last_fun!=other || LastFun(0,NULL)!=43) return 7;
+    ExePutS("I64 LastTwo(I64 a,I64 b){return a+b;}");
+    if (Fs->last_fun->arg_count!=2 || LastFun(2,args)!=42) return 8;
+    return 42;
+}
+
+I64 LastFunRawChecks()
+{
+    I64 args[3], extras[2]={3,4}, bits;
+    F64 values[2]={19.5,22.5};
+    ExePutS("F64 LastFloat(F64 a,F64 b){return a+b;}");
+    args[0]=values[0](I64);
+    args[1]=values[1](I64);
+    bits=LastFun(2,args);
+    if (ToI64(bits(F64))!=42) return 1;
+    ExePutS("I64 LastVariadic(I64 base,...){I64 i;for(i=0;i<argc;i++)base+=argv[i];return base;}");
+    args[0]=35;
+    args[1]=2;
+    args[2]=extras;
+    if (!(Fs->last_fun->flags&(1<<Ff_DOT_DOT_DOT)) ||
+        Fs->last_fun->arg_count!=3 || LastFun(3,args)!=42) return 2;
+    ExePutS("U0 LastVoid(I64 *out){*out=42;}");
+    bits=0;
+    args[0]=&bits;
+    LastFun(1,args);
+    if (bits!=42) return 3;
+    ExePutS("I64 LastDefault(I64 x=42){return x;}");
+    // LastFun is a raw call; defaults belong to normal source call parsing.
+    args[0]=42;
+    if (LastFun(1,args)!=42) return 4;
+    return 42;
+}
+
+I64 RunFileChecks()
+{
+    U8 *original=DirCur;
+    I64 result;
+    CHashFun *entry;
+    if (!original || !Cd("/LICENSE")) return 1;
+    run_file_loads=0;
+    // Fixed words occupy X0-X7; F64 i and integer j spill to the stack.
+    result=RunFile("/Tests/RunFileEntry",CCF_CMD_LINE,1,2.5,"args",4,5,6,7,8,4.5,5);
+    entry=Fs->last_fun;
+    if (result!=42 || run_file_loads!=1 || run_file_task!=Fs->task_num ||
+        !entry || entry->arg_count!=10 || StrCompare(entry->str,"RunFileEntry") ||
+        StrCompare(Fs->cur_dir,"/LICENSE")) return 2;
+    // A later standalone expression never changes the last function.
+    ExePutS("1+1;");
+    if (Fs->last_fun!=entry) return 3;
+    if (!Cd("/Tests") ||
+        RunFile("RunFileEntry.ZC",CCF_JUST_LOAD,1,2.5,"args",4,5,6,7,8,4.5,5)!=42 ||
+        run_file_loads!=1 || run_file_task!=Fs->task_num) return 4;
+    if (RunFile("RunFileEntry",,1,2.5,"args",4,5,6,7,8,4.5,5)!=42 ||
+        run_file_loads!=2) return 5;
+    if (!Cd(original)) return 6;
+    Free(original);
+    return 42;
+}
+
+U0 RunFileChild(U8 *data)
+{
+    I64 arg[1]={42};
+    CHashFun *entry;
+    run_file_child_result=1;
+    if (Fs->last_fun || LastFun(0,NULL)) return;
+    ExePutS("I64 LastChild(I64 x){Yield;return x;}");
+    entry=Fs->last_fun;
+    run_file_stage=1;
+    while (run_file_stage!=2) Yield;
+    if (LastFun(1,arg)!=42 || Fs->last_fun!=entry ||
+        StrCompare(entry->str,"LastChild")) return;
+    run_file_child_result=42;
+}
+I64 RunFileTaskChecks()
+{
+    CTask *child;
+    CHashFun *entry;
+    run_file_stage=0;
+    child=Spawn(&RunFileChild);
+    if (!child) return 1;
+    while (!run_file_stage) Yield;
+    ExePutS("I64 LastParent(){return 42;}");
+    entry=Fs->last_fun;
+    run_file_stage=2;
+    while (TaskValidate(child)) Yield;
+    if (run_file_child_result!=42 || Fs->last_fun!=entry || LastFun(0,NULL)!=42)
+        return 2;
+    return 42;
+}
+
+I64 RunFileNestedChecks()
+{
+    I64 result, extras[2]={3,4};
+    ExePutS("I64 LastNested(){ExePutS(\"I64 LastInner(){return 42;}\");return LastFun(0,NULL);}");
+    if (LastFun(0,NULL)!=42 || StrCompare(Fs->last_fun->str,"LastInner")) return 1;
+    // Include lookup follows the loaded file, while RunFile leaves task cwd.
+    result=ExePutS("RunFile(\"/Tests/RunFileEntry\",0,1,2.5,\"args\",4,5,6,7,8,4.5,5);");
+    if (result!=42 || StrCompare(Fs->last_fun->str,"RunFileEntry")) return 2;
+    if (RunFile("/Tests/RunFileVariadic",0,35,2,extras)!=42 ||
+        !(Fs->last_fun->flags&(1<<Ff_DOT_DOT_DOT))) return 3;
+    return 42;
+}
+
+I64 RunFileLeakChecks()
+{
+    I64 i;
+    CHashFun *entry=Fs->last_fun;
+    for (i=0;i<8;i++)
+        if (ExePutS("{I64 LastPartial(){return 99;} MissingLastName;}") ||
+            Fs->last_fun!=entry) return 1;
+    return 42;
+}
+
+I64 RunFileJobChecks()
+{
+    CJob *job=TaskExe(Fs,Fs,
+        "RunFile(\"/Tests/RunFileEntry\",0,1,2.5,\"args\",4,5,6,7,8,4.5,5);",0);
+    if (!job || JobsHandler(0)!=1 || JobResGet(job)!=42 ||
+        run_file_task!=Fs->task_num || StrCompare(Fs->last_fun->str,"RunFileEntry"))
+        return 1;
+    return 42;
+}

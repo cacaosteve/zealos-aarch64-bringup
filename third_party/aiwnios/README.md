@@ -10,6 +10,9 @@ Normal builds use vendored files and need neither a sibling checkout nor network
 
 Port changes:
 
+- Notify the host after a function definition compiles successfully, allowing
+  the guest task's pinned-layout `last_fun` view to track the native function.
+  The native compiler's function metadata remains a separate layout.
 - Link the lexer to the active guest compiler option word. Enforce
   `OPTf_DECIMAL_ONLY` and `OPTf_NO_FLOATS` for numeric constants, and keep
   function locals/parameters on the stack under `OPTf_NO_REG_VAR`. Refresh
