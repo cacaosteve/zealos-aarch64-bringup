@@ -23,10 +23,11 @@ ZealOS aarch64 shell (HolyC-IR exprs)
 >
 ```
 
-The boot graphical terminal is a guest window with a smaller command set.
-Click inside it before typing; its `help` lists graphical commands such as
-`zstatus`, `zvol`, `zls`, `zload`, `zcall`, and `edit`. Commands outside that
-set report that they need the serial shell. The current installer keeps the
+The boot graphical terminal accepts ZealC directly through the original
+`UserTaskCont` / `ExeCmdLine` loops and the ARM64 compiler adapter. Click inside
+it and type `40+2;`, then Return: the answer should be 42. `help` also lists
+bootstrap commands such as `zstatus`, `zvol`, `zls`, `zload`, `zcall`, and `edit`.
+The current installer keeps the
 working UTM 5.0.7 built-in Terminal 1 serial window. This is independent of
 the graphical guest terminal's keyboard and document rendering. The graphical
 `zstatus` output should show
@@ -48,6 +49,14 @@ reported path in the `screen` command. For example, the 2026-10-16 live check
 reported `/dev/ttys001`; the earlier `/dev/ttys002` was no longer connected.
 
 ## Graphical development gate
+
+`make check-user-command` checks the original command loop, then inspects real
+framebuffer glyphs for direct typing and output, a function entered on multiple
+lines, persistent compiler options, Escape cancellation, and a usable prompt
+after compiler and runtime errors. The input editor accepts 255 characters per
+line and collects open delimiters, strings and comments into chunks up to 64 KiB.
+Oversized input is discarded with a diagnostic. Use braces for multiline
+control-flow bodies; this is not the complete upstream document-backed lexer.
 
 Run `make check-gui-workflow` on a disposable PCI guest. It checks framebuffer
 glyphs before Return, a visible insertion caret, tablet-pointer pixels, and
@@ -592,3 +601,14 @@ and repeated error-recovery checks. Status diagnostics and pointer motion
 retain their automated/earlier physical acceptance; no new `zstatus` output
 or pointer-motion test was supplied here. Backup and scope details are in
 [COMPATIBILITY.md](COMPATIBILITY.md).
+
+2026-10-18: the original `UserTaskCont` / `ExeCmdLine` command-loop adapter
+passed 219 PCI graphical workflow checks, 379 ISO checks and 39 native USB
+command-loop checks through two hubs. Actual scanout confirms visible direct
+ZealC input/output, multiline functions, float answers, compiler options shared
+with legacy `zc`, Escape cancellation and recovery after errors. The editor
+save/compile/run/reboot/reopen gate also passes. Physical UTM acceptance is
+pending: click beside the graphical prompt, type `40+2;` without a `zc` prefix,
+then Return. The letters should appear while typing and the result should be
+42. This is the interactive command-loop milestone; full `HomeSys` startup
+and the remaining compiler/document interfaces are still separate work.

@@ -4,7 +4,7 @@ from pathlib import Path
 import re
 import sys
 
-from arm64_source import (extract_server_task, translate_docfind, translate_docform, translate_docpopup, translate_grbitmap,
+from arm64_source import (extract_server_task, extract_user_task, translate_docfind, translate_docform, translate_docpopup, translate_grbitmap,
                           translate_grdc, translate_grscreen, translate_ktask, translate_winmgr)
 
 root = Path(__file__).resolve().parent.parent
@@ -100,6 +100,21 @@ else:
     raise AssertionError('overlay accepted a changed window-manager refresh call')
 
 ktask_source = (root / 'upstream/pinned/Kernel/KTask.ZC').read_bytes()
+user_slice = extract_user_task(ktask_source)
+for anchor in (b'UserTaskCont()', b'I64 ExeCmdLine(CCompCtrl *cc)',
+               b'QueueInsert(cc, Fs->last_cc);', b'cont = Bt(&cc->flags, CCf_PROMPT);',
+               b'res = Call(machine_code);', b'Fs->answer_type\t= type;',
+               b'ZcUserStatement2Bin(cc, &type)', b'ZcUserCompCtrlDel(cc);',
+               b'\tcatch\n\t{\n\t\tFs->title_src = old_title_src;'):
+    assert anchor in user_slice, anchor
+assert user_slice.count(b'Free(old_task_title);') == 2
+assert b'ServerTaskCont' not in user_slice
+try:
+    extract_user_task(ktask_source.replace(b'LexStatement2Bin(cc, &type)', b'OtherCompiler(cc)', 1))
+except ValueError:
+    pass
+else:
+    raise AssertionError('user extraction accepted a changed compiler call')
 server_slice = extract_server_task(ktask_source)
 assert (ktask_source.split(b'U0 ServerTaskCont()\n')[1].split(b'\nU0 UserTaskCont()\n')[0]
         .replace(b'JobsHandler(old_flags)', b'ZcServerJobsHandler(old_flags)', 1)

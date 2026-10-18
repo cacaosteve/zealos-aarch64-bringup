@@ -44,6 +44,8 @@ p.add_argument('--probe-system-launch', action='store_true',
                help='check upstream Sys/SysFile and popup file execution at normal desktop boot')
 p.add_argument('--probe-system-server', action='store_true',
                help='check the dedicated original ServerTaskCont loop and shared system namespace')
+p.add_argument('--probe-user-command', action='store_true',
+               help='check original ExeCmdLine/UserTaskCont through the ARM64 compiler ABI')
 p.add_argument('--probe-source-exceptions', action='store_true',
                help='check catchable source/file errors, native cleanup and command/job recovery')
 p.add_argument('--probe-winmgr', action='store_true',
@@ -375,6 +377,14 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             '=': ('equal',),
             '(': ('shift', '9'), ')': ('shift', '0'),
             '{': ('shift', 'bracket_left'), '}': ('shift', 'bracket_right'),
+            '[': ('bracket_left',), ']': ('bracket_right',),
+            '\\': ('backslash',),
+            '*': ('shift', '8'), '-': ('minus',),
+            '!': ('shift', '1'), '@': ('shift', '2'), '#': ('shift', '3'),
+            '$': ('shift', '4'), '^': ('shift', '6'), '&': ('shift', '7'),
+            '|': ('shift', 'backslash'), '<': ('shift', 'comma'),
+            '>': ('shift', 'dot'), '?': ('shift', 'slash'),
+            '`': ('grave_accent',), '~': ('shift', 'grave_accent'),
         }
         for char in text:
             keys = qcodes.get(char)
@@ -544,6 +554,59 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         if not text_pixels or int(text_pixels.group(1), 16) < 100:
             raise RuntimeError('boot graphical terminal has no visible document text pixels:\n' + visible_text)
         print(f'PASS boot graphical terminal visible text pixels: {int(text_pixels.group(1), 16)}', flush=True)
+        if args.probe_user_command:
+            command('zload /Tests/UserCommand.ZC', 'zc: loaded /Tests/UserCommand.ZC')
+            for check in ('InputChecks','Checks','ErrorChecks','LoopChecks','TaskChecks','KillChecks'):
+                command('zcall UserCommand'+check, 'zc => 0x000000000000002a', timeout=30)
+            before = command('zstatus', 'failed=0')
+            for check in ('ErrorChecks','KillChecks'):
+                command('zcall UserCommand'+check, 'zc => 0x000000000000002a', timeout=30)
+            after = command('zstatus', 'failed=0')
+            heap = r'data=([0-9/]+) code=([0-9/]+) allocations=([0-9]+)'
+            if re.search(heap,before).groups() != re.search(heap,after).groups():
+                raise RuntimeError('command error/kill cleanup leaked managed memory')
+            print('PASS original input loop, persistent options, exception tags and exact error/kill reclamation', flush=True)
+            if args.probe_gui_keyboard:
+                focus_graphical_terminal()
+                qmp_send_text('40+2;')
+                require_graphical_text('native-typing','40+2;')
+                qmp_send_key('ret')
+                require_graphical_text('native-answer','=42')
+                qmp_send_text('Print("Native %d\\n",42);'); qmp_send_key('ret')
+                frame = require_graphical_text('native-output','Native 42')
+                if len(re.findall(r'Native 42',frame[3])) != 1:
+                    raise RuntimeError('direct Print output was duplicated')
+                qmp_send_text('I64 GuiNative(){'); qmp_send_key('ret')
+                require_graphical_text('native-continuation','... ')
+                qmp_send_text('return 42;}'); qmp_send_key('ret')
+                qmp_send_text('Print("NativeFn %d\\n",GuiNative);'); qmp_send_key('ret')
+                require_graphical_text('native-function','NativeFn 42')
+                qmp_send_text('1.5+2.25;'); qmp_send_key('ret')
+                require_graphical_text('native-float','ansf=3.75')
+                qmp_send_text('Option(OPTf_DECIMAL_ONLY,ON);'); qmp_send_key('ret')
+                qmp_send_text('Print("NativeOpts %d\\n",OptionGet(OPTf_DECIMAL_ONLY)*42);'); qmp_send_key('ret')
+                require_graphical_text('native-options','NativeOpts 42')
+                qmp_send_text('Option(OPTf_DECIMAL_ONLY,OFF);'); qmp_send_key('ret')
+                qmp_send_text('zc Option(OPTf_DECIMAL_ONLY,ON);'); qmp_send_key('ret')
+                qmp_send_text('Print("NativeLegacy %d\\n",OptionGet(OPTf_DECIMAL_ONLY)*42);'); qmp_send_key('ret')
+                require_graphical_text('native-legacy-options','NativeLegacy 42')
+                qmp_send_text('zc Option(OPTf_DECIMAL_ONLY,OFF);'); qmp_send_key('ret')
+                qmp_send_text('I64 GuiCancelled(){'); qmp_send_key('ret')
+                require_graphical_text('native-cancel-pending','... ')
+                qmp_send_key('esc')
+                qmp_send_text('Print("NativeCancel %d\\n",42);'); qmp_send_key('ret')
+                require_graphical_text('native-cancelled','NativeCancel 42')
+                qmp_send_text('I64 GuiBroken( {)'); qmp_send_key('ret')
+                require_graphical_text('native-error',"Expected ')'")
+                qmp_send_text('throw(42);'); qmp_send_key('ret')
+                require_graphical_text('native-throw','Except: 0x000000000000002a')
+                qmp_send_text('Print("NativeRecovery %d\\n",40+2);'); qmp_send_key('ret')
+                require_graphical_text('native-recovery','NativeRecovery 42')
+                desktop = command('zstatus','user_command: original_loop=1 statements=')
+                if not re.search(r'user_command: original_loop=1 statements=[1-9][0-9]*',desktop):
+                    raise RuntimeError('graphical commands did not use the original execution loop')
+                print('PASS visible direct ZealC typing/output, multiline definitions, options, Escape, parser/runtime recovery', flush=True)
+            raise SystemExit(0)
         if 'system_server: running=1 separate=1' not in desktop:
             raise RuntimeError('boot did not start a separate source System server:\n'+desktop)
         command('zload /Tests/SystemServer.ZC', 'zc: loaded /Tests/SystemServer.ZC')
@@ -1049,6 +1112,10 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                                          stderr=subprocess.STDOUT, bufsize=0)
                 buf.clear()
                 until(b'\n> ')
+                # A fresh QEMU pointer starts at (0,0), opening the guest's
+                # top-row menu over the terminal. Restore client focus before
+                # asserting prompt glyphs, just as on the initial boot.
+                focus_graphical_terminal()
                 qmp_send_text('edit '+editor_path)
                 require_graphical_text('editor-reopen-command', '> edit '+editor_path)
                 qmp_send_key('ret')
@@ -1059,7 +1126,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 command('zstatus', 'gui_editor_active=0')
                 cancelled = require_graphical_text(
                     'editor-cancelled-after-reboot',
-                    'The serial shell remains available.')
+                    'ZealC runs directly; help lists bootstrap commands.')
                 if 'edit: could not open document' in cancelled[3]:
                     raise RuntimeError('cancelling an open editor reported an open failure')
                 print('PASS graphical edit/save/compile/run/reboot/reopen workflow', flush=True)

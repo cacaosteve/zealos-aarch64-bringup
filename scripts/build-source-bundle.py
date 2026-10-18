@@ -7,7 +7,7 @@ from pathlib import Path
 import sys
 import tarfile
 
-from arm64_source import (extract_server_task, translate_docfind, translate_docform, translate_docpopup, translate_grbitmap,
+from arm64_source import (extract_server_task, extract_user_task, translate_docfind, translate_docform, translate_docpopup, translate_grbitmap,
                           translate_grdc, translate_grscreen, translate_ktask, translate_mathode,
                           translate_winmgr)
 
@@ -58,6 +58,7 @@ for name, expected in manifest['files'].items():
             raise SystemExit(f'ARM64 source overlay no longer applies: {exc}') from exc
     elif rel == 'Kernel/KTask.ZC':
         entries['System/ServerTask.ZC'] = extract_server_task(data)
+        entries['System/UserTask.ZC'] = extract_user_task(data)
         try:
             data = translate_ktask(data)
         except ValueError as exc:

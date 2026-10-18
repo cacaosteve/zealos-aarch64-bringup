@@ -6656,7 +6656,7 @@ int64_t zc_gui_shell_exec(int64_t *a) {
     if (streq(command, "help"))
         return (int64_t)(uintptr_t)
             "Graphical commands: zstatus | zvol | zls | zgc | zverify <path> | zload <path> | zput <name> <source> | zrm <name> | edit <path> | zc <source> | zcall <function> | windowdemo\n"
-            "Use the serial shell for the full command set.\n";
+            "Type ZealC directly, for example: 40+2;\n";
     if (streq(command, "windowdemo")) {
         if (zc_window_demo_active() || gui_window_demo_requested)
             return (int64_t)(uintptr_t)"windowdemo: already running or starting\n";
@@ -6674,8 +6674,7 @@ int64_t zc_gui_shell_exec(int64_t *a) {
           str_startswith(command, "zput ") ||
           str_startswith(command, "zrm ") ||
           str_startswith(command, "zc ")))
-        return (int64_t)(uintptr_t)
-            "graphical shell: use help; this command needs the serial shell\n";
+        return 0; /* Feed unrecognized input to the original UserTaskCont. */
 
     gui_shell_output_len = 0;
     gui_shell_output[0] = 0;

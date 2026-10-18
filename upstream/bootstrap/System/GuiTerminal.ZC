@@ -10,6 +10,8 @@ I64 bootstrap_gui_terminal_editor_raw = -1;
 U8 bootstrap_gui_terminal_last_command[256];
 U0 (*bootstrap_gui_terminal_final_update)(CDC *dc);
 extern U8 *ZcGuiShellExec(U8 *line);
+U8 bootstrap_gui_terminal_history[256];
+I64 bootstrap_gui_terminal_history_len;
 extern I64 ZcFbTextPixel(I64 x, I64 y);
 
 #define GUI_MENU_ACTION_TAG 0x475549
@@ -271,29 +273,39 @@ Bool BootstrapGuiTerminalEditFile(U8 *path)
     return TRUE;
 }
 
-U0 BootstrapGuiTerminalTask(U8 *data)
+U0 BootstrapGuiTerminalPrompt(Bool continuation)
+{
+    if (!continuation && Fs->new_answer)
+    {
+        if (Fs->answer_type & ~1 != RT_I0)
+        {
+            if (Fs->answer_type == RT_F64)
+                DocPrint(DocPut, "ansf=%.7f\n", Fs->answer);
+            else
+                DocPrint(DocPut, "ans=0x%X=%d\n", Fs->answer, Fs->answer);
+        }
+        Fs->new_answer = FALSE;
+    }
+    if (continuation)
+        DocPrint(DocPut, "... ");
+    else
+        DocPrint(DocPut, "> ");
+}
+
+U8 *BootstrapGuiTerminalReadLine(Bool continuation)
 {
     I64 ch, sc;
     I64 message;
     I64 command_len = 0;
     I64 command_pos = 0;
-    I64 history_len = 0;
+    Bool overflow = FALSE;
     I64 i;
     U8 command[256];
-    U8 history[256];
+
     U8 *output, *edit_path;
 
     command[0] = 0;
-    history[0] = 0;
-    KeyDevInit;
-    DocTermNew;
-    BootstrapGuiTerminalMenuInstall;
-    KeyDevAdd(&KDDocPutKey, &KDDocPutS, 0x80000000, TRUE);
-    DocPrint(DocPut, "ZealOS ARM64 graphical terminal\n");
-    DocPrint(DocPut, "Edit with Left/Right, Home/End, Backspace and Delete.\n");
-    DocPrint(DocPut, "Up recalls the last command; Down clears it.\n");
-    DocPrint(DocPut, "The serial shell remains available.\n");
-    DocPrint(DocPut, "> ");
+    BootstrapGuiTerminalPrompt(continuation);
 
     while (TRUE)
     {
@@ -314,7 +326,8 @@ U0 BootstrapGuiTerminalTask(U8 *data)
                     command_len = 0;
                     command_pos = 0;
                     command[0] = 0;
-                    DocPrint(DocPut, "> ");
+                    overflow = FALSE;
+                    BootstrapGuiTerminalPrompt(continuation);
                 }
             }
             else if (message == MESSAGE_KEY_DOWN)
@@ -326,14 +339,19 @@ U0 BootstrapGuiTerminalTask(U8 *data)
                 {
                     DocPutKey(DocPut, 0, SC_END);
                     DocPutKey(DocPut, ch, sc);
+                    if (overflow)
+                    {
+                        DocPrint(DocPut, "input line exceeds 255 characters; chunk discarded\n");
+                        return NULL;
+                    }
                     command[command_len] = 0;
                     // Return on an empty line is a no-op, like the serial shell.
                     // In particular, don't flood the terminal with a command error
                     // when the host has delivered Return but not printable keys.
-                    if (command_len)
+                    if (command_len && !continuation)
                     {
                         StrCopy(bootstrap_gui_terminal_last_command, command);
-                        BootstrapGuiTerminalHistorySave(history, &history_len,
+                        BootstrapGuiTerminalHistorySave(bootstrap_gui_terminal_history, &bootstrap_gui_terminal_history_len,
                                                         command, command_len);
                         if (BootstrapGuiTerminalEditCommand(command, &edit_path))
                         {
@@ -351,22 +369,32 @@ U0 BootstrapGuiTerminalTask(U8 *data)
                         else
                         {
                             output = ZcGuiShellExec(command);
-                            if (output)
-                                BootstrapGuiTerminalPrintOutput(output);
+                            if (!output)
+                                return StrNew(command);
+                            BootstrapGuiTerminalPrintOutput(output);
                         }
                     }
+                    if (continuation)
+                        return StrNew(command);
                     command_len = 0;
                     command_pos = 0;
                     command[0] = 0;
-                    DocPrint(DocPut, "> ");
+                    BootstrapGuiTerminalPrompt(FALSE);
                 }
-                else if (!ch && sc.u8[0] == SC_CURSOR_UP && history_len)
+                else if (ch == 27)
+                {
+                    DocPutKey(DocPut, 0, SC_END);
+                    DocPrint(DocPut, "\n");
+                    // Abort the complete pending chunk, including continuations.
+                    return NULL;
+                }
+                else if (!ch && sc.u8[0] == SC_CURSOR_UP && bootstrap_gui_terminal_history_len)
                 {
                     DocPutKey(DocPut, 0, SC_END);
                     for (i = 0; i < command_len; i++)
                         DocPutKey(DocPut, 8, 0);
                     BootstrapGuiTerminalHistoryRecall(command, &command_len,
-                                                      history, history_len);
+                                                      bootstrap_gui_terminal_history, bootstrap_gui_terminal_history_len);
                     command_pos = command_len;
                     for (i = 0; i < command_len; i++)
                         DocPutKey(DocPut, command[i], 0);
@@ -389,6 +417,8 @@ U0 BootstrapGuiTerminalTask(U8 *data)
                     DocPutKey(DocPut, 0, SC_END);
                     for (i = command_len; i > command_pos; i--)
                         DocPutKey(DocPut, 0, SC_CURSOR_LEFT);
+                    if (ch >= 32 && ch < 127 && command_len == 255)
+                        overflow = TRUE;
                     if (BootstrapGuiTerminalCommandKey(command, &command_len,
                                                        &command_pos, ch, sc) == 1)
                         DocPutKey(DocPut, ch, sc);
@@ -397,6 +427,24 @@ U0 BootstrapGuiTerminalTask(U8 *data)
         }
         ZcTaskYield;
     }
+}
+
+U0 BootstrapGuiTerminalTask(U8 *data)
+{
+    if (data) {}
+    bootstrap_gui_terminal_history[0] = 0;
+    bootstrap_gui_terminal_history_len = 0;
+    KeyDevInit;
+    DocTermNew;
+    BootstrapGuiTerminalMenuInstall;
+    KeyDevAdd(&KDDocPutKey, &KDDocPutS, 0x80000000, TRUE);
+    DocPrint(DocPut, "ZealOS ARM64 graphical terminal\n");
+    DocPrint(DocPut, "Edit with Left/Right, Home/End, Backspace and Delete.\n");
+    DocPrint(DocPut, "Up recalls the last command; Down clears it.\n");
+    DocPrint(DocPut, "ZealC runs directly; help lists bootstrap commands.\n");
+    ZcUserPromptSet(&BootstrapGuiTerminalReadLine);
+    ZcUserOutputSet(&BootstrapGuiTerminalPrintOutput);
+    UserTaskCont;
 }
 
 U0 BootstrapGuiTerminalFinalUpdate(CDC *dc)

@@ -3047,7 +3047,8 @@ lifecycle, child submissions, asynchronous submitter teardown, compiler and
 runtime errors, and waits across a yielded job. The graphical workflow runs
 the fixture privately in the terminal as well as the existing system/popup
 launch checks. This milestone does not implement the original interactive
-`UserTaskCont` compiler/lexer interface or `HomeSys` startup.
+`UserTaskCont` compiler/lexer interface or `HomeSys` startup. The command-loop
+adapter is covered separately below.
 
 Validation passed: 461 full PCI checks including source-volume compaction and
 reboot persistence, 379 full ISO checks, and 251 focused graphics checks
@@ -3091,3 +3092,73 @@ screenshot is saved in `build/system-server-utm-accepted.png`. This completes
 the requested live System-server/recovery acceptance. A fresh `zstatus`
 read and physical pointer-motion/drag test were not part of this screenshot;
 their existing automated/physical evidence remains as documented above.
+
+## Original interactive command loop — 2026-10-18
+
+Normal graphical startup now enters the pinned `KTask.ZC` `UserTaskCont` and
+`ExeCmdLine` loops, extracted as `System/UserTask.ZC` by a guarded overlay.
+The source still owns its compiler queue, statement loop, `Call`, answer/type/
+elapsed-time recording and outer exception/restart loop. The overlay redirects
+compiler construction, lexing, statement emission and generated-code disposal
+to private ARM64 ABI functions. It also guards an absent native EOF file view,
+restores the title on exceptions and deletes the failed compiler context before
+the outer catch resumes. Pinned files and their hashes remain unchanged.
+
+`src/zc/user_compiler.h` keeps native Aiwnios lexer/IR objects separate from
+the pinned-size guest `CCompCtrl`. Input buffers are copied; caller storage is
+not freed by this private API. Controllers are task-owned, capped at eight per
+task, validated against their owner's list and reclaimed on normal completion,
+exceptions or task exit/kill. Compilation uses the existing per-statement
+checkpoint/rollback boundary. Executable code runs outside that boundary and
+may yield. `JUST_LOAD`, block termination, statement return types, LastFun,
+include paths and compiler options use the existing native compiler machinery.
+An include-file title view is padded before the original fixed-size title copy.
+
+The working graphical editor supplies lines instead of routing every command
+through the bounded host shell. Unknown bootstrap commands become ZealC input:
+`40+2;`, function definitions, `Print`, `ExeFile` and ordinary expressions need
+no `zc` prefix. Native EOF ends an input chunk, while the source execution loop
+and its options remain alive across prompts. The retained `zc` command uses a
+temporary child compiler and exports committed option changes to that same
+interactive session. Nested file/execution contexts keep their existing option
+isolation. Direct text output goes to the task's DolDoc; legacy shell capture
+suppresses that route to avoid duplicate output. Parser diagnostics are buffered
+outside the managed arenas and displayed after rollback/commit, so compiler
+recovery cannot undo document output. Float answers use the existing fixed-point
+formatter rather than unsupported `%g`.
+
+Input collection happens outside parsing because a native parse cannot yield.
+The adapter recognizes open delimiters, quoted literals, escaped quotes, line
+comments and nested block comments, then compiles the collected chunk with the
+real lexer/parser. Mismatched closing delimiters go directly to that compiler.
+The existing line editor is bounded to 255 characters; overflow discards the
+whole chunk. Collected chunks are bounded to 64 KiB. Escape cancels a pending
+chunk. This is not the complete upstream document-backed lexer: use braces for
+multiline control-flow bodies. Full `UserCmdLine`/`HomeSys` startup, autocomplete
+and the remaining compiler interfaces are separate bring-up work.
+
+`make check-user-command` covers integer/float answers, definitions, calls,
+control flow, includes, load-only execution, title/queue restoration, exact
+exception tags, persistent options, multiline input, child tasks and killing
+a task parked in a continuation. Repeated error/kill checks restore exact
+managed data/code allocation counts. Framebuffer checks require visible input,
+single-copy direct output, multiline function execution, fixed-point float
+answers, options shared with legacy `zc`, Escape cancellation, diagnostics,
+runtime exceptions and a subsequent successful command. `zstatus` exposes
+`user_command: original_loop=1 statements=...` for the focused terminal.
+
+UTM refresh manages the derived `System/UserTask.ZC` alongside the existing
+port modules; ordinary guest files and deletion masks remain preserved.
+
+Validation passed: 219 PCI graphical workflow checks including save, compile,
+run, reboot and reopen; 379 full ISO compatibility checks; and 39 focused
+native USB command-loop checks on NEC xHCI with two hubs and duplicate VirtIO
+devices present. Logs are `build/user-command-pci.log`,
+`build/user-command-iso.log` and `build/user-command-usb.log`. The last run's
+actual USB scanout is saved as `build/user-command-usb-graphical.png`.
+The workflow now refocuses the client after reboot before checking glyphs,
+because QEMU resets its pointer to the guest's top-row menu. Its cancellation
+assertion also uses the new direct-ZealC banner. Pinned hashes, guarded overlays,
+Python/shell syntax and whitespace checks pass. The Pi diagnostic builds;
+no Pi hardware was tested. Physical typing in the refreshed UTM image remains
+the final interactive gate.

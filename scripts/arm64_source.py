@@ -16,6 +16,67 @@ _KTASK_GROW_BEGIN = "#exe {Option(OPTf_NO_REG_VAR, ON);};"
 _KTASK_GROW_END = "#exe {Option(OPTf_NO_REG_VAR, OFF);};"
 
 
+def extract_user_task(source: bytes) -> bytes:
+    """Retain KTask's execution/input loops with a native compiler ABI.
+
+    Aiwnios IR and lexer objects do not have the pinned compiler layout. Only
+    the compiler entry points are redirected; execution, answers and the outer
+    try/catch loop remain source code. Explicit abort cleanup also reclaims a
+    partially compiled statement after a guest exception.
+    """
+    text = source.decode("utf-8")
+    boundaries = ("I64 ExeCmdLine(CCompCtrl *cc)\n", "\nU0 ServerTaskCont()\n",
+                  "U0 UserTaskCont()\n", "\nU0 ServerCmdLine(I64 dummy=0)\n")
+    if any(text.count(s) != 1 for s in boundaries):
+        raise ValueError("expected the pinned execution/user loop boundaries")
+    exe = text[text.index(boundaries[0]):text.index(boundaries[1])]
+    user = text[text.index(boundaries[2]):text.index(boundaries[3])]
+    replacements = {
+        "LexStatement2Bin(cc, &type)": "ZcUserStatement2Bin(cc, &type)",
+        "Free(machine_code);": "ZcUserCodeFree(cc, machine_code);",
+        "cc->lex_include_stack->flags & LFSF_DOC":
+            "cc->lex_include_stack && cc->lex_include_stack->flags & LFSF_DOC",
+        "(ptr = cc->lex_include_stack->line_start) && *ptr":
+            "cc->lex_include_stack && (ptr = cc->lex_include_stack->line_start) && *ptr",
+    }
+    for old, new in replacements.items():
+        if exe.count(old) != 1:
+            raise ValueError(f"pinned ExeCmdLine changed: {old}")
+        exe = exe.replace(old, new, 1)
+    # The upstream function predates this port's recoverable compiler boundary.
+    # Restore the title and free its saved copy even if Call or parsing throws.
+    begin = "\twhile (cc->token &&"
+    end = "\tif (Fs->title_src != TTS_LOCKED_CONST)\n\t{\n\t\tFs->title_src = old_title_src;"
+    if exe.count(begin) != 1 or exe.count(end) != 1:
+        raise ValueError("pinned ExeCmdLine title cleanup changed")
+    exe = exe.replace(begin, "\ttry\n\t{\n" + begin, 1)
+    exe = exe.replace(end, "\t}\n\tcatch\n\t{\n"
+        "\t\tFs->title_src = old_title_src;\n"
+        "\t\tStrCopy(Fs->task_title, old_task_title);\n"
+        "\t\tFree(old_task_title);\n\t}\n" + end, 1)
+    for old, new in {
+        "CompCtrlNew(,": "ZcUserCompCtrlNew(,",
+        "Lex(cc);": "ZcUserLex(cc);",
+        "CompCtrlDel(cc);": "ZcUserCompCtrlDel(cc);",
+        "\t\t\tPutExcept;": "\t\t\tZcUserCompCtrlDel(cc);\n\t\t\tZcUserPutExcept;",
+    }.items():
+        if user.count(old) != 1:
+            raise ValueError(f"pinned UserTaskCont changed: {old}")
+        user = user.replace(old, new, 1)
+    header = """// Original Kernel/KTask.ZC loops, using the ARM64 lexer/JIT ABI.
+extern CCompCtrl *ZcUserCompCtrlNew(U8 *buf=NULL, I64 flags=0);
+extern U0 ZcUserCompCtrlDel(CCompCtrl *cc);
+extern I64 ZcUserLex(CCompCtrl *cc);
+extern U8 *ZcUserStatement2Bin(CCompCtrl *cc, I64 *type);
+extern U0 ZcUserCodeFree(CCompCtrl *cc, U8 *code);
+extern I64 ZcUserPromptSet(U8 *(*reader)(Bool continuation));
+extern U0 ZcUserOutputSet(U0 (*writer)(U8 *text));
+extern U0 ZcUserPutExcept();
+extern Bool ZcUserInputComplete(U8 *text);
+"""
+    return (header + exe + "\n" + user).encode("utf-8")
+
+
 def extract_server_task(source: bytes) -> bytes:
     """Load the original server loop before KTask's compiler-dependent loop.
 

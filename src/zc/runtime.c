@@ -240,6 +240,7 @@ struct guest_unwind {
     unsigned irq_depth;
 };
 struct source_context;
+struct user_compiler;
 struct guest_fiber {
     uint64_t words[2048];
     uint64_t heap_words[256];
@@ -248,6 +249,13 @@ struct guest_fiber {
     CHeapCtrl compiler_heap, compiler_code_heap;
     void *prompt_cc;
     struct source_context *source_context;
+    struct user_compiler *user_compilers;
+    void *user_prompt_reader;
+    void *user_output_writer;
+    int user_output_suppressed, user_diagnostic_active;
+    size_t user_diagnostic_length;
+    char user_diagnostic[2048];
+    uint64_t user_statements;
     jmp_buf context;
     unsigned char stack[GUEST_STACK_BYTES] __attribute__((aligned(16)));
     unsigned char *large_stack;
@@ -370,10 +378,10 @@ static int64_t guest_last_fun_off, guest_fun_size, guest_fun_name_off;
 static int64_t guest_fun_type_off, guest_fun_flags_off;
 static int64_t guest_fun_argc_off, guest_fun_code_off;
 static int64_t guest_cc_size, guest_cc_flags_off, guest_cc_opts_off;
-static int64_t guest_cc_files_off, guest_cc_errors_off;
+static int64_t guest_cc_files_off, guest_cc_errors_off, guest_cc_token_off;
 static int64_t guest_lex_size, guest_lex_buf_off, guest_lex_ptr_off;
 static int64_t guest_lex_line_off, guest_lex_flags_off, guest_lex_name_off;
-static int64_t guest_lex_depth_off;
+static int64_t guest_lex_depth_off, guest_lex_start_off;
 static void *guest_prompt_context(void);
 static int guest_task_bound;
 static int source_winmgr_active;
@@ -413,6 +421,16 @@ void zc_fail(const char *s) __attribute__((noreturn));
 void zc_output(const char *s) {
     if (output_cb)
         output_cb(s);
+    if (guest_task_bound && s) {
+        struct guest_fiber *f = &guest_fibers[guest_current];
+        if (f->user_diagnostic_active) {
+            size_t n = strlen(s), avail = sizeof(f->user_diagnostic) - 1 - f->user_diagnostic_length;
+            if (n > avail) n = avail;
+            memcpy(f->user_diagnostic + f->user_diagnostic_length, s, n);
+            f->user_diagnostic_length += n;
+            f->user_diagnostic[f->user_diagnostic_length] = 0;
+        }
+    }
 }
 void zc_set_source_reader(zc_source_read_fn read) { disk_reader = read; }
 void zc_set_source_writer(zc_source_write_fn write) { disk_writer = write; }
@@ -1439,6 +1457,14 @@ static void guest_task_text_output(const char *text) {
     if (!guest_task_bound || !text || guest_current >= GUEST_TASKS ||
         guest_fibers[guest_current].state != GUEST_RUNNABLE)
         return;
+    struct guest_fiber *f = &guest_fibers[guest_current];
+    /* Parser diagnostics are replayed only after the checkpoint commits or
+     * rolls back. Doc mutations must never be undone by compiler recovery. */
+    if (f->user_diagnostic_active) return;
+    if (f->user_output_writer && !f->user_output_suppressed) {
+        FFI_CALL_TOS_1(f->user_output_writer, (int64_t)(uintptr_t)text);
+        return;
+    }
     unsigned char *task = (unsigned char *)guest_fibers[guest_current].words;
     int64_t left = *(int64_t *)(task + guest_win_left_off);
     int64_t right = *(int64_t *)(task + guest_win_right_off);
@@ -2726,6 +2752,7 @@ static void cancel_active_job(struct guest_job *job) {
     job->ctrl = (unsigned char *)recipient->words + guest_server_ctrl_off;
     guest_job_insert(guest_done_head(recipient), job);
 }
+static void user_compilers_clear(struct guest_fiber *f);
 static void finish_guest(unsigned i, int64_t result) {
     struct guest_fiber *f = &guest_fibers[i];
     if (f->state != GUEST_RUNNABLE)
@@ -2794,6 +2821,7 @@ static void finish_guest(unsigned i, int64_t result) {
     f->except_top = f->except_caught = NULL;
     f->unwind = NULL;
     guest_jobs_clear(f);
+    user_compilers_clear(f);
     reclaim_guest_heap(&f->heap_owner);
     if (i) {
         reclaim_guest_heap(&f->compiler_code_heap);
@@ -4427,6 +4455,7 @@ static void bind_guest_task(void) {
         !task_field(cc, "flags", 8, -1) || !task_field(cc, "opts", 8, -1) ||
         !task_field(cc, "lex_include_stack", 8, -1) ||
         !task_field(cc, "error_count", 8, -1) ||
+        !task_field(cc, "token", 8, -1) ||
         !task_field(lf, "next", 8, 0) || !task_field(lf, "buf", 8, -1) ||
         !task_field(lf, "buf_ptr", 8, -1) || !task_field(lf, "line_num", 8, -1) ||
         !task_field(lf, "flags", 8, -1) || !task_field(lf, "full_name", 8, -1) ||
@@ -4455,6 +4484,7 @@ static void bind_guest_task(void) {
     guest_cc_opts_off = MemberFind("opts", cc)->off;
     guest_cc_files_off = MemberFind("lex_include_stack", cc)->off;
     guest_cc_errors_off = MemberFind("error_count", cc)->off;
+    guest_cc_token_off = MemberFind("token", cc)->off;
     guest_lex_size = lf->sz;
     guest_lex_buf_off = MemberFind("buf", lf)->off;
     guest_lex_ptr_off = MemberFind("buf_ptr", lf)->off;
@@ -4462,6 +4492,9 @@ static void bind_guest_task(void) {
     guest_lex_flags_off = MemberFind("flags", lf)->off;
     guest_lex_name_off = MemberFind("full_name", lf)->off;
     guest_lex_depth_off = MemberFind("depth", lf)->off;
+    if (!task_field(lf, "line_start", 8, -1))
+        zc_fail("pinned lexer line-start layout mismatch");
+    guest_lex_start_off = MemberFind("line_start", lf)->off;
     if (ctrl->sz != 40 || !task_field(ctrl, "next_waiting", 8, 0) ||
         !task_field(ctrl, "last_waiting", 8, 8) ||
         !task_field(ctrl, "next_done", 8, 16) ||
@@ -4653,6 +4686,7 @@ static int64_t host_last_fun(int64_t *a) {
 struct source_context {
     struct source_context *previous;
     unsigned char *mirror;
+    unsigned char *option_target;
     int owned;
 };
 static unsigned char *guest_context_new(int64_t flags) {
@@ -4684,6 +4718,7 @@ static void guest_context_files_clear(unsigned char *cc) {
         unsigned char *file = *head;
         *head = *(unsigned char **)file;
         free(*(void **)(file + guest_lex_name_off));
+        free(*(void **)(file + guest_lex_start_off));
         free(file);
     }
 }
@@ -4706,6 +4741,16 @@ static void guest_context_sync(CLexer *lex) {
         *(void **)(mirror + guest_lex_name_off) =
             __AIWNIOS_StrDup(file->filename, &guest_fibers[guest_current].heap_owner);
         *(int32_t *)(mirror + guest_lex_depth_off) = depth < 0 ? 0 : depth;
+        /* ExeCmdLine copies STR_LEN-1 bytes for the title, even for a short
+         * final line. Give it padded task-owned storage, never an unchecked
+         * pointer into the lexer's possibly tiny input allocation. */
+        char *line = __AIWNIOS_CAlloc(STR_LEN, &guest_fibers[guest_current].heap_owner);
+        size_t start = file->pos;
+        while (start && file->text[start - 1] != '\n') start--;
+        for (size_t i = 0; i < STR_LEN - 1 && file->text[start + i] &&
+                           file->text[start + i] != '\n'; i++)
+            line[i] = file->text[start + i];
+        *(void **)(mirror + guest_lex_start_off) = line;
         depth -= !!file->is_file;
         *next = mirror;
         next = (unsigned char **)mirror;
@@ -4718,7 +4763,15 @@ static void guest_context_enter(struct source_context *context, CLexer *lex,
         return;
     struct guest_fiber *f = &guest_fibers[guest_current];
     context->previous = f->source_context;
-    context->owned = !interactive || context->previous != NULL;
+    context->owned = !interactive || context->previous != NULL || f->user_compilers != NULL;
+    /* Legacy `zc` commands entered by the line editor are statements of the
+     * same interactive session. Their temporary compiler inherits its flags
+     * and exports committed option changes back to the waiting source cc. */
+    if (interactive && !context->previous && f->user_compilers) {
+        unsigned char *head = (unsigned char *)f->words + guest_next_cc_off;
+        unsigned char *tail = *(unsigned char **)(head + 8);
+        if (tail != head) context->option_target = tail;
+    }
     context->mirror = context->owned ? guest_context_new(flags) : guest_prompt_context();
     f->source_context = context;
     lex->port_options = (int64_t *)(context->mirror + guest_cc_opts_off);
@@ -4729,6 +4782,9 @@ static void guest_context_leave(struct source_context *context) {
     if (!context->mirror)
         return;
     struct guest_fiber *f = &guest_fibers[guest_current];
+    if (context->option_target)
+        *(int64_t *)(context->option_target + guest_cc_opts_off) =
+            *(int64_t *)(context->mirror + guest_cc_opts_off);
     guest_context_files_clear(context->mirror);
     if (context->owned) {
         unsigned char *next = *(unsigned char **)context->mirror;
@@ -5035,6 +5091,8 @@ static int64_t execute_source_mode(const char *path, const char *src,
     source_execution_leave(&execution);
     return just_load ? 1 : result;
 }
+#include "user_compiler.h"
+
 static int64_t execute_source_result(const char *path, const char *src,
                                      int return_expr, int record_answer) {
     return execute_source_mode(path, src, return_expr, record_answer, NULL, 0, 0, 1, NULL);
@@ -5407,8 +5465,19 @@ static int load_source_path(const char *path, int merged, int recover) {
         PrsBindCSymbol("ZcSystemTaskStart", host_system_task_start, 1);
         PrsBindCSymbol("ZcServerJobsHandler", host_server_jobs_handler, 1);
     }
+    if (!strcmp(path, "/System/UserTask.ZC")) {
+        PrsBindCSymbol("ZcUserCompCtrlNew", host_user_compiler_new, 2);
+        PrsBindCSymbol("ZcUserCompCtrlDel", host_user_compiler_del, 1);
+        PrsBindCSymbol("ZcUserLex", host_user_lex, 1);
+        PrsBindCSymbol("ZcUserStatement2Bin", host_user_statement, 2);
+        PrsBindCSymbol("ZcUserCodeFree", host_user_code_free, 2);
+        PrsBindCSymbol("ZcUserPromptSet", host_user_prompt_set, 1);
+        PrsBindCSymbol("ZcUserOutputSet", host_user_output_set, 1);
+        PrsBindCSymbol("ZcUserPutExcept", host_user_put_except, 0);
+        PrsBindCSymbol("ZcUserInputComplete", host_user_input_complete, 1);
+    }
     if (!strcmp(path, "/System/GuiTerminal.ZC"))
-        PrsBindCSymbol("ZcGuiShellExec", zc_gui_shell_exec, 1);
+        PrsBindCSymbol("ZcGuiShellExec", host_gui_shell_exec, 1);
     if (!strcmp(path, "/Kernel/KeyDev.ZC")) {
         CHashFun *put = (CHashFun *)HashFind("PutKey", Fs->hash_table, HTT_FUN, 1);
         if (put && put->fun_ptr && put->argc == 2 &&
@@ -5588,7 +5657,7 @@ static int load_source_path(const char *path, int merged, int recover) {
         PrsBindCSymbol("ExePrint", host_exe_print, 3);
         PrsBindCSymbol("ExePrint2", host_exe_print2, 3);
         PrsBindCSymbol("Print", host_print, 3);
-        PrsBindCSymbol("ZcGuiShellExec", zc_gui_shell_exec, 1);
+        PrsBindCSymbol("ZcGuiShellExec", host_gui_shell_exec, 1);
         PrsBindCSymbol("StrPrintJoin", host_str_print_join, 4);
         PrsBindCSymbol("PutKey", host_put_key, 2);
         PrsBindCSymbol("StrLen", host_str_len, 1);
@@ -6096,6 +6165,7 @@ int zc_start_gui_terminal(void) {
         "/System/DolDoc/DocPutKey.ZC",
         "/System/TaskSettings.ZC",
         "/System/ServerTask.ZC",
+        "/System/UserTask.ZC",
         "/System/GuiTerminal.ZC",
     };
     int64_t result = 0;
@@ -6285,6 +6355,10 @@ void zc_status(void) {
     printf("keyboard_focus=%s\n", keyboard_focus
            ? (const char *)((unsigned char *)keyboard_focus->words + guest_name_off)
            : "none");
+    if (keyboard_focus)
+        printf("user_command: original_loop=%d statements=%lu\n",
+               keyboard_focus->user_prompt_reader != NULL,
+               (unsigned long)keyboard_focus->user_statements);
     printf("virtio_keyboard: ready=%d key_events=%lu last_code=%u last_value=%lu\n",
            zc_virtio_keyboard_ready(),
            (unsigned long)zc_virtio_keyboard_event_count(),

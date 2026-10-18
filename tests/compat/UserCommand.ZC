@@ -1,0 +1,146 @@
+I64 UserCommandRun(U8 *source, I64 flags=0)
+{
+    CCompCtrl *cc=ZcUserCompCtrlNew(source,flags);
+    I64 result=0;
+    QueueInsert(cc,Fs->last_cc);
+    try
+    {
+        ZcUserLex(cc);
+        result=ExeCmdLine(cc);
+    }
+    catch
+    {
+        ZcUserCompCtrlDel(cc);
+    }
+    ZcUserCompCtrlDel(cc);
+    return result;
+}
+
+I64 UserCommandChecks()
+{
+    CCompCtrl *outer=Fs->last_cc;
+    U8 title[STR_LEN];
+    I64 title_src=Fs->title_src, arg=40;
+    StrCopy(title,Fs->task_title);
+    if (UserCommandRun("40+2;")!=42 || !Fs->new_answer ||
+        Fs->answer!=42 || Fs->answer_type!=RT_I64) return 1;
+    if (UserCommandRun("I64 UserCommandDefined(I64 n){return n+2;} UserCommandDefined(40);")!=42 ||
+        LastFun(1,&arg)!=42) return 2;
+    if (UserCommandRun("I64 UserCommandCounter=0;while(UserCommandCounter<42)UserCommandCounter++;UserCommandCounter;")!=42) return 3;
+    UserCommandRun("1.25+2.5;");
+    if (Fs->answer(F64)!=3.75 || Fs->answer_type!=RT_F64) return 4;
+    UserCommandRun("I64 UserCommandUnrun;");
+    if (UserCommandRun("UserCommandUnrun=42;",CCF_JUST_LOAD)!=1 ||
+        UserCommandRun("UserCommandUnrun;")!=0) return 5;
+    if (UserCommandRun("#include \"/Tests/SourceExecuteValue.HH\"\nSOURCE_EXECUTE_VALUE+2;")!=42) return 6;
+    if (Fs->last_cc!=outer || Fs->title_src!=title_src ||
+        StrCompare(title,Fs->task_title)) return 7;
+    return 42;
+}
+
+I64 UserCommandErrorChecks()
+{
+    CCompCtrl *outer=Fs->last_cc;
+    U8 title[STR_LEN];
+    I64 i, caught=0, code=0, title_src=Fs->title_src;
+    StrCopy(title,Fs->task_title);
+    for(i=0;i<8;i++)
+    {
+        try { UserCommandRun("I64 UserCommandHalf( {"); }
+        catch { code=Fs->except_ch;Fs->catch_except=TRUE;caught++; }
+        if (code!='Compiler') return 3;
+        try { UserCommandRun("throw('UsrFail');"); }
+        catch { code=Fs->except_ch;Fs->catch_except=TRUE;caught++; }
+        if (code!='UsrFail') return 4;
+        if (UserCommandRun("40+2;")!=42 || Fs->last_cc!=outer ||
+            Fs->title_src!=title_src || StrCompare(title,Fs->task_title)) return 1;
+    }
+    if (caught!=16) return 2;
+    return 42;
+}
+
+I64 user_command_input_step, user_command_input_errors, user_command_child_result;
+U8 *UserCommandInput(Bool continuation)
+{
+    I64 step=user_command_input_step++;
+    if (step==0) return StrNew("I64 UserCommandMulti(){");
+    if (step==1)
+    {
+        if (!continuation) user_command_input_errors++;
+        return StrNew("return 42;}");
+    }
+    if (step==2) return StrNew("Option(OPTf_DECIMAL_ONLY,ON);");
+    if (step==3) return StrNew("#assert OptionGet(OPTf_DECIMAL_ONLY)\n42;");
+    if (step==4) return StrNew("Option(OPTf_DECIMAL_ONLY,OFF);UserCommandMulti;");
+    if (step==5) return StrNew("throw('UsrFail');");
+    if (step==6) return StrNew("I64 UserCommandBad( {");
+    if (step==7) return StrNew(")"); // Mismatched close: diagnose, don't wait forever.
+    if (step==8) return StrNew("40+2;");
+    ZcUserPromptSet(NULL);
+    return NULL;
+}
+I64 UserCommandLoopChecks()
+{
+    CCompCtrl *outer=Fs->last_cc;
+    I64 old=ZcUserPromptSet(&UserCommandInput);
+    user_command_input_step=0;
+    user_command_input_errors=0;
+    UserTaskCont;
+    ZcUserPromptSet(old);
+    if (user_command_input_step!=10 || user_command_input_errors ||
+        Fs->last_cc!=outer || Fs->answer!=42) return 1;
+    return 42;
+}
+U0 UserCommandChild(U8 *unused)
+{
+    if (unused) {}
+    if (UserCommandChecks!=42 || UserCommandErrorChecks!=42 ||
+        UserCommandLoopChecks!=42) return;
+    user_command_child_result=42;
+}
+I64 UserCommandTaskChecks()
+{
+    CTask *child;
+    user_command_child_result=0;
+    child=Spawn(&UserCommandChild);
+    if (!child) return 1;
+    while (TaskValidate(child)) Yield;
+    return user_command_child_result;
+}
+I64 UserCommandInputChecks()
+{
+    if (ZcUserInputComplete("I64 f(){") || ZcUserInputComplete("/* { */ (40+") ||
+        ZcUserInputComplete("/* open") || ZcUserInputComplete("\"open") ||
+        !ZcUserInputComplete("/* { */ (40+2); // }\n") ||
+        !ZcUserInputComplete("\"{\\\"\";") || !ZcUserInputComplete("[)")) return 1;
+    return 42;
+}
+
+I64 user_command_wait_stage;
+U8 *UserCommandWaitInput(Bool continuation)
+{
+    if (!continuation) return StrNew("I64 UserCommandPending(){");
+    user_command_wait_stage=1;
+    while (TRUE) Yield;
+    return NULL;
+}
+U0 UserCommandWaitingChild(U8 *unused)
+{
+    if (unused) {}
+    ZcUserPromptSet(&UserCommandWaitInput);
+    UserTaskCont;
+}
+I64 UserCommandKillChecks()
+{
+    CTask *child;
+    I64 i;
+    for(i=0;i<8;i++)
+    {
+        user_command_wait_stage=0;
+        child=Spawn(&UserCommandWaitingChild);
+        if (!child) return 1;
+        while (!user_command_wait_stage && TaskValidate(child)) Yield;
+        if (!TaskValidate(child) || !Kill(child)) return 2;
+    }
+    return 42;
+}
