@@ -612,3 +612,9 @@ pending: click beside the graphical prompt, type `40+2;` without a `zc` prefix,
 then Return. The letters should appear while typing and the result should be
 42. This is the interactive command-loop milestone; full `HomeSys` startup
 and the remaining compiler/document interfaces are still separate work.
+
+The VM is backed up and refreshed from `440631e`; CLI reports it started.
+The refresh preserved 185 existing files outside the managed paths, deletion
+mask, RedSea bytes and VM settings, and verified the boot payload against the
+tested image. The Mac was locked during the visual check. Unlock it and leave
+ZealosAarch64Hello visible to complete the direct `40+2;` typing gate above.

@@ -71,7 +71,7 @@ fi
 echo "Resolved $VM_NAME → $DEST"
 
 python3 - <<PY
-import plistlib, pathlib, shutil, subprocess, sys, uuid as uuidlib
+import hashlib, os, plistlib, pathlib, shutil, subprocess, sys, uuid as uuidlib
 
 dest = pathlib.Path("$DEST")
 disk_src = pathlib.Path("$DISK_IMG")
@@ -170,7 +170,13 @@ if target.is_file() and target.stat().st_size >= (RS_LBA_BASE + RS_SECTS) * 512:
             if len(candidate) == SHADOW_BYTES and candidate[:8] == b"ZCSRC002":
                 old_shadow = candidate
 
-shutil.copyfile(disk_src, target)
+# Write through the existing file and flush before preserving the guest data.
+# A successful source-volume merge alone does not establish that the EFI/kernel
+# payload was refreshed: check those bytes separately before offering a restart.
+with disk_src.open("rb") as source, target.open("wb") as image:
+    shutil.copyfileobj(source, image, 1024 * 1024)
+    image.flush()
+    os.fsync(image.fileno())
 if old_rs and len(old_rs) == RS_BYTES:
     with open(target, "r+b") as f:
         f.seek(RS_LBA_BASE * 512)
@@ -203,6 +209,23 @@ subprocess.run([sys.executable, str(root / "scripts/source-volume.py"),
                 "--replace", "System/WinMgr.ZC",
                 "--replace", "System/Gr/GrDC.ZC",
                 "--replace", "System/Gr/SpriteRaster.ZC"], check=True)
+
+def boot_digest(path):
+    remaining = RS_LBA_BASE * 512  # GPT and ESP; exclude preserved guest regions.
+    digest = hashlib.sha256()
+    with path.open("rb") as image:
+        while remaining:
+            chunk = image.read(min(remaining, 1024 * 1024))
+            if not chunk:
+                raise RuntimeError("short boot image: " + str(path))
+            digest.update(chunk)
+            remaining -= len(chunk)
+    return digest.hexdigest()
+
+expected_boot = boot_digest(disk_src)
+if boot_digest(target) != expected_boot:
+    raise RuntimeError("UTM boot payload differs from the tested disk; VM left stopped")
+print("Verified GPT/ESP SHA-256: " + expected_boot)
 
 # Convenience second name for humans / older scripts
 shutil.copyfile(target, data / "zealos-esp.raw")

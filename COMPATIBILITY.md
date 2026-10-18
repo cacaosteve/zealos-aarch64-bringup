@@ -3162,3 +3162,17 @@ assertion also uses the new direct-ZealC banner. Pinned hashes, guarded overlays
 Python/shell syntax and whitespace checks pass. The Pi diagnostic builds;
 no Pi hardware was tested. Physical typing in the refreshed UTM image remains
 the final interactive gate.
+
+UTM was backed up while stopped at
+`build/utm-before-user-command-20261018-093036/` and refreshed from `440631e`.
+All 185 existing files outside the seven managed paths, the deletion mask,
+RedSea bytes and VM settings were verified preserved. The two added files are
+`System/UserTask.ZC` and `Tests/UserCommand.ZC`. The first boot-region comparison
+caught the prior payload despite a successful source merge. The installer now
+writes and flushes the disk explicitly, then checks the GPT/ESP bytes against
+the tested image before offering restart. The repeated refresh passed that
+check with SHA-256
+`c59a2b667a5c24be3f8d36a8bd967f57d082479930f218cbe09bf0e9766e5c83`.
+The preservation report is `build/user-command-utm-backup.json`.
+CLI reports the refreshed VM started. The Mac is locked, so a live visual/
+physical typing check has not yet been collected for this milestone.
