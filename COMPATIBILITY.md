@@ -2970,3 +2970,29 @@ Source hashes/overlays and Python syntax checks passed. Whitespace checks
 passed outside the new pinned file's original trailing space, whose bytes
 are preserved and hash-verified. The Pi diagnostic target builds; Pi hardware
 was not tested for this milestone.
+
+The live UTM image was refreshed from `7ae8794` after the stopped-VM backup
+at `build/utm-before-system-launch-20261017-231151/`. All 180 files outside
+the four managed bridge/demo paths, deletion masks and VM settings were
+preserved. The new pinned popup module and four system-launch fixtures were
+added. RedSea retained SHA-256
+`f216648875bf18c1eb122e4ad80cb8a85242e74619e424f9e9d6daac4de8d666`.
+The preservation report is `build/system-launch-utm-backup.json`.
+
+Live graphical `SystemLaunchQueueChecks`, `SystemLaunchChecks`,
+`SystemLaunchTaskChecks` and `SystemLaunchFileChecks` each returned
+`0x000000000000002a`; typing and the insertion caret were visible. The
+malformed system source deliberately emitted a compiler error before the
+successful result and next command. The first popup command was mistyped by
+desktop automation and rejected as an unknown function. The VM stopped
+before a corrected popup command could be delivered; the cause of the stop
+was not established. After restarting, the desktop returned, but the new
+automation connection did not deliver a single `h` key or pointer clicks to
+the guest. The user then physically loaded `/Tests/SystemLaunch.ZC` and ran
+`SystemLaunchPopupChecks`: typing appeared and the result was 42. The visible
+result was independently inspected and saved in
+`build/system-launch-utm-accepted.png`. This accepts all five launch paths in
+live UTM, including physical typing after restart. A final `zstatus` read was
+not collected from the restarted VM. Pointer capture was left released
+(`Value: 0`). Pointer movement/drag acceptance remains the earlier native USB
+baseline; it was not repeated for this milestone.
