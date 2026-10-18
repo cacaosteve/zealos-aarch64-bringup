@@ -3293,3 +3293,53 @@ not been enabled. Later automated modifier delivery became unreliable while
 trying to arrange that window, including a repeating `(` key. A physical
 release/Escape and typing check was requested; that follow-up remains pending.
 This is not a new physical acceptance claim or a change to the USB driver.
+
+## Input-filter text and startup commands — 2026-10-18
+
+The original `User(format, ...)` already called the original `XTalk`, but its
+text-producing input-filter job reached the bootstrap text sink. The recipient
+never received the supplied command. Native formatted output now recognizes
+`TASKf_INPUT_FILTER_TASK` and calls the pinned `KDInputFilterPutS` handler;
+the early native `PutKey` bridge likewise honors the source input-filter flag.
+This applies both to the pinned `InputFilterTask`, which is a normal spawned
+task, and to the native fallback filter. The source KeyDev handler posts the
+ordered input messages, which the recipient's existing graphical reader and
+original `ExeCmdLine` execute. Definitions belong to that terminal's compiler
+namespace rather than the temporary filter's namespace.
+
+The new `make check-user-text` gate exercises formatted initial `User` commands,
+multiple `XTalk` jobs, partial lines spanning filters, packed-character output,
+cursor-message ordering, a yielding text producer, long queued input, includes,
+and recovery after compiler/runtime errors. It checks actual scanout for the
+script's output and a subsequent unique command sent through real input
+devices, then repeats terminal/filter creation and teardown and compares data,
+code and allocation usage exactly. Long input allows time for the original
+`DocPutKey` scheduler yield after each echoed character; the ASCII graphical
+line limit remains 255 characters and the buffered compiler chunk remains 64 KiB.
+
+The malformed command `return (1+);` exposed a separate Aiwnios parser defect:
+an incomplete operand reached `OptPassExpandPtrs` with a null class pointer,
+causing a synchronous guest fault. The documented vendor patch now rejects
+missing operands and unmatched grouping/index delimiters before their operators
+reach optimization. Unary plus retains its operand-required state. Twelve
+negative expression cases each recover to a successful `40+2;`, with positive
+checks for unary operators, array indexing and default/omitted function
+arguments. The original vendor hashes still verify after reversing `PORT.patch`.
+
+These changes provide the command transport needed by HomeSys's `XTalk` of
+`Once`; they do not execute `StartUpTasks` or supply its remaining home-file,
+autocomplete and splash dependencies. Native USB configuration is unchanged.
+The running UTM bundle remains on `0034e51` while its previously requested
+physical typing check is pending; this candidate has only been run in disposable
+test guests so far.
+
+Validation passed 31 PCI queued-input checks, 34 NEC xHCI checks through two
+hubs with duplicate VirtIO devices, 380 ISO compatibility checks, 67 dedicated
+compiler-recovery checks and 220 PCI graphical workflow checks. Scanout shows
+`XTalk 42`, a visible insertion caret and a subsequent device-typed `Device 42`
+in the receiving terminal. Repeated terminal/filter teardown preserves data,
+code and allocation usage exactly. The compiler log contains twelve rejection
+diagnostics followed by 42 from `CompilerRecoveryOperandChecks`; the editor
+save/compile/run/reboot/reopen workflow also passes. Logs are
+`build/user-text-{pci,usb,iso,recovery,workflow}.log`. Upstream/overlay integrity,
+Python syntax and whitespace checks pass.

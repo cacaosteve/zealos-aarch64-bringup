@@ -84,6 +84,10 @@ Port changes:
   called it.
 - Accept ZealOS `sizeof(expr)` (not only `sizeof(Type)`), including member
   array sizes such as `sizeof(doldoc.default_de_flags)` in DocInit.
+- Reject missing expression operands and unmatched grouping/index delimiters
+  before emitting their operators. Malformed `return (1+);` previously reached
+  pointer expansion with a missing operand and faulted instead of reporting a
+  catchable compiler error. Empty and omitted function arguments remain valid.
 
 The freestanding C support and host API are in `src/zc/`. See
 `COMPATIBILITY.md` for the tested scope and deliberate runtime limitations.

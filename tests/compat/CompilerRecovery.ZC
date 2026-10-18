@@ -27,6 +27,23 @@ I64 CompilerRecoveryResult()
     return compiler_recovery_committed;
 }
 
+I64 CompilerRecoveryOperandChecks()
+{
+    I64 i;
+    U8 *bad[12] = {"I64 RecoveryOperand(){return (1+);}", "1+;", "/1;",
+        "1+ /2;", "(+);", "~;", "();", "(1;", "1==;", "+;",
+        "I64 RecoveryIndex(){I64 a[2];return a[1+];}",
+        "I64 RecoveryIndex(){I64 a[2];return a[];}"};
+    for (i = 0; i < 12; i++)
+        if (ExePutS(bad[i]) || ExePutS("40+2;") != 42) return i + 1;
+    if (ExePutS("+40+2;") != 42 || ExePutS("1+ +41;") != 42 ||
+        ExePutS("-(-40)+2;") != 42) return 13;
+    if (ExePutS("I64 RecoveryDefaults(I64 a=40,I64 b=2){return a+b;}RecoveryDefaults(,2);") != 42 ||
+        ExePutS("RecoveryDefaults();") != 42) return 14;
+    if (ExePutS("I64 RecoveryArray(){I64 a[2]={40,2};return a[0]+a[1];}RecoveryArray();") != 42) return 15;
+    return 42;
+}
+
 I64 CompilerRecoveryChecks()
 {
     I64 i, caught = 0;

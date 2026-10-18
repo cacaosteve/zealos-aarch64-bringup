@@ -48,6 +48,8 @@ p.add_argument('--probe-user-command', action='store_true',
                help='check original ExeCmdLine/UserTaskCont through the ARM64 compiler ABI')
 p.add_argument('--probe-user-startup', action='store_true',
                help='check original User/UserCmdLine, HomeSys hooks and independent graphical terminals')
+p.add_argument('--probe-user-text', action='store_true',
+               help='check User formatted startup and XTalk input-filter delivery to graphical terminals')
 p.add_argument('--probe-source-exceptions', action='store_true',
                help='check catchable source/file errors, native cleanup and command/job recovery')
 p.add_argument('--probe-winmgr', action='store_true',
@@ -117,7 +119,8 @@ if args.probe_live_window_control and not (
         args.probe_grscreen and args.probe_live_winmgr):
     p.error('--probe-live-window-control requires --probe-module /System/Win.ZC '
             '--probe-winmgr --probe-grscreen --probe-live-winmgr')
-log_path = ROOT / 'build' / (f'check-usb-{usb_label}{"-user-startup" if args.probe_user_startup else ""}.log' if args.usb_input else
+log_path = ROOT / 'build' / (f'check-usb-{usb_label}{"-user-text" if args.probe_user_text else "-user-startup" if args.probe_user_startup else ""}.log' if args.usb_input else
+                             'check-user-text-pci.log' if args.probe_user_text else
                              'check-user-startup-pci.log' if args.probe_user_startup and args.pci else
                              'check-user-startup-iso.log' if args.probe_user_startup else
                              'check-gui-workflow.log' if args.probe_gui_workflow else
@@ -320,12 +323,13 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         deadline = time.monotonic() + 3
         while True:
             for row, text in enumerate(screen[3].splitlines()):
-                if line in text:
-                    col = text.index(line) + len(line)
+                # Repeated commands may also appear in history, another
+                # terminal or a title. Inspect every occurrence for the caret.
+                for match in re.finditer(re.escape(line), text):
+                    col = match.end()
                     if white_pixels(screen, col*8, row*8, 8, 8) >= 8:
                         print('PASS visible graphical insertion caret', flush=True)
                         return
-                    break
             if time.monotonic() >= deadline:
                 break
             time.sleep(0.1)
@@ -564,6 +568,37 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         if not redraw_count or int(redraw_count.group(1), 16) == 0:
             raise RuntimeError('boot compositor has not redrawn the terminal document:\n' + redraws)
         print(f'PASS boot terminal document redraws: {int(redraw_count.group(1), 16)}', flush=True)
+        if args.probe_user_text:
+            command('zload /Tests/UserText.ZC', 'zc: loaded /Tests/UserText.ZC')
+            for check in ('StartChecks', 'OrderChecks', 'LongChecks', 'BarrierChecks', 'RecoveryChecks'):
+                try:
+                    command('zcall UserText'+check, 'zc => 0x000000000000002a', timeout=60)
+                except RuntimeError as error:
+                    if 'guest synchronous fault' in str(error) or 'timeout waiting' in str(error):
+                        raise
+                    command('zstatus', 'failed=')
+                    command('zc Print("user_text_debug value=%d flags=%X filter=%X queue=%X self=%X\\n",user_text_value,user_text_terminal->task_flags,user_text_terminal->last_input_filter_task,user_text_terminal->server_ctrl.next_waiting,&user_text_terminal->server_ctrl);', 'user_text_debug')
+                    graphical_screen('user-text-failure')
+                    raise
+            require_graphical_text('user-text-answer', 'XTalk 42')
+            if args.probe_gui_keyboard:
+                device_command = 'Print("Device %d\\n",40+2);'
+                qmp_send_text(device_command)
+                typed = require_graphical_text('user-text-typing', device_command)
+                require_graphical_caret(typed, device_command)
+                qmp_send_key('ret')
+                require_graphical_text('user-text-device-answer', 'Device 42')
+            command('zcall UserTextCloseChecks', 'zc => 0x000000000000002a')
+            before = command('zstatus', 'failed=0')
+            for _ in range(2):
+                for check in ('StartChecks', 'OrderChecks', 'LongChecks', 'BarrierChecks', 'RecoveryChecks', 'CloseChecks'):
+                    command('zcall UserText'+check, 'zc => 0x000000000000002a', timeout=60)
+            after = command('zstatus', 'failed=0')
+            heap = r'data=([0-9/]+) code=([0-9/]+) allocations=([0-9]+)'
+            if re.search(heap, before).groups() != re.search(heap, after).groups():
+                raise RuntimeError('XTalk terminal/filter teardown leaked managed memory')
+            print('PASS original User startup text, XTalk ordering, long input, target compiler recovery and exact cleanup', flush=True)
+            raise SystemExit(0)
         if args.probe_user_startup:
             focus_graphical_terminal()
             command('zload /Tests/UserStartUp.ZC', 'zc: loaded /Tests/UserStartUp.ZC')
@@ -755,6 +790,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         command('zc I64 RecoveryClassSize(){return sizeof(CRecoveryHalf)+34;}', 'zc: executed')
         command('zcall RecoveryClassSize', 'zc => 0x000000000000002a')
         command('zcall CompilerRecoveryChecks', 'zc => 0x000000000000002a')
+        command('zcall CompilerRecoveryOperandChecks', 'zc => 0x000000000000002a')
         command('zcall CompilerRecoveryReentryChecks', 'zc => 0x000000000000002a')
         command('zcall CompilerRecoveryJobChecks', 'zc => 0x000000000000002a')
         command('zcall CompilerRecoveryTaskChecks', 'zc => 0x000000000000002a')

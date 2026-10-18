@@ -1658,7 +1658,7 @@ int64_t ParseExpr(CCmpCtrl *ccmp, int64_t flags) {
       }                                                                        \
     }                                                                          \
   }
-  int64_t tok, prec, type, binop_before = 1, arg, str_len;
+  int64_t tok, prec, type, binop_before = 1, want_operand, arg, str_len;
   int64_t ic_stk[0x100];
   int64_t prec_stk[0x100];
   int64_t stk_ptr = 0, idx;
@@ -1672,6 +1672,7 @@ int64_t ParseExpr(CCmpCtrl *ccmp, int64_t flags) {
   CArrayDim dummy_dim;
 next:
   while (tok = ccmp->lex->cur_tok) {
+    want_operand = binop_before;
     switch (tok) {
     case '\n':
       goto fin;
@@ -1799,7 +1800,7 @@ next:
       Lex(ccmp->lex);
       if (binop_before) {
         // Unary
-        binop_before = 0;
+        binop_before = 1;
         prec = 0;
         type = IC_POS;
       } else {
@@ -2008,6 +2009,8 @@ next:
       binop_before = 1; // We consume the next thing like a binop
       break;
     case ')':
+      if (binop_before && stk_ptr)
+        ParseErr(ccmp, "Expected an expression before ')'.");
       binop_before = 0;
       for (idx = 0; idx != stk_ptr; idx++) {
         if (ic_stk[idx] == IC_PAREN) {
@@ -2032,6 +2035,8 @@ next:
       binop_before = 1; // Acts like a binop as it consumes the right side
       break;
     case ']':
+      if (binop_before && stk_ptr)
+        ParseErr(ccmp, "Expected an expression before ']'.");
       binop_before = 0;
       for (idx = 0; idx != stk_ptr; idx++) {
         if (ic_stk[idx] == IC_ARRAY_ACC) {
@@ -2359,6 +2364,21 @@ next:
     default:
       goto fin;
     }
+    /* Do not emit a binary operator without its left operand. Likewise,
+     * prefix operators cannot follow an already complete value. Invalid
+     * RPN otherwise reaches pointer expansion with a missing ic_class. */
+    switch (type) {
+    case IC_PAREN:
+      break;
+    case IC_POS: case IC_NEG: case IC_DEREF: case IC_ADDR_OF:
+    case IC_BNOT: case IC_LNOT: case IC_PRE_INC: case IC_PRE_DEC:
+      if (!want_operand)
+        ParseErr(ccmp, "Expected an operator.");
+      break;
+    default:
+      if (want_operand)
+        ParseErr(ccmp, "Expected an expression before operator.");
+    }
     if (type == IC_PAREN || type == IC_ARRAY_ACC) {
       prec_stk[stk_ptr] = prec;
       ic_stk[stk_ptr++] = type;
@@ -2386,7 +2406,12 @@ next:
     }
   }
 fin:
+  if (binop_before && stk_ptr)
+    ParseErr(ccmp, "Expected an expression.");
   while (stk_ptr) {
+    if (ic_stk[stk_ptr - 1] == IC_PAREN ||
+        ic_stk[stk_ptr - 1] == IC_ARRAY_ACC)
+      ParseErr(ccmp, "Expected a closing expression delimiter.");
     ic = A_CALLOC(sizeof(CRPN), NULL);
     ic->type = ic_stk[stk_ptr - 1];
     QueIns(ic, ccmp->code_ctrl->ir_code);

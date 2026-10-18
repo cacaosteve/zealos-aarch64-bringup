@@ -26,12 +26,17 @@ make check-run-file     # task-local LastFun + upstream RunFile with application
 make check-source-exceptions # catchable source/file errors + prompt, job and task cleanup
 make check-system-launch # upstream Sys/SysFile + popup application arguments
 make check-system-server # dedicated source System loop + namespace/job ownership
+make check-user-command # original ExeCmdLine loop, options and error recovery
+make check-user-startup # per-user HomeSys setup and independent graphical terminals
+make check-user-text    # User startup commands + XTalk input delivery and recovery
 make utm               # refresh VM, preserving RedSea/source edits and adding new bundled files
 ```
 
 The UTM refresh also updates the repository-managed
 `Tests/WindowDragLive.ZC`, `System/GuiTerminal.ZC`, `System/TaskBridge.ZC`,
-`System/WinMgr.ZC`, `System/Gr/GrDC.ZC`, and `System/Gr/SpriteRaster.ZC` files
+`System/UserTask.ZC`, `System/HomeStartUp.ZC`, `System/SourceDir.ZC`,
+`System/DolDoc/DocTerm.ZC`, `System/DolDoc/DocEd.ZC`, `System/WinMgr.ZC`,
+`System/Gr/GrDC.ZC`, and `System/Gr/SpriteRaster.ZC` files
 so they stay in sync with the kernel; other existing guest source files remain
 untouched.
 
@@ -101,7 +106,9 @@ The graphical terminal now runs the original `UserCmdLine`, `UserTaskCont` and
 directly, for example `40+2;`. `User;` creates another terminal with its own
 document, compiler context and history. The default per-user hook retains the
 pinned `HomeSys.ZC` welcome-document/window setup, then installs the accepted
-graphical input adapter. Full `HomeSys` desktop launch, document-backed lexing,
+graphical input adapter. `User("40+2;\n")` supplies an initial command;
+`XTalk` and `XTalkWait` send further input to that terminal's compiler through
+the source KeyDev input filter. Full `HomeSys` desktop launch, document-backed lexing,
 autocomplete and the remaining compiler interfaces are still open.
 The bridge also maintains the upstream-visible runnable-task and parent/child
 task rings, including `TaskFocusNext` selection and child unlink on teardown.

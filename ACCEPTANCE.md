@@ -635,3 +635,13 @@ automation opened another terminal with `User;` and visibly obtained
 `ans=0x2A=42` from `40+2;`. A physical typing/release check remains pending
 after later automation repeated a modifier key while arranging the window.
 Full `HomeSys` desktop startup remains separate work.
+
+2026-10-18: formatted `User` startup commands and `XTalk` input delivery passed
+31 PCI and 34 native USB checks, with visible script output, subsequent device
+typing and exact terminal/filter reclamation. The receiving terminal owns the
+definitions and executes queued includes and commands after parser/runtime
+errors. A malformed-expression compiler fault found by this gate is fixed by
+the documented Aiwnios parser patch. Dedicated compiler recovery (67), ISO
+compatibility (380) and graphical save/compile/run/reboot/reopen workflow (220)
+checks pass. The running UTM bundle remains on `0034e51` for its pending physical
+typing check; these changes have been verified in disposable guests.

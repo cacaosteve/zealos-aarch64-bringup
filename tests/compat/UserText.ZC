@@ -1,0 +1,92 @@
+// HomeSys/Once depends on XTalk delivering text to the user's compiler,
+// rather than merely executing the text-producing job in its input filter.
+CTask *user_text_terminal, *user_text_seen;
+I64 user_text_value;
+
+I64 UserTextStartChecks()
+{
+    user_text_value = 0;
+    user_text_seen = NULL;
+    user_text_terminal = User("user_text_value=%d+2;user_text_seen=Fs;\n", 40);
+    if (!TaskValidate(user_text_terminal)) return 1;
+    if (!ZcTaskWaitTimeout(user_text_terminal, 10000, TRUE)) return 2;
+    if (user_text_value != 42 || user_text_seen != user_text_terminal) return 3;
+    XTalk(user_text_terminal, "I64 UserTextLocal=40;\nUserTextLocal+=2;\n");
+    if (!ZcTaskWaitTimeout(user_text_terminal, 10000, TRUE)) return 4;
+    CJob *job = TaskExe(user_text_terminal, Fs, "UserTextLocal;", 0);
+    if (!job || JobResGet(job) != 42) return 5;
+    if (user_text_terminal->last_input_filter_task != user_text_terminal) return 6;
+    WinHorz(48, 96, user_text_terminal);
+    WinVert(28, 58, user_text_terminal);
+    WinToTop(user_text_terminal);
+    return 42;
+}
+
+I64 UserTextOrderChecks()
+{
+    user_text_value = 0;
+    XTalk(user_text_terminal, "user_text_value=4");
+    if (!ZcTaskWaitTimeout(user_text_terminal, 10000, TRUE)) return 1;
+    if (user_text_value) return 2;
+    XTalk(user_text_terminal, "2;\n");
+    XTalk(user_text_terminal, "user_text_value=user_text_value*10+3;\n");
+    if (!ZcTaskWaitTimeout(user_text_terminal, 10000, TRUE)) return 3;
+    if (user_text_value != 423) return 4;
+    // PutChars travels through PutKey, rather than the formatted PutS path.
+    if (!TaskText(user_text_terminal, NULL, "PutChars('40+2;');PutChars('\\n');", 0)) return 5;
+    if (!ZcTaskWaitTimeout(user_text_terminal, 10000, TRUE)) return 6;
+    if (user_text_terminal->answer != 42) return 7;
+    return 42;
+}
+
+I64 UserTextLongChecks()
+{
+    U8 text[240];
+    StrCopy(text, "//");
+    MemSet(text + 2, 'x', 180);
+    text[182] = '\n';
+    StrCopy(text + 183, "user_text_value=42;\n");
+    user_text_value = 0;
+    XTalk(user_text_terminal, "%s", text);
+    // DocPutKey yields after each echoed key; allow the real compositor to run.
+    if (!ZcTaskWaitTimeout(user_text_terminal, 15000, TRUE)) return 1;
+    if (user_text_value != 42) return 2;
+    return 42;
+}
+
+I64 UserTextBarrierChecks()
+{
+    user_text_value = 0;
+    if (!TaskText(user_text_terminal, NULL,
+        "PutS(\"user_text_value=4\");Message(MESSAGE_KEY_DOWN,0,SC_CURSOR_LEFT);PutS(\"2\");Message(MESSAGE_KEY_DOWN,0,SC_END);PutS(\";\\n\");", 0)) return 1;
+    if (!ZcTaskWaitTimeout(user_text_terminal, 10000, TRUE)) return 2;
+    if (user_text_value != 24) return 3;
+    if (!TaskText(user_text_terminal, NULL,
+        "PutS(\"user_text_value=4\");Yield;PutS(\"2;\\n\");", 0)) return 4;
+    if (!ZcTaskWaitTimeout(user_text_terminal, 10000, TRUE)) return 5;
+    if (user_text_value != 42) return 6;
+    return 42;
+}
+
+I64 UserTextRecoveryChecks()
+{
+    user_text_value = 0;
+    XTalk(user_text_terminal, "I64 UserTextBroken(){return (1+);}\n");
+    XTalk(user_text_terminal, "throw('TextFail');\n");
+    XTalk(user_text_terminal, "#include \"/Tests/SourceExecuteValue.HH\"\n");
+    XTalkWait(user_text_terminal, "user_text_value=SOURCE_EXECUTE_VALUE+2;user_text_seen=Fs;\n");
+    if (!ZcTaskWaitTimeout(user_text_terminal, 10000, TRUE)) return 1;
+    if (user_text_value != 42 || user_text_seen != user_text_terminal) return 2;
+    if (user_text_terminal->last_input_filter_task != user_text_terminal ||
+        !Bt(&user_text_terminal->task_flags, TASKf_CMD_LINE_PROMPT)) return 3;
+    XTalkWait(user_text_terminal, "Print(\"XTalk %%d\\n\",40+2);\n");
+    return 42;
+}
+
+I64 UserTextCloseChecks()
+{
+    if (TaskValidate(user_text_terminal) && !Kill(user_text_terminal)) return 1;
+    user_text_terminal = NULL;
+    WinToTop(bootstrap_gui_terminal_task);
+    return 42;
+}

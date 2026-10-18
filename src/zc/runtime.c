@@ -180,6 +180,7 @@ static double *pow10_I64_host = pow10_values;
 #define GUEST_JOBS_MAX 128u
 #define GUEST_JOB_DEPTH_MAX 8u
 #define GUEST_MESSAGE_MS_MOVE 4
+#define GUEST_INPUT_FILTER_TASK (1u << 5) /* TASKf_INPUT_FILTER_TASK */
 /* KernelA.HH CJob: keep the queue links and message fields at their original
  * offsets so guest code may inspect the pending queue through CTask. */
 struct guest_job {
@@ -408,6 +409,7 @@ extern uint64_t zeal_fb_task_text_compose(unsigned slot, int64_t left,
 extern uint64_t zeal_fb_shell_text_compose(uint32_t *text_base,
                                             int64_t stride);
 static void guest_task_text_output(const char *text);
+static uint32_t *guest_flags(struct guest_fiber *f);
 static void guest_raise(int64_t code) __attribute__((noreturn));
 static void guest_unwind_all(void);
 static int64_t host_rflags_get(int64_t *a);
@@ -1464,6 +1466,18 @@ static void guest_task_text_output(const char *text) {
     /* Parser diagnostics are replayed only after the checkpoint commits or
      * rolls back. Doc mutations must never be undone by compiler recovery. */
     if (f->user_diagnostic_active) return;
+    /* Both the pinned InputFilterTask (a normal Spawn) and the native filter
+     * publish TASKf_INPUT_FILTER_TASK. Their formatted output is StdIn for
+     * the linked recipient, through the original KeyDev message producer. */
+    if (*guest_flags(f) & GUEST_INPUT_FILTER_TASK) {
+        CHashFun *put = (CHashFun *)HashFind(
+            "KDInputFilterPutS", Fs->hash_table, HTT_FUN, 1);
+        if (put && put->fun_ptr && put->argc == 1 &&
+            !(put->base.base.type & HTF_EXTERN)) {
+            FFI_CALL_TOS_1(put->fun_ptr, (int64_t)(uintptr_t)text);
+            return;
+        }
+    }
     if (f->user_output_writer && !f->user_output_suppressed) {
         FFI_CALL_TOS_1(f->user_output_writer, (int64_t)(uintptr_t)text);
         return;
@@ -2237,7 +2251,6 @@ static int64_t host_end_catch(int64_t *a) {
 #define GUEST_KILL_TASK (1u << 1) /* TASKf_KILL_TASK */
 #define GUEST_IDLE (1u << 3) /* TASKf_IDLE in pinned KernelA.HH */
 #define GUEST_CMD_LINE_PROMPT (1u << 4) /* TASKf_CMD_LINE_PROMPT */
-#define GUEST_INPUT_FILTER_TASK (1u << 5)
 #define GUEST_FILTER_INPUT (1u << 6)
 #define GUEST_AWAITING_MESSAGE (1u << 9)
 #define GUEST_WIF_SELF_KEY_DESC (1u << 12) /* WIf_SELF_KEY_DESC in KernelA.HH */
@@ -3495,6 +3508,11 @@ static int64_t host_put_key(int64_t *a) {
      * bootstrap echo target. Once the graphical task installs its document
      * device, honor that real output chain (including editor/navigation keys)
      * instead of sending its input to the hidden bootstrap text console. */
+    if (guest_keydev_put_key &&
+        (*guest_flags(&guest_fibers[guest_current]) & GUEST_INPUT_FILTER_TASK)) {
+        FFI_CALL_TOS_2(guest_keydev_put_key, a[0], a[1]);
+        return 0;
+    }
     if (gui_terminal_active && guest_keydev_put_key) {
         CHashFun *terminal = (CHashFun *)HashFind(
             "BootstrapGuiTerminalState", Fs->hash_table, HTT_FUN, 1);
