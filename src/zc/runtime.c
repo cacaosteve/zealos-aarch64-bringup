@@ -1105,6 +1105,39 @@ static uint64_t host_f64_to_bits(double value) {
     memcpy(&bits, &value, sizeof(bits));
     return bits;
 }
+/* Freestanding natural log for the pinned _LN import. Reduce x=2^e*m
+ * to sqrt(1/2)<=m<=sqrt(2), then ln(m)=2*(z+z^3/3+...). The fixed
+ * series is below binary64 precision; no hosted libm or x87 is required. */
+static int64_t host_ln(int64_t *a) {
+    uint64_t bits = (uint64_t)a[0], magnitude = bits & UINT64_C(0x7fffffffffffffff);
+    if (magnitude > UINT64_C(0x7ff0000000000000))
+        return (int64_t)(bits | UINT64_C(0x0008000000000000));
+    if (!magnitude)
+        return (int64_t)UINT64_C(0xfff0000000000000);
+    if (bits >> 63)
+        return (int64_t)UINT64_C(0x7ff8000000000000);
+    if (magnitude == UINT64_C(0x7ff0000000000000))
+        return (int64_t)bits;
+    int exponent = 0;
+    if (!(bits >> 52)) {
+        bits = host_f64_to_bits(host_f64_from_bits(bits) * 0x1p52);
+        exponent = -52;
+    }
+    exponent += (int)(bits >> 52) - 1023;
+    double m = host_f64_from_bits((bits & UINT64_C(0x000fffffffffffff)) |
+                                 UINT64_C(0x3ff0000000000000));
+    /* Center on 1 so values just below 1 do not subtract two ln(2)s. */
+    if (m > 0x1.6a09e667f3bcdp0) {
+        m *= 0.5;
+        exponent++;
+    }
+    double z = (m - 1.0) / (m + 1.0), z2 = z * z, term = z, sum = z;
+    for (unsigned n = 3; n <= 51; n += 2) {
+        term *= z2;
+        sum += term / (double)n;
+    }
+    return (int64_t)host_f64_to_bits(2.0 * sum + exponent * 0x1.62e42fefa39efp-1);
+}
 static double host_sqrt_value(double value) {
     return host_f64_from_bits(hc_builtin_sqrt(host_f64_to_bits(value)));
 }
@@ -2162,6 +2195,8 @@ static int64_t host_end_catch(int64_t *a) {
 #define GUEST_JOBF_DISPATCHED (1u << 6)
 #define GUEST_JOBF_FREE_ON_COMPLETE (1u << 7)
 #define GUEST_JOBF_ADD_TO_QUE (1u << 8)
+/* Internal requests may bypass root UI messages; normal TaskExe keeps FIFO. */
+#define GUEST_JOBF_SYSTEM_REQUEST (UINT64_C(1) << 62)
 #define GUEST_JOBT_TEXT_INPUT 0
 #define GUEST_JOBT_MESSAGE 1
 #define GUEST_JOBT_EXE_STR 2
@@ -2196,6 +2231,7 @@ static int64_t host_task_yield(int64_t *a);
 static int64_t host_rflags_get(int64_t *a);
 static int64_t host_rflags_set(int64_t *a);
 static int64_t host_jobs_handler(int64_t *a);
+static int64_t host_jobs_handler_mode(int64_t *a, int system_only);
 static uint64_t counter_now(void);
 static uint64_t deadline_after_milliseconds(uint64_t milliseconds);
 static int64_t poll_guest_keys(void);
@@ -2985,6 +3021,18 @@ static int64_t host_task_yield(int64_t *a) {
         zc_fail("yield during job dispatch is unsupported");
     unsigned me = guest_current;
     struct guest_fiber *self = &guest_fibers[me];
+    /* Root stands in for sys_task while the native serial shell owns its
+     * outer loop. Service queued system source at cooperative boundaries,
+     * including when root is waiting for the child that called Sys. Never
+     * enter the parser while it is compiling. A yielded source body can
+     * service nested requests through the normal bounded job dispatcher. */
+    int serve_system = !me;
+    uint32_t was_idle = *guest_flags(self) & GUEST_IDLE;
+    if (serve_system) {
+        int64_t handle[2] = {0, 0};
+        (void)host_jobs_handler_mode(handle, self->source_job_active || self->active_jobs);
+        *guest_flags(self) |= GUEST_IDLE;
+    }
     /* Only poll device input for the explicitly focused task. A merely
      * waiting background task must not steal serial-shell input. */
     if (guest_focus_task)
@@ -2998,13 +3046,16 @@ static int64_t host_task_yield(int64_t *a) {
         self->wait_kind = GUEST_WAIT_SERVER;
     }
     unsigned next = next_guest(me);
-    if (next == me) {
-        if (park_server)
-            self->wait_kind = GUEST_WAIT_NONE;
-        return 0;
-    }
-    if (!setjmp(self->context))
+    if (next != me && !setjmp(self->context))
         enter_guest(next);
+    /* A child can queue Sys work and suspend itself in the slice above.
+     * Pump before returning to root's task-wait loop, which may otherwise
+     * see no runnable child and stop before dispatching the request. */
+    if (serve_system) {
+        int64_t handle[2] = {0, 0};
+        (void)host_jobs_handler_mode(handle, self->source_job_active || self->active_jobs);
+        *guest_flags(self) = (*guest_flags(self) & ~GUEST_IDLE) | was_idle;
+    }
     if (self->kill_requested && !self->ending)
         end_guest_current(-1);
     if (park_server)
@@ -3630,13 +3681,14 @@ static int64_t host_task_text(int64_t *a) {
     *guest_flags(filter) &= ~(GUEST_IDLE | GUEST_AWAITING_MESSAGE);
     return (int64_t)(uintptr_t)job;
 }
-static int64_t host_task_exe(int64_t *a) {
+static int64_t host_task_exe_mode(int64_t *a, int system_request) {
     struct guest_fiber *server = find_guest_task((void *)(uintptr_t)a[0]);
     void *master = (void *)(uintptr_t)a[1];
     const char *source = (const char *)(uintptr_t)a[2];
     uint64_t flags = (uint64_t)a[3];
     if (!server || !source ||
-        (*(void **)((unsigned char *)server->words + guest_popup_off) &&
+        (!(system_request && server == &guest_fibers[0]) &&
+         *(void **)((unsigned char *)server->words + guest_popup_off) &&
          !(*guest_flags(server) & GUEST_FILTER_INPUT)) ||
         (master && !valid_guest_task(master)) ||
         (flags & ~(uint64_t)(GUEST_JOBF_WAKE_MASTER |
@@ -3659,7 +3711,7 @@ static int64_t host_task_exe(int64_t *a) {
     memcpy(copy, source, length);
     job->ctrl = (unsigned char *)server->words + guest_server_ctrl_off;
     job->job_code = GUEST_JOBT_EXE_STR;
-    job->flags = (int64_t)flags;
+    job->flags = (int64_t)(flags | (system_request ? GUEST_JOBF_SYSTEM_REQUEST : 0));
     job->aux_str = copy;
     job->master_task = master;
     guest_job_insert(guest_job_head(server), job);
@@ -3671,6 +3723,9 @@ static int64_t host_task_exe(int64_t *a) {
         (void)guest_wait(GUEST_WAIT_JOB, &self->wait_target, 0);
     }
     return (int64_t)(uintptr_t)job;
+}
+static int64_t host_task_exe(int64_t *a) {
+    return host_task_exe_mode(a, 0);
 }
 static int64_t host_job_queue(int64_t *a) {
     void *callback = (void *)(uintptr_t)a[0];
@@ -3788,7 +3843,7 @@ static int64_t host_job_res_get(int64_t *a) {
         zc_fail("job result vanished");
     return result;
 }
-static int64_t host_jobs_handler(int64_t *a) {
+static int64_t host_jobs_handler_mode(int64_t *a, int system_only) {
     void *task = a[1] ? (void *)(uintptr_t)a[1] : guest_fibers[guest_current].words;
     if (task != guest_fibers[guest_current].words)
         zc_fail("JobsHandler requires the current task");
@@ -3805,6 +3860,16 @@ static int64_t host_jobs_handler(int64_t *a) {
     int64_t count = 0;
     while (head->next != head) {
         struct guest_job *job = head->next;
+        /* Only internal Sys requests bypass root's UI messages. Ordinary
+         * source/callback jobs retain their position behind those messages.
+         * A yielding root job likewise admits only nested system requests. */
+        if (server == &guest_fibers[0] &&
+            (system_only || job->job_code == GUEST_JOBT_MESSAGE)) {
+            while (job != head && !(job->flags & GUEST_JOBF_SYSTEM_REQUEST))
+                job = job->next;
+            if (job == head)
+                break;
+        }
         if (job->job_code != GUEST_JOBT_EXE_STR && job->job_code != GUEST_JOBT_CALL &&
             job->job_code != GUEST_JOBT_SPAWN_TASK)
             break;
@@ -3851,6 +3916,11 @@ static int64_t host_jobs_handler(int64_t *a) {
         if (master && (job->flags & GUEST_JOBF_FOCUS_MASTER) &&
             !(*(uint32_t *)((unsigned char *)master->words + guest_win_inhibit_off) & 1u))
             guest_focus_task = master->words;
+        /* Pinned TaskExe suspends its master for WAKE_MASTER. Native
+         * TaskExe waits on the job instead; completing either form must
+         * make that same master runnable again. */
+        if (master && (job->flags & GUEST_JOBF_WAKE_MASTER))
+            *guest_flags(master) &= ~GUEST_SUSPENDED;
         if ((job->flags & GUEST_JOBF_FREE_ON_COMPLETE) ||
             (job->master_task && !master)) {
             guest_job_delete(job);
@@ -3864,6 +3934,9 @@ static int64_t host_jobs_handler(int64_t *a) {
             end_guest_current(0);
     }
     return count;
+}
+static int64_t host_jobs_handler(int64_t *a) {
+    return host_jobs_handler_mode(a, 0);
 }
 static void guest_executive_loop(void) {
     for (;;) {
@@ -4958,11 +5031,36 @@ static int64_t host_exe_puts2(int64_t *a) {
     return host_exe_puts_mode(args, 1);
 }
 static size_t format_text(char *output, size_t capacity, const char *format,
-                          int64_t argc, const int64_t *argv);
+                          int64_t argc, const int64_t *argv, int strip_markers);
+static int64_t host_sys(int64_t *a) {
+    if (!guest_task_bound || guest_task_exe_active ||
+        (guest_current == GUEST_EXECUTIVE && guest_job_call_active))
+        zc_fail("Sys requires a cooperative execution context");
+    char source[4097];
+    format_text(source, sizeof(source), (const char *)(uintptr_t)a[0],
+                a[1], (const int64_t *)(uintptr_t)a[2], 0);
+    int64_t request[4] = {
+        (int64_t)(uintptr_t)guest_fibers[0].words,
+        (int64_t)(uintptr_t)guest_fibers[guest_current].words,
+        (int64_t)(uintptr_t)source,
+        guest_current ? GUEST_JOBF_WAKE_MASTER : 0
+    };
+    int64_t job = host_task_exe_mode(request, 1);
+    if (!job)
+        return 0;
+    if (!guest_current) {
+        int64_t handle[2] = {0, 0};
+        (void)host_jobs_handler_mode(handle, 1);
+    }
+    int64_t result = 0, scan[2] = {job, (int64_t)(uintptr_t)&result};
+    if (!host_job_res_scan(scan))
+        zc_fail("system request did not complete");
+    return result;
+}
 static int64_t host_exe_print_mode(int64_t *a, int throwing) {
     char source[4097];
     format_text(source, sizeof(source), (const char *)(uintptr_t)a[0],
-                a[1], (const int64_t *)(uintptr_t)a[2]);
+                a[1], (const int64_t *)(uintptr_t)a[2], 0);
     int64_t args[4] = {(int64_t)(uintptr_t)source, 0, 0, 0};
     return host_exe_puts_mode(args, throwing);
 }
@@ -4973,10 +5071,12 @@ static int64_t host_exe_print2(int64_t *a) {
     return host_exe_print_mode(a, 1);
 }
 static int64_t host_print(int64_t *a);
-/* Bounded text formatter shared by Print and StrPrintJoin. Supports the
- * markers and codes used by Message.ZC, Job.ZC, and upstream progress UI. */
+/* Bounded formatter shared by Print, source generation and StrPrintJoin.
+ * ExePrint preserves source display markers. The existing text-oriented
+ * Print/StrPrintJoin subset still strips them until full DolDoc formatting
+ * is supported. Empty generated string statements remain valid source. */
 static size_t format_text(char *output, size_t capacity, const char *format,
-                          int64_t argc, const int64_t *argv) {
+                          int64_t argc, const int64_t *argv, int strip_markers) {
     size_t used = 0;
     int64_t arg = 0;
     if (!format || argc < 0 || argc > 64 || (argc && !argv))
@@ -4987,7 +5087,7 @@ static size_t format_text(char *output, size_t capacity, const char *format,
 } while (0)
     for (size_t i = 0;;) {
         if (!format[i]) break;
-        if (format[i] == '$' && format[i + 1] == '$') {
+        if (strip_markers && format[i] == '$' && format[i + 1] == '$') {
             /* Text console has no DolDoc style state; drop $$...$$ markers. */
             i += 2;
             while (format[i] && !(format[i] == '$' && format[i + 1] == '$'))
@@ -4998,8 +5098,8 @@ static size_t format_text(char *output, size_t capacity, const char *format,
         }
         /* Aiwnios string decoding can normalize doubled DolDoc delimiters
          * from source text to single-dollar tags before calling Print. */
-        if (!strncmp(format + i, "$PT$", 4) ||
-            !strncmp(format + i, "$FG$", 4)) {
+        if (strip_markers && (!strncmp(format + i, "$PT$", 4) ||
+            !strncmp(format + i, "$FG$", 4))) {
             i += 4;
             continue;
         }
@@ -5114,7 +5214,7 @@ static int64_t host_str_print_join(int64_t *a) {
     int64_t argc = a[2];
     const int64_t *argv = (const int64_t *)(uintptr_t)a[3];
     char stack[4097];
-    size_t used = format_text(stack, sizeof(stack), format, argc, argv);
+    size_t used = format_text(stack, sizeof(stack), format, argc, argv, 1);
     if (!dst) {
         CHeapCtrl *owner = guest_task_bound ? &guest_fibers[guest_current].heap_owner
                                             : &data_heap;
@@ -5130,7 +5230,7 @@ static int64_t host_print(int64_t *a) {
     int64_t argc = a[1];
     const int64_t *argv = (const int64_t *)(uintptr_t)a[2];
     char output[4097];
-    format_text(output, sizeof(output), format, argc, argv);
+    format_text(output, sizeof(output), format, argc, argv, 1);
     zc_output(output);
     guest_task_text_output(output);
     return 0;
@@ -5212,6 +5312,7 @@ static int load_source_path(const char *path, int merged, int recover) {
          * the bridge helpers below, so calls compiled in TaskBridge resolve. */
         PrsBindCSymbol("FileRead", host_file_read, 3);
         PrsBindCSymbol("FileWrite", host_file_write, 5);
+        PrsBindCSymbol("ZcSys", host_sys, 3);
         PrsBindCSymbol("ZcSourceDirExists", host_file_dir_exists, 1);
         PrsBindCSymbol("ZcSourcePath", host_source_path, 1);
         PrsBindCSymbol("Cd", host_cd, 2);
@@ -5232,6 +5333,9 @@ static int load_source_path(const char *path, int merged, int recover) {
         PrsBindCSymbol("ExePutS2", host_exe_puts2, 3);
         PrsBindCSymbol("LastFun", host_last_fun, 2);
     }
+    if (!strcmp(path, "/Kernel/Job.ZC"))
+        execute_source("<system execution bridge>",
+            "I64 Sys(U8 *format,...){return ZcSys(format,argc,argv);}");
     if (!strcmp(path, "/System/GuiTerminal.ZC"))
         PrsBindCSymbol("ZcGuiShellExec", zc_gui_shell_exec, 1);
     if (!strcmp(path, "/Kernel/KeyDev.ZC")) {
@@ -5401,6 +5505,7 @@ static int load_source_path(const char *path, int merged, int recover) {
         PrsBindCSymbol("MemSetU32", host_memset_u32, 3);
         PrsBindCSymbol("Sqrt", host_sqrt, 1);
         PrsBindCSymbol("Exp", host_exp, 1);
+        PrsBindCSymbol("Ln", host_ln, 1);
         PrsBindCSymbol("ZcSinF64", host_sin_f64, 1);
         PrsBindCSymbol("ZcCosF64", host_cos_f64, 1);
         PrsBindCSymbol("ZcMonotonicNs", host_monotonic_ns, 0);
@@ -5909,6 +6014,9 @@ int zc_start_gui_terminal(void) {
         "/System/DolDoc/DocFind.ZC",
         "/System/DolDoc/DocLink.ZC",
         "/System/DolDoc/DocEd.ZC",
+        "/System/DolDoc/DocPopUp.ZC",
+        /* Rebind the terminal's RIGHT_AINCLUDE action to real SysFile. */
+        "/System/DolDoc/DocTerm.ZC",
         /* Direct calls retain the function present at compile time. The
          * first DocPutKey load breaks DolDoc's dependency cycle, but binds
          * EdCharIns/EdCursorLeft/etc. to bootstrap stand-ins. Recompile after

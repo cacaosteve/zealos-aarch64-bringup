@@ -4,7 +4,7 @@ from pathlib import Path
 import re
 import sys
 
-from arm64_source import (translate_docfind, translate_docform, translate_grbitmap,
+from arm64_source import (translate_docfind, translate_docform, translate_docpopup, translate_grbitmap,
                           translate_grscreen, translate_ktask, translate_winmgr)
 
 root = Path(__file__).resolve().parent.parent
@@ -205,3 +205,14 @@ runtime = (root / 'src/zc/runtime.c').read_text()
 assert runtime.index('"/System/Menu.ZC"') < runtime.index('"/System/Win.ZC"')
 
 print('PASS guarded ARM64 source overlays', flush=True)
+
+# Only raw source-display metadata is removed; program tokens remain pinned.
+docpopup_source = (root / 'upstream/pinned/System/DolDoc/DocPopUp.ZC').read_bytes()
+assert translate_docpopup(docpopup_source) == docpopup_source.replace(b'$WW,0$', b'')
+try:
+    translate_docpopup(docpopup_source.replace(b'$WW,0$', b'$WW,1$'))
+except ValueError:
+    pass
+else:
+    raise AssertionError('DocPopUp overlay accepted changed source metadata')
+print('PASS guarded DocPopUp display-metadata overlay')

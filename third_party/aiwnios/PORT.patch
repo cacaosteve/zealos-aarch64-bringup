@@ -640,7 +640,7 @@
 -    misc->str = string;
 -  found_str:
 -    rpn->code_misc = misc;
-+    if (!*string) {
++    if (!*string && ccmp->lex->cur_tok != ';') {
 +      /* ZealC's "" prefix takes the next expression as the format string:
 +       * "" prompt, value; is Print(prompt, value). */
 +      A_FREE(string);

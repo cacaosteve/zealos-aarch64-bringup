@@ -7,7 +7,7 @@ from pathlib import Path
 import sys
 import tarfile
 
-from arm64_source import (translate_docfind, translate_docform, translate_grbitmap,
+from arm64_source import (translate_docfind, translate_docform, translate_docpopup, translate_grbitmap,
                           translate_grscreen, translate_ktask, translate_mathode,
                           translate_winmgr)
 
@@ -39,6 +39,8 @@ for name, expected in manifest['files'].items():
             data = translate_mathode(data)
         except ValueError as exc:
             raise SystemExit(f'ARM64 MathODE overlay no longer applies: {exc}') from exc
+    elif rel == 'System/DolDoc/DocPopUp.ZC':
+        data = translate_docpopup(data)
     elif rel == 'System/DolDoc/DocForm.ZC':
         try:
             data = translate_docform(data)

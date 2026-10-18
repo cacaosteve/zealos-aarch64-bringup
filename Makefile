@@ -609,6 +609,11 @@ check-run-file: check-upstream esp
 check-source-exceptions: check-upstream esp
 	python3 scripts/check-compat.py --pci --probe-source-exceptions
 
+.PHONY: check-system-launch
+check-system-launch: check-upstream esp
+	python3 scripts/check-arm64-source.py
+	python3 scripts/check-compat.py --pci --probe-system-launch
+
 # UTM-shaped path: boot GPT disk via virtio-blk-pci only (no MMIO RedSea).
 # Accepts when serial shows: virtio-blk: OK … pci / virtio-blk: rw OK
 run-pci: esp $(FW_VARS)

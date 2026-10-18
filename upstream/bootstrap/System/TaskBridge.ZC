@@ -5313,6 +5313,7 @@ extern CTask *SpawnQueue(U0 (*fp_addr)(U8 *data), U8 *data=NULL,
                         U8 *task_name=NULL, I64 target_cpu,
                         CTask *parent=NULL, I64 stack_size=0,
                         I64 flags=1 << JOBf_ADD_TO_QUE);
+extern I64 ZcSys(U8 *format, I64 argc, I64 *argv);
 extern I64 JobsHandler(I64 run_flags, CTask *task=NULL);
 extern Bool JobResScan(CJob *request=NULL, I64 *_res=NULL);
 extern I64 JobResGet(CJob *request=NULL);

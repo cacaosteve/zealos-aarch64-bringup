@@ -2898,3 +2898,75 @@ Evidence is `build/source-exceptions-utm-accepted.png` and
 `build/source-exceptions-utm-status.png`. Physical typing/pointer/drag
 acceptance remains the earlier native USB baseline; these live compiler
 checks used desktop automation.
+
+## System-task and popup file launch (2026-10-17)
+
+The desktop loads pinned `System/DolDoc/DocPopUp.ZC`, including the original
+`SysFile` and `PopUpRunFile` bodies. Its only source overlay removes the one
+inline `$WW,0$` source-display directive; all executable tokens are retained.
+The original file and its hash are pinned at the existing ZealOS commit.
+`DocTerm` is recompiled afterward so its RIGHT_AINCLUDE action binds the real
+`SysFile`; the final `DocPutKey` load likewise sees the real launch functions.
+
+Root still stands in for `sys_task` while the serial shell owns its outer
+loop. At a cooperative yield, it now services system source jobs before and
+after running another task. The idle flag is exposed while yielded and
+restored when foreground work resumes. Parser execution cannot yield;
+paused source bodies can service nested requests through the bounded native
+job dispatcher. Completion also wakes a master suspended by original
+`TaskExe` source.
+
+The bootstrap `Sys` adapter formats and queues a native request for root,
+then collects that exact request's result. It is installed after `Job.ZC`;
+the pinned source itself stays unchanged. Root's job dispatcher skips queued
+UI messages without deleting them, so messages cannot block system requests.
+Only internally tagged system requests bypass those messages; ordinary
+`TaskExe` jobs keep their position. A yielding root job admits nested system
+requests while deferring ordinary work until its own execution resumes.
+The upstream wait-on-empty-queue path otherwise deadlocked after graphical
+input, and a failed request could scan an unrelated completed result.
+The native adapter also keeps system execution independent of root's linked
+popup, while ordinary `TaskExe` retains its popup guard. Definitions belong
+to the system namespace and survive the caller exiting. This is a bootstrap
+bridge, not acceptance of the complete original system-task command loop.
+
+Formatted source execution (`ExePrint`/`ExePrint2`) preserves DolDoc markers.
+The existing bounded text formatter for `Print`/`StrPrintJoin` still strips
+those markers. A popup launch can therefore contain a standalone empty string
+statement. The parser now accepts that valid empty Print separately from the
+`"" dynamic_format, args;` prefix form, so the following file call can run.
+An attempted broader formatting change was rejected by the editor regression
+gate; full DolDoc formatting remains work beyond this milestone.
+The new `_LN` binding supplies a freestanding binary64 natural logarithm for
+DocPopUp's range helper, including
+subnormal, zero, negative, infinity and NaN handling. It does not claim a
+correctly rounded libm implementation or floating-point exception flags.
+
+`make check-system-launch` checks system definitions, nested requests,
+compiler/runtime error recovery, child ownership, relative file includes,
+message preservation, exact result ownership, nested requests, extension
+cancellation and popup application arguments/CCF_JUST_LOAD.
+The graphical workflow also loads its fixture privately into the terminal
+and requires visible results for each path.
+
+This remains code-only popup execution. `PopUpMenu` still cancels, file-picker
+and full interactive popup-window behavior are not implemented, and
+`PopUpFile`'s `UserTaskCont` path is not an accepted upstream shell startup.
+Full `KTask`/compiler integration and normal upstream startup remain later
+bring-up work. Loading the module does not certify every exported helper.
+
+Validation passed: 455 full PCI checks, 373 full ISO checks and 298 NEC USB2
+hub/VirtIO graphical workflow checks. The latter visibly returned `Queue 42`,
+`System 42`, `Caller 42`, `SystemFile 42` and `Popup 42`, then passed source
+exception recovery, edit/save/execute/reboot/reopen, twelve keyboard reconnects
+and whole-hub removal/reattach without DMA growth. The final fixture explicitly
+completes its unrelated result in the system server; a pending terminal key-up
+must not be mistaken for a completed self-job. The native implementation is
+identical across these runs. Logs are `build/system-launch-pci.log`,
+`build/system-launch-iso.log` and `build/system-launch-usb.log`; inspected
+scanout is `build/system-launch-graphical-accepted.png`.
+
+Source hashes/overlays and Python syntax checks passed. Whitespace checks
+passed outside the new pinned file's original trailing space, whose bytes
+are preserved and hash-verified. The Pi diagnostic target builds; Pi hardware
+was not tested for this milestone.

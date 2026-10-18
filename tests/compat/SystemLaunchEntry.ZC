@@ -1,0 +1,5 @@
+#include "SystemLaunchValue.HH"
+I64 SystemLaunchFileValue=SYSTEM_LAUNCH_VALUE;
+CTask *SystemLaunchFileTask=Fs;
+I64 SystemLaunchFileEntry(){return SYSTEM_LAUNCH_VALUE;}
+SystemLaunchFileEntry;

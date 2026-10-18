@@ -110,6 +110,18 @@ def translate_mathode(source: bytes) -> bytes:
     return text.encode("utf-8")
 
 
+def translate_docpopup(source: bytes) -> bytes:
+    """Remove DocPopUp's one inline DolDoc word-wrap directive.
+
+    It controls source-document display, not program evaluation. The native
+    text lexer has no raw DolDoc mode; retain every executable token.
+    """
+    directive = b'return $WW,0$PopUp2("YES", 1, "NO", 0, header, footer) > 0;'
+    if source.count(directive) != 1 or source.count(b'$WW,0$') != 1:
+        raise ValueError("expected the single pinned PopUpNoYes word-wrap directive")
+    return source.replace(directive, directive.replace(b'$WW,0$', b''), 1)
+
+
 def translate_docform(source: bytes) -> bytes:
     """Fix the bit-index argument in the pinned form's DEFAULT_LEN test.
 

@@ -1,0 +1,119 @@
+// Run at ordinary desktop boot; use the pinned Job and DocPopUp functions.
+I64 system_launch_child_result;
+
+I64 SystemLaunchChecks()
+{
+    F64 value;
+    U64 bits=1;
+    if (Ln(1.0)!=0.0 || Ln(2.0)<0.69314718055994 ||
+        Ln(2.0)>0.69314718055995 || Ln(0.5)>-0.69314718055994 ||
+        Ln(0.5)<-0.69314718055995) return 10;
+    value=Ln(bits(F64));
+    if (value < -744.44007192139 || value > -744.44007192138) return 11;
+    bits=0x3FEFFFFFFFFFFFFF;
+    value=Ln(bits(F64));
+    if (value>=0.0 || value < -1.12e-16 || value > -1.10e-16) return 14;
+    value=Ln(0.0);
+    if (value(U64)!=0xFFF0000000000000) return 12;
+    value=Ln(-1.0);
+    if ((value(U64)&0x7FF8000000000000)!=0x7FF8000000000000) return 13;
+    bits=0x7FF0000000000000;
+    value=Ln(bits(F64));
+    if (value(U64)!=bits) return 15;
+    bits=0x7FF0000000000001;
+    value=Ln(bits(F64));
+    if (value(U64)!=0x7FF8000000000001) return 16;
+    I64 sys_result=Sys("%d+%d;",19,23);
+    if (sys_result!=42) {
+        Print("system result=%d root=%d math=%X\n",sys_result,Fs==sys_task,value(U64));
+        return 1;
+    }
+    if (Sys("%d+%d;",19,23)!=42) return 17;
+    if (Sys("I64 SystemPublished(){return 42;} SystemPublished;")!=42) return 2;
+    if (ExePutS2("SystemPublished;")!=42) return 3;
+    // The job's catch must allow a subsequent system request to succeed.
+    if (Sys("throw('SysFail');") || Sys("40+2;")!=42) return 4;
+    if (Sys("I64 SystemBroken( {") || Sys("40+2;")!=42) return 5;
+    return 42;
+}
+
+U0 SystemLaunchChild(U8 *data)
+{
+    system_launch_child_result=1;
+    // These definitions belong to sys_task and outlive this caller's heap.
+    if (Sys("I64 SystemChildPublished(){return 42;} Fs==sys_task;")!=1) return;
+    if (Sys("I64 SystemReentrant(){return Sys(\"40+2;\");} SystemReentrant;")!=42) return;
+    if (ExePutS2("SystemChildPublished;")!=42) return;
+    system_launch_child_result=42;
+}
+I64 SystemLaunchTaskChecks()
+{
+    CTask *child=Spawn(&SystemLaunchChild,NULL,"Sys caller",,Fs);
+    if (!child) return 1;
+    while (TaskValidate(child)) Yield;
+    if (system_launch_child_result!=42 ||
+        ExePutS2("SystemChildPublished;")!=42 || IsSuspended(Fs)) return 2;
+    return 42;
+}
+
+I64 SystemLaunchFileChecks()
+{
+    U8 *dir=DirCur;
+    I64 result;
+    if (!Cd("/Tests")) return 1;
+    result=SysFile("SystemLaunchEntry");
+    if (!Cd(dir)) return 2;
+    Free(dir);
+    if (result!=42 || ExePutS2("SystemLaunchFileTask==sys_task;")!=1 ||
+        ExePutS2("SystemLaunchFileValue;")!=42) return 3;
+    // Extension validation still cancels files outside FILEMASK_JIT.
+    if (SysFile("/Tests/SystemLaunchValue.HH")) return 4;
+    return 42;
+}
+
+I64 SystemLaunchQueueChecks()
+{
+    I64 value=0;
+    CJob *other, *deferred;
+    if (Sys("FlushMessages; I64 SystemDeferredValue=0;43;")!=43) return 7;
+    other=TaskExe(sys_task,Fs,"17;",0);
+    if (!other || Sys("FlushMessages; JobsHandler(RFlagsGet);43;")!=43) return 1;
+    // Reproduce UI messages blocking sys_task and a stale done result being
+    // consumed instead of the new system request's exact result.
+    MessagePost(sys_task,MESSAGE_CMD,73,0);
+    deferred=TaskExe(sys_task,Fs,"SystemDeferredValue=99;99;",0);
+    if (!deferred || Sys("40+2;")!=42 || Sys("SystemDeferredValue;")!=0) return 2;
+    if (Sys("I64 SystemQueueValue=0; MessageScan(&SystemQueueValue,NULL,1<<MESSAGE_CMD); SystemQueueValue;")!=73) return 3;
+    if (Sys("JobsHandler(RFlagsGet); SystemDeferredValue;")!=99 ||
+        !JobResScan(deferred,&value) || value!=99) return 8;
+    if (!JobResScan(other,&value) || value!=17) return 4;
+    if (Sys("Sys(\"40+2;\");")!=42) return 5;
+    // A system job may yield while its child calls back into sys_task.
+    if (Sys("I64 SystemWaitValue=0; "
+            "U0 SystemWaitChild(U8 *d){SystemWaitValue=Sys(\"40+2;\");}"
+            "I64 SystemWaitParent(){CTask *t=Spawn(&SystemWaitChild);"
+            "if(!t)return 0;while(TaskValidate(t))Yield;return SystemWaitValue;}"
+            "SystemWaitParent;")!=42) return 6;
+    return 42;
+}
+
+I64 SystemLaunchLeakChecks()
+{
+    I64 i;
+    for (i=0;i<12;i++)
+        if (Sys("40+2;")!=42 || Sys("throw('SysFail');")) return 1;
+    return 42;
+}
+
+I64 SystemLaunchPopupChecks()
+{
+    I64 result;
+    // Source-generation display markers may collapse to an empty literal.
+    // It is a valid empty Print, distinct from "" dynamic_format,args;
+    if (ExePutS2("\"\"; 42;")!=42) return 3;
+    result=PopUpRunFile("/Tests/SystemLaunchApp",,19,23);
+    if (result!=42 || Fs->popup_task || sys_focus_task!=Fs) return 1;
+    if (PopUpRunFile("/Tests/SystemLaunchApp",CCF_JUST_LOAD,19,23)!=42 ||
+        Fs->popup_task) return 2;
+    return 42;
+}

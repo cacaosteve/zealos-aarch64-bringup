@@ -1,0 +1,5 @@
+I64 SystemLaunchApp(I64 a,I64 b)
+{
+    if (Fs==sys_task || !Fs->parent_task) return 0;
+    return a+b;
+}

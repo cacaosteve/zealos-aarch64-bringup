@@ -40,6 +40,8 @@ p.add_argument('--probe-compiler-context', action='store_true',
                help='check guest compiler contexts, option inheritance, restrictions and task isolation')
 p.add_argument('--probe-run-file', action='store_true',
                help='check task-local LastFun and unchanged RunFile with raw fixed/variadic argument words')
+p.add_argument('--probe-system-launch', action='store_true',
+               help='check upstream Sys/SysFile and popup file execution at normal desktop boot')
 p.add_argument('--probe-source-exceptions', action='store_true',
                help='check catchable source/file errors, native cleanup and command/job recovery')
 p.add_argument('--probe-winmgr', action='store_true',
@@ -280,6 +282,12 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             if expected in screen[3]:
                 break
             if time.monotonic() >= deadline:
+                guest.stdin.write(b'zstatus\r'); guest.stdin.flush()
+                try:
+                    diagnostic = until(b'\n> ', timeout=5)
+                except RuntimeError as error:
+                    diagnostic = str(error)
+                print('GRAPHICAL FAILURE STATUS\n'+diagnostic, flush=True)
                 raise RuntimeError(f'graphical scanout is missing {expected!r}; '
                                    f'see {graphical_path(name)} and .txt\n'+screen[3])
             time.sleep(0.1)
@@ -534,6 +542,30 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         if not text_pixels or int(text_pixels.group(1), 16) < 100:
             raise RuntimeError('boot graphical terminal has no visible document text pixels:\n' + visible_text)
         print(f'PASS boot graphical terminal visible text pixels: {int(text_pixels.group(1), 16)}', flush=True)
+        if args.probe_system_launch:
+            command('zc Print("Direct %d",Sys("19+23;"));', 'Direct 42')
+            command('zc Print("Formatted %d",Sys("%d+%d;",19,23));', 'Formatted 42')
+        command('zload /Tests/SystemLaunch.ZC', 'zc: loaded /Tests/SystemLaunch.ZC')
+        for check in ('QueueChecks','Checks','TaskChecks','FileChecks','PopupChecks','LeakChecks'):
+            command('zcall SystemLaunch'+check, 'zc => 0x000000000000002a', timeout=20)
+        launch_heap = r'data=([0-9/]+) code=([0-9/]+) allocations=([0-9]+)'
+        launch_before = command('zstatus', 'failed=0')
+        command('zcall SystemLaunchLeakChecks', 'zc => 0x000000000000002a')
+        launch_after = command('zstatus', 'failed=0')
+        if re.search(launch_heap, launch_before).groups() != re.search(launch_heap, launch_after).groups():
+            raise RuntimeError('system requests leaked managed memory')
+        print('PASS system requests complete and restore queues without arena growth', flush=True)
+        if args.probe_system_launch:
+            if args.probe_gui_keyboard:
+                focus_graphical_terminal()
+                qmp_send_text('zload /Tests/SystemLaunch.ZC'); qmp_send_key('ret')
+                require_graphical_text('launch-private-load','zc: loaded /Tests/SystemLaunch.ZC')
+                for check,label in (('QueueChecks','Queue'), ('Checks','System'), ('TaskChecks','Caller'),
+                                    ('FileChecks','SystemFile'), ('PopupChecks','Popup')):
+                    qmp_send_text('zc Print("  '+label+' %d",SystemLaunch'+check+'());')
+                    qmp_send_key('ret')
+                    require_graphical_text('launch-private-'+check,label+' 42')
+            raise SystemExit(0)
         command('zload /Tests/TaskSettings.ZC', 'zc: loaded /Tests/TaskSettings.ZC')
         command('zcall TaskCurrentDirectoryChecks', 'zc => 0x000000000000002a')
         command('zcall TaskSettingsRestoreChecks', 'zc => 0x000000000000002a')
@@ -933,6 +965,15 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 if private_task[3].count(result_line) != before_task + 1:
                     raise RuntimeError('graphical task did not complete its private child-function check')
                 print('PASS graphical task-owned code spawns an owned child and keeps LastFun task-local', flush=True)
+                qmp_send_text('zload /Tests/SystemLaunch.ZC')
+                qmp_send_key('ret')
+                require_graphical_text('system-private-load', 'zc: loaded /Tests/SystemLaunch.ZC')
+                for check,label in (('QueueChecks','Queue'), ('Checks','System'), ('TaskChecks','Caller'),
+                                    ('FileChecks','SystemFile'), ('PopupChecks','Popup')):
+                    qmp_send_text('zc Print("  '+label+' %d",SystemLaunch'+check+'());')
+                    qmp_send_key('ret')
+                    require_graphical_text('system-private-'+check, label+' 42')
+                print('PASS graphical task-owned system/file/popup launch and caller recovery', flush=True)
                 qmp_send_text('zload /Tests/SourceExceptions.ZC')
                 qmp_send_key('ret')
                 require_graphical_text('exceptions-private-load', 'zc: loaded /Tests/SourceExceptions.ZC')

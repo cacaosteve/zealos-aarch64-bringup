@@ -2687,7 +2687,7 @@ not_label:
     if (!rpn->global_var)
       ParseErr(ccmp, "'Print' function doesnt exist yet.");
     QueIns(rpn, ccmp->code_ctrl->ir_code);
-    if (!*string) {
+    if (!*string && ccmp->lex->cur_tok != ';') {
       /* ZealC's "" prefix takes the next expression as the format string:
        * "" prompt, value; is Print(prompt, value). */
       A_FREE(string);

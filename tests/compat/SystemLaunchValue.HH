@@ -1,0 +1,1 @@
+#define SYSTEM_LAUNCH_VALUE 42
