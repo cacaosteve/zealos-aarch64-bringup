@@ -166,6 +166,12 @@ that the white guest arrow follows the physical mouse and the graphical
 terminal can be dragged by its top border. This accepts the physical UTM
 tablet path separately from QMP injection.
 
+2026-10-17, after the native `ExeFile` refresh: the user confirmed visible
+physical typing and successful graphical `help`. Their 18:19 screenshot shows
+the command, output, and prompt caret with capture released. This verifies
+graphical boot and physical keyboard input on the refreshed image. Live file
+execution and a fresh physical drag check remain pending.
+
 ## Checklist — interactive smoke
 
 1. Boot until `>` stays on screen.

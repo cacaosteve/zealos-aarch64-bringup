@@ -2553,8 +2553,15 @@ masks were retained. Five bundled files were added. USB, display, serial,
 network, QEMU and drive settings are unchanged. The detailed preservation
 report is `build/source-execute-utm-backup.json`.
 
-The Mac remains locked, so visual boot and input acceptance are still pending.
-Verify visible typing and use `zc ExeFile("/Tests/GuiAcceptance.ZC");` followed
-by `zcall GuiAcceptance` against the previously saved source. The process's
-started state does not prove a successful graphical boot, and the QMP result
-does not renew physical host input acceptance.
+After unlocking, the graphical terminal was visible in the UTM app. The user
+confirmed that physical typing shows letters and `help` executes; their
+2026-10-17 18:19 screenshot shows the entered command, its output and the new
+prompt's white caret. Capture was released. Automated host key injection did
+not establish input delivery in either UTM console during this check; the
+physical result is the input acceptance evidence.
+
+Live source-file execution remains pending: use
+`zc ExeFile("/Tests/GuiAcceptance.ZC");` followed by `zcall GuiAcceptance`
+against the previously saved source and require `0x2a`. Pointer motion and
+dragging were accepted on the earlier native USB baseline; this refreshed
+image has no new physical drag result yet.
