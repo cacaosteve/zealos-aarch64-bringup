@@ -42,6 +42,7 @@ extern U8 *FileRead(U8 *filename, I64 *_size=NULL, I64 *_attr=NULL);
 extern I64 FileWrite(U8 *filename, U8 *fbuf, I64 size, I64 cdt=0, I64 attr=0);
 extern Bool ZcSourceDirExists(U8 *path);
 extern U8 *ZcSourcePath(U8 *path);
+extern Bool ZcSourceWritable(U8 *path);
 extern Bool Cd(U8 *dirname=NULL, Bool make_dirs=FALSE);
 extern U8 *DirCur(CTask *task=NULL, CTask *mem_task=NULL);
 extern Bool ZcSourceFileAt(I64 index, U8 *path, I64 path_cap, I64 *_size);
@@ -1056,6 +1057,28 @@ U8 *StrMatch(U8 *needle, U8 *haystack_str)
     }
     return NULL;
 }
+// Verbatim segment-removal helper from pinned Kernel/StrA.ZC.
+U8 *StrFirstRemove(U8 *src, U8 *marker, U8 *dst=NULL)
+{//Remove first str segment and place in dst buf or NULL.
+	I64 ch;
+	U8 *ptr = src, *res = dst;
+
+	if (dst)
+	{
+		while ((ch = *ptr++) && !StrOcc(marker, ch))
+			*dst++ = ch;
+		*dst = 0;
+	}
+	else
+		while ((ch = *ptr++) && !StrOcc(marker, ch));
+	if (ch)
+		StrCopy(src, ptr);
+	else
+		*src = 0;
+
+	return res;
+}
+
 U8 *StrLastRemove(U8 *src, U8 *marker, U8 *dst=NULL)
 {
     U8 *ptr;
@@ -1158,6 +1181,7 @@ U0 DocTop(CDoc *doc=NULL)
 }
 // BlkDev globals and DocTerm link hook used by DocNew before those modules load.
 CBlkDevGlobals blkdev;
+CDoc *sys_clip_doc;
 U0 BootstrapBlkDevGlbls()
 {
     blkdev.tmp_filename = SysStrNew("~/Tmp.DD");

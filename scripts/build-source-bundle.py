@@ -7,7 +7,7 @@ from pathlib import Path
 import sys
 import tarfile
 
-from arm64_source import (extract_home_set, extract_home_startup, extract_server_task, extract_user_task, translate_docterm, translate_doced, translate_docfind, translate_docform, translate_docpopup, translate_grbitmap,
+from arm64_source import (extract_home_set, extract_home_startup, extract_version_scalars, extract_server_task, extract_user_task, translate_doctree, translate_registry, translate_docterm, translate_doced, translate_docfind, translate_docform, translate_docpopup, translate_grbitmap,
                           translate_grdc, translate_grscreen, translate_ktask, translate_mathode,
                           translate_winmgr)
 
@@ -27,6 +27,8 @@ for name, expected in manifest['files'].items():
         # Seed the same editable home startup file installed by upstream.
         # It is available for the upcoming registry bring-up, not auto-run.
         entries['Home/Once.ZC'] = data
+    if rel == 'Kernel/KGlobals.ZC':
+        entries['System/VersionScalars.ZC'] = extract_version_scalars(data)
     if rel == 'System/Gr/GrScreen.ZC':
         try:
             data = translate_grscreen(data)
@@ -68,6 +70,10 @@ for name, expected in manifest['files'].items():
         data = translate_docterm(data)
     elif rel == 'System/DolDoc/DocEd.ZC':
         data = translate_doced(data)
+    elif rel == 'System/DolDoc/DocTree.ZC':
+        data = translate_doctree(data)
+    elif rel == 'System/Registry.ZC':
+        data = translate_registry(data)
     elif rel == 'Kernel/KTask.ZC':
         entries['System/ServerTask.ZC'] = extract_server_task(data)
         entries['System/UserTask.ZC'] = extract_user_task(data)

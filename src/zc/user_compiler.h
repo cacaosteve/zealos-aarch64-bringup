@@ -7,8 +7,14 @@ struct user_compiler {
     CLexer *lex;
     CCmpCtrl *native;
     char *input, *code;
+    void *doc_input, *doc_reader, *doc_delete;
+    char *doc_filename;
+    int64_t doc_position, doc_last;
     int primed;
 };
+static void **user_doc_state(CLexFile *file) {
+    return ((struct user_compiler *)file->port_data)->doc_input;
+}
 static struct user_compiler *user_compiler_find(void *mirror) {
     for (struct user_compiler *c = guest_fibers[guest_current].user_compilers;
          c; c = c->next)
@@ -23,6 +29,8 @@ static void user_compiler_delete(struct guest_fiber *f, struct user_compiler *c)
     *link = c->next;
     free(c->code);
     free(c->input);
+    if (c->doc_delete) FFI_CALL_TOS_1(c->doc_delete, (int64_t)(uintptr_t)c->doc_input);
+    free(c->doc_filename);
     if (c->native) compiler_source_cleanup(c->native, c->lex);
     guest_context_files_clear(c->mirror);
     /* Self-linked before insertion; QueueRemove clears both links. Abort
@@ -63,6 +71,32 @@ static int64_t host_user_compiler_del(int64_t *a) {
     if (compiler_recovery_active) AIWNIOS_throw(0);
     user_compiler_delete(&guest_fibers[guest_current],
                          user_compiler_find((void *)(uintptr_t)a[0]));
+    return 0;
+}
+/* CArmDocInput begins with doc, current entry and one-based source line.
+ * The source adapter owns traversal/quoting; native objects never alias it. */
+static int64_t user_doc_read(CLexer *lex, CLexFile *file) {
+    struct user_compiler *c = file->port_data;
+    if (file->pos + 1 == c->doc_position) return c->doc_last;
+    if (file->pos != c->doc_position) AIWNIOS_throw(0);
+    int64_t ch = FFI_CALL_TOS_2(c->doc_reader, (int64_t)(uintptr_t)c->doc_input,
+                              lex->port_in_quotes);
+    if (ch < 0 || ch > 255) AIWNIOS_throw(0);
+    file->ln = ((int64_t *)c->doc_input)[2] - 1;
+    c->doc_position++;
+    c->doc_last = ch;
+    return ch;
+}
+static int64_t host_user_doc_attach(int64_t *a) {
+    if (compiler_recovery_active) AIWNIOS_throw(0);
+    struct user_compiler *c = user_compiler_find((void *)(uintptr_t)a[0]);
+    if (c->native || c->input || c->doc_input || !a[1] || !a[2] || !a[3])
+        guest_raise(GUEST_EXCEPT_COMPILER);
+    c->doc_input = (void *)(uintptr_t)a[1];
+    c->doc_reader = (void *)(uintptr_t)a[2];
+    c->doc_delete = (void *)(uintptr_t)a[3];
+    c->doc_filename = __AIWNIOS_StrDup(a[4] ? (char *)(uintptr_t)a[4] : "<document>",
+                                     &guest_fibers[guest_current].heap_owner);
     return 0;
 }
 /* Collect a logical chunk before parsing: the parser cannot Yield for more
@@ -229,14 +263,18 @@ static int64_t host_user_lex(int64_t *a) {
             continuation = !user_input_complete(joined);
         } while (continuation);
     }
-    if (!c->input) {
+    if (!c->input && !c->doc_input) {
         *(int64_t *)(c->mirror + guest_cc_flags_off) &= ~INT64_C(0x002);
         *(int64_t *)(c->mirror + guest_cc_token_off) = 0;
         return 0;
     }
-    c->lex = LexerNew("<command>", c->input);
+    c->lex = LexerNew(c->doc_input ? c->doc_filename : "<command>", c->input ? c->input : "");
     c->lex->file->is_file = 1;
     c->lex->file->dir = __AIWNIOS_StrDup((char *)guest_current_dir(), NULL);
+    if (c->doc_input) {
+        c->lex->file->port_read = user_doc_read;
+        c->lex->file->port_data = c;
+    }
     c->native = CmpCtrlNew(c->lex);
     c->native->flags |= CCF_STRINGS_ON_HEAP;
     CodeCtrlPush(c->native);

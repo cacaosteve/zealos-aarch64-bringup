@@ -136,6 +136,68 @@ def extract_home_set(source: bytes) -> bytes:
             body.replace(anchor, anchor + guard, 1))
 
 
+def extract_version_scalars(source: bytes) -> bytes:
+    text = source.decode('utf-8')
+    match = re.search(r'F64\s+\*pow10_I64,\s+(sys_os_version = [0-9.]+;)\n'
+                      r'U64\s+(sys_os_version_sub = [0-9]+;)', text)
+    if not match:
+        raise ValueError('pinned kernel version scalars changed')
+    return ('// Version values from pinned Kernel/KGlobals.ZC.\nF64 ' +
+            match[1] + '\nU64 ' + match[2] + '\n').encode()
+
+
+def translate_doctree(source: bytes) -> bytes:
+    text = source.decode('utf-8')
+    for old, new, count in (
+        ('DriveIsWritable(*doc->filename.name)', 'ZcSourceWritable(doc->filename.name)', 2),
+        ('CompCtrlNew(, ccf_flags | CCF_DONT_FREE_BUF)',
+         'ZcUserCompCtrlNew(, ccf_flags | CCF_DONT_FREE_BUF)', 1),
+        ('LexAttachDoc(cc,, doc);', 'ArmLexAttachDoc(cc, doc);', 1),
+        ('\t\tLex(cc);', '\t\tZcUserLex(cc);', 1),
+        ('\tQueueRemove(cc);\n\tif (okay)\n\t\tCompCtrlDel(cc); //TODO: can crash',
+         '\tif (cc)\n\t{\n\t\tQueueRemove(cc);\n\t\tZcUserCompCtrlDel(cc);\n\t}', 1),
+    ):
+        if text.count(old) != count:
+            raise ValueError('pinned DocTree dependency changed: ' + old)
+        text = text.replace(old, new)
+    # Every exception leaves the private compiler controller and document
+    # lock usable, including non-Compiler exceptions that keep propagating.
+    anchor = '\t\t\tres = 0;\n\t\t}\n\t}\n\tif (cc)'
+    replacement = ('\t\t\tres = 0;\n\t\t}\n'
+        '\t\tZcUserCompCtrlDel(cc);\n\t\tcc = NULL;\n'
+        '\t\tif (unlock_doc) DocUnlock(doc);\n\t\tunlock_doc = FALSE;\n\t}\n\tif (cc)')
+    if text.count(anchor) != 1:
+        raise ValueError('pinned ExeDoc catch changed')
+    text = text.replace(anchor, replacement, 1)
+    # Only the snapshot copy needs to stay locked during user code. A child
+    # killed while that code yields must not strand the System registry lock.
+    anchor = '\t\tdoc2=DocCopy(doc, tree_branch, end_indent);'
+    if text.count(anchor) != 1:
+        raise ValueError('pinned DocTreeExe copy changed')
+    text = text.replace(anchor, anchor + '\n\t\tif (unlock_doc) DocUnlock(doc);\n'
+                        '\t\tunlock_doc = FALSE;', 1)
+    anchor = '\t\tres=ExeDoc(doc2);'
+    if text.count(anchor) != 1:
+        raise ValueError('pinned DocTreeExe body changed')
+    text = text.replace(anchor, '\t\ttry { res=ExeDoc(doc2); }\n\t\tcatch\n\t\t{\n'
+        '\t\t\tDocDel(doc2);\n\t\t\tif (unlock_doc) DocUnlock(doc);\n\t\t}', 1)
+    return text.encode()
+
+
+def translate_registry(source: bytes) -> bytes:
+    text = source.decode('utf-8')
+    old = 'DriveIsWritable(*sys_registry_doc->filename.name)'
+    if text.count(old) != 1:
+        raise ValueError('pinned Registry writable guard changed')
+    text = text.replace(old, 'ZcSourceWritable(sys_registry_doc->filename.name)')
+    anchor = '\tif (!sys_registry_doc)\n\t{\n'
+    if text.count(anchor) != 1:
+        raise ValueError('pinned registry cache ownership changed')
+    text = text.replace(anchor, anchor + '\t\tif (Fs != sys_task)\n\t\t{\n'
+        '\t\t\tSys("RegCache;");\n\t\t\treturn FALSE;\n\t\t}\n', 1)
+    return text.encode()
+
+
 def translate_docterm(source: bytes) -> bytes:
     """Evaluate the title length in ZealC before the bounded document lexer."""
     old = 'LEN=STR_LEN-1,A=\\"%%s...\\",SCX=15$$");'

@@ -219,16 +219,16 @@ public U8 *DocSave(CDoc *doc, I64 *_size=NULL)
 
 public Bool DocWrite(CDoc *doc, Bool prompt=FALSE)
 {//Store doc to disk.
-	I64 size;
+	I64 size, written;
 	U8 *buf;
 
 	if (prompt && !DocForm(&doc->filename) || doc->filename.name[0] == 'A' && doc->filename.name[2] == ':')
 		return FALSE;  //CANCEL || LK_DOC,LK_DOC_ANCHOR,LK_DOC_FIND,LK_DOC_LINE?
 	buf = DocSave(doc, &size);
-	FileWrite(doc->filename.name, buf, size, 0, doc->file_attr);
+	written = FileWrite(doc->filename.name, buf, size, 0, doc->file_attr);
 	Free(buf);
 
-	return TRUE;
+	return written == size;
 }
 
 #help_index "DolDoc"

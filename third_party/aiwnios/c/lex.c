@@ -45,7 +45,8 @@ enter:;
   if (!lex->file)
     return lex->cur_char = 0;
   // We terminate the silly sauces with 0 as per ASCII nul character
-  if (ret = (unsigned char)lex->file->text[lex->file->pos]) {
+  if (ret = file->port_read ? file->port_read(lex, file) :
+                              (unsigned char)file->text[file->pos]) {
     lex->file->pos++;
     if (ret == 5 || ret == '\r') // TempleOS cursor charactor
       goto enter;
@@ -151,6 +152,8 @@ static int64_t LexSkipMultlineComment(CLexer *lex) {
 
 static int64_t LexString(CLexer *lex, int64_t till) {
   int64_t idx, chr1, hex;
+  int64_t old_quotes = lex->port_in_quotes;
+  lex->port_in_quotes = till == '"';
   for (idx = 0;;) {
     switch (chr1 = LexAdvChr(lex)) {
     case '$':
@@ -236,6 +239,7 @@ static int64_t LexString(CLexer *lex, int64_t till) {
     }
   }
 fin:
+  lex->port_in_quotes = old_quotes;
   lex->str_len = idx;
   lex->string[idx++] = 0;
   return 0;
@@ -660,6 +664,8 @@ re_enter:;
             lex->flags &= ~LEXF_USE_LAST_CHAR;
             //
             new_file = A_MALLOC(sizeof(CLexFile), NULL);
+            new_file->port_read = NULL;
+            new_file->port_data = NULL;
             new_file->is_file = 0;
             new_file->dir = NULL;
             new_file->last = lex->file;
@@ -909,6 +915,8 @@ re_enter:;
         fseek(f, 0, SEEK_SET);
         idx -= ftell(f);
         new_file = A_MALLOC(sizeof(CLexFile), NULL);
+        new_file->port_read = NULL;
+        new_file->port_data = NULL;
         new_file->text = A_MALLOC(idx + 1, NULL);
         new_file->text[idx] = 0;
         new_file->dir = dir;

@@ -93,6 +93,10 @@ I64 CompilerRecoveryLeakChecks()
 
 I64 CompilerRecoveryJobChecks()
 {
+    // Registry startup now runs original document code that can queue UI
+    // messages. Original JobsHandler intentionally stops at such a message;
+    // this source-error fixture needs an otherwise empty message inbox.
+    FlushMessages;
     CJob *job = TaskExe(Fs, Fs, "I64 RecoveryJobHalf( {", 0);
     if (!job || JobsHandler(0) != 1 || JobResGet(job) != 0)
         return 1;

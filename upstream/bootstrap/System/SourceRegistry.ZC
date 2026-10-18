@@ -1,0 +1,6 @@
+I64 BootstrapRegistryStart()
+{//Open and initialize the original registry on the persistent System heap.
+    Sys("RegInit;");
+    if (sys_registry_doc != NULL && sys_registry_doc->mem_task == sys_task) return 42;
+    return 1;
+}

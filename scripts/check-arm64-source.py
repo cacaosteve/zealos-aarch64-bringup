@@ -4,10 +4,23 @@ from pathlib import Path
 import re
 import sys
 
-from arm64_source import (extract_home_set, extract_home_startup, extract_server_task, extract_user_task, translate_docterm, translate_doced, translate_docfind, translate_docform, translate_docpopup, translate_grbitmap,
+from arm64_source import (extract_home_set, extract_home_startup, extract_server_task, extract_user_task, extract_version_scalars, translate_doctree, translate_registry, translate_docterm, translate_doced, translate_docfind, translate_docform, translate_docpopup, translate_grbitmap,
                           translate_grdc, translate_grscreen, translate_ktask, translate_winmgr)
 
 root = Path(__file__).resolve().parent.parent
+for path, transform, original, changed in (
+    ('System/DolDoc/DocTree.ZC', translate_doctree, b'LexAttachDoc(cc,, doc);', b'LexAttachDoc(cc,, other);'),
+    ('System/Registry.ZC', translate_registry, b'if (!sys_registry_doc)', b'if (sys_registry_doc)'),
+    ('Kernel/KGlobals.ZC', extract_version_scalars, b'sys_os_version_sub', b'other_version_sub'),
+):
+    source = (root / 'upstream/pinned' / path).read_bytes()
+    transform(source)
+    try:
+        transform(source.replace(original, changed, 1))
+    except ValueError:
+        pass
+    else:
+        raise AssertionError('overlay accepted changed dependency: ' + path)
 docterm = (root / 'upstream/pinned/System/DolDoc/DocTerm.ZC').read_bytes()
 assert b'SCX=15$$", STR_LEN - 1);' in translate_docterm(docterm)
 try:

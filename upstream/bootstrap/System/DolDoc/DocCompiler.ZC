@@ -1,0 +1,104 @@
+// Character input for Aiwnios from real DolDoc entries. The initial three
+// fields are the private native reader ABI; CCompCtrl retains its own layout.
+class CArmDocInput
+{
+    CDoc *doc;
+    CDocEntry *entry;
+    I64 line;
+    U8 *text, *owned;
+    Bool first;
+};
+extern U0 ZcUserDocAttach(CCompCtrl *cc, CArmDocInput *input,
+    I64 (*reader)(CArmDocInput *input, Bool in_quotes),
+    U0 (*deleter)(CArmDocInput *input), U8 *filename);
+
+U0 ArmDocInputDel(CArmDocInput *input)
+{
+    Free(input->owned);
+    Free(input);
+}
+I64 ArmDocInputChar(CArmDocInput *input, Bool in_quotes)
+{//LexCharGet's document traversal and LexDollar quote policy.
+    CDocEntry *entry;
+    U8 *plain;
+    I64 ch;
+    while (TRUE)
+    {
+reader_start:
+        if (input->text)
+        {
+            if (ch = *input->text++) return ch;
+            input->text = NULL;
+            Free(input->owned);
+            input->owned = NULL;
+            input->entry = input->entry->next;
+        }
+        entry = input->entry;
+        if (entry == input->doc) return 0;
+        input->line = entry->y + 1;
+        // LexAttachDoc starts at the first source-code entry, rather than
+        // interpreting a tree heading preceding its code as a string.
+        if (input->first)
+        {
+            if (entry->type_u8 != DOCT_TEXT && entry->type_u8 != DOCT_TAB &&
+                entry->type_u8 != DOCT_INS_BIN && entry->type_u8 != DOCT_INS_BIN_SIZE)
+            {
+                input->entry = entry->next;
+                goto reader_start;
+            }
+            input->first = FALSE;
+        }
+        switch (entry->type_u8)
+        {
+            case DOCT_TEXT:
+                if (!(entry->de_flags & ~(DOCEF_TAG | DOCEF_DEFINE | DOCEF_TAG_CB |
+                    DOCG_BL_IV_UL | DOCEF_WORD_WRAP | DOCEF_HIGHLIGHT |
+                    DOCEF_SKIP | DOCEF_FILTER_SKIP)) || !in_quotes)
+                {
+                    input->text = entry->tag;
+                    goto reader_start;
+                }
+                break;
+            case DOCT_NEW_LINE:
+                input->entry = entry->next;
+                return '\n';
+            case DOCT_TAB:
+                input->entry = entry->next;
+                return '\t';
+            case DOCT_MARKER:
+            case DOCT_CURSOR:
+                input->entry = entry->next;
+                goto reader_start;
+            case DOCT_INS_BIN:
+            case DOCT_INS_BIN_SIZE:
+                Print("ARM64 compiler does not yet accept inline DolDoc binary tokens.\n");
+                throw('Compiler');
+            case DOCT_SHIFTED_Y:
+                if (!in_quotes && entry->attr)
+                {
+                    Print("ARM64 compiler does not yet accept DolDoc script tokens.\n");
+                    throw('Compiler');
+                }
+                break;
+        }
+        if (in_quotes)
+        {
+            plain = Doc2PlainText(input->doc, entry);
+            input->owned = MStrPrint("$$%$$Q$$", plain);
+            Free(plain);
+            input->text = input->owned;
+        }
+        else
+            input->entry = entry->next;
+    }
+    return 0;
+}
+U0 ArmLexAttachDoc(CCompCtrl *cc, CDoc *doc)
+{
+    CArmDocInput *input = CAlloc(sizeof(CArmDocInput));
+    input->doc = doc;
+    input->entry = doc->head.next;
+    input->line = 1;
+    input->first = TRUE;
+    ZcUserDocAttach(cc, input, &ArmDocInputChar, &ArmDocInputDel, doc->filename.name);
+}

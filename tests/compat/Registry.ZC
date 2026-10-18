@@ -1,0 +1,175 @@
+I64 registry_test_value, registry_test_system;
+U8 *registry_test_text;
+
+I64 RegistryDocChecks()
+{
+    CDoc *doc = DocNew;
+    I64 result = 42;
+    DocPrint(doc, "registry_test_value=40;\nregistry_test_value+=2;\n");
+    if (ExeDoc(doc) != 42 || registry_test_value != 42) result = 1;
+    DocReset(doc, TRUE);
+    DocPrint(doc, "#define REGISTRY_DOC_VALUE 40\nREGISTRY_DOC_VALUE+2;\n");
+    if (ExeDoc(doc) != 42) result = 2;
+    DocReset(doc, TRUE);
+    DocPrint(doc, "#include \"/Tests/SourceExecuteValue.HH\"\nSOURCE_EXECUTE_VALUE+2;\n");
+    if (ExeDoc(doc) != 42) result = 3;
+    DocReset(doc, TRUE);
+    DocPrint(doc, "%s", "registry_test_text=MStrPrint(\"A$$FG,RED$$B\");42;\n");
+    if (ExeDoc(doc) != 42 || !registry_test_text ||
+        !StrMatch("FG", registry_test_text) || registry_test_text[0] != 'A') result = 4;
+    Free(registry_test_text);
+    registry_test_text = NULL;
+    DocDel(doc);
+    return result;
+}
+
+I64 RegistryTreeChecks()
+{
+    CDoc *doc = DocNew;
+    I64 result = 42;
+    if (!DocTreeMake(doc, "BringUp/Value") ||
+        !DocTreeFind(doc, "BringUp/Value") || DocTreeMake(doc, "BringUp/Value")) result = 1;
+    if (!DocTreeWrite(doc, "BringUp/Value", FALSE, "registry_test_value=%d;\n", 40) ||
+        !DocTreeAppend(doc, "BringUp/Value", FALSE, "registry_test_value+=2;\n")) result = 2;
+    if (DocTreeExe(doc, "BringUp/Value") != 42 || registry_test_value != 42) result = 3;
+    if (DocTreeFind(doc, "BringUp/Missing") || DocTreeExe(doc, "Missing")) result = 4;
+    if (!DocTreeWrite(doc, "BringUp/Value", FALSE, "registry_test_value=6*7;\n") ||
+        DocTreeExe(doc, "BringUp/Value") != 42) result = 5;
+    DocDel(doc);
+    return result;
+}
+
+I64 RegistryRecoveryChecks()
+{
+    CDoc *doc = DocNew;
+    CCompCtrl *outer = Fs->last_cc;
+    I64 caught = 0, result = 42;
+    DocPrint(doc, "I64 RegistryBroken(){return (1+);}\n");
+    if (ExeDoc(doc) || Fs->last_cc != outer || !DocLock(doc)) result = 1;
+    DocUnlock(doc);
+    DocReset(doc, TRUE);
+    DocPrint(doc, "throw('RegThrow');\n");
+    try { ExeDoc(doc); }
+    catch { caught=Fs->except_ch; Fs->catch_except=TRUE; }
+    if (caught != 'RegThrow' || Fs->last_cc != outer || !DocLock(doc)) result = 2;
+    DocUnlock(doc);
+    DocReset(doc, TRUE);
+    CDocEntry *binary = CAlloc(sizeof(CDocEntry), doc->mem_task);
+    binary->type = DOCT_INS_BIN;
+    QueueInsert(binary, doc->head.last);
+    if (ExeDoc(doc) || Fs->last_cc != outer || !DocLock(doc)) result = 4;
+    DocUnlock(doc);
+    DocReset(doc, TRUE);
+    DocPrint(doc, "40+2;\n");
+    if (ExeDoc(doc) != 42 || Fs->last_cc != outer) result = 3;
+    DocDel(doc);
+    return result;
+}
+
+I64 RegistryChecks()
+{
+    if (!sys_registry_doc || sys_registry_doc->mem_task != sys_task ||
+        !DocTreeFind(sys_registry_doc, "System/SysRegVer")) return 1;
+    RegWrite("BringUp/Code", "registry_test_value=40;\n");
+    if (!RegDefault("BringUp/Code", "registry_test_value=0;\n") ||
+        RegExe("BringUp/Code") != 40 || registry_test_value != 40) return 2;
+    if (!RegAppend("BringUp/Code", "registry_test_value+=2;\n") ||
+        RegExe("BringUp/Code") != 42 || registry_test_value != 42 ||
+        RegCount("BringUp/Code") < 4) return 3;
+    if (!RegWrite("BringUp/Code", "registry_test_value=6*7;\n") ||
+        RegExe("BringUp/Code") != 42) return 4;
+    return 42;
+}
+
+I64 RegistryPersistChecks()
+{
+    CDoc *saved = DocRead("~/Registry.ZC");
+    I64 result = 42;
+    registry_test_value = 0;
+    if (DocTreeExe(saved, "BringUp/Code") != 42 || registry_test_value != 42) result = 1;
+    DocDel(saved);
+    return result;
+}
+
+I64 RegistryOnceChecks()
+{
+    registry_test_value = 0;
+    Btr(&sys_run_level, RLf_ONCE_USER);
+    Btr(&sys_run_level, RLf_ONCE_SYSTEM);
+    registry_test_system = 0;
+    SysOnce("registry_test_system=(Fs==sys_task)*42;");
+    Once("registry_test_value=42;");
+    OnceExe;
+    if (registry_test_value != 42 || !Bt(&sys_run_level, RLf_ONCE_USER) ||
+        RegCount("Once/User") > 2 || registry_test_system != 42 ||
+        RegCount("Once/System") > 2) return 1;
+    registry_test_value = 0;
+    registry_test_system = 0;
+    OnceExe;
+    if (registry_test_value || registry_test_system) return 2;
+    return 42;
+}
+
+I64 registry_kill_stage;
+U0 RegistryWaitingChild(U8 *unused)
+{
+    if (unused) {}
+    RegExe("BringUp/Wait");
+}
+I64 RegistryKillChecks()
+{
+    CTask *child;
+    registry_kill_stage = 0;
+    RegWrite("BringUp/Wait", "registry_kill_stage=1;while(TRUE)Yield;\n");
+    child = Spawn(&RegistryWaitingChild);
+    if (!child) return 1;
+    while (!registry_kill_stage && TaskValidate(child)) Yield;
+    if (!TaskValidate(child) || !Kill(child)) return 2;
+    if (Bt(&sys_registry_doc->locked_flags, DOClf_LOCKED)) return 3;
+    RegWrite("BringUp/Wait", "");
+    return RegExe("BringUp/Code");
+}
+
+I64 registry_child_result;
+U0 RegistryChild(U8 *unused)
+{
+    if (unused) {}
+    if (RegistryDocChecks != 42 || RegistryTreeChecks != 42 ||
+        RegistryRecoveryChecks != 42) return;
+    registry_child_result = 42;
+}
+I64 RegistryTaskChecks()
+{
+    CTask *child;
+    registry_child_result = 0;
+    child = Spawn(&RegistryChild);
+    if (!child) return 1;
+    while (TaskValidate(child)) Yield;
+    return registry_child_result;
+}
+
+I64 RegistryQueueChecks()
+{
+    SysOnce("registry_test_system=(Fs==sys_task)*42;");
+    Once("registry_test_value=42;");
+    if (RegCount("Once/System") <= 2 || RegCount("Once/User") <= 2) return 1;
+    return 42;
+}
+I64 RegistryRebootChecks()
+{
+    CDoc *saved;
+    if (registry_test_value || registry_test_system ||
+        RegCount("Once/System") <= 2 || RegCount("Once/User") <= 2) return 1;
+    OnceExe;
+    if (registry_test_value != 42 || registry_test_system != 42 ||
+        RegCount("Once/System") > 2 || RegCount("Once/User") > 2) return 2;
+    registry_test_value = 0;
+    registry_test_system = 0;
+    saved = DocRead("~/Registry.ZC");
+    DocTreeExe(saved, "Once/User");
+    DocTreeExe(saved, "Once/System");
+    DocDel(saved);
+    OnceExe;
+    if (registry_test_value || registry_test_system) return 3;
+    return RegExe("BringUp/Code");
+}

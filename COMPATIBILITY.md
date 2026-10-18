@@ -3387,3 +3387,105 @@ ZealOS drives, extension lookup for `#include "Once"`, registry tree execution,
 tips, autocomplete and splash still require their own source/dependency
 bring-up. The running UTM remains on implementation `0034e51`; this milestone
 and the preceding XTalk/parser changes are verified in disposable guests.
+
+## Registry trees and DolDoc execution — 2026-10-18
+
+Desktop boot now loads the pinned registry and document-tree modules through
+bounded ARM64 dependency overlays. `RegInit` runs on the persistent System
+task; its real `sys_registry_doc` and cache allocations belong to System.
+`RegDefault`, `RegWrite`, `RegAppend`, `RegCount` and `RegExe` operate on the
+original DolDoc tree structures, with `~/Registry.ZC` on the native source
+volume. The writability boundary checks the actual source-store backend and
+full canonical path, without inventing a writable `CDrive` object. `DocWrite`
+now returns failure when `FileWrite` does not write the complete document.
+
+`ExeDoc` retains the original `ExeCmdLine` loop and reads real document entries
+through a private character-reader ABI in the pinned native lexer. Text,
+newlines, tabs, macros and file includes are compiled normally; formatting
+inside a quoted string is serialized by `Doc2PlainText`. The public
+`CCompCtrl` and `CLexFile` retain their ZealOS layouts. The controller owns the
+reader state, so normal return, compiler/runtime exceptions and task teardown
+can release it. Inline binary and nonzero script tokens are explicitly rejected
+with a catchable Compiler exception; this is not the complete original DolDoc
+compiler interface.
+
+A killed-child test exposed a shared-lock failure in the original
+`DocTreeExe` sequence. The overlay releases the parent document after making
+its private branch copy, before executing user code that can yield. This
+preserves a coherent snapshot and lets other tasks use the registry even if
+the executing child is killed. Regular exceptions also delete the copy and
+release any acquired lock. The original `StrFirstRemove` helper and kernel
+version scalars are extracted from pinned sources; upstream hashes and overlay
+rejection guards check those dependencies.
+
+Original `Once`, `SysOnce`, `OnceExe`, `OnceFlush` and `SysOnceFlush` now run.
+The focused gate queues User and System code, reboots the same source volume,
+loads the pending branches, explicitly calls `OnceExe`, verifies the System
+code ran on `sys_task`, and checks that execution flushes both saved branches
+and does not run again. This does not yet enable `HomeSys.StartUpTasks`, run
+`Home/Once.ZC` automatically, or supply tips, autocomplete or splash support.
+
+The refresh installer manages nineteen bootstrap/dependency paths, including
+the registry, document compiler/tree/file modules and version scalars. Existing
+home startup/registry files remain outside that replacement list.
+
+The user's physical test also reported symbols and missing input before Shift
+and Return presses recovered it. Live desktop checks subsequently entered
+visible `42;` and `zstatus` successfully, with the existing kernel reporting no
+USB errors. Capture was returned to released-pointer mode. That demonstrates
+recovery, not resolution of intermittent host input. This candidate adds
+`keyboard_state` diagnostics for decoder Shift/Ctrl, HID modifier bits and the
+repeat usage so a future recurrence can distinguish host-held keys from guest
+state. USB input semantics and UTM adapter settings are unchanged.
+
+The broader compiler-recovery fixture also needed to clear its UI inbox before
+asserting that exactly one source job is dispatched. Registry startup now
+executes original document code that can queue desktop messages. The pinned
+`JobsHandler` deliberately stops at such a message; its FIFO behavior is
+retained. The fixture drains UI messages before testing malformed and valid
+source jobs. The native job dispatcher is unchanged for this milestone.
+
+One concurrent PCI acceptance run visibly received an apostrophe where its
+injected command required a double quote, leaving the real compiler waiting
+for the rest of the string. The QMP typing helper now sends explicit down/up
+edges, releasing chord keys in reverse order, instead of depending on
+`send-key`'s deferred release timer. Character pacing includes the hold time,
+so the ten-characters-per-second case retains its intended rate.
+`make check-input-edges` exercises visible mixed-case/symbol input, a held
+Shift+9 chord (including USB software repeat), explicit release, Escape
+cancellation, a subsequent visible `42;` result, and idle modifier/repeat state
+on both VirtIO and native USB with two hubs and duplicate VirtIO devices.
+This changes test injection, not the guest USB driver, and does not by itself
+establish the cause of the user's physical-keyboard problem.
+
+Validation passed 47 logged PCI checks and 47 native USB checks (NEC, two
+hubs, duplicate VirtIO devices), including real saved registry data, rebooted
+Once execution and exact managed-memory reclamation after repeated document
+execution/error/task teardown. The focused read-only ISO gate passed 30
+checks, including a failed `DocWrite` being reported honestly. The full ISO
+compatibility gate passed 384 and the graphical editor workflow passed 225,
+including save/compile/run/reboot/reopen. Focused modifier/held-key recovery
+passed 16 PCI and 19 native USB checks. Logs are
+`build/registry-{pci,usb,iso-focused,iso,workflow}.log` and
+`build/input-edges-{pci,usb}.log`; a compact record is in
+`build/registry-acceptance.json`. Cold reboot waits now use the same 180-second
+allowance as initial source compilation. Upstream hashes, overlay guards,
+Python/shell syntax and whitespace checks outside pinned sources pass. The
+newly pinned originals retain upstream whitespace to preserve their hashes.
+
+UTM was stopped, backed up to
+`build/utm-before-registry-20261018-152037`, and refreshed with tested kernel
+SHA-256 `d1d7073650586af3eb2d19e878c6f491628d8c0e99fb394b8b4a111b02250b5b`.
+The stopped-image audit confirms 185 pre-existing files outside the managed
+paths, deletion masks, RedSea bytes and VM settings were preserved; the GPT/ESP
+payload matches the tested image. Audit details are in
+`build/registry-utm-backup.json`. Live typing verification is recorded below
+when performed; automated QEMU acceptance is separate from a physical UTM
+keyboard check.
+
+The refreshed live graphical terminal visibly echoed lowercase `help`, ran it,
+then echoed `42;` before Return and returned `ans=0x2A=42`. UTM's Capture Input
+checkbox remained off. The user then physically typed `help` without first
+tapping Shift and confirmed all letters appeared and help ran. This accepts
+normal physical typing in the refreshed session; it does not attribute the
+older intermittent symptoms to a proven guest-driver fault.

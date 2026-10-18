@@ -4674,6 +4674,13 @@ void zc_usb_status(void) {
     con_puts(" wheel_events="); zc_print_decimal(g_usb.wheel_events);
     con_puts(" errors="); zc_print_decimal(g_usb.errors);
     con_puts(" dma_bytes="); zc_print_decimal(usb_dma_used); con_puts("\n");
+    /* Report both the decoder and last HID report, so a host-held modifier
+     * can be distinguished from a guest decoder that failed to release it. */
+    con_puts("keyboard_state: shift="); zc_print_decimal(g_vk.shift);
+    con_puts(" ctrl="); zc_print_decimal(g_vk.ctrl);
+    con_puts(" usb_modifiers="); zc_print_decimal(usb_keyboard_ready() ? g_usb.keyboard->previous[0] : 0);
+    con_puts(" usb_repeat="); zc_print_decimal(usb_keyboard_ready() ? g_usb.keyboard->repeat_usage : 0);
+    con_puts("\n");
     con_puts("usb_topology: hubs="); zc_print_decimal(hubs);
     con_puts(" attaches="); zc_print_decimal(g_usb.attaches);
     con_puts(" detaches="); zc_print_decimal(g_usb.detaches);
@@ -4856,6 +4863,7 @@ int zeal_zss_entry_at(uint32_t index, char *name, size_t name_cap,
     return zss_entry_at(index, name, name_cap, size_out);
 }
 uint64_t zeal_zss_catalog_revision(void) { return g_zss_catalog_revision; }
+int zeal_zss_writable(void) { return zss_available(); }
 #include "zc_source_editor.h"
 #else
 int zeal_zss_entry_at(uint32_t index, char *name, size_t name_cap,
@@ -4863,6 +4871,7 @@ int zeal_zss_entry_at(uint32_t index, char *name, size_t name_cap,
     (void)index; (void)name; (void)name_cap; (void)size_out; return 0;
 }
 uint64_t zeal_zss_catalog_revision(void) { return 0; }
+int zeal_zss_writable(void) { return 0; }
 #endif
 
 static void shell_handle(const char *line, int *done) {

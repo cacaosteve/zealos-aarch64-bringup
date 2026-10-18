@@ -15,6 +15,7 @@ int64_t TempleOS_CallNOnStack(uint64_t stack_top, void (*fptr)(),
 extern int zeal_zss_entry_at(uint32_t index, char *name, size_t name_cap,
                              size_t *size_out);
 extern uint64_t zeal_zss_catalog_revision(void);
+extern int zeal_zss_writable(void);
 
 /* ZealOS KernelA.HH currently defines EXT_EXTS_NUM as five. Keep a stable
  * pointer/table pair for its kernel-owned function dispatch slots; guest
@@ -384,6 +385,7 @@ static int64_t guest_cc_files_off, guest_cc_errors_off, guest_cc_token_off;
 static int64_t guest_lex_size, guest_lex_buf_off, guest_lex_ptr_off;
 static int64_t guest_lex_line_off, guest_lex_flags_off, guest_lex_name_off;
 static int64_t guest_lex_depth_off, guest_lex_start_off;
+static int64_t guest_lex_doc_off, guest_lex_entry_off;
 static void *guest_prompt_context(void);
 static int guest_task_bound;
 static int source_winmgr_active;
@@ -973,6 +975,12 @@ static int64_t host_file_dir_exists(int64_t *a) {
     if (guest_path((const char *)(uintptr_t)a[0], path))
         return 0;
     return source_dir_exists(path + (!strncmp(path, "disk:", 5) ? 5 : 0));
+}
+static int64_t host_source_writable(int64_t *a) {
+    char path[134];
+    if (guest_path((const char *)(uintptr_t)a[0], path)) return 0;
+    const char *name = path + (!strncmp(path, "disk:", 5) ? 6 : 1);
+    return *name && strlen(name) <= 95 && zeal_zss_writable();
 }
 static int disk_name(const char *path, char name[128]) {
     if (strncmp(path, "disk:", 5) || normal_path(path + 5, name)) return -1;
@@ -4561,7 +4569,8 @@ static void bind_guest_task(void) {
         !task_field(lf, "next", 8, 0) || !task_field(lf, "buf", 8, -1) ||
         !task_field(lf, "buf_ptr", 8, -1) || !task_field(lf, "line_num", 8, -1) ||
         !task_field(lf, "flags", 8, -1) || !task_field(lf, "full_name", 8, -1) ||
-        !task_field(lf, "depth", 4, -1))
+        !task_field(lf, "depth", 4, -1) || !task_field(lf, "doc", 8, -1) ||
+        !task_field(lf, "cur_entry", 8, -1))
         zc_fail("pinned compiler context layout mismatch");
     guest_next_cc_off = MemberFind("next_cc", cls)->off;
     guest_last_cc_off = MemberFind("last_cc", cls)->off;
@@ -4597,6 +4606,8 @@ static void bind_guest_task(void) {
     if (!task_field(lf, "line_start", 8, -1))
         zc_fail("pinned lexer line-start layout mismatch");
     guest_lex_start_off = MemberFind("line_start", lf)->off;
+    guest_lex_doc_off = MemberFind("doc", lf)->off;
+    guest_lex_entry_off = MemberFind("cur_entry", lf)->off;
     if (ctrl->sz != 40 || !task_field(ctrl, "next_waiting", 8, 0) ||
         !task_field(ctrl, "last_waiting", 8, 8) ||
         !task_field(ctrl, "next_done", 8, 16) ||
@@ -4791,6 +4802,7 @@ struct source_context {
     unsigned char *option_target;
     int owned;
 };
+static void **user_doc_state(CLexFile *file);
 static unsigned char *guest_context_new(int64_t flags) {
     struct guest_fiber *f = &guest_fibers[guest_current];
     unsigned char *head = (unsigned char *)f->words + guest_next_cc_off;
@@ -4837,9 +4849,16 @@ static void guest_context_sync(CLexer *lex) {
         unsigned char *mirror = __AIWNIOS_CAlloc(guest_lex_size,
             &guest_fibers[guest_current].heap_owner);
         *(void **)(mirror + guest_lex_buf_off) = file->text;
-        *(void **)(mirror + guest_lex_ptr_off) = file->text + file->pos;
+        *(void **)(mirror + guest_lex_ptr_off) = file->text + (file->port_read ? 0 : file->pos);
         *(int64_t *)(mirror + guest_lex_line_off) = file->ln + 1;
-        *(int64_t *)(mirror + guest_lex_flags_off) = file->is_file ? 0 : 2;
+        *(int64_t *)(mirror + guest_lex_flags_off) = file->port_read ? 1 : file->is_file ? 0 : 2;
+        if (file->port_read) {
+            /* The reader's private data starts with its original document
+             * and current entry, used by ExeCmdLine's source-aware title. */
+            void **input = user_doc_state(file);
+            *(void **)(mirror + guest_lex_doc_off) = input[0];
+            *(void **)(mirror + guest_lex_entry_off) = input[1];
+        }
         *(void **)(mirror + guest_lex_name_off) =
             __AIWNIOS_StrDup(file->filename, &guest_fibers[guest_current].heap_owner);
         *(int32_t *)(mirror + guest_lex_depth_off) = depth < 0 ? 0 : depth;
@@ -4847,7 +4866,7 @@ static void guest_context_sync(CLexer *lex) {
          * final line. Give it padded task-owned storage, never an unchecked
          * pointer into the lexer's possibly tiny input allocation. */
         char *line = __AIWNIOS_CAlloc(STR_LEN, &guest_fibers[guest_current].heap_owner);
-        size_t start = file->pos;
+        size_t start = file->port_read ? 0 : file->pos;
         while (start && file->text[start - 1] != '\n') start--;
         for (size_t i = 0; i < STR_LEN - 1 && file->text[start + i] &&
                            file->text[start + i] != '\n'; i++)
@@ -5611,6 +5630,7 @@ static int load_source_path(const char *path, int merged, int recover) {
         PrsBindCSymbol("ZcSystemTask", host_system_task, 0);
         PrsBindCSymbol("ZcSourceDirExists", host_file_dir_exists, 1);
         PrsBindCSymbol("ZcSourcePath", host_source_path, 1);
+        PrsBindCSymbol("ZcSourceWritable", host_source_writable, 1);
         PrsBindCSymbol("Cd", host_cd, 2);
         PrsBindCSymbol("DirCur", host_dir_cur, 2);
         CHashGlblVar *blkdev = (CHashGlblVar *)HashFind(
@@ -5659,6 +5679,13 @@ static int load_source_path(const char *path, int merged, int recover) {
     }
     if (!strcmp(path, "/System/GuiTerminal.ZC"))
         PrsBindCSymbol("ZcGuiShellExec", host_gui_shell_exec, 1);
+    if (!strcmp(path, "/System/DolDoc/DocCompiler.ZC")) {
+        CHashClass *input = (CHashClass *)HashFind("CArmDocInput", Fs->hash_table, HTT_CLASS, 1);
+        if (!input || !task_field(input, "doc", 8, 0) ||
+            !task_field(input, "entry", 8, 8) || !task_field(input, "line", 8, 16))
+            zc_fail("private DolDoc input layout mismatch");
+        PrsBindCSymbol("ZcUserDocAttach", host_user_doc_attach, 5);
+    }
     if (!strcmp(path, "/Kernel/KeyDev.ZC")) {
         CHashFun *put = (CHashFun *)HashFind("PutKey", Fs->hash_table, HTT_FUN, 1);
         if (put && put->fun_ptr && put->argc == 2 &&
@@ -6342,6 +6369,7 @@ int zc_start_gui_terminal(void) {
         "/System/DolDoc/DocLink.ZC",
         "/System/DolDoc/DocEd.ZC",
         "/System/DolDoc/DocPopUp.ZC",
+        "/System/DolDoc/DocClipBoard.ZC",
         /* Rebind the terminal's RIGHT_AINCLUDE action to real SysFile. */
         "/System/DolDoc/DocTerm.ZC",
         /* Direct calls retain the function present at compile time. The
@@ -6357,6 +6385,11 @@ int zc_start_gui_terminal(void) {
         "/Kernel/KeyDev.ZC",
         "/System/SourceDir.ZC",
         "/System/SourceHome.ZC",
+        "/System/VersionScalars.ZC",
+        "/System/DolDoc/DocCompiler.ZC",
+        "/System/DolDoc/DocTree.ZC",
+        "/System/Registry.ZC",
+        "/System/SourceRegistry.ZC",
         "/System/HomeStartUp.ZC",
         "/System/GuiTerminal.ZC",
     };
@@ -6375,6 +6408,8 @@ int zc_start_gui_terminal(void) {
         gui_terminal_modules_loaded = 1;
     }
     if (zc_call("BootstrapSystemTaskStart", &result) != 0 || result != 42)
+        return -1;
+    if (zc_call("BootstrapRegistryStart", &result) != 0 || result != 42)
         return -1;
     if (zc_call("BootstrapGuiTerminalDevicesInit", &result) != 0 || result != 42)
         return -1;

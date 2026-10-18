@@ -52,6 +52,10 @@ p.add_argument('--probe-user-text', action='store_true',
                help='check User formatted startup and XTalk input-filter delivery to graphical terminals')
 p.add_argument('--probe-home-path', action='store_true',
                help='check shared HomeSet, home file execution and reboot persistence')
+p.add_argument('--probe-registry', action='store_true',
+               help='check DolDoc compiler input, registry trees and Once execution')
+p.add_argument('--probe-input-edges', action='store_true',
+               help='check visible modifier typing and held-key release without the full workflow')
 p.add_argument('--probe-source-exceptions', action='store_true',
                help='check catchable source/file errors, native cleanup and command/job recovery')
 p.add_argument('--probe-winmgr', action='store_true',
@@ -92,6 +96,8 @@ usb_label = (f'{args.usb_input}-{args.usb_pointer}' +
              ('-hotplug' if args.usb_hotplug else '')) if args.usb_input else None
 if args.probe_gui_workflow:
     args.probe_gui_keyboard = True
+if args.probe_input_edges:
+    args.probe_gui_keyboard = True
 if args.probe_module_override and not args.probe_module:
     p.error('--probe-module-override requires --probe-module')
 if args.probe_fulltext_visible:
@@ -121,7 +127,10 @@ if args.probe_live_window_control and not (
         args.probe_grscreen and args.probe_live_winmgr):
     p.error('--probe-live-window-control requires --probe-module /System/Win.ZC '
             '--probe-winmgr --probe-grscreen --probe-live-winmgr')
-log_path = ROOT / 'build' / (f'check-usb-{usb_label}{"-home-path" if args.probe_home_path else "-user-text" if args.probe_user_text else "-user-startup" if args.probe_user_startup else ""}.log' if args.usb_input else
+log_path = ROOT / 'build' / (f'check-usb-{usb_label}{"-input-edges" if args.probe_input_edges else "-registry" if args.probe_registry else "-home-path" if args.probe_home_path else "-user-text" if args.probe_user_text else "-user-startup" if args.probe_user_startup else ""}.log' if args.usb_input else
+                             'check-input-edges-pci.log' if args.probe_input_edges else
+                             'check-registry-pci.log' if args.probe_registry and args.pci else
+                             'check-registry-iso.log' if args.probe_registry else
                              'check-home-path-pci.log' if args.probe_home_path and args.pci else
                              'check-home-path-iso.log' if args.probe_home_path else
                              'check-user-text-pci.log' if args.probe_user_text else
@@ -263,10 +272,16 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             return response['return']
         finally:
             sock.close()
+    def qmp_key_edges(qcodes, down):
+        qmp_command('input-send-event', {'events': [
+            {'type': 'key', 'data': {'down': down,
+             'key': {'type': 'qcode', 'data': qcode}}} for qcode in qcodes]})
     def qmp_send_keys(qcodes):
-        qmp_command('send-key', {
-            'keys': [{'type': 'qcode', 'data': qcode} for qcode in qcodes],
-            'hold-time': 50})
+        # Explicit edges avoid relying on send-key's shared deferred release
+        # timer while concurrent guests compete for host execution time.
+        qmp_key_edges(qcodes, True)
+        time.sleep(0.05)
+        qmp_key_edges(reversed(qcodes), False)
     def graphical_path(name):
         screen_name = f'usb-{usb_label}-{name}' if args.usb_input else name
         return ROOT/'build'/f'gui-{screen_name}.ppm'
@@ -371,9 +386,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             time.sleep(0.1)
     def qmp_send_key(qcode):
         qmp_send_keys([qcode])
-        # send-key acknowledges before its 50 ms release and guest polling.
-        # Separate navigation-probe keystrokes; the explicit ten-char/sec
-        # typing gate still uses qmp_send_keys directly with its own timing.
+        # Separate navigation-probe keystrokes and allow guest polling after
+        # the explicit release; the typing gate accounts for the hold time.
         time.sleep(0.1)
     def focus_graphical_terminal():
         location = command('zc Print("gui_click=%d,%d\\n", '
@@ -410,6 +424,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             '`': ('grave_accent',), '~': ('shift', 'grave_accent'),
         }
         for char in text:
+            started = time.monotonic()
             keys = qcodes.get(char)
             if keys is None:
                 keys = ('shift', char.lower()) if char.isupper() else (char,)
@@ -417,7 +432,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             # Keep longer lines below the guest's cooperative input polling
             # rate; QMP acknowledges injection before the source task consumes
             # each event, and an early Return can otherwise overtake the tail.
-            time.sleep(delay)
+            time.sleep(max(0, delay - (time.monotonic() - started)))
     def checked_put_key():
         command('zload /Tests/TaskPutKey.ZC', 'zc: loaded /Tests/TaskPutKey.ZC')
         result = command('zcall TaskPutKeyChecks', 'zc => 0x000000000000002a')
@@ -572,6 +587,81 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         if not redraw_count or int(redraw_count.group(1), 16) == 0:
             raise RuntimeError('boot compositor has not redrawn the terminal document:\n' + redraws)
         print(f'PASS boot terminal document redraws: {int(redraw_count.group(1), 16)}', flush=True)
+        if args.probe_input_edges:
+            focus_graphical_terminal()
+            text = 'Print("Input edges %d\\n",40+2);'
+            qmp_send_text(text, delay=0.1)
+            typed = require_graphical_text('input-edges-typing', text)
+            require_graphical_caret(typed, text)
+            qmp_send_key('ret')
+            require_graphical_text('input-edges-answer', 'Input edges 42')
+            qmp_key_edges(['shift', '9'], True)
+            time.sleep(0.6)
+            require_graphical_text('input-edges-held', '> ((' if args.usb_input else '> (')
+            qmp_key_edges(['9', 'shift'], False)
+            qmp_send_key('esc')
+            qmp_send_text('42;')
+            typed = require_graphical_text('input-edges-recovered', '> 42;')
+            require_graphical_caret(typed, '> 42;')
+            qmp_send_key('ret')
+            require_graphical_text('input-edges-recovered-answer', 'ans=0x2A=42')
+            command('zstatus', 'keyboard_state: shift=0 ctrl=0 usb_modifiers=0 usb_repeat=0')
+            print('PASS visible mixed-case/symbol input, held Shift+9, release and prompt recovery', flush=True)
+            raise SystemExit(0)
+        if args.probe_registry:
+            command('zc Print("registry_writable=%d\\n",ZcSourceWritable("~/Registry.ZC"));',
+                    'registry_writable='+('1' if args.pci else '0'))
+            if not args.pci:
+                command('zc CDoc *registry_readonly=DocNew; '
+                        'StrCopy(registry_readonly->filename.name,"/Home/RegistryReadOnly.ZC"); '
+                        'DocPrint(registry_readonly,"40+2;"); '
+                        'Print("registry_write=%d\\n",DocWrite(registry_readonly)); '
+                        'DocDel(registry_readonly);', 'registry_write=0')
+            command('zload /Tests/Registry.ZC', 'zc: loaded /Tests/Registry.ZC')
+            for check in ('DocChecks', 'TreeChecks', 'RecoveryChecks', 'Checks', 'OnceChecks', 'KillChecks', 'TaskChecks'):
+                name = 'Registry'+check
+                command('zcall '+name, 'zc => 0x000000000000002a')
+            if args.pci:
+                command('zcall RegistryPersistChecks', 'zc => 0x000000000000002a')
+            before = command('zstatus', 'failed=0')
+            for _ in range(3):
+                for check in ('TaskChecks', 'TreeChecks', 'RecoveryChecks', 'KillChecks'):
+                    command('zcall Registry'+check, 'zc => 0x000000000000002a')
+            after = command('zstatus', 'failed=0')
+            heap = r'data=([0-9/]+) code=([0-9/]+) allocations=([0-9]+)'
+            if re.search(heap, before).groups() != re.search(heap, after).groups():
+                raise RuntimeError('registry document/compiler/task teardown leaked managed memory')
+            print('PASS registry execution, error recovery and killed-child cleanup preserve managed memory', flush=True)
+            if args.probe_gui_keyboard:
+                focus_graphical_terminal()
+                text = 'Print("Registry device %d\\n",RegistryTreeChecks);'
+                qmp_send_text(text)
+                typed = require_graphical_text('registry-typing', text)
+                require_graphical_caret(typed, text)
+                qmp_send_key('ret')
+                require_graphical_text('registry-device-answer', 'Registry device 42')
+                command('zstatus', 'keyboard_state: shift=0 ctrl=0 usb_modifiers=0 usb_repeat=0')
+                require_graphical_pointer()
+            if args.pci:
+                command('zcall RegistryQueueChecks', 'zc => 0x000000000000002a')
+                guest.terminate()
+                try:
+                    guest.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    guest.kill(); guest.wait()
+                guest = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                         stderr=subprocess.STDOUT, bufsize=0)
+                buf.clear()
+                until(b'\n> ', timeout=180)
+                command('zload /Tests/Registry.ZC', 'zc: loaded /Tests/Registry.ZC')
+                command('zcall RegistryRebootChecks', 'zc => 0x000000000000002a')
+                if args.probe_gui_keyboard:
+                    focus_graphical_terminal()
+                    qmp_send_text('Print("Registry reboot %d\\n",RegExe("BringUp/Code"));')
+                    qmp_send_key('ret')
+                    require_graphical_text('registry-reboot-answer', 'Registry reboot 42')
+                print('PASS saved registry and Once/System + Once/User survive reboot and flush after execution', flush=True)
+            raise SystemExit(0)
         if args.probe_user_text:
             command('zload /Tests/UserText.ZC', 'zc: loaded /Tests/UserText.ZC')
             for check in ('StartChecks', 'OrderChecks', 'LongChecks', 'BarrierChecks', 'RecoveryChecks'):
@@ -841,7 +931,13 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         command('zcall CompilerRecoveryChecks', 'zc => 0x000000000000002a')
         command('zcall CompilerRecoveryOperandChecks', 'zc => 0x000000000000002a')
         command('zcall CompilerRecoveryReentryChecks', 'zc => 0x000000000000002a')
-        command('zcall CompilerRecoveryJobChecks', 'zc => 0x000000000000002a')
+        try:
+            command('zcall CompilerRecoveryJobChecks', 'zc => 0x000000000000002a')
+        except RuntimeError:
+            command('zc Print("recovery_queue: code=%d flags=%X\\n",'
+                    'Fs->server_ctrl.next_waiting->job_code,Fs->server_ctrl.next_waiting->flags);',
+                    'recovery_queue:')
+            raise
         command('zcall CompilerRecoveryTaskChecks', 'zc => 0x000000000000002a')
         command('zcall CompilerRecoveryStackChecks', 'zc => 0x000000000000002a')
         command('zcall CompilerRecoveryLeakChecks', 'zc => 0x000000000000002a')
@@ -2722,7 +2818,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         guest = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                  stderr=subprocess.STDOUT, bufsize=0)
         buf.clear()
-        boot = until(b'\n> ')
+        # Reboot recompiles the same desktop source set as the initial boot.
+        boot = until(b'\n> ', timeout=180)
         if 'zc: native compiler ready' not in boot:
             raise RuntimeError('compiler unavailable after reboot')
         if args.pci:
@@ -2745,7 +2842,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             guest = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                      stderr=subprocess.STDOUT, bufsize=0)
             buf.clear()
-            boot = until(b'\n> ')
+            boot = until(b'\n> ', timeout=180)
             if 'zc: native compiler ready' not in boot:
                 raise RuntimeError('compiler unavailable after second reboot')
             command('zvol', 'bank=A generation=2')

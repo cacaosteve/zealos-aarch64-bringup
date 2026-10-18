@@ -24,7 +24,7 @@
            lex->file->col + 1);
    return A_STRDUP(buf, task);
  }
-@@ -32,9 +43,9 @@
+@@ -32,9 +43,10 @@
    CLexFile *file = lex->file, *last;
    int64_t ret;
    if (!lex->file)
@@ -32,11 +32,12 @@
 +    return lex->cur_char = 0;
    // We terminate the silly sauces with 0 as per ASCII nul character
 -  if (ret = lex->file->text[lex->file->pos]) {
-+  if (ret = (unsigned char)lex->file->text[lex->file->pos]) {
++  if (ret = file->port_read ? file->port_read(lex, file) :
++                              (unsigned char)file->text[file->pos]) {
      lex->file->pos++;
      if (ret == 5 || ret == '\r') // TempleOS cursor charactor
        goto enter;
-@@ -65,7 +76,7 @@
+@@ -65,7 +77,7 @@
    va_list lst;
    char buffer[STR_LEN];
    va_start(lst, fmt);
@@ -45,7 +46,7 @@
    va_end(lst);
    if (lex->file) {
      fprintf(AIWNIOS_OSTREAM, "ERR %s:%d:%d %s", lex->file->filename,
-@@ -73,6 +84,7 @@
+@@ -73,6 +85,7 @@
    } else {
      fprintf(AIWNIOS_OSTREAM, "ERR ???:?:? %s", buffer);
    }
@@ -53,7 +54,7 @@
    throw(*(int64_t *)"Lex\0\0\0\0\0");
  }
 
-@@ -80,7 +92,7 @@
+@@ -80,7 +93,7 @@
    va_list lst;
    char buffer[STR_LEN];
    va_start(lst, fmt);
@@ -62,8 +63,12 @@
    va_end(lst);
    if (lex->file) {
      fprintf(AIWNIOS_OSTREAM, "WARN %s:%d:%d %s\n", lex->file->filename,
-@@ -141,6 +153,16 @@
+@@ -139,8 +152,20 @@
+
+ static int64_t LexString(CLexer *lex, int64_t till) {
    int64_t idx, chr1, hex;
++  int64_t old_quotes = lex->port_in_quotes;
++  lex->port_in_quotes = till == '"';
    for (idx = 0;;) {
      switch (chr1 = LexAdvChr(lex)) {
 +    case '$':
@@ -79,7 +84,15 @@
      case '\\':
        switch (chr1 = LexAdvChr(lex)) {
          break;
-@@ -267,6 +289,11 @@
+@@ -214,6 +239,7 @@
+     }
+   }
+ fin:
++  lex->port_in_quotes = old_quotes;
+   lex->str_len = idx;
+   lex->string[idx++] = 0;
+   return 0;
+@@ -267,6 +293,11 @@
    case '`':
      return lex->cur_tok = '`';
      break;
@@ -91,7 +104,7 @@
    case ';':
      return lex->cur_tok = ';';
      break;
-@@ -277,7 +304,10 @@
+@@ -277,7 +308,10 @@
      return lex->cur_tok = ',';
      break;
    case '\n':
@@ -103,7 +116,7 @@
        lex->flags &= ~LEXF_UNTIL_NEWLINE;
        return lex->cur_tok = '\n';
      }
-@@ -293,11 +323,15 @@
+@@ -293,11 +327,15 @@
          break;
        case 'x':
        case 'X':
@@ -119,7 +132,7 @@
          chr1 = LexAdvChr(lex);
          base = 2;
          lex->flags |= LEXF_USE_LAST_CHAR;
-@@ -338,9 +372,11 @@
+@@ -338,9 +376,11 @@
            return lex->cur_tok = ERR;
          }
        fin_f64:
@@ -132,7 +145,7 @@
          } else
            lex->flt = integer;
          lex->flt *= pow(10, exponet);
-@@ -459,6 +495,12 @@
+@@ -459,6 +499,12 @@
        }
        return lex->cur_tok = TK_DOT_DOT_DOT;
        break;
@@ -145,7 +158,7 @@
      default:
        lex->flags |= LEXF_USE_LAST_CHAR;
        return lex->cur_tok = '.';
-@@ -582,6 +624,7 @@
+@@ -582,6 +628,7 @@
    case '@':
    case 'a' ... 'z':
    case 'A' ... 'Z':
@@ -153,7 +166,7 @@
      lex->flags |= LEXF_USE_LAST_CHAR;
      for (;;) {
        switch (chr1 = LexAdvChr(lex)) {
-@@ -591,6 +634,7 @@
+@@ -591,6 +638,7 @@
        case 'a' ... 'z':
        case 'A' ... 'Z':
        case '0' ... '9':
@@ -161,7 +174,7 @@
          if (idx + 1 >= STR_LEN) {
            LexErr(lex, "Name is too long.");
            return lex->cur_tok = ERR;
-@@ -610,11 +654,13 @@
+@@ -610,11 +658,15 @@
              //   to
              // --->(at plus)
              //
@@ -172,11 +185,13 @@
              lex->flags &= ~LEXF_USE_LAST_CHAR;
              //
              new_file = A_MALLOC(sizeof(CLexFile), NULL);
++            new_file->port_read = NULL;
++            new_file->port_data = NULL;
 +            new_file->is_file = 0;
              new_file->dir = NULL;
              new_file->last = lex->file;
              new_file->filename = A_STRDUP(define->base.str, NULL);
-@@ -632,17 +678,85 @@
+@@ -632,17 +684,85 @@
    case '#':
      if (TK_NAME == Lex(lex)) {
        if (!strcmp(lex->string, "help_file")) {
@@ -265,7 +280,7 @@
          lex->flags |= LEXF_UNTIL_NEWLINE;
          CCmpCtrl *cc = CmpCtrlNew(lex);
          char *code;
-@@ -654,6 +768,8 @@
+@@ -654,6 +774,8 @@
            rtrn->type = IC_RET;
            QueIns(rtrn, cc->code_ctrl->ir_code);
            if (code = Compile(cc, NULL, NULL, NULL)) {
@@ -274,7 +289,7 @@
              ret = FFI_CALL_TOS_0(code);
            }
            A_FREE(code);
-@@ -662,6 +778,7 @@
+@@ -662,6 +784,7 @@
          CmpCtrlDel(cc);
          if (ret)
            goto re_enter;
@@ -282,7 +297,7 @@
          goto if_fail;
        } else if (!strcmp(lex->string, "ifaot")) {
          // AIWN will only AOT compile for you,the JIT will be
-@@ -756,11 +873,12 @@
+@@ -756,11 +879,12 @@
            actual_file = actual_file->last;
          }
          if (actual_file) {
@@ -297,7 +312,7 @@
              dir = __AIWNIOS_StrDup(buf, NULL);
              *strrchr(dir, '/') = 0;
              f = fopen(buf, "rb");
-@@ -770,7 +888,12 @@
+@@ -770,7 +894,12 @@
          normal:
            f = fopen(lex->string, "rb");
            if (!strrchr(lex->string, '/')) {
@@ -311,7 +326,16 @@
            } else {
              dir = __AIWNIOS_StrDup(lex->string, NULL);
              *strrchr(dir, '/') = 0;
-@@ -798,12 +921,19 @@
+@@ -786,6 +915,8 @@
+         fseek(f, 0, SEEK_SET);
+         idx -= ftell(f);
+         new_file = A_MALLOC(sizeof(CLexFile), NULL);
++        new_file->port_read = NULL;
++        new_file->port_data = NULL;
+         new_file->text = A_MALLOC(idx + 1, NULL);
+         new_file->text[idx] = 0;
+         new_file->dir = dir;
+@@ -798,12 +929,19 @@
          lex->file = new_file;
          goto re_enter;
        } else if (!strcmp(lex->string, "define")) {
@@ -333,7 +357,7 @@
          strcpy(macro_name, lex->string);
          strcpy(lex->string, "");
          define = A_CALLOC(sizeof(CHashDefineStr), NULL);
-@@ -861,8 +991,7 @@
+@@ -861,8 +999,7 @@
  }
 
  CLexer *LexerNew(char *filename, char *text) {
@@ -343,7 +367,7 @@
      struct {
        char *name;
        int64_t tok;
-@@ -925,7 +1054,16 @@
+@@ -925,7 +1062,16 @@
        kw->tk = kws[i].tok;
        HashAdd(kw, Fs->hash_table);
      }
@@ -2095,7 +2119,25 @@
    struct CHash *next;
 --- a/c/aiwn_lexparser.h
 +++ b/c/aiwn_lexparser.h
-@@ -40,9 +40,15 @@
+@@ -6,6 +6,7 @@
+ #include "aiwn_asm.h"
+ #include <stdint.h>
+ struct CTask;
++struct CLexer;
+ // This represents a peice of text being lexed(it could be a file macro, or
+ // such)
+ typedef struct CLexFile {
+@@ -16,6 +17,9 @@
+   struct CLexFile *last;
+   char *filename, *text, *dir;
+   int64_t ln, col, pos, is_file;
++  /* ARM64 DolDoc input; ordinary files and macro expansions use text. */
++  int64_t (*port_read)(struct CLexer *, struct CLexFile *);
++  void *port_data;
+ } CLexFile;
+ #define STR_LEN 144
+ typedef struct CLexer {
+@@ -40,9 +44,16 @@
    int64_t flags, cur_char;
    int64_t cur_tok;
    struct CHeapCtrl *hc;
@@ -2104,6 +2146,7 @@
 +  int64_t *port_options;
 +  void (*port_sync)(struct CLexer *);
 +  void (*port_fun_complete)(struct CHashFun *);
++  int64_t port_in_quotes;
  } CLexer;
  typedef enum {
    TK_I64 = 0x100,
@@ -2111,7 +2154,7 @@
    TK_F64,
    TK_NAME,
    TK_STR,
-@@ -224,6 +230,7 @@
+@@ -224,6 +235,7 @@
  #define PRSF_IMPORT   0x20
  #define PRSF__IMPORT  0x40
  #define PRSF_STATIC   0x80
@@ -2119,7 +2162,7 @@
  enum {
    IC_GOTO,
    IC_SQR,
-@@ -345,6 +352,7 @@
+@@ -345,6 +357,7 @@
    IC_GS,
    IC_TO_BOOL,
    IC_SQRT,
@@ -2127,7 +2170,7 @@
    IC_CNT, // MUST BE THE LAST ITEM
  };
  typedef struct CICArg {
-@@ -441,7 +449,7 @@
+@@ -441,7 +454,7 @@
  void ICFree(CRPN *ic);
  CHashClass *PrsClassNew();
  char *PrsArray(CCmpCtrl *ccmp, CHashClass *base, CArrayDim *dim,
@@ -2136,7 +2179,7 @@
  int64_t PrsFunArgs(CCmpCtrl *ccmp, CHashFun *fun);
  int64_t PrsArrayDim(CCmpCtrl *ccmp, CArrayDim *to);
  double PrsF64(CCmpCtrl *ccmp);
-@@ -567,7 +575,7 @@
+@@ -567,7 +580,7 @@
  #  define AIWNIOS_TMP_FREG_START 3
  #  define AIWNIOS_TMP_FREG_CNT   (5 - 3 + 1)
  #  define AIWNIOS_FREG_CNT       (15 - 6 + 1)
@@ -2145,7 +2188,7 @@
      (defined(_M_ARM64) || defined(__aarch64__))
  #  define AIWNIOS_IREG_START     19
  #  define AIWNIOS_IREG_CNT       (27 - 19 + 1)
-@@ -767,3 +775,8 @@
+@@ -767,3 +780,8 @@
 
  void CacheRPNArgs(CCmpCtrl *cctrl);
  extern int64_t DolDocDumpIR(char *to, int64_t, CRPN *);

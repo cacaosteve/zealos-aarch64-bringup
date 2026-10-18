@@ -6,6 +6,7 @@ typedef struct CRPN CRPN;
 #include "aiwn_asm.h"
 #include <stdint.h>
 struct CTask;
+struct CLexer;
 // This represents a peice of text being lexed(it could be a file macro, or
 // such)
 typedef struct CLexFile {
@@ -16,6 +17,9 @@ typedef struct CLexFile {
   struct CLexFile *last;
   char *filename, *text, *dir;
   int64_t ln, col, pos, is_file;
+  /* ARM64 DolDoc input; ordinary files and macro expansions use text. */
+  int64_t (*port_read)(struct CLexer *, struct CLexFile *);
+  void *port_data;
 } CLexFile;
 #define STR_LEN 144
 typedef struct CLexer {
@@ -45,6 +49,7 @@ typedef struct CLexer {
   int64_t *port_options;
   void (*port_sync)(struct CLexer *);
   void (*port_fun_complete)(struct CHashFun *);
+  int64_t port_in_quotes;
 } CLexer;
 typedef enum {
   TK_I64 = 0x100,

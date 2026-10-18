@@ -659,3 +659,29 @@ Default home is `/Home`; an existing customized `Home/Once.ZC` is preserved on
 refresh. Registry-backed Once execution and full HomeSys startup remain pending.
 The current UTM session was left unchanged on `0034e51`; these results are from
 disposable guests and do not claim a new physical UTM acceptance.
+
+2026-10-18: the System-owned registry, original document-tree APIs and
+`ExeDoc` character-reader adapter passed 47 PCI and 47 native USB logged
+checks, including error recovery, killed-child cleanup, exact managed-memory
+reclamation and saved Once/System + Once/User execution after reboot. The
+read-only ISO gate passed 30, full ISO compatibility passed 384, and graphical
+save/compile/run/reboot/reopen passed 225. Explicit key-edge tests passed 16
+PCI and 19 native USB checks, including held Shift+9, release, Escape and a
+subsequent visible `42;` answer with idle modifiers/repeat state.
+
+The user's physical input report included wrong symbols and missing typing;
+the live pre-refresh check subsequently entered visible `42;` and `zstatus`
+successfully and restored released-pointer mode. This records recovery, not a
+confirmed fix for intermittent physical input. A QMP injection failure in a
+disposable guest is addressed by explicit key edges in the test harness.
+The guest USB driver remains unchanged; `zstatus` gains keyboard-state
+diagnostics. UTM has been backed up and refreshed with the tested kernel,
+preserving 185 existing files outside managed paths, deletion masks, RedSea and
+VM settings. Full HomeSys startup, automatic home Once loading, tips,
+autocomplete and splash remain separate work.
+
+The refreshed live graphical window also passed desktop checks for visible
+`help`, help execution, visible `42;` before Return and `ans=0x2A=42` afterward,
+with UTM capture released. The user then physically typed `help` without first
+tapping Shift and confirmed normal lowercase typing and successful execution.
+This completes the refreshed-session physical typing gate.

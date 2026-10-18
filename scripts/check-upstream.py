@@ -50,4 +50,8 @@ compiler_misc = (zeal/'Compiler/CMisc.ZC').read_text()
 option_end = compiler_misc.index('\nasm {')
 if compiler_misc[:option_end].strip() not in (root/'upstream/bootstrap/System/TaskBridge.ZC').read_text():
     raise SystemExit('Option / OptionGet bodies drifted from pinned CMisc source')
-print('PASS pinned Aiwnios originals + documented patch; unchanged ZealOS files; Win progress, CMain cleanup wrappers and Option fixtures')
+str_source = (zeal/'Kernel/StrA.ZC').read_text()
+first_remove = str_source.split('U8 *StrFirstRemove(', 1)[1].split('\nU8 *StrLastOcc(', 1)[0]
+if 'U8 *StrFirstRemove(' + first_remove.strip() not in bridge:
+    raise SystemExit('StrFirstRemove body drifted from pinned StrA source')
+print('PASS pinned Aiwnios originals + documented patch; unchanged ZealOS files; Win progress, CMain cleanup wrappers, Option and StrFirstRemove fixtures')

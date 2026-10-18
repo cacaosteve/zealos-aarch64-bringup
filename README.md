@@ -30,12 +30,17 @@ make check-user-command # original ExeCmdLine loop, options and error recovery
 make check-user-startup # per-user HomeSys setup and independent graphical terminals
 make check-user-text    # User startup commands + XTalk input delivery and recovery
 make check-home-path    # shared home paths, includes and saved source after reboot
+make check-registry     # DolDoc execution, shared registry and Once across reboot
+make check-input-edges  # visible modifier typing, held keys and explicit release
 make utm               # refresh VM, preserving RedSea/source edits and adding new bundled files
 ```
 
 The UTM refresh also updates the repository-managed
 `Tests/WindowDragLive.ZC`, `System/GuiTerminal.ZC`, `System/TaskBridge.ZC`,
 `System/UserTask.ZC`, `System/HomeStartUp.ZC`, `System/SourceDir.ZC`, `System/SourceHome.ZC`,
+`System/VersionScalars.ZC`, `System/Registry.ZC`, `System/SourceRegistry.ZC`,
+`System/DolDoc/DocCompiler.ZC`, `System/DolDoc/DocTree.ZC`,
+`System/DolDoc/DocClipBoard.ZC`, `System/DolDoc/DocFile.ZC`,
 `System/DolDoc/DocTerm.ZC`, `System/DolDoc/DocEd.ZC`, `System/WinMgr.ZC`,
 `System/Gr/GrDC.ZC`, and `System/Gr/SpriteRaster.ZC` files
 so they stay in sync with the kernel; other existing guest source files remain
@@ -109,8 +114,14 @@ document, compiler context and history. The default per-user hook retains the
 pinned `HomeSys.ZC` welcome-document/window setup, then installs the accepted
 graphical input adapter. `User("40+2;\n")` supplies an initial command;
 `XTalk` and `XTalkWait` send further input to that terminal's compiler through
-the source KeyDev input filter. Full `HomeSys` desktop launch, document-backed lexing,
-autocomplete and the remaining compiler interfaces are still open.
+the source KeyDev input filter. `ExeDoc` now reads real DolDoc entries through
+the native lexer, including quoted formatting, macros and includes. The original
+registry tree APIs share a System-owned cache backed by `~/Registry.ZC`.
+`Once`, `SysOnce` and explicit `OnceExe` execute and flush saved User/System
+branches; full `HomeSys` desktop launch does not yet call them automatically.
+Inline binary/script compiler tokens, autocomplete and the remaining startup
+dependencies are still open. `zstatus` also reports `keyboard_state` modifier
+and repeat values to diagnose held host keys separately from guest decoding.
 The bridge also maintains the upstream-visible runnable-task and parent/child
 task rings, including `TaskFocusNext` selection and child unlink on teardown.
 `TaskMathChecks`,
