@@ -2560,8 +2560,12 @@ prompt's white caret. Capture was released. Automated host key injection did
 not establish input delivery in either UTM console during this check; the
 physical result is the input acceptance evidence.
 
-Live source-file execution remains pending: use
+Live source-file execution was accepted next. The user entered
 `zc ExeFile("/Tests/GuiAcceptance.ZC");` followed by `zcall GuiAcceptance`
-against the previously saved source and require `0x2a`. Pointer motion and
-dragging were accepted on the earlier native USB baseline; this refreshed
-image has no new physical drag result yet.
+against the previously saved source. Their 2026-10-17 18:21 screenshot shows
+`zc: executed`, then `zc => 0x000000000000002a`, followed by the prompt and
+caret; they also explicitly confirmed the result. This closes the live
+file-execution gate on the refreshed image. Pointer motion and dragging were
+accepted on the earlier native USB baseline and were not repeated for this
+compiler-only change. Full upstream startup and compiler recovery remain
+outside this accepted file-execution milestone.

@@ -169,8 +169,13 @@ tablet path separately from QMP injection.
 2026-10-17, after the native `ExeFile` refresh: the user confirmed visible
 physical typing and successful graphical `help`. Their 18:19 screenshot shows
 the command, output, and prompt caret with capture released. This verifies
-graphical boot and physical keyboard input on the refreshed image. Live file
-execution and a fresh physical drag check remain pending.
+graphical boot and physical keyboard input on the refreshed image. Their 18:21
+screenshot and explicit confirmation then accepted
+`zc ExeFile("/Tests/GuiAcceptance.ZC");` followed by `zcall GuiAcceptance`:
+the graphical terminal reports `zc: executed`, returns `0x2a`, and displays a
+fresh prompt and caret. The saved-file execution gate is accepted in live UTM.
+The earlier physical pointer/drag acceptance was not repeated for this
+compiler-only change.
 
 ## Checklist — interactive smoke
 
