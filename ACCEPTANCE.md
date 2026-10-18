@@ -628,5 +628,10 @@ hook passed 42 focused PCI and 45 native USB startup checks, plus 379 ISO,
 terminals show independent visible typing, carets, answers and histories;
 repeated creation/teardown preserves managed memory usage. This milestone also
 fixes input starvation when a compositor frame misses its sleep deadline.
-The stopped UTM bundle has been backed up. Refreshed-VM acceptance is pending;
-full `HomeSys` desktop startup remains separate work.
+UTM was backed up, refreshed from `0034e51` and restarted. Its installed kernel
+matches the tested build; 184 existing files outside the managed paths,
+deletion masks, RedSea bytes and VM settings were preserved. Live desktop
+automation opened another terminal with `User;` and visibly obtained
+`ans=0x2A=42` from `40+2;`. A physical typing/release check remains pending
+after later automation repeated a modifier key while arranging the window.
+Full `HomeSys` desktop startup remains separate work.

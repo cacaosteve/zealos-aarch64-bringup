@@ -3277,6 +3277,19 @@ are `build/user-startup-{pci,usb,iso,workflow,command-regression}.log`.
 
 The existing UTM bundle was stopped and copied to
 `build/utm-before-user-startup-20261018-124630/` before refresh. The backup
-report is `build/user-startup-utm-backup.json`. The new per-user startup path
-still requires its own live UTM check; the earlier physical `40+2;` acceptance
-applies to the preceding command-loop milestone.
+report is `build/user-startup-utm-backup.json`. UTM was refreshed from
+implementation `0034e51` and restarted; CLI reports `started`. Verification
+preserved 184 existing files outside the managed paths, deletion masks, RedSea
+bytes, VM settings and view/device settings. The installed GPT/ESP prefix
+matches the tested image, and the extracted `/boot/kernel.elf` matches
+`esp/boot/kernel.elf` at SHA-256
+`39febc87a69606ab5bd9b26d22096c3a31ac7fc0c5430f0c05f0782ceffc76bc`.
+
+Live UTM inspection shows the new welcome document, directory listing and
+graphical prompt. Desktop automation visibly typed `User;`, opened its new
+terminal, then typed `40+2;` and observed `ans=0x2A=42` there. The upstream
+new-terminal geometry is initially fullscreen; automatic desktop tiling has
+not been enabled. Later automated modifier delivery became unreliable while
+trying to arrange that window, including a repeating `(` key. A physical
+release/Escape and typing check was requested; that follow-up remains pending.
+This is not a new physical acceptance claim or a change to the USB driver.
