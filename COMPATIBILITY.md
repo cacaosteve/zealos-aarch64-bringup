@@ -3160,8 +3160,8 @@ The workflow now refocuses the client after reboot before checking glyphs,
 because QEMU resets its pointer to the guest's top-row menu. Its cancellation
 assertion also uses the new direct-ZealC banner. Pinned hashes, guarded overlays,
 Python/shell syntax and whitespace checks pass. The Pi diagnostic builds;
-no Pi hardware was tested. Physical typing in the refreshed UTM image remains
-the final interactive gate.
+no Pi hardware was tested. The user subsequently accepted physical typing in
+the refreshed UTM image: direct `40+2;` input appeared and returned 42.
 
 UTM was backed up while stopped at
 `build/utm-before-user-command-20261018-093036/` and refreshed from `440631e`.
@@ -3174,5 +3174,7 @@ the tested image before offering restart. The repeated refresh passed that
 check with SHA-256
 `c59a2b667a5c24be3f8d36a8bd967f57d082479930f218cbe09bf0e9766e5c83`.
 The preservation report is `build/user-command-utm-backup.json`.
-CLI reports the refreshed VM started. The Mac is locked, so a live visual/
-physical typing check has not yet been collected for this milestone.
+CLI reports the refreshed VM started. After unlocking, the user physically
+typed `40+2;` without a `zc` prefix and confirmed visible characters and an
+answer of 42. This completes live command-loop acceptance. No new pointer or
+status-diagnostic check is implied by this text confirmation.

@@ -607,14 +607,14 @@ passed 219 PCI graphical workflow checks, 379 ISO checks and 39 native USB
 command-loop checks through two hubs. Actual scanout confirms visible direct
 ZealC input/output, multiline functions, float answers, compiler options shared
 with legacy `zc`, Escape cancellation and recovery after errors. The editor
-save/compile/run/reboot/reopen gate also passes. Physical UTM acceptance is
-pending: click beside the graphical prompt, type `40+2;` without a `zc` prefix,
-then Return. The letters should appear while typing and the result should be
-42. This is the interactive command-loop milestone; full `HomeSys` startup
+save/compile/run/reboot/reopen gate also passes. The user physically typed
+`40+2;` without a `zc` prefix in the refreshed UTM graphical terminal and
+confirmed that the characters appeared and the result was 42. This accepts
+the live interactive command-loop milestone; full `HomeSys` startup
 and the remaining compiler/document interfaces are still separate work.
 
 The VM is backed up and refreshed from `440631e`; CLI reports it started.
 The refresh preserved 185 existing files outside the managed paths, deletion
 mask, RedSea bytes and VM settings, and verified the boot payload against the
-tested image. The Mac was locked during the visual check. Unlock it and leave
-ZealosAarch64Hello visible to complete the direct `40+2;` typing gate above.
+tested image. The user's subsequent physical typing check completed the live
+gate. Pointer motion and drag retain their earlier acceptance.
