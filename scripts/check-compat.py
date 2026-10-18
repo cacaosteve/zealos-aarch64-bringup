@@ -937,17 +937,20 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 qmp_send_key('ret')
                 require_graphical_text('exceptions-private-load', 'zc: loaded /Tests/SourceExceptions.ZC')
                 for check in ('Checks', 'NestedChecks', 'TaskChecks'):
-                    label = 'Exception '+check+' '
-                    qmp_send_text('zc Print("'+label+'%d",SourceException'+check+'());')
+                    # Keep the command within the terminal width. Its
+                    # horizontal cursor scroll also affects following output.
+                    label = {'Checks': 'Source ', 'NestedChecks': 'Nested ',
+                             'TaskChecks': 'Task '}[check]
+                    qmp_send_text('zc Print("  '+label+'%d",SourceException'+check+'());')
                     qmp_send_key('ret')
                     require_graphical_text('exceptions-private-'+check, label+'42')
                 qmp_send_text("zc throw('Prompt');")
                 qmp_send_key('ret')
                 require_graphical_text('exceptions-uncaught', 'zc: uncaught guest exception 0x')
-                qmp_send_text('zc Print("Exception recovery %d",ExePutS2("40+2;"));')
+                qmp_send_text('zc Print("  Recovery %d",ExePutS2("40+2;"));')
                 qmp_send_key('ret')
-                recovered_frame = require_graphical_text('exceptions-prompt-recovered', 'Exception recovery 42')
-                if recovered_frame[3].count('Exception recovery 42') != 1:
+                recovered_frame = require_graphical_text('exceptions-prompt-recovered', 'Recovery 42')
+                if recovered_frame[3].count('Recovery 42') != 1:
                     raise RuntimeError('graphical command recovery output was duplicated')
                 command('zstatus', 'failed=0')
                 print('PASS graphical source/file throws clean up and accept the next command', flush=True)

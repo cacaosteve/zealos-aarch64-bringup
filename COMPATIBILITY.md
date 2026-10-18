@@ -2867,3 +2867,34 @@ handlers across yields, larger stacks, Exit/Kill and repeated error paths
 without managed-arena growth. The graphical workflow additionally loads
 private test code into the terminal task, verifies catch/recovery checks and
 an uncaught command followed by a successful corrected command.
+
+Validation: 444 full PCI checks, 362 full ISO checks and 280 NEC two-hub /
+VirtIO graphical workflow checks passed. The latter includes visible
+`Source 42`, `Nested 42`, `Task 42` and `Recovery 42` results, editing and
+saved-file execution across reboot, twelve keyboard reconnects, tablet
+recovery and removal/reattach of the whole hub tree without DMA growth.
+The inspected framebuffer is `build/source-exceptions-graphical-recovered.png`;
+the suite logs are `build/source-exceptions-pci.log`,
+`build/source-exceptions-iso.log` and `build/source-exceptions-usb.log`.
+Source-pin/overlay, Python syntax and whitespace checks passed. The Pi
+diagnostic target built; this does not add Pi hardware acceptance.
+
+The live UTM image was refreshed from `aa7ad23` after the stopped-VM backup
+at `build/utm-before-source-exceptions-20261017-213323/`. All 176 files outside
+the four managed bridge/demo paths, deletion masks and VM settings were
+preserved; the four new source-exception fixtures were added. RedSea retained
+SHA-256 `f216648875bf18c1eb122e4ad80cb8a85242e74619e424f9e9d6daac4de8d666`.
+The preservation report is `build/source-exceptions-utm-backup.json`.
+
+Live graphical `SourceExceptionChecks`, `SourceExceptionFileChecks`,
+`SourceExceptionTaskChecks` and `SourceExceptionNestedChecks` each returned
+`0x000000000000002a`. The deliberate `zc throw(42);` reported the uncaught
+code and returned to the prompt; the following nested/IRQ-state check still
+returned 42. Typing and the insertion caret were visible. Final status showed
+`ready=1 failed=0`, `compiler_recovery: errors=4 active=0`, a running desktop,
+terminal focus and USB keyboard/tablet ownership. The four recovery errors
+are the intentional test inputs. Pointer capture was left released.
+Evidence is `build/source-exceptions-utm-accepted.png` and
+`build/source-exceptions-utm-status.png`. Physical typing/pointer/drag
+acceptance remains the earlier native USB baseline; these live compiler
+checks used desktop automation.
