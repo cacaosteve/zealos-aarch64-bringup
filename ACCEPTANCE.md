@@ -569,3 +569,22 @@ appeared and the result was `0x2a` (42), completing the live system/file/popup
 launch acceptance described in [COMPATIBILITY.md](COMPATIBILITY.md).
 This confirmation precedes the dedicated System-server update; that update
 requires its own live check.
+
+2026-10-18: dedicated System-server implementation `52b27ba` passed 461 PCI,
+379 ISO, 251 graphics, 314 NEC two-hub/VirtIO graphical workflow, and 37 final
+focused root/graphical checks. UTM was backed up, refreshed and restarted;
+183 existing files outside six managed paths, deletion masks, RedSea and VM
+settings were verified unchanged. The Mac is locked, so live acceptance of
+this image remains pending. In its graphical terminal, run:
+
+```text
+zload /Tests/SystemServer.ZC
+zcall SystemServerChecks
+zcall SystemServerErrorChecks
+```
+
+Expect visible typing and two `0x000000000000002a` results. The second check
+deliberately emits one compiler error; success is its following 42 and a
+usable prompt. `zstatus` should show `system_server: running=1 separate=1`
+and `ready=1 failed=0`. Backup and scope details are in
+[COMPATIBILITY.md](COMPATIBILITY.md).

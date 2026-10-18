@@ -3073,3 +3073,14 @@ literal had itself caused a lexer error. Actual runtime throws, CLI throws,
 usable System/terminal contexts. All four private graphical checks and the
 five existing launch paths visibly returned 42. See
 `build/system-server-final-focused.log`.
+
+The live UTM image was refreshed from `52b27ba` after the stopped-VM backup
+at `build/utm-before-system-server-20261018-004117/`. All 183 existing files
+outside the six managed paths, deletion masks, RedSea bytes and VM settings
+were preserved. The refresh added `System/ServerTask.ZC` and
+`Tests/SystemServer.ZC`. RedSea retained SHA-256
+`f216648875bf18c1eb122e4ad80cb8a85242e74619e424f9e9d6daac4de8d666`.
+The preservation report is `build/system-server-utm-backup.json`.
+`utmctl` reports the refreshed VM started. The Mac is locked, so the live
+graphical boot, physical typing and System-server check are still pending;
+the earlier popup confirmation applies to the previous image.
