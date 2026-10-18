@@ -96,8 +96,13 @@ routed through the native compiler/unwind dispatcher. `Sys` and `SysFile`
 execute there; the serial shell retains its own root stack and input. System
 shares the persistent kernel namespace, has its own guest heap, directory,
 queues and compiler-context stack, and drains UI messages as upstream does.
-This does not yet replace the graphical bootstrap with `UserTaskCont`: the
-original interactive compiler/lexer interface and home startup remain open.
+The graphical terminal now runs the original `UserCmdLine`, `UserTaskCont` and
+`ExeCmdLine` control flow through a private ARM64 compiler ABI. Type ZealC
+directly, for example `40+2;`. `User;` creates another terminal with its own
+document, compiler context and history. The default per-user hook retains the
+pinned `HomeSys.ZC` welcome-document/window setup, then installs the accepted
+graphical input adapter. Full `HomeSys` desktop launch, document-backed lexing,
+autocomplete and the remaining compiler interfaces are still open.
 The bridge also maintains the upstream-visible runnable-task and parent/child
 task rings, including `TaskFocusNext` selection and child unlink on teardown.
 `TaskMathChecks`,

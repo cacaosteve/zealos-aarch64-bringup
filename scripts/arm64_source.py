@@ -74,7 +74,69 @@ extern U0 ZcUserOutputSet(U0 (*writer)(U8 *text));
 extern U0 ZcUserPutExcept();
 extern Bool ZcUserInputComplete(U8 *text);
 """
-    return (header + exe + "\n" + user).encode("utf-8")
+    # Normal user entry is separate from the compiler loop: it sets the window
+    # policy, calls the late-bound home hook and checks that it made a window.
+    start, end = "U0 UserCmdLine(I64 dummy=0)\n", "\nU0 TaskDel(CTask *task)\n"
+    if text.count(start) != 1 or text.count(end) != 1:
+        raise ValueError("expected the pinned UserCmdLine/User boundaries")
+    entry = text[text.index(start):text.index(end)]
+    for old in ('\tno_warn dummy;', 'CallExtStr("UserStartUp");',
+                'CTask\t*task = Spawn(&UserCmdLine,, "Terminal");'):
+        if entry.count(old) != 1:
+            raise ValueError(f"pinned user entry changed: {old}")
+    entry = entry.replace('\tno_warn dummy;', '\tif (dummy) {}', 1)
+    entry = entry.replace('CallExtStr("UserStartUp");',
+                          'ZcCallExtStr("UserStartUp");', 1)
+    # This port has bounded task slots. Fail before TaskWait(NULL) would wait
+    # for the caller itself when all application slots are in use.
+    entry = entry.replace('CTask\t*task = Spawn(&UserCmdLine,, "Terminal");',
+        'CTask\t*task = Spawn(&UserCmdLine,, "Terminal");\n'
+        '\n\tif (!task)\n\t\treturn NULL;', 1)
+    return (header + '\nextern I64 ZcCallExtStr(U8 *name);\n' +
+            exe + "\n" + user + "\n" + entry).encode("utf-8")
+
+
+def extract_home_startup(source: bytes) -> bytes:
+    """Keep the pinned per-user/server hooks, before HomeSys's desktop launch.
+
+    The ARM64 terminal hook calls these bodies and installs its working input
+    adapter. Do not execute StartUpTasks until autocomplete, Once and splash
+    dependencies are brought up.
+    """
+    text = source.decode('utf-8')
+    boundary = '\nU0 StartUpTasks()\n'
+    if text.count(boundary) != 1:
+        raise ValueError('expected the pinned HomeSys startup boundary')
+    hooks = text[:text.index(boundary)]
+    for name in ('UserStartUp', 'ServerStartUp'):
+        signature = 'U0 ' + name + '()'
+        if hooks.count(signature) != 1:
+            raise ValueError('pinned HomeSys hook changed: ' + name)
+        hooks = hooks.replace(signature, 'U0 BootstrapHome' + name + '()', 1)
+    if hooks.count('Type("::/Doc/Start.DD");') != 1 or hooks.count('\tDir;') != 1:
+        raise ValueError('pinned HomeSys user document/directory setup changed')
+    return ('// HomeSys per-task hooks; desktop StartUpTasks is not executed.\n' +
+            hooks).encode('utf-8')
+
+
+def translate_docterm(source: bytes) -> bytes:
+    """Evaluate the title length in ZealC before the bounded document lexer."""
+    old = 'LEN=STR_LEN-1,A=\\"%%s...\\",SCX=15$$");'
+    new = 'LEN=%d,A=\\"%%s...\\",SCX=15$$", STR_LEN - 1);'
+    text = source.decode('utf-8')
+    if text.count(old) != 1:
+        raise ValueError('pinned DocBorderNew title length changed')
+    return text.replace(old, new, 1).encode('utf-8')
+
+
+def translate_doced(source: bytes) -> bytes:
+    """Use the same evaluated title length in the editor's border document."""
+    old = 'LEN=STR_LEN-1,A=\\"%%s\\"$$");'
+    new = 'LEN=%d,A=\\"%%s\\"$$", STR_LEN - 1);'
+    text = source.decode('utf-8')
+    if text.count(old) != 1:
+        raise ValueError('pinned DocEd title length changed')
+    return text.replace(old, new, 1).encode('utf-8')
 
 
 def extract_server_task(source: bytes) -> bytes:

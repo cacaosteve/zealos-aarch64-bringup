@@ -46,6 +46,8 @@ p.add_argument('--probe-system-server', action='store_true',
                help='check the dedicated original ServerTaskCont loop and shared system namespace')
 p.add_argument('--probe-user-command', action='store_true',
                help='check original ExeCmdLine/UserTaskCont through the ARM64 compiler ABI')
+p.add_argument('--probe-user-startup', action='store_true',
+               help='check original User/UserCmdLine, HomeSys hooks and independent graphical terminals')
 p.add_argument('--probe-source-exceptions', action='store_true',
                help='check catchable source/file errors, native cleanup and command/job recovery')
 p.add_argument('--probe-winmgr', action='store_true',
@@ -115,7 +117,10 @@ if args.probe_live_window_control and not (
         args.probe_grscreen and args.probe_live_winmgr):
     p.error('--probe-live-window-control requires --probe-module /System/Win.ZC '
             '--probe-winmgr --probe-grscreen --probe-live-winmgr')
-log_path = ROOT / 'build' / (f'check-usb-{usb_label}.log' if args.usb_input else
+log_path = ROOT / 'build' / (f'check-usb-{usb_label}{"-user-startup" if args.probe_user_startup else ""}.log' if args.usb_input else
+                             'check-user-startup-pci.log' if args.probe_user_startup and args.pci else
+                             'check-user-startup-iso.log' if args.probe_user_startup else
+                             'check-gui-workflow.log' if args.probe_gui_workflow else
                              'check-live-window-control.log' if args.probe_live_window_control else
                              'check-window-buttons.log' if args.probe_window_buttons else
                              'check-winmgr-live.log' if args.probe_live_winmgr else
@@ -201,8 +206,18 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         result = bytes(buf[:end]); del buf[:end]
         return result.decode(errors='replace')
     def command(line, expected, timeout=120):
-        guest.stdin.write((line+'\r').encode()); guest.stdin.flush()
-        result = until(b'\n> ', timeout=timeout)
+        # A full DolDoc refresh can keep the cooperative guest away from its
+        # UART for longer than a host pipe write. Wait for each small echoed
+        # byte before sending more, so long diagnostics cannot overrun the
+        # emulated PL011 receive FIFO while several windows are painting.
+        result = ''
+        encoded = line.encode()
+        for start in range(len(encoded)):
+            chunk = encoded[start:start+1]
+            guest.stdin.write(chunk); guest.stdin.flush()
+            result += until(chunk, timeout=timeout)
+        guest.stdin.write(b'\r'); guest.stdin.flush()
+        result += until(b'\n> ', timeout=timeout)
         if expected not in result: raise RuntimeError(f'{line}: missing {expected!r}\n{result}')
         print(f'PASS {line}: {expected}', flush=True)
         return result
@@ -549,11 +564,62 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         if not redraw_count or int(redraw_count.group(1), 16) == 0:
             raise RuntimeError('boot compositor has not redrawn the terminal document:\n' + redraws)
         print(f'PASS boot terminal document redraws: {int(redraw_count.group(1), 16)}', flush=True)
+        if args.probe_user_startup:
+            focus_graphical_terminal()
+            command('zload /Tests/UserStartUp.ZC', 'zc: loaded /Tests/UserStartUp.ZC')
+            command('zcall UserStartUpChecks', 'zc => 0x000000000000002a')
         visible_text = command('zcall BootstrapGuiTerminalTextPixelCount', 'zc => 0x')
         text_pixels = re.search(r'zc => 0x([0-9a-fA-F]+)', visible_text)
         if not text_pixels or int(text_pixels.group(1), 16) < 100:
+            graphical_screen('boot-text-failure')
             raise RuntimeError('boot graphical terminal has no visible document text pixels:\n' + visible_text)
         print(f'PASS boot graphical terminal visible text pixels: {int(text_pixels.group(1), 16)}', flush=True)
+        if args.probe_user_startup:
+            for check in ('HookChecks', 'CapacityChecks', 'SleepFairnessChecks', 'FrameLockChecks'):
+                command('zcall UserStartUp'+check, 'zc => 0x000000000000002a', timeout=30)
+            before = command('zstatus', 'failed=0')
+            for _ in range(3):
+                command('zcall UserStartUpCapacityChecks', 'zc => 0x000000000000002a', timeout=30)
+            after = command('zstatus', 'failed=0')
+            heap = r'data=([0-9/]+) code=([0-9/]+) allocations=([0-9]+)'
+            if re.search(heap,before).groups() != re.search(heap,after).groups():
+                raise RuntimeError('repeated user terminal creation/teardown leaked managed memory')
+            print('PASS HomeSys document startup, late-bound hooks, prompt readiness, task capacity and exact cleanup', flush=True)
+            if args.probe_gui_keyboard:
+                command('zcall UserStartUpOpenChecks', 'zc => 0x000000000000002a', timeout=30)
+                move_graphical_pointer(600,360)
+                # User() leaves its new task focused; type through real devices.
+                qmp_send_text('Print("Second %d\\n",40+2);')
+                typed = require_graphical_text('user-second-typing','Print("Second %d\\n",40+2);')
+                require_graphical_caret(typed,'Print("Second %d\\n",40+2);')
+                qmp_send_key('ret')
+                require_graphical_text('user-second-answer','Second 42')
+                qmp_send_key('up')
+                require_graphical_text('user-second-history','> Print("Second')
+                qmp_send_key('down')
+                require_graphical_text('user-second-cleared','Second 42')
+                focus_graphical_terminal()
+                qmp_send_key('up')
+                command('zc Print("history_isolated=%d\\n",BootstrapGuiTerminalState(bootstrap_gui_terminal_task)->history_len==0);',
+                        'history_isolated=1')
+                qmp_send_text('Print("First %d\\n",40+2);')
+                typed = require_graphical_text('user-first-typing','Print("First %d\\n",40+2);')
+                require_graphical_caret(typed,'Print("First %d\\n",40+2);')
+                qmp_send_key('ret')
+                require_graphical_text('user-first-answer','First 42')
+                command('zc Print("second_state=%d/%X z=%d win=%d,%d,%d,%d\\n",TaskValidate(user_startup_second),user_startup_second->display_flags,user_startup_second->win_z_num,user_startup_second->win_left,user_startup_second->win_right,user_startup_second->win_top,user_startup_second->win_bottom);',
+                        'second_state=')
+                command('zc Print("second_doc=%X/%X top=%d x=%d y=%d scroll=%d,%d\\n",user_startup_second->display_doc->flags,user_startup_second->display_doc->locked_flags,user_startup_second->display_doc->top_line_num,user_startup_second->display_doc->x,user_startup_second->display_doc->y,user_startup_second->scroll_x,user_startup_second->scroll_y);',
+                        'second_doc=')
+                screen = require_graphical_text('user-both-terminals','Second 42')
+                target = ROOT/'build'/('user-startup-usb-graphical.ppm' if args.usb_input else 'user-startup-graphical.ppm')
+                shutil.copyfile(graphical_path('user-both-terminals'),target)
+                command('zcall UserStartUpCloseChecks', 'zc => 0x000000000000002a')
+                focus_graphical_terminal()
+                qmp_send_text('40+2;'); require_graphical_text('user-primary-recovery','> 40+2;')
+                qmp_send_key('ret'); require_graphical_text('user-primary-answer','=42')
+                print('PASS independent visible typing, output, history and prompt recovery in two original User terminals', flush=True)
+            raise SystemExit(0)
         if args.probe_user_command:
             command('zload /Tests/UserCommand.ZC', 'zc: loaded /Tests/UserCommand.ZC')
             for check in ('InputChecks','Checks','ErrorChecks','LoopChecks','TaskChecks','KillChecks'):
@@ -926,6 +992,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     'zc => 0x0000000000000001')
             editor_open = command('zstatus', 'gui_editor_active=')
             if 'gui_editor_active=1' not in editor_open:
+                graphical_screen('editor-open-failure')
                 raise RuntimeError('GUI editor returned before accepting input:\n' + editor_open)
             if 'keyboard_focus=Terminal' not in editor_open:
                 raise RuntimeError('GUI editor lost the focused terminal task:\n' + editor_open)

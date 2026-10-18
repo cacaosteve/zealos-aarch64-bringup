@@ -3178,3 +3178,105 @@ CLI reports the refreshed VM started. After unlocking, the user physically
 typed `40+2;` without a `zc` prefix and confirmed visible characters and an
 answer of 42. This completes live command-loop acceptance. No new pointer or
 status-diagnostic check is implied by this text confirmation.
+
+## Original user entry and per-user HomeSys setup — 2026-10-18
+
+`System/UserTask.ZC` now also derives the original `UserCmdLine` and `User`
+bodies from pinned `KTask.ZC`. Normal graphical boot enters `UserCmdLine`;
+`User;` creates another terminal, waits for its input prompt and returns its
+task pointer. The entry retains the upstream window policy, late-bound
+`UserStartUp` call, display check and `UserTaskCont`. Its overlays remove the
+unsupported warning directive, redirect `CallExtStr` to the existing native
+lookup and return NULL when bounded task slots are exhausted instead of
+waiting on the caller through `TaskWait(NULL)`.
+
+`HomeSys.ZC` and `Doc/Start.DD` were pinned from the existing upstream commit
+`eee210f4379ba3d00b47507f336a158eefb2c993`. A guarded extraction supplies the
+unchanged per-user/server hook bodies under private names in
+`System/HomeStartUp.ZC`; the ARM64 `UserStartUp` wrapper calls the per-user
+body before installing the accepted keyboard/editor/output adapters. This
+creates the normal terminal document and border, inserts the welcome document,
+shows/raises the window and lists the current directory. The server hook is
+available but is not installed on the headless System service. `StartUpTasks`
+is not executed: automatic desktop tiling, `Once`, autocomplete and splash
+startup remain future work. This is not full `HomeSys` or `StartOS` boot.
+
+The single source volume now accepts `::/` at its public path boundary as
+the boot-volume root. Other drive letters and home-directory resolution are
+unchanged. `System/SourceDir.ZC` lists the existing merged source namespace
+using `FilesFind`, with names, synthesized directories and file sizes. It loads
+after DolDoc so its calls use the real printer. Disk dates, clusters and the
+upstream `Dir` presentation are not implemented by this adapter.
+
+Welcome insertion exposed a DolDoc load-order defect: the first `DocPutS`
+compilation retained the early `ParseDollarCmd` stand-in even after `DocPlain`
+loaded. Startup now recompiles the printer after the real parser exists,
+before loading `DocFile`. Parsed text, links and foreground/background commands
+then survive insertion instead of becoming error entries or black text.
+The bounded formatter gained `%h*c` packed-character repetition, string
+alignment/truncation, `%Z` through the current task's `DefineSub`, and `%$Q` /
+`%$$Q` dollar escaping for document serialization. These additions do not claim
+the full upstream formatter. Guarded `DocTerm` and `DocEd` overlays evaluate
+the title length `STR_LEN - 1` in ZealC and pass the resulting integer in the
+document tag, avoiding an unsupported expression in the document lexer.
+
+Terminal histories now live in a fixed registry keyed by both task address and
+generation. Task-slot reuse clears stale history. Each terminal retains
+its own document and native compiler session. The source frame adapter redraws
+every registered terminal; the caret follows the focused terminal. The input
+reader publishes idle/prompt readiness only while waiting, clears those flags
+when processing events, and restores them on return or an exception. Explicit
+graphical shutdown kills all registered user terminals before restarting the
+bootstrap. Native USB configuration and routing were not changed.
+
+Guest definition tables now inherit the parent's table, alongside the already
+inherited compiler namespace. Without this link, DolDoc callbacks in user or
+window-manager tasks could not find the root's `ST_DOC_CMDS` list and threw
+an undefined-definition exception. Local tables remain distinct and are
+reclaimed with their tasks. The early native key-output bridge now recognizes
+all registered terminals, including secondary terminal editors.
+
+The frame boundary also resolves the completed source `WinZBufUpdate` before
+drawing. The earlier frame helpers retained their forward binding, leaving
+the full-screen occlusion cells from a newly created terminal after its
+geometry changed. A rear terminal could then be clipped even when the two
+windows no longer overlapped. The framebuffer transaction rejects recursive
+entry and keeps a source `Yield` from saving the borrowed root identity onto
+the window-manager stack; the document lock deadline still advances and can
+skip a locked document. The acceptance fixture holds a document lock across
+a frame and verifies that the shell resumes and the owner releases it.
+Expired `SleepUntil` calls now yield once for a child task outside a frame.
+Without that slice, a window manager whose document redraw exceeded its
+refresh period could monopolize this cooperative scheduler indefinitely:
+frames continued while serial input stalled and device-key queues filled.
+A staged worker test verifies that an already-expired sleep lets another task
+run before the worker continues.
+
+Repeated terminal creation also exposed an older ownership bug: per-terminal
+`KeyDevInit` reset a global hook queue, leaked System-owned entries and left
+its arrays on a terminal's reclaimable heap. Device initialization and the
+DolDoc output hook now run once from the persistent root context. `KeyDev.ZC`
+is recompiled after the real `User` definition so its terminal shortcut also
+uses the original task entry.
+
+`make check-user-startup` checks welcome/document setup, formatter operations,
+late-bound startup replacement, prompt readiness, independent task resources,
+bounded capacity and repeated creation/teardown without managed arena growth.
+Device tests inspect actual scanout for input, answers, carets and separate
+histories in two terminals, then close the second and execute another command
+in the first.
+
+Validation on 2026-10-18 passed 42 focused PCI startup checks, 45 native USB
+startup checks with NEC xHCI, two hubs and duplicate VirtIO input devices,
+379 ISO compatibility checks, 219 PCI graphical workflow checks and 36 original
+command-loop regression checks. The graphical gates inspect visible characters,
+carets and answers, independent histories, editor save/compile/run/reboot/reopen,
+and recovery after parser/runtime errors. Upstream integrity, guarded overlays,
+Python syntax, installer shell syntax and whitespace checks also passed. Logs
+are `build/user-startup-{pci,usb,iso,workflow,command-regression}.log`.
+
+The existing UTM bundle was stopped and copied to
+`build/utm-before-user-startup-20261018-124630/` before refresh. The backup
+report is `build/user-startup-utm-backup.json`. The new per-user startup path
+still requires its own live UTM check; the earlier physical `40+2;` acceptance
+applies to the preceding command-loop milestone.

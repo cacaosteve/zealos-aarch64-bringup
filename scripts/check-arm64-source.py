@@ -4,10 +4,20 @@ from pathlib import Path
 import re
 import sys
 
-from arm64_source import (extract_server_task, extract_user_task, translate_docfind, translate_docform, translate_docpopup, translate_grbitmap,
+from arm64_source import (extract_home_startup, extract_server_task, extract_user_task, translate_docterm, translate_doced, translate_docfind, translate_docform, translate_docpopup, translate_grbitmap,
                           translate_grdc, translate_grscreen, translate_ktask, translate_winmgr)
 
 root = Path(__file__).resolve().parent.parent
+docterm = (root / 'upstream/pinned/System/DolDoc/DocTerm.ZC').read_bytes()
+assert b'SCX=15$$", STR_LEN - 1);' in translate_docterm(docterm)
+try:
+    translate_docterm(docterm.replace(b'LEN=STR_LEN-1', b'LEN=other'))
+except ValueError:
+    pass
+else:
+    raise AssertionError('DocTerm overlay accepted a changed title length')
+doced = (root / 'upstream/pinned/System/DolDoc/DocEd.ZC').read_bytes()
+assert b'", STR_LEN - 1);' in translate_doced(doced)
 source = (root / 'upstream/pinned/System/Gr/GrScreen.ZC').read_bytes()
 translated = translate_grscreen(source)
 text = translated.decode('utf-8')
@@ -109,6 +119,22 @@ for anchor in (b'UserTaskCont()', b'I64 ExeCmdLine(CCompCtrl *cc)',
     assert anchor in user_slice, anchor
 assert user_slice.count(b'Free(old_task_title);') == 2
 assert b'ServerTaskCont' not in user_slice
+assert b'U0 UserCmdLine(I64 dummy=0)' in user_slice
+assert b'ZcCallExtStr("UserStartUp");' in user_slice
+assert b'CTask *User(U8 *format=NULL, ...)' in user_slice
+assert b'if (!task)\n\t\treturn NULL;' in user_slice
+home_source = (root / 'upstream/pinned/HomeSys.ZC').read_bytes()
+home_hooks = extract_home_startup(home_source)
+assert b'StartUpTasks;' not in home_hooks
+for name in (b'UserStartUp', b'ServerStartUp'):
+    assert b'U0 BootstrapHome' + name + b'()' in home_hooks
+assert b'Type("::/Doc/Start.DD");' in home_hooks
+try:
+    extract_home_startup(home_source.replace(b'Type("::/Doc/Start.DD");', b'Type("other");'))
+except ValueError:
+    pass
+else:
+    raise AssertionError('HomeSys extraction accepted a changed startup document')
 try:
     extract_user_task(ktask_source.replace(b'LexStatement2Bin(cc, &type)', b'OtherCompiler(cc)', 1))
 except ValueError:

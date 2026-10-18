@@ -7,7 +7,7 @@ from pathlib import Path
 import sys
 import tarfile
 
-from arm64_source import (extract_server_task, extract_user_task, translate_docfind, translate_docform, translate_docpopup, translate_grbitmap,
+from arm64_source import (extract_home_startup, extract_server_task, extract_user_task, translate_docterm, translate_doced, translate_docfind, translate_docform, translate_docpopup, translate_grbitmap,
                           translate_grdc, translate_grscreen, translate_ktask, translate_mathode,
                           translate_winmgr)
 
@@ -19,6 +19,8 @@ for name, expected in manifest['files'].items():
     data = (root / 'upstream/pinned' / rel).read_bytes()
     if hashlib.sha256(data).hexdigest() != expected:
         raise SystemExit(f'Pinned source changed: {name}')
+    if rel == 'HomeSys.ZC':
+        entries['System/HomeStartUp.ZC'] = extract_home_startup(data)
     if rel == 'System/Gr/GrScreen.ZC':
         try:
             data = translate_grscreen(data)
@@ -56,6 +58,10 @@ for name, expected in manifest['files'].items():
             data = translate_docfind(data)
         except ValueError as exc:
             raise SystemExit(f'ARM64 source overlay no longer applies: {exc}') from exc
+    elif rel == 'System/DolDoc/DocTerm.ZC':
+        data = translate_docterm(data)
+    elif rel == 'System/DolDoc/DocEd.ZC':
+        data = translate_doced(data)
     elif rel == 'Kernel/KTask.ZC':
         entries['System/ServerTask.ZC'] = extract_server_task(data)
         entries['System/UserTask.ZC'] = extract_user_task(data)

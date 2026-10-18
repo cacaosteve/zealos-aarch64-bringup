@@ -1,0 +1,169 @@
+// Normal user-task entry, HomeSys document setup and independent terminals.
+CTask *user_startup_second;
+I64 user_startup_hook_calls;
+Bool user_startup_doc_locked;
+I64 user_startup_sleep_stage;
+
+U0 UserStartUpLateSleep(I64 unused)
+{
+    if (unused) {}
+    user_startup_sleep_stage = 1;
+    SleepUntil(0);
+    user_startup_sleep_stage = 2;
+    SleepUntil(0);
+    user_startup_sleep_stage = 3;
+}
+
+I64 UserStartUpSleepFairnessChecks()
+{
+    I64 result = 42;
+    user_startup_sleep_stage = 0;
+    CTask *worker = Spawn(&UserStartUpLateSleep);
+    if (!worker) return 1;
+    Yield;
+    if (user_startup_sleep_stage != 1) result = 2;
+    Yield;
+    if (user_startup_sleep_stage != 2) result = 3;
+    DeathWait(&worker);
+    if (user_startup_sleep_stage != 3) result = 4;
+    return result;
+}
+
+U0 UserStartUpHoldDoc(I64 unused)
+{
+    if (unused) {}
+    CDoc *doc = bootstrap_gui_terminal_task->display_doc;
+    DocLock(doc);
+    user_startup_doc_locked = TRUE;
+    Sleep(50);
+    DocUnlock(doc);
+}
+
+I64 UserStartUpFrameLockChecks()
+{
+    CTask *holder = Spawn(&UserStartUpHoldDoc);
+    if (!holder) return 1;
+    while (!user_startup_doc_locked) Yield;
+    ZcTaskFrameRun;
+    DeathWait(&holder);
+    if (bootstrap_gui_terminal_task->display_doc->locked_flags) return 2;
+    return 42;
+}
+
+Bool UserStartUpDocumentHas(CTask *task, U8 *needle)
+{
+    I64 size;
+    Bool found;
+    U8 *saved = DocSave(task->put_doc, &size);
+    if (!saved) return FALSE;
+    found = StrMatch(needle, saved) != NULL;
+    Free(saved);
+    return found;
+}
+
+I64 UserStartUpChecks()
+{
+    CTask *term = bootstrap_gui_terminal_task;
+    U8 *repeat = MStrPrint("a%h*cb%h*cc", 3, 'XY', 0, 'Z');
+    if (StrCompare(repeat, "aXYXYXYbc")) return 5;
+    Free(repeat);
+    repeat = MStrPrint("%Z", WHITE, "ST_COLORS");
+    if (StrCompare(repeat, "WHITE")) return 6;
+    Free(repeat);
+    repeat = MStrPrint("%$$Q", "a\"b");
+    if (StrCompare(repeat, "a\\\"b")) return 7;
+    Free(repeat);
+    repeat = MStrPrint("[%-3ts][%4s]", "abcdef", "xy");
+    if (StrCompare(repeat, "[abc][  xy]")) return 8;
+    Free(repeat);
+    U8 *path = FileNameAbs("::/Doc/Start.DD");
+    if (!path || StrCompare(path, "/Doc/Start.DD")) return 1;
+    Free(path);
+    if (!TaskValidate(term) || !BootstrapGuiTerminalState(term) ||
+        term->win_inhibit != WIG_USER_TASK_DEFAULT ||
+        !Bt(&term->display_flags, DISPLAYf_SHOW) ||
+        !term->put_doc || !term->display_doc || !term->border_doc) return 2;
+    if (term->hash_table == Fs->hash_table ||
+        HashFind("ST_DOC_CMDS", term->hash_table, HTT_DEFINE_STR) !=
+        HashFind("ST_DOC_CMDS", Fs->hash_table, HTT_DEFINE_STR)) return 9;
+    if (!UserStartUpDocumentHas(term, "Public Domain Operating System") ||
+        !UserStartUpDocumentHas(term, "Directory of /") ||
+        !UserStartUpDocumentHas(term, "ZealOS ARM64 graphical terminal")) return 3;
+    if (!ZcTaskWaitTimeout(term, 100, TRUE)) return 4;
+    return 42;
+}
+
+I64 UserStartUpOpenChecks()
+{
+    CTask *first = bootstrap_gui_terminal_task;
+    if (TaskValidate(user_startup_second)) return 1;
+    user_startup_second = User;
+    if (!TaskValidate(user_startup_second)) return 2;
+    if (user_startup_second == first || user_startup_second->put_doc == first->put_doc ||
+        user_startup_second->border_doc == first->border_doc ||
+        user_startup_second->last_cc == first->last_cc ||
+        BootstrapGuiTerminalState(user_startup_second) == BootstrapGuiTerminalState(first)) return 3;
+    if (!UserStartUpDocumentHas(user_startup_second, "Public Domain Operating System") ||
+        !ZcTaskWaitTimeout(user_startup_second, 100, TRUE)) return 4;
+    // Leave both clients visible for real device-key and caret assertions.
+    WinHorz(2, 46, first); WinVert(3, 25, first);
+    WinHorz(50, 96, user_startup_second); WinVert(29, 58, user_startup_second);
+    WinToTop(user_startup_second);
+    return 42;
+}
+
+I64 UserStartUpCloseChecks()
+{
+    if (!TaskValidate(user_startup_second) || !Kill(user_startup_second)) return 1;
+    user_startup_second = NULL;
+    WinHorz(4, 70, bootstrap_gui_terminal_task);
+    WinVert(4, 34, bootstrap_gui_terminal_task);
+    WinToTop(bootstrap_gui_terminal_task);
+    return 42;
+}
+
+I64 UserStartUpHookChecks()
+{
+    CTask *term;
+    I64 i, result = 42;
+    user_startup_hook_calls = 0;
+    // Hooks are resolved when a new task starts, not captured at boot.
+    Sys("U0 UserStartUp(){BootstrapGuiTerminalUserStartUp;if(DefineCount(\"ST_DOC_CMDS\")==DOCT_TYPES_NUM)user_startup_hook_calls++;}");
+    try
+    {
+        for (i = 0; i < 4; i++)
+        {
+            term = User;
+            if (!TaskValidate(term)) { result = 1; break; }
+            if (!BootstrapGuiTerminalState(term) || !Kill(term)) { result = 2; break; }
+        }
+    }
+    catch
+    {
+        Sys("U0 UserStartUp(){BootstrapGuiTerminalUserStartUp;}");
+    }
+    Sys("U0 UserStartUp(){BootstrapGuiTerminalUserStartUp;}");
+    WinToTop(bootstrap_gui_terminal_task);
+    if (user_startup_hook_calls != 4) return 3;
+    return result;
+}
+
+I64 UserStartUpCapacityChecks()
+{
+    CTask *terms[4];
+    I64 i, result = 42;
+    MemSet(terms, 0, sizeof(terms));
+    for (i = 0; i < 4; i++)
+    {
+        terms[i] = User;
+        if (!TaskValidate(terms[i])) break;
+    }
+    // The source window manager also occupies an application slot. Probe the
+    // remaining capacity instead of counting reserved services as free slots.
+    if (i < 1 || i > 3) result = 1;
+    if (i < 4 && User != NULL) result = 2;
+    for (i = 0; i < 4; i++)
+        if (TaskValidate(terms[i])) Kill(terms[i]);
+    WinToTop(bootstrap_gui_terminal_task);
+    return result;
+}

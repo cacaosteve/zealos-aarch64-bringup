@@ -680,6 +680,9 @@ static int guest_path(const char *path, char out[134]) {
         return -1;
     int disk = !strncmp(path, "disk:", 5);
     const char *src = path + (disk ? 5 : 0);
+    /* ZealOS's boot-drive root shorthand names the single source volume.
+     * Other drive letters still require mounted-drive services. */
+    if (!disk && !strncmp(src, "::/", 3)) src += 2;
     size_t length = strlen(src);
     if (length >= 128 || strchr(src, ':') || strchr(src, '\\'))
         return -1;
@@ -1551,6 +1554,8 @@ static int guest_source_full_screen_active(void) {
     return global && global->data_addr && *(uint64_t *)global->data_addr;
 }
 static int64_t guest_task_frame_run(void) {
+    if (guest_task_frame_active)
+        return 0;
     uint8_t *surface = guest_graphics_surface();
     uint32_t *rgba = guest_graphics_rgba_surface();
     CHashFun *present;
@@ -1566,6 +1571,14 @@ static int64_t guest_task_frame_run(void) {
     set_guest_task(guest_fibers[0].words);
     guest_task_frame_active = 1;
     guest_task_frame_rgba_ready = 0;
+    /* TaskBridge's frame helpers are emitted before WinZBufUpdate's body.
+     * Resolve the completed source function here so geometry/focus changes
+     * cannot leave the previous full-screen window's occlusion cells behind. */
+    CHashFun *z_update = (CHashFun *)HashFind(
+        "WinZBufUpdate", Fs->hash_table, HTT_FUN, 1);
+    if (z_update && z_update->fun_ptr && !z_update->argc &&
+        !(z_update->base.base.type & HTF_EXTERN))
+        FFI_CALL_TOS_0(z_update->fun_ptr);
     FFI_CALL_TOS_0(guest_winmgr_tick_fun->fun_ptr);
     /* The source incremental screen pass must finish in the staging buffer
      * before scanout. Running it after frame_end caused visible pixel-by-pixel
@@ -1685,7 +1698,7 @@ static int64_t host_gr_screen_update(int64_t *a) {
 static int64_t host_gr_update_task_win(int64_t *a) {
     CHashFun *draw;
     CHashFun *redraw;
-    CHashGlblVar *terminal_task;
+    CHashFun *terminal_state;
     if (!Fs || !Fs->hash_table || !a[0])
         return 0;
     draw = (CHashFun *)HashFind("GrUpdateTaskWin", Fs->hash_table,
@@ -1696,15 +1709,16 @@ static int64_t host_gr_update_task_win(int64_t *a) {
     FFI_CALL_TOS_1(draw->fun_ptr, a[0]);
     /* The graphics modules are loaded before DolDoc during boot. Keep the
      * normal GrUpdateTaskWin path, then explicitly run the fully loaded
-     * document renderer for the boot graphical terminal. This makes the
-     * first visible terminal frame independent of early forward stubs. */
+     * document renderer for every registered user terminal. This makes their
+     * visible frames independent of early forward stubs. */
     if (gui_terminal_active) {
-        terminal_task = (CHashGlblVar *)HashFind(
-            "bootstrap_gui_terminal_task", Fs->hash_table, HTT_GLBL_VAR, 1);
+        terminal_state = (CHashFun *)HashFind(
+            "BootstrapGuiTerminalState", Fs->hash_table, HTT_FUN, 1);
         redraw = (CHashFun *)HashFind("BootstrapGuiTerminalRedraw",
                                      Fs->hash_table, HTT_FUN, 1);
-        if (terminal_task && terminal_task->data_addr &&
-            *(void **)terminal_task->data_addr == (void *)(uintptr_t)a[0] &&
+        if (terminal_state && terminal_state->fun_ptr && terminal_state->argc == 1 &&
+            !(terminal_state->base.base.type & HTF_EXTERN) &&
+            FFI_CALL_TOS_1(terminal_state->fun_ptr, a[0]) &&
             redraw && redraw->fun_ptr && redraw->argc == 1 &&
             !(redraw->base.base.type & HTF_EXTERN))
             FFI_CALL_TOS_1(redraw->fun_ptr, a[0]);
@@ -1778,6 +1792,14 @@ static int64_t host_doc_recalc(int64_t *a) {
     return FFI_CALL_TOS_2(fun->fun_ptr, a[0], a[1]);
 }
 static int64_t host_doc_update_task_docs(int64_t *a) {
+    if (gui_terminal_active) {
+        CHashFun *available = (CHashFun *)HashFind(
+            "BootstrapGuiTerminalDocumentsAvailable", Fs->hash_table, HTT_FUN, 1);
+        if (available && available->fun_ptr && available->argc == 1 &&
+            !(available->base.base.type & HTF_EXTERN) &&
+            !FFI_CALL_TOS_1(available->fun_ptr, a[0]))
+            return 1;
+    }
     CHashFun *fun = (CHashFun *)HashFind(
         "DocUpdateTaskDocs", Fs->hash_table, HTT_FUN, 1);
     if (!fun || !fun->fun_ptr || fun->argc != 1 ||
@@ -2262,6 +2284,7 @@ static struct guest_fiber *guest_popup_child(struct guest_fiber *parent) {
         ? child : NULL;
 }
 static int64_t host_task_yield(int64_t *a);
+static int64_t host_time_cal(int64_t *a);
 static int64_t host_rflags_get(int64_t *a);
 static int64_t host_rflags_set(int64_t *a);
 static int64_t host_jobs_handler(int64_t *a);
@@ -2581,8 +2604,14 @@ static void init_guest_fiber(unsigned i, void *parent, const char *name) {
     *(void **)(words + guest_data_heap_off) = heap;
     *(void **)(words + guest_code_heap_off) = heap;
     /* Guest DEFINE/FramePtr tables are separate from the Aiwnios compiler
-     * hash. HashTableNew's CHash/CHashTable layout matches ZealOS. */
-    *(void **)(words + guest_hash_table_off) = HashTableNew(1024, &f->heap_owner);
+     * hash. Inherit the parent's definitions just as compiler names do;
+     * DolDoc callbacks need the root's ST_DOC_CMDS and related lists.
+     * HashTableNew's CHash/CHashTable layout matches ZealOS. */
+    CHashTable *guest_hash = HashTableNew(1024, &f->heap_owner);
+    if (parent)
+        guest_hash->next = *(CHashTable **)((unsigned char *)parent +
+                                           guest_hash_table_off);
+    *(void **)(words + guest_hash_table_off) = guest_hash;
     memcpy(heap + guest_heap_sig_off, "HcSV", 4);
     *(void **)(heap + guest_heap_task_off) = words;
     f->irq_flags_live = 1u << 9; /* IF enabled until CLI/RFlagsSet. */
@@ -3089,6 +3118,16 @@ static int64_t host_kill(int64_t *a) {
 }
 static int64_t host_task_yield(int64_t *a) {
     (void)a;
+    /* A frame can borrow root's identity while running on WinMgr's stack.
+     * Saving a scheduler context here would replace root's suspended shell
+     * context with that borrowed stack. Let DocRecalc's short lock deadline
+     * advance and bail out; the owning task can finish after the frame. */
+    if (guest_task_frame_active) {
+        if (guest_focus_task)
+            poll_guest_keys();
+        (void)host_time_cal(NULL);
+        return 0;
+    }
     if (guest_task_exe_active)
         zc_fail("yield during job dispatch is unsupported");
     unsigned me = guest_current;
@@ -3457,10 +3496,12 @@ static int64_t host_put_key(int64_t *a) {
      * device, honor that real output chain (including editor/navigation keys)
      * instead of sending its input to the hidden bootstrap text console. */
     if (gui_terminal_active && guest_keydev_put_key) {
-        CHashGlblVar *terminal = (CHashGlblVar *)HashFind(
-            "bootstrap_gui_terminal_task", Fs->hash_table, HTT_GLBL_VAR, 1);
-        if (terminal && terminal->data_addr &&
-            *(void **)terminal->data_addr == guest_fibers[guest_current].words) {
+        CHashFun *terminal = (CHashFun *)HashFind(
+            "BootstrapGuiTerminalState", Fs->hash_table, HTT_FUN, 1);
+        if (terminal && terminal->fun_ptr && terminal->argc == 1 &&
+            !(terminal->base.base.type & HTF_EXTERN) &&
+            FFI_CALL_TOS_1(terminal->fun_ptr,
+                           (int64_t)(uintptr_t)guest_fibers[guest_current].words)) {
             FFI_CALL_TOS_2(guest_keydev_put_key, a[0], a[1]);
             return 0;
         }
@@ -4262,8 +4303,15 @@ static int64_t host_sleep_until(int64_t *a) {
     uint64_t milliseconds, seconds, ticks, deadline;
     int64_t now_jiffies = host_monotonic_ns(NULL) / 1000000;
     guest_counts.jiffies = now_jiffies;
-    if (a[0] <= now_jiffies)
+    if (a[0] <= now_jiffies) {
+        /* Real ZealOS can preempt a late window-manager refresh. This
+         * cooperative scheduler must still offer a task slice when a frame
+         * has already missed its deadline, or WinMgr can render forever
+         * without letting the shell or input-owning terminal run. */
+        if (guest_task_bound && guest_current && !guest_task_frame_active)
+            (void)host_task_yield(NULL);
         return 0;
+    }
     milliseconds = (uint64_t)(a[0] - now_jiffies);
     __asm__ volatile("mrs %0, cntfrq_el0" : "=r"(frequency));
     if (!frequency)
@@ -5235,10 +5283,44 @@ static size_t format_text(char *output, size_t capacity, const char *format,
         size_t spec = i + 1;
         int precision = 1;
         int has_precision = 0;
-        /* ZealOS formats commonly use %0.3f. Width is parsed and ignored
-         * for now; precision controls the emitted fractional digits. */
-        while (format[spec] >= '0' && format[spec] <= '9')
+        int left = 0, truncate = 0, escape_dollars = 0;
+        size_t width = 0;
+        /* ZealOS height repeat, used unchanged by DocType after inserting a
+         * file. Repeat the whole packed character value, not just its low
+         * byte. Check the total before looping so zero/huge counts are bounded. */
+        if (format[spec] == 'h' && format[spec + 1] == '*' &&
+            (format[spec + 2] == 'c' || format[spec + 2] == 'C')) {
+            if (arg + 2 > argc) zc_fail("format needs repeat and character arguments");
+            int64_t count = argv[arg++];
+            uint64_t packed = (uint64_t)argv[arg++];
+            unsigned length = 0;
+            while (length < 8 && (unsigned char)(packed >> (length * 8))) length++;
+            if (count > 0 && length) {
+                if ((uint64_t)count > (capacity - 1 - used) / length)
+                    zc_fail("formatted text exceeds buffer");
+                for (int64_t repeat = 0; repeat < count; repeat++)
+                    for (unsigned byte = 0; byte < length; byte++)
+                        FMT_BYTE(packed >> (byte * 8));
+            }
+            i = spec + 3;
+            continue;
+        }
+        if (format[spec] == '-') { left = 1; spec++; }
+        /* String width/truncation is needed by the original border callbacks.
+         * Numeric width remains outside this formatter's current subset. */
+        if (format[spec] == '*') {
+            if (arg >= argc) zc_fail("format needs a width argument");
+            int64_t requested = argv[arg++];
+            if (requested < 0) {
+                left = 1;
+                width = (uint64_t)(-(requested + 1)) + 1;
+            } else width = (uint64_t)requested;
             spec++;
+        } else while (format[spec] >= '0' && format[spec] <= '9') {
+            if (width < capacity) width = width * 10 + (format[spec] - '0');
+            spec++;
+        }
+        if (width >= capacity) zc_fail("format width exceeds buffer");
         if (format[spec] == '.') {
             has_precision = 1;
             precision = 0;
@@ -5249,6 +5331,13 @@ static size_t format_text(char *output, size_t capacity, const char *format,
                 spec++;
             }
         }
+        if (format[spec] == 't') { truncate = 1; spec++; }
+        /* Aiwnios can normalize %$$Q to %$Q while decoding source strings. */
+        if (format[spec] == '$') {
+            size_t escaped = spec + 1;
+            if (format[escaped] == '$') escaped++;
+            if (format[escaped] == 'Q') { spec = escaped; escape_dollars = 1; }
+        }
         char code = format[spec];
         if (!code)
             zc_fail("format ends with incomplete conversion");
@@ -5257,10 +5346,13 @@ static size_t format_text(char *output, size_t capacity, const char *format,
             FMT_BYTE('%');
             continue;
         }
-        if (code != 'c' && code != 'C' && code != 's' && code != 'Q' &&
+        if (code != 'c' && code != 'C' && code != 's' && code != 'Q' && code != 'Z' &&
             code != 'd' && code != 'x' && code != 'X' &&
             code != 'f' && code != 'F')
+        {
+            printf("zc: unsupported format conversion '%c' in %s\n", code, format);
             zc_fail("format code is unsupported");
+        }
         if (arg >= argc)
             zc_fail("format needs another argument");
         if (code == 'c' || code == 'C') {
@@ -5271,10 +5363,21 @@ static size_t format_text(char *output, size_t capacity, const char *format,
                 if (!ch) break;
                 FMT_BYTE(ch);
             }
-        } else if (code == 's' || code == 'Q') {
-            const char *s = (const char *)(uintptr_t)argv[arg++];
+        } else if (code == 's' || code == 'Q' || code == 'Z') {
+            size_t field_start = used;
+            const char *s;
+            if (code == 'Z') {
+                if (arg + 2 > argc) zc_fail("format needs index and define arguments");
+                CHashFun *sub = (CHashFun *)HashFind("DefineSub", Fs->hash_table, HTT_FUN, 1);
+                if (!sub || !sub->fun_ptr || sub->argc != 2 || (sub->base.base.type & HTF_EXTERN))
+                    zc_fail("format %Z requires DefineSub");
+                s = (const char *)(uintptr_t)FFI_CALL_TOS_2(sub->fun_ptr, argv[arg], argv[arg + 1]);
+                arg += 2;
+                if (!s) s = "";
+            } else s = (const char *)(uintptr_t)argv[arg++];
             if (!s) zc_fail("format %s argument is null");
             for (size_t j = 0; s[j]; j++) {
+                if (truncate && width && used - field_start >= width) break;
                 if (code == 'Q') {
                     switch (s[j]) {
                     case '"': FMT_BYTE('\\'); FMT_BYTE('"'); break;
@@ -5282,11 +5385,25 @@ static size_t format_text(char *output, size_t capacity, const char *format,
                     case '\n': FMT_BYTE('\\'); FMT_BYTE('n'); break;
                     case '\r': FMT_BYTE('\\'); FMT_BYTE('r'); break;
                     case '\t': FMT_BYTE('\\'); FMT_BYTE('t'); break;
-                    case '$': FMT_BYTE('$'); FMT_BYTE('$'); break;
+                    case '$':
+                        if (escape_dollars) { FMT_BYTE('\\'); FMT_BYTE('x'); FMT_BYTE('2'); FMT_BYTE('4'); }
+                        else { FMT_BYTE('$'); FMT_BYTE('$'); }
+                        break;
                     default: FMT_BYTE(s[j]); break;
                     }
                 } else
                     FMT_BYTE(s[j]);
+            }
+            size_t length = used - field_start;
+            if (truncate && width && length > width) used = field_start + (length = width);
+            if (width > length) {
+                size_t pad = width - length;
+                if (pad > capacity - 1 - used) zc_fail("formatted text exceeds buffer");
+                if (!left) {
+                    memmove(output + field_start + pad, output + field_start, length);
+                    memset(output + field_start, ' ', pad);
+                    used += pad;
+                } else while (pad--) FMT_BYTE(' ');
             }
         } else if (code == 'f' || code == 'F') {
             char number[64];
@@ -5466,6 +5583,7 @@ static int load_source_path(const char *path, int merged, int recover) {
         PrsBindCSymbol("ZcServerJobsHandler", host_server_jobs_handler, 1);
     }
     if (!strcmp(path, "/System/UserTask.ZC")) {
+        PrsBindCSymbol("ZcCallExtStr", host_call_ext_str, 1);
         PrsBindCSymbol("ZcUserCompCtrlNew", host_user_compiler_new, 2);
         PrsBindCSymbol("ZcUserCompCtrlDel", host_user_compiler_del, 1);
         PrsBindCSymbol("ZcUserLex", host_user_lex, 1);
@@ -6145,6 +6263,10 @@ int zc_start_gui_terminal(void) {
         "/System/DolDoc/DocRecalcLib.ZC",
         "/System/DolDoc/DocHighlight.ZC",
         "/System/DolDoc/DocRecalc.ZC",
+        /* DocPutS was first compiled to break DolDoc's load cycle. Recompile
+         * after DocPlain defines ParseDollarCmd so DocLoad/DocPrint retain the
+         * real parser, including welcome text, links, colors and saved flags. */
+        "/System/DolDoc/DocPutS.ZC",
         /* Make the pinned document/file/editor stack available to the normal
          * graphical shell instead of leaving Ed as a source-load-only path. */
         "/System/DolDoc/DocFile.ZC",
@@ -6166,6 +6288,11 @@ int zc_start_gui_terminal(void) {
         "/System/TaskSettings.ZC",
         "/System/ServerTask.ZC",
         "/System/UserTask.ZC",
+        /* Bind CtrlAltT to the original User body instead of the early stub.
+         * KeyDevInit is performed once on root's persistent stack below. */
+        "/Kernel/KeyDev.ZC",
+        "/System/SourceDir.ZC",
+        "/System/HomeStartUp.ZC",
         "/System/GuiTerminal.ZC",
     };
     int64_t result = 0;
@@ -6183,6 +6310,8 @@ int zc_start_gui_terminal(void) {
         gui_terminal_modules_loaded = 1;
     }
     if (zc_call("BootstrapSystemTaskStart", &result) != 0 || result != 42)
+        return -1;
+    if (zc_call("BootstrapGuiTerminalDevicesInit", &result) != 0 || result != 42)
         return -1;
     result = 0;
     if (zc_call("BootstrapGuiTerminalStart", &result) != 0 || result != 0x2a)

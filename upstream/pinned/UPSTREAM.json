@@ -4,6 +4,8 @@
   "files": {
     "src/Compiler/CMain.ZC": "73ed8eab7cbfc4c2b4d3af348ab4c9218327713eddf4be32f01d0c6c1dd96348",
     "src/Compiler/CMisc.ZC": "8aab1c44038486f725dbf6a71f71c09ee5babe26a7afe8dfa409830afdc16499",
+    "src/Doc/Start.DD": "124c712ea631b996ed6a1aaf5bbe4c039491e5ba2f065e092e6f0b1aed8a96e6",
+    "src/HomeSys.ZC": "15b68cd26d93bb432be80adabc4720f78a667b106f197d95a2bb55fbab209798",
     "src/Kernel/Display.ZC": "ed49f65321f39edeeacd342da5c0836588e438435d67194ee49eb741fdc5c727",
     "src/Kernel/Job.ZC": "712893a3ff33df3f862baea1ec5624c9dfb9e167d696e6a6d9b7c2dabb66181b",
     "src/Kernel/KMathB.ZC": "1d249c72ef21eb75eb492f6aaa8cd3885ef085635a06bab8c26af55ced10ba33",

@@ -24,9 +24,12 @@ ZealOS aarch64 shell (HolyC-IR exprs)
 ```
 
 The boot graphical terminal accepts ZealC directly through the original
-`UserTaskCont` / `ExeCmdLine` loops and the ARM64 compiler adapter. Click inside
+`UserCmdLine` / `UserTaskCont` / `ExeCmdLine` path and the ARM64 compiler adapter. Click inside
 it and type `40+2;`, then Return: the answer should be 42. `help` also lists
 bootstrap commands such as `zstatus`, `zvol`, `zls`, `zload`, `zcall`, and `edit`.
+`User;` opens another graphical terminal through the original task entry and
+the default per-user `HomeSys` hook. Each terminal has its own input history,
+document and compiler context. Full `HomeSys` desktop launch remains separate.
 The current installer keeps the
 working UTM 5.0.7 built-in Terminal 1 serial window. This is independent of
 the graphical guest terminal's keyboard and document rendering. The graphical
@@ -618,3 +621,12 @@ The refresh preserved 185 existing files outside the managed paths, deletion
 mask, RedSea bytes and VM settings, and verified the boot payload against the
 tested image. The user's subsequent physical typing check completed the live
 gate. Pointer motion and drag retain their earlier acceptance.
+
+2026-10-18: original `User` / `UserCmdLine` entry and the per-user `HomeSys`
+hook passed 42 focused PCI and 45 native USB startup checks, plus 379 ISO,
+219 graphical workflow and 36 command-loop regression checks. Two graphical
+terminals show independent visible typing, carets, answers and histories;
+repeated creation/teardown preserves managed memory usage. This milestone also
+fixes input starvation when a compositor frame misses its sleep deadline.
+The stopped UTM bundle has been backed up. Refreshed-VM acceptance is pending;
+full `HomeSys` desktop startup remains separate work.

@@ -1,0 +1,29 @@
+// Source-volume directory display, loaded after the real DolDoc printer.
+I64 Dir(U8 *files_find_mask="*", Bool full=FALSE)
+{//Directory listing over the merged source volume; no disk dates/clusters yet.
+    CDirEntry *entry = FilesFind(files_find_mask), *next;
+    I64 count = 0;
+    U8 *dir = DirCur;
+    CDoc *doc = DocPut;
+
+    if (doc)
+        DocPrint(doc, "Directory of %s\n", dir);
+    while (entry)
+    {
+        next = entry->next;
+        if (doc)
+        {
+            if (entry->attr & RS_ATTR_DIR)
+                DocPrint(doc, "%s/\n", entry->name);
+            else
+                DocPrint(doc, "%s %d\n", entry->name, entry->size);
+        }
+        count++;
+        Free(entry->full_name);
+        Free(entry);
+        entry = next;
+    }
+    Free(dir);
+    if (full) {} // The source store has neither timestamps nor disk clusters.
+    return count;
+}

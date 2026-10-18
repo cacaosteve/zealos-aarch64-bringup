@@ -7,11 +7,55 @@ I64 bootstrap_gui_terminal_last_key_char = 0;
 I64 bootstrap_gui_terminal_last_scan = 0;
 I64 bootstrap_gui_terminal_editor_active = 0;
 I64 bootstrap_gui_terminal_editor_raw = -1;
+Bool bootstrap_gui_terminal_devices_ready = FALSE;
 U8 bootstrap_gui_terminal_last_command[256];
 U0 (*bootstrap_gui_terminal_final_update)(CDC *dc);
 extern U8 *ZcGuiShellExec(U8 *line);
-U8 bootstrap_gui_terminal_history[256];
-I64 bootstrap_gui_terminal_history_len;
+// Task slots can be reused. Match both address and generation before reading
+// a terminal's history; the fixed registry owns no task-heap allocations.
+class CBootstrapTerminalState
+{
+    CTask *task;
+    I64 task_num;
+    U8 history[256];
+    I64 history_len;
+};
+CBootstrapTerminalState bootstrap_terminal_states[8];
+
+CBootstrapTerminalState *BootstrapGuiTerminalState(CTask *task)
+{
+    I64 i;
+    CBootstrapTerminalState *state;
+    for (i = 0; i < 8; i++)
+    {
+        state = &bootstrap_terminal_states[i];
+        if (state->task == task && TaskValidate(task) &&
+            state->task_num == task->task_num)
+            return state;
+    }
+    return NULL;
+}
+
+CBootstrapTerminalState *BootstrapGuiTerminalRegister()
+{
+    I64 i;
+    CBootstrapTerminalState *state = BootstrapGuiTerminalState(Fs);
+    if (state)
+        return state;
+    for (i = 0; i < 8; i++)
+    {
+        state = &bootstrap_terminal_states[i];
+        if (!TaskValidate(state->task) || state->task_num != state->task->task_num)
+        {
+            MemSet(state, 0, sizeof(CBootstrapTerminalState));
+            state->task = Fs;
+            state->task_num = Fs->task_num;
+            return state;
+        }
+    }
+    throw('TermSlot');
+    return NULL;
+}
 extern I64 ZcFbTextPixel(I64 x, I64 y);
 
 #define GUI_MENU_ACTION_TAG 0x475549
@@ -292,8 +336,9 @@ U0 BootstrapGuiTerminalPrompt(Bool continuation)
         DocPrint(DocPut, "> ");
 }
 
-U8 *BootstrapGuiTerminalReadLine(Bool continuation)
+U8 *BootstrapGuiTerminalReadLine2(Bool continuation)
 {
+    CBootstrapTerminalState *state = BootstrapGuiTerminalRegister;
     I64 ch, sc;
     I64 message;
     I64 command_len = 0;
@@ -314,6 +359,8 @@ U8 *BootstrapGuiTerminalReadLine(Bool continuation)
         // the UP/cleanup pass. Consume every event once in arrival order.
         while ((message = MessageScan(&ch, &sc, ~1)) != 0)
         {
+            LBtr(&Fs->task_flags, TASKf_IDLE);
+            LBtr(&Fs->task_flags, TASKf_CMD_LINE_PROMPT);
             if (message == MESSAGE_KEY_UP)
             {
                 if (sc == GUI_MENU_ACTION_TAG)
@@ -351,7 +398,7 @@ U8 *BootstrapGuiTerminalReadLine(Bool continuation)
                     if (command_len && !continuation)
                     {
                         StrCopy(bootstrap_gui_terminal_last_command, command);
-                        BootstrapGuiTerminalHistorySave(bootstrap_gui_terminal_history, &bootstrap_gui_terminal_history_len,
+                        BootstrapGuiTerminalHistorySave(state->history, &state->history_len,
                                                         command, command_len);
                         if (BootstrapGuiTerminalEditCommand(command, &edit_path))
                         {
@@ -388,13 +435,13 @@ U8 *BootstrapGuiTerminalReadLine(Bool continuation)
                     // Abort the complete pending chunk, including continuations.
                     return NULL;
                 }
-                else if (!ch && sc.u8[0] == SC_CURSOR_UP && bootstrap_gui_terminal_history_len)
+                else if (!ch && sc.u8[0] == SC_CURSOR_UP && state->history_len)
                 {
                     DocPutKey(DocPut, 0, SC_END);
                     for (i = 0; i < command_len; i++)
                         DocPutKey(DocPut, 8, 0);
                     BootstrapGuiTerminalHistoryRecall(command, &command_len,
-                                                      bootstrap_gui_terminal_history, bootstrap_gui_terminal_history_len);
+                                                      state->history, state->history_len);
                     command_pos = command_len;
                     for (i = 0; i < command_len; i++)
                         DocPutKey(DocPut, command[i], 0);
@@ -425,35 +472,80 @@ U8 *BootstrapGuiTerminalReadLine(Bool continuation)
                 }
             }
         }
+        // User() waits for this task to reach its input prompt. Incoming
+        // messages clear IDLE; reassert it only after draining the queue.
+        LBts(&Fs->task_flags, TASKf_IDLE);
+        LBts(&Fs->task_flags, TASKf_CMD_LINE_PROMPT);
         ZcTaskYield;
     }
 }
 
-U0 BootstrapGuiTerminalTask(U8 *data)
-{
-    if (data) {}
-    bootstrap_gui_terminal_history[0] = 0;
-    bootstrap_gui_terminal_history_len = 0;
-    KeyDevInit;
-    DocTermNew;
+U8 *BootstrapGuiTerminalReadLine(Bool continuation)
+{//Restore wait flags on normal return and a reader/editor exception alike.
+    I64 mask = 1 << TASKf_IDLE | 1 << TASKf_CMD_LINE_PROMPT;
+    I64 old = Fs->task_flags & mask;
+    U8 *result;
+    try
+    {
+        result = BootstrapGuiTerminalReadLine2(continuation);
+    }
+    catch
+    {
+        bootstrap_gui_terminal_editor_active = FALSE;
+        Fs->task_flags = Fs->task_flags & ~mask | old;
+    }
+    Fs->task_flags = Fs->task_flags & ~mask | old;
+    return result;
+}
+
+I64 BootstrapGuiTerminalDevicesInit()
+{//KeyDev is global; its arrays and hooks must outlive every user terminal.
+    if (!bootstrap_gui_terminal_devices_ready)
+    {
+        KeyDevInit;
+        KeyDevAdd(&KDDocPutKey, &KDDocPutS, 0x80000000, TRUE);
+        bootstrap_gui_terminal_devices_ready = TRUE;
+    }
+    return 42;
+}
+
+U0 BootstrapGuiTerminalUserStartUp()
+{//HomeSys owns the standard document/window setup; retain the accepted input.
+    BootstrapHomeUserStartUp;
+    // The source volume has no CDrive yet to supply its normal border color.
+    if (!Fs->cur_dv)
+        Fs->border_attr = CYAN;
+    BootstrapGuiTerminalRegister;
     BootstrapGuiTerminalMenuInstall;
-    KeyDevAdd(&KDDocPutKey, &KDDocPutS, 0x80000000, TRUE);
+    // The welcome document changes foreground attributes. Give command input
+    // the accepted white-on-black appearance after inserting that document.
+    DocPrint(DocPut, "$$FG,WHITE$$$$BG,BLACK$$");
     DocPrint(DocPut, "ZealOS ARM64 graphical terminal\n");
     DocPrint(DocPut, "Edit with Left/Right, Home/End, Backspace and Delete.\n");
     DocPrint(DocPut, "Up recalls the last command; Down clears it.\n");
     DocPrint(DocPut, "ZealC runs directly; help lists bootstrap commands.\n");
     ZcUserPromptSet(&BootstrapGuiTerminalReadLine);
     ZcUserOutputSet(&BootstrapGuiTerminalPrintOutput);
-    UserTaskCont;
+}
+
+U0 UserStartUp()
+{//Late-bound customization point called by the original UserCmdLine.
+    BootstrapGuiTerminalUserStartUp;
+}
+
+U0 BootstrapGuiTerminalTask(U8 *data)
+{
+    if (data) {}
+    UserCmdLine;
 }
 
 U0 BootstrapGuiTerminalFinalUpdate(CDC *dc)
 {//Paint the insertion caret after the source compositor's window redraws.
-    CTask *term = bootstrap_gui_terminal_task;
+    CTask *term = sys_focus_task;
     CDoc *doc;
     I64 x, y, old_color;
 
-    if (dc && TaskValidate(term) && term == sys_focus_task &&
+    if (dc && BootstrapGuiTerminalState(term) && TaskValidate(term) &&
         Bt(&term->display_flags, DISPLAYf_SHOW) &&
         (doc = term->display_doc) && !(doc->flags & DOCF_HIDE_CURSOR) && !Blink)
     {
@@ -507,10 +599,19 @@ I64 BootstrapGuiTerminalStart()
 
 I64 BootstrapGuiTerminalStop()
 {
+    I64 i;
+    CBootstrapTerminalState *state;
     CGrGlobals *active_gr = ZcActiveGrGlobals();
 
     if (active_gr && active_gr->fp_final_screen_update == &BootstrapGuiTerminalFinalUpdate)
         active_gr->fp_final_screen_update = bootstrap_gui_terminal_final_update;
+    for (i = 0; i < 8; i++)
+    {
+        state = &bootstrap_terminal_states[i];
+        if (TaskValidate(state->task) && state->task_num == state->task->task_num)
+            Kill(state->task);
+        state->task = NULL;
+    }
     if (TaskValidate(bootstrap_gui_terminal_task))
         Kill(bootstrap_gui_terminal_task);
     bootstrap_gui_terminal_task = NULL;
@@ -538,11 +639,24 @@ I64 BootstrapGuiTerminalWindowState()
     return state;
 }
 
+Bool BootstrapGuiTerminalDocumentsAvailable(CTask *task)
+{//A frame must not wait on a document whose owner needs the next task slice.
+    if (!TaskValidate(task))
+        return FALSE;
+    if (task->display_doc && Bt(&task->display_doc->locked_flags, DOClf_LOCKED))
+        return FALSE;
+    if (task->border_doc && Bt(&task->border_doc->locked_flags, DOClf_LOCKED))
+        return FALSE;
+    return TRUE;
+}
+
 I64 BootstrapGuiTerminalRedraw(CTask *task)
 {
     if (!TaskValidate(task) || !task->display_doc)
         return 0;
     if (task->display_doc->win_task != task)
+        return 0;
+    if (!BootstrapGuiTerminalDocumentsAvailable(task))
         return 0;
     DocRecalc(task->display_doc, RECALCt_TO_SCREEN | RECALCF_HAS_CURSOR);
     if (task->border_doc && task->border_doc->win_task == task)

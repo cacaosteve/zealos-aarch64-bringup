@@ -458,9 +458,10 @@ Bool Silent(Bool val=ON)
         Btr(&Fs->display_flags, DISPLAYf_SILENT);
     return old;
 }
-U0 User(U8 *fmt=NULL, ...)
+CTask *User(U8 *fmt=NULL, ...)
 {
     if (fmt) {}
+    return NULL; // Replaced by the original KTask body at desktop startup.
 }
 U0 LFBFlush()
 {
