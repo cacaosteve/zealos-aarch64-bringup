@@ -206,6 +206,18 @@ with one recovered error, an inactive recovery boundary and terminal focus.
 Physical input was accepted on the earlier native USB baseline and was not
 repeated for this compiler-only update.
 
+`make check-compiler-context` checks nested compiler queues, inherited options,
+independent child-task defaults, option state across task yields, include
+metadata and cleanup without managed-arena growth. It checks decimal-only and
+no-floating-constant rejection, corrected input after each error, and mixed
+floating-argument functions with register allocation enabled and disabled.
+The graphical workflow enables decimal-only mode, rejects a hexadecimal
+assignment, disables it and executes the same assignment in the same prompt.
+The original Option / OptionGet bodies are checked against pinned CMisc.ZC.
+
+2026-10-17 final automated context validation passed 407 full PCI checks,
+325 full ISO checks and 225 NEC two-hub/VirtIO graphical workflow checks.
+
 ## Checklist — interactive smoke
 
 1. Boot until `>` stays on screen.

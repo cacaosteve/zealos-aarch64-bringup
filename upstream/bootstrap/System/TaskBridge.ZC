@@ -16,9 +16,16 @@
 #define PAUSE ;
 extern U0 RFlagsPush();
 extern U0 RFlagsPop();
-// Option currently only suppresses header-mismatch diagnostics in the
-// upstream graphics module; the bootstrap compiler accepts it as a no-op.
-extern U0 Option(I64 option, I64 value);
+// Verbatim Option / OptionGet bodies from pinned Compiler/CMisc.ZC.
+Bool Option(I64 num, Bool val)
+{//Set compiler $LK,"Option",A="FI:::/Doc/Options.DD"$ to value.
+	return BEqual(&Fs->last_cc->opts, num, val);
+}
+
+Bool OptionGet(I64 num)
+{//Get state of compiler $LK,"option",A="MN:OPTf_ECHO"$.
+	return Bt(&Fs->last_cc->opts, num);
+}
 extern I64 DistSqrI64(I64 x0, I64 y0, I64 x1, I64 y1);
 // KernelC normally owns this timer-frequency global. Bind the same guest
 // storage during the KernelB task bridge so keyboard/task tests can use it

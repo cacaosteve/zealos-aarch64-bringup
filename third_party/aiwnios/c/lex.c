@@ -84,6 +84,7 @@ static void LexErr(CLexer *lex, char *fmt, ...) {
   } else {
     fprintf(AIWNIOS_OSTREAM, "ERR ???:?:? %s", buffer);
   }
+  fprintf(AIWNIOS_OSTREAM, "\n");
   throw(*(int64_t *)"Lex\0\0\0\0\0");
 }
 
@@ -303,7 +304,10 @@ re_enter:;
     return lex->cur_tok = ',';
     break;
   case '\n':
-    if (lex->flags & LEXF_UNTIL_NEWLINE) {
+    /* A define's stored trailing newline is whitespace in its expansion,
+     * not the end of the surrounding #assert / #if directive. */
+    if ((lex->flags & LEXF_UNTIL_NEWLINE) &&
+        (!lex->file || lex->file->is_file)) {
       lex->flags &= ~LEXF_UNTIL_NEWLINE;
       return lex->cur_tok = '\n';
     }
@@ -319,11 +323,15 @@ re_enter:;
         break;
       case 'x':
       case 'X':
+        if (lex->port_options && (*lex->port_options & (1LL << 12)))
+          LexErr(lex, "Hex constant disabled by OPTf_DECIMAL_ONLY.");
         chr1 = LexAdvChr(lex);
         base = 16;
         lex->flags |= LEXF_USE_LAST_CHAR;
         break;
       case 'b':
+        if (lex->port_options && (*lex->port_options & (1LL << 12)))
+          LexErr(lex, "Binary constant disabled by OPTf_DECIMAL_ONLY.");
         chr1 = LexAdvChr(lex);
         base = 2;
         lex->flags |= LEXF_USE_LAST_CHAR;
@@ -364,6 +372,8 @@ re_enter:;
           return lex->cur_tok = ERR;
         }
       fin_f64:
+        if (lex->port_options && (*lex->port_options & (1LL << 13)))
+          LexErr(lex, "Float constant disabled by OPTf_NO_FLOATS.");
         if (decimal) {
           lex->flt =
               integer + decimal * LexDecimalScale(decimal, zeros);
@@ -736,6 +746,8 @@ re_enter:;
         code = Compile(cc, NULL, NULL, NULL);
         if (!code)
           LexErr(lex, "Could not compile #assert expression.");
+        if (lex->port_sync)
+          lex->port_sync(lex);
         ret = FFI_CALL_TOS_0(code);
         A_FREE(code);
         CodeCtrlPop(cc);
@@ -756,6 +768,8 @@ re_enter:;
           rtrn->type = IC_RET;
           QueIns(rtrn, cc->code_ctrl->ir_code);
           if (code = Compile(cc, NULL, NULL, NULL)) {
+            if (lex->port_sync)
+              lex->port_sync(lex);
             ret = FFI_CALL_TOS_0(code);
           }
           A_FREE(code);

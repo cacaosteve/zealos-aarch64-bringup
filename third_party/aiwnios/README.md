@@ -10,6 +10,14 @@ Normal builds use vendored files and need neither a sibling checkout nor network
 
 Port changes:
 
+- Link the lexer to the active guest compiler option word. Enforce
+  `OPTf_DECIMAL_ONLY` and `OPTf_NO_FLOATS` for numeric constants, and keep
+  function locals/parameters on the stack under `OPTf_NO_REG_VAR`. Refresh
+  guest include metadata before executing preprocessor expressions.
+- Keep newlines stored in macro expansions from ending a surrounding
+  `#assert` / `#if` directive before the real source newline.
+- End lexer diagnostics with a newline so the host recovery message starts
+  on its own terminal line.
 - Select Aiwnios' non-Darwin ARM register convention on freestanding ELF.
 - Initialize keywords per symbol table so a discarded session can restart.
 - Resolve absolute includes without adding the current source directory.

@@ -41,6 +41,9 @@ typedef struct CLexer {
   int64_t cur_tok;
   struct CHeapCtrl *hc;
   int64_t *layout_off; /* Current class byte offset for ZealC $$. */
+  /* ARM64 host bridge: options belong to the active guest CCompCtrl. */
+  int64_t *port_options;
+  void (*port_sync)(struct CLexer *);
 } CLexer;
 typedef enum {
   TK_I64 = 0x100,

@@ -1,0 +1,168 @@
+I64 compiler_context_child_result, compiler_context_file_result;
+I64 compiler_context_stage;
+
+I64 CompilerContextDepth()
+{
+    CCompCtrl *head = &Fs->next_cc, *cc = head->next;
+    I64 count = 0;
+    while (cc != head && count < 16)
+    {
+        if (cc->next->last != cc || cc->last->next != cc) return -1;
+        count++;
+        cc = cc->next;
+    }
+    if (cc != head) return -2;
+    return count;
+}
+
+I64 CompilerContextNested()
+{
+    CCompCtrl *outer = Fs->last_cc;
+    I64 depth = CompilerContextDepth;
+    if (depth < 2 || !OptionGet(OPTf_DECIMAL_ONLY)) return 1;
+    if (ExePutS("CompilerContextDepth();") != depth + 1 || Fs->last_cc != outer)
+        return 2;
+    if (ExePutS("#assert Option(OPTf_DECIMAL_ONLY,OFF)\n0x2a;") != 42 ||
+        !OptionGet(OPTf_DECIMAL_ONLY) || Fs->last_cc != outer)
+        return 3;
+    if (ExePutS("I64 ContextHalf( {") || Fs->last_cc != outer)
+        return 4;
+    return 42;
+}
+
+I64 CompilerContextFile()
+{
+    CCompCtrl *cc = Fs->last_cc;
+    CLexFile *file = cc->lex_include_stack;
+    if (!file || file->depth != 1 || file->line_num < 2 ||
+        StrCompare(file->full_name, "/Tests/CompilerContextEntry.ZC") ||
+        !file->next || !(cc->flags & CCF_CMD_LINE) ||
+        !(cc->flags & CCF_DONT_FREE_BUF))
+        return 1;
+    return 42;
+}
+
+I64 CompilerContextChecks()
+{
+    CCompCtrl *outer = Fs->last_cc;
+    I64 opts = outer->opts, depth = CompilerContextDepth;
+    if (depth != 1 || !OptionGet(OPTf_WARN_UNUSED_VAR) ||
+        !OptionGet(OPTf_WARN_HEADER_MISMATCH)) return 1;
+    if (Option(OPTf_DECIMAL_ONLY,ON) || !OptionGet(OPTf_DECIMAL_ONLY) ||
+        !Option(OPTf_DECIMAL_ONLY,ON)) return 2;
+    if (ExePutS("0x2a;") || ExePutS("0b101010;") ||
+        ExePutS("40+2;") != 42 || ExePutS("CompilerContextNested();") != 42 ||
+        Fs->last_cc != outer || CompilerContextDepth != depth)
+        return 3;
+    if (!Option(OPTf_DECIMAL_ONLY,OFF) || ExePutS("0x2a;") != 42) return 4;
+    if (Option(OPTf_NO_FLOATS,ON) || ExePutS("42.0;") ||
+        ExePutS(".25;") || ExePutS("1e2;") || ExePutS("40+2;") != 42)
+        return 5;
+    if (!Option(OPTf_NO_FLOATS,OFF) || ExePutS("ToI64(42.0);") != 42)
+        return 6;
+    if (ExePutS("Option(OPTf_DECIMAL_ONLY,ON); I64 ContextHex=0x2a;") ||
+        OptionGet(OPTf_DECIMAL_ONLY) || Fs->last_cc != outer)
+        return 7;
+    compiler_context_file_result = 0;
+    ExeFile("/Tests/CompilerContextEntry.ZC", CCF_CMD_LINE);
+    if (compiler_context_file_result != 42 || Fs->last_cc != outer ||
+        outer->opts != opts || CompilerContextDepth != depth)
+        return 8;
+    return 42;
+}
+
+U0 CompilerContextChild(U8 *unused)
+{
+    if (unused) {}
+    if (CompilerContextDepth != 0) return;
+    if (ExePutS("OptionGet(OPTf_DECIMAL_ONLY);") ||
+        ExePutS("0x2a;") != 42 || CompilerContextDepth != 0)
+        return;
+    compiler_context_child_result = 42;
+}
+
+I64 CompilerContextTaskChecks()
+{
+    CTask *child;
+    compiler_context_child_result = 0;
+    Option(OPTf_DECIMAL_ONLY,ON);
+    child = Spawn(&CompilerContextChild);
+    if (!child) return 1;
+    while (TaskValidate(child)) Yield;
+    if (!Option(OPTf_DECIMAL_ONLY,OFF) || compiler_context_child_result != 42)
+        return 2;
+    return 42;
+}
+
+U0 CompilerContextYieldChild(U8 *unused)
+{
+    if (unused) {}
+    if (ExePutS("Option(OPTf_DECIMAL_ONLY,ON); compiler_context_stage=1; Yield; "
+                "while(compiler_context_stage!=2)Yield; "
+                "OptionGet(OPTf_DECIMAL_ONLY)*42;") != 42 ||
+        CompilerContextDepth != 0 || ExePutS("OptionGet(OPTf_NO_FLOATS);"))
+        return;
+    compiler_context_child_result = 42;
+}
+
+I64 CompilerContextYieldChecks()
+{
+    CTask *child;
+    I64 result;
+    compiler_context_stage = compiler_context_child_result = 0;
+    Option(OPTf_NO_FLOATS,ON);
+    child = Spawn(&CompilerContextYieldChild);
+    if (!child) return 1;
+    while (!compiler_context_stage && TaskValidate(child)) Yield;
+    result = ExePutS("OptionGet(OPTf_NO_FLOATS)*42;");
+    compiler_context_stage = 2;
+    while (TaskValidate(child)) Yield;
+    if (!Option(OPTf_NO_FLOATS,OFF) || result != 42 ||
+        OptionGet(OPTf_DECIMAL_ONLY) || compiler_context_child_result != 42 ||
+        CompilerContextDepth != 1)
+        return 2;
+    return 42;
+}
+
+I64 CompilerContextLeakChecks()
+{
+    I64 i;
+    CCompCtrl *outer = Fs->last_cc;
+    for (i = 0; i < 16; i++)
+        if (ExePutS("I64 ContextHalf( {") || ExePutS("40+2;") != 42 ||
+            Fs->last_cc != outer || CompilerContextDepth != 1)
+            return 1;
+    return 42;
+}
+
+I64 CompilerContextRegChecks()
+{
+    Option(OPTf_NO_REG_VAR,ON);
+    if (ExePutS("I64 ContextNoRegs(F64 a,F64 b){F64 x=a+b;F64 y=x*2;return ToI64(y);}") ||
+        ExePutS("ContextNoRegs(10.0,11.0);") != 42 || !OptionGet(OPTf_NO_REG_VAR))
+        return 1;
+    Option(OPTf_NO_REG_VAR,OFF);
+    if (ExePutS("I64 ContextRegs(F64 a,F64 b){F64 x=a+b;F64 y=x*2;return ToI64(y);}") ||
+        ExePutS("ContextRegs(10.0,11.0);") != 42 || OptionGet(OPTf_NO_REG_VAR))
+        return 2;
+    return 42;
+}
+
+I64 CompilerContextControlChecks()
+{
+    compiler_context_stage = 0;
+    if (ExePutS("while(compiler_context_stage<3)compiler_context_stage++; 40+2;") != 42 ||
+        compiler_context_stage != 3)
+        return 1;
+    if (ExePutS("if(compiler_context_stage==3)compiler_context_stage=4; 40+2;") != 42 ||
+        compiler_context_stage != 4)
+        return 2;
+    if (ExePutS("for(compiler_context_stage=0;compiler_context_stage<5;compiler_context_stage++); 40+2;") != 42 ||
+        compiler_context_stage != 5)
+        return 3;
+    if (ExePutS("do compiler_context_stage++; while(compiler_context_stage<7); 40+2;") != 42 ||
+        compiler_context_stage != 7 || ExePutS("return 42;") ||
+        ExePutS("40+2;") != 42)
+        return 4;
+    return 42;
+}

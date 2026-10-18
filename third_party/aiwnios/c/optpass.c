@@ -1111,7 +1111,9 @@ void OptPassRegAlloc(CCmpCtrl *cctrl) {
   i = 0;
   for (tmpm = cctrl->cur_fun->base.members_lst; tmpm; tmpm = tmpm->next) {
     mv[i].m = tmpm;
-    if (tmpm->flags & MLF_STATIC)
+    if ((tmpm->flags & MLF_STATIC) ||
+        (cctrl->lex && cctrl->lex->port_options &&
+         (*cctrl->lex->port_options & (1LL << 8))))
       mv[i].m->reg = REG_NONE;
     mv[i++].score = 1;
   }

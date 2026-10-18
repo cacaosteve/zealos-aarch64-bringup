@@ -216,12 +216,15 @@ struct guest_exception {
     int64_t previous_ch;
     jmp_buf context;
 };
+struct source_context;
 struct guest_fiber {
     uint64_t words[2048];
     uint64_t heap_words[256];
     CHeapCtrl heap_owner;
     CTask compiler_task;
     CHeapCtrl compiler_heap, compiler_code_heap;
+    void *prompt_cc;
+    struct source_context *source_context;
     jmp_buf context;
     unsigned char stack[GUEST_STACK_BYTES] __attribute__((aligned(16)));
     unsigned char *large_stack;
@@ -338,6 +341,13 @@ static int64_t guest_heap_sig_off, guest_heap_used_off, guest_heap_task_off;
 static int64_t guest_except_ch_off, guest_catch_except_off;
 static int64_t guest_hash_table_off;
 static int64_t guest_cur_dir_off;
+static int64_t guest_next_cc_off, guest_last_cc_off;
+static int64_t guest_cc_size, guest_cc_flags_off, guest_cc_opts_off;
+static int64_t guest_cc_files_off, guest_cc_errors_off;
+static int64_t guest_lex_size, guest_lex_buf_off, guest_lex_ptr_off;
+static int64_t guest_lex_line_off, guest_lex_flags_off, guest_lex_name_off;
+static int64_t guest_lex_depth_off;
+static void *guest_prompt_context(void);
 static int guest_task_bound;
 static int source_winmgr_active;
 extern uint64_t zeal_fb_text_cols(void), zeal_fb_text_rows(void);
@@ -1219,13 +1229,6 @@ static int64_t host_max_f64(int64_t *a) {
     double result = left > right ? left : right;
     memcpy(&bits, &result, sizeof(bits));
     return (int64_t)bits;
-}
-/* Option() controls compiler/runtime diagnostics in ZealOS. The ARM64
- * compiler currently has no matching option state; accept the call so
- * upstream modules can bracket declarations with compatible syntax. */
-static int64_t host_option(int64_t *a) {
-    (void)a;
-    return 0;
 }
 static int64_t host_calloc(int64_t *a) {
     return (int64_t)(uintptr_t)__AIWNIOS_CAlloc(a[0], guest_allocation_owner(a[1]));
@@ -2351,6 +2354,8 @@ static void init_guest_fiber(unsigned i, void *parent, const char *name) {
     *(void **)(words + guest_last_child_off) = child_head;
     *(void **)(words + guest_next_ctrl_off) = words + guest_next_ctrl_off;
     *(void **)(words + guest_last_ctrl_off) = words + guest_next_ctrl_off;
+    *(void **)(words + guest_next_cc_off) = words + guest_next_cc_off;
+    *(void **)(words + guest_last_cc_off) = words + guest_next_cc_off;
     *(void **)(words + guest_parent_off) = parent;
     const char *dir = parent
         ? *(char **)((unsigned char *)parent + guest_cur_dir_off) : NULL;
@@ -4068,8 +4073,10 @@ static void bind_guest_task(void) {
     CHashClass *ctrl = (CHashClass *)HashFind("CJobCtrl", Fs->hash_table, HTT_CLASS, 1);
     CHashClass *job = (CHashClass *)HashFind("CJob", Fs->hash_table, HTT_CLASS, 1);
     CHashClass *counts = (CHashClass *)HashFind("CCountsGlobals", Fs->hash_table, HTT_CLASS, 1);
+    CHashClass *cc = (CHashClass *)HashFind("CCompCtrl", Fs->hash_table, HTT_CLASS, 1);
+    CHashClass *lf = (CHashClass *)HashFind("CLexFile", Fs->hash_table, HTT_CLASS, 1);
     CHashFun *fun = (CHashFun *)HashFind("Fs", Fs->hash_table, HTT_FUN, 1);
-    if (!cls || !heap || !ctrl || !job || !counts || !fun || !fun->import_name || strcmp(fun->import_name, "IC_FS") ||
+    if (!cls || !heap || !ctrl || !job || !counts || !cc || !lf || !fun || !fun->import_name || strcmp(fun->import_name, "IC_FS") ||
         fun->argc || fun->return_class != cls + 1 ||
         cls->sz <= 0 || cls->sz > (int64_t)sizeof(guest_fibers[0].words) ||
         heap->sz <= 0 || heap->sz > (int64_t)sizeof(guest_fibers[0].heap_words) ||
@@ -4113,10 +4120,38 @@ static void bind_guest_task(void) {
         !task_field(cls, "catch_except", 1, -1) ||
         !task_field(cls, "hash_table", 8, -1) ||
         !task_field(cls, "cur_dir", 8, -1) ||
+        !task_field(cls, "next_cc", 8, -1) ||
+        !task_field(cls, "last_cc", 8, -1) ||
         !task_field(heap, "hc_signature", 4, 8) ||
         !task_field(heap, "used_u8s", 8, -1) ||
         !task_field(heap, "mem_task", 8, -1))
         zc_fail("pinned task/heap layout or Fs signature mismatch");
+    if (cc->sz < 16 || cc->sz > 4096 || lf->sz < 8 || lf->sz > 256 ||
+        !task_field(cc, "next", 8, 0) || !task_field(cc, "last", 8, 8) ||
+        !task_field(cc, "flags", 8, -1) || !task_field(cc, "opts", 8, -1) ||
+        !task_field(cc, "lex_include_stack", 8, -1) ||
+        !task_field(cc, "error_count", 8, -1) ||
+        !task_field(lf, "next", 8, 0) || !task_field(lf, "buf", 8, -1) ||
+        !task_field(lf, "buf_ptr", 8, -1) || !task_field(lf, "line_num", 8, -1) ||
+        !task_field(lf, "flags", 8, -1) || !task_field(lf, "full_name", 8, -1) ||
+        !task_field(lf, "depth", 4, -1))
+        zc_fail("pinned compiler context layout mismatch");
+    guest_next_cc_off = MemberFind("next_cc", cls)->off;
+    guest_last_cc_off = MemberFind("last_cc", cls)->off;
+    if (guest_last_cc_off != guest_next_cc_off + 8)
+        zc_fail("pinned compiler queue sentinel layout mismatch");
+    guest_cc_size = cc->sz;
+    guest_cc_flags_off = MemberFind("flags", cc)->off;
+    guest_cc_opts_off = MemberFind("opts", cc)->off;
+    guest_cc_files_off = MemberFind("lex_include_stack", cc)->off;
+    guest_cc_errors_off = MemberFind("error_count", cc)->off;
+    guest_lex_size = lf->sz;
+    guest_lex_buf_off = MemberFind("buf", lf)->off;
+    guest_lex_ptr_off = MemberFind("buf_ptr", lf)->off;
+    guest_lex_line_off = MemberFind("line_num", lf)->off;
+    guest_lex_flags_off = MemberFind("flags", lf)->off;
+    guest_lex_name_off = MemberFind("full_name", lf)->off;
+    guest_lex_depth_off = MemberFind("depth", lf)->off;
     if (ctrl->sz != 40 || !task_field(ctrl, "next_waiting", 8, 0) ||
         !task_field(ctrl, "last_waiting", 8, 8) ||
         !task_field(ctrl, "next_done", 8, 16) ||
@@ -4262,6 +4297,100 @@ static void bind_guest_task(void) {
     PrsBindCSymbol("sys_semas", guest_sys_semas, 0);
 }
 
+/* Guest CCompCtrl objects retain the pinned layout, while the native parser
+ * owns its separate CCmpCtrl. Only the queue, flags, opts, error count and
+ * include-file metadata are exposed here; native IR/hash fields are not cast
+ * to the incompatible upstream compiler structures. */
+struct source_context {
+    struct source_context *previous;
+    unsigned char *mirror;
+    int owned;
+};
+static unsigned char *guest_context_new(int64_t flags) {
+    struct guest_fiber *f = &guest_fibers[guest_current];
+    unsigned char *head = (unsigned char *)f->words + guest_next_cc_off;
+    unsigned char *tail = *(unsigned char **)(head + 8);
+    unsigned char *cc = __AIWNIOS_CAlloc(guest_cc_size, &f->heap_owner);
+    *(void **)cc = head;
+    *(void **)(cc + 8) = tail;
+    *(void **)tail = cc;
+    *(void **)(head + 8) = cc;
+    *(int64_t *)(cc + guest_cc_flags_off) = flags | 0x008;
+    /* CompCtrlNew's defaults, inherited only from this task's outer cc. */
+    *(int64_t *)(cc + guest_cc_opts_off) = tail == head ? (1 << 2) | (1 << 5)
+        : *(int64_t *)(tail + guest_cc_opts_off);
+    return cc;
+}
+static void *guest_prompt_context(void) {
+    if (!guest_task_bound)
+        return NULL;
+    struct guest_fiber *f = &guest_fibers[guest_current];
+    if (!f->prompt_cc)
+        f->prompt_cc = guest_context_new(0x001 | 0x002 | 0x004);
+    return f->prompt_cc;
+}
+static void guest_context_files_clear(unsigned char *cc) {
+    unsigned char **head = (unsigned char **)(cc + guest_cc_files_off);
+    while (*head) {
+        unsigned char *file = *head;
+        *head = *(unsigned char **)file;
+        free(*(void **)(file + guest_lex_name_off));
+        free(file);
+    }
+}
+static void guest_context_sync(CLexer *lex) {
+    if (!guest_task_bound || !guest_fibers[guest_current].source_context)
+        return;
+    unsigned char *cc = guest_fibers[guest_current].source_context->mirror;
+    guest_context_files_clear(cc);
+    unsigned char **next = (unsigned char **)(cc + guest_cc_files_off);
+    int depth = -1;
+    for (CLexFile *file = lex->file; file; file = file->last)
+        depth += !!file->is_file;
+    for (CLexFile *file = lex->file; file; file = file->last) {
+        unsigned char *mirror = __AIWNIOS_CAlloc(guest_lex_size,
+            &guest_fibers[guest_current].heap_owner);
+        *(void **)(mirror + guest_lex_buf_off) = file->text;
+        *(void **)(mirror + guest_lex_ptr_off) = file->text + file->pos;
+        *(int64_t *)(mirror + guest_lex_line_off) = file->ln + 1;
+        *(int64_t *)(mirror + guest_lex_flags_off) = file->is_file ? 0 : 2;
+        *(void **)(mirror + guest_lex_name_off) =
+            __AIWNIOS_StrDup(file->filename, &guest_fibers[guest_current].heap_owner);
+        *(int32_t *)(mirror + guest_lex_depth_off) = depth < 0 ? 0 : depth;
+        depth -= !!file->is_file;
+        *next = mirror;
+        next = (unsigned char **)mirror;
+    }
+}
+static void guest_context_enter(struct source_context *context, CLexer *lex,
+                                int interactive, int64_t flags) {
+    memset(context, 0, sizeof(*context));
+    if (!guest_task_bound)
+        return;
+    struct guest_fiber *f = &guest_fibers[guest_current];
+    context->previous = f->source_context;
+    context->owned = !interactive || context->previous != NULL;
+    context->mirror = context->owned ? guest_context_new(flags) : guest_prompt_context();
+    f->source_context = context;
+    lex->port_options = (int64_t *)(context->mirror + guest_cc_opts_off);
+    lex->port_sync = guest_context_sync;
+    guest_context_sync(lex);
+}
+static void guest_context_leave(struct source_context *context) {
+    if (!context->mirror)
+        return;
+    struct guest_fiber *f = &guest_fibers[guest_current];
+    guest_context_files_clear(context->mirror);
+    if (context->owned) {
+        unsigned char *next = *(unsigned char **)context->mirror;
+        unsigned char *last = *(unsigned char **)(context->mirror + 8);
+        *(void **)last = next;
+        *(void **)(next + 8) = last;
+        free(context->mirror);
+    }
+    f->source_context = context->previous;
+}
+
 /* Parsing/emission cannot yield. Keep a statement checkpoint outside the
  * managed heaps: parser failures can leave half-built hash entries, changed
  * existing externs and freed/reused allocations. Restoring both arenas also
@@ -4355,7 +4484,7 @@ static void compiler_source_cleanup(CCmpCtrl *cc, CLexer *lex) {
 }
 static int64_t execute_source_mode(const char *path, const char *src,
                                    int return_expr, int record_answer,
-                                   const char *initial_dir, int just_load,
+                                   const char *initial_dir, int64_t guest_flags, int just_load,
                                    int recover, int *error) {
     CLexer *lex = LexerNew((char *)path, (char *)src);
     lex->file->is_file = 1;
@@ -4377,6 +4506,8 @@ static int64_t execute_source_mode(const char *path, const char *src,
     CCmpCtrl *cc = CmpCtrlNew(lex);
     cc->flags |= CCF_STRINGS_ON_HEAP;
     CodeCtrlPush(cc);
+    struct source_context context;
+    guest_context_enter(&context, lex, !strcmp(path, "<shell>"), guest_flags);
     int previous_compiling = guest_task_exe_active;
     int started = 0;
     int64_t result = 0;
@@ -4389,6 +4520,9 @@ static int64_t execute_source_mode(const char *path, const char *src,
                 compiler_recovery_active = 0;
                 compiler_checkpoint_restore();
                 guest_task_exe_active = previous_compiling;
+                if (context.mirror)
+                    (*(int64_t *)(context.mirror + guest_cc_errors_off))++;
+                guest_context_leave(&context);
                 compiler_source_cleanup(cc, lex);
                 compiler_recovery_errors++;
                 if (error)
@@ -4418,8 +4552,10 @@ static int64_t execute_source_mode(const char *path, const char *src,
         CRPN *first = (CRPN *)cc->code_ctrl->ir_code->next;
         int has_statement = first != (CRPN *)cc->code_ctrl->ir_code &&
                             first->type != IC_NOP;
+        int explicit_return = first != (CRPN *)cc->code_ctrl->ir_code &&
+                              first->type == IC_RET;
         int64_t raw_type = RT_U0;
-        if (record_answer && first != (CRPN *)cc->code_ctrl->ir_code) {
+        if ((record_answer || return_expr) && first != (CRPN *)cc->code_ctrl->ir_code) {
             if (first->type == IC_RET)
                 first = (CRPN *)first->base.next;
             if (first != (CRPN *)cc->code_ctrl->ir_code && first->type != IC_NOP)
@@ -4427,10 +4563,10 @@ static int64_t execute_source_mode(const char *path, const char *src,
         }
         /* The Aiwnios file loader discards each top-level expression. ExePrint
          * returns its last value, so give each TaskExe statement a return.
-         * Definition-only statements are emitted as IC_NOP and supply no
-         * additional expression result. */
-        if (return_expr && cc->code_ctrl->ir_code->next != cc->code_ctrl->ir_code &&
-            ((CRPN *)cc->code_ctrl->ir_code->next)->type != IC_NOP) {
+         * Definition-only and control-flow statements supply no expression
+         * operand. Wrapping a final IC_LABEL in IC_RET consumes that label,
+         * leaving its branches unbound. Explicit returns already have RET. */
+        if (return_expr && !explicit_return && raw_type > RT_UNDEF) {
             CRPN *ret = __AIWNIOS_CAlloc(sizeof(*ret), NULL);
             ret->type = IC_RET;
             QueIns((CQue *)ret, cc->code_ctrl->ir_code);
@@ -4439,6 +4575,8 @@ static int64_t execute_source_mode(const char *path, const char *src,
         compiler_recovery_active = 0;
         guest_task_exe_active = previous_compiling;
         if (code) {
+            if (lex->port_sync)
+                lex->port_sync(lex);
             uint64_t start = record_answer ? counter_now() : 0;
             int source_job = guest_task_bound &&
                              guest_fibers[guest_current].source_job_active;
@@ -4470,12 +4608,13 @@ static int64_t execute_source_mode(const char *path, const char *src,
         CodeCtrlPop(cc);
         CodeCtrlPush(cc);
     }
+    guest_context_leave(&context);
     compiler_source_cleanup(cc, lex);
     return just_load ? 1 : result;
 }
 static int64_t execute_source_result(const char *path, const char *src,
                                      int return_expr, int record_answer) {
-    return execute_source_mode(path, src, return_expr, record_answer, NULL, 0, 1, NULL);
+    return execute_source_mode(path, src, return_expr, record_answer, NULL, 0, 0, 1, NULL);
 }
 static int64_t host_exe_puts(int64_t *a) {
     const char *source = (const char *)(uintptr_t)a[0];
@@ -4505,7 +4644,7 @@ static int64_t host_exe_puts(int64_t *a) {
     f->source_job_active++;
     guest_task_exe_active = 1;
     int64_t result = execute_source_mode(filename ? path : "<ExePutS>",
-        source, 1, 1, guest_current_dir(), !!(a[2] & 0x040), 1, NULL);
+        source, 1, 1, guest_current_dir(), a[2], !!(a[2] & 0x040), 1, NULL);
     guest_task_exe_active = 0;
     f->source_job_active--;
     return result;
@@ -4742,7 +4881,7 @@ static int64_t host_call_ext_str(int64_t *a) {
     return FFI_CALL_TOS_0(fun->fun_ptr);
 }
 static int execute_source(const char *path, const char *src) {
-    (void)execute_source_mode(path, src, 0, 0, NULL, 0, 0, NULL);
+    (void)execute_source_mode(path, src, 0, 0, NULL, 0, 0, 0, NULL);
     return 0;
 }
 static int load_inner(const char *path);
@@ -4776,7 +4915,7 @@ static int load_source_path(const char *path, int merged, int recover) {
         PrsBindCSymbol("text", guest_text_globals, 0);
     }
     int compile_error = 0;
-    (void)execute_source_mode(path, src, 0, 0, NULL, 0, recover, &compile_error);
+    (void)execute_source_mode(path, src, 0, 0, NULL, 0, 0, recover, &compile_error);
     if (compile_error) {
         free(src);
         return -1;
@@ -4965,7 +5104,6 @@ static int load_source_path(const char *path, int merged, int recover) {
         PrsBindCSymbol("ZcGrUpdateTaskWin", host_gr_update_task_win, 1);
         PrsBindCSymbol("ZcODEsUpdate", host_ode_update_task, 1);
         PrsBindCSymbol("ZcGrUpdateTaskODEs", host_gr_update_task_odes, 1);
-        PrsBindCSymbol("Option", host_option, 2);
         PrsBindCSymbol("DistSqrI64", host_dist_sqr_i64, 4);
         PrsBindCSymbol("SwapU16", host_swap_u16, 2);
         PrsBindCSymbol("ClampI64", host_clamp_i64, 3);
@@ -5066,7 +5204,7 @@ int zc_exec(const char *src) {
      * answer path. Module loads keep their separate load-only path. */
     int compile_error = 0;
     (void)execute_source_mode("<shell>", src, guest_task_bound, guest_task_bound,
-                              NULL, 0, 1, &compile_error);
+                              NULL, 0x001 | 0x002 | 0x004, 0, 1, &compile_error);
     guarded = 0;
     return compile_error ? -1 : 0;
 }
@@ -5121,6 +5259,8 @@ int zc_call(const char *name, int64_t *out) {
         guarded = 0;
         return -1;
     }
+    if (guest_task_bound && !guest_fibers[guest_current].source_context)
+        (void)guest_prompt_context();
     if (key_reset)
         key_reset();
     int64_t r = FFI_CALL_TOS_0(f->fun_ptr);

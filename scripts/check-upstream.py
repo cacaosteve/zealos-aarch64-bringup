@@ -38,4 +38,8 @@ start = compiler_source.index('I64 ExeFile(U8 *name, I64 ccf_flags=0)')
 end = compiler_source.index('\nI64 RunFile(', start)
 if compiler_source[start:end].strip() not in (root/'upstream/bootstrap/System/TaskBridge.ZC').read_text():
     raise SystemExit('ExeFile wrapper drifted from pinned CMain source')
-print('PASS pinned Aiwnios originals + documented patch; unchanged ZealOS files; Win progress and ExeFile fixtures')
+compiler_misc = (zeal/'Compiler/CMisc.ZC').read_text()
+option_end = compiler_misc.index('\nasm {')
+if compiler_misc[:option_end].strip() not in (root/'upstream/bootstrap/System/TaskBridge.ZC').read_text():
+    raise SystemExit('Option / OptionGet bodies drifted from pinned CMisc source')
+print('PASS pinned Aiwnios originals + documented patch; unchanged ZealOS files; Win progress, ExeFile and Option fixtures')

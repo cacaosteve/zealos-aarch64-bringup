@@ -2648,3 +2648,54 @@ The screenshot is preserved at `build/compiler-recovery-utm-accepted.png`.
 Automation keys reached UTM again during this check. Physical typing and
 pointer/drag acceptance remain the earlier native USB baseline; they were not
 repeated for this compiler-only update.
+
+## Guest compiler contexts and options (2026-10-17)
+
+`Option` and `OptionGet` now use the unchanged bodies from pinned
+`Compiler/CMisc.ZC`, replacing the no-state host stub. Native compiler
+invocations join the calling task's `next_cc` / `last_cc` queue using checked
+`CCompCtrl` field offsets from KernelA. Nested invocations inherit their
+outer context's option word; removal restores that outer context on normal
+return or compiler error. Interactive host commands retain a prompt context
+between lines, matching the persistent compiler state of an upstream prompt.
+Spawned callbacks begin with an empty compiler queue; their first source
+invocation receives CompCtrlNew's defaults, independently of their parent's
+compiler options.
+
+The native lexer reads the live option word for `OPTf_DECIMAL_ONLY` and
+`OPTf_NO_FLOATS`, and the register allocator honors `OPTf_NO_REG_VAR` for
+locals and parameters. Source lookahead still matters when changing options
+inside a source stream, as it does upstream. Include metadata exposes the
+current file, line, depth and include/macro chain before runtime statements
+and preprocessor expressions execute. Metadata buffers and temporary compiler
+contexts are released on both success and recovered errors.
+
+The interleaved-task test also exposed a source-execution bug: the host added
+an implicit return to every top-level statement, including a loop's closing
+label. That return consumed the label and left branch patches unresolved.
+Implicit returns now wrap value expressions only; existing explicit returns
+are retained. The regression gate executes top-level while/for/do/if source,
+then compiles in another task while a source invocation is suspended in Yield.
+Lexer diagnostics now end with a newline, so their recovery message remains
+visible on a separate line. The new option errors fit the default terminal
+width rather than clipping the option name at the right border.
+
+This establishes the context/option boundary, not the full upstream compiler
+implementation. Native IR, parser/hash context, token and code-generation
+fields are not reinterpreted as upstream CCompCtrl fields. Other option bits
+can be stored/read by the upstream API, but their diagnostic and optimization
+effects still need native implementations. Full `#exe` stream semantics,
+LastFun/RunFile, arbitrary hash-table contexts and full upstream startup remain
+work.
+
+Validation: 407 full PCI checks, 325 full ISO checks and 225 NEC two-hub/VirtIO
+graphical workflow checks passed on the final build. These include compiler
+recovery, nested queues, option inheritance and task isolation across yields,
+include metadata, register-disabled floating-argument functions, top-level
+control flow and repeated failures without managed-arena growth. The graphical
+test observed the complete option error and recovery text, verified the
+rejected assignment had no effect, disabled the option and verified the same
+assignment produced 42. Saved-file execution, editor persistence across reboot,
+twelve keyboard reconnects, tablet fallback/reattach and whole-hub recovery
+also passed. Source pins/overlays, Python syntax and whitespace checks passed;
+the Pi diagnostic target built, without new Pi hardware acceptance.

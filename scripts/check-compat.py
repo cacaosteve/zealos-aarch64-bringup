@@ -36,6 +36,8 @@ p.add_argument('--probe-source-execute', action='store_true',
                help='check upstream ExeFile through the native compiler, including task-local and nested files')
 p.add_argument('--probe-compiler-recovery', action='store_true',
                help='check statement rollback, continued execution and task-local compiler error recovery')
+p.add_argument('--probe-compiler-context', action='store_true',
+               help='check guest compiler contexts, option inheritance, restrictions and task isolation')
 p.add_argument('--probe-winmgr', action='store_true',
                help='also try the unchanged WinMgr.ZC load with a short timeout after Win.ZC')
 p.add_argument('--probe-grscreen', action='store_true',
@@ -352,6 +354,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         qcodes = {
             ' ': ('spc',), '/': ('slash',), '.': ('dot',),
             ';': ('semicolon',), ':': ('shift', 'semicolon'), '\n': ('ret',),
+            ',': ('comma',),
             '"': ('shift', 'apostrophe'), "'": ('apostrophe',),
             '_': ('shift', 'minus'),
             '=': ('equal',),
@@ -590,6 +593,26 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             raise RuntimeError('compiler recovery diagnostics did not return to an inactive boundary')
         if args.probe_compiler_recovery:
             raise SystemExit(0)
+        command('zload /Tests/CompilerContext.ZC', 'zc: loaded /Tests/CompilerContext.ZC')
+        command('zcall CompilerContextChecks', 'zc => 0x000000000000002a')
+        command('zcall CompilerContextTaskChecks', 'zc => 0x000000000000002a')
+        command('zcall CompilerContextControlChecks', 'zc => 0x000000000000002a')
+        command('zcall CompilerContextYieldChecks', 'zc => 0x000000000000002a')
+        command('zcall CompilerContextRegChecks', 'zc => 0x000000000000002a')
+        command('zcall CompilerContextLeakChecks', 'zc => 0x000000000000002a')
+        before_context = command('zstatus', 'failed=0')
+        command('zcall CompilerContextLeakChecks', 'zc => 0x000000000000002a')
+        after_context = command('zstatus', 'failed=0')
+        if re.search(heap_pattern, before_context).groups() != re.search(heap_pattern, after_context).groups():
+            raise RuntimeError('compiler contexts leaked managed memory')
+        print('PASS compiler contexts restore nested queues and options without arena growth', flush=True)
+        command('zc Option(OPTf_DECIMAL_ONLY,ON);', 'zc: executed')
+        command('zc 0x2a;', 'disabled by OPTf_DECIMAL_ONLY')
+        command('zc Option(OPTf_DECIMAL_ONLY,OFF);', 'zc: executed')
+        command('zc 0x2a;', 'zc: executed')
+        command('zstatus', 'failed=0')
+        if args.probe_compiler_context:
+            raise SystemExit(0)
         if args.probe_gui_keyboard:
             # The source manager opens its menu when the uninitialized QMP
             # pointer rests in the top screen row. Select the actual client
@@ -797,6 +820,22 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     'zc => 0x0000000000000001')
             print('PASS QMP graphical window demo launch/stop restored the terminal and keyboard focus', flush=True)
             if args.probe_gui_workflow:
+                command('zc compiler_recovery_committed=0;', 'zc: executed')
+                qmp_send_text('zc Option(OPTf_DECIMAL_ONLY,ON);')
+                qmp_send_key('ret')
+                qmp_send_text('zc compiler_recovery_committed=0x2a;')
+                qmp_send_key('ret')
+                option_error = require_graphical_text('option-error', 'Hex constant disabled by OPTf_DECIMAL_ONLY.')
+                if 'current statement discarded' not in option_error[3]:
+                    raise RuntimeError('lexer error hid its recovery diagnostic in the graphical terminal')
+                command('zcall CompilerRecoveryResult', 'zc => 0x0000000000000000')
+                qmp_send_text('zc Option(OPTf_DECIMAL_ONLY,OFF);')
+                qmp_send_key('ret')
+                qmp_send_text('zc compiler_recovery_committed=0x2a;')
+                qmp_send_key('ret')
+                require_graphical_text('option-restored', 'zc compiler_recovery_committed=0x2a;')
+                command('zcall CompilerRecoveryResult', 'zc => 0x000000000000002a')
+                print('PASS graphical prompt retains compiler options across commands and recovered errors', flush=True)
                 command('zc compiler_recovery_committed=0;', 'zc: executed')
                 qmp_send_text('zc I64 GuiRecoveryBroken( {')
                 qmp_send_key('ret')
