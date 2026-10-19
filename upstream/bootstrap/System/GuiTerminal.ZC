@@ -248,33 +248,36 @@ CMenuEntry *BootstrapGuiTerminalMenuEntry(CTask *task, U8 *name, I64 action)
 
 U0 BootstrapGuiTerminalMenuInstall()
 {
-    CMenu *menu = CAlloc(sizeof(CMenu), Fs);
-    CMenuEntry *root = CAlloc(sizeof(CMenuEntry), Fs);
     CMenuEntry *entry;
+    I64 action = 1;
+    // Use ZealOS's MenuNew parser and renderer for the normal graphical boot
+    // menu. The action bridge still maps this bounded bootstrap command set,
+    // while nested menus and key/message arguments follow the upstream format.
+    CMenu *menu = MenuNew("OS { Help(); Status(); Files(); Disk(); WindowDemo(); TileHorz(); TileVert(); TileGrid(); }");
 
-    StrCopy(root->name, "OS");
-    root->dir = TRUE;
-    root->sub = BootstrapGuiTerminalMenuEntry(Fs, "Help", 1);
-    entry = root->sub;
-    entry->next = BootstrapGuiTerminalMenuEntry(Fs, "Status", 2);
-    entry = entry->next;
-    entry->next = BootstrapGuiTerminalMenuEntry(Fs, "Files", 3);
-    entry = entry->next;
-    entry->next = BootstrapGuiTerminalMenuEntry(Fs, "Disk", 4);
-    entry = entry->next;
-    entry->next = BootstrapGuiTerminalMenuEntry(Fs, "Window Demo", 5);
-    entry = entry->next;
-    entry->next = BootstrapGuiTerminalMenuEntry(
-            Fs, "Tile Windows Horizontally", 6);
-    entry = entry->next;
-    entry->next = BootstrapGuiTerminalMenuEntry(
-            Fs, "Tile Windows Vertically", 7);
-    entry = entry->next;
-    entry->next = BootstrapGuiTerminalMenuEntry(
-            Fs, "Tile Windows as Grid", 8);
-    menu->task = Fs;
+    if (!menu || !menu->sub || !menu->sub->sub)
+        throw('Menu');
+    // The upstream menu grammar takes identifiers as labels. Restore the
+    // familiar display strings after parsing so actions keep concise tokens.
+    entry = menu->sub->sub;
+    while (entry)
+    {
+        entry->message_code = MESSAGE_KEY_UP;
+        entry->arg1 = action++;
+        entry->arg2 = GUI_MENU_ACTION_TAG;
+        entry = entry->next;
+    }
+    entry = menu->sub->sub;
+    StrCopy(entry->name, "Help"); entry = entry->next;
+    StrCopy(entry->name, "Status"); entry = entry->next;
+    StrCopy(entry->name, "Files"); entry = entry->next;
+    StrCopy(entry->name, "Disk"); entry = entry->next;
+    StrCopy(entry->name, "Window Demo"); entry = entry->next;
+    StrCopy(entry->name, "Tile Windows Horizontally"); entry = entry->next;
+    StrCopy(entry->name, "Tile Windows Vertically"); entry = entry->next;
+    StrCopy(entry->name, "Tile Windows as Grid");
     menu->attr = BLUE << 4 + YELLOW;
-    menu->sub = root;
+    menu->next = Fs->cur_menu;
     Fs->cur_menu = menu;
 }
 

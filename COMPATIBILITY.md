@@ -3738,3 +3738,15 @@ and map-capacity bounds. `make esp` and `make pi-sd` build the UTM and distinct
 Pi diagnostic payloads. The Pi diagnostic prints the actual FDT windows and
 reservation on HDMI, and also reports a guarded root-complex status read over
 PL011; the physical check is still required before any VL805 config read.
+
+## Graphical boot menu uses native parser — 2026-10-19
+
+The graphical terminal's `OS` pull-down menu is now constructed with the
+upstream `MenuNew` parser and linked into the task's normal menu chain. The
+bootstrap action bridge still handles the bounded set of boot-menu commands;
+the established user-facing labels and actions are retained.
+
+`make check-home-autostart` and `make check-gui-workflow` passed, including
+menu structure/action checks, graphical input and caret, window-demo focus
+recovery, source execution, and editor save/compile/run/reopen. A final
+hands-on UTM check of menu drawing and selection remains pending.
