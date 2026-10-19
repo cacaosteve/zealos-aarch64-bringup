@@ -20,6 +20,7 @@ make check-usb-topology # nested USB2 hubs, repeated reconnects + subtree recove
 make check-task-settings # upstream application state + task-local directories
 make check-source-context # directory masks + relative document/project files
 make check-source-execute # upstream ExeFile + native task-local file execution
+make check-source-editor # full-screen editor scanout + save/reopen/run
 make check-compiler-recovery # malformed source, statement rollback and task/stack recovery
 make check-compiler-context # compiler queues, option inheritance and task isolation
 make check-run-file     # task-local LastFun + upstream RunFile with application arguments
@@ -93,6 +94,10 @@ Nested native-only paths also synthesize their parent directories in recursive
 directory searches, and deleting the last native file removes those synthesized
 directories from the merged view. Serial uploads refresh the same listing cache
 as ordinary saves and deletes.
+While `zedit` is active, the full-screen source view is composited over the
+desktop every frame; enter its line-edit commands in UTM's built-in Terminal 1.
+`make check-source-editor` checks visible controls and edits, modified/saved
+state, disk reopen, and execution of the saved file.
 The complete unchanged upstream
 `KernelA.HH` and `KernelB.HH` load as declaration headers in that order.
 The boot terminal's OS menu includes a Window Demo entry that launches the

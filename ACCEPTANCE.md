@@ -83,6 +83,30 @@ The live UTM check is separate from QMP injection, which bypasses UTM's host
 keyboard capture. Keep the display adapter and serial mode fixed during this
 gate so input/rendering changes can be compared against the same VM setup.
 
+## Native source-editor scanout gate
+
+`zedit` is controlled from the built-in Terminal 1 serial shell while its
+full-screen source view is drawn on the guest display. After `make utm`, enter
+these commands one at a time in Terminal 1 and inspect the UTM display between
+commands:
+
+```text
+zedit App/EditorScanout.ZC
+a I64 EditorScanout(){return 40+2;}
+wq
+zload disk:App/EditorScanout.ZC
+zcall EditorScanout
+zedit App/EditorScanout.ZC
+q
+```
+
+The first editor view should show its navigation/save controls. After `a`, the
+source line and `[modified]` state should be visible; after `wq`, reopening the
+file should show the same line and `[saved]`. `zcall` should return
+`0x000000000000002a`. This eyes-on check complements
+`make check-source-editor`, which verifies the same scanout and persistence
+path in the disposable PCI guest.
+
 ## Application settings gate
 
 Run `make check-task-settings` on a disposable PCI guest. It boots the
