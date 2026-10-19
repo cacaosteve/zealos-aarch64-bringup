@@ -1,7 +1,15 @@
 // Bare HolyC string statements use Print's (format, argc, argv) ABI.
+DefineLoad("TaskPrintExpansionCheck", "expanded define text");
 I64 TaskPrintChecks()
 {
     U8 *dynamic_format = " %s\n";
+    U8 *expanded = MStrPrint("%S", "TaskPrintExpansionCheck");
+    if (!expanded || StrCompare(expanded, "expanded define text"))
+    {
+        Free(expanded);
+        return 1;
+    }
+    Free(expanded);
     "$$PT$$%c$$FG$$", 'A';
     " %s %% %c\n", "text", 'BC';
     "" dynamic_format, "tail";

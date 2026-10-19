@@ -5530,7 +5530,8 @@ static size_t format_text(char *output, size_t capacity, const char *format,
             FMT_BYTE('%');
             continue;
         }
-        if (code != 'c' && code != 'C' && code != 's' && code != 'Q' && code != 'Z' &&
+        if (code != 'c' && code != 'C' && code != 's' && code != 'Q' &&
+            code != 'S' && code != 'Z' &&
             code != 'd' && code != 'x' && code != 'X' &&
             code != 'f' && code != 'F')
         {
@@ -5547,7 +5548,7 @@ static size_t format_text(char *output, size_t capacity, const char *format,
                 if (!ch) break;
                 FMT_BYTE(ch);
             }
-        } else if (code == 's' || code == 'Q' || code == 'Z') {
+        } else if (code == 's' || code == 'Q' || code == 'S' || code == 'Z') {
             size_t field_start = used;
             const char *s;
             if (code == 'Z') {
@@ -5557,6 +5558,14 @@ static size_t format_text(char *output, size_t capacity, const char *format,
                     zc_fail("format %Z requires DefineSub");
                 s = (const char *)(uintptr_t)FFI_CALL_TOS_2(sub->fun_ptr, argv[arg], argv[arg + 1]);
                 arg += 2;
+                if (!s) s = "";
+            } else if (code == 'S') {
+                CHashFun *define = (CHashFun *)HashFind("Define", Fs->hash_table, HTT_FUN, 1);
+                if (!define || !define->fun_ptr || define->argc != 1 ||
+                    (define->base.base.type & HTF_EXTERN))
+                    zc_fail("format %S requires Define");
+                s = (const char *)(uintptr_t)FFI_CALL_TOS_1(define->fun_ptr, argv[arg]);
+                arg++;
                 if (!s) s = "";
             } else s = (const char *)(uintptr_t)argv[arg++];
             if (!s) zc_fail("format %s argument is null");

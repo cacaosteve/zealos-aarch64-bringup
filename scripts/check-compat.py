@@ -2230,8 +2230,12 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                             'zc => 0x000000000000002a')
             if args.probe_module_override:
                 override_data = args.probe_module_override.read_bytes()
-                upload_source('Probe/ModuleOverride.ZC', override_data)
-                probe_path = 'disk:Probe/ModuleOverride.ZC'
+                # The guest's persistent source volume only contains the
+                # standard App directory. zrecv does not create parent dirs.
+                override_result = upload_source('App/ModuleOverride.ZC', override_data)
+                if 'zrecv: saved App/ModuleOverride.ZC' not in override_result:
+                    raise RuntimeError('module override transfer failed:\n'+override_result)
+                probe_path = 'disk:App/ModuleOverride.ZC'
             else:
                 probe_path = args.probe_module
             guest.stdin.write(('zload '+probe_path+'\r').encode())
