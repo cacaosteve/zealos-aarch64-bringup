@@ -657,6 +657,10 @@ check-home-autostart: check-upstream esp
 	python3 scripts/check-arm64-source.py
 	python3 scripts/check-compat.py --pci --probe-home-autostart
 
+.PHONY: check-source-editor
+check-source-editor: check-upstream esp
+	python3 scripts/check-compat.py --pci --probe-source-editor
+
 .PHONY: check-dvd-live
 check-dvd-live: check-upstream esp iso
 	python3 scripts/check-arm64-source.py

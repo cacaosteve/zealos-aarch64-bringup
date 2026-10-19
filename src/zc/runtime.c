@@ -432,6 +432,7 @@ static int64_t execute_source_result(const char *path, const char *src,
                                      int return_expr, int record_answer);
 extern void __clear_cache(void *, void *);
 extern int64_t zc_gui_shell_exec(int64_t *);
+extern int64_t zc_source_editor_overlay_render(int64_t *);
 void zc_fail(const char *s) __attribute__((noreturn));
 
 void zc_output(const char *s) {
@@ -5817,8 +5818,11 @@ static int load_source_path(const char *path, int merged, int recover) {
         PrsBindCSymbol("ZcUserPutExcept", host_user_put_except, 0);
         PrsBindCSymbol("ZcUserInputComplete", host_user_input_complete, 1);
     }
-    if (!strcmp(path, "/System/GuiTerminal.ZC"))
+    if (!strcmp(path, "/System/GuiTerminal.ZC")) {
         PrsBindCSymbol("ZcGuiShellExec", host_gui_shell_exec, 1);
+        PrsBindCSymbol("ZcSourceEditorOverlayRender",
+                       zc_source_editor_overlay_render, 0);
+    }
     if (!strcmp(path, "/System/DolDoc/DocCompiler.ZC")) {
         CHashClass *input = (CHashClass *)HashFind("CArmDocInput", Fs->hash_table, HTT_CLASS, 1);
         if (!input || !task_field(input, "doc", 8, 0) ||

@@ -50,6 +50,8 @@ p.add_argument('--probe-user-command', action='store_true',
                help='check original ExeCmdLine/UserTaskCont through the ARM64 compiler ABI')
 p.add_argument('--probe-user-startup', action='store_true',
                help='check original User/UserCmdLine, HomeSys hooks and independent graphical terminals')
+p.add_argument('--probe-source-editor', action='store_true',
+               help='check the full-screen native source editor controls, scanout and save/reopen path')
 p.add_argument('--probe-user-text', action='store_true',
                help='check User formatted startup and XTalk input-filter delivery to graphical terminals')
 p.add_argument('--probe-home-path', action='store_true',
@@ -118,6 +120,8 @@ if args.probe_source and not args.pci:
     p.error('--probe-source requires --pci')
 if args.probe_home_autostart and not args.pci:
     p.error('--probe-home-autostart requires --pci')
+if args.probe_source_editor and not args.pci:
+    p.error('--probe-source-editor requires --pci')
 if args.probe_autocomplete and not args.pci:
     p.error('--probe-autocomplete requires --pci')
 if args.probe_gui_terminal and (
@@ -151,6 +155,7 @@ log_path = ROOT / 'build' / (f'check-usb-{usb_label}{"-windowdemo-input" if args
                              'check-home-once-pci.log' if args.probe_home_once and args.pci else
                              'check-home-once-iso.log' if args.probe_home_once else
                              'check-dvd-live.log' if args.probe_dvd_live else
+                             'check-source-editor-pci.log' if args.probe_source_editor else
                              'check-home-autostart-pci.log' if args.probe_home_autostart else
                              'check-autocomplete-pci.log' if args.probe_autocomplete else
                              'check-input-edges-pci.log' if args.probe_input_edges else
@@ -787,6 +792,30 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             require_graphical_text('dvd-live-help', 'Graphical commands:')
             print('PASS ISO/DVD startup reaches the graphical live terminal, reports installer status, and accepts input', flush=True)
             raise SystemExit(0)
+        if args.probe_source_editor:
+            editor_command('zedit App/EditorScanout.ZC',
+                           'zedit: new App/EditorScanout.ZC')
+            require_graphical_text('zedit-navigation-controls',
+                                   'j/k line  [/] page  g/G top/end')
+            require_graphical_text('zedit-save-controls',
+                                   'p [line [count]]  w save  wq save+close')
+            editor_command('a I64 EditorScanout(){return 40+2;}',
+                           'zedit: added line 1')
+            require_graphical_text('zedit-visible-source',
+                                   '1:> I64 EditorScanout(){return 40+2;}')
+            require_graphical_text('zedit-modified-state', '[modified]')
+            editor_command('wq', 'zedit: saved App/EditorScanout.ZC', finish=True)
+            command('zload disk:App/EditorScanout.ZC',
+                    'zc: loaded disk:App/EditorScanout.ZC')
+            command('zcall EditorScanout', 'zc => 0x000000000000002a')
+            editor_command('zedit App/EditorScanout.ZC',
+                           'zedit: opened App/EditorScanout.ZC')
+            require_graphical_text('zedit-reopened-source',
+                                   '1:> I64 EditorScanout(){return 40+2;}')
+            require_graphical_text('zedit-saved-state', '[saved]')
+            editor_command('q', 'zedit: closed', finish=True)
+            print('PASS full-screen source editor controls, visible edits, save/reopen and execution', flush=True)
+            raise SystemExit(0)
         if args.probe_gui_windowdemo_input:
             focus_graphical_terminal()
             qmp_send_text('edit /System/DolDoc/DocEd.ZC')
@@ -1145,6 +1174,10 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 qmp_send_key('up')
                 command('zc Print("history_isolated=%d\\n",BootstrapGuiTerminalState(bootstrap_gui_terminal_task)->history_len==user_startup_first_history_before);',
                         'history_isolated=1')
+                # Up above intentionally recalled the primary terminal's
+                # history; Down clears that recalled line before the fresh
+                # visible-typing check below.
+                qmp_send_key('down')
                 qmp_send_text('Print("First %d\\n",40+2);')
                 typed = require_graphical_text('user-first-typing','Print("First %d\\n",40+2);')
                 require_graphical_caret(typed,'Print("First %d\\n",40+2);')
@@ -3170,6 +3203,10 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         command('rspersist', 'rspersist ok')
         if args.pci:
             editor_command('zedit App/Editor.ZC', 'zedit: new App/Editor.ZC')
+            require_graphical_text('zedit-navigation-controls',
+                                   'j/k line  [/] page  g/G top/end')
+            require_graphical_text('zedit-save-controls',
+                                   'p [line [count]]  w save  wq save+close')
             editor_command('a I64 Edited(){return 17;}', 'zedit: added line 1')
             editor_command('n // cursor insertion', 'zedit: inserted line 1')
             editor_command('j', 'zedit: cursor line 2')

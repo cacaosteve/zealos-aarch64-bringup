@@ -15,6 +15,7 @@ I64 bootstrap_gui_terminal_input_len;
 I64 bootstrap_gui_terminal_last_edit_result;
 U0 (*bootstrap_gui_terminal_final_update)(CDC *dc);
 extern U8 *ZcGuiShellExec(U8 *line);
+extern I64 ZcSourceEditorOverlayRender();
 extern CDoc *DocRead(U8 *name=NULL, I64 flags=0);
 extern U0 DocDel(CDoc *doc);
 extern I64 ExeDoc(CDoc *doc, I64 ccf_flags=0);
@@ -668,6 +669,9 @@ U0 BootstrapGuiTerminalFinalUpdate(CDC *dc)
             dc->color.c0 = old_color;
         }
     }
+    // zedit owns the frame while it is active. Render it after the compositor
+    // so a window redraw cannot erase the editor before scanout.
+    ZcSourceEditorOverlayRender();
     // Preserve the source menu/progress/mouse overlay, with the pointer last.
     if (bootstrap_gui_terminal_final_update)
         (*bootstrap_gui_terminal_final_update)(dc);

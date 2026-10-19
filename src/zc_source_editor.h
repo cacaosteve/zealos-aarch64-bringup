@@ -16,70 +16,102 @@ static int zedit_bounds(uint32_t number, uint32_t *start, uint32_t *end);
 /* The editor keeps the existing command-based edits, but uses the framebuffer
  * as a stable full-screen source view. fb_putc updates the retained shell text
  * plane without sending these redraw bytes to the serial console. */
-static void zedit_fb_puts(const char *text) {
-    while (*text) fb_putc(*text++);
-}
-
-static void zedit_fb_number(uint32_t value) {
-    char digits[10];
-    uint32_t count = 0;
-    do {
-        digits[count++] = (char)('0' + value % 10u);
-        value /= 10u;
-    } while (value && count < sizeof(digits));
-    while (count) fb_putc(digits[--count]);
-}
-
 static void zedit_render(void) {
-    if (!g_fb || !g_zedit.active) return;
+    if (!g_zedit.active) return;
     uint32_t rows = g_fb_rows < ZEAL_TEXT_MAX_ROWS ? g_fb_rows : ZEAL_TEXT_MAX_ROWS;
     uint32_t cols = g_fb_cols < ZEAL_TEXT_MAX_COLS ? g_fb_cols : ZEAL_TEXT_MAX_COLS;
-    if (rows < 6 || !cols) return;
+    if (rows < 8 || !cols) return;
 
-    uint32_t capacity = rows - 5u;
+    uint32_t capacity = rows - 7u;
     uint32_t lines = zedit_lines();
     if (!g_zedit.view_first) g_zedit.view_first = 1;
     if (g_zedit.view_first > lines && lines) g_zedit.view_first = lines;
     if (g_zedit.view_count > capacity) g_zedit.view_count = capacity;
     if (!g_zedit.view_count) g_zedit.view_count = capacity;
+}
 
-    fb_clear(0x00101820u);
-    zedit_fb_puts("zedit ");
-    zedit_fb_puts(g_zedit.name);
-    zedit_fb_puts(g_zedit.dirty ? "  [modified]" : "  [saved]");
-    fb_putc('\n');
+/* Draw from the compositor's final-update callback, after the window manager
+ * has repainted its surfaces. The old fb_clear/fb_putc path was only a
+ * transient framebuffer scribble and vanished on the next composite frame. */
+int64_t zc_source_editor_overlay_render(int64_t *args) {
+    char line[ZEAL_TEXT_MAX_COLS + 1u];
+    uint32_t rows, cols;
+    (void)args;
+    if (!g_fb || !g_zedit.active) return 0;
+    rows = g_fb_rows < ZEAL_TEXT_MAX_ROWS ? g_fb_rows : ZEAL_TEXT_MAX_ROWS;
+    cols = g_fb_cols < ZEAL_TEXT_MAX_COLS ? g_fb_cols : ZEAL_TEXT_MAX_COLS;
+    if (rows < 8 || !cols) return 0;
+    zedit_render();
+    uint32_t lines = zedit_lines();
+
+    (void)zeal_fb_graph_rect(0, 0, g_fb_w, g_fb_h, 0x00101820u,
+                             0, 0, (int64_t)g_fb_w - 1,
+                             (int64_t)g_fb_h - 1, 0);
+    size_t at = 0;
+    const char *title = "zedit ";
+    while (*title && at < cols) line[at++] = *title++;
+    for (uint32_t i = 0; g_zedit.name[i] && at < cols; i++)
+        line[at++] = g_zedit.name[i];
+    const char *state = g_zedit.dirty ? "  [modified]" : "  [saved]";
+    for (size_t i = 0; state[i] && at < cols; i++) line[at++] = state[i];
+    line[at] = 0;
+    (void)zeal_fb_graph_text(0, 8, 0x00ffffffu, 0, 0,
+                             (int64_t)g_fb_w - 1, (int64_t)g_fb_h - 1,
+                             line, 0);
+    (void)zeal_fb_graph_text(0, 16, 0x00ffffffu, 0, 0,
+                             (int64_t)g_fb_w - 1, (int64_t)g_fb_h - 1,
+                             g_zedit.dirty ? "[modified]" : "[saved]", 0);
 
     uint32_t shown = 0;
     for (uint32_t number = g_zedit.view_first;
          number <= lines && shown < g_zedit.view_count; number++, shown++) {
         uint32_t start, end;
         if (!zedit_bounds(number, &start, &end)) break;
-        zedit_fb_number(number);
-        zedit_fb_puts(number == g_zedit.cursor_line ? ":> " : ":  ");
-        uint32_t room = cols > 14u ? cols - 14u : 1u;
+        at = 0;
+        char digits[10];
+        uint32_t digit_count = 0, value = number;
+        do {
+            digits[digit_count++] = (char)('0' + value % 10u);
+            value /= 10u;
+        } while (value && digit_count < sizeof(digits));
+        while (digit_count && at < cols) line[at++] = digits[--digit_count];
+        const char *marker = number == g_zedit.cursor_line ? ":> " : ":  ";
+        for (size_t i = 0; marker[i] && at < cols; i++) line[at++] = marker[i];
+        uint32_t room = cols > at ? cols - (uint32_t)at : 0;
         uint32_t copied = 0;
         for (uint32_t i = start; i < end && g_zedit.text[i] != '\n'; i++) {
             if (copied == room) {
-                fb_putc('.'); fb_putc('.'); fb_putc('.');
+                if (room >= 3 && at >= 3) {
+                    line[at - 3] = '.';
+                    line[at - 2] = '.';
+                    line[at - 1] = '.';
+                }
                 break;
             }
-            fb_putc(g_zedit.text[i]);
+            line[at++] = g_zedit.text[i];
             copied++;
         }
-        fb_putc('\n');
+        line[at] = 0;
+        uint32_t row = 4u + shown;
+        (void)zeal_fb_graph_text(0, (int64_t)row * 8,
+                                 0x00ffffffu,
+                                 0, 0, (int64_t)g_fb_w - 1,
+                                 (int64_t)g_fb_h - 1, line, 0);
     }
 
-    g_fb_cx = 0;
-    g_fb_cy = rows - 3u;
-    zedit_fb_puts("j/k move  e edit  n insert  x delete  p page  w save  q close");
-    g_fb_cx = 0;
-    g_fb_cy = rows - 2u;
-    zedit_fb_puts("view "); zedit_fb_number(g_zedit.view_first);
-    zedit_fb_puts("  lines "); zedit_fb_number(lines);
-    zedit_fb_puts(g_zedit.dirty ? "  unsaved" : "  saved");
-    /* shell_run writes the edit> prompt at this reserved final row. */
-    g_fb_cx = 0;
-    g_fb_cy = rows - 1u;
+    (void)zeal_fb_graph_text(0, (int64_t)(rows - 3u) * 8, 0x00ffffffu,
+                             0, 0, (int64_t)g_fb_w - 1,
+                             (int64_t)g_fb_h - 1,
+                             "j/k line  [/] page  g/G top/end  e edit  n insert  x delete", 0);
+    (void)zeal_fb_graph_text(0, (int64_t)(rows - 2u) * 8, 0x00ffffffu,
+                             0, 0, (int64_t)g_fb_w - 1,
+                             (int64_t)g_fb_h - 1,
+                             "p [line [count]]  w save  wq save+close  q close  q! discard", 0);
+    (void)zeal_fb_graph_text(0, (int64_t)(rows - 1u) * 8, 0x0000ffffu,
+                             0, 0, (int64_t)g_fb_w - 1,
+                             (int64_t)g_fb_h - 1,
+                             "edit> commands are entered in the serial shell", 0);
+    return 0x2a;
 }
 
 static uint32_t zedit_lines(void) {
