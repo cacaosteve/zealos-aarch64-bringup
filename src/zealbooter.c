@@ -592,7 +592,7 @@ void kmain(void) {
     g_handoff.magic0 = ZEAL_HANDOFF_MAGIC_0;
     g_handoff.magic1 = ZEAL_HANDOFF_MAGIC_1;
     g_handoff.size = (uint32_t)sizeof(g_handoff);
-    g_handoff.revision = 3;
+    g_handoff.revision = 4;
     g_handoff.bootloader_id = ZEAL_BL_LIMINE;
     g_handoff.flags = is_pi ? ZEAL_FLAG_PLAT_PI4 : 0;
     g_handoff.hhdm_offset = hhdm;
@@ -645,6 +645,7 @@ void kmain(void) {
     }
 
     struct limine_file *mod = module_request.response->modules[0];
+    g_handoff.boot_media_type = mod->media_type;
     if (is_pi) {
         fb_bar(240, 256, 0x40, 0xC0, 0xC0); /* teal = module present */
     }

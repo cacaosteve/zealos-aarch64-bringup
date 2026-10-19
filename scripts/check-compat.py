@@ -54,6 +54,8 @@ p.add_argument('--probe-home-path', action='store_true',
                help='check shared HomeSet, home file execution and reboot persistence')
 p.add_argument('--probe-registry', action='store_true',
                help='check DolDoc compiler input, registry trees and Once execution')
+p.add_argument('--probe-home-once', action='store_true',
+               help='check default include extension, real boot media and original home Once/tips')
 p.add_argument('--probe-input-edges', action='store_true',
                help='check visible modifier typing and held-key release without the full workflow')
 p.add_argument('--probe-source-exceptions', action='store_true',
@@ -127,7 +129,9 @@ if args.probe_live_window_control and not (
         args.probe_grscreen and args.probe_live_winmgr):
     p.error('--probe-live-window-control requires --probe-module /System/Win.ZC '
             '--probe-winmgr --probe-grscreen --probe-live-winmgr')
-log_path = ROOT / 'build' / (f'check-usb-{usb_label}{"-input-edges" if args.probe_input_edges else "-registry" if args.probe_registry else "-home-path" if args.probe_home_path else "-user-text" if args.probe_user_text else "-user-startup" if args.probe_user_startup else ""}.log' if args.usb_input else
+log_path = ROOT / 'build' / (f'check-usb-{usb_label}{"-home-once" if args.probe_home_once else "-input-edges" if args.probe_input_edges else "-registry" if args.probe_registry else "-home-path" if args.probe_home_path else "-user-text" if args.probe_user_text else "-user-startup" if args.probe_user_startup else ""}.log' if args.usb_input else
+                             'check-home-once-pci.log' if args.probe_home_once and args.pci else
+                             'check-home-once-iso.log' if args.probe_home_once else
                              'check-input-edges-pci.log' if args.probe_input_edges else
                              'check-registry-pci.log' if args.probe_registry and args.pci else
                              'check-registry-iso.log' if args.probe_registry else
@@ -308,8 +312,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             row = ''
             for x in range(0, width-7, 8):
                 bits = tuple(sum(0x80 >> col for col in range(8)
-                                 if pixels[((y+r)*width+x+col)*3:
-                                           ((y+r)*width+x+col)*3+3] == b'\xff\xff\xff')
+                                 if max(pixels[((y+r)*width+x+col)*3:
+                                               ((y+r)*width+x+col)*3+3]) > 32)
                              for r in range(8))
                 row += font.get(bits, font.get(tuple(v ^ 255 for v in bits), '?'))
             rows.append(row.rstrip())
@@ -607,6 +611,54 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             require_graphical_text('input-edges-recovered-answer', 'ans=0x2A=42')
             command('zstatus', 'keyboard_state: shift=0 ctrl=0 usb_modifiers=0 usb_repeat=0')
             print('PASS visible mixed-case/symbol input, held Shift+9, release and prompt recovery', flush=True)
+            raise SystemExit(0)
+        if args.probe_home_once:
+            command('zc Print("home_boot_source=%d\\n",sys_boot_src);',
+                    'home_boot_source='+('3' if args.pci else '4'))
+            command('zload /Tests/HomeOnce.ZC', 'zc: loaded /Tests/HomeOnce.ZC')
+            for check in ('IncludeChecks', 'TipChecks'):
+                command('zcall HomeOnce'+check, 'zc => 0x000000000000002a')
+            before = command('zstatus', 'failed=0')
+            for _ in range(3):
+                for check in ('IncludeChecks', 'TipChecks'):
+                    command('zcall HomeOnce'+check, 'zc => 0x000000000000002a')
+            after = command('zstatus', 'failed=0')
+            heap = r'data=([0-9/]+) code=([0-9/]+) allocations=([0-9]+)'
+            if re.search(heap, before).groups() != re.search(heap, after).groups():
+                raise RuntimeError('home include/tip/error child teardown leaked managed memory')
+            command('zcall HomeOnceStartChecks', 'zc => 0x000000000000002a')
+            if not args.pci:
+                require_graphical_text('home-once-dvd-confirm', '(y or n)?')
+                qmp_send_key('n')
+            command('zcall HomeOnceFinishChecks', 'zc => 0x000000000000002a')
+            require_graphical_text('home-once-output', 'NO' if not args.pci else 'Tips of the Day')
+            qmp_send_text('40+2;')
+            typed = require_graphical_text('home-once-typing', '> 40+2;')
+            require_graphical_caret(typed, '> 40+2;')
+            qmp_send_key('ret')
+            require_graphical_text('home-once-answer', 'ans=0x2A=42')
+            command('zcall HomeOnceCloseChecks', 'zc => 0x000000000000002a')
+            if args.pci:
+                command('zcall HomeOnceSavedStartChecks', 'zc => 0x000000000000002a')
+                command('zcall HomeOnceSavedFinishChecks', 'zc => 0x000000000000002a')
+                require_graphical_text('home-once-saved', 'Saved home Once 42')
+                command('zcall HomeOnceCloseChecks', 'zc => 0x000000000000002a')
+                guest.terminate()
+                try:
+                    guest.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    guest.kill(); guest.wait()
+                guest = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                         stderr=subprocess.STDOUT, bufsize=0)
+                buf.clear()
+                until(b'\n> ', timeout=300 if args.probe_home_once else 180)
+                command('zload /Tests/HomeOnce.ZC', 'zc: loaded /Tests/HomeOnce.ZC')
+                command('zcall HomeOnceReopenStartChecks', 'zc => 0x000000000000002a')
+                command('zcall HomeOnceSavedFinishChecks', 'zc => 0x000000000000002a')
+                require_graphical_text('home-once-reboot', 'Saved home Once 42')
+                command('zcall HomeOnceCloseChecks', 'zc => 0x000000000000002a')
+                print('PASS customized Home/Once.ZC wins over root/bare files and survives reboot', flush=True)
+            print('PASS original Once include, real boot-source branch, tips and prompt recovery', flush=True)
             raise SystemExit(0)
         if args.probe_registry:
             command('zc Print("registry_writable=%d\\n",ZcSourceWritable("~/Registry.ZC"));',

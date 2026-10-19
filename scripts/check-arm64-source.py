@@ -4,17 +4,26 @@ from pathlib import Path
 import re
 import sys
 
-from arm64_source import (extract_home_set, extract_home_startup, extract_server_task, extract_user_task, extract_version_scalars, translate_doctree, translate_registry, translate_docterm, translate_doced, translate_docfind, translate_docform, translate_docpopup, translate_grbitmap,
+from arm64_source import (extract_home_set, extract_home_startup, extract_server_task, extract_user_task, extract_version_scalars, extract_source_prompt, extract_source_training, translate_doctree, translate_registry, translate_docterm, translate_doced, translate_docfind, translate_docform, translate_docpopup, translate_grbitmap,
                           translate_grdc, translate_grscreen, translate_ktask, translate_winmgr)
 
 root = Path(__file__).resolve().parent.parent
 for path, transform, original, changed in (
+    ('Kernel/StrB.ZC', extract_source_prompt, b'Bool YorN()', b'Bool OtherPrompt()'),
+    ('System/Training.ZC', extract_source_training, b'i = RandU16;', b'i = 0;'),
     ('System/DolDoc/DocTree.ZC', translate_doctree, b'LexAttachDoc(cc,, doc);', b'LexAttachDoc(cc,, other);'),
     ('System/Registry.ZC', translate_registry, b'if (!sys_registry_doc)', b'if (sys_registry_doc)'),
     ('Kernel/KGlobals.ZC', extract_version_scalars, b'sys_os_version_sub', b'other_version_sub'),
 ):
     source = (root / 'upstream/pinned' / path).read_bytes()
-    transform(source)
+    translated = transform(source)
+    if path == 'System/DolDoc/DocTree.ZC':
+        text = translated.decode('utf-8')
+        start = text.index('public I64 DocTreeExe(')
+        end = text.index('\npublic I64 DocTreeFExe(', start)
+        doc_tree_exe = text[start:end]
+        assert doc_tree_exe.count('DocDel(doc2);') == 1
+        assert doc_tree_exe.index('catch') < doc_tree_exe.index('DocDel(doc2);')
     try:
         transform(source.replace(original, changed, 1))
     except ValueError:

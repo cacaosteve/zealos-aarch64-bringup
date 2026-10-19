@@ -20,6 +20,7 @@ typedef struct CLexFile {
   /* ARM64 DolDoc input; ordinary files and macro expansions use text. */
   int64_t (*port_read)(struct CLexer *, struct CLexFile *);
   void *port_data;
+  const char *(*port_dir)(void); // Current task directory for command input.
 } CLexFile;
 #define STR_LEN 144
 typedef struct CLexer {
@@ -50,6 +51,8 @@ typedef struct CLexer {
   void (*port_sync)(struct CLexer *);
   void (*port_fun_complete)(struct CHashFun *);
   int64_t port_in_quotes;
+  /* ARM64 command compilers may execute before lexing the next top-level statement. */
+  int64_t port_statement_depth, port_defer_statement_lex, port_lex_pending;
 } CLexer;
 typedef enum {
   TK_I64 = 0x100,

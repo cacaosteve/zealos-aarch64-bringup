@@ -139,10 +139,17 @@ static int64_t host_user_input_complete(int64_t *a) {
 struct user_parse_scope {
     struct guest_unwind unwind;
     struct source_context context;
+    struct user_compiler *compiler;
     int previous_compiling;
+    int keep_lex_pending;
 };
 static void user_parse_cleanup(struct guest_unwind *scope) {
     struct user_parse_scope *parse = (struct user_parse_scope *)scope;
+    if (parse->compiler && parse->compiler->lex) {
+        parse->compiler->lex->port_statement_depth = 0;
+        if (!parse->keep_lex_pending)
+            parse->compiler->lex->port_lex_pending = 0;
+    }
     guest_task_exe_active = parse->previous_compiling;
     guest_fibers[guest_current].source_context = parse->context.previous;
     guest_fibers[guest_current].user_diagnostic_active = 0;
@@ -156,7 +163,9 @@ static int64_t user_compiler_step(struct user_compiler *c, int prime, int64_t *t
     if (compiler_recovery_active) AIWNIOS_throw(0);
     struct guest_fiber *f = &guest_fibers[guest_current];
     if (!c->native) guest_raise(GUEST_EXCEPT_COMPILER);
-    struct user_parse_scope parse = {.previous_compiling = guest_task_exe_active};
+    struct user_parse_scope parse = {
+        .compiler = c, .previous_compiling = guest_task_exe_active
+    };
     parse.context.previous = f->source_context;
     parse.context.mirror = c->mirror;
     f->source_context = &parse.context;
@@ -177,6 +186,8 @@ static int64_t user_compiler_step(struct user_compiler *c, int prime, int64_t *t
     compiler_checkpoint_save();
     if (setjmp(compiler_recovery_guard)) {
         compiler_recovery_active = 0;
+        c->lex->port_statement_depth = 0;
+        c->lex->port_lex_pending = 0;
         compiler_checkpoint_restore();
         (*(int64_t *)(c->mirror + guest_cc_errors_off))++;
         compiler_recovery_errors++;
@@ -196,6 +207,10 @@ static int64_t user_compiler_step(struct user_compiler *c, int prime, int64_t *t
         result = c->lex->cur_tok;
     } else {
         if (!c->primed || c->code) AIWNIOS_throw(0);
+        if (c->lex->port_lex_pending) {
+            c->lex->port_lex_pending = 0;
+            Lex(c->lex);
+        }
         if (!PrsStmt(c->native)) {
             if (c->lex->cur_tok) AIWNIOS_throw(0);
         } else {
@@ -225,6 +240,7 @@ static int64_t user_compiler_step(struct user_compiler *c, int prime, int64_t *t
         ((*(int64_t *)(c->mirror + guest_cc_flags_off) & 0x002) && f->user_prompt_reader ? 1 : 0);
     guest_context_sync(c->lex);
     compiler_recovery_active = 0;
+    parse.keep_lex_pending = 1;
     guest_unwind_leave(&parse.unwind);
     user_diagnostic_flush(f);
     return result;
@@ -271,6 +287,14 @@ static int64_t host_user_lex(int64_t *a) {
     c->lex = LexerNew(c->doc_input ? c->doc_filename : "<command>", c->input ? c->input : "");
     c->lex->file->is_file = 1;
     c->lex->file->dir = __AIWNIOS_StrDup((char *)guest_current_dir(), NULL);
+    c->lex->file->port_dir = guest_current_dir;
+    /* Only a prompt-backed compiler must stop at each statement boundary so
+     * ExeCmdLine can request another input chunk without yielding in Lex.
+     * File and DolDoc input are already buffered readers; letting Lex advance
+     * normally is required for their EOF token to terminate the command loop. */
+    c->lex->port_defer_statement_lex = !c->doc_input &&
+        !!(*(int64_t *)(c->mirror + guest_cc_flags_off) & 0x002) &&
+        !!guest_fibers[guest_current].user_prompt_reader;
     if (c->doc_input) {
         c->lex->file->port_read = user_doc_read;
         c->lex->file->port_data = c;

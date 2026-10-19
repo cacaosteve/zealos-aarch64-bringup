@@ -146,6 +146,35 @@ def extract_version_scalars(source: bytes) -> bytes:
             match[1] + '\nU64 ' + match[2] + '\n').encode()
 
 
+def extract_source_prompt(source: bytes) -> bytes:
+    begin, end = b'Bool YorN()\n', b'\nI64 PressAKey()\n'
+    if source.count(begin) != 1 or source.count(end) != 1:
+        raise ValueError('pinned YorN boundaries changed')
+    body = begin + source.split(begin, 1)[1].split(end, 1)[0]
+    return b'// Original keyboard-driven confirmation prompt.\n' + body + b'\n'
+
+
+def extract_source_training(source: bytes) -> bytes:
+    begin = b'public U0 TipOfDay(U8 *tip_file = "::/Doc/Tips.DD")\n'
+    if source.count(begin) != 1:
+        raise ValueError('pinned TipOfDay signature changed')
+    tip = begin + source.split(begin, 1)[1]
+    anchor = b'\t"$$WW,1$$\\n";\n\twhile (TRUE)'
+    if tip.count(anchor) != 1 or tip.count(b'I64\t\t\t i = RandU16;') != 1:
+        raise ValueError('pinned TipOfDay selection loop changed')
+    # The original circular scan chooses RandU16 modulo the tip count. Count
+    # first to avoid 65535 complete-document scans and reject an empty/missing
+    # tip file instead of spinning forever without yielding the desktop.
+    guard = (b'\tI64 tip_count = 0;\n'
+             b'\twhile (doc_e != doc)\n\t{\n'
+             b"\t\tif (doc_e->type_u8 == DOCT_TEXT && *doc_e->tag == '*') tip_count++;\n"
+             b'\t\tdoc_e = doc_e->next;\n\t}\n'
+             b"\tif (!tip_count) { DocDel(doc2); DocDel(doc); throw('NoTips'); }\n"
+             b'\ti %= tip_count;\n\tdoc_e = doc->head.next;\n')
+    return (b'// Original TipOfDay with bounded equivalent selection and empty-file recovery.\n' +
+            tip.replace(anchor, guard + anchor, 1))
+
+
 def translate_doctree(source: bytes) -> bytes:
     text = source.decode('utf-8')
     for old, new, count in (
@@ -179,8 +208,8 @@ def translate_doctree(source: bytes) -> bytes:
     anchor = '\t\tres=ExeDoc(doc2);'
     if text.count(anchor) != 1:
         raise ValueError('pinned DocTreeExe body changed')
-    text = text.replace(anchor, '\t\ttry { res=ExeDoc(doc2); }\n\t\tcatch\n\t\t{\n'
-        '\t\t\tDocDel(doc2);\n\t\t\tif (unlock_doc) DocUnlock(doc);\n\t\t}', 1)
+    text = text.replace(anchor, '\t\ttry\n\t\t{\n\t\t\tres=ExeDoc(doc2);\n\t\t}\n\t\tcatch\n\t\t{\n'
+        '\t\t\tif (unlock_doc) DocUnlock(doc);\n\t\t}', 1)
     return text.encode()
 
 

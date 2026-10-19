@@ -13,6 +13,8 @@ typedef int (*zc_source_read_fn)(const char *name, char *dst, size_t cap, size_t
 void zc_set_source_reader(zc_source_read_fn read);
 typedef int (*zc_source_write_fn)(const char *name, const char *src, size_t length);
 void zc_set_source_writer(zc_source_write_fn write);
+/* Actual boot module media, from Limine (generic disk/optical/TFTP). */
+void zc_set_boot_media(uint32_t media_type);
 /* Read-only source archive. The bytes must stay alive for the session. */
 void zc_init(const void *archive, size_t size, zc_output_fn output);
 /* Load the pinned ZealOS kernel/window/graphics source for normal UTM boot. */

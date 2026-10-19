@@ -7,7 +7,7 @@ from pathlib import Path
 import sys
 import tarfile
 
-from arm64_source import (extract_home_set, extract_home_startup, extract_version_scalars, extract_server_task, extract_user_task, translate_doctree, translate_registry, translate_docterm, translate_doced, translate_docfind, translate_docform, translate_docpopup, translate_grbitmap,
+from arm64_source import (extract_home_set, extract_home_startup, extract_version_scalars, extract_source_prompt, extract_source_training, extract_server_task, extract_user_task, translate_doctree, translate_registry, translate_docterm, translate_doced, translate_docfind, translate_docform, translate_docpopup, translate_grbitmap,
                           translate_grdc, translate_grscreen, translate_ktask, translate_mathode,
                           translate_winmgr)
 
@@ -25,10 +25,14 @@ for name, expected in manifest['files'].items():
         entries['System/SourceHome.ZC'] = extract_home_set(data)
     if rel == 'Once.ZC':
         # Seed the same editable home startup file installed by upstream.
-        # It is available for the upcoming registry bring-up, not auto-run.
+        # Full HomeSys StartUpTasks remains staged; its include is executable.
         entries['Home/Once.ZC'] = data
     if rel == 'Kernel/KGlobals.ZC':
         entries['System/VersionScalars.ZC'] = extract_version_scalars(data)
+    if rel == 'Kernel/StrB.ZC':
+        entries['System/SourcePrompt.ZC'] = extract_source_prompt(data)
+    if rel == 'System/Training.ZC':
+        entries['System/SourceTraining.ZC'] = extract_source_training(data)
     if rel == 'System/Gr/GrScreen.ZC':
         try:
             data = translate_grscreen(data)
@@ -86,7 +90,7 @@ for path in sorted((root / 'upstream/bootstrap').rglob('*')):
     if path.is_file():
         entries[path.relative_to(root / 'upstream/bootstrap').as_posix()] = path.read_bytes()
 for path in sorted((root / 'tests/compat').glob('*')):
-    if path.suffix in ('.ZC', '.HH'):
+    if path.suffix in ('.ZC', '.HH', '.DD'):
         entries['Tests/' + path.name] = path.read_bytes()
 entries['LICENSE/ZealOS.txt'] = (root / 'upstream/pinned/LICENSE').read_bytes()
 entries['LICENSE/Aiwnios.txt'] = (root / 'third_party/aiwnios/LICENSE').read_bytes()

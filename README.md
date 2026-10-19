@@ -28,6 +28,7 @@ make check-system-launch # upstream Sys/SysFile + popup application arguments
 make check-system-server # dedicated source System loop + namespace/job ownership
 make check-user-command # original ExeCmdLine loop, options and error recovery
 make check-user-startup # per-user HomeSys setup and independent graphical terminals
+make check-home-once    # original Once include, boot-media branch, tips and prompt recovery
 make check-user-text    # User startup commands + XTalk input delivery and recovery
 make check-home-path    # shared home paths, includes and saved source after reboot
 make check-registry     # DolDoc execution, shared registry and Once across reboot
@@ -39,6 +40,7 @@ The UTM refresh also updates the repository-managed
 `Tests/WindowDragLive.ZC`, `System/GuiTerminal.ZC`, `System/TaskBridge.ZC`,
 `System/UserTask.ZC`, `System/HomeStartUp.ZC`, `System/SourceDir.ZC`, `System/SourceHome.ZC`,
 `System/VersionScalars.ZC`, `System/Registry.ZC`, `System/SourceRegistry.ZC`,
+`System/SourcePrompt.ZC`, `System/SourceTraining.ZC`,
 `System/DolDoc/DocCompiler.ZC`, `System/DolDoc/DocTree.ZC`,
 `System/DolDoc/DocClipBoard.ZC`, `System/DolDoc/DocFile.ZC`,
 `System/DolDoc/DocTerm.ZC`, `System/DolDoc/DocEd.ZC`, `System/WinMgr.ZC`,
@@ -119,6 +121,11 @@ the native lexer, including quoted formatting, macros and includes. The original
 registry tree APIs share a System-owned cache backed by `~/Registry.ZC`.
 `Once`, `SysOnce` and explicit `OnceExe` execute and flush saved User/System
 branches; full `HomeSys` desktop launch does not yet call them automatically.
+The original `Cd; #include "Once";` path now runs with the compiler's `.ZC`
+default extension, source-backed `YorN` and `TipOfDay`, and the original tips and
+customization documents. `sys_boot_src` comes from the actual Limine module
+medium: disk, optical, or TFTP download. Full desktop startup remains staged
+until its autocomplete and splash dependencies are available.
 Inline binary/script compiler tokens, autocomplete and the remaining startup
 dependencies are still open. `zstatus` also reports `keyboard_state` modifier
 and repeat values to diagnose held host keys separately from guest decoding.

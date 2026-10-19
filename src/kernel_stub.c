@@ -9798,9 +9798,11 @@ void kernel_entry(const struct zeal_handoff *h) {
     zc_set_source_reader(zc_read_redsea);
     zc_set_source_writer(zc_write_source);
     zc_set_key_reader(zc_key_read, zc_key_reset);
-    if (h->revision >= 3 && h->size >= sizeof(*h))
+    if (h->revision >= 4 && h->size >= sizeof(*h))
+        zc_set_boot_media(h->boot_media_type);
+    if (h->revision >= 3 && h->size >= offsetof(struct zeal_handoff, boot_media_type))
         zc_init((void *)(uintptr_t)h->sources_virt, h->sources_size, con_puts);
-    if (h->revision >= 3 && h->size >= sizeof(*h) &&
+    if (h->revision >= 3 && h->size >= offsetof(struct zeal_handoff, boot_media_type) &&
         zc_start_graphics() == 0) {
         /* Source loading writes useful diagnostics to the bootstrap console.
          * Retire that retained shell plane before the desktop takes ownership,

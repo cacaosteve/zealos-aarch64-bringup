@@ -2449,11 +2449,12 @@ int64_t ParseErr(CCmpCtrl *ctrl, char *fmt, ...) {
 int64_t PrsKw(CCmpCtrl *ccmp, int64_t kwt) {
   CHashKeyword *kw;
   if (ccmp->lex->cur_tok == TK_NAME)
-    if (kw = HashFind(ccmp->lex->string, Fs->hash_table, HTT_KEYWORD, 1))
+    if (kw = HashFind(ccmp->lex->string, Fs->hash_table, HTT_KEYWORD, 1)) {
       if (kw->tk == kwt) {
         Lex(ccmp->lex);
         return 1;
       }
+    }
   return 0;
 }
 static int64_t PeekKw(CCmpCtrl *ccmp, int64_t kwt) {
@@ -2464,6 +2465,14 @@ static int64_t PeekKw(CCmpCtrl *ccmp, int64_t kwt) {
         return 1;
       }
   return 0;
+}
+
+static void PrsStatementEnd(CCmpCtrl *ccmp) {
+  if (ccmp->lex->port_defer_statement_lex &&
+      ccmp->lex->port_statement_depth == 1)
+    ccmp->lex->port_lex_pending = 1;
+  else
+    Lex(ccmp->lex);
 }
 
 int64_t PrsGoto(CCmpCtrl *ccmp) {
@@ -2495,7 +2504,7 @@ int64_t PrsGoto(CCmpCtrl *ccmp) {
       ParseErr(ccmp, "Expected a ';'.");
       return 0;
     }
-    Lex(ccmp->lex);
+    PrsStatementEnd(ccmp);
     return 1;
   }
   return 0;
@@ -2569,7 +2578,7 @@ not_label:
       ParseErr(ccmp, "Expected a ';'.");
       return 0;
     }
-    Lex(ccmp->lex);
+    PrsStatementEnd(ccmp);
     if (ccmp->flags & CCF_IN_SUBSWITCH_START_BLOCK) {
       rpn = A_CALLOC(sizeof(CRPN), NULL);
       rpn->type = IC_SUB_RET;
@@ -2612,7 +2621,7 @@ not_label:
     else { // cls was declared if we reach here
       // Don't whine about class declaration without variable declared also
       if (ccmp->lex->cur_tok == ';') {
-        Lex(ccmp->lex);
+        PrsStatementEnd(ccmp);
         return 1;
       }
     }
@@ -2630,6 +2639,8 @@ not_label:
     }
     if (import_name)
       A_FREE(import_name);
+    PrsStatementEnd(ccmp);
+    return 1;
   } else if (PrsKw(ccmp, TK_KW__EXTERN)) {
     flags = PRSF__EXTERN;
     if (ccmp->lex->cur_tok != TK_NAME)
@@ -2663,8 +2674,17 @@ not_label:
     flags |= PRSF_STATIC;
   }
   if (ccmp->lex->cur_tok == TK_NAME) {
-    if (cls = PrsClass(ccmp, flags))
+    if (cls = PrsClass(ccmp, flags)) {
+      /* A standalone class/union definition is its own statement. Without
+       * returning here, the following declaration is parsed as though it
+       * belonged to the class and modifiers such as `public` become an
+       * unexpected expression. */
+      if (ccmp->lex->cur_tok == ';') {
+        PrsStatementEnd(ccmp);
+        return 1;
+      }
       goto mloop;
+    }
     if (cls = HashFind(ccmp->lex->string, Fs->hash_table, HTT_CLASS, 1)) {
       Lex(ccmp->lex);
       // Here's the deal,TempleOS lets you put a fallback type a class/union
@@ -2677,6 +2697,10 @@ not_label:
         cls2->fwd_class = cls;
         cls2->raw_type = cls->raw_type;
         cls = cls2;
+        if (ccmp->lex->cur_tok == ';') {
+          PrsStatementEnd(ccmp);
+          return 1;
+        }
       } else if (PeekKw(ccmp, TK_KW_UNION)) {
         goto ye;
       }
@@ -2699,7 +2723,7 @@ not_label:
         ParseErr(ccmp, "Expected ';'");
         return 0;
       }
-      Lex(ccmp->lex);
+      PrsStatementEnd(ccmp);
       return 1;
     }
   }
@@ -2748,7 +2772,7 @@ not_label:
         argc++;
         break;
       case ';':
-        Lex(ccmp->lex);
+        PrsStatementEnd(ccmp);
         goto fin_str;
         break;
       default:
@@ -2764,7 +2788,7 @@ not_label:
     return 1;
   }
   if (ccmp->lex->cur_tok == ';') {
-    Lex(ccmp->lex);
+    PrsStatementEnd(ccmp);
     (rpn = A_CALLOC(sizeof(CRPN), NULL))->type = IC_NOP;
     QueIns(rpn, ccmp->code_ctrl->ir_code);
     return 1;
@@ -2772,7 +2796,7 @@ not_label:
   if (ParseExpr(ccmp, 0)) {
     if (ccmp->lex->cur_tok != ';')
       ParseErr(ccmp, "Expected a ';'.");
-    Lex(ccmp->lex);
+    PrsStatementEnd(ccmp);
     return 1;
   }
   return 0;
@@ -2780,7 +2804,10 @@ not_label:
 
 int64_t PrsStmt(CCmpCtrl *ccmp) {
   CRPN *old = ccmp->code_ctrl->ir_code->next, *cur, *new;
+  CLexer *lex = ccmp->lex;
+  lex->port_statement_depth++;
   char ret = _PrsStmt(ccmp);
+  lex->port_statement_depth--;
   if (old == ccmp->code_ctrl->ir_code->next) {
     (old = A_CALLOC(sizeof(CRPN), 0))->type = IC_NOP;
     QueIns(old, ccmp->code_ctrl->ir_code);

@@ -666,6 +666,7 @@ re_enter:;
             new_file = A_MALLOC(sizeof(CLexFile), NULL);
             new_file->port_read = NULL;
             new_file->port_data = NULL;
+            new_file->port_dir = NULL;
             new_file->is_file = 0;
             new_file->dir = NULL;
             new_file->last = lex->file;
@@ -872,6 +873,18 @@ re_enter:;
           LexErr(lex, "Expected a string for #include.");
           return lex->cur_tok = ERR;
         }
+        /* ZealOS Lex.ZC applies ExtDefault(name, "ZC") before resolving
+         * every include. Keep explicit extensions and dot path components. */
+        char *ext = lex->string;
+        while (*ext && !(*ext == '.' && ext[1] != '/' && ext[1] != '.')) ext++;
+        if (!*ext) {
+          size_t len = strlen(lex->string);
+          if (len + 4 > sizeof(lex->string)) {
+            LexErr(lex, "Include filename is too long.");
+            return lex->cur_tok = ERR;
+          }
+          memcpy(lex->string + len, ".ZC", 4);
+        }
         actual_file = lex->file;
         while (actual_file) {
           if (actual_file->is_file)
@@ -879,12 +892,14 @@ re_enter:;
           actual_file = actual_file->last;
         }
         if (actual_file) {
-          if (actual_file->dir && lex->string[0] != '/' &&
+          const char *include_dir = actual_file->port_dir ?
+              actual_file->port_dir() : actual_file->dir;
+          if (include_dir && lex->string[0] != '/' &&
               !strchr(lex->string, ':')) {
             int64_t len =
-                snprintf(NULL, 0, "%s/%s", actual_file->dir, lex->string);
+                snprintf(NULL, 0, "%s/%s", include_dir, lex->string);
             char buf[len + 1];
-            snprintf(buf, sizeof(buf), "%s/%s", actual_file->dir, lex->string);
+            snprintf(buf, sizeof(buf), "%s/%s", include_dir, lex->string);
             dir = __AIWNIOS_StrDup(buf, NULL);
             *strrchr(dir, '/') = 0;
             f = fopen(buf, "rb");
@@ -917,6 +932,7 @@ re_enter:;
         new_file = A_MALLOC(sizeof(CLexFile), NULL);
         new_file->port_read = NULL;
         new_file->port_data = NULL;
+        new_file->port_dir = NULL;
         new_file->text = A_MALLOC(idx + 1, NULL);
         new_file->text[idx] = 0;
         new_file->dir = dir;
@@ -999,7 +1015,7 @@ re_enter:;
 }
 
 CLexer *LexerNew(char *filename, char *text) {
-  if (!HashFind("if", Fs->hash_table, HTT_KEYWORD, 1)) {
+  {
     struct {
       char *name;
       int64_t tok;
@@ -1056,11 +1072,14 @@ CLexer *LexerNew(char *filename, char *text) {
     int64_t i;
     CHashKeyword *kw;
     for (i = 0; i != sizeof(kws) / sizeof(*kws); i++) {
-      kw = A_CALLOC(sizeof *kw, NULL);
-      kw->base.type = HTT_KEYWORD;
-      kw->base.str = A_STRDUP(kws[i].name, NULL);
+      kw = HashFind(kws[i].name, Fs->hash_table, HTT_KEYWORD, 1);
+      if (!kw) {
+        kw = A_CALLOC(sizeof *kw, NULL);
+        kw->base.type = HTT_KEYWORD;
+        kw->base.str = A_STRDUP(kws[i].name, NULL);
+        HashAdd(kw, Fs->hash_table);
+      }
       kw->tk = kws[i].tok;
-      HashAdd(kw, Fs->hash_table);
     }
   }
   /* A bootstrapped lexer may already have installed the core keyword table

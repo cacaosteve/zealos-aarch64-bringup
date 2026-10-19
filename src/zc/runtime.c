@@ -22,6 +22,12 @@ extern int zeal_zss_writable(void);
  * modules populate these slots as they load. */
 static void *guest_ext_entries[5];
 static void **guest_ext_table = guest_ext_entries;
+static uint32_t guest_boot_source; /* BOOT_SRC_NULL until a boot handoff arrives. */
+void zc_set_boot_media(uint32_t media_type) {
+    /* Pinned KernelA.HH: HARDDRIVE=3, DVD=4, RAM=2. No x86 boot-block
+     * offset exists on the EFI path, so the high half remains zero. */
+    guest_boot_source = media_type == 0 ? 3 : media_type == 1 ? 4 : media_type == 2 ? 2 : 0;
+}
 static uint64_t guest_fb_addr, guest_fb_width, guest_fb_height, guest_fb_pitch;
 static uint64_t guest_fb_bpp;
 static uint64_t guest_text_globals[16];
@@ -102,6 +108,11 @@ _Static_assert(sizeof(struct block) % 16 == 0, "allocator alignment");
 static unsigned char data_arena[DATA_BYTES] __attribute__((aligned(16)));
 static unsigned char code_arena[CODE_BYTES] __attribute__((section(".jit"), aligned(4096)));
 static struct block *arenas[2];
+/* Keep a separate address-ordered list of free blocks. First-fit allocation
+ * stays byte-for-byte compatible with the original arena layout, while
+ * avoiding a walk across every live compiler allocation on each request.
+ * Free blocks reuse owner/pad for their free-list links. */
+static struct block *arena_free_heads[2];
 static CTask task;
 CTask *Fs;
 static CHeapCtrl data_heap, code_heap;
@@ -495,6 +506,51 @@ void DoNothing(void) {
 static void arena_init(unsigned i, void *p, size_t size) {
     arenas[i] = p;
     *arenas[i] = (struct block){.magic = BLOCK_MAGIC, .size = size - sizeof(struct block)};
+    arena_free_heads[i] = arenas[i];
+}
+static struct block *free_prev(const struct block *b) {
+    return (struct block *)(uintptr_t)b->owner;
+}
+static struct block *free_next(const struct block *b) {
+    return (struct block *)(uintptr_t)b->pad;
+}
+static void free_list_remove(unsigned a, struct block *b) {
+    struct block *prev = free_prev(b), *next = free_next(b);
+    if (prev)
+        prev->pad = (uint64_t)(uintptr_t)next;
+    else
+        arena_free_heads[a] = next;
+    if (next)
+        next->owner = (CHeapCtrl *)prev;
+    b->owner = NULL;
+    b->pad = 0;
+}
+static void free_list_replace(unsigned a, struct block *old, struct block *replacement) {
+    struct block *prev = free_prev(old), *next = free_next(old);
+    replacement->owner = (CHeapCtrl *)prev;
+    replacement->pad = (uint64_t)(uintptr_t)next;
+    if (prev)
+        prev->pad = (uint64_t)(uintptr_t)replacement;
+    else
+        arena_free_heads[a] = replacement;
+    if (next)
+        next->owner = (CHeapCtrl *)replacement;
+}
+static void free_list_insert(unsigned a, struct block *b) {
+    struct block *prev = NULL, *next = arena_free_heads[a];
+    uintptr_t address = (uintptr_t)b;
+    while (next && (uintptr_t)next < address) {
+        prev = next;
+        next = free_next(next);
+    }
+    b->owner = (CHeapCtrl *)prev;
+    b->pad = (uint64_t)(uintptr_t)next;
+    if (prev)
+        prev->pad = (uint64_t)(uintptr_t)b;
+    else
+        arena_free_heads[a] = b;
+    if (next)
+        next->owner = (CHeapCtrl *)b;
 }
 static CHeapCtrl *heap_for(void *t) {
     /* Aiwnios parser allocations use the currently compiling task; queued
@@ -528,8 +584,8 @@ void *__AIWNIOS_MAlloc(int64_t count, void *t) {
     size_t n = ((size_t)count + 15) & ~(size_t)15;
     if (!n)
         n = 16;
-    for (struct block *b = arenas[a]; b; b = b->next) {
-        if (b->used || b->size < n)
+    for (struct block *b = arena_free_heads[a]; b; b = free_next(b)) {
+        if (b->size < n)
             continue;
         if (b->size >= n + sizeof(*b) + 16) {
             struct block *tail = (void *)((unsigned char *)(b + 1) + n);
@@ -539,10 +595,14 @@ void *__AIWNIOS_MAlloc(int64_t count, void *t) {
                 tail->next->prev = tail;
             b->next = tail;
             b->size = n;
+            free_list_replace(a, b, tail);
+        } else {
+            free_list_remove(a, b);
         }
         b->used = 1;
         b->requested = (size_t)count;
         b->owner = owner;
+        b->pad = 0;
         owner->used_u8s += (int64_t)b->size;
         sync_guest_heap(owner);
         return b + 1;
@@ -564,13 +624,18 @@ static struct block *get_block(void *p) {
 }
 static struct block *release(struct block *b) {
     CHeapCtrl *owner = b->owner;
+    unsigned a = (uintptr_t)b >= (uintptr_t)code_arena &&
+                 (uintptr_t)b < (uintptr_t)code_arena + CODE_BYTES;
     owner->used_u8s -= (int64_t)b->size;
     sync_guest_heap(owner);
     b->used = 0;
     b->owner = NULL;
     b->requested = 0;
+    b->pad = 0;
+    free_list_insert(a, b);
     if (b->next && !b->next->used) {
         struct block *n = b->next;
+        free_list_remove(a, n);
         b->size += sizeof(*n) + n->size;
         b->next = n->next;
         n->magic = 0;
@@ -579,6 +644,7 @@ static struct block *release(struct block *b) {
     }
     if (b->prev && !b->prev->used) {
         struct block *p = b->prev;
+        free_list_remove(a, b);
         p->size += sizeof(*b) + b->size;
         p->next = b->next;
         b->magic = 0;
@@ -4029,7 +4095,8 @@ static int64_t host_jobs_handler_mode(int64_t *a, int system_only) {
     void *task = a[1] ? (void *)(uintptr_t)a[1] : guest_fibers[guest_current].words;
     if (task != guest_fibers[guest_current].words)
         zc_fail("JobsHandler requires the current task");
-    if (guest_task_exe_active ||
+    if ((guest_task_exe_active &&
+         !(system_only && guest_current == GUEST_SYSTEM)) ||
         (guest_job_call_active && guest_current == GUEST_EXECUTIVE))
         zc_fail("job dispatch during compilation or executive callback is unsupported");
     struct guest_fiber *server = &guest_fibers[guest_current];
@@ -4065,6 +4132,8 @@ static int64_t host_jobs_handler_mode(int64_t *a, int system_only) {
         struct dispatch_scope dispatch;
         jmp_buf landing;
         dispatch_scope_enter(&dispatch, &landing);
+        int task_exe_active_before = guest_task_exe_active;
+        unsigned source_job_active_before = server->source_job_active;
         int raised = setjmp(landing);
         int service_exit = server == &guest_fibers[GUEST_SYSTEM] &&
                            (job->flags & GUEST_JOBF_EXIT_ON_COMPLETE);
@@ -4089,6 +4158,11 @@ static int64_t host_jobs_handler_mode(int64_t *a, int system_only) {
                 : NULL;
             job->spawned_task = child ? child->words : NULL;
         }
+        /* A source job may call Sys recursively on the dedicated System
+         * task. Its nested request has its own dispatch scope, so restore the
+         * enclosing job's state after a normal return or exception unwind. */
+        guest_task_exe_active = task_exe_active_before;
+        server->source_job_active = source_job_active_before;
         guest_unwind_leave(&dispatch.unwind);
         if (raised)
             guest_unwind_handled(&dispatch.unwind, dispatch.unwind.exception);
@@ -4929,6 +5003,7 @@ static unsigned char compiler_saved_code[CODE_BYTES] __attribute__((aligned(16))
 static CTask compiler_saved_task;
 static int compiler_saved_switch_depth, compiler_saved_fun_depth;
 static size_t compiler_saved_bytes[2];
+static struct block *compiler_saved_free_heads[2];
 static uintptr_t compiler_saved_sp;
 static void *compiler_saved_last_fun;
 static struct guest_exception *compiler_saved_except_top, *compiler_saved_except_caught;
@@ -4948,6 +5023,7 @@ static CHeapCtrl *compiler_checkpoint_heap(unsigned i) {
 static void compiler_checkpoint_save(void) {
     __asm__ volatile("mov %0, sp" : "=r"(compiler_saved_sp));
     for (unsigned a = 0; a < 2; a++) {
+        compiler_saved_free_heads[a] = arena_free_heads[a];
         size_t span = 0;
         for (struct block *b = arenas[a]; b; b = b->next)
             span = (unsigned char *)(b + 1) - (unsigned char *)arenas[a] +
@@ -4997,6 +5073,8 @@ static void compiler_checkpoint_restore(void) {
     memcpy(data_arena + copied, compiler_saved_data + copied,
            compiler_saved_bytes[0] - copied);
     memcpy(code_arena, compiler_saved_code, compiler_saved_bytes[1]);
+    arena_free_heads[0] = compiler_saved_free_heads[0];
+    arena_free_heads[1] = compiler_saved_free_heads[1];
     memcpy(Fs, &compiler_saved_task, sizeof(compiler_saved_task));
     if (guest_task_bound)
         *(void **)((unsigned char *)guest_fibers[guest_current].words + guest_last_fun_off) =
@@ -5077,6 +5155,12 @@ static int64_t execute_source_mode(const char *path, const char *src,
         strcpy(dir, source_dir);
     }
     lex->file->dir = __AIWNIOS_StrDup(dir, NULL);
+    /* ExePutS and interactive text execute Cd between statements. Actual
+     * include files retain their own source directory in the lexer stack. */
+    if (initial_dir || path[0] == '<') {
+        lex->file->port_dir = guest_current_dir;
+        lex->port_defer_statement_lex = 1;
+    }
     CCmpCtrl *cc = CmpCtrlNew(lex);
     cc->flags |= CCF_STRINGS_ON_HEAP;
     CodeCtrlPush(cc);
@@ -5096,6 +5180,8 @@ static int64_t execute_source_mode(const char *path, const char *src,
         guest_unwind_enter(&execution.unwind, source_execution_cleanup, &landing);
         if (setjmp(landing)) {
             int64_t code = execution.unwind.exception;
+            lex->port_statement_depth = 0;
+            lex->port_lex_pending = 0;
             source_execution_leave(&execution);
             guest_unwind_flags(&execution.unwind);
             if (recover == 1 && (code == GUEST_EXCEPT_COMPILER || code == GUEST_EXCEPT_BREAK)) {
@@ -5111,6 +5197,8 @@ static int64_t execute_source_mode(const char *path, const char *src,
             compiler_checkpoint_save();
             if (setjmp(compiler_recovery_guard)) {
                 compiler_recovery_active = 0;
+                lex->port_statement_depth = 0;
+                lex->port_lex_pending = 0;
                 compiler_checkpoint_restore();
                 guest_task_exe_active = previous_compiling;
                 int64_t code = compiler_recovery_exception;
@@ -5135,6 +5223,9 @@ static int64_t execute_source_mode(const char *path, const char *src,
         if (!started) {
             Lex(lex);
             started = 1;
+        } else if (lex->port_lex_pending) {
+            lex->port_lex_pending = 0;
+            Lex(lex);
         }
         if (!PrsStmt(cc)) {
             if (lex->cur_tok) {
@@ -5274,7 +5365,8 @@ static int64_t host_exe_puts2(int64_t *a) {
 static size_t format_text(char *output, size_t capacity, const char *format,
                           int64_t argc, const int64_t *argv, int strip_markers);
 static int64_t host_sys(int64_t *a) {
-    if (!guest_task_bound || guest_task_exe_active ||
+    if (!guest_task_bound ||
+        (guest_task_exe_active && guest_current != GUEST_SYSTEM) ||
         (guest_current == GUEST_EXECUTIVE && guest_job_call_active))
         zc_fail("Sys requires a cooperative execution context");
     char source[4097];
@@ -5316,9 +5408,9 @@ static int64_t host_exe_print2(int64_t *a) {
 }
 static int64_t host_print(int64_t *a);
 /* Bounded formatter shared by Print, source generation and StrPrintJoin.
- * ExePrint preserves source display markers. The existing text-oriented
- * Print/StrPrintJoin subset still strips them until full DolDoc formatting
- * is supported. Empty generated string statements remain valid source. */
+ * ExePrint and graphical Print preserve source display markers; StrPrintJoin
+ * keeps its text-oriented behavior. Empty generated string statements remain
+ * valid source. */
 static size_t format_text(char *output, size_t capacity, const char *format,
                           int64_t argc, const int64_t *argv, int strip_markers) {
     size_t used = 0;
@@ -5543,7 +5635,7 @@ static int64_t host_print(int64_t *a) {
     int64_t argc = a[1];
     const int64_t *argv = (const int64_t *)(uintptr_t)a[2];
     char output[4097];
-    format_text(output, sizeof(output), format, argc, argv, 1);
+    format_text(output, sizeof(output), format, argc, argv, 0);
     zc_output(output);
     guest_task_text_output(output);
     return 0;
@@ -5785,6 +5877,7 @@ static int load_source_path(const char *path, int merged, int recover) {
     }
     if (!strcmp(path, "/Kernel/KernelB.HH")) {
         bind_guest_task();
+        PrsBindCSymbol("sys_boot_src", &guest_boot_source, 0);
         /* ZealOS's Call invokes a zero-argument JIT entry point. Rebind it
          * after KernelB declares the _CALL import. */
         PrsBindCSymbol("Call", host_call, 1);
@@ -6390,6 +6483,8 @@ int zc_start_gui_terminal(void) {
         "/System/DolDoc/DocTree.ZC",
         "/System/Registry.ZC",
         "/System/SourceRegistry.ZC",
+        "/System/SourcePrompt.ZC",
+        "/System/SourceTraining.ZC",
         "/System/HomeStartUp.ZC",
         "/System/GuiTerminal.ZC",
     };
@@ -6407,15 +6502,20 @@ int zc_start_gui_terminal(void) {
                 return -1;
         gui_terminal_modules_loaded = 1;
     }
+    zc_output("zc: graphical terminal starting system task\n");
     if (zc_call("BootstrapSystemTaskStart", &result) != 0 || result != 42)
         return -1;
+    zc_output("zc: graphical terminal starting registry\n");
     if (zc_call("BootstrapRegistryStart", &result) != 0 || result != 42)
         return -1;
+    zc_output("zc: graphical terminal initializing devices\n");
     if (zc_call("BootstrapGuiTerminalDevicesInit", &result) != 0 || result != 42)
         return -1;
     result = 0;
+    zc_output("zc: graphical terminal spawning task\n");
     if (zc_call("BootstrapGuiTerminalStart", &result) != 0 || result != 0x2a)
         return -1;
+    zc_output("zc: graphical terminal task spawned\n");
     /* BootstrapGuiTerminalStart assigns VM keyboard focus to the visible
      * graphical shell. The serial shell remains available through UART. */
     gui_terminal_active = 1;

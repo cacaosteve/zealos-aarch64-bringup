@@ -1,0 +1,152 @@
+// Original home Once file, TipOfDay and default compiler include extension.
+I64 home_once_result, home_once_value, home_once_system;
+CTask *home_once_terminal, *home_once_task;
+
+U0 HomeOnceIncludeChild(U8 *unused)
+{
+    if (unused) {}
+    if (!Cd("/Tests")) return;
+    if (ExePutS2("#include \"HomeOnceValue\"\nHomeOnceValue;", "<default include>") != 42) return;
+    if (ExePutS2("#include \"../Tests/HomeOnceValue\"\nHomeOnceValue;", "<dot include>") != 42) return;
+    if (ExePutS2("#include \"~:/Tests/HomeOnceValue\"\nHomeOnceValue;", "<boot include>") != 42) return;
+    if (ExePutS2("#include \"::/Tests/HomeOnceValue\"\nHomeOnceValue;", "<boot include>") != 42) return;
+    Bool caught = FALSE;
+    try { ExePutS2("#include \"HomeOnceMissing\"", "<missing default include>"); }
+    catch { caught=Fs->except_ch=='Compiler'; Fs->catch_except=TRUE; }
+    if (!caught || ExePutS2("40+2;", "<recovered>") != 42) return;
+    home_once_result=42;
+}
+
+I64 HomeOnceIncludeChecks()
+{
+    home_once_result=0;
+    CTask *child=Spawn(&HomeOnceIncludeChild);
+    if (!child) return 1;
+    while (TaskValidate(child)) Yield;
+    return home_once_result;
+}
+
+I64 HomeOnceTipBody()
+{
+    CDoc *old=Fs->put_doc, *doc=DocNew;
+    I64 old_seed=Fs->rand_seed, expected, seed, result=42;
+    Bool old_rand=LBts(&Fs->task_flags,TASKf_NONTIMER_RAND);
+    U8 *saved, *expected_text;
+    Fs->put_doc=doc;
+    for (seed=0; seed<4; seed++)
+    {
+        Fs->rand_seed=seed;
+        expected=RandU16 % 3;
+        Fs->rand_seed=seed;
+        DocReset(doc,TRUE);
+        TipOfDay("/Tests/HomeOnceTips.DD");
+        saved=DocSave(doc);
+        expected_text="alpha";
+        if (expected==1) expected_text="beta";
+        if (expected==2) expected_text="gamma";
+        if (!saved || !StrMatch(expected_text,saved) ||
+            StrOcc(saved,'*') != 1) result=1;
+        Free(saved);
+    }
+    DocReset(doc,TRUE);
+    TipOfDay;
+    saved=DocSave(doc);
+    if (!saved || !StrMatch("*",saved)) result=2;
+    Free(saved);
+    Bool caught=FALSE;
+    try { TipOfDay("/Tests/HomeOnceEmptyTips.DD"); }
+    catch { caught=Fs->except_ch=='NoTips'; Fs->catch_except=TRUE; }
+    if (!caught) result=3;
+    caught=FALSE;
+    try { TipOfDay("/Tests/HomeOnceMissingTips.DD"); }
+    catch { caught=Fs->except_ch=='NoTips'; Fs->catch_except=TRUE; }
+    if (!caught || ExePutS2("40+2;","<tip recovery>") != 42) result=4;
+    Fs->put_doc=old;
+    DocDel(doc);
+    Fs->rand_seed=old_seed;
+    LBEqual(&Fs->task_flags,TASKf_NONTIMER_RAND,old_rand);
+    return result;
+}
+
+U0 HomeOnceTipChild(U8 *unused)
+{
+    if (unused) {}
+    home_once_result=HomeOnceTipBody;
+}
+
+I64 HomeOnceTipChecks()
+{
+    home_once_result=0;
+    CTask *child=Spawn(&HomeOnceTipChild);
+    if (!child) return 1;
+    while (TaskValidate(child)) Yield;
+    return home_once_result;
+}
+
+I64 HomeOnceStartChecks()
+{
+    home_once_value=0; home_once_system=0; home_once_task=NULL;
+    Btr(&sys_run_level,RLf_ONCE_USER); Btr(&sys_run_level,RLf_ONCE_SYSTEM);
+    SysOnce("home_once_system=1;if(Fs==sys_task)home_once_system=42;");
+    Once("home_once_value=42;home_once_task=Fs;");
+    home_once_terminal=User();
+    if (!TaskValidate(home_once_terminal)) return 1;
+    XTalk(home_once_terminal,"Cd; #include \"Once\";\n");
+    WinToTop(home_once_terminal);
+    return 42;
+}
+
+I64 HomeOnceFinishChecks()
+{
+    if (!ZcTaskWaitTimeout(home_once_terminal,15000,TRUE)) return 1;
+    if (home_once_value!=42 || home_once_system!=42 || home_once_task!=home_once_terminal) return 2;
+    if (!Bt(&sys_run_level,RLf_ONCE_USER) || !Bt(&sys_run_level,RLf_ONCE_SYSTEM) ||
+        RegCount("Once/User")>2 || RegCount("Once/System")>2) return 3;
+    U8 *saved=DocSave(home_once_terminal->put_doc);
+    U8 *needle="Tips of the Day";
+    if (sys_boot_src.u16[0]==BOOT_SRC_DVD) needle="NO";
+    Bool found=saved && StrMatch(needle,saved);
+    Free(saved);
+    if (found) return 42;
+    return 4;
+}
+
+I64 HomeOnceCloseChecks()
+{
+    if (!Kill(home_once_terminal)) return 1;
+    home_once_terminal=NULL;
+    WinToTop(bootstrap_gui_terminal_task);
+    return 42;
+}
+
+I64 HomeOnceReopenStartChecks()
+{
+    home_once_value=0; home_once_task=NULL;
+    home_once_terminal=User();
+    if (!TaskValidate(home_once_terminal)) return 1;
+    // The terminal starts outside Home; Cd and include share one input line.
+    XTalk(home_once_terminal,"Cd(\"/Tests\");Cd; #include \"Once\";\n");
+    WinToTop(home_once_terminal);
+    return 42;
+}
+
+I64 HomeOnceSavedStartChecks()
+{
+    U8 *saved="OnceExe;home_once_value=42;home_once_task=Fs;Print(\"Saved home Once 42\\n\");\n";
+    U8 *bare="throw('BareFile');\n";
+    if (FileWrite("~/Once.ZC",saved,StrLen(saved))!=StrLen(saved) ||
+        FileWrite("~/Once",bare,StrLen(bare))!=StrLen(bare)) return 1;
+    return HomeOnceReopenStartChecks;
+}
+
+I64 HomeOnceSavedFinishChecks()
+{
+    if (!ZcTaskWaitTimeout(home_once_terminal,15000,TRUE)) return 1;
+    if (home_once_value!=42 || home_once_task!=home_once_terminal ||
+        StrCompare(home_once_terminal->cur_dir,"/Home")) return 2;
+    U8 *saved=DocSave(home_once_terminal->put_doc);
+    Bool found=saved && StrMatch("Saved home Once 42",saved);
+    Free(saved);
+    if (found) return 42;
+    return 3;
+}
