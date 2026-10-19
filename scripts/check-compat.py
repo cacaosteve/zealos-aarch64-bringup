@@ -1533,12 +1533,40 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             before_count = re.search(r'zc => 0x([0-9a-fA-F]+)', before)
             if not before_count:
                 raise RuntimeError('could not read graphical-terminal key-event count:\n' + before)
-            for key in ('h', 'e', 'l', 'p'):
+            for input_length, key in enumerate(('h', 'e', 'l', 'p'), 1):
                 qmp_send_key(key)
+                input_deadline = time.monotonic() + 3
+                while True:
+                    input_diag = command('zcall BootstrapGuiTerminalInputDiag',
+                                         'zc => 0x')
+                    input_value = re.search(r'zc => 0x([0-9a-fA-F]+)', input_diag)
+                    last_char_diag = command('zcall BootstrapGuiTerminalLastKeyChar',
+                                             'zc => 0x')
+                    last_char_value = re.search(r'zc => 0x([0-9a-fA-F]+)',
+                                                last_char_diag)
+                    if not input_value or not last_char_value:
+                        raise RuntimeError('could not inspect graphical input while typing:\n'
+                                           + input_diag + last_char_diag)
+                    current_length = int(input_value.group(1), 16) & 0xff
+                    current_char = int(last_char_value.group(1), 16)
+                    if current_length == input_length and current_char == ord(key):
+                        break
+                    if current_length > input_length or time.monotonic() >= input_deadline:
+                        status = command('zstatus', 'gui_keyboard:')
+                        raise RuntimeError(f'graphical input diverged at {key!r}: '
+                                           f'length={current_length} '
+                                           f'last_char=0x{current_char:x}\n{status}')
+                    time.sleep(0.05)
             time.sleep(0.3)
             typing = require_graphical_prompt_text('typing-before-return', 'help')
             require_graphical_pointer()
             require_graphical_caret(typing, '> help')
+            input_diag = command('zcall BootstrapGuiTerminalInputDiag', 'zc => 0x')
+            input_value = re.search(r'zc => 0x([0-9a-fA-F]+)', input_diag)
+            if not input_value or int(input_value.group(1), 16) & 0xff != 4:
+                status = command('zstatus', 'gui_keyboard:')
+                raise RuntimeError('graphical prompt did not contain exactly "help" before Return:\n'
+                                   + input_diag + status)
             qmp_send_key('ret')
             time.sleep(0.5)
             after = command('zcall BootstrapGuiTerminalKeyEventCount', 'zc => 0x')
