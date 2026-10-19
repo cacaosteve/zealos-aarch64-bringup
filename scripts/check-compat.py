@@ -499,11 +499,13 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                    == b'\xff\xff\xff' for r in range(height) for c in range(width))
     def require_graphical_caret(screen, line):
         deadline = time.monotonic() + 6
+        pattern = (re.compile(r'>[ \t]+' + re.escape(line[2:]))
+                   if line.startswith('> ') else re.compile(re.escape(line)))
         while True:
             for row, text in enumerate(screen[3].splitlines()):
                 # Repeated commands may also appear in history, another
                 # terminal or a title. Inspect every occurrence for the caret.
-                for match in re.finditer(re.escape(line), text):
+                for match in pattern.finditer(text):
                     col = match.end()
                     if white_pixels(screen, col*8, row*8, 8, 8) >= 8:
                         print('PASS visible graphical insertion caret', flush=True)
@@ -1472,6 +1474,35 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             # has already emitted enough guest output to scroll the boot banner
             # off-screen, so use the live prompt as the readiness marker.
             focus_graphical_terminal()
+            if args.probe_gui_workflow:
+                # The upstream window manager exposes the focused task's menu
+                # only while the pointer is over the desktop's first text row.
+                # Check the rendered row itself so a title-bar hover cannot be
+                # mistaken for a visible OS menu.
+                move_graphical_pointer(4, 4)
+                menu_deadline = time.monotonic() + 5
+                menu_screen = graphical_screen('os-menu-top-edge')
+                while time.monotonic() < menu_deadline:
+                    blue_menu = rgb_pixels_in(menu_screen, (0, 0, 170),
+                                               (0, 0, 240, 100))
+                    yellow_menu = rgb_pixels_in(menu_screen, (255, 255, 85),
+                                                 (0, 0, 240, 100))
+                    # The whole menu bar is blue even when the pointer is
+                    # horizontally beyond the OS title. Confirm the submenu
+                    # itself is drawn below the bar while the pointer rests
+                    # over the first label at (4,4).
+                    blue_submenu = rgb_pixels_in(menu_screen, (0, 0, 170),
+                                                  (0, 8, 240, 100))
+                    if (blue_menu >= 100 and yellow_menu >= 100 and
+                            blue_submenu >= 1000):
+                        print('PASS OS menu bar and dropdown render on hover', flush=True)
+                        break
+                    time.sleep(0.1)
+                    menu_screen = graphical_screen('os-menu-top-edge')
+                else:
+                    raise RuntimeError('OS menu did not appear on the desktop top edge; '
+                                       f'see {graphical_path("os-menu-top-edge")} and .txt\n'
+                                       + menu_screen[3])
             require_graphical_text('boot-terminal', '> ')
             raw_pattern = r'usb_input:.* key_events=(\d+)' if args.usb_input else r'virtio_keyboard: ready=1 key_events=(\d+)'
             raw_before = re.search(raw_pattern, desktop)
@@ -1484,7 +1515,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             for key in ('h', 'e', 'l', 'p'):
                 qmp_send_key(key)
             time.sleep(0.3)
-            typing = require_graphical_text('typing-before-return', '> help')
+            typing = require_graphical_prompt_text('typing-before-return', 'help')
             require_graphical_pointer()
             require_graphical_caret(typing, '> help')
             qmp_send_key('ret')
@@ -1531,7 +1562,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 focus_graphical_terminal()
                 fast_command = 'zc I64 UsbFastTyping(){return 42;}'
                 qmp_send_text(fast_command, delay=0.1)
-                require_graphical_text('usb-fast-typing', '> '+fast_command)
+                require_graphical_prompt_text('usb-fast-typing', fast_command)
+                require_graphical_caret(graphical_screen('usb-fast-typing'), '> '+fast_command)
                 qmp_send_key('ret')
                 require_graphical_text('usb-fast-submit', 'zc: executed')
                 # Definitions belong to the graphical task's compiler scope.
@@ -1830,7 +1862,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 wait_for_graphical_terminal_banner()
                 focus_graphical_terminal()
                 qmp_send_text('edit '+editor_path)
-                require_graphical_text('editor-reopen-command', '> edit '+editor_path)
+                require_graphical_prompt_text('editor-reopen-command', 'edit '+editor_path)
                 qmp_send_key('ret')
                 require_graphical_text('editor-reopened-after-reboot', source)
                 command('zstatus', 'gui_editor_active=1')

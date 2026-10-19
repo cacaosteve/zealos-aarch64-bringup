@@ -3749,4 +3749,16 @@ the established user-facing labels and actions are retained.
 `make check-home-autostart` and `make check-gui-workflow` passed, including
 menu structure/action checks, graphical input and caret, window-demo focus
 recovery, source execution, and editor save/compile/run/reopen. A final
-hands-on UTM check of menu drawing and selection remains pending.
+UTM hover check passed on 2026-10-19: the user reports that moving the guest
+pointer onto the desktop's top row turns the menu strip blue, and the attached
+comparison screenshot shows the strip returning to its normal appearance when
+the pointer leaves. This confirms live menu-bar hover drawing. Opening the
+drop-down over the far-left `OS` label and selecting an item still need a
+hands-on UTM check. The expanded two-hub graphical workflow now also hovers the
+guest pointer over that label and checks framebuffer pixels for the actual
+drop-down below the highlighted bar; `python3 scripts/check-compat.py
+--usb-input nec --usb-with-virtio --usb-hubs 2 --usb-hotplug
+--probe-gui-workflow` passed, including input, editor persistence, USB
+reconnects, tablet recovery and hub-subtree recovery. The run also reproduced
+an editor command with leading whitespace after reboot; the terminal now trims
+leading spaces/tabs when recognizing `edit`, and the save/reopen check passed.

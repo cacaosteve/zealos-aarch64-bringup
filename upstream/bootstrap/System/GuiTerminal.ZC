@@ -302,20 +302,25 @@ U8 *BootstrapGuiTerminalMenuAction(I64 action)
 
 Bool BootstrapGuiTerminalEditCommand(U8 *command, U8 **path)
 {//Keep the interactive editor inside the guest terminal task, not host shell.
+    U8 *start = command;
     if (path)
         *path = NULL;
-    if (!command || command[0] != 'e' || command[1] != 'd' ||
-        command[2] != 'i' || command[3] != 't' ||
-        (command[4] && command[4] != ' ' && command[4] != '\t'))
+    if (!command)
+        return FALSE;
+    while (*start == ' ' || *start == '\t')
+        start++;
+    if (start[0] != 'e' || start[1] != 'd' ||
+        start[2] != 'i' || start[3] != 't' ||
+        (start[4] && start[4] != ' ' && start[4] != '\t'))
         return FALSE;
     if (!path)
         return TRUE;
-    if (!command[4])
+    if (!start[4])
     {
-        *path = command + 4;
+        *path = start + 4;
         return TRUE;
     }
-    *path = command + 5;
+    *path = start + 5;
     while (**path == ' ' || **path == '\t')
         (*path)++;
     return TRUE;
@@ -948,6 +953,10 @@ I64 BootstrapGuiTerminalSmoke()
         if (!BootstrapGuiTerminalEditCommand(command, &edit_path) ||
             StrCompare(edit_path, "/Kernel/KernelA.HH"))
             return 48;
+        StrCopy(command, " \tedit \t/Kernel/KernelA.HH");
+        if (!BootstrapGuiTerminalEditCommand(command, &edit_path) ||
+            StrCompare(edit_path, "/Kernel/KernelA.HH"))
+            return 53;
         StrCopy(command, "editor /Kernel/KernelA.HH");
         if (BootstrapGuiTerminalEditCommand(command, &edit_path))
             return 49;
