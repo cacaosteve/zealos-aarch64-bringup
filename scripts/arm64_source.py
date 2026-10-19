@@ -100,9 +100,9 @@ def extract_home_startup(source: bytes) -> bytes:
     """Keep the pinned per-user/server hooks ahead of the ARM64 launch adapter.
 
     The ARM64 terminal hook calls these bodies and installs its working input
-    adapter. The supported first-terminal Once command is queued separately by
-    the desktop bootstrap; autocomplete, DVD installer flow and splash remain
-    staged until their dependencies are available.
+    adapter. The supported first-terminal Once command and autocomplete scan
+    are queued separately by the desktop bootstrap; DVD installer flow and
+    splash remain staged until their dependencies are available.
     """
     text = source.decode('utf-8')
     boundary = '\nU0 StartUpTasks()\n'
@@ -235,6 +235,63 @@ def translate_docterm(source: bytes) -> bytes:
     text = source.decode('utf-8')
     if text.count(old) != 1:
         raise ValueError('pinned DocBorderNew title length changed')
+    return text.replace(old, new, 1).encode('utf-8')
+
+
+def translate_autocomplete_task(source: bytes) -> bytes:
+    """Render AutoComplete suggestions into the popup's DolDoc document."""
+    text = source.decode('utf-8')
+    old = '\tWinHorz(left, Fs->win_right);\n\tWinVert(top,  Fs->win_bottom);'
+    new = ('\t// Spawned ARM64 tasks may not yet have TaskInit window bounds.\n'
+           '\t// Keep the anchored completion popup large enough to render.\n'
+           '\tif (Fs->win_right <= left)\n'
+           '\t\tFs->win_right = TEXT_COLS - 2;\n'
+           '\tif (Fs->win_bottom <= top)\n'
+           '\t\tFs->win_bottom = TEXT_ROWS - 2;\n' + old)
+    if text.count(old) != 1:
+        raise ValueError('pinned AutoComplete popup geometry changed')
+    text = text.replace(old, new, 1)
+
+    # Aiwnios lowers a bare string statement to the host Print binding. In this
+    # ARM64 port that binding is a task-text output path, so it bypasses
+    # AutoComplete's DolDoc and leaves the popup document empty. Use the normal
+    # DolDoc printer explicitly for every suggestion row instead.
+    print_calls = (
+        ('"$$RED$$Word:%s$$FG$$\\n", ac.cur_word;',
+         'DocPrint(DocPut, "$$RED$$Word:%s$$FG$$\\n", ac.cur_word);'),
+        ('"$$GREEN$$F%02d$$FG$$$$HL$$ ", i + 1;',
+         'DocPrint(DocPut, "$$GREEN$$F%02d$$FG$$$$HL$$ ", i + 1);'),
+        ('"$$TX+UL+L+PU,\\"%$$Q\\",A=\\"%s\\"$$$$IV,0$$\\n", st, tmph->src_link;',
+         'DocPrint(DocPut, "$$TX+UL+L+PU,\\"%$$Q\\",A=\\"%s\\"$$$$IV,0$$\\n", st, tmph->src_link);'),
+        ('"%s\\n", st;', 'DocPrint(DocPut, "%s\\n", st);'),
+        ('"$$HL,0$$";', 'DocPrint(DocPut, "$$HL,0$$");'),
+    )
+    for old, new in print_calls:
+        if text.count(old) != 1:
+            raise ValueError(f'pinned AutoComplete popup output changed: {old}')
+        text = text.replace(old, new, 1)
+    old = '\t\t\t\t\t\t"$$IV$$";'
+    new = '\t\t\t\t\t\tDocPrint(DocPut, "$$IV$$");'
+    if text.count(old) != 1:
+        raise ValueError('pinned AutoComplete public-link marker changed')
+    text = text.replace(old, new, 1)
+    old = "'\\n';"
+    new = 'DocPrint(DocPut, "\\n");'
+    if text.count(old) != 1:
+        raise ValueError('pinned AutoComplete dictionary row break changed')
+    text = text.replace(old, new, 1)
+    old = '"$$GREEN$$\'%d\'$$FG$$ $$BLACK$$%-23ts$$FG$$", i, ptr;'
+    new = 'DocPrint(DocPut, "$$GREEN$$\'%d\'$$FG$$ $$BLACK$$%-23ts$$FG$$", i, ptr);'
+    if text.count(old) != 1:
+        raise ValueError('pinned AutoComplete dictionary row changed')
+    text = text.replace(old, new, 1)
+
+    old = '\t\t\tACPutChoices(doc, doc_e, focus_task, ToBool(sc != last_sc));'
+    new = (old + '\n'
+           '\t\t\t// Recalc size-to-content after inserting the suggestions.\n'
+           '\t\t\tDocRecalc(DocPut);')
+    if text.count(old) != 1:
+        raise ValueError('pinned AutoComplete choice-update call changed')
     return text.replace(old, new, 1).encode('utf-8')
 
 

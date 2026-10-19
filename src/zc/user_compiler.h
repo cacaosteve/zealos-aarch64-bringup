@@ -155,8 +155,17 @@ static void user_parse_cleanup(struct guest_unwind *scope) {
     guest_fibers[guest_current].user_diagnostic_active = 0;
 }
 static void user_diagnostic_flush(struct guest_fiber *f) {
-    if (f->user_diagnostic_length && f->user_output_writer)
-        guest_task_text_output(f->user_diagnostic);
+    if (f->user_diagnostic_length && f->user_output_writer) {
+        /* GUI shell execution suppresses ordinary Print while it captures the
+         * command result for the DolDoc. Compiler diagnostics are held until
+         * rollback is complete, so send them straight to that same writer
+         * instead of falling through to the raw framebuffer text console. */
+        if (f->user_output_suppressed)
+            FFI_CALL_TOS_1(f->user_output_writer,
+                           (int64_t)(uintptr_t)f->user_diagnostic);
+        else
+            guest_task_text_output(f->user_diagnostic);
+    }
     f->user_diagnostic_length = 0;
 }
 static int64_t user_compiler_step(struct user_compiler *c, int prime, int64_t *type) {

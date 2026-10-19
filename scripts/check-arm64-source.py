@@ -4,7 +4,7 @@ from pathlib import Path
 import re
 import sys
 
-from arm64_source import (extract_home_set, extract_home_startup, extract_server_task, extract_user_task, extract_version_scalars, extract_source_prompt, extract_source_training, translate_doctree, translate_registry, translate_docterm, translate_doced, translate_docfind, translate_docform, translate_docpopup, translate_grbitmap,
+from arm64_source import (extract_home_set, extract_home_startup, extract_server_task, extract_user_task, extract_version_scalars, extract_source_prompt, extract_source_training, translate_autocomplete_task, translate_doctree, translate_registry, translate_docterm, translate_doced, translate_docfind, translate_docform, translate_docpopup, translate_grbitmap,
                           translate_grdc, translate_grscreen, translate_ktask, translate_winmgr)
 
 root = Path(__file__).resolve().parent.parent
@@ -38,6 +38,29 @@ except ValueError:
     pass
 else:
     raise AssertionError('DocTerm overlay accepted a changed title length')
+autocomplete_task = (root / 'upstream/pinned/System/AutoComplete/ACTask.ZC').read_bytes()
+autocomplete_overlay = translate_autocomplete_task(autocomplete_task)
+assert b'if (Fs->win_right <= left)' in autocomplete_overlay
+assert b'if (Fs->win_bottom <= top)' in autocomplete_overlay
+assert b'DocRecalc(DocPut);' in autocomplete_overlay
+assert autocomplete_overlay.count(b'DocPrint(DocPut,') == 8
+assert b'"$$RED$$Word:%s$$FG$$\\n", ac.cur_word;' not in autocomplete_overlay
+assert b'"%s\\n", st;' not in autocomplete_overlay
+try:
+    translate_autocomplete_task(autocomplete_task.replace(
+        b'WinHorz(left, Fs->win_right);', b'WinHorz(left, other);', 1))
+except ValueError:
+    pass
+else:
+    raise AssertionError('AutoComplete overlay accepted changed popup geometry')
+try:
+    translate_autocomplete_task(autocomplete_task.replace(
+        b'ACPutChoices(doc, doc_e, focus_task, ToBool(sc != last_sc));',
+        b'ACPutChoices(doc, doc_e, focus_task, FALSE);', 1))
+except ValueError:
+    pass
+else:
+    raise AssertionError('AutoComplete overlay accepted changed choice update')
 doced = (root / 'upstream/pinned/System/DolDoc/DocEd.ZC').read_bytes()
 assert b'", STR_LEN - 1);' in translate_doced(doced)
 source = (root / 'upstream/pinned/System/Gr/GrScreen.ZC').read_bytes()

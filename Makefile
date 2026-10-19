@@ -653,6 +653,11 @@ check-home-autostart: check-upstream esp
 	python3 scripts/check-arm64-source.py
 	python3 scripts/check-compat.py --pci --probe-home-autostart
 
+.PHONY: check-autocomplete
+check-autocomplete: check-upstream esp
+	python3 scripts/check-arm64-source.py
+	python3 scripts/check-compat.py --pci --probe-autocomplete
+
 .PHONY: check-input-edges
 check-input-edges: esp
 	python3 scripts/check-compat.py --pci --probe-input-edges

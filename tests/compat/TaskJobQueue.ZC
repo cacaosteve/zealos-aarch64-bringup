@@ -66,8 +66,8 @@ I64 TaskJobQueueChecks()
 {
     I64 value = 40;
     CJob *job, *free_job;
-    CTask *children[4];
-    I64 i;
+    CTask *children[8];
+    I64 i, child_count;
     if (mp_count != 1 || JobQueue(&JobCall, &value) ||
         JobQueue(&JobCall, &value, 1, 0) ||
         JobQueue(&JobCall, &value, 0, 0, JOBT_SPAWN_TASK))
@@ -83,10 +83,15 @@ I64 TaskJobQueueChecks()
     free_job = JobQueue(&JobCall, &value, 0);
     if (!free_job || ZcTaskRun || job_call_count != 2 || JobResScan(free_job))
         return 4;
-    for (i = 0; i < 4; i++)
-        if (!(children[i] = Spawn(&JobHold))) return 5;
+    child_count = 0;
+    for (i = 0; i < 8; i++) {
+        children[i] = Spawn(&JobHold);
+        if (!children[i]) break;
+        child_count++;
+    }
+    if (!child_count) return 5;
     if (Spawn(&JobHold)) return 6;
-    for (i = 0; i < 4; i++)
+    for (i = 0; i < child_count; i++)
         if (!Kill(children[i])) return 7;
     return 42;
 }

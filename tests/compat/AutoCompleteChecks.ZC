@@ -1,0 +1,73 @@
+I64 AutoCompleteBootChecks()
+{
+    CHashAC *entry;
+
+    // Home startup is queued to the graphical shell; drain that text before
+    // observing its globally shared index and popup task.
+    TaskWait(bootstrap_gui_terminal_task);
+    if (!ac.hash_table)
+        return 25;
+    entry = HashFind("ZealAutoFixtureWord7Z", ac.hash_table, HTT_WORD);
+
+    if (!entry)
+        return 21;
+    if (!entry->hits)
+        return 22;
+    if (!TaskValidate(ac.task))
+        return 23;
+    if (!Bt(&sys_run_level, RLf_AUTOCOMPLETE))
+        return 24;
+    return 42;
+}
+
+I64 AutoCompleteWindowDiag()
+{
+    CTask *task = ac.task;
+
+    if (!TaskValidate(task))
+        return 0;
+    return (task->win_left & 127) |
+           ((task->win_right & 127) << 7) |
+           ((task->win_top & 127) << 14) |
+           ((task->win_bottom & 127) << 21) |
+           ((task->win_z_num & 63) << 28) |
+           (Bt(&task->display_flags, DISPLAYf_SHOW) << 34);
+}
+
+I64 AutoCompleteDocumentDiag()
+{
+    CDoc *doc;
+    I64 width, height;
+
+    if (!TaskValidate(ac.task) || !(doc = ac.task->display_doc))
+        return 0;
+    width = doc->max_x - doc->min_x;
+    height = doc->max_y - doc->min_y;
+    return (width & 65535) | ((height & 65535) << 16);
+}
+
+I64 AutoCompleteChecks()
+{
+    CHashAC *entry;
+
+    ACInit("/Tests/AutoCompleteCorpus.txt");
+    entry = HashFind("ZealAutoFixtureWord7Z", ac.hash_table, HTT_WORD);
+    if (!entry)
+    {
+        AutoComplete(OFF);
+        return 11;
+    }
+    if (!entry->hits)
+    {
+        AutoComplete(OFF);
+        return 12;
+    }
+    if (!TaskValidate(ac.task))
+    {
+        AutoComplete(OFF);
+        return 13;
+    }
+    if (!AutoComplete(OFF))
+        return 2;
+    return 42;
+}

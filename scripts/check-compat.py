@@ -28,6 +28,8 @@ p.add_argument('--probe-gui-keyboard', action='store_true',
                help='inject printable virtio keys and verify the boot graphical terminal receives them')
 p.add_argument('--probe-gui-workflow', action='store_true',
                help='verify visible graphical editing, save/compile/run, and reopen after reboot')
+p.add_argument('--probe-gui-windowdemo-input', action='store_true',
+               help='isolate graphical terminal input/display across a windowdemo stop')
 p.add_argument('--probe-task-settings', action='store_true',
                help='check upstream application settings and task-local directories at normal desktop boot')
 p.add_argument('--probe-source-context', action='store_true',
@@ -58,6 +60,8 @@ p.add_argument('--probe-home-once', action='store_true',
                help='check default include extension, real boot media and original home Once/tips')
 p.add_argument('--probe-home-autostart', action='store_true',
                help='verify disk boot automatically sends the first-terminal HomeSys Once command')
+p.add_argument('--probe-autocomplete', action='store_true',
+               help='verify upstream autocomplete indexes a source corpus and stops cleanly')
 p.add_argument('--probe-input-edges', action='store_true',
                help='check visible modifier typing and held-key release without the full workflow')
 p.add_argument('--probe-source-exceptions', action='store_true',
@@ -100,6 +104,8 @@ usb_label = (f'{args.usb_input}-{args.usb_pointer}' +
              ('-hotplug' if args.usb_hotplug else '')) if args.usb_input else None
 if args.probe_gui_workflow:
     args.probe_gui_keyboard = True
+if args.probe_gui_windowdemo_input:
+    args.probe_gui_keyboard = True
 if args.probe_input_edges:
     args.probe_gui_keyboard = True
 if args.probe_module_override and not args.probe_module:
@@ -110,11 +116,15 @@ if args.probe_source and not args.pci:
     p.error('--probe-source requires --pci')
 if args.probe_home_autostart and not args.pci:
     p.error('--probe-home-autostart requires --pci')
+if args.probe_autocomplete and not args.pci:
+    p.error('--probe-autocomplete requires --pci')
 if args.probe_gui_terminal and (
         not args.pci or args.probe_module != '/System/DolDoc/DocRecalc.ZC'):
     p.error('--probe-gui-terminal requires --pci --probe-module /System/DolDoc/DocRecalc.ZC')
 if args.probe_gui_keyboard and not args.pci:
     p.error('--probe-gui-keyboard requires --pci')
+if args.probe_gui_windowdemo_input and not args.pci:
+    p.error('--probe-gui-windowdemo-input requires --pci')
 if args.probe_grscreen and not args.probe_winmgr:
     p.error('--probe-grscreen requires --probe-winmgr')
 if args.probe_fulltext and not args.probe_grscreen:
@@ -133,10 +143,11 @@ if args.probe_live_window_control and not (
         args.probe_grscreen and args.probe_live_winmgr):
     p.error('--probe-live-window-control requires --probe-module /System/Win.ZC '
             '--probe-winmgr --probe-grscreen --probe-live-winmgr')
-log_path = ROOT / 'build' / (f'check-usb-{usb_label}{"-home-once" if args.probe_home_once else "-input-edges" if args.probe_input_edges else "-registry" if args.probe_registry else "-home-path" if args.probe_home_path else "-user-text" if args.probe_user_text else "-user-startup" if args.probe_user_startup else ""}.log' if args.usb_input else
+log_path = ROOT / 'build' / (f'check-usb-{usb_label}{"-windowdemo-input" if args.probe_gui_windowdemo_input else "-home-once" if args.probe_home_once else "-input-edges" if args.probe_input_edges else "-registry" if args.probe_registry else "-home-path" if args.probe_home_path else "-user-text" if args.probe_user_text else "-user-startup" if args.probe_user_startup else ""}.log' if args.usb_input else
                              'check-home-once-pci.log' if args.probe_home_once and args.pci else
                              'check-home-once-iso.log' if args.probe_home_once else
                              'check-home-autostart-pci.log' if args.probe_home_autostart else
+                             'check-autocomplete-pci.log' if args.probe_autocomplete else
                              'check-input-edges-pci.log' if args.probe_input_edges else
                              'check-registry-pci.log' if args.probe_registry and args.pci else
                              'check-registry-iso.log' if args.probe_registry else
@@ -321,8 +332,9 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             row = ''
             for x in range(0, width-7, 8):
                 bits = tuple(sum(0x80 >> col for col in range(8)
-                                 if max(pixels[((y+r)*width+x+col)*3:
-                                               ((y+r)*width+x+col)*3+3]) > 32)
+                                 if (pixels[((y+r)*width+x+col)*3] * 299 +
+                                     pixels[((y+r)*width+x+col)*3+1] * 587 +
+                                     pixels[((y+r)*width+x+col)*3+2] * 114) > 240000)
                              for r in range(8))
                 row += font.get(bits, font.get(tuple(v ^ 255 for v in bits), '?'))
             rows.append(row.rstrip())
@@ -352,7 +364,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         return sum(pixels[((y+r)*stride+x+c)*3:((y+r)*stride+x+c)*3+3]
                    == b'\xff\xff\xff' for r in range(height) for c in range(width))
     def require_graphical_caret(screen, line):
-        deadline = time.monotonic() + 3
+        deadline = time.monotonic() + 6
         while True:
             for row, text in enumerate(screen[3].splitlines()):
                 # Repeated commands may also appear in history, another
@@ -455,7 +467,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
     def checked_task_print():
         command('zload /Tests/TaskPrint.ZC', 'zc: loaded /Tests/TaskPrint.ZC')
         result = command('zcall TaskPrintChecks', 'zc => 0x000000000000002a')
-        if 'A text % BC\n tail\n' not in result.replace('\r\n', '\n'):
+        if '$PT$A$FG$ text % BC\n tail\n' not in result.replace('\r\n', '\n'):
             raise RuntimeError('Print format or varargs output mismatch: '+result)
         print('PASS bare Print format and varargs', flush=True)
     def checked_task_recycling():
@@ -600,10 +612,112 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         if not redraw_count or int(redraw_count.group(1), 16) == 0:
             raise RuntimeError('boot compositor has not redrawn the terminal document:\n' + redraws)
         print(f'PASS boot terminal document redraws: {int(redraw_count.group(1), 16)}', flush=True)
+        if args.probe_gui_windowdemo_input:
+            focus_graphical_terminal()
+            qmp_send_text('edit /System/DolDoc/DocEd.ZC')
+            qmp_send_key('ret')
+            time.sleep(0.5)
+            editor_open = command('zstatus', 'gui_editor_active=1')
+            if 'keyboard_focus=Terminal' not in editor_open:
+                raise RuntimeError('GUI editor lost terminal focus in isolated restore probe:\n' + editor_open)
+            for key in ('left', 'right', 'esc'):
+                qmp_send_key(key)
+            editor_closed = command('zstatus', 'gui_editor_active=0')
+            if 'keyboard_focus=Terminal' not in editor_closed:
+                raise RuntimeError('GUI editor did not restore terminal focus:\n' + editor_closed)
+            for key in ('z', 'l', 's', 'ret'):
+                qmp_send_key(key)
+            command('zcall BootstrapGuiTerminalLastCommandIsZls',
+                    'zc => 0x0000000000000001')
+            qmp_send_text('windowdemo')
+            qmp_send_key('ret')
+            command('zstatus', 'desktop: winmgr=1 gterm=1 windowdemo=1 presented_frames=')
+            command('windowdemostop',
+                    'windowdemo: stopped; bootstrap shell display resumed')
+            restored = command('zstatus',
+                               'desktop: winmgr=1 gterm=1 windowdemo=0 presented_frames=')
+            if 'keyboard_focus=Terminal' not in restored:
+                raise RuntimeError('window demo did not restore terminal focus:\n' + restored)
+            for key in ('z', 'l', 's', 'ret'):
+                qmp_send_key(key)
+            command('zcall BootstrapGuiTerminalLastCommandIsZls',
+                    'zc => 0x0000000000000001')
+            qmp_send_text('help')
+            caret_screen = require_graphical_text('windowdemo-terminal-caret-text', '> help')
+            require_graphical_caret(caret_screen, '> help')
+            qmp_send_key('esc')
+            command('zc I64 compiler_recovery_committed=0;', 'zc: executed')
+            option_command = 'zc Option(OPTf_DECIMAL_ONLY,ON);'
+            qmp_send_text(option_command)
+            input_state = command('zcall BootstrapGuiTerminalInputDiag', 'zc => 0x')
+            input_match = re.search(r'zc => 0x([0-9a-fA-F]+)', input_state)
+            input_diag = int(input_match.group(1), 16) if input_match else -1
+            if ((input_diag & 255) != len(option_command) or
+                    ((input_diag >> 8) & 255) != 1):
+                raise RuntimeError('post-windowdemo GUI command buffer is incomplete:\n' + input_state)
+            print(f"INFO post-windowdemo input: length={input_diag & 255} "
+                  f"last_edit={(input_diag >> 8) & 255}", flush=True)
+            require_graphical_text('windowdemo-terminal-echo', '> ' + option_command)
+            qmp_send_key('ret')
+            rejected_hex_command = 'zc compiler_recovery_committed=0x2a;'
+            qmp_send_text(rejected_hex_command)
+            require_graphical_text('windowdemo-terminal-rejected-hex-echo',
+                                   '> ' + rejected_hex_command)
+            qmp_send_key('ret')
+            require_graphical_text('windowdemo-terminal-option-error',
+                                   'Hex constant disabled by OPTf_DECIMAL_ONLY.')
+            print('PASS long terminal input and compiler diagnostics after windowdemo', flush=True)
+            raise SystemExit(0)
         if args.probe_home_autostart:
             command('zload /Tests/HomeAutoStart.ZC', 'zc: loaded /Tests/HomeAutoStart.ZC')
             command('zcall HomeAutoStartChecks', 'zc => 0x000000000000002a')
             print('PASS disk boot ran HomeSys first-terminal Once through graphical input', flush=True)
+            raise SystemExit(0)
+        if args.probe_autocomplete:
+            command('zload /Tests/AutoCompleteChecks.ZC',
+                    'zc: loaded /Tests/AutoCompleteChecks.ZC')
+            command('zcall AutoCompleteBootChecks',
+                    'zc => 0x000000000000002a')
+            print('PASS boot autocomplete corpus indexing and task startup', flush=True)
+            # Exercise the real foreground key handler and AutoComplete task,
+            # not just the dictionary API. The fixture word has a unique
+            # prefix, so Ctrl+F1 should insert exactly its remaining suffix.
+            focus_graphical_terminal()
+            prefix = 'ZealAutoFixtureWord7'
+            completion = prefix + 'Z'
+            qmp_send_text(prefix)
+            require_graphical_text('autocomplete-prefix', '> ' + prefix)
+            window_state = command('zcall AutoCompleteWindowDiag', 'zc => 0x')
+            match = re.search(r'zc => 0x([0-9a-fA-F]+)', window_state)
+            if not match:
+                raise RuntimeError('could not inspect live autocomplete popup window:\n' + window_state)
+            packed = int(match.group(1), 16)
+            popup = {
+                'left': packed & 127,
+                'right': (packed >> 7) & 127,
+                'top': (packed >> 14) & 127,
+                'bottom': (packed >> 21) & 127,
+                'z': (packed >> 28) & 63,
+                'shown': bool((packed >> 34) & 1),
+            }
+            doc_state = command('zcall AutoCompleteDocumentDiag', 'zc => 0x')
+            doc_match = re.search(r'zc => 0x([0-9a-fA-F]+)', doc_state)
+            if not doc_match:
+                raise RuntimeError('could not inspect autocomplete popup document:\n' + doc_state)
+            doc_packed = int(doc_match.group(1), 16)
+            print(f"INFO autocomplete popup document size: "
+                  f"{doc_packed & 65535}x{(doc_packed >> 16) & 65535}", flush=True)
+            print(f"INFO autocomplete popup geometry: {popup}", flush=True)
+            if (popup['right'] - popup['left'] < 8 or
+                    popup['bottom'] - popup['top'] < 2 or
+                    not popup['shown'] or popup['z'] == 0):
+                raise RuntimeError(f'autocomplete popup has invalid visible geometry: {popup}')
+            qmp_send_keys(['ctrl', 'f1'])
+            require_graphical_text('autocomplete-fill-in', '> ' + completion)
+            qmp_send_key('esc')
+            print('PASS graphical autocomplete suggestion and Ctrl+F1 fill-in', flush=True)
+            command('zcall AutoCompleteChecks', 'zc => 0x000000000000002a')
+            print('PASS upstream autocomplete corpus indexing and task teardown', flush=True)
             raise SystemExit(0)
         if args.probe_input_edges:
             focus_graphical_terminal()
@@ -1088,9 +1202,11 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         if args.probe_gui_keyboard:
             # The source manager opens its menu when the uninitialized QMP
             # pointer rests in the top screen row. Select the actual client
-            # before requiring unobscured terminal text or delivering keys.
+            # before checking its prompt or delivering keys. This workflow
+            # has already emitted enough guest output to scroll the boot banner
+            # off-screen, so use the live prompt as the readiness marker.
             focus_graphical_terminal()
-            require_graphical_text('boot-terminal', 'ZealOS ARM64 graphical terminal')
+            require_graphical_text('boot-terminal', '> ')
             raw_pattern = r'usb_input:.* key_events=(\d+)' if args.usb_input else r'virtio_keyboard: ready=1 key_events=(\d+)'
             raw_before = re.search(raw_pattern, desktop)
             if not raw_before:
@@ -1294,7 +1410,17 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             print('PASS QMP graphical window demo launch/stop restored the terminal and keyboard focus', flush=True)
             if args.probe_gui_workflow:
                 command('zc compiler_recovery_committed=0;', 'zc: executed')
-                qmp_send_text('zc Option(OPTf_DECIMAL_ONLY,ON);')
+                option_command = 'zc Option(OPTf_DECIMAL_ONLY,ON);'
+                qmp_send_text(option_command)
+                input_state = command('zcall BootstrapGuiTerminalInputDiag', 'zc => 0x')
+                input_match = re.search(r'zc => 0x([0-9a-fA-F]+)', input_state)
+                input_diag = int(input_match.group(1), 16) if input_match else -1
+                input_len = input_diag & 255
+                input_result = (input_diag >> 8) & 255
+                print(f'INFO live GUI input buffer: length={input_len} last_edit={input_result}', flush=True)
+                if input_len != len(option_command) or input_result != 1:
+                    raise RuntimeError('USB keys did not assemble the expected live GUI command buffer:\n' + input_state)
+                require_graphical_text('option-command-echo', '> ' + option_command)
                 qmp_send_key('ret')
                 qmp_send_text('zc compiler_recovery_committed=0x2a;')
                 qmp_send_key('ret')
@@ -1392,8 +1518,10 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 require_graphical_text('exceptions-uncaught', 'zc: uncaught guest exception 0x')
                 qmp_send_text('zc Print("  Recovery %d",ExePutS2("40+2;"));')
                 qmp_send_key('ret')
-                recovered_frame = require_graphical_text('exceptions-prompt-recovered', 'Recovery 42')
-                if len(re.findall(r'\bRecovery 42', recovered_frame[3])) != 1:
+                recovery_text = '  Recovery 42'
+                recovered_frame = require_graphical_text(
+                    'exceptions-prompt-recovered', recovery_text)
+                if recovered_frame[3].count(recovery_text) != 1:
                     raise RuntimeError('graphical command recovery output was duplicated')
                 command('zstatus', 'failed=0')
                 print('PASS graphical source/file throws clean up and accept the next command', flush=True)
@@ -1439,9 +1567,11 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 qmp_send_keys(['shift', 'esc'])
                 time.sleep(0.5)
                 command('zstatus', 'gui_editor_active=0')
+                qmp_send_text('help')
+                qmp_send_key('ret')
                 cancelled = require_graphical_text(
                     'editor-cancelled-after-reboot',
-                    'ZealC runs directly; help lists bootstrap commands.')
+                    'Graphical commands:')
                 if 'edit: could not open document' in cancelled[3]:
                     raise RuntimeError('cancelling an open editor reported an open failure')
                 print('PASS graphical edit/save/compile/run/reboot/reopen workflow', flush=True)

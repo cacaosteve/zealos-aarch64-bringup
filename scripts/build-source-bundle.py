@@ -8,7 +8,7 @@ import sys
 import tarfile
 
 from arm64_source import (extract_home_set, extract_home_startup, extract_version_scalars, extract_source_prompt, extract_source_training, extract_server_task, extract_user_task, translate_doctree, translate_registry, translate_docterm, translate_doced, translate_docfind, translate_docform, translate_docpopup, translate_grbitmap,
-                          translate_grdc, translate_grscreen, translate_ktask, translate_mathode,
+                          translate_autocomplete_task, translate_grdc, translate_grscreen, translate_ktask, translate_mathode,
                           translate_winmgr)
 
 root = Path(__file__).resolve().parent.parent
@@ -72,6 +72,11 @@ for name, expected in manifest['files'].items():
             raise SystemExit(f'ARM64 source overlay no longer applies: {exc}') from exc
     elif rel == 'System/DolDoc/DocTerm.ZC':
         data = translate_docterm(data)
+    elif rel == 'System/AutoComplete/ACTask.ZC':
+        try:
+            data = translate_autocomplete_task(data)
+        except ValueError as exc:
+            raise SystemExit(f'ARM64 AutoComplete overlay no longer applies: {exc}') from exc
     elif rel == 'System/DolDoc/DocEd.ZC':
         data = translate_doced(data)
     elif rel == 'System/DolDoc/DocTree.ZC':
@@ -90,7 +95,7 @@ for path in sorted((root / 'upstream/bootstrap').rglob('*')):
     if path.is_file():
         entries[path.relative_to(root / 'upstream/bootstrap').as_posix()] = path.read_bytes()
 for path in sorted((root / 'tests/compat').glob('*')):
-    if path.suffix in ('.ZC', '.HH', '.DD'):
+    if path.suffix in ('.ZC', '.HH', '.DD', '.txt'):
         entries['Tests/' + path.name] = path.read_bytes()
 entries['LICENSE/ZealOS.txt'] = (root / 'upstream/pinned/LICENSE').read_bytes()
 entries['LICENSE/Aiwnios.txt'] = (root / 'third_party/aiwnios/LICENSE').read_bytes()

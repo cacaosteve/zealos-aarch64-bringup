@@ -11,6 +11,8 @@ I64 bootstrap_gui_terminal_editor_raw = -1;
 Bool bootstrap_gui_terminal_devices_ready = FALSE;
 Bool bootstrap_gui_terminal_home_started = FALSE;
 U8 bootstrap_gui_terminal_last_command[256];
+I64 bootstrap_gui_terminal_input_len;
+I64 bootstrap_gui_terminal_last_edit_result;
 U0 (*bootstrap_gui_terminal_final_update)(CDC *dc);
 extern U8 *ZcGuiShellExec(U8 *line);
 // Task slots can be reused. Match both address and generation before reading
@@ -192,6 +194,44 @@ I64 BootstrapGuiTerminalCommandKey(U8 *command, I64 *command_len,
     return 0;
 }
 
+Bool BootstrapGuiTerminalComplete(U8 *command, I64 *command_len,
+                                  I64 *command_pos, I64 scan)
+{//Route upstream Ctrl+F1..F12 autocomplete into the bootstrap line buffer.
+    I64 i, code = scan.u8[0], n;
+    U8 *word;
+
+    if (!(scan & SCF_CTRL))
+        return FALSE;
+    if (SC_F1 <= code <= SC_F10)
+        n = code - SC_F1 + 1;
+    else if (code == SC_F11)
+        n = 11;
+    else if (code == SC_F12)
+        n = 12;
+    else
+        return FALSE;
+
+    if (AutoComplete(ON) && n <= ac.num_fillins &&
+        ac.fillin_matches[n - 1] &&
+        (word = ac.fillin_matches[n - 1]->str) &&
+        StrLen(word) > ac.partial_len)
+    {
+        // Keep the command buffer and document caret in lockstep. The
+        // upstream ACFillIn uses In(), which writes only to DolDoc and would
+        // leave this bootstrap shell's separate command buffer stale.
+        DocPutKey(DocPut, 0, SC_END);
+        for (i = *command_len; i > *command_pos; i--)
+            DocPutKey(DocPut, 0, SC_CURSOR_LEFT);
+        for (i = ac.partial_len; word[i]; i++)
+            if (BootstrapGuiTerminalCommandKey(command, command_len,
+                                               command_pos, word[i], 0) == 1)
+                DocPutKey(DocPut, word[i], 0);
+            else
+                break;
+    }
+    return TRUE;
+}
+
 CMenuEntry *BootstrapGuiTerminalMenuEntry(CTask *task, U8 *name, I64 action)
 {
     CMenuEntry *entry = CAlloc(sizeof(CMenuEntry), task);
@@ -352,6 +392,8 @@ U8 *BootstrapGuiTerminalReadLine2(Bool continuation)
     U8 *output, *edit_path;
 
     command[0] = 0;
+    bootstrap_gui_terminal_input_len = 0;
+    bootstrap_gui_terminal_last_edit_result = 0;
     BootstrapGuiTerminalPrompt(continuation);
 
     while (TRUE)
@@ -457,6 +499,12 @@ U8 *BootstrapGuiTerminalReadLine2(Bool continuation)
                     command_pos = 0;
                     command[0] = 0;
                 }
+                else if (!ch && BootstrapGuiTerminalComplete(
+                                        command, &command_len, &command_pos, sc))
+                {
+                    // The upstream Ctrl+Fn completion has already updated
+                    // both the command buffer and visible document.
+                }
                 else
                 {
                     // A mouse click inside the terminal can move DolDoc's
@@ -468,10 +516,13 @@ U8 *BootstrapGuiTerminalReadLine2(Bool continuation)
                         DocPutKey(DocPut, 0, SC_CURSOR_LEFT);
                     if (ch >= 32 && ch < 127 && command_len == 255)
                         overflow = TRUE;
-                    if (BootstrapGuiTerminalCommandKey(command, &command_len,
-                                                       &command_pos, ch, sc) == 1)
+                    bootstrap_gui_terminal_last_edit_result =
+                        BootstrapGuiTerminalCommandKey(command, &command_len,
+                                                       &command_pos, ch, sc);
+                    if (bootstrap_gui_terminal_last_edit_result == 1)
                         DocPutKey(DocPut, ch, sc);
                 }
+                bootstrap_gui_terminal_input_len = command_len;
             }
         }
         // User() waits for this task to reach its input prompt. Incoming
@@ -556,6 +607,9 @@ I64 BootstrapGuiTerminalHomeStart()
     bootstrap_gui_terminal_home_second = User();
     WinToTop(user);
     XTalk(user, "Cd; #include \"Once\";\n");
+    // HomeSys builds the text index after the shell scheduler is running.
+    // Queue it after Once so Spawn/TaskWait have a live guest task context.
+    XTalk(user, "Silent; Cd(\"/\"); ACInit(\"/*;!*/Bible.TXT;!*/Clementine.TXT;!*/PCIDevices.DD;!*/HTML/*;!*/ChangeLog.DD\"); Cd(\"/Home\"); Silent(OFF);\n");
     return 0x2a;
 }
 
@@ -701,6 +755,12 @@ I64 BootstrapGuiTerminalKeyEventCount()
     return bootstrap_gui_terminal_key_events;
 }
 
+I64 BootstrapGuiTerminalInputDiag()
+{//Pack live line length and last editing result for cross-console diagnostics.
+    return bootstrap_gui_terminal_input_len |
+           bootstrap_gui_terminal_last_edit_result << 8;
+}
+
 I64 BootstrapGuiTerminalEditorActive()
 {
     return bootstrap_gui_terminal_editor_active;
@@ -781,10 +841,10 @@ I64 BootstrapGuiTerminalShow()
     if (TaskValidate(term))
     {
         bootstrap_gui_terminal_task->display_flags |= 1 << DISPLAYf_SHOW;
-        // Restoring the window also restores its keyboard ownership. The
-        // window-demo path temporarily hands the screen to other tasks; simply
-        // making the terminal visible again leaves focus on the root shell.
-        sys_focus_task = term;
+        // Window-demo temporarily moves other task windows above the shell.
+        // Showing the terminal and assigning keyboard focus alone leaves its
+        // text behind those windows, so restore its z-order as well.
+        WinToTop(term);
     }
     return 0x2a;
 }

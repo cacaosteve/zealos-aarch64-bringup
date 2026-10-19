@@ -56,6 +56,8 @@
 #define VK_KEY_RIGHTSHIFT   54u
 #define VK_KEY_LEFTCTRL     29u
 #define VK_KEY_RIGHTCTRL    97u
+#define VK_KEY_LEFTALT      56u
+#define VK_KEY_RIGHTALT     100u
 /* Linux KEY_* for Lattice MessageGet scancode path (arg1==0). */
 #define VK_KEY_UP           103u
 #define VK_KEY_LEFT         105u
@@ -89,6 +91,7 @@ struct vk_dev {
     uint16_t avail_idx;
     uint8_t shift;
     uint8_t ctrl;
+    uint8_t alt;
     int ready;
 };
 
@@ -184,6 +187,11 @@ static int vk_linux_to_sc(uint16_t code) {
     if (code == VK_KEY_RIGHT) {
         return (int)VK_SC_CURSOR_RIGHT;
     }
+    if (59 <= code && code <= 68) {
+        return 0x3b + (int)(code - 59); /* F1-F10 */
+    }
+    if (code == 87) return 0x57; /* F11 */
+    if (code == 88) return 0x58; /* F12 */
     return -1;
 }
 
@@ -247,9 +255,17 @@ static void vk_decode_key(struct vk_dev *d, struct vk_event ev) {
         d->ctrl = pressed ? d->ctrl | bit : d->ctrl & ~bit;
         return;
     }
+    if (ev.code == VK_KEY_LEFTALT || ev.code == VK_KEY_RIGHTALT) {
+        unsigned bit = ev.code == VK_KEY_LEFTALT ? 1 : 2;
+        d->alt = pressed ? d->alt | bit : d->alt & ~bit;
+        return;
+    }
     int sc = vk_linux_to_sc(ev.code);
     if (sc >= 0) {
-        /* Lattice: arg1==0, arg2.u8[0]==SC_CURSOR_* (down and up). */
+        /* Lattice: arg1==0, arg2 carries the scan code and held modifiers. */
+        if (d->shift) sc |= 1 << 9; /* SCF_SHIFT */
+        if (d->ctrl) sc |= 1 << 10; /* SCF_CTRL */
+        if (d->alt) sc |= 1 << 11; /* SCF_ALT */
         vk_msg_push(pressed ? 2 : 3, 0, (uint64_t)(unsigned)sc);
         return;
     }
@@ -299,6 +315,7 @@ static void vk_poll(void) {
 static int virtio_kbd_init(uint64_t hhdm) {
     g_vk_hhdm = hhdm;
     g_vk.ready = 0;
+    g_vk.shift = g_vk.ctrl = g_vk.alt = 0;
     g_vk_rh = g_vk_rt = 0;
     g_vk_key_event_count = 0;
     g_vk_last_key_code = 0;

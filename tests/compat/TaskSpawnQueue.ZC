@@ -34,9 +34,9 @@ U0 SpawnQueueDeepWorker(U8 *data)
 I64 TaskSpawnQueueChecks()
 {
     I64 value = 42;
-    CTask *child, *parent, *nested, *full[4];
+    CTask *child, *parent, *nested, *full[8];
     CJob *job;
-    I64 i;
+    I64 i, full_count;
     if (SpawnQueue(&SpawnQueueWorker, &value, "Wrong", 1) ||
         SpawnQueue(&SpawnQueueWorker, &value, "Wrong", 0, NULL,
                    2 * 1024 * 1024 + 1) ||
@@ -73,13 +73,18 @@ I64 TaskSpawnQueueChecks()
     if (!TaskValidate(nested) || nested->parent_task != parent ||
         !Kill(parent) || TaskValidate(nested))
         return 8;
-    for (i = 0; i < 4; i++) {
+    // Fill every app slot left after the persistent desktop services, rather
+    // than assuming the old four-child pool size.
+    full_count = 0;
+    for (i = 0; i < 8; i++) {
         full[i] = Spawn(&SpawnQueueHold);
-        if (!TaskValidate(full[i])) return 9;
+        if (!full[i]) break;
+        full_count++;
         Suspend(full[i]);
     }
+    if (!full_count) return 9;
     if (SpawnQueue(&SpawnQueueWorker, &value, "Full", 0)) return 10;
-    for (i = 0; i < 4; i++)
+    for (i = 0; i < full_count; i++)
         if (!Kill(full[i])) return 11;
     return 42;
 }

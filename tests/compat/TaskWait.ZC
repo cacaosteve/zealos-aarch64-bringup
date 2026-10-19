@@ -1,6 +1,7 @@
 // Cooperative BirthWait/DeathWait over the pinned KTask signatures.
 I64 wait_target_steps, wait_death_done, wait_birth_done, wait_publish_done;
 I64 wait_exit_callback_seen;
+I64 wait_sleep_idle_done;
 I64 birth_old_num, birth_seen_num;
 CTask *wait_target, *birth_slot;
 
@@ -40,9 +41,29 @@ U0 WaitExitTarget(U8 *data)
     Sleep(1000);
 }
 
+U0 WaitSleepIdle(U8 *data)
+{
+    Sleep(1000);
+    wait_sleep_idle_done++;
+}
+
 I64 TaskWaitChecks()
 {
-    CTask *old, *waiter, *publisher;
+    CTask *old, *waiter, *publisher, *sleeping;
+
+    // SleepUntil publishes TASKf_IDLE while yielding so TaskWait can return.
+    wait_sleep_idle_done = 0;
+    sleeping = Spawn(&WaitSleepIdle);
+    if (!sleeping || !TaskValidate(sleeping))
+        return 10;
+    TaskWait(sleeping);
+    if (!TaskValidate(sleeping) || !Bt(&sleeping->task_flags, TASKf_IDLE) ||
+        wait_sleep_idle_done)
+        return 11;
+    Kill(sleeping);
+    if (TaskValidate(sleeping))
+        return 12;
+
     wait_target = Spawn(&WaitTarget);
     DeathWait(&wait_target);
     if (TaskValidate(wait_target) || wait_target_steps != 2)

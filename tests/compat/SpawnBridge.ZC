@@ -32,8 +32,9 @@ U0 SpawnEmpty(U8 *data)
 
 I64 SpawnBridgeChecks()
 {
-    CTask *a, *b, *root = Fs;
+    CTask *a, *b, *root = Fs, *slots[8];
     I64 last_num, root_used_before;
+    I64 i;
     U8 *root_buf;
     spawn_root = root;
     spawn_first = 1;
@@ -65,12 +66,17 @@ I64 SpawnBridgeChecks()
     Free(root_buf);
     if (root->data_heap->used_u8s != root_used_before)
         return 9;
-    // Completed slots can be reused, while the four-live-task bound holds.
-    a = Spawn(&SpawnEmpty);
-    if (!a || a->task_num <= last_num || !Spawn(&SpawnEmpty) ||
-        !Spawn(&SpawnEmpty) || !Spawn(&SpawnEmpty) || Spawn(&SpawnEmpty))
+    // Completed slots can be reused; eight live child slots fit after the
+    // persistent desktop services, and the ninth spawn is rejected.
+    slots[0] = Spawn(&SpawnEmpty);
+    if (!slots[0] || slots[0]->task_num <= last_num)
         return 10;
-    if (ZcTaskRun != 4 || spawn_count != 8)
+    for (i = 1; i < 8; i++)
+        if (!(slots[i] = Spawn(&SpawnEmpty)))
+            return 10;
+    if (Spawn(&SpawnEmpty))
+        return 10;
+    if (ZcTaskRun != 8 || spawn_count != 12)
         return 11;
     return 42;
 }

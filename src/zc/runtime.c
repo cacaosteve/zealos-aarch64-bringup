@@ -183,10 +183,10 @@ static double *pow10_I64_host = pow10_values;
 /* Guest CTask storage remains separate from Aiwnios compiler CTask state.
  * Each child compiler table inherits its parent's names, matching pinned
  * Spawn, while these fibers still implement only cooperative scheduling. */
-#define GUEST_APP_TASKS 5 /* root plus four user-spawned children */
-#define GUEST_EXECUTIVE 5 /* reserved CPU-0 job server */
-#define GUEST_SYSTEM 6 /* original ServerTaskCont; does not consume an app slot */
-#define GUEST_TASKS 7
+#define GUEST_APP_TASKS 9 /* root plus eight user-spawned children */
+#define GUEST_EXECUTIVE GUEST_APP_TASKS /* reserved CPU-0 job server */
+#define GUEST_SYSTEM (GUEST_APP_TASKS + 1) /* original ServerTaskCont */
+#define GUEST_TASKS (GUEST_APP_TASKS + 2)
 #define GUEST_STACK_BYTES (64u * 1024u)
 #define GUEST_STACK_MAX_BYTES (2u * 1024u * 1024u)
 #define GUEST_JOBS_MAX 128u
@@ -1610,6 +1610,11 @@ static int64_t host_swap(int64_t *a) {
 /* GenFFIBinding passes X0 = argv[]; raw CHash* APIs must not be bound directly. */
 static int64_t host_hash_table_new(int64_t *a) {
     return (int64_t)(uintptr_t)HashTableNew(a[0], (void *)(uintptr_t)a[1]);
+}
+static int64_t host_hash_table_del(int64_t *a) {
+    if (a[0])
+        HashTableDel((CHashTable *)(uintptr_t)a[0]);
+    return 0;
 }
 static int64_t host_hash_find(int64_t *a) {
     return (int64_t)(uintptr_t)HashFind((char *)(uintptr_t)a[0],
@@ -4299,6 +4304,9 @@ static int64_t host_dist_sqr_i64(int64_t *a) {
 static int64_t host_clamp_i64(int64_t *a) {
     return a[0] < a[1] ? a[1] : a[0] > a[2] ? a[2] : a[0];
 }
+static int64_t host_max_i64(int64_t *a) {
+    return a[0] > a[1] ? a[0] : a[1];
+}
 static int64_t host_swap_u16(int64_t *a) {
     uint16_t *x = (uint16_t *)(uintptr_t)a[0];
     uint16_t *y = (uint16_t *)(uintptr_t)a[1];
@@ -4444,8 +4452,13 @@ static int64_t host_sleep_until(int64_t *a) {
          * cooperative scheduler must still offer a task slice when a frame
          * has already missed its deadline, or WinMgr can render forever
          * without letting the shell or input-owning terminal run. */
-        if (guest_task_bound && guest_current && !guest_task_frame_active)
+        if (guest_task_bound && guest_current && !guest_task_frame_active) {
+            struct guest_fiber *self = &guest_fibers[guest_current];
+            uint32_t was_idle = *guest_flags(self) & GUEST_IDLE;
+            *guest_flags(self) |= GUEST_IDLE;
             (void)host_task_yield(NULL);
+            *guest_flags(self) = (*guest_flags(self) & ~GUEST_IDLE) | was_idle;
+        }
         return 0;
     }
     milliseconds = (uint64_t)(a[0] - now_jiffies);
@@ -4465,6 +4478,8 @@ static int64_t host_sleep_until(int64_t *a) {
             __asm__ volatile("yield");
     } else {
         struct guest_fiber *self = &guest_fibers[guest_current];
+        uint32_t was_idle = *guest_flags(self) & GUEST_IDLE;
+        *guest_flags(self) |= GUEST_IDLE;
         self->wait_deadline = deadline;
         self->wait_kind = GUEST_WAIT_TIMER;
         while (!wait_ready(self)) {
@@ -4473,6 +4488,7 @@ static int64_t host_sleep_until(int64_t *a) {
             __asm__ volatile("yield");
         }
         self->wait_kind = GUEST_WAIT_NONE;
+        *guest_flags(self) = (*guest_flags(self) & ~GUEST_IDLE) | was_idle;
     }
     guest_counts.jiffies = host_monotonic_ns(NULL) / 1000000;
     return 0;
@@ -4504,6 +4520,8 @@ static int64_t host_sleep(int64_t *a) {
         return 0;
     }
     struct guest_fiber *self = &guest_fibers[guest_current];
+    uint32_t was_idle = *guest_flags(self) & GUEST_IDLE;
+    *guest_flags(self) |= GUEST_IDLE;
     self->wait_deadline = deadline;
     self->wait_kind = GUEST_WAIT_TIMER;
     while (!wait_ready(self)) {
@@ -4511,6 +4529,7 @@ static int64_t host_sleep(int64_t *a) {
         __asm__ volatile("yield");
     }
     self->wait_kind = GUEST_WAIT_NONE;
+    *guest_flags(self) = (*guest_flags(self) & ~GUEST_IDLE) | was_idle;
     return 0;
 }
 static uint8_t zeal_answer_type(int64_t raw_type) {
@@ -5796,6 +5815,7 @@ static int load_source_path(const char *path, int merged, int recover) {
     PrsBindCSymbol("SleepUntil", host_sleep_until, 1);
     PrsBindCSymbol("Clamp", host_clamp_f64, 3);
     PrsBindCSymbol("Max", host_max_f64, 2);
+    PrsBindCSymbol("MaxI64", host_max_i64, 2);
     if (!strcmp(path, "/Kernel/KernelC.HH")) {
         PrsBindCSymbol("FileRead", host_file_read, 3);
         PrsBindCSymbol("FileWrite", host_file_write, 5);
@@ -6002,6 +6022,7 @@ static int load_source_path(const char *path, int merged, int recover) {
         /* ZealOS CHash/CHashTable layout matches Aiwnios; guest DEFINE entries
          * use ZealOS HTT_* bits on the guest Fs->hash_table. */
         PrsBindCSymbol("HashTableNew", host_hash_table_new, 2);
+        PrsBindCSymbol("HashTableDel", host_hash_table_del, 1);
         PrsBindCSymbol("HashFind", host_hash_find, 4);
         PrsBindCSymbol("HashAdd", host_hash_add, 2);
     }
@@ -6465,11 +6486,6 @@ int zc_start_gui_terminal(void) {
         "/System/DolDoc/DocClipBoard.ZC",
         /* Rebind the terminal's RIGHT_AINCLUDE action to real SysFile. */
         "/System/DolDoc/DocTerm.ZC",
-        /* Direct calls retain the function present at compile time. The
-         * first DocPutKey load breaks DolDoc's dependency cycle, but binds
-         * EdCharIns/EdCursorLeft/etc. to bootstrap stand-ins. Recompile after
-         * their real definitions exist, before installing KDDocPutKey. */
-        "/System/DolDoc/DocPutKey.ZC",
         "/System/TaskSettings.ZC",
         "/System/ServerTask.ZC",
         "/System/UserTask.ZC",
@@ -6483,6 +6499,16 @@ int zc_start_gui_terminal(void) {
         "/System/DolDoc/DocTree.ZC",
         "/System/Registry.ZC",
         "/System/SourceRegistry.ZC",
+        /* The normal key handler calls these services; load their upstream
+         * implementations before rebinding DocPutKey below. */
+        "/System/AutoComplete/ACFill.ZC",
+        "/System/AutoComplete/ACTask.ZC",
+        "/System/AutoComplete/ACInit.ZC",
+        /* Direct calls retain the function present at compile time. The
+         * first DocPutKey load breaks DolDoc's dependency cycle, but binds
+         * EdCharIns/EdCursorLeft/etc. to bootstrap stand-ins. Recompile after
+         * their real definitions exist, before installing KDDocPutKey. */
+        "/System/DolDoc/DocPutKey.ZC",
         "/System/SourcePrompt.ZC",
         "/System/SourceTraining.ZC",
         "/System/HomeStartUp.ZC",
