@@ -79,9 +79,24 @@ static int64_t user_doc_read(CLexer *lex, CLexFile *file) {
     struct user_compiler *c = file->port_data;
     if (file->pos + 1 == c->doc_position) return c->doc_last;
     if (file->pos != c->doc_position) AIWNIOS_throw(0);
-    int64_t ch = FFI_CALL_TOS_2(c->doc_reader, (int64_t)(uintptr_t)c->doc_input,
-                              lex->port_in_quotes);
-    if (ch < 0 || ch > 255) AIWNIOS_throw(0);
+    int64_t binary_data = 0, binary_size = 0;
+    int64_t ch = FFI_CALL_TOS_4(c->doc_reader,
+        (int64_t)(uintptr_t)c->doc_input, lex->port_in_quotes,
+        (int64_t)(uintptr_t)&binary_data, (int64_t)(uintptr_t)&binary_size);
+    if (ch == 0x7FFFFF01) {
+        if (binary_size < 0 || binary_size > 0x40000000 ||
+            (!binary_data && binary_size) || lex->port_doc_binary)
+            AIWNIOS_throw(0);
+        lex->port_doc_binary = A_CALLOC(binary_size ? (size_t)binary_size : 1, NULL);
+        if (binary_size) memcpy(lex->port_doc_binary, (void *)(uintptr_t)binary_data,
+                                (size_t)binary_size);
+        lex->port_doc_binary_len = binary_size;
+    } else if (ch == 0x7FFFFF02) {
+        if (binary_size < 0) AIWNIOS_throw(0);
+        lex->port_doc_integer = binary_size;
+    } else if (ch < 0 || ch > 255) {
+        AIWNIOS_throw(0);
+    }
     file->ln = ((int64_t *)c->doc_input)[2] - 1;
     c->doc_position++;
     c->doc_last = ch;

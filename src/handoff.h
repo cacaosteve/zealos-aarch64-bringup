@@ -25,6 +25,25 @@
 #define ZEAL_MEM_KERNEL   9 /* loaded kernel image (reserved for runtime) */
 #define ZEAL_MEM_PAGETABLE 10 /* boot-reserved 4KiB translation-table pool */
 
+#define PI4_PCIE_FDT_PRESENT  (1u << 0)
+#define PI4_PCIE_FDT_ENABLED  (1u << 1)
+#define PI4_PCIE_FDT_REG      (1u << 2)
+#define PI4_PCIE_FDT_MEM      (1u << 3)
+#define PI4_PCIE_FDT_DMA      (1u << 4)
+
+struct zeal_pi4_pcie {
+    uint32_t flags; /* PI4_PCIE_FDT_*; descriptive only, no controller touched */
+    uint32_t reserved;
+    uint64_t reg_base;
+    uint64_t reg_size;
+    uint64_t mem_bus_base;
+    uint64_t mem_cpu_base;
+    uint64_t mem_size;
+    uint64_t dma_bus_base;
+    uint64_t dma_cpu_base;
+    uint64_t dma_size;
+};
+
 #define ZEAL_MEM_MAX 256
 
 struct zeal_mem_entry {
@@ -38,7 +57,7 @@ struct zeal_handoff {
     uint64_t magic0;
     uint64_t magic1;
     uint32_t size; /* sizeof(struct zeal_handoff) */
-    uint32_t revision; /* 4; extensions are appended */
+    uint32_t revision; /* 5; extensions are appended */
     uint32_t bootloader_id; /* ZEAL_BL_* */
     uint32_t flags;
     uint64_t hhdm_offset;
@@ -62,4 +81,6 @@ struct zeal_handoff {
      * Generic disk = 0, optical = 1, TFTP/RAM download = 2. */
     uint32_t boot_media_type;
     uint32_t reserved;
+    /* revision >= 5; read-only FDT description of the Pi 4 PCIe host. */
+    struct zeal_pi4_pcie pi4_pcie;
 };

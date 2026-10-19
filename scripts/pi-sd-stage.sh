@@ -28,7 +28,7 @@ cp -f "$ESP/boot/demo.hcbc" "$OUT/boot/" 2>/dev/null || true
 cp -f "$ESP/limine-pi.conf" "$OUT/limine.conf"
 
 cat <<EOF
-Pi ESP staged (PI-DIAG-4): $OUT
+Pi ESP staged (PI-DIAG-4 + read-only PCIe status): $OUT
 
 FB markers (keep firmware splash; do not expect a cleared screen):
   yellow   ~y40   ZealBooter entry
@@ -48,6 +48,9 @@ FB markers (keep firmware splash; do not expect a cleared screen):
 
 Next: boot; after white IRQ bar expect FB/UART shell prompt (help|halt|...).
   USB-TTL @ 115200 on GPIO 14/15 if you want serial input.
+After PL011 TX succeeds, serial also reports the FDT PCIe windows and one
+guarded read of root-complex status at +0x4068. No downstream config reads or
+bus mastering are attempted.
 
 QEMU virt path is unchanged (make / make run-serial) — distinct ELFs.
 

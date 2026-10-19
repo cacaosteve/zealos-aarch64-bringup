@@ -1,0 +1,41 @@
+CTask *splash_window_child;
+
+I64 SplashWindowOpen()
+{
+    I64 i;
+
+    splash_window_child = NULL;
+    PopUp("BootstrapGuiTerminalExeDocFile(\"::/System/ZSplash.ZC\");", NULL,
+          &splash_window_child);
+    if (!TaskValidate(splash_window_child))
+        return 1;
+    for (i = 0; i < 500; i++)
+    {
+        if (!TaskValidate(splash_window_child))
+            return 2;
+        if (splash_window_child->display_doc &&
+            Bt(&splash_window_child->display_flags, DISPLAYf_SHOW))
+            return 42;
+        Yield;
+    }
+    return 3;
+}
+
+I64 SplashWindowWaitForExit()
+{
+    I64 i;
+    CTask *child = splash_window_child;
+
+    if (!child)
+        return 1;
+    for (i = 0; i < 500; i++)
+    {
+        if (!TaskValidate(child))
+        {
+            splash_window_child = NULL;
+            return 42;
+        }
+        Yield;
+    }
+    return 2;
+}

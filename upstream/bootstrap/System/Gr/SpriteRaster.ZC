@@ -298,7 +298,7 @@ I64 SpriteMesh0(CDC *dc, U8 *sprite, I64 base_x, I64 base_y, I64 base_z,
     I64 i, j, work, total_work, tx, ty, tz, old_dither;
     I64 *points, px[3], py[3], pz[3], mirror_px[3], mirror_py[3];
     CD3I32 *mesh_points;
-    I32 vx, vy, vz, tri_color, indices[3];
+    I32 vx, vy, vz, vertex_count32, tri_count32, tri_color, indices[3];
     U8 *vertices, *triangles;
     I64 old_color;
     Bool valid;
@@ -306,8 +306,22 @@ I64 SpriteMesh0(CDC *dc, U8 *sprite, I64 base_x, I64 base_y, I64 base_z,
     if ((sprite[0] & 0x7F) == 24)
     {
         header_size = 12;
-        MemCopy(&vertex_count, sprite + 4, sizeof(I32));
-        MemCopy(&tri_count, sprite + 8, sizeof(I32));
+        MemCopy(&vertex_count32, sprite + 4, sizeof(I32));
+        MemCopy(&tri_count32, sprite + 8, sizeof(I32));
+        // Source-embedded upstream sprites use the packed mesh encoding:
+        // type, vertex_count, tri_count, vertices. Preserve the bootstrap's
+        // aligned records too, but fall back to the packed header when the
+        // aligned count pair is outside the bounded mesh limits.
+        if (vertex_count32 < 1 || vertex_count32 > 1024 ||
+                tri_count32 < 0 || tri_count32 > 2048 ||
+                header_size + vertex_count32 * 12 + tri_count32 * 16 > 480000)
+        {
+            MemCopy(&vertex_count32, sprite + 1, sizeof(I32));
+            MemCopy(&tri_count32, sprite + 5, sizeof(I32));
+            header_size = 9;
+        }
+        vertex_count = vertex_count32;
+        tri_count = tri_count32;
     }
     else
     {
@@ -315,8 +329,10 @@ I64 SpriteMesh0(CDC *dc, U8 *sprite, I64 base_x, I64 base_y, I64 base_z,
         MemCopy(&vx, sprite + 4, sizeof(I32));
         MemCopy(&vy, sprite + 8, sizeof(I32));
         MemCopy(&vz, sprite + 12, sizeof(I32));
-        MemCopy(&vertex_count, sprite + 16, sizeof(I32));
-        MemCopy(&tri_count, sprite + 20, sizeof(I32));
+        MemCopy(&vertex_count32, sprite + 16, sizeof(I32));
+        MemCopy(&tri_count32, sprite + 20, sizeof(I32));
+        vertex_count = vertex_count32;
+        tri_count = tri_count32;
         base_x += vx;
         base_y += vy;
         base_z += vz;
@@ -361,8 +377,12 @@ I64 SpriteMesh0(CDC *dc, U8 *sprite, I64 base_x, I64 base_y, I64 base_z,
             }
             (*dc->transform)(dc, &tx, &ty, &tz);
         }
+        // The upstream splash anchors its 3D mesh at GR_Z_ALL (half the
+        // signed I32 depth range). Screen coordinates stay tightly bounded,
+        // while transformed depth must retain that valid large offset for
+        // the depth buffer instead of being rejected by the 2D coordinate cap.
         if (SpriteAbsI64(tx) > 1000000 || SpriteAbsI64(ty) > 1000000 ||
-                SpriteAbsI64(tz) > 1000000)
+                tz < I32_MIN || tz > I32_MAX)
         {
             Free(points);
             Free(mesh_points);
@@ -1748,7 +1768,8 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
     old_color = dc->color;
     old_thick = dc->thick;
     old_flags = dc->flags;
-    transform_enabled = dc->flags & DCF_TRANSFORMATION;
+    // Bool is an 8-bit value; normalize the flag mask before storing it.
+    transform_enabled = (dc->flags & DCF_TRANSFORMATION) != 0;
     old_x = old_y = 0;
     symmetry_x1 = symmetry_y1 = symmetry_x2 = symmetry_y2 = 0;
     symmetry_enabled = FALSE;

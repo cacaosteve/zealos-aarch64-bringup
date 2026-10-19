@@ -6,10 +6,10 @@ U0 HomeOnceIncludeChild(U8 *unused)
 {
     if (unused) {}
     if (!Cd("/Tests")) return;
-    if (ExePutS2("#include \"HomeOnceValue\"\nHomeOnceValue;", "<default include>") != 42) return;
-    if (ExePutS2("#include \"../Tests/HomeOnceValue\"\nHomeOnceValue;", "<dot include>") != 42) return;
-    if (ExePutS2("#include \"~:/Tests/HomeOnceValue\"\nHomeOnceValue;", "<boot include>") != 42) return;
-    if (ExePutS2("#include \"::/Tests/HomeOnceValue\"\nHomeOnceValue;", "<boot include>") != 42) return;
+    if (ExePutS2("#include \"HomeOnceValue\"\nHomeOnceValue();", "<default include>") != 42) return;
+    if (ExePutS2("#include \"../Tests/HomeOnceValue\"\nHomeOnceValue();", "<dot include>") != 42) return;
+    if (ExePutS2("#include \"~:/Tests/HomeOnceValue\"\nHomeOnceValue();", "<boot include>") != 42) return;
+    if (ExePutS2("#include \"::/Tests/HomeOnceValue\"\nHomeOnceValue();", "<boot include>") != 42) return;
     Bool caught = FALSE;
     try { ExePutS2("#include \"HomeOnceMissing\"", "<missing default include>"); }
     catch { caught=Fs->except_ch=='Compiler'; Fs->catch_except=TRUE; }
@@ -83,6 +83,20 @@ I64 HomeOnceTipChecks()
     return home_once_result;
 }
 
+I64 HomeOnceWaitForAutocomplete()
+{
+    I64 i;
+    // Disk startup queues ACInit after Once. Let its background scan settle
+    // before measuring fixture cleanup, or index growth looks like a leak.
+    for (i=0; i<100000 &&
+        (!ac.hash_table || Bt(&ac.flags,ACf_INIT_IN_PROGRESS)); i++) Yield;
+    if (!ac.hash_table) return 1;
+    if (Bt(&ac.flags,ACf_INIT_IN_PROGRESS)) return 2;
+    if (!TaskValidate(ac.task)) return 3;
+    if (!Bt(&sys_run_level,RLf_AUTOCOMPLETE)) return 4;
+    return 42;
+}
+
 I64 HomeOnceStartChecks()
 {
     home_once_value=0; home_once_system=0; home_once_task=NULL;
@@ -106,7 +120,7 @@ I64 HomeOnceFinishChecks()
         RegCount("Once/User")>2 || RegCount("Once/System")>2) return 3;
     U8 *saved=DocSave(home_once_terminal->put_doc);
     U8 *needle="Tips of the Day";
-    if (sys_boot_src.u16[0]==BOOT_SRC_DVD) needle="NO";
+    if (sys_boot_src.u16[0]==BOOT_SRC_DVD) needle="ARM64 live session is ready.";
     Bool found=saved && StrMatch(needle,saved);
     Free(saved);
     if (found) return 42;

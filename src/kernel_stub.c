@@ -9460,6 +9460,88 @@ void kernel_entry(const struct zeal_handoff *h) {
                 uart_write(g_uart, (char)('0' + (int)h->boot_el));
                 uart_puts(g_uart, " (PI-DIAG-2)\n");
                 uart_flush(g_uart);
+                if (h->revision >= 5 &&
+                    h->size >= offsetof(struct zeal_handoff, pi4_pcie) +
+                               sizeof(h->pi4_pcie)) {
+                    uart_puts(g_uart, "PI4 PCIe FDT flags=");
+                    uart_put_u64_hex(g_uart, h->pi4_pcie.flags);
+                    uart_puts(g_uart, " regs=");
+                    uart_put_u64_hex(g_uart, h->pi4_pcie.reg_base);
+                    uart_puts(g_uart, "/");
+                    uart_put_u64_hex(g_uart, h->pi4_pcie.reg_size);
+                    uart_puts(g_uart, " mem=");
+                    uart_put_u64_hex(g_uart, h->pi4_pcie.mem_cpu_base);
+                    uart_puts(g_uart, "<-bus:");
+                    uart_put_u64_hex(g_uart, h->pi4_pcie.mem_bus_base);
+                    uart_puts(g_uart, "/");
+                    uart_put_u64_hex(g_uart, h->pi4_pcie.mem_size);
+                    uart_puts(g_uart, " dma=");
+                    uart_put_u64_hex(g_uart, h->pi4_pcie.dma_cpu_base);
+                    uart_puts(g_uart, "<-bus:");
+                    uart_put_u64_hex(g_uart, h->pi4_pcie.dma_bus_base);
+                    uart_puts(g_uart, "/");
+                    uart_put_u64_hex(g_uart, h->pi4_pcie.dma_size);
+                    uart_puts(g_uart, " (read-only discovery)\n");
+
+                    /*
+                     * Read only the BCM2711 root-complex link status. The
+                     * FDT descriptor gates this probe; no config-space reads,
+                     * downstream enumeration, or bus mastering occur here.
+                     * Recover synchronous MMIO aborts using the same guarded
+                     * one-instruction path used for the first PL011 probe.
+                     */
+                    if ((h->pi4_pcie.flags & (PI4_PCIE_FDT_PRESENT |
+                                               PI4_PCIE_FDT_ENABLED |
+                                               PI4_PCIE_FDT_REG)) ==
+                            (PI4_PCIE_FDT_PRESENT | PI4_PCIE_FDT_ENABLED |
+                             PI4_PCIE_FDT_REG) &&
+                        h->pi4_pcie.reg_size >= PI4_PCIE_STATUS_OFFSET + 4u &&
+                        h->pi4_pcie.reg_base <= UINT64_MAX - PI4_PCIE_STATUS_OFFSET) {
+                        uint64_t status_phys = h->pi4_pcie.reg_base +
+                                               PI4_PCIE_STATUS_OFFSET;
+                        if (status_phys < (1ull << 48) &&
+                            h->hhdm_offset <= UINT64_MAX - status_phys) {
+                            volatile uint32_t *status_reg =
+                                (volatile uint32_t *)(uintptr_t)(h->hhdm_offset +
+                                                                 status_phys);
+                            uint32_t status = 0;
+                            g_uart_probe = 1;
+                            g_sync_recover = 1;
+                            g_uart_dead = 0;
+                            g_probe_esr = 0;
+                            g_probe_far = 0;
+                            __asm__ volatile("ldr %w0, [%1]"
+                                             : "+&r"(status)
+                                             : "r"(status_reg)
+                                             : "memory");
+                            __asm__ volatile("dsb sy" ::: "memory");
+                            g_sync_recover = 0;
+                            g_uart_probe = 0;
+                            if (g_uart_dead) {
+                                uart_puts(g_uart, "PCIe status MMIO abort ESR=");
+                                uart_put_u64_hex(g_uart, g_probe_esr);
+                                uart_puts(g_uart, " FAR=");
+                                uart_put_u64_hex(g_uart, g_probe_far);
+                                uart_puts(g_uart, " (no downstream access)\n");
+                            } else {
+                                uart_puts(g_uart, "PCIe link status=");
+                                uart_put_u64_hex(g_uart, status);
+                                uart_puts(g_uart, " PHY=");
+                                uart_puts(g_uart, (status & PI4_PCIE_STATUS_PHY_LINKUP)
+                                                       ? "up" : "down");
+                                uart_puts(g_uart, " DL=");
+                                uart_puts(g_uart, (status & PI4_PCIE_STATUS_DL_ACTIVE)
+                                                       ? "active" : "inactive");
+                                uart_puts(g_uart, " (read only)\n");
+                            }
+                            g_uart_dead = 0;
+                        } else {
+                            uart_puts(g_uart, "PCIe status address rejected\n");
+                        }
+                    } else {
+                        uart_puts(g_uart, "PCIe status skipped: no enabled FDT reg\n");
+                    }
+                }
                 if (g_fb && g_fb_h > 300) {
                     fb_fillrect(0, 280, bw, 12, 0x00E0E0E0u); /* white = UART OK */
                 }

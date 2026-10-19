@@ -15,6 +15,9 @@ I64 bootstrap_gui_terminal_input_len;
 I64 bootstrap_gui_terminal_last_edit_result;
 U0 (*bootstrap_gui_terminal_final_update)(CDC *dc);
 extern U8 *ZcGuiShellExec(U8 *line);
+extern CDoc *DocRead(U8 *name=NULL, I64 flags=0);
+extern U0 DocDel(CDoc *doc);
+extern I64 ExeDoc(CDoc *doc, I64 ccf_flags=0);
 // Task slots can be reused. Match both address and generation before reading
 // a terminal's history; the fixed registry owns no task-heap allocations.
 class CBootstrapTerminalState
@@ -586,6 +589,11 @@ U0 UserStartUp()
     BootstrapGuiTerminalUserStartUp;
 }
 
+U0 ServerStartUp()
+{//Late-bound HomeSys hook called by source-backed popup server tasks.
+    BootstrapHomeServerStartUp;
+}
+
 U0 BootstrapGuiTerminalTileHomeWindows(CTask *first, CTask *second)
 {//Tile only the two user terminals; bridge/System tasks are not desktop windows.
     I64 half = TEXT_COLS / 2;
@@ -598,31 +606,37 @@ U0 BootstrapGuiTerminalTileHomeWindows(CTask *first, CTask *second)
     WinVert(2, TEXT_ROWS - 2, second);
 }
 
+public I64 BootstrapGuiTerminalExeDocFile(U8 *filename, I64 ccf_flags=0)
+{//Execute a source file as DolDoc so inline binary entries remain available.
+    CDoc *doc = DocRead(filename);
+    I64 result = 0;
+    if (!doc)
+        return 0;
+    try
+    {
+        result = ExeDoc(doc, ccf_flags);
+    }
+    catch
+    {
+        Fs->catch_except = TRUE;
+    }
+    DocDel(doc);
+    return result;
+}
+
 I64 BootstrapGuiTerminalHomeStart()
 {//Run the supported first-terminal portion of HomeSys after the shell exists.
-    CTask *user = bootstrap_gui_terminal_task;
-
-    if (!TaskValidate(user))
-        return 1;
     if (bootstrap_gui_terminal_home_started)
         return 0x2a;
+
+    // Execute the startup body extracted from pinned HomeSys.ZC. Its ARM64
+    // overlay reuses the already-running first terminal and queues scheduler-
+    // dependent commands there instead of issuing them from the C boot stack.
+    // The DVD Once overlay opens a live session and explains that installation
+    // is not yet supported on ARM64.
+    if (BootstrapHomeStartUpTasks() != 0x2a)
+        return 1;
     bootstrap_gui_terminal_home_started = TRUE;
-
-    // The original HomeSys asks an interactive install question on DVD boot.
-    // Keep that first-boot flow staged until the source-backed installer path
-    // and its prompts are available; disk and RAM boots can run Once directly.
-    if (sys_boot_src.u16[0] == BOOT_SRC_DVD)
-        return 0x2a;
-
-    // HomeSys creates a second terminal on disk/RAM boots. Keep the current
-    // two-terminal layout used by the original HomeSys startup.
-    bootstrap_gui_terminal_home_second = User();
-    WinToTop(user);
-    BootstrapGuiTerminalTileHomeWindows(user, bootstrap_gui_terminal_home_second);
-    XTalk(user, "Cd; #include \"Once\";\n");
-    // HomeSys builds the text index after the shell scheduler is running.
-    // Queue it after Once so Spawn/TaskWait have a live guest task context.
-    XTalk(user, "Silent; Cd(\"/\"); ACInit(\"/*;!*/Bible.TXT;!*/Clementine.TXT;!*/PCIDevices.DD;!*/HTML/*;!*/ChangeLog.DD\"); Cd(\"/Home\"); Silent(OFF);\n");
     return 0x2a;
 }
 

@@ -30,6 +30,7 @@ make check-user-command # original ExeCmdLine loop, options and error recovery
 make check-user-startup # per-user HomeSys setup and independent graphical terminals
 make check-home-once    # original Once include, boot-media branch, tips and prompt recovery
 make check-home-autostart # disk boot launches the saved Home/Once.ZC in the GUI terminal
+make check-autocomplete # boot indexing and visible GUI fill-in on a disposable disk
 make check-user-text    # User startup commands + XTalk input delivery and recovery
 make check-home-path    # shared home paths, includes and saved source after reboot
 make check-registry     # DolDoc execution, shared registry and Once across reboot
@@ -60,8 +61,11 @@ and event ring wraparound. This USB backend supports boot keyboards and
 unnumbered HID mouse/tablet reports on root ports or behind USB 1.x/2.0 hubs.
 Port-change polling debounces new connections, removes hub subtrees, and
 reuses reserved per-device DMA only after successful slot teardown. Limits
-are eight devices, fifteen ports per hub and five hub tiers. SuperSpeed hubs,
-USB storage and Pi's PCIe/VL805 backend remain future work.
+are eight devices, fifteen ports per hub and five hub tiers. A SuperSpeed hub
+control path is present, but stock QEMU cannot exercise it and physical SS-hub
+validation remains open. The QEMU hub stress gate uses generic full-speed hub
+devices; physical high-speed TT routing is also pending. USB storage and Pi's
+PCIe/VL805 backend remain future work.
 
 At the UTM prompt, run `zcheck`. Expected: `zc: upstream QuickSort + persistent
 modules OK`. Use `zc` for declarations/statements, `zload` for a source file in the
@@ -121,21 +125,36 @@ the source KeyDev input filter. `ExeDoc` now reads real DolDoc entries through
 the native lexer, including quoted formatting, macros and includes. The original
 registry tree APIs share a System-owned cache backed by `~/Registry.ZC`.
 `Once`, `SysOnce` and explicit `OnceExe` execute and flush saved User/System
-branches. On disk and RAM boots, the first graphical terminal now receives the
-original `Cd; #include "Once";` startup command through `XTalk`; DVD boots keep
-their interactive installer flow staged. Disk/RAM startup also opens the
-second terminal and tiles it beside the first, excluding bridge/System tasks
-from the window layout. Startup queues autocomplete indexing after `Once`; the
-first prompt is checked for a visible caret and usable input after startup
-output.
+branches. On disk, RAM, and DVD boots, the first graphical terminal now
+receives the original `Cd; #include "Once";` startup command through `XTalk`.
+DVD boot opens the live graphical session and says that the legacy disk
+installer is not yet ported to ARM64; disk/RAM startup also opens a second
+terminal and tiles it beside the first, excluding bridge/System tasks from the
+window layout. Startup queues autocomplete indexing after `Once`; the
+autocomplete corpus is indexed by its background task, and the first prompt is
+checked for a visible caret and usable input after startup output. The bundled
+ARM64 `ZSplash.ZC` adapter restores the pinned CP437 mesh asset, runs the
+upstream rotating splash with the native pointer enabled, and restores terminal
+focus when dismissed. Automated scanout checks cover the two-terminal boot,
+splash animation and dismissal, popup windows, terminal input and autocomplete
+fill-in.
 The original `Cd; #include "Once";` path now runs with the compiler's `.ZC`
 default extension, source-backed `YorN` and `TipOfDay`, and the original tips and
 customization documents. `sys_boot_src` comes from the actual Limine module
-medium: disk, optical, or TFTP download. `ZSplash.ZC` is not bundled, and DVD
-boot still needs its interactive install flow.
-Inline binary/script compiler tokens and the remaining HomeSys startup
-dependencies are still open. `zstatus` also reports `keyboard_state` modifier
-and repeat values to diagnose held host keys separately from guest decoding.
+medium: disk, optical, or TFTP download. The splash asset is restored from its
+UTF-8 CP437 source bytes, and the renderer normalizes the 0x100 transform flag
+before using its 8-bit Boolean state. The DVD live path is covered by
+`make check-dvd-live`; disk/RAM HomeSys startup preserves its formatted boot-time
+banner, two-terminal layout, splash and popup flow. `make check-home-once` also
+covers the disk and ISO/DVD noninstall branches, including include/tip/error
+cleanup. The ARM64 compiler preserves superscript, subscript and normal-script
+DolDoc markers inside identifiers and executes inline binary DolDoc tokens,
+including payloads with embedded NUL bytes. Startup uses a guarded translation
+of the pinned `HomeSys.StartUpTasks` body; the original YDE disk installer
+remains unavailable because its boot and storage paths are not ported to
+ARM64. `zstatus`
+also reports `keyboard_state` modifier and repeat values to diagnose held host
+keys separately from guest decoding.
 The bridge also maintains the upstream-visible runnable-task and parent/child
 task rings, including `TaskFocusNext` selection and child unlink on teardown.
 `TaskMathChecks`,
@@ -180,7 +199,7 @@ paint dots=0x0
 | Fast `Cls`/`FillRect` + `GrLine`/`GrHLine`/`GrVLine`/`GrCircle`/`GrFillCircle` | OK |
 | Shell `bars` / `stars` / `circles` / `bounce` / `paint` | OK |
 | virtio keyboard + tablet | OK (QEMU/UTM) |
-| native USB keyboard + mouse/tablet | NEC/QEMU gates; live UTM USB typing/editor and physical released-pointer dragging accepted |
+| native USB keyboard + mouse/tablet | NEC and QEMU xHCI matrices pass USB-only, VirtIO fallback, nested hubs/hotplug; live UTM typing and released-pointer drag accepted |
 | RedSea + freeze `runzc` UseAdd/Notes/MemSort | OK (`make check-serial` / `run-pci`; UTM eyes-on in ACCEPTANCE.md) |
 | Lattice compose (`disklat` / `latticeplay`, through M166) | QEMU scripted green; live UTM controls are eyes-on |
 

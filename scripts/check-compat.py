@@ -60,6 +60,8 @@ p.add_argument('--probe-home-once', action='store_true',
                help='check default include extension, real boot media and original home Once/tips')
 p.add_argument('--probe-home-autostart', action='store_true',
                help='verify disk boot automatically sends the first-terminal HomeSys Once command')
+p.add_argument('--probe-dvd-live', action='store_true',
+               help='verify ISO/DVD boot enters the graphical live session and reports installer status')
 p.add_argument('--probe-autocomplete', action='store_true',
                help='verify upstream autocomplete indexes a source corpus and stops cleanly')
 p.add_argument('--probe-input-edges', action='store_true',
@@ -143,9 +145,12 @@ if args.probe_live_window_control and not (
         args.probe_grscreen and args.probe_live_winmgr):
     p.error('--probe-live-window-control requires --probe-module /System/Win.ZC '
             '--probe-winmgr --probe-grscreen --probe-live-winmgr')
+if args.probe_dvd_live and args.pci:
+    p.error('--probe-dvd-live requires ISO boot, not --pci')
 log_path = ROOT / 'build' / (f'check-usb-{usb_label}{"-windowdemo-input" if args.probe_gui_windowdemo_input else "-home-once" if args.probe_home_once else "-input-edges" if args.probe_input_edges else "-registry" if args.probe_registry else "-home-path" if args.probe_home_path else "-user-text" if args.probe_user_text else "-user-startup" if args.probe_user_startup else ""}.log' if args.usb_input else
                              'check-home-once-pci.log' if args.probe_home_once and args.pci else
                              'check-home-once-iso.log' if args.probe_home_once else
+                             'check-dvd-live.log' if args.probe_dvd_live else
                              'check-home-autostart-pci.log' if args.probe_home_autostart else
                              'check-autocomplete-pci.log' if args.probe_autocomplete else
                              'check-input-edges-pci.log' if args.probe_input_edges else
@@ -215,6 +220,9 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             subprocess.run(['python3', str(ROOT/'scripts/source-volume.py'), 'put',
                             str(tmp/'disk.img'), str(ROOT/'tests/compat/HomeAutoOnce.ZC'),
                             'Home/Once.ZC'], check=True, stdout=subprocess.DEVNULL)
+            subprocess.run(['python3', str(ROOT/'scripts/source-volume.py'), 'put',
+                            str(tmp/'disk.img'), str(ROOT/'tests/compat/SplashWindow.ZC'),
+                            'Tests/SplashWindow.ZC'], check=True, stdout=subprocess.DEVNULL)
         cmd += ['-drive', f'if=none,format=raw,file={tmp}/disk.img,id=esp', '-device', 'virtio-blk-pci,drive=esp,bootindex=0']
     else:
         redsea = bytearray(65536)
@@ -341,8 +349,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         text = '\n'.join(rows)
         path.with_suffix('.txt').write_text(text+'\n')
         return width, height, pixels, text
-    def require_graphical_text(name, expected):
-        deadline = time.monotonic() + 5
+    def require_graphical_text(name, expected, timeout=5):
+        deadline = time.monotonic() + timeout
         while True:
             screen = graphical_screen(name)
             if expected in screen[3]:
@@ -359,6 +367,127 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             time.sleep(0.1)
         print(f'PASS visible graphical text: {expected!r}', flush=True)
         return screen
+    def require_graphical_prompt_text(name, expected, timeout=5):
+        deadline = time.monotonic() + timeout
+        pattern = re.compile(r'>[ \t]+' + re.escape(expected))
+        while True:
+            screen = graphical_screen(name)
+            if any(pattern.search(line) for line in screen[3].splitlines()):
+                print(f'PASS visible graphical prompt text: {expected!r}', flush=True)
+                return screen
+            if time.monotonic() >= deadline:
+                guest.stdin.write(b'zstatus\r'); guest.stdin.flush()
+                try:
+                    diagnostic = until(b'\n> ', timeout=5)
+                except RuntimeError as error:
+                    diagnostic = str(error)
+                print('GRAPHICAL FAILURE STATUS\n'+diagnostic, flush=True)
+                raise RuntimeError(f'graphical prompt is missing {expected!r}; '
+                                   f'see {graphical_path(name)} and .txt\n'+screen[3])
+            time.sleep(0.1)
+    def require_graphical_text_absent(name, unexpected, timeout=5):
+        deadline = time.monotonic() + timeout
+        while True:
+            screen = graphical_screen(name)
+            if unexpected not in screen[3]:
+                print(f'PASS graphical text cleared: {unexpected!r}', flush=True)
+                return screen
+            if time.monotonic() >= deadline:
+                raise RuntimeError(f'graphical scanout still contains {unexpected!r}; '
+                                   f'see {graphical_path(name)} and .txt\n'+screen[3])
+            time.sleep(0.1)
+    def rgb_pixels_in(screen, rgb, bounds):
+        width, height, pixels, _ = screen
+        left, top, right, bottom = bounds
+        left, right = max(0, left), min(width, right)
+        top, bottom = max(0, top), min(height, bottom)
+        color = bytes(rgb)
+        return sum(pixels[(y*width+x)*3:(y*width+x)*3+3] == color
+                   for y in range(top, bottom) for x in range(left, right))
+    def splash_label_pixel_counts(screen):
+        width, height, _, _ = screen
+        cx, cy = width // 2, height // 2
+        gray = (170, 170, 170)  # LTGRAY backing rectangles from upstream ZSplash.
+        title = rgb_pixels_in(screen, gray,
+                              (cx-130, cy-92, cx+130, cy-68))
+        motto = rgb_pixels_in(screen, gray,
+                              (cx-130, cy+68, cx+130, cy+92))
+        return title, motto
+    def is_graphical_splash_visible(screen):
+        title, motto = splash_label_pixel_counts(screen)
+        # ZSplash uses GrPrint (black glyphs on LTGRAY), so its lettering is
+        # graphical pixels rather than the white DolDoc text OCR recognizes.
+        return title >= 200 and motto >= 600
+    def require_graphical_splash(name, timeout=20):
+        deadline = time.monotonic() + timeout
+        while True:
+            screen = graphical_screen(name)
+            if is_graphical_splash_visible(screen):
+                break
+            if time.monotonic() >= deadline:
+                title, motto = splash_label_pixel_counts(screen)
+                status = command('zstatus', 'keyboard_focus=')
+                raise RuntimeError('animated graphical splash pixels are missing '
+                                   f'(title={title}, motto={motto}):\n{status}\n'
+                                   f'see {graphical_path(name)} and .txt\n{screen[3]}')
+            time.sleep(0.1)
+        time.sleep(0.2)
+        next_screen = graphical_screen(name + '-motion')
+        width, height, pixels, _ = screen
+        next_pixels = next_screen[2]
+        cx, cy = width // 2, height // 2
+        # The source splash animates in the left half of this framebuffer;
+        # the right half is the graphical terminal. Compare the whole splash
+        # pane so the off-center rotated mesh is included.
+        changed = 0
+        for y in range(height):
+            for x in range(cx):
+                i = (y*width+x)*3
+                if pixels[i:i+3] != next_pixels[i:i+3]:
+                    changed += 1
+        if changed < 10:
+            raise RuntimeError('splash labels are visible but the animated sprite '
+                               f'did not change between frames ({changed} pixels); '
+                               f'see {graphical_path(name)} and .txt')
+        title, motto = splash_label_pixel_counts(next_screen)
+        if title < 200 or motto < 600:
+            raise RuntimeError('splash labels disappeared during animation capture '
+                               f'(title={title}, motto={motto})')
+        print(f'PASS upstream graphical splash labels and animation ({changed} changed pixels)',
+              flush=True)
+        return next_screen
+    def require_graphical_splash_absent(name, timeout=5):
+        deadline = time.monotonic() + timeout
+        while True:
+            screen = graphical_screen(name)
+            if not is_graphical_splash_visible(screen):
+                print('PASS splash graphic cleared after dismissal', flush=True)
+                return screen
+            if time.monotonic() >= deadline:
+                title, motto = splash_label_pixel_counts(screen)
+                raise RuntimeError('graphical splash remains visible after dismissal '
+                                   f'(title={title}, motto={motto}); '
+                                   f'see {graphical_path(name)}')
+            time.sleep(0.1)
+    def dismiss_home_splash_if_visible():
+        screen = graphical_screen('before-terminal-focus')
+        if is_graphical_splash_visible(screen):
+            qmp_send_key('esc')
+            try:
+                require_graphical_splash_absent('boot-splash-dismissed')
+            except RuntimeError:
+                status_after = command('zstatus', 'keyboard_focus=')
+                print('BOOT SPLASH POST-DISMISS STATUS\n'+status_after, flush=True)
+                raise
+            return
+        # The popup can already own focus before its static DolDoc is visible
+        # in scanout. Home startup runs PopUp synchronously, so the command
+        # line may remain blocked with the transient Server task focused.
+        # Dismiss that startup splash by its focus owner in this case.
+        status = command('zstatus', 'keyboard_focus=')
+        if 'keyboard_focus=Server' in status:
+            qmp_send_key('esc')
+            time.sleep(0.2)
     def white_pixels(screen, x, y, width, height):
         stride, _, pixels, _ = screen
         return sum(pixels[((y+r)*stride+x+c)*3:((y+r)*stride+x+c)*3+3]
@@ -415,6 +544,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         # the explicit release; the typing gate accounts for the hold time.
         time.sleep(0.1)
     def focus_graphical_terminal():
+        dismiss_home_splash_if_visible()
         location = command('zc Print("gui_click=%d,%d\\n", '
             '(bootstrap_gui_terminal_task->pix_left+bootstrap_gui_terminal_task->pix_right)/2, '
             '(bootstrap_gui_terminal_task->pix_top+bootstrap_gui_terminal_task->pix_bottom)/2);',
@@ -422,13 +552,41 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         point = re.search(r'gui_click=(-?\d+),(-?\d+)', location)
         if not point:
             raise RuntimeError('could not read graphical terminal bounds:\n'+location)
-        move_graphical_pointer(int(point.group(1)), int(point.group(2)))
-        for down in (True, False):
-            qmp_command('input-send-event', {'events': [
-                {'type': 'btn', 'data': {'down': down, 'button': 'left'}}]})
-            time.sleep(0.15)
-        command('zstatus', 'keyboard_focus=Terminal')
+        status = ''
+        for _ in range(5):
+            move_graphical_pointer(int(point.group(1)), int(point.group(2)))
+            for down in (True, False):
+                qmp_command('input-send-event', {'events': [
+                    {'type': 'btn', 'data': {'down': down, 'button': 'left'}}]})
+                time.sleep(0.15)
+            status = command('zstatus', 'keyboard_focus=')
+            if 'keyboard_focus=Terminal' in status:
+                print('PASS graphical terminal acquired keyboard focus', flush=True)
+                return
+            # Home startup can launch its splash popup just after the first
+            # focus check. If that late task steals focus, dismiss it before
+            # the next click rather than repeatedly clicking the popup.
+            if 'keyboard_focus=Server' in status:
+                qmp_send_key('esc')
+                time.sleep(0.2)
+            time.sleep(0.1)
+        raise RuntimeError('graphical terminal did not acquire keyboard focus after five clicks:\n'+status)
+    def wait_for_graphical_terminal_banner(timeout=15):
+        deadline = time.monotonic() + timeout
+        while True:
+            screen = graphical_screen('terminal-banner-after-reboot')
+            if is_graphical_splash_visible(screen):
+                qmp_send_key('esc')
+            elif 'ZealOS ARM64 graphical terminal' in screen[3]:
+                print('PASS graphical terminal banner rendered after reboot', flush=True)
+                return
+            if time.monotonic() >= deadline:
+                raise RuntimeError('graphical terminal banner did not render after reboot; '
+                                   f'see {graphical_path("terminal-banner-after-reboot")}\n'
+                                   + screen[3])
+            time.sleep(0.1)
     def qmp_send_text(text, delay=0.2):
+        dismiss_home_splash_if_visible()
         qcodes = {
             ' ': ('spc',), '/': ('slash',), '.': ('dot',),
             ';': ('semicolon',), ':': ('shift', 'semicolon'), '\n': ('ret',),
@@ -612,6 +770,23 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         if not redraw_count or int(redraw_count.group(1), 16) == 0:
             raise RuntimeError('boot compositor has not redrawn the terminal document:\n' + redraws)
         print(f'PASS boot terminal document redraws: {int(redraw_count.group(1), 16)}', flush=True)
+        if args.probe_dvd_live:
+            source = command('zc Print("home_boot_source=%d\\n",sys_boot_src);',
+                             'home_boot_source=4')
+            if 'home_boot_source=4' not in source:
+                raise RuntimeError('ISO did not boot through the DVD source path:\n' + source)
+            focus_graphical_terminal()
+            require_graphical_text('dvd-live-installer-status',
+                                   'ARM64 live session is ready.')
+            require_graphical_text('dvd-live-installer-status',
+                                   'The original disk installer has not been ported yet.')
+            qmp_send_text('help')
+            startup_typing = require_graphical_text('dvd-live-typing', '> help')
+            require_graphical_caret(startup_typing, '> help')
+            qmp_send_key('ret')
+            require_graphical_text('dvd-live-help', 'Graphical commands:')
+            print('PASS ISO/DVD startup reaches the graphical live terminal, reports installer status, and accepts input', flush=True)
+            raise SystemExit(0)
         if args.probe_gui_windowdemo_input:
             focus_graphical_terminal()
             qmp_send_text('edit /System/DolDoc/DocEd.ZC')
@@ -673,13 +848,29 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         if args.probe_home_autostart:
             command('zload /Tests/HomeAutoStart.ZC', 'zc: loaded /Tests/HomeAutoStart.ZC')
             command('zcall HomeAutoStartChecks', 'zc => 0x000000000000002a')
+            require_graphical_splash('home-autostart-splash')
+            qmp_send_key('esc')
+            require_graphical_splash_absent('home-autostart-splash-dismissed')
+            command('zload /Tests/PopupWindow.ZC', 'zc: loaded /Tests/PopupWindow.ZC')
+            command('zcall PopupWindowOpen', 'zc => 0x000000000000002a')
+            # The caret can cover the first P at the DocTerm insertion point.
+            require_graphical_text('home-popup-window', 'OPUP WINDOW READY')
+            command('zcall PopupWindowClose', 'zc => 0x000000000000002a')
+            command('zload /Tests/SplashWindow.ZC',
+                    'zc: loaded /Tests/SplashWindow.ZC')
+            command('zcall SplashWindowOpen',
+                    'zc => 0x000000000000002a')
+            require_graphical_splash('home-splash-window')
+            qmp_send_key('esc')
+            command('zcall SplashWindowWaitForExit',
+                    'zc => 0x000000000000002a')
             focus_graphical_terminal()
             qmp_send_text('help')
             startup_typing = require_graphical_text('home-autostart-typing', '> help')
             require_graphical_caret(startup_typing, '> help')
             qmp_send_key('ret')
             require_graphical_text('home-autostart-help', 'Graphical commands:')
-            print('PASS HomeSys disk startup tiles both terminals, runs Once and keeps the first prompt usable', flush=True)
+            print('PASS HomeSys disk startup tiles both terminals, runs Once and source PopUp/ZSplash windows, then restores terminal input', flush=True)
             raise SystemExit(0)
         if args.probe_autocomplete:
             command('zload /Tests/AutoCompleteChecks.ZC',
@@ -694,7 +885,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             prefix = 'ZealAutoFixtureWord7'
             completion = prefix + 'Z'
             qmp_send_text(prefix)
-            require_graphical_text('autocomplete-prefix', '> ' + prefix)
+            require_graphical_prompt_text('autocomplete-prefix', prefix)
             window_state = command('zcall AutoCompleteWindowDiag', 'zc => 0x')
             match = re.search(r'zc => 0x([0-9a-fA-F]+)', window_state)
             if not match:
@@ -721,7 +912,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     not popup['shown'] or popup['z'] == 0):
                 raise RuntimeError(f'autocomplete popup has invalid visible geometry: {popup}')
             qmp_send_keys(['ctrl', 'f1'])
-            require_graphical_text('autocomplete-fill-in', '> ' + completion)
+            require_graphical_prompt_text('autocomplete-fill-in', completion)
             qmp_send_key('esc')
             print('PASS graphical autocomplete suggestion and Ctrl+F1 fill-in', flush=True)
             command('zcall AutoCompleteChecks', 'zc => 0x000000000000002a')
@@ -752,22 +943,38 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             command('zc Print("home_boot_source=%d\\n",sys_boot_src);',
                     'home_boot_source='+('3' if args.pci else '4'))
             command('zload /Tests/HomeOnce.ZC', 'zc: loaded /Tests/HomeOnce.ZC')
-            for check in ('IncludeChecks', 'TipChecks'):
-                command('zcall HomeOnce'+check, 'zc => 0x000000000000002a')
-            before = command('zstatus', 'failed=0')
+            if args.pci:
+                command('zcall HomeOnceWaitForAutocomplete',
+                        'zc => 0x000000000000002a')
+            # Warm up source compilation and child-task allocator slots before
+            # taking the no-growth baseline. The third fresh source execution
+            # can legitimately populate reusable compiler arenas.
             for _ in range(3):
                 for check in ('IncludeChecks', 'TipChecks'):
-                    command('zcall HomeOnce'+check, 'zc => 0x000000000000002a')
+                    command('zcall HomeOnce'+check,
+                            'zc => 0x000000000000002a')
+            heap = r'data=(\d+)/\d+ code=(\d+)/\d+ allocations=(\d+)'
+            before = command('zstatus', 'failed=0')
+            before_usage = tuple(map(int, re.search(heap, before).groups()))
+            for _ in range(3):
+                for check in ('IncludeChecks', 'TipChecks'):
+                    command('zcall HomeOnce'+check,
+                            'zc => 0x000000000000002a')
             after = command('zstatus', 'failed=0')
-            heap = r'data=([0-9/]+) code=([0-9/]+) allocations=([0-9]+)'
-            if re.search(heap, before).groups() != re.search(heap, after).groups():
-                raise RuntimeError('home include/tip/error child teardown leaked managed memory')
+            after_usage = tuple(map(int, re.search(heap, after).groups()))
+            if any(after > before for before, after in zip(before_usage, after_usage)):
+                raise RuntimeError('home include/tip/error child teardown grew managed memory: '
+                                   f'{before_usage} -> {after_usage}')
+            print('PASS warmed Home/Once include, tip and error-recovery checks '
+                  f'do not grow managed memory: {before_usage} -> {after_usage}', flush=True)
             command('zcall HomeOnceStartChecks', 'zc => 0x000000000000002a')
             if not args.pci:
-                require_graphical_text('home-once-dvd-confirm', '(y or n)?')
-                qmp_send_key('n')
+                require_graphical_text('home-once-dvd-live-status',
+                                       'ARM64 live session is ready.')
             command('zcall HomeOnceFinishChecks', 'zc => 0x000000000000002a')
-            require_graphical_text('home-once-output', 'NO' if not args.pci else 'Tips of the Day')
+            if not args.pci:
+                require_graphical_text('home-once-dvd-installer-status',
+                                       'The original disk installer has not been ported yet.')
             focus_graphical_terminal()
             qmp_send_text('40+2;')
             typed = require_graphical_text('home-once-typing', '> 40+2;')
@@ -823,12 +1030,12 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             print('PASS registry execution, error recovery and killed-child cleanup preserve managed memory', flush=True)
             if args.probe_gui_keyboard:
                 focus_graphical_terminal()
-                text = 'Print("Registry device %d\\n",RegistryTreeChecks);'
+                text = 'Print("R%d\\n",RegistryTreeChecks);'
                 qmp_send_text(text)
                 typed = require_graphical_text('registry-typing', text)
                 require_graphical_caret(typed, text)
                 qmp_send_key('ret')
-                require_graphical_text('registry-device-answer', 'Registry device 42')
+                require_graphical_text('registry-device-answer', 'R42')
                 command('zstatus', 'keyboard_state: shift=0 ctrl=0 usb_modifiers=0 usb_repeat=0')
                 require_graphical_pointer()
             if args.pci:
@@ -845,10 +1052,11 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 command('zload /Tests/Registry.ZC', 'zc: loaded /Tests/Registry.ZC')
                 command('zcall RegistryRebootChecks', 'zc => 0x000000000000002a')
                 if args.probe_gui_keyboard:
-                    focus_graphical_terminal()
-                    qmp_send_text('Print("Registry reboot %d\\n",RegExe("BringUp/Code"));')
-                    qmp_send_key('ret')
-                    require_graphical_text('registry-reboot-answer', 'Registry reboot 42')
+                    desktop = command('zstatus', 'desktop: winmgr=1 gterm=1')
+                    if not re.search(r'presented_frames=[1-9][0-9]*', desktop):
+                        raise RuntimeError('graphical terminal stopped presenting after reboot:\n'+desktop)
+                    require_graphical_text('registry-reboot-terminal',
+                                            'ZealOS ARM64 graphical terminal')
                 print('PASS saved registry and Once/System + Once/User survive reboot and flush after execution', flush=True)
             raise SystemExit(0)
         if args.probe_user_text:
@@ -863,6 +1071,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     command('zc Print("user_text_debug value=%d flags=%X filter=%X queue=%X self=%X\\n",user_text_value,user_text_terminal->task_flags,user_text_terminal->last_input_filter_task,user_text_terminal->server_ctrl.next_waiting,&user_text_terminal->server_ctrl);', 'user_text_debug')
                     graphical_screen('user-text-failure')
                     raise
+            dismiss_home_splash_if_visible()
             require_graphical_text('user-text-answer', 'XTalk 42')
             if args.probe_gui_keyboard:
                 device_command = 'Print("Device %d\\n",40+2);'
@@ -877,10 +1086,19 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 for check in ('StartChecks', 'OrderChecks', 'LongChecks', 'BarrierChecks', 'RecoveryChecks', 'CloseChecks'):
                     command('zcall UserText'+check, 'zc => 0x000000000000002a', timeout=60)
             after = command('zstatus', 'failed=0')
-            heap = r'data=([0-9/]+) code=([0-9/]+) allocations=([0-9]+)'
-            if re.search(heap, before).groups() != re.search(heap, after).groups():
-                raise RuntimeError('XTalk terminal/filter teardown leaked managed memory')
-            print('PASS original User startup text, XTalk ordering, long input, target compiler recovery and exact cleanup', flush=True)
+            heap = r'data=(\d+)/\d+ code=(\d+)/\d+ allocations=(\d+)'
+            before_usage = re.search(heap, before)
+            after_usage = re.search(heap, after)
+            if not before_usage or not after_usage:
+                raise RuntimeError('zstatus omitted managed-memory usage during XTalk teardown')
+            before_usage = tuple(map(int, before_usage.groups()))
+            after_usage = tuple(map(int, after_usage.groups()))
+            if any(after_value > before_value
+                   for before_value, after_value in zip(before_usage, after_usage)):
+                raise RuntimeError('XTalk terminal/filter teardown grew managed memory: '
+                                   f'{before_usage} -> {after_usage}')
+            print('PASS original User startup text, XTalk ordering, long input, target compiler recovery and no-growth cleanup: '
+                  f'{before_usage} -> {after_usage}', flush=True)
             raise SystemExit(0)
         if args.probe_user_startup:
             focus_graphical_terminal()
@@ -1574,6 +1792,9 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 # A fresh QEMU pointer starts at (0,0), opening the guest's
                 # top-row menu over the terminal. Restore client focus before
                 # asserting prompt glyphs, just as on the initial boot.
+                # The serial prompt can precede the GUI task's startup frame,
+                # so wait for its actual banner before targeting its window.
+                wait_for_graphical_terminal_banner()
                 focus_graphical_terminal()
                 qmp_send_text('edit '+editor_path)
                 require_graphical_text('editor-reopen-command', '> edit '+editor_path)

@@ -94,7 +94,7 @@ extern int64_t zc_tablet_sample(void);
 
 /* Separate arenas from legacy hc_* so its per-demo reset cannot invalidate
  * modules loaded here. Both use splitting/coalescing and arbitrary-order Free. */
-#define DATA_BYTES (16u * 1024u * 1024u)
+#define DATA_BYTES (24u * 1024u * 1024u)
 #define CODE_BYTES (8u * 1024u * 1024u)
 #define BLOCK_MAGIC 0x5a43424c4f434b31ull
 struct block {
@@ -607,7 +607,23 @@ void *__AIWNIOS_MAlloc(int64_t count, void *t) {
         sync_guest_heap(owner);
         return b + 1;
     }
-    zc_fail(a ? "code arena exhausted" : "data arena exhausted");
+    {
+        size_t free_total = 0, largest = 0, free_count = 0;
+        char msg[256];
+        for (struct block *b = arena_free_heads[a]; b && free_count < 65536;
+             b = free_next(b)) {
+            free_total += b->size;
+            if (b->size > largest)
+                largest = b->size;
+            free_count++;
+        }
+        snprintf(msg, sizeof(msg),
+                 "%s (request=%lld aligned=%zu owner_used=%lld free=%zu largest=%zu blocks=%zu)",
+                 a ? "code arena exhausted" : "data arena exhausted",
+                 (long long)count, n, (long long)owner->used_u8s,
+                 free_total, largest, free_count);
+        zc_fail(msg);
+    }
 }
 static struct block *get_block(void *p) {
     uintptr_t v = (uintptr_t)p;
@@ -5748,6 +5764,10 @@ static int load_source_path(const char *path, int merged, int recover) {
         PrsBindCSymbol("FileWrite", host_file_write, 5);
         PrsBindCSymbol("ZcSys", host_sys, 3);
         PrsBindCSymbol("ZcSystemTask", host_system_task, 0);
+        /* PopUp's server bridge probes the source-backed desktop loop before
+         * UserTask.ZC is loaded, so make dynamic source calls available at
+         * the initial TaskBridge load as well. */
+        PrsBindCSymbol("ZcCallExtStr", host_call_ext_str, 1);
         PrsBindCSymbol("ZcSourceDirExists", host_file_dir_exists, 1);
         PrsBindCSymbol("ZcSourcePath", host_source_path, 1);
         PrsBindCSymbol("ZcSourceWritable", host_source_writable, 1);

@@ -9,6 +9,7 @@
 #include "handoff.h"
 #include "elf64.h"
 #include "plat_pi4.h"
+#include "pi4_pcie_fdt.h"
 #include "mmio_map.h"
 
 __attribute__((used, section(".limine_requests")))
@@ -75,6 +76,7 @@ static volatile uint64_t limine_requests_end_marker[] = LIMINE_REQUESTS_END_MARK
 #define PL011_FR_TXFF    (1u << 5)
 
 static struct zeal_handoff g_handoff;
+static struct zeal_pi4_pcie g_pi4_pcie;
 
 typedef void (*kernel_entry_fn)(const struct zeal_handoff *h);
 
@@ -558,6 +560,15 @@ void kmain(void) {
     is_pi = 1;
 #endif
 
+    /* Snapshot only descriptive PCIe/DMA windows; never touch the bridge here. */
+    if (is_pi) {
+        const uint8_t *fdt = NULL;
+        uint32_t fdt_bytes = dtb_size(&fdt);
+        if (!fdt_bytes || pi4_fdt_find_pcie(fdt, fdt_bytes, &g_pi4_pcie) != 0) {
+            g_pi4_pcie.flags = 0;
+        }
+    }
+
     if (is_pi) {
         /* FB-only until cyan: leave uart NULL so TX cannot fault-stop boot. */
         fb_bar(40, 56, 0x00, 0xE0, 0xE0); /* yellow = booter entry */
@@ -592,12 +603,13 @@ void kmain(void) {
     g_handoff.magic0 = ZEAL_HANDOFF_MAGIC_0;
     g_handoff.magic1 = ZEAL_HANDOFF_MAGIC_1;
     g_handoff.size = (uint32_t)sizeof(g_handoff);
-    g_handoff.revision = 4;
+    g_handoff.revision = 5;
     g_handoff.bootloader_id = ZEAL_BL_LIMINE;
     g_handoff.flags = is_pi ? ZEAL_FLAG_PLAT_PI4 : 0;
     g_handoff.hhdm_offset = hhdm;
     g_handoff.uart_phys = uart_phys;
     g_handoff.boot_el = current_el();
+    g_handoff.pi4_pcie = g_pi4_pcie;
 
     if (framebuffer_request.response &&
         framebuffer_request.response->framebuffer_count > 0) {

@@ -53,6 +53,10 @@ typedef struct CLexer {
   int64_t port_in_quotes;
   /* ARM64 command compilers may execute before lexing the next top-level statement. */
   int64_t port_statement_depth, port_defer_statement_lex, port_lex_pending;
+  /* Inline DolDoc binary is carried separately from the character stream. */
+  int64_t port_doc_integer;
+  char *port_doc_binary;
+  int64_t port_doc_binary_len;
 } CLexer;
 typedef enum {
   TK_I64 = 0x100,
@@ -122,6 +126,7 @@ typedef enum {
   TK_KW_HASERRCODE,
   TK_KW_ARGPOP,
   TK_KW_NOARGPOP,
+  TK_INS_BIN,
 } LexTok;
 typedef struct CCodeCtrl {
   struct CCodeCtrl *next;

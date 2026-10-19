@@ -290,6 +290,31 @@ re_enter:;
   CLexFile *new_file, *actual_file;
   char *dir;
   switch (chr1) {
+  case 0x7FFFFF01: /* Private marker from the ARM64 DolDoc reader. */
+    if (!lex->port_doc_binary || lex->port_doc_binary_len < 0) {
+      LexErr(lex, "Missing inline DolDoc binary payload.");
+      return lex->cur_tok = ERR;
+    }
+    return lex->cur_tok = TK_INS_BIN;
+  case 0x7FFFFF02: /* Size expression is an ordinary integer token. */
+    if (lex->port_doc_integer < 0) {
+      LexErr(lex, "Invalid inline DolDoc binary size.");
+      return lex->cur_tok = ERR;
+    }
+    lex->integer = lex->port_doc_integer;
+    return lex->cur_tok = TK_I64;
+  case 1: /* ZealOS DolDoc superscript marker. */
+    chr1 = '>';
+    goto lex_ident;
+    break;
+  case 2: /* ZealOS DolDoc subscript marker. */
+    chr1 = '<';
+    goto lex_ident;
+    break;
+  case 3: /* ZealOS DolDoc normal-script marker. */
+    chr1 = '=';
+    goto lex_ident;
+    break;
   case '`':
     return lex->cur_tok = '`';
     break;
@@ -629,9 +654,19 @@ re_enter:;
   case 'a' ... 'z':
   case 'A' ... 'Z':
   case 0x80 ... 0xff: /* UTF-8 identifier bytes in upstream ZealC. */
+lex_ident:
     lex->flags |= LEXF_USE_LAST_CHAR;
     for (;;) {
       switch (chr1 = LexAdvChr(lex)) {
+        break;
+      case 1:
+        lex->string[idx++] = '>';
+        break;
+      case 2:
+        lex->string[idx++] = '<';
+        break;
+      case 3:
+        lex->string[idx++] = '=';
         break;
       case '_':
       case '@':
@@ -1101,6 +1136,7 @@ CLexer *LexerNew(char *filename, char *text) {
 }
 
 void LexerDel(CLexer *lex) {
+  A_FREE(lex->port_doc_binary);
   HeapCtrlDel(lex->hc);
   A_FREE(lex);
 }

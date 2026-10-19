@@ -2,10 +2,11 @@
 """Verify guarded AArch64 overlays for pinned ZealOS sources."""
 from pathlib import Path
 import re
+import struct
 import sys
 
-from arm64_source import (extract_home_set, extract_home_startup, extract_server_task, extract_user_task, extract_version_scalars, extract_source_prompt, extract_source_training, translate_autocomplete_task, translate_doctree, translate_registry, translate_docterm, translate_doced, translate_docfind, translate_docform, translate_docpopup, translate_grbitmap,
-                          translate_grdc, translate_grscreen, translate_ktask, translate_winmgr)
+from arm64_source import (extract_home_set, extract_home_startup, extract_home_startup_tasks, inject_home_startup_tasks, extract_server_task, extract_user_task, extract_version_scalars, extract_source_prompt, extract_source_training, translate_autocomplete_task, translate_doctree, translate_registry, translate_docterm, translate_doced, translate_docfind, translate_docform, translate_docpopup, translate_grbitmap,
+                          translate_grdc, translate_grscreen, translate_ktask, translate_winmgr, translate_zsplash, translate_home_once)
 
 root = Path(__file__).resolve().parent.parent
 for path, transform, original, changed in (
@@ -169,6 +170,19 @@ assert b'ZcCallExtStr("UserStartUp");' in user_slice
 assert b'CTask *User(U8 *format=NULL, ...)' in user_slice
 assert b'if (!task)\n\t\treturn NULL;' in user_slice
 home_source = (root / 'upstream/pinned/HomeSys.ZC').read_bytes()
+once_source = (root / 'upstream/pinned/Once.ZC').read_bytes()
+once_overlay = translate_home_once(once_source)
+assert b'ARM64 live session is ready.' in once_overlay
+assert b'The original disk installer has not been ported yet.' in once_overlay
+assert b'RunFile("::/Misc/OSInstall",, TRUE);' not in once_overlay
+assert b'if (FileFind("::/Misc/Tour"))' in once_overlay
+try:
+    translate_home_once(once_source.replace(b'RunFile("::/Misc/OSInstall",, TRUE);',
+                                             b'RunFile("other",, TRUE);'))
+except ValueError:
+    pass
+else:
+    raise AssertionError('Once DVD overlay accepted a changed installer call')
 disk_dir = (root / 'upstream/pinned/Kernel/BlkDev/DiskDirB.ZC').read_bytes()
 home_set = extract_home_set(disk_dir)
 original = disk_dir.split(b'\nBool Cd(', 1)[0]
@@ -183,22 +197,53 @@ except ValueError:
 else:
     raise AssertionError('HomeSet extraction accepted a changed allocation owner')
 home_hooks = extract_home_startup(home_source)
+home_tasks = extract_home_startup_tasks(home_source)
 assert b'StartUpTasks;' not in home_hooks
 for name in (b'UserStartUp', b'ServerStartUp'):
     assert b'U0 BootstrapHome' + name + b'()' in home_hooks
 assert b'Type("::/Doc/Start.DD");' in home_hooks
+assert b'I64 BootstrapHomeStartUpTasks()' in home_tasks
+assert b'CTask *user = bootstrap_gui_terminal_task;' in home_tasks
+assert b'bootstrap_gui_terminal_home_second = User();' in home_tasks
+assert b'BootstrapGuiTerminalTileHomeWindows(user, bootstrap_gui_terminal_home_second);' in home_tasks
+assert b'Boot Time:%%7.3fs' in home_tasks
+assert b'#include \\"Once\\";' in home_tasks
+assert b'ACInit(\\"/*;!*/Bible.TXT;!*/Clementine.TXT;!*/PCIDevices.DD;!*/HTML/*;!*/ChangeLog.DD\\")' in home_tasks
+assert b'BootstrapGuiTerminalExeDocFile' in home_tasks
+assert b'return 0x2a;' in home_tasks
+gui_terminal_bootstrap = (root / 'upstream/bootstrap/System/GuiTerminal.ZC').read_bytes()
+injected_gui_terminal = inject_home_startup_tasks(gui_terminal_bootstrap, home_tasks)
+assert (injected_gui_terminal.index(b'I64 BootstrapHomeStartUpTasks()') <
+        injected_gui_terminal.index(b'I64 BootstrapGuiTerminalHomeStart()'))
+assert b'CTask *bootstrap_gui_terminal_task;' in injected_gui_terminal
+try:
+    inject_home_startup_tasks(gui_terminal_bootstrap.replace(
+        b'I64 BootstrapGuiTerminalHomeStart()', b'I64 OtherStart()', 1), home_tasks)
+except ValueError:
+    pass
+else:
+    raise AssertionError('HomeSys task injection accepted a missing GUI insertion point')
 try:
     extract_home_startup(home_source.replace(b'Type("::/Doc/Start.DD");', b'Type("other");'))
 except ValueError:
     pass
 else:
     raise AssertionError('HomeSys extraction accepted a changed startup document')
-gui_terminal_source = (root / 'upstream/bootstrap/System/GuiTerminal.ZC').read_text()
+try:
+    extract_home_startup(home_source.replace(b'WinTileVert;', b'WinTileGrid;', 1))
+except ValueError:
+    pass
+else:
+    raise AssertionError('HomeSys startup extraction accepted changed window tiling')
+gui_terminal_source = gui_terminal_bootstrap.decode('utf-8')
 assert 'I64 BootstrapGuiTerminalHomeStart()' in gui_terminal_source
-assert 'sys_boot_src.u16[0] == BOOT_SRC_DVD' in gui_terminal_source
-assert 'bootstrap_gui_terminal_home_second = User();' in gui_terminal_source
-assert 'WinToTop(user);' in gui_terminal_source
-assert 'XTalk(user, "Cd; #include \\"Once\\";\\n");' in gui_terminal_source
+assert 'BootstrapHomeStartUpTasks() != 0x2a' in gui_terminal_source
+assert 'The DVD Once overlay opens a live session' in gui_terminal_source
+assert 'sys_boot_src.u16[0] == BOOT_SRC_DVD' not in gui_terminal_source
+assert 'bootstrap_gui_terminal_home_second = User();' not in gui_terminal_source
+assert 'XTalk(user, "Cd; #include \\"Once\\";\\n");' not in gui_terminal_source
+assert 'U0 ServerStartUp()' in gui_terminal_source
+assert 'BootstrapHomeServerStartUp;' in gui_terminal_source
 runtime_source = (root / 'src/zc/runtime.c').read_text()
 assert 'zc_call("BootstrapGuiTerminalHomeStart", &result)' in runtime_source
 kernel_source = (root / 'src/kernel_stub.c').read_text()
@@ -215,6 +260,9 @@ assert (ktask_source.split(b'U0 ServerTaskCont()\n')[1].split(b'\nU0 UserTaskCon
         in server_slice)
 assert b'UserTaskCont' not in server_slice
 assert b'return ZcSystemTaskStart(&ServerTaskCont);' in server_slice
+assert b'U0 BootstrapServerTaskStart()' in server_slice
+assert b'ZcCallExtStr("ServerStartUp");' in server_slice
+assert b'ServerTaskCont;' in server_slice
 try:
     extract_server_task(ktask_source.replace(b'JobsHandler(old_flags)', b'JobsHandler(0)', 1))
 except ValueError:
@@ -338,6 +386,42 @@ runtime = (root / 'src/zc/runtime.c').read_text()
 assert runtime.index('"/System/Menu.ZC"') < runtime.index('"/System/Win.ZC"')
 
 print('PASS guarded ARM64 source overlays', flush=True)
+
+zsplash_source = (root / 'upstream/pinned/System/ZSplash.ZC').read_bytes()
+zsplash_overlay = translate_zsplash(zsplash_source)
+zsplash_payload = zsplash_source.split(b'\0', 1)[1].decode('utf-8').encode('cp437')
+assert b'ZSplash;' in zsplash_overlay
+assert b'$SP,"<1>",BI=1$' in zsplash_overlay
+assert b'Sprite3(dc, 0, 0, 0, $IB,"<1>",BI=1$);' in zsplash_overlay
+assert zsplash_overlay.endswith(b'\0' + zsplash_payload)
+assert struct.unpack_from('<IIII', zsplash_payload) == (1, 0, len(zsplash_payload) - 16, 2)
+assert zsplash_payload[16] == 24
+assert struct.unpack_from('<II', zsplash_payload, 17) == (20, 35)
+assert struct.unpack_from('<iii', zsplash_payload, 25) == (-50, -50, -20)
+assert b'Sleep(counts.timer & 0x7F);' in zsplash_overlay
+assert b'Sleep((Now + counts.timer) & 0x7F);' not in zsplash_overlay
+assert b'MStrPrint("%s", "ZealOS ARM64");' in zsplash_overlay
+assert b'DD_OS_NAME_VERSION' not in zsplash_overlay
+assert b'no_warn' not in zsplash_overlay
+assert b'AutoComplete(' not in zsplash_overlay
+assert b'MouseHard' not in zsplash_overlay and b'DrawStdMouse' not in zsplash_overlay
+assert b'DocPrint(' not in zsplash_overlay
+assert b'CTask *splash_task = Fs;' in zsplash_overlay
+assert b'sys_focus_task = splash_task;' in zsplash_overlay
+assert b'sys_focus_task = old_focus;' in zsplash_overlay
+assert b'WinToTop(splash_task);' in zsplash_overlay
+assert b'Simplicity Perfected' in zsplash_overlay
+assert b'Kill(bg_task)' not in zsplash_overlay and b'Kill(splash_task)' not in zsplash_overlay
+gui_terminal = (root / 'upstream/bootstrap/System/GuiTerminal.ZC').read_bytes()
+assert b'BootstrapGuiTerminalExeDocFile(' in gui_terminal and b'::/System/ZSplash.ZC' not in gui_terminal
+assert b'BootstrapHomeStartUpTasks() != 0x2a' in gui_terminal
+try:
+    translate_zsplash(zsplash_source.replace(b'Sprite3(dc,', b'Sprite4(dc,', 1))
+except ValueError:
+    pass
+else:
+    raise AssertionError('ZSplash overlay accepted changed inline sprite call')
+print('PASS guarded upstream animated ZSplash sprite with native pointer ownership')
 
 # Only raw source-display metadata is removed; program tokens remain pinned.
 docpopup_source = (root / 'upstream/pinned/System/DolDoc/DocPopUp.ZC').read_bytes()

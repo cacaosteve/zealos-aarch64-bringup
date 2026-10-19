@@ -16,3 +16,8 @@
 #define PI4_GICC_PHYS 0xff842000ull
 
 #define PI4_CNTP_PPI 30 /* non-secure EL1 physical timer, same PPI number */
+
+/* BCM2711 PCIe RC status: read only after firmware FDT reports the host. */
+#define PI4_PCIE_STATUS_OFFSET 0x4068u
+#define PI4_PCIE_STATUS_PHY_LINKUP (1u << 4)
+#define PI4_PCIE_STATUS_DL_ACTIVE  (1u << 5)

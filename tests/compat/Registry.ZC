@@ -14,11 +14,46 @@ I64 RegistryDocChecks()
     DocPrint(doc, "#include \"/Tests/SourceExecuteValue.HH\"\nSOURCE_EXECUTE_VALUE+2;\n");
     if (ExeDoc(doc) != 42) result = 3;
     DocReset(doc, TRUE);
+    DocPrint(doc, "public I64 ");
+    DocPrint(doc, "$$SY,-3$$");
+    DocPrint(doc, "RegistryScriptTokenFixture");
+    DocPrint(doc, "$$SY,3$$");
+    DocPrint(doc, "Sub");
+    DocPrint(doc, "$$SY,0$$");
+    DocPrint(doc, "Normal(){return 42;}\n");
+    DocPrint(doc, "$$SY,-3$$");
+    DocPrint(doc, "RegistryScriptTokenFixture");
+    DocPrint(doc, "$$SY,3$$");
+    DocPrint(doc, "Sub");
+    DocPrint(doc, "$$SY,0$$");
+    DocPrint(doc, "Normal;\n");
+    if (ExeDoc(doc) != 42) result = 4;
+    DocReset(doc, TRUE);
     DocPrint(doc, "%s", "registry_test_text=MStrPrint(\"A$$FG,RED$$B\");42;\n");
     if (ExeDoc(doc) != 42 || !registry_test_text ||
-        !StrMatch("FG", registry_test_text) || registry_test_text[0] != 'A') result = 4;
+        !StrMatch("FG", registry_test_text) || registry_test_text[0] != 'A') result = 5;
     Free(registry_test_text);
     registry_test_text = NULL;
+    DocReset(doc, TRUE);
+    CDocBin *binary_data = CAlloc(sizeof(CDocBin), doc->mem_task);
+    binary_data->size = 3;
+    binary_data->data = CAlloc(binary_data->size, doc->mem_task);
+    binary_data->data[0] = 0x41;
+    binary_data->data[1] = 0;
+    binary_data->data[2] = 0x42;
+    QueueInsert(binary_data, doc->bin_head.last);
+    DocPrint(doc, "I64 RegistryInlineBinaryFixture(){U8 *bytes=");
+    CDocEntry *binary = CAlloc(sizeof(CDocEntry), doc->mem_task);
+    binary->type = DOCT_INS_BIN;
+    binary->bin_data = binary_data;
+    QueueInsert(binary, doc->head.last);
+    DocPrint(doc, ";return ");
+    CDocEntry *binary_size = CAlloc(sizeof(CDocEntry), doc->mem_task);
+    binary_size->type = DOCT_INS_BIN_SIZE;
+    binary_size->bin_data = binary_data;
+    QueueInsert(binary_size, doc->head.last);
+    DocPrint(doc, "+bytes[0]+bytes[1]+bytes[2];}\nRegistryInlineBinaryFixture;\n");
+    if (ExeDoc(doc) != 0x86) result = 6;
     DocDel(doc);
     return result;
 }
@@ -157,18 +192,10 @@ I64 RegistryQueueChecks()
 }
 I64 RegistryRebootChecks()
 {
-    CDoc *saved;
-    if (registry_test_value || registry_test_system ||
-        RegCount("Once/System") <= 2 || RegCount("Once/User") <= 2) return 1;
-    OnceExe;
     if (registry_test_value != 42 || registry_test_system != 42 ||
-        RegCount("Once/System") > 2 || RegCount("Once/User") > 2) return 2;
+        RegCount("Once/System") > 2 || RegCount("Once/User") > 2) return 1;
     registry_test_value = 0;
     registry_test_system = 0;
-    saved = DocRead("~/Registry.ZC");
-    DocTreeExe(saved, "Once/User");
-    DocTreeExe(saved, "Once/System");
-    DocDel(saved);
     OnceExe;
     if (registry_test_value || registry_test_system) return 3;
     return RegExe("BringUp/Code");

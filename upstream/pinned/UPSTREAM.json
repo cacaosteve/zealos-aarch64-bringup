@@ -68,7 +68,8 @@
     "src/System/TaskSettings.ZC": "bb2a791c817c00b6033d5b911b036a90a817a63bd2022e4bcb966efe4d17589f",
     "src/System/Training.ZC": "c4e5aa1a76065f7112d3e8fc887c83d67eb3d5239ea0ce225f95842c04b0cf71",
     "src/System/Win.ZC": "5366052a69f2c0cd5fe035210d89b22b71c1ebf596462b4fa9a9451db605c540",
-    "src/System/WinMgr.ZC": "9dc78a33cd27921260667b7273f9869816e6de58f4cc7b04773f7840b9fcd79d"
+    "src/System/WinMgr.ZC": "9dc78a33cd27921260667b7273f9869816e6de58f4cc7b04773f7840b9fcd79d",
+    "src/System/ZSplash.ZC": "58166a9abff4964940ddf39161f996bbb921db7cac6cf214c60d9cdd4dba2a25"
   },
   "changes": []
 }

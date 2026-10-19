@@ -2375,11 +2375,21 @@ Port sequence and remaining gates:
    reuse are implemented with a separate topology gate. Hubs are bounded to
    fifteen ports and five tiers. The first upstream high-speed hub supplies
    TT routing for LS/FS descendants; physical high-speed TT acceptance is
-   still pending. SuperSpeed hubs and expanded HID reports/lock-key LEDs
-   remain work beyond the shared US-layout Shift/Ctrl/navigation decoder.
-4. Add the Pi 4B platform backend for its BCM2711 PCIe host bridge and VL805
-   xHCI controller. Validate firmware handoff, DMA windows/cache behavior,
-   register access widths, and physical keyboard/mouse operation separately.
+   still pending. A YDE-derived SuperSpeed hub control path is now present,
+   but stock QEMU's generic hub cannot exercise it; a physical SS-hub check is
+   still required. Expanded HID reports/lock-key LEDs remain work beyond the
+   shared US-layout Shift/Ctrl/navigation decoder.
+4. The first Pi 4B discovery layer is implemented: the booter reads the
+   `brcm,bcm2711-pcie` firmware-DTB node and snapshots its translated host
+   register range, PCI memory window, and DMA aperture in revision-5 handoff.
+   It performs no PCIe register access. `make check-pi4-pcie-fdt` covers the
+   standard BCM2711 `ranges` translation, 64 MiB PCI memory aperture, 3 GiB
+   inbound DMA window, disabled nodes, and malformed truncation. The actual
+   UEFI FDT values remain to be checked on the Pi. Next, add read-only bridge
+   link detection; then a bounded downstream config read for VL805. Keep xHCI
+   disabled until DMA allocations are guaranteed to fit the parsed DMA window
+   and firmware handoff is understood. Validate cache behavior, register
+   access widths, and physical keyboard/mouse separately.
    Raspberry Pi's [PCIe driver](https://github.com/raspberrypi/linux/blob/rpi-6.12.y/drivers/pci/controller/pcie-brcmstb.c)
    and [VL805 firmware documentation](https://github.com/raspberrypi/documentation/blob/master/documentation/asciidoc/computers/raspberry-pi/eeprom-bootloader.adoc)
    are platform references, not proof of this port working on hardware.
@@ -3312,8 +3322,8 @@ multiple `XTalk` jobs, partial lines spanning filters, packed-character output,
 cursor-message ordering, a yielding text producer, long queued input, includes,
 and recovery after compiler/runtime errors. It checks actual scanout for the
 script's output and a subsequent unique command sent through real input
-devices, then repeats terminal/filter creation and teardown and compares data,
-code and allocation usage exactly. Long input allows time for the original
+devices, then repeats terminal/filter creation and teardown and rejects growth
+in data, code or allocation usage. Long input allows time for the original
 `DocPutKey` scheduler yield after each echoed character; the ASCII graphical
 line limit remains 255 characters and the buffered compiler chunk remains 64 KiB.
 
@@ -3338,7 +3348,7 @@ hubs with duplicate VirtIO devices, 380 ISO compatibility checks, 67 dedicated
 compiler-recovery checks and 220 PCI graphical workflow checks. Scanout shows
 `XTalk 42`, a visible insertion caret and a subsequent device-typed `Device 42`
 in the receiving terminal. Repeated terminal/filter teardown preserves data,
-code and allocation usage exactly. The compiler log contains twelve rejection
+code and allocation usage without growth. The compiler log contains twelve rejection
 diagnostics followed by 42 from `CompilerRecoveryOperandChecks`; the editor
 save/compile/run/reboot/reopen workflow also passes. Logs are
 `build/user-text-{pci,usb,iso,recovery,workflow}.log`. Upstream/overlay integrity,
@@ -3405,9 +3415,12 @@ newlines, tabs, macros and file includes are compiled normally; formatting
 inside a quoted string is serialized by `Doc2PlainText`. The public
 `CCompCtrl` and `CLexFile` retain their ZealOS layouts. The controller owns the
 reader state, so normal return, compiler/runtime exceptions and task teardown
-can release it. Inline binary and nonzero script tokens are explicitly rejected
-with a catchable Compiler exception; this is not the complete original DolDoc
-compiler interface.
+can release it. `DOCT_INS_BIN` entries become native byte strings and
+`DOCT_INS_BIN_SIZE` entries become their byte lengths; the registry regression
+executes a three-byte payload containing an embedded NUL. Shifted-Y DolDoc
+entries retain their superscript, subscript and normal-script lexer markers
+inside identifiers. The guest regression compiles and calls an identifier
+containing all three forms.
 
 A killed-child test exposed a shared-lock failure in the original
 `DocTreeExe` sequence. The overlay releases the parent document after making
@@ -3502,16 +3515,190 @@ installer dependencies are ready. Manual `gterm` launches do not rerun the
 startup file.
 
 Disk/RAM startup also creates the upstream second terminal, then sends `Once`
-to the first terminal. Automatic `WinTileVert` is staged: tiling currently
-leaves the first terminal's typed command visible but its insertion caret
-hidden at the lower edge of the window. Autocomplete, `ZSplash.ZC`, full
-`StartUpTasks`, inline compiler tokens and the DVD installer flow remain open
-dependencies.
+to the first terminal. The startup path dismisses the splash, restores terminal
+focus and checks visible input and caret placement. Autocomplete indexing and
+fill-in are also covered. The startup sequence now derives from a guarded
+translation of the pinned `HomeSys.StartUpTasks` body: it reuses the boot
+terminal created by the ARM64 adapter, creates the second terminal through the
+upstream `User()` body, and bridges tiling, the boot-time banner, `ACInit` and
+the splash command into the live terminal. The DVD installer flow remains
+staged, and this is not execution of the completely unmodified `HomeSys` file.
 
 `make check-home-autostart` writes a marker `Once.ZC` only into its disposable
 PCI test disk and confirms that the boot terminal ran it and a second terminal
 exists. The home-once checks cover both disk and ISO/DVD paths, including the
 visible `40+2;` caret and 42 answer after startup output; `make check-user-text`
-covers XTalk ordering, long input, device-typed output and exact cleanup. Logs
+covers XTalk ordering, long input, device-typed output and no-growth cleanup. Logs
 are `build/check-home-autostart-pci.log`, `build/check-home-once-{pci,iso}.log`
 and `build/check-user-text-pci.log`.
+
+## Splash and autocomplete boot verification — 2026-10-19
+
+Disk startup now includes an ARM64-safe adapter around the pinned upstream
+`ZSplash.ZC`. It preserves the source's CP437-encoded CDocBin mesh, runs the
+rotating 3D splash with the native pointer enabled, owns keyboard focus while
+waiting, and restores its caller's focus when dismissed. The renderer
+normalizes the 0x100 transformation flag before storing it in an 8-bit Bool,
+so transformed vertices reach the window center and depth buffer. DVD startup
+still leaves its interactive installer flow staged.
+
+The disk/RAM startup adapter also runs the saved `Home/Once.ZC`, creates and
+tiles the second terminal, and queues the upstream autocomplete corpus scan
+after `Once`. `make check-autocomplete` passed on a disposable PCI/QEMU disk:
+the boot index and background task initialize, the startup popup releases
+focus, graphical typing appears in the prompt, the suggestion window has
+visible geometry, Ctrl+F1 fills the unique fixture word, and autocomplete
+tears down cleanly. `make check-home-autostart` separately exercises the
+animated startup splash (over 3,000 changed pixels between scanouts), dismissal,
+popup windows, restored terminal focus and visible input. The same autocomplete
+probe also passed with the NEC xHCI controller, two nested USB hubs, and
+duplicate VirtIO keyboard/pointer devices left attached; USB ownership and
+autocomplete work together in that topology.
+`make check-system-launch` also passed after source-backed server startup was
+enabled, covering `Sys`, `SysFile`, popup file execution, task ownership and
+queue restoration without managed-memory growth.
+The shared `make check-user-text` gate also passed with visible device input,
+repeated XTalk terminal/filter creation, compiler-error recovery, and no
+managed-memory growth.
+These checks use a guarded source-derived startup adapter; they do not mean
+the unmodified upstream `HomeSys` startup file, DVD installer, or kernel has
+been ported.
+
+## DolDoc shifted-script compiler input — 2026-10-19
+
+`ExeDoc` now passes superscript, subscript and normal-script DolDoc entries to
+the native lexer as its three script markers. The lexer folds them into
+identifier spellings as `>`, `<` and `=`, matching ZealOS's upstream lexer.
+`RegistryDocChecks` builds and calls an identifier containing all three marker
+types and returns 42. Inline `DOCT_INS_BIN` and `DOCT_INS_BIN_SIZE` tokens also
+execute as byte strings and integer lengths; the embedded-NUL fixture returns
+134.
+
+`make check-registry` passed with the new source fixture, registry and task
+checks, visible graphical keyboard input and pointer, saved registry/Once
+execution across reboot, and a rendered graphical terminal after reboot. The
+post-reboot persistence assertion uses the serial control path; graphical
+keyboard input is exercised before reboot.
+
+## Native USB input matrix and rebooted GUI focus — 2026-10-19
+
+The post-reboot GUI workflow now waits for the graphical terminal's visible
+banner before clicking it. The serial shell can reach its prompt while the GUI
+task is still drawing its first frame; starting clicks in that interval can
+land on the transient Home startup server/popup. The focus probe now dismisses
+a popup that takes focus late in startup before retrying the terminal click.
+This was a test timing issue; native USB enumeration and the live UTM input
+path remained healthy.
+
+`make check-usb-input` passed all four profiles: NEC xHCI with native USB only,
+QEMU xHCI, NEC xHCI with a relative USB mouse, and NEC xHCI with duplicate
+VirtIO keyboard/tablet devices for fallback. The USB-only NEC GUI workflow
+visibly typed, opened the editor, survived cold reboot and reopened its saved
+source. The five-level QEMU generic full-speed hub tree passed attach, reconnect
+and subtree removal/recovery checks. The deeper NEC two-hub + VirtIO + hotplug
+GUI workflow also passed, including twelve keyboard reconnects, tablet removal/reattach,
+visible typing after recovery, and saved editor reopen after reboot. USB error
+counters remained zero and reconnect/hub teardown did not grow DMA use. Logs
+are `build/check-usb-{nec-tablet,qemu-tablet,nec-mouse,nec-tablet-virtio,qemu-tablet-hubs5-hotplug}.log`
+and `build/check-usb-nec-tablet-virtio-hubs2-hotplug.log`.
+
+These QEMU checks complement the earlier physical UTM confirmation that normal
+typing and the released guest pointer work. They do not yet validate physical
+USB SuperSpeed hubs, high-speed TT behavior, or Raspberry Pi USB hardware; the
+hub stress topology here uses generic full-speed hubs behind QEMU's emulated
+xHCI controller.
+
+## SuperSpeed hub control path — 2026-10-19
+
+The ARM64 xHCI enumerator now reads and validates the 12-byte SuperSpeed hub
+descriptor, sets the xHCI hub context without USB2 transaction-translator
+settings, sends `SET_HUB_DEPTH` before downstream routing, powers ports using
+the descriptor's power-good delay, and uses SuperSpeed BH reset/change feature
+selectors. The USB2 descriptor, TT configuration and reset path remain
+separate.
+
+The protocol flow follows the existing YDE implementation in
+`~/github/templeos/ZealOS-yde-unified-hardware`; it has not been validated with
+a physical SuperSpeed hub. QEMU's built-in generic `usb-hub` advertises USB
+1.1 and negotiates full speed in this topology, so current emulator tests cover
+generic hub enumeration, hotplug and controller regression, not high-speed TT
+behavior or the new SuperSpeed requests. The Pi 4B VL805 PCIe backend remains a
+separate platform task from supporting USB 3 devices on UTM's NEC/QEMU xHCI
+controller.
+
+Validation on this change: `make esp`, `make check-usb-input`, and a fresh
+`python3 scripts/check-compat.py --usb-input qemu --usb-hubs 5 --usb-hotplug`
+run passed. The aggregate `make check-usb-topology` run passed the NEC single-hub
+hotplug profile, then stopped in the NEC two-hub GUI workflow when scripted key
+input inserted an extra `?`. A full rerun on 2026-10-19 passed all three
+profiles: NEC single-hub hotplug, NEC two-hub + VirtIO hotplug with graphical
+edit/save/run/reboot/reopen, and five-level QEMU hub hotplug. The earlier stray
+symbol did not reproduce.
+
+## Input edge and aggregate USB topology rerun — 2026-10-19
+
+`make check-input-edges` passed both the PCI input profile and NEC xHCI behind
+two nested hubs with VirtIO fallback attached. Each profile typed mixed-case
+and symbol input, held and released `Shift+9`, then visibly accepted `40+2;`
+and returned 42; `zstatus` showed shift, Ctrl, USB modifiers and repeat all at
+zero after release. This checks the guest release path that had been a concern
+in the physical UTM session.
+
+`make check-registry` passed its inline binary `ExeDoc` fixture with a payload
+containing an embedded NUL, as well as registry, compiler recovery, memory
+cleanup, and saved registry/Once reboot-persistence checks.
+
+The complete `make check-usb-topology` rerun passed the NEC single-hub hotplug
+profile, the NEC two-hub + VirtIO GUI/reboot workflow, and five nested generic
+QEMU USB hubs with hotplug/subtree recovery. The earlier extra `?` did not
+recur. These emulator results do not validate a physical SuperSpeed hub, USB
+high-speed TT behavior, or the Pi 4B VL805 backend. Logs are
+`build/check-usb-nec-tablet-virtio-hotplug.log`,
+`build/check-usb-nec-tablet-virtio-hubs2-hotplug.log`,
+`build/check-usb-qemu-tablet-hubs5-hotplug.log`,
+`build/check-input-edges-pci.log`,
+`build/check-usb-nec-tablet-virtio-hubs2-input-edges.log`, and
+`build/check-registry-pci.log`.
+
+## DVD live startup — 2026-10-19
+
+ISO/DVD boot now follows the translated pinned `HomeSys.StartUpTasks` path,
+reuses one graphical terminal, queues `Home/Once.ZC`, and preserves the live
+session. The generated home startup source replaces the legacy hard-drive
+installer prompt with a clear message that installation is not ported to
+ARM64. This is deliberate: the YDE installer found in the sibling repository
+formats and writes boot/storage structures using legacy BIOS/AHCI assumptions,
+so it is not safe to expose as an ARM64 UTM installer. The optional upstream
+tour remains conditional on its source being present.
+
+`make check-dvd-live` passed a clean ISO/HVF boot, confirmed boot source 4,
+checked the installer-status text in framebuffer scanout, typed `help` in the
+graphical terminal, and verified the graphical help output. Source-overlay
+checks also confirm that the generated `Home/Once.ZC` keeps the source-backed
+tour branch and does not call the legacy installer.
+
+## HomeSys startup timing output — 2026-10-19
+
+Disk and RAM startup now preserve the pinned `HomeSys` boot-time banner in the
+first graphical terminal before loading `Home/Once.ZC`. The first-terminal
+acceptance check waits for both the formatted `Boot Time:` line and the Once
+marker, then verifies the second terminal, animated splash, popup lifecycle,
+restored focus, visible typing and caret. `make check-home-autostart` passed
+after the change. DVD startup uses the same first-terminal path and its safe
+live-session message is covered by `make check-dvd-live`.
+
+## Home/Once include and teardown checks — 2026-10-19
+
+The Home/Once acceptance test now invokes the included function through all
+four supported include path forms, catches a missing-include compiler error,
+and verifies that source execution recovers. It also exercises tip selection,
+the saved `Home/Once.ZC` override, and prompt input after the startup popup.
+Disk and ISO/DVD checks pass. The DVD check verifies the ARM64 live-session
+status message instead of the upstream installer question, which is not
+available in this build.
+
+Before comparing managed-memory usage, the check warms source compilation and
+child-task allocator slots. A one-time arena reservation appeared on the third
+fresh source execution and then stayed flat. After warm-up, three additional
+include, tip and error-recovery cycles must not grow data, code or allocation
+counts; a small decrease from cleanup is allowed.

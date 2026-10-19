@@ -2175,6 +2175,37 @@ next:
       QueIns(ic, ccmp->code_ctrl->ir_code);
       goto next;
       break;
+    case TK_INS_BIN:
+      binop_before = 0;
+      string = ccmp->lex->port_doc_binary;
+      str_len = ccmp->lex->port_doc_binary_len;
+      ccmp->lex->port_doc_binary = NULL;
+      ccmp->lex->port_doc_binary_len = 0;
+      if (!string || str_len < 0) {
+        ParseErr(ccmp, "Missing inline DolDoc binary payload.");
+        return 0;
+      }
+      ic = A_CALLOC(sizeof(CRPN), NULL);
+      QueInit(&ic->base);
+      ic->type = IC_STR;
+      for (misc = ccmp->code_ctrl->code_misc->next;
+           ccmp->code_ctrl->code_misc != misc; misc = misc->base.next) {
+        if (misc->type == CMT_STRING && misc->str_len == str_len &&
+            0 == memcmp(misc->str, string, str_len)) {
+          A_FREE(string);
+          ic->code_misc = misc;
+          goto found_binary;
+        }
+      }
+      misc = CodeMiscNew(ccmp, CMT_STRING);
+      misc->str_len = str_len;
+      misc->str = string;
+      ic->code_misc = misc;
+    found_binary:
+      QueIns(ic, ccmp->code_ctrl->ir_code);
+      Lex(ccmp->lex);
+      goto next;
+      break;
     case TK_CHR:
       binop_before = 0;
       ic = A_CALLOC(sizeof(CRPN), NULL);

@@ -7,13 +7,14 @@ from pathlib import Path
 import sys
 import tarfile
 
-from arm64_source import (extract_home_set, extract_home_startup, extract_version_scalars, extract_source_prompt, extract_source_training, extract_server_task, extract_user_task, translate_doctree, translate_registry, translate_docterm, translate_doced, translate_docfind, translate_docform, translate_docpopup, translate_grbitmap,
-                          translate_autocomplete_task, translate_grdc, translate_grscreen, translate_ktask, translate_mathode,
-                          translate_winmgr)
+from arm64_source import (extract_home_set, extract_home_startup, extract_home_startup_tasks, inject_home_startup_tasks, extract_version_scalars, extract_source_prompt, extract_source_training, extract_server_task, extract_user_task, translate_doctree, translate_registry, translate_docterm, translate_doced, translate_docfind, translate_docform, translate_docpopup, translate_grbitmap,
+                          translate_autocomplete_task, translate_grdc, translate_grscreen, translate_ktask, translate_mathode, translate_zsplash,
+                          translate_winmgr, translate_home_once)
 
 root = Path(__file__).resolve().parent.parent
 manifest = json.loads((root / 'upstream/pinned/UPSTREAM.json').read_text())
 entries = {}
+home_startup_tasks = None
 for name, expected in manifest['files'].items():
     rel = name.removeprefix('src/')
     data = (root / 'upstream/pinned' / rel).read_bytes()
@@ -21,12 +22,15 @@ for name, expected in manifest['files'].items():
         raise SystemExit(f'Pinned source changed: {name}')
     if rel == 'HomeSys.ZC':
         entries['System/HomeStartUp.ZC'] = extract_home_startup(data)
+        home_startup_tasks = extract_home_startup_tasks(data)
     if rel == 'Kernel/BlkDev/DiskDirB.ZC':
         entries['System/SourceHome.ZC'] = extract_home_set(data)
     if rel == 'Once.ZC':
         # Seed the same editable home startup file installed by upstream.
-        # Disk/RAM boot now queues this file in the first graphical terminal.
-        entries['Home/Once.ZC'] = data
+        # Disk/RAM and DVD boot queue this file in the first graphical
+        # terminal. The ARM64 DVD overlay avoids the unported BIOS/AHCI
+        # installer while preserving the live session.
+        entries['Home/Once.ZC'] = translate_home_once(data)
     if rel == 'Kernel/KGlobals.ZC':
         entries['System/VersionScalars.ZC'] = extract_version_scalars(data)
     if rel == 'Kernel/StrB.ZC':
@@ -58,6 +62,11 @@ for name, expected in manifest['files'].items():
             data = translate_mathode(data)
         except ValueError as exc:
             raise SystemExit(f'ARM64 MathODE overlay no longer applies: {exc}') from exc
+    elif rel == 'System/ZSplash.ZC':
+        try:
+            data = translate_zsplash(data)
+        except ValueError as exc:
+            raise SystemExit(f'ARM64 ZSplash overlay no longer applies: {exc}') from exc
     elif rel == 'System/DolDoc/DocPopUp.ZC':
         data = translate_docpopup(data)
     elif rel == 'System/DolDoc/DocForm.ZC':
@@ -94,6 +103,16 @@ for name, expected in manifest['files'].items():
 for path in sorted((root / 'upstream/bootstrap').rglob('*')):
     if path.is_file():
         entries[path.relative_to(root / 'upstream/bootstrap').as_posix()] = path.read_bytes()
+if home_startup_tasks is not None:
+    gui_terminal_path = 'System/GuiTerminal.ZC'
+    gui_terminal = entries.get(gui_terminal_path)
+    if gui_terminal is None:
+        raise SystemExit('cannot place pinned HomeSys.StartUpTasks adapter')
+    try:
+        entries[gui_terminal_path] = inject_home_startup_tasks(
+            gui_terminal, home_startup_tasks)
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
 for path in sorted((root / 'tests/compat').glob('*')):
     if path.suffix in ('.ZC', '.HH', '.DD', '.txt'):
         entries['Tests/' + path.name] = path.read_bytes()

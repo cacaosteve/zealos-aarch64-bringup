@@ -48,7 +48,8 @@ struct usb_dev {
     unsigned slot, port, speed, packet0, ep_count, vendor, product;
     unsigned present, configured, failed;
     unsigned quarantined, route, depth, parent_port, tt_slot, tt_port;
-    unsigned hub_ports, hub_protocol, hub_think, hub_pending;
+    unsigned hub_ports, hub_protocol, hub_think, hub_pending, hub_superspeed;
+    unsigned hub_power_good_ms;
     uint64_t hub_rescan_at;
     struct usb_port_state children[USB_HUB_PORTS];
     uint64_t control_pending, control_data;
@@ -425,7 +426,7 @@ static int usb_configure(struct usb_dev *d) {
     }
     slot[0] = (slot[0] & 0x07ffffff) | (max_dci << 27);
     if (d->hub_ports) {
-        slot[0] |= 1u << 26; /* hub, single TT (alternate setting zero) */
+        slot[0] |= 1u << 26; /* hub; TT fields below apply only to USB2 hubs */
         slot[1] = (slot[1] & 0x00ffffff) | (d->hub_ports << 24);
         slot[2] = (slot[2] & ~(3u << 16)) | (d->hub_think << 16);
     }
@@ -461,13 +462,23 @@ static int usb_enumerate(struct usb_dev *d) {
     unsigned hub = device_class == 9;
     for (unsigned j = 0; j < d->ep_count; j++) hub |= d->ep[j].kind == 4;
     if (hub) {
-        /* USB 1.x/2.0 hub class. SuperSpeed hubs need a separate descriptor,
-         * depth and link-state path; reject before claiming any endpoints. */
-        if (d->depth >= 5 || d->speed >= 4 ||
-            usb_control(d, 0xa0, 6, 0x2900, 0, 9) < 7 || d->buffer[1] != 0x29)
-            return 0;
-        d->hub_ports = d->buffer[2];
-        d->hub_think = (usb_le16(d->buffer + 3) >> 5) & 3;
+        if (d->depth >= 5) return 0;
+        if (d->speed >= 4) {
+            /* USB 3.x hub descriptor is fixed at 12 bytes. */
+            if (usb_control(d, 0xa0, 6, 0x2a00, 0, 12) < 12 ||
+                d->buffer[0] < 12 || d->buffer[1] != 0x2a)
+                return 0;
+            d->hub_superspeed = 1;
+            d->hub_ports = d->buffer[2];
+            d->hub_power_good_ms = d->buffer[5] * 2;
+            d->hub_think = 0; /* SuperSpeed hubs do not use transaction translators. */
+        } else {
+            if (usb_control(d, 0xa0, 6, 0x2900, 0, 9) < 7 || d->buffer[1] != 0x29)
+                return 0;
+            d->hub_ports = d->buffer[2];
+            d->hub_think = (usb_le16(d->buffer + 3) >> 5) & 3;
+            d->hub_power_good_ms = d->buffer[5] * 2;
+        }
         if (!d->hub_ports || d->hub_ports > USB_HUB_PORTS) return 0;
     }
     /* Parse before configuring endpoints; unsupported HID layouts stay unowned. */
@@ -489,6 +500,8 @@ static int usb_enumerate(struct usb_dev *d) {
     }
     if (!accepted || !usb_configure(d) || usb_control(d, 0, 9, config, 0, 0) != 0) return 0;
     d->configured = 1;
+    if (d->hub_superspeed && usb_control(d, 0x20, 12, d->depth, 0, 0) != 0)
+        return 0; /* SET_HUB_DEPTH is required before a SuperSpeed hub can route. */
     for (unsigned j = 0; j < d->ep_count; j++) {
         struct usb_ep *ep = &d->ep[j];
         if (!ep->kind) continue;
@@ -507,7 +520,7 @@ static int usb_enumerate(struct usb_dev *d) {
     if (d->hub_ports) {
         for (unsigned p = 1; p <= d->hub_ports; p++)
             if (usb_control(d, 0x23, 3, 8, p, 0) != 0) return 0; /* PORT_POWER */
-        usb_delay(100);
+        usb_delay(d->hub_power_good_ms < 100 ? 100 : d->hub_power_good_ms);
         d->hub_pending = (1u << (d->hub_ports + 1)) - 1;
     }
     return 1;
@@ -693,23 +706,33 @@ static int usb_hub_status(struct usb_dev *hub, unsigned port, uint32_t *status) 
 static void usb_port_ack(struct usb_hc *hc, struct usb_dev *hub,
                           unsigned port, uint32_t status) {
     if (hub) {
-        for (unsigned bit = 0; bit < 5; bit++)
-            if (status & (1u << (16 + bit)))
-                (void)usb_control(hub, 0x23, 1, 16 + bit, port, 0);
+        for (unsigned bit = 0; bit < (hub->hub_superspeed ? 8u : 5u); bit++) {
+            if (!(status & (1u << (16 + bit)))) continue;
+            unsigned feature = bit < 5 ? 16 + bit :
+                              bit == 5 ? 29 : bit == 6 ? 25 : 26;
+            (void)usb_control(hub, 0x23, 1, feature, port, 0);
+        }
     } else if (status & (0x7fu << 17)) {
         usb_w32(hc->op, 0x400 + port * 16, status & ~(2u | (1u << 4) | (1u << 31)));
     }
 }
 static unsigned usb_hub_reset(struct usb_dev *hub, unsigned port) {
-    if (usb_control(hub, 0x23, 3, 4, port, 0) != 0) return 0;
+    unsigned reset_feature = hub->hub_superspeed ? 28 : 4;
+    unsigned reset_change = hub->hub_superspeed ? (1u << 21) : (1u << 20);
+    if (usb_control(hub, 0x23, 3, reset_feature, port, 0) != 0) return 0;
     uint64_t end = usb_deadline(1000);
     uint32_t status = 0;
     do {
         usb_delay(10);
         if (!usb_hub_status(hub, port, &status) || !(status & 1)) return 0;
-        if (!(status & 16) && (status & 2)) {
+        if (!(status & 16) && (status & 2) &&
+            (!hub->hub_superspeed || (status & reset_change))) {
             usb_port_ack(hub->hc, hub, port, status);
-            usb_delay(10); /* USB2 reset recovery */
+            if (hub->hub_superspeed) {
+                usb_delay(50); /* USB3 link training/recovery after BH reset. */
+                return 4;
+            }
+            usb_delay(10);
             return status & (1u << 9) ? 2 : status & (1u << 10) ? 3 : 1;
         }
     } while (usb_now() < end);

@@ -60,7 +60,7 @@ extern U8 *DocSave(CDoc *doc, I64 *_size=NULL);
 extern U0 StreamPrint(U8 *format, ...);
 extern Bool DocGoToLine(CDoc *doc, I64 line);
 extern Bool DocLock(CDoc *doc);
-extern U0 DocUnlock(CDoc *doc);
+extern Bool DocUnlock(CDoc *doc);
 extern U8 *StrNew(U8 *source, CTask *mem_task=NULL);
 // ASCII case-insensitive substring search used by the pinned DocFind source.
 // The upstream _STRIMATCH runtime external is not implemented in this
@@ -5383,11 +5383,19 @@ extern I64 JobsHandler(I64 run_flags, CTask *task=NULL);
 extern Bool JobResScan(CJob *request=NULL, I64 *_res=NULL);
 extern I64 JobResGet(CJob *request=NULL);
 
-// Code-only bootstrap for pinned Job.ZC's PopUp path. ServerCmdLine and its
-// Doc/window loop are not loaded yet; this server only dispatches jobs.
+// Bootstrap for pinned Job.ZC's PopUp path. Full desktop startup supplies a
+// source-backed server loop; isolated jobs tests retain this code-only loop.
 // Synchronous callers give the child keyboard focus until the source returns.
+extern I64 ZcCallExtStr(U8 *name);
 U0 ServerCmdLine(U8 *data)
 {
+    if (data) {}
+    Fs->win_inhibit = WIG_USER_TASK_DEFAULT;
+    // ServerTask.ZC loads only after the graphical window manager is ready.
+    // Its entry calls HomeSys ServerStartUp and then runs the original loop.
+    if (ZcCallExtStr("BootstrapServerTaskStart") != -1)
+        return;
+
     while (TRUE) {
         JobsHandler(0);
         LBts(&Fs->task_flags, TASKf_IDLE);

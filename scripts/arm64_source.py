@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+import struct
 
 
 _TEXT_BG_X86 = re.compile(
@@ -97,18 +98,65 @@ extern Bool ZcUserInputComplete(U8 *text);
 
 
 def extract_home_startup(source: bytes) -> bytes:
-    """Keep the pinned per-user/server hooks ahead of the ARM64 launch adapter.
+    """Extract the pinned HomeSys per-task hooks."""
+    return _extract_home_startup_parts(source)[0]
 
-    The ARM64 terminal hook calls these bodies and installs its working input
-    adapter. The supported first-terminal Once command and autocomplete scan
-    are queued separately by the desktop bootstrap; DVD installer flow and
-    splash remain staged until their dependencies are available.
+
+def extract_home_startup_tasks(source: bytes) -> bytes:
+    """Translate the pinned HomeSys desktop-startup body for ARM64."""
+    return _extract_home_startup_parts(source)[1]
+
+
+def inject_home_startup_tasks(gui_terminal: bytes, startup_tasks: bytes) -> bytes:
+    """Place the derived startup body after its GUI globals and helpers."""
+    anchor = b'I64 BootstrapGuiTerminalHomeStart()\n'
+    if gui_terminal.count(anchor) != 1:
+        raise ValueError('expected the GUI HomeSys startup insertion point')
+    return gui_terminal.replace(anchor, startup_tasks + b'\n' + anchor, 1)
+
+
+def translate_home_once(source: bytes) -> bytes:
+    """Keep the live DVD session usable without offering the legacy installer.
+
+    The pinned DVD installer writes BIOS boot sectors and depends on storage
+    helpers that are not part of this ARM64 image. Preserve the upstream
+    ``Once.ZC`` source everywhere else, but make the DVD branch state that the
+    live session is available and the installer has not been ported.
+    """
+    text = source.decode('utf-8')
+    start = '\t\t\t"\\nIf you answer \'No\' you can play with\\n"\n'
+    end = '\t\t\tif (FileFind("::/Misc/Tour"))\n'
+    if text.count(start) != 1 or text.count(end) != 1:
+        raise ValueError('pinned Once DVD installer prompt changed')
+    first = text.index(start)
+    last = text.index(end, first)
+    dvd_prompt = text[first:last]
+    if (dvd_prompt.count('Install onto hard drive') != 1 or
+            dvd_prompt.count('RunFile("::/Misc/OSInstall",, TRUE);') != 1):
+        raise ValueError('pinned Once DVD installer flow changed')
+    replacement = ('\t\t\t"\\nARM64 live session is ready.\\n"\n'
+                   '\t\t\t"The original disk installer has not been ported yet.\\n";\n')
+    return (text[:first] + replacement + text[last:]).encode('utf-8')
+
+
+def _extract_home_startup_parts(source: bytes) -> tuple[bytes, bytes]:
+    """Keep HomeSys hooks and its pinned desktop-startup body.
+
+    The ARM64 adapter reuses the first terminal it already brought up, then
+    translates upstream-only output/tiling calls into terminal-scoped bridges.
+    This keeps the startup sequence tied to the pinned HomeSys implementation.
+    The DVD path now reaches the live graphical session; its generated
+    ``Home/Once.ZC`` clearly reports that legacy installation is not ported.
     """
     text = source.decode('utf-8')
     boundary = '\nU0 StartUpTasks()\n'
-    if text.count(boundary) != 1:
+    task_end = '\nStartUpTasks;'
+    if text.count(boundary) != 1 or text.count(task_end) != 1:
         raise ValueError('expected the pinned HomeSys startup boundary')
-    hooks = text[:text.index(boundary)]
+    task_start = text.index(boundary) + 1
+    task_end_at = text.index(task_end, task_start)
+    hooks = text[:task_start - 1]
+    startup = text[task_start:task_end_at]
     for name in ('UserStartUp', 'ServerStartUp'):
         signature = 'U0 ' + name + '()'
         if hooks.count(signature) != 1:
@@ -116,8 +164,151 @@ def extract_home_startup(source: bytes) -> bytes:
         hooks = hooks.replace(signature, 'U0 BootstrapHome' + name + '()', 1)
     if hooks.count('Type("::/Doc/Start.DD");') != 1 or hooks.count('\tDir;') != 1:
         raise ValueError('pinned HomeSys user document/directory setup changed')
-    return ('// HomeSys per-task hooks; desktop StartUpTasks is not executed.\n' +
-            hooks).encode('utf-8')
+    anchors = (
+        'U0 StartUpTasks()\n',
+        '\tCTask *user = User;\n',
+        '\tif (sys_boot_src.u16[0] != BOOT_SRC_DVD)\n\t\tUser;\n',
+        '\tWinToTop(user);\n',
+        '\tWinTileVert;\n',
+        '\t"Boot Time:%7.3fs\\n", tS;\n',
+        '\tXTalk(user, "Cd; #include \\"Once\\";\\n");\n',
+        '\tSilent; //no output to screen\n',
+        '\tACInit("/*;!*/Bible.TXT;!*/Clementine.TXT;!*/PCIDevices.DD;!*/HTML/*;!*/ChangeLog.DD");\n',
+        '\tSilent(OFF); //no output to screen\n',
+        '\tif (sys_boot_src.u16[0] != BOOT_SRC_RAM)\n'
+        '\t\tPopUp("ExeFile2(\\"::/System/ZSplash.ZC\\");");\n',
+    )
+    if any(startup.count(anchor) != 1 for anchor in anchors):
+        raise ValueError('pinned HomeSys StartUpTasks body changed')
+    replacements = (
+        ('U0 StartUpTasks()', 'I64 BootstrapHomeStartUpTasks()'),
+        ('\tCTask *user = User;\n',
+         '\tCTask *user = bootstrap_gui_terminal_task;\n'
+         '\tif (!TaskValidate(user)) return 1;\n'),
+        ('\tif (sys_boot_src.u16[0] != BOOT_SRC_DVD)\n\t\tUser;\n',
+         '\tif (sys_boot_src.u16[0] != BOOT_SRC_DVD)\n'
+         '\t{\n'
+         '\t\tbootstrap_gui_terminal_home_second = User();\n'
+         '\t\tif (!TaskValidate(bootstrap_gui_terminal_home_second)) return 2;\n'
+         '\t}\n'),
+        ('\tWinTileVert;\n',
+         '\tBootstrapGuiTerminalTileHomeWindows(user, bootstrap_gui_terminal_home_second);\n'),
+        ('\t"Boot Time:%7.3fs\\n", tS;\n',
+         '\tXTalk(user, "\\"Boot Time:%%7.3fs\\n\\", tS;\\n");\n'),
+        ('\tSilent; //no output to screen\n'
+         '\tACInit("/*;!*/Bible.TXT;!*/Clementine.TXT;!*/PCIDevices.DD;!*/HTML/*;!*/ChangeLog.DD");\n'
+         '\tSilent(OFF); //no output to screen\n',
+         '\tXTalk(user, "Silent; Cd(\\"/\\"); ACInit(\\"/*;!*/Bible.TXT;!*/Clementine.TXT;!*/PCIDevices.DD;!*/HTML/*;!*/ChangeLog.DD\\"); Cd(\\"/Home\\"); Silent(OFF);\\n");\n'),
+        ('\tif (sys_boot_src.u16[0] != BOOT_SRC_RAM)\n'
+         '\t\tPopUp("ExeFile2(\\"::/System/ZSplash.ZC\\");");\n',
+         '\tif (sys_boot_src.u16[0] != BOOT_SRC_RAM)\n'
+         '\t\tXTalk(user, "PopUp(\\"BootstrapGuiTerminalExeDocFile(\\\\\\"::/System/ZSplash.ZC\\\\\\");\\");\\n");\n'),
+        ('\n}', '\n\treturn 0x2a;\n}'),
+    )
+    for old, new in replacements:
+        if startup.count(old) != 1:
+            raise ValueError('HomeSys startup translation anchor changed: ' + old[:48])
+        startup = startup.replace(old, new, 1)
+    hook_file = ('// Pinned HomeSys per-task hooks.\n' + hooks + '\n').encode('utf-8')
+    startup_body = ('// Guarded ARM64 translation of pinned HomeSys.StartUpTasks.\n' +
+                    startup + '\n').encode('utf-8')
+    return hook_file, startup_body
+
+
+def translate_zsplash(source: bytes) -> bytes:
+    """Run the pinned animated splash with ARM64-owned pointer and task state.
+
+    Keep its embedded sprite and renderer intact. The ARM64 task already owns
+    native USB pointer input, so drop the x86 mouse-driver handoff and restore
+    keyboard focus locally instead of killing the parent task. Preserve its
+    short startup jitter with the loaded timer counter because this bootstrap
+    does not load the full date/time helper.
+    """
+    if source.count(b'\0') < 1:
+        raise ValueError('expected ZSplash inline sprite payload terminator')
+    raw, payload = source.split(b'\0', 1)
+    if not raw.endswith(b'ZSplash;') or not payload:
+        raise ValueError('expected ZSplash launch statement and sprite payload')
+    # The pinned source stores this CDocBin as UTF-8 text whose non-ASCII
+    # codepoints are the original CP437 byte values. Restore those single-byte
+    # sprite bytes before the bootstrap compiler embeds the binary. Passing
+    # the UTF-8 bytes through literally changes negative mesh coordinates into
+    # unrelated multi-byte values and leaves the splash labels without their
+    # rotating mesh.
+    try:
+        payload = payload.decode('utf-8').encode('cp437')
+    except (UnicodeDecodeError, UnicodeEncodeError) as exc:
+        raise ValueError('pinned ZSplash binary is not UTF-8 encoded CP437 data') from exc
+    if len(payload) < 26:
+        raise ValueError('pinned ZSplash binary is truncated')
+    bin_num, bin_flags, bin_size, bin_use_count = struct.unpack_from('<IIII', payload)
+    if (bin_num != 1 or bin_flags != 0 or bin_size != len(payload) - 16 or
+            bin_use_count < 1 or payload[16] != 24):
+        raise ValueError('pinned ZSplash CDocBin or mesh header changed')
+    vertex_count, tri_count = struct.unpack_from('<II', payload, 17)
+    if (vertex_count < 1 or vertex_count > 1024 or tri_count > 2048 or
+            9 + vertex_count * 12 + tri_count * 16 + 1 != bin_size):
+        raise ValueError('pinned ZSplash packed mesh payload changed')
+    text = raw.decode('utf-8')
+    anchors = (
+        '$SP,"<1>",BI=1$',
+        'Sprite3(dc, 0, 0, 0, $IB,"<1>",BI=1$);',
+        'Sleep((Now + counts.timer) & 0x7F);',
+        'MStrPrint("%S", "DD_OS_NAME_VERSION");',
+        'U0 ZSplash()\n',
+        'while (!CharScan)',
+        'DCDepthBufAlloc(dc);',
+        'CTask\t*bg_task = User;',
+        'WinBorder(, bg_task);',
+        'WinMax(bg_task);',
+        'gr.fp_draw_mouse = &DrawNoMouse;',
+        'MouseHardEnable(FALSE);',
+        'gr.fp_draw_mouse = &DrawStdMouse;',
+        'MouseHardEnable(TRUE);',
+        'Spawn(&MouseHardDriverInstall);',
+        'Kill(bg_task);',
+        'no_warn dc, x, y;',
+        'AutoComplete(OFF);',
+        'AutoComplete(ON);',
+    )
+    if any(text.count(anchor) != 1 for anchor in anchors):
+        raise ValueError('pinned ZSplash sprite, renderer, pointer, or task-exit code changed')
+    if 'DD_OS_NAME_VERSION' not in text or 'Simplicity Perfected' not in text:
+        raise ValueError('pinned ZSplash title or motto changed')
+    text = text.replace('Sleep((Now + counts.timer) & 0x7F);',
+                        'Sleep(counts.timer & 0x7F);', 1)
+    text = text.replace('MStrPrint("%S", "DD_OS_NAME_VERSION");',
+                        'MStrPrint("%s", "ZealOS ARM64");', 1)
+    text = text.replace('DCDepthBufAlloc(dc);',
+                        'if (!dc->depth_buf) DCDepthBufAlloc(dc);', 1)
+    text = text.replace('no_warn dc, x, y;',
+                        '// Native ARM64 cursor rendering stays enabled.', 1)
+    text = text.replace('AutoComplete(OFF);',
+                        '// Keep global autocomplete task state unchanged.', 1)
+    text = text.replace('AutoComplete(ON);',
+                        '// Keep global autocomplete task state unchanged.', 1)
+    text = text.replace('CTask\t*bg_task = User;',
+                        'CTask *splash_task = Fs;\n\tCTask *old_focus = sys_focus_task;', 1)
+    text = text.replace('WinToTop(bg_task);',
+                        'WinToTop(splash_task);\n\tsys_focus_task = splash_task;', 1)
+    text = text.replace('WinBorder(, bg_task);', 'WinBorder(, splash_task);', 1)
+    text = text.replace('WinMax(bg_task);', 'WinMax(splash_task);', 1)
+    text = text.replace('bg_task->', 'splash_task->')
+    text = text.replace('gr.fp_draw_mouse = &DrawNoMouse;', '// Native USB pointer remains enabled.', 1)
+    text = text.replace('MouseHardEnable(FALSE);', '', 1)
+    text = text.replace('gr.fp_draw_mouse = &DrawStdMouse;', '', 1)
+    text = text.replace('MouseHardEnable(TRUE);', '', 1)
+    text = text.replace('Spawn(&MouseHardDriverInstall);', '', 1)
+    text = text.replace('Kill(bg_task);',
+                        'if (TaskValidate(old_focus))\n\t\tsys_focus_task = old_focus;', 1)
+    result = ('// ARM64 restores the packed pinned sprite bytes and uses the native USB pointer.\n' + text).encode('utf-8') + b'\0' + payload
+    if (b'$SP,"<1>",BI=1$' not in result or
+            b'Sprite3(dc, 0, 0, 0, $IB,"<1>",BI=1$);' not in result or
+            b'if (!dc->depth_buf) DCDepthBufAlloc(dc);' not in result or
+            b'MStrPrint("%s", "ZealOS ARM64");' not in result or
+            b'bg_task' in result):
+        raise ValueError('ARM64 ZSplash translation lost its embedded sprite tokens')
+    return result
 
 
 def extract_home_set(source: bytes) -> bytes:
@@ -325,10 +516,15 @@ def extract_server_task(source: bytes) -> bytes:
             raise ValueError(f"pinned ServerTaskCont changed: {anchor}")
     body = body.replace("JobsHandler(old_flags)", "ZcServerJobsHandler(old_flags)", 1)
     return ("// Kernel/KTask.ZC server loop with the ARM64 job-dispatch boundary.\n"
-            "extern I64 ZcServerJobsHandler(I64 flags);\n" +
-            body + "\nextern I64 ZcSystemTaskStart(U0 (*entry)());\n"
-            "I64 BootstrapSystemTaskStart()\n"
-            "{\n    return ZcSystemTaskStart(&ServerTaskCont);\n}\n").encode("utf-8")
+            "extern I64 ZcServerJobsHandler(I64 flags);\n"
+            "extern I64 ZcSystemTaskStart(U0 (*entry)());\n"
+            "extern I64 ZcCallExtStr(U8 *name);\n" + body +
+            "\nI64 BootstrapSystemTaskStart()\n"
+            "{\n    return ZcSystemTaskStart(&ServerTaskCont);\n}\n"
+            "U0 BootstrapServerTaskStart()\n"
+            "{\n    Fs->win_inhibit = WIG_USER_TASK_DEFAULT;\n"
+            "    ZcCallExtStr(\"ServerStartUp\");\n"
+            "    ServerTaskCont;\n}\n").encode("utf-8")
 
 
 def translate_winmgr(source: bytes) -> bytes:

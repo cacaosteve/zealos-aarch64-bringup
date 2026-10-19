@@ -1,0 +1,52 @@
+I64 popup_window_release;
+CTask *popup_window_child;
+
+I64 PopupWindowOpen()
+{
+    I64 i, valid, has_doc, shown;
+
+    popup_window_release = 0;
+    popup_window_child = NULL;
+    PopUp("DocPrint(DocPut, \"POPUP WINDOW READY\"); "
+          "while(!popup_window_release) Yield; 42;",
+          NULL, &popup_window_child);
+    if (!TaskValidate(popup_window_child))
+        return 1;
+    for (i = 0; i < 256; i++)
+    {
+        if (!TaskValidate(popup_window_child))
+            return 2;
+        if (popup_window_child->display_doc &&
+            Bt(&popup_window_child->display_flags, DISPLAYf_SHOW))
+            return 42;
+        Yield;
+    }
+    valid = TaskValidate(popup_window_child);
+    has_doc = 0;
+    shown = 0;
+    if (valid)
+    {
+        if (popup_window_child->display_doc)
+            has_doc = 1;
+        if (Bt(&popup_window_child->display_flags, DISPLAYf_SHOW))
+            shown = 1;
+    }
+    Print("popup diag: task=%d doc=%d shown=%d\n", valid, has_doc, shown);
+    return 3;
+}
+
+I64 PopupWindowClose()
+{
+    I64 i;
+    CTask *child = popup_window_child;
+
+    if (!TaskValidate(child))
+        return 1;
+    popup_window_release = 1;
+    for (i = 0; i < 256 && TaskValidate(child); i++)
+        Yield;
+    popup_window_child = NULL;
+    if (TaskValidate(child))
+        return 2;
+    return 42;
+}

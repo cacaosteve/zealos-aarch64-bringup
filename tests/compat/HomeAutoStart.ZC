@@ -1,4 +1,4 @@
-// Verify the first-terminal HomeSys startup, two-window layout and Once step.
+// Verify HomeSys boot time, first-terminal Once and the two-window layout.
 I64 HomeAutoStartChecks()
 {
     CTask *term = bootstrap_gui_terminal_task;
@@ -15,7 +15,8 @@ I64 HomeAutoStartChecks()
     for (i = 0; i < 500; i++)
     {
         saved = DocSave(term->put_doc);
-        if (saved && StrMatch("HOME_AUTO_ONCE_42", saved))
+        if (saved && StrMatch("Boot Time:", saved) &&
+            StrMatch("HOME_AUTO_ONCE_42", saved))
         {
             Free(saved);
             return 42;

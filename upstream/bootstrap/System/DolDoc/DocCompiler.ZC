@@ -9,19 +9,28 @@ class CArmDocInput
     Bool first;
 };
 extern U0 ZcUserDocAttach(CCompCtrl *cc, CArmDocInput *input,
-    I64 (*reader)(CArmDocInput *input, Bool in_quotes),
+    I64 (*reader)(CArmDocInput *input, Bool in_quotes, U8 **binary_data,
+        I64 *binary_size),
     U0 (*deleter)(CArmDocInput *input), U8 *filename);
+
+// Private markers consumed by Aiwnios' ARM64 lexer. Binary payload bytes and
+// size travel through output parameters, never through the character stream.
+#define ARM_DOC_TOKEN_INS_BIN      0x7FFFFF01
+#define ARM_DOC_TOKEN_INS_BIN_SIZE 0x7FFFFF02
 
 U0 ArmDocInputDel(CArmDocInput *input)
 {
     Free(input->owned);
     Free(input);
 }
-I64 ArmDocInputChar(CArmDocInput *input, Bool in_quotes)
+I64 ArmDocInputChar(CArmDocInput *input, Bool in_quotes,
+    U8 **binary_data, I64 *binary_size)
 {//LexCharGet's document traversal and LexDollar quote policy.
     CDocEntry *entry;
     U8 *plain;
     I64 ch;
+    *binary_data = NULL;
+    *binary_size = 0;
     while (TRUE)
     {
 reader_start:
@@ -70,14 +79,35 @@ reader_start:
                 input->entry = entry->next;
                 goto reader_start;
             case DOCT_INS_BIN:
-            case DOCT_INS_BIN_SIZE:
-                Print("ARM64 compiler does not yet accept inline DolDoc binary tokens.\n");
-                throw('Compiler');
-            case DOCT_SHIFTED_Y:
-                if (!in_quotes && entry->attr)
+                if (!entry->bin_data ||
+                    (!entry->bin_data->data && entry->bin_data->size))
                 {
-                    Print("ARM64 compiler does not yet accept DolDoc script tokens.\n");
+                    Print("ARM64 compiler found an inline DolDoc binary token without data.\n");
                     throw('Compiler');
+                }
+                *binary_data = entry->bin_data->data;
+                *binary_size = entry->bin_data->size;
+                input->entry = entry->next;
+                return ARM_DOC_TOKEN_INS_BIN;
+            case DOCT_INS_BIN_SIZE:
+                if (!entry->bin_data)
+                {
+                    Print("ARM64 compiler found an inline DolDoc binary size token without data.\n");
+                    throw('Compiler');
+                }
+                *binary_size = entry->bin_data->size;
+                input->entry = entry->next;
+                return ARM_DOC_TOKEN_INS_BIN_SIZE;
+            case DOCT_SHIFTED_Y:
+                if (!in_quotes)
+                {
+                    input->entry = entry->next;
+                    if (entry->attr < 0)
+                        return TK_SUPERSCRIPT;
+                    else if (entry->attr > 0)
+                        return TK_SUBSCRIPT;
+                    else
+                        return TK_NORMALSCRIPT;
                 }
                 break;
         }
