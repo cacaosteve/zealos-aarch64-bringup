@@ -2379,17 +2379,16 @@ Port sequence and remaining gates:
    but stock QEMU's generic hub cannot exercise it; a physical SS-hub check is
    still required. Expanded HID reports/lock-key LEDs remain work beyond the
    shared US-layout Shift/Ctrl/navigation decoder.
-4. The first Pi 4B discovery layer is implemented: the booter reads the
-   `brcm,bcm2711-pcie` firmware-DTB node and snapshots its translated host
-   register range, PCI memory window, and DMA aperture in revision-5 handoff.
-   It performs no PCIe register access. `make check-pi4-pcie-fdt` covers the
-   standard BCM2711 `ranges` translation, 64 MiB PCI memory aperture, 3 GiB
-   inbound DMA window, disabled nodes, and malformed truncation. The actual
-   UEFI FDT values remain to be checked on the Pi. Next, add read-only bridge
-   link detection; then a bounded downstream config read for VL805. Keep xHCI
-   disabled until DMA allocations are guaranteed to fit the parsed DMA window
-   and firmware handoff is understood. Validate cache behavior, register
-   access widths, and physical keyboard/mouse separately.
+4. The Pi 4B discovery layer parses the `brcm,bcm2711-pcie` firmware-DTB node,
+   snapshots its translated host register range, PCI memory window, and DMA
+   aperture in revision-6 handoff, and reserves a 1 MiB aligned arena wholly
+   inside that aperture. `make check-pi4-pcie-fdt` and `make check-pi4-dma`
+   cover the parser and allocator, including address translation, map splitting
+   and capacity. A guarded read-only link-status probe is also implemented.
+   The arena is not used for DMA; PCI config-space access, bus mastering and
+   xHCI remain disabled. Check the actual UEFI FDT values, link status and
+   reservation on the Pi before a bounded VL805 config read. Validate cache
+   behavior, register access widths, and physical keyboard/mouse separately.
    Raspberry Pi's [PCIe driver](https://github.com/raspberrypi/linux/blob/rpi-6.12.y/drivers/pci/controller/pcie-brcmstb.c)
    and [VL805 firmware documentation](https://github.com/raspberrypi/documentation/blob/master/documentation/asciidoc/computers/raspberry-pi/eeprom-bootloader.adoc)
    are platform references, not proof of this port working on hardware.
@@ -2609,10 +2608,11 @@ Shell compiler entry points reject calls made from code being evaluated during
 parsing, before replacing either recovery guard. This keeps a compile-time
 callback from overwriting the outer statement checkpoint.
 
-Recovery reserves 24 MiB outside the managed arenas. Copies cover live prefixes
-and allocator headers rather than the unused arena tails. The managed 16 MiB
-data and 8 MiB code limits remain unchanged. `zstatus` exposes the number of
-recovered errors and whether the parser recovery boundary is active.
+Recovery reserves 112 MiB outside the managed arenas. Copies cover live prefixes
+and allocator headers rather than the unused arena tails. The managed arenas
+provide 96 MiB of data and 16 MiB of compiled code for the source graphics and
+desktop runtime. `zstatus` exposes the number of recovered errors and whether
+the parser recovery boundary is active.
 
 The lexer now clears its lookahead character at EOF, preventing a missing final
 newline from repeating a stale token until the arena is exhausted. Macro
@@ -3702,3 +3702,39 @@ child-task allocator slots. A one-time arena reservation appeared on the third
 fresh source execution and then stayed flat. After warm-up, three additional
 include, tip and error-recovery cycles must not grow data, code or allocation
 counts; a small decrease from cleanup is allowed.
+
+## USB2 transaction-translator route diagnostics — 2026-10-19
+
+The USB2 TT route selection and xHCI context encoding now live in small helpers
+shared by the driver and a host-side test. A full/low-speed child of a
+high-speed hub uses that hub's slot and immediate downstream port; descendants
+behind intervening full/low-speed hubs retain the same route. High-speed and
+SuperSpeed devices leave the TT fields clear. `zstatus` now prints `tt_slot`
+and `tt_port` for each enumerated USB device so a physical hub test can inspect
+the route chosen by enumeration.
+
+`make check-usb-route` passed with address and undefined-behavior sanitizers,
+`make esp` rebuilt the ARM64 guest, `make check-usb-input` passed the NEC and
+QEMU xHCI input profiles including duplicate-VirtIO fallback, and
+`python3 scripts/check-compat.py --usb-input qemu --usb-hubs 5 --usb-hotplug`
+passed after the driver integration. The QEMU profiles cover enumeration,
+hotplug and subtree recovery through generic full-speed hubs; they do not
+exercise a nonzero TT route. Physical high-speed hub acceptance and the
+separate Pi 4B VL805 backend remain open.
+
+## Pi 4 USB DMA arena reservation — 2026-10-19
+
+The Pi boot handoff is now revision 6. After reserving the kernel and page-table
+pool, the booter can reserve a 1 MiB, 64 KiB-aligned region from usable RAM only
+when it lies wholly within the firmware FDT's translated DMA aperture. The
+handoff records both CPU physical and PCI bus addresses, and the memory map
+marks the range unavailable to the general allocator. This step does not access
+downstream PCI config space, use the arena for DMA, enable bus mastering, or
+start xHCI.
+
+`make check-pi4-platform` passes the existing BCM2711 FDT fixture and new tests
+for address translation, memory-map splitting, missing/overflowing windows,
+and map-capacity bounds. `make esp` and `make pi-sd` build the UTM and distinct
+Pi diagnostic payloads. The Pi diagnostic prints the actual FDT windows and
+reservation on HDMI, and also reports a guarded root-complex status read over
+PL011; the physical check is still required before any VL805 config read.

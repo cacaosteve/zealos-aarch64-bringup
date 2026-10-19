@@ -10,6 +10,7 @@
 #include "elf64.h"
 #include "plat_pi4.h"
 #include "pi4_pcie_fdt.h"
+#include "pi4_dma.h"
 #include "mmio_map.h"
 
 __attribute__((used, section(".limine_requests")))
@@ -603,7 +604,7 @@ void kmain(void) {
     g_handoff.magic0 = ZEAL_HANDOFF_MAGIC_0;
     g_handoff.magic1 = ZEAL_HANDOFF_MAGIC_1;
     g_handoff.size = (uint32_t)sizeof(g_handoff);
-    g_handoff.revision = 5;
+    g_handoff.revision = 6;
     g_handoff.bootloader_id = ZEAL_BL_LIMINE;
     g_handoff.flags = is_pi ? ZEAL_FLAG_PLAT_PI4 : 0;
     g_handoff.hhdm_offset = hhdm;
@@ -700,6 +701,14 @@ void kmain(void) {
     handoff_reserve_kernel(&g_handoff);
     if (handoff_reserve_pt_pool(&g_handoff) != 0) {
         uart_puts(uart, "warning: no reserved page-table pool\n");
+    }
+    if (is_pi) {
+        int dma_rc = pi4_usb_dma_reserve(&g_handoff);
+        if (dma_rc != 0) {
+            uart_puts(uart, "warning: Pi USB DMA arena unavailable rc=");
+            uart_put_u64_hex(uart, (uint64_t)(int64_t)dma_rc);
+            uart_puts(uart, "\n");
+        }
     }
     uart_puts(uart, "kernel phys=");
     uart_put_u64_hex(uart, g_kernel_phys);

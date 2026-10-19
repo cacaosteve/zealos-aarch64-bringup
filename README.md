@@ -2,7 +2,7 @@
 
 Limine → ZealBooter → kernel + `demo.hcbc` → HolyC-IR JIT → graphical terminal → **native USB or VirtIO input**
 
-**Not a full ZealOS port.** Two parallel tracks: QEMU/UTM virt (HolyC + RedSea + Lattice compose) and Pi 4B UEFI (boot/timer/IRQ/shell; UART RX still hardware-pending).
+**Not a full ZealOS port.** Two parallel tracks: QEMU/UTM virt (HolyC + RedSea + Lattice compose) and Pi 4B UEFI (boot/timer/IRQ/shell; actual PCIe/DMA-window discovery is the next hardware check, with USB still disabled).
 
 ## Native source compatibility milestone
 
@@ -17,6 +17,7 @@ make check-compat-pci   # disposable UTM-shaped GPT/PCI disk guest
 make check-gui-workflow # visible typing/cursors + graphical edit/save/run/reboot
 make check-usb-input    # native NEC/QEMU xHCI keyboard, mouse/tablet + recovery
 make check-usb-topology # nested USB2 hubs, repeated reconnects + subtree recovery
+make check-pi4-platform # firmware FDT parsing + bounded Pi USB DMA reservation
 make check-task-settings # upstream application state + task-local directories
 make check-source-context # directory masks + relative document/project files
 make check-source-execute # upstream ExeFile + native task-local file execution
@@ -57,8 +58,9 @@ USB keyboard and pointer take ownership; VirtIO devices remain configured
 as recovery input, with their transports parked while USB is active and
 reinitialized on disconnect/failure. Terminal 1
 serial input stays independent. `zstatus` reports the selected owners, raw
-USB events, controller state and errors; serial `usbcheck` exercises command
-and event ring wraparound. This USB backend supports boot keyboards and
+USB events, controller state, errors, and each device's route including USB2
+transaction-translator slot/port; serial `usbcheck` exercises command and
+event ring wraparound. This USB backend supports boot keyboards and
 unnumbered HID mouse/tablet reports on root ports or behind USB 1.x/2.0 hubs.
 Port-change polling debounces new connections, removes hub subtrees, and
 reuses reserved per-device DMA only after successful slot teardown. Limits
@@ -240,7 +242,7 @@ Bridge notes: [AIWNIOS.md](AIWNIOS.md). Milestone ladder: [upstream/README.md](u
 | Track | Status |
 |--|--|
 | QEMU/UTM virt | **Regression freeze** M33–M39 (`Notes.ZC` / DocLib `#include`) still the bar — see ACCEPTANCE.md. **Lattice compose** continued on top (M151–M199) + **M200–M206** PL011 RX/`uartrx`, shell idle, depth clear, StockLat NULL, PopUpColor Mid/Edge headers + live titles. Automated QMP tests verify printable keys reach the graphical terminal and native `KeyGet`; the 2026-10-16 UTM check also confirmed the physical keyboard entered and submitted `zstatus` in the graphical terminal. |
-| Pi 4B UEFI | PI-DIAG-1..4 + **shell entry on FB** accepted (2026-09-23). **UART RX:** use `uartrx` on USB–TTL @ 115200 after `make pi-sd` (M200 prep). No virtio/RedSea disk on Pi yet ([PI4.md](PI4.md)). |
+| Pi 4B UEFI | PI-DIAG-1..4 + **shell entry on FB** accepted (2026-09-23). HDMI now shows the read-only FDT PCIe windows and reserved DMA arena; **UART RX** still needs `uartrx` on USB–TTL @ 115200 after `make pi-sd` (M200 prep). No virtio/RedSea disk on Pi yet ([PI4.md](PI4.md)). |
 
 ## Earlier platform follow-ups
 

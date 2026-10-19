@@ -186,8 +186,10 @@ I64 WindowDragLiveStartInternal(Bool with_control)
         window_drag_live_right_control.right = 20 * FONT_WIDTH;
         // Put the CDC control in the A/B overlap so the frame test can prove
         // a rear control is clipped by the same front-window z cell as text.
-        window_drag_live_right_control.top = 6 * FONT_HEIGHT;
-        window_drag_live_right_control.bottom = 9 * FONT_HEIGHT;
+        // Keep the control in the A/B overlap above the visible Server task
+        // window, so this fixture tests the two demo windows' z-order alone.
+        window_drag_live_right_control.top = 2 * FONT_HEIGHT;
+        window_drag_live_right_control.bottom = 4 * FONT_HEIGHT;
         window_drag_live_right_control.right_click = &WindowDragLiveRightClick;
         window_drag_live_right_control.wheel_chg = &WindowDragLiveWheel;
         window_drag_live_right_control.draw_it = &WindowDragLiveRightDraw;
@@ -267,7 +269,9 @@ I64 WindowDragLiveRenderChecks()
         return 6;
     if (!window_drag_live_control_dc_matches)
         return 7;
-    if (BootstrapWinTextCellVisible(window_drag_live_b, 49, 27) != b_is_front)
+    // The Server task's window covers the lower half of this A/B overlap;
+    // sample the upper overlap row where no unrelated window is occluding it.
+    if (BootstrapWinTextCellVisible(window_drag_live_b, 49, 22) != b_is_front)
         return 24;
     if ((b_is_front && window_drag_live_presented_pixel != 0x00FFFF55) ||
         (!b_is_front && window_drag_live_presented_pixel != 0))

@@ -7,6 +7,7 @@
 #pragma once
 #include "usb_platform.h"
 #include "usb_hid.h"
+#include "usb_route.h"
 
 #define USB_HCS 2
 #define USB_DEVS 8
@@ -353,7 +354,7 @@ static int usb_address(struct usb_dev *d) {
     control[1] = 3;
     slot[0] = (1u << 27) | (d->speed << 20) | d->route;
     slot[1] = (d->port + 1) << 16;
-    slot[2] = d->tt_slot | (d->tt_port << 8);
+    slot[2] = usb_tt_context_word(d->tt_slot, d->tt_port);
     ep0[1] = (3u << 1) | (4u << 3) | (d->packet0 << 16);
     uint64_t ring = usb_dma_addr(d->control_ring.trbs);
     ep0[2] = (uint32_t)ring | 1;
@@ -685,10 +686,11 @@ static void usb_attach(struct usb_hc *hc, struct usb_dev *parent,
         d->depth = parent->depth + 1;
         /* A LS/FS descendant uses the first upstream high-speed hub's TT,
          * including when intervening full-speed hubs are present. */
-        if (speed <= 2) {
-            if (parent->speed == 3) { d->tt_slot = parent->slot; d->tt_port = port; }
-            else { d->tt_slot = parent->tt_slot; d->tt_port = parent->tt_port; }
-        }
+        struct usb_tt_route tt = usb_tt_child_route(
+            parent->speed, parent->slot, parent->tt_slot, parent->tt_port,
+            speed, port);
+        d->tt_slot = tt.slot;
+        d->tt_port = tt.port;
     }
     if (!speed || !usb_enumerate(d)) {
         usb_log("usb: rejected device root="); usb_number(d->port + 1);

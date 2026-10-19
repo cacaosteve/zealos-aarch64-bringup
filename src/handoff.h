@@ -24,6 +24,7 @@
 #define ZEAL_MEM_RECLAIM  8
 #define ZEAL_MEM_KERNEL   9 /* loaded kernel image (reserved for runtime) */
 #define ZEAL_MEM_PAGETABLE 10 /* boot-reserved 4KiB translation-table pool */
+#define ZEAL_MEM_USB_DMA  11 /* boot-reserved DMA region; not a general allocator */
 
 #define PI4_PCIE_FDT_PRESENT  (1u << 0)
 #define PI4_PCIE_FDT_ENABLED  (1u << 1)
@@ -44,6 +45,15 @@ struct zeal_pi4_pcie {
     uint64_t dma_size;
 };
 
+#define PI4_USB_DMA_RESERVED (1u << 0)
+struct zeal_pi4_dma {
+    uint32_t flags;
+    uint32_t reserved;
+    uint64_t phys_base;
+    uint64_t bus_base;
+    uint64_t size;
+};
+
 #define ZEAL_MEM_MAX 256
 
 struct zeal_mem_entry {
@@ -57,7 +67,7 @@ struct zeal_handoff {
     uint64_t magic0;
     uint64_t magic1;
     uint32_t size; /* sizeof(struct zeal_handoff) */
-    uint32_t revision; /* 5; extensions are appended */
+    uint32_t revision; /* 6; extensions are appended */
     uint32_t bootloader_id; /* ZEAL_BL_* */
     uint32_t flags;
     uint64_t hhdm_offset;
@@ -83,4 +93,6 @@ struct zeal_handoff {
     uint32_t reserved;
     /* revision >= 5; read-only FDT description of the Pi 4 PCIe host. */
     struct zeal_pi4_pcie pi4_pcie;
+    /* revision >= 6; reserved low-address memory, not yet used to start xHCI. */
+    struct zeal_pi4_dma pi4_usb_dma;
 };

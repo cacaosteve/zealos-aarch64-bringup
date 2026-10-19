@@ -108,15 +108,29 @@ they do not provide physical Pi USB support. See the
 
 ## PCIe firmware description probe
 
-The booter now parses the firmware FDT's `brcm,bcm2711-pcie` node and appends
+The booter parses the firmware FDT's `brcm,bcm2711-pcie` node and appends
 its translated register base, PCI memory window, and DMA window to handoff
-revision 5. The parser validates all FDT spans and cell widths and does not
-read or write controller MMIO. The Pi diagnostic prints the captured values
-after PL011 TX succeeds. A host-built synthetic fixture checks the standard
+revision 6. It reserves a 1 MiB, 64 KiB-aligned arena from usable RAM wholly
+inside the translated DMA aperture, recording both CPU physical and PCI bus
+addresses. The reservation is metadata only: it does not map or use the arena,
+access PCIe config space, or enable bus mastering/xHCI. The parser validates
+all FDT spans and cell widths and does not read or write controller MMIO. The
+Pi diagnostic prints the captured windows and reservation over HDMI after the
+GIC/IRQ check, and reports the same data plus a guarded link-status read over
+PL011 when UART TX works. Host-built synthetic fixtures check the standard
 BCM2711 node translation (`0x7d500000` through `/scb/ranges` to `0xfd500000`),
 the PCI memory aperture, the 3 GiB DMA aperture, disabled-node handling, and
-truncated-FDT rejection (`make check-pi4-pcie-fdt`). This is parser coverage;
-the actual UEFI-provided FDT still needs an eyes-on Pi run.
+truncated-FDT rejection (`make check-pi4-pcie-fdt`), plus reservation bounds,
+bus-address translation, memory-map splitting, and capacity (`make check-pi4-dma`,
+or both together with `make check-pi4-platform`).
+These are parser/allocator checks; the actual UEFI-provided FDT and resulting
+reservation still need an eyes-on Pi run.
+
+For the first physical check, use a prepared microSD card, a suitable Pi 4
+power supply, and HDMI to read the report; no serial adapter is needed just to
+confirm the FDT values and reserved arena. For interactive UART input/logs,
+connect a USB-to-3.3 V TTL adapter to the Mac and cross its RX/TX with Pi GPIO
+14/15, plus GND. Leave the adapter's VCC wire disconnected.
 
 PI-DIAG now makes one guarded, read-only load of the BCM2711 root-complex
 link-status register at offset `0x4068`, only when the FDT marks the bridge
@@ -126,9 +140,10 @@ recorded and the diagnostic continues without touching downstream config
 space. This still needs a physical Pi run: the synthetic FDT test does not
 validate MMIO mapping or actual link state.
 
-After that probe is confirmed, the next gate is a bounded downstream config
-read to identify the VL805. Do not enable bus mastering or start xHCI until the
-low-address DMA allocator is constrained to the DTB's DMA window.
+The next gate is a bounded downstream config read to identify the VL805 while
+leaving bus mastering off. Before any controller DMA is enabled, confirm this
+reservation against the Pi's actual FDT and add allocator ownership, cache
+maintenance, and controller-specific DMA tests.
 
 ## Code plan (small batches)
 
@@ -139,12 +154,14 @@ low-address DMA allocator is constrained to the DTB's DMA window.
 5. **GICv2 + CNTP IRQ (PI-DIAG-4)** — **accepted** (Device-map FF window).
 6. **Serial/FB shell** — **reached** (banner + cmd list after IRQ OK). **M200:** `pl011_rx_prep` +
    `uartrx` for USB-TTL @ 115200; still need hardware eyes-on (`uartrx` then `help`/`halt`).
-7. **PCIe discovery** — read-only FDT parser, revision-5 handoff, and guarded
-   link-status probe are built; synthetic BCM2711 fixture passes. Confirm the
-   actual firmware values and status over Pi diagnostic UART before downstream
-   config access.
-8. **USB input** — VL805 config reads, firmware handoff, constrained DMA,
-   xHCI, and physical keyboard/mouse are separate hardware gates.
+7. **PCIe discovery** — read-only FDT parser, revision-6 handoff, guarded
+   link-status probe, and a DMA-aperture-contained 1 MiB arena reservation are
+   built. Synthetic fixtures pass. Confirm the actual firmware windows,
+   link status, and reservation over Pi diagnostic UART before downstream config
+   access.
+8. **USB input** — bounded VL805 config reads with bus mastering off, then
+   firmware handoff, cache-safe DMA allocation, xHCI, and physical keyboard/
+   mouse are separate hardware gates.
 9. **Storage / display** — after serial input and native USB input are usable.
 
 ## Non-goals (for now)

@@ -1067,6 +1067,70 @@ static void fb_putc(char ch) {
     }
 }
 
+#if defined(ZEAL_PI_DIAG) || defined(ZEAL_FORCE_PI4)
+static void pi_diag_fb_puts(const char *s) {
+    while (s && *s) {
+        fb_putc(*s++);
+    }
+}
+
+static void pi_diag_fb_u64_hex(uint64_t value) {
+    static const char hex[] = "0123456789abcdef";
+    pi_diag_fb_puts("0x");
+    for (int shift = 60; shift >= 0; shift -= 4) {
+        fb_putc(hex[(value >> shift) & 0xf]);
+    }
+}
+
+/* Keep the Pi's PCIe/DMA discovery report readable without a UART adapter. */
+static void pi_diag_fb_report(const struct zeal_handoff *h) {
+    if (!g_fb || !h) {
+        return;
+    }
+    /* Keep this away from the PI-DIAG color bars; use the top on small modes. */
+    g_fb_cx = 0;
+    g_fb_cy = g_fb_rows >= 75 ? g_fb_rows - 15 : 0;
+    if (h->revision < 5 ||
+        h->size < offsetof(struct zeal_handoff, pi4_pcie) + sizeof(h->pi4_pcie)) {
+        pi_diag_fb_puts("PI4 FDT report unavailable\n");
+        return;
+    }
+    pi_diag_fb_puts("PI4 FDT flags=");
+    pi_diag_fb_u64_hex(h->pi4_pcie.flags);
+    pi_diag_fb_puts("\nPCIe reg=");
+    pi_diag_fb_u64_hex(h->pi4_pcie.reg_base);
+    pi_diag_fb_puts("+");
+    pi_diag_fb_u64_hex(h->pi4_pcie.reg_size);
+    pi_diag_fb_puts("\nPCIe mem CPU=");
+    pi_diag_fb_u64_hex(h->pi4_pcie.mem_cpu_base);
+    pi_diag_fb_puts(" bus=");
+    pi_diag_fb_u64_hex(h->pi4_pcie.mem_bus_base);
+    pi_diag_fb_puts(" size=");
+    pi_diag_fb_u64_hex(h->pi4_pcie.mem_size);
+    pi_diag_fb_puts("\nDMA CPU=");
+    pi_diag_fb_u64_hex(h->pi4_pcie.dma_cpu_base);
+    pi_diag_fb_puts(" bus=");
+    pi_diag_fb_u64_hex(h->pi4_pcie.dma_bus_base);
+    pi_diag_fb_puts(" size=");
+    pi_diag_fb_u64_hex(h->pi4_pcie.dma_size);
+    if (h->revision >= 6 &&
+        h->size >= offsetof(struct zeal_handoff, pi4_usb_dma) +
+                   sizeof(h->pi4_usb_dma)) {
+        pi_diag_fb_puts("\nDMA arena flags=");
+        pi_diag_fb_u64_hex(h->pi4_usb_dma.flags);
+        pi_diag_fb_puts(" CPU=");
+        pi_diag_fb_u64_hex(h->pi4_usb_dma.phys_base);
+        pi_diag_fb_puts(" bus=");
+        pi_diag_fb_u64_hex(h->pi4_usb_dma.bus_base);
+        pi_diag_fb_puts(" size=");
+        pi_diag_fb_u64_hex(h->pi4_usb_dma.size);
+    } else {
+        pi_diag_fb_puts("\nDMA arena: no rev-6 reservation");
+    }
+    pi_diag_fb_puts("\nRead-only discovery; DMA/xHCI remain off\n");
+}
+#endif
+
 /* Shell line editing emits BS-space-BS for terminal serials. The framebuffer
  * is a direct-pixel console, so erase the preceding cell explicitly instead
  * of painting the control bytes as visible glyphs. */
@@ -4693,6 +4757,8 @@ void zc_usb_status(void) {
         con_puts(" route="); zc_print_decimal(d->route);
         con_puts(" depth="); zc_print_decimal(d->depth);
         con_puts(" speed="); zc_print_decimal(d->speed);
+        con_puts(" tt_slot="); zc_print_decimal(d->tt_slot);
+        con_puts(" tt_port="); zc_print_decimal(d->tt_port);
         con_puts(" hub_ports="); zc_print_decimal(d->hub_ports); con_puts("\n");
     }
     for (unsigned i = 0; i < g_usb.controllers; i++) {
@@ -9483,6 +9549,22 @@ void kernel_entry(const struct zeal_handoff *h) {
                     uart_put_u64_hex(g_uart, h->pi4_pcie.dma_size);
                     uart_puts(g_uart, " (read-only discovery)\n");
 
+                    if (h->revision >= 6 &&
+                        h->size >= offsetof(struct zeal_handoff, pi4_usb_dma) +
+                                       sizeof(h->pi4_usb_dma)) {
+                        uart_puts(g_uart, "Pi USB DMA arena flags=");
+                        uart_put_u64_hex(g_uart, h->pi4_usb_dma.flags);
+                        uart_puts(g_uart, " phys=");
+                        uart_put_u64_hex(g_uart, h->pi4_usb_dma.phys_base);
+                        uart_puts(g_uart, " bus=");
+                        uart_put_u64_hex(g_uart, h->pi4_usb_dma.bus_base);
+                        uart_puts(g_uart, " size=");
+                        uart_put_u64_hex(g_uart, h->pi4_usb_dma.size);
+                        uart_puts(g_uart, " (reserved only; xHCI off)\n");
+                    } else {
+                        uart_puts(g_uart, "Pi USB DMA arena: no rev-6 reservation\n");
+                    }
+
                     /*
                      * Read only the BCM2711 root-complex link status. The
                      * FDT descriptor gates this probe; no config-space reads,
@@ -9691,6 +9773,9 @@ void kernel_entry(const struct zeal_handoff *h) {
                                     fb_fillrect(0, 420, bw, 14, 0x00E0E0E0u); /* white = IRQ OK */
                                     con_puts("GICv2 IRQ OK\n");
                                     uart_puts(g_uart, "GICv2 IRQ OK - entering shell\n");
+#if defined(ZEAL_PI_DIAG) || defined(ZEAL_FORCE_PI4)
+                                    pi_diag_fb_report(h);
+#endif
                                     /* Stop timer IRQs before interactive input. */
                                     __asm__ volatile("msr daifset, #2");
                                     __asm__ volatile("msr cntp_ctl_el0, %0" ::"r"(0ull));
@@ -9880,7 +9965,9 @@ void kernel_entry(const struct zeal_handoff *h) {
     zc_set_source_reader(zc_read_redsea);
     zc_set_source_writer(zc_write_source);
     zc_set_key_reader(zc_key_read, zc_key_reset);
-    if (h->revision >= 4 && h->size >= sizeof(*h))
+    if (h->revision >= 4 &&
+        h->size >= offsetof(struct zeal_handoff, boot_media_type) +
+                       sizeof(h->boot_media_type))
         zc_set_boot_media(h->boot_media_type);
     if (h->revision >= 3 && h->size >= offsetof(struct zeal_handoff, boot_media_type))
         zc_init((void *)(uintptr_t)h->sources_virt, h->sources_size, con_puts);

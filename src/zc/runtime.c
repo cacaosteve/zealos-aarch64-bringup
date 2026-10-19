@@ -94,8 +94,8 @@ extern int64_t zc_tablet_sample(void);
 
 /* Separate arenas from legacy hc_* so its per-demo reset cannot invalidate
  * modules loaded here. Both use splitting/coalescing and arbitrary-order Free. */
-#define DATA_BYTES (24u * 1024u * 1024u)
-#define CODE_BYTES (8u * 1024u * 1024u)
+#define DATA_BYTES (96u * 1024u * 1024u)
+#define CODE_BYTES (16u * 1024u * 1024u)
 #define BLOCK_MAGIC 0x5a43424c4f434b31ull
 struct block {
     uint64_t magic;
@@ -468,6 +468,22 @@ void zc_fail(const char *s) {
     zc_output("zc: ");
     zc_output(s);
     zc_output("\n");
+    if (s && strstr(s, "data arena exhausted")) {
+        char detail[192];
+        size_t index = 0;
+        for (struct block *b = arenas[0]; b; b = b->next) {
+            if (b->used && b->requested >= 1024 * 1024) {
+                snprintf(detail, sizeof(detail),
+                         "large_live[%zu]: offset=%zu requested=%zu block=%zu owner_used=%lld\n",
+                         index++, (size_t)((unsigned char *)b - data_arena),
+                         b->requested, b->size,
+                         (long long)(b->owner ? b->owner->used_u8s : -1));
+                zc_output(detail);
+            }
+        }
+        if (!index)
+            zc_output("large_live: none\n");
+    }
     failed = 1;
     if (guarded) {
         /* A failed guest call may be running on a fiber stack. The guard is
@@ -5032,7 +5048,7 @@ static void guest_context_leave(struct source_context *context) {
  * existing externs and freed/reused allocations. Restoring both arenas also
  * restores those links and import patches. Commit before running emitted
  * code, so prior statements and other tasks' runtime work are never undone.
- * This costs 24 MiB of fixed recovery storage; boot module loading does not
+ * This costs 112 MiB of fixed recovery storage; boot module loading does not
  * take checkpoints. Only one parser can own this buffer on CPU 0. */
 static unsigned char compiler_saved_data[DATA_BYTES] __attribute__((aligned(16)));
 static unsigned char compiler_saved_code[CODE_BYTES] __attribute__((aligned(16)));
