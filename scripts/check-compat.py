@@ -1503,6 +1503,27 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     raise RuntimeError('OS menu did not appear on the desktop top edge; '
                                        f'see {graphical_path("os-menu-top-edge")} and .txt\n'
                                        + menu_screen[3])
+                # Leaving the top row should collapse both the highlight and
+                # its dropdown. This is the normal desktop state shown in the
+                # live UTM reference when the pointer is elsewhere.
+                move_graphical_pointer(400, 300)
+                menu_deadline = time.monotonic() + 5
+                menu_screen = graphical_screen('os-menu-left-top-row')
+                while time.monotonic() < menu_deadline:
+                    blue_menu = rgb_pixels_in(menu_screen, (0, 0, 170),
+                                               (0, 0, 240, 8))
+                    blue_submenu = rgb_pixels_in(menu_screen, (0, 0, 170),
+                                                  (0, 8, 240, 100))
+                    if blue_menu < 100 and blue_submenu < 1000:
+                        print('PASS OS menu highlight and dropdown hide off the top row',
+                              flush=True)
+                        break
+                    time.sleep(0.1)
+                    menu_screen = graphical_screen('os-menu-left-top-row')
+                else:
+                    raise RuntimeError('OS menu stayed open after leaving the desktop top row; '
+                                       f'see {graphical_path("os-menu-left-top-row")} and .txt\n'
+                                       + menu_screen[3])
             require_graphical_text('boot-terminal', '> ')
             raw_pattern = r'usb_input:.* key_events=(\d+)' if args.usb_input else r'virtio_keyboard: ready=1 key_events=(\d+)'
             raw_before = re.search(raw_pattern, desktop)

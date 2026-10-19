@@ -3759,6 +3759,8 @@ guest pointer over that label and checks framebuffer pixels for the actual
 drop-down below the highlighted bar; `python3 scripts/check-compat.py
 --usb-input nec --usb-with-virtio --usb-hubs 2 --usb-hotplug
 --probe-gui-workflow` passed, including input, editor persistence, USB
-reconnects, tablet recovery and hub-subtree recovery. The run also reproduced
-an editor command with leading whitespace after reboot; the terminal now trims
-leading spaces/tabs when recognizing `edit`, and the save/reopen check passed.
+reconnects, tablet recovery and hub-subtree recovery. The graphical check now
+also confirms that the menu highlight and dropdown disappear after the pointer
+leaves the desktop top row. The run also reproduced an editor command with
+leading whitespace after reboot; the terminal now trims leading spaces/tabs
+when recognizing `edit`, and the save/reopen check passed.
