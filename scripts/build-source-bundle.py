@@ -25,7 +25,7 @@ for name, expected in manifest['files'].items():
         entries['System/SourceHome.ZC'] = extract_home_set(data)
     if rel == 'Once.ZC':
         # Seed the same editable home startup file installed by upstream.
-        # Full HomeSys StartUpTasks remains staged; its include is executable.
+        # Disk/RAM boot now queues this file in the first graphical terminal.
         entries['Home/Once.ZC'] = data
     if rel == 'Kernel/KGlobals.ZC':
         entries['System/VersionScalars.ZC'] = extract_version_scalars(data)

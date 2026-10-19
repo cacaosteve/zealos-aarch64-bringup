@@ -6521,6 +6521,15 @@ int zc_start_gui_terminal(void) {
     gui_terminal_active = 1;
     return 0;
 }
+int zc_start_home_startup(void) {
+    int64_t result = 0;
+    if (!ready || failed || !gui_terminal_active || !source_winmgr_active)
+        return -1;
+    result = 0;
+    if (zc_call("BootstrapGuiTerminalHomeStart", &result) != 0 || result != 0x2a)
+        return -1;
+    return 0;
+}
 int zc_stop_gui_terminal(void) {
     int64_t result = 0;
     if (!ready || failed || !gui_terminal_active ||

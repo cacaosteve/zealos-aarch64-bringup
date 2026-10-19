@@ -24,6 +24,7 @@ int zc_start_winmgr(void);
 int zc_source_winmgr_active(void);
 /* Load the upstream DolDoc terminal and show its interactive GUI task. */
 int zc_start_gui_terminal(void);
+int zc_start_home_startup(void);
 int zc_stop_gui_terminal(void);
 int zc_gui_terminal_active(void);
 /* Stop source-backed windows before discarding their compiler/session state. */

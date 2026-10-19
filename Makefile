@@ -648,6 +648,11 @@ check-home-once: check-upstream esp iso
 	python3 scripts/check-compat.py --pci --probe-home-once
 	python3 scripts/check-compat.py --probe-home-once
 
+.PHONY: check-home-autostart
+check-home-autostart: check-upstream esp
+	python3 scripts/check-arm64-source.py
+	python3 scripts/check-compat.py --pci --probe-home-autostart
+
 .PHONY: check-input-edges
 check-input-edges: esp
 	python3 scripts/check-compat.py --pci --probe-input-edges

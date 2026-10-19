@@ -89,7 +89,9 @@ I64 HomeOnceStartChecks()
     Btr(&sys_run_level,RLf_ONCE_USER); Btr(&sys_run_level,RLf_ONCE_SYSTEM);
     SysOnce("home_once_system=1;if(Fs==sys_task)home_once_system=42;");
     Once("home_once_value=42;home_once_task=Fs;");
-    home_once_terminal=User();
+    // Exercise the same first graphical terminal used by HomeSys autostart;
+    // independent User() windows are covered by UserStartUp.ZC.
+    home_once_terminal=bootstrap_gui_terminal_task;
     if (!TaskValidate(home_once_terminal)) return 1;
     XTalk(home_once_terminal,"Cd; #include \"Once\";\n");
     WinToTop(home_once_terminal);
@@ -113,7 +115,7 @@ I64 HomeOnceFinishChecks()
 
 I64 HomeOnceCloseChecks()
 {
-    if (!Kill(home_once_terminal)) return 1;
+    if (home_once_terminal!=bootstrap_gui_terminal_task && !Kill(home_once_terminal)) return 1;
     home_once_terminal=NULL;
     WinToTop(bootstrap_gui_terminal_task);
     return 42;
@@ -122,7 +124,10 @@ I64 HomeOnceCloseChecks()
 I64 HomeOnceReopenStartChecks()
 {
     home_once_value=0; home_once_task=NULL;
-    home_once_terminal=User();
+    // Disk boots already have the normal second HomeSys terminal. Reuse it
+    // instead of exhausting task slots by opening an extra fixture window.
+    home_once_terminal=bootstrap_gui_terminal_home_second;
+    if (!TaskValidate(home_once_terminal)) home_once_terminal=User();
     if (!TaskValidate(home_once_terminal)) return 1;
     // The terminal starts outside Home; Cd and include share one input line.
     XTalk(home_once_terminal,"Cd(\"/Tests\");Cd; #include \"Once\";\n");

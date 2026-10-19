@@ -97,11 +97,12 @@ extern Bool ZcUserInputComplete(U8 *text);
 
 
 def extract_home_startup(source: bytes) -> bytes:
-    """Keep the pinned per-user/server hooks, before HomeSys's desktop launch.
+    """Keep the pinned per-user/server hooks ahead of the ARM64 launch adapter.
 
     The ARM64 terminal hook calls these bodies and installs its working input
-    adapter. Do not execute StartUpTasks until autocomplete, Once and splash
-    dependencies are brought up.
+    adapter. The supported first-terminal Once command is queued separately by
+    the desktop bootstrap; autocomplete, DVD installer flow and splash remain
+    staged until their dependencies are available.
     """
     text = source.decode('utf-8')
     boundary = '\nU0 StartUpTasks()\n'

@@ -29,6 +29,7 @@ make check-system-server # dedicated source System loop + namespace/job ownershi
 make check-user-command # original ExeCmdLine loop, options and error recovery
 make check-user-startup # per-user HomeSys setup and independent graphical terminals
 make check-home-once    # original Once include, boot-media branch, tips and prompt recovery
+make check-home-autostart # disk boot launches the saved Home/Once.ZC in the GUI terminal
 make check-user-text    # User startup commands + XTalk input delivery and recovery
 make check-home-path    # shared home paths, includes and saved source after reboot
 make check-registry     # DolDoc execution, shared registry and Once across reboot
@@ -120,12 +121,17 @@ the source KeyDev input filter. `ExeDoc` now reads real DolDoc entries through
 the native lexer, including quoted formatting, macros and includes. The original
 registry tree APIs share a System-owned cache backed by `~/Registry.ZC`.
 `Once`, `SysOnce` and explicit `OnceExe` execute and flush saved User/System
-branches; full `HomeSys` desktop launch does not yet call them automatically.
+branches. On disk and RAM boots, the first graphical terminal now receives the
+original `Cd; #include "Once";` startup command through `XTalk`; DVD boots keep
+their interactive installer flow staged. Disk/RAM startup also opens the
+second terminal. Automatic tiling is staged because it currently hides the
+first terminal's insertion caret after startup output.
 The original `Cd; #include "Once";` path now runs with the compiler's `.ZC`
 default extension, source-backed `YorN` and `TipOfDay`, and the original tips and
 customization documents. `sys_boot_src` comes from the actual Limine module
-medium: disk, optical, or TFTP download. Full desktop startup remains staged
-until its autocomplete and splash dependencies are available.
+medium: disk, optical, or TFTP download. The remaining HomeSys launch steps are
+staged: autocomplete and `ZSplash.ZC` are not bundled, and DVD boot still needs
+its interactive install flow.
 Inline binary/script compiler tokens, autocomplete and the remaining startup
 dependencies are still open. `zstatus` also reports `keyboard_state` modifier
 and repeat values to diagnose held host keys separately from guest decoding.

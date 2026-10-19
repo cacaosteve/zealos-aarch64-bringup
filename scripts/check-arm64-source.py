@@ -170,6 +170,16 @@ except ValueError:
     pass
 else:
     raise AssertionError('HomeSys extraction accepted a changed startup document')
+gui_terminal_source = (root / 'upstream/bootstrap/System/GuiTerminal.ZC').read_text()
+assert 'I64 BootstrapGuiTerminalHomeStart()' in gui_terminal_source
+assert 'sys_boot_src.u16[0] == BOOT_SRC_DVD' in gui_terminal_source
+assert 'bootstrap_gui_terminal_home_second = User();' in gui_terminal_source
+assert 'WinToTop(user);' in gui_terminal_source
+assert 'XTalk(user, "Cd; #include \\"Once\\";\\n");' in gui_terminal_source
+runtime_source = (root / 'src/zc/runtime.c').read_text()
+assert 'zc_call("BootstrapGuiTerminalHomeStart", &result)' in runtime_source
+kernel_source = (root / 'src/kernel_stub.c').read_text()
+assert 'if (zc_start_home_startup() != 0)' in kernel_source
 try:
     extract_user_task(ktask_source.replace(b'LexStatement2Bin(cc, &type)', b'OtherCompiler(cc)', 1))
 except ValueError:

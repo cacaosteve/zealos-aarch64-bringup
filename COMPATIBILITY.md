@@ -3489,3 +3489,29 @@ checkbox remained off. The user then physically typed `help` without first
 tapping Shift and confirmed all letters appeared and help ran. This accepts
 normal physical typing in the refreshed session; it does not attribute the
 older intermittent symptoms to a proven guest-driver fault.
+
+## First-terminal HomeSys startup — 2026-10-18
+
+After the graphical terminal and source Window Manager start on a disk boot,
+the kernel now invokes a separate HomeSys startup adapter. It queues the
+original `Cd; #include "Once";` command through `XTalk` on the first terminal,
+so the saved `Home/Once.ZC`, registry branches, tips and customization
+document execute as part of normal disk/RAM startup. DVD boot deliberately
+leaves the interactive installer prompt to the existing manual path until its
+installer dependencies are ready. Manual `gterm` launches do not rerun the
+startup file.
+
+Disk/RAM startup also creates the upstream second terminal, then sends `Once`
+to the first terminal. Automatic `WinTileVert` is staged: tiling currently
+leaves the first terminal's typed command visible but its insertion caret
+hidden at the lower edge of the window. Autocomplete, `ZSplash.ZC`, full
+`StartUpTasks`, inline compiler tokens and the DVD installer flow remain open
+dependencies.
+
+`make check-home-autostart` writes a marker `Once.ZC` only into its disposable
+PCI test disk and confirms that the boot terminal ran it and a second terminal
+exists. The home-once checks cover both disk and ISO/DVD paths, including the
+visible `40+2;` caret and 42 answer after startup output; `make check-user-text`
+covers XTalk ordering, long input, device-typed output and exact cleanup. Logs
+are `build/check-home-autostart-pci.log`, `build/check-home-once-{pci,iso}.log`
+and `build/check-user-text-pci.log`.

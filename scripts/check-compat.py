@@ -56,6 +56,8 @@ p.add_argument('--probe-registry', action='store_true',
                help='check DolDoc compiler input, registry trees and Once execution')
 p.add_argument('--probe-home-once', action='store_true',
                help='check default include extension, real boot media and original home Once/tips')
+p.add_argument('--probe-home-autostart', action='store_true',
+               help='verify disk boot automatically sends the first-terminal HomeSys Once command')
 p.add_argument('--probe-input-edges', action='store_true',
                help='check visible modifier typing and held-key release without the full workflow')
 p.add_argument('--probe-source-exceptions', action='store_true',
@@ -106,6 +108,8 @@ if args.probe_fulltext_visible:
     args.probe_fulltext = True
 if args.probe_source and not args.pci:
     p.error('--probe-source requires --pci')
+if args.probe_home_autostart and not args.pci:
+    p.error('--probe-home-autostart requires --pci')
 if args.probe_gui_terminal and (
         not args.pci or args.probe_module != '/System/DolDoc/DocRecalc.ZC'):
     p.error('--probe-gui-terminal requires --pci --probe-module /System/DolDoc/DocRecalc.ZC')
@@ -132,6 +136,7 @@ if args.probe_live_window_control and not (
 log_path = ROOT / 'build' / (f'check-usb-{usb_label}{"-home-once" if args.probe_home_once else "-input-edges" if args.probe_input_edges else "-registry" if args.probe_registry else "-home-path" if args.probe_home_path else "-user-text" if args.probe_user_text else "-user-startup" if args.probe_user_startup else ""}.log' if args.usb_input else
                              'check-home-once-pci.log' if args.probe_home_once and args.pci else
                              'check-home-once-iso.log' if args.probe_home_once else
+                             'check-home-autostart-pci.log' if args.probe_home_autostart else
                              'check-input-edges-pci.log' if args.probe_input_edges else
                              'check-registry-pci.log' if args.probe_registry and args.pci else
                              'check-registry-iso.log' if args.probe_registry else
@@ -195,6 +200,10 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 subprocess.run(['python3', str(ROOT/'scripts/source-volume.py'), 'put',
                                 str(tmp/'disk.img'), str(source), f'Probe/Source{i}.ZC'],
                                check=True, stdout=subprocess.DEVNULL)
+        if args.probe_home_autostart:
+            subprocess.run(['python3', str(ROOT/'scripts/source-volume.py'), 'put',
+                            str(tmp/'disk.img'), str(ROOT/'tests/compat/HomeAutoOnce.ZC'),
+                            'Home/Once.ZC'], check=True, stdout=subprocess.DEVNULL)
         cmd += ['-drive', f'if=none,format=raw,file={tmp}/disk.img,id=esp', '-device', 'virtio-blk-pci,drive=esp,bootindex=0']
     else:
         redsea = bytearray(65536)
@@ -591,6 +600,11 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         if not redraw_count or int(redraw_count.group(1), 16) == 0:
             raise RuntimeError('boot compositor has not redrawn the terminal document:\n' + redraws)
         print(f'PASS boot terminal document redraws: {int(redraw_count.group(1), 16)}', flush=True)
+        if args.probe_home_autostart:
+            command('zload /Tests/HomeAutoStart.ZC', 'zc: loaded /Tests/HomeAutoStart.ZC')
+            command('zcall HomeAutoStartChecks', 'zc => 0x000000000000002a')
+            print('PASS disk boot ran HomeSys first-terminal Once through graphical input', flush=True)
+            raise SystemExit(0)
         if args.probe_input_edges:
             focus_graphical_terminal()
             text = 'Print("Input edges %d\\n",40+2);'
@@ -632,6 +646,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 qmp_send_key('n')
             command('zcall HomeOnceFinishChecks', 'zc => 0x000000000000002a')
             require_graphical_text('home-once-output', 'NO' if not args.pci else 'Tips of the Day')
+            focus_graphical_terminal()
             qmp_send_text('40+2;')
             typed = require_graphical_text('home-once-typing', '> 40+2;')
             require_graphical_caret(typed, '> 40+2;')

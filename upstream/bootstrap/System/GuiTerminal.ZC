@@ -1,6 +1,7 @@
 // Minimal document-backed terminal used by the ARM64 graphical bootstrap.
 // The serial shell remains available independently through UART.
 CTask *bootstrap_gui_terminal_task;
+CTask *bootstrap_gui_terminal_home_second;
 I64 bootstrap_gui_terminal_redraws = 0;
 I64 bootstrap_gui_terminal_key_events = 0;
 I64 bootstrap_gui_terminal_last_key_char = 0;
@@ -8,6 +9,7 @@ I64 bootstrap_gui_terminal_last_scan = 0;
 I64 bootstrap_gui_terminal_editor_active = 0;
 I64 bootstrap_gui_terminal_editor_raw = -1;
 Bool bootstrap_gui_terminal_devices_ready = FALSE;
+Bool bootstrap_gui_terminal_home_started = FALSE;
 U8 bootstrap_gui_terminal_last_command[256];
 U0 (*bootstrap_gui_terminal_final_update)(CDC *dc);
 extern U8 *ZcGuiShellExec(U8 *line);
@@ -531,6 +533,30 @@ U0 BootstrapGuiTerminalUserStartUp()
 U0 UserStartUp()
 {//Late-bound customization point called by the original UserCmdLine.
     BootstrapGuiTerminalUserStartUp;
+}
+
+I64 BootstrapGuiTerminalHomeStart()
+{//Run the supported first-terminal portion of HomeSys after the shell exists.
+    CTask *user = bootstrap_gui_terminal_task;
+
+    if (!TaskValidate(user))
+        return 1;
+    if (bootstrap_gui_terminal_home_started)
+        return 0x2a;
+    bootstrap_gui_terminal_home_started = TRUE;
+
+    // The original HomeSys asks an interactive install question on DVD boot.
+    // Keep that first-boot flow staged until the source-backed installer path
+    // and its prompts are available; disk and RAM boots can run Once directly.
+    if (sys_boot_src.u16[0] == BOOT_SRC_DVD)
+        return 0x2a;
+
+    // HomeSys creates a second terminal on disk/RAM boots. Keep the current
+    // window geometry until caret placement is correct in tiled terminals.
+    bootstrap_gui_terminal_home_second = User();
+    WinToTop(user);
+    XTalk(user, "Cd; #include \"Once\";\n");
+    return 0x2a;
 }
 
 U0 BootstrapGuiTerminalTask(U8 *data)

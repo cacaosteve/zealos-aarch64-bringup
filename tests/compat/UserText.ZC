@@ -7,15 +7,23 @@ I64 UserTextStartChecks()
 {
     user_text_value = 0;
     user_text_seen = NULL;
+    // This fixture creates its own User terminal. Boot now opens the normal
+    // second HomeSys terminal, so release that slot before testing User(args).
+    if (TaskValidate(bootstrap_gui_terminal_home_second))
+    {
+        if (!Kill(bootstrap_gui_terminal_home_second)) return 1;
+        bootstrap_gui_terminal_home_second = NULL;
+        WinToTop(bootstrap_gui_terminal_task);
+    }
     user_text_terminal = User("user_text_value=%d+2;user_text_seen=Fs;\n", 40);
-    if (!TaskValidate(user_text_terminal)) return 1;
-    if (!ZcTaskWaitTimeout(user_text_terminal, 10000, TRUE)) return 2;
-    if (user_text_value != 42 || user_text_seen != user_text_terminal) return 3;
+    if (!TaskValidate(user_text_terminal)) return 2;
+    if (!ZcTaskWaitTimeout(user_text_terminal, 10000, TRUE)) return 3;
+    if (user_text_value != 42 || user_text_seen != user_text_terminal) return 4;
     XTalk(user_text_terminal, "I64 UserTextLocal=40;\nUserTextLocal+=2;\n");
-    if (!ZcTaskWaitTimeout(user_text_terminal, 10000, TRUE)) return 4;
+    if (!ZcTaskWaitTimeout(user_text_terminal, 10000, TRUE)) return 5;
     CJob *job = TaskExe(user_text_terminal, Fs, "UserTextLocal;", 0);
-    if (!job || JobResGet(job) != 42) return 5;
-    if (user_text_terminal->last_input_filter_task != user_text_terminal) return 6;
+    if (!job || JobResGet(job) != 42) return 6;
+    if (user_text_terminal->last_input_filter_task != user_text_terminal) return 7;
     WinHorz(48, 96, user_text_terminal);
     WinVert(28, 58, user_text_terminal);
     WinToTop(user_text_terminal);

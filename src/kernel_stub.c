@@ -9813,7 +9813,11 @@ void kernel_entry(const struct zeal_handoff *h) {
         if (zc_start_winmgr() == 0) {
             uart_puts(g_uart, "zc: source Window Manager started at boot\n");
             if (zc_start_gui_terminal() == 0)
+            {
                 uart_puts(g_uart, "zc: graphical terminal started at boot; serial shell remains available\n");
+                if (zc_start_home_startup() != 0)
+                    uart_puts(g_uart, "zc: HomeSys Once startup could not be queued\n");
+            }
             else
                 uart_puts(g_uart, "zc: graphical terminal auto-start failed; type gterm to retry\n");
         } else

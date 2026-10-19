@@ -1,0 +1,21 @@
+// Verify the first graphical terminal ran the supported HomeSys Once step.
+I64 HomeAutoStartChecks()
+{
+    CTask *term = bootstrap_gui_terminal_task;
+    I64 i;
+    U8 *saved;
+
+    if (!TaskValidate(term) || !TaskValidate(bootstrap_gui_terminal_home_second)) return 1;
+    for (i = 0; i < 500; i++)
+    {
+        saved = DocSave(term->put_doc);
+        if (saved && StrMatch("HOME_AUTO_ONCE_42", saved))
+        {
+            Free(saved);
+            return 42;
+        }
+        Free(saved);
+        Yield;
+    }
+    return 2;
+}
