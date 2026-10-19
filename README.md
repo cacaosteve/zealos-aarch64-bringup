@@ -124,15 +124,16 @@ registry tree APIs share a System-owned cache backed by `~/Registry.ZC`.
 branches. On disk and RAM boots, the first graphical terminal now receives the
 original `Cd; #include "Once";` startup command through `XTalk`; DVD boots keep
 their interactive installer flow staged. Disk/RAM startup also opens the
-second terminal. Automatic tiling is staged because it currently hides the
-first terminal's insertion caret after startup output.
+second terminal and tiles it beside the first, excluding bridge/System tasks
+from the window layout. Startup queues autocomplete indexing after `Once`; the
+first prompt is checked for a visible caret and usable input after startup
+output.
 The original `Cd; #include "Once";` path now runs with the compiler's `.ZC`
 default extension, source-backed `YorN` and `TipOfDay`, and the original tips and
 customization documents. `sys_boot_src` comes from the actual Limine module
-medium: disk, optical, or TFTP download. The remaining HomeSys launch steps are
-staged: autocomplete and `ZSplash.ZC` are not bundled, and DVD boot still needs
-its interactive install flow.
-Inline binary/script compiler tokens, autocomplete and the remaining startup
+medium: disk, optical, or TFTP download. `ZSplash.ZC` is not bundled, and DVD
+boot still needs its interactive install flow.
+Inline binary/script compiler tokens and the remaining HomeSys startup
 dependencies are still open. `zstatus` also reports `keyboard_state` modifier
 and repeat values to diagnose held host keys separately from guest decoding.
 The bridge also maintains the upstream-visible runnable-task and parent/child

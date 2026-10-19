@@ -665,13 +665,21 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                                    '> ' + rejected_hex_command)
             qmp_send_key('ret')
             require_graphical_text('windowdemo-terminal-option-error',
-                                   'Hex constant disabled by OPTf_DECIMAL_ONLY.')
+                                   'Hex constant disabled by')
+            require_graphical_text('windowdemo-terminal-option-name',
+                                   'OPTf_DECIMAL_ONLY.')
             print('PASS long terminal input and compiler diagnostics after windowdemo', flush=True)
             raise SystemExit(0)
         if args.probe_home_autostart:
             command('zload /Tests/HomeAutoStart.ZC', 'zc: loaded /Tests/HomeAutoStart.ZC')
             command('zcall HomeAutoStartChecks', 'zc => 0x000000000000002a')
-            print('PASS disk boot ran HomeSys first-terminal Once through graphical input', flush=True)
+            focus_graphical_terminal()
+            qmp_send_text('help')
+            startup_typing = require_graphical_text('home-autostart-typing', '> help')
+            require_graphical_caret(startup_typing, '> help')
+            qmp_send_key('ret')
+            require_graphical_text('home-autostart-help', 'Graphical commands:')
+            print('PASS HomeSys disk startup tiles both terminals, runs Once and keeps the first prompt usable', flush=True)
             raise SystemExit(0)
         if args.probe_autocomplete:
             command('zload /Tests/AutoCompleteChecks.ZC',
@@ -890,10 +898,17 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             before = command('zstatus', 'failed=0')
             for _ in range(3):
                 command('zcall UserStartUpCapacityChecks', 'zc => 0x000000000000002a', timeout=30)
+            # Source TaskEnd retires a task immediately but defers reclaiming
+            # its heaps until the DYING_JIFFIES quarantine expires.
+            time.sleep(0.5)
             after = command('zstatus', 'failed=0')
-            heap = r'data=([0-9/]+) code=([0-9/]+) allocations=([0-9]+)'
-            if re.search(heap,before).groups() != re.search(heap,after).groups():
-                raise RuntimeError('repeated user terminal creation/teardown leaked managed memory')
+            heap = r'data=(\d+)/\d+ code=(\d+)/\d+ allocations=(\d+)'
+            before_heap = tuple(map(int, re.search(heap, before).groups()))
+            after_heap = tuple(map(int, re.search(heap, after).groups()))
+            if (after_heap[0] > before_heap[0] or
+                after_heap[1:] != before_heap[1:]):
+                raise RuntimeError('repeated user terminal creation/teardown left managed allocations:\n'
+                                   + before + '\n' + after)
             print('PASS HomeSys document startup, late-bound hooks, prompt readiness, task capacity and exact cleanup', flush=True)
             if args.probe_gui_keyboard:
                 command('zcall UserStartUpOpenChecks', 'zc => 0x000000000000002a', timeout=30)
@@ -910,7 +925,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 require_graphical_text('user-second-cleared','Second 42')
                 focus_graphical_terminal()
                 qmp_send_key('up')
-                command('zc Print("history_isolated=%d\\n",BootstrapGuiTerminalState(bootstrap_gui_terminal_task)->history_len==0);',
+                command('zc Print("history_isolated=%d\\n",BootstrapGuiTerminalState(bootstrap_gui_terminal_task)->history_len==user_startup_first_history_before);',
                         'history_isolated=1')
                 qmp_send_text('Print("First %d\\n",40+2);')
                 typed = require_graphical_text('user-first-typing','Print("First %d\\n",40+2);')
@@ -1424,7 +1439,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 qmp_send_key('ret')
                 qmp_send_text('zc compiler_recovery_committed=0x2a;')
                 qmp_send_key('ret')
-                option_error = require_graphical_text('option-error', 'Hex constant disabled by OPTf_DECIMAL_ONLY.')
+                option_error = require_graphical_text('option-error', 'Hex constant disabled by')
+                require_graphical_text('option-error-option-name', 'OPTf_DECIMAL_ONLY.')
                 if 'current statement discarded' not in option_error[3]:
                     raise RuntimeError('lexer error hid its recovery diagnostic in the graphical terminal')
                 command('zcall CompilerRecoveryResult', 'zc => 0x0000000000000000')

@@ -586,6 +586,18 @@ U0 UserStartUp()
     BootstrapGuiTerminalUserStartUp;
 }
 
+U0 BootstrapGuiTerminalTileHomeWindows(CTask *first, CTask *second)
+{//Tile only the two user terminals; bridge/System tasks are not desktop windows.
+    I64 half = TEXT_COLS / 2;
+
+    if (!TaskValidate(first) || !TaskValidate(second) || half < 4)
+        return;
+    WinHorz(1, half - 1, first);
+    WinHorz(half + 1, TEXT_COLS - 2, second);
+    WinVert(2, TEXT_ROWS - 2, first);
+    WinVert(2, TEXT_ROWS - 2, second);
+}
+
 I64 BootstrapGuiTerminalHomeStart()
 {//Run the supported first-terminal portion of HomeSys after the shell exists.
     CTask *user = bootstrap_gui_terminal_task;
@@ -603,9 +615,10 @@ I64 BootstrapGuiTerminalHomeStart()
         return 0x2a;
 
     // HomeSys creates a second terminal on disk/RAM boots. Keep the current
-    // window geometry until caret placement is correct in tiled terminals.
+    // two-terminal layout used by the original HomeSys startup.
     bootstrap_gui_terminal_home_second = User();
     WinToTop(user);
+    BootstrapGuiTerminalTileHomeWindows(user, bootstrap_gui_terminal_home_second);
     XTalk(user, "Cd; #include \"Once\";\n");
     // HomeSys builds the text index after the shell scheduler is running.
     // Queue it after Once so Spawn/TaskWait have a live guest task context.

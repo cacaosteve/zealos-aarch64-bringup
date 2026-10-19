@@ -1,11 +1,17 @@
-// Verify the first graphical terminal ran the supported HomeSys Once step.
+// Verify the first-terminal HomeSys startup, two-window layout and Once step.
 I64 HomeAutoStartChecks()
 {
     CTask *term = bootstrap_gui_terminal_task;
+    CTask *second = bootstrap_gui_terminal_home_second;
     I64 i;
     U8 *saved;
 
-    if (!TaskValidate(term) || !TaskValidate(bootstrap_gui_terminal_home_second)) return 1;
+    if (!TaskValidate(term) || !TaskValidate(second)) return 1;
+    if (term->win_top != second->win_top || term->win_bottom != second->win_bottom ||
+        term->win_left != 1 || term->win_right >= TEXT_COLS / 2 ||
+        second->win_left <= term->win_right || second->win_right >= TEXT_COLS ||
+        (term->win_left <= second->win_right && second->win_left <= term->win_right))
+        return 3;
     for (i = 0; i < 500; i++)
     {
         saved = DocSave(term->put_doc);

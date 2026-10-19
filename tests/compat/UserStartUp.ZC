@@ -1,6 +1,7 @@
 // Normal user-task entry, HomeSys document setup and independent terminals.
 CTask *user_startup_second;
 I64 user_startup_hook_calls;
+I64 user_startup_first_history_before;
 Bool user_startup_doc_locked;
 I64 user_startup_sleep_stage;
 
@@ -97,6 +98,7 @@ I64 UserStartUpOpenChecks()
 {
     CTask *first = bootstrap_gui_terminal_task;
     if (TaskValidate(user_startup_second)) return 1;
+    user_startup_first_history_before = BootstrapGuiTerminalState(first)->history_len;
     user_startup_second = User;
     if (!TaskValidate(user_startup_second)) return 2;
     if (user_startup_second == first || user_startup_second->put_doc == first->put_doc ||
@@ -158,10 +160,9 @@ I64 UserStartUpCapacityChecks()
         terms[i] = User;
         if (!TaskValidate(terms[i])) break;
     }
-    // The source window manager also occupies an application slot. Probe the
-    // remaining capacity instead of counting reserved services as free slots.
-    if (i < 1 || i > 3) result = 1;
-    if (i < 4 && User != NULL) result = 2;
+    // Keep a bounded burst of four live user terminals inside the guest task
+    // pool, without pinning the test to the pool's exact reserved-slot count.
+    if (i != 4) result = 1;
     for (i = 0; i < 4; i++)
         if (TaskValidate(terms[i])) Kill(terms[i]);
     WinToTop(bootstrap_gui_terminal_task);
