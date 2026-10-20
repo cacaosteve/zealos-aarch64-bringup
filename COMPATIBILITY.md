@@ -3764,3 +3764,14 @@ also confirms that the menu highlight and dropdown disappear after the pointer
 leaves the desktop top row. The run also reproduced an editor command with
 leading whitespace after reboot; the terminal now trims leading spaces/tabs
 when recognizing `edit`, and the save/reopen check passed.
+
+## Terminal resize and autocomplete popup sizing — 2026-10-19
+
+The small `TERM`/`EOF` window shown with a `Word:` suggestion is the
+autocomplete popup. Its document uses `DOCF_SIZE_MIN`, so the window follows
+the suggestion content and can shrink after it redraws. The two regular
+terminals do not use that flag. The USB graphical workflow now resizes both the
+ARM64 bootstrap terminal and the independent upstream `User()` terminal, then
+checks their bounds after release, settling, and another command. Both passed
+with `python3 scripts/check-compat.py --usb-input nec
+--probe-gui-workflow --quick`.

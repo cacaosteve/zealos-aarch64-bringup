@@ -578,31 +578,34 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 time.sleep(0.2)
             time.sleep(0.1)
         raise RuntimeError('graphical terminal did not acquire keyboard focus after five clicks:\n'+status)
-    def graphical_terminal_rect():
-        result = command('zc Print("gterm_rect=%d,%d,%d,%d\\n", '
-            'bootstrap_gui_terminal_task->win_left, bootstrap_gui_terminal_task->win_right, '
-            'bootstrap_gui_terminal_task->win_top, bootstrap_gui_terminal_task->win_bottom);',
-            'gterm_rect=')
+    def graphical_task_rect(task_expr):
+        result = command(f'zc Print("gterm_rect=%d,%d,%d,%d\\n", '
+            f'{task_expr}->win_left, {task_expr}->win_right, '
+            f'{task_expr}->win_top, {task_expr}->win_bottom);', 'gterm_rect=')
         match = re.search(r'gterm_rect=(-?\d+),(-?\d+),(-?\d+),(-?\d+)', result)
         if not match:
-            raise RuntimeError('could not read graphical-terminal geometry:\n' + result)
+            raise RuntimeError(f'could not read {task_expr} geometry:\n' + result)
         return tuple(map(int, match.groups()))
-    def probe_graphical_terminal_resize():
-        # A live UTM report says a small TERM/EOF window returns to its old
-        # size on release. Check the separate boot graphical terminal as a
-        # control: this distinguishes a general window-manager regression from
-        # behavior specific to that small task/window. Inspect the geometry
-        # after release, after a settling interval, and after another command.
-        command('zc WinToTop(bootstrap_gui_terminal_task);', 'zc: executed')
-        original = graphical_terminal_rect()
+    def probe_graphical_task_resize(task_expr, label):
+        # Check both the ARM64 bootstrap terminal and the independent terminal
+        # created by upstream User(). The small TERM/EOF autocomplete popup is
+        # DOCF_SIZE_MIN and intentionally follows its content; these regular
+        # terminal windows must retain their bounds after release, settling,
+        # and another command.
+        command(f'zc WinToTop({task_expr});', 'zc: executed')
+        original = graphical_task_rect(task_expr)
         left, right, top, bottom = original
-        dx = min(4, 99 - right)
+        dx = min(4, 98 - right)
+        # A window already at the right screen edge can still be tested by
+        # shrinking it from the lower-right corner.
+        if dx <= 0:
+            dx = -min(4, right - left - 1)
         # The test display can start with the terminal nearly full-height.
         # In that case shrink from the lower-right corner instead of trying
         # to grow past the visible screen edge.
         dy = 2 if bottom <= 71 else -2
-        if dx <= 0 or top >= bottom + dy:
-            raise RuntimeError(f'graphical terminal has no resize room at {original}')
+        if dx == 0 or top >= bottom + dy:
+            raise RuntimeError(f'{label} has no resize room at {original}')
         start_x = (right + 1) * 8 + 4
         start_y = (bottom + 1) * 8 + 4
         try:
@@ -615,28 +618,43 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             qmp_command('input-send-event', {'events': [
                 {'type': 'btn', 'data': {'down': False, 'button': 'left'}}]})
             time.sleep(0.4)
-            after_release = graphical_terminal_rect()
+            after_release = graphical_task_rect(task_expr)
             expected = (left, right + dx, top, bottom + dy)
             if after_release != expected:
-                raise RuntimeError('graphical terminal resize did not persist on release: '
+                raise RuntimeError(f'{label} resize did not persist on release: '
                                    f'expected {expected}, got {after_release}')
             time.sleep(0.6)
-            after_settle = graphical_terminal_rect()
+            after_settle = graphical_task_rect(task_expr)
             if after_settle != expected:
-                raise RuntimeError('graphical terminal geometry reverted after release: '
+                raise RuntimeError(f'{label} geometry reverted after release: '
                                    f'expected {expected}, got {after_settle}')
             # The original serial shell command itself must not recreate or
             # resize the graphical task.
             command('zstatus', 'desktop:')
-            after_command = graphical_terminal_rect()
+            after_command = graphical_task_rect(task_expr)
             if after_command != expected:
-                raise RuntimeError('graphical terminal geometry changed after another command: '
+                raise RuntimeError(f'{label} geometry changed after another command: '
                                    f'expected {expected}, got {after_command}')
-            print(f'PASS graphical terminal corner resize persists: {original} -> {expected}',
+            print(f'PASS {label} corner resize persists: {original} -> {expected}',
                   flush=True)
         finally:
-            command(f'zc WinHorz({left},{right},bootstrap_gui_terminal_task); '
-                    f'WinVert({top},{bottom},bootstrap_gui_terminal_task);', 'zc: executed')
+            command(f'zc WinHorz({left},{right},{task_expr}); '
+                    f'WinVert({top},{bottom},{task_expr});', 'zc: executed')
+    def probe_graphical_terminal_resize():
+        probe_graphical_task_resize('bootstrap_gui_terminal_task',
+                                    'bootstrap graphical terminal')
+        second = command('zc Print("gterm_second_valid=%d\\n", '
+                         'TaskValidate(bootstrap_gui_terminal_home_second));',
+                         'gterm_second_valid=')
+        match = re.search(r'gterm_second_valid=(\d+)', second)
+        if not match:
+            raise RuntimeError('could not inspect upstream second terminal:\n' + second)
+        if int(match.group(1)):
+            probe_graphical_task_resize('bootstrap_gui_terminal_home_second',
+                                        'upstream User terminal')
+        else:
+            print('SKIP upstream User terminal resize: normal startup did not create it',
+                  flush=True)
     def wait_for_graphical_terminal_banner(timeout=15):
         deadline = time.monotonic() + timeout
         while True:
