@@ -71,7 +71,7 @@ fi
 echo "Resolved $VM_NAME → $DEST"
 
 python3 - <<PY
-import hashlib, os, plistlib, pathlib, shutil, subprocess, sys, uuid as uuidlib
+import datetime, hashlib, os, plistlib, pathlib, shutil, subprocess, sys, uuid as uuidlib
 
 dest = pathlib.Path("$DEST")
 disk_src = pathlib.Path("$DISK_IMG")
@@ -139,6 +139,23 @@ cfg["Drive"] = [disk]
 data = dest / "Data"
 data.mkdir(exist_ok=True)
 target = data / img_name
+
+# Keep a complete rollback point after utmctl has stopped the guest and before
+# replacing its disk/config. Partition preservation below remains useful for
+# carrying guest edits forward, while this copy also protects the old boot
+# payload and firmware variables if a refresh fails unexpectedly.
+backup = pathlib.Path("$ROOT") / "build" / (
+    "utm-before-" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
+backup_data = backup / "Data"
+backup_data.mkdir(parents=True, exist_ok=False)
+for source, relative in ((target, pathlib.Path("Data") / img_name),
+                         (cfg_path, pathlib.Path("config.plist")),
+                         (data / "efi_vars.fd", pathlib.Path("Data/efi_vars.fd"))):
+    if source.is_file():
+        destination = backup / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, destination)
+print(f"Full pre-refresh UTM backup: {backup}")
 
 # Preserve RedSea and both native-source banks across GPT refresh.
 # Must match src/disk_layout.h and the Makefile layout constants.
