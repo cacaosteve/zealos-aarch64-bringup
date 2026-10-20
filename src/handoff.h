@@ -32,9 +32,18 @@
 #define PI4_PCIE_FDT_MEM      (1u << 3)
 #define PI4_PCIE_FDT_DMA      (1u << 4)
 
+/* Stored in the old reserved word so the handoff size and offsets stay stable. */
+#define PI4_FDT_STATUS_OK             0u
+#define PI4_FDT_STATUS_NO_RESPONSE    1u
+#define PI4_FDT_STATUS_NULL_POINTER   2u
+#define PI4_FDT_STATUS_BAD_MAGIC      3u
+#define PI4_FDT_STATUS_BAD_SIZE       4u
+#define PI4_FDT_STATUS_NODE_NOT_FOUND 5u
+#define PI4_FDT_STATUS_PARSE_BASE     0x100u
+
 struct zeal_pi4_pcie {
     uint32_t flags; /* PI4_PCIE_FDT_*; descriptive only, no controller touched */
-    uint32_t reserved;
+    uint32_t fdt_status; /* PI4_FDT_STATUS_* or PARSE_BASE + parser error code */
     uint64_t reg_base;
     uint64_t reg_size;
     uint64_t mem_bus_base;

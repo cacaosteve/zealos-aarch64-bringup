@@ -63,7 +63,7 @@ static void property_string(const char *name, const char *value) {
     while (structure_size & 3u) structure[structure_size++] = 0;
 }
 
-static size_t make_tree(const char *status) {
+static size_t make_tree(const char *status, const char *compatible) {
     static const uint32_t root_ac[] = {2}, root_sc[] = {1};
     static const uint32_t scb_ac[] = {2}, scb_sc[] = {1};
     static const uint32_t scb_ranges[] = {
@@ -92,7 +92,7 @@ static size_t make_tree(const char *status) {
     property("#size-cells", scb_sc, 1);
     property("ranges", scb_ranges, 5);
     begin_node("pcie@7d500000");
-    property_string("compatible", "brcm,bcm2711-pcie");
+    property_string("compatible", compatible);
     property("reg", reg, 3);
     property("#address-cells", pcie_ac, 1);
     property("#size-cells", pcie_sc, 1);
@@ -119,7 +119,7 @@ static size_t make_tree(const char *status) {
 
 int main(void) {
     struct zeal_pi4_pcie pcie;
-    size_t size = make_tree("okay");
+    size_t size = make_tree("okay", "brcm,bcm2711-pcie");
     if (pi4_fdt_find_pcie(blob, size, &pcie) != 0 ||
         pcie.flags != (PI4_PCIE_FDT_PRESENT | PI4_PCIE_FDT_ENABLED |
                        PI4_PCIE_FDT_REG | PI4_PCIE_FDT_MEM | PI4_PCIE_FDT_DMA) ||
@@ -138,16 +138,21 @@ int main(void) {
                 (unsigned long long)pcie.dma_size);
         return 1;
     }
-    size = make_tree("disabled");
+    size = make_tree("disabled", "brcm,bcm2711-pcie");
     if (pi4_fdt_find_pcie(blob, size, &pcie) != 0 ||
         !(pcie.flags & PI4_PCIE_FDT_PRESENT) || (pcie.flags & PI4_PCIE_FDT_ENABLED)) {
         fprintf(stderr, "disabled PCIe node was not rejected\n");
         return 2;
     }
-    size = make_tree("okay");
+    size = make_tree("okay", "brcm,bcm2711-pcie");
     if (pi4_fdt_find_pcie(blob, size - 1, &pcie) == 0) {
         fprintf(stderr, "truncated FDT was accepted\n");
         return 3;
+    }
+    size = make_tree("okay", "brcm,other-pcie");
+    if (pi4_fdt_find_pcie(blob, size, &pcie) != -13) {
+        fprintf(stderr, "valid FDT without BCM2711 PCIe node was not distinguished\n");
+        return 4;
     }
     puts("PASS BCM2711 FDT host registers, PCI memory window and 3 GiB DMA aperture");
     return 0;

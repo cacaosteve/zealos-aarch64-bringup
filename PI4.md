@@ -108,7 +108,7 @@ they do not provide physical Pi USB support. See the
 
 ## PCIe firmware description probe
 
-The booter parses the firmware FDT's `brcm,bcm2711-pcie` node and appends
+The booter parses Limine's FDT `brcm,bcm2711-pcie` node and appends
 its translated register base, PCI memory window, and DMA window to handoff
 revision 6. It reserves a 1 MiB, 64 KiB-aligned arena from usable RAM wholly
 inside the translated DMA aperture, recording both CPU physical and PCI bus
@@ -123,8 +123,18 @@ the PCI memory aperture, the 3 GiB DMA aperture, disabled-node handling, and
 truncated-FDT rejection (`make check-pi4-pcie-fdt`), plus reservation bounds,
 bus-address translation, memory-map splitting, and capacity (`make check-pi4-dma`,
 or both together with `make check-pi4-platform`).
-These are parser/allocator checks; the actual UEFI-provided FDT and resulting
+These are parser/allocator checks; the actual card DTB handoff and resulting
 reservation still need an eyes-on Pi run.
+
+The current Pi Limine entry explicitly loads `bcm2711-rpi-4-b.dtb` from the SD
+root. This avoids depending on whether the UEFI firmware publishes the same
+tree through its EFI configuration table. The HDMI report now distinguishes a
+missing Limine response, invalid pointer/magic/size, a missing BCM2711 PCIe node,
+and parser errors. The card's DTB was parsed on the host with the current parser:
+it contains the expected PCIe node and translates to register base `0xfd500000`,
+memory window `0xc0000000` → `0x600000000` (1 GiB), and a 3 GiB DMA aperture.
+The next Pi boot must confirm that Limine can load this root-level DTB and that
+the updated report shows its decoded values.
 
 For the first physical check, use a prepared microSD card, a suitable Pi 4
 power supply, and HDMI to read the report; no serial adapter is needed just to

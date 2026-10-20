@@ -28,7 +28,10 @@ cp -f "$ESP/boot/demo.hcbc" "$OUT/boot/" 2>/dev/null || true
 cp -f "$ESP/limine-pi.conf" "$OUT/limine.conf"
 
 cat <<EOF
-Pi ESP staged (PI-DIAG-4 + read-only PCIe/DMA discovery): $OUT
+Pi ESP staged (PI-DIAG-4 + explicit card DTB + read-only PCIe/DMA discovery): $OUT
+
+The generated limine.conf loads bcm2711-rpi-4-b.dtb from the SD root and the
+HDMI report identifies whether Limine returned, validated, and parsed that FDT.
 
 FB markers (keep firmware splash; do not expect a cleared screen):
   yellow   ~y40   ZealBooter entry

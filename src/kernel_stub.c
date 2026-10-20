@@ -1277,7 +1277,36 @@ static void pi_diag_fb_report(const struct zeal_handoff *h) {
         pi_diag_fb_puts("PI4 FDT report unavailable\n");
         return;
     }
-    pi_diag_fb_puts("PI4 FDT flags=");
+    pi_diag_fb_puts("PI4 FDT status=");
+    switch (h->pi4_pcie.fdt_status) {
+    case PI4_FDT_STATUS_OK:
+        pi_diag_fb_puts("ok");
+        break;
+    case PI4_FDT_STATUS_NO_RESPONSE:
+        pi_diag_fb_puts("no response");
+        break;
+    case PI4_FDT_STATUS_NULL_POINTER:
+        pi_diag_fb_puts("null pointer");
+        break;
+    case PI4_FDT_STATUS_BAD_MAGIC:
+        pi_diag_fb_puts("bad magic");
+        break;
+    case PI4_FDT_STATUS_BAD_SIZE:
+        pi_diag_fb_puts("bad totalsize");
+        break;
+    case PI4_FDT_STATUS_NODE_NOT_FOUND:
+        pi_diag_fb_puts("PCIe node missing");
+        break;
+    default:
+        if (h->pi4_pcie.fdt_status >= PI4_FDT_STATUS_PARSE_BASE) {
+            pi_diag_fb_puts("parse error=");
+            pi_diag_fb_u64_hex(h->pi4_pcie.fdt_status - PI4_FDT_STATUS_PARSE_BASE);
+        } else {
+            pi_diag_fb_puts("unknown");
+        }
+        break;
+    }
+    pi_diag_fb_puts("\nFDT flags=");
     pi_diag_fb_u64_hex(h->pi4_pcie.flags);
     pi_diag_fb_puts("\nPCIe reg=");
     pi_diag_fb_u64_hex(h->pi4_pcie.reg_base);
@@ -9758,7 +9787,9 @@ void kernel_entry(const struct zeal_handoff *h) {
                 if (h->revision >= 5 &&
                     h->size >= offsetof(struct zeal_handoff, pi4_pcie) +
                                sizeof(h->pi4_pcie)) {
-                    uart_puts(g_uart, "PI4 PCIe FDT flags=");
+                    uart_puts(g_uart, "PI4 FDT status=");
+                    uart_put_u64_hex(g_uart, h->pi4_pcie.fdt_status);
+                    uart_puts(g_uart, " PCIe flags=");
                     uart_put_u64_hex(g_uart, h->pi4_pcie.flags);
                     uart_puts(g_uart, " regs=");
                     uart_put_u64_hex(g_uart, h->pi4_pcie.reg_base);

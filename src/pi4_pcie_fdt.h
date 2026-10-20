@@ -255,7 +255,8 @@ static int pi4_fdt_find_pcie(const void *blob, size_t available,
         } else if (token == 4) { /* FDT_NOP */
             continue;
         } else if (token == 9) { /* FDT_END */
-            return depth == 0 && found ? 0 : -10;
+            if (depth != 0) return -10;
+            return found ? 0 : -13;
         } else {
             return -11;
         }

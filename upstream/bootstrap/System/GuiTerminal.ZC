@@ -281,6 +281,80 @@ U0 BootstrapGuiTerminalMenuInstall()
     Fs->cur_menu = menu;
 }
 
+I64 BootstrapGuiTerminalFilesAppend(U8 *dst, I64 capacity, I64 *used,
+                                    U8 *text)
+{
+    I64 length;
+
+    if (!dst || !used || !text || *used < 0 || *used >= capacity)
+        return FALSE;
+    length = StrLen(text);
+    if (length >= capacity - *used)
+        return FALSE;
+    MemCopy(dst + *used, text, length + 1);
+    *used += length;
+    return TRUE;
+}
+
+U8 *BootstrapGuiTerminalFilesListing()
+{//Build a bounded read-only listing for the graphical Files menu action.
+    U8 *listing = MAlloc(8192), *line;
+    CDirEntry *entries, *entry;
+    I64 used = 0;
+    Bool complete = TRUE;
+
+    if (!listing)
+        return NULL;
+    *listing = 0;
+    line = MStrPrint("$$PURPLE$$Directory of %s$$FG$$\n\n", DirCur);
+    complete = BootstrapGuiTerminalFilesAppend(listing, 8192, &used, line);
+    Free(line);
+    if (complete)
+        complete = BootstrapGuiTerminalFilesAppend(listing, 8192, &used,
+                                                    "Directories\n");
+    entries = FilesFind("*", FUF_JUST_DIRS);
+    entry = entries;
+    while (complete && entry)
+    {
+        line = MStrPrint("  %s/\n", entry->name);
+        complete = BootstrapGuiTerminalFilesAppend(listing, 8192, &used, line);
+        Free(line);
+        entry = entry->next;
+    }
+    DirTreeDel(entries);
+    if (complete)
+        complete = BootstrapGuiTerminalFilesAppend(listing, 8192, &used,
+                                                    "\nFiles\n");
+    entries = FilesFind("*", FUF_JUST_FILES);
+    entry = entries;
+    while (complete && entry)
+    {
+        line = MStrPrint("  %s  %d bytes\n", entry->name, entry->size);
+        complete = BootstrapGuiTerminalFilesAppend(listing, 8192, &used, line);
+        Free(line);
+        entry = entry->next;
+    }
+    DirTreeDel(entries);
+    if (!complete)
+        BootstrapGuiTerminalFilesAppend(listing, 8192, &used,
+                                        "\n[listing truncated]\n");
+    return listing;
+}
+
+U8 *BootstrapGuiTerminalFilesOpen()
+{//Show the current merged source directory in a separate, scrollable window.
+    U8 *listing = BootstrapGuiTerminalFilesListing();
+    CTask *view;
+
+    if (!listing)
+        return "Files: could not allocate listing\n";
+    view = PopUpViewPrint("%s", listing);
+    Free(listing);
+    if (!TaskValidate(view))
+        return "Files: could not open directory window\n";
+    return "Files window opened; press Escape to close it\n";
+}
+
 U8 *BootstrapGuiTerminalMenuAction(I64 action)
 {
     if (action == 1)
@@ -288,7 +362,7 @@ U8 *BootstrapGuiTerminalMenuAction(I64 action)
     if (action == 2)
         return ZcGuiShellExec("zstatus");
     if (action == 3)
-        return ZcGuiShellExec("zls");
+        return BootstrapGuiTerminalFilesOpen();
     if (action == 4)
         return ZcGuiShellExec("zvol");
     if (action == 6)
@@ -1016,7 +1090,7 @@ I64 BootstrapGuiTerminalSmoke()
 
 I64 BootstrapGuiShellSmoke()
 {
-    U8 *output;
+    U8 *output, *listing;
 
     output = ZcGuiShellExec("");
     if (!output || output[0])
@@ -1033,15 +1107,17 @@ I64 BootstrapGuiShellSmoke()
     output = BootstrapGuiTerminalMenuAction(2);
     if (!output || output[0] != 'z')
         return 2;
-    output = BootstrapGuiTerminalMenuAction(3);
-    // Catalog order depends on bundled directories and subsequent guest
-    // writes. Check the listing's completion marker, not its first filename.
-    if (!output)
+    listing = BootstrapGuiTerminalFilesListing();
+    if (!listing)
         return 3;
-    if (StrCompare(output, "zls: native source partition unavailable\n") &&
-        (!StrMatch("zls: n=", output) ||
-         StrMatch("[output truncated]", output)))
-        return 9;
+    if (!StrMatch("$$PURPLE$$Directory of", listing) ||
+        !StrMatch("\nDirectories\n", listing) ||
+        !StrMatch("\nFiles\n", listing))
+    {
+        Free(listing);
+        return 3;
+    }
+    Free(listing);
     output = BootstrapGuiTerminalMenuAction(4);
     if (!output || output[0] != 'z')
         return 4;

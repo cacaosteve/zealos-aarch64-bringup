@@ -161,26 +161,38 @@ static int dtb_has_substr(const void *dtb, size_t max, const char *needle) {
     return 0;
 }
 
-/* Returns FDT totalsize, or 0 if no valid DTB. */
-static uint32_t dtb_size(const uint8_t **out_ptr) {
+/* Returns FDT totalsize, or 0 with a reason suitable for the Pi report. */
+static uint32_t dtb_size_status(const uint8_t **out_ptr, uint32_t *out_status) {
     const uint8_t *p;
     uint32_t total;
-    if (!dtb_request.response || !dtb_request.response->dtb_ptr) {
+    if (!dtb_request.response) {
+        if (out_status) *out_status = PI4_FDT_STATUS_NO_RESPONSE;
+        return 0;
+    }
+    if (!dtb_request.response->dtb_ptr) {
+        if (out_status) *out_status = PI4_FDT_STATUS_NULL_POINTER;
         return 0;
     }
     p = (const uint8_t *)dtb_request.response->dtb_ptr;
     if (p[0] != 0xd0 || p[1] != 0x0d || p[2] != 0xfe || p[3] != 0xed) {
+        if (out_status) *out_status = PI4_FDT_STATUS_BAD_MAGIC;
         return 0;
     }
     total = ((uint32_t)p[4] << 24) | ((uint32_t)p[5] << 16) | ((uint32_t)p[6] << 8) |
             (uint32_t)p[7];
-    if (total < 32 || total > 512u * 1024u) {
+    if (total < 40 || total > 512u * 1024u) {
+        if (out_status) *out_status = PI4_FDT_STATUS_BAD_SIZE;
         return 0;
     }
     if (out_ptr) {
         *out_ptr = p;
     }
+    if (out_status) *out_status = PI4_FDT_STATUS_OK;
     return total;
+}
+
+static uint32_t dtb_size(const uint8_t **out_ptr) {
+    return dtb_size_status(out_ptr, NULL);
 }
 
 static int cmdline_has(const char *needle) {
@@ -564,8 +576,11 @@ void kmain(void) {
     /* Snapshot only descriptive PCIe/DMA windows; never touch the bridge here. */
     if (is_pi) {
         const uint8_t *fdt = NULL;
-        uint32_t fdt_bytes = dtb_size(&fdt);
-        if (!fdt_bytes || pi4_fdt_find_pcie(fdt, fdt_bytes, &g_pi4_pcie) != 0) {
+        uint32_t fdt_bytes = dtb_size_status(&fdt, &g_pi4_pcie.fdt_status);
+        int parse_rc = fdt_bytes ? pi4_fdt_find_pcie(fdt, fdt_bytes, &g_pi4_pcie) : -1;
+        if (fdt_bytes && parse_rc != 0) {
+            g_pi4_pcie.fdt_status = parse_rc == -13 ? PI4_FDT_STATUS_NODE_NOT_FOUND :
+                                    PI4_FDT_STATUS_PARSE_BASE + (uint32_t)(-parse_rc);
             g_pi4_pcie.flags = 0;
         }
     }

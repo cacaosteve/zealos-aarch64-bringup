@@ -1681,6 +1681,90 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     raise RuntimeError('OS menu stayed open after leaving the desktop top row; '
                                        f'see {graphical_path("os-menu-left-top-row")} and .txt\n'
                                        + menu_screen[3])
+                # Files is the first real desktop application behind the
+                # OS menu: it opens a read-only listing in its own DolDoc
+                # window rather than dumping `zls` output into the terminal.
+                move_graphical_pointer(4, 4)
+                menu_deadline = time.monotonic() + 5
+                menu_screen = graphical_screen('os-menu-files-open')
+                while time.monotonic() < menu_deadline:
+                    if (rgb_pixels_in(menu_screen, (0, 0, 170),
+                                      (0, 0, 240, 100)) >= 100 and
+                            rgb_pixels_in(menu_screen, (0, 0, 170),
+                                          (0, 8, 240, 100)) >= 1000):
+                        break
+                    time.sleep(0.1)
+                    menu_screen = graphical_screen('os-menu-files-open')
+                else:
+                    raise RuntimeError('OS menu did not reopen for Files selection:\n' +
+                                       menu_screen[3])
+                qmp_command('input-send-event', {'events': [
+                    {'type': 'btn', 'data': {'down': True, 'button': 'left'}}]})
+                time.sleep(0.2)
+                files_press_status = command('zstatus', 'pointer_state: ready=1')
+                files_press_match = re.search(
+                    r'pointer_state: ready=1 pointer_xy=(\d+)/(\d+) buttons=(\d+)',
+                    files_press_status)
+                if not files_press_match or int(files_press_match.group(3)) != 1:
+                    qmp_command('input-send-event', {'events': [
+                        {'type': 'btn', 'data': {'down': False, 'button': 'left'}}]})
+                    raise RuntimeError('OS menu Files press did not reach the guest:\n' +
+                                       files_press_status)
+                move_graphical_pointer(4, 28)
+                time.sleep(0.2)
+                files_row = graphical_screen('os-menu-files-held')
+                files_held_status = command('zstatus', 'pointer_state: ready=1')
+                files_held_match = re.search(
+                    r'pointer_state: ready=1 pointer_xy=(\d+)/(\d+) buttons=(\d+)',
+                    files_held_status)
+                if (not files_held_match or
+                        int(files_held_match.group(3)) != 1 or
+                        abs(int(files_held_match.group(1)) - 4) > 1 or
+                        abs(int(files_held_match.group(2)) - 28) > 1):
+                    qmp_command('input-send-event', {'events': [
+                        {'type': 'btn', 'data': {'down': False, 'button': 'left'}}]})
+                    raise RuntimeError('OS menu button was not held over Files:\n' +
+                                       files_held_status + files_row[3])
+                if rgb_pixels_in(files_row, (255, 255, 85), (0, 24, 240, 32)) < 32:
+                    qmp_command('input-send-event', {'events': [
+                        {'type': 'btn', 'data': {'down': False, 'button': 'left'}}]})
+                    raise RuntimeError('OS menu Files row was not highlighted while held:\n' +
+                                       files_row[3])
+                qmp_command('input-send-event', {'events': [
+                    {'type': 'btn', 'data': {'down': False, 'button': 'left'}}]})
+                files_release_status = command('zstatus', 'buttons=0')
+                files_pointer_match = re.search(
+                    r'pointer_xy=(\d+)/(\d+)\s+buttons=0', files_release_status)
+                if (not files_pointer_match or
+                        abs(int(files_pointer_match.group(1)) - 4) > 1 or
+                        abs(int(files_pointer_match.group(2)) - 28) > 1):
+                    raise RuntimeError('OS menu Files click did not release on its row:\n' +
+                                       files_release_status)
+                # Move the guest cursor away from the first text cell before
+                # OCR; the bitmap cursor otherwise obscures the section label.
+                move_graphical_pointer(400, 300)
+                time.sleep(0.2)
+                files_view = require_graphical_text(
+                    'os-menu-files-action', 'Directory of /Home', timeout=8)
+                if 'Directories' not in files_view[3] or 'Files' not in files_view[3]:
+                    raise RuntimeError('Files window omitted directory/file sections:\n' +
+                                       files_view[3])
+                qmp_send_key('esc')
+                files_restore_deadline = time.monotonic() + 5
+                while True:
+                    files_restored = command('zstatus', 'desktop:')
+                    if 'keyboard_focus=Terminal' in files_restored:
+                        break
+                    if time.monotonic() >= files_restore_deadline:
+                        raise RuntimeError('Escape did not close the Files window and restore '
+                                           'terminal focus:\n' + files_restored)
+                    time.sleep(0.1)
+                restored_screen = graphical_screen('os-menu-files-restored')
+                if 'Directory of /Home' in restored_screen[3]:
+                    raise RuntimeError('Files window remained visible after Escape:\n' +
+                                       restored_screen[3])
+                print('PASS OS menu Files opened a read-only directory window and Escape restored the terminal',
+                      flush=True)
                 # Exercise the special Window Demo menu action through the
                 # same press-drag-release path a user takes. This action is
                 # dispatched by the graphical terminal's MESSAGE_KEY_UP
@@ -1754,6 +1838,32 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                       flush=True)
             require_graphical_text('boot-terminal', '> ')
             raw_pattern = r'usb_input:.* key_events=(\d+)' if args.usb_input else r'virtio_keyboard: ready=1 key_events=(\d+)'
+            initial_input = command('zcall BootstrapGuiTerminalInputDiag', 'zc => 0x')
+            initial_value = re.search(r'zc => 0x([0-9a-fA-F]+)', initial_input)
+            if not initial_value:
+                raise RuntimeError('could not inspect graphical input before typing:\n' +
+                                   initial_input)
+            initial_length = int(initial_value.group(1), 16) & 0xff
+            if initial_length:
+                print(f'INFO clearing {initial_length} stale graphical input characters',
+                      flush=True)
+            # A prior Escape/focus transition can leave a partially edited
+            # command line when QEMU xHCI delivers its final key edge late.
+            # Down is the shell's documented clear-line action; start the
+            # visible-key assertions from a known empty prompt.
+            qmp_send_key('down')
+            clear_deadline = time.monotonic() + 3
+            while True:
+                input_diag = command('zcall BootstrapGuiTerminalInputDiag',
+                                     'zc => 0x')
+                input_value = re.search(r'zc => 0x([0-9a-fA-F]+)', input_diag)
+                if input_value and (int(input_value.group(1), 16) & 0xff) == 0:
+                    break
+                if time.monotonic() >= clear_deadline:
+                    raise RuntimeError('graphical prompt line did not clear before typing:\n' +
+                                       input_diag)
+                time.sleep(0.05)
+            desktop = command('zstatus', 'desktop:')
             raw_before = re.search(raw_pattern, desktop)
             if not raw_before:
                 raise RuntimeError('could not read low-level virtio keyboard event count:\n' + desktop)
