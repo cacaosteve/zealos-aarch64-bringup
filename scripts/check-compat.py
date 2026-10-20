@@ -322,7 +322,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
     def graphical_path(name):
         screen_name = f'usb-{usb_label}-{name}' if args.usb_input else name
         return ROOT/'build'/f'gui-{screen_name}.ppm'
-    def graphical_screen(name):
+    def graphical_screen(name, foreground_threshold=240000):
         # Inspect actual scanout, rather than treating successful command
         # assembly as proof that the user could see characters while typing.
         path = graphical_path(name)
@@ -347,17 +347,17 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 bits = tuple(sum(0x80 >> col for col in range(8)
                                  if (pixels[((y+r)*width+x+col)*3] * 299 +
                                      pixels[((y+r)*width+x+col)*3+1] * 587 +
-                                     pixels[((y+r)*width+x+col)*3+2] * 114) > 240000)
+                                     pixels[((y+r)*width+x+col)*3+2] * 114) > foreground_threshold)
                              for r in range(8))
                 row += font.get(bits, font.get(tuple(v ^ 255 for v in bits), '?'))
             rows.append(row.rstrip())
         text = '\n'.join(rows)
         path.with_suffix('.txt').write_text(text+'\n')
         return width, height, pixels, text
-    def require_graphical_text(name, expected, timeout=5):
+    def require_graphical_text(name, expected, timeout=5, foreground_threshold=240000):
         deadline = time.monotonic() + timeout
         while True:
-            screen = graphical_screen(name)
+            screen = graphical_screen(name, foreground_threshold)
             if expected in screen[3]:
                 break
             if time.monotonic() >= deadline:
@@ -1538,7 +1538,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     raise RuntimeError('OS menu click did not release on the Help row:\n' +
                                        menu_release_status)
                 menu_action_deadline = time.monotonic() + 5
-                menu_action_screen = graphical_screen('os-menu-help-action')
+                menu_action_screen = graphical_screen('os-menu-help-action', 100000)
                 while True:
                     if 'Graphical commands:' in menu_action_screen[3]:
                         break
@@ -1547,7 +1547,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                         raise RuntimeError('OS menu click did not dispatch Help:\n' +
                                            status + menu_action_screen[3])
                     time.sleep(0.1)
-                    menu_action_screen = graphical_screen('os-menu-help-action')
+                    menu_action_screen = graphical_screen('os-menu-help-action', 100000)
                 print('PASS OS menu press-drag-release dispatched Help', flush=True)
                 # Leaving the top row should collapse both the highlight and
                 # its dropdown. This is the normal desktop state shown in the
@@ -1570,6 +1570,59 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     raise RuntimeError('OS menu stayed open after leaving the desktop top row; '
                                        f'see {graphical_path("os-menu-left-top-row")} and .txt\n'
                                        + menu_screen[3])
+                # Exercise the special Window Demo menu action through the
+                # same press-drag-release path a user takes. This action is
+                # dispatched by the graphical terminal's MESSAGE_KEY_UP
+                # handler, so a shell-command-only demo check would miss a
+                # broken menu-to-application bridge.
+                move_graphical_pointer(4, 4)
+                menu_deadline = time.monotonic() + 5
+                menu_screen = graphical_screen('os-menu-windowdemo-open')
+                while time.monotonic() < menu_deadline:
+                    if (rgb_pixels_in(menu_screen, (0, 0, 170),
+                                      (0, 0, 240, 100)) >= 100 and
+                            rgb_pixels_in(menu_screen, (0, 0, 170),
+                                          (0, 8, 240, 100)) >= 1000):
+                        break
+                    time.sleep(0.1)
+                    menu_screen = graphical_screen('os-menu-windowdemo-open')
+                else:
+                    raise RuntimeError('OS menu did not reopen for Window Demo selection:\n' +
+                                       menu_screen[3])
+                qmp_command('input-send-event', {'events': [
+                    {'type': 'btn', 'data': {'down': True, 'button': 'left'}}]})
+                time.sleep(0.2)
+                move_graphical_pointer(4, 44)
+                time.sleep(0.2)
+                demo_row = graphical_screen('os-menu-windowdemo-held')
+                if rgb_pixels_in(demo_row, (255, 255, 85), (0, 40, 240, 48)) < 32:
+                    qmp_command('input-send-event', {'events': [
+                        {'type': 'btn', 'data': {'down': False, 'button': 'left'}}]})
+                    status = command('zstatus', 'usb_input:')
+                    raise RuntimeError('OS menu Window Demo row was not highlighted while held:\n' +
+                                       status + demo_row[3])
+                qmp_command('input-send-event', {'events': [
+                    {'type': 'btn', 'data': {'down': False, 'button': 'left'}}]})
+                demo_deadline = time.monotonic() + 5
+                demo_status = ''
+                while True:
+                    demo_status = command('zstatus', 'desktop:')
+                    if 'windowdemo=1' in demo_status:
+                        break
+                    if time.monotonic() >= demo_deadline:
+                        raise RuntimeError('OS menu Window Demo action did not start the demo:\n' +
+                                           demo_status)
+                    time.sleep(0.1)
+                require_graphical_text('os-menu-windowdemo-action', 'WINDOW A', timeout=8)
+                command('windowdemostop',
+                        'windowdemo: stopped; bootstrap shell display resumed')
+                restored = command('zstatus',
+                                   'desktop: winmgr=1 gterm=1 windowdemo=0 presented_frames=')
+                if 'keyboard_focus=Terminal' not in restored:
+                    raise RuntimeError('OS menu Window Demo did not restore terminal focus:\n' +
+                                       restored)
+                print('PASS OS menu press-drag-release launched Window Demo and restored the terminal',
+                      flush=True)
             require_graphical_text('boot-terminal', '> ')
             raw_pattern = r'usb_input:.* key_events=(\d+)' if args.usb_input else r'virtio_keyboard: ready=1 key_events=(\d+)'
             raw_before = re.search(raw_pattern, desktop)
