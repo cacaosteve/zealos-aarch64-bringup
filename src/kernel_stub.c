@@ -13,6 +13,9 @@
 #include "fb_font.h"
 #include "mmio_map.h"
 #include "plat_pi4.h"
+#if defined(ZEAL_PI_DIAG) || defined(ZEAL_FORCE_PI4)
+#include "pi4_pcie_cfg.h"
+#endif
 #include "virtio_kbd.h"
 #include "virtio_tablet.h"
 #include "virtio_blk.h"
@@ -197,6 +200,19 @@ static volatile uint32_t g_uart_probe;
 static volatile uint32_t g_uart_dead;
 static volatile uint64_t g_probe_esr;
 static volatile uint64_t g_probe_far;
+#if defined(ZEAL_PI_DIAG) || defined(ZEAL_FORCE_PI4)
+static uint32_t g_pi4_link_status;
+static uint32_t g_pi4_cfg_state;
+static uint32_t g_pi4_cfg_id;
+static uint32_t g_pi4_cfg_class_rev;
+static uint32_t g_pi4_cfg_header;
+#define PI4_CFG_NOT_RUN 0u
+#define PI4_CFG_READ_OK 1u
+#define PI4_CFG_MMIO_FAIL 2u
+#define PI4_CFG_MAP_FAIL 3u
+#define PI4_CFG_NOT_LINKED 4u
+#define PI4_CFG_NO_DEVICE 5u
+#endif
 static uint64_t g_hhdm;
 static uint64_t g_timer_ticks;
 
@@ -1082,6 +1098,104 @@ static void pi_diag_fb_u64_hex(uint64_t value) {
     }
 }
 
+static int pi4_pcie_read_config32(const struct zeal_handoff *h,
+                                  uint32_t link_status, unsigned offset,
+                                  uint32_t *value) {
+    struct pi4_pcie_cfg_read plan;
+    uint64_t hhdm, index_phys, data_phys;
+    volatile uint32_t *index_reg;
+    volatile uint32_t *data_reg;
+    uint32_t result = 0xffffffffu;
+
+    if (!value || pi4_pcie_cfg_read_plan(h, link_status, 1, 0, 0,
+                                         offset, &plan) != 0)
+        return -1;
+    hhdm = h->hhdm_offset;
+    if (h->pi4_pcie.reg_base > UINT64_MAX - PI4_PCIE_CFG_INDEX_OFFSET ||
+        h->pi4_pcie.reg_base > UINT64_MAX - plan.data_offset)
+        return -2;
+    index_phys = h->pi4_pcie.reg_base + PI4_PCIE_CFG_INDEX_OFFSET;
+    data_phys = h->pi4_pcie.reg_base + plan.data_offset;
+    if (index_phys >= (1ull << 48) || data_phys >= (1ull << 48) ||
+        hhdm > UINT64_MAX - index_phys || hhdm > UINT64_MAX - data_phys)
+        return -3;
+
+    index_reg = (volatile uint32_t *)(uintptr_t)(hhdm + index_phys);
+    data_reg = (volatile uint32_t *)(uintptr_t)(hhdm + data_phys);
+    g_uart_probe = 1;
+    g_sync_recover = 1;
+    g_uart_dead = 0;
+    g_probe_esr = 0;
+    g_probe_far = 0;
+    __asm__ volatile("str %w1, [%0]" :: "r"(index_reg), "r"(plan.index) : "memory");
+    __asm__ volatile("dsb sy" ::: "memory");
+    if (!g_uart_dead) {
+        __asm__ volatile("ldr %w0, [%1]" : "=r"(result) : "r"(data_reg) : "memory");
+        __asm__ volatile("dsb sy" ::: "memory");
+    }
+    g_sync_recover = 0;
+    g_uart_probe = 0;
+    if (g_uart_dead) {
+        g_uart_dead = 0;
+        return -4;
+    }
+    *value = result;
+    return 0;
+}
+
+static void pi4_pcie_probe_first_function(const struct zeal_handoff *h,
+                                         uint32_t link_status) {
+    uint32_t id = 0xffffffffu;
+    uint32_t class_rev = 0xffffffffu;
+    uint32_t header = 0xffffffffu;
+
+    g_pi4_link_status = link_status;
+    g_pi4_cfg_state = PI4_CFG_NOT_RUN;
+    if ((link_status & (PI4_PCIE_STATUS_PHY_LINKUP | PI4_PCIE_STATUS_DL_ACTIVE)) !=
+        (PI4_PCIE_STATUS_PHY_LINKUP | PI4_PCIE_STATUS_DL_ACTIVE)) {
+        g_pi4_cfg_state = PI4_CFG_NOT_LINKED;
+        uart_puts(g_uart, "PCIe cfg skipped: link not active\n");
+        return;
+    }
+    if (!g_pt_pool_phys || mmio_map_2m(h->hhdm_offset, h->pi4_pcie.reg_base) != 0) {
+        g_pi4_cfg_state = PI4_CFG_MAP_FAIL;
+        uart_puts(g_uart, "PCIe cfg skipped: Device MMIO map failed\n");
+        return;
+    }
+
+    /* Read only bus 1/device 0/function 0; never write endpoint config. */
+    if (pi4_pcie_read_config32(h, link_status, 0x00, &id) != 0 ||
+        pi4_pcie_read_config32(h, link_status, 0x08, &class_rev) != 0 ||
+        pi4_pcie_read_config32(h, link_status, 0x0c, &header) != 0) {
+        g_pi4_cfg_state = PI4_CFG_MMIO_FAIL;
+        uart_puts(g_uart, "PCIe cfg read aborted ESR=");
+        uart_put_u64_hex(g_uart, g_probe_esr);
+        uart_puts(g_uart, " FAR=");
+        uart_put_u64_hex(g_uart, g_probe_far);
+        uart_puts(g_uart, "\n");
+        g_uart_dead = 0;
+        return;
+    }
+    g_pi4_cfg_id = id;
+    g_pi4_cfg_class_rev = class_rev;
+    g_pi4_cfg_header = header;
+    if (id == 0xffffffffu || (id & 0xffffu) == 0xffffu) {
+        g_pi4_cfg_state = PI4_CFG_NO_DEVICE;
+        uart_puts(g_uart, "PCIe cfg 01:00.0 absent ID=");
+        uart_put_u64_hex(g_uart, id);
+        uart_puts(g_uart, "\n");
+        return;
+    }
+    g_pi4_cfg_state = PI4_CFG_READ_OK;
+    uart_puts(g_uart, "PCIe cfg 01:00.0 ID=");
+    uart_put_u64_hex(g_uart, id);
+    uart_puts(g_uart, " class/rev=");
+    uart_put_u64_hex(g_uart, class_rev);
+    uart_puts(g_uart, " header=");
+    uart_put_u64_hex(g_uart, header);
+    uart_puts(g_uart, " (read only; bus mastering off)\n");
+}
+
 /* Keep the Pi's PCIe/DMA discovery report readable without a UART adapter. */
 static void pi_diag_fb_report(const struct zeal_handoff *h) {
     if (!g_fb || !h) {
@@ -1127,7 +1241,28 @@ static void pi_diag_fb_report(const struct zeal_handoff *h) {
     } else {
         pi_diag_fb_puts("\nDMA arena: no rev-6 reservation");
     }
-    pi_diag_fb_puts("\nRead-only discovery; DMA/xHCI remain off\n");
+    pi_diag_fb_puts("\nPCIe link status=");
+    pi_diag_fb_u64_hex(g_pi4_link_status);
+    if (g_pi4_cfg_state == PI4_CFG_READ_OK) {
+        pi_diag_fb_puts("\nPCI 01:00.0 ID=");
+        pi_diag_fb_u64_hex(g_pi4_cfg_id);
+        pi_diag_fb_puts(" class/rev=");
+        pi_diag_fb_u64_hex(g_pi4_cfg_class_rev);
+        pi_diag_fb_puts(" hdr=");
+        pi_diag_fb_u64_hex(g_pi4_cfg_header);
+    } else if (g_pi4_cfg_state == PI4_CFG_NO_DEVICE) {
+        pi_diag_fb_puts("\nPCI 01:00.0 absent ID=");
+        pi_diag_fb_u64_hex(g_pi4_cfg_id);
+    } else if (g_pi4_cfg_state == PI4_CFG_MMIO_FAIL) {
+        pi_diag_fb_puts("\nPCI config read trapped; see UART ESR/FAR");
+    } else if (g_pi4_cfg_state == PI4_CFG_MAP_FAIL) {
+        pi_diag_fb_puts("\nPCI config skipped: MMIO map failed");
+    } else if (g_pi4_cfg_state == PI4_CFG_NOT_LINKED) {
+        pi_diag_fb_puts("\nPCI config skipped: link inactive");
+    } else {
+        pi_diag_fb_puts("\nPCI config read not attempted");
+    }
+    pi_diag_fb_puts("\nRead-only; bus mastering and xHCI remain off\n");
 }
 #endif
 
@@ -9566,9 +9701,10 @@ void kernel_entry(const struct zeal_handoff *h) {
                     }
 
                     /*
-                     * Read only the BCM2711 root-complex link status. The
-                     * FDT descriptor gates this probe; no config-space reads,
-                     * downstream enumeration, or bus mastering occur here.
+                     * Read the BCM2711 root-complex link status first. The
+                     * FDT descriptor gates this probe; only a live link allows
+                     * the separate bounded read-only function probe below.
+                     * No endpoint config writes or bus mastering occur.
                      * Recover synchronous MMIO aborts using the same guarded
                      * one-instruction path used for the first PL011 probe.
                      */
@@ -9615,6 +9751,7 @@ void kernel_entry(const struct zeal_handoff *h) {
                                 uart_puts(g_uart, (status & PI4_PCIE_STATUS_DL_ACTIVE)
                                                        ? "active" : "inactive");
                                 uart_puts(g_uart, " (read only)\n");
+                                pi4_pcie_probe_first_function(h, status);
                             }
                             g_uart_dead = 0;
                         } else {
