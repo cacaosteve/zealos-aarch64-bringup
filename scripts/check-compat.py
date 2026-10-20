@@ -314,11 +314,16 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             {'type': 'key', 'data': {'down': down,
              'key': {'type': 'qcode', 'data': qcode}}} for qcode in qcodes]})
     def qmp_send_keys(qcodes):
-        # Explicit edges avoid relying on send-key's shared deferred release
-        # timer while concurrent guests compete for host execution time.
-        qmp_key_edges(qcodes, True)
-        time.sleep(0.05)
-        qmp_key_edges(reversed(qcodes), False)
+        # Send chords as ordered edges. Grouping Shift+key in a single QMP
+        # request can leave Shift logically held when the guest samples the
+        # events under load; the following punctuation is then typed shifted
+        # (for example, `);` becomes `):`) and the command never completes.
+        for qcode in qcodes:
+            qmp_key_edges([qcode], True)
+            time.sleep(0.015)
+        for qcode in reversed(qcodes):
+            qmp_key_edges([qcode], False)
+            time.sleep(0.015)
     def graphical_path(name):
         screen_name = f'usb-{usb_label}-{name}' if args.usb_input else name
         return ROOT/'build'/f'gui-{screen_name}.ppm'
