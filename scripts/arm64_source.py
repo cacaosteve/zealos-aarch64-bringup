@@ -957,3 +957,25 @@ def translate_grscreen(source: bytes) -> bytes:
     replaced = replaced.replace(doc_call, "ZcDocUpdateTaskDocs(task);", 1)
     replaced = replaced.replace(ode_call, "ZcODEsUpdate(task);", 1)
     return replaced.encode("utf-8")
+
+
+def translate_grpalette(source: bytes) -> bytes:
+    """Mirror upstream palette changes into the ARM64 framebuffer bridge."""
+    try:
+        text = source.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValueError("GrPalette.ZC is not UTF-8") from exc
+    setter = (
+        "public U0 GrPaletteSet(CBGR24 *bgr24)\n"
+        "{//16 colors\n"
+        "\tMemCopy(&gr_palette, bgr24, sizeof(CBGR24) * COLORS_NUM);\n"
+        "}"
+    )
+    if text.count(setter) != 1:
+        raise ValueError("expected exactly one pinned GrPaletteSet body")
+    text = text.replace(
+        setter,
+        setter[:-1] + "\tZcFbGraphPaletteSet(bgr24);\n}",
+        1,
+    )
+    return text.encode("utf-8")

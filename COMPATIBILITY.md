@@ -2047,8 +2047,13 @@ ZealOS live distribution or installer.
   the guest CDC points at an 800x600 indexed surface. Host-backed framebuffer
   primitives and CDC byte writes compose into that shared surface, which is
   presented to Limine's framebuffer when the refresh completes. The surface
-  clears to black and uses the 16-color text palette; arbitrary 8-bit CDC color
-  semantics and the full upstream display pipeline remain unsupported.
+  clears to black and uses the active ZealOS 16-color palette for indexed
+  plot, rectangle, line, text, and flood-fill colors. The guarded
+  `GrPalette.ZC` overlay mirrors `GrPaletteSet` changes to the framebuffer
+  bridge. `python3 scripts/check-compat.py --pci --probe-graphics-palette`
+  checks custom palette resolution plus plot, rectangle, line, and glyph
+  drawing through the bridge. Arbitrary 8-bit CDC color semantics and the full
+  upstream display pipeline remain unsupported.
   `TextBorder` draws the upstream
   CP437 single- and double-line glyphs through `TextChar`. A bootstrap
   `GrUpdateTaskWin` clears one task's cell rectangle, draws its border, and
@@ -2068,7 +2073,7 @@ ZealOS live distribution or installer.
   before the tightly allocated result. Live source WinMgr checks cover startup,
   draw, mouse, title dragging, resizing, and captured-control release after
   moving the pointer outside the control.
-  Arbitrary indexed-color palette behavior, full planar semantics, remaining
+  Full planar semantics, remaining
   sprite and depth-buffer paths, music state, and normal upstream menu/task
   startup remain open.
 

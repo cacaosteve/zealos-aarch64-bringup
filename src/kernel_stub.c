@@ -277,6 +277,8 @@ static const uint32_t g_text_palette[16] = {
     0x00555555u, 0x005555ffu, 0x0055ff55u, 0x0055ffffu,
     0x00ff5555u, 0x00ff55ffu, 0x00ffff55u, 0x00ffffffu,
 };
+static uint32_t g_graphics_palette[16];
+static int g_graphics_palette_ready;
 static void fb_text_buffer_reset(void);
 void zeal_fb_task_text_reset(unsigned slot);
 
@@ -287,7 +289,8 @@ static uint8_t fb_nearest_palette_index(uint32_t bgr) {
     uint64_t best_distance = UINT64_MAX;
     uint8_t best = 0;
     for (uint8_t i = 0; i < 16; i++) {
-        uint32_t p = g_text_palette[i];
+        uint32_t p = g_graphics_palette_ready ? g_graphics_palette[i]
+                                              : g_text_palette[i];
         int32_t dr = (int32_t)r - (int32_t)((p >> 16) & 0xffu);
         int32_t dg = (int32_t)g - (int32_t)((p >> 8) & 0xffu);
         int32_t db = (int32_t)b - (int32_t)(p & 0xffu);
@@ -678,7 +681,9 @@ uint64_t zeal_fb_task_frame_end(uint64_t use_rgba) {
         } else {
             const uint8_t *src = surface + y * stride;
             for (uint64_t x = 0; x < g_fb_w; x++) {
-                uint32_t pixel = g_text_palette[src[x] & 0x0fu];
+                uint32_t pixel = g_graphics_palette_ready
+                    ? g_graphics_palette[src[x] & 0x0fu]
+                    : g_text_palette[src[x] & 0x0fu];
                 if (fb_peek((int32_t)x, (int32_t)y) !=
                     (int64_t)(pixel & 0x00ffffffu))
                     fb_putpixel((uint32_t)x, (uint32_t)y, pixel);
@@ -2481,7 +2486,23 @@ uint64_t hc_builtin_putpixel(uint64_t x, uint64_t y, uint64_t c) {
 }
 
 static uint32_t zeal_graphics_color(uint32_t color) {
-    return color < 16 ? g_text_palette[color] : color & 0x00ffffffu;
+    if (color < 16)
+        return g_graphics_palette_ready ? g_graphics_palette[color]
+                                        : g_text_palette[color];
+    return color & 0x00ffffffu;
+}
+
+void zeal_fb_graph_palette_set(const uint8_t *palette) {
+    if (!palette)
+        return;
+    for (size_t i = 0; i < 16; i++) {
+        /* ZealOS CBGR24 is a padded 32-bit struct: b, g, r, pad. */
+        uint32_t b = palette[i * 4];
+        uint32_t g = palette[i * 4 + 1];
+        uint32_t r = palette[i * 4 + 2];
+        g_graphics_palette[i] = (r << 16) | (g << 8) | b;
+    }
+    g_graphics_palette_ready = 1;
 }
 
 uint64_t zeal_fb_graph_color(uint32_t color) {

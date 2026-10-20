@@ -57,6 +57,7 @@ extern Bool ZcFbGraphPlot(I64 x, I64 y, U32 color,
                          I64 left, I64 top, I64 right, I64 bottom,
                          I64 task_z);
 extern I64 ZcFbGraphColor(I64 color);
+extern U0 ZcFbGraphPaletteSet(U8 *palette);
 extern Bool ZcFbGraphRect(I64 x, I64 y, I64 width, I64 height, U32 color,
                          I64 left, I64 top, I64 right, I64 bottom,
                          I64 task_z);

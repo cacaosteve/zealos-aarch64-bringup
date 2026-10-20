@@ -88,6 +88,8 @@ p.add_argument('--probe-live-window-control', action='store_true',
                help='verify source CDC control rendering while WinMgrTask remains active')
 p.add_argument('--probe-task-jobs', action='store_true', help='check CPU-0 callback jobs after loading pinned task headers')
 p.add_argument('--probe-window-buttons', action='store_true', help='check live task-window title buttons in a disposable guest')
+p.add_argument('--probe-graphics-palette', action='store_true',
+               help='verify indexed graphics drawing follows the active ZealOS palette')
 p.add_argument('--probe-source', type=pathlib.Path, action='append',
                help='load a host source file from the disposable PCI source partition')
 p.add_argument('--probe-source-call',
@@ -118,6 +120,8 @@ if args.probe_fulltext_visible:
     args.probe_fulltext = True
 if args.probe_source and not args.pci:
     p.error('--probe-source requires --pci')
+if args.probe_graphics_palette and not args.pci:
+    p.error('--probe-graphics-palette requires --pci')
 if args.probe_home_autostart and not args.pci:
     p.error('--probe-home-autostart requires --pci')
 if args.probe_source_editor and not args.pci:
@@ -168,6 +172,7 @@ log_path = ROOT / 'build' / (f'check-usb-{usb_label}{"-windowdemo-input" if args
                              'check-user-startup-iso.log' if args.probe_user_startup else
                              'check-gui-workflow.log' if args.probe_gui_workflow else
                              'check-live-window-control.log' if args.probe_live_window_control else
+                             'check-graphics-palette.log' if args.probe_graphics_palette else
                              'check-window-buttons.log' if args.probe_window_buttons else
                              'check-winmgr-live.log' if args.probe_live_winmgr else
                              'check-module-probe.log' if args.probe_module else
@@ -876,6 +881,14 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         if int(scanout.group(1)) < 1000:
             raise RuntimeError('boot graphical terminal is not painting visible pixels:\n' + desktop)
         print('PASS boot graphical terminal window and framebuffer diagnostics', flush=True)
+        if args.probe_graphics_palette:
+            command('zload /Tests/GrSpriteBridge.ZC',
+                    'zc: loaded /Tests/GrSpriteBridge.ZC')
+            command('zcall GrSpriteCustomPaletteChecks',
+                    'zc => 0x000000000000002a')
+            print('PASS indexed plot, rectangle, line and text primitives use the active palette',
+                  flush=True)
+            raise SystemExit(0)
         redraws = command('zcall BootstrapGuiTerminalRedrawCount', 'zc => 0x')
         redraw_count = re.search(r'zc => 0x([0-9a-fA-F]+)', redraws)
         if not redraw_count or int(redraw_count.group(1), 16) == 0:
@@ -2739,6 +2752,9 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 # removed from the boot-loaded compiler session.
                 command('zload /Kernel/KMathB.ZC',
                         'zc: loaded /Kernel/KMathB.ZC', timeout=30)
+                if not args.probe_live_winmgr_ode:
+                    command('zcall GrSpriteCustomPaletteChecks',
+                            'zc => 0x000000000000002a')
                 command('zload /System/Gr/GrBitMap.ZC',
                         'zc: loaded /System/Gr/GrBitMap.ZC', timeout=30)
                 command('zload /Tests/GrSpriteText.ZC',

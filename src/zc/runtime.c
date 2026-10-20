@@ -74,6 +74,7 @@ extern uint64_t zeal_fb_graph_plot(int64_t x, int64_t y, uint32_t color,
                                    int64_t right, int64_t bottom,
                                    uint16_t task_z);
 extern uint64_t zeal_fb_graph_color(uint32_t color);
+extern void zeal_fb_graph_palette_set(const uint8_t *palette);
 extern void zeal_fb_set_win_z_buffer(const uint16_t *z_buf);
 extern uint64_t zeal_fb_graph_rect(int64_t x, int64_t y,
                                    int64_t width, int64_t height,
@@ -2220,6 +2221,10 @@ static int64_t host_fb_graph_plot(int64_t *a) {
 }
 static int64_t host_fb_graph_color(int64_t *a) {
     return (int64_t)zeal_fb_graph_color((uint32_t)a[0]);
+}
+static int64_t host_fb_graph_palette_set(int64_t *a) {
+    zeal_fb_graph_palette_set((const uint8_t *)(uintptr_t)a[0]);
+    return 0;
 }
 static int64_t host_fb_set_win_z_buffer(int64_t *a) {
     zeal_fb_set_win_z_buffer((const uint16_t *)(uintptr_t)a[0]);
@@ -6408,6 +6413,7 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
                     {"ZcFbTextFlushRect", host_fb_text_flush_rect, 6},
                     {"ZcFbGraphPlot", host_fb_graph_plot, 8},
                     {"ZcFbGraphColor", host_fb_graph_color, 1},
+                    {"ZcFbGraphPaletteSet", host_fb_graph_palette_set, 1},
                     {"ZcFbSetWinZBuffer", host_fb_set_win_z_buffer, 1},
                     {"ZcFbGraphRect", host_fb_graph_rect, 10},
                     {"ZcFbGraphText", host_fb_graph_text, 9},

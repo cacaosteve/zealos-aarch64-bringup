@@ -6,7 +6,7 @@ import struct
 import sys
 
 from arm64_source import (extract_home_set, extract_home_startup, extract_home_startup_tasks, inject_home_startup_tasks, extract_server_task, extract_user_task, extract_version_scalars, extract_source_prompt, extract_source_training, translate_autocomplete_task, translate_doctree, translate_registry, translate_docterm, translate_doced, translate_docfind, translate_docform, translate_docpopup, translate_grbitmap,
-                          translate_grdc, translate_grscreen, translate_ktask, translate_winmgr, translate_zsplash, translate_home_once)
+                          translate_grdc, translate_grpalette, translate_grscreen, translate_ktask, translate_winmgr, translate_zsplash, translate_home_once)
 
 root = Path(__file__).resolve().parent.parent
 for path, transform, original, changed in (
@@ -97,6 +97,19 @@ except ValueError:
     pass
 else:
     raise AssertionError('GrDC overlay accepted a changed row-stride calculation')
+
+palette_source = (root / 'upstream/pinned/System/Gr/GrPalette.ZC').read_bytes()
+palette_overlay = translate_grpalette(palette_source)
+assert palette_overlay != palette_source
+assert b'ZcFbGraphPaletteSet(bgr24);' in palette_overlay
+try:
+    translate_grpalette(palette_source.replace(
+        b'MemCopy(&gr_palette, bgr24, sizeof(CBGR24) * COLORS_NUM);',
+        b'MemCopy(&other_palette, bgr24, sizeof(CBGR24) * COLORS_NUM);', 1))
+except ValueError:
+    pass
+else:
+    raise AssertionError('GrPalette overlay accepted a changed palette setter')
 
 bitmap_source = (root / 'upstream/pinned/System/Gr/GrBitMap.ZC').read_bytes()
 bitmap_overlay = translate_grbitmap(bitmap_source)

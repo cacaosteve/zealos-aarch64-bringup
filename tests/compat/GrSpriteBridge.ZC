@@ -1,6 +1,49 @@
 extern I64 ZcFbTextPixel(I64 x, I64 y);
+extern I64 ZcFbGraphColor(I64 color);
 extern Bool ZcFbGraphPlot(I64 x, I64 y, U32 color, I64 left, I64 top,
                          I64 right, I64 bottom, I64 task_z);
+extern Bool ZcFbGraphRect(I64 x, I64 y, I64 width, I64 height, U32 color,
+                         I64 left, I64 top, I64 right, I64 bottom,
+                         I64 task_z);
+
+I64 GrSpriteCustomPaletteChecks()
+{
+    CDC *dc;
+    CBGR24 saved_palette[COLORS_NUM];
+    CBGR24 custom_palette[COLORS_NUM];
+    I64 x, y, text_drawn, result = 42;
+    U32 expected = 0x00563412;
+
+    dc = DCNew(800, 600);
+    if (!dc)
+        return 1;
+    GrPaletteGet(saved_palette);
+    MemCopy(custom_palette, saved_palette, sizeof(custom_palette));
+    custom_palette[9].b = 0x12;
+    custom_palette[9].g = 0x34;
+    custom_palette[9].r = 0x56;
+    GrPaletteSet(custom_palette);
+    dc->flags |= DCF_SCREEN_BITMAP | DCF_ON_TOP;
+    dc->color.c0 = 9;
+    if (ZcFbGraphColor(9) != expected)
+        result = 2;
+    if (!GrPlot(dc, 540, 500))
+        result = 3;
+    if (!GrRect(dc, 542, 500, 3, 2))
+        result = 4;
+    if (!GrLine(dc, 546, 500, 548, 500))
+        result = 5;
+    text_drawn = ZcFbGraphText(550, 500, 9, 0, 0, 799, 599, "X", 0);
+    if (text_drawn != 26)
+        result = 6;
+
+    GrPaletteSet(saved_palette);
+    for (y = 500; y < 508; y++)
+        for (x = 540; x < 564; x++)
+            ZcFbGraphPlot(x, y, 0, 0, 0, 799, 599, 0);
+    DCDel(dc);
+    return result;
+}
 
 I64 GrDC2SpriteChecks()
 {

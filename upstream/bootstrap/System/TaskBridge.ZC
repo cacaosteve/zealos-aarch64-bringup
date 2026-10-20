@@ -2301,7 +2301,6 @@ extern Bool GrLine(CDC *dc, I64 x1, I64 y1, I64 x2, I64 y2,
 extern Bool GrRect(CDC *dc, I64 x, I64 y, I64 width, I64 height);
 extern I64 GrHLine(CDC *dc, I64 x1, I64 x2, I64 y, I64 z1, I64 z2);
 extern U0 SpriteEllipse0(CDC *dc, I64 cx, I64 cy, I64 rx, I64 ry);
-
 #define SPT_END 0
 #define SPT_COLOR 1
 #define SPT_DITHER_COLOR 2
@@ -3130,7 +3129,7 @@ Bool GrPlot(CDC *dc=gr.dc, I64 x=0, I64 y=0)
 {
     CTask *task;
     I64 left, top, right, bottom, task_z;
-    U8 color;
+    I64 color;
     if (!dc)
         return FALSE;
     task = dc->win_task;
@@ -3160,8 +3159,7 @@ Bool GrPlot(CDC *dc=gr.dc, I64 x=0, I64 y=0)
     // bridge; sprite dither-color records use the deterministic flag.
     if ((dc->color.c1.rop & 0x40) && ((x ^ y) & 1))
         color = dc->color.c1 & 0xff;
-    return ZcFbGraphPlot(x, y, color,
-                         left, top, right, bottom, task_z);
+    return ZcFbGraphPlot(x, y, color, left, top, right, bottom, task_z);
 }
 I64 bootstrap_mouse_draw_calls = 0;
 U0 BootstrapDrawMouse(CDC *dc, I64 x, I64 y)
@@ -3271,8 +3269,10 @@ Bool GrLine(CDC *dc=gr.dc, I64 x1=0, I64 y1=0, I64 x2=0, I64 y2=0,
 {
     CTask *task;
     I64 left, top, right, bottom, thick, line_shift, dx, dy, line_step, task_z;
+    U32 color;
     if (!dc || step < 1 || start < 0)
         return FALSE;
+    color = dc->color.c0 & 0xff;
     task = dc->win_task;
     task_z = 0;
     if ((dc->flags & DCF_SCREEN_BITMAP) && !(dc->flags & DCF_ON_TOP))
@@ -3298,7 +3298,7 @@ Bool GrLine(CDC *dc=gr.dc, I64 x1=0, I64 y1=0, I64 x2=0, I64 y2=0,
     }
     thick = dc->thick;
     if (thick <= 1)
-        return ZcFbGraphLine(x1, y1, x2, y2, dc->color.c0 & 0xff,
+        return ZcFbGraphLine(x1, y1, x2, y2, color,
                              step, start, left, top, right, bottom,
                              task_z);
     // Keep the bootstrap line path bounded. ZealOS's normal GrLine3 applies
@@ -3322,7 +3322,7 @@ Bool GrLine(CDC *dc=gr.dc, I64 x1=0, I64 y1=0, I64 x2=0, I64 y2=0,
             x1 += line_shift;
             x2 += line_shift;
         }
-        ZcFbGraphLine(x1, y1, x2, y2, dc->color.c0 & 0xff,
+        ZcFbGraphLine(x1, y1, x2, y2, color,
                 step, start, left, top, right, bottom,
                 task_z);
         if (dx >= dy)
