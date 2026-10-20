@@ -2400,10 +2400,13 @@ Port sequence and remaining gates:
    inside that aperture. `make check-pi4-pcie-fdt` and `make check-pi4-dma`
    cover the parser and allocator, including address translation, map splitting
    and capacity. A guarded read-only link-status probe is also implemented.
-   The arena is not used for DMA; PCI config-space access, bus mastering and
-   xHCI remain disabled. Check the actual UEFI FDT values, link status and
-   reservation on the Pi before a bounded VL805 config read. Validate cache
-   behavior, register access widths, and physical keyboard/mouse separately.
+   The arena is not used for DMA. A guarded read-only link/PCI probe reports
+   the first downstream function's ID, class/header, command/status, and
+   header-valid BAR dwords; it performs no config writes. Check the actual
+   UEFI FDT values, link status, reservation, and VL805 BAR assignment on the
+   Pi before deciding how to map the controller. Bus mastering and xHCI remain
+   disabled. Validate cache behavior, register access widths, and physical
+   keyboard/mouse separately.
    Raspberry Pi's [PCIe driver](https://github.com/raspberrypi/linux/blob/rpi-6.12.y/drivers/pci/controller/pcie-brcmstb.c)
    and [VL805 firmware documentation](https://github.com/raspberrypi/documentation/blob/master/documentation/asciidoc/computers/raspberry-pi/eeprom-bootloader.adoc)
    are platform references, not proof of this port working on hardware.

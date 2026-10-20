@@ -206,6 +206,9 @@ static uint32_t g_pi4_cfg_state;
 static uint32_t g_pi4_cfg_id;
 static uint32_t g_pi4_cfg_class_rev;
 static uint32_t g_pi4_cfg_header;
+static uint32_t g_pi4_cfg_command;
+static uint32_t g_pi4_cfg_bars[6];
+static unsigned g_pi4_cfg_bar_count;
 #define PI4_CFG_NOT_RUN 0u
 #define PI4_CFG_READ_OK 1u
 #define PI4_CFG_MMIO_FAIL 2u
@@ -1148,9 +1151,14 @@ static void pi4_pcie_probe_first_function(const struct zeal_handoff *h,
     uint32_t id = 0xffffffffu;
     uint32_t class_rev = 0xffffffffu;
     uint32_t header = 0xffffffffu;
+    uint32_t command = 0xffffffffu;
+    unsigned bar_count = 0;
 
     g_pi4_link_status = link_status;
     g_pi4_cfg_state = PI4_CFG_NOT_RUN;
+    g_pi4_cfg_bar_count = 0;
+    for (unsigned i = 0; i < 6; i++)
+        g_pi4_cfg_bars[i] = 0;
     if ((link_status & (PI4_PCIE_STATUS_PHY_LINKUP | PI4_PCIE_STATUS_DL_ACTIVE)) !=
         (PI4_PCIE_STATUS_PHY_LINKUP | PI4_PCIE_STATUS_DL_ACTIVE)) {
         g_pi4_cfg_state = PI4_CFG_NOT_LINKED;
@@ -1176,16 +1184,50 @@ static void pi4_pcie_probe_first_function(const struct zeal_handoff *h,
         g_uart_dead = 0;
         return;
     }
-    g_pi4_cfg_id = id;
-    g_pi4_cfg_class_rev = class_rev;
-    g_pi4_cfg_header = header;
     if (id == 0xffffffffu || (id & 0xffffu) == 0xffffu) {
+        g_pi4_cfg_id = id;
         g_pi4_cfg_state = PI4_CFG_NO_DEVICE;
         uart_puts(g_uart, "PCIe cfg 01:00.0 absent ID=");
         uart_put_u64_hex(g_uart, id);
         uart_puts(g_uart, "\n");
         return;
     }
+
+    /* Header type 0 has six BARs; a PCI bridge (type 1) has only two.
+     * Never report a bridge's bus-number registers as BARs. */
+    unsigned header_type = (header >> 16) & 0x7fu;
+    if (header_type == 0)
+        bar_count = 6;
+    else if (header_type == 1)
+        bar_count = 2;
+    if (pi4_pcie_read_config32(h, link_status, 0x04, &command) != 0) {
+        g_pi4_cfg_state = PI4_CFG_MMIO_FAIL;
+        uart_puts(g_uart, "PCIe command/status read aborted ESR=");
+        uart_put_u64_hex(g_uart, g_probe_esr);
+        uart_puts(g_uart, " FAR=");
+        uart_put_u64_hex(g_uart, g_probe_far);
+        uart_puts(g_uart, "\n");
+        g_uart_dead = 0;
+        return;
+    }
+    for (unsigned i = 0; i < bar_count; i++) {
+        if (pi4_pcie_read_config32(h, link_status, 0x10 + i * 4,
+                                   &g_pi4_cfg_bars[i]) != 0) {
+            g_pi4_cfg_state = PI4_CFG_MMIO_FAIL;
+            uart_puts(g_uart, "PCIe BAR read aborted ESR=");
+            uart_put_u64_hex(g_uart, g_probe_esr);
+            uart_puts(g_uart, " FAR=");
+            uart_put_u64_hex(g_uart, g_probe_far);
+            uart_puts(g_uart, "\n");
+            g_uart_dead = 0;
+            return;
+        }
+    }
+    g_pi4_cfg_id = id;
+    g_pi4_cfg_class_rev = class_rev;
+    g_pi4_cfg_header = header;
+    g_pi4_cfg_command = command;
+    g_pi4_cfg_bar_count = bar_count;
     g_pi4_cfg_state = PI4_CFG_READ_OK;
     uart_puts(g_uart, "PCIe cfg 01:00.0 ID=");
     uart_put_u64_hex(g_uart, id);
@@ -1193,7 +1235,16 @@ static void pi4_pcie_probe_first_function(const struct zeal_handoff *h,
     uart_put_u64_hex(g_uart, class_rev);
     uart_puts(g_uart, " header=");
     uart_put_u64_hex(g_uart, header);
-    uart_puts(g_uart, " (read only; bus mastering off)\n");
+    uart_puts(g_uart, " command/status=");
+    uart_put_u64_hex(g_uart, command);
+    uart_puts(g_uart, " (read only)\n");
+    for (unsigned i = 0; i < bar_count; i++) {
+        uart_puts(g_uart, "  BAR");
+        uart_write(g_uart, '0' + i);
+        uart_puts(g_uart, "=");
+        uart_put_u64_hex(g_uart, g_pi4_cfg_bars[i]);
+        uart_puts(g_uart, "\n");
+    }
 }
 
 /* Keep the Pi's PCIe/DMA discovery report readable without a UART adapter. */
@@ -1249,6 +1300,14 @@ static void pi_diag_fb_report(const struct zeal_handoff *h) {
         pi_diag_fb_u64_hex(g_pi4_cfg_class_rev);
         pi_diag_fb_puts(" hdr=");
         pi_diag_fb_u64_hex(g_pi4_cfg_header);
+        pi_diag_fb_puts("\nPCI cmd/status=");
+        pi_diag_fb_u64_hex(g_pi4_cfg_command);
+        for (unsigned i = 0; i < g_pi4_cfg_bar_count; i++) {
+            pi_diag_fb_puts("\nBAR");
+            fb_putc('0' + i);
+            pi_diag_fb_puts("=");
+            pi_diag_fb_u64_hex(g_pi4_cfg_bars[i]);
+        }
     } else if (g_pi4_cfg_state == PI4_CFG_NO_DEVICE) {
         pi_diag_fb_puts("\nPCI 01:00.0 absent ID=");
         pi_diag_fb_u64_hex(g_pi4_cfg_id);

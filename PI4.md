@@ -135,14 +135,17 @@ connect a USB-to-3.3 V TTL adapter to the Mac and cross its RX/TX with Pi GPIO
 PI-DIAG makes a guarded, read-only load of the BCM2711 root-complex link-status
 register at offset `0x4068`, only when the FDT marks the bridge enabled and
 provides the register window. When both PHY link and Data Link are active, it
-maps the controller window as Device MMIO and reads only bus 1/device 0/function
-0 offsets `0x00`, `0x08`, and `0x0c` through the BCM2711 indirect config index
-and data registers. These report the vendor/device ID, class/revision, and
-header type. The probe validates the FDT window, alignment, and address bounds,
-rejects link-down access, and recovers synchronous MMIO aborts. It never writes
-endpoint configuration, enables bus mastering, or starts xHCI. Host tests cover
-the address plan, link gate, and range limits (`make check-pi4-pcie-cfg`, or
-`make check-pi4-platform` for the full PCIe/DMA helper suite).
+maps the controller window as Device MMIO and reads bus 1/device 0/function 0
+through the BCM2711 indirect config index and data registers. It reports the
+vendor/device ID, class/revision, header type, command/status, and the BAR
+dwords valid for a type-0 endpoint or type-1 bridge. The probe validates the
+FDT window, alignment, and address bounds, rejects link-down access, and
+recovers synchronous MMIO aborts. It never writes endpoint configuration,
+enables bus mastering, or starts xHCI. Host tests cover the address plan, link
+gate, and range limits (`make check-pi4-pcie-cfg`, or `make check-pi4-platform`
+for the full PCIe/DMA helper suite). A physical Pi report is still needed to
+confirm the UEFI-assigned VL805 BAR values before deciding how to map its
+register window.
 
 This is still an unverified hardware probe: synthetic tests do not validate the
 UEFI-provided FDT, Device mapping, actual link state, or the device identity on
