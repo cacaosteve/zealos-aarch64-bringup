@@ -3846,6 +3846,12 @@ event-ring cycling.
 
 After the `status` alias was added, the same full command passed again against
 the freshly rebuilt QEMU image. Its graphical shell smoke accepts both
-`status` and `zstatus`; menu Status still dispatches `zstatus`. This acceptance
-run does not update an already-running UTM VM, so visual verification of this
-exact image in UTM remains pending.
+`status` and `zstatus`; menu Status still dispatches `zstatus`. After refreshing
+UTM, the user confirmed that the OS menu's letter shapes look normal. The
+post-palette USB run `python3 scripts/check-compat.py --usb-input nec
+--usb-with-virtio --usb-hubs 2 --usb-hotplug --probe-gui-workflow` also passed:
+USB ownership and recovery, menu actions, Files and Window Demo, editor
+save/reopen across reboot, `latticeplay`, `stockplay`, and hub-subtree recovery
+all passed. The Pi 4B VL805 path still needs a fresh boot of the staged
+`build/pi-esp` payload; the earlier HDMI photo predates its FDT-status
+diagnostics and is not a basis for enabling bus mastering or xHCI.
