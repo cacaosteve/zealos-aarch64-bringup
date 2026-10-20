@@ -17,6 +17,10 @@ I64 GrSpriteCustomPaletteChecks()
     dc = DCNew(800, 600);
     if (!dc)
         return 1;
+    // The disposable compiler probe may load GrPalette after boot, before
+    // any display startup initializes gr_palette. Establish a known baseline
+    // so this test restores the active standard palette rather than zeros.
+    PaletteSetStd(FALSE);
     GrPaletteGet(saved_palette);
     MemCopy(custom_palette, saved_palette, sizeof(custom_palette));
     custom_palette[9].b = 0x12;

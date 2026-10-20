@@ -661,7 +661,8 @@ def translate_grbitmap(source: bytes) -> bytes:
             body.count("res = DCNew(x2 - x1 + 1, y2 -y1 + 1, task);") != 1):
         raise ValueError("pinned DCExt extraction sequence changed")
     body = body.replace("\tCTask *win_task;",
-                        "\tCTask *win_task;\n\tI64 row, width;", 1)
+                        "\tCTask *win_task;\n"
+                        "\tI64 row, width, copy_x1, copy_y1, copy_x2, copy_y2;", 1)
     body = body.replace(
         "\tres = DCNew(x2 - x1 + 1, y2 -y1 + 1, task);",
         "\twidth = x2 - x1 + 1;\n"
@@ -673,11 +674,31 @@ def translate_grbitmap(source: bytes) -> bytes:
         "\tGrBlot(res, -x1, -y1, dc);",
         """\tif (dc->flags & DCF_SCREEN_BITMAP)
 		GrBlot(res, -x1, -y1, dc);
-	else
-		for (row = 0; row < res->height; row++)
-			MemCopy(res->body + row * res->width_internal,
-					dc->body + (y1 + row) * dc->width_internal + x1,
-					res->width);""",
+		else
+		{
+			copy_x1 = x1;
+			if (copy_x1 < 0)
+				copy_x1 = 0;
+			copy_y1 = y1;
+			if (copy_y1 < 0)
+				copy_y1 = 0;
+			copy_x2 = x2;
+			if (copy_x2 >= dc->width)
+				copy_x2 = dc->width - 1;
+			copy_y2 = y2;
+			if (copy_y2 >= dc->height)
+				copy_y2 = dc->height - 1;
+			if (copy_x1 <= copy_x2 && copy_y1 <= copy_y2)
+			{
+				width = copy_x2 - copy_x1 + 1;
+				for (row = 0; row <= copy_y2 - copy_y1; row++)
+					MemCopy(res->body + (copy_y1 + row - y1) *
+							res->width_internal + copy_x1 - x1,
+						dc->body + (copy_y1 + row) *
+							dc->width_internal + copy_x1,
+						width);
+			}
+		}""",
         1,
     )
     return (text[:start] + body + text[end:]).encode("utf-8")

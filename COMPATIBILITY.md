@@ -2068,9 +2068,16 @@ ZealOS live distribution or installer.
   compiler. QEMU checks validate table contents and actual pen-brush pixels;
   the CDC diff check verifies empty and changed regions, including a
   nonzero-origin, seven-pixel-wide extraction and its padded row stride. A
-  guarded ARM64 `GrBitMap.ZC` overlay copies ordinary CDC rows directly in
-  `DCExt`; the pinned implementation's negative-origin `GrBlot` could write
-  before the tightly allocated result. Live source WinMgr checks cover startup,
+  guarded ARM64 `GrBitMap.ZC` overlay keeps `DCExt`'s requested dimensions,
+  rounds its row stride safely, and copies only the source intersection; the
+  pinned negative-origin `GrBlot` could write before the tightly allocated
+  result. `GrDCExtClipChecks` verifies transparent margins for top-left and
+  bottom-right overhangs, a wholly out-of-bounds crop, and padded rows. The
+  disposable custom-palette check first activates the standard palette so it
+  restores a defined palette for later sprite checks. The full graphics probe
+  `python3 scripts/check-compat.py --pci --probe-module /System/Win.ZC` passes
+  these CDC checks and the sprite text, spline, flood-fill, symmetry, and
+  transform checks. Live source WinMgr checks cover startup,
   draw, mouse, title dragging, resizing, and captured-control release after
   moving the pointer outside the control.
   Full planar semantics, remaining

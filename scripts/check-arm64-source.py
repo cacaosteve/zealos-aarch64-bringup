@@ -119,11 +119,17 @@ ext_start = bitmap_text.index('public CDC *DCExt(')
 ext_end = bitmap_text.index('\npublic CDC *DCDiff(', ext_start)
 ext_text = bitmap_text[ext_start:ext_end]
 assert 'if (dc->flags & DCF_SCREEN_BITMAP)\n\t\tGrBlot(res, -x1, -y1, dc);' in ext_text
-assert 'for (row = 0; row < res->height; row++)' in ext_text
+assert 'copy_x1 = x1;' in ext_text and 'if (copy_x1 < 0)' in ext_text
+assert 'copy_y1 = y1;' in ext_text and 'if (copy_y1 < 0)' in ext_text
+assert 'if (copy_x2 >= dc->width)' in ext_text
+assert 'if (copy_y2 >= dc->height)' in ext_text
+assert 'if (copy_x1 <= copy_x2 && copy_y1 <= copy_y2)' in ext_text
+assert 'for (row = 0; row <= copy_y2 - copy_y1; row++)' in ext_text
 assert 'DCNew((width + 7) & ~7, y2 - y1 + 1, task)' in ext_text
 assert 'res->width = width;' in ext_text
-assert 'dc->body + (y1 + row) * dc->width_internal + x1' in ext_text
-assert 'res->width);' in ext_text
+assert 'res->body + (copy_y1 + row - y1) *' in ext_text
+assert 'dc->body + (copy_y1 + row) *' in ext_text
+assert 'width = copy_x2 - copy_x1 + 1;' in ext_text
 
 try:
     translate_grbitmap(bitmap_source.replace(b'GrBlot(res, -x1, -y1, dc);',
