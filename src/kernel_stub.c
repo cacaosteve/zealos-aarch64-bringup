@@ -4880,6 +4880,19 @@ void zc_usb_status(void) {
     con_puts(" usb_modifiers="); zc_print_decimal(usb_keyboard_ready() ? g_usb.keyboard->previous[0] : 0);
     con_puts(" usb_repeat="); zc_print_decimal(usb_keyboard_ready() ? g_usb.keyboard->repeat_usage : 0);
     con_puts("\n");
+    /* Report the effective pointer path even when VirtIO owns it and there
+     * is no xHCI controller to contribute an `xhci: ... buttons=` line.
+     * This is also useful when diagnosing UTM capture/release behavior. */
+    uint32_t pointer_x = 0, pointer_y = 0;
+    int pointer_buttons = 0;
+    int pointer_ready = input_pointer_ready() && g_fb &&
+        input_pointer_sample((uint32_t)g_fb_w, (uint32_t)g_fb_h,
+                             &pointer_x, &pointer_y,
+                             &pointer_buttons, NULL);
+    con_puts("pointer_state: ready="); zc_print_decimal(pointer_ready);
+    con_puts(" pointer_xy="); zc_print_decimal(pointer_x);
+    con_puts("/"); zc_print_decimal(pointer_y);
+    con_puts(" buttons="); zc_print_decimal(pointer_buttons); con_puts("\n");
     con_puts("usb_topology: hubs="); zc_print_decimal(hubs);
     con_puts(" attaches="); zc_print_decimal(g_usb.attaches);
     con_puts(" detaches="); zc_print_decimal(g_usb.detaches);
