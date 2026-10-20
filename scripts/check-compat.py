@@ -1503,6 +1503,52 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     raise RuntimeError('OS menu did not appear on the desktop top edge; '
                                        f'see {graphical_path("os-menu-top-edge")} and .txt\n'
                                        + menu_screen[3])
+                # The upstream WinMgr keeps the menu open while the left
+                # button is held. Drag from the OS title into its Help row,
+                # then release; this exercises the actual MESSAGE_KEY_UP
+                # action route rather than only checking the painted menu.
+                qmp_command('input-send-event', {'events': [
+                    {'type': 'btn', 'data': {'down': True, 'button': 'left'}}]})
+                time.sleep(0.2)
+                menu_title_held = graphical_screen('os-menu-title-held')
+                # The menu bar is one FONT_HEIGHT row tall; Help is its first
+                # submenu item, so target the center of screen row 1.
+                move_graphical_pointer(4, 12)
+                time.sleep(0.2)
+                help_row = graphical_screen('os-menu-help-held')
+                if rgb_pixels_in(help_row, (255, 255, 85), (0, 8, 240, 16)) < 32:
+                    # Never leave QEMU's button held when this diagnostic
+                    # exits; a failed hover/selection probe must not strand
+                    # the interactive desktop in pointer capture.
+                    qmp_command('input-send-event', {'events': [
+                        {'type': 'btn', 'data': {'down': False, 'button': 'left'}}]})
+                    status = command('zstatus', 'usb_input:')
+                    raise RuntimeError('OS menu Help row was not highlighted while held:\n' +
+                                       status +
+                                       'title-held frame:\n' + menu_title_held[3] +
+                                       'help-held frame:\n' + help_row[3])
+                qmp_command('input-send-event', {'events': [
+                    {'type': 'btn', 'data': {'down': False, 'button': 'left'}}]})
+                menu_release_status = command('zstatus', 'buttons=0')
+                pointer_match = re.search(r'pointer_xy=(\d+)/(\d+)\s+buttons=0',
+                                           menu_release_status)
+                if (not pointer_match or
+                        abs(int(pointer_match.group(1)) - 4) > 1 or
+                        abs(int(pointer_match.group(2)) - 12) > 1):
+                    raise RuntimeError('OS menu click did not release on the Help row:\n' +
+                                       menu_release_status)
+                menu_action_deadline = time.monotonic() + 5
+                menu_action_screen = graphical_screen('os-menu-help-action')
+                while True:
+                    if 'Graphical commands:' in menu_action_screen[3]:
+                        break
+                    if time.monotonic() >= menu_action_deadline:
+                        status = command('zstatus', 'usb_input:')
+                        raise RuntimeError('OS menu click did not dispatch Help:\n' +
+                                           status + menu_action_screen[3])
+                    time.sleep(0.1)
+                    menu_action_screen = graphical_screen('os-menu-help-action')
+                print('PASS OS menu press-drag-release dispatched Help', flush=True)
                 # Leaving the top row should collapse both the highlight and
                 # its dropdown. This is the normal desktop state shown in the
                 # live UTM reference when the pointer is elsewhere.

@@ -1990,6 +1990,17 @@ static int64_t host_active_mouse_globals(int64_t *a) {
                ? (int64_t)(uintptr_t)global->data_addr
                : 0;
 }
+static int64_t host_active_mouse_hard_globals(int64_t *a) {
+    CHashGlblVar *global;
+    (void)a;
+    if (!Fs || !Fs->hash_table)
+        return 0;
+    global = (CHashGlblVar *)HashFind("mouse_hard", Fs->hash_table,
+                                     HTT_GLBL_VAR, 1);
+    return global && global->data_addr
+               ? (int64_t)(uintptr_t)global->data_addr
+               : 0;
+}
 static int64_t host_active_winmgr_globals(int64_t *a) {
     CHashGlblVar *global;
     (void)a;
@@ -5808,6 +5819,8 @@ static int load_source_path(const char *path, int merged, int recover) {
         PrsBindCSymbol("ZcMouseButtonsUpdate", host_mouse_buttons_update, 2);
         PrsBindCSymbol("ZcActiveGrGlobals", host_active_gr_globals, 0);
         PrsBindCSymbol("ZcActiveMouseGlobals", host_active_mouse_globals, 0);
+        PrsBindCSymbol("ZcActiveMouseHardGlobals",
+                       host_active_mouse_hard_globals, 0);
         PrsBindCSymbol("ZcActiveWinMgrGlobals", host_active_winmgr_globals, 0);
         PrsBindCSymbol("ZcSetWinMgrTask", host_set_winmgr_task, 1);
         PrsBindCSymbol("ExePrint2", host_exe_print2, 3);
@@ -6370,6 +6383,8 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
                     {"ZcDocRecalc", host_doc_recalc, 2},
                     {"ZcActiveGrGlobals", host_active_gr_globals, 0},
                     {"ZcActiveMouseGlobals", host_active_mouse_globals, 0},
+                    {"ZcActiveMouseHardGlobals",
+                     host_active_mouse_hard_globals, 0},
                     {"ZcActiveWinMgrGlobals", host_active_winmgr_globals, 0},
                     {"ZcSetWinMgrTask", host_set_winmgr_task, 1},
                     {"ZcFbTextFlushRect", host_fb_text_flush_rect, 6},

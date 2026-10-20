@@ -147,6 +147,24 @@ winmgr_text = winmgr_translated.decode('utf-8')
 assert winmgr_translated != winmgr_source
 assert winmgr_text.count('ZcTaskFrameRun;') == 1
 assert '\t\tGrUpdateScreen;' not in winmgr_text
+assert ('if (task == Fs && 0 <= mouse.pos.y < FONT_HEIGHT && mouse_hard.installed)\n'
+        '\t\t\t\t{\n'
+        '\t\t\t\t\twinmgr.show_menu = TRUE;\n'
+        '\t\t\t\t\tBootstrapMenuFocusRemember;\n'
+        '\t\t\t\t\tBootstrapCtrlInputPoll(TRUE);\n'
+        '\t\t\t\t\tBootstrapMenuFocusRestore;\n'
+        '\t\t\t\t\tif (mouse.lb)\n') in winmgr_text
+assert ('while (mouse.lb)\n'
+        '\t\t\t\t\t\t{\n'
+        '\t\t\t\t\t\t\tBootstrapCtrlInputPoll(TRUE);\n'
+        '\t\t\t\t\t\t\tBootstrapMenuFocusRestore;\n'
+        '\t\t\t\t\t\t\tWinMgrSleep(TRUE);\n'
+        '\t\t\t\t\t\t\tBootstrapMenuFocusRestore;\n'
+        '\t\t\t\t\t\t}') in winmgr_text
+assert ('BootstrapMenuFocusRestore;\n'
+        '\t\t\t\t\t\tif (sys_cur_submenu_entry)\n'
+        '\t\t\t\t\t\t\tTaskMessage(sys_focus_task, 0,') in winmgr_text
+assert '\t\t\t\t\t\tBootstrapMenuFocusRestore(TRUE);\n' in winmgr_text
 
 try:
     translate_winmgr(winmgr_source.replace(b'GrUpdateScreen;', b'GrUpdateScreen32;', 1))
@@ -154,6 +172,26 @@ except ValueError:
     pass
 else:
     raise AssertionError('overlay accepted a changed window-manager refresh call')
+
+try:
+    translate_winmgr(winmgr_source.replace(
+        b'\t\t\t\t\tif (mouse.lb && !old_mouse.lb)\n',
+        b'\t\t\t\t\tif (mouse.lb)\n', 1))
+except ValueError:
+    pass
+else:
+    raise AssertionError('overlay accepted a changed top-menu press check')
+
+try:
+    translate_winmgr(winmgr_source.replace(
+        b'\t\t\t\t\t\twhile (mouse.lb)\n'
+        b'\t\t\t\t\t\t\tWinMgrSleep(TRUE);',
+        b'\t\t\t\t\t\twhile (mouse.lb)\n'
+        b'\t\t\t\t\t\t\tWinMgrSleep;', 1))
+except ValueError:
+    pass
+else:
+    raise AssertionError('overlay accepted a changed top-menu mouse wait loop')
 
 ktask_source = (root / 'upstream/pinned/Kernel/KTask.ZC').read_bytes()
 user_slice = extract_user_task(ktask_source)

@@ -528,11 +528,13 @@ def extract_server_task(source: bytes) -> bytes:
 
 
 def translate_winmgr(source: bytes) -> bytes:
-    """Route the source manager's periodic redraw through atomic scanout.
+    """Adapt the source manager redraw and USB mouse menu wait loop.
 
     The upstream manager otherwise calls GrUpdateScreen from WinMgrSleep,
-    bypassing the host's staged framebuffer transaction. Require the exact
-    single call site so source updates cannot silently change its semantics.
+    bypassing the host's staged framebuffer transaction. Poll native USB input
+    in the manager task immediately before its top-menu held-button check, and
+    during the held selection loop so clicks, drags and release stay live.
+    Require exact anchors for all changes.
     """
     try:
         text = source.decode("utf-8")
@@ -547,6 +549,75 @@ def translate_winmgr(source: bytes) -> bytes:
     if "ZcTaskFrameRun" in text:
         raise ValueError("WinMgr.ZC already contains the frame-run hook")
     text = text.replace(call, "\t\tZcTaskFrameRun;", 1)
+    menu_press = "\t\t\t\t\tif (mouse.lb && !old_mouse.lb)\n"
+    if text.count(menu_press) != 1:
+        raise ValueError(
+            "expected exactly one edge-triggered top-menu press check; "
+            f"found {text.count(menu_press)}"
+        )
+    text = text.replace(
+        menu_press,
+        "\t\t\t\t\tBootstrapCtrlInputPoll(TRUE);\n"
+        "\t\t\t\t\tBootstrapMenuFocusRestore;\n"
+        "\t\t\t\t\tif (mouse.lb)\n",
+        1,
+    )
+    menu_show_poll = ("\t\t\t\t\twinmgr.show_menu = TRUE;\n"
+                      "\t\t\t\t\tBootstrapCtrlInputPoll(TRUE);\n")
+    if text.count(menu_show_poll) != 1:
+        raise ValueError(
+            "expected exactly one top-menu show/poll sequence; "
+            f"found {text.count(menu_show_poll)}"
+        )
+    text = text.replace(
+        menu_show_poll,
+        "\t\t\t\t\twinmgr.show_menu = TRUE;\n"
+        "\t\t\t\t\tBootstrapMenuFocusRemember;\n"
+        "\t\t\t\t\tBootstrapCtrlInputPoll(TRUE);\n",
+        1,
+    )
+    menu_wait = ("\t\t\t\t\t\twhile (mouse.lb)\n"
+                 "\t\t\t\t\t\t\tWinMgrSleep(TRUE);")
+    if text.count(menu_wait) != 1:
+        raise ValueError(
+            "expected exactly one top-menu mouse wait loop; "
+            f"found {text.count(menu_wait)}"
+        )
+    text = text.replace(
+        menu_wait,
+        "\t\t\t\t\t\twhile (mouse.lb)\n"
+        "\t\t\t\t\t\t{\n"
+        "\t\t\t\t\t\t\tBootstrapCtrlInputPoll(TRUE);\n"
+        "\t\t\t\t\t\t\tBootstrapMenuFocusRestore;\n"
+        "\t\t\t\t\t\t\tWinMgrSleep(TRUE);\n"
+        "\t\t\t\t\t\t\tBootstrapMenuFocusRestore;\n"
+        "\t\t\t\t\t\t}",
+        1,
+    )
+    menu_dispatch = ("\t\t\t\t\t\tif (sys_cur_submenu_entry)\n"
+                     "\t\t\t\t\t\t\tTaskMessage(sys_focus_task, 0,")
+    if text.count(menu_dispatch) != 1:
+        raise ValueError(
+            "expected exactly one top-menu action dispatch; "
+            f"found {text.count(menu_dispatch)}"
+        )
+    text = text.replace(
+        menu_dispatch,
+        "\t\t\t\t\t\tBootstrapMenuFocusRestore;\n"
+        + menu_dispatch,
+        1,
+    )
+    menu_done = "\t\t\t\t\t\twinmgr.show_menu = FALSE;\n"
+    if text.count(menu_done) != 1:
+        raise ValueError(
+            "expected exactly one top-menu close after selection; "
+            f"found {text.count(menu_done)}"
+        )
+    text = text.replace(
+        menu_done,
+        menu_done + "\t\t\t\t\t\tBootstrapMenuFocusRestore(TRUE);\n",
+        1,
+    )
     return text.encode("utf-8")
 
 

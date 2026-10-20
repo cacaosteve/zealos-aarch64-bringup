@@ -163,6 +163,7 @@ extern Bool ZcMouseButtonsUpdate(Bool left, Bool right);
 extern U0 BootstrapMouseHardSample(I64 sample, I64 now_ns);
 extern Bool BootstrapCtrlInputSubmit(CTask *task, I64 sample, I64 now_ns);
 extern CMouseStateGlobals *ZcActiveMouseGlobals();
+extern CMouseHardStateGlobals *ZcActiveMouseHardGlobals();
 extern CWinMgrGlobals *ZcActiveWinMgrGlobals();
 extern U0 ZcSetWinMgrTask(CTask *task);
 extern F64 Exp(F64 x);
@@ -4078,6 +4079,20 @@ public U0 BootstrapWinDragEnd()
 // to BootstrapCtrlInputSampleAt during the initial module load.
 CMouseStateGlobals mouse, mouse_last;
 CMouseHardStateGlobals mouse_hard, mouse_hard_last;
+CTask *bootstrap_menu_focus_task;
+public U0 BootstrapMenuFocusRemember()
+{//Remember the focused task when the source manager opens its menu bar.
+    if (TaskValidate(sys_focus_task) && sys_focus_task != sys_winmgr_task &&
+        sys_focus_task->cur_menu)
+        bootstrap_menu_focus_task = sys_focus_task;
+}
+public U0 BootstrapMenuFocusRestore(Bool clear=FALSE)
+{//Keep the application's menu owner focused while the source manager tracks a menu click.
+    if (TaskValidate(bootstrap_menu_focus_task))
+        sys_focus_task = bootstrap_menu_focus_task;
+    if (clear)
+        bootstrap_menu_focus_task = NULL;
+}
 U0 BootstrapMouseGlobalsInit()
 {//MouseInit's visible, unscaled defaults for the VirtIO tablet bridge.
     mouse.scale.x = mouse.scale.y = mouse.scale.z = 1.0;
@@ -4495,8 +4510,8 @@ fail:
     active_mouse->pos.z = old_pos_z;
     return fail_code;
 }
-U0 BootstrapCtrlInputPoll()
-{//Poll UTM's absolute tablet and route left-button samples to the focused task.
+U0 BootstrapCtrlInputPoll(Bool source_manager=FALSE)
+{//Poll UTM's absolute tablet through the active input path.
     CTask *task;
     I64 sample, now_ns, wheel;
     Bool ctrl_down;
@@ -4524,7 +4539,13 @@ U0 BootstrapCtrlInputPoll()
     // to the focused task's controls.
     if (ctrl_down && wheel)
         sample &= ~(0xff << 40);
-    BootstrapCtrlInputSubmit(task, sample, now_ns);
+    // WinMgr owns native mouse dispatch while its source task is running.
+    // Its top-menu loop must see the hard button state without the bootstrap
+    // click-to-focus bridge first reassigning sys_focus_task to the manager.
+    if (source_manager)
+        BootstrapMouseHardSample(sample, now_ns);
+    else
+        BootstrapCtrlInputSubmit(task, sample, now_ns);
     ZcWinMouseUpdate();
     BootstrapCtrlWheelZoom(ctrl_down, wheel);
 }
@@ -4909,18 +4930,33 @@ U0 MouseUpdate(I64 x, I64 y, I64 z, Bool l, Bool r)
 }
 public U0 BootstrapMouseHardSample(I64 sample, I64 now_ns)
 {//Adapt one absolute tablet sample to ZealOS's CMouseHardStateGlobals contract.
+    CMouseHardStateGlobals *active_mouse_hard = ZcActiveMouseHardGlobals();
+    I64 x = sample & 0xffff, y = (sample >> 16) & 0xffff;
+    I64 buttons = (sample >> 32) & 0xff;
     I64 wheel = (sample >> 40) & 0xff;
+    if (!active_mouse_hard)
+        active_mouse_hard = &mouse_hard;
+    // Preserve the focused task's menu while the pointer is idle over the
+    // desktop menu bar. Button-down may otherwise redirect focus to WinMgr.
+    if (!(buttons & 1) && y < FONT_HEIGHT && TaskValidate(sys_focus_task) &&
+        sys_focus_task != sys_winmgr_task)
+    {
+        if (sys_focus_task->cur_menu)
+            bootstrap_menu_focus_task = sys_focus_task;
+        else
+            bootstrap_menu_focus_task = NULL;
+    }
     if (wheel & 0x80)
         wheel -= 0x100;
-    mouse_hard.pos.x = sample & 0xffff;
-    mouse_hard.pos.y = (sample >> 16) & 0xffff;
-    mouse_hard.pos.z += wheel;
-    mouse_hard.bttns[0] = (sample >> 32) & 1;
-    mouse_hard.bttns[1] = (sample >> 32) & 2;
-    mouse_hard.has_wheel = TRUE;
-    mouse_hard.timestamp = now_ns;
-    mouse_hard.event = TRUE;
-    mouse_hard.installed = TRUE;
+    active_mouse_hard->pos.x = x;
+    active_mouse_hard->pos.y = y;
+    active_mouse_hard->pos.z += wheel;
+    active_mouse_hard->bttns[0] = buttons & 1;
+    active_mouse_hard->bttns[1] = buttons & 2;
+    active_mouse_hard->has_wheel = TRUE;
+    active_mouse_hard->timestamp = now_ns;
+    active_mouse_hard->event = TRUE;
+    active_mouse_hard->installed = TRUE;
 }
 // Zoom initialization belongs to a later native subsystem.
 // The source renderer budgets optional MathODE work; the real integrator is
