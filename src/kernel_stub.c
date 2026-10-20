@@ -7046,9 +7046,12 @@ int64_t zc_gui_shell_exec(int64_t *a) {
         command_buf[i] = command[i];
     command_buf[command_len] = 0;
     command = command_buf;
+    /* Match the visible OS menu's Status label at the shell prompt too. */
+    if (streq(command, "status"))
+        command = "zstatus";
     if (streq(command, "help"))
         return (int64_t)(uintptr_t)
-            "Graphical commands: zstatus | zvol | zls | zgc | zverify <path> | zload <path> | zput <name> <source> | zrm <name> | edit <path> | zc <source> | zcall <function> | windowdemo | latticeplay | stockplay\n"
+            "Graphical commands: status (zstatus) | zvol | zls | zgc | zverify <path> | zload <path> | zput <name> <source> | zrm <name> | edit <path> | zc <source> | zcall <function> | windowdemo | latticeplay | stockplay\n"
             "Lattice controls: Esc exit | Enter restart | Space step | c colors | L-click place | R-drag aim\n"
             "Type ZealC directly, for example: 40+2;\n";
     if (streq(command, "windowdemo")) {
