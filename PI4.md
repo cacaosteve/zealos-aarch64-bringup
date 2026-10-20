@@ -139,6 +139,15 @@ memory window `0xc0000000` → `0x600000000` (1 GiB), and a 3 GiB DMA aperture.
 The next Pi boot must confirm that Limine can load this root-level DTB and that
 the updated report shows its decoded values.
 
+The user-provided Pi HDMI photo from 2026-10-20 shows zero PCIe register,
+memory-window, and DMA-window values, zero link status, and `PCI config read not
+attempted`; the diagnostic correctly kept bus mastering and xHCI off. That
+photo predates the latest staged image, which also prints the FDT response
+status, so it does not yet distinguish a missing/invalid Limine DTB response
+from a parser result. Boot the freshly staged `build/pi-esp` payload before
+choosing a PCIe fix; the next useful evidence is the `PI4 FDT status=` line and
+the `FDT flags=` line together.
+
 For the first physical check, use a prepared microSD card, a suitable Pi 4
 power supply, and HDMI to read the report; no serial adapter is needed just to
 confirm the FDT values and reserved arena. For interactive UART input/logs,
