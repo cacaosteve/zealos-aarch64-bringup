@@ -414,6 +414,23 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         color = bytes(rgb)
         return sum(pixels[(y*width+x)*3:(y*width+x)*3+3] == color
                    for y in range(top, bottom) for x in range(left, right))
+    def graphical_ascii_glyph_matches(screen, x, y, ch, rgb):
+        width, height, pixels, _ = screen
+        glyphs = re.findall(r'/\*.*?\*/\s*\{([^}]+)\}',
+                            (ROOT/'src/fb_font.h').read_text(), re.S)[:96]
+        rows = [int(value.strip(), 0)
+                for value in glyphs[ord(ch) - 32].split(',')]
+        color = bytes(rgb)
+        # GrPutChar's font starts one scanline below the menu row origin.
+        for row, bits in enumerate(rows):
+            for col in range(8):
+                offset = ((y + 1 + row) * width + x + col) * 3
+                if offset < 0 or offset + 3 > len(pixels):
+                    return False
+                drawn = pixels[offset:offset + 3] == color
+                if drawn != bool(bits & (0x80 >> col)):
+                    return False
+        return True
     def splash_label_pixel_counts(screen):
         width, height, _, _ = screen
         cx, cy = width // 2, height // 2
@@ -1584,6 +1601,13 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                                                   (0, 8, 240, 100))
                     if (blue_menu >= 100 and yellow_menu >= 100 and
                             blue_submenu >= 1000):
+                        if not graphical_ascii_glyph_matches(
+                                menu_screen, 0, 24, 'F', (255, 255, 85)):
+                            raise RuntimeError(
+                                'OS menu glyphs do not match the normal left-to-right font; '
+                                f'see {graphical_path("os-menu-top-edge")} and .txt\n' +
+                                menu_screen[3])
+                        print('PASS OS menu glyph orientation', flush=True)
                         print('PASS OS menu bar and dropdown render on hover', flush=True)
                         break
                     time.sleep(0.1)

@@ -1548,7 +1548,18 @@ static void init_guest_gr_tables(void) {
         }
         if (font_ch > 127)
             font_ch = '?';
-        memcpy(&guest_gr_font[ch], g_font8[font_ch - 32], 8);
+        /* The text framebuffer consumes glyph rows MSB-first (bit 7 is the
+         * left pixel), but GrPutChar/GrAsm expand bit 0 into the leftmost
+         * packed pixel through gr.to_8_bits. Reverse each row when adapting
+         * the shared font so direct graphics text (menus, GrPrint) reads
+         * normally too. */
+        for (unsigned row = 0; row < 8; row++) {
+            uint8_t bits = g_font8[font_ch - 32][row];
+            bits = (uint8_t)((bits >> 4) | (bits << 4));
+            bits = (uint8_t)(((bits & 0xccu) >> 2) | ((bits & 0x33u) << 2));
+            bits = (uint8_t)(((bits & 0xaau) >> 1) | ((bits & 0x55u) << 1));
+            ((uint8_t *)&guest_gr_font[ch])[row] = bits;
+        }
     }
     /* GrUpdateTextFG masks the attribute to the low foreground nibble before
      * calling GrRopEquU8NoClipping. The renderer's

@@ -209,12 +209,15 @@ static uint32_t g_pi4_cfg_header;
 static uint32_t g_pi4_cfg_command;
 static uint32_t g_pi4_cfg_bars[6];
 static unsigned g_pi4_cfg_bar_count;
+static int g_pi4_uart_tx_ok;
 #define PI4_CFG_NOT_RUN 0u
 #define PI4_CFG_READ_OK 1u
 #define PI4_CFG_MMIO_FAIL 2u
 #define PI4_CFG_MAP_FAIL 3u
 #define PI4_CFG_NOT_LINKED 4u
 #define PI4_CFG_NO_DEVICE 5u
+#define PI4_CFG_FDT_SKIP 6u
+#define PI4_CFG_STATUS_FAIL 7u
 #endif
 static uint64_t g_hhdm;
 static uint64_t g_timer_ticks;
@@ -1165,7 +1168,8 @@ static int pi4_pcie_read_config32(const struct zeal_handoff *h,
 }
 
 static void pi4_pcie_probe_first_function(const struct zeal_handoff *h,
-                                         uint32_t link_status) {
+                                         uint32_t link_status,
+                                         volatile uint8_t *log_uart) {
     uint32_t id = 0xffffffffu;
     uint32_t class_rev = 0xffffffffu;
     uint32_t header = 0xffffffffu;
@@ -1180,12 +1184,12 @@ static void pi4_pcie_probe_first_function(const struct zeal_handoff *h,
     if ((link_status & (PI4_PCIE_STATUS_PHY_LINKUP | PI4_PCIE_STATUS_DL_ACTIVE)) !=
         (PI4_PCIE_STATUS_PHY_LINKUP | PI4_PCIE_STATUS_DL_ACTIVE)) {
         g_pi4_cfg_state = PI4_CFG_NOT_LINKED;
-        uart_puts(g_uart, "PCIe cfg skipped: link not active\n");
+        uart_puts(log_uart, "PCIe cfg skipped: link not active\n");
         return;
     }
     if (!g_pt_pool_phys || mmio_map_2m(h->hhdm_offset, h->pi4_pcie.reg_base) != 0) {
         g_pi4_cfg_state = PI4_CFG_MAP_FAIL;
-        uart_puts(g_uart, "PCIe cfg skipped: Device MMIO map failed\n");
+        uart_puts(log_uart, "PCIe cfg skipped: Device MMIO map failed\n");
         return;
     }
 
@@ -1194,20 +1198,20 @@ static void pi4_pcie_probe_first_function(const struct zeal_handoff *h,
         pi4_pcie_read_config32(h, link_status, 0x08, &class_rev) != 0 ||
         pi4_pcie_read_config32(h, link_status, 0x0c, &header) != 0) {
         g_pi4_cfg_state = PI4_CFG_MMIO_FAIL;
-        uart_puts(g_uart, "PCIe cfg read aborted ESR=");
-        uart_put_u64_hex(g_uart, g_probe_esr);
-        uart_puts(g_uart, " FAR=");
-        uart_put_u64_hex(g_uart, g_probe_far);
-        uart_puts(g_uart, "\n");
+        uart_puts(log_uart, "PCIe cfg read aborted ESR=");
+        uart_put_u64_hex(log_uart, g_probe_esr);
+        uart_puts(log_uart, " FAR=");
+        uart_put_u64_hex(log_uart, g_probe_far);
+        uart_puts(log_uart, "\n");
         g_uart_dead = 0;
         return;
     }
     if (id == 0xffffffffu || (id & 0xffffu) == 0xffffu) {
         g_pi4_cfg_id = id;
         g_pi4_cfg_state = PI4_CFG_NO_DEVICE;
-        uart_puts(g_uart, "PCIe cfg 01:00.0 absent ID=");
-        uart_put_u64_hex(g_uart, id);
-        uart_puts(g_uart, "\n");
+        uart_puts(log_uart, "PCIe cfg 01:00.0 absent ID=");
+        uart_put_u64_hex(log_uart, id);
+        uart_puts(log_uart, "\n");
         return;
     }
 
@@ -1220,11 +1224,11 @@ static void pi4_pcie_probe_first_function(const struct zeal_handoff *h,
         bar_count = 2;
     if (pi4_pcie_read_config32(h, link_status, 0x04, &command) != 0) {
         g_pi4_cfg_state = PI4_CFG_MMIO_FAIL;
-        uart_puts(g_uart, "PCIe command/status read aborted ESR=");
-        uart_put_u64_hex(g_uart, g_probe_esr);
-        uart_puts(g_uart, " FAR=");
-        uart_put_u64_hex(g_uart, g_probe_far);
-        uart_puts(g_uart, "\n");
+        uart_puts(log_uart, "PCIe command/status read aborted ESR=");
+        uart_put_u64_hex(log_uart, g_probe_esr);
+        uart_puts(log_uart, " FAR=");
+        uart_put_u64_hex(log_uart, g_probe_far);
+        uart_puts(log_uart, "\n");
         g_uart_dead = 0;
         return;
     }
@@ -1232,11 +1236,11 @@ static void pi4_pcie_probe_first_function(const struct zeal_handoff *h,
         if (pi4_pcie_read_config32(h, link_status, 0x10 + i * 4,
                                    &g_pi4_cfg_bars[i]) != 0) {
             g_pi4_cfg_state = PI4_CFG_MMIO_FAIL;
-            uart_puts(g_uart, "PCIe BAR read aborted ESR=");
-            uart_put_u64_hex(g_uart, g_probe_esr);
-            uart_puts(g_uart, " FAR=");
-            uart_put_u64_hex(g_uart, g_probe_far);
-            uart_puts(g_uart, "\n");
+            uart_puts(log_uart, "PCIe BAR read aborted ESR=");
+            uart_put_u64_hex(log_uart, g_probe_esr);
+            uart_puts(log_uart, " FAR=");
+            uart_put_u64_hex(log_uart, g_probe_far);
+            uart_puts(log_uart, "\n");
             g_uart_dead = 0;
             return;
         }
@@ -1247,22 +1251,73 @@ static void pi4_pcie_probe_first_function(const struct zeal_handoff *h,
     g_pi4_cfg_command = command;
     g_pi4_cfg_bar_count = bar_count;
     g_pi4_cfg_state = PI4_CFG_READ_OK;
-    uart_puts(g_uart, "PCIe cfg 01:00.0 ID=");
-    uart_put_u64_hex(g_uart, id);
-    uart_puts(g_uart, " class/rev=");
-    uart_put_u64_hex(g_uart, class_rev);
-    uart_puts(g_uart, " header=");
-    uart_put_u64_hex(g_uart, header);
-    uart_puts(g_uart, " command/status=");
-    uart_put_u64_hex(g_uart, command);
-    uart_puts(g_uart, " (read only)\n");
+    uart_puts(log_uart, "PCIe cfg 01:00.0 ID=");
+    uart_put_u64_hex(log_uart, id);
+    uart_puts(log_uart, " class/rev=");
+    uart_put_u64_hex(log_uart, class_rev);
+    uart_puts(log_uart, " header=");
+    uart_put_u64_hex(log_uart, header);
+    uart_puts(log_uart, " command/status=");
+    uart_put_u64_hex(log_uart, command);
+    uart_puts(log_uart, " (read only)\n");
     for (unsigned i = 0; i < bar_count; i++) {
-        uart_puts(g_uart, "  BAR");
-        uart_write(g_uart, '0' + i);
-        uart_puts(g_uart, "=");
-        uart_put_u64_hex(g_uart, g_pi4_cfg_bars[i]);
-        uart_puts(g_uart, "\n");
+        uart_puts(log_uart, "  BAR");
+        uart_write(log_uart, '0' + i);
+        uart_puts(log_uart, "=");
+        uart_put_u64_hex(log_uart, g_pi4_cfg_bars[i]);
+        uart_puts(log_uart, "\n");
     }
+}
+
+/* Probe the bridge independently of PL011 so HDMI-only Pi diagnostics still
+ * report the firmware link state. The guarded reads are read-only; the only
+ * write is the BCM2711 config-window index latch needed to select a read. */
+static void pi4_pcie_probe_readonly(const struct zeal_handoff *h) {
+    const uint32_t required = PI4_PCIE_FDT_PRESENT | PI4_PCIE_FDT_ENABLED |
+                              PI4_PCIE_FDT_REG;
+    uint64_t status_phys;
+    volatile uint32_t *status_reg;
+    uint32_t status = 0;
+
+    g_pi4_link_status = 0;
+    g_pi4_cfg_state = PI4_CFG_NOT_RUN;
+    g_pi4_cfg_bar_count = 0;
+    if (!h || h->revision < 5 ||
+        h->size < offsetof(struct zeal_handoff, pi4_pcie) + sizeof(h->pi4_pcie) ||
+        (h->pi4_pcie.flags & required) != required ||
+        h->pi4_pcie.reg_size < PI4_PCIE_STATUS_OFFSET + sizeof(uint32_t) ||
+        h->pi4_pcie.reg_base > UINT64_MAX - PI4_PCIE_STATUS_OFFSET) {
+        g_pi4_cfg_state = PI4_CFG_FDT_SKIP;
+        return;
+    }
+
+    status_phys = h->pi4_pcie.reg_base + PI4_PCIE_STATUS_OFFSET;
+    if (status_phys >= (1ull << 48) ||
+        h->hhdm_offset > UINT64_MAX - status_phys ||
+        mmio_map_2m(h->hhdm_offset, h->pi4_pcie.reg_base) != 0) {
+        g_pi4_cfg_state = PI4_CFG_MAP_FAIL;
+        return;
+    }
+
+    status_reg = (volatile uint32_t *)(uintptr_t)(h->hhdm_offset + status_phys);
+    g_uart_probe = 1;
+    g_sync_recover = 1;
+    g_uart_dead = 0;
+    g_probe_esr = 0;
+    g_probe_far = 0;
+    __asm__ volatile("ldr %w0, [%1]" : "+&r"(status) : "r"(status_reg) : "memory");
+    __asm__ volatile("dsb sy" ::: "memory");
+    g_sync_recover = 0;
+    g_uart_probe = 0;
+    if (g_uart_dead) {
+        g_pi4_cfg_state = PI4_CFG_STATUS_FAIL;
+        g_uart_dead = 0;
+        return;
+    }
+
+    g_pi4_link_status = status;
+    pi4_pcie_probe_first_function(h, status,
+                                  g_pi4_uart_tx_ok ? g_uart : NULL);
 }
 
 /* Keep the Pi's PCIe/DMA discovery report readable without a UART adapter. */
@@ -1359,11 +1414,21 @@ static void pi_diag_fb_report(const struct zeal_handoff *h) {
         pi_diag_fb_puts("\nPCI 01:00.0 absent ID=");
         pi_diag_fb_u64_hex(g_pi4_cfg_id);
     } else if (g_pi4_cfg_state == PI4_CFG_MMIO_FAIL) {
-        pi_diag_fb_puts("\nPCI config read trapped; see UART ESR/FAR");
+        pi_diag_fb_puts("\nPCI config read trapped ESR=");
+        pi_diag_fb_u64_hex(g_probe_esr);
+        pi_diag_fb_puts(" FAR=");
+        pi_diag_fb_u64_hex(g_probe_far);
     } else if (g_pi4_cfg_state == PI4_CFG_MAP_FAIL) {
-        pi_diag_fb_puts("\nPCI config skipped: MMIO map failed");
+        pi_diag_fb_puts("\nPCIe probe skipped: MMIO map failed");
     } else if (g_pi4_cfg_state == PI4_CFG_NOT_LINKED) {
         pi_diag_fb_puts("\nPCI config skipped: link inactive");
+    } else if (g_pi4_cfg_state == PI4_CFG_FDT_SKIP) {
+        pi_diag_fb_puts("\nPCIe probe skipped: no enabled FDT reg");
+    } else if (g_pi4_cfg_state == PI4_CFG_STATUS_FAIL) {
+        pi_diag_fb_puts("\nPCIe status trapped ESR=");
+        pi_diag_fb_u64_hex(g_probe_esr);
+        pi_diag_fb_puts(" FAR=");
+        pi_diag_fb_u64_hex(g_probe_far);
     } else {
         pi_diag_fb_puts("\nPCI config read not attempted");
     }
@@ -9778,6 +9843,7 @@ void kernel_entry(const struct zeal_handoff *h) {
             }
 
             if (fr_ok && dr_ok) {
+                g_pi4_uart_tx_ok = 1;
                 g_uart_dead = 0;
                 pl011_enable_txrx(g_uart);
                 uart_puts(g_uart, "\nhello from EL");
@@ -9825,66 +9891,6 @@ void kernel_entry(const struct zeal_handoff *h) {
                         uart_puts(g_uart, "Pi USB DMA arena: no rev-6 reservation\n");
                     }
 
-                    /*
-                     * Read the BCM2711 root-complex link status first. The
-                     * FDT descriptor gates this probe; only a live link allows
-                     * the separate bounded read-only function probe below.
-                     * No endpoint config writes or bus mastering occur.
-                     * Recover synchronous MMIO aborts using the same guarded
-                     * one-instruction path used for the first PL011 probe.
-                     */
-                    if ((h->pi4_pcie.flags & (PI4_PCIE_FDT_PRESENT |
-                                               PI4_PCIE_FDT_ENABLED |
-                                               PI4_PCIE_FDT_REG)) ==
-                            (PI4_PCIE_FDT_PRESENT | PI4_PCIE_FDT_ENABLED |
-                             PI4_PCIE_FDT_REG) &&
-                        h->pi4_pcie.reg_size >= PI4_PCIE_STATUS_OFFSET + 4u &&
-                        h->pi4_pcie.reg_base <= UINT64_MAX - PI4_PCIE_STATUS_OFFSET) {
-                        uint64_t status_phys = h->pi4_pcie.reg_base +
-                                               PI4_PCIE_STATUS_OFFSET;
-                        if (status_phys < (1ull << 48) &&
-                            h->hhdm_offset <= UINT64_MAX - status_phys) {
-                            volatile uint32_t *status_reg =
-                                (volatile uint32_t *)(uintptr_t)(h->hhdm_offset +
-                                                                 status_phys);
-                            uint32_t status = 0;
-                            g_uart_probe = 1;
-                            g_sync_recover = 1;
-                            g_uart_dead = 0;
-                            g_probe_esr = 0;
-                            g_probe_far = 0;
-                            __asm__ volatile("ldr %w0, [%1]"
-                                             : "+&r"(status)
-                                             : "r"(status_reg)
-                                             : "memory");
-                            __asm__ volatile("dsb sy" ::: "memory");
-                            g_sync_recover = 0;
-                            g_uart_probe = 0;
-                            if (g_uart_dead) {
-                                uart_puts(g_uart, "PCIe status MMIO abort ESR=");
-                                uart_put_u64_hex(g_uart, g_probe_esr);
-                                uart_puts(g_uart, " FAR=");
-                                uart_put_u64_hex(g_uart, g_probe_far);
-                                uart_puts(g_uart, " (no downstream access)\n");
-                            } else {
-                                uart_puts(g_uart, "PCIe link status=");
-                                uart_put_u64_hex(g_uart, status);
-                                uart_puts(g_uart, " PHY=");
-                                uart_puts(g_uart, (status & PI4_PCIE_STATUS_PHY_LINKUP)
-                                                       ? "up" : "down");
-                                uart_puts(g_uart, " DL=");
-                                uart_puts(g_uart, (status & PI4_PCIE_STATUS_DL_ACTIVE)
-                                                       ? "active" : "inactive");
-                                uart_puts(g_uart, " (read only)\n");
-                                pi4_pcie_probe_first_function(h, status);
-                            }
-                            g_uart_dead = 0;
-                        } else {
-                            uart_puts(g_uart, "PCIe status address rejected\n");
-                        }
-                    } else {
-                        uart_puts(g_uart, "PCIe status skipped: no enabled FDT reg\n");
-                    }
                 }
                 if (g_fb && g_fb_h > 300) {
                     fb_fillrect(0, 280, bw, 12, 0x00E0E0E0u); /* white = UART OK */
@@ -9913,6 +9919,11 @@ void kernel_entry(const struct zeal_handoff *h) {
             }
             con_puts("UART none — continue soft timer\n");
         }
+
+        /* Keep HDMI PCIe/FDT diagnostics useful even when UART is absent or
+         * its probe fails. The endpoint remains read-only and bus mastering
+         * and xHCI are deliberately untouched. */
+        pi4_pcie_probe_readonly(h);
 
         /*
          * PI-DIAG-3: soft CNTP (poll ISTATUS). No GICv2 yet — proves timer

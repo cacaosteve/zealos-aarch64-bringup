@@ -116,7 +116,10 @@ addresses. The reservation is metadata only: it does not map or use the arena,
 or enable bus mastering/xHCI. The parser validates all FDT spans and cell
 widths and does not read or write controller MMIO. The Pi diagnostic prints
 the captured windows and reservation over HDMI after the GIC/IRQ check; the
-PL011 report also includes guarded link and config reads when UART TX works.
+HDMI report now also attempts the guarded root-complex link-status read and,
+only when the link is active, bounded read-only PCI 01:00.0 identity/header/BAR
+reads. The PL011 is optional for this discovery path. No endpoint config writes,
+bus mastering, or xHCI initialization occur.
 Host-built synthetic fixtures check the standard
 BCM2711 node translation (`0x7d500000` through `/scb/ranges` to `0xfd500000`),
 the PCI memory aperture, the 3 GiB DMA aperture, disabled-node handling, and

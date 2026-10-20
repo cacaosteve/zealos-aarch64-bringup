@@ -52,10 +52,11 @@ FB markers (keep firmware splash; do not expect a cleared screen):
 Next: boot with HDMI attached. After the white IRQ bar, the screen prints the
 FDT PCIe windows and DMA arena reservation; the shell prompt follows. A USB-TTL
 adapter @ 115200 on GPIO 14/15/GND is only needed for serial logs/input. The
-serial report includes the guarded root-complex status read at +0x4068 and,
-when both links are active, bounded PCI 01:00.0 reads for identity,
-command/status, and header-valid BARs. These are read-only; the reserved arena
-is not used for DMA and bus mastering/xHCI remain off.
+HDMI report independently attempts the guarded root-complex status read at
++0x4068 and, when both links are active, bounded PCI 01:00.0 reads for identity,
+command/status, and header-valid BARs. The PL011 is optional for this
+discovery. Endpoint config is never written; the reserved arena is not used for
+DMA and bus mastering/xHCI remain off.
 
 QEMU virt path is unchanged (make / make run-serial) — distinct ELFs.
 
