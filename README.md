@@ -60,8 +60,9 @@ reinitialized on disconnect/failure. Terminal 1
 serial input stays independent. `zstatus` reports the selected owners, raw
 USB events, controller state, errors, and each device's route including USB2
 transaction-translator slot/port; serial `usbcheck` exercises command and
-event ring wraparound. This USB backend supports boot keyboards and
-unnumbered HID mouse/tablet reports on root ports or behind USB 1.x/2.0 hubs.
+event ring wraparound. This USB backend supports boot keyboards and single
+HID mouse/tablet input reports, with or without a report-ID prefix, on root
+ports or behind USB 1.x/2.0 hubs.
 Port-change polling debounces new connections, removes hub subtrees, and
 reuses reserved per-device DMA only after successful slot teardown. Limits
 are eight devices, fifteen ports per hub and five hub tiers. A SuperSpeed hub

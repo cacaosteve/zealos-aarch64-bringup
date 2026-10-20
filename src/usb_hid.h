@@ -1,5 +1,6 @@
 /* Small, bounded HID decoder, adapted from YDE KUsbHid.ZC (public domain).
- * Boot keyboards and one unnumbered pointer report; reject other layouts.
+ * Boot keyboards and one pointer input report (optionally report-ID prefixed);
+ * reject other layouts.
  * Pure decoding stays independent of xHCI/DMA so malformed inputs are testable. */
 #pragma once
 #include <stdint.h>
@@ -9,6 +10,7 @@ struct usb_hid_axis { unsigned off, bits; int32_t min, max; };
 struct usb_hid_pointer {
     struct usb_hid_axis x, y, wheel;
     unsigned buttons_off, buttons_count, report_bits;
+    unsigned report_id;
     int absolute;
 };
 static uint32_t usb_hid_bits(const uint8_t *p, unsigned off, unsigned bits) {
@@ -25,8 +27,9 @@ static int usb_hid_pointer_parse(struct usb_hid_pointer *out,
                                   const uint8_t *desc, size_t len) {
     struct usb_hid_pointer h = {0};
     unsigned page = 0, size = 0, count = 0, bit = 0, usages[32], n = 0;
+    unsigned current_report_id = 0, input_report_id = 0;
     unsigned usage_min = 0, usage_max = 0;
-    int have_range = 0, relative = -1;
+    int have_range = 0, relative = -1, input_report_selected = 0;
     int32_t min = 0, max = 0;
     for (size_t pos = 0; pos < len;) {
         unsigned b = desc[pos++], bytes = b & 3, tag = b & 0xfc;
@@ -35,8 +38,11 @@ static int usb_hid_pointer_parse(struct usb_hid_pointer *out,
         if (pos + bytes > len) return 0;
         uint32_t v = 0;
         for (unsigned i = 0; i < bytes; i++) v |= (uint32_t)desc[pos++] << (i * 8);
-        if (tag == 0x84 || tag == 0xa4 || tag == 0xb4) return 0; /* IDs/push/pop */
-        if (tag == 0x04) page = v;
+        if (tag == 0x84) { /* Report ID global item */
+            if (bytes != 1 || !v || v > 255) return 0;
+            current_report_id = v;
+        } else if (tag == 0xa4 || tag == 0xb4) return 0; /* Push/Pop global state */
+        else if (tag == 0x04) page = v;
         else if (tag == 0x14) min = bytes ? (int32_t)(v << (32 - bytes * 8)) >> (32 - bytes * 8) : 0;
         else if (tag == 0x24) max = min < 0 && bytes ? (int32_t)(v << (32 - bytes * 8)) >> (32 - bytes * 8) : (int32_t)v;
         else if (tag == 0x74) size = v;
@@ -47,6 +53,12 @@ static int usb_hid_pointer_parse(struct usb_hid_pointer *out,
         } else if (tag == 0x18) { usage_min = v; have_range = 1; }
         else if (tag == 0x28) usage_max = v;
         else if (tag == 0x80) {
+            if (!input_report_selected) {
+                input_report_id = current_report_id;
+                input_report_selected = 1;
+            } else if (input_report_id != current_report_id) {
+                return 0; /* A single bounded input report is supported. */
+            }
             if (!size || size > 32 || count > 64 || size * count > 512 - bit) return 0;
             for (unsigned i = 0; i < count; i++) {
                 unsigned usage = i < n ? usages[i] :
@@ -76,13 +88,22 @@ static int usb_hid_pointer_parse(struct usb_hid_pointer *out,
     if (!h.x.bits || !h.y.bits || h.buttons_count > 3) return 0;
     h.absolute = !relative;
     h.report_bits = bit;
+    h.report_id = input_report_id;
     *out = h;
     return 1;
+}
+static unsigned usb_hid_pointer_wire_bits(const struct usb_hid_pointer *h) {
+    return h->report_bits + (h->report_id ? 8u : 0u);
 }
 static int usb_hid_pointer_read(const struct usb_hid_pointer *h,
                                  const uint8_t *report, size_t len,
                                  int32_t *x, int32_t *y, int32_t *wheel, int *buttons) {
-    if (len * 8 < h->report_bits) return 0;
+    if (h->report_id) {
+        if (!len || report[0] != h->report_id) return 0;
+        report++;
+        len--;
+    }
+    if (len < (h->report_bits + 7u) / 8u) return 0;
     uint32_t vx = usb_hid_bits(report, h->x.off, h->x.bits);
     uint32_t vy = usb_hid_bits(report, h->y.off, h->y.bits);
     *x = h->x.min < 0 ? usb_hid_signed(vx, h->x.bits) : (int32_t)vx;

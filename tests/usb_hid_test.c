@@ -3,8 +3,8 @@
 #include <string.h>
 #include "../src/usb_hid.h"
 
-/* Standard, unnumbered button/X/Y/wheel report layouts, assembled as HID
- * descriptor items. Real QEMU descriptors are exercised by check-usb-input. */
+/* Standard button/X/Y/wheel report layouts, assembled as HID descriptor
+ * items. Real QEMU descriptors are exercised by check-usb-input. */
 static const uint8_t tablet[] = {
     0x05,1, 0x09,2, 0xa1,1,
     0x05,9, 0x19,1, 0x29,3, 0x15,0, 0x25,1, 0x75,1, 0x95,3, 0x81,2,
@@ -20,6 +20,14 @@ static const uint8_t mouse[] = {
     0x05,1, 0x09,0x30, 0x09,0x31, 0x09,0x38,
     0x15,0x81, 0x25,0x7f, 0x75,8, 0x95,3, 0x81,6, 0xc0
 };
+static const uint8_t tablet_report_id[] = {
+    0x05,1, 0x09,2, 0xa1,1, 0x85,7,
+    0x05,9, 0x19,1, 0x29,3, 0x15,0, 0x25,1, 0x75,1, 0x95,3, 0x81,2,
+    0x75,5, 0x95,1, 0x81,1,
+    0x05,1, 0x09,0x30, 0x09,0x31, 0x15,0, 0x26,0xff,0x7f,
+    0x75,16, 0x95,2, 0x81,2,
+    0x09,0x38, 0x15,0x81, 0x25,0x7f, 0x75,8, 0x95,1, 0x81,6, 0xc0
+};
 int main(void) {
     struct usb_hid_pointer h;
     int32_t x,y,z; int buttons;
@@ -33,9 +41,19 @@ int main(void) {
     uint8_t m[] = {2,0x81,0x7f,1};
     assert(!h.absolute && usb_hid_pointer_read(&h,m,sizeof(m),&x,&y,&z,&buttons));
     assert(x == -127 && y == 127 && z == 1 && buttons == 2);
-    uint8_t invalid[sizeof(tablet)+2];
-    memcpy(invalid,tablet,sizeof(tablet)); invalid[sizeof(tablet)] = 0x85; invalid[sizeof(tablet)+1] = 1;
-    assert(!usb_hid_pointer_parse(&h,invalid,sizeof(invalid))); /* report IDs */
+    assert(usb_hid_pointer_parse(&h,tablet_report_id,sizeof(tablet_report_id)));
+    assert(h.report_id == 7 && h.report_bits == 48 && usb_hid_pointer_wire_bits(&h) == 56);
+    uint8_t numbered[] = {7,5,0xff,0x7f,0x00,0x40,0xff};
+    assert(usb_hid_pointer_read(&h,numbered,sizeof(numbered),&x,&y,&z,&buttons));
+    assert(x == 32767 && y == 16384 && z == -1 && buttons == 5);
+    assert(!usb_hid_pointer_read(&h,numbered+1,sizeof(numbered)-1,&x,&y,&z,&buttons));
+    numbered[0] = 8;
+    assert(!usb_hid_pointer_read(&h,numbered,sizeof(numbered),&x,&y,&z,&buttons));
+    const uint8_t two_ids[] = {0x85,7,0x75,8,0x95,1,0x81,1,0x85,8,0x81,1};
+    assert(!usb_hid_pointer_parse(&h,two_ids,sizeof(two_ids)));
+    uint8_t invalid_id[sizeof(tablet_report_id)];
+    memcpy(invalid_id,tablet_report_id,sizeof(invalid_id)); invalid_id[7] = 0;
+    assert(!usb_hid_pointer_parse(&h,invalid_id,sizeof(invalid_id)));
     assert(!usb_hid_pointer_parse(&h,tablet,sizeof(tablet)-2)); /* incomplete item */
     uint8_t oversized[] = {0x75,32,0x96,0xff,0xff,0x81,2};
     assert(!usb_hid_pointer_parse(&h,oversized,sizeof(oversized)));
@@ -52,6 +70,7 @@ int main(void) {
             memcpy(mutated,tablet,sizeof(tablet)); mutated[pos] = value;
             if (usb_hid_pointer_parse(&h,mutated,sizeof(mutated))) {
                 assert(h.report_bits <= 512 && h.x.bits <= 31 && h.y.bits <= 31);
+                report[0] = h.report_id;
                 assert(usb_hid_pointer_read(&h,report,sizeof(report),&x,&y,&z,&buttons));
             }
         }

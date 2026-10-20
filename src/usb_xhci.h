@@ -494,7 +494,7 @@ static int usb_enumerate(struct usb_dev *d) {
             int n = usb_control(d, 0x81, 6, 0x2200, ep->interface, ep->report_descriptor_length);
             if (n == (int)ep->report_descriptor_length &&
                 usb_hid_pointer_parse(&ep->pointer, d->buffer, n) &&
-                ep->pointer.report_bits <= ep->packet * 8)
+                usb_hid_pointer_wire_bits(&ep->pointer) <= ep->packet * 8)
                 ep->kind = ep->pointer.absolute ? 3 : 2;
         }
         accepted += ep->kind != 0;

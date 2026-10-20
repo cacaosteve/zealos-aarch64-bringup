@@ -2326,8 +2326,9 @@ delivery in this VM; it does not establish native guest USB support.
 ## USB direction: reuse YDE with ARM64 platform hooks
 
 The first native USB backend now initializes the NEC/QEMU PCI xHCI models on
-QEMU virt, enumerates root-port boot keyboards and unnumbered HID relative
-mice/absolute tablets, and feeds the existing graphical input path. VirtIO
+QEMU virt, enumerates root-port boot keyboards and HID relative mice/absolute
+tablets with either one unnumbered input report or one report-ID-prefixed input
+report, and feeds the existing graphical input path. VirtIO
 MMIO and independent serial input remain available. USB claims keyboard and
 pointer ownership only after successful enumeration/configuration; the
 VirtIO input transports are reset/parked while USB owns their capability.
@@ -2350,7 +2351,10 @@ and event draining allow that region to be reused on reconnect; uncertain
 teardown quarantines it. Controller-owned allocations remain reserved.
 `src/usb_xhci.h` adapts YDE's polled ring and
 enumeration behavior; `src/usb_hid.h` isolates bounded report decoding from
-hardware access. Unsupported layouts (including report IDs) are rejected.
+hardware access. Pointer report IDs are checked and removed before field
+decoding; mixed input report IDs, push/pop global state, and unsupported HID
+layouts are rejected. Non-boot HID keyboards and additional keyboard layouts
+remain unsupported.
 
 The bootstrap graphical terminal now consumes key-down, key-up and menu
 messages in one ordered scan. `MessageScan` discards messages outside its
@@ -3800,3 +3804,18 @@ On 2026-10-20, the user confirmed that the regular desktop windows move and
 resize correctly. The `TERM`/`EOF` suggestion popup shrinking on release is
 consistent with its content-sized minimum-window behavior; it is not the
 regular terminal resize path.
+
+## HID pointer report IDs — 2026-10-20
+
+The bounded USB pointer decoder now accepts a single report-ID-prefixed mouse
+or tablet input report, verifies the received ID, and accounts for its prefix
+when checking the endpoint packet size. Mixed input report IDs remain rejected
+so fields from distinct reports cannot be combined accidentally. Boot-keyboard
+input is unchanged.
+
+`make check-usb-hid` passes sanitizer-backed numbered/unnumbered report,
+wrong-ID, missing-prefix, mixed-ID, truncation and malformed-descriptor checks.
+`make check-usb-input` passed all four end-to-end NEC/QEMU profiles, including
+the complete graphical workflow and VirtIO input recovery. QEMU's stock HID
+devices use unnumbered reports, so the numbered-report path is directly covered
+by the descriptor/report decoder test rather than a physical device test.
