@@ -578,6 +578,65 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 time.sleep(0.2)
             time.sleep(0.1)
         raise RuntimeError('graphical terminal did not acquire keyboard focus after five clicks:\n'+status)
+    def graphical_terminal_rect():
+        result = command('zc Print("gterm_rect=%d,%d,%d,%d\\n", '
+            'bootstrap_gui_terminal_task->win_left, bootstrap_gui_terminal_task->win_right, '
+            'bootstrap_gui_terminal_task->win_top, bootstrap_gui_terminal_task->win_bottom);',
+            'gterm_rect=')
+        match = re.search(r'gterm_rect=(-?\d+),(-?\d+),(-?\d+),(-?\d+)', result)
+        if not match:
+            raise RuntimeError('could not read graphical-terminal geometry:\n' + result)
+        return tuple(map(int, match.groups()))
+    def probe_graphical_terminal_resize():
+        # A live UTM report says a small TERM/EOF window returns to its old
+        # size on release. Check the separate boot graphical terminal as a
+        # control: this distinguishes a general window-manager regression from
+        # behavior specific to that small task/window. Inspect the geometry
+        # after release, after a settling interval, and after another command.
+        command('zc WinToTop(bootstrap_gui_terminal_task);', 'zc: executed')
+        original = graphical_terminal_rect()
+        left, right, top, bottom = original
+        dx = min(4, 99 - right)
+        # The test display can start with the terminal nearly full-height.
+        # In that case shrink from the lower-right corner instead of trying
+        # to grow past the visible screen edge.
+        dy = 2 if bottom <= 71 else -2
+        if dx <= 0 or top >= bottom + dy:
+            raise RuntimeError(f'graphical terminal has no resize room at {original}')
+        start_x = (right + 1) * 8 + 4
+        start_y = (bottom + 1) * 8 + 4
+        try:
+            move_graphical_pointer(start_x, start_y)
+            qmp_command('input-send-event', {'events': [
+                {'type': 'btn', 'data': {'down': True, 'button': 'left'}}]})
+            time.sleep(0.15)
+            move_graphical_pointer(start_x + dx * 8, start_y + dy * 8)
+            time.sleep(0.25)
+            qmp_command('input-send-event', {'events': [
+                {'type': 'btn', 'data': {'down': False, 'button': 'left'}}]})
+            time.sleep(0.4)
+            after_release = graphical_terminal_rect()
+            expected = (left, right + dx, top, bottom + dy)
+            if after_release != expected:
+                raise RuntimeError('graphical terminal resize did not persist on release: '
+                                   f'expected {expected}, got {after_release}')
+            time.sleep(0.6)
+            after_settle = graphical_terminal_rect()
+            if after_settle != expected:
+                raise RuntimeError('graphical terminal geometry reverted after release: '
+                                   f'expected {expected}, got {after_settle}')
+            # The original serial shell command itself must not recreate or
+            # resize the graphical task.
+            command('zstatus', 'desktop:')
+            after_command = graphical_terminal_rect()
+            if after_command != expected:
+                raise RuntimeError('graphical terminal geometry changed after another command: '
+                                   f'expected {expected}, got {after_command}')
+            print(f'PASS graphical terminal corner resize persists: {original} -> {expected}',
+                  flush=True)
+        finally:
+            command(f'zc WinHorz({left},{right},bootstrap_gui_terminal_task); '
+                    f'WinVert({top},{bottom},bootstrap_gui_terminal_task);', 'zc: executed')
     def wait_for_graphical_terminal_banner(timeout=15):
         deadline = time.monotonic() + timeout
         while True:
@@ -846,6 +905,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 raise RuntimeError('window demo did not restore terminal focus:\n' + restored)
             for key in ('z', 'l', 's', 'ret'):
                 qmp_send_key(key)
+            require_graphical_prompt_text('windowdemo-poststop-zls', 'zls')
             command('zcall BootstrapGuiTerminalLastCommandIsZls',
                     'zc => 0x0000000000000001')
             qmp_send_text('help')
@@ -1511,11 +1571,33 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     {'type': 'btn', 'data': {'down': True, 'button': 'left'}}]})
                 time.sleep(0.2)
                 menu_title_held = graphical_screen('os-menu-title-held')
+                press_status = command('zstatus', 'pointer_state: ready=1')
+                press_match = re.search(
+                    r'pointer_state: ready=1 pointer_xy=(\d+)/(\d+) buttons=(\d+)',
+                    press_status)
+                if (not press_match or int(press_match.group(3)) != 1 or
+                        abs(int(press_match.group(1)) - 4) > 1 or
+                        abs(int(press_match.group(2)) - 4) > 1):
+                    qmp_command('input-send-event', {'events': [
+                        {'type': 'btn', 'data': {'down': False, 'button': 'left'}}]})
+                    raise RuntimeError('OS menu press did not reach the guest at its title row:\n' +
+                                       press_status + menu_title_held[3])
                 # The menu bar is one FONT_HEIGHT row tall; Help is its first
                 # submenu item, so target the center of screen row 1.
                 move_graphical_pointer(4, 12)
                 time.sleep(0.2)
                 help_row = graphical_screen('os-menu-help-held')
+                held_status = command('zstatus', 'pointer_state: ready=1')
+                held_match = re.search(
+                    r'pointer_state: ready=1 pointer_xy=(\d+)/(\d+) buttons=(\d+)',
+                    held_status)
+                if (not held_match or int(held_match.group(3)) != 1 or
+                        abs(int(held_match.group(1)) - 4) > 1 or
+                        abs(int(held_match.group(2)) - 12) > 1):
+                    qmp_command('input-send-event', {'events': [
+                        {'type': 'btn', 'data': {'down': False, 'button': 'left'}}]})
+                    raise RuntimeError('OS menu button was not held over the Help row:\n' +
+                                       held_status + help_row[3])
                 if rgb_pixels_in(help_row, (255, 255, 85), (0, 8, 240, 16)) < 32:
                     # Never leave QEMU's button held when this diagnostic
                     # exits; a failed hover/selection probe must not strand
@@ -1592,9 +1674,27 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 qmp_command('input-send-event', {'events': [
                     {'type': 'btn', 'data': {'down': True, 'button': 'left'}}]})
                 time.sleep(0.2)
+                demo_press_status = command('zstatus', 'pointer_state: ready=1')
+                demo_press_match = re.search(
+                    r'pointer_state: ready=1 pointer_xy=(\d+)/(\d+) buttons=(\d+)',
+                    demo_press_status)
+                if not demo_press_match or int(demo_press_match.group(3)) != 1:
+                    qmp_command('input-send-event', {'events': [
+                        {'type': 'btn', 'data': {'down': False, 'button': 'left'}}]})
+                    raise RuntimeError('OS menu Window Demo press did not reach the guest:\n' +
+                                       demo_press_status)
                 move_graphical_pointer(4, 44)
                 time.sleep(0.2)
                 demo_row = graphical_screen('os-menu-windowdemo-held')
+                demo_held_status = command('zstatus', 'pointer_state: ready=1')
+                demo_held_match = re.search(
+                    r'pointer_state: ready=1 pointer_xy=(\d+)/(\d+) buttons=(\d+)',
+                    demo_held_status)
+                if not demo_held_match or int(demo_held_match.group(3)) != 1:
+                    qmp_command('input-send-event', {'events': [
+                        {'type': 'btn', 'data': {'down': False, 'button': 'left'}}]})
+                    raise RuntimeError('OS menu button was not held over Window Demo:\n' +
+                                       demo_held_status + demo_row[3])
                 if rgb_pixels_in(demo_row, (255, 255, 85), (0, 40, 240, 48)) < 32:
                     qmp_command('input-send-event', {'events': [
                         {'type': 'btn', 'data': {'down': False, 'button': 'left'}}]})
@@ -1720,6 +1820,9 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 qmp_send_key('ret')
                 require_graphical_text('usb-fast-run', 'zc => 0x000000000000002a')
                 print('PASS native USB mixed-case/modifier typing at ten characters per second', flush=True)
+                # Run geometry manipulation after key-injection checks so a
+                # resize/reflow cannot affect the keyboard acceptance probe.
+                probe_graphical_terminal_resize()
             last_key = command('zcall BootstrapGuiTerminalLastKeyChar', 'zc => 0x')
             last_key_value = re.search(r'zc => 0x([0-9a-fA-F]+)', last_key)
             if not last_key_value or int(last_key_value.group(1), 16) != 10:
@@ -1851,6 +1954,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             for key in ('z', 'l', 's', 'ret'):
                 qmp_send_key(key)
             time.sleep(0.3)
+            require_graphical_prompt_text('windowdemo-poststop-zls', 'zls')
             command('zcall BootstrapGuiTerminalLastCommandIsZls',
                     'zc => 0x0000000000000001')
             print('PASS QMP graphical window demo launch/stop restored the terminal and keyboard focus', flush=True)
