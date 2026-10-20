@@ -3778,7 +3778,9 @@ comparison screenshot shows the strip returning to its normal appearance when
 the pointer leaves. This confirms live menu-bar hover drawing. On 2026-10-20,
 the user followed the live drag-from-`OS`-menu to `Window Demo` check and
 reported that the windows move, accepting the menu action and interactive
-window fixture. The expanded two-hub graphical workflow now also hovers the
+window fixture. After the refreshed VM showed the menu again on 2026-10-20,
+the user confirmed the menu letter shapes looked normal. The expanded two-hub
+graphical workflow now also hovers the
 guest pointer over that label and checks framebuffer pixels for the actual
 drop-down below the highlighted bar; `python3 scripts/check-compat.py
 --usb-input nec --usb-with-virtio --usb-hubs 2 --usb-hotplug
