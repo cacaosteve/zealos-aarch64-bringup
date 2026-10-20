@@ -3862,3 +3862,10 @@ save/reopen across reboot, `latticeplay`, `stockplay`, and hub-subtree recovery
 all passed. The Pi 4B VL805 path still needs a fresh boot of the staged
 `build/pi-esp` payload; the earlier HDMI photo predates its FDT-status
 diagnostics and is not a basis for enabling bus mastering or xHCI.
+
+The PCI graphical workflow also checks that task-local commands are fully
+visible in the guest terminal before Return. This catches a missing character
+at the input boundary instead of running a malformed command; the fresh
+`make check-gui-workflow` run passed the menu, Files, Window Demo, input/caret,
+editor persistence, source execution, task isolation, `latticeplay`, and
+`stockplay` checks.

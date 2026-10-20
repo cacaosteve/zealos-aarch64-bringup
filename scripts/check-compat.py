@@ -2224,7 +2224,10 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 require_graphical_text('run-file-private-load', 'zc: loaded /Tests/RunFile.ZC')
                 result_line = 'zc => 0x000000000000002a'
                 before_task = graphical_screen('run-file-before-private-task')[3].count(result_line)
-                qmp_send_text('zcall RunFileTaskChecks')
+                task_check_command = 'zcall RunFileTaskChecks'
+                qmp_send_text(task_check_command, delay=0.3)
+                require_graphical_prompt_text('run-file-private-command',
+                                              task_check_command)
                 qmp_send_key('ret')
                 private_task = require_graphical_text('run-file-private-task', result_line)
                 if private_task[3].count(result_line) != before_task + 1:
