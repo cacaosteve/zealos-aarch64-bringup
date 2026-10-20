@@ -387,17 +387,18 @@ oracle are needed before broad language compatibility can be claimed.
 
 ## Next substantial work
 
-1. Verify the source editor's framebuffer layout and keyboard behavior in UTM;
-   then improve it toward upstream editing semantics. The
-   eventual installed system needs a real filesystem
-   and installer; the old RedSea demo volume is preserved during this bootstrap
-   phase.
-2. Extend the cooperative task subset with synchronization, full task-local
-   compiler/Doc state and remaining job kinds, then implement
-   preemption and the Doc/Gr
-   services needed for Adam and the editor.
-3. Boot the upstream startup sequence using those services. Then support guest
-   kernel/compiler builds and an install-to-blank-disk/reboot workflow.
+1. Replace the remaining graphics and document compatibility shims with the
+   upstream services needed by ordinary desktop applications. The current UTM
+   path has a working graphical shell, source editor, startup windows, native
+   input and a bounded source window manager, but it is not yet the complete
+   ZealOS Doc/Gr stack or ordinary kernel task/application initialization.
+2. Continue task-runtime parity: complete remaining task-local compiler and
+   document state, job kinds and synchronization, then add preemption and boot
+   the actual upstream system startup path instead of the current bounded
+   HomeSys adapters.
+3. Add the filesystem, guest kernel/compiler build and install-to-blank-disk/
+   reboot workflow needed for an installed system. Keep the preserved RedSea
+   demo volume and source partition as bootstrap/recovery paths until then.
 
 ## Recorded validation — editor navigation
 
@@ -3770,9 +3771,10 @@ recovery, source execution, and editor save/compile/run/reopen. A final
 UTM hover check passed on 2026-10-19: the user reports that moving the guest
 pointer onto the desktop's top row turns the menu strip blue, and the attached
 comparison screenshot shows the strip returning to its normal appearance when
-the pointer leaves. This confirms live menu-bar hover drawing. Opening the
-drop-down over the far-left `OS` label and selecting an item still need a
-hands-on UTM check. The expanded two-hub graphical workflow now also hovers the
+the pointer leaves. This confirms live menu-bar hover drawing. On 2026-10-20,
+the user followed the live drag-from-`OS`-menu to `Window Demo` check and
+reported that the windows move, accepting the menu action and interactive
+window fixture. The expanded two-hub graphical workflow now also hovers the
 guest pointer over that label and checks framebuffer pixels for the actual
 drop-down below the highlighted bar; `python3 scripts/check-compat.py
 --usb-input nec --usb-with-virtio --usb-hubs 2 --usb-hotplug
@@ -3793,3 +3795,8 @@ ARM64 bootstrap terminal and the independent upstream `User()` terminal, then
 checks their bounds after release, settling, and another command. Both passed
 with `python3 scripts/check-compat.py --usb-input nec
 --probe-gui-workflow --quick`.
+
+On 2026-10-20, the user confirmed that the regular desktop windows move and
+resize correctly. The `TERM`/`EOF` suggestion popup shrinking on release is
+consistent with its content-sized minimum-window behavior; it is not the
+regular terminal resize path.
