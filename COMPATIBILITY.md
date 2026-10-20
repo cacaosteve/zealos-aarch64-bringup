@@ -3819,3 +3819,20 @@ wrong-ID, missing-prefix, mixed-ID, truncation and malformed-descriptor checks.
 the complete graphical workflow and VirtIO input recovery. QEMU's stock HID
 devices use unnumbered reports, so the numbered-report path is directly covered
 by the descriptor/report decoder test rather than a physical device test.
+
+## Graphical input workflow and modifier recovery — 2026-10-20
+
+The QMP acceptance harness now sends modifier and base-key press/release edges
+in order. Grouped chord events could leave Shift logically held under load;
+the following semicolon became a colon, making a long GUI command appear to
+stall. `make check-input-edges` passes both the PCI keyboard path and the
+native NEC keyboard behind two hubs with duplicate VirtIO input configured,
+including a clear modifier state after Shift+9 is released.
+
+The existing standalone `make check-gui-workflow` target runs the PCI
+graphical acceptance path. In addition, `python3 scripts/check-compat.py
+--usb-input nec --probe-gui-workflow` passed the full graphical acceptance
+run: OS menu rendering and actions, native USB keyboard/pointer controls, both
+terminal resizes, source execution and exceptions, System/Popup task recovery,
+editor save/reopen across reboot, `latticeplay`, `stockplay`, and USB
+event-ring cycling.
