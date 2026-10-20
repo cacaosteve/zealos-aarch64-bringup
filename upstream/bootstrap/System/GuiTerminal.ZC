@@ -677,9 +677,6 @@ U0 BootstrapGuiTerminalFinalUpdate(CDC *dc)
             dc->color.c0 = old_color;
         }
     }
-    // zedit owns the frame while it is active. Render it after the compositor
-    // so a window redraw cannot erase the editor before scanout.
-    ZcSourceEditorOverlayRender();
     // Preserve the source menu/progress/mouse overlay, with the pointer last.
     if (bootstrap_gui_terminal_final_update)
         (*bootstrap_gui_terminal_final_update)(dc);

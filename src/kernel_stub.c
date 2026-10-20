@@ -235,6 +235,7 @@ static uint32_t g_fb_bpp;
  * one frame. Framebuffer primitives keep their direct path outside that scope. */
 static uint8_t *g_fb_render_surface;
 static uint32_t *g_fb_render_rgba;
+static int g_fb_render_rgba_overlay;
 static uint64_t g_fb_render_stride, g_fb_render_rows;
 static const uint16_t *g_fb_win_z_buf;
 static uint32_t g_fb_cx, g_fb_cy;
@@ -406,9 +407,16 @@ static void fb_putpixel(uint32_t x, uint32_t y, uint32_t bgr) {
         return;
     }
     if (g_fb_render_surface) {
-        if (x < g_fb_render_stride && y < g_fb_render_rows)
+        if (x < g_fb_render_stride && y < g_fb_render_rows) {
             g_fb_render_surface[(uint64_t)y * g_fb_render_stride + x] =
                 fb_nearest_palette_index(bgr);
+            /* A full-screen source compositor presents the RGBA staging
+             * plane, while graph primitives normally target the indexed task
+             * plane. The editor overlay must update whichever plane scans out. */
+            if (g_fb_render_rgba_overlay && g_fb_render_rgba)
+                g_fb_render_rgba[(uint64_t)y * g_fb_render_stride + x] =
+                    bgr & 0x00ffffffu;
+        }
         return;
     }
     uint32_t pxb = (g_fb_bpp + 7) / 8;
@@ -608,6 +616,7 @@ uint64_t zeal_fb_task_frame_begin(uint8_t *surface, uint32_t *rgba,
         return 0;
     g_fb_render_surface = surface;
     g_fb_render_rgba = rgba;
+    g_fb_render_rgba_overlay = 0;
     g_fb_render_stride = stride;
     g_fb_render_rows = rows;
     /* ZealOS uses black as the base layer; text and task windows are composed
@@ -630,7 +639,16 @@ uint64_t zeal_fb_task_frame_begin(uint8_t *surface, uint32_t *rgba,
 void zeal_fb_task_frame_cancel(void) {
     g_fb_render_surface = NULL;
     g_fb_render_rgba = NULL;
+    g_fb_render_rgba_overlay = 0;
     g_fb_render_stride = g_fb_render_rows = 0;
+}
+
+void zeal_fb_task_frame_overlay_begin(void) {
+    g_fb_render_rgba_overlay = g_fb_render_surface && g_fb_render_rgba;
+}
+
+void zeal_fb_task_frame_overlay_end(void) {
+    g_fb_render_rgba_overlay = 0;
 }
 
 uint64_t zeal_fb_task_frame_end(uint64_t use_rgba) {

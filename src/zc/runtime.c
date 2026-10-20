@@ -409,6 +409,8 @@ extern uint64_t zeal_fb_task_frame_begin(uint8_t *surface, uint32_t *rgba,
                                          uint64_t stride, uint64_t rows);
 extern uint64_t zeal_fb_task_frame_end(uint64_t use_rgba);
 extern void zeal_fb_task_frame_cancel(void);
+extern void zeal_fb_task_frame_overlay_begin(void);
+extern void zeal_fb_task_frame_overlay_end(void);
 extern void zeal_fb_task_text_reset(unsigned slot);
 extern uint64_t zeal_fb_task_text_write(unsigned slot, int64_t left,
                                          int64_t right, int64_t top,
@@ -1750,6 +1752,11 @@ static int64_t guest_task_frame_run(void) {
     if (present && present->fun_ptr && !present->argc &&
         !(present->base.base.type & HTF_EXTERN))
         FFI_CALL_TOS_0(present->fun_ptr);
+    /* The editor is a full-screen top layer. Render after the source
+     * compositor into the same staging plane that frame_end will present. */
+    zeal_fb_task_frame_overlay_begin();
+    (void)zc_source_editor_overlay_render(NULL);
+    zeal_fb_task_frame_overlay_end();
     presented = zeal_fb_task_frame_end(guest_source_full_screen_active() ||
                                        guest_task_frame_rgba_ready) != 0;
     if (presented)

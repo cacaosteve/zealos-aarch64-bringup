@@ -322,7 +322,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
     def graphical_path(name):
         screen_name = f'usb-{usb_label}-{name}' if args.usb_input else name
         return ROOT/'build'/f'gui-{screen_name}.ppm'
-    def graphical_screen(name, foreground_threshold=240000):
+    def graphical_screen(name, foreground_threshold=240000,
+                         scanline_offset=1):
         # Inspect actual scanout, rather than treating successful command
         # assembly as proof that the user could see characters while typing.
         path = graphical_path(name)
@@ -340,8 +341,9 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         font = {tuple(int(v.strip(), 0) for v in glyph.split(',')): chr(i+32)
                 for i, glyph in enumerate(glyphs)}
         rows = []
-        # The source planar font starts one scanline below the text cell.
-        for y in range(1, height-7, 8):
+        # The source planar font starts one scanline below the text cell;
+        # direct pixel graphics begin at the requested scanline.
+        for y in range(scanline_offset, height-7, 8):
             row = ''
             for x in range(0, width-7, 8):
                 bits = tuple(sum(0x80 >> col for col in range(8)
@@ -354,10 +356,13 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         text = '\n'.join(rows)
         path.with_suffix('.txt').write_text(text+'\n')
         return width, height, pixels, text
-    def require_graphical_text(name, expected, timeout=5, foreground_threshold=240000):
+    def require_graphical_text(name, expected, timeout=5,
+                               foreground_threshold=240000,
+                               scanline_offset=1):
         deadline = time.monotonic() + timeout
         while True:
-            screen = graphical_screen(name, foreground_threshold)
+            screen = graphical_screen(name, foreground_threshold,
+                                      scanline_offset)
             if expected in screen[3]:
                 break
             if time.monotonic() >= deadline:
@@ -875,14 +880,18 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             editor_command('zedit App/EditorScanout.ZC',
                            'zedit: new App/EditorScanout.ZC')
             require_graphical_text('zedit-navigation-controls',
-                                   'j/k line  [/] page  g/G top/end')
+                                   'j/k line  [/] page  g/G top/end',
+                                   scanline_offset=0)
             require_graphical_text('zedit-save-controls',
-                                   'p [line [count]]  w save  wq save+close')
+                                   'p [line [count]]  w save  wq save+close',
+                                   scanline_offset=0)
             editor_command('a I64 EditorScanout(){return 40+2;}',
                            'zedit: added line 1')
             require_graphical_text('zedit-visible-source',
-                                   '1:> I64 EditorScanout(){return 40+2;}')
-            require_graphical_text('zedit-modified-state', '[modified]')
+                                   '1:> I64 EditorScanout(){return 40+2;}',
+                                   scanline_offset=0)
+            require_graphical_text('zedit-modified-state', '[modified]',
+                                   scanline_offset=0)
             editor_command('wq', 'zedit: saved App/EditorScanout.ZC', finish=True)
             command('zload disk:App/EditorScanout.ZC',
                     'zc: loaded disk:App/EditorScanout.ZC')
@@ -890,8 +899,10 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             editor_command('zedit App/EditorScanout.ZC',
                            'zedit: opened App/EditorScanout.ZC')
             require_graphical_text('zedit-reopened-source',
-                                   '1:> I64 EditorScanout(){return 40+2;}')
-            require_graphical_text('zedit-saved-state', '[saved]')
+                                   '1:> I64 EditorScanout(){return 40+2;}',
+                                   scanline_offset=0)
+            require_graphical_text('zedit-saved-state', '[saved]',
+                                   scanline_offset=0)
             editor_command('q', 'zedit: closed', finish=True)
             print('PASS full-screen source editor controls, visible edits, save/reopen and execution', flush=True)
             raise SystemExit(0)
