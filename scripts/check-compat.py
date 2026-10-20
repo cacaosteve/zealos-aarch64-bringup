@@ -2171,6 +2171,27 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 if 'edit: could not open document' in cancelled[3]:
                     raise RuntimeError('cancelling an open editor reported an open failure')
                 print('PASS graphical edit/save/compile/run/reboot/reopen workflow', flush=True)
+                # The live Lattice demos used to be exposed only through the
+                # serial command dispatcher. Exercise the graphical shell
+                # command route too, and prove each live loop returns to the
+                # same terminal after Escape.
+                for demo in ('latticeplay', 'stockplay'):
+                    qmp_send_text(demo)
+                    qmp_send_key('ret')
+                    # GrPrint draws HUD text in LTGRAY (224), while DolDoc's
+                    # scanout text is brighter. Use a matching threshold and
+                    # scan from row zero because GrPrint has no cell offset.
+                    require_graphical_text(demo+'-live-hud', 'Layer:', timeout=10,
+                                           foreground_threshold=215000,
+                                           scanline_offset=0)
+                    qmp_send_key('esc')
+                    require_graphical_text(demo+'-returns-to-terminal',
+                                           demo+' ok', timeout=10)
+                    status = command('zstatus', 'failed=0')
+                    if 'gterm=1' not in status:
+                        raise RuntimeError(f'{demo} did not restore the graphical terminal:\n'+status)
+                    print(f'PASS graphical {demo} launch, live HUD, and Escape recovery',
+                          flush=True)
             if args.usb_input:
                 final_usb = command('zstatus', 'usb_input:')
                 if not re.search(r'usb_input:.* errors=0', final_usb):

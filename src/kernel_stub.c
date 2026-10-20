@@ -6954,7 +6954,8 @@ int64_t zc_gui_shell_exec(int64_t *a) {
     command = command_buf;
     if (streq(command, "help"))
         return (int64_t)(uintptr_t)
-            "Graphical commands: zstatus | zvol | zls | zgc | zverify <path> | zload <path> | zput <name> <source> | zrm <name> | edit <path> | zc <source> | zcall <function> | windowdemo\n"
+            "Graphical commands: zstatus | zvol | zls | zgc | zverify <path> | zload <path> | zput <name> <source> | zrm <name> | edit <path> | zc <source> | zcall <function> | windowdemo | latticeplay | stockplay\n"
+            "Lattice controls: Esc exit | Enter restart | Space step | c colors | L-click place | R-drag aim\n"
             "Type ZealC directly, for example: 40+2;\n";
     if (streq(command, "windowdemo")) {
         if (zc_window_demo_active() || gui_window_demo_requested)
@@ -6967,6 +6968,7 @@ int64_t zc_gui_shell_exec(int64_t *a) {
     if (!(streq(command, "zstatus") ||
           streq(command, "zvol") || streq(command, "zls") ||
           streq(command, "zgc") ||
+          streq(command, "latticeplay") || streq(command, "stockplay") ||
           str_startswith(command, "zverify ") ||
           str_startswith(command, "zload ") ||
           str_startswith(command, "zcall ") ||
