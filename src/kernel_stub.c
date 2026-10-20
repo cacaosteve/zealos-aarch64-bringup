@@ -1201,9 +1201,8 @@ static void pi_diag_fb_report(const struct zeal_handoff *h) {
     if (!g_fb || !h) {
         return;
     }
-    /* Keep this away from the PI-DIAG color bars; use the top on small modes. */
+    /* Called below the shell banner on the first visible screen. */
     g_fb_cx = 0;
-    g_fb_cy = g_fb_rows >= 75 ? g_fb_rows - 15 : 0;
     if (h->revision < 5 ||
         h->size < offsetof(struct zeal_handoff, pi4_pcie) + sizeof(h->pi4_pcie)) {
         pi_diag_fb_puts("PI4 FDT report unavailable\n");
@@ -1217,13 +1216,13 @@ static void pi_diag_fb_report(const struct zeal_handoff *h) {
     pi_diag_fb_u64_hex(h->pi4_pcie.reg_size);
     pi_diag_fb_puts("\nPCIe mem CPU=");
     pi_diag_fb_u64_hex(h->pi4_pcie.mem_cpu_base);
-    pi_diag_fb_puts(" bus=");
+    pi_diag_fb_puts("\nPCIe mem bus=");
     pi_diag_fb_u64_hex(h->pi4_pcie.mem_bus_base);
     pi_diag_fb_puts(" size=");
     pi_diag_fb_u64_hex(h->pi4_pcie.mem_size);
     pi_diag_fb_puts("\nDMA CPU=");
     pi_diag_fb_u64_hex(h->pi4_pcie.dma_cpu_base);
-    pi_diag_fb_puts(" bus=");
+    pi_diag_fb_puts("\nDMA bus=");
     pi_diag_fb_u64_hex(h->pi4_pcie.dma_bus_base);
     pi_diag_fb_puts(" size=");
     pi_diag_fb_u64_hex(h->pi4_pcie.dma_size);
@@ -1232,11 +1231,11 @@ static void pi_diag_fb_report(const struct zeal_handoff *h) {
                    sizeof(h->pi4_usb_dma)) {
         pi_diag_fb_puts("\nDMA arena flags=");
         pi_diag_fb_u64_hex(h->pi4_usb_dma.flags);
-        pi_diag_fb_puts(" CPU=");
+        pi_diag_fb_puts("\nDMA arena CPU=");
         pi_diag_fb_u64_hex(h->pi4_usb_dma.phys_base);
-        pi_diag_fb_puts(" bus=");
+        pi_diag_fb_puts("\nDMA arena bus=");
         pi_diag_fb_u64_hex(h->pi4_usb_dma.bus_base);
-        pi_diag_fb_puts(" size=");
+        pi_diag_fb_puts("\nDMA arena size=");
         pi_diag_fb_u64_hex(h->pi4_usb_dma.size);
     } else {
         pi_diag_fb_puts("\nDMA arena: no rev-6 reservation");
@@ -1706,7 +1705,7 @@ static void enable_irq(void) {
     __asm__ volatile("isb");
 }
 
-static void shell_run(void);
+static void shell_run(const struct zeal_handoff *h);
 
 /* Limine-mapped RWX scratch for emit-and-run (HolyC/JIT bridge). */
 __attribute__((section(".jit"), aligned(64)))
@@ -6921,7 +6920,8 @@ int64_t zc_gui_shell_exec(int64_t *a) {
 }
 #endif
 
-static void shell_run(void) {
+static void shell_run(const struct zeal_handoff *h) {
+    (void)h;
     /* Interactive by default: no auto-script, no timeout.
      * Automated demos belong in jit_smoke / make run-serial kill, not here. */
     /* M200: RXE + drain before input (Pi USB-TTL / virt serial). */
@@ -6940,6 +6940,8 @@ static void shell_run(void) {
     con_puts("      hc <src> | bars | paint | nearlatticelite | disklat | latticeplay | stocklat | stockplay\n");
 #ifndef ZEAL_PI_DIAG
     con_puts("native: zcheck | zload /Kernel/QuickSort.ZC | zc <source> | zstatus\n");
+#else
+    pi_diag_fb_report(h);
 #endif
     con_puts("> ");
     char line[512];
@@ -9923,15 +9925,12 @@ void kernel_entry(const struct zeal_handoff *h) {
                                     fb_fillrect(0, 420, bw, 14, 0x00E0E0E0u); /* white = IRQ OK */
                                     con_puts("GICv2 IRQ OK\n");
                                     uart_puts(g_uart, "GICv2 IRQ OK - entering shell\n");
-#if defined(ZEAL_PI_DIAG) || defined(ZEAL_FORCE_PI4)
-                                    pi_diag_fb_report(h);
-#endif
                                     /* Stop timer IRQs before interactive input. */
                                     __asm__ volatile("msr daifset, #2");
                                     __asm__ volatile("msr cntp_ctl_el0, %0" ::"r"(0ull));
                                     __asm__ volatile("isb");
                                     pl011_rx_prep();
-                                    shell_run();
+                                    shell_run(h);
                                     for (;;) {
                                         __asm__ volatile("wfi");
                                     }
@@ -10143,7 +10142,7 @@ void kernel_entry(const struct zeal_handoff *h) {
             con_puts("zc: source Window Manager auto-start failed; use winmgr to retry\n");
     }
 #endif
-    shell_run();
+    shell_run(h);
 
     uart_puts(g_uart, "tablet clicks=");
     uart_put_u32_dec(g_uart, g_tab_clicks);
