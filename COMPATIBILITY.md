@@ -3838,3 +3838,9 @@ run: OS menu rendering and actions, native USB keyboard/pointer controls, both
 terminal resizes, source execution and exceptions, System/Popup task recovery,
 editor save/reopen across reboot, `latticeplay`, `stockplay`, and USB
 event-ring cycling.
+
+After the `status` alias was added, the same full command passed again against
+the freshly rebuilt QEMU image. Its graphical shell smoke accepts both
+`status` and `zstatus`; menu Status still dispatches `zstatus`. This acceptance
+run does not update an already-running UTM VM, so visual verification of this
+exact image in UTM remains pending.
