@@ -1980,11 +1980,24 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 command('zc compiler_recovery_committed=0;', 'zc: executed')
                 option_command = 'zc Option(OPTf_DECIMAL_ONLY,ON);'
                 qmp_send_text(option_command)
-                input_state = command('zcall BootstrapGuiTerminalInputDiag', 'zc => 0x')
-                input_match = re.search(r'zc => 0x([0-9a-fA-F]+)', input_state)
-                input_diag = int(input_match.group(1), 16) if input_match else -1
-                input_len = input_diag & 255
-                input_result = (input_diag >> 8) & 255
+                # QMP acknowledges a key edge before the cooperative GUI task
+                # necessarily consumes it. Let the guest scheduler run until
+                # the full visible input buffer catches up, with a bounded
+                # timeout so a genuinely lost character still fails loudly.
+                input_deadline = time.monotonic() + 2
+                input_state = ''
+                input_len = input_result = -1
+                while True:
+                    input_state = command('zcall BootstrapGuiTerminalInputDiag', 'zc => 0x')
+                    input_match = re.search(r'zc => 0x([0-9a-fA-F]+)', input_state)
+                    input_diag = int(input_match.group(1), 16) if input_match else -1
+                    input_len = input_diag & 255
+                    input_result = (input_diag >> 8) & 255
+                    if input_len == len(option_command) and input_result == 1:
+                        break
+                    if time.monotonic() >= input_deadline:
+                        break
+                    time.sleep(0.1)
                 print(f'INFO live GUI input buffer: length={input_len} last_edit={input_result}', flush=True)
                 if input_len != len(option_command) or input_result != 1:
                     raise RuntimeError('USB keys did not assemble the expected live GUI command buffer:\n' + input_state)
