@@ -2281,8 +2281,11 @@ ZealOS live distribution or installer.
   vertical, and grid arrangement commands. `BootstrapGuiTerminalSmoke` checks
   the three new menu labels, message tags, and action IDs. The PCI/HVF boot
   probe loaded the terminal and returned `0x2a` from both terminal and shell
-  menu checks; the boot compositor presented frames. Interactive layout
-  verification remains part of the UTM screen/input check.
+  menu checks; the boot compositor presented frames. The full NEC/native-USB
+  graphical workflow now selects horizontal tiling through the visible menu,
+  checks both terminal rectangles after horizontal, vertical, and grid
+  layouts, then restores their original positions. The complete workflow
+  passed, including the visible caret and keyboard checks.
 
 ## Visible graphical input and persistent editing
 

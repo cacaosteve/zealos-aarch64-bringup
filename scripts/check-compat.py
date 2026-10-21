@@ -610,7 +610,6 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                                held_status+screen[3])
         qmp_command('input-send-event', {'events': [
             {'type': 'btn', 'data': {'down': False, 'button': 'left'}}]})
-        command('zstatus', 'buttons=0')
     def require_graphical_pointer():
         # A newly attached tablet starts at zero, while QEMU can retain its
         # last host absolute position. Force an actual axis change before
@@ -2521,6 +2520,65 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                         time.sleep(0.2)
                         command('zcall BootstrapGuiTerminalLastCommandIsHelp', 'zc => 0x0000000000000001')
                         print('PASS hub subtree removal/reattach disables descendants and restores native typing without DMA growth', flush=True)
+                # Verify the three source WinTile routines against both live
+                # terminal tasks after keyboard and caret checks. Exercise the
+                # first through the visible menu; call the other two actions
+                # directly because tiling moves the menu's owning terminal.
+                main_task = 'bootstrap_gui_terminal_task'
+                second_task = 'bootstrap_gui_terminal_home_second'
+                second_valid = command('zc Print("gterm_second_valid=%d\\n", '
+                                       'TaskValidate(bootstrap_gui_terminal_home_second));',
+                                       'gterm_second_valid=')
+                if 'gterm_second_valid=1' not in second_valid:
+                    raise RuntimeError('OS menu tiling needs the second terminal task:\n' +
+                                       second_valid)
+                original_main = graphical_task_rect(main_task)
+                original_second = graphical_task_rect(second_task)
+                def restore_tiled_terminals():
+                    command(f'zc WinHorz({original_main[0]},{original_main[1]},{main_task}); '
+                            f'WinVert({original_main[2]},{original_main[3]},{main_task}); '
+                            f'WinHorz({original_second[0]},{original_second[1]},{second_task}); '
+                            f'WinVert({original_second[2]},{original_second[3]},{second_task});',
+                            'zc: executed')
+                def check_tiled_pair(label):
+                    main_rect = graphical_task_rect(main_task)
+                    second_rect = graphical_task_rect(second_task)
+                    left, right, top, bottom = main_rect
+                    other_left, other_right, other_top, other_bottom = second_rect
+                    if label == 'horizontal':
+                        ordered = sorted((main_rect, second_rect), key=lambda r: r[2])
+                        if (main_rect[0:2] != second_rect[0:2] or
+                                ordered[0][3] >= ordered[1][2]):
+                            raise RuntimeError('Tile Windows Horizontally did not create '
+                                               f'top/bottom bands: {main_rect}, {second_rect}')
+                    elif label == 'vertical':
+                        ordered = sorted((main_rect, second_rect), key=lambda r: r[0])
+                        if (main_rect[2:4] != second_rect[2:4] or
+                                ordered[0][1] >= ordered[1][0]):
+                            raise RuntimeError('Tile Windows Vertically did not create '
+                                               f'left/right columns: {main_rect}, {second_rect}')
+                    else:
+                        overlap_x = max(0, min(right, other_right) -
+                                        max(left, other_left) + 1)
+                        overlap_y = max(0, min(bottom, other_bottom) -
+                                        max(top, other_top) + 1)
+                        if (overlap_x and overlap_y) or right-left > 52 or bottom-top > 39:
+                            raise RuntimeError('Tile Windows as Grid did not create '
+                                               f'bounded, non-overlapping cells: '
+                                               f'{main_rect}, {second_rect}')
+                    print(f'PASS OS menu tile {label}: {main_rect}, {second_rect}',
+                          flush=True)
+                try:
+                    select_os_menu_row('os-menu-tile-horizontal', 5)
+                    check_tiled_pair('horizontal')
+                    restore_tiled_terminals()
+                    for label, action in (('vertical', 7), ('grid', 8)):
+                        command(f'zc BootstrapGuiTerminalMenuAction({action});',
+                                'zc: executed')
+                        check_tiled_pair(label)
+                        restore_tiled_terminals()
+                finally:
+                    restore_tiled_terminals()
             raise SystemExit(0)
         command('zcall BootstrapGuiTerminalSmoke',
                 'zc => 0x000000000000002a')
