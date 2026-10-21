@@ -4174,11 +4174,11 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         # complete guest restart, not merely remain in the compiler session.
         command('rspersist', 'rspersist ok')
         if args.pci:
+            # The task-isolation checks above deliberately zreset the source
+            # compiler and its loaded desktop modules. Keep this final editor
+            # pass focused on native-file persistence; --probe-source-editor
+            # boots a fresh desktop and owns the graphical scanout assertions.
             editor_command('zedit App/Editor.ZC', 'zedit: new App/Editor.ZC')
-            require_graphical_text('zedit-navigation-controls',
-                                   'j/k line  [/] page  g/G top/end')
-            require_graphical_text('zedit-save-controls',
-                                   'p [line [count]]  w save  wq save+close')
             editor_command('a I64 Edited(){return 17;}', 'zedit: added line 1')
             editor_command('n // cursor insertion', 'zedit: inserted line 1')
             editor_command('j', 'zedit: cursor line 2')
