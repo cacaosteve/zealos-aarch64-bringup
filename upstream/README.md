@@ -3173,6 +3173,15 @@ Freeze catalog unchanged.
 | Smoke | `BootstrapGrContextFlagsChecks` verifies all four role assignments in the PCI boot integration sequence; `make check-compat-pci` passes |
 | Limits | The roles align the bootstrap CDCs with upstream expectations; normal kernel graphics initialization, menu startup, and the full desktop task lifecycle are still incomplete |
 
+## Milestone 279 — use upstream sprite opcode definitions
+
+| Item | Path |
+|--|--|
+| Gap | `BootstrapGrSpriteHashInit` duplicated the pinned `GrInitA.ZC` sprite type and code lists, allowing the bridge to drift from the source graphics ABI |
+| Bring-up | Reuse upstream `GrInit1` when a task lacks both definitions, reject a partially initialized pair, and populate the source sprite hash from `ST_SPRITE_ELEM_CODES` |
+| Smoke | `BootstrapGrContextInitChecks` verifies both 30-entry source lists and representative names; the PCI Win/GrScreen live-manager probe passes |
+| Limits | Sprite hash allocation and the bootstrap empty sprite remain bridge services; complete upstream graphics initialization and ordinary application startup remain open |
+
 ## Milestone 279 — start the source window manager during boot
 
 | Item | Path |

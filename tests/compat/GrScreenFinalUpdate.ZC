@@ -309,6 +309,18 @@ I64 BootstrapGrContextInitChecks()
 
     if (!active_gr)
         return 1;
+    // These definitions must come from the unchanged pinned GrInitA.ZC
+    // initializer; TaskBridge must not carry a second opcode-name list.
+    if (DefineCount("ST_SPRITE_ELEM_TYPES") != 30 ||
+            DefineCount("ST_SPRITE_ELEM_CODES") != 30 ||
+            StrCompare(DefineSub(0, "ST_SPRITE_ELEM_TYPES"), "End") ||
+            StrCompare(DefineSub(13, "ST_SPRITE_ELEM_TYPES"), "Rotated Rect") ||
+            StrCompare(DefineSub(23, "ST_SPRITE_ELEM_TYPES"), "BitMap") ||
+            StrCompare(DefineSub(29, "ST_SPRITE_ELEM_TYPES"), "Text Diamond") ||
+            StrCompare(DefineSub(0, "ST_SPRITE_ELEM_CODES"), "End") ||
+            StrCompare(DefineSub(25, "ST_SPRITE_ELEM_CODES"), "Mesh") ||
+            StrCompare(DefineSub(29, "ST_SPRITE_ELEM_CODES"), "TextDiamond"))
+        return 0;
     active_gr->screen_image = active_gr->dc = active_gr->dc1 = NULL;
     active_gr->dc2 = active_gr->dc_cache = active_gr->zoomed_dc = NULL;
     active_gr->text_base = NULL;

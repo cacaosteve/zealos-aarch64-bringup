@@ -2637,32 +2637,34 @@ U0 BootstrapGrZoomTablesInit(CGrGlobals *active_gr)
     for (i = 1; i <= 8; i++)
         active_gr->screen_zoom_tables[i] = bootstrap_screen_zoom_tables[i];
 }
+extern U0 GrInit1();
 U0 BootstrapGrSpriteHashInit(CGrGlobals *active_gr)
-{//Build the sprite opcode hash expected by the unchanged ZealOS sprite editor.
+{//Bind the pinned sprite definitions to the source graphics opcode hash.
+    Bool have_types, have_codes;
+
     if (!active_gr)
         return;
-    if (!HashFind("ST_SPRITE_ELEM_TYPES", Fs->hash_table, HTT_DEFINE_STR))
-        DefineListLoad("ST_SPRITE_ELEM_TYPES",
-                "End\0Color\0Dither Color\0Thick\0Planar Symmetry\0"
-                "Transform On\0Transform Off\0Shift\0Point\0PolyPoint\0"
-                "Line\0PolyLine\0Rect\0Rotated Rect\0Circle\0Ellipse\0"
-                "Polygon\0BSpline2\0BSpline2 Closed\0BSpline3\0"
-                "BSpline3 Closed\0Flood Fill\0Flood Fill Not Color\0"
-                "BitMap\0Mesh\0Shiftable Mesh\0Arrow\0Text\0Text Box\0"
-                "Text Diamond\0");
-    if (!HashFind("ST_SPRITE_ELEM_CODES", Fs->hash_table, HTT_DEFINE_STR))
-        DefineListLoad("ST_SPRITE_ELEM_CODES",
-                "End\0Color\0Color\0Thick\0PlanarSymmetry\0Transform\0"
-                "Transform\0Shift\0Pt\0PolyPt\0Line\0PolyLine\0Rect\0"
-                "Rect\0Circle\0Ellipse\0Polygon\0BSpline2\0BSpline2\0"
-                "BSpline3\0BSpline3\0FloodFill\0FloodFill\0BitMap\0Mesh\0"
-                "Mesh\0Arrow\0Text\0TextBox\0TextDiamond\0");
+    have_types = HashFind("ST_SPRITE_ELEM_TYPES", Fs->hash_table,
+            HTT_DEFINE_STR) != NULL;
+    have_codes = HashFind("ST_SPRITE_ELEM_CODES", Fs->hash_table,
+            HTT_DEFINE_STR) != NULL;
+    // GrInitA.ZC is the single source of these lists. Its file-scope call
+    // initializes the boot task; a later task with a private define table
+    // runs that same upstream initializer instead of a copied bridge list.
+    if (!have_types && !have_codes)
+        GrInit1;
+    else if (!have_types || !have_codes)
+        throw('Sprite');
+    if (DefineCount("ST_SPRITE_ELEM_TYPES") != SPT_TYPES_NUM ||
+            DefineCount("ST_SPRITE_ELEM_CODES") != SPT_TYPES_NUM)
+        throw('Sprite');
     if (!active_gr->sprite_hash)
     {
         active_gr->sprite_hash = HashTableNew(512);
-        if (active_gr->sprite_hash)
-            HashDefineListAdd("ST_SPRITE_ELEM_CODES", 1,
-                    active_gr->sprite_hash);
+        if (!active_gr->sprite_hash ||
+                HashDefineListAdd("ST_SPRITE_ELEM_CODES", 1,
+                        active_gr->sprite_hash) != SPT_TYPES_NUM)
+            throw('SprHash');
     }
     active_gr->empty_sprite = bootstrap_empty_sprite;
 }
