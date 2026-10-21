@@ -459,7 +459,8 @@ oracle are needed before broad language compatibility can be claimed.
   around the guest pointer. On 2026-10-21, the user also confirmed that
   `latticeplay` Space draws a visible step, Escape returns to the prompt, `c`
   changes the swatches, and Return restarts the drawing/colors in UTM.
-  Non-default pan and plain-wheel delivery remain to be checked separately.
+  Scrolling back down returns the view to its normal size. Non-default pan and
+  plain-wheel delivery remain to be checked separately.
 
 The current boot images are useful delivery artifacts; they are not a finished
 ZealOS live distribution or installer.
