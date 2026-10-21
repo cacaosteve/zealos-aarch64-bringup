@@ -3959,3 +3959,19 @@ the complete graphical workflow on 2026-10-21. It also passed the live Lattice
 color-swatches, restart, and Space-step checks. In UTM, the user confirmed
 Control+scroll zoom, Lattice Space/Escape, `c` color cycling, Return reset, and
 ordinary graphical typing.
+
+The user further confirmed that Control+scroll down returns the guest to its
+normal zoom and that Space advances `latticeplay` while Escape returns to the
+graphical prompt. The graphical `help` output now explains the OS menu's
+press-drag-release gesture, guarded by `BootstrapGuiShellSmoke`.
+
+The full UTM workflow `python3 scripts/check-compat.py --usb-input nec
+--probe-gui-workflow` passed again on 2026-10-21, including graphical input,
+Lattice and stock demos, native USB event-ring cycling, and horizontal,
+vertical, and grid tiling. A repeat of the source graphics probe
+`python3 scripts/check-compat.py --pci --probe-module /System/Win.ZC
+--probe-winmgr --probe-grscreen` stopped in its earlier `windowdemo` phase:
+the 96 MiB guest test data arena fragmented before its next 1.92 MiB surface
+request, leaving only 1.08 MiB contiguous. It failed before loading the
+GrScreen regression; the prior passing result above remains valid, but this
+run gives no new result for the compositor path.
