@@ -454,8 +454,10 @@ oracle are needed before broad language compatibility can be claimed.
 - `BootstrapCtrlWheelZoomChecks` verifies that plain wheel does not zoom,
   Ctrl+wheel applies every accumulated notch, reaches ZealOS's 8x limit, returns
   to 1x, and keeps the mouse scale synchronized. The full PCI compatibility
-  suite and focused graphics probe pass. Physical Ctrl+wheel behavior in UTM
-  remains to be confirmed.
+  suite and focused graphics probe pass. In the refreshed UTM guest, the user
+  confirmed that holding Control and scrolling the wheel visibly zooms the
+  desktop. Pointer-centered anchoring and non-default pan remain to be checked
+  separately.
 
 The current boot images are useful delivery artifacts; they are not a finished
 ZealOS live distribution or installer.
