@@ -239,9 +239,23 @@ filemgr_text = filemgr_translated.decode('utf-8')
 assert filemgr_translated != filemgr_source
 assert 'FMRebuildDocSourceVolume(doc, _head);' in filemgr_text
 assert 'BootstrapSourceFilesTree();' in filemgr_text
+assert 'extern Bool BootstrapGuiTerminalEditFile(U8 *path);' in filemgr_text
 assert '\tif (blkdev.drvs)\n\t\tfor (i = 0; i < DRIVES_NUM; i++)' in filemgr_text
 assert '\t\tif (drive->bd)\n\t\t{' in filemgr_text
 assert '\tif (doc2)\n\t\tDocReset(doc2, TRUE);' in filemgr_text
+assert filemgr_text.count(
+    'tmpde->user_data(CDocEntry *)->user_data = tmpde;') == 3
+assert 'root->user_data(CDocEntry *)->user_data = root;' in filemgr_text
+assert 'U=0x%X' not in filemgr_text
+assert ('(tmpde = doc->cur_entry->user_data) && tmpde->full_name' in
+        filemgr_text)
+assert ('BootstrapGuiTerminalEditFile(tmpde->full_name);' in
+        filemgr_text)
+assert ('BootstrapGuiTerminalEditFile(\n'
+        '\t\t\t\t\t\t\t\tdoc_e->user_data(CDirEntry *)->full_name);' in
+        filemgr_text)
+assert 'Ed(tmpde->full_name);' not in filemgr_text
+assert 'Ed(doc_e->user_data(CDirEntry *)->full_name);' not in filemgr_text
 try:
     translate_filemgr(filemgr_source.replace(
         b'drive = &blkdev.drvs[i];', b'drive = &blkdev.drvs[j];', 1))

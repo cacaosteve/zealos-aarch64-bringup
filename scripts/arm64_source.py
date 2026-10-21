@@ -638,14 +638,67 @@ def translate_filemgr(source: bytes) -> bytes:
         raise ValueError("expected exactly one FMRebuildDoc definition")
     if "FMRebuildDocSourceVolume" in text:
         raise ValueError("FileMgr.ZC already contains the source-volume adapter")
+    for old, new in (
+        ('tmpde->user_data = DocPrint(doc, "$$TR,\\\"%s\\\",U=0x%X$$", tmpde->name, tmpde);',
+         'tmpde->user_data = DocPrint(doc, "$$TR,\\\"%s\\\"$$", tmpde->name);\n'
+         '\t\t\ttmpde->user_data(CDocEntry *)->user_data = tmpde;'),
+        ('tmpde->user_data = DocPrint(doc, "$$MU,\\\"%s\\\",U=0x%X$$", tmpde->name, tmpde);',
+         'tmpde->user_data = DocPrint(doc, "$$MU,\\\"%s\\\"$$", tmpde->name);\n'
+         '\t\t\ttmpde->user_data(CDocEntry *)->user_data = tmpde;'),
+        ('tmpde->user_data = DocPrint(doc, "$$TR,\\\"%s\\\",U=0x%X$$", tmpde->full_name, tmpde);',
+         'tmpde->user_data = DocPrint(doc, "$$TR,\\\"%s\\\"$$", tmpde->full_name);\n'
+         '\ttmpde->user_data(CDocEntry *)->user_data = tmpde;'),
+    ):
+        if text.count(old) != 1:
+            raise ValueError("expected exactly one FileMgr DocEntry pointer format")
+        text = text.replace(old, new, 1)
+    space_open = (
+        "\t\t\t\t\tcase CH_SPACE:\n"
+        "\t\t\t\t\t\tif (doc->cur_entry->type_u8 == DOCT_MENU_VAL)\n"
+        "\t\t\t\t\t\t{\n"
+        "\t\t\t\t\t\t\tDocUnlock(doc);\n"
+        "\t\t\t\t\t\t\tEd(doc->cur_entry->user_data(CDirEntry *)->full_name);\n"
+        "\t\t\t\t\t\t\tDocLock(doc);\n"
+        "\t\t\t\t\t\t}\n"
+        "\t\t\t\t\t\telse\n"
+        "\t\t\t\t\t\t\tgoto fm_regular_key;\n"
+        "\t\t\t\t\t\tbreak;"
+    )
+    safe_space_open = (
+        "\t\t\t\t\tcase CH_SPACE:\n"
+        "\t\t\t\t\t\tif (doc->cur_entry->type_u8 == DOCT_MENU_VAL &&\n"
+        "\t\t\t\t\t\t\t(tmpde = doc->cur_entry->user_data) && tmpde->full_name)\n"
+        "\t\t\t\t\t\t{\n"
+        "\t\t\t\t\t\t\tDocUnlock(doc);\n"
+        "\t\t\t\t\t\t\tBootstrapGuiTerminalEditFile(tmpde->full_name);\n"
+        "\t\t\t\t\t\t\tDocLock(doc);\n"
+        "\t\t\t\t\t\t}\n"
+        "\t\t\t\t\t\telse\n"
+        "\t\t\t\t\t\t\tgoto fm_regular_key;\n"
+        "\t\t\t\t\t\tbreak;"
+    )
+    if text.count(space_open) != 1:
+        raise ValueError("expected exactly one FileMgr Space-to-open branch")
+    text = text.replace(space_open, safe_space_open, 1)
+    click_open = "\t\t\t\t\t\t\tEd(doc_e->user_data(CDirEntry *)->full_name);\n"
+    if text.count(click_open) != 1:
+        raise ValueError("expected exactly one FileMgr click-to-open branch")
+    text = text.replace(
+        click_open,
+        "\t\t\t\t\t\t\tBootstrapGuiTerminalEditFile(\n"
+        "\t\t\t\t\t\t\t\tdoc_e->user_data(CDirEntry *)->full_name);\n",
+        1,
+    )
     helper = (
+        "extern Bool BootstrapGuiTerminalEditFile(U8 *path);\n"
         "extern CDirEntry *BootstrapSourceFilesTree();\n"
         "CDirEntry *FMRebuildDocSourceVolume(CDoc *doc, CDirEntry **_head)\n"
         "{\n"
         "\tCDirEntry *root = BootstrapSourceFilesTree();\n"
         "\tif (!root)\n"
         "\t\treturn NULL;\n"
-        "\troot->user_data = DocPrint(doc, \"$$TR,\\\"Source /\\\",U=0x%X$$\", root);\n"
+        "\troot->user_data = DocPrint(doc, \"$$TR,\\\"Source /\\\"$$\");\n"
+        "\troot->user_data(CDocEntry *)->user_data = root;\n"
         "\troot->next = *_head;\n"
         "\t*_head = root;\n"
         "\tDocPrint(doc, \"\\n$$ID,+2$$\");\n"

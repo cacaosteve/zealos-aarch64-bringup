@@ -1927,8 +1927,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     raise RuntimeError('OS menu stayed open after leaving the desktop top row; '
                                        f'see {graphical_path("os-menu-left-top-row")} and .txt\n'
                                        + menu_screen[3])
-                # Files launches the unchanged upstream FileMgr over the
-                # merged source-volume directory tree.
+                # Files launches the native FileMgr over the merged
+                # source-volume directory tree.
                 move_graphical_pointer(4, 4)
                 menu_deadline = time.monotonic() + 5
                 menu_screen = graphical_screen('os-menu-files-open')
@@ -1998,6 +1998,74 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                                        files_view[3])
                 print('PASS native FileMgr source title and directory tree rendered',
                       flush=True)
+                # The FileMgr opens a file with Space on the selected leaf.
+                # Its initial selection is the already-expanded /Home node;
+                # Down selects the first source file there. Confirm that Ed
+                # opens that file, then Shift+Escape returns to FileMgr.
+                keyboard_before_down = command('zstatus', 'gui_keyboard: key_events=')
+                keyboard_before_match = re.search(
+                    r'gui_keyboard: key_events=(\d+)', keyboard_before_down)
+                if not keyboard_before_match:
+                    raise RuntimeError('zstatus omitted the graphical key counter before FileMgr Down:\n' +
+                                       keyboard_before_down)
+                qmp_send_key('down')
+                keyboard_after_down = command('zstatus', 'gui_keyboard: key_events=')
+                keyboard_after_match = re.search(
+                    r'gui_keyboard: key_events=(\d+)', keyboard_after_down)
+                if (not keyboard_after_match or
+                        int(keyboard_after_match.group(1)) !=
+                        int(keyboard_before_match.group(1))):
+                    raise RuntimeError('FileMgr did not retain keyboard ownership for Down:\n' +
+                                       keyboard_before_down + '\n' + keyboard_after_down)
+                selected_entry = command(
+                    'zc Print("filemgr_select=%d/%X/%s\\n", '
+                    'bootstrap_gui_terminal_task->display_doc->cur_entry->type_u8, '
+                    'bootstrap_gui_terminal_task->display_doc->cur_entry->user_data, '
+                    'bootstrap_gui_terminal_task->display_doc->cur_entry->user_data(CDirEntry *)->full_name);',
+                    'filemgr_select=')
+                selected_entry_match = re.search(
+                    r'filemgr_select=(\d+)/([0-9a-fA-F]+)/([^\r\n]+)',
+                    selected_entry)
+                if (not selected_entry_match or
+                        int(selected_entry_match.group(1)) != 34 or
+                        int(selected_entry_match.group(2), 16) == 0):
+                    raise RuntimeError('Down did not select a FileMgr file with valid data:\n' +
+                                       selected_entry)
+                selected_name = selected_entry_match.group(3).strip().rsplit('/', 1)[-1]
+                qmp_send_key('spc')
+                file_edit_deadline = time.monotonic() + 5
+                opened_file = ''
+                opened_file_screen = None
+                while time.monotonic() < file_edit_deadline:
+                    opened_file_screen = graphical_screen(
+                        'os-menu-files-space-open')
+                    opened_file = opened_file_screen[3]
+                    if (selected_name.lower() in opened_file.lower() and
+                            'onceexe;' in opened_file.lower() and
+                            'boot_src_rom' in opened_file.lower()):
+                        break
+                    time.sleep(0.1)
+                else:
+                    post_space_status = command('zstatus', 'keyboard_focus=')
+                    raise RuntimeError('Space did not show the selected source file in the graphical editor:\n' +
+                                       post_space_status + '\n' + opened_file + '\nselected path: ' +
+                                       selected_entry_match.group(3).strip())
+                qmp_send_keys(['shift', 'esc'])
+                filemgr_restore_deadline = time.monotonic() + 5
+                restored_screen = None
+                while time.monotonic() < filemgr_restore_deadline:
+                    restored_screen = graphical_screen(
+                        'os-menu-files-editor-return')
+                    if ('onceexe;' not in restored_screen[3].lower() and
+                            rgb_pixels_in(restored_screen, (85, 85, 255),
+                                          (0, 0, 400, 200)) >= 500):
+                        break
+                    time.sleep(0.1)
+                else:
+                    raise RuntimeError('Shift+Escape did not return from the editor to FileMgr:\n' +
+                                       (restored_screen[3] if restored_screen else ''))
+                print(f'PASS native FileMgr opened {selected_name} in the graphical editor and returned with Shift+Escape',
+                      flush=True)
                 qmp_send_key('esc')
                 files_restore_deadline = time.monotonic() + 5
                 while True:
@@ -2009,7 +2077,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                                            'terminal focus:\n' + files_restored)
                     time.sleep(0.1)
                 restored_screen = graphical_screen('os-menu-files-restored')
-                if 'Directory of /Home' in restored_screen[3]:
+                if rgb_pixels_in(restored_screen, (85, 85, 255),
+                                 (0, 0, 400, 200)) >= 500:
                     raise RuntimeError('Files window remained visible after Escape:\n' +
                                        restored_screen[3])
                 print('PASS OS menu Files opened native FileMgr and Escape restored the terminal',
