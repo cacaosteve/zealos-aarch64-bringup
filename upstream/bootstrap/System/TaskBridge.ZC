@@ -2253,6 +2253,9 @@ U0 Mat4x4RotZ(I64 *matrix, F64 angle)
 I64 BootstrapMat4x4Checks()
 {
     I64 matrix[16], epsilon = 4096;
+    F64 cosine = 0.5403023058681397174;
+    F64 sine = 0.8414709848078965067;
+    F64 tolerance = 0.000001;
     Mat4x4IdentEqu(matrix);
     if (matrix[0] != 0x100000000 || matrix[5] != 0x100000000 ||
         matrix[10] != 0x100000000 || matrix[15] != 0x100000000 ||
@@ -2293,6 +2296,39 @@ I64 BootstrapMat4x4Checks()
         matrix[8] > -0x100000000 + epsilon ||
         matrix[8] < -0x100000000 - epsilon)
         return 5;
+    Mat4x4IdentEqu(matrix);
+    Mat4x4RotX(matrix, 1.0);
+    if (BootstrapMat4x4Float(matrix[5]) < cosine - tolerance ||
+        BootstrapMat4x4Float(matrix[5]) > cosine + tolerance ||
+        BootstrapMat4x4Float(matrix[6]) < -sine - tolerance ||
+        BootstrapMat4x4Float(matrix[6]) > -sine + tolerance ||
+        BootstrapMat4x4Float(matrix[9]) < sine - tolerance ||
+        BootstrapMat4x4Float(matrix[9]) > sine + tolerance ||
+        BootstrapMat4x4Float(matrix[10]) < cosine - tolerance ||
+        BootstrapMat4x4Float(matrix[10]) > cosine + tolerance)
+        return 6;
+    Mat4x4IdentEqu(matrix);
+    Mat4x4RotY(matrix, 1.0);
+    if (BootstrapMat4x4Float(matrix[0]) < cosine - tolerance ||
+        BootstrapMat4x4Float(matrix[0]) > cosine + tolerance ||
+        BootstrapMat4x4Float(matrix[2]) < sine - tolerance ||
+        BootstrapMat4x4Float(matrix[2]) > sine + tolerance ||
+        BootstrapMat4x4Float(matrix[8]) < -sine - tolerance ||
+        BootstrapMat4x4Float(matrix[8]) > -sine + tolerance ||
+        BootstrapMat4x4Float(matrix[10]) < cosine - tolerance ||
+        BootstrapMat4x4Float(matrix[10]) > cosine + tolerance)
+        return 7;
+    Mat4x4IdentEqu(matrix);
+    Mat4x4RotZ(matrix, 1.0);
+    if (BootstrapMat4x4Float(matrix[0]) < cosine - tolerance ||
+        BootstrapMat4x4Float(matrix[0]) > cosine + tolerance ||
+        BootstrapMat4x4Float(matrix[1]) < -sine - tolerance ||
+        BootstrapMat4x4Float(matrix[1]) > -sine + tolerance ||
+        BootstrapMat4x4Float(matrix[4]) < sine - tolerance ||
+        BootstrapMat4x4Float(matrix[4]) > sine + tolerance ||
+        BootstrapMat4x4Float(matrix[5]) < cosine - tolerance ||
+        BootstrapMat4x4Float(matrix[5]) > cosine + tolerance)
+        return 8;
     return 0x2a;
 }
 extern Bool GrPlot(CDC *dc, I64 x, I64 y);

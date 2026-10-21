@@ -3881,3 +3881,17 @@ and hub-subtree removal/reattach without DMA growth. The HomeSys run verified
 the disk-boot `Once` path, two-terminal tiling, popup/splash lifecycle, and
 restored graphical prompt. This is QEMU regression evidence; a physical UTM
 drag/resize check on the refreshed VM is still awaiting an unlocked Mac.
+
+## Non-cardinal affine sprite transform coverage — 2026-10-20
+
+The matrix smoke now checks the expected Q32.32 sine/cosine coefficients for
+one-radian X, Y, and Z rotations in addition to the existing cardinal and
+composition cases. `GrSpriteTransformChecks` also applies a one-radian Z
+rotation through the source CDC transform callback and `Sprite3`, then checks
+the resulting framebuffer pixel. This verifies a non-cardinal affine sprite
+point path; perspective division, general 3D clipping, complete transformed
+mesh coverage, and interactive view-angle controls remain open.
+
+`python3 scripts/check-compat.py --pci --probe-module /System/Win.ZC
+--probe-winmgr --probe-grscreen` passed, including the new matrix and visible
+pixel assertions alongside the full source graphics/window-manager checks.

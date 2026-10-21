@@ -459,6 +459,24 @@ I64 GrSpriteTransformChecks()
     if (ZcFbTextPixel(511, 483) != color ||
             ZcFbTextPixel(510, 479) == color)
         return 8;
+
+    // Exercise a non-cardinal source Q32.32 matrix through the real CDC
+    // transform callback and Sprite3 point path.  A 1-radian Z turn maps
+    // (180,0) to approximately (97,151), then the CDC origin is restored.
+    Mat4x4IdentEqu(dc->r);
+    Mat4x4RotZ(dc->r, 1.0);
+    MemSet(records, 0, 715);
+    type = SPT_TRANSFORM_ON;
+    MemCopy(records, &type, sizeof(U8));
+    type = SPT_PT;
+    MemCopy(records + 1, &type, sizeof(U8));
+    x = 180;
+    y = 0;
+    MemCopy(records + 5, &x, sizeof(I32));
+    MemCopy(records + 9, &y, sizeof(I32));
+    Sprite3(dc, dc->x, dc->y, dc->z, records);
+    if (ZcFbTextPixel(707, 581) != color)
+        return 9;
     if (ZcFbTextPixel(585, 445) == color)
         return 3;
     if (dc->flags & DCF_TRANSFORMATION)
