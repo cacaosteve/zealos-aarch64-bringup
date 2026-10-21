@@ -456,8 +456,11 @@ oracle are needed before broad language compatibility can be claimed.
   to 1x, and keeps the mouse scale synchronized. The full PCI compatibility
   suite and focused graphics probe pass. In the refreshed UTM guest, the user
   confirmed that holding Control and scrolling the wheel zooms the desktop
-  around the guest pointer. Non-default pan and plain-wheel delivery remain to
-  be checked separately.
+  around the guest pointer. On 2026-10-21, the user also confirmed that
+  `latticeplay` Space draws a visible step and Escape returns to the prompt in
+  UTM. Non-default pan and plain-wheel delivery remain to be checked
+  separately; Lattice color-cycle and Return-reset still need live UTM
+  confirmation.
 
 The current boot images are useful delivery artifacts; they are not a finished
 ZealOS live distribution or installer.
