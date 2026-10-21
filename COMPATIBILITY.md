@@ -3975,3 +3975,11 @@ the 96 MiB guest test data arena fragmented before its next 1.92 MiB surface
 request, leaving only 1.08 MiB contiguous. It failed before loading the
 GrScreen regression; the prior passing result above remains valid, but this
 run gives no new result for the compositor path.
+
+An immediate rerun completed the full source graphics probe, so the arena
+pressure was transient. The rerun also passed `GrScreenFinalUpdateChecks`
+after adding a nonzero-pan case: at 2x zoom it sets `sx=31` and `sy=23`, then
+checks both the expanded indexed pixels and the presented framebuffer against
+the corresponding source pixels. The probe reports `0x2a` and exits
+successfully. Large live allocations now retain their guest call site in the
+arena-exhaustion diagnostic to make a recurrence attributable.

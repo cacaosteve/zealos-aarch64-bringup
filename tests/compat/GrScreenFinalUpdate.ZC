@@ -791,6 +791,31 @@ I64 GrScreenFinalUpdateChecks()
                 frame_gr->sy = old_screen_sy;
                 return 24;
             }
+    // Pan the 2x viewport away from the source origin and verify that both
+    // the expanded indexed plane and the presented framebuffer use sx/sy.
+    frame_gr->sx = 31;
+    frame_gr->sy = 23;
+    if (!ZcTaskFrameRun())
+    {
+        frame_gr->screen_zoom = old_screen_zoom;
+        frame_gr->sx = old_screen_sx;
+        frame_gr->sy = old_screen_sy;
+        return 25;
+    }
+    for (y = 0; y < 4; y++)
+        for (x = 0; x < 4; x++)
+        {
+            U8 expected = frame_gr->dc2->body[
+                (23 + y / 2) * 800 + 31 + x / 2];
+            if (frame_gr->zoomed_dc->body[y * 800 + x] != expected ||
+                screen[y * pitch + x] != gr_palette[expected])
+            {
+                frame_gr->screen_zoom = old_screen_zoom;
+                frame_gr->sx = old_screen_sx;
+                frame_gr->sy = old_screen_sy;
+                return 26;
+            }
+        }
     frame_gr->screen_zoom = old_screen_zoom;
     frame_gr->sx = old_screen_sx;
     frame_gr->sy = old_screen_sy;

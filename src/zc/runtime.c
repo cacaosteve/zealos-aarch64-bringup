@@ -476,11 +476,17 @@ void zc_fail(const char *s) {
         size_t index = 0;
         for (struct block *b = arenas[0]; b; b = b->next) {
             if (b->used && b->requested >= 1024 * 1024) {
+                uintptr_t caller_offset = 0;
+                const char *caller = zc_debug_function_for_pc(
+                    (uintptr_t)b->pad, &caller_offset);
                 snprintf(detail, sizeof(detail),
-                         "large_live[%zu]: offset=%zu requested=%zu block=%zu owner_used=%lld\n",
+                         "large_live[%zu]: offset=%zu requested=%zu block=%zu owner_used=%lld caller=%s+0x%lx pc=0x%lx\n",
                          index++, (size_t)((unsigned char *)b - data_arena),
                          b->requested, b->size,
-                         (long long)(b->owner ? b->owner->used_u8s : -1));
+                         (long long)(b->owner ? b->owner->used_u8s : -1),
+                         caller ? caller : "unknown",
+                         (unsigned long)caller_offset,
+                         (unsigned long)b->pad);
                 zc_output(detail);
             }
         }
@@ -590,7 +596,7 @@ static void sync_guest_heap(CHeapCtrl *owner) {
         }
     }
 }
-void *__AIWNIOS_MAlloc(int64_t count, void *t) {
+static void *arena_alloc(int64_t count, void *t, uintptr_t caller_pc) {
     if (count < 0 || (uint64_t)count > DATA_BYTES) {
         static char msg[96];
         snprintf(msg, sizeof(msg),
@@ -622,7 +628,9 @@ void *__AIWNIOS_MAlloc(int64_t count, void *t) {
         b->used = 1;
         b->requested = (size_t)count;
         b->owner = owner;
-        b->pad = 0;
+        /* Free blocks use pad for their free-list link. While allocated,
+         * retain the guest call site to make large arena diagnostics useful. */
+        b->pad = caller_pc;
         owner->used_u8s += (int64_t)b->size;
         sync_guest_heap(owner);
         return b + 1;
@@ -644,6 +652,9 @@ void *__AIWNIOS_MAlloc(int64_t count, void *t) {
                  free_total, largest, free_count);
         zc_fail(msg);
     }
+}
+void *__AIWNIOS_MAlloc(int64_t count, void *t) {
+    return arena_alloc(count, t, (uintptr_t)__builtin_return_address(0));
 }
 static struct block *get_block(void *p) {
     uintptr_t v = (uintptr_t)p;
@@ -1251,7 +1262,9 @@ static CHeapCtrl *guest_allocation_owner(int64_t selector) {
     return &data_heap;
 }
 static int64_t host_malloc(int64_t *a) {
-    return (int64_t)(uintptr_t)__AIWNIOS_MAlloc(a[0], guest_allocation_owner(a[1]));
+    return (int64_t)(uintptr_t)arena_alloc(
+        a[0], guest_allocation_owner(a[1]),
+        (uintptr_t)__builtin_return_address(0));
 }
 static int64_t host_system_task(int64_t *a) {
     (void)a;
@@ -1472,7 +1485,10 @@ static int64_t host_max_f64(int64_t *a) {
     return (int64_t)bits;
 }
 static int64_t host_calloc(int64_t *a) {
-    return (int64_t)(uintptr_t)__AIWNIOS_CAlloc(a[0], guest_allocation_owner(a[1]));
+    void *p = arena_alloc(a[0], guest_allocation_owner(a[1]),
+                          (uintptr_t)__builtin_return_address(0));
+    memset(p, 0, (size_t)a[0]);
+    return (int64_t)(uintptr_t)p;
 }
 static int64_t host_free(int64_t *a) {
     free((void *)(uintptr_t)a[0]);
