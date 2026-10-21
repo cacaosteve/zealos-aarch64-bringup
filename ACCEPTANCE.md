@@ -29,7 +29,11 @@ it and type `40+2;`, then Return: the answer should be 42. `help` also lists
 bootstrap commands such as `zstatus`, `zvol`, `zls`, `zload`, `zcall`, and `edit`.
 `User;` opens another graphical terminal through the original task entry and
 the default per-user `HomeSys` hook. Each terminal has its own input history,
-document and compiler context. Full `HomeSys` desktop launch remains separate.
+document and compiler context. Boot also runs a guarded ARM64 translation of
+`HomeSys.StartUpTasks`: it starts and tiles the second user terminal on disk
+boot, queues `Home/Once.ZC`, initializes autocomplete, and opens the splash
+where the boot-media path calls for it. Full native `KTask` startup and the
+complete system menu/music path remain separate work.
 The current installer keeps the
 working UTM 5.0.7 built-in Terminal 1 serial window. This is independent of
 the graphical guest terminal's keyboard and document rendering. The graphical
@@ -701,8 +705,10 @@ disposable guest is addressed by explicit key edges in the test harness.
 The guest USB driver remains unchanged; `zstatus` gains keyboard-state
 diagnostics. UTM has been backed up and refreshed with the tested kernel,
 preserving 185 existing files outside managed paths, deletion masks, RedSea and
-VM settings. Full HomeSys startup, automatic home Once loading, tips,
-autocomplete and splash remain separate work.
+VM settings. First-stage `HomeSys.StartUpTasks`, automatic home `Once` loading,
+tips, autocomplete initialization, and the boot-media splash are now part of
+the tested boot path. Full native `KTask` startup and the complete system
+menu/music path remain open.
 
 The refreshed live graphical window also passed desktop checks for visible
 `help`, help execution, visible `42;` before Return and `ans=0x2A=42` afterward,
