@@ -473,6 +473,49 @@ I64 GrSpriteSymmetryChecks()
             dc->body[350 * dc->width_internal + 560] != mirror_pixel)
         return 19;
 
+    // A non-cardinal affine Z turn must carry all indexed mesh vertices
+    // through Sprite3 and fill an interior pixel of the transformed triangle.
+    MemSet(records, 0, 246);
+    type = SPT_TRANSFORM_ON;
+    MemCopy(records, &type, sizeof(U8));
+    type = SPT_MESH;
+    MemCopy(records + 1, &type, sizeof(U8));
+    sides = 3;
+    MemCopy(records + 5, &sides, sizeof(I32));
+    sides = 1;
+    MemCopy(records + 9, &sides, sizeof(I32));
+    x1 = 300; y1 = 0; z1 = 10;
+    MemCopy(records + 13, &x1, sizeof(I32));
+    MemCopy(records + 17, &y1, sizeof(I32));
+    MemCopy(records + 21, &z1, sizeof(I32));
+    x1 = 340;
+    MemCopy(records + 25, &x1, sizeof(I32));
+    MemCopy(records + 29, &y1, sizeof(I32));
+    MemCopy(records + 33, &z1, sizeof(I32));
+    x1 = 300; y1 = 40;
+    MemCopy(records + 37, &x1, sizeof(I32));
+    MemCopy(records + 41, &y1, sizeof(I32));
+    MemCopy(records + 45, &z1, sizeof(I32));
+    sides = 12;
+    MemCopy(records + 49, &sides, sizeof(I32));
+    sides = 0;
+    MemCopy(records + 53, &sides, sizeof(I32));
+    sides = 1;
+    MemCopy(records + 57, &sides, sizeof(I32));
+    sides = 2;
+    MemCopy(records + 61, &sides, sizeof(I32));
+    Mat4x4IdentEqu(dc->r);
+    Mat4x4RotZ(dc->r, 1.0);
+    for (scan_y = 245; scan_y <= 295; scan_y++)
+        for (scan_x = 120; scan_x <= 190; scan_x++)
+        {
+            dc->body[scan_y * dc->width_internal + scan_x] = 0;
+            dc->depth_buf[scan_y * dc->width_internal + scan_x] = I32_MAX;
+        }
+    Sprite3(dc, 0, 0, 0, records);
+    if (!dc->body[275 * dc->width_internal + 158])
+        return 23;
+
     DCDel(dc);
     Free(records);
     return 0x2a;

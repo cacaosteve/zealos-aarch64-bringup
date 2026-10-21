@@ -3888,10 +3888,20 @@ The matrix smoke now checks the expected Q32.32 sine/cosine coefficients for
 one-radian X, Y, and Z rotations in addition to the existing cardinal and
 composition cases. `GrSpriteTransformChecks` also applies a one-radian Z
 rotation through the source CDC transform callback and `Sprite3`, then checks
-the resulting framebuffer pixel. This verifies a non-cardinal affine sprite
-point path; perspective division, general 3D clipping, complete transformed
-mesh coverage, and interactive view-angle controls remain open.
+the resulting framebuffer pixel. `GrSpriteSymmetryChecks` now also rotates an
+indexed triangle and checks an interior pixel in its transformed fill. This
+verifies non-cardinal affine point and mesh paths; perspective division,
+general 3D clipping, complete transformed-mesh coverage, and interactive
+view-angle controls remain open.
+
+The full run exposed an empty bootstrap `DCDel` stub: source `WinMgr` creates
+and deletes a large diff surface on refreshed frames, and the no-op leaked
+those surfaces until the guest data arena fragmented. The bootstrap now frees
+the CDC matrix, owned body, depth buffer, and object while leaving its shared
+static framebuffer contexts intact. The repeated live-frame window test and
+the complete graphics/window-manager checks pass after this fix.
 
 `python3 scripts/check-compat.py --pci --probe-module /System/Win.ZC
---probe-winmgr --probe-grscreen` passed, including the new matrix and visible
-pixel assertions alongside the full source graphics/window-manager checks.
+--probe-winmgr --probe-grscreen` passed, including the matrix, transformed
+point/mesh pixels, repeated window-manager frame rendering, and full source
+graphics/window-manager checks.
