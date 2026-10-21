@@ -433,11 +433,11 @@ oracle are needed before broad language compatibility can be claimed.
 ## Recorded validation — native USB desktop path — 2026-10-20
 
 - `make check-usb-input` passes the UTM-default NEC controller's full graphical
-  workflow. The test opens the OS dropdown, press-drags to `Window Demo`, checks
-  that the two-window fixture appears, and verifies that stopping it restores
-  terminal focus. Native USB typing, pointer buttons, wheel input, editor
-  actions, save/compile/run, reboot, and reopen also pass. NEC mouse mode,
-  QEMU xHCI, and USB-plus-VirtIO fallback pass in the same target.
+  workflow. The test opens the OS dropdown, press-drags to `Window Demo`,
+  `Lattice Play`, and `Stock Play`, checks each fixture/HUD, and verifies that
+  Escape restores terminal focus. Native USB typing, pointer buttons, wheel
+  input, editor actions, save/compile/run, reboot, and reopen also pass. NEC
+  mouse mode, QEMU xHCI, and USB-plus-VirtIO fallback pass in the same target.
 - `make check-usb-topology` passes native NEC enumeration through two nested
   hubs, keyboard/tablet hotplug and reconnect without DMA growth, and the
   graphical menu workflow behind the hubs. QEMU xHCI enumeration and hotplug

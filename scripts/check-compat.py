@@ -559,6 +559,58 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         qmp_command('input-send-event', {'events': [
             {'type': 'abs', 'data': {'axis': 'x', 'value': round(x*32767/799)}},
             {'type': 'abs', 'data': {'axis': 'y', 'value': round(y*32767/599)}}]})
+    def select_os_menu_row(name, row_index):
+        # Press on the OS title, drag to a submenu row, and release, matching
+        # the native WinMgr menu gesture instead of calling the action bridge.
+        move_graphical_pointer(4, 4)
+        deadline = time.monotonic() + 5
+        screen = graphical_screen(name+'-open')
+        while time.monotonic() < deadline:
+            if (rgb_pixels_in(screen, (0, 0, 170), (0, 0, 240, 8)) >= 100 and
+                    rgb_pixels_in(screen, (0, 0, 170), (0, 8, 240, 100)) >= 1000):
+                break
+            time.sleep(0.1)
+            screen = graphical_screen(name+'-open')
+        else:
+            raise RuntimeError('OS menu did not open for '+name+':\n'+screen[3])
+        qmp_command('input-send-event', {'events': [
+            {'type': 'btn', 'data': {'down': True, 'button': 'left'}}]})
+        time.sleep(0.2)
+        press_status = command('zstatus', 'pointer_state: ready=1')
+        press_match = re.search(
+            r'pointer_state: ready=1 pointer_xy=(\d+)/(\d+) buttons=(\d+)',
+            press_status)
+        if (not press_match or int(press_match.group(3)) != 1 or
+                abs(int(press_match.group(1)) - 4) > 1 or
+                abs(int(press_match.group(2)) - 4) > 1):
+            qmp_command('input-send-event', {'events': [
+                {'type': 'btn', 'data': {'down': False, 'button': 'left'}}]})
+            raise RuntimeError('OS menu press did not reach the guest for '+name+':\n'+
+                               press_status)
+        row_y = 12 + row_index * 8
+        move_graphical_pointer(4, row_y)
+        time.sleep(0.2)
+        screen = graphical_screen(name+'-held')
+        held_status = command('zstatus', 'pointer_state: ready=1')
+        held_match = re.search(
+            r'pointer_state: ready=1 pointer_xy=(\d+)/(\d+) buttons=(\d+)',
+            held_status)
+        if (not held_match or int(held_match.group(3)) != 1 or
+                abs(int(held_match.group(1)) - 4) > 1 or
+                abs(int(held_match.group(2)) - row_y) > 1):
+            qmp_command('input-send-event', {'events': [
+                {'type': 'btn', 'data': {'down': False, 'button': 'left'}}]})
+            raise RuntimeError('OS menu drag did not reach '+name+':\n'+
+                               held_status+screen[3])
+        if rgb_pixels_in(screen, (255, 255, 85),
+                         (0, row_y-4, 240, row_y+4)) < 32:
+            qmp_command('input-send-event', {'events': [
+                {'type': 'btn', 'data': {'down': False, 'button': 'left'}}]})
+            raise RuntimeError('OS menu did not highlight '+name+':\n'+
+                               held_status+screen[3])
+        qmp_command('input-send-event', {'events': [
+            {'type': 'btn', 'data': {'down': False, 'button': 'left'}}]})
+        command('zstatus', 'buttons=0')
     def require_graphical_pointer():
         # A newly attached tablet starts at zero, while QEMU can retain its
         # last host absolute position. Force an actual axis change before
@@ -1691,7 +1743,9 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     raise RuntimeError('OS menu click did not release on the Help row:\n' +
                                        menu_release_status)
                 menu_action_deadline = time.monotonic() + 5
-                menu_action_screen = graphical_screen('os-menu-help-action', 100000)
+                # The Help command list uses ZealOS's dim green, whose
+                # luminance falls just below the default white-text cutoff.
+                menu_action_screen = graphical_screen('os-menu-help-action', 90000)
                 while True:
                     if 'Graphical commands:' in menu_action_screen[3]:
                         break
@@ -1878,6 +1932,20 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                                        restored)
                 print('PASS OS menu press-drag-release launched Window Demo and restored the terminal',
                       flush=True)
+                # The same desktop menu must launch the two graphics apps,
+                # not merely leave them reachable through typed commands.
+                for demo, row_index in (('latticeplay', 8), ('stockplay', 9)):
+                    select_os_menu_row('os-menu-'+demo, row_index)
+                    require_graphical_text(demo+'-menu-live-hud', 'Layer:', timeout=10,
+                                           foreground_threshold=215000,
+                                           scanline_offset=0)
+                    qmp_send_key('esc')
+                    require_graphical_text(demo+'-menu-returns', demo+' ok', timeout=10)
+                    status = command('zstatus', 'failed=0')
+                    if 'keyboard_focus=Terminal' not in status:
+                        raise RuntimeError(f'OS menu {demo} did not return focus to the terminal:\n'+status)
+                    print(f'PASS OS menu launched {demo}, rendered its HUD, and returned on Escape',
+                          flush=True)
             require_graphical_text('boot-terminal', '> ')
             raw_pattern = r'usb_input:.* key_events=(\d+)' if args.usb_input else r'virtio_keyboard: ready=1 key_events=(\d+)'
             initial_input = command('zcall BootstrapGuiTerminalInputDiag', 'zc => 0x')
