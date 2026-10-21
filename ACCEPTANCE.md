@@ -485,6 +485,7 @@ the pseudo-TTY path changes.
 - M153: after `disklat` / `nearlatticelite`, FB should clear (no leftover HUD/`Width:nan` soup); `>` on clean surface.
 - M154: Lattice idle — empty MessageGet no longer aborts the demo early; scripted ESC still ends the smoke.
 - M155: `latticeplay` — live Lattice on UTM (tablet/keys); Esc to exit. `disklat` remains the scripted smoke.
+- Live UTM check (2026-10-20): after restoring normal zoom, `latticeplay` responded to Space with a drawn step and Escape returned to the prompt. This confirms the live step/exit keys; place, aim, restart, and color-cycle controls remain to be checked.
 - M156: compose *Lites (Demo/Frame/Live/Play/Wrap) idle like Lattice on empty MessageGet.
 - M157: after `disklat` / `latticeplay` / etc., shell restores dark FB before `ok` (not pure black from DCFill).
 - M158: in `latticeplay`, Enter restarts (virtio Enter maps to `\n` like Lattice Restart).
