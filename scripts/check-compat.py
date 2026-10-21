@@ -1927,6 +1927,11 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     raise RuntimeError('OS menu stayed open after leaving the desktop top row; '
                                        f'see {graphical_path("os-menu-left-top-row")} and .txt\n'
                                        + menu_screen[3])
+                # Add an isolated source-volume fixture before FileMgr builds
+                # its tree. This joins the Files/editor checks into the same
+                # user workflow and avoids editing any bundled boot source.
+                command('zput Home/ZZFileMgrEdit.ZC I64 FileMgrOriginal(){return 17;}',
+                        'zput: saved Home/ZZFileMgrEdit.ZC')
                 # Files launches the native FileMgr over the merged
                 # source-volume directory tree.
                 move_graphical_pointer(4, 4)
@@ -2115,6 +2120,51 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 else:
                     raise RuntimeError('Shift+Escape did not return from the clicked file to FileMgr:\n' +
                                        clicked_return_screen[3])
+                # Open the temporary source from the native tree, edit it in
+                # the upstream DolDoc editor, and prove Escape saves through
+                # DocWrite into the same persistent source volume.
+                command(
+                    'zc I64 FileMgrEditTargetSelected(){CDocEntry*e='
+                    'bootstrap_gui_terminal_task->display_doc->cur_entry;'
+                    'if(e->type_u8==DOCT_MENU_VAL&&!StrCompare('
+                    'e->user_data(CDirEntry*)->full_name,"/Home/ZZFileMgrEdit.ZC"))'
+                    'return 42;return 0;}',
+                    'zc: executed')
+                for _ in range(32):
+                    filemgr_target = command('zcall FileMgrEditTargetSelected',
+                                             'zc => 0x')
+                    if 'zc => 0x000000000000002a' in filemgr_target:
+                        break
+                    qmp_send_key('down')
+                else:
+                    raise RuntimeError('FileMgr keyboard navigation did not reach the edit fixture:\n' +
+                                       filemgr_target)
+                qmp_send_key('spc')
+                filemgr_edit_deadline = time.monotonic() + 5
+                filemgr_edit_screen = None
+                while time.monotonic() < filemgr_edit_deadline:
+                    filemgr_edit_screen = graphical_screen('filemgr-source-edit-open')
+                    if ('filemgroriginal' in filemgr_edit_screen[3].lower() and
+                            'zzfilemgredit.zc' in filemgr_edit_screen[3].lower()):
+                        break
+                    time.sleep(0.1)
+                else:
+                    raise RuntimeError('Space did not open the temporary source from FileMgr:\n' +
+                                       (filemgr_edit_screen[3] if filemgr_edit_screen else ''))
+                qmp_send_key('end')
+                qmp_send_key('ret')
+                appended_source = 'I64 FileMgrEditSaved(){return 42;}'
+                qmp_send_text(appended_source)
+                require_graphical_text('filemgr-source-edit-visible', appended_source,
+                                       timeout=8)
+                qmp_send_key('esc')
+                time.sleep(0.5)
+                command('zload disk:Home/ZZFileMgrEdit.ZC',
+                        'zc: loaded disk:Home/ZZFileMgrEdit.ZC')
+                command('zcall FileMgrEditSaved',
+                        'zc => 0x000000000000002a')
+                print('PASS FileMgr source edit saved through DocWrite and executed from disk',
+                      flush=True)
                 print(f'PASS native FileMgr opened {selected_name} by Space and click, '
                       'returning with Shift+Escape', flush=True)
                 qmp_send_key('esc')
@@ -2134,6 +2184,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                                        restored_screen[3])
                 print('PASS OS menu Files opened native FileMgr and Escape restored the terminal',
                       flush=True)
+                command('zrm Home/ZZFileMgrEdit.ZC',
+                        'zrm: deleted Home/ZZFileMgrEdit.ZC')
                 # Exercise the special Window Demo menu action through the
                 # same press-drag-release path a user takes. This action is
                 # dispatched by the graphical terminal's MESSAGE_KEY_UP

@@ -3948,3 +3948,13 @@ paths entered the graphical DolDoc editor, returned to the source tree with
 Shift+Escape, and closed Files with Escape. The click target is derived from
 the selected DocEntry's screen coordinates, so this covers the FileMgr/WinMgr
 pointer route rather than a guessed screen location.
+
+The same acceptance run now seeds an isolated `Home/ZZFileMgrEdit.ZC` source,
+opens it from FileMgr with Space, appends a function in the graphical editor,
+and checks that Escape saved it through `DocWrite`: reloading the file from the
+native source volume and calling the new function returns 42. The fixture is
+deleted afterward. `python3 scripts/check-compat.py --usb-input nec
+--probe-gui-workflow` passed this combined Files/editor/save/reload path and
+the complete graphical workflow on 2026-10-21. It also passed the live Lattice
+color-swatches, restart, and Space-step checks. In UTM, the user confirmed
+Control+scroll zoom, Lattice Space/Escape, and ordinary graphical typing.
