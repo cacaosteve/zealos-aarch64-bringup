@@ -1031,7 +1031,8 @@ I64 BootstrapGuiShellSmoke()
     if (!output || output[0])
         return 6;
     output = ZcGuiShellExec(" \thelp \t");
-    if (!output || output[0] != 'G')
+    if (!output || output[0] != 'G' ||
+        !StrMatch("OS menu: hold the pointer button, drag, then release on an item.", output))
         return 7;
     output = ZcGuiShellExec(" \tzstatus \t");
     if (!output || output[0] != 'z' || output[1] != 'c')

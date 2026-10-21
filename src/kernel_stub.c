@@ -7286,6 +7286,7 @@ int64_t zc_gui_shell_exec(int64_t *a) {
     if (streq(command, "help"))
         return (int64_t)(uintptr_t)
             "Graphical commands: status (zstatus) | zvol | zls | zgc | zverify <path> | zload <path> | zput <name> <source> | zrm <name> | edit <path> | zc <source> | zcall <function> | windowdemo | latticeplay | stockplay\n"
+            "OS menu: hold the pointer button, drag, then release on an item.\n"
             "Lattice controls: Esc exit | Enter restart | Space step | c colors | L-click place | R-drag aim\n"
             "Type ZealC directly, for example: 40+2;\n";
     if (streq(command, "windowdemo")) {
