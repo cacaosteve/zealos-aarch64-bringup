@@ -3471,6 +3471,10 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             if args.probe_module == '/Kernel/KTask.ZC':
                 command('zload /Tests/KTaskCallStackGrow.ZC',
                         'zc: loaded /Tests/KTaskCallStackGrow.ZC')
+                command('zload /Tests/KTaskTaskInit.ZC',
+                        'zc: loaded /Tests/KTaskTaskInit.ZC')
+                command('zcall KTaskTaskInitChecks',
+                        'zc => 0x000000000000002a')
                 command('zcall KTaskCallStackGrowChecks',
                         'zc => 0x000000000000002a')
                 command('zcall KTaskCallBindingChecks',

@@ -1,0 +1,81 @@
+I64 KTaskTaskInitChecks()
+{
+    CTask *task;
+    CHeapCtrl *heap;
+    I64 before, result = 0, i;
+
+    task = CAlloc(sizeof(CTask), Fs);
+    heap = CAlloc(sizeof(CHeapCtrl), Fs);
+    if (!task || !heap)
+    {
+        if (task)
+            Free(task);
+        if (heap)
+            Free(heap);
+        return 1;
+    }
+    before = sys_num_spawned_tasks;
+    task->task_signature = TASK_SIGNATURE_VAL;
+    task->parent_task = Fs;
+    task->code_heap = task->data_heap = heap;
+    if (TaskInit(task, 32768) != task)
+        result = 2;
+    else if (task->addr != task || task->task_num != before ||
+             task->rflags != RFLAGG_NORMAL ||
+             task->win_inhibit != WIG_TASK_DEFAULT)
+        result = 3;
+    else if (task->next_task != task || task->last_task != task ||
+             task->next_input_filter_task != task ||
+             task->last_input_filter_task != task)
+        result = 4;
+    else if (task->next_child_task !=
+             (&task->next_child_task)(U8 *) - offset(CTask.next_sibling_task) ||
+             task->last_child_task != task->next_child_task)
+        result = 5;
+    else if (!task->fpu_mmx || !task->hash_table || !task->stack ||
+             !task->cur_dir || task->cur_dir[0] != '/' ||
+             task->cur_dir[1] != 'H' || task->cur_dir[2] != 'o' ||
+             task->cur_dir[3] != 'm' || task->cur_dir[4] != 'e' ||
+             task->cur_dir[5] || !task->rand_seed ||
+             (task->task_flags & (1 << TASKf_NONTIMER_RAND)))
+        result = 6;
+    else if (task->stack->stack_size < 32768 ||
+             task->rsp != (&task->stack->stack_base)(U8 *) +
+                          task->stack->stack_size)
+        result = 7;
+    else if (task->server_ctrl.next_waiting !=
+                 &task->server_ctrl.next_waiting ||
+             task->server_ctrl.last_waiting !=
+                 &task->server_ctrl.next_waiting ||
+             task->server_ctrl.next_done != &task->server_ctrl.next_done ||
+             task->server_ctrl.last_done != &task->server_ctrl.next_done ||
+             task->next_cc != &task->next_cc || task->last_cc != &task->next_cc ||
+             task->next_except != &task->next_except ||
+             task->last_except != &task->next_except ||
+             task->next_ctrl != &task->next_ctrl ||
+             task->last_ctrl != &task->next_ctrl ||
+             task->next_ode != &task->next_ode ||
+             task->last_ode != &task->next_ode)
+        result = 8;
+    else if (heap->next_mem_blk != &heap->next_mem_blk ||
+             heap->last_mem_blk != &heap->next_mem_blk || heap->last_mergable)
+        result = 9;
+    if (task->fpu_mmx)
+        for (i = 0; i < sizeof(CFPU) && !result; i++)
+            if (task->fpu_mmx->body[i])
+                result = 10;
+
+    if (task->hash_table)
+        HashTableDel(task->hash_table);
+    if (task->fpu_mmx)
+        Free(task->fpu_mmx);
+    if (task->stack)
+        Free(task->stack);
+    if (task->cur_dir)
+        Free(task->cur_dir);
+    Free(heap);
+    Free(task);
+    if (result)
+        return result;
+    return 0x2a;
+}

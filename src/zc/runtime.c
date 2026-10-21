@@ -1246,6 +1246,25 @@ size_t fread(void *d, size_t w, size_t n, FILE *f) {
     return n;
 }
 
+static CHeapCtrl *guest_task_record_owner(void *task) {
+    uintptr_t p = (uintptr_t)task;
+    int arena = (p >= (uintptr_t)data_arena + sizeof(struct block) &&
+                 p < (uintptr_t)data_arena + DATA_BYTES) ||
+                (p >= (uintptr_t)code_arena + sizeof(struct block) &&
+                 p < (uintptr_t)code_arena + CODE_BYTES);
+    if (!arena || p % 16)
+        return NULL;
+    struct block *b = (struct block *)task - 1;
+    if (b->magic != BLOCK_MAGIC || !b->used || b->requested < 12 ||
+        b->size < 16 || memcmp((unsigned char *)task + 8, "TskS", 4))
+        return NULL;
+    for (unsigned i = 0; i < GUEST_TASKS; i++) {
+        struct guest_fiber *f = &guest_fibers[i];
+        if (f->state != GUEST_UNUSED && b->owner == &f->heap_owner)
+            return b->owner;
+    }
+    return NULL;
+}
 static CHeapCtrl *guest_allocation_owner(int64_t selector) {
     if (guest_task_bound) {
         if (!selector)
@@ -1257,6 +1276,9 @@ static CHeapCtrl *guest_allocation_owner(int64_t selector) {
                  (void *)(uintptr_t)selector == f->heap_words))
                 return &f->heap_owner;
         }
+        CHeapCtrl *owner = guest_task_record_owner((void *)(uintptr_t)selector);
+        if (owner)
+            return owner;
         zc_fail("allocation target is not a live guest task or heap");
     }
     return &data_heap;
@@ -1265,6 +1287,27 @@ static int64_t host_malloc(int64_t *a) {
     return (int64_t)(uintptr_t)arena_alloc(
         a[0], guest_allocation_owner(a[1]),
         (uintptr_t)__builtin_return_address(0));
+}
+static int64_t host_task_fpu_init(int64_t *a) {
+    void *fpu = (void *)(uintptr_t)a[0];
+    if (!fpu || (uintptr_t)fpu % 16 || get_block(fpu)->requested < 512)
+        zc_fail("TaskInit FPU buffer is invalid");
+    /* ARM64 has no ZealOS x86 FX state image at SYS_FIXED_AREA. The bridge
+     * keeps the legacy record zeroed until native per-task FP state exists. */
+    memset(fpu, 0, 512);
+    return 0;
+}
+static int64_t host_task_str_new(int64_t *a) {
+    const char *src = (const char *)(uintptr_t)a[0];
+    if (!src)
+        zc_fail("TaskInit directory string is null");
+    size_t len = strlen(src);
+    if (len >= DATA_BYTES)
+        zc_fail("TaskInit directory string is too large");
+    char *dst = arena_alloc((int64_t)len + 1, guest_allocation_owner(a[1]),
+                            (uintptr_t)__builtin_return_address(0));
+    memcpy(dst, src, len + 1);
+    return (int64_t)(uintptr_t)dst;
 }
 static int64_t host_system_task(int64_t *a) {
     (void)a;
@@ -1672,7 +1715,8 @@ static int64_t host_swap(int64_t *a) {
 }
 /* GenFFIBinding passes X0 = argv[]; raw CHash* APIs must not be bound directly. */
 static int64_t host_hash_table_new(int64_t *a) {
-    return (int64_t)(uintptr_t)HashTableNew(a[0], (void *)(uintptr_t)a[1]);
+    void *owner = a[1] ? guest_allocation_owner(a[1]) : NULL;
+    return (int64_t)(uintptr_t)HashTableNew(a[0], owner);
 }
 static int64_t host_hash_table_del(int64_t *a) {
     if (a[0])
@@ -5982,7 +6026,7 @@ static int load_source_path(const char *path, int merged, int recover) {
          * CTask* parameter types and _MALLOC/_FREE import names. Rebind
          * after those declarations so the ARM backend sees callable host
          * implementations instead of unresolved x86 import labels. */
-    PrsBindCSymbol("MAlloc", host_malloc, 2);
+        PrsBindCSymbol("MAlloc", host_malloc, 2);
         PrsBindCSymbol("CAlloc", host_calloc, 2);
         PrsBindCSymbol("Free", host_free, 1);
         PrsBindCSymbol("MSize", host_msize, 1);
@@ -6126,6 +6170,13 @@ static int load_source_path(const char *path, int merged, int recover) {
         PrsBindCSymbol("HashTableDel", host_hash_table_del, 1);
         PrsBindCSymbol("HashFind", host_hash_find, 4);
         PrsBindCSymbol("HashAdd", host_hash_add, 2);
+    }
+    if (!strcmp(path, "/Kernel/KTask.ZC")) {
+        /* The ARM64 KTask overlay declares these hooks in the source being
+         * compiled. Bind after that declaration exists so TaskInit's calls
+         * receive callable host addresses. */
+        PrsBindCSymbol("ZcTaskFpuInit", host_task_fpu_init, 1);
+        PrsBindCSymbol("ZcTaskStrNew", host_task_str_new, 2);
     }
     if (registered) guest_unwind_leave(&load.unwind);
     else free(src);

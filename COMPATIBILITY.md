@@ -2209,10 +2209,18 @@ ZealOS live distribution or installer.
   exercise its task-end callback exactly once, the ZealOS `Call` primitive,
   and named startup-hook bridge. The probe
   uses compile-only stubs for heap-control initialization and the interactive
-  lexer. Full upstream `TaskInit` and its code/data block pools remain outside
-  this bridge; alternate flags, other CPU IDs and `Kill`'s debug-break mode are
-  also not implemented by the host runtime. Custom task stacks up to 2 MiB are
-  separately covered by `KTaskSpawnBridgeChecks`.
+  lexer. A new focused `KTaskTaskInitChecks` probe now executes the translated,
+  upstream `TaskInit` against a disposable task record and private heap-control
+  records. It verifies task identity/serial, circular task and job queues,
+  task-owned FPU/hash/stack/path allocations, stack geometry, timer-based seed,
+  and heap queue sentinels; it returns `0x2a`. The ARM64 overlay replaces the
+  x86 fixed-area FPU image with an explicit zeroed legacy placeholder and uses
+  the 16-byte-aligned bootstrap allocator. This exercises source
+  initialization; production `Spawn` still uses the cooperative fiber bridge,
+  and real code/data block-pool setup and the upstream scheduler remain outside
+  the boot path. Alternate queue flags, other CPU IDs and `Kill`'s debug-break
+  mode are also not implemented by the host runtime. Custom task stacks up to
+  2 MiB are separately covered by `KTaskSpawnBridgeChecks`.
 
 ## AAPCS64 calls on a caller-owned stack
 

@@ -931,7 +931,9 @@ def translate_ktask(source: bytes) -> bytes:
     The original function uses lex-ahead #exe options and two x86 stack
     assembly blocks. Its portable replacement allocates a temporary task-owned
     stack and forwards the complete variadic integer argument vector through
-    ZcCallNOnStack. The surrounding pinned task source remains unchanged.
+    ZcCallNOnStack. TaskInit retains its source queue/layout work while the
+    fixed-area FPU image and heap-owned string/allocation edges use explicit
+    ARM64 runtime hooks.
     """
     try:
         text = source.decode("utf-8")
@@ -973,6 +975,35 @@ argpop I64 CallStackGrow(I64 stack_size_threshold, I64 stack_size,
     return result;
 }"""
     text = text[:start] + replacement + text[finish:]
+
+    # TaskInit still owns the task ABI and queue setup, but its x86 fixed-area
+    # FPU image and implicit kernel heap helpers are not available in the
+    # host-fiber runtime. Keep those two platform edges explicit so the real
+    # source initializer can be exercised against a disposable task record.
+    fpu_alloc = "task->fpu_mmx = MAllocAligned(sizeof(CFPU), 0x10, task);"
+    fpu_alloc_arm = "task->fpu_mmx = MAlloc(sizeof(CFPU), task);"
+    if text.count(fpu_alloc) != 1 or text.count(fpu_alloc_arm):
+        raise ValueError("expected the pinned TaskInit aligned FPU allocation")
+    text = text.replace(fpu_alloc, fpu_alloc_arm, 1)
+    fpu_copy = (
+        "\tMemCopy(task->fpu_mmx, SYS_FIXED_AREA + "
+        "offset(CSysFixedArea.init_fpu_mmx), sizeof(CFPU));"
+    )
+    fpu_init = "\tZcTaskFpuInit(task->fpu_mmx);"
+    if text.count(fpu_copy) != 1 or text.count(fpu_init):
+        raise ValueError("expected the pinned TaskInit fixed-area FPU copy")
+    text = text.replace(fpu_copy, fpu_init, 1)
+    for old, new in (
+        ("task->cur_dir\t= StrNew(blkdev.home_dir + 2, task);",
+         "task->cur_dir\t= ZcTaskStrNew(blkdev.home_dir + 2, task);"),
+        ("task->cur_dir\t= StrNew(\"/Home\", task);",
+         "task->cur_dir\t= ZcTaskStrNew(\"/Home\", task);"),
+        ("Seed(, task);",
+         "task->rand_seed = TSCGet;\n\t\tLBtr(&task->task_flags, TASKf_NONTIMER_RAND);"),
+    ):
+        if text.count(old) != 1 or text.count(new):
+            raise ValueError(f"expected one pinned TaskInit platform call: {old!r}")
+        text = text.replace(old, new, 1)
     no_warn = "\tno_warn dummy;"
     if text.count(no_warn) != 2:
         raise ValueError("expected the pinned KTask dummy-argument suppressions")
@@ -982,6 +1013,8 @@ argpop I64 CallStackGrow(I64 stack_size_threshold, I64 stack_size,
     text = text.replace(no_warn, "\t// ARM64 compiler: no_warn is metadata only.", 2)
     extstr_decl = (
         "extern I64 ZcCallExtStr(U8 *name);\n"
+        "extern U0 ZcTaskFpuInit(U8 *fpu);\n"
+        "extern U8 *ZcTaskStrNew(U8 *text, CTask *task);\n"
         "extern Bool ZcTaskValidate(CTask *task);\n"
         "extern Bool ZcTaskKill(CTask *task, Bool wait=TRUE, Bool just_break=FALSE);\n"
         "extern CTask *ZcSpawn(U0 (*fp_start_addr)(U8 *data), U8 *data=NULL, "

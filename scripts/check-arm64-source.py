@@ -398,6 +398,14 @@ assert 'stack_size, flags);' in ktask_overlay
 assert 'return ZcTaskValidate(task);' in ktask_overlay
 assert 'return ZcTaskKill(task, wait, just_break);' in ktask_overlay
 assert 'if (task == sys_winmgr_task)' in ktask_overlay
+assert 'task->fpu_mmx = MAlloc(sizeof(CFPU), task);' in ktask_overlay
+assert 'ZcTaskFpuInit(task->fpu_mmx);' in ktask_overlay
+assert 'ZcTaskStrNew(blkdev.home_dir + 2, task)' in ktask_overlay
+assert 'ZcTaskStrNew("/Home", task)' in ktask_overlay
+assert 'task->rand_seed = TSCGet;' in ktask_overlay
+assert 'LBtr(&task->task_flags, TASKf_NONTIMER_RAND);' in ktask_overlay
+assert 'MAllocAligned(sizeof(CFPU)' not in ktask_overlay
+assert 'SYS_FIXED_AREA + offset(CSysFixedArea.init_fpu_mmx)' not in ktask_overlay
 assert '0 < task <= I32_MAX' not in ktask_overlay
 assert 'TaskQueueInsChild(task);' not in ktask_overlay
 assert 'MemCopy(task->rsp(U8 *), &data, sizeof(U8 *));' not in ktask_overlay
