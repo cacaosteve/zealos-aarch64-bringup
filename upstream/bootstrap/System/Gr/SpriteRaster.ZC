@@ -1516,6 +1516,7 @@ I64 SpritePolygon0(CDC *dc, I64 x, I64 y, I64 z, Bool transform_enabled,
     I64 i, x2, y2, x1, y1, px, py, nx, ny, dx, dy, steps, total;
     I64 s1, s2, c, s12, s22, c2;
     I64 screen_x1, screen_y1, screen_x2, screen_y2;
+    I64 mirror_x1, mirror_y1, mirror_x2, mirror_y2;
     F64 angle, angle_step;
 
     if (sides < 3 || sides > 1024 || rx <= 0 || ry <= 0 ||
@@ -1600,10 +1601,13 @@ I64 SpritePolygon0(CDC *dc, I64 x, I64 y, I64 z, Bool transform_enabled,
         // x2/y2 retain the unrotated recurrence; draw the transformed edge.
         SpritePolygonLine0(dc, screen_x1, screen_y1,
                 screen_x2, screen_y2);
-        if (symmetry_enabled)
-            SpriteMirrorLine0(dc, screen_x1, screen_y1,
-                    screen_x2, screen_y2, axis_x1, axis_y1,
-                    axis_x2, axis_y2);
+        if (symmetry_enabled &&
+                SpriteMirrorPoint0(axis_x1, axis_y1, axis_x2, axis_y2,
+                screen_x1, screen_y1, &mirror_x1, &mirror_y1) &&
+                SpriteMirrorPoint0(axis_x1, axis_y1, axis_x2, axis_y2,
+                screen_x2, screen_y2, &mirror_x2, &mirror_y2))
+            SpritePolygonLine0(dc, mirror_x1, mirror_y1,
+                    mirror_x2, mirror_y2);
         px = nx;
         py = ny;
         screen_x1 = screen_x2;
@@ -1624,7 +1628,7 @@ Bool SpriteFloodMatch0(I64 pixel, I64 fill_color, I64 seed_color,
 I64 SpriteFloodFill0(CDC *dc, I64 seed_x, I64 seed_y, Bool not_color,
         I64 pixel_limit)
 {//Framebuffer-backed bounded counterpart of GrFloodFill for the ARM64 bridge.
-    I64 origin_x, origin_y, left, top, right, bottom;
+    I64 origin_x, origin_y, left, top, right, bottom, task_z;
     I64 width, height, area, fill_color, seed_color, index;
     I64 stack_len, work, run_left, run_right, scan_x, scan_y;
     I64 x, y, row, old_color;
@@ -1633,7 +1637,7 @@ I64 SpriteFloodFill0(CDC *dc, I64 seed_x, I64 seed_y, Bool not_color,
 
     if (!dc || (dc->flags & DCF_DONT_DRAW) || pixel_limit <= 0)
         return 0;
-    origin_x = origin_y = 0;
+    origin_x = origin_y = task_z = 0;
     left = top = 0;
     right = dc->width - 1;
     bottom = dc->height - 1;
@@ -1644,6 +1648,7 @@ I64 SpriteFloodFill0(CDC *dc, I64 seed_x, I64 seed_y, Bool not_color,
         WinDerivedValsUpdate(dc->win_task);
         origin_x = dc->win_task->pix_left + dc->win_task->scroll_x;
         origin_y = dc->win_task->pix_top + dc->win_task->scroll_y;
+        task_z = BootstrapTaskZ(dc->win_task);
         left = dc->win_task->pix_left - origin_x;
         top = dc->win_task->pix_top - origin_y;
         right = dc->win_task->pix_right - origin_x;
@@ -1667,8 +1672,8 @@ I64 SpriteFloodFill0(CDC *dc, I64 seed_x, I64 seed_y, Bool not_color,
     if (area <= 0 || area > 480000)
         return 0;
 
-    // The bridge's GrPlot maps an 8-bit palette index to the current RGB
-    // framebuffer. Flood comparisons therefore use the same resolved RGB.
+    // Flood-fill comparisons read the presented framebuffer, so resolve the
+    // CDC's 8-bit palette index through the active graphics palette.
     fill_color = ZcFbGraphColor(dc->color.c0 & 0xff) & 0x00ffffff;
     seed_color = ZcFbTextPixel(seed_x + origin_x, seed_y + origin_y) &
             0x00ffffff;
@@ -1724,7 +1729,13 @@ I64 SpriteFloodFill0(CDC *dc, I64 seed_x, I64 seed_y, Bool not_color,
         {
             index = (y - top) * width + x - left;
             visited[index >> 3] |= 1 << (index & 7);
-            GrPlot(dc, x, y);
+            // FloodFill0 reads and updates the presented framebuffer, so
+            // write through the same clipped graph-pixel bridge. GrPlot
+            // targets the CDC's backing bitmap and would leave these reads
+            // observing stale pixels until the next window composition.
+            ZcFbGraphPlot(x + origin_x, y + origin_y,
+                    dc->color.c0 & 0xff, left + origin_x, top + origin_y,
+                    right + origin_x, bottom + origin_y, task_z);
             work++;
         }
         for (row = -1; row <= 1; row += 2)
@@ -2111,8 +2122,8 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
             MemCopy(&radius, sprite + 12, sizeof(I32));
             if (radius < 0 || radius > 4096 || 8 * radius > 480000 - pixel_budget)
                 break;
-            // Bounded integer midpoint raster; GrPlot applies the active CDC
-            // clipping and framebuffer path for every symmetric point.
+            // Bounded integer midpoint raster; GrPlot applies active CDC
+            // clipping and writes each symmetric point to the CDC bitmap.
             pixel_budget += 8 * radius;
             if (radius)
             {

@@ -1,6 +1,14 @@
+I64 GrSpriteSymmetryPixel(CDC *dc, I64 x, I64 y)
+{
+	return dc->body[y * dc->width_internal + x];
+}
 extern I64 ZcFbTextPixel(I64 x, I64 y);
-extern Bool ZcFbGraphPlot(I64 x, I64 y, U32 color, I64 left, I64 top,
-        I64 right, I64 bottom, I64 task_z);
+extern I64 ZcFbGraphColor(I64 color);
+
+I64 GrSpriteSymmetryScanoutPixel(I64 x, I64 y)
+{
+	return ZcFbTextPixel(x, y);
+}
 
 I64 GrSpriteSymmetryChecks()
 {
@@ -10,6 +18,7 @@ I64 GrSpriteSymmetryChecks()
     I32 x1, y1, x2, y2, sides, z1, z2, z3;
     U8 move_code;
     I64 i, color, scan_x, scan_y, source_pixel, mirror_pixel, spline_pixels;
+    I64 screen_color;
 
     dc = DCNew(800, 600);
     records = CAlloc(246);
@@ -17,11 +26,12 @@ I64 GrSpriteSymmetryChecks()
         return 1;
     dc->flags |= DCF_SCREEN_BITMAP | DCF_ON_TOP;
     dc->color.c0 = 12;
-    // Prime the graphics bridge before checking streamed Sprite3 output.
-    GrPlot(dc, 420, 500);
-    if (ZcFbTextPixel(420, 500) != 0x00FF5555)
+    // Sprite3 writes indexed pixels into the CDC bitmap; keep these assertions
+    // independent of the live scanout and the shell window's position.
+    GrPlot(dc, 700, 550);
+    if (GrSpriteSymmetryPixel(dc, 700, 550) != 12)
         return 98;
-    ZcFbGraphPlot(420, 500, 0, 0, 0, 799, 599, 0);
+    dc->body[550 * dc->width_internal + 700] = 0;
 
     // Keep the packed-point-with-symmetry smoke independent of the larger
     // variable-length record stream below.
@@ -42,15 +52,11 @@ I64 GrSpriteSymmetryChecks()
     move_code = 4;
     MemCopy(records + 36, &move_code, sizeof(U8));
     Sprite3(dc, 400, 300, 0, records);
-    if (ZcFbTextPixel(420, 500) != 0x00FF5555 ||
-            ZcFbTextPixel(421, 500) != 0x00FF5555 ||
-            ZcFbTextPixel(580, 500) != 0x00FF5555 ||
-            ZcFbTextPixel(579, 500) != 0x00FF5555)
+    if (GrSpriteSymmetryPixel(dc, 420, 500) != 12 ||
+            GrSpriteSymmetryPixel(dc, 421, 500) != 12 ||
+            GrSpriteSymmetryPixel(dc, 580, 500) != 12 ||
+            GrSpriteSymmetryPixel(dc, 579, 500) != 12)
         return 99;
-    ZcFbGraphPlot(420, 500, 0, 0, 0, 799, 599, 0);
-    ZcFbGraphPlot(421, 500, 0, 0, 0, 799, 599, 0);
-    ZcFbGraphPlot(580, 500, 0, 0, 0, 799, 599, 0);
-    ZcFbGraphPlot(579, 500, 0, 0, 0, 799, 599, 0);
     MemSet(records, 0, 246);
 
     // A vertical symmetry axis at x=500 in screen coordinates.
@@ -147,46 +153,47 @@ I64 GrSpriteSymmetryChecks()
     MemCopy(records + 237, &y1, sizeof(I32));
     MemCopy(records + 241, &x2, sizeof(I32));
 
-    color = 0x00FF5555;
+    color = 12;
+    screen_color = ZcFbGraphColor(color) & 0x00FFFFFF;
     Sprite3(dc, 400, 300, 0, records);
-    if (ZcFbTextPixel(420, 330) != color ||
-            ZcFbTextPixel(580, 330) != color)
+    if (GrSpriteSymmetryPixel(dc, 420, 330) != color ||
+            GrSpriteSymmetryPixel(dc, 580, 330) != color)
         return 2;
-    if (ZcFbTextPixel(410, 350) != color ||
-            ZcFbTextPixel(440, 350) != color ||
-            ZcFbTextPixel(590, 350) != color ||
-            ZcFbTextPixel(560, 350) != color)
+    if (GrSpriteSymmetryScanoutPixel(410, 350) != screen_color ||
+            GrSpriteSymmetryScanoutPixel(440, 350) != screen_color ||
+            GrSpriteSymmetryScanoutPixel(590, 350) != screen_color ||
+            GrSpriteSymmetryScanoutPixel(560, 350) != screen_color)
         return 3;
-    if (ZcFbTextPixel(420, 360) != color)
+    if (GrSpriteSymmetryPixel(dc, 420, 360) != color)
         return 4;
-    if (ZcFbTextPixel(580, 360) != color)
+    if (GrSpriteSymmetryScanoutPixel(580, 360) != screen_color)
         return 4;
-    if (ZcFbTextPixel(570, 370) != color)
+    if (GrSpriteSymmetryScanoutPixel(570, 370) != screen_color)
         return 4;
-    if (ZcFbTextPixel(439, 379) != color)
+    if (GrSpriteSymmetryPixel(dc, 439, 379) != color)
         return 4;
-    if (ZcFbTextPixel(561, 379) != color)
+    if (GrSpriteSymmetryScanoutPixel(561, 379) != screen_color)
         return 4;
-    if (ZcFbTextPixel(440, 400) != color ||
-            ZcFbTextPixel(560, 400) != color)
+    if (GrSpriteSymmetryPixel(dc, 440, 400) != color ||
+            GrSpriteSymmetryPixel(dc, 560, 400) != color)
         return 5;
-    if (ZcFbTextPixel(438, 440) != color ||
-            ZcFbTextPixel(562, 440) != color)
+    if (GrSpriteSymmetryPixel(dc, 438, 440) != color ||
+            GrSpriteSymmetryPixel(dc, 562, 440) != color)
         return 6;
-    if (ZcFbTextPixel(442, 480) != color ||
-            ZcFbTextPixel(558, 480) != color)
+    if (GrSpriteSymmetryPixel(dc, 442, 480) != color ||
+            GrSpriteSymmetryPixel(dc, 558, 480) != color)
         return 7;
-    if (ZcFbTextPixel(420, 500) != color ||
-            ZcFbTextPixel(580, 500) != color ||
-            ZcFbTextPixel(421, 500) != color ||
-            ZcFbTextPixel(579, 500) != color)
+    if (GrSpriteSymmetryPixel(dc, 420, 500) != color ||
+            GrSpriteSymmetryPixel(dc, 580, 500) != color ||
+            GrSpriteSymmetryPixel(dc, 421, 500) != color ||
+            GrSpriteSymmetryPixel(dc, 579, 500) != color)
         return 9;
     spline_pixels = 0;
     for (scan_y = 520; scan_y <= 550; scan_y++)
         for (scan_x = 410; scan_x <= 490; scan_x++)
         {
-            source_pixel = ZcFbTextPixel(scan_x, scan_y);
-            mirror_pixel = ZcFbTextPixel(1000 - scan_x, scan_y);
+            source_pixel = GrSpriteSymmetryPixel(dc, scan_x, scan_y);
+            mirror_pixel = GrSpriteSymmetryPixel(dc, 1000 - scan_x, scan_y);
             if (source_pixel != mirror_pixel)
                 return 10;
             if (source_pixel == color)

@@ -9,7 +9,8 @@ U0 GrSpriteFloodFillPaint(CDC *dc, I64 left, I64 top, I64 right,
 	dc->color.c0.color = color;
 	for (y = top; y <= bottom; y++)
 		for (x = left; x <= right; x++)
-			GrPlot(dc, x, y);
+			ZcFbGraphPlot(x, y, dc->color.c0 & 0xff,
+					0, 0, 799, 599, 0);
 	dc->color.c0.color = old_color;
 }
 
@@ -59,17 +60,45 @@ I64 GrSpriteFloodFillChecks()
 	MemCopy(records + 16, &x, sizeof(I32));
 	MemCopy(records + 20, &y, sizeof(I32));
 	Sprite3(&dc, 0, 0, 0, records);
-	if (ZcFbTextPixel(200, 200) != ZcFbGraphColor(12) ||
-			ZcFbTextPixel(219, 211) != ZcFbGraphColor(12) ||
-			ZcFbTextPixel(199, 199) != ZcFbGraphColor(15) ||
-			ZcFbTextPixel(221, 201) != ZcFbGraphColor(0) ||
-			ZcFbTextPixel(300, 200) != ZcFbGraphColor(12) ||
-			ZcFbTextPixel(319, 211) != ZcFbGraphColor(12) ||
-			ZcFbTextPixel(299, 199) != ZcFbGraphColor(12) ||
-			ZcFbTextPixel(321, 201) != ZcFbGraphColor(0))
+	if (ZcFbTextPixel(200, 200) != ZcFbGraphColor(12))
 	{
 		Free(records);
-		return 3;
+		return 31;
+	}
+	if (ZcFbTextPixel(219, 211) != ZcFbGraphColor(12))
+	{
+		Free(records);
+		return 32;
+	}
+	if (ZcFbTextPixel(199, 199) != ZcFbGraphColor(15))
+	{
+		Free(records);
+		return 33;
+	}
+	if (ZcFbTextPixel(221, 201) != ZcFbGraphColor(0))
+	{
+		Free(records);
+		return 34;
+	}
+	if (ZcFbTextPixel(300, 200) != ZcFbGraphColor(12))
+	{
+		Free(records);
+		return 35;
+	}
+	if (ZcFbTextPixel(319, 211) != ZcFbGraphColor(12))
+	{
+		Free(records);
+		return 36;
+	}
+	if (ZcFbTextPixel(299, 199) != ZcFbGraphColor(12))
+	{
+		Free(records);
+		return 37;
+	}
+	if (ZcFbTextPixel(321, 201) != ZcFbGraphColor(0))
+	{
+		Free(records);
+		return 38;
 	}
 	Free(records);
 	return 0x2a;

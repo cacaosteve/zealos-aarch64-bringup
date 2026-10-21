@@ -65,3 +65,19 @@ static int pi4_xhci_memory_command(uint16_t original, uint16_t *enabled) {
     *enabled = original | PI4_PCI_COMMAND_MEMORY;
     return 0;
 }
+
+/* Reject reads that look like an unmapped or poisoned BAR rather than xHCI. */
+static int pi4_xhci_caps_valid(const uint32_t caps[6]) {
+    uint32_t cap_length, version, max_slots, max_ports;
+
+    if (!caps) return 0;
+    cap_length = caps[0] & 0xffu;
+    version = caps[0] >> 16;
+    max_slots = caps[1] & 0xffu;
+    max_ports = (caps[1] >> 24) & 0xffu;
+    if (cap_length < 0x20u || cap_length > 0xfcu || (cap_length & 3u) ||
+        version < 0x0100u || version > 0x01ffu || !max_slots || !max_ports ||
+        (caps[4] & 3u) || (caps[5] & 0xfu))
+        return 0;
+    return 1;
+}

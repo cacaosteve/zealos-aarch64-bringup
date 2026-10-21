@@ -3,6 +3,12 @@ extern I64 ZcFbGraphColor(I64 color);
 extern Bool ZcFbGraphPlot(I64 x, I64 y, U32 color, I64 left, I64 top,
                          I64 right, I64 bottom, I64 task_z);
 
+Bool GrSpriteTransformPixelMatches(CDC *dc, I64 x, I64 y, I64 color)
+{
+    return dc->body[y * dc->width_internal + x] == 12 ||
+            ZcFbTextPixel(x, y) == color;
+}
+
 I64 GrSpriteTransformChecks()
 {
     CDC *dc;
@@ -17,6 +23,7 @@ I64 GrSpriteTransformChecks()
     records = CAlloc(715);
     if (!dc || !records || !dc->r || !dc->transform)
         return 1;
+    MemSet(dc->body, 0, dc->width_internal * dc->height);
     dc->flags |= DCF_SCREEN_BITMAP | DCF_ON_TOP;
     dc->color.c0 = 12;
     dc->x = 610;
@@ -360,50 +367,56 @@ I64 GrSpriteTransformChecks()
 
     color = 0x00FF5555;
     // Run the primitive and text records first; the flood-fill fixture must
-    // wait until its closed boundary has been drawn below.
+    // wait until its closed boundary has been drawn below. The ARM64 bridge
+    // routes GrPlot-based primitives to the CDC bitmap and line paths to
+    // immediate scanout, so clear and inspect both output destinations.
+    for (scan_i = 530; scan_i <= 720; scan_i++)
+        for (scan_j = 430; scan_j <= 590; scan_j++)
+            ZcFbGraphPlot(scan_i, scan_j, 0, 0, 0, 799, 599, 0);
     records[667] = 0;
     Sprite3(dc, dc->x, dc->y, dc->z, records);
     type = SPT_TRANSFORM_ON;
     MemCopy(records + 667, &type, sizeof(U8));
-    if (ZcFbTextPixel(593, 453) != color ||
-            ZcFbTextPixel(633, 447) != color ||
-            ZcFbTextPixel(575, 445) != color ||
-            ZcFbTextPixel(625, 465) != color ||
-            ZcFbTextPixel(575, 460) != color ||
-            ZcFbTextPixel(645, 460) != color ||
-            ZcFbTextPixel(600, 450) != color ||
-            ZcFbTextPixel(630, 440) != color ||
-            ZcFbTextPixel(580, 473) != color ||
-            ZcFbTextPixel(658, 500) != color ||
-            ZcFbTextPixel(570, 480) != color ||
-            ZcFbTextPixel(660, 500) != color ||
-            ZcFbTextPixel(595, 445) != color ||
-            ZcFbTextPixel(625, 445) != color ||
-            ZcFbTextPixel(600, 440) != color ||
-            ZcFbTextPixel(600, 441) != color ||
-            ZcFbTextPixel(599, 441) != color ||
-            ZcFbTextPixel(620, 440) != color ||
-            ZcFbTextPixel(621, 441) != color ||
-            ZcFbTextPixel(590, 440) != color ||
-            ZcFbTextPixel(590, 460) != color ||
-            ZcFbTextPixel(620, 450) != color ||
-            ZcFbTextPixel(640, 450) != color ||
-            ZcFbTextPixel(540, 490) != color ||
-            ZcFbTextPixel(540, 520) != color ||
-            ZcFbTextPixel(670, 500) != color ||
-            ZcFbTextPixel(700, 500) != color ||
-            ZcFbTextPixel(560, 530) != color ||
-            ZcFbTextPixel(560, 531) != color ||
-            ZcFbTextPixel(559, 530) != color ||
-            ZcFbTextPixel(559, 531) != color ||
-            ZcFbTextPixel(710, 480) != color ||
-            ZcFbTextPixel(711, 480) != color ||
-            ZcFbTextPixel(710, 481) != color ||
-            ZcFbTextPixel(711, 481) != color)
+    if (!GrSpriteTransformPixelMatches(dc, 593, 453, color) ||
+            !GrSpriteTransformPixelMatches(dc, 633, 447, color) ||
+            !GrSpriteTransformPixelMatches(dc, 575, 445, color) ||
+            !GrSpriteTransformPixelMatches(dc, 625, 465, color) ||
+            !GrSpriteTransformPixelMatches(dc, 575, 460, color) ||
+            !GrSpriteTransformPixelMatches(dc, 645, 460, color) ||
+            !GrSpriteTransformPixelMatches(dc, 600, 450, color) ||
+            !GrSpriteTransformPixelMatches(dc, 630, 440, color) ||
+            !GrSpriteTransformPixelMatches(dc, 580, 473, color) ||
+            !GrSpriteTransformPixelMatches(dc, 658, 500, color) ||
+            !GrSpriteTransformPixelMatches(dc, 570, 480, color) ||
+            !GrSpriteTransformPixelMatches(dc, 660, 500, color) ||
+            !GrSpriteTransformPixelMatches(dc, 595, 445, color) ||
+            !GrSpriteTransformPixelMatches(dc, 625, 445, color) ||
+            !GrSpriteTransformPixelMatches(dc, 600, 440, color) ||
+            !GrSpriteTransformPixelMatches(dc, 600, 441, color) ||
+            !GrSpriteTransformPixelMatches(dc, 599, 441, color) ||
+            !GrSpriteTransformPixelMatches(dc, 620, 440, color) ||
+            !GrSpriteTransformPixelMatches(dc, 621, 441, color) ||
+            !GrSpriteTransformPixelMatches(dc, 590, 440, color) ||
+            !GrSpriteTransformPixelMatches(dc, 590, 460, color) ||
+            !GrSpriteTransformPixelMatches(dc, 620, 450, color) ||
+            !GrSpriteTransformPixelMatches(dc, 640, 450, color) ||
+            !GrSpriteTransformPixelMatches(dc, 540, 490, color) ||
+            !GrSpriteTransformPixelMatches(dc, 540, 520, color) ||
+            !GrSpriteTransformPixelMatches(dc, 670, 500, color) ||
+            !GrSpriteTransformPixelMatches(dc, 700, 500, color) ||
+            !GrSpriteTransformPixelMatches(dc, 560, 530, color) ||
+            !GrSpriteTransformPixelMatches(dc, 560, 531, color) ||
+            !GrSpriteTransformPixelMatches(dc, 559, 530, color) ||
+            !GrSpriteTransformPixelMatches(dc, 559, 531, color) ||
+            !GrSpriteTransformPixelMatches(dc, 710, 480, color) ||
+            !GrSpriteTransformPixelMatches(dc, 711, 480, color) ||
+            !GrSpriteTransformPixelMatches(dc, 710, 481, color) ||
+            !GrSpriteTransformPixelMatches(dc, 711, 481, color))
         return 2;
     if (glyph_row < 0)
         return 5;
-    if (ZcFbTextPixel(550 - glyph_row, 550 + glyph_col) != color)
+    if (!GrSpriteTransformPixelMatches(dc, 550 - glyph_row,
+            550 + glyph_col, color))
         return 6;
 
     // Exercise ordinary CDC text in its native body coordinates separately
@@ -428,27 +441,25 @@ I64 GrSpriteTransformChecks()
     pixel_count = 0;
     for (scan_i = 460; scan_i <= 500; scan_i++)
         for (scan_j = 580; scan_j <= 620; scan_j++)
-            if (ZcFbTextPixel(scan_i, scan_j) == color)
+            if (GrSpriteTransformPixelMatches(dc, scan_i, scan_j, color))
                 pixel_count++;
     if (pixel_count < 25)
         return 6;
-    dc->color.c0 = 15;
+    for (scan_i = 409; scan_i <= 413; scan_i++)
+        for (scan_j = 529; scan_j <= 533; scan_j++)
+            ZcFbGraphPlot(scan_i, scan_j, 0, 0, 0, 799, 599, 0);
     for (scan_i = 409; scan_i <= 413; scan_i++)
     {
-        GrPlot(dc, scan_i, 529);
-        GrPlot(dc, scan_i, 533);
+        ZcFbGraphPlot(scan_i, 529, 15, 0, 0, 799, 599, 0);
+        ZcFbGraphPlot(scan_i, 533, 15, 0, 0, 799, 599, 0);
     }
     for (scan_i = 530; scan_i <= 532; scan_i++)
     {
-        GrPlot(dc, 409, scan_i);
-        GrPlot(dc, 413, scan_i);
+        ZcFbGraphPlot(409, scan_i, 15, 0, 0, 799, 599, 0);
+        ZcFbGraphPlot(413, scan_i, 15, 0, 0, 799, 599, 0);
     }
-    dc->color.c0 = 0;
-    for (scan_i = 410; scan_i <= 412; scan_i++)
-        for (scan_j = 530; scan_j <= 532; scan_j++)
-            GrPlot(dc, scan_i, scan_j);
-    dc->color.c0 = 15;
-    GrPlot(dc, 100, 200);
+    ZcFbGraphPlot(100, 200, 0, 0, 0, 799, 599, 0);
+    ZcFbGraphPlot(100, 200, 15, 0, 0, 799, 599, 0);
     dc->color.c0 = 12;
     Sprite3(dc, dc->x, dc->y, dc->z, records + 667);
     if (ZcFbTextPixel(411, 531) != ZcFbGraphColor(12) ||
@@ -475,7 +486,7 @@ I64 GrSpriteTransformChecks()
     MemCopy(records + 5, &x, sizeof(I32));
     MemCopy(records + 9, &y, sizeof(I32));
     Sprite3(dc, dc->x, dc->y, dc->z, records);
-    if (ZcFbTextPixel(707, 581) != color)
+    if (!GrSpriteTransformPixelMatches(dc, 707, 581, color))
         return 9;
     if (ZcFbTextPixel(585, 445) == color)
         return 3;

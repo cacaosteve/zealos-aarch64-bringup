@@ -21,6 +21,10 @@ static void init_handoff(struct zeal_handoff *h) {
 int main(void) {
     struct zeal_handoff h;
     struct pi4_xhci_bar_plan plan;
+    const uint32_t valid_caps[6] = {
+        0x01000020u, 0x08004020u, 0, 0, 0x1000u, 0x800u
+    };
+    uint32_t invalid_caps[6];
     uint16_t command;
 
     init_handoff(&h);
@@ -55,6 +59,24 @@ int main(void) {
     if (pi4_xhci_memory_command(PI4_PCI_COMMAND_MASTER, &command) == 0)
         return fail("bus-mastering state accepted");
 
-    puts("PASS Pi4 xHCI BAR translation and bus-master-off MMIO command plan");
+    if (!pi4_xhci_caps_valid(valid_caps))
+        return fail("valid xHCI capability header rejected");
+    memcpy(invalid_caps, valid_caps, sizeof(invalid_caps));
+    invalid_caps[0] = 0xdeadbeadu;
+    invalid_caps[1] = 0xdeadbeadu;
+    invalid_caps[4] = 0xdeadbeadu;
+    invalid_caps[5] = 0xdeadbeadu;
+    if (pi4_xhci_caps_valid(invalid_caps))
+        return fail("poisoned BAR values accepted as xHCI");
+    memcpy(invalid_caps, valid_caps, sizeof(invalid_caps));
+    invalid_caps[0] = (valid_caps[0] & ~0xffu) | 0x21u;
+    if (pi4_xhci_caps_valid(invalid_caps))
+        return fail("unaligned capability length accepted");
+    memcpy(invalid_caps, valid_caps, sizeof(invalid_caps));
+    invalid_caps[1] &= ~0xffu;
+    if (pi4_xhci_caps_valid(invalid_caps))
+        return fail("controller reporting no slots accepted");
+
+    puts("PASS Pi4 xHCI BAR translation, header validation, and bus-master-off MMIO plan");
     return 0;
 }

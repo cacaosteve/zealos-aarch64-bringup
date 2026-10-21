@@ -163,16 +163,21 @@ synchronous MMIO aborts. Host tests cover the config address plan and the
 BAR-to-CPU-window translation plus the rule that bus mastering must already be
 off (`make check-pi4-platform`).
 
-The next diagnostic stage maps the assigned VL805 BAR through the FDT PCI
-memory window, temporarily sets only PCI Memory Space Enable, confirms Bus
-Master Enable remains clear, and reads the xHCI capability header. It then
-restores the original PCI command word and verifies it. It does not write an
-xHCI register, reset/start the controller, or use DMA. This build has compiled
-and passed the host safety tests; its first physical Pi run is still pending.
-The newest HDMI photos show the earlier report ending with “bus mastering and
-xHCI remain off,” without an `xHCI CAP/version` or `xHCI caps state` line, so
-they do not yet test this staged probe. Starting xHCI and using DMA remain later
-steps requiring cache-safe arena access, firmware handoff, and controller tests.
+The first physical capability-probe run (2026-10-21) temporarily enabled only
+PCI Memory Space Enable, kept Bus Master Enable clear, read the assigned BAR,
+then restored the original PCI command word. The HDMI photo shows repeated
+`0xdeadbead` values for CAP/version, HCS1/HCC1, DB, and RTS. Those values fail
+basic xHCI header checks, so the read is not accepted as a valid capability
+header even though no MMIO abort was reported. The probe did not write an xHCI
+register, reset/start the controller, or use DMA.
+
+The next diagnostic build labels malformed capability data explicitly and
+prints the translated BAR CPU and virtual addresses alongside the raw values.
+This will help distinguish an endpoint that does not respond to the mapped
+window from a bad translation or decode path. Bus mastering remains off and
+xHCI remains stopped. Starting xHCI and using DMA remain later steps requiring
+validated capability reads, cache-safe arena access, firmware handoff, and
+controller tests.
 
 ## Code plan (small batches)
 
@@ -186,10 +191,11 @@ steps requiring cache-safe arena access, firmware handoff, and controller tests.
 7. **PCIe discovery** — **physically accepted (2026-10-20):** Pi FDT windows,
    active link, 1 MiB DMA reservation, and VL805 `1106:3483` xHCI identity/BAR
    confirmed with read-only probes; bus mastering and xHCI stayed off.
-8. **USB input** — physical PCIe discovery is accepted. Next boot checks the
-   xHCI capability header with transient memory decode and bus mastering off;
-   then separately validate firmware handoff, cache-safe DMA, controller
-   startup, and physical HID input.
+8. **USB input** — physical PCIe discovery is accepted. The first capability
+   read returned `0xdeadbead` instead of a valid header; next boot reports the
+   translated BAR CPU/virtual addresses and validates register shape while
+   keeping bus mastering off. Then separately validate firmware handoff,
+   cache-safe DMA, controller startup, and physical HID input.
 9. **Storage / display** — after serial input and native USB input are usable.
 
 ## Non-goals (for now)

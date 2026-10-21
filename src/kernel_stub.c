@@ -213,6 +213,8 @@ static unsigned g_pi4_cfg_bar_count;
 static int g_pi4_uart_tx_ok;
 static uint32_t g_pi4_xhci_state;
 static uint32_t g_pi4_xhci_caps[6];
+static uint64_t g_pi4_xhci_bar_cpu;
+static uint64_t g_pi4_xhci_bar_va;
 #define PI4_CFG_NOT_RUN 0u
 #define PI4_CFG_READ_OK 1u
 #define PI4_CFG_MMIO_FAIL 2u
@@ -229,6 +231,7 @@ static uint32_t g_pi4_xhci_caps[6];
 #define PI4_XHCI_CFG_FAIL 5u
 #define PI4_XHCI_MMIO_FAIL 6u
 #define PI4_XHCI_RESTORE_FAIL 7u
+#define PI4_XHCI_CAPS_INVALID 8u
 #endif
 static uint64_t g_hhdm;
 static uint64_t g_timer_ticks;
@@ -1369,6 +1372,8 @@ static void pi4_xhci_probe_capabilities(const struct zeal_handoff *h,
     int changed = 0;
 
     g_pi4_xhci_state = PI4_XHCI_NOT_RUN;
+    g_pi4_xhci_bar_cpu = 0;
+    g_pi4_xhci_bar_va = 0;
     for (unsigned i = 0; i < 6; i++) g_pi4_xhci_caps[i] = 0;
     if (g_pi4_cfg_state != PI4_CFG_READ_OK ||
         (g_pi4_cfg_id & 0xffffffffu) != 0x34831106u ||
@@ -1378,6 +1383,7 @@ static void pi4_xhci_probe_capabilities(const struct zeal_handoff *h,
         g_pi4_xhci_state = PI4_XHCI_BAD_BAR;
         return;
     }
+    g_pi4_xhci_bar_cpu = bar.cpu_base;
     if (!g_pt_pool_phys || !h->hhdm_offset ||
         h->hhdm_offset > UINT64_MAX - bar.cpu_base ||
         mmio_map_2m(h->hhdm_offset, bar.cpu_base) != 0) {
@@ -1385,6 +1391,7 @@ static void pi4_xhci_probe_capabilities(const struct zeal_handoff *h,
         return;
     }
     virt = h->hhdm_offset + bar.cpu_base;
+    g_pi4_xhci_bar_va = virt;
     regs = (volatile uint8_t *)(uintptr_t)virt;
 
     original = (uint16_t)g_pi4_cfg_command;
@@ -1421,7 +1428,8 @@ static void pi4_xhci_probe_capabilities(const struct zeal_handoff *h,
             goto restore;
         }
     }
-    g_pi4_xhci_state = PI4_XHCI_CAPS_OK;
+    g_pi4_xhci_state = pi4_xhci_caps_valid(g_pi4_xhci_caps)
+        ? PI4_XHCI_CAPS_OK : PI4_XHCI_CAPS_INVALID;
 
 restore:
     if (changed) {
@@ -1433,7 +1441,8 @@ restore:
             probe_far = g_probe_far;
         }
     }
-    if (g_pi4_xhci_state != PI4_XHCI_CAPS_OK) {
+    if (g_pi4_xhci_state != PI4_XHCI_CAPS_OK &&
+        g_pi4_xhci_state != PI4_XHCI_CAPS_INVALID) {
         g_probe_esr = probe_esr;
         g_probe_far = probe_far;
     }
@@ -1441,7 +1450,8 @@ restore:
     if (log_uart) {
         uart_puts(log_uart, "Pi xHCI cap probe state=");
         uart_put_u64_hex(log_uart, g_pi4_xhci_state);
-        if (g_pi4_xhci_state == PI4_XHCI_CAPS_OK) {
+        if (g_pi4_xhci_state == PI4_XHCI_CAPS_OK ||
+            g_pi4_xhci_state == PI4_XHCI_CAPS_INVALID) {
             for (unsigned i = 0; i < 6; i++) {
                 uart_puts(log_uart, " cap[");
                 uart_put_u32_dec(log_uart, offsets[i]);
@@ -1606,8 +1616,14 @@ static void pi_diag_fb_report(const struct zeal_handoff *h) {
             pi_diag_fb_puts("=");
             pi_diag_fb_u64_hex(g_pi4_cfg_bars[i]);
         }
-        if (g_pi4_xhci_state == PI4_XHCI_CAPS_OK) {
-            pi_diag_fb_puts("\nxHCI CAP/version=");
+        if (g_pi4_xhci_state == PI4_XHCI_CAPS_OK ||
+            g_pi4_xhci_state == PI4_XHCI_CAPS_INVALID) {
+            pi_diag_fb_puts(g_pi4_xhci_state == PI4_XHCI_CAPS_INVALID
+                ? "\nxHCI caps invalid" : "\nxHCI CAP/version");
+            if (g_pi4_xhci_state == PI4_XHCI_CAPS_INVALID)
+                pi_diag_fb_puts(" CAP/version=");
+            else
+                pi_diag_fb_puts("=");
             pi_diag_fb_u64_hex(g_pi4_xhci_caps[0]);
             pi_diag_fb_puts(" HCS1=");
             pi_diag_fb_u64_hex(g_pi4_xhci_caps[1]);
@@ -1617,6 +1633,10 @@ static void pi_diag_fb_report(const struct zeal_handoff *h) {
             pi_diag_fb_u64_hex(g_pi4_xhci_caps[4]);
             pi_diag_fb_puts(" RTS=");
             pi_diag_fb_u64_hex(g_pi4_xhci_caps[5]);
+            pi_diag_fb_puts("\nxHCI BAR CPU=");
+            pi_diag_fb_u64_hex(g_pi4_xhci_bar_cpu);
+            pi_diag_fb_puts(" VA=");
+            pi_diag_fb_u64_hex(g_pi4_xhci_bar_va);
         } else {
             pi_diag_fb_puts("\nxHCI caps state=");
             pi_diag_fb_u64_hex(g_pi4_xhci_state);

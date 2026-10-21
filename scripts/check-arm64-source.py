@@ -537,6 +537,17 @@ assert b'CTask *splash_task = Fs;' in zsplash_overlay
 assert b'sys_focus_task = splash_task;' in zsplash_overlay
 assert b'sys_focus_task = old_focus;' in zsplash_overlay
 assert b'WinToTop(splash_task);' in zsplash_overlay
+assert b'U0 (*old_draw_it)(CTask *task, CDC *dc) = Fs->draw_it;' in zsplash_overlay
+assert b'Free(dc->depth_buf);' in zsplash_overlay
+assert b'dc->depth_buf = NULL;' in zsplash_overlay
+assert zsplash_overlay.index(b'Sprite3(dc, 0, 0, 0, $IB,"<1>",BI=1$);') < \
+       zsplash_overlay.index(b'Free(dc->depth_buf);')
+assert zsplash_overlay.count(b'Free(dc->depth_buf);') == 1
+zsplash_loop_end = '\t\tΦ += .03;\n\t\tWinToTop;\n\t}\n'.encode('utf-8')
+assert zsplash_overlay.index(zsplash_loop_end) < \
+       zsplash_overlay.index(b'Free(dc->depth_buf);')
+assert zsplash_overlay.index(b'while (!CharScan)') < \
+       zsplash_overlay.index(b'Fs->draw_it = old_draw_it;')
 assert b'Simplicity Perfected' in zsplash_overlay
 assert b'Kill(bg_task)' not in zsplash_overlay and b'Kill(splash_task)' not in zsplash_overlay
 gui_terminal = (root / 'upstream/bootstrap/System/GuiTerminal.ZC').read_bytes()

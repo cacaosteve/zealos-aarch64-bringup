@@ -2,7 +2,7 @@
 
 Limine → ZealBooter → kernel + `demo.hcbc` → HolyC-IR JIT → graphical terminal → **native USB or VirtIO input**
 
-**Not a full ZealOS port.** Two parallel tracks: QEMU/UTM virt (HolyC + RedSea + Lattice compose) and Pi 4B UEFI (boot/timer/IRQ/shell plus physically confirmed PCIe/VL805 discovery; guarded xHCI capability probing is next, with USB input still disabled).
+**Not a full ZealOS port.** Two parallel tracks: QEMU/UTM virt (HolyC + RedSea + Lattice compose) and Pi 4B UEFI (boot/timer/IRQ/shell plus physically confirmed PCIe/VL805 discovery; the first xHCI capability read returned invalid `0xdeadbead` values, so USB input remains disabled while BAR mapping is diagnosed).
 
 ## Native source compatibility milestone
 

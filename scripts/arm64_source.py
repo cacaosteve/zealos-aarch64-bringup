@@ -222,7 +222,10 @@ def translate_zsplash(source: bytes) -> bytes:
     native USB pointer input, so drop the x86 mouse-driver handoff and restore
     keyboard focus locally instead of killing the parent task. Preserve its
     short startup jitter with the loaded timer counter because this bootstrap
-    does not load the full date/time helper.
+    does not load the full date/time helper. Reuse the splash depth buffer
+    across animation frames and release it when the splash is dismissed,
+    because the bootstrap's screen CDC is shared. Restore the task's prior
+    draw callback when the splash is dismissed.
     """
     if source.count(b'\0') < 1:
         raise ValueError('expected ZSplash inline sprite payload terminator')
@@ -258,7 +261,9 @@ def translate_zsplash(source: bytes) -> bytes:
         'U0 ZSplash()\n',
         'while (!CharScan)',
         'DCDepthBufAlloc(dc);',
+        'Sprite3(dc, 0, 0, 0, $IB,"<1>",BI=1$);',
         'CTask\t*bg_task = User;',
+        'Fs->draw_it = &DrawIt;',
         'WinBorder(, bg_task);',
         'WinMax(bg_task);',
         'gr.fp_draw_mouse = &DrawNoMouse;',
@@ -288,7 +293,9 @@ def translate_zsplash(source: bytes) -> bytes:
     text = text.replace('AutoComplete(ON);',
                         '// Keep global autocomplete task state unchanged.', 1)
     text = text.replace('CTask\t*bg_task = User;',
-                        'CTask *splash_task = Fs;\n\tCTask *old_focus = sys_focus_task;', 1)
+        'CTask *splash_task = Fs;\n'
+        '\tCTask *old_focus = sys_focus_task;\n'
+        '\tU0 (*old_draw_it)(CTask *task, CDC *dc) = Fs->draw_it;', 1)
     text = text.replace('WinToTop(bg_task);',
                         'WinToTop(splash_task);\n\tsys_focus_task = splash_task;', 1)
     text = text.replace('WinBorder(, bg_task);', 'WinBorder(, splash_task);', 1)
@@ -299,12 +306,25 @@ def translate_zsplash(source: bytes) -> bytes:
     text = text.replace('gr.fp_draw_mouse = &DrawStdMouse;', '', 1)
     text = text.replace('MouseHardEnable(TRUE);', '', 1)
     text = text.replace('Spawn(&MouseHardDriverInstall);', '', 1)
+    loop_end = '\t\tΦ += .03;\n\t\tWinToTop;\n\t}\n'
+    if text.count(loop_end) != 1:
+        raise ValueError('pinned ZSplash animation loop boundary changed')
+    text = text.replace(loop_end,
+        loop_end +
+        '\tif (dc->depth_buf)\n'
+        '\t{\n'
+        '\t\tFree(dc->depth_buf);\n'
+        '\t\tdc->depth_buf = NULL;\n'
+        '\t}\n'
+        '\tFs->draw_it = old_draw_it;\n', 1)
     text = text.replace('Kill(bg_task);',
                         'if (TaskValidate(old_focus))\n\t\tsys_focus_task = old_focus;', 1)
     result = ('// ARM64 restores the packed pinned sprite bytes and uses the native USB pointer.\n' + text).encode('utf-8') + b'\0' + payload
     if (b'$SP,"<1>",BI=1$' not in result or
             b'Sprite3(dc, 0, 0, 0, $IB,"<1>",BI=1$);' not in result or
             b'if (!dc->depth_buf) DCDepthBufAlloc(dc);' not in result or
+            b'Free(dc->depth_buf);' not in result or
+            b'Fs->draw_it = old_draw_it;' not in result or
             b'MStrPrint("%s", "ZealOS ARM64");' not in result or
             b'bg_task' in result):
         raise ValueError('ARM64 ZSplash translation lost its embedded sprite tokens')

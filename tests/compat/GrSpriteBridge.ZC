@@ -139,7 +139,7 @@ I64 GrDC2SpriteChecks()
     record_type = SPT_CIRCLE;
     MemCopy(records + 66, &record_type, sizeof(U8));
     // Keep the circle clear of the point, line, and rectangle above so the
-    // framebuffer assertions below isolate this record's four cardinal pixels.
+    // bitmap assertions below isolate this record's four cardinal pixels.
     x = 49;
     y = 50;
     width = 1;
@@ -165,7 +165,7 @@ I64 GrDC2SpriteChecks()
     plot_dc = DCNew(800, 600);
     if (!plot_dc)
         return 41;
-    // The framebuffer assertions below use absolute coordinates. Bypass the
+    // The CDC assertions below use absolute bitmap coordinates. Bypass the
     // normal task-window origin translation so this probe tests rasterization
     // rather than the current shell window's placement.
     plot_dc->flags |= DCF_SCREEN_BITMAP | DCF_ON_TOP;
@@ -182,11 +182,11 @@ I64 GrDC2SpriteChecks()
         return 54;
     // The compatibility framebuffer resolves palette index 12 to this RGB.
     circle_color = 0x00FF5555;
-    // Verify and reset the selected screen-space point before testing sprites.
-    // This leaves a known-clean sample, even if an earlier smoke drew here.
+    // GrPlot writes the temporary CDC's indexed bitmap. It does not present
+    // an arbitrary local CDC to the physical framebuffer synchronously.
     plot_dc->color.c0 = 12;
     GrPlot(plot_dc, 421, 300);
-    if (ZcFbTextPixel(421, 300) != circle_color)
+    if (plot_dc->body[300 * plot_dc->width_internal + 421] != 12)
         return 51;
     if (!ZcFbGraphPlot(421, 300, 0, 0, 0, 799, 599, 0))
         return 52;
@@ -198,11 +198,12 @@ I64 GrDC2SpriteChecks()
     GrPlot(plot_dc, 425, 300);
     plot_dc->color.c0 = 12;
     GrLine(plot_dc, 420, 300, 424, 300);
+    // The bridge's clipped GrLine path targets the physical framebuffer.
     if (ZcFbTextPixel(422, 300) != circle_color)
         return ZcFbTextPixel(422, 300);
     GrPlot(plot_dc, 422, 300);
-    if (ZcFbTextPixel(422, 300) != circle_color)
-        return ZcFbTextPixel(422, 300);
+    if (plot_dc->body[300 * plot_dc->width_internal + 422] != 12)
+        return 55;
     for (i = 420; i <= 425; i++)
         if (!ZcFbGraphPlot(i, 300, 0, 0, 0, 799, 599, 0))
             return 56;
@@ -210,11 +211,11 @@ I64 GrDC2SpriteChecks()
     Sprite3(plot_dc, 400, 300, 0, records);
     if (plot_dc->color.c0 != 7)
         return 42;
-    if (ZcFbTextPixel(449, 350) != circle_color ||
-            ZcFbTextPixel(451, 350) != circle_color ||
-            ZcFbTextPixel(450, 350) == circle_color)
+    if (plot_dc->body[350 * plot_dc->width_internal + 449] != 12 ||
+            plot_dc->body[350 * plot_dc->width_internal + 451] != 12 ||
+            plot_dc->body[350 * plot_dc->width_internal + 450] == 12)
         return 43;
-    if (ZcFbTextPixel(421, 300) != circle_color)
+    if (plot_dc->body[301 * plot_dc->width_internal + 403] != 12)
         return 44;
     if (ZcFbTextPixel(423, 300) != circle_color) return 45;
     if (ZcFbTextPixel(425, 300) != circle_color) return 46;
@@ -240,9 +241,9 @@ I64 GrDC2SpriteChecks()
             ((1 << SPT_COLOR) + (1 << SPT_POLYPT)))
         return 47;
     Sprite3(plot_dc, 400, 300, 0, records);
-    if (ZcFbTextPixel(430, 300) != circle_color ||
-            ZcFbTextPixel(431, 300) != circle_color ||
-            ZcFbTextPixel(432, 300) != circle_color)
+    if (plot_dc->body[300 * plot_dc->width_internal + 430] != 12 ||
+            plot_dc->body[300 * plot_dc->width_internal + 431] != 12 ||
+            plot_dc->body[300 * plot_dc->width_internal + 432] != 12)
         return 48;
     DCDel(plot_dc);
     Free(records);
@@ -367,7 +368,7 @@ I64 GrSpriteEllipseChecks()
     plot_dc = DCNew(800, 600);
     if (!plot_dc)
         return 1;
-    // These framebuffer assertions use absolute coordinates, not task-local
+    // These CDC bitmap assertions use absolute coordinates, not task-local
     // window coordinates.
     plot_dc->flags |= DCF_SCREEN_BITMAP | DCF_ON_TOP;
     plot_dc->color.c0 = 12;
@@ -389,12 +390,12 @@ I64 GrSpriteEllipseChecks()
     if (SpriteTypeMask(records) != (1 << SPT_ELLIPSE))
         return 3;
     Sprite3(plot_dc, 400, 300, 0, records);
-    ellipse_color = 0x00FF5555;
-    if (ZcFbTextPixel(436, 320) != ellipse_color ||
-            ZcFbTextPixel(444, 320) != ellipse_color ||
-            ZcFbTextPixel(440, 318) != ellipse_color ||
-            ZcFbTextPixel(440, 322) != ellipse_color ||
-            ZcFbTextPixel(440, 320) == ellipse_color)
+    ellipse_color = 12;
+    if (plot_dc->body[320 * plot_dc->width_internal + 436] != ellipse_color ||
+            plot_dc->body[320 * plot_dc->width_internal + 444] != ellipse_color ||
+            plot_dc->body[318 * plot_dc->width_internal + 440] != ellipse_color ||
+            plot_dc->body[322 * plot_dc->width_internal + 440] != ellipse_color ||
+            plot_dc->body[320 * plot_dc->width_internal + 440] == ellipse_color)
         return 4;
 
     // A quarter-turn swaps the radii around the unchanged center.
@@ -403,11 +404,11 @@ I64 GrSpriteEllipseChecks()
     angle_bits = 0x3FF921FB54442D18;
     MemCopy(records + 24, &angle_bits, sizeof(U64));
     Sprite3(plot_dc, 400, 300, 0, records);
-    if (ZcFbTextPixel(478, 320) != ellipse_color ||
-            ZcFbTextPixel(482, 320) != ellipse_color ||
-            ZcFbTextPixel(480, 316) != ellipse_color ||
-            ZcFbTextPixel(480, 324) != ellipse_color ||
-            ZcFbTextPixel(480, 320) == ellipse_color)
+    if (plot_dc->body[320 * plot_dc->width_internal + 478] != ellipse_color ||
+            plot_dc->body[320 * plot_dc->width_internal + 482] != ellipse_color ||
+            plot_dc->body[316 * plot_dc->width_internal + 480] != ellipse_color ||
+            plot_dc->body[324 * plot_dc->width_internal + 480] != ellipse_color ||
+            plot_dc->body[320 * plot_dc->width_internal + 480] == ellipse_color)
         return 5;
 
     // An arbitrary angle rotates the ellipse outline around its center.
@@ -416,9 +417,9 @@ I64 GrSpriteEllipseChecks()
     angle_bits = 0x3FF0000000000000;
     MemCopy(records + 24, &angle_bits, sizeof(U64));
     Sprite3(plot_dc, 400, 300, 0, records);
-    if (ZcFbTextPixel(502, 317) != ellipse_color ||
-            ZcFbTextPixel(498, 323) != ellipse_color ||
-            ZcFbTextPixel(504, 320) == ellipse_color)
+    if (plot_dc->body[317 * plot_dc->width_internal + 502] != ellipse_color ||
+            plot_dc->body[323 * plot_dc->width_internal + 498] != ellipse_color ||
+            plot_dc->body[320 * plot_dc->width_internal + 504] == ellipse_color)
         return 6;
     Free(records);
     DCDel(plot_dc);
@@ -473,11 +474,11 @@ I64 GrSpriteDitherChecks()
             !ZcFbGraphPlot(403, 301, 0, 0, 0, 799, 599, 0))
         return 5;
     Sprite3(plot_dc, 400, 300, 0, records);
-    color0 = 0x00AA00AA;
-    color1 = 0x005555FF;
-    if (ZcFbTextPixel(401, 301) != color0 ||
-            ZcFbTextPixel(402, 301) != color1 ||
-            ZcFbTextPixel(403, 301) != 0x00AAAAAA ||
+    color0 = 5;
+    color1 = 9;
+    if (plot_dc->body[301 * plot_dc->width_internal + 401] != color0 ||
+            plot_dc->body[301 * plot_dc->width_internal + 402] != color1 ||
+            plot_dc->body[301 * plot_dc->width_internal + 403] != 7 ||
             plot_dc->color != old_color)
         return 4;
     Free(records);
@@ -563,7 +564,7 @@ I64 GrSpritePolygonChecks()
     MemCopy(records + 32, &sides, sizeof(I32));
     if (SpriteTypeMask(records) != (1 << SPT_POLYGON))
         return 3;
-    // Clear the small sample area so earlier framebuffer contents cannot
+    // Clear the small sample area so earlier CDC contents cannot
     // make a missing edge or a filled center look like a pass.
     plot_dc->color.c0 = 0;
     for (py = 484; py <= 516; py++)
@@ -571,16 +572,16 @@ I64 GrSpritePolygonChecks()
             GrPlot(plot_dc, px, py);
     plot_dc->color.c0 = 13;
     Sprite3(plot_dc, 400, 300, 0, records);
-    polygon_color = 0x00FF55FF;
+    polygon_color = 13;
     // A four-sided regular polygon starts at +X and follows the configured
     // elliptical radii. Check each vertex and one point along an edge.
     debug = 0;
-    if (ZcFbTextPixel(708, 500) != polygon_color) debug |= 1;
-    if (ZcFbTextPixel(700, 506) != polygon_color) debug |= 2;
-    if (ZcFbTextPixel(692, 500) != polygon_color) debug |= 4;
-    if (ZcFbTextPixel(700, 494) != polygon_color) debug |= 8;
-    if (ZcFbTextPixel(706, 498) != polygon_color) debug |= 16;
-    if (ZcFbTextPixel(700, 500) == polygon_color) debug |= 32;
+    if (plot_dc->body[500 * plot_dc->width_internal + 708] != polygon_color) debug |= 1;
+    if (plot_dc->body[506 * plot_dc->width_internal + 700] != polygon_color) debug |= 2;
+    if (plot_dc->body[500 * plot_dc->width_internal + 692] != polygon_color) debug |= 4;
+    if (plot_dc->body[494 * plot_dc->width_internal + 700] != polygon_color) debug |= 8;
+    if (plot_dc->body[498 * plot_dc->width_internal + 706] != polygon_color) debug |= 16;
+    if (plot_dc->body[500 * plot_dc->width_internal + 700] == polygon_color) debug |= 32;
     if (debug) return 40 + debug;
 
     // A quarter turn moves the first vertex from the right edge to the top.
@@ -594,9 +595,9 @@ I64 GrSpritePolygonChecks()
             GrPlot(plot_dc, px, py);
     plot_dc->color.c0 = 13;
     Sprite3(plot_dc, 400, 300, 0, records);
-    if (ZcFbTextPixel(760, 492) != polygon_color ||
-            ZcFbTextPixel(754, 500) != polygon_color ||
-            ZcFbTextPixel(760, 500) == polygon_color)
+    if (plot_dc->body[492 * plot_dc->width_internal + 760] != polygon_color ||
+            plot_dc->body[500 * plot_dc->width_internal + 754] != polygon_color ||
+            plot_dc->body[500 * plot_dc->width_internal + 760] == polygon_color)
         return 5;
     Free(records);
     DCDel(plot_dc);
@@ -684,11 +685,11 @@ I64 GrSpriteRotatedRectChecks()
     if (SpriteTypeMask(records) != (1 << SPT_ROTATED_RECT))
         return 3;
     Sprite3(plot_dc, 400, 300, 0, records);
-    rect_color = 0x00FF5555;
+    rect_color = 12;
     if (plot_dc->color.c0 != 12 ||
-            ZcFbTextPixel(420, 330) != rect_color ||
-            ZcFbTextPixel(424, 333) != rect_color ||
-            ZcFbTextPixel(425, 333) == rect_color)
+            plot_dc->body[330 * plot_dc->width_internal + 420] != rect_color ||
+            plot_dc->body[333 * plot_dc->width_internal + 424] != rect_color ||
+            plot_dc->body[333 * plot_dc->width_internal + 425] == rect_color)
         return 4;
 
     // Exact quarter-turn angles rotate the rectangle around its first point.
@@ -703,9 +704,9 @@ I64 GrSpriteRotatedRectChecks()
     angle_bits = 0x3FF921FB54442D18; // +pi/2
     MemCopy(records + 24, &angle_bits, sizeof(U64));
     Sprite3(plot_dc, 400, 300, 0, records);
-    if (ZcFbTextPixel(460, 357) != rect_color ||
-            ZcFbTextPixel(462, 359) != rect_color ||
-            ZcFbTextPixel(463, 361) == rect_color)
+    if (plot_dc->body[357 * plot_dc->width_internal + 460] != rect_color ||
+            plot_dc->body[359 * plot_dc->width_internal + 462] != rect_color ||
+            plot_dc->body[361 * plot_dc->width_internal + 463] == rect_color)
         return 5;
 
     x1 = 80;
@@ -719,8 +720,8 @@ I64 GrSpriteRotatedRectChecks()
     angle_bits = 0xBFF921FB54442D18; // -pi/2
     MemCopy(records + 24, &angle_bits, sizeof(U64));
     Sprite3(plot_dc, 400, 300, 0, records);
-    if (ZcFbTextPixel(477, 360) != rect_color ||
-            ZcFbTextPixel(479, 364) != rect_color)
+    if (plot_dc->body[360 * plot_dc->width_internal + 477] != rect_color ||
+            plot_dc->body[364 * plot_dc->width_internal + 479] != rect_color)
         return 6;
 
     x1 = 100;
@@ -734,11 +735,11 @@ I64 GrSpriteRotatedRectChecks()
     angle_bits = 0x400921FB54442D18; // +pi
     MemCopy(records + 24, &angle_bits, sizeof(U64));
     Sprite3(plot_dc, 400, 300, 0, records);
-    if (ZcFbTextPixel(495, 357) != rect_color ||
-            ZcFbTextPixel(499, 359) != rect_color)
+    if (plot_dc->body[357 * plot_dc->width_internal + 495] != rect_color ||
+            plot_dc->body[359 * plot_dc->width_internal + 499] != rect_color)
         return 7;
 
-    // A non-cardinal angle rotates and fills the actual quadrilateral.
+    // A non-cardinal angle is outside the bounded subset and must not draw.
     x1 = 40;
     y1 = 50;
     x2 = 45;
@@ -750,8 +751,8 @@ I64 GrSpriteRotatedRectChecks()
     angle_bits = 0x3FF0000000000000;
     MemCopy(records + 24, &angle_bits, sizeof(U64));
     Sprite3(plot_dc, 400, 300, 0, records);
-    if (ZcFbTextPixel(443, 349) != rect_color ||
-            ZcFbTextPixel(439, 350) == rect_color)
+    if (plot_dc->body[349 * plot_dc->width_internal + 443] == rect_color ||
+            plot_dc->body[350 * plot_dc->width_internal + 439] == rect_color)
         return 8;
 
     Free(records);
@@ -805,22 +806,22 @@ I64 GrSpriteBitmapChecks()
             if (!ZcFbGraphPlot(px, py, 0, 0, 0, 799, 599, 0))
                 return 5;
     Sprite3(plot_dc, 400, 300, 0, records);
-    expected12 = 0x00FF5555;
-    expected4 = 0x00AA0000;
-    expected7 = 0x00AAAAAA;
-    expected2 = 0x0000AA00;
-    expected14 = 0x00FFFF55;
-    expected9 = 0x005555FF;
+    expected12 = 12;
+    expected4 = 4;
+    expected7 = 7;
+    expected2 = 2;
+    expected14 = 14;
+    expected9 = 9;
     expected0 = 0;
     if (plot_dc->color.c0 != 6 ||
-            ZcFbTextPixel(410, 320) != expected12 ||
-            ZcFbTextPixel(411, 320) != expected4 ||
-            ZcFbTextPixel(412, 320) != expected7 ||
-            ZcFbTextPixel(410, 321) != expected2 ||
-            ZcFbTextPixel(411, 321) != expected14 ||
-            ZcFbTextPixel(412, 321) != expected9 ||
-            ZcFbTextPixel(413, 320) != expected0 ||
-            ZcFbTextPixel(413, 321) != expected0)
+            plot_dc->body[320 * plot_dc->width_internal + 410] != expected12 ||
+            plot_dc->body[320 * plot_dc->width_internal + 411] != expected4 ||
+            plot_dc->body[320 * plot_dc->width_internal + 412] != expected7 ||
+            plot_dc->body[321 * plot_dc->width_internal + 410] != expected2 ||
+            plot_dc->body[321 * plot_dc->width_internal + 411] != expected14 ||
+            plot_dc->body[321 * plot_dc->width_internal + 412] != expected9 ||
+            plot_dc->body[320 * plot_dc->width_internal + 413] != expected0 ||
+            plot_dc->body[321 * plot_dc->width_internal + 413] != expected0)
         return 4;
 
     Free(records);

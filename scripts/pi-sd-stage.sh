@@ -52,9 +52,10 @@ FB markers (keep firmware splash; do not expect a cleared screen):
 Copy this staged payload to the Pi SD card, then boot with HDMI attached. After
 the white IRQ bar, the screen prints the FDT PCIe windows, DMA reservation,
 VL805 identity/BARs, and the guarded capability-probe result before the shell
-prompt. On a successful probe, look for xHCI CAP/version=... HCS1=... HCC1=...
-and xHCI DB=... RTS=.... A failure prints xHCI caps state=...; either result
-is useful evidence. If the screen ends with the older Read-only; bus mastering
+prompt. On a valid probe, look for xHCI CAP/version=... HCS1=... HCC1=...
+and xHCI DB=... RTS=.... A probe fault prints xHCI caps state=...; implausible
+register values print xHCI caps invalid and the translated CPU/virtual BAR
+addresses. Either result is useful evidence. If the screen ends with the older Read-only; bus mastering
 and xHCI remain off line and has no xHCI CAP/version or xHCI caps state, the
 Pi booted an older card payload. A USB-TTL adapter @ 115200 on GPIO 14/15/GND is
 only needed for serial logs/input. The HDMI report independently attempts the
