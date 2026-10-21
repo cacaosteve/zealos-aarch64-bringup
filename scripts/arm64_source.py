@@ -520,7 +520,11 @@ def extract_server_task(source: bytes) -> bytes:
             "extern I64 ZcSystemTaskStart(U0 (*entry)());\n"
             "extern I64 ZcCallExtStr(U8 *name);\n" + body +
             "\nI64 BootstrapSystemTaskStart()\n"
-            "{\n    return ZcSystemTaskStart(&ServerTaskCont);\n}\n"
+            "{\n"
+            "    I64 result = ZcSystemTaskStart(&ServerTaskCont);\n"
+            "    if (result == 42) LBts(&sys_run_level, RLf_SYSTEM_SERVER);\n"
+            "    return result;\n"
+            "}\n"
             "U0 BootstrapServerTaskStart()\n"
             "{\n    Fs->win_inhibit = WIG_USER_TASK_DEFAULT;\n"
             "    ZcCallExtStr(\"ServerStartUp\");\n"

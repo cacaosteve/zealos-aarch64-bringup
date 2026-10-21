@@ -2824,7 +2824,8 @@ U0 GrSetUpTables()
            sizeof(bootstrap_win_uncovered_cells));
     active_gr->highest_uncovered = 0;
 }
-// Dead-task reaping still requires the kernel scheduler's lifecycle queues.
+// Guest fibers are reclaimed immediately by finish_guest; the cooperative
+// bridge has no delayed CTaskDying queue for the source server to reap.
 U0 TaskKillDying() {}
 // GodExterns.ZC globals used by DocPutKey F7 handlers.
 #define GOD_BAD_BITS	4

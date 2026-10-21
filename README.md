@@ -137,6 +137,10 @@ registry tree APIs share a System-owned cache backed by `~/Registry.ZC`.
 `Once`, `SysOnce` and explicit `OnceExe` execute and flush saved User/System
 branches. On disk, RAM, and DVD boots, the first graphical terminal now
 receives the original `Cd; #include "Once";` startup command through `XTalk`.
+Boot run-level flags now record the dedicated System task, persistent Registry,
+and Home startup only after each phase succeeds; the reboot checks wait for
+the graphical terminal to consume its queued `Once` command before asserting
+the persisted values and flushes.
 DVD boot opens the live graphical session and says that the legacy disk
 installer is not yet ported to ARM64; disk/RAM startup also opens a second
 terminal and tiles it beside the first, excluding bridge/System tasks from the

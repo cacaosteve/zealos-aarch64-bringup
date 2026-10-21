@@ -376,7 +376,9 @@ assert (ktask_source.split(b'U0 ServerTaskCont()\n')[1].split(b'\nU0 UserTaskCon
         .replace(b'JobsHandler(old_flags)', b'ZcServerJobsHandler(old_flags)', 1)
         in server_slice)
 assert b'UserTaskCont' not in server_slice
-assert b'return ZcSystemTaskStart(&ServerTaskCont);' in server_slice
+assert b'I64 result = ZcSystemTaskStart(&ServerTaskCont);' in server_slice
+assert b'if (result == 42) LBts(&sys_run_level, RLf_SYSTEM_SERVER);' in server_slice
+assert b'return result;' in server_slice
 assert b'U0 BootstrapServerTaskStart()' in server_slice
 assert b'ZcCallExtStr("ServerStartUp");' in server_slice
 assert b'ServerTaskCont;' in server_slice

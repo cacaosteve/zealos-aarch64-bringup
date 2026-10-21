@@ -6,7 +6,8 @@ I64 HomeAutoStartChecks()
     I64 i;
     U8 *saved;
 
-    if (!TaskValidate(term) || !TaskValidate(second)) return 1;
+    if (!Bt(&sys_run_level, RLf_HOME) ||
+        !TaskValidate(term) || !TaskValidate(second)) return 1;
     if (term->win_top != second->win_top || term->win_bottom != second->win_bottom ||
         term->win_left != 1 || term->win_right >= TEXT_COLS / 2 ||
         second->win_left <= term->win_right || second->win_right >= TEXT_COLS ||

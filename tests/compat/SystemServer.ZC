@@ -7,6 +7,7 @@ I64 SystemServerChecks()
     U8 *dir=DirCur;
     Bool directory_ok;
     if (!TaskValidate(server) || server==root ||
+        !Bt(&sys_run_level, RLf_SYSTEM_SERVER) ||
         StrCompare(server->task_name,"System") || !server->parent_task)
         return 1;
     if (Sys("Fs==sys_task;")!=1 || Sys("RFlagsGet&0x200;")!=0x200 ||

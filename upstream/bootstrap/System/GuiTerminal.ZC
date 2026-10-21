@@ -651,6 +651,7 @@ I64 BootstrapGuiTerminalHomeStart()
     // is not yet supported on ARM64.
     if (BootstrapHomeStartUpTasks() != 0x2a)
         return 1;
+    LBts(&sys_run_level, RLf_HOME);
     bootstrap_gui_terminal_home_started = TRUE;
     return 0x2a;
 }

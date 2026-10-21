@@ -103,7 +103,8 @@ I64 RegistryRecoveryChecks()
 
 I64 RegistryChecks()
 {
-    if (!sys_registry_doc || sys_registry_doc->mem_task != sys_task ||
+    if (!Bt(&sys_run_level, RLf_REGISTRY) ||
+        !sys_registry_doc || sys_registry_doc->mem_task != sys_task ||
         !DocTreeFind(sys_registry_doc, "System/SysRegVer")) return 1;
     RegWrite("BringUp/Code", "registry_test_value=40;\n");
     if (!RegDefault("BringUp/Code", "registry_test_value=0;\n") ||
@@ -192,8 +193,16 @@ I64 RegistryQueueChecks()
 }
 I64 RegistryRebootChecks()
 {
-    if (registry_test_value != 42 || registry_test_system != 42 ||
-        RegCount("Once/System") > 2 || RegCount("Once/User") > 2) return 1;
+    I64 i;
+    // The serial test shell is independent of the graphical HomeSys terminal.
+    // Let that terminal consume its queued Once include before inspecting the
+    // values written by Once/User and Once/System after a fresh boot.
+    for (i = 0; i < 10000 &&
+         (registry_test_value != 42 || registry_test_system != 42); i++) Yield;
+    if (registry_test_value != 42) return 11;
+    if (registry_test_system != 42) return 12;
+    if (RegCount("Once/System") > 2) return 13;
+    if (RegCount("Once/User") > 2) return 14;
     registry_test_value = 0;
     registry_test_system = 0;
     OnceExe;
