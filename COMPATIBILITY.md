@@ -457,10 +457,9 @@ oracle are needed before broad language compatibility can be claimed.
   suite and focused graphics probe pass. In the refreshed UTM guest, the user
   confirmed that holding Control and scrolling the wheel zooms the desktop
   around the guest pointer. On 2026-10-21, the user also confirmed that
-  `latticeplay` Space draws a visible step and Escape returns to the prompt in
-  UTM. Non-default pan and plain-wheel delivery remain to be checked
-  separately; Lattice color-cycle and Return-reset still need live UTM
-  confirmation.
+  `latticeplay` Space draws a visible step, Escape returns to the prompt, `c`
+  changes the swatches, and Return restarts the drawing/colors in UTM.
+  Non-default pan and plain-wheel delivery remain to be checked separately.
 
 The current boot images are useful delivery artifacts; they are not a finished
 ZealOS live distribution or installer.
@@ -3957,4 +3956,5 @@ deleted afterward. `python3 scripts/check-compat.py --usb-input nec
 --probe-gui-workflow` passed this combined Files/editor/save/reload path and
 the complete graphical workflow on 2026-10-21. It also passed the live Lattice
 color-swatches, restart, and Space-step checks. In UTM, the user confirmed
-Control+scroll zoom, Lattice Space/Escape, and ordinary graphical typing.
+Control+scroll zoom, Lattice Space/Escape, `c` color cycling, Return reset, and
+ordinary graphical typing.

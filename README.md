@@ -211,7 +211,7 @@ paint dots=0x0
 | virtio keyboard + tablet | OK (QEMU/UTM) |
 | native USB keyboard + mouse/tablet | NEC and QEMU xHCI matrices pass USB-only, VirtIO fallback, nested hubs/hotplug; live UTM typing and released-pointer drag accepted |
 | RedSea + freeze `runzc` UseAdd/Notes/MemSort | OK (`make check-serial` / `run-pci`; UTM eyes-on in ACCEPTANCE.md) |
-| Lattice compose (`disklat` / `latticeplay`) | NEC/xHCI live-control regression green (`make check-lattice-controls`); UTM placement/aim/Space/Escape and zoom confirmed, color/restart still need eyes-on |
+| Lattice compose (`disklat` / `latticeplay`) | NEC/xHCI live-control regression green (`make check-lattice-controls`); UTM placement/aim, color/Return restart, Space/Escape, and zoom confirmed |
 
 Window keystrokes (`make run-iso`) and serial both feed the shell. HHDM lacks the virtio-mmio window, so the kernel maps a 2MiB Device block at `0x0a000000` before probing.
 
@@ -244,11 +244,11 @@ Bridge notes: [AIWNIOS.md](AIWNIOS.md). Milestone ladder: [upstream/README.md](u
 
 | Track | Status |
 |--|--|
-| QEMU/UTM virt | **Regression freeze** M33–M39 (`Notes.ZC` / DocLib `#include`) remains the bar — see ACCEPTANCE.md. **Lattice compose and desktop graphics** continued through M309: native input, source window-manager rendering, GUI editor/file services, source graphics primitives, and Ctrl+wheel zoom. Live UTM confirms graphical typing, mouse movement and window drag/resize, OS menu/Files, Lattice launch, pointer placement/aim, Space/Escape, GrBlot3 checks, and pointer-centered Ctrl+wheel zoom. QEMU also checks Lattice color/restart/visible-step controls through NEC/xHCI; color/restart still need live UTM confirmation. Non-default pan/plain-wheel behavior and full ZealOS system/menu startup remain open. |
+| QEMU/UTM virt | **Regression freeze** M33–M39 (`Notes.ZC` / DocLib `#include`) remains the bar — see ACCEPTANCE.md. **Lattice compose and desktop graphics** continued through M309: native input, source window-manager rendering, GUI editor/file services, source graphics primitives, and Ctrl+wheel zoom. Live UTM confirms graphical typing, mouse movement and window drag/resize, OS menu/Files, Lattice launch, pointer placement/aim, color/Return restart, Space/Escape, GrBlot3 checks, and pointer-centered Ctrl+wheel zoom. QEMU also checks Lattice controls through NEC/xHCI. Non-default pan/plain-wheel behavior and full ZealOS system/menu startup remain open. |
 | Pi 4B UEFI | PI-DIAG-1..4 + shell accepted; **physical PCIe discovery accepted (2026-10-20)**: FDT windows, active link, reserved 1 MiB DMA arena, and VL805 `1106:3483` xHCI identity/BAR confirmed by HDMI report. The next diagnostic build temporarily enables PCI memory decoding only, reads xHCI capabilities, restores the command word, and keeps bus mastering off. USB input and UART RX (`uartrx` on USB–TTL @ 115200) remain unproven. No virtio/RedSea disk on Pi yet ([PI4.md](PI4.md)). |
 
 ## Earlier platform follow-ups
 
-1. UTM eyes-on after `make utm`: freeze checklist + `latticeplay` color/restart controls and `stockplay`
+1. UTM eyes-on after `make utm`: freeze checklist and remaining normal ZealOS menu/startup path
 2. Pi: prove UART RX — `uartrx` then `help`/`halt` on USB–TTL @ 115200; then native storage / keyboard path
 3. HCRT host stubs only after IR gap shrinks; DT-based discovery before other ARM64 boards

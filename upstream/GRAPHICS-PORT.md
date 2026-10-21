@@ -221,7 +221,7 @@ active ZealOS globals. The QEMU regression places the pointer at the right edge
 of a 2x view and verifies source pan, velocity decay, and wheel state. Ctrl+wheel
 dispatches to unchanged `GrScaleZoom` after updating the pointer transform, while
 plain wheel remains available to controls. The user confirmed that Ctrl+wheel
-zooms the desktop around the guest pointer in UTM; non-default pan, plain-wheel
+zooms the desktop around the guest pointer in UTM. Non-default pan, plain-wheel
 delivery, and the full input gesture still need UTM acceptance.
 
 ## Remaining graphics path
@@ -253,7 +253,7 @@ replaced with architecture-neutral ZealC.
 | Gap | `GrZoomInScreen` had a direct scaler regression, but the full source compositor/presenter had not been exercised with zoom enabled |
 | Bring-up | Enable 2x on the active source graphics global, run the complete staged frame, and compare selected Limine pixels with the source zoom CDC and palette |
 | Smoke | `GrScreenFinalUpdateChecks` verifies zoomed framebuffer output and restores zoom/pan state |
-| Limits | Live pointer-centered zoom controls, non-default pan, zoom-cache presentation, and view-angle controls remain open |
+| Limits | Pointer-centered Ctrl+wheel zoom is live-UTM confirmed; non-default pan, plain-wheel behavior, zoom-cache presentation, and view-angle controls remain open |
 
 ## Milestone 225 — CDC drawing uses the window cell z-buffer
 
