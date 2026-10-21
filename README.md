@@ -244,7 +244,7 @@ Bridge notes: [AIWNIOS.md](AIWNIOS.md). Milestone ladder: [upstream/README.md](u
 
 | Track | Status |
 |--|--|
-| QEMU/UTM virt | **Regression freeze** M33–M39 (`Notes.ZC` / DocLib `#include`) still the bar — see ACCEPTANCE.md. **Lattice compose** continued on top (M151–M199) + **M200–M206** PL011 RX/`uartrx`, shell idle, depth clear, StockLat NULL, PopUpColor Mid/Edge headers + live titles. Automated QMP tests verify printable keys reach the graphical terminal and native `KeyGet`; the 2026-10-16 UTM check also confirmed the physical keyboard entered and submitted `zstatus` in the graphical terminal. |
+| QEMU/UTM virt | **Regression freeze** M33–M39 (`Notes.ZC` / DocLib `#include`) remains the bar — see ACCEPTANCE.md. **Lattice compose and desktop graphics** continued through M309: native input, source window-manager rendering, GUI editor/file services, source graphics primitives, and Ctrl+wheel zoom. Live UTM confirms graphical typing, mouse movement and window drag/resize, OS menu/Files, Lattice launch/Esc, GrBlot3 checks, and visible Ctrl+wheel zoom. Lattice place/aim/step/restart/colors, pointer-centered zoom/pan, and full ZealOS system/menu startup remain open. |
 | Pi 4B UEFI | PI-DIAG-1..4 + shell accepted; **physical PCIe discovery accepted (2026-10-20)**: FDT windows, active link, reserved 1 MiB DMA arena, and VL805 `1106:3483` xHCI identity/BAR confirmed by HDMI report. The next diagnostic build temporarily enables PCI memory decoding only, reads xHCI capabilities, restores the command word, and keeps bus mastering off. USB input and UART RX (`uartrx` on USB–TTL @ 115200) remain unproven. No virtio/RedSea disk on Pi yet ([PI4.md](PI4.md)). |
 
 ## Earlier platform follow-ups
