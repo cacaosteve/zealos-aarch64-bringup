@@ -2300,7 +2300,10 @@ ZealOS live distribution or installer.
 - `python3 scripts/check-compat.py --pci --probe-gui-workflow` verified the
   native FileMgr heading/tree in the framebuffer and that Escape returns to
   the graphical terminal. The separate native-USB Lattice workflow also
-  passes. A live UTM check of this new FileMgr view remains to be done.
+  passes. In UTM, the user confirmed that Files opens the directory listing
+  and Escape closes it. Opening a file from that listing is still unverified:
+  the automated click-to-open probe faulted in the guest, so that attempted
+  test wiring was reverted and is not counted as a pass.
 
 ## Visible graphical input and persistent editing
 
