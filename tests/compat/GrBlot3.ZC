@@ -1,0 +1,76 @@
+U0 GrBlot3TestTranslate(CDC *dc, I64 *x, I64 *y, I64 *z)
+{
+	*x += 4;
+	*y += 3;
+	*z += 2;
+}
+
+I64 GrBlot3Checks()
+{
+	CDC *img = NULL, *plain = NULL, *depth_dc = NULL;
+	I32 *depth;
+	I64 result = 42;
+	// zreset/module probes may replace the active source `gr` global after
+	// boot-time graphics setup, so restore the packed lookup tables before
+	// exercising the unchanged bitmap routines.
+	GrSetUpTables();
+
+	img = DCNew(8, 2);
+	plain = DCNew(16, 4);
+	depth_dc = DCNew(24, 8);
+	if (!img || !plain || !depth_dc)
+	{
+		result = 1;
+		goto done;
+	}
+	DCFill(img, TRANSPARENT);
+	img->body[0] = 3;
+	img->body[1] = 4;
+	img->body[8] = 5;
+	img->body[9] = TRANSPARENT;
+
+	// With no transform or depth buffer, GrBlot3 must preserve GrBlot's
+	// ordinary clipped 2D copy and transparency behavior.
+	plain->color.c0.rop = ROPB_EQU;
+	if (GrBlot3(plain, 2, 1, 0, img) != 1 ||
+			plain->body[1 * plain->width_internal + 2] != 3 ||
+			plain->body[1 * plain->width_internal + 3] != 4 ||
+			plain->body[2 * plain->width_internal + 2] != 5 ||
+			plain->body[2 * plain->width_internal + 3] != 0)
+	{
+		result = 2;
+		goto done;
+	}
+
+	// A depth-buffered transformed blit must apply the CDC callback to the
+	// image origin, retain indexed pixels, skip transparent pixels, and write
+	// the transformed depth through GrPlot1.
+	depth = DCDepthBufAlloc(depth_dc);
+	if (!depth)
+	{
+		result = 3;
+		goto done;
+	}
+	depth_dc->color.c0.color = 7;
+	depth_dc->color.c0.rop = ROPB_EQU;
+	depth_dc->transform = &GrBlot3TestTranslate;
+	depth_dc->flags |= DCF_TRANSFORMATION;
+	if (GrBlot3(depth_dc, 3, 1, 7, img) != 1 ||
+			depth_dc->body[4 * depth_dc->width_internal + 7] != 3 ||
+			depth_dc->body[4 * depth_dc->width_internal + 8] != 4 ||
+			depth_dc->body[5 * depth_dc->width_internal + 7] != 5 ||
+			depth_dc->body[5 * depth_dc->width_internal + 8] != 0 ||
+			depth[4 * depth_dc->width_internal + 7] != 9 ||
+			depth[4 * depth_dc->width_internal + 8] != 9 ||
+			depth[5 * depth_dc->width_internal + 7] != 9 ||
+			depth[5 * depth_dc->width_internal + 8] != I32_MAX ||
+			depth_dc->color.c0.color != 7 ||
+			depth_dc->color.c0.rop != ROPB_EQU)
+		result = 4;
+
+done:
+	DCDel(depth_dc);
+	DCDel(plain);
+	DCDel(img);
+	return result;
+}

@@ -5,7 +5,7 @@ import re
 import struct
 import sys
 
-from arm64_source import (extract_home_set, extract_home_startup, extract_home_startup_tasks, inject_home_startup_tasks, extract_server_task, extract_user_task, extract_version_scalars, extract_source_prompt, extract_source_training, translate_autocomplete_task, translate_doctree, translate_registry, translate_docterm, translate_doced, translate_docfind, translate_docform, translate_docpopup, translate_grbitmap,
+from arm64_source import (extract_home_set, extract_home_startup, extract_home_startup_tasks, inject_home_startup_tasks, extract_server_task, extract_user_task, extract_version_scalars, extract_source_prompt, extract_source_training, translate_autocomplete_task, translate_doctree, translate_registry, translate_docterm, translate_doced, translate_docfind, translate_docform, translate_docpopup, translate_docrecalc, translate_grbitmap,
                           translate_grdc, translate_grpalette, translate_grscreen, translate_ktask, translate_winmgr, translate_zsplash, translate_home_once)
 
 root = Path(__file__).resolve().parent.parent
@@ -64,6 +64,27 @@ else:
     raise AssertionError('AutoComplete overlay accepted changed choice update')
 doced = (root / 'upstream/pinned/System/DolDoc/DocEd.ZC').read_bytes()
 assert b'", STR_LEN - 1);' in translate_doced(doced)
+
+docrecalc_source = (root / 'upstream/pinned/System/DolDoc/DocRecalc.ZC').read_bytes()
+docrecalc_overlay = translate_docrecalc(docrecalc_source)
+assert docrecalc_overlay != docrecalc_source
+assert docrecalc_overlay.count(b'DCDel(dc);') == docrecalc_source.count(b'DCDel(dc);') + 2
+assert docrecalc_overlay.count(b'Free(depth_buf);') == docrecalc_source.count(b'Free(depth_buf);') + 2
+entry_trim = docrecalc_overlay.index(b'DocDelToEntry')
+entry_cleanup = docrecalc_overlay.index(b'DCDel(dc);', entry_trim)
+entry_recalc = docrecalc_overlay.index(b'DocRecalc(doc, recalc_flags);', entry_trim)
+assert entry_cleanup < entry_recalc
+count_trim = docrecalc_overlay.index(b'DocDelToNum')
+count_cleanup = docrecalc_overlay.index(b'DCDel(dc);', count_trim)
+count_recalc = docrecalc_overlay.index(b'DocRecalc(doc, recalc_flags);', count_trim)
+assert count_cleanup < count_recalc
+try:
+    translate_docrecalc(docrecalc_source.replace(
+        b'DocDelToNum(doc, i);', b'DocDelToNum(doc, i - 1);', 1))
+except ValueError:
+    pass
+else:
+    raise AssertionError('DocRecalc overlay accepted a changed trim path')
 source = (root / 'upstream/pinned/System/Gr/GrScreen.ZC').read_bytes()
 translated = translate_grscreen(source)
 text = translated.decode('utf-8')

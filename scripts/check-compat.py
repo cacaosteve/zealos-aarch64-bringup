@@ -90,6 +90,8 @@ p.add_argument('--probe-task-jobs', action='store_true', help='check CPU-0 callb
 p.add_argument('--probe-window-buttons', action='store_true', help='check live task-window title buttons in a disposable guest')
 p.add_argument('--probe-graphics-palette', action='store_true',
                help='verify indexed graphics drawing follows the active ZealOS palette')
+p.add_argument('--probe-grblot3', action='store_true',
+               help='check the boot-loaded 3D bitmap blit path before window-demo stress tests')
 p.add_argument('--probe-source', type=pathlib.Path, action='append',
                help='load a host source file from the disposable PCI source partition')
 p.add_argument('--probe-source-call',
@@ -122,6 +124,8 @@ if args.probe_source and not args.pci:
     p.error('--probe-source requires --pci')
 if args.probe_graphics_palette and not args.pci:
     p.error('--probe-graphics-palette requires --pci')
+if args.probe_grblot3 and not args.pci:
+    p.error('--probe-grblot3 requires --pci')
 if args.probe_home_autostart and not args.pci:
     p.error('--probe-home-autostart requires --pci')
 if args.probe_source_editor and not args.pci:
@@ -156,6 +160,7 @@ if args.probe_live_window_control and not (
 if args.probe_dvd_live and args.pci:
     p.error('--probe-dvd-live requires ISO boot, not --pci')
 log_path = ROOT / 'build' / (f'check-usb-{usb_label}{"-windowdemo-input" if args.probe_gui_windowdemo_input else "-home-once" if args.probe_home_once else "-input-edges" if args.probe_input_edges else "-registry" if args.probe_registry else "-home-path" if args.probe_home_path else "-user-text" if args.probe_user_text else "-user-startup" if args.probe_user_startup else ""}.log' if args.usb_input else
+                             'check-grblot3-pci.log' if args.probe_grblot3 else
                              'check-home-once-pci.log' if args.probe_home_once and args.pci else
                              'check-home-once-iso.log' if args.probe_home_once else
                              'check-dvd-live.log' if args.probe_dvd_live else
@@ -932,6 +937,25 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         if int(scanout.group(1)) < 1000:
             raise RuntimeError('boot graphical terminal is not painting visible pixels:\n' + desktop)
         print('PASS boot graphical terminal window and framebuffer diagnostics', flush=True)
+        if args.probe_grblot3:
+            command('zload /Tests/GrBlot3.ZC',
+                    'zc: loaded /Tests/GrBlot3.ZC')
+            heap_pattern = r'data=([0-9]+)/[0-9]+ code=([0-9]+)/[0-9]+ allocations=([0-9]+)'
+            before = command('zstatus', 'failed=0')
+            before_usage = re.search(heap_pattern, before).groups()
+            for _ in range(3):
+                command('zcall GrBlot3Checks',
+                        'zc => 0x000000000000002a', timeout=30)
+            after = command('zstatus', 'failed=0')
+            after_usage = re.search(heap_pattern, after).groups()
+            if any(int(end) > int(start) + 4096
+                   for start, end in zip(before_usage, after_usage)):
+                raise RuntimeError('repeated GrBlot3 calls leaked compiler arena: '
+                                   f'{before_usage} -> {after_usage}')
+            print('PASS boot-loaded GrBlot3 transparent, transformed and depth-buffer paths; '
+                  f'no arena growth ({before_usage} -> {after_usage})',
+                  flush=True)
+            raise SystemExit(0)
         if args.probe_graphics_palette:
             command('zload /Tests/GrSpriteBridge.ZC',
                     'zc: loaded /Tests/GrSpriteBridge.ZC')
@@ -2886,6 +2910,12 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                             'zc => 0x000000000000002a')
                 command('zload /System/Gr/GrBitMap.ZC',
                         'zc: loaded /System/Gr/GrBitMap.ZC', timeout=30)
+                command('zload /System/Gr/GrBlot3.ZC',
+                        'zc: loaded /System/Gr/GrBlot3.ZC', timeout=30)
+                command('zload /Tests/GrBlot3.ZC',
+                        'zc: loaded /Tests/GrBlot3.ZC')
+                command('zcall GrBlot3Checks',
+                        'zc => 0x000000000000002a', timeout=30)
                 command('zload /Tests/GrDCLifecycle.ZC',
                         'zc: loaded /Tests/GrDCLifecycle.ZC')
                 command('zcall GrDCExtClipChecks',

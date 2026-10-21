@@ -634,6 +634,37 @@ def translate_grdc(source: bytes) -> bytes:
     return source.replace(old, b'\tres->width_internal\t= (width + 7) & ~7;', 1)
 
 
+def translate_docrecalc(source: bytes) -> bytes:
+    """Release per-frame depth buffers before recursive document trimming.
+
+    The pinned full-refresh path recursively recalculates after deleting old
+    entries. A mesh sprite allocates a screen-sized depth buffer in each
+    frame, so retaining those locals until recursion unwinds can exhaust the
+    bounded guest heap. Keep the upstream redraw and trim order, but release
+    each completed frame's CDC and depth buffer before descending.
+    """
+    try:
+        text = source.decode('utf-8')
+    except UnicodeDecodeError as exc:
+        raise ValueError('DocRecalc.ZC is not UTF-8') from exc
+    anchors = (
+        ('\t\t\tDocDelToEntry(doc, next_clear_found, clear_holds);\n'
+         '\t\t\tDocRecalc(doc, recalc_flags);'),
+        ('\t\t\tDocDelToNum(doc, i);\n'
+         '\t\t\tDocRecalc(doc, recalc_flags);'),
+    )
+    if any(text.count(anchor) != 1 for anchor in anchors):
+        raise ValueError('expected both pinned recursive DocRecalc trim paths')
+    cleanup = ('\t\t\tDCDel(dc);\n'
+               '\t\t\tdc = NULL;\n'
+               '\t\t\tFree(depth_buf);\n'
+               '\t\t\tdepth_buf = NULL;\n')
+    for anchor, trim in zip(anchors, ('DocDelToEntry', 'DocDelToNum')):
+        before, recurse = anchor.split('\n', 1)
+        text = text.replace(anchor, before + '\n' + cleanup + recurse, 1)
+    return text.encode('utf-8')
+
+
 def translate_grbitmap(source: bytes) -> bytes:
     """Extract regular CDC rectangles without negative-destination blitting.
 

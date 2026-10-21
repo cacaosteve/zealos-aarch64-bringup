@@ -6451,6 +6451,7 @@ int zc_start_graphics(void) {
         "/System/Gr/GrPalette.ZC",
         "/System/Gr/GrDC.ZC",
         "/System/Gr/GrBitMap.ZC",
+        "/System/Gr/GrBlot3.ZC",
         "/System/Menu.ZC",
         "/System/Win.ZC",
         "/System/WinMgr.ZC",
