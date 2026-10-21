@@ -544,6 +544,11 @@ check-usb-hid: | $(BUILD)
 	$(HOST_CC) -std=c11 -Wall -Wextra -fsanitize=address,undefined tests/usb_hid_test.c -o $(BUILD)/usb-hid-test
 	$(BUILD)/usb-hid-test
 
+.PHONY: check-lattice-controls
+check-lattice-controls: check-upstream esp
+	python3 scripts/check-arm64-source.py
+	python3 scripts/check-compat.py --usb-input nec --probe-lattice-controls
+
 check-usb-route: | $(BUILD)
 	$(HOST_CC) -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined tests/usb_route_test.c -o $(BUILD)/usb-route-test
 	$(BUILD)/usb-route-test

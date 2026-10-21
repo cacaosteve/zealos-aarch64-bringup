@@ -485,7 +485,8 @@ the pseudo-TTY path changes.
 - M153: after `disklat` / `nearlatticelite`, FB should clear (no leftover HUD/`Width:nan` soup); `>` on clean surface.
 - M154: Lattice idle — empty MessageGet no longer aborts the demo early; scripted ESC still ends the smoke.
 - M155: `latticeplay` — live Lattice on UTM (tablet/keys); Esc to exit. `disklat` remains the scripted smoke.
-- Live UTM check (2026-10-20): after restoring normal zoom, `latticeplay` responded to Space with a drawn step and Escape returned to the prompt. This confirms the live step/exit keys; place, aim, restart, and color-cycle controls remain to be checked.
+- Live UTM check (2026-10-20): after restoring normal zoom, `latticeplay` responded to Space with a drawn step and Escape returned to the prompt. This confirms the live step/exit keys; place, aim, restart, and color-cycle controls remain to be checked in UTM.
+- Automated NEC/xHCI GUI regression (`make check-lattice-controls`, 2026-10-21): live pointer left-click places the head, right-drag changes its heading, `c` updates Mid/Edge swatches, Enter restores the initial pose/colors, widened Space leaves a visible stroke, and Escape restores the terminal. This proves the QEMU event/render path; UTM place/aim/restart/colors remain eyes-on.
 - M156: compose *Lites (Demo/Frame/Live/Play/Wrap) idle like Lattice on empty MessageGet.
 - M157: after `disklat` / `latticeplay` / etc., shell restores dark FB before `ok` (not pure black from DCFill).
 - M158: in `latticeplay`, Enter restarts (virtio Enter maps to `\n` like Lattice Restart).
@@ -537,7 +538,7 @@ the pseudo-TTY path changes.
 - M204: `PopUpColor` uses `"Mid…"` / `"Edge…"` header strings (g_hc_mem); Edge-first smoke → BLACK; Mid → YELLOW.
 - M205: live `PopUpColor` paints the header first word above the Mid/Edge swatch (eyes-on `'c'` cue).
 - M206: Mid/Edge header words persist across Refresh (`paint_swatch` / `paint_live`); cleared on Restart/`hc_run`.
-- **Scope:** QEMU/`disklat`/`LatticePlay` exercise DiskLat-shaped compose source, **not** stock ZealOS `Demo/Graphics/Lattice.ZC` with original behavior. Live `stockplay` softens idle DrawIt (M193–M194) but still ≠ DiskLat/latticeplay. Place/aim/step/restart/colors need an eyes-on UTM pass after `make utm`.
+- **Scope:** QEMU/`disklat`/`LatticePlay` exercise DiskLat-shaped compose source, **not** stock ZealOS `Demo/Graphics/Lattice.ZC` with original behavior. Live `stockplay` softens idle DrawIt (M193–M194) but still ≠ DiskLat/latticeplay. UTM has eyes-on Space/Escape and zoom confirmation; place/aim/restart/colors still need an eyes-on UTM pass after `make utm`.
 - Freeze checklist still: `vblk`, `rspersist`, `rscatalog`, `runzc` UseAdd/Notes/MemSort (same as QEMU `run-pci`).
 
 ## Notes

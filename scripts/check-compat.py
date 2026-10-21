@@ -28,6 +28,8 @@ p.add_argument('--probe-gui-keyboard', action='store_true',
                help='inject printable virtio keys and verify the boot graphical terminal receives them')
 p.add_argument('--probe-gui-workflow', action='store_true',
                help='verify visible graphical editing, save/compile/run, and reopen after reboot')
+p.add_argument('--probe-lattice-controls', action='store_true',
+               help='check live Lattice mouse placement/aim, colors, restart, and Space in the GUI')
 p.add_argument('--probe-gui-windowdemo-input', action='store_true',
                help='isolate graphical terminal input/display across a windowdemo stop')
 p.add_argument('--probe-task-settings', action='store_true',
@@ -112,6 +114,8 @@ usb_label = (f'{args.usb_input}-{args.usb_pointer}' +
              ('-hotplug' if args.usb_hotplug else '')) if args.usb_input else None
 if args.probe_gui_workflow:
     args.probe_gui_keyboard = True
+if args.probe_lattice_controls:
+    args.probe_gui_keyboard = True
 if args.probe_gui_windowdemo_input:
     args.probe_gui_keyboard = True
 if args.probe_input_edges:
@@ -137,6 +141,8 @@ if args.probe_gui_terminal and (
     p.error('--probe-gui-terminal requires --pci --probe-module /System/DolDoc/DocRecalc.ZC')
 if args.probe_gui_keyboard and not args.pci:
     p.error('--probe-gui-keyboard requires --pci')
+if args.probe_lattice_controls and not args.pci:
+    p.error('--probe-lattice-controls requires --pci')
 if args.probe_gui_windowdemo_input and not args.pci:
     p.error('--probe-gui-windowdemo-input requires --pci')
 if args.probe_grscreen and not args.probe_winmgr:
@@ -159,7 +165,7 @@ if args.probe_live_window_control and not (
             '--probe-winmgr --probe-grscreen --probe-live-winmgr')
 if args.probe_dvd_live and args.pci:
     p.error('--probe-dvd-live requires ISO boot, not --pci')
-log_path = ROOT / 'build' / (f'check-usb-{usb_label}{"-windowdemo-input" if args.probe_gui_windowdemo_input else "-home-once" if args.probe_home_once else "-input-edges" if args.probe_input_edges else "-registry" if args.probe_registry else "-home-path" if args.probe_home_path else "-user-text" if args.probe_user_text else "-user-startup" if args.probe_user_startup else ""}.log' if args.usb_input else
+log_path = ROOT / 'build' / (f'check-usb-{usb_label}{"-lattice-controls" if args.probe_lattice_controls else "-windowdemo-input" if args.probe_gui_windowdemo_input else "-home-once" if args.probe_home_once else "-input-edges" if args.probe_input_edges else "-registry" if args.probe_registry else "-home-path" if args.probe_home_path else "-user-text" if args.probe_user_text else "-user-startup" if args.probe_user_startup else ""}.log' if args.usb_input else
                              'check-grblot3-pci.log' if args.probe_grblot3 else
                              'check-home-once-pci.log' if args.probe_home_once and args.pci else
                              'check-home-once-iso.log' if args.probe_home_once else
@@ -176,6 +182,7 @@ log_path = ROOT / 'build' / (f'check-usb-{usb_label}{"-windowdemo-input" if args
                              'check-user-startup-pci.log' if args.probe_user_startup and args.pci else
                              'check-user-startup-iso.log' if args.probe_user_startup else
                              'check-gui-workflow.log' if args.probe_gui_workflow else
+                             'check-lattice-controls-pci.log' if args.probe_lattice_controls else
                              'check-live-window-control.log' if args.probe_live_window_control else
                              'check-graphics-palette.log' if args.probe_graphics_palette else
                              'check-window-buttons.log' if args.probe_window_buttons else
@@ -429,6 +436,14 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         color = bytes(rgb)
         return sum(pixels[(y*width+x)*3:(y*width+x)*3+3] == color
                    for y in range(top, bottom) for x in range(left, right))
+    def rgb_coordinates_in(screen, rgb, bounds):
+        width, height, pixels, _ = screen
+        left, top, right, bottom = bounds
+        left, right = max(0, left), min(width, right)
+        top, bottom = max(0, top), min(height, bottom)
+        color = bytes(rgb)
+        return {(x, y) for y in range(top, bottom) for x in range(left, right)
+                if pixels[(y*width+x)*3:(y*width+x)*3+3] == color}
     def graphical_ascii_glyph_matches(screen, x, y, ch, rgb):
         width, height, pixels, _ = screen
         glyphs = re.findall(r'/\*.*?\*/\s*\{([^}]+)\}',
@@ -564,6 +579,9 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         qmp_command('input-send-event', {'events': [
             {'type': 'abs', 'data': {'axis': 'x', 'value': round(x*32767/799)}},
             {'type': 'abs', 'data': {'axis': 'y', 'value': round(y*32767/599)}}]})
+    def graphical_mouse_button(button, down):
+        qmp_command('input-send-event', {'events': [
+            {'type': 'btn', 'data': {'down': down, 'button': button}}]})
     def select_os_menu_row(name, row_index):
         # Press on the OS title, drag to a submenu row, and release, matching
         # the native WinMgr menu gesture instead of calling the action bridge.
@@ -788,6 +806,98 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             # rate; QMP acknowledges injection before the source task consumes
             # each event, and an early Return can otherwise overtake the tail.
             time.sleep(max(0, delay - (time.monotonic() - started)))
+    def exercise_live_lattice_controls():
+        # This runs while the graphical demo owns the guest event loop, so use
+        # QMP directly; qmp_send_text also probes the serial shell for splash
+        # state and would block until Lattice exits.
+        head_box = (150, 190, 171, 211)
+        move_graphical_pointer(160, 200)
+        graphical_mouse_button('left', True)
+        time.sleep(0.1)
+        graphical_mouse_button('left', False)
+        place_deadline = time.monotonic() + 5
+        while True:
+            placed = graphical_screen('lattice-live-place')
+            placed_head = rgb_coordinates_in(placed, (255, 85, 85), head_box)
+            if len(placed_head) >= 5:
+                break
+            if time.monotonic() >= place_deadline:
+                raise RuntimeError('Lattice left-click did not place its red head:\n' +
+                                   placed[3])
+            time.sleep(0.1)
+        move_graphical_pointer(160, 200)
+        graphical_mouse_button('right', True)
+        time.sleep(0.1)
+        move_graphical_pointer(160, 240)
+        time.sleep(0.1)
+        graphical_mouse_button('right', False)
+        aim_deadline = time.monotonic() + 5
+        while True:
+            aimed = graphical_screen('lattice-live-aim')
+            aimed_head = rgb_coordinates_in(aimed, (255, 85, 85), head_box)
+            if len(aimed_head) >= 5 and aimed_head != placed_head:
+                break
+            if time.monotonic() >= aim_deadline:
+                raise RuntimeError('Lattice right-drag did not rotate its red head')
+            time.sleep(0.1)
+        print('PASS live Lattice left-click placement and right-drag aim', flush=True)
+
+        # The bring-up picker cycles a deterministic palette pair per `c`;
+        # verify the visible Mid/Edge swatches after the second pair.
+        qmp_send_key('c')
+        qmp_send_key('c')
+        color_deadline = time.monotonic() + 5
+        while True:
+            colors = graphical_screen('lattice-live-colors')
+            mid_red = rgb_pixels_in(colors, (170, 0, 0),
+                                    (10, colors[1]-26, 62, colors[1]-10))
+            edge_white = rgb_pixels_in(colors, (255, 255, 255),
+                                       (74, colors[1]-26, 126, colors[1]-10))
+            if mid_red >= 100 and edge_white >= 100:
+                break
+            if time.monotonic() >= color_deadline:
+                raise RuntimeError('Lattice color key did not update Mid/Edge swatches')
+            time.sleep(0.1)
+        print('PASS live Lattice color key updates both visible swatches', flush=True)
+
+        # Enter clears old strokes and restores the centered default turtle.
+        qmp_send_key('ret')
+        restart_deadline = time.monotonic() + 5
+        while True:
+            restarted = graphical_screen('lattice-live-restart')
+            center_head = rgb_coordinates_in(
+                restarted, (255, 85, 85),
+                (restarted[0]//2-10, restarted[1]//2-10,
+                 restarted[0]//2+11, restarted[1]//2+11))
+            reset_mid = rgb_pixels_in(restarted, (255, 255, 85),
+                                      (10, restarted[1]-26,
+                                       62, restarted[1]-10))
+            if len(center_head) >= 5 and reset_mid >= 100:
+                break
+            if time.monotonic() >= restart_deadline:
+                raise RuntimeError('Lattice Enter did not restore its initial pose/colors')
+            time.sleep(0.1)
+
+        # Width zero plots the black edge over its centerline. Widen to two
+        # pixels and raise speed once so Space produces visible color pixels.
+        qmp_send_keys(['shift', 'equal'])
+        qmp_send_keys(['shift', 'equal'])
+        qmp_send_key('up')
+        qmp_send_key('spc')
+        step_deadline = time.monotonic() + 5
+        while True:
+            stepped = graphical_screen('lattice-live-space-step')
+            step_yellow = rgb_pixels_in(
+                stepped, (255, 255, 85),
+                (stepped[0]//2-2, stepped[1]//2-4,
+                 stepped[0]//2+8, stepped[1]//2+5))
+            if step_yellow:
+                break
+            if time.monotonic() >= step_deadline:
+                raise RuntimeError('Lattice Space did not leave a visible step mark')
+            time.sleep(0.1)
+        print('PASS live Lattice restart and visible Space step', flush=True)
+
     def checked_put_key():
         command('zload /Tests/TaskPutKey.ZC', 'zc: loaded /Tests/TaskPutKey.ZC')
         result = command('zcall TaskPutKeyChecks', 'zc => 0x000000000000002a')
@@ -937,6 +1047,23 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         if int(scanout.group(1)) < 1000:
             raise RuntimeError('boot graphical terminal is not painting visible pixels:\n' + desktop)
         print('PASS boot graphical terminal window and framebuffer diagnostics', flush=True)
+        if args.probe_lattice_controls:
+            focus_graphical_terminal()
+            qmp_send_text('latticeplay')
+            qmp_send_key('ret')
+            require_graphical_text('lattice-live-hud', 'Layer:', timeout=10,
+                                   foreground_threshold=215000,
+                                   scanline_offset=0)
+            exercise_live_lattice_controls()
+            qmp_send_key('esc')
+            require_graphical_text('lattice-returns-to-terminal',
+                                   'latticeplay ok', timeout=10)
+            recovered = command('zstatus', 'failed=0')
+            if 'gterm=1' not in recovered:
+                raise RuntimeError('Lattice Escape did not restore the graphical terminal:\n' +
+                                   recovered)
+            print('PASS focused live Lattice controls and Escape recovery', flush=True)
+            raise SystemExit(0)
         if args.probe_grblot3:
             command('zload /Tests/GrBlot3.ZC',
                     'zc: loaded /Tests/GrBlot3.ZC')
@@ -2430,6 +2557,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     require_graphical_text(demo+'-live-hud', 'Layer:', timeout=10,
                                            foreground_threshold=215000,
                                            scanline_offset=0)
+                    if demo == 'latticeplay':
+                        exercise_live_lattice_controls()
                     qmp_send_key('esc')
                     require_graphical_text(demo+'-returns-to-terminal',
                                            demo+' ok', timeout=10)
