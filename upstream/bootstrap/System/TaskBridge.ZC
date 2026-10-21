@@ -3229,27 +3229,27 @@ Bool WinInside(I64 x, I64 y, CTask *task=NULL, I64 border=0)
     }
     return FALSE;
 }
-Bool GrPlot(CDC *dc=gr.dc, I64 x=0, I64 y=0)
-{
+Bool BootstrapGraphPixel(CDC *dc, I64 x, I64 y)
+{//Write task graphics into the indexed compositor bitmap before scanout.
     CTask *task;
-    I64 left, top, right, bottom, task_z;
-    I64 color;
-    if (!dc)
+    I64 left, top, right, bottom, color;
+    if (!dc || !dc->body || !(dc->flags & DCF_SCREEN_BITMAP))
         return FALSE;
     task = dc->win_task;
-    task_z = 0;
-    if ((dc->flags & DCF_SCREEN_BITMAP) && !(dc->flags & DCF_ON_TOP))
+    if (!(dc->flags & DCF_ON_TOP))
     {
         if (!task)
             return FALSE;
         WinDerivedValsUpdate(task);
-        task_z = BootstrapTaskZ(task);
         left = task->pix_left;
         top = task->pix_top;
         right = task->pix_right;
         bottom = task->pix_bottom;
         x += left + task->scroll_x;
         y += top + task->scroll_y;
+        if (!BootstrapWinTextCellVisible(task, x / FONT_WIDTH,
+                                         y / FONT_HEIGHT))
+            return FALSE;
     }
     else
     {
@@ -3257,13 +3257,19 @@ Bool GrPlot(CDC *dc=gr.dc, I64 x=0, I64 y=0)
         right = dc->width - 1;
         bottom = dc->height - 1;
     }
+    if (x < left || x > right || y < top || y > bottom ||
+        x < 0 || x >= dc->width_internal || y < 0 || y >= dc->height)
+        return FALSE;
     color = dc->color.c0 & 0xff;
-    // Match upstream GrPlot0's checkerboard DITHER mode. Probability
-    // dithering remains a separate unsupported path in this framebuffer
-    // bridge; sprite dither-color records use the deterministic flag.
+    // Preserve GrPlot0's deterministic checkerboard dither variant.
     if ((dc->color.c1.rop & 0x40) && ((x ^ y) & 1))
         color = dc->color.c1 & 0xff;
-    return ZcFbGraphPlot(x, y, color, left, top, right, bottom, task_z);
+    dc->body[y * dc->width_internal + x] = color;
+    return TRUE;
+}
+Bool GrPlot(CDC *dc=gr.dc, I64 x=0, I64 y=0)
+{
+    return BootstrapGraphPixel(dc, x, y);
 }
 I64 bootstrap_mouse_draw_calls = 0;
 U0 BootstrapDrawMouse(CDC *dc, I64 x, I64 y)
@@ -3304,17 +3310,17 @@ U0 BootstrapDrawMouse(CDC *dc, I64 x, I64 y)
 Bool GrRect(CDC *dc=gr.dc, I64 x=0, I64 y=0, I64 width=0, I64 height=0)
 {
     CTask *task;
-    I64 left, top, right, bottom, task_z;
-    if (!dc || width <= 0 || height <= 0)
+    I64 left, top, right, bottom, x0, y0, x1, y1, px, py, color;
+    Bool plotted = FALSE;
+    if (!dc || !dc->body || !(dc->flags & DCF_SCREEN_BITMAP) ||
+        width <= 0 || height <= 0 || width > 16384 || height > 16384)
         return FALSE;
     task = dc->win_task;
-    task_z = 0;
-    if ((dc->flags & DCF_SCREEN_BITMAP) && !(dc->flags & DCF_ON_TOP))
+    if (!(dc->flags & DCF_ON_TOP))
     {
         if (!task)
             return FALSE;
         WinDerivedValsUpdate(task);
-        task_z = BootstrapTaskZ(task);
         left = task->pix_left;
         top = task->pix_top;
         right = task->pix_right;
@@ -3328,8 +3334,35 @@ Bool GrRect(CDC *dc=gr.dc, I64 x=0, I64 y=0, I64 width=0, I64 height=0)
         right = dc->width - 1;
         bottom = dc->height - 1;
     }
-    return ZcFbGraphRect(x, y, width, height, dc->color.c0 & 0xff,
-                         left, top, right, bottom, task_z);
+    x0 = x;
+    y0 = y;
+    if (x0 < left) x0 = left;
+    if (y0 < top) y0 = top;
+    x1 = x + width - 1;
+    y1 = y + height - 1;
+    if (x0 < 0) x0 = 0;
+    if (y0 < 0) y0 = 0;
+    if (x1 > right) x1 = right;
+    if (y1 > bottom) y1 = bottom;
+    if (x1 >= dc->width_internal) x1 = dc->width_internal - 1;
+    if (y1 >= dc->height) y1 = dc->height - 1;
+    if (x0 > x1 || y0 > y1)
+        return FALSE;
+    for (py = y0; py <= y1; py++)
+        for (px = x0; px <= x1; px++)
+        {
+            if (!task || (dc->flags & DCF_ON_TOP) ||
+                BootstrapWinTextCellVisible(task, px / FONT_WIDTH,
+                                            py / FONT_HEIGHT))
+            {
+                color = dc->color.c0 & 0xff;
+                if ((dc->color.c1.rop & 0x40) && ((px ^ py) & 1))
+                    color = dc->color.c1 & 0xff;
+                dc->body[py * dc->width_internal + px] = color;
+                plotted = TRUE;
+            }
+        }
+    return plotted;
 }
 U0 GrPrint(CDC *dc=gr.dc, I64 x=0, I64 y=0, U8 *format, ...)
 {

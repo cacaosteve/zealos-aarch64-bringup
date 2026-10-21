@@ -230,7 +230,7 @@ I64 WindowDragLiveBasicRenderChecks()
 
 I64 WindowDragLiveRenderChecks()
 {//Require stable overlap pixels across consecutive presented task frames.
-    I64 x, y, px, py, found, b_is_front, i;
+    I64 x, y, px, py, found, b_is_front, i, pixel_x, pixel_y;
     if (!TaskValidate(window_drag_live_a) || !TaskValidate(window_drag_live_b))
         return 1;
     if (window_drag_live_a->win_left != 15 ||
@@ -252,13 +252,13 @@ I64 WindowDragLiveRenderChecks()
         return 15;
     b_is_front = window_drag_live_b->win_z_num >
                  window_drag_live_a->win_z_num;
-    window_drag_live_presented_pixel = ZcFbTextPixel(
-        window_drag_live_b->pix_left + window_drag_live_right_control.left +
-            (window_drag_live_right_control.right -
-             window_drag_live_right_control.left) / 2,
-        window_drag_live_b->pix_top + window_drag_live_right_control.top +
-            (window_drag_live_right_control.bottom -
-             window_drag_live_right_control.top) / 2);
+    pixel_x = window_drag_live_b->pix_left + window_drag_live_right_control.left +
+              (window_drag_live_right_control.right -
+               window_drag_live_right_control.left) / 2;
+    // Sample the first pixel row inside the control. Its vertical center was
+    // landing in the unrelated Server window's z-buffer cell at row 23.
+    pixel_y = window_drag_live_b->pix_top + window_drag_live_right_control.top + 1;
+    window_drag_live_presented_pixel = ZcFbTextPixel(pixel_x, pixel_y);
     // A clean visible frame does not have to rerun unchanged source callbacks.
     // BasicRenderChecks separately exercises each callback directly.
     if (!window_drag_live_draw_a_count)
@@ -270,14 +270,18 @@ I64 WindowDragLiveRenderChecks()
     if (!window_drag_live_control_dc_matches)
         return 7;
     // The Server task's window covers the lower half of this A/B overlap;
-    // sample the upper overlap row where no unrelated window is occluding it.
+    // sample the control's upper row where no unrelated window is occluding it.
     if (BootstrapWinTextCellVisible(window_drag_live_b, 49, 22) != b_is_front)
         return 24;
     if ((b_is_front && window_drag_live_presented_pixel != 0x00FFFF55) ||
         (!b_is_front && window_drag_live_presented_pixel != 0))
     {
-        Print("window overlap: front=%d pixel=%X\n", b_is_front,
-            window_drag_live_presented_pixel);
+        Print("window overlap: front=%d pixel=%X at %d,%d cell-visible=%d z=%d\n",
+            b_is_front, window_drag_live_presented_pixel, pixel_x, pixel_y,
+            BootstrapWinTextCellVisible(window_drag_live_b,
+                                        pixel_x / FONT_WIDTH,
+                                        pixel_y / FONT_HEIGHT),
+            window_drag_live_b->win_z_num);
         return 9;
     }
     // The original UTM symptom was intermittent black/yellow alternation in
@@ -293,9 +297,7 @@ I64 WindowDragLiveRenderChecks()
                 (window_drag_live_right_control.right -
                  window_drag_live_right_control.left) / 2,
             window_drag_live_b->pix_top +
-                window_drag_live_right_control.top +
-                (window_drag_live_right_control.bottom -
-                 window_drag_live_right_control.top) / 2);
+                window_drag_live_right_control.top + 1);
         if (b_is_front && window_drag_live_presented_pixel != 0x00FFFF55)
             return 26;
         if (!b_is_front && window_drag_live_presented_pixel != 0)

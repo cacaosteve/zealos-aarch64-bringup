@@ -717,3 +717,15 @@ The refreshed live graphical window also passed desktop checks for visible
 with UTM capture released. The user then physically typed `help` without first
 tapping Shift and confirmed normal lowercase typing and successful execution.
 This completes the refreshed-session physical typing gate.
+
+2026-10-21: the live source Window Manager had been drawing task-window
+`GrPlot`/`GrRect` output straight to scanout, where staged RGBA presentation
+could overwrite it. These primitives now draw into the indexed compositor
+bitmap and apply current window-cell visibility. `make check-window-buttons`
+passes the stable overlap-pixel assertion across repeated frames, and
+`make check-lattice-controls` still passes with native NEC USB keyboard, mouse,
+tablet, Space and Escape. The `ZealosAarch64Hello` UTM disk was refreshed from
+this tested build; the installer verified the EFI image and preserved the
+RedSea/source partitions and VM settings. The full pre-refresh backup is at
+`build/utm-before-20261021-054447`. A physical UTM check of the window control's
+plain-wheel swatch remains pending.
