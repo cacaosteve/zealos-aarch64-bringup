@@ -17,7 +17,7 @@ Native firmware+DTB is a fallback only if UEFI on the board is unusable.
 | Track | Goal |
 |--|--|
 | **UTM / QEMU virt** | ZealOS *compatibility* ladder (HolyC, RedSea, Lattice compose through M199; M200–M206 PL011 RX, shell idle, depth clear, StockLat NULL, PopUpColor headers/titles). M33–M39 freeze bar + eyes-on Lattice notes in ACCEPTANCE.md. Not “full ZealOS” yet; `latticeplay` (DiskLat) ≠ `stockplay` (StockLat body, soft HeadMark DrawIt); `stocklat` = scripted StockLat. |
-| **Pi 4B UEFI** | First *physical* platform: boot/timer/IRQ + FB shell **reached**; M200 `uartrx` / RX prep for USB-TTL @ 115200; then SD/USB/GPU. |
+| **Pi 4B UEFI** | Physical boot/timer/IRQ/FB shell reached; FDT/PCIe discovery and VL805 identity **accepted**. Next: hardware UART RX, then guarded xHCI bring-up and HID. |
 
 Virtio drivers do **not** apply on the Pi. Need BCM2711 UART, GICv2, and later SD/display.
 
@@ -126,33 +126,30 @@ the PCI memory aperture, the 3 GiB DMA aperture, disabled-node handling, and
 truncated-FDT rejection (`make check-pi4-pcie-fdt`), plus reservation bounds,
 bus-address translation, memory-map splitting, and capacity (`make check-pi4-dma`,
 or both together with `make check-pi4-platform`).
-These are parser/allocator checks; the actual card DTB handoff and resulting
-reservation still need an eyes-on Pi run.
+These parser/allocator checks are complemented by the physical Pi report below,
+which confirms the actual FDT handoff and reserved arena.
 
 The current Pi Limine entry explicitly loads `bcm2711-rpi-4-b.dtb` from the SD
-root. This avoids depending on whether the UEFI firmware publishes the same
-tree through its EFI configuration table. The HDMI report now distinguishes a
-missing Limine response, invalid pointer/magic/size, a missing BCM2711 PCIe node,
-and parser errors. The card's DTB was parsed on the host with the current parser:
-it contains the expected PCIe node and translates to register base `0xfd500000`,
-memory window `0xc0000000` → `0x600000000` (1 GiB), and a 3 GiB DMA aperture.
-The next Pi boot must confirm that Limine can load this root-level DTB and that
-the updated report shows its decoded values.
+root, rather than relying on UEFI to publish the same tree through its EFI
+configuration table. The HDMI report distinguishes a missing Limine response,
+invalid pointer/magic/size, missing PCIe node, and parser errors.
 
-The user-provided Pi HDMI photo from 2026-10-20 shows zero PCIe register,
-memory-window, and DMA-window values, zero link status, and `PCI config read not
-attempted`; the diagnostic correctly kept bus mastering and xHCI off. That
-photo predates the latest staged image, which also prints the FDT response
-status, so it does not yet distinguish a missing/invalid Limine DTB response
-from a parser result. Boot the freshly staged `build/pi-esp` payload before
-choosing a PCIe fix; the next useful evidence is the `PI4 FDT status=` line and
-the `FDT flags=` line together.
+**Physical PCIe discovery accepted (2026-10-20):** the Pi 4B HDMI report shows
+`FDT status=ok`, flags `0x1f`, register window `0xfd500000+0x9310`, PCI memory
+window bus `0xc0000000` → CPU `0x600000000` (1 GiB), and DMA window
+CPU/bus `0` with size `0xc0000000` (3 GiB). The 1 MiB DMA arena is reserved at
+CPU/bus address `0x04000000`. Link status `0xb0` has both PHY-link-up and
+Data-Link-active bits set. Read-only config access finds PCI `01:00.0` ID
+`1106:3483` (VIA Labs VL805), class `0x0c0330` (xHCI), revision 1, with BAR0
+`0xf8000004`. The command register remains zero, so memory decoding and bus
+mastering are disabled; the diagnostic explicitly leaves xHCI off. This accepts
+FDT translation, DMA reservation, link gating, and endpoint identity on the
+physical Pi. It does not yet show USB device enumeration or keyboard/mouse input.
 
-For the first physical check, use a prepared microSD card, a suitable Pi 4
-power supply, and HDMI to read the report; no serial adapter is needed just to
-confirm the FDT values and reserved arena. For interactive UART input/logs,
-connect a USB-to-3.3 V TTL adapter to the Mac and cross its RX/TX with Pi GPIO
-14/15, plus GND. Leave the adapter's VCC wire disconnected.
+The HDMI FDT/PCIe discovery report is confirmed on the physical Pi and needs no
+serial adapter. For interactive UART input/logs, connect a USB-to-3.3 V TTL
+adapter to the Mac and cross its RX/TX with Pi GPIO 14/15, plus GND. Leave the
+adapter's VCC wire disconnected.
 
 PI-DIAG makes a guarded, read-only load of the BCM2711 root-complex link-status
 register at offset `0x4068`, only when the FDT marks the bridge enabled and
@@ -165,15 +162,11 @@ FDT window, alignment, and address bounds, rejects link-down access, and
 recovers synchronous MMIO aborts. It never writes endpoint configuration,
 enables bus mastering, or starts xHCI. Host tests cover the address plan, link
 gate, and range limits (`make check-pi4-pcie-cfg`, or `make check-pi4-platform`
-for the full PCIe/DMA helper suite). A physical Pi report is still needed to
-confirm the UEFI-assigned VL805 BAR values before deciding how to map its
-register window.
-
-This is still an unverified hardware probe: synthetic tests do not validate the
-UEFI-provided FDT, Device mapping, actual link state, or the device identity on
-a physical Pi. Before any controller DMA is enabled, confirm the FDT windows
-and PCI ID on the Pi, then add allocator ownership, cache maintenance, and
-controller-specific DMA tests.
+for the full PCIe/DMA helper suite). The physical report now confirms the FDT
+windows, active link, and VL805 identity/BAR assignment. The next controller
+gate is a bounded, read-only xHCI capability-register probe through the assigned
+BAR, still with bus mastering off. Starting xHCI and using DMA remain separate
+steps requiring cache-safe arena access, firmware handoff, and controller tests.
 
 ## Code plan (small batches)
 
@@ -184,14 +177,12 @@ controller-specific DMA tests.
 5. **GICv2 + CNTP IRQ (PI-DIAG-4)** — **accepted** (Device-map FF window).
 6. **Serial/FB shell** — **reached** (banner + cmd list after IRQ OK). **M200:** `pl011_rx_prep` +
    `uartrx` for USB-TTL @ 115200; still need hardware eyes-on (`uartrx` then `help`/`halt`).
-7. **PCIe discovery** — read-only FDT parser, revision-6 handoff, guarded
-   link-status probe, DMA-aperture-contained 1 MiB arena reservation, and a
-   bounded three-register read of bus 1/device 0/function 0 are built. Synthetic
-   fixtures pass. Confirm the actual firmware windows, link status, reservation,
-   and PCI ID on the Pi before any DMA or controller startup.
-8. **USB input** — bounded VL805 config reads with bus mastering off, then
-   firmware handoff, cache-safe DMA allocation, xHCI, and physical keyboard/
-   mouse are separate hardware gates.
+7. **PCIe discovery** — **physically accepted (2026-10-20):** Pi FDT windows,
+   active link, 1 MiB DMA reservation, and VL805 `1106:3483` xHCI identity/BAR
+   confirmed with read-only probes; bus mastering and xHCI stayed off.
+8. **USB input** — next: safely read xHCI capability registers through the
+   assigned BAR with bus mastering off; then separately validate firmware
+   handoff, cache-safe DMA, controller startup, and physical HID input.
 9. **Storage / display** — after serial input and native USB input are usable.
 
 ## Non-goals (for now)
