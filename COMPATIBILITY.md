@@ -2289,6 +2289,19 @@ ZealOS live distribution or installer.
   layouts, then restores their original positions. The complete workflow
   passed, including the visible caret and keyboard checks.
 
+## Native graphical Files menu
+
+- The boot terminal's Files menu now launches the unchanged pinned ZealOS
+  `System/BlkDev/FileMgr.ZC` over the merged source namespace. The ARM64
+  overlay builds the nested `CDirEntry` tree FileMgr expects from the source
+  store's flat `FilesFind` results, and skips absent legacy block-drive slots
+  safely. Its browser displays source files and directories; disk mutation
+  helpers remain unavailable on this bridge.
+- `python3 scripts/check-compat.py --pci --probe-gui-workflow` verified the
+  native FileMgr heading/tree in the framebuffer and that Escape returns to
+  the graphical terminal. The separate native-USB Lattice workflow also
+  passes. A live UTM check of this new FileMgr view remains to be done.
+
 ## Visible graphical input and persistent editing
 
 - A fresh PCI/HVF guest reproduced invisible command echo even though key
@@ -2382,7 +2395,9 @@ the supported power of two so a 10 ms endpoint is serviced at 8 ms.
 `make check-usb-input` tests NEC and QEMU models, USB-only input, relative
 mouse/tablet decoding, actual framebuffer typing and cursors, source editing
 and persistence, ring wraparound, duplicate suppression and VirtIO recovery.
-Live UTM physical capture/release and Pi acceptance remain separate gates.
+On 2026-10-21 the user confirmed UTM typing, pointer movement and window drag,
+Control-scroll zoom, and Lattice mouse/Space/Escape controls. Pi hardware
+acceptance remains a separate gate.
 
 The local YDE work is relevant and remains untouched:
 
@@ -2407,7 +2422,8 @@ Port sequence and remaining gates:
    pointer values as DMA addresses remain isolated from ARM64.
 3. NEC/QEMU keyboard, relative mouse, tablet, button/wheel, focus and recovery
    gates exercise the native path. Live UTM mixed-case typing/editor use and
-   the physical released-pointer/drag check were accepted on 2026-10-17.
+   the physical released-pointer/drag check were accepted on 2026-10-17; a
+   later UTM run also confirmed Control-scroll zoom and Lattice controls.
    USB 1.x/2.0 hub routing, new-device hotplug, subtree teardown and safe DMA
    reuse are implemented with a separate topology gate. Hubs are bounded to
    fifteen ports and five tiers. The first upstream high-speed hub supplies

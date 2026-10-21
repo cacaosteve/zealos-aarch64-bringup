@@ -6582,6 +6582,8 @@ int zc_start_gui_terminal(void) {
          * KeyDevInit is performed once on root's persistent stack below. */
         "/Kernel/KeyDev.ZC",
         "/System/SourceDir.ZC",
+        /* Native FileMgr uses the merged source-volume CDirEntry adapter. */
+        "/System/BlkDev/FileMgr.ZC",
         "/System/SourceHome.ZC",
         "/System/VersionScalars.ZC",
         "/System/DolDoc/DocCompiler.ZC",

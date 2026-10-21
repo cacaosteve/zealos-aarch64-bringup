@@ -1927,9 +1927,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     raise RuntimeError('OS menu stayed open after leaving the desktop top row; '
                                        f'see {graphical_path("os-menu-left-top-row")} and .txt\n'
                                        + menu_screen[3])
-                # Files is the first real desktop application behind the
-                # OS menu: it opens a read-only listing in its own DolDoc
-                # window rather than dumping `zls` output into the terminal.
+                # Files launches the unchanged upstream FileMgr over the
+                # merged source-volume directory tree.
                 move_graphical_pointer(4, 4)
                 menu_deadline = time.monotonic() + 5
                 menu_screen = graphical_screen('os-menu-files-open')
@@ -1990,11 +1989,15 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 # OCR; the bitmap cursor otherwise obscures the section label.
                 move_graphical_pointer(400, 300)
                 time.sleep(0.2)
-                files_view = require_graphical_text(
-                    'os-menu-files-action', 'Directory of /Home', timeout=8)
-                if 'Directories' not in files_view[3] or 'Files' not in files_view[3]:
-                    raise RuntimeError('Files window omitted directory/file sections:\n' +
+                files_view = graphical_screen('os-menu-files-action')
+                if (rgb_pixels_in(files_view, (170, 0, 170),
+                                  (0, 0, 400, 600)) < 1000 or
+                        rgb_pixels_in(files_view, (85, 85, 255),
+                                      (0, 0, 400, 600)) < 1000):
+                    raise RuntimeError('Files did not show the native source-volume tree:\n' +
                                        files_view[3])
+                print('PASS native FileMgr source title and directory tree rendered',
+                      flush=True)
                 qmp_send_key('esc')
                 files_restore_deadline = time.monotonic() + 5
                 while True:
@@ -2009,7 +2012,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 if 'Directory of /Home' in restored_screen[3]:
                     raise RuntimeError('Files window remained visible after Escape:\n' +
                                        restored_screen[3])
-                print('PASS OS menu Files opened a read-only directory window and Escape restored the terminal',
+                print('PASS OS menu Files opened native FileMgr and Escape restored the terminal',
                       flush=True)
                 # Exercise the special Window Demo menu action through the
                 # same press-drag-release path a user takes. This action is

@@ -621,6 +621,71 @@ def translate_winmgr(source: bytes) -> bytes:
     return text.encode("utf-8")
 
 
+def translate_filemgr(source: bytes) -> bytes:
+    """Add the merged source volume to the unchanged ZealOS FileMgr tree.
+
+    The bring-up filesystem has a persistent source namespace alongside
+    optional block drives. FilesFind returns a flat listing there, so the
+    bootstrap builds the CDirEntry tree consumed by FileMgr. Guard unmounted
+    drive slots before following their block-device pointers.
+    """
+    try:
+        text = source.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValueError("FileMgr.ZC is not UTF-8") from exc
+    marker = "U0 FMRebuildDoc(CDoc **_doc, CDirEntry **_head, I64 mode)\n"
+    if text.count(marker) != 1:
+        raise ValueError("expected exactly one FMRebuildDoc definition")
+    if "FMRebuildDocSourceVolume" in text:
+        raise ValueError("FileMgr.ZC already contains the source-volume adapter")
+    helper = (
+        "extern CDirEntry *BootstrapSourceFilesTree();\n"
+        "CDirEntry *FMRebuildDocSourceVolume(CDoc *doc, CDirEntry **_head)\n"
+        "{\n"
+        "\tCDirEntry *root = BootstrapSourceFilesTree();\n"
+        "\tif (!root)\n"
+        "\t\treturn NULL;\n"
+        "\troot->user_data = DocPrint(doc, \"$$TR,\\\"Source /\\\",U=0x%X$$\", root);\n"
+        "\troot->next = *_head;\n"
+        "\t*_head = root;\n"
+        "\tDocPrint(doc, \"\\n$$ID,+2$$\");\n"
+        "\tDocBottom(doc);\n"
+        "\tDirFileDoc(doc, root->sub);\n"
+        "\tDocPrint(doc, \"$$ID,-2$$\");\n"
+        "\treturn root;\n"
+        "}\n\n"
+    )
+    text = text.replace(marker, helper + marker, 1)
+    drive_loop = "\tfor (i = 0; i < DRIVES_NUM; i++)\n"
+    if text.count(drive_loop) != 1:
+        raise ValueError("expected exactly one FileMgr drive-list loop")
+    text = text.replace(drive_loop, "\tif (blkdev.drvs)\n\t\tfor (i = 0; i < DRIVES_NUM; i++)\n", 1)
+    drive = "\t\tdrive = &blkdev.drvs[i];\n"
+    if text.count(drive) != 1:
+        raise ValueError("expected exactly one FileMgr drive-list assignment")
+    text = text.replace(drive, drive + "\t\tif (drive->bd)\n\t\t{\n", 1)
+    clip_reset = "\tDocReset(doc2, TRUE);\n"
+    if text.count(clip_reset) != 1:
+        raise ValueError("expected exactly one FileMgr clipboard reset")
+    text = text.replace(clip_reset, "\tif (doc2)\n\t\tDocReset(doc2, TRUE);\n", 1)
+    source_root = (
+        "\t\telse if (drive->fs_type == FSt_REDSEA || drive->fs_type == FSt_FAT32)\n"
+        "\t\t\tFMRebuildDocDrive(Drive2Letter(drive), doc, _head, TRUE);\n"
+        "\t}\n"
+        "\tDocTop(doc);"
+    )
+    if text.count(source_root) != 1:
+        raise ValueError("expected exactly one end of FileMgr drive-list loop")
+    text = text.replace(
+        source_root,
+        source_root.replace(
+            "\n\t}\n\tDocTop(doc);",
+            "\n\t\t}\n\t}\n\tFMRebuildDocSourceVolume(doc, _head);\n\tDocTop(doc);"),
+        1,
+    )
+    return text.encode("utf-8")
+
+
 def translate_grdc(source: bytes) -> bytes:
     """Allocate every requested pixel, with rows rounded up to eight bytes.
 

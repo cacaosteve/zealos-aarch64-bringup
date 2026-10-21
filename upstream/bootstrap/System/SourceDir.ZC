@@ -1,4 +1,128 @@
-// Source-volume directory display, loaded after the real DolDoc printer.
+// Source-volume tree and directory display, loaded after the DolDoc printer.
+CDirEntry *BootstrapSourceTreeChild(CDirEntry *parent, U8 *name)
+{
+    CDirEntry *entry = parent->sub;
+    while (entry)
+    {
+        if (!StrCompare(entry->name, name))
+            return entry;
+        entry = entry->next;
+    }
+    return NULL;
+}
+
+CDirEntry *BootstrapSourceFilesTree()
+{//Build the nested CDirEntry tree expected by ZealOS FileMgr from source files.
+    CDirEntry *root, *flat, *entry, *next, *parent, *node, *tail;
+    U8 *old_dir;
+    U8 prefix[258], component[CDIR_FILENAME_LEN];
+    I64 i, start, length, prefix_len;
+    Bool is_last;
+
+    old_dir = Fs->cur_dir;
+    Fs->cur_dir = StrNew("/");
+    flat = FilesFind("*", FUF_RECURSE);
+    Free(Fs->cur_dir);
+    Fs->cur_dir = old_dir;
+    root = CAlloc(sizeof(CDirEntry));
+    if (!root)
+    {
+        DirTreeDel(flat);
+        return NULL;
+    }
+    root->full_name = StrNew("/");
+    root->attr = RS_ATTR_DIR;
+    if (!root->full_name)
+    {
+        DirTreeDel(flat);
+        Free(root);
+        return NULL;
+    }
+    for (entry = flat; entry; entry = next)
+    {
+        next = entry->next;
+        if (entry->full_name && entry->full_name[0] == '/')
+        {
+            prefix[0] = '/';
+            prefix[1] = 0;
+            prefix_len = 1;
+            parent = root;
+            i = 1;
+            while (entry->full_name[i])
+            {
+                start = i;
+                while (entry->full_name[i] && entry->full_name[i] != '/')
+                    i++;
+                length = i - start;
+                is_last = entry->full_name[i] == 0;
+                if (length > 0 && length < CDIR_FILENAME_LEN &&
+                    prefix_len + length + 1 < sizeof(prefix))
+                {
+                    if (prefix_len > 1)
+                        prefix[prefix_len++] = '/';
+                    MemCopy(component, entry->full_name + start, length);
+                    component[length] = 0;
+                    MemCopy(prefix + prefix_len, component, length + 1);
+                    prefix_len += length;
+                    node = BootstrapSourceTreeChild(parent, component);
+                    if (!node)
+                    {
+                        node = CAlloc(sizeof(CDirEntry));
+                        if (node)
+                        {
+                            node->full_name = StrNew(prefix);
+                            if (!node->full_name)
+                            {
+                                Free(node);
+                                node = NULL;
+                            }
+                            else
+                            {
+                                StrCopy(node->name, component);
+                                if (is_last)
+                                {
+                                    node->attr = entry->attr;
+                                    node->size = entry->size;
+                                }
+                                else
+                                {
+                                    node->attr = RS_ATTR_DIR;
+                                    node->size = 0;
+                                }
+                                node->parent = parent;
+                                tail = parent->sub;
+                                if (!tail)
+                                    parent->sub = node;
+                                else
+                                {
+                                    while (tail->next)
+                                        tail = tail->next;
+                                    tail->next = node;
+                                }
+                            }
+                        }
+                    }
+                    else if (is_last)
+                    {
+                        node->attr = entry->attr;
+                        node->size = entry->size;
+                    }
+                    if (!node)
+                        break;
+                    parent = node;
+                }
+                else
+                    break;
+                if (!is_last)
+                    i++;
+            }
+        }
+        Free(entry->full_name);
+        Free(entry);
+    }
+    return root;
+}
+
 I64 Dir(U8 *files_find_mask="*", Bool full=FALSE)
 {//Directory listing over the merged source volume; no disk dates/clusters yet.
     CDirEntry *entry = FilesFind(files_find_mask), *next;

@@ -6,7 +6,7 @@ import struct
 import sys
 
 from arm64_source import (extract_home_set, extract_home_startup, extract_home_startup_tasks, inject_home_startup_tasks, extract_server_task, extract_user_task, extract_version_scalars, extract_source_prompt, extract_source_training, translate_autocomplete_task, translate_doctree, translate_registry, translate_docterm, translate_doced, translate_docfind, translate_docform, translate_docpopup, translate_docrecalc, translate_grbitmap,
-                          translate_grdc, translate_grpalette, translate_grscreen, translate_ktask, translate_winmgr, translate_zsplash, translate_home_once)
+                          translate_filemgr, translate_grdc, translate_grpalette, translate_grscreen, translate_ktask, translate_winmgr, translate_zsplash, translate_home_once)
 
 root = Path(__file__).resolve().parent.parent
 for path, transform, original, changed in (
@@ -232,6 +232,31 @@ except ValueError:
     pass
 else:
     raise AssertionError('overlay accepted a changed top-menu mouse wait loop')
+
+filemgr_source = (root / 'upstream/pinned/System/BlkDev/FileMgr.ZC').read_bytes()
+filemgr_translated = translate_filemgr(filemgr_source)
+filemgr_text = filemgr_translated.decode('utf-8')
+assert filemgr_translated != filemgr_source
+assert 'FMRebuildDocSourceVolume(doc, _head);' in filemgr_text
+assert 'BootstrapSourceFilesTree();' in filemgr_text
+assert '\tif (blkdev.drvs)\n\t\tfor (i = 0; i < DRIVES_NUM; i++)' in filemgr_text
+assert '\t\tif (drive->bd)\n\t\t{' in filemgr_text
+assert '\tif (doc2)\n\t\tDocReset(doc2, TRUE);' in filemgr_text
+try:
+    translate_filemgr(filemgr_source.replace(
+        b'drive = &blkdev.drvs[i];', b'drive = &blkdev.drvs[j];', 1))
+except ValueError:
+    pass
+else:
+    raise AssertionError('FileMgr overlay accepted a changed drive lookup')
+try:
+    translate_filemgr(filemgr_source.replace(
+        b'\t\t\tFMRebuildDocDrive(Drive2Letter(drive), doc, _head, TRUE);',
+        b'\t\t\tFMRebuildDocDrive(Drive2Letter(drive), doc, _head, FALSE);', 1))
+except ValueError:
+    pass
+else:
+    raise AssertionError('FileMgr overlay accepted a changed drive-tree rebuild')
 
 ktask_source = (root / 'upstream/pinned/Kernel/KTask.ZC').read_bytes()
 user_slice = extract_user_task(ktask_source)

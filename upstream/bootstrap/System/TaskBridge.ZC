@@ -982,6 +982,19 @@ I64 StrCompare(U8 *s1, U8 *s2)
         i++;
     return s1[i] - s2[i];
 }
+I64 StrNCompare(U8 *s1, U8 *s2, I64 n)
+{
+    I64 i = 0;
+    if (!s1)
+        s1 = "";
+    if (!s2)
+        s2 = "";
+    while (i < n && s1[i] && s1[i] == s2[i])
+        i++;
+    if (i == n)
+        return 0;
+    return s1[i] - s2[i];
+}
 I64 StrICompare(U8 *s1, U8 *s2)
 {//ASCII case-insensitive comparison for pinned modules on the ARM64 bridge.
     U8 c1, c2;
@@ -1983,10 +1996,25 @@ U0 DirTreeDel(CDirEntry *entry)
     while (entry)
     {
         next = entry->next;
+        DirTreeDel(entry->sub);
         Free(entry->full_name);
         Free(entry);
         entry = next;
     }
+}
+CDirEntry *Cd2DirEntry(CDirEntry *entry, U8 *abs_name)
+{
+    CDirEntry *found;
+    while (entry)
+    {
+        if (entry->full_name && abs_name &&
+            !StrCompare(entry->full_name, abs_name))
+            return entry;
+        if (entry->sub && (found = Cd2DirEntry(entry->sub, abs_name)))
+            return found;
+        entry = entry->next;
+    }
+    return NULL;
 }
 U0 GodBitsInsert(I64 num_bits, I64 bit_field)
 {
@@ -2075,11 +2103,36 @@ CBlkDev *DriveIsWritable(U8 drv_let=0, Bool except=FALSE)
     if (except) {}
     return NULL;
 }
+CBlkDev *Letter2BlkDev(U8 drv_let=0, Bool except=TRUE)
+{
+    if (drv_let) {}
+    if (except) {}
+    return NULL;
+}
+U0 Unmount(U8 drv_let=0)
+{
+    if (drv_let) {}
+}
+U0 DiskChange(U8 drv_let=0)
+{
+    if (drv_let) {}
+}
+U0 Format(U8 drv_let, Bool quick=TRUE, Bool confirm=TRUE,
+          I64 type=FSt_FAT32)
+{
+    if (drv_let) {}
+    if (quick) {}
+    if (confirm) {}
+    if (type) {}
+}
 U0 EdInsWidgetWiz()
 {
 }
-U0 FileMgr()
+U8 *FileMgr(I64 mode=0, CTask *mem_task=NULL)
 {
+    if (mode) {}
+    if (mem_task) {}
+    return NULL;
 }
 U0 FindWiz()
 {
@@ -6086,6 +6139,17 @@ Bool Move(U8 *f1, U8 *f2)
 {
     if (f1) {}
     if (f2) {}
+    return FALSE;
+}
+Bool CopyTree(U8 *src, U8 *dst)
+{
+    if (src) {}
+    if (dst) {}
+    return FALSE;
+}
+Bool DelTree(U8 *path)
+{
+    if (path) {}
     return FALSE;
 }
 I64 Del(U8 *files_find_mask, Bool make_mask=FALSE, Bool del_dir=FALSE,
