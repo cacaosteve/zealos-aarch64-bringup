@@ -3911,3 +3911,8 @@ the complete graphics/window-manager checks pass after this fix.
 --probe-winmgr --probe-grscreen` passed, including the matrix, transformed
 point/mesh pixels, repeated window-manager frame rendering, and full source
 graphics/window-manager checks.
+
+After refreshing UTM with the GrBlot3 source module, the user loaded
+`/System/Gr/GrBlot3.ZC` and `/Tests/GrBlot3.ZC` in the graphical terminal and
+ran `GrBlot3Checks`; the displayed result was `0x000000000000002a`. This
+confirms the new source graphics path loads and executes in the live UTM guest.
