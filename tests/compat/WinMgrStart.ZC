@@ -295,8 +295,10 @@ I64 WinMgrSourceDragChecks()
     BootstrapCtrlInputSubmit(drag_task, x | (y << 16) | (1 << 32),
                              ZcMonotonicNs());
     Sleep(50);
-    if (sys_focus_task != drag_task || sys_winmgr_task->last_task != drag_task)
-        result = 5;
+    if (sys_focus_task != drag_task)
+        result = 51;
+    else if (sys_winmgr_task->last_task != drag_task)
+        result = 52;
     // Move the still-held pointer by two text cells in each direction.
     BootstrapCtrlInputSubmit(drag_task,
                              (x + 2 * FONT_WIDTH) |

@@ -4517,7 +4517,10 @@ U0 BootstrapCtrlInputPoll(Bool source_manager=FALSE)
     Bool ctrl_down;
     if (bootstrap_ctrl_input_poll_suspended)
     {
-        ZcWinMouseUpdate();
+        // A deterministic test or calibration caller owns the pending hard
+        // sample while polling is suspended.  Do not consume it here: the
+        // source WinMgr must see the button edge in its own WinMouseUpdate
+        // after WinQueueIPMessages has captured the previous mouse state.
         return;
     }
     task = Fs;
