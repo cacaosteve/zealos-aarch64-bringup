@@ -3995,7 +3995,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             command('zc I64 Broken( {', 'compile failed')
             command('zstatus', 'failed=0')
             command('zcheck', 'zc: upstream QuickSort + persistent modules OK')
-            command('zc MAlloc(33554432);', 'allocation size out of range')
+            # Keep this beyond the bridge's current 96 MiB data-arena bound.
+            command('zc MAlloc(100663297);', 'allocation size out of range')
             command('zstatus', 'failed=1')
             command('zreset', 'native compiler ready')
             command('zc try {} catch {}', 'Guest try/catch requires the task bridge')
