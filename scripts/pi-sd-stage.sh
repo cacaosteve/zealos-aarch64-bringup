@@ -63,8 +63,10 @@ guarded root-complex status read at +0x4068 and, when both links are active,
 bounded PCI 01:00.0 reads for identity, command/status, and header-valid BARs.
 The capability probe temporarily enables only PCI Memory Space Enable, reads
 the xHCI capability header through the assigned BAR, then restores the original
-command word. Bus mastering stays off, no xHCI register is written, and the
-reserved DMA arena is not used; this diagnostic does not enable USB input.
+command word. The report also reads BCM2711 outbound-window and error registers
+before/after the BAR access; it does not write them. Bus mastering stays off,
+no xHCI register is written, and the reserved DMA arena is not used; this
+diagnostic does not enable USB input.
 
 QEMU virt path is unchanged (make / make run-serial) — distinct ELFs.
 

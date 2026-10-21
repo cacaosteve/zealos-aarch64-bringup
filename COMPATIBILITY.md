@@ -3895,11 +3895,12 @@ post-palette USB run `python3 scripts/check-compat.py --usb-input nec
 --usb-with-virtio --usb-hubs 2 --usb-hotplug --probe-gui-workflow` also passed:
 USB ownership and recovery, menu actions, Files and Window Demo, editor
 save/reopen across reboot, `latticeplay`, `stockplay`, and hub-subtree recovery
-all passed. The latest Pi HDMI photos show the accepted FDT windows, DMA
-reservation, active link, and VL805 identity/BAR report, ending with the older
-“bus mastering and xHCI remain off” line. They do not contain the newer probe's
-`xHCI CAP/version` or `xHCI caps state` output, so the guarded capability read
-still needs a boot from the freshly staged `build/pi-esp` payload.
+all passed. The latest Pi HDMI photos now show the guarded probe from the
+staged kernel: VL805 BAR0 is `0xf8000004`, its FDT-translated CPU/virtual
+addresses are printed, and the xHCI capability reads return `0xdeadbead`.
+Bus mastering remained off and the command word was restored. This narrows the
+next investigation to the live BCM2711 outbound window/error state; the next
+read-only diagnostic captures those registers before and after the xHCI read.
 
 The PCI graphical workflow also checks that task-local commands are fully
 visible in the guest terminal before Return. This catches a missing character

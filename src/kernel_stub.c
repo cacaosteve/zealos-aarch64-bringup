@@ -215,6 +215,33 @@ static uint32_t g_pi4_xhci_state;
 static uint32_t g_pi4_xhci_caps[6];
 static uint64_t g_pi4_xhci_bar_cpu;
 static uint64_t g_pi4_xhci_bar_va;
+struct pi4_pcie_readback {
+    uint32_t mask;
+    uint32_t win0_lo;
+    uint32_t win0_hi;
+    uint32_t win0_base_limit;
+    uint32_t win0_base_hi;
+    uint32_t win0_limit_hi;
+    uint32_t err_valid_before;
+    uint32_t err_valid_after;
+    uint32_t err_info;
+    uint32_t err_addr;
+    uint32_t mem_err_addr_lo;
+    uint32_t mem_err_addr_hi;
+    uint32_t mem_err_cause;
+};
+static struct pi4_pcie_readback g_pi4_pcie_readback;
+#define PI4_PCIE_WIN0_LO              0x400cu
+#define PI4_PCIE_WIN0_HI              0x4010u
+#define PI4_PCIE_WIN0_BASE_LIMIT      0x4070u
+#define PI4_PCIE_WIN0_BASE_HI         0x4080u
+#define PI4_PCIE_WIN0_LIMIT_HI        0x4084u
+#define PI4_PCIE_OUTB_ERR_VALID       0x6004u
+#define PI4_PCIE_OUTB_ERR_INFO        0x600cu
+#define PI4_PCIE_OUTB_ERR_ADDR        0x6010u
+#define PI4_PCIE_OUTB_MEM_ERR_ADDR_LO 0x6018u
+#define PI4_PCIE_OUTB_MEM_ERR_ADDR_HI 0x601cu
+#define PI4_PCIE_OUTB_MEM_ERR_CAUSE   0x6020u
 #define PI4_CFG_NOT_RUN 0u
 #define PI4_CFG_READ_OK 1u
 #define PI4_CFG_MMIO_FAIL 2u
@@ -1141,6 +1168,14 @@ static void pi_diag_fb_u64_hex(uint64_t value) {
     }
 }
 
+static void pi_diag_fb_u32_hex(uint32_t value) {
+    static const char hex[] = "0123456789abcdef";
+    pi_diag_fb_puts("0x");
+    for (int shift = 28; shift >= 0; shift -= 4) {
+        fb_putc(hex[(value >> shift) & 0xf]);
+    }
+}
+
 static int pi4_pcie_read_config32(const struct zeal_handoff *h,
                                   uint32_t link_status, unsigned offset,
                                   uint32_t *value) {
@@ -1354,6 +1389,101 @@ static int pi4_xhci_read_mmio32(volatile uint8_t *base, unsigned offset,
     return 0;
 }
 
+/* Read the BCM2711 root-complex translation/error registers without writes. */
+static int pi4_pcie_read_mmio32(const struct zeal_handoff *h, unsigned offset,
+                                uint32_t *value) {
+    uint64_t phys, virt;
+    uint32_t result = 0;
+    volatile uint32_t *reg;
+
+    if (!h || !value || (offset & 3u) || h->revision < 5 ||
+        h->size < offsetof(struct zeal_handoff, pi4_pcie) + sizeof(h->pi4_pcie) ||
+        h->pi4_pcie.reg_size < sizeof(uint32_t) ||
+        offset > h->pi4_pcie.reg_size - sizeof(uint32_t) ||
+        h->pi4_pcie.reg_base > UINT64_MAX - offset)
+        return -1;
+    phys = h->pi4_pcie.reg_base + offset;
+    if (phys >= (1ull << 48) || h->hhdm_offset > UINT64_MAX - phys)
+        return -1;
+    virt = h->hhdm_offset + phys;
+    reg = (volatile uint32_t *)(uintptr_t)virt;
+
+    g_uart_probe = 1;
+    g_sync_recover = 1;
+    g_uart_dead = 0;
+    g_probe_esr = 0;
+    g_probe_far = 0;
+    __asm__ volatile("ldr %w0, [%1]" : "+&r"(result) : "r"(reg) : "memory");
+    __asm__ volatile("dsb sy" ::: "memory");
+    g_sync_recover = 0;
+    g_uart_probe = 0;
+    if (g_uart_dead) {
+        g_uart_dead = 0;
+        return -2;
+    }
+    *value = result;
+    return 0;
+}
+
+static void pi4_pcie_readback_before(const struct zeal_handoff *h) {
+    uint32_t value;
+
+    g_pi4_pcie_readback = (struct pi4_pcie_readback){0};
+    if (pi4_pcie_read_mmio32(h, PI4_PCIE_WIN0_LO, &value) == 0) {
+        g_pi4_pcie_readback.win0_lo = value;
+        g_pi4_pcie_readback.mask |= 1u << 0;
+    }
+    if (pi4_pcie_read_mmio32(h, PI4_PCIE_WIN0_HI, &value) == 0) {
+        g_pi4_pcie_readback.win0_hi = value;
+        g_pi4_pcie_readback.mask |= 1u << 1;
+    }
+    if (pi4_pcie_read_mmio32(h, PI4_PCIE_WIN0_BASE_LIMIT, &value) == 0) {
+        g_pi4_pcie_readback.win0_base_limit = value;
+        g_pi4_pcie_readback.mask |= 1u << 2;
+    }
+    if (pi4_pcie_read_mmio32(h, PI4_PCIE_WIN0_BASE_HI, &value) == 0) {
+        g_pi4_pcie_readback.win0_base_hi = value;
+        g_pi4_pcie_readback.mask |= 1u << 3;
+    }
+    if (pi4_pcie_read_mmio32(h, PI4_PCIE_WIN0_LIMIT_HI, &value) == 0) {
+        g_pi4_pcie_readback.win0_limit_hi = value;
+        g_pi4_pcie_readback.mask |= 1u << 4;
+    }
+    if (pi4_pcie_read_mmio32(h, PI4_PCIE_OUTB_ERR_VALID, &value) == 0) {
+        g_pi4_pcie_readback.err_valid_before = value;
+        g_pi4_pcie_readback.mask |= 1u << 5;
+    }
+}
+
+static void pi4_pcie_readback_after(const struct zeal_handoff *h) {
+    uint32_t value;
+
+    if (pi4_pcie_read_mmio32(h, PI4_PCIE_OUTB_ERR_VALID, &value) == 0) {
+        g_pi4_pcie_readback.err_valid_after = value;
+        g_pi4_pcie_readback.mask |= 1u << 6;
+    }
+    if (pi4_pcie_read_mmio32(h, PI4_PCIE_OUTB_ERR_INFO, &value) == 0) {
+        g_pi4_pcie_readback.err_info = value;
+        g_pi4_pcie_readback.mask |= 1u << 7;
+    }
+    if (pi4_pcie_read_mmio32(h, PI4_PCIE_OUTB_ERR_ADDR, &value) == 0) {
+        g_pi4_pcie_readback.err_addr = value;
+        g_pi4_pcie_readback.mask |= 1u << 8;
+    }
+    if (pi4_pcie_read_mmio32(h, PI4_PCIE_OUTB_MEM_ERR_ADDR_LO, &value) == 0) {
+        g_pi4_pcie_readback.mem_err_addr_lo = value;
+        g_pi4_pcie_readback.mask |= 1u << 9;
+    }
+    if (pi4_pcie_read_mmio32(h, PI4_PCIE_OUTB_MEM_ERR_ADDR_HI, &value) == 0) {
+        g_pi4_pcie_readback.mem_err_addr_hi = value;
+        g_pi4_pcie_readback.mask |= 1u << 10;
+    }
+    if (pi4_pcie_read_mmio32(h, PI4_PCIE_OUTB_MEM_ERR_CAUSE, &value) == 0) {
+        g_pi4_pcie_readback.mem_err_cause = value;
+        g_pi4_pcie_readback.mask |= 1u << 11;
+    }
+}
+
 /*
  * Read only the xHCI capability header. Memory Space Enable is temporary;
  * Bus Master Enable remains clear, no controller register is written, and
@@ -1521,9 +1651,12 @@ static void pi4_pcie_probe_readonly(const struct zeal_handoff *h) {
     g_pi4_link_status = status;
     pi4_pcie_probe_first_function(h, status,
                                   g_pi4_uart_tx_ok ? g_uart : NULL);
-    if (g_pi4_cfg_state == PI4_CFG_READ_OK)
+    if (g_pi4_cfg_state == PI4_CFG_READ_OK) {
+        pi4_pcie_readback_before(h);
         pi4_xhci_probe_capabilities(h, status,
                                     g_pi4_uart_tx_ok ? g_uart : NULL);
+        pi4_pcie_readback_after(h);
+    }
 }
 
 /* Keep the Pi's PCIe/DMA discovery report readable without a UART adapter. */
@@ -1637,6 +1770,32 @@ static void pi_diag_fb_report(const struct zeal_handoff *h) {
             pi_diag_fb_u64_hex(g_pi4_xhci_bar_cpu);
             pi_diag_fb_puts(" VA=");
             pi_diag_fb_u64_hex(g_pi4_xhci_bar_va);
+            pi_diag_fb_puts("\nPCIe win0 LO/HI/BASELIMIT=");
+            pi_diag_fb_u32_hex(g_pi4_pcie_readback.win0_lo);
+            pi_diag_fb_puts("/");
+            pi_diag_fb_u32_hex(g_pi4_pcie_readback.win0_hi);
+            pi_diag_fb_puts("/");
+            pi_diag_fb_u32_hex(g_pi4_pcie_readback.win0_base_limit);
+            pi_diag_fb_puts(" BASEHI/LIMHI=");
+            pi_diag_fb_u32_hex(g_pi4_pcie_readback.win0_base_hi);
+            pi_diag_fb_puts("/");
+            pi_diag_fb_u32_hex(g_pi4_pcie_readback.win0_limit_hi);
+            pi_diag_fb_puts("\nPCIe err valid before/after=");
+            pi_diag_fb_u32_hex(g_pi4_pcie_readback.err_valid_before);
+            pi_diag_fb_puts("/");
+            pi_diag_fb_u32_hex(g_pi4_pcie_readback.err_valid_after);
+            pi_diag_fb_puts(" info/addr=");
+            pi_diag_fb_u32_hex(g_pi4_pcie_readback.err_info);
+            pi_diag_fb_puts("/");
+            pi_diag_fb_u32_hex(g_pi4_pcie_readback.err_addr);
+            pi_diag_fb_puts("\nPCIe mem err addr hi:lo=");
+            pi_diag_fb_u32_hex(g_pi4_pcie_readback.mem_err_addr_hi);
+            pi_diag_fb_puts(":");
+            pi_diag_fb_u32_hex(g_pi4_pcie_readback.mem_err_addr_lo);
+            pi_diag_fb_puts(" cause=");
+            pi_diag_fb_u32_hex(g_pi4_pcie_readback.mem_err_cause);
+            pi_diag_fb_puts(" readmask=");
+            pi_diag_fb_u32_hex(g_pi4_pcie_readback.mask);
         } else {
             pi_diag_fb_puts("\nxHCI caps state=");
             pi_diag_fb_u64_hex(g_pi4_xhci_state);

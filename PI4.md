@@ -163,21 +163,23 @@ synchronous MMIO aborts. Host tests cover the config address plan and the
 BAR-to-CPU-window translation plus the rule that bus mastering must already be
 off (`make check-pi4-platform`).
 
-The first physical capability-probe run (2026-10-21) temporarily enabled only
-PCI Memory Space Enable, kept Bus Master Enable clear, read the assigned BAR,
-then restored the original PCI command word. The HDMI photo shows repeated
-`0xdeadbead` values for CAP/version, HCS1/HCC1, DB, and RTS. Those values fail
-basic xHCI header checks, so the read is not accepted as a valid capability
-header even though no MMIO abort was reported. The probe did not write an xHCI
-register, reset/start the controller, or use DMA.
+The physical capability-probe run (2026-10-21) temporarily enabled only PCI
+Memory Space Enable, kept Bus Master Enable clear, read BAR0 `0xf8000004`, then
+restored the original PCI command word. The fresh HDMI photos show the expected
+`xHCI caps invalid` result and repeated `0xdeadbead` values for CAP/version,
+HCS1/HCC1, DB, and RTS. The report includes the computed CPU and virtual BAR
+addresses. This confirms the FDT translation calculation is exercised, but it
+does not establish that the BCM2711 outbound window is programmed consistently
+with that FDT mapping. No xHCI register was written, the controller was not
+reset or started, and the DMA arena was not used.
 
-The next diagnostic build labels malformed capability data explicitly and
-prints the translated BAR CPU and virtual addresses alongside the raw values.
-This will help distinguish an endpoint that does not respond to the mapped
-window from a bad translation or decode path. Bus mastering remains off and
-xHCI remains stopped. Starting xHCI and using DMA remain later steps requiring
-validated capability reads, cache-safe arena access, firmware handoff, and
-controller tests.
+The next diagnostic reads the BCM2711 outbound-window registers and snapshots
+the bridge's outbound error status before and after the guarded BAR read. This
+should distinguish a host-bridge mapping/error from an endpoint response
+problem while keeping the probe read-only. Bus mastering stays off and xHCI
+stays stopped. Starting xHCI and using DMA remain later steps requiring valid
+capability reads, cache-safe arena access, firmware handoff, and controller
+tests.
 
 ## Code plan (small batches)
 
@@ -191,11 +193,11 @@ controller tests.
 7. **PCIe discovery** — **physically accepted (2026-10-20):** Pi FDT windows,
    active link, 1 MiB DMA reservation, and VL805 `1106:3483` xHCI identity/BAR
    confirmed with read-only probes; bus mastering and xHCI stayed off.
-8. **USB input** — physical PCIe discovery is accepted. The first capability
-   read returned `0xdeadbead` instead of a valid header; next boot reports the
-   translated BAR CPU/virtual addresses and validates register shape while
-   keeping bus mastering off. Then separately validate firmware handoff,
-   cache-safe DMA, controller startup, and physical HID input.
+8. **USB input** — physical PCIe discovery is accepted. The guarded capability
+   read returned `0xdeadbead`; the next boot reports live BCM2711 outbound
+   window/error registers around that read, with bus mastering off. Then
+   separately validate firmware handoff, cache-safe DMA, controller startup,
+   and physical HID input.
 9. **Storage / display** — after serial input and native USB input are usable.
 
 ## Non-goals (for now)
