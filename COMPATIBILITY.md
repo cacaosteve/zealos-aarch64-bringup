@@ -3879,8 +3879,11 @@ passed. The USB run verified visible typing, pointer buttons/wheel, editor
 save/reopen, window-demo recovery, 12 keyboard reconnects, tablet recovery,
 and hub-subtree removal/reattach without DMA growth. The HomeSys run verified
 the disk-boot `Once` path, two-terminal tiling, popup/splash lifecycle, and
-restored graphical prompt. This is QEMU regression evidence; a physical UTM
-drag/resize check on the refreshed VM is still awaiting an unlocked Mac.
+restored graphical prompt. This is QEMU regression evidence. In the refreshed
+UTM guest, the user also confirmed normal OS-menu glyphs, opening and closing
+the Files listing with Escape, Window Demo interaction, and moving/resizing the
+main windows. The small `TERM`/`EOF` suggestion popup returns to its
+content-sized geometry on release; it is not the normal terminal resize path.
 
 ## Non-cardinal affine sprite transform coverage — 2026-10-20
 
