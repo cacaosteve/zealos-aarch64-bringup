@@ -169,8 +169,10 @@ Master Enable remains clear, and reads the xHCI capability header. It then
 restores the original PCI command word and verifies it. It does not write an
 xHCI register, reset/start the controller, or use DMA. This build has compiled
 and passed the host safety tests; its first physical Pi run is still pending.
-Starting xHCI and using DMA remain later steps requiring cache-safe arena
-access, firmware handoff, and controller tests.
+The newest HDMI photos show the earlier report ending with “bus mastering and
+xHCI remain off,” without an `xHCI CAP/version` or `xHCI caps state` line, so
+they do not yet test this staged probe. Starting xHCI and using DMA remain later
+steps requiring cache-safe arena access, firmware handoff, and controller tests.
 
 ## Code plan (small batches)
 

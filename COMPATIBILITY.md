@@ -3859,9 +3859,11 @@ post-palette USB run `python3 scripts/check-compat.py --usb-input nec
 --usb-with-virtio --usb-hubs 2 --usb-hotplug --probe-gui-workflow` also passed:
 USB ownership and recovery, menu actions, Files and Window Demo, editor
 save/reopen across reboot, `latticeplay`, `stockplay`, and hub-subtree recovery
-all passed. The Pi 4B VL805 path still needs a fresh boot of the staged
-`build/pi-esp` payload; the earlier HDMI photo predates its FDT-status
-diagnostics and is not a basis for enabling bus mastering or xHCI.
+all passed. The latest Pi HDMI photos show the accepted FDT windows, DMA
+reservation, active link, and VL805 identity/BAR report, ending with the older
+“bus mastering and xHCI remain off” line. They do not contain the newer probe's
+`xHCI CAP/version` or `xHCI caps state` output, so the guarded capability read
+still needs a boot from the freshly staged `build/pi-esp` payload.
 
 The PCI graphical workflow also checks that task-local commands are fully
 visible in the guest terminal before Return. This catches a missing character

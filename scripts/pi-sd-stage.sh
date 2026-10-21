@@ -49,15 +49,21 @@ FB markers (keep firmware splash; do not expect a cleared screen):
   cyan×3   ~y384+ PI-DIAG-4: GICv2 IRQ ticks
   white    ~y420  PI-DIAG-4: IRQ OK; HDMI FDT/DMA report follows
 
-Next: boot with HDMI attached. After the white IRQ bar, the screen prints the
-FDT PCIe windows and DMA arena reservation; the shell prompt follows. A USB-TTL
-adapter @ 115200 on GPIO 14/15/GND is only needed for serial logs/input. The
-HDMI report independently attempts the guarded root-complex status read at
-+0x4068 and, when both links are active, bounded PCI 01:00.0 reads for identity,
-command/status, and header-valid BARs. The next probe temporarily enables only
-PCI Memory Space Enable, reads xHCI capability registers through the assigned
-BAR, then restores the original command word. Bus mastering stays off, no xHCI
-register is written, and the reserved DMA arena is not used.
+Copy this staged payload to the Pi SD card, then boot with HDMI attached. After
+the white IRQ bar, the screen prints the FDT PCIe windows, DMA reservation,
+VL805 identity/BARs, and the guarded capability-probe result before the shell
+prompt. On a successful probe, look for xHCI CAP/version=... HCS1=... HCC1=...
+and xHCI DB=... RTS=.... A failure prints xHCI caps state=...; either result
+is useful evidence. If the screen ends with the older Read-only; bus mastering
+and xHCI remain off line and has no xHCI CAP/version or xHCI caps state, the
+Pi booted an older card payload. A USB-TTL adapter @ 115200 on GPIO 14/15/GND is
+only needed for serial logs/input. The HDMI report independently attempts the
+guarded root-complex status read at +0x4068 and, when both links are active,
+bounded PCI 01:00.0 reads for identity, command/status, and header-valid BARs.
+The capability probe temporarily enables only PCI Memory Space Enable, reads
+the xHCI capability header through the assigned BAR, then restores the original
+command word. Bus mastering stays off, no xHCI register is written, and the
+reserved DMA arena is not used; this diagnostic does not enable USB input.
 
 QEMU virt path is unchanged (make / make run-serial) — distinct ELFs.
 
