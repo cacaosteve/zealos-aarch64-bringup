@@ -730,5 +730,7 @@ RedSea/source partitions and VM settings. The full pre-refresh backup is at
 `build/utm-before-20261021-054447`. The user subsequently confirmed the window
 control's plain-wheel swatch on UTM. After restoring normal zoom with Control+scroll,
 `latticeplay` also drew with Space and returned to the prompt with Escape. These
-close the plain-wheel and live Lattice keyboard-control checks; non-default pan
-behavior remains open.
+close the plain-wheel and live Lattice keyboard-control checks. The user then
+confirmed Control+scroll zoom and pointer-edge pan both work; zoom remains active
+while the desktop recenters at the edge. The ARM64 GrScreen regression now checks
+that invariant directly.
