@@ -17,7 +17,7 @@ Native firmware+DTB is a fallback only if UEFI on the board is unusable.
 | Track | Goal |
 |--|--|
 | **UTM / QEMU virt** | ZealOS *compatibility* ladder (HolyC, RedSea, Lattice compose through M199; M200–M206 PL011 RX, shell idle, depth clear, StockLat NULL, PopUpColor headers/titles). M33–M39 freeze bar + eyes-on Lattice notes in ACCEPTANCE.md. Not “full ZealOS” yet; `latticeplay` (DiskLat) ≠ `stockplay` (StockLat body, soft HeadMark DrawIt); `stocklat` = scripted StockLat. |
-| **Pi 4B UEFI** | Physical boot/timer/IRQ/FB shell reached; FDT/PCIe discovery and VL805 identity **accepted**. Next: hardware UART RX, then guarded xHCI bring-up and HID. |
+| **Pi 4B UEFI** | Physical boot/timer/IRQ/FB shell and VL805 PCIe discovery **accepted**. Next diagnostic reads xHCI capabilities with PCI memory decode temporarily enabled and bus mastering held off. |
 
 Virtio drivers do **not** apply on the Pi. Need BCM2711 UART, GICv2, and later SD/display.
 
@@ -118,8 +118,8 @@ widths and does not read or write controller MMIO. The Pi diagnostic prints
 the captured windows and reservation over HDMI after the GIC/IRQ check; the
 HDMI report now also attempts the guarded root-complex link-status read and,
 only when the link is active, bounded read-only PCI 01:00.0 identity/header/BAR
-reads. The PL011 is optional for this discovery path. No endpoint config writes,
-bus mastering, or xHCI initialization occur.
+reads. The PL011 is optional for this discovery path. This first pass does not
+write endpoint config, enable bus mastering, or initialize xHCI.
 Host-built synthetic fixtures check the standard
 BCM2711 node translation (`0x7d500000` through `/scb/ranges` to `0xfd500000`),
 the PCI memory aperture, the 3 GiB DMA aperture, disabled-node handling, and
@@ -151,22 +151,26 @@ serial adapter. For interactive UART input/logs, connect a USB-to-3.3 V TTL
 adapter to the Mac and cross its RX/TX with Pi GPIO 14/15, plus GND. Leave the
 adapter's VCC wire disconnected.
 
-PI-DIAG makes a guarded, read-only load of the BCM2711 root-complex link-status
+PI-DIAG makes a guarded load of the BCM2711 root-complex link-status
 register at offset `0x4068`, only when the FDT marks the bridge enabled and
 provides the register window. When both PHY link and Data Link are active, it
 maps the controller window as Device MMIO and reads bus 1/device 0/function 0
 through the BCM2711 indirect config index and data registers. It reports the
 vendor/device ID, class/revision, header type, command/status, and the BAR
-dwords valid for a type-0 endpoint or type-1 bridge. The probe validates the
-FDT window, alignment, and address bounds, rejects link-down access, and
-recovers synchronous MMIO aborts. It never writes endpoint configuration,
-enables bus mastering, or starts xHCI. Host tests cover the address plan, link
-gate, and range limits (`make check-pi4-pcie-cfg`, or `make check-pi4-platform`
-for the full PCIe/DMA helper suite). The physical report now confirms the FDT
-windows, active link, and VL805 identity/BAR assignment. The next controller
-gate is a bounded, read-only xHCI capability-register probe through the assigned
-BAR, still with bus mastering off. Starting xHCI and using DMA remain separate
-steps requiring cache-safe arena access, firmware handoff, and controller tests.
+dwords valid for a type-0 endpoint or type-1 bridge. It validates the FDT
+window, alignment, and address bounds, rejects link-down access, and recovers
+synchronous MMIO aborts. Host tests cover the config address plan and the
+BAR-to-CPU-window translation plus the rule that bus mastering must already be
+off (`make check-pi4-platform`).
+
+The next diagnostic stage maps the assigned VL805 BAR through the FDT PCI
+memory window, temporarily sets only PCI Memory Space Enable, confirms Bus
+Master Enable remains clear, and reads the xHCI capability header. It then
+restores the original PCI command word and verifies it. It does not write an
+xHCI register, reset/start the controller, or use DMA. This build has compiled
+and passed the host safety tests; its first physical Pi run is still pending.
+Starting xHCI and using DMA remain later steps requiring cache-safe arena
+access, firmware handoff, and controller tests.
 
 ## Code plan (small batches)
 
@@ -180,9 +184,10 @@ steps requiring cache-safe arena access, firmware handoff, and controller tests.
 7. **PCIe discovery** — **physically accepted (2026-10-20):** Pi FDT windows,
    active link, 1 MiB DMA reservation, and VL805 `1106:3483` xHCI identity/BAR
    confirmed with read-only probes; bus mastering and xHCI stayed off.
-8. **USB input** — next: safely read xHCI capability registers through the
-   assigned BAR with bus mastering off; then separately validate firmware
-   handoff, cache-safe DMA, controller startup, and physical HID input.
+8. **USB input** — physical PCIe discovery is accepted. Next boot checks the
+   xHCI capability header with transient memory decode and bus mastering off;
+   then separately validate firmware handoff, cache-safe DMA, controller
+   startup, and physical HID input.
 9. **Storage / display** — after serial input and native USB input are usable.
 
 ## Non-goals (for now)

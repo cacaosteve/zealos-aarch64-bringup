@@ -95,7 +95,7 @@ SRC_SHADOW_END   := $(shell echo $$(($(SRC_SHADOW_LBA) + $(SRC_SHADOW_SECTS) - 1
 ESP_END_SECTOR   := $(shell echo $$(($(RS_LBA_BASE) - 1)))
 ESP_SECTORS      := $(shell echo $$(($(ESP_END_SECTOR) - $(ESP_START_SECTOR) + 1)))
 
-.PHONY: all clean esp iso run run-serial check-serial check-page-tables check-pi4-pcie-fdt check-pi4-pcie-cfg check-pi4-dma check-pi4-platform check-window-buttons check-doced-popup check-docfile-persistence run-iso run-pci utm pi-sd pi-diag
+.PHONY: all clean esp iso run run-serial check-serial check-page-tables check-pi4-pcie-fdt check-pi4-pcie-cfg check-pi4-dma check-pi4-xhci-probe check-pi4-platform check-window-buttons check-doced-popup check-docfile-persistence run-iso run-pci utm pi-sd pi-diag
 
 all: $(BOOT) $(KERNEL) iso esp
 
@@ -420,6 +420,8 @@ $(BUILD)/zealbooter-pi.o: src/zealbooter.c src/handoff.h src/elf64.h src/plat_pi
 $(BUILD)/kernel_stub-pi.o: src/kernel_stub.c src/zc/runtime.h Makefile src/handoff.h src/plat_pi4.h src/hc_ir.h src/hc_front.h src/a64_emit.h src/fb_font.h src/virtio_kbd.h src/virtio_tablet.h src/virtio_blk.h src/usb_input.h src/usb_xhci.h src/usb_hid.h src/usb_platform.h src/zc_source_store.h src/zc_source_editor.h src/disk_layout.h src/mmio_map.h $(BUILD)/netofdots_zc.h $(BUILD)/lines_zc.h $(BUILD)/minigr_zc.h $(BUILD)/memsort_zc.h $(BUILD)/peekplot_zc.h $(BUILD)/offbmp_zc.h $(BUILD)/heapstr_zc.h $(BUILD)/catfmt_zc.h $(BUILD)/heapque_zc.h $(BUILD)/jobque_zc.h $(BUILD)/jobrun_zc.h $(BUILD)/taskspawn_zc.h $(BUILD)/popup_zc.h $(BUILD)/doclite_zc.h $(BUILD)/doclib_zc.h $(BUILD)/notes_zc.h $(BUILD)/globshare_zc.h $(BUILD)/life_zc.h $(BUILD)/cartlite_zc.h $(BUILD)/vec2lite_zc.h $(BUILD)/angleslite_zc.h $(BUILD)/coslite_zc.h $(BUILD)/sqrtlite_zc.h $(BUILD)/arglite_zc.h $(BUILD)/commalite_zc.h $(BUILD)/plot3lite_zc.h $(BUILD)/tospilite_zc.h $(BUILD)/tosutf8lite_zc.h $(BUILD)/colorlite_zc.h $(BUILD)/turtlelite_zc.h $(BUILD)/filllite_zc.h $(BUILD)/initlite_zc.h $(BUILD)/deflite_zc.h $(BUILD)/printlite_zc.h $(BUILD)/msglite_zc.h $(BUILD)/menulite_zc.h $(BUILD)/findlite_zc.h $(BUILD)/fslite_zc.h $(BUILD)/setuplite_zc.h $(BUILD)/ttlite_zc.h $(BUILD)/buflite_zc.h $(BUILD)/inclite_zc.h $(BUILD)/dclite_zc.h $(BUILD)/linedclite_zc.h $(BUILD)/grflite_zc.h $(BUILD)/movelite_zc.h $(BUILD)/checkedlite_zc.h $(BUILD)/cmplite_zc.h $(BUILD)/forinclite_zc.h $(BUILD)/microlite_zc.h $(BUILD)/movestacklite_zc.h $(BUILD)/endlite_zc.h $(BUILD)/drawitlite_zc.h $(BUILD)/latticelite_zc.h $(BUILD)/looplite_zc.h $(BUILD)/demolite_zc.h $(BUILD)/eventlite_zc.h $(BUILD)/playlite_zc.h $(BUILD)/inputlite_zc.h $(BUILD)/rightlite_zc.h $(BUILD)/cursorlite_zc.h $(BUILD)/uplite_zc.h $(BUILD)/ticklite_zc.h $(BUILD)/framelite_zc.h $(BUILD)/plotdclite_zc.h $(BUILD)/abortlite_zc.h $(BUILD)/aimmovelite_zc.h $(BUILD)/idlelite_zc.h $(BUILD)/layerlite_zc.h $(BUILD)/endslite_zc.h $(BUILD)/speedlite_zc.h $(BUILD)/midlite_zc.h $(BUILD)/livelite_zc.h $(BUILD)/accellite_zc.h $(BUILD)/restartlite_zc.h $(BUILD)/widthlite_zc.h $(BUILD)/bothcolorlite_zc.h $(BUILD)/menufulllite_zc.h $(BUILD)/menubiglite_zc.h $(BUILD)/trylite_zc.h $(BUILD)/stepcountlite_zc.h $(BUILD)/anglesfulllite_zc.h $(BUILD)/braceangleslite_zc.h $(BUILD)/setmenulite_zc.h $(BUILD)/nearlatticelite_zc.h $(BUILD)/f64iflite_zc.h $(BUILD)/wraplatticelite_zc.h $(BUILD)/menulooplite_zc.h $(BUILD)/idxalllite_zc.h $(BUILD)/disklat_zc.h $(BUILD)/stocklat_zc.h $(BUILD)/depthbuflite_zc.h $(BUILD)/depthrstlite_zc.h $(BUILD)/depthplotlite_zc.h $(BUILD)/depthlinelite_zc.h $(BUILD)/ramblk_zc.h $(BUILD)/namefile_zc.h $(BUILD)/dirlook_zc.h $(BUILD)/dirdel_zc.h $(BUILD)/fopen_zc.h $(BUILD)/fwrite_zc.h $(BUILD)/multiblk_zc.h $(BUILD)/redsea_zc.h $(BUILD)/rsroot_zc.h $(BUILD)/rsfile_zc.h $(BUILD)/rsalloc_zc.h $(BUILD)/rsfree_zc.h $(BUILD)/rsmulti_zc.h $(BUILD)/rscfile_zc.h $(BUILD)/rscwrite_zc.h $(BUILD)/rscseek_zc.h $(BUILD)/rsclib_zc.h $(BUILD)/rspersist_zc.h $(BUILD)/runzc_zc.h | $(BUILD)
 	$(CLANG) $(CFLAGS_KERNEL_PI) $(CFLAGS_PI) -I$(BUILD) -c src/kernel_stub.c -o $@
 
+$(BUILD)/kernel_stub-pi.o: src/pi4_xhci_probe.h
+
 $(BOOT_PI): $(BUILD)/zealbooter-pi.o src/linker-booter.ld
 	$(CLANG) $(CFLAGS) $(CFLAGS_PI) $(LDFLAGS_BOOT) $(BUILD)/zealbooter-pi.o -o $@
 
@@ -531,7 +533,11 @@ check-pi4-dma: | $(BUILD)
 	$(HOST_CC) -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined tests/pi4_dma_test.c -o $(BUILD)/pi4-dma-test
 	$(BUILD)/pi4-dma-test
 
-check-pi4-platform: check-pi4-pcie-fdt check-pi4-pcie-cfg check-pi4-dma
+check-pi4-xhci-probe: | $(BUILD)
+	$(HOST_CC) -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined tests/pi4_xhci_probe_test.c -o $(BUILD)/pi4-xhci-probe-test
+	$(BUILD)/pi4-xhci-probe-test
+
+check-pi4-platform: check-pi4-pcie-fdt check-pi4-pcie-cfg check-pi4-dma check-pi4-xhci-probe
 
 .PHONY: check-usb-hid check-usb-route check-usb-input check-usb-topology
 check-usb-hid: | $(BUILD)

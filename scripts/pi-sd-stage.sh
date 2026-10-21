@@ -28,7 +28,7 @@ cp -f "$ESP/boot/demo.hcbc" "$OUT/boot/" 2>/dev/null || true
 cp -f "$ESP/limine-pi.conf" "$OUT/limine.conf"
 
 cat <<EOF
-Pi ESP staged (PI-DIAG-4 + explicit card DTB + read-only PCIe/DMA discovery): $OUT
+Pi ESP staged (PI-DIAG-4 + explicit card DTB + guarded xHCI capability probe): $OUT
 
 The generated limine.conf loads bcm2711-rpi-4-b.dtb from the SD root and the
 HDMI report identifies whether Limine returned, validated, and parsed that FDT.
@@ -54,9 +54,10 @@ FDT PCIe windows and DMA arena reservation; the shell prompt follows. A USB-TTL
 adapter @ 115200 on GPIO 14/15/GND is only needed for serial logs/input. The
 HDMI report independently attempts the guarded root-complex status read at
 +0x4068 and, when both links are active, bounded PCI 01:00.0 reads for identity,
-command/status, and header-valid BARs. The PL011 is optional for this
-discovery. Endpoint config is never written; the reserved arena is not used for
-DMA and bus mastering/xHCI remain off.
+command/status, and header-valid BARs. The next probe temporarily enables only
+PCI Memory Space Enable, reads xHCI capability registers through the assigned
+BAR, then restores the original command word. Bus mastering stays off, no xHCI
+register is written, and the reserved DMA arena is not used.
 
 QEMU virt path is unchanged (make / make run-serial) — distinct ELFs.
 

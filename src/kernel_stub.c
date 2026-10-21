@@ -15,6 +15,7 @@
 #include "plat_pi4.h"
 #if defined(ZEAL_PI_DIAG) || defined(ZEAL_FORCE_PI4)
 #include "pi4_pcie_cfg.h"
+#include "pi4_xhci_probe.h"
 #endif
 #include "virtio_kbd.h"
 #include "virtio_tablet.h"
@@ -210,6 +211,8 @@ static uint32_t g_pi4_cfg_command;
 static uint32_t g_pi4_cfg_bars[6];
 static unsigned g_pi4_cfg_bar_count;
 static int g_pi4_uart_tx_ok;
+static uint32_t g_pi4_xhci_state;
+static uint32_t g_pi4_xhci_caps[6];
 #define PI4_CFG_NOT_RUN 0u
 #define PI4_CFG_READ_OK 1u
 #define PI4_CFG_MMIO_FAIL 2u
@@ -218,6 +221,14 @@ static int g_pi4_uart_tx_ok;
 #define PI4_CFG_NO_DEVICE 5u
 #define PI4_CFG_FDT_SKIP 6u
 #define PI4_CFG_STATUS_FAIL 7u
+#define PI4_XHCI_NOT_RUN 0u
+#define PI4_XHCI_CAPS_OK 1u
+#define PI4_XHCI_BAD_BAR 2u
+#define PI4_XHCI_MAP_FAIL 3u
+#define PI4_XHCI_CMD_FAIL 4u
+#define PI4_XHCI_CFG_FAIL 5u
+#define PI4_XHCI_MMIO_FAIL 6u
+#define PI4_XHCI_RESTORE_FAIL 7u
 #endif
 static uint64_t g_hhdm;
 static uint64_t g_timer_ticks;
@@ -1264,7 +1275,7 @@ static void pi4_pcie_probe_first_function(const struct zeal_handoff *h,
     uart_put_u64_hex(log_uart, header);
     uart_puts(log_uart, " command/status=");
     uart_put_u64_hex(log_uart, command);
-    uart_puts(log_uart, " (read only)\n");
+    uart_puts(log_uart, " (identity/BAR read)\n");
     for (unsigned i = 0; i < bar_count; i++) {
         uart_puts(log_uart, "  BAR");
         uart_write(log_uart, '0' + i);
@@ -1274,9 +1285,185 @@ static void pi4_pcie_probe_first_function(const struct zeal_handoff *h,
     }
 }
 
+static int pi4_pcie_write_config32(const struct zeal_handoff *h,
+                                   uint32_t link_status, unsigned offset,
+                                   uint32_t value) {
+    struct pi4_pcie_cfg_read plan;
+    uint64_t index_phys, data_phys;
+    volatile uint32_t *index_reg;
+    volatile uint32_t *data_reg;
+
+    if (offset != 0x04 || value > 0xffffu ||
+        pi4_pcie_cfg_read_plan(h, link_status, 1, 0, 0, offset, &plan) != 0 ||
+        h->pi4_pcie.reg_base > UINT64_MAX - PI4_PCIE_CFG_INDEX_OFFSET ||
+        h->pi4_pcie.reg_base > UINT64_MAX - plan.data_offset)
+        return -1;
+    index_phys = h->pi4_pcie.reg_base + PI4_PCIE_CFG_INDEX_OFFSET;
+    data_phys = h->pi4_pcie.reg_base + plan.data_offset;
+    if (index_phys >= (1ull << 48) || data_phys >= (1ull << 48) ||
+        h->hhdm_offset > UINT64_MAX - index_phys ||
+        h->hhdm_offset > UINT64_MAX - data_phys)
+        return -2;
+
+    index_reg = (volatile uint32_t *)(uintptr_t)(h->hhdm_offset + index_phys);
+    data_reg = (volatile uint32_t *)(uintptr_t)(h->hhdm_offset + data_phys);
+    g_uart_probe = 1;
+    g_sync_recover = 1;
+    g_uart_dead = 0;
+    g_probe_esr = 0;
+    g_probe_far = 0;
+    __asm__ volatile("str %w1, [%0]" :: "r"(index_reg), "r"(plan.index) : "memory");
+    __asm__ volatile("dsb sy" ::: "memory");
+    if (!g_uart_dead) {
+        /* For command/status at 0x04, upper status bits are zero (W1C-safe). */
+        __asm__ volatile("str %w1, [%0]" :: "r"(data_reg), "r"(value) : "memory");
+        __asm__ volatile("dsb sy" ::: "memory");
+    }
+    g_sync_recover = 0;
+    g_uart_probe = 0;
+    if (g_uart_dead) {
+        g_uart_dead = 0;
+        return -3;
+    }
+    return 0;
+}
+
+static int pi4_xhci_read_mmio32(volatile uint8_t *base, unsigned offset,
+                                uint32_t *value) {
+    uint32_t result = 0;
+    if (!base || !value || (offset & 3u) || offset > PI4_XHCI_CAP_BYTES - 4u)
+        return -1;
+    g_uart_probe = 1;
+    g_sync_recover = 1;
+    g_uart_dead = 0;
+    g_probe_esr = 0;
+    g_probe_far = 0;
+    __asm__ volatile("ldr %w0, [%1]" : "+&r"(result) :
+                     "r"((volatile uint32_t *)(base + offset)) : "memory");
+    __asm__ volatile("dsb sy" ::: "memory");
+    g_sync_recover = 0;
+    g_uart_probe = 0;
+    if (g_uart_dead) {
+        g_uart_dead = 0;
+        return -2;
+    }
+    *value = result;
+    return 0;
+}
+
+/*
+ * Read only the xHCI capability header. Memory Space Enable is temporary;
+ * Bus Master Enable remains clear, no controller register is written, and
+ * the endpoint command word is restored before this diagnostic returns.
+ */
+static void pi4_xhci_probe_capabilities(const struct zeal_handoff *h,
+                                        uint32_t link_status,
+                                        volatile uint8_t *log_uart) {
+    static const unsigned offsets[6] = {0x00, 0x04, 0x08, 0x10, 0x14, 0x18};
+    struct pi4_xhci_bar_plan bar;
+    volatile uint8_t *regs;
+    uint16_t original, enabled;
+    uint32_t command_status, verify;
+    uint64_t virt;
+    uint64_t probe_esr = 0, probe_far = 0;
+    int changed = 0;
+
+    g_pi4_xhci_state = PI4_XHCI_NOT_RUN;
+    for (unsigned i = 0; i < 6; i++) g_pi4_xhci_caps[i] = 0;
+    if (g_pi4_cfg_state != PI4_CFG_READ_OK ||
+        (g_pi4_cfg_id & 0xffffffffu) != 0x34831106u ||
+        ((g_pi4_cfg_class_rev >> 8) & 0xffffffu) != 0x0c0330u ||
+        g_pi4_cfg_bar_count < 2 ||
+        pi4_xhci_bar_plan(h, g_pi4_cfg_bars[0], g_pi4_cfg_bars[1], &bar) != 0) {
+        g_pi4_xhci_state = PI4_XHCI_BAD_BAR;
+        return;
+    }
+    if (!g_pt_pool_phys || !h->hhdm_offset ||
+        h->hhdm_offset > UINT64_MAX - bar.cpu_base ||
+        mmio_map_2m(h->hhdm_offset, bar.cpu_base) != 0) {
+        g_pi4_xhci_state = PI4_XHCI_MAP_FAIL;
+        return;
+    }
+    virt = h->hhdm_offset + bar.cpu_base;
+    regs = (volatile uint8_t *)(uintptr_t)virt;
+
+    original = (uint16_t)g_pi4_cfg_command;
+    if (pi4_xhci_memory_command(original, &enabled) != 0) {
+        g_pi4_xhci_state = PI4_XHCI_CMD_FAIL;
+        return;
+    }
+    if (enabled != original) {
+        changed = 1; /* Restore even if the guarded write reports an abort. */
+        if (pi4_pcie_write_config32(h, link_status, 0x04, enabled) != 0) {
+            g_pi4_xhci_state = PI4_XHCI_CFG_FAIL;
+            probe_esr = g_probe_esr;
+            probe_far = g_probe_far;
+            goto restore;
+        }
+    }
+
+    if (pi4_pcie_read_config32(h, link_status, 0x04, &verify) != 0 ||
+        (uint16_t)verify != enabled ||
+        ((uint16_t)verify & PI4_PCI_COMMAND_MASTER)) {
+        g_pi4_xhci_state = PI4_XHCI_CFG_FAIL;
+        probe_esr = g_probe_esr;
+        probe_far = g_probe_far;
+        goto restore;
+    }
+    command_status = verify;
+
+    for (unsigned i = 0; i < 6; i++) {
+        if (pi4_xhci_read_mmio32(regs, offsets[i],
+                                 &g_pi4_xhci_caps[i]) != 0) {
+            g_pi4_xhci_state = PI4_XHCI_MMIO_FAIL;
+            probe_esr = g_probe_esr;
+            probe_far = g_probe_far;
+            goto restore;
+        }
+    }
+    g_pi4_xhci_state = PI4_XHCI_CAPS_OK;
+
+restore:
+    if (changed) {
+        if (pi4_pcie_write_config32(h, link_status, 0x04, original) != 0 ||
+            pi4_pcie_read_config32(h, link_status, 0x04, &verify) != 0 ||
+            (uint16_t)verify != original) {
+            g_pi4_xhci_state = PI4_XHCI_RESTORE_FAIL;
+            probe_esr = g_probe_esr;
+            probe_far = g_probe_far;
+        }
+    }
+    if (g_pi4_xhci_state != PI4_XHCI_CAPS_OK) {
+        g_probe_esr = probe_esr;
+        g_probe_far = probe_far;
+    }
+
+    if (log_uart) {
+        uart_puts(log_uart, "Pi xHCI cap probe state=");
+        uart_put_u64_hex(log_uart, g_pi4_xhci_state);
+        if (g_pi4_xhci_state == PI4_XHCI_CAPS_OK) {
+            for (unsigned i = 0; i < 6; i++) {
+                uart_puts(log_uart, " cap[");
+                uart_put_u32_dec(log_uart, offsets[i]);
+                uart_puts(log_uart, "]=");
+                uart_put_u64_hex(log_uart, g_pi4_xhci_caps[i]);
+            }
+            uart_puts(log_uart, " cmd/status=");
+            uart_put_u64_hex(log_uart, command_status);
+            uart_puts(log_uart, "; BM stayed off, command restored\n");
+        } else {
+            uart_puts(log_uart, " ESR=");
+            uart_put_u64_hex(log_uart, g_probe_esr);
+            uart_puts(log_uart, " FAR=");
+            uart_put_u64_hex(log_uart, g_probe_far);
+            uart_puts(log_uart, "\n");
+        }
+    }
+}
+
 /* Probe the bridge independently of PL011 so HDMI-only Pi diagnostics still
- * report the firmware link state. The guarded reads are read-only; the only
- * write is the BCM2711 config-window index latch needed to select a read. */
+ * report the firmware link state. Endpoint discovery remains read-only; the
+ * separate capability step may temporarily enable PCI memory decoding. */
 static void pi4_pcie_probe_readonly(const struct zeal_handoff *h) {
     const uint32_t required = PI4_PCIE_FDT_PRESENT | PI4_PCIE_FDT_ENABLED |
                               PI4_PCIE_FDT_REG;
@@ -1287,6 +1474,7 @@ static void pi4_pcie_probe_readonly(const struct zeal_handoff *h) {
     g_pi4_link_status = 0;
     g_pi4_cfg_state = PI4_CFG_NOT_RUN;
     g_pi4_cfg_bar_count = 0;
+    g_pi4_xhci_state = PI4_XHCI_NOT_RUN;
     if (!h || h->revision < 5 ||
         h->size < offsetof(struct zeal_handoff, pi4_pcie) + sizeof(h->pi4_pcie) ||
         (h->pi4_pcie.flags & required) != required ||
@@ -1323,6 +1511,9 @@ static void pi4_pcie_probe_readonly(const struct zeal_handoff *h) {
     g_pi4_link_status = status;
     pi4_pcie_probe_first_function(h, status,
                                   g_pi4_uart_tx_ok ? g_uart : NULL);
+    if (g_pi4_cfg_state == PI4_CFG_READ_OK)
+        pi4_xhci_probe_capabilities(h, status,
+                                    g_pi4_uart_tx_ok ? g_uart : NULL);
 }
 
 /* Keep the Pi's PCIe/DMA discovery report readable without a UART adapter. */
@@ -1415,6 +1606,28 @@ static void pi_diag_fb_report(const struct zeal_handoff *h) {
             pi_diag_fb_puts("=");
             pi_diag_fb_u64_hex(g_pi4_cfg_bars[i]);
         }
+        if (g_pi4_xhci_state == PI4_XHCI_CAPS_OK) {
+            pi_diag_fb_puts("\nxHCI CAP/version=");
+            pi_diag_fb_u64_hex(g_pi4_xhci_caps[0]);
+            pi_diag_fb_puts(" HCS1=");
+            pi_diag_fb_u64_hex(g_pi4_xhci_caps[1]);
+            pi_diag_fb_puts(" HCC1=");
+            pi_diag_fb_u64_hex(g_pi4_xhci_caps[3]);
+            pi_diag_fb_puts("\nxHCI DB=");
+            pi_diag_fb_u64_hex(g_pi4_xhci_caps[4]);
+            pi_diag_fb_puts(" RTS=");
+            pi_diag_fb_u64_hex(g_pi4_xhci_caps[5]);
+        } else {
+            pi_diag_fb_puts("\nxHCI caps state=");
+            pi_diag_fb_u64_hex(g_pi4_xhci_state);
+            if (g_pi4_xhci_state == PI4_XHCI_MMIO_FAIL ||
+                g_pi4_xhci_state == PI4_XHCI_RESTORE_FAIL) {
+                pi_diag_fb_puts(" ESR=");
+                pi_diag_fb_u64_hex(g_probe_esr);
+                pi_diag_fb_puts(" FAR=");
+                pi_diag_fb_u64_hex(g_probe_far);
+            }
+        }
     } else if (g_pi4_cfg_state == PI4_CFG_NO_DEVICE) {
         pi_diag_fb_puts("\nPCI 01:00.0 absent ID=");
         pi_diag_fb_u64_hex(g_pi4_cfg_id);
@@ -1437,7 +1650,7 @@ static void pi_diag_fb_report(const struct zeal_handoff *h) {
     } else {
         pi_diag_fb_puts("\nPCI config read not attempted");
     }
-    pi_diag_fb_puts("\nRead-only; bus mastering and xHCI remain off\n");
+    pi_diag_fb_puts("\nPolicy: bus master off; xHCI not started; see capability state\n");
 }
 #endif
 

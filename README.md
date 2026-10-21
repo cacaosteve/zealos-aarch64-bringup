@@ -2,7 +2,7 @@
 
 Limine → ZealBooter → kernel + `demo.hcbc` → HolyC-IR JIT → graphical terminal → **native USB or VirtIO input**
 
-**Not a full ZealOS port.** Two parallel tracks: QEMU/UTM virt (HolyC + RedSea + Lattice compose) and Pi 4B UEFI (boot/timer/IRQ/shell plus guarded read-only PCIe config discovery; physical verification is next, with USB still disabled).
+**Not a full ZealOS port.** Two parallel tracks: QEMU/UTM virt (HolyC + RedSea + Lattice compose) and Pi 4B UEFI (boot/timer/IRQ/shell plus physically confirmed PCIe/VL805 discovery; guarded xHCI capability probing is next, with USB input still disabled).
 
 ## Native source compatibility milestone
 
@@ -243,7 +243,7 @@ Bridge notes: [AIWNIOS.md](AIWNIOS.md). Milestone ladder: [upstream/README.md](u
 | Track | Status |
 |--|--|
 | QEMU/UTM virt | **Regression freeze** M33–M39 (`Notes.ZC` / DocLib `#include`) still the bar — see ACCEPTANCE.md. **Lattice compose** continued on top (M151–M199) + **M200–M206** PL011 RX/`uartrx`, shell idle, depth clear, StockLat NULL, PopUpColor Mid/Edge headers + live titles. Automated QMP tests verify printable keys reach the graphical terminal and native `KeyGet`; the 2026-10-16 UTM check also confirmed the physical keyboard entered and submitted `zstatus` in the graphical terminal. |
-| Pi 4B UEFI | PI-DIAG-1..4 + shell accepted; **physical PCIe discovery accepted (2026-10-20)**: FDT windows, active link, reserved 1 MiB DMA arena, and VL805 `1106:3483` xHCI identity/BAR confirmed by read-only HDMI report. Bus mastering and xHCI remain off; physical USB input and UART RX (`uartrx` on USB–TTL @ 115200) remain. No virtio/RedSea disk on Pi yet ([PI4.md](PI4.md)). |
+| Pi 4B UEFI | PI-DIAG-1..4 + shell accepted; **physical PCIe discovery accepted (2026-10-20)**: FDT windows, active link, reserved 1 MiB DMA arena, and VL805 `1106:3483` xHCI identity/BAR confirmed by HDMI report. The next diagnostic build temporarily enables PCI memory decoding only, reads xHCI capabilities, restores the command word, and keeps bus mastering off. USB input and UART RX (`uartrx` on USB–TTL @ 115200) remain unproven. No virtio/RedSea disk on Pi yet ([PI4.md](PI4.md)). |
 
 ## Earlier platform follow-ups
 
