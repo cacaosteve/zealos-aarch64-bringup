@@ -727,5 +727,8 @@ passes the stable overlap-pixel assertion across repeated frames, and
 tablet, Space and Escape. The `ZealosAarch64Hello` UTM disk was refreshed from
 this tested build; the installer verified the EFI image and preserved the
 RedSea/source partitions and VM settings. The full pre-refresh backup is at
-`build/utm-before-20261021-054447`. A physical UTM check of the window control's
-plain-wheel swatch remains pending.
+`build/utm-before-20261021-054447`. The user subsequently confirmed the window
+control's plain-wheel swatch on UTM. After restoring normal zoom with Control+scroll,
+`latticeplay` also drew with Space and returned to the prompt with Escape. These
+close the plain-wheel and live Lattice keyboard-control checks; non-default pan
+behavior remains open.
