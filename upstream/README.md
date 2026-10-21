@@ -3323,8 +3323,8 @@ Freeze catalog unchanged.
 |--|--|
 | Gap | The UTM tablet path routed Ctrl+wheel to source zoom, but automated checks covered only `GrScaleZoom` itself and not the gesture dispatch |
 | Bring-up | Factor the Ctrl+wheel decision into `BootstrapCtrlWheelZoom`; preserve every accumulated wheel notch, keep plain wheel for focused controls, and clamp work at ZealOS's 1x–8x limits |
-| Smoke | `BootstrapCtrlWheelZoomChecks` verifies plain wheel is not consumed, one- and multi-notch Ctrl+wheel changes source zoom, and both zoom limits preserve the matching mouse scale; the focused graphics probe passes. The user confirmed visible desktop zoom from Ctrl+wheel in refreshed UTM |
-| Limits | The live result confirms zoom activation; pointer-centered anchoring, non-default pan, and plain-wheel delivery still need separate UTM checks |
+| Smoke | `BootstrapCtrlWheelZoomChecks` verifies plain wheel is not consumed, one- and multi-notch Ctrl+wheel changes source zoom, and both zoom limits preserve the matching mouse scale; the focused graphics probe passes. The user confirmed pointer-centered Ctrl+wheel zoom in refreshed UTM |
+| Limits | The live result confirms pointer-centered zoom; non-default pan and plain-wheel delivery still need separate UTM checks |
 
 ## Milestone 295 — open the guest editor from the graphical terminal
 
