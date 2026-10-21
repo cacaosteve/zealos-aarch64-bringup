@@ -125,8 +125,9 @@ I64 GrScreenZoomTransformChecks()
 }
 
 I64 GrScreenMouseEdgeChecks()
-{//The unchanged WinMouseUpdate recenters a zoomed view at pointer edges.
+{//The unchanged WinMouseUpdate pans a zoomed view at pointer edges without zooming out.
     I64 old_zoom = gr.screen_zoom, old_sx = gr.sx, old_sy = gr.sy;
+    I64 old_x = mouse.pos.x, old_y = mouse.pos.y, old_z = mouse.pos.z;
     I64 old_ox = mouse.offset.x, old_oy = mouse.offset.y, old_oz = mouse.offset.z;
     F64 old_scale_x = mouse.scale.x, old_scale_y = mouse.scale.y;
     F64 old_scale_z = mouse.scale.z, old_speed = mouse.speed;
@@ -143,12 +144,15 @@ I64 GrScreenMouseEdgeChecks()
     mouse_hard.installed = TRUE;
     mouse_hard.event = FALSE;
     mouse_hard.has_wheel = TRUE;
-    ok = ZcWinMouseUpdate() && gr.sx == 400 &&
+    ok = ZcWinMouseUpdate() && gr.screen_zoom == 2 && gr.sx == 400 &&
          mouse.speed < 1.0 && mouse.speed > 0.9 && mouse.has_wheel;
 
     gr.screen_zoom = old_zoom;
     gr.sx = old_sx;
     gr.sy = old_sy;
+    mouse.pos.x = old_x;
+    mouse.pos.y = old_y;
+    mouse.pos.z = old_z;
     mouse.offset.x = old_ox;
     mouse.offset.y = old_oy;
     mouse.offset.z = old_oz;
