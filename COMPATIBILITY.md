@@ -3869,3 +3869,13 @@ at the input boundary instead of running a malformed command; the fresh
 `make check-gui-workflow` run passed the menu, Files, Window Demo, input/caret,
 editor persistence, source execution, task isolation, `latticeplay`, and
 `stockplay` checks.
+
+After the source window-manager input-poll fix, the PCI graphical workflow,
+the NEC xHCI + VirtIO two-hub hotplug workflow, and `make
+check-home-autostart` were rerun against the rebuilt image on 2026-10-20; all
+passed. The USB run verified visible typing, pointer buttons/wheel, editor
+save/reopen, window-demo recovery, 12 keyboard reconnects, tablet recovery,
+and hub-subtree removal/reattach without DMA growth. The HomeSys run verified
+the disk-boot `Once` path, two-terminal tiling, popup/splash lifecycle, and
+restored graphical prompt. This is QEMU regression evidence; a physical UTM
+drag/resize check on the refreshed VM is still awaiting an unlocked Mac.
