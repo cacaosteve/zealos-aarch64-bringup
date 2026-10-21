@@ -2301,9 +2301,10 @@ ZealOS live distribution or installer.
   native FileMgr heading/tree in the framebuffer and that Escape returns to
   the graphical terminal. The separate native-USB Lattice workflow also
   passes. In UTM, the user confirmed that Files opens the directory listing
-  and Escape closes it. Opening a file from that listing is still unverified:
-  the automated click-to-open probe faulted in the guest, so that attempted
-  test wiring was reverted and is not counted as a pass.
+  and Escape closes it. The automated USB-backed guest workflow also verifies
+  Space and a pointer click opening `/Home/Once.ZC` in the graphical source
+  editor, Shift+Escape returning to FileMgr, and Escape closing Files. The
+  click target comes from the selected DocEntry's guest-screen coordinates.
 
 ## Visible graphical input and persistent editing
 
@@ -3937,3 +3938,10 @@ After refreshing UTM with the GrBlot3 source module, the user loaded
 `/System/Gr/GrBlot3.ZC` and `/Tests/GrBlot3.ZC` in the graphical terminal and
 ran `GrBlot3Checks`; the displayed result was `0x000000000000002a`. This
 confirms the new source graphics path loads and executes in the live UTM guest.
+
+On 2026-10-21, the USB graphical workflow also opened `/Home/Once.ZC` from the
+native FileMgr with both Space and a pointer click on the selected row. Both
+paths entered the graphical DolDoc editor, returned to the source tree with
+Shift+Escape, and closed Files with Escape. The click target is derived from
+the selected DocEntry's screen coordinates, so this covers the FileMgr/WinMgr
+pointer route rather than a guessed screen location.

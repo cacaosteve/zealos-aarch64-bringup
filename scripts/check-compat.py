@@ -2064,8 +2064,59 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 else:
                     raise RuntimeError('Shift+Escape did not return from the editor to FileMgr:\n' +
                                        (restored_screen[3] if restored_screen else ''))
-                print(f'PASS native FileMgr opened {selected_name} in the graphical editor and returned with Shift+Escape',
-                      flush=True)
+                # The stock FileMgr also opens a leaf on a mouse click.
+                # Derive the guest-pixel center from the selected DocEntry so
+                # this exercises its real WinMgr/Doc cursor path.
+                point_def = (
+                    'zc I64 FileMgrSelectedPoint(){CTask*t=bootstrap_gui_terminal_task;'
+                    'CDoc*d=t->display_doc;Print("fmxy=%d,%d\\n",'
+                    't->pix_left+t->scroll_x+(d->cur_entry->x-d->line_start_col)*8+4,'
+                    't->pix_top+t->scroll_y+(d->cur_entry->y-d->top_line_num)*8+4);'
+                    'return 42;}'
+                )
+                command(point_def, 'zc: executed')
+                point_result = command(
+                    'zcall FileMgrSelectedPoint', 'zc => 0x000000000000002a')
+                point_match = re.search(r'fmxy=(\d+),(\d+)', point_result)
+                if not point_match:
+                    raise RuntimeError('could not locate the selected FileMgr row:\n' +
+                                       point_result)
+                file_x, file_y = map(int, point_match.groups())
+                if not (0 <= file_x < 800 and 0 <= file_y < 600):
+                    raise RuntimeError(f'selected FileMgr row is outside the guest display: '
+                                       f'{file_x},{file_y}')
+                move_graphical_pointer(file_x, file_y)
+                graphical_mouse_button('left', True)
+                time.sleep(0.15)
+                graphical_mouse_button('left', False)
+                click_open_deadline = time.monotonic() + 5
+                while time.monotonic() < click_open_deadline:
+                    clicked_file_screen = graphical_screen(
+                        'os-menu-files-click-open')
+                    if (selected_name.lower() in clicked_file_screen[3].lower() and
+                            'onceexe;' in clicked_file_screen[3].lower() and
+                            'boot_src_rom' in clicked_file_screen[3].lower()):
+                        break
+                    time.sleep(0.1)
+                else:
+                    raise RuntimeError('click did not open the selected source file in the graphical editor:\n' +
+                                       f'click={file_x},{file_y}\n' +
+                                       clicked_file_screen[3])
+                qmp_send_keys(['shift', 'esc'])
+                click_return_deadline = time.monotonic() + 5
+                while time.monotonic() < click_return_deadline:
+                    clicked_return_screen = graphical_screen(
+                        'os-menu-files-click-return')
+                    if ('onceexe;' not in clicked_return_screen[3].lower() and
+                            rgb_pixels_in(clicked_return_screen, (85, 85, 255),
+                                          (0, 0, 400, 200)) >= 500):
+                        break
+                    time.sleep(0.1)
+                else:
+                    raise RuntimeError('Shift+Escape did not return from the clicked file to FileMgr:\n' +
+                                       clicked_return_screen[3])
+                print(f'PASS native FileMgr opened {selected_name} by Space and click, '
+                      'returning with Shift+Escape', flush=True)
                 qmp_send_key('esc')
                 files_restore_deadline = time.monotonic() + 5
                 while True:
