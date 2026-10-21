@@ -3991,3 +3991,12 @@ checks both the expanded indexed pixels and the presented framebuffer against
 the corresponding source pixels. The probe reports `0x2a` and exits
 successfully. Large live allocations now retain their guest call site in the
 arena-exhaustion diagnostic to make a recurrence attributable.
+
+## Sprite arrow symmetry — 2026-10-21
+
+The bounded `SPT_ARROW` rasterizer now reflects its shaft and both arrowhead
+strokes across an active planar symmetry axis. It validates all reflected
+points before drawing and charges the added lines against the sprite work
+budget. The new framebuffer check verifies the source and reflected shaft,
+tip, and arrowhead pixels. `make check-sprite-arrow-symmetry` passed in a fresh
+ARM64 PCI guest; the target also rebuilds the source bundle used by UTM.

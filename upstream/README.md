@@ -3466,6 +3466,15 @@ Freeze catalog unchanged.
 | Live retest | The 2026-10-16 screenshots confirm physical typing and command submission in the graphical terminal. Earlier failures were before this successful run |
 | Limits | Full editor key coverage and the normal ZealOS keyboard/menu stack remain open |
 
+## Milestone 310 — reflect bounded sprite arrows across symmetry planes
+
+| Item | Path |
+|--|--|
+| Gap | `SPT_ARROW` drew its shaft and arrowhead only on the source side even when the sprite enabled planar symmetry |
+| Bring-up | Reflect the shaft and both arrowhead strokes across the validated screen-space symmetry axis; validate all mirrored endpoints before drawing and include the extra strokes in the per-sprite work budget |
+| Smoke | `GrSpriteArrowSymmetryChecks` checks both arrow tips, shaft samples, and both reflected arrowhead arms in the framebuffer; `make check-sprite-arrow-symmetry` passes |
+| Limits | The bounded path uses the affine sprite transform and 2D symmetry bridge; general perspective projection and full 3D clipping remain open |
+
 **Historical live UTM check (2026-10-16, UTM 5.0.7):** the VM renders graphics
 and the serial shell works through the PTTY reported for the current boot.
 `utmctl attach ZealosAarch64Hello` warns that attachment is not implemented but

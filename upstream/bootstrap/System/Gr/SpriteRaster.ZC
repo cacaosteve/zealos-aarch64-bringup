@@ -1390,10 +1390,14 @@ I64 SpriteRotatedRect0(CDC *dc, I64 x, I64 y, I32 x1, I32 y1,
 
 Bool SpriteArrow0(CDC *dc, I64 x, I64 y, I64 x1, I64 y1,
         I64 x2, I64 y2, Bool transform_enabled, I64 z,
-        I64 *pixel_budget)
+        Bool symmetry_enabled, I64 axis_x1, I64 axis_y1,
+        I64 axis_x2, I64 axis_y2, I64 *pixel_budget)
 {
-    I64 dx, dy, dy_abs, length_sqr, line_steps, head_x, head_y;
-    I64 start_x, start_y, end_x, end_y;
+    I64 dx, dy, dy_abs, length_sqr, line_steps, line_budget;
+    I64 head1_x, head1_y;
+    I64 head2_x, head2_y, start_x, start_y, end_x, end_y;
+    I64 mirror_start_x, mirror_start_y, mirror_end_x, mirror_end_y;
+    I64 mirror_head1_x, mirror_head1_y, mirror_head2_x, mirror_head2_y;
     F64 arrow_scale;
     if (transform_enabled)
     {
@@ -1423,20 +1427,42 @@ Bool SpriteArrow0(CDC *dc, I64 x, I64 y, I64 x1, I64 y1,
     if (dy_abs > line_steps)
         line_steps = dy_abs;
     line_steps++;
+    line_budget = 3;
+    if (symmetry_enabled)
+        line_budget = 6;
     if (length_sqr > 16384 * 16384 ||
-            3 * line_steps > 480000 - *pixel_budget)
+            line_budget * line_steps > 480000 - *pixel_budget)
         return FALSE;
-    *pixel_budget += 3 * line_steps;
+    *pixel_budget += line_budget * line_steps;
     if (!dx && !dy)
         return TRUE;
     arrow_scale = 2.75 * dc->thick / Sqrt(ToF64(length_sqr));
-    head_x = end_x - dx * arrow_scale + dy * arrow_scale + 0.5;
-    head_y = end_y - dy * arrow_scale - dx * arrow_scale + 0.5;
+    head1_x = end_x - dx * arrow_scale + dy * arrow_scale + 0.5;
+    head1_y = end_y - dy * arrow_scale - dx * arrow_scale + 0.5;
+    head2_x = end_x - dx * arrow_scale - dy * arrow_scale + 0.5;
+    head2_y = end_y - dy * arrow_scale + dx * arrow_scale + 0.5;
+    if (symmetry_enabled &&
+            (!SpriteMirrorPoint0(axis_x1, axis_y1, axis_x2, axis_y2,
+                    start_x, start_y, &mirror_start_x, &mirror_start_y) ||
+            !SpriteMirrorPoint0(axis_x1, axis_y1, axis_x2, axis_y2,
+                    end_x, end_y, &mirror_end_x, &mirror_end_y) ||
+            !SpriteMirrorPoint0(axis_x1, axis_y1, axis_x2, axis_y2,
+                    head1_x, head1_y, &mirror_head1_x, &mirror_head1_y) ||
+            !SpriteMirrorPoint0(axis_x1, axis_y1, axis_x2, axis_y2,
+                    head2_x, head2_y, &mirror_head2_x, &mirror_head2_y)))
+        return FALSE;
     GrLine(dc, start_x, start_y, end_x, end_y);
-    GrLine(dc, head_x, head_y, end_x, end_y);
-    head_x = end_x - dx * arrow_scale - dy * arrow_scale + 0.5;
-    head_y = end_y - dy * arrow_scale + dx * arrow_scale + 0.5;
-    GrLine(dc, head_x, head_y, end_x, end_y);
+    GrLine(dc, head1_x, head1_y, end_x, end_y);
+    GrLine(dc, head2_x, head2_y, end_x, end_y);
+    if (symmetry_enabled)
+    {
+        GrLine(dc, mirror_start_x, mirror_start_y,
+                mirror_end_x, mirror_end_y);
+        GrLine(dc, mirror_head1_x, mirror_head1_y,
+                mirror_end_x, mirror_end_y);
+        GrLine(dc, mirror_head2_x, mirror_head2_y,
+                mirror_end_x, mirror_end_y);
+    }
     return TRUE;
 }
 
@@ -1987,7 +2013,7 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
             }
             size = 20;
         }
-        else if (type == 26) // SPT_ARROW, bounded 2D GrArrow3 equivalent
+        else if (type == 26) // SPT_ARROW, bounded transformed/symmetric 2D
         {
             MemCopy(&x1, sprite + 4, sizeof(I32));
             MemCopy(&y1, sprite + 8, sizeof(I32));
@@ -1995,7 +2021,8 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
             MemCopy(&y2, sprite + 16, sizeof(I32));
             if (!SpriteArrow0(dc, x + old_x, y + old_y,
                     x1, y1, x2, y2, transform_enabled, z,
-                    &pixel_budget))
+                    symmetry_enabled, symmetry_x1, symmetry_y1,
+                    symmetry_x2, symmetry_y2, &pixel_budget))
                 break;
             size = 20;
         }

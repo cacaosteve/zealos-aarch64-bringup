@@ -1,0 +1,62 @@
+extern I64 ZcFbTextPixel(I64 x, I64 y);
+extern I64 ZcFbGraphColor(I64 color);
+extern Bool ZcFbGraphPlot(I64 x, I64 y, U32 color, I64 left, I64 top,
+        I64 right, I64 bottom, I64 task_z);
+
+I64 GrSpriteArrowSymmetryChecks()
+{
+    CDC *dc;
+    U8 *records;
+    U8 type;
+    I32 x1, y1, x2, y2;
+    I64 color, x, y, result;
+
+    dc = DCNew(800, 600);
+    records = CAlloc(41);
+    if (!dc || !records)
+    {
+        if (records) Free(records);
+        if (dc) DCDel(dc);
+        return 1;
+    }
+    dc->flags |= DCF_SCREEN_BITMAP | DCF_ON_TOP;
+    dc->color.c0 = 14;
+    color = ZcFbGraphColor(14);
+    for (y = 317; y <= 323; y++)
+        for (x = 410; x <= 590; x++)
+            ZcFbGraphPlot(x, y, 0, 0, 0, 799, 599, 0);
+
+    // Reflect an east-facing arrow across x=500. Its shaft, tip and both
+    // arrowhead arms should all be drawn on both sides of the symmetry axis.
+    type = SPT_PLANAR_SYMMETRY;
+    MemCopy(records, &type, sizeof(U8));
+    x1 = 100; y1 = 0; x2 = 100; y2 = 200;
+    MemCopy(records + 4, &x1, sizeof(I32));
+    MemCopy(records + 8, &y1, sizeof(I32));
+    MemCopy(records + 12, &x2, sizeof(I32));
+    MemCopy(records + 16, &y2, sizeof(I32));
+    type = SPT_ARROW;
+    MemCopy(records + 20, &type, sizeof(U8));
+    x1 = 0; y1 = 20; x2 = 20; y2 = 20;
+    MemCopy(records + 24, &x1, sizeof(I32));
+    MemCopy(records + 28, &y1, sizeof(I32));
+    MemCopy(records + 32, &x2, sizeof(I32));
+    MemCopy(records + 36, &y2, sizeof(I32));
+    Sprite3(dc, 400, 300, 0, records);
+
+    result = 42;
+    if (ZcFbTextPixel(410, 320) != color) result = 3;
+    else if (ZcFbTextPixel(420, 320) != color) result = 4;
+    else if (ZcFbTextPixel(590, 320) != color) result = 5;
+    else if (ZcFbTextPixel(580, 320) != color) result = 6;
+    else if (ZcFbTextPixel(417, 317) != color) result = 7;
+    else if (ZcFbTextPixel(583, 317) != color) result = 8;
+    else if (ZcFbTextPixel(417, 323) != color) result = 9;
+    else if (ZcFbTextPixel(583, 323) != color) result = 10;
+    for (y = 317; y <= 323; y++)
+        for (x = 410; x <= 590; x++)
+            ZcFbGraphPlot(x, y, 0, 0, 0, 799, 599, 0);
+    DCDel(dc);
+    Free(records);
+    return result;
+}

@@ -95,7 +95,7 @@ SRC_SHADOW_END   := $(shell echo $$(($(SRC_SHADOW_LBA) + $(SRC_SHADOW_SECTS) - 1
 ESP_END_SECTOR   := $(shell echo $$(($(RS_LBA_BASE) - 1)))
 ESP_SECTORS      := $(shell echo $$(($(ESP_END_SECTOR) - $(ESP_START_SECTOR) + 1)))
 
-.PHONY: all clean esp iso run run-serial check-serial check-page-tables check-pi4-pcie-fdt check-pi4-pcie-cfg check-pi4-dma check-pi4-xhci-probe check-pi4-platform check-window-buttons check-doced-popup check-docfile-persistence run-iso run-pci utm pi-sd pi-diag
+.PHONY: all clean esp iso run run-serial check-serial check-page-tables check-pi4-pcie-fdt check-pi4-pcie-cfg check-pi4-dma check-pi4-xhci-probe check-pi4-platform check-window-buttons check-sprite-arrow-symmetry check-doced-popup check-docfile-persistence run-iso run-pci utm pi-sd pi-diag
 
 all: $(BOOT) $(KERNEL) iso esp
 
@@ -602,6 +602,10 @@ check-serial: check-page-tables iso $(FW_VARS) $(RS_IMG)
 # Exercise real task/window and control drawing against the UTM PCI machine.
 check-window-buttons: esp
 	python3 scripts/check-compat.py --pci --probe-window-buttons
+
+# Check the bounded source sprite arrow symmetry path against framebuffer pixels.
+check-sprite-arrow-symmetry: check-upstream esp
+	python3 scripts/check-compat.py --pci --probe-sprite-arrow-symmetry
 
 # Verify upstream DocEd's asynchronous PopUpEd source-launch path.
 check-doced-popup: esp
