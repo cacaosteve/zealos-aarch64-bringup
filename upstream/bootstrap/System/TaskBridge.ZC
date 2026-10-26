@@ -2166,6 +2166,10 @@ U0 FindWiz()
 // text-plane constants declared below so the forward CDC stub can use it.
 U8 bootstrap_graphics_pixels[800 * 600];
 CDC bootstrap_graphics_dc;
+// Upstream gr.dc is retained foreground; gr.dc2 is the compositor target.
+U8 bootstrap_foreground_pixels[800 * 600];
+CDC bootstrap_foreground_dc;
+Bool bootstrap_foreground_ready;
 I32 bootstrap_graphics_depth_pixels[800 * 600];
 I64 bootstrap_graphics_depth_width;
 I64 bootstrap_graphics_depth_height;
@@ -2191,6 +2195,11 @@ Bool bootstrap_present_cache_ready = FALSE;
 Bool bootstrap_present_ready = FALSE;
 Bool bootstrap_gr_packed_tables_ready = FALSE;
 Bool bootstrap_gr_zoom_tables_ready = FALSE;
+bootstrap_foreground_dc.body = bootstrap_foreground_pixels;
+bootstrap_foreground_dc.width = bootstrap_foreground_dc.width_internal = 800;
+bootstrap_foreground_dc.height = 600;
+bootstrap_foreground_dc.dc_signature = DCS_SIGNATURE_VAL;
+bootstrap_foreground_dc.flags = DCF_SCREEN_BITMAP;
 bootstrap_graphics_dc.body = bootstrap_graphics_pixels;
 bootstrap_graphics_dc.width = 800;
 bootstrap_graphics_dc.width_internal = 800;
@@ -2240,7 +2249,7 @@ CDC *DCAlias(CDC *dc, CTask *task=NULL)
     if (!task)
         task = Fs;
     if (!dc)
-        dc = &bootstrap_graphics_dc;
+        dc = &bootstrap_foreground_dc;
     dc->width = ZcFbScreenWidth();
     dc->width_internal = dc->width & ~7;
     dc->height = ZcFbScreenHeight();
@@ -2301,7 +2310,7 @@ U0 DCReset(CDC *dc)
 }
 U0 DCDel(CDC *dc)
 {
-    if (!dc || dc == &bootstrap_graphics_dc || dc == &bootstrap_zoom_dc ||
+    if (!dc || dc == &bootstrap_graphics_dc || dc == &bootstrap_foreground_dc || dc == &bootstrap_zoom_dc ||
             dc == &bootstrap_planar_dc || dc == &bootstrap_planar_cache_dc)
         return;
     if (dc->dc_signature != DCS_SIGNATURE_VAL)
@@ -2596,7 +2605,7 @@ public class CGrGlobals
 	Bool hide_row, hide_col;
 } gr;
 extern CGrGlobals *ZcActiveGrGlobals();
-gr.dc = &bootstrap_graphics_dc;
+gr.dc = &bootstrap_foreground_dc;
 gr.dc2 = &bootstrap_graphics_dc;
 gr.text_base = bootstrap_text_base;
 gr.win_z_buf = bootstrap_win_z_buf;
@@ -2927,7 +2936,13 @@ U0 BootstrapGrContextInit()
     bootstrap_zoom_dc.dc_signature = DCS_SIGNATURE_VAL;
     active_gr->screen_image = &bootstrap_graphics_dc;
     active_gr->fp_wall_paper = &BootstrapWinPaper;
-    active_gr->dc = active_gr->dc2 = &bootstrap_graphics_dc;
+    active_gr->dc = &bootstrap_foreground_dc;
+    active_gr->dc2 = &bootstrap_graphics_dc;
+    if (!bootstrap_foreground_ready)
+    {
+        MemSet(bootstrap_foreground_pixels, TRANSPARENT, 800 * 600);
+        bootstrap_foreground_ready = TRUE;
+    }
     active_gr->dc1 = &bootstrap_planar_dc;
     active_gr->dc_cache = &bootstrap_planar_cache_dc;
     active_gr->zoomed_dc = &bootstrap_zoom_dc;
@@ -3816,39 +3831,10 @@ Bool GrLine(CDC *dc=gr.dc, I64 x1=0, I64 y1=0, I64 x2=0, I64 y2=0,
     U32 color;
     if (!dc || step < 1 || start < 0)
         return FALSE;
-    // GrPlot1 owns the source brush semantics and performs screen-window
-    // clipping. Keep its coordinates task-local before the framebuffer path
-    // below converts them to absolute pixels.
-    if ((dc->flags & DCF_SCREEN_BITMAP) && dc->brush)
-        return BootstrapGraphCdcBrushLine(dc, x1, y1, x2, y2,
-                                          step, start, dc->thick);
-    color = dc->color.c0 & 0xff;
-    task = dc->win_task;
-    task_z = 0;
-    if ((dc->flags & DCF_SCREEN_BITMAP) && !(dc->flags & DCF_ON_TOP))
+    if (!(dc->flags & DCF_SCREEN_BITMAP) ||
+            dc->body == bootstrap_foreground_pixels)
     {
-        if (!task)
-            return FALSE;
-        WinDerivedValsUpdate(task);
-        task_z = BootstrapTaskZ(task);
-        left = task->pix_left;
-        top = task->pix_top;
-        right = task->pix_right;
-        bottom = task->pix_bottom;
-        x1 += left + task->scroll_x;
-        x2 += left + task->scroll_x;
-        y1 += top + task->scroll_y;
-        y2 += top + task->scroll_y;
-    }
-    else
-    {
-        left = top = 0;
-        right = dc->width - 1;
-        bottom = dc->height - 1;
-    }
-    thick = dc->thick;
-    if (!(dc->flags & DCF_SCREEN_BITMAP))
-    {
+        thick = dc->thick;
         Bool plotted = FALSE;
         if (thick <= 1)
             return BootstrapGraphCdcLine0(dc, x1, y1, x2, y2,
@@ -3897,6 +3883,37 @@ Bool GrLine(CDC *dc=gr.dc, I64 x1=0, I64 y1=0, I64 x2=0, I64 y2=0,
         }
         return plotted;
     }
+    // GrPlot1 owns the source brush semantics and performs screen-window
+    // clipping. Keep its coordinates task-local before the framebuffer path
+    // below converts them to absolute pixels.
+    if ((dc->flags & DCF_SCREEN_BITMAP) && dc->brush)
+        return BootstrapGraphCdcBrushLine(dc, x1, y1, x2, y2,
+                                          step, start, dc->thick);
+    color = dc->color.c0 & 0xff;
+    task = dc->win_task;
+    task_z = 0;
+    if ((dc->flags & DCF_SCREEN_BITMAP) && !(dc->flags & DCF_ON_TOP))
+    {
+        if (!task)
+            return FALSE;
+        WinDerivedValsUpdate(task);
+        task_z = BootstrapTaskZ(task);
+        left = task->pix_left;
+        top = task->pix_top;
+        right = task->pix_right;
+        bottom = task->pix_bottom;
+        x1 += left + task->scroll_x;
+        x2 += left + task->scroll_x;
+        y1 += top + task->scroll_y;
+        y2 += top + task->scroll_y;
+    }
+    else
+    {
+        left = top = 0;
+        right = dc->width - 1;
+        bottom = dc->height - 1;
+    }
+    thick = dc->thick;
     if (thick <= 1)
         return ZcFbGraphLine(x1, y1, x2, y2, color,
                              step, start, left, top, right, bottom,
@@ -5611,6 +5628,21 @@ Bool BootstrapCanUseUpstreamGrUpdateTasks()
         return FALSE;
     return TRUE;
 }
+U0 BootstrapForegroundBlot(CDC *dst, CDC *src)
+{//The fallback path must preserve the same foreground stage as GrUpdateScreen.
+    I64 i, count;
+    if (!dst || !src || !dst->body || !src->body ||
+        dst->width_internal != src->width_internal || dst->height != src->height ||
+        src->width_internal < 1 || src->width_internal > 800 ||
+        src->height < 1 || src->height > 600)
+        return;
+    count = src->width_internal * src->height;
+    if (count < 0 || count > 800 * 600)
+        return;
+    for (i = 0; i < count; i++)
+        if (src->body[i] != TRANSPARENT)
+            dst->body[i] = src->body[i];
+}
 Bool BootstrapTryUpstreamGrUpdateScreen()
 {//Use the unchanged full compositor only when its buffers and task graph are live.
     CGrGlobals *active_gr;
@@ -5631,7 +5663,7 @@ Bool BootstrapTryUpstreamGrUpdateScreen()
     BootstrapBindGrTaskTables(active_gr);
     bootstrap_present_ready = FALSE;
     bootstrap_present_ready = TRUE;
-    active_gr->dc = &bootstrap_graphics_dc;
+    active_gr->dc = &bootstrap_foreground_dc;
     active_gr->dc2 = &bootstrap_graphics_dc;
     active_gr->fp_wall_paper = &BootstrapWinPaper;
     active_gr->dc1 = &bootstrap_planar_dc;
@@ -5726,7 +5758,7 @@ U0 BootstrapGrUpdateTasks()
     bootstrap_present_ready = TRUE;
     // Bind the upstream rasterizers to the bootstrap frame surface.
     // Task/window draws already target this same CDC through DCAlias.
-    active_gr->dc = &bootstrap_graphics_dc;
+    active_gr->dc = &bootstrap_foreground_dc;
     active_gr->dc2 = &bootstrap_graphics_dc;
     active_gr->dc1 = &bootstrap_planar_dc;
     active_gr->dc_cache = &bootstrap_planar_cache_dc;
@@ -5829,6 +5861,7 @@ U0 BootstrapGrUpdateTasks()
             while (task && task != ode_root && ode_visited < 64);
         }
     }
+    BootstrapForegroundBlot(active_gr->dc2, active_gr->dc);
     if (active_gr->fp_final_screen_update)
     {
         CDC *dc = DCAlias(&bootstrap_graphics_dc, NULL);
@@ -5994,6 +6027,13 @@ I64 CharGet(I64 *_scan_code=NULL, Bool echo=TRUE, Bool raw_cursor=FALSE)
     while (!ch);
     return ch;
 }
+// Unchanged Kernel/StrB.ZC key-wait wrapper; CharGet uses native task input.
+I64 PressAKey()
+{//Print "Press a key" and wait for non-zero $LK,"ASCII",A="MN:CH_CTRLA"$ key.
+	"$$BK,1$$PRESS A KEY$$BK,0$$\n";
+	return CharGet(, FALSE);
+}
+
 // A bounded TaskExe subset runs source in the recipient's inherited compiler
 // symbol table when it calls JobsHandler. WAKE_MASTER waits for the
 // calling master; FOCUS_MASTER restores focus after completion unless the

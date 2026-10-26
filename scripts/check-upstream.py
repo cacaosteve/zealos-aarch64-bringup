@@ -54,4 +54,8 @@ str_source = (zeal/'Kernel/StrA.ZC').read_text()
 first_remove = str_source.split('U8 *StrFirstRemove(', 1)[1].split('\nU8 *StrLastOcc(', 1)[0]
 if 'U8 *StrFirstRemove(' + first_remove.strip() not in bridge:
     raise SystemExit('StrFirstRemove body drifted from pinned StrA source')
-print('PASS pinned Aiwnios originals + documented patch; unchanged ZealOS files; Win progress, CMain cleanup wrappers, Option and StrFirstRemove fixtures')
+str_b_source = (zeal/'Kernel/StrB.ZC').read_text()
+press_key = str_b_source.split('I64 PressAKey()', 1)[1].split('\nBool AreYouSure()', 1)[0]
+if 'I64 PressAKey()' + press_key.rstrip() not in bridge:
+    raise SystemExit('PressAKey body drifted from pinned StrB source')
+print('PASS pinned Aiwnios originals + documented patch; unchanged ZealOS files; Win progress, CMain cleanup wrappers, Option, StrFirstRemove and PressAKey fixtures')

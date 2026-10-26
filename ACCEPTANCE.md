@@ -2321,3 +2321,75 @@ accept writable save/reboot/reopen persistence, native SD, disconnect recovery,
 Pi installation, Apple multitouch/secondary click, full splash-animation
 behavior or complete ZealOS parity. No boot payload changed for this evidence
 update; the previously passing platform/image tests remain applicable.
+
+## Unchanged upstream programs in UTM-shaped QEMU (2026-10-26)
+
+The first regular-program batch imports the complete, unchanged
+`Demo/Graphics/NetOfDots.ZC` and `Demo/Graphics/Lines.ZC` from the existing
+public ZealOS pin. Their file hashes are in `upstream/pinned/UPSTREAM.json`;
+`make check-upstream` checks those bytes and the original StrB `PressAKey`
+body used by the bridge. This is distinct from the legacy adapted bring-up
+copies. Both programs are in the boot archive/source partition and have Apps
+menu entries. The menu returns their include command to the original User
+command loop, so compilation does not run inside the input-reader callback.
+
+Running the originals exposed four concrete gaps: unbound `PressAKey`,
+unimplemented `SignI64`, `DocClear` retaining an early no-op `DocPrint`, and
+one-shot graphics being erased by the next compositor refresh. The runtime
+now binds signed comparison-based `SignI64` (including I64_MIN), uses the
+unchanged `PressAKey` body with native input, and reloads DocRecalcLib after
+the real output writer. Retained foreground `gr.dc` now has its own
+transparent 800×600 indexed surface, separate from compositor target `gr.dc2`.
+Foreground lines use the existing CDC rasterizer with task coordinates and
+visibility; source and fallback compositors retain the foreground stage.
+
+The program gate passes with both NEC USB input and VirtIO input. It observes
+actual menu selection and graphical-terminal inclusion, clears a document
+sentinel, requires the red fan inside the program's own window across later
+frames, verifies DCFill clears it after key exit, and runs `40+2; → 42`.
+Lines must produce changing colored pixels within that window, then exit on
+Escape and leave `6*7; → 42` working with `failed=0`. The color/animation
+checks exclude the other terminal, menu transitions and cursor blinking.
+`StockProgramIntrinsicChecks` also returns `0x2a` for direct and indirect
+SignI64 calls over negative/zero/positive values and both signed extremes.
+
+Logs: `build/check-stock-programs-nec-run.log`,
+`build/check-usb-nec-tablet-stock-programs.log`,
+`build/check-stock-programs-virtio-run.log`, and
+`build/check-stock-programs-pci.log`. A captured retained fan is
+`build/utm-stock-netofdots.png`. These are automated QEMU/HVF guest checks,
+not a new eyes-on UTM app acceptance or physical Pi program acceptance.
+The broader `make check-grscreen-full`, `make check-gui-workflow`, and
+`make check-iso-installer` regressions also pass. The graphics gate covers
+CDC lines, sprites, screen context/foreground roles, zoom, view controls and
+final text composition. The NEC GUI workflow covers menus/paint, compiler
+options/error recovery, source execution and System tasks, graphical editor
+save/compile/run, cold reboot/reopen, Lattice controls and demo Escape returns.
+The new ISO installs onto a disposable 128 MiB VirtIO disk with full read-back
+and byte-identical comparison, then cold-boots from the disk alone. Saved
+`InstallerPersist` returns `0x2a` before and after a second disk-only cold boot.
+Logs: `build/check-stock-programs-graphics-regression.log`,
+`build/check-stock-programs-workflow-regression.log`, and
+`build/check-stock-programs-iso-regression.log`. All commands exited zero.
+The prior live-accepted ISO `52c214c…` is preserved as
+`build/zealos-aarch64-hello-accepted-52c214c.iso`.
+
+The wider upstream Apps/Demo collection is still not bundled or accepted;
+[PROGRAMS.md](PROGRAMS.md) records the program boundary. The previously
+accepted physical Pi desktop image and diagnostic recovery were not rebuilt
+or staged by this UTM follow-up.
+
+Current program ISO SHA-256:
+`95cb32ad3d28926adc8845e4def9532ae42ab49b24b4dfdabdfbc9626f55126b`.
+Installed template disk SHA-256:
+`c1e9d008b9cb531d8d4315992d3041194893a76d0b6039421c805ace76c41a96`.
+Kernel SHA-256:
+`52fda0313ab8d2855de2fece5a0bc6a8f29429373c9ef9c8596382d78de9a2e5`.
+The **249-file** source archive SHA-256 is
+`22ce6cb2e7a1315100f50d5ca66c024b446a9d56c81b139ded57334e73fe6c29`.
+Both program files in that archive match the pinned originals byte-for-byte.
+Artifact sizes/hashes and gate summary are in
+`build/utm-stock-programs-artifacts.json`. Source integrity/ARM64 overlays and
+`git diff --check` pass. The last live UTM app installer acceptance remains
+the preserved `52c214c…` image; an eyes-on UTM launch of the two new Apps
+entries on `95cb32ad…` is still pending.

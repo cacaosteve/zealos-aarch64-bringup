@@ -4,6 +4,8 @@
   "files": {
     "src/Compiler/CMain.ZC": "73ed8eab7cbfc4c2b4d3af348ab4c9218327713eddf4be32f01d0c6c1dd96348",
     "src/Compiler/CMisc.ZC": "8aab1c44038486f725dbf6a71f71c09ee5babe26a7afe8dfa409830afdc16499",
+    "src/Demo/Graphics/Lines.ZC": "477ba20615592849179da4864bf1f958bada5d5343317858e402abc9a3b161f9",
+    "src/Demo/Graphics/NetOfDots.ZC": "6ce3cc560dc36a1f2943c9eecf3fc12675a0b618dbe8ce3320356c389e5b3fab",
     "src/Doc/Customize.DD": "8a516c8b29cc037039b68d36f1ac4676b3d871e68d173b18fd1c75e0c41aefa6",
     "src/Doc/FileMgr.DD": "86db37f3801e6b8989c99c7c43e89d4a1552453e56d91de229f87ea5a2718098",
     "src/Doc/FileMgrPullDown.DD": "02d7c8ef51489ae998b3d08af3d038154884b65c3a68a14ffa05c986bac2f4cc",

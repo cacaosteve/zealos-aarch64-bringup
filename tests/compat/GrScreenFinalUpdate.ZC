@@ -9,7 +9,7 @@ extern I64 bootstrap_upstream_gr_update_screen;
 extern U16 bootstrap_win_z_buf[TEXT_COLS * TEXT_ROWS];
 extern U16 bootstrap_win_pixel_z_buf[800 * 600];
 extern U16 bootstrap_win_uncovered[(BOOTSTRAP_WIN_MAX + 16) / 16];
-extern CDC bootstrap_graphics_dc, bootstrap_planar_dc;
+extern CDC bootstrap_graphics_dc, bootstrap_foreground_dc, bootstrap_planar_dc;
 extern CDC bootstrap_planar_cache_dc, bootstrap_zoom_dc;
 extern U32 bootstrap_text_base[TEXT_COLS * TEXT_ROWS];
 extern U8 bootstrap_present_cache[800 * 600];
@@ -372,7 +372,7 @@ I64 BootstrapGrContextInitChecks()
     if (BootstrapWallpaperChecks() != 0x2a)
         return 3;
     if (active_gr->screen_image != &bootstrap_graphics_dc ||
-        active_gr->dc != &bootstrap_graphics_dc ||
+        active_gr->dc != &bootstrap_foreground_dc ||
         active_gr->dc1 != &bootstrap_planar_dc ||
         active_gr->dc2 != &bootstrap_graphics_dc ||
         active_gr->dc_cache != &bootstrap_planar_cache_dc ||

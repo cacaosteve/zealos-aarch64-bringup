@@ -17,6 +17,16 @@ splash logo:
 
 ![ZealOS AArch64 graphical desktop running in UTM](docs/images/zealos-aarch64-utm-desktop.png)
 
+## Regular ZealOS programs
+
+The ARM64 source bundle now includes the unchanged upstream **Net of Dots**
+and **Lines** programs. Launch them from **Apps**, or type
+`#include "/Demo/Graphics/NetOfDots"` or `#include "/Demo/Graphics/Lines"`
+in a graphical terminal. These are separate from the older adapted bring-up
+commands. See [PROGRAMS.md](PROGRAMS.md) for scope and remaining applications;
+`make check-stock-programs` checks visible drawing, input exit and recovery
+with UTM's NEC USB controller model.
+
 ## Native source compatibility milestone
 
 A new **persistent compiler session** runs the pinned Aiwnios ARM64 compiler
@@ -29,6 +39,7 @@ make check-compat       # disposable ISO guest + old boot regressions
 make check-compat-pci   # disposable UTM-shaped GPT/PCI disk guest
 make check-gui-terminal # terminal output ownership, menus, paint and zoom/pan
 make check-gui-workflow # visible typing/cursors + graphical edit/save/run/reboot
+make check-stock-programs # unchanged upstream graphics programs through Apps
 make check-usb-input    # native NEC/QEMU xHCI keyboard, mouse/tablet + recovery
 make check-usb-topology # nested USB2 hubs, repeated reconnects + subtree recovery
 make check-pi4-platform # Pi FDT/DMA/xHCI, HID/storage and framebuffer adapter
@@ -305,11 +316,11 @@ Bridge notes: [AIWNIOS.md](AIWNIOS.md). Milestone ladder: [upstream/README.md](u
 
 | Track | Status |
 |--|--|
-| QEMU/UTM virt | Current ISO `build/zealos-aarch64-hello.iso` (`52c214c…`) passes `make check-iso-installer`. Exact-image UTM install completed with full 128 MiB read-back verification; the CD-detached VirtIO disk cold-booted through RedSea to the desktop and centered animated Z. `InstallerPersist` returned `0x2a` before and after a second cold reboot; live Ctrl-Alt-F dispatch and automated menu/paint Escape checks passed. See [ACCEPTANCE.md](ACCEPTANCE.md). |
+| QEMU/UTM virt | Live ISO install/disk-only desktop/persistence accepted for `52c214c…`. New program ISO `build/zealos-aarch64-hello.iso` (`95cb32ad…`) adds unchanged Net of Dots and Lines in Apps, with NEC/VirtIO visible drawing and key-exit tests. Full graphics, graphical editor/save/reboot/reopen and automated ISO install/read-back/disk-only persistence gates pass. Live UTM app checks of the two new entries remain pending. See [ACCEPTANCE.md](ACCEPTANCE.md) and [PROGRAMS.md](PROGRAMS.md). |
 | Pi 4B UEFI | **PI-DESKTOP-2 native desktop/basic input accepted (2026-10-26)**: native graphical terminals, visible pointer movement, menu clicks and `40+2; → 42`. IMG_9182 confirms firmware 1920×1280, packed 800×600 desktop scaled 2×, 1632 composed frames and USB active/fault/stopped 1/0/0. Physical read-only FAT32 USB file reads and simultaneous keyboard/pointer/storage were accepted earlier. Kernel `b12497c8…93d4930b`; M6 diagnostic recovery preserved. Writable persistence, native SD, reconnect recovery and Pi installation remain open ([PI4.md](PI4.md)). |
 
 ## Earlier platform follow-ups
 
-1. UTM/QEMU installer acceptance is complete for the current ISO; optional follow-up: capture a live UTM screenshot of the Paint Demo Escape reset.
+1. UTM: check Apps → Net of Dots and Lines in the new `95cb32ad…` ISO (USB CD first). Automated program, graphics, editor and ISO install/persistence gates pass; the prior live-accepted ISO is preserved.
 2. Pi: extend the accepted native desktop/input milestone to source-program/editor workflows and writable save/reboot/reopen persistence; native SD, disconnect recovery and installation remain open.
 3. HCRT host stubs only after IR gap shrinks; DT-based discovery before other ARM64 boards

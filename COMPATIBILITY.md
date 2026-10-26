@@ -58,6 +58,16 @@ SHA-256 and makes every pinned file independently retrievable.
 
 ## Use it
 
+The first unchanged upstream graphics programs, `Demo/Graphics/NetOfDots.ZC`
+and `Demo/Graphics/Lines.ZC`, are now bundled and launch through the graphical
+Apps menu or normal `#include`. `make check-stock-programs` checks their
+visible drawing, retained foreground across redraws, keyboard exit and prompt
+recovery with UTM's NEC input model. `SignI64` now has an ARM64 runtime binding
+including extreme signed values and indirect calls; the original `PressAKey`
+wrapper uses native task input. Reloading DocRecalcLib after the real DocPrint
+implementation also makes the original DocClear remove terminal history.
+See [PROGRAMS.md](PROGRAMS.md) for the supported subset and remaining collection.
+
 Boot the refreshed UTM image and run `zcheck`. It resets the native session,
 loads the upstream module and separate callers, then reports the integration
 checks. A successful session remains available at the prompt.

@@ -1,0 +1,13 @@
+// SignI64 is used unchanged by Demo/Graphics/Lines.ZC. Include extreme signed
+// values and indirect calls, where arithmetic-negation implementations fail.
+I64 StockProgramIntrinsicChecks()
+{
+    I64 i, value[7] = {I64_MIN, -123456789, -1, 0, 1, 123456789, I64_MAX};
+    I64 expected[7] = {-1, -1, -1, 0, 1, 1, 1};
+    I64 (*sign)(I64) = &SignI64;
+
+    for (i = 0; i < 7; i++)
+        if (SignI64(value[i]) != expected[i] || (*sign)(value[i]) != expected[i])
+            return 0;
+    return 42;
+}

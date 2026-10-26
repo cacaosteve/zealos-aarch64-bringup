@@ -4846,6 +4846,10 @@ static int64_t host_abs_i64(int64_t *a) {
     /* KernelB declares AbsI64 as _intern IC_ABS_I64; Aiwnios has no that opcode. */
     return a[0] < 0 ? -a[0] : a[0];
 }
+static int64_t host_sign_i64(int64_t *a) {
+    /* Compare rather than negate: I64_MIN must also return -1. */
+    return (a[0] > 0) - (a[0] < 0);
+}
 static int64_t host_abs_f64(int64_t *a) {
     /* Preserve NaN payloads while applying IEEE-754 absolute value. */
     return (int64_t)((uint64_t)a[0] & UINT64_C(0x7fffffffffffffff));
@@ -5187,6 +5191,7 @@ static void bind_guest_task(void) {
     PrsBindCSymbol("ToF64", host_to_f64, 1);
     PrsBindCSymbol("ToI64", host_to_i64, 1);
     PrsBindCSymbol("AbsI64", host_abs_i64, 1);
+    PrsBindCSymbol("SignI64", host_sign_i64, 1);
     PrsBindCSymbol("Abs", host_abs_f64, 1);
     PrsBindCSymbol("D3Add", host_d3_add, 3);
     PrsBindCSymbol("D3AddEqu", host_d3_add_equ, 2);
@@ -6985,6 +6990,10 @@ int zc_start_gui_terminal(void) {
          * after DocPlain defines ParseDollarCmd so DocLoad/DocPrint retain the
          * real parser, including welcome text, links, colors and saved flags. */
         "/System/DolDoc/DocPutS.ZC",
+        /* DocClear was compiled against the early no-op DocPrint. Rebind its
+         * original body after the real writer exists, before applications and
+         * editor helpers capture its address. */
+        "/System/DolDoc/DocRecalcLib.ZC",
         /* Make the pinned document/file/editor stack available to the normal
          * graphical shell instead of leaving Ed as a source-load-only path. */
         "/System/DolDoc/DocFile.ZC",

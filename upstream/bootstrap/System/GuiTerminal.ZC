@@ -307,7 +307,7 @@ Bool BootstrapGuiTerminalMenuBindLeaf(CMenuEntry *root, U8 *source_name,
                                       U8 *display_name, I64 action)
 {
     CMenuEntry *entry;
-    if (!root || !source_name || !display_name || action < 1 || action > 19)
+    if (!root || !source_name || !display_name || action < 1 || action > 21)
         return FALSE;
     entry = root->sub;
     while (entry)
@@ -350,7 +350,7 @@ U0 BootstrapGuiTerminalMenuInstall()
 {
     CMenu *menu = MenuNew("File { Files(); Disk(); }");
     BootstrapGuiTerminalMenuAppendRoot(menu, MenuNew("Windows { Demo(); TileHorz(); TileVert(); TileGrid(); }"));
-    BootstrapGuiTerminalMenuAppendRoot(menu, MenuNew("Apps { LatticePlay(); StockPlay(); PaintDemo(); }"));
+    BootstrapGuiTerminalMenuAppendRoot(menu, MenuNew("Apps { LatticePlay(); StockPlay(); PaintDemo(); NetOfDots(); Lines(); }"));
     BootstrapGuiTerminalMenuAppendRoot(menu, MenuNew("View { ViewAngles(); ZoomIn(); ZoomOut(); ResetView(); PanLeft(); PanRight(); PanUp(); PanDown(); }"));
     BootstrapGuiTerminalMenuAppendRoot(menu, MenuNew("OS { Help(); Status(); }"));
     CMenuEntry *file = BootstrapGuiTerminalMenuRoot(menu, "File");
@@ -370,6 +370,8 @@ U0 BootstrapGuiTerminalMenuInstall()
         !BootstrapGuiTerminalMenuBindLeaf(apps, "LatticePlay", "Lattice Play", 9) ||
         !BootstrapGuiTerminalMenuBindLeaf(apps, "StockPlay", "Stock Play", 10) ||
         !BootstrapGuiTerminalMenuBindLeaf(apps, "PaintDemo", "Paint Demo", 19) ||
+        !BootstrapGuiTerminalMenuBindLeaf(apps, "NetOfDots", "Net of Dots", 20) ||
+        !BootstrapGuiTerminalMenuBindLeaf(apps, "Lines", "Lines", 21) ||
         !BootstrapGuiTerminalMenuBindLeaf(view, "ViewAngles", "View Angles", 11) ||
         !BootstrapGuiTerminalMenuBindLeaf(view, "ZoomIn", "Zoom In", 12) ||
         !BootstrapGuiTerminalMenuBindLeaf(view, "ZoomOut", "Zoom Out", 13) ||
@@ -454,6 +456,15 @@ Bool BootstrapGuiTerminalPaintEscape(U8 *command, I64 *command_len,
     if (overflow)
         *overflow = FALSE;
     return TRUE;
+}
+
+U8 *BootstrapGuiTerminalMenuSource(I64 action)
+{//Run programs through the normal User command loop, outside the input reader.
+    if (action == 20)
+        return "#include \"/Demo/Graphics/NetOfDots\"";
+    if (action == 21)
+        return "#include \"/Demo/Graphics/Lines\"";
+    return NULL;
 }
 
 U8 *BootstrapGuiTerminalMenuAction(I64 action)
@@ -731,6 +742,15 @@ U8 *BootstrapGuiTerminalReadLine2(Bool continuation)
             {
                 if (sc == GUI_MENU_ACTION_TAG)
                 {
+                    output = BootstrapGuiTerminalMenuSource(ch);
+                    if (output)
+                    {
+                        BootstrapGuiTerminalHistorySave(state->history,
+                                &state->history_len, output, StrLen(output));
+                        StrCopy(bootstrap_gui_terminal_last_command, output);
+                        DocPrint(DocPut, "\n> %s\n", output);
+                        return StrNew(output);
+                    }
                     output = BootstrapGuiTerminalMenuAction(ch);
                     if (ch == 5)
                         output = ZcGuiShellExec("windowdemo");
@@ -1473,6 +1493,8 @@ I64 BootstrapGuiTerminalSmoke()
             !BootstrapGuiTerminalMenuActionValid(menu, "Apps", "Lattice Play", 9) ||
             !BootstrapGuiTerminalMenuActionValid(menu, "Apps", "Stock Play", 10) ||
             !BootstrapGuiTerminalMenuActionValid(menu, "Apps", "Paint Demo", 19) ||
+            !BootstrapGuiTerminalMenuActionValid(menu, "Apps", "Net of Dots", 20) ||
+            !BootstrapGuiTerminalMenuActionValid(menu, "Apps", "Lines", 21) ||
             !BootstrapGuiTerminalMenuActionValid(menu, "View", "View Angles", 11) ||
             !BootstrapGuiTerminalMenuActionValid(menu, "View", "Zoom In", 12) ||
             !BootstrapGuiTerminalMenuActionValid(menu, "View", "Zoom Out", 13) ||

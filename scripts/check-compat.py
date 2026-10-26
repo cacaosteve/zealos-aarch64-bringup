@@ -30,6 +30,8 @@ p.add_argument('--probe-gui-workflow', action='store_true',
                help='verify visible graphical editing, save/compile/run, and reopen after reboot')
 p.add_argument('--probe-gui-editor-text', action='store_true',
                help='isolate visible keyboard text entry, save, and run in the GUI document editor')
+p.add_argument('--probe-stock-programs', action='store_true',
+               help='run unchanged pinned NetOfDots and Lines in the graphical terminal')
 p.add_argument('--probe-lattice-controls', action='store_true',
                help='check live Lattice mouse placement/aim, colors, restart, and Space in the GUI')
 p.add_argument('--probe-gui-windowdemo-input', action='store_true',
@@ -124,6 +126,9 @@ if args.probe_gui_workflow:
     args.probe_gui_keyboard = True
 if args.probe_gui_editor_text:
     args.probe_gui_keyboard = True
+if args.probe_stock_programs:
+    args.pci = True
+    args.probe_gui_keyboard = True
 if args.probe_lattice_controls:
     args.probe_gui_keyboard = True
 if args.probe_gui_windowdemo_input:
@@ -181,7 +186,8 @@ if args.probe_live_window_control and not (
             '--probe-winmgr --probe-grscreen --probe-live-winmgr')
 if args.probe_dvd_live and args.pci:
     p.error('--probe-dvd-live requires ISO boot, not --pci')
-log_path = ROOT / 'build' / (f'check-usb-{usb_label}{"-lattice-controls" if args.probe_lattice_controls else "-windowdemo-input" if args.probe_gui_windowdemo_input else "-home-once" if args.probe_home_once else "-input-edges" if args.probe_input_edges else "-registry" if args.probe_registry else "-home-path" if args.probe_home_path else "-user-text" if args.probe_user_text else "-user-startup" if args.probe_user_startup else ""}.log' if args.usb_input else
+log_path = ROOT / 'build' / (f'check-usb-{usb_label}{"-stock-programs" if args.probe_stock_programs else "-lattice-controls" if args.probe_lattice_controls else "-windowdemo-input" if args.probe_gui_windowdemo_input else "-home-once" if args.probe_home_once else "-input-edges" if args.probe_input_edges else "-registry" if args.probe_registry else "-home-path" if args.probe_home_path else "-user-text" if args.probe_user_text else "-user-startup" if args.probe_user_startup else ""}.log' if args.usb_input else
+                             'check-stock-programs-pci.log' if args.probe_stock_programs else
                              'check-grblot3-pci.log' if args.probe_grblot3 else
                              'check-sprite-arrow-symmetry-pci.log' if args.probe_sprite_arrow_symmetry else
                              'check-home-once-pci.log' if args.probe_home_once and args.pci else
@@ -1173,6 +1179,77 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         if int(scanout.group(1)) < 1000:
             raise RuntimeError('boot graphical terminal is not painting visible pixels:\n' + desktop)
         print('PASS boot graphical terminal window and framebuffer diagnostics', flush=True)
+        if args.probe_stock_programs:
+            command('zload /Tests/StockPrograms.ZC', 'zc: loaded /Tests/StockPrograms.ZC')
+            command('zcall StockProgramIntrinsicChecks', 'zc => 0x000000000000002a')
+            focus_graphical_terminal()
+            command('zc DocPrint(bootstrap_gui_terminal_task->put_doc, "STOCK_CLEAR_SENTINEL\\n> ");',
+                    'zc: executed')
+            require_graphical_text('stock-netofdots-preclear', 'STOCK_CLEAR_SENTINEL')
+            if args.usb_input:
+                select_os_menu_row('stock-netofdots-menu', 'Apps', 3)
+            else:
+                type_graphical_prompt_line('stock-netofdots-command',
+                                           '#include "/Demo/Graphics/NetOfDots"')
+                qmp_send_key('ret')
+            # Only the program's own window counts. The other terminal has
+            # red welcome links even when a transient fan has disappeared.
+            fan_box = (8, 32, 395, 500)
+            deadline = time.monotonic() + 15
+            while True:
+                screen = graphical_screen('stock-netofdots-drawing')
+                red = rgb_pixels_in(screen, (170, 0, 0), fan_box)
+                if red >= 300:
+                    break
+                if time.monotonic() >= deadline:
+                    raise RuntimeError(f'NetOfDots fan is missing from its window: {red} red pixels')
+                time.sleep(.1)
+            require_graphical_text_absent('stock-netofdots-cleared', 'STOCK_CLEAR_SENTINEL')
+            command('zstatus', 'failed=0')
+            # Foreground dots can cover individual glyph pixels, so strict
+            # font OCR is unsuitable for the overlapped PRESS A KEY line.
+            # Check its actual output and the separately captured fan instead.
+            if b'PRESS A KEY' not in log_path.read_bytes():
+                raise RuntimeError('NetOfDots did not reach its upstream key-wait prompt')
+            time.sleep(.75)
+            retained = graphical_screen('stock-netofdots-retained')
+            retained_red = rgb_pixels_in(retained, (170, 0, 0), fan_box)
+            if red < 300 or retained_red < 300:
+                raise RuntimeError(f'unchanged NetOfDots did not draw its red fan: {red} red pixels')
+            print(f'PASS unchanged NetOfDots rendered red fan ({red} pixels) and waits for input', flush=True)
+            qmp_send_key('spc')
+            run_graphical_terminal_command('stock-netofdots-return', '40+2;', 'ans=0x2A=42')
+            cleared = graphical_screen('stock-netofdots-exit-cleared')
+            if rgb_pixels_in(cleared, (170, 0, 0), fan_box) > 10:
+                raise RuntimeError('NetOfDots DCFill did not clear its retained foreground')
+            select_os_menu_row('stock-lines-menu', 'Apps', 4)
+            deadline = time.monotonic() + 60
+            # The original draws its first 1000 lines in BLACK, then advances
+            # the palette index. Wait for its real animation rather than
+            # changing its cadence or replacing the program with a fixture.
+            time.sleep(2)  # Let the menu close before sampling animation.
+            first = graphical_screen('stock-lines-frame-1')
+            while True:
+                time.sleep(.5)
+                second = graphical_screen('stock-lines-frame-2')
+                if 'ERR:/Demo/Graphics/Lines' in second[3]:
+                    raise RuntimeError('unchanged Lines failed:\n' + second[3])
+                changed = sum(first[2][(y * 800 + x) * 3 + c] !=
+                              second[2][(y * 800 + x) * 3 + c]
+                              for y in range(fan_box[1], fan_box[3])
+                              for x in range(fan_box[0], fan_box[2]) for c in range(3))
+                blue = rgb_pixels_in(second, (0, 0, 170), fan_box)
+                if changed >= 100 and blue > 20:
+                    break
+                if time.monotonic() >= deadline:
+                    raise RuntimeError(f'unchanged Lines did not animate: {changed} changed channel bytes')
+                first = second
+            print(f'PASS unchanged Lines animated ({changed} changed channel bytes)', flush=True)
+            qmp_send_key('esc')
+            run_graphical_terminal_command('stock-lines-return', '6*7;', 'ans=0x2A=42')
+            command('zstatus', 'failed=0')
+            print('PASS unchanged stock NetOfDots/Lines include, visible drawing, input exit and prompt recovery', flush=True)
+            raise SystemExit(0)
         if args.probe_gui_editor_text:
             editor_path = '/Tests/GuiInputProbe.ZC'
             source = 'I64 GuiInputProbe(){return 40+2;}'

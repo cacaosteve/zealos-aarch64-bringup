@@ -49,6 +49,9 @@ check-gui-terminal: check-upstream esp
 	QEMU="$(QEMU)" QEMU_VIRT="$(QEMU_VIRT)" FW_CODE="$(FW_CODE)" FW_VARS_IN="$(FW_VARS_IN)" python3 scripts/check-compat.py --pci --probe-module /System/DolDoc/DocRecalc.ZC --probe-gui-terminal
 check-gui-workflow: check-upstream esp
 	QEMU="$(QEMU)" QEMU_VIRT="$(QEMU_VIRT)" FW_CODE="$(FW_CODE)" FW_VARS_IN="$(FW_VARS_IN)" python3 scripts/check-compat.py --usb-input nec --probe-gui-workflow
+.PHONY: check-stock-programs
+check-stock-programs: check-upstream esp
+	QEMU="$(QEMU)" QEMU_VIRT="$(QEMU_VIRT)" FW_CODE="$(FW_CODE)" FW_VARS_IN="$(FW_VARS_IN)" python3 scripts/check-compat.py --usb-input nec --probe-stock-programs
 check-gui-editor-text: check-upstream esp
 	QEMU="$(QEMU)" QEMU_VIRT="$(QEMU_VIRT)" FW_CODE="$(FW_CODE)" FW_VARS_IN="$(FW_VARS_IN)" python3 scripts/check-compat.py --usb-input nec --probe-gui-editor-text
 check-grscreen: check-upstream esp

@@ -468,3 +468,25 @@ expanded source regression live: the user confirmed `GrBlot3Checks`,
 | Limits | This reduces writes on the single-buffer UTM scanout but cannot provide atomic frame flips or vblank synchronization |
 
 Freeze catalog unchanged.
+
+## Retained foreground for unchanged source programs (2026-10-26)
+
+`gr.dc` now owns a separate transparent 800×600 foreground surface; `gr.dc2`
+remains the source compositor's frame target. Previously they shared a body,
+and the text/window refresh erased graphics drawn once before waiting for
+input. The unchanged NetOfDots program exposed this even though callback-based
+demos redrew on each frame. Foreground lines use the bounded CDC rasterizer
+and task-window visibility; the full source screen path's original
+DCBlotColor8 stage and the fallback compositor both overlay the retained body.
+Original DCFill clears it on exit. The foreground does not inherit ON_TOP: its
+normal alias retains task-local origin and clipping.
+
+The program gate requires the actual red fan inside its own window across
+redraws and verifies that exit clears it, then checks colored Lines animation
+and prompt recovery through NEC USB and VirtIO input. A whole-screen red-pixel
+check was insufficient because the second terminal contains red welcome text;
+that check was replaced with the program-window and persistence checks.
+This does not establish complete CDC/ROP, persistent text-raster or whole-mesh
+parity for the entire regular application collection. See
+[PROGRAMS.md](../PROGRAMS.md) and [ACCEPTANCE.md](../ACCEPTANCE.md) for scope,
+completed runs and current-image status.
