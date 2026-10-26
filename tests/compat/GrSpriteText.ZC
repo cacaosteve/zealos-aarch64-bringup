@@ -72,10 +72,10 @@ I64 GrSpriteTextChecks()
 	MemCopy(records + 8, &y, sizeof(I32));
 	records[12] = 'A';
 	GrPutS(&expected_dc, 24, 12, "A");
-	GrLine(&expected_dc, 28, 7, 38, 16);
-	GrLine(&expected_dc, 38, 16, 28, 25);
-	GrLine(&expected_dc, 28, 25, 18, 16);
-	GrLine(&expected_dc, 18, 16, 28, 7);
+	GrLine(&expected_dc, 28, 7, 39, 16);
+	GrLine(&expected_dc, 39, 16, 28, 25);
+	GrLine(&expected_dc, 28, 25, 17, 16);
+	GrLine(&expected_dc, 17, 16, 28, 7);
 	Sprite3(&actual_dc, 3, 4, 0, records);
 	for (i = 0; i < 64 * 32; i++)
 		if (expected[i] != actual[i])

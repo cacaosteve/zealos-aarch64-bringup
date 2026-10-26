@@ -28,6 +28,8 @@ extern U8 *MemCopy(U8 *dst,U8 *src,I64 count);
 extern U8 *MemSet(U8 *dst,I64 byte,I64 count);
 extern U0 DCBlotColor4(U8 *dst, I64 *img, I64 *img_cache, I64 count);
 extern U0 GrRopEquU8NoClipping(I64 ch, U8 *dst, I64 width_internal);
+extern I64 ZcGrRopEquU8NoClipping(U64 *font, I64 ch, U8 *dst,
+                                 I64 width_internal);
 extern I64 SwapI64(I64 *a,I64 *b);
 extern U0 Puts(U8 *text);
 // Temporary cooperative task bridge. These are not ZealOS Spawn/Yield APIs.
@@ -62,6 +64,7 @@ extern Bool ZcFbGraphRect(I64 x, I64 y, I64 width, I64 height, U32 color,
                          I64 left, I64 top, I64 right, I64 bottom,
                          I64 task_z);
 extern U0 ZcFbSetWinZBuffer(U16 *z_buf);
+extern U0 ZcFbSetWinPixelZBuffer(U16 *z_buf);
 extern I64 ZcFbGraphText(I64 x, I64 y, U32 color,
                         I64 left, I64 top, I64 right, I64 bottom, U8 *text,
                         I64 task_z);

@@ -10,6 +10,10 @@ static void input_usb_key(unsigned code, int down) {
     vk_decode_key(&g_vk, e);
 }
 static void input_poll(void) {
+#if defined(ZEAL_PI_DIAG) || defined(ZEAL_FORCE_PI4)
+    pi4_usb_keyboard_poll();
+    pi4_usb_bus_poll();
+#endif
     usb_poll();
     g_vk_input_suppressed = usb_keyboard_ready();
     /* QEMU activates its VirtIO host input handler at DRIVER_OK. Merely
@@ -40,7 +44,12 @@ static void input_poll(void) {
     }
     vk_poll();
 }
-static int input_keyboard_ready(void) { return usb_keyboard_ready() || virtio_kbd_ready(); }
+static int input_keyboard_ready(void) {
+#if defined(ZEAL_PI_DIAG) || defined(ZEAL_FORCE_PI4)
+    if (pi4_usb_keyboard_ready() || pi4_usb_bus_keyboard_ready()) return 1;
+#endif
+    return usb_keyboard_ready() || virtio_kbd_ready();
+}
 static int input_keyboard_getc_nb(void) { input_poll(); return virtio_kbd_getc_nb(); }
 static int input_keyboard_msg_nb(uint8_t *type, uint64_t *a1, uint64_t *a2) {
     input_poll(); return virtio_kbd_msg_nb(type, a1, a2);
@@ -50,10 +59,26 @@ static int input_keyboard_ctrl_down(void) { input_poll(); return virtio_kbd_ctrl
 static int input_keyboard_take_ctrl_c(void) {
     input_poll(); return virtio_kbd_take_ctrl_c();
 }
-static int input_pointer_ready(void) { return usb_pointer_ready() || virtio_tablet_ready(); }
-static void input_pointer_poll(void) { usb_poll(); if (!usb_pointer_ready()) virtio_tablet_poll(); }
+static int input_pointer_ready(void) {
+#if defined(ZEAL_PI_DIAG) || defined(ZEAL_FORCE_PI4)
+    if (pi4_usb_mouse_ready() || pi4_usb_bus_pointer_ready()) return 1;
+#endif
+    return usb_pointer_ready() || virtio_tablet_ready();
+}
+static void input_pointer_poll(void) {
+#if defined(ZEAL_PI_DIAG) || defined(ZEAL_FORCE_PI4)
+    pi4_usb_keyboard_poll();
+    pi4_usb_bus_poll();
+    if (pi4_usb_mouse_ready() || pi4_usb_bus_pointer_ready()) return;
+#endif
+    usb_poll(); if (!usb_pointer_ready()) virtio_tablet_poll();
+}
 static int input_pointer_sample(uint32_t w, uint32_t h, uint32_t *x, uint32_t *y,
                                   int *buttons, int *wheel) {
+#if defined(ZEAL_PI_DIAG) || defined(ZEAL_FORCE_PI4)
+    if (pi4_usb_bus_sample(w, h, x, y, buttons, wheel)) return 1;
+    if (pi4_usb_mouse_sample(w, h, x, y, buttons, wheel)) return 1;
+#endif
     usb_poll();
     if (!usb_pointer_ready()) return virtio_tablet_sample(w, h, x, y, buttons, wheel);
     *x = g_usb.x; *y = g_usb.y;
@@ -62,11 +87,21 @@ static int input_pointer_sample(uint32_t w, uint32_t h, uint32_t *x, uint32_t *y
     return 1;
 }
 static int input_pointer_xy(uint32_t w, uint32_t h, uint32_t *x, uint32_t *y) {
+#if defined(ZEAL_PI_DIAG) || defined(ZEAL_FORCE_PI4)
+    if (pi4_usb_bus_sample(w, h, x, y, NULL, NULL)) return 1;
+    if (pi4_usb_mouse_sample(w, h, x, y, NULL, NULL)) return 1;
+#endif
     usb_poll();
     if (!usb_pointer_ready()) return virtio_tablet_xy(w, h, x, y);
     return input_pointer_sample(w, h, x, y, NULL, NULL);
 }
 static int input_pointer_buttons(void) {
+#if defined(ZEAL_PI_DIAG) || defined(ZEAL_FORCE_PI4)
+    uint32_t x, y;
+    int buttons;
+    if (pi4_usb_bus_sample(1u, 1u, &x, &y, &buttons, NULL)) return buttons;
+    if (pi4_usb_mouse_sample(1u, 1u, &x, &y, &buttons, NULL)) return buttons;
+#endif
     usb_poll();
     return usb_pointer_ready() ? g_usb.buttons : virtio_tablet_buttons();
 }

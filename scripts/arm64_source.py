@@ -118,10 +118,9 @@ def inject_home_startup_tasks(gui_terminal: bytes, startup_tasks: bytes) -> byte
 def translate_home_once(source: bytes) -> bytes:
     """Keep the live DVD session usable without offering the legacy installer.
 
-    The pinned DVD installer writes BIOS boot sectors and depends on storage
-    helpers that are not part of this ARM64 image. Preserve the upstream
-    ``Once.ZC`` source everywhere else, but make the DVD branch state that the
-    live session is available and the installer has not been ported.
+    Keep the pinned DVD branch's live-session behavior while exposing the
+    bounded ARM64 installer command to the user. Preserve the upstream
+    ``Once.ZC`` source everywhere else.
     """
     text = source.decode('utf-8')
     start = '\t\t\t"\\nIf you answer \'No\' you can play with\\n"\n'
@@ -135,7 +134,7 @@ def translate_home_once(source: bytes) -> bytes:
             dvd_prompt.count('RunFile("::/Misc/OSInstall",, TRUE);') != 1):
         raise ValueError('pinned Once DVD installer flow changed')
     replacement = ('\t\t\t"\\nARM64 live session is ready.\\n"\n'
-                   '\t\t\t"The original disk installer has not been ported yet.\\n";\n')
+                   '\t\t\t"Install to a 128 MiB UTM/QEMU VirtIO disk: zinstall, then zinstall ERASE.\\n";\n')
     return (text[:first] + replacement + text[last:]).encode('utf-8')
 
 
@@ -145,8 +144,9 @@ def _extract_home_startup_parts(source: bytes) -> tuple[bytes, bytes]:
     The ARM64 adapter reuses the first terminal it already brought up, then
     translates upstream-only output/tiling calls into terminal-scoped bridges.
     This keeps the startup sequence tied to the pinned HomeSys implementation.
-    The DVD path now reaches the live graphical session; its generated
-    ``Home/Once.ZC`` clearly reports that legacy installation is not ported.
+    The DVD path reaches the live graphical session; its generated
+    ``Home/Once.ZC`` points to the bounded UTM/QEMU ``zinstall`` command and
+    never invokes the legacy BIOS/AHCI installer.
     """
     text = source.decode('utf-8')
     boundary = '\nU0 StartUpTasks()\n'
@@ -222,10 +222,10 @@ def translate_zsplash(source: bytes) -> bytes:
     native USB pointer input, so drop the x86 mouse-driver handoff and restore
     keyboard focus locally instead of killing the parent task. Preserve its
     short startup jitter with the loaded timer counter because this bootstrap
-    does not load the full date/time helper. Reuse the splash depth buffer
-    across animation frames and release it when the splash is dismissed,
-    because the bootstrap's screen CDC is shared. Restore the task's prior
-    draw callback when the splash is dismissed.
+    does not load the full date/time helper. Keep a task-owned splash depth
+    buffer across animation frames, detach it from the transient CDC alias
+    before that alias is deleted, and release it when the splash is dismissed.
+    Restore the task's prior draw callback when the splash is dismissed.
     """
     if source.count(b'\0') < 1:
         raise ValueError('expected ZSplash inline sprite payload terminator')
@@ -261,6 +261,7 @@ def translate_zsplash(source: bytes) -> bytes:
         'U0 ZSplash()\n',
         'while (!CharScan)',
         'DCDepthBufAlloc(dc);',
+        'dc->r = old_r;',
         'Sprite3(dc, 0, 0, 0, $IB,"<1>",BI=1$);',
         'CTask\t*bg_task = User;',
         'Fs->draw_it = &DrawIt;',
@@ -285,7 +286,14 @@ def translate_zsplash(source: bytes) -> bytes:
     text = text.replace('MStrPrint("%S", "DD_OS_NAME_VERSION");',
                         'MStrPrint("%s", "ZealOS ARM64");', 1)
     text = text.replace('DCDepthBufAlloc(dc);',
-                        'if (!dc->depth_buf) DCDepthBufAlloc(dc);', 1)
+        'if (!bootstrap_zsplash_depth_buf)\n'
+        '\t\tbootstrap_zsplash_depth_buf = MAlloc(dc->width_internal * dc->height * sizeof(I32), dc->mem_task);\n'
+        '\tdc->depth_buf = bootstrap_zsplash_depth_buf;\n'
+        '\tDCDepthBufReset(dc);', 1)
+    text = text.replace('U0 DrawIt(CTask *,CDC *dc)\n',
+                        'I32 *bootstrap_zsplash_depth_buf;\n\nU0 DrawIt(CTask *,CDC *dc)\n', 1)
+    text = text.replace('dc->r = old_r;',
+                        'dc->r = old_r;\n\tdc->depth_buf = NULL;', 1)
     text = text.replace('no_warn dc, x, y;',
                         '// Native ARM64 cursor rendering stays enabled.', 1)
     text = text.replace('AutoComplete(OFF);',
@@ -311,10 +319,10 @@ def translate_zsplash(source: bytes) -> bytes:
         raise ValueError('pinned ZSplash animation loop boundary changed')
     text = text.replace(loop_end,
         loop_end +
-        '\tif (dc->depth_buf)\n'
+        '\tif (bootstrap_zsplash_depth_buf)\n'
         '\t{\n'
-        '\t\tFree(dc->depth_buf);\n'
-        '\t\tdc->depth_buf = NULL;\n'
+        '\t\tFree(bootstrap_zsplash_depth_buf);\n'
+        '\t\tbootstrap_zsplash_depth_buf = NULL;\n'
         '\t}\n'
         '\tFs->draw_it = old_draw_it;\n', 1)
     text = text.replace('Kill(bg_task);',
@@ -322,8 +330,9 @@ def translate_zsplash(source: bytes) -> bytes:
     result = ('// ARM64 restores the packed pinned sprite bytes and uses the native USB pointer.\n' + text).encode('utf-8') + b'\0' + payload
     if (b'$SP,"<1>",BI=1$' not in result or
             b'Sprite3(dc, 0, 0, 0, $IB,"<1>",BI=1$);' not in result or
-            b'if (!dc->depth_buf) DCDepthBufAlloc(dc);' not in result or
-            b'Free(dc->depth_buf);' not in result or
+            b'bootstrap_zsplash_depth_buf = MAlloc(dc->width_internal * dc->height * sizeof(I32), dc->mem_task);' not in result or
+            b'dc->depth_buf = bootstrap_zsplash_depth_buf;' not in result or
+            b'Free(bootstrap_zsplash_depth_buf);' not in result or
             b'Fs->draw_it = old_draw_it;' not in result or
             b'MStrPrint("%s", "ZealOS ARM64");' not in result or
             b'bg_task' in result):
@@ -808,13 +817,17 @@ def translate_docrecalc(source: bytes) -> bytes:
 
 
 def translate_grbitmap(source: bytes) -> bytes:
-    """Extract regular CDC rectangles without negative-destination blitting.
+    """Apply ARM-safe bitmap blitting and extract regular CDC rectangles.
 
     Pinned DCExt creates a result CDC sized to the requested source rectangle,
     then calls GrBlot at (-x1, -y1). GrBlot's negative-origin clipping is only
     valid for a larger/screen destination; for an ordinary tightly-sized CDC
     the path can address before the result buffer. Keep screen-bitmap handling
-    on the upstream path and copy rows directly for regular CDCs.
+    on the upstream path and copy rows directly for regular CDCs. The packed
+    no-transparency GrBlot path also combines unaligned source words with
+    pre/post-incremented pointers in one expression; on AArch64 this loses
+    source bytes. Keep its fast path for aligned blits and use an equivalent
+    pixel-safe ROP path for unaligned destinations.
     """
     try:
         text = source.decode("utf-8")
@@ -874,7 +887,108 @@ def translate_grbitmap(source: bytes) -> bytes:
 		}""",
         1,
     )
-    return (text[:start] + body + text[end:]).encode("utf-8")
+    text = text[:start] + body + text[end:]
+    blot_signature = "public I64 GrBlot(CDC *dc=gr.dc, I64 x, I64 y, CDC *img)"
+    blot_end_anchor = "\n#help_index \"Graphics/Device Contexts\"\n\nU8 *GrBitMap4ToBitMap8"
+    if text.count(blot_signature) != 1 or text.count(blot_end_anchor) != 1:
+        raise ValueError("expected the pinned GrBlot definition boundaries")
+    blot_start = text.index(blot_signature)
+    blot_end = text.index(blot_end_anchor, blot_start)
+    blot = text[blot_start:blot_end]
+    packed_copy = "if (img->flags & DCF_NO_TRANSPARENTS)"
+    if blot.count(packed_copy) != 3:
+        raise ValueError("expected the three packed no-transparency ROP paths")
+    draw_guard = "\t\tif (dc->flags & DCF_DONT_DRAW)\n\t\t\treturn 1;"
+    if blot.count(draw_guard) != 1:
+        raise ValueError("expected the pinned GrBlot no-draw return")
+    safe_unaligned = """\t\tif ((img->flags & DCF_NO_TRANSPARENTS) && (-x & 7) &&
+				(dc->color.c0.rop == ROPB_COLLISION || dc->color.c0.rop == ROPB_MONO ||
+				 dc->color.c0.rop == ROPB_EQU || dc->color.c0.rop == ROPB_XOR))
+		{
+			old_color = dc->color;
+			db = dc->depth_buf;
+			dc->depth_buf = NULL;
+			dc->color &= ~ROPF_DITHER;
+			color = dc->color;
+			if (dc->flags & DCF_SCREEN_BITMAP)
+				win_z_num = win_task->win_z_num;
+			k = h1 * img->width_internal;
+			for (j = h1; j < h2; j++)
+			{
+				for (i = w1; i < w2; i++)
+				{
+					color_mask = TRUE;
+					if (dc->flags & DCF_SCREEN_BITMAP && !(dc->flags & DCF_ON_TOP))
+					{
+						win_z_buf_ptr = gr.win_z_buf(U8 *) +
+								((y + j) / FONT_HEIGHT * TEXT_COLS + (x + i) / FONT_WIDTH) * sizeof(U16);
+						if (win_z_num < *win_z_buf_ptr)
+							color_mask = FALSE;
+					}
+					if (color_mask)
+					{
+						c = img->body[k + i];
+						switch (color.c0.rop)
+						{
+							case ROPB_COLLISION:
+								if (dc->body[(y + j) * dc->width_internal + x + i] != TRANSPARENT &&
+										dc->body[(y + j) * dc->width_internal + x + i] != dc->bkcolor.c0.color)
+									dc->collision_count++;
+								break;
+							case ROPB_MONO:
+								dc->color.c0.color = color.c0.color & c;
+								GrPlot0(dc, x + i, y + j);
+								break;
+							case ROPB_EQU:
+							case ROPB_XOR:
+								dc->color.c0.color = c;
+								GrPlot0(dc, x + i, y + j);
+								break;
+						}
+					}
+				}
+				k += img->width_internal;
+			}
+			dc->depth_buf = db;
+			dc->color = old_color;
+			return 1;
+		}
+"""
+    blot = blot.replace(draw_guard, draw_guard + "\n" + safe_unaligned.rstrip("\n"), 1)
+    collision_start_anchor = "\t\t\tcase ROPB_COLLISION: //TODO: Might want to check win_z_buf\n"
+    collision_end_anchor = "\n\t\t\tcase ROPB_MONO:"
+    if blot.count(collision_start_anchor) != 1:
+        raise ValueError("expected the pinned GrBlot collision z-buffer TODO")
+    collision_start = blot.index(collision_start_anchor)
+    collision_end = blot.index(collision_end_anchor, collision_start)
+    collision_case = """\t\t\tcase ROPB_COLLISION:
+				color = dc->bkcolor.c0.color;
+				k = h1 * img->width_internal;
+				k1 = (h1 + y) * dc->width_internal + x;
+				for (j = h1; j < h2; j++)
+				{
+					for (i = w1; i < w2; i++)
+					{
+						if (img->body[k + i] != TRANSPARENT &&
+								(!(dc->flags & DCF_SCREEN_BITMAP) ||
+								 dc->flags & DCF_ON_TOP || !gr.win_z_buf ||
+								 win_task->win_z_num >= gr.win_z_buf[
+										(y + j) / FONT_HEIGHT * TEXT_COLS +
+										(x + i) / FONT_WIDTH]))
+						{
+							c = dc->body[k1 + i];
+							if (c != TRANSPARENT && c != color)
+								dc->collision_count++;
+						}
+					}
+					k += img->width_internal;
+					k1 += dc->width_internal;
+				}
+				break;
+"""
+    blot = blot[:collision_start] + collision_case + blot[collision_end:]
+    text = text[:blot_start] + blot + text[blot_end:]
+    return text.encode("utf-8")
 
 
 def translate_mathode(source: bytes) -> bytes:
@@ -1141,6 +1255,9 @@ def translate_grscreen(source: bytes) -> bytes:
     ode_call = "ODEsUpdate(task);"
     if text.count(ode_call) != 1:
         raise ValueError("expected exactly one GrUpdateTaskODEs integrator call")
+    rop_call = "GrRopEquU8NoClipping("
+    if text.count(rop_call) != 2:
+        raise ValueError("expected exactly two GrScreen glyph rasterizer calls")
     indent = matches[0].group("indent")
     replacement = (
         f"{indent}cell_dst = dst(U8 *);\n"
@@ -1183,6 +1300,9 @@ def translate_grscreen(source: bytes) -> bytes:
     replaced = replaced.replace(marker, function + marker, 1)
     replaced = replaced.replace(doc_call, "ZcDocUpdateTaskDocs(task);", 1)
     replaced = replaced.replace(ode_call, "ZcODEsUpdate(task);", 1)
+    replaced = replaced.replace(
+        rop_call, "ZcGrRopEquU8NoClipping(text.font,", 2,
+    )
     return replaced.encode("utf-8")
 
 
@@ -1206,3 +1326,35 @@ def translate_grpalette(source: bytes) -> bytes:
         1,
     )
     return text.encode("utf-8")
+
+
+def translate_message(source: bytes) -> bytes:
+    """Route decoded Ctrl-Alt guest messages through registered key callbacks."""
+    try:
+        text = source.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValueError("Message.ZC is not UTF-8") from exc
+    marker = "U0 InputFilterTask()"
+    if text.count(marker) != 1 or "ZcCtrlAltDispatch" in text:
+        raise ValueError("expected unchanged SerialDev/Message.ZC input filter")
+    old = (
+        "\t\t\t\tif (_arg1)\n"
+        "\t\t\t\t\t*_arg1 = tmpc->aux1;\n"
+        "\t\t\t\tif (_arg2)\n"
+        "\t\t\t\t\t*_arg2 = tmpc->aux2;\n"
+        "\t\t\t\tJobDel(tmpc);\n"
+        "\t\t\t\tif ((res != MESSAGE_KEY_DOWN || !(tmpc->aux2 & SCF_KEY_DESC) || !Bt(&task->win_inhibit, WIf_SELF_KEY_DESC)) &&\n"
+    )
+    new = (
+        "\t\t\t\tI64 arg1 = tmpc->aux1, arg2 = tmpc->aux2;\n"
+        "\t\t\t\tif (_arg1)\n"
+        "\t\t\t\t\t*_arg1 = arg1;\n"
+        "\t\t\t\tif (_arg2)\n"
+        "\t\t\t\t\t*_arg2 = arg2;\n"
+        "\t\t\t\tJobDel(tmpc);\n"
+        "\t\t\t\tif (!ZcCtrlAltDispatch(res, arg1, arg2, task) &&\n"
+        "\t\t\t\t\t(res != MESSAGE_KEY_DOWN || !(arg2 & SCF_KEY_DESC) || !Bt(&task->win_inhibit, WIf_SELF_KEY_DESC)) &&\n"
+    )
+    if text.count(old) != 1:
+        raise ValueError("expected unchanged SerialDev/Message.ZC message dequeue")
+    return text.replace(old, new, 1).encode("utf-8")

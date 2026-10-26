@@ -3,7 +3,9 @@
 This milestone replaces the **compiler bottleneck** for a separate native source
 session. It does not yet boot the complete upstream ZealOS system. The original
 `hc` / `runzc` / graphics / RedSea shell remains available for regression checks.
-Pi is outside this milestone; its diagnostic image does not link this runtime.
+The Pi diagnostic image does not link this runtime. The separate full Pi
+desktop image now does; its physical desktop/basic input milestone is accepted
+in [PI4.md](PI4.md), while Pi source writes remain disabled.
 
 ## What is being integrated
 
@@ -396,9 +398,12 @@ oracle are needed before broad language compatibility can be claimed.
    document state, job kinds and synchronization, then add preemption and boot
    the actual upstream system startup path instead of the current bounded
    HomeSys adapters.
-3. Add the filesystem, guest kernel/compiler build and install-to-blank-disk/
-   reboot workflow needed for an installed system. Keep the preserved RedSea
-   demo volume and source partition as bootstrap/recovery paths until then.
+3. General filesystem support and a guest kernel/compiler build remain future
+   work. The bounded 128 MiB UTM/QEMU installer for the current GPT/ESP/source
+   image now has a disposable-disk install, byte-for-byte read-back, disk boot,
+   and saved-source reboot check (`make check-iso-installer`). Keep the
+   preserved RedSea demo volume and native source partition as bootstrap and
+   recovery paths.
 
 ## Recorded validation — editor navigation
 
@@ -1964,6 +1969,11 @@ ZealOS live distribution or installer.
   DolDoc, and include-file filters. Its filesystem traversal flags remain
   outside this string-matching helper. `TaskFileMaskChecks` covers alternatives,
   wildcards, case folding, and rejected extensions (`0x2a`).
+- `FilesFind` merges source archive/native entries with readable files from the
+  legacy eight-slot RedSea root. It skips `.`/`..`, bounds-checks names and
+  file extents, suppresses tombstoned names, and lists only root files. The
+  DocFile compatibility probe renames a RedSea-only file, checks that
+  `FilesFind` returns its path and size, then reads its contents (`0x2a`).
 - `TaskOriginalDocPlainChecks` exercises real `ParseDollarCmd` for `TX` tags,
   `CM+LE+RE` flags, `FG,RED`, and `DocPrint("$$TX,\"Yo\"$$")` (`0x2a`).
   Interactive DocForm/DocEd and Adam startup remain later work.
@@ -2085,9 +2095,11 @@ ZealOS live distribution or installer.
   transform checks. Live source WinMgr checks cover startup,
   draw, mouse, title dragging, resizing, and captured-control release after
   moving the pointer outside the control.
-  Full planar semantics, remaining
-  sprite and depth-buffer paths, music state, and normal upstream menu/task
-  startup remain open.
+  Full planar semantics, remaining sprite/depth-buffer operations, music
+  state, and the complete upstream menu/task graph remain open. The supported
+  UTM boot desktop now autostarts its HomeSys-backed terminals and source
+  Window Manager and exposes grouped File/Windows/Apps/View/OS menus; the
+  original full upstream kernel startup is still not ported.
 
 ## Tablet button messages
 
@@ -2142,7 +2154,8 @@ ZealOS live distribution or installer.
   the upstream fill, clear, color-change, and mono operations against the
   allocated indexed bitmap. `GrDCTransformChecks` exercises the unchanged
   fixed-point matrix transform and CDC translation callback. Remaining work
-  includes broader CDC operation coverage and automatic desktop startup.
+  includes broader CDC operation coverage and upstream-wide task/menu startup
+  beyond the tested boot desktop.
 
 ## ARM64 MathODE source module
 
@@ -2447,24 +2460,25 @@ Port sequence and remaining gates:
    but stock QEMU's generic hub cannot exercise it; a physical SS-hub check is
    still required. Expanded HID reports/lock-key LEDs remain work beyond the
    shared US-layout Shift/Ctrl/navigation decoder.
-4. The Pi 4B discovery layer parses the `brcm,bcm2711-pcie` firmware-DTB node,
-   snapshots its translated host register range, PCI memory window, and DMA
-   aperture in revision-6 handoff, and reserves a 1 MiB aligned arena wholly
-   inside that aperture. `make check-pi4-pcie-fdt` and `make check-pi4-dma`
-   cover the parser and allocator, including address translation, map splitting
-   and capacity. A guarded read-only link-status probe is also implemented.
-   The arena is not used for DMA. A guarded read-only link/PCI probe reports
-   the first downstream function's ID, class/header, command/status, and
-   header-valid BAR dwords; it performs no config writes. Check the actual
-   UEFI FDT values, link status, reservation, and VL805 BAR assignment on the
-   Pi before deciding how to map the controller. Bus mastering and xHCI remain
-   disabled. Validate cache behavior, register access widths, and physical
-   keyboard/mouse separately.
-   Raspberry Pi's [PCIe driver](https://github.com/raspberrypi/linux/blob/rpi-6.12.y/drivers/pci/controller/pcie-brcmstb.c)
-   and [VL805 firmware documentation](https://github.com/raspberrypi/documentation/blob/master/documentation/asciidoc/computers/raspberry-pi/eeprom-bootloader.adoc)
-   are platform references, not proof of this port working on hardware.
-5. Follow with hubs/hotplug and mass storage. Mac mini-specific trackpad,
-   audio, and other quirks stay scoped to the hardware that needs them.
+4. The Pi 4B backend now has physical acceptance for firmware-DTB discovery,
+   BCM2711 PCIe/VL805 access, cache/DMA translation, retained controller
+   ownership, USB2 hub/child enumeration, direct SuperSpeed SanDisk block and
+   FAT32 file reads, boot-keyboard typing and basic Apple trackpad pointer/
+   primary-button painting. IMG_9147–9150 accept keyboard-to-shell input;
+   IMG_9151–9154 accept generic boot-mouse input and nine transfer-ring wraps.
+   [PI4.md](PI4.md) records exact images, hashes, acceptance and later limits.
+   This is still a bounded selected-child backend: keyboard, pointer and
+   storage were accepted on separate cold boots, not together. It has not
+   integrated writable media with the full source filesystem or run the
+   normal ARM64 compiler/desktop on physical Pi hardware.
+5. Next Pi gates are simultaneous input/system storage, bounded disconnect/
+   error recovery, writable filesystem and cold-boot persistence, then the
+   normal graphical startup/compiler/editor/application and installer path.
+   The Apple trackpad currently uses boot-mouse reports; multitouch,
+   secondary-click gestures and scrolling have not been ported. The existing
+   Mac mini YDE `UsbTrackpadAttach` / `UsbTrackpadFeatureSend` /
+   `UsbTrackpadCB` implementation is a device-specific reference for that
+   work. Audio/network and other board peripherals need their own drivers.
 
 The goal is normal UTM USB settings and a reusable native USB stack for Pi,
 with one shared OS input path. A USB 2 keyboard or mouse can operate behind
@@ -3733,14 +3747,12 @@ high-speed TT behavior, or the Pi 4B VL805 backend. Logs are
 
 ## DVD live startup — 2026-10-19
 
-ISO/DVD boot now follows the translated pinned `HomeSys.StartUpTasks` path,
-reuses one graphical terminal, queues `Home/Once.ZC`, and preserves the live
-session. The generated home startup source replaces the legacy hard-drive
-installer prompt with a clear message that installation is not ported to
-ARM64. This is deliberate: the YDE installer found in the sibling repository
-formats and writes boot/storage structures using legacy BIOS/AHCI assumptions,
-so it is not safe to expose as an ARM64 UTM installer. The optional upstream
-tour remains conditional on its source being present.
+As of 2026-10-19, ISO/DVD boot followed the translated pinned
+`HomeSys.StartUpTasks` path and the generated home startup source reported that
+installation was not yet ported. The bounded UTM/QEMU installer described
+below supersedes that status; it still does not invoke the legacy YDE
+BIOS/AHCI installer. The optional upstream tour remains conditional on its
+source being present.
 
 `make check-dvd-live` passed a clean ISO/HVF boot, confirmed boot source 4,
 checked the installer-status text in framebuffer scanout, typed `help` in the
@@ -3895,12 +3907,18 @@ post-palette USB run `python3 scripts/check-compat.py --usb-input nec
 --usb-with-virtio --usb-hubs 2 --usb-hotplug --probe-gui-workflow` also passed:
 USB ownership and recovery, menu actions, Files and Window Demo, editor
 save/reopen across reboot, `latticeplay`, `stockplay`, and hub-subtree recovery
-all passed. The latest Pi HDMI photos now show the guarded probe from the
-staged kernel: VL805 BAR0 is `0xf8000004`, its FDT-translated CPU/virtual
-addresses are printed, and the xHCI capability reads return `0xdeadbead`.
-Bus mastering remained off and the command word was restored. This narrows the
-next investigation to the live BCM2711 outbound window/error state; the next
-read-only diagnostic captures those registers before and after the xHCI read.
+The latest Pi HDMI photos were captured at 09:44 on 2026-10-21, before the
+live-window fix was built. They show the old guarded probe returning
+`0xdeadbead` for BAR0 `0xf8400004`. The read-only BCM2711 report shows window 0
+mapping PCI bus `0xf8000000` to CPU `0x600000000` for 64 MiB, while the broad
+FDT aperture would put BAR `0xf8400000` at CPU `0x638400000`, outside that
+window. The live-window mapping is CPU `0x604000000`; the error registers
+remain clear. The corrected probe derives its BAR target from the captured
+window registers and checks it against the FDT aperture. Host tests pass; the
+corrected kernel was built at 09:54, staged at 09:59, and copied to the
+microSD with the prior kernel backed up. A new Pi boot is pending to verify
+the corrected CPU BAR and capability values. Bus mastering remains off and
+the PCI command word is restored.
 
 The PCI graphical workflow also checks that task-local commands are fully
 visible in the guest terminal before Return. This catches a missing character
@@ -3930,9 +3948,20 @@ composition cases. `GrSpriteTransformChecks` also applies a one-radian Z
 rotation through the source CDC transform callback and `Sprite3`, then checks
 the resulting framebuffer pixel. `GrSpriteSymmetryChecks` now also rotates an
 indexed triangle and checks an interior pixel in its transformed fill. This
-verifies non-cardinal affine point and mesh paths; perspective division,
-general 3D clipping, complete transformed-mesh coverage, and interactive
-view-angle controls remain open.
+verifies non-cardinal affine point and mesh paths. The source sprite path now
+applies homogeneous perspective division for the default `DCTransform` matrix
+to point sprites and indexed meshes, with positive-`w` and projected-coordinate
+bounds checks. Indexed mesh triangles are clipped against the near plane and
+the CDC's four screen edges before projection, then rasterized as a fan. Tests
+cover projected pixels, a pentagon produced by multi-plane clipping, a triangle
+crossing the near plane, and atomic rejection when a later triangle exceeds
+the depth bound. The point perspective case and large-coordinate overflow
+guard pass in `GrSpriteTransformChecks`; mesh cases pass in
+`GrSpriteSymmetryChecks`. Far-plane clipping and complete transformed-mesh
+coverage remain open. The view-angle
+control's display and X/Y/Z click response have been confirmed in UTM;
+point sprites at or behind `w=0` are rejected rather than clipped against the
+near plane.
 
 The full run exposed an empty bootstrap `DCDel` stub: source `WinMgr` creates
 and deletes a large diff surface on refreshed frames, and the no-op leaked
@@ -3946,10 +3975,24 @@ the complete graphics/window-manager checks pass after this fix.
 point/mesh pixels, repeated window-manager frame rendering, and full source
 graphics/window-manager checks.
 
-After refreshing UTM with the GrBlot3 source module, the user loaded
-`/System/Gr/GrBlot3.ZC` and `/Tests/GrBlot3.ZC` in the graphical terminal and
-ran `GrBlot3Checks`; the displayed result was `0x000000000000002a`. This
-confirms the new source graphics path loads and executes in the live UTM guest.
+On 2026-10-21, the same full source graphics/window-manager probe passed again
+after adding homogeneous perspective division for the default CDC transform.
+The point and indexed-mesh checks both verify projected framebuffer/CDC
+pixels; mesh tests cover near-plane crossing, four-edge viewport clipping into
+a five-vertex polygon, and rejection before drawing when a later triangle
+exceeds the depth bound. The perspective point, mesh, and large-coordinate
+regressions returned `0x000000000000002a`. On 2026-10-21, the user
+loaded the refreshed tests in UTM and confirmed both
+`GrSpriteTransformChecks` and `GrSpriteSymmetryChecks` returned
+`0x000000000000002a`; live execution is accepted for these transform cases.
+
+The transformed `GrBlot3` raster now reports no blit when every sampled source
+pixel lands outside the destination CDC, while preserving success for a bitmap
+that is clipped but still reaches the destination. `GrBlot3Checks` covers both
+cases, and the full PCI graphics/window-manager probe passed after the change.
+The refreshed UTM image was checked live: the user loaded
+`/System/Gr/GrBlot3.ZC` and `/Tests/GrBlot3.ZC` and confirmed
+`GrBlot3Checks` returned `0x000000000000002a`.
 
 On 2026-10-21, the USB graphical workflow also opened `/Home/Once.ZC` from the
 native FileMgr with both Space and a pointer click on the selected row. Both
@@ -4001,3 +4044,65 @@ points before drawing and charges the added lines against the sprite work
 budget. The new framebuffer check verifies the source and reflected shaft,
 tip, and arrowhead pixels. `make check-sprite-arrow-symmetry` passed in a fresh
 ARM64 PCI guest; the target also rebuilds the source bundle used by UTM.
+
+## Projective line and polyline clipping — 2026-10-22
+
+The default non-affine CDC transform now clips `SPT_LINE` and each segment of
+`SPT_POLYLINE` in homogeneous space against the near plane and viewport before
+bounded integer projection. The regression starts a line and polyline at a
+source coordinate five million pixels beyond the left edge, then inspects the
+visible horizontal segment, the later vertical segment, and clipped-off
+scanout. `make check-grscreen-full` passed; `GrSpriteSymmetryChecks` returned
+`0x2a` both in that QEMU suite and in the refreshed UTM installed-disk guest.
+
+## Projective rectangle clipping — 2026-10-22
+
+`SPT_RECT` now clips its two fill triangles and four outline segments in
+homogeneous space before projection. `GrSpriteSymmetryChecks` sends a
+five-million-pixel off-screen rectangle through the default perspective
+transform and checks the visible fill, clipped outline, and untouched area.
+The full graphics suite passes, and the same regression returns `0x2a` on the
+installed UTM disk after cold restart. The refreshed ISO installer also passes
+the guarded full-target readback; `Tests/InstallerPersist.ZC` returns `0x2a`
+before and after another installed-disk restart.
+
+## Screen bitmap collision visibility — 2026-10-22
+
+The guarded ARM64 `GrBitMap.ZC` overlay closes the upstream `GrBlot`
+collision-path TODO for screen-backed bitmaps. Collision counts now honor the
+window z-buffer in aligned screen bitmap blits as well as the unaligned safe
+fallback. `GrBlot3Checks` creates a 16-pixel bitmap spanning two text cells,
+marks one cell occluded and one visible, and verifies that only the eight
+visible overlaps count. The test uses the boot terminal and a temporary
+z-buffer, so it runs deterministically in headless PCI guests. The focused
+`python3 scripts/check-compat.py --pci --probe-grblot3` gate passes; the
+refreshed `make check-grscreen-full` and ISO installer results are recorded in
+`ACCEPTANCE.md` after the candidate rebuild.
+
+## Formatter startup coverage — 2026-10-22
+
+The shared `MStrPrint`/`GrPrint` formatter now accepts signed decimal,
+hexadecimal, and floating-point conversions with numeric field width and zero
+padding, including upstream's dynamic `%0*tX` form. `%g`/`%G` use significant
+digits, trim redundant trailing zeroes, select fixed or scientific notation,
+and preserve the uppercase exponent form. `UserStartUpChecks` covers negative
+zero-padded decimal, fixed zero-padded hex, dynamic-width hex, fixed `%g`, and
+lower/uppercase scientific notation. `make check-user-startup` passed with
+independent typing/history in both graphical terminals and exact repeated-task
+cleanup. After this change, `make check-grscreen-full` also passed its
+window-manager, font/text, zoom/view, CDC/sprite, and full-frame scanout checks;
+the latest `make check-iso-installer` passed after the formatter change. Other
+standard formatter flags/conversions and the full upstream font set remain
+incomplete.
+
+## Graphical shell prompt and focus recovery — 2026-10-22
+
+The bootstrap terminal now places its DolDoc cursor at the document sentinel
+after printing output and after a terminal receives mouse focus. This avoids
+inserting the shell's separate input buffer at an old text position when a
+user clicks a terminal transcript. The QMP acceptance harness also waits for
+the command to be visible before Return and explicitly re-focuses the shell
+after Window Demo closes. `make check-user-startup`, `make check-home-autostart`,
+`make check-grscreen-full`, and the full `make check-compat-pci` rerun pass;
+the startup check confirms typed commands, independent history, output, and
+prompt recovery in both tiled terminals.

@@ -240,7 +240,8 @@ subprocess.run([sys.executable, str(root / "scripts/source-volume.py"),
                 "--replace", "System/TaskBridge.ZC",
                 "--replace", "System/WinMgr.ZC",
                 "--replace", "System/Gr/GrDC.ZC",
-                "--replace", "System/Gr/SpriteRaster.ZC"], check=True)
+                "--replace", "System/Gr/SpriteRaster.ZC",
+                "--replace", "Tests/GrSpriteSymmetry.ZC"], check=True)
 
 def boot_digest(path):
     remaining = RS_LBA_BASE * 512  # GPT and ESP; exclude preserved guest regions.

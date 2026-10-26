@@ -1,6 +1,8 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include "../src/pi4_dma.h"
+#include "../src/pi4_dma_probe.h"
 #include "../src/pi4_pcie_fdt.h"
 
 #define TEST_BLOB_BYTES 4096
@@ -119,6 +121,8 @@ static size_t make_tree(const char *status, const char *compatible) {
 
 int main(void) {
     struct zeal_pi4_pcie pcie;
+    struct zeal_handoff handoff = {0};
+    struct pi4_dma_probe_plan plan;
     size_t size = make_tree("okay", "brcm,bcm2711-pcie");
     if (pi4_fdt_find_pcie(blob, size, &pcie) != 0 ||
         pcie.flags != (PI4_PCIE_FDT_PRESENT | PI4_PCIE_FDT_ENABLED |
@@ -138,6 +142,25 @@ int main(void) {
                 (unsigned long long)pcie.dma_size);
         return 1;
     }
+
+    /* Exercise the exact Pi FDT -> reserved arena path used by ZealBooter. */
+    handoff.revision = 6;
+    handoff.size = sizeof(handoff);
+    handoff.pi4_pcie = pcie;
+    handoff.mem_count = 1;
+    handoff.mem[0] = (struct zeal_mem_entry){
+        .base = 0x04000000ull,
+        .length = PI4_USB_DMA_ARENA_BYTES,
+        .type = ZEAL_MEM_USABLE
+    };
+    if (pi4_usb_dma_reserve(&handoff) != 0 ||
+        handoff.pi4_usb_dma.phys_base != 0x04000000ull ||
+        handoff.pi4_usb_dma.bus_base != 0x04000000ull ||
+        pi4_dma_probe_plan_make(&handoff, &plan) != PI4_DMA_PROBE_PLAN_OK ||
+        plan.phys_base != 0x04000000ull || plan.bus_base != 0x04000000ull) {
+        fprintf(stderr, "Pi 4B parsed identity DMA map did not produce identity arena\n");
+        return 5;
+    }
     size = make_tree("disabled", "brcm,bcm2711-pcie");
     if (pi4_fdt_find_pcie(blob, size, &pcie) != 0 ||
         !(pcie.flags & PI4_PCIE_FDT_PRESENT) || (pcie.flags & PI4_PCIE_FDT_ENABLED)) {
@@ -154,6 +177,6 @@ int main(void) {
         fprintf(stderr, "valid FDT without BCM2711 PCIe node was not distinguished\n");
         return 4;
     }
-    puts("PASS BCM2711 FDT host registers, PCI memory window and 3 GiB DMA aperture");
+    puts("PASS BCM2711 FDT decode and identity DMA arena reservation");
     return 0;
 }

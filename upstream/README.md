@@ -3126,7 +3126,7 @@ Freeze catalog unchanged.
 | Gap | `SPT_MESH` and `SPT_SHIFTABLE_MESH` drew filled triangles without updating the CDC depth buffer, so triangle overlap depended on record order |
 | Bring-up | Interpolate vertex Z along each scanline and send bounded spans through upstream `GrHLine`, retaining its normal clipping and depth test; declare the source API early enough for the bootstrap raster bridge |
 | Smoke | Extend `GrSpriteSymmetryChecks` to cover ordinary 2D fallback without a depth buffer, flat near/far overlap, a sloped triangle's interpolated interior depth, and Z scaling through the CDC transform; full PCI compatibility passes |
-| Limits | The bounded scanline path covers the current mesh subset; pixel-identical parity with upstream mesh rasterization and broader 3D clipping remain open |
+| Limits | The bounded scanline path covers the current mesh subset; pixel-identical parity with upstream mesh rasterization and clipping for other 3D sprite opcodes remain open |
 
 ## Milestone 274 — initialize sprite opcode tables for source graphics
 
@@ -3153,7 +3153,7 @@ Freeze catalog unchanged.
 | Gap | The bootstrap exported empty `Mat4x4IdentEqu` and `Mat4x4RotX/Y/Z` stubs, so unchanged 3D graphics consumers could not form or compose the source Q32.32 transforms |
 | Bring-up | Initialize the exact Q32.32 identity matrix and implement X/Y/Z rotations using the ARM-safe F64 sine/cosine bindings; compose through F64 products to avoid overflowing intermediate Q32.32 integer products |
 | Smoke | `BootstrapMat4x4Checks` verifies identity, positive quarter-turn and one-radian coefficients for all axes, and composition order; `GrSpriteTransformChecks` checks a one-radian Z-rotated point and `GrSpriteSymmetryChecks` checks an interior pixel from a rotated indexed triangle |
-| Limits | This covers affine X/Y/Z rotation plus source point and indexed-triangle sprite paths; perspective division, general 3D clipping, full transformed-mesh visual acceptance, and interactive view-angle controls remain open |
+| Limits | The affine path covers X/Y/Z rotation, while the indexed-mesh path now adds bounded homogeneous perspective division and five-plane clipping before rasterization. Other 3D sprite opcodes, pixel-identical raster parity, full transformed-mesh visual acceptance, and interactive view-angle controls remain open |
 
 ## Milestone 277 — skip unchanged staged framebuffer pixels
 
@@ -3473,7 +3473,193 @@ Freeze catalog unchanged.
 | Gap | `SPT_ARROW` drew its shaft and arrowhead only on the source side even when the sprite enabled planar symmetry |
 | Bring-up | Reflect the shaft and both arrowhead strokes across the validated screen-space symmetry axis; validate all mirrored endpoints before drawing and include the extra strokes in the per-sprite work budget |
 | Smoke | `GrSpriteArrowSymmetryChecks` checks both arrow tips, shaft samples, and both reflected arrowhead arms in the framebuffer; `make check-sprite-arrow-symmetry` passes |
-| Limits | The bounded path uses the affine sprite transform and 2D symmetry bridge; general perspective projection and full 3D clipping remain open |
+| Limits | The bounded symmetry path still uses the affine transform. The indexed-mesh path separately supports homogeneous perspective projection and five-plane clipping; complete projective symmetry and clipping for other 3D opcodes remain open |
+
+## Milestone 311 — clip projective sprite lines before projection
+
+| Item | Path |
+|--|--|
+| Gap | `SPT_LINE` transformed each endpoint separately, so an endpoint beyond the safe integer projection bound discarded a segment even when part of it crossed the CDC |
+| Bring-up | For the default non-affine CDC matrix, transform both endpoints to homogeneous coordinates, clip the segment against the near plane and four CDC viewport edges, then project and rasterize the surviving segment; affine and custom transform callbacks retain their existing behavior |
+| Smoke | `GrSpriteSymmetryChecks` exercises exact clipped endpoints and a `Sprite3` line with a five-million-pixel source endpoint, checking visible and clipped framebuffer pixels; `make check-grscreen-full` passes and the same check returns `0x2a` in the refreshed UTM installed-disk guest |
+| Limits | This extends projective clipping to `SPT_LINE`; other non-mesh sprite opcodes still have their bounded 2D/affine behavior, and pixel-identical upstream mesh parity remains open |
+
+## Milestone 312 — clip projective sprite polylines before projection
+
+| Item | Path |
+|--|--|
+| Gap | `SPT_POLYLINE` transformed each source point independently, so one endpoint beyond the safe integer projection bound discarded an otherwise visible connected path |
+| Bring-up | Reuse homogeneous near-plane and CDC-edge clipping for each segment in both the validation and draw passes; account raster work only for visible clipped segments and retain later visible segments when earlier points lie outside the viewport |
+| Smoke | `GrSpriteSymmetryChecks` draws a projective polyline from a five-million-pixel off-screen source point, checks the clipped horizontal and following vertical segments in actual scanout, and verifies the clipped-off pixel remains clear; `make check-grscreen-full` passes and the same regression returns `0x2a` in the refreshed UTM installed-disk guest |
+| Limits | This extends projective clipping to `SPT_POLYLINE`; splines and other 3D sprite opcodes still need equivalent projective handling, and pixel-identical upstream mesh parity remains open |
+
+## Milestone 313 — clip projective rectangle fill and outline
+
+The default non-affine `SPT_RECT` path clips both triangles that form its fill
+and all four outline edges in homogeneous space against the near plane and CDC
+viewport. It checks the complete raster work before drawing. The regression
+uses a rectangle beginning five million source pixels beyond the left edge,
+then checks its visible CDC fill pixel, clipped scanout outline, and untouched
+off-screen area. `make check-grscreen-full` passes; the current refreshed ISO
+also installs in UTM, and the installed-disk `GrSpriteSymmetryChecks` returns
+`0x2a` after a second cold restart. Projective spline and other sprite opcodes
+remain open.
+
+## Milestone 319 — verify projective bitmap and glyph sampling
+
+The projective `Sprite3` regression now includes an indexed bitmap and a text
+glyph under a positive homogeneous half-scale. It checks exact bitmap texels
+and glyph samples in the CDC body after division, guarding against fixed-point
+product overflow and ensuring each bitmap/glyph sample uses the same point
+transform as sprite geometry. The full compatibility probe and
+`make check-grscreen-full` pass; the current ISO
+(`sha256=d9e2c5d5aa64c54bdbe259f286c5c1560e141b7db0495a69a97f42ffc3da858b`)
+also installs through UTM, cold-boots from a disk-only VM, and returns
+`0x2a` from `GrSpriteSymmetryChecks` after restart. Other projective sprite
+records, broader CDC operations, normal upstream system-menu startup, and
+pixel-identical mesh raster parity remain open. The live UTM view still
+captures gray although guest scanout is nonblack.
+
+## Milestone 320 — expose Paint Demo in the boot menu
+
+The installed graphical terminal can now launch the existing bounded `paint`
+program from the OS menu. The graphical-shell allowlist and help text include
+the command; the QEMU startup regression verifies that the menu item is
+registered and that selecting it runs the program and returns its dot count.
+`make check-grscreen-full` passes. The user also confirmed in the live UTM
+disk-only guest that Zoom In, Pan Right, and Reset View visibly work. This
+closes the expanded menu's live interaction check. The new ISO still needs a
+fresh UTM installer and disk-only acceptance cycle. Normal upstream system
+startup, broader CDC behavior, and pixel-identical transformed-mesh parity
+remain open.
+
+## Milestone 321 — verify rotated projective ellipse clipping
+
+`GrSpriteSymmetryChecks` now exercises a non-cardinal `SPT_ELLIPSE` whose
+source-space outline crosses the homogeneous near plane. The test checks that
+the rotated visible arc reaches scanout and an off-shape pixel stays clear.
+`make check-grscreen` and `make check-grscreen-full` pass, including
+transformed-sprite, view-angle, window-manager graphics checks, and the
+full-text frame smoke. This regression changes only test sources;
+the ISO remains at SHA-256
+`11bba223d4162ab6dd1788e66dd34dd0c7ecb9b02f35c27bf38fc07577fbf8c4`. The
+exact ISO's live UTM installer cycle is still pending because the current VM
+booted its VirtIO disk without the ISO attached as the boot medium.
+
+## Milestone 322 — isolate screen-backed mesh depth by task
+
+| Item | Path |
+|--|--|
+| Gap | Screen-backed sprite meshes shared scene depth state across desktop tasks, so a nearer mesh in one task could reject pixels in another task's scene |
+| Bring-up | Keep a separate screen-coordinate depth plane for the bootstrap screen CDC, clear only the current task's visible rectangle at the start of its draw callback, and map sprite-local coordinates through task origin and scroll; let the existing window z-buffer determine cross-task visibility and let `DCF_ON_TOP` overlays bypass scene depth |
+| Smoke | `SpriteScreenDepthChecks` returns `0x2a` for disjoint task regions, per-task redraw reset, and on-top overlay behavior; `make check-grscreen-full` passes |
+| Limits | Exact upstream mesh raster parity and damage-region redraw remain open |
+
+## Milestone 323 — show registered Ctrl-Alt shortcuts in help
+
+| Item | Path |
+|--|--|
+| Gap | AutoComplete's `KeyMapCtrlAltFamily` displayed no shortcut information in the ARM64 bootstrap, even though `KeyDevInit` registered Ctrl-Alt-F for the font toggle |
+| Bring-up | Preserve bounded callback descriptions in the native bridge, read the authoritative callback/description tables from guest `keydev`, and route the help function to the guest terminal |
+| Smoke | `CtrlAltFontMapChecks` returns `0x2a` and the QEMU startup gate asserts `Ctrl-Alt-F: Cmd /Toggle Aux Font`; the same gate sends Ctrl-Alt-F twice and checks auxiliary then standard font state |
+| Limits | This covers registered shortcuts and the font toggle in the bootstrap runtime; the full upstream kernel key-device stack and remaining font behavior remain open |
+
+## Milestone 324 — show supported bootstrap terminal keys in help
+
+| Item | Path |
+|--|--|
+| Gap | The ordinary key-map preview said it was unavailable even though the ARM64 graphical shell has tested command-line editing, history, and execution keys |
+| Bring-up | Report the controls implemented by the bootstrap line editor and keep registered Ctrl-Alt shortcuts in their separate live map |
+| Smoke | `KeyMapFamilyChecks` checks Left/Right, Home/End, Backspace/Delete, Up/Down, and Return descriptions; `make check-home-autostart` passes with Ctrl-Alt-F mapping and dispatch |
+| Limits | This is the bootstrap command-line map; the full upstream DocTerm key-description device and dynamic per-key handler map remain open |
+
+## Milestone 314 — clip projective regular polygon fill and outline
+
+The default non-affine `SPT_POLYGON` path clips its fill triangles and each
+outline segment against the near plane and CDC viewport in homogeneous space
+before bounded projection. The regression uses a four-sided regular polygon
+whose left vertices cross `w=0`, checks its visible edge after near-plane and
+viewport clipping, and verifies an empty CDC pixel remains clear.
+`make check-grscreen-full` passes; the exact refreshed ISO installs in the
+UTM acceptance VM, and the disk-only guest returns `0x2a` from
+`GrSpriteSymmetryChecks` after a cold restart.
+
+Projective clipping for other sprite opcodes, broader CDC operations, normal
+upstream menu/task startup, and pixel-identical mesh parity remain open.
+
+## Milestone 315 — clip projective spline segments before rasterization
+
+Default projective quadratic and cubic B-splines now remain in source space
+while the renderer samples each Bezier span, clips adjacent points against the
+homogeneous near plane and CDC viewport, then rasterizes only visible segments.
+The work is preflighted before drawing and remains bounded by the sprite pixel
+budget; affine transforms and custom callbacks keep their existing path.
+`GrSpriteSymmetryChecks` verifies a quadratic curve crossing the near plane in
+actual scanout through both direct `SpriteBSpline0` use and the `Sprite3`
+record dispatcher. `make check-grscreen-full` passes.
+
+The rebuilt ISO (`sha256=6e190f916007ffcd32d2aca643b6afb9dbccb737270fd820ecbe2c017716b550`)
+passes `make check-iso-installer` and the isolated UTM cycle: boot the USB ISO,
+confirm `zinstall ERASE`, fully read back the 128 MiB target, copy it to the
+disk-only acceptance VM, cold boot twice, and verify the saved function and
+projective graphics check both return `0x2a`. Wallpaper appearance still needs
+eyes-on confirmation. Projective clipping for other sprite opcodes, broader
+CDC operations, normal upstream menu/task startup, and pixel-identical mesh
+parity remain open.
+
+## Milestone 316 — clip projective ellipses and circles before rasterization
+
+Default projective `SPT_ELLIPSE` and `SPT_CIRCLE` now sample their outlines in
+source space, clip every adjacent chord against the homogeneous near plane and
+CDC viewport, preflight bounded raster work, then draw only visible segments.
+Affine and custom transform callbacks retain the existing midpoint path.
+`GrSpriteSymmetryChecks` verifies actual scanout for a stretched ellipse and a
+circle whose source outlines cross the near plane. `make check-grscreen-full`
+passes.
+
+The rebuilt ISO (`sha256=974532ae9d4f80224cfdeb7a5faf35568edc6f75f2374a55fc7837dd2f977588`)
+passes `make check-iso-installer` and the isolated UTM cycle: USB ISO boot,
+explicit `zinstall ERASE`, complete 128 MiB target readback, disk-only install
+boot, cold restart, and persistence plus projective graphics checks returning
+`0x2a`. The desktop and wallpaper still require eyes-on confirmation. Other
+projective sprite operations, broader CDC graphics, normal upstream menu/task
+startup, and pixel-identical mesh parity remain open.
+
+## Milestone 317 — clip projective arrow shafts before rasterization
+
+Default projective `SPT_ARROW` now clips the shaft against the homogeneous
+near plane and CDC viewport before rasterization. It draws the arrowhead only
+when the true tip remains inside the viewport; clipping an offscreen endpoint
+does not invent a head at the viewport edge. The regression starts behind the
+near plane and checks the clipped line and full scanout coverage. Affine and
+custom transform callbacks retain the existing behavior. `make
+check-grscreen-full` passes with `GrSpriteSymmetryChecks=0x2a`.
+
+The rebuilt ISO (`sha256=8a705d3df5dc9a39146e7ce3fc226b4ab6b89aa4d054ca78b63aec160dfce16a`)
+passes `make check-iso-installer` and the isolated UTM cycle: guarded erase,
+full 128 MiB readback, disk-only boot and cold restart, and persistence plus
+projective graphics checks returning `0x2a`. The desktop and wallpaper still
+need eyes-on confirmation. Projective line, polyline, rectangle, polygon,
+spline, ellipse, circle, and arrow paths pass; transformed rotated rectangles
+and other sprite opcodes, broader CDC graphics, normal upstream menu/task
+startup, and pixel-identical mesh parity remain open.
+
+## Milestone 318 — clip projective rotated rectangles
+
+Default projective `SPT_ROTATED_RECT` now transforms and clips the complete
+quadrilateral against the near plane and CDC viewport before rasterizing its
+fill and outline. The regression uses a non-cardinal angle crossing the left
+edge and checks both the direct helper and `Sprite3` scanout paths. The full
+QEMU graphics suite passes. The current ISO
+(`sha256=211cb160efbcfb9841397f0cb212401e657a6e20a9061660819cdb9d4e5d3c88`)
+also passes `make check-iso-installer` and the live UTM installer plus
+disk-only cold-restart cycle. Saved-volume persistence and
+`GrSpriteSymmetryChecks` both returned `0x2a` after the stop/start. UTM serial
+reports active nonblack scanout, but this session's console screenshot was a
+blank gray canvas, so visual wallpaper acceptance remains pending. Expanded
+zoom/pan menu clicks, broader CDC operations, normal upstream menu/task
+startup, other sprite opcodes, and pixel-identical transformed-mesh parity
+remain open.
 
 **Historical live UTM check (2026-10-16, UTM 5.0.7):** the VM renders graphics
 and the serial shell works through the PTTY reported for the current boot.
@@ -3537,7 +3723,7 @@ Guest `try/catch` now calls uniquely named `ZcTryEnter`/`ZcTryLeave`/`ZcTryCatch
 
 The parser now resolves a later guest `extern` global to an earlier guest definition when scalar types have a matching ABI, aggregate types are identical, and array dimensions match. `GlobalExternLinkChecks` covers this across separately loaded modules; this lets declarations such as `Externs.ZC`'s `winmgr` refer to storage already supplied by the task bridge. The ARM64 math runtime implements ZealOS's `_EXP` import, and the bootstrap `LowPass1` follows the unchanged `MathODE.ZC` formula. Named HolyC `reg RSI`/`reg R13`/`reg RCX` hints parse as nonbinding allocation hints on ARM64, alongside ordinary `reg bit_shift` locals. The source bundle applies guarded ARM64 overlays to unchanged `GrScreen.ZC` and `MathODE.ZC`: the former expands its `GrUpdateTextBG` x86 register loop to eight inline typed stores per character; the latter rewrites one inline address-of-member bit-test to an equivalent local pointer. The AArch64 runtime implements and tests `DCBlotColor4`'s cached four-bitplane conversion and the MathODE `CD3` ABI plus F64 `Abs`. `make check-compat-pci` loads the complete MathODE module and checks constructor allocation/cleanup, one Cash–Karp RK5 step, and the source `ODEsUpdate` routine on the root task's ODE queue for `y'=y`. The opt-in `--probe-fulltext-visible` path passes the staged full-frame text smoke with framebuffer-console and serial output both enabled. Pinned source remains byte-identical. MathODE is now loaded before the source window manager starts at boot, and `make check-grscreen-ode` verifies its root-task ODE advances across live manager frames; multi-CPU derivative workers remain open.
 
-This remains a bring-up probe, not a complete running desktop. The task-geometry bridge, source graphics-context initialization, pixel hit-test helper, guest task control-queue initialization, CPU-pointer inheritance for synthetic tasks, and task-ring insertion/removal are implemented and tested. The disposable live-start probe starts unchanged `WinMgrTask`, verifies a timer-woken scan, consumes a tablet sample through source `WinMouseUpdate`, and drives a synthetic title-bar drag through the source manager to check focus and geometry. Every entry point in pinned `GrAsm.ZC` is now covered by a native bridge or source implementation and a focused smoke. The shell can start and stop the manager, but normal ZealOS system-menu/music startup and ordinary kernel task/application initialization still need porting or real implementations. Q32.32 identity and non-cardinal X/Y/Z affine rotation matrices are implemented; the source `Sprite3` point and indexed-mesh paths are verified with a non-cardinal Z rotation. The bootstrap `DCDel` releases owned CDC buffers while preserving shared bootstrap surfaces, which keeps repeated live manager frames from exhausting the guest data arena. Perspective division, general 3D clipping, full transformed-mesh visual acceptance, and interactive view-angle controls remain open.
+This remains a bring-up probe, not a complete running desktop. The task-geometry bridge, source graphics-context initialization, pixel hit-test helper, guest task control-queue initialization, CPU-pointer inheritance for synthetic tasks, and task-ring insertion/removal are implemented and tested. The disposable live-start probe starts unchanged `WinMgrTask`, verifies a timer-woken scan, consumes a tablet sample through source `WinMouseUpdate`, and drives a synthetic title-bar drag through the source manager to check focus and geometry. Every entry point in pinned `GrAsm.ZC` is now covered by a native bridge or source implementation and a focused smoke. The shell can start and stop the manager, but normal ZealOS system-menu/music startup and ordinary kernel task/application initialization still need porting or real implementations. Q32.32 identity and non-cardinal X/Y/Z affine rotation matrices are implemented; the source `Sprite3` point and indexed-mesh paths are verified with a non-cardinal Z rotation. Bounded homogeneous perspective division and near/viewport clipping are exercised for transformed indexed meshes, including a five-vertex clipped polygon and fan rasterization. The bootstrap `DCDel` releases owned CDC buffers while preserving shared bootstrap surfaces, which keeps repeated live manager frames from exhausting the guest data arena. Projective clipping covers line, polyline, rectangle, regular polygon, spline, ellipse, circle, and arrow paths; rotated rectangles and other sprite opcodes remain open. Pixel-identical upstream mesh parity, full transformed-mesh visual acceptance, broader CDC operations, and normal upstream system-menu/task startup remain open. UTM has since confirmed the view-angle control and X/Y/Z click response.
 
 ## Milestone — graphical editor persistence
 
@@ -3634,3 +3820,115 @@ the remaining `KTask` startup, interactive compiler loop or `HomeSys`.
 - QEMU `make run-serial` (interactive shell) after green check-serial.
 - QEMU `make run-pci` boots with virtio-blk-pci (same ESP).
 - UTM (acceptance) boots the same virt HW config (`scripts/install-utm.sh` / Makefile `QEMU_VIRT`).
+
+2026-10-22 UTM splash and installer acceptance: filled sprite scanlines now
+respect task-window origin, clipping, scroll, and Z order, placing the animated
+blue Z between the splash labels. The fresh UTM screenshot shows the full
+desktop and centered splash. The refreshed ISO
+(`sha256=e0545f0a9d2fda8f872c90ab91c9bf46f465db2ecf0a7cc2e4294a752a9ca4e7`)
+boots and installs through UTM with full target read-back; the disk-only VM
+retains saved source across a cold restart, and both persistence and sprite
+symmetry checks return `0x2a`. `make check-grscreen-full` and
+`make check-iso-installer` pass. Remaining startup, CDC, transformed-sprite,
+menu-interaction, and transformed-mesh parity work is tracked in
+`ACCEPTANCE.md`.
+
+2026-10-22 graphics and installer regression: the arbitrary-angle
+`SPT_ROTATED_RECT` test checks scanout pixels and an untouched off-shape pixel;
+`make check-grscreen-full` passes. The current ISO
+(`sha256=11bba223d4162ab6dd1788e66dd34dd0c7ecb9b02f35c27bf38fc07577fbf8c4`)
+passes `make check-iso-installer`, including full read-back, disk-only boot,
+and saved data across a cold reboot. `make check-home-autostart` also passes;
+it verifies terminal tiling, `Home/Once.ZC`, the animated startup splash, and
+input recovery. The user confirmed Zoom In, Pan Right, and Reset View visibly
+work in UTM. This exact ISO still needs its own live UTM installer and
+disk-only cold-boot cycle. Broader upstream startup, CDC coverage, and
+pixel-identical transformed-mesh output remain open.
+
+2026-10-22 projective bitmap near-plane regression: `GrSpriteSymmetryChecks`
+now covers an indexed `SPT_BITMAP` with source texels on both sides of `w=0`;
+positive-`w` colors must land at their exact projected CDC pixels, and
+nonpositive-`w` samples must remain clipped. `make check-grscreen-full` and
+`make check-home-autostart` pass, including centered animated splash rendering
+and input recovery. A separate candidate ISO,
+`build/zealos-aarch64-hello-projective-bitmap.iso`
+(`sha256=2132026a4c4f045222dcdf9f2a3a23e33db8e84a6dce2478af7788b67c872d94`),
+passes guarded erase, full read-back, byte-identical install, disk-only boot,
+saved-data return `0x2a`, and cold-reboot persistence through
+`make ISO=build/zealos-aarch64-hello-projective-bitmap.iso
+check-iso-installer`. The previously attached ISO was left unchanged. The
+candidate still needs the live UTM cycle: boot the SCSI CD/DVD first, install
+to the disposable VirtIO target, then cold-boot that target alone.
+
+2026-10-22 projective point near-plane regression: `GrSpriteSymmetryChecks`
+now covers transformed `SPT_PT` and packed `SPT_POLYPT` records on both sides
+of `w=0`, including exact positive-w pixels and clipped nonpositive-w points.
+The QEMU graphics suite passes. The new candidate
+`build/zealos-aarch64-hello-projective-points.iso`
+(`sha256=4cc06c89809220abb6d67f6d6a8b945aaae9d5d26d46c8f471be3f04abc674fa`)
+passes guarded installation, full read-back, byte-identical disk comparison,
+disk-only boot, and saved-data persistence through a cold reboot. The exact
+candidate still needs its live UTM install and disk-only cold-boot cycle.
+
+2026-10-22 full graphics rerun and UTM boot-order correction: `make
+check-grscreen-full` completes with exit status 0, including projective
+near-plane/viewport checks for points, packed points, lines, polylines,
+rectangles, rotated rectangles, polygons, splines, ellipses, circles, arrows,
+indexed meshes, bitmaps, glyphs, text boxes, and text diamonds. Text and
+borders use the cell visibility map; pixel graphics use a separate 800x600
+per-pixel window-visibility mask. The mask handles window overlap, while
+global 3D depth composition and exact upstream mesh raster parity remain open.
+The latest UTM screenshot shows the installed-disk shell and
+`zinstall ERASE` reporting that no installer image is available. The exact
+projective-points ISO has therefore not yet passed its live CD boot/install
+cycle; UTM's SCSI CD/DVD must be above the disposable VirtIO disk in boot order.
+
+2026-10-22 screen-depth fixture correction and fresh installer gate:
+`SpriteScreenDepthChecks` now spawns and tears down a temporary guest task, so
+it exercises task-local screen depth without relying on shell-reset globals.
+The focused probe and `make check-grscreen-full` pass. The fresh
+`build/zealos-aarch64-hello-screen-depth-validated.iso`
+(`sha256=f3c082919bee000e4e0bf83fe2dd578df1ae4d5c3eebd8cae707eb5315b14339`)
+also passes `make check-iso-installer`, including complete sector read-back,
+byte-for-byte disk comparison, disk-only desktop boot, and `InstallerPersist`
+returning `0x2a` before and after a second cold reboot. This exact image still
+needs its live UTM CD-first install and installed-disk-only cold boot; attach it
+as SCSI CD/DVD above the disposable VirtIO target in boot order.
+
+2026-10-22 animated Z splash regression fixed: `SpriteHLine0` now respects a
+task-owned depth buffer and retains screen-backed mesh pixels in the staged
+CDC surface. This restores the normal rotating blue splash between its labels;
+the startup regression checks 698 changed pixels between frames, 2,082 centered
+mesh pixels, and dismissal cleanup. `make check-grscreen-full` also passes,
+including the screen-depth fixture's `0x2a` result. The replacement
+`build/zealos-aarch64-hello-screen-depth-splash.iso`
+(`sha256=e495e6e52095777d1742e63219b0f90a104096a6cb7914016a08cf5f0b2e9d19`)
+passes `make check-iso-installer`: full sector read-back, byte-identical disk
+comparison, disk-only desktop boot, and saved data returning `0x2a` across a
+second reboot. The preceding `screen-depth-validated.iso` is superseded. This
+replacement still needs the live UTM CD-first installer and disk-only boot.
+
+2026-10-23 legacy RedSea file browser merge: bootstrap `FilesFind` now adds
+readable files from the legacy eight-entry RedSea root beside bundled and
+native source files. The C adapter validates name termination and sector
+bounds, skips directory records (`.` and `..`), and excludes native
+tombstones. Recursive directory synthesis continues to come from source
+archive/native paths; RedSea remains a flat root. The DocFile QEMU compatibility
+probe seeds and renames a RedSea file to an archive-unique name, then verifies
+its listing path, size, and `FileRead` contents. `python3
+scripts/check-compat.py --probe-module /System/DolDoc/DocFile.ZC` passed this
+end-to-end check. The current ISO was then rebuilt with this bridge and passed
+the RedSea-backed DocFile probe plus the installer, startup, graphics, input,
+and user-startup QEMU gates. The exact ISO was installed in UTM with full
+read-back, then cold-booted twice from its VirtIO disk with the CD detached;
+the saved persistence program returned `0x2a` after reboot. The remaining
+UTM-specific check is visual inspection of the splash, menus, and font toggle.
+
+2026-10-23 final candidate after terminal-output ownership fix:
+`build/zealos-aarch64-hello.iso` has SHA-256
+`a2a161123ba31e3d00c20bccd6fe1810ea4f186b93035a01a9c2fa4c1a047a91`.
+Installer/read-back/persistence, Home/Once startup, graphical splash and
+font-toggle, GUI workflow, full graphics, and input-edge gates all pass. The
+exact ISO boots in the staged UTM VM and reports the graphical desktop started;
+the final live install and disk-only verification are waiting on the unlocked
+UTM window because the Mac is locked.

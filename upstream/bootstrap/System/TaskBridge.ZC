@@ -29,6 +29,7 @@ Bool OptionGet(I64 num)
 // Pinned CMisc's _LAST_FUN assembly is replaced by the native ARM64 ABI bridge.
 extern I64 LastFun(I64 argc, I64 *argv);
 extern I64 DistSqrI64(I64 x0, I64 y0, I64 x1, I64 y1);
+extern U16 RandU16();
 // KernelC normally owns this timer-frequency global. Bind the same guest
 // storage during the KernelB task bridge so keyboard/task tests can use it
 // before KernelC is loaded.
@@ -46,6 +47,7 @@ extern Bool ZcSourceWritable(U8 *path);
 extern Bool Cd(U8 *dirname=NULL, Bool make_dirs=FALSE);
 extern U8 *DirCur(CTask *task=NULL, CTask *mem_task=NULL);
 extern Bool ZcSourceFileAt(I64 index, U8 *path, I64 path_cap, I64 *_size);
+extern Bool ZcRedSeaFileAt(I64 index, U8 *path, I64 path_cap, I64 *_size);
 extern Bool FilesFindMatch(U8 *test_name, U8 *files_find_mask,
                            I64 fuf_flags=0);
 extern CDoc *DocNew(U8 *filename=NULL, CTask *task=NULL);
@@ -200,6 +202,7 @@ extern U0 Print(U8 *format, ...);
 // Until that chain is loaded, the bridge sends printable ASCII to its text
 // output and honors the task's DISPLAYf_SILENT flag.
 extern U0 PutKey(I64 ch=0, I64 sc=0);
+extern U0 ZcKeyMapFamilyPrint(I64 scf, Bool no_shift, Bool shift);
 // KMisc.ZC defines IsRaw from DISPLAYf_NOT_RAW. Boot into the current
 // text/Doc-style console mode and retain this flag across child tasks.
 Bool IsRaw()
@@ -414,7 +417,8 @@ U8 Drive2Letter(CDrive *drive=NULL)
     return 'C';
 }
 // KeyDev.ZC StdOut chain. RawPutChar is the text-console sink until DolDoc
-// registers DocPutKey. Ctrl-Alt handlers are inert stubs until WinMgr/Debug.
+// registers DocPutKey. The bootstrap shell reports its supported key map;
+// Ctrl-Alt callbacks use the guarded message bridge below.
 CKeyDevGlobals keydev;
 CKbdStateGlobals kbd;
 I64 sys_ctrl_alt_flags = 0;
@@ -1402,17 +1406,14 @@ U8 *Char2KeyName(I64 ch, Bool include_ctrl=TRUE)
     return StrNew("");
 }
 U0 KeyMapFamily(CTask *task, I64 scf, Bool no_shift, Bool shift)
-{//Training.ZC's live scan-code probe is not available in this ARM64 bridge.
+{//Show only command-line controls that the ARM64 bootstrap implements.
     if (task) {}
-    if (scf) {}
-    if (no_shift) {}
-    if (shift) {}
-    Print("Keyboard map preview is unavailable in this ARM64 build.\n");
+    ZcKeyMapFamilyPrint(scf, no_shift, shift);
 }
+extern U0 ZcCtrlAltMapPrint(Bool no_shift, Bool shift);
 U0 KeyMapCtrlAltFamily(Bool no_shift, Bool shift)
-{//Keep AutoComplete's Ctrl/Alt help path callable without a second warning.
-    if (no_shift) {}
-    if (shift) {}
+{//Display the registered Ctrl-Alt shortcuts used by AutoComplete's key help.
+    ZcCtrlAltMapPrint(no_shift, shift);
 }
 I64 HashTableSize2(CHashTable *table)
 {//Approximate the allocation size for the pinned AutoComplete diagnostic.
@@ -1987,6 +1988,29 @@ CDirEntry *FilesFind(U8 *files_find_mask, I64 fuf_flags=0)
             }
         }
     }
+    if (!(fuf_flags & FUF_SINGLE) || !head)
+    {
+        index = 0;
+        while (ZcRedSeaFileAt(index++, path, sizeof(path), &size))
+        {
+            file_len = StrLen(path);
+            if (file_len + 2 < sizeof(full_name))
+            {
+                full_name[0] = '/';
+                for (i = 0; i <= file_len; i++)
+                    full_name[i + 1] = path[i];
+                if (BootstrapFilesFindInCurrent(full_name, cur_dir, &remainder) &&
+                    !(fuf_flags & FUF_JUST_DIRS) &&
+                    (recurse || !StrOcc(remainder, '/')))
+                {
+                    added = BootstrapFilesFindAppend(&head, &tail, full_name,
+                        size, FALSE, files_find_mask, fuf_flags);
+                    if (added && (fuf_flags & FUF_SINGLE))
+                        break;
+                }
+            }
+        }
+    }
     return head;
 }
 U0 DirTreeDel(CDirEntry *entry)
@@ -2142,6 +2166,10 @@ U0 FindWiz()
 // text-plane constants declared below so the forward CDC stub can use it.
 U8 bootstrap_graphics_pixels[800 * 600];
 CDC bootstrap_graphics_dc;
+I32 bootstrap_graphics_depth_pixels[800 * 600];
+I64 bootstrap_graphics_depth_width;
+I64 bootstrap_graphics_depth_height;
+Bool bootstrap_graphics_depth_ready = FALSE;
 U8 bootstrap_zoom_pixels[800 * 600];
 CDC bootstrap_zoom_dc;
 // ZealOS's legacy DCBlotColor4 output is four one-bit planes, one byte per
@@ -2180,6 +2208,33 @@ bootstrap_planar_cache_dc.body = bootstrap_planar_cache(U8 *);
 bootstrap_planar_cache_dc.width = 800;
 bootstrap_planar_cache_dc.width_internal = 800;
 bootstrap_planar_cache_dc.height = 600;
+U0 BootstrapDepthFill(I32 *depth, I64 count)
+{
+    I64 i;
+    if (!depth || count <= 0)
+        return;
+    for (i = 0; i < count; i++)
+        depth[i] = I32_MAX;
+}
+I32 *BootstrapScreenDepthBuffer(CDC *dc)
+{
+    I64 count;
+    if (!dc || dc != &bootstrap_graphics_dc)
+        return NULL;
+    count = dc->width_internal * dc->height;
+    if (count <= 0 || count > 800 * 600)
+        return NULL;
+    if (!bootstrap_graphics_depth_ready ||
+            bootstrap_graphics_depth_width != dc->width_internal ||
+            bootstrap_graphics_depth_height != dc->height)
+    {
+        bootstrap_graphics_depth_width = dc->width_internal;
+        bootstrap_graphics_depth_height = dc->height;
+        bootstrap_graphics_depth_ready = TRUE;
+        BootstrapDepthFill(bootstrap_graphics_depth_pixels, count);
+    }
+    return bootstrap_graphics_depth_pixels;
+}
 CDC *DCAlias(CDC *dc, CTask *task=NULL)
 {
     if (!task)
@@ -2195,7 +2250,51 @@ CDC *DCAlias(CDC *dc, CTask *task=NULL)
     dc->color.c0.color = WHITE;
     dc->color.c0.rop = ROPB_MONO;
     dc->depth_buf = NULL;
+    if (dc == &bootstrap_graphics_dc)
+        BootstrapScreenDepthBuffer(dc);
     return dc;
+}
+I32 *BootstrapScreenDepthReset(CDC *dc)
+{//Reset only this visible window's screen cells before its 3D scene is drawn.
+    CTask *task;
+    I64 left, right, top, bottom, y, width;
+    I32 *depth;
+    if (!dc)
+        return NULL;
+    if (dc == &bootstrap_graphics_dc)
+        depth = BootstrapScreenDepthBuffer(dc);
+    else
+        depth = dc->depth_buf;
+    if (!depth)
+        return NULL;
+    if (dc != &bootstrap_graphics_dc)
+    {
+        BootstrapDepthFill(depth,
+                dc->width_internal * dc->height);
+        return depth;
+    }
+    task = dc->win_task;
+    if (!TaskValidate(task))
+    {
+        BootstrapDepthFill(depth,
+                dc->width_internal * dc->height);
+        return depth;
+    }
+    left = task->pix_left;
+    right = task->pix_right;
+    top = task->pix_top;
+    bottom = task->pix_bottom;
+    if (left < 0) left = 0;
+    if (top < 0) top = 0;
+    if (right >= dc->width_internal) right = dc->width_internal - 1;
+    if (bottom >= dc->height) bottom = dc->height - 1;
+    if (left > right || top > bottom)
+        return depth;
+    width = right - left + 1;
+    for (y = top; y <= bottom; y++)
+        BootstrapDepthFill(depth + y * dc->width_internal + left,
+                width);
+    return depth;
 }
 U0 DCReset(CDC *dc)
 {
@@ -2398,6 +2497,7 @@ I64 BootstrapMat4x4Checks()
     return 0x2a;
 }
 extern Bool GrPlot(CDC *dc, I64 x, I64 y);
+extern Bool GrPlot1(CDC *dc, I64 x, I64 y);
 extern Bool GrLine(CDC *dc, I64 x1, I64 y1, I64 x2, I64 y2,
                    I64 step=1, I64 start=0);
 extern Bool GrRect(CDC *dc, I64 x, I64 y, I64 width, I64 height);
@@ -2462,6 +2562,9 @@ extern Bool GrPlot0(CDC *dc, I64 x, I64 y);
 U32 bootstrap_text_base[TEXT_COLS * TEXT_ROWS];
 #define BOOTSTRAP_WIN_MAX 64
 U16 bootstrap_win_z_buf[TEXT_COLS * TEXT_ROWS];
+// Pixel-granularity visibility lets CDC graphics preserve partial-cell
+// overlaps even though the text plane still clips at 8x8 cell boundaries.
+U16 bootstrap_win_pixel_z_buf[800 * 600];
 // ZealOS's GrUpdateTasks tests bitmap bit `win_z_num` directly; bit zero is
 // reserved, so the bridge needs one extra bit beyond the window count.
 U16 bootstrap_win_uncovered[(BOOTSTRAP_WIN_MAX + 16) / 16];
@@ -2498,6 +2601,91 @@ gr.dc2 = &bootstrap_graphics_dc;
 gr.text_base = bootstrap_text_base;
 gr.win_z_buf = bootstrap_win_z_buf;
 gr.win_uncovered_bitmap = bootstrap_win_uncovered;
+I64 BootstrapWallpaperBg(I64 x, I64 y)
+{//Low-contrast palette bands for the uncovered text-cell background.
+    I64 stripe = (x + (y >> 1)) & 31;
+    if (stripe == 0)
+        return 9;
+    if (stripe == 1 && !(y & 1))
+        return 3;
+    return 1;
+}
+U32 BootstrapWallpaperCell(U32 cell, I64 x, I64 y)
+{//Change only the packed text background nibble; preserve glyph and foreground.
+    I64 attr = (cell >> 8) & 0xFF;
+
+    if (x < 0 || x >= TEXT_COLS || y < 0 || y >= TEXT_ROWS)
+        return cell;
+    attr = (attr & 0x0F) | (BootstrapWallpaperBg(x, y) << 4);
+    return (cell & 0xFFFF00FF) | (attr << 8);
+}
+U0 BootstrapWallpaperApply()
+{//Tint only desktop cells outside all visible task windows.
+    CGrGlobals *active_gr = ZcActiveGrGlobals();
+    U32 *cells;
+    U16 *z_buf;
+    I64 x, y, index;
+
+    if (!active_gr)
+        active_gr = &gr;
+    cells = active_gr->text_base;
+    z_buf = active_gr->win_z_buf;
+    if (!cells || !z_buf)
+        return;
+    for (y = 0; y < TEXT_ROWS; y++)
+    {
+        index = y * TEXT_COLS;
+        for (x = 0; x < TEXT_COLS; x++)
+            if (!z_buf[index + x])
+                cells[index + x] = BootstrapWallpaperCell(
+                        cells[index + x], x, y);
+    }
+}
+U0 BootstrapWinPaper(CTask *task)
+{//Pinned GrUpdateTaskWin invokes this only for the window-manager task.
+    if (!task || !TaskValidate(task))
+        return;
+    BootstrapWallpaperApply();
+}
+I64 BootstrapWallpaperChecks()
+{//Verify desktop tinting preserves foregrounds and leaves window cells alone.
+    CGrGlobals *active_gr = ZcActiveGrGlobals();
+    U32 before = 0x1234B641, after, covered;
+    U32 *cells;
+    U16 *z_buf, old_z0, old_z1;
+    U32 old_cell0, old_cell1;
+    if (!active_gr)
+        active_gr = &gr;
+    after = BootstrapWallpaperCell(before, 0, 0);
+    if (active_gr->fp_wall_paper != &BootstrapWinPaper ||
+        BootstrapWallpaperBg(0, 0) != 9 ||
+        BootstrapWallpaperBg(1, 0) != 3 ||
+        BootstrapWallpaperBg(2, 0) != 1 ||
+        after != 0x12349641 ||
+        BootstrapWallpaperCell(before, -1, 0) != before)
+        return 0;
+    cells = active_gr->text_base;
+    z_buf = active_gr->win_z_buf;
+    if (!cells || !z_buf)
+        return 0;
+    old_cell0 = cells[0];
+    old_cell1 = cells[1];
+    old_z0 = z_buf[0];
+    old_z1 = z_buf[1];
+    cells[0] = cells[1] = before;
+    z_buf[0] = 0;
+    z_buf[1] = 1;
+    BootstrapWallpaperApply();
+    after = cells[0];
+    covered = cells[1];
+    cells[0] = old_cell0;
+    cells[1] = old_cell1;
+    z_buf[0] = old_z0;
+    z_buf[1] = old_z1;
+    if (after != 0x12349641 || covered != before)
+        return 0;
+    return 0x2a;
+}
 U0 BootstrapBindGrTaskTables(CGrGlobals *active_gr)
 {//Give each later source gr global the bridge's bounded window z tables.
     if (!active_gr)
@@ -2738,6 +2926,7 @@ U0 BootstrapGrContextInit()
     bootstrap_planar_cache_dc.dc_signature = DCS_SIGNATURE_VAL;
     bootstrap_zoom_dc.dc_signature = DCS_SIGNATURE_VAL;
     active_gr->screen_image = &bootstrap_graphics_dc;
+    active_gr->fp_wall_paper = &BootstrapWinPaper;
     active_gr->dc = active_gr->dc2 = &bootstrap_graphics_dc;
     active_gr->dc1 = &bootstrap_planar_dc;
     active_gr->dc_cache = &bootstrap_planar_cache_dc;
@@ -3008,6 +3197,12 @@ Bool BootstrapWinTextCellVisible(CTask *task, I64 x, I64 y)
     cell_z = gr.win_z_buf[y * TEXT_COLS + x];
     return task->win_z_num >= cell_z;
 }
+Bool BootstrapWinPixelVisible(CTask *task, I64 x, I64 y)
+{//Clip raster graphics per pixel while text continues to use its cell plane.
+    if (!task || !task->win_z_num || x < 0 || x >= 800 || y < 0 || y >= 600)
+        return TRUE;
+    return bootstrap_win_pixel_z_buf[y * 800 + x] <= task->win_z_num;
+}
 Bool TextChar(CTask *task, Bool allow_border=FALSE, I64 x=0, I64 y=0, I64 d=0)
 {//Single-cell framebuffer path; border mode permits the adjacent outer row/column.
     I64 cell_x, cell_y;
@@ -3230,27 +3425,42 @@ Bool WinInside(I64 x, I64 y, CTask *task=NULL, I64 border=0)
     }
     return FALSE;
 }
-Bool BootstrapGraphPixel(CDC *dc, I64 x, I64 y)
-{//Write task graphics into the indexed compositor bitmap before scanout.
+Bool BootstrapGraphPixelAt(CDC *dc, I64 x, I64 y, Bool screen_mapped)
+{//Raster one clipped CDC pixel, including the upstream GrPlot0 pixel rules.
     CTask *task;
-    I64 left, top, right, bottom, color;
-    if (!dc || !dc->body || !(dc->flags & DCF_SCREEN_BITMAP))
+    I64 left, top, right, bottom, d, dist;
+    I32 *depth;
+    U8 *dst;
+    CColorROPU32 color, bkcolor;
+    Bool was_timer_rand;
+    if (!dc)
         return FALSE;
     task = dc->win_task;
-    if (!(dc->flags & DCF_ON_TOP))
+    if (dc->flags & DCF_SCREEN_BITMAP)
     {
-        if (!task)
-            return FALSE;
-        WinDerivedValsUpdate(task);
-        left = task->pix_left;
-        top = task->pix_top;
-        right = task->pix_right;
-        bottom = task->pix_bottom;
-        x += left + task->scroll_x;
-        y += top + task->scroll_y;
-        if (!BootstrapWinTextCellVisible(task, x / FONT_WIDTH,
-                                         y / FONT_HEIGHT))
-            return FALSE;
+        if (!(dc->flags & DCF_ON_TOP))
+        {
+            if (!task)
+                return FALSE;
+            if (!screen_mapped)
+            {
+                WinDerivedValsUpdate(task);
+                x += task->pix_left + task->scroll_x;
+                y += task->pix_top + task->scroll_y;
+            }
+            left = task->pix_left;
+            top = task->pix_top;
+            right = task->pix_right;
+            bottom = task->pix_bottom;
+            if (!BootstrapWinPixelVisible(task, x, y))
+                return FALSE;
+        }
+        else
+        {
+            left = top = 0;
+            right = dc->width - 1;
+            bottom = dc->height - 1;
+        }
     }
     else
     {
@@ -3261,11 +3471,97 @@ Bool BootstrapGraphPixel(CDC *dc, I64 x, I64 y)
     if (x < left || x > right || y < top || y > bottom ||
         x < 0 || x >= dc->width_internal || y < 0 || y >= dc->height)
         return FALSE;
-    color = dc->color.c0 & 0xff;
-    // Preserve GrPlot0's deterministic checkerboard dither variant.
-    if ((dc->color.c1.rop & 0x40) && ((x ^ y) & 1))
-        color = dc->color.c1 & 0xff;
-    dc->body[y * dc->width_internal + x] = color;
+    was_timer_rand = Bts(&Fs->task_flags, TASKf_NONTIMER_RAND);
+    if (dc->flags & DCF_LOCATE_NEAREST)
+    {
+        dist = DistSqrI64(x, y, dc->cur_x, dc->cur_y);
+        if (dist <= dc->nearest_dist)
+            dc->nearest_dist = dist;
+    }
+    if (dc->flags & DCF_RECORD_EXTENTS)
+    {
+        if (x < dc->min_x) dc->min_x = x;
+        if (x > dc->max_x) dc->max_x = x;
+        if (y < dc->min_y) dc->min_y = y;
+        if (y > dc->max_y) dc->max_y = y;
+    }
+    if (dc->flags & DCF_DONT_DRAW)
+        return TRUE;
+    if (!dc->body)
+        return FALSE;
+    d = dc->width_internal * y + x;
+    depth = dc->depth_buf;
+    if (dc == &bootstrap_graphics_dc &&
+            !(dc->flags & DCF_ON_TOP))
+        depth = BootstrapScreenDepthBuffer(dc);
+    if (depth)
+    {
+        if (!((dc->flags & (DCF_SCREEN_BITMAP | DCF_ON_TOP)) ==
+                (DCF_SCREEN_BITMAP | DCF_ON_TOP)))
+        {
+            depth += d;
+            if (0 <= dc->db_z <= *depth)
+                *depth = dc->db_z;
+            else
+                return TRUE;
+        }
+    }
+    color = dc->color;
+    bkcolor = dc->bkcolor;
+    if (color.c1.rop & (ROPBF_DITHER | ROPBF_PROBABILITY_DITHER))
+    {
+        if (color.c1.rop & ROPBF_PROBABILITY_DITHER)
+        {
+            if (RandU16 < dc->dither_probability_u16)
+            {
+                color.c1.rop = color.c0.rop;
+                color.c0 = color.c1;
+            }
+            BEqual(&Fs->task_flags, TASKf_NONTIMER_RAND,
+                   was_timer_rand);
+        }
+        else if ((x ^ y) & 1)
+        {
+            color.c1.rop = color.c0.rop;
+            color.c0 = color.c1;
+        }
+    }
+    dst = dc->body + d;
+    switch [color.c0.rop]
+    {
+        case ROPB_EQU:
+        case ROPB_MONO:
+            *dst = color.c0.color;
+            break;
+        case ROPB_COLLISION:
+            if (*dst != TRANSPARENT && *dst != bkcolor.c0.color)
+                dc->collision_count++;
+            break;
+        case ROPB_XOR:
+            *dst ^= color.c0.color;
+            break;
+    }
+    return TRUE;
+}
+Bool BootstrapGraphPixel(CDC *dc, I64 x, I64 y)
+{
+    return BootstrapGraphPixelAt(dc, x, y, FALSE);
+}
+Bool BootstrapSpriteMeshPixel(CDC *dc, I64 x, I64 y)
+{//Keep source mesh pixels in the staged screen CDC for the final presenter.
+    CTask *task;
+    I64 index;
+    if (!dc || !dc->body || !(dc->flags & DCF_SCREEN_BITMAP) ||
+            (dc->flags & DCF_ON_TOP))
+        return FALSE;
+    task = dc->win_task;
+    if (!TaskValidate(task) || x < task->pix_left || x > task->pix_right ||
+            y < task->pix_top || y > task->pix_bottom ||
+            x < 0 || x >= dc->width_internal || y < 0 || y >= dc->height ||
+            !BootstrapWinPixelVisible(task, x, y))
+        return FALSE;
+    index = y * dc->width_internal + x;
+    dc->body[index] = dc->color.c0.color & 0xff;
     return TRUE;
 }
 Bool GrPlot(CDC *dc=gr.dc, I64 x=0, I64 y=0)
@@ -3311,13 +3607,16 @@ U0 BootstrapDrawMouse(CDC *dc, I64 x, I64 y)
 Bool GrRect(CDC *dc=gr.dc, I64 x=0, I64 y=0, I64 width=0, I64 height=0)
 {
     CTask *task;
-    I64 left, top, right, bottom, x0, y0, x1, y1, px, py, color;
+    I64 left, top, right, bottom, origin_x, origin_y;
+    I64 x0, y0, x1, y1, px, py;
     Bool plotted = FALSE;
-    if (!dc || !dc->body || !(dc->flags & DCF_SCREEN_BITMAP) ||
+    if (!dc ||
         width <= 0 || height <= 0 || width > 16384 || height > 16384)
         return FALSE;
     task = dc->win_task;
-    if (!(dc->flags & DCF_ON_TOP))
+    origin_x = origin_y = 0;
+    if ((dc->flags & DCF_SCREEN_BITMAP) &&
+            !(dc->flags & DCF_ON_TOP))
     {
         if (!task)
             return FALSE;
@@ -3326,8 +3625,12 @@ Bool GrRect(CDC *dc=gr.dc, I64 x=0, I64 y=0, I64 width=0, I64 height=0)
         top = task->pix_top;
         right = task->pix_right;
         bottom = task->pix_bottom;
-        x += left + task->scroll_x;
-        y += top + task->scroll_y;
+        origin_x = left + task->scroll_x;
+        origin_y = top + task->scroll_y;
+        left -= origin_x;
+        top -= origin_y;
+        right -= origin_x;
+        bottom -= origin_y;
     }
     else
     {
@@ -3351,18 +3654,11 @@ Bool GrRect(CDC *dc=gr.dc, I64 x=0, I64 y=0, I64 width=0, I64 height=0)
         return FALSE;
     for (py = y0; py <= y1; py++)
         for (px = x0; px <= x1; px++)
-        {
-            if (!task || (dc->flags & DCF_ON_TOP) ||
-                BootstrapWinTextCellVisible(task, px / FONT_WIDTH,
-                                            py / FONT_HEIGHT))
-            {
-                color = dc->color.c0 & 0xff;
-                if ((dc->color.c1.rop & 0x40) && ((px ^ py) & 1))
-                    color = dc->color.c1 & 0xff;
-                dc->body[py * dc->width_internal + px] = color;
+            if (BootstrapGraphPixelAt(dc, px + origin_x,
+                    py + origin_y,
+                    (dc->flags & DCF_SCREEN_BITMAP) &&
+                    !(dc->flags & DCF_ON_TOP)))
                 plotted = TRUE;
-            }
-        }
     return plotted;
 }
 U0 GrPrint(CDC *dc=gr.dc, I64 x=0, I64 y=0, U8 *format, ...)
@@ -3402,6 +3698,116 @@ U0 GrPrint(CDC *dc=gr.dc, I64 x=0, I64 y=0, U8 *format, ...)
         Free(text);
     }
 }
+Bool BootstrapGraphCdcLine0(CDC *dc, I64 x0, I64 y0, I64 x1, I64 y1,
+                            I64 step, I64 start)
+{//Raster a bounded line into an offscreen CDC using the screen helper's rule.
+    I64 dx, sx, dy, sy, err, i = 0, e2, max_x, max_y;
+    CDC *brush;
+    Bool plotted = FALSE;
+    if (!dc || step < 1 || start < 0)
+        return FALSE;
+    max_x = dc->width + 16384;
+    max_y = dc->height + 16384;
+    if (x0 < -16384 || x0 > max_x || x1 < -16384 || x1 > max_x ||
+        y0 < -16384 || y0 > max_y || y1 < -16384 || y1 > max_y)
+        return FALSE;
+    if (x0 < x1)
+    {
+        dx = x1 - x0;
+        sx = 1;
+    }
+    else
+    {
+        dx = x0 - x1;
+        sx = -1;
+    }
+    if (y0 < y1)
+    {
+        dy = y0 - y1;
+        sy = 1;
+    }
+    else
+    {
+        dy = y1 - y0;
+        sy = -1;
+    }
+    if (dx > 16384 || -dy > 16384)
+        return FALSE;
+    err = dx + dy;
+    while (TRUE)
+    {
+        if (i >= start && (i - start) % step == 0)
+        {
+            brush = dc->brush;
+            if (brush)
+            {
+                if (dc->body && brush->body && brush->width > 0 &&
+                    brush->height > 0 && x0 + brush->width > 0 &&
+                    x0 < dc->width && y0 + brush->height > 0 &&
+                    y0 < dc->height)
+                {
+                    GrPlot1(dc, x0, y0);
+                    plotted = TRUE;
+                }
+            }
+            else if (BootstrapGraphPixelAt(dc, x0, y0, FALSE))
+                plotted = TRUE;
+        }
+        if (x0 == x1 && y0 == y1)
+            break;
+        e2 = err * 2;
+        if (e2 >= dy)
+        {
+            err += dy;
+            x0 += sx;
+        }
+        if (e2 <= dx)
+        {
+            err += dx;
+            y0 += sy;
+        }
+        if (++i > 16384)
+            break;
+    }
+    return plotted;
+}
+Bool BootstrapGraphCdcBrushLine(CDC *dc, I64 x0, I64 y0, I64 x1, I64 y1,
+                                I64 step, I64 start, I64 thick)
+{//Use upstream GrPlot1 brush stamps for a screen-backed CDC line.
+    I64 dx, dy, line_step, shift, line_x0, line_y0, line_x1, line_y1;
+    Bool plotted = FALSE;
+    if (!dc || !dc->brush || step < 1 || start < 0 || thick < 1 || thick > 64)
+        return FALSE;
+    if (x0 < -16384 || x0 > dc->width + 16384 ||
+        x1 < -16384 || x1 > dc->width + 16384 ||
+        y0 < -16384 || y0 > dc->height + 16384 ||
+        y1 < -16384 || y1 > dc->height + 16384)
+        return FALSE;
+    dx = AbsI64(x1 - x0);
+    dy = AbsI64(y1 - y0);
+    for (line_step = 0; line_step < thick; line_step++)
+    {
+        shift = line_step - (thick - 1) / 2;
+        line_x0 = x0;
+        line_y0 = y0;
+        line_x1 = x1;
+        line_y1 = y1;
+        if (dx >= dy)
+        {
+            line_y0 += shift;
+            line_y1 += shift;
+        }
+        else
+        {
+            line_x0 += shift;
+            line_x1 += shift;
+        }
+        if (BootstrapGraphCdcLine0(dc, line_x0, line_y0,
+                                   line_x1, line_y1, step, start))
+            plotted = TRUE;
+    }
+    return plotted;
+}
 Bool GrLine(CDC *dc=gr.dc, I64 x1=0, I64 y1=0, I64 x2=0, I64 y2=0,
             I64 step=1, I64 start=0)
 {
@@ -3410,6 +3816,12 @@ Bool GrLine(CDC *dc=gr.dc, I64 x1=0, I64 y1=0, I64 x2=0, I64 y2=0,
     U32 color;
     if (!dc || step < 1 || start < 0)
         return FALSE;
+    // GrPlot1 owns the source brush semantics and performs screen-window
+    // clipping. Keep its coordinates task-local before the framebuffer path
+    // below converts them to absolute pixels.
+    if ((dc->flags & DCF_SCREEN_BITMAP) && dc->brush)
+        return BootstrapGraphCdcBrushLine(dc, x1, y1, x2, y2,
+                                          step, start, dc->thick);
     color = dc->color.c0 & 0xff;
     task = dc->win_task;
     task_z = 0;
@@ -3435,6 +3847,56 @@ Bool GrLine(CDC *dc=gr.dc, I64 x1=0, I64 y1=0, I64 x2=0, I64 y2=0,
         bottom = dc->height - 1;
     }
     thick = dc->thick;
+    if (!(dc->flags & DCF_SCREEN_BITMAP))
+    {
+        Bool plotted = FALSE;
+        if (thick <= 1)
+            return BootstrapGraphCdcLine0(dc, x1, y1, x2, y2,
+                                          step, start);
+        if (thick > 64)
+            return FALSE;
+        if (x1 < -16384 || x1 > dc->width + 16384 ||
+            x2 < -16384 || x2 > dc->width + 16384 ||
+            y1 < -16384 || y1 > dc->height + 16384 ||
+            y2 < -16384 || y2 > dc->height + 16384)
+            return FALSE;
+        if (x1 < x2)
+            dx = x2 - x1;
+        else
+            dx = x1 - x2;
+        if (y1 < y2)
+            dy = y2 - y1;
+        else
+            dy = y1 - y2;
+        for (line_step = 0; line_step < thick; line_step++)
+        {
+            line_shift = line_step - (thick - 1) / 2;
+            if (dx >= dy)
+            {
+                y1 += line_shift;
+                y2 += line_shift;
+            }
+            else
+            {
+                x1 += line_shift;
+                x2 += line_shift;
+            }
+            if (BootstrapGraphCdcLine0(dc, x1, y1, x2, y2,
+                                       step, start))
+                plotted = TRUE;
+            if (dx >= dy)
+            {
+                y1 -= line_shift;
+                y2 -= line_shift;
+            }
+            else
+            {
+                x1 -= line_shift;
+                x2 -= line_shift;
+            }
+        }
+        return plotted;
+    }
     if (thick <= 1)
         return ZcFbGraphLine(x1, y1, x2, y2, color,
                              step, start, left, top, right, bottom,
@@ -4911,6 +5373,8 @@ U0 GrDrawTaskCallback(CTask *task)
     if (!active_gr)
         active_gr = &gr;
     dc = DCAlias(active_gr->dc2, task);
+    if (dc == &bootstrap_graphics_dc)
+        BootstrapScreenDepthReset(dc);
     task->draw_it(task, dc);
     DCDel(dc);
 }
@@ -5169,6 +5633,7 @@ Bool BootstrapTryUpstreamGrUpdateScreen()
     bootstrap_present_ready = TRUE;
     active_gr->dc = &bootstrap_graphics_dc;
     active_gr->dc2 = &bootstrap_graphics_dc;
+    active_gr->fp_wall_paper = &BootstrapWinPaper;
     active_gr->dc1 = &bootstrap_planar_dc;
     active_gr->dc_cache = &bootstrap_planar_cache_dc;
     active_gr->zoomed_dc = &bootstrap_zoom_dc;
@@ -5188,7 +5653,9 @@ Bool BootstrapTryUpstreamGrUpdateScreen()
         bootstrap_present_cache_ready = TRUE;
     }
     ZcFbShellTextCompose(gr.text_base, TEXT_COLS);
+    bootstrap_gr_text_updates++;
     WinZBufUpdate();
+    BootstrapWallpaperApply();
     // Draw shown tasks in task-ring order. TextChar still applies per-cell
     // z-buffer clipping, while avoiding a stale uncovered bitmap suppressing
     // every task window in this startup compositor path.
@@ -5284,6 +5751,8 @@ U0 BootstrapGrUpdateTasks()
     else
         ZcFbTextFlush(gr.text_base, TEXT_COLS, TEXT_ROWS);
     WinZBufUpdate();
+    active_gr->fp_wall_paper = &BootstrapWinPaper;
+    BootstrapWallpaperApply();
     // Match GrUpdateScreen's final overlay stage: run after the window draw
     // callbacks with DCF_ON_TOP and screen-space coordinates. The bootstrap
     // and later source modules each define non-extern `gr` storage, so resolve
@@ -5892,10 +6361,12 @@ U0 DocBottom(CDoc *doc=NULL)
 {
     if (!doc && !(doc = DocPut))
         return;
-    doc->cur_entry = doc->head.last;
-    if (doc->cur_entry == doc)
-        doc->cur_entry = doc->head.next;
-    doc->cur_col = doc->cur_entry->max_col;
+    // Match DocRecalcLib's sentinel-based insertion point. Selecting the
+    // final entry itself leaves DocPutKey at the previous line when a mouse
+    // click moved the cursor into the transcript.
+    doc->cur_entry = doc;
+    doc->cur_col = 0;
+    DocRecalc(doc, RECALCt_TO_SCREEN | RECALCF_HAS_CURSOR);
 }
 I64 PopUpMenu(CDoc *doc, I64 dof_flags=0)
 {
@@ -6009,12 +6480,14 @@ U8 *FileExtDot(U8 *src)
     return NULL;
 }
 U0 WinZBufUpdate()
-{//Build the ARM64 cell z-buffer and bitmap of windows with visible cells.
+{//Build cell and pixel z-buffers plus the bitmap of visible windows.
     CTask *root, *task;
     I64 visited = 0, z_count = 0, left, right, top, bottom, x, y, index, i;
+    I64 pixel_left, pixel_right, pixel_top, pixel_bottom, pixel_index, py, px;
     U16 old_z, z;
 
     MemSet(gr.win_z_buf, 0, TEXT_COLS * TEXT_ROWS * sizeof(U16));
+    MemSet(bootstrap_win_pixel_z_buf, 0, 800 * 600 * sizeof(U16));
     MemSet(gr.win_uncovered_bitmap, 0,
            (BOOTSTRAP_WIN_MAX + 16) / 16 * sizeof(U16));
     MemSet(bootstrap_win_uncovered_cells, 0,
@@ -6063,6 +6536,20 @@ U0 WinZBufUpdate()
                     bootstrap_win_uncovered_cells[z - 1]++;
                 }
             }
+            pixel_left = left * FONT_WIDTH;
+            pixel_right = (right + 1) * FONT_WIDTH - 1;
+            pixel_top = top * FONT_HEIGHT;
+            pixel_bottom = (bottom + 1) * FONT_HEIGHT - 1;
+            if (pixel_left < 0) pixel_left = 0;
+            if (pixel_top < 0) pixel_top = 0;
+            if (pixel_right >= 800) pixel_right = 799;
+            if (pixel_bottom >= 600) pixel_bottom = 599;
+            for (py = pixel_top; py <= pixel_bottom; py++)
+            {
+                pixel_index = py * 800 + pixel_left;
+                for (px = pixel_left; px <= pixel_right; px++)
+                    bootstrap_win_pixel_z_buf[pixel_index++] = z;
+            }
         }
         task = task->next_task;
         visited++;
@@ -6078,6 +6565,7 @@ U0 WinZBufUpdate()
         }
     }
     ZcFbSetWinZBuffer(gr.win_z_buf);
+    ZcFbSetWinPixelZBuffer(bootstrap_win_pixel_z_buf);
 }
 Bool BootstrapWinIsUncovered(CTask *task)
 {

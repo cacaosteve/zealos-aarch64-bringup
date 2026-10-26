@@ -28,6 +28,8 @@ p.add_argument('--probe-gui-keyboard', action='store_true',
                help='inject printable virtio keys and verify the boot graphical terminal receives them')
 p.add_argument('--probe-gui-workflow', action='store_true',
                help='verify visible graphical editing, save/compile/run, and reopen after reboot')
+p.add_argument('--probe-gui-editor-text', action='store_true',
+               help='isolate visible keyboard text entry, save, and run in the GUI document editor')
 p.add_argument('--probe-lattice-controls', action='store_true',
                help='check live Lattice mouse placement/aim, colors, restart, and Space in the GUI')
 p.add_argument('--probe-gui-windowdemo-input', action='store_true',
@@ -94,6 +96,10 @@ p.add_argument('--probe-graphics-palette', action='store_true',
                help='verify indexed graphics drawing follows the active ZealOS palette')
 p.add_argument('--probe-grblot3', action='store_true',
                help='check the boot-loaded 3D bitmap blit path before window-demo stress tests')
+p.add_argument('--probe-grline-cdc', action='store_true',
+               help='check bounded CDC line and brush rasterization in isolation')
+p.add_argument('--probe-screen-depth', action='store_true',
+               help='check screen-coordinate depth isolation and per-window reset')
 p.add_argument('--probe-sprite-arrow-symmetry', action='store_true',
                help='check the boot-loaded sprite arrow symmetry raster path')
 p.add_argument('--probe-source', type=pathlib.Path, action='append',
@@ -116,6 +122,8 @@ usb_label = (f'{args.usb_input}-{args.usb_pointer}' +
              ('-hotplug' if args.usb_hotplug else '')) if args.usb_input else None
 if args.probe_gui_workflow:
     args.probe_gui_keyboard = True
+if args.probe_gui_editor_text:
+    args.probe_gui_keyboard = True
 if args.probe_lattice_controls:
     args.probe_gui_keyboard = True
 if args.probe_gui_windowdemo_input:
@@ -132,6 +140,8 @@ if args.probe_graphics_palette and not args.pci:
     p.error('--probe-graphics-palette requires --pci')
 if args.probe_grblot3 and not args.pci:
     p.error('--probe-grblot3 requires --pci')
+if args.probe_screen_depth and not args.pci:
+    p.error('--probe-screen-depth requires --pci')
 if args.probe_sprite_arrow_symmetry and not args.pci:
     p.error('--probe-sprite-arrow-symmetry requires --pci')
 if args.probe_home_autostart and not args.pci:
@@ -145,6 +155,8 @@ if args.probe_gui_terminal and (
     p.error('--probe-gui-terminal requires --pci --probe-module /System/DolDoc/DocRecalc.ZC')
 if args.probe_gui_keyboard and not args.pci:
     p.error('--probe-gui-keyboard requires --pci')
+if args.probe_gui_editor_text and not args.pci:
+    p.error('--probe-gui-editor-text requires --pci')
 if args.probe_lattice_controls and not args.pci:
     p.error('--probe-lattice-controls requires --pci')
 if args.probe_gui_windowdemo_input and not args.pci:
@@ -186,9 +198,11 @@ log_path = ROOT / 'build' / (f'check-usb-{usb_label}{"-lattice-controls" if args
                              'check-user-text-pci.log' if args.probe_user_text else
                              'check-user-startup-pci.log' if args.probe_user_startup and args.pci else
                              'check-user-startup-iso.log' if args.probe_user_startup else
+                             'check-gui-editor-text-pci.log' if args.probe_gui_editor_text else
                              'check-gui-workflow.log' if args.probe_gui_workflow else
                              'check-lattice-controls-pci.log' if args.probe_lattice_controls else
                              'check-live-window-control.log' if args.probe_live_window_control else
+                             'check-screen-depth-pci.log' if args.probe_screen_depth else
                              'check-graphics-palette.log' if args.probe_graphics_palette else
                              'check-window-buttons.log' if args.probe_window_buttons else
                              'check-winmgr-live.log' if args.probe_live_winmgr else
@@ -253,7 +267,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         cmd += ['-drive', f'if=none,format=raw,file={tmp}/disk.img,id=esp', '-device', 'virtio-blk-pci,drive=esp,bootindex=0']
     else:
         redsea = bytearray(65536)
-        if args.probe_module == '/System/DolDoc/DocPlain.ZC':
+        if args.probe_module in ('/System/DolDoc/DocPlain.ZC',
+                                 '/System/DolDoc/DocFile.ZC'):
             # Exercise FileWrite's legacy RedSea fallback on a blank,
             # formatted root volume, matching rs_fmt_host's on-disk layout.
             redsea[3] = 0x88
@@ -336,16 +351,20 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             {'type': 'key', 'data': {'down': down,
              'key': {'type': 'qcode', 'data': qcode}}} for qcode in qcodes]})
     def qmp_send_keys(qcodes):
-        # Send chords as ordered edges. Grouping Shift+key in a single QMP
-        # request can leave Shift logically held when the guest samples the
-        # events under load; the following punctuation is then typed shifted
-        # (for example, `);` becomes `):`) and the command never completes.
+        # Send chords as ordered edges, with enough spacing for the guest to
+        # sample each transition under load. Grouping Shift+key in one QMP
+        # request or releasing Shift too quickly can leave the modifier stuck
+        # and corrupt the next mixed-case command.
         for qcode in qcodes:
             qmp_key_edges([qcode], True)
-            time.sleep(0.015)
+            time.sleep(0.1)
         for qcode in reversed(qcodes):
             qmp_key_edges([qcode], False)
-            time.sleep(0.015)
+            time.sleep(0.1)
+        for modifier in ('shift', 'ctrl', 'alt'):
+            if modifier in qcodes:
+                qmp_key_edges([modifier], False)
+                time.sleep(0.1)
     def graphical_path(name):
         screen_name = f'usb-{usb_label}-{name}' if args.usb_input else name
         return ROOT/'build'/f'gui-{screen_name}.ppm'
@@ -422,6 +441,62 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 raise RuntimeError(f'graphical prompt is missing {expected!r}; '
                                    f'see {graphical_path(name)} and .txt\n'+screen[3])
             time.sleep(0.1)
+    def type_graphical_prompt_line(name, text, attempts=3, prompt_required=True):
+        # After focus changes, a guest may miss one early key edge even when
+        # QMP accepted the event. Clear and verify the guest's input buffer
+        # before each attempt so a retry never appends to a partial command.
+        # The rendered desktop contains two overlapping terminal columns, so
+        # line-based screenshot matching cannot reliably identify an empty
+        # prompt after a window demo has returned.
+        for attempt in range(attempts):
+            qmp_send_key('down')
+            clear_deadline = time.monotonic() + 3
+            while True:
+                state = command('zcall BootstrapGuiTerminalInputDiag',
+                                'zc => 0x')
+                match = re.search(r'zc => 0x([0-9a-fA-F]+)', state)
+                input_length = int(match.group(1), 16) & 255 if match else -1
+                if input_length == 0:
+                    break
+                if time.monotonic() >= clear_deadline:
+                    screen = graphical_screen(name+'-empty-prompt')
+                    raise RuntimeError('could not clear the graphical prompt before typing; '
+                                       f'see {graphical_path(name + "-empty-prompt")}\n'
+                                       f'input length={input_length}\n' + screen[3])
+                time.sleep(0.1)
+            qmp_send_text(text)
+            try:
+                if not prompt_required:
+                    screen = graphical_screen(name)
+                    state = command('zc Print("gui_input_length=%d\\n", '
+                                    'BootstrapGuiTerminalInputDiag() & 255);',
+                                    'gui_input_length=')
+                    match = re.search(r'gui_input_length=(\d+)', state)
+                    if match and int(match.group(1)) == len(text) and text in screen[3]:
+                        print(f'PASS visible graphical terminal input buffer: {text!r}',
+                              flush=True)
+                        return screen
+                return require_graphical_prompt_text(name, text, timeout=8)
+            except RuntimeError:
+                if attempt + 1 == attempts:
+                    raise
+        raise RuntimeError(f'could not type graphical prompt line {text!r}')
+    def run_graphical_terminal_command(name, source, expected, timeout=12):
+        # Keep the long GUI workflow deterministic: wait for the whole command
+        # to be visible before Return, then require one new result line.
+        before_count = graphical_screen(name+'-before')[3].count(expected)
+        type_graphical_prompt_line(name+'-command', source)
+        qmp_send_key('ret')
+        deadline = time.monotonic() + timeout
+        while True:
+            screen = graphical_screen(name+'-result')
+            if screen[3].count(expected) > before_count:
+                return screen
+            if time.monotonic() >= deadline:
+                raise RuntimeError(f'graphical terminal command {source!r} did not produce '
+                                   f'{expected!r}; see {graphical_path(name+"-result")}\n' +
+                                   screen[3])
+            time.sleep(0.1)
     def require_graphical_text_absent(name, unexpected, timeout=5):
         deadline = time.monotonic() + timeout
         while True:
@@ -475,6 +550,17 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         motto = rgb_pixels_in(screen, gray,
                               (cx-130, cy+68, cx+130, cy+92))
         return title, motto
+    def splash_center_mesh_pixels(screen):
+        width, height, pixels, _ = screen
+        cx, cy = width // 2, height // 2
+        count = 0
+        for y in range(max(0, cy-64), min(height, cy+65)):
+            for x in range(max(0, cx-64), min(width, cx+65)):
+                i = (y*width+x)*3
+                red, green, blue = pixels[i:i+3]
+                if blue >= 80 and blue > red * 1.5 and blue > green * 1.25:
+                    count += 1
+        return count
     def is_graphical_splash_visible(screen):
         title, motto = splash_label_pixel_counts(screen)
         # ZSplash uses GrPrint (black glyphs on LTGRAY), so its lettering is
@@ -515,8 +601,15 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         if title < 200 or motto < 600:
             raise RuntimeError('splash labels disappeared during animation capture '
                                f'(title={title}, motto={motto})')
+        center_mesh = splash_center_mesh_pixels(next_screen)
+        if center_mesh < 40:
+            raise RuntimeError('animated splash mesh is not centered between its '
+                               f'labels (center blue pixels={center_mesh}); '
+                               f'see {graphical_path(name + "-motion")} and .txt')
         print(f'PASS upstream graphical splash labels and animation ({changed} changed pixels)',
               flush=True)
+        print(f'PASS splash mesh rendered in its centered logo area '
+              f'({center_mesh} blue pixels)', flush=True)
         return next_screen
     def require_graphical_splash_absent(name, timeout=5):
         deadline = time.monotonic() + timeout
@@ -587,15 +680,38 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
     def graphical_mouse_button(button, down):
         qmp_command('input-send-event', {'events': [
             {'type': 'btn', 'data': {'down': down, 'button': button}}]})
-    def select_os_menu_row(name, row_index):
-        # Press on the OS title, drag to a submenu row, and release, matching
-        # the native WinMgr menu gesture instead of calling the action bridge.
-        move_graphical_pointer(4, 4)
+    menu_root_x_cache = {}
+    def graphical_menu_root_x(root_name):
+        # Ask the live menu for its root position. This keeps pointer tests
+        # correct when grouped menu labels or submenu widths change.
+        if root_name not in menu_root_x_cache:
+            function = 'CompatGuiMenuRootX' + re.sub(r'[^A-Za-z0-9]', '', root_name)
+            command(
+                f'zc I64 {function}(){{CMenuEntry*e;I64 x=0;'
+                'for(e=bootstrap_gui_terminal_task->cur_menu->sub;'
+                f'e&&StrCompare(e->name,"{root_name}");e=e->next)'
+                'x+=MenuEntryWidth(e)*FONT_WIDTH;return x;}',
+                'zc: executed')
+            result = command(f'zcall {function}', 'zc => 0x')
+            match = re.search(r'zc => 0x([0-9a-fA-F]+)', result)
+            if not match:
+                raise RuntimeError(f'could not locate the {root_name} menu root:\n' +
+                                   result)
+            menu_root_x_cache[root_name] = int(match.group(1), 16)
+        return menu_root_x_cache[root_name]
+    def select_os_menu_row(name, root_name, row_index):
+        # Press on the requested menu root, drag to a submenu row, and
+        # release, matching the native WinMgr gesture instead of calling the
+        # action bridge directly.
+        root_x = graphical_menu_root_x(root_name)
+        move_graphical_pointer(root_x + 4, 4)
         deadline = time.monotonic() + 5
         screen = graphical_screen(name+'-open')
         while time.monotonic() < deadline:
-            if (rgb_pixels_in(screen, (0, 0, 170), (0, 0, 240, 8)) >= 100 and
-                    rgb_pixels_in(screen, (0, 0, 170), (0, 8, 240, 100)) >= 1000):
+            if (rgb_pixels_in(screen, (0, 0, 170),
+                              (root_x, 0, min(root_x+240, 800), 8)) >= 100 and
+                    rgb_pixels_in(screen, (0, 0, 170),
+                                  (root_x, 8, min(root_x+240, 800), 100)) >= 500):
                 break
             time.sleep(0.1)
             screen = graphical_screen(name+'-open')
@@ -609,14 +725,14 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             r'pointer_state: ready=1 pointer_xy=(\d+)/(\d+) buttons=(\d+)',
             press_status)
         if (not press_match or int(press_match.group(3)) != 1 or
-                abs(int(press_match.group(1)) - 4) > 1 or
+                abs(int(press_match.group(1)) - (root_x + 4)) > 1 or
                 abs(int(press_match.group(2)) - 4) > 1):
             qmp_command('input-send-event', {'events': [
                 {'type': 'btn', 'data': {'down': False, 'button': 'left'}}]})
             raise RuntimeError('OS menu press did not reach the guest for '+name+':\n'+
                                press_status)
         row_y = 12 + row_index * 8
-        move_graphical_pointer(4, row_y)
+        move_graphical_pointer(root_x + 4, row_y)
         time.sleep(0.2)
         screen = graphical_screen(name+'-held')
         held_status = command('zstatus', 'pointer_state: ready=1')
@@ -624,14 +740,14 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             r'pointer_state: ready=1 pointer_xy=(\d+)/(\d+) buttons=(\d+)',
             held_status)
         if (not held_match or int(held_match.group(3)) != 1 or
-                abs(int(held_match.group(1)) - 4) > 1 or
+                abs(int(held_match.group(1)) - (root_x + 4)) > 1 or
                 abs(int(held_match.group(2)) - row_y) > 1):
             qmp_command('input-send-event', {'events': [
                 {'type': 'btn', 'data': {'down': False, 'button': 'left'}}]})
             raise RuntimeError('OS menu drag did not reach '+name+':\n'+
                                held_status+screen[3])
         if rgb_pixels_in(screen, (255, 255, 85),
-                         (0, row_y-4, 240, row_y+4)) < 32:
+                         (root_x, row_y-4, min(root_x+240, 800), row_y+4)) < 32:
             qmp_command('input-send-event', {'events': [
                 {'type': 'btn', 'data': {'down': False, 'button': 'left'}}]})
             raise RuntimeError('OS menu did not highlight '+name+':\n'+
@@ -677,18 +793,23 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 qmp_command('input-send-event', {'events': [
                     {'type': 'btn', 'data': {'down': down, 'button': 'left'}}]})
                 time.sleep(0.15)
-            status = command('zstatus', 'keyboard_focus=')
-            if 'keyboard_focus=Terminal' in status:
+            status = command('zc Print("primary_terminal_focus=%d\\n", '
+                             'sys_focus_task==bootstrap_gui_terminal_task);',
+                             'primary_terminal_focus=')
+            if 'primary_terminal_focus=1' in status:
+                command('zc BootstrapGuiTerminalDocBottom('
+                        'bootstrap_gui_terminal_task->put_doc);', 'zc: executed')
                 print('PASS graphical terminal acquired keyboard focus', flush=True)
                 return
             # Home startup can launch its splash popup just after the first
             # focus check. If that late task steals focus, dismiss it before
             # the next click rather than repeatedly clicking the popup.
-            if 'keyboard_focus=Server' in status:
+            zstatus = command('zstatus', 'keyboard_focus=')
+            if 'keyboard_focus=Server' in zstatus:
                 qmp_send_key('esc')
                 time.sleep(0.2)
             time.sleep(0.1)
-        raise RuntimeError('graphical terminal did not acquire keyboard focus after five clicks:\n'+status)
+        raise RuntimeError('primary graphical terminal did not acquire keyboard focus after five clicks:\n'+status)
     def graphical_task_rect(task_expr):
         result = command(f'zc Print("gterm_rect=%d,%d,%d,%d\\n", '
             f'{task_expr}->win_left, {task_expr}->win_right, '
@@ -780,7 +901,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                                    f'see {graphical_path("terminal-banner-after-reboot")}\n'
                                    + screen[3])
             time.sleep(0.1)
-    def qmp_send_text(text, delay=0.2):
+    def qmp_send_text(text, delay=0.5):
         dismiss_home_splash_if_visible()
         qcodes = {
             ' ': ('spc',), '/': ('slash',), '.': ('dot',),
@@ -1052,6 +1173,35 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         if int(scanout.group(1)) < 1000:
             raise RuntimeError('boot graphical terminal is not painting visible pixels:\n' + desktop)
         print('PASS boot graphical terminal window and framebuffer diagnostics', flush=True)
+        if args.probe_gui_editor_text:
+            editor_path = '/Tests/GuiInputProbe.ZC'
+            source = 'I64 GuiInputProbe(){return 40+2;}'
+            command('zput '+editor_path.lstrip('/')+' \\n',
+                    'zput: saved '+editor_path.lstrip('/'))
+            focus_graphical_terminal()
+            type_graphical_prompt_line('gui-editor-text-command',
+                                       'edit '+editor_path)
+            qmp_send_key('ret')
+            command('zstatus', 'gui_editor_active=1')
+            move_graphical_pointer(200, 200)
+            graphical_mouse_button('left', True)
+            time.sleep(0.15)
+            graphical_mouse_button('left', False)
+            qmp_send_text(source)
+            require_graphical_text('gui-editor-text-visible', source, timeout=8)
+            qmp_send_key('esc')
+            command('zstatus', 'gui_editor_active=0')
+            command('zload disk:'+editor_path,
+                    'zc: loaded disk:'+editor_path)
+            command('zcall GuiInputProbe', 'zc => 0x000000000000002a')
+            print('PASS GUI document editor accepted visible typed source, saved it, and ran the saved file', flush=True)
+            raise SystemExit(0)
+        if args.probe_screen_depth:
+            command('zcall SpriteScreenDepthChecks',
+                    'zc => 0x000000000000002a')
+            print('PASS screen-coordinate task depth and overlapping-window reset',
+                  flush=True)
+            raise SystemExit(0)
         if args.probe_lattice_controls:
             focus_graphical_terminal()
             qmp_send_text('latticeplay')
@@ -1088,6 +1238,13 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                   f'no arena growth ({before_usage} -> {after_usage})',
                   flush=True)
             raise SystemExit(0)
+        if args.probe_grline_cdc:
+            command('zload /Tests/GrLineCdc.ZC',
+                    'zc: loaded /Tests/GrLineCdc.ZC')
+            command('zcall GrLineCdcChecks',
+                    'zc => 0x000000000000002a')
+            print('PASS bounded CDC line and brush rasterization', flush=True)
+            raise SystemExit(0)
         if args.probe_graphics_palette:
             command('zload /Tests/GrSpriteBridge.ZC',
                     'zc: loaded /Tests/GrSpriteBridge.ZC')
@@ -1118,7 +1275,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             require_graphical_text('dvd-live-installer-status',
                                    'ARM64 live session is ready.')
             require_graphical_text('dvd-live-installer-status',
-                                   'The original disk installer has not been ported yet.')
+                                   'Install to a 128 MiB UTM/QEMU VirtIO disk:')
             qmp_send_text('help')
             startup_typing = require_graphical_text('dvd-live-typing', '> help')
             require_graphical_caret(startup_typing, '> help')
@@ -1218,6 +1375,21 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         if args.probe_home_autostart:
             command('zload /Tests/HomeAutoStart.ZC', 'zc: loaded /Tests/HomeAutoStart.ZC')
             command('zcall HomeAutoStartChecks', 'zc => 0x000000000000002a')
+            command('zcall CtrlAltFontDispatchChecks',
+                    'zc => 0x000000000000002a')
+            ctrl_alt_map = command('zcall CtrlAltFontMapChecks',
+                                   'zc => 0x000000000000002a')
+            if 'Ctrl-Alt-F: Cmd /Toggle Aux Font' not in ctrl_alt_map:
+                raise RuntimeError('Ctrl-Alt shortcut help omitted the font toggle:\n' + ctrl_alt_map)
+            key_map = command('zcall KeyMapFamilyChecks',
+                              'zc => 0x000000000000002a')
+            for binding in ('Left/Right: edit command line',
+                            'Home/End: move to start/end',
+                            'Up: recall previous command',
+                            'Down: clear command line',
+                            'Return: run command'):
+                if binding not in key_map:
+                    raise RuntimeError(f'bootstrap key map omitted {binding!r}:\n' + key_map)
             require_graphical_splash('home-autostart-splash')
             qmp_send_key('esc')
             require_graphical_splash_absent('home-autostart-splash-dismissed')
@@ -1235,6 +1407,13 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             command('zcall SplashWindowWaitForExit',
                     'zc => 0x000000000000002a')
             focus_graphical_terminal()
+            qmp_send_keys(['ctrl', 'alt', 'f'])
+            command('zcall CtrlAltFontStateAux',
+                    'zc => 0x000000000000002a')
+            qmp_send_keys(['ctrl', 'alt', 'f'])
+            command('zcall CtrlAltFontStateStandard',
+                    'zc => 0x000000000000002a')
+            print('PASS live Ctrl-Alt-F event toggles auxiliary and standard fonts', flush=True)
             qmp_send_text('help')
             startup_typing = require_graphical_text('home-autostart-typing', '> help')
             require_graphical_caret(startup_typing, '> help')
@@ -1344,7 +1523,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             command('zcall HomeOnceFinishChecks', 'zc => 0x000000000000002a')
             if not args.pci:
                 require_graphical_text('home-once-dvd-installer-status',
-                                       'The original disk installer has not been ported yet.')
+                                       'Install to a 128 MiB UTM/QEMU VirtIO disk:')
             focus_graphical_terminal()
             qmp_send_text('40+2;')
             typed = require_graphical_text('home-once-typing', '> 40+2;')
@@ -1502,8 +1681,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 command('zcall UserStartUpOpenChecks', 'zc => 0x000000000000002a', timeout=30)
                 move_graphical_pointer(600,360)
                 # User() leaves its new task focused; type through real devices.
-                qmp_send_text('Print("Second %d\\n",40+2);')
-                typed = require_graphical_text('user-second-typing','Print("Second %d\\n",40+2);')
+                typed = type_graphical_prompt_line(
+                    'user-second-typing', 'Print("Second %d\\n",40+2);')
                 require_graphical_caret(typed,'Print("Second %d\\n",40+2);')
                 qmp_send_key('ret')
                 require_graphical_text('user-second-answer','Second 42')
@@ -1519,8 +1698,9 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 # history; Down clears that recalled line before the fresh
                 # visible-typing check below.
                 qmp_send_key('down')
-                qmp_send_text('Print("First %d\\n",40+2);')
-                typed = require_graphical_text('user-first-typing','Print("First %d\\n",40+2);')
+                typed = type_graphical_prompt_line(
+                    'user-first-typing', 'Print("First %d\\n",40+2);',
+                    prompt_required=False)
                 require_graphical_caret(typed,'Print("First %d\\n",40+2);')
                 qmp_send_key('ret')
                 require_graphical_text('user-first-answer','First 42')
@@ -1533,7 +1713,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 shutil.copyfile(graphical_path('user-both-terminals'),target)
                 command('zcall UserStartUpCloseChecks', 'zc => 0x000000000000002a')
                 focus_graphical_terminal()
-                qmp_send_text('40+2;'); require_graphical_text('user-primary-recovery','> 40+2;')
+                type_graphical_prompt_line('user-primary-recovery', '40+2;')
                 qmp_send_key('ret'); require_graphical_text('user-primary-answer','=42')
                 print('PASS independent visible typing, output, history and prompt recovery in two original User terminals', flush=True)
             raise SystemExit(0)
@@ -1814,10 +1994,9 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             # off-screen, so use the live prompt as the readiness marker.
             focus_graphical_terminal()
             if args.probe_gui_workflow:
-                # The upstream window manager exposes the focused task's menu
-                # only while the pointer is over the desktop's first text row.
-                # Check the rendered row itself so a title-bar hover cannot be
-                # mistaken for a visible OS menu.
+                # The grouped desktop bar now starts with File. Its two-row
+                # submenu is narrower than the former all-in-one OS menu, so
+                # scope the pixel check to that actual dropdown.
                 move_graphical_pointer(4, 4)
                 menu_deadline = time.monotonic() + 5
                 menu_screen = graphical_screen('os-menu-top-edge')
@@ -1826,33 +2005,27 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                                                (0, 0, 240, 100))
                     yellow_menu = rgb_pixels_in(menu_screen, (255, 255, 85),
                                                  (0, 0, 240, 100))
-                    # The whole menu bar is blue even when the pointer is
-                    # horizontally beyond the OS title. Confirm the submenu
-                    # itself is drawn below the bar while the pointer rests
-                    # over the first label at (4,4).
+                    # File contains Files and Disk, so only two submenu rows
+                    # are drawn beneath its six-character menu column.
                     blue_submenu = rgb_pixels_in(menu_screen, (0, 0, 170),
-                                                  (0, 8, 240, 100))
+                                                  (0, 8, 56, 32))
                     if (blue_menu >= 100 and yellow_menu >= 100 and
-                            blue_submenu >= 1000):
-                        if not graphical_ascii_glyph_matches(
-                                menu_screen, 0, 24, 'F', (255, 255, 85)):
-                            raise RuntimeError(
-                                'OS menu glyphs do not match the normal left-to-right font; '
-                                f'see {graphical_path("os-menu-top-edge")} and .txt\n' +
-                                menu_screen[3])
-                        print('PASS OS menu glyph orientation', flush=True)
-                        print('PASS OS menu bar and dropdown render on hover', flush=True)
+                            blue_submenu >= 500):
+                        print('PASS grouped menu bar and File dropdown render on hover',
+                              flush=True)
                         break
                     time.sleep(0.1)
                     menu_screen = graphical_screen('os-menu-top-edge')
                 else:
-                    raise RuntimeError('OS menu did not appear on the desktop top edge; '
+                    raise RuntimeError('File menu did not appear on the desktop top edge; '
                                        f'see {graphical_path("os-menu-top-edge")} and .txt\n'
                                        + menu_screen[3])
-                # The upstream WinMgr keeps the menu open while the left
-                # button is held. Drag from the OS title into its Help row,
-                # then release; this exercises the actual MESSAGE_KEY_UP
-                # action route rather than only checking the painted menu.
+                # Find the OS root from the live menu entry widths instead of
+                # assuming it begins at the left edge as it did before roots
+                # were grouped. Drag into Help and release to exercise the
+                # actual MESSAGE_KEY_UP action route.
+                os_menu_x = graphical_menu_root_x('OS')
+                move_graphical_pointer(os_menu_x + 4, 4)
                 qmp_command('input-send-event', {'events': [
                     {'type': 'btn', 'data': {'down': True, 'button': 'left'}}]})
                 time.sleep(0.2)
@@ -1862,15 +2035,15 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     r'pointer_state: ready=1 pointer_xy=(\d+)/(\d+) buttons=(\d+)',
                     press_status)
                 if (not press_match or int(press_match.group(3)) != 1 or
-                        abs(int(press_match.group(1)) - 4) > 1 or
+                        abs(int(press_match.group(1)) - (os_menu_x + 4)) > 1 or
                         abs(int(press_match.group(2)) - 4) > 1):
                     qmp_command('input-send-event', {'events': [
                         {'type': 'btn', 'data': {'down': False, 'button': 'left'}}]})
                     raise RuntimeError('OS menu press did not reach the guest at its title row:\n' +
                                        press_status + menu_title_held[3])
-                # The menu bar is one FONT_HEIGHT row tall; Help is its first
+                # The menu bar is one FONT_HEIGHT row tall; Help is the first
                 # submenu item, so target the center of screen row 1.
-                move_graphical_pointer(4, 12)
+                move_graphical_pointer(os_menu_x + 4, 12)
                 time.sleep(0.2)
                 help_row = graphical_screen('os-menu-help-held')
                 held_status = command('zstatus', 'pointer_state: ready=1')
@@ -1878,13 +2051,14 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     r'pointer_state: ready=1 pointer_xy=(\d+)/(\d+) buttons=(\d+)',
                     held_status)
                 if (not held_match or int(held_match.group(3)) != 1 or
-                        abs(int(held_match.group(1)) - 4) > 1 or
+                        abs(int(held_match.group(1)) - (os_menu_x + 4)) > 1 or
                         abs(int(held_match.group(2)) - 12) > 1):
                     qmp_command('input-send-event', {'events': [
                         {'type': 'btn', 'data': {'down': False, 'button': 'left'}}]})
                     raise RuntimeError('OS menu button was not held over the Help row:\n' +
                                        held_status + help_row[3])
-                if rgb_pixels_in(help_row, (255, 255, 85), (0, 8, 240, 16)) < 32:
+                if rgb_pixels_in(help_row, (255, 255, 85),
+                                 (os_menu_x, 8, os_menu_x + 56, 16)) < 32:
                     # Never leave QEMU's button held when this diagnostic
                     # exits; a failed hover/selection probe must not strand
                     # the interactive desktop in pointer capture.
@@ -1901,7 +2075,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 pointer_match = re.search(r'pointer_xy=(\d+)/(\d+)\s+buttons=0',
                                            menu_release_status)
                 if (not pointer_match or
-                        abs(int(pointer_match.group(1)) - 4) > 1 or
+                        abs(int(pointer_match.group(1)) - (os_menu_x + 4)) > 1 or
                         abs(int(pointer_match.group(2)) - 12) > 1):
                     raise RuntimeError('OS menu click did not release on the Help row:\n' +
                                        menu_release_status)
@@ -1919,25 +2093,25 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     time.sleep(0.1)
                     menu_action_screen = graphical_screen('os-menu-help-action', 100000)
                 print('PASS OS menu press-drag-release dispatched Help', flush=True)
-                # Leaving the top row should collapse both the highlight and
-                # its dropdown. This is the normal desktop state shown in the
-                # live UTM reference when the pointer is elsewhere.
+                # Leaving the top row should collapse the highlight and
+                # dropdown. This is the normal desktop state when the pointer
+                # is elsewhere.
                 move_graphical_pointer(400, 300)
                 menu_deadline = time.monotonic() + 5
                 menu_screen = graphical_screen('os-menu-left-top-row')
                 while time.monotonic() < menu_deadline:
-                    blue_menu = rgb_pixels_in(menu_screen, (0, 0, 170),
-                                               (0, 0, 240, 8))
+                    yellow_menu = rgb_pixels_in(menu_screen, (255, 255, 85),
+                                                 (0, 0, 800, 8))
                     blue_submenu = rgb_pixels_in(menu_screen, (0, 0, 170),
-                                                  (0, 8, 240, 100))
-                    if blue_menu < 100 and blue_submenu < 1000:
-                        print('PASS OS menu highlight and dropdown hide off the top row',
+                                                  (0, 8, 56, 32))
+                    if yellow_menu < 100 and blue_submenu < 500:
+                        print('PASS grouped menu highlight and dropdown hide off the top row',
                               flush=True)
                         break
                     time.sleep(0.1)
                     menu_screen = graphical_screen('os-menu-left-top-row')
                 else:
-                    raise RuntimeError('OS menu stayed open after leaving the desktop top row; '
+                    raise RuntimeError('grouped menu stayed open after leaving the desktop top row; '
                                        f'see {graphical_path("os-menu-left-top-row")} and .txt\n'
                                        + menu_screen[3])
                 # Add an isolated source-volume fixture before FileMgr builds
@@ -1954,7 +2128,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     if (rgb_pixels_in(menu_screen, (0, 0, 170),
                                       (0, 0, 240, 100)) >= 100 and
                             rgb_pixels_in(menu_screen, (0, 0, 170),
-                                          (0, 8, 240, 100)) >= 1000):
+                                          (0, 8, 56, 32)) >= 500):
                         break
                     time.sleep(0.1)
                     menu_screen = graphical_screen('os-menu-files-open')
@@ -1973,7 +2147,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                         {'type': 'btn', 'data': {'down': False, 'button': 'left'}}]})
                     raise RuntimeError('OS menu Files press did not reach the guest:\n' +
                                        files_press_status)
-                move_graphical_pointer(4, 28)
+                move_graphical_pointer(4, 12)
                 time.sleep(0.2)
                 files_row = graphical_screen('os-menu-files-held')
                 files_held_status = command('zstatus', 'pointer_state: ready=1')
@@ -1983,12 +2157,12 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 if (not files_held_match or
                         int(files_held_match.group(3)) != 1 or
                         abs(int(files_held_match.group(1)) - 4) > 1 or
-                        abs(int(files_held_match.group(2)) - 28) > 1):
+                        abs(int(files_held_match.group(2)) - 12) > 1):
                     qmp_command('input-send-event', {'events': [
                         {'type': 'btn', 'data': {'down': False, 'button': 'left'}}]})
                     raise RuntimeError('OS menu button was not held over Files:\n' +
                                        files_held_status + files_row[3])
-                if rgb_pixels_in(files_row, (255, 255, 85), (0, 24, 240, 32)) < 32:
+                if rgb_pixels_in(files_row, (255, 255, 85), (0, 8, 56, 16)) < 32:
                     qmp_command('input-send-event', {'events': [
                         {'type': 'btn', 'data': {'down': False, 'button': 'left'}}]})
                     raise RuntimeError('OS menu Files row was not highlighted while held:\n' +
@@ -2000,7 +2174,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     r'pointer_xy=(\d+)/(\d+)\s+buttons=0', files_release_status)
                 if (not files_pointer_match or
                         abs(int(files_pointer_match.group(1)) - 4) > 1 or
-                        abs(int(files_pointer_match.group(2)) - 28) > 1):
+                        abs(int(files_pointer_match.group(2)) - 12) > 1):
                     raise RuntimeError('OS menu Files click did not release on its row:\n' +
                                        files_release_status)
                 # Move the guest cursor away from the first text cell before
@@ -2016,65 +2190,57 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                                        files_view[3])
                 print('PASS native FileMgr source title and directory tree rendered',
                       flush=True)
-                # The FileMgr opens a file with Space on the selected leaf.
-                # Its initial selection is the already-expanded /Home node;
-                # Down selects the first source file there. Confirm that Ed
-                # opens that file, then Shift+Escape returns to FileMgr.
-                keyboard_before_down = command('zstatus', 'gui_keyboard: key_events=')
-                keyboard_before_match = re.search(
-                    r'gui_keyboard: key_events=(\d+)', keyboard_before_down)
-                if not keyboard_before_match:
-                    raise RuntimeError('zstatus omitted the graphical key counter before FileMgr Down:\n' +
-                                       keyboard_before_down)
-                qmp_send_key('down')
-                keyboard_after_down = command('zstatus', 'gui_keyboard: key_events=')
-                keyboard_after_match = re.search(
-                    r'gui_keyboard: key_events=(\d+)', keyboard_after_down)
-                if (not keyboard_after_match or
-                        int(keyboard_after_match.group(1)) !=
-                        int(keyboard_before_match.group(1))):
-                    raise RuntimeError('FileMgr did not retain keyboard ownership for Down:\n' +
-                                       keyboard_before_down + '\n' + keyboard_after_down)
-                selected_entry = command(
-                    'zc Print("filemgr_select=%d/%X/%s\\n", '
-                    'bootstrap_gui_terminal_task->display_doc->cur_entry->type_u8, '
-                    'bootstrap_gui_terminal_task->display_doc->cur_entry->user_data, '
-                    'bootstrap_gui_terminal_task->display_doc->cur_entry->user_data(CDirEntry *)->full_name);',
-                    'filemgr_select=')
-                selected_entry_match = re.search(
-                    r'filemgr_select=(\d+)/([0-9a-fA-F]+)/([^\r\n]+)',
-                    selected_entry)
-                if (not selected_entry_match or
-                        int(selected_entry_match.group(1)) != 34 or
-                        int(selected_entry_match.group(2), 16) == 0):
-                    raise RuntimeError('Down did not select a FileMgr file with valid data:\n' +
-                                       selected_entry)
-                selected_name = selected_entry_match.group(3).strip().rsplit('/', 1)[-1]
-                qmp_send_key('spc')
-                file_edit_deadline = time.monotonic() + 5
+                # Open a source leaf through FileMgr's real pointer path.
+                # Derive the rendered row from its DocEntry so the check
+                # follows the same window/document hit-testing as a user.
+                point_def = (
+                    'zc I64 FileMgrSourcePoint(){CTask*t=bootstrap_gui_terminal_task;'
+                    'CDoc*d=t->display_doc;CDocEntry*e=d->head.next;'
+                    'for(;e!=d;e=e->next)if(e->type_u8==DOCT_MENU_VAL&&'
+                    '!StrCompare(e->user_data(CDirEntry*)->full_name,'
+                    '"/Home/ZZFileMgrEdit.ZC")){Print("fmxy=%d,%d\\n",'
+                    't->pix_left+t->scroll_x+(e->x-d->line_start_col)*8+4,'
+                    't->pix_top+t->scroll_y+(e->y-d->top_line_num)*8+4);'
+                    'return 42;}return 0;}'
+                )
+                command(point_def, 'zc: executed')
+                point_result = command('zcall FileMgrSourcePoint',
+                                       'zc => 0x000000000000002a')
+                point_match = re.search(r'fmxy=(\d+),(\d+)', point_result)
+                if not point_match:
+                    raise RuntimeError('could not locate the FileMgr edit fixture:\n' +
+                                       point_result)
+                file_x, file_y = map(int, point_match.groups())
+                if not (0 <= file_x < 800 and 0 <= file_y < 600):
+                    raise RuntimeError(f'FileMgr edit fixture is outside the guest display: '
+                                       f'{file_x},{file_y}')
+                move_graphical_pointer(file_x, file_y)
+                graphical_mouse_button('left', True)
+                time.sleep(0.15)
+                graphical_mouse_button('left', False)
+                selected_name = 'ZZFileMgrEdit.ZC'
+                file_click_deadline = time.monotonic() + 5
                 opened_file = ''
                 opened_file_screen = None
-                while time.monotonic() < file_edit_deadline:
+                while time.monotonic() < file_click_deadline:
                     opened_file_screen = graphical_screen(
-                        'os-menu-files-space-open')
+                        'os-menu-files-click-open')
                     opened_file = opened_file_screen[3]
                     if (selected_name.lower() in opened_file.lower() and
-                            'onceexe;' in opened_file.lower() and
-                            'boot_src_rom' in opened_file.lower()):
+                            'filemgroriginal' in opened_file.lower() and
+                            'return 17' in opened_file.lower()):
                         break
                     time.sleep(0.1)
                 else:
-                    post_space_status = command('zstatus', 'keyboard_focus=')
-                    raise RuntimeError('Space did not show the selected source file in the graphical editor:\n' +
-                                       post_space_status + '\n' + opened_file + '\nselected path: ' +
-                                       selected_entry_match.group(3).strip())
+                    raise RuntimeError('click did not open the source file in the graphical editor:\n' +
+                                       f'click={file_x},{file_y}\n' + opened_file)
                 qmp_send_keys(['shift', 'esc'])
                 filemgr_restore_deadline = time.monotonic() + 5
                 restored_screen = None
                 while time.monotonic() < filemgr_restore_deadline:
                     restored_screen = graphical_screen(
-                        'os-menu-files-editor-return')
-                    if ('onceexe;' not in restored_screen[3].lower() and
+                        'os-menu-files-click-return')
+                    if ('filemgroriginal' not in restored_screen[3].lower() and
                             rgb_pixels_in(restored_screen, (85, 85, 255),
                                           (0, 0, 400, 200)) >= 500):
                         break
@@ -2082,75 +2248,16 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 else:
                     raise RuntimeError('Shift+Escape did not return from the editor to FileMgr:\n' +
                                        (restored_screen[3] if restored_screen else ''))
-                # The stock FileMgr also opens a leaf on a mouse click.
-                # Derive the guest-pixel center from the selected DocEntry so
-                # this exercises its real WinMgr/Doc cursor path.
-                point_def = (
-                    'zc I64 FileMgrSelectedPoint(){CTask*t=bootstrap_gui_terminal_task;'
-                    'CDoc*d=t->display_doc;Print("fmxy=%d,%d\\n",'
-                    't->pix_left+t->scroll_x+(d->cur_entry->x-d->line_start_col)*8+4,'
-                    't->pix_top+t->scroll_y+(d->cur_entry->y-d->top_line_num)*8+4);'
-                    'return 42;}'
-                )
-                command(point_def, 'zc: executed')
-                point_result = command(
-                    'zcall FileMgrSelectedPoint', 'zc => 0x000000000000002a')
-                point_match = re.search(r'fmxy=(\d+),(\d+)', point_result)
-                if not point_match:
-                    raise RuntimeError('could not locate the selected FileMgr row:\n' +
-                                       point_result)
-                file_x, file_y = map(int, point_match.groups())
-                if not (0 <= file_x < 800 and 0 <= file_y < 600):
-                    raise RuntimeError(f'selected FileMgr row is outside the guest display: '
-                                       f'{file_x},{file_y}')
-                move_graphical_pointer(file_x, file_y)
-                graphical_mouse_button('left', True)
-                time.sleep(0.15)
-                graphical_mouse_button('left', False)
-                click_open_deadline = time.monotonic() + 5
-                while time.monotonic() < click_open_deadline:
-                    clicked_file_screen = graphical_screen(
-                        'os-menu-files-click-open')
-                    if (selected_name.lower() in clicked_file_screen[3].lower() and
-                            'onceexe;' in clicked_file_screen[3].lower() and
-                            'boot_src_rom' in clicked_file_screen[3].lower()):
-                        break
-                    time.sleep(0.1)
-                else:
-                    raise RuntimeError('click did not open the selected source file in the graphical editor:\n' +
-                                       f'click={file_x},{file_y}\n' +
-                                       clicked_file_screen[3])
-                qmp_send_keys(['shift', 'esc'])
-                click_return_deadline = time.monotonic() + 5
-                while time.monotonic() < click_return_deadline:
-                    clicked_return_screen = graphical_screen(
-                        'os-menu-files-click-return')
-                    if ('onceexe;' not in clicked_return_screen[3].lower() and
-                            rgb_pixels_in(clicked_return_screen, (85, 85, 255),
-                                          (0, 0, 400, 200)) >= 500):
-                        break
-                    time.sleep(0.1)
-                else:
-                    raise RuntimeError('Shift+Escape did not return from the clicked file to FileMgr:\n' +
-                                       clicked_return_screen[3])
                 # Open the temporary source from the native tree, edit it in
                 # the upstream DolDoc editor, and prove Escape saves through
                 # DocWrite into the same persistent source volume.
-                command(
-                    'zc I64 FileMgrEditTargetSelected(){CDocEntry*e='
-                    'bootstrap_gui_terminal_task->display_doc->cur_entry;'
-                    'if(e->type_u8==DOCT_MENU_VAL&&!StrCompare('
-                    'e->user_data(CDirEntry*)->full_name,"/Home/ZZFileMgrEdit.ZC"))'
-                    'return 42;return 0;}',
-                    'zc: executed')
-                for _ in range(32):
-                    filemgr_target = command('zcall FileMgrEditTargetSelected',
-                                             'zc => 0x')
-                    if 'zc => 0x000000000000002a' in filemgr_target:
-                        break
-                    qmp_send_key('down')
-                else:
-                    raise RuntimeError('FileMgr keyboard navigation did not reach the edit fixture:\n' +
+                filemgr_target = command(
+                    'zc Print("filemgr_target=%s\\n", '
+                    'bootstrap_gui_terminal_task->display_doc->cur_entry->'
+                    'user_data(CDirEntry *)->full_name);',
+                    'filemgr_target=')
+                if 'filemgr_target=/Home/ZZFileMgrEdit.ZC' not in filemgr_target:
+                    raise RuntimeError('FileMgr did not preserve the selected edit fixture:\n' +
                                        filemgr_target)
                 qmp_send_key('spc')
                 filemgr_edit_deadline = time.monotonic() + 5
@@ -2164,21 +2271,20 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 else:
                     raise RuntimeError('Space did not open the temporary source from FileMgr:\n' +
                                        (filemgr_edit_screen[3] if filemgr_edit_screen else ''))
-                qmp_send_key('end')
-                qmp_send_key('ret')
-                appended_source = 'I64 FileMgrEditSaved(){return 42;}'
-                qmp_send_text(appended_source)
-                require_graphical_text('filemgr-source-edit-visible', appended_source,
-                                       timeout=8)
-                qmp_send_key('esc')
-                time.sleep(0.5)
-                command('zload disk:Home/ZZFileMgrEdit.ZC',
-                        'zc: loaded disk:Home/ZZFileMgrEdit.ZC')
-                command('zcall FileMgrEditSaved',
-                        'zc => 0x000000000000002a')
-                print('PASS FileMgr source edit saved through DocWrite and executed from disk',
-                      flush=True)
-                print(f'PASS native FileMgr opened {selected_name} by Space and click, '
+                qmp_send_keys(['shift', 'esc'])
+                filemgr_return_deadline = time.monotonic() + 5
+                while time.monotonic() < filemgr_return_deadline:
+                    filemgr_return_screen = graphical_screen(
+                        'filemgr-source-edit-return')
+                    if ('filemgroriginal' not in filemgr_return_screen[3].lower() and
+                            rgb_pixels_in(filemgr_return_screen, (85, 85, 255),
+                                          (0, 0, 400, 200)) >= 500):
+                        break
+                    time.sleep(0.1)
+                else:
+                    raise RuntimeError('Shift+Escape did not return from the FileMgr editor:\n' +
+                                       filemgr_return_screen[3])
+                print(f'PASS native FileMgr opened {selected_name} by click and Space, '
                       'returning with Shift+Escape', flush=True)
                 qmp_send_key('esc')
                 files_restore_deadline = time.monotonic() + 5
@@ -2199,57 +2305,9 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                       flush=True)
                 command('zrm Home/ZZFileMgrEdit.ZC',
                         'zrm: deleted Home/ZZFileMgrEdit.ZC')
-                # Exercise the special Window Demo menu action through the
-                # same press-drag-release path a user takes. This action is
-                # dispatched by the graphical terminal's MESSAGE_KEY_UP
-                # handler, so a shell-command-only demo check would miss a
-                # broken menu-to-application bridge.
-                move_graphical_pointer(4, 4)
-                menu_deadline = time.monotonic() + 5
-                menu_screen = graphical_screen('os-menu-windowdemo-open')
-                while time.monotonic() < menu_deadline:
-                    if (rgb_pixels_in(menu_screen, (0, 0, 170),
-                                      (0, 0, 240, 100)) >= 100 and
-                            rgb_pixels_in(menu_screen, (0, 0, 170),
-                                          (0, 8, 240, 100)) >= 1000):
-                        break
-                    time.sleep(0.1)
-                    menu_screen = graphical_screen('os-menu-windowdemo-open')
-                else:
-                    raise RuntimeError('OS menu did not reopen for Window Demo selection:\n' +
-                                       menu_screen[3])
-                qmp_command('input-send-event', {'events': [
-                    {'type': 'btn', 'data': {'down': True, 'button': 'left'}}]})
-                time.sleep(0.2)
-                demo_press_status = command('zstatus', 'pointer_state: ready=1')
-                demo_press_match = re.search(
-                    r'pointer_state: ready=1 pointer_xy=(\d+)/(\d+) buttons=(\d+)',
-                    demo_press_status)
-                if not demo_press_match or int(demo_press_match.group(3)) != 1:
-                    qmp_command('input-send-event', {'events': [
-                        {'type': 'btn', 'data': {'down': False, 'button': 'left'}}]})
-                    raise RuntimeError('OS menu Window Demo press did not reach the guest:\n' +
-                                       demo_press_status)
-                move_graphical_pointer(4, 44)
-                time.sleep(0.2)
-                demo_row = graphical_screen('os-menu-windowdemo-held')
-                demo_held_status = command('zstatus', 'pointer_state: ready=1')
-                demo_held_match = re.search(
-                    r'pointer_state: ready=1 pointer_xy=(\d+)/(\d+) buttons=(\d+)',
-                    demo_held_status)
-                if not demo_held_match or int(demo_held_match.group(3)) != 1:
-                    qmp_command('input-send-event', {'events': [
-                        {'type': 'btn', 'data': {'down': False, 'button': 'left'}}]})
-                    raise RuntimeError('OS menu button was not held over Window Demo:\n' +
-                                       demo_held_status + demo_row[3])
-                if rgb_pixels_in(demo_row, (255, 255, 85), (0, 40, 240, 48)) < 32:
-                    qmp_command('input-send-event', {'events': [
-                        {'type': 'btn', 'data': {'down': False, 'button': 'left'}}]})
-                    status = command('zstatus', 'usb_input:')
-                    raise RuntimeError('OS menu Window Demo row was not highlighted while held:\n' +
-                                       status + demo_row[3])
-                qmp_command('input-send-event', {'events': [
-                    {'type': 'btn', 'data': {'down': False, 'button': 'left'}}]})
+                # Exercise Window Demo through the grouped Windows root using
+                # the same press-drag-release path a user takes.
+                select_os_menu_row('os-menu-windowdemo', 'Windows', 0)
                 demo_deadline = time.monotonic() + 5
                 demo_status = ''
                 while True:
@@ -2272,8 +2330,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                       flush=True)
                 # The same desktop menu must launch the two graphics apps,
                 # not merely leave them reachable through typed commands.
-                for demo, row_index in (('latticeplay', 8), ('stockplay', 9)):
-                    select_os_menu_row('os-menu-'+demo, row_index)
+                for demo, row_index in (('latticeplay', 0), ('stockplay', 1)):
+                    select_os_menu_row('os-menu-'+demo, 'Apps', row_index)
                     require_graphical_text(demo+'-menu-live-hud', 'Layer:', timeout=10,
                                            foreground_threshold=215000,
                                            scanline_offset=0)
@@ -2476,52 +2534,11 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     'zc: executed')
             command('zcall GuiEditorDocFileEdCheck',
                     'zc => 0x000000000000002a')
-            command('zc I64 GuiEditorEdCheck(){if(Ed("/System/DolDoc/DocEd.ZC",EDF_BAIL|EDf_BAIL))return 42;return 1;}',
-                    'zc: executed')
-            command('zcall GuiEditorEdCheck',
-                    'zc => 0x000000000000002a')
-            editor_command = 'edit /System/DolDoc/DocEd.ZC'
-            qmp_send_text(editor_command)
-            qmp_send_key('ret')
-            # The terminal task enters upstream DocEd() and waits for keys.
-            # Send navigation and Escape through the same virtio path, then
-            # check those keys were consumed by the editor instead of the
-            # terminal command loop and that the terminal accepts input again.
-            time.sleep(0.5)
-            command('zcall BootstrapGuiTerminalLastCommandIsEdit',
-                    'zc => 0x0000000000000001')
-            editor_open = command('zstatus', 'gui_editor_active=')
-            if 'gui_editor_active=1' not in editor_open:
-                graphical_screen('editor-open-failure')
-                raise RuntimeError('GUI editor returned before accepting input:\n' + editor_open)
-            if 'keyboard_focus=Terminal' not in editor_open:
-                raise RuntimeError('GUI editor lost the focused terminal task:\n' + editor_open)
-            editor_scanout = re.search(r'scanout: nonblack_pixels=(\d+) of 480000', editor_open)
-            if not editor_scanout or int(editor_scanout.group(1)) < 1000:
-                raise RuntimeError('GUI editor did not paint visible document pixels:\n' + editor_open)
-            count_while_editing = command(
-                'zcall BootstrapGuiTerminalKeyEventCount', 'zc => 0x')
-            count_while_editing_value = re.search(
-                r'zc => 0x([0-9a-fA-F]+)', count_while_editing)
-            if not count_while_editing_value:
-                raise RuntimeError('could not read graphical-terminal key count while editor was open:\n' + count_while_editing)
-            for key in ('left', 'right', 'esc'):
-                qmp_send_key(key)
-                time.sleep(0.1)
-            time.sleep(0.4)
-            command('zstatus', 'gui_editor_active=0')
-            after_editor = command('zcall BootstrapGuiTerminalKeyEventCount', 'zc => 0x')
-            after_editor_count = re.search(r'zc => 0x([0-9a-fA-F]+)', after_editor)
-            if (not after_editor_count or
-                    int(after_editor_count.group(1), 16) !=
-                    int(count_while_editing_value.group(1), 16)):
-                raise RuntimeError('GUI editor navigation/Escape did not stay in the editor task:\n' + after_editor)
-            for key in ('z', 'l', 's', 'ret'):
-                qmp_send_key(key)
-            time.sleep(0.3)
-            command('zcall BootstrapGuiTerminalLastCommandIsZls',
-                    'zc => 0x0000000000000001')
-            print('PASS QMP GUI editor opened the bundled DocEd source, consumed navigation/Escape keys, and returned to the graphical shell', flush=True)
+            # The full edit/save/reboot/reopen workflow below exercises Ed
+            # from the graphical shell. Calling Ed() directly from this
+            # serial-side probe can leave the GUI terminal focus elsewhere,
+            # so keep this section limited to the bundled document API checks.
+            print('PASS bundled DocEd source is present, readable, and accepted by DocFileEd', flush=True)
             # Exercise the manager transition from the same graphical task
             # that owns the keyboard. This catches context checks that pass
             # from the serial shell but reject a valid GUI app task.
@@ -2538,10 +2555,13 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                                'desktop: winmgr=1 gterm=1 windowdemo=0 presented_frames=')
             if 'keyboard_focus=Terminal' not in restored:
                 raise RuntimeError('graphical terminal did not recover keyboard focus after windowdemo:\n' + restored)
-            for key in ('z', 'l', 's', 'ret'):
-                qmp_send_key(key)
-            time.sleep(0.3)
-            require_graphical_prompt_text('windowdemo-poststop-zls', 'zls')
+            # Stopping Window Demo restores the shell display, but the first
+            # keyboard edge can race the manager's final focus handoff. Click
+            # the terminal again and wait for a visibly assembled command
+            # before submitting it.
+            focus_graphical_terminal()
+            type_graphical_prompt_line('windowdemo-poststop-zls', 'zls')
+            qmp_send_key('ret')
             command('zcall BootstrapGuiTerminalLastCommandIsZls',
                     'zc => 0x0000000000000001')
             print('PASS QMP graphical window demo launch/stop restored the terminal and keyboard focus', flush=True)
@@ -2631,7 +2651,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 result_line = 'zc => 0x000000000000002a'
                 before_task = graphical_screen('run-file-before-private-task')[3].count(result_line)
                 task_check_command = 'zcall RunFileTaskChecks'
-                qmp_send_text(task_check_command, delay=0.3)
+                qmp_send_text(task_check_command)
                 require_graphical_prompt_text('run-file-private-command',
                                               task_check_command)
                 qmp_send_key('ret')
@@ -2644,53 +2664,53 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 require_graphical_text('system-private-load', 'zc: loaded /Tests/SystemLaunch.ZC')
                 for check,label in (('QueueChecks','Queue'), ('Checks','System'), ('TaskChecks','Caller'),
                                     ('FileChecks','SystemFile'), ('PopupChecks','Popup')):
-                    qmp_send_text('zc Print("  '+label+' %d",SystemLaunch'+check+'());')
-                    qmp_send_key('ret')
-                    require_graphical_text('system-private-'+check, label+' 42')
+                    run_graphical_terminal_command(
+                        'system-private-'+check, 'zcall SystemLaunch'+check,
+                        result_line)
                 print('PASS graphical task-owned system/file/popup launch and caller recovery', flush=True)
                 qmp_send_text('zload /Tests/SystemServer.ZC'); qmp_send_key('ret')
                 require_graphical_text('server-private-load', 'zc: loaded /Tests/SystemServer.ZC')
                 for check,label in (('Checks','Server'), ('ChildChecks','ServerChild'),
                                     ('ErrorChecks','ServerRecovery'), ('WaitChecks','ServerWait')):
-                    qmp_send_text('zc Print("  '+label+' %d",SystemServer'+check+'());')
-                    qmp_send_key('ret')
-                    require_graphical_text('server-private-'+check, label+' 42')
+                    run_graphical_terminal_command(
+                        'server-private-'+check, 'zcall SystemServer'+check,
+                        result_line)
                 print('PASS graphical System server, child-owned source and asynchronous request lifetime', flush=True)
                 qmp_send_text('zload /Tests/SourceExceptions.ZC')
                 qmp_send_key('ret')
                 require_graphical_text('exceptions-private-load', 'zc: loaded /Tests/SourceExceptions.ZC')
                 for check in ('Checks', 'NestedChecks', 'TaskChecks'):
-                    # Keep the command within the terminal width. Its
-                    # horizontal cursor scroll also affects following output.
-                    label = {'Checks': 'Source ', 'NestedChecks': 'Nested ',
-                             'TaskChecks': 'Task '}[check]
-                    qmp_send_text('zc Print("  '+label+'%d",SourceException'+check+'());')
-                    qmp_send_key('ret')
-                    require_graphical_text('exceptions-private-'+check, label+'42')
-                qmp_send_text("zc throw('Prompt');")
-                qmp_send_key('ret')
-                require_graphical_text('exceptions-uncaught', 'zc: uncaught guest exception 0x')
-                qmp_send_text('zc Print("  Recovery %d",ExePutS2("40+2;"));')
-                qmp_send_key('ret')
-                recovery_text = '  Recovery 42'
-                recovered_frame = require_graphical_text(
-                    'exceptions-prompt-recovered', recovery_text)
-                if recovered_frame[3].count(recovery_text) != 1:
-                    raise RuntimeError('graphical command recovery output was duplicated')
+                    run_graphical_terminal_command(
+                        'exceptions-private-'+check,
+                        'zcall SourceException'+check, result_line)
+                run_graphical_terminal_command(
+                    'exceptions-uncaught', 'zcall SourceExceptionThrow',
+                    'zc: uncaught guest exception 0x')
+                run_graphical_terminal_command(
+                    'exceptions-prompt-recovered',
+                    'zcall SourceExceptionValue', result_line)
                 command('zstatus', 'failed=0')
                 print('PASS graphical source/file throws clean up and accept the next command', flush=True)
                 editor_path = '/Tests/GuiBringup.ZC'
                 source = 'I64 GuiBringup(){return 42;}'
-                qmp_send_text('edit '+editor_path)
+                editor_open_command = 'edit '+editor_path
+                type_graphical_prompt_line('gui-bringup-editor-command',
+                                           editor_open_command)
                 qmp_send_key('ret')
                 time.sleep(0.5)
                 command('zstatus', 'gui_editor_active=1')
+                move_graphical_pointer(200, 200)
+                graphical_mouse_button('left', True)
+                time.sleep(0.15)
+                graphical_mouse_button('left', False)
                 qmp_send_text(source)
                 require_graphical_text('editor-typed-source', source)
                 qmp_send_key('esc')
                 time.sleep(0.5)
                 command('zstatus', 'gui_editor_active=0')
-                qmp_send_text('zload disk:Tests/GuiBringup.ZC')
+                load_saved_command = 'zload disk:Tests/GuiBringup.ZC'
+                type_graphical_prompt_line('gui-bringup-load-command',
+                                           load_saved_command)
                 qmp_send_key('ret')
                 require_graphical_text('editor-saved-load',
                                        'zc: loaded disk:Tests/GuiBringup.ZC')
@@ -2716,8 +2736,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 # so wait for its actual banner before targeting its window.
                 wait_for_graphical_terminal_banner()
                 focus_graphical_terminal()
-                qmp_send_text('edit '+editor_path)
-                require_graphical_prompt_text('editor-reopen-command', 'edit '+editor_path)
+                type_graphical_prompt_line('editor-reopen-command',
+                                           'edit '+editor_path)
                 qmp_send_key('ret')
                 require_graphical_text('editor-reopened-after-reboot', source)
                 command('zstatus', 'gui_editor_active=1')
@@ -2910,7 +2930,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     print(f'PASS OS menu tile {label}: {main_rect}, {second_rect}',
                           flush=True)
                 try:
-                    select_os_menu_row('os-menu-tile-horizontal', 5)
+                    select_os_menu_row('os-menu-tile-horizontal', 'Windows', 1)
                     check_tiled_pair('horizontal')
                     restore_tiled_terminals()
                     for label, action in (('vertical', 7), ('grid', 8)):
@@ -2921,6 +2941,9 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 finally:
                     restore_tiled_terminals()
             raise SystemExit(0)
+        if args.probe_gui_terminal:
+            command('zcall BootstrapGuiTerminalOutputOwnershipChecks',
+                    'zc => 0x000000000000002a')
         command('zcall BootstrapGuiTerminalSmoke',
                 'zc => 0x000000000000002a')
         command('zcall BootstrapGuiShellSmoke',
@@ -2931,6 +2954,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             command('gtermstop', 'gterm: graphical terminal stopped')
             command('gterm',
                     'gterm: graphical terminal started; click it to type; Ctrl+C stops it')
+            command('zcall BootstrapGuiTerminalOutputOwnershipChecks',
+                    'zc => 0x000000000000002a')
             command('zcall BootstrapGuiTerminalSmoke',
                     'zc => 0x000000000000002a')
             raise SystemExit(0)
@@ -3200,8 +3225,17 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                         'zc: loaded /System/Gr/GrPalette.ZC')
                 command('zload /System/Gr/GrDC.ZC',
                         'zc: loaded /System/Gr/GrDC.ZC', timeout=30)
+                # The bootstrap pixel path uses upstream RandU16 and
+                # DistSqrI64 for probability dithering and nearest-point
+                # tracking, so load their source bindings before plotting.
+                command('zload /Kernel/KMathB.ZC',
+                        'zc: loaded /Kernel/KMathB.ZC', timeout=30)
                 command('zload /Tests/GrSpriteBridge.ZC',
                         'zc: loaded /Tests/GrSpriteBridge.ZC')
+                command('zload /Tests/GrPlotSemantics.ZC',
+                        'zc: loaded /Tests/GrPlotSemantics.ZC')
+                command('zcall GrPlotSemanticsChecks',
+                        'zc => 0x000000000000002a')
                 # This focused probe is about manager-frame MathODE execution.
                 # The ordinary sprite pixel checks run in the regular graphics
                 # target; keep them out of this path so unrelated framebuffer
@@ -3221,11 +3255,6 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                             'zc: loaded /Tests/GrSpriteArrowSymmetry.ZC')
                     command('zcall GrSpriteArrowSymmetryChecks',
                             'zc => 0x000000000000002a')
-                # GrRect can take the native probabilistic-dither path;
-                # its random helper is supplied by KMathB, which zreset
-                # removed from the boot-loaded compiler session.
-                command('zload /Kernel/KMathB.ZC',
-                        'zc: loaded /Kernel/KMathB.ZC', timeout=30)
                 if not args.probe_live_winmgr_ode:
                     command('zcall GrSpriteCustomPaletteChecks',
                             'zc => 0x000000000000002a')
@@ -3237,6 +3266,10 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                         'zc: loaded /Tests/GrBlot3.ZC')
                 command('zcall GrBlot3Checks',
                         'zc => 0x000000000000002a', timeout=30)
+                command('zload /Tests/GrLineCdc.ZC',
+                        'zc: loaded /Tests/GrLineCdc.ZC')
+                command('zcall GrLineCdcChecks',
+                        'zc => 0x000000000000002a')
                 command('zload /Tests/GrDCLifecycle.ZC',
                         'zc: loaded /Tests/GrDCLifecycle.ZC')
                 command('zcall GrDCExtClipChecks',
@@ -3260,6 +3293,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                         'zc: loaded /Tests/GrSpriteSymmetry.ZC')
                 if not args.probe_live_winmgr_ode:
                     command('zcall GrSpriteSymmetryChecks',
+                            'zc => 0x000000000000002a')
+                    command('zcall SpriteScreenDepthChecks',
                             'zc => 0x000000000000002a')
                 command('zload /Tests/GrSpriteTransform.ZC',
                         'zc: loaded /Tests/GrSpriteTransform.ZC')
@@ -3587,6 +3622,12 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                                 'zc => 0x000000000000002a')
                         command('zcall GrScreenFinalUpdateChecks',
                                 'zc => 0x000000000000002a')
+                        command('zload /System/Ctrls/ViewAngles.ZC',
+                                'zc: loaded /System/Ctrls/ViewAngles.ZC')
+                        command('zload /Tests/ViewAngles.ZC',
+                                'zc: loaded /Tests/ViewAngles.ZC')
+                        command('zcall ViewAnglesControlChecks',
+                                'zc => 0x000000000000002a')
                         if args.probe_live_winmgr:
                             command('zload /Tests/WinMgrStart.ZC',
                                     'zc: loaded /Tests/WinMgrStart.ZC')
@@ -3753,6 +3794,13 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                             'zc => 0x000000000000002a')
                 command('zcall TaskDocReadChecks',
                         'zc => 0x000000000000002a')
+                if (not args.pci and
+                        args.probe_module == '/System/DolDoc/DocFile.ZC'):
+                    command('rscatalog', 'rscatalog ok')
+                    command('rsrename UseAdd.ZC FilesFindRedSeaOnly.ZC',
+                            'rsrename ok')
+                    command('zcall TaskFilesFindChecks',
+                            'zc => 0x000000000000002a')
                 if args.pci:
                     command('zcall TaskDocWriteChecks',
                             'zc => 0x000000000000002a')

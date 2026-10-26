@@ -176,8 +176,9 @@ static void user_diagnostic_flush(struct guest_fiber *f) {
          * rollback is complete, so send them straight to that same writer
          * instead of falling through to the raw framebuffer text console. */
         if (f->user_output_suppressed)
-            FFI_CALL_TOS_1(f->user_output_writer,
-                           (int64_t)(uintptr_t)f->user_diagnostic);
+            FFI_CALL_TOS_2(f->user_output_writer,
+                           (int64_t)(uintptr_t)f->user_diagnostic,
+                           (int64_t)(uintptr_t)f->words);
         else
             guest_task_text_output(f->user_diagnostic);
     }

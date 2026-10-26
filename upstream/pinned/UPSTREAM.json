@@ -12,6 +12,8 @@
     "src/HomeSys.ZC": "15b68cd26d93bb432be80adabc4720f78a667b106f197d95a2bb55fbab209798",
     "src/Kernel/BlkDev/DiskDirB.ZC": "e14ae9667065a246d0ce778b9c00c0ef268146e1b4c36123b1d452dbcf22369c",
     "src/Kernel/Display.ZC": "ed49f65321f39edeeacd342da5c0836588e438435d67194ee49eb741fdc5c727",
+    "src/Kernel/FontAux.ZC": "970754c0feaa84fe71f773e892b59cd5b7030927b25990b78a2523442602c1de",
+    "src/Kernel/FontStd.ZC": "4f592db78b85ba1dcb45171415493922d9fe26017637b284fa9d53cba935ecff",
     "src/Kernel/Job.ZC": "712893a3ff33df3f862baea1ec5624c9dfb9e167d696e6a6d9b7c2dabb66181b",
     "src/Kernel/KGlobals.ZC": "4302735ec248c015a5f442b29cd1b4b19ae2761a3fdd6b6f50d673be0cc3a236",
     "src/Kernel/KMathB.ZC": "1d249c72ef21eb75eb492f6aaa8cd3885ef085635a06bab8c26af55ced10ba33",

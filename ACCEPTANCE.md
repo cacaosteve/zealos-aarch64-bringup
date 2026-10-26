@@ -1,11 +1,15 @@
 # UTM acceptance (interactive) — **frozen virt regression bar (M33–M39)**
 
+The UTM/QEMU ARM64 bring-up is active again. The M33–M39 table remains the
+regression baseline; the desktop/startup/graphics and ISO-installer acceptance
+gates below are being closed as this goal proceeds.
+
 Automated QEMU/HVF covers boot + compiler smokes. **You** verify screen / keyboard / mouse
 and the disk path below.
 
-**Role:** UTM (`ZealosAarch64Hello`) is the frozen **regression harness** for the virt
-track. Do not extend the small-demo ladder further; next large efforts are subsystems
-or Pi bring-up. Re-run this list after risky changes; QEMU first, UTM when it matters.
+**Role:** UTM (`ZealosAarch64Hello`) is the live virt acceptance target. Re-run
+the M33–M39 regression list after risky changes, then run the focused UTM gates
+for the active bring-up.
 
 ## VM
 
@@ -486,7 +490,7 @@ the pseudo-TTY path changes.
 - M154: Lattice idle — empty MessageGet no longer aborts the demo early; scripted ESC still ends the smoke.
 - M155: `latticeplay` — live Lattice on UTM (tablet/keys); Esc to exit. `disklat` remains the scripted smoke.
 - Live UTM check (2026-10-20/21): after restoring normal zoom, `latticeplay` responded to Space with a drawn step and Escape returned to the prompt. The user confirmed left-click placement, right-drag aiming, pointer-centered Control+wheel zoom, and that Space/Escape still work afterward. On 2026-10-21, the user also confirmed that `c` changes the color swatches and Return restarts the drawing/colors in UTM.
-- Automated NEC/xHCI GUI regression (`make check-lattice-controls`, 2026-10-21): live pointer left-click places the head, right-drag changes its heading, `c` updates Mid/Edge swatches, Enter restores the initial pose/colors, widened Space leaves a visible stroke, and Escape restores the terminal. QEMU event/render and live UTM controls are now both confirmed; only non-default pan remains open.
+- Automated NEC/xHCI GUI regression (`make check-lattice-controls`, 2026-10-21): live pointer left-click places the head, right-drag changes its heading, `c` updates Mid/Edge swatches, Enter restores the initial pose/colors, widened Space leaves a visible stroke, and Escape restores the terminal. The boot menu now also provides bounded manual pan steps; QEMU verifies those actions and their panned framebuffer output, while live UTM confirmation of the new menu entries remains open.
 - M156: compose *Lites (Demo/Frame/Live/Play/Wrap) idle like Lattice on empty MessageGet.
 - M157: after `disklat` / `latticeplay` / etc., shell restores dark FB before `ok` (not pure black from DCFill).
 - M158: in `latticeplay`, Enter restarts (virtio Enter maps to `\n` like Lattice Restart).
@@ -538,7 +542,7 @@ the pseudo-TTY path changes.
 - M204: `PopUpColor` uses `"Mid…"` / `"Edge…"` header strings (g_hc_mem); Edge-first smoke → BLACK; Mid → YELLOW.
 - M205: live `PopUpColor` paints the header first word above the Mid/Edge swatch (eyes-on `'c'` cue).
 - M206: Mid/Edge header words persist across Refresh (`paint_swatch` / `paint_live`); cleared on Restart/`hc_run`.
-- **Scope:** QEMU/`disklat`/`LatticePlay` exercise DiskLat-shaped compose source, **not** stock ZealOS `Demo/Graphics/Lattice.ZC` with original behavior. Live `stockplay` softens idle DrawIt (M193–M194) but still ≠ DiskLat/latticeplay. UTM has eyes-on place/aim, color/Return restart, Space/Escape, zoom, and plain-wheel behavior; non-default pan remains to be checked.
+- **Scope:** QEMU/`disklat`/`LatticePlay` exercise DiskLat-shaped compose source, **not** stock ZealOS `Demo/Graphics/Lattice.ZC` with original behavior. Live `stockplay` softens idle DrawIt (M193–M194) but still ≠ DiskLat/latticeplay. UTM has eyes-on place/aim, color/Return restart, Space/Escape, zoom, and plain-wheel behavior. Bounded directional pan is now in the OS menu and QEMU-tested; live UTM confirmation remains pending.
 - Freeze checklist still: `vblk`, `rspersist`, `rscatalog`, `runzc` UseAdd/Notes/MemSort (same as QEMU `run-pci`).
 
 ## Notes
@@ -734,3 +738,1586 @@ close the plain-wheel and live Lattice keyboard-control checks. The user then
 confirmed Control+scroll zoom and pointer-edge pan both work; zoom remains active
 while the desktop recenters at the edge. The ARM64 GrScreen regression now checks
 that invariant directly.
+
+2026-10-21 UTM graphics follow-up: the OS menu's View Angles control appeared,
+and the user confirmed that its X, Y, and Z tracks each respond. In the refreshed
+guest, `GrBlot3Checks`, `GrSpriteTransformChecks`, and
+`GrSpriteSymmetryChecks` each returned `0x2a`. `make check-grscreen-full` also
+passed the QEMU source-backed graphics suite, including zoomed framebuffer
+presentation and the three-axis control checks. UTM pan beyond pointer-edge
+recentering, zoom-cache presentation, and the full normal desktop/menu startup
+remain open.
+
+## ARM64 ISO installer milestone — 2026-10-22
+
+The ISO now carries a 5.2 MiB sparse representation of the normal 128 MiB
+UTM/QEMU disk, rather than embedding the whole disk and exhausting the 512 MiB
+guest's boot memory. The packer/round-trip check reconstructs the disk
+byte-for-byte across its 25 nonzero extents. The installer accepts only one
+128 MiB PCI VirtIO target, shows a no-write readiness prompt, and requires the
+explicit `zinstall ERASE` command. It zeroes the full disk, writes the image,
+flushes, and compares every sector on read-back.
+
+`make check-dvd-live` passed the 512 MiB ISO boot, graphical startup, visible
+installer instructions, and interactive help. `make check-iso-installer`
+passed on QEMU/HVF: the blank disposable disk was installed and read back
+byte-for-byte, booted by itself without the ISO, and started the graphical
+desktop. A source file saved on that installed disk returned 42, then returned
+42 again after a second reboot. Logs: `build/check-iso-installer-live.log`,
+`build/check-iso-installer-disk-boot.log`, and
+`build/check-iso-installer-reboot.log`.
+
+For a manual UTM install, attach the ISO itself to the VM's SCSI CD/DVD drive
+and put that drive above the VirtIO target in the Drives list; UTM uses list
+order as boot priority. The purple highlight only selects a device for editing.
+After installation, shut down and boot the VirtIO target first, with the CD/DVD
+below it or detached.
+
+2026-10-22 live UTM acceptance used the isolated
+`ZealOS AArch64 ISO Installer Acceptance` clone and its blank 128 MiB VirtIO
+disk. The corrected ISO booted as a read-only USB CD-ROM; the default
+`zinstall` command made no writes and displayed the explicit `zinstall ERASE`
+gate. The confirmed install erased, wrote, flushed and read back every sector.
+The installed disk matched that build's `build/disk.img` byte-for-byte
+(`sha256=7499fc5c394efd624eef892c479c6af7ede0a2aa6e61a7733f122816da83c4dc`).
+With the target disk at QEMU boot index 0 and the installer CD at index 1, a
+UTM cold boot started the installed desktop: `zstatus` reported
+`ready=1 failed=0`, `compiler_recovery: errors=0 active=0`,
+`winmgr=1 gterm=1`, two xHCI controllers running with zero errors, and
+nonblack scanout pixels. `Tests/InstallerPersist.ZC`, saved to the installed
+disk, returned `0x2a` before and after the cold reboot. The imported ISO
+remained attached as a lower-priority fallback during that reboot; disk-only
+boot is independently covered by the QEMU/HVF test above. The exact tested ISO
+is `build/zealos-aarch64-hello.iso` (SHA-256
+`330ab43890bd30be51376b73b86b8230f4698359c2745ce9a80fe22c4875e63e`).
+
+The first live UTM installer milestone is closed for the ISO above. After
+adding bounded Zoom In/Out, Reset View, and Pan Left/Right/Up/Down actions to
+the boot OS menu, the graphics gate passed again: `make check-grscreen-full`
+returned exit code 0, including the menu action bounds smoke and source
+compositor zoom plus non-origin pan presentation on the Limine framebuffer.
+The refreshed current ISO then passed `make check-iso-installer` on QEMU/HVF:
+all 25 sparse extents round-tripped; `zinstall` refused to write without
+confirmation; `zinstall ERASE` installed the image; the installed target
+matched `build/disk.img` byte-for-byte (`sha256=de6fcd2f9a51a37e25571678da7abef55ae30f6942cc224cbd9d5a9d9f9030b2`);
+it booted and returned 42 from `InstallerPersist` before and after another
+reboot. Current artifact hashes: ISO
+`2e9f64e38512a302a912ff7f84454893c6889b084415ad7d33e25439279d8ca4`, disk
+`de6fcd2f9a51a37e25571678da7abef55ae30f6942cc224cbd9d5a9d9f9030b2`.
+
+The exact current ISO was then installed in the isolated UTM acceptance clone
+`ZealOS AArch64 ISO Installer Acceptance`. Its decoded USB-CD image matched
+`build/zealos-aarch64-hello.iso` byte-for-byte at SHA-256
+`2e9f64e38512a302a912ff7f84454893c6889b084415ad7d33e25439279d8ca4`; the
+target was confirmed all-zero and 128 MiB before installation. UTM live boot
+reported `ready=1 failed=0`, `compiler_recovery: errors=0 active=0`,
+`winmgr=1 gterm=1`, two running xHCI controllers with zero errors, and
+nonblack scanout. The default `zinstall` wrote nothing and displayed the
+confirmation gate. `zinstall ERASE` installed and read back the image; before
+saving test data the UTM target matched the build disk byte-for-byte at SHA-256
+`de6fcd2f9a51a37e25571678da7abef55ae30f6942cc224cbd9d5a9d9f9030b2`. The
+saved `Tests/InstallerPersist.ZC` function returned `0x2a`, then after a cold
+UTM stop/start boot with the VirtIO target at boot index 0 and ISO at index 1,
+the desktop again reported clean compiler recovery, two clean controllers and
+nonblack scanout; loading the saved file from `disk:` again returned `0x2a`.
+That reboot's serial transcript also shows the disk-startup `Once` command,
+autocomplete initialization, splash launch, and return to the shell. In the
+same refreshed UTM guest, `zcall BootstrapGuiTerminalZoomPanChecks` and
+`zcall BootstrapGuiTerminalSmoke` both returned `0x2a`, covering the menu
+action bridge, zoom changes, bounded pan steps, command editor, and current
+terminal/window state. A following `zstatus` still reported
+`compiler_recovery: errors=0 active=0`, `winmgr=1 gterm=1`, the System task
+running, two clean xHCI controllers, and nonblack scanout.
+The graphical UTM window could not be inspected because the Mac session was
+locked; the serial status and guest framebuffer diagnostics were available.
+The live installer cycle is accepted on that ISO. At that iteration, a direct
+run of the framebuffer test source inside UTM first needed the `ODEsUpdateStub`
+fixture and source modules loaded in the same order as the QEMU harness; it was
+not counted until that setup was corrected below. The VM was cold-booted again,
+and the final guest status returned to `errors=0` with the saved function still
+returning 42.
+
+2026-10-22 full-source compositor and ISO acceptance: the UTM-only
+`GrScreenFinalUpdateChecks` exposed that the live full-source path called
+`ZcFbShellTextCompose` without advancing the shared text-update diagnostic.
+The full compositor now records that composition, and a source guard keeps the
+counter tied to the real shell-text call. `make check-grscreen-full` and
+`make check-iso-installer` both pass. The exact artifact hashes are ISO
+`1d5feeddd699f077b499703f3ea98f91c16e2ca747f1fa9ce83ca45757c17de5` and
+installer disk
+`5964ea3a0a151f903a95bf26283feb9e8e1749e0e24ae021b9e6356331c4bbcb`.
+
+The isolated UTM acceptance VM was refreshed with that exact ISO; the decoded
+USB-CD image matched byte-for-byte. Its disposable 128 MiB target was backed
+up, confirmed all-zero, and installed only after the no-write `zinstall` gate
+showed the explicit `zinstall ERASE` confirmation. The confirmed install
+read back every sector, and its pre-test target matched `build/disk.img`
+byte-for-byte at the hash above. `Tests/InstallerPersist.ZC` returned `0x2a`
+before and after a cold UTM stop/start with the target first in boot order.
+After reboot, the same guest loaded the full graphics fixtures in the QEMU
+harness order: `ODEsUpdateStubCheck`, text background/foreground, screen update,
+zoom, `GrScreenFinalUpdateChecks`, and ViewAngles checks all returned `0x2a`.
+`BootstrapGuiTerminalZoomPanChecks` and `BootstrapGuiTerminalSmoke` also
+returned `0x2a`. Final `zstatus` reported `ready=1 failed=0`,
+`compiler_recovery: errors=0 active=0`, `winmgr=1 gterm=1`, a running System
+task, two xHCI controllers with zero errors, and nonblack scanout. The Mac
+session is locked, so visual confirmation of the added OS-menu entries remains
+pending. Normal upstream menu/task startup, wallpaper, and broader CDC/3D
+graphics work also remain open; the ISO/installed-disk acceptance is complete
+for this artifact, while the larger UTM bring-up goal remains active.
+
+2026-10-22 wallpaper layer and final UTM installer retest: the source
+compositor now applies a restrained three-color pattern through packed text
+background attributes on uncovered desktop cells. Window-owned cells, glyphs,
+and foreground colors are preserved. `BootstrapWallpaperChecks` exercises the
+actual text-plane application and confirms a covered cell remains unchanged;
+`make check-grscreen-full` passes with `GrScreenFinalUpdateChecks` returning
+`0x2a`.
+
+The exact rebuilt ISO (`sha256=fb940e7030def43d02b67b15139f0d2c137a90c6a8bf2ac74018442c6beb8384`)
+passes `make check-iso-installer`; its 25 sparse extents round-trip, the
+unconfirmed install remains write-free, the confirmed install reads back every
+sector, and the disk-only QEMU reboot starts the desktop and reopens the saved
+test function as 42. The corresponding build disk hash is
+`37302a23fdddb8d71cb9958b232129f0ad86ae89be176c2c575752a0fe6835c0`.
+
+The same ISO was booted in the isolated UTM VM `ZealOS AArch64 Wallpaper
+Acceptance` from its USB CD drive. Serial boot output contains the compiler,
+VirtIO block, source Window Manager, and graphical terminal startup markers.
+`zinstall` displayed the explicit `ERASE` gate; `zinstall ERASE` completed its
+full target read-back. The installed 128 MiB VirtIO target was then copied into
+the separate `ZealOS AArch64 Installed Disk Acceptance` VM with no ISO drive
+attached. That disk-only VM cold-booted the desktop with
+`compiler_recovery: errors=0 active=0`, `winmgr=1 gterm=1`, and nonzero
+presented frames. `Tests/InstallerPersist.ZC` returned `0x2a` before and after
+a second cold UTM stop/start. Serial transcripts are
+`build/utm-wallpaper-serial-install-final.log`,
+`build/utm-wallpaper-disk-boot.log`, and
+`build/utm-wallpaper-disk-reboot.log`.
+
+The UTM graphics run was performed while the Mac session was locked, so the
+wallpaper's visible appearance still needs an eyes-on check. The wallpaper
+code path and installer acceptance are implemented and automated; the full
+upstream menu/task startup, broader CDC operations, and complete 3D graphics
+remain open bring-up work.
+
+The same `make check-grscreen-full` run exercises the bounded transformed-mesh
+projective path: homogeneous perspective division, clipping through the near
+plane and each viewport edge before integer projection, plus a five-vertex
+polygon clipped on multiple planes and fan-rasterized. Perspective behavior
+for other sprite opcodes and pixel-identical upstream mesh parity remain open.
+
+2026-10-22 projective-line graphics fix and current-artifact UTM retest: the
+default non-affine `SPT_LINE` path now clips both homogeneous endpoints against
+the near plane and four CDC viewport edges before integer projection. The
+regression includes an endpoint at -5,000,000 source pixels, verifies the
+clipped projected segment, and checks actual framebuffer pixels; affine and
+custom transform callbacks keep their previous behavior. `make
+check-grscreen-full` passes. In the live UTM guest,
+`GrSpriteSymmetryChecks` also returned `0x2a` on the same line-clipping path.
+
+The rebuilt ISO SHA-256 is
+`860b7f0ceb8651edfbac794013971ce8f704461e587019433132fb15968beae3`; the build
+disk hash is `596dabe04abc242fd63caa952bfcaaaadd29cb8dd6f90ee10f822c7c22588b35`.
+`make check-iso-installer` passed: the ISO booted, required the explicit erase
+confirmation, installed all 128 MiB, and read back every sector. In UTM, that
+same ISO was copied into the USB-CD installer VM, booted with a fresh zeroed
+VirtIO target, and installed. After UTM's full readback completed, the target
+file compared byte-for-byte with `build/disk.img` at the hash above. The exact
+target was copied into the separate disk-only VM. Its cold boot reported
+`compiler_recovery: errors=0 active=0`, `winmgr=1 gterm=1`, and nonblack scanout;
+`Tests/InstallerPersist.ZC` returned `0x2a` before and after another cold
+stop/start. Transcripts are `build/utm-projective-line-serial-status.log`,
+`build/utm-projective-line-disk-boot.log`,
+`build/utm-projective-line-disk-persist-before.log`,
+`build/utm-projective-line-disk-reboot.log`, and
+`build/utm-projective-line-graphics-check.log`.
+
+The Mac remained locked during this run, so the wallpaper's visual appearance
+still needs eyes-on UTM confirmation. The projective line slice and current ISO
+installer cycle are accepted; normal upstream menu/task startup, broader CDC
+operations, other projective sprite opcodes, and pixel-identical mesh parity
+remain open bring-up work.
+
+2026-10-22 projective polyline clipping and refreshed ISO/UTM install: the
+default non-affine `SPT_POLYLINE` path now clips each segment in homogeneous
+space against the near plane and four CDC edges before integer projection.
+`GrSpriteSymmetryChecks` sends a five-million-pixel off-screen endpoint into a
+visible horizontal segment followed by a visible vertical segment, then checks
+the actual scanout pixels and clipped-off area. `make check-grscreen-full`
+passes, and the same test returns `0x2a` in the refreshed UTM installed-disk
+guest.
+
+The rebuilt ISO has SHA-256
+`ee7620a224988b9d69d024648c0268050e1b6184ceae7c93c94a800fc07849f1`; the
+build disk hash is
+`2764110dbae5630c65c6bbe00048de67854c383f0787e9fede3b068484728aa1`.
+`make check-iso-installer` passed the 25-extent payload round-trip, write-free
+confirmation gate, complete sector readback, installed-disk cold boot, and
+saved-source return value `42` before and after reboot.
+
+The exact ISO was copied to the isolated UTM USB-CD installer VM with a fresh
+zeroed 128 MiB VirtIO target. UTM boot reported `ready=1 failed=0`, clean
+compiler recovery, `winmgr=1 gterm=1`, and nonblack scanout. `zinstall` showed
+the explicit `ERASE` gate; `zinstall ERASE` completed its full readback. The
+installer guest then created its normal `Home/Registry.ZC` record, so the
+stopped target includes that post-install startup write and is not a pristine
+byte-for-byte copy of `build/disk.img`. The target was copied into the separate
+disk-only UTM VM with no CD attached. After a cold boot and another cold
+stop/start, `Tests/InstallerPersist.ZC` returned `0x2a`; the live UTM
+`GrSpriteSymmetryChecks` also returned `0x2a` for projective polyline clipping.
+Serial transcripts are `build/utm-polyline-serial-install.log`,
+`build/utm-polyline-disk-boot.log`, and
+`build/utm-polyline-disk-reboot.log`.
+
+The Mac session remains locked, so the wallpaper and final desktop appearance
+still need eyes-on confirmation. Normal upstream menu/task startup, broader
+CDC operations, projective handling for splines and other sprite opcodes, and
+pixel-identical mesh parity remain open; the ISO installer, disk-only desktop
+boot, and saved-data path are accepted for this artifact.
+
+2026-10-22 projective rectangle clipping and refreshed ISO/UTM install: the
+default non-affine `SPT_RECT` path now clips both triangle faces and all four
+outline segments in homogeneous space against the near plane and CDC viewport
+before bounded projection. Its regression sends a rectangle five million
+source pixels beyond the left edge, then checks the clipped filled CDC pixel,
+visible scanout outline, and off-viewport area. `make check-grscreen-full`
+passes, and the refreshed disk-only UTM guest returns `0x2a` from
+`GrSpriteSymmetryChecks` after a second cold stop/start.
+
+The current ISO SHA-256 is
+`d75b43fed2c2d7a0286e0fa811ef7cf3d7460cdc73b3512f4ec6392215b18087`; the
+build disk hash is
+`bc35220aa62f1f374e784fc4587d73e76aba3c7dedbf88af8bbf45b7e3e7a726`.
+`make check-iso-installer` passed payload round-trip, the write-free
+confirmation gate, complete sector readback, disk-only desktop boot, and
+saved-source return value `42` before and after reboot. In UTM, this exact ISO
+booted with a fresh zeroed 128 MiB VirtIO target. `zinstall` required the
+explicit `ERASE` token and then read back the full target. The installer made
+its normal `Home/Registry.ZC` first-startup write, so the stopped target
+contains that record in addition to the ISO image. After copying it into the
+separate disk-only VM, two cold starts reported `ready=1 failed=0`,
+`compiler_recovery: errors=0 active=0`, `winmgr=1 gterm=1`, and nonblack
+scanout; `Tests/InstallerPersist.ZC` and `GrSpriteSymmetryChecks` each returned
+`0x2a` after the second restart. Transcripts are
+`build/utm-rect-serial-install.log`, `build/utm-rect-disk-boot.log`, and
+`build/utm-rect-disk-reboot.log`.
+
+The Mac is still locked, so visual confirmation of the wallpaper and final
+desktop appearance is pending. Projective rectangle and polygon clipping and
+this ISO installer cycle are accepted; upstream menu/task startup, broader CDC
+operations, projective spline and other sprite paths, and pixel-identical mesh
+parity remain open.
+
+2026-10-22 projective polygon clipping and refreshed ISO/UTM install: the
+default non-affine `SPT_POLYGON` path now clips each outline edge and fill
+triangle in homogeneous space before integer projection. Its regression sends
+a regular polygon through both the `w=0` near plane and the CDC viewport,
+checks the visible clipped edge at the center column, and verifies a
+known-empty pixel. `make check-grscreen-full` passes, and the same
+`GrSpriteSymmetryChecks` returns `0x2a` from a disk-only UTM guest after a
+cold restart.
+
+The refreshed ISO SHA-256 is
+`e3a8915af37e92664a7efd17667150ec9dc860804f6582e0df8e938c1826d417`; the
+build disk hash is
+`a8639a1a6ea5753ecd385dd3bf10031878e7233cca2bf35a6ebb83c0f7da3238`.
+`make check-iso-installer` passed the live ISO boot, guarded erase, complete
+readback, installed-disk boot, and a second cold reboot with
+`Tests/InstallerPersist.ZC` returning `0x2a`. In UTM, that exact ISO booted in
+the isolated installer VM, `zinstall ERASE` completed and read back the full
+128 MiB target, and the copied disk-only VM reported `ready=1 failed=0`,
+`winmgr=1 gterm=1`, and nonblack scanout on two cold starts. The saved-data
+check and projective `GrSpriteSymmetryChecks` both returned `0x2a` after the
+second start. Transcripts are `build/utm-polygon-serial-install.log`,
+`build/utm-polygon-disk-boot.log`, and
+`build/utm-polygon-disk-reboot.log`.
+
+2026-10-22 projective spline clipping and current-ISO UTM cycle: default
+projective quadratic/cubic B-splines now stay in source space while each
+sampled curve segment is clipped through the homogeneous near plane and CDC
+viewport before rasterization. `GrSpriteSymmetryChecks` verifies the projected
+curve in scanout both through direct `SpriteBSpline0` use and the public
+`Sprite3` record path. `make check-grscreen-full` passes. The refreshed ISO
+SHA-256 is `6e190f916007ffcd32d2aca643b6afb9dbccb737270fd820ecbe2c017716b550`;
+`make check-iso-installer` passes live boot, guarded erase, full-sector
+readback, disk-only reboot, and saved-data return value `42` before and after
+a cold restart.
+
+That exact ISO booted in the isolated UTM installer VM with a fresh zeroed
+128 MiB VirtIO target; `zinstall ERASE` completed its full readback. The
+installed target was copied to the separate disk-only UTM VM. Both cold boots
+reported `ready=1 failed=0`, `compiler_recovery: errors=0 active=0`,
+`winmgr=1 gterm=1`, and nonblack scanout. The saved-source function and
+`GrSpriteSymmetryChecks` both returned `0x2a` on the first boot and after a
+second cold stop/start. Transcripts are
+`build/utm-spline-serial-install.log`, `build/utm-spline-disk-boot.log`, and
+`build/utm-spline-disk-reboot.log`.
+
+The Mac remains locked during this automated run, so visual confirmation of
+the wallpaper and final desktop appearance is still pending. Projective
+splines are now accepted; projective clipping for other sprite paths, broader
+CDC operations, normal upstream menu/task startup, and pixel-identical mesh
+parity remain open.
+
+2026-10-22 projective ellipse/circle clipping and refreshed ISO/UTM install:
+default projective `SPT_ELLIPSE` and `SPT_CIRCLE` now sample source-space
+outlines and clip each chord through the homogeneous near plane and CDC
+viewport before rasterization. `GrSpriteSymmetryChecks` exercises an ellipse
+and a circle crossing the near plane and checks their visible scanout pixels.
+`make check-grscreen-full` passes.
+
+The rebuilt ISO SHA-256 is
+`974532ae9d4f80224cfdeb7a5faf35568edc6f75f2374a55fc7837dd2f977588`; the
+build-disk SHA-256 is
+`6007b1f5318ce9cb53ec90476ffbd538c3a294d5fcf6eec828612b7396ceba34`.
+`make check-iso-installer` passed the guarded erase, whole-disk readback,
+disk-only desktop boot, and persistent return value `42` before and after a
+cold reboot. The exact ISO was installed in the isolated UTM installer VM;
+`zinstall ERASE` completed full target readback. The copied disk-only VM
+reported `ready=1 failed=0`, clean compiler recovery, `winmgr=1 gterm=1`, and
+nonblack scanout on two cold starts. Both the saved-data function and
+`GrSpriteSymmetryChecks` returned `0x2a` after reboot. Transcripts are
+`build/utm-ellipse-serial-install.log`, `build/utm-ellipse-disk-boot.log`, and
+`build/utm-ellipse-disk-reboot.log`.
+
+The Mac is locked, so final desktop and wallpaper appearance still needs
+eyes-on confirmation. Projective line, polyline, rectangle, polygon, spline,
+ellipse, and circle paths now pass; other transformed sprite paths, broader
+CDC operations, normal upstream menu/task startup, and pixel-identical mesh
+parity remain open.
+
+2026-10-22 projective arrow clipping and refreshed ISO/UTM install: default
+projective `SPT_ARROW` now clips its shaft against the homogeneous near plane
+and viewport before drawing. It draws an arrowhead only when the true endpoint
+remains visible, instead of moving the head to a clipped viewport edge. The
+regression starts the shaft behind the near plane, checks the clipped endpoint,
+and counts the full visible raster in scanout. `make check-grscreen-full`
+passes with `GrSpriteSymmetryChecks=0x2a`.
+
+The refreshed ISO SHA-256 is
+`8a705d3df5dc9a39146e7ce3fc226b4ab6b89aa4d054ca78b63aec160dfce16a`; the
+build-disk SHA-256 is
+`d682f9148d4f87ac4e2875356fd855fa7978b49a2a5de32587dbbda666143693`.
+`make check-iso-installer` passed the confirmation gate, full target readback,
+disk-only desktop boot, and saved return value `42` before and after reboot.
+The exact ISO then booted in the isolated UTM installer VM, erased and verified
+the disposable 128 MiB target, and was copied byte-for-byte to the separate
+disk-only VM. Both cold starts reported a healthy desktop and nonblack scanout;
+the saved function and projective graphics suite returned `0x2a`, including
+after a second cold restart. Transcripts are
+`build/utm-arrow-serial-install.log`, `build/utm-arrow-disk-boot.log`, and
+`build/utm-arrow-disk-reboot.log`.
+
+The Mac is still locked, so wallpaper and final desktop appearance need
+eyes-on confirmation. Projective line, polyline, rectangle, polygon, spline,
+ellipse, circle, and arrow paths now pass; transformed rotated rectangles and
+other sprite opcodes, broader CDC operations, normal upstream menu/task
+startup, and pixel-identical mesh parity remain open.
+
+2026-10-22 rotated-rectangle clipping and current UTM disk-only acceptance:
+default projective `SPT_ROTATED_RECT` now transforms its four source corners,
+clips the resulting fill triangles and all four outline segments against the
+near plane and CDC viewport, and preflights bounded draw work. The regression
+uses a non-cardinal angle with one edge outside the left viewport; direct
+helper and `Sprite3` paths both draw visible body and scanout pixels. The full
+`make check-grscreen-full` suite passes.
+
+The current ISO SHA-256 is
+`211cb160efbcfb9841397f0cb212401e657a6e20a9061660819cdb9d4e5d3c88`; its
+build-disk SHA-256 is
+`d3b2f7775ceec9820c9a4bb20002eab0954d34f3b5d6fba9e81c2fe0e35b4f5c`.
+`make check-iso-installer` passed the explicit erase gate, full 128 MiB
+readback, byte-for-byte image check, disk-only boot, and saved return value 42
+before and after reboot. The exact ISO was also installed through the isolated
+UTM installer VM into its disposable 128 MiB VirtIO target. After copying that
+target to the separate disk-only UTM VM, two cold starts reported
+`ready=1 failed=0`, `compiler_recovery: errors=0 active=0`, `winmgr=1 gterm=1`,
+two clean xHCI controllers, and active nonblack framebuffer scanout. A
+`Tests/InstallerPersist.ZC` function saved on the installed volume returned
+`0x2a` before and after a cold UTM stop/start. The rotated-sprite
+`GrSpriteSymmetryChecks` returned `0x2a` both before and after that restart.
+
+Visual wallpaper acceptance is still pending: the UTM console capture in this
+session showed a blank gray canvas despite the guest's active-frame and
+nonblack-scanout diagnostics, so the actual wallpaper colors and desktop
+layout were not visually established. The OS menu's expanded zoom/pan entries
+have bootstrap/QEMU bounds checks; clicking those new entries live also
+remains open. Broader CDC operations, normal upstream menu/task startup, and
+pixel-identical transformed-mesh parity remain open.
+
+2026-10-22 current ISO installed through UTM: the installer VM was saved with
+the USB CD ahead of the target VirtIO disk, and its launch arguments confirmed
+the ISO as the boot device. The ISO SHA-256 is
+`d9e2c5d5aa64c54bdbe259f286c5c1560e141b7db0495a69a97f42ffc3da858b`; the
+128 MiB installed-disk SHA-256 is
+`676d51daebb9b5839188e30a24fe5c594a563a7a6b3c1c699c845cbd1ffdec86`.
+`zinstall ERASE` completed the UTM full-sector read-back. The disk was copied
+byte-for-byte to the disk-only acceptance VM, whose two cold starts reported
+`ready=1 failed=0`, `compiler_recovery: errors=0 active=0`, `winmgr=1 gterm=1`,
+and nonblack scanout. `Tests/InstallerPersist.ZC` returned `0x2a` before and
+after restart; the expanded projective `GrSpriteSymmetryChecks`, including
+bitmap and glyph samples, also returned `0x2a` after restart. The live UTM
+display capture remains gray while serial reports nonblack scanout, so visual
+wallpaper colors and desktop layout are not yet accepted.
+
+2026-10-22 centered splash sprite and refreshed UTM installer acceptance:
+`SpriteHLine0` now sends filled screen-bitmap scanlines through the task-aware
+plot path, applying the task's screen origin, scroll offset, clip rectangle,
+and Z order. This fixes the splash Z being drawn away from its centered logo
+area. `scripts/check-compat.py` checks that blue mesh pixels appear between
+the splash labels during animation. A refreshed UTM screenshot shows the
+rotating Z centered between “ZealOS ARM64” and “Modern Innovation,” with both
+desktop terminals visible.
+
+The refreshed ISO SHA-256 is
+`e0545f0a9d2fda8f872c90ab91c9bf46f465db2ecf0a7cc2e4294a752a9ca4e7`; the
+installed build-disk SHA-256 is
+`88a12f6d8dfb94d9457b874e3cb450947c0d19087f1546a94c8e71f70a24479e`.
+`make check-home-autostart`, `make check-grscreen-full`, and
+`make check-iso-installer` pass. The graphical startup test observed 2,006 blue
+mesh pixels in the center logo area in both the boot splash and splash-window
+animation, then confirmed the splash graphic cleared on dismissal. The exact
+ISO booted in the isolated UTM installer, required `zinstall ERASE`, and completed
+full 128 MiB read-back verification. Its byte-identical disk-only UTM copy
+cold-booted with the desktop; `Tests/InstallerPersist.ZC` and
+`GrSpriteSymmetryChecks` both returned `0x2a` after cold restart. The post-boot
+serial transcript is `build/utm-splash-disk-reboot.log`; installer read-back
+is recorded in `build/utm-splash-serial-install.log`.
+
+The centered splash and current ISO installer cycle are accepted. The broader
+bring-up remains active: normal upstream menu/task startup, remaining CDC and
+transformed-sprite paths, expanded OS-menu zoom/pan interaction, and
+pixel-identical transformed-mesh parity remain open.
+
+2026-10-22 live UTM splash review: with the installed-disk acceptance VM
+unlocked and visible, the UTM screenshot confirms the animated blue Z rotates
+in the center of the splash between its two labels, while both graphical
+terminals remain visible. The splash alignment is visually accepted. The live
+OS-menu zoom/pan check remains open: the UI bridge reached the running guest,
+but did not expose the dropdown for item selection. The QEMU menu-action and
+bounded-pan regression remains green.
+
+2026-10-22 current-artifact UTM disk-only cold boot: ISO SHA-256
+`f81ea919301d9e57e5171b354dc5078ef15b31e19660fae7cf5fce71c9070479`; installed
+128 MiB image SHA-256
+`c04c141bec750201f3265bd0abd9c05d81472aa8688b84f2dd78ea26af5d010c`. The
+exact ISO passed `make check-iso-installer`, including the explicit erase gate,
+full read-back, and byte-identical installed-image comparison. In UTM, the
+acceptance VM was restarted with only its VirtIO target attached at boot index
+0. The QEMU launch record contains the target disk and no optical drive. The
+cold boot reached the graphical desktop (`ready=1 failed=0`, 72 modules,
+`winmgr=1 gterm=1`), displayed both terminal windows and the centered animated
+splash Z, and loaded `disk:Tests/InstallerPersist.ZC`; `InstallerPersist`
+returned `0x2a`. Running `zinstall` on this disk-only boot reported that the
+installer image is unavailable, confirming it did not boot from the ISO. The
+serial transcript is `build/utm-current-disk-coldboot.log`. The live UTM menu
+zoom/pan click acceptance remains open; headless menu action and pan tests pass.
+
+2026-10-22 live UTM zoom/pan menu acceptance: the user selected Zoom In, Pan
+Right, and Reset View in the installed-disk guest and confirmed the actions
+visibly worked. This closes the remaining live interaction check for the
+expanded menu; zoom/pan regressions also pass in QEMU. Startup beyond the
+current staged desktop, broader CDC behavior, and pixel-identical transformed
+mesh parity remain open.
+
+2026-10-22 Paint Demo menu and rebuilt ISO acceptance: the OS menu now has a
+Paint Demo item, and the graphical shell exposes the existing bounded `paint`
+program. `BootstrapGuiTerminalSmoke` checks the label/action wiring and runs
+the program through the menu, confirming it returns a dot count.
+`make check-grscreen-full` passes.
+
+The rebuilt ISO SHA-256 is
+`77d3103707f3840db33827781ef57b125ed01756091c787323d63ee40ae4fc9a`; its
+128 MiB build-disk SHA-256 is
+`999349b3714f055c3d40eb40e1becd64cc583298d588e9f129e4bbba3b3f33c8`.
+`make check-iso-installer` passed the explicit erase gate, full readback,
+byte-identical installed image, disk-only boot, and saved return value `42`
+before and after reboot. This latest source revision still needs a live UTM
+installer/disk-only cycle; the previous artifact's live UTM cycle remains
+recorded above.
+
+2026-10-22 current graphics and installer regression: the non-cardinal
+`SPT_ROTATED_RECT` case now asserts actual scanout pixels and an untouched
+off-shape pixel, in addition to the cardinal CDC bounds. `make
+check-grscreen-full` passes, including rotated rectangles, transformed sprites,
+view-angle controls, and the QEMU zoom/pan menu path. The current ISO SHA-256 is
+`11bba223d4162ab6dd1788e66dd34dd0c7ecb9b02f35c27bf38fc07577fbf8c4`; its
+build-disk SHA-256 is
+`49a1fac2e761fabf5804a08d65eb2a37cb662283f37615cac6c1ff0920898ae5`.
+`make check-iso-installer` passed the explicit erase gate, full 128 MiB
+read-back, byte-identical installed image, disk-only boot, and saved-data
+checks returning `0x2a` before and after cold reboot. A live UTM check has
+confirmed Zoom In, Pan Right, and Reset View work visibly; the current ISO
+revision still needs its own live install and disk-only cold-boot cycle.
+`make check-home-autostart` also passes: disk startup tiles both terminals,
+runs `Home/Once.ZC`, presents and dismisses the centered animated splash, and
+restores graphical-terminal input.
+
+2026-10-22 projective rotated-ellipse regression: `GrSpriteSymmetryChecks`
+now covers a non-cardinal ellipse crossing the homogeneous near plane and
+asserts visible scanout plus an untouched off-shape pixel. Both `make
+check-grscreen` and `make check-grscreen-full` pass with this case, along with
+the view-angle controls, window-manager graphics checks, and full-text frame
+smoke. This
+test-only update did not rebuild the ISO, which remains SHA-256
+`11bba223d4162ab6dd1788e66dd34dd0c7ecb9b02f35c27bf38fc07577fbf8c4`. The
+current live UTM attempt booted the disk-only guest (`zinstall` reported that
+the installer image was unavailable); the ISO drive still needs to be
+attached and selected for boot before the exact-artifact install cycle can
+pass.
+
+2026-10-22 projective bitmap near-plane regression: `GrSpriteSymmetryChecks`
+now covers an indexed `SPT_BITMAP` whose source texels straddle `w=0`. It
+checks exact projected colors for positive-`w` texels and confirms that
+nonpositive-`w` samples stay clipped. `make check-grscreen-full` and
+`make check-home-autostart` pass; the latter confirms both startup splash
+labels, animated centered Z, dismissal, and restored terminal input. A
+separate candidate ISO was built without replacing the previously attached
+artifact: `build/zealos-aarch64-hello-projective-bitmap.iso`, SHA-256
+`2132026a4c4f045222dcdf9f2a3a23e33db8e84a6dce2478af7788b67c872d94`.
+`make ISO=build/zealos-aarch64-hello-projective-bitmap.iso
+check-iso-installer` passed guarded erase, complete readback, byte-identical
+install, disk-only boot, saved result `0x2a`, and the same result after cold
+reboot. The original
+`build/zealos-aarch64-hello.iso` remains unchanged at SHA-256
+`11bba223d4162ab6dd1788e66dd34dd0c7ecb9b02f35c27bf38fc07577fbf8c4`.
+The candidate still needs the live UTM cycle: boot the SCSI CD/DVD first,
+install to the disposable VirtIO target, then cold-boot that target alone.
+
+2026-10-22 projective point near-plane regression: `GrSpriteSymmetryChecks`
+now checks transformed `SPT_PT` and packed `SPT_POLYPT` records at negative,
+zero, and positive homogeneous `w`; invalid points remain clipped and the
+positive-w samples land on their expected pixels. The QEMU graphics suite
+passed with the new case. A fresh, separately named ISO,
+`build/zealos-aarch64-hello-projective-points.iso`
+(`sha256=4cc06c89809220abb6d67f6d6a8b945aaae9d5d26d46c8f471be3f04abc674fa`),
+also passed `make ISO=build/zealos-aarch64-hello-projective-points.iso
+check-iso-installer`: guarded erase, complete read-back, byte-identical
+installation, disk-only boot, and saved-data result `0x2a` before and after a
+cold reboot. The previous candidate files remain unchanged. This exact image
+still needs the live UTM install and disk-only cold-boot cycle.
+
+2026-10-22 live UTM installer retry: the guest reached the installed-disk
+shell and `zinstall ERASE` reported that the installer image was unavailable,
+so this was not a CD boot. The earlier UTM drive-list screenshot had VirtIO
+above SCSI; UTM uses list order as boot order. For the next attempt, put the
+SCSI CD/DVD first, confirm it points to the projective-points ISO above, and
+leave the disposable VirtIO target second.
+
+2026-10-22 graphics rerun and live boot diagnosis: the latest
+`make check-grscreen-full` completed with exit status 0. It includes the
+projective point, packed-point, text-box, text-diamond, bitmap, mesh, spline,
+ellipse, rotated-rectangle, and compositor checks. The projective-points ISO
+remains unchanged at SHA-256
+`4cc06c89809220abb6d67f6d6a8b945aaae9d5d26d46c8f471be3f04abc674fa`.
+The 11:05 UTM screenshot again shows the disk shell and the
+“installer image is unavailable” response, so the live ISO installation and
+subsequent disk-only acceptance have not happened yet.
+
+2026-10-22 upstream pixel-operation parity and fresh installer candidate:
+the bootstrap pixel path now applies the pinned `GrPlot0` rules for bounded
+offscreen CDCs and screen CDCs, including depth test/update, `DCF_DONT_DRAW`,
+nearest-point and extents tracking, deterministic and probability dithering,
+collision counting, and XOR. Filled `GrRect` routes each clipped pixel through
+that same path, preserving task-window pixel visibility and CDC operations.
+`GrPlotSemanticsChecks` passes every case, and `make check-grscreen-full`
+passes the source-backed graphics suite.
+
+The separately named ISO
+`build/zealos-aarch64-hello-grplot-ops.iso` has SHA-256
+`a9e35867928b69a3aa1a9ea5abde21fd59d1112f5758370d28c09fd52388366e` and its
+build disk has SHA-256
+`68d995d7e773fbd30b6befb3c5294d2acd01c5ea5fd7fec880383ae19636c513`.
+`make ISO=build/zealos-aarch64-hello-grplot-ops.iso check-iso-installer`
+passed ISO boot/startup, the no-write erase gate, full target read-back,
+byte-for-byte install comparison, installed-disk-only cold boot, and
+`InstallerPersist` returning `0x2a` before and after another cold reboot.
+This exact ISO still needs its live UTM CD-first install and installed-disk
+cold-boot cycle; the previous UTM screenshot showed the CD was not selected
+first.
+
+2026-10-22 verified GrPlot installer refresh: after the upstream `GrLine`
+experiment was removed because it changed the pinned text-diamond raster,
+`make check-grscreen-full` passed again with `GrPlotSemanticsChecks` returning
+`0x2a`, and the existing source sprite, menu, window-manager, and view-angle
+checks remained green. The fresh candidate
+`build/zealos-aarch64-hello-grplot-final.iso` has SHA-256
+`61a3a7117893290d7fdd7f8a0ab2838754884c0dedcaf06c6531d8d0a1679496`; its
+128 MiB build disk has SHA-256
+`3964e6db44c60202ab35aa0e73e064c415e4ba7ae8241442aa0c1fd2be0c5cf9`.
+`make ISO=build/zealos-aarch64-hello-grplot-final.iso
+check-iso-installer` passed the erase guard, full read-back, byte-identical
+installation, disk-only cold boot, and `InstallerPersist` returning `0x2a`
+before and after another reboot. The exact ISO still needs its live UTM
+CD-first install and installed-disk cold boot.
+
+2026-10-22 bitmap-blit ROP regressions and refreshed installer: `GrBlot3Checks`
+now covers the 2D `GrBlot` fallback's source-color XOR while preserving
+transparent source pixels, plus collision counting for eligible destination
+overlaps. `make check-grscreen-full` passed with `GrBlot3Checks` and the full
+sprite/text/compositor suite returning their expected success values. The new
+candidate `build/zealos-aarch64-hello-grplot-blot-rop.iso` has SHA-256
+`055eaa5ab08bd82b269ca936c544ed4a35647b5a811422a548644f8d59523b61`; its
+128 MiB build disk has SHA-256
+`3b1cc0efce44c30bcc7c51eead85ac9a662f7dfea23aec40a838846ade18dddd`.
+`make ISO=build/zealos-aarch64-hello-grplot-blot-rop.iso
+check-iso-installer` passed the erase confirmation gate, full read-back,
+byte-identical install, disk-only cold boot, and `InstallerPersist` returning
+`0x2a` before and after another reboot. This exact candidate still needs its
+live UTM CD-first install and installed-disk cold boot.
+
+2026-10-22 bounded offscreen `GrLine` and refreshed installer: offscreen CDC
+lines now rasterize with bounded clipping, step/start patterns, pen thickness,
+and pixel ROP handling. `GrLineCdcChecks` and the text-diamond outline reference
+pass as part of `make check-grscreen-full`; the symmetry test also restores its
+screen-bitmap flag after the preceding private-CDC mesh checks. The new
+candidate `build/zealos-aarch64-hello-grline-cdc.iso` has SHA-256
+`14b63f995f3d7399846394788a851b5b109cfae10c1c220a64f972f29838f4df`; its
+128 MiB build disk has SHA-256
+`85ebcb8c48b342feeb19049e1de5ba15100272ef0eb550c0a49f0bf868067342`.
+`make ISO=build/zealos-aarch64-hello-grline-cdc.iso check-iso-installer`
+passed the ISO live boot, erase confirmation, full read-back, byte-for-byte
+disk comparison, disk-only cold boot, and saved `InstallerPersist` returning
+`0x2a` before and after another reboot. This exact ISO still needs its live
+UTM CD-first install and installed-disk cold boot.
+
+2026-10-22 CDC brush-line rasterization and refreshed installer: the bounded
+offscreen `GrLine` bridge now sends brush strokes through upstream `GrPlot1`,
+preserving ZealOS's bit-mask brush format. `GrLineCdcChecks` covers a transparent
+mask brush on an aligned stamp and at the clipped negative edge; the full
+`make check-grscreen-full` gate passed. The new candidate
+`build/zealos-aarch64-hello-grline-brush.iso` has SHA-256
+`09a16f80072ea67c7edd704a97708476132d1015ece68ad70b1e7bc02a981a8a`; its
+128 MiB build disk has SHA-256
+`0ae23cfe9578870f16fa8f3b0a3db718908960577452fdafa312f1a4c684397a`.
+`make ISO=build/zealos-aarch64-hello-grline-brush.iso check-iso-installer`
+passed live ISO boot, the explicit erase gate, full read-back, byte-identical
+installation, disk-only cold boot, and `InstallerPersist` returning `0x2a`
+before and after a second cold reboot. This exact candidate still needs its
+live UTM CD-first install and installed-disk cold boot. Full brush-blit ROPs,
+broader CDC parity, full upstream menu/task startup, and pixel-identical
+transformed-mesh output remain open.
+
+2026-10-22 screen-backed CDC brush lines and refreshed installer: screen
+`GrLine` strokes with a ZealOS brush now stay in task-local coordinates and
+use upstream `GrPlot1` for brush stamps and window clipping. The focused
+`--pci --probe-grline-cdc` check passed, and `make check-grscreen-full` passed
+with the fixture-aware screen-CDC assertion. The new candidate
+`build/zealos-aarch64-hello-grline-screen-brush.iso` has SHA-256
+`15e0aca9474719c473da00f16c2c849e2fb69abd2aa4670ea2f76c6ffa75b639`; its
+128 MiB build disk has SHA-256
+`e7883e6b28f0da77bd95b97d787a6c1807a5f6b20cb2de0f20402faf0735f26e`.
+`make ISO=build/zealos-aarch64-hello-grline-screen-brush.iso
+check-iso-installer` passed live ISO boot, explicit erase confirmation,
+complete read-back, byte-identical install, disk-only cold boot, and the saved
+`InstallerPersist` value `0x2a` before and after a second cold reboot. This
+exact ISO still needs its live UTM CD-first install and installed-disk cold
+boot. Brush-blit ROP parity, broader CDC parity, full upstream menu/task
+startup, and pixel-identical transformed-mesh output remain open.
+
+2026-10-22 unaligned packed bitmap blits and refreshed installer: the guarded
+ARM64 `GrBitMap.ZC` overlay now sends unaligned `DCF_NO_TRANSPARENTS` blits
+through per-pixel ROP handling. This avoids the upstream shifted-word copy
+producing incorrect pixels while preserving MONO mask, EQU, XOR, collision,
+screen z-buffer visibility, and `DCF_DONT_DRAW` behavior; aligned blits keep
+the packed path. `GrBlot3Checks` covers unaligned MONO mask, EQU copy, XOR,
+collision/background exclusions, `DCF_DONT_DRAW`, and untouched boundary
+pixels; the `GrLineCdcChecks` screen/offscreen brush cases still pass.
+`python3 scripts/check-arm64-source.py`,
+`python3 scripts/check-compat.py --pci --probe-grblot3`,
+`python3 scripts/check-compat.py --pci --probe-grline-cdc`, and
+`make check-grscreen-full` all pass. The current candidate
+`build/zealos-aarch64-hello-grline-screen-brush-bitmap-safe.iso` has SHA-256
+`7e794907b5048de8771227557c1df86f13158ce97ab1a953c6179d0f078a2e3b`; its
+128 MiB build disk has SHA-256
+`d10b9f00d2365b0672eafe641f5ea0563be3dc88272ec573b5cb47eca76643e`.
+`make ISO=build/zealos-aarch64-hello-grline-screen-brush-bitmap-safe.iso
+check-iso-installer` passed live ISO startup, erase confirmation, full
+read-back, byte-identical install, disk-only cold boot, and `InstallerPersist`
+returning `0x2a` before and after a second reboot. Live UTM install and
+installed-disk cold boot of this exact ISO remain open. Broader brush-blit and
+CDC parity, normal upstream menu/task startup, and pixel-identical transformed
+mesh output remain open.
+
+2026-10-22 screen-bitmap collision visibility and refreshed installer:
+`GrBlot3Checks` now verifies that the screen-window z-buffer excludes the
+occluded half of a bitmap collision while retaining the eight visible
+overlapping pixels. The test uses a synthetic task and temporary z-buffer, so
+it is deterministic in headless PCI guests. The focused GrBlot probe and full
+`make check-grscreen-full` suite pass. The candidate
+`build/zealos-aarch64-hello-bitmap-collision.iso` has SHA-256
+`4c91f5d9de71de6829dd3fe91be7c0160c76ab1f250b7e3ca6d1ee282cf527eb`; its
+128 MiB build disk has SHA-256
+`496c80c403874ce87592d191710135eaf85eb1eb3fe5e725fcf056784283f9e5`.
+`make ISO=build/zealos-aarch64-hello-bitmap-collision.iso
+check-iso-installer` passed the ISO startup and desktop markers, guarded erase,
+full sector read-back, byte-for-byte install, disk-only cold boot, desktop
+status, and `InstallerPersist` returning `0x2a` before and after a second
+reboot. This exact candidate still needs the live UTM CD-first installation
+and installed-disk cold boot. Full upstream menu/task startup, broader brush
+and CDC combinations, and pixel-identical transformed-mesh output remain
+open.
+
+2026-10-22 screen-window bitmap ROP checks and refreshed installer: the
+`GrBlot3Checks` fixture now covers unaligned `DCF_NO_TRANSPARENTS` blits into a
+screen CDC across three z-buffer cells. It verifies that the hidden edge cells
+remain untouched and the visible middle cell gets the expected MONO, EQU, and
+XOR pixels; collision mode counts only the eight visible destinations. The
+focused QEMU probe passed three consecutive runs with `0x2a` and no arena
+growth, and `make check-grscreen-full` passed the full source, startup, task,
+sprite, compositor, and graphics regression gates.
+
+The new ISO `build/zealos-aarch64-hello-bitmap-window-rops.iso` has SHA-256
+`c90828dc332be943118dd5dce4d27e8f362f74dfc44dcc52cb02f17f4dd61683`; its
+build-disk SHA-256 is
+`b5a41daa55da628cd4c6091fb9a70a8bd2fff0cc9819f369d98b74a65ddac04a`. The
+QEMU installer acceptance passed ISO startup, the write-free confirmation
+gate, full sector read-back, byte-for-byte installation, disk-only cold boot,
+desktop status, and the saved `InstallerPersist` result `0x2a` both before and
+after a second reboot. This exact ISO still needs the live UTM CD-first install
+and installed-disk cold boot. Full upstream menu/task startup, broader
+brush-blit/CDC parity, and pixel-identical transformed-mesh output remain
+open.
+
+2026-10-22 aligned packed bitmap ROP checks and refreshed installer: the
+screen-window `GrBlot3Checks` fixture now exercises both the aligned packed
+copy path and the unaligned per-pixel path. For each, MONO, EQU, and XOR leave
+the occluded destination cell unchanged and update only the visible cell;
+collision counts exactly eight visible pixels. The aligned fixture includes
+nonzero task scroll offsets. The focused probe returned `0x2a` on three
+consecutive runs without arena growth, and `make check-grscreen-full` passed.
+
+The new ISO `build/zealos-aarch64-hello-bitmap-window-rops-scroll.iso` has
+SHA-256
+`76b67ed2070f696f4e05e64a4efaf901f9f969e7f6fd11be963cda6485035600`; its
+build-disk SHA-256 is
+`2d3437e4978583f3885247bd26c2f80cdb35d6bb6197b5b17aa0abdd646017ec`. The
+QEMU installer gate passed live ISO boot, guarded erase, full-sector read-back,
+byte-for-byte installation, disk-only desktop boot, and saved-data return
+value `0x2a` before and after a second reboot. This exact ISO still needs the
+live UTM CD-first install and installed-disk cold boot. Full upstream
+menu/task startup, broader brush-blit/CDC parity, and pixel-identical
+transformed-mesh output remain open.
+
+2026-10-22 packed bitmap vertical window-boundary check and refreshed ISO:
+`GrBlot3Checks` now sends a 16x9 no-transparency bitmap across a vertical
+8-pixel window-z-buffer boundary, with alternating visibility across all four
+cells. MONO, EQU, XOR, and collision each update/count only visible pixels;
+hidden cells remain unchanged. The focused probe returned `0x2a` three times
+without arena growth, and `make check-grscreen-full` passed the full startup,
+task, compositor, and graphics gate.
+
+The refreshed ISO `build/zealos-aarch64-hello-bitmap-window-rops-vertical.iso`
+has SHA-256
+`064f7bb8b7a2181b062e45f9c85dcd94eb53992ccd69593930208f7b5a19c419`; its
+128 MiB build disk has SHA-256
+`50e826076387d9807a64acd62e9fca7c3040b79172361f43a4927f04141caa04`.
+`make ISO=build/zealos-aarch64-hello-bitmap-window-rops-vertical.iso
+check-iso-installer` passed the ISO boot and desktop markers, guarded erase,
+full-sector read-back, byte-identical installation, disk-only cold boot, and
+saved `InstallerPersist` value `0x2a` before and after a second reboot. This
+exact candidate still needs the live UTM CD-first install and disk-only cold
+boot. Full upstream menu/task startup, broader brush-blit/CDC parity, and
+pixel-identical transformed-mesh output remain open.
+
+2026-10-22 transparent bitmap ROPs across the vertical window boundary: the
+`GrBlot3Checks` 16x9 screen fixture now also exercises ordinary transparent
+EQU and XOR copies and collision detection with an alternating transparent
+source mask. Transparent source pixels and occluded cells stay unchanged;
+collision counts exactly 36 visible, nontransparent intersections. The
+focused probe returned `0x2a` three times without arena growth, and the full
+`make check-grscreen-full` gate passed with the updated fixture.
+
+The refreshed current ISO
+`build/zealos-aarch64-hello-bitmap-window-rops-visible.iso` has SHA-256
+`386fd22c76eec201cd11bacd4b94c5ee1cb2ebe2126bb764c3fd75ddece5c5b3`; its
+128 MiB installed-disk SHA-256 is
+`6755be1b238b7c1b61ea99ec382e55536d4b4dd9aa1c50b007db29a7671edce8`.
+`make ISO=build/zealos-aarch64-hello-bitmap-window-rops-visible.iso
+check-iso-installer` passed ISO startup, guarded erase, full read-back,
+byte-identical installation, disk-only desktop boot, and `InstallerPersist`
+returning `0x2a` before and after a second cold reboot. This exact candidate
+still needs the live UTM CD-first install and disk-only cold boot. Full
+upstream menu/task startup, broader brush-blit/CDC parity, and
+pixel-identical transformed-mesh output remain open.
+
+2026-10-22 CDC mask-brush ROP restoration and collision: `GrLineCdcChecks`
+now verifies that `GrPlot1` renders a no-transparency brush as a MONO mask
+even when the caller's ROP is XOR, then restores the original color and ROP.
+A transparent brush in collision mode counts only its opaque pixels that
+overlap non-background, nontransparent destination pixels. The focused
+`--probe-grline-cdc` guest check and full `make check-grscreen-full` gate pass.
+
+The current ISO `build/zealos-aarch64-hello-bitmap-window-rops-brush.iso` has
+SHA-256
+`876c7dee6f489140209eeebf652080c3e9cea37a0bcdf7bc1e0021d7efb6bea2`; its
+128 MiB installed-disk SHA-256 is
+`c90e3e9db449243cf4938d945ca654fd362e80cebc0534a0395468292299b12b`.
+`make ISO=build/zealos-aarch64-hello-bitmap-window-rops-brush.iso
+check-iso-installer` passed live ISO boot, the erase gate, complete read-back,
+byte-identical installation, disk-only desktop boot, and saved-data result
+`0x2a` before and after a second cold reboot. This exact ISO still needs the
+live UTM CD-first install and disk-only cold boot. Full upstream menu/task
+startup, broader CDC operations, and pixel-identical transformed-mesh output
+remain open.
+
+2026-10-22 screen-backed mesh depth isolation: screen sprite mesh draws now
+use an 800x600 screen-coordinate depth plane separate from CDC-owned depth
+buffers. Each source task callback resets only its visible screen rectangle;
+sprite coordinates include task origin and scroll, while the window z-buffer
+continues to decide cross-task visibility and `DCF_ON_TOP` bypasses scene
+depth. `SpriteScreenDepthChecks` returns `0x2a` for separate task regions,
+redraw reset, and overlay bypass; `make check-grscreen-full` passes.
+
+The new ISO candidate `build/zealos-aarch64-hello-screen-depth.iso` has SHA-256
+`a2acb07c4510c9358e2bb51cf3a42b9eaa83e3c5a2eb93587659be97b5f15789`; its
+build disk SHA-256 is
+`1f3df13b36fe5dce87f88803151b8f991a500a9ac3f3d56be829bbba1ff2a866`.
+`make ISO=build/zealos-aarch64-hello-screen-depth.iso check-iso-installer`
+passed ISO startup, the no-write `zinstall` gate, confirmed full-sector
+installation and byte-for-byte comparison, disk-only desktop boot, and
+`InstallerPersist` returning `0x2a` before and after a cold reboot. This exact
+ISO still needs the live UTM CD-first installer cycle and installed-disk-only
+cold boot. For that check, attach this ISO as SCSI CD/DVD above the disposable
+VirtIO disk in boot order, install with `zinstall ERASE`, then detach the ISO
+and cold-boot the VirtIO disk by itself. Exact upstream mesh raster parity and
+damage-region redraw remain open.
+
+2026-10-22 screen-depth fixture isolation correction: `SpriteScreenDepthChecks`
+now creates and tears down a real temporary guest task, saves and restores both
+task geometries, scroll offsets, window-Z values, depth regions, visibility
+entries, and CDC state. This avoids relying on task globals that can be reset
+when modules are loaded from the shell. The focused probe and
+`make check-grscreen-full` both return `0x2a`/pass with the corrected fixture.
+
+The refreshed candidate `build/zealos-aarch64-hello-screen-depth-validated.iso`
+has SHA-256
+`f3c082919bee000e4e0bf83fe2dd578df1ae4d5c3eebd8cae707eb5315b14339`; its
+128 MiB build disk has SHA-256
+`e64a67f36ea62959e0a73ce3447b03f80ddffd3c67533f4edcc052a585fad3ef`.
+`make ISO=build/zealos-aarch64-hello-screen-depth-validated.iso
+check-iso-installer` passed ISO startup, the no-write `zinstall` gate,
+confirmed full-sector installation and byte-for-byte comparison, disk-only
+desktop cold boot, and `InstallerPersist` returning `0x2a` before and after a
+second reboot. This exact ISO still needs the live UTM CD-first install and
+installed-disk-only cold boot. Broader upstream startup, CDC coverage, and
+pixel-identical transformed-mesh output remain open.
+
+2026-10-22 animated splash regression and correction: the preceding
+`screen-depth-validated.iso` passed the installer gate but failed the home
+startup visual regression: the title and motto appeared without the rotating
+mesh. `SpriteHLine0` now retains a CDC-owned task depth buffer when present,
+uses the shared screen depth plane only when the CDC has none, and stores
+visible mesh pixels in the staged framebuffer surface. `make
+check-home-autostart` now verifies 698 changed pixels between frames, 2,082
+centered blue mesh pixels, and that dismissal clears the splash. The full
+`make check-grscreen-full` suite also passes, including
+`SpriteScreenDepthChecks` returning `0x2a`.
+
+The replacement ISO `build/zealos-aarch64-hello-screen-depth-splash.iso` has
+SHA-256
+`e495e6e52095777d1742e63219b0f90a104096a6cb7914016a08cf5f0b2e9d19`; its
+128 MiB build disk has SHA-256
+`ac0a1efdcd867e4eb96f2133c2d0db92beaed400e5c61653ab75198f5e54896f`.
+`make ISO=build/zealos-aarch64-hello-screen-depth-splash.iso
+check-iso-installer` passed ISO startup, the no-write confirmation gate,
+full-sector install read-back, byte-identical comparison, disk-only desktop
+cold boot, and `InstallerPersist` returning `0x2a` before and after another
+reboot. This exact replacement still needs live UTM CD-first installation and
+disk-only boot; the prior `screen-depth-validated.iso` is superseded.
+
+2026-10-22 projective rectangle triangle fill and current installer candidate:
+the clipped fill now uses the pinned upstream `GrFillTri0` scan converter
+(`eee210f4379ba3d00b47507f336a158eefb2c993`) with ARM64 CDC line adapters.
+`DCF_ON_TOP` triangle fills skip task-window bounds because their line writer
+uses CDC-local coordinates. `GrSpriteSymmetryChecks` exercises the triangle
+writer and the perspective rectangle directly and through `Sprite3`. Both
+`make check-grscreen-full` and `make check-home-autostart` pass; the splash
+regression observes 542 changing pixels, 2,199 centered blue mesh pixels, and
+clearing on dismissal.
+
+The refreshed ISO `build/zealos-aarch64-hello-triangle-ontop-clip.iso` has
+SHA-256
+`e1688919f825ea8d6f1a5905db67a9c0cb3ed7d723c521bbc3e024cdee99c5b8`; its
+128 MiB build disk has SHA-256
+`eabe65ea6bfd404241932090982508b791aba68393e16c1cfba96cf8721a8bdf`.
+`python3 scripts/check-iso-installer.py
+build/zealos-aarch64-hello-triangle-ontop-clip.iso` passed with exit code 0:
+ISO startup, the no-write erase-confirmation gate, full-sector install
+read-back, byte-for-byte disk comparison, disk-only desktop cold boot, and
+`InstallerPersist` returning `0x2a` before and after a second cold boot.
+This exact ISO still needs live UTM installation from its SCSI CD/DVD with the
+disposable VirtIO target second, followed by a disk-only cold boot. Full
+upstream menu/task startup, broader CDC parity, exact whole-mesh raster parity,
+and optimized damage-region redraw remain open.
+
+2026-10-22 pinned standard font and refreshed ISO candidate: the graphics
+bridge now loads all 256 glyphs from the hash-pinned upstream
+`Kernel/FontStd.ZC` instead of a compact fallback. The generator verifies the
+source hash (`4f592db78b85ba1dcb45171415493922d9fe26017637b284fa9d53cba935ecff`)
+and emits the exact row-major 8x8 table. The foreground ROP and text-frame
+fixtures check upstream glyph bytes and LSB-left pixel order. The viewport
+frame regression suspends live tablet polling only while it checks non-origin
+zoom/pan, then restores the input state. `make check-grscreen-full` and
+`make check-home-autostart` pass; the latter sees 724/720 changed pixels across
+splash animation, 2,067/1,991 centered blue mesh pixels, and cleared pixels
+after dismissal.
+
+The refreshed ISO `build/zealos-aarch64-hello-font-std.iso` has SHA-256
+`1f53f3317ccd607492be6d0bedea97451ffc44621917d88bc295ac8d3686ce36`; its
+128 MiB install image SHA-256 is
+`73f215db77fb4ef8ae3571784e11c88cad8d4c1d18892835a28deefcd2fc73c0`.
+`make ISO=build/zealos-aarch64-hello-font-std.iso check-iso-installer` passed
+ISO startup and desktop markers, the explicit no-write erase gate, complete
+read-back, byte-identical disk comparison, disk-only desktop cold boot, and
+`InstallerPersist` returning `0x2a` before and after another reboot. The
+previous `triangle-ontop-clip.iso` is superseded for current-artifact checks.
+This exact new ISO still needs the live UTM CD-first installer cycle and
+installed-disk-only cold boot in the isolated disposable acceptance VM. Use
+the SCSI CD/DVD before its VirtIO target, run `zinstall ERASE`, then detach the
+ISO and boot the VirtIO disk alone. Full upstream menu/task startup, broader
+CDC parity, exact whole-mesh raster parity, and optimized damage-region redraw
+remain open.
+
+
+2026-10-22 exact-font ISO rebuild and UTM CD refresh: `make ISO=build/zealos-aarch64-hello-font-std.iso check-iso-installer` regenerated the same source candidate with ISO SHA-256 `6b051913f3f940feee39c017d908c8899714e16e70ad5891de772b4c1ca822c1` and build-disk SHA-256 `e84b771ac24f7084a31421734739423d750785dfb346943adb286f13d5b89c8f`. The QEMU gate passed live ISO startup, the no-write erase guard, full install/read-back, byte-identical target comparison, disk-only desktop boot, and `InstallerPersist` returning `0x2a` before and after reboot. The earlier live UTM launch still had the superseded `projective-bitmap.iso`; the acceptance VM is now configured with a copy of this exact rebuilt ISO as SCSI CD boot index 0 and the disposable VirtIO target at index 1. The running UTM QEMU command line confirms both device order and the new ISO filename. Live display/installer interaction and the disk-only UTM cold boot remain pending.
+
+
+2026-10-22 current-font ISO live UTM install and disk-only persistence acceptance: the rebuilt ISO SHA-256 `6b051913f3f940feee39c017d908c8899714e16e70ad5891de772b4c1ca822c1` booted in the isolated installer VM from a USB CD. A harmless SCSI-CD-only probe did not reach the shell; the repository’s prior accepted UTM runs use USB CD, and switching to that interface reached the ISO shell. With the disposable 128 MiB VirtIO target attached second, `zinstall` showed the erase confirmation, and `zinstall ERASE` erased, installed, checked every sector through 100%, and reported full read-back verified. After stopping the VM, the installed target SHA-256 was `e84b771ac24f7084a31421734739423d750785dfb346943adb286f13d5b89c8f`, byte-identical to `build/disk.img`.
+
+The same target then cold-booted in UTM with the CD detached and VirtIO as the only drive. Serial `zstatus` reported `ready=1 failed=0`, `winmgr=1 gterm=1`, `presented_frames=664`, and `scanout: nonblack_pixels=50980 of 480000`. `Tests/InstallerPersist.ZC` was saved with `zput`, loaded from `disk:`, and returned `0x2a`; after a second cold stop/start with the disk alone, `zstatus` again showed the desktop and `InstallerPersist` again returned `0x2a`. Transcripts are `build/utm-font-std-utm-install.log`, `build/utm-font-std-disk-only-boot.log`, `build/utm-font-std-persist.log`, and `build/utm-font-std-disk-reboot.log`. The current UTM window remains locked, so a screenshot of this exact rebuilt image is not recorded. Full upstream menu/task startup, broader CDC parity, exact whole-mesh raster parity, and optimized damage-region redraw remain open.
+
+Follow-up visual inspection after raising the UTM window showed a uniformly gray guest canvas rather than the desktop. Treat the serial desktop/persistence acceptance above as valid, but keep exact-image visual acceptance open until the guest display shows the splash and desktop.
+
+2026-10-22 startup/splash regression rerun: `make check-home-autostart` rebuilt the disposable test disk and reached `HomeAutoStartChecks = 0x2a`; `PopupWindowOpen`, `PopupWindowClose`, `SplashWindowOpen`, and `SplashWindowWaitForExit` also each returned `0x2a`. The final guest status remained `ready=1 failed=0`, `winmgr=1 gterm=1`, with nonblack scanout. Transcript: `build/check-home-autostart-pci.log`. This verifies the automated startup/splash path; it does not resolve the gray live UTM canvas or the remaining full-menu/graphics parity gaps.
+
+2026-10-22 full graphics regression rerun: `make check-grscreen-full` exited successfully. The PCI/QEMU guest returned `0x2a` from the plot semantics, line CDC, sprite bitmap/text/spline/flood-fill/symmetry/transform, screen-depth, DC lifecycle/copy/diff/ROP, source compositor, zoom, and view-angle checks; the final screen-frame tests passed as well. This does not close the documented broader CDC/brush ROP or exact whole-mesh parity gaps.
+
+2026-10-22 bitmap ROP coverage follow-up: `GrBlot3Checks` now exercises the
+upstream transparent-image MONO mask rule (zero clears, nonzero paints) at a
+clipped destination edge and across screen cells with alternating visible and
+occluded regions. The focused PCI probe returned `0x2a` three times without
+arena growth, and the subsequent `make check-grscreen-full` passed, including
+the full startup/window/graphics checks. Broader CDC and brush ROP parity,
+whole-mesh pixel parity, and optimized damage redraw remain open.
+
+2026-10-22 installed-disk UTM visual follow-up: the user started
+`ZealOS AArch64 ISO Installer Acceptance` and supplied a live screenshot of
+the guest. It shows both terminal windows and the blue animated Z centered
+between the splash labels. This supersedes the earlier gray-canvas observation
+and closes the live visual check for the previously UTM-installed
+runtime-identical `font-std.iso`; no `zinstall` command was needed on this
+disk-only boot.
+
+2026-10-22 current ISO installer rerun: `make
+ISO=build/zealos-aarch64-hello-font-std.iso check-iso-installer` passed against
+the current source tree. The rebuilt ISO SHA-256 is
+`4f532e3f6271ca06f6788ab7fd80ceb25e4b7de2781ef6e4e8b9213fa1467d73`; the
+128 MiB build disk SHA-256 is
+`713eb20b0340e21b036e08a1c250f53e8f26ca92b2d642377c55619f56b99e67`. QEMU
+passed ISO startup, the no-write erase guard, full install and read-back,
+byte-identical comparison, disk-only boot, and `InstallerPersist` returning
+`0x2a` before and after reboot. This rebuild followed the test/documentation
+update and has not been separately installed in UTM; the live UTM screenshot
+and installation record above apply to the prior runtime-identical image.
+
+2026-10-22 persistent Paint Demo and installer rerun: the live UTM Paint Demo
+test exposed that the previous action returned only a `paint dots=` counter
+without leaving an interactive drawing surface. Paint Demo now stays active
+after OS-menu selection (or the `paint` command), samples held left-button
+motion each frame, interpolates pointer gaps, and clears its bounded retained
+stroke on Escape. `BootstrapGuiTerminalPaintChecks` verifies pointer sampling,
+line interpolation, the yellow raster pixel in the screen CDC, release, and
+cleanup; `BootstrapGuiTerminalSmoke` returns `0x2a`. `make
+check-grscreen-full` passes with this change.
+
+`make check-iso-installer` then passed with the updated source: ISO startup,
+explicit erase confirmation, full readback, byte-identical disk comparison,
+disk-only boot, and `InstallerPersist = 0x2a` before and after a second reboot.
+The current `build/zealos-aarch64-hello.iso` SHA-256 is
+`f4192b2766c059b024a66e181a9878ab0988f9b53ca739f647bcbae6f8b8fff2`; its
+`build/install.img` payload SHA-256 is
+`9506c65c5c91c48ad686f6497ada6021375abeb2e554b1d606a2b14f443443aa`.
+This exact ISO still needs a live UTM install/cold-boot and interactive Paint
+Demo confirmation. Full upstream menu/task startup, broader CDC/brush ROP
+parity, pixel-identical whole-mesh output, and optimized damage redraw remain
+open.
+
+The same source revision also passed `make check-home-autostart`: the disk boot
+tiles both terminals, executes `Home/Once.ZC`, opens and dismisses the source
+PopUp and animated ZSplash windows, then restores graphical shell input and a
+visible caret. The splash scanout check found 2,199 centered blue logo pixels
+and verified that dismissal clears them. This confirms the staged startup
+sequence; the complete upstream menu/task startup remains separate work.
+
+2026-10-22 live UTM installer and Paint checkpoint: the user configured the
+current ARM64 ISO as a USB CD ahead of the disposable VirtIO target, booted
+ZealOS, and ran `zinstall ERASE` against an exact 128 MiB target. The guest
+reported erase progress, checked every sector, and completed full read-back
+verification. The subsequent UTM screenshot shows the desktop and yellow
+Paint Demo strokes drawn inside the graphical terminal; Paint is an inline
+terminal demo, not a separate window. The screenshot does not show the VM's
+drive list, so the installed-disk-only cold boot and live `InstallerPersist`
+save/readback across another reboot still need confirmation. The independent
+QEMU installer gate already verifies those steps for this runtime.
+
+The focused `GrLineCdcChecks` now also covers a thick dashed opaque-mask brush
+stroke and confirms the MONO/ROP restoration and transparent-brush collision
+behavior. The isolated probe returned `0x2a`, followed by a passing
+`make check-grscreen-full` run. This closes the tested line/brush cases while
+broader CDC/brush ROP combinations, whole-mesh pixel parity, full upstream
+menu/task startup, and optimized damage redraw remain open.
+
+2026-10-22 live UTM Paint follow-up: the user confirmed Paint Demo is not a
+separate window and reported that it appears to work. The screenshot shows the
+OS menu popup and yellow strokes drawn directly over the left graphical
+terminal; this is the intended inline drawing surface. It confirms live guest
+rasterization, but does not show the drive list or establish Escape cleanup,
+ISO detachment, disk-only cold boot, or saved-file persistence. Those remain
+separate live acceptance points; QEMU's installer/persistence gate passes.
+
+2026-10-22 transparent brush regression: `GrLineCdcChecks` now additionally
+verifies ordinary MONO brushes preserve destination pixels under zero-valued
+source cells, paint nonzero brush cells with the caller's color even when the
+caller selected XOR, and restore the caller's ROP afterward. The focused QEMU
+probe returned `0x2a`; `make check-grscreen-full` then passed, including this
+case and the graphics/startup suite. Broader CDC/brush ROP combinations,
+whole-mesh pixel parity, full upstream menu/task startup, and optimized damage
+redraw remain open.
+
+2026-10-22 line rasterization follow-up: `GrLineCdcChecks` now also verifies
+the exact seven-pixel shallow Bresenham path, per-pixel alternating-color
+dither, and a depth-blocked pixel that must retain both its prior color and
+depth. `make check-grscreen-full` passed after rebuilding the 245-file source
+bundle; `GrLineCdcChecks`, the full sprite/CDC suite, startup checks, and final
+screen-frame checks returned `0x2a` or passed as applicable.
+
+2026-10-22 live installed-disk data check: the user corrected the `zput`
+destination syntax, saved `Tests/InstallerPersist.ZC`, loaded it back from
+`disk:`, and called `InstallerPersist` successfully; the shell reported
+`ans=0x2A=42`. The `zcall` shell command takes a bare function name, without
+parentheses or a semicolon. This verifies file write/read and execution on the
+current installed volume. The post-reboot disk-only result remains to be
+confirmed live.
+
+2026-10-22 latest ISO gate after line-raster test additions:
+`make check-iso-installer` passed from a fresh source bundle. The ISO booted
+and reached the desktop, refused installation without the explicit ERASE
+confirmation, fully erased/wrote/read back the disposable target, and matched
+the payload byte-for-byte (`sha256=1ef64879a7e04f8c2d4b422aa4d7a0b75e7e55dd7ca83b44268fb883d082e4c5`).
+The installed disk booted by itself in QEMU and `InstallerPersist()` returned
+`0x2a` before and after another reboot. Latest ISO SHA-256:
+`e7fd59bfae46f56e60fbfbb77f86d605144f15f146d610bb675dea4875a48286`.
+This ISO differs from the live UTM-installed runtime only by the added
+source-level `GrLineCdcChecks` regression cases; live UTM confirmation of the
+disk-only reboot on the user's installed target remains pending.
+
+2026-10-22 grouped boot-menu and installer refresh: the boot graphical
+terminal now presents its implemented commands under `File`, `Windows`,
+`Apps`, `View`, and `OS`, preserving the existing action handlers. Each menu
+is parsed from a short `MenuNew` string because the guest compiler enforces
+`STR_LEN`; the roots are then linked into one menu bar. `BootstrapGuiTerminalSmoke`
+passed the nested-root and action-binding assertions in the full graphics
+QEMU run. `make check-home-autostart` also passed: both terminals tiled, the
+animated splash moved and cleared, and terminal keyboard input recovered.
+`make check-iso-installer` passed with the rebuilt image: it reached
+the desktop, refused an unconfirmed erase, fully wrote and read back the
+disposable target, verified the installed bytes against the source disk
+(`dafd8c46ea6b2812dfb456bbf6ae95d577a928794b148cc01effc956388686c4`),
+booted the target without the ISO, and returned `0x2a` from `InstallerPersist`
+before and after a cold reboot. ISO SHA-256:
+`24f71af50d0e0f885ac7656771985fd2cf8d316b6e0a35744772c0cc4b8ff635`.
+
+The user then cold-booted the installed UTM disk with the CD detached, loaded
+`disk:Tests/InstallerPersist.ZC`, and ran `zcall InstallerPersist`; the guest
+returned `0x2a`. The parenthesized command was rejected because `zcall` is a
+shell command that takes a bare name. This closes live installed-disk saved
+data persistence for that installed image. The refreshed grouped-menu ISO has
+passed QEMU startup and installer checks but has not yet been installed or
+visually inspected in UTM. Full upstream menu/task startup, broader CDC parity,
+exact whole-mesh raster parity, and optimized damage-region redraw remain
+open.
+
+2026-10-22 final grouped-menu ISO gate: after the latest menu and GUI workflow
+changes, `make check-home-autostart`, `make check-grscreen-full`, and
+`make check-iso-installer` all passed. The home-startup probe tiled both
+terminals, animated and cleared the centered Z splash, dismissed the source
+popup, and restored shell input. The full graphics workflow passed its grouped
+File/Windows/Apps/View/OS menu routes, graphical editor/save/reboot/reopen
+flow, live Lattice and Stock demos, sprite/screen-depth cases, and final-frame
+checks. The installer gate booted the ISO, rejected an unconfirmed erase,
+installed and read-back-verified the disposable target, and matched its bytes
+to the source disk (`sha256=d8780ca1e1c57d7e6e583e59123d35c171844b2b1875d23030f64ded898ba41d`).
+The installed disk then booted alone and returned `0x2a` from
+`InstallerPersist` both before and after a second reboot. Current artifact
+hashes: ISO `ea471a30ab6ee3f7004f8323285ecdf6445a25b19832c94a4596493c7870ef1f`,
+installer payload `74876fb25b79046b98394edc562bebf0bbe654d9008bc8e1b0580883ecac8817`.
+At this QEMU-gate checkpoint, the exact refreshed ISO still awaited its live
+UTM installation and visual menu check; the subsequent live install milestone
+is recorded below.
+
+2026-10-22 live UTM install of the grouped-menu candidate: the user reports
+booting from its freshly installed target. The live guest shows the File,
+Windows, Apps, View, and OS menu groups. The user saved
+`Tests/InstallerPersist.ZC`, loaded it with
+`zload disk:Tests/InstallerPersist.ZC`, and ran `zcall InstallerPersist`; the
+guest returned `0x2a`. An initial load omitted the `Tests/` directory and
+reported source-not-found; the corrected path succeeded. The user then
+cold-booted with the CD detached and repeated the disk-only `zload`/`zcall`;
+it returned `0x2a` again. The supplied screenshot shows the grouped menus and
+successful result after that cold boot. Live installed-disk persistence is
+accepted for ISO
+`ea471a30ab6ee3f7004f8323285ecdf6445a25b19832c94a4596493c7870ef1f`.
+
+2026-10-22 final current-artifact installer rerun: after the startup test
+regenerated the ISO, `make check-iso-installer` passed again against
+`build/zealos-aarch64-hello.iso`. It rejected an unconfirmed erase, installed
+and fully read-back-verified the disposable 128 MiB VirtIO disk, and confirmed
+the installed image matched byte-for-byte
+(`sha256=53beb35a854bb0ba01660ba0cf8f73aead36eb650bc77d87eec051f4831907d2`).
+The disk-only guest reached the desktop, returned `0x2a` from
+`InstallerPersist` before reboot, then loaded and returned `0x2a` again after
+reboot. Current ISO SHA-256:
+`03be7af84d2029cb2252b631a47c4fa383b8c5d18a71692e20cf8befc8c66fa7`.
+The live UTM install above used the same tested source state with different
+generated GPT identifiers; its installed disk independently passed the
+user-observed second cold-boot check. Remaining broader port work—full
+upstream startup/menu/task initialization, complete CDC/brush behavior,
+pixel-identical whole-mesh rasterization, and damage-region redraw—is still
+tracked in `COMPATIBILITY.md` and `upstream/GRAPHICS-PORT.md`.
+
+2026-10-22 Paint Demo stop/clear regression and final ISO rebuild:
+`BootstrapGuiTerminalPaintChecks` now activates the demo, samples a held-button
+stroke, verifies the yellow CDC pixel, invokes the same stop action used by
+Escape, and asserts the active flag, retained point count, and previous-point
+state are cleared. `make check-grscreen-full` passed with the new assertion and
+all source-backed graphics/window-manager checks. The rebuilt current ISO
+`build/zealos-aarch64-hello.iso`
+(`sha256=aa2dbf05fd2c63dd10ed67dce801bbec0a3ebeb553af74da66e0a5b52e238b6d`)
+passed `make check-iso-installer`: guarded erase, complete read-back,
+byte-identical disk
+(`sha256=f88010e61145442a98ad0439f6917f849686ba41feba4226d087c14473cb424c`),
+disk-only boot, and `InstallerPersist` returning `0x2a` before and after a
+cold reboot. The immediately preceding same-source ISO remains the one
+installed and visually checked by the user in UTM; this rebuild adds the
+automated Escape-state assertion to its bundled source checks.
+
+2026-10-22 formatter/startup extension and latest installer rebuild:
+`MStrPrint` and the graphical formatter now support significant-digit `%g` and
+`%G`, fixed/scientific notation, numeric field width, zero padding, and dynamic
+`%0*tX`. `make check-user-startup` passed the formatting assertions, the
+original startup and terminal workflows, independent input/history in two
+graphical terminals, and the exact repeated-terminal cleanup check.
+The same updated runtime passed `make check-grscreen-full`, including the
+source window-manager frame path, standard-font glyphs, zoom/view controls,
+CDC/sprite operations, and full-frame text scanout.
+`make check-iso-installer` passed for the rebuilt
+`build/zealos-aarch64-hello.iso`: it rejected unconfirmed erase, installed the
+disposable 128 MiB VirtIO disk, and read every sector back. The installed disk
+matched the build disk (`sha256=840f6f1a1dce85a9a72a386321f79d6d7675d9c6979a5d72ac44c41909958bcf`);
+its disk-only boot reached the desktop and `InstallerPersist` returned `0x2a`
+before and after a cold reboot. Current hashes: ISO
+`058eada37cbf24427f8528cf31d72a240d34827bf7c5939c3ab2d7cf90cdca88`, installer
+payload `c5675e34efbf6d0bbe834cf73af4a1f276482b95284f7373bd416030a8223784`.
+The exact current ISO has not yet been installed in UTM; the user-observed
+File/Windows/Apps/View/OS menus and second-reboot persistence remain accepted
+for the earlier `ea471a30…` candidate. Full upstream startup/menu/task
+initialization, the rest of formatter/font parity, broader CDC/brush behavior,
+pixel-identical whole-mesh output, and damage-region redraw remain open.
+
+2026-10-22 final QEMU desktop and installer rerun: the terminal now restores
+the shell caret to the DolDoc sentinel after output and mouse focus changes.
+`make check-user-startup` passed the formatted Home/Once startup, two tiled
+terminals, visible typing and output in both, isolated command history, and
+prompt recovery. `make check-home-autostart` passed both terminal startup, the
+centered animated splash and its dismissal, popup open/close, and restored
+keyboard input. `make check-grscreen-full` passed the grouped menu, source
+window manager, zoom/pan, CDC, sprite and full-frame checks. The first broad
+PCI rerun exposed a post-Window-Demo focus timing race in its QMP test; the
+test now refocuses the shell and confirms visible `zls` before Return.
+`make check-compat-pci` then exited successfully, including the graphical
+keyboard/editor/window-demo recovery path and the MathODE module probe.
+
+The same source produced ISO
+`build/zealos-aarch64-hello.iso` (SHA-256
+`3b5ab41723f781e0c40a6dd2218a0a48e6bf97fbc9e5fb17bf99520e64cebea3`) and
+installer payload `build/install.img` (SHA-256
+`4d2986f1302039073f3b559ad28759188f2a7ff74d09825b85d64de89f691b71`).
+`make check-iso-installer` passed the unconfirmed-erase guard, full 128 MiB
+read-back, byte-identical target comparison (disk SHA-256
+`9dd15f5ee2b91dda98dbd080487193dfb7892d2de30857eeb8d4e5c7cc0499ef`),
+disk-only desktop boot, and `InstallerPersist` returning `0x2a` before and
+after reboot. This exact ISO still needs its live UTM install and disk-only
+cold-boot check; the earlier UTM artifact acceptance above remains valid.
+
+2026-10-23 terminal output ownership fix and current installer candidate:
+`BootstrapGuiTerminalPrintOutput` now appends output to the registered GUI
+terminal's document explicitly. The previous callback recalculated the active
+task's `put_doc`; compiler output could therefore move the cursor in a source
+document while that file was being compiled. The NEC/QEMU graphical-workflow
+script passed after the fix. The rebuilt `build/zealos-aarch64-hello.iso` passed
+`make check-iso-installer`: unconfirmed erase was rejected, the disposable
+128 MiB VirtIO target was fully read back and matched the embedded disk image
+(`sha256=7b0e55db04b21848b50df48aefe54bd3112160788a02352df5cd7084dfc9af54`),
+the installed-disk-only boot reached the desktop, and `InstallerPersist`
+returned `0x2a` before and after a cold reboot. Current ISO SHA-256:
+`0a7063a9f4777a12b1e2d8b99f86652d760bc15ebcdd27560d3263c506899756`;
+installer payload SHA-256:
+`a846515fc0a0e34d396796198074e15f052eb04a0db54453b2c3371294677777`.
+
+The user also supplied a 2026-10-22 UTM screenshot showing the grouped File,
+Windows, Apps, View, and OS menus and `zcall InstallerPersist` returning
+`0x2a` after a disk-only boot. The screenshot does not identify its ISO digest.
+The exact `0a7063a9…` candidate still needs the live UTM install, splash/menu
+visual check, and disk-only cold-boot persistence check.
+
+2026-10-23 GUI output ownership regression and final QEMU installer run:
+`BootstrapGuiTerminalOutputOwnershipChecks` creates a temporary source document
+on a separate valid task, directs output to the GUI terminal while that source
+task is active, then verifies that only the terminal document changes. The
+test is included in `BootstrapGuiTerminalSmoke`, and the focused
+`make check-gui-terminal` gate passed both before and after restarting the
+graphical terminal. The broader NEC/QEMU USB, graphical editor, menu, window,
+and VirtIO recovery matrix also passed with `make check-usb-input`.
+
+The rebuilt current ISO passed `make check-iso-installer`: the unconfirmed
+erase guard held, the disposable 128 MiB VirtIO disk passed full read-back and
+matched the source image (`sha256=3fe6df8dbdc899f5c456d42482e9479614ab237b004a482db855c5e884593354`),
+the installed disk booted alone, and `InstallerPersist` returned `0x2a`
+before and after a cold reboot. Current artifact hashes: ISO
+`132401a095fe5f3c828492bbf6f08f8cc814e4e8d4100198f45c1e9610f6fc16`,
+installer payload
+`0bf4cda4582d6ff98fc327b1eb32c1488f20dd7c27675ebecf7cdffd59fc2a73`.
+The same updated source tree also passed `make check-home-autostart`, which
+measured the centered splash mesh and its dismissal, and
+`make check-grscreen-full`, which exercised full-frame scanout, CDC and sprite
+regressions. The exact ISO file and installer payload stayed unchanged after
+these source-tree checks.
+
+The user supplied a later UTM screenshot showing File/Windows/Apps/View/OS
+menus and `InstallerPersist` returning `0x2a` after loading the saved source
+from the installed disk. The screenshot does not identify its ISO digest, so
+it confirms the prior live UTM install but not this final rebuilt candidate.
+The exact `132401a0…` ISO still needs a live UTM install, visual desktop/splash
+check, and disk-only cold-boot persistence check.
+
+2026-10-23 formatter compatibility and refreshed installer candidate:
+`StrPrintJoin` now handles ZealOS uppercase packed `%C`, boolean `%o`, unsigned
+`%u`, binary `%b`/`%B`, and decoded `%q` string escapes in addition to its existing
+formatter subset. `UserStartUpChecks` covers these conversions; both
+`make check-user-startup` and `make check-grscreen-full` passed. The refreshed
+`build/zealos-aarch64-hello.iso` passed `make check-iso-installer`: guarded
+erase, complete 128 MiB read-back, byte-identical target, installed-disk-only
+boot, and saved data returning `0x2a` before and after a cold reboot. The
+subsequent `make check-home-autostart` also passed the centered animated splash,
+popup lifecycle, and restored terminal input checks. Hashes: ISO
+`e81be7dae77f8d32a1c9186192585df804b26e01d5e9ecce01ea337ef17538b6`, installer
+payload `adf0759771c105ae325b13e7c59e6b196e525d99ddcedf9755ecbbcfee984fd7`,
+and installed disk
+`a3b50b4879eda2f30ffb00b78250e50494070f578a67d81cff083e4fb006df96`. The
+exact rebuilt ISO still needs live UTM install, splash/menu inspection, and
+disk-only persistence confirmation. The remaining formatter conversions and
+flags, complete font system, broader CDC/brush ROP parity, exact whole-mesh
+raster parity, full upstream menu/task startup, and damage-region redraw remain
+open.
+
+2026-10-23 AArch64 font-table and installer refresh: the build now generates
+both pinned ZealOS `FontStd.ZC` and `FontAux.ZC` tables, and the translated
+`GrScreen.ZC` passes the active `text.font` pointer to the ARM64 glyph
+rasterizer. `make check-grscreen-full` passed standard and auxiliary glyph
+raster comparisons against the pinned tables, CDC, and sprite checks;
+`make check-home-autostart` passed the centered animated splash, popup
+lifecycle, and restored terminal input. The source-side standard/auxiliary
+pointer swap passes; the complete upstream font hotkey/event path remains open.
+
+The refreshed `build/zealos-aarch64-hello.iso` passed `make check-iso-installer`:
+the erase guard held, all sectors of the disposable 128 MiB disk were read back,
+the installed image matched byte-for-byte (`sha256=944b1088b6a2bb30797e2449392411b2fbbabe1fa6a420e9e0f7713517e78403`),
+the disk booted without the ISO, and `InstallerPersist` returned `0x2a` before
+and after a second reboot. Artifact hashes: ISO
+`ec1d78cb70eb1853d8983e89111a78eb966177aa93af00257c2e824e14b9cb6d`, installer
+payload `60d91a26319968581049029d247266d0cb586c0b804d9ada0a1e7ff778a769ac`.
+The Oct 22 UTM screenshot confirms persistence on its installed candidate but
+does not identify an ISO digest. This exact ISO still needs live UTM install,
+visual splash/menu inspection, and disk-only cold-boot persistence confirmation.
+
+2026-10-23 auxiliary-font raster parity: `make check-grscreen-full` now checks
+the active auxiliary `A` glyph row-by-row and pixel-by-pixel against the
+pinned `FontAux.ZC` table, including transparent pixels and row padding. The
+full graphics suite passed. `make check-iso-installer` rebuilt and passed the
+QEMU install/read-back, disk-only boot, and second-reboot persistence gate for
+the ISO above. The exact ISO still needs installation and visual acceptance in
+UTM; the complete font hotkey/event path, full upstream menu/task startup,
+broader CDC/brush parity, exact whole-mesh raster parity, and optimized
+damage-region redraw remain open.
+
+2026-10-23 Ctrl-Alt-F message dispatch and installer refresh: the guarded
+ARM64 `Message.ZC` overlay routes decoded, non-IRQ Ctrl-Alt callbacks through
+the normal message consumer while preserving the pinned upstream file. The
+Home startup regression passed with synthetic messages, and the live QEMU
+keyboard probe pressed Ctrl-Alt-F twice and verified the auxiliary font became
+active and the standard font returned. `make check-input-edges` passed for PCI
+VirtIO input and NEC USB input through two hubs with duplicate VirtIO input
+present. The rebuilt ISO passed `make check-iso-installer`: erase protection,
+complete 128 MiB read-back, byte-identical installed disk
+(`sha256=a696fc5ef912d1c008bac07f4c4ca6a233889e59d57fadedb8b177840bc22223`),
+disk-only boot, and `InstallerPersist` returning `0x2a` before and after a
+second cold reboot. Artifact hashes: ISO
+`2ea7965e6fd34867797e00dc9a44d072247e1a361f4bc84e74edf54f1d9a7bd4`, installer
+payload `5a1b8ea265579e54902be4a8723f5e96f9d1bf74e1f20d9383985218e11b83d3`.
+The user supplied a disk-only UTM screenshot showing
+`zload disk:Tests/InstallerPersist.ZC` followed by `zcall InstallerPersist`
+returning `0x2a`. Its filename timestamp (2026-10-22 9:31 PM) predates this
+candidate's build (2026-10-23 4:31 AM PDT), so it confirms persistence on the
+earlier installed candidate only. This exact ISO still needs live UTM
+installation, visual desktop/splash inspection, font-toggle confirmation, and
+disk-only persistence confirmation.
+
+UTM's current acceptance VM config has only a 128 MiB VirtIO disk attached;
+its notes identify an earlier installer ISO (`6b051913…`). The powered-off
+disk was preserved before the next erase cycle as
+`build/utm-installed-disk-pre-2ea.qcow2` (SHA-256
+`1b27dd69574734f6a6a96f41f075bb12bcaa8d7b5f11ed106c5189f9c87f5156`); its
+`qemu-img check` reports no errors. The current ISO is ready to attach as a
+USB CD at boot index 0 for the live installer acceptance.
+
+2026-10-23 prepared a separate live UTM acceptance VM for the current ISO.
+`ZealOS AArch64 Current ISO Acceptance` was cloned from the wallpaper
+acceptance template; the original template and ISO Installer Acceptance VM
+were left untouched. The clone uses the current `2ea7965e…` ISO in its existing
+USB-CD-first slot and has a fresh zeroed 128 MiB VirtIO target second. The
+template's copied target was found nonblank, so it was preserved at
+`build/utm-current-acceptance-template-backup/WallpaperAcceptanceTarget.raw`
+(SHA-256 `75e8d8c8c93300ffcb2836bb9d62d687eb6bc02118a16bb22613e22b780947c8`)
+before replacing only the clone's target. The cloned CD file hashes exactly to
+the current ISO; the VM is stopped and ready for the user to start. The current
+ISO's live UTM install, desktop/splash and Ctrl-Alt-F inspection, and
+disk-only persistence check remain pending.
+
+The user's Oct 22 9:31 PM screenshot shows the earlier installed disk loading
+`Tests/InstallerPersist.ZC` and returning `0x2a` after reboot. It is useful
+evidence for that earlier disk only; the screenshot predates the current
+`2ea7965e…` candidate.
+
+2026-10-23 Ctrl-Alt help bridge: `KeyMapCtrlAltFamily` now prints the source
+shortcut descriptions from guest `keydev`, and its QEMU regression asserts the
+Ctrl-Alt-F font-toggle entry. `make check-home-autostart` passed the map check,
+both queued font-toggle states, centered animated splash and dismissal,
+popup lifecycle, and terminal focus/input recovery. The native bridge bounds
+guest descriptions to their arena and caps output. The ISO predates this source
+change and will be rebuilt before the exact-image UTM acceptance run.
+
+2026-10-23 rebuilt UTM candidate: the source-bound shortcut-help change passed
+`make check-home-autostart`; `make check-iso-installer` then passed guarded
+erase, full 128 MiB read-back, byte-identical install
+(`sha256=6ac5aed711f81a067a11866c906b3827a67fefb8833b480ef50ba3e1c69bdf6),
+disk-only desktop boot, and `InstallerPersist` returning `0x2a` before and
+after a second cold reboot. Artifact hashes: ISO
+`e2bbad705ba3f60d8527af12ab3dbb7847e11f96f198639548b068d48c9b29a8`, installer
+payload `2b85227620cdf1a4db196d53888d6b24d320ff18984a377284494156d9722cf6`.
+`make check-grscreen-full` also passed against the same rebuilt source tree.
+`make check-input-edges` passed both PCI VirtIO keyboard and NEC USB keyboard
+input through two nested hubs with VirtIO also attached; `make
+check-user-startup` passed formatted Home/Once startup, independent terminal
+typing/output/history, late-bound hooks, prompt recovery, and exact task
+cleanup. The current source regression set is green; the remaining acceptance
+step is the live UTM run of this exact ISO.
+The stopped `ZealOS AArch64 Current ISO Acceptance` clone now contains this
+exact ISO as USB CD boot index 0 and the fresh 128 MiB VirtIO target at index
+1. The prior CD image was preserved as
+`build/utm-current-acceptance-pre-e2bb.iso`. This exact candidate still needs
+live UTM install, visual desktop/splash and Ctrl-Alt-F confirmation, and
+disk-only persistence verification.
+
+2026-10-23 screenshot follow-up: the supplied disk-only screenshot shows
+`zload disk:Tests/InstallerPersist.ZC` followed by `zcall InstallerPersist`
+returning `0x2a` after reboot. Its embedded filename timestamp is Oct 22, so it
+confirms the previously installed disk and does not identify the ISO digest.
+
+2026-10-23 bootstrap keyboard help: the ordinary key-map preview now lists the
+command-line controls implemented by the ARM64 graphical terminal, while the
+Ctrl-Alt map continues to show the registered font toggle. `make
+check-home-autostart` passed the key-map assertions, both Ctrl-Alt-F font
+states, centered splash and dismissal, popup lifecycle, and terminal focus and
+input recovery. This source change is newer than `e2bbad70…`; the exact UTM
+candidate must be rebuilt and rechecked before the pending live acceptance.
+
+2026-10-23 current ISO rebuild after bootstrap key-map work: the current
+`build/zealos-aarch64-hello.iso` has SHA-256
+`4696f713b7e1c34a7d8b65a825d41fe9c22dec497f4bfbfc1add6c052c987074` and its
+embedded installer disk is `build/disk.img` (SHA-256
+`05d9d62375fed8a234b13dcc40a5dac797cc536e31f37b09b3f57744a462fd63`). The
+rebuilt image passed `make check-iso-installer`: the erase guard held, all
+sectors of the disposable 128 MiB target were read back, the installed disk
+booted alone, and `InstallerPersist` returned `0x2a` before and after a second
+cold reboot. `make check-home-autostart`, `make check-grscreen-full`,
+`make check-input-edges`, and `make check-user-startup` passed on the current
+source tree, covering centered splash animation and dismissal, grouped menus,
+keyboard help and Ctrl-Alt-F font-toggle paths, full graphics scanout, input
+through nested hubs, independent terminal input/output/history, startup hooks,
+and terminal recovery.
+
+The stopped live VM `ZealOS AArch64 Current ISO Acceptance` now has this exact
+ISO in its USB CD slot at boot index 0 and a fresh zeroed 128 MiB VirtIO target
+at index 1. The prior CD image was preserved as
+`build/utm-current-acceptance-pre-4696.iso`. The supplied Oct 22 disk-only
+screenshot returns `0x2a`, but its timestamp predates this ISO and cannot
+confirm this candidate. Exact-image live UTM installation, visual desktop and
+splash inspection, Ctrl-Alt-F check, and disk-only persistence after cold
+reboot remain pending.
+
+2026-10-23 refreshed live candidate after the RedSea file-list bridge: current
+ISO `build/zealos-aarch64-hello.iso` SHA-256 is
+`3dec114946364a91eae0e5b1af69a93bf89bff2397e809aa307f35156eb45be1`. The
+installer round-trip verified guarded erase, every sector of the 128 MiB
+VirtIO target, byte-identical installation, disk-only desktop startup, and
+`InstallerPersist` returning `0x2a` before and after a second cold reboot.
+`make check-home-autostart`, `make check-grscreen-full`, `make
+check-input-edges`, and `make check-user-startup` also passed on this source
+tree, and the RedSea DocFile probe verified root-file listing, size, and
+contents. Together these gates cover the centered animated splash, menu and
+view paths, font switching/help, graphics scanout, keyboard input and terminal
+recovery.
+
+The `ZealOS AArch64 Current ISO Acceptance` clone was configured with this
+exact ISO in its USB CD slot at boot index 0 and a zero-filled 128 MiB VirtIO
+target at index 1. The prior CD image is preserved as
+`build/utm-current-acceptance-pre-3dec.iso` (SHA-256
+`4696f713b7e1c34a7d8b65a825d41fe9c22dec497f4bfbfc1add6c052c987074`). The
+exact current ISO was installed in this UTM clone; the guest reported full
+sector read-back verification. The ISO was then removed from the clone
+configuration, leaving only the VirtIO disk. Its first disk-only boot reported
+the window manager and graphical terminal started; after saving
+`Tests/InstallerPersist.ZC`, the program loaded from `disk:` and returned
+`0x2a`. A second cold boot with only the VirtIO disk again reported desktop
+startup, loaded the saved file, and returned `0x2a`. The running VM's config
+now lists only that VirtIO disk. The final disk image hash is
+`919b194272fffd1e26ec3c77b66ae0239f9b12177c4f8cb33c31d43093be37b7`.
+
+The CUA display bridge still reports the Mac locked, so the remaining exact
+image acceptance is visual: confirm the animated centered Z splash, menus,
+and Ctrl-Alt-F font toggle in the running disk-only guest. The Oct 22
+screenshot remains useful as earlier visual/persistence evidence, but is not
+being used as a substitute for this ISO's live check.
+
+2026-10-23 final post-multi-terminal-fix candidate: `build/zealos-aarch64-hello.iso`
+has SHA-256
+`a2a161123ba31e3d00c20bccd6fe1810ea4f186b93035a01a9c2fa4c1a047a91`; its
+embedded installer disk is `build/disk.img` with SHA-256
+`db775d46f879c4a2ba23ead3cb21c89cf39385f40233578cca61e979802385b8`.
+`make check-iso-installer` passed guarded erase, full 128 MiB read-back,
+byte-identical installation, disk-only desktop boot, and saved-data persistence
+through a second cold reboot (`InstallerPersist` returned `0x2a` both times).
+The output callback now routes `Print` and diagnostics to the task that
+registered the callback, fixing the second Home/Once terminal's output capture.
+`make check-home-once`, `make check-home-autostart`, `make check-user-startup`,
+`make check-gui-workflow`, `make check-grscreen-full`, and
+`make check-input-edges` all pass on this source. These include splash and
+font-toggle checks, two-terminal startup and input, graphics, and nested-hub
+USB input.
+
+The `ZealOS AArch64 Current ISO Acceptance` VM has this exact ISO in its USB CD
+slot at boot index 0 and a disposable 128 MiB VirtIO disk at index 1. It booted
+the ISO and its serial output reported that the window manager and graphical
+terminal started. The previous installed disk is preserved at
+`build/utm-3dec-final-persist.raw`. UTM installation of this exact candidate,
+disk-only persistence, and visual splash/menu inspection remain pending. The
+Mac display bridge reports the Mac locked; the current UTM stop request has
+also timed out, so the VirtIO target will be re-zeroed after the VM is stopped
+and before installation.
+
+2026-10-23 refreshed candidate and UTM boot-source check: the latest ISO
+`build/zealos-aarch64-hello.iso` has SHA-256
+`7cbcc872e2c992d1c52081126efa81b5fbfddb17186779cf1152cd0bb76693c0`; its
+embedded installer disk `build/disk.img` has SHA-256
+`e0625c5fe7535851086aadb6d866f14b32309747dc54e7d71c8fcfa8e74c386a`.
+`make check-iso-installer` passed for this exact build: guarded erase, full
+128 MiB read-back, disk-only desktop boot, and `InstallerPersist` returning
+`0x2a` before and after a second cold reboot.
+
+The live `ZealOS AArch64 ISO Installer Acceptance` VM was inspected in UTM.
+Its active QEMU command line contains only a VirtIO block device (boot index
+0) and no CD/DVD device, so its current desktop is booted from storage. A
+second launch failed while trying to bind `127.0.0.1:2222`, which is already
+used by this running VM's SSH forward; this is a host-port collision, not an
+ISO boot error. Do not count that earlier storage-only session as exact-image
+ISO acceptance. At that point, the remaining live step was to attach the ISO
+as a USB CD and verify install, disk-only startup, saved data after reboot,
+and the visual desktop/splash/menu paths.
+
+2026-10-23 refreshed ISO USB-CD boot confirmed in UTM: the
+`ZealOS AArch64 ISO Installer Acceptance` VM now has
+`build/zealos-aarch64-hello.iso` attached as a read-only USB CD at boot index 0
+and the disposable 128 MiB VirtIO target at index 1. UTM's QEMU command line
+shows `media=cdrom`, `readonly=on`, and the ISO path inside the VM package; the
+UEFI screen loaded the USB device and the guest reached ISO startup graphics.
+Converting UTM's imported qcow2 back to raw produced a byte-for-byte match for
+the repository ISO, and the VM target passes `qemu-img check`. The target
+contains a prior test install and
+will be erased by the already-authorized `zinstall ERASE` acceptance step.
+The remaining checks are the installer read-back report, CD-detached cold
+boot, persistent `InstallerPersist` value, and final visual desktop/menu
+inspection. The Mac locked again while the startup sequence was running, so
+the guest prompt needs a manual unlock to continue.
+
+2026-10-23 exact-image UTM install and disk-only desktop boot: the same
+`7cbcc872…` ISO reached the guest desktop from its read-only USB CD, and
+`zinstall ERASE` completed on the disposable 128 MiB VirtIO target. The guest
+reported erase through 100%, checked every sector, verified through 100%, and
+ended with “installed, and fully read-back verified.” After stopping the VM,
+the CD image was preserved and its drive interface was set to `None
+(Advanced)` in UTM. A cold boot then loaded the disk through UEFI/RedSea to the
+graphical desktop, with the centered animated Z splash visible during startup.
+The saved UTM configuration confirms the CD image has `Interface=None` and
+the writable target is the only drive with an active storage interface
+(`VirtIO`).
+The remaining live checks are saving `Tests/InstallerPersist.ZC`, verifying
+`0x2a` on the disk-only boot and after a second cold reboot, and completing
+the current-image menu/font-toggle inspection.
+
+2026-10-23 final ISO UTM acceptance: the current
+`build/zealos-aarch64-hello.iso` (SHA-256
+`52c214c29a9c23d86c94899e8ef2ba94bd4a21231c92ecdd649714708e2bc627`) was
+attached as a read-only USB CD at boot index 0 in a fresh UTM installer VM,
+ahead of its disposable 128 MiB VirtIO target at index 1. `zinstall ERASE`
+completed erase, sector checking, and full read-back verification. The target
+passed `qemu-img check` and compared byte-for-byte with the embedded
+`build/disk.img` (SHA-256
+`1a4516a67d42aecc7284bfc68e455c5231767360e75a9df021dddb6946d98fde`).
+
+A separate UTM VM with only the installed VirtIO disk cold-booted through
+RedSea to the graphical desktop. `zstatus` reported `winmgr=1 gterm=1` and
+nonblack scanout. `Tests/InstallerPersist.ZC` returned `0x2a` on the first
+disk-only boot and again after a second cold reboot. The live
+`CtrlAltFontDispatchChecks` also returned `0x2a`. The captured final desktop
+screen is preserved at `build/utm-52c-installed-disk.png`; it shows the two
+terminal windows and centered animated Z. `make check-home-autostart` and
+`make check-gui-terminal` passed on this source, covering startup, menu actions,
+zoom/pan, Paint Demo drawing, and Escape cleanup. The desktop-control bridge
+returned a gray live capture during the final visual session, so no claim is
+made that its latest menu or Escape interaction was observed through that
+bridge.
+
+Final local gates passed: `make check-home-autostart`, `make check-gui-terminal`,
+`make check-iso-installer`, and `git diff --check`. The ISO installer gate
+verified guarded erase, full read-back, byte-for-byte disk comparison,
+disk-only desktop boot, and persistence before and after a second cold reboot.
+
+## Pi 4B native desktop / basic input (2026-10-26)
+
+**Accepted for PI-DESKTOP-2**, staged native kernel SHA-256
+`b12497c8e4df1998966b2a46d4f1ed7c31363090c3a1363df0a6183993d4930b`.
+IMG_9182 shows coherent graphical terminal output and executed `usbstatus`,
+physical framebuffer 1920×1280/pitch 7680, packed logical 800×600/pitch 3200
+scaled 2×, 1632 composed frames, and USB active/fault/stopped **1/0/0**.
+The user then explicitly confirms visible cursor movement, working menu
+clicks and **40+2;** returning **42**. This closes the PI-DESKTOP-1 stalled
+desktop/basic input follow-up. Details and prior physical USB/FAT32 evidence
+are in [PI4.md](PI4.md). The accepted M6 diagnostic recovery entry is retained.
+
+The Pi image remains read-only for storage/source writes. This gate does not
+accept writable save/reboot/reopen persistence, native SD, disconnect recovery,
+Pi installation, Apple multitouch/secondary click, full splash-animation
+behavior or complete ZealOS parity. No boot payload changed for this evidence
+update; the previously passing platform/image tests remain applicable.

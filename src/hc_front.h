@@ -80,6 +80,7 @@ uint64_t hc_builtin_grprint(uint64_t dc, uint64_t x, uint64_t y, uint64_t fmt);
 uint64_t hc_builtin_grprintn(uint64_t dc, uint64_t x, uint64_t y, uint64_t fmt, uint64_t argv,
                              uint64_t nargs);
 void hc_fmt_f64_bits(char **dp, uint64_t bits, int prec);
+void hc_fmt_f64_g_bits(char **dp, uint64_t bits, int prec, int uppercase);
 uint64_t hc_builtin_printi64(uint64_t v);
 uint64_t hc_builtin_strlen(uint64_t s);
 uint64_t hc_builtin_strcmp(uint64_t a, uint64_t b);

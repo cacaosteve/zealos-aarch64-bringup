@@ -7,6 +7,106 @@ extern I64 ZcFbTextPixel(I64 x, I64 y);
 extern I64 ZcFbGraphColor(I64 color);
 extern I64 ZcFbScreenWidth();
 extern I64 ZcFbScreenHeight();
+extern I64 BootstrapTaskZ(CTask *task);
+extern I32 *BootstrapScreenDepthBuffer(CDC *dc);
+extern I32 *BootstrapScreenDepthReset(CDC *dc);
+extern Bool BootstrapSpriteMeshPixel(CDC *dc, I64 x, I64 y);
+extern CDC bootstrap_graphics_dc;
+extern U16 bootstrap_win_pixel_z_buf[800 * 600];
+
+Bool SpriteMatrixTransformProbePoint0(CDC *dc, I64 x, I64 y, I64 z)
+{//Match the default CDC callback's fixed-point matrix behavior without taking
+ //the address of an extern function, which the bootstrap compiler disallows.
+    I64 actual_x, actual_y, actual_z, expected_x, expected_y, expected_z;
+
+    if (!dc || !dc->r || !dc->transform)
+        return FALSE;
+    actual_x = x;
+    actual_y = y;
+    actual_z = z;
+    (*dc->transform)(dc, &actual_x, &actual_y, &actual_z);
+    expected_x = ((dc->r[0] * x + dc->r[1] * y + dc->r[2] * z +
+            dc->r[3]) >> 32) + dc->x;
+    expected_y = ((dc->r[4] * x + dc->r[5] * y + dc->r[6] * z +
+            dc->r[7]) >> 32) + dc->y;
+    expected_z = ((dc->r[8] * x + dc->r[9] * y + dc->r[10] * z +
+            dc->r[11]) >> 32) + dc->z;
+    return actual_x == expected_x && actual_y == expected_y &&
+            actual_z == expected_z;
+}
+
+Bool SpriteMatrixTransformDefault0(CDC *dc)
+{//Use several points so custom callbacks that resemble the matrix at the
+ //origin still retain their own semantics.
+    return SpriteMatrixTransformProbePoint0(dc, 3, 5, 7) &&
+            SpriteMatrixTransformProbePoint0(dc, -11, 13, 2) &&
+            SpriteMatrixTransformProbePoint0(dc, 0, 1, 0);
+}
+
+Bool SpritePerspectiveMatrix0(CDC *dc)
+{//True only for the standard CDC matrix with a non-affine fourth row.
+    if (!dc || !dc->r)
+        return FALSE;
+    return dc->r[12] || dc->r[13] || dc->r[14] ||
+            dc->r[15] != 0x100000000;
+}
+
+Bool SpritePerspectiveClip0(CDC *dc, I64 x, I64 y, I64 z, F64 *clip)
+{//Transform one source point to homogeneous coordinates without dividing.
+    F64 scale = 4294967296.0;
+
+    if (!SpritePerspectiveMatrix0(dc) || !clip)
+        return FALSE;
+    clip[0] = (ToF64(dc->r[0]) * ToF64(x) +
+            ToF64(dc->r[1]) * ToF64(y) +
+            ToF64(dc->r[2]) * ToF64(z) + ToF64(dc->r[3])) / scale;
+    clip[1] = (ToF64(dc->r[4]) * ToF64(x) +
+            ToF64(dc->r[5]) * ToF64(y) +
+            ToF64(dc->r[6]) * ToF64(z) + ToF64(dc->r[7])) / scale;
+    clip[2] = (ToF64(dc->r[8]) * ToF64(x) +
+            ToF64(dc->r[9]) * ToF64(y) +
+            ToF64(dc->r[10]) * ToF64(z) + ToF64(dc->r[11])) / scale;
+    clip[3] = (ToF64(dc->r[12]) * ToF64(x) +
+            ToF64(dc->r[13]) * ToF64(y) +
+            ToF64(dc->r[14]) * ToF64(z) + ToF64(dc->r[15])) / scale;
+    return clip[0] == clip[0] && clip[1] == clip[1] &&
+            clip[2] == clip[2] && clip[3] == clip[3] &&
+            clip[0] > -1.0e20 && clip[0] < 1.0e20 &&
+            clip[1] > -1.0e20 && clip[1] < 1.0e20 &&
+            clip[2] > -1.0e20 && clip[2] < 1.0e20 &&
+            clip[3] > -1.0e20 && clip[3] < 1.0e20;
+}
+
+Bool SpritePerspectiveProject0(CDC *dc, F64 *clip, I64 *x, I64 *y,
+        I64 *z)
+{//Project a clipped homogeneous point and bound it before integer conversion.
+    F64 projected_x, projected_y, projected_z;
+
+    if (!dc || !clip || !x || !y || !z || clip[3] < 0.01)
+        return FALSE;
+    projected_x = clip[0] / clip[3] + ToF64(dc->x);
+    projected_y = clip[1] / clip[3] + ToF64(dc->y);
+    projected_z = clip[2] / clip[3] + ToF64(dc->z);
+    if (projected_x != projected_x || projected_y != projected_y ||
+            projected_z != projected_z || projected_x < -1048576.0 ||
+            projected_x > 1048576.0 || projected_y < -1048576.0 ||
+            projected_y > 1048576.0 || projected_z < -2147483648.0 ||
+            projected_z > 2147483647.0)
+        return FALSE;
+    if (projected_x < 0)
+        *x = ToI64(projected_x - 0.5);
+    else
+        *x = ToI64(projected_x + 0.5);
+    if (projected_y < 0)
+        *y = ToI64(projected_y - 0.5);
+    else
+        *y = ToI64(projected_y + 0.5);
+    if (projected_z < 0)
+        *z = ToI64(projected_z - 0.5);
+    else
+        *z = ToI64(projected_z + 0.5);
+    return TRUE;
+}
 
 I64 SpriteCeilF64(F64 value)
 {
@@ -155,23 +255,77 @@ I64 SpriteTriangleWork0(CDC *dc, I64 *px, I64 *py)
     return (max_x - min_x + 1) * (max_y - min_y + 1);
 }
 
+U0 SpriteRasterPixel0(CDC *dc, I64 x, I64 y, I64 z)
+{//Apply mesh depth and route accepted pixels to the active CDC/screen target.
+    I64 depth_i, origin_x, origin_y, depth_x, depth_y;
+    Bool graph_target, task_depth, plot = TRUE;
+    CTask *task;
+    I32 *depth;
+
+    if (!dc || !dc->body || x < 0 || x >= dc->width || y < 0 ||
+            y >= dc->height)
+        return;
+    task = dc->win_task;
+    graph_target = (dc->flags & DCF_SCREEN_BITMAP) &&
+            !(dc->flags & DCF_ON_TOP) && task;
+    depth = dc->depth_buf;
+    task_depth = graph_target && depth;
+    if (graph_target && !depth)
+        depth = BootstrapScreenDepthBuffer(dc);
+    // Window z-order already decides which screen task is visible. Keep the
+    // 3D depth test inside a task's window scene, and let on-top overlays draw
+    // above every task scene.
+    if ((dc->flags & (DCF_SCREEN_BITMAP | DCF_ON_TOP)) ==
+            (DCF_SCREEN_BITMAP | DCF_ON_TOP))
+        depth = NULL;
+    origin_x = origin_y = 0;
+    if (graph_target)
+    {
+        origin_x = task->pix_left + task->scroll_x;
+        origin_y = task->pix_top + task->scroll_y;
+    }
+    depth_x = x;
+    depth_y = y;
+    if (graph_target && !task_depth)
+    {
+        depth_x += origin_x;
+        depth_y += origin_y;
+        if (depth_x < 0 || depth_x >= dc->width_internal ||
+                depth_y < 0 || depth_y >= dc->height)
+            plot = FALSE;
+    }
+    depth_i = dc->width_internal * depth_y + depth_x;
+    if (plot && depth)
+    {
+        if (z < 0 || z > depth[depth_i])
+            plot = FALSE;
+        else
+            depth[depth_i] = z;
+    }
+    if (plot)
+    {
+        if (graph_target)
+            BootstrapSpriteMeshPixel(dc, x + origin_x, y + origin_y);
+        else
+            dc->body[depth_i] = dc->color.c0 & 0xff;
+    }
+}
+
 U0 SpriteHLine0(CDC *dc, I64 left, I64 right, I64 y,
         I64 z_left, I64 z_right)
 {//Plot one clipped triangle scanline with interpolated depth.
-    I64 x, z, span, x_first, x_last, depth_i;
-    Bool plot;
-    I32 *depth;
+    I64 x, z, span, x_first, x_last, swap;
 
     if (!dc || !dc->body || y < 0 || y >= dc->height)
         return;
     if (right < left)
     {
-        x = left;
+        swap = left;
         left = right;
-        right = x;
-        x = z_left;
+        right = swap;
+        swap = z_left;
         z_left = z_right;
-        z_right = x;
+        z_right = swap;
     }
     x_first = left;
     if (x_first < 0)
@@ -182,79 +336,827 @@ U0 SpriteHLine0(CDC *dc, I64 left, I64 right, I64 y,
     if (x_first > x_last)
         return;
     span = right - left;
-    depth = dc->depth_buf;
     for (x = x_first; x <= x_last; x++)
     {
         z = z_left;
         if (span)
             z += (x - left) * (z_right - z_left) / span;
-        depth_i = dc->width_internal * y + x;
-        plot = TRUE;
-        if (depth)
-        {
-            if (z < 0 || z > depth[depth_i])
-                plot = FALSE;
-            else
-                depth[depth_i] = z;
-        }
-        if (plot)
-            dc->body[depth_i] = dc->color.c0 & 0xff;
+        SpriteRasterPixel0(dc, x, y, z);
     }
 }
 
-U0 SpriteFillTriangle0(CDC *dc, I64 *px, I64 *py, I64 *pz)
-{//Rasterize a triangle with scanline depth interpolation.
-    I64 i, j, y, count, min_y, max_y, left, right, z_left, z_right;
-    F64 crossings[3], depths[3], cross_x, cross_z, swap;
+U0 SpriteVLine0(CDC *dc, I64 x, I64 top, I64 bottom,
+        I64 z_top, I64 z_bottom)
+{//Plot one clipped triangle column with interpolated depth.
+    I64 y, z, span, first, last, swap;
 
-    min_y = max_y = py[0];
-    for (i = 1; i < 3; i++)
-    {
-        if (py[i] < min_y) min_y = py[i];
-        if (py[i] > max_y) max_y = py[i];
-    }
-    if (min_y < 0) min_y = 0;
-    if (max_y >= dc->height) max_y = dc->height - 1;
-    if (min_y > max_y)
+    if (!dc || !dc->body || x < 0 || x >= dc->width)
         return;
-    for (y = min_y; y <= max_y; y++)
+    if (bottom < top)
     {
-        count = 0;
-        for (i = 0; i < 3; i++)
+        swap = top;
+        top = bottom;
+        bottom = swap;
+        swap = z_top;
+        z_top = z_bottom;
+        z_bottom = swap;
+    }
+    first = top;
+    if (first < 0)
+        first = 0;
+    last = bottom;
+    if (last >= dc->height)
+        last = dc->height - 1;
+    if (first > last)
+        return;
+    span = bottom - top;
+    for (y = first; y <= last; y++)
+    {
+        z = z_top;
+        if (span)
+            z += (y - top) * (z_bottom - z_top) / span;
+        SpriteRasterPixel0(dc, x, y, z);
+    }
+}
+
+U0 SpriteScreenDepthFixtureTask(U8 *data)
+{
+    if (data) {}
+}
+
+I64 SpriteScreenDepthChecks()
+{
+    CDC *dc;
+    CTask *task1, *task2;
+    I32 *depth;
+    I64 old_flags, old_width, old_width_internal, old_height;
+    I64 old_color0, old_rop0, old_color1, old_rop1;
+    CTask *old_task;
+    I32 *old_depth_buf;
+    I64 old1_left, old1_top, old1_right, old1_bottom;
+    I64 old1_scroll_x, old1_scroll_y, old2_left, old2_top;
+    I64 old2_right, old2_bottom, old2_scroll_x, old2_scroll_y;
+    U16 old1_z, old2_z, old_win_z_first, old_win_z_second;
+    I32 saved_depth1[121], saved_depth2[121], old_overlay_depth;
+    U8 old_body_pixel, old_body_first, old_body_second;
+    I64 first, second, overlay, i, j, k, result = 0x2a;
+    Bool tasks_saved = FALSE, regions_saved = FALSE, z_saved = FALSE;
+    Bool fixture_spawned = FALSE;
+
+    dc = &bootstrap_graphics_dc;
+    old_flags = dc->flags;
+    old_width = dc->width;
+    old_width_internal = dc->width_internal;
+    old_height = dc->height;
+    old_task = dc->win_task;
+    old_depth_buf = dc->depth_buf;
+    old_color0 = dc->color.c0.color;
+    old_rop0 = dc->color.c0.rop;
+    old_color1 = dc->color.c1.color;
+    old_rop1 = dc->color.c1.rop;
+    task1 = Fs;
+    task2 = Spawn(&SpriteScreenDepthFixtureTask, NULL,
+            "SpriteDepthFixture", -1, Fs);
+    fixture_spawned = TaskValidate(task2);
+    if (!TaskValidate(task1))
+        result = 1;
+    else if (!TaskValidate(task2))
+        result = 11;
+    else if (task1 == task2)
+        result = 12;
+    else if (ZcFbScreenWidth() != 800 || ZcFbScreenHeight() != 600)
+        result = 2;
+    else
+    {
+        old1_left = task1->pix_left;
+        old1_top = task1->pix_top;
+        old1_right = task1->pix_right;
+        old1_bottom = task1->pix_bottom;
+        old1_scroll_x = task1->scroll_x;
+        old1_scroll_y = task1->scroll_y;
+        old1_z = task1->win_z_num;
+        old2_left = task2->pix_left;
+        old2_top = task2->pix_top;
+        old2_right = task2->pix_right;
+        old2_bottom = task2->pix_bottom;
+        old2_scroll_x = task2->scroll_x;
+        old2_scroll_y = task2->scroll_y;
+        old2_z = task2->win_z_num;
+        tasks_saved = TRUE;
+
+        dc->width = ZcFbScreenWidth();
+        dc->width_internal = dc->width & ~7;
+        dc->height = ZcFbScreenHeight();
+        dc->flags = DCF_SCREEN_BITMAP;
+        dc->color.c0.color = BLACK;
+        dc->color.c0.rop = ROPB_MONO;
+
+        task1->pix_left = 700;
+        task1->pix_top = 500;
+        task1->pix_right = 710;
+        task1->pix_bottom = 510;
+        task1->scroll_x = 2;
+        task1->scroll_y = 3;
+        task1->win_z_num = 100;
+
+        task2->pix_left = 720;
+        task2->pix_top = 520;
+        task2->pix_right = 730;
+        task2->pix_bottom = 530;
+        task2->scroll_x = 1;
+        task2->scroll_y = 2;
+        task2->win_z_num = 101;
+
+        depth = BootstrapScreenDepthBuffer(dc);
+        if (!depth)
+            result = 3;
+        else
         {
-            j = (i + 1) % 3;
-            if ((py[i] <= y && py[j] > y) ||
-                    (py[j] <= y && py[i] > y))
-            {
-                cross_x = ToF64(px[i]) +
-                        ToF64(y - py[i]) * (px[j] - px[i]) /
-                        (py[j] - py[i]);
-                cross_z = ToF64(pz[i]) +
-                        ToF64(y - py[i]) * (pz[j] - pz[i]) /
-                        (py[j] - py[i]);
-                crossings[count] = cross_x;
-                depths[count++] = cross_z;
-            }
-        }
-        if (count >= 2)
-        {
-            if (crossings[1] < crossings[0])
-            {
-                swap = crossings[0];
-                crossings[0] = crossings[1];
-                crossings[1] = swap;
-                swap = depths[0];
-                depths[0] = depths[1];
-                depths[1] = swap;
-            }
-            left = ToI64(crossings[0]);
-            right = ToI64(crossings[1]);
-            z_left = ToI64(depths[0]);
-            z_right = ToI64(depths[1]);
-            if (left <= right)
-                SpriteHLine0(dc, left, right, y, z_left, z_right);
+            for (i = 0; i < 11; i++)
+                for (j = 0; j < 11; j++)
+                {
+                    k = i * 11 + j;
+                    saved_depth1[k] = depth[(500 + i) * dc->width_internal +
+                            700 + j];
+                    saved_depth2[k] = depth[(520 + i) * dc->width_internal +
+                            720 + j];
+                }
+            regions_saved = TRUE;
+
+            // Keep the regression from changing scanout pixels. The depth
+            // plane still accepts the test samples, but the host framebuffer
+            // visibility gate rejects these two synthetic locations.
+            first = 504 * dc->width_internal + 703;
+            second = 526 * dc->width_internal + 724;
+            old_win_z_first = bootstrap_win_pixel_z_buf[first];
+            old_win_z_second = bootstrap_win_pixel_z_buf[second];
+            old_body_first = dc->body[first];
+            old_body_second = dc->body[second];
+            z_saved = TRUE;
+            bootstrap_win_pixel_z_buf[first] = task1->win_z_num;
+            bootstrap_win_pixel_z_buf[second] = task2->win_z_num;
+
+            dc->win_task = task1;
+            dc->color.c0.color = WHITE;
+            BootstrapScreenDepthReset(dc);
+            SpriteHLine0(dc, 1, 1, 1, 10, 10);
+            if (depth[first] != 10 || dc->body[first] != WHITE)
+                result = 4;
+
+            dc->win_task = task2;
+            dc->color.c0.color = LTGRAY;
+            depth[second] = 30;
+            BootstrapScreenDepthReset(dc);
+            if (depth[first] != 10 || depth[second] != I32_MAX)
+                result = 5;
+            SpriteHLine0(dc, 3, 3, 4, 20, 20);
+            if (first == second || depth[first] != 10 || depth[second] != 20 ||
+                    dc->body[second] != LTGRAY)
+                result = 6;
+
+            task2->pix_left = 702;
+            task2->pix_top = 503;
+            task2->pix_right = 710;
+            task2->pix_bottom = 510;
+            task2->scroll_x = 0;
+            task2->scroll_y = 0;
+            dc->color.c0.color = BLUE;
+            BootstrapScreenDepthReset(dc);
+            SpriteHLine0(dc, 1, 1, 1, 20, 20);
+            if (depth[first] != 20 || depth[second] != 20 ||
+                    dc->body[first] != BLUE)
+                result = 7;
+
+            dc->flags |= DCF_ON_TOP;
+            overlay = dc->width_internal + 1;
+            old_body_pixel = dc->body[overlay];
+            old_overlay_depth = depth[overlay];
+            depth[overlay] = 7;
+            if (old_body_pixel == BLACK)
+                dc->color.c0.color = WHITE;
+            else
+                dc->color.c0.color = BLACK;
+            SpriteHLine0(dc, 1, 1, 1, 1, 1);
+            if (dc->body[overlay] == old_body_pixel || depth[overlay] != 7)
+                result = 8;
+            dc->body[overlay] = old_body_pixel;
+            depth[overlay] = old_overlay_depth;
         }
     }
+    if (regions_saved)
+        for (i = 0; i < 11; i++)
+            for (j = 0; j < 11; j++)
+            {
+                k = i * 11 + j;
+                depth[(500 + i) * dc->width_internal + 700 + j] =
+                        saved_depth1[k];
+                depth[(520 + i) * dc->width_internal + 720 + j] =
+                        saved_depth2[k];
+            }
+    if (z_saved)
+    {
+        bootstrap_win_pixel_z_buf[first] = old_win_z_first;
+        bootstrap_win_pixel_z_buf[second] = old_win_z_second;
+        dc->body[first] = old_body_first;
+        dc->body[second] = old_body_second;
+    }
+    if (tasks_saved)
+    {
+        task1->pix_left = old1_left;
+        task1->pix_top = old1_top;
+        task1->pix_right = old1_right;
+        task1->pix_bottom = old1_bottom;
+        task1->scroll_x = old1_scroll_x;
+        task1->scroll_y = old1_scroll_y;
+        task1->win_z_num = old1_z;
+        task2->pix_left = old2_left;
+        task2->pix_top = old2_top;
+        task2->pix_right = old2_right;
+        task2->pix_bottom = old2_bottom;
+        task2->scroll_x = old2_scroll_x;
+        task2->scroll_y = old2_scroll_y;
+        task2->win_z_num = old2_z;
+    }
+    if (fixture_spawned && TaskValidate(task2))
+        Kill(task2, TRUE, FALSE);
+    dc->flags = old_flags;
+    dc->width = old_width;
+    dc->width_internal = old_width_internal;
+    dc->height = old_height;
+    dc->win_task = old_task;
+    dc->depth_buf = old_depth_buf;
+    dc->color.c0.color = old_color0;
+    dc->color.c0.rop = old_rop0;
+    dc->color.c1.color = old_color1;
+    dc->color.c1.rop = old_rop1;
+    return result;
+}
+
+I64 SpriteHLineCount0(CDC *dc, I64 x1, I64 x2, I64 y,
+        I64 z1, I64 z2)
+{
+    SpriteHLine0(dc, x1, x2, y, z1, z2);
+    return 0;
+}
+
+I64 SpriteVLineCount0(CDC *dc, I64 x, I64 y1, I64 y2,
+        I64 z1, I64 z2)
+{
+    SpriteVLine0(dc, x, y1, y2, z1, z2);
+    return 0;
+}
+
+// Raster order and fixed-point edge stepping adapted from the pinned
+// upstream GrFillTri0 at eee210f4379ba3d00b47507f336a158eefb2c993.
+// Keep the upstream dominant-axis selection, vertex ordering, Q32 stepping,
+// and inclusive/exclusive row endpoints; line helpers retain the ARM64 CDC,
+// screen-depth, window-origin, and staged-framebuffer behavior. Exact span
+// ties take the Y path so a flat edge never becomes a zero-height divisor.
+I64 SpriteFillTriangleUpstream0(CDC *dc, CD3I32 *p1, CD3I32 *p2, CD3I32 *p4)
+{//3D. Returns count of pixs changed
+	I64		 x1, x2, y1, y2, z1, z2, dx1, dy1, dz1, dx2, dy2, dz2, res = 0, i, min, max;
+	CTask	*win_task;
+
+	if (AbsI64(p1->y - p2->y) + AbsI64(p1->y - p4->y) < AbsI64(p1->x - p2->x) + AbsI64(p1->x - p4->x))
+	{//p1 is min x
+		if (p4->x < p2->x)
+			SwapI64(&p4, &p2);
+		if (p2->x < p1->x)
+			SwapI64(&p2, &p1);
+
+			//p2y <= p4y
+		if (p4->y < p2->y)
+			SwapI64(&p4, &p2);
+
+		min = 0;
+		max = dc->height;
+		if ((dc->flags & DCF_SCREEN_BITMAP) && !(dc->flags & DCF_ON_TOP) && dc->win_task)
+		{
+			win_task = dc->win_task;
+			min -= win_task->scroll_y + win_task->pix_top;
+			max -= win_task->scroll_y + win_task->pix_top;
+			if (max > win_task->pix_bottom - (win_task->scroll_y + win_task->pix_top))
+				max = win_task->pix_bottom - (win_task->scroll_y + win_task->pix_top);
+		}
+
+		if ((dy2 = p4->y - p1->y) < 0)
+		{
+			dy1 = p2->y - p1->y;
+			dx1 = (p1->x - p2->x) << 32 / dy1;
+			dz1 = (p1->z - p2->z) << 32 / dy1;
+
+			dx2 = (p1->x - p4->x) << 32 / dy2;
+			dz2 = (p1->z - p4->z) << 32 / dy2;
+			x1 = x2 = p1->x << 32;
+			y1 = p1->y;
+			z1 = z2 = p1->z << 32;
+			if (y1 + dy2 < min)
+			{
+				i = min - (y1 + dy2);
+				if (i > -dy2)
+					goto ft_done;
+				dy2 += i;
+			}
+			if (y1 >= max)
+			{
+				i = y1 - max + 1;
+				if (i > -dy2)
+					i = -dy2;
+				dy2 += i;
+				y1 -= i;
+				x1 += dx1 * i;
+				x2 += dx2 * i;
+				z1 += dz1 * i;
+				z2 += dz2 * i;
+			}
+			while (dy2++)
+			{
+				res += SpriteHLineCount0(dc, x1.i32[1], x2.i32[1], y1, z1.i32[1], z2.i32[1]);
+				y1--;
+				x1 += dx1;
+				x2 += dx2;
+				z1 += dz1;
+				z2 += dz2;
+			}
+			if (dy2 = p2->y-p4->y)
+			{
+				dx2 = (p4->x - p2->x) << 32 / dy2;
+				dz2 = (p4->z - p2->z) << 32 / dy2;
+				if (y1+dy2<min)
+				{
+					i = min - (y1 + dy2);
+					if (i > -dy2)
+						goto ft_done;
+					dy2 += i;
+				}
+				if (y1 >= max)
+				{
+					i = y1 - max + 1;
+					if (i > -dy2)
+						goto ft_done;
+					dy2 += i;
+					y1 -= i;
+					x1 += dx1 * i;
+					x2 += dx2 * i;
+					z1 += dz1 * i;
+					z2 += dz2 * i;
+				}
+			}
+			while (dy2++ <= 0)
+			{
+				res += SpriteHLineCount0(dc, x1.i32[1], x2.i32[1], y1, z1.i32[1], z2.i32[1]);
+				y1--;
+				x1 += dx1;
+				x2 += dx2;
+				z1 += dz1;
+				z2 += dz2;
+			}
+		}
+		else if ((dy2 = p2->y - p1->y) > 0)
+		{
+			dy1 = p4->y  - p1->y;
+			dx1 = (p4->x - p1->x) << 32 / dy1;
+			dz1 = (p4->z - p1->z) << 32 / dy1;
+
+			dx2 = (p2->x-p1->x) << 32 / dy2;
+			dz2 = (p2->z-p1->z) << 32 / dy2;
+			x1 = x2 = p1->x << 32;
+			y1 = p1->y;
+			z1 = z2 = p1->z << 32;
+			if (y1 + dy2 >= max)
+			{
+				i = y1 + dy2 - max + 1;
+				if (i > dy2)
+					goto ft_done;
+				dy2 -= i;
+			}
+			if (y1 < min)
+			{
+				i = min - y1;
+				if (i > dy2)
+					i = dy2;
+				dy2 -= i;
+				y1 += i;
+				x1 += dx1 * i;
+				x2 += dx2 * i;
+				z1 += dz1 * i;
+				z2 += dz2 * i;
+			}
+			while (dy2--)
+			{
+				res += SpriteHLineCount0(dc, x1.i32[1], x2.i32[1], y1, z1.i32[1], z2.i32[1]);
+				y1++;
+				x1 += dx1;
+				x2 += dx2;
+				z1 += dz1;
+				z2 += dz2;
+			}
+			if (dy2 = p4->y - p2->y)
+			{
+				dx2 = (p4->x - p2->x) << 32 / dy2;
+				dz2 = (p4->z - p2->z) << 32 / dy2;
+				if (y1 + dy2 >= max)
+				{
+					i = y1 + dy2 - max + 1;
+					if (i > dy2)
+						goto ft_done;
+					dy2 -= i;
+				}
+				if (y1 < min)
+				{
+					i = min - y1;
+					if (i > dy2)
+						goto ft_done;
+					dy2 -= i;
+					y1 += i;
+					x1 += dx1 * i;
+					x2 += dx2 * i;
+					z1 += dz1 * i;
+					z2 += dz2 * i;
+				}
+			}
+			while (dy2-- >= 0)
+			{
+				res += SpriteHLineCount0(dc, x1.i32[1], x2.i32[1], y1, z1.i32[1], z2.i32[1]);
+				y1++;
+				x1 += dx1;
+				x2 += dx2;
+				z1 += dz1;
+				z2 += dz2;
+			}
+		}
+		else
+		{
+			if (dy1 = p2->y - p1->y)
+			{
+				dx1 = (p2->x - p1->x) << 32 / dy1;
+				dz1 = (p2->z - p1->z) << 32 / dy1;
+				if (dy2 = p2->y - p4->y)
+				{
+					dx2 = (p2->x - p4->x) << 32 / dy2;
+					dz2 = (p2->z - p4->z) << 32 / dy2;
+				}
+				else
+				{
+					dx2 = 0;
+					dz2 = 0;
+				}
+				x1 = x2 = p2->x << 32;
+				y1 = p2->y;
+				z1 = z2 = p2->z << 32;
+				if (y1 < min)
+				{
+					i = min - y1;
+					if (i > -dy1)
+						i = -dy1;
+					dy1 += i;
+					y1 += i;
+					x1 += dx1 * i;
+					x2 += dx2 * i;
+					z1 += dz1 * i;
+					z2 += dz2 * i;
+				}
+				while (dy1++ <= 0)
+				{
+					if (y1 < max)
+						res += SpriteHLineCount0(dc, x1.i32[1], x2.i32[1], y1, z1.i32[1], z2.i32[1]);
+					y1++;
+					x1 += dx1;
+					x2 += dx2;
+					z1 += dz1;
+					z2 += dz2;
+				}
+			}
+			if (dy1 = p4->y - p1->y)
+			{
+				dx1 = (p1->x - p4->x) << 32 / dy1;
+				dz1 = (p1->z - p4->z) << 32 / dy1;
+				if (dy2 = p4->y - p2->y)
+				{
+					dx2 = (p2->x - p4->x) << 32 / dy2;
+					dz2 = (p2->z - p4->z) << 32 / dy2;
+				}
+				else
+				{
+					dx2 = 0;
+					dz2 = 0;
+				}
+				x1 = x2 = p4->x << 32;
+				y1 = p4->y;
+				z1 = z2 = p4->z << 32;
+				if (y1-dy1 < min)
+				{
+					i = min-(y1 - dy1);
+					if (i > dy1)
+						goto ft_done;
+					dy1 -= i;
+				}
+				if (y1 >= max)
+				{
+					i = y1 - max + 1;
+					if (i > dy1)
+						goto ft_done;
+					dy1 -= i;
+					y1 -= i;
+					x1 += dx1 * i;
+					x2 += dx2 * i;
+					z1 += dz1 * i;
+					z2 += dz2 * i;
+				}
+				while (dy1-- >= 0)
+				{
+					res += SpriteHLineCount0(dc, x1.i32[1], x2.i32[1], y1, z1.i32[1], z2.i32[1]);
+					y1--;
+					x1 += dx1;
+					x2 += dx2;
+					z1 += dz1;
+					z2 += dz2;
+				}
+			}
+		}
+	}
+	else
+	{
+//p1 is min y
+		if (p4->y < p2->y)
+			SwapI64(&p4, &p2);
+		if (p2->y < p1->y)
+			SwapI64(&p2, &p1);
+
+			//p2x <= p4x
+		if (p4->x < p2->x)
+			SwapI64(&p4, &p2);
+
+		min = 0;
+		max = dc->width;
+		if ((dc->flags & DCF_SCREEN_BITMAP) && !(dc->flags & DCF_ON_TOP) && dc->win_task)
+		{
+			win_task = dc->win_task;
+			min -= win_task->scroll_x + win_task->pix_left;
+			max -= win_task->scroll_x + win_task->pix_left;
+			if (max > win_task->pix_right - (win_task->scroll_x + win_task->pix_left))
+				max = win_task->pix_right - (win_task->scroll_x + win_task->pix_left);
+		}
+
+		if ((dx2 = p4->x-p1->x) < 0)
+		{
+			dx1 = p2->x - p1->x;
+			dy1 = (p1->y - p2->y) << 32 / dx1;
+			dz1 = (p1->z - p2->z) << 32 / dx1;
+
+			dy2 = (p1->y - p4->y) << 32 / dx2;
+			dz2 = (p1->z - p4->z) << 32 / dx2;
+			y1 = y2 = p1->y << 32;
+			x1 = p1->x;
+			z1 = z2 = p1->z << 32;
+			if (x1 + dx2 < min)
+			{
+				i = min - (x1 + dx2);
+				if (i > -dx2)
+					goto ft_done;
+				dx2 += i;
+			}
+			if (x1 >= max)
+			{
+				i = x1 - max + 1;
+				if (i > -dx2)
+					i = -dx2;
+				dx2 += i;
+				x1 -= i;
+				y1 += dy1 * i;
+				y2 += dy2 * i;
+				z1 += dz1 * i;
+				z2 += dz2 * i;
+			}
+			while (dx2++)
+			{
+				res += SpriteVLineCount0(dc, x1, y1.i32[1], y2.i32[1], z1.i32[1], z2.i32[1]);
+				x1--;
+				y1 += dy1;
+				y2 += dy2;
+				z1 += dz1;
+				z2 += dz2;
+			}
+			if (dx2 = p2->x - p4->x)
+			{
+				dy2 = (p4->y - p2->y) << 32 / dx2;
+				dz2 = (p4->z - p2->z) << 32 / dx2;
+				if (x1 + dx2 < min)
+				{
+					i = min - (x1 + dx2);
+					if (i > -dx2)
+						goto ft_done;
+					dx2 += i;
+				}
+				if (x1 >= max)
+				{
+					i = x1 - max + 1;
+					if (i > -dx2)
+						goto ft_done;
+					dx2 += i;
+					x1 -= i;
+					y1 += dy1 * i;
+					y2 += dy2 * i;
+					z1 += dz1 * i;
+					z2 += dz2 * i;
+				}
+			}
+			while (dx2++ <= 0)
+			{
+				res += SpriteVLineCount0(dc, x1, y1.i32[1], y2.i32[1], z1.i32[1], z2.i32[1]);
+				x1--;
+				y1 += dy1;
+				y2 += dy2;
+				z1 += dz1;
+				z2 += dz2;
+			}
+		}
+		else if ((dx2 = p2->x - p1->x) > 0)
+		{
+			dx1 = p4->x - p1->x;
+			dy1 = (p4->y - p1->y) << 32 / dx1;
+			dz1 = (p4->z - p1->z) << 32 / dx1;
+
+			dy2 = (p2->y - p1->y) << 32 / dx2;
+			dz2 = (p2->z - p1->z) << 32 / dx2;
+			y1 = y2 = p1->y << 32;
+			x1 = p1->x;
+			z1 = z2 = p1->z << 32;
+			if (x1 + dx2 >= max)
+			{
+				i = x1 + dx2 - max + 1;
+				if (i > dx2)
+					goto ft_done;
+				dx2 -= i;
+			}
+			if (x1 < min)
+			{
+				i = min - x1;
+				if (i > dx2)
+					i = dx2;
+				dx2 -= i;
+				x1 += i;
+				y1 += dy1 * i;
+				y2 += dy2 * i;
+				z1 += dz1 * i;
+				z2 += dz2 * i;
+			}
+			while (dx2--)
+			{
+				res += SpriteVLineCount0(dc, x1, y1.i32[1], y2.i32[1], z1.i32[1], z2.i32[1]);
+				x1++;
+				y1 += dy1;
+				y2 += dy2;
+				z1 += dz1;
+				z2 += dz2;
+			}
+			if (dx2 = p4->x - p2->x)
+			{
+				dy2 = (p4->y - p2->y) << 32 / dx2;
+				dz2 = (p4->z - p2->z) << 32 / dx2;
+				if (x1 + dx2 >= max)
+				{
+					i = x1 + dx2 - max + 1;
+					if (i > dx2)
+						goto ft_done;
+					dx2 -= i;
+				}
+				if (x1 < min)
+				{
+					i = min - x1;
+					if (i > dx2)
+						goto ft_done;
+					dx2 -= i;
+					x1 += i;
+					y1 += dy1 * i;
+					y2 += dy2 * i;
+					z1 += dz1 * i;
+					z2 += dz2 * i;
+				}
+			}
+			while (dx2-- >= 0)
+			{
+				res += SpriteVLineCount0(dc, x1, y1.i32[1], y2.i32[1], z1.i32[1], z2.i32[1]);
+				x1++;
+				y1 += dy1;
+				y2 += dy2;
+				z1 += dz1;
+				z2 += dz2;
+			}
+		}
+		else
+		{
+			if (dx1 = p2->x - p1->x)
+			{
+				dy1 = (p2->y - p1->y) << 32 / dx1;
+				dz1 = (p2->z - p1->z) << 32 / dx1;
+				if (dx2 = p2->x - p4->x)
+				{
+					dy2 = (p2->y - p4->y) << 32 / dx2;
+					dz2 = (p2->z - p4->z) << 32 / dx2;
+				}
+				else
+				{
+					dy2 = 0;
+					dz2 = 0;
+				}
+				y1 = y2 = p2->y << 32;
+				x1 = p2->x;
+				z1 = z2 = p2->z << 32;
+				if (x1 < min)
+				{
+					i = min - x1;
+					if (i > -dx1)
+						i = -dx1;
+					dx1 += i;
+					x1 += i;
+					y1 += dy1 * i;
+					y2 += dy2 * i;
+					z1 += dz1 * i;
+					z2 += dz2 * i;
+				}
+				while (dx1++ <= 0)
+				{
+					if (x1 < max)
+						res += SpriteVLineCount0(dc, x1, y1.i32[1], y2.i32[1], z1.i32[1], z2.i32[1]);
+					x1++;
+					y1 += dy1;
+					y2 += dy2;
+					z1 += dz1;
+					z2 += dz2;
+				}
+			}
+			if (dx1 = p4->x - p1->x)
+			{
+				dy1 = (p1->y - p4->y) << 32 / dx1;
+				dz1 = (p1->z - p4->z) << 32 / dx1;
+				if (dx2 = p4->x - p2->x)
+				{
+					dy2 = (p2->y - p4->y) << 32 / dx2;
+					dz2 = (p2->z - p4->z) << 32 / dx2;
+				}
+				else
+				{
+					dy2 = 0;
+					dz2 = 0;
+				}
+				y1 = y2 = p4->y << 32;
+				x1 = p4->x;
+				z1 = z2 = p4->z << 32;
+				if (x1 - dx1 < min)
+				{
+					i = min - (x1 - dx1);
+					if (i > dx1)
+						goto ft_done;
+					dx1 -= i;
+				}
+				if (x1 >= max)
+				{
+					i = x1 - max + 1;
+					if (i > dx1)
+						goto ft_done;
+					dx1 -= i;
+					x1 -= i;
+					y1 += dy1 * i;
+					y2 += dy2 * i;
+					z1 += dz1 * i;
+					z2 += dz2 * i;
+				}
+				while (dx1-- >= 0)
+				{
+					res += SpriteVLineCount0(dc, x1, y1.i32[1], y2.i32[1], z1.i32[1], z2.i32[1]);
+					x1--;
+					y1 += dy1;
+					y2 += dy2;
+					z1 += dz1;
+					z2 += dz2;
+				}
+			}
+		}
+	}
+ft_done:
+
+	return res;
+}
+
+U0 SpriteFillTriangle0(CDC *dc, I64 *px, I64 *py, I64 *pz)
+{//Use upstream's dominant-axis fixed-point triangle coverage for sprite meshes.
+    CD3I32 points[3];
+    I64 i;
+
+    if (!dc || !px || !py || !pz)
+        return;
+    for (i = 0; i < 3; i++)
+    {
+        if (px[i] < I32_MIN || px[i] > I32_MAX ||
+                py[i] < I32_MIN || py[i] > I32_MAX ||
+                pz[i] < I32_MIN || pz[i] > I32_MAX)
+            return;
+        points[i].x = px[i];
+        points[i].y = py[i];
+        points[i].z = pz[i];
+    }
+    SpriteFillTriangleUpstream0(dc, &points[0], &points[1], &points[2]);
 }
 
 
@@ -275,18 +1177,319 @@ U0 SpriteMirrorRect0(CDC *dc, I64 left, I64 top, I64 right, I64 bottom,
     SpriteFillQuad0(dc, px, py);
 }
 
+Bool SpriteTransformXYZ0(CDC *dc, Bool enabled, I64 *x, I64 *y, I64 *z)
+{//Apply CDC transforms, including homogeneous division for the default matrix path.
+    F64 clip[4];
+
+    if (!enabled)
+        return TRUE;
+    if (!dc || !dc->transform)
+        return FALSE;
+    if (!SpritePerspectiveMatrix0(dc))
+    {
+        (*dc->transform)(dc, x, y, z);
+        return TRUE;
+    }
+    // Only the standard matrix callback follows CDC's Q32.32 matrix layout;
+    // custom callbacks keep their own semantics, including their result.
+    if (!SpriteMatrixTransformDefault0(dc))
+    {
+        (*dc->transform)(dc, x, y, z);
+        return TRUE;
+    }
+    // Use floating-point intermediates here. A valid Q32.32 coefficient
+    // multiplied by a large signed sprite coordinate can overflow I64 before
+    // the fixed-point shift, even when the final projected point is bounded.
+    if (!SpritePerspectiveClip0(dc, *x, *y, *z, clip) ||
+            clip[3] <= 0.0)
+        return FALSE;
+    if (!SpritePerspectiveProject0(dc, clip, x, y, z))
+        return FALSE;
+    return TRUE;
+}
+
 Bool SpriteTransformPoint0(CDC *dc, Bool enabled, I64 x, I64 y, I64 z,
         I64 *screen_x, I64 *screen_y)
 {//Use the CDC's upstream transform callback when sprite transform mode is on.
-    if (enabled)
-    {
-        if (!dc->transform)
-            return FALSE;
-        (*dc->transform)(dc, &x, &y, &z);
-    }
+    if (!SpriteTransformXYZ0(dc, enabled, &x, &y, &z))
+        return FALSE;
     *screen_x = x;
     *screen_y = y;
     return TRUE;
+}
+
+I64 SpriteMeshTriangleWork0(CDC *dc, I64 *px, I64 *py, I64 *pz,
+        Bool symmetry_enabled, I64 axis_x1, I64 axis_y1,
+        I64 axis_x2, I64 axis_y2, I64 *mirror_px, I64 *mirror_py)
+{//Validate lighting bounds and return total visible work for one triangle.
+    I64 i, j, work, mirror_work;
+
+    if (dc->lighting)
+        for (i = 0; i < 3; i++)
+        {
+            j = (i + 1) % 3;
+            if (SpriteAbsI64(px[i] - px[j]) > 12000 ||
+                    SpriteAbsI64(py[i] - py[j]) > 12000 ||
+                    SpriteAbsI64(pz[i] - pz[j]) > 12000)
+                return -1;
+        }
+    work = SpriteTriangleWork0(dc, px, py);
+    if (work < 0)
+        return -1;
+    if (symmetry_enabled)
+    {
+        for (i = 0; i < 3; i++)
+            if (!SpriteMirrorPoint0(axis_x1, axis_y1, axis_x2, axis_y2,
+                    px[i], py[i], &mirror_px[i], &mirror_py[i]))
+                return -1;
+        mirror_work = SpriteTriangleWork0(dc, mirror_px, mirror_py);
+        if (mirror_work < 0 || mirror_work > 480000 - work)
+            return -1;
+        work += mirror_work;
+    }
+    return work;
+}
+
+#define SPRITE_CLIP_POLY_MAX 8
+
+F64 SpritePerspectiveClipDistance0(CDC *dc, F64 *clip, I64 plane)
+{//Signed homogeneous distance from the near and four CDC viewport planes.
+    if (plane == 0)
+        return clip[3] - 0.01;
+    if (plane == 1)
+        return clip[0] + ToF64(dc->x) * clip[3];
+    if (plane == 2)
+        return (ToF64(dc->width) - 1.0 - ToF64(dc->x)) * clip[3] - clip[0];
+    if (plane == 3)
+        return clip[1] + ToF64(dc->y) * clip[3];
+    return (ToF64(dc->height) - 1.0 - ToF64(dc->y)) * clip[3] - clip[1];
+}
+
+U0 SpritePerspectiveClipSnap0(CDC *dc, F64 *clip, I64 plane)
+{//Pin intersections to their plane to avoid projection drift at a border.
+    if (plane == 0)
+        clip[3] = 0.01;
+    else if (plane == 1)
+        clip[0] = -ToF64(dc->x) * clip[3];
+    else if (plane == 2)
+        clip[0] = (ToF64(dc->width) - 1.0 - ToF64(dc->x)) * clip[3];
+    else if (plane == 3)
+        clip[1] = -ToF64(dc->y) * clip[3];
+    else
+        clip[1] = (ToF64(dc->height) - 1.0 - ToF64(dc->y)) * clip[3];
+}
+
+I64 SpritePerspectiveClipLine0(CDC *dc, F64 *clip_a, F64 *clip_b,
+        I64 *out_x1, I64 *out_y1, I64 *out_z1,
+        I64 *out_x2, I64 *out_y2, I64 *out_z2)
+{//Clip a homogeneous line segment before division, like the indexed mesh path.
+    F64 a[4], b[4], intersection[4];
+    F64 distance_a, distance_b, denominator, t;
+    I64 i, j, plane, a_inside, b_inside;
+
+    if (!dc || dc->width <= 0 || dc->height <= 0 || !clip_a || !clip_b ||
+            !out_x1 || !out_y1 || !out_z1 || !out_x2 || !out_y2 || !out_z2)
+        return -1;
+    for (i = 0; i < 4; i++)
+    {
+        a[i] = clip_a[i];
+        b[i] = clip_b[i];
+    }
+    for (plane = 0; plane < 5; plane++)
+    {
+        distance_a = SpritePerspectiveClipDistance0(dc, a, plane);
+        distance_b = SpritePerspectiveClipDistance0(dc, b, plane);
+        if (distance_a != distance_a || distance_b != distance_b ||
+                distance_a < -1.0e40 || distance_a > 1.0e40 ||
+                distance_b < -1.0e40 || distance_b > 1.0e40)
+            return -1;
+        a_inside = distance_a >= 0.0;
+        b_inside = distance_b >= 0.0;
+        if (!a_inside && !b_inside)
+            return 0;
+        if (a_inside != b_inside)
+        {
+            denominator = distance_a - distance_b;
+            if (!denominator)
+                return -1;
+            t = distance_a / denominator;
+            if (t < 0.0 || t > 1.0)
+                return -1;
+            for (j = 0; j < 4; j++)
+                intersection[j] = a[j] + t * (b[j] - a[j]);
+            SpritePerspectiveClipSnap0(dc, intersection, plane);
+            if (a_inside)
+                for (j = 0; j < 4; j++)
+                    b[j] = intersection[j];
+            else
+                for (j = 0; j < 4; j++)
+                    a[j] = intersection[j];
+        }
+    }
+    if (!SpritePerspectiveProject0(dc, a, out_x1, out_y1, out_z1) ||
+            !SpritePerspectiveProject0(dc, b, out_x2, out_y2, out_z2))
+        return -1;
+    return 1;
+}
+
+I64 SpriteTransformLine0(CDC *dc, Bool enabled, I64 x1, I64 y1, I64 z1,
+        I64 x2, I64 y2, I64 z2, I64 *screen_x1, I64 *screen_y1,
+        I64 *screen_x2, I64 *screen_y2)
+{//Return -1 on invalid input, 0 when clipped away, or 1 for a visible line.
+ //Use homogeneous clipping for default projective CDC transforms.
+    F64 clip_a[4], clip_b[4];
+    if (!enabled)
+    {
+        *screen_x1 = x1;
+        *screen_y1 = y1;
+        *screen_x2 = x2;
+        *screen_y2 = y2;
+        return 1;
+    }
+    if (!dc || !dc->transform)
+        return -1;
+    if (SpritePerspectiveMatrix0(dc) && SpriteMatrixTransformDefault0(dc))
+    {
+        if (!SpritePerspectiveClip0(dc, x1, y1, z1, clip_a) ||
+                !SpritePerspectiveClip0(dc, x2, y2, z2, clip_b))
+            return -1;
+        return SpritePerspectiveClipLine0(dc, clip_a, clip_b,
+                screen_x1, screen_y1, &z1,
+                screen_x2, screen_y2, &z2);
+    }
+    if (!SpriteTransformPoint0(dc, TRUE, x1, y1, z1,
+            screen_x1, screen_y1) ||
+            !SpriteTransformPoint0(dc, TRUE, x2, y2, z2,
+            screen_x2, screen_y2))
+        return -1;
+    return 1;
+}
+
+I64 SpritePerspectiveClipTriangle0(CDC *dc, F64 *clip_points, I32 *indices,
+        I64 *out_x, I64 *out_y, I64 *out_z, CD3I32 *out_points)
+{//Clip an indexed triangle to w>=0.01 and the four CDC viewport planes.
+    F64 polygon[SPRITE_CLIP_POLY_MAX * 4];
+    F64 next_polygon[SPRITE_CLIP_POLY_MAX * 4];
+    F64 previous[4], current[4], intersection[4];
+    F64 previous_distance, current_distance, denominator, t;
+    I64 count, next_count, i, j, plane, previous_inside, current_inside;
+
+    if (!dc || dc->width <= 0 || dc->height <= 0 || !clip_points ||
+            !indices || !out_x || !out_y || !out_z || !out_points)
+        return -1;
+    count = 3;
+    for (j = 0; j < 4; j++)
+        polygon[2 * 4 + j] = clip_points[indices[2] * 4 + j];
+    for (i = 0; i < 2; i++)
+        for (j = 0; j < 4; j++)
+            polygon[i * 4 + j] = clip_points[indices[i] * 4 + j];
+
+    for (plane = 0; plane < 5; plane++)
+    {
+        if (!count)
+            return 0;
+        next_count = 0;
+        for (j = 0; j < 4; j++)
+            previous[j] = polygon[(count - 1) * 4 + j];
+        previous_distance = SpritePerspectiveClipDistance0(dc, previous,
+                plane);
+        if (previous_distance != previous_distance ||
+                previous_distance < -1.0e40 || previous_distance > 1.0e40)
+            return -1;
+        previous_inside = previous_distance >= 0.0;
+        for (i = 0; i < count; i++)
+        {
+            for (j = 0; j < 4; j++)
+                current[j] = polygon[i * 4 + j];
+            current_distance = SpritePerspectiveClipDistance0(dc, current,
+                    plane);
+            if (current_distance != current_distance ||
+                    current_distance < -1.0e40 || current_distance > 1.0e40)
+                return -1;
+            current_inside = current_distance >= 0.0;
+            if (current_inside != previous_inside)
+            {
+                denominator = previous_distance - current_distance;
+                if (!denominator || next_count >= SPRITE_CLIP_POLY_MAX)
+                    return -1;
+                t = previous_distance / denominator;
+                if (t < 0.0 || t > 1.0)
+                    return -1;
+                for (j = 0; j < 4; j++)
+                    intersection[j] = previous[j] +
+                            t * (current[j] - previous[j]);
+                SpritePerspectiveClipSnap0(dc, intersection, plane);
+                for (j = 0; j < 4; j++)
+                    next_polygon[next_count * 4 + j] = intersection[j];
+                next_count++;
+            }
+            if (current_inside)
+            {
+                if (next_count >= SPRITE_CLIP_POLY_MAX)
+                    return -1;
+                for (j = 0; j < 4; j++)
+                    next_polygon[next_count * 4 + j] = current[j];
+                next_count++;
+            }
+            for (j = 0; j < 4; j++)
+                previous[j] = current[j];
+            previous_distance = current_distance;
+            previous_inside = current_inside;
+        }
+        count = next_count;
+        for (i = 0; i < count; i++)
+            for (j = 0; j < 4; j++)
+                polygon[i * 4 + j] = next_polygon[i * 4 + j];
+    }
+    for (i = 0; i < count; i++)
+    {
+        for (j = 0; j < 4; j++)
+            intersection[j] = polygon[i * 4 + j];
+        if (!SpritePerspectiveProject0(dc, intersection, &out_x[i],
+                &out_y[i], &out_z[i]))
+            return -1;
+        out_points[i].x = out_x[i];
+        out_points[i].y = out_y[i];
+        out_points[i].z = out_z[i];
+    }
+    return count;
+}
+
+U0 SpriteMeshDrawPrepared0(CDC *dc, I32 tri_color, I64 *px, I64 *py,
+        I64 *pz, CD3I32 *points, Bool symmetry_enabled, I64 axis_x1,
+        I64 axis_y1, I64 axis_x2, I64 axis_y2)
+{//Draw one prevalidated projected triangle and its optional reflection.
+    I64 i, mirror_px[3], mirror_py[3];
+    Bool mirror_ok;
+
+    mirror_ok = symmetry_enabled;
+    if (mirror_ok)
+        for (i = 0; i < 3; i++)
+            if (!SpriteMirrorPoint0(axis_x1, axis_y1, axis_x2, axis_y2,
+                    px[i], py[i], &mirror_px[i], &mirror_py[i]))
+                mirror_ok = FALSE;
+    if (mirror_ok)
+    {
+        if (dc->lighting)
+            (*dc->lighting)(dc, &points[0], &points[2], &points[1], tri_color);
+        else
+            dc->color.c0 = tri_color & 15;
+        SpriteFillTriangle0(dc, mirror_px, mirror_py, pz);
+    }
+    if (dc->lighting)
+        (*dc->lighting)(dc, &points[0], &points[1], &points[2], tri_color);
+    else
+        dc->color.c0 = tri_color & 15;
+    SpriteFillTriangle0(dc, px, py, pz);
+}
+
+U0 SpriteMeshFree0(I64 *points, CD3I32 *mesh_points,
+        CD3I32 *clip_tri_points, U8 *clip_counts)
+{
+    if (points) Free(points);
+    if (mesh_points) Free(mesh_points);
+    if (clip_tri_points) Free(clip_tri_points);
+    if (clip_counts) Free(clip_counts);
 }
 
 I64 SpriteMesh0(CDC *dc, U8 *sprite, I64 base_x, I64 base_y, I64 base_z,
@@ -296,12 +1499,17 @@ I64 SpriteMesh0(CDC *dc, U8 *sprite, I64 base_x, I64 base_y, I64 base_z,
 {//Read and draw one variable-sized mesh record; return its encoded size.
     I64 vertex_count, tri_count, header_size, size;
     I64 i, j, work, total_work, tx, ty, tz, old_dither;
+    I64 poly_count, poly_x[SPRITE_CLIP_POLY_MAX];
+    I64 poly_y[SPRITE_CLIP_POLY_MAX], poly_z[SPRITE_CLIP_POLY_MAX], fan;
     I64 *points, px[3], py[3], pz[3], mirror_px[3], mirror_py[3];
-    CD3I32 *mesh_points;
+    F64 *clip_points;
+    CD3I32 *mesh_points, *clip_tri_points;
+    CD3I32 poly_points[SPRITE_CLIP_POLY_MAX], tri_points[3];
     I32 vx, vy, vz, vertex_count32, tri_count32, tri_color, indices[3];
     U8 *vertices, *triangles;
     I64 old_color;
-    Bool valid;
+    U8 *clip_counts;
+    Bool perspective_transform;
 
     if ((sprite[0] & 0x7F) == 24)
     {
@@ -344,14 +1552,38 @@ I64 SpriteMesh0(CDC *dc, U8 *sprite, I64 base_x, I64 base_y, I64 base_z,
     size = header_size + vertex_count * 12 + tri_count * 16;
     vertices = sprite + header_size;
     triangles = vertices + vertex_count * 12;
-    points = CAlloc(vertex_count * 2 * sizeof(I64));
+    perspective_transform = transform_enabled && SpritePerspectiveMatrix0(dc) &&
+            SpriteMatrixTransformDefault0(dc);
+    if (perspective_transform)
+        points = CAlloc(vertex_count * (2 * sizeof(I64) + 4 * sizeof(F64)));
+    else
+        points = CAlloc(vertex_count * 2 * sizeof(I64));
     mesh_points = CAlloc(vertex_count * sizeof(CD3I32));
-    if (!points || !mesh_points)
+    clip_tri_points = NULL;
+    clip_counts = NULL;
+    if (perspective_transform)
     {
-        if (points) Free(points);
-        if (mesh_points) Free(mesh_points);
+        if (tri_count)
+        {
+            clip_tri_points = CAlloc(tri_count * SPRITE_CLIP_POLY_MAX *
+                    sizeof(CD3I32));
+            clip_counts = CAlloc(tri_count);
+        }
+        else
+        {
+            clip_tri_points = CAlloc(SPRITE_CLIP_POLY_MAX * sizeof(CD3I32));
+            clip_counts = CAlloc(1);
+        }
+    }
+    if (!points || !mesh_points || (perspective_transform &&
+            (!clip_tri_points || !clip_counts)))
+    {
+        SpriteMeshFree0(points, mesh_points, clip_tri_points, clip_counts);
         return -1;
     }
+    clip_points = NULL;
+    if (perspective_transform)
+        clip_points = points + vertex_count * 2;
     for (i = 0; i < vertex_count; i++)
     {
         MemCopy(&vx, vertices + i * 12, sizeof(I32));
@@ -363,29 +1595,38 @@ I64 SpriteMesh0(CDC *dc, U8 *sprite, I64 base_x, I64 base_y, I64 base_z,
         if (SpriteAbsI64(tx) > 100000 || SpriteAbsI64(ty) > 100000 ||
                 SpriteAbsI64(tz) > 100000)
         {
-            Free(points);
-            Free(mesh_points);
+            SpriteMeshFree0(points, mesh_points, clip_tri_points, clip_counts);
             return -1;
         }
-        if (transform_enabled)
+        if (perspective_transform)
         {
-            if (!dc->transform)
+            F64 clip[4];
+            if (!SpritePerspectiveClip0(dc, tx, ty, tz, clip))
             {
-                Free(points);
-                Free(mesh_points);
+                SpriteMeshFree0(points, mesh_points, clip_tri_points,
+                        clip_counts);
                 return -1;
             }
-            (*dc->transform)(dc, &tx, &ty, &tz);
+            for (j = 0; j < 4; j++)
+                clip_points[i * 4 + j] = clip[j];
+        }
+        else if (transform_enabled)
+        {
+            if (!SpriteTransformXYZ0(dc, TRUE, &tx, &ty, &tz))
+            {
+                SpriteMeshFree0(points, mesh_points, clip_tri_points,
+                        clip_counts);
+                return -1;
+            }
         }
         // The upstream splash anchors its 3D mesh at GR_Z_ALL (half the
         // signed I32 depth range). Screen coordinates stay tightly bounded,
         // while transformed depth must retain that valid large offset for
         // the depth buffer instead of being rejected by the 2D coordinate cap.
         if (SpriteAbsI64(tx) > 1000000 || SpriteAbsI64(ty) > 1000000 ||
-                tz < I32_MIN || tz > I32_MAX)
+                (!perspective_transform && (tz < I32_MIN || tz > I32_MAX)))
         {
-            Free(points);
-            Free(mesh_points);
+            SpriteMeshFree0(points, mesh_points, clip_tri_points, clip_counts);
             return -1;
         }
         mesh_points[i].x = tx;
@@ -404,63 +1645,62 @@ I64 SpriteMesh0(CDC *dc, U8 *sprite, I64 base_x, I64 base_y, I64 base_z,
                     sizeof(I32));
             if (indices[j] < 0 || indices[j] >= vertex_count)
             {
-                Free(points);
-                Free(mesh_points);
+                SpriteMeshFree0(points, mesh_points, clip_tri_points,
+                        clip_counts);
                 return -1;
             }
         }
-        if (dc->lighting)
-            for (j = 0; j < 3; j++)
+        if (perspective_transform)
+        {
+            poly_count = SpritePerspectiveClipTriangle0(dc, clip_points,
+                    indices, poly_x, poly_y, poly_z, poly_points);
+            if (poly_count < 0 || poly_count > SPRITE_CLIP_POLY_MAX)
             {
-                work = (j + 1) % 3;
-                if (SpriteAbsI64(mesh_points[indices[j]].x -
-                        mesh_points[indices[work]].x) > 12000 ||
-                        SpriteAbsI64(mesh_points[indices[j]].y -
-                        mesh_points[indices[work]].y) > 12000 ||
-                        SpriteAbsI64(mesh_points[indices[j]].z -
-                        mesh_points[indices[work]].z) > 12000)
+                SpriteMeshFree0(points, mesh_points, clip_tri_points,
+                        clip_counts);
+                return -1;
+            }
+            clip_counts[i] = poly_count;
+            for (j = 0; j < poly_count; j++)
+                MemCopy(&clip_tri_points[i * SPRITE_CLIP_POLY_MAX + j],
+                        &poly_points[j],
+                        sizeof(CD3I32));
+            for (fan = 1; fan < poly_count - 1; fan++)
+            {
+                px[0] = poly_x[0]; py[0] = poly_y[0]; pz[0] = poly_z[0];
+                px[1] = poly_x[fan]; py[1] = poly_y[fan]; pz[1] = poly_z[fan];
+                px[2] = poly_x[fan + 1]; py[2] = poly_y[fan + 1];
+                pz[2] = poly_z[fan + 1];
+                work = SpriteMeshTriangleWork0(dc, px, py, pz,
+                        symmetry_enabled, axis_x1, axis_y1, axis_x2,
+                        axis_y2, mirror_px, mirror_py);
+                if (work < 0 || work > pixel_limit - total_work)
                 {
-                    // Default lighting squares 64-bit normal components.
-                    Free(points);
-                    Free(mesh_points);
+                    SpriteMeshFree0(points, mesh_points, clip_tri_points,
+                            clip_counts);
                     return -1;
                 }
+                total_work += work;
             }
-        px[0] = points[indices[0] * 2];
-        py[0] = points[indices[0] * 2 + 1];
-        pz[0] = mesh_points[indices[0]].z;
-        px[1] = points[indices[1] * 2];
-        py[1] = points[indices[1] * 2 + 1];
-        pz[1] = mesh_points[indices[1]].z;
-        px[2] = points[indices[2] * 2];
-        py[2] = points[indices[2] * 2 + 1];
-        pz[2] = mesh_points[indices[2]].z;
-        work = SpriteTriangleWork0(dc, px, py);
-        if (work < 0 || work > pixel_limit - total_work)
-        {
-            Free(points);
-            Free(mesh_points);
-            return -1;
         }
-        total_work += work;
-        if (symmetry_enabled)
+        else
         {
-            valid = TRUE;
-            for (j = 0; j < 3; j++)
-                if (!SpriteMirrorPoint0(axis_x1, axis_y1, axis_x2, axis_y2,
-                        px[j], py[j], &mirror_px[j], &mirror_py[j]))
-                    valid = FALSE;
-            if (!valid)
-            {
-                Free(points);
-                Free(mesh_points);
-                return -1;
-            }
-            work = SpriteTriangleWork0(dc, mirror_px, mirror_py);
+            px[0] = points[indices[0] * 2];
+            py[0] = points[indices[0] * 2 + 1];
+            pz[0] = mesh_points[indices[0]].z;
+            px[1] = points[indices[1] * 2];
+            py[1] = points[indices[1] * 2 + 1];
+            pz[1] = mesh_points[indices[1]].z;
+            px[2] = points[indices[2] * 2];
+            py[2] = points[indices[2] * 2 + 1];
+            pz[2] = mesh_points[indices[2]].z;
+            work = SpriteMeshTriangleWork0(dc, px, py, pz,
+                    symmetry_enabled, axis_x1, axis_y1, axis_x2,
+                    axis_y2, mirror_px, mirror_py);
             if (work < 0 || work > pixel_limit - total_work)
             {
-                Free(points);
-                Free(mesh_points);
+                SpriteMeshFree0(points, mesh_points, clip_tri_points,
+                        clip_counts);
                 return -1;
             }
             total_work += work;
@@ -474,40 +1714,47 @@ I64 SpriteMesh0(CDC *dc, U8 *sprite, I64 base_x, I64 base_y, I64 base_z,
         for (j = 0; j < 3; j++)
             MemCopy(&indices[j], triangles + i * 16 + 4 + j * 4,
                     sizeof(I32));
-        px[0] = points[indices[0] * 2];
-        py[0] = points[indices[0] * 2 + 1];
-        px[1] = points[indices[1] * 2];
-        py[1] = points[indices[1] * 2 + 1];
-        px[2] = points[indices[2] * 2];
-        py[2] = points[indices[2] * 2 + 1];
-        if (symmetry_enabled &&
-                SpriteMirrorPoint0(axis_x1, axis_y1, axis_x2, axis_y2,
-                px[0], py[0], &mirror_px[0], &mirror_py[0]) &&
-                SpriteMirrorPoint0(axis_x1, axis_y1, axis_x2, axis_y2,
-                px[1], py[1], &mirror_px[1], &mirror_py[1]) &&
-                SpriteMirrorPoint0(axis_x1, axis_y1, axis_x2, axis_y2,
-                px[2], py[2], &mirror_px[2], &mirror_py[2]))
+        if (perspective_transform)
         {
-            if (dc->lighting)
-                (*dc->lighting)(dc, &mesh_points[indices[0]],
-                        &mesh_points[indices[2]], &mesh_points[indices[1]],
-                        tri_color);
-            else
-                dc->color.c0 = tri_color & 15;
-            SpriteFillTriangle0(dc, mirror_px, mirror_py, pz);
+            poly_count = clip_counts[i];
+            for (fan = 1; fan < poly_count - 1; fan++)
+            {
+                MemCopy(&tri_points[0],
+                        &clip_tri_points[i * SPRITE_CLIP_POLY_MAX],
+                        sizeof(CD3I32));
+                MemCopy(&tri_points[1],
+                        &clip_tri_points[i * SPRITE_CLIP_POLY_MAX + fan],
+                        sizeof(CD3I32));
+                MemCopy(&tri_points[2],
+                        &clip_tri_points[i * SPRITE_CLIP_POLY_MAX + fan + 1],
+                        sizeof(CD3I32));
+                for (j = 0; j < 3; j++)
+                {
+                    px[j] = tri_points[j].x;
+                    py[j] = tri_points[j].y;
+                    pz[j] = tri_points[j].z;
+                }
+                SpriteMeshDrawPrepared0(dc, tri_color, px, py, pz,
+                        tri_points, symmetry_enabled, axis_x1, axis_y1,
+                        axis_x2, axis_y2);
+            }
         }
-        if (dc->lighting)
-            (*dc->lighting)(dc, &mesh_points[indices[0]],
-                    &mesh_points[indices[1]], &mesh_points[indices[2]],
-                    tri_color);
         else
-            dc->color.c0 = tri_color & 15;
-        SpriteFillTriangle0(dc, px, py, pz);
+        {
+            for (j = 0; j < 3; j++)
+            {
+                px[j] = points[indices[j] * 2];
+                py[j] = points[indices[j] * 2 + 1];
+                pz[j] = mesh_points[indices[j]].z;
+                tri_points[j] = mesh_points[indices[j]];
+            }
+            SpriteMeshDrawPrepared0(dc, tri_color, px, py, pz, tri_points,
+                    symmetry_enabled, axis_x1, axis_y1, axis_x2, axis_y2);
+        }
     }
     dc->color = old_color;
     dc->dither_probability_u16 = old_dither;
-    Free(points);
-    Free(mesh_points);
+    SpriteMeshFree0(points, mesh_points, clip_tri_points, clip_counts);
     *raster_work = total_work;
     return size;
 }
@@ -533,6 +1780,180 @@ U0 SpritePlotSymTransform0(CDC *dc, Bool enabled, I64 x, I64 y, I64 z,
     if (symmetry_enabled && SpriteMirrorPoint0(axis_x1, axis_y1,
             axis_x2, axis_y2, screen_x, screen_y, &mirror_x, &mirror_y))
         GrPlot(dc, mirror_x, mirror_y);
+}
+
+I64 SpritePerspectiveQuad0(CDC *dc, I64 *corner_x, I64 *corner_y,
+        I64 z, I64 pixel_limit, Bool symmetry_enabled,
+        I64 axis_x1, I64 axis_y1, I64 axis_x2, I64 axis_y2)
+{//Clip and fill a projective quad without projecting an outside corner.
+    F64 clip_points[16], clip[4];
+    I32 triangles[6];
+    I64 poly_x[2 * SPRITE_CLIP_POLY_MAX];
+    I64 poly_y[2 * SPRITE_CLIP_POLY_MAX];
+    I64 poly_z[2 * SPRITE_CLIP_POLY_MAX];
+    I64 mirror_x[2 * SPRITE_CLIP_POLY_MAX];
+    I64 mirror_y[2 * SPRITE_CLIP_POLY_MAX];
+    CD3I32 poly_points[2 * SPRITE_CLIP_POLY_MAX];
+    I64 counts[2], mirror_ok[2];
+    I64 i, j, k, t, poly_base, count, fan, total, work;
+    I64 px[3], py[3], pz[3], mx[3], my[3];
+    I64 sx1, sy1, sx2, sy2, line_result, dx, dy, steps;
+
+    if (!dc || !dc->body || !corner_x || !corner_y || pixel_limit < 0)
+        return -1;
+    for (i = 0; i < 4; i++)
+    {
+        if (!SpritePerspectiveClip0(dc, corner_x[i], corner_y[i], z, clip))
+            return -1;
+        for (j = 0; j < 4; j++)
+            clip_points[i * 4 + j] = clip[j];
+    }
+    triangles[0] = 0; triangles[1] = 1; triangles[2] = 2;
+    triangles[3] = 0; triangles[4] = 2; triangles[5] = 3;
+    total = 0;
+    for (t = 0; t < 2; t++)
+    {
+        poly_base = t * SPRITE_CLIP_POLY_MAX;
+        count = SpritePerspectiveClipTriangle0(dc, clip_points,
+                triangles + t * 3, poly_x + poly_base, poly_y + poly_base,
+                poly_z + poly_base, poly_points + poly_base);
+        if (count < 0 || count > SPRITE_CLIP_POLY_MAX)
+            return -1;
+        counts[t] = count;
+        mirror_ok[t] = symmetry_enabled;
+        for (i = 0; i < count && mirror_ok[t]; i++)
+            if (!SpriteMirrorPoint0(axis_x1, axis_y1, axis_x2, axis_y2,
+                    poly_x[poly_base + i], poly_y[poly_base + i],
+                    &mirror_x[poly_base + i], &mirror_y[poly_base + i]))
+                mirror_ok[t] = FALSE;
+        for (fan = 1; fan < count - 1; fan++)
+        {
+            px[0] = poly_x[poly_base];
+            py[0] = poly_y[poly_base];
+            pz[0] = poly_z[poly_base];
+            px[1] = poly_x[poly_base + fan];
+            py[1] = poly_y[poly_base + fan];
+            pz[1] = poly_z[poly_base + fan];
+            px[2] = poly_x[poly_base + fan + 1];
+            py[2] = poly_y[poly_base + fan + 1];
+            pz[2] = poly_z[poly_base + fan + 1];
+            work = SpriteTriangleWork0(dc, px, py);
+            if (work < 0 || work > pixel_limit - total)
+                return -1;
+            total += work;
+            if (mirror_ok[t])
+            {
+                mx[0] = mirror_x[poly_base];
+                my[0] = mirror_y[poly_base];
+                mx[1] = mirror_x[poly_base + fan];
+                my[1] = mirror_y[poly_base + fan];
+                mx[2] = mirror_x[poly_base + fan + 1];
+                my[2] = mirror_y[poly_base + fan + 1];
+                work = SpriteTriangleWork0(dc, mx, my);
+                if (work < 0 || work > pixel_limit - total)
+                    return -1;
+                total += work;
+            }
+        }
+    }
+    for (i = 0; i < 4; i++)
+    {
+        j = (i + 1) & 3;
+        line_result = SpriteTransformLine0(dc, TRUE,
+                corner_x[i], corner_y[i], z,
+                corner_x[j], corner_y[j], z,
+                &sx1, &sy1, &sx2, &sy2);
+        if (line_result < 0)
+            return -1;
+        if (line_result > 0)
+        {
+            dx = sx2 - sx1;
+            dy = sy2 - sy1;
+            if (dx < 0) dx = -dx;
+            if (dy < 0) dy = -dy;
+            steps = dx;
+            if (dy > steps)
+                steps = dy;
+            steps++;
+            if (steps > 16384 || steps > pixel_limit - total)
+                return -1;
+            total += steps;
+            if (symmetry_enabled &&
+                    SpriteMirrorPoint0(axis_x1, axis_y1, axis_x2, axis_y2,
+                            sx1, sy1, &mx[0], &my[0]) &&
+                    SpriteMirrorPoint0(axis_x1, axis_y1, axis_x2, axis_y2,
+                            sx2, sy2, &mx[1], &my[1]))
+            {
+                if (steps > pixel_limit - total)
+                    return -1;
+                total += steps;
+            }
+        }
+    }
+
+    // Every clipped face and outline is preflighted before the first write.
+    for (i = 0; i < 4; i++)
+    {
+        j = (i + 1) & 3;
+        line_result = SpriteTransformLine0(dc, TRUE,
+                corner_x[i], corner_y[i], z,
+                corner_x[j], corner_y[j], z,
+                &sx1, &sy1, &sx2, &sy2);
+        if (line_result > 0)
+        {
+            GrLine(dc, sx1, sy1, sx2, sy2);
+            if (symmetry_enabled &&
+                    SpriteMirrorPoint0(axis_x1, axis_y1, axis_x2, axis_y2,
+                            sx1, sy1, &mx[0], &my[0]) &&
+                    SpriteMirrorPoint0(axis_x1, axis_y1, axis_x2, axis_y2,
+                            sx2, sy2, &mx[1], &my[1]))
+                GrLine(dc, mx[0], my[0], mx[1], my[1]);
+        }
+    }
+    for (t = 0; t < 2; t++)
+    {
+        poly_base = t * SPRITE_CLIP_POLY_MAX;
+        for (fan = 1; fan < counts[t] - 1; fan++)
+        {
+            px[0] = poly_x[poly_base]; py[0] = poly_y[poly_base];
+            pz[0] = poly_z[poly_base];
+            px[1] = poly_x[poly_base + fan];
+            py[1] = poly_y[poly_base + fan];
+            pz[1] = poly_z[poly_base + fan];
+            px[2] = poly_x[poly_base + fan + 1];
+            py[2] = poly_y[poly_base + fan + 1];
+            pz[2] = poly_z[poly_base + fan + 1];
+            SpriteFillTriangle0(dc, px, py, pz);
+            if (mirror_ok[t])
+            {
+                for (k = 0; k < 3; k++)
+                {
+                    if (!k)
+                        i = 0;
+                    else
+                        i = fan + k - 1;
+                    mx[k] = mirror_x[poly_base + i];
+                    my[k] = mirror_y[poly_base + i];
+                }
+                SpriteFillTriangle0(dc, mx, my, pz);
+            }
+        }
+    }
+    return total;
+}
+
+I64 SpritePerspectiveRect0(CDC *dc, I64 left, I64 top, I64 right,
+        I64 bottom, I64 z, I64 pixel_limit, Bool symmetry_enabled,
+        I64 axis_x1, I64 axis_y1, I64 axis_x2, I64 axis_y2)
+{//Build an axis-aligned source quad and share the projective clipper.
+    I64 corner_x[4], corner_y[4];
+
+    corner_x[0] = left; corner_y[0] = top;
+    corner_x[1] = right; corner_y[1] = top;
+    corner_x[2] = right; corner_y[2] = bottom;
+    corner_x[3] = left; corner_y[3] = bottom;
+    return SpritePerspectiveQuad0(dc, corner_x, corner_y, z, pixel_limit,
+            symmetry_enabled, axis_x1, axis_y1, axis_x2, axis_y2);
 }
 
 U0 SpriteRectTransform0(CDC *dc, I64 left, I64 top, I64 right, I64 bottom,
@@ -630,6 +2051,40 @@ I64 SpriteQuadLineWork0(I64 *x, I64 *y)
     return work;
 }
 
+I64 SpriteProjectiveQuadOutline0(CDC *dc, I64 *x, I64 *y, I64 z,
+        I64 pixel_limit, Bool draw)
+{//Preflight and draw four clipped projective outline segments atomically.
+    I64 screen_x1[4], screen_y1[4], screen_x2[4], screen_y2[4];
+    I64 line_result[4], i, j, dx, dy, steps, work;
+
+    work = 0;
+    for (i = 0; i < 4; i++)
+    {
+        j = (i + 1) & 3;
+        line_result[i] = SpriteTransformLine0(dc, TRUE,
+                x[i], y[i], z, x[j], y[j], z,
+                &screen_x1[i], &screen_y1[i],
+                &screen_x2[i], &screen_y2[i]);
+        if (line_result[i] < 0)
+            return -1;
+        if (line_result[i] > 0)
+        {
+            dx = SpriteAbsI64(screen_x2[i] - screen_x1[i]);
+            dy = SpriteAbsI64(screen_y2[i] - screen_y1[i]);
+            steps = SpriteMaxI64(dx, dy) + 1;
+            if (steps > 16384 || steps > pixel_limit - work)
+                return -1;
+            work += steps;
+        }
+    }
+    if (draw)
+        for (i = 0; i < 4; i++)
+            if (line_result[i] > 0)
+                GrLine(dc, screen_x1[i], screen_y1[i],
+                        screen_x2[i], screen_y2[i]);
+    return work;
+}
+
 U0 SpriteQuadLines0(CDC *dc, I64 *x, I64 *y)
 {
     I64 i, j;
@@ -660,6 +2115,7 @@ I64 SpriteTextBox0(CDC *dc, I64 x, I64 y, U8 *s, I64 text_len,
 {
     I64 i, width, width_max, height, work, edge_work;
     I64 px[4], py[4], screen_x[4], screen_y[4];
+    Bool projective;
     U8 ch;
 
     width = width_max = 0;
@@ -683,15 +2139,21 @@ I64 SpriteTextBox0(CDC *dc, I64 x, I64 y, U8 *s, I64 text_len,
         width_max = width;
     // Text is bounded to 8x8 work per source byte. Preflight the outline
     // using its transformed vertices when transform mode is active.
+    projective = transform_enabled && SpritePerspectiveMatrix0(dc) &&
+            SpriteMatrixTransformDefault0(dc);
     if (transform_enabled)
     {
         px[0] = px[3] = x - 2;
         px[1] = px[2] = x + width_max + 2;
         py[0] = py[1] = y - 2;
         py[2] = py[3] = y + height + 2;
-        if (!SpriteTransformQuad0(dc, px, py, z, screen_x, screen_y))
-            return -1;
-        edge_work = SpriteQuadLineWork0(screen_x, screen_y);
+        if (projective)
+            edge_work = SpriteProjectiveQuadOutline0(dc, px, py, z,
+                    pixel_limit, FALSE);
+        else if (SpriteTransformQuad0(dc, px, py, z, screen_x, screen_y))
+            edge_work = SpriteQuadLineWork0(screen_x, screen_y);
+        else
+            edge_work = -1;
         if (edge_work < 0)
             return -1;
         work = 64 * text_len + edge_work;
@@ -703,7 +2165,10 @@ I64 SpriteTextBox0(CDC *dc, I64 x, I64 y, U8 *s, I64 text_len,
     if (transform_enabled)
     {
         SpriteTextTransform0(dc, x, y, s, text_len, z);
-        SpriteQuadLines0(dc, screen_x, screen_y);
+        if (projective)
+            SpriteProjectiveQuadOutline0(dc, px, py, z, pixel_limit, TRUE);
+        else
+            SpriteQuadLines0(dc, screen_x, screen_y);
     }
     else
     {
@@ -724,6 +2189,7 @@ I64 SpriteTextDiamond0(CDC *dc, I64 x, I64 y, U8 *s, I64 text_len,
     I64 i, line_start, line_end, line_count, line_y, dx, dy;
     I64 dx_old, dy_old, width, work, edge_work, final_dx, final_dy;
     I64 px[4], py[4], screen_x[4], screen_y[4];
+    Bool projective;
     F64 slope;
     U8 *copy, saved, ch;
 
@@ -790,6 +2256,8 @@ I64 SpriteTextDiamond0(CDC *dc, I64 x, I64 y, U8 *s, I64 text_len,
     }
     final_dx = dx;
     final_dy = dy;
+    projective = transform_enabled && SpritePerspectiveMatrix0(dc) &&
+            SpriteMatrixTransformDefault0(dc);
     if (transform_enabled)
     {
         px[0] = px[2] = x;
@@ -798,12 +2266,13 @@ I64 SpriteTextDiamond0(CDC *dc, I64 x, I64 y, U8 *s, I64 text_len,
         py[0] = y - final_dy;
         py[1] = py[3] = y;
         py[2] = y + final_dy;
-        if (!SpriteTransformQuad0(dc, px, py, z, screen_x, screen_y))
-        {
-            Free(copy);
-            return -1;
-        }
-        edge_work = SpriteQuadLineWork0(screen_x, screen_y);
+        if (projective)
+            edge_work = SpriteProjectiveQuadOutline0(dc, px, py, z,
+                    pixel_limit, FALSE);
+        else if (SpriteTransformQuad0(dc, px, py, z, screen_x, screen_y))
+            edge_work = SpriteQuadLineWork0(screen_x, screen_y);
+        else
+            edge_work = -1;
         if (edge_work < 0)
         {
             Free(copy);
@@ -878,7 +2347,9 @@ I64 SpriteTextDiamond0(CDC *dc, I64 x, I64 y, U8 *s, I64 text_len,
             break;
         line_start = line_end + 1;
     }
-    if (transform_enabled)
+    if (transform_enabled && projective)
+        SpriteProjectiveQuadOutline0(dc, px, py, z, pixel_limit, TRUE);
+    else if (transform_enabled)
         SpriteQuadLines0(dc, screen_x, screen_y);
     else
     {
@@ -984,6 +2455,95 @@ I64 SpriteBezierRaster0(CDC *dc, I64 ox, I64 oy, CD3I32 *points,
     return work;
 }
 
+I64 SpriteBezierProjective0(CDC *dc, I64 ox, I64 oy, CD3I32 *points,
+        I64 order, I64 z, I64 pixel_limit, Bool symmetry_enabled,
+        I64 axis_x1, I64 axis_y1, I64 axis_x2, I64 axis_y2,
+        Bool draw)
+{//Sample a source-space Bezier and clip each projected segment before drawing.
+    I64 i, steps, work, px, py, nx, ny, scale, denominator, t, nt;
+    I64 a, b, d, sx1, sy1, sx2, sy2, line_result, dx, dy, segment_work;
+    I64 mx1, my1, mx2, my2;
+    Bool mirror_ok;
+
+    if (!dc || !points || pixel_limit < 0 || (order != 2 && order != 3))
+        return -1;
+    steps = SpriteSplineWork0(points, order);
+    if (steps <= 0 || steps > 480000)
+        return -1;
+    scale = 1024;
+    denominator = scale * scale;
+    if (order == 3)
+        denominator *= scale;
+    px = points[0].x;
+    py = points[0].y;
+    work = 0;
+    for (i = 1; i <= steps; i++)
+    {
+        t = i * scale / steps;
+        nt = scale - t;
+        if (order == 2)
+        {
+            a = nt * t;
+            b = t * t;
+            nx = points[0].x +
+                    (a * (points[1].x - points[0].x) +
+                     b * (points[2].x - points[0].x)) / denominator;
+            ny = points[0].y +
+                    (a * (points[1].y - points[0].y) +
+                     b * (points[2].y - points[0].y)) / denominator;
+        }
+        else
+        {
+            a = nt * nt * t;
+            b = nt * t * t;
+            d = t * t * t;
+            nx = points[0].x +
+                    (a * (points[1].x - points[0].x) +
+                     b * (points[2].x - points[0].x) +
+                     d * (points[3].x - points[0].x)) / denominator;
+            ny = points[0].y +
+                    (a * (points[1].y - points[0].y) +
+                     b * (points[2].y - points[0].y) +
+                     d * (points[3].y - points[0].y)) / denominator;
+        }
+        line_result = SpriteTransformLine0(dc, TRUE,
+                ox + px, oy + py, z, ox + nx, oy + ny, z,
+                &sx1, &sy1, &sx2, &sy2);
+        if (line_result < 0)
+            return -1;
+        if (line_result > 0)
+        {
+            dx = SpriteAbsI64(sx2 - sx1);
+            dy = SpriteAbsI64(sy2 - sy1);
+            segment_work = dx;
+            if (dy > segment_work)
+                segment_work = dy;
+            segment_work++;
+            if (segment_work > pixel_limit - work)
+                return -1;
+            mirror_ok = symmetry_enabled &&
+                    SpriteMirrorPoint0(axis_x1, axis_y1,
+                            axis_x2, axis_y2, sx1, sy1, &mx1, &my1) &&
+                    SpriteMirrorPoint0(axis_x1, axis_y1,
+                            axis_x2, axis_y2, sx2, sy2, &mx2, &my2);
+            if (mirror_ok && segment_work > pixel_limit - work - segment_work)
+                return -1;
+            if (draw)
+            {
+                GrLine(dc, sx1, sy1, sx2, sy2);
+                if (mirror_ok)
+                    GrLine(dc, mx1, my1, mx2, my2);
+            }
+            work += segment_work;
+            if (mirror_ok)
+                work += segment_work;
+        }
+        px = nx;
+        py = ny;
+    }
+    return work;
+}
+
 I64 SpriteBSpline0(CDC *dc, I64 ox, I64 oy, U8 *sprite, I64 type,
         Bool transform_enabled, I64 z, I64 pixel_limit,
         Bool symmetry_enabled, I64 axis_x1, I64 axis_y1,
@@ -993,6 +2553,7 @@ I64 SpriteBSpline0(CDC *dc, I64 ox, I64 oy, U8 *sprite, I64 type,
     I64 work, total_work, raster_work, screen_x, screen_y;
     I32 count32;
     CD3I32 *input, *control;
+    Bool projective_transform;
 
     MemCopy(&count32, sprite + 4, sizeof(I32));
     count = count32;
@@ -1014,6 +2575,8 @@ I64 SpriteBSpline0(CDC *dc, I64 ox, I64 oy, U8 *sprite, I64 type,
         if (closed)
             control_count += 3;
     }
+    projective_transform = transform_enabled &&
+            SpritePerspectiveMatrix0(dc) && SpriteMatrixTransformDefault0(dc);
     input = MAlloc(count * sizeof(CD3I32));
     control = MAlloc(control_count * sizeof(CD3I32));
     if (!input || !control)
@@ -1033,7 +2596,7 @@ I64 SpriteBSpline0(CDC *dc, I64 ox, I64 oy, U8 *sprite, I64 type,
             return -1;
         }
         input[i].z = 0;
-        if (transform_enabled)
+        if (transform_enabled && !projective_transform)
         {
             if (!SpriteTransformPoint0(dc, TRUE, ox + input[i].x,
                     oy + input[i].y, z, &screen_x, &screen_y) ||
@@ -1048,7 +2611,7 @@ I64 SpriteBSpline0(CDC *dc, I64 ox, I64 oy, U8 *sprite, I64 type,
             input[i].y = screen_y;
         }
     }
-    if (transform_enabled)
+    if (transform_enabled && !projective_transform)
         ox = oy = 0;
 
     if (order == 2 && !closed)
@@ -1150,26 +2713,55 @@ I64 SpriteBSpline0(CDC *dc, I64 ox, I64 oy, U8 *sprite, I64 type,
     }
 
     total_work = 0;
-    for (i = 0; i < control_count - order; i += order)
+    if (projective_transform)
     {
-        work = SpriteSplineWork0(control + i, order);
-        if (work > pixel_limit - total_work)
+        for (i = 0; i < control_count - order; i += order)
         {
-            Free(control);
-            Free(input);
-            return -1;
+            work = SpriteBezierProjective0(dc, ox, oy, control + i,
+                    order, z, pixel_limit - total_work, symmetry_enabled,
+                    axis_x1, axis_y1, axis_x2, axis_y2, FALSE);
+            if (work < 0)
+            {
+                Free(control);
+                Free(input);
+                return -1;
+            }
+            total_work += work;
         }
-        total_work += work;
+        raster_work = total_work;
+        for (i = 0; i < control_count - order; i += order)
+        {
+            work = SpriteBezierProjective0(dc, ox, oy, control + i,
+                    order, z, total_work, symmetry_enabled,
+                    axis_x1, axis_y1, axis_x2, axis_y2, TRUE);
+            if (work < 0)
+                break;
+            total_work -= work;
+        }
     }
-    raster_work = total_work;
-    for (i = 0; i < control_count - order; i += order)
+    else
     {
-        work = SpriteBezierRaster0(dc, ox, oy, control + i, order,
-                total_work, symmetry_enabled, axis_x1, axis_y1,
-                axis_x2, axis_y2);
-        if (work < 0)
-            break;
-        total_work -= work;
+        for (i = 0; i < control_count - order; i += order)
+        {
+            work = SpriteSplineWork0(control + i, order);
+            if (work > pixel_limit - total_work)
+            {
+                Free(control);
+                Free(input);
+                return -1;
+            }
+            total_work += work;
+        }
+        raster_work = total_work;
+        for (i = 0; i < control_count - order; i += order)
+        {
+            work = SpriteBezierRaster0(dc, ox, oy, control + i, order,
+                    total_work, symmetry_enabled, axis_x1, axis_y1,
+                    axis_x2, axis_y2);
+            if (work < 0)
+                break;
+            total_work -= work;
+        }
     }
     Free(control);
     Free(input);
@@ -1279,6 +2871,87 @@ U0 SpriteEllipse0(CDC *dc, I64 cx, I64 cy, I64 rx, I64 ry,
     }
 }
 
+I64 SpriteEllipseProjective0(CDC *dc, I64 cx, I64 cy, I64 rx, I64 ry,
+        F64 angle, I64 z, I64 pixel_limit, Bool symmetry_enabled,
+        I64 axis_x1, I64 axis_y1, I64 axis_x2, I64 axis_y2)
+{//Sample a source-space ellipse and clip each chord before rasterization.
+    I64 radius, steps, i, pass, work, line_result, sx1, sy1, sx2, sy2;
+    I64 dx, dy, segment_work, px, py, nx, ny, mx1, my1, mx2, my2;
+    F64 sin_angle, cos_angle, t, sample_cos, sample_sin;
+    Bool mirror_ok;
+
+    if (!dc || pixel_limit < 0 || rx < 0 || ry < 0 || rx > 4096 ||
+            ry > 4096 || angle != angle || angle < -1000000.0 ||
+            angle > 1000000.0)
+        return -1;
+    radius = rx;
+    if (ry > radius)
+        radius = ry;
+    steps = SpriteCeilF64(6.283185307179586 * radius);
+    if (steps < 1)
+        steps = 1;
+    if (steps > 480000)
+        return -1;
+    sin_angle = ZcSinF64(angle);
+    cos_angle = ZcCosF64(angle);
+    work = 0;
+    // Preflight the complete outline before the draw pass touches scanout.
+    for (pass = 0; pass < 2; pass++)
+    {
+        work = 0;
+        t = 0.0;
+        px = cx + SpriteRoundF64(cos_angle * rx);
+        py = cy - SpriteRoundF64(sin_angle * rx);
+        for (i = 1; i <= steps; i++)
+        {
+            t = 6.283185307179586 * i / steps;
+            sample_cos = ZcCosF64(t);
+            sample_sin = ZcSinF64(t);
+            nx = cx + SpriteRoundF64(cos_angle * rx * sample_cos +
+                    sin_angle * ry * sample_sin);
+            ny = cy + SpriteRoundF64(-sin_angle * rx * sample_cos +
+                    cos_angle * ry * sample_sin);
+            line_result = SpriteTransformLine0(dc, TRUE, px, py, z,
+                    nx, ny, z, &sx1, &sy1, &sx2, &sy2);
+            if (line_result < 0)
+                return -1;
+            if (line_result > 0)
+            {
+                dx = SpriteAbsI64(sx2 - sx1);
+                dy = SpriteAbsI64(sy2 - sy1);
+                segment_work = dx;
+                if (dy > segment_work)
+                    segment_work = dy;
+                segment_work++;
+                if (segment_work > pixel_limit - work)
+                    return -1;
+                mirror_ok = symmetry_enabled &&
+                        SpriteMirrorPoint0(axis_x1, axis_y1,
+                                axis_x2, axis_y2, sx1, sy1, &mx1, &my1) &&
+                        SpriteMirrorPoint0(axis_x1, axis_y1,
+                                axis_x2, axis_y2, sx2, sy2, &mx2, &my2);
+                if (mirror_ok &&
+                        segment_work > pixel_limit - work - segment_work)
+                    return -1;
+                if (pass)
+                {
+                    GrLine(dc, sx1, sy1, sx2, sy2);
+                    if (mirror_ok)
+                        GrLine(dc, mx1, my1, mx2, my2);
+                }
+                work += segment_work;
+                if (mirror_ok)
+                    work += segment_work;
+            }
+            px = nx;
+            py = ny;
+        }
+        if (pass)
+            return work;
+    }
+    return -1;
+}
+
 I64 SpriteRotatedRect0(CDC *dc, I64 x, I64 y, I32 x1, I32 y1,
         I32 x2, I32 y2, U64 angle_bits, Bool transform_enabled, I64 z,
         I64 pixel_limit)
@@ -1286,6 +2959,7 @@ I64 SpriteRotatedRect0(CDC *dc, I64 x, I64 y, I32 x1, I32 y1,
     I64 rect_x, rect_y, width, height, area, swap;
     I64 px[4], py[4], screen_x[4], screen_y[4];
     I64 i, j, min_x, min_y, max_x, max_y;
+    Bool perspective;
     F64 angle, sin_angle, cos_angle;
 
     // Promote before subtraction so adversarial I32 endpoints cannot
@@ -1296,6 +2970,8 @@ I64 SpriteRotatedRect0(CDC *dc, I64 x, I64 y, I32 x1, I32 y1,
     height -= y1;
     if (width <= 0 || width > 4096 || height <= 0 || height > 4096)
         return -1;
+    perspective = transform_enabled && SpritePerspectiveMatrix0(dc) &&
+            SpriteMatrixTransformDefault0(dc);
     area = width * height;
     if (area > pixel_limit)
         return -1;
@@ -1343,6 +3019,10 @@ I64 SpriteRotatedRect0(CDC *dc, I64 x, I64 y, I32 x1, I32 y1,
         px[3] = px[0] + SpriteRoundF64(sin_angle * height);
         py[3] = py[0] + SpriteRoundF64(cos_angle * height);
 
+        if (perspective)
+            return SpritePerspectiveQuad0(dc, px, py, z, pixel_limit,
+                    FALSE, 0, 0, 0, 0);
+
         for (i = 0; i < 4; i++)
             if (!SpriteTransformPoint0(dc, transform_enabled,
                     px[i], py[i], z, &screen_x[i], &screen_y[i]) ||
@@ -1379,6 +3059,16 @@ I64 SpriteRotatedRect0(CDC *dc, I64 x, I64 y, I32 x1, I32 y1,
         return area;
     }
 
+    if (perspective)
+    {
+        px[0] = x + rect_x; py[0] = y + rect_y;
+        px[1] = x + rect_x + width; py[1] = y + rect_y;
+        px[2] = x + rect_x + width; py[2] = y + rect_y + height;
+        px[3] = x + rect_x; py[3] = y + rect_y + height;
+        return SpritePerspectiveQuad0(dc, px, py, z, pixel_limit,
+                FALSE, 0, 0, 0, 0);
+    }
+
     if (transform_enabled)
         SpriteRectTransform0(dc, x + rect_x, y + rect_y,
                 x + rect_x + width, y + rect_y + height,
@@ -1398,8 +3088,30 @@ Bool SpriteArrow0(CDC *dc, I64 x, I64 y, I64 x1, I64 y1,
     I64 head2_x, head2_y, start_x, start_y, end_x, end_y;
     I64 mirror_start_x, mirror_start_y, mirror_end_x, mirror_end_y;
     I64 mirror_head1_x, mirror_head1_y, mirror_head2_x, mirror_head2_y;
+    I64 line_result, tip_x, tip_y, head1_steps, head2_steps;
     F64 arrow_scale;
-    if (transform_enabled)
+    Bool perspective, tip_visible;
+    perspective = transform_enabled && SpritePerspectiveMatrix0(dc) &&
+            SpriteMatrixTransformDefault0(dc);
+    tip_visible = TRUE;
+    if (perspective)
+    {
+        line_result = SpriteTransformLine0(dc, TRUE, x + x1, y + y1, z,
+                x + x2, y + y2, z, &start_x, &start_y, &end_x, &end_y);
+        if (line_result < 0)
+            return FALSE;
+        if (!line_result)
+            return TRUE;
+        tip_visible = SpriteTransformPoint0(dc, TRUE, x + x2, y + y2, z,
+                &tip_x, &tip_y) && tip_x >= dc->x && tip_y >= dc->y &&
+                tip_x < dc->x + dc->width && tip_y < dc->y + dc->height;
+        if (tip_visible)
+        {
+            end_x = tip_x;
+            end_y = tip_y;
+        }
+    }
+    else if (transform_enabled)
     {
         if (!SpriteTransformPoint0(dc, TRUE, x + x1, y + y1, z,
                 &start_x, &start_y) ||
@@ -1427,41 +3139,71 @@ Bool SpriteArrow0(CDC *dc, I64 x, I64 y, I64 x1, I64 y1,
     if (dy_abs > line_steps)
         line_steps = dy_abs;
     line_steps++;
-    line_budget = 3;
-    if (symmetry_enabled)
-        line_budget = 6;
-    if (length_sqr > 16384 * 16384 ||
-            line_budget * line_steps > 480000 - *pixel_budget)
+    line_budget = line_steps;
+    if (tip_visible && (dx || dy))
+    {
+        arrow_scale = 2.75 * dc->thick / Sqrt(ToF64(length_sqr));
+        head1_x = end_x - dx * arrow_scale + dy * arrow_scale + 0.5;
+        head1_y = end_y - dy * arrow_scale - dx * arrow_scale + 0.5;
+        head2_x = end_x - dx * arrow_scale - dy * arrow_scale + 0.5;
+        head2_y = end_y - dy * arrow_scale + dx * arrow_scale + 0.5;
+        head1_steps = SpriteAbsI64(end_x - head1_x);
+        if (SpriteAbsI64(end_y - head1_y) > head1_steps)
+            head1_steps = SpriteAbsI64(end_y - head1_y);
+        head1_steps++;
+        head2_steps = SpriteAbsI64(end_x - head2_x);
+        if (SpriteAbsI64(end_y - head2_y) > head2_steps)
+            head2_steps = SpriteAbsI64(end_y - head2_y);
+        head2_steps++;
+        if (head1_steps > 480000 - line_budget ||
+                head2_steps > 480000 - line_budget - head1_steps)
+            return FALSE;
+        line_budget += head1_steps + head2_steps;
+    }
+    if (length_sqr > 16384 * 16384)
         return FALSE;
-    *pixel_budget += line_budget * line_steps;
+    if (symmetry_enabled)
+    {
+        if (line_budget > (480000 - *pixel_budget) / 2)
+            return FALSE;
+        line_budget *= 2;
+    }
+    if (line_budget > 480000 - *pixel_budget)
+        return FALSE;
+    *pixel_budget += line_budget;
     if (!dx && !dy)
         return TRUE;
-    arrow_scale = 2.75 * dc->thick / Sqrt(ToF64(length_sqr));
-    head1_x = end_x - dx * arrow_scale + dy * arrow_scale + 0.5;
-    head1_y = end_y - dy * arrow_scale - dx * arrow_scale + 0.5;
-    head2_x = end_x - dx * arrow_scale - dy * arrow_scale + 0.5;
-    head2_y = end_y - dy * arrow_scale + dx * arrow_scale + 0.5;
+    if (tip_visible && (!head1_steps || !head2_steps))
+        return FALSE;
     if (symmetry_enabled &&
             (!SpriteMirrorPoint0(axis_x1, axis_y1, axis_x2, axis_y2,
                     start_x, start_y, &mirror_start_x, &mirror_start_y) ||
             !SpriteMirrorPoint0(axis_x1, axis_y1, axis_x2, axis_y2,
-                    end_x, end_y, &mirror_end_x, &mirror_end_y) ||
-            !SpriteMirrorPoint0(axis_x1, axis_y1, axis_x2, axis_y2,
+                    end_x, end_y, &mirror_end_x, &mirror_end_y)))
+        return FALSE;
+    if (symmetry_enabled && tip_visible &&
+            (!SpriteMirrorPoint0(axis_x1, axis_y1, axis_x2, axis_y2,
                     head1_x, head1_y, &mirror_head1_x, &mirror_head1_y) ||
             !SpriteMirrorPoint0(axis_x1, axis_y1, axis_x2, axis_y2,
                     head2_x, head2_y, &mirror_head2_x, &mirror_head2_y)))
         return FALSE;
     GrLine(dc, start_x, start_y, end_x, end_y);
-    GrLine(dc, head1_x, head1_y, end_x, end_y);
-    GrLine(dc, head2_x, head2_y, end_x, end_y);
+    if (tip_visible)
+    {
+        GrLine(dc, head1_x, head1_y, end_x, end_y);
+        GrLine(dc, head2_x, head2_y, end_x, end_y);
+    }
     if (symmetry_enabled)
     {
         GrLine(dc, mirror_start_x, mirror_start_y,
                 mirror_end_x, mirror_end_y);
-        GrLine(dc, mirror_head1_x, mirror_head1_y,
-                mirror_end_x, mirror_end_y);
-        GrLine(dc, mirror_head2_x, mirror_head2_y,
-                mirror_end_x, mirror_end_y);
+        if (tip_visible)
+        {
+            GrLine(dc, mirror_head1_x, mirror_head1_y,
+                    mirror_end_x, mirror_end_y);
+            GrLine(dc, mirror_head2_x, mirror_head2_y,
+                    mirror_end_x, mirror_end_y);
+        }
     }
     return TRUE;
 }
@@ -1514,9 +3256,11 @@ I64 SpritePolygon0(CDC *dc, I64 x, I64 y, I64 z, Bool transform_enabled,
         I64 axis_x2, I64 axis_y2)
 {
     I64 i, x2, y2, x1, y1, px, py, nx, ny, dx, dy, steps, total;
+    I64 line_result;
     I64 s1, s2, c, s12, s22, c2;
     I64 screen_x1, screen_y1, screen_x2, screen_y2;
     I64 mirror_x1, mirror_y1, mirror_x2, mirror_y2;
+    Bool perspective;
     F64 angle, angle_step;
 
     if (sides < 3 || sides > 1024 || rx <= 0 || ry <= 0 ||
@@ -1525,6 +3269,8 @@ I64 SpritePolygon0(CDC *dc, I64 x, I64 y, I64 z, Bool transform_enabled,
     MemCopy(&angle, &angle_bits, sizeof(U64));
     if (angle != angle || angle < -6283185.0 || angle > 6283185.0)
         return -1;
+    perspective = transform_enabled && SpritePerspectiveMatrix0(dc) &&
+            SpriteMatrixTransformDefault0(dc);
 
     angle_step = 2 * pi / sides;
     s1 = (1 << 24) * ZcSinF64(angle_step);
@@ -1540,7 +3286,7 @@ I64 SpritePolygon0(CDC *dc, I64 x, I64 y, I64 z, Bool transform_enabled,
     y1 = (s22 * x2 + c2 * (y2 * ry / rx)) >> 24;
     px = cx + (x1 >> 8);
     py = cy + (y1 >> 8);
-    if (!SpriteTransformPoint0(dc, transform_enabled,
+    if (!perspective && !SpriteTransformPoint0(dc, transform_enabled,
             x + px, y + py, z, &screen_x1, &screen_y1))
         return -1;
 
@@ -1557,22 +3303,40 @@ I64 SpritePolygon0(CDC *dc, I64 x, I64 y, I64 z, Bool transform_enabled,
         y1 = (s22 * x2 + c2 * (y2 * ry / rx)) >> 24;
         nx = cx + (x1 >> 8);
         ny = cy + (y1 >> 8);
-        if (!SpriteTransformPoint0(dc, transform_enabled,
-                x + nx, y + ny, z, &screen_x2, &screen_y2))
-            return -1;
-        dx = screen_x2 - screen_x1;
-        dy = screen_y2 - screen_y1;
-        if (dx < 0) dx = -dx;
-        if (dy < 0) dy = -dy;
-        if (dx > dy) steps = dx + 1;
-        else steps = dy + 1;
-        if (steps > 16384 || steps > pixel_limit - total)
-            return -1;
-        total += steps;
+        if (perspective)
+        {
+            line_result = SpriteTransformLine0(dc, TRUE,
+                    x + px, y + py, z, x + nx, y + ny, z,
+                    &screen_x1, &screen_y1, &screen_x2, &screen_y2);
+            if (line_result < 0)
+                return -1;
+        }
+        else
+        {
+            if (!SpriteTransformPoint0(dc, transform_enabled,
+                    x + nx, y + ny, z, &screen_x2, &screen_y2))
+                return -1;
+            line_result = 1;
+        }
+        if (line_result > 0)
+        {
+            dx = screen_x2 - screen_x1;
+            dy = screen_y2 - screen_y1;
+            if (dx < 0) dx = -dx;
+            if (dy < 0) dy = -dy;
+            if (dx > dy) steps = dx + 1;
+            else steps = dy + 1;
+            if (steps > 16384 || steps > pixel_limit - total)
+                return -1;
+            total += steps;
+        }
         px = nx;
         py = ny;
-        screen_x1 = screen_x2;
-        screen_y1 = screen_y2;
+        if (!perspective)
+        {
+            screen_x1 = screen_x2;
+            screen_y1 = screen_y2;
+        }
     }
 
     // Rebuild the first vertex and rasterize the already-validated edges.
@@ -1582,7 +3346,7 @@ I64 SpritePolygon0(CDC *dc, I64 x, I64 y, I64 z, Bool transform_enabled,
     y1 = (s22 * x2 + c2 * (y2 * ry / rx)) >> 24;
     px = cx + (x1 >> 8);
     py = cy + (y1 >> 8);
-    if (!SpriteTransformPoint0(dc, transform_enabled,
+    if (!perspective && !SpriteTransformPoint0(dc, transform_enabled,
             x + px, y + py, z, &screen_x1, &screen_y1))
         return -1;
     for (i = 0; i < sides; i++)
@@ -1595,23 +3359,39 @@ I64 SpritePolygon0(CDC *dc, I64 x, I64 y, I64 z, Bool transform_enabled,
         y1 = (s22 * x2 + c2 * (y2 * ry / rx)) >> 24;
         nx = cx + (x1 >> 8);
         ny = cy + (y1 >> 8);
-        if (!SpriteTransformPoint0(dc, transform_enabled,
-                x + nx, y + ny, z, &screen_x2, &screen_y2))
+        if (perspective)
+            line_result = SpriteTransformLine0(dc, TRUE,
+                    x + px, y + py, z, x + nx, y + ny, z,
+                    &screen_x1, &screen_y1, &screen_x2, &screen_y2);
+        else
+        {
+            line_result = 1;
+            if (!SpriteTransformPoint0(dc, transform_enabled,
+                    x + nx, y + ny, z, &screen_x2, &screen_y2))
+                return -1;
+        }
+        if (line_result < 0)
             return -1;
-        // x2/y2 retain the unrotated recurrence; draw the transformed edge.
-        SpritePolygonLine0(dc, screen_x1, screen_y1,
-                screen_x2, screen_y2);
-        if (symmetry_enabled &&
-                SpriteMirrorPoint0(axis_x1, axis_y1, axis_x2, axis_y2,
-                screen_x1, screen_y1, &mirror_x1, &mirror_y1) &&
-                SpriteMirrorPoint0(axis_x1, axis_y1, axis_x2, axis_y2,
-                screen_x2, screen_y2, &mirror_x2, &mirror_y2))
-            SpritePolygonLine0(dc, mirror_x1, mirror_y1,
-                    mirror_x2, mirror_y2);
+        if (line_result > 0)
+        {
+            // x2/y2 retain the unrotated recurrence; draw the transformed edge.
+            SpritePolygonLine0(dc, screen_x1, screen_y1,
+                    screen_x2, screen_y2);
+            if (symmetry_enabled &&
+                    SpriteMirrorPoint0(axis_x1, axis_y1, axis_x2, axis_y2,
+                    screen_x1, screen_y1, &mirror_x1, &mirror_y1) &&
+                    SpriteMirrorPoint0(axis_x1, axis_y1, axis_x2, axis_y2,
+                    screen_x2, screen_y2, &mirror_x2, &mirror_y2))
+                SpritePolygonLine0(dc, mirror_x1, mirror_y1,
+                        mirror_x2, mirror_y2);
+        }
         px = nx;
         py = ny;
-        screen_x1 = screen_x2;
-        screen_y1 = screen_y2;
+        if (!perspective)
+        {
+            screen_x1 = screen_x2;
+            screen_y1 = screen_y2;
+        }
     }
     return total;
 }
@@ -1785,10 +3565,10 @@ fill_done:
 U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
 {
     I64 row, col, stride, old_color, old_thick, old_x, old_y, size, records, pixel_budget;
-    I64 mesh_work;
+    I64 mesh_work, line_result;
     I64 symmetry_x1, symmetry_y1, symmetry_x2, symmetry_y2;
     I64 old_flags, screen_x1, screen_y1, screen_x2, screen_y2;
-    Bool symmetry_enabled, transform_enabled;
+    Bool symmetry_enabled, transform_enabled, projective_transform;
     I64 text_len;
     I64 circle_x, circle_y, circle_err;
     I64 poly_i, poly_x1, poly_y1, poly_dx, poly_dy, poly_work, poly_total;
@@ -1849,15 +3629,34 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
             }
             else
                 ellipse_angle = 0;
-            if (width < 0 || width > 4096 || height < 0 || height > 4096 ||
-                    8 * (width + height + 1) > 480000 - pixel_budget)
+            if (width < 0 || width > 4096 || height < 0 || height > 4096)
                 break;
-            pixel_budget += 8 * (width + height + 1);
-            SpriteEllipse0(dc, x + old_x + x1, y + old_y + y1,
-                           width, height, ellipse_angle,
-                           transform_enabled, z, symmetry_enabled,
-                           symmetry_x1, symmetry_y1,
-                           symmetry_x2, symmetry_y2);
+            projective_transform = transform_enabled &&
+                    SpritePerspectiveMatrix0(dc) &&
+                    SpriteMatrixTransformDefault0(dc);
+            if (projective_transform)
+            {
+                size = SpriteEllipseProjective0(dc,
+                        x + old_x + x1, y + old_y + y1,
+                        width, height, ellipse_angle, z,
+                        480000 - pixel_budget, symmetry_enabled,
+                        symmetry_x1, symmetry_y1,
+                        symmetry_x2, symmetry_y2);
+                if (size < 0)
+                    break;
+                pixel_budget += size;
+            }
+            else
+            {
+                if (8 * (width + height + 1) > 480000 - pixel_budget)
+                    break;
+                pixel_budget += 8 * (width + height + 1);
+                SpriteEllipse0(dc, x + old_x + x1, y + old_y + y1,
+                        width, height, ellipse_angle,
+                        transform_enabled, z, symmetry_enabled,
+                        symmetry_x1, symmetry_y1,
+                        symmetry_x2, symmetry_y2);
+            }
             size = 32;
         }
         else if (type == 13) // SPT_ROTATED_RECT, bounded cardinal subset
@@ -2008,12 +3807,11 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
             MemCopy(&y1, sprite + 8, sizeof(I32));
             MemCopy(&x2, sprite + 12, sizeof(I32));
             MemCopy(&y2, sprite + 16, sizeof(I32));
-            if (SpriteTransformPoint0(dc, transform_enabled,
+            line_result = SpriteTransformLine0(dc, transform_enabled,
                     x + old_x + x1, y + old_y + y1, z,
-                    &screen_x1, &screen_y1) &&
-                    SpriteTransformPoint0(dc, transform_enabled,
                     x + old_x + x2, y + old_y + y2, z,
-                    &screen_x2, &screen_y2))
+                    &screen_x1, &screen_y1, &screen_x2, &screen_y2);
+            if (line_result > 0)
             {
                 GrLine(dc, screen_x1, screen_y1, screen_x2, screen_y2);
                 if (symmetry_enabled)
@@ -2043,7 +3841,20 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
             MemCopy(&y1, sprite + 8, sizeof(I32));
             MemCopy(&x2, sprite + 12, sizeof(I32));
             MemCopy(&y2, sprite + 16, sizeof(I32));
-            if (transform_enabled)
+            if (transform_enabled && SpritePerspectiveMatrix0(dc) &&
+                    SpriteMatrixTransformDefault0(dc))
+            {
+                size = SpritePerspectiveRect0(dc,
+                        x + old_x + x1, y + old_y + y1,
+                        x + old_x + x2, y + old_y + y2, z,
+                        480000 - pixel_budget, symmetry_enabled,
+                        symmetry_x1, symmetry_y1,
+                        symmetry_x2, symmetry_y2);
+                if (size < 0)
+                    break;
+                pixel_budget += size;
+            }
+            else if (transform_enabled)
             {
                 I64 px[4], py[4], mirror_px[4], mirror_py[4], i, j;
                 Bool valid;
@@ -2120,13 +3931,30 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
             MemCopy(&x1, sprite + 4, sizeof(I32));
             MemCopy(&y1, sprite + 8, sizeof(I32));
             MemCopy(&radius, sprite + 12, sizeof(I32));
-            if (radius < 0 || radius > 4096 || 8 * radius > 480000 - pixel_budget)
+            if (radius < 0 || radius > 4096)
                 break;
             // Bounded integer midpoint raster; GrPlot applies active CDC
             // clipping and writes each symmetric point to the CDC bitmap.
-            pixel_budget += 8 * radius;
-            if (radius)
+            projective_transform = transform_enabled &&
+                    SpritePerspectiveMatrix0(dc) &&
+                    SpriteMatrixTransformDefault0(dc);
+            if (radius && projective_transform)
             {
+                size = SpriteEllipseProjective0(dc,
+                        x + old_x + x1, y + old_y + y1,
+                        radius, radius, 0.0, z,
+                        480000 - pixel_budget, symmetry_enabled,
+                        symmetry_x1, symmetry_y1,
+                        symmetry_x2, symmetry_y2);
+                if (size < 0)
+                    break;
+                pixel_budget += size;
+            }
+            else if (radius)
+            {
+                if (8 * radius > 480000 - pixel_budget)
+                    break;
+                pixel_budget += 8 * radius;
                 circle_x = radius;
                 circle_y = 0;
                 circle_err = 1 - radius;
@@ -2210,10 +4038,6 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
                 MemCopy(&y1, sprite + 12, sizeof(I32));
                 poly_x1 = x1;
                 poly_y1 = y1;
-                if (!SpriteTransformPoint0(dc, transform_enabled,
-                        x + old_x + poly_x1, y + old_y + poly_y1, z,
-                        &screen_x1, &screen_y1))
-                    poly_total = -1;
                 // Validate segment work before drawing so a bad later segment
                 // cannot leave a partially rendered record behind.
                 for (poly_i = 1; poly_i < poly_count && poly_total >= 0;
@@ -2221,32 +4045,37 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
                 {
                     MemCopy(&x2, sprite + 8 + poly_i * 8, sizeof(I32));
                     MemCopy(&y2, sprite + 12 + poly_i * 8, sizeof(I32));
-                    if (!SpriteTransformPoint0(dc, transform_enabled,
+                    line_result = SpriteTransformLine0(dc,
+                            transform_enabled,
+                            x + old_x + poly_x1, y + old_y + poly_y1, z,
                             x + old_x + x2, y + old_y + y2, z,
-                            &screen_x2, &screen_y2))
+                            &screen_x1, &screen_y1,
+                            &screen_x2, &screen_y2);
+                    if (line_result < 0)
                     {
                         poly_total = -1;
                         break;
                     }
-                    poly_dx = screen_x2 - screen_x1;
-                    poly_dy = screen_y2 - screen_y1;
-                    if (poly_dx < 0) poly_dx = -poly_dx;
-                    if (poly_dy < 0) poly_dy = -poly_dy;
-                    if (poly_dx > poly_dy)
-                        poly_work = poly_dx + 1;
-                    else
-                        poly_work = poly_dy + 1;
-                    if (poly_work > 16384 ||
-                            poly_work > 480000 - pixel_budget - poly_total)
+                    if (line_result > 0)
                     {
-                        poly_total = -1;
-                        break;
+                        poly_dx = screen_x2 - screen_x1;
+                        poly_dy = screen_y2 - screen_y1;
+                        if (poly_dx < 0) poly_dx = -poly_dx;
+                        if (poly_dy < 0) poly_dy = -poly_dy;
+                        if (poly_dx > poly_dy)
+                            poly_work = poly_dx + 1;
+                        else
+                            poly_work = poly_dy + 1;
+                        if (poly_work > 16384 || poly_work >
+                                480000 - pixel_budget - poly_total)
+                        {
+                            poly_total = -1;
+                            break;
+                        }
+                        poly_total += poly_work;
                     }
-                    poly_total += poly_work;
                     poly_x1 = x2;
                     poly_y1 = y2;
-                    screen_x1 = screen_x2;
-                    screen_y1 = screen_y2;
                 }
                 if (poly_total < 0)
                     break;
@@ -2259,24 +4088,29 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
                 {
                     MemCopy(&x2, sprite + 8 + poly_i * 8, sizeof(I32));
                     MemCopy(&y2, sprite + 12 + poly_i * 8, sizeof(I32));
-                    if (!SpriteTransformPoint0(dc, transform_enabled,
+                    line_result = SpriteTransformLine0(dc,
+                            transform_enabled,
                             x + old_x + poly_x1, y + old_y + poly_y1, z,
-                            &screen_x1, &screen_y1) ||
-                            !SpriteTransformPoint0(dc, transform_enabled,
                             x + old_x + x2, y + old_y + y2, z,
-                            &screen_x2, &screen_y2))
+                            &screen_x1, &screen_y1,
+                            &screen_x2, &screen_y2);
+                    if (line_result < 0)
                     {
                         poly_total = -1;
                         break;
                     }
                     // Segment work is prevalidated above. Use the native CDC
                     // line rasterizer and reflect the resulting segment.
-                    GrLine(dc, screen_x1, screen_y1, screen_x2, screen_y2);
-                    if (symmetry_enabled)
-                        SpriteMirrorLine0(dc, screen_x1, screen_y1,
-                                screen_x2, screen_y2,
-                                symmetry_x1, symmetry_y1,
-                                symmetry_x2, symmetry_y2);
+                    if (line_result > 0)
+                    {
+                        GrLine(dc, screen_x1, screen_y1,
+                                screen_x2, screen_y2);
+                        if (symmetry_enabled)
+                            SpriteMirrorLine0(dc, screen_x1, screen_y1,
+                                    screen_x2, screen_y2,
+                                    symmetry_x1, symmetry_y1,
+                                    symmetry_x2, symmetry_y2);
+                    }
                     poly_x1 = x2;
                     poly_y1 = y2;
                 }

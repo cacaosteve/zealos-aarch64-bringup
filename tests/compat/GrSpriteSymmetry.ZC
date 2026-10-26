@@ -4,6 +4,14 @@ I64 GrSpriteSymmetryPixel(CDC *dc, I64 x, I64 y)
 }
 extern I64 ZcFbTextPixel(I64 x, I64 y);
 extern I64 ZcFbGraphColor(I64 color);
+extern Bool ZcFbGraphRect(I64 x, I64 y, I64 width, I64 height, U32 color,
+        I64 left, I64 top, I64 right, I64 bottom, I64 task_z);
+extern I64 SpritePerspectiveRect0(CDC *dc, I64 left, I64 top, I64 right,
+        I64 bottom, I64 z, I64 pixel_limit, Bool symmetry_enabled,
+        I64 axis_x1, I64 axis_y1, I64 axis_x2, I64 axis_y2);
+extern U0 SpriteFillTriangle0(CDC *dc, I64 *px, I64 *py, I64 *pz);
+extern U0 SpriteVLine0(CDC *dc, I64 x, I64 top, I64 bottom,
+        I64 z_top, I64 z_bottom);
 
 I64 GrSpriteSymmetryScanoutPixel(I64 x, I64 y)
 {
@@ -14,11 +22,27 @@ I64 GrSpriteSymmetryChecks()
 {
     CDC *dc;
     U8 *records;
-    U8 type;
+    U8 type, pixel;
     I32 x1, y1, x2, y2, sides, z1, z2, z3;
     U8 move_code;
     I64 i, color, scan_x, scan_y, source_pixel, mirror_pixel, spline_pixels;
+    I64 direct_work;
+    I64 arrow_pixels;
+    I64 rotated_body_pixels, rotated_scanout_pixels, rotated_work;
+    I64 rotated_ellipse_scanout_pixels;
+    I64 projective_bitmap_pixels, projective_polypt_pixels;
+    I64 projective_text_pixels;
+    I64 projective_diamond_pixels;
+    I64 polygon_found, polygon_line_result;
     I64 screen_color;
+    I64 projected_x, projected_y, projected_z, clip_poly_count;
+    I64 line_x1, line_y1, line_x2, line_y2;
+    U64 ellipse_angle_bits;
+    F64 clip[4];
+    F64 mesh_clip[12];
+    I64 mesh_x[8], mesh_y[8], mesh_z[8];
+    I32 mesh_indices[3];
+    CD3I32 mesh_projected[8];
 
     dc = DCNew(800, 600);
     records = CAlloc(246);
@@ -522,6 +546,993 @@ I64 GrSpriteSymmetryChecks()
     Sprite3(dc, 0, 0, 0, records);
     if (!dc->body[275 * dc->width_internal + 158])
         return 23;
+
+    // Projective line clipping below is asserted against the live scanout;
+    // the preceding mesh probes deliberately used the private CDC bitmap.
+    dc->flags |= DCF_SCREEN_BITMAP | DCF_ON_TOP;
+
+    // Indexed meshes share point sprites' homogeneous projection. With
+    // w=1+z/10, this triangle's x/y coordinates halve and its z becomes 5.
+    dc->x = dc->y = dc->z = 0;
+    Mat4x4IdentEqu(dc->r);
+    dc->r[14] = 0x1999999A;
+    if (!SpriteMatrixTransformDefault0(dc))
+        return 27;
+    if (!SpritePerspectiveClip0(dc, 200, 120, 10, clip) ||
+            !SpritePerspectiveProject0(dc, clip, &projected_x,
+            &projected_y, &projected_z) || projected_x != 100 ||
+            projected_y != 60 || projected_z != 5)
+        return 28;
+    if (!SpritePerspectiveClip0(dc, 280, 120, 10, mesh_clip) ||
+            !SpritePerspectiveClip0(dc, 200, 200, 10, mesh_clip + 4))
+        return 29;
+    if (!SpritePerspectiveProject0(dc, mesh_clip, &projected_x,
+            &projected_y, &projected_z) || projected_z != 5 ||
+            !SpritePerspectiveProject0(dc, mesh_clip + 4, &projected_x,
+            &projected_y, &projected_z) || projected_z != 5)
+        return 31;
+    for (i = 0; i < 4; i++)
+        mesh_clip[8 + i] = clip[i];
+    mesh_indices[0] = 0;
+    mesh_indices[1] = 1;
+    mesh_indices[2] = 2;
+    if (SpritePerspectiveClipTriangle0(dc, mesh_clip, mesh_indices,
+            mesh_x, mesh_y, mesh_z, mesh_projected) != 3 ||
+            mesh_z[0] != 5 || mesh_z[1] != 5 || mesh_z[2] != 5 ||
+            mesh_projected[0].z != 5 || mesh_projected[1].z != 5 ||
+            mesh_projected[2].z != 5)
+        return 30;
+
+    // Projective sprite lines must clip a huge source endpoint before the
+    // bounded integer projection. The visible half of this segment crosses
+    // the left CDC edge at x=0 and remains drawable through x=100.
+    Mat4x4IdentEqu(dc->r);
+    dc->r[14] = 0x1999999A;
+    dc->x = dc->y = dc->z = 0;
+    if (SpriteTransformLine0(dc, TRUE, -5000000, 200, 10,
+            200, 200, 10, &line_x1, &line_y1, &line_x2, &line_y2) != 1)
+        return 33;
+    if (line_x1 != 0 || line_y1 != 100 || line_x2 != 100 ||
+            line_y2 != 100)
+        return 34;
+    ZcFbGraphRect(0, 100, 150, 1, ZcFbGraphColor(0),
+            0, 0, 799, 599, 0);
+    screen_color = ZcFbGraphColor(12);
+    MemSet(records, 0, 246);
+    type = SPT_TRANSFORM_ON;
+    MemCopy(records, &type, sizeof(U8));
+    type = SPT_LINE;
+    MemCopy(records + 1, &type, sizeof(U8));
+    x1 = -5000000; y1 = 200; x2 = 200; y2 = 200;
+    MemCopy(records + 5, &x1, sizeof(I32));
+    MemCopy(records + 9, &y1, sizeof(I32));
+    MemCopy(records + 13, &x2, sizeof(I32));
+    MemCopy(records + 17, &y2, sizeof(I32));
+    Sprite3(dc, 0, 0, 10, records);
+    if (GrSpriteSymmetryScanoutPixel(50, 100) != screen_color ||
+            GrSpriteSymmetryScanoutPixel(120, 100) != ZcFbGraphColor(0))
+        return 32;
+
+    // Projective polylines must keep later visible segments when an earlier
+    // segment begins outside the viewport. Each edge is clipped before its
+    // raster work is charged and before it reaches the framebuffer.
+    ZcFbGraphRect(0, 100, 150, 101, ZcFbGraphColor(0),
+            0, 0, 799, 599, 0);
+    MemSet(records, 0, 246);
+    type = SPT_TRANSFORM_ON;
+    MemCopy(records, &type, sizeof(U8));
+    type = SPT_POLYLINE;
+    MemCopy(records + 1, &type, sizeof(U8));
+    sides = 3;
+    MemCopy(records + 5, &sides, sizeof(I32));
+    x1 = -5000000; y1 = 200; x2 = 200; y2 = 200;
+    MemCopy(records + 9, &x1, sizeof(I32));
+    MemCopy(records + 13, &y1, sizeof(I32));
+    MemCopy(records + 17, &x2, sizeof(I32));
+    MemCopy(records + 21, &y2, sizeof(I32));
+    x2 = 200; y2 = 400;
+    MemCopy(records + 25, &x2, sizeof(I32));
+    MemCopy(records + 29, &y2, sizeof(I32));
+    Sprite3(dc, 0, 0, 10, records);
+    if (GrSpriteSymmetryScanoutPixel(50, 100) != screen_color ||
+            GrSpriteSymmetryScanoutPixel(100, 150) != screen_color ||
+            GrSpriteSymmetryScanoutPixel(120, 100) != ZcFbGraphColor(0))
+        return 35;
+
+    // A projective rectangle crossing the left CDC edge must clip its fill
+    // and outline instead of dropping the shape when one corner is remote.
+    ZcFbGraphRect(0, 200, 150, 201, ZcFbGraphColor(0),
+            0, 0, 799, 599, 0);
+    for (scan_y = 200; scan_y <= 450; scan_y++)
+        for (scan_x = 0; scan_x <= 150; scan_x++)
+        {
+            dc->body[scan_y * dc->width_internal + scan_x] = 0;
+            dc->depth_buf[scan_y * dc->width_internal + scan_x] = I32_MAX;
+        }
+    MemSet(records, 0, 246);
+    type = SPT_TRANSFORM_ON;
+    MemCopy(records, &type, sizeof(U8));
+    type = SPT_RECT;
+    MemCopy(records + 1, &type, sizeof(U8));
+    x1 = -5000000; y1 = 400; x2 = 200; y2 = 800;
+    dc->color.c0 = 12;
+    SpriteVLine0(dc, 50, 200, 300, 10, 10);
+    if (dc->body[250 * dc->width_internal + 50] != 12)
+        return 0x400;
+    for (scan_y = 200; scan_y <= 450; scan_y++)
+        for (scan_x = 0; scan_x <= 150; scan_x++)
+        {
+            dc->body[scan_y * dc->width_internal + scan_x] = 0;
+            dc->depth_buf[scan_y * dc->width_internal + scan_x] = I32_MAX;
+        }
+    mesh_x[0] = 0; mesh_y[0] = 400; mesh_z[0] = 10;
+    mesh_x[1] = 0; mesh_y[1] = 200; mesh_z[1] = 10;
+    mesh_x[2] = 100; mesh_y[2] = 200; mesh_z[2] = 10;
+    SpriteFillTriangle0(dc, mesh_x, mesh_y, mesh_z);
+    if (dc->body[250 * dc->width_internal + 50] != 12)
+        return 0x300;
+    for (scan_y = 200; scan_y <= 450; scan_y++)
+        for (scan_x = 0; scan_x <= 150; scan_x++)
+        {
+            dc->body[scan_y * dc->width_internal + scan_x] = 0;
+            dc->depth_buf[scan_y * dc->width_internal + scan_x] = I32_MAX;
+        }
+    direct_work = SpritePerspectiveRect0(dc, x1, y1, x2, y2, 10,
+            480000, FALSE, 0, 0, 0, 0);
+    if (direct_work < 0)
+        return 0x100 + direct_work;
+    if (dc->body[250 * dc->width_internal + 50] != 12)
+        return 0x200;
+    for (scan_y = 200; scan_y <= 450; scan_y++)
+        for (scan_x = 0; scan_x <= 150; scan_x++)
+        {
+            dc->body[scan_y * dc->width_internal + scan_x] = 0;
+            dc->depth_buf[scan_y * dc->width_internal + scan_x] = I32_MAX;
+        }
+    MemCopy(records + 5, &x1, sizeof(I32));
+    MemCopy(records + 9, &y1, sizeof(I32));
+    MemCopy(records + 13, &x2, sizeof(I32));
+    MemCopy(records + 17, &y2, sizeof(I32));
+    Sprite3(dc, 0, 0, 10, records);
+    if (dc->body[250 * dc->width_internal + 50] != 12)
+        return 36;
+    if (GrSpriteSymmetryScanoutPixel(50, 200) != screen_color)
+        return 37;
+    if (dc->body[250 * dc->width_internal + 120])
+        return 38;
+    if (dc->body[450 * dc->width_internal + 50])
+        return 39;
+
+    // A regular polygon whose left vertices cross w=0 must retain the visible
+    // part of its right edge after near-plane and viewport clipping.
+    ZcFbGraphRect(0, 0, 800, 600, ZcFbGraphColor(0),
+            0, 0, 799, 599, 0);
+    Mat4x4IdentEqu(dc->r);
+    dc->r[3] = 3000 * 0x100000000;
+    dc->r[7] = -400 * 0x100000000;
+    dc->r[12] = 0x00100000; // w = 1 + x / 4096
+    dc->x = dc->y = dc->z = 0;
+    dc->width = 800;
+    dc->height = 600;
+    dc->flags |= DCF_SCREEN_BITMAP | DCF_ON_TOP;
+    screen_color = ZcFbGraphColor(12);
+    for (scan_y = 0; scan_y < 600; scan_y++)
+        for (scan_x = 0; scan_x < 800; scan_x++)
+        {
+            dc->body[scan_y * dc->width_internal + scan_x] = 0;
+            dc->depth_buf[scan_y * dc->width_internal + scan_x] = I32_MAX;
+        }
+    MemSet(records, 0, 246);
+    type = SPT_TRANSFORM_ON;
+    MemCopy(records, &type, sizeof(U8));
+    type = SPT_POLYGON;
+    MemCopy(records + 1, &type, sizeof(U8));
+    x1 = -4096; y1 = 300; x2 = 4096; y2 = 180;
+    MemCopy(records + 5, &x1, sizeof(I32));
+    MemCopy(records + 9, &y1, sizeof(I32));
+    MemCopy(records + 13, &x2, sizeof(I32));
+    MemCopy(records + 17, &y2, sizeof(I32));
+    sides = 4;
+    MemCopy(records + 33, &sides, sizeof(I32));
+    polygon_line_result = SpriteTransformLine0(dc, TRUE,
+            -4096, 480, 0, 0, 300, 0,
+            &line_x1, &line_y1, &line_x2, &line_y2);
+    if (polygon_line_result != 1 || line_x1 != 0 || line_x2 != 799)
+        return 41;
+    Sprite3(dc, 0, 0, 0, records);
+    polygon_found = FALSE;
+    for (scan_y = 0; scan_y < 600 && !polygon_found; scan_y++)
+        if (GrSpriteSymmetryPixel(dc, 400, scan_y) == 12)
+            polygon_found = TRUE;
+    if (!polygon_found)
+        return 40;
+    if (GrSpriteSymmetryPixel(dc, 400, 200) != 0)
+        return 43;
+
+    // A projective quadratic spline begins behind the near plane and crosses
+    // the viewport after perspective division. Sampling source-space control
+    // points and clipping each projected segment must preserve that arc.
+    ZcFbGraphRect(0, 0, 800, 600, ZcFbGraphColor(0),
+            0, 0, 799, 599, 0);
+    Mat4x4IdentEqu(dc->r);
+    dc->r[3] = 3000 * 0x100000000;
+    dc->r[12] = 0x00100000; // w = 1 + x / 4096
+    dc->x = dc->y = dc->z = 0;
+    dc->width = 800;
+    dc->height = 600;
+    dc->flags |= DCF_SCREEN_BITMAP | DCF_ON_TOP;
+    screen_color = ZcFbGraphColor(12);
+    for (scan_y = 0; scan_y < 600; scan_y++)
+        for (scan_x = 0; scan_x < 800; scan_x++)
+            dc->body[scan_y * dc->width_internal + scan_x] = 0;
+    MemSet(records, 0, 246);
+    type = SPT_TRANSFORM_ON;
+    MemCopy(records, &type, sizeof(U8));
+    type = SPT_BSPLINE2;
+    MemCopy(records + 1, &type, sizeof(U8));
+    sides = 3;
+    MemCopy(records + 5, &sides, sizeof(I32));
+    x1 = -4096; y1 = 60; z1 = 0;
+    MemCopy(records + 9, &x1, sizeof(I32));
+    MemCopy(records + 13, &y1, sizeof(I32));
+    MemCopy(records + 17, &z1, sizeof(I32));
+    x1 = 0;
+    MemCopy(records + 21, &x1, sizeof(I32));
+    MemCopy(records + 25, &y1, sizeof(I32));
+    MemCopy(records + 29, &z1, sizeof(I32));
+    x1 = 4096;
+    MemCopy(records + 33, &x1, sizeof(I32));
+    MemCopy(records + 37, &y1, sizeof(I32));
+    MemCopy(records + 41, &z1, sizeof(I32));
+    polygon_line_result = SpriteTransformLine0(dc, TRUE,
+            -3000, 60, 0, -2800, 60, 0,
+            &line_x1, &line_y1, &line_x2, &line_y2);
+    if (polygon_line_result != 1 || line_x1 < 0 || line_x1 > 1 ||
+            line_x2 < 632 || line_x2 > 634 || line_y1 < 220 ||
+            line_y1 > 226 || line_y2 < 188 || line_y2 > 193)
+        return 46;
+    dc->color.c0 = 12;
+    spline_pixels = SpriteBSpline0(dc, 0, 0, records + 1,
+            SPT_BSPLINE2, TRUE, 0, 480000, FALSE,
+            0, 0, 0, 0);
+    if (spline_pixels <= 0)
+        return 47;
+    polygon_found = FALSE;
+    for (scan_y = 150; scan_y <= 260 && !polygon_found; scan_y++)
+        for (scan_x = 380; scan_x <= 420 && !polygon_found; scan_x++)
+            if (GrSpriteSymmetryScanoutPixel(scan_x, scan_y) == screen_color)
+                polygon_found = TRUE;
+    if (!polygon_found)
+        return 49;
+    ZcFbGraphRect(0, 0, 800, 600, ZcFbGraphColor(0),
+            0, 0, 799, 599, 0);
+    for (scan_y = 0; scan_y < 600; scan_y++)
+        for (scan_x = 0; scan_x < 800; scan_x++)
+            dc->body[scan_y * dc->width_internal + scan_x] = 0;
+    dc->flags |= DCF_SCREEN_BITMAP | DCF_ON_TOP;
+    dc->color.c0 = 12;
+    Sprite3(dc, 0, 0, 0, records);
+    polygon_found = FALSE;
+    for (scan_y = 150; scan_y <= 260 && !polygon_found; scan_y++)
+        for (scan_x = 380; scan_x <= 420 && !polygon_found; scan_x++)
+            if (GrSpriteSymmetryScanoutPixel(scan_x, scan_y) == screen_color)
+                polygon_found = TRUE;
+    if (!polygon_found)
+        return 44;
+    if (GrSpriteSymmetryPixel(dc, 700, 500) != 0)
+        return 45;
+
+    // Projective ellipses retain visible arcs when their source-space outline
+    // crosses w=0 and the CDC viewport. Test the public ellipse record rather
+    // than projecting each midpoint sample independently.
+    ZcFbGraphRect(0, 0, 800, 600, ZcFbGraphColor(0),
+            0, 0, 799, 599, 0);
+    Mat4x4IdentEqu(dc->r);
+    dc->r[3] = 3000 * 0x100000000;
+    dc->r[12] = 0x00100000;
+    dc->x = dc->y = dc->z = 0;
+    dc->width = 800;
+    dc->height = 600;
+    dc->flags |= DCF_SCREEN_BITMAP | DCF_ON_TOP;
+    dc->color.c0 = 12;
+    MemSet(records, 0, 246);
+    type = SPT_TRANSFORM_ON;
+    MemCopy(records, &type, sizeof(U8));
+    type = SPT_ELLIPSE;
+    MemCopy(records + 1, &type, sizeof(U8));
+    x1 = -4096; y1 = 60; x2 = 4096; y2 = 60;
+    MemCopy(records + 5, &x1, sizeof(I32));
+    MemCopy(records + 9, &y1, sizeof(I32));
+    MemCopy(records + 13, &x2, sizeof(I32));
+    MemCopy(records + 17, &y2, sizeof(I32));
+    ellipse_angle_bits = 0;
+    MemCopy(records + 25, &ellipse_angle_bits, sizeof(U64));
+    Sprite3(dc, 0, 0, 0, records);
+    polygon_found = FALSE;
+    for (scan_y = 280; scan_y <= 500 && !polygon_found; scan_y++)
+        for (scan_x = 250; scan_x <= 550 && !polygon_found; scan_x++)
+            if (GrSpriteSymmetryScanoutPixel(scan_x, scan_y) == screen_color)
+                polygon_found = TRUE;
+    if (!polygon_found)
+        return 50;
+
+    // A rotated source ellipse must retain a clipped projective arc too.
+    // This catches regressions where the dispatcher drops the angle when it
+    // selects the homogeneous near-plane path.
+    ZcFbGraphRect(0, 0, 800, 600, ZcFbGraphColor(0),
+            0, 0, 799, 599, 0);
+    for (scan_y = 0; scan_y < 600; scan_y++)
+        for (scan_x = 0; scan_x < 800; scan_x++)
+        {
+            dc->body[scan_y * dc->width_internal + scan_x] = 0;
+            dc->depth_buf[scan_y * dc->width_internal + scan_x] = I32_MAX;
+        }
+    Mat4x4IdentEqu(dc->r);
+    dc->r[3] = 3000 * 0x100000000;
+    dc->r[7] = 1100 * 0x100000000;
+    dc->r[12] = 0x00100000;
+    dc->x = dc->y = dc->z = 0;
+    dc->width = 800;
+    dc->height = 600;
+    dc->flags |= DCF_SCREEN_BITMAP | DCF_ON_TOP;
+    dc->color.c0 = 12;
+    ellipse_angle_bits = 0x3FE921FB54442D18; // pi/4
+    MemCopy(records + 25, &ellipse_angle_bits, sizeof(U64));
+    Sprite3(dc, 0, 0, 0, records);
+    rotated_ellipse_scanout_pixels = 0;
+    for (scan_y = 0; scan_y < 600; scan_y++)
+        for (scan_x = 0; scan_x < 800; scan_x++)
+            if (GrSpriteSymmetryScanoutPixel(scan_x, scan_y) == screen_color)
+                rotated_ellipse_scanout_pixels++;
+    if (rotated_ellipse_scanout_pixels < 20 ||
+            rotated_ellipse_scanout_pixels > 20000)
+        return 64;
+    if (GrSpriteSymmetryScanoutPixel(700, 550) == screen_color)
+        return 65;
+
+    // The circle opcode uses the same projective outline path and must keep a
+    // small visible arc instead of dropping samples behind the near plane.
+    ZcFbGraphRect(0, 0, 800, 600, ZcFbGraphColor(0),
+            0, 0, 799, 599, 0);
+    Mat4x4IdentEqu(dc->r);
+    dc->r[3] = 4000 * 0x100000000;
+    dc->r[7] = -399 * 0x100000000;
+    dc->r[12] = 0x00100000;
+    MemSet(records, 0, 246);
+    type = SPT_TRANSFORM_ON;
+    MemCopy(records, &type, sizeof(U8));
+    type = SPT_CIRCLE;
+    MemCopy(records + 1, &type, sizeof(U8));
+    x1 = -4096; y1 = 400; x2 = 100;
+    MemCopy(records + 5, &x1, sizeof(I32));
+    MemCopy(records + 9, &y1, sizeof(I32));
+    MemCopy(records + 13, &x2, sizeof(I32));
+    Sprite3(dc, 0, 0, 0, records);
+    polygon_found = FALSE;
+    for (scan_y = 100; scan_y <= 400 && !polygon_found; scan_y++)
+        for (scan_x = 80; scan_x <= 240 && !polygon_found; scan_x++)
+            if (GrSpriteSymmetryScanoutPixel(scan_x, scan_y) == screen_color)
+                polygon_found = TRUE;
+    if (!polygon_found)
+        return 51;
+
+    // Projective arrows clip a source endpoint behind the near plane and keep
+    // the visible body and arrowhead in scanout when the tip remains visible.
+    ZcFbGraphRect(0, 0, 800, 600, ZcFbGraphColor(0),
+            0, 0, 799, 599, 0);
+    Mat4x4IdentEqu(dc->r);
+    dc->r[3] = 3000 * 0x100000000;
+    dc->r[12] = 0x00100000; // x'=x+3000, w=1+x/4096
+    dc->x = dc->y = dc->z = 0;
+    dc->width = 800;
+    dc->height = 600;
+    dc->flags |= DCF_SCREEN_BITMAP | DCF_ON_TOP;
+    dc->color.c0 = 12;
+    for (scan_y = 0; scan_y < 600; scan_y++)
+        for (scan_x = 0; scan_x < 800; scan_x++)
+            dc->body[scan_y * dc->width_internal + scan_x] = 0;
+    MemSet(records, 0, 246);
+    type = SPT_TRANSFORM_ON;
+    MemCopy(records, &type, sizeof(U8));
+    type = 26; // SPT_ARROW
+    MemCopy(records + 1, &type, sizeof(U8));
+    x1 = -5000; y1 = 60; x2 = -2800;
+    MemCopy(records + 5, &x1, sizeof(I32));
+    MemCopy(records + 9, &y1, sizeof(I32));
+    MemCopy(records + 13, &x2, sizeof(I32));
+    MemCopy(records + 17, &y1, sizeof(I32));
+    polygon_line_result = SpriteTransformLine0(dc, TRUE,
+            x1, y1, 0, x2, y1, 0,
+            &line_x1, &line_y1, &line_x2, &line_y2);
+    if (polygon_line_result != 1 || line_x1 != 0 || line_x2 < 632 ||
+            line_x2 > 634 || line_y2 < 188 || line_y2 > 193)
+        return 52;
+    Sprite3(dc, 0, 0, 0, records);
+    arrow_pixels = 0;
+    for (scan_y = 150; scan_y <= 250; scan_y++)
+        for (scan_x = 0; scan_x <= 650; scan_x++)
+            if (GrSpriteSymmetryScanoutPixel(scan_x, scan_y) == screen_color)
+                arrow_pixels++;
+    if (arrow_pixels < 500 || arrow_pixels > 900)
+        return 53;
+
+    // A non-cardinal rotated rectangle stays in source space through the
+    // perspective transform, then clips to the left CDC viewport edge.
+    ZcFbGraphRect(0, 0, 800, 600, ZcFbGraphColor(0),
+            0, 0, 799, 599, 0);
+    for (scan_y = 0; scan_y < 600; scan_y++)
+        for (scan_x = 0; scan_x < 800; scan_x++)
+        {
+            dc->body[scan_y * dc->width_internal + scan_x] = 0;
+            dc->depth_buf[scan_y * dc->width_internal + scan_x] = I32_MAX;
+        }
+    Mat4x4IdentEqu(dc->r);
+    dc->r[3] = 0;
+    dc->r[12] = 0x00100000;
+    dc->x = dc->y = dc->z = 0;
+    dc->width = 800;
+    dc->height = 600;
+    dc->color.c0 = 12;
+    dc->flags |= DCF_SCREEN_BITMAP | DCF_ON_TOP;
+    MemSet(records, 0, 246);
+    type = SPT_TRANSFORM_ON;
+    MemCopy(records, &type, sizeof(U8));
+    type = 13; // SPT_ROTATED_RECT
+    MemCopy(records + 1, &type, sizeof(U8));
+    x1 = -1000; y1 = 1000; x2 = 500; y2 = 1200;
+    MemCopy(records + 5, &x1, sizeof(I32));
+    MemCopy(records + 9, &y1, sizeof(I32));
+    MemCopy(records + 13, &x2, sizeof(I32));
+    MemCopy(records + 17, &y2, sizeof(I32));
+    ellipse_angle_bits = 0x3FE921FB54442D18; // pi/4
+    MemCopy(records + 25, &ellipse_angle_bits, sizeof(U64));
+    // Exercise the source-space rotated helper before checking the public
+    // Sprite3 record path below.
+    rotated_work = SpriteRotatedRect0(dc, 0, 0, x1, y1, x2, y2,
+            ellipse_angle_bits, TRUE, 0, 480000);
+    if (rotated_work < 0)
+        return 59;
+    if (rotated_work < 100)
+        return 60;
+    rotated_body_pixels = 0;
+    for (scan_y = 0; scan_y < 600; scan_y++)
+        for (scan_x = 0; scan_x < 800; scan_x++)
+            if (dc->body[scan_y * dc->width_internal + scan_x] == 12)
+                rotated_body_pixels++;
+    if (rotated_body_pixels < 100)
+        return 61;
+    for (scan_y = 0; scan_y < 600; scan_y++)
+        for (scan_x = 0; scan_x < 800; scan_x++)
+        {
+            dc->body[scan_y * dc->width_internal + scan_x] = 0;
+            dc->depth_buf[scan_y * dc->width_internal + scan_x] = I32_MAX;
+        }
+    Sprite3(dc, 0, 0, 0, records);
+    rotated_body_pixels = 0;
+    rotated_scanout_pixels = 0;
+    for (scan_y = 0; scan_y < 600; scan_y++)
+        for (scan_x = 0; scan_x < 800; scan_x++)
+        {
+            if (dc->body[scan_y * dc->width_internal + scan_x] == 12)
+                rotated_body_pixels++;
+            if (GrSpriteSymmetryScanoutPixel(scan_x, scan_y) == screen_color)
+                rotated_scanout_pixels++;
+        }
+    if (rotated_body_pixels < 100)
+        return 62;
+    if (rotated_scanout_pixels < 100)
+        return 63;
+    if (dc->body[550 * dc->width_internal + 50])
+        return 55;
+    dc->flags &= ~(DCF_SCREEN_BITMAP | DCF_ON_TOP);
+    Mat4x4IdentEqu(dc->r);
+    dc->r[14] = 0x1999999A;
+    dc->x = dc->y = dc->z = 0;
+
+    for (scan_y = 50; scan_y < 150; scan_y++)
+        for (scan_x = 90; scan_x < 310; scan_x++)
+        {
+            dc->body[scan_y * dc->width_internal + scan_x] = 0;
+            dc->depth_buf[scan_y * dc->width_internal + scan_x] = I32_MAX;
+        }
+    MemSet(records, 0, 246);
+    type = SPT_TRANSFORM_ON;
+    MemCopy(records, &type, sizeof(U8));
+    type = SPT_MESH;
+    MemCopy(records + 1, &type, sizeof(U8));
+    sides = 3;
+    MemCopy(records + 5, &sides, sizeof(I32));
+    sides = 1;
+    MemCopy(records + 9, &sides, sizeof(I32));
+    x1 = 200; y1 = 120; z1 = 10;
+    MemCopy(records + 13, &x1, sizeof(I32));
+    MemCopy(records + 17, &y1, sizeof(I32));
+    MemCopy(records + 21, &z1, sizeof(I32));
+    x1 = 280;
+    MemCopy(records + 25, &x1, sizeof(I32));
+    MemCopy(records + 29, &y1, sizeof(I32));
+    MemCopy(records + 33, &z1, sizeof(I32));
+    x1 = 200; y1 = 200;
+    MemCopy(records + 37, &x1, sizeof(I32));
+    MemCopy(records + 41, &y1, sizeof(I32));
+    MemCopy(records + 45, &z1, sizeof(I32));
+    sides = 12;
+    MemCopy(records + 49, &sides, sizeof(I32));
+    sides = 0;
+    MemCopy(records + 53, &sides, sizeof(I32));
+    sides = 1;
+    MemCopy(records + 57, &sides, sizeof(I32));
+    sides = 2;
+    MemCopy(records + 61, &sides, sizeof(I32));
+    Sprite3(dc, 0, 0, 0, records);
+    if (dc->body[70 * dc->width_internal + 110] != 12)
+        return 241;
+    if (dc->depth_buf[70 * dc->width_internal + 110] != 5)
+        return 242;
+    if (dc->body[130 * dc->width_internal + 210])
+        return 243;
+
+    // A triangle crossing w=0 is clipped at the near plane. Its visible
+    // polygon includes an interior pixel, and clipped depth reaches the CDC.
+    // Keep clip-space Z positive for the vertex behind the near plane so the
+    // depth test isolates clipping, rather than culling negative depth.
+    dc->r[10] = 0;
+    dc->r[11] = 10 * 0x100000000;
+    dc->x = dc->y = dc->z = 0;
+    for (scan_y = 0; scan_y < 450; scan_y++)
+        for (scan_x = 0; scan_x < 220; scan_x++)
+        {
+            dc->body[scan_y * dc->width_internal + scan_x] = 0;
+            dc->depth_buf[scan_y * dc->width_internal + scan_x] = I32_MAX;
+        }
+    x1 = 0; y1 = 0; z1 = 10;
+    MemCopy(records + 13, &x1, sizeof(I32));
+    MemCopy(records + 17, &y1, sizeof(I32));
+    MemCopy(records + 21, &z1, sizeof(I32));
+    x1 = 400;
+    MemCopy(records + 25, &x1, sizeof(I32));
+    MemCopy(records + 29, &y1, sizeof(I32));
+    MemCopy(records + 33, &z1, sizeof(I32));
+    x1 = 0; y1 = 4; z1 = -10;
+    MemCopy(records + 37, &x1, sizeof(I32));
+    MemCopy(records + 41, &y1, sizeof(I32));
+    MemCopy(records + 45, &z1, sizeof(I32));
+    Sprite3(dc, 0, 0, 0, records);
+    if (dc->body[100 * dc->width_internal + 50] != 12)
+        return 251;
+    if (dc->depth_buf[100 * dc->width_internal + 50] == I32_MAX)
+        return 252;
+
+    // Clip against the viewport before projection: this source vertex is
+    // outside SpritePerspectiveProject0's integer bound, but the triangle
+    // still covers visible pixels after its right/bottom edges are clipped.
+    Mat4x4IdentEqu(dc->r);
+    dc->r[10] = 0;
+    dc->r[11] = 50 * 0x100000000;
+    dc->r[14] = 0x1AE147AE; // approximately 0.105
+    dc->x = dc->y = dc->z = 0;
+    for (scan_y = 0; scan_y < 120; scan_y++)
+        for (scan_x = 0; scan_x < 800; scan_x++)
+        {
+            dc->body[scan_y * dc->width_internal + scan_x] = 0;
+            dc->depth_buf[scan_y * dc->width_internal + scan_x] = I32_MAX;
+        }
+    x1 = 100000; y1 = 1000; z1 = -9;
+    MemCopy(records + 13, &x1, sizeof(I32));
+    MemCopy(records + 17, &y1, sizeof(I32));
+    MemCopy(records + 21, &z1, sizeof(I32));
+    x1 = 2300; y1 = 230; z1 = 100;
+    MemCopy(records + 25, &x1, sizeof(I32));
+    MemCopy(records + 29, &y1, sizeof(I32));
+    MemCopy(records + 33, &z1, sizeof(I32));
+    x1 = 2300; y1 = 1150;
+    MemCopy(records + 37, &x1, sizeof(I32));
+    MemCopy(records + 41, &y1, sizeof(I32));
+    MemCopy(records + 45, &z1, sizeof(I32));
+    Sprite3(dc, 0, 0, 0, records);
+    if (dc->body[60 * dc->width_internal + 500] != 12 ||
+            dc->depth_buf[60 * dc->width_internal + 500] == I32_MAX)
+        return 253;
+    if (dc->body[60 * dc->width_internal + 150])
+        return 254;
+
+    // A triangle that surrounds the small CDC is clipped to a pentagon.
+    // This checks multi-plane clipping and the fan triangulation path.
+    Mat4x4IdentEqu(dc->r);
+    dc->r[14] = 1; // Keep w=1 for z=0 while selecting homogeneous clipping.
+    dc->x = dc->y = dc->z = 0;
+    dc->width = 120;
+    dc->height = 100;
+    if (!SpritePerspectiveClip0(dc, 46026, -9663, 0, mesh_clip) ||
+            !SpritePerspectiveClip0(dc, 26884, 65284, 0, mesh_clip + 4) ||
+            !SpritePerspectiveClip0(dc, -74399, 15684, 0, mesh_clip + 8))
+        return 255;
+    mesh_indices[0] = 0;
+    mesh_indices[1] = 1;
+    mesh_indices[2] = 2;
+    clip_poly_count = SpritePerspectiveClipTriangle0(dc, mesh_clip,
+            mesh_indices, mesh_x, mesh_y, mesh_z, mesh_projected);
+    if (clip_poly_count != 5)
+        return 256;
+    for (scan_y = 0; scan_y < 120; scan_y++)
+        for (scan_x = 0; scan_x < 180; scan_x++)
+        {
+            dc->body[scan_y * dc->width_internal + scan_x] = 0;
+            dc->depth_buf[scan_y * dc->width_internal + scan_x] = I32_MAX;
+        }
+    MemSet(records, 0, 246);
+    type = SPT_TRANSFORM_ON;
+    MemCopy(records, &type, sizeof(U8));
+    type = SPT_MESH;
+    MemCopy(records + 1, &type, sizeof(U8));
+    sides = 3;
+    MemCopy(records + 5, &sides, sizeof(I32));
+    sides = 1;
+    MemCopy(records + 9, &sides, sizeof(I32));
+    x1 = 46026; y1 = -9663; z1 = 0;
+    MemCopy(records + 13, &x1, sizeof(I32));
+    MemCopy(records + 17, &y1, sizeof(I32));
+    MemCopy(records + 21, &z1, sizeof(I32));
+    x1 = 26884; y1 = 65284;
+    MemCopy(records + 25, &x1, sizeof(I32));
+    MemCopy(records + 29, &y1, sizeof(I32));
+    MemCopy(records + 33, &z1, sizeof(I32));
+    x1 = -74399; y1 = 15684;
+    MemCopy(records + 37, &x1, sizeof(I32));
+    MemCopy(records + 41, &y1, sizeof(I32));
+    MemCopy(records + 45, &z1, sizeof(I32));
+    sides = 12;
+    MemCopy(records + 49, &sides, sizeof(I32));
+    sides = 0;
+    MemCopy(records + 53, &sides, sizeof(I32));
+    sides = 1;
+    MemCopy(records + 57, &sides, sizeof(I32));
+    sides = 2;
+    MemCopy(records + 61, &sides, sizeof(I32));
+    Sprite3(dc, 0, 0, 0, records);
+    if (dc->body[50 * dc->width_internal + 60] != 12 ||
+            dc->depth_buf[50 * dc->width_internal + 60] == I32_MAX)
+        return 257;
+    if (dc->body[50 * dc->width_internal + 150])
+        return 258;
+    dc->width = 800;
+    dc->height = 600;
+
+    // A later invalid clipped triangle must reject the whole mesh before the
+    // valid leading triangle writes any pixels. Its clipped depth exceeds
+    // I32_MAX, so the source must reject atomically during prevalidation.
+    for (scan_y = 0; scan_y < 450; scan_y++)
+        for (scan_x = 0; scan_x < 220; scan_x++)
+        {
+            dc->body[scan_y * dc->width_internal + scan_x] = 0;
+            dc->depth_buf[scan_y * dc->width_internal + scan_x] = I32_MAX;
+        }
+    Mat4x4IdentEqu(dc->r);
+    dc->r[10] = 0;
+    dc->r[11] = 30000000 * 0x100000000;
+    dc->r[14] = 0x1AE147AE;
+    sides = 6;
+    MemCopy(records + 5, &sides, sizeof(I32));
+    sides = 2;
+    MemCopy(records + 9, &sides, sizeof(I32));
+    x1 = 0; y1 = 0; z1 = 10;
+    MemCopy(records + 13, &x1, sizeof(I32));
+    MemCopy(records + 17, &y1, sizeof(I32));
+    MemCopy(records + 21, &z1, sizeof(I32));
+    x1 = 400;
+    MemCopy(records + 25, &x1, sizeof(I32));
+    MemCopy(records + 29, &y1, sizeof(I32));
+    MemCopy(records + 33, &z1, sizeof(I32));
+    x1 = 0; y1 = 4; z1 = -10;
+    MemCopy(records + 37, &x1, sizeof(I32));
+    MemCopy(records + 41, &y1, sizeof(I32));
+    MemCopy(records + 45, &z1, sizeof(I32));
+    x1 = 0; y1 = 0; z1 = 10;
+    MemCopy(records + 49, &x1, sizeof(I32));
+    MemCopy(records + 53, &y1, sizeof(I32));
+    MemCopy(records + 57, &z1, sizeof(I32));
+    x1 = 24000;
+    MemCopy(records + 61, &x1, sizeof(I32));
+    MemCopy(records + 65, &y1, sizeof(I32));
+    MemCopy(records + 69, &z1, sizeof(I32));
+    x1 = 0; y1 = 4; z1 = -10;
+    MemCopy(records + 73, &x1, sizeof(I32));
+    MemCopy(records + 77, &y1, sizeof(I32));
+    MemCopy(records + 81, &z1, sizeof(I32));
+    sides = 12;
+    MemCopy(records + 85, &sides, sizeof(I32));
+    sides = 0;
+    MemCopy(records + 89, &sides, sizeof(I32));
+    sides = 1;
+    MemCopy(records + 93, &sides, sizeof(I32));
+    sides = 2;
+    MemCopy(records + 97, &sides, sizeof(I32));
+    sides = 12;
+    MemCopy(records + 101, &sides, sizeof(I32));
+    sides = 3;
+    MemCopy(records + 105, &sides, sizeof(I32));
+    sides = 4;
+    MemCopy(records + 109, &sides, sizeof(I32));
+    sides = 5;
+    MemCopy(records + 113, &sides, sizeof(I32));
+    Sprite3(dc, 0, 0, 0, records);
+    if (dc->body[100 * dc->width_internal + 50] ||
+            dc->depth_buf[100 * dc->width_internal + 50] != I32_MAX)
+        return 26;
+
+    // Bitmap texels and text glyph samples use the same homogeneous point
+    // projection as the primitive opcodes. A constant w=1/2 must double
+    // their source coordinates without overflowing fixed-point products.
+    Mat4x4IdentEqu(dc->r);
+    // Keep the 32.32 half-scale positive when widened by the compiler.
+    dc->r[15] = 0x0000000080000000;
+    dc->x = dc->y = dc->z = 0;
+    dc->width = 800;
+    dc->height = 600;
+    dc->color.c0 = 12;
+    dc->flags |= DCF_SCREEN_BITMAP | DCF_ON_TOP;
+    for (scan_y = 0; scan_y < 100; scan_y++)
+        for (scan_x = 0; scan_x < 180; scan_x++)
+        {
+            dc->body[scan_y * dc->width_internal + scan_x] = 0;
+            dc->depth_buf[scan_y * dc->width_internal + scan_x] = I32_MAX;
+        }
+    MemSet(records, 0, 246);
+    type = SPT_TRANSFORM_ON;
+    MemCopy(records, &type, sizeof(U8));
+    type = SPT_BITMAP;
+    MemCopy(records + 1, &type, sizeof(U8));
+    x1 = 20; y1 = 20; x2 = 2; y2 = 2;
+    MemCopy(records + 5, &x1, sizeof(I32));
+    MemCopy(records + 9, &y1, sizeof(I32));
+    MemCopy(records + 13, &x2, sizeof(I32));
+    MemCopy(records + 17, &y2, sizeof(I32));
+    color = 12; MemCopy(records + 21, &color, sizeof(U8));
+    color = 13; MemCopy(records + 22, &color, sizeof(U8));
+    color = 14; MemCopy(records + 29, &color, sizeof(U8));
+    color = 15; MemCopy(records + 30, &color, sizeof(U8));
+    type = SPT_TEXT;
+    MemCopy(records + 37, &type, sizeof(U8));
+    x1 = 80; y1 = 40;
+    MemCopy(records + 41, &x1, sizeof(I32));
+    MemCopy(records + 45, &y1, sizeof(I32));
+    records[49] = 'A';
+    type = SPT_TRANSFORM_OFF;
+    MemCopy(records + 51, &type, sizeof(U8));
+    if (!(SpriteTypeMask(records) & (1 << SPT_BITMAP)) ||
+            !(SpriteTypeMask(records) & (1 << SPT_TEXT)))
+        return 262;
+    SpritePlotTransform0(dc, TRUE, 20, 20, 0);
+    if (dc->body[40 * dc->width_internal + 40] != 12)
+        return 263;
+    for (scan_y = 0; scan_y < 100; scan_y++)
+        for (scan_x = 0; scan_x < 180; scan_x++)
+        {
+            dc->body[scan_y * dc->width_internal + scan_x] = 0;
+            dc->depth_buf[scan_y * dc->width_internal + scan_x] = I32_MAX;
+        }
+    Sprite3(dc, 0, 0, 0, records);
+    if (dc->body[40 * dc->width_internal + 40] != 12 ||
+            dc->body[40 * dc->width_internal + 42] != 13 ||
+            dc->body[42 * dc->width_internal + 40] != 14 ||
+            dc->body[42 * dc->width_internal + 42] != 15)
+        return 259;
+    projective_text_pixels = 0;
+    for (scan_y = 80; scan_y < 96; scan_y++)
+        for (scan_x = 160; scan_x < 176; scan_x++)
+            if (dc->body[scan_y * dc->width_internal + scan_x] == 15)
+                projective_text_pixels++;
+    if (projective_text_pixels < 8)
+        return 260;
+    projective_bitmap_pixels = 0;
+    for (scan_y = 40; scan_y <= 42; scan_y += 2)
+        for (scan_x = 40; scan_x <= 42; scan_x += 2)
+            if (dc->body[scan_y * dc->width_internal + scan_x])
+                projective_bitmap_pixels++;
+    if (projective_bitmap_pixels != 4)
+        return 261;
+
+    // A projective bitmap may straddle the near plane. Samples with w<=0
+    // must be clipped while the positive-w texels keep their colors at the
+    // divided destination coordinates.
+    Mat4x4IdentEqu(dc->r);
+    dc->r[0] = 400 * 0x100000000;
+    dc->r[3] = 900 * 0x100000000;
+    dc->r[4] = 100 * 0x100000000;
+    dc->r[5] = dc->r[6] = 0;
+    dc->r[7] = 300 * 0x100000000;
+    dc->r[12] = 0x100000000;
+    dc->r[15] = 3 * 0x100000000;
+    dc->x = dc->y = dc->z = 0;
+    dc->width = 800;
+    dc->height = 600;
+    dc->color.c0 = 15;
+    ZcFbGraphRect(90, 95, 260, 12, ZcFbGraphColor(0),
+            0, 0, 799, 599, 0);
+    for (scan_y = 95; scan_y <= 106; scan_y++)
+        for (scan_x = 90; scan_x <= 350; scan_x++)
+        {
+            dc->body[scan_y * dc->width_internal + scan_x] = 0;
+            dc->depth_buf[scan_y * dc->width_internal + scan_x] = I32_MAX;
+        }
+    MemSet(records, 0, 246);
+    type = SPT_TRANSFORM_ON;
+    MemCopy(records, &type, sizeof(U8));
+    type = SPT_BITMAP;
+    MemCopy(records + 1, &type, sizeof(U8));
+    x1 = -5; y1 = 0; x2 = 8; y2 = 1;
+    MemCopy(records + 5, &x1, sizeof(I32));
+    MemCopy(records + 9, &y1, sizeof(I32));
+    MemCopy(records + 13, &x2, sizeof(I32));
+    MemCopy(records + 17, &y2, sizeof(I32));
+    for (scan_x = 0; scan_x < 8; scan_x++)
+    {
+        pixel = scan_x + 1;
+        MemCopy(records + 21 + scan_x, &pixel, sizeof(U8));
+    }
+    type = SPT_TRANSFORM_OFF;
+    MemCopy(records + 29, &type, sizeof(U8));
+    dc->flags |= DCF_SCREEN_BITMAP | DCF_ON_TOP;
+    Sprite3(dc, 0, 0, 0, records);
+    if (dc->body[100 * dc->width_internal + 100] != 4 ||
+            dc->body[100 * dc->width_internal + 250] != 5 ||
+            dc->body[100 * dc->width_internal + 300] != 6 ||
+            dc->body[100 * dc->width_internal + 325] != 7 ||
+            dc->body[100 * dc->width_internal + 340] != 8 ||
+            dc->body[100 * dc->width_internal + 200] != 0)
+        return 268;
+
+    // Projective point records must reject points behind or on w=0 while
+    // packed poly-points keep the later positive-w samples. All visible
+    // points divide to y=100; the packed path crosses w<0, w=0, then w>0.
+    Mat4x4IdentEqu(dc->r);
+    dc->r[0] = 25 * 0x100000000;
+    dc->r[3] = 100 * 0x100000000;
+    dc->r[4] = 50 * 0x100000000;
+    dc->r[5] = dc->r[6] = 0;
+    dc->r[7] = 100 * 0x100000000;
+    dc->r[12] = 0x80000000;
+    dc->r[15] = 0x100000000;
+    dc->x = dc->y = dc->z = 0;
+    dc->width = 800;
+    dc->height = 600;
+    dc->color.c0 = 14;
+    for (scan_y = 96; scan_y <= 104; scan_y++)
+        for (scan_x = 70; scan_x <= 160; scan_x++)
+        {
+            dc->body[scan_y * dc->width_internal + scan_x] = 0;
+            dc->depth_buf[scan_y * dc->width_internal + scan_x] = I32_MAX;
+        }
+    MemSet(records, 0, 246);
+    type = SPT_TRANSFORM_ON;
+    MemCopy(records, &type, sizeof(U8));
+    type = SPT_PT;
+    MemCopy(records + 1, &type, sizeof(U8));
+    x1 = -3; y1 = 20;
+    MemCopy(records + 5, &x1, sizeof(I32));
+    MemCopy(records + 9, &y1, sizeof(I32));
+    type = SPT_TRANSFORM_OFF;
+    MemCopy(records + 13, &type, sizeof(U8));
+    Sprite3(dc, 0, 0, 0, records);
+    for (scan_y = 96; scan_y <= 104; scan_y++)
+        for (scan_x = 70; scan_x <= 160; scan_x++)
+            if (dc->body[scan_y * dc->width_internal + scan_x])
+                return 269;
+
+    // The same SPT_PT record is accepted once its homogeneous w is positive.
+    x1 = -1;
+    MemCopy(records + 5, &x1, sizeof(I32));
+    Sprite3(dc, 0, 0, 0, records);
+    if (dc->body[100 * dc->width_internal + 150] != 14)
+        return 270;
+
+    for (scan_y = 96; scan_y <= 104; scan_y++)
+        for (scan_x = 70; scan_x <= 160; scan_x++)
+        {
+            dc->body[scan_y * dc->width_internal + scan_x] = 0;
+            dc->depth_buf[scan_y * dc->width_internal + scan_x] = I32_MAX;
+        }
+    MemSet(records, 0, 246);
+    type = SPT_TRANSFORM_ON;
+    MemCopy(records, &type, sizeof(U8));
+    type = SPT_POLYPT;
+    MemCopy(records + 1, &type, sizeof(U8));
+    sides = 4;
+    MemCopy(records + 5, &sides, sizeof(I32));
+    x1 = -3; y1 = 20;
+    MemCopy(records + 9, &x1, sizeof(I32));
+    MemCopy(records + 13, &y1, sizeof(I32));
+    records[17] = 0x24; // two packed eastward moves
+    records[18] = 0x09; // two more, crossing from w<=0 to w>0
+    type = SPT_TRANSFORM_OFF;
+    MemCopy(records + 19, &type, sizeof(U8));
+    Sprite3(dc, 0, 0, 0, records);
+    if (dc->body[100 * dc->width_internal + 150] != 14 ||
+            dc->body[100 * dc->width_internal + 100] != 14 ||
+            dc->body[100 * dc->width_internal + 83] != 14)
+        return 271;
+    projective_polypt_pixels = 0;
+    for (scan_x = 70; scan_x <= 160; scan_x++)
+        if (dc->body[100 * dc->width_internal + scan_x] == 14)
+            projective_polypt_pixels++;
+    if (projective_polypt_pixels != 3)
+        return 272;
+
+    // A text box crossing the projective near plane must keep its visible
+    // outline instead of rejecting all four corners as one indivisible quad.
+    Mat4x4IdentEqu(dc->r);
+    dc->r[0] = dc->r[1] = dc->r[2] = 0;
+    dc->r[3] = 0x0000000400000000;
+    dc->r[4] = dc->r[6] = 0;
+    dc->r[5] = 0x00000000028F5C29;
+    dc->r[7] = 0x000000019999999A;
+    dc->r[8] = dc->r[9] = dc->r[11] = 0;
+    dc->r[12] = 0x000000000010624E;
+    dc->r[13] = dc->r[14] = dc->r[15] = 0;
+    dc->x = dc->y = dc->z = 0;
+    dc->width = 800;
+    dc->height = 600;
+    dc->color.c0 = 15;
+    ZcFbGraphRect(280, 140, 170, 100, ZcFbGraphColor(0),
+            0, 0, 799, 599, 0);
+    for (scan_y = 140; scan_y <= 240; scan_y++)
+        for (scan_x = 280; scan_x <= 450; scan_x++)
+        {
+            dc->body[scan_y * dc->width_internal + scan_x] = 0;
+            dc->depth_buf[scan_y * dc->width_internal + scan_x] = I32_MAX;
+        }
+    MemSet(records, 0, 246);
+    type = SPT_TRANSFORM_ON;
+    MemCopy(records, &type, sizeof(U8));
+    type = SPT_TEXT_BOX;
+    MemCopy(records + 1, &type, sizeof(U8));
+    x1 = 40; y1 = 40;
+    MemCopy(records + 5, &x1, sizeof(I32));
+    MemCopy(records + 9, &y1, sizeof(I32));
+    records[13] = 'A';
+    type = SPT_TRANSFORM_OFF;
+    MemCopy(records + 15, &type, sizeof(U8));
+    if (!(SpriteTypeMask(records) & (1 << SPT_TEXT_BOX)))
+        return 264;
+    Sprite3(dc, 0, 0, 0, records);
+    if (GrSpriteSymmetryScanoutPixel(320, 163) != ZcFbGraphColor(15))
+        return 265;
+
+    // The text-diamond outline shares the clipped four-edge path, while its
+    // individually transformed glyph samples remain inside the same view.
+    for (scan_y = 140; scan_y <= 240; scan_y++)
+        for (scan_x = 280; scan_x <= 450; scan_x++)
+        {
+            dc->body[scan_y * dc->width_internal + scan_x] = 0;
+            dc->depth_buf[scan_y * dc->width_internal + scan_x] = I32_MAX;
+        }
+    ZcFbGraphRect(280, 140, 170, 100, ZcFbGraphColor(0),
+            0, 0, 799, 599, 0);
+    MemSet(records, 0, 246);
+    type = SPT_TRANSFORM_ON;
+    MemCopy(records, &type, sizeof(U8));
+    type = SPT_TEXT_DIAMOND;
+    MemCopy(records + 1, &type, sizeof(U8));
+    x1 = 40; y1 = 40;
+    MemCopy(records + 5, &x1, sizeof(I32));
+    MemCopy(records + 9, &y1, sizeof(I32));
+    records[13] = 'A';
+    type = SPT_TRANSFORM_OFF;
+    MemCopy(records + 15, &type, sizeof(U8));
+    if (!(SpriteTypeMask(records) & (1 << SPT_TEXT_DIAMOND)))
+        return 266;
+    // Use a color absent from the ordinary white terminal text so scanout
+    // cannot satisfy this check from the live shell beneath the test region.
+    dc->color.c0 = 14;
+    Sprite3(dc, 0, 0, 0, records);
+    projective_diamond_pixels = 0;
+    for (scan_y = 140; scan_y <= 240; scan_y++)
+        for (scan_x = 280; scan_x <= 450; scan_x++)
+            if (GrSpriteSymmetryScanoutPixel(scan_x, scan_y) ==
+                    ZcFbGraphColor(14))
+                projective_diamond_pixels++;
+    if (projective_diamond_pixels < 8)
+        return 267;
 
     DCDel(dc);
     Free(records);

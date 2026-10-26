@@ -4,6 +4,7 @@
 #include "aiwn_lexparser.h"
 #include "aiwn_mem.h"
 #include "../fb_font.h"
+#include "font_std_data.h"
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -35,12 +36,14 @@ static uint64_t guest_text_globals[16];
  * guest CTextGlobals.font table. Entries are U64 so unchanged ZealOS code can
  * index text.font[character] with its original ABI. */
 static uint64_t guest_gr_font[256];
+static uint64_t guest_gr_aux_font[256];
 static uint64_t guest_gr_colors[256];
 static int guest_gr_tables_ready;
 static void *guest_fp_set_std_palette;
 static void *guest_fp_update_ctrls;
 
 extern void hc_fmt_f64_bits(char **dp, uint64_t bits, int prec);
+extern void hc_fmt_f64_g_bits(char **dp, uint64_t bits, int prec, int uppercase);
 extern uint64_t hc_builtin_exp(uint64_t xbits);
 extern uint64_t hc_builtin_sqrt(uint64_t xbits);
 extern uint64_t hc_builtin_cos(uint64_t xbits);
@@ -76,6 +79,7 @@ extern uint64_t zeal_fb_graph_plot(int64_t x, int64_t y, uint32_t color,
 extern uint64_t zeal_fb_graph_color(uint32_t color);
 extern void zeal_fb_graph_palette_set(const uint8_t *palette);
 extern void zeal_fb_set_win_z_buffer(const uint16_t *z_buf);
+extern void zeal_fb_set_win_pixel_z_buffer(const uint16_t *z_buf);
 extern uint64_t zeal_fb_graph_rect(int64_t x, int64_t y,
                                    int64_t width, int64_t height,
                                    uint32_t color, int64_t left, int64_t top,
@@ -136,6 +140,9 @@ static int window_demo_loaded;
 static int window_demo_restore_gui_terminal;
 static int gui_terminal_active;
 static void *guest_keydev_put_key;
+static uint64_t guest_ctrl_alt_cbs[26];
+static char guest_ctrl_alt_no_shift_descs[26][96];
+static char guest_ctrl_alt_shift_descs[26][96];
 static void *guest_doc_recalc_stub;
 static int gui_terminal_modules_loaded;
 
@@ -912,6 +919,8 @@ struct source_list_entry {
     char path[256];
     size_t size;
 };
+extern int zeal_redsea_file_at(uint64_t index, char *dst, size_t cap,
+                               size_t *out_size);
 struct source_overlay_entry {
     char name[96];
     size_t size;
@@ -1036,6 +1045,17 @@ static int64_t host_source_file_at(int64_t *a) {
     memcpy((char *)(uintptr_t)a[1], entry->path, length + 1);
     if (a[3])
         *(int64_t *)(uintptr_t)a[3] = (int64_t)entry->size;
+    return 1;
+}
+static int64_t host_redsea_file_at(int64_t *a) {
+    size_t size = 0;
+    if (a[0] < 0 || a[2] <= 0)
+        return 0;
+    if (!zeal_redsea_file_at((uint64_t)a[0], (char *)(uintptr_t)a[1],
+                             (size_t)a[2], &size))
+        return 0;
+    if (a[3])
+        *(int64_t *)(uintptr_t)a[3] = (int64_t)size;
     return 1;
 }
 static int source_dir_exists(const char *path) {
@@ -1572,17 +1592,17 @@ static int64_t host_dc_blot_color4(int64_t *a) {
  * lookup tables expand one glyph bit into an eight-pixel mask and one text
  * attribute into eight copies of a palette index. This scalar version keeps
  * the same row-stride/transparent-foreground behavior without x86 assembly. */
-static int64_t host_gr_rop_equ_u8_no_clipping(int64_t *a) {
-    uint64_t packed = (uint64_t)a[0];
-    uint8_t *dst = (uint8_t *)(uintptr_t)a[1];
-    int64_t stride = a[2];
+static int64_t gr_rop_equ_u8_no_clipping(uint64_t packed, uint8_t *dst,
+                                         int64_t stride,
+                                         const uint64_t *font) {
     if (!dst || stride <= 0 || stride > (1 << 24))
         return -1;
 
     unsigned ch = (unsigned)(packed & 0xffu);
     uint8_t fg = (uint8_t)guest_gr_colors[(packed >> 8) & 0xffu];
-    const uint8_t *rows = ch >= 0x80
-        ? fb_glyph8(ch) : (const uint8_t *)&guest_gr_font[ch];
+    if (!font)
+        font = guest_gr_font;
+    const uint8_t *rows = (const uint8_t *)&font[ch];
     int underline = (packed & 0x80000000u) != 0;
     for (unsigned y = 0; y < 8; y++) {
         uint8_t bits = rows[y];
@@ -1591,36 +1611,30 @@ static int64_t host_gr_rop_equ_u8_no_clipping(int64_t *a) {
         if (!bits)
             continue;
         for (unsigned x = 0; x < 8; x++)
-            if (bits & (0x80u >> x))
+            if (bits & (1u << x))
                 dst[(size_t)y * (size_t)stride + x] = fg;
     }
     return 0;
+}
+static int64_t host_gr_rop_equ_u8_no_clipping(int64_t *a) {
+    return gr_rop_equ_u8_no_clipping((uint64_t)a[0],
+        (uint8_t *)(uintptr_t)a[1], a[2], guest_gr_font);
+}
+static int64_t host_gr_rop_equ_u8_with_font(int64_t *a) {
+    int64_t result = gr_rop_equ_u8_no_clipping((uint64_t)a[1],
+        (uint8_t *)(uintptr_t)a[2], a[3],
+        (const uint64_t *)(uintptr_t)a[0]);
+    return result < 0 ? result : 42;
 }
 
 static void init_guest_gr_tables(void) {
     if (guest_gr_tables_ready)
         return;
-    for (unsigned ch = 0; ch < 256; ch++) {
-        unsigned font_ch = ch;
-        if (font_ch < 32) {
-            guest_gr_font[ch] = 0;
-            continue;
-        }
-        if (font_ch > 127)
-            font_ch = '?';
-        /* The text framebuffer consumes glyph rows MSB-first (bit 7 is the
-         * left pixel), but GrPutChar/GrAsm expand bit 0 into the leftmost
-         * packed pixel through gr.to_8_bits. Reverse each row when adapting
-         * the shared font so direct graphics text (menus, GrPrint) reads
-         * normally too. */
-        for (unsigned row = 0; row < 8; row++) {
-            uint8_t bits = g_font8[font_ch - 32][row];
-            bits = (uint8_t)((bits >> 4) | (bits << 4));
-            bits = (uint8_t)(((bits & 0xccu) >> 2) | ((bits & 0x33u) << 2));
-            bits = (uint8_t)(((bits & 0xaau) >> 1) | ((bits & 0x55u) << 1));
-            ((uint8_t *)&guest_gr_font[ch])[row] = bits;
-        }
-    }
+    /* Both font tables are pinned to the same ZealOS revision as the source
+     * modules. They store each 8x8 glyph row-major, with bit 0 at the left
+     * edge, exactly as RawPutChar and GrRopEquU8NoClipping consume them. */
+    memcpy(guest_gr_font, zeal_font_std, sizeof(guest_gr_font));
+    memcpy(guest_gr_aux_font, zeal_font_aux, sizeof(guest_gr_aux_font));
     /* GrUpdateTextFG masks the attribute to the low foreground nibble before
      * calling GrRopEquU8NoClipping. The renderer's
      * intermediate surface is palette-indexed; foreground-only stores use
@@ -1695,7 +1709,8 @@ static void guest_task_text_output(const char *text) {
         }
     }
     if (f->user_output_writer && !f->user_output_suppressed) {
-        FFI_CALL_TOS_1(f->user_output_writer, (int64_t)(uintptr_t)text);
+        FFI_CALL_TOS_2(f->user_output_writer, (int64_t)(uintptr_t)text,
+                       (int64_t)(uintptr_t)f->words);
         return;
     }
     unsigned char *task = (unsigned char *)guest_fibers[guest_current].words;
@@ -2290,6 +2305,10 @@ static int64_t host_fb_set_win_z_buffer(int64_t *a) {
     zeal_fb_set_win_z_buffer((const uint16_t *)(uintptr_t)a[0]);
     return 0;
 }
+static int64_t host_fb_set_win_pixel_z_buffer(int64_t *a) {
+    zeal_fb_set_win_pixel_z_buffer((const uint16_t *)(uintptr_t)a[0]);
+    return 0;
+}
 static int64_t host_fb_graph_rect(int64_t *a) {
     return (int64_t)zeal_fb_graph_rect(a[0], a[1], a[2], a[3],
                                        (uint32_t)a[4], a[5], a[6], a[7], a[8],
@@ -2547,6 +2566,8 @@ static int64_t host_jobs_handler_mode(int64_t *a, int system_only);
 static uint64_t counter_now(void);
 static uint64_t deadline_after_milliseconds(uint64_t milliseconds);
 static int64_t poll_guest_keys(void);
+static uint64_t guest_ctrl_alt_callback(int64_t index);
+static int guest_ctrl_alt_callback_in_irq(int64_t index);
 static void guest_executive_loop(void) __attribute__((noreturn));
 static void guest_input_filter_loop(void);
 static struct guest_job *guest_job_head(struct guest_fiber *f) {
@@ -3679,6 +3700,28 @@ static int64_t host_message_scan(int64_t *a) {
     if (a[1]) *(int64_t *)(uintptr_t)a[1] = 0;
     return 0;
 }
+static int64_t host_ctrl_alt_dispatch(int64_t *a) {
+    if (!guest_task_bound || a[0] != 2 ||
+        (a[3] && (void *)(uintptr_t)a[3] !=
+                     guest_fibers[guest_current].words))
+        return 0;
+    uint64_t scan = (uint64_t)a[2];
+    if ((scan & GUEST_SCF_KEY_DESC) ||
+        (scan & ((1ull << 10) | (1ull << 11))) !=
+            ((1ull << 10) | (1ull << 11)))
+        return 0;
+    int64_t key_char = a[1] & 0xff;
+    if (key_char >= 1 && key_char <= 26 && (scan & (1ull << 10)))
+        key_char = 'A' + key_char - 1;
+    if (key_char >= 'a' && key_char <= 'z')
+        key_char = key_char - 'a' + 'A';
+    int64_t letter = key_char - 'A';
+    uint64_t callback = guest_ctrl_alt_callback(letter);
+    if (!callback || guest_ctrl_alt_callback_in_irq(letter))
+        return 0;
+    FFI_CALL_TOS_1((void *)(uintptr_t)callback, scan);
+    return 1;
+}
 static int64_t poll_guest_keys(void) {
     if (!key_reader)
         return 0;
@@ -3739,12 +3782,100 @@ static int64_t host_kbd_messages_queue(int64_t *a) {
     f->last_polled_key_code = 0;
     return result;
 }
+static uint64_t guest_ctrl_alt_callback(int64_t index) {
+    if (index < 0 || index >= 26)
+        return 0;
+    CHashGlblVar *global = Fs && Fs->hash_table
+        ? (CHashGlblVar *)HashFind("keydev", Fs->hash_table, HTT_GLBL_VAR, 1)
+        : NULL;
+    if (global && global->data_addr && global->var_class) {
+        CMemberLst *member = guest_class_member(global->var_class,
+                                                "fp_ctrl_alt_cbs");
+        if (global->var_class->sz >= (int64_t)sizeof(void *) && member &&
+            member->off >= 0 &&
+            member->off <= global->var_class->sz - (int64_t)sizeof(void *)) {
+            uint64_t *callbacks = NULL;
+            memcpy(&callbacks, (unsigned char *)global->data_addr + member->off,
+                   sizeof(callbacks));
+            if (callbacks && callbacks[index])
+                return callbacks[index];
+        }
+    }
+    return guest_ctrl_alt_cbs[index];
+}
+static int guest_ctrl_alt_copy_desc(int64_t index, int shift,
+                                    char *dst, size_t capacity) {
+    CHashGlblVar *global = Fs && Fs->hash_table
+        ? (CHashGlblVar *)HashFind("keydev", Fs->hash_table, HTT_GLBL_VAR, 1)
+        : NULL;
+    const char *field = shift ? "ctrl_alt_shift_descs"
+                              : "ctrl_alt_no_shift_descs";
+    CMemberLst *member;
+    uint64_t *entries = NULL;
+    uintptr_t array, string;
+    if (dst && capacity) dst[0] = 0;
+    if (index < 0 || index >= 26 || !dst || !capacity || !global ||
+        !global->data_addr || !global->var_class)
+        return 0;
+    member = guest_class_member(global->var_class, field);
+    if (global->var_class->sz < (int64_t)sizeof(entries) || !member ||
+        member->off < 0 ||
+        member->off > global->var_class->sz - (int64_t)sizeof(entries))
+        return 0;
+    memcpy(&entries, (unsigned char *)global->data_addr + member->off,
+           sizeof(entries));
+    array = (uintptr_t)entries;
+    if (!array || array > UINTPTR_MAX - 26 * sizeof(uint64_t) ||
+        !((array >= (uintptr_t)data_arena &&
+           array + 26 * sizeof(uint64_t) <= (uintptr_t)data_arena + sizeof(data_arena)) ||
+          (array >= (uintptr_t)code_arena &&
+           array + 26 * sizeof(uint64_t) <= (uintptr_t)code_arena + sizeof(code_arena))))
+        return 0;
+    memcpy(&string, (unsigned char *)entries + index * sizeof(uint64_t),
+           sizeof(string));
+    if (!string)
+        return 0;
+    for (size_t i = 0; i < capacity; i++) {
+        uintptr_t address = string + i;
+        if (address < string ||
+            !((address >= (uintptr_t)data_arena &&
+               address < (uintptr_t)data_arena + sizeof(data_arena)) ||
+              (address >= (uintptr_t)code_arena &&
+               address < (uintptr_t)code_arena + sizeof(code_arena)))) {
+            dst[0] = 0;
+            return 0;
+        }
+        dst[i] = *(const char *)address;
+        if (!dst[i])
+            return i != 0;
+    }
+    dst[capacity - 1] = 0;
+    return 1;
+}
+static int guest_ctrl_alt_callback_in_irq(int64_t index) {
+    CHashGlblVar *global = Fs && Fs->hash_table
+        ? (CHashGlblVar *)HashFind("keydev", Fs->hash_table, HTT_GLBL_VAR, 1)
+        : NULL;
+    if (!global || !global->data_addr || !global->var_class)
+        return 0;
+    CMemberLst *member = guest_class_member(global->var_class,
+                                            "ctrl_alt_in_irq_flags");
+    if (global->var_class->sz < (int64_t)sizeof(uint64_t) || !member ||
+        member->off < 0 ||
+        member->off > global->var_class->sz - (int64_t)sizeof(uint64_t))
+        return 0;
+    uint64_t flags = 0;
+    memcpy(&flags, (unsigned char *)global->data_addr + member->off,
+           sizeof(flags));
+    return (flags & (1ull << index)) != 0;
+}
 static int64_t host_put_key(int64_t *a) {
-    if (!guest_task_bound ||
-        (*(uint32_t *)((unsigned char *)guest_fibers[guest_current].words +
-                       guest_display_flags_off) &
-         (1u << 2)) ||
-        ((uint64_t)a[1] & GUEST_SCF_KEY_DESC))
+    if (!guest_task_bound)
+        return 0;
+    uint64_t scan = (uint64_t)a[1];
+    if ((*(uint32_t *)((unsigned char *)guest_fibers[guest_current].words +
+                       guest_display_flags_off) & (1u << 2)) ||
+        (scan & GUEST_SCF_KEY_DESC))
         return 0;
     /* Message.ZC's KeyGet is compiled before KeyDev.ZC and retains this
      * bootstrap echo target. Once the graphical task installs its document
@@ -3756,6 +3887,13 @@ static int64_t host_put_key(int64_t *a) {
         return 0;
     }
     if (gui_terminal_active && guest_keydev_put_key) {
+        CHashFun *editor_put_key = (CHashFun *)HashFind(
+            "BootstrapGuiTerminalEditorPutKey", Fs->hash_table, HTT_FUN, 1);
+        if (editor_put_key && editor_put_key->fun_ptr &&
+            editor_put_key->argc == 2 &&
+            !(editor_put_key->base.base.type & HTF_EXTERN) &&
+            FFI_CALL_TOS_2(editor_put_key->fun_ptr, a[0], a[1]))
+            return 0;
         CHashFun *terminal = (CHashFun *)HashFind(
             "BootstrapGuiTerminalState", Fs->hash_table, HTT_FUN, 1);
         if (terminal && terminal->fun_ptr && terminal->argc == 1 &&
@@ -3772,6 +3910,24 @@ static int64_t host_put_key(int64_t *a) {
         guest_task_text_output(shown);
     }
     return 0;
+}
+static int64_t host_keymap_family_print(int64_t *a) {
+    /* TaskBridge's graphical shell has its own bounded line editor rather
+     * than the full upstream DocTerm key-description device. Report exactly
+     * the command-line controls that its tested input path implements. */
+    static const char bindings[] =
+        "Bootstrap terminal keys:\n"
+        "Left/Right: edit command line\n"
+        "Home/End: move to start/end\n"
+        "Backspace/Delete: remove characters\n"
+        "Up: recall previous command\n"
+        "Down: clear command line\n"
+        "Return: run command\n";
+    if (a[0] || !a[1])
+        return 0;
+    zc_output(bindings);
+    guest_task_text_output(bindings);
+    return (int64_t)(sizeof(bindings) - 1);
 }
 static int64_t host_str_len(int64_t *a) {
     const char *s = (const char *)(uintptr_t)a[0];
@@ -4705,11 +4861,95 @@ static int64_t host_to_upper(int64_t *a) {
         ch = ch - 'a' + 'A';
     return ch;
 }
+static void guest_copy_ctrl_alt_desc(char *dst, size_t capacity,
+                                     uintptr_t source) {
+    uintptr_t begin, end;
+    size_t available, count;
+    if (!dst || !capacity)
+        return;
+    dst[0] = 0;
+    begin = (uintptr_t)data_arena;
+    end = begin + sizeof(data_arena);
+    if (source >= begin && source < end)
+        available = (size_t)(end - source);
+    else {
+        begin = (uintptr_t)code_arena;
+        end = begin + sizeof(code_arena);
+        if (source < begin || source >= end)
+            return;
+        available = (size_t)(end - source);
+    }
+    count = available < capacity ? available : capacity;
+    for (size_t i = 0; i < count; i++) {
+        dst[i] = *(const char *)(source + i);
+        if (!dst[i])
+            return;
+    }
+    dst[capacity - 1] = 0;
+}
 static int64_t host_ctrl_alt_cb_set(int64_t *a) {
-    /* Startup can register window hotkeys before the native key-device
-     * dispatcher exists. Registration is intentionally inert at this stage. */
-    (void)a;
+    /* Preserve callback registrations and their user-facing descriptions for
+     * the guarded Message.ZC input overlay and the Ctrl-Alt key-map help. */
+    int64_t key_char = a[0] & 0xff;
+    if (key_char >= 'a' && key_char <= 'z')
+        key_char = key_char - 'a' + 'A';
+    int64_t index = key_char - 'A';
+    if (index >= 0 && index < 26) {
+        guest_ctrl_alt_cbs[index] = (uint64_t)a[1];
+        guest_ctrl_alt_no_shift_descs[index][0] = 0;
+        guest_ctrl_alt_shift_descs[index][0] = 0;
+        if (a[2])
+            guest_copy_ctrl_alt_desc(guest_ctrl_alt_no_shift_descs[index],
+                                     sizeof(guest_ctrl_alt_no_shift_descs[index]),
+                                     (uintptr_t)a[2]);
+        if (a[3])
+            guest_copy_ctrl_alt_desc(guest_ctrl_alt_shift_descs[index],
+                                     sizeof(guest_ctrl_alt_shift_descs[index]),
+                                     (uintptr_t)a[3]);
+    }
     return 0;
+}
+static int64_t host_ctrl_alt_map_print(int64_t *a) {
+    char output[8192];
+    char no_shift_desc[96], shift_desc[96];
+    size_t used = 0;
+    int no_shift = a[0] != 0;
+    int shift = a[1] != 0;
+    if (no_shift)
+        used += (size_t)snprintf(output + used, sizeof(output) - used,
+                                 "Ctrl-Alt-Delete: Cmd /Reboot\n");
+    for (int index = 0; index < 26 && used < sizeof(output); index++) {
+        if (!guest_ctrl_alt_callback(index))
+            continue;
+        int have_no_shift = guest_ctrl_alt_copy_desc(index, 0, no_shift_desc,
+                                                      sizeof(no_shift_desc));
+        int have_shift = guest_ctrl_alt_copy_desc(index, 1, shift_desc,
+                                                   sizeof(shift_desc));
+        if (!have_no_shift)
+            snprintf(no_shift_desc, sizeof(no_shift_desc), "%s",
+                     guest_ctrl_alt_no_shift_descs[index]);
+        if (!have_shift)
+            snprintf(shift_desc, sizeof(shift_desc), "%s",
+                     guest_ctrl_alt_shift_descs[index]);
+        if (no_shift && no_shift_desc[0])
+            used += (size_t)snprintf(output + used, sizeof(output) - used,
+                                     "Ctrl-Alt-%c: %s\n", 'A' + index,
+                                     no_shift_desc);
+        if (shift && shift_desc[0] &&
+            used < sizeof(output))
+            used += (size_t)snprintf(output + used, sizeof(output) - used,
+                                     "Ctrl-Alt-Shift-%c: %s\n", 'A' + index,
+                                     shift_desc);
+    }
+    if (used >= sizeof(output))
+        output[sizeof(output) - 1] = 0;
+    else
+        output[used] = 0;
+    if (output[0]) {
+        zc_output(output);
+        guest_task_text_output(output);
+    }
+    return (int64_t)used;
 }
 static int task_field(CHashClass *cls, const char *name, int64_t size, int64_t expected_off) {
     CMemberLst *m = MemberFind((char *)name, cls);
@@ -4970,6 +5210,7 @@ static void bind_guest_task(void) {
     PrsBindCSymbol("ToUpper", host_to_upper, 1);
     PrsBindCSymbol("CtrlAltCBSet", host_ctrl_alt_cb_set, 5);
     PrsBindCSymbol("SwapI64", host_swap, 2);
+    PrsBindCSymbol("ZcGrRopEquU8NoClipping", host_gr_rop_equ_u8_with_font, 4);
     PrsBindCSymbol("sys_semas", guest_sys_semas, 0);
 }
 
@@ -5594,7 +5835,7 @@ static size_t format_text(char *output, size_t capacity, const char *format,
         size_t spec = i + 1;
         int precision = 1;
         int has_precision = 0;
-        int left = 0, truncate = 0, escape_dollars = 0;
+        int left = 0, zero_pad = 0, truncate = 0, escape_dollars = 0;
         size_t width = 0;
         /* ZealOS height repeat, used unchanged by DocType after inserting a
          * file. Repeat the whole packed character value, not just its low
@@ -5616,7 +5857,11 @@ static size_t format_text(char *output, size_t capacity, const char *format,
             i = spec + 3;
             continue;
         }
-        if (format[spec] == '-') { left = 1; spec++; }
+        while (format[spec] == '-' || format[spec] == '0') {
+            if (format[spec] == '-') left = 1;
+            else zero_pad = 1;
+            spec++;
+        }
         /* String width/truncation is needed by the original border callbacks.
          * Numeric width remains outside this formatter's current subset. */
         if (format[spec] == '*') {
@@ -5658,9 +5903,11 @@ static size_t format_text(char *output, size_t capacity, const char *format,
             continue;
         }
         if (code != 'c' && code != 'C' && code != 's' && code != 'Q' &&
-            code != 'S' && code != 'Z' &&
-            code != 'd' && code != 'x' && code != 'X' &&
-            code != 'f' && code != 'F')
+            code != 'q' &&
+            code != 'S' && code != 'Z' && code != 'o' &&
+            code != 'd' && code != 'u' && code != 'x' && code != 'X' &&
+            code != 'b' && code != 'B' &&
+            code != 'f' && code != 'F' && code != 'g' && code != 'G')
         {
             printf("zc: unsupported format conversion '%c' in %s\n", code, format);
             zc_fail("format code is unsupported");
@@ -5673,12 +5920,17 @@ static size_t format_text(char *output, size_t capacity, const char *format,
             for (unsigned byte = 0; byte < 8; byte++) {
                 unsigned char ch = (unsigned char)(packed >> (byte * 8));
                 if (!ch) break;
+                if (code == 'C' && ch >= 'a' && ch <= 'z')
+                    ch -= 'a' - 'A';
                 FMT_BYTE(ch);
             }
-        } else if (code == 's' || code == 'Q' || code == 'S' || code == 'Z') {
+        } else if (code == 's' || code == 'q' || code == 'Q' || code == 'o' ||
+                   code == 'S' || code == 'Z') {
             size_t field_start = used;
             const char *s;
-            if (code == 'Z') {
+            if (code == 'o') {
+                s = argv[arg++] ? "TRUE" : "FALSE";
+            } else if (code == 'Z') {
                 if (arg + 2 > argc) zc_fail("format needs index and define arguments");
                 CHashFun *sub = (CHashFun *)HashFind("DefineSub", Fs->hash_table, HTT_FUN, 1);
                 if (!sub || !sub->fun_ptr || sub->argc != 2 || (sub->base.base.type & HTF_EXTERN))
@@ -5698,7 +5950,53 @@ static size_t format_text(char *output, size_t capacity, const char *format,
             if (!s) zc_fail("format %s argument is null");
             for (size_t j = 0; s[j]; j++) {
                 if (truncate && width && used - field_start >= width) break;
-                if (code == 'Q') {
+                if (code == 'q') {
+                    /* Decode the string escapes accepted by ZealOS MPrintq.
+                     * Embedded NUL naturally terminates the resulting C string. */
+                    unsigned char ch = (unsigned char)s[j];
+                    if (ch == '\\' && s[j + 1]) {
+                        unsigned char next = (unsigned char)s[j + 1];
+                        switch (next) {
+                        case '0':
+                            j++;
+                            goto decoded_string_end;
+                        case '\'': ch = '\''; j++; break;
+                        case '`': ch = '`'; j++; break;
+                        case '"': ch = '"'; j++; break;
+                        case '\\': ch = '\\'; j++; break;
+                        case 'd': ch = '$'; j++; break;
+                        case 'n': ch = '\n'; j++; break;
+                        case 'r': ch = '\r'; j++; break;
+                        case 't': ch = '\t'; j++; break;
+                        case 'x': case 'X': {
+                            unsigned value = 0, digits = 0;
+                            j++;
+                            while (digits < 2 && s[j + 1]) {
+                                unsigned char hex = (unsigned char)s[j + 1];
+                                unsigned nibble;
+                                if (hex >= '0' && hex <= '9') nibble = hex - '0';
+                                else if (hex >= 'a' && hex <= 'f') nibble = hex - 'a' + 10;
+                                else if (hex >= 'A' && hex <= 'F') nibble = hex - 'A' + 10;
+                                else break;
+                                value = (value << 4) | nibble;
+                                digits++;
+                                j++;
+                            }
+                            ch = (unsigned char)value;
+                            break;
+                        }
+                        default:
+                            /* Unknown escapes preserve the slash, matching
+                             * the source routine's two-byte walk. */
+                            break;
+                        }
+                    } else if (ch == '$' && s[j + 1] == '$') {
+                        j++;
+                    }
+                    if (!ch)
+                        goto decoded_string_end;
+                    FMT_BYTE(ch);
+                } else if (code == 'Q') {
                     switch (s[j]) {
                     case '"': FMT_BYTE('\\'); FMT_BYTE('"'); break;
                     case '\\': FMT_BYTE('\\'); FMT_BYTE('\\'); break;
@@ -5714,6 +6012,7 @@ static size_t format_text(char *output, size_t capacity, const char *format,
                 } else
                     FMT_BYTE(s[j]);
             }
+decoded_string_end: ;
             size_t length = used - field_start;
             if (truncate && width && length > width) used = field_start + (length = width);
             if (width > length) {
@@ -5725,43 +6024,77 @@ static size_t format_text(char *output, size_t capacity, const char *format,
                     used += pad;
                 } else while (pad--) FMT_BYTE(' ');
             }
-        } else if (code == 'f' || code == 'F') {
-            char number[64];
-            char *end = number;
-            hc_fmt_f64_bits(&end, (uint64_t)argv[arg++],
-                            has_precision ? precision : 1);
-            *end = 0;
-            for (const char *p = number; *p; p++)
-                FMT_BYTE(*p);
-        } else if (code == 'x' || code == 'X') {
-            static const char lower_digits[] = "0123456789abcdef";
-            static const char upper_digits[] = "0123456789ABCDEF";
-            const char *digits = code == 'X' ? upper_digits : lower_digits;
-            uint64_t value = (uint64_t)argv[arg++];
-            char reversed[16];
-            size_t n = 0;
-            do {
-                reversed[n++] = digits[value & 0xF];
-                value >>= 4;
-            } while (value && n < sizeof(reversed));
-            while (n)
-                FMT_BYTE(reversed[--n]);
         } else {
-            int64_t value = argv[arg++];
-            char digits[32];
-            size_t n = 0;
-            uint64_t mag;
-            if (value < 0) {
-                FMT_BYTE('-');
-                mag = (uint64_t)(-(value + 1)) + 1;
-            } else
-                mag = (uint64_t)value;
-            do {
-                digits[n++] = (char)('0' + (mag % 10));
-                mag /= 10;
-            } while (mag && n < sizeof(digits));
-            while (n)
-                FMT_BYTE(digits[--n]);
+            char number[128];
+            size_t length = 0;
+            if (code == 'f' || code == 'F') {
+                char *end = number;
+                hc_fmt_f64_bits(&end, (uint64_t)argv[arg++],
+                                has_precision ? precision : 1);
+                *end = 0;
+                length = (size_t)(end - number);
+            } else if (code == 'g' || code == 'G') {
+                uint64_t bits = (uint64_t)argv[arg++];
+                char *end = number;
+                int significant = has_precision ? precision : 6;
+                if (significant < 1) significant = 1;
+                hc_fmt_f64_g_bits(&end, bits, significant, code == 'G');
+                *end = 0;
+                length = (size_t)(end - number);
+            } else if (code == 'x' || code == 'X' || code == 'u' ||
+                       code == 'b' || code == 'B') {
+                static const char lower_digits[] = "0123456789abcdef";
+                static const char upper_digits[] = "0123456789ABCDEF";
+                const char *digits = code == 'X' ? upper_digits : lower_digits;
+                uint64_t value = (uint64_t)argv[arg++];
+                char reversed[64];
+                unsigned base = code == 'b' || code == 'B' ? 2 :
+                                code == 'u' ? 10 : 16;
+                size_t n = 0;
+                do {
+                    unsigned digit = (unsigned)(value % base);
+                    reversed[n++] = base == 10 ? (char)('0' + digit) : digits[digit];
+                    value /= base;
+                } while (value && n < sizeof(reversed));
+                while (n)
+                    number[length++] = reversed[--n];
+                number[length] = 0;
+            } else {
+                int64_t value = argv[arg++];
+                char digits[32];
+                size_t n = 0;
+                uint64_t mag;
+                if (value < 0) {
+                    number[length++] = '-';
+                    mag = (uint64_t)(-(value + 1)) + 1;
+                } else
+                    mag = (uint64_t)value;
+                do {
+                    digits[n++] = (char)('0' + (mag % 10));
+                    mag /= 10;
+                } while (mag && n < sizeof(digits));
+                while (n)
+                    number[length++] = digits[--n];
+                number[length] = 0;
+            }
+            size_t pad = width > length ? width - length : 0;
+            if (length > capacity - 1 - used ||
+                pad > capacity - 1 - used - length)
+                zc_fail("formatted text exceeds buffer");
+            if (pad && !left) {
+                if (zero_pad && (number[0] == '-' || number[0] == '+')) {
+                    FMT_BYTE(number[0]);
+                    for (size_t j = 0; j < pad; j++) FMT_BYTE('0');
+                    for (size_t j = 1; j < length; j++) FMT_BYTE(number[j]);
+                } else {
+                    char fill = zero_pad ? '0' : ' ';
+                    for (size_t j = 0; j < pad; j++) FMT_BYTE(fill);
+                    for (size_t j = 0; j < length; j++) FMT_BYTE(number[j]);
+                }
+            } else {
+                for (size_t j = 0; j < length; j++) FMT_BYTE(number[j]);
+                for (size_t j = 0; j < pad; j++) FMT_BYTE(' ');
+            }
         }
     }
 #undef FMT_BYTE
@@ -5856,6 +6189,15 @@ static int load_source_path(const char *path, int merged, int recover) {
         guest_text_globals[5] = zeal_fb_screen_width() / 8;
         PrsBindCSymbol("text", guest_text_globals, 0);
     }
+    if (!strcmp(path, "/Kernel/SerialDev/Message.ZC")) {
+        /* The guarded ARM64 Message.ZC overlay dispatches Ctrl-Alt callbacks
+         * from decoded key messages. Declare and bind the bridge before the
+         * source body is compiled, just as upstream binds its kernel hooks. */
+        execute_source("<CtrlAlt dispatch bridge>",
+            "extern Bool ZcCtrlAltDispatch(I64 message_code, I64 ch, "
+            "I64 scan_code, CTask *task);");
+        PrsBindCSymbol("ZcCtrlAltDispatch", host_ctrl_alt_dispatch, 4);
+    }
     int compile_error = 0;
     (void)execute_source_mode(path, src, 0, 0, NULL, 0, 0, recover, &compile_error);
     if (compile_error) {
@@ -5867,6 +6209,8 @@ static int load_source_path(const char *path, int merged, int recover) {
         CHashFun *recalc = (CHashFun *)HashFind("DocRecalc", Fs->hash_table,
                                                HTT_FUN, 1);
         guest_doc_recalc_stub = recalc ? recalc->fun_ptr : NULL;
+        PrsBindCSymbol("ZcCtrlAltMapPrint", host_ctrl_alt_map_print, 2);
+        PrsBindCSymbol("ZcKeyMapFamilyPrint", host_keymap_family_print, 3);
         PrsBindCSymbol("ZcDocRecalc", host_doc_recalc, 2);
         /* TaskBridge declares the generic file API before defining DocRead /
          * DocWrite.  Bind it as soon as those declarations exist, just like
@@ -5894,6 +6238,7 @@ static int load_source_path(const char *path, int merged, int recover) {
             zc_fail("pinned home directory globals missing");
         guest_home_dir_ptr = (char **)((unsigned char *)blkdev->data_addr + home->off);
         PrsBindCSymbol("ZcSourceFileAt", host_source_file_at, 4);
+        PrsBindCSymbol("ZcRedSeaFileAt", host_redsea_file_at, 4);
         PrsBindCSymbol("LowPass1", host_low_pass1, 4);
         /* These functions were pre-registered before TaskBridge introduced
          * their extern declarations, so bind them again now that the symbols
@@ -6021,6 +6366,7 @@ static int load_source_path(const char *path, int merged, int recover) {
         guest_text_globals[5] = guest_fb_width / 8;
         init_guest_gr_tables();
         guest_text_globals[6] = (uint64_t)(uintptr_t)guest_gr_font;
+        guest_text_globals[7] = (uint64_t)(uintptr_t)guest_gr_aux_font;
         PrsBindCSymbol("text", guest_text_globals, 0);
         /* KernelC redeclares the bootstrap heap calls with ZealOS's real
          * CTask* parameter types and _MALLOC/_FREE import names. Rebind
@@ -6377,6 +6723,11 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
     window_demo_restore_gui_terminal = 0;
     gui_terminal_active = 0;
     guest_keydev_put_key = NULL;
+    memset(guest_ctrl_alt_cbs, 0, sizeof(guest_ctrl_alt_cbs));
+    memset(guest_ctrl_alt_no_shift_descs, 0,
+           sizeof(guest_ctrl_alt_no_shift_descs));
+    memset(guest_ctrl_alt_shift_descs, 0,
+           sizeof(guest_ctrl_alt_shift_descs));
     guest_doc_recalc_stub = NULL;
     guest_home_dir_ptr = NULL;
     gui_terminal_modules_loaded = 0;
@@ -6454,6 +6805,7 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
                     {"MemCopy", host_copy, 3},  {"MemSet", host_set, 3}, {"SwapI64", host_swap, 2},
                     {"DCBlotColor4", host_dc_blot_color4, 4},
                     {"GrRopEquU8NoClipping", host_gr_rop_equ_u8_no_clipping, 3},
+                    {"ZcGrRopEquU8NoClipping", host_gr_rop_equ_u8_with_font, 4},
                     {"Puts", host_puts, 1},
                     {"ZcTaskSpawn", host_task_spawn, 1},
                     {"ZcCallNOnStack", host_call_n_on_stack, 5},
@@ -6482,6 +6834,8 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
                     {"ZcFbGraphColor", host_fb_graph_color, 1},
                     {"ZcFbGraphPaletteSet", host_fb_graph_palette_set, 1},
                     {"ZcFbSetWinZBuffer", host_fb_set_win_z_buffer, 1},
+                    {"ZcFbSetWinPixelZBuffer",
+                     host_fb_set_win_pixel_z_buffer, 1},
                     {"ZcFbGraphRect", host_fb_graph_rect, 10},
                     {"ZcFbGraphText", host_fb_graph_text, 9},
                     {"ZcFbGraphLine", host_fb_graph_line, 12},
@@ -6525,6 +6879,9 @@ int zc_start_graphics(void) {
         "/System/Gr/WinMgrBoot.ZC",
         "/System/Gr/GrScreen.ZC",
         "/System/Gr/GrBootBridge.ZC",
+        /* The boot terminal exposes the source three-axis view control in
+         * its OS menu, so load it after the task and graphics primitives. */
+        "/System/Ctrls/ViewAngles.ZC",
     };
     const unsigned char *archive = source_archive;
     size_t archive_len = archive_size;

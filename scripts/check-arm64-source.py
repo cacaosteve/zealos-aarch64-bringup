@@ -6,9 +6,51 @@ import struct
 import sys
 
 from arm64_source import (extract_home_set, extract_home_startup, extract_home_startup_tasks, inject_home_startup_tasks, extract_server_task, extract_user_task, extract_version_scalars, extract_source_prompt, extract_source_training, translate_autocomplete_task, translate_doctree, translate_registry, translate_docterm, translate_doced, translate_docfind, translate_docform, translate_docpopup, translate_docrecalc, translate_grbitmap,
-                          translate_filemgr, translate_grdc, translate_grpalette, translate_grscreen, translate_ktask, translate_winmgr, translate_zsplash, translate_home_once)
+                          translate_filemgr, translate_grdc, translate_grpalette, translate_message, translate_grscreen, translate_ktask, translate_winmgr, translate_zsplash, translate_home_once)
 
 root = Path(__file__).resolve().parent.parent
+task_bridge = (root / 'upstream/bootstrap/System/TaskBridge.ZC').read_text()
+full_compositor_start = task_bridge.index('Bool BootstrapTryUpstreamGrUpdateScreen()')
+full_compositor_end = task_bridge.index('\nU0 BootstrapGrUpdateTasks()', full_compositor_start)
+full_compositor = task_bridge[full_compositor_start:full_compositor_end]
+assert ('ZcFbShellTextCompose(gr.text_base, TEXT_COLS);\n'
+        '    bootstrap_gr_text_updates++;') in full_compositor
+pixel_visible_start = task_bridge.index('Bool BootstrapWinPixelVisible(')
+pixel_visible_end = task_bridge.index('\nBool TextChar(', pixel_visible_start)
+pixel_visible = task_bridge[pixel_visible_start:pixel_visible_end]
+assert 'bootstrap_win_pixel_z_buf[y * 800 + x] <= task->win_z_num' in pixel_visible
+assert 'x >= 800 || y < 0 || y >= 600' in pixel_visible
+pixel_function_start = task_bridge.index('Bool BootstrapGraphPixelAt(')
+pixel_function_end = task_bridge.find('\n}', pixel_function_start) + 2
+assert 'BootstrapWinPixelVisible(task,' in task_bridge[
+        pixel_function_start:pixel_function_end]
+rect_function_start = task_bridge.rindex('Bool GrRect(')
+rect_function_end = task_bridge.find('\n}', rect_function_start) + 2
+assert 'BootstrapGraphPixelAt(dc,' in task_bridge[
+        rect_function_start:rect_function_end]
+win_z_start = task_bridge.index('U0 WinZBufUpdate()')
+win_z_end = task_bridge.index('\nBool BootstrapWinIsUncovered(', win_z_start)
+win_z_update = task_bridge[win_z_start:win_z_end]
+assert 'MemSet(bootstrap_win_pixel_z_buf, 0, 800 * 600 * sizeof(U16));' in win_z_update
+assert 'bootstrap_win_pixel_z_buf[pixel_index++] = z;' in win_z_update
+assert 'ZcFbSetWinPixelZBuffer(bootstrap_win_pixel_z_buf);' in win_z_update
+wallpaper_start = task_bridge.index('I64 BootstrapWallpaperBg(')
+wallpaper_end = task_bridge.index('\nU0 BootstrapBindGrTaskTables(', wallpaper_start)
+wallpaper = task_bridge[wallpaper_start:wallpaper_end]
+assert 'U32 BootstrapWallpaperCell(U32 cell, I64 x, I64 y)' in wallpaper
+assert 'if (!z_buf[index + x])' in wallpaper
+assert 'cells[index + x] = BootstrapWallpaperCell(' in wallpaper
+assert 'active_gr->fp_wall_paper != &BootstrapWinPaper' in wallpaper
+assert 'active_gr->fp_wall_paper = &BootstrapWinPaper;' in task_bridge
+assert task_bridge.count('BootstrapWallpaperApply();') >= 3
+assert 'BootstrapWallpaperChecks() != 0x2a' in (root / 'tests/compat/GrScreenFinalUpdate.ZC').read_text()
+upstream_grscreen = (root / 'upstream/pinned/System/Gr/GrScreen.ZC').read_text()
+assert 'if (gr.fp_wall_paper)\n\t\t\t\t(*gr.fp_wall_paper)(task);' in upstream_grscreen
+kernel_stub = (root / 'src/kernel_stub.c').read_text()
+assert 'void zeal_fb_set_win_pixel_z_buffer(const uint16_t *z_buf)' in kernel_stub
+assert 'g_fb_win_pixel_z_buf[(size_t)y * 800u + x] <= task_z' in kernel_stub
+runtime = (root / 'src/zc/runtime.c').read_text()
+assert '{"ZcFbSetWinPixelZBuffer",' in runtime
 for path, transform, original, changed in (
     ('Kernel/StrB.ZC', extract_source_prompt, b'Bool YorN()', b'Bool OtherPrompt()'),
     ('System/Training.ZC', extract_source_training, b'i = RandU16;', b'i = 0;'),
@@ -103,6 +145,8 @@ assert text.count('ZcDocUpdateTaskDocs(task);') == 1
 assert not re.search(r'(?<!Zc)DocUpdateTaskDocs\(task\);', text)
 assert text.count('ZcODEsUpdate(task);') == 1
 assert not re.search(r'(?<!Zc)ODEsUpdate\(task\);', text)
+assert text.count('ZcGrRopEquU8NoClipping(text.font,') == 2
+assert not re.search(r'(?<!Zc)GrRopEquU8NoClipping\(', text)
 assert text.count('dst(U8 *) += w2;') >= 2
 assert 'MOV U64 [RSI], R13' not in text
 assert 'ADD RSI, R12' not in text
@@ -132,6 +176,20 @@ except ValueError:
 else:
     raise AssertionError('GrPalette overlay accepted a changed palette setter')
 
+message_source = (root / 'upstream/pinned/Kernel/SerialDev/Message.ZC').read_bytes()
+message_overlay = translate_message(message_source)
+assert message_overlay != message_source
+assert b'ZcCtrlAltDispatch(res, arg1, arg2, task)' in message_overlay
+assert b'JobDel(tmpc);\n\t\t\t\tif (!ZcCtrlAltDispatch' in message_overlay
+try:
+    translate_message(message_source.replace(
+        b'if ((res != MESSAGE_KEY_DOWN ||',
+        b'if ((res != MESSAGE_NULL ||', 1))
+except ValueError:
+    pass
+else:
+    raise AssertionError('Message overlay accepted a changed pinned message dequeue')
+
 bitmap_source = (root / 'upstream/pinned/System/Gr/GrBitMap.ZC').read_bytes()
 bitmap_overlay = translate_grbitmap(bitmap_source)
 bitmap_text = bitmap_overlay.decode('utf-8')
@@ -151,6 +209,15 @@ assert 'res->width = width;' in ext_text
 assert 'res->body + (copy_y1 + row - y1) *' in ext_text
 assert 'dc->body + (copy_y1 + row) *' in ext_text
 assert 'width = copy_x2 - copy_x1 + 1;' in ext_text
+blot_start = bitmap_text.index('public I64 GrBlot(')
+blot_end = bitmap_text.index('\n#help_index "Graphics/Device Contexts"\n\nU8 *GrBitMap4ToBitMap8', blot_start)
+blot_text = bitmap_text[blot_start:blot_end]
+assert blot_text.count('if (img->flags & DCF_NO_TRANSPARENTS)') == 3
+assert 'if ((img->flags & DCF_NO_TRANSPARENTS) && (-x & 7)' in blot_text
+assert 'dc->color.c0.color = color.c0.color & c;' in blot_text
+assert 'if (win_z_num < *win_z_buf_ptr)' in blot_text
+assert 'case ROPB_COLLISION: //TODO: Might want to check win_z_buf' not in blot_text
+assert 'win_task->win_z_num >= gr.win_z_buf[' in blot_text
 
 try:
     translate_grbitmap(bitmap_source.replace(b'GrBlot(res, -x1, -y1, dc);',
@@ -251,6 +318,8 @@ assert ('(tmpde = doc->cur_entry->user_data) && tmpde->full_name' in
         filemgr_text)
 assert ('BootstrapGuiTerminalEditFile(tmpde->full_name);' in
         filemgr_text)
+assert '\t\t\t\t\t\t\tPutKey(ch, sc);' in filemgr_text
+assert 'bootstrap_filemgr_key_events' not in filemgr_text
 assert ('BootstrapGuiTerminalEditFile(\n'
         '\t\t\t\t\t\t\t\tdoc_e->user_data(CDirEntry *)->full_name);' in
         filemgr_text)
@@ -290,7 +359,7 @@ home_source = (root / 'upstream/pinned/HomeSys.ZC').read_bytes()
 once_source = (root / 'upstream/pinned/Once.ZC').read_bytes()
 once_overlay = translate_home_once(once_source)
 assert b'ARM64 live session is ready.' in once_overlay
-assert b'The original disk installer has not been ported yet.' in once_overlay
+assert b'Install to a 128 MiB UTM/QEMU VirtIO disk: zinstall, then zinstall ERASE.' in once_overlay
 assert b'RunFile("::/Misc/OSInstall",, TRUE);' not in once_overlay
 assert b'if (FileFind("::/Misc/Tour"))' in once_overlay
 try:
@@ -538,14 +607,17 @@ assert b'sys_focus_task = splash_task;' in zsplash_overlay
 assert b'sys_focus_task = old_focus;' in zsplash_overlay
 assert b'WinToTop(splash_task);' in zsplash_overlay
 assert b'U0 (*old_draw_it)(CTask *task, CDC *dc) = Fs->draw_it;' in zsplash_overlay
-assert b'Free(dc->depth_buf);' in zsplash_overlay
+assert b'I32 *bootstrap_zsplash_depth_buf;' in zsplash_overlay
+assert b'bootstrap_zsplash_depth_buf = MAlloc(dc->width_internal * dc->height * sizeof(I32), dc->mem_task);' in zsplash_overlay
+assert b'dc->depth_buf = bootstrap_zsplash_depth_buf;' in zsplash_overlay
 assert b'dc->depth_buf = NULL;' in zsplash_overlay
+assert b'Free(bootstrap_zsplash_depth_buf);' in zsplash_overlay
 assert zsplash_overlay.index(b'Sprite3(dc, 0, 0, 0, $IB,"<1>",BI=1$);') < \
-       zsplash_overlay.index(b'Free(dc->depth_buf);')
-assert zsplash_overlay.count(b'Free(dc->depth_buf);') == 1
+       zsplash_overlay.index(b'Free(bootstrap_zsplash_depth_buf);')
+assert zsplash_overlay.count(b'Free(bootstrap_zsplash_depth_buf);') == 1
 zsplash_loop_end = '\t\tΦ += .03;\n\t\tWinToTop;\n\t}\n'.encode('utf-8')
 assert zsplash_overlay.index(zsplash_loop_end) < \
-       zsplash_overlay.index(b'Free(dc->depth_buf);')
+       zsplash_overlay.index(b'Free(bootstrap_zsplash_depth_buf);')
 assert zsplash_overlay.index(b'while (!CharScan)') < \
        zsplash_overlay.index(b'Fs->draw_it = old_draw_it;')
 assert b'Simplicity Perfected' in zsplash_overlay
@@ -553,6 +625,16 @@ assert b'Kill(bg_task)' not in zsplash_overlay and b'Kill(splash_task)' not in z
 gui_terminal = (root / 'upstream/bootstrap/System/GuiTerminal.ZC').read_bytes()
 assert b'BootstrapGuiTerminalExeDocFile(' in gui_terminal and b'::/System/ZSplash.ZC' not in gui_terminal
 assert b'BootstrapHomeStartUpTasks() != 0x2a' in gui_terminal
+for menu_item in (b'Zoom In', b'Zoom Out', b'Reset View', b'Pan Left',
+                  b'Pan Right', b'Pan Up', b'Pan Down', b'Paint Demo'):
+    assert menu_item in gui_terminal
+assert b'BootstrapGuiTerminalZoomPanChecks()' in gui_terminal
+assert b'active_gr->sx = ClampI64(active_gr->sx, 0, max_x);' in gui_terminal
+assert b'active_gr->sy = ClampI64(active_gr->sy, 0, max_y);' in gui_terminal
+assert b'if (12 <= action <= 18)' in gui_terminal
+assert b'if (action == 19)' in gui_terminal
+assert b'BootstrapGuiTerminalMenuAction(19)' in gui_terminal
+print('PASS zoom and bounded viewport pan controls in the boot OS menu')
 try:
     translate_zsplash(zsplash_source.replace(b'Sprite3(dc,', b'Sprite4(dc,', 1))
 except ValueError:

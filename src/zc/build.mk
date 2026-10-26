@@ -8,15 +8,17 @@ ZC_FLAGS := -target aarch64-unknown-none-elf -std=gnu11 -ffreestanding \
     -fno-builtin -fPIE -fno-stack-protector -fno-stack-check \
     -ffunction-sections -fdata-sections -march=armv8-a -mcmodel=small \
     -mno-outline-atomics -mbranch-protection=none -ffixed-x28 -O2 \
-    -I$(ROOT)/src/zc/libc -I$(ROOT)/src/zc -I$(ZC_VENDOR) \
+    -I$(ROOT)/src/zc/libc -I$(ROOT)/src/zc -I$(BUILD)/zc -I$(ZC_VENDOR) \
     -DZEAL_FREESTANDING -DZEAL_GUEST_EXCEPTIONS -include $(ROOT)/src/zc/port.h
 ZC_HEADERS := $(wildcard src/zc/*.h src/zc/libc/*.h third_party/aiwnios/c/*.h)
 
 $(BUILD)/zc:
 	mkdir -p $@
+$(BUILD)/zc/font_std_data.h: upstream/pinned/Kernel/FontStd.ZC upstream/pinned/Kernel/FontAux.ZC upstream/pinned/UPSTREAM.json scripts/generate-font-std.py | $(BUILD)/zc
+	python3 scripts/generate-font-std.py $< $@
 $(BUILD)/zc/%.o: third_party/aiwnios/c/%.c $(ZC_HEADERS) src/zc/build.mk | $(BUILD)/zc
 	$(CLANG) $(ZC_FLAGS) -w -Wno-incompatible-pointer-types -Wno-int-conversion -c $< -o $@
-$(BUILD)/zc/runtime.o: src/zc/runtime.c src/fb_font.h $(ZC_HEADERS) src/zc/build.mk | $(BUILD)/zc
+$(BUILD)/zc/runtime.o: src/zc/runtime.c src/fb_font.h $(ZC_HEADERS) $(BUILD)/zc/font_std_data.h src/zc/build.mk | $(BUILD)/zc
 	$(CLANG) $(ZC_FLAGS) -Wall -Wextra -c $< -o $@
 $(BUILD)/zc/libc.o: src/zc/libc.c $(ZC_HEADERS) src/zc/build.mk | $(BUILD)/zc
 	$(CLANG) $(ZC_FLAGS) -Wall -Wextra -c $< -o $@
@@ -33,7 +35,7 @@ ZC_SOURCES := $(shell find upstream/pinned upstream/bootstrap tests/compat -type
 $(BUILD)/sources.tar: $(ZC_SOURCES) third_party/aiwnios/LICENSE scripts/build-source-bundle.py scripts/arm64_source.py scripts/check-arm64-source.py upstream/arm64/GrScreen.md | $(BUILD)
 	python3 scripts/build-source-bundle.py $@
 
-.PHONY: check-upstream check-compat check-compat-pci check-gui-workflow check-grscreen check-grscreen-full check-grscreen-ode
+.PHONY: check-upstream check-compat check-compat-pci check-gui-terminal check-gui-workflow check-gui-editor-text check-grscreen check-grscreen-full check-grscreen-ode
 check-upstream:
 	python3 scripts/check-upstream.py
 check-compat: check-upstream iso
@@ -42,8 +44,13 @@ check-compat-pci: check-upstream esp
 	python3 scripts/check-arm64-source.py
 	QEMU="$(QEMU)" QEMU_VIRT="$(QEMU_VIRT)" FW_CODE="$(FW_CODE)" FW_VARS_IN="$(FW_VARS_IN)" python3 scripts/check-compat.py --pci --probe-gui-keyboard
 	QEMU="$(QEMU)" QEMU_VIRT="$(QEMU_VIRT)" FW_CODE="$(FW_CODE)" FW_VARS_IN="$(FW_VARS_IN)" python3 scripts/check-compat.py --pci --probe-module /System/Math/MathODE.ZC
+check-gui-terminal: check-upstream esp
+	python3 scripts/check-arm64-source.py
+	QEMU="$(QEMU)" QEMU_VIRT="$(QEMU_VIRT)" FW_CODE="$(FW_CODE)" FW_VARS_IN="$(FW_VARS_IN)" python3 scripts/check-compat.py --pci --probe-module /System/DolDoc/DocRecalc.ZC --probe-gui-terminal
 check-gui-workflow: check-upstream esp
-	QEMU="$(QEMU)" QEMU_VIRT="$(QEMU_VIRT)" FW_CODE="$(FW_CODE)" FW_VARS_IN="$(FW_VARS_IN)" python3 scripts/check-compat.py --pci --probe-gui-workflow
+	QEMU="$(QEMU)" QEMU_VIRT="$(QEMU_VIRT)" FW_CODE="$(FW_CODE)" FW_VARS_IN="$(FW_VARS_IN)" python3 scripts/check-compat.py --usb-input nec --probe-gui-workflow
+check-gui-editor-text: check-upstream esp
+	QEMU="$(QEMU)" QEMU_VIRT="$(QEMU_VIRT)" FW_CODE="$(FW_CODE)" FW_VARS_IN="$(FW_VARS_IN)" python3 scripts/check-compat.py --usb-input nec --probe-gui-editor-text
 check-grscreen: check-upstream esp
 	python3 scripts/check-arm64-source.py
 	QEMU="$(QEMU)" QEMU_VIRT="$(QEMU_VIRT)" FW_CODE="$(FW_CODE)" FW_VARS_IN="$(FW_VARS_IN)" python3 scripts/check-compat.py --pci --probe-module /System/Win.ZC --probe-winmgr --probe-grscreen --probe-live-winmgr

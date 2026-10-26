@@ -1,0 +1,275 @@
+I64 GrLineCdcChecks()
+{
+    CDC *dc = DCNew(32, 16), *brush = NULL, *screen_dc = NULL;
+    CTask *screen_task;
+    I32 *depth;
+    I64 x, y, expected;
+
+    if (!dc || !dc->body)
+        return 1;
+    dc->color.c0.color = 3;
+    dc->color.c0.rop = ROPB_EQU;
+    if (!GrLine(dc, 2, 2, 8, 2))
+        return 2;
+    for (x = 2; x <= 8; x++)
+        if (dc->body[2 * dc->width_internal + x] != 3)
+            return 3;
+    if (dc->body[2 * dc->width_internal + 9] != 0)
+        return 4;
+
+    // A shallow diagonal must follow the inclusive integer Bresenham path.
+    DCFill(dc, 0);
+    dc->color.c0.color = 4;
+    dc->color.c0.rop = ROPB_EQU;
+    if (!GrLine(dc, 2, 12, 8, 15))
+        return 37;
+    for (y = 0; y < 16; y++)
+        for (x = 0; x < 32; x++)
+        {
+            expected = 0;
+            if ((x == 2 && y == 12) ||
+                    (x == 3 && y == 13) || (x == 4 && y == 13) ||
+                    (x == 5 && y == 14) || (x == 6 && y == 14) ||
+                    (x == 7 && y == 15) || (x == 8 && y == 15))
+                expected = 4;
+            if (dc->body[y * dc->width_internal + x] != expected)
+                return 38;
+        }
+
+    // Source dither selects the secondary color from pixel parity per line.
+    DCFill(dc, 0);
+    dc->color.c0.color = 2;
+    dc->color.c0.rop = ROPB_EQU;
+    dc->color.c1.color = 6;
+    dc->color.c1.rop = ROPBF_DITHER;
+    if (!GrLine(dc, 2, 6, 6, 6))
+        return 39;
+    for (x = 2; x <= 6; x++)
+    {
+        expected = 2;
+        if ((x ^ 6) & 1)
+            expected = 6;
+        if (dc->body[6 * dc->width_internal + x] != expected)
+            return 40;
+    }
+    dc->color.c1.rop = 0;
+
+    // The per-pixel depth test must preserve the pre-existing front sample.
+    depth = MAlloc(dc->width_internal * dc->height * sizeof(I32));
+    if (!depth)
+        return 41;
+    MemSetU32(depth, I32_MAX, dc->width_internal * dc->height);
+    DCFill(dc, 0);
+    dc->depth_buf = depth;
+    dc->db_z = 5;
+    depth[7 * dc->width_internal + 4] = 2;
+    dc->color.c0.color = 10;
+    dc->color.c0.rop = ROPB_EQU;
+    if (!GrLine(dc, 2, 7, 6, 7))
+        return 42;
+    for (x = 2; x <= 6; x++)
+    {
+        if (x == 4)
+        {
+            if (dc->body[7 * dc->width_internal + x] != 0 ||
+                    depth[7 * dc->width_internal + x] != 2)
+                return 43;
+        }
+        else if (dc->body[7 * dc->width_internal + x] != 10 ||
+                depth[7 * dc->width_internal + x] != 5)
+            return 44;
+    }
+    dc->depth_buf = NULL;
+    Free(depth);
+
+    DCFill(dc, 0);
+    dc->color.c0.color = 5;
+    if (!GrLine(dc, 2, 4, 8, 4, 2, 1))
+        return 5;
+    for (x = 2; x <= 8; x++)
+        if ((x & 1 && dc->body[4 * dc->width_internal + x] != 5) ||
+            (!(x & 1) && dc->body[4 * dc->width_internal + x] != 0))
+            return 6;
+
+    DCFill(dc, 0);
+    dc->color.c0.color = 9;
+    dc->thick = 3;
+    if (!GrLine(dc, 12, 2, 12, 6))
+        return 7;
+    for (y = 2; y <= 6; y++)
+        for (x = 10; x <= 14; x++)
+            if ((11 <= x <= 13 &&
+                    dc->body[y * dc->width_internal + x] != 9) ||
+                (!(11 <= x <= 13) &&
+                    dc->body[y * dc->width_internal + x] != 0))
+                return 8;
+
+    DCFill(dc, 0);
+    dc->thick = 1;
+    dc->color.c0.color = 6;
+    if (!GrLine(dc, -2, 8, 2, 8))
+        return 9;
+    for (x = 0; x <= 3; x++)
+        if ((x <= 2 && dc->body[8 * dc->width_internal + x] != 6) ||
+            (x > 2 && dc->body[8 * dc->width_internal + x] != 0))
+            return 10;
+
+    DCFill(dc, 0);
+    for (x = 2; x <= 4; x++)
+        dc->body[10 * dc->width_internal + x] = 1;
+    dc->color.c0.color = 3;
+    dc->color.c0.rop = ROPB_XOR;
+    if (!GrLine(dc, 2, 10, 4, 10))
+        return 11;
+    for (x = 2; x <= 4; x++)
+        if (dc->body[10 * dc->width_internal + x] != 2)
+            return 12;
+
+	// No-transparency brushes use their source bytes as foreground color masks.
+	brush = DCNew(8, 8);
+	if (!brush)
+		return 13;
+	DCFill(brush, 0);
+	brush->flags |= DCF_NO_TRANSPARENTS;
+	brush->body[4 * brush->width_internal + 4] = 1;
+	brush->body[4 * brush->width_internal + 5] = 3;
+	dc->brush = brush;
+	dc->color.c0.color = 7;
+	dc->color.c0.rop = ROPB_EQU;
+	if (!GrLine(dc, 8, 0, 8, 0) ||
+			dc->body[4 * dc->width_internal + 12] != 1 ||
+			dc->body[4 * dc->width_internal + 13] != 3 ||
+			dc->body[4 * dc->width_internal + 11] != 0)
+		return 14;
+	DCFill(dc, 0);
+	if (!GrLine(dc, -5, 0, -5, 0) ||
+			dc->body[4 * dc->width_internal] != 3 ||
+			dc->body[4 * dc->width_internal + 1] != 0)
+		return 15;
+	// Thick opaque-mask brush strokes stamp through GrPlot1; the brush's
+	// background pixels are opaque and may overwrite earlier parallel stamps.
+	DCFill(dc, 0);
+	dc->color.c0.color = 7;
+	dc->color.c0.rop = ROPB_EQU;
+	dc->thick = 3;
+	brush->flags |= DCF_NO_TRANSPARENTS;
+	DCFill(brush, 0);
+	brush->body[4 * brush->width_internal + 4] = 1;
+	brush->body[4 * brush->width_internal + 5] = 3;
+	if (!GrLine(dc, 5, 2, 7, 2, 2, 1))
+		return 20;
+	for (y = 4; y <= 8; y++)
+		for (x = 9; x <= 12; x++)
+		{
+			if (x == 10 && y == 7)
+			{
+				if (dc->body[y * dc->width_internal + x] != 1)
+					return 21;
+			}
+			else if (x == 11 && y == 7)
+			{
+				if (dc->body[y * dc->width_internal + x] != 3)
+					return 22;
+			}
+			else if (dc->body[y * dc->width_internal + x])
+				return 24;
+		}
+	DCFill(dc, 0);
+	dc->thick = 1;
+	if (!GrLine(dc, 5, 2, 7, 2, 2, 1) ||
+			dc->body[6 * dc->width_internal + 10] != 1 ||
+			dc->body[6 * dc->width_internal + 11] != 3 ||
+			dc->body[6 * dc->width_internal + 9] != 0 ||
+			dc->body[6 * dc->width_internal + 12] != 0)
+		return 25;
+
+	// GrPlot1 treats a no-transparency brush as a MONO mask even when the
+	// caller selected another ROP, and restores the caller's color state.
+	brush->flags |= DCF_NO_TRANSPARENTS;
+	DCFill(brush, 0);
+	brush->body[4 * brush->width_internal + 4] = 1;
+	brush->body[4 * brush->width_internal + 5] = 3;
+	DCFill(dc, 0);
+	dc->color.c0.color = 7;
+	dc->color.c0.rop = ROPB_XOR;
+	if (!GrLine(dc, 8, 0, 8, 0)) return 26;
+	if (dc->body[4 * dc->width_internal + 12] != 1) return 27;
+	if (dc->body[4 * dc->width_internal + 13] != 3) return 28;
+	if (dc->color.c0.color != 7) return 29;
+	if (dc->color.c0.rop != ROPB_XOR) return 30;
+
+	// The ordinary transparent MONO brush treats zero source cells as gaps;
+	// nonzero cells paint with the caller's color and leave its ROP unchanged.
+	brush->flags = 0;
+	DCFill(brush, 0);
+	brush->body[4 * brush->width_internal + 4] = 1;
+	brush->body[4 * brush->width_internal + 5] = 3;
+	DCFill(dc, 0);
+	dc->body[4 * dc->width_internal + 11] = 4;
+	dc->body[4 * dc->width_internal + 12] = 5;
+	dc->body[4 * dc->width_internal + 13] = 6;
+	dc->body[4 * dc->width_internal + 14] = 7;
+	dc->color.c0.color = 7;
+	dc->color.c0.rop = ROPB_XOR;
+	if (!GrLine(dc, 8, 0, 8, 0)) return 31;
+	if (dc->body[4 * dc->width_internal + 11] != 4) return 32;
+	if (dc->body[4 * dc->width_internal + 12] != 7) return 33;
+	if (dc->body[4 * dc->width_internal + 13] != 7) return 34;
+	if (dc->body[4 * dc->width_internal + 14] != 7) return 35;
+	if (dc->color.c0.color != 7 || dc->color.c0.rop != ROPB_XOR)
+		return 36;
+
+	// Collision-mode brush stamps count only nontransparent brush pixels and
+	// exclude destination background/transparent pixels.
+	brush->flags = 0;
+	DCFill(brush, TRANSPARENT);
+	brush->body[4 * brush->width_internal + 4] = 1;
+	brush->body[4 * brush->width_internal + 5] = 3;
+	DCFill(dc, 0);
+	dc->body[4 * dc->width_internal + 12] = 5;
+	dc->body[4 * dc->width_internal + 13] = TRANSPARENT;
+	dc->collision_count = 0;
+	dc->bkcolor.c0.color = 0;
+	dc->color.c0.rop = ROPB_COLLISION;
+	if (!GrLine(dc, 8, 0, 8, 0) || dc->collision_count != 1 ||
+			dc->body[4 * dc->width_internal + 12] != 5 ||
+			dc->body[4 * dc->width_internal + 13] != TRANSPARENT)
+		return 19;
+	brush->flags |= DCF_NO_TRANSPARENTS;
+	DCFill(brush, 0);
+	brush->body[4 * brush->width_internal + 4] = 1;
+	brush->body[4 * brush->width_internal + 5] = 3;
+
+	// A screen-backed line must use the same upstream brush stamp and clip it
+	// to the owning task's pixel rectangle after task-local coordinate mapping.
+	screen_task = sys_focus_task;
+	if (TaskValidate(screen_task) &&
+			screen_task->pix_right > screen_task->pix_left + 24 &&
+			screen_task->pix_bottom > screen_task->pix_top + 24)
+	{
+		screen_dc = DCNew(800, 600);
+		if (!screen_dc)
+			return 16;
+		screen_dc->flags |= DCF_SCREEN_BITMAP | DCF_ON_TOP;
+		screen_dc->win_task = screen_task;
+		screen_dc->brush = brush;
+		screen_dc->color.c0.color = 7;
+		screen_dc->color.c0.rop = ROPB_EQU;
+		screen_dc->thick = 1;
+		if (!GrLine(screen_dc, 8, 8, 8, 8) ||
+				screen_dc->body[(screen_task->pix_top + screen_task->scroll_y + 12) *
+						screen_dc->width_internal + screen_task->pix_left + screen_task->scroll_x + 12] != 1 ||
+				screen_dc->body[(screen_task->pix_top + screen_task->scroll_y + 12) *
+						screen_dc->width_internal + screen_task->pix_left + screen_task->scroll_x + 13] != 3 ||
+				screen_dc->body[(screen_task->pix_top + screen_task->scroll_y + 12) *
+						screen_dc->width_internal + screen_task->pix_left + screen_task->scroll_x + 11] != 0)
+			return 17;
+		screen_dc->brush = NULL;
+		DCDel(screen_dc);
+	}
+	dc->brush = NULL;
+	DCDel(brush);
+
+    DCDel(dc);
+    return 0x2a;
+}

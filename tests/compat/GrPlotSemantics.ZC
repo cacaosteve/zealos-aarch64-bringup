@@ -1,0 +1,99 @@
+I64 GrPlotSemanticsChecks()
+{
+    CDC *dc, *measure_dc;
+    I32 *depth;
+    I64 index;
+
+    dc = DCNew(16, 4);
+    if (!dc || !dc->body)
+        return 1;
+    dc->color.c0.color = 7;
+    dc->color.c0.rop = ROPB_EQU;
+    if (!GrPlot(dc, 15, 3) ||
+            dc->body[3 * dc->width_internal + 15] != 7)
+        return 2;
+    if (GrPlot(dc, 16, 3) || GrPlot(dc, 0, 4))
+        return 3;
+    dc->color.c0.color = 11;
+    if (!GrRect(dc, 14, 2, 8, 3) ||
+            dc->body[2 * dc->width_internal + 14] != 11 ||
+            dc->body[2 * dc->width_internal + 15] != 11 ||
+            dc->body[3 * dc->width_internal + 14] != 11 ||
+            dc->body[3 * dc->width_internal + 15] != 11 ||
+            dc->body[1 * dc->width_internal + 15] != 0)
+        return 16;
+
+    index = 1 * dc->width_internal + 2;
+    dc->body[index] = 0x35;
+    dc->color.c0.color = 0x0f;
+    dc->color.c0.rop = ROPB_XOR;
+    if (!GrPlot(dc, 2, 1) || dc->body[index] != 0x3a)
+        return 4;
+
+    dc->bkcolor.c0.color = 0;
+    dc->body[index] = 9;
+    dc->collision_count = 0;
+    dc->color.c0.rop = ROPB_COLLISION;
+    if (!GrPlot(dc, 2, 1) || dc->collision_count != 1 ||
+            dc->body[index] != 9)
+        return 5;
+    dc->body[index] = TRANSPARENT;
+    if (!GrPlot(dc, 2, 1) || dc->collision_count != 1)
+        return 6;
+    dc->body[index] = dc->bkcolor.c0.color;
+    if (!GrPlot(dc, 2, 1) || dc->collision_count != 1)
+        return 7;
+
+    dc->color.c0.rop = ROPB_EQU;
+    dc->color.c0.color = 4;
+    dc->color.c1.color = 6;
+    dc->color.c1.rop = ROPBF_DITHER;
+    if (!GrPlot(dc, 0, 0) || !GrPlot(dc, 1, 0) ||
+            dc->body[0] != 4 || dc->body[1] != 6)
+        return 8;
+    dc->color.c1.rop = ROPBF_PROBABILITY_DITHER;
+    dc->dither_probability_u16 = 0;
+    if (!GrPlot(dc, 2, 0) || dc->body[2] != 4)
+        return 9;
+    dc->dither_probability_u16 = 0x10000;
+    if (!GrPlot(dc, 3, 0) || dc->body[3] != 6)
+        return 10;
+    dc->color.c1.rop = 0;
+
+    depth = MAlloc(dc->width_internal * dc->height * sizeof(I32));
+    if (!depth)
+        return 11;
+    MemSetU32(depth, I32_MAX, dc->width_internal * dc->height);
+    dc->depth_buf = depth;
+    dc->db_z = 5;
+    dc->body[index] = 2;
+    depth[index] = 20;
+    dc->color.c0.rop = ROPB_EQU;
+    dc->color.c0.color = 12;
+    if (!GrPlot(dc, 2, 1) || depth[index] != 5 ||
+            dc->body[index] != 12)
+        return 12;
+    dc->db_z = 8;
+    depth[index] = 4;
+    dc->body[index] = 3;
+    if (!GrPlot(dc, 2, 1) || depth[index] != 4 ||
+            dc->body[index] != 3)
+        return 13;
+    DCDel(dc);
+
+    measure_dc = DCNew(16, 8, NULL, TRUE);
+    if (!measure_dc || measure_dc->body)
+        return 14;
+    measure_dc->flags |= DCF_RECORD_EXTENTS | DCF_LOCATE_NEAREST;
+    measure_dc->min_x = measure_dc->min_y = I64_MAX;
+    measure_dc->max_x = measure_dc->max_y = I64_MIN;
+    measure_dc->cur_x = 5;
+    measure_dc->cur_y = 6;
+    measure_dc->nearest_dist = I64_MAX;
+    if (!GrPlot(measure_dc, 5, 6) || measure_dc->min_x != 5 ||
+            measure_dc->max_x != 5 || measure_dc->min_y != 6 ||
+            measure_dc->max_y != 6 || measure_dc->nearest_dist != 0)
+        return 15;
+    DCDel(measure_dc);
+    return 42;
+}

@@ -1,4 +1,6 @@
 extern U0 GrRopEquU8NoClipping(I64 ch, U8 *dst, I64 width_internal);
+extern I64 ZcGrRopEquU8NoClipping(U64 *font, I64 ch, U8 *dst,
+                                 I64 width_internal);
 extern U0 GrUpdateTextFG();
 extern U0 GrUpdateScreen32();
 extern U0 GrPaletteGet(CBGR24 *palette);
@@ -8,24 +10,31 @@ extern I64 ZcFbTextPixel(I64 x, I64 y);
 I64 GrRopForegroundChecks()
 {
 	U8 pixels[8 * 12];
-	U8 *glyphs = text.font(U8 *);
+	U64 *glyphs = text.font(U64 *);
+	U64 *aux_glyphs = text.aux_font(U64 *);
+	U64 *saved_font = text.font(U64 *);
 	I64 i, x, y;
-	U8 a_rows[8] = {0x18, 0x3c, 0x66, 0x66, 0x7e, 0x66, 0x66, 0x00};
+	U8 expected, bits;
+	// sys_font_std['A'] = 0x002121213F21211E; its bytes are
+	// consumed least-significant first by GrRopEquU8NoClipping.
+	U8 a_rows[8] = {0x1e, 0x21, 0x21, 0x3f, 0x21, 0x21, 0x21, 0x00};
 
 	for (i = 0; i < 8 * 12; i++)
 		pixels[i] = 0x5a;
-	if (!glyphs || glyphs['A' * 8] != a_rows[0])
+	if (!glyphs || glyphs['A'] != 0x002121213F21211E ||
+			glyphs[0xB3] != 0x0808080808080808 ||
+			glyphs[0xE9] != 0x001C22417F41221C)
 		return 1;
-	GrRopEquU8NoClipping(0x00000341, pixels, 12);
+	ZcGrRopEquU8NoClipping(glyphs, 0x00000341, pixels, 12);
 	for (y = 0; y < 8; y++)
 	{
 		for (x = 0; x < 8; x++)
 		{
-			U8 expected = 0x5a;
-			if (a_rows[y] & (0x80 >> x))
+			expected = 0x5a;
+			if (a_rows[y] & (1 << x))
 				expected = 0x03;
 			if (pixels[y * 12 + x] != expected)
-				return 2;
+				return 0x100 + y * 8 + x;
 		}
 		for (x = 8; x < 12; x++)
 			if (pixels[y * 12 + x] != 0x5a)
@@ -34,7 +43,7 @@ I64 GrRopForegroundChecks()
 	// A zero glyph is transparent, while underline forces the bottom row.
 	for (i = 0; i < 8 * 12; i++)
 		pixels[i] = 0x5a;
-	GrRopEquU8NoClipping(0x80000320, pixels, 12);
+	ZcGrRopEquU8NoClipping(glyphs, 0x80000320, pixels, 12);
 	for (y = 0; y < 7; y++)
 		for (x = 0; x < 8; x++)
 			if (pixels[y * 12 + x] != 0x5a)
@@ -46,6 +55,39 @@ I64 GrRopForegroundChecks()
 		for (x = 8; x < 12; x++)
 			if (pixels[y * 12 + x] != 0x5a)
 				return 6;
+	if (!glyphs || !aux_glyphs || glyphs == aux_glyphs ||
+			glyphs['A'] != 0x002121213F21211E ||
+			aux_glyphs['A'] != 0x0063637F6363361C)
+		return 7;
+	// Ctrl-Alt-F swaps CTextGlobals.font and aux_font. Check source-side table
+	// selection and that the pinned auxiliary table is available.
+	SwapI64(&text.font, &text.aux_font);
+	if (text.font != aux_glyphs)
+	{
+		SwapI64(&text.font, &text.aux_font);
+		return 8;
+	}
+	for (i = 0; i < 8 * 12; i++)
+		pixels[i] = 0x5a;
+	ZcGrRopEquU8NoClipping(text.font, 0x00000341, pixels, 12);
+	for (y = 0; y < 8; y++)
+	{
+		bits = (aux_glyphs['A'] >> (y * 8)) & 0xff;
+		for (x = 0; x < 8; x++)
+		{
+			expected = 0x5a;
+			if (bits & (1 << x))
+				expected = 0x03;
+			if (pixels[y * 12 + x] != expected)
+				return 0x200 + y * 8 + x;
+		}
+		for (x = 8; x < 12; x++)
+			if (pixels[y * 12 + x] != 0x5a)
+				return 0x280 + y;
+	}
+	SwapI64(&text.font, &text.aux_font);
+	if (text.font != saved_font)
+		return 9;
 	return 42;
 }
 
@@ -100,8 +142,10 @@ I64 GrUpdateTextFGChecks()
 	gr.hide_row = saved_hide_row;
 	Blink = saved_blink;
 	Free(body);
-	if (first != 6419 || changed != 28)
-		return 1000 + changed;
+	if (first != 6417)
+		return 0x1000 + first;
+	if (changed != 20)
+		return 0x2000 + changed;
 	return 42;
 }
 
@@ -208,8 +252,12 @@ I64 GrUpdateScreen32LimineChecks()
 			sys_framebuffer_width != 800 || sys_framebuffer_height != 600 ||
 			pitch_pixels < 800 || !pixels || !screen_cache || !raw)
 		return 1;
-	saved_pixel = text.fb_alias;
-	if (!saved_pixel || saved_pixel != sys_framebuffer_addr)
+	// The compositor may leave fb_alias bound to its staging plane between
+	// frames. This test explicitly switches it to the real framebuffer below,
+	// so save/restore through the validated framebuffer global rather than
+	// requiring the previous caller to have left a particular alias installed.
+	saved_pixel = sys_framebuffer_addr;
+	if (!saved_pixel)
 		return 2;
 	// Preserve the visible boot text while exercising one real Limine scanline.
 	GrPaletteGet(saved_palette);

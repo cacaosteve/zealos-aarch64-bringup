@@ -8,7 +8,7 @@
 #define PI4_USB_DMA_ARENA_ALIGN (64ull * 1024ull)
 #define PI4_USB_DMA_MIN_PHYS    (4ull * 1024ull * 1024ull)
 
-static int pi4_usb_dma_reserve(struct zeal_handoff *h) {
+static inline int pi4_usb_dma_reserve(struct zeal_handoff *h) {
     const uint32_t required = PI4_PCIE_FDT_PRESENT | PI4_PCIE_FDT_ENABLED |
                               PI4_PCIE_FDT_DMA;
     const uint64_t bytes = PI4_USB_DMA_ARENA_BYTES;

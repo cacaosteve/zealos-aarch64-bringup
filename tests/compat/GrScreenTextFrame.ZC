@@ -14,7 +14,8 @@ I64 GrScreenTextFrameChecks()
 	I64 saved_pan_x = gr.pan_text_x, saved_pan_y = gr.pan_text_y;
 	Bool saved_hide_col = gr.hide_col, saved_hide_row = gr.hide_row;
 	Bool saved_blink = Blink;
-	U8 glyph_rows[8] = {0x18, 0x3c, 0x66, 0x66, 0x7e, 0x66, 0x66, 0x00};
+	// Match the pinned Kernel/FontStd.ZC uppercase A, consumed LSB first.
+	U8 glyph_rows[8] = {0x1e, 0x21, 0x21, 0x3f, 0x21, 0x21, 0x21, 0x00};
 	I64 i, x, y, expected, result = 42;
 	if (!allocation)
 		return 1;
@@ -52,7 +53,7 @@ I64 GrScreenTextFrameChecks()
 			if (8 <= y < 16 && 16 <= x < 24)
 			{
 				expected = 12;
-				if (glyph_rows[y - 8] & (0x80 >> (x - 16)))
+				if (glyph_rows[y - 8] & (1 << (x - 16)))
 					expected = 3;
 			}
 			if (body[y * GR_WIDTH + x] != expected)

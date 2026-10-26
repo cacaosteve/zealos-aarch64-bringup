@@ -9,7 +9,8 @@ import tarfile
 
 from arm64_source import (extract_home_set, extract_home_startup, extract_home_startup_tasks, inject_home_startup_tasks, extract_version_scalars, extract_source_prompt, extract_source_training, extract_server_task, extract_user_task, translate_doctree, translate_registry, translate_docterm, translate_doced, translate_docfind, translate_docform, translate_docpopup, translate_docrecalc, translate_grbitmap,
                           translate_autocomplete_task, translate_grdc, translate_grscreen, translate_ktask, translate_mathode, translate_zsplash,
-                          translate_winmgr, translate_filemgr, translate_home_once, translate_grpalette)
+                          translate_winmgr, translate_filemgr, translate_home_once,
+                          translate_grpalette, translate_message)
 
 root = Path(__file__).resolve().parent.parent
 manifest = json.loads((root / 'upstream/pinned/UPSTREAM.json').read_text())
@@ -25,6 +26,11 @@ for name, expected in manifest['files'].items():
         home_startup_tasks = extract_home_startup_tasks(data)
     if rel == 'Kernel/BlkDev/DiskDirB.ZC':
         entries['System/SourceHome.ZC'] = extract_home_set(data)
+    if rel == 'Kernel/SerialDev/Message.ZC':
+        try:
+            data = translate_message(data)
+        except ValueError as exc:
+            raise SystemExit(f'ARM64 keyboard message overlay no longer applies: {exc}') from exc
     if rel == 'Once.ZC':
         # Seed the same editable home startup file installed by upstream.
         # Disk/RAM and DVD boot queue this file in the first graphical

@@ -5,11 +5,32 @@ U0 GrBlot3TestTranslate(CDC *dc, I64 *x, I64 *y, I64 *z)
 	*z += 2;
 }
 
+U0 GrBlot3TestTranslateOffscreen(CDC *dc, I64 *x, I64 *y, I64 *z)
+{
+	*x += 1000;
+	*y += 3;
+	*z += 2;
+}
+
+U0 GrBlot3TestTranslatePartial(CDC *dc, I64 *x, I64 *y, I64 *z)
+{
+	*x += 19;
+	*y += 3;
+	*z += 2;
+}
+
 I64 GrBlot3Checks()
 {
 	CDC *img = NULL, *plain = NULL, *depth_dc = NULL;
+	CDC *screen_img = NULL, *screen_dc = NULL;
+	CDC *screen_img_tall = NULL;
+	CTask *screen_task;
+	U16 *old_win_z_buf, *probe_z_buf;
 	I32 *depth;
-	I64 result = 42;
+	I64 result = 42, i, x, y, screen_x, screen_y, abs_x, abs_y, z_index;
+	U16 old_z_left, old_z_right, old_z_far;
+	U16 old_z0, old_z1, old_z2, old_z3;
+	screen_task = NULL;
 	// zreset/module probes may replace the active source `gr` global after
 	// boot-time graphics setup, so restore the packed lookup tables before
 	// exercising the unchanged bitmap routines.
@@ -42,6 +63,74 @@ I64 GrBlot3Checks()
 		goto done;
 	}
 
+	// The ordinary 2D fallback must preserve source pixels through XOR and
+	// leave transparent source pixels untouched.
+	plain->color.c0.rop = ROPB_XOR;
+	if (GrBlot3(plain, 2, 1, 0, img) != 1 ||
+			plain->body[1 * plain->width_internal + 2] != 0 ||
+			plain->body[1 * plain->width_internal + 3] != 0 ||
+			plain->body[2 * plain->width_internal + 2] != 0 ||
+			plain->body[2 * plain->width_internal + 3] != 0)
+	{
+		result = 7;
+		goto done;
+	}
+
+	// A MONO source is a mask: zero pixels are clear, while every nonzero
+	// pixel paints the selected foreground color, even at a clipped edge.
+	for (i = 2; i < 8; i++) img->body[i] = 0;
+	img->body[9] = 0;
+	for (i = 10; i < 16; i++) img->body[i] = 0;
+	DCFill(plain, 0xaa);
+	plain->color.c0.color = 6;
+	plain->color.c0.rop = ROPB_MONO;
+	if (GrBlot3(plain, -1, 1, 0, img) != 1)
+	{
+		result = 91;
+		goto done;
+	}
+	if (plain->body[1 * plain->width_internal + 0] != 6)
+	{
+		result = 92;
+		goto done;
+	}
+	if (plain->body[1 * plain->width_internal + 1] != 0xaa)
+	{
+		result = 93;
+		goto done;
+	}
+	if (plain->body[2 * plain->width_internal + 0] != 0xaa)
+	{
+		result = 94;
+		goto done;
+	}
+	if (plain->body[1 * plain->width_internal + 15] != 0xaa)
+	{
+		result = 95;
+		goto done;
+	}
+	for (i = 2; i < 8; i++) img->body[i] = TRANSPARENT;
+	img->body[9] = TRANSPARENT;
+	for (i = 10; i < 16; i++) img->body[i] = TRANSPARENT;
+
+	// Collision mode counts only covered destination pixels that are neither
+	// transparent nor the CDC background, and skips transparent source pixels.
+	plain->bkcolor.c0.color = 0;
+	plain->body[1 * plain->width_internal + 2] = 9;
+	plain->body[1 * plain->width_internal + 3] = 0;
+	plain->body[2 * plain->width_internal + 2] = TRANSPARENT;
+	plain->body[2 * plain->width_internal + 3] = 9;
+	plain->collision_count = 0;
+	plain->color.c0.rop = ROPB_COLLISION;
+	if (GrBlot3(plain, 2, 1, 0, img) != 1 ||
+			plain->collision_count != 1 ||
+			plain->body[1 * plain->width_internal + 2] != 9 ||
+			plain->body[2 * plain->width_internal + 3] != 9)
+	{
+		result = 8;
+		goto done;
+	}
+
 	// A depth-buffered transformed blit must apply the CDC callback to the
 	// image origin, retain indexed pixels, skip transparent pixels, and write
 	// the transformed depth through GrPlot1.
@@ -68,7 +157,466 @@ I64 GrBlot3Checks()
 			depth_dc->color.c0.rop != ROPB_EQU)
 		result = 4;
 
+	// A transformed bitmap wholly beyond the target bounds reports no visible
+	// blit, while a bitmap clipped by the right edge reports that it drew.
+	depth_dc->transform = &GrBlot3TestTranslateOffscreen;
+	if (GrBlot3(depth_dc, 3, 1, 7, img) != 0)
+	{
+		result = 5;
+		goto done;
+	}
+	depth_dc->transform = &GrBlot3TestTranslatePartial;
+	if (GrBlot3(depth_dc, 3, 1, 7, img) != 1 ||
+			depth_dc->body[4 * depth_dc->width_internal + 22] != 3 ||
+			depth_dc->body[4 * depth_dc->width_internal + 23] != 4)
+		result = 6;
+
+	// Unaligned no-transparency MONO blits combine each source byte with the
+	// selected color mask, while retaining destination pixels outside the blit.
+	if (result == 42)
+	{
+		img->flags |= DCF_NO_TRANSPARENTS;
+		DCFill(img, 0);
+		img->body[0] = 3;
+		img->body[1] = 0x0c;
+		DCFill(plain, 0xaa);
+		plain->color.c0.color = 5;
+		plain->color.c0.rop = ROPB_MONO;
+		if (GrBlot3(plain, 3, 1, 0, img) != 1 ||
+				plain->body[plain->width_internal + 2] != 0xaa ||
+				plain->body[plain->width_internal + 3] != 1 ||
+				plain->body[plain->width_internal + 4] != 4 ||
+				plain->body[plain->width_internal + 11] != 0xaa)
+		{
+			result = 9;
+			goto done;
+		}
+
+		// EQU copies every nontransparent source byte, including zero, without
+		// changing pixels adjacent to an unaligned copy.
+		DCFill(plain, 0xaa);
+		plain->color.c0.rop = ROPB_EQU;
+		if (GrBlot3(plain, 3, 1, 0, img) != 1 ||
+				plain->body[plain->width_internal + 2] != 0xaa ||
+				plain->body[plain->width_internal + 3] != 3 ||
+				plain->body[plain->width_internal + 4] != 0x0c ||
+				plain->body[plain->width_internal + 5] != 0 ||
+				plain->body[plain->width_internal + 11] != 0xaa)
+		{
+			result = 12;
+			goto done;
+		}
+
+		// Collision mode excludes transparent/background destinations and
+		// still counts zero-valued sources when NO_TRANSPARENTS is set.
+		DCFill(plain, 9);
+		plain->bkcolor.c0.color = 9;
+		plain->body[plain->width_internal + 3] = 7;
+		plain->body[plain->width_internal + 4] = TRANSPARENT;
+		plain->body[plain->width_internal + 5] = 0x20;
+		plain->collision_count = 0;
+		plain->color.c0.rop = ROPB_COLLISION;
+		if (GrBlot3(plain, 3, 1, 0, img) != 1 ||
+				plain->collision_count != 2 ||
+				plain->body[plain->width_internal + 3] != 7 ||
+				plain->body[plain->width_internal + 4] != TRANSPARENT ||
+				plain->body[plain->width_internal + 5] != 0x20)
+		{
+			result = 13;
+			goto done;
+		}
+
+		DCFill(plain, 0x20);
+		plain->color.c0.rop = ROPB_XOR;
+		if (GrBlot3(plain, 3, 1, 0, img) != 1 ||
+				plain->body[plain->width_internal + 2] != 0x20 ||
+				plain->body[plain->width_internal + 3] != 0x23 ||
+				plain->body[plain->width_internal + 4] != 0x2c ||
+				plain->body[plain->width_internal + 11] != 0x20)
+		{
+			result = 10;
+			goto done;
+		}
+
+		DCFill(plain, 0x31);
+		plain->flags |= DCF_DONT_DRAW;
+		plain->color.c0.rop = ROPB_EQU;
+		if (GrBlot3(plain, 3, 1, 0, img) != 1 ||
+				plain->body[plain->width_internal + 3] != 0x31 ||
+				plain->body[plain->width_internal + 4] != 0x31)
+		{
+			result = 11;
+			goto done;
+		}
+	}
+
+	// Screen-backed collision counts only pixels visible above the window
+	// z-buffer. Start on a character-cell boundary so this exercises the
+	// aligned upstream collision branch, not the unaligned bitmap fallback.
+	if (result == 42)
+	{
+		screen_task = CAlloc(sizeof(CTask));
+		if (!screen_task)
+		{
+			result = 14;
+			goto done;
+		}
+		screen_task->pix_right = 799;
+		screen_task->pix_bottom = 599;
+		screen_task->win_z_num = 1;
+		screen_img = DCNew(16, 1);
+		screen_dc = DCNew(800, 600);
+		if (!screen_img || !screen_dc)
+		{
+			result = 15;
+			goto done;
+		}
+		screen_img->flags |= DCF_NO_TRANSPARENTS;
+		DCFill(screen_img, 1);
+		screen_dc->flags |= DCF_SCREEN_BITMAP;
+		screen_dc->win_task = screen_task;
+		screen_x = (FONT_WIDTH -
+				((screen_task->pix_left + screen_task->scroll_x) &
+				 (FONT_WIDTH - 1))) & (FONT_WIDTH - 1);
+		screen_y = FONT_HEIGHT;
+		abs_x = screen_task->pix_left + screen_task->scroll_x + screen_x;
+		abs_y = screen_task->pix_top + screen_task->scroll_y + screen_y;
+		if (abs_x + 16 > 800 || abs_y < 0 || abs_y >= 600 ||
+				abs_x < screen_task->pix_left || abs_x + 15 > screen_task->pix_right ||
+				abs_y > screen_task->pix_bottom)
+		{
+			result = 16;
+			goto done;
+		}
+		z_index = abs_y / FONT_HEIGHT * TEXT_COLS + abs_x / FONT_WIDTH;
+		if (z_index < 0 || z_index + 1 >= TEXT_COLS * TEXT_ROWS)
+		{
+			result = 17;
+			goto done;
+		}
+		probe_z_buf = CAlloc(TEXT_COLS * TEXT_ROWS * sizeof(U16));
+		if (!probe_z_buf)
+		{
+			result = 19;
+			goto done;
+		}
+		old_win_z_buf = gr.win_z_buf;
+		gr.win_z_buf = probe_z_buf;
+		old_z_left = gr.win_z_buf[z_index];
+		old_z_right = gr.win_z_buf[z_index + 1];
+		gr.win_z_buf[z_index] = screen_task->win_z_num + 1;
+		gr.win_z_buf[z_index + 1] = screen_task->win_z_num;
+		for (i = 0; i < 16; i++)
+			screen_dc->body[abs_y * screen_dc->width_internal + abs_x + i] = 7;
+		screen_dc->bkcolor.c0.color = 0;
+		screen_dc->color.c0.rop = ROPB_COLLISION;
+		screen_dc->collision_count = 0;
+		x = GrBlot(screen_dc, screen_x, screen_y, screen_img);
+		i = screen_dc->collision_count;
+		gr.win_z_buf[z_index] = old_z_left;
+		gr.win_z_buf[z_index + 1] = old_z_right;
+		gr.win_z_buf = old_win_z_buf;
+		Free(probe_z_buf);
+		if (x != 1 || i != 8)
+			result = 18;
+	}
+
+	// Unaligned no-transparency blits on a screen CDC must apply each ROP only
+	// to pixels whose character cell is visible in the task z-buffer. The
+	// 16-pixel span starts one pixel into the first cell: the first seven and
+	// final pixel are hidden, while the eight pixels in the middle cell draw.
+	if (result == 42)
+	{
+		screen_x = ((FONT_WIDTH -
+				((screen_task->pix_left + screen_task->scroll_x) &
+				 (FONT_WIDTH - 1))) & (FONT_WIDTH - 1)) + 1;
+		abs_x = screen_task->pix_left + screen_task->scroll_x + screen_x;
+		abs_y = screen_task->pix_top + screen_task->scroll_y + screen_y;
+		z_index = abs_y / FONT_HEIGHT * TEXT_COLS + abs_x / FONT_WIDTH;
+		if (abs_x + 16 > 800 || abs_y < 0 || abs_y >= 600 ||
+				abs_x < screen_task->pix_left || abs_x + 15 > screen_task->pix_right ||
+				abs_y > screen_task->pix_bottom || z_index + 2 >= TEXT_COLS * TEXT_ROWS)
+		{
+			result = 20;
+			goto done;
+		}
+		old_z_left = gr.win_z_buf[z_index];
+		old_z_right = gr.win_z_buf[z_index + 1];
+		old_z_far = gr.win_z_buf[z_index + 2];
+		gr.win_z_buf[z_index] = screen_task->win_z_num + 1;
+		gr.win_z_buf[z_index + 1] = screen_task->win_z_num;
+		gr.win_z_buf[z_index + 2] = screen_task->win_z_num + 1;
+		for (i = 0; i < 16; i++)
+			screen_img->body[i] = 3;
+
+		DCFill(screen_dc, 0xAA);
+		screen_dc->color.c0.color = 5;
+		screen_dc->color.c0.rop = ROPB_MONO;
+		if (GrBlot(screen_dc, screen_x, screen_y, screen_img) != 1 ||
+				screen_dc->body[abs_y * screen_dc->width_internal + abs_x] != 0xAA ||
+				screen_dc->body[abs_y * screen_dc->width_internal + abs_x + 7] != 1 ||
+				screen_dc->body[abs_y * screen_dc->width_internal + abs_x + 14] != 1 ||
+				screen_dc->body[abs_y * screen_dc->width_internal + abs_x + 15] != 0xAA)
+			result = 21;
+
+		DCFill(screen_dc, 0xAA);
+		screen_dc->color.c0.rop = ROPB_EQU;
+		for (i = 0; i < 16; i++)
+			screen_img->body[i] = 0x20 + i;
+		if (result == 42 && (GrBlot(screen_dc, screen_x, screen_y, screen_img) != 1 ||
+				screen_dc->body[abs_y * screen_dc->width_internal + abs_x] != 0xAA ||
+				screen_dc->body[abs_y * screen_dc->width_internal + abs_x + 7] != 0x27 ||
+				screen_dc->body[abs_y * screen_dc->width_internal + abs_x + 14] != 0x2E ||
+				screen_dc->body[abs_y * screen_dc->width_internal + abs_x + 15] != 0xAA))
+			result = 22;
+
+		DCFill(screen_dc, 0x20);
+		screen_dc->color.c0.rop = ROPB_XOR;
+		DCFill(screen_img, 3);
+		if (result == 42 && (GrBlot(screen_dc, screen_x, screen_y, screen_img) != 1 ||
+				screen_dc->body[abs_y * screen_dc->width_internal + abs_x] != 0x20 ||
+				screen_dc->body[abs_y * screen_dc->width_internal + abs_x + 7] != 0x23 ||
+				screen_dc->body[abs_y * screen_dc->width_internal + abs_x + 14] != 0x23 ||
+				screen_dc->body[abs_y * screen_dc->width_internal + abs_x + 15] != 0x20))
+			result = 23;
+
+		DCFill(screen_dc, 7);
+		screen_dc->bkcolor.c0.color = 0;
+		screen_dc->collision_count = 0;
+		screen_dc->color.c0.rop = ROPB_COLLISION;
+		if (result == 42 && (GrBlot(screen_dc, screen_x, screen_y, screen_img) != 1 ||
+				screen_dc->collision_count != 8))
+			result = 24;
+
+		gr.win_z_buf[z_index] = old_z_left;
+		gr.win_z_buf[z_index + 1] = old_z_right;
+		gr.win_z_buf[z_index + 2] = old_z_far;
+	}
+
+	// Exercise the aligned packed-word path with task scrolling enabled. The
+	// first cell is occluded and the second is visible, so every ROP must leave
+	// the first eight pixels alone and update only the second eight.
+	if (result == 42)
+	{
+		screen_task->scroll_x = 3;
+		screen_task->scroll_y = 1;
+		screen_x = (FONT_WIDTH -
+				((screen_task->pix_left + screen_task->scroll_x) &
+				 (FONT_WIDTH - 1))) & (FONT_WIDTH - 1);
+		screen_y = (FONT_HEIGHT -
+				((screen_task->pix_top + screen_task->scroll_y) &
+				 (FONT_HEIGHT - 1))) & (FONT_HEIGHT - 1);
+		abs_x = screen_task->pix_left + screen_task->scroll_x + screen_x;
+		abs_y = screen_task->pix_top + screen_task->scroll_y + screen_y;
+		z_index = abs_y / FONT_HEIGHT * TEXT_COLS + abs_x / FONT_WIDTH;
+		if (abs_x + 16 > 800 || abs_y >= 600 || z_index + 1 >= TEXT_COLS * TEXT_ROWS)
+		{
+			result = 25;
+			goto done;
+		}
+		old_z_left = gr.win_z_buf[z_index];
+		old_z_right = gr.win_z_buf[z_index + 1];
+		gr.win_z_buf[z_index] = screen_task->win_z_num + 1;
+		gr.win_z_buf[z_index + 1] = screen_task->win_z_num;
+		for (i = 0; i < 16; i++)
+			screen_img->body[i] = 3;
+
+		DCFill(screen_dc, 0xAA);
+		screen_dc->color.c0.color = 5;
+		screen_dc->color.c0.rop = ROPB_MONO;
+		if (GrBlot(screen_dc, screen_x, screen_y, screen_img) != 1 ||
+				screen_dc->body[abs_y * screen_dc->width_internal + abs_x] != 0xAA ||
+				screen_dc->body[abs_y * screen_dc->width_internal + abs_x + 7] != 0xAA ||
+				screen_dc->body[abs_y * screen_dc->width_internal + abs_x + 8] != 1 ||
+				screen_dc->body[abs_y * screen_dc->width_internal + abs_x + 15] != 1)
+			result = 26;
+
+		DCFill(screen_dc, 0xAA);
+		screen_dc->color.c0.rop = ROPB_EQU;
+		for (i = 0; i < 16; i++)
+			screen_img->body[i] = 0x40 + i;
+		if (result == 42 && (GrBlot(screen_dc, screen_x, screen_y, screen_img) != 1 ||
+				screen_dc->body[abs_y * screen_dc->width_internal + abs_x] != 0xAA ||
+				screen_dc->body[abs_y * screen_dc->width_internal + abs_x + 7] != 0xAA ||
+				screen_dc->body[abs_y * screen_dc->width_internal + abs_x + 8] != 0x48 ||
+				screen_dc->body[abs_y * screen_dc->width_internal + abs_x + 15] != 0x4F))
+			result = 27;
+
+		DCFill(screen_dc, 0x20);
+		screen_dc->color.c0.rop = ROPB_XOR;
+		DCFill(screen_img, 3);
+		if (result == 42 && (GrBlot(screen_dc, screen_x, screen_y, screen_img) != 1 ||
+				screen_dc->body[abs_y * screen_dc->width_internal + abs_x] != 0x20 ||
+				screen_dc->body[abs_y * screen_dc->width_internal + abs_x + 7] != 0x20 ||
+				screen_dc->body[abs_y * screen_dc->width_internal + abs_x + 8] != 0x23 ||
+				screen_dc->body[abs_y * screen_dc->width_internal + abs_x + 15] != 0x23))
+			result = 28;
+
+		DCFill(screen_dc, 7);
+		screen_dc->bkcolor.c0.color = 0;
+		screen_dc->collision_count = 0;
+		screen_dc->color.c0.rop = ROPB_COLLISION;
+		if (result == 42 && (GrBlot(screen_dc, screen_x, screen_y, screen_img) != 1 ||
+				screen_dc->collision_count != 8))
+			result = 29;
+
+		gr.win_z_buf[z_index] = old_z_left;
+		gr.win_z_buf[z_index + 1] = old_z_right;
+		screen_task->scroll_x = 0;
+		screen_task->scroll_y = 0;
+	}
+
+	// Packed no-transparency blits must advance their window-z cursor at each
+	// eight-pixel row boundary. This 16x9 image begins on the last scanline of
+	// a text cell and crosses into the next cell row, with alternating visible
+	// and hidden cells in both rows and columns.
+	if (result == 42)
+	{
+		screen_task->scroll_x = 3;
+		screen_task->scroll_y = 1;
+		screen_x = (FONT_WIDTH -
+				((screen_task->pix_left + screen_task->scroll_x) &
+				 (FONT_WIDTH - 1))) & (FONT_WIDTH - 1);
+		screen_y = (FONT_HEIGHT - 1 -
+				((screen_task->pix_top + screen_task->scroll_y) &
+				 (FONT_HEIGHT - 1))) & (FONT_HEIGHT - 1);
+		abs_x = screen_task->pix_left + screen_task->scroll_x + screen_x;
+		abs_y = screen_task->pix_top + screen_task->scroll_y + screen_y;
+		z_index = abs_y / FONT_HEIGHT * TEXT_COLS + abs_x / FONT_WIDTH;
+		if (abs_x + 16 > 800 || abs_y + 9 > 600 ||
+				z_index + TEXT_COLS + 1 >= TEXT_COLS * TEXT_ROWS)
+		{
+			result = 30;
+			goto done;
+		}
+		screen_img_tall = DCNew(16, 9);
+		if (!screen_img_tall)
+		{
+			result = 31;
+			goto done;
+		}
+		screen_img_tall->flags |= DCF_NO_TRANSPARENTS;
+		old_z0 = gr.win_z_buf[z_index];
+		old_z1 = gr.win_z_buf[z_index + 1];
+		old_z2 = gr.win_z_buf[z_index + TEXT_COLS];
+		old_z3 = gr.win_z_buf[z_index + TEXT_COLS + 1];
+		gr.win_z_buf[z_index] = screen_task->win_z_num + 1;
+		gr.win_z_buf[z_index + 1] = screen_task->win_z_num;
+		gr.win_z_buf[z_index + TEXT_COLS] = screen_task->win_z_num;
+		gr.win_z_buf[z_index + TEXT_COLS + 1] = screen_task->win_z_num + 1;
+
+		DCFill(screen_img_tall, 3);
+		DCFill(screen_dc, 0xAA);
+		screen_dc->color.c0.color = 5;
+		screen_dc->color.c0.rop = ROPB_MONO;
+		if (GrBlot(screen_dc, screen_x, screen_y, screen_img_tall) != 1 ||
+				screen_dc->body[abs_y * screen_dc->width_internal + abs_x] != 0xAA ||
+				screen_dc->body[abs_y * screen_dc->width_internal + abs_x + 8] != 1 ||
+				screen_dc->body[(abs_y + 1) * screen_dc->width_internal + abs_x] != 1 ||
+				screen_dc->body[(abs_y + 1) * screen_dc->width_internal + abs_x + 8] != 0xAA)
+			result = 32;
+
+		for (i = 0; i < 9 * 16; i++)
+			screen_img_tall->body[i] = 0x40 + i;
+		DCFill(screen_dc, 0xAA);
+		screen_dc->color.c0.rop = ROPB_EQU;
+		if (result == 42 && (GrBlot(screen_dc, screen_x, screen_y, screen_img_tall) != 1 ||
+				screen_dc->body[abs_y * screen_dc->width_internal + abs_x] != 0xAA ||
+				screen_dc->body[abs_y * screen_dc->width_internal + abs_x + 8] != 0x48 ||
+				screen_dc->body[(abs_y + 1) * screen_dc->width_internal + abs_x] != 0x50 ||
+				screen_dc->body[(abs_y + 1) * screen_dc->width_internal + abs_x + 8] != 0xAA))
+			result = 33;
+
+		DCFill(screen_img_tall, 3);
+		DCFill(screen_dc, 0x20);
+		screen_dc->color.c0.rop = ROPB_XOR;
+		if (result == 42 && (GrBlot(screen_dc, screen_x, screen_y, screen_img_tall) != 1 ||
+				screen_dc->body[abs_y * screen_dc->width_internal + abs_x] != 0x20 ||
+				screen_dc->body[abs_y * screen_dc->width_internal + abs_x + 8] != 0x23 ||
+				screen_dc->body[(abs_y + 1) * screen_dc->width_internal + abs_x] != 0x23 ||
+				screen_dc->body[(abs_y + 1) * screen_dc->width_internal + abs_x + 8] != 0x20))
+			result = 34;
+
+		DCFill(screen_dc, 7);
+		screen_dc->bkcolor.c0.color = 0;
+		screen_dc->collision_count = 0;
+		screen_dc->color.c0.rop = ROPB_COLLISION;
+		if (result == 42 && (GrBlot(screen_dc, screen_x, screen_y, screen_img_tall) != 1 ||
+				screen_dc->collision_count != 72))
+			result = 35;
+
+		// Ordinary transparent color blits use the separate upstream path.
+		// Alternate visible source pixels with TRANSPARENT across the same
+		// vertical boundary to check copy, XOR, and collision behavior.
+		screen_img_tall->flags &= ~DCF_NO_TRANSPARENTS;
+		DCFill(screen_img_tall, TRANSPARENT);
+		for (i = 0; i < 9 * 16; i += 2)
+			screen_img_tall->body[i] = 0x40 + i;
+		DCFill(screen_dc, 0xAA);
+		screen_dc->color.c0.rop = ROPB_EQU;
+		if (result == 42 && (GrBlot(screen_dc, screen_x, screen_y, screen_img_tall) != 1 ||
+				screen_dc->body[abs_y * screen_dc->width_internal + abs_x] != 0xAA ||
+				screen_dc->body[abs_y * screen_dc->width_internal + abs_x + 8] != 0x48 ||
+				screen_dc->body[abs_y * screen_dc->width_internal + abs_x + 9] != 0xAA ||
+				screen_dc->body[(abs_y + 1) * screen_dc->width_internal + abs_x] != 0x50 ||
+				screen_dc->body[(abs_y + 1) * screen_dc->width_internal + abs_x + 1] != 0xAA ||
+				screen_dc->body[(abs_y + 1) * screen_dc->width_internal + abs_x + 8] != 0xAA))
+			result = 36;
+
+		DCFill(screen_dc, 0x20);
+		screen_dc->color.c0.rop = ROPB_XOR;
+		if (result == 42 && (GrBlot(screen_dc, screen_x, screen_y, screen_img_tall) != 1 ||
+				screen_dc->body[abs_y * screen_dc->width_internal + abs_x] != 0x20 ||
+				screen_dc->body[abs_y * screen_dc->width_internal + abs_x + 8] != 0x68 ||
+				screen_dc->body[abs_y * screen_dc->width_internal + abs_x + 9] != 0x20 ||
+				screen_dc->body[(abs_y + 1) * screen_dc->width_internal + abs_x] != 0x70 ||
+				screen_dc->body[(abs_y + 1) * screen_dc->width_internal + abs_x + 1] != 0x20 ||
+				screen_dc->body[(abs_y + 1) * screen_dc->width_internal + abs_x + 8] != 0x20))
+			result = 37;
+
+		DCFill(screen_dc, 7);
+		screen_dc->bkcolor.c0.color = 0;
+		screen_dc->collision_count = 0;
+		screen_dc->color.c0.rop = ROPB_COLLISION;
+		if (result == 42 && (GrBlot(screen_dc, screen_x, screen_y, screen_img_tall) != 1 ||
+				screen_dc->collision_count != 36))
+			result = 38;
+
+		// MONO treats zero bytes as transparent; also keep that mask behavior
+		// when visible/occluded cells cross a text-row boundary.
+		for (i = 1; i < 9 * 16; i += 2)
+			screen_img_tall->body[i] = 0;
+		DCFill(screen_dc, 0xaa);
+		screen_dc->color.c0.color = 6;
+		screen_dc->color.c0.rop = ROPB_MONO;
+		if (result == 42 && (GrBlot(screen_dc, screen_x, screen_y, screen_img_tall) != 1 ||
+				screen_dc->body[abs_y * screen_dc->width_internal + abs_x] != 0xaa ||
+				screen_dc->body[abs_y * screen_dc->width_internal + abs_x + 8] != 6 ||
+				screen_dc->body[abs_y * screen_dc->width_internal + abs_x + 9] != 0xaa ||
+				screen_dc->body[(abs_y + 1) * screen_dc->width_internal + abs_x] != 6 ||
+				screen_dc->body[(abs_y + 1) * screen_dc->width_internal + abs_x + 1] != 0xaa ||
+				screen_dc->body[(abs_y + 1) * screen_dc->width_internal + abs_x + 8] != 0xaa))
+			result = 39;
+		for (i = 1; i < 9 * 16; i += 2)
+			screen_img_tall->body[i] = TRANSPARENT;
+
+		gr.win_z_buf[z_index] = old_z0;
+		gr.win_z_buf[z_index + 1] = old_z1;
+		gr.win_z_buf[z_index + TEXT_COLS] = old_z2;
+		gr.win_z_buf[z_index + TEXT_COLS + 1] = old_z3;
+		screen_task->scroll_x = 0;
+		screen_task->scroll_y = 0;
+	}
+
 done:
+	if (screen_img_tall)
+		DCDel(screen_img_tall);
+	if (screen_dc)
+		DCDel(screen_dc);
+	if (screen_img)
+		DCDel(screen_img);
+	if (screen_task)
+		Free(screen_task);
 	DCDel(depth_dc);
 	DCDel(plain);
 	DCDel(img);

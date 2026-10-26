@@ -273,11 +273,17 @@ static void vk_decode_key(struct vk_dev *d, struct vk_event ev) {
     if (ch < 0) {
         return;
     }
+    int sc_flags = 0;
+    if (d->shift) sc_flags |= 1 << 9; /* SCF_SHIFT */
+    if (d->ctrl) sc_flags |= 1 << 10; /* SCF_CTRL */
+    if (d->alt) sc_flags |= 1 << 11; /* SCF_ALT */
     if (pressed) {
         vk_ring_push((uint8_t)ch);
-        vk_msg_push(2, (uint64_t)(int64_t)ch, 0); /* MESSAGE_KEY_DOWN */
+        vk_msg_push(2, (uint64_t)(int64_t)ch,
+                    (uint64_t)(unsigned)sc_flags); /* MESSAGE_KEY_DOWN */
     } else {
-        vk_msg_push(3, (uint64_t)(int64_t)ch, 0); /* MESSAGE_KEY_UP */
+        vk_msg_push(3, (uint64_t)(int64_t)ch,
+                    (uint64_t)(unsigned)sc_flags); /* MESSAGE_KEY_UP */
     }
 }
 

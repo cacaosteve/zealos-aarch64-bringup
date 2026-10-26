@@ -1,0 +1,90 @@
+#define VIEWANGLES_SPACING 22
+#define VIEWANGLES_RANGE   360
+
+Bool ViewAnglesNear0(F64 value, F64 expected)
+{
+    return value > expected - 0.0001 && value < expected + 0.0001;
+}
+
+I64 ViewAnglesControlFail(CTask *task, I64 old_display_flags, I64 result)
+{
+    ViewAnglesDel(task);
+    task->display_flags = old_display_flags;
+    TaskDerivedValsUpdate(task, FALSE);
+    return result;
+}
+
+I64 ViewAnglesControlChecks()
+{
+    CTask *task = Fs;
+    CCtrl *ctrl = NULL, *existing;
+    CViewAngles *state;
+    I64 screen_x, screen_y, local_y, old_display_flags;
+
+    if (!TaskValidate(task))
+        return 1;
+    if (CtrlFindUnique(task, CTRLT_VIEWING_ANGLES))
+        return 10;
+    old_display_flags = task->display_flags;
+    task->display_flags &= ~(1 << DISPLAYf_SHOW);
+    if (!(ctrl = ViewAnglesNew(task)))
+    {
+        task->display_flags = old_display_flags;
+        TaskDerivedValsUpdate(task, FALSE);
+        return 1;
+    }
+    state = ctrl->state;
+    if (!state || ctrl->type != CTRLT_VIEWING_ANGLES ||
+            !(ctrl->flags & CTRLF_SHOW) ||
+            !(ctrl->flags & CTRLF_CAPTURE_LEFT_MS) ||
+            !ctrl->draw_it || !ctrl->left_click ||
+            !ctrl->update_derived_vals)
+        return ViewAnglesControlFail(task, old_display_flags, 2);
+
+    existing = ViewAnglesNew(task);
+    if (existing != ctrl || CtrlFindUnique(task, CTRLT_VIEWING_ANGLES) != ctrl)
+        return ViewAnglesControlFail(task, old_display_flags, 3);
+
+    state->sx = 361;
+    state->sy = -1;
+    state->sz = 180;
+    ctrl->update_derived_vals(ctrl);
+    if (state->sx != 359 || state->sy != 0 || state->sz != 180 ||
+            !ViewAnglesNear0(state->ax, 6.2831853071795864769 * 359 / 360) ||
+            !ViewAnglesNear0(state->ay, 0.0) ||
+            !ViewAnglesNear0(state->az, 3.1415926535897932385))
+        return ViewAnglesControlFail(task, old_display_flags, 4);
+
+    local_y = ctrl->top + VIEWANGLES_SPACING + VIEWANGLES_RANGE - 1 - 90;
+    screen_y = gr.pan_text_y + task->pix_top + local_y;
+    screen_x = gr.pan_text_x + task->pix_left + ctrl->left +
+            VIEWANGLES_SPACING;
+    if (!CtrlDispatchLeftClick(task, screen_x, screen_y, TRUE) ||
+            state->sx != 270 ||
+            !ViewAnglesNear0(state->ax, 4.7123889803846898577))
+        return ViewAnglesControlFail(task, old_display_flags, 5);
+    screen_x = gr.pan_text_x + task->pix_left + ctrl->left +
+            2 * VIEWANGLES_SPACING + 1;
+    if (!CtrlDispatchLeftClick(task, screen_x, screen_y, TRUE) ||
+            state->sy != 270 ||
+            !ViewAnglesNear0(state->ay, 4.7123889803846898577))
+        return ViewAnglesControlFail(task, old_display_flags, 6);
+    screen_x = gr.pan_text_x + task->pix_left + ctrl->left +
+            3 * VIEWANGLES_SPACING + 2;
+    if (!CtrlDispatchLeftClick(task, screen_x, screen_y, TRUE) ||
+            state->sz != 270 ||
+            !ViewAnglesNear0(state->az, 4.7123889803846898577))
+        return ViewAnglesControlFail(task, old_display_flags, 7);
+    if (ctrl->left >= ctrl->right || ctrl->top >= ctrl->bottom ||
+            ctrl->right - ctrl->left != VIEWANGLES_SPACING * 4 + 3 ||
+            ctrl->bottom - ctrl->top != VIEWANGLES_SPACING * 2 +
+                    VIEWANGLES_RANGE)
+        return ViewAnglesControlFail(task, old_display_flags, 8);
+
+    ViewAnglesDel(task);
+    task->display_flags = old_display_flags;
+    TaskDerivedValsUpdate(task, FALSE);
+    if (CtrlFindUnique(task, CTRLT_VIEWING_ANGLES))
+        return 9;
+    return 0x2a;
+}

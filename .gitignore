@@ -5,6 +5,8 @@ esp/EFI/BOOT/BOOTAA64.EFI
 *.iso
 *.img
 .DS_Store
+__pycache__/
+*.py[cod]
 
 # Vendored boot firmware / Limine (download locally; see README / Makefile)
 third_party/limine-*.tar.*

@@ -7,6 +7,7 @@ extern I64 bootstrap_upstream_ode_updates;
 extern I64 bootstrap_upstream_gr_update_tasks;
 extern I64 bootstrap_upstream_gr_update_screen;
 extern U16 bootstrap_win_z_buf[TEXT_COLS * TEXT_ROWS];
+extern U16 bootstrap_win_pixel_z_buf[800 * 600];
 extern U16 bootstrap_win_uncovered[(BOOTSTRAP_WIN_MAX + 16) / 16];
 extern CDC bootstrap_graphics_dc, bootstrap_planar_dc;
 extern CDC bootstrap_planar_cache_dc, bootstrap_zoom_dc;
@@ -17,9 +18,12 @@ extern Bool bootstrap_present_cache_ready, bootstrap_present_ready;
 extern I64 BootstrapGrCircleBoundsChecks();
 extern I64 BootstrapGrPenTablesChecks();
 extern U0 BootstrapGrContextInit();
+extern I64 BootstrapWallpaperChecks();
 extern U0 PaletteSetStd(Bool persistent=TRUE);
 extern Bool BootstrapCanUseUpstreamGrUpdateTasks();
+extern Bool bootstrap_ctrl_input_poll_suspended;
 extern Bool BootstrapWinIsUncovered(CTask *task);
+extern Bool BootstrapWinPixelVisible(CTask *task, I64 x, I64 y);
 extern Bool ZcWinMouseUpdate();
 extern CWinMgrGlobals *ZcActiveWinMgrGlobals();
 extern U0 WinCalcIdles();
@@ -306,6 +310,31 @@ I64 GrSetUpTablesSourceChecks()
     return 0;
 }
 
+I64 GrScreenPixelVisibilityChecks()
+{//Pixels in one 8x8 text cell can have different front-window owners.
+    CTask *task = Fs;
+    I64 x = 137, y = 137, index = y * 800 + x, old_z;
+    U16 old_hidden, old_visible;
+    Bool hidden, visible;
+
+    if (!TaskValidate(task) || x / 8 != (x + 1) / 8 || y / 8 != (y + 1) / 8)
+        return 1;
+    old_z = task->win_z_num;
+    old_hidden = bootstrap_win_pixel_z_buf[index];
+    old_visible = bootstrap_win_pixel_z_buf[index + 1];
+    task->win_z_num = 1;
+    bootstrap_win_pixel_z_buf[index] = 2;
+    bootstrap_win_pixel_z_buf[index + 1] = 1;
+    hidden = !BootstrapWinPixelVisible(task, x, y);
+    visible = BootstrapWinPixelVisible(task, x + 1, y);
+    task->win_z_num = old_z;
+    bootstrap_win_pixel_z_buf[index] = old_hidden;
+    bootstrap_win_pixel_z_buf[index + 1] = old_visible;
+    if (hidden && visible)
+        return 0x2a;
+    return 0;
+}
+
 I64 BootstrapGrContextInitChecks()
 {//A source manager must see its full bounded display context before first draw.
     CGrGlobals *active_gr = ZcActiveGrGlobals();
@@ -340,6 +369,8 @@ I64 BootstrapGrContextInitChecks()
     BootstrapGrContextInit();
     if (!TaskValidate(sys_task))
         return 2;
+    if (BootstrapWallpaperChecks() != 0x2a)
+        return 3;
     if (active_gr->screen_image != &bootstrap_graphics_dc ||
         active_gr->dc != &bootstrap_graphics_dc ||
         active_gr->dc1 != &bootstrap_planar_dc ||
@@ -487,7 +518,8 @@ I64 GrScreenFinalUpdateChecks()
     I64 x, y, i, overlay_x, overlay_y, changed;
     U32 *screen;
     I64 pitch;
-    Bool old_mouse_show, old_mouse_installed;
+    Bool old_mouse_show, old_mouse_installed, old_continuous_scroll;
+    Bool old_input_poll_suspended;
 
     if (!TaskValidate(sys_task))
         return 3;
@@ -517,6 +549,8 @@ I64 GrScreenFinalUpdateChecks()
         return 32;
     if (GrSetUpTablesSourceChecks() != 0x2a)
         return 34;
+    if (GrScreenPixelVisibilityChecks() != 0x2a)
+        return 38;
     gr_screen_final_update_old_pixel = bootstrap_graphics_pixels[599 * 800 + 799];
     gr_screen_final_update_calls = 0;
     gr.fp_final_screen_update = &GrScreenFinalUpdateProbe;
@@ -615,21 +649,24 @@ I64 GrScreenFinalUpdateChecks()
         mouse.pos.y = old_mouse_y;
         return 20;
     }
-    if (bootstrap_gr_text_updates != old_text_updates + 1)
+    // The live UTM manager can deliver another frame between this probe's
+    // snapshot and assertion. Require the source path to advance, not an
+    // exact single-frame delta that only holds in a quiescent test guest.
+    if (bootstrap_gr_text_updates <= old_text_updates)
     {
         mouse_grid.coord = old_coord;
         mouse.pos.x = old_mouse_x;
         mouse.pos.y = old_mouse_y;
         return 15;
     }
-    if (bootstrap_gr_screen_updates != old_screen_updates + 1)
+    if (bootstrap_gr_screen_updates <= old_screen_updates)
     {
         mouse_grid.coord = old_coord;
         mouse.pos.x = old_mouse_x;
         mouse.pos.y = old_mouse_y;
         return 16;
     }
-    if (bootstrap_gr_planar_updates != old_planar_updates + 1)
+    if (bootstrap_gr_planar_updates <= old_planar_updates)
     {
         mouse_grid.coord = old_coord;
         mouse.pos.x = old_mouse_x;
@@ -776,6 +813,15 @@ I64 GrScreenFinalUpdateChecks()
     old_screen_zoom = frame_gr->screen_zoom;
     old_screen_sx = frame_gr->sx;
     old_screen_sy = frame_gr->sy;
+    old_continuous_scroll = frame_gr->continuous_scroll;
+    old_input_poll_suspended = bootstrap_ctrl_input_poll_suspended;
+    // Keep a live pointer away from the edge-panning threshold while the
+    // frame hook exercises zoom and a translated viewport.
+    mouse_hard.installed = FALSE;
+    mouse.pos.x = 200;
+    mouse.pos.y = 150;
+    frame_gr->continuous_scroll = FALSE;
+    bootstrap_ctrl_input_poll_suspended = TRUE;
     frame_gr->screen_zoom = 2;
     frame_gr->sx = frame_gr->sy = 0;
     if (!ZcTaskFrameRun())
@@ -783,6 +829,11 @@ I64 GrScreenFinalUpdateChecks()
         frame_gr->screen_zoom = old_screen_zoom;
         frame_gr->sx = old_screen_sx;
         frame_gr->sy = old_screen_sy;
+        frame_gr->continuous_scroll = old_continuous_scroll;
+        bootstrap_ctrl_input_poll_suspended = old_input_poll_suspended;
+        mouse_hard.installed = old_mouse_installed;
+        mouse.pos.x = old_mouse_x;
+        mouse.pos.y = old_mouse_y;
         return 23;
     }
     for (y = 0; y < 8; y++)
@@ -793,6 +844,11 @@ I64 GrScreenFinalUpdateChecks()
                 frame_gr->screen_zoom = old_screen_zoom;
                 frame_gr->sx = old_screen_sx;
                 frame_gr->sy = old_screen_sy;
+                frame_gr->continuous_scroll = old_continuous_scroll;
+                bootstrap_ctrl_input_poll_suspended = old_input_poll_suspended;
+                mouse_hard.installed = old_mouse_installed;
+                mouse.pos.x = old_mouse_x;
+                mouse.pos.y = old_mouse_y;
                 return 24;
             }
     // Pan the 2x viewport away from the source origin and verify that both
@@ -804,6 +860,11 @@ I64 GrScreenFinalUpdateChecks()
         frame_gr->screen_zoom = old_screen_zoom;
         frame_gr->sx = old_screen_sx;
         frame_gr->sy = old_screen_sy;
+        frame_gr->continuous_scroll = old_continuous_scroll;
+        bootstrap_ctrl_input_poll_suspended = old_input_poll_suspended;
+        mouse_hard.installed = old_mouse_installed;
+        mouse.pos.x = old_mouse_x;
+        mouse.pos.y = old_mouse_y;
         return 25;
     }
     for (y = 0; y < 4; y++)
@@ -811,18 +872,39 @@ I64 GrScreenFinalUpdateChecks()
         {
             U8 expected = frame_gr->dc2->body[
                 (23 + y / 2) * 800 + 31 + x / 2];
-            if (frame_gr->zoomed_dc->body[y * 800 + x] != expected ||
-                screen[y * pitch + x] != gr_palette[expected])
+            if (frame_gr->zoomed_dc->body[y * 800 + x] != expected)
             {
                 frame_gr->screen_zoom = old_screen_zoom;
                 frame_gr->sx = old_screen_sx;
                 frame_gr->sy = old_screen_sy;
+                frame_gr->continuous_scroll = old_continuous_scroll;
+                bootstrap_ctrl_input_poll_suspended = old_input_poll_suspended;
+                mouse_hard.installed = old_mouse_installed;
+                mouse.pos.x = old_mouse_x;
+                mouse.pos.y = old_mouse_y;
                 return 26;
+            }
+            if (screen[y * pitch + x] != gr_palette[expected])
+            {
+                frame_gr->screen_zoom = old_screen_zoom;
+                frame_gr->sx = old_screen_sx;
+                frame_gr->sy = old_screen_sy;
+                frame_gr->continuous_scroll = old_continuous_scroll;
+                bootstrap_ctrl_input_poll_suspended = old_input_poll_suspended;
+                mouse_hard.installed = old_mouse_installed;
+                mouse.pos.x = old_mouse_x;
+                mouse.pos.y = old_mouse_y;
+                return 27;
             }
         }
     frame_gr->screen_zoom = old_screen_zoom;
     frame_gr->sx = old_screen_sx;
     frame_gr->sy = old_screen_sy;
+    frame_gr->continuous_scroll = old_continuous_scroll;
+    bootstrap_ctrl_input_poll_suspended = old_input_poll_suspended;
+    mouse_hard.installed = old_mouse_installed;
+    mouse.pos.x = old_mouse_x;
+    mouse.pos.y = old_mouse_y;
     ZcTaskFrameRun();
     return 42;
 }

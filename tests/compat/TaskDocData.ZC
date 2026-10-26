@@ -312,7 +312,8 @@ I64 TaskFilesFindNativeStreamChecks()
 I64 TaskFilesFindChecks()
 {
     CDirEntry *entries, *de, *next;
-    U8 *old_cur_dir;
+    U8 *old_cur_dir, *contents, redsea_path[256];
+    I64 redsea_size = 0, read_size = 0;
     I64 count, found, result = 42;
 
     old_cur_dir = Fs->cur_dir;
@@ -404,6 +405,38 @@ I64 TaskFilesFindChecks()
         next = de->next;
         Free(de->full_name);
         Free(de);
+    }
+    if (ZcRedSeaFileAt(0, redsea_path, sizeof(redsea_path), &redsea_size))
+    {
+        entries = FilesFind("FilesFindRedSeaOnly.ZC", FUF_JUST_FILES);
+        count = 0;
+        found = FALSE;
+        for (de = entries; de; de = de->next)
+        {
+            count++;
+            if (de->full_name &&
+                !StrCompare(de->full_name, "/FilesFindRedSeaOnly.ZC") &&
+                (de->attr & RS_ATTR_ARCHIVE) && de->size == redsea_size)
+                found = TRUE;
+        }
+        if (!found || count != 1)
+            result = 10;
+        if (result == 42)
+        {
+            contents = FileRead("/FilesFindRedSeaOnly.ZC", &read_size);
+            if (!contents || read_size != redsea_size ||
+                StrCompare(contents,
+                    "#include \"AddLib.ZC\"\n\nreturn Add(20, 22);\n"))
+                result = 11;
+            if (contents)
+                Free(contents);
+        }
+        for (de = entries; de; de = next)
+        {
+            next = de->next;
+            Free(de->full_name);
+            Free(de);
+        }
     }
     Free(Fs->cur_dir);
     Fs->cur_dir = old_cur_dir;

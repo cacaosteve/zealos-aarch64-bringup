@@ -1,4 +1,6 @@
 // Verify HomeSys boot time, first-terminal Once and the two-window layout.
+U64 *ctrl_alt_font_standard, *ctrl_alt_font_auxiliary;
+
 I64 HomeAutoStartChecks()
 {
     CTask *term = bootstrap_gui_terminal_task;
@@ -26,4 +28,63 @@ I64 HomeAutoStartChecks()
         Yield;
     }
     return 2;
+}
+
+// The root startup path calls KeyDevInit and registers Ctrl-Alt-F. Verify
+// queued key messages dispatch that callback and restore the standard font.
+I64 CtrlAltFontDispatchChecks()
+{
+    U64 *standard = text.font(U64 *);
+    U64 *auxiliary = text.aux_font(U64 *);
+    I64 ch, scan;
+
+    if (!standard || !auxiliary || standard == auxiliary)
+        return 1;
+    if (!keydev.fp_ctrl_alt_cbs)
+        return 10;
+    if (!keydev.fp_ctrl_alt_cbs['F' - 'A'])
+        return 11;
+    ctrl_alt_font_standard = standard;
+    ctrl_alt_font_auxiliary = auxiliary;
+    Message(MESSAGE_KEY_DOWN, 'f', SCF_CTRL | SCF_ALT);
+    if (MessageScan(&ch, &scan, 1 << MESSAGE_KEY_DOWN))
+        return 4;
+    if (text.font != auxiliary || text.aux_font != standard)
+        return 2;
+    Message(MESSAGE_KEY_DOWN, 'f', SCF_CTRL | SCF_ALT);
+    if (MessageScan(&ch, &scan, 1 << MESSAGE_KEY_DOWN))
+        return 5;
+    if (text.font != standard || text.aux_font != auxiliary)
+        return 3;
+    return 42;
+}
+
+I64 CtrlAltFontStateAux()
+{
+    if (text.font == ctrl_alt_font_auxiliary &&
+        text.aux_font == ctrl_alt_font_standard)
+        return 42;
+    return 0;
+}
+
+I64 CtrlAltFontStateStandard()
+{
+    if (text.font == ctrl_alt_font_standard &&
+        text.aux_font == ctrl_alt_font_auxiliary)
+        return 42;
+    return 0;
+}
+
+I64 CtrlAltFontMapChecks()
+{
+    KeyMapCtrlAltFamily(TRUE, FALSE);
+    return 42;
+}
+
+I64 KeyMapFamilyChecks()
+{
+    KeyMapFamily(Fs, 0, TRUE, TRUE);
+    KeyMapFamily(Fs, SCF_CTRL, TRUE, TRUE);
+    KeyMapFamily(Fs, SCF_ALT, TRUE, TRUE);
+    return 42;
 }

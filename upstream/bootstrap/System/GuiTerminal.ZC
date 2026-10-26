@@ -14,11 +14,24 @@ U8 bootstrap_gui_terminal_last_command[256];
 I64 bootstrap_gui_terminal_input_len;
 I64 bootstrap_gui_terminal_last_edit_result;
 U0 (*bootstrap_gui_terminal_final_update)(CDC *dc);
+#define GUI_PAINT_MAX_POINTS 8192
+Bool bootstrap_gui_paint_active = FALSE;
+I64 bootstrap_gui_paint_count;
+I64 bootstrap_gui_paint_last_x, bootstrap_gui_paint_last_y;
+Bool bootstrap_gui_paint_have_last = FALSE;
+I32 bootstrap_gui_paint_x[GUI_PAINT_MAX_POINTS];
+I32 bootstrap_gui_paint_y[GUI_PAINT_MAX_POINTS];
 extern U8 *ZcGuiShellExec(U8 *line);
 extern I64 ZcSourceEditorOverlayRender();
 extern CDoc *DocRead(U8 *name=NULL, I64 flags=0);
+extern U0 BootstrapGuiTerminalDocBottom(CDoc *doc=NULL);
 extern U0 DocDel(CDoc *doc);
 extern I64 ExeDoc(CDoc *doc, I64 ccf_flags=0);
+extern U0 GrScaleZoom(F64 scale);
+extern CMouseStateGlobals *ZcActiveMouseGlobals();
+extern I64 BootstrapGuiTerminalZoomPanChecks();
+extern Bool BootstrapWinPixelVisible(CTask *task, I64 x, I64 y);
+extern Bool GrPlot(CDC *dc, I64 x, I64 y);
 // Task slots can be reused. Match both address and generation before reading
 // a terminal's history; the fixed registry owns no task-heap allocations.
 class CBootstrapTerminalState
@@ -68,20 +81,27 @@ extern I64 ZcFbTextPixel(I64 x, I64 y);
 
 #define GUI_MENU_ACTION_TAG 0x475549
 
-U0 BootstrapGuiTerminalPrintOutput(U8 *output)
+U0 BootstrapGuiTerminalPrintOutput(U8 *output, CTask *terminal)
 {//Keep each DocPrint below the runtime formatter limit for long command output.
+    CDoc *doc;
     I64 i = 0;
     I64 n;
     U8 chunk[1024];
 
     if (!output)
         return;
+    // Output may arrive while another task is compiling a DolDoc source file.
+    // Always update the terminal document explicitly so cursor recalculation
+    // cannot mutate the document that the compiler is currently reading.
+    if (!TaskValidate(terminal) || !(doc = terminal->put_doc))
+        return;
+    BootstrapGuiTerminalDocBottom(doc);
     while (output[i])
     {
         for (n = 0; n < 1023 && output[i]; n++, i++)
             chunk[n] = output[i];
         chunk[n] = 0;
-        DocPrint(DocPut, "%s", chunk);
+        DocPrint(doc, "%s", chunk);
     }
 }
 
@@ -99,6 +119,15 @@ I64 BootstrapGuiTerminalBufferSet(U8 *command, I64 *command_len,
     command[value_len] = 0;
     *command_len = value_len;
     return 0x2a;
+}
+
+U0 BootstrapGuiTerminalDocBottom(CDoc *doc=NULL)
+{//Place shell output/input at the document sentinel, even after a mouse click.
+    if (!doc && !(doc = Fs->put_doc))
+        return;
+    DocRecalc(doc, RECALCt_TO_SCREEN | RECALCF_HAS_CURSOR);
+    doc->cur_entry = doc;
+    doc->cur_col = 0;
 }
 
 I64 BootstrapGuiTerminalHistorySave(U8 *history, I64 *history_len,
@@ -223,7 +252,7 @@ Bool BootstrapGuiTerminalComplete(U8 *command, I64 *command_len,
         // Keep the command buffer and document caret in lockstep. The
         // upstream ACFillIn uses In(), which writes only to DolDoc and would
         // leave this bootstrap shell's separate command buffer stale.
-        DocPutKey(DocPut, 0, SC_END);
+        BootstrapGuiTerminalDocBottom(DocPut);
         for (i = *command_len; i > *command_pos; i--)
             DocPutKey(DocPut, 0, SC_CURSOR_LEFT);
         for (i = ac.partial_len; word[i]; i++)
@@ -246,41 +275,185 @@ CMenuEntry *BootstrapGuiTerminalMenuEntry(CTask *task, U8 *name, I64 action)
     return entry;
 }
 
-U0 BootstrapGuiTerminalMenuInstall()
+CMenuEntry *BootstrapGuiTerminalMenuRoot(CMenu *menu, U8 *name)
+{
+    CMenuEntry *root;
+    if (!menu || !name)
+        return NULL;
+    root = menu->sub;
+    while (root)
+    {
+        if (!StrCompare(root->name, name))
+            return root;
+        root = root->next;
+    }
+    return NULL;
+}
+
+U0 BootstrapGuiTerminalMenuAppendRoot(CMenu *menu, CMenu *extra)
+{//MenuNew input is capped at STR_LEN, so assemble the desktop bar from short pieces.
+    CMenuEntry *tail;
+    if (!menu || !extra || !extra->sub)
+        throw('Menu');
+    tail = &menu->sub;
+    while (tail->next)
+        tail = tail->next;
+    tail->next = extra->sub;
+    extra->sub = NULL;
+    Free(extra);
+}
+
+Bool BootstrapGuiTerminalMenuBindLeaf(CMenuEntry *root, U8 *source_name,
+                                      U8 *display_name, I64 action)
 {
     CMenuEntry *entry;
-    I64 action = 1;
-    // Use ZealOS's MenuNew parser and renderer for the normal graphical boot
-    // menu. The action bridge still maps this bounded bootstrap command set,
-    // while nested menus and key/message arguments follow the upstream format.
-    CMenu *menu = MenuNew("OS { Help(); Status(); Files(); Disk(); WindowDemo(); TileHorz(); TileVert(); TileGrid(); LatticePlay(); StockPlay(); }");
-
-    if (!menu || !menu->sub || !menu->sub->sub)
-        throw('Menu');
-    // The upstream menu grammar takes identifiers as labels. Restore the
-    // familiar display strings after parsing so actions keep concise tokens.
-    entry = menu->sub->sub;
+    if (!root || !source_name || !display_name || action < 1 || action > 19)
+        return FALSE;
+    entry = root->sub;
     while (entry)
     {
-        entry->message_code = MESSAGE_KEY_UP;
-        entry->arg1 = action++;
-        entry->arg2 = GUI_MENU_ACTION_TAG;
+        if (!StrCompare(entry->name, source_name))
+        {
+            if (entry->sub)
+                return FALSE;
+            StrCopy(entry->name, display_name);
+            entry->message_code = MESSAGE_KEY_UP;
+            entry->arg1 = action;
+            entry->arg2 = GUI_MENU_ACTION_TAG;
+            return TRUE;
+        }
         entry = entry->next;
     }
-    entry = menu->sub->sub;
-    StrCopy(entry->name, "Help"); entry = entry->next;
-    StrCopy(entry->name, "Status"); entry = entry->next;
-    StrCopy(entry->name, "Files"); entry = entry->next;
-    StrCopy(entry->name, "Disk"); entry = entry->next;
-    StrCopy(entry->name, "Window Demo"); entry = entry->next;
-    StrCopy(entry->name, "Tile Windows Horizontally"); entry = entry->next;
-    StrCopy(entry->name, "Tile Windows Vertically"); entry = entry->next;
-    StrCopy(entry->name, "Tile Windows as Grid"); entry = entry->next;
-    StrCopy(entry->name, "Lattice Play"); entry = entry->next;
-    StrCopy(entry->name, "Stock Play");
+    return FALSE;
+}
+
+Bool BootstrapGuiTerminalMenuActionValid(CMenu *menu, U8 *root_name,
+                                         U8 *entry_name, I64 action)
+{
+    CMenuEntry *root = BootstrapGuiTerminalMenuRoot(menu, root_name);
+    CMenuEntry *entry;
+    if (!root || !entry_name)
+        return FALSE;
+    entry = root->sub;
+    while (entry)
+    {
+        if (!StrCompare(entry->name, entry_name))
+            return entry->message_code == MESSAGE_KEY_UP &&
+                    entry->arg1 == action &&
+                    entry->arg2 == GUI_MENU_ACTION_TAG;
+        entry = entry->next;
+    }
+    return FALSE;
+}
+
+U0 BootstrapGuiTerminalMenuInstall()
+{
+    CMenu *menu = MenuNew("File { Files(); Disk(); }");
+    BootstrapGuiTerminalMenuAppendRoot(menu, MenuNew("Windows { Demo(); TileHorz(); TileVert(); TileGrid(); }"));
+    BootstrapGuiTerminalMenuAppendRoot(menu, MenuNew("Apps { LatticePlay(); StockPlay(); PaintDemo(); }"));
+    BootstrapGuiTerminalMenuAppendRoot(menu, MenuNew("View { ViewAngles(); ZoomIn(); ZoomOut(); ResetView(); PanLeft(); PanRight(); PanUp(); PanDown(); }"));
+    BootstrapGuiTerminalMenuAppendRoot(menu, MenuNew("OS { Help(); Status(); }"));
+    CMenuEntry *file = BootstrapGuiTerminalMenuRoot(menu, "File");
+    CMenuEntry *windows = BootstrapGuiTerminalMenuRoot(menu, "Windows");
+    CMenuEntry *apps = BootstrapGuiTerminalMenuRoot(menu, "Apps");
+    CMenuEntry *view = BootstrapGuiTerminalMenuRoot(menu, "View");
+    CMenuEntry *os = BootstrapGuiTerminalMenuRoot(menu, "OS");
+
+    if (!file || !windows || !apps || !view || !os)
+        throw('Menu');
+    if (!BootstrapGuiTerminalMenuBindLeaf(file, "Files", "Files", 3) ||
+        !BootstrapGuiTerminalMenuBindLeaf(file, "Disk", "Disk", 4) ||
+        !BootstrapGuiTerminalMenuBindLeaf(windows, "Demo", "Window Demo", 5) ||
+        !BootstrapGuiTerminalMenuBindLeaf(windows, "TileHorz", "Tile Windows Horizontally", 6) ||
+        !BootstrapGuiTerminalMenuBindLeaf(windows, "TileVert", "Tile Windows Vertically", 7) ||
+        !BootstrapGuiTerminalMenuBindLeaf(windows, "TileGrid", "Tile Windows as Grid", 8) ||
+        !BootstrapGuiTerminalMenuBindLeaf(apps, "LatticePlay", "Lattice Play", 9) ||
+        !BootstrapGuiTerminalMenuBindLeaf(apps, "StockPlay", "Stock Play", 10) ||
+        !BootstrapGuiTerminalMenuBindLeaf(apps, "PaintDemo", "Paint Demo", 19) ||
+        !BootstrapGuiTerminalMenuBindLeaf(view, "ViewAngles", "View Angles", 11) ||
+        !BootstrapGuiTerminalMenuBindLeaf(view, "ZoomIn", "Zoom In", 12) ||
+        !BootstrapGuiTerminalMenuBindLeaf(view, "ZoomOut", "Zoom Out", 13) ||
+        !BootstrapGuiTerminalMenuBindLeaf(view, "ResetView", "Reset View", 14) ||
+        !BootstrapGuiTerminalMenuBindLeaf(view, "PanLeft", "Pan Left", 15) ||
+        !BootstrapGuiTerminalMenuBindLeaf(view, "PanRight", "Pan Right", 16) ||
+        !BootstrapGuiTerminalMenuBindLeaf(view, "PanUp", "Pan Up", 17) ||
+        !BootstrapGuiTerminalMenuBindLeaf(view, "PanDown", "Pan Down", 18) ||
+        !BootstrapGuiTerminalMenuBindLeaf(os, "Help", "Help", 1) ||
+        !BootstrapGuiTerminalMenuBindLeaf(os, "Status", "Status", 2))
+        throw('Menu');
     menu->attr = BLUE << 4 + YELLOW;
     menu->next = Fs->cur_menu;
     Fs->cur_menu = menu;
+}
+
+U8 *BootstrapGuiTerminalZoomPanAction(I64 action)
+{//Expose the source zoom viewport controls when edge recentering is insufficient.
+    CGrGlobals *active_gr = ZcActiveGrGlobals();
+    I64 max_x, max_y;
+
+    if (!active_gr)
+        active_gr = &gr;
+    if (action == 12)
+    {
+        if (active_gr->screen_zoom < GR_SCREEN_ZOOM_MAX)
+            GrScaleZoom(2.0);
+        return "Zoom increased";
+    }
+    if (action == 13)
+    {
+        if (active_gr->screen_zoom > 1)
+            GrScaleZoom(0.5);
+        return "Zoom decreased";
+    }
+    if (action == 14)
+    {
+        while (active_gr->screen_zoom > 1)
+            GrScaleZoom(0.5);
+        active_gr->sx = active_gr->sy = 0;
+        return "View reset";
+    }
+    if (action < 15 || action > 18)
+        return NULL;
+
+    max_x = GR_WIDTH - GR_WIDTH / MaxI64(1, active_gr->screen_zoom);
+    max_y = GR_HEIGHT - GR_HEIGHT / MaxI64(1, active_gr->screen_zoom);
+    if (action == 15)
+        active_gr->sx -= 40;
+    else if (action == 16)
+        active_gr->sx += 40;
+    else if (action == 17)
+        active_gr->sy -= 40;
+    else
+        active_gr->sy += 40;
+    active_gr->sx = ClampI64(active_gr->sx, 0, max_x);
+    active_gr->sy = ClampI64(active_gr->sy, 0, max_y);
+    return "View panned";
+}
+
+Bool BootstrapGuiTerminalPaintStop()
+{//Clear the retained overlay so the next composed frame removes every stroke.
+    if (!bootstrap_gui_paint_active)
+        return FALSE;
+    bootstrap_gui_paint_active = FALSE;
+    bootstrap_gui_paint_count = 0;
+    bootstrap_gui_paint_have_last = FALSE;
+    return TRUE;
+}
+
+Bool BootstrapGuiTerminalPaintEscape(U8 *command, I64 *command_len,
+                                     I64 *command_pos, Bool *overflow)
+{//Consume Escape in Paint Demo and discard both the drawing and typed input.
+    if (!BootstrapGuiTerminalPaintStop())
+        return FALSE;
+    if (command)
+        command[0] = 0;
+    if (command_len)
+        *command_len = 0;
+    if (command_pos)
+        *command_pos = 0;
+    if (overflow)
+        *overflow = FALSE;
+    return TRUE;
 }
 
 U8 *BootstrapGuiTerminalMenuAction(I64 action)
@@ -303,7 +476,137 @@ U8 *BootstrapGuiTerminalMenuAction(I64 action)
         return ZcGuiShellExec("latticeplay");
     if (action == 10)
         return ZcGuiShellExec("stockplay");
+    if (action == 11)
+    {
+        if (CtrlFindUnique(Fs, CTRLT_VIEWING_ANGLES))
+        {
+            ViewAnglesDel(Fs);
+            return "View-angle control hidden";
+        }
+        if (!ViewAnglesNew(Fs))
+            return "View-angle control could not be created";
+        return "View-angle control shown: click an X, Y, or Z track";
+    }
+    if (12 <= action <= 18)
+        return BootstrapGuiTerminalZoomPanAction(action);
+    if (action == 19)
+    {
+        if (bootstrap_gui_paint_active)
+        {
+            BootstrapGuiTerminalPaintStop;
+            return "Paint Demo stopped";
+        }
+        bootstrap_gui_paint_active = TRUE;
+        bootstrap_gui_paint_count = 0;
+        bootstrap_gui_paint_have_last = FALSE;
+        return "Paint Demo: hold and drag in this window; Esc clears";
+    }
     return NULL;
+}
+
+U0 BootstrapGuiTerminalPaintAppend(I64 x, I64 y)
+{//Retain one visible sample until Escape clears the drawing.
+    CTask *task = bootstrap_gui_terminal_task;
+    if (!TaskValidate(task) || bootstrap_gui_paint_count >= GUI_PAINT_MAX_POINTS ||
+        x < task->pix_left || x > task->pix_right ||
+        y < task->pix_top || y > task->pix_bottom ||
+        !BootstrapWinPixelVisible(task, x, y))
+        return;
+    if (bootstrap_gui_paint_count &&
+        bootstrap_gui_paint_x[bootstrap_gui_paint_count - 1] == x &&
+        bootstrap_gui_paint_y[bootstrap_gui_paint_count - 1] == y)
+        return;
+    bootstrap_gui_paint_x[bootstrap_gui_paint_count] = x;
+    bootstrap_gui_paint_y[bootstrap_gui_paint_count] = y;
+    bootstrap_gui_paint_count++;
+}
+
+U0 BootstrapGuiTerminalPaintSample()
+{//Sample the live absolute pointer while Paint Demo is active.
+    CMouseStateGlobals *active_mouse = ZcActiveMouseGlobals();
+    I64 x, y, dx, dy, sx, sy, err, e2, steps = 0;
+    CTask *task = bootstrap_gui_terminal_task;
+    if (!bootstrap_gui_paint_active || !TaskValidate(task) || !active_mouse ||
+        !active_mouse->lb)
+    {
+        bootstrap_gui_paint_have_last = FALSE;
+        return;
+    }
+    x = active_mouse->pos.x;
+    y = active_mouse->pos.y;
+    if (x < task->pix_left || x > task->pix_right ||
+        y < task->pix_top || y > task->pix_bottom ||
+        !BootstrapWinPixelVisible(task, x, y))
+    {
+        bootstrap_gui_paint_have_last = FALSE;
+        return;
+    }
+    if (!bootstrap_gui_paint_have_last)
+    {
+        BootstrapGuiTerminalPaintAppend(x, y);
+        bootstrap_gui_paint_last_x = x;
+        bootstrap_gui_paint_last_y = y;
+        bootstrap_gui_paint_have_last = TRUE;
+        return;
+    }
+    // Bridge gaps between 60 Hz pointer samples with a bounded Bresenham line.
+    dx = AbsI64(x - bootstrap_gui_paint_last_x);
+    dy = -AbsI64(y - bootstrap_gui_paint_last_y);
+    if (bootstrap_gui_paint_last_x < x)
+        sx = 1;
+    else
+        sx = -1;
+    if (bootstrap_gui_paint_last_y < y)
+        sy = 1;
+    else
+        sy = -1;
+    err = dx + dy;
+    while (steps++ < 1600)
+    {
+        BootstrapGuiTerminalPaintAppend(bootstrap_gui_paint_last_x,
+                                        bootstrap_gui_paint_last_y);
+        if (bootstrap_gui_paint_last_x == x &&
+            bootstrap_gui_paint_last_y == y)
+            break;
+        e2 = 2 * err;
+        if (e2 >= dy)
+        {
+            err += dy;
+            bootstrap_gui_paint_last_x += sx;
+        }
+        if (e2 <= dx)
+        {
+            err += dx;
+            bootstrap_gui_paint_last_y += sy;
+        }
+    }
+    bootstrap_gui_paint_last_x = x;
+    bootstrap_gui_paint_last_y = y;
+}
+
+U0 BootstrapGuiTerminalPaintDraw(CDC *dc)
+{//Replay the small retained stroke list over each freshly composited frame.
+    I64 i, old_color;
+    CTask *task = bootstrap_gui_terminal_task;
+    if (!dc || !bootstrap_gui_paint_active || !TaskValidate(task))
+        return;
+    BootstrapGuiTerminalPaintSample;
+    old_color = dc->color.c0;
+    dc->color.c0 = YELLOW;
+    for (i = 0; i < bootstrap_gui_paint_count; i++)
+        if (BootstrapWinPixelVisible(task, bootstrap_gui_paint_x[i],
+                                     bootstrap_gui_paint_y[i]))
+            GrPlot(dc, bootstrap_gui_paint_x[i], bootstrap_gui_paint_y[i]);
+    dc->color.c0 = old_color;
+}
+
+Bool BootstrapGuiTerminalPaintCommand(U8 *command, U8 **output)
+{//Route typed `paint` to the live app instead of the serial smoke loop.
+    if (!command || StrCompare(command, "paint"))
+        return FALSE;
+    if (output)
+        *output = BootstrapGuiTerminalMenuAction(19);
+    return TRUE;
 }
 
 Bool BootstrapGuiTerminalEditCommand(U8 *command, U8 **path)
@@ -379,6 +682,7 @@ Bool BootstrapGuiTerminalEditFile(U8 *path)
 
 U0 BootstrapGuiTerminalPrompt(Bool continuation)
 {
+    BootstrapGuiTerminalDocBottom;
     if (!continuation && Fs->new_answer)
     {
         if (Fs->answer_type & ~1 != RT_I0)
@@ -431,7 +735,7 @@ U8 *BootstrapGuiTerminalReadLine2(Bool continuation)
                     if (ch == 5)
                         output = ZcGuiShellExec("windowdemo");
                     if (output)
-                        BootstrapGuiTerminalPrintOutput(output);
+                        BootstrapGuiTerminalPrintOutput(output, Fs);
                     command_len = 0;
                     command_pos = 0;
                     command[0] = 0;
@@ -446,7 +750,7 @@ U8 *BootstrapGuiTerminalReadLine2(Bool continuation)
                 bootstrap_gui_terminal_last_scan = sc.u8[0];
                 if (ch == '\r' || ch == '\n')
                 {
-                    DocPutKey(DocPut, 0, SC_END);
+                    BootstrapGuiTerminalDocBottom(DocPut);
                     DocPutKey(DocPut, ch, sc);
                     if (overflow)
                     {
@@ -477,10 +781,12 @@ U8 *BootstrapGuiTerminalReadLine2(Bool continuation)
                         }
                         else
                         {
-                            output = ZcGuiShellExec(command);
+                            if (!BootstrapGuiTerminalPaintCommand(command,
+                                                                  &output))
+                                output = ZcGuiShellExec(command);
                             if (!output)
                                 return StrNew(command);
-                            BootstrapGuiTerminalPrintOutput(output);
+                            BootstrapGuiTerminalPrintOutput(output, Fs);
                         }
                     }
                     if (continuation)
@@ -492,14 +798,23 @@ U8 *BootstrapGuiTerminalReadLine2(Bool continuation)
                 }
                 else if (ch == 27)
                 {
-                    DocPutKey(DocPut, 0, SC_END);
-                    DocPrint(DocPut, "\n");
-                    // Abort the complete pending chunk, including continuations.
-                    return NULL;
+                    BootstrapGuiTerminalDocBottom(DocPut);
+                    if (BootstrapGuiTerminalPaintEscape(command,
+                            &command_len, &command_pos, &overflow))
+                    {
+                        DocPrint(DocPut, "\nPaint Demo stopped; drawing cleared.\n");
+                        BootstrapGuiTerminalPrompt(FALSE);
+                    }
+                    else
+                    {
+                        DocPrint(DocPut, "\n");
+                        // Abort the complete pending chunk, including continuations.
+                        return NULL;
+                    }
                 }
                 else if (!ch && sc.u8[0] == SC_CURSOR_UP && state->history_len)
                 {
-                    DocPutKey(DocPut, 0, SC_END);
+                    BootstrapGuiTerminalDocBottom(DocPut);
                     for (i = 0; i < command_len; i++)
                         DocPutKey(DocPut, 8, 0);
                     BootstrapGuiTerminalHistoryRecall(command, &command_len,
@@ -510,7 +825,7 @@ U8 *BootstrapGuiTerminalReadLine2(Bool continuation)
                 }
                 else if (!ch && sc.u8[0] == SC_CURSOR_DOWN)
                 {
-                    DocPutKey(DocPut, 0, SC_END);
+                    BootstrapGuiTerminalDocBottom(DocPut);
                     for (i = 0; i < command_len; i++)
                         DocPutKey(DocPut, 8, 0);
                     command_len = 0;
@@ -526,10 +841,10 @@ U8 *BootstrapGuiTerminalReadLine2(Bool continuation)
                 else
                 {
                     // A mouse click inside the terminal can move DolDoc's
-                    // insertion cursor away from the command buffer. Re-anchor
-                    // it to the current input position before echoing or editing
-                    // so captured keyboard input remains visible after focus.
-                    DocPutKey(DocPut, 0, SC_END);
+                    // insertion cursor into old text. Re-anchor at the end of
+                    // the document, then move to the command-buffer position,
+                    // so new prompt input never overwrites the transcript.
+                    BootstrapGuiTerminalDocBottom(DocPut);
                     for (i = command_len; i > command_pos; i--)
                         DocPutKey(DocPut, 0, SC_CURSOR_LEFT);
                     if (ch >= 32 && ch < 127 && command_len == 255)
@@ -570,11 +885,10 @@ U8 *BootstrapGuiTerminalReadLine(Bool continuation)
 }
 
 I64 BootstrapGuiTerminalDevicesInit()
-{//KeyDev is global; its arrays and hooks must outlive every user terminal.
+{//Initialize upstream keyboard-device services used by shell helpers.
     if (!bootstrap_gui_terminal_devices_ready)
     {
         KeyDevInit;
-        KeyDevAdd(&KDDocPutKey, &KDDocPutS, 0x80000000, TRUE);
         bootstrap_gui_terminal_devices_ready = TRUE;
     }
     return 42;
@@ -687,6 +1001,7 @@ U0 BootstrapGuiTerminalFinalUpdate(CDC *dc)
     // Preserve the source menu/progress/mouse overlay, with the pointer last.
     if (bootstrap_gui_terminal_final_update)
         (*bootstrap_gui_terminal_final_update)(dc);
+    BootstrapGuiTerminalPaintDraw(dc);
 }
 
 I64 BootstrapGuiTerminalStart()
@@ -809,6 +1124,16 @@ I64 BootstrapGuiTerminalEditorActive()
     return bootstrap_gui_terminal_editor_active;
 }
 
+Bool BootstrapGuiTerminalEditorPutKey(I64 ch, I64 sc)
+{//The headless ARM64 key bridge has no native KeyDev DolDoc device to echo into an editor.
+    if (Fs == bootstrap_gui_terminal_task && bootstrap_gui_terminal_editor_active)
+    {
+        DocPutKey(DocPut, ch, sc);
+        return TRUE;
+    }
+    return FALSE;
+}
+
 I64 BootstrapGuiTerminalEditorRaw()
 {
     return bootstrap_gui_terminal_editor_raw;
@@ -870,6 +1195,150 @@ I64 BootstrapGuiTerminalTextPixelCount()
     return count;
 }
 
+I64 BootstrapGuiTerminalPaintChecks()
+{//Exercise pointer sampling, gap fill, and Escape cleanup.
+    CMouseStateGlobals *active_mouse = ZcActiveMouseGlobals();
+    CGrGlobals *active_gr = ZcActiveGrGlobals();
+    CTask *task = bootstrap_gui_terminal_task;
+    CDC *dc;
+    U8 command[32];
+    I64 command_len = 15, command_pos = 4;
+    Bool overflow = TRUE;
+    I64 old_x, old_y;
+    I64 old_pixel, old_flags;
+    Bool old_lb, old_active;
+    I64 x, y;
+    if (!TaskValidate(task) || !active_mouse || !active_gr ||
+        !(dc = active_gr->dc) || !dc->body || dc->width_internal <= 0 ||
+        dc->height <= 0)
+        return 1;
+    old_x = active_mouse->pos.x;
+    old_y = active_mouse->pos.y;
+    old_lb = active_mouse->lb;
+    old_active = bootstrap_gui_paint_active;
+    x = task->pix_left + 16;
+    y = task->pix_top + 16;
+    if (x < 0 || x >= dc->width_internal || y < 0 || y >= dc->height)
+        return 1;
+    old_pixel = dc->body[y * dc->width_internal + x];
+    old_flags = dc->flags;
+    dc->flags |= DCF_SCREEN_BITMAP | DCF_ON_TOP;
+    bootstrap_gui_paint_active = TRUE;
+    bootstrap_gui_paint_count = 0;
+    bootstrap_gui_paint_have_last = FALSE;
+    active_mouse->pos.x = x;
+    active_mouse->pos.y = y;
+    active_mouse->lb = TRUE;
+    BootstrapGuiTerminalPaintSample;
+    if (bootstrap_gui_paint_count != 1 ||
+        bootstrap_gui_paint_x[0] != x || bootstrap_gui_paint_y[0] != y)
+        goto fail;
+    BootstrapGuiTerminalPaintSample;
+    if (bootstrap_gui_paint_count != 1)
+        goto fail;
+    active_mouse->pos.x = x + 5;
+    active_mouse->pos.y = y + 3;
+    BootstrapGuiTerminalPaintSample;
+    if (bootstrap_gui_paint_count < 6 ||
+        bootstrap_gui_paint_x[bootstrap_gui_paint_count - 1] != x + 5 ||
+        bootstrap_gui_paint_y[bootstrap_gui_paint_count - 1] != y + 3)
+        goto fail;
+    bootstrap_gui_paint_count = 1;
+    bootstrap_gui_paint_x[0] = x;
+    bootstrap_gui_paint_y[0] = y;
+    BootstrapGuiTerminalPaintDraw(dc);
+    if (dc->body[y * dc->width_internal + x] != YELLOW)
+        goto fail;
+    StrCopy(command, "pending command");
+    dc->body[y * dc->width_internal + x] = old_pixel;
+    if (!BootstrapGuiTerminalPaintEscape(command, &command_len,
+                                          &command_pos, &overflow) ||
+        command[0] || command_len || command_pos || overflow ||
+        bootstrap_gui_paint_active || bootstrap_gui_paint_count ||
+        bootstrap_gui_paint_have_last)
+        goto fail;
+    active_mouse->lb = FALSE;
+    BootstrapGuiTerminalPaintSample;
+    BootstrapGuiTerminalPaintDraw(dc);
+    if (bootstrap_gui_paint_have_last ||
+        dc->body[y * dc->width_internal + x] != old_pixel)
+        goto fail;
+    active_mouse->pos.x = old_x;
+    active_mouse->pos.y = old_y;
+    active_mouse->lb = old_lb;
+    dc->body[y * dc->width_internal + x] = old_pixel;
+    dc->flags = old_flags;
+    bootstrap_gui_paint_active = old_active;
+    bootstrap_gui_paint_count = 0;
+    bootstrap_gui_paint_have_last = FALSE;
+    return 0x2a;
+fail:
+    active_mouse->pos.x = old_x;
+    active_mouse->pos.y = old_y;
+    active_mouse->lb = old_lb;
+    dc->body[y * dc->width_internal + x] = old_pixel;
+    dc->flags = old_flags;
+    bootstrap_gui_paint_active = old_active;
+    bootstrap_gui_paint_count = 0;
+    bootstrap_gui_paint_have_last = FALSE;
+    return 2;
+}
+
+I64 BootstrapGuiTerminalOutputOwnershipChecks()
+{//Compiler diagnostics must append to the GUI terminal, not the active source doc.
+    CTask *old_fs = Fs;
+    CTask *terminal = bootstrap_gui_terminal_task;
+    CTask *source_task = old_fs;
+    CTask *candidate;
+    CDoc *terminal_doc, *source_doc;
+    CDoc *old_source_doc;
+    CDocEntryBase *terminal_last, *source_last;
+    I64 terminal_updates, source_updates;
+
+    if (!TaskValidate(terminal) || !(terminal_doc = terminal->put_doc))
+        return 1;
+    if (!TaskValidate(source_task) || source_task == terminal)
+        source_task = terminal->parent_task;
+    if (!TaskValidate(source_task) || source_task == terminal)
+        source_task = sys_task;
+    if (!TaskValidate(source_task) || source_task == terminal)
+    {
+        candidate = terminal->next_task;
+        if (TaskValidate(candidate) && candidate != terminal)
+            source_task = candidate;
+    }
+    if (!TaskValidate(source_task))
+        return 20;
+    if (source_task == terminal)
+        return 21;
+    // The serial command task has no DolDoc put_doc in this startup profile.
+    // Give it a temporary, real source document to model the compiler's Fs
+    // context without changing the terminal or depending on another window.
+    source_doc = DocNew(NULL, source_task);
+    if (!source_doc)
+        return 22;
+    if (source_doc == terminal_doc)
+        return 23;
+
+    terminal_last = terminal_doc->head.last;
+    terminal_updates = terminal_doc->updates_count;
+    source_last = source_doc->head.last;
+    source_updates = source_doc->updates_count;
+    old_source_doc = source_task->put_doc;
+    source_task->put_doc = source_doc;
+    Fs = source_task;
+    BootstrapGuiTerminalPrintOutput("GUI output ownership check\n", terminal);
+    Fs = old_fs;
+    source_task->put_doc = old_source_doc;
+
+    if (source_doc->head.last != source_last ||
+        source_doc->updates_count != source_updates ||
+        terminal_doc->head.last == terminal_last ||
+        terminal_doc->updates_count <= terminal_updates)
+        return 3;
+    return 0x2a;
+}
+
 I64 BootstrapGuiTerminalHide()
 {
     if (TaskValidate(bootstrap_gui_terminal_task))
@@ -896,13 +1365,12 @@ I64 BootstrapGuiTerminalSmoke()
 {
     CMenu *menu;
     CMenuEntry *root;
-    CMenuEntry *entry;
-    I64 action;
     I64 command_len = 0;
     I64 history_len = 0;
     I64 command_pos = 0;
     U8 command[256];
     U8 history[256];
+    U8 *output;
     U8 *edit_path;
 
     // The normal ARM64 boot already starts this task. In that configuration
@@ -986,31 +1454,49 @@ I64 BootstrapGuiTerminalSmoke()
         if (!menu) return 11;
         if (menu->task != bootstrap_gui_terminal_task) return 18;
         root = menu->sub;
-        if (!root) return 12;
-        if (StrCompare(root->name, "OS") || !root->dir) return 19;
-        entry = root->sub;
-        for (action = 1; action <= 10; action++)
-        {
-            if (!entry) return 12 + action;
-            if (entry->message_code != MESSAGE_KEY_UP) return 20 + action;
-            if (entry->arg1 != action) return 24 + action;
-            if (entry->arg2 != GUI_MENU_ACTION_TAG) return 28 + action;
-            if (action == 1 && StrCompare(entry->name, "Help")) return 33;
-            if (action == 2 && StrCompare(entry->name, "Status")) return 34;
-            if (action == 3 && StrCompare(entry->name, "Files")) return 35;
-            if (action == 4 && StrCompare(entry->name, "Disk")) return 36;
-            if (action == 5 && StrCompare(entry->name, "Window Demo")) return 47;
-            if (action == 6 &&
-                StrCompare(entry->name, "Tile Windows Horizontally")) return 48;
-            if (action == 7 &&
-                StrCompare(entry->name, "Tile Windows Vertically")) return 49;
-            if (action == 8 &&
-                StrCompare(entry->name, "Tile Windows as Grid")) return 50;
-            if (action == 9 && StrCompare(entry->name, "Lattice Play")) return 54;
-            if (action == 10 && StrCompare(entry->name, "Stock Play")) return 55;
-            entry = entry->next;
-        }
-        if (entry) return 37;
+        if (!root || StrCompare(root->name, "File") || !root->dir) return 19;
+        root = root->next;
+        if (!root || StrCompare(root->name, "Windows") || !root->dir) return 69;
+        root = root->next;
+        if (!root || StrCompare(root->name, "Apps") || !root->dir) return 70;
+        root = root->next;
+        if (!root || StrCompare(root->name, "View") || !root->dir) return 71;
+        root = root->next;
+        if (!root || StrCompare(root->name, "OS") || !root->dir || root->next)
+            return 72;
+        if (!BootstrapGuiTerminalMenuActionValid(menu, "File", "Files", 3) ||
+            !BootstrapGuiTerminalMenuActionValid(menu, "File", "Disk", 4) ||
+            !BootstrapGuiTerminalMenuActionValid(menu, "Windows", "Window Demo", 5) ||
+            !BootstrapGuiTerminalMenuActionValid(menu, "Windows", "Tile Windows Horizontally", 6) ||
+            !BootstrapGuiTerminalMenuActionValid(menu, "Windows", "Tile Windows Vertically", 7) ||
+            !BootstrapGuiTerminalMenuActionValid(menu, "Windows", "Tile Windows as Grid", 8) ||
+            !BootstrapGuiTerminalMenuActionValid(menu, "Apps", "Lattice Play", 9) ||
+            !BootstrapGuiTerminalMenuActionValid(menu, "Apps", "Stock Play", 10) ||
+            !BootstrapGuiTerminalMenuActionValid(menu, "Apps", "Paint Demo", 19) ||
+            !BootstrapGuiTerminalMenuActionValid(menu, "View", "View Angles", 11) ||
+            !BootstrapGuiTerminalMenuActionValid(menu, "View", "Zoom In", 12) ||
+            !BootstrapGuiTerminalMenuActionValid(menu, "View", "Zoom Out", 13) ||
+            !BootstrapGuiTerminalMenuActionValid(menu, "View", "Reset View", 14) ||
+            !BootstrapGuiTerminalMenuActionValid(menu, "View", "Pan Left", 15) ||
+            !BootstrapGuiTerminalMenuActionValid(menu, "View", "Pan Right", 16) ||
+            !BootstrapGuiTerminalMenuActionValid(menu, "View", "Pan Up", 17) ||
+            !BootstrapGuiTerminalMenuActionValid(menu, "View", "Pan Down", 18) ||
+            !BootstrapGuiTerminalMenuActionValid(menu, "OS", "Help", 1) ||
+            !BootstrapGuiTerminalMenuActionValid(menu, "OS", "Status", 2))
+            return 73;
+        if (BootstrapGuiTerminalOutputOwnershipChecks() != 0x2a)
+            return 74;
+        if (BootstrapGuiTerminalZoomPanChecks() != 0x2a) return 64;
+        output = BootstrapGuiTerminalMenuAction(19);
+        if (!output || StrCompare(output,
+            "Paint Demo: hold and drag in this window; Esc clears")) return 66;
+        if (!bootstrap_gui_paint_active ||
+            BootstrapGuiTerminalPaintChecks() != 0x2a)
+            return 67;
+        output = BootstrapGuiTerminalMenuAction(19);
+        if (!output || StrCompare(output, "Paint Demo stopped") ||
+            bootstrap_gui_paint_active || bootstrap_gui_paint_count)
+            return 68;
         if (BootstrapGuiTerminalWindowState() != 0x3f) return 52;
         return 0x2a;
     }
@@ -1021,6 +1507,84 @@ I64 BootstrapGuiTerminalSmoke()
         TaskValidate(bootstrap_gui_terminal_task))
         return 2;
     return 0x2a;
+}
+
+I64 BootstrapGuiTerminalZoomPanChecks()
+{//Pan shortcuts move the zoomed source viewport and remain bounded at each edge.
+    CGrGlobals *active_gr = ZcActiveGrGlobals();
+    CMouseStateGlobals *active_mouse = ZcActiveMouseGlobals();
+    I64 old_mouse_x, old_mouse_y, old_mouse_z;
+    I64 old_mouse_ox, old_mouse_oy, old_mouse_oz;
+    F64 old_scale_x, old_scale_y, old_scale_z;
+    I64 old_zoom, old_sx, old_sy, max_x, max_y;
+    if (!active_gr)
+        active_gr = &gr;
+    if (!active_mouse)
+        active_mouse = &mouse;
+    old_zoom = active_gr->screen_zoom;
+    old_sx = active_gr->sx;
+    old_sy = active_gr->sy;
+    old_mouse_x = active_mouse->pos.x;
+    old_mouse_y = active_mouse->pos.y;
+    old_mouse_z = active_mouse->pos.z;
+    old_mouse_ox = active_mouse->offset.x;
+    old_mouse_oy = active_mouse->offset.y;
+    old_mouse_oz = active_mouse->offset.z;
+    old_scale_x = active_mouse->scale.x;
+    old_scale_y = active_mouse->scale.y;
+    old_scale_z = active_mouse->scale.z;
+    active_gr->screen_zoom = 1;
+    active_gr->sx = active_gr->sy = 0;
+    active_mouse->pos.x = 400;
+    active_mouse->pos.y = 300;
+    active_mouse->pos.z = 0;
+    active_mouse->offset.x = active_mouse->offset.y = active_mouse->offset.z = 0;
+    active_mouse->scale.x = active_mouse->scale.y = active_mouse->scale.z = 1.0;
+    if (!BootstrapGuiTerminalZoomPanAction(12) || active_gr->screen_zoom != 2 ||
+        !BootstrapGuiTerminalZoomPanAction(13) || active_gr->screen_zoom != 1 ||
+        !BootstrapGuiTerminalZoomPanAction(14) || active_gr->sx || active_gr->sy)
+        goto fail;
+    active_gr->screen_zoom = 2;
+    active_gr->sx = active_gr->sy = 0;
+    if (!BootstrapGuiTerminalZoomPanAction(15) || active_gr->sx != 0 ||
+        !BootstrapGuiTerminalZoomPanAction(16) || active_gr->sx != 40 ||
+        !BootstrapGuiTerminalZoomPanAction(18) || active_gr->sy != 40 ||
+        !BootstrapGuiTerminalZoomPanAction(17) || active_gr->sy != 0)
+        goto fail;
+    max_x = GR_WIDTH - GR_WIDTH / active_gr->screen_zoom;
+    max_y = GR_HEIGHT - GR_HEIGHT / active_gr->screen_zoom;
+    active_gr->sx = max_x;
+    active_gr->sy = max_y;
+    if (!BootstrapGuiTerminalZoomPanAction(16) || active_gr->sx != max_x ||
+        !BootstrapGuiTerminalZoomPanAction(18) || active_gr->sy != max_y)
+        goto fail;
+    active_gr->screen_zoom = old_zoom;
+    active_gr->sx = old_sx;
+    active_gr->sy = old_sy;
+    active_mouse->pos.x = old_mouse_x;
+    active_mouse->pos.y = old_mouse_y;
+    active_mouse->pos.z = old_mouse_z;
+    active_mouse->offset.x = old_mouse_ox;
+    active_mouse->offset.y = old_mouse_oy;
+    active_mouse->offset.z = old_mouse_oz;
+    active_mouse->scale.x = old_scale_x;
+    active_mouse->scale.y = old_scale_y;
+    active_mouse->scale.z = old_scale_z;
+    return 0x2a;
+fail:
+    active_gr->screen_zoom = old_zoom;
+    active_gr->sx = old_sx;
+    active_gr->sy = old_sy;
+    active_mouse->pos.x = old_mouse_x;
+    active_mouse->pos.y = old_mouse_y;
+    active_mouse->pos.z = old_mouse_z;
+    active_mouse->offset.x = old_mouse_ox;
+    active_mouse->offset.y = old_mouse_oy;
+    active_mouse->offset.z = old_mouse_oz;
+    active_mouse->scale.x = old_scale_x;
+    active_mouse->scale.y = old_scale_y;
+    active_mouse->scale.z = old_scale_z;
+    return 0;
 }
 
 I64 BootstrapGuiShellSmoke()

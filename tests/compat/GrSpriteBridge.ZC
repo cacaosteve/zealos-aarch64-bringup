@@ -660,7 +660,7 @@ I64 GrSpriteRotatedRectChecks()
     U8 record_type;
     I32 x1, y1, x2, y2;
     U64 angle_bits;
-    I64 rect_color;
+    I64 rect_color, rotated_pixels, scan_x, scan_y, screen_color;
 
     plot_dc = DCNew(800, 600);
     if (!plot_dc)
@@ -739,7 +739,7 @@ I64 GrSpriteRotatedRectChecks()
             plot_dc->body[359 * plot_dc->width_internal + 499] != rect_color)
         return 7;
 
-    // A non-cardinal angle is outside the bounded subset and must not draw.
+    // A non-cardinal angle rotates and fills the four-point CDC quadrilateral.
     x1 = 40;
     y1 = 50;
     x2 = 45;
@@ -750,9 +750,17 @@ I64 GrSpriteRotatedRectChecks()
     MemCopy(records + 16, &y2, sizeof(I32));
     angle_bits = 0x3FF0000000000000;
     MemCopy(records + 24, &angle_bits, sizeof(U64));
+    screen_color = ZcFbGraphColor(12);
+    if (!ZcFbGraphRect(435, 340, 20, 20, ZcFbGraphColor(0),
+            0, 0, 799, 599, 0))
+        return 9;
     Sprite3(plot_dc, 400, 300, 0, records);
-    if (plot_dc->body[349 * plot_dc->width_internal + 443] == rect_color ||
-            plot_dc->body[350 * plot_dc->width_internal + 439] == rect_color)
+    rotated_pixels = 0;
+    for (scan_y = 344; scan_y <= 354; scan_y++)
+        for (scan_x = 436; scan_x <= 450; scan_x++)
+            if (ZcFbTextPixel(scan_x, scan_y) == screen_color)
+                rotated_pixels++;
+    if (rotated_pixels < 12 || ZcFbTextPixel(436, 344) == screen_color)
         return 8;
 
     Free(records);

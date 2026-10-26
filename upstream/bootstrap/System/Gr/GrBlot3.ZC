@@ -98,6 +98,22 @@ public U0 DCReflect(CDC *dc, I64 *_x, I64 *_y, I64 *_z)
 	}
 }
 
+Bool GrBlot3PointOnScreen0(CDC *dc, I64 x, I64 y)
+{//Check device-context bounds after the screen-bitmap task offset is applied.
+	CTask *win_task;
+
+	if (dc->flags & DCF_SCREEN_BITMAP)
+	{
+		win_task = dc->win_task;
+		x += win_task->pix_left + win_task->scroll_x;
+		y += win_task->pix_top + win_task->scroll_y;
+		return win_task->pix_left <= x <= win_task->pix_right &&
+				win_task->pix_top <= y <= win_task->pix_bottom &&
+				0 <= x < dc->width && 0 <= y < dc->height;
+	}
+	return 0 <= x < dc->width && 0 <= y < dc->height;
+}
+
 public I64 GrBlot3(CDC *dc=gr.dc, I64 x1, I64 y1, I64 z1, CDC *img)
 {//3D. Clipping and transformation.
 	CColorROPU32	 old_color = dc->color;
@@ -223,6 +239,8 @@ public I64 GrBlot3(CDC *dc=gr.dc, I64 x1, I64 y1, I64 z1, CDC *img)
 					{
 						if ((color = GrPeek(img, x.i32[1], y.i32[1])) >= 0)
 						{
+							if (GrBlot3PointOnScreen0(dc, _x2.i32[1], _y2.i32[1]))
+								res = 1;
 							if (dc->color.c0.rop == ROPB_MONO)
 							{
 								if (color)
@@ -266,7 +284,6 @@ public I64 GrBlot3(CDC *dc=gr.dc, I64 x1, I64 y1, I64 z1, CDC *img)
 				_z1 += dz1;
 				x += dw;
 			}
-			res = 1;
 normal_image:
 			if (dc->flags & DCF_JUST_MIRROR)
 				goto gr_done;
@@ -355,6 +372,8 @@ normal_image:
 				{
 					if ((color = GrPeek(img, x.i32[1], y.i32[1])) >= 0)
 					{
+						if (GrBlot3PointOnScreen0(dc, x2.i32[1], y2.i32[1]))
+							res = 1;
 						if (dc->color.c0.rop == ROPB_MONO)
 						{
 							if (color)
@@ -398,7 +417,6 @@ normal_image:
 			z1 += dz1;
 			x += dw;
 		}
-		res = 1;	//TODO: check off screen
 	}
 	else
 		res = GrBlot(dc, x1, y1, img);

@@ -1,0 +1,213 @@
+/* ARM64 source bridge for ZealOS's three-axis view-angle control.
+ * Adapted from System/Ctrls/CtrlsA.ZC at
+ * eee210f4379ba3d00b47507f336a158eefb2c993.
+ */
+#help_index "Ctrls"
+
+#define VIEWANGLES_SPACING 22
+#define VIEWANGLES_RANGE   360
+#define VIEWANGLES_BORDER  2
+#define VIEWANGLES_SNAP    1
+
+U0 DrawViewAnglesCtrl(CDC *dc, CCtrl *ctrl)
+{
+    I64 i, j, x, marker_y;
+    CViewAngles *state;
+
+    if (!dc || !ctrl || !(state = ctrl->state))
+        return;
+
+    dc->color = state->cbd;
+    GrRect(dc, ctrl->left, ctrl->top,
+            VIEWANGLES_SPACING * 4 + 3,
+            VIEWANGLES_SPACING * 2 + VIEWANGLES_RANGE);
+    dc->color = state->cbg;
+    GrRect(dc, ctrl->left + VIEWANGLES_BORDER,
+            ctrl->top + VIEWANGLES_BORDER,
+            VIEWANGLES_SPACING * 4 + 3 - 2 * VIEWANGLES_BORDER,
+            VIEWANGLES_SPACING * 2 + VIEWANGLES_RANGE -
+                    2 * VIEWANGLES_BORDER);
+    dc->color = state->config;
+    GrLine(dc, ctrl->left + VIEWANGLES_SPACING,
+            ctrl->top + VIEWANGLES_SPACING,
+            ctrl->left + VIEWANGLES_SPACING,
+            ctrl->top + VIEWANGLES_SPACING + VIEWANGLES_RANGE - 1);
+    GrLine(dc, ctrl->left + 2 * VIEWANGLES_SPACING + 1,
+            ctrl->top + VIEWANGLES_SPACING,
+            ctrl->left + 2 * VIEWANGLES_SPACING + 1,
+            ctrl->top + VIEWANGLES_SPACING + VIEWANGLES_RANGE - 1);
+    GrLine(dc, ctrl->left + 3 * VIEWANGLES_SPACING + 2,
+            ctrl->top + VIEWANGLES_SPACING,
+            ctrl->left + 3 * VIEWANGLES_SPACING + 2,
+            ctrl->top + VIEWANGLES_SPACING + VIEWANGLES_RANGE - 1);
+    for (i = 1; i < VIEWANGLES_RANGE + 1; i += 2 * VIEWANGLES_SNAP)
+    {
+        j = 2 - i / 3 & 1;
+        GrLine(dc, ctrl->left + VIEWANGLES_SPACING - j,
+                ctrl->bottom - VIEWANGLES_SPACING - i,
+                ctrl->left + VIEWANGLES_SPACING + j,
+                ctrl->bottom - VIEWANGLES_SPACING - i);
+        GrLine(dc, ctrl->left + 2 * VIEWANGLES_SPACING + 1 - j,
+                ctrl->bottom - VIEWANGLES_SPACING - i,
+                ctrl->left + 2 * VIEWANGLES_SPACING + 1 + j,
+                ctrl->bottom - VIEWANGLES_SPACING - i);
+        GrLine(dc, ctrl->left + 3 * VIEWANGLES_SPACING + 2 - j,
+                ctrl->bottom - VIEWANGLES_SPACING - i,
+                ctrl->left + 3 * VIEWANGLES_SPACING + 2 + j,
+                ctrl->bottom - VIEWANGLES_SPACING - i);
+    }
+
+    dc->color = state->cx;
+    GrPrint(dc, ctrl->left + VIEWANGLES_SPACING - FONT_WIDTH / 2,
+            ctrl->top + VIEWANGLES_SPACING - 1 - FONT_HEIGHT, "X");
+    GrPrint(dc, ctrl->left + VIEWANGLES_SPACING - 3 * FONT_WIDTH / 2,
+            ctrl->top + VIEWANGLES_SPACING + VIEWANGLES_RANGE + 3,
+            "%3d", state->sx * 360 / VIEWANGLES_RANGE);
+    x = ctrl->left + VIEWANGLES_SPACING;
+    if (state->sx > VIEWANGLES_RANGE / 2)
+        j = -VIEWANGLES_RANGE / 2 + state->sx;
+    else
+        j = state->sx + VIEWANGLES_RANGE / 2;
+    marker_y = ctrl->top + VIEWANGLES_SPACING + VIEWANGLES_RANGE - 1 - j;
+    GrRect(dc, x - 3, marker_y - 2, 7, 5);
+    dc->color = state->cx ^ 8;
+    GrRect(dc, x - 2, marker_y - 1, 5, 3);
+
+    dc->color = state->cy;
+    GrPrint(dc, ctrl->left + 2 * VIEWANGLES_SPACING + 1 - FONT_WIDTH / 2,
+            ctrl->top + VIEWANGLES_SPACING - 1 - FONT_HEIGHT, "Y");
+    GrPrint(dc, ctrl->left + 2 * VIEWANGLES_SPACING + 1 -
+            3 * FONT_WIDTH / 2,
+            ctrl->top + VIEWANGLES_SPACING + VIEWANGLES_RANGE + 3,
+            "%3d", state->sy * 360 / VIEWANGLES_RANGE);
+    x = ctrl->left + 2 * VIEWANGLES_SPACING + 1;
+    if (state->sy > VIEWANGLES_RANGE / 2)
+        j = -VIEWANGLES_RANGE / 2 + state->sy;
+    else
+        j = state->sy + VIEWANGLES_RANGE / 2;
+    marker_y = ctrl->top + VIEWANGLES_SPACING + VIEWANGLES_RANGE - 1 - j;
+    GrRect(dc, x - 3, marker_y - 2, 7, 5);
+    dc->color = state->cy ^ 8;
+    GrRect(dc, x - 2, marker_y - 1, 5, 3);
+
+    dc->color = state->cz;
+    GrPrint(dc, ctrl->left + 3 * VIEWANGLES_SPACING + 2 - FONT_WIDTH / 2,
+            ctrl->top + VIEWANGLES_SPACING - 1 - FONT_HEIGHT, "Z");
+    GrPrint(dc, ctrl->left + 3 * VIEWANGLES_SPACING + 2 -
+            3 * FONT_WIDTH / 2,
+            ctrl->top + VIEWANGLES_SPACING + VIEWANGLES_RANGE + 3,
+            "%3d", state->sz * 360 / VIEWANGLES_RANGE);
+    x = ctrl->left + 3 * VIEWANGLES_SPACING + 2;
+    if (state->sz > VIEWANGLES_RANGE / 2)
+        j = -VIEWANGLES_RANGE / 2 + state->sz;
+    else
+        j = state->sz + VIEWANGLES_RANGE / 2;
+    marker_y = ctrl->top + VIEWANGLES_SPACING + VIEWANGLES_RANGE - 1 - j;
+    GrRect(dc, x - 3, marker_y - 2, 7, 5);
+    dc->color = state->cz ^ 8;
+    GrRect(dc, x - 2, marker_y - 1, 5, 3);
+}
+
+U0 UpdateDerivedViewAnglesCtrl(CCtrl *ctrl)
+{
+    CViewAngles *state;
+
+    if (!ctrl || !ctrl->win_task || !(state = ctrl->state))
+        return;
+    ctrl->left = ctrl->win_task->pix_width -
+            (VIEWANGLES_SPACING * 4 + 3);
+    ctrl->right = ctrl->left + VIEWANGLES_SPACING * 4 + 3;
+    ctrl->top = ctrl->win_task->pix_height -
+            (VIEWANGLES_SPACING * 2 + VIEWANGLES_RANGE);
+    ctrl->bottom = ctrl->top + VIEWANGLES_SPACING * 2 + VIEWANGLES_RANGE;
+    state->sx = ClampI64(RoundI64(state->sx, VIEWANGLES_SNAP), 0,
+            VIEWANGLES_RANGE - 1);
+    state->sy = ClampI64(RoundI64(state->sy, VIEWANGLES_SNAP), 0,
+            VIEWANGLES_RANGE - 1);
+    state->sz = ClampI64(RoundI64(state->sz, VIEWANGLES_SNAP), 0,
+            VIEWANGLES_RANGE - 1);
+    state->ax = 6.2831853071795864769 * state->sx / VIEWANGLES_RANGE;
+    state->ay = 6.2831853071795864769 * state->sy / VIEWANGLES_RANGE;
+    state->az = 6.2831853071795864769 * state->sz / VIEWANGLES_RANGE;
+}
+
+U0 LeftClickViewAngles(CCtrl *ctrl, I64 x, I64 y, Bool down)
+{
+    CViewAngles *state;
+    I64 angle_index;
+
+    if (!ctrl || !(state = ctrl->state) ||
+            x < ctrl->left || x >= ctrl->right ||
+            y < ctrl->top || y >= ctrl->bottom)
+        return;
+    angle_index = VIEWANGLES_RANGE - 1 -
+            (y - (ctrl->top + VIEWANGLES_SPACING));
+    if (angle_index >= VIEWANGLES_RANGE / 2)
+        angle_index -= VIEWANGLES_RANGE / 2;
+    else
+        angle_index += VIEWANGLES_RANGE / 2;
+    if (x < ctrl->left + (ctrl->right - ctrl->left) / 3)
+        state->sx = angle_index;
+    else if (x < ctrl->left + 2 * (ctrl->right - ctrl->left) / 3)
+        state->sy = angle_index;
+    else
+        state->sz = angle_index;
+    if (ctrl->update_derived_vals)
+        ctrl->update_derived_vals(ctrl);
+}
+
+public CCtrl *ViewAnglesNew(CTask *task=NULL)
+{
+    CCtrl *ctrl;
+    CViewAngles *state;
+
+    if (!task)
+        task = Fs;
+    if (!task || !TaskValidate(task))
+        return NULL;
+    if ((ctrl = CtrlFindUnique(task, CTRLT_VIEWING_ANGLES)))
+        return ctrl;
+
+    state = CAlloc(sizeof(CViewAngles), task);
+    if (!state)
+        return NULL;
+    ctrl = CAlloc(sizeof(CCtrl), task);
+    if (!ctrl)
+    {
+        Free(state);
+        return NULL;
+    }
+    state->cbd = BLUE;
+    state->cbg = LTBLUE;
+    state->config = BLACK;
+    state->cx = LTGREEN;
+    state->cy = GREEN;
+    state->cz = LTGREEN;
+    ctrl->win_task = task;
+    ctrl->flags = CTRLF_SHOW | CTRLF_CAPTURE_LEFT_MS;
+    ctrl->type = CTRLT_VIEWING_ANGLES;
+    ctrl->state = state;
+    ctrl->draw_it = &DrawViewAnglesCtrl;
+    ctrl->left_click = &LeftClickViewAngles;
+    ctrl->update_derived_vals = &UpdateDerivedViewAnglesCtrl;
+    QueueInsert(ctrl, task->last_ctrl);
+    TaskDerivedValsUpdate(task);
+    return ctrl;
+}
+
+public U0 ViewAnglesDel(CTask *task=NULL)
+{
+    CCtrl *ctrl;
+
+    if (!task)
+        task = Fs;
+    if (!task || !TaskValidate(task))
+        return;
+    if ((ctrl = CtrlFindUnique(task, CTRLT_VIEWING_ANGLES)))
+    {
+        QueueRemove(ctrl);
+        Free(ctrl->state);
+        Free(ctrl);
+        TaskDerivedValsUpdate(task);
+    }
+}

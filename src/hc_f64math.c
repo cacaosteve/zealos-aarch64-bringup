@@ -337,3 +337,101 @@ void hc_fmt_f64_bits(char **dp, uint64_t bits, int prec) {
     }
     *dp = d;
 }
+
+/* Format IEEE F64 bits using the significant-digit rules of %g/%G. This is
+ * deliberately self-contained: the freestanding guest snprintf does not
+ * implement floating-point conversions. */
+void hc_fmt_f64_g_bits(char **dp, uint64_t bits, int prec, int uppercase) {
+    char *d = *dp;
+    double value = hc_bits_to_d(bits & 0x7fffffffffffffffULL);
+    unsigned exp_bits = (unsigned)((bits >> 52) & 0x7ffu);
+    uint64_t fraction = bits & 0x000fffffffffffffULL;
+    char digits[18];
+    int exponent = 0;
+    int count;
+
+    if (prec < 1) prec = 1;
+    if (prec > 17) prec = 17;
+    if (exp_bits == 0x7ffu) {
+        const char *special = fraction ? (uppercase ? "NAN" : "nan")
+                                       : (uppercase ? "INF" : "inf");
+        if (!fraction && (bits >> 63)) *d++ = '-';
+        while (*special) *d++ = *special++;
+        *dp = d;
+        return;
+    }
+    if (bits >> 63) *d++ = '-';
+    if (value == 0.0) {
+        *d++ = '0';
+        *dp = d;
+        return;
+    }
+
+    while (value >= 10.0) {
+        value *= 0.1;
+        exponent++;
+    }
+    while (value < 1.0) {
+        value *= 10.0;
+        exponent--;
+    }
+
+    for (int i = 0; i < prec; i++) {
+        int digit = (int)value;
+        if (digit < 0) digit = 0;
+        if (digit > 9) digit = 9;
+        digits[i] = (char)('0' + digit);
+        value = (value - digit) * 10.0;
+    }
+    int guard = (int)value;
+    if (guard >= 5) {
+        int carry = 1;
+        for (int i = prec - 1; i >= 0 && carry; i--) {
+            if (digits[i] == '9') digits[i] = '0';
+            else { digits[i]++; carry = 0; }
+        }
+        if (carry) {
+            digits[0] = '1';
+            exponent++;
+        }
+    }
+    count = prec;
+    while (count > 1 && digits[count - 1] == '0') count--;
+
+    if (exponent < -4 || exponent >= prec) {
+        *d++ = digits[0];
+        if (count > 1) {
+            *d++ = '.';
+            for (int i = 1; i < count; i++) *d++ = digits[i];
+        }
+        *d++ = uppercase ? 'E' : 'e';
+        *d++ = exponent < 0 ? '-' : '+';
+        unsigned magnitude = exponent < 0 ? (unsigned)-exponent
+                                          : (unsigned)exponent;
+        char reversed[4];
+        int n = 0;
+        do {
+            reversed[n++] = (char)('0' + magnitude % 10);
+            magnitude /= 10;
+        } while (magnitude && n < (int)sizeof(reversed));
+        if (n < 2) *d++ = '0';
+        while (n) *d++ = reversed[--n];
+    } else {
+        int decimal = exponent + 1;
+        if (decimal <= 0) {
+            *d++ = '0';
+            *d++ = '.';
+            for (int i = 0; i < -decimal; i++) *d++ = '0';
+            for (int i = 0; i < count; i++) *d++ = digits[i];
+        } else {
+            int i = 0;
+            while (i < count && i < decimal) *d++ = digits[i++];
+            while (i < decimal) { *d++ = '0'; i++; }
+            if (i < count) {
+                *d++ = '.';
+                while (i < count) *d++ = digits[i++];
+            }
+        }
+    }
+    *dp = d;
+}

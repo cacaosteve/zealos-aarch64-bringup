@@ -2,7 +2,20 @@
 
 Limine → ZealBooter → kernel + `demo.hcbc` → HolyC-IR JIT → graphical terminal → **native USB or VirtIO input**
 
-**Not a full ZealOS port.** Two parallel tracks: QEMU/UTM virt (HolyC + RedSea + Lattice compose) and Pi 4B UEFI (boot/timer/IRQ/shell plus physically confirmed PCIe/VL805 discovery; the assigned BAR translates through the FDT window, but xHCI reads still return invalid `0xdeadbead`, so USB input remains disabled while the live BCM2711 outbound window is checked).
+**Not a full ZealOS port.** QEMU/UTM has an accepted ARM64 ISO install,
+disk-only desktop boot and saved-data persistence milestone. Physical Pi 4B
+UEFI now boots the native graphical terminals with working USB keyboard,
+pointer, menu clicks and `40+2;` returning `42`. Read-only USB storage remains
+active alongside the desktop. The Pi desktop/basic input milestone is accepted;
+writable Pi storage, persistence and installation remain work. See
+[ACCEPTANCE.md](ACCEPTANCE.md) and [PI4.md](PI4.md).
+
+## AArch64 desktop in UTM
+
+The graphical desktop runs with two tiled terminals and the animated ZealOS
+splash logo:
+
+![ZealOS AArch64 graphical desktop running in UTM](docs/images/zealos-aarch64-utm-desktop.png)
 
 ## Native source compatibility milestone
 
@@ -14,10 +27,11 @@ recursion, callbacks, shared symbols, F64 and reclaimable allocations.
 ```sh
 make check-compat       # disposable ISO guest + old boot regressions
 make check-compat-pci   # disposable UTM-shaped GPT/PCI disk guest
+make check-gui-terminal # terminal output ownership, menus, paint and zoom/pan
 make check-gui-workflow # visible typing/cursors + graphical edit/save/run/reboot
 make check-usb-input    # native NEC/QEMU xHCI keyboard, mouse/tablet + recovery
 make check-usb-topology # nested USB2 hubs, repeated reconnects + subtree recovery
-make check-pi4-platform # firmware FDT parsing + bounded Pi USB DMA reservation
+make check-pi4-platform # Pi FDT/DMA/xHCI, HID/storage and framebuffer adapter
 make check-task-settings # upstream application state + task-local directories
 make check-source-context # directory masks + relative document/project files
 make check-source-execute # upstream ExeFile + native task-local file execution
@@ -48,7 +62,8 @@ The UTM refresh also updates the repository-managed
 `System/DolDoc/DocCompiler.ZC`, `System/DolDoc/DocTree.ZC`,
 `System/DolDoc/DocClipBoard.ZC`, `System/DolDoc/DocFile.ZC`,
 `System/DolDoc/DocTerm.ZC`, `System/DolDoc/DocEd.ZC`, `System/WinMgr.ZC`,
-`System/Gr/GrDC.ZC`, and `System/Gr/SpriteRaster.ZC` files
+`System/Gr/GrDC.ZC`, `System/Gr/SpriteRaster.ZC`, and
+`Tests/GrSpriteSymmetry.ZC` files
 so they stay in sync with the kernel; other existing guest source files remain
 untouched.
 
@@ -68,15 +83,22 @@ reuses reserved per-device DMA only after successful slot teardown. Limits
 are eight devices, fifteen ports per hub and five hub tiers. A SuperSpeed hub
 control path is present, but stock QEMU cannot exercise it and physical SS-hub
 validation remains open. The QEMU hub stress gate uses generic full-speed hub
-devices; physical high-speed TT routing is also pending. USB storage and Pi's
-PCIe/VL805 backend remain future work.
+devices; physical high-speed TT routing is also pending. Pi's separate
+PCIe/VL805 backend has physical keyboard, basic trackpad and read-only FAT32
+USB-storage acceptance, including operation alongside its native desktop.
+Writable Pi storage and disconnect/reconnect recovery remain work
+([PI4.md](PI4.md)).
 
 At the UTM prompt, run `zcheck`. Expected: `zc: upstream QuickSort + persistent
 modules OK`. Use `zc` for declarations/statements, `zload` for a source file in the
-boot archive, `zcall` for a no-argument integer function, and `zreset` to discard
-the native session. Existing `hc`/`runzc` commands keep their original behavior.
+boot archive, `zcall Function` (bare name, without parentheses or a semicolon)
+for a no-argument integer function, and `zreset`
+to discard the native session. Existing `hc`/`runzc` commands keep their original behavior.
 `zput Name.ZC <source>` saves a short source file on the native 32 MiB source
 partition in the 128 MiB UTM/GPT disk (legacy ISO/MMIO uses RedSea);
+the `<source>` marker is explanatory syntax—do not type the angle brackets.
+For example, `zput Tests/InstallerPersist.ZC I64 InstallerPersist(){return 40+2;}`
+saves a callable persistence check.
 `zload disk:Name.ZC` compiles it, including after a full reboot. The QEMU gates also
 exercise a relative include between two disk files. `zverify` checks the
 seeded large upstream files, and `scripts/source-volume.py put` can import a
@@ -91,8 +113,10 @@ and `q!` commands, as well as numbered-line edits. Saved files load through
 `zload disk:<path>`. The graphical editor reads absolute `/...` paths from the
 writable source volume before falling back to bundled files, and saves those
 absolute paths to the same persistent volume. `FilesFind` returns a merged
-view of bundled and native source files: saved replacements supply their native
-size, saved-only files appear in listings, and tombstoned files are hidden.
+view of bundled files, native source files, and readable files in a legacy
+RedSea root: saved replacements supply their native size, saved-only files
+appear in listings, and tombstoned files are hidden. The legacy adapter lists
+root files only and skips the `.` and `..` directory records.
 Nested native-only paths also synthesize their parent directories in recursive
 directory searches, and deleting the last native file removes those synthesized
 directories from the merged view. Serial uploads refresh the same listing cache
@@ -141,8 +165,11 @@ Boot run-level flags now record the dedicated System task, persistent Registry,
 and Home startup only after each phase succeeds; the reboot checks wait for
 the graphical terminal to consume its queued `Once` command before asserting
 the persisted values and flushes.
-DVD boot opens the live graphical session and says that the legacy disk
-installer is not yet ported to ARM64; disk/RAM startup also opens a second
+DVD boot opens the live graphical session. Its bounded UTM/QEMU installer
+accepts one 128 MiB PCI VirtIO target disk and requires the explicit
+`zinstall ERASE` confirmation; it writes the packaged GPT/ESP/source image and
+reads back every sector. It is separate from the legacy YDE installer, whose
+BIOS/AHCI storage path is not ported. Disk/RAM startup also opens a second
 terminal and tiles it beside the first, excluding bridge/System tasks from the
 window layout. Startup queues autocomplete indexing after `Once`; the
 autocomplete corpus is indexed by its background task, and the first prompt is
@@ -152,6 +179,15 @@ upstream rotating splash with the native pointer enabled, and restores terminal
 focus when dismissed. Automated scanout checks cover the two-terminal boot,
 splash animation and dismissal, popup windows, terminal input and autocomplete
 fill-in.
+The OS menu's Paint Demo keeps a small retained stroke while the left pointer
+button is held, draws a yellow line as the pointer moves, and clears it on
+Escape. QEMU checks exercise pointer sampling, gap interpolation, and actual
+screen-CDC raster output. A live UTM screenshot now confirms yellow strokes
+drawn over the graphical terminal; Paint Demo is an inline mode, not a separate
+window. The Escape reset path clears retained strokes and the partial command;
+`make check-home-autostart` exercises the reset and next empty paint frame. The
+final-image UTM guest passed the automated Escape test; the saved UTM screenshot
+shows Paint Demo drawing but does not capture the Escape gesture itself.
 The original `Cd; #include "Once";` path now runs with the compiler's `.ZC`
 default extension, source-backed `YorN` and `TipOfDay`, and the original tips and
 customization documents. `sys_boot_src` comes from the actual Limine module
@@ -164,9 +200,10 @@ covers the disk and ISO/DVD noninstall branches, including include/tip/error
 cleanup. The ARM64 compiler preserves superscript, subscript and normal-script
 DolDoc markers inside identifiers and executes inline binary DolDoc tokens,
 including payloads with embedded NUL bytes. Startup uses a guarded translation
-of the pinned `HomeSys.StartUpTasks` body; the original YDE disk installer
-remains unavailable because its boot and storage paths are not ported to
-ARM64. `zstatus`
+of the pinned `HomeSys.StartUpTasks` body. `make check-iso-installer` covers the
+bounded ISO installer on a disposable VirtIO disk, including byte-for-byte
+image verification, disk boot, and saved source persistence across reboot; it
+does not port the original YDE BIOS/AHCI installer. `zstatus`
 also reports `keyboard_state` modifier and repeat values to diagnose held host
 keys separately from guest decoding.
 The bridge also maintains the upstream-visible runnable-task and parent/child
@@ -182,9 +219,25 @@ those paths. Most other x86 intrinsics and unresolved externals
 remain unavailable. This does not boot the upstream kernel or provide its
 preemptive scheduler.
 
+The current ISO, `build/zealos-aarch64-hello.iso`, has SHA-256
+`52c214c29a9c23d86c94899e8ef2ba94bd4a21231c92ecdd649714708e2bc627`.
+`make check-iso-installer` passed against this exact build: guarded erase,
+full 128 MiB read-back, disk-only desktop boot, and saved-data persistence
+(`InstallerPersist` returned `0x2a` before and after a second cold reboot).
+The embedded installer disk `build/disk.img` has SHA-256
+`1a4516a67d42aecc7284bfc68e455c5231767360e75a9df021dddb6946d98fde`.
+The exact current ISO (`52c214c…`) was installed in UTM to a disposable 128 MiB
+VirtIO disk and passed full sector read-back. A separate disk-only UTM VM
+cold-booted to the desktop; its captured screen shows both terminals and the
+centered animated Z. `InstallerPersist` returned `0x2a` before and after a
+second cold reboot. The live guest also returned `0x2a` for Ctrl-Alt-F font
+dispatch, while the menu, paint Escape cleanup, and startup graphics checks
+passed in the automated guest gates. See [ACCEPTANCE.md](ACCEPTANCE.md).
+
 [COMPATIBILITY.md](COMPATIBILITY.md) describes the scope and remaining work.
-This is a compiler/runtime foundation, not the complete ZealOS desktop or an
-installer. The immediate focus is UTM; Pi diagnostics remain a separate path.
+This does not boot the original upstream kernel and remains a scoped ARM64
+desktop/runtime port. It includes a bounded UTM/QEMU ISO installer for its
+128 MiB VirtIO disk image. Pi diagnostics remain a separate path.
 
 ## Status
 
@@ -240,7 +293,11 @@ make check-serial   # QEMU regression (must print hc IR OK)
 
 UTM: `make utm` → only **ZealosAarch64Hello** ([ACCEPTANCE.md](ACCEPTANCE.md)).
 
-Pi 4B UEFI (parallel track): [PI4.md](PI4.md) — `make pi-sd` stages Limine/ESP; unpack [pftf/RPi4](https://github.com/pftf/RPi4/releases) onto the SD root first.
+Pi 4B UEFI (parallel track): [PI4.md](PI4.md). `make pi-desktop-sd` prepares
+`build/pi-desktop-esp/` with the native desktop, bundled sources and the accepted
+USB diagnostic recovery entry; `make pi-sd` prepares diagnostics only. These
+targets prepare files without writing a card. Existing Pi UEFI/firmware/DTBs
+must be preserved; a fresh card first needs [pftf/RPi4](https://github.com/pftf/RPi4/releases).
 
 Bridge notes: [AIWNIOS.md](AIWNIOS.md). Milestone ladder: [upstream/README.md](upstream/README.md).
 
@@ -248,11 +305,11 @@ Bridge notes: [AIWNIOS.md](AIWNIOS.md). Milestone ladder: [upstream/README.md](u
 
 | Track | Status |
 |--|--|
-| QEMU/UTM virt | **Regression freeze** M33–M39 (`Notes.ZC` / DocLib `#include`) remains the bar — see ACCEPTANCE.md. **Lattice compose and desktop graphics** continued through M309: native input, source window-manager rendering, GUI editor/file services, source graphics primitives, and Ctrl+wheel zoom. Live UTM confirms graphical typing, mouse movement and window drag/resize, OS menu/Files, Lattice launch, pointer placement/aim, color/Return restart, Space/Escape, GrBlot3 checks, and pointer-centered Ctrl+wheel zoom and plain-wheel control swatch. QEMU also checks Lattice controls through NEC/xHCI. Non-default pan behavior and full ZealOS system/menu startup remain open. |
-| Pi 4B UEFI | PI-DIAG-1..4 + shell accepted; **physical PCIe discovery accepted (2026-10-20)**: FDT windows, active link, reserved 1 MiB DMA arena, and VL805 `1106:3483` xHCI identity/BAR confirmed by HDMI report. The guarded capability probe now reports the translated BAR and reads `0xdeadbead`; the next diagnostic reads BCM2711 outbound-window and error registers without writing them. Bus mastering and xHCI remain off; USB input and UART RX (`uartrx` on USB–TTL @ 115200) remain unproven. No virtio/RedSea disk on Pi yet ([PI4.md](PI4.md)). |
+| QEMU/UTM virt | Current ISO `build/zealos-aarch64-hello.iso` (`52c214c…`) passes `make check-iso-installer`. Exact-image UTM install completed with full 128 MiB read-back verification; the CD-detached VirtIO disk cold-booted through RedSea to the desktop and centered animated Z. `InstallerPersist` returned `0x2a` before and after a second cold reboot; live Ctrl-Alt-F dispatch and automated menu/paint Escape checks passed. See [ACCEPTANCE.md](ACCEPTANCE.md). |
+| Pi 4B UEFI | **PI-DESKTOP-2 native desktop/basic input accepted (2026-10-26)**: native graphical terminals, visible pointer movement, menu clicks and `40+2; → 42`. IMG_9182 confirms firmware 1920×1280, packed 800×600 desktop scaled 2×, 1632 composed frames and USB active/fault/stopped 1/0/0. Physical read-only FAT32 USB file reads and simultaneous keyboard/pointer/storage were accepted earlier. Kernel `b12497c8…93d4930b`; M6 diagnostic recovery preserved. Writable persistence, native SD, reconnect recovery and Pi installation remain open ([PI4.md](PI4.md)). |
 
 ## Earlier platform follow-ups
 
-1. UTM eyes-on after `make utm`: freeze checklist and remaining normal ZealOS menu/startup path
-2. Pi: prove UART RX — `uartrx` then `help`/`halt` on USB–TTL @ 115200; then native storage / keyboard path
+1. UTM/QEMU installer acceptance is complete for the current ISO; optional follow-up: capture a live UTM screenshot of the Paint Demo Escape reset.
+2. Pi: extend the accepted native desktop/input milestone to source-program/editor workflows and writable save/reboot/reopen persistence; native SD, disconnect recovery and installation remain open.
 3. HCRT host stubs only after IR gap shrinks; DT-based discovery before other ARM64 boards

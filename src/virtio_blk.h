@@ -88,7 +88,8 @@ struct vb_dev {
     int flush_supported;
 };
 
-__attribute__((aligned(4096))) static uint8_t g_vb_dma[16384];
+/* Keep the request queues and a multi-sector data window physically contiguous. */
+__attribute__((aligned(4096))) static uint8_t g_vb_dma[65536];
 static struct vb_dev g_vb;
 static uint64_t g_vb_hhdm;
 static int g_vb_last_rw;
@@ -102,6 +103,27 @@ static inline void vb_rw(volatile uint32_t *m, unsigned off, uint32_t v) {
 }
 static inline void vb_dsb(void) {
     __asm__ volatile("dsb sy" ::: "memory");
+}
+static inline void vb_cache_range(void *ptr, size_t size, unsigned operation) {
+    uint64_t ctr, line_bytes;
+    uintptr_t start, end;
+    if (!ptr || !size) return;
+    __asm__ volatile("mrs %0, ctr_el0" : "=r"(ctr));
+    line_bytes = 4ull << ((ctr >> 16) & 15u);
+    if (line_bytes < 16 || line_bytes > 2048 ||
+        (line_bytes & (line_bytes - 1))) line_bytes = 64;
+    start = (uintptr_t)ptr & ~(uintptr_t)(line_bytes - 1);
+    end = (uintptr_t)ptr + size;
+    if (end < (uintptr_t)ptr) return;
+    for (uintptr_t a = start; a < end; a += (uintptr_t)line_bytes) {
+        if (operation == 0)
+            __asm__ volatile("dc cvac, %0" :: "r"(a) : "memory");
+        else if (operation == 1)
+            __asm__ volatile("dc civac, %0" :: "r"(a) : "memory");
+        else
+            __asm__ volatile("dc ivac, %0" :: "r"(a) : "memory");
+    }
+    vb_dsb();
 }
 static inline uint64_t vb_v2p(void *v) {
     return (uint64_t)(uintptr_t)v - g_vb_hhdm;
@@ -673,6 +695,14 @@ static int virtio_blk_ready(void) {
     return g_vb.ready;
 }
 
+static int virtio_blk_absolute_ready(void) {
+    return g_vb.ready && g_vb.xport == VB_XPORT_PCI;
+}
+
+static uint64_t virtio_blk_full_capacity(void) {
+    return g_vb.full_capacity;
+}
+
 static uint64_t virtio_blk_capacity(void) {
     return g_vb.capacity;
 }
@@ -694,22 +724,28 @@ static void vb_notify(void) {
     }
 }
 
-static int virtio_blk_rw_sector(uint64_t sector, void *buf, int write, int absolute) {
+static int virtio_blk_rw_sectors(uint64_t sector, void *buf, uint32_t count,
+                                 int write, int absolute) {
     struct vb_dev *d = &g_vb;
     uint8_t *hdr;
     uint16_t cur, next, ring;
     uint64_t spin;
     unsigned i;
     uint64_t host_lba;
+    uint64_t limit = absolute ? d->full_capacity : d->capacity;
+    size_t data_bytes, data_capacity;
 
     /* Allow probe while bringing the device up (ready not set yet). */
-    if ((!d->ready && !d->mmio && !d->pci_common) || !buf ||
-        sector >= (absolute ? d->full_capacity : d->capacity)) {
+    if ((!d->ready && !d->mmio && !d->pci_common) || !buf || !count ||
+        sector >= limit || (uint64_t)count > limit - sector) {
         return 0;
     }
     if (d->capacity == 0) {
         return 0;
     }
+    data_capacity = (size_t)(g_vb_dma + sizeof(g_vb_dma) - d->data);
+    if ((uint64_t)count > data_capacity / VB_SECT) return 0;
+    data_bytes = (size_t)count * VB_SECT;
     host_lba = absolute ? sector : d->lba_base + sector;
 
     hdr = d->hdr;
@@ -720,13 +756,13 @@ static int virtio_blk_rw_sector(uint64_t sector, void *buf, int write, int absol
 
     if (write) {
         uint8_t *src = (uint8_t *)buf;
-        for (i = 0; i < VB_SECT; i++) {
+        for (i = 0; i < data_bytes; i++) {
             d->data[i] = src[i];
         }
     }
 
     vb_desc(d->desc + 0 * 16, vb_v2p(hdr), 16, VB_DESC_F_NEXT, 1);
-    vb_desc(d->desc + 1 * 16, vb_v2p(d->data), VB_SECT,
+    vb_desc(d->desc + 1 * 16, vb_v2p(d->data), (uint32_t)data_bytes,
             VB_DESC_F_NEXT | (write ? 0u : VB_DESC_F_WRITE), 2);
     vb_desc(d->desc + 2 * 16, vb_v2p(hdr + 16), 1, VB_DESC_F_WRITE, 0);
 
@@ -738,10 +774,10 @@ static int virtio_blk_rw_sector(uint64_t sector, void *buf, int write, int absol
     d->avail_idx = next;
     vb_w16(d->avail + 2, next);
     if (d->xport == VB_XPORT_PCI) {
-        __asm__ volatile("dc cvac, %0" ::"r"(d->desc) : "memory");
-        __asm__ volatile("dc cvac, %0" ::"r"(d->avail) : "memory");
-        __asm__ volatile("dc cvac, %0" ::"r"(hdr) : "memory");
-        __asm__ volatile("dc cvac, %0" ::"r"(d->data) : "memory");
+        vb_cache_range(d->desc, 3 * 16, 0);
+        vb_cache_range(d->avail, 6 + VB_QSIZE * 2, 0);
+        vb_cache_range(hdr, 17, 0);
+        vb_cache_range(d->data, data_bytes, write ? 0 : 1);
     }
     vb_dsb();
     vb_notify();
@@ -749,7 +785,7 @@ static int virtio_blk_rw_sector(uint64_t sector, void *buf, int write, int absol
     spin = 0;
     while (1) {
         if (d->xport == VB_XPORT_PCI) {
-            __asm__ volatile("dc civac, %0" ::"r"(d->used) : "memory");
+            vb_cache_range(d->used, 4, 2);
         }
         vb_dsb();
         if (vb_r16((volatile uint8_t *)d->used + 2) == next) {
@@ -761,8 +797,8 @@ static int virtio_blk_rw_sector(uint64_t sector, void *buf, int write, int absol
     }
     vb_dsb();
     if (d->xport == VB_XPORT_PCI) {
-        __asm__ volatile("dc civac, %0" ::"r"(hdr) : "memory");
-        __asm__ volatile("dc civac, %0" ::"r"(d->data) : "memory");
+        vb_cache_range(hdr, 17, 2);
+        if (!write) vb_cache_range(d->data, data_bytes, 2);
         vb_dsb();
     }
 
@@ -771,11 +807,22 @@ static int virtio_blk_rw_sector(uint64_t sector, void *buf, int write, int absol
     }
     if (!write) {
         uint8_t *dst = (uint8_t *)buf;
-        for (i = 0; i < VB_SECT; i++) {
+        for (i = 0; i < data_bytes; i++) {
             dst[i] = d->data[i];
         }
     }
     return 1;
+}
+
+static uint32_t virtio_blk_max_sectors(void) {
+    size_t bytes;
+    if (!g_vb.data) return 0;
+    bytes = (size_t)(g_vb_dma + sizeof(g_vb_dma) - g_vb.data);
+    return (uint32_t)(bytes / VB_SECT);
+}
+
+static int virtio_blk_rw_sector(uint64_t sector, void *buf, int write, int absolute) {
+    return virtio_blk_rw_sectors(sector, buf, 1, write, absolute);
 }
 
 /* Complete all earlier writes on the PCI boot disk before publishing a new
@@ -796,16 +843,16 @@ static int virtio_blk_flush_abs(void) {
     vb_dsb();
     d->avail_idx = next;
     vb_w16(d->avail + 2, next);
-    __asm__ volatile("dc cvac, %0" : : "r"(d->desc) : "memory");
-    __asm__ volatile("dc cvac, %0" : : "r"(d->avail) : "memory");
-    __asm__ volatile("dc cvac, %0" : : "r"(hdr) : "memory");
+    vb_cache_range(d->desc, 2 * 16, 0);
+    vb_cache_range(d->avail, 6 + VB_QSIZE * 2, 0);
+    vb_cache_range(hdr, 17, 0);
     vb_dsb();
     vb_notify();
     for (uint64_t spin = 0; spin < 20000000ull; spin++) {
-        __asm__ volatile("dc civac, %0" : : "r"(d->used) : "memory");
+        vb_cache_range(d->used, 4, 2);
         vb_dsb();
         if (vb_r16((volatile uint8_t *)d->used + 2) == next) {
-            __asm__ volatile("dc civac, %0" : : "r"(hdr) : "memory");
+            vb_cache_range(hdr, 17, 2);
             vb_dsb();
             return vb_r8((volatile uint8_t *)hdr + 16) == 0;
         }
@@ -813,14 +860,25 @@ static int virtio_blk_flush_abs(void) {
     return 0;
 }
 
+static int virtio_blk_flush_disk(void) {
+    return virtio_blk_absolute_ready() && virtio_blk_flush_abs();
+}
+
 static int virtio_blk_read(void *buf, uint64_t sector, uint64_t count) {
     uint64_t i;
     uint8_t *p = (uint8_t *)buf;
-    for (i = 0; i < count; i++) {
-        g_vb_last_rw = virtio_blk_rw_sector(sector + i, p + i * VB_SECT, 0, 0);
+    for (i = 0; i < count;) {
+        uint32_t max = virtio_blk_max_sectors();
+        uint64_t remaining = count - i;
+        uint32_t batch;
+        if (!max) return 0;
+        batch = remaining > max ? max : (uint32_t)remaining;
+        g_vb_last_rw = virtio_blk_rw_sectors(sector + i, p + i * VB_SECT,
+                                              batch, 0, 0);
         if (g_vb_last_rw != 1) {
             return 0;
         }
+        i += batch;
     }
     return 1;
 }
@@ -828,12 +886,18 @@ static int virtio_blk_read(void *buf, uint64_t sector, uint64_t count) {
 static int virtio_blk_write(const void *buf, uint64_t sector, uint64_t count) {
     uint64_t i;
     const uint8_t *p = (const uint8_t *)buf;
-    for (i = 0; i < count; i++) {
-        g_vb_last_rw =
-            virtio_blk_rw_sector(sector + i, (void *)(uintptr_t)(p + i * VB_SECT), 1, 0);
+    for (i = 0; i < count;) {
+        uint32_t max = virtio_blk_max_sectors();
+        uint64_t remaining = count - i;
+        uint32_t batch;
+        if (!max) return 0;
+        batch = remaining > max ? max : (uint32_t)remaining;
+        g_vb_last_rw = virtio_blk_rw_sectors(sector + i,
+            (void *)(uintptr_t)(p + i * VB_SECT), batch, 1, 0);
         if (g_vb_last_rw != 1) {
             return 0;
         }
+        i += batch;
     }
     return 1;
 }
@@ -850,4 +914,15 @@ static int virtio_blk_read_abs(void *buf, uint64_t sector) {
 static int virtio_blk_write_abs(const void *buf, uint64_t sector) {
     if (!g_vb.ready || g_vb.xport != VB_XPORT_PCI) return 0;
     return virtio_blk_rw_sector(sector, (void *)(uintptr_t)buf, 1, 1) == 1;
+}
+
+static int virtio_blk_read_abs_many(void *buf, uint64_t sector, uint32_t count) {
+    if (!g_vb.ready || g_vb.xport != VB_XPORT_PCI || !count) return 0;
+    return virtio_blk_rw_sectors(sector, buf, count, 0, 1) == 1;
+}
+
+static int virtio_blk_write_abs_many(const void *buf, uint64_t sector,
+                                     uint32_t count) {
+    if (!g_vb.ready || g_vb.xport != VB_XPORT_PCI || !count) return 0;
+    return virtio_blk_rw_sectors(sector, (void *)(uintptr_t)buf, count, 1, 1) == 1;
 }

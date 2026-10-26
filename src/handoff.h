@@ -76,7 +76,7 @@ struct zeal_handoff {
     uint64_t magic0;
     uint64_t magic1;
     uint32_t size; /* sizeof(struct zeal_handoff) */
-    uint32_t revision; /* 6; extensions are appended */
+    uint32_t revision; /* 7; extensions are appended */
     uint32_t bootloader_id; /* ZEAL_BL_* */
     uint32_t flags;
     uint64_t hhdm_offset;
@@ -104,4 +104,7 @@ struct zeal_handoff {
     struct zeal_pi4_pcie pi4_pcie;
     /* revision >= 6; reserved low-address memory, not yet used to start xHCI. */
     struct zeal_pi4_dma pi4_usb_dma;
+    /* revision >= 7; optional sparse UTM/QEMU install image supplied by ISO boot. */
+    uint64_t install_image_virt;
+    uint64_t install_image_size;
 };

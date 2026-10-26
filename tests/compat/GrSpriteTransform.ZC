@@ -14,7 +14,7 @@ I64 GrSpriteTransformChecks()
     CDC *dc;
     U8 *records;
     U8 type, pixel;
-    I32 x, y;
+    I32 x, y, z1;
     U64 angle;
     I64 i, color, glyph_row, glyph_col, scan_i, scan_j, pixel_count;
     CD3I32 point;
@@ -492,6 +492,39 @@ I64 GrSpriteTransformChecks()
         return 3;
     if (dc->flags & DCF_TRANSFORMATION)
         return 4;
+
+    // A non-affine fourth matrix row must perspective-divide transformed
+    // sprite coordinates. Here w=1+z/10, so (100,80,10) projects to
+    // (50,40,5) before the CDC origin is added.
+    Mat4x4IdentEqu(dc->r);
+    dc->r[14] = 0x1999999A; // Q32.32 approximation of 0.1.
+    MemSet(records, 0, 715);
+    type = SPT_TRANSFORM_ON;
+    MemCopy(records, &type, sizeof(U8));
+    type = SPT_PT;
+    MemCopy(records + 1, &type, sizeof(U8));
+    x = 100;
+    y = 80;
+    MemCopy(records + 5, &x, sizeof(I32));
+    MemCopy(records + 9, &y, sizeof(I32));
+    type = SPT_TRANSFORM_OFF;
+    MemCopy(records + 13, &type, sizeof(U8));
+    Sprite3(dc, dc->x, dc->y, 10, records);
+    if (!GrSpriteTransformPixelMatches(dc, 660, 470, color) ||
+            GrSpriteTransformPixelMatches(dc, 710, 510, color))
+        return 10;
+    if (dc->flags & DCF_TRANSFORMATION)
+        return 11;
+
+    // Large fixed-point products must not wrap into a plausible on-screen
+    // coordinate before the projection bounds check.
+    Mat4x4IdentEqu(dc->r);
+    dc->r[0] = 0x700000000; // x scale 7.0
+    dc->r[15] = 0x200000000; // w = 2.0
+    x = 1500000000;
+    y = z1 = 0;
+    if (SpriteTransformXYZ0(dc, TRUE, &x, &y, &z1))
+        return 17;
 
     DCDel(dc);
     Free(records);
