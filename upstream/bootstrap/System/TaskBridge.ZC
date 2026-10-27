@@ -44,6 +44,7 @@ extern I64 FileWrite(U8 *filename, U8 *fbuf, I64 size, I64 cdt=0, I64 attr=0);
 extern Bool ZcSourceDirExists(U8 *path);
 extern U8 *ZcSourcePath(U8 *path);
 extern Bool ZcSourceWritable(U8 *path);
+extern U8 *ZcDocInputBytes(U8 *src, I64 size, I64 *_decoded_size);
 extern Bool Cd(U8 *dirname=NULL, Bool make_dirs=FALSE);
 extern U8 *DirCur(CTask *task=NULL, CTask *mem_task=NULL);
 extern Bool ZcSourceFileAt(I64 index, U8 *path, I64 path_cap, I64 *_size);
@@ -198,6 +199,11 @@ extern I64 ExePrint2(U8 *format, ...);
 // The bridge renders a bounded text subset until ZealOS StrPrintJoin/Doc
 // output is available. Styling markers used by CharGet are stripped.
 extern U0 Print(U8 *format, ...);
+U0 PutExcept(Bool catch_it=TRUE)
+{//Preserve KExcept's reporting/catch contract without an x86 stack trace.
+    Print("Except: %c\n", Fs->except_ch);
+    Fs->catch_except = catch_it;
+}
 // KeyDev.ZC normally routes PutKey through a chain of output devices.
 // Until that chain is loaded, the bridge sends printable ASCII to its text
 // output and honors the task's DISPLAYf_SILENT flag.
@@ -665,6 +671,26 @@ I64 DefineCount(U8 *dname)
     else
         return -1;
 }
+U8 *ListSub(I64 sub, U8 *list)
+{//Kernel/StrA.ZC: aliases share the preceding entry's index.
+    if (!list)
+        return NULL;
+    while (*list && sub > 0)
+    {
+        while (*list)
+            list++;
+        list++;
+        if (*list == '@')
+            list++;
+        else
+            sub--;
+    }
+    if (sub || !*list)
+        return NULL;
+    else
+        return list;
+}
+
 I64 ListMatch(U8 *needle, U8 *haystack_list, I64 flags=0)
 {//-2 ambiguous, -1 not found. DocPlain RT= via DefineMatch.
     I64 sub = 0, res = -1;

@@ -37,18 +37,19 @@
  // This represents a peice of text being lexed(it could be a file macro, or
  // such)
  typedef struct CLexFile {
-@@ -16,6 +17,10 @@
+@@ -16,6 +17,11 @@
    struct CLexFile *last;
    char *filename, *text, *dir;
    int64_t ln, col, pos, is_file;
 +  /* ARM64 DolDoc input; ordinary files and macro expansions use text. */
 +  int64_t (*port_read)(struct CLexer *, struct CLexFile *);
++  void (*port_close)(struct CLexFile *);
 +  void *port_data;
 +  const char *(*port_dir)(void); // Current task directory for command input.
  } CLexFile;
  #define STR_LEN 144
  typedef struct CLexer {
-@@ -40,9 +45,22 @@
+@@ -40,9 +46,24 @@
    int64_t flags, cur_char;
    int64_t cur_tok;
    struct CHeapCtrl *hc;
@@ -57,6 +58,8 @@
 +  int64_t *port_options;
 +  void (*port_sync)(struct CLexer *);
 +  void (*port_fun_complete)(struct CHashFun *);
++  /* Convert nested source files to the host's document-aware input stream. */
++  void (*port_include)(struct CLexer *, struct CLexFile *, int64_t);
 +  int64_t port_in_quotes;
 +  /* ARM64 command compilers may execute before lexing the next top-level statement. */
 +  int64_t port_statement_depth, port_defer_statement_lex, port_lex_pending;
@@ -71,7 +74,7 @@
    TK_F64,
    TK_NAME,
    TK_STR,
-@@ -108,6 +126,7 @@
+@@ -108,6 +129,7 @@
    TK_KW_HASERRCODE,
    TK_KW_ARGPOP,
    TK_KW_NOARGPOP,
@@ -79,7 +82,7 @@
  } LexTok;
  typedef struct CCodeCtrl {
    struct CCodeCtrl *next;
-@@ -224,6 +243,7 @@
+@@ -224,6 +246,7 @@
  #define PRSF_IMPORT   0x20
  #define PRSF__IMPORT  0x40
  #define PRSF_STATIC   0x80
@@ -87,7 +90,7 @@
  enum {
    IC_GOTO,
    IC_SQR,
-@@ -345,6 +365,7 @@
+@@ -345,6 +368,7 @@
    IC_GS,
    IC_TO_BOOL,
    IC_SQRT,
@@ -95,7 +98,7 @@
    IC_CNT, // MUST BE THE LAST ITEM
  };
  typedef struct CICArg {
-@@ -441,7 +462,7 @@
+@@ -441,7 +465,7 @@
  void ICFree(CRPN *ic);
  CHashClass *PrsClassNew();
  char *PrsArray(CCmpCtrl *ccmp, CHashClass *base, CArrayDim *dim,
@@ -104,7 +107,7 @@
  int64_t PrsFunArgs(CCmpCtrl *ccmp, CHashFun *fun);
  int64_t PrsArrayDim(CCmpCtrl *ccmp, CArrayDim *to);
  double PrsF64(CCmpCtrl *ccmp);
-@@ -567,7 +588,7 @@
+@@ -567,7 +591,7 @@
  #  define AIWNIOS_TMP_FREG_START 3
  #  define AIWNIOS_TMP_FREG_CNT   (5 - 3 + 1)
  #  define AIWNIOS_FREG_CNT       (15 - 6 + 1)
@@ -113,7 +116,7 @@
      (defined(_M_ARM64) || defined(__aarch64__))
  #  define AIWNIOS_IREG_START     19
  #  define AIWNIOS_IREG_CNT       (27 - 19 + 1)
-@@ -767,3 +788,8 @@
+@@ -767,3 +791,8 @@
  
  void CacheRPNArgs(CCmpCtrl *cctrl);
  extern int64_t DolDocDumpIR(char *to, int64_t, CRPN *);
@@ -493,7 +496,16 @@
      lex->file->pos++;
      if (ret == 5 || ret == '\r') // TempleOS cursor charactor
        goto enter;
-@@ -65,7 +77,7 @@
+@@ -46,6 +58,8 @@
+   } else {
+     // Free all the assets of the previous file
+     last = file->last;
++    if (file->port_close)
++      file->port_close(file);
+     A_FREE(file->text);
+     A_FREE(file->dir);
+     A_FREE(file->filename);
+@@ -65,7 +79,7 @@
    va_list lst;
    char buffer[STR_LEN];
    va_start(lst, fmt);
@@ -502,7 +514,7 @@
    va_end(lst);
    if (lex->file) {
      fprintf(AIWNIOS_OSTREAM, "ERR %s:%d:%d %s", lex->file->filename,
-@@ -73,6 +85,7 @@
+@@ -73,6 +87,7 @@
    } else {
      fprintf(AIWNIOS_OSTREAM, "ERR ???:?:? %s", buffer);
    }
@@ -510,7 +522,7 @@
    throw(*(int64_t *)"Lex\0\0\0\0\0");
  }
  
-@@ -80,7 +93,7 @@
+@@ -80,7 +95,7 @@
    va_list lst;
    char buffer[STR_LEN];
    va_start(lst, fmt);
@@ -519,7 +531,7 @@
    va_end(lst);
    if (lex->file) {
      fprintf(AIWNIOS_OSTREAM, "WARN %s:%d:%d %s\n", lex->file->filename,
-@@ -139,8 +152,20 @@
+@@ -139,8 +154,20 @@
  
  static int64_t LexString(CLexer *lex, int64_t till) {
    int64_t idx, chr1, hex;
@@ -540,7 +552,7 @@
      case '\\':
        switch (chr1 = LexAdvChr(lex)) {
          break;
-@@ -214,6 +239,7 @@
+@@ -214,6 +241,7 @@
      }
    }
  fin:
@@ -548,7 +560,7 @@
    lex->str_len = idx;
    lex->string[idx++] = 0;
    return 0;
-@@ -264,9 +290,39 @@
+@@ -264,9 +292,39 @@
    CLexFile *new_file, *actual_file;
    char *dir;
    switch (chr1) {
@@ -588,7 +600,7 @@
    case ';':
      return lex->cur_tok = ';';
      break;
-@@ -277,7 +333,10 @@
+@@ -277,7 +335,10 @@
      return lex->cur_tok = ',';
      break;
    case '\n':
@@ -600,7 +612,7 @@
        lex->flags &= ~LEXF_UNTIL_NEWLINE;
        return lex->cur_tok = '\n';
      }
-@@ -293,11 +352,15 @@
+@@ -293,11 +354,15 @@
          break;
        case 'x':
        case 'X':
@@ -616,7 +628,7 @@
          chr1 = LexAdvChr(lex);
          base = 2;
          lex->flags |= LEXF_USE_LAST_CHAR;
-@@ -338,9 +401,11 @@
+@@ -338,9 +403,11 @@
            return lex->cur_tok = ERR;
          }
        fin_f64:
@@ -629,7 +641,7 @@
          } else
            lex->flt = integer;
          lex->flt *= pow(10, exponet);
-@@ -459,6 +524,12 @@
+@@ -459,6 +526,12 @@
        }
        return lex->cur_tok = TK_DOT_DOT_DOT;
        break;
@@ -642,7 +654,7 @@
      default:
        lex->flags |= LEXF_USE_LAST_CHAR;
        return lex->cur_tok = '.';
-@@ -582,15 +653,58 @@
+@@ -582,15 +655,58 @@
    case '@':
    case 'a' ... 'z':
    case 'A' ... 'Z':
@@ -701,7 +713,7 @@
          if (idx + 1 >= STR_LEN) {
            LexErr(lex, "Name is too long.");
            return lex->cur_tok = ERR;
-@@ -601,6 +715,17 @@
+@@ -601,6 +717,17 @@
          lex->flags |= LEXF_USE_LAST_CHAR;
          lex->string[idx++] = 0;
          if (!(lex->flags & LEXF_NO_EXPAND)) {
@@ -719,7 +731,7 @@
            define = HashFind(lex->string, Fs->hash_table, HTT_DEFINE_STR, 1);
            if (define) {
              //
-@@ -610,11 +735,16 @@
+@@ -610,11 +737,17 @@
              //   to
              // --->(at plus)
              //
@@ -731,13 +743,14 @@
              //
              new_file = A_MALLOC(sizeof(CLexFile), NULL);
 +            new_file->port_read = NULL;
++            new_file->port_close = NULL;
 +            new_file->port_data = NULL;
 +            new_file->port_dir = NULL;
 +            new_file->is_file = 0;
              new_file->dir = NULL;
              new_file->last = lex->file;
              new_file->filename = A_STRDUP(define->base.str, NULL);
-@@ -629,20 +759,89 @@
+@@ -629,20 +762,89 @@
        }
      }
      break;
@@ -830,7 +843,7 @@
          lex->flags |= LEXF_UNTIL_NEWLINE;
          CCmpCtrl *cc = CmpCtrlNew(lex);
          char *code;
-@@ -654,6 +853,8 @@
+@@ -654,6 +856,8 @@
            rtrn->type = IC_RET;
            QueIns(rtrn, cc->code_ctrl->ir_code);
            if (code = Compile(cc, NULL, NULL, NULL)) {
@@ -839,7 +852,7 @@
              ret = FFI_CALL_TOS_0(code);
            }
            A_FREE(code);
-@@ -662,6 +863,7 @@
+@@ -662,6 +866,7 @@
          CmpCtrlDel(cc);
          if (ret)
            goto re_enter;
@@ -847,7 +860,11 @@
          goto if_fail;
        } else if (!strcmp(lex->string, "ifaot")) {
          // AIWN will only AOT compile for you,the JIT will be
-@@ -748,6 +950,18 @@
+@@ -745,9 +950,22 @@
+         goto re_enter;
+       }
+       if (!strcmp(lex->string, "include")) {
++        char *include_path;
          if (TK_STR != Lex(lex)) {
            LexErr(lex, "Expected a string for #include.");
            return lex->cur_tok = ERR;
@@ -866,7 +883,7 @@
          }
          actual_file = lex->file;
          while (actual_file) {
-@@ -756,11 +970,14 @@
+@@ -756,11 +974,15 @@
            actual_file = actual_file->last;
          }
          if (actual_file) {
@@ -881,11 +898,15 @@
              char buf[len + 1];
 -            sprintf(buf, "%s/%s", actual_file->dir, lex->string);
 +            snprintf(buf, sizeof(buf), "%s/%s", include_dir, lex->string);
++            include_path = A_STRDUP(buf, NULL);
              dir = __AIWNIOS_StrDup(buf, NULL);
              *strrchr(dir, '/') = 0;
              f = fopen(buf, "rb");
-@@ -770,7 +987,12 @@
+@@ -768,9 +990,15 @@
+             goto normal;
+         } else {
          normal:
++          include_path = A_STRDUP(lex->string, NULL);
            f = fopen(lex->string, "rb");
            if (!strrchr(lex->string, '/')) {
 -            dir = __AIWNIOS_StrDup(".", NULL);
@@ -898,18 +919,27 @@
            } else {
              dir = __AIWNIOS_StrDup(lex->string, NULL);
              *strrchr(dir, '/') = 0;
-@@ -786,6 +1008,9 @@
+@@ -786,6 +1014,10 @@
          fseek(f, 0, SEEK_SET);
          idx -= ftell(f);
          new_file = A_MALLOC(sizeof(CLexFile), NULL);
 +        new_file->port_read = NULL;
++        new_file->port_close = NULL;
 +        new_file->port_data = NULL;
 +        new_file->port_dir = NULL;
          new_file->text = A_MALLOC(idx + 1, NULL);
          new_file->text[idx] = 0;
          new_file->dir = dir;
-@@ -798,12 +1023,19 @@
+@@ -793,17 +1025,26 @@
+         fclose(f);
+         new_file->is_file = 1;
+         new_file->last = lex->file;
+-        new_file->filename = A_STRDUP(lex->string, NULL);
++        new_file->filename = include_path;
+         new_file->pos = new_file->col = new_file->ln = 0;
          lex->file = new_file;
++        if (lex->port_include)
++          lex->port_include(lex, new_file, idx);
          goto re_enter;
        } else if (!strcmp(lex->string, "define")) {
 +        old_flags = lex->flags;
@@ -930,7 +960,7 @@
          strcpy(macro_name, lex->string);
          strcpy(lex->string, "");
          define = A_CALLOC(sizeof(CHashDefineStr), NULL);
-@@ -861,8 +1093,7 @@
+@@ -861,8 +1102,7 @@
  }
  
  CLexer *LexerNew(char *filename, char *text) {
@@ -940,7 +970,7 @@
      struct {
        char *name;
        int64_t tok;
-@@ -919,14 +1150,26 @@
+@@ -919,13 +1159,25 @@
      int64_t i;
      CHashKeyword *kw;
      for (i = 0; i != sizeof(kws) / sizeof(*kws); i++) {
@@ -959,7 +989,7 @@
 +      kw->tk = kws[i].tok;
      }
 -    init = 1;
-   }
++  }
 +  /* A bootstrapped lexer may already have installed the core keyword table
 +   * before this port adds HolyC-specific tokens. Install lastclass even when
 +   * the existing table makes the bulk initialization above unnecessary. */
@@ -969,11 +999,10 @@
 +    kw->base.str = A_STRDUP("lastclass", NULL);
 +    kw->tk = TK_KW_LASTCLASS;
 +    HashAdd(kw, Fs->hash_table);
-+  }
+   }
    CLexer *new = A_CALLOC(sizeof(CLexer), NULL);
    new->hc = HeapCtrlInit(NULL, Fs, 0);
-   CLexFile *file = new->file = A_CALLOC(sizeof(CLexFile), new->hc);
-@@ -936,6 +1179,7 @@
+@@ -936,6 +1188,7 @@
  }
  
  void LexerDel(CLexer *lex) {
@@ -2329,7 +2358,16 @@
      rpn->raw_type = rpn->ic_class->raw_type;
      return rpn->raw_type;
      break;
-@@ -3824,6 +4281,11 @@
+@@ -3782,6 +4239,8 @@
+     rpn->ic_class = ICFwd(rpn->base.next)->ic_class;
+     rpn->ic_fun = ICFwd(rpn->base.next)->ic_fun;
+     rpn->ic_dim = ICFwd(rpn->base.next)->ic_dim;
++    if (!rpn->ic_class)
++      ParseErr(ccmp, "Assignment operand has no type.");
+     rpn->raw_type = rpn->ic_class->raw_type;
+     return rpn->raw_type;
+     break;
+@@ -3824,6 +4283,11 @@
      rpn->raw_type = RT_I64i;
      goto ret;
      break;
@@ -2341,7 +2379,7 @@
    case IC_F64:
      rpn->raw_type = RT_F64;
      goto ret;
-@@ -3839,6 +4301,12 @@
+@@ -3839,6 +4303,12 @@
      if (ICFwd(rpn->base.next)->ic_dim) {
        rpn->ic_class = ICFwd(rpn->base.next)->ic_class;
        rpn->ic_dim = ICFwd(rpn->base.next)->ic_dim->next;
@@ -2354,7 +2392,7 @@
      } else
        rpn->ic_class = ICFwd(rpn->base.next)->ic_class - 1;
      rpn->ic_fun = ICFwd(rpn->base.next)->ic_fun;
-@@ -3909,9 +4377,11 @@
+@@ -3909,9 +4379,11 @@
  static void PrsMembers(CCmpCtrl *cctrl, CHashClass *bungis, int64_t flags,
                         int64_t *off) {
    int64_t is_func, union_end;
@@ -2366,7 +2404,7 @@
      Lex(cctrl->lex);
      while (cctrl->lex->cur_tok != '}') {
        if (cctrl->lex->cur_tok == ';') {
-@@ -3920,10 +4390,24 @@
+@@ -3920,10 +4392,24 @@
          if (cctrl->lex->cur_tok == '{') {
            PrsMembers(cctrl, bungis, flags | PRSF_UNION, off);
          }
@@ -2392,7 +2430,7 @@
          //
          // Here's the deal,I store the last member in last_m,once I find the
          // members I assign their offsets
-@@ -3983,6 +4467,7 @@
+@@ -3983,6 +4469,7 @@
          return;
        }
      }
@@ -2400,7 +2438,7 @@
      Lex(cctrl->lex);
    }
    if (flags & PRSF_UNION)
-@@ -4043,6 +4528,8 @@
+@@ -4043,6 +4530,8 @@
        HashAdd(bungis, Fs->hash_table);
    PrsMembers(cctrl, bungis, flags, &off); // This consumes '{'
    // Compute size
@@ -2409,7 +2447,7 @@
    for (last_m = bungis->members_lst; last_m; last_m = last_m->next) {
      if (bungis->sz < (off = last_m->off +
                              last_m->member_class->sz * last_m->dim.total_cnt)) {
-@@ -4101,6 +4588,8 @@
+@@ -4101,6 +4590,8 @@
    int64_t val;
    CCodeMisc *label;
  } CSwitchCase;
@@ -2418,7 +2456,7 @@
  int64_t PrsSwitch(CCmpCtrl *cctrl) {
    if (!PrsKw(cctrl, TK_KW_SWITCH))
      return 0;
-@@ -4113,6 +4602,7 @@
+@@ -4113,6 +4604,7 @@
    int64_t k_low = INT_MAX, k_hi = INT_MIN, last, lo, hi, idx;
    old_break_to = cctrl->code_ctrl->break_to;
    cctrl->code_ctrl->break_to = lb_exit;
@@ -2426,7 +2464,7 @@
    //
    // When we encounter the start: block,we enter a secret function call
    // So when we `break` or we implictly break by hitting the first sub-switch
-@@ -4134,12 +4624,14 @@
+@@ -4134,12 +4626,14 @@
      //
      if (!ParseExpr(cctrl, 0)) {
        ParseErr(cctrl, "Expected an expression.");
@@ -2441,7 +2479,7 @@
        return 0;
      } else
        Lex(cctrl->lex);
-@@ -4147,6 +4639,7 @@
+@@ -4147,6 +4641,7 @@
      Lex(cctrl->lex);
      if (!ParseExpr(cctrl, 0)) {
        ParseErr(cctrl, "Expected an expression.");
@@ -2449,7 +2487,7 @@
        return 0;
      }
      (switch_ir = A_CALLOC(sizeof(CRPN), NULL))->type = IC_BOUNDED_SWITCH;
-@@ -4155,12 +4648,14 @@
+@@ -4155,12 +4650,14 @@
      // start,(cond),end,BOUNDED_SWITCH
      if (cctrl->lex->cur_tok != ')') {
        ParseErr(cctrl, "Expected a ')'.");
@@ -2464,7 +2502,7 @@
      return 0;
    } else
      Lex(cctrl->lex);
-@@ -4241,6 +4736,7 @@
+@@ -4241,6 +4738,7 @@
            Lex(cctrl->lex);
          } else {
            ParseErr(cctrl, "Expected a ':'.");
@@ -2472,7 +2510,7 @@
            return 0;
          }
        }
-@@ -4251,6 +4747,7 @@
+@@ -4251,6 +4749,7 @@
        }
        if (cctrl->lex->cur_tok != ':') {
          ParseErr(cctrl, "Expected a ':'.");
@@ -2480,7 +2518,7 @@
          return 0;
        }
        lb_dft->flags |= CMF_DEFINED;
-@@ -4268,6 +4765,7 @@
+@@ -4268,6 +4767,7 @@
      } else if (PrsKw(cctrl, TK_KW_START)) {
        if (cctrl->lex->cur_tok != ':') {
          ParseErr(cctrl, "Expected a ':'.");
@@ -2488,7 +2526,7 @@
          return 0;
        } else
          Lex(cctrl->lex);
-@@ -4293,6 +4791,7 @@
+@@ -4293,6 +4793,7 @@
      } else if (PrsKw(cctrl, TK_KW_END)) {
        if (subs.base.last == &subs) {
          ParseErr(cctrl, "Unexpected 'end' statement.");
@@ -2496,7 +2534,7 @@
          return 0;
        }
        QueRem(tmpss = subs.base.last);
-@@ -4309,6 +4808,7 @@
+@@ -4309,6 +4810,7 @@
        A_FREE(tmpss);
        if (cctrl->lex->cur_tok != ':') {
          ParseErr(cctrl, "Expected a ':'.");
@@ -2504,7 +2542,7 @@
          return 0;
        } else
          Lex(cctrl->lex);
-@@ -4317,6 +4817,7 @@
+@@ -4317,6 +4819,7 @@
        goto add_stmt;
      } else {
        ParseErr(cctrl, "Expected a statement.");
@@ -2512,7 +2550,7 @@
        return 0;
      }
    }
-@@ -4362,6 +4863,7 @@
+@@ -4362,6 +4865,7 @@
      switch_ir->code_misc = jmp_tab;
    }
    cctrl->flags = old_flags;
@@ -2520,7 +2558,7 @@
    return 1;
  }
  static void __PrsBindCSymbol(char *name, void *ptr, int64_t naked,
-@@ -4378,7 +4880,8 @@
+@@ -4378,7 +4882,8 @@
          abort();
        }
        if (!fun->fun_ptr || fun->fun_ptr == &DoNothing ||
@@ -2530,7 +2568,7 @@
          fun->base.base.type &= ~HTF_EXTERN;
          if (naked)
            fun->fun_ptr = GenFFIBindingNaked(ptr, arity);
-@@ -4417,7 +4920,15 @@
+@@ -4417,7 +4922,15 @@
              *exit_misc = CodeMiscNew(cctrl, CMT_LABEL);
    if (!PrsKw(cctrl, TK_KW_TRY))
      return 0;
@@ -2547,7 +2585,7 @@
    *(rpn = A_CALLOC(sizeof(CRPN), NULL)) = (CRPN){
        .type = IC_GLOBAL,
        .global_var = HashFind("AIWNIOS_SetJmp", Fs->hash_table, HTT_FUN, 1),
-@@ -4425,7 +4936,7 @@
+@@ -4425,7 +4938,7 @@
    QueIns(rpn, cctrl->code_ctrl->ir_code);
    *(rpn = A_CALLOC(sizeof(CRPN), NULL)) = (CRPN){
        .type = IC_GLOBAL,
@@ -2556,7 +2594,7 @@
    };
    QueIns(rpn, cctrl->code_ctrl->ir_code);
    (rpn = A_CALLOC(sizeof(CRPN), NULL))->type = IC_CALL;
-@@ -4442,10 +4953,10 @@
+@@ -4442,10 +4955,10 @@
    QueIns(rpn, cctrl->code_ctrl->ir_code);
    // See below note
    PrsStmt(cctrl);
@@ -2569,7 +2607,7 @@
    };
    QueIns(rpn, cctrl->code_ctrl->ir_code);
    (rpn = A_CALLOC(sizeof(CRPN), NULL))->type = IC_CALL;
-@@ -4466,10 +4977,10 @@
+@@ -4466,10 +4979,10 @@
    QueIns(rpn, cctrl->code_ctrl->ir_code);
    // Our catch block
    PrsStmt(cctrl);
@@ -2582,7 +2620,7 @@
    };
    QueIns(rpn, cctrl->code_ctrl->ir_code);
    (rpn = A_CALLOC(sizeof(CRPN), NULL))->type = IC_CALL;
-@@ -4585,6 +5096,7 @@
+@@ -4585,6 +5098,7 @@
      QueIns(rpn, cc->ir_code);                                                  \
      return rpn;                                                                \
    }

@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "doc_bytes.h"
 
 int64_t TempleOS_CallNOnStack(uint64_t stack_top, void (*fptr)(),
                               int64_t argc, int64_t *argv);
@@ -344,17 +345,13 @@ static struct guest_counts {
 static uint64_t guest_tS_bits;
 _Static_assert(offsetof(struct guest_counts, time_stamp_freq) == 16 &&
                sizeof(struct guest_counts) == 48, "pinned counts layout");
-/* KernelB's pinned CProgress layout; populated independently by graphics
- * compatibility tests until the native progress service is ported. */
+/* KernelB's pinned CProgress layout and KStart32's scalar aliases. */
 struct guest_progress {
     int64_t val, max;
     double t0, tf;
     uint8_t desc[48];
 };
 static struct guest_progress guest_progresses[4];
-/* KernelB exposes the elapsed-time origin of each progress bar separately
- * from its CProgress record; Win.ZC reads these when saving progress timing. */
-static double guest_progress_t0[4];
 _Static_assert(offsetof(struct guest_progress, desc) == 32 &&
                sizeof(struct guest_progress) == 80,
                "pinned CProgress layout");
@@ -1139,7 +1136,10 @@ static char *disk_copy(const char *path, size_t *length, int *tombstoned) {
     if (status || !n || n > 4u * 1024u * 1024u)
         return NULL;
     char *src = malloc(n + 1);
-    if (!src || disk_reader(name, src, n + 1, &got) || got != n || memchr(src, 0, n)) {
+    /* DolDoc files carry packed resources after their text NUL. Callers use
+     * the explicit length; retain the final sentinel without rejecting the
+     * document's binary bytes or falling back to an older archive copy. */
+    if (!src || disk_reader(name, src, n + 1, &got) || got != n) {
         free(src);
         return NULL;
     }
@@ -1208,6 +1208,19 @@ static int64_t host_file_write(int64_t *a) {
         disk_writer(path, src, (size_t)length))
         return -1;
     return length;
+}
+static int64_t host_doc_input_bytes(int64_t *a) {
+    if (a[1] < 0 || a[1] > DATA_BYTES || (!a[0] && a[1]) || !a[2])
+        guest_raise(GUEST_EXCEPT_COMPILER);
+    unsigned char *owned = NULL;
+    size_t size = (size_t)a[1];
+    if (doc_bytes_normalize((const unsigned char *)(uintptr_t)a[0], size,
+                            &owned, &size) < 0) {
+        zc_output("invalid or truncated DolDoc binary resources\n");
+        guest_raise(GUEST_EXCEPT_COMPILER);
+    }
+    *(int64_t *)(uintptr_t)a[2] = (int64_t)size;
+    return (int64_t)(uintptr_t)owned;
 }
 FILE *fopen(const char *path, const char *mode) {
     if (strcmp(mode, "rb") && strcmp(mode, "r"))
@@ -5171,7 +5184,6 @@ static void bind_guest_task(void) {
     guest_heap_task_off = MemberFind("mem_task", heap)->off;
     memset(guest_fibers, 0, sizeof(guest_fibers));
     memset(guest_progresses, 0, sizeof(guest_progresses));
-    memset(guest_progress_t0, 0, sizeof(guest_progress_t0));
     guest_current = guest_completed = 0;
     guest_task_serial = 0;
     guest_job_count = 0;
@@ -5194,10 +5206,19 @@ static void bind_guest_task(void) {
     PrsBindCSymbol("mp_count", &guest_mp_count, 0);
     PrsBindCSymbol("sys_focus_task", &guest_focus_task, 0);
     PrsBindCSymbol("sys_progresses", guest_progresses, 0);
-    PrsBindCSymbol("progress1_t0", &guest_progress_t0[0], 0);
-    PrsBindCSymbol("progress2_t0", &guest_progress_t0[1], 0);
-    PrsBindCSymbol("progress3_t0", &guest_progress_t0[2], 0);
-    PrsBindCSymbol("progress4_t0", &guest_progress_t0[3], 0);
+    for (unsigned i = 0; i < 4; i++) {
+        char name[32];
+        snprintf(name, sizeof(name), "progress%u", i+1);
+        PrsBindCSymbol(name, &guest_progresses[i].val, 0);
+        snprintf(name, sizeof(name), "progress%u_max", i+1);
+        PrsBindCSymbol(name, &guest_progresses[i].max, 0);
+        snprintf(name, sizeof(name), "progress%u_t0", i+1);
+        PrsBindCSymbol(name, &guest_progresses[i].t0, 0);
+        snprintf(name, sizeof(name), "progress%u_tf", i+1);
+        PrsBindCSymbol(name, &guest_progresses[i].tf, 0);
+        snprintf(name, sizeof(name), "progress%u_desc", i+1);
+        PrsBindCSymbol(name, guest_progresses[i].desc, 0);
+    }
     PrsBindCSymbol("Bt", host_bt, 2);
     PrsBindCSymbol("Bts", host_bts, 2);
     PrsBindCSymbol("Btr", host_btr, 2);
@@ -5301,6 +5322,7 @@ struct source_context {
     int owned;
 };
 static void **user_doc_state(CLexFile *file);
+static void user_doc_include(CLexer *lex, CLexFile *file, int64_t size);
 static unsigned char *guest_context_new(int64_t flags) {
     struct guest_fiber *f = &guest_fibers[guest_current];
     unsigned char *head = (unsigned char *)f->words + guest_next_cc_off;
@@ -5527,6 +5549,8 @@ static void compiler_source_cleanup(CCmpCtrl *cc, CLexer *lex) {
     while (lex->file) {
         CLexFile *file = lex->file;
         lex->file = file->last;
+        if (file->port_close)
+            file->port_close(file);
         free(file->text);
         free(file->dir);
         free(file->filename);
@@ -5563,6 +5587,7 @@ static int64_t execute_source_mode(const char *path, const char *src,
                                    const char *initial_dir, int64_t guest_flags, int just_load,
                                    int recover, int *error) {
     CLexer *lex = LexerNew((char *)path, (char *)src);
+    lex->port_include = user_doc_include;
     lex->file->is_file = 1;
     char dir[128];
     if (normal_path(path, dir))
@@ -5941,7 +5966,7 @@ static size_t format_text(char *output, size_t capacity, const char *format,
         }
         if (code != 'c' && code != 'C' && code != 's' && code != 'Q' &&
             code != 'q' &&
-            code != 'S' && code != 'Z' && code != 'o' &&
+            code != 'S' && code != 'z' && code != 'Z' && code != 'o' &&
             code != 'd' && code != 'u' && code != 'x' && code != 'X' &&
             code != 'b' && code != 'B' &&
             code != 'f' && code != 'F' && code != 'g' && code != 'G')
@@ -5962,16 +5987,17 @@ static size_t format_text(char *output, size_t capacity, const char *format,
                 FMT_BYTE(ch);
             }
         } else if (code == 's' || code == 'q' || code == 'Q' || code == 'o' ||
-                   code == 'S' || code == 'Z') {
+                   code == 'S' || code == 'z' || code == 'Z') {
             size_t field_start = used;
             const char *s;
             if (code == 'o') {
                 s = argv[arg++] ? "TRUE" : "FALSE";
-            } else if (code == 'Z') {
-                if (arg + 2 > argc) zc_fail("format needs index and define arguments");
-                CHashFun *sub = (CHashFun *)HashFind("DefineSub", Fs->hash_table, HTT_FUN, 1);
+            } else if (code == 'z' || code == 'Z') {
+                if (arg + 2 > argc) zc_fail("format needs index and list arguments");
+                const char *name = code == 'z' ? "ListSub" : "DefineSub";
+                CHashFun *sub = (CHashFun *)HashFind(name, Fs->hash_table, HTT_FUN, 1);
                 if (!sub || !sub->fun_ptr || sub->argc != 2 || (sub->base.base.type & HTF_EXTERN))
-                    zc_fail("format %Z requires DefineSub");
+                    zc_fail("format list conversion requires its source helper");
                 s = (const char *)(uintptr_t)FFI_CALL_TOS_2(sub->fun_ptr, argv[arg], argv[arg + 1]);
                 arg += 2;
                 if (!s) s = "";
@@ -6183,6 +6209,18 @@ static int64_t host_call_ext_str(int64_t *a) {
         return -1;
     return FFI_CALL_TOS_0(fun->fun_ptr);
 }
+static int64_t host_progress_reset(int64_t *a) {
+    /* KMisc.ProgressBarsReset saves elapsed times before clearing the shared
+     * records. The optional Win callback has no effect for a NULL path. */
+    if (a[0]) {
+        CHashFun *save = (CHashFun *)HashFind("ProgressBarsRegTf", Fs->hash_table, HTT_FUN, 1);
+        if (save && save->fun_ptr && save->argc == 1 &&
+            !(save->base.base.type & HTF_EXTERN))
+            FFI_CALL_TOS_1(save->fun_ptr, a[0]);
+    }
+    memset(guest_progresses, 0, sizeof(guest_progresses));
+    return 0;
+}
 static int execute_source(const char *path, const char *src) {
     (void)execute_source_mode(path, src, 0, 0, NULL, 0, 0, 0, NULL);
     return 0;
@@ -6251,6 +6289,7 @@ static int load_source_path(const char *path, int merged, int recover) {
          * otherwise later applications capture a permanent zero tS while
          * TimeCal continues updating only the preceding declaration. */
         PrsBindCSymbol("tS", &guest_tS_bits, 0);
+        PrsBindCSymbol("ProgressBarsReset", host_progress_reset, 1);
         CHashFun *recalc = (CHashFun *)HashFind("DocRecalc", Fs->hash_table,
                                                HTT_FUN, 1);
         guest_doc_recalc_stub = recalc ? recalc->fun_ptr : NULL;
@@ -6271,6 +6310,7 @@ static int load_source_path(const char *path, int merged, int recover) {
         PrsBindCSymbol("ZcSourceDirExists", host_file_dir_exists, 1);
         PrsBindCSymbol("ZcSourcePath", host_source_path, 1);
         PrsBindCSymbol("ZcSourceWritable", host_source_writable, 1);
+        PrsBindCSymbol("ZcDocInputBytes", host_doc_input_bytes, 3);
         PrsBindCSymbol("Cd", host_cd, 2);
         PrsBindCSymbol("DirCur", host_dir_cur, 2);
         CHashGlblVar *blkdev = (CHashGlblVar *)HashFind(

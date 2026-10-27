@@ -1,19 +1,22 @@
 /* Private ABI for the pinned ExeCmdLine/UserTaskCont loops. Included after
  * the runtime's compiler checkpoint helpers. Never expose Aiwnios objects as
  * CCompCtrl: the public mirror has the original ZealOS layout. */
+struct user_doc_stream {
+    void *input, *reader, *deleter;
+    int64_t position, last;
+};
 struct user_compiler {
     struct user_compiler *next;
     unsigned char *mirror;
     CLexer *lex;
     CCmpCtrl *native;
     char *input, *code;
-    void *doc_input, *doc_reader, *doc_delete;
+    struct user_doc_stream doc;
     char *doc_filename;
-    int64_t doc_position, doc_last;
     int primed;
 };
 static void **user_doc_state(CLexFile *file) {
-    return ((struct user_compiler *)file->port_data)->doc_input;
+    return ((struct user_doc_stream *)file->port_data)->input;
 }
 static struct user_compiler *user_compiler_find(void *mirror) {
     for (struct user_compiler *c = guest_fibers[guest_current].user_compilers;
@@ -29,9 +32,9 @@ static void user_compiler_delete(struct guest_fiber *f, struct user_compiler *c)
     *link = c->next;
     free(c->code);
     free(c->input);
-    if (c->doc_delete) FFI_CALL_TOS_1(c->doc_delete, (int64_t)(uintptr_t)c->doc_input);
     free(c->doc_filename);
     if (c->native) compiler_source_cleanup(c->native, c->lex);
+    if (c->doc.deleter) FFI_CALL_TOS_1(c->doc.deleter, (int64_t)(uintptr_t)c->doc.input);
     guest_context_files_clear(c->mirror);
     /* Self-linked before insertion; QueueRemove clears both links. Abort
      * cleanup also accepts a controller still linked in the task's queue. */
@@ -76,12 +79,12 @@ static int64_t host_user_compiler_del(int64_t *a) {
 /* CArmDocInput begins with doc, current entry and one-based source line.
  * The source adapter owns traversal/quoting; native objects never alias it. */
 static int64_t user_doc_read(CLexer *lex, CLexFile *file) {
-    struct user_compiler *c = file->port_data;
-    if (file->pos + 1 == c->doc_position) return c->doc_last;
-    if (file->pos != c->doc_position) AIWNIOS_throw(0);
+    struct user_doc_stream *stream = file->port_data;
+    if (file->pos + 1 == stream->position) return stream->last;
+    if (file->pos != stream->position) AIWNIOS_throw(0);
     int64_t binary_data = 0, binary_size = 0;
-    int64_t ch = FFI_CALL_TOS_4(c->doc_reader,
-        (int64_t)(uintptr_t)c->doc_input, lex->port_in_quotes,
+    int64_t ch = FFI_CALL_TOS_4(stream->reader,
+        (int64_t)(uintptr_t)stream->input, lex->port_in_quotes,
         (int64_t)(uintptr_t)&binary_data, (int64_t)(uintptr_t)&binary_size);
     if (ch == 0x7FFFFF01) {
         if (binary_size < 0 || binary_size > 0x40000000 ||
@@ -97,19 +100,62 @@ static int64_t user_doc_read(CLexer *lex, CLexFile *file) {
     } else if (ch < 0 || ch > 255) {
         AIWNIOS_throw(0);
     }
-    file->ln = ((int64_t *)c->doc_input)[2] - 1;
-    c->doc_position++;
-    c->doc_last = ch;
+    file->ln = ((int64_t *)stream->input)[2] - 1;
+    stream->position++;
+    stream->last = ch;
     return ch;
+}
+static void user_doc_include_close(CLexFile *file) {
+    struct user_doc_stream *stream = file->port_data;
+    FFI_CALL_TOS_1(stream->deleter, (int64_t)(uintptr_t)stream->input);
+    free(stream);
+    file->port_data = NULL;
+    file->port_read = NULL;
+    file->port_close = NULL;
+}
+static void user_doc_include(CLexer *lex, CLexFile *file, int64_t size) {
+    (void)lex;
+    /* Early boot includes remain ordinary text until DolDoc is initialized.
+     * Once available, use the same reader as ExeDoc, including binary tokens.
+     * All state is in the managed arena, so parser rollback restores reader
+     * ownership together with its lexer frame and document allocations. */
+    CHashFun *factory = (CHashFun *)HashFind("ArmDocIncludeNew", Fs->hash_table, HTT_FUN, 1);
+    CHashFun *reader = (CHashFun *)HashFind("ArmDocInputChar", Fs->hash_table, HTT_FUN, 1);
+    CHashFun *deleter = (CHashFun *)HashFind("ArmDocInputDel", Fs->hash_table, HTT_FUN, 1);
+    if (!factory || !reader || !deleter || !factory->fun_ptr ||
+        !reader->fun_ptr || !deleter->fun_ptr)
+        return;
+    char path[134], name[128];
+    if (guest_home_suffix(file->filename) || strchr(file->filename, ':')) {
+        if (guest_path(file->filename, path)) AIWNIOS_throw(0);
+    } else {
+        if (normal_path(file->filename, name)) AIWNIOS_throw(0);
+        snprintf(path, sizeof(path), "/%s", name);
+    }
+    free(file->filename);
+    file->filename = __AIWNIOS_StrDup(path, NULL);
+    char *slash = strrchr(path, '/');
+    if (slash == path) slash[1] = 0;
+    else if (slash) *slash = 0;
+    free(file->dir);
+    file->dir = __AIWNIOS_StrDup(path, NULL);
+    struct user_doc_stream *stream = __AIWNIOS_CAlloc(sizeof(*stream), NULL);
+    stream->reader = reader->fun_ptr;
+    stream->deleter = deleter->fun_ptr;
+    stream->input = (void *)(uintptr_t)FFI_CALL_TOS_3(factory->fun_ptr,
+        (int64_t)(uintptr_t)file->filename, (int64_t)(uintptr_t)file->text, size);
+    file->port_data = stream;
+    file->port_read = user_doc_read;
+    file->port_close = user_doc_include_close;
 }
 static int64_t host_user_doc_attach(int64_t *a) {
     if (compiler_recovery_active) AIWNIOS_throw(0);
     struct user_compiler *c = user_compiler_find((void *)(uintptr_t)a[0]);
-    if (c->native || c->input || c->doc_input || !a[1] || !a[2] || !a[3])
+    if (c->native || c->input || c->doc.input || !a[1] || !a[2] || !a[3])
         guest_raise(GUEST_EXCEPT_COMPILER);
-    c->doc_input = (void *)(uintptr_t)a[1];
-    c->doc_reader = (void *)(uintptr_t)a[2];
-    c->doc_delete = (void *)(uintptr_t)a[3];
+    c->doc.input = (void *)(uintptr_t)a[1];
+    c->doc.reader = (void *)(uintptr_t)a[2];
+    c->doc.deleter = (void *)(uintptr_t)a[3];
     c->doc_filename = __AIWNIOS_StrDup(a[4] ? (char *)(uintptr_t)a[4] : "<document>",
                                      &guest_fibers[guest_current].heap_owner);
     return 0;
@@ -304,12 +350,13 @@ static int64_t host_user_lex(int64_t *a) {
             continuation = !user_input_complete(joined);
         } while (continuation);
     }
-    if (!c->input && !c->doc_input) {
+    if (!c->input && !c->doc.input) {
         *(int64_t *)(c->mirror + guest_cc_flags_off) &= ~INT64_C(0x002);
         *(int64_t *)(c->mirror + guest_cc_token_off) = 0;
         return 0;
     }
-    c->lex = LexerNew(c->doc_input ? c->doc_filename : "<command>", c->input ? c->input : "");
+    c->lex = LexerNew(c->doc.input ? c->doc_filename : "<command>", c->input ? c->input : "");
+    c->lex->port_include = user_doc_include;
     c->lex->file->is_file = 1;
     c->lex->file->dir = __AIWNIOS_StrDup((char *)guest_current_dir(), NULL);
     c->lex->file->port_dir = guest_current_dir;
@@ -317,12 +364,12 @@ static int64_t host_user_lex(int64_t *a) {
      * ExeCmdLine can request another input chunk without yielding in Lex.
      * File and DolDoc input are already buffered readers; letting Lex advance
      * normally is required for their EOF token to terminate the command loop. */
-    c->lex->port_defer_statement_lex = !c->doc_input &&
+    c->lex->port_defer_statement_lex = !c->doc.input &&
         !!(*(int64_t *)(c->mirror + guest_cc_flags_off) & 0x002) &&
         !!guest_fibers[guest_current].user_prompt_reader;
-    if (c->doc_input) {
+    if (c->doc.input) {
         c->lex->file->port_read = user_doc_read;
-        c->lex->file->port_data = c;
+        c->lex->file->port_data = &c->doc;
     }
     c->native = CmpCtrlNew(c->lex);
     c->native->flags |= CCF_STRINGS_ON_HEAP;

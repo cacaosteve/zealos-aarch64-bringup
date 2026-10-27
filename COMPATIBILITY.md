@@ -4155,3 +4155,61 @@ Life's background evolution with NEC USB and VirtIO input, plus clean exit to
 the terminal. Doodle, Mass Spring and Life also pass live UTM checks on
 `3b59782c…`; screenshots and the user's reset/exit confirmation are recorded in
 ACCEPTANCE.md. Physical Pi application acceptance remains separate.
+
+## Document-backed includes and Digital Logic (2026-10-26)
+
+After DolDoc startup, nested `#include` frames now use the original document
+traversal adapter, including inline binary and binary-size tokens. Managed
+readers close their documents at EOF and on compiler cleanup; compiled binary
+constants retain their own storage. The root bootstrap `zload` reader remains
+plain text; use normal graphical `#include`/`ExeFile2` for document source.
+
+`DocLoad` validates resource record bounds and recovers CP437 bytes from the
+UTF-8 binary tails in the pinned repository. It leaves source text and native
+binary files unchanged. Saved source-partition files may contain NUL bytes;
+their explicit length is retained on read instead of rejecting them as text.
+Malformed resource data raises a catchable Compiler exception before the
+document lock is acquired. Nested syntax errors, missing assignment operands,
+bad resource data and later registry/script execution are covered by
+`make check-doc-includes`; repeated compiler failures preserve managed memory.
+
+The shared formatter now supports `%z` via the current task's original
+`ListSub` semantics, including aliases, missing entries, field widths and
+truncation. Progress scalar aliases point into the four actual `CProgress`
+records, and `ProgressBarsReset` clears those same records after its optional
+timing callback. The bitmap writer, record-size reader and renderer now agree
+on the original packed 17-byte header, including transparent pixels. Other
+serialized sprite layouts still have separate compatibility gaps.
+
+These changes enable the unchanged Digital Logic application. The focused
+NEC USB and VirtIO gates compare every pixel of its ten gate resources, run
+the original AND solver, and use Apps → Digital Logic through its real keyboard
+prompts, circuit rendering and Escape-to-terminal recovery. Live UTM acceptance
+for this addition remains separate; see PROGRAMS.md and ACCEPTANCE.md.
+
+## Graphical prompt editing and setup aborts (2026-10-26)
+
+Live UTM testing of Logic exposed two missing integration paths. `StrGet`
+still used `BootstrapGetStr2`, which reduces its buffer on Backspace but emits
+terminal erase characters into a DolDoc document. The screen retained stale
+characters, and that bootstrap reader ignored editing keys and Escape.
+After real document and keyboard services initialize, `fp_getstr2` now selects
+the original `DocGetStr2` for graphical document tasks. Raw/no-document callers
+retain the early reader. This follows the late binding done by upstream
+`MakeDoc.ZC`; the pinned application and document reader remain unchanged.
+
+Logic's missing-table/input/output paths use `catch PutExcept;`. `KernelC.HH`
+declared `PutExcept`, but this port did not implement it. A reproduced setup
+abort reached an unresolved call and set the runtime's failed state. The
+bridge now reports the exception and sets `Fs->catch_except` according to
+`catch_it`, preserving the original reporting/catch contract. It does not
+claim to provide the original x86 caller trace. Tests cover both the default
+catch and `PutExcept(FALSE)` propagation to an outer catch.
+
+The Logic gate now checks actual framebuffer text during Backspace, forward
+Delete and middle-of-line editing, then rejects malformed quote/parenthesis
+values while preserving pointer input and continued compilation. It also
+checks all three early-abort paths, Shift+Escape, restored geometry/callbacks
+and a working terminal after each exit. Upstream `DocGetStr2` uses Shift+Escape
+for an empty result; plain Escape runs the current document entry and does not
+cancel a setup prompt. Plain Escape exits Logic's completed circuit view.

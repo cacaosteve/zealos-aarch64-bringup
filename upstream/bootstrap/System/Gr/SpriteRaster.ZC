@@ -4175,10 +4175,12 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
         }
         else if (type == 23) // SPT_BITMAP
         {
-            MemCopy(&sprite_x, sprite + 4, sizeof(I32));
-            MemCopy(&sprite_y, sprite + 8, sizeof(I32));
-            MemCopy(&width, sprite + 12, sizeof(I32));
-            MemCopy(&height, sprite + 16, sizeof(I32));
+            // Serialized CSpritePtWHU8s is packed: one type byte followed
+            // by four I32 fields. It is independent of ARM64 class alignment.
+            MemCopy(&sprite_x, sprite + 1, sizeof(I32));
+            MemCopy(&sprite_y, sprite + 5, sizeof(I32));
+            MemCopy(&width, sprite + 9, sizeof(I32));
+            MemCopy(&height, sprite + 13, sizeof(I32));
             if (width <= 0 || width > 4096 || height <= 0 || height > 4096)
                 break;
             stride = (width + 7) & ~7;
@@ -4189,13 +4191,16 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
             for (row = 0; row < height; row++)
                 for (col = 0; col < width; col++)
                 {
-                    MemCopy(&pixel, sprite + 20 + row * stride + col, sizeof(U8));
-                    dc->color.c0 = pixel;
-                    SpritePlotTransform0(dc, transform_enabled,
-                            x + old_x + sprite_x + col,
-                            y + old_y + sprite_y + row, z);
+                    MemCopy(&pixel, sprite + 17 + row * stride + col, sizeof(U8));
+                    if (pixel != TRANSPARENT)
+                    {
+                        dc->color.c0 = pixel;
+                        SpritePlotTransform0(dc, transform_enabled,
+                                x + old_x + sprite_x + col,
+                                y + old_y + sprite_y + row, z);
+                    }
                 }
-            size = 20 + stride * height;
+            size = 17 + stride * height;
         }
         else if (type == 27 || type == 28 || type == 29)
         {

@@ -34,6 +34,10 @@ p.add_argument('--probe-stock-programs', action='store_true',
                help='run unchanged pinned NetOfDots and Lines in the graphical terminal')
 p.add_argument('--probe-program-catalog', action='store_true',
                help='report compile-only results for original application entry points in isolated tasks')
+p.add_argument('--probe-doc-includes', action='store_true',
+               help='verify nested DolDoc includes, binary payload lifetime and compiler recovery')
+p.add_argument('--probe-logic-program', action='store_true',
+               help='exercise original Digital Logic gate sprites, solver and keyboard prompts')
 p.add_argument('--probe-stock-interactive', action='store_true',
                help='exercise unchanged upstream interactive programs with mouse and key input')
 p.add_argument('--probe-lattice-controls', action='store_true',
@@ -130,7 +134,8 @@ if args.probe_gui_workflow:
     args.probe_gui_keyboard = True
 if args.probe_gui_editor_text:
     args.probe_gui_keyboard = True
-if args.probe_stock_programs or args.probe_stock_interactive or args.probe_program_catalog:
+if (args.probe_stock_programs or args.probe_stock_interactive or args.probe_program_catalog or
+        args.probe_doc_includes or args.probe_logic_program):
     args.pci = True
     args.probe_gui_keyboard = True
 if args.probe_lattice_controls:
@@ -190,7 +195,9 @@ if args.probe_live_window_control and not (
             '--probe-winmgr --probe-grscreen --probe-live-winmgr')
 if args.probe_dvd_live and args.pci:
     p.error('--probe-dvd-live requires ISO boot, not --pci')
-log_path = ROOT / 'build' / (f'check-usb-{usb_label}{"-program-catalog" if args.probe_program_catalog else "-stock-interactive" if args.probe_stock_interactive else "-stock-programs" if args.probe_stock_programs else "-lattice-controls" if args.probe_lattice_controls else "-windowdemo-input" if args.probe_gui_windowdemo_input else "-home-once" if args.probe_home_once else "-input-edges" if args.probe_input_edges else "-registry" if args.probe_registry else "-home-path" if args.probe_home_path else "-user-text" if args.probe_user_text else "-user-startup" if args.probe_user_startup else ""}.log' if args.usb_input else
+log_path = ROOT / 'build' / (f'check-usb-{usb_label}{"-logic" if args.probe_logic_program else "-program-catalog" if args.probe_program_catalog else "-stock-interactive" if args.probe_stock_interactive else "-stock-programs" if args.probe_stock_programs else "-lattice-controls" if args.probe_lattice_controls else "-windowdemo-input" if args.probe_gui_windowdemo_input else "-home-once" if args.probe_home_once else "-input-edges" if args.probe_input_edges else "-registry" if args.probe_registry else "-home-path" if args.probe_home_path else "-user-text" if args.probe_user_text else "-user-startup" if args.probe_user_startup else ""}.log' if args.usb_input else
+                             'check-logic-pci.log' if args.probe_logic_program else
+                             'check-doc-includes-pci.log' if args.probe_doc_includes else
                              'check-program-catalog-pci.log' if args.probe_program_catalog else
                              'check-stock-interactive-pci.log' if args.probe_stock_interactive else
                              'check-stock-programs-pci.log' if args.probe_stock_programs else
@@ -381,7 +388,9 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         # Independent program/workflow gates may run concurrently. Keep
         # their QMP screendumps separate so one VM cannot satisfy another's
         # visible-pixel or OCR assertions.
-        mode = ('interactive-' if args.probe_stock_interactive else
+        mode = ('doc-includes-' if args.probe_doc_includes else
+                'logic-' if args.probe_logic_program else
+                'interactive-' if args.probe_stock_interactive else
                 'stock-' if args.probe_stock_programs else
                 'workflow-' if args.probe_gui_workflow else
                 'catalog-' if args.probe_program_catalog else '')
@@ -1195,6 +1204,143 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         if int(scanout.group(1)) < 1000:
             raise RuntimeError('boot graphical terminal is not painting visible pixels:\n' + desktop)
         print('PASS boot graphical terminal window and framebuffer diagnostics', flush=True)
+        if args.probe_doc_includes:
+            focus_graphical_terminal()
+            run_graphical_terminal_command('doc-includes-ready', '40+2;', 'ans=0x2A=42')
+            command('zload /Tests/ProgressAliases.ZC', 'zc: loaded /Tests/ProgressAliases.ZC')
+            command('zcall ProgressAliasChecks', 'zc => 0x000000000000002a')
+            command('zload /Tests/ListFormat.ZC', 'zc: loaded /Tests/ListFormat.ZC')
+            command('zcall ListFormatChecks', 'zc => 0x000000000000002a')
+            command('zload /Tests/DocIncludes.ZC', 'zc: loaded /Tests/DocIncludes.ZC')
+            for check in ('WriteChecks', 'Checks', 'RecoveryChecks', 'MalformedChecks'):
+                command('zcall DocInclude'+check, 'zc => 0x000000000000002a')
+            command('zc U8 doc_include_truncated[17]; MemSet(doc_include_truncated,0,17); doc_include_truncated[9]=100; FileWrite("/Tests/DocIncludes/Truncated.ZC",doc_include_truncated,17);', 'zc: executed')
+            command('zc I64 DocIncludeBadResource(){return ExeFile("/Tests/DocIncludes/Truncated.ZC");}', 'zc: executed')
+            command('zcall DocIncludeBadResource', 'zc => 0x0000000000000000')
+            before = command('zstatus', 'failed=0')
+            for _ in range(3):
+                command('zcall DocIncludeRecoveryChecks', 'zc => 0x000000000000002a')
+                command('zcall DocIncludeBadResource', 'zc => 0x0000000000000000')
+            after = command('zstatus', 'failed=0')
+            heap = r'data=([0-9/]+) code=([0-9/]+) allocations=([0-9]+)'
+            if re.search(heap, before).groups() != re.search(heap, after).groups():
+                raise RuntimeError('failed nested DolDoc includes leaked managed memory')
+            command('zload /Tests/Registry.ZC', 'zc: loaded /Tests/Registry.ZC')
+            for check in ('RegistryDocChecks', 'RegistryRecoveryChecks'):
+                command('zcall '+check, 'zc => 0x000000000000002a')
+            command('zload /Tests/SourceMacros.ZC', 'zc: loaded /Tests/SourceMacros.ZC')
+            command('zcall StockSourceMacroChecks', 'zc => 0x000000000000002a')
+            command('zstatus', 'failed=0')
+            print('PASS nested DolDoc source/binary includes, EOF lifetime, paths and recovery without leaks', flush=True)
+            raise SystemExit(0)
+        if args.probe_logic_program:
+            command('zload /Tests/ListFormat.ZC', 'zc: loaded /Tests/ListFormat.ZC')
+            command('zcall ListFormatChecks', 'zc => 0x000000000000002a')
+            command('zload /Tests/ProgressAliases.ZC', 'zc: loaded /Tests/ProgressAliases.ZC')
+            command('zcall ProgressAliasChecks', 'zc => 0x000000000000002a')
+            command('zload /Tests/ProgramCatalog.ZC', 'zc: loaded /Tests/ProgramCatalog.ZC')
+            command('zc CTask *logic_check_task=Spawn(&StockCatalogServer);', 'zc: executed')
+            command('zc CJob *logic_check_job=TaskExe(logic_check_task,Fs,"ExeFile2(\\"/Tests/LogicProgram.ZC\\");",0);', 'zc: executed')
+            command('zc Print("logic_checks=%d\\n",JobResGet(logic_check_job));', 'logic_checks=42')
+            command('zc Kill(logic_check_task);', 'zc: executed')
+            focus_graphical_terminal()
+            run_graphical_terminal_command('ready', '40+2;', 'ans=0x2A=42')
+            original_rect = graphical_task_rect('bootstrap_gui_terminal_task')
+            select_os_menu_row('menu', 'Apps', 8)
+            require_graphical_text('gates', '0 Gate:', timeout=20)
+            qmp_send_text('ANX', delay=.15)
+            require_graphical_text('gate-before-edit', '0 Gate: ANX')
+            qmp_send_key('backspace')
+            require_graphical_text_absent('gate-erased', '0 Gate: ANX')
+            qmp_send_text('D\n\n', delay=.15)
+            require_graphical_text('table', 'Table size in hex', timeout=10)
+            # Edit in the middle, then exercise both Backspace and forward
+            # Delete. Assert scanout, not just the final accepted values.
+            qmp_send_text('0x20', delay=.15)
+            qmp_send_key('left')
+            qmp_send_key('backspace')
+            qmp_send_text('1', delay=.15)
+            qmp_send_key('end')
+            qmp_send_key('ret')
+            require_graphical_text('input-a', 'Input A:')
+            qmp_send_text('0x3', delay=.15)
+            require_graphical_text('input-before-edit', 'Input A: 0x3')
+            qmp_send_key('backspace')
+            require_graphical_text_absent('input-erased', 'Input A: 0x3')
+            qmp_send_text('C\n', delay=.15)
+            require_graphical_text('input-corrected', 'Input A: 0xC')
+            qmp_send_text('0x0A', delay=.15)
+            qmp_send_key('left')
+            qmp_send_key('left')
+            qmp_send_key('delete')
+            qmp_send_key('end')
+            qmp_send_key('ret')
+            require_graphical_text('input-b-corrected', 'Input B: 0xA')
+            qmp_send_key('ret')
+            require_graphical_text('output-a', 'Output A:')
+            before_errors = command('zstatus', 'failed=0')
+            qmp_send_text("'\n)\n", delay=.15)
+            after_errors = command('zstatus', 'failed=0')
+            errors = r'compiler_recovery: errors=(\d+) active=0'
+            if int(re.search(errors, after_errors)[1]) < int(re.search(errors, before_errors)[1])+2:
+                raise RuntimeError('Logic did not reject both malformed prompt values')
+            move_graphical_pointer(550, 350)
+            command('zstatus', 'pointer_xy=550/350')
+            qmp_send_text('0x8\n\n', delay=.15)
+            time.sleep(1)
+            circuit = graphical_screen('and-circuit')
+            if (rgb_pixels_in(circuit, (0, 0, 0), (40, 20, 180, 90)) < 100 or
+                    rgb_pixels_in(circuit, (170, 0, 0), (40, 20, 180, 90)) < 20 or
+                    rgb_pixels_in(circuit, (0, 170, 0), (20, 20, 180, 90)) < 20):
+                raise RuntimeError('Digital Logic did not render its gate, wires and input labels')
+            command('zc Print("logic_drawing=%d\\n",bootstrap_gui_terminal_task->draw_it!=NULL);', 'logic_drawing=1')
+            qmp_send_key('esc')
+            time.sleep(.5)
+            run_graphical_terminal_command('return', '6*7;', 'ans=0x2A=42')
+            if graphical_task_rect('bootstrap_gui_terminal_task') != original_rect:
+                raise RuntimeError('Digital Logic did not restore terminal geometry')
+            command('zc Print("logic_clean=%d\\n",bootstrap_gui_terminal_task->draw_it==NULL);', 'logic_clean=1')
+            select_os_menu_row('menu-reopen', 'Apps', 8)
+            require_graphical_text('gates-reopen', '0 Gate:', timeout=20)
+            qmp_send_text('OR\n\n', delay=.15)
+            require_graphical_text('table-reopen', 'Table size in hex', timeout=10)
+            qmp_send_text('0x10\n0xC\n0xA\n\n0xE\n\n', delay=.15)
+            time.sleep(1)
+            reopened = graphical_screen('or-circuit')
+            gate_box = (80, 24, 120, 64)
+            if len(rgb_coordinates_in(circuit, (0, 0, 0), gate_box) ^
+                   rgb_coordinates_in(reopened, (0, 0, 0), gate_box)) < 12:
+                raise RuntimeError('reopened Digital Logic did not render a different OR gate')
+            qmp_send_key('esc')
+            time.sleep(.5)
+            run_graphical_terminal_command('reopen-return', '7*6;', 'ans=0x2A=42')
+            command('zc Print("logic_reopen_clean=%d\\n",bootstrap_gui_terminal_task->draw_it==NULL);', 'logic_reopen_clean=1')
+            # Original Logic aborts through PutExcept for missing setup
+            # values. Previously that helper was unresolved and failed the
+            # whole runtime. Check each allocation/cleanup boundary.
+            for label, setup in (('no-table', 'AND\n\n\n'),
+                                 ('no-inputs', 'AND\n\n0x10\n\n'),
+                                 ('no-outputs', 'AND\n\n0x10\n0xC\n0xA\n\n\n')):
+                select_os_menu_row(label+'-menu', 'Apps', 8)
+                require_graphical_text(label+'-gates', '0 Gate:', timeout=20)
+                qmp_send_text(setup, delay=.15)
+                run_graphical_terminal_command(label+'-return', '40+2;', 'ans=0x2A=42')
+                if graphical_task_rect('bootstrap_gui_terminal_task') != original_rect:
+                    raise RuntimeError('Logic abort did not restore geometry: '+label)
+                command('zc Print("logic_abort_clean=%d\\n",bootstrap_gui_terminal_task->draw_it==NULL);', 'logic_abort_clean=1')
+                command('zstatus', 'failed=0')
+            select_os_menu_row('cancel-menu', 'Apps', 8)
+            require_graphical_text('cancel-gates', '0 Gate:', timeout=20)
+            qmp_send_text('AND\n\n', delay=.15)
+            require_graphical_text('cancel-table', 'Table size in hex', timeout=10)
+            # Upstream StrGet cancels with Shift+Escape; plain Escape runs
+            # the current document entry instead of cancelling the prompt.
+            qmp_send_keys(['shift', 'esc'])
+            run_graphical_terminal_command('cancel-return', '40+2;', 'ans=0x2A=42')
+            command('zc Print("logic_cancel_clean=%d\\n",bootstrap_gui_terminal_task->draw_it==NULL);', 'logic_cancel_clean=1')
+            command('zstatus', 'failed=0')
+            print('PASS original Digital Logic: ten exact gate bitmaps, AND/OR circuits, visible prompt editing, malformed-value recovery, all setup aborts, Shift+Escape, relaunch and clean exit', flush=True)
+            raise SystemExit(0)
         if args.probe_program_catalog:
             command('zload /Tests/SourceMacros.ZC', 'zc: loaded /Tests/SourceMacros.ZC')
             command('zcall StockSourceMacroChecks', 'zc => 0x000000000000002a')

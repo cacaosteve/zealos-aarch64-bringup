@@ -4239,6 +4239,8 @@ int64_t AssignRawTypeToNode(CCmpCtrl *ccmp, CRPN *rpn) {
     rpn->ic_class = ICFwd(rpn->base.next)->ic_class;
     rpn->ic_fun = ICFwd(rpn->base.next)->ic_fun;
     rpn->ic_dim = ICFwd(rpn->base.next)->ic_dim;
+    if (!rpn->ic_class)
+      ParseErr(ccmp, "Assignment operand has no type.");
     rpn->raw_type = rpn->ic_class->raw_type;
     return rpn->raw_type;
     break;

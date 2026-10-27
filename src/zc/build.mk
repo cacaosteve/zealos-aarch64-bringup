@@ -57,6 +57,14 @@ check-stock-interactive: check-upstream esp
 	QEMU="$(QEMU)" QEMU_VIRT="$(QEMU_VIRT)" FW_CODE="$(FW_CODE)" FW_VARS_IN="$(FW_VARS_IN)" python3 scripts/check-compat.py --usb-input nec --probe-stock-interactive
 check-program-catalog: check-upstream esp
 	python3 scripts/check-compat.py --pci --probe-program-catalog
+.PHONY: check-doc-bytes check-doc-includes
+check-doc-bytes:
+	python3 scripts/check-doc-bytes.py
+check-doc-includes: check-doc-bytes check-upstream esp
+	python3 scripts/check-compat.py --pci --probe-doc-includes
+.PHONY: check-logic-program
+check-logic-program: check-doc-bytes check-upstream esp
+	python3 scripts/check-compat.py --usb-input nec --probe-logic-program
 check-gui-editor-text: check-upstream esp
 	QEMU="$(QEMU)" QEMU_VIRT="$(QEMU_VIRT)" FW_CODE="$(FW_CODE)" FW_VARS_IN="$(FW_VARS_IN)" python3 scripts/check-compat.py --usb-input nec --probe-gui-editor-text
 check-grscreen: check-upstream esp

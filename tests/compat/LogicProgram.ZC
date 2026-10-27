@@ -1,0 +1,81 @@
+// Run in a disposable task: the unchanged application owns its symbol names.
+#include "/Apps/Logic/Load.ZC"
+
+I64 LogicProgramChecks()
+{
+    CDC *dc = DCNew(160, 80);
+    I64 gate, row, col, stride, expected, result = 42;
+    I32 x, y, width, height;
+    U8 *sprite;
+    I64 caught = 0;
+    // Logic's early-abort catch uses this helper. Its default must swallow
+    // the exception, while FALSE must preserve propagation to an outer catch.
+    try
+        throw('Prompt');
+    catch
+        PutExcept;
+    try
+    {
+        try
+            throw('Prompt');
+        catch
+            PutExcept(FALSE);
+    }
+    catch
+    {
+        caught = Fs->except_ch == 'Prompt';
+        Fs->catch_except = TRUE;
+    }
+    if (!caught) return 5;
+    if (!dc) return 1;
+    for (gate = GT_FIRST_REAL_GATE; gate < GT_ENTRIES_NUM; gate++)
+    {
+        sprite = imgs[gate];
+        MemCopy(&x, sprite+1, 4);
+        MemCopy(&y, sprite+5, 4);
+        MemCopy(&width, sprite+9, 4);
+        MemCopy(&height, sprite+13, 4);
+        stride = (width+7) & ~7;
+        MemSet(dc->body, WHITE, dc->width_internal*dc->height);
+        dc->color = BLUE;
+        Sprite3(dc, 80, 40, 0, sprite);
+        if (dc->color != BLUE) result = 2;
+        // Compare the whole target, including transparent pixels and the
+        // surrounding area; a missing gate cannot pass from labels/wires.
+        for (row = 0; row < 80; row++)
+            for (col = 0; col < 160; col++)
+            {
+                expected = WHITE;
+                if (80+x <= col < 80+x+width && 40+y <= row < 40+y+height)
+                {
+                    expected = sprite[17+(row-40-y)*stride+col-80-x];
+                    if (expected == TRANSPARENT) expected = WHITE;
+                }
+                if (dc->body[row*dc->width_internal+col] != expected) result = 3;
+            }
+    }
+    DCDel(dc);
+    // The original solver must construct the requested two-input AND gate.
+    table_size = 16;
+    num_inputs_entered = 2;
+    num_outputs_entered = 1;
+    num_sel_gates = 1;
+    sel_gates[0] = GT_AND;
+    gate_type_table = CAlloc(table_size);
+    displayed_design = CAlloc(2);
+    added_this_pass = CAlloc(2);
+    input1_table = CAlloc(table_size*sizeof(U16));
+    input2_table = CAlloc(table_size*sizeof(U16));
+    input3_table = CAlloc(table_size*sizeof(U16));
+    gate_type_table[12] = gate_type_table[10] = GT_INPUT;
+    input1_table[12] = 0;
+    input1_table[10] = 1;
+    gate_type_table[8] = GT_OUTPUT;
+    if (FillGateTable != 1 || output_found != 8 || gate_type_table[8] != GT_AND ||
+        (input1_table[8] & input2_table[8]) != 8 || progress1_max) result = 4;
+    CleanUp;
+    Print("logic_resources=10 solver=AND\n");
+    return result;
+}
+
+LogicProgramChecks;

@@ -58,6 +58,8 @@ enter:;
   } else {
     // Free all the assets of the previous file
     last = file->last;
+    if (file->port_close)
+      file->port_close(file);
     A_FREE(file->text);
     A_FREE(file->dir);
     A_FREE(file->filename);
@@ -742,6 +744,7 @@ lex_ident: {
             //
             new_file = A_MALLOC(sizeof(CLexFile), NULL);
             new_file->port_read = NULL;
+            new_file->port_close = NULL;
             new_file->port_data = NULL;
             new_file->port_dir = NULL;
             new_file->is_file = 0;
@@ -947,6 +950,7 @@ lex_ident: {
         goto re_enter;
       }
       if (!strcmp(lex->string, "include")) {
+        char *include_path;
         if (TK_STR != Lex(lex)) {
           LexErr(lex, "Expected a string for #include.");
           return lex->cur_tok = ERR;
@@ -978,6 +982,7 @@ lex_ident: {
                 snprintf(NULL, 0, "%s/%s", include_dir, lex->string);
             char buf[len + 1];
             snprintf(buf, sizeof(buf), "%s/%s", include_dir, lex->string);
+            include_path = A_STRDUP(buf, NULL);
             dir = __AIWNIOS_StrDup(buf, NULL);
             *strrchr(dir, '/') = 0;
             f = fopen(buf, "rb");
@@ -985,6 +990,7 @@ lex_ident: {
             goto normal;
         } else {
         normal:
+          include_path = A_STRDUP(lex->string, NULL);
           f = fopen(lex->string, "rb");
           if (!strrchr(lex->string, '/')) {
             char *qualifier = strrchr(lex->string, ':');
@@ -1009,6 +1015,7 @@ lex_ident: {
         idx -= ftell(f);
         new_file = A_MALLOC(sizeof(CLexFile), NULL);
         new_file->port_read = NULL;
+        new_file->port_close = NULL;
         new_file->port_data = NULL;
         new_file->port_dir = NULL;
         new_file->text = A_MALLOC(idx + 1, NULL);
@@ -1018,9 +1025,11 @@ lex_ident: {
         fclose(f);
         new_file->is_file = 1;
         new_file->last = lex->file;
-        new_file->filename = A_STRDUP(lex->string, NULL);
+        new_file->filename = include_path;
         new_file->pos = new_file->col = new_file->ln = 0;
         lex->file = new_file;
+        if (lex->port_include)
+          lex->port_include(lex, new_file, idx);
         goto re_enter;
       } else if (!strcmp(lex->string, "define")) {
         old_flags = lex->flags;

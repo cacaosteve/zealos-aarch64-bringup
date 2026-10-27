@@ -307,7 +307,7 @@ Bool BootstrapGuiTerminalMenuBindLeaf(CMenuEntry *root, U8 *source_name,
                                       U8 *display_name, I64 action)
 {
     CMenuEntry *entry;
-    if (!root || !source_name || !display_name || action < 1 || action > 24)
+    if (!root || !source_name || !display_name || action < 1 || action > 25)
         return FALSE;
     entry = root->sub;
     while (entry)
@@ -350,7 +350,7 @@ U0 BootstrapGuiTerminalMenuInstall()
 {
     CMenu *menu = MenuNew("File { Files(); Disk(); }");
     BootstrapGuiTerminalMenuAppendRoot(menu, MenuNew("Windows { Demo(); TileHorz(); TileVert(); TileGrid(); }"));
-    BootstrapGuiTerminalMenuAppendRoot(menu, MenuNew("Apps { LatticePlay(); StockPlay(); PaintDemo(); NetOfDots(); Lines(); Doodle(); MassSpring(); Life(); }"));
+    BootstrapGuiTerminalMenuAppendRoot(menu, MenuNew("Apps { LatticePlay(); StockPlay(); PaintDemo(); NetOfDots(); Lines(); Doodle(); MassSpring(); Life(); Logic(); }"));
     BootstrapGuiTerminalMenuAppendRoot(menu, MenuNew("View { ViewAngles(); ZoomIn(); ZoomOut(); ResetView(); PanLeft(); PanRight(); PanUp(); PanDown(); }"));
     BootstrapGuiTerminalMenuAppendRoot(menu, MenuNew("OS { Help(); Status(); }"));
     CMenuEntry *file = BootstrapGuiTerminalMenuRoot(menu, "File");
@@ -375,6 +375,7 @@ U0 BootstrapGuiTerminalMenuInstall()
         !BootstrapGuiTerminalMenuBindLeaf(apps, "Doodle", "Doodle", 22) ||
         !BootstrapGuiTerminalMenuBindLeaf(apps, "MassSpring", "Mass Spring", 23) ||
         !BootstrapGuiTerminalMenuBindLeaf(apps, "Life", "Game of Life", 24) ||
+        !BootstrapGuiTerminalMenuBindLeaf(apps, "Logic", "Digital Logic", 25) ||
         !BootstrapGuiTerminalMenuBindLeaf(view, "ViewAngles", "View Angles", 11) ||
         !BootstrapGuiTerminalMenuBindLeaf(view, "ZoomIn", "Zoom In", 12) ||
         !BootstrapGuiTerminalMenuBindLeaf(view, "ZoomOut", "Zoom Out", 13) ||
@@ -484,6 +485,8 @@ U8 *BootstrapGuiTerminalMenuSource(I64 action)
         return "BootstrapGuiTerminalRunLightProgram(\"/Demo/Games/MassSpring\");";
     if (action == 24)
         return "BootstrapGuiTerminalRunLightProgram(\"/Demo/Graphics/Life\");";
+    if (action == 25)
+        return "BootstrapGuiTerminalRunLightProgram(\"/Apps/Logic/Run.ZC\");";
     return NULL;
 }
 
@@ -924,6 +927,13 @@ U8 *BootstrapGuiTerminalReadLine(Bool continuation)
     return result;
 }
 
+U8 *BootstrapGuiTerminalGetStr2(I64 flags=0)
+{//MakeDoc installs DocGetStr2 once the real document/key services exist.
+    if (!IsRaw && DocPut)
+        return DocGetStr2(flags);
+    return BootstrapGetStr2(flags);
+}
+
 I64 BootstrapGuiTerminalDevicesInit()
 {//Initialize upstream keyboard-device services used by shell helpers.
     if (!bootstrap_gui_terminal_devices_ready)
@@ -932,6 +942,7 @@ I64 BootstrapGuiTerminalDevicesInit()
         KeyDevAdd(&KDDocPutKey, &KDDocPutS, 0x80000000, TRUE);
         bootstrap_gui_terminal_devices_ready = TRUE;
     }
+    fp_getstr2 = &BootstrapGuiTerminalGetStr2;
     return 42;
 }
 
@@ -1519,6 +1530,7 @@ I64 BootstrapGuiTerminalSmoke()
             !BootstrapGuiTerminalMenuActionValid(menu, "Apps", "Doodle", 22) ||
             !BootstrapGuiTerminalMenuActionValid(menu, "Apps", "Mass Spring", 23) ||
             !BootstrapGuiTerminalMenuActionValid(menu, "Apps", "Game of Life", 24) ||
+            !BootstrapGuiTerminalMenuActionValid(menu, "Apps", "Digital Logic", 25) ||
             !BootstrapGuiTerminalMenuActionValid(menu, "View", "View Angles", 11) ||
             !BootstrapGuiTerminalMenuActionValid(menu, "View", "Zoom In", 12) ||
             !BootstrapGuiTerminalMenuActionValid(menu, "View", "Zoom Out", 13) ||

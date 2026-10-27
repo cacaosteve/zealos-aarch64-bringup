@@ -2465,7 +2465,7 @@ original NetOfDots/Lines gate also passes again on NEC USB and VirtIO input
 (`build/check-stock-programs-nec-final.log` and
 `build/check-stock-programs-virtio-final.log`, both exit zero).
 
-Current ISO SHA-256:
+Initial Logic ISO SHA-256 (superseded after the prompt failure below):
 `3b59782c36e57b058670281cb5661d8b86f31212db637020237e1d65f980f4bb`.
 Installed template disk SHA-256:
 `a509c2f73880b93c1ec2bd55eff5f59168b0f543df909cb7d75b4d46b20f15aa`.
@@ -2504,3 +2504,135 @@ live UTM acceptance for these three original programs on ISO `3b59782c…`, in
 addition to their passing automated NEC/VirtIO checks. It does not accept the
 rest of the Apps collection or claim a new live installer/disk-persistence run;
 the exact current ISO's installation/persistence run above is automated QEMU.
+
+## Digital Logic and document-resource includes — 2026-10-26
+
+The unchanged `/Apps/Logic/Run.ZC` is available through Apps → Digital Logic.
+The common compiler adapter now reads nested includes through DolDoc, retains
+compiled inline binary constants after EOF, and closes owned documents on EOF
+and error cleanup. Saved source files containing NUL bytes remain readable.
+The document loader restores the repository's UTF-8 representation of CP437
+binary resources, validates record bounds and raises a catchable exception
+before locking a document with malformed data. The formatter adds original
+`ListSub`-based `%z`; progress aliases share the actual progress records. The
+bitmap writer, size reader and renderer use the original packed 17-byte bitmap
+header, preserving transparent pixels. The Apps/Demo files themselves remain
+unchanged and hash-checked.
+
+The NEC USB and VirtIO Logic gates pass **49** and **47** logged checks.
+They compare all ten original gate bitmaps, pixel for pixel including the
+surrounding background, and exercise the original AND solver. Both then select
+the actual Apps menu entry, type an AND truth table, verify its visible circuit,
+exit to a working prompt, reopen Logic and solve an OR circuit with a different
+gate image. The checks verify callback cleanup, window restoration and working
+terminal output after exit and relaunch.
+The automated AND circuit is preserved in
+[the QEMU capture](docs/images/qemu-logic-and.png).
+
+The document-input gate passes **40** checks: nested relative includes,
+file/line macros, saved binary documents, compiled constant lifetime, malformed
+resources both directly and inside an include, assignment/syntax error recovery
+and later registry/script execution. Repeated failed loads leave managed
+data/code usage and allocation count unchanged. The native decoder also passes
+exact recovery of all **54** encoded Apps/Demo documents, all 256 CP437 byte
+values and malformed/truncated payloads.
+
+Regression gates pass: **275** full graphics checks (including bitmap packing,
+sprite transforms/symmetry and full text presentation), **272** Window Manager
+and MathODE frame checks, **421** NEC graphical editor/workflow checks including
+save/compile/run/reboot/reopen, **60** Doodle/Mass Spring/Life interaction checks,
+and **33** Net of Dots/Lines checks. The isolated compilation inventory passes
+and records the remaining individual application blockers; compilation is not
+runtime acceptance.
+
+The exact candidate ISO passes **14** installation checks using an NEC USB CD,
+native USB input and VirtIO recovery input. Unconfirmed `zinstall` leaves the
+blank disk unchanged; `zinstall ERASE` completes full read-back verification.
+The installed 128 MiB disk matches the template byte for byte. Two subsequent
+cold boots have no CD attached; saved `Tests/InstallerPersist.ZC` loads and
+returns `0x2a` on each. All reported test commands exit zero.
+
+Current ISO SHA-256:
+`804f42c2850f9e93c607402f187e879d060d7df6969fb64c3a3e090f5651ef2a`.
+Kernel SHA-256:
+`607acd3630238056ab7103b8174d17feb093a90e71339ee07e64572f161b8fec`.
+The **560-file** source archive SHA-256 is
+`022d388712d7771481d4e18d716c2d0f1fe258d6adb1cf3022983886efd82f55`;
+all **294** Apps/Demo files match the pinned originals. The template disk hash
+is `54fc196533a3ab4e6487d8afde921bbf71a0b129f9e24d0ea0bb8e885e6b406b`.
+Artifact sizes, hashes and exact log paths are in
+[the Logic report](docs/acceptance/utm-logic-2026-10-26.json), and the current
+[compile inventory](docs/acceptance/program-catalog-2026-10-26.json) records
+the first remaining blocker for each application.
+
+The tested ISO has replaced `build/zealos-aarch64-hello.iso` atomically. The
+live-accepted `3b59782c…` program ISO remains preserved alongside the older
+`52c214c…` installer image. Live UTM confirmed the AND circuit, then exposed
+failed prompt editing and a reported freeze. The original perfect-input gates
+above did not cover these cases. The user confirmed deletion was inside a
+prompt, not circuit editing. Evidence is preserved in
+[the live AND capture](docs/images/utm-logic-and-live.png) and
+[the reported prompt failure](docs/images/utm-logic-input-freeze-live.png).
+Full live Logic acceptance remains pending. Pi media were not rebuilt or staged.
+
+## Logic prompt editing and setup abort correction — 2026-10-26
+
+The live report exposed gaps in the original perfect-input acceptance. The
+bootstrap `StrGet` reader sent `Backspace, Space, Backspace` to a graphical
+document rather than editing its entries. It also ignored cursor keys and
+Escape. The graphical service now selects the original `DocGetStr2`, retaining
+the early fallback for raw/no-document callers. Separately, Logic's setup
+abort reached the declared but unimplemented `PutExcept` and set runtime
+`failed=1`. The bridge now implements its reporting/catch contract; the test
+also verifies `PutExcept(FALSE)` propagation. This reproduces a fatal setup
+abort, without claiming the exact sequence behind the user's reported freeze.
+
+The expanded NEC USB and VirtIO gates pass **106** and **104** checks. They
+visibly edit `ANX` into `AND`, change a table value in the middle, Backspace
+`0x3` into `0xC`, and forward-Delete an extra digit from an input. Both malformed
+quote and closing-parenthesis values raise recoverable errors; pointer input
+continues and a corrected value produces the circuit. Missing table, inputs
+and outputs, plus Shift+Escape at the table prompt, each return to a terminal
+where `40+2;` gives 42. Normal AND/OR rendering, exit and relaunch still pass.
+The [corrected prompt capture](docs/images/qemu-logic-input-edited.png) shows
+the actual framebuffer after Backspace and replacement, with no stale digit.
+
+The Doodle/Mass Spring/Life interaction regression passes **60** checks. The
+exact replacement ISO passes **14** USB-CD installer checks, complete read-back,
+byte-identical installation and two cold disk-only boots returning `0x2a`
+from the saved source file. The full NEC desktop/editor workflow passes
+**421** checks, including graphical compiler recovery, edit/save/compile/run,
+cold reboot/reopen, graphics and menu controls. All five test commands exit zero.
+
+Corrected ISO: `build/zealos-aarch64-logic-prompt-fix.iso`, SHA-256
+`9c5e90c964cbd1f0badd36d20b712e27e65947b129a2ab43ec4f79473180976c`.
+The source archive SHA-256 is
+`eafb017fc0b34274129d80ba4a668806169d0a62cd5dc0f76693387fb12f6543`;
+all 294 Apps/Demo files remain unchanged. Kernel SHA-256 stays `607acd36…`.
+The new template disk hash is
+`0396bdce1da20746180acaeee79e19e19a8f33c82167a2f941f267709738db34`.
+Exact logs, artifact sizes and full hashes are in
+[the correction report](docs/acceptance/utm-logic-prompt-fix-2026-10-26.json).
+The initial `804f42c2…` Logic ISO is preserved as
+`build/zealos-aarch64-hello-logic-804f42c2.iso`. At build completion, live UTM
+acceptance of the correction was pending. The existing live UTM session and Pi media were
+not changed during this investigation.
+The corrected ISO has also replaced `build/zealos-aarch64-hello.iso` atomically,
+so a running VM retains its original open image rather than seeing a truncated
+or partly rewritten CD.
+
+### Corrected-image live UTM retest — 2026-10-26
+
+After receiving the corrected `9c5e90c9…` ISO and the prompt-editing/exit
+checklist, the user reported **“okay it works”** and attached a screenshot
+timestamped 21:50:02 local time. The [live screenshot](docs/images/utm-logic-prompt-fix-live.png)
+shows the expected AND circuit: inputs `000A` and `000C`, output `0008`.
+The requested prompt editing, Escape exit, Shift+Escape setup cancellation,
+pointer response and subsequent `40+2;` checks are accepted by user report;
+those interactions are not independently visible in the still image.
+
+This closes the Digital Logic live program retest for the corrected ISO. It
+does not add a new live installation/persistence run or accept other programs
+in the remaining collection. The report records the screenshot digest and
+separates observed pixels from the user's confirmation. No ISO or Pi media
+were rebuilt or staged while recording this result.

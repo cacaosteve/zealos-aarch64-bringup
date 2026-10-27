@@ -7,6 +7,7 @@ class CArmDocInput
     I64 line;
     U8 *text, *owned;
     Bool first;
+    Bool owns_doc;
 };
 extern U0 ZcUserDocAttach(CCompCtrl *cc, CArmDocInput *input,
     I64 (*reader)(CArmDocInput *input, Bool in_quotes, U8 **binary_data,
@@ -21,7 +22,22 @@ extern U0 ZcUserDocAttach(CCompCtrl *cc, CArmDocInput *input,
 U0 ArmDocInputDel(CArmDocInput *input)
 {
     Free(input->owned);
+    if (input->owns_doc)
+        DocDel(input->doc);
     Free(input);
+}
+
+CArmDocInput *ArmDocIncludeNew(U8 *filename, U8 *text, I64 size)
+{//Same DocLoad and dollar policy as upstream LexDocRead/LexAttachDoc.
+    CArmDocInput *input = CAlloc(sizeof(CArmDocInput));
+    input->doc = DocNew(filename);
+    input->owns_doc = TRUE;
+    input->doc->flags |= DOCF_DBL_DOLLARS;
+    DocLoad(input->doc, text, size);
+    input->entry = input->doc->head.next;
+    input->line = 1;
+    input->first = TRUE;
+    return input;
 }
 I64 ArmDocInputChar(CArmDocInput *input, Bool in_quotes,
     U8 **binary_data, I64 *binary_size)

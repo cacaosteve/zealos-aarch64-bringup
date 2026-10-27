@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import sys
 import tarfile
+from arm64_source import translate_docfile
 
 from arm64_source import (extract_home_set, extract_home_startup, extract_home_startup_tasks, inject_home_startup_tasks, extract_version_scalars, extract_source_prompt, extract_source_training, extract_server_task, extract_user_task, translate_doctree, translate_registry, translate_docterm, translate_doced, translate_docfind, translate_docform, translate_docpopup, translate_docrecalc, translate_grbitmap,
                           translate_autocomplete_task, translate_grdc, translate_grscreen, translate_ktask, translate_mathode, translate_zsplash,
@@ -123,7 +124,11 @@ for name, expected in manifest['files'].items():
     entries[rel] = data
 for path in sorted((root / 'upstream/bootstrap').rglob('*')):
     if path.is_file():
-        entries[path.relative_to(root / 'upstream/bootstrap').as_posix()] = path.read_bytes()
+        rel = path.relative_to(root / 'upstream/bootstrap').as_posix()
+        data = path.read_bytes()
+        if rel == 'System/DolDoc/DocFile.ZC':
+            data = translate_docfile(data)
+        entries[rel] = data
 if home_startup_tasks is not None:
     gui_terminal_path = 'System/GuiTerminal.ZC'
     gui_terminal = entries.get(gui_terminal_path)

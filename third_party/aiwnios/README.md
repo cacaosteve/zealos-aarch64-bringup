@@ -10,6 +10,11 @@ Normal builds use vendored files and need neither a sibling checkout nor network
 
 Port changes:
 
+- Let the ARM64 host attach the real DolDoc reader to nested include frames
+  after document startup. Owned readers close at normal EOF and compiler
+  cleanup; their managed allocations participate in statement rollback.
+- Reject a missing assignment operand type with a compiler diagnostic,
+  including malformed document input that has no expression at that position.
 - Accept `no_warn` lists of existing locals and arguments without generating
   reads or other runtime code; reject missing names and malformed lists.
 - Expand `__DIR__`, `__FILE__` and `__LINE__` from the originating source

@@ -1,0 +1,99 @@
+{
+  "upstream_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "live_utm_logic": "partial: user screenshot confirms AND circuit; subsequent prompt editing left stale text and user reports pointer/Escape unresponsive; fix and full live acceptance pending",
+  "prior_live_program_iso": "build/zealos-aarch64-hello-programs-accepted-3b59782c.iso",
+  "pi_media": "not rebuilt or staged",
+  "checks": [
+    {
+      "description": "Digital Logic NEC USB menu, ten bitmaps, AND solver, AND/OR prompts, relaunch and exit",
+      "log": "build/check-logic-reopen-nec.log",
+      "pass_markers": 49,
+      "exit_code": 0
+    },
+    {
+      "description": "Digital Logic VirtIO menu, AND/OR prompts, relaunch and exit",
+      "log": "build/check-logic-reopen-virtio.log",
+      "pass_markers": 47,
+      "exit_code": 0
+    },
+    {
+      "description": "DolDoc nested includes, binary save/read and constant lifetime, malformed inputs, recovery without leaks",
+      "log": "build/check-doc-includes-malformed.log",
+      "pass_markers": 40,
+      "exit_code": 0
+    },
+    {
+      "description": "Full graphics, sprite pixels, transforms and screen presentation",
+      "log": "build/check-graphics-full-programs-next.log",
+      "pass_markers": 275,
+      "exit_code": 0
+    },
+    {
+      "description": "Window Manager frame and MathODE integration",
+      "log": "build/check-graphics-programs-next.log",
+      "pass_markers": 272,
+      "exit_code": 0
+    },
+    {
+      "description": "NEC GUI editor, save/compile/run/reboot/reopen and desktop controls",
+      "log": "build/check-workflow-programs-next.log",
+      "pass_markers": 421,
+      "exit_code": 0
+    },
+    {
+      "description": "NEC Doodle, Mass Spring and Life regression",
+      "log": "build/check-stock-interactive-programs-next.log",
+      "pass_markers": 60,
+      "exit_code": 0
+    },
+    {
+      "description": "VirtIO Net of Dots and Lines regression",
+      "log": "build/check-stock-base-programs-next.log",
+      "pass_markers": 33,
+      "exit_code": 0
+    },
+    {
+      "description": "Isolated Apps compilation inventory",
+      "log": "build/check-catalog-programs-next.log",
+      "pass_markers": 27,
+      "exit_code": 0
+    },
+    {
+      "description": "NEC USB CD installer, full read-back, byte-identical disk, two disk-only persistence boots",
+      "log": "build/check-logic-iso-usb.log",
+      "pass_markers": 14,
+      "exit_code": 0
+    }
+  ],
+  "artifacts": {
+    "build/kernel.elf": {
+      "sha256": "607acd3630238056ab7103b8174d17feb093a90e71339ee07e64572f161b8fec",
+      "bytes": 18821320
+    },
+    "build/sources.tar": {
+      "sha256": "022d388712d7771481d4e18d716c2d0f1fe258d6adb1cf3022983886efd82f55",
+      "bytes": 5212160
+    },
+    "build/disk.img": {
+      "sha256": "54fc196533a3ab4e6487d8afde921bbf71a0b129f9e24d0ea0bb8e885e6b406b",
+      "bytes": 134217728
+    },
+    "build/zealos-aarch64-hello.iso": {
+      "sha256": "804f42c2850f9e93c607402f187e879d060d7df6969fb64c3a3e090f5651ef2a",
+      "bytes": 37437440
+    },
+    "build/zealos-aarch64-hello-programs-accepted-3b59782c.iso": {
+      "sha256": "3b59782c36e57b058670281cb5661d8b86f31212db637020237e1d65f980f4bb",
+      "bytes": 37396480
+    }
+  },
+  "source_files": 560,
+  "unchanged_apps_demo_files": 294,
+  "automated_logic_image": "docs/images/qemu-logic-and.png",
+  "live_utm_evidence": {
+    "AND circuit": "docs/images/utm-logic-and-live.png",
+    "reported prompt freeze": "docs/images/utm-logic-input-freeze-live.png"
+  },
+  "artifact_snapshot": "Initial Logic image 804f42c2 before prompt fixes; build paths are historical snapshot identities",
+  "superseded_by": "utm-logic-prompt-fix-2026-10-26.json"
+}

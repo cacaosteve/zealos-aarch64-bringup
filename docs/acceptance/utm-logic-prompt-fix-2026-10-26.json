@@ -1,0 +1,100 @@
+{
+  "date": "2026-10-26",
+  "upstream_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "supersedes": "utm-logic-2026-10-26.json",
+  "live_utm_logic": "accepted by user report on 2026-10-26: requested corrected-ISO retest works; attached screenshot independently confirms the expected AND circuit",
+  "reproduced": [
+    "BootstrapGetStr2 emits terminal erase characters into DolDoc, leaving stale text and ignoring editing keys",
+    "Logic early abort calls unimplemented PutExcept, setting runtime failed=1"
+  ],
+  "fixes": [
+    "Graphical StrGet selects original DocGetStr2 after real keyboard/document initialization; raw/no-document fallback retained",
+    "PutExcept reports exception and honors default catch / FALSE rethrow contract without an x86 backtrace"
+  ],
+  "checks": [
+    {
+      "description": "NEC USB: visible prompt edits, invalid input recovery, all setup aborts, Shift+Escape, AND/OR rendering and clean relaunch",
+      "log": "build/check-logic-prompt-nec.log",
+      "pass_markers": 106,
+      "exit_code": 0
+    },
+    {
+      "description": "VirtIO: same expanded Logic gate",
+      "log": "build/check-logic-prompt-virtio.log",
+      "pass_markers": 104,
+      "exit_code": 0
+    },
+    {
+      "description": "NEC Doodle, Mass Spring and Life interaction regression",
+      "log": "build/check-stock-interactive-prompt-fix.log",
+      "pass_markers": 60,
+      "exit_code": 0
+    },
+    {
+      "description": "Exact ISO: USB-CD installation, complete read-back, byte-identical disk and two disk-only persistence boots",
+      "log": "build/check-logic-prompt-iso-usb.log",
+      "pass_markers": 14,
+      "exit_code": 0
+    },
+    {
+      "description": "NEC full desktop/GUI editor workflow: compiler recovery, edit/save/compile/run/reboot/reopen, graphics and menu controls",
+      "log": "build/check-workflow-prompt-fix.log",
+      "pass_markers": 421,
+      "exit_code": 0
+    }
+  ],
+  "artifacts": {
+    "build/kernel.elf": {
+      "sha256": "607acd3630238056ab7103b8174d17feb093a90e71339ee07e64572f161b8fec",
+      "bytes": 18821320
+    },
+    "build/sources.tar": {
+      "sha256": "eafb017fc0b34274129d80ba4a668806169d0a62cd5dc0f76693387fb12f6543",
+      "bytes": 5212160
+    },
+    "build/disk.img": {
+      "sha256": "0396bdce1da20746180acaeee79e19e19a8f33c82167a2f941f267709738db34",
+      "bytes": 134217728
+    },
+    "build/zealos-aarch64-logic-prompt-fix.iso": {
+      "sha256": "9c5e90c964cbd1f0badd36d20b712e27e65947b129a2ab43ec4f79473180976c",
+      "bytes": 37439488
+    },
+    "build/zealos-aarch64-hello-logic-804f42c2.iso": {
+      "sha256": "804f42c2850f9e93c607402f187e879d060d7df6969fb64c3a3e090f5651ef2a",
+      "bytes": 37437440
+    },
+    "build/zealos-aarch64-hello-programs-accepted-3b59782c.iso": {
+      "sha256": "3b59782c36e57b058670281cb5661d8b86f31212db637020237e1d65f980f4bb",
+      "bytes": 37396480
+    },
+    "build/zealos-aarch64-hello.iso": {
+      "sha256": "9c5e90c964cbd1f0badd36d20b712e27e65947b129a2ab43ec4f79473180976c",
+      "bytes": 37439488
+    }
+  },
+  "source_files": 560,
+  "unchanged_apps_demo_files": 294,
+  "pi_media": "not rebuilt or staged",
+  "evidence": {
+    "original_AND": "docs/images/utm-logic-and-live.png",
+    "reported_failure": "docs/images/utm-logic-input-freeze-live.png",
+    "corrected_prompt": "docs/images/qemu-logic-input-edited.png",
+    "corrected_live_AND": "docs/images/utm-logic-prompt-fix-live.png"
+  },
+  "standard_iso_promoted_atomically": true,
+  "live_utm_confirmation": {
+    "local_date": "2026-10-26",
+    "screenshot_local_time": "21:50:02 America/Los_Angeles",
+    "user_report": "okay it works",
+    "requested_checks": [
+      "Backspace edits 0x3 into 0xC without a stale digit",
+      "Finish AND setup and Escape to terminal",
+      "Reopen and Shift+Escape at table-size prompt; working pointer and 40+2 returning 42 after exits"
+    ],
+    "evidence_scope": "User confirmation follows the requested retest. Screenshot shows AND inputs 000A/000C and output 0008; editing, cancellation and terminal recovery are user-reported, not independently visible in this still image.",
+    "screenshot": "docs/images/utm-logic-prompt-fix-live.png",
+    "screenshot_sha256": "d4a9e48dfbe857570b7beadd87dbd1e627fed27898c5faf024fef78240bc7513",
+    "iso_sha256": "9c5e90c964cbd1f0badd36d20b712e27e65947b129a2ab43ec4f79473180976c"
+  }
+}

@@ -19,6 +19,7 @@ typedef struct CLexFile {
   int64_t ln, col, pos, is_file;
   /* ARM64 DolDoc input; ordinary files and macro expansions use text. */
   int64_t (*port_read)(struct CLexer *, struct CLexFile *);
+  void (*port_close)(struct CLexFile *);
   void *port_data;
   const char *(*port_dir)(void); // Current task directory for command input.
 } CLexFile;
@@ -50,6 +51,8 @@ typedef struct CLexer {
   int64_t *port_options;
   void (*port_sync)(struct CLexer *);
   void (*port_fun_complete)(struct CHashFun *);
+  /* Convert nested source files to the host's document-aware input stream. */
+  void (*port_include)(struct CLexer *, struct CLexFile *, int64_t);
   int64_t port_in_quotes;
   /* ARM64 command compilers may execute before lexing the next top-level statement. */
   int64_t port_statement_depth, port_defer_statement_lex, port_lex_pending;

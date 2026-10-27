@@ -19,18 +19,18 @@ U8 *DC2Sprite(CDC *dc)
     copy_width = dc->width_internal;
     if (copy_width > sprite_stride)
         copy_width = sprite_stride;
-    sprite = CAlloc(20 + sprite_stride * dc->height + 1);
+    sprite = CAlloc(17 + sprite_stride * dc->height + 1);
     if (!sprite)
         return NULL;
     bitmap_type = 23; // SPT_BITMAP
     MemCopy(sprite, &bitmap_type, sizeof(U8));
     zero = 0;
-    MemCopy(sprite + 4, &zero, sizeof(I32));
-    MemCopy(sprite + 8, &zero, sizeof(I32));
-    MemCopy(sprite + 12, &dc->width, sizeof(I32));
-    MemCopy(sprite + 16, &dc->height, sizeof(I32));
+    MemCopy(sprite + 1, &zero, sizeof(I32));
+    MemCopy(sprite + 5, &zero, sizeof(I32));
+    MemCopy(sprite + 9, &dc->width, sizeof(I32));
+    MemCopy(sprite + 13, &dc->height, sizeof(I32));
     for (row = 0; row < dc->height; row++)
-        MemCopy(sprite + 20 + row * sprite_stride,
+        MemCopy(sprite + 17 + row * sprite_stride,
                 dc->body + row * dc->width_internal, copy_width);
     // CAlloc leaves the trailing SPT_END byte zeroed.
     return sprite;
@@ -85,11 +85,11 @@ I64 SpriteElemSize(U8 *p, I64 type)
         return 16 + (a * 3 + 7) / 8;
     }
     if (type == SPT_BITMAP) {
-        MemCopy(&a, p + 12, sizeof(I32));
-        MemCopy(&b, p + 16, sizeof(I32));
+        MemCopy(&a, p + 9, sizeof(I32));
+        MemCopy(&b, p + 13, sizeof(I32));
         if (a < 0 || a > I32_MAX - 7 || b < 0 || b > 1048576)
             return -1;
-        return 20 + ((a + 7) & ~7) * b;
+        return 17 + ((a + 7) & ~7) * b;
     }
     if (type == SPT_MESH || type == SPT_SHIFTABLE_MESH) {
         if (type == SPT_MESH) {

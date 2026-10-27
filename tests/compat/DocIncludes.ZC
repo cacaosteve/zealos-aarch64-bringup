@@ -1,0 +1,103 @@
+// Serialized DolDoc includes must keep binary payloads, source paths and
+// ownership across nested EOF, compiler rollback and subsequent execution.
+I64 DocIncludeWriteChecks()
+{
+    CDoc *doc = DocNew("/Tests/DocIncludes/Sub/Child.ZC");
+    CDocBin *binary = CAlloc(sizeof(CDocBin), doc->mem_task);
+    CDocEntry *entry;
+    U8 *parent = "#include \"Sub/Child\"\nDocIncludeAnswer;\n";
+    U8 *shared = "#define DOC_INCLUDE_SHARED 3\n";
+    U8 *bad = "#include \"Sub/Broken\"\n";
+    U8 *broken = "$$BG,RED$$\nI64 DocIncludeBroken(){return (1+);}\n";
+    I64 result = 42;
+
+    binary->num = 1;
+    binary->size = 3;
+    binary->data = CAlloc(3, doc->mem_task);
+    binary->data[0] = 0x41;
+    binary->data[1] = 0;
+    binary->data[2] = 0x42;
+    QueueInsert(binary, doc->bin_head.last);
+    DocPrint(doc, "$$BG,YELLOW$$\n");
+    DocPrint(doc, "#include \"../Shared.HH\"\n#define DOC_INCLUDE_VALUE 39\n");
+    DocPrint(doc, "U8 *doc_include_file=__FILE__;\nU8 *doc_include_dir=__DIR__;\n");
+    DocPrint(doc, "I64 DocIncludeAnswer(){return DOC_INCLUDE_VALUE+DOC_INCLUDE_SHARED;}\n");
+    DocPrint(doc, "I64 DocIncludePayload(){U8 *bytes=");
+    entry = CAlloc(sizeof(CDocEntry), doc->mem_task);
+    entry->type = DOCT_INS_BIN;
+    entry->de_flags = DOCEF_HAS_BIN | DOCEF_TAG;
+    entry->tag = StrNew("", doc->mem_task);
+    entry->bin_num = 1;
+    entry->bin_data = binary;
+    QueueInsert(entry, doc->head.last);
+    DocPrint(doc, ";return ");
+    entry = CAlloc(sizeof(CDocEntry), doc->mem_task);
+    entry->type = DOCT_INS_BIN_SIZE;
+    entry->de_flags = DOCEF_HAS_BIN | DOCEF_TAG;
+    entry->tag = StrNew("", doc->mem_task);
+    entry->bin_num = 1;
+    entry->bin_data = binary;
+    QueueInsert(entry, doc->head.last);
+    DocPrint(doc, "+bytes[0]+bytes[1]+bytes[2];}\n");
+    if (!DocWrite(doc)) result = 1;
+    DocDel(doc);
+    if (FileWrite("/Tests/DocIncludes/Root.ZC", parent, StrLen(parent)) != StrLen(parent) ||
+        FileWrite("/Tests/DocIncludes/Shared.HH", shared, StrLen(shared)) != StrLen(shared) ||
+        FileWrite("/Tests/DocIncludes/Bad.ZC", bad, StrLen(bad)) != StrLen(bad) ||
+        FileWrite("/Tests/DocIncludes/Sub/Broken.ZC", broken, StrLen(broken)) != StrLen(broken))
+        result = 2;
+    return result;
+}
+
+I64 DocIncludeChecks()
+{
+    U8 *original = DirCur;
+    CCompCtrl *outer = Fs->last_cc;
+    I64 result = 42;
+    if (!Cd("/LICENSE")) return 1;
+    if (ExeFile("/Tests/DocIncludes/Root.ZC") != 42 ||
+        Fs->last_cc != outer || StrCompare(Fs->cur_dir, "/LICENSE")) result = 2;
+    // Definitions were compiled from an include in this function's execution,
+    // so use a second compiler invocation to resolve them. The include's
+    // document has already been deleted; its binary constant must still live.
+    if (ExePutS("DocIncludePayload;") != 0x86) result = 3;
+    if (ExePutS("StrCompare(doc_include_file,\"/Tests/DocIncludes/Sub/Child.ZC\") || StrCompare(doc_include_dir,\"/Tests/DocIncludes/Sub\");"))
+        result = 4;
+    Cd(original);
+    Free(original);
+    return result;
+}
+
+I64 DocIncludeRecoveryChecks()
+{
+    CCompCtrl *outer = Fs->last_cc;
+    U8 *original = DirCur;
+    I64 i, result = 42;
+    for (i = 0; i < 3; i++)
+    {
+        if (ExeFile("/Tests/DocIncludes/Bad.ZC") || Fs->last_cc != outer ||
+            StrCompare(original, Fs->cur_dir)) result = 1;
+        if (ExePutS("6*7;") != 42) result = 2;
+        // A missing initializer used to fault in assignment type inference.
+        if (ExePutS("I64 DocIncludeBadAssignment(){U8 *bytes=;return 0;}")) result = 3;
+    }
+    Free(original);
+    return result;
+}
+
+I64 DocIncludeMalformedChecks()
+{
+    CDoc *doc = DocNew;
+    U8 bytes[17];
+    I64 caught = 0, result = 42;
+    MemSet(bytes, 0, sizeof(bytes));
+    bytes[9] = 100; // Header claims 100 bytes, but no payload follows it.
+    try { DocLoad(doc, bytes, sizeof(bytes)); }
+    catch { caught=Fs->except_ch; Fs->catch_except=TRUE; }
+    if (caught != 'Compiler' || !DocLock(doc)) result = 1;
+    DocUnlock(doc);
+    DocLoad(doc, "40+2;", 5);
+    if (ExeDoc(doc) != 42) result = 2;
+    DocDel(doc);
+    return result;
+}

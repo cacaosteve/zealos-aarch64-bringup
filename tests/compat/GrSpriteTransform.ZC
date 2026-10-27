@@ -270,90 +270,90 @@ I64 GrSpriteTransformChecks()
     type = 23; // SPT_BITMAP
     MemCopy(records + 533, &type, sizeof(U8));
     x = 100; y = 50;
-    MemCopy(records + 537, &x, sizeof(I32));
-    MemCopy(records + 541, &y, sizeof(I32));
+    MemCopy(records + 534, &x, sizeof(I32));
+    MemCopy(records + 538, &y, sizeof(I32));
     x = 2; y = 2;
-    MemCopy(records + 545, &x, sizeof(I32));
-    MemCopy(records + 549, &y, sizeof(I32));
+    MemCopy(records + 542, &x, sizeof(I32));
+    MemCopy(records + 546, &y, sizeof(I32));
     pixel = 12;
-    MemCopy(records + 553, &pixel, sizeof(U8));
-    MemCopy(records + 554, &pixel, sizeof(U8));
-    MemCopy(records + 561, &pixel, sizeof(U8));
-    MemCopy(records + 562, &pixel, sizeof(U8));
+    MemCopy(records + 550, &pixel, sizeof(U8));
+    MemCopy(records + 551, &pixel, sizeof(U8));
+    MemCopy(records + 558, &pixel, sizeof(U8));
+    MemCopy(records + 559, &pixel, sizeof(U8));
 
     type = SPT_TRANSFORM_OFF;
-    MemCopy(records + 569, &type, sizeof(U8));
+    MemCopy(records + 566, &type, sizeof(U8));
     type = 23; // SPT_BITMAP
-    MemCopy(records + 570, &type, sizeof(U8));
+    MemCopy(records + 567, &type, sizeof(U8));
     x = 100; y = 50;
-    MemCopy(records + 574, &x, sizeof(I32));
-    MemCopy(records + 578, &y, sizeof(I32));
+    MemCopy(records + 568, &x, sizeof(I32));
+    MemCopy(records + 572, &y, sizeof(I32));
     x = 2; y = 2;
-    MemCopy(records + 582, &x, sizeof(I32));
-    MemCopy(records + 586, &y, sizeof(I32));
-    MemCopy(records + 590, &pixel, sizeof(U8));
-    MemCopy(records + 591, &pixel, sizeof(U8));
-    MemCopy(records + 598, &pixel, sizeof(U8));
-    MemCopy(records + 599, &pixel, sizeof(U8));
+    MemCopy(records + 576, &x, sizeof(I32));
+    MemCopy(records + 580, &y, sizeof(I32));
+    MemCopy(records + 584, &pixel, sizeof(U8));
+    MemCopy(records + 585, &pixel, sizeof(U8));
+    MemCopy(records + 592, &pixel, sizeof(U8));
+    MemCopy(records + 593, &pixel, sizeof(U8));
 
     type = SPT_TRANSFORM_ON;
-    MemCopy(records + 606, &type, sizeof(U8));
+    MemCopy(records + 600, &type, sizeof(U8));
     type = SPT_TEXT;
-    MemCopy(records + 607, &type, sizeof(U8));
+    MemCopy(records + 601, &type, sizeof(U8));
     x = 120; y = 60;
-    MemCopy(records + 611, &x, sizeof(I32));
-    MemCopy(records + 615, &y, sizeof(I32));
-    records[619] = 'A';
+    MemCopy(records + 605, &x, sizeof(I32));
+    MemCopy(records + 609, &y, sizeof(I32));
+    records[613] = 'A';
 
     type = SPT_TRANSFORM_OFF;
-    MemCopy(records + 621, &type, sizeof(U8));
+    MemCopy(records + 615, &type, sizeof(U8));
     type = SPT_TEXT;
-    MemCopy(records + 622, &type, sizeof(U8));
+    MemCopy(records + 616, &type, sizeof(U8));
     x = 120; y = 60;
-    MemCopy(records + 626, &x, sizeof(I32));
-    MemCopy(records + 630, &y, sizeof(I32));
-    records[634] = 'A';
+    MemCopy(records + 620, &x, sizeof(I32));
+    MemCopy(records + 624, &y, sizeof(I32));
+    records[628] = 'A';
 
     type = SPT_TRANSFORM_ON;
-    MemCopy(records + 636, &type, sizeof(U8));
+    MemCopy(records + 630, &type, sizeof(U8));
     type = SPT_TEXT_BOX;
-    MemCopy(records + 637, &type, sizeof(U8));
+    MemCopy(records + 631, &type, sizeof(U8));
     x = 140; y = 100;
-    MemCopy(records + 641, &x, sizeof(I32));
-    MemCopy(records + 645, &y, sizeof(I32));
-    records[649] = 'A';
+    MemCopy(records + 635, &x, sizeof(I32));
+    MemCopy(records + 639, &y, sizeof(I32));
+    records[643] = 'A';
 
     type = SPT_TRANSFORM_ON;
-    MemCopy(records + 651, &type, sizeof(U8));
+    MemCopy(records + 645, &type, sizeof(U8));
     type = SPT_TEXT_DIAMOND;
-    MemCopy(records + 652, &type, sizeof(U8));
+    MemCopy(records + 646, &type, sizeof(U8));
     x = 170; y = 130;
-    MemCopy(records + 656, &x, sizeof(I32));
-    MemCopy(records + 660, &y, sizeof(I32));
-    records[664] = 'A';
+    MemCopy(records + 650, &x, sizeof(I32));
+    MemCopy(records + 654, &y, sizeof(I32));
+    records[658] = 'A';
 
     // Fill coordinates follow the active transform, while the fill remains
     // connected in the destination framebuffer's pixel space.
     type = SPT_TRANSFORM_ON;
-    MemCopy(records + 667, &type, sizeof(U8));
+    MemCopy(records + 661, &type, sizeof(U8));
     type = SPT_FLOOD_FILL;
-    MemCopy(records + 668, &type, sizeof(U8));
+    MemCopy(records + 662, &type, sizeof(U8));
     x = 100; y = 200;
-    MemCopy(records + 672, &x, sizeof(I32));
-    MemCopy(records + 676, &y, sizeof(I32));
+    MemCopy(records + 666, &x, sizeof(I32));
+    MemCopy(records + 670, &y, sizeof(I32));
 
     type = SPT_TRANSFORM_ON;
-    MemCopy(records + 681, &type, sizeof(U8));
+    MemCopy(records + 675, &type, sizeof(U8));
     type = SPT_ROTATED_RECT;
-    MemCopy(records + 682, &type, sizeof(U8));
+    MemCopy(records + 676, &type, sizeof(U8));
     x = 50; y = 100;
-    MemCopy(records + 686, &x, sizeof(I32));
-    MemCopy(records + 690, &y, sizeof(I32));
+    MemCopy(records + 680, &x, sizeof(I32));
+    MemCopy(records + 684, &y, sizeof(I32));
     x = 55; y = 104;
-    MemCopy(records + 694, &x, sizeof(I32));
-    MemCopy(records + 698, &y, sizeof(I32));
+    MemCopy(records + 688, &x, sizeof(I32));
+    MemCopy(records + 692, &y, sizeof(I32));
     angle = 0x3FF0000000000000; // 1 radian
-    MemCopy(records + 706, &angle, sizeof(U64));
+    MemCopy(records + 700, &angle, sizeof(U64));
 
     glyph_row = glyph_col = -1;
     for (scan_i = 0; scan_i < FONT_HEIGHT && glyph_row < 0; scan_i++)
@@ -373,10 +373,10 @@ I64 GrSpriteTransformChecks()
     for (scan_i = 530; scan_i <= 720; scan_i++)
         for (scan_j = 430; scan_j <= 590; scan_j++)
             ZcFbGraphPlot(scan_i, scan_j, 0, 0, 0, 799, 599, 0);
-    records[667] = 0;
+    records[661] = 0;
     Sprite3(dc, dc->x, dc->y, dc->z, records);
     type = SPT_TRANSFORM_ON;
-    MemCopy(records + 667, &type, sizeof(U8));
+    MemCopy(records + 661, &type, sizeof(U8));
     if (!GrSpriteTransformPixelMatches(dc, 593, 453, color) ||
             !GrSpriteTransformPixelMatches(dc, 633, 447, color) ||
             !GrSpriteTransformPixelMatches(dc, 575, 445, color) ||
@@ -424,7 +424,7 @@ I64 GrSpriteTransformChecks()
     // the owning task's pixel origin before indexing dc->body, so the screen
     // path above is not a valid local-body pixel assertion.
     dc->flags &= ~DCF_SCREEN_BITMAP;
-    Sprite3(dc, 0, 0, 0, records + 622);
+    Sprite3(dc, 0, 0, 0, records + 616);
     if (dc->body[(60 + glyph_row) * dc->width_internal +
             120 + glyph_col] != 12)
         return 7;
@@ -437,7 +437,7 @@ I64 GrSpriteTransformChecks()
             ZcFbGraphPlot(scan_i, scan_j, 0, 0, 0, 799, 599, 0);
             dc->body[scan_j * dc->width_internal + scan_i] = 0;
         }
-    Sprite3(dc, dc->x, dc->y, dc->z, records + 651);
+    Sprite3(dc, dc->x, dc->y, dc->z, records + 645);
     pixel_count = 0;
     for (scan_i = 460; scan_i <= 500; scan_i++)
         for (scan_j = 580; scan_j <= 620; scan_j++)
@@ -461,12 +461,12 @@ I64 GrSpriteTransformChecks()
     ZcFbGraphPlot(100, 200, 0, 0, 0, 799, 599, 0);
     ZcFbGraphPlot(100, 200, 15, 0, 0, 799, 599, 0);
     dc->color.c0 = 12;
-    Sprite3(dc, dc->x, dc->y, dc->z, records + 667);
+    Sprite3(dc, dc->x, dc->y, dc->z, records + 661);
     if (ZcFbTextPixel(411, 531) != ZcFbGraphColor(12) ||
             ZcFbTextPixel(409, 530) != ZcFbGraphColor(15) ||
             ZcFbTextPixel(100, 200) != ZcFbGraphColor(15))
         return 7;
-    Sprite3(dc, dc->x, dc->y, dc->z, records + 681);
+    Sprite3(dc, dc->x, dc->y, dc->z, records + 675);
     if (ZcFbTextPixel(511, 483) != color ||
             ZcFbTextPixel(510, 479) == color)
         return 8;

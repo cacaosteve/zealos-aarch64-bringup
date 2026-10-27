@@ -396,6 +396,30 @@ def extract_source_training(source: bytes) -> bytes:
             tip.replace(anchor, guard + anchor, 1))
 
 
+def translate_docfile(source: bytes) -> bytes:
+    """Normalize serialized binary resources before the unchanged DocLoad loop."""
+    text = source.decode('utf-8')
+    start = '\tCDocBin\t*tmpb;\n\n\tdoc->find_replace->filter_lines = 0;'
+    if text.count(start) != 1:
+        raise ValueError('pinned DocLoad local declarations changed')
+    # Validate before locking: a catchable malformed resource must leave the
+    # caller's document unlocked and usable for a subsequent load.
+    lock = '\tBool\t unlock = DocLock(doc);'
+    if text.count(lock) != 1:
+        raise ValueError('DocLoad lock boundary changed')
+    text = text.replace(lock, '\tBool\t unlock;', 1)
+    text = text.replace(start, '\tCDocBin\t*tmpb;\n'
+        '\tU8 *arm_owned = ZcDocInputBytes(src2, size, &size);\n'
+        '\tif (arm_owned) src2 = arm_owned;\n'
+        '\tunlock = DocLock(doc);\n\n'
+        '\tdoc->find_replace->filter_lines = 0;', 1)
+    end = '\tDocTop(doc); //Calls $LK,"DocRecalc",A="MN:DocRecalc"$().  DOCT_CURSOR will be set.\n'
+    if text.count(end) != 1:
+        raise ValueError('pinned DocLoad cleanup boundary changed')
+    text = text.replace(end, end+'\tFree(arm_owned);\n', 1)
+    return text.encode('utf-8')
+
+
 def translate_doctree(source: bytes) -> bytes:
     text = source.decode('utf-8')
     for old, new, count in (

@@ -1280,25 +1280,25 @@ I64 GrSpriteSymmetryChecks()
     MemSet(records, 0, 246);
     type = SPT_TRANSFORM_ON;
     MemCopy(records, &type, sizeof(U8));
-    type = SPT_BITMAP;
+    type = 23; // SPT_BITMAP, packed fixture
     MemCopy(records + 1, &type, sizeof(U8));
     x1 = 20; y1 = 20; x2 = 2; y2 = 2;
-    MemCopy(records + 5, &x1, sizeof(I32));
-    MemCopy(records + 9, &y1, sizeof(I32));
-    MemCopy(records + 13, &x2, sizeof(I32));
-    MemCopy(records + 17, &y2, sizeof(I32));
-    color = 12; MemCopy(records + 21, &color, sizeof(U8));
-    color = 13; MemCopy(records + 22, &color, sizeof(U8));
-    color = 14; MemCopy(records + 29, &color, sizeof(U8));
-    color = 15; MemCopy(records + 30, &color, sizeof(U8));
+    MemCopy(records + 2, &x1, sizeof(I32));
+    MemCopy(records + 6, &y1, sizeof(I32));
+    MemCopy(records + 10, &x2, sizeof(I32));
+    MemCopy(records + 14, &y2, sizeof(I32));
+    color = 12; MemCopy(records + 18, &color, sizeof(U8));
+    color = 13; MemCopy(records + 19, &color, sizeof(U8));
+    color = 14; MemCopy(records + 26, &color, sizeof(U8));
+    color = 15; MemCopy(records + 27, &color, sizeof(U8));
     type = SPT_TEXT;
-    MemCopy(records + 37, &type, sizeof(U8));
+    MemCopy(records + 34, &type, sizeof(U8));
     x1 = 80; y1 = 40;
-    MemCopy(records + 41, &x1, sizeof(I32));
-    MemCopy(records + 45, &y1, sizeof(I32));
-    records[49] = 'A';
+    MemCopy(records + 38, &x1, sizeof(I32));
+    MemCopy(records + 42, &y1, sizeof(I32));
+    records[46] = 'A';
     type = SPT_TRANSFORM_OFF;
-    MemCopy(records + 51, &type, sizeof(U8));
+    MemCopy(records + 48, &type, sizeof(U8));
     if (!(SpriteTypeMask(records) & (1 << SPT_BITMAP)) ||
             !(SpriteTypeMask(records) & (1 << SPT_TEXT)))
         return 262;
@@ -1358,20 +1358,20 @@ I64 GrSpriteSymmetryChecks()
     MemSet(records, 0, 246);
     type = SPT_TRANSFORM_ON;
     MemCopy(records, &type, sizeof(U8));
-    type = SPT_BITMAP;
+    type = 23; // SPT_BITMAP, packed fixture
     MemCopy(records + 1, &type, sizeof(U8));
     x1 = -5; y1 = 0; x2 = 8; y2 = 1;
-    MemCopy(records + 5, &x1, sizeof(I32));
-    MemCopy(records + 9, &y1, sizeof(I32));
-    MemCopy(records + 13, &x2, sizeof(I32));
-    MemCopy(records + 17, &y2, sizeof(I32));
+    MemCopy(records + 2, &x1, sizeof(I32));
+    MemCopy(records + 6, &y1, sizeof(I32));
+    MemCopy(records + 10, &x2, sizeof(I32));
+    MemCopy(records + 14, &y2, sizeof(I32));
     for (scan_x = 0; scan_x < 8; scan_x++)
     {
         pixel = scan_x + 1;
-        MemCopy(records + 21 + scan_x, &pixel, sizeof(U8));
+        MemCopy(records + 18 + scan_x, &pixel, sizeof(U8));
     }
     type = SPT_TRANSFORM_OFF;
-    MemCopy(records + 29, &type, sizeof(U8));
+    MemCopy(records + 26, &type, sizeof(U8));
     dc->flags |= DCF_SCREEN_BITMAP | DCF_ON_TOP;
     Sprite3(dc, 0, 0, 0, records);
     if (dc->body[100 * dc->width_internal + 100] != 4 ||

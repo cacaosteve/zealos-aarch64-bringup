@@ -1,0 +1,16 @@
+// Kernel StrA ListSub semantics through the shared Print/StrPrintJoin path.
+I64 ListFormatChecks()
+{
+    U8 *list = "AND\0@and\0OR\0XOR\0\0";
+    U8 *text = MStrPrint("%z/%z/%z:%d", 0, list, 1, list, 2, list, 42);
+    if (StrCompare(text, "AND/OR/XOR:42")) return 1;
+    Free(text);
+    text = MStrPrint("[%5z][%-2tz]", 1, list, 2, list);
+    if (StrCompare(text, "[   OR][XO]")) return 2;
+    Free(text);
+    text = MStrPrint("[%z][%z][%z][%z]", -1, list, 3, list, 0, "", 0, NULL);
+    if (StrCompare(text, "[][][][]")) return 3;
+    Free(text);
+    Print("list_format=%z/%z/%z:%d\n", 0, list, 1, list, 2, list, 42);
+    return 42;
+}
