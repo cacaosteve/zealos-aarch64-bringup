@@ -1,0 +1,5 @@
+I64 StockNoWarnInvalid()
+{
+    no_warn missing_local;
+    return 42;
+}

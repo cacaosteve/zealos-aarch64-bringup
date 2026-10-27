@@ -1,0 +1,38 @@
+I64 StockPopupEntryChecks()
+{
+    CDoc *doc = DocNew;
+    CDocEntry *button, *entry;
+    I64 buttons = 0, last_type = -1;
+
+    DocPrint(doc, "Left-Click to place mas\nRight-Click and drag to\nconnect with spring.\n\nSprings are 100 pixs long.\n");
+    button = DocPrint(doc, "$$CM+CX,%d,4$$$$BT,\"%s\",LE=%d$$\n", -2, "OKAY", 1);
+    for (entry = doc->head.next; entry != doc; entry = entry->next)
+        if (entry->type_u8 == DOCT_BTTN)
+        {
+            Print("popup_button flags=%X x=%d y=%d tag=%s\n",
+                  entry->de_flags, entry->x, entry->y, entry->tag);
+            buttons++;
+        }
+    if (button)
+        last_type = button->type_u8;
+    Print("popup_button_count=%d last_type=%d\n", buttons, last_type);
+    DocDel(doc);
+    return buttons == 1;
+}
+
+I64 StockPopupPoint(U8 *label)
+{
+    CTask *task = sys_focus_task;
+    CDoc *doc = task->display_doc;
+    CDocEntry *entry;
+    I64 x, y;
+
+    for (entry = doc->head.next; entry != doc; entry = entry->next)
+        if (entry->tag && StrMatch(label, entry->tag))
+        {
+            x = task->pix_left + (entry->x - doc->line_start_col) * FONT_WIDTH + 8;
+            y = task->pix_top + (entry->y - doc->top_line_num) * FONT_HEIGHT + 4;
+            return y << 32 + x;
+        }
+    return -1;
+}

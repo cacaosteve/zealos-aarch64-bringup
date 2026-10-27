@@ -2089,8 +2089,10 @@ ZealOS live distribution or installer.
   `CGrGlobals` packed-bit and all-256-value color lookup tables, circle bounds,
   normal/collision/even/odd pen-brush CDCs, zoom expansion tables, and bounded
   window z/visibility tables. Circle bounds use layout-derived flat pointers
-  because nested inline-array member access currently faults in the ARM64
-  compiler. QEMU checks validate table contents and actual pen-brush pixels;
+  during early initialization. The compiler now preserves inline row addresses
+  and trailing-dimension strides, so the unchanged full graphics primitives
+  can read those two-dimensional tables directly. QEMU checks validate dynamic
+  signed member arrays, three-dimensional arrays and actual thick-line pixels;
   the CDC diff check verifies empty and changed regions, including a
   nonzero-origin, seven-pixel-wide extraction and its padded row stride. A
   guarded ARM64 `GrBitMap.ZC` overlay keeps `DCExt`'s requested dimensions,
@@ -3036,12 +3038,11 @@ to the system namespace and survive the caller exiting. This is a bootstrap
 bridge, not acceptance of the complete original system-task command loop.
 
 Formatted source execution (`ExePrint`/`ExePrint2`) preserves DolDoc markers.
-The existing bounded text formatter for `Print`/`StrPrintJoin` still strips
-those markers. A popup launch can therefore contain a standalone empty string
-statement. The parser now accepts that valid empty Print separately from the
+At this milestone, the bounded `Print`/`StrPrintJoin` formatter still stripped
+those markers. The parser accepts a valid empty Print separately from the
 `"" dynamic_format, args;` prefix form, so the following file call can run.
-An attempted broader formatting change was rejected by the editor regression
-gate; full DolDoc formatting remains work beyond this milestone.
+The program expansion below subsequently preserves markers in StrPrintJoin
+and checks original popup buttons and the graphical editor together.
 The new `_LN` binding supplies a freestanding binary64 natural logarithm for
 DocPopUp's range helper, including
 subnormal, zero, negative, infinity and NaN handling. It does not claim a
@@ -4116,3 +4117,41 @@ after Window Demo closes. `make check-user-startup`, `make check-home-autostart`
 `make check-grscreen-full`, and the full `make check-compat-pci` rerun pass;
 the startup check confirms typed commands, independent history, output, and
 prompt recovery in both tiled terminals.
+
+## Original graphics program expansion — 2026-10-26
+
+The complete pinned Apps/Demo trees (294 files) are available in the source
+bundle. This is separate from support: the application inventory compiles
+entry points in isolated tasks, and only programs with interactive acceptance
+are exposed as working additions in [PROGRAMS.md](PROGRAMS.md).
+
+The original GrMath and GrPrimatives modules now load during graphics startup.
+Exact upstream excerpts provide R2P, PopUpColor, QueueDel and QueueCount. Native
+bindings supply Ceil, floating Sqr, unsigned square and normal Sin/Cos/Arg;
+Arg reduces its atan argument before the series evaluation. Boundary checks
+cover integer wraparound, signed zero, a negative subnormal, infinity, polar
+quadrants and circle/thick-line pixels. Decimal-literal conversion can still
+be one ULP off, so this does not claim correctly rounded floating input/libm.
+
+The compiler now handles `__DIR__`, `__FILE__` and `__LINE__` with originating
+file provenance, and validates `no_warn` local/argument names. Inline member
+arrays preserve each remaining row's address and complete stride. Dynamic
+signed-byte, wide-element and three-dimensional cases have guarded guest
+regressions. The original brush-bound access no longer dereferences a null
+base in GrFillCircle.
+
+Popup startup reloads DocRecalcLib after real form navigation and DocForm after
+real DocEd. StrPrintJoin preserves adjacent DolDoc markers; ordinary popup
+tasks receive the actual KDDocPutKey echo path. Source execution can tear down
+children with callbacks while parser and executive-dispatch restrictions stay
+in place. The original color picker, buttons and the full editor workflow pass.
+
+Reloading TaskBridge binds its later tS symbol to the live timer cell. Defining
+the current input router before its poll caller also prevents a preceding
+bootstrap implementation from dispatching each physical mouse edge a second
+time. Clock progression and exact one-down/one-up checks pass. These shared
+fixes enable Doodle's retained stroke, Mass Spring's moving ODE masses and
+Life's background evolution with NEC USB and VirtIO input, plus clean exit to
+the terminal. Doodle, Mass Spring and Life also pass live UTM checks on
+`3b59782c…`; screenshots and the user's reset/exit confirmation are recorded in
+ACCEPTANCE.md. Physical Pi application acceptance remains separate.

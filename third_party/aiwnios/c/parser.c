@@ -2593,6 +2593,27 @@ not_label:
    * compatibility while treating these declarations as ordinary functions. */
   if (PrsKw(ccmp, TK_KW_ARGPOP) || PrsKw(ccmp, TK_KW_NOARGPOP))
     return PrsStmt(ccmp);
+  if (PrsKw(ccmp, TK_KW_NOWARN)) {
+    /* ZealOS marks existing locals/arguments as intentionally unused.
+     * It is an annotation, so emit no expression or variable read. */
+    CMemberLst *member;
+    do {
+      if (!ccmp->cur_fun || ccmp->lex->cur_tok != TK_NAME ||
+          !(member = MemberFind(ccmp->lex->string, ccmp->cur_fun))) {
+        ParseErr(ccmp, "no_warn expects a local variable or argument.");
+        return 0;
+      }
+      member->use_cnt++;
+      Lex(ccmp->lex);
+      if (ccmp->lex->cur_tok != ',')
+        break;
+      Lex(ccmp->lex);
+    } while (1);
+    if (ccmp->lex->cur_tok != ';')
+      ParseErr(ccmp, "Expected ',' or ';' after no_warn variable.");
+    PrsStatementEnd(ccmp);
+    return 1;
+  }
   if (found_label) {
     QueIns(rpn, ccmp->code_ctrl->ir_code);
     if (!PrsStmt(ccmp)) {

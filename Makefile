@@ -757,6 +757,11 @@ check-iso-installer: check-upstream esp iso
 	python3 scripts/check-install-image.py $(DISK_IMG)
 	python3 scripts/check-iso-installer.py $(ISO)
 
+.PHONY: check-iso-installer-usb
+check-iso-installer-usb: check-upstream esp iso
+	python3 scripts/check-install-image.py $(DISK_IMG)
+	python3 scripts/check-iso-installer.py --usb-cd $(ISO)
+
 .PHONY: check-autocomplete
 check-autocomplete: check-upstream esp
 	python3 scripts/check-arm64-source.py

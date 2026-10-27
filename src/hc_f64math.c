@@ -214,6 +214,16 @@ uint64_t hc_builtin_wrap1(uint64_t th_bits) {
 
 /* atan for |z| <= 1 (odd Taylor). */
 static double hc_atan_unit(double z) {
+    /* Keep the Taylor argument within tan(pi/8). At z=1 the un-reduced
+     * series converges too slowly for program geometry and polar transforms. */
+    double offset = 0.0;
+    if (z > 0.4142135623730950488) {
+        offset = HC_PI * 0.25;
+        z = (z - 1.0) / (z + 1.0);
+    } else if (z < -0.4142135623730950488) {
+        offset = -HC_PI * 0.25;
+        z = (z + 1.0) / (1.0 - z);
+    }
     double z2 = z * z;
     double t = z;
     double s = z;
@@ -222,7 +232,7 @@ static double hc_atan_unit(double z) {
         t *= -z2;
         s += t / (double)(2 * i + 1);
     }
-    return s;
+    return offset + s;
 }
 
 static double hc_atan(double z) {

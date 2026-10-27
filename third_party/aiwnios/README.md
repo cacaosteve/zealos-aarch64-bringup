@@ -10,6 +10,16 @@ Normal builds use vendored files and need neither a sibling checkout nor network
 
 Port changes:
 
+- Accept `no_warn` lists of existing locals and arguments without generating
+  reads or other runtime code; reject missing names and malformed lists.
+- Expand `__DIR__`, `__FILE__` and `__LINE__` from the originating source
+  frame, including nested includes and macro expansions. Guest paths remain
+  absolute so an application's `Cd(__DIR__)` works from any current directory.
+- Keep the address of any remaining inline array row during subscript
+  lowering, including its pointer-width result. Loading an intermediate
+  two-dimensional row as a pointer read its first element instead, breaking
+  `CGrGlobals` brush bounds and other inline member arrays.
+
 - Accept standalone `"";` as an empty Print while retaining the dynamic-format
   prefix form `"" format, args;`. Popup-generated source can contain an empty
   display-control statement under the bounded text formatter.

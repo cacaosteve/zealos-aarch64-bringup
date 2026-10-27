@@ -1,0 +1,31 @@
+// Macro provenance must follow real files through includes and macro frames.
+#include "SourceMacrosInclude.HH"
+U8 *stock_source_dir = __DIR__;
+U8 *stock_source_file = __FILE__;
+I64 stock_source_line = __LINE__;
+
+I64 StockSourceMacroChecks()
+{
+    Print("source_macro=%s|%s|%d included=%s|%s|%d\n",
+          stock_source_dir, stock_source_file, stock_source_line,
+          stock_included_dir, stock_included_file, stock_included_line);
+    if (StrCompare(stock_source_dir, "/Tests") ||
+        StrCompare(stock_source_file, "/Tests/SourceMacros.ZC") ||
+        stock_source_line != 5 ||
+        StrCompare(stock_included_dir, "/Tests") ||
+        StrCompare(stock_included_file, "/Tests/SourceMacrosInclude.HH") ||
+        stock_included_line != 4)
+        return 0;
+    return 42;
+}
+
+I64 StockNoWarn(I64 unused)
+{
+    I64 unused_local;
+    no_warn unused, unused_local;
+    return 42;
+}
+I64 StockNoWarnChecks()
+{
+    return StockNoWarn(7);
+}

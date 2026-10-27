@@ -1,0 +1,28 @@
+// Unchanged queue lifecycle helpers from pinned Kernel/KDataTypes.ZC.
+U0 QueueDel(CQueue *head, Bool querem=FALSE)
+{//Free entries in queue, not head.
+	CQueue *tmpq = head->next, *tmpq1;
+
+	while (tmpq != head)
+	{
+		tmpq1 = tmpq->next;
+		if (querem)
+			QueueRemove(tmpq);
+		Free(tmpq);
+		tmpq = tmpq1;
+	}
+}
+
+I64 QueueCount(CQueue *head)
+{//Count of nodes in queue, not head.
+	CQueue	*tmpq = head->next;
+	I64		 res = 0;
+
+	while (tmpq != head)
+	{
+		res++;
+		tmpq = tmpq->next;
+	}
+
+	return res;
+}

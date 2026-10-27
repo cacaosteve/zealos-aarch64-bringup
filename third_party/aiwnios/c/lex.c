@@ -654,7 +654,38 @@ re_enter:;
   case 'a' ... 'z':
   case 'A' ... 'Z':
   case 0x80 ... 0xff: /* UTF-8 identifier bytes in upstream ZealC. */
-lex_ident:
+lex_ident: {
+    char source_name[STR_LEN] = "", source_dir[STR_LEN] = "";
+    int64_t source_line = 0;
+    /* Keep provenance before scanning: the final character can pop a file
+     * frame at EOF. Macro frames inherit the nearest real source file. */
+    if (chr1 == '_') {
+      actual_file = lex->file;
+      while (actual_file && !actual_file->is_file)
+        actual_file = actual_file->last;
+      if (actual_file) {
+        const char *filename = actual_file->filename;
+        const char *file_dir = actual_file->port_dir ? actual_file->port_dir() :
+                               actual_file->dir ? actual_file->dir : ".";
+        /* Archive-relative lexer paths are absolute in the guest's public
+         * file namespace. Cd(__DIR__) must not rejoin the task's cwd. */
+        if (!strcmp(file_dir, ".") || !*file_dir)
+          file_dir = "/";
+        snprintf(source_dir, sizeof(source_dir), "%s",
+                 file_dir);
+        if (*file_dir != '/' && !strchr(file_dir, ':'))
+          snprintf(source_dir, sizeof(source_dir), "/%s", file_dir);
+        if (*filename == '/' || *filename == '<' || strchr(filename, ':'))
+          snprintf(source_name, sizeof(source_name), "%s", filename);
+        else {
+          const char *base_name = strrchr(filename, '/');
+          base_name = base_name ? base_name + 1 : filename;
+          snprintf(source_name, sizeof(source_name), "%s%s%s", source_dir,
+                   !strcmp(source_dir, "/") ? "" : "/", base_name);
+        }
+        source_line = actual_file->ln + 1;
+      }
+    }
     lex->flags |= LEXF_USE_LAST_CHAR;
     for (;;) {
       switch (chr1 = LexAdvChr(lex)) {
@@ -684,6 +715,17 @@ lex_ident:
         lex->flags |= LEXF_USE_LAST_CHAR;
         lex->string[idx++] = 0;
         if (!(lex->flags & LEXF_NO_EXPAND)) {
+          if (!strcmp(lex->string, "__DIR__") ||
+              !strcmp(lex->string, "__FILE__")) {
+            int is_dir = !strcmp(lex->string, "__DIR__");
+            strcpy(lex->string, is_dir ? source_dir : source_name);
+            lex->str_len = strlen(lex->string) + 1;
+            return lex->cur_tok = TK_STR;
+          }
+          if (!strcmp(lex->string, "__LINE__")) {
+            lex->integer = source_line;
+            return lex->cur_tok = TK_I64;
+          }
           define = HashFind(lex->string, Fs->hash_table, HTT_DEFINE_STR, 1);
           if (define) {
             //
@@ -717,6 +759,7 @@ lex_ident:
       }
     }
     break;
+  }
   case '#':
     if (TK_NAME == Lex(lex)) {
       if (!strcmp(lex->string, "help_file")) {

@@ -1,0 +1,25 @@
+// Run through ExeFile2, so the caller has an active source execution context.
+I64 stock_source_child_ended;
+U0 StockSourceChildEnd()
+{
+    stock_source_child_ended = 42;
+}
+U0 StockSourceChild(U8 *)
+{
+    Fs->task_end_cb = &StockSourceChildEnd;
+    while (TRUE)
+        Yield;
+}
+I64 StockSourceChildKillChecks()
+{
+    CTask *task;
+    stock_source_child_ended = 0;
+    task = Spawn(&StockSourceChild);
+    if (!task)
+        return 1;
+    Sleep(2);
+    if (!Kill(task) || TaskValidate(task) || stock_source_child_ended != 42)
+        return 2;
+    return 42;
+}
+StockSourceChildKillChecks;

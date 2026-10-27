@@ -19,8 +19,10 @@ static int64_t IsConst(CRPN *rpn) {
 static int64_t PtrWidthOfRPN(CRPN *rpn) {
   int64_t r = 1;
   if (rpn->ic_dim) {
-    if (rpn->ic_dim->next)
-      r *= rpn->ic_dim->next->total_cnt;
+    /* ic_dim points at dim.next, past the declaration's size header.
+     * Its total_cnt already contains the product of the trailing dimensions;
+     * skipping another node drops one row stride for multidimensional arrays. */
+    r *= rpn->ic_dim->total_cnt;
     r *= rpn->ic_class->sz;
   } else if (rpn->ic_class->flags & CLSF_FUNPTR) {
     /* Funptrs are CHashFun, not a CHashClass star array — never use [-1]. */
@@ -269,9 +271,11 @@ void OptPassExpandPtrs(CCmpCtrl *cctrl) {
       b = rpn->base.next;
       a = ICFwd(b);
       dim = rpn->ic_dim;
-      if (!dim)
-        goto aderef;
-      if (dim->next) {
+      if (dim) {
+        /* ic_dim describes the dimensions remaining after this subscript.
+         * Any remaining dimension denotes an inline row, whose address must
+         * survive for the next subscript. Loading it as a pointer reads array
+         * contents instead (notably the first row of gr.circle_lo/hi). */
         new = A_CALLOC(sizeof(CRPN), cctrl->hc);
         new->type = IC_MUL;
         new->raw_type = RT_I64i;
@@ -284,10 +288,9 @@ void OptPassExpandPtrs(CCmpCtrl *cctrl) {
         lit->integer = PtrWidthOfRPN(a);
         QueIns(lit, new);
         AssignRawTypeToNode(cctrl, new);
-        dim = dim->next;
         rpn->type = IC_ADD;
+        rpn->raw_type = RT_PTR;
       } else {
-      aderef:
         new2 = A_CALLOC(sizeof(CRPN), cctrl->hc);
         new2->type = IC_ADD;
         QueIns(new2, rpn);

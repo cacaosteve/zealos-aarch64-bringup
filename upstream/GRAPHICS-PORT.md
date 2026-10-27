@@ -490,3 +490,26 @@ This does not establish complete CDC/ROP, persistent text-raster or whole-mesh
 parity for the entire regular application collection. See
 [PROGRAMS.md](../PROGRAMS.md) and [ACCEPTANCE.md](../ACCEPTANCE.md) for scope,
 completed runs and current-image status.
+
+## Original Doodle, Mass Spring and Life (2026-10-26)
+
+Graphics startup now loads the complete unchanged GrMath and GrPrimatives
+modules. The compiler preserves inline-array row addresses and full strides,
+fixing the original brush-circle table access used by thick lines. Native
+floating square, Ceil and trigonometric bindings and the exact upstream R2P
+body support the original circle and polar geometry paths.
+
+The interactive gate uses real menu and pointer input. It checks Doodle's
+original color chooser and retained thick stroke, Mass Spring's circles,
+spring, visible ODE motion and reset, and Life's drawn cells and evolving
+background buffer. Every program must exit to a usable terminal. Both NEC USB
+and VirtIO input pass. A frozen tS redeclaration and duplicate old/new mouse
+routers found by these programs were fixed in the shared runtime/load order.
+
+The Apps wrapper selects a light task surface for their original black ink;
+the three program files remain byte-identical to the pinned upstream commit.
+Live UTM checks also confirm Doodle drawing/colors, Mass Spring motion/reset,
+Life evolution and working terminal recovery after all three programs.
+This does not accept the rest of the application collection or establish full
+graphics parity. Embedded sprite source includes and several application
+services still block other programs; PROGRAMS.md records the inventory.

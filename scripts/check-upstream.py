@@ -59,3 +59,20 @@ press_key = str_b_source.split('I64 PressAKey()', 1)[1].split('\nBool AreYouSure
 if 'I64 PressAKey()' + press_key.rstrip() not in bridge:
     raise SystemExit('PressAKey body drifted from pinned StrB source')
 print('PASS pinned Aiwnios originals + documented patch; unchanged ZealOS files; Win progress, CMain cleanup wrappers, Option, StrFirstRemove and PressAKey fixtures')
+
+color_picker = (root/'upstream/bootstrap/System/DolDoc/ColorPicker.ZC').read_bytes()
+polar_bridge = (root/'upstream/bootstrap/System/Math/PolarBridge.ZC').read_bytes()
+for name, begin, end, target in [
+    ('Kernel/KDataTypes.ZC', b'U0 QueueDel(', b'CQueue *QueueCopy(',
+     (root/'upstream/bootstrap/Kernel/QueueBridge.ZC').read_bytes()),
+    ('Kernel/KDataTypes.ZC', b'I64 QueueCount(', b'I64 QueueSize(',
+     (root/'upstream/bootstrap/Kernel/QueueBridge.ZC').read_bytes()),
+    ('System/Math/Math.ZC', b'public U0 R2P(', b'public U0 P2R(', polar_bridge),
+    ('System/DolDoc/DocGr.ZC', b'public I64 PopUpColor(', b'public I64 PopUpColorLighting(', color_picker),
+]:
+    source = (zeal/name).read_bytes()
+    start = source.index(begin)
+    body = source[start:source.index(end, start)].rstrip()
+    if body not in target:
+        raise SystemExit(f'Portable source fixture drifted: {begin!r} in {name}')
+print('PASS unchanged QueueDel, QueueCount, R2P and PopUpColor bodies')

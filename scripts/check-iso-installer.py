@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Install the ISO image onto a disposable QEMU disk and verify reboot persistence."""
+import argparse
 import hashlib
 import os
 import pathlib
@@ -7,7 +8,6 @@ import select
 import shlex
 import shutil
 import subprocess
-import sys
 import tempfile
 import time
 
@@ -79,7 +79,8 @@ class Guest:
 
 
 def build_command(temp: pathlib.Path, vars_file: pathlib.Path,
-                  target: pathlib.Path, iso: pathlib.Path | None) -> list[str]:
+                  target: pathlib.Path, iso: pathlib.Path | None,
+                  usb_cd: bool = False) -> list[str]:
     fw = os.environ.get("FW_CODE", "/opt/homebrew/share/qemu/edk2-aarch64-code.fd")
     platform = shlex.split(os.environ.get(
         "QEMU_VIRT", "-machine virt,accel=hvf,gic-version=3 -cpu host -m 512 "
@@ -88,12 +89,21 @@ def build_command(temp: pathlib.Path, vars_file: pathlib.Path,
     command += ["-drive", f"if=pflash,unit=0,format=raw,file={fw},readonly=on",
                 "-drive", f"if=pflash,unit=1,format=raw,file={vars_file}",
                 "-serial", "stdio", "-monitor", "none", "-display", "none"]
+    if usb_cd:
+        # Exercise UTM's NEC controller, USB installer media and native input
+        # together, retaining VirtIO devices as recovery input on every boot.
+        command += ["-device", "nec-usb-xhci,id=installer_usb",
+                    "-device", "usb-kbd,bus=installer_usb.0,port=1",
+                    "-device", "usb-tablet,bus=installer_usb.0,port=2"]
     if iso:
         command += ["-drive", f"if=none,format=raw,file={target},id=target",
                     "-device", "virtio-blk-pci,drive=target,bootindex=1",
-                    "-drive", f"if=none,file={iso},id=cd,media=cdrom,readonly=on",
-                    "-device", "virtio-scsi-pci,id=scsi",
-                    "-device", "scsi-cd,drive=cd,bootindex=0"]
+                    "-drive", f"if=none,file={iso},id=cd,media=cdrom,readonly=on"]
+        if usb_cd:
+            command += ["-device", "usb-storage,bus=installer_usb.0,port=3,drive=cd,bootindex=0"]
+        else:
+            command += ["-device", "virtio-scsi-pci,id=scsi",
+                        "-device", "scsi-cd,drive=cd,bootindex=0"]
     else:
         command += ["-drive", f"if=none,format=raw,file={target},id=target",
                     "-device", "virtio-blk-pci,drive=target,bootindex=0"]
@@ -128,10 +138,13 @@ def compare_files(expected: pathlib.Path, actual: pathlib.Path) -> None:
 
 
 def main() -> None:
-    if len(sys.argv) > 2:
-        raise SystemExit("usage: check-iso-installer.py [ISO_PATH]")
-    iso = pathlib.Path(sys.argv[1]) if len(sys.argv) == 2 else \
-        ROOT / "build/zealos-aarch64-hello.iso"
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("iso", nargs="?", type=pathlib.Path,
+                        default=ROOT / "build/zealos-aarch64-hello.iso")
+    parser.add_argument("--usb-cd", action="store_true",
+                        help="use NEC xHCI USB CD, keyboard and tablet alongside VirtIO recovery input")
+    args = parser.parse_args()
+    iso = args.iso
     if not iso.is_absolute():
         iso = ROOT / iso
     source_disk = ROOT / "build/disk.img"
@@ -147,7 +160,7 @@ def main() -> None:
         vars_file = temp / "vars.fd"
         shutil.copyfile(fw_vars, vars_file)
 
-        live = Guest(build_command(temp, vars_file, target, iso),
+        live = Guest(build_command(temp, vars_file, target, iso, args.usb_cd),
                      ROOT / "build/check-iso-installer-live.log")
         try:
             boot_to_prompt(live, "ISO live")
@@ -166,7 +179,7 @@ def main() -> None:
         compare_files(source_disk, target)
         # Reset UEFI's volatile boot choice; the target is the only bootable disk.
         shutil.copyfile(fw_vars, vars_file)
-        installed_guest = Guest(build_command(temp, vars_file, target, None),
+        installed_guest = Guest(build_command(temp, vars_file, target, None, args.usb_cd),
                                 ROOT / "build/check-iso-installer-disk-boot.log")
         try:
             boot_to_prompt(installed_guest, "installed disk")
@@ -184,7 +197,7 @@ def main() -> None:
             installed_guest.close()
 
         shutil.copyfile(fw_vars, vars_file)
-        rebooted = Guest(build_command(temp, vars_file, target, None),
+        rebooted = Guest(build_command(temp, vars_file, target, None, args.usb_cd),
                          ROOT / "build/check-iso-installer-reboot.log")
         try:
             boot_to_prompt(rebooted, "rebooted installed disk")
@@ -194,7 +207,8 @@ def main() -> None:
             rebooted.command("zcall InstallerPersist", "zc => 0x000000000000002a")
         finally:
             rebooted.close()
-    print("PASS ISO installer → disposable VirtIO disk → rebooted desktop and saved data",
+    media = "NEC USB CD" if args.usb_cd else "SCSI CD"
+    print(f"PASS {media} ISO installer → disposable VirtIO disk → rebooted desktop and saved data",
           flush=True)
 
 

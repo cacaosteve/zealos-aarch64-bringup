@@ -307,7 +307,7 @@ Bool BootstrapGuiTerminalMenuBindLeaf(CMenuEntry *root, U8 *source_name,
                                       U8 *display_name, I64 action)
 {
     CMenuEntry *entry;
-    if (!root || !source_name || !display_name || action < 1 || action > 21)
+    if (!root || !source_name || !display_name || action < 1 || action > 24)
         return FALSE;
     entry = root->sub;
     while (entry)
@@ -350,7 +350,7 @@ U0 BootstrapGuiTerminalMenuInstall()
 {
     CMenu *menu = MenuNew("File { Files(); Disk(); }");
     BootstrapGuiTerminalMenuAppendRoot(menu, MenuNew("Windows { Demo(); TileHorz(); TileVert(); TileGrid(); }"));
-    BootstrapGuiTerminalMenuAppendRoot(menu, MenuNew("Apps { LatticePlay(); StockPlay(); PaintDemo(); NetOfDots(); Lines(); }"));
+    BootstrapGuiTerminalMenuAppendRoot(menu, MenuNew("Apps { LatticePlay(); StockPlay(); PaintDemo(); NetOfDots(); Lines(); Doodle(); MassSpring(); Life(); }"));
     BootstrapGuiTerminalMenuAppendRoot(menu, MenuNew("View { ViewAngles(); ZoomIn(); ZoomOut(); ResetView(); PanLeft(); PanRight(); PanUp(); PanDown(); }"));
     BootstrapGuiTerminalMenuAppendRoot(menu, MenuNew("OS { Help(); Status(); }"));
     CMenuEntry *file = BootstrapGuiTerminalMenuRoot(menu, "File");
@@ -372,6 +372,9 @@ U0 BootstrapGuiTerminalMenuInstall()
         !BootstrapGuiTerminalMenuBindLeaf(apps, "PaintDemo", "Paint Demo", 19) ||
         !BootstrapGuiTerminalMenuBindLeaf(apps, "NetOfDots", "Net of Dots", 20) ||
         !BootstrapGuiTerminalMenuBindLeaf(apps, "Lines", "Lines", 21) ||
+        !BootstrapGuiTerminalMenuBindLeaf(apps, "Doodle", "Doodle", 22) ||
+        !BootstrapGuiTerminalMenuBindLeaf(apps, "MassSpring", "Mass Spring", 23) ||
+        !BootstrapGuiTerminalMenuBindLeaf(apps, "Life", "Game of Life", 24) ||
         !BootstrapGuiTerminalMenuBindLeaf(view, "ViewAngles", "View Angles", 11) ||
         !BootstrapGuiTerminalMenuBindLeaf(view, "ZoomIn", "Zoom In", 12) ||
         !BootstrapGuiTerminalMenuBindLeaf(view, "ZoomOut", "Zoom Out", 13) ||
@@ -458,12 +461,29 @@ Bool BootstrapGuiTerminalPaintEscape(U8 *command, I64 *command_len,
     return TRUE;
 }
 
+U0 BootstrapGuiTerminalRunLightProgram(U8 *filename)
+{//These original programs use black ink against ZealOS's light task surface.
+    SettingsPush;
+    Fs->text_attr = WHITE << 4 + BLACK;
+    try
+        ExeFile2(filename);
+    catch
+        PutExcept;
+    SettingsPop;
+}
+
 U8 *BootstrapGuiTerminalMenuSource(I64 action)
 {//Run programs through the normal User command loop, outside the input reader.
     if (action == 20)
         return "#include \"/Demo/Graphics/NetOfDots\"";
     if (action == 21)
         return "#include \"/Demo/Graphics/Lines\"";
+    if (action == 22)
+        return "BootstrapGuiTerminalRunLightProgram(\"/Demo/Graphics/Doodle\");";
+    if (action == 23)
+        return "BootstrapGuiTerminalRunLightProgram(\"/Demo/Games/MassSpring\");";
+    if (action == 24)
+        return "BootstrapGuiTerminalRunLightProgram(\"/Demo/Graphics/Life\");";
     return NULL;
 }
 
@@ -909,6 +929,7 @@ I64 BootstrapGuiTerminalDevicesInit()
     if (!bootstrap_gui_terminal_devices_ready)
     {
         KeyDevInit;
+        KeyDevAdd(&KDDocPutKey, &KDDocPutS, 0x80000000, TRUE);
         bootstrap_gui_terminal_devices_ready = TRUE;
     }
     return 42;
@@ -1145,7 +1166,7 @@ I64 BootstrapGuiTerminalEditorActive()
 }
 
 Bool BootstrapGuiTerminalEditorPutKey(I64 ch, I64 sc)
-{//The headless ARM64 key bridge has no native KeyDev DolDoc device to echo into an editor.
+{//Keep the terminal's explicit editor lifecycle ahead of generic KeyDev echo.
     if (Fs == bootstrap_gui_terminal_task && bootstrap_gui_terminal_editor_active)
     {
         DocPutKey(DocPut, ch, sc);
@@ -1495,6 +1516,9 @@ I64 BootstrapGuiTerminalSmoke()
             !BootstrapGuiTerminalMenuActionValid(menu, "Apps", "Paint Demo", 19) ||
             !BootstrapGuiTerminalMenuActionValid(menu, "Apps", "Net of Dots", 20) ||
             !BootstrapGuiTerminalMenuActionValid(menu, "Apps", "Lines", 21) ||
+            !BootstrapGuiTerminalMenuActionValid(menu, "Apps", "Doodle", 22) ||
+            !BootstrapGuiTerminalMenuActionValid(menu, "Apps", "Mass Spring", 23) ||
+            !BootstrapGuiTerminalMenuActionValid(menu, "Apps", "Game of Life", 24) ||
             !BootstrapGuiTerminalMenuActionValid(menu, "View", "View Angles", 11) ||
             !BootstrapGuiTerminalMenuActionValid(menu, "View", "Zoom In", 12) ||
             !BootstrapGuiTerminalMenuActionValid(menu, "View", "Zoom Out", 13) ||

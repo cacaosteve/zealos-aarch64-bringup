@@ -19,13 +19,19 @@ splash logo:
 
 ## Regular ZealOS programs
 
-The ARM64 source bundle now includes the unchanged upstream **Net of Dots**
-and **Lines** programs. Launch them from **Apps**, or type
+The **Apps** menu now launches unchanged upstream **Net of Dots**, **Lines**,
+**Doodle**, **Mass Spring** and **Game of Life**. For the first two, you can also type
 `#include "/Demo/Graphics/NetOfDots"` or `#include "/Demo/Graphics/Lines"`
 in a graphical terminal. These are separate from the older adapted bring-up
-commands. See [PROGRAMS.md](PROGRAMS.md) for scope and remaining applications;
-`make check-stock-programs` checks visible drawing, input exit and recovery
-with UTM's NEC USB controller model.
+commands. The complete pinned Apps/Demo collection (294 files) is bundled,
+but most applications still need compatibility work. See
+[PROGRAMS.md](PROGRAMS.md) for tested behavior and the remaining blockers.
+`make check-stock-programs` and `make check-stock-interactive` exercise visible
+drawing, mouse/keyboard input, animation and clean exit in QEMU with UTM's NEC
+USB controller model. Live UTM checks also pass for Doodle drawing/colors,
+Mass Spring motion/reset, Life evolution and all three programs' return to a
+working terminal. Evidence is recorded in
+[ACCEPTANCE.md](ACCEPTANCE.md).
 
 ## Native source compatibility milestone
 
@@ -40,6 +46,9 @@ make check-compat-pci   # disposable UTM-shaped GPT/PCI disk guest
 make check-gui-terminal # terminal output ownership, menus, paint and zoom/pan
 make check-gui-workflow # visible typing/cursors + graphical edit/save/run/reboot
 make check-stock-programs # unchanged upstream graphics programs through Apps
+make check-stock-interactive # Doodle, Mass Spring and Life with real input
+make check-program-catalog # compile-only inventory of all Apps entry points
+make check-iso-installer-usb # USB CD install, disk-only boot and persistence
 make check-usb-input    # native NEC/QEMU xHCI keyboard, mouse/tablet + recovery
 make check-usb-topology # nested USB2 hubs, repeated reconnects + subtree recovery
 make check-pi4-platform # Pi FDT/DMA/xHCI, HID/storage and framebuffer adapter
@@ -316,11 +325,11 @@ Bridge notes: [AIWNIOS.md](AIWNIOS.md). Milestone ladder: [upstream/README.md](u
 
 | Track | Status |
 |--|--|
-| QEMU/UTM virt | Live ISO install/disk-only desktop/persistence accepted for `52c214c…`. New program ISO `build/zealos-aarch64-hello.iso` (`95cb32ad…`) adds unchanged Net of Dots and Lines in Apps, with NEC/VirtIO visible drawing and key-exit tests. Full graphics, graphical editor/save/reboot/reopen and automated ISO install/read-back/disk-only persistence gates pass. Live UTM app checks of the two new entries remain pending. See [ACCEPTANCE.md](ACCEPTANCE.md) and [PROGRAMS.md](PROGRAMS.md). |
+| QEMU/UTM virt | Live ISO install/disk-only desktop/persistence accepted for `52c214c…`. Current program ISO `build/zealos-aarch64-hello.iso` (`3b59782c…`) adds unchanged Net of Dots, Lines, Doodle, Mass Spring and Life in Apps. NEC/VirtIO program interaction, full graphics/editor workflow, USB-CD installation and disk-only persistence gates pass. Doodle, Mass Spring and Life also pass live UTM drawing/input, animation, reset where applicable, and terminal recovery. See [ACCEPTANCE.md](ACCEPTANCE.md) and [PROGRAMS.md](PROGRAMS.md). |
 | Pi 4B UEFI | **PI-DESKTOP-2 native desktop/basic input accepted (2026-10-26)**: native graphical terminals, visible pointer movement, menu clicks and `40+2; → 42`. IMG_9182 confirms firmware 1920×1280, packed 800×600 desktop scaled 2×, 1632 composed frames and USB active/fault/stopped 1/0/0. Physical read-only FAT32 USB file reads and simultaneous keyboard/pointer/storage were accepted earlier. Kernel `b12497c8…93d4930b`; M6 diagnostic recovery preserved. Writable persistence, native SD, reconnect recovery and Pi installation remain open ([PI4.md](PI4.md)). |
 
 ## Earlier platform follow-ups
 
-1. UTM: check Apps → Net of Dots and Lines in the new `95cb32ad…` ISO (USB CD first). Automated program, graphics, editor and ISO install/persistence gates pass; the prior live-accepted ISO is preserved.
+1. UTM: continue the remaining application compatibility work listed in PROGRAMS.md. Doodle, Mass Spring and Life pass live checks in `3b59782c…`; automated program, graphics, editor and ISO install/persistence gates also pass. Preserve the accepted images while developing the next additions.
 2. Pi: extend the accepted native desktop/input milestone to source-program/editor workflows and writable save/reboot/reopen persistence; native SD, disconnect recovery and installation remain open.
 3. HCRT host stubs only after IR gap shrinks; DT-based discovery before other ARM64 boards

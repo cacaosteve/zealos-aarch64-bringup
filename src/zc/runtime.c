@@ -48,6 +48,7 @@ extern uint64_t hc_builtin_exp(uint64_t xbits);
 extern uint64_t hc_builtin_sqrt(uint64_t xbits);
 extern uint64_t hc_builtin_cos(uint64_t xbits);
 extern uint64_t hc_builtin_sin(uint64_t xbits);
+extern uint64_t hc_builtin_arg(uint64_t xbits, uint64_t ybits);
 
 extern uint64_t zeal_fb_text_span(int64_t x, int64_t y, int64_t len,
                                   uint32_t attr, const void *data, int mode,
@@ -1339,6 +1340,23 @@ static int64_t host_system_task(int64_t *a) {
 static int64_t host_sqrt(int64_t *a) {
     return (int64_t)hc_builtin_sqrt((uint64_t)a[0]);
 }
+static int64_t host_ceil(int64_t *a) {
+    uint64_t bits = (uint64_t)a[0];
+    unsigned exp = (unsigned)((bits >> 52) & 0x7ff);
+    uint64_t magnitude = bits & UINT64_C(0x7fffffffffffffff);
+    /* Already integral, infinity or NaN. Preserve their payload/sign bits. */
+    if (exp >= 1023 + 52 || !magnitude)
+        return (int64_t)bits;
+    if (exp < 1023)
+        return (int64_t)((bits >> 63) ? UINT64_C(0x8000000000000000)
+                                      : UINT64_C(0x3ff0000000000000));
+    uint64_t mask = (UINT64_C(1) << (1023 + 52 - exp)) - 1;
+    if (!(bits & mask))
+        return (int64_t)bits;
+    if (!(bits >> 63))
+        bits += mask;
+    return (int64_t)(bits & ~mask);
+}
 static int64_t host_exp(int64_t *a) {
     return (int64_t)hc_builtin_exp((uint64_t)a[0]);
 }
@@ -1347,6 +1365,9 @@ static int64_t host_sin_f64(int64_t *a) {
 }
 static int64_t host_cos_f64(int64_t *a) {
     return (int64_t)hc_builtin_cos((uint64_t)a[0]);
+}
+static int64_t host_arg_f64(int64_t *a) {
+    return (int64_t)hc_builtin_arg((uint64_t)a[0], (uint64_t)a[1]);
 }
 static double host_f64_from_bits(uint64_t bits) {
     double value;
@@ -3375,7 +3396,12 @@ static int64_t host_kill(int64_t *a) {
         return 1; /* The callback already started; DeathWait waits for teardown. */
     int has_callback = !!*(void **)((unsigned char *)f->words + guest_end_cb_off);
     if (has_callback || guest_has_children(f)) {
-        if (dispatch_blocks_current())
+        /* ExeFile/source jobs may yield while their compiled body runs.
+         * Their parser flag is clear here, and child teardown must be able
+         * to run callbacks (popup cleanup and application worker tasks).
+         * Current/ancestor kills keep the stricter guard above. */
+        if (guest_task_exe_active ||
+            (guest_job_call_active && guest_current == GUEST_EXECUTIVE))
             zc_fail("kill with task teardown during job dispatch is unsupported");
         f->kill_requested = 1;
         *guest_flags(f) |= GUEST_KILL_TASK;
@@ -3894,12 +3920,14 @@ static int64_t host_put_key(int64_t *a) {
             !(editor_put_key->base.base.type & HTF_EXTERN) &&
             FFI_CALL_TOS_2(editor_put_key->fun_ptr, a[0], a[1]))
             return 0;
-        CHashFun *terminal = (CHashFun *)HashFind(
-            "BootstrapGuiTerminalState", Fs->hash_table, HTT_FUN, 1);
-        if (terminal && terminal->fun_ptr && terminal->argc == 1 &&
-            !(terminal->base.base.type & HTF_EXTERN) &&
-            FFI_CALL_TOS_1(terminal->fun_ptr,
-                           (int64_t)(uintptr_t)guest_fibers[guest_current].words)) {
+        /* DocEd also runs in ordinary popup/server tasks, outside the
+         * terminal registry. Its echoed keys must reach KDDocPutKey for
+         * button selection, form navigation and editable document input. */
+        CHashFun *doc_put = (CHashFun *)HashFind(
+            "DocPut", Fs->hash_table, HTT_FUN, 1);
+        if (doc_put && doc_put->fun_ptr && doc_put->argc == 1 &&
+            !(doc_put->base.base.type & HTF_EXTERN) &&
+            FFI_CALL_TOS_1(doc_put->fun_ptr, 0)) {
             FFI_CALL_TOS_2(guest_keydev_put_key, a[0], a[1]);
             return 0;
         }
@@ -4566,8 +4594,8 @@ static int64_t host_bsr(int64_t *a) {
     return v ? (int64_t)(63 - __builtin_clzll(v)) : -1;
 }
 static int64_t host_sqr_i64(int64_t *a) {
-    int64_t i = a[0];
-    return i * i;
+    uint64_t i = (uint64_t)a[0];
+    return (int64_t)(i * i);
 }
 static int64_t host_dist_sqr_i64(int64_t *a) {
     /* Graphics coordinates are framebuffer-bounded in this port. Keep the
@@ -4853,6 +4881,10 @@ static int64_t host_sign_i64(int64_t *a) {
 static int64_t host_abs_f64(int64_t *a) {
     /* Preserve NaN payloads while applying IEEE-754 absolute value. */
     return (int64_t)((uint64_t)a[0] & UINT64_C(0x7fffffffffffffff));
+}
+static int64_t host_sqr_f64(int64_t *a) {
+    double value = host_f64_from_bits((uint64_t)a[0]);
+    return (int64_t)host_f64_to_bits(value * value);
 }
 static int64_t host_to_bool(int64_t *a) {
     /* KernelB declares ToBool as _intern IC_TO_BOOL; bind host until call sites
@@ -5800,9 +5832,9 @@ static int64_t host_exe_print2(int64_t *a) {
 }
 static int64_t host_print(int64_t *a);
 /* Bounded formatter shared by Print, source generation and StrPrintJoin.
- * ExePrint and graphical Print preserve source display markers; StrPrintJoin
- * keeps its text-oriented behavior. Empty generated string statements remain
- * valid source. */
+ * Formatting preserves DolDoc markers, including adjacent end/start dollars.
+ * Their interpretation belongs to the document consumer. Empty generated
+ * string statements remain valid source. */
 static size_t format_text(char *output, size_t capacity, const char *format,
                           int64_t argc, const int64_t *argv, int strip_markers) {
     size_t used = 0;
@@ -6112,7 +6144,10 @@ static int64_t host_str_print_join(int64_t *a) {
     int64_t argc = a[2];
     const int64_t *argv = (const int64_t *)(uintptr_t)a[3];
     char stack[4097];
-    size_t used = format_text(stack, sizeof(stack), format, argc, argv, 1);
+    /* The end of one command followed by the start of another is "$$" in
+     * decoded strings. Stripping it as a style tag truncated popup buttons
+     * and subsequent fields. StrPrintJoin must preserve the full text. */
+    size_t used = format_text(stack, sizeof(stack), format, argc, argv, 0);
     if (!dst) {
         CHeapCtrl *owner = guest_task_bound ? &guest_fibers[guest_current].heap_owner
                                             : &data_heap;
@@ -6211,6 +6246,11 @@ static int load_source_path(const char *path, int merged, int recover) {
         return -1;
     }
     if (!strcmp(path, "/System/TaskBridge.ZC")) {
+        /* TaskBridge is loaded again after KernelC and redeclares the early
+         * clock global. Bind that new symbol to the same live timer storage;
+         * otherwise later applications capture a permanent zero tS while
+         * TimeCal continues updating only the preceding declaration. */
+        PrsBindCSymbol("tS", &guest_tS_bits, 0);
         CHashFun *recalc = (CHashFun *)HashFind("DocRecalc", Fs->hash_table,
                                                HTT_FUN, 1);
         guest_doc_recalc_stub = recalc ? recalc->fun_ptr : NULL;
@@ -6461,10 +6501,16 @@ static int load_source_path(const char *path, int merged, int recover) {
         PrsBindCSymbol("MemSet", host_set, 3);
         PrsBindCSymbol("MemSetU32", host_memset_u32, 3);
         PrsBindCSymbol("Sqrt", host_sqrt, 1);
+        PrsBindCSymbol("Sqr", host_sqr_f64, 1);
+        PrsBindCSymbol("SqrU64", host_sqr_i64, 1);
+        PrsBindCSymbol("Ceil", host_ceil, 1);
         PrsBindCSymbol("Exp", host_exp, 1);
         PrsBindCSymbol("Ln", host_ln, 1);
         PrsBindCSymbol("ZcSinF64", host_sin_f64, 1);
         PrsBindCSymbol("ZcCosF64", host_cos_f64, 1);
+        PrsBindCSymbol("Sin", host_sin_f64, 1);
+        PrsBindCSymbol("Cos", host_cos_f64, 1);
+        PrsBindCSymbol("Arg", host_arg_f64, 2);
         PrsBindCSymbol("ZcMonotonicNs", host_monotonic_ns, 0);
         PrsBindCSymbol("ZcTryEnter", host_sys_try, 0);
         PrsBindCSymbol("ZcTryLeave", host_sys_untry, 0);
@@ -6863,6 +6909,7 @@ int zc_start_graphics(void) {
         "/Kernel/KernelB.HH",
         "/Kernel/KernelC.HH",
         "/Kernel/KMathB.ZC",
+        "/Kernel/QueueBridge.ZC",
         "/System/TaskBridge.ZC",
         "/System/Externs.ZC",
         /* GrUpdateTaskODEs is part of the normal source frame path. Load its
@@ -6878,6 +6925,9 @@ int zc_start_graphics(void) {
         "/System/Gr/GrDC.ZC",
         "/System/Gr/GrBitMap.ZC",
         "/System/Gr/GrBlot3.ZC",
+        "/System/Gr/GrMath.ZC",
+        "/System/Math/PolarBridge.ZC",
+        "/System/Gr/GrPrimatives.ZC",
         "/System/Menu.ZC",
         "/System/Win.ZC",
         "/System/WinMgr.ZC",
@@ -6999,12 +7049,20 @@ int zc_start_gui_terminal(void) {
         "/System/DolDoc/DocFile.ZC",
         "/System/DolDoc/DocRun.ZC",
         "/System/DolDoc/DocForm.ZC",
+        /* DocTop must select the first real form field, rather than the
+         * cycle-breaking DocFormFwd stub captured during the early load. */
+        "/System/DolDoc/DocRecalcLib.ZC",
         "/System/DolDoc/DocGet.ZC",
         "/System/DolDoc/DocChar.ZC",
         "/System/DolDoc/DocFind.ZC",
         "/System/DolDoc/DocLink.ZC",
         "/System/DolDoc/DocEd.ZC",
+        /* DocMenu was compiled against the cycle-breaking DocEd stub.
+         * Rebind chooser entry points to the real interactive editor before
+         * PopUpOk, color pickers and applications capture their addresses. */
+        "/System/DolDoc/DocForm.ZC",
         "/System/DolDoc/DocPopUp.ZC",
+        "/System/DolDoc/ColorPicker.ZC",
         "/System/DolDoc/DocClipBoard.ZC",
         /* Rebind the terminal's RIGHT_AINCLUDE action to real SysFile. */
         "/System/DolDoc/DocTerm.ZC",

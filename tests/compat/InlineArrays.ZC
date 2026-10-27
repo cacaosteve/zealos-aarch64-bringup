@@ -1,0 +1,59 @@
+class StockArrayRows
+{
+    U64 before;
+    I8 rows[4][7];
+    I64 words[3][5];
+    U64 after;
+};
+
+StockArrayRows stock_array_rows;
+I16 stock_array_cube[2][3][4];
+
+I64 StockInlineArrayChecks()
+{//Exercise dynamic row strides, signed elements and inline member addresses.
+    StockArrayRows local, *ptr = &local;
+    I64 i, j, k;
+
+    local.before = stock_array_rows.before = 0x123456789abcdef;
+    local.after = stock_array_rows.after = 0xfedcba987654321;
+    for (i = 0; i < 4; i++)
+        for (j = 0; j < 7; j++)
+        {
+            ptr->rows[i][j] = i * 7 + j - 40;
+            stock_array_rows.rows[i][j] = 60 - i * 7 - j;
+        }
+    for (i = 0; i < 3; i++)
+        for (j = 0; j < 5; j++)
+            local.words[i][j] = 10000000000 + i * 100 + j;
+    for (i = 0; i < 4; i++)
+    {
+        if (&ptr->rows[i][0] - &ptr->rows[0][0] != i * 7)
+            return 1;
+        for (j = 0; j < 7; j++)
+            if (local.rows[i][j] != i * 7 + j - 40 ||
+                stock_array_rows.rows[i][j] != 60 - i * 7 - j)
+            {
+                Print("array mismatch %d,%d local=%d global=%d\n", i, j,
+                    local.rows[i][j], stock_array_rows.rows[i][j]);
+                return 2;
+            }
+    }
+    for (i = 0; i < 3; i++)
+        for (j = 0; j < 5; j++)
+            if (ptr->words[i][j] != 10000000000 + i * 100 + j)
+                return 3;
+    for (i = 0; i < 2; i++)
+        for (j = 0; j < 3; j++)
+            for (k = 0; k < 4; k++)
+                stock_array_cube[i][j][k] = i * 100 + j * 10 + k - 200;
+    for (i = 0; i < 2; i++)
+        for (j = 0; j < 3; j++)
+            for (k = 0; k < 4; k++)
+                if (stock_array_cube[i][j][k] != i * 100 + j * 10 + k - 200)
+                    return 4;
+    if (local.before != 0x123456789abcdef ||
+        stock_array_rows.before != local.before ||
+        local.after != 0xfedcba987654321 || stock_array_rows.after != local.after)
+        return 5;
+    return 42;
+}

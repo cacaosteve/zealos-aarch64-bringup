@@ -1,3 +1,2 @@
-# Hash-pinned upstream font originals must retain their exact bytes.
-upstream/pinned/Kernel/FontStd.ZC -whitespace
-upstream/pinned/Kernel/FontAux.ZC -whitespace
+# Hash-pinned upstream originals must retain their exact bytes.
+upstream/pinned/** -whitespace

@@ -1,0 +1,59 @@
+{
+  "build/kernel.elf": {
+    "sha256": "20c04e1f862d4211ad9bc6322d0d19b0adaa7268aa461b1986e2dc91d284e459",
+    "bytes": 18821008
+  },
+  "build/sources.tar": {
+    "sha256": "e498e8030cfcd20d61ecf0372095dfa1f43c8e8e5f4bdeaa4297e93e712f3091",
+    "bytes": 5201920
+  },
+  "build/zealos-aarch64-hello.iso": {
+    "sha256": "3b59782c36e57b058670281cb5661d8b86f31212db637020237e1d65f980f4bb",
+    "bytes": 37396480
+  },
+  "build/disk.img": {
+    "sha256": "a509c2f73880b93c1ec2bd55eff5f59168b0f543df909cb7d75b4d46b20f15aa",
+    "bytes": 134217728
+  },
+  "build/zealos-aarch64-hello-accepted-52c214c.iso": {
+    "sha256": "52c214c29a9c23d86c94899e8ef2ba94bd4a21231c92ecdd649714708e2bc627",
+    "bytes": 28207104
+  },
+  "source_files": 556,
+  "unchanged_apps_demo_files": 294,
+  "checks": [
+    "NEC USB Doodle/Mass Spring/Life interactive gate",
+    "VirtIO Doodle/Mass Spring/Life interactive gate",
+    "NEC USB unchanged NetOfDots/Lines",
+    "VirtIO unchanged NetOfDots/Lines",
+    "full graphics regression",
+    "NEC GUI editor/save/reopen/reboot workflow",
+    "isolated Apps compilation inventory",
+    "NEC USB CD installation with full read-back, byte-identical disk and two disk-only persistence boots",
+    "pinned source, ARM64 overlays, sparse installer round-trip, Python syntax and whitespace"
+  ],
+  "live_utm_new_programs": "passed: user confirms Doodle drawing/colors, Mass Spring placement/connections/motion/Return reset, Life drawing/evolution and Escape-to-terminal recovery with 40+2; returning 42 for all three",
+  "live_utm_evidence": {
+    "Doodle": "docs/images/utm-doodle-live.png",
+    "Mass Spring": "docs/images/utm-mass-spring-live.png",
+    "Life drawn": "docs/images/utm-life-drawn-live.png",
+    "Life evolved": "docs/images/utm-life-evolved-live.png"
+  },
+  "live_utm_checks": {
+    "Doodle": {
+      "drawing_colors": true,
+      "escape_prompt": true
+    },
+    "Mass Spring": {
+      "placement_connections": true,
+      "motion": true,
+      "return_reset": true,
+      "escape_prompt": true
+    },
+    "Life": {
+      "drawing_evolution": true,
+      "escape_prompt": true
+    }
+  },
+  "preserved_program_iso": "build/zealos-aarch64-hello-programs-accepted-3b59782c.iso"
+}

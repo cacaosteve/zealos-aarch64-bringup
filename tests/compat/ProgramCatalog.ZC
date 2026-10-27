@@ -1,0 +1,34 @@
+// Compile original application entry points in disposable compiler namespaces.
+// CCF_JUST_LOAD suppresses top-level execution; success is not runtime acceptance.
+U0 StockCatalogServer(U8 *)
+{
+    while (TRUE)
+    {
+        JobsHandler(0);
+        LBts(&Fs->task_flags, TASKf_IDLE);
+        LBts(&Fs->task_flags, TASKf_AWAITING_MESSAGE);
+        Yield;
+    }
+}
+
+I64 StockCatalogCompile(U8 *path)
+{
+    CTask *task = Spawn(&StockCatalogServer);
+    CJob *job;
+    U8 *source;
+    I64 result;
+
+    if (!task)
+        return -1;
+    source = MStrPrint("ExeFile2(\"%Q\",CCF_JUST_LOAD);42;", path);
+    job = TaskExe(task, Fs, source, 0);
+    Free(source);
+    if (!job)
+    {
+        Kill(task);
+        return -2;
+    }
+    result = JobResGet(job);
+    Kill(task);
+    return result == 42;
+}

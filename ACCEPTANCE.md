@@ -2393,3 +2393,114 @@ Artifact sizes/hashes and gate summary are in
 `git diff --check` pass. The last live UTM app installer acceptance remains
 the preserved `52c214c…` image; an eyes-on UTM launch of the two new Apps
 entries on `95cb32ad…` is still pending.
+
+## Collection expansion and interactive program work (2026-10-26)
+
+All 294 files in the pinned upstream Apps/Demo trees are now bundled unchanged,
+including their document and binary resources. The original `GrMath.ZC`,
+`GrPrimatives.ZC`, `Math.ZC`, `DocGr.ZC` and `KDataTypes.ZC` are also pinned.
+`make check-upstream` verifies those files and the unchanged R2P, PopUpColor,
+QueueDel and QueueCount excerpts used by the bootstrap. Availability is separate
+from program acceptance; see [PROGRAMS.md](PROGRAMS.md) for the application
+inventory and first compilation blockers.
+
+The native compiler now expands file/directory/line macros from the originating
+file, including nested includes and macro expansion. `no_warn` accepts existing
+local variables and arguments without executing them. Inline-array lowering now
+keeps row addresses at pointer width and uses the complete trailing-dimension
+stride. Guest checks cover dynamic signed byte member arrays, wide elements,
+local and global structs, row addresses, a three-dimensional array and guard
+values around the storage. The unchanged thick-line primitive also draws the
+expected offscreen pixels instead of faulting in `GrFillCircle`.
+
+The runtime adds Ceil, floating/unsigned square and normal Sin/Cos/Arg bindings.
+Arg uses reduced atan arguments; R2P checks cover all four quadrants. The square
+check uses exact result bits because decimal literal conversion can be one ULP
+off (observed for `1.5625`); correctly rounded decimal input remains separate
+compiler work. Popup formatting now preserves adjacent DolDoc commands, and
+the load graph binds real form navigation and document editing rather than
+their early forward stubs. Popup tasks receive the real DolDoc KeyDev echo
+chain. Killing a child with teardown from an executing source body is allowed
+while parser/executive callback guards remain in place.
+
+Running the original Mass Spring exposed a frozen clock: TaskBridge's later
+`tS` declaration shadowed the timer-backed cell. Each bridge load now binds its
+new cell to the live timer. The boot-session elapsed-time check returns 42.
+Native event tracing also found mouse events arriving from both the source
+WinMgr and a preceding bootstrap router retained by a forward declaration.
+The current router is now defined before its poll caller. The real pointer
+regression receives exactly one down and one up for one injected click.
+
+Doodle, Mass Spring and Life now pass their combined interactive gate through
+both NEC USB keyboard/tablet input and VirtIO input:
+
+- Doodle opens the original PopUpColor chooser, selects RED by an actual menu
+  click, previews and retains its thick stroke across compositor refreshes,
+  clears it on Escape and returns to a working terminal.
+- Mass Spring accepts two mouse-placed masses and a right-dragged spring. The
+  circles visibly approach one another under the original ODE simulation.
+  Return clears the masses and spring; Escape restores window geometry and
+  removes the drawing callback before the next terminal command.
+- Life accepts mouse-drawn green cells, changes them through its background
+  simulation and tears down that child on Escape before prompt recovery.
+
+Logs: `build/check-stock-interactive-nec-final.log` and
+`build/check-stock-interactive-virtio-final.log` (both exited zero). The full
+graphics regression (`build/check-stock-collection-graphics-final.log`) and
+NEC graphical editor/save/reopen/workflow regression
+(`build/check-stock-collection-final-workflow.log`) also exited zero on this
+kernel/source pair. The isolated application inventory passed and records
+Budget and Vocabulary as compile-only; the other applications' first blockers
+are documented in PROGRAMS.md. No complete-collection acceptance is implied.
+
+The rebuilt ISO also passes installation through an NEC xHCI USB CD with USB
+keyboard/tablet and VirtIO recovery input present. Unconfirmed `zinstall`
+leaves the target unchanged. `zinstall ERASE` completes full read-back, and the
+installed 128 MiB raw disk matches the template byte-for-byte. Two subsequent
+cold boots have only that VirtIO disk attached. The desktop starts on each;
+saved `Tests/InstallerPersist.ZC` loads and returns `0x2a` before and after the
+second boot. The log is `build/check-stock-collection-iso-usb.log` (exit zero).
+`make check-iso-installer-usb` repeats that media/input configuration. The
+original NetOfDots/Lines gate also passes again on NEC USB and VirtIO input
+(`build/check-stock-programs-nec-final.log` and
+`build/check-stock-programs-virtio-final.log`, both exit zero).
+
+Current ISO SHA-256:
+`3b59782c36e57b058670281cb5661d8b86f31212db637020237e1d65f980f4bb`.
+Installed template disk SHA-256:
+`a509c2f73880b93c1ec2bd55eff5f59168b0f543df909cb7d75b4d46b20f15aa`.
+Kernel SHA-256:
+`20c04e1f862d4211ad9bc6322d0d19b0adaa7268aa461b1986e2dc91d284e459`.
+The **556-file** source archive SHA-256 is
+`e498e8030cfcd20d61ecf0372095dfa1f43c8e8e5f4bdeaa4297e93e712f3091`.
+All 294 Apps/Demo files in the built archive match the pinned manifest hashes.
+Artifact sizes, hashes and gate summary are recorded in
+`build/utm-stock-collection-artifacts.json`, with a committed snapshot at
+[docs/acceptance/utm-programs-2026-10-26.json](docs/acceptance/utm-programs-2026-10-26.json).
+Live UTM program acceptance is recorded below. The prior live-accepted
+`52c214c…` ISO is still preserved. Pi boot media were not rebuilt or staged.
+
+### Live UTM program evidence — 2026-10-26
+
+The user booted the current program ISO in `ZealOS AArch64 ISO Installer
+Acceptance` and reached the original Mass Spring and Doodle programs. The
+18:33:29 screenshot shows mouse-placed masses connected by red springs; the
+user confirmed the right-drag interaction. The 18:33:57 screenshot shows
+Doodle's retained thick black/green strokes and XOR intersections, and the
+user reports that Doodle seems good. The original screenshots are preserved
+without edits in [Mass Spring](docs/images/utm-mass-spring-live.png) and
+[Doodle](docs/images/utm-doodle-live.png).
+
+The 18:34:38 and 18:35:01 screenshots show the same mouse-drawn Life pattern
+changing from thin green lines into a different cellular pattern, and the user
+explicitly confirms that it is evolving. Both originals are preserved:
+[Life drawing](docs/images/utm-life-drawn-live.png) and
+[Life evolution](docs/images/utm-life-evolved-live.png).
+
+The user subsequently confirmed that all remaining checks pass: Mass Spring's
+connected circles move, Return clears them, and Escape from each of Doodle,
+Mass Spring and Life returns to a terminal where `40+2;` gives 42. This closes
+live UTM acceptance for these three original programs on ISO `3b59782c…`, in
+addition to their passing automated NEC/VirtIO checks. It does not accept the
+rest of the Apps collection or claim a new live installer/disk-persistence run;
+the exact current ISO's installation/persistence run above is automated QEMU.

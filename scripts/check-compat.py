@@ -32,6 +32,10 @@ p.add_argument('--probe-gui-editor-text', action='store_true',
                help='isolate visible keyboard text entry, save, and run in the GUI document editor')
 p.add_argument('--probe-stock-programs', action='store_true',
                help='run unchanged pinned NetOfDots and Lines in the graphical terminal')
+p.add_argument('--probe-program-catalog', action='store_true',
+               help='report compile-only results for original application entry points in isolated tasks')
+p.add_argument('--probe-stock-interactive', action='store_true',
+               help='exercise unchanged upstream interactive programs with mouse and key input')
 p.add_argument('--probe-lattice-controls', action='store_true',
                help='check live Lattice mouse placement/aim, colors, restart, and Space in the GUI')
 p.add_argument('--probe-gui-windowdemo-input', action='store_true',
@@ -126,7 +130,7 @@ if args.probe_gui_workflow:
     args.probe_gui_keyboard = True
 if args.probe_gui_editor_text:
     args.probe_gui_keyboard = True
-if args.probe_stock_programs:
+if args.probe_stock_programs or args.probe_stock_interactive or args.probe_program_catalog:
     args.pci = True
     args.probe_gui_keyboard = True
 if args.probe_lattice_controls:
@@ -186,7 +190,9 @@ if args.probe_live_window_control and not (
             '--probe-winmgr --probe-grscreen --probe-live-winmgr')
 if args.probe_dvd_live and args.pci:
     p.error('--probe-dvd-live requires ISO boot, not --pci')
-log_path = ROOT / 'build' / (f'check-usb-{usb_label}{"-stock-programs" if args.probe_stock_programs else "-lattice-controls" if args.probe_lattice_controls else "-windowdemo-input" if args.probe_gui_windowdemo_input else "-home-once" if args.probe_home_once else "-input-edges" if args.probe_input_edges else "-registry" if args.probe_registry else "-home-path" if args.probe_home_path else "-user-text" if args.probe_user_text else "-user-startup" if args.probe_user_startup else ""}.log' if args.usb_input else
+log_path = ROOT / 'build' / (f'check-usb-{usb_label}{"-program-catalog" if args.probe_program_catalog else "-stock-interactive" if args.probe_stock_interactive else "-stock-programs" if args.probe_stock_programs else "-lattice-controls" if args.probe_lattice_controls else "-windowdemo-input" if args.probe_gui_windowdemo_input else "-home-once" if args.probe_home_once else "-input-edges" if args.probe_input_edges else "-registry" if args.probe_registry else "-home-path" if args.probe_home_path else "-user-text" if args.probe_user_text else "-user-startup" if args.probe_user_startup else ""}.log' if args.usb_input else
+                             'check-program-catalog-pci.log' if args.probe_program_catalog else
+                             'check-stock-interactive-pci.log' if args.probe_stock_interactive else
                              'check-stock-programs-pci.log' if args.probe_stock_programs else
                              'check-grblot3-pci.log' if args.probe_grblot3 else
                              'check-sprite-arrow-symmetry-pci.log' if args.probe_sprite_arrow_symmetry else
@@ -372,7 +378,14 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 qmp_key_edges([modifier], False)
                 time.sleep(0.1)
     def graphical_path(name):
-        screen_name = f'usb-{usb_label}-{name}' if args.usb_input else name
+        # Independent program/workflow gates may run concurrently. Keep
+        # their QMP screendumps separate so one VM cannot satisfy another's
+        # visible-pixel or OCR assertions.
+        mode = ('interactive-' if args.probe_stock_interactive else
+                'stock-' if args.probe_stock_programs else
+                'workflow-' if args.probe_gui_workflow else
+                'catalog-' if args.probe_program_catalog else '')
+        screen_name = f'usb-{usb_label}-{mode}{name}' if args.usb_input else mode+name
         return ROOT/'build'/f'gui-{screen_name}.ppm'
     def graphical_screen(name, foreground_threshold=240000,
                          scanline_offset=1):
@@ -392,6 +405,9 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                             (ROOT/'src/fb_font.h').read_text(), re.S)[:96]
         font = {tuple(int(v.strip(), 0) for v in glyph.split(',')): chr(i+32)
                 for i, glyph in enumerate(glyphs)}
+        # DolDoc menu values underline the last scanline of each glyph.
+        # Recognize that real output as well as ordinary terminal text.
+        font.update({bits[:-1] + (255,): char for bits, char in tuple(font.items())})
         rows = []
         # The source planar font starts one scanline below the text cell;
         # direct pixel graphics begin at the requested scanline.
@@ -1179,6 +1195,189 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         if int(scanout.group(1)) < 1000:
             raise RuntimeError('boot graphical terminal is not painting visible pixels:\n' + desktop)
         print('PASS boot graphical terminal window and framebuffer diagnostics', flush=True)
+        if args.probe_program_catalog:
+            command('zload /Tests/SourceMacros.ZC', 'zc: loaded /Tests/SourceMacros.ZC')
+            command('zcall StockSourceMacroChecks', 'zc => 0x000000000000002a')
+            command('zcall StockNoWarnChecks', 'zc => 0x000000000000002a')
+            command('zload /Tests/ProgramCatalog.ZC', 'zc: loaded /Tests/ProgramCatalog.ZC')
+            command('zc Print("invalid_no_warn=%d\\n",StockCatalogCompile("/Tests/NoWarnInvalid.ZC"));',
+                    'invalid_no_warn=0')
+            paths = []
+            for directory in sorted((ROOT/'upstream/pinned/Apps').iterdir()):
+                entry = directory/('Run.ZC' if (directory/'Run.ZC').exists() else 'Load.ZC')
+                paths.append('/'+entry.relative_to(ROOT/'upstream/pinned').as_posix())
+            paths += ['/System/Gr/GrMath.ZC', '/System/Gr/GrPrimatives.ZC',
+                      '/Demo/Graphics/Doodle.ZC', '/Demo/Graphics/Life.ZC',
+                      '/Demo/Games/MassSpring.ZC']
+            results = []
+            for path in paths:
+                result = command('zc Print("catalog_compile=%d\\n", '
+                                 f'StockCatalogCompile("{path}"));',
+                                 'catalog_compile=', timeout=45)
+                passed = 'catalog_compile=1' in result
+                results.append({'path': path, 'compiled': passed, 'output': result})
+                print(('COMPILES ' if passed else 'BLOCKED ')+path, flush=True)
+            (ROOT/'build/program-catalog.json').write_text(json.dumps({
+                'commit': json.loads((ROOT/'upstream/pinned/UPSTREAM.json').read_text())['commit'],
+                'mode': 'CCF_JUST_LOAD in disposable task; no runtime acceptance',
+                'programs': results}, indent=2)+'\n')
+            command('zstatus', 'failed=0')
+            print('PASS isolated program compilation inventory saved', flush=True)
+            raise SystemExit(0)
+        if args.probe_stock_interactive:
+            command('zload /Tests/SourceMacros.ZC', 'zc: loaded /Tests/SourceMacros.ZC')
+            command('zcall StockSourceMacroChecks', 'zc => 0x000000000000002a')
+            command('zcall StockNoWarnChecks', 'zc => 0x000000000000002a')
+            command('zload /Tests/InlineArrays.ZC', 'zc: loaded /Tests/InlineArrays.ZC')
+            command('zcall StockInlineArrayChecks', 'zc => 0x000000000000002a')
+            command('zc Print("stock_source_kill=%d\\n",ExeFile2("/Tests/SourceKillBody.ZC"));', 'stock_source_kill=42')
+            command('zload /Tests/PopupMenus.ZC', 'zc: loaded /Tests/PopupMenus.ZC')
+            command('zcall StockPopupEntryChecks', 'zc => 0x0000000000000001')
+            command('zload /Tests/StockPrograms.ZC', 'zc: loaded /Tests/StockPrograms.ZC')
+            command('zcall StockClockChecks', 'zc => 0x000000000000002a')
+            command('zcall StockQueueChecks', 'zc => 0x000000000000002a')
+            command('zcall StockCircleIntrinsicChecks', 'zc => 0x000000000000002a')
+            command('zcall StockPolarCircleChecks', 'zc => 0x000000000000002a')
+            command('zcall StockBrushChecks', 'zc => 0x000000000000002a')
+            focus_graphical_terminal()
+            command('zc TaskExe(bootstrap_gui_terminal_task,NULL,"StockMouseReceiver;",1<<JOBf_FREE_ON_COMPLETE);', 'zc: executed')
+            command('zc Print("mouse_ready=%d\\n",stock_mouse_ready);', 'mouse_ready=1')
+            move_graphical_pointer(200, 240)
+            graphical_mouse_button('left', True)
+            time.sleep(.25)
+            graphical_mouse_button('left', False)
+            time.sleep(.25)
+            command('zc stock_mouse_finish=TRUE;', 'zc: executed')
+            command('zcall StockMouseEdgeChecks', 'zc => 0x000000000000002a')
+            original_rect = graphical_task_rect('bootstrap_gui_terminal_task')
+            select_os_menu_row('stock-massspring-menu', 'Apps', 6)
+            require_graphical_text('stock-massspring-help', 'Left-Click to place', timeout=20,
+                                   foreground_threshold=120000)
+            time.sleep(1)
+            require_graphical_text('stock-massspring-okay', 'OKAY', timeout=15,
+                                   foreground_threshold=120000)
+            def click_popup(label):
+                output = command(f'zc Print("popup_point=%X\\n",StockPopupPoint("{label}"));', 'popup_point=')
+                point = int(re.search(r'popup_point=([0-9A-Fa-f]+)', output).group(1), 16)
+                if point == 0xffffffffffffffff:
+                    raise RuntimeError('popup entry not found: '+label)
+                move_graphical_pointer(point & 0xffffffff, point >> 32)
+                graphical_mouse_button('left', True)
+                time.sleep(.2)
+                graphical_mouse_button('left', False)
+                time.sleep(.4)
+            click_popup('OKAY')
+            command('zstatus', 'failed=0')
+            command('zc Print("stock_max=%d,%d draw=%d\\n", bootstrap_gui_terminal_task->pix_width, bootstrap_gui_terminal_task->pix_height, bootstrap_gui_terminal_task->draw_it!=NULL);', 'stock_max=800,592 draw=1')
+            for x, y in ((200, 240), (420, 240)):
+                move_graphical_pointer(x, y)
+                graphical_mouse_button('left', True)
+                time.sleep(.2)
+                graphical_mouse_button('left', False)
+                time.sleep(.4)
+            move_graphical_pointer(700, 500)
+            time.sleep(.2)
+            command('zstatus', 'failed=0')
+            masses = graphical_screen('stock-massspring-masses')
+            for x in (200, 420):
+                if rgb_pixels_in(masses, (0, 0, 0), (x-16, 224, x+17, 257)) < 15:
+                    raise RuntimeError('Mass Spring did not draw both placed circles')
+            move_graphical_pointer(200, 240)
+            graphical_mouse_button('right', True)
+            time.sleep(.2)
+            move_graphical_pointer(420, 240)
+            time.sleep(.2)
+            graphical_mouse_button('right', False)
+            move_graphical_pointer(700, 500)
+            initial_black = rgb_coordinates_in(masses, (0, 0, 0), (100, 150, 600, 400))
+            initial_width = max(x for x, y in initial_black)-min(x for x, y in initial_black)
+            deadline = time.monotonic()+20
+            while True:
+                spring = graphical_screen('stock-massspring-spring')
+                black = rgb_coordinates_in(spring, (0, 0, 0), (100, 150, 600, 400))
+                red = rgb_pixels_in(spring, (170, 0, 0), (100, 150, 600, 400))
+                if black and red > 30:
+                    width = max(x for x, y in black)-min(x for x, y in black)
+                    if width < initial_width-30:
+                        break
+                if time.monotonic() >= deadline:
+                    raise RuntimeError('Mass Spring did not visibly pull its two masses together')
+                time.sleep(.2)
+            print('PASS unchanged Mass Spring mouse placement, spring creation, visible circles/line and physics', flush=True)
+            qmp_send_key('ret')
+            time.sleep(.5)
+            reset = graphical_screen('stock-massspring-reset')
+            if rgb_pixels_in(reset, (170, 0, 0), (100, 150, 600, 400)) > 10 or rgb_pixels_in(reset, (0, 0, 0), (100, 150, 600, 400)) > 10:
+                raise RuntimeError('Mass Spring restart did not remove its masses and spring')
+            qmp_send_key('esc')
+            time.sleep(.5)
+            run_graphical_terminal_command('stock-massspring-return', '40+2;', 'ans=0x2A=42')
+            restored_rect = graphical_task_rect('bootstrap_gui_terminal_task')
+            if restored_rect != original_rect:
+                raise RuntimeError(f'Mass Spring did not restore window geometry: {original_rect} -> {restored_rect}')
+            command('zc Print("stock_draw_restored=%d\\n", bootstrap_gui_terminal_task->draw_it==NULL);', 'stock_draw_restored=1')
+            select_os_menu_row('stock-doodle-menu', 'Apps', 5)
+            time.sleep(.5)
+            # Right release opens the original color picker. Pick RED by its
+            # real menu entry, then draw an XOR preview and commit on release.
+            move_graphical_pointer(300, 220)
+            graphical_mouse_button('right', True)
+            time.sleep(.2)
+            graphical_mouse_button('right', False)
+            picker = require_graphical_text('stock-doodle-picker', 'RED', timeout=10,
+                                            foreground_threshold=25000)
+            click_popup('__RED')
+            time.sleep(.4)
+            move_graphical_pointer(160, 180)
+            graphical_mouse_button('left', True)
+            time.sleep(.2)
+            move_graphical_pointer(330, 330)
+            time.sleep(.3)
+            preview = graphical_screen('stock-doodle-preview')
+            if rgb_pixels_in(preview, (170, 0, 0), (140, 160, 350, 350)) < 200:
+                raise RuntimeError('Doodle did not show its red drag preview')
+            graphical_mouse_button('left', False)
+            time.sleep(.5)
+            drawn = graphical_screen('stock-doodle-line')
+            red = rgb_pixels_in(drawn, (170, 0, 0), (140, 160, 350, 350))
+            if red < 200:
+                raise RuntimeError(f'Doodle did not retain its selected red stroke: {red} pixels')
+            time.sleep(.5)
+            retained = graphical_screen('stock-doodle-retained')
+            if rgb_pixels_in(retained, (170, 0, 0), (140, 160, 350, 350)) < 200:
+                raise RuntimeError('Doodle lost its stroke on compositor refresh')
+            qmp_send_key('esc')
+            run_graphical_terminal_command('stock-doodle-return', '6*7;', 'ans=0x2A=42')
+            cleared = graphical_screen('stock-doodle-cleared')
+            if rgb_pixels_in(cleared, (170, 0, 0), (140, 160, 350, 350)) > 10:
+                raise RuntimeError('Doodle did not clear its foreground on exit')
+            print('PASS unchanged Doodle color picker, drag preview, retained stroke, clear and prompt recovery', flush=True)
+            select_os_menu_row('stock-life-menu', 'Apps', 7)
+            time.sleep(.5)
+            move_graphical_pointer(180, 200)
+            graphical_mouse_button('left', True)
+            for x, y in ((230, 250), (290, 200), (350, 260), (410, 210)):
+                move_graphical_pointer(x, y)
+                time.sleep(.25)
+            graphical_mouse_button('left', False)
+            deadline = time.monotonic()+25
+            first = graphical_screen('stock-life-drawn')
+            while True:
+                time.sleep(.5)
+                second = graphical_screen('stock-life-evolved')
+                green1 = rgb_coordinates_in(first, (0, 170, 0), (100, 100, 600, 400))
+                green2 = rgb_coordinates_in(second, (0, 170, 0), (100, 100, 600, 400))
+                if len(green1) > 10 and len(green2) > 10 and len(green1 ^ green2) > 10:
+                    break
+                if time.monotonic() >= deadline:
+                    raise RuntimeError('Game of Life did not draw and evolve its green cells')
+                first = second
+            qmp_send_key('esc')
+            time.sleep(.5)
+            run_graphical_terminal_command('stock-life-return', '7*6;', 'ans=0x2A=42')
+            command('zstatus', 'failed=0')
+            print('PASS unchanged Game of Life mouse drawing, background evolution, cleanup and terminal recovery', flush=True)
+            raise SystemExit(0)
         if args.probe_stock_programs:
             command('zload /Tests/StockPrograms.ZC', 'zc: loaded /Tests/StockPrograms.ZC')
             command('zcall StockProgramIntrinsicChecks', 'zc => 0x000000000000002a')

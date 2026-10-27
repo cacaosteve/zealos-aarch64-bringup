@@ -2703,13 +2703,12 @@ U0 BootstrapBindGrTaskTables(CGrGlobals *active_gr)
     active_gr->win_uncovered_bitmap = bootstrap_win_uncovered;
 }
 U0 BootstrapGrCircleBoundsInit(CGrGlobals *active_gr)
-{//Build upstream brush-circle bounds without ZealC's broken nested-array access.
+{//Build upstream brush-circle bounds before the full primitive module loads.
     I64 i, j, k, x, y, rr, bound;
     I8 *circle_lo, *circle_hi;
     if (!active_gr)
         return;
-    // ZealC currently emits a null base for CGrGlobals inline 2-D arrays.
-    // Keep the real upstream layout and index each table through a flat view.
+    // Preserve the real upstream layout; initialize the two packed tables.
     circle_lo = active_gr(I8 *) + offset(CGrGlobals.circle_lo);
     circle_hi = active_gr(I8 *) + offset(CGrGlobals.circle_hi);
     for (i = 0; i < 64 * 64; i++)
@@ -5127,6 +5126,27 @@ fail:
     active_mouse->pos.z = old_pos_z;
     return fail_code;
 }
+// Define the current router before Poll. Reloaded extern declarations can
+// otherwise retain an implemented router from the preceding bootstrap load.
+Bool BootstrapSourceWinMgrActive()
+{//Do not send tablet events through both bridge and source-manager dispatch.
+    return Bt(&sys_run_level, RLf_WINMGR) && TaskValidate(sys_task) &&
+           TaskValidate(sys_winmgr_task) && sys_winmgr_task != sys_task;
+}
+public Bool BootstrapCtrlInputSubmit(CTask *task, I64 sample, I64 now_ns)
+{//Queue raw tablet state; only the bridge routes input before WinMgr is live.
+    if (sample < 0 || !TaskValidate(task))
+        return FALSE;
+    if (BootstrapSourceWinMgrActive())
+        BootstrapMouseHardSample(sample, now_ns);
+    else
+    {
+        BootstrapCtrlInputSampleAt(task, sample, now_ns);
+        BootstrapMouseHardSample(sample, now_ns);
+    }
+    return TRUE;
+}
+
 U0 BootstrapCtrlInputPoll(Bool source_manager=FALSE)
 {//Poll UTM's absolute tablet through the active input path.
     CTask *task;
@@ -5186,24 +5206,6 @@ public Bool CtrlDispatchWheel(CTask *task, I64 delta)
         ctrl = ctrl->next;
     }
     return FALSE;
-}
-Bool BootstrapSourceWinMgrActive()
-{//Do not send tablet events through both bridge and source-manager dispatch.
-    return Bt(&sys_run_level, RLf_WINMGR) && TaskValidate(sys_task) &&
-           TaskValidate(sys_winmgr_task) && sys_winmgr_task != sys_task;
-}
-public Bool BootstrapCtrlInputSubmit(CTask *task, I64 sample, I64 now_ns)
-{//Queue raw tablet state; only the bridge routes input before WinMgr is live.
-    if (sample < 0 || !TaskValidate(task))
-        return FALSE;
-    if (BootstrapSourceWinMgrActive())
-        BootstrapMouseHardSample(sample, now_ns);
-    else
-    {
-        BootstrapCtrlInputSampleAt(task, sample, now_ns);
-        BootstrapMouseHardSample(sample, now_ns);
-    }
-    return TRUE;
 }
 U0 WinDerivedScrollValsUpdate(CCtrl *ctrl)
 {

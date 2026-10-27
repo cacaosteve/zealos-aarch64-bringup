@@ -1,0 +1,19 @@
+// Original PopUpColor body from pinned System/DolDoc/DocGr.ZC.
+public I64 PopUpColor(U8 *header=NULL, Bool allow_transparent=TRUE, Bool allow_default=TRUE)
+{//Chooser for 16-color, default or transparent.
+	I64   i;
+	CDoc *doc = DocNew;
+
+	if (header)
+		DocPrint(doc, "%s",header);
+	if (allow_transparent)
+		DocPrint(doc, "$$MU,\"TRANSPARENT\",LE=TRANSPARENT$$\n");
+	for (i = 0; i < COLORS_NUM; i++)
+		DocPrint(doc, "$$BG,%d$$$$MU,\"__%-8Z__\",LE=%d$$$$BG$$\n", i, i, "ST_COLORS", i);
+	if (allow_default)
+		DocPrint(doc, "$$BG,WHITE$$$$MU,\"DEFAULT\",LE=DOC_DEFAULT$$$$BG$$");
+	i = PopUpMenu(doc);
+	DocDel(doc);
+
+	return i;
+}
