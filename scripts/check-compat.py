@@ -1578,6 +1578,10 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 raise RuntimeError('guest wall clock does not match the host UTC clock')
             command('zc Print("clock=%D %T\\n",Now,Now);', 'clock=')
             command('zload /Tests/ProgramCatalog.ZC', 'zc: loaded /Tests/ProgramCatalog.ZC')
+            command('zc CTask *budget_form_probe=Spawn(&StockCatalogServer,NULL,"FormProbe",-1,Fs);', 'zc: executed')
+            command('zc CJob *budget_form_probe_job=TaskExe(budget_form_probe,Fs,"StockBudgetFormChildCheck();",0);', 'zc: executed')
+            command('zc Print("budget_form_field_child=%d\\n",JobResGet(budget_form_probe_job));', 'budget_form_field_child=1')
+            command('zc Kill(budget_form_probe);', 'zc: executed')
             command('zc CTask *budget_check_task=Spawn(&StockCatalogServer);', 'zc: executed')
             command('zc CJob *budget_check_job=TaskExe(budget_check_task,Fs,"ExeFile2(\\"/Tests/BudgetProgram.ZC\\");",0);', 'zc: executed')
             command('zc Print("budget_checks=%d\\n",JobResGet(budget_check_job));', 'budget_checks=42')
@@ -1635,7 +1639,14 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             print('PASS Budget File/Edit/View shortcuts, key labels and continued presentation after hover', flush=True)
             select_os_menu_row('new-entry-menu', 'Edit', 0)
             move_graphical_pointer(700,500)
-            require_graphical_text('new-form', 'Credit (from) Acct:', timeout=15)
+            try:
+                require_graphical_text('new-form-menu', 'Credit (from) Acct:', timeout=2)
+            except RuntimeError:
+                # Distinguish a menu activation issue from the original n
+                # shortcut/form path before treating the whole program as
+                # blocked.
+                qmp_send_text('n', delay=.15, dismiss_splash=False)
+                require_graphical_text('new-form-shortcut', 'Credit (from) Acct:', timeout=5)
             for index, value in enumerate(('02/29/2024', '     12.50', 'BANK', 'FOOD', 'UTM Budget entry')):
                 budget_field(index, value)
             move_graphical_pointer(700, 500)
@@ -1815,16 +1826,33 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                       '/Demo/Games/MassSpring.ZC']
             results = []
             for path in paths:
+                loader = {
+                    '/Apps/Psalmody/Run.ZC': '/Apps/Psalmody/Load.ZC',
+                    '/Apps/ToTheFront/Run.ZC': '/Apps/ToTheFront/Load.ZC',
+                    '/Apps/X-Caliber/Run.ZC': '/Apps/X-Caliber/Load.ZC',
+                }.get(path)
+                compile_expr = (
+                    f'StockCatalogCompileAfterLoad("{loader}","{path}")'
+                    if loader else f'StockCatalogCompile("{path}")')
                 result = command('zc Print("catalog_compile=%d\\n", '
-                                 f'StockCatalogCompile("{path}"));',
+                                 f'{compile_expr});',
                                  'catalog_compile=', timeout=45)
                 passed = 'catalog_compile=1' in result
                 results.append({'path': path, 'compiled': passed, 'output': result})
                 print(('COMPILES ' if passed else 'BLOCKED ')+path, flush=True)
+            normal_loads = []
+            for path in ('/Apps/ToTheFront/Load.ZC', '/Apps/X-Caliber/Load.ZC'):
+                result = command('zc Print("normal_load=%d\\n", '
+                                 f'StockCatalogNormalLoad("{path}"));',
+                                 'normal_load=', timeout=45)
+                passed = 'normal_load=1' in result
+                normal_loads.append({'path': path, 'loaded': passed, 'output': result})
+                print(('NORMAL LOADS ' if passed else 'NORMAL LOAD BLOCKED ')+path,
+                      flush=True)
             (ROOT/'build/program-catalog.json').write_text(json.dumps({
                 'commit': json.loads((ROOT/'upstream/pinned/UPSTREAM.json').read_text())['commit'],
                 'mode': 'CCF_JUST_LOAD in disposable task; no runtime acceptance',
-                'programs': results}, indent=2)+'\n')
+                'programs': results, 'normal_loads': normal_loads}, indent=2)+'\n')
             command('zstatus', 'failed=0')
             print('PASS isolated program compilation inventory saved', flush=True)
             raise SystemExit(0)

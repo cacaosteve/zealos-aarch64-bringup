@@ -1575,7 +1575,7 @@ def translate_docform(source: bytes) -> bytes:
         'CMemberList\t*ml;': 'CArmDocFormField arm_field;\n\tI64 arm_index = 0;',
         '\tCHashClass\t*tmpc, *tmpc2;\n': '',
         'if (!(tmpc = HashFind(class_name, Fs->hash_table, HTT_CLASS)))':
-            'if (!ZcDocFormField(class_name, 0, NULL))',
+            'if (!ZcDocFormField(class_name, 0, NULL))\n\t\treturn FALSE;',
         '\tml = tmpc->member_list_and_root;\n\twhile (ml)':
             '\twhile (ZcDocFormField(class_name, arm_index++, &arm_field))',
         'MemberMetaData("format", ml)': 'arm_field.format',

@@ -151,45 +151,42 @@ installer. Saving requires a writable installed VirtIO source volume.
 
 ![Budget entry reopened after a cold disk-only boot](docs/images/qemu-budget-entry.png)
 
-## Remaining collection
+## Current named-app status — 2026-10-27
 
-An inventory of the pinned upstream `src/Apps` and `src/Demo` tree contains
-294 files, including source, documents and binary resources. That is a file
-count, not a count of applications. The pinned mirror contains that complete
-tree, unchanged and hash-checked; the generated Budget overlay is described
-above. Availability does not establish
-compilation or runtime support.
+The pinned upstream `src/Apps` and `src/Demo` mirror contains 294 files,
+including source, documents and binary resources. It is complete and
+hash-checked; that file count is not a count of supported programs. This
+table tracks the eight named apps in the current batch alongside the 3D apps
+and Logic. A compile or normal-load result is not runtime acceptance.
 
-The full application directories still need individual acceptance:
-Budget, GrModels, KeepAway, Psalmody, Span, Strut, TimeClock, Titanium,
-ToTheFront, Vocabulary and X-Caliber. The wider demo/game collection includes
-Chess, Varoom, FlapBat and many others that have not been accepted on ARM64.
-Some depend on missing sound, graphics, document, task or hardware behavior;
-the assembly demos also require architecture-specific implementations.
-
-`make check-program-catalog` compiles each application entry point in an
-isolated guest task with `CCF_JUST_LOAD` and records the first blocker in
-`build/program-catalog.json`. This is an inventory, not execution acceptance.
-The remaining blockers include missing controls, graphics types and
-dictionary/audio services. TimeClock now compiles with the calendar services;
-it and Vocabulary still need runtime acceptance. Budget and Logic have
-separate execution gates described above.
-
-| Application | First compile blocker in the inventory |
+| Application | Current verified status |
 |--|--|
-| Budget | Candidate entry/form/storage gate; live UTM and advanced workflows remain pending |
-| GrModels | `sprite_elem_base_sizes` |
-| KeepAway | `SpriteInterpolate` |
-| Logic | Passes focused NEC/VirtIO execution gates and the user-confirmed live UTM retest on `9c5e90c9…` |
-| Psalmody | `GodWordStr` (audio also remains unimplemented) |
-| Span, Strut | `CCtrlBttnState` |
-| TimeClock | Compiles with the new calendar services; runtime and saved-data workflows remain unaccepted |
-| ToTheFront | `DCOS` |
-| Titanium | `Sprite3Mat4x4B` |
-| X-Caliber | `best_score` |
-| Vocabulary | Compiles only; dictionary and audio need runtime acceptance |
+| Budget | Catalog compile passes; date, storage and menu fixtures pass. The fresh graphical entry-form gate currently fails: neither Edit → New Entry nor `n` presents the form. Not complete. |
+| GrModels | App source compiles; shared mesh, interpolation and 3D service fixtures pass. End-to-end app form/generation gate is not passing yet. |
+| KeepAway | App source now compiles after adding session-only high-score globals; 3D compatibility fixtures pass. Interactive gameplay is not accepted yet. |
+| Psalmody | Compile advances past missing text-search/reward symbols, then stops at missing `Ona2Octave`. Note conversion and audio playback remain incomplete. |
+| Span | Compiles after adding the original control-button source and optional silent audio hooks. Runtime/form acceptance pending. |
+| Strut | Compiles after adding the original control-button source and optional silent audio hooks. Runtime/form acceptance pending. |
+| TimeClock | Compiles with the calendar/clock services. Punch-in/out, file persistence and report workflows are not accepted. |
+| Titanium | App source now compiles after adding session-only high-score globals; 3D compatibility fixtures pass. Interactive gameplay is not accepted yet. |
+| ToTheFront | Normal load reaches an unsupported compiler backend path for its runtime-sized global arrays; compile/runtime acceptance is blocked. |
+| Vocabulary | Compiles, but runtime needs the dictionary data/index, which is not included in this image; sound effects are silent. |
+| X-Caliber | Normal `Load.ZC` succeeds and the app entry compiles after that loader initializes registry globals. Runtime not accepted. |
 
-For each program, track original-file integrity separately from compilation,
-visible behavior/input, clean exit and any save/reboot/reopen requirements.
-Merely copying an upstream file into the image does not make it supported.
-Detailed passing runs and limitations belong in [ACCEPTANCE.md](ACCEPTANCE.md).
+The current isolated catalog is `docs/acceptance/program-catalog-2026-10-27.json`;
+its mode is `CCF_JUST_LOAD` plus selected normal-load checks. The sprite service fixtures
+are `build/3d-apps-compile.json`. Neither report proves interactive app
+behavior. The user confirmed live UTM drawing/simulation and Escape recovery
+for Doodle, Mass Spring and Game of Life, and confirmed the Digital Logic
+prompt fix. Their acceptance records are above. The wider demo/game collection
+still includes Chess, Varoom, FlapBat and many other programs that have not
+been accepted on ARM64. Assembly demos require architecture-specific
+implementations.
+
+The latest Budget PCI run failed before creating an entry: the ledger stayed
+blank after the menu action and keyboard shortcut, while the desktop remained
+responsive. This supersedes the earlier automated form-persistence pass for
+the current candidate. The form path is still open work, not a completed app.
+The 3D fixture tests pass, but the GrModels end-to-end gate still needs a
+reliable launch/input path. Track upstream source integrity separately from
+compilation, visible behavior/input, clean exit and save/reopen requirements.

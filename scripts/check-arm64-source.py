@@ -15,6 +15,9 @@ from arm64_source import (extract_home_set, extract_home_startup, extract_home_s
 root = Path(__file__).resolve().parent.parent
 sprite_new = (root/'upstream/pinned/System/Gr/SpriteNew.ZC').read_bytes()
 sprite_bridge = (root/'upstream/bootstrap/System/Gr/SpriteBridge.ZC').read_bytes()
+assert b'Fs ? Fs->task_name : NULL' not in sprite_bridge
+assert b'doc ? doc->flags : 0' not in sprite_bridge
+assert b'entry ? entry->type : -1' not in sprite_bridge
 sprite_size_declaration = extract_sprite_elem_base_sizes(sprite_new)
 assert sprite_size_declaration.startswith(
     b'I64 sprite_elem_base_sizes[SPT_TYPES_NUM] = {')
@@ -84,6 +87,11 @@ for changed_keyboard, changed_printer in [
     else:
         raise AssertionError('keyboard helper extraction accepted changed dependencies')
 task_bridge = (root / 'upstream/bootstrap/System/TaskBridge.ZC').read_text()
+assert 'I64 best_score, best_score0, best_score1;' in task_bridge
+for sound_compat in ('U0 Play(U8 *music=NULL, ...)', 'U0 SoundTaskEndCB()',
+                     'U0 Sweep(I64 frequency, I64 duration, I64 end_frequency)',
+                     'Bool FileOcc(U8 *needle, U8 *filename, U8 *flags="")'):
+    assert sound_compat in task_bridge
 full_compositor_start = task_bridge.index('Bool BootstrapTryUpstreamGrUpdateScreen()')
 full_compositor_end = task_bridge.index('\nU0 BootstrapGrUpdateTasks()', full_compositor_start)
 full_compositor = task_bridge[full_compositor_start:full_compositor_end]

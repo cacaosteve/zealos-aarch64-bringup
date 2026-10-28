@@ -333,6 +333,7 @@
     "src/System/AutoComplete/ACInit.ZC": "577395d43ea0289ef31c12080ad040b592e2c823235335416b5259be4ab376f8",
     "src/System/AutoComplete/ACTask.ZC": "824cab32d449fbe7eff812330ee524226ad837bb75332ec1b592884f7d6b4d5c",
     "src/System/BlkDev/FileMgr.ZC": "3ffda33c7d1e9fc2d517ef95ac854a06db3c0c5dd9c782938c6081ca87b54062",
+    "src/System/Ctrls/CtrlsBttn.ZC": "b538e59015f793f2e701b4062506c1db225b6a9ae8b602883398462c15dcfdb4",
     "src/System/DolDoc/DocBin.ZC": "fa839e325468dd9620f297986d93011fbf957aa7e39975dd0368c7bb08abaa8a",
     "src/System/DolDoc/DocChar.ZC": "21088c3426f1938ef1e1a828621f4add66a144f6566389d1a0076d15d28038be",
     "src/System/DolDoc/DocClipBoard.ZC": "da90340c0dcb5be53b4bdd17891e3b80a03fdec099997b546b18a10a9f799487",

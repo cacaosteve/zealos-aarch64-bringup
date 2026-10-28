@@ -2141,6 +2141,56 @@ U0 GodDoodle(U8 *hex=NULL)
 U0 GodSong()
 {
 }
+// Stock sample games use these shared high-score globals. They retain scores
+// during one session; persistent high-score storage is not provided yet.
+I64 best_score, best_score0, best_score1;
+// Psalmody's text helpers are absent from the ARM64 bootstrap. Keep its
+// optional word/reward branches well-defined without inventing a generated
+// passage or song payload.
+U8 *GodWordStr = "";
+U8 *GodSongStr = NULL;
+Bool FileOcc(U8 *needle, U8 *filename, U8 *flags="")
+{//Simple literal byte-substring search used by Psalmody's song library.
+    U8 *data;
+    I64 data_size, needle_size, i, j;
+
+    if (!needle || !filename || !flags || *flags)
+        return FALSE;
+    needle_size = StrLen(needle);
+    if (!needle_size)
+        return TRUE;
+    data = FileRead(filename, &data_size);
+    if (!data)
+        return FALSE;
+    for (i = 0; i + needle_size <= data_size; i++)
+    {
+        for (j = 0; j < needle_size && data[i + j] == needle[j]; j++)
+            ;
+        if (j == needle_size)
+        {
+            Free(data);
+            return TRUE;
+        }
+    }
+    Free(data);
+    return FALSE;
+}
+// Audio hardware/PSG emulation is not part of the ARM64 bring-up yet. Keep
+// source applications that treat sound as an optional effect loadable; this
+// compatibility hook deliberately produces silence.
+U0 Play(U8 *music=NULL, ...)
+{
+    if (music) {}
+}
+U0 SoundTaskEndCB()
+{
+}
+U0 Sweep(I64 frequency, I64 duration, I64 end_frequency)
+{//Silence optional sound effects until an ARM64 audio device is implemented.
+    if (frequency) {}
+    if (duration) {}
+    if (end_frequency) {}
+}
 U0 GodBiblePassage(I64 num_lines=20)
 {
     if (num_lines) {}
@@ -3130,6 +3180,7 @@ class CBootstrapMusicGlobals
 {
     U8 *cur_song;
     CTask *cur_song_task;
+    F64 tempo, stacatto_factor;
 } music;
 U0 CurSongTask() {}
 U0 MusicSettingsReset()

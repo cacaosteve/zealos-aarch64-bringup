@@ -7222,6 +7222,8 @@ int zc_start_graphics(void) {
         /* The boot terminal exposes the source three-axis view control in
          * its OS menu, so load it after the task and graphics primitives. */
         "/System/Ctrls/ViewAngles.ZC",
+        /* Span and Strut use ZealOS's standard stateful button controls. */
+        "/System/Ctrls/CtrlsBttn.ZC",
     };
     const unsigned char *archive = source_archive;
     size_t archive_len = archive_size;

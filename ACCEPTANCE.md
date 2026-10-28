@@ -2754,3 +2754,33 @@ Exact artifact sizes, hashes, logs and the scope of live evidence are recorded
 in the correction report. The failed Budget ISO and prior live-accepted Logic
 image remain preserved. Live UTM retesting of this replacement and advanced
 Budget workflows remain pending. No running UTM session or Pi media changed.
+
+### Follow-up PCI form check — 2026-10-27
+
+A later fresh PCI run of `--probe-budget-program` still did not open the
+transaction form. The automated workflow selected Edit → New Entry and then
+sent the documented `n` shortcut; neither produced the form labels. The
+blank ledger remained responsive, with terminal focus and advancing desktop
+frames, so this run isolates the failure to Budget's entry-form path rather
+than a whole-guest lockup. Calendar, account/data storage, class reflection,
+and menu-hover fixtures still passed. This newer failure supersedes the
+earlier automated form-persistence result for the current candidate; Budget
+is not counted as finished. Log: `build/check-budget-pci.log`.
+
+The 3D mesh, interpolation, formatter and service fixtures also pass. The
+GrModels app workflow gate compiles the app but does not yet pass its form and
+mesh-generation interaction checks. KeepAway and Titanium compile, but the
+interactive games still need acceptance.
+
+### Named-app catalog rerun — 2026-10-27
+
+The fresh isolated catalog now compiles KeepAway and Titanium after adding
+session-only high-score globals, and compiles X-Caliber after its normal
+loader initializes registry globals. Span, Strut, TimeClock, Vocabulary,
+Budget, GrModels and Logic also compile in their catalog paths. This is
+compile/load evidence, not interactive acceptance. Psalmody now reaches the
+missing `Ona2Octave` helper after the text-search/reward compatibility hooks;
+ToTheFront's normal loader still aborts in the ARM64 compiler on its
+runtime-sized global arrays. The full per-entry output is saved in
+`docs/acceptance/program-catalog-2026-10-27.json`. Psalmody audio hooks remain
+silent, and Vocabulary has no dictionary data bundled.

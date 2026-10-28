@@ -263,15 +263,21 @@ public CDocEntry *Sprite(U8 *elems, U8 *format=NULL)
     CDocEntry *entry;
 
     sprite_debug_doc_sprite_calls++;
-    sprite_debug_doc_sprite_task_name = Fs ? Fs->task_name : NULL;
+    sprite_debug_doc_sprite_task_name = NULL;
+    if (Fs)
+        sprite_debug_doc_sprite_task_name = Fs->task_name;
     sprite_debug_doc_sprite_doc_is_put = doc && Fs && doc == Fs->put_doc;
     sprite_debug_doc_sprite_doc_is_display = doc && Fs && doc == Fs->display_doc;
     sprite_debug_doc_sprite_doc_window_is_current = doc && Fs && doc->win_task == Fs;
-    sprite_debug_doc_sprite_doc_flags = doc ? doc->flags : 0;
+    sprite_debug_doc_sprite_doc_flags = 0;
+    if (doc)
+        sprite_debug_doc_sprite_doc_flags = doc->flags;
     if (!doc)
         return NULL;
     entry = DocSprite(doc, elems, format);
-    sprite_debug_doc_sprite_entry_type = entry ? entry->type : -1;
+    sprite_debug_doc_sprite_entry_type = -1;
+    if (entry)
+        sprite_debug_doc_sprite_entry_type = entry->type;
     sprite_debug_doc_sprite_has_bin = entry && entry->bin_data;
     return entry;
 }

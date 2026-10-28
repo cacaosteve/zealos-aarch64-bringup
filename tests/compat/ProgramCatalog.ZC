@@ -32,3 +32,70 @@ I64 StockCatalogCompile(U8 *path)
     Kill(task);
     return result == 42;
 }
+
+// Some stock entry files rely on top-level setup (RegDefault/DefinePrint).
+// Exercise their normal Load.ZC path in a disposable task because CCF_JUST_LOAD
+// deliberately suppresses that setup and can report false unknown symbols.
+I64 StockCatalogNormalLoad(U8 *path)
+{
+    CTask *task = Spawn(&StockCatalogServer);
+    CJob *job;
+    U8 *source;
+    I64 result;
+
+    if (!task)
+        return -1;
+    source = MStrPrint("ExeFile2(\"%Q\");42;", path);
+    job = TaskExe(task, Fs, source, 0);
+    Free(source);
+    if (!job)
+    {
+        Kill(task);
+        return -2;
+    }
+    result = JobResGet(job);
+    Kill(task);
+    return result == 42;
+}
+
+I64 StockCatalogCompileAfterLoad(U8 *load_path, U8 *app_path)
+{//Compile entry points that depend on globals declared by their normal loader.
+    CTask *task = Spawn(&StockCatalogServer);
+    CJob *job;
+    U8 *source;
+    I64 result;
+
+    if (!task)
+        return -1;
+    source = MStrPrint("ExeFile2(\"%Q\");ExeFile2(\"%Q\",CCF_JUST_LOAD);42;",
+                       load_path, app_path);
+    job = TaskExe(task, Fs, source, 0);
+    Free(source);
+    if (!job)
+    {
+        Kill(task);
+        return -2;
+    }
+    result = JobResGet(job);
+    Kill(task);
+    return result == 42;
+}
+
+I64 StockBudgetFormChildCheck()
+{//Budget's popup form must reflect classes loaded by its normal app source.
+    CTask *task;
+    CJob *job;
+    I64 result;
+
+    ExeFile2("/Apps/Budget/Load.ZC");
+    task = Spawn(&StockCatalogServer, NULL, "FormProbe", -1, Fs);
+    if (!task)
+        return -1;
+    job = TaskExe(task, Fs,
+                  "ZcDocFormField(\"CBgtEntryForm\",0,NULL);", 0);
+    result = -2;
+    if (job)
+        result = JobResGet(job);
+    Kill(task);
+    return result;
+}
