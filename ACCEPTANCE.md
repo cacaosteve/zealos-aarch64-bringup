@@ -2798,12 +2798,20 @@ The fresh PCI Budget workflow now passes form creation, field edits, save and
 abort, cancel, reopen, cold disk-only persistence, and clean guest status. The
 fresh `--probe-3d-apps` run passes the GrModels Man and Ball form workflows,
 mesh generation (Ball reports 58 vertices), clean terminal recovery, and the
-3D fixtures. KeepAway and Titanium still have compile/service-fixture evidence
-only; interactive gameplay remains unaccepted. These are QEMU PCI checks, not
-live UTM acceptance.
+3D fixtures. Its first KeepAway run exposed an unresolved `Noise` import in
+the animation task. The ARM64 runtime now binds `Noise` as a silent no-op after
+loading `Externs.ZC`, and makes `Sound` a silent no-op because this target has
+no audio device. A service-fixture regression calls both hooks. The rerun
+renders the KeepAway court and players, keeps the frame active through Space
+and mouse input, returns on Escape, and passes `40+2;` plus `zstatus`.
+
+Titanium compiles and reaches its help page, but the automated PCI keypress
+does not advance its `PressAKey` wait. Its gameplay and normal exit remain
+unverified and need a live UTM check. These are QEMU PCI checks, not live UTM
+acceptance.
 
 The rebuilt combined ISO is `build/zealos-aarch64-hello.iso`, SHA-256
-`ad4c04b1c9891a2e8a44e74f2597f3d35992023ac65a86efad6b771e405ccb5b`. The
-Budget and 3D PCI logs are `build/check-budget-pci.log` and
-`build/check-3d-apps-pci.log`; the source translation regression is checked by
+`8f0bc3f474e7fc09c0692051d4d8efbab1c4b47bfbf7363bc652dcc2295b3275`. The
+3D probe details are in `build/3d-apps-compile.json` and
+`build/check-3d-apps-pci.log`. The source translation regression is checked by
 `python3 scripts/check-arm64-source.py`.

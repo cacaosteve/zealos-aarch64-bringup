@@ -163,13 +163,13 @@ and Logic. A compile or normal-load result is not runtime acceptance.
 | Application | Current verified status |
 |--|--|
 | Budget | Graphical entry form, field editing, save/abort, reopen and cold disk-only persistence pass in the PCI workflow; live UTM retest of the corrected image is pending. |
-| GrModels | Man and Ball forms render; both mesh-generation workflows reach their repeat prompt and return to a responsive terminal. Live UTM acceptance is pending. |
-| KeepAway | App source now compiles after adding session-only high-score globals; 3D compatibility fixtures pass. Interactive gameplay is not accepted yet. |
+| GrModels | Man and Ball forms render; both mesh-generation workflows reach their repeat prompt and return to a responsive terminal in the PCI workflow. Live UTM acceptance is pending. |
+| KeepAway | PCI gameplay frame renders; Space and mouse input leave the court active, Escape returns to the terminal, and the `40+2;` smoke check passes. Speaker effects are silent on ARM64. Live UTM retest is pending. |
 | Psalmody | Compile advances past missing text-search/reward symbols, then stops at missing `Ona2Octave`. Note conversion and audio playback remain incomplete. |
 | Span | Compiles after adding the original control-button source and optional silent audio hooks. Runtime/form acceptance pending. |
 | Strut | Compiles after adding the original control-button source and optional silent audio hooks. Runtime/form acceptance pending. |
 | TimeClock | Compiles with the calendar/clock services. Punch-in/out, file persistence and report workflows are not accepted. |
-| Titanium | App source now compiles after adding session-only high-score globals; 3D compatibility fixtures pass. Interactive gameplay is not accepted yet. |
+| Titanium | App compiles and its help screen is visible in the PCI workflow. The automated keypress did not advance its `PressAKey` wait, so gameplay and normal exit remain unverified. Speaker effects are silent on ARM64. |
 | ToTheFront | Normal load reaches an unsupported compiler backend path for its runtime-sized global arrays; compile/runtime acceptance is blocked. |
 | Vocabulary | Compiles, but runtime needs the dictionary data/index, which is not included in this image; sound effects are silent. |
 | X-Caliber | Normal `Load.ZC` succeeds and the app entry compiles after that loader initializes registry globals. Runtime not accepted. |
@@ -191,6 +191,7 @@ translator now replaces the condition and its return as one block, with a
 regression assertion on the generated source. The corrected PCI workflow
 passes Budget form creation/edit/cancel/save/reopen and cold disk-only
 persistence; the 3D live probe passes GrModels Man and Ball form and mesh
-generation. KeepAway and Titanium remain compile-only pending interactive
-gameplay acceptance. Track upstream source integrity separately from
-compilation, visible behavior/input, clean exit and save/reopen requirements.
+generation. KeepAway now runs through gameplay and returns cleanly in the PCI
+probe. Titanium reaches its help screen, but gameplay input remains unverified.
+Track upstream source integrity separately from compilation, visible
+behavior/input, clean exit and save/reopen requirements.

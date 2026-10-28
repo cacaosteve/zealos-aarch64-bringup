@@ -3464,10 +3464,14 @@ static int64_t host_dir_cur(int64_t *a) {
     return dir ? (int64_t)(uintptr_t)__AIWNIOS_StrDup(dir, &owner->heap_owner) : 0;
 }
 static int64_t host_sound(int64_t *a) {
-    /* SettingsPop silences the PC speaker. There is no audio device on this
-     * platform yet; do not pretend that nonzero notes can be played. */
-    if (a[0])
-        zc_fail("Sound: audio output is not available on ARM64");
+    /* There is no audio device on this platform. Keep speaker-dependent apps
+     * callable while silently omitting their optional sound effects. */
+    (void)a;
+    return 0;
+}
+static int64_t host_noise(int64_t *a) {
+    /* Noise is the asynchronous PC-speaker hook used by several games. */
+    (void)a;
     return 0;
 }
 static int64_t host_fb_task_text_compose(int64_t *a) {
@@ -6692,6 +6696,8 @@ static int load_source_path(const char *path, int merged, int recover) {
         if (load_inner("/System/Gr/SpriteRaster.ZC"))
             zc_fail("sprite raster bridge source missing");
     }
+    if (!strcmp(path, "/System/Externs.ZC"))
+        PrsBindCSymbol("Noise", host_noise, 3);
     if (!strcmp(path, "/Kernel/KernelB.HH")) {
         bind_guest_task();
         PrsBindCSymbol("sys_boot_src", &guest_boot_source, 0);

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Exercise the native compiler inside a disposable QEMU/HVF guest."""
 import argparse, json, os, pathlib, re, select, shlex, shutil, socket, struct, subprocess, tempfile, time, zlib
+from collections import Counter
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 p = argparse.ArgumentParser()
 p.add_argument('--pci', action='store_true')
@@ -1538,7 +1539,76 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     'sprite_debug_mesh_target_scroll_y);'))
             print('GRMODELS BALL RASTER DIAGNOSTIC\n'+mesh_diag, flush=True)
 
-            raise SystemExit(0)
+            type_graphical_prompt_line(
+                '3d-keepaway-launch',
+                'ExeFile2("/Apps/KeepAway/Run.ZC");')
+            qmp_send_key('ret')
+            require_graphical_text('3d-keepaway-help', 'Pass or hand-off',
+                                   timeout=15)
+            # This one-button PopUpOk is positioned at the top-left of the
+            # primary graphical terminal; click the center of its OKAY link.
+            move_graphical_pointer(192, 116)
+            graphical_mouse_button('left', True)
+            time.sleep(0.2)
+            graphical_mouse_button('left', False)
+            time.sleep(0.4)
+            # KeepAway renders a gold court with dark, compact HUD text, so
+            # the generic white-on-black glyph scanner cannot read its HUD.
+            # Confirm the actual game frame from its upstream palette instead.
+            keepaway_frame = None
+            keepaway_deadline = time.monotonic() + 15
+            while True:
+                candidate = graphical_screen('3d-keepaway-hud')
+                keepaway_colors = Counter(
+                    tuple(candidate[2][offset:offset+3])
+                    for offset in range(0, len(candidate[2]), 3))
+                if (keepaway_colors[(255, 255, 85)] > 400000 and
+                        keepaway_colors[(170, 0, 0)] > 1000 and
+                        keepaway_colors[(0, 0, 0)] > 5000 and
+                        len(keepaway_colors) >= 8):
+                    keepaway_frame = candidate
+                    break
+                if time.monotonic() >= keepaway_deadline:
+                    raise RuntimeError(
+                        'KeepAway did not render its gold court, boundary and players')
+                time.sleep(0.1)
+            print('PASS KeepAway court, HUD and player frame rendered', flush=True)
+            qmp_key_edges(['spc'], True)
+            time.sleep(0.5)
+            qmp_key_edges(['spc'], False)
+            move_graphical_pointer(400, 300)
+            graphical_mouse_button('left', True)
+            time.sleep(0.1)
+            graphical_mouse_button('left', False)
+            time.sleep(1)
+            keepaway_input_frame = graphical_screen('3d-keepaway-input-frame')
+            keepaway_input_colors = Counter(
+                tuple(keepaway_input_frame[2][offset:offset+3])
+                for offset in range(0, len(keepaway_input_frame[2]), 3))
+            if (keepaway_input_colors[(255, 255, 85)] < 400000 or
+                    keepaway_input_colors[(170, 0, 0)] < 1000 or
+                    keepaway_input_colors[(0, 0, 0)] < 5000):
+                raise RuntimeError('KeepAway game frame disappeared after input')
+            print('PASS KeepAway game frame, space/mouse input and HUD refresh',
+                  flush=True)
+            qmp_send_key('esc')
+            run_graphical_terminal_command(
+                '3d-keepaway-exit-smoke', '40+2;', 'ans=0x2A=42', timeout=20)
+            command('zstatus', 'failed=0')
+
+            type_graphical_prompt_line(
+                '3d-titanium-launch',
+                'ExeFile2("/Apps/Titanium/Run.ZC");')
+            qmp_send_key('ret')
+            require_graphical_text('3d-titanium-help',
+                                   'Sweep side-to-side while shooting',
+                                   timeout=15)
+            report['titanium_help_reached'] = True
+            report['titanium_gameplay_verified'] = False
+            (ROOT/'build/3d-apps-compile.json').write_text(
+                json.dumps(report, indent=2)+'\n')
+            print('PENDING Titanium gameplay input: app help is visible; '
+                  'the automated CharGet keypress did not advance it', flush=True)
             raise SystemExit(0)
         if args.probe_budget_program:
             command('zload /Tests/KeyboardMenus.ZC', 'zc: loaded /Tests/KeyboardMenus.ZC')

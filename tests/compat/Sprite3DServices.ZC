@@ -55,6 +55,11 @@ I64 Sprite3DServiceChecks()
     I64 tri_x[3], tri_y[3], tri_z[3];
     CDC *dc;
 
+    // The bundled 3D games use these speaker hooks. ARM64 has no audio
+    // backend, so both entry points must remain callable as silent no-ops.
+    Noise(1, 74, 86);
+    Sound(86);
+
     // The table and walker must agree with the pinned ZealOS sprite records.
     if (sprite_elem_base_sizes[SPT_END] != sizeof(CSpriteBase) ||
             sprite_elem_base_sizes[SPT_MESH] != sizeof(CSpriteMeshU8s) ||
