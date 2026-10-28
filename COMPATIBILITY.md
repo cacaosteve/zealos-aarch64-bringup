@@ -4213,3 +4213,75 @@ checks all three early-abort paths, Shift+Escape, restored geometry/callbacks
 and a working terminal after each exit. Upstream `DocGetStr2` uses Shift+Escape
 for an empty result; plain Escape runs the current document entry and does not
 cancel a setup prompt. Plain Escape exits Logic's completed circuit view.
+
+## Budget calendar, forms and repeated loading
+
+The UTM desktop now loads source calendar/date parsing and printing services
+derived from pinned `KDate.ZC`, `StrScan.ZC` and `StrPrint.ZC`. The x86 CMOS
+boundary is replaced by Limine's optional UTC boot timestamp plus elapsed
+generic-counter time. `Now` is UTC; `local_time_offset` defaults to zero.
+Unavailable clock data raises a catchable `Clock` exception. This does not add
+a Pi hardware RTC, timezone database or clock synchronization service.
+
+The calendar overlay replaces the x86 `ModU64` intrinsic, corrects December's
+carry to January, checks month-table bounds and rejects an invalid month
+before indexing it. Date/scanner temporary buffers are freed when conversion
+throws. `%D` and `%T` use the source print helpers. Original string transforms
+and allocating helpers are loaded separately; `Round` uses ARM nearest-even
+rounding. Calendar tests include leap/non-leap years, all months, UTC clock
+agreement, local offsets and repeated conversion/error paths without growth.
+
+Class member string/integer metadata is retained by the native compiler.
+`DocForm` enumerates it through a checked `CArmDocFormField` ABI, translating
+member offsets, array lengths and raw-type IDs. It does not read Aiwnios
+objects through ZealOS's incompatible `CHashClass`/`CMemberList` layout.
+`lastclass` uses the actual preceding argument type and its emitted name
+buffer outlives the compiler's temporary heap. A previous argument's `&`
+operator no longer suppresses an implicit function call in the next argument.
+
+Repeated application loading also requires forward declarations to follow a
+new definition in their task. Guest forward aliases load a callable slot;
+later ABI-compatible definitions update that slot. Ordinary direct calls keep
+their original binding, and native adapters retain their ABI boundary. The
+regression checks direct, forward, function-address and F64 calls. Internal
+compiler aborts report their source location and use an active statement
+checkpoint when one is available.
+
+The small DolDoc lexer now accepts radix-prefixed 64-bit integer literals.
+Previously `U=0x...` became zero, losing the pointer used to edit a Budget
+row. This remains a bounded document-expression reader, not the complete
+original compiler's expression parser. The generated Budget string-file
+reader also corrects its comma separator comparison. The pinned originals
+remain unchanged, and the factory image seeds the original default accounts
+instead of implementing general `DirMake`/`Copy` behavior.
+
+`make check-budget-program` exercises the visible entry form, save/reopen,
+edit/abort, form cancellation, restored terminal and cold disk-only data
+persistence. Advanced Budget workflows and live UTM acceptance are tracked
+separately in [PROGRAMS.md](PROGRAMS.md) and [ACCEPTANCE.md](ACCEPTANCE.md).
+
+### Budget menu hover and shortcut correction
+
+The first Budget candidate passed entry/storage automation but froze in live
+UTM when the pointer hovered File → Abort. A separate QEMU reproduction
+records an unresolved external call from `DrawMenu+0x324` and `failed=1`.
+The menu renderer required `Char2ScanCode` and `ScanCode2KeyName`, which had
+not been loaded. The bootstrap lexer also rejected quoted menu characters
+and replaced named key constants with zero, dropping the Edit/View menu tree.
+
+`System/KeyboardBridge.ZC` now extracts the portable character/scan-code and
+key-name routines from the pinned original keyboard source, plus original
+`CatPrint`. Its three 80-byte decode tables are emitted as source arrays
+instead of x86 `DU8` assembly. No PS/2 port I/O is imported. The key-name
+buffer is initialized for control characters without a prefix, and bitmap
+indices are bounded before lookup. The pinned source is unchanged.
+
+The document lexer accepts packed character literals up to eight bytes and
+the escaped newline, tab, backspace, carriage return, NUL, quote and backslash
+forms needed by menu shortcuts. Malformed quotes throw a catchable `Lex`
+exception. Literal-valued named constants use borrowed compiler define text
+through `ZcLexDefineText`, avoiding incompatible native/source hash layouts;
+expression-valued defines and general expression evaluation remain unported.
+The expanded Budget gate hovers the actual File/Edit/View items, checks
+continued presentation and input, creates a transaction through Edit → New
+Entry, and invokes File → Exit and File → Abort.

@@ -1,0 +1,26 @@
+I64 ReloadTarget() { return 1; }
+I64 ReloadDirect() { return ReloadTarget; }
+extern I64 ReloadTarget();
+I64 ReloadForward() { return ReloadTarget; }
+I64 ReloadAddress()
+{
+    I64 (*fn)() = &ReloadTarget;
+    return (*fn)();
+}
+I64 ReloadTarget() { return 42; }
+
+F64 ReloadFloat(F64 value) { return value+1.0; }
+extern F64 ReloadFloat(F64 value);
+F64 ReloadFloatCaller() { return ReloadFloat(40.0); }
+F64 ReloadFloat(F64 value) { return value+2.0; }
+
+// A header redeclaration without a following definition still calls the
+// existing implementation, including its native argument/result ABI.
+extern I64 StrLen(U8 *text);
+I64 ReloadForwardChecks()
+{
+    if (ReloadDirect != 1 || ReloadForward != 42 || ReloadAddress != 42) return 1;
+    if (ReloadFloatCaller != 42.0) return 2;
+    if (StrLen("abc") != 3) return 3;
+    return 42;
+}

@@ -7,6 +7,11 @@ typedef struct CArrayDim {
   struct CArrayDim *next;
   int64_t cnt, total_cnt;
 } CArrayDim;
+typedef struct CMemberMeta {
+  struct CMemberMeta *next;
+  char *name, *string;
+  int64_t value;
+} CMemberMeta;
 typedef struct CMemberLst {
   struct CMemberLst *next, *last;
   struct CHashClass *member_class;
@@ -23,6 +28,7 @@ typedef struct CMemberLst {
     // USed for MLF_STATIC,this is a heap allocated "static" variable
     char *static_bytes;
   };
+  CMemberMeta *meta;
 } CMemberLst;
 
 #define HTT_INVALID         0
@@ -88,6 +94,8 @@ typedef struct CHashClass {
 
 #define CLSF_VARGS  1
 #define CLSF_FUNPTR 2
+#define CLSF_FORWARD_ALIAS 4
+#define CLSF_NATIVE_BINDING 8
 
   int64_t member_cnt, ptr_star_cnt, raw_type, flags, use_cnt, sz;
   struct CHashClass *base_class;

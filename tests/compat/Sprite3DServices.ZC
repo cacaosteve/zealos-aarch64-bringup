@@ -1,0 +1,357 @@
+// Focused service gate for the original GrModels, KeepAway and Titanium apps.
+// Keep this fixture test-first: it is compiled in a disposable namespace.
+
+U0 Sprite3DSetLine(U8 *sprite, I32 x1, I32 y1, I32 x2, I32 y2)
+{
+    I32 type = SPT_LINE;
+    MemCopy(sprite, &type, sizeof(type));
+    MemCopy(sprite + 4, &x1, sizeof(x1));
+    MemCopy(sprite + 8, &y1, sizeof(y1));
+    MemCopy(sprite + 12, &x2, sizeof(x2));
+    MemCopy(sprite + 16, &y2, sizeof(y2));
+}
+
+U0 Sprite3DSetMeshPoint(U8 *sprite, I64 index, I32 x, I32 y, I32 z)
+{
+    I64 point_offset = sizeof(CSpriteMeshU8s) + index * 12;
+    MemCopy(sprite + point_offset, &x, sizeof(I32));
+    MemCopy(sprite + point_offset + 4, &y, sizeof(I32));
+    MemCopy(sprite + point_offset + 8, &z, sizeof(I32));
+}
+
+I64 Sprite3DMeshBounds(CDC *dc, I64 *min_x, I64 *min_y,
+        I64 *max_x, I64 *max_y)
+{
+    I64 x, y, count = 0;
+    *min_x = *min_y = I64_MAX;
+    *max_x = *max_y = I64_MIN;
+    for (y = 0; y < dc->height; y++)
+        for (x = 0; x < dc->width_internal; x++)
+            if (dc->body[y * dc->width_internal + x] == 12)
+            {
+                count++;
+                if (x < *min_x) *min_x = x;
+                if (x > *max_x) *max_x = x;
+                if (y < *min_y) *min_y = y;
+                if (y > *max_y) *max_y = y;
+            }
+    return count;
+}
+
+I64 Sprite3DServiceChecks()
+{
+    U8 mesh_header[9], line0[21], line1[21], point[13], mesh[64];
+    U8 *interpolated;
+    I32 type, vertices, triangles, x, y;
+    I64 z_check, wrap_bits;
+    F64 wrap_value, wrap_angle, wrap_base;
+    I64 result = 0x2a, caught = FALSE;
+    I64 *matrix, *old_matrix, *allocated_matrix;
+    I64 matrix_check[16];
+    I64 min_x, min_y, max_x, max_y, identity_width, identity_height;
+    I64 direct_x, direct_y, direct_z;
+    I64 old_flags, old_x, old_y, old_z, saved_x, saved_y, saved_z, pixel_count;
+    I64 mesh_result, mesh_work, tri_offset, mesh_bytes;
+    I64 tri_x[3], tri_y[3], tri_z[3];
+    CDC *dc;
+
+    // The table and walker must agree with the pinned ZealOS sprite records.
+    if (sprite_elem_base_sizes[SPT_END] != sizeof(CSpriteBase) ||
+            sprite_elem_base_sizes[SPT_MESH] != sizeof(CSpriteMeshU8s) ||
+            sprite_elem_base_sizes[SPT_SHIFTABLE_MESH] != sizeof(CSpritePtMeshU8s))
+        return 1;
+    MemSet(mesh_header, 0, sizeof(mesh_header));
+    type = SPT_MESH;
+    vertices = 3;
+    triangles = 2;
+    MemCopy(mesh_header, &type, sizeof(type));
+    MemCopy(mesh_header + 1, &vertices, sizeof(vertices));
+    MemCopy(mesh_header + 5, &triangles, sizeof(triangles));
+    if (SpriteElemSize(mesh_header, SPT_MESH) !=
+            sizeof(CSpriteMeshU8s) + 12 * vertices + 16 * triangles)
+        return 2;
+    vertices = 0;
+    triangles = 0;
+    MemCopy(mesh_header + 1, &vertices, sizeof(I32));
+    MemCopy(mesh_header + 5, &triangles, sizeof(I32));
+    if (SpriteElemSize(mesh_header, SPT_MESH) != sizeof(CSpriteMeshU8s))
+        return 3;
+    vertices = -1;
+    MemCopy(mesh_header + 1, &vertices, sizeof(I32));
+    if (SpriteElemSize(mesh_header, SPT_MESH) >= 0)
+        return 4;
+    vertices = 1048577;
+    MemCopy(mesh_header + 1, &vertices, sizeof(I32));
+    if (SpriteElemSize(mesh_header, SPT_MESH) >= 0)
+        return 5;
+    vertices = 3;
+    triangles = -1;
+    MemCopy(mesh_header + 1, &vertices, sizeof(I32));
+    MemCopy(mesh_header + 5, &triangles, sizeof(I32));
+    if (SpriteElemSize(mesh_header, SPT_MESH) >= 0)
+        return 6;
+    triangles = 1048577;
+    MemCopy(mesh_header + 5, &triangles, sizeof(I32));
+    if (SpriteElemSize(mesh_header, SPT_MESH) >= 0)
+        return 7;
+
+    // Lines interpolate coordinate-by-coordinate and preserve their type.
+    MemSet(line0, 0, sizeof(line0));
+    MemSet(line1, 0, sizeof(line1));
+    Sprite3DSetLine(line0, 0, 0, 10, 0);
+    Sprite3DSetLine(line1, 20, 10, 30, 10);
+    interpolated = SpriteInterpolate(0.0, line0, line1);
+    if (!interpolated || interpolated[0] != SPT_LINE)
+        return 8;
+    MemCopy(&x, interpolated + 4, sizeof(x));
+    MemCopy(&y, interpolated + 8, sizeof(y));
+    if (x != 0 || y != 0)
+        result = 9;
+    Free(interpolated);
+    interpolated = SpriteInterpolate(0.5, line0, line1);
+    if (!interpolated || interpolated[0] != SPT_LINE)
+        return 10;
+    MemCopy(&x, interpolated + 4, sizeof(x));
+    MemCopy(&y, interpolated + 8, sizeof(y));
+    if (x != 10 || y != 5)
+        result = 11;
+    Free(interpolated);
+    interpolated = SpriteInterpolate(1.0, line0, line1);
+    if (!interpolated || interpolated[0] != SPT_LINE)
+        return 12;
+    MemCopy(&x, interpolated + 4, sizeof(x));
+    MemCopy(&y, interpolated + 8, sizeof(y));
+    if (x != 20 || y != 10)
+        result = 13;
+    Free(interpolated);
+    if (SpriteSize(line0) != sizeof(line0))
+        result = 14;
+
+    // Incompatible streams fail as a catchable graphics exception.
+    MemSet(point, 0, sizeof(point));
+    type = SPT_PT;
+    MemCopy(point, &type, sizeof(type));
+    try
+        interpolated = SpriteInterpolate(0.5, line0, point);
+    catch
+    {
+        caught = Fs->except_ch == 'Graphics';
+        Fs->catch_except = TRUE;
+    }
+    if (!caught)
+        result = 15;
+
+    // A small upstream-layout triangle must retain its identity bounds and
+    // swap those bounds under a 90-degree turn. CDC state must be restored.
+    dc = DCNew(100, 100);
+    if (!dc || !dc->body || !dc->r)
+        return 16;
+    // Use deterministic flat mesh color here. The live CDC retains upstream
+    // DCLighting, which is checked by the graphical app probes.
+    dc->lighting = NULL;
+    // Isolate the upstream triangle rasterizer from mesh parsing and matrix
+    // transforms before using it as the service fixture's baseline.
+    MemSet(dc->body, 0, dc->width_internal * dc->height);
+    dc->color.c0 = 12;
+    tri_x[0] = 5; tri_x[1] = 25; tri_x[2] = 5;
+    tri_y[0] = 5; tri_y[1] = 5; tri_y[2] = 15;
+    tri_z[0] = tri_z[1] = tri_z[2] = 0;
+    SpriteFillTriangle0(dc, tri_x, tri_y, tri_z);
+    pixel_count = Sprite3DMeshBounds(dc, &min_x, &min_y, &max_x, &max_y);
+    if (pixel_count < 20)
+        return 0x6000000000000000 | (pixel_count & 0xFFFFFFFF);
+    MemSet(mesh, 0, sizeof(mesh));
+    type = SPT_MESH;
+    vertices = 3;
+    triangles = 1;
+    MemCopy(mesh, &type, sizeof(U8));
+    // Match GrModels' packed type + sequential I32 count layout exactly.
+    MemCopy(mesh + 1, &vertices, sizeof(I32));
+    MemCopy(mesh + 5, &triangles, sizeof(I32));
+    Sprite3DSetMeshPoint(mesh, 0, 5, 5, 0);
+    Sprite3DSetMeshPoint(mesh, 1, 25, 5, 0);
+    Sprite3DSetMeshPoint(mesh, 2, 5, 15, 0);
+    tri_offset = sizeof(CSpriteMeshU8s) + vertices * 12;
+    type = 12;
+    MemCopy(mesh + tri_offset, &type, sizeof(I32));
+    x = 0; y = 1;
+    MemCopy(mesh + tri_offset + 4, &x, sizeof(I32));
+    MemCopy(mesh + tri_offset + 8, &y, sizeof(I32));
+    x = 2;
+    MemCopy(mesh + tri_offset + 12, &x, sizeof(I32));
+    MemCopy(&x, mesh + tri_offset + 4, sizeof(I32));
+    MemCopy(&y, mesh + tri_offset + 8, sizeof(I32));
+    MemCopy(&vertices, mesh + 1, sizeof(I32));
+    if (x != 0 || y != 1 || vertices != 3)
+        return 0x6300000000000000 | ((x & 0xFFFF) << 32) |
+                ((y & 0xFFFF) << 16) | (vertices & 0xFFFF);
+    mesh_bytes = sizeof(CSpriteMeshU8s) + 12 * vertices +
+            16 * triangles + sizeof(CSpriteBase);
+    if (SpriteSize(mesh) != mesh_bytes)
+        result = 17;
+    MemCopy(&vertices, mesh + 1, sizeof(I32));
+    MemCopy(&triangles, mesh + 5, sizeof(I32));
+    if (vertices != 3 || triangles != 1)
+        return 0x6400000000000000 | ((vertices & 0xFFFF) << 16) |
+                (triangles & 0xFFFF);
+
+    // This direct baseline identifies whether a failure occurs before the
+    // matrix wrapper enters the existing bounded mesh rasterizer.
+    MemSet(dc->body, 0, dc->width_internal * dc->height);
+    Mat4x4IdentEqu(dc->r);
+    mesh_result = SpriteMesh0(dc, mesh, 40, 40, 0, FALSE, FALSE,
+            0, 0, 0, 0, 480000, &mesh_work);
+    if (mesh_result != mesh_bytes - sizeof(CSpriteBase) || mesh_work < 20)
+        return 0x6100000000000000 | ((mesh_result & 0xFFFFF) << 32) |
+                (mesh_work & 0xFFFFFFFF);
+    pixel_count = Sprite3DMeshBounds(dc, &min_x, &min_y, &max_x, &max_y);
+    if (pixel_count < 20)
+        return 0x6200000000000000 | (pixel_count & 0xFFFFFFFF);
+
+    // Mesh lighting uses the CDC's probability-dither pair. The raster path
+    // must choose the second color when the probability covers every U16.
+    dc->color.c0.color = BLACK;
+    dc->color.c0.rop = ROPB_EQU;
+    dc->color.c1.color = RED;
+    dc->color.c1.rop = ROPBF_PROBABILITY_DITHER;
+    if (SpriteMeshColorSelect0(dc->color, 65536, 65535, 10, 10) != RED)
+        return 28;
+    if (SpriteMeshColorSelect0(dc->color, 0, 0, 10, 10) != BLACK)
+        return 29;
+    dc->color.c1.rop = ROPBF_DITHER;
+    if (SpriteMeshColorSelect0(dc->color, 0, 0, 10, 11) != RED ||
+            SpriteMeshColorSelect0(dc->color, 0, 0, 10, 10) != BLACK)
+        return 30;
+
+    // Titanium clears its frame through the native 3D rectangle primitive.
+    MemSet(dc->body, 0, dc->width_internal * dc->height);
+    dc->color.c1 = 0;
+    dc->color.c0 = 12;
+    if (!GrRect3(dc, 10, 12, 0, 8, 4))
+        return 27;
+    pixel_count = Sprite3DMeshBounds(dc, &min_x, &min_y, &max_x, &max_y);
+    if (pixel_count != 32 || min_x != 10 || max_x != 17 ||
+            min_y != 12 || max_y != 15)
+        return 0x6500000000000000 | ((pixel_count & 0xFFFFF) << 28) |
+                (((min_x & 0x3FFF) << 14) | (max_x & 0x3FFF));
+
+    wrap_angle = -1.0;
+    wrap_base = 0.0;
+    MemCopy(&wrap_bits, &wrap_angle, sizeof(wrap_bits));
+    if (wrap_bits != 0xBFF0000000000000)
+        return 0x2400000000000000 |
+                (wrap_bits & 0x00FFFFFFFFFFFFFF);
+    MemCopy(&wrap_bits, &wrap_base, sizeof(wrap_bits));
+    if (wrap_bits != 0)
+        return 0x2500000000000000 |
+                (wrap_bits & 0x00FFFFFFFFFFFFFF);
+    wrap_value = Wrap(wrap_angle, wrap_base);
+    MemCopy(&wrap_bits, &wrap_value, sizeof(wrap_bits));
+    if (wrap_value < 5.28 || wrap_value > 5.29)
+        result = 0x2300000000000000 |
+                (wrap_bits & 0x00FFFFFFFFFFFFFF);
+    allocated_matrix = Mat4x4IdentNew;
+    if (!allocated_matrix || allocated_matrix[0] != 0x100000000 ||
+            allocated_matrix[15] != 0x100000000)
+        result = 24;
+    if (allocated_matrix)
+        Free(allocated_matrix);
+    Mat4x4IdentEqu(matrix_check);
+    Mat4x4Scale(matrix_check, 0.5);
+    if (matrix_check[0] != 0x80000000 || matrix_check[5] != 0x80000000)
+        result = 25;
+    Mat4x4IdentEqu(matrix_check);
+    Mat4x4RotZ(matrix_check, 1.5707963267948966);
+    x = 10; y = 0; z_check = 0;
+    Mat4x4MulXYZ(matrix_check, &x, &y, &z_check);
+    if (x < -1 || x > 1 || y < 9 || y > 11 || z_check != 0)
+        result = 26;
+
+    // Start the identity transform assertion from a clean target after the
+    // independent GrRect3 check above.
+    MemSet(dc->body, 0, dc->width_internal * dc->height);
+    dc->color.c0 = 12;
+    old_matrix = dc->r;
+    old_flags = dc->flags;
+    saved_x = dc->x;
+    saved_y = dc->y;
+    saved_z = dc->z;
+    old_x = dc->x = 17;
+    old_y = dc->y = 19;
+    old_z = dc->z = 23;
+    matrix = CAlloc(16 * sizeof(I64));
+    if (!matrix)
+    {
+        DCDel(dc);
+        return 18;
+    }
+    caught = FALSE;
+    try
+        Sprite3Mat4x4B(dc, 40, 40, 0, mesh, NULL);
+    catch
+    {
+        caught = Fs->except_ch == 'Graphics';
+        Fs->catch_except = TRUE;
+    }
+    if (!caught || dc->r != old_matrix || dc->flags != old_flags ||
+            dc->x != old_x || dc->y != old_y || dc->z != old_z)
+        result = 19;
+    dc->x = saved_x;
+    dc->y = saved_y;
+    dc->z = saved_z;
+
+    Mat4x4IdentEqu(matrix);
+    Sprite3Mat4x4B(dc, 40, 40, 0, mesh, matrix);
+    if (dc->r != old_matrix ||
+            (dc->flags & DCF_TRANSFORMATION) !=
+            (old_flags & DCF_TRANSFORMATION))
+        result = 20;
+    pixel_count = Sprite3DMeshBounds(dc, &min_x, &min_y, &max_x, &max_y);
+    identity_width = max_x - min_x;
+    identity_height = max_y - min_y;
+    if (pixel_count < 20 || min_x < 44 || min_x > 46 ||
+            max_x < 64 || max_x > 66 || min_y < 44 || min_y > 46 ||
+            max_y < 54 || max_y > 56 || identity_width <= identity_height)
+    {
+        DCDel(dc);
+        return 0x2100000000000000 | ((min_x & 0xFF) << 40) |
+                ((min_y & 0xFF) << 32) | ((max_x & 0xFF) << 24) |
+                ((max_y & 0xFF) << 16) | (pixel_count & 0xFFFF);
+    }
+
+    // The default CDC callback must apply the same affine matrix used by the
+    // sprite transform path before testing the transformed raster bounds.
+    Mat4x4IdentEqu(matrix);
+    Mat4x4RotZ(matrix, 1.5707963267948966);
+    matrix[3] = 40 << 32;
+    matrix[7] = 40 << 32;
+    direct_x = 5; direct_y = 5; direct_z = 0;
+    Mat4x4MulXYZ(matrix, &direct_x, &direct_y, &direct_z);
+    direct_x += saved_x; direct_y += saved_y; direct_z += saved_z;
+    old_matrix = dc->r;
+    dc->r = matrix;
+    x = 5; y = 5; z_check = 0;
+    (*dc->transform)(dc, &x, &y, &z_check);
+    dc->r = old_matrix;
+    if (x != direct_x || y != direct_y || z_check != direct_z)
+        return 0x5000000000000000 | ((x & 0xFFF) << 36) |
+                ((y & 0xFFF) << 24) | ((direct_x & 0xFFF) << 12) |
+                (direct_y & 0xFFF);
+
+    MemSet(dc->body, 0, dc->width_internal * dc->height);
+    Mat4x4IdentEqu(matrix);
+    Mat4x4RotZ(matrix, 1.5707963267948966);
+    Sprite3Mat4x4B(dc, 40, 40, 0, mesh, matrix);
+    pixel_count = Sprite3DMeshBounds(dc, &min_x, &min_y, &max_x, &max_y);
+    if (pixel_count < 20 || max_x - min_x < identity_height - 2 ||
+            max_x - min_x > identity_height + 2 ||
+            max_y - min_y < identity_width - 2 ||
+            max_y - min_y > identity_width + 2)
+        result = 0x4000000000000000 | ((result & 0xFF) << 48) |
+                ((pixel_count & 0xFFFFF) << 28) |
+                (((max_x - min_x) & 0x3FFF) << 14) |
+                ((max_y - min_y) & 0x3FFF);
+    Free(matrix);
+    DCDel(dc);
+    return result;
+}

@@ -307,7 +307,7 @@ Bool BootstrapGuiTerminalMenuBindLeaf(CMenuEntry *root, U8 *source_name,
                                       U8 *display_name, I64 action)
 {
     CMenuEntry *entry;
-    if (!root || !source_name || !display_name || action < 1 || action > 25)
+    if (!root || !source_name || !display_name || action < 1 || action > 26)
         return FALSE;
     entry = root->sub;
     while (entry)
@@ -350,7 +350,7 @@ U0 BootstrapGuiTerminalMenuInstall()
 {
     CMenu *menu = MenuNew("File { Files(); Disk(); }");
     BootstrapGuiTerminalMenuAppendRoot(menu, MenuNew("Windows { Demo(); TileHorz(); TileVert(); TileGrid(); }"));
-    BootstrapGuiTerminalMenuAppendRoot(menu, MenuNew("Apps { LatticePlay(); StockPlay(); PaintDemo(); NetOfDots(); Lines(); Doodle(); MassSpring(); Life(); Logic(); }"));
+    BootstrapGuiTerminalMenuAppendRoot(menu, MenuNew("Apps { LatticePlay(); StockPlay(); PaintDemo(); NetOfDots(); Lines(); Doodle(); MassSpring(); Life(); Logic(); Budget(); }"));
     BootstrapGuiTerminalMenuAppendRoot(menu, MenuNew("View { ViewAngles(); ZoomIn(); ZoomOut(); ResetView(); PanLeft(); PanRight(); PanUp(); PanDown(); }"));
     BootstrapGuiTerminalMenuAppendRoot(menu, MenuNew("OS { Help(); Status(); }"));
     CMenuEntry *file = BootstrapGuiTerminalMenuRoot(menu, "File");
@@ -376,6 +376,7 @@ U0 BootstrapGuiTerminalMenuInstall()
         !BootstrapGuiTerminalMenuBindLeaf(apps, "MassSpring", "Mass Spring", 23) ||
         !BootstrapGuiTerminalMenuBindLeaf(apps, "Life", "Game of Life", 24) ||
         !BootstrapGuiTerminalMenuBindLeaf(apps, "Logic", "Digital Logic", 25) ||
+        !BootstrapGuiTerminalMenuBindLeaf(apps, "Budget", "Budget", 26) ||
         !BootstrapGuiTerminalMenuBindLeaf(view, "ViewAngles", "View Angles", 11) ||
         !BootstrapGuiTerminalMenuBindLeaf(view, "ZoomIn", "Zoom In", 12) ||
         !BootstrapGuiTerminalMenuBindLeaf(view, "ZoomOut", "Zoom Out", 13) ||
@@ -487,6 +488,8 @@ U8 *BootstrapGuiTerminalMenuSource(I64 action)
         return "BootstrapGuiTerminalRunLightProgram(\"/Demo/Graphics/Life\");";
     if (action == 25)
         return "BootstrapGuiTerminalRunLightProgram(\"/Apps/Logic/Run.ZC\");";
+    if (action == 26)
+        return "BootstrapGuiTerminalRunLightProgram(\"/Apps/Budget/Run.ZC\");";
     return NULL;
 }
 
@@ -1531,6 +1534,7 @@ I64 BootstrapGuiTerminalSmoke()
             !BootstrapGuiTerminalMenuActionValid(menu, "Apps", "Mass Spring", 23) ||
             !BootstrapGuiTerminalMenuActionValid(menu, "Apps", "Game of Life", 24) ||
             !BootstrapGuiTerminalMenuActionValid(menu, "Apps", "Digital Logic", 25) ||
+            !BootstrapGuiTerminalMenuActionValid(menu, "Apps", "Budget", 26) ||
             !BootstrapGuiTerminalMenuActionValid(menu, "View", "View Angles", 11) ||
             !BootstrapGuiTerminalMenuActionValid(menu, "View", "Zoom In", 12) ||
             !BootstrapGuiTerminalMenuActionValid(menu, "View", "Zoom Out", 13) ||

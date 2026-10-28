@@ -1,4 +1,17 @@
 // Unchanged queue lifecycle helpers from pinned Kernel/KDataTypes.ZC.
+I64 LinkedListCount(U8 **_list)
+{//Count of nodes in linked-list.
+	I64 res = 0;
+
+	while (_list)
+	{
+		res++;
+		_list = *_list;
+	}
+
+	return res;
+}
+
 U0 QueueDel(CQueue *head, Bool querem=FALSE)
 {//Free entries in queue, not head.
 	CQueue *tmpq = head->next, *tmpq1;

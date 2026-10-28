@@ -67,6 +67,8 @@ for name, begin, end, target in [
      (root/'upstream/bootstrap/Kernel/QueueBridge.ZC').read_bytes()),
     ('Kernel/KDataTypes.ZC', b'I64 QueueCount(', b'I64 QueueSize(',
      (root/'upstream/bootstrap/Kernel/QueueBridge.ZC').read_bytes()),
+    ('Kernel/KDataTypes.ZC', b'I64 LinkedListCount(', b'I64 LinkedListSize(',
+     (root/'upstream/bootstrap/Kernel/QueueBridge.ZC').read_bytes()),
     ('System/Math/Math.ZC', b'public U0 R2P(', b'public U0 P2R(', polar_bridge),
     ('System/DolDoc/DocGr.ZC', b'public I64 PopUpColor(', b'public I64 PopUpColorLighting(', color_picker),
 ]:
@@ -75,4 +77,4 @@ for name, begin, end, target in [
     body = source[start:source.index(end, start)].rstrip()
     if body not in target:
         raise SystemExit(f'Portable source fixture drifted: {begin!r} in {name}')
-print('PASS unchanged QueueDel, QueueCount, R2P and PopUpColor bodies')
+print('PASS unchanged QueueDel, QueueCount, LinkedListCount, R2P and PopUpColor bodies')

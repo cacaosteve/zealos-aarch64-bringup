@@ -25,6 +25,12 @@ extern int zeal_zss_writable(void);
 static void *guest_ext_entries[5];
 static void **guest_ext_table = guest_ext_entries;
 static uint32_t guest_boot_source; /* BOOT_SRC_NULL until a boot handoff arrives. */
+static int64_t guest_boot_timestamp = -1;
+static uint64_t guest_boot_counter;
+void zc_set_boot_time(int64_t timestamp, uint64_t counter) {
+    guest_boot_timestamp = timestamp;
+    guest_boot_counter = counter;
+}
 void zc_set_boot_media(uint32_t media_type) {
     /* Pinned KernelA.HH: HARDDRIVE=3, DVD=4, RAM=2. No x86 boot-block
      * offset exists on the EFI path, so the high half remains zero. */
@@ -50,6 +56,7 @@ extern uint64_t hc_builtin_sqrt(uint64_t xbits);
 extern uint64_t hc_builtin_cos(uint64_t xbits);
 extern uint64_t hc_builtin_sin(uint64_t xbits);
 extern uint64_t hc_builtin_arg(uint64_t xbits, uint64_t ybits);
+extern uint64_t hc_builtin_wrap2(uint64_t angle_bits, uint64_t base_bits);
 
 extern uint64_t zeal_fb_text_span(int64_t x, int64_t y, int64_t len,
                                   uint32_t attr, const void *data, int mode,
@@ -330,6 +337,18 @@ static CHashFun *guest_winmgr_tick_fun;
 /* Keep source graphics updates inside the staged framebuffer transaction. */
 static int guest_task_frame_active;
 static int guest_task_frame_rgba_ready;
+static uint8_t guest_mesh_previous_mask[800u * 600u];
+static uint64_t guest_mesh_overlay_calls;
+static uint64_t guest_mesh_overlay_gate_skips;
+static uint64_t guest_mesh_overlay_resource_skips;
+static uint64_t guest_mesh_overlay_range_skips;
+static uint64_t guest_mesh_overlay_applied_frames;
+static uint64_t guest_mesh_overlay_pixels;
+static uint64_t guest_mesh_overlay_rgba_frames;
+static uint64_t guest_mesh_overlay_indexed_frames;
+static size_t guest_mesh_overlay_sample_index = SIZE_MAX;
+static uint32_t guest_mesh_overlay_sample_rgba;
+static uint32_t guest_mesh_overlay_sample_scanout;
 static void set_guest_task(void *p);
 static int64_t guest_mp_count = 1;
 static void *guest_cpu_structs;
@@ -1382,6 +1401,9 @@ static int64_t host_cos_f64(int64_t *a) {
 static int64_t host_arg_f64(int64_t *a) {
     return (int64_t)hc_builtin_arg((uint64_t)a[0], (uint64_t)a[1]);
 }
+static int64_t host_wrap_f64(int64_t *a) {
+    return (int64_t)hc_builtin_wrap2((uint64_t)a[0], (uint64_t)a[1]);
+}
 static double host_f64_from_bits(uint64_t bits) {
     double value;
     memcpy(&value, &bits, sizeof(value));
@@ -1391,6 +1413,12 @@ static uint64_t host_f64_to_bits(double value) {
     uint64_t bits;
     memcpy(&bits, &value, sizeof(bits));
     return bits;
+}
+static int64_t host_round_f64(int64_t *a) {
+    double input = host_f64_from_bits((uint64_t)a[0]), result;
+    /* Match the original default x87 rounding: nearest, ties to even. */
+    __asm__ volatile("frintn %d0, %d1" : "=w"(result) : "w"(input));
+    return (int64_t)host_f64_to_bits(result);
 }
 /* Freestanding natural log for the pinned _LN import. Reduce x=2^e*m
  * to sqrt(1/2)<=m<=sqrt(2), then ln(m)=2*(z+z^3/3+...). The fixed
@@ -1592,6 +1620,22 @@ static int64_t host_free(int64_t *a) {
     return 0;
 }
 static int64_t host_msize(int64_t *a) { return MSize((void *)(uintptr_t)a[0]); }
+/* Return the requested extent only when p is the start of one of our live
+ * managed allocations. Unlike MSize this is safe for stack/static pointers
+ * and arbitrary addresses; zero means the allocation extent is unknown. */
+static int64_t host_managed_allocation_size(int64_t *a) {
+    uintptr_t v = (uintptr_t)a[0];
+    int valid = v >= (uintptr_t)data_arena + sizeof(struct block) &&
+                v < (uintptr_t)data_arena + DATA_BYTES;
+    valid |= v >= (uintptr_t)code_arena + sizeof(struct block) &&
+             v < (uintptr_t)code_arena + CODE_BYTES;
+    if (!valid || v % 16)
+        return 0;
+    struct block *b = (struct block *)v - 1;
+    if (b->magic != BLOCK_MAGIC || !b->used)
+        return 0;
+    return (int64_t)b->requested;
+}
 static int64_t host_copy(int64_t *a) {
     return (int64_t)(uintptr_t)memcpy((void *)(uintptr_t)a[0], (void *)(uintptr_t)a[1],
                                       (size_t)a[2]);
@@ -1682,6 +1726,13 @@ static int64_t host_compare(int64_t *a) {
         return 0;
     return memcmp((const void *)(uintptr_t)a[0],
                   (const void *)(uintptr_t)a[1], (size_t)a[2]);
+}
+static int64_t host_lex_define_text(int64_t *a) {
+    const char *name = (const char *)(uintptr_t)a[0];
+    CHashDefineStr *define = name ? (CHashDefineStr *)HashFind(
+        (char *)name, Fs->hash_table, HTT_DEFINE_STR, 1) : NULL;
+    /* Borrow the compiler-owned text; source hash layouts/types differ. */
+    return define ? (int64_t)(uintptr_t)define->data : 0;
 }
 static int64_t host_define_mirror(int64_t *a) {
     const char *name = (const char *)(uintptr_t)a[0];
@@ -1816,6 +1867,7 @@ static uint8_t *guest_graphics_surface(void) {
         return (uint8_t *)p;
     return NULL;
 }
+static int guest_source_full_screen_active(void);
 static uint32_t *guest_graphics_rgba_surface(void) {
     CHashGlblVar *global = (CHashGlblVar *)HashFind(
         "bootstrap_present_raw", Fs->hash_table, HTT_GLBL_VAR, 1);
@@ -1832,6 +1884,71 @@ static uint32_t *guest_graphics_rgba_surface(void) {
          p + bytes <= (uintptr_t)code_arena + sizeof(code_arena)))
         return (uint32_t *)p;
     return NULL;
+}
+static void guest_mesh_overlay_present(void) {
+    CHashGlblVar *mesh_global, *palette_global;
+    uint8_t *surface, *mesh;
+    uint32_t *rgba, *palette;
+    uintptr_t mesh_addr, palette_addr;
+    const size_t count = 800u * 600u;
+    guest_mesh_overlay_calls++;
+    if ((!guest_task_frame_rgba_ready && !guest_source_full_screen_active()) ||
+        !Fs || !Fs->hash_table) {
+        guest_mesh_overlay_gate_skips++;
+        return;
+    }
+    surface = guest_graphics_surface();
+    rgba = guest_graphics_rgba_surface();
+    mesh_global = (CHashGlblVar *)HashFind(
+        "bootstrap_mesh_pixels", Fs->hash_table, HTT_GLBL_VAR, 1);
+    palette_global = (CHashGlblVar *)HashFind(
+        "gr_palette", Fs->hash_table, HTT_GLBL_VAR, 1);
+    if (!surface || !rgba || !mesh_global || !mesh_global->data_addr ||
+        !palette_global || !palette_global->data_addr) {
+        guest_mesh_overlay_resource_skips++;
+        return;
+    }
+    mesh_addr = (uintptr_t)mesh_global->data_addr;
+    palette_addr = (uintptr_t)palette_global->data_addr;
+    if (mesh_addr > UINTPTR_MAX - count ||
+        palette_addr > UINTPTR_MAX - 16u * sizeof(uint32_t) ||
+        !((mesh_addr >= (uintptr_t)data_arena &&
+           mesh_addr + count <= (uintptr_t)data_arena + sizeof(data_arena)) ||
+          (mesh_addr >= (uintptr_t)code_arena &&
+           mesh_addr + count <= (uintptr_t)code_arena + sizeof(code_arena))) ||
+        !((palette_addr >= (uintptr_t)data_arena &&
+           palette_addr + 16u * sizeof(uint32_t) <=
+               (uintptr_t)data_arena + sizeof(data_arena)) ||
+          (palette_addr >= (uintptr_t)code_arena &&
+           palette_addr + 16u * sizeof(uint32_t) <=
+               (uintptr_t)code_arena + sizeof(code_arena)))) {
+        guest_mesh_overlay_range_skips++;
+        return;
+    }
+    mesh = (uint8_t *)mesh_addr;
+    palette = (uint32_t *)palette_addr;
+    // Restore the prior frame's overlay from current window composition, then
+    // stage this frame's mesh. The CDC and its screen cache stay unmodified.
+    for (size_t i = 0; i < count; i++) {
+        if (guest_mesh_previous_mask[i]) {
+            uint8_t base_color = surface[i];
+            rgba[i] = palette[base_color < 16 ? base_color : 0];
+            guest_mesh_previous_mask[i] = 0;
+        }
+    }
+    for (size_t i = 0; i < count; i++) {
+        uint8_t color = mesh[i];
+        if (color != 0xff && color < 16) {
+            rgba[i] = palette[color];
+            guest_mesh_previous_mask[i] = 1;
+            guest_mesh_overlay_pixels++;
+            if (color && guest_mesh_overlay_sample_index == SIZE_MAX) {
+                guest_mesh_overlay_sample_index = i;
+                guest_mesh_overlay_sample_rgba = rgba[i];
+            }
+        }
+    }
+    guest_mesh_overlay_applied_frames++;
 }
 static int guest_source_full_screen_active(void) {
     CHashGlblVar *global = (CHashGlblVar *)HashFind(
@@ -1873,13 +1990,29 @@ static int64_t guest_task_frame_run(void) {
     if (present && present->fun_ptr && !present->argc &&
         !(present->base.base.type & HTF_EXTERN))
         FFI_CALL_TOS_0(present->fun_ptr);
+    guest_mesh_overlay_sample_index = SIZE_MAX;
+    guest_mesh_overlay_present();
     /* The editor is a full-screen top layer. Render after the source
      * compositor into the same staging plane that frame_end will present. */
     zeal_fb_task_frame_overlay_begin();
     (void)zc_source_editor_overlay_render(NULL);
     zeal_fb_task_frame_overlay_end();
-    presented = zeal_fb_task_frame_end(guest_source_full_screen_active() ||
-                                       guest_task_frame_rgba_ready) != 0;
+    int use_rgba = guest_source_full_screen_active() ||
+                   guest_task_frame_rgba_ready;
+    if (use_rgba)
+        guest_mesh_overlay_rgba_frames++;
+    else
+        guest_mesh_overlay_indexed_frames++;
+    presented = zeal_fb_task_frame_end(use_rgba) != 0;
+    if (guest_mesh_overlay_sample_index != SIZE_MAX &&
+        guest_mesh_overlay_sample_index < 800u * 600u && guest_fb_addr &&
+        guest_fb_pitch >= 800u * sizeof(uint32_t)) {
+        size_t y = guest_mesh_overlay_sample_index / 800u;
+        size_t x = guest_mesh_overlay_sample_index % 800u;
+        volatile uint32_t *scanout = (volatile uint32_t *)(uintptr_t)
+            (guest_fb_addr + y * guest_fb_pitch + x * sizeof(uint32_t));
+        guest_mesh_overlay_sample_scanout = *scanout;
+    }
     if (presented)
         guest_task_frame_count++;
     guest_task_frame_active = 0;
@@ -2039,6 +2172,8 @@ static int64_t host_gr_screen_full_update(int64_t *a) {
         (update->base.base.type & HTF_EXTERN))
         return 0;
     FFI_CALL_TOS_0(update->fun_ptr);
+    if (guest_task_frame_active)
+        guest_task_frame_rgba_ready = 1;
     return 1;
 }
 static int64_t host_ode_update_task(int64_t *a) {
@@ -2179,6 +2314,45 @@ static CMemberLst *guest_class_member(CHashClass *cls, const char *name) {
     }
     return cls && cls->base_class ? guest_class_member(cls->base_class, name)
                                   : NULL;
+}
+struct arm_doc_form_field {
+    const char *format;
+    int64_t data, offset, elements, raw_type, pointer, is_array, is_internal;
+};
+static CMemberLst *guest_form_member(CHashClass *cls, int64_t *index, unsigned depth) {
+    if (!cls || depth > 32) return NULL;
+    CMemberLst *member = guest_form_member(cls->base_class, index, depth + 1);
+    if (member) return member;
+    for (member = cls->members_lst; member; member = member->next)
+        if ((*index)-- == 0) return member;
+    return NULL;
+}
+static int64_t host_doc_form_field(int64_t *a) {
+    const char *name = (const char *)(uintptr_t)a[0];
+    int64_t index = a[1];
+    if (!name || index < 0) return 0;
+    CHashClass *cls = (CHashClass *)HashFind(name, Fs->hash_table, HTT_CLASS, 1);
+    CMemberLst *member = guest_form_member(cls, &index, 0);
+    if (!member) return 0;
+    if (!a[2]) return 1;
+    struct arm_doc_form_field *field = (void *)(uintptr_t)a[2];
+    memset(field, 0, sizeof(*field));
+    for (CMemberMeta *meta = member->meta; meta; meta = meta->next) {
+        if (!strcmp(meta->name, "format")) field->format = meta->string;
+        if (!strcmp(meta->name, "data"))
+            field->data = meta->string ? (int64_t)(uintptr_t)meta->string : meta->value;
+    }
+    /* The source renderer uses ZealOS's raw-type IDs, not Aiwnios's IDs. */
+    static const int raw_types[] = {0, 4, 5, 6, 7, 8, 9, 10, 11, 10, 14, 10};
+    CHashClass *type = member->member_class;
+    field->offset = member->off;
+    field->elements = member->dim.total_cnt;
+    field->pointer = type->ptr_star_cnt;
+    field->is_array = member->dim.next != NULL;
+    field->is_internal = type->raw_type > 0 && type->raw_type <= RT_F64 &&
+                         type->raw_type != RT_PTR;
+    field->raw_type = field->is_internal ? raw_types[type->raw_type] : 0;
+    return 1;
 }
 static int guest_store_i64_member(void *data, CHashClass *cls,
                                   CMemberLst *member, int64_t value) {
@@ -4750,6 +4924,26 @@ static int64_t host_timer_seconds_bits(int64_t *a) {
     guest_tS_bits = bits;
     return (int64_t)bits;
 }
+static int64_t host_unix_time_ns(int64_t *a) {
+    (void)a;
+    uint64_t frequency;
+    __asm__ volatile("mrs %0, cntfrq_el0" : "=r"(frequency));
+    uint64_t now = counter_now();
+    if (guest_boot_timestamp < 0 || !frequency || now < guest_boot_counter)
+        guest_raise(0x6b636f6c43); /* 'Clock': catchable, never fabricate a date. */
+    uint64_t elapsed = now - guest_boot_counter;
+    uint64_t seconds = elapsed / frequency;
+    uint64_t remainder = elapsed % frequency;
+    if ((uint64_t)guest_boot_timestamp > (uint64_t)INT64_MAX / 1000000000ULL ||
+        seconds > (uint64_t)INT64_MAX / 1000000000ULL - (uint64_t)guest_boot_timestamp ||
+        remainder > UINT64_MAX / 1000000000ULL)
+        guest_raise(0x6b636f6c43);
+    uint64_t ns = ((uint64_t)guest_boot_timestamp + seconds) * 1000000000ULL;
+    uint64_t fraction = remainder * 1000000000ULL / frequency;
+    if (fraction > (uint64_t)INT64_MAX - ns)
+        guest_raise(0x6b636f6c43);
+    return (int64_t)(ns + fraction);
+}
 static int64_t host_time_cal(int64_t *a) {
     (void)a;
     /* Source TimeCal updates both the millisecond jiffy count and F64 tS. */
@@ -5899,13 +6093,29 @@ static size_t format_text(char *output, size_t capacity, const char *format,
         int has_precision = 0;
         int left = 0, zero_pad = 0, truncate = 0, escape_dollars = 0;
         size_t width = 0;
-        /* ZealOS height repeat, used unchanged by DocType after inserting a
-         * file. Repeat the whole packed character value, not just its low
-         * byte. Check the total before looping so zero/huge counts are bounded. */
-        if (format[spec] == 'h' && format[spec + 1] == '*' &&
-            (format[spec + 2] == 'c' || format[spec + 2] == 'C')) {
-            if (arg + 2 > argc) zc_fail("format needs repeat and character arguments");
-            int64_t count = argv[arg++];
+        /* ZealOS character-repeat formats use either a literal count
+         * (%h7c) or a secondary count argument (%h*c). Repeat the whole
+         * packed character value, not just its low byte. Check the total
+         * before looping so zero/huge counts remain bounded. */
+        if (format[spec] == 'h' &&
+            (format[spec + 1] == '*' ||
+             (format[spec + 1] >= '0' && format[spec + 1] <= '9'))) {
+            size_t repeat_spec = spec + 1;
+            int64_t count = 0;
+            if (format[repeat_spec] == '*') {
+                if (arg >= argc) zc_fail("format needs repeat argument");
+                count = argv[arg++];
+                repeat_spec++;
+            } else {
+                while (format[repeat_spec] >= '0' && format[repeat_spec] <= '9') {
+                    if (count < (int64_t)capacity)
+                        count = count * 10 + format[repeat_spec] - '0';
+                    repeat_spec++;
+                }
+            }
+            if (format[repeat_spec] != 'c' && format[repeat_spec] != 'C')
+                goto format_repeat_not_char;
+            if (arg >= argc) zc_fail("format needs character argument");
             uint64_t packed = (uint64_t)argv[arg++];
             unsigned length = 0;
             while (length < 8 && (unsigned char)(packed >> (length * 8))) length++;
@@ -5916,9 +6126,10 @@ static size_t format_text(char *output, size_t capacity, const char *format,
                     for (unsigned byte = 0; byte < length; byte++)
                         FMT_BYTE(packed >> (byte * 8));
             }
-            i = spec + 3;
+            i = repeat_spec + 1;
             continue;
         }
+format_repeat_not_char:
         while (format[spec] == '-' || format[spec] == '0') {
             if (format[spec] == '-') left = 1;
             else zero_pad = 1;
@@ -5966,7 +6177,7 @@ static size_t format_text(char *output, size_t capacity, const char *format,
         }
         if (code != 'c' && code != 'C' && code != 's' && code != 'Q' &&
             code != 'q' &&
-            code != 'S' && code != 'z' && code != 'Z' && code != 'o' &&
+            code != 'S' && code != 'z' && code != 'Z' && code != 'o' && code != 'D' && code != 'T' &&
             code != 'd' && code != 'u' && code != 'x' && code != 'X' &&
             code != 'b' && code != 'B' &&
             code != 'f' && code != 'F' && code != 'g' && code != 'G')
@@ -5987,10 +6198,18 @@ static size_t format_text(char *output, size_t capacity, const char *format,
                 FMT_BYTE(ch);
             }
         } else if (code == 's' || code == 'q' || code == 'Q' || code == 'o' ||
-                   code == 'S' || code == 'z' || code == 'Z') {
+                   code == 'S' || code == 'z' || code == 'Z' || code == 'D' || code == 'T') {
             size_t field_start = used;
             const char *s;
-            if (code == 'o') {
+            char *owned = NULL;
+            if (code == 'D' || code == 'T') {
+                const char *name = code == 'D' ? "MPrintDate" : "MPrintTime";
+                CHashFun *sub = (CHashFun *)HashFind(name, Fs->hash_table, HTT_FUN, 1);
+                if (!sub || !sub->fun_ptr || sub->argc != 1 || (sub->base.base.type & HTF_EXTERN))
+                    zc_fail("date format conversion requires its source helper");
+                owned = (char *)(uintptr_t)FFI_CALL_TOS_1(sub->fun_ptr, argv[arg++]);
+                s = owned;
+            } else if (code == 'o') {
                 s = argv[arg++] ? "TRUE" : "FALSE";
             } else if (code == 'z' || code == 'Z') {
                 if (arg + 2 > argc) zc_fail("format needs index and list arguments");
@@ -6076,6 +6295,7 @@ static size_t format_text(char *output, size_t capacity, const char *format,
                     FMT_BYTE(s[j]);
             }
 decoded_string_end: ;
+            free(owned);
             size_t length = used - field_start;
             if (truncate && width && length > width) used = field_start + (length = width);
             if (width > length) {
@@ -6462,6 +6682,7 @@ static int load_source_path(const char *path, int merged, int recover) {
         PrsBindCSymbol("Free", host_free, 1);
         PrsBindCSymbol("MSize", host_msize, 1);
         PrsBindCSymbol("MSize2", host_msize, 1);
+        PrsBindCSymbol("ZcManagedAllocationSize", host_managed_allocation_size, 1);
         /* KernelC declares keyboard shortcut registration after KernelB has
          * bound the guest task bridge. Keep early Win.ZC initialization from
          * dispatching into the unresolved-symbol sentinel. */
@@ -6521,6 +6742,12 @@ static int load_source_path(const char *path, int merged, int recover) {
         PrsBindCSymbol("sys_framebuffer_bpp", &guest_fb_bpp, 0);
         if (load_inner("/System/TaskBridge.ZC"))
             zc_fail("task bridge source missing");
+        CHashClass *form_field = (CHashClass *)HashFind(
+            "CArmDocFormField", Fs->hash_table, HTT_CLASS, 1);
+        if (!form_field || form_field->sz != sizeof(struct arm_doc_form_field) ||
+            !task_field(form_field, "format", 8, 0) ||
+            !task_field(form_field, "is_internal", 8, 56))
+            zc_fail("form reflection ABI mismatch");
         PrsBindCSymbol("ZcGrTextUpdate", host_gr_text_update, 0);
         PrsBindCSymbol("ZcWinMouseUpdate", host_win_mouse_update, 0);
         PrsBindCSymbol("ZcGrScreenUpdate", host_gr_screen_update, 0);
@@ -6533,6 +6760,7 @@ static int load_source_path(const char *path, int merged, int recover) {
         PrsBindCSymbol("SwapU16", host_swap_u16, 2);
         PrsBindCSymbol("ClampI64", host_clamp_i64, 3);
         PrsBindCSymbol("ZcDefineMirror", host_define_mirror, 2);
+        PrsBindCSymbol("ZcLexDefineText", host_lex_define_text, 1);
         /* The bridge declares counts for KernelB-stage task tests. KernelC
          * later rebinds the same object after its own declaration is loaded. */
         PrsBindCSymbol("counts", &guest_counts, 0);
@@ -6544,6 +6772,7 @@ static int load_source_path(const char *path, int merged, int recover) {
         PrsBindCSymbol("Sqr", host_sqr_f64, 1);
         PrsBindCSymbol("SqrU64", host_sqr_i64, 1);
         PrsBindCSymbol("Ceil", host_ceil, 1);
+        PrsBindCSymbol("Round", host_round_f64, 1);
         PrsBindCSymbol("Exp", host_exp, 1);
         PrsBindCSymbol("Ln", host_ln, 1);
         PrsBindCSymbol("ZcSinF64", host_sin_f64, 1);
@@ -6551,7 +6780,10 @@ static int load_source_path(const char *path, int merged, int recover) {
         PrsBindCSymbol("Sin", host_sin_f64, 1);
         PrsBindCSymbol("Cos", host_cos_f64, 1);
         PrsBindCSymbol("Arg", host_arg_f64, 2);
+        PrsBindCSymbol("ZcWrapF64", host_wrap_f64, 2);
         PrsBindCSymbol("ZcMonotonicNs", host_monotonic_ns, 0);
+        PrsBindCSymbol("ZcUnixTimeNs", host_unix_time_ns, 0);
+        PrsBindCSymbol("ZcDocFormField", host_doc_form_field, 3);
         PrsBindCSymbol("ZcTryEnter", host_sys_try, 0);
         PrsBindCSymbol("ZcTryLeave", host_sys_untry, 0);
         PrsBindCSymbol("ZcTryCatchEnd", host_end_catch, 0);
@@ -6839,6 +7071,18 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
     guest_background_dispatch = 0;
     guest_idle_frame_divider = 0;
     guest_task_frame_count = 0;
+    guest_mesh_overlay_calls = 0;
+    guest_mesh_overlay_gate_skips = 0;
+    guest_mesh_overlay_resource_skips = 0;
+    guest_mesh_overlay_range_skips = 0;
+    guest_mesh_overlay_applied_frames = 0;
+    guest_mesh_overlay_pixels = 0;
+    guest_mesh_overlay_rgba_frames = 0;
+    guest_mesh_overlay_indexed_frames = 0;
+    guest_mesh_overlay_sample_index = SIZE_MAX;
+    guest_mesh_overlay_sample_rgba = 0;
+    guest_mesh_overlay_sample_scanout = 0;
+    memset(guest_mesh_previous_mask, 0, sizeof(guest_mesh_previous_mask));
     guest_keyboard_route_polls = 0;
     guest_keyboard_route_reads = 0;
     guest_keyboard_route_posts = 0;
@@ -6891,6 +7135,7 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
                     {"ZcTaskKill", host_kill, 3},
                     {"ZcSpawn", host_spawn, 7},
                     {"Free", host_free, 1},  {"MSize", host_msize, 1},
+                    {"ZcManagedAllocationSize", host_managed_allocation_size, 1},
                     /* MSize2 is ZealOS internal size; alias requested size for now. */
                     {"MSize2", host_msize, 1},
                     {"MemCopy", host_copy, 3},  {"MemSet", host_set, 3}, {"SwapI64", host_swap, 2},
@@ -7117,6 +7362,10 @@ int zc_start_gui_terminal(void) {
         "/System/BlkDev/FileMgr.ZC",
         "/System/SourceHome.ZC",
         "/System/VersionScalars.ZC",
+        "/System/StringUtilities.ZC",
+        "/System/KeyboardBridge.ZC",
+        "/System/DateBridge.ZC",
+        "/Kernel/QuickSort.ZC",
         "/System/DolDoc/DocCompiler.ZC",
         "/System/DolDoc/DocTree.ZC",
         "/System/Registry.ZC",
@@ -7331,6 +7580,19 @@ void zc_status(void) {
     printf("desktop: winmgr=%d gterm=%d windowdemo=%d presented_frames=%lu\n",
            source_winmgr_active, gui_terminal_active, window_demo_loaded,
            (unsigned long)guest_task_frame_count);
+    printf("mesh_overlay: calls=%lu gate_skips=%lu resource_skips=%lu range_skips=%lu applied=%lu pixels=%lu\n",
+           (unsigned long)guest_mesh_overlay_calls,
+           (unsigned long)guest_mesh_overlay_gate_skips,
+           (unsigned long)guest_mesh_overlay_resource_skips,
+           (unsigned long)guest_mesh_overlay_range_skips,
+           (unsigned long)guest_mesh_overlay_applied_frames,
+           (unsigned long)guest_mesh_overlay_pixels);
+    printf("mesh_overlay_frame: rgba=%lu indexed=%lu sample=%lu raw=%08lx scanout=%08lx\n",
+           (unsigned long)guest_mesh_overlay_rgba_frames,
+           (unsigned long)guest_mesh_overlay_indexed_frames,
+           (unsigned long)guest_mesh_overlay_sample_index,
+           (unsigned long)guest_mesh_overlay_sample_rgba,
+           (unsigned long)guest_mesh_overlay_sample_scanout);
     struct guest_fiber *system_server = &guest_fibers[GUEST_SYSTEM];
     printf("system_server: running=%d separate=%d idle=%d queued=%d\n",
            system_server->state == GUEST_RUNNABLE,

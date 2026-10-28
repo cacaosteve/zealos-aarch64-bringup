@@ -53,6 +53,12 @@ static volatile struct limine_dtb_request dtb_request = {
 };
 
 __attribute__((used, section(".limine_requests")))
+static volatile struct limine_date_at_boot_request date_request = {
+    .id = LIMINE_DATE_AT_BOOT_REQUEST_ID,
+    .revision = 0,
+};
+
+__attribute__((used, section(".limine_requests")))
 static volatile struct limine_executable_cmdline_request cmdline_request = {
     .id = LIMINE_EXECUTABLE_CMDLINE_REQUEST_ID,
     .revision = 0,
@@ -619,7 +625,9 @@ void kmain(void) {
     g_handoff.magic0 = ZEAL_HANDOFF_MAGIC_0;
     g_handoff.magic1 = ZEAL_HANDOFF_MAGIC_1;
     g_handoff.size = (uint32_t)sizeof(g_handoff);
-    g_handoff.revision = 7;
+    g_handoff.revision = 8;
+    g_handoff.boot_timestamp = date_request.response ? date_request.response->timestamp : -1;
+    __asm__ volatile("mrs %0, cntpct_el0" : "=r"(g_handoff.boot_counter));
     g_handoff.bootloader_id = ZEAL_BL_LIMINE;
     g_handoff.flags = is_pi ? ZEAL_FLAG_PLAT_PI4 : 0;
     g_handoff.hhdm_offset = hhdm;

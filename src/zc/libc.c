@@ -231,7 +231,11 @@ int puts(const char *s) {
     zc_output("\n");
     return 0;
 }
-void abort(void) { zc_fail("compiler abort"); }
+void zc_abort(void) { zc_fail("compiler abort"); }
+void zc_compiler_abort(const char *file, int line) {
+    fprintf(stderr, "compiler abort at %s:%d\n", file, line);
+    AIWNIOS_throw(0); // Restore the active statement checkpoint when available.
+}
 void zc_assert_fail(const char *e, const char *f, int l) {
     fprintf(stderr, "assert %s:%d: %s\n", f, l, e);
     zc_fail("compiler assertion");

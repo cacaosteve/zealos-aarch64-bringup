@@ -1,0 +1,3 @@
+// Titanium receives this registry-backed score global during normal startup.
+I64 best_score=0;
+#include "/Apps/Titanium/Run.ZC"

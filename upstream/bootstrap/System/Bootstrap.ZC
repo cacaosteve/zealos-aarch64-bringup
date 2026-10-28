@@ -24,6 +24,7 @@ F64 tS()
 extern U0 Free(U8 *ptr);
 extern I64 MSize(U8 *ptr);
 extern I64 MSize2(U8 *ptr);
+extern I64 ZcManagedAllocationSize(U8 *ptr);
 extern U8 *MemCopy(U8 *dst,U8 *src,I64 count);
 extern U8 *MemSet(U8 *dst,I64 byte,I64 count);
 extern U0 DCBlotColor4(U8 *dst, I64 *img, I64 *img_cache, I64 count);

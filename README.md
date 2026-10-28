@@ -20,7 +20,7 @@ splash logo:
 ## Regular ZealOS programs
 
 The **Apps** menu now launches unchanged upstream **Net of Dots**, **Lines**,
-**Doodle**, **Mass Spring** and **Game of Life**. For the first two, you can also type
+**Doodle**, **Mass Spring**, **Game of Life** and **Digital Logic**. For the first two, you can also type
 `#include "/Demo/Graphics/NetOfDots"` or `#include "/Demo/Graphics/Lines"`
 in a graphical terminal. These are separate from the older adapted bring-up
 commands. The complete pinned Apps/Demo collection (294 files) is bundled,
@@ -32,6 +32,17 @@ USB controller model. Live UTM checks also pass for Doodle drawing/colors,
 Mass Spring motion/reset, Life evolution and all three programs' return to a
 working terminal. Evidence is recorded in
 [ACCEPTANCE.md](ACCEPTANCE.md).
+
+The next candidate adds **Apps → Budget**, calendar/UTC clock services and
+editable class forms. Its create/edit/cancel/save/reopen workflow passes
+automated NEC USB tests, including persistence after a cold disk-only boot.
+Use `build/zealos-aarch64-budget-menu-fix.iso` (SHA-256 `c92f5f3c…`) as the first USB CD
+with an installed writable VirtIO disk attached; no reinstall is needed.
+The original `00b5cd34…` candidate froze on menu hover; this replacement
+loads the missing key-name services and restores the Edit/View menus.
+Live UTM acceptance of the replacement is pending. The standard ISO path still contains the
+live-accepted Digital Logic image. Budget's advanced account/template
+workflows and the rest of the collection remain separate acceptance work.
 
 ## Native source compatibility milestone
 
@@ -47,6 +58,8 @@ make check-gui-terminal # terminal output ownership, menus, paint and zoom/pan
 make check-gui-workflow # visible typing/cursors + graphical edit/save/run/reboot
 make check-stock-programs # unchanged upstream graphics programs through Apps
 make check-stock-interactive # Doodle, Mass Spring and Life with real input
+make check-logic-program # original Digital Logic, prompt editing and recovery
+make check-budget-program # Budget forms, save/abort and cold-boot persistence
 make check-program-catalog # compile-only inventory of all Apps entry points
 make check-iso-installer-usb # USB CD install, disk-only boot and persistence
 make check-usb-input    # native NEC/QEMU xHCI keyboard, mouse/tablet + recovery
@@ -239,14 +252,14 @@ those paths. Most other x86 intrinsics and unresolved externals
 remain unavailable. This does not boot the upstream kernel or provide its
 preemptive scheduler.
 
-The current ISO, `build/zealos-aarch64-hello.iso`, has SHA-256
+The preserved installer milestone ISO has SHA-256
 `52c214c29a9c23d86c94899e8ef2ba94bd4a21231c92ecdd649714708e2bc627`.
 `make check-iso-installer` passed against this exact build: guarded erase,
 full 128 MiB read-back, disk-only desktop boot, and saved-data persistence
 (`InstallerPersist` returned `0x2a` before and after a second cold reboot).
-The embedded installer disk `build/disk.img` has SHA-256
+That build's embedded installer disk had SHA-256
 `1a4516a67d42aecc7284bfc68e455c5231767360e75a9df021dddb6946d98fde`.
-The exact current ISO (`52c214c…`) was installed in UTM to a disposable 128 MiB
+That exact ISO (`52c214c…`) was installed in UTM to a disposable 128 MiB
 VirtIO disk and passed full sector read-back. A separate disk-only UTM VM
 cold-booted to the desktop; its captured screen shows both terminals and the
 centered animated Z. `InstallerPersist` returned `0x2a` before and after a

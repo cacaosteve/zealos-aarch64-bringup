@@ -106,3 +106,15 @@ Port changes:
 
 The freestanding C support and host API are in `src/zc/`. See
 `COMPATIBILITY.md` for the tested scope and deliberate runtime limitations.
+
+The Budget integration also retains string/integer member metadata for form
+reflection, infers `lastclass` from the actual preceding argument type, and
+keeps inferred name buffers alive when emitted code owns its string data.
+Implicit no-argument calls after an address argument use the current operator
+stack; a preceding argument's RPN must not turn them into function addresses.
+The original ZealOS compiler's class/member layout is accessed through a
+separate form-reflection adapter, rather than by casting Aiwnios metadata.
+Guest forward aliases also follow a later ABI-compatible definition in the
+same task, including repeated application loads. Their calls and function
+addresses use a slot; ordinary direct calls and native adapter bindings keep
+their original behavior.

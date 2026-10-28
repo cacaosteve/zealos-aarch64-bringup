@@ -2636,3 +2636,121 @@ does not add a new live installation/persistence run or accept other programs
 in the remaining collection. The report records the screenshot digest and
 separates observed pixels from the user's confirmation. No ISO or Pi media
 were rebuilt or staged while recording this result.
+
+## Budget calendar, forms and persistent entries — 2026-10-27
+
+The next application candidate is `build/zealos-aarch64-budget.iso`, SHA-256
+`00b5cd349b6da41edeba525066268df4795bb0c8df6f3818f40d04a22b2d9649`.
+Apps → Budget runs its original entry and data workflow. The unchanged pinned
+sources are complemented by a guarded, generated correction to Budget's comma
+separator comparison and a seeded copy of its original accounts document.
+The complete pinned Apps/Demo mirror still has 294 unchanged files; this does
+not imply acceptance of the rest of the collection.
+
+Calendar support loads the original source date/scanning/formatting helpers
+with bounded ARM64 adaptations. The boot wall clock comes from Limine and
+advances using the generic counter; the current default is UTC. Missing boot
+time raises a catchable error. Original DocForm rendering uses an explicit
+native class-field metadata interface instead of assuming the two compilers'
+internal structures share a layout. The compiler now retains member metadata,
+infers `lastclass` from the actual argument type and preserves its default
+string after compilation.
+
+Repeated Budget loading exposed a forward declaration still calling its old
+implementation and freed global data. Forward aliases now follow a compatible
+later definition in the same task, while native adapters retain their ABI
+boundaries. A separate expression fix prevents an address argument from
+turning a subsequent implicit function call into a function pointer. DolDoc's
+numeric lexer also retains full hexadecimal pointer values for editable Budget
+rows. Focused fixtures exercise these cases, malformed metadata recovery and
+integer/date parsing without managed-memory growth.
+
+The NEC USB Budget gate passes **115** checks. It creates a dated 12.50 entry,
+saves and reopens it, edits the amount to 25.00 then aborts without altering
+saved data, cancels a new form without adding an entry, and reopens the saved
+entry after a cold disk-only boot. Escape accepts the form; Shift+Escape
+cancels it. In the main view, Escape saves and exits and Shift+Escape aborts
+changes. Each tested exit restores a working terminal returning 42.
+The [filled form](docs/images/qemu-budget-form.png) and
+[cold-reopened entry](docs/images/qemu-budget-entry.png) are framebuffer captures
+from this passing run.
+
+The expanded VirtIO Digital Logic regression passes **104** checks; NEC
+Doodle/Mass Spring/Life interaction passes **60**. The exact Budget ISO passes
+**14** USB-CD installer checks, including complete read-back, a byte-identical
+installed disk and two subsequent cold disk-only boots returning `0x2a` from
+saved source. The full NEC desktop/editor workflow passes **421** checks,
+including compiler/task recovery, edit/save/compile/run/reboot/reopen,
+interactive Lattice/Stock Play and menu/window controls. All six guest test
+commands exit zero. The compile inventory now includes TimeClock as compilable;
+its runtime workflows remain unaccepted. Original-source, guarded-overlay,
+resource-byte and Python syntax checks also pass.
+
+Kernel SHA-256 is
+`0d150179ead170f4387e4aa06027f6eb522f9fe9669dea83eacaab6853836e0c`.
+The **575-file** source archive SHA-256 is
+`d71865677c623bc33e0097504ed3cb4fa8c952fbde957555db754433d3ee5cc7`.
+The template disk hash is
+`01027bd014dbff21b250c3fb7325f35c03109bdbb77b006fa483e40be058d671`.
+Full artifact hashes, checks and limitations are in
+[the Budget report](docs/acceptance/utm-budget-2026-10-27.json); the updated
+[compile inventory](docs/acceptance/program-catalog-2026-10-27.json) records
+individual blockers.
+
+Live UTM Budget testing subsequently failed: the user reported frozen input
+with File/Abort/Exit visible in the empty ledger. Hovering File → Abort in a
+separate QEMU guest reproduces an unresolved external call from DrawMenu and
+sets `failed=1`. The transaction-only gate above did not exercise this path.
+The [live screenshot](docs/images/utm-budget-menu-freeze-live.png) and report
+record that failure; the screenshot alone does not establish loss of input.
+Periodic/template, account-file editing
+and account-filter workflows have not been accepted. Saving requires an
+installed writable VirtIO source volume. The standard ISO path retains the
+live-accepted `9c5e90c9…` Logic image; the Budget candidate has its own path.
+The existing UTM session and Pi media were not changed.
+
+## Budget File/Edit/View menu correction — 2026-10-27
+
+The failed live image `00b5cd34…` called unresolved keyboard helpers when
+`DrawMenu` tried to label File → Abort. Its small document lexer also lacked
+quoted character literals and evaluated named key constants as zero. This
+discarded the Edit/View menu tree and made the surviving exit actions inert.
+The QEMU hover reproduction exits nonzero with `failed=1`; its log is linked
+from [the correction report](docs/acceptance/utm-budget-menu-fix-2026-10-27.json).
+
+The corrected image loads portable original keyboard translation/name helpers
+and `CatPrint`, with equivalent source byte arrays for the original assembly
+tables. PS/2 I/O code is not loaded. A guarded change initializes the original
+key-name buffer and bounds its printable-character lookup. The document lexer
+reads quoted/escaped character literals and literal-valued compiler defines
+through an explicit borrowed-text interface, including trailing whitespace.
+This does not add general expression-valued define evaluation.
+
+The expanded NEC USB Budget gate passes **140** checks. It verifies the
+original key maps and key names, character escapes and named constants, then
+hovers the actual File/Edit/View menu items while checking that presentation
+continues with `failed=0`. Edit → New Entry opens the real form, File → Exit
+saves and returns to a working terminal, and File → Abort discards changes.
+Edit/abort, form cancellation, reopen and a cold disk-only persistence boot
+also pass. The [menu capture](docs/images/qemu-budget-menu-exit.png) shows
+File/Edit/View and the Exit shortcut over the saved entry.
+
+VirtIO Digital Logic's expanded regression passes **104** checks. The exact
+corrected ISO passes **14** USB-CD installer checks, full read-back,
+byte-identical installation and two cold disk-only persistence boots.
+The full NEC desktop/editor regression passes **422** checks, including task,
+compiler and exception recovery, edit/save/compile/run/cold reboot/reopen,
+Lattice/Stock Play and menu/window controls. All four commands exit zero.
+
+Replacement ISO: `build/zealos-aarch64-budget-menu-fix.iso`, SHA-256
+`c92f5f3cc58cd005277add43b3601b0089b8756b34e4ee4d7f134043d9bca30c`.
+Kernel SHA-256:
+`0e4fe8f42058211fb4ea9c545447e0b75103ea437313b9b3095e13ef2de59cfc`.
+The **578-file** source archive SHA-256 is
+`bfaf6708ef04b52446355290c55c5b67a0ec1e6c06362c15c6b5e4bfef672ffa`.
+The template disk hash is
+`1a8cfe7f77df71d88a3d1b16eac40379f28b74ebf4f3f10e32d9d1de12e49de0`.
+Exact artifact sizes, hashes, logs and the scope of live evidence are recorded
+in the correction report. The failed Budget ISO and prior live-accepted Logic
+image remain preserved. Live UTM retesting of this replacement and advanced
+Budget workflows remain pending. No running UTM session or Pi media changed.

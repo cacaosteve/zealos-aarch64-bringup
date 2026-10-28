@@ -10154,6 +10154,13 @@ void exc_handle_sync(uint64_t *frame) {
                 uart_puts(g_uart, "+");
                 uart_put_hex_raw(g_uart, offset);
             }
+            name = zc_debug_function_for_pc((uintptr_t)frame[30], &offset);
+            if (name) {
+                uart_puts(g_uart, " CALLER=");
+                uart_puts(g_uart, name);
+                uart_puts(g_uart, "+");
+                uart_put_hex_raw(g_uart, offset);
+            }
         }
 #endif
         uart_puts(g_uart, "\n");
@@ -18441,6 +18448,10 @@ static int pi4_desktop_prepare(void) {
 
 #ifndef ZEAL_PI_DIAG
 static __attribute__((always_inline)) inline void native_desktop_start(const struct zeal_handoff *h) {
+    if (h->revision >= 8 && h->size >= offsetof(struct zeal_handoff, boot_counter) + sizeof(h->boot_counter))
+        zc_set_boot_time(h->boot_timestamp, h->boot_counter);
+    else
+        zc_set_boot_time(-1, 0);
     zc_set_source_reader(zc_read_redsea);
 #ifdef ZEAL_FORCE_PI4
     zc_set_source_writer(NULL); /* Pi media remains read-only in this gate. */

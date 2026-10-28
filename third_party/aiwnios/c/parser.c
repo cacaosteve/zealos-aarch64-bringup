@@ -66,6 +66,12 @@ static void HashFunDel(CHashFun *fun);
 CHashClass *PrsType(CCmpCtrl *ccmp, CHashClass *base, char **name,
                     CHashFun **fun, CArrayDim *dim);
 static void MemberLstDel(CMemberLst *lst) {
+  for (CMemberMeta *meta = lst->meta, *next; meta; meta = next) {
+    next = meta->next;
+    A_FREE(meta->name);
+    A_FREE(meta->string);
+    A_FREE(meta);
+  }
   A_FREE(lst->str);
   if (lst->next)
     MemberLstDel(lst->next);
@@ -2113,11 +2119,10 @@ next:
         goto name_pass;
       } else if (global_var =
                      HashFind(ccmp->lex->string, Fs->hash_table, HTT_FUN, 1)) {
-        if (((CRPN *)ccmp->code_ctrl->ir_code->next)->type == IC_ADDR_OF) {
-          ic->type = IC_GLOBAL;
-          ic->global_var = global_var;
-          goto name_pass;
-        } else {
+        /* The preceding RPN may belong to a previous call argument. Only
+         * this expression's operator stack determines whether & names a
+         * function; otherwise a bare function must be called normally. */
+        {
           Lex(ccmp->lex);
           ic->type = IC_GLOBAL;
           ic->global_var = global_var;
@@ -3371,6 +3376,12 @@ int64_t PrsDecl(CCmpCtrl *ccmp, CHashClass *base, CHashClass *add_to,
             PrsSameFunctionABI(fun, old)) {
           fun->fun_ptr = old->fun_ptr;
           fun->base.base.type &= ~(HTF_EXTERN | HTF_INTRINSIC);
+          /* Native adapters are intentional ABI boundaries. A later
+           * source implementation must not redirect their early callers. */
+          if (old->base.flags & CLSF_NATIVE_BINDING)
+            fun->base.flags |= CLSF_NATIVE_BINDING;
+          else
+            fun->base.flags |= CLSF_FORWARD_ALIAS;
           break;
         }
       }
@@ -3424,6 +3435,17 @@ int64_t PrsDecl(CCmpCtrl *ccmp, CHashClass *base, CHashClass *add_to,
         decl->fun_ptr = ccmp->cur_fun->fun_ptr;
         decl->base.base.type &= ~(HTF_EXTERN | HTF_INTRINSIC);
       }
+    }
+    /* A redeclared forward may initially use a previous implementation.
+     * Its callers load this slot, so a later definition in the same task
+     * must replace that binding without rewriting ordinary direct calls. */
+    for (int64_t inst = 1;; inst++) {
+      CHashFun *decl = HashSingleTableFind(name, Fs->hash_table, HTT_FUN, inst);
+      if (!decl) break;
+      if (decl != ccmp->cur_fun &&
+          (decl->base.flags & CLSF_FORWARD_ALIAS) &&
+          PrsSameFunctionABI(decl, ccmp->cur_fun))
+        decl->fun_ptr = ccmp->cur_fun->fun_ptr;
     }
     if (ccmp->cur_fun->base.base.str)
       SysSymImportsResolve(ccmp->cur_fun->base.base.str, 0);
@@ -4420,29 +4442,23 @@ static void PrsMembers(CCmpCtrl *cctrl, CHashClass *bungis, int64_t flags,
         do {
           Lex(cctrl->lex);
           PrsDecl(cctrl, base_class, bungis, &is_func, PRSF_CLASS, NULL);
-        next_meta:
-          if (cctrl->lex->cur_tok == TK_NAME) {
-            // Nroot will parse the meta data but do nothing with it
-            switch (Lex(cctrl->lex)) {
-            case TK_STR:
-              while (Lex(cctrl->lex) == TK_STR)
-                ;
-              if (cctrl->lex->cur_tok == ',')
-                break;
-              else
-                goto next_meta;
-            case TK_I64:
-            case TK_CHR:
-
-              Lex(cctrl->lex);
-              if (cctrl->lex->cur_tok == ',')
-                break;
-              else
-                goto next_meta;
-              break;
-            default:
-              ParseErr(cctrl, "Unexpected meta-data!!!");
-            }
+          while (cctrl->lex->cur_tok == TK_NAME) {
+            CMemberLst *member = bungis->members_lst;
+            while (member && member->next) member = member->next;
+            if (!member) ParseErr(cctrl, "Metadata requires a member.");
+            CMemberMeta *meta = A_CALLOC(sizeof(*meta), NULL);
+            meta->name = A_STRDUP(cctrl->lex->string, NULL);
+            meta->next = member->meta;
+            member->meta = meta;
+            Lex(cctrl->lex);
+            if (cctrl->lex->cur_tok == TK_STR) {
+              int64_t length;
+              meta->string = PrsString(cctrl, &length);
+            } else if (cctrl->lex->cur_tok == TK_I64 ||
+                       cctrl->lex->cur_tok == TK_CHR ||
+                       cctrl->lex->cur_tok == '-') {
+              meta->value = PrsI64(cctrl);
+            } else ParseErr(cctrl, "Unexpected member metadata.");
           }
         } while (cctrl->lex->cur_tok == ',');
         if (last_m)
@@ -4889,6 +4905,7 @@ static void __PrsBindCSymbol(char *name, void *ptr, int64_t naked,
           fun->fun_ptr = GenFFIBindingNaked(ptr, arity);
         else
           fun->fun_ptr = GenFFIBinding(ptr, arity);
+        fun->base.flags |= CLSF_NATIVE_BINDING;
       }
     }
     SysSymImportsResolve(name, 0);

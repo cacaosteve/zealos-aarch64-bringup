@@ -1,0 +1,132 @@
+I64 CalendarChecks()
+{
+    CDateStruct ds, out;
+    CDate date, old_offset = local_time_offset;
+    U8 *text;
+    I64 year, month, days;
+    if (Round(0.5) != 0.0 || Round(1.5) != 2.0 || Round(2.5) != 2.0 ||
+        Round(-0.5) != 0.0 || Round(-1.5) != -2.0) return 15;
+    text = MStrUtil("  hello\tWORLD \n", SUF_REM_LEADING | SUF_REM_TRAILING |
+                    SUF_SINGLE_SPACE | SUF_TO_UPPER);
+    if (StrCompare(text, "HELLO WORLD")) return 16;
+    Free(text);
+    if (YearStartDate(1970) != 719527 || DayOfWeek(719527) != 4) return 1;
+    if (YearStartDate(2001)-YearStartDate(2000) != 366 ||
+        YearStartDate(2101)-YearStartDate(2100) != 365 ||
+        YearStartDate(4001)-YearStartDate(4000) != 365) return 2;
+    local_time_offset = 0;
+    for (year = 2023; year <= 2024; year++)
+        for (month = 1; month <= 12; month++)
+        {
+            MemSet(&ds, 0, sizeof(ds));
+            ds.year = year; ds.mon = month; ds.day_of_mon = 1;
+            ds.hour = 12; ds.min = 34; ds.sec = 56;
+            date = Struct2Date(&ds);
+            Date2Struct(&out, date);
+            if (out.year != year || out.mon != month || out.day_of_mon != 1 ||
+                out.hour != 12 || out.min != 34 || out.sec != 56) return 3;
+            days = LastDayOfMon(date.date)-FirstDayOfMon(date.date)+1;
+            if (month == 2 && days != 28+(year == 2024)) return 4;
+            if ((month == 1 || month == 3 || month == 5 || month == 7 ||
+                 month == 8 || month == 10 || month == 12) && days != 31) return 5;
+            if ((month == 4 || month == 6 || month == 9 || month == 11) && days != 30) return 6;
+        }
+    date = Str2Date("02/29/2024");
+    Date2Struct(&out, date);
+    if (out.year != 2024 || out.mon != 2 || out.day_of_mon != 29) return 7;
+    text = MStrPrint("%D", date);
+    if (StrCompare(text, "02/29/24")) return 8;
+    Free(text);
+    MemCopy(&ds, &out, sizeof(ds)); ds.hour = 12; ds.min = 34; ds.sec = 56;
+    date = Struct2Date(&ds);
+    text = MStrPrint("%D %T", date, date);
+    if (StrCompare(text, "02/29/24 12:34:56")) return 9;
+    Free(text);
+    local_time_offset = ToI64(-7*60*60 * (4294967296.0/86400.0));
+    text = MStrPrint("%T", date);
+    if (StrCompare(text, "05:34:56")) return 10;
+    Free(text);
+    if (Str2Date("02/29/24") != Str2Date("02/29/2024")) return 11;
+    local_time_offset = old_offset;
+    date = Str2Date(" em(02/10/2024) ");
+    Date2Struct(&out, date);
+    if (out.mon != 2 || out.day_of_mon != 29) return 14;
+    try
+    {
+        Str2Date("bad");
+        return 12;
+    }
+    catch
+    {
+        if (Fs->except_ch != 'Date') return 13;
+        Fs->catch_except = TRUE;
+    }
+    return 42;
+}
+
+I64 CalendarBufferChecks()
+{
+    I64 i;
+    U8 *text;
+    CDate date = Str2Date("02/29/2024");
+    for (i = 0; i < 100; i++)
+    {
+        text = MStrPrint("%D %T", date, date);
+        Free(text);
+        try
+        {
+            Str2Date("bad");
+            return 1;
+        }
+        catch
+        {
+            if (Fs->except_ch != 'Date') return 2;
+            Fs->catch_except = TRUE;
+        }
+    }
+    return 42;
+}
+
+I64 CalendarScanChecks()
+{
+    F64 amount;
+    I64 value;
+    U8 data[64], *ptr = data, *end;
+    if (Str2F64(" -12.50", &end) != -12.5 || *end) return 1;
+    amount = Str2F64("2.5e-2") - 0.025;
+    if (!(-0.000000000001 < amount < 0.000000000001)) return 2;
+    StrScan("Amount $     12.50", "Amount $%10.2f", &amount);
+    if (amount != 12.5) return 3;
+    StrScan("BANK", "%s", &ptr);
+    if (StrCompare(data, "BANK")) return 4;
+    StrScan("0x2a", "%X", &value);
+    if (value != 42) return 5;
+    try
+    {
+        StrScan("123", "%d");
+        return 6;
+    }
+    catch
+    {
+        if (Fs->except_ch != 'Scan') return 7;
+        Fs->catch_except = TRUE;
+    }
+    return 42;
+}
+
+I64 CalendarClockChecks()
+{
+    CDateStruct ds;
+    I64 first = ZcUnixTimeNs();
+    Date2Struct(&ds, Now);
+    if (ds.year < 2024 || ds.year > 2100 || !ds.mon || ds.mon > 12 ||
+        !ds.day_of_mon || ds.day_of_mon > 31 || ds.hour > 23) return 1;
+    Sleep(25);
+    if (ZcUnixTimeNs() <= first) return 2;
+    return 42;
+}
+
+I64 CalendarUnixNanoseconds()
+{
+    return ZcUnixTimeNs();
+}

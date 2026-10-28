@@ -1,0 +1,67 @@
+I64 KeyboardMenuChecks()
+{
+    U8 *st;
+    I64 ch, sc, i, value, expected[7] = {'n','\n','\\','\'',CH_ESC,CH_SHIFT_ESC,CH_CTRLY};
+    CCompCtrl *cc;
+    CMenu *menu;
+    CMenuEntry *entry;
+
+    if (Char2ScanCode('n') != 0x31 ||
+        Char2ScanCode('N') != (0x31 | SCF_SHIFT) ||
+        Char2ScanCode(CH_SHIFT_ESC) != (SC_ESC | SCF_SHIFT) ||
+        Char2ScanCode(CH_CTRLY) != (0x15 | SCF_CTRL)) return 1;
+    for (ch = 1; ch < 256; ch++)
+        if ((sc = Char2ScanCode(ch)) && ScanCode2Char(sc) != ch) return 2;
+    st = ScanCode2KeyName(Char2ScanCode(CH_SHIFT_ESC));
+    if (StrCompare(st, "SHIFT ESC")) { Free(st); return 3; }
+    Free(st);
+    st = ScanCode2KeyName(Char2ScanCode('n'));
+    if (StrCompare(st, "n")) { Free(st); return 4; }
+    Free(st);
+    st = ScanCode2KeyName(SC_CURSOR_LEFT);
+    if (StrCompare(st, "LEFT")) { Free(st); return 5; }
+    Free(st);
+    st = Char2KeyName(CH_CTRLA, FALSE);
+    if (StrCompare(st, "a")) { Free(st); return 6; }
+    Free(st);
+
+    cc = CompCtrlNew("'n' '\\n' '\\\\' '\\'' CH_ESC CH_SHIFT_ESC CH_CTRLY");
+    Lex(cc);
+    for (i = 0; i < 7; i++)
+        if ((value = LexExpressionI64(cc)) != expected[i])
+        {
+            Print("menu literal %d: got 0x%X expected 0x%X\n",i,value,expected[i]);
+            CompCtrlDel(cc);
+            return 70+i;
+        }
+    CompCtrlDel(cc);
+    menu = MenuNew("File { Abort(,CH_SHIFT_ESC); Exit(,CH_ESC); }"
+                   "Edit { NewEntry(,'n'); EditEntry(,'\\n'); DeleteEntry(,CH_CTRLY); }"
+                   "View { ViewAcct(,'v'); }");
+    entry = MenuEntryFind(menu, "File/Abort");
+    if (!entry || entry->arg1 != CH_SHIFT_ESC) { MenuDel(menu); return 8; }
+    entry = MenuEntryFind(menu, "File/Exit");
+    if (!entry || entry->arg1 != CH_ESC) { MenuDel(menu); return 9; }
+    entry = MenuEntryFind(menu, "Edit/NewEntry");
+    if (!entry || entry->arg1 != 'n') { MenuDel(menu); return 10; }
+    entry = MenuEntryFind(menu, "Edit/EditEntry");
+    if (!entry || entry->arg1 != '\n') { MenuDel(menu); return 11; }
+    entry = MenuEntryFind(menu, "View/ViewAcct");
+    if (!entry || entry->arg1 != 'v') { MenuDel(menu); return 12; }
+    MenuDel(menu);
+    return 42;
+}
+
+I64 BudgetMenuChecks()
+{
+    CMenu *menu = bootstrap_gui_terminal_task->cur_menu;
+    CMenuEntry *entry = MenuEntryFind(menu, "File/Abort");
+    if (!entry || entry->arg1 != CH_SHIFT_ESC) return 1;
+    entry = MenuEntryFind(menu, "Edit/NewEntry");
+    if (!entry || entry->arg1 != 'n') return 2;
+    entry = MenuEntryFind(menu, "Edit/EditEntry");
+    if (!entry || entry->arg1 != '\n') return 3;
+    entry = MenuEntryFind(menu, "View/ViewAcct");
+    if (!entry || entry->arg1 != 'v') return 4;
+    return 42;
+}

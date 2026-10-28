@@ -32,13 +32,21 @@ I64 LastClassExplicit(U8 *value, U8 *name=lastclass)
     return 0;
 }
 
+I64 LastClassGeneric(U8 *value, U8 *name=lastclass)
+{
+    return !StrCompare(name, "CLastClassProbe");
+}
+
 I64 LastClassChecks()
 {
+    CLastClassProbe value;
     if (LastClassU8(NULL) != 42)
         return 1;
     if (LastClassStruct(NULL) != 42)
         return 2;
     if (LastClassExplicit(NULL, "explicit") != 42)
         return 3;
+    if (!LastClassGeneric(&value) || !LastClassGeneric(&value,))
+        return 4;
     return 42;
 }

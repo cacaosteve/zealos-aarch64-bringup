@@ -1,0 +1,22 @@
+I64 DocNumberChecks()
+{
+    CCompCtrl *cc = CompCtrlNew("0xFFFFFFFFFFFFFFFF 0b101010 0o52 0d42");
+    CDoc *doc = DocNew;
+    CDocEntry *entry;
+    I64 *value = MAlloc(8), count = 0;
+    Lex(cc);
+    if (LexExpressionI64(cc) != -1 || LexExpressionI64(cc) != 42 ||
+        LexExpressionI64(cc) != 42 || LexExpressionI64(cc) != 42) return 1;
+    CompCtrlDel(cc);
+    DocPrint(doc, "$$MU,\"row\",U=0x%X,LE=0x2A$$\n", value);
+    for (entry = doc->head.next; entry != doc; entry = entry->next)
+        if (entry->type_u8 == DOCT_MENU_VAL)
+        {
+            if (entry->user_data != value || entry->left_exp != 42) return 2;
+            count++;
+        }
+    DocDel(doc);
+    Free(value);
+    if (count == 1) return 42;
+    return 3;
+}

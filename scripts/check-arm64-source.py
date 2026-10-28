@@ -4,11 +4,85 @@ from pathlib import Path
 import re
 import struct
 import sys
+from arm64_source import extract_keyboard_helpers
+from arm64_source import (extract_sprite_elem_base_sizes, inject_sprite_elem_base_sizes,
+                          extract_sprite_interpolation, inject_sprite_interpolation,
+                          extract_sprite_matrix_draw, inject_sprite_matrix_draw)
 
 from arm64_source import (extract_home_set, extract_home_startup, extract_home_startup_tasks, inject_home_startup_tasks, extract_server_task, extract_user_task, extract_version_scalars, extract_source_prompt, extract_source_training, translate_autocomplete_task, translate_doctree, translate_registry, translate_docterm, translate_doced, translate_docfind, translate_docform, translate_docpopup, translate_docrecalc, translate_grbitmap,
                           translate_filemgr, translate_grdc, translate_grpalette, translate_message, translate_grscreen, translate_ktask, translate_winmgr, translate_zsplash, translate_home_once)
 
 root = Path(__file__).resolve().parent.parent
+sprite_new = (root/'upstream/pinned/System/Gr/SpriteNew.ZC').read_bytes()
+sprite_bridge = (root/'upstream/bootstrap/System/Gr/SpriteBridge.ZC').read_bytes()
+sprite_size_declaration = extract_sprite_elem_base_sizes(sprite_new)
+assert sprite_size_declaration.startswith(
+    b'I64 sprite_elem_base_sizes[SPT_TYPES_NUM] = {')
+assert sprite_size_declaration.count(b'//SPT_') == 30
+sprite_bridge_with_sizes = inject_sprite_elem_base_sizes(
+    sprite_bridge, sprite_new)
+assert sprite_bridge_with_sizes.startswith(sprite_size_declaration + b'\n\n')
+assert sprite_bridge_with_sizes.endswith(sprite_bridge)
+assert sprite_bridge_with_sizes.count(b'I64 sprite_elem_base_sizes[') == 1
+sprite_plot = (root/'upstream/pinned/System/Gr/GrSpritePlot.ZC').read_bytes()
+sprite_helpers = extract_sprite_interpolation(sprite_new, sprite_plot)
+assert b'public I64 SpriteSize(U8 *elems)' in sprite_helpers
+assert b'public U8 *SpriteInterpolate(F64 t, U8 *elems0, U8 *elems1)' in sprite_helpers
+assert b'records < 65536 && total < 16777216' in sprite_helpers
+assert b't < 0.0 || t > 1.0' in sprite_helpers
+assert b'SpriteInterpolationStreamsCompatible' in sprite_helpers
+sprite_bridge_with_interpolation = inject_sprite_interpolation(
+    sprite_bridge_with_sizes, sprite_new, sprite_plot)
+assert sprite_helpers in sprite_bridge_with_interpolation
+assert sprite_bridge_with_interpolation.count(b'public U8 *SpriteInterpolate(') == 1
+assert sprite_bridge_with_interpolation.index(b'public I64 SpriteSize(') < \
+        sprite_bridge_with_interpolation.index(b'public CDocEntry *DocSprite(')
+sprite_matrix_helpers = extract_sprite_matrix_draw()
+assert b'public U0 Sprite3Mat4x4B(' in sprite_matrix_helpers
+assert b'Sprite3MatrixBounded(matrix)' in sprite_matrix_helpers
+assert b'dc->r = old_matrix;' in sprite_matrix_helpers
+sprite_bridge_with_matrix = inject_sprite_matrix_draw(sprite_bridge_with_interpolation)
+assert sprite_bridge_with_matrix.endswith(sprite_matrix_helpers)
+for symbol in (b'Sprite3XB', b'Sprite3YB', b'Sprite3ZB'):
+    assert sprite_matrix_helpers.count(b'public U0 ' + symbol + b'(') == 1
+try:
+    inject_sprite_matrix_draw(sprite_bridge_with_matrix)
+except ValueError:
+    pass
+else:
+    raise AssertionError('sprite matrix injection accepted duplicate API')
+for changed_new, changed_plot in (
+    (sprite_new.replace(b'public I64 SpriteSize(U8 *elems)',
+                        b'public I64 SpriteExtent(U8 *elems)', 1), sprite_plot),
+    (sprite_new, sprite_plot.replace(b'public U8 *SpriteInterpolate(',
+                                     b'public U8 *SpriteMix(', 1)),
+    (sprite_new, sprite_plot.replace(b'case SPT_BITMAP:', b'case SPT_IMAGE:')),
+):
+    try:
+        extract_sprite_interpolation(changed_new, changed_plot)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError('sprite helper extraction accepted changed upstream input')
+keyboard = (root / 'upstream/pinned/Kernel/SerialDev/Keyboard.ZC').read_bytes()
+printer = (root / 'upstream/pinned/Kernel/StrPrint.ZC').read_bytes()
+keyboard_bridge = extract_keyboard_helpers(keyboard, printer)
+assert b'asm {' not in keyboard_bridge
+assert b'U0 KbdCmdSend' not in keyboard_bridge
+assert b'CH_SHIFT_ESC' in keyboard_bridge
+assert b'U8 *CatPrint(' in keyboard_bridge
+assert b'*buf = 0;\n\tif (ch < 0 || ch > 255)' in keyboard_bridge
+for changed_keyboard, changed_printer in [
+    (keyboard.replace(b'I64 Char2ScanCode(', b'I64 OtherScanCode(', 1), printer),
+    (keyboard.replace(b'NORMAL_KEY_SCAN_DECODE_TABLE::', b'OTHER_KEY_SCAN_DECODE_TABLE::', 1), printer),
+    (keyboard, printer.replace(b'U8 *CatPrint(', b'U8 *OtherPrint(', 1)),
+]:
+    try:
+        extract_keyboard_helpers(changed_keyboard, changed_printer)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError('keyboard helper extraction accepted changed dependencies')
 task_bridge = (root / 'upstream/bootstrap/System/TaskBridge.ZC').read_text()
 full_compositor_start = task_bridge.index('Bool BootstrapTryUpstreamGrUpdateScreen()')
 full_compositor_end = task_bridge.index('\nU0 BootstrapGrUpdateTasks()', full_compositor_start)

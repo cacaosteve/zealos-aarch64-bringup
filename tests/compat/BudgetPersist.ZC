@@ -1,0 +1,23 @@
+#include "/Apps/Budget/Load.ZC"
+
+I64 BudgetPersistChecks()
+{
+    CBgtEntry *entry;
+    I64 result = 42;
+    Cd("~/Budget");
+    bgt_string_file = FileNameAbs("Strs.DD");
+    bgt_accts_file = FileNameAbs("Accts.DD");
+    bgt_data_file = FileNameAbs("Bgt.DATA");
+    BgtAcctsRead;
+    BgtDataRead;
+    entry = b_head.next;
+    if (QueueCount(&b_head) != 1) result = 1;
+    else if (entry->date != Str2Date("02/29/2024") || entry->amount != 12.5 ||
+             StrCompare(entry->credit, "BANK") || StrCompare(entry->debit, "FOOD") ||
+             StrCompare(entry->desc, "UTM Budget entry")) result = 2;
+    BgtDel;
+    Free(bgt_string_file); Free(bgt_accts_file); Free(bgt_data_file);
+    return result;
+}
+
+BudgetPersistChecks;

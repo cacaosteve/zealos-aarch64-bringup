@@ -108,12 +108,56 @@ repeated failed compilations without managed-memory growth. Application source
 should use the graphical terminal's normal `#include`/`ExeFile2` path; the
 bootstrap `zload` command does not itself decode a DolDoc root file.
 
+## Budget candidate
+
+Budget now has the calendar, clock, string scanning and class-form services
+needed by its original entry/data code. Apps → Budget opens its default
+`~/Budget` accounts. Click a field to edit it; Escape accepts a form and
+Shift+Escape cancels it. In the main Budget view, Escape saves and exits;
+Shift+Escape exits without saving changes. The clock defaults to UTC.
+
+`make check-budget-program` checks calendar boundaries and formatting, the
+boot wall clock, class metadata and inferred class names, scanner cleanup,
+and malformed-source recovery. Its visible workflow creates an entry, edits
+and aborts a change, cancels a new form, saves, reopens and checks the data
+after a cold disk-only reboot. The NEC USB gate passes 115 checks on
+`build/zealos-aarch64-budget.iso` (`00b5cd34…`). The exact ISO also passes
+USB-CD installation, full read-back and two disk-only persistence boots.
+Live UTM then exposed a menu-hover freeze in that image. The replacement is
+`build/zealos-aarch64-budget-menu-fix.iso` (`c92f5f3c…`), which loads missing
+key-name services and parses the original File/Edit/View shortcuts.
+Its expanded NEC USB gate passes 140 checks, including actual shortcut hover,
+menu selection and cold disk-only entry persistence. See
+[the correction report](docs/acceptance/utm-budget-menu-fix-2026-10-27.json).
+The previous live-accepted Logic image remains at the standard
+`build/zealos-aarch64-hello.iso` path while the corrected Budget live check is pending.
+Periodic/template, account-file editing and account-filter UI workflows have
+not been accepted; live UTM acceptance of this candidate also remains pending.
+
+Budget records dated transfers between accounts and displays a balance.
+An empty white ledger is expected before the first transaction. Choose
+Edit → New Entry or press lowercase `n` to open the Date/Amount/accounts/Desc
+form. A small example is amount `12.50`, credit `BANK`, debit `FOOD` and a
+description; the default date `*` means the current date. Escape accepts the
+form, or Shift+Escape cancels it. File → Exit saves and returns to the terminal;
+File → Abort returns without saving changes.
+
+The pinned Budget files remain byte-identical to upstream. The generated
+`BgtStrs.ZC` corrects one separator comparison from a two-byte comma/space
+literal to a comma, so account names do not gain a comma when reopened.
+The factory image seeds the original `Accts.DD` in `Home/Budget`; this does
+not implement the general directory creation or copy APIs used by upstream's
+installer. Saving requires a writable installed VirtIO source volume.
+
+![Budget entry reopened after a cold disk-only boot](docs/images/qemu-budget-entry.png)
+
 ## Remaining collection
 
 An inventory of the pinned upstream `src/Apps` and `src/Demo` tree contains
 294 files, including source, documents and binary resources. That is a file
-count, not a count of applications. The ARM64 source bundle now ships that
-complete tree, unchanged and hash-checked. Availability does not establish
+count, not a count of applications. The pinned mirror contains that complete
+tree, unchanged and hash-checked; the generated Budget overlay is described
+above. Availability does not establish
 compilation or runtime support.
 
 The full application directories still need individual acceptance:
@@ -126,19 +170,20 @@ the assembly demos also require architecture-specific implementations.
 `make check-program-catalog` compiles each application entry point in an
 isolated guest task with `CCF_JUST_LOAD` and records the first blocker in
 `build/program-catalog.json`. This is an inventory, not execution acceptance.
-The remaining blockers include missing controls and graphics types, date/time
-globals and dictionary/audio services. Budget and Vocabulary compile; their
-runtime behavior is untested. Logic has the separate execution gate above.
+The remaining blockers include missing controls, graphics types and
+dictionary/audio services. TimeClock now compiles with the calendar services;
+it and Vocabulary still need runtime acceptance. Budget and Logic have
+separate execution gates described above.
 
 | Application | First compile blocker in the inventory |
 |--|--|
-| Budget | Compiles after `no_warn` support; date, forms and save/reopen need runtime acceptance |
+| Budget | Candidate entry/form/storage gate; live UTM and advanced workflows remain pending |
 | GrModels | `sprite_elem_base_sizes` |
 | KeepAway | `SpriteInterpolate` |
 | Logic | Passes focused NEC/VirtIO execution gates and the user-confirmed live UTM retest on `9c5e90c9…` |
 | Psalmody | `GodWordStr` (audio also remains unimplemented) |
 | Span, Strut | `CCtrlBttnState` |
-| TimeClock | Unbound `local_time_offset` |
+| TimeClock | Compiles with the new calendar services; runtime and saved-data workflows remain unaccepted |
 | ToTheFront | `DCOS` |
 | Titanium | `Sprite3Mat4x4B` |
 | X-Caliber | `best_score` |

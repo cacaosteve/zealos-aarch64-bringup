@@ -1,0 +1,4 @@
+// KeepAway receives these registry-backed globals during normal startup.
+// Declare them in the same disposable compiler namespace as its real entry.
+I64 best_score0=0,best_score1=9999;
+#include "/Apps/KeepAway/Run.ZC"

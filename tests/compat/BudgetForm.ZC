@@ -1,0 +1,32 @@
+I64 BudgetFormPoint(I64 index)
+{
+    CTask *task = sys_focus_task;
+    CDoc *doc = task->put_doc;
+    CDocEntry *entry;
+    I64 x, y;
+    for (entry = doc->head.next; entry != doc; entry = entry->next)
+        if (entry->type_u8 == DOCT_DATA && !index--)
+        {
+            x = task->pix_left + (entry->x + entry->min_col - doc->line_start_col)*FONT_WIDTH + 4;
+            y = task->pix_top + (entry->y - doc->top_line_num)*FONT_HEIGHT + 4;
+            return y << 32 + x;
+        }
+    return -1;
+}
+
+I64 BudgetEntryPoint()
+{
+    CTask *task = sys_focus_task;
+    CDoc *doc = task->put_doc;
+    CDocEntry *entry;
+    I64 x, y;
+    for (entry = doc->head.next; entry != doc; entry = entry->next)
+        if (entry->type_u8 == DOCT_MENU_VAL && entry->tag &&
+            StrMatch("UTM Budget entry", entry->tag))
+        {
+            x = task->pix_left + (entry->x - doc->line_start_col)*FONT_WIDTH + 24;
+            y = task->pix_top + (entry->y - doc->top_line_num)*FONT_HEIGHT + 4;
+            return y << 32 + x;
+        }
+    return -1;
+}

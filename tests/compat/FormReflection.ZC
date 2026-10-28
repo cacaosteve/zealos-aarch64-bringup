@@ -1,0 +1,27 @@
+class CFormBase
+{
+    U8 label[16] format "$$DA-P,A=\"Label:%s\"$$\n";
+};
+class CFormProbe:CFormBase
+{
+    F64 amount format "$$DA,A=\"Amount:%8.2f\"$$\n" data -7;
+    U16 kind format "$$LS,D=\"ST_FORM_TYPES\"$$\n";
+};
+
+I64 FormReflectionChecks()
+{
+    CArmDocFormField field;
+    if (!ZcDocFormField("CFormProbe", 0, &field) || field.offset ||
+        field.elements != 16 || field.raw_type != RT_U8 ||
+        !field.is_array || field.pointer || !field.is_internal ||
+        !StrMatch("Label:%s", field.format)) return 1;
+    if (!ZcDocFormField("CFormProbe", 1, &field) || field.offset != 16 ||
+        field.raw_type != RT_F64 || field.data != -7 || field.is_array ||
+        !StrMatch("Amount:%8.2f", field.format)) return 2;
+    if (!ZcDocFormField("CFormProbe", 2, &field) || field.offset != 24 ||
+        field.raw_type != RT_U16 || !StrMatch("ST_FORM_TYPES", field.format)) return 3;
+    if (ZcDocFormField("CFormProbe", 3, &field) ||
+        ZcDocFormField("CFormProbe", -1, &field) ||
+        ZcDocFormField("MissingFormClass", 0, &field)) return 4;
+    return 42;
+}

@@ -1,0 +1,91 @@
+{
+  "commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "mode": "CCF_JUST_LOAD in disposable task; no runtime acceptance",
+  "programs": [
+    {
+      "path": "/Apps/Budget/Run.ZC",
+      "compiled": true,
+      "output": "zc Print(\"catalog_compile=%d\\n\", StockCatalogCompile(\"/Apps/Budget/Run.ZC\"));\r\nWARN /Apps/Budget/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Budget/Load.ZC:12:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/GrModels/Run.ZC",
+      "compiled": false,
+      "output": "zc Print(\"catalog_compile=%d\\n\", StockCatalogCompile(\"/Apps/GrModels/Run.ZC\"));\r\nWARN /Apps/GrModels/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nERR:/Apps/GrModels/ManGen.ZC:192:99 Unknown symbol 'sprite_elem_base_sizes'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/KeepAway/Run.ZC",
+      "compiled": false,
+      "output": "zc Print(\"catalog_compile=%d\\n\", StockCatalogCompile(\"/Apps/KeepAway/Run.ZC\"));\r\nWARN /Apps/KeepAway/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nERR:/Apps/KeepAway/KeepAway.ZC:270:28 Unknown symbol 'SpriteInterpolate'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/Logic/Run.ZC",
+      "compiled": true,
+      "output": "zc Print(\"catalog_compile=%d\\n\", StockCatalogCompile(\"/Apps/Logic/Run.ZC\"));\r\nWARN /Apps/Logic/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Logic/Load.ZC:6:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/Psalmody/Run.ZC",
+      "compiled": false,
+      "output": "zc Print(\"catalog_compile=%d\\n\", StockCatalogCompile(\"/Apps/Psalmody/Run.ZC\"));\r\nWARN /Apps/Psalmody/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nERR:/Apps/Psalmody/JukeBox.ZC:104:48 Unknown symbol 'GodWordStr'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/Span/Run.ZC",
+      "compiled": false,
+      "output": "zc Print(\"catalog_compile=%d\\n\", StockCatalogCompile(\"/Apps/Span/Run.ZC\"));\r\nWARN /Apps/Span/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nERR:/Apps/Span/Span.HH:27:25 Expected ':' after label candidate 'CCtrlBttnState'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/Strut/Run.ZC",
+      "compiled": false,
+      "output": "zc Print(\"catalog_compile=%d\\n\", StockCatalogCompile(\"/Apps/Strut/Run.ZC\"));\r\nWARN /Apps/Strut/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nERR:/Apps/Strut/Strut.ZC:34:31 Expected ':' after label candidate 'CCtrlBttnState'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/TimeClock/Load.ZC",
+      "compiled": true,
+      "output": "zc Print(\"catalog_compile=%d\\n\", StockCatalogCompile(\"/Apps/TimeClock/Load.ZC\"));\r\nWARN /Apps/TimeClock/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/TimeClock/Load.ZC:7:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/Titanium/Run.ZC",
+      "compiled": false,
+      "output": "zc Print(\"catalog_compile=%d\\n\", StockCatalogCompile(\"/Apps/Titanium/Run.ZC\"));\r\nWARN /Apps/Titanium/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nERR:/Apps/Titanium/Titanium.ZC:321:21 Expected ':' after label candidate 'Sprite3Mat4x4B'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/ToTheFront/Run.ZC",
+      "compiled": false,
+      "output": "zc Print(\"catalog_compile=%d\\n\", StockCatalogCompile(\"/Apps/ToTheFront/Run.ZC\"));\r\nWARN /Apps/ToTheFront/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nERR:/Apps/ToTheFront/TTFGlobals.ZC:13:37 Unknown symbol 'DCOS'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/Vocabulary/Run.ZC",
+      "compiled": true,
+      "output": "zc Print(\"catalog_compile=%d\\n\", StockCatalogCompile(\"/Apps/Vocabulary/Run.ZC\"));\r\nWARN /Apps/Vocabulary/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Vocabulary/Load.ZC:6:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/X-Caliber/Run.ZC",
+      "compiled": false,
+      "output": "zc Print(\"catalog_compile=%d\\n\", StockCatalogCompile(\"/Apps/X-Caliber/Run.ZC\"));\r\nWARN /Apps/X-Caliber/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nERR:/Apps/X-Caliber/X-Caliber.ZC:492:80 Unknown symbol 'best_score'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Gr/GrMath.ZC",
+      "compiled": true,
+      "output": "zc Print(\"catalog_compile=%d\\n\", StockCatalogCompile(\"/System/Gr/GrMath.ZC\"));\r\nWARN /System/Gr/GrMath.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Gr/GrMath.ZC:103:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Gr/GrMath.ZC:338:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Gr/GrMath.ZC:533:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Gr/GrMath.ZC:554:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Gr/GrPrimatives.ZC",
+      "compiled": true,
+      "output": "zc Print(\"catalog_compile=%d\\n\", StockCatalogCompile(\"/System/Gr/GrPrimatives.ZC\"));\r\nWARN /System/Gr/GrPrimatives.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Gr/GrPrimatives.ZC:980:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Gr/GrPrimatives.ZC:1016:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Gr/GrPrimatives.ZC:1159:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Gr/GrPrimatives.ZC:1474:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Demo/Graphics/Doodle.ZC",
+      "compiled": true,
+      "output": "zc Print(\"catalog_compile=%d\\n\", StockCatalogCompile(\"/Demo/Graphics/Doodle.ZC\"));\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Demo/Graphics/Life.ZC",
+      "compiled": true,
+      "output": "zc Print(\"catalog_compile=%d\\n\", StockCatalogCompile(\"/Demo/Graphics/Life.ZC\"));\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Demo/Games/MassSpring.ZC",
+      "compiled": true,
+      "output": "zc Print(\"catalog_compile=%d\\n\", StockCatalogCompile(\"/Demo/Games/MassSpring.ZC\"));\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    }
+  ]
+}

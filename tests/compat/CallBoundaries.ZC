@@ -1,0 +1,26 @@
+I64 CallBoundaryValue()
+{
+    return 42;
+}
+
+I64 CallBoundaryStore(I64 *out, I64 value)
+{
+    *out = value;
+    return value;
+}
+
+I64 CallBoundaryInvoke(I64 (*fn)(), I64 value)
+{
+    return (*fn)() + value;
+}
+
+I64 CallBoundaryChecks()
+{
+    I64 out = 0;
+    I64 (*fn)() = &CallBoundaryValue;
+    if (CallBoundaryStore(&out, CallBoundaryValue) != 42 || out != 42) return 1;
+    if (CallBoundaryStore(&out, CallBoundaryValue+1) != 43 || out != 43) return 2;
+    if (CallBoundaryInvoke(&CallBoundaryValue, CallBoundaryValue) != 84) return 3;
+    if ((*fn)() != 42) return 4;
+    return 42;
+}

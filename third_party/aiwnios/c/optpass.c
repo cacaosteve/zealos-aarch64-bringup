@@ -39,6 +39,7 @@ static void FixFunArgs(CCmpCtrl *cctrl, CRPN *rpn) {
   CHashFun *ic_fun;
   CMemberLst *arg, *args_lst_rev;
   CHashClass *last_class;
+  CHashClass *previous_class = NULL;
   CCodeMisc *misc;
   for (cnt = 0; cnt != rpn->length; cnt++)
     rpn2 = ICFwd(rpn2);
@@ -57,13 +58,15 @@ static void FixFunArgs(CCmpCtrl *cctrl, CRPN *rpn) {
       if (arg->flags & MLF_LASTCLASS) {
         if (cnt == 0)
           ParseErr(cctrl, "lastclass default requires a preceding argument.");
-        last_class = arg->last->member_class;
+        last_class = previous_class ? previous_class : arg->last->member_class;
         /* Pointer class entries share the base class name only at star 0. */
         last_class -= last_class->ptr_star_cnt;
         if (!last_class || !last_class->base.str)
           ParseErr(cctrl, "lastclass default cannot infer the preceding argument type.");
         misc = CodeMiscNew(cctrl, CMT_STRING);
-        misc->str = A_STRDUP(last_class->base.str, cctrl->hc);
+        /* CCF_STRINGS_ON_HEAP transfers this buffer to emitted code. It
+         * must outlive the compiler's temporary heap. */
+        misc->str = A_STRDUP(last_class->base.str, NULL);
         misc->str_len = strlen(misc->str) + 1;
         rpn2->type = IC_STR;
         rpn2->code_misc = misc;
@@ -78,6 +81,9 @@ static void FixFunArgs(CCmpCtrl *cctrl, CRPN *rpn) {
         AssignRawTypeToNode(cctrl, rpn2);
       }
     } else {
+      AssignRawTypeToNode(cctrl, rpn2);
+      previous_class = rpn2->type == IC_I64 && !rpn2->integer
+          ? arg->member_class : rpn2->ic_class;
       // If we are passing an F64 to an I64 argument,be sure to convert the F64
       // to a I64
       if ((arg->member_class->raw_type == RT_F64) ^ // Check for difference
@@ -103,12 +109,12 @@ static void FixFunArgs(CCmpCtrl *cctrl, CRPN *rpn) {
     if (arg->flags & MLF_LASTCLASS) {
       if (!arg->last)
         ParseErr(cctrl, "lastclass default requires a preceding argument.");
-      last_class = arg->last->member_class;
+      last_class = previous_class ? previous_class : arg->last->member_class;
       last_class -= last_class->ptr_star_cnt;
       if (!last_class->base.str)
         ParseErr(cctrl, "lastclass default cannot infer the preceding argument type.");
       misc = CodeMiscNew(cctrl, CMT_STRING);
-      misc->str = A_STRDUP(last_class->base.str, cctrl->hc);
+      misc->str = A_STRDUP(last_class->base.str, NULL);
       misc->str_len = strlen(misc->str) + 1;
       ic->type = IC_STR;
       ic->code_misc = misc;
@@ -123,6 +129,7 @@ static void FixFunArgs(CCmpCtrl *cctrl, CRPN *rpn) {
       AssignRawTypeToNode(cctrl, ic);
     }
     QueIns(ic, rpn);
+    previous_class = ic->ic_class;
     arg = arg->next;
   }
   if (ic_fun->base.flags & CLSF_VARGS) {

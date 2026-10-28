@@ -1,0 +1,104 @@
+{
+  "date": "2026-10-27",
+  "recorded_at": "2026-10-27T00:32:09.937048-07:00",
+  "upstream_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "supersedes": "utm-budget-2026-10-27.json",
+  "live_utm_budget": "replacement retest pending; user plans to test later",
+  "reproduction": {
+    "iso_sha256": "00b5cd349b6da41edeba525066268df4795bb0c8df6f3818f40d04a22b2d9649",
+    "trigger": "Move the pointer from Budget File to Abort",
+    "result": "unresolved external call from DrawMenu+0x324, failed=1 and loss of desktop input/presentation",
+    "log": "build/check-budget-menu-repro.log",
+    "exit_code": 1
+  },
+  "fixes": [
+    "Load portable original character/scan-code and key-name helpers, original CatPrint, and source arrays equivalent to the three x86 DU8 tables; no PS/2 I/O",
+    "Initialize the original key-name buffer for the no-prefix control-character branch and bound printable bitmap indexes",
+    "Read quoted and escaped packed character literals used in menu shortcuts",
+    "Read literal-valued native compiler defines through a borrowed-text ABI, including trailing macro newlines, instead of assuming native/source hash layouts or returning zero"
+  ],
+  "checks": [
+    {
+      "description": "NEC USB: keyboard/scan-code helpers, quoted shortcut literals and named constants, actual Budget File/Edit/View hover with continued presentation, menu New Entry/Exit/Abort, form create/edit/cancel and cold disk-only persistence",
+      "log": "build/check-budget-menu-fix-nec.log",
+      "pass_markers": 140,
+      "exit_code": 0
+    },
+    {
+      "description": "VirtIO: expanded Digital Logic prompt editing/recovery, AND/OR rendering and clean relaunch",
+      "log": "build/check-budget-menu-logic-regression.log",
+      "pass_markers": 104,
+      "exit_code": 0
+    },
+    {
+      "description": "Exact corrected ISO: USB-CD install, full read-back, byte-identical target and two cold disk-only persistence boots",
+      "log": "build/check-budget-menu-iso-installer.log",
+      "pass_markers": 14,
+      "exit_code": 0
+    },
+    {
+      "description": "NEC USB: full desktop/editor workflow, task/compiler/exception recovery, edit/save/compile/run/cold reboot/reopen, Lattice/Stock Play and menu/window controls",
+      "log": "build/check-budget-menu-desktop-regression.log",
+      "pass_markers": 422,
+      "exit_code": 0
+    }
+  ],
+  "source_checks": {
+    "pinned_upstream_integrity": "passed",
+    "guarded_overlays_and_keyboard_dependency_checks": "passed",
+    "doc_resource_bytes": "all 54 encoded documents passed",
+    "python_syntax": "passed",
+    "git_diff_check": "passed"
+  },
+  "artifacts": {
+    "build/kernel.elf": {
+      "sha256": "0e4fe8f42058211fb4ea9c545447e0b75103ea437313b9b3095e13ef2de59cfc",
+      "bytes": 18826168
+    },
+    "build/zealbooter.elf": {
+      "sha256": "bc40a8a4e1a1f3bfe4a03a0d602e31aa20615cc35d6fc03b6feef95bcabb8d4f",
+      "bytes": 30944
+    },
+    "build/sources.tar": {
+      "sha256": "bfaf6708ef04b52446355290c55c5b67a0ec1e6c06362c15c6b5e4bfef672ffa",
+      "bytes": 5314560
+    },
+    "build/disk.img": {
+      "sha256": "1a8cfe7f77df71d88a3d1b16eac40379f28b74ebf4f3f10e32d9d1de12e49de0",
+      "bytes": 134217728
+    },
+    "build/zealos-aarch64-budget-menu-fix.iso": {
+      "sha256": "c92f5f3cc58cd005277add43b3601b0089b8756b34e4ee4d7f134043d9bca30c",
+      "bytes": 37750784
+    },
+    "build/zealos-aarch64-budget.iso": {
+      "sha256": "00b5cd349b6da41edeba525066268df4795bb0c8df6f3818f40d04a22b2d9649",
+      "bytes": 37679104
+    },
+    "build/zealos-aarch64-hello.iso": {
+      "sha256": "9c5e90c964cbd1f0badd36d20b712e27e65947b129a2ab43ec4f79473180976c",
+      "bytes": 37439488
+    }
+  },
+  "source_files": 578,
+  "unchanged_pinned_apps_demo_files": 294,
+  "evidence": {
+    "docs/images/utm-budget-menu-freeze-live.png": {
+      "sha256": "7a572b16745fcecd24f1d84c070d841a0a48827569d2b6931969cb4059abee31"
+    },
+    "docs/images/qemu-budget-menu-exit.png": {
+      "sha256": "5ccb91a9dab84a61269e2b23cd1e3d72de321094daba9a3836a73eeeb2defd03"
+    }
+  },
+  "limitations": [
+    "Corrected image still needs a live UTM retest",
+    "Periodic/template, account-file editing and account-filter UI workflows unaccepted",
+    "Saving requires an installed writable VirtIO source volume",
+    "Document lexer supports literal-valued defines; general macro expressions remain unsupported",
+    "Clock defaults to UTC; missing boot wall clock raises a catchable error"
+  ],
+  "standard_iso_promoted_atomically": false,
+  "standard_iso_scope": "Retains prior live-accepted Logic ISO; failed Budget ISO also retained at its old path",
+  "pi_media": "not rebuilt or staged",
+  "running_utm": "not changed"
+}

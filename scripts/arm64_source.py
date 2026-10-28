@@ -17,6 +17,351 @@ _KTASK_GROW_BEGIN = "#exe {Option(OPTf_NO_REG_VAR, ON);};"
 _KTASK_GROW_END = "#exe {Option(OPTf_NO_REG_VAR, OFF);};"
 
 
+def extract_sprite_elem_base_sizes(source: bytes) -> bytes:
+    """Extract the exact pinned ZealOS packed sprite size declaration."""
+    text = source.decode('utf-8')
+    start = text.find('I64 sprite_elem_base_sizes[SPT_TYPES_NUM] = {')
+    if start < 0:
+        raise ValueError('pinned SpriteNew.ZC has no sprite base-size table')
+    brace = text.find('{', start)
+    depth = 0
+    for index in range(brace, len(text)):
+        if text[index] == '{':
+            depth += 1
+        elif text[index] == '}':
+            depth -= 1
+            if depth == 0:
+                end = text.find(';', index)
+                if end < 0:
+                    break
+                declaration = text[start:end + 1]
+                if declaration.count('//SPT_') != 30:
+                    raise ValueError('pinned sprite base-size table entry count changed')
+                return declaration.encode('utf-8')
+    raise ValueError('pinned sprite base-size table is unterminated')
+
+
+def inject_sprite_elem_base_sizes(bridge: bytes, source: bytes) -> bytes:
+    """Prepend pinned sprite record sizes to the ARM64 sprite bridge."""
+    if b'sprite_elem_base_sizes' in bridge:
+        raise ValueError('ARM64 sprite bridge already declares the pinned size table')
+    declaration = extract_sprite_elem_base_sizes(source)
+    return declaration + b'\n\n' + bridge
+
+
+def _extract_between(source: bytes, start: bytes, end: bytes, label: str) -> bytes:
+    if source.count(start) != 1:
+        raise ValueError(f'pinned {label} function boundaries changed')
+    first = source.index(start)
+    last = source.find(end, first)
+    if last < 0:
+        raise ValueError(f'pinned {label} function end changed')
+    return source[first:last].rstrip()
+
+
+def extract_sprite_interpolation(sprite_new: bytes, sprite_plot: bytes) -> bytes:
+    """Generate bounded sprite sizing plus pinned upstream interpolation.
+
+    SpriteSize lives in SpriteNew.ZC; interpolation is the upstream
+    GrSpritePlot.ZC implementation. The generated walker uses the existing
+    SpriteElemSize bridge, caps records and total bytes, and the interpolation
+    wrapper validates matching stream shape and the documented t interval
+    before entering the upstream field interpolation switch.
+    """
+    sprite_size = _extract_between(
+        sprite_new, b'public I64 SpriteSize(U8 *elems)\n',
+        b'\nI64 SpriteTypeMask(', 'SpriteSize')
+    if (b'tmpg(U8 *) += SpriteElemSize(tmpg);' not in sprite_size or
+            b'sprite_elem_base_sizes[SPT_END]' not in sprite_size):
+        raise ValueError('pinned SpriteSize traversal changed')
+    interpolation = _extract_between(
+        sprite_plot, b'public U8 *SpriteInterpolate(F64 t, U8 *elems0, U8 *elems1)\n',
+        b'\n#help_index', 'SpriteInterpolate')
+    required = (
+        b'if (t < 0.5)',
+        b'case SPT_BITMAP:',
+        b'case SPT_MESH:',
+        b'case SPT_SHIFTABLE_MESH:',
+        b'return res;',
+    )
+    if any(token not in interpolation for token in required):
+        raise ValueError('pinned SpriteInterpolate implementation changed')
+    if interpolation.count(b'GR_SCALE') != 3:
+        raise ValueError('pinned SpriteInterpolate scale references changed')
+
+    bounded_size = b'''// Bounded ARM64 walker derived from the pinned SpriteNew.ZC SpriteSize.
+public I64 SpriteSize(U8 *elems)
+{
+    U8 *record_bytes;
+    CSprite *record;
+    I64 records = 0, total = 0, size, type, available;
+
+    if (!elems)
+        throw('Graphics');
+    record_bytes = elems;
+    record = record_bytes - offset(CSprite.start);
+    available = ZcManagedAllocationSize(elems);
+    while (records < 65536 && total < 16777216)
+    {
+        records++;
+        type = record->type & SPG_TYPE_MASK;
+        if (!type)
+        {
+            if (available && total + sprite_elem_base_sizes[SPT_END] > available)
+                throw('Graphics');
+            return total + sprite_elem_base_sizes[SPT_END];
+        }
+        if (type >= SPT_TYPES_NUM)
+            throw('Graphics');
+        size = SpriteElemSize(record_bytes, type);
+        if (size < 1 || size > 16777216 - total ||
+                (available && total + size + sprite_elem_base_sizes[SPT_END] > available))
+            throw('Graphics');
+        total += size;
+        record_bytes += size;
+        record = record_bytes - offset(CSprite.start);
+    }
+    throw('Graphics');
+}
+
+Bool SpriteInterpolationStreamsCompatible(U8 *elems0, U8 *elems1,
+        I64 size0, I64 size1)
+{
+    U8 *p0 = elems0, *p1 = elems1;
+    I64 byte_offset = 0, records = 0, type0, type1, elem_size0, elem_size1;
+    I32 count0, count1;
+
+    if (size0 != size1 || size0 < 1 || size0 > 16777216)
+        return FALSE;
+    while (records < 65536 && byte_offset < size0)
+    {
+        records++;
+        type0 = p0[0] & SPG_TYPE_MASK;
+        type1 = p1[0] & SPG_TYPE_MASK;
+        if (type0 != type1)
+            return FALSE;
+        if (!type0)
+            return byte_offset == size0 - 1;
+        if (type0 >= SPT_TYPES_NUM)
+            return FALSE;
+        elem_size0 = SpriteElemSize(p0, type0);
+        elem_size1 = SpriteElemSize(p1, type1);
+        if (elem_size0 < 1 || elem_size0 != elem_size1 ||
+                elem_size0 > 16777216 || byte_offset + elem_size0 >= size0)
+            return FALSE;
+        if (type0 == SPT_POLYLINE || type0 == SPT_POLYPT ||
+                type0 == SPT_BSPLINE2 || type0 == SPT_BSPLINE3 ||
+                type0 == SPT_BSPLINE2_CLOSED || type0 == SPT_BSPLINE3_CLOSED)
+        {
+            MemCopy(&count0, p0 + 4, sizeof(I32));
+            MemCopy(&count1, p1 + 4, sizeof(I32));
+            if (count0 != count1)
+                return FALSE;
+        }
+        else if (type0 == SPT_BITMAP)
+        {
+            if (MemCompare(p0 + 9, p1 + 9, 8))
+                return FALSE;
+        }
+        else if (type0 == SPT_MESH)
+        {
+            if (MemCompare(p0 + 1, p1 + 1, 8))
+                return FALSE;
+        }
+        else if (type0 == SPT_SHIFTABLE_MESH)
+        {
+            if (MemCompare(p0 + 13, p1 + 13, 8))
+                return FALSE;
+        }
+        byte_offset += elem_size0;
+        p0 += elem_size0;
+        p1 += elem_size1;
+    }
+    return FALSE;
+}
+
+'''
+    # Retain the original interpolation switch but validate its inputs and
+    # replace the upstream size call with the ARM64 bridge signature.
+    old_declaration = b'I64\t\t i, t1 = GR_SCALE * t, t0 = GR_SCALE - t1;'
+    if interpolation.count(old_declaration) != 1:
+        raise ValueError('pinned SpriteInterpolate local declaration changed')
+    interpolation = interpolation.replace(
+        old_declaration,
+        b'I64\t\t i, t1, t0, size0, size1;', 1)
+    for source_size in (b'elems0', b'elems1'):
+        old_allocation = b'i = SpriteSize(' + source_size + b'), res = MAlloc(i);'
+        if interpolation.count(old_allocation) != 1:
+            raise ValueError('pinned SpriteInterpolate allocation setup changed')
+        interpolation = interpolation.replace(
+            old_allocation,
+            b'i = SpriteSize(' + source_size + b');\n\t\tres = MAlloc(i);', 1)
+    guard = b'''\n\tif (!elems0 || !elems1 || t != t || t < 0.0 || t > 1.0)
+		throw('Graphics');
+	size0 = SpriteSize(elems0);
+	size1 = SpriteSize(elems1);
+	if (!SpriteInterpolationStreamsCompatible(elems0, elems1, size0, size1))
+		throw('Graphics');
+	t1 = GR_SCALE * t;
+	t0 = GR_SCALE - t1;
+'''
+    if interpolation.count(b'\n\tif (t < 0.5)') != 1:
+        raise ValueError('pinned SpriteInterpolate selection point changed')
+    interpolation = interpolation.replace(b'\n\tif (t < 0.5)', guard + b'\n\tif (t < 0.5)', 1)
+    old_type_check = b'if (tmpg0->type & SPG_TYPE_MASK != tmpg1->type & SPG_TYPE_MASK)'
+    if interpolation.count(old_type_check) != 1:
+        raise ValueError('pinned SpriteInterpolate type check changed')
+    interpolation = interpolation.replace(
+        old_type_check,
+        b'if ((tmpg0->type & SPG_TYPE_MASK) != (tmpg1->type & SPG_TYPE_MASK))', 1)
+    old_step0 = b'tmpg0(U8 *) += SpriteElemSize(tmpg0);'
+    old_step1 = b'tmpg1(U8 *) += SpriteElemSize(tmpg1);'
+    old_step_result = b'tmpgr(U8 *) += SpriteElemSize(tmpgr);'
+    for old, new in (
+        (old_step0, b'bytes0 += SpriteElemSize(bytes0, tmpg0->type & SPG_TYPE_MASK); tmpg0 = bytes0 - offset(CSprite.start);'),
+        (old_step1, b'bytes1 += SpriteElemSize(bytes1, tmpg1->type & SPG_TYPE_MASK); tmpg1 = bytes1 - offset(CSprite.start);'),
+        (old_step_result, b'bytesr += SpriteElemSize(bytesr, tmpgr->type & SPG_TYPE_MASK); tmpgr = bytesr - offset(CSprite.start);'),
+    ):
+        if interpolation.count(old) != 1:
+            raise ValueError('pinned SpriteInterpolate record walk changed')
+        interpolation = interpolation.replace(old, new, 1)
+    interpolation = interpolation.replace(
+        b'CSprite\t*tmpg0 = elems0 - offset(CSprite.start), *tmpg1 = elems1 - offset(CSprite.start), *tmpgr;',
+        b'CSprite\t*tmpg0, *tmpg1, *tmpgr;\n\tU8\t*bytes0 = elems0, *bytes1 = elems1, *bytesr;', 1)
+    if interpolation.count(b'U8\t*bytes0 = elems0, *bytes1 = elems1, *bytesr;') != 1:
+        raise ValueError('pinned SpriteInterpolate sprite-pointer declaration changed')
+    interpolation = interpolation.replace(
+        b'\ttmpgr = res - offset(CSprite.start);',
+        b'\tbytesr = res;\n\ttmpg0 = bytes0 - offset(CSprite.start);\n'
+        b'\ttmpg1 = bytes1 - offset(CSprite.start);\n'
+        b'\ttmpgr = bytesr - offset(CSprite.start);', 1)
+    if interpolation.count(b'\tbytesr = res;') != 1:
+        raise ValueError('pinned SpriteInterpolate result pointer setup changed')
+    if interpolation.count(b'GR_SCALE') != 3:
+        raise ValueError('pinned SpriteInterpolate scale references changed')
+    interpolation = interpolation.replace(b'GR_SCALE', b'SPRITE_INTERPOLATION_SCALE')
+    return (bounded_size + b'#define SPRITE_INTERPOLATION_SCALE (1<<32)\n' +
+            interpolation + b'\n')
+
+
+def inject_sprite_interpolation(bridge: bytes, sprite_new: bytes,
+                                sprite_plot: bytes) -> bytes:
+    """Append size/interpolation APIs before helpers that depend on SpriteSize."""
+    if b'public U8 *SpriteInterpolate(' in bridge or b'public I64 SpriteSize(' in bridge:
+        raise ValueError('ARM64 sprite bridge already declares sprite interpolation helpers')
+    helper_start = bridge.find(b'public CDocEntry *DocSprite(')
+    doc_helpers = b''
+    if helper_start >= 0:
+        doc_helpers = bridge[helper_start:].rstrip()
+        if (doc_helpers.count(b'public CDocEntry *DocSprite(') != 1 or
+                doc_helpers.count(b'public CDocEntry *Sprite(') != 1):
+            raise ValueError('ARM64 document sprite helpers changed')
+        bridge = bridge[:helper_start].rstrip()
+    generated = extract_sprite_interpolation(sprite_new, sprite_plot)
+    if doc_helpers:
+        return bridge + b'\n' + generated + b'\n' + doc_helpers + b'\n'
+    return bridge + b'\n' + generated
+
+
+def extract_sprite_matrix_draw() -> bytes:
+    """Generate bounded matrix-based mesh drawing and axis-rotation adapters."""
+    return b'''\n#define SPRITE3_MATRIX_LIMIT (64 * SPRITE_INTERPOLATION_SCALE)
+
+Bool Sprite3MatrixBounded(I64 *matrix)
+{
+    I64 i;
+    if (!matrix)
+        return FALSE;
+    for (i = 0; i < 16; i++)
+        if (matrix[i] < -SPRITE3_MATRIX_LIMIT ||
+                matrix[i] > SPRITE3_MATRIX_LIMIT)
+            return FALSE;
+    return TRUE;
+}
+
+public U0 Sprite3Mat4x4B(CDC *dc=gr.dc, I64 x, I64 y, I64 z,
+        U8 *elems, I64 *matrix)
+{//Bounded upstream matrix-composition wrapper for the ARM64 sprite rasterizer.
+    I64 composed[16], local[16], *old_matrix, old_flags, old_x, old_y, old_z;
+    I64 i, sprite_size;
+
+    if (!dc || dc->dc_signature != DCS_SIGNATURE_VAL || !dc->r ||
+            !elems || !matrix || x < -1073741824 || x > 1073741824 ||
+            y < -1073741824 || y > 1073741824 ||
+            z < -1073741824 || z > 1073741824 ||
+            !Sprite3MatrixBounded(matrix) || !Sprite3MatrixBounded(dc->r))
+        throw('Graphics');
+    sprite_size = SpriteSize(elems);
+    if (sprite_size < 1)
+        throw('Graphics');
+
+    old_matrix = dc->r;
+    old_flags = dc->flags;
+    old_x = dc->x;
+    old_y = dc->y;
+    old_z = dc->z;
+    MemCopy(local, matrix, sizeof(local));
+    local[3] += x << 32;
+    local[7] += y << 32;
+    local[11] += z << 32;
+    local[15] = SPRITE_INTERPOLATION_SCALE;
+    BootstrapMat4x4Mul(composed, old_matrix, local);
+    dc->r = composed;
+    dc->flags |= DCF_TRANSFORMATION;
+    try
+        Sprite3(dc, 0, 0, 0, elems);
+    catch
+    {
+        dc->r = old_matrix;
+        dc->flags = old_flags;
+        dc->x = old_x;
+        dc->y = old_y;
+        dc->z = old_z;
+        throw;
+    }
+    dc->r = old_matrix;
+    dc->flags = old_flags;
+    dc->x = old_x;
+    dc->y = old_y;
+    dc->z = old_z;
+}
+
+public U0 Sprite3XB(CDC *dc=gr.dc, I64 x, I64 y, I64 z,
+        U8 *elems, F64 angle=0)
+{
+    I64 matrix[16];
+    Mat4x4IdentEqu(matrix);
+    Mat4x4RotX(matrix, angle);
+    Sprite3Mat4x4B(dc, x, y, z, elems, matrix);
+}
+
+public U0 Sprite3YB(CDC *dc=gr.dc, I64 x, I64 y, I64 z,
+        U8 *elems, F64 angle=0)
+{
+    I64 matrix[16];
+    Mat4x4IdentEqu(matrix);
+    Mat4x4RotY(matrix, angle);
+    Sprite3Mat4x4B(dc, x, y, z, elems, matrix);
+}
+
+public U0 Sprite3ZB(CDC *dc=gr.dc, I64 x, I64 y, I64 z,
+        U8 *elems, F64 angle=0)
+{
+    I64 matrix[16];
+    Mat4x4IdentEqu(matrix);
+    Mat4x4RotZ(matrix, angle);
+    Sprite3Mat4x4B(dc, x, y, z, elems, matrix);
+}
+'''
+
+
+def inject_sprite_matrix_draw(bridge: bytes) -> bytes:
+    """Append the bounded Sprite3 matrix API and upstream axis wrappers."""
+    if b'public U0 Sprite3Mat4x4B(' in bridge:
+        raise ValueError('ARM64 sprite bridge already declares matrix drawing')
+    return bridge + extract_sprite_matrix_draw()
+
+
 def extract_user_task(source: bytes) -> bytes:
     """Retain KTask's execution/input loops with a native compiler ABI.
 
@@ -373,6 +718,163 @@ def extract_source_prompt(source: bytes) -> bytes:
         raise ValueError('pinned YorN boundaries changed')
     body = begin + source.split(begin, 1)[1].split(end, 1)[0]
     return b'// Original keyboard-driven confirmation prompt.\n' + body + b'\n'
+
+
+def translate_budget_strings(source: bytes) -> bytes:
+    """Correct the pinned reader's two-byte comma literal at the file boundary."""
+    old = b"if (*ptr == ', ')"
+    if source.count(old) != 1:
+        raise ValueError('pinned Budget separator check changed')
+    return source.replace(old, b"if (*ptr == ',')", 1)
+
+
+def extract_keyboard_helpers(source: bytes, printer: bytes) -> bytes:
+    """Keep source key translation/naming, replacing only x86 DU8 table syntax."""
+    import ast
+    import re
+    tables = []
+    names = ('NORMAL_KEY_SCAN_DECODE_TABLE', 'SHIFT_KEY_SCAN_DECODE_TABLE',
+             'CTRL_KEY_SCAN_DECODE_TABLE')
+    assembly = source.split(b'\nU0 KbdCmdSend(', 1)[0].decode('utf-8')
+    constants = {'CH_ESC': 27, 'CH_SHIFT_ESC': 28, 'CH_BACKSPACE': 8, 'CH_SPACE': 32}
+    constants.update({'CH_CTRL'+chr(65+i): i+1 for i in range(26)})
+    for i, name in enumerate(names):
+        marker = name + '::'
+        if assembly.count(marker) != 1:
+            raise ValueError('pinned keyboard table changed: '+name)
+        body = assembly.split(marker, 1)[1]
+        body = body.split(names[i+1]+'::', 1)[0] if i < 2 else body.split('}', 1)[0]
+        body = body.replace('DU8', '')
+        values = []
+        tokens = re.findall(r'''"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|CH_[A-Z_]+|\b0\b''', body)
+        for token in tokens:
+            if token in constants:
+                values.append(constants[token])
+            elif token == '0':
+                values.append(0)
+            else:
+                value = ast.literal_eval(token.replace('\\`', '`')).replace('$$', '$')
+                values.extend(value.encode('ascii'))
+        if len(values) != 0x50:
+            raise ValueError('pinned keyboard table length changed: '+name)
+        tables.append(('U8 '+name+'[0x50] = {'+
+                       ','.join('0x%02x'%v for v in values)+'};\n').encode())
+    bodies = []
+    for begin, end in [(b'I64 Char2ScanCode(', b'\nU8 scan_code_map['),
+                       (b'U8 *Char2KeyName(', b'\nU0 KbdBuildSC(')]:
+        if source.count(begin) != 1 or source.count(end) != 1:
+            raise ValueError('pinned keyboard helper boundaries changed')
+        bodies.append(begin+source.split(begin, 1)[1].split(end, 1)[0])
+    # The original no-prefix control-character case reads an uninitialized
+    # buffer; initialize it and reject out-of-range bitmap indexes.
+    old = b'\tif (ch <= CH_SPACE)'
+    if bodies[1].count(old) != 1:
+        raise ValueError('pinned key-name buffer boundary changed')
+    bodies[1] = bodies[1].replace(old, b'\t*buf = 0;\n\tif (ch < 0 || ch > 255) return StrNew("");\n'+old, 1)
+    begin, end = b'U8 *CatPrint(', b'\nU0 Print('
+    if printer.count(begin) != 1 or printer.count(end) != 1:
+        raise ValueError('pinned CatPrint boundaries changed')
+    cat_print = begin+printer.split(begin, 1)[1].split(end, 1)[0]
+    return (b'// Portable helpers from pinned SerialDev/Keyboard.ZC; no PS/2 I/O.\n'
+            + cat_print+b'\n'+b''.join(tables)+b'\n'+b'\n'.join(bodies)+b'\n')
+
+
+def extract_string_utilities(str_a: bytes, str_b: bytes) -> bytes:
+    """Keep the pinned allocating string transforms used by date/application input."""
+    begin, end = b'I64 Spaces2Tabs(U8 *dst, U8 *src)\n', b'\nU8 *StrFirstOcc('
+    if str_a.count(begin) != 1 or str_a.count(end) != 1:
+        raise ValueError('pinned string utility boundaries changed')
+    inplace = begin + str_a.split(begin, 1)[1].split(end, 1)[0]
+    end = b'\nU0 GetOutOfDollar()'
+    if not str_b.startswith(b'U8 *Tabs2Spaces(') or str_b.count(end) != 1:
+        raise ValueError('pinned allocating string utility boundaries changed')
+    allocating = str_b.split(end, 1)[0]
+    return (b'// Original StrA/StrB string transforms and whitespace bitmap.\n'
+            b'U32 char_bmp_white_space[16] = {0x80002600, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};\n'
+            + inplace + b'\n' + allocating + b'\n')
+
+
+def extract_source_dates(calendar: bytes, scan: bytes, printer: bytes) -> bytes:
+    """Retain source calendar/parse/print routines; replace the CMOS boundary."""
+    boundary = b'U8 CMOSRegRead(I64 register)\n'
+    if calendar.count(boundary) != 1:
+        raise ValueError('pinned calendar/CMOS boundary changed')
+    body = calendar.split(boundary, 1)[0]
+    # ModU64 is an x86 compiler intrinsic, not a callable kernel function.
+    if body.count(b'ModU64(') != 4:
+        raise ValueError('pinned date division dependency changed')
+    body = body.replace(b'ModU64(', b'ArmDateDivMod(')
+    # December must advance to January. Keep the source calendar otherwise,
+    # with bounds checked before reading the month table's next element.
+    old = b'\t\tds.mon = 0;\n\t\tds.year++;'
+    if body.count(old) != 1:
+        raise ValueError('pinned December carry changed')
+    body = body.replace(old, b'\t\tds.mon = 1;\n\t\tds.year++;', 1)
+    for table in (b'month_start_days', b'month_start_days_leap'):
+        old = b'date >= '+table+b'[k + 1] && k < 11'
+        if body.count(old) != 1:
+            raise ValueError('pinned month search changed')
+        body = body.replace(old, b'k < 11 && date >= '+table+b'[k + 1]', 1)
+    old = b'\ti1 = YearStartDate(_ds->year);'
+    if body.count(old) != 1:
+        raise ValueError('pinned Struct2Date boundary changed')
+    body = body.replace(old, b"\tif (!_ds || !(_ds->mon >= 1 && _ds->mon <= 12)) throw('Date');\n"+old, 1)
+    begin, end = b'CDate Str2Date(U8 *_src)\n', b'\nU8 *StrScan('
+    if scan.count(begin) != 1 or scan.count(end) != 1:
+        raise ValueError('pinned Str2Date boundaries changed')
+    parser = begin + scan.split(begin, 1)[1].split(end, 1)[0]
+    # The month guard below can throw on malformed text. Reclaim the two
+    # original parser buffers on that path as well as on success.
+    start = b'\tMemSet(&ds, 0, sizeof(CDateStruct));'
+    finish = b'\tFree(src);\n\tFree(v);'
+    if parser.count(start) != 1 or parser.count(finish) != 1:
+        raise ValueError('pinned date parser cleanup changed')
+    parser = parser.replace(start, b'\ttry\n\t{\n'+start, 1)
+    parser = parser.replace(finish,
+        b'\t}\n\tcatch\n\t{\n\t\tFree(src);\n\t\tFree(v);\n\t}\n'+finish, 1)
+    float_begin = b'F64 Str2F64(U8 *src, U8 **_end_ptr=NULL)\n'
+    if scan.count(float_begin) != 1:
+        raise ValueError('pinned floating point scanner changed')
+    float_scan = float_begin + scan.split(float_begin, 1)[1].split(begin, 1)[0]
+    scanner_begin = b'U8 *StrScan(U8 *src, U8 *format, ...)\n'
+    if scan.count(scanner_begin) != 1:
+        raise ValueError('pinned format scanner changed')
+    scanner = scanner_begin + scan.split(scanner_begin, 1)[1]
+    scan_switch = b'\t\t\t\tswitch (ch)\n'
+    scan_free = b'\t\t\t\tFree(buf);'
+    if scanner.count(scan_switch) != 1 or scanner.count(scan_free) != 1:
+        raise ValueError('pinned format scanner cleanup changed')
+    scanner = scanner.replace(scan_switch, b'\t\t\t\ttry\n\t\t\t\t{\n'+scan_switch, 1)
+    scanner = scanner.replace(scan_free,
+        b'\t\t\t\t}\n\t\t\t\tcatch\n\t\t\t\t{\n\t\t\t\t\tFree(buf);\n\t\t\t\t}\n'+scan_free, 1)
+    begin, end = b'U8 *MPrintTime(CDate cdt)\n', b'\nU8 *MPrintQ('
+    if printer.count(begin) != 1 or printer.count(end) != 1:
+        raise ValueError('pinned date formatter boundaries changed')
+    formatting = begin + printer.split(begin, 1)[1].split(end, 1)[0]
+    prefix = b'''// Original KDate/StrScan/StrPrint calendar services, with an ARM64 clock.
+CDate local_time_offset = 0; // UTC by default; callers may configure local time.
+U64 ArmDateDivMod(U64 *value, U64 divisor)
+{
+    U64 remainder = *value % divisor;
+    *value /= divisor;
+    return remainder;
+}
+'''
+    clock = b'''
+CDate Now()
+{//Limine's boot epoch is UTC; the generic counter supplies elapsed time.
+    I64 ns = ZcUnixTimeNs();
+    CDate result;
+    result.date = YearStartDate(1970) + ns / 86400000000000;
+    result.time = ToF64(ns % 86400000000000) * (4294967296.0 / 86400000000000.0);
+    return result;
+}
+U0 NowDateTimeStruct(CDateStruct *ds)
+{
+    Date2Struct(ds, Now + local_time_offset);
+}
+'''
+    return prefix + body + clock + parser + b'\n' + float_scan + b'\n' + scanner + b'\n' + formatting + b'\n'
 
 
 def extract_source_training(source: bytes) -> bytes:
@@ -1065,7 +1567,34 @@ def translate_docform(source: bytes) -> bytes:
     good = "LBtr(&doc_e->de_flags, DOCEf_DEFAULT_LEN)"
     if text.count(bad) != 1 or text.count(good):
         raise ValueError("expected the pinned DocForm DEFAULT_LEN bit test")
-    return text.replace(bad, good, 1).encode("utf-8")
+    text = text.replace(bad, good, 1)
+    start = text.index('public Bool DocForm(')
+    end = text.index('\nU0 DocMenuEndTaskCB()', start)
+    form = text[start:end]
+    replacements = {
+        'CMemberList\t*ml;': 'CArmDocFormField arm_field;\n\tI64 arm_index = 0;',
+        '\tCHashClass\t*tmpc, *tmpc2;\n': '',
+        'if (!(tmpc = HashFind(class_name, Fs->hash_table, HTT_CLASS)))':
+            'if (!ZcDocFormField(class_name, 0, NULL))',
+        '\tml = tmpc->member_list_and_root;\n\twhile (ml)':
+            '\twhile (ZcDocFormField(class_name, arm_index++, &arm_field))',
+        'MemberMetaData("format", ml)': 'arm_field.format',
+        '\t\t\ttmpc2 = ml->member_class;\n': '',
+        '!tmpc2->ptr_stars_count': '!arm_field.pointer',
+        '\t\t\t\ttmpc2 = OptClassFwd(tmpc2);\n\t\t\t\ttmpc2 -= tmpc2->ptr_stars_count;\n': '',
+        'tmpc2->type & HTT_INTERNAL_TYPE': 'arm_field.is_internal',
+        'ml->dim.next': 'arm_field.is_array',
+        'ml->dim.total_count': 'arm_field.elements',
+        'tmpc2->raw_type': 'arm_field.raw_type',
+        'ml->offset': 'arm_field.offset',
+        'MemberMetaData("data", ml)': 'arm_field.data',
+        '\t\tml = ml->next;\n': '',
+    }
+    for old, new in replacements.items():
+        if old not in form:
+            raise ValueError('pinned DocForm reflection changed: '+old)
+        form = form.replace(old, new)
+    return (text[:start] + form + text[end:]).encode("utf-8")
 
 
 def translate_docfind(source: bytes) -> bytes:

@@ -6,12 +6,14 @@ import json
 from pathlib import Path
 import sys
 import tarfile
-from arm64_source import translate_docfile
+from arm64_source import translate_docfile, extract_source_dates, extract_string_utilities, translate_budget_strings, extract_keyboard_helpers
 
 from arm64_source import (extract_home_set, extract_home_startup, extract_home_startup_tasks, inject_home_startup_tasks, extract_version_scalars, extract_source_prompt, extract_source_training, extract_server_task, extract_user_task, translate_doctree, translate_registry, translate_docterm, translate_doced, translate_docfind, translate_docform, translate_docpopup, translate_docrecalc, translate_grbitmap,
                           translate_autocomplete_task, translate_grdc, translate_grscreen, translate_ktask, translate_mathode, translate_zsplash,
                           translate_winmgr, translate_filemgr, translate_home_once,
-                          translate_grpalette, translate_message)
+                          translate_grpalette, translate_message,
+                          inject_sprite_elem_base_sizes,
+                          inject_sprite_interpolation, inject_sprite_matrix_draw)
 
 root = Path(__file__).resolve().parent.parent
 manifest = json.loads((root / 'upstream/pinned/UPSTREAM.json').read_text())
@@ -25,6 +27,8 @@ for name, expected in manifest['files'].items():
     if rel == 'HomeSys.ZC':
         entries['System/HomeStartUp.ZC'] = extract_home_startup(data)
         home_startup_tasks = extract_home_startup_tasks(data)
+    if rel == 'Apps/Budget/BgtStrs.ZC':
+        data = translate_budget_strings(data)
     if rel == 'Kernel/BlkDev/DiskDirB.ZC':
         entries['System/SourceHome.ZC'] = extract_home_set(data)
     if rel == 'Kernel/SerialDev/Message.ZC':
@@ -126,9 +130,30 @@ for path in sorted((root / 'upstream/bootstrap').rglob('*')):
     if path.is_file():
         rel = path.relative_to(root / 'upstream/bootstrap').as_posix()
         data = path.read_bytes()
+        if rel == 'System/Gr/SpriteBridge.ZC':
+            try:
+                data = inject_sprite_elem_base_sizes(
+                    data, (root/'upstream/pinned/System/Gr/SpriteNew.ZC').read_bytes())
+                data = inject_sprite_interpolation(
+                    data,
+                    (root/'upstream/pinned/System/Gr/SpriteNew.ZC').read_bytes(),
+                    (root/'upstream/pinned/System/Gr/GrSpritePlot.ZC').read_bytes())
+                data = inject_sprite_matrix_draw(data)
+            except ValueError as exc:
+                raise SystemExit(f'ARM64 sprite helper overlay no longer applies: {exc}') from exc
         if rel == 'System/DolDoc/DocFile.ZC':
             data = translate_docfile(data)
         entries[rel] = data
+entries['System/StringUtilities.ZC'] = extract_string_utilities(
+    entries['Kernel/StrA.ZC'], entries['Kernel/StrB.ZC'])
+entries['System/DateBridge.ZC'] = extract_source_dates(
+    entries['Kernel/KDate.ZC'], entries['Kernel/StrScan.ZC'], entries['Kernel/StrPrint.ZC'])
+entries['System/KeyboardBridge.ZC'] = extract_keyboard_helpers(
+    entries['Kernel/SerialDev/Keyboard.ZC'], entries['Kernel/StrPrint.ZC'])
+# Factory account data is the same file installed by Budget/Install.ZC. The
+# source volume infers directories from their files; seed its default home
+# before the unchanged installer checks for it.
+entries['Home/Budget/Accts.DD'] = entries['Apps/Budget/Accts.DD']
 if home_startup_tasks is not None:
     gui_terminal_path = 'System/GuiTerminal.ZC'
     gui_terminal = entries.get(gui_terminal_path)

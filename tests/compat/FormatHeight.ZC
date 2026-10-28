@@ -1,0 +1,13 @@
+I64 FormatHeightChecks()
+{
+    U8 *literal = MStrPrint("<%h7c>", 'x');
+    U8 *dynamic = MStrPrint("<%h*c>", 3, 'y');
+    I64 passed = !StrCompare(literal, "<xxxxxxx>") &&
+                 !StrCompare(dynamic, "<yyy>");
+
+    Free(literal);
+    Free(dynamic);
+    if (passed)
+        return 0x2a;
+    return 0;
+}

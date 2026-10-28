@@ -1,0 +1,128 @@
+{
+  "date": "2026-10-27",
+  "recorded_at": "2026-10-27T00:07:12.662088-07:00",
+  "upstream_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "prior_pushed_commit": "e0f7552f39e6b4227d051fed848769eb17890424",
+  "prior_commit_scope": "Accepted Digital Logic and document/prompt compatibility work pushed to origin/master; this Budget candidate is subsequent local work",
+  "live_utm_budget": "failed: user reports frozen pointer/keyboard in empty Budget ledger with File menu open; menu hover failure reproduced in headless QEMU",
+  "features": [
+    "Original Budget entry/data workflow, seeded upstream accounts document and Apps menu launch",
+    "UTC boot wall clock, original date/scanning/formatting helpers with guarded ARM64 adaptations",
+    "Retained compiler class metadata and explicit DocForm field ABI; actual-argument lastclass inference",
+    "Repeated forward declarations follow later same-task definitions while native adapter ABI bindings remain fixed",
+    "Implicit function calls after address arguments, full-width hexadecimal document values and catchable compiler abort recovery"
+  ],
+  "checks": [
+    {
+      "description": "NEC USB: calendar/UTC clock/scanner, class forms and metadata, repeated loading, Budget create/edit/cancel, save/abort, clean exit, reopen and cold disk-only persistence",
+      "log": "build/check-budget-final-nec.log",
+      "pass_markers": 115,
+      "exit_code": 0
+    },
+    {
+      "description": "VirtIO: expanded Digital Logic prompt editing, malformed input recovery, all setup aborts, AND/OR rendering, relaunch and clean exit",
+      "log": "build/check-logic-budget-regression.log",
+      "pass_markers": 104,
+      "exit_code": 0
+    },
+    {
+      "description": "NEC USB: Doodle, Mass Spring and Life interaction regression",
+      "log": "build/check-budget-interactive-regression.log",
+      "pass_markers": 60,
+      "exit_code": 0
+    },
+    {
+      "description": "Exact Budget ISO: USB-CD installation, full read-back, byte-identical disk and two cold disk-only persistence boots",
+      "log": "build/check-budget-iso-installer.log",
+      "pass_markers": 14,
+      "exit_code": 0
+    },
+    {
+      "description": "Compile-only application inventory, including TimeClock compiling with calendar services; no runtime acceptance",
+      "log": "build/check-budget-program-catalog.log",
+      "pass_markers": 27,
+      "exit_code": 0
+    },
+    {
+      "description": "NEC USB: full desktop/editor workflow, compiler/task recovery, edit/save/compile/run/reboot/reopen, live Lattice/Stock Play, menu/window controls",
+      "log": "build/check-budget-desktop-regression.log",
+      "pass_markers": 421,
+      "exit_code": 0
+    }
+  ],
+  "source_checks": {
+    "upstream_integrity": "passed",
+    "guarded_arm64_overlays": "passed",
+    "doc_resource_bytes": "passed: all 54 encoded Apps/Demo documents",
+    "python_syntax": "passed",
+    "whitespace": "passed"
+  },
+  "artifacts": {
+    "build/kernel.elf": {
+      "sha256": "0d150179ead170f4387e4aa06027f6eb522f9fe9669dea83eacaab6853836e0c",
+      "bytes": 18826072
+    },
+    "build/zealbooter.elf": {
+      "sha256": "bc40a8a4e1a1f3bfe4a03a0d602e31aa20615cc35d6fc03b6feef95bcabb8d4f",
+      "bytes": 30944
+    },
+    "build/sources.tar": {
+      "sha256": "d71865677c623bc33e0097504ed3cb4fa8c952fbde957555db754433d3ee5cc7",
+      "bytes": 5294080
+    },
+    "build/disk.img": {
+      "sha256": "01027bd014dbff21b250c3fb7325f35c03109bdbb77b006fa483e40be058d671",
+      "bytes": 134217728
+    },
+    "build/zealos-aarch64-budget.iso": {
+      "sha256": "00b5cd349b6da41edeba525066268df4795bb0c8df6f3818f40d04a22b2d9649",
+      "bytes": 37679104
+    },
+    "build/zealos-aarch64-hello.iso": {
+      "sha256": "9c5e90c964cbd1f0badd36d20b712e27e65947b129a2ab43ec4f79473180976c",
+      "bytes": 37439488
+    },
+    "build/zealos-aarch64-logic-prompt-fix.iso": {
+      "sha256": "9c5e90c964cbd1f0badd36d20b712e27e65947b129a2ab43ec4f79473180976c",
+      "bytes": 37439488
+    }
+  },
+  "source_files": 575,
+  "unchanged_pinned_apps_demo_files": 294,
+  "generated_application_overlays": {
+    "Apps/Budget/BgtStrs.ZC": "One guarded comma separator comparison correction; pinned mirror unchanged"
+  },
+  "evidence": {
+    "docs/images/qemu-budget-form.png": {
+      "sha256": "6ab9ebd50a66fb68a31e62947c0976902681c472ae3ca5a54895d6c3b67f0e83",
+      "scope": "automated QEMU framebuffer; not a live UTM screenshot"
+    },
+    "docs/images/qemu-budget-entry.png": {
+      "sha256": "07ead413795bd412408663d5cc7fdf7ebda31b6114232e541c2bf39ae2328fca",
+      "scope": "automated QEMU framebuffer; not a live UTM screenshot"
+    }
+  },
+  "limitations": [
+    "Live UTM test failed on menu hover; transaction-only automation did not cover this path",
+    "Periodic/template, account-file editing and account-filter workflows unaccepted",
+    "Saving requires an installed writable VirtIO source volume",
+    "Clock defaults to UTC; missing boot wall clock raises a catchable error",
+    "TimeClock compiles only; no runtime or save/reopen acceptance",
+    "Remaining Apps/Demo collection is bundled but not fully ported"
+  ],
+  "standard_iso_promoted_atomically": false,
+  "standard_iso_scope": "Retained prior live-accepted Logic ISO; Budget candidate uses its separate path",
+  "pi_media": "not rebuilt or staged",
+  "running_utm": "not changed",
+  "live_utm_failure": {
+    "date": "2026-10-27",
+    "screenshot_local_time": "00:08:07 America/Los_Angeles",
+    "user_report": "it froze up?",
+    "followup_report": "well it's frozen but maybe i'll try later with new iso",
+    "screenshot": "docs/images/utm-budget-menu-freeze-live.png",
+    "screenshot_sha256": "7a572b16745fcecd24f1d84c070d841a0a48827569d2b6931969cb4059abee31",
+    "evidence_scope": "Still image shows empty ledger with File/Abort/Exit; loss of input is user-reported. Independent QEMU reproduction hovers File/Abort and records unresolved external call from DrawMenu+0x324 and failed=1.",
+    "reproduction_log": "build/check-budget-menu-repro.log",
+    "reproduction_exit_code": 1
+  }
+}

@@ -16,6 +16,8 @@
 #define PAUSE ;
 extern U0 RFlagsPush();
 extern U0 RFlagsPop();
+extern U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite);
+extern Bool GrPlot3B(CDC *dc, I64 x, I64 y, I64 z);
 // Verbatim Option / OptionGet bodies from pinned Compiler/CMisc.ZC.
 Bool Option(I64 num, Bool val)
 {//Set compiler $LK,"Option",A="FI:::/Doc/Options.DD"$ to value.
@@ -160,6 +162,15 @@ extern I64 ZcTabletSample();
 extern U0 GrScaleZoom(F64 scale);
 extern Bool ZcWinMouseUpdate();
 extern I64 ZcMonotonicNs();
+extern I64 ZcUnixTimeNs();
+// Compiler reflection crosses an explicit ABI; Aiwnios CHashClass and
+// CMemberLst are not the original ZealOS compiler's structures.
+class CArmDocFormField
+{
+    U8 *format;
+    I64 data, offset, elements, raw_type, pointer, is_array, is_internal;
+};
+extern Bool ZcDocFormField(U8 *class_name, I64 index, CArmDocFormField *field);
 extern Bool ZcMouseStateUpdate(I64 x, I64 y, I64 text_x, I64 text_y,
                                I64 now_ns);
 extern Bool ZcMouseButtonsUpdate(Bool left, Bool right);
@@ -810,6 +821,29 @@ U0 CompCtrlDel(CCompCtrl *cc)
     Free(cc->cur_str);
     Free(cc);
 }
+extern I64 Str2I64(U8 *st, I64 radix=10, U8 **_end_ptr=NULL);
+extern U8 *ZcLexDefineText(U8 *name);
+I64 BootstrapLexQuotedByte(U8 **_ptr)
+{
+    U8 *ptr = *_ptr;
+    I64 ch = *ptr++;
+
+    if (ch == '\\')
+    {
+        ch = *ptr++;
+        switch (ch)
+        {
+            case 'n': ch = '\n'; break;
+            case 'r': ch = '\r'; break;
+            case 't': ch = '\t'; break;
+            case 'b': ch = CH_BACKSPACE; break;
+            case '0': ch = 0; break;
+            case 0: throw('Lex');
+        }
+    }
+    *_ptr = ptr;
+    return ch;
+}
 I64 Lex(CCompCtrl *cc)
 {//Tokenize idents, strings, ints, and punctuation for DocInit/DocPlain.
     U8 *ptr, buf[STR_LEN];
@@ -854,14 +888,28 @@ I64 Lex(CCompCtrl *cc)
         cc->cur_str_len = i + 1;
         return cc->token = TK_STR;
     }
+    if (ch == '\'')
+    {
+        ptr++;
+        n = 0;
+        i = 0;
+        while (*ptr && *ptr != '\'')
+        {
+            if (i == 8)
+                throw('Lex');
+            n |= BootstrapLexQuotedByte(&ptr) << (i++ * 8);
+        }
+        if (*ptr != '\'' || !i)
+            throw('Lex');
+        cc->cur_buf_ptr = ptr + 1;
+        cc->cur_i64 = n;
+        return cc->token = TK_I64;
+    }
     if ('0' <= ch <= '9')
     {
-        n = 0;
-        while ('0' <= *ptr <= '9')
-        {
-            n = n * 10 + *ptr - '0';
-            ptr++;
-        }
+        // DolDoc stores live pointers and menu values as 0x-prefixed words.
+        // Keep the complete 64-bit value, using the source radix rules.
+        n = Str2I64(ptr, 10, &ptr);
         cc->cur_buf_ptr = ptr;
         cc->cur_i64 = n;
         return cc->token = TK_I64;
@@ -914,9 +962,9 @@ U8 *LexExtStr(CCompCtrl *cc, I64 *_size=NULL, Bool lex_next=TRUE)
     return st;
 }
 I64 LexExpressionI64(CCompCtrl *cc)
-{//Stub: decimal I64, doldoc color name, or define; full ParseExp later.
+{//Literal I64/character, color or literal-valued define; full ParseExp later.
     I64 res = 0, neg = 1;
-    U8 *name;
+    U8 *name, *value, *end;
     CHashGeneric *tmph;
 
     if (!cc)
@@ -939,8 +987,19 @@ I64 LexExpressionI64(CCompCtrl *cc)
         if (name && doldoc.hash &&
             (tmph = HashFind(name, doldoc.hash, DHT_COLOR)))
             res = tmph->user_data0;
-        else if (name && HashFind(name, Fs->hash_table, HTT_DEFINE_STR))
-            res = 0;
+        else if (name && (value = ZcLexDefineText(name)))
+        {
+            while (*value == CH_SPACE || *value == '\t' || *value == '\r' || *value == '\n')
+                value++;
+            if ('0' <= *value <= '9' || *value == '-' || *value == '+')
+            {
+                res = Str2I64(value, 10, &end);
+                while (*end == CH_SPACE || *end == '\t' || *end == '\r' || *end == '\n')
+                    end++;
+                if (*end)
+                    res = 0; // Expression-valued defines remain unsupported.
+            }
+        }
         Lex(cc);
     }
     return res * neg;
@@ -2195,6 +2254,9 @@ CDC bootstrap_graphics_dc;
 // Upstream gr.dc is retained foreground; gr.dc2 is the compositor target.
 U8 bootstrap_foreground_pixels[800 * 600];
 CDC bootstrap_foreground_dc;
+// Meshes are rasterized into a per-frame overlay, then composed after task
+// windows so later window paints cannot erase them and old frames cannot leak.
+U8 bootstrap_mesh_pixels[800 * 600];
 Bool bootstrap_foreground_ready;
 I32 bootstrap_graphics_depth_pixels[800 * 600];
 I64 bootstrap_graphics_depth_width;
@@ -2374,6 +2436,7 @@ U0 Mat4x4IdentEqu(I64 *matrix)
 }
 extern F64 ZcSinF64(F64 angle);
 extern F64 ZcCosF64(F64 angle);
+extern F64 ZcWrapF64(F64 angle, F64 base);
 I64 BootstrapMat4x4Fixed(F64 value)
 {
     return ToI64(value * 4294967296.0);
@@ -2449,6 +2512,46 @@ U0 Mat4x4RotZ(I64 *matrix, F64 angle)
     rotation[5] = cosine;
     BootstrapMat4x4Mul(result, rotation, matrix);
     MemCopy(matrix, result, sizeof(result));
+}
+public I64 *Mat4x4IdentNew(CTask *mem_task=NULL)
+{
+    I64 *matrix = MAlloc(16 * sizeof(I64), mem_task);
+    if (!matrix)
+        return NULL;
+    Mat4x4IdentEqu(matrix);
+    return matrix;
+}
+public U0 Mat4x4MulXYZ(I64 *matrix, I64 *_x, I64 *_y, I64 *_z)
+{
+    I64 x, y, z, old_x, old_y, old_z;
+    if (!matrix || !_x || !_y || !_z)
+        return;
+    old_x = *_x;
+    old_y = *_y;
+    old_z = *_z;
+    x = (matrix[0] * old_x + matrix[1] * old_y +
+            matrix[2] * old_z + matrix[3]) >> 32;
+    y = (matrix[4] * old_x + matrix[5] * old_y +
+            matrix[6] * old_z + matrix[7]) >> 32;
+    z = (matrix[8] * old_x + matrix[9] * old_y +
+            matrix[10] * old_z + matrix[11]) >> 32;
+    *_x = x;
+    *_y = y;
+    *_z = z;
+}
+public I64 *Mat4x4Scale(I64 *matrix, F64 scale)
+{
+    I64 i;
+    if (!matrix || scale != scale || scale < -64.0 || scale > 64.0)
+        return matrix;
+    for (i = 0; i < 16; i++)
+        matrix[i] = BootstrapMat4x4Fixed(
+                BootstrapMat4x4Float(matrix[i]) * scale);
+    return matrix;
+}
+public F64 Wrap(F64 angle, F64 base=-3.14159265358979323846)
+{
+    return ZcWrapF64(angle, base);
 }
 I64 BootstrapMat4x4Checks()
 {
@@ -3243,6 +3346,10 @@ Bool BootstrapWinPixelVisible(CTask *task, I64 x, I64 y)
         return TRUE;
     return bootstrap_win_pixel_z_buf[y * 800 + x] <= task->win_z_num;
 }
+U0 BootstrapMeshLayerClear()
+{//Mesh pixels are a transient screen-composition layer, never retained state.
+    MemSet(bootstrap_mesh_pixels, TRANSPARENT, sizeof(bootstrap_mesh_pixels));
+}
 Bool TextChar(CTask *task, Bool allow_border=FALSE, I64 x=0, I64 y=0, I64 d=0)
 {//Single-cell framebuffer path; border mode permits the adjacent outer row/column.
     I64 cell_x, cell_y;
@@ -3587,7 +3694,20 @@ Bool BootstrapGraphPixel(CDC *dc, I64 x, I64 y)
 {
     return BootstrapGraphPixelAt(dc, x, y, FALSE);
 }
-Bool BootstrapSpriteMeshPixel(CDC *dc, I64 x, I64 y)
+I64 sprite_debug_mesh_target_dc_is_bootstrap = 0;
+I64 sprite_debug_mesh_target_body_is_graphics = 0;
+I64 sprite_debug_mesh_target_body_is_foreground = 0;
+I64 sprite_debug_mesh_target_last_x = 0;
+I64 sprite_debug_mesh_target_last_y = 0;
+I64 sprite_debug_mesh_target_last_pixel = 0;
+I64 sprite_debug_mesh_target_last_index = 0;
+I64 sprite_debug_mesh_target_left = 0;
+I64 sprite_debug_mesh_target_right = 0;
+I64 sprite_debug_mesh_target_top = 0;
+I64 sprite_debug_mesh_target_bottom = 0;
+I64 sprite_debug_mesh_target_scroll_x = 0;
+I64 sprite_debug_mesh_target_scroll_y = 0;
+Bool BootstrapSpriteMeshPixel(CDC *dc, I64 x, I64 y, I64 color)
 {//Keep source mesh pixels in the staged screen CDC for the final presenter.
     CTask *task;
     I64 index;
@@ -3601,7 +3721,22 @@ Bool BootstrapSpriteMeshPixel(CDC *dc, I64 x, I64 y)
             !BootstrapWinPixelVisible(task, x, y))
         return FALSE;
     index = y * dc->width_internal + x;
-    dc->body[index] = dc->color.c0.color & 0xff;
+    bootstrap_mesh_pixels[index] = color & 0xff;
+    sprite_debug_mesh_target_dc_is_bootstrap = dc == &bootstrap_graphics_dc;
+    sprite_debug_mesh_target_body_is_graphics =
+            dc->body == bootstrap_graphics_pixels;
+    sprite_debug_mesh_target_body_is_foreground =
+            dc->body == bootstrap_foreground_pixels;
+    sprite_debug_mesh_target_last_x = x;
+    sprite_debug_mesh_target_last_y = y;
+    sprite_debug_mesh_target_last_pixel = dc->body[index];
+    sprite_debug_mesh_target_last_index = index;
+    sprite_debug_mesh_target_left = task->pix_left;
+    sprite_debug_mesh_target_right = task->pix_right;
+    sprite_debug_mesh_target_top = task->pix_top;
+    sprite_debug_mesh_target_bottom = task->pix_bottom;
+    sprite_debug_mesh_target_scroll_x = task->scroll_x;
+    sprite_debug_mesh_target_scroll_y = task->scroll_y;
     return TRUE;
 }
 Bool GrPlot(CDC *dc=gr.dc, I64 x=0, I64 y=0)
@@ -3700,6 +3835,54 @@ Bool GrRect(CDC *dc=gr.dc, I64 x=0, I64 y=0, I64 width=0, I64 height=0)
                     !(dc->flags & DCF_ON_TOP)))
                 plotted = TRUE;
     return plotted;
+}
+public Bool GrRect3(CDC *dc=gr.dc, I64 x, I64 y, I64 z,
+        I64 width, I64 height)
+{//Bounded 3D filled rectangle used by the original sprite/game apps.
+    U8 rect[21];
+    I32 type, x1, y1, x2, y2;
+    I64 row, col, area, old_db_z;
+    Bool transform_enabled, symmetry_enabled;
+
+    if (!dc || dc->dc_signature != DCS_SIGNATURE_VAL ||
+            width <= 0 || width > 16384 || height <= 0 || height > 16384 ||
+            x < -1073741824 || x > 1073741824 ||
+            y < -1073741824 || y > 1073741824 ||
+            z < I32_MIN || z > I32_MAX ||
+            width > 16777216 / height)
+        return FALSE;
+    area = width * height;
+    transform_enabled = (dc->flags & DCF_TRANSFORMATION) != 0;
+    symmetry_enabled = (dc->flags & DCF_SYMMETRY) != 0;
+    if (transform_enabled || symmetry_enabled)
+    {
+        if (area > 480000)
+            return FALSE;
+        MemSet(rect, 0, sizeof(rect));
+        type = SPT_RECT;
+        x1 = y1 = 0;
+        x2 = width;
+        y2 = height;
+        MemCopy(rect, &type, sizeof(I32));
+        MemCopy(rect + 4, &x1, sizeof(I32));
+        MemCopy(rect + 8, &y1, sizeof(I32));
+        MemCopy(rect + 12, &x2, sizeof(I32));
+        MemCopy(rect + 16, &y2, sizeof(I32));
+        Sprite3(dc, x, y, z, rect);
+        return TRUE;
+    }
+    if (!dc->depth_buf)
+        return GrRect(dc, x, y, width, height);
+
+    // The sprite interpreter deliberately caps a stream at 480,000 pixels.
+    // A single bounded rectangle can be larger, so preserve depth semantics
+    // with the existing 3D plot callback for this axis-aligned case.
+    old_db_z = dc->db_z;
+    for (row = 0; row < height; row++)
+        for (col = 0; col < width; col++)
+            GrPlot3B(dc, x + col, y + row, z);
+    dc->db_z = old_db_z;
+    return TRUE;
 }
 U0 GrPrint(CDC *dc=gr.dc, I64 x=0, I64 y=0, U8 *format, ...)
 {
@@ -3847,6 +4030,16 @@ Bool BootstrapGraphCdcBrushLine(CDC *dc, I64 x0, I64 y0, I64 x1, I64 y1,
             plotted = TRUE;
     }
     return plotted;
+}
+public U0 GrBorder(CDC *dc=gr.dc, I64 x1, I64 y1, I64 x2, I64 y2)
+{
+    if (!dc || x1 < -16384 || x2 > 16384 || y1 < -16384 || y2 > 16384 ||
+            x1 > x2 || y1 > y2)
+        return;
+    GrLine(dc, x1, y1, x2, y1);
+    GrLine(dc, x2, y1, x2, y2);
+    GrLine(dc, x2, y2, x1, y2);
+    GrLine(dc, x1, y2, x1, y1);
 }
 Bool GrLine(CDC *dc=gr.dc, I64 x1=0, I64 y1=0, I64 x2=0, I64 y2=0,
             I64 step=1, I64 start=0)
@@ -5774,6 +5967,7 @@ U0 BootstrapGrUpdateTasks()
     if (!root || !TaskValidate(root))
         return;
 
+    BootstrapMeshLayerClear();
     BootstrapCtrlInputPoll();
     BootstrapWinMgrTimingInit();
 
@@ -5902,6 +6096,7 @@ public U0 BootstrapWinMgrTick()
     bootstrap_winmgr_ticks++;
     Blink = (ZcMonotonicNs() / 500000000) & 1;
     bootstrap_gr_fullscreen_active = FALSE;
+    BootstrapMeshLayerClear();
     if (BootstrapTryUpstreamGrUpdateScreen())
         return;
     BootstrapGrUpdateTasks();

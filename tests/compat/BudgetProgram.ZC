@@ -1,0 +1,42 @@
+#include "/Apps/Budget/Load.ZC"
+
+I64 BudgetDataChecks()
+{
+    U8 *old_dir = DirCur;
+    CBgtEntry *entry;
+    I64 size;
+    U8 *accounts = FileRead("/Apps/Budget/Accts.DD", &size);
+    CDate date = Str2Date("02/29/2024");
+    if (!accounts) return 1;
+    FileWrite("/Home/BudgetDataCheck/Accts.DD", accounts, size);
+    Free(accounts);
+    if (!Cd("/Home/BudgetDataCheck")) return 1;
+    bgt_string_file = FileNameAbs("Strs.DD");
+    bgt_accts_file = FileNameAbs("Accts.DD");
+    bgt_data_file = FileNameAbs("Bgt.DATA");
+    BgtAcctsRead;
+    BgtDataRead;
+    if (!HashFind("BANK", accts_table, SFT_GENERIC) || QueueCount(&b_head)) return 2;
+    entry = CAlloc(sizeof(CBgtEntry));
+    entry->date = date;
+    entry->amount = 12.5;
+    entry->credit = StrNew("BANK");
+    entry->debit = StrNew("FOOD");
+    entry->desc = StrNew("ARM64 Budget test");
+    BgtIns(entry);
+    BgtDataWrite;
+    BgtAcctsWrite;
+    BgtDel;
+    BgtAcctsRead;
+    BgtDataRead;
+    entry = b_head.next;
+    if (QueueCount(&b_head) != 1 || entry->date != date || entry->amount != 12.5 ||
+        StrCompare(entry->credit, "BANK") || StrCompare(entry->debit, "FOOD") ||
+        StrCompare(entry->desc, "ARM64 Budget test")) return 3;
+    BgtDel;
+    Free(bgt_string_file); Free(bgt_accts_file); Free(bgt_data_file);
+    Cd(old_dir); Free(old_dir);
+    return 42;
+}
+
+BudgetDataChecks;

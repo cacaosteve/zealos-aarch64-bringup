@@ -1,0 +1,174 @@
+// Isolated regression for the original sprite stream interpolation API.
+// Keep independent of the matrix renderer so this runs as soon as the API lands.
+
+U0 Sprite3DInterpolationSetLine(U8 *sprite, I32 x1, I32 y1, I32 x2, I32 y2)
+{
+    CSprite *record = sprite - offset(CSprite.start);
+    record->type = SPT_LINE;
+    record->pp.x1 = x1;
+    record->pp.y1 = y1;
+    record->pp.x2 = x2;
+    record->pp.y2 = y2;
+}
+
+I64 Sprite3DInterpolationChecks()
+{
+    U8 line0[21], line1[21], point[13];
+    U8 bitmap0[26], bitmap1[26], mesh0[65], mesh1[65];
+    U8 *result, *truncated;
+    CSprite *record;
+    I32 x, y, width, height, vertices, triangles;
+    I64 i, caught, result_code = 0x2a;
+    I64 bitmap_data_offset = 17;
+    I64 mesh_data_offset = sizeof(CSpriteMeshU8s);
+    I64 mesh_triangle_offset;
+
+    MemSet(line0, 0, sizeof(line0));
+    MemSet(line1, 0, sizeof(line1));
+    Sprite3DInterpolationSetLine(line0, 0, 0, 10, 0);
+    Sprite3DInterpolationSetLine(line1, 20, 10, 30, 10);
+    line0[20] = SPT_END;
+    line1[20] = SPT_END;
+    if (SpriteSize(line0) != sizeof(line0) ||
+            SpriteSize(line1) != sizeof(line1))
+        return 18;
+    result = SpriteInterpolate(0.0, line0, line1);
+    if (!result || result[0] != SPT_LINE)
+        return 2;
+    record = result - offset(CSprite.start);
+    if (record->pp.x1 != 0 || record->pp.y1 != 0 ||
+            record->pp.x2 != 10 || record->pp.y2 != 0)
+        result_code = 3;
+    Free(result);
+    if (SpriteSize(line0) != sizeof(line0) || SpriteSize(line1) != sizeof(line1))
+        result_code = 16;
+    result = SpriteInterpolate(0.5, line0, line1);
+    if (!result || result[0] != SPT_LINE)
+        return 4;
+    record = result - offset(CSprite.start);
+    if (record->pp.x1 != 10 || record->pp.y1 != 5 ||
+            record->pp.x2 != 20 || record->pp.y2 != 5)
+        result_code = 5;
+    Free(result);
+    result = SpriteInterpolate(1.0, line0, line1);
+    if (!result || result[0] != SPT_LINE)
+        return 6;
+    record = result - offset(CSprite.start);
+    if (record->pp.x1 != 20 || record->pp.y1 != 10 ||
+            record->pp.x2 != 30 || record->pp.y2 != 10)
+        result_code = 7;
+    Free(result);
+
+    // Bitmap placement moves; the packed pixel payload comes from the chosen
+    // source frame without interpolation or corruption.
+    MemSet(bitmap0, 0, sizeof(bitmap0));
+    MemSet(bitmap1, 0, sizeof(bitmap1));
+    bitmap0[0] = bitmap1[0] = SPT_BITMAP;
+    x = 2; y = 4; width = 1; height = 1;
+    MemCopy(bitmap0 + 1, &x, sizeof(I32));
+    MemCopy(bitmap0 + 5, &y, sizeof(I32));
+    MemCopy(bitmap1 + 1, &x, sizeof(I32));
+    MemCopy(bitmap1 + 5, &y, sizeof(I32));
+    MemCopy(bitmap0 + 9, &width, sizeof(I32));
+    MemCopy(bitmap0 + 13, &height, sizeof(I32));
+    MemCopy(bitmap1 + 9, &width, sizeof(I32));
+    MemCopy(bitmap1 + 13, &height, sizeof(I32));
+    for (i = 0; i < 8; i++)
+    {
+        bitmap0[17 + i] = i + 1;
+        bitmap1[17 + i] = 0x80 + i;
+    }
+    bitmap0[25] = bitmap1[25] = SPT_END;
+    result = SpriteInterpolate(0.25, bitmap0, bitmap1);
+    if (!result)
+        return 8;
+    if (result[0] != SPT_BITMAP ||
+            MemCompare(result + bitmap_data_offset, bitmap0 + bitmap_data_offset, 8))
+        result_code = 9;
+    Free(result);
+    result = SpriteInterpolate(0.75, bitmap0, bitmap1);
+    if (!result)
+        return 10;
+    if (MemCompare(result + bitmap_data_offset, bitmap1 + bitmap_data_offset, 8))
+        result_code = 11;
+    Free(result);
+
+    // Mesh vertices interpolate while triangle/index bytes are copied from
+    // the selected source frame unchanged.
+    MemSet(mesh0, 0, sizeof(mesh0));
+    MemSet(mesh1, 0, sizeof(mesh1));
+    mesh0[0] = mesh1[0] = SPT_MESH;
+    vertices = 3; triangles = 1;
+    MemCopy(mesh0 + 1, &vertices, sizeof(I32));
+    MemCopy(mesh0 + 5, &triangles, sizeof(I32));
+    MemCopy(mesh1 + 1, &vertices, sizeof(I32));
+    MemCopy(mesh1 + 5, &triangles, sizeof(I32));
+    for (i = 0; i < 36; i += sizeof(I32))
+    {
+        x = i / sizeof(I32) * 10;
+        MemCopy(mesh0 + mesh_data_offset + i, &x, sizeof(I32));
+        x += 100;
+        MemCopy(mesh1 + mesh_data_offset + i, &x, sizeof(I32));
+    }
+    mesh_triangle_offset = mesh_data_offset + 3 * sizeof(CD3I32);
+    for (i = 0; i < 16; i++)
+    {
+        mesh0[mesh_triangle_offset + i] = 0x20 + i;
+        mesh1[mesh_triangle_offset + i] = 0x40 + i;
+    }
+    mesh0[64] = mesh1[64] = SPT_END;
+    result = SpriteInterpolate(0.5, mesh0, mesh1);
+    if (!result)
+        return 12;
+    MemCopy(&x, result + mesh_data_offset, sizeof(I32));
+    if (x != 50 || MemCompare(result + mesh_triangle_offset,
+            mesh1 + mesh_triangle_offset, 16))
+        result_code = 13;
+    Free(result);
+
+    // A pointer-only stream with a managed allocation is checked against its
+    // true extent before a variable bitmap can walk beyond the buffer.
+    truncated = MAlloc(18);
+    MemSet(truncated, 0, MSize(truncated));
+    truncated[0] = SPT_BITMAP;
+    width = 8; height = 2;
+    MemCopy(truncated + 9, &width, sizeof(I32));
+    MemCopy(truncated + 13, &height, sizeof(I32));
+    caught = FALSE;
+    try
+        i = SpriteSize(truncated);
+    catch
+    {
+        caught = Fs->except_ch == 'Graphics';
+        Fs->catch_except = TRUE;
+    }
+    Free(truncated);
+    if (!caught)
+        result_code = 17;
+
+    // A type mismatch and a parameter outside the documented interval must
+    // raise catchable Graphics exceptions without corrupting the terminal.
+    MemSet(point, 0, sizeof(point));
+    point[0] = SPT_PT;
+    caught = FALSE;
+    try
+        result = SpriteInterpolate(0.5, line0, point);
+    catch
+    {
+        caught = Fs->except_ch == 'Graphics';
+        Fs->catch_except = TRUE;
+    }
+    if (!caught)
+        result_code = 14;
+    caught = FALSE;
+    try
+        result = SpriteInterpolate(1.25, line0, line1);
+    catch
+    {
+        caught = Fs->except_ch == 'Graphics';
+        Fs->catch_except = TRUE;
+    }
+    if (!caught)
+        result_code = 15;
+    return result_code;
+}

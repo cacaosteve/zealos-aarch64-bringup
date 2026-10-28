@@ -36,11 +36,16 @@ U8 *DC2Sprite(CDC *dc)
     return sprite;
 }
 
+I64 sprite_debug_type_mask_failures = 0;
+I64 sprite_debug_type_mask_last_type = 0;
+I64 sprite_debug_type_mask_last_size = 0;
+
 I64 SpriteElemSize(U8 *p, I64 type)
 {
     I64 size;
-    I32 a, b;
+    I32 a, b, packed_a, packed_b, aligned_a, aligned_b;
     U8 ch;
+    Bool aligned_header;
 
     // These sizes follow SpriteElemSize in upstream System/Gr/SpriteNew.ZC.
     // Read packed fields with MemCopy: several records are not naturally
@@ -92,17 +97,45 @@ I64 SpriteElemSize(U8 *p, I64 type)
         return 17 + ((a + 7) & ~7) * b;
     }
     if (type == SPT_MESH || type == SPT_SHIFTABLE_MESH) {
+        aligned_header = p[1] == 0 && p[2] == 0 && p[3] == 0;
         if (type == SPT_MESH) {
-            MemCopy(&a, p + 4, sizeof(I32));
-            MemCopy(&b, p + 8, sizeof(I32));
-            size = 12;
+            // ZealOS writes the count fields immediately after the type byte.
+            // Prefer that exact packed format. Retain the earlier ARM64
+            // aligned record format when its packed candidate is invalid.
+            MemCopy(&packed_a, p + 1, sizeof(I32));
+            MemCopy(&packed_b, p + 5, sizeof(I32));
+            MemCopy(&aligned_a, p + 4, sizeof(I32));
+            MemCopy(&aligned_b, p + 8, sizeof(I32));
+            if (packed_a >= 0 && packed_a <= 1048576 &&
+                    packed_b >= 0 && packed_b <= 1048576) {
+                a = packed_a;
+                b = packed_b;
+                size = sizeof(CSpriteMeshU8s);
+            } else if (aligned_header && aligned_a >= 0 && aligned_a <= 1048576 &&
+                    aligned_b >= 0 && aligned_b <= 1048576) {
+                a = aligned_a;
+                b = aligned_b;
+                size = 12;
+            } else
+                return -1;
         } else {
-            MemCopy(&a, p + 16, sizeof(I32));
-            MemCopy(&b, p + 20, sizeof(I32));
-            size = 24;
+            MemCopy(&packed_a, p + 13, sizeof(I32));
+            MemCopy(&packed_b, p + 17, sizeof(I32));
+            MemCopy(&aligned_a, p + 16, sizeof(I32));
+            MemCopy(&aligned_b, p + 20, sizeof(I32));
+            if (packed_a >= 0 && packed_a <= 1048576 &&
+                    packed_b >= 0 && packed_b <= 1048576) {
+                a = packed_a;
+                b = packed_b;
+                size = sizeof(CSpritePtMeshU8s);
+            } else if (aligned_header && aligned_a >= 0 && aligned_a <= 1048576 &&
+                    aligned_b >= 0 && aligned_b <= 1048576) {
+                a = aligned_a;
+                b = aligned_b;
+                size = 24;
+            } else
+                return -1;
         }
-        if (a < 0 || a > 1048576 || b < 0 || b > 1048576)
-            return -1;
         return size + a * 12 + b * 16;
     }
     if (type == SPT_TEXT || type == SPT_TEXT_BOX ||
@@ -134,12 +167,111 @@ I64 SpriteTypeMask(U8 *elems)
         if (!type)
             return result;
         if (type >= SPT_TYPES_NUM)
+        {
+            sprite_debug_type_mask_failures++;
+            sprite_debug_type_mask_last_type = type;
+            sprite_debug_type_mask_last_size = -1;
             return 1 << SPT_TYPES_NUM;
+        }
         size = SpriteElemSize(p, type);
         if (size < 1 || size > 16777216)
+        {
+            sprite_debug_type_mask_failures++;
+            sprite_debug_type_mask_last_type = type;
+            sprite_debug_type_mask_last_size = size;
             return 1 << SPT_TYPES_NUM;
+        }
         result |= 1 << type;
         p += size;
     }
     return 1 << SPT_TYPES_NUM;
+}
+
+public CDocEntry *DocSprite(CDoc *doc=NULL, U8 *elems, U8 *format=NULL)
+{//Attach a bounded sprite binary to a DolDoc entry for the original Apps.
+    I64 size;
+    U8 *markup;
+    Bool unlock;
+    CDocBin *bin;
+    CDocEntry *entry;
+
+    if (!elems)
+        return NULL;
+    if (!doc)
+        doc = DocPut;
+    if (!doc)
+        return NULL;
+    size = SpriteSize(elems);
+    if (size < 1 || size > 480000)
+        return NULL;
+    unlock = DocLock(doc);
+    bin = CAlloc(sizeof(CDocBin), doc->mem_task);
+    if (!bin)
+    {
+        if (unlock)
+            DocUnlock(doc);
+        return NULL;
+    }
+    bin->data = MAlloc(size, doc->mem_task);
+    if (!bin->data)
+    {
+        Free(bin);
+        if (unlock)
+            DocUnlock(doc);
+        return NULL;
+    }
+    bin->size = size;
+    MemCopy(bin->data, elems, size);
+    bin->num = doc->cur_bin_num;
+    bin->use_count = 1;
+    QueueInsert(bin, doc->bin_head.last);
+    if (format)
+        markup = MStrPrint(format, doc->cur_bin_num++);
+    else
+        markup = MStrPrint("$$SP,\"\",BI=%d$$", doc->cur_bin_num++);
+    entry = DocPutS(doc, markup);
+    Free(markup);
+    if (!entry)
+    {
+        QueueRemove(bin);
+        Free(bin->data);
+        Free(bin);
+        if (unlock)
+            DocUnlock(doc);
+        return NULL;
+    }
+    entry->bin_data = bin;
+    if (entry->de_flags & DOCEF_TAG && entry->tag && *entry->tag)
+        bin->tag = StrNew(entry->tag, doc->mem_task);
+    if (unlock)
+        DocUnlock(doc);
+    return entry;
+}
+
+I64 sprite_debug_doc_sprite_calls = 0;
+I64 sprite_debug_doc_sprite_doc_is_put = 0;
+I64 sprite_debug_doc_sprite_doc_is_display = 0;
+I64 sprite_debug_doc_sprite_doc_window_is_current = 0;
+I64 sprite_debug_doc_sprite_doc_flags = 0;
+I64 sprite_debug_doc_sprite_entry_type = -1;
+I64 sprite_debug_doc_sprite_has_bin = 0;
+U8 *sprite_debug_doc_sprite_task_name = NULL;
+
+public CDocEntry *Sprite(U8 *elems, U8 *format=NULL)
+{//Append one sprite to the active graphical terminal document.
+    CDoc *doc = DocPut;
+    CDocEntry *entry;
+
+    sprite_debug_doc_sprite_calls++;
+    sprite_debug_doc_sprite_task_name = Fs ? Fs->task_name : NULL;
+    sprite_debug_doc_sprite_doc_is_put = doc && Fs && doc == Fs->put_doc;
+    sprite_debug_doc_sprite_doc_is_display = doc && Fs && doc == Fs->display_doc;
+    sprite_debug_doc_sprite_doc_window_is_current = doc && Fs && doc->win_task == Fs;
+    sprite_debug_doc_sprite_doc_flags = doc ? doc->flags : 0;
+    if (!doc)
+        return NULL;
+    entry = DocSprite(doc, elems, format);
+    sprite_debug_doc_sprite_entry_type = entry ? entry->type : -1;
+    sprite_debug_doc_sprite_has_bin = entry && entry->bin_data;
+    return entry;
 }

@@ -76,7 +76,7 @@ struct zeal_handoff {
     uint64_t magic0;
     uint64_t magic1;
     uint32_t size; /* sizeof(struct zeal_handoff) */
-    uint32_t revision; /* 7; extensions are appended */
+    uint32_t revision; /* 8; extensions are appended */
     uint32_t bootloader_id; /* ZEAL_BL_* */
     uint32_t flags;
     uint64_t hhdm_offset;
@@ -107,4 +107,8 @@ struct zeal_handoff {
     /* revision >= 7; optional sparse UTM/QEMU install image supplied by ISO boot. */
     uint64_t install_image_virt;
     uint64_t install_image_size;
+    /* revision >= 8; UTC Unix seconds and generic-counter sample at boot.
+     * A negative timestamp means the bootloader supplied no wall clock. */
+    int64_t boot_timestamp;
+    uint64_t boot_counter;
 };

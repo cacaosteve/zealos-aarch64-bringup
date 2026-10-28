@@ -38,6 +38,10 @@ p.add_argument('--probe-doc-includes', action='store_true',
                help='verify nested DolDoc includes, binary payload lifetime and compiler recovery')
 p.add_argument('--probe-logic-program', action='store_true',
                help='exercise original Digital Logic gate sprites, solver and keyboard prompts')
+p.add_argument('--probe-budget-program', action='store_true',
+               help='check real clock/calendar and original Budget storage and forms')
+p.add_argument('--probe-3d-apps', action='store_true',
+               help='check original GrModels, KeepAway and Titanium 3D sprite services and runtime paths')
 p.add_argument('--probe-stock-interactive', action='store_true',
                help='exercise unchanged upstream interactive programs with mouse and key input')
 p.add_argument('--probe-lattice-controls', action='store_true',
@@ -135,7 +139,8 @@ if args.probe_gui_workflow:
 if args.probe_gui_editor_text:
     args.probe_gui_keyboard = True
 if (args.probe_stock_programs or args.probe_stock_interactive or args.probe_program_catalog or
-        args.probe_doc_includes or args.probe_logic_program):
+        args.probe_doc_includes or args.probe_logic_program or args.probe_budget_program or
+        args.probe_3d_apps):
     args.pci = True
     args.probe_gui_keyboard = True
 if args.probe_lattice_controls:
@@ -195,7 +200,9 @@ if args.probe_live_window_control and not (
             '--probe-winmgr --probe-grscreen --probe-live-winmgr')
 if args.probe_dvd_live and args.pci:
     p.error('--probe-dvd-live requires ISO boot, not --pci')
-log_path = ROOT / 'build' / (f'check-usb-{usb_label}{"-logic" if args.probe_logic_program else "-program-catalog" if args.probe_program_catalog else "-stock-interactive" if args.probe_stock_interactive else "-stock-programs" if args.probe_stock_programs else "-lattice-controls" if args.probe_lattice_controls else "-windowdemo-input" if args.probe_gui_windowdemo_input else "-home-once" if args.probe_home_once else "-input-edges" if args.probe_input_edges else "-registry" if args.probe_registry else "-home-path" if args.probe_home_path else "-user-text" if args.probe_user_text else "-user-startup" if args.probe_user_startup else ""}.log' if args.usb_input else
+log_path = ROOT / 'build' / (f'check-usb-{usb_label}{"-budget" if args.probe_budget_program else "-logic" if args.probe_logic_program else "-program-catalog" if args.probe_program_catalog else "-stock-interactive" if args.probe_stock_interactive else "-stock-programs" if args.probe_stock_programs else "-lattice-controls" if args.probe_lattice_controls else "-windowdemo-input" if args.probe_gui_windowdemo_input else "-home-once" if args.probe_home_once else "-input-edges" if args.probe_input_edges else "-registry" if args.probe_registry else "-home-path" if args.probe_home_path else "-user-text" if args.probe_user_text else "-user-startup" if args.probe_user_startup else ""}.log' if args.usb_input else
+                             'check-budget-pci.log' if args.probe_budget_program else
+                             'check-3d-apps-pci.log' if args.probe_3d_apps else
                              'check-logic-pci.log' if args.probe_logic_program else
                              'check-doc-includes-pci.log' if args.probe_doc_includes else
                              'check-program-catalog-pci.log' if args.probe_program_catalog else
@@ -388,7 +395,9 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         # Independent program/workflow gates may run concurrently. Keep
         # their QMP screendumps separate so one VM cannot satisfy another's
         # visible-pixel or OCR assertions.
-        mode = ('doc-includes-' if args.probe_doc_includes else
+        mode = ('budget-' if args.probe_budget_program else
+                '3d-apps-' if args.probe_3d_apps else
+                'doc-includes-' if args.probe_doc_includes else
                 'logic-' if args.probe_logic_program else
                 'interactive-' if args.probe_stock_interactive else
                 'stock-' if args.probe_stock_programs else
@@ -932,8 +941,9 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                                    f'see {graphical_path("terminal-banner-after-reboot")}\n'
                                    + screen[3])
             time.sleep(0.1)
-    def qmp_send_text(text, delay=0.5):
-        dismiss_home_splash_if_visible()
+    def qmp_send_text(text, delay=0.5, dismiss_splash=True):
+        if dismiss_splash:
+            dismiss_home_splash_if_visible()
         qcodes = {
             ' ': ('spc',), '/': ('slash',), '.': ('dot',),
             ';': ('semicolon',), ':': ('shift', 'semicolon'), '\n': ('ret',),
@@ -1232,6 +1242,454 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             command('zcall StockSourceMacroChecks', 'zc => 0x000000000000002a')
             command('zstatus', 'failed=0')
             print('PASS nested DolDoc source/binary includes, EOF lifetime, paths and recovery without leaks', flush=True)
+            raise SystemExit(0)
+        if args.probe_3d_apps:
+            command('zload /Tests/ProgramCatalog.ZC',
+                    'zc: loaded /Tests/ProgramCatalog.ZC')
+            mesh_output = command(
+                'zc Print("3d_mesh_fixture_compile=%d\\n",'
+                'StockCatalogCompile("/Tests/Sprite3DMesh.ZC"));',
+                '3d_mesh_fixture_compile=', timeout=45)
+            mesh_compiled = '3d_mesh_fixture_compile=1' in mesh_output
+            print(('COMPILES ' if mesh_compiled else 'BLOCKED ')+
+                  '/Tests/Sprite3DMesh.ZC', flush=True)
+            if mesh_compiled:
+                command('zload /Tests/Sprite3DMesh.ZC',
+                        'zc: loaded /Tests/Sprite3DMesh.ZC')
+                command('zcall Sprite3DMeshChecks',
+                        'zc => 0x000000000000002a')
+            interpolation_output = command(
+                'zc Print("3d_interpolation_fixture_compile=%d\\n",'
+                'StockCatalogCompile("/Tests/Sprite3DInterpolation.ZC"));',
+                '3d_interpolation_fixture_compile=', timeout=45)
+            interpolation_compiled = '3d_interpolation_fixture_compile=1' in interpolation_output
+            print(('COMPILES ' if interpolation_compiled else 'BLOCKED ')+
+                  '/Tests/Sprite3DInterpolation.ZC', flush=True)
+            if interpolation_compiled:
+                command('zload /Tests/Sprite3DInterpolation.ZC',
+                        'zc: loaded /Tests/Sprite3DInterpolation.ZC')
+                command('zcall Sprite3DInterpolationChecks',
+                        'zc => 0x000000000000002a')
+            app_probes = (
+                ('/Apps/GrModels/Run.ZC', '/Apps/GrModels/Run.ZC'),
+                ('/Apps/KeepAway/Run.ZC', '/Tests/KeepAwayCompile.ZC'),
+                ('/Apps/Titanium/Run.ZC', '/Tests/TitaniumCompile.ZC'),
+            )
+            app_results = []
+            for path, compile_path in app_probes:
+                output = command('zc Print("3d_catalog=%d\\n",'
+                                 f'StockCatalogCompile("{compile_path}"));',
+                                 '3d_catalog=', timeout=45)
+                compiled = '3d_catalog=1' in output
+                app_results.append({'path': path, 'compiled': compiled,
+                                    'compile_path': compile_path,
+                                    'output': output})
+                print(('COMPILES ' if compiled else 'BLOCKED ')+path,
+                      flush=True)
+            service_output = command(
+                'zc Print("3d_services_compile=%d\\n",'
+                'StockCatalogCompile("/Tests/Sprite3DServices.ZC"));',
+                '3d_services_compile=', timeout=45)
+            services_compiled = '3d_services_compile=1' in service_output
+            print(('COMPILES ' if services_compiled else 'BLOCKED ')+
+                  '/Tests/Sprite3DServices.ZC', flush=True)
+            service_runtime_output = ''
+            service_runtime_passed = False
+            if services_compiled:
+                command('zload /Tests/Sprite3DServices.ZC',
+                        'zc: loaded /Tests/Sprite3DServices.ZC')
+                service_runtime_output = command(
+                    'zcall Sprite3DServiceChecks',
+                    'zc =>')
+                service_runtime_passed = (
+                    'zc => 0x000000000000002a' in service_runtime_output)
+            height_output = command(
+                'zc Print("3d_height_fixture_compile=%d\\n",'
+                'StockCatalogCompile("/Tests/FormatHeight.ZC"));',
+                '3d_height_fixture_compile=')
+            if '3d_height_fixture_compile=1' not in height_output:
+                raise RuntimeError('3D app formatter fixture did not compile:\n'+
+                                   height_output)
+            command('zload /Tests/FormatHeight.ZC',
+                    'zc: loaded /Tests/FormatHeight.ZC')
+            command('zcall FormatHeightChecks',
+                    'zc => 0x000000000000002a')
+            report = {
+                'commit': json.loads((ROOT/'upstream/pinned/UPSTREAM.json').read_text())['commit'],
+                'mode': 'isolated CCF_JUST_LOAD compile plus runtime service fixture',
+                'applications': app_results,
+                'mesh_fixture_compiled': mesh_compiled,
+                'mesh_fixture_output': mesh_output,
+                'interpolation_fixture_compiled': interpolation_compiled,
+                'interpolation_fixture_output': interpolation_output,
+                'service_fixture_compiled': services_compiled,
+                'service_output': service_output,
+                'service_runtime_output': service_runtime_output,
+                'service_runtime_passed': service_runtime_passed,
+            }
+            (ROOT/'build/3d-apps-compile.json').write_text(
+                json.dumps(report, indent=2)+'\n')
+            if (not mesh_compiled or not interpolation_compiled or
+                    not services_compiled or not service_runtime_passed or
+                    not all(item['compiled'] for item in app_results)):
+                print('BLOCKED 3D service/app gate: sprite compile or runtime checks failed',
+                      flush=True)
+                raise SystemExit(2)
+            command('zstatus', 'failed=0')
+            focus_graphical_terminal()
+            type_graphical_prompt_line(
+                '3d-grmodels-launch',
+                'ExeFile2("/Apps/GrModels/Run.ZC");')
+            qmp_send_key('ret')
+            time.sleep(1)
+            grmodels = graphical_screen('3d-grmodels-entry')
+            print('GRMODELS ENTRY SCREEN\n'+grmodels[3], flush=True)
+            move_graphical_pointer(53, 52)
+            graphical_mouse_button('left', True)
+            time.sleep(0.2)
+            graphical_mouse_button('left', False)
+            time.sleep(1)
+            man_form = graphical_screen('3d-grmodels-man-form')
+            print('GRMODELS MAN FORM\n'+man_form[3], flush=True)
+            qmp_send_key('esc')
+            require_graphical_text(
+                '3d-grmodels-man-color-shirt', 'Single-Sided means', timeout=12)
+
+            def click_3d_color(name, current_marker, next_marker):
+                # Select the red entry in the first (single-sided, full-range)
+                # column. In the 800x600 UI it is the fifth eight-pixel row
+                # below the section header.
+                deadline = time.monotonic() + 12
+                attempt = 0
+                while True:
+                    screen = graphical_screen(name+'-before')
+                    if next_marker in screen[3]:
+                        return screen
+                    if current_marker not in screen[3]:
+                        raise RuntimeError(
+                            f'{name}: color picker changed without showing '
+                            f'{next_marker!r}:\n'+screen[3])
+                    if time.monotonic() >= deadline:
+                        diagnostic = command('zstatus', 'failed=')
+                        raise RuntimeError(
+                            f'{name}: color choice did not advance from '
+                            f'{current_marker!r} to {next_marker!r}:\n'+
+                            screen[3]+'\n'+diagnostic)
+                    attempt += 1
+                    time.sleep(0.25)
+                    if attempt == 1:
+                        move_graphical_pointer(100, 124)
+                        graphical_mouse_button('left', True)
+                        time.sleep(0.15)
+                        graphical_mouse_button('left', False)
+                    elif attempt == 2:
+                        # PopUpMenu also supports Return on the highlighted
+                        # DolDoc link; use it once if the click only hovered.
+                        qmp_send_key('ret')
+                    else:
+                        move_graphical_pointer(100, 124)
+                        graphical_mouse_button('left', True)
+                        time.sleep(0.15)
+                        graphical_mouse_button('left', False)
+                    print(f'3D color selection {name} attempt {attempt}', flush=True)
+                    time.sleep(0.35)
+
+            click_3d_color('3d-grmodels-man-pants', 'Shirt', 'Pants')
+            click_3d_color('3d-grmodels-man-skin', 'Pants', 'Skin')
+            click_3d_color('3d-grmodels-man-shoes', 'Skin', 'Shoes')
+            click_3d_color('3d-grmodels-man-generated', 'Shoes', 'Do another')
+            man_generated = require_graphical_text(
+                '3d-grmodels-man-generated', 'Do another', timeout=20)
+            if 'Do another' not in man_generated[3]:
+                raise RuntimeError('GrModels Man did not finish mesh generation')
+            print('PASS GrModels Man mesh generation reached its repeat prompt',
+                  flush=True)
+            qmp_send_key('n')
+            time.sleep(0.5)
+            graphical_screen('3d-grmodels-man-after-exit')
+            run_graphical_terminal_command(
+                '3d-grmodels-man-exit-smoke', '40+2;', 'ans=0x2A=42', timeout=20)
+            command('zstatus', 'failed=0')
+            mesh_diag = ''.join(command(
+                line, 'zc: executed', timeout=20)
+                for line in (
+                    'zc Print("3d_live_mesh=%d,%d,%d,%d\\n",'
+                    'sprite_debug_mesh_last_vertices,'
+                    'sprite_debug_mesh_last_triangles,'
+                    'sprite_debug_mesh_last_result,'
+                    'sprite_debug_mesh_last_work);',
+                    'zc Print("3d_live_color_pixels=%d,%d,%d,%d,%d,%d\\n",'
+                    'sprite_debug_mesh_last_color,'
+                    'sprite_debug_mesh_last_lit_color,'
+                    'sprite_debug_mesh_pixel_attempts,'
+                    'sprite_debug_mesh_pixel_writes,'
+                    'sprite_debug_mesh_pixel_min_x,'
+                    'sprite_debug_mesh_pixel_min_y);',
+                    'zc Print("3d_live_color_masks=%d,%d,%d\\n",'
+                    'sprite_debug_mesh_raw_color_mask,'
+                    'sprite_debug_mesh_lit_color_mask,'
+                    'sprite_debug_mesh_pixel_color_mask);',
+                    'zc Print("3d_live_bounds_masks=%d,%d,%d,%d,%d\\n",'
+                    'sprite_debug_mesh_pixel_max_x,'
+                    'sprite_debug_mesh_pixel_max_y,'
+                    'sprite_debug_type_mask_failures,'
+                    'sprite_debug_type_mask_last_type,'
+                    'sprite_debug_type_mask_last_size);',
+                    'zc Print("3d_live_choices=%d,%d,%d,%d,%d\\n",'
+                    'sprite_debug_lighting_choice_count,'
+                    'sprite_debug_lighting_choices[0],'
+                    'sprite_debug_lighting_choices[1],'
+                    'sprite_debug_lighting_choices[2],'
+                    'sprite_debug_lighting_choices[3]);',
+                    'zc Print("3d_live_target=%d,%d,%d,%d,%d,%d,%d\\n",'
+                    'sprite_debug_mesh_target_dc_is_bootstrap,'
+                    'sprite_debug_mesh_target_body_is_graphics,'
+                    'sprite_debug_mesh_target_body_is_foreground,'
+                    'sprite_debug_mesh_target_last_x,'
+                    'sprite_debug_mesh_target_last_y,'
+                    'sprite_debug_mesh_target_last_pixel,'
+                    'sprite_debug_mesh_target_last_index);',
+                    'zc Print("3d_live_target_window=%d,%d,%d,%d,%d,%d\\n",'
+                    'sprite_debug_mesh_target_left,'
+                    'sprite_debug_mesh_target_right,'
+                    'sprite_debug_mesh_target_top,'
+                    'sprite_debug_mesh_target_bottom,'
+                    'sprite_debug_mesh_target_scroll_x,'
+                    'sprite_debug_mesh_target_scroll_y);'))
+            print('GRMODELS MAN RASTER DIAGNOSTIC\n'+mesh_diag, flush=True)
+
+            type_graphical_prompt_line(
+                '3d-grmodels-ball-launch',
+                'ExeFile2("/Apps/GrModels/Run.ZC");')
+            qmp_send_key('ret')
+            require_graphical_text('3d-grmodels-ball-entry', 'Make a CSprite model',
+                                   timeout=12)
+            move_graphical_pointer(53, 84)
+            graphical_mouse_button('left', True)
+            time.sleep(0.15)
+            graphical_mouse_button('left', False)
+            ball_form = require_graphical_text('3d-grmodels-ball-form', 'Longitude Faces',
+                                                timeout=12)
+            if 'Radius' not in ball_form[3] or 'Lattitude Rings' not in ball_form[3]:
+                raise RuntimeError('GrModels Ball form is missing expected fields:\n'+
+                                   ball_form[3])
+            qmp_send_key('esc')
+            require_graphical_text('3d-grmodels-ball-color', 'Single-Sided means',
+                                   timeout=12)
+            click_3d_color('3d-grmodels-ball-generated',
+                           'Single-Sided means', 'Vertices:')
+            ball_generated = require_graphical_text(
+                '3d-grmodels-ball-generated', 'Vertices:', timeout=25)
+            require_graphical_text('3d-grmodels-ball-repeat', 'Do another', timeout=10)
+            print('PASS GrModels Ball mesh generation; '+
+                  next((line.strip() for line in ball_generated[3].splitlines()
+                        if 'Vertices:' in line), 'Vertices reported'), flush=True)
+            qmp_send_key('n')
+            time.sleep(0.5)
+            graphical_screen('3d-grmodels-ball-after-exit')
+            run_graphical_terminal_command(
+                '3d-grmodels-ball-exit-smoke', '40+2;', 'ans=0x2A=42', timeout=20)
+            command('zstatus', 'failed=0')
+            mesh_diag = ''.join(command(
+                line, 'zc: executed', timeout=20)
+                for line in (
+                    'zc Print("3d_live_mesh=%d,%d,%d,%d\\n",'
+                    'sprite_debug_mesh_last_vertices,'
+                    'sprite_debug_mesh_last_triangles,'
+                    'sprite_debug_mesh_last_result,'
+                    'sprite_debug_mesh_last_work);',
+                    'zc Print("3d_live_color_pixels=%d,%d,%d,%d,%d,%d\\n",'
+                    'sprite_debug_mesh_last_color,'
+                    'sprite_debug_mesh_last_lit_color,'
+                    'sprite_debug_mesh_pixel_attempts,'
+                    'sprite_debug_mesh_pixel_writes,'
+                    'sprite_debug_mesh_pixel_min_x,'
+                    'sprite_debug_mesh_pixel_min_y);',
+                    'zc Print("3d_live_color_masks=%d,%d,%d\\n",'
+                    'sprite_debug_mesh_raw_color_mask,'
+                    'sprite_debug_mesh_lit_color_mask,'
+                    'sprite_debug_mesh_pixel_color_mask);',
+                    'zc Print("3d_live_bounds_masks=%d,%d,%d,%d,%d\\n",'
+                    'sprite_debug_mesh_pixel_max_x,'
+                    'sprite_debug_mesh_pixel_max_y,'
+                    'sprite_debug_type_mask_failures,'
+                    'sprite_debug_type_mask_last_type,'
+                    'sprite_debug_type_mask_last_size);',
+                    'zc Print("3d_live_choices=%d,%d,%d,%d,%d\\n",'
+                    'sprite_debug_lighting_choice_count,'
+                    'sprite_debug_lighting_choices[0],'
+                    'sprite_debug_lighting_choices[1],'
+                    'sprite_debug_lighting_choices[2],'
+                    'sprite_debug_lighting_choices[3]);',
+                    'zc Print("3d_live_target=%d,%d,%d,%d,%d,%d,%d\\n",'
+                    'sprite_debug_mesh_target_dc_is_bootstrap,'
+                    'sprite_debug_mesh_target_body_is_graphics,'
+                    'sprite_debug_mesh_target_body_is_foreground,'
+                    'sprite_debug_mesh_target_last_x,'
+                    'sprite_debug_mesh_target_last_y,'
+                    'sprite_debug_mesh_target_last_pixel,'
+                    'sprite_debug_mesh_target_last_index);',
+                    'zc Print("3d_live_target_window=%d,%d,%d,%d,%d,%d\\n",'
+                    'sprite_debug_mesh_target_left,'
+                    'sprite_debug_mesh_target_right,'
+                    'sprite_debug_mesh_target_top,'
+                    'sprite_debug_mesh_target_bottom,'
+                    'sprite_debug_mesh_target_scroll_x,'
+                    'sprite_debug_mesh_target_scroll_y);'))
+            print('GRMODELS BALL RASTER DIAGNOSTIC\n'+mesh_diag, flush=True)
+
+            raise SystemExit(0)
+            raise SystemExit(0)
+        if args.probe_budget_program:
+            command('zload /Tests/KeyboardMenus.ZC', 'zc: loaded /Tests/KeyboardMenus.ZC')
+            command('zcall KeyboardMenuChecks', 'zc => 0x000000000000002a')
+            command('zload /Tests/ReloadForward.ZC', 'zc: loaded /Tests/ReloadForward.ZC')
+            command('zcall ReloadForwardChecks', 'zc => 0x000000000000002a')
+            command('zload /Tests/DocNumbers.ZC', 'zc: loaded /Tests/DocNumbers.ZC')
+            command('zcall DocNumberChecks', 'zc => 0x000000000000002a')
+            command('zload /Tests/CallBoundaries.ZC', 'zc: loaded /Tests/CallBoundaries.ZC')
+            command('zcall CallBoundaryChecks', 'zc => 0x000000000000002a')
+            command('zload /Tests/FormReflection.ZC', 'zc: loaded /Tests/FormReflection.ZC')
+            command('zcall FormReflectionChecks', 'zc => 0x000000000000002a')
+            command('zload /Tests/LastClass.ZC', 'zc: loaded /Tests/LastClass.ZC')
+            command('zcall LastClassChecks', 'zc => 0x000000000000002a')
+            command('zload /Tests/Calendar.ZC', 'zc: loaded /Tests/Calendar.ZC')
+            command('zcall CalendarChecks', 'zc => 0x000000000000002a')
+            command('zcall CalendarClockChecks', 'zc => 0x000000000000002a')
+            command('zcall CalendarScanChecks', 'zc => 0x000000000000002a')
+            command('zcall CalendarBufferChecks', 'zc => 0x000000000000002a')
+            before = command('zstatus', 'failed=0')
+            command('zcall CalendarBufferChecks', 'zc => 0x000000000000002a')
+            command('zcall CalendarScanChecks', 'zc => 0x000000000000002a')
+            after = command('zstatus', 'failed=0')
+            heap = r'data=([0-9/]+) code=([0-9/]+) allocations=([0-9]+)'
+            if re.search(heap, before).groups() != re.search(heap, after).groups():
+                raise RuntimeError('date/scanner conversion or recovery leaked managed memory')
+            before = command('zstatus', 'failed=0')
+            for _ in range(3):
+                command('zc class BrokenForm { U8 text[16] format "Field" data; };',
+                        'compile failed; current statement discarded')
+            after = command('zstatus', 'failed=0')
+            if re.search(heap, before).groups() != re.search(heap, after).groups():
+                raise RuntimeError('malformed class metadata leaked managed memory')
+            epoch = command('zcall CalendarUnixNanoseconds', 'zc => 0x')
+            epoch_ns = int(re.search(r'zc => 0x([0-9a-fA-F]+)', epoch)[1], 16)
+            if abs(epoch_ns/1e9-time.time()) > 5:
+                raise RuntimeError('guest wall clock does not match the host UTC clock')
+            command('zc Print("clock=%D %T\\n",Now,Now);', 'clock=')
+            command('zload /Tests/ProgramCatalog.ZC', 'zc: loaded /Tests/ProgramCatalog.ZC')
+            command('zc CTask *budget_check_task=Spawn(&StockCatalogServer);', 'zc: executed')
+            command('zc CJob *budget_check_job=TaskExe(budget_check_task,Fs,"ExeFile2(\\"/Tests/BudgetProgram.ZC\\");",0);', 'zc: executed')
+            command('zc Print("budget_checks=%d\\n",JobResGet(budget_check_job));', 'budget_checks=42')
+            command('zc Kill(budget_check_task);', 'zc: executed')
+            command('zload /Tests/BudgetForm.ZC', 'zc: loaded /Tests/BudgetForm.ZC')
+            def budget_click_point(expression):
+                output = command(f'zc Print("budget_point=%X\\n",{expression});', 'budget_point=')
+                point = int(re.search(r'budget_point=([0-9A-Fa-f]+)', output)[1], 16)
+                if point == 0xffffffffffffffff:
+                    raise RuntimeError('Budget form/entry not found: '+expression)
+                move_graphical_pointer(point & 0xffffffff, point >> 32)
+                graphical_mouse_button('left', True)
+                time.sleep(.2)
+                graphical_mouse_button('left', False)
+                time.sleep(.2)
+                move_graphical_pointer(700, 500)
+            def budget_field(index, value):
+                budget_click_point(f'BudgetFormPoint({index})')
+                # A real form is also a Server popup; do not treat it as
+                # the startup splash and dismiss it before typing.
+                qmp_send_text(value, delay=.15, dismiss_splash=False)
+            def budget_persistence_check():
+                command('zc budget_check_task=Spawn(&StockCatalogServer);', 'zc: executed')
+                command('zc budget_check_job=TaskExe(budget_check_task,Fs,"ExeFile2(\\"/Tests/BudgetPersist.ZC\\");",0);', 'zc: executed')
+                command('zc Print("budget_persist=%d\\n",JobResGet(budget_check_job));', 'budget_persist=42')
+                command('zc Kill(budget_check_task);', 'zc: executed')
+            focus_graphical_terminal()
+            run_graphical_terminal_command('ready', '40+2;', 'ans=0x2A=42')
+            original_rect = graphical_task_rect('bootstrap_gui_terminal_task')
+            select_os_menu_row('menu', 'Apps', 9)
+            deadline = time.monotonic() + 20
+            while True:
+                ready = command('zc Print("budgetmenu_ready=%d\\n",MenuEntryFind(bootstrap_gui_terminal_task->cur_menu,"File/Abort")!=NULL);', 'budgetmenu_ready=')
+                if 'budgetmenu_ready=1' in ready:
+                    break
+                if time.monotonic() >= deadline:
+                    raise RuntimeError('Budget application menu did not appear')
+                time.sleep(.3)
+            command('zcall BudgetMenuChecks', 'zc => 0x000000000000002a')
+            # Merely hovering an original shortcut used to call an unresolved
+            # key-name helper from DrawMenu and permanently stop presentation.
+            for root, row in [('File', 0), ('File', 1), ('Edit', 0), ('View', 0)]:
+                x = graphical_menu_root_x(root) + 4
+                move_graphical_pointer(x, 4)
+                time.sleep(.2)
+                before_hover = command('zstatus', 'failed=0')
+                move_graphical_pointer(x, 12+row*8)
+                time.sleep(.3)
+                after_hover = command('zstatus', 'failed=0')
+                frames = r'presented_frames=(\d+)'
+                if int(re.search(frames, after_hover)[1]) <= int(re.search(frames, before_hover)[1]):
+                    raise RuntimeError('Budget shortcut hover stopped desktop presentation')
+            graphical_screen('menu-shortcut-hover')
+            move_graphical_pointer(700,500)
+            print('PASS Budget File/Edit/View shortcuts, key labels and continued presentation after hover', flush=True)
+            select_os_menu_row('new-entry-menu', 'Edit', 0)
+            move_graphical_pointer(700,500)
+            require_graphical_text('new-form', 'Credit (from) Acct:', timeout=15)
+            for index, value in enumerate(('02/29/2024', '     12.50', 'BANK', 'FOOD', 'UTM Budget entry')):
+                budget_field(index, value)
+            move_graphical_pointer(700, 500)
+            require_graphical_text('filled-form', 'UTM Budget entry')
+            qmp_send_key('esc')
+            require_graphical_text('created-entry', '12.50:UTM Budget entry')
+            select_os_menu_row('save-exit-menu', 'File', 1)
+            run_graphical_terminal_command('saved-return', '6*7;', 'ans=0x2A=42')
+            if graphical_task_rect('bootstrap_gui_terminal_task') != original_rect:
+                raise RuntimeError('Budget did not restore terminal geometry')
+            budget_persistence_check()
+            select_os_menu_row('reopen-menu', 'Apps', 9)
+            require_graphical_text('reopened-entry', '12.50:UTM Budget entry', timeout=20)
+            budget_click_point('BudgetEntryPoint()')
+            qmp_send_key('ret')
+            move_graphical_pointer(700, 500)
+            require_graphical_text('edit-form', 'Credit (from) Acct:', timeout=15)
+            budget_field(1, '     25.00')
+            qmp_send_key('esc')
+            require_graphical_text('edited-entry', '25.00:UTM Budget entry')
+            qmp_send_keys(['shift', 'esc'])
+            run_graphical_terminal_command('abort-return', '40+2;', 'ans=0x2A=42')
+            budget_persistence_check()
+            select_os_menu_row('cancel-menu', 'Apps', 9)
+            require_graphical_text('abort-preserved-entry', '12.50:UTM Budget entry', timeout=20)
+            qmp_send_text('n', delay=.15, dismiss_splash=False)
+            require_graphical_text('cancel-form', 'Credit (from) Acct:')
+            budget_field(4, 'CANCELLED')
+            qmp_send_keys(['shift', 'esc'])
+            require_graphical_text('cancelled-entry', '12.50:UTM Budget entry')
+            require_graphical_text_absent('cancelled-entry-absent', 'CANCELLED')
+            select_os_menu_row('abort-exit-menu', 'File', 0)
+            run_graphical_terminal_command('cancel-return', '40+2;', 'ans=0x2A=42')
+            budget_persistence_check()
+            command('zvol', 'flush=yes')
+            command('zstatus', 'failed=0')
+            guest.terminate()
+            guest.wait(timeout=10)
+            buf.clear()
+            guest = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                     stderr=subprocess.STDOUT, bufsize=0)
+            reboot = until(b'\n> ', timeout=180)
+            if 'zc: graphical terminal started at boot' not in reboot:
+                raise RuntimeError('Budget cold disk-only boot did not reach the desktop')
+            command('zload /Tests/ProgramCatalog.ZC', 'zc: loaded /Tests/ProgramCatalog.ZC')
+            command('zc CTask *budget_check_task; CJob *budget_check_job;', 'zc: executed')
+            budget_persistence_check()
+            focus_graphical_terminal()
+            select_os_menu_row('cold-menu', 'Apps', 9)
+            require_graphical_text('cold-entry', '12.50:UTM Budget entry', timeout=20)
+            qmp_send_key('esc')
+            run_graphical_terminal_command('cold-return', '40+2;', 'ans=0x2A=42')
+            command('zstatus', 'failed=0')
+            print('PASS calendar/UTC clock/scanner without leaks; Budget form create/edit/cancel, save/abort, clean exit, reopen and cold disk-only persistence', flush=True)
             raise SystemExit(0)
         if args.probe_logic_program:
             command('zload /Tests/ListFormat.ZC', 'zc: loaded /Tests/ListFormat.ZC')

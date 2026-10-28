@@ -1,0 +1,87 @@
+// Focused packed mesh sizing checks, independent of interpolation/matrices.
+
+U0 Sprite3DWriteMesh(U8 *mesh, I32 vertices, I32 triangles)
+{
+    U8 *dst = mesh;
+    *dst++ = SPT_MESH;
+    *dst(I32 *)++ = vertices;
+    *dst(I32 *)++ = triangles;
+}
+
+U0 Sprite3DWriteShiftableMesh(U8 *mesh, I32 x, I32 y, I32 z,
+        I32 vertices, I32 triangles)
+{
+    U8 *dst = mesh;
+    *dst++ = SPT_SHIFTABLE_MESH;
+    *dst(I32 *)++ = x;
+    *dst(I32 *)++ = y;
+    *dst(I32 *)++ = z;
+    *dst(I32 *)++ = vertices;
+    *dst(I32 *)++ = triangles;
+}
+
+I64 Sprite3DMeshChecks()
+{
+    U8 mesh[128], shiftable[128];
+    I32 vertices, triangles;
+    I64 mesh_size, mesh_expected;
+
+    if (sizeof(sprite_elem_base_sizes) / sizeof(I64) != SPT_TYPES_NUM)
+        return 1;
+    if (sprite_elem_base_sizes[SPT_END] != sizeof(CSpriteBase) ||
+            sprite_elem_base_sizes[SPT_MESH] != sizeof(CSpriteMeshU8s) ||
+            sprite_elem_base_sizes[SPT_SHIFTABLE_MESH] != sizeof(CSpritePtMeshU8s))
+        return 2;
+
+    // Build the record exactly like the original GrModels source: a type byte
+    // followed by sequential I32 pointer stores, without a synthetic pad.
+    MemSet(mesh, 0, sizeof(mesh));
+    vertices = 3;
+    triangles = 2;
+    Sprite3DWriteMesh(mesh, vertices, triangles);
+    mesh_size = SpriteElemSize(mesh, SPT_MESH);
+    mesh_expected = sizeof(CSpriteMeshU8s) + 12 * vertices + 16 * triangles;
+    if (mesh_size != mesh_expected)
+        return mesh_size * 10000 + mesh_expected;
+
+    vertices = triangles = 0;
+    Sprite3DWriteMesh(mesh, vertices, triangles);
+    if (SpriteElemSize(mesh, SPT_MESH) != sizeof(CSpriteMeshU8s))
+        return 3;
+    vertices = -1;
+    Sprite3DWriteMesh(mesh, vertices, triangles);
+    if (SpriteElemSize(mesh, SPT_MESH) >= 0)
+        return 4;
+    vertices = 1048577;
+    Sprite3DWriteMesh(mesh, vertices, triangles);
+    if (SpriteElemSize(mesh, SPT_MESH) >= 0)
+        return 5;
+    vertices = 3;
+    triangles = -1;
+    Sprite3DWriteMesh(mesh, vertices, triangles);
+    if (SpriteElemSize(mesh, SPT_MESH) >= 0)
+        return 6;
+    triangles = 1048577;
+    Sprite3DWriteMesh(mesh, vertices, triangles);
+    if (SpriteElemSize(mesh, SPT_MESH) >= 0)
+        return 7;
+
+    // Shiftable records preserve their packed type/xyz/count field order.
+    MemSet(shiftable, 0, sizeof(shiftable));
+    vertices = 2;
+    triangles = 1;
+    Sprite3DWriteShiftableMesh(shiftable, 5, 6, 7, vertices, triangles);
+    if (SpriteElemSize(shiftable, SPT_SHIFTABLE_MESH) !=
+            sizeof(CSpritePtMeshU8s) + 12 * vertices + 16 * triangles)
+        return 8;
+    vertices = -1;
+    Sprite3DWriteShiftableMesh(shiftable, 5, 0, 0, vertices, triangles);
+    if (SpriteElemSize(shiftable, SPT_SHIFTABLE_MESH) >= 0)
+        return 9;
+    vertices = 2;
+    triangles = 1048577;
+    Sprite3DWriteShiftableMesh(shiftable, 5, 0, 0, vertices, triangles);
+    if (SpriteElemSize(shiftable, SPT_SHIFTABLE_MESH) >= 0)
+        return 10;
+    return 0x2a;
+}

@@ -1060,6 +1060,14 @@ static int64_t __ICFCallTOS(CCmpCtrl *cctrl, CRPN *rpn, char *bin,
   }
   if (rpn2->type == IC_GLOBAL) {
     if (rpn2->global_var->base.type & HTT_FUN) {
+      CHashFun *target = (CHashFun *)rpn2->global_var;
+      if (target->base.flags & CLSF_FORWARD_ALIAS) {
+        BEFORE_CALL;
+        code_off = __ICMoveI64(cctrl, 8, &target->fun_ptr, bin, code_off);
+        AIWNIOS_ADD_CODE(ARM_ldrRegImmX(MIR(cctrl, 8), 8, 0));
+        AIWNIOS_ADD_CODE(ARM_blr(MIR(cctrl, 8)));
+        goto after_call;
+      }
       fptr = ((CHashFun *)rpn2->global_var)->fun_ptr;
       if (cctrl->code_ctrl->final_pass && fptr != &DoNothing && fptr) {
         if (ARM_ERR_INV_OFF != ARM_bl((char *)fptr - (bin + code_off))) {
@@ -3819,7 +3827,9 @@ static int64_t __OptPassFinal(CCmpCtrl *cctrl, CRPN *rpn, char *bin,
       } else
         abort();
       // Undefined?
-      if (!enter_addr || enter_addr == &DoNothing) {
+      if (!enter_addr || enter_addr == &DoNothing ||
+          ((next->global_var->base.type & HTT_FUN) &&
+           (((CHashFun *)next->global_var)->base.flags & CLSF_FORWARD_ALIAS))) {
         if (next->global_var->base.type & HTT_GLBL_VAR) {
           enter_addr = &next->global_var->data_addr;
         } else if (next->global_var->base.type & HTT_FUN) {
