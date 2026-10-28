@@ -129,8 +129,9 @@ key-name services and parses the original File/Edit/View shortcuts.
 Its expanded NEC USB gate passes 140 checks, including actual shortcut hover,
 menu selection and cold disk-only entry persistence. See
 [the correction report](docs/acceptance/utm-budget-menu-fix-2026-10-27.json).
-The previous live-accepted Logic image remains at the standard
-`build/zealos-aarch64-hello.iso` path while the corrected Budget live check is pending.
+The current combined Logic/Budget/3D image is at
+`build/zealos-aarch64-hello.iso`; its shared `DocForm` correction is described
+below. Live UTM acceptance of the corrected Budget workflow is still pending.
 Periodic/template, account-file editing and account-filter UI workflows have
 not been accepted; live UTM acceptance of this candidate also remains pending.
 
@@ -161,8 +162,8 @@ and Logic. A compile or normal-load result is not runtime acceptance.
 
 | Application | Current verified status |
 |--|--|
-| Budget | Catalog compile passes; date, storage and menu fixtures pass. The fresh graphical entry-form gate currently fails: neither Edit → New Entry nor `n` presents the form. Not complete. |
-| GrModels | App source compiles; shared mesh, interpolation and 3D service fixtures pass. End-to-end app form/generation gate is not passing yet. |
+| Budget | Graphical entry form, field editing, save/abort, reopen and cold disk-only persistence pass in the PCI workflow; live UTM retest of the corrected image is pending. |
+| GrModels | Man and Ball forms render; both mesh-generation workflows reach their repeat prompt and return to a responsive terminal. Live UTM acceptance is pending. |
 | KeepAway | App source now compiles after adding session-only high-score globals; 3D compatibility fixtures pass. Interactive gameplay is not accepted yet. |
 | Psalmody | Compile advances past missing text-search/reward symbols, then stops at missing `Ona2Octave`. Note conversion and audio playback remain incomplete. |
 | Span | Compiles after adding the original control-button source and optional silent audio hooks. Runtime/form acceptance pending. |
@@ -183,10 +184,13 @@ still includes Chess, Varoom, FlapBat and many other programs that have not
 been accepted on ARM64. Assembly demos require architecture-specific
 implementations.
 
-The latest Budget PCI run failed before creating an entry: the ledger stayed
-blank after the menu action and keyboard shortcut, while the desktop remained
-responsive. This supersedes the earlier automated form-persistence pass for
-the current candidate. The form path is still open work, not a completed app.
-The 3D fixture tests pass, but the GrModels end-to-end gate still needs a
-reliable launch/input path. Track upstream source integrity separately from
+The apparent Budget and GrModels form failures were traced to the generated
+ARM64 `DocForm` adapter: its replacement left behind the original
+`return FALSE`, causing every form to exit before document creation. The
+translator now replaces the condition and its return as one block, with a
+regression assertion on the generated source. The corrected PCI workflow
+passes Budget form creation/edit/cancel/save/reopen and cold disk-only
+persistence; the 3D live probe passes GrModels Man and Ball form and mesh
+generation. KeepAway and Titanium remain compile-only pending interactive
+gameplay acceptance. Track upstream source integrity separately from
 compilation, visible behavior/input, clean exit and save/reopen requirements.

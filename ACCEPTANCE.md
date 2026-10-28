@@ -2784,3 +2784,26 @@ ToTheFront's normal loader still aborts in the ARM64 compiler on its
 runtime-sized global arrays. The full per-entry output is saved in
 `docs/acceptance/program-catalog-2026-10-27.json`. Psalmody audio hooks remain
 silent, and Vocabulary has no dictionary data bundled.
+
+### Shared ARM64 DocForm correction and form acceptance — 2026-10-27
+
+The Budget and GrModels form failures shared a translator defect. The ARM64
+`DocForm` source rewrite replaced the original class lookup but left its
+following `return FALSE` in place, so the translated function returned before
+creating any form. The rewrite now consumes the original condition and its
+failure return together. `scripts/check-arm64-source.py` asserts that the
+generated guard flows directly into `doc = DocNew`.
+
+The fresh PCI Budget workflow now passes form creation, field edits, save and
+abort, cancel, reopen, cold disk-only persistence, and clean guest status. The
+fresh `--probe-3d-apps` run passes the GrModels Man and Ball form workflows,
+mesh generation (Ball reports 58 vertices), clean terminal recovery, and the
+3D fixtures. KeepAway and Titanium still have compile/service-fixture evidence
+only; interactive gameplay remains unaccepted. These are QEMU PCI checks, not
+live UTM acceptance.
+
+The rebuilt combined ISO is `build/zealos-aarch64-hello.iso`, SHA-256
+`ad4c04b1c9891a2e8a44e74f2597f3d35992023ac65a86efad6b771e405ccb5b`. The
+Budget and 3D PCI logs are `build/check-budget-pci.log` and
+`build/check-3d-apps-pci.log`; the source translation regression is checked by
+`python3 scripts/check-arm64-source.py`.

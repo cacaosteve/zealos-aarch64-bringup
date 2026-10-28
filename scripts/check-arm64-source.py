@@ -616,6 +616,8 @@ docform_overlay = translate_docform(docform_source)
 assert docform_overlay != docform_source
 assert docform_overlay.count(b'LBtr(&doc_e->de_flags, DOCEf_DEFAULT_LEN)') == 1
 assert b'LBtr(&doc_e->de_flags, &DOCEf_DEFAULT_LEN)' not in docform_overlay
+assert (b'if (!ZcDocFormField(class_name, 0, NULL))\n'
+        b'\t\treturn FALSE;\n\tdoc = DocNew;') in docform_overlay
 try:
     translate_docform(docform_source.replace(
         b'LBtr(&doc_e->de_flags, &DOCEf_DEFAULT_LEN)',
