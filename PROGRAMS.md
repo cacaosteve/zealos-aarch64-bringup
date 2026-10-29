@@ -152,13 +152,13 @@ installer. Saving requires a writable installed VirtIO source volume.
 
 ![Budget entry reopened after a cold disk-only boot](docs/images/qemu-budget-entry.png)
 
-## Current named-app status — 2026-10-27
+## Current named-app status — 2026-10-28
 
 The pinned upstream `src/Apps` and `src/Demo` mirror contains 294 files,
 including source, documents and binary resources. It is complete and
 hash-checked; that file count is not a count of supported programs. This
-table tracks the eight named apps in the current batch alongside the 3D apps
-and Logic. A compile or normal-load result is not runtime acceptance.
+table tracks the named Apps currently in scope alongside Logic. A compile or
+normal-load result is not runtime acceptance.
 
 | Application | Current verified status |
 |--|--|
@@ -169,7 +169,7 @@ and Logic. A compile or normal-load result is not runtime acceptance.
 | Span | Compiles after adding the original control-button source and optional silent audio hooks. Runtime/form acceptance pending. |
 | Strut | Compiles after adding the original control-button source and optional silent audio hooks. Runtime/form acceptance pending. |
 | TimeClock | Compiles with the calendar/clock services. Punch-in/out, file persistence and report workflows are not accepted. |
-| Titanium | App compiles and its help screen is visible in the PCI workflow. The automated keypress did not advance its `PressAKey` wait, so gameplay and normal exit remain unverified. Speaker effects are silent on ARM64. |
+| Titanium | Automated QEMU confirms a key starts gameplay, Space advances frames, and Escape returns to a terminal where `40+2;` returns 42. The fix is pushed as `b201b39`; live UTM acceptance remains pending. Speaker effects are silent on ARM64. |
 | ToTheFront | Normal load reaches an unsupported compiler backend path for its runtime-sized global arrays; compile/runtime acceptance is blocked. |
 | Vocabulary | Compiles, but runtime needs the dictionary data/index, which is not included in this image; sound effects are silent. |
 | X-Caliber | Normal `Load.ZC` succeeds and the app entry compiles after that loader initializes registry globals. Runtime not accepted. |
@@ -192,6 +192,14 @@ regression assertion on the generated source. The corrected PCI workflow
 passes Budget form creation/edit/cancel/save/reopen and cold disk-only
 persistence; the 3D live probe passes GrModels Man and Ball form and mesh
 generation. KeepAway now runs through gameplay and returns cleanly in the PCI
-probe. Titanium reaches its help screen, but gameplay input remains unverified.
-Track upstream source integrity separately from compilation, visible
+probe. Track upstream source integrity separately from compilation, visible
 behavior/input, clean exit and save/reopen requirements.
+
+## Full Apps and Demo inventory / work plan — 2026-10-28
+
+See [the file-derived inventory and phased plan](docs/PROGRAM-INVENTORY-2026-10-28.md).
+The pinned mirror contains 70 `.ZC` files under `Apps` and 206 under `Demo`.
+These are source-file counts, not runnable-program counts: both trees include
+loaders, shared routines, templates, and data-driven examples. The inventory
+keeps file presence, compilation, runtime, interactive behavior, and live UTM
+acceptance as separate states.
