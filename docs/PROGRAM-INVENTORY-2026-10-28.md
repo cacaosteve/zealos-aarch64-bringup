@@ -48,7 +48,7 @@ Record a separate result for each program at each level:
 | Psalmody | Loader compiles until missing `Ona2Octave`. | Note conversion, audio path and interactive song editing/playback. |
 | Span, Strut | Compile after adding original control-button source and optional silent audio hooks. | Runtime/forms, save behavior and exit. |
 | TimeClock | Compiles with calendar/clock services. | Punch-in/out, persistence and reports. |
-| ToTheFront | Blocked by runtime-sized global arrays in compiler backend. | Implement/test the required array ABI, then exercise game turns and AI. |
+| ToTheFront | Compile and normal load pass after ARM64 pointer-add address generation and guarded source overlays for its sentinel, pure timing helpers, and runtime-sized map clears. | Exercise map initialization, game turns, drawing, input, and AI in QEMU/UTM. |
 | Vocabulary | Compiles; dictionary/index data is absent. | Bundle source data/index, then quiz interaction and optional sound. |
 | X-Caliber | Normal loader and app entry compile. | Runtime behavior, controls and data persistence. |
 
@@ -73,7 +73,7 @@ actual UTM environment.
 1. **Forms and storage:** Span and Strut first (shared control-button/form
    work), then TimeClock and X-Caliber (clock/registry/persistence). Reuse the
    Budget form and cold-boot gates where applicable.
-2. **Compiler and bundled data:** solve ToTheFront's runtime-sized array ABI;
+2. **Compiler and bundled data:** run ToTheFront's newly compiling game and resolve any runtime blockers;
    bundle and exercise Vocabulary's dictionary/index. Keep compiler support
    separate from app-data availability so failures are easy to attribute.
 3. **Audio and music:** add a bounded ARM64 audio service, then complete

@@ -728,6 +728,64 @@ def translate_budget_strings(source: bytes) -> bytes:
     return source.replace(old, b"if (*ptr == ',')", 1)
 
 
+def translate_tothefront_sentinel(source: bytes) -> bytes:
+    """Compare the ToTheFront queue cursor to its sentinel object's address."""
+    old = b'while (tmpi != *indirect_head)'
+    if source.count(old) != 1:
+        raise ValueError('pinned ToTheFront indirect-fire queue check changed')
+    return source.replace(old, b'while (tmpi != &indirect_head)', 1)
+
+
+def translate_tothefront_draw(source: bytes) -> bytes:
+    """Provide app-local math helpers without loading unrelated sound services."""
+    replacements = (
+        (b'Saw(4 * tS, 2.0)', b'ToTheFrontSaw(4 * tS, 2.0)'),
+        (b'Saw(4 * tS + 1.0, 2.0)', b'ToTheFrontSaw(4 * tS + 1.0, 2.0)'),
+        (b'Blink(5)', b'ToTheFrontBlink(5)'),
+        (b'Blink(10)', b'ToTheFrontBlink(10)'),
+    )
+    text = source
+    for old, new in replacements:
+        if text.count(old) != 1:
+            raise ValueError('pinned ToTheFront Saw call changed')
+        text = text.replace(old, new, 1)
+    helper = (
+        b'F64 ToTheFrontSaw(F64 t, F64 period)\n'
+        b'{\n'
+        b'    if (!period)\n'
+        b'        return 0.0;\n'
+        b'    if (t >= 0.0)\n'
+        b'        return t % period / period;\n'
+        b'    return 1.0 + t % period / period;\n'
+        b'}\n\n'
+        b'Bool ToTheFrontBlink(F64 hz)\n'
+        b'{\n'
+        b'    return (tS * hz) % 2.0 < 1.0;\n'
+        b'}\n\n'
+    )
+    return helper + text
+
+
+def translate_tothefront_init(source: bytes) -> bytes:
+    """Compute byte counts for app arrays whose bounds are runtime globals."""
+    replacements = (
+        (b'MemSet(terrain, PLAINS, sizeof(terrain));',
+         b'MemSet(terrain, PLAINS, map_rows * map_cols * sizeof(U8));'),
+        (b'MemSet(roads, FALSE, sizeof(roads));',
+         b'MemSet(roads, FALSE, map_rows * map_cols * sizeof(Bool));'),
+        (b'MemSet(rivers, FALSE, sizeof(rivers));',
+         b'MemSet(rivers, FALSE, map_rows * map_cols * sizeof(Bool));'),
+        (b'MemSet(vis_map, FALSE, sizeof(vis_map));',
+         b'MemSet(vis_map, FALSE, map_rows * map_cols * sizeof(Bool));'),
+    )
+    text = source
+    for old, new in replacements:
+        if text.count(old) != 1:
+            raise ValueError('pinned ToTheFront runtime-sized map initialization changed')
+        text = text.replace(old, new, 1)
+    return text
+
+
 def extract_keyboard_helpers(source: bytes, printer: bytes) -> bytes:
     """Keep source key translation/naming, replacing only x86 DU8 table syntax."""
     import ast

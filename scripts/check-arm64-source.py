@@ -9,7 +9,7 @@ from arm64_source import (extract_sprite_elem_base_sizes, inject_sprite_elem_bas
                           extract_sprite_interpolation, inject_sprite_interpolation,
                           extract_sprite_matrix_draw, inject_sprite_matrix_draw)
 
-from arm64_source import (extract_home_set, extract_home_startup, extract_home_startup_tasks, inject_home_startup_tasks, extract_server_task, extract_user_task, extract_version_scalars, extract_source_prompt, extract_source_training, translate_autocomplete_task, translate_doctree, translate_registry, translate_docterm, translate_doced, translate_docfind, translate_docform, translate_docpopup, translate_docrecalc, translate_grbitmap,
+from arm64_source import (extract_home_set, extract_home_startup, extract_home_startup_tasks, inject_home_startup_tasks, extract_server_task, extract_user_task, extract_version_scalars, extract_source_prompt, extract_source_training, translate_autocomplete_task, translate_doctree, translate_registry, translate_docterm, translate_doced, translate_docfind, translate_docform, translate_docpopup, translate_docrecalc, translate_grbitmap, translate_tothefront_draw, translate_tothefront_init, translate_tothefront_sentinel,
                           translate_filemgr, translate_grdc, translate_grpalette, translate_message, translate_grscreen, translate_ktask, translate_winmgr, translate_zsplash, translate_home_once)
 
 root = Path(__file__).resolve().parent.parent
@@ -666,6 +666,51 @@ runtime = (root / 'src/zc/runtime.c').read_text()
 assert runtime.index('"/System/Menu.ZC"') < runtime.index('"/System/Win.ZC"')
 
 print('PASS guarded ARM64 source overlays', flush=True)
+
+tothefront_fire = (root/'upstream/pinned/Apps/ToTheFront/TTFFire.ZC').read_bytes()
+tothefront_overlay = translate_tothefront_sentinel(tothefront_fire)
+assert b'while (tmpi != &indirect_head)' in tothefront_overlay
+assert b'while (tmpi != *indirect_head)' not in tothefront_overlay
+try:
+    translate_tothefront_sentinel(tothefront_fire.replace(
+        b'while (tmpi != *indirect_head)', b'while (tmpi != *other_head)'))
+except ValueError:
+    pass
+else:
+    raise AssertionError('ToTheFront queue overlay accepted changed pinned source')
+print('PASS guarded ToTheFront sentinel-address source overlay', flush=True)
+
+tothefront_draw = (root/'upstream/pinned/Apps/ToTheFront/TTFDraw.ZC').read_bytes()
+tothefront_draw_overlay = translate_tothefront_draw(tothefront_draw)
+assert b'F64 ToTheFrontSaw(F64 t, F64 period)' in tothefront_draw_overlay
+assert b'Bool ToTheFrontBlink(F64 hz)' in tothefront_draw_overlay
+assert b'ToTheFrontSaw(4 * tS, 2.0)' in tothefront_draw_overlay
+assert b'ToTheFrontSaw(4 * tS + 1.0, 2.0)' in tothefront_draw_overlay
+assert b'ToTheFrontBlink(5)' in tothefront_draw_overlay
+assert b'ToTheFrontBlink(10)' in tothefront_draw_overlay
+assert b'    Saw(4 * tS' not in tothefront_draw_overlay
+try:
+    translate_tothefront_draw(tothefront_draw.replace(
+        b'Saw(4 * tS, 2.0)', b'Saw(5 * tS, 2.0)'))
+except ValueError:
+    pass
+else:
+    raise AssertionError('ToTheFront drawing overlay accepted changed pinned source')
+print('PASS guarded ToTheFront pure waveform helper overlay', flush=True)
+
+tothefront_init = (root/'upstream/pinned/Apps/ToTheFront/TTFInit.ZC').read_bytes()
+tothefront_init_overlay = translate_tothefront_init(tothefront_init)
+assert b'MemSet(terrain, PLAINS, map_rows * map_cols * sizeof(U8));' in tothefront_init_overlay
+assert tothefront_init_overlay.count(b'map_rows * map_cols * sizeof(Bool)') == 3
+try:
+    translate_tothefront_init(tothefront_init.replace(
+        b'MemSet(terrain, PLAINS, sizeof(terrain));',
+        b'MemSet(terrain, PLAINS, sizeof(other));', 1))
+except ValueError:
+    pass
+else:
+    raise AssertionError('ToTheFront map overlay accepted changed pinned source')
+print('PASS guarded ToTheFront runtime-sized map initialization overlay', flush=True)
 
 zsplash_source = (root / 'upstream/pinned/System/ZSplash.ZC').read_bytes()
 zsplash_overlay = translate_zsplash(zsplash_source)

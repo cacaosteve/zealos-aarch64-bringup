@@ -3779,6 +3779,7 @@ static int64_t __OptPassFinal(CCmpCtrl *cctrl, CRPN *rpn, char *bin,
       goto restore_reg;
       break;
     case IC_DEREF:
+    case IC_ADD:
       next = rpn->base.next;
       code_off = __OptPassFinal(cctrl, next, bin, code_off);
       code_off = PutICArgIntoReg(cctrl, &next->res, RT_PTR, 1, bin, code_off);

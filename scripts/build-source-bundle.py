@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 import sys
 import tarfile
-from arm64_source import translate_docfile, extract_source_dates, extract_string_utilities, translate_budget_strings, extract_keyboard_helpers
+from arm64_source import translate_docfile, extract_source_dates, extract_string_utilities, translate_budget_strings, translate_tothefront_draw, translate_tothefront_init, translate_tothefront_sentinel, extract_keyboard_helpers
 
 from arm64_source import (extract_home_set, extract_home_startup, extract_home_startup_tasks, inject_home_startup_tasks, extract_version_scalars, extract_source_prompt, extract_source_training, extract_server_task, extract_user_task, translate_doctree, translate_registry, translate_docterm, translate_doced, translate_docfind, translate_docform, translate_docpopup, translate_docrecalc, translate_grbitmap,
                           translate_autocomplete_task, translate_grdc, translate_grscreen, translate_ktask, translate_mathode, translate_zsplash,
@@ -29,6 +29,12 @@ for name, expected in manifest['files'].items():
         home_startup_tasks = extract_home_startup_tasks(data)
     if rel == 'Apps/Budget/BgtStrs.ZC':
         data = translate_budget_strings(data)
+    if rel == 'Apps/ToTheFront/TTFFire.ZC':
+        data = translate_tothefront_sentinel(data)
+    if rel == 'Apps/ToTheFront/TTFDraw.ZC':
+        data = translate_tothefront_draw(data)
+    if rel == 'Apps/ToTheFront/TTFInit.ZC':
+        data = translate_tothefront_init(data)
     if rel == 'Kernel/BlkDev/DiskDirB.ZC':
         entries['System/SourceHome.ZC'] = extract_home_set(data)
     if rel == 'Kernel/SerialDev/Message.ZC':
