@@ -1,0 +1,60 @@
+#include "/Tests/ProgramCatalog.ZC"
+
+I64 TimeFormatChecks()
+{
+    CDateStruct ds;
+    CDate date;
+    U8 *text;
+    U64 quotient;
+
+    quotient = 1000;
+    if (ModU64(&quotient, 60) != 40 || quotient != 16) return 10;
+    quotient = 0xFFFFFFFFFFFFFFFF;
+    if (ModU64(&quotient, 10) != 5 || quotient != 0x1999999999999999)
+        return 11;
+
+    MemSet(&ds, 0, sizeof(ds));
+    ds.year = 2024;
+    ds.mon = 2;
+    ds.day_of_mon = 29;
+    ds.hour = 12;
+    ds.min = 34;
+    ds.sec = 56;
+    local_time_offset = 0;
+    date = Struct2Date(&ds);
+    text = MPrintDate(date);
+    if (StrCompare(text, "02/29/24")) return 1;
+    Free(text);
+    text = MPrintTime(date);
+    if (StrCompare(text, "12:34:56")) return 2;
+    Free(text);
+    local_time_offset = ToI64(-7*60*60 * (4294967296.0/86400.0));
+    text = MPrintTime(date);
+    if (StrCompare(text, "05:34:56")) return 3;
+    Free(text);
+    local_time_offset = 0;
+
+    ds.mon = 12;
+    ds.day_of_mon = 31;
+    ds.hour = 23;
+    ds.min = 59;
+    ds.sec = 58;
+    date = Struct2Date(&ds);
+    text = MPrintDate(date);
+    if (StrCompare(text, "12/31/24")) return 4;
+    Free(text);
+    text = MPrintTime(date);
+    if (StrCompare(text, "23:59:58")) return 5;
+    Free(text);
+    Date2Struct(&ds, date);
+    if (ds.year != 2024 || ds.mon != 12 || ds.day_of_mon != 31 ||
+        ds.hour != 23 || ds.min != 59 || ds.sec != 58) return 6;
+    return 42;
+}
+
+I64 TimeClockCompileChecks()
+{
+    if (!StockCatalogCompile("/Apps/TimeClock/TimeClk.ZC"))
+        return 1;
+    return 42;
+}

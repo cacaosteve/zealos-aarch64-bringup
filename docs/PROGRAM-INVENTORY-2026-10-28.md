@@ -44,10 +44,10 @@ Record a separate result for each program at each level:
 | Budget | PCI workflow covers form editing, save/reopen and cold persistence; menu-fix image has automated coverage. | Live UTM retest of the corrected menu/form image. |
 | GrModels | PCI workflow covers Man/Ball forms and mesh generation. | Live UTM forms, generated meshes and exit. |
 | KeepAway | PCI workflow covers gameplay, Space/mouse input, Escape and shell recovery. | Live UTM gameplay; ARM64 speaker effects are currently silent. |
-| Titanium | Current automated QEMU probe confirms a key starts gameplay, Space advances frames, Escape restores the shell, and `40+2;` returns 42. Fix pushed as `b201b39`. | Live UTM retest of this build; ARM64 speaker effects are currently silent. |
+| Titanium | Current automated QEMU probe confirms a key starts gameplay, Space advances frames, Escape restores the shell, and `40+2;` returns 42. Fix pushed as `b201b39`. | User reports the live UTM guest freezes after opening Titanium; reproduce and fix the UTM input/task path before acceptance. ARM64 speaker effects are silent. |
 | Psalmody | Normal loader and app compile pass; catalog regression checks note/octave conversion helpers and default shared music state. | ARM64 audio path and interactive song editing/playback. |
 | Span, Strut | Compile after adding original control-button source and optional silent audio hooks. | Runtime/forms, save behavior and exit. |
-| TimeClock | Compiles with calendar/clock services. | Punch-in/out, persistence and reports. |
+| TimeClock | ARM64 `ModU64`, Gregorian date conversion, and `MPrintDate`/`MPrintTime` compatibility helpers are implemented in the bootstrap bridge. CMOS register access stays unavailable. | Verify the focused formatter gate, then exercise punch-in/out, persistence and reports in QEMU/UTM. |
 | ToTheFront | Compile and normal load pass after ARM64 pointer-add address generation and guarded source overlays for its sentinel, pure timing helpers, and runtime-sized map clears. | Exercise map initialization, game turns, drawing, input, and AI in QEMU/UTM. |
 | Vocabulary | Compiles; dictionary/index data is absent. | Bundle source data/index, then quiz interaction and optional sound. |
 | X-Caliber | Normal loader and app entry compile. | Runtime behavior, controls and data persistence. |

@@ -1,0 +1,15 @@
+I64 ModU64Checks()
+{
+    U64 quotient;
+
+    quotient = 1000;
+    if (ModU64(&quotient, 60) != 40 || quotient != 16) return 1;
+    quotient = 3;
+    if (ModU64(&quotient, 10) != 3 || quotient != 0) return 2;
+    quotient = 0xFFFFFFFFFFFFFFFF;
+    if (ModU64(&quotient, 10) != 5 || quotient != 0x1999999999999999)
+        return 3;
+    quotient = 0;
+    if (ModU64(&quotient, 7) != 0 || quotient != 0) return 4;
+    return 42;
+}

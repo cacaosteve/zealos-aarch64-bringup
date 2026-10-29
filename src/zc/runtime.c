@@ -5119,6 +5119,27 @@ static int64_t host_abs_i64(int64_t *a) {
     /* KernelB declares AbsI64 as _intern IC_ABS_I64; Aiwnios has no that opcode. */
     return a[0] < 0 ? -a[0] : a[0];
 }
+static int64_t host_mod_u64(int64_t *a) {
+    uint64_t *quotient = (uint64_t *)(uintptr_t)a[0];
+    uint64_t dividend, divisor = (uint64_t)a[1];
+    if (!quotient)
+        zc_fail("ModU64 quotient pointer is null");
+    if (!divisor)
+        zc_fail("ModU64 divisor is zero");
+    dividend = *quotient;
+    *quotient = dividend / divisor;
+    return (int64_t)(dividend % divisor);
+}
+static int64_t host_in_u8_unsupported(int64_t *a) {
+    (void)a;
+    zc_fail("CMOS/port input is unavailable on the AArch64 runtime");
+    return 0;
+}
+static int64_t host_out_u8_unsupported(int64_t *a) {
+    (void)a;
+    zc_fail("CMOS/port output is unavailable on the AArch64 runtime");
+    return 0;
+}
 static int64_t host_sign_i64(int64_t *a) {
     /* Compare rather than negate: I64_MIN must also return -1. */
     return (a[0] > 0) - (a[0] < 0);
@@ -5476,6 +5497,9 @@ static void bind_guest_task(void) {
     PrsBindCSymbol("ToF64", host_to_f64, 1);
     PrsBindCSymbol("ToI64", host_to_i64, 1);
     PrsBindCSymbol("AbsI64", host_abs_i64, 1);
+    PrsBindCSymbol("ModU64", host_mod_u64, 2);
+    PrsBindCSymbol("InU8", host_in_u8_unsupported, 1);
+    PrsBindCSymbol("OutU8", host_out_u8_unsupported, 2);
     PrsBindCSymbol("SignI64", host_sign_i64, 1);
     PrsBindCSymbol("Abs", host_abs_f64, 1);
     PrsBindCSymbol("D3Add", host_d3_add, 3);

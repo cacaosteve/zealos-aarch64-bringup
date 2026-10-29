@@ -2363,7 +2363,7 @@
      break;
    case IC_LOCK: // Lock means "lock *ptr++;",it operates on expressions as a
                  // whole
-@@ -3508,6 +3948,29 @@
+@@ -3508,6 +3948,35 @@
    got_fun:
      if (!fun)
        ParseErr(ccmp, "Invalid type to call."); // TODO add type name
@@ -2372,6 +2372,9 @@
 +        !(fun->import_name && (!strcmp(fun->import_name, "IC_SQRT") ||
 +                               !strcmp(fun->import_name, "IC_ABS") ||
 +                               !strcmp(fun->import_name, "IC_SQR") ||
++                               !strcmp(fun->import_name, "IC_MOD_U64") ||
++                               !strcmp(fun->import_name, "IC_IN_U8") ||
++                               !strcmp(fun->import_name, "IC_OUT_U8") ||
 +                               !strcmp(fun->import_name, "IC_SWAP_U16") ||
 +                               !strcmp(fun->import_name, "IC_RDTSC") ||
 +                               !strcmp(fun->import_name, "IC_RFLAGS_GET") ||
@@ -2383,6 +2386,9 @@
 +        !(fun->import_name && (!strcmp(fun->import_name, "IC_SQRT") ||
 +                               !strcmp(fun->import_name, "IC_ABS") ||
 +                               !strcmp(fun->import_name, "IC_SQR") ||
++                               !strcmp(fun->import_name, "IC_MOD_U64") ||
++                               !strcmp(fun->import_name, "IC_IN_U8") ||
++                               !strcmp(fun->import_name, "IC_OUT_U8") ||
 +                               !strcmp(fun->import_name, "IC_SWAP_U16") ||
 +                               !strcmp(fun->import_name, "IC_RDTSC") ||
 +                               !strcmp(fun->import_name, "IC_RFLAGS_GET") ||

@@ -168,8 +168,8 @@ normal-load result is not runtime acceptance.
 | Psalmody | Normal loader and app compile pass; pure note/octave conversion and default music-state checks pass. ARM64 audio is still silent, and interactive editing/playback is not accepted. |
 | Span | Compiles after adding the original control-button source and optional silent audio hooks. Runtime/form acceptance pending. |
 | Strut | Compiles after adding the original control-button source and optional silent audio hooks. Runtime/form acceptance pending. |
-| TimeClock | Compiles with the calendar/clock services. Punch-in/out, file persistence and report workflows are not accepted. |
-| Titanium | Automated QEMU confirms a key starts gameplay, Space advances frames, and Escape returns to a terminal where `40+2;` returns 42. The fix is pushed as `b201b39`; live UTM acceptance remains pending. Speaker effects are silent on ARM64. |
+| TimeClock | ARM64 `ModU64`, date conversion, and `MPrintDate`/`MPrintTime` compatibility helpers are implemented in the bootstrap bridge; `make check-time-format` covers date/time text and timezone offset. CMOS hardware clock access is unavailable. Punch-in/out, file persistence and report workflows remain unaccepted. |
+| Titanium | Automated QEMU confirms a key starts gameplay, Space advances frames, and Escape returns to a terminal where `40+2;` returns 42. The fix is pushed as `b201b39`; the user reports the live UTM guest freezes after opening Titanium, so live acceptance failed and needs investigation. Speaker effects are silent on ARM64. |
 | ToTheFront | Compile and normal load now pass with ARM64 pointer-add address generation and guarded app overlays for the sentinel, pure timing helpers, and runtime-sized map clears. Interactive game/runtime acceptance remains. |
 | Vocabulary | Compiles, but runtime needs the dictionary data/index, which is not included in this image; sound effects are silent. |
 | X-Caliber | Normal `Load.ZC` succeeds and the app entry compiles after that loader initializes registry globals. Runtime not accepted. |

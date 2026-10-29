@@ -97,12 +97,18 @@ SRC_SHADOW_END   := $(shell echo $$(($(SRC_SHADOW_LBA) + $(SRC_SHADOW_SECTS) - 1
 ESP_END_SECTOR   := $(shell echo $$(($(RS_LBA_BASE) - 1)))
 ESP_SECTORS      := $(shell echo $$(($(ESP_END_SECTOR) - $(ESP_START_SECTOR) + 1)))
 
-.PHONY: all clean esp iso run run-serial check-serial check-page-tables check-pi4-pcie-fdt check-pi4-pcie-cfg check-pi4-dma check-pi4-xhci-probe check-pi4-xhci-dma check-pi4-platform check-window-buttons check-sprite-arrow-symmetry check-doced-popup check-docfile-persistence run-iso run-pci utm pi-sd pi-diag
+.PHONY: all clean esp iso run run-serial check-serial check-page-tables check-pi4-pcie-fdt check-pi4-pcie-cfg check-pi4-dma check-pi4-xhci-probe check-pi4-xhci-dma check-pi4-platform check-window-buttons check-sprite-arrow-symmetry check-doced-popup check-docfile-persistence check-time-format check-timeclock run-iso run-pci utm pi-sd pi-diag
 
 all: $(BOOT) $(KERNEL) iso esp
 
 include src/zc/build.mk
 KERNEL_OBJS += $(ZC_OBJS)
+
+check-time-format: all
+	python3 scripts/check-compat.py --pci --quick --probe-source tests/compat/TimeFormatChecks.ZC --probe-source-call TimeFormatChecks --probe-source-kernel
+
+check-timeclock: all
+	python3 scripts/check-compat.py --pci --quick --probe-source tests/compat/TimeFormatChecks.ZC --probe-source-call TimeClockCompileChecks --probe-source-kernel
 
 $(BUILD):
 	mkdir -p $@

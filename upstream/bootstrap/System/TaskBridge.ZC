@@ -36,6 +36,10 @@ extern U16 RandU16();
 // storage during the KernelB task bridge so keyboard/task tests can use it
 // before KernelC is loaded.
 extern CCountsGlobals counts;
+// Kernel/KGlobals normally owns the timezone adjustment used by date
+// formatting and time-based applications. Keep that shared ARM64 source
+// global available to pinned programs such as TimeClock.
+CDate local_time_offset;
 extern I64 ZcFbTextSpan(I64 x, I64 y, I64 len, I64 attr, U8 *data,
                         I64 mode, I64 left_right, I64 top_bottom,
                         U32 *text_base, I64 stride);
@@ -407,6 +411,85 @@ extern U8 *StrPrintJoin(U8 *dst, U8 *format, I64 argc, I64 *argv);
 U8 *MStrPrint(U8 *format, ...)
 {
     return StrPrintJoin(NULL, format, argc, argv);
+}
+// Pinned KDate conversion helpers used by the date/time reports in TimeClock.
+// Keep the arithmetic source-compatible while leaving CMOS port access
+// unavailable on this AArch64 platform.
+U16 month_start_days[12] = {0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334};
+U16 month_start_days_leap[12] = {0, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335};
+I64 YearStartDate(I64 year)
+{
+    I64 y1 = year - 1, yd4000 = y1 / 4000, yd400 = y1 / 400,
+        yd100 = y1 / 100, yd4 = y1 / 4;
+    return year * 365 + yd4 - yd100 + yd400 - yd4000;
+}
+I64 DayOfWeek(I64 day)
+{
+    day += CDATE_BASE_DAY_OF_WEEK;
+    if (day >= 0)
+        return day % 7;
+    return 6 - (6 - day) % 7;
+}
+CDate Struct2Date(CDateStruct *ds)
+{
+    CDate cdt;
+    I64 i1 = YearStartDate(ds->year), i2 = YearStartDate(ds->year + 1);
+    if (i2 - i1 == 365)
+        i1 += month_start_days[ds->mon - 1];
+    else
+        i1 += month_start_days_leap[ds->mon - 1];
+    cdt.date = i1 + ds->day_of_mon - 1;
+    cdt.time = (ds->sec10000 + 100 * (ds->sec100 + 100 *
+        (ds->sec + 60 * (ds->min + 60 * ds->hour)))) << 21 /
+        (15 * 15 * 3 * 625);
+    return cdt;
+}
+U0 Date2Struct(CDateStruct *ds, CDate cdt)
+{
+    I64 i, k, day = cdt.date;
+    ds->day_of_week = DayOfWeek(day);
+    ds->year = (day + 1) * 100000 / CDATE_YEAR_DAYS_INT;
+    i = YearStartDate(ds->year);
+    while (i > day)
+    {
+        ds->year--;
+        i = YearStartDate(ds->year);
+    }
+    day -= i;
+    if (YearStartDate(ds->year + 1) - i == 365)
+    {
+        k = 0;
+        while (k < 11 && day >= month_start_days[k + 1])
+            k++;
+        day -= month_start_days[k];
+    }
+    else
+    {
+        k = 0;
+        while (k < 11 && day >= month_start_days_leap[k + 1])
+            k++;
+        day -= month_start_days_leap[k];
+    }
+    ds->mon = k + 1;
+    ds->day_of_mon = day + 1;
+    k = (625 * 15 * 15 * 3 * cdt.time) >> 21 + 1;
+    ds->sec10000 = ModU64(&k, 100);
+    ds->sec100 = ModU64(&k, 100);
+    ds->sec = ModU64(&k, 60);
+    ds->min = ModU64(&k, 60);
+    ds->hour = k;
+}
+U8 *MPrintTime(CDate cdt)
+{
+    CDateStruct ds;
+    Date2Struct(&ds, cdt + local_time_offset);
+    return MStrPrint("%02d:%02d:%02d", ds.hour, ds.min, ds.sec);
+}
+U8 *MPrintDate(CDate cdt)
+{
+    CDateStruct ds;
+    Date2Struct(&ds, cdt + local_time_offset);
+    return MStrPrint("%02d/%02d/%02d", ds.mon, ds.day_of_mon, ds.year % 100);
 }
 Bool IsSingleUser()
 {

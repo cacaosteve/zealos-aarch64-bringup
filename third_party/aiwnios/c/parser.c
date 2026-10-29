@@ -3953,6 +3953,9 @@ int64_t AssignRawTypeToNode(CCmpCtrl *ccmp, CRPN *rpn) {
         !(fun->import_name && (!strcmp(fun->import_name, "IC_SQRT") ||
                                !strcmp(fun->import_name, "IC_ABS") ||
                                !strcmp(fun->import_name, "IC_SQR") ||
+                               !strcmp(fun->import_name, "IC_MOD_U64") ||
+                               !strcmp(fun->import_name, "IC_IN_U8") ||
+                               !strcmp(fun->import_name, "IC_OUT_U8") ||
                                !strcmp(fun->import_name, "IC_SWAP_U16") ||
                                !strcmp(fun->import_name, "IC_RDTSC") ||
                                !strcmp(fun->import_name, "IC_RFLAGS_GET") ||
@@ -3964,6 +3967,9 @@ int64_t AssignRawTypeToNode(CCmpCtrl *ccmp, CRPN *rpn) {
         !(fun->import_name && (!strcmp(fun->import_name, "IC_SQRT") ||
                                !strcmp(fun->import_name, "IC_ABS") ||
                                !strcmp(fun->import_name, "IC_SQR") ||
+                               !strcmp(fun->import_name, "IC_MOD_U64") ||
+                               !strcmp(fun->import_name, "IC_IN_U8") ||
+                               !strcmp(fun->import_name, "IC_OUT_U8") ||
                                !strcmp(fun->import_name, "IC_SWAP_U16") ||
                                !strcmp(fun->import_name, "IC_RDTSC") ||
                                !strcmp(fun->import_name, "IC_RFLAGS_GET") ||
