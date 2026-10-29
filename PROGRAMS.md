@@ -165,7 +165,7 @@ normal-load result is not runtime acceptance.
 | Budget | Graphical entry form, field editing, save/abort, reopen and cold disk-only persistence pass in the PCI workflow; live UTM retest of the corrected image is pending. |
 | GrModels | Man and Ball forms render; both mesh-generation workflows reach their repeat prompt and return to a responsive terminal in the PCI workflow. Live UTM acceptance is pending. |
 | KeepAway | PCI gameplay frame renders; Space and mouse input leave the court active, Escape returns to the terminal, and the `40+2;` smoke check passes. Speaker effects are silent on ARM64. Live UTM retest is pending. |
-| Psalmody | Compile advances past missing text-search/reward symbols, then stops at missing `Ona2Octave`. Note conversion and audio playback remain incomplete. |
+| Psalmody | Normal loader and app compile pass; pure note/octave conversion and default music-state checks pass. ARM64 audio is still silent, and interactive editing/playback is not accepted. |
 | Span | Compiles after adding the original control-button source and optional silent audio hooks. Runtime/form acceptance pending. |
 | Strut | Compiles after adding the original control-button source and optional silent audio hooks. Runtime/form acceptance pending. |
 | TimeClock | Compiles with the calendar/clock services. Punch-in/out, file persistence and report workflows are not accepted. |

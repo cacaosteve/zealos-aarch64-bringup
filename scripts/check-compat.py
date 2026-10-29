@@ -1972,6 +1972,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             command('zload /Tests/ProgramCatalog.ZC', 'zc: loaded /Tests/ProgramCatalog.ZC')
             command('zc Print("invalid_no_warn=%d\\n",StockCatalogCompile("/Tests/NoWarnInvalid.ZC"));',
                     'invalid_no_warn=0')
+            command('zc Print("psalmody_math=%d\\n",StockCatalogPsalmodyNoteMathChecks());',
+                    'psalmody_math=42')
             paths = []
             for directory in sorted((ROOT/'upstream/pinned/Apps').iterdir()):
                 entry = directory/('Run.ZC' if (directory/'Run.ZC').exists() else 'Load.ZC')

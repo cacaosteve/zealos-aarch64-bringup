@@ -2175,6 +2175,25 @@ Bool FileOcc(U8 *needle, U8 *filename, U8 *flags="")
     Free(data);
     return FALSE;
 }
+// Sound.ZC pitch conversions are pure math and work without an audio device.
+public I8 Note2Ona(I64 note, I64 octave=4)
+{//Mid C is ona=51, note=3 and octave=4.
+    if (note < 3)
+        return (octave + 1) * 12 + note;
+    return octave * 12 + note;
+}
+public I8 Ona2Note(I8 ona)
+{//Mid C is ona=51, note=3 and octave=4.
+    return ona % 12;
+}
+public I8 Ona2Octave(I8 ona)
+{//Mid C is ona=51, note=3 and octave=4.
+    I64 note = ona % 12, octave = ona / 12;
+
+    if (note < 3)
+        return octave - 1;
+    return octave;
+}
 // Audio hardware/PSG emulation is not part of the ARM64 bring-up yet. Keep
 // source applications that treat sound as an optional effect loadable; this
 // compatibility hook deliberately produces silence.
@@ -3180,11 +3199,26 @@ class CBootstrapMusicGlobals
 {
     U8 *cur_song;
     CTask *cur_song_task;
+    I64 octave;
+    F64 note_len;
+    U8 note_map[7];
+    Bool mute;
+    I64 meter_top, meter_bottom;
     F64 tempo, stacatto_factor;
-} music;
+    I64 play_note_num;
+    F64 tM_correction, last_Beat, last_tM;
+} music = {NULL, NULL, 4, 1.0, {0, 2, 3, 5, 7, 8, 10}, FALSE,
+           4, 4, 2.5, 0.9, 0, 0, 0, 0};
 U0 CurSongTask() {}
 U0 MusicSettingsReset()
 {
+    music.play_note_num = 0;
+    music.stacatto_factor = 0.9;
+    music.tempo = 2.5;
+    music.octave = 4;
+    music.note_len = 1.0;
+    music.meter_top = 4;
+    music.meter_bottom = 4;
 }
 // The full kernel's SystemTask sets these run-level flags during startup.
 I64 sys_run_level;

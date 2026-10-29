@@ -81,6 +81,36 @@ I64 StockCatalogCompileAfterLoad(U8 *load_path, U8 *app_path)
     return result == 42;
 }
 
+I64 StockCatalogPsalmodyNoteMathChecks()
+{//The editor depends on the pure pitch/octave helpers from the sound module.
+    CTask *task = Spawn(&StockCatalogServer);
+    CJob *job;
+    U8 *source;
+    I64 result;
+
+    if (!task)
+        return -1;
+    source = MStrPrint(
+        "ExeFile2(\"/Apps/Psalmody/Load.ZC\");"
+        "if (!(Ona2Note(51)==3 && Ona2Octave(51)==4 && "
+        "Note2Ona(3,4)==51 && Note2Ona(2,4)==62 && "
+        "Ona2Octave(60)==4 && Ona2Note(60)==0)) 11;"
+        "if (music.octave!=4 || music.note_len!=1.0 || "
+        "music.note_map[0]!=0 || music.note_map[6]!=10 || "
+        "music.meter_top!=4 || music.meter_bottom!=4) 12;"
+        "42;");
+    job = TaskExe(task, Fs, source, 0);
+    Free(source);
+    if (!job)
+    {
+        Kill(task);
+        return -2;
+    }
+    result = JobResGet(job);
+    Kill(task);
+    return result;
+}
+
 I64 StockBudgetFormChildCheck()
 {//Budget's popup form must reflect classes loaded by its normal app source.
     CTask *task;
