@@ -32,6 +32,7 @@ extern CMouseStateGlobals *ZcActiveMouseGlobals();
 extern I64 BootstrapGuiTerminalZoomPanChecks();
 extern Bool BootstrapWinPixelVisible(CTask *task, I64 x, I64 y);
 extern Bool GrPlot(CDC *dc, I64 x, I64 y);
+extern U0 BootstrapGuiTerminalUserStartUp();
 // Task slots can be reused. Match both address and generation before reading
 // a terminal's history; the fixed registry owns no task-heap allocations.
 class CBootstrapTerminalState
@@ -464,8 +465,46 @@ Bool BootstrapGuiTerminalPaintEscape(U8 *command, I64 *command_len,
     return TRUE;
 }
 
+U0 BootstrapGuiTerminalTitaniumTask(U8 *filename)
+{//Run the blocking game input loop on a schedulable application task.
+    Fs->win_inhibit = WIG_USER_TASK_DEFAULT;
+    BootstrapGuiTerminalUserStartUp();
+    if (!LBts(&Fs->display_flags, DISPLAYf_SHOW))
+        Debug;
+    SettingsPush;
+    Fs->text_attr = WHITE << 4 + BLACK;
+    try
+        ExeFile2(filename);
+    catch
+        PutExcept;
+    SettingsPop;
+}
+
 U0 BootstrapGuiTerminalRunLightProgram(U8 *filename)
 {//These original programs use black ink against ZealOS's light task surface.
+    CTask *app_task;
+
+    // Titanium waits for a key before it enters its game loop. Launch it as
+    // a normal guest task so that KeyGet/Yield can schedule the input path;
+    // running it inline from a WinMgr frame leaves the frame on the root
+    // stack and prevents the focused task from consuming the key event.
+    if (!StrCompare(filename, "/Apps/Titanium/Run.ZC"))
+    {
+        app_task = Spawn(&BootstrapGuiTerminalTitaniumTask, filename,
+                         "Titanium", -1, Fs);
+        if (!TaskValidate(app_task))
+            return;
+        app_task->display_flags = 1 << DISPLAYf_SHOW;
+        app_task->border_attr = CYAN;
+        app_task->win_left = 4;
+        app_task->win_right = 70;
+        app_task->win_top = 4;
+        app_task->win_bottom = 34;
+        WinDerivedValsUpdate(app_task);
+        sys_focus_task = app_task;
+        return;
+    }
+
     SettingsPush;
     Fs->text_attr = WHITE << 4 + BLACK;
     try
@@ -492,8 +531,13 @@ U8 *BootstrapGuiTerminalMenuSource(I64 action)
     if (action == 26)
         return "BootstrapGuiTerminalRunLightProgram(\"/Apps/Budget/Run.ZC\");";
     if (action == 27)
-        return "BootstrapGuiTerminalRunLightProgram(\"/Apps/Titanium/Run.ZC\");";
+        return "BootstrapGuiTerminalTitaniumRun();";
     return NULL;
+}
+
+U0 BootstrapGuiTerminalTitaniumRun()
+{//Keep the menu action and command-line acceptance path identical.
+    BootstrapGuiTerminalRunLightProgram("/Apps/Titanium/Run.ZC");
 }
 
 U8 *BootstrapGuiTerminalMenuAction(I64 action)
@@ -1552,7 +1596,7 @@ I64 BootstrapGuiTerminalSmoke()
             return 73;
         output = BootstrapGuiTerminalMenuSource(27);
         if (!output || StrCompare(output,
-            "BootstrapGuiTerminalRunLightProgram(\"/Apps/Titanium/Run.ZC\");"))
+            "BootstrapGuiTerminalTitaniumRun();"))
             return 75;
         if (BootstrapGuiTerminalOutputOwnershipChecks() != 0x2a)
             return 74;

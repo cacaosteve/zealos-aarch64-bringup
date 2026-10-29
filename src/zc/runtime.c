@@ -3011,6 +3011,15 @@ static CHeapCtrl *code_owner(void *p) {
     }
     return NULL;
 }
+static int code_owner_is_live_task(CHeapCtrl *owner) {
+    if (!owner)
+        return 0;
+    for (unsigned i = 1; i < GUEST_APP_TASKS; i++)
+        if (guest_fibers[i].state == GUEST_RUNNABLE &&
+            owner == &guest_fibers[i].compiler_code_heap)
+            return 1;
+    return 0;
+}
 static int code_lives_with_parent(void *entry, void *parent) {
     CHeapCtrl *owner = code_owner(entry);
     if (owner == &code_heap)
@@ -3615,7 +3624,7 @@ static int64_t host_task_yield(int64_t *a) {
      * Saving a scheduler context here would replace root's suspended shell
      * context with that borrowed stack. Let DocRecalc's short lock deadline
      * advance and bail out; the owning task can finish after the frame. */
-    if (guest_task_frame_active) {
+    if (guest_task_frame_active && guest_current == 0) {
         if (guest_focus_task)
             poll_guest_keys();
         (void)host_time_cal(NULL);
@@ -4487,9 +4496,19 @@ static int64_t host_job_queue(int64_t *a) {
     uint64_t flags = (uint64_t)a[3];
     int spawn = a[4] == GUEST_JOBT_SPAWN_TASK;
     void *parent = a[6] ? (void *)(uintptr_t)a[6] : guest_fibers[0].words;
-    /* Queued callbacks may outlive their submitter. Root-owned code stays
-     * live for this compiler session; child-owned code would need pinning. */
-    if (!guest_task_bound || code_owner(callback) != &code_heap || a[2] != 0 ||
+    struct guest_fiber *submitter = &guest_fibers[guest_current];
+    CHeapCtrl *callback_owner = code_owner(callback);
+    int frame_task_callback = guest_task_frame_active && guest_current == 0 &&
+        code_owner_is_live_task(callback_owner);
+    int task_owned_callback = guest_task_bound && guest_current != GUEST_EXECUTIVE &&
+        guest_current != GUEST_SYSTEM &&
+        callback_owner != &code_heap &&
+        (code_lives_with_parent(callback, submitter->words) || frame_task_callback);
+    /* DrawIt callbacks may be queued while the root owns a borrowed frame
+     * stack. That stack cannot yield to the executive, so run a live task's
+     * callback inline and publish its result before JobQueue returns. */
+    if (!guest_task_bound ||
+        (code_owner(callback) != &code_heap && !task_owned_callback) || a[2] != 0 ||
         (spawn ? (flags != GUEST_JOBF_ADD_TO_QUE || a[7] < 0 ||
                   (uint64_t)a[7] > GUEST_STACK_MAX_BYTES ||
                   !valid_guest_task(parent))
@@ -4514,6 +4533,21 @@ static int64_t host_job_queue(int64_t *a) {
     job->flags = (int64_t)flags;
     job->addr = callback;
     job->fun_arg = (void *)(uintptr_t)a[1];
+    if (task_owned_callback)
+        job->master_task = submitter->words;
+    if (frame_task_callback) {
+        job->flags |= GUEST_JOBF_DISPATCHED;
+        int call_active = guest_job_call_active;
+        guest_job_call_active = 1;
+        job->res = FFI_CALL_TOS_1(job->addr, (int64_t)(uintptr_t)job->fun_arg);
+        guest_job_call_active = call_active;
+        job->flags |= GUEST_JOBF_DONE;
+        if (job->flags & GUEST_JOBF_FREE_ON_COMPLETE)
+            guest_job_delete(job);
+        else
+            guest_job_insert(guest_done_head(submitter), job);
+        return (int64_t)(uintptr_t)job;
+    }
     if (spawn) {
         if (name) {
             job->aux_str = __AIWNIOS_CAlloc(name_len + 1, &data_heap);
@@ -6095,7 +6129,8 @@ static size_t format_text(char *output, size_t capacity, const char *format,
         size_t spec = i + 1;
         int precision = 1;
         int has_precision = 0;
-        int left = 0, zero_pad = 0, truncate = 0, escape_dollars = 0;
+        int left = 0, zero_pad = 0, group_commas = 0;
+        int truncate = 0, escape_dollars = 0;
         size_t width = 0;
         /* ZealOS character-repeat formats use either a literal count
          * (%h7c) or a secondary count argument (%h*c). Repeat the whole
@@ -6134,9 +6169,10 @@ static size_t format_text(char *output, size_t capacity, const char *format,
             continue;
         }
 format_repeat_not_char:
-        while (format[spec] == '-' || format[spec] == '0') {
+        while (format[spec] == '-' || format[spec] == '0' || format[spec] == ',') {
             if (format[spec] == '-') left = 1;
-            else zero_pad = 1;
+            else if (format[spec] == '0') zero_pad = 1;
+            else group_commas = 1;
             spec++;
         }
         /* String width/truncation is needed by the original border callbacks.
@@ -6363,6 +6399,25 @@ decoded_string_end: ;
                 while (n)
                     number[length++] = digits[--n];
                 number[length] = 0;
+            }
+            if (group_commas && (code == 'd' || code == 'u')) {
+                size_t first_digit = number[0] == '-' || number[0] == '+' ? 1 : 0;
+                size_t digit_count = length - first_digit;
+                size_t commas = digit_count ? (digit_count - 1) / 3 : 0;
+                if (commas) {
+                    char grouped[128];
+                    size_t grouped_length = 0;
+                    if (first_digit)
+                        grouped[grouped_length++] = number[0];
+                    for (size_t j = 0; j < digit_count; j++) {
+                        if (j && (digit_count - j) % 3 == 0)
+                            grouped[grouped_length++] = ',';
+                        grouped[grouped_length++] = number[first_digit + j];
+                    }
+                    memcpy(number, grouped, grouped_length);
+                    length = grouped_length;
+                    number[length] = 0;
+                }
             }
             size_t pad = width > length ? width - length : 0;
             if (length > capacity - 1 - used ||
@@ -7009,7 +7064,8 @@ void zc_idle_step(void) {
         guarded = 0;
         return;
     }
-    if (guest_focus_task || next_guest(0)) {
+    unsigned next = next_guest(0);
+    if (guest_focus_task || next) {
         guest_background_dispatch = 1;
         (void)host_task_yield(NULL);
         guest_background_dispatch = 0;

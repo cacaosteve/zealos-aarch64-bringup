@@ -59,6 +59,19 @@ I64 TaskJobQueueCoopChecks()
     if (!IsSuspended(worker)) return 3;
     job = JobQueue(&JobCoopSleep, worker, 0, 0);
     if (!job || JobResGet(job) != 42 || TaskValidate(worker)) return 4;
+
+    // TaskExe compiles this callback into the server task's private code heap.
+    // JobQueue must retain that live owner while the task waits for completion.
+    worker = Spawn(&JobServer);
+    if (!worker) return 5;
+    job = TaskExe(worker, Fs,
+        "I64 ChildJobCallback(U8 *data){return 42;} "
+        "I64 ChildJobCheck(){CJob *queued; "
+        "queued=JobQueue(&ChildJobCallback,NULL,0,0); "
+        "if(!queued) return 1; return JobResGet(queued);} "
+        "ChildJobCheck();", 0);
+    if (!job || JobResGet(job) != 42 || !Kill(worker) || TaskValidate(worker))
+        return 6;
     return 42;
 }
 

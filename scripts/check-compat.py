@@ -43,6 +43,8 @@ p.add_argument('--probe-budget-program', action='store_true',
                help='check real clock/calendar and original Budget storage and forms')
 p.add_argument('--probe-3d-apps', action='store_true',
                help='check original GrModels, KeepAway and Titanium 3D sprite services and runtime paths')
+p.add_argument('--probe-titanium-only', action='store_true',
+               help='run only Titanium compile and graphical input/gameplay checks')
 p.add_argument('--probe-stock-interactive', action='store_true',
                help='exercise unchanged upstream interactive programs with mouse and key input')
 p.add_argument('--probe-lattice-controls', action='store_true',
@@ -139,6 +141,8 @@ if args.probe_gui_workflow:
     args.probe_gui_keyboard = True
 if args.probe_gui_editor_text:
     args.probe_gui_keyboard = True
+if args.probe_titanium_only:
+    args.probe_3d_apps = True
 if (args.probe_stock_programs or args.probe_stock_interactive or args.probe_program_catalog or
         args.probe_doc_includes or args.probe_logic_program or args.probe_budget_program or
         args.probe_3d_apps):
@@ -1338,6 +1342,59 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 raise SystemExit(2)
             command('zstatus', 'failed=0')
             focus_graphical_terminal()
+            if args.probe_titanium_only:
+                type_graphical_prompt_line('titanium-press-a-key', 'PressAKey;')
+                qmp_send_key('ret')
+                require_graphical_text('titanium-press-a-key-prompt',
+                                       'PRESS A KEY', timeout=10)
+                qmp_send_key('a')
+                run_graphical_terminal_command(
+                    'titanium-press-a-key-smoke', '40+2;', 'ans=0x2A=42',
+                    timeout=20)
+                type_graphical_prompt_line(
+                    '3d-titanium-launch', 'BootstrapGuiTerminalTitaniumRun();')
+                qmp_send_key('ret')
+                require_graphical_text('3d-titanium-help',
+                                       'Sweep side-to-side while shooting',
+                                       timeout=15)
+                before_input = command('zstatus', 'keyboard_focus=')
+                print('TITANIUM WAIT STATUS BEFORE KEY\n'+before_input, flush=True)
+                qmp_send_key('a')
+                try:
+                    require_graphical_text_absent('3d-titanium-after-key',
+                                                  'PRESS A KEY', timeout=5)
+                except RuntimeError as ui_error:
+                    try:
+                        after_input = command('zstatus', 'keyboard_focus=', timeout=5)
+                    except RuntimeError as status_error:
+                        after_input = str(status_error)
+                    screen = graphical_screen('3d-titanium-after-key-timeout')
+                    raise RuntimeError(
+                        f'{ui_error}\nTITANIUM STATUS AFTER KEY\n{after_input}\n'
+                        f'POST-KEY FRAME TEXT\n{screen[3]}') from ui_error
+                after_input = command('zstatus', 'keyboard_focus=', timeout=5)
+                print('TITANIUM GAME STATUS AFTER KEY\n'+after_input, flush=True)
+                if 'keyboard_focus=Titanium' not in after_input:
+                    raise RuntimeError('Titanium did not retain keyboard focus after starting')
+                frame_match = re.search(r'mesh_overlay: calls=(\d+)', after_input)
+                if not frame_match or int(frame_match.group(1)) == 0:
+                    raise RuntimeError('Titanium did not render a gameplay frame after starting')
+                frames_before_space = int(frame_match.group(1))
+                qmp_key_edges(['spc'], True)
+                time.sleep(0.3)
+                qmp_key_edges(['spc'], False)
+                time.sleep(0.5)
+                after_space = command('zstatus', 'keyboard_focus=Titanium', timeout=5)
+                frame_match = re.search(r'mesh_overlay: calls=(\d+)', after_space)
+                if not frame_match or int(frame_match.group(1)) <= frames_before_space:
+                    raise RuntimeError('Titanium gameplay frame did not advance after Space')
+                qmp_send_key('esc')
+                run_graphical_terminal_command(
+                    '3d-titanium-exit-smoke', '40+2;', 'ans=0x2A=42', timeout=20)
+                command('zstatus', 'failed=0')
+                print('PASS Titanium press-a-key, game frame, input and Escape recovery',
+                      flush=True)
+                raise SystemExit(0)
             type_graphical_prompt_line(
                 '3d-grmodels-launch',
                 'ExeFile2("/Apps/GrModels/Run.ZC");')
@@ -1596,20 +1653,48 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 '3d-keepaway-exit-smoke', '40+2;', 'ans=0x2A=42', timeout=20)
             command('zstatus', 'failed=0')
 
+            # Isolate the same blocking primitive Titanium uses before
+            # attributing its apparent freeze to the renderer/game loop.
             type_graphical_prompt_line(
-                '3d-titanium-launch',
-                'ExeFile2("/Apps/Titanium/Run.ZC");')
+                '3d-charget-wait', 'CharGet(,FALSE);')
+            qmp_send_key('ret')
+            time.sleep(0.5)
+            qmp_send_key('a')
+            run_graphical_terminal_command(
+                '3d-keyget-exit-smoke', '40+2;', 'ans=0x2A=42', timeout=20)
+
+            type_graphical_prompt_line(
+                '3d-titanium-launch', 'BootstrapGuiTerminalTitaniumRun();')
             qmp_send_key('ret')
             require_graphical_text('3d-titanium-help',
                                    'Sweep side-to-side while shooting',
                                    timeout=15)
             report['titanium_help_reached'] = True
-            report['titanium_gameplay_verified'] = False
+            qmp_send_key('a')
+            require_graphical_text_absent('3d-titanium-after-key',
+                                          'PRESS A KEY', timeout=10)
+            gameplay = command('zstatus', 'keyboard_focus=Titanium', timeout=5)
+            frame_match = re.search(r'mesh_overlay: calls=(\d+)', gameplay)
+            if not frame_match or int(frame_match.group(1)) == 0:
+                raise RuntimeError('Titanium did not render a gameplay frame after starting')
+            frames_before_space = int(frame_match.group(1))
+            qmp_key_edges(['spc'], True)
+            time.sleep(0.3)
+            qmp_key_edges(['spc'], False)
+            time.sleep(0.5)
+            gameplay = command('zstatus', 'keyboard_focus=Titanium', timeout=5)
+            frame_match = re.search(r'mesh_overlay: calls=(\d+)', gameplay)
+            if not frame_match or int(frame_match.group(1)) <= frames_before_space:
+                raise RuntimeError('Titanium gameplay frame did not advance after Space')
+            qmp_send_key('esc')
+            run_graphical_terminal_command(
+                '3d-titanium-exit-smoke', '40+2;', 'ans=0x2A=42', timeout=20)
+            command('zstatus', 'failed=0')
+            report['titanium_gameplay_verified'] = True
             (ROOT/'build/3d-apps-compile.json').write_text(
                 json.dumps(report, indent=2)+'\n')
-            print('PENDING Titanium gameplay input: app help is visible; '
-                  'the automated CharGet keypress did not advance it', flush=True)
-            raise SystemExit(0)
+            print('PASS Titanium game frame, input, Escape and terminal recovery',
+                  flush=True)
         if args.probe_budget_program:
             command('zload /Tests/KeyboardMenus.ZC', 'zc: loaded /Tests/KeyboardMenus.ZC')
             command('zcall KeyboardMenuChecks', 'zc => 0x000000000000002a')
