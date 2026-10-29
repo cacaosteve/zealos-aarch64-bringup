@@ -368,6 +368,10 @@ U8 *SysCAlloc(I64 size)
 {
     return CAlloc(size, ZcSystemTask());
 }
+U8 *SysMAlloc(I64 size)
+{
+    return MAlloc(size, ZcSystemTask());
+}
 U8 *SysStrNew(U8 *buf)
 {
     return StrNew(buf, ZcSystemTask());

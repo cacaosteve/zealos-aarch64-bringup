@@ -17,6 +17,12 @@ I64 AutoCompleteBootChecks()
         return 23;
     if (!Bt(&sys_run_level, RLf_AUTOCOMPLETE))
         return 24;
+    if (!acd.word_list || !acd.num_words || !acd.word_list_size)
+        return 26;
+    if (!acd.has_defs || !FileFind(ACD_DEF_FILENAME))
+        return 27;
+    if (!acd.has_words || !FileFind(ACD_WORD_FILENAME))
+        return 28;
     return 42;
 }
 

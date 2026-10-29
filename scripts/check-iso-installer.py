@@ -83,7 +83,7 @@ def build_command(temp: pathlib.Path, vars_file: pathlib.Path,
                   usb_cd: bool = False) -> list[str]:
     fw = os.environ.get("FW_CODE", "/opt/homebrew/share/qemu/edk2-aarch64-code.fd")
     platform = shlex.split(os.environ.get(
-        "QEMU_VIRT", "-machine virt,accel=hvf,gic-version=3 -cpu host -m 512 "
+        "QEMU_VIRT", "-machine virt,accel=hvf,gic-version=3 -cpu host -m 1024 "
         "-device ramfb -device virtio-keyboard-device -device virtio-tablet-device"))
     command = [os.environ.get("QEMU", "qemu-system-aarch64")] + platform
     command += ["-drive", f"if=pflash,unit=0,format=raw,file={fw},readonly=on",

@@ -506,7 +506,7 @@ QEMU_FW = \
 	-drive if=pflash,unit=1,format=raw,file=$(FW_VARS)
 
 # Match Makefile run-iso / run-serial (canonical virt HW).
-QEMU_VIRT = -machine virt,accel=hvf,gic-version=3 -cpu host -m 512 \
+QEMU_VIRT = -machine virt,accel=hvf,gic-version=3 -cpu host -m 1024 \
 	-device ramfb \
 	-device virtio-keyboard-device \
 	-device virtio-tablet-device
