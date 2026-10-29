@@ -569,6 +569,25 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         color = bytes(rgb)
         return {(x, y) for y in range(top, bottom) for x in range(left, right)
                 if pixels[(y*width+x)*3:(y*width+x)*3+3] == color}
+    def largest_color_component_center(screen, rgb, bounds):
+        points = rgb_coordinates_in(screen, rgb, bounds)
+        largest = []
+        while points:
+            stack = [points.pop()]
+            component = []
+            while stack:
+                x, y = stack.pop()
+                component.append((x, y))
+                for neighbor in ((x-1, y), (x+1, y), (x, y-1), (x, y+1)):
+                    if neighbor in points:
+                        points.remove(neighbor)
+                        stack.append(neighbor)
+            if len(component) > len(largest):
+                largest = component
+        if len(largest) < 100:
+            return len(largest), None
+        return len(largest), (sum(x for x, _ in largest) // len(largest),
+                              sum(y for _, y in largest) // len(largest))
     def graphical_ascii_glyph_matches(screen, x, y, ch, rgb):
         width, height, pixels, _ = screen
         glyphs = re.findall(r'/\*.*?\*/\s*\{([^}]+)\}',
@@ -1379,6 +1398,46 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 frame_match = re.search(r'mesh_overlay: calls=(\d+)', after_input)
                 if not frame_match or int(frame_match.group(1)) == 0:
                     raise RuntimeError('Titanium did not render a gameplay frame after starting')
+                player_bounds = (0, 400, 800, 600)
+                before_left = graphical_screen('3d-titanium-before-left')
+                before_size, before_center = largest_color_component_center(
+                    before_left, (5, 124, 126), player_bounds)
+                if before_center is None:
+                    raise RuntimeError('could not identify Titanium player sprite before movement')
+                qmp_key_edges(['left'], True)
+                time.sleep(1.0)
+                left_held_status = command('zstatus', 'keyboard_focus=Titanium', timeout=5)
+                print('TITANIUM LEFT-HELD STATUS\n'+left_held_status, flush=True)
+                if 'keyboard_bitmap: left=1' not in left_held_status:
+                    raise RuntimeError('held left arrow did not set kbd.down_bitmap')
+                during_left = graphical_screen('3d-titanium-during-left')
+                qmp_key_edges(['left'], False)
+                time.sleep(0.2)
+                after_size, after_center = largest_color_component_center(
+                    during_left, (5, 124, 126), player_bounds)
+                if after_center is None or after_center[0] >= before_center[0] - 30:
+                    raise RuntimeError('Titanium left arrow did not move the player: '
+                        f'before={before_center}/{before_size}, '
+                        f'after={after_center}/{after_size}')
+                print('PASS Titanium left arrow moves player: '
+                      f'{before_center} -> {after_center}', flush=True)
+                qmp_key_edges(['right'], True)
+                time.sleep(1.0)
+                right_held_status = command('zstatus', 'keyboard_focus=Titanium', timeout=5)
+                print('TITANIUM RIGHT-HELD STATUS\n'+right_held_status, flush=True)
+                if not re.search(r'keyboard_bitmap:.*\bright=1\b', right_held_status):
+                    raise RuntimeError('held right arrow did not set kbd.down_bitmap')
+                during_right = graphical_screen('3d-titanium-during-right')
+                qmp_key_edges(['right'], False)
+                time.sleep(0.2)
+                right_size, right_center = largest_color_component_center(
+                    during_right, (5, 124, 126), player_bounds)
+                if right_center is None or right_center[0] <= after_center[0] + 30:
+                    raise RuntimeError('Titanium right arrow did not move the player: '
+                        f'before={after_center}/{after_size}, '
+                        f'after={right_center}/{right_size}')
+                print('PASS Titanium right arrow moves player: '
+                      f'{after_center} -> {right_center}', flush=True)
                 frames_before_space = int(frame_match.group(1))
                 qmp_key_edges(['spc'], True)
                 time.sleep(0.3)

@@ -195,6 +195,26 @@ static int vk_linux_to_sc(uint16_t code) {
     return -1;
 }
 
+/* TempleOS keeps the merged scan code in byte zero and the physical,
+ * E0-distinguished scan code in byte four. Linux input codes already match
+ * Set-1 codes for ordinary keys; cursor/navigation keys and right-side
+ * modifiers need the E0 marker restored. */
+static uint64_t vk_linux_to_scan_event(uint16_t code, int merged) {
+    unsigned raw = (unsigned)merged;
+    switch (code) {
+    case 54: raw = 0x36; break; /* right shift */
+    case 97: raw = 0x9d; break; /* E0 right ctrl */
+    case 100: raw = 0xb8; break; /* E0 right alt */
+    case 102: case 103: case 104: case 105: case 106: case 107:
+    case 108: case 109: case 110: case 111:
+        raw |= 0x80; /* E0-prefixed cursor/navigation key */
+        break;
+    default:
+        break;
+    }
+    return (uint64_t)(unsigned)merged | ((uint64_t)raw << 32);
+}
+
 static int vk_keycode_ascii(uint16_t code, int shift, int ctrl) {
     struct {
         uint16_t c;
@@ -246,18 +266,37 @@ static void vk_notify(struct vk_dev *d) {
 static void vk_decode_key(struct vk_dev *d, struct vk_event ev) {
     int pressed = ev.value != 0;
     if (ev.code == VK_KEY_LEFTSHIFT || ev.code == VK_KEY_RIGHTSHIFT) {
+        unsigned old = d->shift;
         unsigned bit = ev.code == VK_KEY_LEFTSHIFT ? 1 : 2;
         d->shift = pressed ? d->shift | bit : d->shift & ~bit;
+        if (!!old != !!d->shift)
+            vk_msg_push(pressed ? 2 : 3, 0,
+                        vk_linux_to_scan_event(ev.code, 0x2a) |
+                        (d->shift ? 1ull << 9 : 0));
         return;
     }
     if (ev.code == VK_KEY_LEFTCTRL || ev.code == VK_KEY_RIGHTCTRL) {
+        unsigned old = d->ctrl;
         unsigned bit = ev.code == VK_KEY_LEFTCTRL ? 1 : 2;
         d->ctrl = pressed ? d->ctrl | bit : d->ctrl & ~bit;
+        if (!!old != !!d->ctrl)
+            vk_msg_push(pressed ? 2 : 3, 0,
+                        vk_linux_to_scan_event(ev.code, 0x1d) |
+                        (d->shift ? 1ull << 9 : 0) |
+                        (d->ctrl ? 1ull << 10 : 0) |
+                        (d->alt ? 1ull << 11 : 0));
         return;
     }
     if (ev.code == VK_KEY_LEFTALT || ev.code == VK_KEY_RIGHTALT) {
+        unsigned old = d->alt;
         unsigned bit = ev.code == VK_KEY_LEFTALT ? 1 : 2;
         d->alt = pressed ? d->alt | bit : d->alt & ~bit;
+        if (!!old != !!d->alt)
+            vk_msg_push(pressed ? 2 : 3, 0,
+                        vk_linux_to_scan_event(ev.code, 0x38) |
+                        (d->shift ? 1ull << 9 : 0) |
+                        (d->ctrl ? 1ull << 10 : 0) |
+                        (d->alt ? 1ull << 11 : 0));
         return;
     }
     int sc = vk_linux_to_sc(ev.code);
@@ -266,7 +305,9 @@ static void vk_decode_key(struct vk_dev *d, struct vk_event ev) {
         if (d->shift) sc |= 1 << 9; /* SCF_SHIFT */
         if (d->ctrl) sc |= 1 << 10; /* SCF_CTRL */
         if (d->alt) sc |= 1 << 11; /* SCF_ALT */
-        vk_msg_push(pressed ? 2 : 3, 0, (uint64_t)(unsigned)sc);
+        vk_msg_push(pressed ? 2 : 3, 0,
+                    vk_linux_to_scan_event(ev.code, sc & 0xff) |
+                    (uint64_t)(unsigned)(sc & ~0xff));
         return;
     }
     int ch = vk_keycode_ascii(ev.code, d->shift, d->ctrl);
@@ -279,10 +320,12 @@ static void vk_decode_key(struct vk_dev *d, struct vk_event ev) {
     if (d->alt) sc_flags |= 1 << 11; /* SCF_ALT */
     if (pressed) {
         vk_ring_push((uint8_t)ch);
-        vk_msg_push(2, (uint64_t)(int64_t)ch,
-                    (uint64_t)(unsigned)sc_flags); /* MESSAGE_KEY_DOWN */
+    vk_msg_push(2, (uint64_t)(int64_t)ch,
+                vk_linux_to_scan_event(ev.code, ev.code) |
+                (uint64_t)(unsigned)sc_flags); /* MESSAGE_KEY_DOWN */
     } else {
         vk_msg_push(3, (uint64_t)(int64_t)ch,
+                    vk_linux_to_scan_event(ev.code, ev.code) |
                     (uint64_t)(unsigned)sc_flags); /* MESSAGE_KEY_UP */
     }
 }

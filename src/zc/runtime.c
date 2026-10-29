@@ -3948,6 +3948,72 @@ static int64_t host_ctrl_alt_dispatch(int64_t *a) {
     FFI_CALL_TOS_1((void *)(uintptr_t)callback, scan);
     return 1;
 }
+static uint64_t guest_keyboard_bitmap_updates;
+static uint64_t guest_keyboard_bitmap_misses;
+static void guest_keyboard_bitmap_update(const char *field, unsigned scan_code,
+                                        uint8_t type) {
+    CHashGlblVar *global;
+    CMemberLst *member;
+    uint32_t *bitmap;
+    unsigned word = scan_code >> 5;
+    uint32_t mask = 1u << (scan_code & 31);
+    if (!Fs || !Fs->hash_table || word >= 8 || (type != 2 && type != 3)) {
+        guest_keyboard_bitmap_misses++;
+        return;
+    }
+    global = (CHashGlblVar *)HashFind("kbd", Fs->hash_table,
+                                      HTT_GLBL_VAR, 1);
+    if (!global || !global->data_addr || !global->var_class) {
+        guest_keyboard_bitmap_misses++;
+        return;
+    }
+    member = guest_class_member(global->var_class, field);
+    if (!member || !member->member_class || member->off < 0 ||
+        member->member_class->sz != (int64_t)sizeof(uint32_t) ||
+        member->dim.total_cnt < 8 ||
+        member->off > global->var_class->sz -
+                      8 * (int64_t)sizeof(uint32_t)) {
+        guest_keyboard_bitmap_misses++;
+        return;
+    }
+    bitmap = (uint32_t *)((uint8_t *)global->data_addr + member->off);
+    if (type == 2)
+        bitmap[word] |= mask;
+    else
+        bitmap[word] &= ~mask;
+    guest_keyboard_bitmap_updates++;
+}
+static int guest_keyboard_bitmap_read(const char *field, unsigned scan_code) {
+    CHashGlblVar *global;
+    CMemberLst *member;
+    uint32_t word;
+    if (!Fs || !Fs->hash_table || scan_code >= 256)
+        return -1;
+    global = (CHashGlblVar *)HashFind("kbd", Fs->hash_table,
+                                      HTT_GLBL_VAR, 1);
+    if (!global || !global->data_addr || !global->var_class)
+        return -1;
+    member = guest_class_member(global->var_class, field);
+    if (!member || !member->member_class || member->off < 0 ||
+        member->member_class->sz != (int64_t)sizeof(uint32_t) ||
+        member->dim.total_cnt < 8 ||
+        member->off > global->var_class->sz -
+                      8 * (int64_t)sizeof(uint32_t))
+        return -1;
+    memcpy(&word, (uint8_t *)global->data_addr + member->off +
+           (scan_code >> 5) * sizeof(word), sizeof(word));
+    return !!(word & (1u << (scan_code & 31)));
+}
+static void guest_keyboard_scan_state_update(uint8_t type, uint64_t scan) {
+    unsigned merged = (unsigned)(scan & 0xff);
+    unsigned raw = (unsigned)((scan >> 32) & 0xff);
+    if (!merged)
+        return;
+    if (!raw)
+        raw = merged;
+    guest_keyboard_bitmap_update("down_bitmap", merged, type);
+    guest_keyboard_bitmap_update("down_bitmap2", raw, type);
+}
 static int64_t poll_guest_keys(void) {
     if (!key_reader)
         return 0;
@@ -3979,6 +4045,7 @@ static int64_t poll_guest_keys(void) {
         guest_keyboard_route_last_arg2 = (int64_t)sc;
         if (type != 2 && type != 3)
             continue;
+        guest_keyboard_scan_state_update(type, sc);
         if (post_guest_message(task, NULL,
                                type, (int64_t)ch, (int64_t)sc, 0))
         {
@@ -7709,6 +7776,12 @@ void zc_status(void) {
            (long)guest_keyboard_route_last_type,
            (long)guest_keyboard_route_last_arg1,
            (long)guest_keyboard_route_last_arg2);
+    printf("keyboard_bitmap: left=%d right=%d ctrl=%d updates=%lu misses=%lu\n",
+           guest_keyboard_bitmap_read("down_bitmap", 0x4b),
+           guest_keyboard_bitmap_read("down_bitmap", 0x4d),
+           guest_keyboard_bitmap_read("down_bitmap", 0x1d),
+           (unsigned long)guest_keyboard_bitmap_updates,
+           (unsigned long)guest_keyboard_bitmap_misses);
     if (gui_terminal_active) {
         (void)zc_call("BootstrapGuiTerminalKeyEventCount", &gui_key_events);
         (void)zc_call("BootstrapGuiTerminalLastKeyChar", &gui_last_char);
