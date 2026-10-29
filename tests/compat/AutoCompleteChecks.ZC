@@ -1,6 +1,9 @@
 I64 AutoCompleteBootChecks()
 {
     CHashAC *entry;
+    CFile *file;
+    U8 *block;
+    U8 *definition;
 
     // Home startup is queued to the graphical shell; drain that text before
     // observing its globally shared index and popup task.
@@ -23,6 +26,33 @@ I64 AutoCompleteBootChecks()
         return 27;
     if (!acd.has_words || !FileFind(ACD_WORD_FILENAME))
         return 28;
+    file = FOpen(ACD_DEF_FILENAME, "r");
+    if (!file || FSize(file) <= 2 * BLK_SIZE)
+        return 29;
+    block = MAlloc(2 * BLK_SIZE);
+    if (!block)
+    {
+        FClose(file);
+        return 30;
+    }
+    if (!FBlkRead(file, block) || file->fblk_num != 1)
+    {
+        Free(block);
+        FClose(file);
+        return 31;
+    }
+    if (!FBlkRead(file, block, 1, 2) || file->fblk_num != 3)
+    {
+        Free(block);
+        FClose(file);
+        return 32;
+    }
+    Free(block);
+    FClose(file);
+    definition = ACDDefGet("Computer");
+    if (!definition || StrLen(definition) < 8)
+        return 33;
+    Free(definition);
     return 42;
 }
 

@@ -2138,6 +2138,83 @@ I64 KbdMouseEventTime()
 {
     return 0;
 }
+
+// Read-only CFile bridge for the source-backed ARM64 bootstrap. The x86
+// kernel's block-file implementation is not available here; expose the same
+// block-oriented reads over FileRead so bundled ISO assets and writable disk
+// files can use consumers such as AutoComplete's dictionary definition API.
+#define BOOTSTRAP_CFILE_READ_TAG 0x5A434649
+
+CFile *FOpen(U8 *filename, U8 *flags, I64 count=0)
+{
+    CFile *f;
+    U8 *data;
+    I64 size;
+
+    if (!filename || !flags ||
+        (StrCompare(flags, "r") && StrCompare(flags, "rb")))
+        return NULL;
+    data = FileRead(filename, &size);
+    if (!data || size <= 0)
+    {
+        Free(data);
+        return NULL;
+    }
+    f = MAlloc(sizeof(CFile));
+    if (!f)
+    {
+        Free(data);
+        return NULL;
+    }
+    MemSet(f, 0, sizeof(CFile));
+    f->flags = BOOTSTRAP_CFILE_READ_TAG;
+    f->max_blk = size; // byte length for this source-backed CFile
+    f->clus_buf = data;
+    return f;
+}
+
+Bool FBlkRead(CFile *f, U8 *buf, I64 blk=FFB_NEXT_BLK, I64 count=1)
+{
+    I64 byte_offset, bytes, available, copy_size;
+
+    if (!f || f->flags != BOOTSTRAP_CFILE_READ_TAG || !f->clus_buf ||
+        !buf || count <= 0 || count > I64_MAX / BLK_SIZE)
+        return FALSE;
+    if (blk == FFB_NEXT_BLK)
+        blk = f->fblk_num;
+    if (blk < 0 || blk > I64_MAX / BLK_SIZE ||
+        blk + count < blk || blk + count > I64_MAX / BLK_SIZE)
+        return FALSE;
+    byte_offset = blk * BLK_SIZE;
+    bytes = count * BLK_SIZE;
+    if (byte_offset >= f->max_blk)
+        return FALSE;
+    available = f->max_blk - byte_offset;
+    copy_size = bytes;
+    if (copy_size > available)
+        copy_size = available;
+    MemSet(buf, 0, bytes);
+    MemCopy(buf, f->clus_buf + byte_offset, copy_size);
+    f->fblk_num = blk + count;
+    return TRUE;
+}
+
+U0 FClose(CFile *f)
+{
+    if (!f || f->flags != BOOTSTRAP_CFILE_READ_TAG)
+        return;
+    Free(f->clus_buf);
+    f->flags = 0;
+    Free(f);
+}
+
+I64 FSize(CFile *f)
+{
+    if (!f || f->flags != BOOTSTRAP_CFILE_READ_TAG)
+        return 0;
+    return f->max_blk;
+}
+
 U0 GodDoodle(U8 *hex=NULL)
 {
     if (hex) {}

@@ -3474,6 +3474,21 @@ an existing customized home file. `System/SourceHome.ZC` joins the twelve
 repository-managed refresh paths so its ABI stays synchronized with the
 kernel. No UTM refresh was performed for this milestone.
 
+## Read-only CFile access for bundled app data (2026-10-28)
+
+The ARM64 bootstrap now provides a read-only `FOpen`/`FBlkRead`/`FClose`/`FSize`
+subset over `FileRead`. It preserves block offsets, sequential `FFB_NEXT_BLK`
+reads, requested block counts, and zero-fills the unused part of a partial
+final block. This enables pinned AutoComplete/Vocabulary code to read the
+bundled `ACDefs.DATA` definitions through its unchanged CFile API. The focused
+autocomplete boot probe checks default sequential reads, explicit block/count
+reads, file size, and that `ACDDefGet("Computer")` returns a definition.
+Writes through `CFile` remain unsupported; `FileWrite` is the existing
+source-volume write path. The updated probe, app catalog, Digital Logic,
+Budget, and 3D application probes pass in QEMU. Titanium's repeated freeze in
+the user's live UTM session remains to be reconciled with its passing QEMU
+input/gameplay/Escape probe.
+
 `make check-home-path` verifies aliases, context restoration, unsupported-path
 recovery, shared home ownership and exact managed-memory reclamation. It
 writes a home source file and relative header, executes them from an unrelated
