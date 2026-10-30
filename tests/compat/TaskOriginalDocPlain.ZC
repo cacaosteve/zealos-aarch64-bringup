@@ -23,6 +23,16 @@ I64 TaskOriginalDocPlainChecks()
 		return 6;
 	if (entry->attr != RED)
 		return 7;
+	entry = ParseDollarCmd(doc, "SP,\"<1>\",BI=0");
+	if (!entry || entry->type_u8 != DOCT_SPRITE)
+		return 9;
+	if (!(entry->de_flags & DOCEF_HAS_BIN) || entry->bin_num != 0)
+		return 10;
+	entry = ParseDollarCmd(doc, "SP,\"\",BI=0");
+	if (!entry || entry->type_u8 != DOCT_SPRITE)
+		return 11;
+	if (!(entry->de_flags & DOCEF_HAS_BIN) || entry->bin_num != 0)
+		return 12;
 	// DocPrint collapses $$ → $ then DocPutS → ParseDollarCmd.
 	DocPrint(doc, "$$TX,\"Yo\"$$");
 	entry = doc->head.next;

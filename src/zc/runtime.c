@@ -393,6 +393,8 @@ static int64_t guest_keyboard_route_last_arg2;
 static int64_t guest_parent_off, guest_number_off, guest_name_off, guest_flags_off;
 static int64_t guest_gs_off;
 static int64_t guest_display_flags_off;
+static int64_t guest_put_doc_off, guest_display_doc_off, guest_border_doc_off;
+static int64_t guest_win_inhibit_off;
 static int64_t guest_win_left_off, guest_win_right_off;
 static int64_t guest_win_top_off, guest_win_bottom_off, guest_text_attr_off;
 static int64_t guest_next_task_off, guest_last_task_off;
@@ -5482,6 +5484,10 @@ static void bind_guest_task(void) {
     guest_name_off = MemberFind("task_name", cls)->off;
     guest_flags_off = MemberFind("task_flags", cls)->off;
     guest_display_flags_off = MemberFind("display_flags", cls)->off;
+    guest_put_doc_off = MemberFind("put_doc", cls)->off;
+    guest_display_doc_off = MemberFind("display_doc", cls)->off;
+    guest_border_doc_off = MemberFind("border_doc", cls)->off;
+    guest_win_inhibit_off = MemberFind("win_inhibit", cls)->off;
     guest_win_left_off = MemberFind("win_left", cls)->off;
     guest_win_right_off = MemberFind("win_right", cls)->off;
     guest_win_top_off = MemberFind("win_top", cls)->off;
@@ -6291,6 +6297,9 @@ format_repeat_not_char:
                 spec++;
             }
         }
+        /* The upstream formatter accepts grouping after precision too, as in
+         * %12.2,f. Keep the pre-width flag accepted by the existing subset. */
+        if (format[spec] == ',') { group_commas = 1; spec++; }
         if (format[spec] == 't') { truncate = 1; spec++; }
         /* Aiwnios can normalize %$$Q to %$Q while decoding source strings. */
         if (format[spec] == '$') {
@@ -6491,11 +6500,24 @@ decoded_string_end: ;
                     number[length++] = digits[--n];
                 number[length] = 0;
             }
-            if (group_commas && (code == 'd' || code == 'u')) {
+            if (group_commas && (code == 'd' || code == 'u' ||
+                                 code == 'f' || code == 'F' ||
+                                 code == 'g' || code == 'G')) {
                 size_t first_digit = number[0] == '-' || number[0] == '+' ? 1 : 0;
-                size_t digit_count = length - first_digit;
+                size_t integer_end = length;
+                if (code == 'f' || code == 'F' || code == 'g' || code == 'G') {
+                    for (size_t j = first_digit; j < length; j++)
+                        if (number[j] == '.' || number[j] == 'e' || number[j] == 'E') {
+                            integer_end = j;
+                            break;
+                        }
+                }
+                size_t digit_count = integer_end - first_digit;
                 size_t commas = digit_count ? (digit_count - 1) / 3 : 0;
-                if (commas) {
+                int all_digits = digit_count > 0;
+                for (size_t j = first_digit; j < integer_end; j++)
+                    if (number[j] < '0' || number[j] > '9') all_digits = 0;
+                if (commas && all_digits) {
                     char grouped[128];
                     size_t grouped_length = 0;
                     if (first_digit)
@@ -6505,6 +6527,9 @@ decoded_string_end: ;
                             grouped[grouped_length++] = ',';
                         grouped[grouped_length++] = number[first_digit + j];
                     }
+                    memcpy(grouped + grouped_length, number + integer_end,
+                           length - integer_end);
+                    grouped_length += length - integer_end;
                     memcpy(number, grouped, grouped_length);
                     length = grouped_length;
                     number[length] = 0;
@@ -7480,6 +7505,11 @@ int zc_start_gui_terminal(void) {
          * after DocPlain defines ParseDollarCmd so DocLoad/DocPrint retain the
          * real parser, including welcome text, links, colors and saved flags. */
         "/System/DolDoc/DocPutS.ZC",
+        /* SpriteBridge was compiled during graphics startup against the
+         * cycle-breaking DocPutS/parser. Rebind DocSprite/Sprite now that the
+         * real DolDoc parser is loaded, so embedded CSprites become DOCT_SPRITE
+         * entries instead of inert DOCT_ERROR entries. */
+        "/System/Gr/SpriteBridge.ZC",
         /* DocClear was compiled against the early no-op DocPrint. Rebind its
          * original body after the real writer exists, before applications and
          * editor helpers capture its address. */
@@ -7549,9 +7579,16 @@ int zc_start_gui_terminal(void) {
                 return -1;
         if (zc_call("BootstrapDefinesLoad", &result) != 0)
             return -1;
-        for (size_t i = 0; i < sizeof(doc_modules) / sizeof(*doc_modules); i++)
+        for (size_t i = 0; i < sizeof(doc_modules) / sizeof(*doc_modules); i++) {
             if (zc_load_mode(doc_modules[i], 0) != 0)
                 return -1;
+            /* DocInit is a function, not a top-level module initializer. The
+             * bridge parser only knows the early bootstrap commands until its
+             * real command/flag tables are populated. */
+            if (!strcmp(doc_modules[i], "/System/DolDoc/DocInit.ZC") &&
+                    zc_exec("DocInit;") != 0)
+                return -1;
+        }
         gui_terminal_modules_loaded = 1;
     }
     zc_output("zc: graphical terminal starting system task\n");
@@ -7758,6 +7795,29 @@ void zc_status(void) {
     printf("keyboard_focus=%s\n", keyboard_focus
            ? (const char *)((unsigned char *)keyboard_focus->words + guest_name_off)
            : "none");
+    for (unsigned i = 0; i < GUEST_TASKS; i++) {
+        struct guest_fiber *fiber = &guest_fibers[i];
+        if (fiber->state != GUEST_RUNNABLE)
+            continue;
+        void *parent_words = i
+            ? *(void **)((unsigned char *)fiber->words + guest_parent_off) : NULL;
+        struct guest_fiber *parent = parent_words ? find_guest_task(parent_words) : NULL;
+        printf("guest_task[%u]: name=%s parent=%s kill=%d ending=%d wait=%d\n",
+               i, (const char *)((unsigned char *)fiber->words + guest_name_off),
+               parent ? (const char *)((unsigned char *)parent->words + guest_name_off) : "none",
+               fiber->kill_requested, fiber->ending, fiber->wait_kind);
+        printf("  task_docs: put=%p display=%p border=%p\n",
+               *(void **)((unsigned char *)fiber->words + guest_put_doc_off),
+               *(void **)((unsigned char *)fiber->words + guest_display_doc_off),
+               *(void **)((unsigned char *)fiber->words + guest_border_doc_off));
+        printf("  task_window: show=%08x inhibit=%08x rect=%ld,%ld,%ld,%ld\n",
+               *(uint32_t *)((unsigned char *)fiber->words + guest_display_flags_off),
+               *(uint32_t *)((unsigned char *)fiber->words + guest_win_inhibit_off),
+               *(int64_t *)((unsigned char *)fiber->words + guest_win_left_off),
+               *(int64_t *)((unsigned char *)fiber->words + guest_win_right_off),
+               *(int64_t *)((unsigned char *)fiber->words + guest_win_top_off),
+               *(int64_t *)((unsigned char *)fiber->words + guest_win_bottom_off));
+    }
     if (keyboard_focus)
         printf("user_command: original_loop=%d statements=%lu\n",
                keyboard_focus->user_prompt_reader != NULL,

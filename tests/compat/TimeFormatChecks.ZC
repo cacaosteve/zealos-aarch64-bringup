@@ -5,7 +5,16 @@ I64 TimeFormatChecks()
     CDateStruct ds;
     CDate date;
     U8 *text;
+    U8 *grouped;
     U64 quotient;
+
+    grouped = MStrPrint("%12.2,f", 12345.67);
+    if (StrCompare(grouped, "   12,345.67"))
+    {
+        Free(grouped);
+        return 7;
+    }
+    Free(grouped);
 
     quotient = 1000;
     if (ModU64(&quotient, 60) != 40 || quotient != 16) return 10;

@@ -37,19 +37,32 @@ Record a separate result for each program at each level:
 
 ## Present status
 
+On 2026-10-29, the isolated compile catalog compiled all 12 app entry points
+and five shared/demo checks; the ToTheFront and X-Caliber loaders also passed
+normal-load checks. TimeClock's app compile and focused date/time formatter
+gate pass. This remains compile/load evidence only except where noted in the
+table. Focused graphical QEMU probes verified Span's bridge frame,
+Shift+Escape cleanup, and terminal recovery, plus Strut's help, mass-placement
+frame change, play-mode switch, Escape, and terminal recovery (`40+2;` -> 42).
+A ToTheFront GUI launch now displays and accepts text in the seed popup after
+popup-server stdout is routed into its DolDoc. The subsequent player-type
+picker shows its title and AI-directory guidance, but no choices in scanout;
+gameplay acceptance is still blocked on that selector.
+
 | Program/group | Evidence now available | Next acceptance gap |
 |--|--|--|
 | Doodle, Mass Spring, Game of Life | User confirmed live UTM drawing/simulation and Escape recovery. | Retest only if shared graphics/input code changes. |
 | Digital Logic | User confirmed corrected AND workflow in live UTM; PCI workflow covers editing, setup aborts, drawing and recovery. | Retest only if shared prompt/document code changes. |
 | Budget | PCI workflow covers form editing, save/reopen and cold persistence; menu-fix image has automated coverage. | Live UTM retest of the corrected menu/form image. |
-| GrModels | PCI workflow covers Man/Ball forms and mesh generation. | Live UTM forms, generated meshes and exit. |
-| KeepAway | PCI workflow covers gameplay, Space/mouse input, Escape and shell recovery. | Live UTM gameplay; ARM64 speaker effects are currently silent. |
-| Titanium | Live UTM confirms gameplay, Space firing and Escape recovery; Ctrl+left/right work. Ordinary left/right did not move because the VirtIO keyboard bridge posted messages without updating ZealOS's held-key bitmaps. The bridge now updates merged and raw scan-code bitmaps; a rebuilt QEMU probe confirms both arrows move the player and Escape recovers to a terminal where `40+2;` returns 42. | Check ordinary left/right in live UTM with the rebuilt ISO. ARM64 speaker effects are silent. |
+| GrModels | PCI workflow covers Man/Ball forms and mesh generation. Live UTM reaches `Vertices:58` and the repeat prompt after choosing a color. QEMU diagnostics confirm an embedded `DOCT_SPRITE` entry with binary data, and a QEMU capture rendered a small magenta Ball sprite. The user reports no sprite visible in UTM after color selection; do not count the app as visually accepted yet. | Reproduce the missing UTM sprite; determine whether it is hidden/offscreen or a renderer/presentation difference, then verify a clearly visible sprite and Escape/recovery. At the repeat prompt choose `n` to return. |
+| KeepAway | PCI workflow covers gameplay, Space/mouse input, Escape and shell recovery. Live UTM gameplay initially advances and the player follows the pointer, but the user reports a later guest freeze with input unresponsive. | Reproduce and diagnose the live UTM freeze; ARM64 speaker effects are silent. |
+| Titanium | Live UTM confirms gameplay, Space firing, Escape recovery, and ordinary Left/Right movement on ISO `219d751c…`. The VirtIO keyboard bridge updates merged and raw scan-code bitmaps; QEMU confirms arrow movement and Escape recovery to a terminal where `40+2;` returns 42. | ARM64 speaker effects are silent. |
 | Psalmody | Normal loader and app compile pass; catalog regression checks note/octave conversion helpers and default shared music state. | ARM64 audio path and interactive song editing/playback. |
-| Span, Strut | Compile after adding original control-button source and optional silent audio hooks. | Runtime/forms, save behavior and exit. |
-| TimeClock | ARM64 `ModU64`, Gregorian date conversion, and `MPrintDate`/`MPrintTime` compatibility helpers are implemented in the bootstrap bridge. CMOS register access stays unavailable. | Verify the focused formatter gate, then exercise punch-in/out, persistence and reports in QEMU/UTM. |
-| ToTheFront | Compile and normal load pass after ARM64 pointer-add address generation and guarded source overlays for its sentinel, pure timing helpers, and runtime-sized map clears. | Exercise map initialization, game turns, drawing, input, and AI in QEMU/UTM. |
-| Vocabulary | Compiles; dictionary/index data is absent. | Bundle source data/index, then quiz interaction and optional sound. |
+| Span | QEMU graphical entry/help/frame, Shift+Escape cleanup, worker cleanup, and shell recovery pass. | Live UTM bridge editing and save workflow. |
+| Strut | QEMU help, mass placement/frame change, Space play-mode switch, Escape, and shell recovery pass. | Live UTM editing/play behavior; ship save/reopen workflow. |
+| TimeClock | App compile and focused `ModU64`, Gregorian date conversion, date/time text, and timezone formatter gates pass. CMOS register access stays unavailable. | Exercise punch-in/out, persistence, and reports in QEMU/UTM. |
+| ToTheFront | Compile and normal load pass after ARM64 pointer-add address generation and guarded source overlays for its sentinel, pure timing helpers, and runtime-sized map clears. Popup text now displays in its own window. The player-type picker renders its title and AI-directory guidance, but no selectable entries are visible. | Diagnose AI picker choices/data, then exercise map initialization, turns, drawing, input, and AI in QEMU/UTM. |
+| Vocabulary | Compiles. `ACDefs.DATA` and `ACWords.DATA` are bundled and guest reads pass. Fresh QEMU PCI probe confirms boot dictionary indexing (`COMPUTER`), `ACDDefGet("Computer")`, completion popup startup, fixture completion fill, and autocomplete task teardown. | Launch `/Apps/Vocabulary/Run.ZC`; verify quiz prompts, answer handling, definition display, Escape recovery, and optional sound. |
 | X-Caliber | Normal loader and app entry compile. | Runtime behavior, controls and data persistence. |
 
 The primary current named-app tracker is [PROGRAMS.md](../PROGRAMS.md). The
@@ -74,8 +87,8 @@ actual UTM environment.
    work), then TimeClock and X-Caliber (clock/registry/persistence). Reuse the
    Budget form and cold-boot gates where applicable.
 2. **Compiler and bundled data:** run ToTheFront's newly compiling game and resolve any runtime blockers;
-   bundle and exercise Vocabulary's dictionary/index. Keep compiler support
-   separate from app-data availability so failures are easy to attribute.
+   initialize Vocabulary's already-bundled dictionary/index and exercise its quiz.
+   Keep compiler support separate from app-data availability so failures are easy to attribute.
 3. **Audio and music:** add a bounded ARM64 audio service, then complete
    Psalmody note conversion/playback and the Sound demos. A silent no-op hook
    is compile compatibility, not audio acceptance.

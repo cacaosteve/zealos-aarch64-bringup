@@ -1,6 +1,6 @@
 I64 AutoCompleteBootChecks()
 {
-    CHashAC *entry;
+    CHashGeneric *entry;
     CFile *file;
     U8 *block;
     U8 *definition;
@@ -10,11 +10,11 @@ I64 AutoCompleteBootChecks()
     TaskWait(bootstrap_gui_terminal_task);
     if (!ac.hash_table)
         return 25;
-    entry = HashFind("ZealAutoFixtureWord7Z", ac.hash_table, HTT_WORD);
-
+    // The boot mask's text corpus is optional on the live image. Vocabulary
+    // requires the separate dictionary word list and definitions below.
+    // The dedicated completion fixture is added by AutoCompleteFixtureInit.
+    entry = HashFind("COMPUTER", ac.hash_table, HTT_DICT_WORD);
     if (!entry)
-        return 21;
-    if (!entry->hits)
         return 22;
     if (!TaskValidate(ac.task))
         return 23;
@@ -53,6 +53,17 @@ I64 AutoCompleteBootChecks()
     if (!definition || StrLen(definition) < 8)
         return 33;
     Free(definition);
+    return 42;
+}
+
+I64 AutoCompleteFixtureInit()
+{
+    CHashAC *entry;
+
+    ACInit("/Tests/AutoCompleteCorpus.txt");
+    entry = HashFind("ZealAutoFixtureWord7Z", ac.hash_table, HTT_WORD);
+    if (!entry || !entry->hits || !TaskValidate(ac.task))
+        return 34;
     return 42;
 }
 

@@ -309,6 +309,50 @@ I64 TaskFilesFindNativeStreamChecks()
     return 1;
 }
 
+I64 TaskFilesFindRelativeDirectoryMaskChecks()
+{
+    CDirEntry *entries, *de, *next;
+    U8 *old_cur_dir;
+    Bool found_human = FALSE, found_simple = FALSE;
+
+    old_cur_dir = Fs->cur_dir;
+    Fs->cur_dir = StrNew("/Apps/ToTheFront");
+    entries = FilesFind("AIs/*.ZC*", FUF_JUST_FILES);
+    for (de = entries; de; de = de->next)
+    {
+        if (de->full_name &&
+            !StrCompare(de->full_name, "/Apps/ToTheFront/AIs/Human.ZC"))
+            found_human = TRUE;
+        if (de->full_name &&
+            !StrCompare(de->full_name, "/Apps/ToTheFront/AIs/SimpleAI.ZC"))
+            found_simple = TRUE;
+    }
+    for (de = entries; de; de = next)
+    {
+        next = de->next;
+        Free(de->full_name);
+        Free(de);
+    }
+    entries = FilesFind("~/ToTheFront/*.ZC*", FUF_JUST_FILES);
+    if (entries)
+    {
+        for (de = entries; de; de = next)
+        {
+            next = de->next;
+            Free(de->full_name);
+            Free(de);
+        }
+        Free(Fs->cur_dir);
+        Fs->cur_dir = old_cur_dir;
+        return 2;
+    }
+    Free(Fs->cur_dir);
+    Fs->cur_dir = old_cur_dir;
+    if (!found_human || !found_simple)
+        return 1;
+    return 42;
+}
+
 I64 TaskFilesFindChecks()
 {
     CDirEntry *entries, *de, *next;

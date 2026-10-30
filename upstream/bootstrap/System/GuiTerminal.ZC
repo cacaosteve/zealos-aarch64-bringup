@@ -1023,6 +1023,10 @@ U0 UserStartUp()
 U0 ServerStartUp()
 {//Late-bound HomeSys hook called by source-backed popup server tasks.
     BootstrapHomeServerStartUp;
+    // Popup tasks use Print/StrGet just like the visible shell. Route their
+    // stdout into the server task's DolDoc so the window manager renders it
+    // and input editing remains attached to the popup document.
+    ZcUserOutputSet(&BootstrapGuiTerminalPrintOutput);
 }
 
 U0 BootstrapGuiTerminalTileHomeWindows(CTask *first, CTask *second)

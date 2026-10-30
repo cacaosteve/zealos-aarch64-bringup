@@ -728,6 +728,57 @@ def translate_budget_strings(source: bytes) -> bytes:
     return source.replace(old, b"if (*ptr == ',')", 1)
 
 
+def translate_span_worker_cleanup(source: bytes) -> bytes:
+    # Debug instrumentation for worker teardown in the compatibility probe.
+    """Join Span's app-owned workers before its stack-backed animation state ends."""
+    replacements = (
+        (b'F64 SpanTime()\n',
+         b'I64 span_worker_cleanup_diag;\n'
+         b'F64 SpanTime()\n'),
+        (b'\tCCtrl\t\t*bt_run, *bt_mode;\n',
+         b'\tCCtrl\t\t*bt_run, *bt_mode;\n'
+         b'\tCTask\t\t*span_song_task = NULL, *span_animate_task = NULL;\n'),
+        (b'\tFs->song_task = Spawn(&SongTask, NULL, "Song",, Fs);',
+         b'\tspan_song_task = Fs->song_task = Spawn(&SongTask, NULL, "Song",, Fs);'),
+        (b'\tFs->animate_task = Spawn(&AnimateTask, &a, "Animate",, Fs);',
+         b'\tspan_animate_task = Fs->animate_task = Spawn(&AnimateTask, &a, "Animate",, Fs);'),
+        (b'\tDocClear;\n\tSettingsPop;\n',
+         b'\t// Stop app workers before their stack data and graphics state go away.\n'
+         b'\tspan_worker_cleanup_diag = 1;\n'
+         b'\tif (Fs->animate_task == span_animate_task)\n'
+         b'\t\tspan_worker_cleanup_diag |= 1 << 1;\n'
+         b'\tif (Fs->song_task == span_song_task)\n'
+         b'\t\tspan_worker_cleanup_diag |= 1 << 2;\n'
+         b'\tif (TaskValidate(span_animate_task))\n'
+         b'\t\tspan_worker_cleanup_diag |= 1 << 3;\n'
+         b'\tif (TaskValidate(span_song_task))\n'
+         b'\t\tspan_worker_cleanup_diag |= 1 << 4;\n'
+         b'\tif (TaskValidate(span_animate_task))\n'
+         b'\t{\n'
+         b'\t\tspan_worker_cleanup_diag |= Kill(span_animate_task, TRUE) << 5;\n'
+         b'\t}\n'
+         b'\tif (TaskValidate(span_song_task))\n'
+         b'\t{\n'
+         b'\t\tspan_worker_cleanup_diag |= Kill(span_song_task, TRUE) << 6;\n'
+         b'\t}\n'
+         b'\tif (TaskValidate(span_animate_task))\n'
+         b'\t\tspan_worker_cleanup_diag |= 1 << 7;\n'
+         b'\tif (TaskValidate(span_song_task))\n'
+         b'\t\tspan_worker_cleanup_diag |= 1 << 8;\n'
+         b'\tif (Fs->animate_task == span_animate_task)\n'
+         b'\t\tFs->animate_task = NULL;\n'
+         b'\tif (Fs->song_task == span_song_task)\n'
+         b'\t\tFs->song_task = NULL;\n'
+         b'\tDocClear;\n\tSettingsPop;\n'),
+    )
+    text = source
+    for old, new in replacements:
+        if text.count(old) != 1:
+            raise ValueError('pinned Span worker lifecycle changed')
+        text = text.replace(old, new, 1)
+    return text
+
+
 def translate_tothefront_sentinel(source: bytes) -> bytes:
     """Compare the ToTheFront queue cursor to its sentinel object's address."""
     old = b'while (tmpi != *indirect_head)'

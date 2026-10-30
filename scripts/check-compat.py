@@ -43,10 +43,16 @@ p.add_argument('--probe-budget-program', action='store_true',
                help='check real clock/calendar and original Budget storage and forms')
 p.add_argument('--probe-3d-apps', action='store_true',
                help='check original GrModels, KeepAway and Titanium 3D sprite services and runtime paths')
+p.add_argument('--probe-span-strut', action='store_true',
+               help='exercise original Span bridge and Strut ship apps through entry, input and exit')
+p.add_argument('--probe-tothefront', action='store_true',
+               help='exercise original ToTheFront setup, map, phase input and exit')
 p.add_argument('--probe-titanium-only', action='store_true',
                help='run only Titanium compile and graphical input/gameplay checks')
 p.add_argument('--probe-stock-interactive', action='store_true',
                help='exercise unchanged upstream interactive programs with mouse and key input')
+p.add_argument('--probe-popup-menu', action='store_true',
+               help='verify the live color-picker PopUpMenu displays and accepts a mouse selection')
 p.add_argument('--probe-lattice-controls', action='store_true',
                help='check live Lattice mouse placement/aim, colors, restart, and Space in the GUI')
 p.add_argument('--probe-gui-windowdemo-input', action='store_true',
@@ -145,7 +151,7 @@ if args.probe_titanium_only:
     args.probe_3d_apps = True
 if (args.probe_stock_programs or args.probe_stock_interactive or args.probe_program_catalog or
         args.probe_doc_includes or args.probe_logic_program or args.probe_budget_program or
-        args.probe_3d_apps):
+        args.probe_3d_apps or args.probe_tothefront):
     args.pci = True
     args.probe_gui_keyboard = True
 if args.probe_lattice_controls:
@@ -211,6 +217,7 @@ log_path = ROOT / 'build' / (f'check-usb-{usb_label}{"-budget" if args.probe_bud
                              'check-logic-pci.log' if args.probe_logic_program else
                              'check-doc-includes-pci.log' if args.probe_doc_includes else
                              'check-program-catalog-pci.log' if args.probe_program_catalog else
+                             'check-popup-menu-pci.log' if args.probe_popup_menu else
                              'check-stock-interactive-pci.log' if args.probe_stock_interactive else
                              'check-stock-programs-pci.log' if args.probe_stock_programs else
                              'check-grblot3-pci.log' if args.probe_grblot3 else
@@ -402,6 +409,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         # visible-pixel or OCR assertions.
         mode = ('budget-' if args.probe_budget_program else
                 '3d-apps-' if args.probe_3d_apps else
+                'tothefront-' if args.probe_tothefront else
+                'popup-menu-' if args.probe_popup_menu else
                 'doc-includes-' if args.probe_doc_includes else
                 'logic-' if args.probe_logic_program else
                 'interactive-' if args.probe_stock_interactive else
@@ -1238,6 +1247,168 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         if int(scanout.group(1)) < 1000:
             raise RuntimeError('boot graphical terminal is not painting visible pixels:\n' + desktop)
         print('PASS boot graphical terminal window and framebuffer diagnostics', flush=True)
+        if args.probe_popup_menu:
+            command('zload /Tests/PopupMenus.ZC', 'zc: loaded /Tests/PopupMenus.ZC')
+            focus_graphical_terminal()
+            command('zc TaskExe(bootstrap_gui_terminal_task,NULL,"PopUpColor;",1<<JOBf_FREE_ON_COMPLETE);',
+                    'zc: executed')
+            require_graphical_text('popup-menu-choice', 'RED', timeout=10,
+                                   foreground_threshold=25000)
+            output = command(
+                'zc Print("popup_point=%X\\n",StockPopupPoint("__RED"));',
+                'popup_point=')
+            point = int(re.search(r'popup_point=([0-9A-Fa-f]+)', output).group(1), 16)
+            if point == 0xffffffffffffffff:
+                raise RuntimeError('PopUpMenu did not expose the selectable entry')
+            move_graphical_pointer(point & 0xffffffff, point >> 32)
+            graphical_mouse_button('left', True)
+            time.sleep(.2)
+            graphical_mouse_button('left', False)
+            command('zstatus', 'failed=0')
+            command('zc Print("popup_menu_focus=%d\\n",sys_focus_task==bootstrap_gui_terminal_task);',
+                    'popup_menu_focus=1')
+            command('zstatus', 'failed=0')
+            print('PASS live color-picker PopUpMenu selection and focus return', flush=True)
+            raise SystemExit(0)
+        if args.probe_tothefront:
+            focus_graphical_terminal()
+            run_graphical_terminal_command(
+                'tothefront-ready', '40+2;', 'ans=0x2A=42')
+            type_graphical_prompt_line(
+                'tothefront-launch',
+                'ExeFile2("/Apps/ToTheFront/Run.ZC");')
+            qmp_send_key('ret')
+            require_graphical_text('tothefront-seed', 'GameSeed(0x', timeout=30)
+            qmp_send_key('ret')
+
+            def choose_tothefront_player(name):
+                expected_player = ('Player 1 Type' if name.endswith('player1')
+                                   else 'Player 2 Type')
+                screen = require_graphical_text(
+                    name, expected_player, timeout=15)
+                player_text = re.search(re.escape(expected_player), screen[3])
+                if not player_text:
+                    raise RuntimeError('ToTheFront did not open a player type menu:\n'+screen[3])
+                # Human is the first choice at x=0. Its orange selected text
+                # is present in RGB scanout but omitted by the monochrome OCR.
+                move_graphical_pointer(20, 28)
+                graphical_mouse_button('left', True)
+                time.sleep(0.1)
+                graphical_mouse_button('left', False)
+                time.sleep(0.2)
+                after_click = graphical_screen(name+'-after-click')
+                if expected_player in after_click[3]:
+                    # In the source-window menu the first entry can be
+                    # preselected even when the mouse-up event is swallowed.
+                    qmp_send_key('ret')
+
+            choose_tothefront_player('tothefront-player1')
+            choose_tothefront_player('tothefront-player2')
+            require_graphical_text(
+                'tothefront-help', 'Left-click and drag to move or fire units',
+                timeout=20)
+            move_graphical_pointer(192, 116)
+            graphical_mouse_button('left', True)
+            time.sleep(0.2)
+            graphical_mouse_button('left', False)
+            match = require_graphical_text(
+                'tothefront-turn', 'Turn 1', timeout=30)
+            colors = Counter(tuple(match[2][i:i+3])
+                             for i in range(0, len(match[2]), 3))
+            if len(colors) < 8:
+                raise RuntimeError('ToTheFront map lacks terrain/unit color variety')
+            before_phase = match[3]
+            qmp_send_key('spc')
+            time.sleep(0.4)
+            after_phase = graphical_screen('tothefront-next-phase')
+            if after_phase[3] == before_phase:
+                raise RuntimeError('ToTheFront Space did not advance or redraw the phase')
+            qmp_send_key('esc')
+            run_graphical_terminal_command(
+                'tothefront-exit-smoke', '40+2;', 'ans=0x2A=42', timeout=20)
+            command('zstatus', 'failed=0')
+            print('PASS ToTheFront setup, map, phase input, Escape and terminal recovery',
+                  flush=True)
+            raise SystemExit(0)
+        if args.probe_span_strut:
+            focus_graphical_terminal()
+            run_graphical_terminal_command('span-strut-ready', '40+2;', 'ans=0x2A=42')
+            span_workers_before = command(
+                'zstatus', 'keyboard_focus=Terminal', timeout=10)
+            span_worker_ids_before = re.findall(
+                r'guest_task\[(\d+)\]: name=(?:Song|Animate) parent=Terminal',
+                span_workers_before)
+            type_graphical_prompt_line(
+                'span-launch', 'ExeFile2("/Apps/Span/Run.ZC");')
+            qmp_send_key('ret')
+            require_graphical_text('span-help', 'Build a bridge to hold-up', timeout=15)
+            # Dismiss the popup by clicking OK. A Return key-up can remain in
+            # the app queue and satisfy Span's subsequent Shift+Escape
+            # key-up wait before the exit path is actually under observation.
+            move_graphical_pointer(120, 172)
+            graphical_mouse_button('left', True)
+            time.sleep(0.1)
+            graphical_mouse_button('left', False)
+            time.sleep(0.5)
+            # App message loops can own terminal focus directly; do not assume
+            # that the shared Server task remains the keyboard focus target.
+            command('zstatus', 'keyboard_focus=', timeout=10)
+            span_frame = graphical_screen('span-initial-frame')
+            if not re.search(r'nonblack_pixels=(\d+) of 480000',
+                             command('zstatus', 'nonblack_pixels=')):
+                raise RuntimeError('Span did not report framebuffer output')
+            # Send a complete chord after dismissing help by mouse so there is
+            # no unrelated Return key-up queued for Span's exit wait.
+            qmp_send_keys(['shift', 'esc'])
+            deadline = time.monotonic() + 10
+            span_exit_status = ''
+            while time.monotonic() < deadline:
+                span_exit_status = command(
+                    'zstatus', 'keyboard_focus=', timeout=10)
+                if re.search(r'keyboard_focus=Terminal\r?\n', span_exit_status):
+                    break
+                time.sleep(0.2)
+            if not re.search(r'keyboard_focus=Terminal\r?\n', span_exit_status):
+                raise RuntimeError(
+                    'Span did not return focus to terminal after Shift+Escape:\n' +
+                    span_exit_status)
+            span_worker_ids_after = re.findall(
+                r'guest_task\[(\d+)\]: name=(?:Song|Animate) parent=Terminal',
+                span_exit_status)
+            if span_worker_ids_after != span_worker_ids_before:
+                raise RuntimeError(
+                    'Span exit did not restore the original Song/Animate tasks: '
+                    f'before={span_worker_ids_before}, after={span_worker_ids_after}\n' +
+                    span_exit_status)
+            focus_graphical_terminal()
+            run_graphical_terminal_command('span-exit-smoke', '40+2;', 'ans=0x2A=42', timeout=20)
+            print('PASS Span bridge entry, instructions, graphical frame and Shift+Escape recovery',
+                  flush=True)
+
+            type_graphical_prompt_line(
+                'strut-launch', 'ExeFile2("/Apps/Strut/Run.ZC");')
+            qmp_send_key('ret')
+            require_graphical_text('strut-help', 'Sel mass mode.', timeout=15)
+            qmp_send_key('a')
+            time.sleep(0.5)
+            command('zstatus', 'keyboard_focus=', timeout=10)
+            qmp_send_key('m')
+            move_graphical_pointer(400, 250)
+            graphical_mouse_button('left', True)
+            time.sleep(0.1)
+            graphical_mouse_button('left', False)
+            time.sleep(0.5)
+            strut_frame = graphical_screen('strut-edit-frame')
+            if strut_frame[2] == span_frame[2]:
+                raise RuntimeError('Strut edit input did not change the framebuffer')
+            qmp_send_key('spc')  # switch from edit to play mode
+            time.sleep(0.5)
+            command('zstatus', 'keyboard_focus=', timeout=10)
+            qmp_send_key('esc')
+            run_graphical_terminal_command('strut-exit-smoke', '40+2;', 'ans=0x2A=42', timeout=20)
+            command('zstatus', 'failed=0')
+            print('PASS Strut help, edit/play input, graphics and Escape recovery', flush=True)
+            raise SystemExit(0)
         if args.probe_doc_includes:
             focus_graphical_terminal()
             run_graphical_terminal_command('doc-includes-ready', '40+2;', 'ans=0x2A=42')
@@ -1585,6 +1756,9 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             graphical_mouse_button('left', True)
             time.sleep(0.15)
             graphical_mouse_button('left', False)
+            # A click can place the caret on the DolDoc button without
+            # activating it. Return activates the focused Ball link.
+            qmp_send_key('ret')
             ball_form = require_graphical_text('3d-grmodels-ball-form', 'Longitude Faces',
                                                 timeout=12)
             if 'Radius' not in ball_form[3] or 'Lattitude Rings' not in ball_form[3]:
@@ -1601,6 +1775,23 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             print('PASS GrModels Ball mesh generation; '+
                   next((line.strip() for line in ball_generated[3].splitlines()
                         if 'Vertices:' in line), 'Vertices reported'), flush=True)
+            ball_render_diag = command(
+                'zc Print("3d_ball_doc_sprite=%d,%d,%d,%d,%d,%d,%d\\n",'
+                'sprite_debug_doc_sprite_calls,sprite_debug_doc_sprite_doc_is_put,'
+                'sprite_debug_doc_sprite_doc_is_display,'
+                'sprite_debug_doc_sprite_doc_window_is_current,'
+                'sprite_debug_doc_sprite_entry_type,sprite_debug_doc_sprite_has_bin,'
+                'sprite_debug_mesh_calls);', 'zc: executed', timeout=20)
+            print('GRMODELS BALL DOCUMENT/RENDER DIAGNOSTIC\\n'+ball_render_diag,
+                  flush=True)
+            command(
+                'zc I64 GrModelsBallSpriteEntryCheck(){'
+                'if (sprite_debug_doc_sprite_calls>0 && '
+                '(sprite_debug_doc_sprite_entry_type&0xFF)==DOCT_SPRITE && '
+                'sprite_debug_doc_sprite_has_bin) return 42; return 0;};',
+                'zc: executed')
+            command('zcall GrModelsBallSpriteEntryCheck',
+                    'zc => 0x000000000000002a')
             qmp_send_key('n')
             time.sleep(0.5)
             graphical_screen('3d-grmodels-ball-after-exit')
@@ -2550,10 +2741,15 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     'zc: loaded /Tests/AutoCompleteChecks.ZC')
             command('zcall AutoCompleteBootChecks',
                     'zc => 0x000000000000002a')
-            print('PASS boot autocomplete corpus indexing and task startup', flush=True)
+            print('PASS boot dictionary indexing, definitions and popup task startup',
+                  flush=True)
             # Exercise the real foreground key handler and AutoComplete task,
             # not just the dictionary API. The fixture word has a unique
             # prefix, so Ctrl+F1 should insert exactly its remaining suffix.
+            # Initialize the fixture explicitly after verifying the normal
+            # HomeSys corpus; it is intentionally not part of the boot mask.
+            command('zcall AutoCompleteFixtureInit',
+                    'zc => 0x000000000000002a')
             focus_graphical_terminal()
             prefix = 'ZealAutoFixtureWord7'
             completion = prefix + 'Z'
@@ -4945,6 +5141,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     command('zcall NativeOverlayLoaded',
                             'zc => 0x000000000000002a')
                     command('zcall TaskFilesFindNativeOverlayChecks',
+                            'zc => 0x000000000000002a')
+                    command('zcall TaskFilesFindRelativeDirectoryMaskChecks',
                             'zc => 0x000000000000002a')
                     command('zrm Tests/FilesFindOverlayDir/Nested/Only.ZC',
                             'zrm: deleted Tests/FilesFindOverlayDir/Nested/Only.ZC')

@@ -10,9 +10,26 @@ from arm64_source import (extract_sprite_elem_base_sizes, inject_sprite_elem_bas
                           extract_sprite_matrix_draw, inject_sprite_matrix_draw)
 
 from arm64_source import (extract_home_set, extract_home_startup, extract_home_startup_tasks, inject_home_startup_tasks, extract_server_task, extract_user_task, extract_version_scalars, extract_source_prompt, extract_source_training, translate_autocomplete_task, translate_doctree, translate_registry, translate_docterm, translate_doced, translate_docfind, translate_docform, translate_docpopup, translate_docrecalc, translate_grbitmap, translate_tothefront_draw, translate_tothefront_init, translate_tothefront_sentinel,
-                          translate_filemgr, translate_grdc, translate_grpalette, translate_message, translate_grscreen, translate_ktask, translate_winmgr, translate_zsplash, translate_home_once)
+                          translate_filemgr, translate_grdc, translate_grpalette, translate_message, translate_grscreen, translate_ktask, translate_winmgr, translate_zsplash, translate_home_once, translate_span_worker_cleanup)
 
 root = Path(__file__).resolve().parent.parent
+span_source = (root / 'upstream/pinned/Apps/Span/SpanMain.ZC').read_bytes()
+span_overlay = translate_span_worker_cleanup(span_source)
+assert span_overlay != span_source
+assert b'span_worker_cleanup_diag |= Kill(span_animate_task, TRUE) << 5;' in span_overlay
+assert span_overlay.count(b'CTask\t\t*span_song_task = NULL, *span_animate_task = NULL;') == 1
+assert span_overlay.count(b'Kill(span_animate_task, TRUE) << 5;') == 1
+assert span_overlay.count(b'Kill(span_song_task, TRUE) << 6;') == 1
+assert b'Fs->animate_task = NULL;' in span_overlay
+assert b'Fs->song_task = NULL;' in span_overlay
+try:
+    translate_span_worker_cleanup(span_source.replace(
+        b'Fs->animate_task = Spawn(&AnimateTask, &a, "Animate",, Fs);',
+        b'Fs->other_task = Spawn(&AnimateTask, &a, "Animate",, Fs);', 1))
+except ValueError:
+    pass
+else:
+    raise AssertionError('Span cleanup overlay accepted changed worker spawn')
 sprite_new = (root/'upstream/pinned/System/Gr/SpriteNew.ZC').read_bytes()
 sprite_bridge = (root/'upstream/bootstrap/System/Gr/SpriteBridge.ZC').read_bytes()
 assert b'Fs ? Fs->task_name : NULL' not in sprite_bridge

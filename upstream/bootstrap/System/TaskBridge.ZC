@@ -2092,13 +2092,15 @@ CDirEntry *FilesFind(U8 *files_find_mask, I64 fuf_flags=0)
 {
     CDirEntry *head = NULL, *tail = NULL;
     U8 path[256], full_name[258], cur_dir[128];
-    U8 *remainder, *slash, *end;
-    I64 index = 0, size, cur_len, i, j, file_len;
+    U8 *remainder, *slash, *end, *mask_dir = NULL, *mask_leaf;
+    U8 *absolute_dir = NULL, *root_dir = NULL;
+    I64 index = 0, size, cur_len, i, j, file_len, dir_len;
     Bool recurse, added;
 
     if (!files_find_mask || !*files_find_mask ||
         ((fuf_flags & FUF_JUST_DIRS) && (fuf_flags & FUF_JUST_FILES)))
         return NULL;
+    mask_leaf = files_find_mask;
     if (Fs && Fs->cur_dir)
     {
         for (i = 0; Fs->cur_dir[i] && i < sizeof(cur_dir) - 1; i++)
@@ -2109,6 +2111,48 @@ CDirEntry *FilesFind(U8 *files_find_mask, I64 fuf_flags=0)
     {
         cur_dir[0] = '/';
         cur_dir[1] = 0;
+    }
+    slash = StrLastOcc(files_find_mask, "/");
+    if (slash)
+    {
+        dir_len = slash - files_find_mask;
+        if (slash[1])
+            mask_leaf = StrNew(slash + 1);
+        else
+            mask_leaf = StrNew("*");
+        if (!dir_len)
+            mask_dir = StrNew("/");
+        else
+        {
+            mask_dir = MAlloc(dir_len + 1);
+            MemCopy(mask_dir, files_find_mask, dir_len);
+            mask_dir[dir_len] = 0;
+        }
+        absolute_dir = ZcSourcePath(mask_dir);
+        // Preserve the previous source-root lookup for relative paths whose
+        // first component names a root directory rather than a child of cwd.
+        if ((!absolute_dir || !ZcSourceDirExists(absolute_dir)) &&
+            files_find_mask[0] != '/' && files_find_mask[0] != '~' &&
+            !StrOcc(files_find_mask, ':'))
+        {
+            root_dir = MStrPrint("/%s", mask_dir);
+            Free(absolute_dir);
+            absolute_dir = ZcSourcePath(root_dir);
+            Free(root_dir);
+        }
+        if (absolute_dir)
+        {
+            U8 *absolute_path = absolute_dir;
+            if (absolute_path[0] == 'd' && absolute_path[1] == 'i' &&
+                absolute_path[2] == 's' && absolute_path[3] == 'k' &&
+                absolute_path[4] == ':')
+                absolute_path += 5;
+            for (i = 0; absolute_path[i] && i < sizeof(cur_dir) - 1; i++)
+                cur_dir[i] = absolute_path[i];
+            cur_dir[i] = 0;
+        }
+        Free(absolute_dir);
+        Free(mask_dir);
     }
     cur_len = StrLen(cur_dir);
     while (cur_len > 1 && cur_dir[cur_len - 1] == '/')
@@ -2129,7 +2173,7 @@ CDirEntry *FilesFind(U8 *files_find_mask, I64 fuf_flags=0)
                     (recurse || !StrOcc(remainder, '/')))
                 {
                     added = BootstrapFilesFindAppend(&head, &tail, full_name,
-                        size, FALSE, files_find_mask, fuf_flags);
+                        size, FALSE, mask_leaf, fuf_flags);
                     if (added && (fuf_flags & FUF_SINGLE))
                         break;
                 }
@@ -2147,7 +2191,7 @@ CDirEntry *FilesFind(U8 *files_find_mask, I64 fuf_flags=0)
                             path[i] = full_name[i];
                         path[j] = 0;
                         added = BootstrapFilesFindAppend(&head, &tail, path,
-                            0, TRUE, files_find_mask, fuf_flags);
+                            0, TRUE, mask_leaf, fuf_flags);
                         if (added && (fuf_flags & FUF_SINGLE))
                             break;
                         if (!recurse)
@@ -2176,13 +2220,15 @@ CDirEntry *FilesFind(U8 *files_find_mask, I64 fuf_flags=0)
                     (recurse || !StrOcc(remainder, '/')))
                 {
                     added = BootstrapFilesFindAppend(&head, &tail, full_name,
-                        size, FALSE, files_find_mask, fuf_flags);
+                        size, FALSE, mask_leaf, fuf_flags);
                     if (added && (fuf_flags & FUF_SINGLE))
                         break;
                 }
             }
         }
     }
+    if (mask_leaf != files_find_mask)
+        Free(mask_leaf);
     return head;
 }
 U0 DirTreeDel(CDirEntry *entry)
@@ -2364,6 +2410,8 @@ public I8 Ona2Octave(I8 ona)
 U0 Play(U8 *music=NULL, ...)
 {
     if (music) {}
+    // Keep silent music loops cooperative until ARM64 audio is implemented.
+    Sleep(1);
 }
 U0 SoundTaskEndCB()
 {
@@ -6990,6 +7038,21 @@ U8 *FileExtDot(U8 *src)
             break;
     }
     return NULL;
+}
+U8 *FileExtRemove(U8 *src, U8 *dst=NULL)
+{//Remove a filename's extension in place and optionally copy the suffix.
+    U8 *dot = FileExtDot(src);
+
+    if (dst)
+    {
+        if (dot)
+            StrCopy(dst, dot + 1);
+        else
+            dst[0] = 0;
+    }
+    if (dot)
+        *dot = 0;
+    return src;
 }
 U0 WinZBufUpdate()
 {//Build cell and pixel z-buffers plus the bitmap of visible windows.
