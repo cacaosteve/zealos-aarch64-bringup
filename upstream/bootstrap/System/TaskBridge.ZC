@@ -341,7 +341,7 @@ I64 BootstrapStrLen(U8 *source)
         length++;
     return length;
 }
-U8 *StrNew(U8 *source, CTask *mem_task=NULL)
+public U8 *StrNew(U8 *source, CTask *mem_task=NULL)
 {
     I64 bytes = 1;
     if (source)
@@ -415,6 +415,8 @@ U8 *MStrPrint(U8 *format, ...)
 // Pinned KDate conversion helpers used by the date/time reports in TimeClock.
 // Keep the arithmetic source-compatible while leaving CMOS port access
 // unavailable on this AArch64 platform.
+U32 char_bmp_white_space[16] =
+{0x80002600, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 U16 month_start_days[12] = {0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334};
 U16 month_start_days_leap[12] = {0, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335};
 I64 YearStartDate(I64 year)
@@ -1875,7 +1877,44 @@ Bool BootstrapFileFindPath(U8 *filename, I64 fuf_flags, U8 *resolved,
     Free(dir);
     return FALSE;
 }
-Bool FileFind(U8 *filename, CDirEntry *_de=NULL, I64 fuf_flags=0)
+public Bool DirMake(U8 *filename, I64 entry_count=0)
+{
+    U8 *absolute;
+    U8 *marker;
+    I64 length;
+    Bool result;
+
+    if (!filename || !*filename)
+        return FALSE;
+    absolute = ZcSourcePath(filename);
+    if (!absolute)
+        return FALSE;
+    if (ZcSourceDirExists(absolute))
+    {
+        Free(absolute);
+        return TRUE;
+    }
+    if (!ZcSourceWritable(absolute))
+    {
+        Free(absolute);
+        return FALSE;
+    }
+    length = StrLen(absolute);
+    marker = MAlloc(length + 6);
+    StrCopy(marker, absolute);
+    if (length && marker[length - 1] != '/')
+        marker[length++] = '/';
+    marker[length++] = '.';
+    marker[length++] = 'D';
+    marker[length++] = 'I';
+    marker[length++] = 'R';
+    marker[length] = 0;
+    result = FileWrite(marker, "DIR", 3) == 3;
+    Free(marker);
+    Free(absolute);
+    return result;
+}
+public Bool FileFind(U8 *filename, CDirEntry *_de=NULL, I64 fuf_flags=0)
 {
     U8 *leaf;
     U8 resolved[256];

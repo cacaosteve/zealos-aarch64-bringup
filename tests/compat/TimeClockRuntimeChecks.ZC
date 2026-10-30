@@ -1,0 +1,49 @@
+#include "/System/DateBridge.ZC"
+#include "/Apps/TimeClock/TimeClk.ZC"
+
+I64 TimeClockStorageChecks()
+{
+    TimeEntry *header;
+    TimeEntry *entry;
+    TimeEntry *report_header;
+    TimeEntry *loaded;
+    Bool is_in;
+
+    if (!FileFind("~/TimeClock",, FUF_JUST_DIRS) && !DirMake("~/TimeClock"))
+        return 1;
+    if (!FileFind("~/TimeClock",, FUF_JUST_DIRS) || !DirMake("~/TimeClock"))
+        return 2;
+
+    header = CAlloc(sizeof(TimeEntry));
+    QueueInit(header);
+    entry = CAlloc(sizeof(TimeEntry));
+    entry->type = TET_PUNCH_IN;
+    entry->datetime = Now - 100;
+    entry->desc = StrNew("compatibility shift start");
+    QueueInsert(entry, header->last);
+    entry = CAlloc(sizeof(TimeEntry));
+    entry->type = TET_PUNCH_OUT;
+    entry->datetime = Now;
+    entry->desc = StrNew("compatibility shift end");
+    QueueInsert(entry, header->last);
+
+    TimeFileWrite(header);
+    TimeEntriesDel(header);
+
+    loaded = CAlloc(sizeof(TimeEntry));
+    TimeFileRead(loaded);
+    if (loaded->next == loaded || loaded->next->type != TET_PUNCH_IN ||
+        StrCompare(loaded->next->desc, "compatibility shift start"))
+        return 3;
+    if (loaded->last == loaded || loaded->last->type != TET_PUNCH_OUT ||
+        StrCompare(loaded->last->desc, "compatibility shift end"))
+        return 4;
+    TimeEntriesDel(loaded);
+
+    is_in = TimeRep(&report_header);
+    TimeEntriesDel(report_header);
+    if (is_in)
+        return 5;
+
+    return 42;
+}
