@@ -377,7 +377,14 @@
        ref = CodeMiscAddRef(rpn->code_misc->dft_lab, fail1_addr);
        ref->patch_cond_br = ARM_bcc;
        ref->user_data1 = ARM_LT;
-@@ -3720,13 +3806,13 @@
+@@ -3693,5 +3779,6 @@
+       goto restore_reg;
+       break;
+     case IC_DEREF:
++    case IC_ADD:
+       next = rpn->base.next;
+       code_off = __OptPassFinal(cctrl, next, bin, code_off);
+@@ -3720,13 +3807,13 @@
          into_reg = 8;
        if (cctrl->code_ctrl->final_pass) {
          i = ARM_adrX(MIR(cctrl, into_reg),

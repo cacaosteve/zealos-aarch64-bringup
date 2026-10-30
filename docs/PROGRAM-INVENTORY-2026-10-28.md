@@ -41,7 +41,11 @@ On 2026-10-29, the isolated compile catalog compiled all 12 app entry points
 and five shared/demo checks; the ToTheFront and X-Caliber loaders also passed
 normal-load checks. TimeClock's app compile and focused date/time formatter
 gate pass. This remains compile/load evidence only except where noted in the
-table. Focused graphical QEMU probes verified Span's bridge frame,
+table. Vocabulary's new PCI runtime probe launches the quiz, displays its
+dictionary content, accepts a numbered answer and advances, then exits with
+Escape to a terminal whose `40+2;` expression returns 42. This does not yet
+visually validate the short-lived answer feedback or dictionary popup. Focused
+graphical QEMU probes verified Span's bridge frame,
 Shift+Escape cleanup, and terminal recovery, plus Strut's help, mass-placement
 frame change, play-mode switch, Escape, and terminal recovery (`40+2;` -> 42).
 A ToTheFront GUI launch now displays and accepts text in the seed popup after
@@ -62,7 +66,7 @@ gameplay acceptance is still blocked on that selector.
 | Strut | QEMU help, mass placement/frame change, Space play-mode switch, Escape, and shell recovery pass. | Live UTM editing/play behavior; ship save/reopen workflow. |
 | TimeClock | App compile and focused `ModU64`, Gregorian date conversion, date/time text, and timezone formatter gates pass. CMOS register access stays unavailable. | Exercise punch-in/out, persistence, and reports in QEMU/UTM. |
 | ToTheFront | Compile and normal load pass after ARM64 pointer-add address generation and guarded source overlays for its sentinel, pure timing helpers, and runtime-sized map clears. Popup text now displays in its own window. The player-type picker renders its title and AI-directory guidance, but no selectable entries are visible. | Diagnose AI picker choices/data, then exercise map initialization, turns, drawing, input, and AI in QEMU/UTM. |
-| Vocabulary | Compiles. `ACDefs.DATA` and `ACWords.DATA` are bundled and guest reads pass. Fresh QEMU PCI probe confirms boot dictionary indexing (`COMPUTER`), `ACDDefGet("Computer")`, completion popup startup, fixture completion fill, and autocomplete task teardown. | Launch `/Apps/Vocabulary/Run.ZC`; verify quiz prompts, answer handling, definition display, Escape recovery, and optional sound. |
+| Vocabulary | The PCI runtime probe launches `/Apps/Vocabulary/Run.ZC`, displays dictionary question content, accepts a numbered answer and advances, then Escape restores a terminal where `40+2;` returns 42. The autocomplete gate covers the bundled `ACDefs.DATA`/`ACWords.DATA`, boot indexing (`COMPUTER`), `ACDDefGet("Computer")`, completion popup startup and fixture completion. | Visually verify answer feedback and definition popup; check sound separately (ARM64 audio remains silent). |
 | X-Caliber | Normal loader and app entry compile. | Runtime behavior, controls and data persistence. |
 
 The primary current named-app tracker is [PROGRAMS.md](../PROGRAMS.md). The

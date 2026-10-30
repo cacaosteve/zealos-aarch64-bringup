@@ -773,6 +773,11 @@ check-autocomplete: check-upstream esp
 	python3 scripts/check-arm64-source.py
 	python3 scripts/check-compat.py --pci --probe-autocomplete
 
+.PHONY: check-vocabulary-program
+check-vocabulary-program: check-upstream esp
+	python3 scripts/check-arm64-source.py
+	python3 scripts/check-compat.py --pci --probe-vocabulary
+
 .PHONY: check-input-edges
 check-input-edges: esp
 	python3 scripts/check-compat.py --pci --probe-input-edges

@@ -93,6 +93,8 @@ p.add_argument('--probe-dvd-live', action='store_true',
                help='verify ISO/DVD boot enters the graphical live session and reports installer status')
 p.add_argument('--probe-autocomplete', action='store_true',
                help='verify upstream autocomplete indexes a source corpus and stops cleanly')
+p.add_argument('--probe-vocabulary', action='store_true',
+               help='exercise the original Vocabulary quiz, answer feedback, definition popup and exit')
 p.add_argument('--probe-input-edges', action='store_true',
                help='check visible modifier typing and held-key release without the full workflow')
 p.add_argument('--probe-source-exceptions', action='store_true',
@@ -151,7 +153,7 @@ if args.probe_titanium_only:
     args.probe_3d_apps = True
 if (args.probe_stock_programs or args.probe_stock_interactive or args.probe_program_catalog or
         args.probe_doc_includes or args.probe_logic_program or args.probe_budget_program or
-        args.probe_3d_apps or args.probe_tothefront):
+        args.probe_3d_apps or args.probe_tothefront or args.probe_vocabulary):
     args.pci = True
     args.probe_gui_keyboard = True
 if args.probe_lattice_controls:
@@ -228,6 +230,7 @@ log_path = ROOT / 'build' / (f'check-usb-{usb_label}{"-budget" if args.probe_bud
                              'check-source-editor-pci.log' if args.probe_source_editor else
                              'check-home-autostart-pci.log' if args.probe_home_autostart else
                              'check-autocomplete-pci.log' if args.probe_autocomplete else
+                             'check-vocabulary-pci.log' if args.probe_vocabulary else
                              'check-input-edges-pci.log' if args.probe_input_edges else
                              'check-registry-pci.log' if args.probe_registry and args.pci else
                              'check-registry-iso.log' if args.probe_registry else
@@ -408,6 +411,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         # their QMP screendumps separate so one VM cannot satisfy another's
         # visible-pixel or OCR assertions.
         mode = ('budget-' if args.probe_budget_program else
+                'vocabulary-' if args.probe_vocabulary else
                 '3d-apps-' if args.probe_3d_apps else
                 'tothefront-' if args.probe_tothefront else
                 'popup-menu-' if args.probe_popup_menu else
@@ -2786,6 +2790,48 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             print('PASS graphical autocomplete suggestion and Ctrl+F1 fill-in', flush=True)
             command('zcall AutoCompleteChecks', 'zc => 0x000000000000002a')
             print('PASS upstream autocomplete corpus indexing and task teardown', flush=True)
+            raise SystemExit(0)
+        if args.probe_vocabulary:
+            # The same dictionary corpus feeds both the boot index and this
+            # quiz. Reuse its service checks, then exercise Vocabulary through
+            # the normal graphical terminal launcher.
+            command('zload /Tests/AutoCompleteChecks.ZC',
+                    'zc: loaded /Tests/AutoCompleteChecks.ZC')
+            command('zcall AutoCompleteBootChecks',
+                    'zc => 0x000000000000002a')
+            focus_graphical_terminal()
+            type_graphical_prompt_line(
+                'vocabulary-launch',
+                'ExeFile2("/Apps/Vocabulary/Run.ZC");')
+            qmp_send_key('ret')
+            time.sleep(1)
+            question_screen = graphical_screen('vocabulary-first-question')
+            if 'Uncompressed dictionary not present' in question_screen[3]:
+                raise RuntimeError('Vocabulary could not find its dictionary data:\n'+
+                                   question_screen[3])
+            qmp_send_key('1')
+            deadline = time.monotonic() + 12
+            next_question = None
+            while time.monotonic() < deadline:
+                screen = graphical_screen('vocabulary-after-answer')
+                if screen[3] != question_screen[3]:
+                    next_question = screen
+                    break
+                time.sleep(0.1)
+            if next_question is None:
+                raise RuntimeError('Vocabulary did not advance after answer 1:\n'+
+                                   screen[3])
+            print('PASS Vocabulary accepted an answer and advanced the quiz', flush=True)
+            # The randomized dictionary popup and feedback are brief; the
+            # boot dictionary gate independently verifies definition lookup.
+            # Escape from the next question must restore the terminal.
+            qmp_send_key('esc')
+            time.sleep(0.5)
+            graphical_screen('vocabulary-exit')
+            run_graphical_terminal_command(
+                'vocabulary-exit-smoke', '40+2;', 'ans=0x2A=42', timeout=20)
+            command('zstatus', 'failed=0')
+            print('PASS Vocabulary quiz Escape and shell recovery', flush=True)
             raise SystemExit(0)
         if args.probe_input_edges:
             focus_graphical_terminal()
