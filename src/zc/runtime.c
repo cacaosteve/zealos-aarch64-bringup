@@ -3480,6 +3480,16 @@ static int64_t host_sound(int64_t *a) {
     (void)a;
     return 0;
 }
+static int64_t host_beep(int64_t *a) {
+    /* Beep is also a speaker-only effect; preserve callers without audio. */
+    (void)a;
+    return 0;
+}
+static int64_t host_sound_reset(int64_t *a) {
+    /* There is no speaker device state to reset on the ARM64 bridge. */
+    (void)a;
+    return 0;
+}
 static int64_t host_noise(int64_t *a) {
     /* Noise is the asynchronous PC-speaker hook used by several games. */
     (void)a;
@@ -6792,6 +6802,8 @@ static int load_source_path(const char *path, int merged, int recover) {
         PrsBindCSymbol("Cd", host_cd, 2);
         PrsBindCSymbol("DirCur", host_dir_cur, 2);
         PrsBindCSymbol("Sound", host_sound, 1);
+        PrsBindCSymbol("Beep", host_beep, 2);
+        PrsBindCSymbol("SoundReset", host_sound_reset, 0);
         /* counts is declared here, not in KernelB.HH; bind after declaration
          * so the generic extern-data binder can resolve the symbol. */
         CHashGlblVar *spawned_tasks = (CHashGlblVar *)HashFind(

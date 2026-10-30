@@ -779,6 +779,17 @@ def translate_span_worker_cleanup(source: bytes) -> bytes:
     return text
 
 
+def translate_keepaway_nearest_ball(source: bytes) -> bytes:
+    """Guard KeepAway's nearest-player read when the owner is first in its team."""
+    old = (b'if (o != last_owner && !nearest_ball[o->team] || '
+           b'o->get_ball_dt < nearest_ball[o->team]->get_ball_dt)')
+    new = (b'if (o != last_owner && (!nearest_ball[o->team] || '
+           b'o->get_ball_dt < nearest_ball[o->team]->get_ball_dt))')
+    if source.count(old) != 1:
+        raise ValueError('pinned KeepAway nearest-player selection changed')
+    return source.replace(old, new, 1)
+
+
 def translate_tothefront_sentinel(source: bytes) -> bytes:
     """Compare the ToTheFront queue cursor to its sentinel object's address."""
     old = b'while (tmpi != *indirect_head)'

@@ -10,9 +10,23 @@ from arm64_source import (extract_sprite_elem_base_sizes, inject_sprite_elem_bas
                           extract_sprite_matrix_draw, inject_sprite_matrix_draw)
 
 from arm64_source import (extract_home_set, extract_home_startup, extract_home_startup_tasks, inject_home_startup_tasks, extract_server_task, extract_user_task, extract_version_scalars, extract_source_prompt, extract_source_training, translate_autocomplete_task, translate_doctree, translate_registry, translate_docterm, translate_doced, translate_docfind, translate_docform, translate_docpopup, translate_docrecalc, translate_grbitmap, translate_tothefront_draw, translate_tothefront_init, translate_tothefront_sentinel,
-                          translate_filemgr, translate_grdc, translate_grpalette, translate_message, translate_grscreen, translate_ktask, translate_winmgr, translate_zsplash, translate_home_once, translate_span_worker_cleanup)
+                          translate_filemgr, translate_grdc, translate_grpalette, translate_message, translate_grscreen, translate_ktask, translate_winmgr, translate_zsplash, translate_home_once, translate_span_worker_cleanup, translate_keepaway_nearest_ball)
 
 root = Path(__file__).resolve().parent.parent
+keepaway_source = (root / 'upstream/pinned/Apps/KeepAway/KeepAway.ZC').read_bytes()
+keepaway_overlay = translate_keepaway_nearest_ball(keepaway_source)
+assert keepaway_overlay != keepaway_source
+assert (b'if (o != last_owner && (!nearest_ball[o->team] || '
+        b'o->get_ball_dt < nearest_ball[o->team]->get_ball_dt))') in keepaway_overlay
+assert b'if (o != last_owner && !nearest_ball[o->team] ||' not in keepaway_overlay
+try:
+    translate_keepaway_nearest_ball(keepaway_source.replace(
+        b'if (o != last_owner && !nearest_ball[o->team] ||',
+        b'if (o != last_owner && nearest_ball[o->team] ||', 1))
+except ValueError:
+    pass
+else:
+    raise AssertionError('KeepAway overlay accepted changed nearest-player selection')
 span_source = (root / 'upstream/pinned/Apps/Span/SpanMain.ZC').read_bytes()
 span_overlay = translate_span_worker_cleanup(span_source)
 assert span_overlay != span_source

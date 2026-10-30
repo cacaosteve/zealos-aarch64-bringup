@@ -43,6 +43,8 @@ p.add_argument('--probe-budget-program', action='store_true',
                help='check real clock/calendar and original Budget storage and forms')
 p.add_argument('--probe-3d-apps', action='store_true',
                help='check original GrModels, KeepAway and Titanium 3D sprite services and runtime paths')
+p.add_argument('--probe-keepaway-full-game', action='store_true',
+               help='leave KeepAway running through its three-minute game and verify scanout and exit')
 p.add_argument('--probe-span-strut', action='store_true',
                help='exercise original Span bridge and Strut ship apps through entry, input and exit')
 p.add_argument('--probe-tothefront', action='store_true',
@@ -150,6 +152,8 @@ if args.probe_gui_workflow:
 if args.probe_gui_editor_text:
     args.probe_gui_keyboard = True
 if args.probe_titanium_only:
+    args.probe_3d_apps = True
+if args.probe_keepaway_full_game:
     args.probe_3d_apps = True
 if (args.probe_stock_programs or args.probe_stock_interactive or args.probe_program_catalog or
         args.probe_doc_includes or args.probe_logic_program or args.probe_budget_program or
@@ -1910,6 +1914,27 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 raise RuntimeError('KeepAway game frame disappeared after input')
             print('PASS KeepAway game frame, space/mouse input and HUD refresh',
                   flush=True)
+            if args.probe_keepaway_full_game:
+                previous = keepaway_input_frame[2]
+                started = time.monotonic()
+                last_report = started
+                last_change = started
+                while time.monotonic() - started < 185:
+                    time.sleep(10)
+                    sample = graphical_screen('3d-keepaway-long-run')
+                    changed = sum(a != b for a, b in zip(previous, sample[2]))
+                    if changed >= 100:
+                        previous = sample[2]
+                        last_change = time.monotonic()
+                    if time.monotonic() - last_report >= 30:
+                        print('KeepAway full-game probe: '
+                              f'{time.monotonic() - started:.0f}s elapsed, '
+                              f'{time.monotonic() - last_change:.0f}s since scanout changed',
+                              flush=True)
+                        last_report = time.monotonic()
+                print('KeepAway full-game probe finished; '
+                      f'last scanout change was {time.monotonic() - last_change:.0f}s ago',
+                      flush=True)
             qmp_send_key('esc')
             run_graphical_terminal_command(
                 '3d-keepaway-exit-smoke', '40+2;', 'ans=0x2A=42', timeout=20)
