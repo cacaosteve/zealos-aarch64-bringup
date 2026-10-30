@@ -1776,6 +1776,14 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             ball_generated = require_graphical_text(
                 '3d-grmodels-ball-generated', 'Vertices:', timeout=25)
             require_graphical_text('3d-grmodels-ball-repeat', 'Do another', timeout=10)
+            ball_sprite_pixels = rgb_pixels_in(
+                ball_generated, (170, 0, 170), (8, 16, 400, 591))
+            if ball_sprite_pixels < 100:
+                raise RuntimeError('GrModels Ball generated a sprite entry but its '
+                                   'purple mesh was not visible in the document: '
+                                   f'{ball_sprite_pixels} matching pixels')
+            print('PASS GrModels Ball sprite visible inline: '
+                  f'{ball_sprite_pixels} purple pixels', flush=True)
             print('PASS GrModels Ball mesh generation; '+
                   next((line.strip() for line in ball_generated[3].splitlines()
                         if 'Vertices:' in line), 'Vertices reported'), flush=True)
