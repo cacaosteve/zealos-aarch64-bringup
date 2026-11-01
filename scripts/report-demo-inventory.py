@@ -27,17 +27,21 @@ KINDS = {
     "Templates": "templates",
 }
 RUNTIME_ACCEPTED = {
-    "/Demo/DateTime.ZC": "docs/acceptance/demo-runtime-basics-2026-10-31.json",
-    "/Demo/NullCase.ZC": "docs/acceptance/demo-runtime-basics-2026-10-31.json",
-    "/Demo/Print.ZC": "docs/acceptance/demo-runtime-basics-2026-10-31.json",
-    "/Demo/RadixSort.ZC": "docs/acceptance/demo-runtime-basics-2026-10-31.json",
-    "/Demo/SubIntAccess.ZC": "docs/acceptance/demo-runtime-basics-2026-10-31.json",
-    "/Demo/SubSwitch.ZC": "docs/acceptance/demo-runtime-basics-2026-10-31.json",
+    "/Demo/DateTime.ZC": "docs/acceptance/demo-runtime-basics-2026-11-01.json",
+    "/Demo/NullCase.ZC": "docs/acceptance/demo-runtime-basics-2026-11-01.json",
+    "/Demo/Print.ZC": "docs/acceptance/demo-runtime-basics-2026-11-01.json",
+    "/Demo/RadixSort.ZC": "docs/acceptance/demo-runtime-basics-2026-11-01.json",
+    "/Demo/SubIntAccess.ZC": "docs/acceptance/demo-runtime-basics-2026-11-01.json",
+    "/Demo/SubSwitch.ZC": "docs/acceptance/demo-runtime-basics-2026-11-01.json",
+    "/Demo/Exceptions.ZC": "docs/acceptance/demo-exceptions-2026-11-01.json",
     "/Demo/Games/Chess.ZC": "docs/acceptance/demo-interactive-games-2026-11-01.json",
     "/Demo/Games/TicTacToe.ZC": "docs/acceptance/demo-interactive-games-2026-11-01.json",
     "/Demo/Graphics/Lines.ZC": "docs/acceptance/demo-stock-graphics-2026-11-01.json",
     "/Demo/Graphics/NetOfDots.ZC": "docs/acceptance/demo-stock-graphics-2026-11-01.json",
     "/Demo/Graphics/Pick3D.ZC": "docs/acceptance/demo-interactive-games-2026-11-01.json",
+}
+RUNTIME_PARTIAL = {
+    "/Demo/AcctExample/HomeKeyPlugIns.ZC": "docs/acceptance/demo-global-vars-jit-2026-11-01.json",
 }
 
 
@@ -73,8 +77,11 @@ def main():
             "classification_confidence": confidence,
             "compile": "pass" if result["compiled"] else "blocked",
             "first_compile_error": first_error(result.get("output", "")),
-            "runtime": "pass" if guest_path in RUNTIME_ACCEPTED else "unverified",
-            "runtime_evidence": RUNTIME_ACCEPTED.get(guest_path),
+            "runtime": ("pass" if guest_path in RUNTIME_ACCEPTED else
+                        "partial" if guest_path in RUNTIME_PARTIAL else
+                        "unverified"),
+            "runtime_evidence": (RUNTIME_ACCEPTED.get(guest_path) or
+                                 RUNTIME_PARTIAL.get(guest_path)),
         })
     report = {
         "source_commit": catalog["commit"],

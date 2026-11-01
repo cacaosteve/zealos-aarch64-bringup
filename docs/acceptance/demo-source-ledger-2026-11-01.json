@@ -114,7 +114,7 @@
       "compile": "pass",
       "first_compile_error": null,
       "runtime": "partial",
-      "runtime_evidence": "demo-global-vars-jit-2026-11-01.json"
+      "runtime_evidence": "docs/acceptance/demo-global-vars-jit-2026-11-01.json"
     },
     {
       "path": "/Demo/AcctExample/HomeLocalize.ZC",
@@ -354,7 +354,7 @@
       "compile": "pass",
       "first_compile_error": null,
       "runtime": "pass",
-      "runtime_evidence": "docs/acceptance/demo-runtime-basics-2026-10-31.json"
+      "runtime_evidence": "docs/acceptance/demo-runtime-basics-2026-11-01.json"
     },
     {
       "path": "/Demo/DebugDemo.ZC",
@@ -574,7 +574,7 @@
       "compile": "pass",
       "first_compile_error": null,
       "runtime": "pass",
-      "runtime_evidence": "demo-exceptions-2026-11-01.json"
+      "runtime_evidence": "docs/acceptance/demo-exceptions-2026-11-01.json"
     },
     {
       "path": "/Demo/ExtChars.ZC",
@@ -1784,7 +1784,7 @@
       "compile": "pass",
       "first_compile_error": null,
       "runtime": "pass",
-      "runtime_evidence": "docs/acceptance/demo-runtime-basics-2026-10-31.json"
+      "runtime_evidence": "docs/acceptance/demo-runtime-basics-2026-11-01.json"
     },
     {
       "path": "/Demo/OnceDemo.ZC",
@@ -1824,7 +1824,7 @@
       "compile": "pass",
       "first_compile_error": null,
       "runtime": "pass",
-      "runtime_evidence": "docs/acceptance/demo-runtime-basics-2026-10-31.json"
+      "runtime_evidence": "docs/acceptance/demo-runtime-basics-2026-11-01.json"
     },
     {
       "path": "/Demo/Progress.ZC",
@@ -1864,7 +1864,7 @@
       "compile": "pass",
       "first_compile_error": null,
       "runtime": "pass",
-      "runtime_evidence": "docs/acceptance/demo-runtime-basics-2026-10-31.json"
+      "runtime_evidence": "docs/acceptance/demo-runtime-basics-2026-11-01.json"
     },
     {
       "path": "/Demo/RandDemo.ZC",
@@ -1994,7 +1994,7 @@
       "compile": "pass",
       "first_compile_error": null,
       "runtime": "pass",
-      "runtime_evidence": "docs/acceptance/demo-runtime-basics-2026-10-31.json"
+      "runtime_evidence": "docs/acceptance/demo-runtime-basics-2026-11-01.json"
     },
     {
       "path": "/Demo/SubSwitch.ZC",
@@ -2004,7 +2004,7 @@
       "compile": "pass",
       "first_compile_error": null,
       "runtime": "pass",
-      "runtime_evidence": "docs/acceptance/demo-runtime-basics-2026-10-31.json"
+      "runtime_evidence": "docs/acceptance/demo-runtime-basics-2026-11-01.json"
     },
     {
       "path": "/Demo/SuggestSpelling.ZC",
