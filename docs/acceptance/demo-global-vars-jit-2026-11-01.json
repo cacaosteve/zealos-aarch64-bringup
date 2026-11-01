@@ -1,0 +1,15 @@
+{
+  "date": "2026-11-01",
+  "command": "python3 scripts/check-compat.py --pci --probe-demo-global-vars",
+  "target": "QEMU PCI ARM64 graphical terminal",
+  "result": "partial",
+  "program": "/Demo/GlobalVars.ZC",
+  "verified": [
+    "JIT run prints Time 1 and Time 2 for dynamically initialized global and static arrays",
+    "graphical terminal recovers and evaluates 40+2 as 42"
+  ],
+  "not_verified": [
+    "AOT-only #ifjit section (Time 3 and Time 4); the current bootstrap does not expose the stock Comp() command"
+  ],
+  "scope_note": "This partial runtime result does not increase the fully accepted Demo count and does not imply live UTM behavior."
+}

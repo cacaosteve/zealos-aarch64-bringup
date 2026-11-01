@@ -492,6 +492,12 @@ static int64_t guest_xcal_last_pending_code;
 static uint64_t guest_xcal_focus_posts;
 static int64_t guest_xcal_last_focus_post_type;
 static int64_t guest_xcal_last_focus_post_scan;
+static unsigned guest_xcal_frame_trace_budget;
+static unsigned guest_xcal_input_trace_budget;
+static uint64_t guest_xcal_frame_trace_count;
+static unsigned guest_xcal_ode_trace_budget;
+static int64_t host_monotonic_ns(int64_t *a);
+static unsigned guest_xcal_yield_trace_budget;
 static int64_t guest_keyboard_last_final_target;
 static int64_t guest_keyboard_last_final_target_flags;
 static int64_t guest_message_scan_last_consumer;
@@ -4018,6 +4024,16 @@ static int64_t host_task_yield(int64_t *a) {
     if (guest_focus_task)
         poll_guest_keys();
     unsigned next = next_guest(me);
+    if (guest_xcal_yield_trace_budget) {
+        struct guest_fiber *nf = &guest_fibers[next];
+        fprintf(stderr,
+                "xcal_yield from=%u/%s wait=%u state=%u to=%u/%s wait=%u state=%u frame=%u\n",
+                me, (const char *)((unsigned char *)self->words + guest_name_off),
+                self->wait_kind, self->state, next,
+                (const char *)((unsigned char *)nf->words + guest_name_off),
+                nf->wait_kind, nf->state, guest_task_frame_active);
+        guest_xcal_yield_trace_budget--;
+    }
     if (next != me && !setjmp(self->context))
         enter_guest(next);
     /* Device IRQ actions are queued until their focused cooperative task is
@@ -4376,6 +4392,71 @@ static int64_t host_xcaliber_message_trace(int64_t *a) {
     fprintf(stderr, "xcal_guest_message task=%s raw_task=%016lx type=%ld ch=%ld scan=0x%016lx\n",
             name, (unsigned long)a[3], (long)a[0], (long)a[1],
             (unsigned long)a[2]);
+    if (a[0] == 2 && !a[1] &&
+        (((uint64_t)a[2] & 0xffu) == 0x4b ||
+         ((uint64_t)a[2] & 0xffu) == 0x4d ||
+         ((uint64_t)a[2] & 0xffu) == 0x01))
+        guest_xcal_frame_trace_budget = 128;
+    if (a[0] == 2 && !a[1] &&
+        (((uint64_t)a[2] & 0xffu) == 0x4b ||
+         ((uint64_t)a[2] & 0xffu) == 0x4d ||
+         ((uint64_t)a[2] & 0xffu) == 0x01))
+        guest_xcal_ode_trace_budget = 16;
+    if ((a[0] == 2 || a[0] == 3) && !a[1] &&
+        (((uint64_t)a[2] & 0xffu) == 0x4b ||
+         ((uint64_t)a[2] & 0xffu) == 0x4d))
+        guest_xcal_input_trace_budget = 12;
+    return 0;
+}
+static int64_t host_xcaliber_frame_trace(int64_t *a) {
+    struct guest_fiber *fiber = find_guest_task((void *)(uintptr_t)a[1]);
+    if (!fiber || strcmp((const char *)((unsigned char *)fiber->words +
+                                        guest_name_off), "X-Caliber") ||
+        !guest_xcal_frame_trace_budget)
+        return 0;
+    fprintf(stderr, "xcal_frame_stage count=%lu stage=%ld current=%u\n",
+            (unsigned long)++guest_xcal_frame_trace_count, (long)a[0],
+            guest_current);
+    if (a[0] == 6)
+        guest_xcal_yield_trace_budget = 32;
+    guest_xcal_frame_trace_budget--;
+    return 0;
+}
+static int64_t host_xcaliber_input_trace(int64_t *a) {
+    struct guest_fiber *fiber = find_guest_task((void *)(uintptr_t)a[0]);
+    double ship_x, ship_y;
+    memcpy(&ship_x, &a[8], sizeof(ship_x));
+    memcpy(&ship_y, &a[9], sizeof(ship_y));
+    if (!guest_xcal_input_trace_budget)
+        return 0;
+    fprintf(stderr, "xcal_input_state task=%016lx slot=%ld title=%s "
+            "t_left_bits=%016lx t_right_bits=%016lx bitmap_left=%ld "
+            "bitmap_right=%ld left_flags=%lx right_flags=%lx exploding=%ld "
+            "ship_x=%.3f ship_y=%.3f "
+            "current=%u\n",
+            (unsigned long)a[0], fiber ? (long)(fiber - guest_fibers) : -1L,
+            fiber ? (const char *)((unsigned char *)fiber->words + guest_name_off)
+                  : "unknown",
+            (unsigned long)a[1], (unsigned long)a[2], (long)a[3],
+            (long)a[4], (unsigned long)a[5], (unsigned long)a[6],
+            (long)a[7], ship_x, ship_y, guest_current);
+    guest_xcal_input_trace_budget--;
+    return 0;
+}
+static int64_t host_xcaliber_ode_trace(int64_t *a) {
+    struct guest_fiber *fiber = find_guest_task((void *)(uintptr_t)a[0]);
+    if (!fiber || strcmp((const char *)((unsigned char *)fiber->words +
+                                        guest_name_off), "X-Caliber") ||
+        !guest_xcal_ode_trace_budget)
+        return 0;
+    fprintf(stderr, "xcal_ode_loop timeout_bits=%016lx desired_bits=%016lx "
+            "ode_t_bits=%016lx fps_bits=%016lx frame_d_bits=%016lx "
+            "guest_tS_bits=%016lx host_now_ns=%016lx\n",
+            (unsigned long)a[1], (unsigned long)a[2], (unsigned long)a[3],
+            (unsigned long)a[4], (unsigned long)a[5],
+            (unsigned long)guest_tS_bits,
+            (unsigned long)host_monotonic_ns(NULL));
+    guest_xcal_ode_trace_budget--;
     return 0;
 }
 static int64_t host_xcaliber_message_scan_trace(int64_t *a) {
@@ -7035,13 +7116,25 @@ static size_t format_text(char *output, size_t capacity, const char *format,
             code != 'd' && code != 'u' && code != 'x' && code != 'X' &&
             code != 'b' && code != 'B' &&
             code != 'f' && code != 'F' && code != 'g' && code != 'G' &&
-            code != 'n')
+            code != 'n' && code != 'P')
         {
             printf("zc: unsupported format conversion '%c' in %s\n", code, format);
             zc_fail("format code is unsupported");
         }
         if (arg >= argc)
             zc_fail("format needs another argument");
+        if (code == 'P') {
+            uint64_t pointer = (uint64_t)argv[arg++];
+            char pointer_link[128];
+            int length = snprintf(pointer_link, sizeof(pointer_link),
+                "$$LK,\"0x%016llX\",A=\"AD:0x%016llX\"$$",
+                (unsigned long long)pointer, (unsigned long long)pointer);
+            if (length < 0 || (size_t)length >= sizeof(pointer_link) ||
+                (size_t)length > capacity - 1 - used)
+                zc_fail("formatted pointer link exceeds buffer");
+            for (int j = 0; j < length; j++) FMT_BYTE(pointer_link[j]);
+            continue;
+        }
         if (code == 'c' || code == 'C') {
             /* ZealOS %c/%C print the nonzero bytes of a packed I64 value. */
             uint64_t packed = (uint64_t)argv[arg++];
@@ -7424,6 +7517,17 @@ static int load_source_path(const char *path, int merged, int recover) {
     int registered = guest_task_bound;
     if (registered)
         guest_unwind_enter(&load.unwind, source_load_cleanup, NULL);
+    if (!strcmp(path, "/System/Math/MathODE.ZC")) {
+        execute_source("<X-Caliber frame trace bridge>",
+            "extern U0 ZcXCaliberFrameTrace(I64 stage, CTask *task);");
+        PrsBindCSymbol("ZcXCaliberFrameTrace", host_xcaliber_frame_trace, 2);
+        execute_source("<X-Caliber input trace bridge>",
+            "extern U0 ZcXCaliberInputTrace(CTask *task, F64 t_left, F64 t_right, I64 key_left, I64 key_right, I64 left_flags, I64 right_flags, I64 exploding, F64 ship_x, F64 ship_y);");
+        PrsBindCSymbol("ZcXCaliberInputTrace", host_xcaliber_input_trace, 10);
+        execute_source("<X-Caliber ODE trace bridge>",
+            "extern U0 ZcXCaliberOdeTrace(CTask *task, F64 timeout_time, F64 t_desired, F64 ode_time, F64 fps, F64 frame_d);");
+        PrsBindCSymbol("ZcXCaliberOdeTrace", host_xcaliber_ode_trace, 6);
+    }
     if (!strcmp(path, "/Kernel/Job.ZC")) {
         execute_source("<window focus trace bridge>",
             "extern U0 ZcFocusTrace(U8 *site, CTask *old_focus, "
@@ -8164,6 +8268,10 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
     guest_xcal_focus_posts = 0;
     guest_xcal_last_focus_post_type = 0;
     guest_xcal_last_focus_post_scan = 0;
+    guest_xcal_frame_trace_budget = 0;
+    guest_xcal_frame_trace_count = 0;
+    guest_xcal_ode_trace_budget = 0;
+    guest_xcal_yield_trace_budget = 0;
     guest_keyboard_last_final_target = -1;
     guest_keyboard_last_final_target_flags = 0;
     guest_winmgr_tick_fun = NULL;

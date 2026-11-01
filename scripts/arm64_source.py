@@ -957,8 +957,15 @@ def translate_xcaliber_held_input(source: bytes) -> bytes:
            b'\t\t\t\t\t(message_code = MessageScan(&arg1, &arg2, 1 << MESSAGE_KEY_DOWN | 1 << MESSAGE_KEY_UP)))')
     if source.count(old) != 1:
         raise ValueError('pinned X-Caliber input loop changed')
-    anchor = b'\t\t\t}\n\t\t\tAI;'
+    anchor = (b'\t\t\t}\n\t\t\tAI;\n'
+              b'\t\t\tSolarFlares;\n'
+              b'\t\t\tExpireShots;\n'
+              b'\t\t\tExpireSplats;\n'
+              b'\t\t\tExpireMissiles;\n'
+              b'\t\t\tCheckDamage;\n'
+              b'\t\t\tRefresh; //messages are only qued by winmgr')
     replacement = (b'\t\t\t}\n'
+                   b'\t\t\tZcXCaliberFrameTrace(0, Fs);\n'
                    b'\t\t\tif (!Bt(kbd.down_bitmap, SC_CTRL) &&\n'
                    b'\t\t\t\t!Bt(kbd.down_bitmap, SC_SHIFT))\n'
                    b'\t\t\t{\n'
@@ -971,9 +978,28 @@ def translate_xcaliber_held_input(source: bytes) -> bytes:
                    b'\t\t\t\telse\n'
                    b'\t\t\t\t\thuman_t_right = 0;\n'
                    b'\t\t\t}\n'
+                   b'\t\t\tif (human && human->p[0].state)\n'
+                   b'\t\t\t\tZcXCaliberInputTrace(Fs, human_t_left, human_t_right, '
+                   b'Bt(kbd.down_bitmap, SC_CURSOR_LEFT), '
+                   b'Bt(kbd.down_bitmap, SC_CURSOR_RIGHT), '
+                   b'human->s[3].flags, human->s[5].flags, human->exploding, '
+                   b'human->p[0].state->x, human->p[0].state->y);\n'
                    b'\t\t\tif (Bt(kbd.down_bitmap, SC_ESC))\n'
                    b'\t\t\t\tch = CH_ESC;\n'
-                   b'\t\t\tAI;')
+                   b'\t\t\tAI;\n'
+                   b'\t\t\tZcXCaliberFrameTrace(1, Fs);\n'
+                   b'\t\t\tSolarFlares;\n'
+                   b'\t\t\tZcXCaliberFrameTrace(2, Fs);\n'
+                   b'\t\t\tExpireShots;\n'
+                   b'\t\t\tZcXCaliberFrameTrace(3, Fs);\n'
+                   b'\t\t\tExpireSplats;\n'
+                   b'\t\t\tZcXCaliberFrameTrace(4, Fs);\n'
+                   b'\t\t\tExpireMissiles;\n'
+                   b'\t\t\tZcXCaliberFrameTrace(5, Fs);\n'
+                   b'\t\t\tCheckDamage;\n'
+                   b'\t\t\tZcXCaliberFrameTrace(6, Fs);\n'
+                   b'\t\t\tRefresh; //messages are only qued by winmgr\n'
+                   b'\t\t\tZcXCaliberFrameTrace(7, Fs);')
     if source.count(anchor) != 1:
         raise ValueError('pinned X-Caliber frame update point changed')
     traced = source
@@ -1345,7 +1371,7 @@ def translate_docfile(source: bytes) -> bytes:
     return text.encode('utf-8')
 
 
-def translate_debug_compat(source: bytes) -> bytes:
+def translate_debug_compat(source: bytes, kernel_debug_source: bytes) -> bytes:
     """Apply narrow ARM64 ZealC compatibility fixes to stock Debug.ZC."""
     text = source.decode('utf-8')
     translated, count = re.subn(r'(?<![.>\w])offset\b', 'base_offset', text)
@@ -1357,7 +1383,19 @@ def translate_debug_compat(source: bytes) -> bytes:
     helper_boundary = '\nU0 UpdateRegVarImg('
     if text.count(helper_boundary) != 1:
         raise ValueError('Debug.ZC portable ClassRep boundary changed')
-    return text.split(helper_boundary, 1)[0].rstrip().encode('utf-8') + b'\n'
+    portable_debug = text.split(helper_boundary, 1)[0].rstrip().encode('utf-8') + b'\n'
+
+    # The portable debugger overlay is loaded at graphical startup, and stock
+    # demos such as GlobalVars call Dump(). Pull that one architecture-neutral
+    # routine from KDebug without compiling KDebug's x86-only register and
+    # memory-map helpers into the ARM64 source bundle.
+    kernel_text = kernel_debug_source.decode('utf-8')
+    dump_start = 'U0 Dump(U8 *addr, I64 count=0x80, Bool show_offset=TRUE)'
+    dump_end = '\nU0 DumpMem('
+    if kernel_text.count(dump_start) != 1 or kernel_text.count(dump_end) != 1:
+        raise ValueError('KDebug.ZC portable Dump extraction boundary changed')
+    dump_body = kernel_text[kernel_text.index(dump_start):kernel_text.index(dump_end)]
+    return portable_debug + dump_body.rstrip().encode('utf-8') + b'\n'
 
 
 def translate_doctree(source: bytes) -> bytes:
@@ -1543,6 +1581,18 @@ def translate_winmgr(source: bytes) -> bytes:
             "expected exactly one WinMgrSleep screen refresh call; "
             f"found {text.count(call)}"
         )
+    timing = ("\tTimeCal;\n"
+              "\tif ((t_delta = (t = tS) - winmgr.last_refresh_tS) > 0.01)\n"
+              "\t\twinmgr.fps = Max(1.0 / t_delta, 1);\n"
+              "\telse\n"
+              "\t\twinmgr.fps = 99;\n"
+              "\twinmgr.last_refresh_tS = t;\n")
+    if text.count(timing) != 1:
+        raise ValueError(
+            "expected exactly one WinMgrSleep frame timing update; "
+            f"found {text.count(timing)}"
+        )
+    text = text.replace(timing, "\tBootstrapWinMgrTimingUpdate;\n", 1)
     if "ZcTaskFrameRun" in text:
         raise ValueError("WinMgr.ZC already contains the frame-run hook")
     text = text.replace(call, "\t\tZcTaskFrameRun;", 1)
@@ -2011,6 +2061,8 @@ def translate_mathode(source: bytes) -> bytes:
             text.count(timeout_calculation) != 1 or
             text.count(integration_loop) != 1):
         raise ValueError("expected the pinned ODE task/update boundaries")
+    if "ZcXCaliberFrameTrace" in text:
+        raise ValueError("MathODE source unexpectedly contains X-Caliber tracing")
     text = text.replace(signature, signature + "\n\tU8 *mp_flags = &ode->mp_not_done_flags;", 1)
     text = text.replace(call, "\t\twhile (!Bt(mp_flags, Gs->num))", 1)
     text = text.replace(reset, "\t\tLBtr(mp_flags, Gs->num);", 1)
@@ -2018,13 +2070,30 @@ def translate_mathode(source: bytes) -> bytes:
         update_declarations + "\tI64\t\t\t monotonic_timeout_ns;\n", 1)
     text = text.replace(timeout_calculation,
         timeout_calculation +
-        "\t\tmonotonic_timeout_ns = timeout_time * 1000000000.0;\n", 1)
+        # `timeout_time` is in the guest's uptime epoch, while
+        # ZcMonotonicNs() is in the host process epoch. Convert only the
+        # remaining guest interval before building a host monotonic deadline.
+        "\t\tmonotonic_timeout_ns = ZcMonotonicNs() + (timeout_time - tS) * 1000000000.0;\n", 1)
     text = text.replace(integration_loop, integration_loop +
+        "\t\t\t\t\t\t\tZcXCaliberOdeTrace(task, timeout_time, t_desired, ode->t, winmgr.fps, d);\n" +
         "\t\t\t\t\t\t\tif (ZcMonotonicNs() > monotonic_timeout_ns)\n"
         "\t\t\t\t\t\t\t{\n"
         "\t\t\t\t\t\t\t\tode->base_t += t_desired - ode->t; //Slip\n"
         "\t\t\t\t\t\t\t\tgoto ode_done;\n"
         "\t\t\t\t\t\t\t}\n", 1)
+    derivative = "\t\t\t\t\t\t\tODECallDerivative(ode, ode->t, ode->state_internal, ode->DstateDt);"
+    step = "\t\t\t\t\t\t\tODERK5OneStep(ode);"
+    if text.count(derivative) != 1 or text.count(step) != 1:
+        raise ValueError("expected one MathODE derivative/step site")
+    text = text.replace(derivative,
+        "\t\t\t\t\t\t\tZcXCaliberFrameTrace(22, task);\n" +
+        derivative + "\n\t\t\t\t\t\t\tZcXCaliberFrameTrace(23, task);", 1)
+    text = text.replace(step,
+        "\t\t\t\t\t\t\tZcXCaliberFrameTrace(24, task);\n" +
+        step + "\n\t\t\t\t\t\t\tZcXCaliberFrameTrace(25, task);", 1)
+    text = ("extern U0 ZcXCaliberFrameTrace(I64 stage, CTask *task);\n"
+            "extern U0 ZcXCaliberInputTrace(CTask *task, F64 t_left, F64 t_right, I64 key_left, I64 key_right, I64 left_flags, I64 right_flags, I64 exploding, F64 ship_x, F64 ship_y);\n"
+            "extern U0 ZcXCaliberOdeTrace(CTask *task, F64 timeout_time, F64 t_desired, F64 ode_time, F64 fps, F64 frame_d);\n\n" + text)
     return text.encode("utf-8")
 
 
@@ -2581,6 +2650,23 @@ def translate_grscreen(source: bytes) -> bytes:
     rop_call = "GrRopEquU8NoClipping("
     if text.count(rop_call) != 2:
         raise ValueError("expected exactly two GrScreen glyph rasterizer calls")
+    task_ode = "\t\tODEsUpdate(task);"
+    screen_tasks = "\tGrUpdateTasks;"
+    if text.count(task_ode) != 1 or text.count(screen_tasks) != 1:
+        raise ValueError("expected exact GrScreen task and screen update sites")
+    # Temporary diagnostic bridge used by the X-Caliber UTM hang probe. The
+    # extern is bound before the app runs; these calls are inert unless the
+    # X-Caliber trace budget has been armed by its input probe.
+    text = text.replace("\ttry\n" + task_ode,
+                        "\ttry\n\t{\n"
+                        "\t\tZcXCaliberFrameTrace(20, task);\n"
+                        "\t\tODEsUpdate(task);\n"
+                        "\t\tZcXCaliberFrameTrace(21, task);\n"
+                        "\t}\n", 1)
+    text = text.replace(screen_tasks,
+                        "\tZcXCaliberFrameTrace(10, sys_focus_task);\n"
+                        "\tGrUpdateTasks;\n"
+                        "\tZcXCaliberFrameTrace(11, sys_focus_task);", 1)
     indent = matches[0].group("indent")
     replacement = (
         f"{indent}cell_dst = dst(U8 *);\n"
@@ -2610,6 +2696,9 @@ def translate_grscreen(source: bytes) -> bytes:
     marker = "U0 GrUpdateTextBG()"
     if text.count(marker) != 1:
         raise ValueError("expected exactly one GrUpdateTextBG definition")
+    matches = list(_TEXT_BG_X86.finditer(text))
+    if len(matches) != 1:
+        raise ValueError("GrScreen text-background assembly changed during overlay")
     replaced = (text[:matches[0].start()] + replacement +
                 text[matches[0].end():])
     function_marker = "\tU8\t\t\t*dst2 = dst;"

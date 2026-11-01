@@ -4,7 +4,7 @@
   "source_count": 206,
   "compile_pass": 178,
   "compile_blocked": 28,
-  "runtime_accepted": 11,
+  "runtime_accepted": 12,
   "directories": {
     ".": {
       "source_count": 34,
@@ -113,8 +113,8 @@
       "classification_confidence": "provisional; based on directory only",
       "compile": "pass",
       "first_compile_error": null,
-      "runtime": "unverified",
-      "runtime_evidence": null
+      "runtime": "partial",
+      "runtime_evidence": "demo-global-vars-jit-2026-11-01.json"
     },
     {
       "path": "/Demo/AcctExample/HomeLocalize.ZC",
@@ -573,8 +573,8 @@
       "classification_confidence": "unclassified",
       "compile": "pass",
       "first_compile_error": null,
-      "runtime": "unverified",
-      "runtime_evidence": null
+      "runtime": "pass",
+      "runtime_evidence": "demo-exceptions-2026-11-01.json"
     },
     {
       "path": "/Demo/ExtChars.ZC",

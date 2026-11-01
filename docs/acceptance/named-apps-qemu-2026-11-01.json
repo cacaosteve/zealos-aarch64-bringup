@@ -75,13 +75,14 @@
       "result": "fail",
       "verified": [
         "launch, help dismissal, level start and gameplay rendering passed",
-        "Left/Right visual response was inconclusive (idle_diff=5, left_diff=5, right_diff=0)",
+        "The MathODE timeout guard was corrected to compare host monotonic now against host monotonic now plus guest-relative remaining time; ODE integration now advances",
+        "QEMU scanout showed Left response when Left was tested first (45 pixels in ship bounds versus 5 idle); Right response when Right was tested first (43 pixels versus 0 idle)",
+        "In each same-session run, the opposite direction tested second had no visible change despite its key bitmap and thrust value being set; both-direction acceptance remains incomplete",
         "Space projectile response was not verified",
-        "Escape did not return to terminal within 8 seconds; serial zstatus then timed out",
-        "the screenshot still showed the game scene"
+        "Escape returned to the graphical terminal, and 40+2 returned 42"
       ],
       "log": "build/check-compat-pci.log",
-      "diagnostic": "Keyboard Enter and Left events reached and were dequeued by the X-Caliber task. Later controls were not observed in the log before the guest stopped responding; investigate the app/window-manager/render scheduling path. Do not add a Yield to MessageScan or an X-Caliber-specific Yield."
+      "diagnostic": "The previous absolute-deadline comparison mixed guest uptime with host monotonic time and skipped ODE integration; using host-now plus guest-relative remaining time fixes that. Left and Right each visibly affect the ship when tested first in a fresh gameplay state. The second direction in the same session sets the expected bitmap and thrust value but does not change scanout. Escape and terminal recovery pass. Continue isolating the second-direction state and verify Space firing. Do not add a Yield to MessageScan or an X-Caliber-specific Yield."
     }
   }
 }

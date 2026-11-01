@@ -13,8 +13,18 @@ from arm64_source import (extract_sprite_elem_base_sizes, inject_sprite_elem_bas
 from arm64_source import (extract_home_set, extract_home_startup, extract_home_startup_tasks, inject_home_startup_tasks, extract_server_task, extract_user_task, extract_version_scalars, extract_source_prompt, extract_source_training, translate_autocomplete_task, translate_doctree, translate_registry, translate_docterm, translate_doced, translate_docfind, translate_docform, translate_docpopup, translate_docrecalc, translate_grbitmap, translate_tothefront_draw, translate_tothefront_init, translate_tothefront_sentinel, translate_math,
 translate_tothefront_player_pick, translate_tothefront_ai, translate_filemgr, translate_grdc, translate_grpalette, translate_message, translate_grscreen, translate_ktask, translate_winmgr, translate_win_focus_trace, translate_job_focus_trace, translate_sched_focus_trace, translate_zsplash, translate_home_once, translate_span_worker_cleanup, translate_keepaway_nearest_ball, translate_stock_game_math_calls, translate_empty_label_statement, translate_wenceslas, translate_progress, translate_xcaliber_shot_return, translate_xcaliber_draw_visibility, translate_xcaliber_key_descriptors, translate_xcaliber_escape_scan, translate_xcaliber_held_input)
 from arm64_source import translate_pick3d_class_terminator, translate_classmeta_callback
+from arm64_source import translate_mathode
+from arm64_source import translate_debug_compat
 
 root = Path(__file__).resolve().parent.parent
+debug_overlay = translate_debug_compat(
+    (root / 'upstream/pinned/System/Debug.ZC').read_bytes(),
+    (root / 'upstream/pinned/Kernel/KDebug.ZC').read_bytes())
+assert b'U0 Dump(U8 *addr, I64 count=0x80, Bool show_offset=TRUE)' in debug_overlay
+assert b'ptr += j;' in debug_overlay and b'count -= j;' in debug_overlay
+assert b'UpdateRegVarImg' not in debug_overlay
+print('PASS ARM64 portable debugger overlay includes upstream Dump without x86 register helpers',
+      flush=True)
 classmeta_source = (root / 'upstream/pinned/Demo/ClassMeta.ZC').read_bytes()
 classmeta_overlay = translate_classmeta_callback(classmeta_source)
 assert b'output_fun &RankOut' not in classmeta_overlay
@@ -156,6 +166,22 @@ except ValueError:
     pass
 else:
     raise AssertionError('X-Caliber Escape overlay accepted changed key switches')
+
+mathode_source = (root / 'upstream/pinned/System/Math/MathODE.ZC').read_bytes()
+mathode_overlay = translate_mathode(mathode_source)
+assert (b'monotonic_timeout_ns = ZcMonotonicNs() + '
+        b'(timeout_time - tS) * 1000000000.0;') in mathode_overlay
+assert b'monotonic_timeout_ns = timeout_time * 1000000000.0;' not in mathode_overlay
+assert b'if (ZcMonotonicNs() > monotonic_timeout_ns)' in mathode_overlay
+try:
+    translate_mathode(mathode_source.replace(
+        b'timeout_time = start_time +', b'timeout_time = other_epoch +', 1))
+except ValueError:
+    pass
+else:
+    raise AssertionError('MathODE overlay accepted changed guest timeout calculation')
+print('PASS guarded MathODE host/guest monotonic deadline overlay', flush=True)
+
 tothefront_players = (root / 'upstream/pinned/Apps/ToTheFront/ToTheFront.ZC').read_bytes()
 tothefront_player_overlay = translate_tothefront_player_pick(tothefront_players)
 assert tothefront_player_overlay.count(b'ToTheFrontPlayerPick("AIs",') == 2

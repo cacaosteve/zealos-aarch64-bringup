@@ -174,7 +174,7 @@ normal-load result is not runtime acceptance.
 | TicTacToe (Demo) | PCI QEMU runtime probe checks the board, two mouse turns, Escape exit, and terminal recovery. Live UTM interaction remains unverified. The source advertises Ctrl-Alt-C, but that chord is not yet verified through the emulated input path. Run `make check-demo-tictactoe`. |
 | ToTheFront | ARM64 source overlay fixes the Human player's indirect-fire unit-count loop; the stock `i > UNITS_NUM` condition skipped the artillery order phase. PCI runtime probe accepts both player-type selections, displays/dismisses help, renders the generated map, selects a visible artillery unit, confirms its range indicator, plots an order into an adjacent hex, advances a phase with Space, and returns through Escape to a working terminal (`40+2;` -> 42). Unit movement/direct fire, broader AI play, and live UTM behavior remain unverified. |
 | Vocabulary | QEMU PCI runtime probe launches the quiz, displays dictionary content, accepts a numbered answer and advances, then Escape returns to a terminal where `40+2;` returns 42. Dictionary indexing and lookup are covered by the autocomplete gate. The brief answer-feedback/definition popup is not yet visually verified; sound effects are silent. Run `make check-vocabulary-program`. |
-| X-Caliber | ARM64 host `Freq2Ona`/`Ona2Freq` bindings resolve startup conversion calls. A generated-source overlay removes the stale task-ODE comparison that hid the scene. The GUI-terminal launcher builds a visible, focused task and QEMU reaches gameplay. On the fresh 2026-11-01 PCI rerun, `keyboard_focus` is X-Caliber and source `MessageScan` executes, but the keyboard device reports only 19 total events—the startup/launcher input—and the runtime records zero X-Caliber key dequeues. Left/Right show no measurable ship motion and Escape does not return to the shell. The QMP `send-key` alternative also produced no new guest key events. QEMU 11.1 rejects per-device targeting on `input-send-event`, so that route cannot identify the input target. A focus trace shows a temporary Server focus followed by `JobRunOne` restoring X-Caliber; it does not establish where the later QMP key events are lost. Keep the input/device path unresolved rather than attributing this to the scheduler: the cooperative-message regression passes and empty `MessageScan` polls do not switch tasks. The next diagnostic needs to observe physical or device-level input while the app is active, then test app queue consumption and UTM recovery. |
+| X-Caliber | QEMU reaches gameplay. Fixed a MathODE timeout comparison that mixed guest uptime with host monotonic time; ODE integration now advances. In separate fresh-state probes, Left and Right each visibly move the ship when tested first (45 and 43 changed ship pixels); the opposite direction tested second in the same session sets its bitmap and thrust value but produces no visible change. Escape returns to the terminal and `40+2;` returns 42. Space firing and reliable sequential left/right control remain unverified. Do not add a `Yield` to `MessageScan` or an X-Caliber-specific `Yield`; the cooperative scheduler regression passes. |
 
 The 2026-11-01 task-message regression passes in PCI QEMU. Empty polling through
 `MessageScan`, `KeyScan`, `CharScan`, and `FlushMessages` does not hand off the
@@ -276,3 +276,17 @@ These are source-file counts, not runnable-program counts: both trees include
 loaders, shared routines, templates, and data-driven examples. The inventory
 keeps file presence, compilation, runtime, interactive behavior, and live UTM
 acceptance as separate states.
+
+The focused `/Demo/GlobalVars.ZC` probe passes its JIT half: the global and
+static arrays print `Time 1` and `Time 2`, and the graphical terminal recovers
+to evaluate `40+2` as 42. Its AOT-only `#ifjit` half remains unverified because
+the current bootstrap does not expose the stock `Comp()` command. This is
+partial runtime evidence and does not increase the fully accepted Demo count.
+See [`demo-global-vars-jit-2026-11-01.json`](docs/acceptance/demo-global-vars-jit-2026-11-01.json).
+
+`/Demo/Exceptions.ZC` now passes its nested Point1 throw/catch path in PCI QEMU.
+The ARM64 formatter supports ZealOS `%P` pointer links, the demo reaches
+`Caught in D2`, completes its final prompt, and returns to a terminal where
+`40+2;` evaluates to 42. The Demo runtime ledger now records twelve fully
+accepted programs; other exception paths and `%P` call sites remain unverified.
+See [`demo-exceptions-2026-11-01.json`](docs/acceptance/demo-exceptions-2026-11-01.json).

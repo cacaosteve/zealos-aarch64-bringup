@@ -33,7 +33,8 @@ for name, expected in manifest['files'].items():
         home_startup_tasks = extract_home_startup_tasks(data)
     if rel == 'System/Debug.ZC':
         try:
-            data = translate_debug_compat(data)
+            kernel_debug = (root / 'upstream/pinned/Kernel/KDebug.ZC').read_bytes()
+            data = translate_debug_compat(data, kernel_debug)
         except ValueError as exc:
             raise SystemExit(f'ARM64 Debug overlay no longer applies: {exc}') from exc
     if rel == 'Apps/Budget/BgtStrs.ZC':

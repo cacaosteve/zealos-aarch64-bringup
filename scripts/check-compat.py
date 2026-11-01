@@ -43,6 +43,10 @@ p.add_argument('--demo-source-raw-path', action='append', default=[],
                help='with --probe-demo-source-catalog, compile this exact path via ExeFile2 instead of DocRead/ExeDoc')
 p.add_argument('--probe-demo-basics', action='store_true',
                help='run Print, DateTime, RadixSort, SubIntAccess and SubSwitch graphically')
+p.add_argument('--probe-demo-global-vars', action='store_true',
+               help='run original Demo GlobalVars dynamic-initialization checks graphically')
+p.add_argument('--probe-demo-exceptions', action='store_true',
+               help='exercise nested exceptions and recovery in the original Demo')
 p.add_argument('--probe-demo-tictactoe', action='store_true',
                help='exercise the original TicTacToe demo with pointer input and exit recovery')
 p.add_argument('--probe-demo-chess', action='store_true',
@@ -190,6 +194,7 @@ if args.probe_titanium_only:
 if args.probe_keepaway_full_game:
     args.probe_3d_apps = True
 if (args.probe_demo_source_catalog or args.probe_demo_basics or
+        args.probe_demo_exceptions or
         args.probe_demo_system_context):
     args.probe_program_catalog = True
 if args.demo_system_path and not args.probe_demo_system_context:
@@ -200,7 +205,7 @@ if (args.probe_stock_programs or args.probe_stock_interactive or args.probe_prog
         args.probe_doc_includes or args.probe_logic_program or args.probe_budget_program or
         args.probe_demo_tictactoe or args.probe_demo_chess or args.probe_demo_pick3d or
         args.probe_3d_apps or args.probe_tothefront or args.probe_xcaliber or
-        args.probe_timeclock or
+        args.probe_demo_global_vars or args.probe_demo_exceptions or args.probe_timeclock or
         args.probe_vocabulary or args.probe_psalmody):
     args.pci = True
     args.probe_gui_keyboard = True
@@ -270,6 +275,7 @@ log_path = ROOT / 'build' / (f'check-usb-{usb_label}{"-budget" if args.probe_bud
                              'check-demo-pick3d-pci.log' if args.probe_demo_pick3d else
                              'check-demo-chess-pci.log' if args.probe_demo_chess else
                              'check-demo-tictactoe-pci.log' if args.probe_demo_tictactoe else
+                             'check-demo-global-vars-pci.log' if args.probe_demo_global_vars else
                              'check-program-catalog-pci.log' if args.probe_program_catalog else
                              'check-popup-menu-pci.log' if args.probe_popup_menu else
                              'check-stock-interactive-pci.log' if args.probe_stock_interactive else
@@ -633,9 +639,16 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             if screen[3].count(expected) > before_count:
                 return screen
             if time.monotonic() >= deadline:
+                try:
+                    input_state = command(
+                        'zc Print("gui_input_length=%d\\n", '
+                        'BootstrapGuiTerminalInputDiag() & 255);',
+                        'gui_input_length=', timeout=3)
+                except Exception as exc:
+                    input_state = f'\nterminal input diagnostic unavailable: {exc}'
                 raise RuntimeError(f'graphical terminal command {source!r} did not produce '
                                    f'{expected!r}; see {graphical_path(name+"-result")}\n' +
-                                   screen[3])
+                                   screen[3] + '\n' + input_state)
             time.sleep(0.1)
     def require_graphical_text_absent(name, unexpected, timeout=5):
         deadline = time.monotonic() + timeout
@@ -1445,6 +1458,10 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             raise SystemExit(0)
         if args.probe_popup_menu:
             command('zload /Tests/PopupMenus.ZC', 'zc: loaded /Tests/PopupMenus.ZC')
+            command('zcall PopupParentHitTestChecks',
+                    'zc => 0x000000000000002a')
+            print('PASS modal popup hit testing over a later-in-ring parent',
+                  flush=True)
             focus_graphical_terminal()
             command('zc TaskExe(bootstrap_gui_terminal_task,NULL,"PopUpColor;",1<<JOBf_FREE_ON_COMPLETE);',
                     'zc: executed')
@@ -1509,6 +1526,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     graphical_mouse_button('left', False)
                     print('X-Caliber one-time popup suppression checkbox clicked',
                           flush=True)
+                    graphical_screen('xcaliber-popup-after-suppress-click')
+                    command('zstatus', 'keyboard_focus=')
                     output = command(
                         'zc Print("xcaliber_okay_after_suppress=%X\\n",'
                         'StockPopupPoint("OKAY"));',
@@ -1520,9 +1539,14 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                         if point == 0xffffffffffffffff:
                             raise RuntimeError('X-Caliber popup lost its OKAY link')
             move_graphical_pointer(point & 0xffffffff, point >> 32)
+            time.sleep(0.2)
             graphical_mouse_button('left', True)
             time.sleep(0.2)
             graphical_mouse_button('left', False)
+            # The popup declares OKAY with LE=1. Its left-expression action
+            # is activated by Space, which the stock WinMgr sends on a click.
+            qmp_send_key('spc')
+            command('zstatus', 'keyboard_focus=')
             require_graphical_text_absent(
                 'xcaliber-solar-storm-dismissed',
                 'Face away from Sun in solar storm', timeout=5)
@@ -1614,25 +1638,9 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             ship_bounds = (340, 250, 460, 375)
             idle_motion = rgb_diff_count(idle, idle_after_wait, ship_bounds)
             xcaliber_control_failures = []
-            qmp_send_key_hold('left', 1750)
-            left_frame = graphical_screen('xcaliber-gameplay-left')
-            left_motion = rgb_diff_count(idle_after_wait, left_frame, ship_bounds)
-            if left_motion < max(12, idle_motion * 2):
-                xcaliber_control_failures.append(
-                    f'Left idle_diff={idle_motion} left_diff={left_motion}')
-                print('INCONCLUSIVE X-Caliber Left visual response: '
-                      f'idle_diff={idle_motion}, left_diff={left_motion}', flush=True)
-            else:
-                print('PASS X-Caliber left thruster changes the player ship: '
-                      f'idle_diff={idle_motion}, left_diff={left_motion}', flush=True)
-            time.sleep(0.3)
-            before_right = graphical_screen('xcaliber-gameplay-before-right')
-            if len(rgb_coordinates_in(before_right, (0, 151, 162),
-                                     player_bounds)) < 5:
-                raise RuntimeError('X-Caliber player ship disappeared before right input')
             qmp_send_key_hold('right', 1750)
             right_frame = graphical_screen('xcaliber-gameplay-right')
-            right_motion = rgb_diff_count(before_right, right_frame, ship_bounds)
+            right_motion = rgb_diff_count(idle_after_wait, right_frame, ship_bounds)
             if right_motion < max(12, idle_motion * 2):
                 xcaliber_control_failures.append(
                     f'Right idle_diff={idle_motion} right_diff={right_motion}')
@@ -1641,6 +1649,25 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             else:
                 print('PASS X-Caliber right thruster changes the player ship: '
                       f'idle_diff={idle_motion}, right_diff={right_motion}', flush=True)
+            time.sleep(0.3)
+            before_left = graphical_screen('xcaliber-gameplay-before-left')
+            if len(rgb_coordinates_in(before_left, (0, 151, 162),
+                                     player_bounds)) < 5:
+                raise RuntimeError('X-Caliber player ship disappeared before left input')
+            # A same-duration counter-thrust can steer back toward the
+            # starting orientation and make a correct opposite-direction
+            # control look like a no-op in a before/after scanout diff.
+            qmp_send_key_hold('left', 500)
+            left_frame = graphical_screen('xcaliber-gameplay-left')
+            left_motion = rgb_diff_count(before_left, left_frame, ship_bounds)
+            if left_motion < max(12, idle_motion * 2):
+                xcaliber_control_failures.append(
+                    f'Left idle_diff={idle_motion} left_diff={left_motion}')
+                print('INCONCLUSIVE X-Caliber Left visual response: '
+                      f'idle_diff={idle_motion}, left_diff={left_motion}', flush=True)
+            else:
+                print('PASS X-Caliber left thruster changes the player ship: '
+                      f'idle_diff={idle_motion}, left_diff={left_motion}', flush=True)
             before_space = graphical_screen('xcaliber-gameplay-before-space')
             player_before_space = rgb_centroid_in(
                 before_space, (0, 151, 162), player_bounds)
@@ -2821,6 +2848,50 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             command('zstatus', 'failed=0')
             print('PASS original Digital Logic: ten exact gate bitmaps, AND/OR circuits, visible prompt editing, malformed-value recovery, all setup aborts, Shift+Escape, relaunch and clean exit', flush=True)
             raise SystemExit(0)
+        if args.probe_demo_global_vars:
+            # Keep this source-level runtime check isolated from the broad
+            # program catalog: that catalog runs unrelated task-owned app
+            # probes, which can obscure whether GlobalVars itself completed.
+            focus_graphical_terminal()
+            globalvars_screen = run_graphical_terminal_command(
+                'demo-global-vars', 'ExeFile2("/Demo/GlobalVars.ZC");',
+                'Time 1:', timeout=20)
+            for expected in ('Time 1:', 'Time 2:'):
+                if expected not in globalvars_screen[3]:
+                    raise RuntimeError('Demo GlobalVars is missing '+expected+'; '
+                        f'see {graphical_path("demo-global-vars-result")}\n'
+                        +globalvars_screen[3])
+            run_graphical_terminal_command(
+                'demo-terminal-recovery', '40+2;', 'ans=0x2A=42')
+            command('zstatus', 'failed=0')
+            print('PASS Demo GlobalVars JIT dynamic initialization (Time 1/2) and '
+                  'terminal recovery; AOT-only #ifjit section remains unverified '
+                  'because the bootstrap does not expose Comp()',
+                  flush=True)
+            raise SystemExit(0)
+        if args.probe_demo_exceptions:
+            focus_graphical_terminal()
+            type_graphical_prompt_line(
+                'demo-exceptions-launch', 'ExeFile2("/Demo/Exceptions.ZC");')
+            qmp_send_key('ret')
+            require_graphical_text('demo-exceptions-first-prompt', 'y or n', timeout=20)
+            qmp_send_key('y')
+            exceptions_screen = require_graphical_text(
+                'demo-exceptions-inner-handler', 'Caught in D2', timeout=15)
+            if 'D2 handler' not in exceptions_screen[3]:
+                raise RuntimeError('Demo Exceptions did not report its inner handler; '
+                    f'see {graphical_path("demo-exceptions-inner-handler")}\n'
+                    +exceptions_screen[3])
+            require_graphical_text(
+                'demo-exceptions-final-prompt', '3 (y or n)', timeout=10)
+            qmp_send_key('n')
+            time.sleep(0.5)
+            run_graphical_terminal_command(
+                'demo-exceptions-terminal-recovery', '40+2;', 'ans=0x2A=42')
+            command('zstatus', 'failed=0')
+            print('PASS Demo Exceptions nested throw/catch and graphical-terminal recovery',
+                  flush=True)
+            raise SystemExit(0)
         if args.probe_program_catalog:
             command('zload /Tests/ProgramCatalog.ZC', 'zc: loaded /Tests/ProgramCatalog.ZC')
             command('zc Print("catalog_endian16=%04X\\n",EndianU16(0x1234));',
@@ -2849,6 +2920,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             if (not args.probe_demo_source_catalog and
                     not args.probe_demo_system_context and
                     not args.probe_demo_basics and
+                    not args.probe_demo_global_vars and
+                    not args.probe_demo_exceptions and
                     not args.demo_source_path and
                     not args.demo_source_raw_path):
                 command('zc Print("catalog_math=%d\\n",StockCatalogMathChecks());',
@@ -2926,8 +2999,12 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 run_graphical_terminal_command(
                     'demo-terminal-recovery', '40+2;', 'ans=0x2A=42')
                 command('zstatus', 'failed=0')
-                print('PASS Demo runtime basics: Print, DateTime, RadixSort, '
-                      'SubIntAccess, SubSwitch, NullCase and graphical-terminal recovery', flush=True)
+                print(('PASS Demo runtime basics: Print, DateTime, RadixSort, '
+                       'SubIntAccess, SubSwitch, NullCase, Exceptions and '
+                       'graphical-terminal recovery'
+                       if args.probe_demo_basics else
+                       'PASS Demo runtime basics and graphical-terminal recovery'),
+                      flush=True)
                 raise SystemExit(0)
             if args.probe_demo_system_context:
                 command('zvol', 'bank=A generation=0')

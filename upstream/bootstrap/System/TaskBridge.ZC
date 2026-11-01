@@ -5105,7 +5105,7 @@ U0 BootstrapWinRaise(CTask *task, CTask *root)
 }
 public CTask *BootstrapWinClickFocus(I64 screen_x, I64 screen_y)
 {//Focus and raise the topmost shown window under one screen-pixel point.
-    CTask *root, *task, *target = NULL;
+    CTask *root, *task, *target = NULL, *popup;
     CCtrl *head, *ctrl;
     I64 visited = 0, left, top, right, bottom, ctrl_visited;
     root = sys_winmgr_task;
@@ -5152,6 +5152,32 @@ public CTask *BootstrapWinClickFocus(I64 screen_x, I64 screen_y)
         visited++;
     }
     while (task && task != root && visited < BOOTSTRAP_WIN_MAX);
+    // A synchronous popup belongs above its parent even when task-ring order
+    // puts the full-screen parent later. Resolve the parent-to-popup chain
+    // after ordinary z-order hit testing so clicks inside a visible modal
+    // window reach that popup instead of falling through to its owner.
+    for (visited = 0; target && visited < BOOTSTRAP_WIN_MAX; visited++)
+    {
+        popup = target->popup_task;
+        if (!TaskValidate(popup) || popup->parent_task != target ||
+            !(popup->display_flags & (1 << DISPLAYf_SHOW)))
+            break;
+        left = gr.pan_text_x + popup->pix_left;
+        top = gr.pan_text_y + popup->pix_top;
+        right = gr.pan_text_x + popup->pix_right;
+        bottom = gr.pan_text_y + popup->pix_bottom;
+        if (!(popup->display_flags & (1 << DISPLAYf_NO_BORDER)))
+        {
+            left -= FONT_WIDTH;
+            right += FONT_WIDTH;
+            top -= FONT_HEIGHT;
+            bottom += FONT_HEIGHT;
+        }
+        if (screen_x < left || screen_x > right ||
+            screen_y < top || screen_y > bottom)
+            break;
+        target = popup;
+    }
     if (target)
     {
         BootstrapWinRaise(target, root);
@@ -6651,8 +6677,24 @@ U0 BootstrapGrUpdateTasks()
         (*active_gr->fp_final_screen_update)(dc);
     }
 }
+extern I64 TimeCal();
+public U0 BootstrapWinMgrTimingUpdate()
+{//Keep the bootstrap frame pump's timing inputs aligned with WinMgrSleep.
+    F64 t, t_delta;
+
+    TimeCal();
+    if ((t_delta = (t = tS) - winmgr.last_refresh_tS) > 0.01)
+    {
+        winmgr.fps = 1.0 / t_delta;
+        if (winmgr.fps < 1) winmgr.fps = 1;
+    }
+    else
+        winmgr.fps = 99;
+    winmgr.last_refresh_tS = t;
+}
 public U0 BootstrapWinMgrTick()
 {//One host-idle frame: route tablet clicks and redraw the task ring.
+    BootstrapWinMgrTimingUpdate;
     bootstrap_winmgr_ticks++;
     bootstrap_gr_fullscreen_active = FALSE;
     BootstrapMeshLayerClear();

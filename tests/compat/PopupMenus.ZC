@@ -1,3 +1,52 @@
+U0 PopupHitTestPark(U8 *data)
+{
+    while (TRUE)
+        Yield;
+}
+
+I64 PopupParentHitTestChecks()
+{
+    CTask *parent, *popup, *root, *focus_before, *hit;
+    I64 x, y;
+
+    parent = Spawn(&PopupHitTestPark, NULL, "PopupHitParent", -1, Fs);
+    if (!parent)
+        return 1;
+    popup = Spawn(&PopupHitTestPark, NULL, "PopupHitChild", -1, parent);
+    if (!popup)
+    {
+        Kill(parent);
+        return 2;
+    }
+    parent->display_flags = popup->display_flags =
+        (1 << DISPLAYf_SHOW) | (1 << DISPLAYf_NO_BORDER);
+    parent->win_inhibit &= ~(1 << WIf_SELF_FOCUS);
+    popup->win_inhibit &= ~(1 << WIf_SELF_FOCUS);
+    if (!WinHorz(5, 30, parent) || !WinVert(5, 20, parent) ||
+        !WinHorz(8, 14, popup) || !WinVert(8, 12, popup))
+    {
+        Kill(parent);
+        return 3;
+    }
+    parent->popup_task = popup;
+    root = sys_winmgr_task;
+    if (!root)
+        root = sys_task;
+    // Put the full-screen owner after its child in ring order. The visible
+    // popup still owns a click in its rectangle.
+    BootstrapWinRaise(parent, root);
+    focus_before = sys_focus_task;
+    x = gr.pan_text_x + popup->pix_left + 8;
+    y = gr.pan_text_y + popup->pix_top + 8;
+    hit = BootstrapWinClickFocus(x, y);
+    parent->popup_task = NULL;
+    sys_focus_task = focus_before;
+    Kill(parent);
+    if (hit == popup)
+        return 42;
+    return 4;
+}
+
 I64 StockPopupEntryChecks()
 {
     CDoc *doc = DocNew;

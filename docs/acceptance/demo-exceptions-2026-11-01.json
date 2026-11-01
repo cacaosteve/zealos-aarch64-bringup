@@ -1,0 +1,15 @@
+{
+  "date": "2026-11-01",
+  "command": "python3 scripts/check-compat.py --pci --probe-demo-exceptions",
+  "target": "QEMU PCI ARM64 graphical terminal",
+  "result": "pass",
+  "program": "/Demo/Exceptions.ZC",
+  "verified": [
+    "accepted the first yes/no prompt and raised Point1",
+    "entered the nested D2 catch handler and printed the Point1 caller as a clickable %P DolDoc link",
+    "printed Caught in D2 and answered the final prompt to complete normally",
+    "graphical terminal recovered and evaluated 40+2 as 42",
+    "runtime reported failed=0"
+  ],
+  "scope_note": "This acceptance covers the Point1 nested-catch path and ARM64 %P pointer-link formatting. Other Exception demo paths and broader %P call sites remain unverified."
+}
