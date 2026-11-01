@@ -6,6 +6,14 @@ Bool SourceContextPathIs(U8 *actual, U8 *expected)
     return result;
 }
 
+I64 SourceContextOffsetShadowChecks()
+{
+	I64 offset;
+	offset = 0;
+	offset = 42;
+	return offset;
+}
+
 I64 SourceContextMaskChecks()
 {
     U8 *original = DirCur;

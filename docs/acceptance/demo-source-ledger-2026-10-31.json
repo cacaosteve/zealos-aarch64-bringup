@@ -1,0 +1,2170 @@
+{
+  "source_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "generated_from": "build/demo-source-catalog.json",
+  "source_count": 206,
+  "compile_pass": 168,
+  "compile_blocked": 38,
+  "runtime_accepted": 6,
+  "directories": {
+    ".": {
+      "source_count": 34,
+      "compile_pass": 27,
+      "compile_blocked": 7,
+      "preliminary_kind": "root-level source; needs classification"
+    },
+    "AcctExample": {
+      "source_count": 13,
+      "compile_pass": 6,
+      "compile_blocked": 7,
+      "preliminary_kind": "account/home-system integration examples"
+    },
+    "Asm": {
+      "source_count": 8,
+      "compile_pass": 0,
+      "compile_blocked": 8,
+      "preliminary_kind": "architecture-specific assembly examples"
+    },
+    "Disk": {
+      "source_count": 5,
+      "compile_pass": 5,
+      "compile_blocked": 0,
+      "preliminary_kind": "disk and storage examples"
+    },
+    "DolDoc": {
+      "source_count": 13,
+      "compile_pass": 12,
+      "compile_blocked": 1,
+      "preliminary_kind": "DolDoc examples and components"
+    },
+    "Games": {
+      "source_count": 33,
+      "compile_pass": 33,
+      "compile_blocked": 0,
+      "preliminary_kind": "interactive game sources"
+    },
+    "Graphics": {
+      "source_count": 59,
+      "compile_pass": 54,
+      "compile_blocked": 5,
+      "preliminary_kind": "graphics examples and components"
+    },
+    "InFile": {
+      "source_count": 2,
+      "compile_pass": 2,
+      "compile_blocked": 0,
+      "preliminary_kind": "root-level source; needs classification"
+    },
+    "Lectures": {
+      "source_count": 11,
+      "compile_pass": 4,
+      "compile_blocked": 7,
+      "preliminary_kind": "lecture and tutorial sources"
+    },
+    "MultiCore": {
+      "source_count": 8,
+      "compile_pass": 6,
+      "compile_blocked": 2,
+      "preliminary_kind": "multicore and interrupt examples"
+    },
+    "RevFileDemo": {
+      "source_count": 1,
+      "compile_pass": 1,
+      "compile_blocked": 0,
+      "preliminary_kind": "root-level source; needs classification"
+    },
+    "SortFileDemo": {
+      "source_count": 2,
+      "compile_pass": 2,
+      "compile_blocked": 0,
+      "preliminary_kind": "root-level source; needs classification"
+    },
+    "Sound": {
+      "source_count": 4,
+      "compile_pass": 4,
+      "compile_blocked": 0,
+      "preliminary_kind": "sound examples"
+    },
+    "Templates": {
+      "source_count": 7,
+      "compile_pass": 7,
+      "compile_blocked": 0,
+      "preliminary_kind": "templates"
+    },
+    "ToHtmlToTXTDemo": {
+      "source_count": 4,
+      "compile_pass": 4,
+      "compile_blocked": 0,
+      "preliminary_kind": "root-level source; needs classification"
+    },
+    "WebLogDemo": {
+      "source_count": 2,
+      "compile_pass": 1,
+      "compile_blocked": 1,
+      "preliminary_kind": "root-level source; needs classification"
+    }
+  },
+  "classification_note": "Directory-based kinds are triage hints, not final runnable-program classifications.",
+  "runtime_note": "Only explicit per-source evidence in the 2026-10-31 basic demo acceptance record is marked pass.",
+  "sources": [
+    {
+      "path": "/Demo/AcctExample/HomeKeyPlugIns.ZC",
+      "directory": "AcctExample",
+      "preliminary_kind": "account/home-system integration examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "blocked",
+      "first_compile_error": "ERR:/Demo/AcctExample/HomeKeyPlugIns.ZC:193:20 Unknown symbol 'fg_on'.",
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/AcctExample/HomeLocalize.ZC",
+      "directory": "AcctExample",
+      "preliminary_kind": "account/home-system integration examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/AcctExample/HomeSys.ZC",
+      "directory": "AcctExample",
+      "preliminary_kind": "account/home-system integration examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "blocked",
+      "first_compile_error": "ERR:<eof>:0:0 AArch64 external data 'sys_compile_time' is not bound.",
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/AcctExample/HomeWrappers.ZC",
+      "directory": "AcctExample",
+      "preliminary_kind": "account/home-system integration examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/AcctExample/MakeHome.ZC",
+      "directory": "AcctExample",
+      "preliminary_kind": "account/home-system integration examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "blocked",
+      "first_compile_error": "ERR /Demo/AcctExample/MakeHome.ZC:5:26 I can't find file '~/HomeLocalize.ZC'.",
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/AcctExample/Once.ZC",
+      "directory": "AcctExample",
+      "preliminary_kind": "account/home-system integration examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/AcctExample/Registry.ZC",
+      "directory": "AcctExample",
+      "preliminary_kind": "account/home-system integration examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/AcctExample/TOS/MakeTOS.ZC",
+      "directory": "AcctExample",
+      "preliminary_kind": "account/home-system integration examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "blocked",
+      "first_compile_error": "ERR /Demo/AcctExample/TOS/MakeTOS.ZC:3:18 I can't find file 'TOSExt.ZC'.",
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/AcctExample/TOS/TOSConfig.ZC",
+      "directory": "AcctExample",
+      "preliminary_kind": "account/home-system integration examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "blocked",
+      "first_compile_error": "ERR:/Demo/AcctExample/TOS/TOSConfig.ZC:7:43 AArch64 external data 'mem_boot_base' is not bound.",
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/AcctExample/TOS/TOSDistro.ZC",
+      "directory": "AcctExample",
+      "preliminary_kind": "account/home-system integration examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "blocked",
+      "first_compile_error": "ERR:/Demo/AcctExample/TOS/TOSDistro.ZC:13:25 Unknown symbol 'TOS_HDS'.",
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/AcctExample/TOS/TOSExtern.ZC",
+      "directory": "AcctExample",
+      "preliminary_kind": "account/home-system integration examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/AcctExample/TOS/TOSMisc.ZC",
+      "directory": "AcctExample",
+      "preliminary_kind": "account/home-system integration examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "blocked",
+      "first_compile_error": "ERR:/Demo/AcctExample/TOS/TOSMisc.ZC:108:21 Unknown symbol 'TOS_HDS'.",
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/AcctExample/TOS/TOSTheme.ZC",
+      "directory": "AcctExample",
+      "preliminary_kind": "account/home-system integration examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Asm/AsmAndC1.ZC",
+      "directory": "Asm",
+      "preliminary_kind": "architecture-specific assembly examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "blocked",
+      "first_compile_error": "ERR:/Demo/Asm/AsmAndC1.ZC:8:5 Unknown symbol 'asm'.",
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Asm/AsmAndC2.ZC",
+      "directory": "Asm",
+      "preliminary_kind": "architecture-specific assembly examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "blocked",
+      "first_compile_error": "ERR:/Demo/Asm/AsmAndC2.ZC:12:5 Unknown symbol 'asm'.",
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Asm/AsmAndC3.ZC",
+      "directory": "Asm",
+      "preliminary_kind": "architecture-specific assembly examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "blocked",
+      "first_compile_error": "ERR:/Demo/Asm/AsmAndC3.ZC:15:11 Expected ':' after label candidate 'MOV'.",
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Asm/AsmHelloWorld.ZC",
+      "directory": "Asm",
+      "preliminary_kind": "architecture-specific assembly examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "blocked",
+      "first_compile_error": "ERR:/Demo/Asm/AsmHelloWorld.ZC:22:5 Unknown symbol 'asm'.",
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Asm/BuzzFizz.ZC",
+      "directory": "Asm",
+      "preliminary_kind": "architecture-specific assembly examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "blocked",
+      "first_compile_error": "ERR:/Demo/Asm/BuzzFizz.ZC:7:5 Unknown symbol 'asm'.",
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Asm/DivByHand.ZC",
+      "directory": "Asm",
+      "preliminary_kind": "architecture-specific assembly examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "blocked",
+      "first_compile_error": "ERR:/Demo/Asm/DivByHand.ZC:1:5 Unknown symbol 'asm'.",
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Asm/MulByHand.ZC",
+      "directory": "Asm",
+      "preliminary_kind": "architecture-specific assembly examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "blocked",
+      "first_compile_error": "ERR:/Demo/Asm/MulByHand.ZC:6:5 Unknown symbol 'asm'.",
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Asm/PutDec.ZC",
+      "directory": "Asm",
+      "preliminary_kind": "architecture-specific assembly examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "blocked",
+      "first_compile_error": "ERR:/Demo/Asm/PutDec.ZC:1:5 Unknown symbol 'asm'.",
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Carry.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "blocked",
+      "first_compile_error": "ERR:/Demo/Carry.ZC:12:15 AArch64 intrinsic 'Carry' (IC_CARRY) is not implemented.",
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/ClassMeta.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "blocked",
+      "first_compile_error": "ERR:/Demo/ClassMeta.ZC:20:56 Unknown symbol 'output_fun'.",
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/CompileDemo.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "blocked",
+      "first_compile_error": "ERR:/Demo/CompileDemo.ZC:14:40 Unknown symbol 'LexExpression2Bin'.",
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/DateTime.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-runtime-basics-2026-10-31.json"
+    },
+    {
+      "path": "/Demo/DebugDemo.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Define.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Directives.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "blocked",
+      "first_compile_error": "ERR __DATE__:1:8 Unexpected charactor '#'.",
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Disk/DataBase.ZC",
+      "directory": "Disk",
+      "preliminary_kind": "disk and storage examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Disk/DiskRaw.ZC",
+      "directory": "Disk",
+      "preliminary_kind": "disk and storage examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Disk/FPrintF.ZC",
+      "directory": "Disk",
+      "preliminary_kind": "disk and storage examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Disk/SerializeTree.ZC",
+      "directory": "Disk",
+      "preliminary_kind": "disk and storage examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Disk/UnusedSpaceRep.ZC",
+      "directory": "Disk",
+      "preliminary_kind": "disk and storage examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/DolDoc/CallBack.ZC",
+      "directory": "DolDoc",
+      "preliminary_kind": "DolDoc examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/DolDoc/ClickCallBack.ZC",
+      "directory": "DolDoc",
+      "preliminary_kind": "DolDoc examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/DolDoc/CursorMove.ZC",
+      "directory": "DolDoc",
+      "preliminary_kind": "DolDoc examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/DolDoc/Data.ZC",
+      "directory": "DolDoc",
+      "preliminary_kind": "DolDoc examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/DolDoc/DefineStr.ZC",
+      "directory": "DolDoc",
+      "preliminary_kind": "DolDoc examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "blocked",
+      "first_compile_error": "ERR /Demo/DolDoc/DefineStr.ZC:15:6 Unexpected charactor '#'.",
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/DolDoc/FileRead.ZC",
+      "directory": "DolDoc",
+      "preliminary_kind": "DolDoc examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/DolDoc/Form.ZC",
+      "directory": "DolDoc",
+      "preliminary_kind": "DolDoc examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/DolDoc/MenuBttn.ZC",
+      "directory": "DolDoc",
+      "preliminary_kind": "DolDoc examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/DolDoc/MenuSprite.ZC",
+      "directory": "DolDoc",
+      "preliminary_kind": "DolDoc examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/DolDoc/NumBible.ZC",
+      "directory": "DolDoc",
+      "preliminary_kind": "DolDoc examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/DolDoc/TextDemo.ZC",
+      "directory": "DolDoc",
+      "preliminary_kind": "DolDoc examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/DolDoc/TreeDemo.ZC",
+      "directory": "DolDoc",
+      "preliminary_kind": "DolDoc examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/DolDoc/UnusedDefine.ZC",
+      "directory": "DolDoc",
+      "preliminary_kind": "DolDoc examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Exceptions.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/ExtChars.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Games/BattleLines.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Games/BigGuns.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Games/BlackDiamond.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Games/BomberGolf.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Games/CastleFrankenstein.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Games/CharDemo.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Games/Chess.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Games/CircleTrace.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Games/Collision.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Games/Digits.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Games/DunGen.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Games/ElephantWalk.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Games/FlapBat.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Games/FlatTops.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Games/Halogen.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Games/MassSpring.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Games/Maze.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Games/RainDrops.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Games/RawHide.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Games/Rocket.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Games/RocketScience.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Games/Squirt.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Games/Stadium/Stadium.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Games/Stadium/StadiumGen.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Games/Talons.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Games/TheDead.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Games/TicTacToe.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Games/TreeCheckers.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Games/Varoom.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Games/Wenceslas.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Games/Whap.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Games/Zing.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Games/ZoneOut.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/GlobalVars.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "blocked",
+      "first_compile_error": "ERR:/Demo/GlobalVars.ZC:26:22 sizeof expression size is invalid.",
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/32BitColor.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/32BitPaint.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/3DPoly.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/BSpline.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/Blot.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/Bounce.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/Box.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/Cartesian.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/CharAnimation.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/Clock.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/Collision.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/CommonAncestor.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/Doodle.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/EdSprite.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/Elephant.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/Extents.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/FontEd.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/GrDir.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/Grid.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/Hanoi.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/Lattice.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/Life.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/LightTable.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "blocked",
+      "first_compile_error": "ERR:/System/DevInfo.ZC:9:19 AArch64 external data 'dev' is not bound.",
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/Lines.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/LowPassFilter.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/Mandel.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/MathAudioDemo.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/MouseDemo.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/NetOfDots.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/Palette.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/PanText.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/Pick.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/Pick3D.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "blocked",
+      "first_compile_error": "ERR:/Demo/Graphics/Pick3D.ZC:38:1 Expected ';'",
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/PoleZeros.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/PredatorPrey.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/RotateTank.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/ScreenCapture.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/ScrollBars.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/Shading.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/Shadow.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/Slider.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/Speedline.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/SpritePlot.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/SpritePlot3D.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/SpritePut.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/SpritePutExt.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/SpriteRaw.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/SpriteText.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/SunMoon.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/Symmetry.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/Transform.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/Usage.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "blocked",
+      "first_compile_error": "ERR:/Demo/Graphics/Usage.ZC:28:31 AArch64 external data 'sys_code_bp' is not bound.",
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/WallPapers/WallPaperCtrl.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/WallPapers/WallPaperDesktop/HomeSys.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "blocked",
+      "first_compile_error": "ERR:<eof>:0:0 AArch64 external data 'sys_compile_time' is not bound.",
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/WallPapers/WallPaperDesktop/Install.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/WallPapers/WallPaperDesktop.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "blocked",
+      "first_compile_error": "ERR /Demo/Graphics/WallPapers/WallPaperDesktop.ZC:14:29 Expected '$$' for a class layout offset.",
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/WallPapers/WallPaperFish.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/WallPapers/WallPaperStars.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/WinZBuf.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/InFile/InPopUp.ZC",
+      "directory": "InFile",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/InFile/InSetIP.ZC",
+      "directory": "InFile",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/KeyBitMap.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/LastClass.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Lectures/AndNotMod.ZC",
+      "directory": "Lectures",
+      "preliminary_kind": "lecture and tutorial sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Lectures/FixedPoint.ZC",
+      "directory": "Lectures",
+      "preliminary_kind": "lecture and tutorial sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Lectures/FixedPointAdvanced.ZC",
+      "directory": "Lectures",
+      "preliminary_kind": "lecture and tutorial sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "blocked",
+      "first_compile_error": "ERR:/Demo/Lectures/FixedPointAdvanced.ZC:23:5 Unknown symbol 'asm'.",
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Lectures/InterruptDemo.ZC",
+      "directory": "Lectures",
+      "preliminary_kind": "lecture and tutorial sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "blocked",
+      "first_compile_error": "ERR:/Demo/Lectures/InterruptDemo.ZC:7:5 Unknown symbol 'asm'.",
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Lectures/LexDemo.ZC",
+      "directory": "Lectures",
+      "preliminary_kind": "lecture and tutorial sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Lectures/MiniCompiler.ZC",
+      "directory": "Lectures",
+      "preliminary_kind": "lecture and tutorial sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "blocked",
+      "first_compile_error": "ERR:/Demo/Lectures/MiniCompiler.ZC:257:8 Expected ':' after label candidate 'Un'.",
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Lectures/MiniGrLib.ZC",
+      "directory": "Lectures",
+      "preliminary_kind": "lecture and tutorial sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Lectures/NegDisp.ZC",
+      "directory": "Lectures",
+      "preliminary_kind": "lecture and tutorial sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "blocked",
+      "first_compile_error": "ERR:/Demo/Lectures/NegDisp.ZC:23:3 Expected ':' after label candidate 'U'.",
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Lectures/Optimization.ZC",
+      "directory": "Lectures",
+      "preliminary_kind": "lecture and tutorial sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "blocked",
+      "first_compile_error": "ERR:/Demo/Lectures/Optimization.ZC:16:5 Unknown symbol 'asm'.",
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Lectures/PCIInterrupts.ZC",
+      "directory": "Lectures",
+      "preliminary_kind": "lecture and tutorial sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "blocked",
+      "first_compile_error": "ERR:/Demo/Lectures/PCIInterrupts.ZC:11:11 Unknown symbol 'interrupt'.",
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Lectures/Ring3.ZC",
+      "directory": "Lectures",
+      "preliminary_kind": "lecture and tutorial sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "blocked",
+      "first_compile_error": "ERR:/Demo/Lectures/Ring3.ZC:14:5 Unknown symbol 'asm'.",
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/MagicPairs.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/MemDemo.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/MessageLoop.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/MultiCore/Interrupts.ZC",
+      "directory": "MultiCore",
+      "preliminary_kind": "multicore and interrupt examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "blocked",
+      "first_compile_error": "ERR:/Demo/MultiCore/Interrupts.ZC:1:11 Unknown symbol 'interrupt'.",
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/MultiCore/LoadTest.ZC",
+      "directory": "MultiCore",
+      "preliminary_kind": "multicore and interrupt examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "blocked",
+      "first_compile_error": "ERR:/Demo/MultiCore/LoadTest.ZC:10:8 Expected ':' after label candidate 'Comp'.",
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/MultiCore/Lock.ZC",
+      "directory": "MultiCore",
+      "preliminary_kind": "multicore and interrupt examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/MultiCore/MPAdd.ZC",
+      "directory": "MultiCore",
+      "preliminary_kind": "multicore and interrupt examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/MultiCore/MPPrint.ZC",
+      "directory": "MultiCore",
+      "preliminary_kind": "multicore and interrupt examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/MultiCore/MPRadix.ZC",
+      "directory": "MultiCore",
+      "preliminary_kind": "multicore and interrupt examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/MultiCore/Palindrome.ZC",
+      "directory": "MultiCore",
+      "preliminary_kind": "multicore and interrupt examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/MultiCore/Primes.ZC",
+      "directory": "MultiCore",
+      "preliminary_kind": "multicore and interrupt examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/NullCase.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-runtime-basics-2026-10-31.json"
+    },
+    {
+      "path": "/Demo/OnceDemo.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "blocked",
+      "first_compile_error": "ERR:/Demo/OnceDemo.ZC:7:11 Expected ':' after label candidate 'BootRAM'.",
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/ParenWarn.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/PhoneNumWords.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Print.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-runtime-basics-2026-10-31.json"
+    },
+    {
+      "path": "/Demo/Progress.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Prompt.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/PullDownMenu.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/RadixSort.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-runtime-basics-2026-10-31.json"
+    },
+    {
+      "path": "/Demo/RandDemo.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/RegistryDemo.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/RevFileDemo/Rev.ZC",
+      "directory": "RevFileDemo",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/ScreenCodes.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/SortFileDemo/F64FileGen.ZC",
+      "directory": "SortFileDemo",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/SortFileDemo/F64FileSort.ZC",
+      "directory": "SortFileDemo",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Sound/ASCIIOrgan.ZC",
+      "directory": "Sound",
+      "preliminary_kind": "sound examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Sound/MorseCode.ZC",
+      "directory": "Sound",
+      "preliminary_kind": "sound examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Sound/OhGreat.ZC",
+      "directory": "Sound",
+      "preliminary_kind": "sound examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Sound/WaterFowl.ZC",
+      "directory": "Sound",
+      "preliminary_kind": "sound examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Spy.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/StackGrow.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/SubIntAccess.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-runtime-basics-2026-10-31.json"
+    },
+    {
+      "path": "/Demo/SubSwitch.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-runtime-basics-2026-10-31.json"
+    },
+    {
+      "path": "/Demo/SuggestSpelling.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Templates/Game1.ZC",
+      "directory": "Templates",
+      "preliminary_kind": "templates",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Templates/Lex1.ZC",
+      "directory": "Templates",
+      "preliminary_kind": "templates",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Templates/MultiCore1.ZC",
+      "directory": "Templates",
+      "preliminary_kind": "templates",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Templates/ODE1.ZC",
+      "directory": "Templates",
+      "preliminary_kind": "templates",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Templates/Registry1.ZC",
+      "directory": "Templates",
+      "preliminary_kind": "templates",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Templates/Util1.ZC",
+      "directory": "Templates",
+      "preliminary_kind": "templates",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Templates/Util2.ZC",
+      "directory": "Templates",
+      "preliminary_kind": "templates",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/TimeIns.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "blocked",
+      "first_compile_error": "ERR /Demo/TimeIns.ZC:23:8 Unexpected charactor '#'.",
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/ToHtmlToTXTDemo/HtmlDirList.ZC",
+      "directory": "ToHtmlToTXTDemo",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/ToHtmlToTXTDemo/HtmlGen.ZC",
+      "directory": "ToHtmlToTXTDemo",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/ToHtmlToTXTDemo/TXTGen.ZC",
+      "directory": "ToHtmlToTXTDemo",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/ToHtmlToTXTDemo/ToHtml.ZC",
+      "directory": "ToHtmlToTXTDemo",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/WebLogDemo/WebLogRep.ZC",
+      "directory": "WebLogDemo",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "blocked",
+      "first_compile_error": "ERR __CMD_LINE__:1:7 Unexpected charactor '#'.",
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/WebLogDemo/WebLogScramble.ZC",
+      "directory": "WebLogDemo",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/WordSearch.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    }
+  ]
+}

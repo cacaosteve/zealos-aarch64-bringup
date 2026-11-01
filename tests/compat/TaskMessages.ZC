@@ -1,5 +1,10 @@
 // Pinned Job.ZC and SerialDev/Message.ZC signatures, cooperative bridge.
 I64 msg_stage, msg_code1, msg_code2, msg_arg1, msg_arg2;
+I64 msg_scan_peer_stage, msg_scan_peer_scans, msg_scan_peer_key_scans;
+I64 msg_scan_peer_char_scans, msg_scan_peer_flushes, msg_scan_started;
+I64 msg_scan_yield_stage, msg_scan_early_peer, msg_scan_peer_bad_order;
+I64 msg_scan_after_yield, msg_scan_sleep_started;
+I64 msg_scan_sleep_peer, msg_scan_after_sleep;
 
 U0 MessageReceiver(U8 *data)
 {
@@ -18,6 +23,78 @@ U0 MessageIdleReceiver(U8 *data)
     MessageGet;
     LBts(&Fs->task_flags, TASKf_IDLE);
     Yield;
+}
+
+U0 MessageScanBusyWaiter()
+{
+    I64 a, b, ch, scan_code, i;
+    msg_scan_started = 1;
+    for (i = 0; i < 5; i++)
+    {
+        MessageScan(&a, &b, 1 << MESSAGE_CMD);
+        msg_scan_peer_scans++;
+        if (msg_scan_peer_stage)
+            msg_scan_early_peer = 1;
+        KeyScan(&ch, &scan_code, FALSE);
+        msg_scan_peer_key_scans++;
+        if (msg_scan_peer_stage)
+            msg_scan_early_peer = 1;
+        CharScan;
+        msg_scan_peer_char_scans++;
+        if (msg_scan_peer_stage)
+            msg_scan_early_peer = 1;
+        FlushMessages;
+        msg_scan_peer_flushes++;
+        if (msg_scan_peer_stage)
+            msg_scan_early_peer = 1;
+    }
+    msg_scan_yield_stage = 1;
+    Yield;
+    msg_scan_after_yield = msg_scan_peer_stage;
+    msg_scan_sleep_started = 1;
+    Sleep(1);
+    msg_scan_after_sleep = msg_scan_sleep_peer;
+}
+
+U0 MessageScanPeer()
+{
+    while (!msg_scan_started)
+        Yield;
+    if (msg_scan_yield_stage != 1 || msg_scan_peer_scans != 5 ||
+            msg_scan_peer_key_scans != 5 || msg_scan_peer_char_scans != 5 ||
+            msg_scan_peer_flushes != 5)
+        msg_scan_peer_bad_order = 1;
+    msg_scan_peer_stage = 1;
+    while (!msg_scan_sleep_started)
+        Yield;
+    msg_scan_sleep_peer = 1;
+}
+
+I64 TaskMessageSchedulingChecks()
+{//Polling does not switch tasks; explicit Yield selects the next ready task.
+    I64 scanner, peer;
+    msg_scan_peer_stage = msg_scan_peer_scans = msg_scan_peer_key_scans = 0;
+    msg_scan_peer_char_scans = msg_scan_peer_flushes = msg_scan_started = 0;
+    msg_scan_yield_stage = msg_scan_early_peer = msg_scan_peer_bad_order = 0;
+    msg_scan_after_yield = msg_scan_sleep_started = 0;
+    msg_scan_sleep_peer = msg_scan_after_sleep = 0;
+    scanner = ZcTaskSpawn(&MessageScanBusyWaiter);
+    peer = ZcTaskSpawn(&MessageScanPeer);
+    if (scanner != 1 || peer != 2 || ZcTaskRun != 2 || ZcTaskRun != 0)
+        return 1;
+    if (msg_scan_peer_scans != 5)
+        return 2;
+    if (msg_scan_yield_stage != 1)
+        return 3;
+    if (msg_scan_early_peer)
+        return 4;
+    if (msg_scan_after_yield != 1)
+        return 5;
+    if (msg_scan_peer_bad_order)
+        return 7;
+    if (msg_scan_after_sleep != 1)
+        return 8;
+    return 42;
 }
 
 I64 TaskMessageChecks()

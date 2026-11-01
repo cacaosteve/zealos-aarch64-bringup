@@ -6,14 +6,18 @@ import json
 from pathlib import Path
 import sys
 import tarfile
-from arm64_source import translate_docfile, extract_source_dates, extract_string_utilities, translate_budget_strings, translate_span_worker_cleanup, translate_keepaway_nearest_ball, translate_tothefront_draw, translate_tothefront_init, translate_tothefront_sentinel, extract_keyboard_helpers
+from arm64_source import translate_docfile, translate_debug_compat, extract_source_dates, extract_string_utilities, translate_budget_strings, translate_span_worker_cleanup, translate_keepaway_nearest_ball, translate_xcaliber_shot_return, translate_xcaliber_draw_visibility, translate_xcaliber_key_descriptors, translate_xcaliber_escape_scan, translate_xcaliber_held_input, translate_tothefront_draw, translate_tothefront_init, translate_tothefront_player_pick, translate_tothefront_ai, translate_tothefront_sentinel, extract_keyboard_helpers, translate_math, translate_sysrep_processor
 
 from arm64_source import (extract_home_set, extract_home_startup, extract_home_startup_tasks, inject_home_startup_tasks, extract_version_scalars, extract_source_prompt, extract_source_training, extract_server_task, extract_user_task, translate_doctree, translate_registry, translate_docterm, translate_doced, translate_docfind, translate_docform, translate_docpopup, translate_docrecalc, translate_grbitmap,
                           translate_autocomplete_task, translate_grdc, translate_grscreen, translate_ktask, translate_mathode, translate_zsplash,
                           translate_winmgr, translate_filemgr, translate_home_once,
                           translate_grpalette, translate_message,
+                          translate_stock_game_math_calls,
+                          translate_empty_label_statement,
+                          translate_wenceslas, translate_progress,
                           inject_sprite_elem_base_sizes,
-                          inject_sprite_interpolation, inject_sprite_matrix_draw)
+                          inject_sprite_interpolation, inject_sprite_matrix_draw,
+                          inject_sprite_wrappers)
 
 root = Path(__file__).resolve().parent.parent
 manifest = json.loads((root / 'upstream/pinned/UPSTREAM.json').read_text())
@@ -27,8 +31,39 @@ for name, expected in manifest['files'].items():
     if rel == 'HomeSys.ZC':
         entries['System/HomeStartUp.ZC'] = extract_home_startup(data)
         home_startup_tasks = extract_home_startup_tasks(data)
+    if rel == 'System/Debug.ZC':
+        try:
+            data = translate_debug_compat(data)
+        except ValueError as exc:
+            raise SystemExit(f'ARM64 Debug overlay no longer applies: {exc}') from exc
     if rel == 'Apps/Budget/BgtStrs.ZC':
         data = translate_budget_strings(data)
+    if rel == 'System/Math/Math.ZC':
+        data = translate_math(data)
+    if rel == 'System/Utils/SysRep.ZC':
+        try:
+            data = translate_sysrep_processor(data)
+        except ValueError as exc:
+            raise SystemExit(f'ARM64 SysRep overlay no longer applies: {exc}') from exc
+    if rel in ('Compiler/Lex.ZC', 'Compiler/CompilerB.HH'):
+        # The pinned signature stores an optional output length but the
+        # implementation dereferences it. Preserve that API correctly on
+        # the AArch64 source volume, including calls that omit the argument.
+        if rel == 'Compiler/Lex.ZC':
+            needle = b'U8 *LexFirstRemove(CCompCtrl *cc, U8 *marker, I64 _len=NULL)'
+            replacement = b'U8 *LexFirstRemove(CCompCtrl *cc, U8 *marker, I64 *_len=NULL)'
+        else:
+            needle = b'public extern U8\t\t*LexFirstRemove(CCompCtrl *cc, U8 *marker, I64 _len=NULL);'
+            replacement = b'public extern U8\t\t*LexFirstRemove(CCompCtrl *cc, U8 *marker, I64 *_len=NULL);'
+        if data.count(needle) != 1:
+            raise SystemExit('ARM64 LexFirstRemove pointer overlay no longer applies')
+        data = data.replace(needle, replacement)
+    if rel == 'Compiler/Lex.ZC':
+        numeric_range = b'\t\t\tcase 128...255:'
+        if data.count(numeric_range) != 1:
+            raise SystemExit('ARM64 lexer byte-range overlay no longer applies')
+        byte_cases = b'\n'.join(b'\t\t\tcase 0x%02X:' % value for value in range(0x80, 0x100))
+        data = data.replace(numeric_range, byte_cases)
     if rel == 'Apps/Span/SpanMain.ZC':
         data = translate_span_worker_cleanup(data)
     if rel == 'Apps/KeepAway/KeepAway.ZC':
@@ -36,12 +71,99 @@ for name, expected in manifest['files'].items():
             data = translate_keepaway_nearest_ball(data)
         except ValueError as exc:
             raise SystemExit(f'ARM64 KeepAway overlay no longer applies: {exc}') from exc
+    if rel == 'Apps/X-Caliber/X-Caliber.ZC':
+        try:
+            data = translate_xcaliber_shot_return(data)
+            data = translate_xcaliber_draw_visibility(data)
+            data = translate_xcaliber_key_descriptors(data)
+            data = translate_xcaliber_escape_scan(data)
+            data = translate_xcaliber_held_input(data)
+        except ValueError as exc:
+            raise SystemExit(f'ARM64 X-Caliber overlay no longer applies: {exc}') from exc
+    if rel == 'Demo/Games/BomberGolf.ZC':
+        try:
+            data = translate_stock_game_math_calls(
+                data, blink_count=3, full_tri_count=1)
+            data = translate_empty_label_statement(data, b'bm_done')
+        except ValueError as exc:
+            raise SystemExit(f'ARM64 BomberGolf math overlay no longer applies: {exc}') from exc
+    if rel == 'Demo/Games/CastleFrankenstein.ZC':
+        try:
+            data = translate_stock_game_math_calls(data, tri_count=1)
+            data = translate_empty_label_statement(data, b'fs_done')
+        except ValueError as exc:
+            raise SystemExit(f'ARM64 CastleFrankenstein math overlay no longer applies: {exc}') from exc
+    if rel == 'Demo/Games/DunGen.ZC':
+        try:
+            data = translate_stock_game_math_calls(data, blink_count=1, tri_count=2)
+        except ValueError as exc:
+            raise SystemExit(f'ARM64 DunGen math overlay no longer applies: {exc}') from exc
+    if rel == 'Demo/Games/Talons.ZC':
+        try:
+            data = translate_stock_game_math_calls(data, tri_count=1,
+                                                   sign_count=2)
+        except ValueError as exc:
+            raise SystemExit(f'ARM64 Talons math overlay no longer applies: {exc}') from exc
+    if rel == 'Demo/Games/Varoom.ZC':
+        try:
+            data = translate_stock_game_math_calls(data, log2_count=1)
+            data = translate_empty_label_statement(data, b'vr_done')
+        except ValueError as exc:
+            raise SystemExit(f'ARM64 Varoom math overlay no longer applies: {exc}') from exc
+    if rel == 'Demo/Games/Wenceslas.ZC':
+        try:
+            data = translate_wenceslas(data)
+            data = translate_empty_label_statement(data, b'ws_done')
+        except ValueError as exc:
+            raise SystemExit(f'ARM64 Wenceslas prompt overlay no longer applies: {exc}') from exc
+    if rel == 'Demo/PhoneNumWords.ZC':
+        # This lookup is indexed only for A-Z and does not need a string
+        # terminator. Use an explicit initializer because the ARM64 compiler
+        # rejects this stock string-to-array initializer form.
+        needle = b'U8 char_map[26]="22233344455566677778889999";'
+        replacement = (b"U8 char_map[26]={'2','2','2','3','3','3','4','4','4',"
+                       b"'5','5','5','6','6','6','7','7','7','7','8','8','8',"
+                       b"'9','9','9','9'};")
+        if data.count(needle) != 1:
+            raise SystemExit('ARM64 PhoneNumWords string extent overlay no longer applies')
+        data = data.replace(needle, replacement)
+    if rel == 'Demo/Progress.ZC':
+        try:
+            data = translate_progress(data)
+        except ValueError as exc:
+            raise SystemExit(f'ARM64 Progress overlay no longer applies: {exc}') from exc
+    if rel == 'Demo/Games/RawHide.ZC':
+        try:
+            data = translate_stock_game_math_calls(data, clamp_u64_count=1)
+        except ValueError as exc:
+            raise SystemExit(f'ARM64 RawHide math overlay no longer applies: {exc}') from exc
+    if rel == 'Demo/Games/BlackDiamond.ZC':
+        try:
+            data = translate_empty_label_statement(data, b'bd_done')
+        except ValueError as exc:
+            raise SystemExit(f'ARM64 BlackDiamond label overlay no longer applies: {exc}') from exc
+    if rel == 'Demo/Games/ZoneOut.ZC':
+        try:
+            data = translate_empty_label_statement(data, b'zo_done')
+        except ValueError as exc:
+            raise SystemExit(f'ARM64 ZoneOut label overlay no longer applies: {exc}') from exc
     if rel == 'Apps/ToTheFront/TTFFire.ZC':
         data = translate_tothefront_sentinel(data)
     if rel == 'Apps/ToTheFront/TTFDraw.ZC':
         data = translate_tothefront_draw(data)
     if rel == 'Apps/ToTheFront/TTFInit.ZC':
         data = translate_tothefront_init(data)
+    if rel in ('Apps/ToTheFront/AIs/Human.ZC',
+               'Apps/ToTheFront/AIs/SimpleAI.ZC'):
+        try:
+            data = translate_tothefront_ai(data)
+        except ValueError as exc:
+            raise SystemExit(f'ARM64 ToTheFront AI overlay no longer applies: {exc}') from exc
+    if rel == 'Apps/ToTheFront/ToTheFront.ZC':
+        try:
+            data = translate_tothefront_player_pick(data)
+        except ValueError as exc:
+            raise SystemExit(f'ARM64 ToTheFront player picker overlay no longer applies: {exc}') from exc
     if rel == 'Kernel/BlkDev/DiskDirB.ZC':
         entries['System/SourceHome.ZC'] = extract_home_set(data)
     if rel == 'Kernel/SerialDev/Message.ZC':
@@ -152,6 +274,8 @@ for path in sorted((root / 'upstream/bootstrap').rglob('*')):
                     (root/'upstream/pinned/System/Gr/SpriteNew.ZC').read_bytes(),
                     (root/'upstream/pinned/System/Gr/GrSpritePlot.ZC').read_bytes())
                 data = inject_sprite_matrix_draw(data)
+                data = inject_sprite_wrappers(
+                    data, (root/'upstream/pinned/System/Gr/GrSpritePlot.ZC').read_bytes())
             except ValueError as exc:
                 raise SystemExit(f'ARM64 sprite helper overlay no longer applies: {exc}') from exc
         if rel == 'System/DolDoc/DocFile.ZC':

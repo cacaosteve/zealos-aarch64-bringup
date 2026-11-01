@@ -3,12 +3,12 @@
 
 U0 Sprite3DSetLine(U8 *sprite, I32 x1, I32 y1, I32 x2, I32 y2)
 {
-    I32 type = SPT_LINE;
+    U8 type = SPT_LINE;
     MemCopy(sprite, &type, sizeof(type));
-    MemCopy(sprite + 4, &x1, sizeof(x1));
-    MemCopy(sprite + 8, &y1, sizeof(y1));
-    MemCopy(sprite + 12, &x2, sizeof(x2));
-    MemCopy(sprite + 16, &y2, sizeof(y2));
+    MemCopy(sprite + 1, &x1, sizeof(x1));
+    MemCopy(sprite + 5, &y1, sizeof(y1));
+    MemCopy(sprite + 9, &x2, sizeof(x2));
+    MemCopy(sprite + 13, &y2, sizeof(y2));
 }
 
 U0 Sprite3DSetMeshPoint(U8 *sprite, I64 index, I32 x, I32 y, I32 z)
@@ -40,8 +40,8 @@ I64 Sprite3DMeshBounds(CDC *dc, I64 *min_x, I64 *min_y,
 
 I64 Sprite3DServiceChecks()
 {
-    U8 mesh_header[9], line0[21], line1[21], point[13], mesh[64];
-    U8 *interpolated;
+    U8 mesh_header[9], line0[18], line1[18], point[13], mesh[64];
+    U8 *interpolated, *transformed;
     I32 type, vertices, triangles, x, y;
     I64 z_check, wrap_bits;
     F64 wrap_value, wrap_angle, wrap_base;
@@ -51,8 +51,9 @@ I64 Sprite3DServiceChecks()
     I64 min_x, min_y, max_x, max_y, identity_width, identity_height;
     I64 direct_x, direct_y, direct_z;
     I64 old_flags, old_x, old_y, old_z, saved_x, saved_y, saved_z, pixel_count;
-    I64 mesh_result, mesh_work, tri_offset, mesh_bytes;
+    I64 mesh_result, mesh_work, tri_offset, mesh_bytes, poly_result;
     I64 tri_x[3], tri_y[3], tri_z[3];
+    CD3I32 fill_poly[4];
     CDC *dc;
 
     // The bundled 3D games use these speaker hooks. ARM64 has no audio
@@ -108,24 +109,24 @@ I64 Sprite3DServiceChecks()
     interpolated = SpriteInterpolate(0.0, line0, line1);
     if (!interpolated || interpolated[0] != SPT_LINE)
         return 8;
-    MemCopy(&x, interpolated + 4, sizeof(x));
-    MemCopy(&y, interpolated + 8, sizeof(y));
+    MemCopy(&x, interpolated + 1, sizeof(x));
+    MemCopy(&y, interpolated + 5, sizeof(y));
     if (x != 0 || y != 0)
         result = 9;
     Free(interpolated);
     interpolated = SpriteInterpolate(0.5, line0, line1);
     if (!interpolated || interpolated[0] != SPT_LINE)
         return 10;
-    MemCopy(&x, interpolated + 4, sizeof(x));
-    MemCopy(&y, interpolated + 8, sizeof(y));
+    MemCopy(&x, interpolated + 1, sizeof(x));
+    MemCopy(&y, interpolated + 5, sizeof(y));
     if (x != 10 || y != 5)
         result = 11;
     Free(interpolated);
     interpolated = SpriteInterpolate(1.0, line0, line1);
     if (!interpolated || interpolated[0] != SPT_LINE)
         return 12;
-    MemCopy(&x, interpolated + 4, sizeof(x));
-    MemCopy(&y, interpolated + 8, sizeof(y));
+    MemCopy(&x, interpolated + 1, sizeof(x));
+    MemCopy(&y, interpolated + 5, sizeof(y));
     if (x != 20 || y != 10)
         result = 13;
     Free(interpolated);
@@ -165,6 +166,28 @@ I64 Sprite3DServiceChecks()
     pixel_count = Sprite3DMeshBounds(dc, &min_x, &min_y, &max_x, &max_y);
     if (pixel_count < 20)
         return 0x6000000000000000 | (pixel_count & 0xFFFFFFFF);
+
+    // GrFillPoly3 must fill stock 3D demo polygons through the same clipped,
+    // depth-aware triangle path, and reject degenerate polygon sizes.
+    dc->flags &= ~(DCF_TRANSFORMATION | DCF_SYMMETRY | DCF_JUST_MIRROR);
+    MemSet(dc->body, 0, dc->width_internal * dc->height);
+    dc->color.c0 = 12;
+    fill_poly[0].x = 10; fill_poly[0].y = 10; fill_poly[0].z = 0;
+    fill_poly[1].x = 30; fill_poly[1].y = 10; fill_poly[1].z = 0;
+    fill_poly[2].x = 30; fill_poly[2].y = 30; fill_poly[2].z = 0;
+    fill_poly[3].x = 10; fill_poly[3].y = 30; fill_poly[3].z = 0;
+    poly_result = GrFillPoly3(dc, 4, fill_poly);
+    if (poly_result < 200)
+        return 0x6600000000000000 | (poly_result & 0xFFFFFFFF);
+    pixel_count = Sprite3DMeshBounds(dc, &min_x, &min_y, &max_x, &max_y);
+    if (pixel_count < 200 || min_x != 10 || max_x != 30 ||
+            min_y != 10 || max_y != 30)
+        return 0x6700000000000000 | (pixel_count & 0xFFFFFFFF);
+    MemSet(dc->body, 0, dc->width_internal * dc->height);
+    if (GrFillPoly3(dc, 2, fill_poly) != 0 ||
+            Sprite3DMeshBounds(dc, &min_x, &min_y, &max_x, &max_y) != 0)
+        return 0x6800000000000000;
+
     MemSet(mesh, 0, sizeof(mesh));
     type = SPT_MESH;
     vertices = 3;
@@ -271,6 +294,18 @@ I64 Sprite3DServiceChecks()
     Mat4x4MulXYZ(matrix_check, &x, &y, &z_check);
     if (x < -1 || x > 1 || y < 9 || y > 11 || z_check != 0)
         result = 26;
+    transformed = SpriteTransform(mesh, matrix_check);
+    if (!transformed)
+        result = 0x2700000000000000;
+    else
+    {
+        MemCopy(&x, transformed + sizeof(CSpriteMeshU8s), sizeof(I32));
+        MemCopy(&y, transformed + sizeof(CSpriteMeshU8s) + 4, sizeof(I32));
+        if (x != -5 || y != 5)
+            result = 0x2800000000000000 |
+                    ((x & 0xFFFF) << 16) | (y & 0xFFFF);
+        Free(transformed);
+    }
 
     // Start the identity transform assertion from a clean target after the
     // independent GrRect3 check above.

@@ -16,6 +16,28 @@
 #define PAUSE ;
 extern U0 RFlagsPush();
 extern U0 RFlagsPop();
+// Native AArch64 user-compiler hooks used by the ARM64 DocTree overlay.
+extern CCompCtrl *ZcUserCompCtrlNew(U8 *buf=NULL, I64 flags=0);
+extern U0 ZcUserCompCtrlDel(CCompCtrl *cc);
+extern I64 ZcUserLex(CCompCtrl *cc);
+extern U8 *ZcUserStatement2Bin(CCompCtrl *cc, I64 *type);
+extern U0 ZcUserCodeFree(CCompCtrl *cc, U8 *code);
+extern I64 ZcUserPromptSet(U8 *(*reader)(Bool continuation));
+extern U0 ZcUserOutputSet(U0 (*writer)(U8 *text));
+extern U0 ZcUserPutExcept();
+extern Bool ZcUserInputComplete(U8 *text);
+extern U0 ArmLexAttachDoc(CCompCtrl *cc, CDoc *doc);
+// Compiler/ParseLib.ZC's target-independent keyword lookup. The full stock
+// parser module also contains x86-specific label/compiler machinery, so keep
+// this small helper available to ARM64 programs such as DolDoc's code tools.
+I64 ParseKeyWord(CCompCtrl *cc)
+{
+	CHashGeneric *tmph;
+
+	if (cc->token == TK_IDENT && (tmph = cc->hash_entry) && tmph->type & HTT_KEYWORD)
+		return tmph->user_data0;
+	return -1;
+}
 extern U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite);
 extern Bool GrPlot3B(CDC *dc, I64 x, I64 y, I64 z);
 // Verbatim Option / OptionGet bodies from pinned Compiler/CMisc.ZC.
@@ -36,6 +58,9 @@ extern U16 RandU16();
 // storage during the KernelB task bridge so keyboard/task tests can use it
 // before KernelC is loaded.
 extern CCountsGlobals counts;
+// Kernel/KGlobals normally owns the shared debugger state. DolDoc's code tools
+// read the last compiler error location through this structure.
+CDebugGlobals debug;
 // Kernel/KGlobals normally owns the timezone adjustment used by date
 // formatting and time-based applications. Keep that shared ARM64 source
 // global available to pinned programs such as TimeClock.
@@ -884,6 +909,10 @@ I64 BootstrapDefinesLoad()
     DefineListLoad("ST_RAW_TYPES",
                    " \0 \0I0\0U0\0I8\0U8\0I16\0U16\0I32\0U32\0I64\0U64\0"
                    "F32\0UF32\0F64\0UF64\0");
+    DefineListLoad("ST_DAYS_OF_WEEK",
+                   "Sun\0Mon\0Tue\0Wed\0Thu\0Fri\0Sat\0");
+    DefineListLoad("ST_MONTHS",
+                   "Jan\0Feb\0Mar\0Apr\0May\0Jun\0Jul\0Aug\0Sep\0Oct\0Nov\0Dec\0");
     return 0;
 }
 // Minimal CompCtrl/Lex so DocInit can parse default flag strings. Full
@@ -2424,7 +2453,79 @@ Bool FileOcc(U8 *needle, U8 *filename, U8 *flags="")
     Free(data);
     return FALSE;
 }
-// Sound.ZC pitch conversions are pure math and work without an audio device.
+// Sound.ZC waveform helpers are pure math and work without an audio device.
+public F64 Saw(F64 t, F64 period)
+{//Sawtooth. 0.0 - 1.0 think "(Sin+1)/2".
+    if (period)
+    {
+        if (t >= 0.0)
+            return t % period / period;
+        return 1.0 + t % period / period;
+    }
+    return 0.0;
+}
+public F64 FullSaw(F64 t, F64 period)
+{//Plus-and-minus sawtooth.
+    if (period)
+    {
+        if (t >= 0.0)
+            return 2.0 * (t % period / period) - 1.0;
+        return 2.0 * (t % period / period) + 1.0;
+    }
+    return 0.0;
+}
+public F64 Caw(F64 t, F64 period)
+{//Cawtooth. 1.0 - 0.0 think "(Cos+1)/2".
+    if (period)
+    {
+        if (t >= 0.0)
+            return 1.0 - t % period / period;
+        return -(t % period) / period;
+    }
+    return 1.0;
+}
+public F64 FullCaw(F64 t, F64 period)
+{//Plus-and-minus cawtooth.
+    if (period)
+    {
+        if (t >= 0.0)
+            return -2.0 * (t % period / period) + 1.0;
+        return -2.0 * (t % period / period) - 1.0;
+    }
+    return 1.0;
+}
+public F64 Tri(F64 t, F64 period)
+{//Triangle waveform. 0.0 - 1.0 - 0.0.
+    if (period)
+    {
+        t = 2.0 * (Abs(t) % period) / period;
+        if (t <= 1.0)
+            return t;
+        return 2.0 - t;
+    }
+    return 0.0;
+}
+public F64 FullTri(F64 t, F64 period)
+{//Plus-and-minus triangle waveform.
+    if (period)
+    {
+        t = 4.0 * (t % period) / period;
+        if (t <= -1.0)
+        {
+            if (t <= -3.0)
+                return t + 4.0;
+            return -2.0 - t;
+        }
+        if (t <= 1.0)
+            return t;
+        if (t <= 3.0)
+            return 2.0 - t;
+        return t - 4.0;
+    }
+    return 0.0;
+}
+
+// Sound.ZC pitch conversions are also pure math.
 public I8 Note2Ona(I64 note, I64 octave=4)
 {//Mid C is ona=51, note=3 and octave=4.
     if (note < 3)
@@ -2954,13 +3055,6 @@ I64 BootstrapMat4x4Checks()
         return 8;
     return 0x2a;
 }
-extern Bool GrPlot(CDC *dc, I64 x, I64 y);
-extern Bool GrPlot1(CDC *dc, I64 x, I64 y);
-extern Bool GrLine(CDC *dc, I64 x1, I64 y1, I64 x2, I64 y2,
-                   I64 step=1, I64 start=0);
-extern Bool GrRect(CDC *dc, I64 x, I64 y, I64 width, I64 height);
-extern I64 GrHLine(CDC *dc, I64 x1, I64 x2, I64 y, I64 z1, I64 z2);
-extern U0 SpriteEllipse0(CDC *dc, I64 cx, I64 cy, I64 rx, I64 ry);
 #define SPT_END 0
 #define SPT_COLOR 1
 #define SPT_DITHER_COLOR 2
@@ -3517,13 +3611,35 @@ U0 BootstrapGodGlbls()
 BootstrapGodGlbls;
 // Temporary clock base for DocRecalc; refreshed from the platform timer later.
 F64 tS = 0;
-// Refreshed from the platform timer by the staged compositor.
-Bool Blink = TRUE;
+public Bool Blink(F64 Hz=2.5)
+{//Stock blink API used by games and graphics demos.
+    if (Hz <= 0.0)
+        return FALSE;
+    return ToI64(ZcMonotonicNs() / 1000000000.0 * 2.0 * Hz) & 1;
+}
 // StrA.ZC char bitmaps required by DocHighlight/DocPutKey/DocPutS before StrA loads.
 U32 char_bmp_alpha_numeric[16] =
 {
     0, 0x03FF0000, 0x87FFFFFF, 0x07FFFFFE,
     0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF,
+    0, 0, 0, 0, 0, 0, 0, 0
+},
+char_bmp_alpha_numeric_no_at[16] =
+{
+    0, 0x03FF0000, 0x87FFFFFE, 0x07FFFFFE,
+    0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF,
+    0, 0, 0, 0, 0, 0, 0, 0
+},
+char_bmp_non_eol[16] =
+{
+    0xFFFFDBFE, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF,
+    0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF,
+    0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF,
+    0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF
+},
+char_bmp_non_eol_white_space[16] =
+{
+    0x80000200, 1, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0
 },
 char_bmp_dec_numeric[16] =
@@ -3557,6 +3673,12 @@ char_bmp_zero_tab_cr_nl_cursor_dollar[16] =
 char_bmp_safe_dollar[16] =
 {
     0x80000000, 0xFFFFFFEF, 0xFFFFFFFF, 0x7FFFFFFF,
+    0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF,
+    0, 0, 0, 0, 0, 0, 0, 0
+},
+char_bmp_macro[16] =
+{
+    0x80002600, 0xFFFFFFDF, 0xFFFFFFFF, 0x7FFFFFFF,
     0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF,
     0, 0, 0, 0, 0, 0, 0, 0
 };
@@ -3727,6 +3849,15 @@ Bool TextLenStr(CTask *task, I64 x, I64 y, I64 len, I64 attr, U8 *str)
             drawn = TRUE;
     }
     return drawn;
+}
+U0 TextPrint(CTask *task, I64 x, I64 y, I64 attr, U8 *format, ...)
+{//Stock TextBase formatter backed by the ARM64 text-cell renderer above.
+    U8 *buf = StrPrintJoin(NULL, format, argc, argv);
+    if (buf)
+    {
+        TextLenStr(task, x, y, StrLen(buf), attr << 8, buf);
+        Free(buf);
+    }
 }
 U0 StrPrint(U8 *dst, U8 *format, ...)
 {
@@ -4075,9 +4206,20 @@ Bool BootstrapSpriteMeshPixel(CDC *dc, I64 x, I64 y, I64 color)
     sprite_debug_mesh_target_scroll_y = task->scroll_y;
     return TRUE;
 }
-Bool GrPlot(CDC *dc=gr.dc, I64 x=0, I64 y=0)
+extern Bool GrPlot(CDC *dc=gr.dc, I64 x=0, I64 y=0);
+extern Bool GrPlot1(CDC *dc=gr.dc, I64 x, I64 y);
+extern Bool GrLine(CDC *dc=gr.dc, I64 x1=0, I64 y1=0,
+                   I64 x2=0, I64 y2=0, I64 step=1, I64 start=0);
+Bool GrPlot(CDC *dc, I64 x, I64 y)
 {
     return BootstrapGraphPixel(dc, x, y);
+}
+U0 DCFill(CDC *dc=NULL, CColorROPU32 val=TRANSPARENT)
+{//Match the stock System/Gr/GrDC.ZC whole-device-context fill operation.
+    if (!dc)
+        dc = gr.dc;
+    if (dc && dc->body && dc->width_internal > 0 && dc->height > 0)
+        MemSet(dc->body, val, dc->width_internal * dc->height);
 }
 I64 bootstrap_mouse_draw_calls = 0;
 U0 BootstrapDrawMouse(CDC *dc, I64 x, I64 y)
@@ -4115,7 +4257,8 @@ U0 BootstrapDrawMouse(CDC *dc, I64 x, I64 y)
         }
     dc->color.c0 = old_color;
 }
-Bool GrRect(CDC *dc=gr.dc, I64 x=0, I64 y=0, I64 width=0, I64 height=0)
+Bool GrRect(CDC *dc=gr.dc, I64 x=0, I64 y=0,
+            I64 width=0, I64 height=0)
 {
     CTask *task;
     I64 left, top, right, bottom, origin_x, origin_y;
@@ -4377,8 +4520,8 @@ public U0 GrBorder(CDC *dc=gr.dc, I64 x1, I64 y1, I64 x2, I64 y2)
     GrLine(dc, x2, y2, x1, y2);
     GrLine(dc, x1, y2, x1, y1);
 }
-Bool GrLine(CDC *dc=gr.dc, I64 x1=0, I64 y1=0, I64 x2=0, I64 y2=0,
-            I64 step=1, I64 start=0)
+Bool GrLine(CDC *dc, I64 x1, I64 y1, I64 x2, I64 y2,
+            I64 step, I64 start)
 {
     CTask *task;
     I64 left, top, right, bottom, thick, line_shift, dx, dy, line_step, task_z;
@@ -6053,6 +6196,13 @@ extern U0 ODEsUpdate(CTask *task);
 // compile and render safely before the full mouse subsystem is started.
 CGridGlobals mouse_grid;
 CMenuEntry *sys_cur_submenu_entry;
+U0 GridInit()
+{//Keep the stock mouse-grid defaults available to unchanged demos/apps.
+    mouse_grid.x = mouse_grid.y = mouse_grid.z = 8;
+    mouse_grid.x_offset = mouse_grid.y_offset = mouse_grid.z_offset = 0;
+    mouse_grid.x_speed = mouse_grid.y_speed = mouse_grid.z_speed = 1;
+    mouse_grid.show = mouse_grid.snap = mouse_grid.coord = FALSE;
+}
 U0 MouseUpdate(I64 x, I64 y, I64 z, Bool l, Bool r)
 {//ARM64 bootstrap equivalent of Kernel/SerialDev/Mouse.ZC's state update.
     F64 scale_x = mouse.scale.x, scale_y = mouse.scale.y;
@@ -6430,7 +6580,6 @@ U0 BootstrapGrUpdateTasks()
 public U0 BootstrapWinMgrTick()
 {//One host-idle frame: route tablet clicks and redraw the task ring.
     bootstrap_winmgr_ticks++;
-    Blink = (ZcMonotonicNs() / 500000000) & 1;
     bootstrap_gr_fullscreen_active = FALSE;
     BootstrapMeshLayerClear();
     if (BootstrapTryUpstreamGrUpdateScreen())

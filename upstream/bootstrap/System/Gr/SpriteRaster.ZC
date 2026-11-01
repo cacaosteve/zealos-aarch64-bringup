@@ -1,3 +1,8 @@
+U0 BootstrapSpriteLine(CDC *dc, I64 x1, I64 y1, I64 x2, I64 y2)
+{//SpriteRaster uses GrLine's stock defaults: step=1, start=0.
+    GrLine(dc, x1, y1, x2, y2, 1, 0);
+}
+
 // Bounded axis-aligned sprite ellipse rasterizer for the ARM64 bootstrap.
 // The caller maps exact cardinal rotations to swapped radii.
 extern F64 ZcSinF64(F64 angle);
@@ -187,7 +192,7 @@ U0 SpriteMirrorLine0(CDC *dc, I64 x1, I64 y1, I64 x2, I64 y2,
             x1, y1, &mx1, &my1) &&
             SpriteMirrorPoint0(axis_x1, axis_y1, axis_x2, axis_y2,
             x2, y2, &mx2, &my2))
-        GrLine(dc, mx1, my1, mx2, my2);
+        BootstrapSpriteLine(dc, mx1, my1, mx2, my2);
 }
 
 U0 SpriteFillQuad0(CDC *dc, I64 *px, I64 *py)
@@ -245,7 +250,7 @@ U0 SpriteFillQuad0(CDC *dc, I64 *px, I64 *py)
                 if (x_start < min_x) x_start = min_x;
                 if (x_end > max_x) x_end = max_x;
                 if (x_start <= x_end)
-                    GrLine(dc, x_start, y, x_end, y);
+                    BootstrapSpriteLine(dc, x_start, y, x_end, y);
             }
         }
     }
@@ -1234,7 +1239,6 @@ U0 SpriteFillTriangle0(CDC *dc, I64 *px, I64 *py, I64 *pz)
     SpriteFillTriangleUpstream0(dc, &points[0], &points[1], &points[2]);
 }
 
-
 U0 SpriteMirrorRect0(CDC *dc, I64 left, I64 top, I64 right, I64 bottom,
         I64 axis_x1, I64 axis_y1, I64 axis_x2, I64 axis_y2)
 {//Rasterize the reflected filled rectangle as a bounded scanline quad.
@@ -2005,13 +2009,13 @@ I64 SpritePerspectiveQuad0(CDC *dc, I64 *corner_x, I64 *corner_y,
                 &sx1, &sy1, &sx2, &sy2);
         if (line_result > 0)
         {
-            GrLine(dc, sx1, sy1, sx2, sy2);
+            BootstrapSpriteLine(dc, sx1, sy1, sx2, sy2);
             if (symmetry_enabled &&
                     SpriteMirrorPoint0(axis_x1, axis_y1, axis_x2, axis_y2,
                             sx1, sy1, &mx[0], &my[0]) &&
                     SpriteMirrorPoint0(axis_x1, axis_y1, axis_x2, axis_y2,
                             sx2, sy2, &mx[1], &my[1]))
-                GrLine(dc, mx[0], my[0], mx[1], my[1]);
+                BootstrapSpriteLine(dc, mx[0], my[0], mx[1], my[1]);
         }
     }
     for (t = 0; t < 2; t++)
@@ -2077,7 +2081,7 @@ U0 SpriteRectTransform0(CDC *dc, I64 left, I64 top, I64 right, I64 bottom,
     for (i = 0; i < 4; i++)
     {
         j = (i + 1) & 3;
-        GrLine(dc, px[i], py[i], px[j], py[j]);
+        BootstrapSpriteLine(dc, px[i], py[i], px[j], py[j]);
     }
     SpriteFillQuad0(dc, px, py);
 }
@@ -2184,7 +2188,7 @@ I64 SpriteProjectiveQuadOutline0(CDC *dc, I64 *x, I64 *y, I64 z,
     if (draw)
         for (i = 0; i < 4; i++)
             if (line_result[i] > 0)
-                GrLine(dc, screen_x1[i], screen_y1[i],
+                BootstrapSpriteLine(dc, screen_x1[i], screen_y1[i],
                         screen_x2[i], screen_y2[i]);
     return work;
 }
@@ -2196,7 +2200,7 @@ U0 SpriteQuadLines0(CDC *dc, I64 *x, I64 *y)
     for (i = 0; i < 4; i++)
     {
         j = (i + 1) & 3;
-        GrLine(dc, x[i], y[i], x[j], y[j]);
+        BootstrapSpriteLine(dc, x[i], y[i], x[j], y[j]);
     }
 }
 
@@ -2277,11 +2281,11 @@ I64 SpriteTextBox0(CDC *dc, I64 x, I64 y, U8 *s, I64 text_len,
     else
     {
         GrPutS(dc, x, y, s);
-        GrLine(dc, x - 2, y - 2, x + width_max + 2, y - 2);
-        GrLine(dc, x - 2, y + height + 2, x + width_max + 2,
+        BootstrapSpriteLine(dc, x - 2, y - 2, x + width_max + 2, y - 2);
+        BootstrapSpriteLine(dc, x - 2, y + height + 2, x + width_max + 2,
                 y + height + 2);
-        GrLine(dc, x - 2, y - 2, x - 2, y + height + 2);
-        GrLine(dc, x + width_max + 2, y - 2, x + width_max + 2,
+        BootstrapSpriteLine(dc, x - 2, y - 2, x - 2, y + height + 2);
+        BootstrapSpriteLine(dc, x + width_max + 2, y - 2, x + width_max + 2,
                 y + height + 2);
     }
     return work;
@@ -2457,10 +2461,10 @@ I64 SpriteTextDiamond0(CDC *dc, I64 x, I64 y, U8 *s, I64 text_len,
         SpriteQuadLines0(dc, screen_x, screen_y);
     else
     {
-        GrLine(dc, x, y - dy, x + dx, y);
-        GrLine(dc, x + dx, y, x, y + dy);
-        GrLine(dc, x, y + dy, x - dx, y);
-        GrLine(dc, x - dx, y, x, y - dy);
+        BootstrapSpriteLine(dc, x, y - dy, x + dx, y);
+        BootstrapSpriteLine(dc, x + dx, y, x, y + dy);
+        BootstrapSpriteLine(dc, x, y + dy, x - dx, y);
+        BootstrapSpriteLine(dc, x - dx, y, x, y - dy);
     }
     Free(copy);
     return work;
@@ -2634,9 +2638,9 @@ I64 SpriteBezierProjective0(CDC *dc, I64 ox, I64 oy, CD3I32 *points,
                 return -1;
             if (draw)
             {
-                GrLine(dc, sx1, sy1, sx2, sy2);
+                BootstrapSpriteLine(dc, sx1, sy1, sx2, sy2);
                 if (mirror_ok)
-                    GrLine(dc, mx1, my1, mx2, my2);
+                    BootstrapSpriteLine(dc, mx1, my1, mx2, my2);
             }
             work += segment_work;
             if (mirror_ok)
@@ -3039,9 +3043,9 @@ I64 SpriteEllipseProjective0(CDC *dc, I64 cx, I64 cy, I64 rx, I64 ry,
                     return -1;
                 if (pass)
                 {
-                    GrLine(dc, sx1, sy1, sx2, sy2);
+                    BootstrapSpriteLine(dc, sx1, sy1, sx2, sy2);
                     if (mirror_ok)
-                        GrLine(dc, mx1, my1, mx2, my2);
+                        BootstrapSpriteLine(dc, mx1, my1, mx2, my2);
                 }
                 work += segment_work;
                 if (mirror_ok)
@@ -3156,7 +3160,7 @@ I64 SpriteRotatedRect0(CDC *dc, I64 x, I64 y, I32 x1, I32 y1,
         for (i = 0; i < 4; i++)
         {
             j = (i + 1) & 3;
-            GrLine(dc, screen_x[i], screen_y[i],
+            BootstrapSpriteLine(dc, screen_x[i], screen_y[i],
                     screen_x[j], screen_y[j]);
         }
         SpriteFillQuad0(dc, screen_x, screen_y);
@@ -3291,21 +3295,21 @@ Bool SpriteArrow0(CDC *dc, I64 x, I64 y, I64 x1, I64 y1,
             !SpriteMirrorPoint0(axis_x1, axis_y1, axis_x2, axis_y2,
                     head2_x, head2_y, &mirror_head2_x, &mirror_head2_y)))
         return FALSE;
-    GrLine(dc, start_x, start_y, end_x, end_y);
+    BootstrapSpriteLine(dc, start_x, start_y, end_x, end_y);
     if (tip_visible)
     {
-        GrLine(dc, head1_x, head1_y, end_x, end_y);
-        GrLine(dc, head2_x, head2_y, end_x, end_y);
+        BootstrapSpriteLine(dc, head1_x, head1_y, end_x, end_y);
+        BootstrapSpriteLine(dc, head2_x, head2_y, end_x, end_y);
     }
     if (symmetry_enabled)
     {
-        GrLine(dc, mirror_start_x, mirror_start_y,
+        BootstrapSpriteLine(dc, mirror_start_x, mirror_start_y,
                 mirror_end_x, mirror_end_y);
         if (tip_visible)
         {
-            GrLine(dc, mirror_head1_x, mirror_head1_y,
+            BootstrapSpriteLine(dc, mirror_head1_x, mirror_head1_y,
                     mirror_end_x, mirror_end_y);
-            GrLine(dc, mirror_head2_x, mirror_head2_y,
+            BootstrapSpriteLine(dc, mirror_head2_x, mirror_head2_y,
                     mirror_end_x, mirror_end_y);
         }
     }
@@ -3917,7 +3921,7 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
                     &screen_x1, &screen_y1, &screen_x2, &screen_y2);
             if (line_result > 0)
             {
-                GrLine(dc, screen_x1, screen_y1, screen_x2, screen_y2);
+                BootstrapSpriteLine(dc, screen_x1, screen_y1, screen_x2, screen_y2);
                 if (symmetry_enabled)
                     SpriteMirrorLine0(dc, screen_x1, screen_y1,
                             screen_x2, screen_y2,
@@ -3980,7 +3984,7 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
                     for (i = 0; i < 4; i++)
                     {
                         j = (i + 1) & 3;
-                        GrLine(dc, px[i], py[i], px[j], py[j]);
+                        BootstrapSpriteLine(dc, px[i], py[i], px[j], py[j]);
                     }
                     SpriteFillQuad0(dc, px, py);
                     if (symmetry_enabled)
@@ -3997,7 +4001,7 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
                             for (i = 0; i < 4; i++)
                             {
                                 j = (i + 1) & 3;
-                                GrLine(dc, mirror_px[i], mirror_py[i],
+                                BootstrapSpriteLine(dc, mirror_px[i], mirror_py[i],
                                         mirror_px[j], mirror_py[j]);
                             }
                             SpriteFillQuad0(dc, mirror_px, mirror_py);
@@ -4207,7 +4211,7 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
                     // line rasterizer and reflect the resulting segment.
                     if (line_result > 0)
                     {
-                        GrLine(dc, screen_x1, screen_y1,
+                        BootstrapSpriteLine(dc, screen_x1, screen_y1,
                                 screen_x2, screen_y2);
                         if (symmetry_enabled)
                             SpriteMirrorLine0(dc, screen_x1, screen_y1,

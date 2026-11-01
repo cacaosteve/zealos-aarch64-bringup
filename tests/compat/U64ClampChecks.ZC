@@ -1,0 +1,16 @@
+I64 Arm64ClampU64Checks()
+{
+    if (Arm64ClampU64(10, 2, 8) != 8)
+        return 1;
+    if (Arm64ClampU64(0, 2, 8) != 2)
+        return 2;
+    if (Arm64ClampU64(5, 2, 8) != 5)
+        return 3;
+    if (Arm64ClampU64(0xFFFFFFFFFFFFFFF0, 0, 0xFFFFFFFFFFFFFFFF) !=
+        0xFFFFFFFFFFFFFFF0)
+        return 4;
+    if (Arm64ClampU64(0, 0xFFFFFFFFFFFFFFF0,
+                      0xFFFFFFFFFFFFFFFF) != 0xFFFFFFFFFFFFFFF0)
+        return 5;
+    return 42;
+}

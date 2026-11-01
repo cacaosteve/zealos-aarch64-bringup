@@ -1,0 +1,36 @@
+I64 LockBlockValue;
+I64 LockBlockDone;
+
+U0 LockBlockWorker(U8 *)
+{
+    I64 i;
+    for (i = 0; i < 10000; i++)
+        lock { LockBlockValue += 1; }
+    lock { LockBlockDone += 1; }
+}
+
+I64 LockBlockRuntime()
+{
+    LockBlockValue = 40;
+    lock { LockBlockValue += 3; }
+    lock { LockBlockValue--; }
+    return LockBlockValue;
+}
+
+I64 LockBlockConcurrentRuntime()
+{
+    I64 i;
+    if (mp_count < 3)
+        return 43;
+    LockBlockValue = 0;
+    LockBlockDone = 0;
+    Spawn(&LockBlockWorker, NULL, "Lock worker 1", 1);
+    Spawn(&LockBlockWorker, NULL, "Lock worker 2", 2);
+    for (i = 0; i < 100000 && LockBlockDone != 2; i++)
+        Yield;
+    if (LockBlockDone != 2)
+        return 44;
+    if (LockBlockValue == 20000)
+        return 42;
+    return 0;
+}

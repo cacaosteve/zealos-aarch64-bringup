@@ -43,7 +43,7 @@ def extract_sprite_elem_base_sizes(source: bytes) -> bytes:
 
 def inject_sprite_elem_base_sizes(bridge: bytes, source: bytes) -> bytes:
     """Prepend pinned sprite record sizes to the ARM64 sprite bridge."""
-    if b'sprite_elem_base_sizes' in bridge:
+    if b'I64 sprite_elem_base_sizes[SPT_TYPES_NUM] =' in bridge:
         raise ValueError('ARM64 sprite bridge already declares the pinned size table')
     declaration = extract_sprite_elem_base_sizes(source)
     return declaration + b'\n\n' + bridge
@@ -360,6 +360,118 @@ def inject_sprite_matrix_draw(bridge: bytes) -> bytes:
     if b'public U0 Sprite3Mat4x4B(' in bridge:
         raise ValueError('ARM64 sprite bridge already declares matrix drawing')
     return bridge + extract_sprite_matrix_draw()
+
+
+def inject_sprite_wrappers(bridge: bytes, sprite_plot: bytes) -> bytes:
+    """Expose upstream Sprite3 translation and extent wrappers at boot."""
+    if (b'public U0 Sprite3B(' in bridge or
+            b'public U0 SpriteExtents(' in bridge or
+            b'public U0 DCExtentsInit(' in bridge or
+            b'public CDC *Sprite2DC(' in bridge or
+            b'public U8 *SpriteTransform(' in bridge):
+        raise ValueError('ARM64 sprite bridge already declares source wrappers')
+    sprite3b = _extract_between(
+        sprite_plot, b'public U0 Sprite3B(',
+        b'\npublic U0 Sprite3Mat4x4B(', 'Sprite3B')
+    extents = _extract_between(
+        sprite_plot, b'public U0 SpriteExtents(',
+        b'\npublic CDC *Sprite2DC(', 'SpriteExtents')
+    sprite_to_dc = _extract_between(
+        sprite_plot, b'public CDC *Sprite2DC(',
+        b'\npublic U8 *SpriteInterpolate(', 'Sprite2DC')
+    if (b'Sprite3(dc, 0, 0, 0, elems);' not in sprite3b or
+            b'DCExtentsInit(dc);' not in extents or
+            b'Sprite3(dc, I32_MAX / 2' not in extents):
+        raise ValueError('pinned sprite wrapper implementation changed')
+    # GrDC isn't part of the boot source bundle. Keep this upstream helper's
+    # small CDC state initialization available to SpriteExtents.
+    dc_extents_init = b'''public U0 DCExtentsInit(CDC *dc=NULL)
+{
+    if (!dc)
+        dc = gr.dc;
+    dc->flags |= DCF_RECORD_EXTENTS;
+    dc->min_x = I64_MAX;
+    dc->max_x = I64_MIN;
+    dc->min_y = I64_MAX;
+    dc->max_y = I64_MIN;
+}
+'''
+    sprite_transform = b'''public U8 *SpriteTransform(U8 *elems, I64 *matrix)
+{//Bounded mesh sprite transform for the stock Talons meshes.
+    U8 *res, *cursor;
+    I64 size, type, i, x, y, z;
+    CSprite *record;
+    CD3I32 *point;
+
+    if (!elems || !matrix || !Sprite3MatrixBounded(matrix))
+        throw('Graphics');
+    size = SpriteSize(elems);
+    if (size < sizeof(CSpriteBase) || size > 16777216)
+        throw('Graphics');
+    res = MAlloc(size);
+    if (!res)
+        throw('Graphics');
+    MemCopy(res, elems, size);
+    cursor = res;
+    while (TRUE)
+    {
+        record = cursor - offset(CSprite.start);
+        type = record->type & SPG_TYPE_MASK;
+        if (!type)
+            break;
+        if (type == SPT_MESH || type == SPT_SHIFTABLE_MESH)
+        {
+            if (type == SPT_MESH)
+            {
+                point = &record->mu.u;
+                i = record->mu.vertex_count;
+            }
+            else
+            {
+                point = &record->pmu.u;
+                i = record->pmu.vertex_count;
+                x = record->pmu.x;
+                y = record->pmu.y;
+                z = record->pmu.z;
+                Mat4x4MulXYZ(matrix, &x, &y, &z);
+                if (x < I32_MIN || x > I32_MAX || y < I32_MIN ||
+                        y > I32_MAX || z < I32_MIN || z > I32_MAX)
+                    throw('Graphics');
+                record->pmu.x = x;
+                record->pmu.y = y;
+                record->pmu.z = z;
+            }
+            if (i < 0 || i > 1048576)
+                throw('Graphics');
+            while (i--)
+            {
+                x = point->x;
+                y = point->y;
+                z = point->z;
+                Mat4x4MulXYZ(matrix, &x, &y, &z);
+                if (x < I32_MIN || x > I32_MAX || y < I32_MIN ||
+                        y > I32_MAX || z < I32_MIN || z > I32_MAX)
+                    throw('Graphics');
+                point->x = x;
+                point->y = y;
+                point->z = z;
+                point++;
+            }
+        }
+        else if (type != SPT_COLOR && type != SPT_DITHER_COLOR &&
+                type != SPT_THICK)
+            throw('Graphics');
+        i = SpriteElemSize(cursor, type);
+        if (i < 1 || cursor - res > size - i)
+            throw('Graphics');
+        cursor += i;
+    }
+    return res;
+}
+'''
+    return (bridge + b'\n\n' + dc_extents_init + b'\n' + sprite3b +
+            b'\n\n' + extents + b'\n\n' + sprite_to_dc + b'\n\n' +
+            sprite_transform + b'\n')
 
 
 def extract_user_task(source: bytes) -> bytes:
@@ -790,6 +902,83 @@ def translate_keepaway_nearest_ball(source: bytes) -> bytes:
     return source.replace(old, new, 1)
 
 
+def translate_xcaliber_shot_return(source: bytes) -> bytes:
+    """Return the newly queued shot to X-Caliber callers that dereference it."""
+    old = (b'\tQueueInsert(&tmps->p, ode->last_mass);\n'
+           b'\tQueueInsert(tmps, shot_head.last);\n}')
+    new = (b'\tQueueInsert(&tmps->p, ode->last_mass);\n'
+           b'\tQueueInsert(tmps, shot_head.last);\n'
+           b'\treturn tmps;\n}')
+    if source.count(old) != 1:
+        raise ValueError('pinned X-Caliber ShotNew queue insertion changed')
+    return source.replace(old, new, 1)
+
+
+def translate_xcaliber_draw_visibility(source: bytes) -> bytes:
+    """Do not hide X-Caliber's whole scene behind a stale task ODE cursor."""
+    old = (b'\tif (ode != task->last_ode)\n'
+           b'\t\treturn;\n')
+    new = (b'\tif (!ode)\n'
+           b'\t\treturn;\n')
+    if source.count(old) != 1:
+        raise ValueError('pinned X-Caliber draw visibility guard changed')
+    return source.replace(old, new, 1)
+
+
+def translate_xcaliber_key_descriptors(source: bytes) -> bytes:
+    """Keep X-Caliber scan-code input enabled after its one-time help popup."""
+    old = (b'Fs->win_inhibit = WIG_TASK_DEFAULT - WIF_SELF_FOCUS - '
+           b'WIF_SELF_BORDER - WIF_FOCUS_TASK_MENU - WIF_SELF_CTRLS;')
+    anchor = b'\t\tInit;\n\t\tQueueInsert(ode, Fs->last_ode);'
+    if source.count(old) != 1 or source.count(anchor) != 1:
+        raise ValueError('pinned X-Caliber window input policy changed')
+    # InitLevel's first OneTimePopUp returns control with the default input
+    # inhibit restored on the task. Set the desired pinned policy after Init
+    # has completed so the modal popup cannot overwrite it.
+    return source.replace(anchor,
+                          b'\t\tInit;\n\t\tFs->win_inhibit = 0x0050E2FA;\n'
+                          b'\t\tQueueInsert(ode, Fs->last_ode);', 1)
+
+
+def translate_xcaliber_escape_scan(source: bytes) -> bytes:
+    """Treat the raw Escape scan code as the exit key in X-Caliber's loop."""
+    anchor = b'\t\t\t\t\tcase SC_CURSOR_RIGHT:'
+    replacement = (b'\t\t\t\t\tcase SC_ESC:\n'
+                   b'\t\t\t\t\t\tch = CH_ESC;\n'
+                   b'\t\t\t\t\t\tbreak;\n\n' + anchor)
+    if source.count(anchor) != 2:
+        raise ValueError('pinned X-Caliber key-down/up scan-code switches changed')
+    return source.replace(anchor, replacement)
+
+
+def translate_xcaliber_held_input(source: bytes) -> bytes:
+    """Poll held controls each frame when no key transition is queued."""
+    old = (b'\t\t\twhile (!game_over && !show_level_message &&\n'
+           b'\t\t\t\t\t(message_code = MessageScan(&arg1, &arg2, 1 << MESSAGE_KEY_DOWN | 1 << MESSAGE_KEY_UP)))')
+    if source.count(old) != 1:
+        raise ValueError('pinned X-Caliber input loop changed')
+    anchor = b'\t\t\t}\n\t\t\tAI;'
+    replacement = (b'\t\t\t}\n'
+                   b'\t\t\tif (!Bt(kbd.down_bitmap, SC_CTRL) &&\n'
+                   b'\t\t\t\t!Bt(kbd.down_bitmap, SC_SHIFT))\n'
+                   b'\t\t\t{\n'
+                   b'\t\t\t\tif (Bt(kbd.down_bitmap, SC_CURSOR_LEFT))\n'
+                   b'\t\t\t\t\thuman_t_left = THRUST_MAX;\n'
+                   b'\t\t\t\telse\n'
+                   b'\t\t\t\t\thuman_t_left = 0;\n'
+                   b'\t\t\t\tif (Bt(kbd.down_bitmap, SC_CURSOR_RIGHT))\n'
+                   b'\t\t\t\t\thuman_t_right = THRUST_MAX;\n'
+                   b'\t\t\t\telse\n'
+                   b'\t\t\t\t\thuman_t_right = 0;\n'
+                   b'\t\t\t}\n'
+                   b'\t\t\tif (Bt(kbd.down_bitmap, SC_ESC))\n'
+                   b'\t\t\t\tch = CH_ESC;\n'
+                   b'\t\t\tAI;')
+    if source.count(anchor) != 1:
+        raise ValueError('pinned X-Caliber frame update point changed')
+    return source.replace(anchor, replacement, 1)
+
+
 def translate_tothefront_sentinel(source: bytes) -> bytes:
     """Compare the ToTheFront queue cursor to its sentinel object's address."""
     old = b'while (tmpi != *indirect_head)'
@@ -799,7 +988,7 @@ def translate_tothefront_sentinel(source: bytes) -> bytes:
 
 
 def translate_tothefront_draw(source: bytes) -> bytes:
-    """Provide app-local math helpers without loading unrelated sound services."""
+    """Keep ToTheFront tank rendering usable without the failing 3D sprite path."""
     replacements = (
         (b'Saw(4 * tS, 2.0)', b'ToTheFrontSaw(4 * tS, 2.0)'),
         (b'Saw(4 * tS + 1.0, 2.0)', b'ToTheFrontSaw(4 * tS + 1.0, 2.0)'),
@@ -810,6 +999,26 @@ def translate_tothefront_draw(source: bytes) -> bytes:
     for old, new in replacements:
         if text.count(old) != 1:
             raise ValueError('pinned ToTheFront Saw call changed')
+        text = text.replace(old, new, 1)
+    unit_branch = (
+        (b'\tif (tmpu->infantry)\n'
+         b'\t\tSprite3(dc, x, y, 0, tmpu->img);\n'
+         b'\telse\n'
+         b'\t\tSprite3ZB(dc, x, y, 0, tmpu->img, f);',
+         b'\tif (tmpu->infantry)\n'
+         b'\t\tSprite3(dc, x, y, 0, tmpu->img);\n'
+         b'\telse\n'
+         b'\t{\n'
+         b'\t\tI64 old_color = dc->color;\n'
+         b'\t\tGrRect(dc, x - 5, y - 3, 10, 6);\n'
+         b'\t\tdc->color = BLACK;\n'
+         b'\t\tGrLine(dc, x, y, x + 9 * Cos(f), y + 9 * Sin(f));\n'
+         b'\t\tdc->color = old_color;\n'
+         b'\t}'),
+    )
+    for old, new in unit_branch:
+        if text.count(old) != 1:
+            raise ValueError('pinned ToTheFront unit sprite path changed')
         text = text.replace(old, new, 1)
     helper = (
         b'F64 ToTheFrontSaw(F64 t, F64 period)\n'
@@ -846,6 +1055,88 @@ def translate_tothefront_init(source: bytes) -> bytes:
             raise ValueError('pinned ToTheFront runtime-sized map initialization changed')
         text = text.replace(old, new, 1)
     return text
+
+
+def translate_tothefront_player_pick(source: bytes) -> bytes:
+    """Use positive menu indices for ToTheFront's dynamically loaded AIs.
+
+    The stock picker stores a CDirEntry pointer in a signed DolDoc link
+    expression. AArch64 heap pointers are negative as I64 values, colliding
+    with the popup's negative cancel result. Preserve the AI directory and
+    callback contract while using small, nonnegative selection indices.
+    """
+    calls = (b'PlayerPick("AIs", 0);', b'PlayerPick("AIs", 1);')
+    if any(source.count(call) != 1 for call in calls):
+        raise ValueError('pinned ToTheFront AI picker calls changed')
+    anchor = b'U0 ToTheFront()'
+    if source.count(anchor) != 1:
+        raise ValueError('pinned ToTheFront entry point changed')
+    helper = b'''I64 ttf_ai_load_slot;
+
+U0 ToTheFrontPlayerPick(U8 *ai_dir, I64 player)
+{
+\tCDirEntry *ais, *entry;
+\tCDoc *doc;
+\tU8 *mask = MStrPrint("%s/*.ZC", ai_dir);
+\tI64 i, selected;
+
+\tais = FilesFind(mask, FUF_JUST_FILES);
+\tFree(mask);
+\tif (!ais)
+\t\treturn;
+\tdoc = DocNew;
+\tDocPrint(doc, "Player %d Type\\n\\n", player + 1);
+\tfor (entry = ais, i = 0; entry; entry = entry->next, i++)
+\t\tDocPrint(doc, "$$MU,\\\"%s\\\",LE=%d$$\\n", entry->name, i);
+\tDocPrint(doc, "\\n$$MU,\\\"CANCEL\\\",LE=DOCM_CANCEL$$\\n");
+\tselected = PopUpMenu(doc);
+\tDocDel(doc);
+\tif (selected >= 0)
+\t{
+\t\tfor (entry = ais, i = 0; entry && i < selected; entry = entry->next, i++);
+\t\tif (entry)
+\t\t{
+\t\t\tttf_ai_load_slot = player;
+\t\t\tExeFile(entry->full_name);
+\t\t\tPrint("ToTheFront AI slot %d=%X,%X,%X\\n", player,
+\t\t\t\tplayer_indirect[player], player_move[player], player_direct[player]);
+\t\t}
+\t}
+\tDirTreeDel(ais);
+}
+
+'''
+    text = source
+    for call in calls:
+        text = text.replace(call, call.replace(b'PlayerPick',
+                                               b'ToTheFrontPlayerPick'), 1)
+    text = text.replace(anchor, helper + anchor, 1)
+    return text
+
+
+def translate_tothefront_ai(source: bytes) -> bytes:
+    """Register an AI's callback addresses before its temporary hash table ends."""
+    callbacks = (b'PlayerIndirect', b'PlayerMove', b'PlayerDirect')
+    for callback in callbacks:
+        if source.count(b'U0 ' + callback + b'()') != 1:
+            raise ValueError('pinned ToTheFront AI callback changed: ' +
+                             callback.decode('ascii'))
+    # The stock Human indirect-fire phase counted artillery with a loop whose
+    # condition could never be true. That silently skipped every artillery
+    # order phase. Correct the source typo in the ARM64 bundle overlay.
+    indirect_loop = b'for (i = 0; i > UNITS_NUM; i++)'
+    if indirect_loop in source:
+        if source.count(indirect_loop) != 1 or b'U0 PlayerIndirect()' not in source:
+            raise ValueError('pinned ToTheFront indirect-fire loop changed')
+        source = source.replace(indirect_loop,
+                                b'for (i = 0; i < UNITS_NUM; i++)', 1)
+    registration = (
+        b'\nplayer_indirect[ttf_ai_load_slot] = &PlayerIndirect;\n'
+        b'player_move[ttf_ai_load_slot] = &PlayerMove;\n'
+        b'player_direct[ttf_ai_load_slot] = &PlayerDirect;\n')
+    if any(line in source for line in registration.splitlines() if line):
+        raise ValueError('ToTheFront AI already has an ARM64 registration overlay')
+    return source + registration
 
 
 def extract_keyboard_helpers(source: bytes, printer: bytes) -> bytes:
@@ -1040,6 +1331,21 @@ def translate_docfile(source: bytes) -> bytes:
         raise ValueError('pinned DocLoad cleanup boundary changed')
     text = text.replace(end, end+'\tFree(arm_owned);\n', 1)
     return text.encode('utf-8')
+
+
+def translate_debug_compat(source: bytes) -> bytes:
+    """Apply narrow ARM64 ZealC compatibility fixes to stock Debug.ZC."""
+    text = source.decode('utf-8')
+    translated, count = re.subn(r'(?<![.>\w])offset\b', 'base_offset', text)
+    if count != 8:
+        raise ValueError(f'Debug.ZC reserved-word overlay matched {count}, expected 8')
+    text = translated
+    # The remaining stock debugger contains x86 disassembly/register helpers
+    # that are not part of the portable ClassRep service needed by apps.
+    helper_boundary = '\nU0 UpdateRegVarImg('
+    if text.count(helper_boundary) != 1:
+        raise ValueError('Debug.ZC portable ClassRep boundary changed')
+    return text.split(helper_boundary, 1)[0].rstrip().encode('utf-8') + b'\n'
 
 
 def translate_doctree(source: bytes) -> bytes:
@@ -1638,10 +1944,12 @@ def translate_grbitmap(source: bytes) -> bytes:
 
 
 def translate_mathode(source: bytes) -> bytes:
-    """Work around a parser failure on inline address-of-member call args.
+    """Adapt the pinned ODE source to the ARM64 cooperative runtime.
 
-    The expression is equivalent and the guarded replacement keeps the
-    upstream mirror pristine while compiling the arm64 source volume.
+    The bit-test expression workaround keeps the pinned source compiling.
+    The monotonic deadline keeps ODE work bounded when the guest's cooperative
+    clock task cannot run while the integrator owns the CPU. The guarded
+    replacements keep the upstream mirror pristine.
     """
     try:
         text = source.decode("utf-8")
@@ -1650,13 +1958,273 @@ def translate_mathode(source: bytes) -> bytes:
     signature = "U0 ODEMPTask(CMathODE *ode)\n{"
     call = "\t\twhile (!Bt(&ode->mp_not_done_flags, Gs->num))"
     reset = "\t\tLBtr(&ode->mp_not_done_flags, Gs->num);"
+    update_signature = "U0 ODEsUpdate(CTask *task)\n{"
+    update_declarations = "\tI64\t\t\t i;\n\tF64\t\t\t d, start_time, timeout_time, t_desired, t_initial, interpolation;\n"
+    timeout_calculation = "\t\ttimeout_time = start_time + (task->last_ode_time / d + 0.1) / (winmgr.last_ode_time / d + 0.1) * ode_alloced_factor * d;\n"
+    integration_loop = "\t\t\t\t\t\twhile (ode->t < t_desired)\n\t\t\t\t\t\t{\n"
     if (text.count(signature) != 1 or text.count(call) != 1 or
-            text.count(reset) != 1):
-        raise ValueError("expected the pinned ODEMPTask bit-test expression")
+            text.count(reset) != 1 or text.count(update_signature) != 1 or
+            text.count(update_declarations) != 1 or
+            text.count(timeout_calculation) != 1 or
+            text.count(integration_loop) != 1):
+        raise ValueError("expected the pinned ODE task/update boundaries")
     text = text.replace(signature, signature + "\n\tU8 *mp_flags = &ode->mp_not_done_flags;", 1)
     text = text.replace(call, "\t\twhile (!Bt(mp_flags, Gs->num))", 1)
     text = text.replace(reset, "\t\tLBtr(mp_flags, Gs->num);", 1)
+    text = text.replace(update_declarations,
+        update_declarations + "\tI64\t\t\t monotonic_timeout_ns;\n", 1)
+    text = text.replace(timeout_calculation,
+        timeout_calculation +
+        "\t\tmonotonic_timeout_ns = timeout_time * 1000000000.0;\n", 1)
+    text = text.replace(integration_loop, integration_loop +
+        "\t\t\t\t\t\t\tif (ZcMonotonicNs() > monotonic_timeout_ns)\n"
+        "\t\t\t\t\t\t\t{\n"
+        "\t\t\t\t\t\t\t\tode->base_t += t_desired - ode->t; //Slip\n"
+        "\t\t\t\t\t\t\t\tgoto ode_done;\n"
+        "\t\t\t\t\t\t\t}\n", 1)
     return text.encode("utf-8")
+
+
+def translate_math(source: bytes) -> bytes:
+    """Use ZealOS Arg in place of the unavailable IC_ATAN backend intrinsic.
+
+    The source Math.ZC formulas call unary ATan. Arg(1, y) has the same
+    principal-value result for finite y and is already implemented by the
+    ARM64 runtime. Add the shared sawtooth helper used by stock demos; the
+    pinned Math.ZC source tree does not include it. Keep the pinned source
+    unchanged and guard all adapted call sites.
+    """
+    old = b'return ATan(s / c);'
+    if source.count(old) != 2:
+        raise ValueError('expected the two pinned ASin/ACos ATan call sites')
+    if b'public F64 Saw(' in source:
+        raise ValueError('pinned Math.ZC unexpectedly defines Saw')
+    translated = source.replace(old, b'return Arg(1.0, s / c);')
+    return translated + (
+        b'\n\npublic F64 Saw(F64 t, F64 period=1.0)\n'
+        b'{\n'
+        b'\tif (!period)\n'
+        b'\t\treturn 0.0;\n'
+        b'\tt %= period;\n'
+        b'\tif (t < 0.0)\n'
+        b'\t\tt += period;\n'
+        b'\treturn t / period;\n'
+        b'}\n'
+        b'\npublic F64 Arm64Tri(F64 t, F64 period)\n'
+        b'{\n'
+        b'\tif (!period)\n'
+        b'\t\treturn 0.0;\n'
+        b'\tt = 2.0 * (Abs(t) % period) / period;\n'
+        b'\tif (t <= 1.0)\n'
+        b'\t\treturn t;\n'
+        b'\treturn 2.0 - t;\n'
+        b'}\n'
+        b'\npublic F64 Arm64FullTri(F64 t, F64 period)\n'
+        b'{\n'
+        b'\tif (!period)\n'
+        b'\t\treturn 0.0;\n'
+        b'\tt = 4.0 * (t % period) / period;\n'
+        b'\tif (t <= -1.0)\n'
+        b'\t{\n'
+        b'\t\tif (t <= -3.0)\n'
+        b'\t\t\treturn t + 4.0;\n'
+        b'\t\treturn -2.0 - t;\n'
+        b'\t}\n'
+        b'\tif (t <= 1.0)\n'
+        b'\t\treturn t;\n'
+        b'\tif (t <= 3.0)\n'
+        b'\t\treturn 2.0 - t;\n'
+        b'\treturn t - 4.0;\n'
+        b'}\n'
+        b'\npublic F64 Arm64Log2(F64 value)\n'
+        b'{\n'
+        b'\tF64 fraction = 0.0, bit = 0.5;\n'
+        b'\tI64 exponent = 0, i;\n'
+        b'\n'
+        b'\tif (!(value > 0.0))\n'
+        b'\t\treturn -1e300;\n'
+        b'\twhile (value >= 2.0 && exponent < 1023)\n'
+        b'\t{\n'
+        b'\t\tvalue /= 2.0;\n'
+        b'\t\texponent++;\n'
+        b'\t}\n'
+        b'\twhile (value < 1.0 && exponent > -1074)\n'
+        b'\t{\n'
+        b'\t\tvalue *= 2.0;\n'
+        b'\t\texponent--;\n'
+        b'\t}\n'
+        b'\tfor (i = 0; i < 53; i++)\n'
+        b'\t{\n'
+        b'\t\tvalue *= value;\n'
+        b'\t\tif (value >= 2.0)\n'
+        b'\t\t{\n'
+        b'\t\t\tvalue /= 2.0;\n'
+        b'\t\t\tfraction += bit;\n'
+        b'\t\t}\n'
+        b'\t\tbit *= 0.5;\n'
+        b'\t}\n'
+        b'\treturn exponent + fraction;\n'
+        b'}\n'
+        b'\npublic F64 Arm64Sign(F64 value)\n'
+        b'{\n'
+        b'\tif (value > 0.0)\n'
+        b'\t\treturn 1.0;\n'
+        b'\tif (value < 0.0)\n'
+        b'\t\treturn -1.0;\n'
+        b'\treturn 0.0;\n'
+        b'}\n'
+        b'\npublic Bool Arm64Blink(F64 hz=2.5)\n'
+        b'{\n'
+        b'\treturn hz > 0.0 && (tS * hz) % 2.0 < 1.0;\n'
+        b'}\n'
+        b'\npublic U64 Arm64ClampU64(U64 num, U64 lo, U64 hi)\n'
+        b'{\n'
+        b'\tif (num < lo)\n'
+        b'\t\treturn lo;\n'
+        b'\tif (num > hi)\n'
+        b'\t\treturn hi;\n'
+        b'\treturn num;\n'
+        b'}\n')
+
+
+def translate_stock_game_math_calls(source: bytes, *, blink_count: int = 0,
+                                    clamp_u64_count: int = 0, tri_count: int = 0,
+                                    full_tri_count: int = 0,
+                                    log2_count: int = 0,
+                                    sign_count: int = 0) -> bytes:
+    """Route stock game calls through ARM64 source helpers, not kernel externs."""
+    for name, count in ((b'Blink(', blink_count),
+                        (b'ClampU64(', clamp_u64_count),
+                        (b'Log2(', log2_count),
+                        (b'Sign(', sign_count)):
+        if source.count(name) != count:
+            raise ValueError(f'pinned stock game {name.decode()} call count changed')
+    direct_tri_count = source.count(b'Tri(') - source.count(b'FullTri(')
+    if direct_tri_count != tri_count or source.count(b'FullTri(') != full_tri_count:
+        raise ValueError('pinned stock game Tri/FullTri call counts changed')
+    return (source.replace(b'Tri(', b'Arm64Tri(')
+            .replace(b'FullArm64Tri(', b'Arm64FullTri(')
+            .replace(b'Log2(', b'Arm64Log2(')
+            .replace(b'Sign(', b'Arm64Sign(')
+            .replace(b'Blink(', b'Arm64Blink(')
+            .replace(b'ClampU64(', b'Arm64ClampU64('))
+
+
+def translate_wenceslas(source: bytes) -> bytes:
+    """Split oversized Wenceslas lyric prompts into STR_LEN-safe pages."""
+    starts = []
+    offset = 0
+    marker = b'PopUpOk("'
+    while True:
+        index = source.find(marker, offset)
+        if index < 0:
+            break
+        starts.append(index)
+        offset = index + len(marker)
+    if len(starts) != 3:
+        raise ValueError('expected the three pinned Wenceslas lyric prompts')
+
+    chunks = []
+    cursor = 0
+    for start in starts:
+        if start < cursor:
+            continue
+        finish = source.find(b'");', start + len(marker))
+        if finish < 0:
+            raise ValueError('pinned Wenceslas prompt terminator changed')
+        payload = source[start + len(marker):finish]
+        if len(payload) <= 143:
+            continue
+
+        lines = payload.splitlines(keepends=True)
+        pages = []
+        page = b''
+        for line in lines:
+            if len(line) > 143:
+                raise ValueError('pinned Wenceslas lyric line exceeds STR_LEN')
+            if page and len(page) + len(line) > 143:
+                pages.append(page)
+                page = b''
+            page += line
+        if page:
+            pages.append(page)
+        replacement = b'\n'.join(marker + page + b'");' for page in pages)
+        chunks.append((start, finish + 3, replacement))
+        cursor = finish + 3
+
+    if len(chunks) != 2:
+        raise ValueError('expected exactly two oversized Wenceslas prompts')
+    for start, finish, replacement in reversed(chunks):
+        source = source[:start] + replacement + source[finish:]
+    return source
+
+
+def translate_sysrep_processor(source: bytes) -> bytes:
+    """Report firmware CPU family on ARM64 without inventing x86 CPUID data."""
+    declaration = b'\t\t\t\t\tCRAXRBXRCXRDX regs;\n'
+    cpuid = b'\t\t\t\t\tCPUId(1, &regs);\n'
+    if source.count(declaration) != 1 or source.count(cpuid) != 1:
+        raise ValueError('pinned SysRep processor register probe changed')
+    source = source.replace(declaration, b'', 1).replace(cpuid, b'', 1)
+
+    family_start = b'\t\t\t\t\t"Family\\t\\t\\t:$$BLACK$$";\n'
+    speed_start = b'\t\t\t\t\t"Current Speed\\t:$$BLACK$$";\n'
+    if source.count(family_start) != 1 or source.count(speed_start) != 1:
+        raise ValueError('pinned SysRep processor family fields changed')
+    first = source.index(family_start)
+    last = source.index(speed_start, first)
+    family = (b'\t\t\t\t\t"CPU Family\\t\\t:$$BLACK$$%Z$$FG$$\\n", '
+              b'p_info->family, "ST_SMBIOS_PROCESSOR_FAMILIES";\n')
+    source = source[:first] + family + source[last:]
+
+    cpuid_flags = b'\t\t\t\t\tFlagsStrPrint(buffer, Define("ST_CPUID_1_EDX_FLAGS")'
+    flags_start = source.find(cpuid_flags)
+    if flags_start < 0:
+        raise ValueError('pinned SysRep CPUID feature report changed')
+    flags_end = source.find(b'\t\t\t\t\tFree(str);\n', flags_start)
+    if flags_end < 0:
+        raise ValueError('pinned SysRep CPUID report terminator changed')
+    flags_end += len(b'\t\t\t\t\tFree(str);\n')
+    source = source[:flags_start] + source[flags_end:]
+    return source
+
+
+def translate_progress(source: bytes) -> bytes:
+    """Replace Progress's x86-only countdown routine with the same C loop."""
+    asm = (
+        b'asm {\n_PROGRESS_DEMO::\n'
+        b'\t\t\t\tMOV \t\tRCX, 12000000\n'
+        b'@@05: \t\t\tMOV \t\tU64 [&progress1], RCX\n'
+        b'\t\t\t\tCALL\t\t&Yield\n'
+        b'\t\t\t\tLOOP\t\t@@05\n'
+        b'\t\t\t\tMOV \t\tU64 [&progress1], RCX\n'
+        b'\t\t\t\tRET\n}'
+    )
+    external = b'_extern _PROGRESS_DEMO U0 AsmProgressDemo();'
+    if source.count(asm) != 1 or source.count(external) != 1:
+        raise ValueError('pinned Progress countdown assembly changed')
+    source = source.replace(asm,
+        b'U0 AsmProgressDemo()\n{\n'
+        b'\tI64 i;\n'
+        b'\tfor (i = 12000000; i > 0; i--)\n'
+        b'\t{\n'
+        b'\t\tprogress1 = i;\n'
+        b'\t\tYield;\n'
+        b'\t}\n'
+        b'\tprogress1 = 0;\n'
+        b'}', 1)
+    return source.replace(external, b'', 1)
+
+
+def translate_empty_label_statement(source: bytes, label: bytes) -> bytes:
+    """Satisfy the native parser where a stock goto label precedes `}`."""
+    pattern = re.compile(rb'(?m)^' + re.escape(label) + rb':([^\n]*)\n(\t})')
+    matches = list(pattern.finditer(source))
+    if len(matches) != 1:
+        raise ValueError(f'pinned empty label {label.decode()} changed')
+    match = matches[0]
+    replacement = label + b':' + match.group(1) + b'\n\t\t;\n\t}'
+    return source[:match.start()] + replacement + source[match.end():]
 
 
 def translate_docpopup(source: bytes) -> bytes:

@@ -1,0 +1,150 @@
+I8	board  [9];
+I64 board_x[9] = {150, 250, 350, 150, 250, 350, 150, 250, 350};
+I64 board_y[9] = {150, 150, 150, 250, 250, 250, 350, 350, 350};
+Bool ttt_exit = FALSE;
+
+U0 DrawX(CDC *dc, I64 x, I64 y)
+{
+	dc->thick = 5;
+	GrLine3(dc, x - 20, y - 20, 0, x + 20, y + 20, 0);
+	GrLine3(dc, x + 20, y - 20, 0, x - 20, y + 20, 0);
+}
+
+U0 DrawO(CDC *dc, I64 x, I64 y)
+{
+	dc->thick = 5;
+	GrCircle3(dc, x, y, 0, 25);
+}
+
+U0 DrawBoard(I64 player)
+{
+	I64  i;
+	CDC *dc = DCAlias;
+
+	// Use explicit colors: the ARM64 graphical terminal's canvas is dark.
+	DCClear(dc);
+	dc->color = WHITE;
+	dc->thick = 5;
+	GrLine3(dc, 200, 100, 0, 200, 400, 0);
+	GrLine3(dc, 300, 100, 0, 300, 400, 0);
+	GrLine3(dc, 100, 200, 0, 400, 200, 0);
+	GrLine3(dc, 100, 300, 0, 400, 300, 0);
+	for (i = 0; i < 9; i++)
+		switch (board[i])
+		{
+			case 1:
+				DrawX(dc, board_x[i], board_y[i]);
+				break;
+
+			case 2:
+				DrawO(dc, board_x[i], board_y[i]);
+				break;
+
+		}
+	if (player == 1)
+		DrawX(dc, mouse.pos.x - Fs->pix_left, mouse.pos.y - Fs->pix_top);
+	else
+		DrawO(dc, mouse.pos.x - Fs->pix_left, mouse.pos.y - Fs->pix_top);
+	DCDel(dc);
+}
+
+U0 TakeTurn(I64 player)
+{
+	I64 i, x, y, arg1, arg2, message_code;
+
+	while (TRUE)
+	{
+		DrawBoard(player);
+		Refresh;
+		message_code = MessageGet(&arg1, &arg2,
+				1 << MESSAGE_MS_L_DOWN | 1 << MESSAGE_KEY_DOWN);
+		if (message_code == MESSAGE_KEY_DOWN &&
+				(arg1 == CH_ESC || arg1 == CH_SHIFT_ESC))
+		{
+			ttt_exit = TRUE;
+			return;
+		}
+		if (message_code == MESSAGE_MS_L_DOWN)
+		{
+			// MessageGet mouse coordinates are already client-area coordinates.
+			x = arg1;
+			y = arg2;
+			if (100 <= x < 400 && 100 <= y < 400)
+			{
+				i = (x - 100) / 100 + (y - 100) / 100 * 3;
+				if (!board[i])
+					break;
+			}
+		}
+	}
+	board[i] = player;
+}
+
+Bool CheckWinner(I64 player)
+{
+	if ((board[0] == player && board[1] == player && board[2] == player) ||
+			(board[3] == player && board[4] == player && board[5] == player) ||
+			(board[6] == player && board[7] == player && board[8] == player) ||
+			(board[0] == player && board[3] == player && board[6] == player) ||
+			(board[1] == player && board[4] == player && board[7] == player) ||
+			(board[2] == player && board[5] == player && board[8] == player) ||
+			(board[0] == player && board[4] == player && board[8] == player) ||
+			(board[2] == player && board[4] == player && board[6] == player))
+		return TRUE;
+	else
+		return FALSE;
+}
+
+U0 DoGame()
+{
+	I64 moves = 0;
+
+	MemSet(board, 0, sizeof(board));
+	while (!ttt_exit)
+	{
+		TakeTurn(1);
+		if (ttt_exit)
+			break;
+		if (CheckWinner(1))
+		{
+			Beep;
+			Beep;
+			Beep;
+			break;
+		}
+		if (++moves == 9)
+			break;
+
+		TakeTurn(2);
+		if (ttt_exit)
+			break;
+		if (CheckWinner(2))
+		{
+			Beep(74);
+			Beep(74);
+			Beep(74);
+			break;
+		}
+		if (++moves == 9)
+			break;
+	}
+}
+
+U0 TicTacToe()
+{
+	SettingsPush;
+	Fs->win_inhibit = WIG_TASK_DEFAULT - WIF_SELF_FOCUS - WIF_SELF_BORDER;
+	Fs->win_inhibit |= WIG_DBL_CLICK;
+	AutoComplete;
+	WinBorder;
+	WinMax;
+	DocClear;
+	"$$GREEN$$ESC$$FG$$ to exit.\n";
+	ttt_exit = FALSE;
+	while (!ttt_exit)
+		DoGame;
+	DCFill;
+	SettingsPop;
+}
+
+TicTacToe;

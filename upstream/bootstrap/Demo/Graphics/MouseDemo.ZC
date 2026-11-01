@@ -1,0 +1,12 @@
+U0 Mouse()
+{
+    "Press left mouse button to exit.\n";
+    while (!mouse.lb)
+    {
+        GrPlot(gr.dc, mouse.pos.x, mouse.pos.y);
+        Refresh;
+    }
+    DCFill(gr.dc);
+}
+
+Mouse;

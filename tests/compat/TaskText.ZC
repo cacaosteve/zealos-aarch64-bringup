@@ -1,5 +1,6 @@
 // Pinned TaskText job and one-shot input-filter behavior.
 I64 text_value, text_seen;
+I64 (*text_child_callback)(U8 *data);
 
 U0 TextIdleServer(U8 *data)
 {
@@ -28,8 +29,7 @@ I64 ParentScope()
 I64 TaskCompilerScopeChecks()
 {
     CTask *server;
-    CJob *definition, *call, *shadow, *shadow_call, *callback_def,
-         *callback_reject, *root_call;
+    CJob *definition, *call, *shadow, *shadow_call, *callback_def, *root_call;
     I64 call_result;
 
     text_value = 40;
@@ -42,20 +42,24 @@ I64 TaskCompilerScopeChecks()
     shadow = TaskExe(server, Fs, "I64 ParentScope(){return 22;}", 0);
     shadow_call = TaskExe(server, Fs, "ParentScope();", 0);
     callback_def = TaskExe(server, Fs,
-                           "I64 ChildCallback(U8 *data){return 13;}", 0);
-    callback_reject = TaskExe(server, Fs,
-                              "JobQueue(&ChildCallback,NULL,0,0)==NULL;", 0);
+                           "I64 ChildCallback(U8 *data){return 13;} "
+                           "text_child_callback=&ChildCallback;", 0);
     if (!definition || !call || !shadow || !shadow_call ||
-        !callback_def || !callback_reject)
+        !callback_def)
         return 2;
     call_result = JobResGet(call);
     JobResGet(definition);
     if (JobResGet(shadow_call) != 22)
         return 5;
     JobResGet(shadow);
-    if (JobResGet(callback_reject) != 1)
-        return 7;
     JobResGet(callback_def);
+    // A child-only function is valid while that child owns the callback, as
+    // TaskJobQueueCoopChecks verifies. It must be rejected when Root queues it,
+    // because the callback's private code heap can disappear with the child.
+    if (!text_child_callback)
+        return 7;
+    if (JobQueue(text_child_callback, NULL, 0, 0) != NULL)
+        return 7;
     if (text_value != 42)
         return 100 + text_value;
     if (call_result != 42)

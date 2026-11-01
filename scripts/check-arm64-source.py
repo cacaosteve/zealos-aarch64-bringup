@@ -7,12 +7,65 @@ import sys
 from arm64_source import extract_keyboard_helpers
 from arm64_source import (extract_sprite_elem_base_sizes, inject_sprite_elem_base_sizes,
                           extract_sprite_interpolation, inject_sprite_interpolation,
-                          extract_sprite_matrix_draw, inject_sprite_matrix_draw)
+                          extract_sprite_matrix_draw, inject_sprite_matrix_draw,
+                          inject_sprite_wrappers)
 
-from arm64_source import (extract_home_set, extract_home_startup, extract_home_startup_tasks, inject_home_startup_tasks, extract_server_task, extract_user_task, extract_version_scalars, extract_source_prompt, extract_source_training, translate_autocomplete_task, translate_doctree, translate_registry, translate_docterm, translate_doced, translate_docfind, translate_docform, translate_docpopup, translate_docrecalc, translate_grbitmap, translate_tothefront_draw, translate_tothefront_init, translate_tothefront_sentinel,
-                          translate_filemgr, translate_grdc, translate_grpalette, translate_message, translate_grscreen, translate_ktask, translate_winmgr, translate_zsplash, translate_home_once, translate_span_worker_cleanup, translate_keepaway_nearest_ball)
+from arm64_source import (extract_home_set, extract_home_startup, extract_home_startup_tasks, inject_home_startup_tasks, extract_server_task, extract_user_task, extract_version_scalars, extract_source_prompt, extract_source_training, translate_autocomplete_task, translate_doctree, translate_registry, translate_docterm, translate_doced, translate_docfind, translate_docform, translate_docpopup, translate_docrecalc, translate_grbitmap, translate_tothefront_draw, translate_tothefront_init, translate_tothefront_sentinel, translate_math,
+translate_tothefront_player_pick, translate_tothefront_ai, translate_filemgr, translate_grdc, translate_grpalette, translate_message, translate_grscreen, translate_ktask, translate_winmgr, translate_zsplash, translate_home_once, translate_span_worker_cleanup, translate_keepaway_nearest_ball, translate_stock_game_math_calls, translate_empty_label_statement, translate_wenceslas, translate_progress, translate_xcaliber_shot_return, translate_xcaliber_draw_visibility, translate_xcaliber_key_descriptors, translate_xcaliber_escape_scan, translate_xcaliber_held_input)
 
 root = Path(__file__).resolve().parent.parent
+math_source = (root / 'upstream/pinned/System/Math/Math.ZC').read_bytes()
+math_overlay = translate_math(math_source)
+assert math_overlay.count(b'return Arg(1.0, s / c);') == 2
+assert b'return ATan(s / c);' not in math_overlay
+assert (b'public F64 Saw(F64 t, F64 period=1.0)' in math_overlay and
+        b'if (!period)' in math_overlay and
+        b'if (t < 0.0)' in math_overlay and
+        b'return t / period;' in math_overlay)
+assert b'public Bool Arm64Blink(F64 hz=2.5)' in math_overlay
+assert b'(tS * hz) % 2.0 < 1.0' in math_overlay
+assert b'public U64 Arm64ClampU64(U64 num, U64 lo, U64 hi)' in math_overlay
+assert b'public F64 Arm64Tri(F64 t, F64 period)' in math_overlay
+assert b'public F64 Arm64FullTri(F64 t, F64 period)' in math_overlay
+assert b'public F64 Arm64Log2(F64 value)' in math_overlay
+assert b'public F64 Arm64Sign(F64 value)' in math_overlay
+assert translate_stock_game_math_calls(
+    b'x=Tri(t,1);y=FullTri(t,1);z=Log2(x);q=Sign(y);', tri_count=1,
+    full_tri_count=1, log2_count=1, sign_count=1) == (
+        b'x=Arm64Tri(t,1);y=Arm64FullTri(t,1);z=Arm64Log2(x);q=Arm64Sign(y);')
+assert translate_stock_game_math_calls(b'if (Blink(5)) A();', blink_count=1) == b'if (Arm64Blink(5)) A();'
+assert translate_stock_game_math_calls(b'x=ClampU64(x,0,9);', clamp_u64_count=1) == b'x=Arm64ClampU64(x,0,9);'
+try:
+    translate_stock_game_math_calls(b'Blink(5);', blink_count=2)
+except ValueError:
+    pass
+else:
+    raise AssertionError('stock math overlay accepted changed Blink call count')
+assert translate_empty_label_statement(b'bd_done:\n\t}', b'bd_done') == b'bd_done:\n\t\t;\n\t}'
+assert translate_empty_label_statement(
+    b'vr_done: // exit label\n\t}', b'vr_done') == (
+        b'vr_done: // exit label\n\t\t;\n\t}')
+wenceslas_source = (root / 'upstream/pinned/Demo/Games/Wenceslas.ZC').read_bytes()
+wenceslas_overlay = translate_wenceslas(wenceslas_source)
+assert b'Sire, the night is darker now' in wenceslas_overlay
+assert wenceslas_overlay.count(b'PopUpOk("') > wenceslas_source.count(b'PopUpOk("')
+assert max(len(chunk) for chunk in re.findall(rb'PopUpOk\("(.*?)"\);', wenceslas_overlay, re.S)) < 144
+progress_source = (root / 'upstream/pinned/Demo/Progress.ZC').read_bytes()
+progress_overlay = translate_progress(progress_source)
+assert b'asm {' not in progress_overlay and b'Yield;' in progress_overlay
+assert b'AsmProgressDemo;' in progress_overlay
+try:
+    translate_math(math_source.replace(b'return ATan(s / c);', b'return ATan(s / c) + 0;', 1))
+except ValueError:
+    pass
+else:
+    raise AssertionError('Math overlay accepted changed ASin/ACos call sites')
+try:
+    translate_math(math_source + b'\npublic F64 Saw(F64 x) { return x; }\n')
+except ValueError:
+    pass
+else:
+    raise AssertionError('Math overlay accepted an upstream Saw definition')
 keepaway_source = (root / 'upstream/pinned/Apps/KeepAway/KeepAway.ZC').read_bytes()
 keepaway_overlay = translate_keepaway_nearest_ball(keepaway_source)
 assert keepaway_overlay != keepaway_source
@@ -27,6 +80,96 @@ except ValueError:
     pass
 else:
     raise AssertionError('KeepAway overlay accepted changed nearest-player selection')
+xcaliber_source = (root / 'upstream/pinned/Apps/X-Caliber/X-Caliber.ZC').read_bytes()
+xcaliber_overlay = translate_xcaliber_shot_return(xcaliber_source)
+assert xcaliber_overlay != xcaliber_source
+shot_new = xcaliber_overlay.split(b'Shot *ShotNew', 1)[1].split(b'\n}\n', 1)[0]
+assert b'QueueInsert(tmps, shot_head.last);\n\treturn tmps;' in shot_new
+try:
+    translate_xcaliber_shot_return(xcaliber_source.replace(
+        b'QueueInsert(tmps, shot_head.last);',
+        b'QueueInsert(tmps, other_head.last);', 1))
+except ValueError:
+    pass
+else:
+    raise AssertionError('X-Caliber overlay accepted changed ShotNew queue insertion')
+xcaliber_draw_overlay = translate_xcaliber_draw_visibility(xcaliber_source)
+draw_it = xcaliber_draw_overlay.split(b'U0 DrawIt(', 1)[1].split(b'\n}', 1)[0]
+assert b'if (!ode)\n\t\treturn;' in draw_it
+assert b'if (ode != task->last_ode)' not in draw_it
+try:
+    translate_xcaliber_draw_visibility(xcaliber_source.replace(
+        b'if (ode != task->last_ode)', b'if (ode == task->last_ode)', 1))
+except ValueError:
+    pass
+else:
+    raise AssertionError('X-Caliber draw overlay accepted changed ODE visibility guard')
+xcaliber_input_overlay = translate_xcaliber_key_descriptors(xcaliber_draw_overlay)
+assert (b'Fs->win_inhibit = WIG_TASK_DEFAULT - WIF_SELF_FOCUS - '
+        b'WIF_SELF_BORDER - WIF_FOCUS_TASK_MENU - WIF_SELF_CTRLS;') in xcaliber_input_overlay
+assert (b'\t\tInit;\n\t\tFs->win_inhibit = 0x0050E2FA;\n'
+        b'\t\tQueueInsert(ode, Fs->last_ode);') in xcaliber_input_overlay
+try:
+    translate_xcaliber_key_descriptors(
+        xcaliber_draw_overlay.replace(b'WIF_SELF_CTRLS;', b'WIF_SELF_CTRLS - WIF_SELF_KEY_DESC;', 1))
+except ValueError:
+    pass
+else:
+    raise AssertionError('X-Caliber overlay accepted changed window input policy')
+xcaliber_escape_overlay = translate_xcaliber_escape_scan(xcaliber_input_overlay)
+assert xcaliber_escape_overlay.count(b'case SC_ESC:\n\t\t\t\t\t\tch = CH_ESC;') == 2
+xcaliber_input_overlay = translate_xcaliber_held_input(xcaliber_escape_overlay)
+assert b'\t\t\tYield; //Keep focused input and other tasks responsive.\n' not in xcaliber_input_overlay
+assert (b'if (Bt(kbd.down_bitmap, SC_CURSOR_LEFT))\n'
+        b'\t\t\t\t\thuman_t_left = THRUST_MAX;\n'
+        b'\t\t\t\telse\n\t\t\t\t\thuman_t_left = 0;') in xcaliber_input_overlay
+assert b'if (Bt(kbd.down_bitmap, SC_ESC))\n\t\t\t\tch = CH_ESC;' in xcaliber_input_overlay
+try:
+    translate_xcaliber_escape_scan(xcaliber_input_overlay.replace(
+        b'case SC_CURSOR_RIGHT:', b'case SC_CURSOR_LEFT:', 1))
+except ValueError:
+    pass
+else:
+    raise AssertionError('X-Caliber Escape overlay accepted changed key switches')
+tothefront_players = (root / 'upstream/pinned/Apps/ToTheFront/ToTheFront.ZC').read_bytes()
+tothefront_player_overlay = translate_tothefront_player_pick(tothefront_players)
+assert tothefront_player_overlay.count(b'ToTheFrontPlayerPick("AIs",') == 2
+assert b'\tPlayerPick("AIs",' not in tothefront_player_overlay
+assert b'FilesFind(mask, FUF_JUST_FILES)' in tothefront_player_overlay
+assert b'LE=%d' in tothefront_player_overlay
+assert b'I64 ttf_ai_load_slot;' in tothefront_player_overlay
+assert b'ttf_ai_load_slot = player;' in tothefront_player_overlay
+assert b'ExeFile(entry->full_name);' in tothefront_player_overlay
+assert b'HashFind("PlayerIndirect"' not in tothefront_player_overlay
+assert b'if (selected >= 0)' in tothefront_player_overlay
+for ai_name in ('Human.ZC', 'SimpleAI.ZC'):
+    ai_source = (root / 'upstream/pinned/Apps/ToTheFront/AIs' / ai_name).read_bytes()
+    ai_overlay = translate_tothefront_ai(ai_source)
+    if ai_name == 'Human.ZC':
+        expected_ai_source = ai_source.replace(
+            b'for (i = 0; i > UNITS_NUM; i++)',
+            b'for (i = 0; i < UNITS_NUM; i++)', 1)
+        assert ai_overlay.startswith(expected_ai_source)
+    else:
+        assert ai_overlay.startswith(ai_source)
+    for callback, slot in ((b'PlayerIndirect', b'player_indirect'),
+                           (b'PlayerMove', b'player_move'),
+                           (b'PlayerDirect', b'player_direct')):
+        registration = (slot + b'[ttf_ai_load_slot] = &' + callback + b';')
+        assert ai_overlay.count(registration) == 1
+    if ai_name == 'Human.ZC':
+        assert b'for (i = 0; i > UNITS_NUM; i++)' in ai_source
+        assert b'for (i = 0; i < UNITS_NUM; i++)' in ai_overlay
+        assert ai_overlay.count(b'for (i = 0; i < UNITS_NUM; i++)') == 1
+    else:
+        assert b'for (i = 0; i > UNITS_NUM; i++)' not in ai_overlay
+try:
+    translate_tothefront_player_pick(tothefront_players.replace(
+        b'PlayerPick("AIs", 1);', b'PlayerPick("Bots", 1);', 1))
+except ValueError:
+    pass
+else:
+    raise AssertionError('ToTheFront picker overlay accepted a changed call site')
 span_source = (root / 'upstream/pinned/Apps/Span/SpanMain.ZC').read_bytes()
 span_overlay = translate_span_worker_cleanup(span_source)
 assert span_overlay != span_source
@@ -85,6 +228,20 @@ except ValueError:
     pass
 else:
     raise AssertionError('sprite matrix injection accepted duplicate API')
+sprite_bridge_with_wrappers = inject_sprite_wrappers(
+    sprite_bridge_with_matrix, sprite_plot)
+assert b'public U0 Sprite3B(' in sprite_bridge_with_wrappers
+assert b'public U0 SpriteExtents(' in sprite_bridge_with_wrappers
+assert b'public CDC *Sprite2DC(U8 *elems)' in sprite_bridge_with_wrappers
+assert b'public U8 *SpriteTransform(U8 *elems, I64 *matrix)' in sprite_bridge_with_wrappers
+assert b'public U0 DCExtentsInit(CDC *dc=NULL)' in sprite_bridge_with_wrappers
+assert b'dc->flags |= DCF_RECORD_EXTENTS;' in sprite_bridge_with_wrappers
+try:
+    inject_sprite_wrappers(sprite_bridge_with_wrappers, sprite_plot)
+except ValueError:
+    pass
+else:
+    raise AssertionError('sprite wrapper injection accepted duplicate APIs')
 for changed_new, changed_plot in (
     (sprite_new.replace(b'public I64 SpriteSize(U8 *elems)',
                         b'public I64 SpriteExtent(U8 *elems)', 1), sprite_plot),
@@ -720,6 +877,9 @@ assert b'ToTheFrontSaw(4 * tS + 1.0, 2.0)' in tothefront_draw_overlay
 assert b'ToTheFrontBlink(5)' in tothefront_draw_overlay
 assert b'ToTheFrontBlink(10)' in tothefront_draw_overlay
 assert b'    Saw(4 * tS' not in tothefront_draw_overlay
+assert b'GrRect(dc, x - 5, y - 3, 10, 6);' in tothefront_draw_overlay
+assert b'GrLine(dc, x, y, x + 9 * Cos(f), y + 9 * Sin(f));' in tothefront_draw_overlay
+assert b'Sprite3ZB(dc, x, y, 0, tmpu->img, f)' not in tothefront_draw_overlay
 try:
     translate_tothefront_draw(tothefront_draw.replace(
         b'Saw(4 * tS, 2.0)', b'Saw(5 * tS, 2.0)'))

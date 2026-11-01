@@ -32,7 +32,7 @@ I64 StockPopupPoint(U8 *label)
         {
             x = task->pix_left + (entry->x - doc->line_start_col) * FONT_WIDTH + 8;
             y = task->pix_top + (entry->y - doc->top_line_num) * FONT_HEIGHT + 4;
-            return y << 32 + x;
+            return (y << 32) | x;
         }
     return -1;
 }

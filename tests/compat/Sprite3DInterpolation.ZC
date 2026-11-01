@@ -13,8 +13,8 @@ U0 Sprite3DInterpolationSetLine(U8 *sprite, I32 x1, I32 y1, I32 x2, I32 y2)
 
 I64 Sprite3DInterpolationChecks()
 {
-    U8 line0[21], line1[21], point[13];
-    U8 bitmap0[26], bitmap1[26], mesh0[65], mesh1[65];
+    U8 line0[18], line1[18], point[13];
+    U8 bitmap0[26], bitmap1[26], mesh0[62], mesh1[62];
     U8 *result, *truncated;
     CSprite *record;
     I32 x, y, width, height, vertices, triangles;
@@ -27,8 +27,8 @@ I64 Sprite3DInterpolationChecks()
     MemSet(line1, 0, sizeof(line1));
     Sprite3DInterpolationSetLine(line0, 0, 0, 10, 0);
     Sprite3DInterpolationSetLine(line1, 20, 10, 30, 10);
-    line0[20] = SPT_END;
-    line1[20] = SPT_END;
+    line0[17] = SPT_END;
+    line1[17] = SPT_END;
     if (SpriteSize(line0) != sizeof(line0) ||
             SpriteSize(line1) != sizeof(line1))
         return 18;
@@ -116,7 +116,7 @@ I64 Sprite3DInterpolationChecks()
         mesh0[mesh_triangle_offset + i] = 0x20 + i;
         mesh1[mesh_triangle_offset + i] = 0x40 + i;
     }
-    mesh0[64] = mesh1[64] = SPT_END;
+    mesh0[61] = mesh1[61] = SPT_END;
     result = SpriteInterpolate(0.5, mesh0, mesh1);
     if (!result)
         return 12;

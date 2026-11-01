@@ -227,8 +227,8 @@ static int64_t LexString(CLexer *lex, int64_t till) {
       break;
     default:
     ins:
-      if (idx + 1 >= STR_LEN) {
-        LexErr(lex, "String exceedes STR_LEN chars.");
+      if (idx + 1 >= sizeof(lex->string)) {
+        LexErr(lex, "String exceedes lexer literal capacity.");
         return ERR;
       }
       lex->string[idx++] = chr1;
@@ -285,7 +285,8 @@ int64_t Lex(CLexer *lex) {
 re_enter:;
   int64_t chr1 = LexAdvChr(lex), chr2;
   int64_t has_base = 0, base = 10, integer = 0, decimal = 0, exponet = 0,
-          zeros = 0, idx = 0, old_flags, in_else;
+          zeros = 0, idx = 0, old_flags, in_else, in_macro_string,
+          macro_escape;
   FILE *f;
   char macro_name[STR_LEN];
   CHashDefineStr *define;
@@ -1052,7 +1053,24 @@ lex_ident: {
         define->base.type = HTT_DEFINE_STR;
         define->src_link = LexSrcLink(lex, NULL);
         idx = 0;
+        in_macro_string = macro_escape = 0;
         while (chr1 = LexAdvChr(lex)) {
+          /* Comment markers inside a quoted macro string are data. */
+          if (in_macro_string) {
+            lex->string[idx++] = chr1;
+            if (macro_escape)
+              macro_escape = 0;
+            else if (chr1 == '\\')
+              macro_escape = 1;
+            else if (chr1 == '"')
+              in_macro_string = 0;
+            continue;
+          }
+          if (chr1 == '"') {
+            in_macro_string = 1;
+            lex->string[idx++] = chr1;
+            continue;
+          }
           switch (chr1) {
             break;
           //
@@ -1385,7 +1403,9 @@ void LexTests() {
                                  "#define onion 1 \\ \n"
                                  "2 \\ \n"
                                  "3 \n"
-                                 "onion\n");
+                                 "onion\n"
+                                 "#define pathmask \"!*/Sup1/Sup1Words/*;!*/Sup1/Sup1Bin/*;\"\n"
+                                 "pathmask\n");
   assert(TK_NAME == Lex(lex));
   assert(HashFind("if", Fs->hash_table, HTT_KEYWORD, 1));
   assert(TK_NAME == Lex(lex));
@@ -1472,5 +1492,8 @@ void LexTests() {
   assert(lex->integer == 2);
   assert(TK_I64 == Lex(lex));
   assert(lex->integer == 3);
+  assert(TK_STR == Lex(lex));
+  assert(!strcmp(lex->string,
+                 "!*/Sup1/Sup1Words/*;!*/Sup1/Sup1Bin/*;"));
 }
 #endif

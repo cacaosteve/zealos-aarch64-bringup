@@ -1,0 +1,28 @@
+I64 StockGraphicsBridgeChecks()
+{
+    U8 pixels[16];
+    CDC dc;
+    I64 i;
+
+    MemSet(pixels, 0x11, sizeof(pixels));
+    MemSet(&dc, 0, sizeof(CDC));
+    dc.body = pixels;
+    dc.width_internal = 4;
+    dc.height = 4;
+    DCFill(&dc, 0x5A);
+    for (i = 0; i < sizeof(pixels); i++)
+        if (pixels[i] != 0x5A)
+            return 1;
+
+    mouse_grid.x = 1;
+    mouse_grid.y = 2;
+    mouse_grid.z = 3;
+    mouse_grid.snap = mouse_grid.show = mouse_grid.coord = TRUE;
+    GridInit;
+    if (mouse_grid.x != 8 || mouse_grid.y != 8 || mouse_grid.z != 8 ||
+        mouse_grid.x_speed != 1 || mouse_grid.y_speed != 1 ||
+        mouse_grid.z_speed != 1 || mouse_grid.snap || mouse_grid.show ||
+        mouse_grid.coord)
+        return 2;
+    return 42;
+}

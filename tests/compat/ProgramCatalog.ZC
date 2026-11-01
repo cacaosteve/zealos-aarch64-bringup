@@ -1,5 +1,6 @@
-// Compile original application entry points in disposable compiler namespaces.
-// CCF_JUST_LOAD suppresses top-level execution; success is not runtime acceptance.
+// Compile original source files in disposable compiler namespaces.
+// CCF_JUST_LOAD suppresses top-level execution; success is not runtime
+// acceptance.
 U0 StockCatalogServer(U8 *)
 {
     while (TRUE)
@@ -9,6 +10,38 @@ U0 StockCatalogServer(U8 *)
         LBts(&Fs->task_flags, TASKf_AWAITING_MESSAGE);
         Yield;
     }
+}
+
+I64 StockCatalogBFieldChecks()
+{
+    U8 bits[5] = {0xAC, 0x35, 0, 0, 0};
+    U8 set_bits[5] = {0, 0, 0, 0, 0};
+
+    if (BFieldExtU32(bits, 2, 9) != 0x16B)
+        return 0;
+    BFieldOrU32(set_bits, 3, 0x89ABCDEF);
+    if (BFieldExtU32(set_bits, 3, 32) == 0x89ABCDEF)
+        return 42;
+    return 0;
+}
+
+I64 StockCatalogExeDocFile(U8 *filename, I64 ccf_flags=0)
+{//Compile a source document with its inline DolDoc payloads intact.
+    CDoc *doc = DocRead(filename);
+    I64 result = 0;
+
+    if (!doc)
+        return 0;
+    try
+    {
+        result = ExeDoc(doc, ccf_flags);
+    }
+    catch
+    {
+        Fs->catch_except = TRUE;
+    }
+    DocDel(doc);
+    return result;
 }
 
 I64 StockCatalogCompile(U8 *path)
@@ -31,6 +64,282 @@ I64 StockCatalogCompile(U8 *path)
     result = JobResGet(job);
     Kill(task);
     return result == 42;
+}
+
+I64 StockCatalogNullCaseChecks()
+{//The original /Demo/NullCase.ZC relies on sequential implicit switch cases.
+    I64 i, seen = 0;
+    for (i = 0; i < 12; i++)
+        switch (i)
+        {
+            case: seen |= 1 << i; break;
+            case: seen |= 1 << i; break;
+            case: seen |= 1 << i; break;
+            case: seen |= 1 << i; break;
+            case 10: seen |= 1 << i; break;
+            case: seen |= 1 << i; break;
+        }
+    if (seen == 0xC0F)
+        return 42;
+    return seen;
+}
+
+I64 StockCatalogCompileDoc(U8 *path)
+{//Use the GUI document path so inline DolDoc sprite payloads are preserved.
+    CTask *task = Spawn(&StockCatalogServer);
+    CJob *job;
+    U8 *source;
+    I64 result;
+
+    if (!task)
+        return -1;
+    source = MStrPrint("StockCatalogExeDocFile(\"%Q\",CCF_JUST_LOAD);42;", path);
+    job = TaskExe(task, Fs, source, 0);
+    Free(source);
+    if (!job)
+    {
+        Kill(task);
+        return -2;
+    }
+    result = JobResGet(job);
+    Kill(task);
+    return result == 42;
+}
+
+I64 StockCatalogCompileWithMath(U8 *path)
+{//Some demos rely on Math.ZC functions that are absent from the raw task.
+    CTask *task = Spawn(&StockCatalogServer);
+    CJob *job;
+    U8 *source;
+    I64 result;
+
+    if (!task)
+        return -1;
+    source = MStrPrint("ExeFile2(\"/System/Math/Math.ZC\",CCF_JUST_LOAD);"
+                       "ExeFile2(\"/System/Sound.ZC\",CCF_JUST_LOAD);"
+                       "StockCatalogExeDocFile(\"%Q\",CCF_JUST_LOAD);42;", path);
+    job = TaskExe(task, Fs, source, 0);
+    Free(source);
+    if (!job)
+    {
+        Kill(task);
+        return -2;
+    }
+    result = JobResGet(job);
+    Kill(task);
+    return result == 42;
+}
+
+I64 StockCatalogCompileWithModules(U8 *path, U8 *module1, U8 *module2=NULL)
+{//Compile a Demo source with the stock modules it normally imports.
+    CTask *task = Spawn(&StockCatalogServer);
+    CJob *job;
+    U8 *source;
+    I64 result;
+
+    if (!task)
+        return -1;
+    if (module2)
+        source = MStrPrint("ExeFile2(\"%Q\",CCF_JUST_LOAD);"
+                           "ExeFile2(\"%Q\",CCF_JUST_LOAD);"
+                           "StockCatalogExeDocFile(\"%Q\",CCF_JUST_LOAD);42;",
+                           module1, module2, path);
+    else
+        source = MStrPrint("ExeFile2(\"%Q\",CCF_JUST_LOAD);"
+                           "StockCatalogExeDocFile(\"%Q\",CCF_JUST_LOAD);42;",
+                           module1, path);
+    job = TaskExe(task, Fs, source, 0);
+    Free(source);
+    if (!job)
+    {
+        Kill(task);
+        return -2;
+    }
+    result = JobResGet(job);
+    Kill(task);
+    return result == 42;
+}
+
+I64 StockCatalogCompileDocWithMath(U8 *path)
+{//Compile a DolDoc source with the stock Math and Sound modules in its task context.
+    CTask *task = Spawn(&StockCatalogServer);
+    CJob *job;
+    U8 *source;
+    I64 result;
+
+    if (!task)
+        return -1;
+    source = MStrPrint("ExeFile2(\"/System/Math/Math.ZC\",CCF_JUST_LOAD);"
+                       "ExeFile2(\"/System/Sound.ZC\",CCF_JUST_LOAD);"
+                       "StockCatalogExeDocFile(\"%Q\",CCF_JUST_LOAD);42;", path);
+    job = TaskExe(task, Fs, source, 0);
+    Free(source);
+    if (!job)
+    {
+        Kill(task);
+        return -2;
+    }
+    result = JobResGet(job);
+    Kill(task);
+    return result == 42;
+}
+
+I64 StockCatalogCompileDocWithGraphics(U8 *path)
+{//Load the stock 3D graphics modules that do not require x86 GrTextBase asm.
+    CTask *task = Spawn(&StockCatalogServer);
+    CJob *job;
+    U8 *source;
+    I64 result;
+
+    if (!task)
+        return -1;
+    source = MStrPrint("ExeFile2(\"/System/Math/Math.ZC\",CCF_JUST_LOAD);"
+                       "ExeFile2(\"/System/Sound.ZC\",CCF_JUST_LOAD);"
+                       "ExeFile2(\"/System/Gr/GrDC.ZC\",CCF_JUST_LOAD);"
+                       "ExeFile2(\"/System/Gr/GrMath.ZC\",CCF_JUST_LOAD);"
+                       "ExeFile2(\"/System/Gr/GrPrimatives.ZC\",CCF_JUST_LOAD);"
+                       "ExeFile2(\"/System/Gr/GrComposites.ZC\",CCF_JUST_LOAD);"
+                       "StockCatalogExeDocFile(\"%Q\",CCF_JUST_LOAD);42;", path);
+    job = TaskExe(task, Fs, source, 0);
+    Free(source);
+    if (!job)
+    {
+        Kill(task);
+        return -2;
+    }
+    result = JobResGet(job);
+    Kill(task);
+    return result == 42;
+}
+
+I64 StockCatalogCompileTreeCheckers()
+{//Its top-level size prompt defines these constants before the unit array.
+    CTask *task = Spawn(&StockCatalogServer);
+    CJob *job;
+    U8 *source;
+    I64 result;
+
+    if (!task)
+        return -1;
+    source = MStrPrint(
+        "ExeFile2(\"/System/Math/Math.ZC\",CCF_JUST_LOAD);"
+        "ExeFile2(\"/System/Sound.ZC\",CCF_JUST_LOAD);"
+        "DefinePrint(\"UNITS_NUM\",\"%%d\",64);"
+        "DefinePrint(\"CIRCLE_RAD\",\"%%d\",8);"
+        "DefinePrint(\"MOVE_CIRCLES\",\"%%d\",8);"
+        "DefinePrint(\"BORDER_X\",\"%%d\",0);"
+        "DefinePrint(\"BORDER_Y\",\"%%d\",0);"
+        "StockCatalogExeDocFile(\"/Demo/Games/TreeCheckers.ZC\","
+        "CCF_JUST_LOAD);42;");
+    job = TaskExe(task, Fs, source, 0);
+    Free(source);
+    if (!job)
+    {
+        Kill(task);
+        return -2;
+    }
+    result = JobResGet(job);
+    Kill(task);
+    return result == 42;
+}
+
+I64 StockCatalogCompileWithProgramModules(U8 *path)
+{//Load common stock dependencies before compiling a standalone Demo source.
+    CTask *task = Spawn(&StockCatalogServer);
+    CJob *job;
+    U8 *source;
+    I64 result;
+
+    if (!task)
+        return -1;
+    source = MStrPrint(
+        "ExeFile2(\"/System/Math/Math.ZC\",CCF_JUST_LOAD);"
+        "ExeFile2(\"/System/Sound.ZC\",CCF_JUST_LOAD);"
+        "ExeFile2(\"/System/Memory.ZC\",CCF_JUST_LOAD);"
+        "ExeFile2(\"/System/Utils/TaskRep.ZC\",CCF_JUST_LOAD);"
+        "ExeFile2(\"/System/Gr/GrDC.ZC\",CCF_JUST_LOAD);"
+        "ExeFile2(\"/System/Gr/GrMath.ZC\",CCF_JUST_LOAD);"
+        "ExeFile2(\"/System/Gr/GrPrimatives.ZC\",CCF_JUST_LOAD);"
+        "ExeFile2(\"/System/Gr/GrComposites.ZC\",CCF_JUST_LOAD);"
+        "U8 *CmdLinePrompt(){return StrNew(\"\\n\");}"
+        "ExeFile2(\"/Kernel/KernelA.HH\",CCF_JUST_LOAD);"
+        "ExeFile2(\"/Compiler/CompilerA.HH\",CCF_JUST_LOAD);"
+        "CCompGlobals cmp;"
+        "ExeFile2(\"/Compiler/CompilerB.HH\",CCF_JUST_LOAD);"
+        "extern U0 ParseStreamBlk(CCompCtrl *cc);"
+        "ExeFile2(\"/Compiler/LexLib.ZC\",CCF_JUST_LOAD);"
+        "ExeFile2(\"/Compiler/Lex.ZC\",CCF_JUST_LOAD);"
+        "ExeFile2(\"/System/Gr/SpriteNew.ZC\",CCF_JUST_LOAD);"
+        "ExeFile2(\"/System/Gr/SpriteCode.ZC\",CCF_JUST_LOAD);"
+        "ExeFile2(\"/System/Gr/ScreenCast.ZC\",CCF_JUST_LOAD);"
+        "ExeFile2(\"/Apps/Psalmody/JukePuppet.ZC\",CCF_JUST_LOAD);"
+        "StockCatalogExeDocFile(\"%Q\",CCF_JUST_LOAD);42;", path);
+    job = TaskExe(task, Fs, source, 0);
+    Free(source);
+    if (!job)
+    {
+        Kill(task);
+        return -2;
+    }
+    result = JobResGet(job);
+    Kill(task);
+    return result == 42;
+}
+
+I64 StockCatalogMathChecks()
+{//Exercise the ARM64 Math.ZC overlay in an isolated namespace.
+    CTask *task = Spawn(&StockCatalogServer);
+    CJob *job;
+    U8 *source;
+    I64 result;
+
+    if (!task)
+        return -1;
+    source = MStrPrint(
+        "ExeFile2(\"/System/Math/Math.ZC\");"
+        "if (Abs(ASin(0.5)-0.52359877559829887308)>0.00001) 11;"
+        "if (Abs(Cosh(0.0)-1.0)>0.00001) 12;"
+        "if (Abs(ACos(1.0))>0.00001) 13;"
+        "if (Abs(Saw(0.5,2.0)-0.25)>0.00001) 14;"
+        "if (Abs(Saw(-0.5,2.0)-0.75)>0.00001) 15;"
+        "if (Saw(2.0,0.0)!=0.0) 16;"
+        "if (Abs(Saw(0.5,1.0)-0.5)>0.00001 || "
+        "Abs(Saw(-0.5,1.0)-0.5)>0.00001) 30;"
+        "if (Abs(FullSaw(0.5,1.0))>0.00001) 31;"
+        "if (Abs(Caw(0.5,1.0)-0.5)>0.00001) 32;"
+        "if (Abs(FullCaw(0.5,1.0))>0.00001) 33;"
+        "if (Abs(Tri(0.25,1.0)-0.5)>0.00001 || "
+        "Abs(Tri(0.75,1.0)-0.5)>0.00001 || Tri(0.5,0.0)!=0.0) 34;"
+        "if (Abs(FullTri(0.125,1.0)-0.5)>0.00001 || "
+        "Abs(FullTri(0.625,1.0)+0.5)>0.00001) 35;"
+        "if (Abs(Arm64Tri(0.25,1.0)-0.5)>0.00001 || "
+        "Abs(Arm64Tri(0.75,1.0)-0.5)>0.00001) 19;"
+        "if (Abs(Arm64FullTri(0.125,1.0)-0.5)>0.00001 || "
+        "Abs(Arm64FullTri(0.625,1.0)+0.5)>0.00001) 20;"
+        "if (Abs(Arm64Log2(8.0)-3.0)>0.00001 || "
+        "Abs(Arm64Log2(0.5)+1.0)>0.00001) 21;"
+        "if (MinI64(-9,4)!=-9 || MinI64(4,-9)!=-9 || "
+        "MinI64(4,9)!=4 || MinI64(-4,-9)!=-9) 23;"
+        "if (MaxI64(-9,4)!=4 || MaxI64(4,-9)!=4 || "
+        "MaxI64(4,9)!=9 || MaxI64(-4,-9)!=-4) 24;"
+        "if (MinU64(0,9)!=0 || MinU64(9,0)!=0 || "
+        "MinU64(4,9)!=4) 25;"
+        "if (MaxU64(0,9)!=9 || MaxU64(9,0)!=9 || "
+        "MaxU64(4,9)!=9) 26;"
+        "if (Arm64Sign(4.0)!=1.0 || Arm64Sign(-4.0)!=-1.0 || "
+        "Arm64Sign(0.0)!=0.0) 22;"
+        "if (Arm64Blink(0.0)) 18;"
+        "42;");
+    job = TaskExe(task, Fs, source, 0);
+    Free(source);
+    if (!job)
+    {
+        Kill(task);
+        return -2;
+    }
+    result = JobResGet(job);
+    Kill(task);
+    return result;
 }
 
 // Some stock entry files rely on top-level setup (RegDefault/DefinePrint).
@@ -99,6 +408,39 @@ I64 StockCatalogPsalmodyNoteMathChecks()
         "music.note_map[0]!=0 || music.note_map[6]!=10 || "
         "music.meter_top!=4 || music.meter_bottom!=4) 12;"
         "42;");
+    job = TaskExe(task, Fs, source, 0);
+    Free(source);
+    if (!job)
+    {
+        Kill(task);
+        return -2;
+    }
+    result = JobResGet(job);
+    Kill(task);
+    return result;
+}
+
+I64 StockCatalogPsalmodySpriteSizeChecks()
+{//Every embedded duration sprite must have a complete bounded record stream.
+    CTask *task = Spawn(&StockCatalogServer);
+    CJob *job;
+    U8 *source;
+    I64 result;
+
+    if (!task)
+        return -1;
+    source = MStrPrint(
+        "Cd(\"/Apps/Psalmody\");;\n"
+        "#include \"Load.ZC\"\n"
+        "I64 PsalmodyDurationSpriteSizes(){I64 i,size=0,caught;"
+        "if(sprite_elem_base_sizes[SPT_LINE]!=17 || "
+        "sprite_elem_base_sizes[SPT_POLYLINE]!=5) return 10;"
+        "if(SpriteElemSize(psm_duration_imgs[4],SPT_LINE)!=17) return 11;"
+        "for(i=0;i<PSM_DURATIONS_NUM;i++){caught=0;"
+        "try{size=SpriteSize(psm_duration_imgs[i]);}"
+        "catch{caught=Fs->except_ch;Fs->catch_except=TRUE;}"
+        "if(caught)return 100+i;if(size<1)return 200+i;}return 42;}"
+        "PsalmodyDurationSpriteSizes();");
     job = TaskExe(task, Fs, source, 0);
     Free(source);
     if (!job)

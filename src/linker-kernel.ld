@@ -49,7 +49,9 @@ SECTIONS
 
     . = ALIGN(CONSTANT(MAXPAGESIZE));
 
-    .jit : {
+    /* JIT code is written at runtime; reserve executable RAM without storing
+     * the zero-filled arena in the kernel image or ISO. */
+    .jit (NOLOAD) : {
         KEEP(*(.jit))
         . = ALIGN(CONSTANT(MAXPAGESIZE));
     } :jit

@@ -9,11 +9,18 @@ where the hardware path applies, Raspberry Pi 4B.
 
 ## Scope and counting rules
 
-The pinned `Apps` tree has 12 top-level application directories and 70 `.ZC`
-files. The pinned `Demo` tree has 206 `.ZC` files in 16 source directories.
-The mirror also contains documents, templates, data and binary resources.
-These are file counts, not counts of independently launchable programs:
-`Load.ZC`, `Run.ZC`, helpers and examples all contribute source files.
+The pinned source mirror now contains all 778 files under upstream `src` at
+the tracked commit, including all 615 `.ZC` files: 70 under `Apps`, 206 under
+`Demo`, and 339 across `Compiler`, `HomeSys.ZC`, `Kernel`, `Once.ZC`, `System`
+and other roots. This includes the 262 `.ZC` files that were previously
+missing, plus their source-tree documents, data, and examples. The ISO source
+bundle now packages 991 entries, including ARM64 overlays and generated
+support files; its expanded source partition uses 13,763 of 65,536 sectors.
+The `Apps` tree has 12 top-level application directories; `Demo` has 16 source
+directories. These are file counts, not counts of independently launchable
+programs: `Load.ZC`, `Run.ZC`, shared services, helpers and examples all
+contribute source files. Many files outside `Apps` and `Demo` are core
+OS/compiler code rather than standalone programs.
 
 The Demo names below are an exhaustive file-derived inventory of `.ZC` sources.
 They still need to be classified as standalone programs, reusable modules,
@@ -45,29 +52,128 @@ table. Vocabulary's new PCI runtime probe launches the quiz, displays its
 dictionary content, accepts a numbered answer and advances, then exits with
 Escape to a terminal whose `40+2;` expression returns 42. This does not yet
 visually validate the short-lived answer feedback or dictionary popup. Focused
-graphical QEMU probes verified Span's bridge frame,
-Shift+Escape cleanup, and terminal recovery, plus Strut's help, mass-placement
+graphical QEMU probes verified Psalmody's editor, note entry, playback call,
+Shift+Escape and terminal recovery; Span's bridge frame, editing,
+Shift+Escape cleanup and terminal recovery; and Strut's help, mass-placement
 frame change, play-mode switch, Escape, and terminal recovery (`40+2;` -> 42).
-A ToTheFront GUI launch now displays and accepts text in the seed popup after
-popup-server stdout is routed into its DolDoc. The subsequent player-type
-picker shows its title and AI-directory guidance, but no choices in scanout;
-gameplay acceptance is still blocked on that selector.
+A ToTheFront GUI launch displays and accepts text in the seed popup after
+popup-server stdout is routed into its DolDoc. The PCI runtime probe now
+selects both player types, dismisses the help popup, verifies the generated
+map, selects a visible artillery unit, confirms its range indicator, plots an
+order into an adjacent hex, advances the phase with Space, and exits cleanly
+to a terminal where `40+2;` returns 42. The phase gate checks visible scanout
+and map pixels rather than comparing OCR strings for graphics text. Unit
+movement/direct fire, broader AI play, and live UTM behavior remain unverified.
+
+On 2026-10-31, a refreshed source catalog compiled all 12 named app entry
+points. The dependency-aware Demo catalog covers all 206 upstream `.ZC`
+sources in a fresh full PCI QEMU sweep. `/Demo/NullCase.ZC` and all three ToHtmlToTXTDemo generator sources were
+rechecked after the parser/resource fixes. HtmlGen compiles via normal file
+loading so its relative include resolves; TXTGen compiles after loading the
+stock ToTXT module. The latest full source catalog shows 168 compiled and 38 blocked out of 206. The lexer now preserves comment markers in quoted `#define` strings, fixing the stock `HomeWrappers.ZC` file-mask macro; loading `/System/Utils/Find.ZC` supplies its required `Find` routine. Loading stock dependencies also lets TOSTheme, InSetIP, UnusedSpaceRep, UnusedDefine, and SerializeTree compile in the isolated probe. Expanding the lexer literal buffer allows the long literals in `MemDemo.ZC` and `WaterFowl.ZC` to compile. `SpriteText.ZC` now compiles with the isolated probe’s compiler and sprite module setup. `PhoneNumWords.ZC` also compiles after changing its A–Z digit lookup to a 26-element explicit initializer in the ARM64 overlay. The `SysRep.ZC` ARM64 overlay removes x86 CPUID-specific reporting; `AndNotMod.ZC` and `FixedPoint.ZC` now compile with the stock `SysRep` and `CPURep` modules. `HomeSys.ZC` advances to a separate unresolved `sys_compile_time` runtime global.
+FlatTops now compiles when its isolated source context loads the stock `GrDC`,
+`GrMath`, `GrPrimatives`, and `GrComposites` modules; its upstream source is
+unchanged. TreeCheckers also compiles in an isolated context with its required
+constants and stock Math/Sound modules. The ARM64 bridge now provides the stock
+`Blink(F64 Hz=2.5)` API. CharAnimation,
+outside the Demo tree, also compiled with its required stock `Memory.ZC` and
+`Utils/TaskRep.ZC` modules. The 2026-10-31 system-launch runtime gate also
+passes numeric checks for the original `Log10` import. ToHtml's large generated
+code now fits the 96 MiB executable arena; the linker reserves that zeroed
+arena in RAM, keeping the ISO small. The enlarged data/code arenas and
+recovery copies reserve about 448 MiB of RAM; the QEMU image boots with 1 GiB,
+but physical Pi validation is still needed for this memory footprint.
+The graphics probes found missing ARM64 bridge services: `GridInit`, `DCFill`,
+and `TextPrint`. Grid and MouseDemo also needed ARM64 overlays to pass `gr.dc`
+explicitly to `GrPlot`; the default first argument is not carried into the
+isolated source loader. Both compile in the broad sweep.
+`TaskBridge.ZC` now provides these with upstream defaults or
+equivalent rendering behavior, and `StockGraphicsBridgeChecks` validates
+`GridInit` and `DCFill` on the rebuilt ISO, returning
+`0x2a`. WebLogRep
+remains blocked when its `#if __CMD_LINE__` expands the unsupported `#exe{}`
+form. Blocked does not always mean a language or backend defect: some files
+need additional module context, hardware services, or architecture-specific
+assembly. The ARM64 bridge now supplies the pure `Saw`, `FullSaw`, `Caw`,
+`FullCaw`, `Tri`, and `FullTri` math helpers from the stock Sound module; their
+numeric checks pass, while audio output remains unsupported.
+The source compiler now accepts the stock HolyC
+`I0` zero-width return type using the same no-value ABI as `U0`; this lets the
+unchanged `/Demo/Graphics/32BitColor.ZC` and `32BitPaint.ZC` sources compile.
+Many other compile failures are missing source dependencies or
+architecture-specific symbols, while some are genuine language/backend gaps. Runtime
+probes passed for Digital Logic, ToTheFront, Span, Strut, TimeClock, Vocabulary
+and Psalmody. Two fresh X-Caliber PCI probes reached gameplay but then timed
+out waiting for guest command responses. Their Left and Right scanout checks
+showed no reliable response, and Escape did not restore the terminal. An
+earlier probe saw a Left response (`idle_diff=2`, `left_diff=39`), so input
+behavior remains inconsistent and unaccepted. Space firing remains
+unverified. The current catalog is
+`build/demo-source-catalog.json`; 206 counts source files, including modules
+and architecture-specific samples, not standalone apps.
+
+A system-context probe on 2026-10-30 compiled the original Box, Mandel, Hanoi,
+Doodle, BattleLines and DataBase sources in the booted ZealC environment. The
+pinned upstream `System/Debug.ZC` now supplies its stock `ClassRep` and
+`ClassRepD` services during graphics startup. Its ARM64 source overlay renames
+the reserved `offset` parameter and limits boot loading to the portable
+structure-report functions; the later x86 disassembly/register helpers remain
+unported. The AArch64 compiler now allows the stock `MinI64` intrinsic, whose
+compare/select implementation was already present in the backend. This is
+compile evidence for DataBase, not acceptance of its on-disk database workflow.
+The probe is recorded in the ignored build artifact
+`build/demo-system-context-catalog.json`; this small sample is not a complete
+Demo compile census. Graphics startup reaches the desktop with these services
+loaded. The broader demo-basics run passed Print, DateTime and RadixSort, then
+hit a graphical input mismatch while entering SubIntAccess; that gate needs
+repair before it can be counted as passing on this build.
+
+On 2026-10-31, the strict PCI program catalog reproduced an unresolved call in
+`StockCatalogMathChecks`. Temporary stage markers localized it to the first
+`MinI64` assertion; the reported `Arm64ClampU64` function name was misleading.
+The bridge already bound `MaxI64`, but not `MinI64`, `MinU64`, or `MaxU64`, so
+the source-backed compiler treated those stock `_intern` functions as external
+calls. The runtime now binds all four signed/unsigned integer min/max functions
+to width-correct host implementations. A rebuilt ISO now passes the complete
+`python3 scripts/check-compat.py --pci --probe-program-catalog` gate, including
+the Math and Psalmody runtime checks and compilation of all 12 named app entry
+points. The temporary stage markers were removed.
+
+The 2026-10-30 multicore compatibility pass adds both stock HolyC lock forms
+(`lock { ... }` and `lock expression;`) to the AArch64 parser/backend path. A
+focused compile scan now passes the original `Demo/MultiCore/Lock.ZC`,
+`MPAdd.ZC`, `Palindrome.ZC`, and `Primes.ZC`; `Primes` uses the cache-line
+width read from `CTR_EL0`. `LockBlockRuntime()` also returns `0x2a` in the
+guest. This verifies syntax and the single-thread atomic operation, not true
+cross-core exclusion: the current ARM64 guest still reports one CPU, so
+`LockBlockConcurrentRuntime()` and the stock jobs targeting CPUs 0 and 1 are
+not accepted as multicore runtime behavior.
+
+On 2026-10-31, `python3 scripts/check-compat.py --pci --probe-demo-basics`
+passed in PCI QEMU. It launched the original Print, DateTime, RadixSort,
+SubIntAccess, SubSwitch and NullCase demos through the graphical terminal,
+checked number formatting and date fields, verified all 16 RadixSort output
+values equal the sorted input table, checked all four subinteger examples,
+all six SubSwitch branches, all six NullCase labels, and confirmed a subsequent
+`40+2;` returns 42. See
+[`acceptance/demo-runtime-basics-2026-10-31.json`](acceptance/demo-runtime-basics-2026-10-31.json).
 
 | Program/group | Evidence now available | Next acceptance gap |
 |--|--|--|
 | Doodle, Mass Spring, Game of Life | User confirmed live UTM drawing/simulation and Escape recovery. | Retest only if shared graphics/input code changes. |
 | Digital Logic | User confirmed corrected AND workflow in live UTM; PCI workflow covers editing, setup aborts, drawing and recovery. | Retest only if shared prompt/document code changes. |
 | Budget | PCI workflow covers form editing, save/reopen and cold persistence; menu-fix image has automated coverage. | Live UTM retest of the corrected menu/form image. |
-| GrModels | PCI workflow covers Man/Ball forms and mesh generation. Live UTM reaches `Vertices:58` and the repeat prompt after choosing a color. QEMU diagnostics confirm an embedded `DOCT_SPRITE` entry with binary data; an automated scanout assertion finds 663 purple pixels for the generated Ball inline in the document. The user reports no sprite visible in UTM; do not count it as visually accepted yet. | Reproduce the missing UTM sprite; determine whether it is hidden/offscreen, low contrast, or a renderer/presentation difference, then verify a clearly visible sprite and Escape/recovery. At the repeat prompt choose `n` to return. |
+| GrModels | The 2026-10-31 PCI rerun passed Man/Ball forms and mesh generation. QEMU diagnostics confirm an embedded `DOCT_SPRITE` entry with binary data; the fresh scanout assertion found 643 purple pixels for the generated Ball inline in the document. Live UTM reaches `Vertices:58` and the repeat prompt, but the user did not see a sprite; visual UTM acceptance remains open. The screenshot does not establish the selected swatch, and UTM uses `virtio-ramfb` while the gate uses plain `ramfb`. | Reproduce with the gate's bright purple swatch under UTM's display path, confirm visible output, then choose `n` and verify Escape recovery. |
+| KeepAway | PCI workflow covers gameplay, Space/mouse input, Escape and shell recovery. A fresh 183-second run on the rebuilt ISO keeps scanout active through game-over and Escape recovery, then returns to a working terminal. Live UTM gameplay initially advances and the player follows the pointer, but the user reports a later guest freeze with input unresponsive. | Retest the live UTM freeze against the rebuilt ISO; ARM64 speaker effects are silent. |
 | KeepAway | PCI workflow covers gameplay, Space/mouse input, Escape and shell recovery. Live UTM gameplay initially advances and the player follows the pointer, but the user reports a later guest freeze with input unresponsive. | Reproduce and diagnose the live UTM freeze; ARM64 speaker effects are silent. |
 | Titanium | Live UTM confirms gameplay, Space firing, Escape recovery, and ordinary Left/Right movement on ISO `219d751c…`. The VirtIO keyboard bridge updates merged and raw scan-code bitmaps; QEMU confirms arrow movement and Escape recovery to a terminal where `40+2;` returns 42. | ARM64 speaker effects are silent. |
-| Psalmody | Normal loader and app compile pass; catalog regression checks note/octave conversion helpers and default shared music state. | ARM64 audio path and interactive song editing/playback. |
-| Span | QEMU graphical entry/help/frame, Shift+Escape cleanup, worker cleanup, and shell recovery pass. | Live UTM bridge editing and save workflow. |
-| Strut | QEMU help, mass placement/frame change, Space play-mode switch, Escape, and shell recovery pass. | Live UTM editing/play behavior; ship save/reopen workflow. |
-| TimeClock | App compile, date/time formatter gates, and automated punch-in/out record write/read plus report-state round-trip pass. CMOS register access stays unavailable. | Exercise interactive punch-in/out entry in QEMU/UTM. |
-| ToTheFront | Compile and normal load pass after ARM64 pointer-add address generation and guarded source overlays for its sentinel, pure timing helpers, and runtime-sized map clears. Popup text now displays in its own window. The player-type picker renders its title and AI-directory guidance, but no selectable entries are visible. | Diagnose AI picker choices/data, then exercise map initialization, turns, drawing, input, and AI in QEMU/UTM. |
+| Psalmody | PCI graphical probe enters the editor, accepts a note, exercises playback, and returns with Shift+Escape to a working terminal. | ARM64 audio output is silent; audible playback remains unsupported. Live UTM editor acceptance remains open. |
+| Span | QEMU graphical entry/help/frame, bridge editing, Shift+Escape cleanup, worker cleanup, and shell recovery pass; rerun on 2026-10-30. | Live UTM bridge editing and save workflow. |
+| Strut | QEMU help, mass placement/frame change, Space play-mode switch, Escape, and shell recovery pass; rerun on 2026-10-30. | Live UTM editing/play behavior; ship save/reopen workflow. |
+| TimeClock | App compile, date/time formatter gates, and automated punch-in/out record write/read plus report-state round-trip pass. The graphical QEMU probe loads the stock app, submits both descriptions through `StrGet`, reads them back with `TimeRep;`, and recovers to a terminal where `40+2;` returns 42. The red `IN`/`OUT` report labels are below the probe's monochrome OCR threshold, so the probe asserts the saved descriptions instead. CMOS register access stays unavailable. | Verify report labels and clock behavior in live UTM; CMOS hardware clock access remains unavailable. |
+| ToTheFront | ARM64 source overlay fixes the Human player's indirect-fire unit-count loop; the stock `i > UNITS_NUM` condition skipped the artillery order phase. PCI runtime probe selects both player types, displays/dismisses help, renders the generated map, selects artillery and sees its range indicator, plots an order into an adjacent hex, advances a phase with Space, and returns through Escape to a working terminal (`40+2;` -> 42). | Exercise unit movement/direct fire, view controls and broader AI behavior in QEMU, then verify setup and turn flow live in UTM. |
 | Vocabulary | The PCI runtime probe launches `/Apps/Vocabulary/Run.ZC`, displays dictionary question content, accepts a numbered answer and advances, then Escape restores a terminal where `40+2;` returns 42. The autocomplete gate covers the bundled `ACDefs.DATA`/`ACWords.DATA`, boot indexing (`COMPUTER`), `ACDDefGet("Computer")`, completion popup startup and fixture completion. | Visually verify answer feedback and definition popup; check sound separately (ARM64 audio remains silent). |
-| X-Caliber | Normal loader and app entry compile. | Runtime behavior, controls and data persistence. |
+| X-Caliber | ARM64 `Freq2Ona`/`Ona2Freq` bindings resolve startup conversion calls. A generated-source overlay removes the stale task-ODE comparison that hid the scene. The GUI-terminal launcher now builds a visible, focused X-Caliber task; QEMU reaches the first-run help, starts gameplay, and confirms focus. In the latest focused-task probe, Left and Right produced no measurable ship motion, Space firing was inconclusive, and Escape did not restore the terminal. | Diagnose routed keyboard-message consumption, then retest Left/Right, Space and Escape recovery in QEMU and live UTM. |
 
 The primary current named-app tracker is [PROGRAMS.md](../PROGRAMS.md). The
 latest Titanium automated result is stronger than the earlier status recorded
@@ -87,11 +193,13 @@ actual UTM environment.
 
 ### 2. Finish remaining named Apps by shared dependency
 
-1. **Forms and storage:** Span and Strut first (shared control-button/form
-   work), then TimeClock and X-Caliber (clock/registry/persistence). Reuse the
-   Budget form and cold-boot gates where applicable.
-2. **Compiler and bundled data:** run ToTheFront's newly compiling game and resolve any runtime blockers;
-   initialize Vocabulary's already-bundled dictionary/index and exercise its quiz.
+1. **Forms and storage:** Span and Strut pass their QEMU edit/play and exit
+   gates; next verify their save workflows in UTM, then focus TimeClock and
+   X-Caliber (clock/registry/persistence). Reuse the Budget form and cold-boot
+   gates where applicable.
+2. **Compiler and bundled data:** ToTheFront's setup/map/turn runtime probe and
+   Vocabulary's quiz/index checks pass in QEMU; verify UTM behavior and expand
+   ToTheFront to unit selection/movement, firing, view controls and AI.
    Keep compiler support separate from app-data availability so failures are easy to attribute.
 3. **Audio and music:** add a bounded ARM64 audio service, then complete
    Psalmody note conversion/playback and the Sound demos. A silent no-op hook

@@ -24,6 +24,7 @@ typedef struct CLexFile {
   const char *(*port_dir)(void); // Current task directory for command input.
 } CLexFile;
 #define STR_LEN 144
+#define LEX_STRING_MAX 2048
 typedef struct CLexer {
   CLexFile *file;
   //
@@ -33,7 +34,7 @@ typedef struct CLexer {
   union {
     int64_t integer;
     double flt;
-    char string[STR_LEN * 6];
+    char string[LEX_STRING_MAX];
   };
   //
   // Sometimes we are lexing and want to go back a charactor
@@ -467,7 +468,7 @@ CHashClass *PrsClassNew();
 char *PrsArray(CCmpCtrl *ccmp, CHashClass *base, CArrayDim *dim,
                char *write_to, int allow_implicit_open);
 int64_t PrsFunArgs(CCmpCtrl *ccmp, CHashFun *fun);
-int64_t PrsArrayDim(CCmpCtrl *ccmp, CArrayDim *to);
+int64_t PrsArrayDim(CCmpCtrl *ccmp, CArrayDim *to, int allow_infer);
 double PrsF64(CCmpCtrl *ccmp);
 int64_t PrsI64(CCmpCtrl *ccmp);
 int64_t _PrsStmt(CCmpCtrl *ccmp);

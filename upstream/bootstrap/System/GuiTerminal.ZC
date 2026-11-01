@@ -465,8 +465,8 @@ Bool BootstrapGuiTerminalPaintEscape(U8 *command, I64 *command_len,
     return TRUE;
 }
 
-U0 BootstrapGuiTerminalTitaniumTask(U8 *filename)
-{//Run the blocking game input loop on a schedulable application task.
+U0 BootstrapGuiTerminalGameTask(U8 *filename)
+{//Run blocking game input loops on schedulable, focused application tasks.
     Fs->win_inhibit = WIG_USER_TASK_DEFAULT;
     BootstrapGuiTerminalUserStartUp();
     if (!LBts(&Fs->display_flags, DISPLAYf_SHOW))
@@ -483,15 +483,18 @@ U0 BootstrapGuiTerminalTitaniumTask(U8 *filename)
 U0 BootstrapGuiTerminalRunLightProgram(U8 *filename)
 {//These original programs use black ink against ZealOS's light task surface.
     CTask *app_task;
+    U8 *title;
 
-    // Titanium waits for a key before it enters its game loop. Launch it as
-    // a normal guest task so that KeyGet/Yield can schedule the input path;
-    // running it inline from a WinMgr frame leaves the frame on the root
-    // stack and prevents the focused task from consuming the key event.
-    if (!StrCompare(filename, "/Apps/Titanium/Run.ZC"))
+    // Titanium and X-Caliber use blocking interactive loops. Launch them as
+    // normal guest tasks so KeyGet/MessageScan can run with an independent,
+    // visible window instead of holding the WinMgr frame on the root stack.
+    if (!StrCompare(filename, "/Apps/Titanium/Run.ZC") ||
+        !StrCompare(filename, "/Apps/X-Caliber/Run.ZC"))
     {
-        app_task = Spawn(&BootstrapGuiTerminalTitaniumTask, filename,
-                         "Titanium", -1, Fs);
+        title = "X-Caliber";
+        if (!StrCompare(filename, "/Apps/Titanium/Run.ZC"))
+            title = "Titanium";
+        app_task = Spawn(&BootstrapGuiTerminalGameTask, filename, title, -1, Fs);
         if (!TaskValidate(app_task))
             return;
         app_task->display_flags = 1 << DISPLAYf_SHOW;
@@ -538,6 +541,11 @@ U8 *BootstrapGuiTerminalMenuSource(I64 action)
 U0 BootstrapGuiTerminalTitaniumRun()
 {//Keep the menu action and command-line acceptance path identical.
     BootstrapGuiTerminalRunLightProgram("/Apps/Titanium/Run.ZC");
+}
+
+U0 BootstrapGuiTerminalXCaliberRun()
+{//Run the blocking game loop as a visible, focused application task.
+    BootstrapGuiTerminalRunLightProgram("/Apps/X-Caliber/Run.ZC");
 }
 
 U8 *BootstrapGuiTerminalMenuAction(I64 action)

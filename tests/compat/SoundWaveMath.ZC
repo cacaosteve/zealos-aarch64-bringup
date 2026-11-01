@@ -1,0 +1,20 @@
+// Pure waveform helpers from the stock Sound.ZC must work without audio I/O.
+I64 SoundWaveMathChecks()
+{
+    if (Saw(0.5, 1.0) != 0.5 || Saw(-0.5, 1.0) != 0.5)
+        return 1;
+    if (FullSaw(0.5, 1.0) != 0.0 || FullSaw(-0.5, 1.0) != 0.0)
+        return 2;
+    if (Caw(0.5, 1.0) != 0.5 || Caw(-0.5, 1.0) != 0.5)
+        return 3;
+    if (FullCaw(0.5, 1.0) != 0.0 || FullCaw(-0.5, 1.0) != 0.0)
+        return 4;
+    if (Tri(0.25, 1.0) < 0.499 || Tri(0.25, 1.0) > 0.501 ||
+        Tri(0.75, 1.0) < 0.499 || Tri(0.75, 1.0) > 0.501 ||
+        Tri(0.5, 0.0) != 0.0)
+        return 5;
+    if (FullTri(0.125, 1.0) < 0.499 || FullTri(0.125, 1.0) > 0.501 ||
+        FullTri(0.625, 1.0) < -0.501 || FullTri(0.625, 1.0) > -0.499)
+        return 6;
+    return 0x2a;
+}

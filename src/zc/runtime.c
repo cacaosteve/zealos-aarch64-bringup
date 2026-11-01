@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 #include "doc_bytes.h"
 
 int64_t TempleOS_CallNOnStack(uint64_t stack_top, void (*fptr)(),
@@ -108,8 +109,8 @@ extern int64_t zc_tablet_sample(void);
 
 /* Separate arenas from legacy hc_* so its per-demo reset cannot invalidate
  * modules loaded here. Both use splitting/coalescing and arbitrary-order Free. */
-#define DATA_BYTES (96u * 1024u * 1024u)
-#define CODE_BYTES (16u * 1024u * 1024u)
+#define DATA_BYTES (128u * 1024u * 1024u)
+#define CODE_BYTES (96u * 1024u * 1024u)
 #define BLOCK_MAGIC 0x5a43424c4f434b31ull
 struct block {
     uint64_t magic;
@@ -351,6 +352,7 @@ static uint32_t guest_mesh_overlay_sample_rgba;
 static uint32_t guest_mesh_overlay_sample_scanout;
 static void set_guest_task(void *p);
 static int64_t guest_mp_count = 1;
+static int64_t guest_sys_cache_line_width = 64;
 static void *guest_cpu_structs;
 static void *guest_kbd_state;
 static void *guest_autocomplete_state;
@@ -387,9 +389,21 @@ static uint64_t guest_keyboard_route_polls;
 static uint64_t guest_keyboard_route_reads;
 static uint64_t guest_keyboard_route_posts;
 static uint64_t guest_keyboard_route_drops;
+static uint64_t guest_host_message_scan_calls;
+static uint64_t guest_host_key_scan_calls;
+static uint64_t guest_host_key_get_calls;
+static uint64_t guest_host_put_key_calls;
+static int64_t guest_host_put_key_last_char;
+static int64_t guest_host_put_key_last_task;
+static int guest_host_put_key_last_doc_active;
 static int64_t guest_keyboard_route_last_type;
 static int64_t guest_keyboard_route_last_arg1;
 static int64_t guest_keyboard_route_last_arg2;
+static uint64_t guest_message_scan_key_hits[GUEST_TASKS][2];
+static int64_t guest_message_scan_last_consumer;
+static int64_t guest_message_scan_last_code;
+static int64_t guest_message_scan_last_arg1;
+static int64_t guest_message_scan_last_arg2;
 static int64_t guest_parent_off, guest_number_off, guest_name_off, guest_flags_off;
 static int64_t guest_gs_off;
 static int64_t guest_display_flags_off;
@@ -1391,6 +1405,31 @@ static int64_t host_ceil(int64_t *a) {
         bits += mask;
     return (int64_t)(bits & ~mask);
 }
+static int64_t host_floor(int64_t *a) {
+    uint64_t bits = (uint64_t)a[0];
+    unsigned exp = (unsigned)((bits >> 52) & 0x7ff);
+    uint64_t magnitude = bits & UINT64_C(0x7fffffffffffffff);
+    /* Preserve integral values, infinities, and NaN payloads. */
+    if (exp >= 1023 + 52 || !magnitude)
+        return (int64_t)bits;
+    if (exp < 1023)
+        return (int64_t)((bits >> 63) ? UINT64_C(0xbff0000000000000) : 0);
+    uint64_t mask = (UINT64_C(1) << (1023 + 52 - exp)) - 1;
+    if (!(bits & mask))
+        return (int64_t)bits;
+    if (bits >> 63)
+        bits += mask;
+    return (int64_t)(bits & ~mask);
+}
+static int64_t host_sign_f64(int64_t *a) {
+    uint64_t bits = (uint64_t)a[0];
+    uint64_t magnitude = bits & UINT64_C(0x7fffffffffffffff);
+    if (!magnitude || ((magnitude >> 52) == 0x7ff &&
+                       (magnitude & UINT64_C(0x000fffffffffffff))))
+        return 0;
+    return (int64_t)((bits >> 63) ? UINT64_C(0xbff0000000000000)
+                                  : UINT64_C(0x3ff0000000000000));
+}
 static int64_t host_exp(int64_t *a) {
     return (int64_t)hc_builtin_exp((uint64_t)a[0]);
 }
@@ -1454,6 +1493,10 @@ static int64_t host_ln(int64_t *a) {
         sum += term / (double)n;
     }
     return (int64_t)host_f64_to_bits(2.0 * sum + exponent * 0x1.62e42fefa39efp-1);
+}
+static int64_t host_log10(int64_t *a) {
+    double value = host_f64_from_bits((uint64_t)host_ln(a));
+    return (int64_t)host_f64_to_bits(value * 0x1.bcb7b1526e50ep-2);
 }
 static double host_sqrt_value(double value) {
     return host_f64_from_bits(hc_builtin_sqrt(host_f64_to_bits(value)));
@@ -1729,6 +1772,40 @@ static int64_t host_compare(int64_t *a) {
     return memcmp((const void *)(uintptr_t)a[0],
                   (const void *)(uintptr_t)a[1], (size_t)a[2]);
 }
+static unsigned char host_ascii_upper(unsigned char c) {
+    return c >= 'a' && c <= 'z' ? (unsigned char)(c - ('a' - 'A')) : c;
+}
+static int64_t host_str_nicompare(int64_t *a) {
+    const unsigned char *s1 = (const unsigned char *)(uintptr_t)a[0];
+    const unsigned char *s2 = (const unsigned char *)(uintptr_t)a[1];
+    int64_t n = a[2];
+    if (!s1) s1 = (const unsigned char *)"";
+    if (!s2) s2 = (const unsigned char *)"";
+    if (n < 0) return 0;
+    for (int64_t i = 0; i < n; i++) {
+        unsigned char c1 = host_ascii_upper(s1[i]);
+        unsigned char c2 = host_ascii_upper(s2[i]);
+        if (c1 != c2 || !c1)
+            return (int64_t)c1 - (int64_t)c2;
+    }
+    return 0;
+}
+static int64_t host_str_imatch(int64_t *a) {
+    const unsigned char *needle = (const unsigned char *)(uintptr_t)a[0];
+    const unsigned char *haystack = (const unsigned char *)(uintptr_t)a[1];
+    const unsigned char *start, *n, *h;
+    if (!needle || !haystack) return 0;
+    for (start = haystack; ; start++) {
+        n = needle;
+        h = start;
+        while (*n && *h && host_ascii_upper(*n) == host_ascii_upper(*h)) {
+            n++;
+            h++;
+        }
+        if (!*n) return (int64_t)(uintptr_t)start;
+        if (!*start) return 0;
+    }
+}
 static int64_t host_lex_define_text(int64_t *a) {
     const char *name = (const char *)(uintptr_t)a[0];
     CHashDefineStr *define = name ? (CHashDefineStr *)HashFind(
@@ -1767,6 +1844,25 @@ static int64_t host_memset_u32(int64_t *a) {
         return 0;
     for (int64_t i = 0; i < count; i++)
         dst[i] = value;
+    return (int64_t)(uintptr_t)dst;
+}
+static int64_t host_memset_u16(int64_t *a) {
+    uint16_t *dst = (uint16_t *)(uintptr_t)a[0];
+    uint16_t value = (uint16_t)a[1];
+    int64_t count = a[2];
+    if (!dst || count < 0 || (uint64_t)count > SIZE_MAX / sizeof(*dst))
+        return 0;
+    for (int64_t i = 0; i < count; i++)
+        dst[i] = value;
+    return (int64_t)(uintptr_t)dst;
+}
+static int64_t host_memset_i64(int64_t *a) {
+    int64_t *dst = (int64_t *)(uintptr_t)a[0];
+    int64_t count = a[2];
+    if (!dst || count < 0 || (uint64_t)count > SIZE_MAX / sizeof(*dst))
+        return 0;
+    for (int64_t i = 0; i < count; i++)
+        dst[i] = a[1];
     return (int64_t)(uintptr_t)dst;
 }
 static int64_t host_puts(int64_t *a) {
@@ -3495,6 +3591,57 @@ static int64_t host_noise(int64_t *a) {
     (void)a;
     return 0;
 }
+static double host_log2_positive(double x) {
+    union { double f; uint64_t u; } value = { .f = x };
+    int exponent;
+    double mantissa, y, y2, term, sum;
+    int i;
+    if (!(x > 0.0) || (value.u & 0x7ff0000000000000ULL) ==
+                          0x7ff0000000000000ULL)
+        return 0.0;
+    exponent = (int)((value.u >> 52) & 0x7ff) - 1023;
+    if (((value.u >> 52) & 0x7ff) == 0) {
+        x *= 4503599627370496.0;
+        value.f = x;
+        exponent = (int)((value.u >> 52) & 0x7ff) - 1023 - 52;
+    }
+    value.u = (value.u & 0x000fffffffffffffULL) | 0x3ff0000000000000ULL;
+    mantissa = value.f;
+    y = (mantissa - 1.0) / (mantissa + 1.0);
+    y2 = y * y;
+    term = y;
+    sum = term;
+    for (i = 3; i <= 25; i += 2) {
+        term *= y2;
+        sum += term / i;
+    }
+    return exponent + (2.0 * sum) * 1.44269504088896340736;
+}
+static double host_exp2(double x) {
+    union { double f; uint64_t u; } input = { .f = x * 0.69314718055994530942 };
+    union { double f; uint64_t u; } output;
+    output.u = hc_builtin_exp(input.u);
+    return output.f;
+}
+static int64_t host_freq2ona(int64_t *a) {
+    double frequency;
+    memcpy(&frequency, &a[0], sizeof(frequency));
+    if (!(frequency > 0.0))
+        return 0;
+    double semitone = 12.0 * host_log2_positive((32.0 / 440.0) * frequency);
+    if (!(semitone > 1.0))
+        return 1;
+    if (semitone >= INT8_MAX)
+        return INT8_MAX;
+    return (int64_t)semitone;
+}
+static int64_t host_ona2freq(int64_t *a) {
+    int8_t ona = (int8_t)a[0];
+    double frequency = ona ? (440.0 / 32.0) * host_exp2(ona / 12.0) : 0.0;
+    int64_t bits;
+    memcpy(&bits, &frequency, sizeof(bits));
+    return bits;
+}
 static int64_t host_fb_task_text_compose(int64_t *a) {
     struct guest_fiber *f = find_guest_task((void *)(uintptr_t)a[0]);
     uint32_t *plane = guest_text_plane(a[1], a[2], 75);
@@ -3895,6 +4042,7 @@ static int64_t host_message_post(int64_t *a) {
     return 0;
 }
 static int64_t host_message_scan(int64_t *a) {
+    guest_host_message_scan_calls++;
     void *task = a[3] ? (void *)(uintptr_t)a[3] : guest_fibers[guest_current].words;
     struct guest_fiber *server = find_guest_task(task);
     /* Until a focus/window router exists, the task reading its own queue
@@ -3914,8 +4062,9 @@ static int64_t host_message_scan(int64_t *a) {
         struct guest_job *head = guest_job_head(server);
         while (head->next != head) {
             struct guest_job *job = head->next;
-            if (job->job_code != GUEST_JOBT_MESSAGE)
+            if (job->job_code != GUEST_JOBT_MESSAGE) {
                 break; /* A future JobsHandler owns non-message requests. */
+            }
             int64_t code = job->message_code, arg1 = job->aux1, arg2 = job->aux2;
             guest_job_unlink(job);
             guest_job_delete(job);
@@ -3927,6 +4076,15 @@ static int64_t host_message_scan(int64_t *a) {
                  GUEST_WIF_SELF_KEY_DESC))
                 continue;
             if (code > 0 && code < 64 && ((uint64_t)a[2] & (1ull << code))) {
+                if (code == 2 || code == 3) {
+                    unsigned direction = code == 2 ? 0 : 1;
+                    if (guest_current < GUEST_TASKS)
+                        guest_message_scan_key_hits[guest_current][direction]++;
+                    guest_message_scan_last_consumer = guest_current;
+                    guest_message_scan_last_code = code;
+                    guest_message_scan_last_arg1 = arg1;
+                    guest_message_scan_last_arg2 = arg2;
+                }
                 if (a[0]) *(int64_t *)(uintptr_t)a[0] = arg1;
                 if (a[1]) *(int64_t *)(uintptr_t)a[1] = arg2;
                 return code;
@@ -3936,6 +4094,8 @@ static int64_t host_message_scan(int64_t *a) {
     }
     if (a[0]) *(int64_t *)(uintptr_t)a[0] = 0;
     if (a[1]) *(int64_t *)(uintptr_t)a[1] = 0;
+    /* MessageScan is a poll. Blocking readers such as MessageGet and KeyGet
+     * own the Yield path; polling and flushing must not schedule another task. */
     return 0;
 }
 static int64_t host_ctrl_alt_dispatch(int64_t *a) {
@@ -4058,8 +4218,9 @@ static int64_t poll_guest_keys(void) {
         if (type != 2 && type != 3)
             continue;
         guest_keyboard_scan_state_update(type, sc);
-        if (post_guest_message(task, NULL,
-                               type, (int64_t)ch, (int64_t)sc, 0))
+        void *posted = post_guest_message(task, NULL,
+                                          type, (int64_t)ch, (int64_t)sc, 0);
+        if (posted)
         {
             guest_keyboard_route_posts++;
             last_code = type;
@@ -4175,6 +4336,10 @@ static int guest_ctrl_alt_callback_in_irq(int64_t index) {
     return (flags & (1ull << index)) != 0;
 }
 static int64_t host_put_key(int64_t *a) {
+    guest_host_put_key_calls++;
+    guest_host_put_key_last_char = a[0];
+    guest_host_put_key_last_task = (int64_t)guest_current;
+    guest_host_put_key_last_doc_active = 0;
     if (!guest_task_bound)
         return 0;
     uint64_t scan = (uint64_t)a[1];
@@ -4207,6 +4372,7 @@ static int64_t host_put_key(int64_t *a) {
         if (doc_put && doc_put->fun_ptr && doc_put->argc == 1 &&
             !(doc_put->base.base.type & HTF_EXTERN) &&
             FFI_CALL_TOS_1(doc_put->fun_ptr, 0)) {
+            guest_host_put_key_last_doc_active = 1;
             FFI_CALL_TOS_2(guest_keydev_put_key, a[0], a[1]);
             return 0;
         }
@@ -4247,6 +4413,7 @@ static int64_t host_str_len(int64_t *a) {
     return 0;
 }
 static int64_t host_key_scan(int64_t *a) {
+    guest_host_key_scan_calls++;
     int64_t ch = 0, sc = 0;
     int64_t scan[4] = {(int64_t)(uintptr_t)&ch, (int64_t)(uintptr_t)&sc,
                        1ll << 2, 0};
@@ -4260,6 +4427,7 @@ static int64_t host_key_scan(int64_t *a) {
     return found;
 }
 static int64_t host_key_get(int64_t *a) {
+    guest_host_key_get_calls++;
     if (a[2])
         zc_fail("KeyGet raw cursor is not implemented");
     /* Emitted source may wait for a key, as MessageGet already does. Keep
@@ -4893,6 +5061,33 @@ static int64_t host_bsf(int64_t *a) {
     uint64_t v = (uint64_t)a[0];
     return v ? (int64_t)__builtin_ctzll(v) : -1;
 }
+static int64_t host_bfield_ext_u32(int64_t *a) {
+    const uint8_t *bytes = (const uint8_t *)(uintptr_t)a[0];
+    uint64_t bit = (uint64_t)a[1];
+    int64_t size = a[2];
+    uint32_t value = 0;
+    if (!bytes || a[1] < 0 || size < 0 || size > 32 || bit > UINT64_MAX - (uint64_t)size)
+        zc_fail("BFieldExtU32 requires a valid bit offset and size 0..32");
+    for (int64_t i = 0; i < size; i++) {
+        uint64_t source_bit = bit + (uint64_t)i;
+        value |= (uint32_t)((bytes[source_bit >> 3] >> (source_bit & 7)) & 1u) << i;
+    }
+    return (int64_t)value;
+}
+static int64_t host_bfield_or_u32(int64_t *a) {
+    uint8_t *bytes = (uint8_t *)(uintptr_t)a[0];
+    uint64_t bit = (uint64_t)a[1];
+    uint32_t pattern = (uint32_t)a[2];
+    if (!bytes || a[1] < 0 || bit > UINT64_MAX - 31)
+        zc_fail("BFieldOrU32 requires a valid bit offset");
+    for (uint32_t i = 0; i < 32; i++) {
+        if ((pattern >> i) & 1u) {
+            uint64_t target_bit = bit + i;
+            bytes[target_bit >> 3] |= (uint8_t)(1u << (target_bit & 7));
+        }
+    }
+    return 0;
+}
 static int64_t host_bsr(int64_t *a) {
     uint64_t v = (uint64_t)a[0];
     return v ? (int64_t)(63 - __builtin_clzll(v)) : -1;
@@ -4922,6 +5117,17 @@ static int64_t host_clamp_i64(int64_t *a) {
 static int64_t host_max_i64(int64_t *a) {
     return a[0] > a[1] ? a[0] : a[1];
 }
+static int64_t host_min_i64(int64_t *a) {
+    return a[0] < a[1] ? a[0] : a[1];
+}
+static int64_t host_max_u64(int64_t *a) {
+    uint64_t left = (uint64_t)a[0], right = (uint64_t)a[1];
+    return (int64_t)(left > right ? left : right);
+}
+static int64_t host_min_u64(int64_t *a) {
+    uint64_t left = (uint64_t)a[0], right = (uint64_t)a[1];
+    return (int64_t)(left < right ? left : right);
+}
 static int64_t host_swap_u16(int64_t *a) {
     uint16_t *x = (uint16_t *)(uintptr_t)a[0];
     uint16_t *y = (uint16_t *)(uintptr_t)a[1];
@@ -4932,11 +5138,42 @@ static int64_t host_swap_u16(int64_t *a) {
     }
     return 0;
 }
+static int64_t host_swap_u32(int64_t *a) {
+    uint32_t *x = (uint32_t *)(uintptr_t)a[0];
+    uint32_t *y = (uint32_t *)(uintptr_t)a[1];
+    if (x && y) {
+        uint32_t value = *x;
+        *x = *y;
+        *y = value;
+    }
+    return 0;
+}
+static int64_t host_swap_u8(int64_t *a) {
+    uint8_t *x = (uint8_t *)(uintptr_t)a[0];
+    uint8_t *y = (uint8_t *)(uintptr_t)a[1];
+    if (x && y) {
+        uint8_t value = *x;
+        *x = *y;
+        *y = value;
+    }
+    return 0;
+}
 static int64_t host_endian_u64(int64_t *a) {
     uint64_t v = (uint64_t)a[0];
     v = ((v & 0x00000000FFFFFFFFull) << 32) | ((v & 0xFFFFFFFF00000000ull) >> 32);
     v = ((v & 0x0000FFFF0000FFFFull) << 16) | ((v & 0xFFFF0000FFFF0000ull) >> 16);
     v = ((v & 0x00FF00FF00FF00FFull) << 8) | ((v & 0xFF00FF00FF00FF00ull) >> 8);
+    return (int64_t)v;
+}
+static int64_t host_endian_u32(int64_t *a) {
+    uint32_t v = (uint32_t)a[0];
+    v = ((v & 0x000000FFu) << 24) | ((v & 0x0000FF00u) << 8) |
+        ((v & 0x00FF0000u) >> 8) | ((v & 0xFF000000u) >> 24);
+    return (int64_t)v;
+}
+static int64_t host_endian_u16(int64_t *a) {
+    uint16_t v = (uint16_t)a[0];
+    v = (uint16_t)((v << 8) | (v >> 8));
     return (int64_t)v;
 }
 static int64_t host_lbequal(int64_t *a) {
@@ -5534,12 +5771,16 @@ static void bind_guest_task(void) {
     guest_counts.time_stamp_kHz_freq = (int64_t)(frequency / 1000);
     guest_counts.time_stamp_freq_initial = (int64_t)frequency;
     guest_counts.time_stamp_calibrated = 1;
+    uint64_t ctr;
+    __asm__ volatile("mrs %0, ctr_el0" : "=r"(ctr));
+    guest_sys_cache_line_width = (int64_t)(4ull << ((ctr >> 16) & 15));
     init_guest_fiber(0, NULL, "Root");
     set_guest_task(guest_fibers[0].words);
     guest_task_bound = 1;
     PrsBindCSymbol("Fs", host_fs, 0);
     PrsBindCSymbol("Gs", host_gs, 0);
     PrsBindCSymbol("mp_count", &guest_mp_count, 0);
+    PrsBindCSymbol("sys_cache_line_width", &guest_sys_cache_line_width, 0);
     PrsBindCSymbol("sys_focus_task", &guest_focus_task, 0);
     PrsBindCSymbol("sys_progresses", guest_progresses, 0);
     for (unsigned i = 0; i < 4; i++) {
@@ -5561,9 +5802,15 @@ static void bind_guest_task(void) {
     PrsBindCSymbol("Btc", host_btc, 2);
     PrsBindCSymbol("Bsf", host_bsf, 1);
     PrsBindCSymbol("Bsr", host_bsr, 1);
+    PrsBindCSymbol("BFieldExtU32", host_bfield_ext_u32, 3);
+    PrsBindCSymbol("BFieldOrU32", host_bfield_or_u32, 3);
     PrsBindCSymbol("SqrI64", host_sqr_i64, 1);
+    PrsBindCSymbol("EndianU16", host_endian_u16, 1);
+    PrsBindCSymbol("EndianU32", host_endian_u32, 1);
     PrsBindCSymbol("EndianU64", host_endian_u64, 1);
     PrsBindCSymbol("StrLen", host_str_len, 1);
+    PrsBindCSymbol("StrNICompare", host_str_nicompare, 3);
+    PrsBindCSymbol("StrIMatch", host_str_imatch, 2);
     PrsBindCSymbol("LBts", host_lbts, 2);
     PrsBindCSymbol("LBtr", host_lbtr, 2);
     PrsBindCSymbol("LBtc", host_lbtc, 2);
@@ -5781,7 +6028,7 @@ static void guest_context_leave(struct source_context *context) {
  * existing externs and freed/reused allocations. Restoring both arenas also
  * restores those links and import patches. Commit before running emitted
  * code, so prior statements and other tasks' runtime work are never undone.
- * This costs 112 MiB of fixed recovery storage; boot module loading does not
+ * This costs 224 MiB of fixed recovery storage; boot module loading does not
  * take checkpoints. Only one parser can own this buffer on CPU 0. */
 static unsigned char compiler_saved_data[DATA_BYTES] __attribute__((aligned(16)));
 static unsigned char compiler_saved_code[CODE_BYTES] __attribute__((aligned(16)));
@@ -6238,6 +6485,7 @@ static size_t format_text(char *output, size_t capacity, const char *format,
         int has_precision = 0;
         int left = 0, zero_pad = 0, group_commas = 0;
         int truncate = 0, escape_dollars = 0;
+        int engineering = 0, engineering_auto = 0, engineering_exp = 0;
         size_t width = 0;
         /* ZealOS character-repeat formats use either a literal count
          * (%h7c) or a secondary count argument (%h*c). Repeat the whole
@@ -6248,9 +6496,9 @@ static size_t format_text(char *output, size_t capacity, const char *format,
              (format[spec + 1] >= '0' && format[spec + 1] <= '9'))) {
             size_t repeat_spec = spec + 1;
             int64_t count = 0;
+            int dynamic_count = 0;
             if (format[repeat_spec] == '*') {
-                if (arg >= argc) zc_fail("format needs repeat argument");
-                count = argv[arg++];
+                dynamic_count = 1;
                 repeat_spec++;
             } else {
                 while (format[repeat_spec] >= '0' && format[repeat_spec] <= '9') {
@@ -6259,23 +6507,26 @@ static size_t format_text(char *output, size_t capacity, const char *format,
                     repeat_spec++;
                 }
             }
-            if (format[repeat_spec] != 'c' && format[repeat_spec] != 'C')
-                goto format_repeat_not_char;
-            if (arg >= argc) zc_fail("format needs character argument");
-            uint64_t packed = (uint64_t)argv[arg++];
-            unsigned length = 0;
-            while (length < 8 && (unsigned char)(packed >> (length * 8))) length++;
-            if (count > 0 && length) {
-                if ((uint64_t)count > (capacity - 1 - used) / length)
-                    zc_fail("formatted text exceeds buffer");
-                for (int64_t repeat = 0; repeat < count; repeat++)
-                    for (unsigned byte = 0; byte < length; byte++)
-                        FMT_BYTE(packed >> (byte * 8));
+            if (format[repeat_spec] == 'c' || format[repeat_spec] == 'C') {
+                if (dynamic_count) {
+                    if (arg >= argc) zc_fail("format needs repeat argument");
+                    count = argv[arg++];
+                }
+                if (arg >= argc) zc_fail("format needs character argument");
+                uint64_t packed = (uint64_t)argv[arg++];
+                unsigned length = 0;
+                while (length < 8 && (unsigned char)(packed >> (length * 8))) length++;
+                if (count > 0 && length) {
+                    if ((uint64_t)count > (capacity - 1 - used) / length)
+                        zc_fail("formatted text exceeds buffer");
+                    for (int64_t repeat = 0; repeat < count; repeat++)
+                        for (unsigned byte = 0; byte < length; byte++)
+                            FMT_BYTE(packed >> (byte * 8));
+                }
+                i = repeat_spec + 1;
+                continue;
             }
-            i = repeat_spec + 1;
-            continue;
         }
-format_repeat_not_char:
         while (format[spec] == '-' || format[spec] == '0' || format[spec] == ',') {
             if (format[spec] == '-') left = 1;
             else if (format[spec] == '0') zero_pad = 1;
@@ -6309,8 +6560,33 @@ format_repeat_not_char:
         }
         /* The upstream formatter accepts grouping after precision too, as in
          * %12.2,f. Keep the pre-width flag accepted by the existing subset. */
-        if (format[spec] == ',') { group_commas = 1; spec++; }
-        if (format[spec] == 't') { truncate = 1; spec++; }
+        for (;;) {
+            if (format[spec] == ',') { group_commas = 1; spec++; }
+            else if (format[spec] == 't') { truncate = 1; spec++; }
+            else if (format[spec] == 'h') {
+                engineering = 1;
+                spec++;
+                if (format[spec] == '?') {
+                    engineering_auto = 1;
+                    spec++;
+                } else {
+                    int negative = 0;
+                    if (format[spec] == '*') {
+                        if (arg >= argc) zc_fail("format needs engineering exponent");
+                        engineering_exp = (int)argv[arg++];
+                        spec++;
+                    } else {
+                        if (format[spec] == '-') { negative = 1; spec++; }
+                        while (format[spec] >= '0' && format[spec] <= '9') {
+                            if (engineering_exp < 1000)
+                                engineering_exp = engineering_exp * 10 + format[spec] - '0';
+                            spec++;
+                        }
+                        if (negative) engineering_exp = -engineering_exp;
+                    }
+                }
+            } else break;
+        }
         /* Aiwnios can normalize %$$Q to %$Q while decoding source strings. */
         if (format[spec] == '$') {
             size_t escaped = spec + 1;
@@ -6330,7 +6606,8 @@ format_repeat_not_char:
             code != 'S' && code != 'z' && code != 'Z' && code != 'o' && code != 'D' && code != 'T' &&
             code != 'd' && code != 'u' && code != 'x' && code != 'X' &&
             code != 'b' && code != 'B' &&
-            code != 'f' && code != 'F' && code != 'g' && code != 'G')
+            code != 'f' && code != 'F' && code != 'g' && code != 'G' &&
+            code != 'n')
         {
             printf("zc: unsupported format conversion '%c' in %s\n", code, format);
             zc_fail("format code is unsupported");
@@ -6460,7 +6737,65 @@ decoded_string_end: ;
         } else {
             char number[128];
             size_t length = 0;
-            if (code == 'f' || code == 'F') {
+            if (engineering && (code == 'd' || code == 'u' || code == 'n' ||
+                                code == 'f' || code == 'F' || code == 'g' || code == 'G')) {
+                double value;
+                if (code == 'n' || code == 'f' || code == 'F' || code == 'g' || code == 'G') {
+                    uint64_t bits = (uint64_t)argv[arg++];
+                    memcpy(&value, &bits, sizeof(value));
+                } else {
+                    value = code == 'd' ? (double)argv[arg++] : (double)(uint64_t)argv[arg++];
+                }
+                int negative = value < 0.0;
+                double scaled = negative ? -value : value;
+                int exponent = 0;
+                static const char *const si_suffix[] = {
+                    "y", "z", "a", "f", "p", "n", "µ", "m", " ",
+                    "K", "M", "G", "T", "P", "E", "Z", "Y"
+                };
+                if (engineering_auto) {
+                    while (scaled >= 1000.0 && exponent < 24) {
+                        scaled /= 1000.0;
+                        exponent += 3;
+                    }
+                    while (scaled > 0.0 && scaled < 1.0 && exponent > -24) {
+                        scaled *= 1000.0;
+                        exponent -= 3;
+                    }
+                } else if (engineering_exp > 0) {
+                    for (int e = 0; e < engineering_exp && e < 300; e++) scaled /= 10.0;
+                    exponent = engineering_exp;
+                } else if (engineering_exp < 0) {
+                    for (int e = 0; e > engineering_exp && e > -300; e--) scaled *= 10.0;
+                    exponent = engineering_exp;
+                }
+                int suffix_index = exponent / 3 + 8;
+                const char *suffix = suffix_index >= 0 && suffix_index < 17
+                    ? si_suffix[suffix_index] : "";
+                int digits = has_precision ? precision : (code == 'd' || code == 'u' ? 3 : 5);
+                if (digits < 0) digits = 0;
+                if (digits > 9) digits = 9;
+                char *end = number;
+                if (negative) *end++ = '-';
+                uint64_t scaled_bits;
+                memcpy(&scaled_bits, &scaled, sizeof(scaled_bits));
+                hc_fmt_f64_bits(&end, scaled_bits, digits);
+                *end = 0;
+                length = (size_t)(end - number);
+                while (!has_precision && length && number[length - 1] == '0' &&
+                       memchr(number, '.', length)) number[--length] = 0;
+                if (!has_precision && length && number[length - 1] == '.') number[--length] = 0;
+                size_t suffix_length = strlen(suffix);
+                if (suffix_length > sizeof(number) - length - 1) zc_fail("format suffix exceeds buffer");
+                memcpy(number + length, suffix, suffix_length);
+                length += suffix_length;
+                number[length] = 0;
+            } else if (code == 'n') {
+                char *end = number;
+                hc_fmt_f64_bits(&end, (uint64_t)argv[arg++], has_precision ? precision : 5);
+                *end = 0;
+                length = (size_t)(end - number);
+            } else if (code == 'f' || code == 'F') {
                 char *end = number;
                 hc_fmt_f64_bits(&end, (uint64_t)argv[arg++],
                                 has_precision ? precision : 1);
@@ -6688,6 +7023,17 @@ static int load_source_path(const char *path, int merged, int recover) {
         else free(src);
         return -1;
     }
+    if (!strcmp(path, "/Kernel/SerialDev/Message.ZC")) {
+        /* Message.ZC's source MessageScan reads a key job's aux2 after
+         * JobDel(tmpc) frees that job. Rebind the interactive readers after
+         * compiling the upstream unit so app prompts consume the safe host
+         * queue path, just like the graphical terminal's input probes. */
+        PrsBindCSymbol("MessageScan", host_message_scan, 4);
+        PrsBindCSymbol("MessageGet", host_message_get, 4);
+        PrsBindCSymbol("FlushMessages", host_flush_messages, 1);
+        PrsBindCSymbol("KeyScan", host_key_scan, 3);
+        PrsBindCSymbol("KeyGet", host_key_get, 3);
+    }
     if (!strcmp(path, "/System/TaskBridge.ZC")) {
         /* TaskBridge is loaded again after KernelC and redeclares the early
          * clock global. Bind that new symbol to the same live timer storage;
@@ -6796,7 +7142,15 @@ static int load_source_path(const char *path, int merged, int recover) {
     PrsBindCSymbol("Clamp", host_clamp_f64, 3);
     PrsBindCSymbol("Max", host_max_f64, 2);
     PrsBindCSymbol("MaxI64", host_max_i64, 2);
+    PrsBindCSymbol("MinI64", host_min_i64, 2);
+    PrsBindCSymbol("MaxU64", host_max_u64, 2);
+    PrsBindCSymbol("MinU64", host_min_u64, 2);
     if (!strcmp(path, "/Kernel/KernelC.HH")) {
+        /* KernelC introduces the pinned case-insensitive string externs.
+         * Bind after their declarations exist so source-backed modules can
+         * compile against the same ASCII matching semantics as ZealOS. */
+        PrsBindCSymbol("StrNICompare", host_str_nicompare, 3);
+        PrsBindCSymbol("StrIMatch", host_str_imatch, 2);
         PrsBindCSymbol("FileRead", host_file_read, 3);
         PrsBindCSymbol("FileWrite", host_file_write, 5);
         PrsBindCSymbol("Cd", host_cd, 2);
@@ -6804,6 +7158,10 @@ static int load_source_path(const char *path, int merged, int recover) {
         PrsBindCSymbol("Sound", host_sound, 1);
         PrsBindCSymbol("Beep", host_beep, 2);
         PrsBindCSymbol("SoundReset", host_sound_reset, 0);
+        /* Keep tone conversion available to unchanged speaker-dependent
+         * programs even though this framebuffer target has no audio device. */
+        PrsBindCSymbol("Freq2Ona", host_freq2ona, 1);
+        PrsBindCSymbol("Ona2Freq", host_ona2freq, 1);
         /* counts is declared here, not in KernelB.HH; bind after declaration
          * so the generic extern-data binder can resolve the symbol. */
         CHashGlblVar *spawned_tasks = (CHashGlblVar *)HashFind(
@@ -6947,6 +7305,8 @@ static int load_source_path(const char *path, int merged, int recover) {
         PrsBindCSymbol("ZcGrUpdateTaskODEs", host_gr_update_task_odes, 1);
         PrsBindCSymbol("DistSqrI64", host_dist_sqr_i64, 4);
         PrsBindCSymbol("SwapU16", host_swap_u16, 2);
+        PrsBindCSymbol("SwapU32", host_swap_u32, 2);
+        PrsBindCSymbol("SwapU8", host_swap_u8, 2);
         PrsBindCSymbol("ClampI64", host_clamp_i64, 3);
         PrsBindCSymbol("ZcDefineMirror", host_define_mirror, 2);
         PrsBindCSymbol("ZcLexDefineText", host_lex_define_text, 1);
@@ -6957,13 +7317,18 @@ static int load_source_path(const char *path, int merged, int recover) {
         PrsBindCSymbol("MemCopy", host_copy, 3);
         PrsBindCSymbol("MemSet", host_set, 3);
         PrsBindCSymbol("MemSetU32", host_memset_u32, 3);
+        PrsBindCSymbol("MemSetU16", host_memset_u16, 3);
+        PrsBindCSymbol("MemSetI64", host_memset_i64, 3);
         PrsBindCSymbol("Sqrt", host_sqrt, 1);
         PrsBindCSymbol("Sqr", host_sqr_f64, 1);
         PrsBindCSymbol("SqrU64", host_sqr_i64, 1);
         PrsBindCSymbol("Ceil", host_ceil, 1);
+        PrsBindCSymbol("Floor", host_floor, 1);
+        PrsBindCSymbol("Sign", host_sign_f64, 1);
         PrsBindCSymbol("Round", host_round_f64, 1);
         PrsBindCSymbol("Exp", host_exp, 1);
         PrsBindCSymbol("Ln", host_ln, 1);
+        PrsBindCSymbol("Log10", host_log10, 1);
         PrsBindCSymbol("ZcSinF64", host_sin_f64, 1);
         PrsBindCSymbol("ZcCosF64", host_cos_f64, 1);
         PrsBindCSymbol("Sin", host_sin_f64, 1);
@@ -7280,6 +7645,11 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
     guest_keyboard_route_last_type = 0;
     guest_keyboard_route_last_arg1 = 0;
     guest_keyboard_route_last_arg2 = 0;
+    memset(guest_message_scan_key_hits, 0, sizeof(guest_message_scan_key_hits));
+    guest_message_scan_last_consumer = -1;
+    guest_message_scan_last_code = 0;
+    guest_message_scan_last_arg1 = 0;
+    guest_message_scan_last_arg2 = 0;
     guest_winmgr_tick_fun = NULL;
     guest_focus_task = NULL;
     /* The shared text object can point into the session's staging buffers.
@@ -7329,6 +7699,9 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
                     /* MSize2 is ZealOS internal size; alias requested size for now. */
                     {"MSize2", host_msize, 1},
                     {"MemCopy", host_copy, 3},  {"MemSet", host_set, 3}, {"SwapI64", host_swap, 2},
+                    {"SwapU8", host_swap_u8, 2}, {"SwapU32", host_swap_u32, 2},
+                    {"StrNICompare", host_str_nicompare, 3},
+                    {"StrIMatch", host_str_imatch, 2},
                     {"DCBlotColor4", host_dc_blot_color4, 4},
                     {"GrRopEquU8NoClipping", host_gr_rop_equ_u8_no_clipping, 3},
                     {"ZcGrRopEquU8NoClipping", host_gr_rop_equ_u8_with_font, 4},
@@ -7387,6 +7760,9 @@ int zc_start_graphics(void) {
         "/Kernel/QueueBridge.ZC",
         "/System/TaskBridge.ZC",
         "/System/Externs.ZC",
+        /* Make the stock ZealOS structure inspector and debugger helpers
+         * available to apps and demos, just as MakeSystem loads Debug.ZC. */
+        "/System/Debug.ZC",
         /* GrUpdateTaskODEs is part of the normal source frame path. Load its
          * implementation during boot so task-owned ODEs advance without an
          * application having to load MathODE.ZC manually. */
@@ -7804,9 +8180,15 @@ void zc_status(void) {
            system_server->state == GUEST_RUNNABLE && !!(*guest_flags(system_server) & GUEST_IDLE),
            system_server->state == GUEST_RUNNABLE &&
                guest_job_head(system_server)->next != guest_job_head(system_server));
-    printf("keyboard_focus=%s\n", keyboard_focus
+    printf("guest_current=%u current_name=%s focus_index=%ld\n",
+           guest_current,
+           (const char *)((unsigned char *)guest_fibers[guest_current].words + guest_name_off),
+           valid_guest_task(guest_focus_task)
+               ? (long)(find_guest_task(guest_focus_task) - guest_fibers) : -1L);
+    printf("keyboard_focus=%s index=%ld\n", keyboard_focus
            ? (const char *)((unsigned char *)keyboard_focus->words + guest_name_off)
-           : "none");
+           : "none", keyboard_focus
+           ? (long)(keyboard_focus - guest_fibers) : -1L);
     for (unsigned i = 0; i < GUEST_TASKS; i++) {
         struct guest_fiber *fiber = &guest_fibers[i];
         if (fiber->state != GUEST_RUNNABLE)
@@ -7814,10 +8196,16 @@ void zc_status(void) {
         void *parent_words = i
             ? *(void **)((unsigned char *)fiber->words + guest_parent_off) : NULL;
         struct guest_fiber *parent = parent_words ? find_guest_task(parent_words) : NULL;
-        printf("guest_task[%u]: name=%s parent=%s kill=%d ending=%d wait=%d\n",
+        unsigned queued = 0;
+        struct guest_job *queue = guest_job_head(fiber);
+        for (struct guest_job *job = queue->next; job != queue && queued < 65535;
+             job = job->next)
+            queued++;
+        printf("guest_task[%u]: name=%s parent=%s kill=%d ending=%d wait=%d key_wait=%d queued=%u\n",
                i, (const char *)((unsigned char *)fiber->words + guest_name_off),
                parent ? (const char *)((unsigned char *)parent->words + guest_name_off) : "none",
-               fiber->kill_requested, fiber->ending, fiber->wait_kind);
+               fiber->kill_requested, fiber->ending, fiber->wait_kind,
+               fiber->key_wait_active, queued);
         printf("  task_docs: put=%p display=%p border=%p\n",
                *(void **)((unsigned char *)fiber->words + guest_put_doc_off),
                *(void **)((unsigned char *)fiber->words + guest_display_doc_off),
@@ -7848,6 +8236,25 @@ void zc_status(void) {
            (long)guest_keyboard_route_last_type,
            (long)guest_keyboard_route_last_arg1,
            (long)guest_keyboard_route_last_arg2);
+    printf("host_key_path: message_scan=%lu key_scan=%lu key_get=%lu put_key=%lu last_char=%ld task=%ld doc_active=%d\n",
+           (unsigned long)guest_host_message_scan_calls,
+           (unsigned long)guest_host_key_scan_calls,
+           (unsigned long)guest_host_key_get_calls,
+           (unsigned long)guest_host_put_key_calls,
+           (long)guest_host_put_key_last_char,
+           (long)guest_host_put_key_last_task,
+           guest_host_put_key_last_doc_active);
+    printf("message_scan_keys: last_consumer=%ld last=%ld/%ld/%016lx",
+           (long)guest_message_scan_last_consumer,
+           (long)guest_message_scan_last_code,
+           (long)guest_message_scan_last_arg1,
+           (unsigned long)guest_message_scan_last_arg2);
+    for (unsigned i = 0; i < GUEST_TASKS; i++)
+        if (guest_message_scan_key_hits[i][0] || guest_message_scan_key_hits[i][1])
+            printf(" task%u=%lu/%lu", i,
+                   (unsigned long)guest_message_scan_key_hits[i][0],
+                   (unsigned long)guest_message_scan_key_hits[i][1]);
+    printf("\n");
     printf("keyboard_bitmap: left=%d right=%d ctrl=%d updates=%lu misses=%lu\n",
            guest_keyboard_bitmap_read("down_bitmap", 0x4b),
            guest_keyboard_bitmap_read("down_bitmap", 0x4d),

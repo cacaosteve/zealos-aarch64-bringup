@@ -1,0 +1,38 @@
+// File-scope arrays with omitted bounds infer their size from initializers.
+I64 inferred_numbers[] = {10, 20, 30};
+I64 fixed_numbers[3] = {10, 20, 30};
+U8 inferred_text[] = "Zeal";
+
+class InferredArrayItem
+{
+    I32 value;
+    U8 name[8];
+};
+
+InferredArrayItem inferred_items[] =
+{
+    {10, "Name1"},
+    {20, "Name2"},
+    {30, "Name3"},
+};
+
+I64 GlobalArrayInferenceChecks()
+{
+    if (sizeof(fixed_numbers) != 3 * sizeof(I64) || fixed_numbers[0] != 10 ||
+        fixed_numbers[1] != 20 || fixed_numbers[2] != 30)
+        return 4;
+    if (sizeof(inferred_numbers) != 3 * sizeof(I64) ||
+        inferred_numbers[0] != 10 || inferred_numbers[1] != 20 ||
+        inferred_numbers[2] != 30)
+        return 1;
+    if (sizeof(inferred_text) != 5 || inferred_text[0] != 'Z' ||
+        inferred_text[3] != 'l' || inferred_text[4] != 0)
+        return 2;
+    if (sizeof(inferred_items) != 3 * sizeof(InferredArrayItem) ||
+        inferred_items[0].value != 10 || inferred_items[1].value != 20 ||
+        inferred_items[2].value != 30 ||
+        inferred_items[1].name[0] != 'N' ||
+        inferred_items[1].name[4] != '2')
+        return 3;
+    return 42;
+}

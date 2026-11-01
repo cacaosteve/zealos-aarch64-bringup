@@ -47,32 +47,28 @@ I64 SpriteElemSize(U8 *p, I64 type)
     U8 ch;
     Bool aligned_header;
 
-    // These sizes follow SpriteElemSize in upstream System/Gr/SpriteNew.ZC.
-    // Read packed fields with MemCopy: several records are not naturally
-    // aligned, and the guest compiler must not synthesize unaligned loads.
-    if (type == SPT_COLOR)
-        return 2;
-    if (type == SPT_DITHER_COLOR)
-        return 4;
-    if (type == SPT_THICK)
-        return 8;
-    if (type == SPT_PLANAR_SYMMETRY)
-        return 20;
+    // Use the pinned base-size table. Embedded sprite streams are tightly
+    // packed: CSpritePtPt is 17 bytes and CSpriteNumU8s is 5 bytes, even when
+    // their I32 fields start at unaligned addresses. Read those fields via
+    // MemCopy so the guest compiler cannot synthesize unaligned loads.
+    if (type == SPT_COLOR || type == SPT_DITHER_COLOR ||
+            type == SPT_THICK || type == SPT_PLANAR_SYMMETRY)
+        return sprite_elem_base_sizes[type];
     if (type == SPT_TRANSFORM_ON || type == SPT_TRANSFORM_OFF)
-        return 1;
+        return sprite_elem_base_sizes[type];
     if (type == SPT_SHIFT || type == SPT_PT ||
             type == SPT_FLOOD_FILL || type == SPT_FLOOD_FILL_NOT)
-        return 12;
+        return sprite_elem_base_sizes[type];
     if (type == SPT_LINE || type == SPT_RECT || type == SPT_ARROW)
-        return 20;
+        return sprite_elem_base_sizes[type];
     if (type == SPT_ROTATED_RECT)
-        return 32;
+        return sprite_elem_base_sizes[type];
     if (type == SPT_CIRCLE)
-        return 16;
+        return sprite_elem_base_sizes[type];
     if (type == SPT_ELLIPSE)
-        return 32;
+        return sprite_elem_base_sizes[type];
     if (type == SPT_POLYGON)
-        return 40;
+        return sprite_elem_base_sizes[type];
     if (type == SPT_POLYLINE || type == SPT_BSPLINE2 ||
             type == SPT_BSPLINE2_CLOSED || type == SPT_BSPLINE3 ||
             type == SPT_BSPLINE3_CLOSED) {
@@ -80,21 +76,21 @@ I64 SpriteElemSize(U8 *p, I64 type)
         if (a < 0 || a > 1048576)
             return -1;
         if (type == SPT_POLYLINE)
-            return 8 + a * 8;
-        return 8 + a * 12;
+            return sprite_elem_base_sizes[type] + a * 8;
+        return sprite_elem_base_sizes[type] + a * 12;
     }
     if (type == SPT_POLYPT) {
         MemCopy(&a, p + 4, sizeof(I32));
         if (a < 0 || a > 1048576)
             return -1;
-        return 16 + (a * 3 + 7) / 8;
+        return sprite_elem_base_sizes[type] + (a * 3 + 7) / 8;
     }
     if (type == SPT_BITMAP) {
         MemCopy(&a, p + 9, sizeof(I32));
         MemCopy(&b, p + 13, sizeof(I32));
         if (a < 0 || a > I32_MAX - 7 || b < 0 || b > 1048576)
             return -1;
-        return 17 + ((a + 7) & ~7) * b;
+        return sprite_elem_base_sizes[type] + ((a + 7) & ~7) * b;
     }
     if (type == SPT_MESH || type == SPT_SHIFTABLE_MESH) {
         aligned_header = p[1] == 0 && p[2] == 0 && p[3] == 0;
@@ -110,7 +106,7 @@ I64 SpriteElemSize(U8 *p, I64 type)
                     packed_b >= 0 && packed_b <= 1048576) {
                 a = packed_a;
                 b = packed_b;
-                size = sizeof(CSpriteMeshU8s);
+            size = sprite_elem_base_sizes[type];
             } else if (aligned_header && aligned_a >= 0 && aligned_a <= 1048576 &&
                     aligned_b >= 0 && aligned_b <= 1048576) {
                 a = aligned_a;
@@ -127,7 +123,7 @@ I64 SpriteElemSize(U8 *p, I64 type)
                     packed_b >= 0 && packed_b <= 1048576) {
                 a = packed_a;
                 b = packed_b;
-                size = sizeof(CSpritePtMeshU8s);
+            size = sprite_elem_base_sizes[type];
             } else if (aligned_header && aligned_a >= 0 && aligned_a <= 1048576 &&
                     aligned_b >= 0 && aligned_b <= 1048576) {
                 a = aligned_a;
@@ -140,7 +136,7 @@ I64 SpriteElemSize(U8 *p, I64 type)
     }
     if (type == SPT_TEXT || type == SPT_TEXT_BOX ||
             type == SPT_TEXT_DIAMOND) {
-        size = 12;
+        size = sprite_elem_base_sizes[type];
         while (size < 1048588) {
             MemCopy(&ch, p + size, sizeof(U8));
             size++;
@@ -280,4 +276,144 @@ public CDocEntry *Sprite(U8 *elems, U8 *format=NULL)
         sprite_debug_doc_sprite_entry_type = entry->type;
     sprite_debug_doc_sprite_has_bin = entry && entry->bin_data;
     return entry;
+}
+
+Bool SpritePolyReflect0(CDC *dc, I64 *x, I64 *y, I64 *z)
+{//Reflect into the half-space nearest the CDC symmetry origin.
+    F64 nx, ny, nz, distance, rx, ry, rz, original_distance2,
+            reflected_distance2;
+
+    if (!dc || !x || !y || !z)
+        return FALSE;
+    nx = ToF64(dc->sym.snx) / 65536.0;
+    ny = ToF64(dc->sym.sny) / 65536.0;
+    nz = ToF64(dc->sym.snz) / 65536.0;
+    distance = (ToF64(*x - dc->sym.sx) * nx +
+            ToF64(*y - dc->sym.sy) * ny +
+            ToF64(*z - dc->sym.sz) * nz) * 2.0;
+    rx = ToF64(*x) - distance * nx;
+    ry = ToF64(*y) - distance * ny;
+    rz = ToF64(*z) - distance * nz;
+    original_distance2 = ToF64(*x - dc->sym.sx) * (*x - dc->sym.sx) +
+            ToF64(*y - dc->sym.sy) * (*y - dc->sym.sy) +
+            ToF64(*z - dc->sym.sz) * (*z - dc->sym.sz);
+    reflected_distance2 = Sqr(rx - dc->sym.sx) + Sqr(ry - dc->sym.sy) +
+            Sqr(rz - dc->sym.sz);
+    if (reflected_distance2 < original_distance2)
+    {
+        if (rx < I32_MIN || rx > I32_MAX || ry < I32_MIN || ry > I32_MAX ||
+                rz < I32_MIN || rz > I32_MAX)
+            return FALSE;
+        *x = ToI64(rx);
+        *y = ToI64(ry);
+        *z = ToI64(rz);
+    }
+    return TRUE;
+}
+
+public I64 GrFillPoly3(CDC *dc=gr.dc, I64 vertex_count, CD3I32 *vertices)
+{//Fill a bounded 3D polygon as a fan of upstream depth-tested triangles.
+    CD3I32 points[64];
+    I64 px[3], py[3], pz[3], mx[3], my[3], mz[3];
+    I64 i, j, total_work = 0, work;
+    I64 x, y, z, old_z;
+    I32 base_color;
+    CColorROPU32 old_color;
+    Bool transform_enabled, symmetry_enabled, just_mirror, mirror_ok;
+
+    if (!dc || !vertices || vertex_count < 3 || vertex_count > 64 ||
+            dc->width <= 0 || dc->height <= 0)
+        return 0;
+    transform_enabled = dc->flags & DCF_TRANSFORMATION;
+    symmetry_enabled = dc->flags & DCF_SYMMETRY;
+    just_mirror = dc->flags & DCF_JUST_MIRROR;
+    old_color = dc->color;
+    old_z = dc->db_z;
+    base_color = dc->color.c0.color;
+    for (i = 0; i < vertex_count; i++)
+    {
+        x = vertices[i].x;
+        y = vertices[i].y;
+        z = vertices[i].z;
+        if (!SpriteTransformXYZ0(dc, transform_enabled, &x, &y, &z) ||
+                x < I32_MIN || x > I32_MAX || y < I32_MIN ||
+                y > I32_MAX || z < I32_MIN || z > I32_MAX)
+            return 0;
+        points[i].x = x;
+        points[i].y = y;
+        points[i].z = z;
+    }
+
+    // Preflight all fan triangles before changing the framebuffer, so invalid
+    // or pathological geometry cannot leave a partially drawn polygon.
+    for (i = 1; i < vertex_count - 1; i++)
+    {
+        px[0] = points[0].x; py[0] = points[0].y; pz[0] = points[0].z;
+        px[1] = points[i].x; py[1] = points[i].y; pz[1] = points[i].z;
+        px[2] = points[i + 1].x; py[2] = points[i + 1].y;
+        pz[2] = points[i + 1].z;
+        work = SpriteTriangleWork0(dc, px, py);
+        if (work < 0 || work > 480000 - total_work)
+            return 0;
+        total_work += work;
+        if (symmetry_enabled)
+        {
+            for (j = 0; j < 3; j++)
+            {
+                x = px[j]; y = py[j]; z = pz[j];
+                if (!SpritePolyReflect0(dc, &x, &y, &z))
+                    return 0;
+                mx[j] = x; my[j] = y; mz[j] = z;
+            }
+            work = SpriteTriangleWork0(dc, mx, my);
+            if (work < 0 || work > 480000 - total_work)
+                return 0;
+            total_work += work;
+        }
+    }
+
+    for (i = 1; i < vertex_count - 1; i++)
+    {
+        px[0] = points[0].x; py[0] = points[0].y; pz[0] = points[0].z;
+        px[1] = points[i].x; py[1] = points[i].y; pz[1] = points[i].z;
+        px[2] = points[i + 1].x; py[2] = points[i + 1].y;
+        pz[2] = points[i + 1].z;
+        mirror_ok = symmetry_enabled;
+        if (mirror_ok)
+        {
+            for (j = 0; j < 3; j++)
+            {
+                x = px[j]; y = py[j]; z = pz[j];
+                if (!SpritePolyReflect0(dc, &x, &y, &z))
+                    return 0;
+                mx[j] = x; my[j] = y; mz[j] = z;
+            }
+            if (!just_mirror)
+            {
+                if (dc->lighting)
+                    (*dc->lighting)(dc, &points[0], &points[i + 1],
+                            &points[i], base_color);
+                SpriteFillTriangle0(dc, mx, my, mz);
+            }
+        }
+        if (!just_mirror)
+        {
+            dc->color = old_color;
+            if (dc->lighting)
+                (*dc->lighting)(dc, &points[0], &points[i],
+                        &points[i + 1], base_color);
+            SpriteFillTriangle0(dc, px, py, pz);
+        }
+        else if (symmetry_enabled)
+        {
+            dc->color = old_color;
+            if (dc->lighting)
+                (*dc->lighting)(dc, &points[0], &points[i + 1],
+                        &points[i], base_color);
+            SpriteFillTriangle0(dc, mx, my, mz);
+        }
+    }
+    dc->color = old_color;
+    dc->db_z = old_z;
+    return total_work;
 }

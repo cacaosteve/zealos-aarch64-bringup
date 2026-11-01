@@ -176,7 +176,9 @@ CCmpCtrl *CmpCtrlNew(CLexer *lex) {
     int64_t rt;
     int64_t sz;
   } static raw_types[] = {
-      {"U0", RT_U0, 0},     {"U8i", RT_U8i, 1},   {"I8i", RT_I8i, 1},
+      {"U0", RT_U0, 0},
+      /* HolyC's signed zero-width I0 shares the no-value ABI with U0. */
+      {"I0", RT_U0, 0},     {"U8i", RT_U8i, 1},   {"I8i", RT_I8i, 1},
       {"U16i", RT_U16i, 2}, {"I16i", RT_I16i, 2}, {"U32i", RT_U32i, 4},
       {"I32i", RT_I32i, 4}, {"U64i", RT_U64i, 8}, {"I64i", RT_I64i, 8},
       {"F64", RT_F64, 8},
@@ -1671,6 +1673,7 @@ int64_t ParseExpr(CCmpCtrl *ccmp, int64_t flags) {
   CRPN *ic, *ic2, *orig = ccmp->code_ctrl->ir_code->next;
   char *string;
   CMemberLst *local;
+  CMemberLst *sizeof_type_member;
   CHashGlblVar *global_var;
   CCodeMisc *misc;
   CHashClass *tc_class;
@@ -1684,6 +1687,15 @@ next:
       goto fin;
       break;
     case TK_KW_OFFSET:
+      /* `offset` is also used as an ordinary identifier by upstream
+       * ZealOS code. The lexer recognizes it as a keyword before the parser
+       * can resolve local/global shadowing, so prefer the visible variable
+       * when one exists in this expression's scope. */
+      if ((ccmp->cur_fun && MemberFind("offset", ccmp->cur_fun)) ||
+          HashFind("offset", Fs->hash_table, HTT_GLBL_VAR, 1)) {
+        ccmp->lex->cur_tok = TK_NAME;
+        goto name;
+      }
     offo:
       if (ccmp->lex->cur_tok != '(')
         ParseErr(ccmp, "Expected a '('.");
@@ -1726,7 +1738,17 @@ next:
                  HashFind(ccmp->lex->string, Fs->hash_table, HTT_CLASS, 1))) {
           Lex(ccmp->lex);
           tc_class = PrsType(ccmp, tc_class, NULL, NULL, &dummy_dim);
-          arg = tc_class->sz * dummy_dim.total_cnt;
+          if (ccmp->lex->cur_tok == '.') {
+            Lex(ccmp->lex);
+            if (ccmp->lex->cur_tok != TK_NAME ||
+                !(sizeof_type_member = MemberFind(ccmp->lex->string, tc_class)))
+              ParseErr(ccmp, "Expected a class member after '.'.");
+            arg = sizeof_type_member->member_class->sz *
+                  sizeof_type_member->dim.total_cnt;
+            Lex(ccmp->lex);
+          } else {
+            arg = tc_class->sz * dummy_dim.total_cnt;
+          }
           if (dummy_dim.next)
             ArrayDimDel(dummy_dim.next);
           (ic = A_CALLOC(sizeof(CRPN), NULL))->type = type = IC_I64;
@@ -2098,9 +2120,12 @@ next:
       goto next;
       break;
     case TK_NAME:
+    name:
       if (PrsKw(ccmp, TK_KW_SIZEOF))
         goto szo;
-      if (PrsKw(ccmp, TK_KW_OFFSET))
+      if (!(ccmp->cur_fun && MemberFind("offset", ccmp->cur_fun)) &&
+          !HashFind("offset", Fs->hash_table, HTT_GLBL_VAR, 1) &&
+          PrsKw(ccmp, TK_KW_OFFSET))
         goto offo;
       binop_before = 0;
       ic = A_CALLOC(sizeof(CRPN), NULL);
@@ -2619,9 +2644,43 @@ not_label:
     PrsStatementEnd(ccmp);
     return 1;
   }
+  if (PrsKw(ccmp, TK_KW_LOCK)) {
+    CRPN *body_start, *body_end, *stmt;
+    if (ccmp->lex->cur_tok == '{') {
+      Lex(ccmp->lex);
+      while (ccmp->lex->cur_tok != '}') {
+        body_start = ccmp->code_ctrl->ir_code->next;
+        if (!PrsStmt(ccmp))
+          ParseErr(ccmp, "Expected a statement in lock block.");
+        body_end = ccmp->code_ctrl->ir_code;
+        /* AArch64 lowers HolyC's lock block by making each read-modify-write
+         * operation in its body use the backend's LDAXR/STLXR retry loop. */
+        for (stmt = body_start; stmt != body_end; stmt = stmt->base.next)
+          stmt->flags |= ICF_LOCK_EXPR;
+      }
+      Lex(ccmp->lex);
+      return 1;
+    }
+    /* Stock HolyC also permits `lock expression;` without braces. Parse the
+     * expression as a statement and use the same per-operation atomic flag. */
+    body_start = ccmp->code_ctrl->ir_code->next;
+    if (!ParseExpr(ccmp, 0))
+      ParseErr(ccmp, "Expected an expression after lock.");
+    if (ccmp->lex->cur_tok != ';')
+      ParseErr(ccmp, "Expected a ';' after locked expression.");
+    PrsStatementEnd(ccmp);
+    body_end = ccmp->code_ctrl->ir_code;
+    /* The backend consumes this flag on supported read-modify-write nodes. */
+    for (stmt = body_start; stmt != body_end; stmt = stmt->base.next)
+      stmt->flags |= ICF_LOCK_EXPR;
+    return 1;
+  }
   if (found_label) {
     QueIns(rpn, ccmp->code_ctrl->ir_code);
-    if (!PrsStmt(ccmp)) {
+    /* TempleOS permits a label to name the end of a block. This is used by
+     * stock sources that jump to a common cleanup point immediately before
+     * the closing brace (for example BattleLines' wg_done label). */
+    if (!PrsStmt(ccmp) && ccmp->lex->cur_tok != '}') {
       ParseErr(ccmp, "Expected a statement for a label.");
     }
     return 1;
@@ -2952,14 +3011,23 @@ double PrsF64(CCmpCtrl *ccmp) {
   return res;
 }
 
-int64_t PrsArrayDim(CCmpCtrl *ccmp, CArrayDim *to) {
+int64_t PrsArrayDim(CCmpCtrl *ccmp, CArrayDim *to, int allow_infer) {
   int64_t dim;
   // CDimArray.next!=NULL if array
   to->total_cnt = 1;
   to->next = NULL;
   if (ccmp->lex->cur_tok == '[') {
     Lex(ccmp->lex);
-    dim = PrsI64(ccmp);
+    /* ZealOS permits an omitted first bound on initialized globals, e.g.
+     * `I64 values[]={1,2,3};`.  Calling PrsI64 on the immediate `]` enters
+     * expression parsing without an operand and can hang the compiler.  A
+     * distinct sentinel marks a bound to infer from the initializer below;
+     * zero remains a valid result for an explicit dimension expression. */
+    dim = ccmp->lex->cur_tok == ']' ? INT64_MIN : PrsI64(ccmp);
+    if (dim == INT64_MIN && !allow_infer) {
+      ParseErr(ccmp, "Only the first array bound may be inferred.");
+      dim = 0;
+    }
     if (ccmp->lex->cur_tok != ']') {
       ParseErr(ccmp, "Expected a ']'.");
       return 0;
@@ -2968,9 +3036,13 @@ int64_t PrsArrayDim(CCmpCtrl *ccmp, CArrayDim *to) {
     to->next = A_CALLOC(sizeof(CArrayDim), NULL);
     to->next->total_cnt = 1;
     to->next->cnt = dim;
-    to->total_cnt *= dim;
-    if (PrsArrayDim(ccmp, to->next))
-      to->total_cnt *= to->next->total_cnt;
+    to->total_cnt = dim;
+    if (PrsArrayDim(ccmp, to->next, 0)) {
+      if (to->next->cnt == INT64_MIN)
+        to->total_cnt = INT64_MIN;
+      else if (to->total_cnt != INT64_MIN)
+        to->total_cnt *= to->next->total_cnt;
+    }
     return 1;
   }
   return 0;
@@ -3092,7 +3164,7 @@ CHashClass *PrsType(CCmpCtrl *ccmp, CHashClass *base, char **name,
       *name = A_STRDUP(ccmp->lex->string, NULL);
     Lex(ccmp->lex);
   }
-  PrsArrayDim(ccmp, dim);
+  PrsArrayDim(ccmp, dim, 1);
   if (is_func_ptr) {
     if (ccmp->lex->cur_tok != ')') {
       ParseErr(ccmp, "Expected a ')'!");
@@ -3199,6 +3271,75 @@ char *PrsArray(CCmpCtrl *ccmp, CHashClass *base, CArrayDim *dim,
     ParseErr(ccmp, "Expected a '}'.");
   Lex(ccmp->lex);
   return write_to;
+}
+
+/* Parse an initialized array whose first bound was omitted.  Grow the
+ * compiler-owned static-data buffer as each element is parsed, then publish
+ * the inferred count for sizeof() and global lookup. */
+static char *PrsArrayInfer(CCmpCtrl *ccmp, CHashClass *base, CArrayDim *dim) {
+  int64_t count = 0, capacity = 4;
+  int64_t stride = base->sz * (dim->next ? dim->next->total_cnt : 1);
+  char *data;
+  if (!dim || dim->cnt != INT64_MIN || stride <= 0) {
+    ParseErr(ccmp, "Invalid inferred array layout.");
+    return NULL;
+  }
+  if (dim->next && dim->next->cnt == INT64_MIN) {
+    ParseErr(ccmp, "Only the first array bound may be inferred.");
+    return NULL;
+  }
+  if (ccmp->lex->cur_tok == TK_STR && !dim->next && base->raw_type == RT_U8i) {
+    int64_t size;
+    char *string = PrsString(ccmp, &size);
+    data = A_CALLOC(size, NULL);
+    memcpy(data, string, size);
+    A_FREE(string);
+    dim->cnt = size;
+    dim->total_cnt = 1;
+    return data;
+  }
+  if (ccmp->lex->cur_tok != '{') {
+    ParseErr(ccmp, "Expected an initializer for inferred array.");
+    return NULL;
+  }
+  Lex(ccmp->lex);
+  data = A_CALLOC(capacity * stride, NULL);
+  while (ccmp->lex->cur_tok != '}' && ccmp->lex->cur_tok != 0) {
+    if (count == capacity) {
+      int64_t next_capacity = capacity * 2;
+      char *next;
+      if (next_capacity <= capacity || stride > INT64_MAX / next_capacity) {
+        ParseErr(ccmp, "Inferred array initializer is too large.");
+        A_FREE(data);
+        return NULL;
+      }
+      next = A_CALLOC(next_capacity * stride, NULL);
+      memcpy(next, data, count * stride);
+      A_FREE(data);
+      data = next;
+      capacity = next_capacity;
+    }
+    PrsArray(ccmp, base, dim->next, data + count * stride, 0);
+    count++;
+    if (ccmp->lex->cur_tok == ',') {
+      Lex(ccmp->lex);
+      if (ccmp->lex->cur_tok == '}')
+        break;
+    } else if (ccmp->lex->cur_tok != '}') {
+      ParseErr(ccmp, "Expected another array element.");
+      A_FREE(data);
+      return NULL;
+    }
+  }
+  if (ccmp->lex->cur_tok != '}') {
+    ParseErr(ccmp, "Expected a '}'.");
+    A_FREE(data);
+    return NULL;
+  }
+  Lex(ccmp->lex);
+  dim->cnt = count;
+  dim->total_cnt = dim->next ? dim->next->total_cnt : 1;
+  return data;
 }
 
 /* Emit stores at the declaration, so expressions and repeated calls use the
@@ -3519,10 +3660,18 @@ int64_t PrsDecl(CCmpCtrl *ccmp, CHashClass *base, CHashClass *add_to,
         }
       } else {
       static_array: // Also applies to classes
-        lst->static_bytes =
-            A_CALLOC(lst->dim.total_cnt * lst->member_class->sz, NULL);
-        PrsArray(ccmp, lst->member_class, lst->dim.next, lst->static_bytes,
-                 !(flags & PRSF_FUN_ARGS) && ccmp->lex->cur_tok != '{');
+        if (lst->dim.next && lst->dim.next->cnt == INT64_MIN)
+          lst->static_bytes = PrsArrayInfer(
+              ccmp, lst->member_class, lst->dim.next);
+        else {
+          lst->static_bytes =
+              A_CALLOC(lst->dim.total_cnt * lst->member_class->sz, NULL);
+          PrsArray(ccmp, lst->member_class, lst->dim.next, lst->static_bytes,
+                   !(flags & PRSF_FUN_ARGS) && ccmp->lex->cur_tok != '{');
+        }
+        if (lst->dim.next && lst->dim.next->cnt == INT64_MIN)
+          lst->dim.total_cnt =
+              lst->dim.next->cnt * lst->dim.next->total_cnt;
       }
     } else if (add_to) { // TODO is a local???
       Lex(ccmp->lex);
@@ -3554,7 +3703,8 @@ int64_t PrsDecl(CCmpCtrl *ccmp, CHashClass *base, CHashClass *add_to,
     glbl_var->fun_ptr = lst->fun_ptr;
     lst->fun_ptr = NULL; // We steal this
     // lst will be Free'd at ret
-    if (!(flags & (PRSF_EXTERN | PRSF__EXTERN)))
+    if (!(flags & (PRSF_EXTERN | PRSF__EXTERN)) &&
+        !(glbl_var->dim.next && glbl_var->dim.next->cnt == INT64_MIN))
       glbl_var->data_addr =
           A_CALLOC(glbl_var->var_class->sz * glbl_var->dim.total_cnt, NULL);
     if (flags & PRSF_IMPORT) {
@@ -3616,7 +3766,10 @@ int64_t PrsDecl(CCmpCtrl *ccmp, CHashClass *base, CHashClass *add_to,
       SysSymImportsResolve(glbl_var->base.str, 0);
     if (ccmp->lex->cur_tok == '=') {
       Lex(ccmp->lex);
-      if (ccmp->lex->cur_tok == '{' || glbl_var->dim.next) {
+      if (glbl_var->dim.next && glbl_var->dim.next->cnt == INT64_MIN) {
+        glbl_var->data_addr =
+            PrsArrayInfer(ccmp, glbl_var->var_class, glbl_var->dim.next);
+      } else if (ccmp->lex->cur_tok == '{' || glbl_var->dim.next) {
         PrsArray(ccmp, glbl_var->var_class, glbl_var->dim.next,
                  glbl_var->data_addr, ccmp->lex->cur_tok != '{');
       } else {
@@ -3629,6 +3782,14 @@ int64_t PrsDecl(CCmpCtrl *ccmp, CHashClass *base, CHashClass *add_to,
         (rpn = A_CALLOC(sizeof(CRPN), NULL))->type = IC_EQ;
         QueIns(rpn, ccmp->code_ctrl->ir_code);
       }
+      if (glbl_var->dim.next && glbl_var->dim.next->cnt != INT64_MIN &&
+          glbl_var->dim.total_cnt == INT64_MIN)
+        glbl_var->dim.total_cnt =
+            glbl_var->dim.next->cnt * glbl_var->dim.next->total_cnt;
+    } else if (!(flags & (PRSF_EXTERN | PRSF__EXTERN)) &&
+               glbl_var->dim.next &&
+               glbl_var->dim.next->cnt == INT64_MIN) {
+      ParseErr(ccmp, "Cannot infer an array bound without an initializer.");
     }
     goto ret;
   }
@@ -3954,9 +4115,15 @@ int64_t AssignRawTypeToNode(CCmpCtrl *ccmp, CRPN *rpn) {
                                !strcmp(fun->import_name, "IC_ABS") ||
                                !strcmp(fun->import_name, "IC_SQR") ||
                                !strcmp(fun->import_name, "IC_MOD_U64") ||
+                               !strcmp(fun->import_name, "IC_MAX_I64") ||
+                               !strcmp(fun->import_name, "IC_MIN_I64") ||
+                               !strcmp(fun->import_name, "IC_MAX_U64") ||
+                               !strcmp(fun->import_name, "IC_MIN_U64") ||
                                !strcmp(fun->import_name, "IC_IN_U8") ||
                                !strcmp(fun->import_name, "IC_OUT_U8") ||
+                               !strcmp(fun->import_name, "IC_SWAP_U8") ||
                                !strcmp(fun->import_name, "IC_SWAP_U16") ||
+                               !strcmp(fun->import_name, "IC_SWAP_U32") ||
                                !strcmp(fun->import_name, "IC_RDTSC") ||
                                !strcmp(fun->import_name, "IC_RFLAGS_GET") ||
                                !strcmp(fun->import_name, "IC_RSP_GET") ||
@@ -3968,9 +4135,15 @@ int64_t AssignRawTypeToNode(CCmpCtrl *ccmp, CRPN *rpn) {
                                !strcmp(fun->import_name, "IC_ABS") ||
                                !strcmp(fun->import_name, "IC_SQR") ||
                                !strcmp(fun->import_name, "IC_MOD_U64") ||
+                               !strcmp(fun->import_name, "IC_MAX_I64") ||
+                               !strcmp(fun->import_name, "IC_MIN_I64") ||
+                               !strcmp(fun->import_name, "IC_MAX_U64") ||
+                               !strcmp(fun->import_name, "IC_MIN_U64") ||
                                !strcmp(fun->import_name, "IC_IN_U8") ||
                                !strcmp(fun->import_name, "IC_OUT_U8") ||
+                               !strcmp(fun->import_name, "IC_SWAP_U8") ||
                                !strcmp(fun->import_name, "IC_SWAP_U16") ||
+                               !strcmp(fun->import_name, "IC_SWAP_U32") ||
                                !strcmp(fun->import_name, "IC_RDTSC") ||
                                !strcmp(fun->import_name, "IC_RFLAGS_GET") ||
                                !strcmp(fun->import_name, "IC_RSP_GET") ||
@@ -4727,10 +4900,16 @@ int64_t PrsSwitch(CCmpCtrl *cctrl) {
   }
       tmps->label = label->code_misc;
       if (cctrl->lex->cur_tok == ':') {
-        if (k_low == INT_MIN)
+        if (k_low == INT_MAX) {
           tmps->val = k_low = 0;
-        else
+          last = 1;
+        } else {
           tmps->val = last++;
+        }
+        if (tmps->val > k_hi)
+          k_hi = tmps->val;
+        INS_TMPSS;
+        Lex(cctrl->lex);
       } else {
         lo = last = tmps->val = PrsI64(cctrl);
         if (lo < k_low)
@@ -4755,6 +4934,7 @@ int64_t PrsSwitch(CCmpCtrl *cctrl) {
         } else {
           hi = lo;
           INS_TMPSS;
+          last = lo + 1;
         }
         if (cctrl->lex->cur_tok == ':') {
           Lex(cctrl->lex);

@@ -1,0 +1,39 @@
+I64 FileExtRemoveChecks()
+{
+    U8 *path;
+    U8 ext[32];
+
+    path = MAlloc(32);
+    MemCopy(path, "/dir.with.dot/file.part.ZC",
+            sizeof("/dir.with.dot/file.part.ZC"));
+    if (FileExtRemove(path, ext) != path ||
+        StrCompare(path, "/dir.with.dot/file.part") ||
+        StrCompare(ext, "ZC"))
+    {
+        Free(path);
+        return 1;
+    }
+    Free(path);
+
+    path = MAlloc(16);
+    MemCopy(path, "AIs/Human", sizeof("AIs/Human"));
+    ext[0] = 'x';
+    ext[1] = 0;
+    if (FileExtRemove(path, ext) != path ||
+        StrCompare(path, "AIs/Human") || *ext)
+    {
+        Free(path);
+        return 2;
+    }
+    Free(path);
+
+    path = MAlloc(16);
+    MemCopy(path, "Human.ZC", sizeof("Human.ZC"));
+    if (FileExtRemove(path) != path || StrCompare(path, "Human"))
+    {
+        Free(path);
+        return 3;
+    }
+    Free(path);
+    return 42;
+}

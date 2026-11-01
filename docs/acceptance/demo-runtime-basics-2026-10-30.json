@@ -1,0 +1,53 @@
+{
+  "date": "2026-10-30",
+  "command": "python3 scripts/check-compat.py --probe-demo-basics",
+  "target": "QEMU PCI graphical terminal",
+  "result": "pass",
+  "programs": [
+    {
+      "path": "/Demo/Print.ZC",
+      "result": "pass",
+      "checks": [
+        "engineering suffix number formatting",
+        "comma formatting output",
+        "floating point formatting output"
+      ]
+    },
+    {
+      "path": "/Demo/DateTime.ZC",
+      "result": "pass",
+      "checks": [
+        "hour, minute and second fields",
+        "day name",
+        "month name"
+      ]
+    },
+    {
+      "path": "/Demo/RadixSort.ZC",
+      "result": "pass",
+      "checks": [
+        "two visible 16-row numeric tables",
+        "output values equal sorted input values"
+      ]
+    },
+    {
+      "path": "/Demo/SubIntAccess.ZC",
+      "result": "pass",
+      "checks": [
+        "signed 16-bit subinteger read",
+        "unsigned byte subinteger read",
+        "nested 32-bit/byte access",
+        "nested 32-bit/signed-byte access"
+      ]
+    },
+    {
+      "path": "/Demo/SubSwitch.ZC",
+      "result": "pass",
+      "checks": [
+        "all six visible switch branches"
+      ]
+    }
+  ],
+  "recovery": "40+2; returned 42 in the graphical terminal after all five demos",
+  "scope_note": "Automated QEMU evidence only; this does not establish live UTM behavior or acceptance of other Demo sources."
+}
