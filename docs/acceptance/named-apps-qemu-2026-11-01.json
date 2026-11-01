@@ -1,8 +1,8 @@
 {
   "date": "2026-11-01",
-  "commit": "9d997a3ea5e8389a1d4466759f9f6460d6058ebc",
+  "commit": "e25855cc269a36fc823bb6491ed40d4055a2660d",
   "target": "QEMU PCI ARM64 graphical guest",
-  "scope": "Targeted runtime acceptance for two named apps. This does not establish live UTM behavior or complete ZealOS program coverage.",
+  "scope": "Targeted runtime acceptance on the current ARM64 compatibility guest. Passing QEMU probes do not establish live UTM behavior or complete ZealOS program coverage.",
   "checks": {
     "ToTheFront": {
       "command": "python3 scripts/check-compat.py --pci --probe-tothefront",
@@ -14,8 +14,7 @@
         "Space advanced the phase",
         "Escape returned to the graphical terminal",
         "40+2 returned 42 and runtime reported failed=0"
-      ],
-      "log": "build/check-compat-pci.log"
+      ]
     },
     "Psalmody": {
       "command": "python3 scripts/check-compat.py --pci --probe-psalmody",
@@ -28,7 +27,61 @@
         "40+2 returned 42 and runtime reported failed=0"
       ],
       "log": "build/check-psalmody-pci.log"
+    },
+    "Span": {
+      "command": "python3 scripts/check-compat.py --pci --probe-span-strut",
+      "result": "pass",
+      "verified": [
+        "bridge entry and instructions displayed",
+        "graphical bridge frame rendered",
+        "Shift+Escape returned to the graphical terminal"
+      ]
+    },
+    "Strut": {
+      "command": "python3 scripts/check-compat.py --pci --probe-span-strut",
+      "result": "pass",
+      "verified": [
+        "mass selection mode displayed",
+        "edit and play input completed",
+        "graphics rendered",
+        "Escape returned to the graphical terminal and runtime reported failed=0"
+      ]
+    },
+    "TimeClock": {
+      "command": "python3 scripts/check-compat.py --pci --probe-timeclock",
+      "result": "pass",
+      "verified": [
+        "loaded app and entered punch-in description",
+        "entered punch-out description and generated report",
+        "40+2 returned 42 after exit and runtime reported failed=0"
+      ],
+      "log": "build/check-timeclock-pci.log"
+    },
+    "Vocabulary": {
+      "command": "python3 scripts/check-compat.py --pci --probe-vocabulary",
+      "result": "pass",
+      "verified": [
+        "answered quiz prompt and advanced through the program",
+        "Escape returned to the graphical terminal",
+        "40+2 returned 42 and runtime reported failed=0"
+      ],
+      "log": "build/check-vocabulary-pci.log"
     }
   },
-  "catalog_note": "The 2026-10-27 isolated compile catalog marked Psalmody and ToTheFront blocked. These targeted runtime runs pass in their proper system context; the old catalog remains a historical compile-only snapshot and should not be read as the current runtime status."
+  "catalog_note": "The 2026-10-27 isolated compile catalog marked Psalmody and ToTheFront blocked. Their targeted runtime runs pass in their proper system context; Vocabulary, Span, Strut, and TimeClock also pass targeted QEMU probes. The historical catalog is compile-only and is not current runtime status. This report is a partial slice, not an inventory of every app/demo.",
+  "unresolved": {
+    "X-Caliber": {
+      "command": "python3 scripts/check-compat.py --pci --probe-xcaliber",
+      "result": "fail",
+      "verified": [
+        "launch, help dismissal, level start and gameplay rendering passed",
+        "Left/Right visual response was inconclusive (idle_diff=5, left_diff=5, right_diff=0)",
+        "Space projectile response was not verified",
+        "Escape did not return to terminal within 8 seconds; serial zstatus then timed out",
+        "the screenshot still showed the game scene"
+      ],
+      "log": "build/check-compat-pci.log",
+      "diagnostic": "Keyboard Enter and Left events reached and were dequeued by the X-Caliber task. Later controls were not observed in the log before the guest stopped responding; investigate the app/window-manager/render scheduling path. Do not add a Yield to MessageScan or an X-Caliber-specific Yield."
+    }
+  }
 }
