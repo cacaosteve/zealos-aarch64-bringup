@@ -1,6 +1,6 @@
 {
   "date": "2026-11-01",
-  "commit": "37dde985cc3b6f4a58f0e66790421414b001b14b",
+  "commit": "ea6d2362727cbc2291980350e1e38da5fec4d0ec",
   "target": "QEMU PCI ARM64 graphical guest",
   "scope": "Targeted runtime acceptance on the current ARM64 compatibility guest. Passing QEMU probes do not establish live UTM behavior or complete ZealOS program coverage.",
   "checks": {
