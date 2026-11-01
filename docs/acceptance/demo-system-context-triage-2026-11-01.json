@@ -4,7 +4,9 @@
   "target": "QEMU PCI ARM64 guest; source loaded in booted ZealC kernel/system namespace",
   "commands": [
     "python3 scripts/check-compat.py --pci --probe-demo-system-context --demo-system-path /Demo/Graphics/LightTable.ZC --demo-system-path /Demo/OnceDemo.ZC --demo-system-path /Demo/MultiCore/LoadTest.ZC --demo-system-path /Demo/AcctExample/TOS/TOSConfig.ZC",
-    "python3 scripts/check-compat.py --pci --probe-demo-system-context --demo-system-path /Demo/Graphics/LightTable.ZC --demo-system-module /System/DevInfo.ZC --demo-system-module /System/Math/Math.ZC"
+    "python3 scripts/check-compat.py --pci --probe-demo-system-context --demo-system-path /Demo/Graphics/LightTable.ZC --demo-system-module /System/DevInfo.ZC --demo-system-module /System/Math/Math.ZC",
+    "python3 scripts/check-compat.py --pci --probe-demo-system-context --demo-system-module /System/Math/Math.ZC",
+    "python3 scripts/check-compat.py --pci --probe-demo-system-context --demo-system-path /Demo/Graphics/LightTable.ZC --demo-system-module /System/Math/Math.ZC"
   ],
   "outcomes": [
     {
@@ -26,6 +28,25 @@
       "path": "/Demo/AcctExample/TOS/TOSConfig.ZC",
       "result": "blocked",
       "evidence": "AArch64 external data mem_boot_base is not bound."
+    },
+    {
+      "modules_loaded": ["/System/Math/Math.ZC"],
+      "result": "pass",
+      "paths": [
+        "/Demo/Graphics/Box.ZC",
+        "/Demo/Graphics/Mandel.ZC",
+        "/Demo/Graphics/Hanoi.ZC",
+        "/Demo/Graphics/Doodle.ZC",
+        "/Demo/Disk/DataBase.ZC",
+        "/Demo/Games/BattleLines.ZC"
+      ],
+      "evidence": "All six sources compiled with CCF_JUST_LOAD in the booted ZealC kernel/system namespace after loading /System/Math/Math.ZC. This establishes compile-in-context only, not runtime acceptance."
+    },
+    {
+      "path": "/Demo/Graphics/LightTable.ZC",
+      "modules_loaded": ["/System/Math/Math.ZC"],
+      "result": "blocked",
+      "evidence": "Loading Math resolves the earlier ACos failure; the next unresolved function is MemBIOSRep at line 522. It is defined in /System/DevInfo.ZC, whose load is currently blocked by unbound external device-global data dev."
     }
   ],
   "interpretation": "These failures are context/module or hardware-global dependencies; they should not all be attributed to parser or backend defects. No source or kernel behavior was changed by these probes."
