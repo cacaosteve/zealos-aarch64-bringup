@@ -8255,10 +8255,11 @@ void zc_status(void) {
                    (unsigned long)guest_message_scan_key_hits[i][0],
                    (unsigned long)guest_message_scan_key_hits[i][1]);
     printf("\n");
-    printf("keyboard_bitmap: left=%d right=%d ctrl=%d updates=%lu misses=%lu\n",
+    printf("keyboard_bitmap: left=%d right=%d ctrl=%d esc=%d updates=%lu misses=%lu\n",
            guest_keyboard_bitmap_read("down_bitmap", 0x4b),
            guest_keyboard_bitmap_read("down_bitmap", 0x4d),
            guest_keyboard_bitmap_read("down_bitmap", 0x1d),
+           guest_keyboard_bitmap_read("down_bitmap", 0x01),
            (unsigned long)guest_keyboard_bitmap_updates,
            (unsigned long)guest_keyboard_bitmap_misses);
     if (gui_terminal_active) {
