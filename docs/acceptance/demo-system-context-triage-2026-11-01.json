@@ -1,0 +1,32 @@
+{
+  "date": "2026-11-01",
+  "repository_commit": "2e3504a778411640c3748b3249f34ff9e4237fb8",
+  "target": "QEMU PCI ARM64 guest; source loaded in booted ZealC kernel/system namespace",
+  "commands": [
+    "python3 scripts/check-compat.py --pci --probe-demo-system-context --demo-system-path /Demo/Graphics/LightTable.ZC --demo-system-path /Demo/OnceDemo.ZC --demo-system-path /Demo/MultiCore/LoadTest.ZC --demo-system-path /Demo/AcctExample/TOS/TOSConfig.ZC",
+    "python3 scripts/check-compat.py --pci --probe-demo-system-context --demo-system-path /Demo/Graphics/LightTable.ZC --demo-system-module /System/DevInfo.ZC --demo-system-module /System/Math/Math.ZC"
+  ],
+  "outcomes": [
+    {
+      "path": "/Demo/Graphics/LightTable.ZC",
+      "result": "blocked",
+      "evidence": "In the booted namespace, first unresolved symbol was ACos. Attempting to load /System/DevInfo.ZC failed earlier because external data dev is not bound; Math and device-global binding are required."
+    },
+    {
+      "path": "/Demo/OnceDemo.ZC",
+      "result": "blocked",
+      "evidence": "BootRAM is unresolved in the current boot namespace; the RAM-boot module is not loaded/bound."
+    },
+    {
+      "path": "/Demo/MultiCore/LoadTest.ZC",
+      "result": "blocked",
+      "evidence": "Comp is unresolved in the current boot namespace; the upstream compiler module is not loaded/bound."
+    },
+    {
+      "path": "/Demo/AcctExample/TOS/TOSConfig.ZC",
+      "result": "blocked",
+      "evidence": "AArch64 external data mem_boot_base is not bound."
+    }
+  ],
+  "interpretation": "These failures are context/module or hardware-global dependencies; they should not all be attributed to parser or backend defects. No source or kernel behavior was changed by these probes."
+}
