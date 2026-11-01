@@ -314,7 +314,7 @@ array size and initialized class-array contents. The original
 are recorded in
 [`acceptance/demo-globalvars-array-size-2026-11-01.json`](acceptance/demo-globalvars-array-size-2026-11-01.json).
 The count is compile evidence only. Separate QEMU checks now bring the Demo
-runtime accepted count to twelve: unchanged TicTacToe and Chess both render,
+runtime accepted count to eighteen: unchanged TicTacToe and Chess both render,
 accept input where applicable, exit cleanly, and return to a terminal where
 `40+2;` evaluates to 42. The original NetOfDots and Lines programs also render, accept exit input, and recover the terminal; Lines animation was verified by changing scanout. See
 [`acceptance/demo-stock-graphics-2026-11-01.json`](acceptance/demo-stock-graphics-2026-11-01.json). Pick3D now passes its QEMU interactive graphics probe, including visible graphics, Escape, and terminal recovery. The failure was a missing bootstrap implementation of the stock task-local `HashGenericAdd` and `FramePtr` helpers. See
