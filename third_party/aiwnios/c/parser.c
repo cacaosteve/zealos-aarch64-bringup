@@ -3669,7 +3669,11 @@ int64_t PrsDecl(CCmpCtrl *ccmp, CHashClass *base, CHashClass *add_to,
           PrsArray(ccmp, lst->member_class, lst->dim.next, lst->static_bytes,
                    !(flags & PRSF_FUN_ARGS) && ccmp->lex->cur_tok != '{');
         }
-        if (lst->dim.next && lst->dim.next->cnt == INT64_MIN)
+        /* PrsArrayInfer replaces the first-dimension sentinel with the
+         * inferred bound.  Test the outer total-count sentinel instead so
+         * inferred static locals (including class arrays) publish their
+         * computed size for sizeof(local_array). */
+        if (lst->dim.next && lst->dim.total_cnt == INT64_MIN)
           lst->dim.total_cnt =
               lst->dim.next->cnt * lst->dim.next->total_cnt;
       }
@@ -3754,6 +3758,17 @@ int64_t PrsDecl(CCmpCtrl *ccmp, CHashClass *base, CHashClass *add_to,
           glbl_var->data_addr = extern_glbl->data_addr;
           glbl_var->base.type &= ~HTF_EXTERN;
           break;
+        }
+      }
+      /* Host data bindings are exported as system symbols so child compiler
+       * tasks can resolve them too. Unlike function imports, extern data has
+       * no trampoline: use the exported original pointer as its storage. */
+      if (!glbl_var->data_addr) {
+        CHashExport *host_data = (CHashExport *)HashFind(
+            glbl_var->base.str, Fs->hash_table, HTT_EXPORT_SYS_SYM, 1);
+        if (host_data && host_data->oval) {
+          glbl_var->data_addr = host_data->oval;
+          glbl_var->base.type &= ~HTF_EXTERN;
         }
       }
     } else {

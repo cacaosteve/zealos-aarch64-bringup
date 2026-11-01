@@ -1,0 +1,26 @@
+{
+  "date": "2026-11-01",
+  "change": "Fix inferred total size for initialized static local arrays in the ARM64 compiler.",
+  "regression": "StockCatalogStaticArraySizeChecks",
+  "target": "PCI QEMU ARM64 compatibility guest",
+  "commands": [
+    "make esp",
+    "python3 scripts/check-compat.py --pci --probe-program-catalog --probe-demo-source-catalog --demo-source-path /Demo/GlobalVars.ZC",
+    "python3 scripts/check-compat.py --pci --probe-program-catalog --probe-demo-source-catalog"
+  ],
+  "result": {
+    "focused_regression": "pass; returned 0x2a and verified inferred array size and initialized class-array fields",
+    "demo_globalvars_compile": "pass",
+    "program_catalog": "pass",
+    "demo_source_compile": {
+      "passed": 176,
+      "total": 206,
+      "blocked": 30
+    }
+  },
+  "limits": [
+    "Compile evidence does not establish runtime correctness for every Demo program.",
+    "The existing Demo runtime accepted count remains six.",
+    "Live UTM-specific freezes are not covered by this QEMU result."
+  ]
+}

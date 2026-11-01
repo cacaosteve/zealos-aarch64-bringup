@@ -11,9 +11,34 @@ from arm64_source import (extract_sprite_elem_base_sizes, inject_sprite_elem_bas
                           inject_sprite_wrappers)
 
 from arm64_source import (extract_home_set, extract_home_startup, extract_home_startup_tasks, inject_home_startup_tasks, extract_server_task, extract_user_task, extract_version_scalars, extract_source_prompt, extract_source_training, translate_autocomplete_task, translate_doctree, translate_registry, translate_docterm, translate_doced, translate_docfind, translate_docform, translate_docpopup, translate_docrecalc, translate_grbitmap, translate_tothefront_draw, translate_tothefront_init, translate_tothefront_sentinel, translate_math,
-translate_tothefront_player_pick, translate_tothefront_ai, translate_filemgr, translate_grdc, translate_grpalette, translate_message, translate_grscreen, translate_ktask, translate_winmgr, translate_zsplash, translate_home_once, translate_span_worker_cleanup, translate_keepaway_nearest_ball, translate_stock_game_math_calls, translate_empty_label_statement, translate_wenceslas, translate_progress, translate_xcaliber_shot_return, translate_xcaliber_draw_visibility, translate_xcaliber_key_descriptors, translate_xcaliber_escape_scan, translate_xcaliber_held_input)
+translate_tothefront_player_pick, translate_tothefront_ai, translate_filemgr, translate_grdc, translate_grpalette, translate_message, translate_grscreen, translate_ktask, translate_winmgr, translate_win_focus_trace, translate_job_focus_trace, translate_sched_focus_trace, translate_zsplash, translate_home_once, translate_span_worker_cleanup, translate_keepaway_nearest_ball, translate_stock_game_math_calls, translate_empty_label_statement, translate_wenceslas, translate_progress, translate_xcaliber_shot_return, translate_xcaliber_draw_visibility, translate_xcaliber_key_descriptors, translate_xcaliber_escape_scan, translate_xcaliber_held_input)
+from arm64_source import translate_pick3d_class_terminator, translate_classmeta_callback
 
 root = Path(__file__).resolve().parent.parent
+classmeta_source = (root / 'upstream/pinned/Demo/ClassMeta.ZC').read_bytes()
+classmeta_overlay = translate_classmeta_callback(classmeta_source)
+assert b'output_fun &RankOut' not in classmeta_overlay
+assert b'percentile "54.20"' in classmeta_overlay
+assert b'" percentile: %s", percentile_str;' in classmeta_overlay
+assert b'RankOut(*q);' in classmeta_overlay
+try:
+    translate_classmeta_callback(classmeta_source.replace(b'&RankOut', b'&Other', 1))
+except ValueError:
+    pass
+else:
+    raise AssertionError('ClassMeta overlay accepted changed callback source')
+print('PASS guarded ClassMeta metadata and rank callback overlay', flush=True)
+pick3d_source = (root / 'upstream/pinned/Demo/Graphics/Pick3D.ZC').read_bytes()
+pick3d_overlay = translate_pick3d_class_terminator(pick3d_source)
+assert pick3d_overlay.count(b'*dr; //Rounding error might eventually screw this up\n};\n\nclass PObj') == 1
+try:
+    translate_pick3d_class_terminator(pick3d_source.replace(b'\t*dr;', b'\t*delta;', 1))
+except ValueError:
+    pass
+else:
+    raise AssertionError('Pick3D overlay accepted changed pinned source')
+print('PASS guarded Pick3D PCSprite class terminator overlay', flush=True)
+
 math_source = (root / 'upstream/pinned/System/Math/Math.ZC').read_bytes()
 math_overlay = translate_math(math_source)
 assert math_overlay.count(b'return Arg(1.0, s / c);') == 2
@@ -275,6 +300,15 @@ for changed_keyboard, changed_printer in [
     else:
         raise AssertionError('keyboard helper extraction accepted changed dependencies')
 task_bridge = (root / 'upstream/bootstrap/System/TaskBridge.ZC').read_text()
+menu_focus_start = task_bridge.index('public U0 BootstrapMenuFocusRestore(')
+menu_focus_end = task_bridge.index('\nU0 BootstrapMouseGlobalsInit()', menu_focus_start)
+menu_focus = task_bridge[menu_focus_start:menu_focus_end]
+assert ('if (clear)\n    {\n        bootstrap_menu_focus_task = NULL;\n'
+        '        return;\n    }\n'
+        '    if (TaskValidate(bootstrap_menu_focus_task))\n'
+        '    {\n'
+        '        ZcFocusTrace("MenuRestore", sys_focus_task, bootstrap_menu_focus_task);\n'
+        '        sys_focus_task = bootstrap_menu_focus_task;') in menu_focus
 assert 'I64 best_score, best_score0, best_score1;' in task_bridge
 for sound_compat in ('U0 Play(U8 *music=NULL, ...)', 'U0 SoundTaskEndCB()',
                      'U0 Sweep(I64 frequency, I64 duration, I64 end_frequency)',
@@ -522,6 +556,18 @@ winmgr_source = (root / 'upstream/pinned/System/WinMgr.ZC').read_bytes()
 winmgr_translated = translate_winmgr(winmgr_source)
 winmgr_text = winmgr_translated.decode('utf-8')
 assert winmgr_translated != winmgr_source
+win_source = (root / 'upstream/pinned/System/Win.ZC').read_bytes()
+win_focus_trace = translate_win_focus_trace(win_source).decode('utf-8')
+assert win_focus_trace.count('ZcFocusTrace("WinRefocus", sys_focus_task, task);') == 1
+assert win_focus_trace.count('ZcFocusTrace("WinToTop", sys_focus_task, task);') == 1
+assert win_focus_trace.count('ZcFocusTrace("WinFocus", sys_focus_task, task);') == 1
+job_source = (root / 'upstream/pinned/Kernel/Job.ZC').read_bytes()
+job_focus_trace = translate_job_focus_trace(job_source).decode('utf-8')
+assert job_focus_trace.count('ZcFocusTrace("JobRunOne", sys_focus_task, master);') == 1
+sched_source = (root / 'upstream/pinned/Kernel/Sched.ZC').read_bytes()
+sched_focus_trace = translate_sched_focus_trace(sched_source).decode('utf-8')
+assert sched_focus_trace.count('ZcFocusTrace("TaskFocusNextClear", sys_focus_task, NULL);') == 1
+assert sched_focus_trace.count('ZcFocusTrace("TaskFocusNextSelect", sys_focus_task, task);') == 1
 assert winmgr_text.count('ZcTaskFrameRun;') == 1
 assert '\t\tGrUpdateScreen;' not in winmgr_text
 assert ('if (task == Fs && 0 <= mouse.pos.y < FONT_HEIGHT && mouse_hard.installed)\n'

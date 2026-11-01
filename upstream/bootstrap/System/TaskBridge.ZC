@@ -670,6 +670,71 @@ extern U0 HashTableDel(CHashTable *table);
 extern CHash *HashFind(U8 *needle_str, CHashTable *haystack_table,
                        I64 mask, I64 instance=1);
 extern U0 HashAdd(CHash *tmph, CHashTable *table);
+// The freestanding bootstrap does not load Kernel/KHashB.ZC, but GUI demos
+// use these stock task-local hash helpers for per-task frame state. Keep the
+// same ZealOS layouts and lookup semantics here so demos can run unchanged.
+CHashGeneric *HashGenericAdd(U8 *name, I64 type, I64 u0=0, I64 u1=0,
+                             I64 u2=0, CTask *task=NULL)
+{
+    CHashGeneric *entry;
+
+    if (!task)
+        task = Fs;
+    entry = CAlloc(sizeof(CHashGeneric), task);
+    entry->type = type;
+    entry->user_data0 = u0;
+    entry->user_data1 = u1;
+    entry->user_data2 = u2;
+    entry->str = StrNew(name, task);
+    HashAdd(entry, task->hash_table);
+    return entry;
+}
+I64 FramePtr(U8 *name, CTask *task=NULL)
+{
+    CHashGeneric *entry;
+
+    if (!task)
+        task = Fs;
+    entry = HashFind(name, task->hash_table, HTT_FRAME_PTR);
+    if (entry)
+        return entry->user_data0;
+    return 0;
+}
+CHashGeneric *FramePtrAdd(U8 *name, I64 val=0, CTask *task=NULL)
+{
+    return HashGenericAdd(name, HTT_FRAME_PTR, val, 0, 0, task);
+}
+I64 FramePtrSet(U8 *name, I64 val, CTask *task=NULL)
+{
+    CHashGeneric *entry;
+    I64 old;
+
+    if (!task)
+        task = Fs;
+    entry = HashFind(name, task->hash_table, HTT_FRAME_PTR);
+    if (!entry)
+        return 0;
+    old = entry->user_data0;
+    entry->user_data0 = val;
+    return old;
+}
+I64 FramePtrDel(U8 *name, CTask *task=NULL)
+{
+    CHashGeneric *entry;
+    I64 old;
+
+    if (!task)
+        task = Fs;
+    entry = HashFind(name, task->hash_table, HTT_FRAME_PTR);
+    if (!entry)
+        return 0;
+    old = entry->user_data0;
+    // HashRemDel is part of the full kernel hash module, not this bootstrap.
+    // Invalid entries are ignored by HashFind and replaced by a fresh head
+    // entry on the next add; task teardown reclaims their heap storage.
+    entry->type = HTT_INVALID;
+    return old;
+}
 I64 HashTypeNum(CHash *tmph)
 {//Hash type index used by upstream DocHighlight's color table.
     if (tmph)
@@ -5032,7 +5097,10 @@ U0 BootstrapWinRaise(CTask *task, CTask *root)
         }
     }
     if (!(task->win_inhibit & (1 << WIf_SELF_FOCUS)))
+    {
+        ZcFocusTrace("WinRaise", sys_focus_task, task);
         sys_focus_task = task;
+    }
     POPFD
 }
 public CTask *BootstrapWinClickFocus(I64 screen_x, I64 screen_y)
@@ -5402,10 +5470,16 @@ public U0 BootstrapMenuFocusRemember()
 }
 public U0 BootstrapMenuFocusRestore(Bool clear=FALSE)
 {//Keep the application's menu owner focused while the source manager tracks a menu click.
-    if (TaskValidate(bootstrap_menu_focus_task))
-        sys_focus_task = bootstrap_menu_focus_task;
     if (clear)
+    {
         bootstrap_menu_focus_task = NULL;
+        return;
+    }
+    if (TaskValidate(bootstrap_menu_focus_task))
+    {
+        ZcFocusTrace("MenuRestore", sys_focus_task, bootstrap_menu_focus_task);
+        sys_focus_task = bootstrap_menu_focus_task;
+    }
 }
 U0 BootstrapMouseGlobalsInit()
 {//MouseInit's visible, unscaled defaults for the VirtIO tablet bridge.
@@ -6824,11 +6898,15 @@ I64 PopUp(U8 *buf, CTask *parent=NULL, CTask **_pu_task=NULL)
 
     Fs->popup_task = task;
     // A synchronous popup owns live input until JOBf_FOCUS_MASTER returns it.
+    ZcFocusTrace("Popup", sys_focus_task, task);
     sys_focus_task = task;
     job = TaskExe(task, parent, buf,
                   1 << JOBf_WAKE_MASTER | 1 << JOBf_FOCUS_MASTER);
     if (!job && !Bt(&parent->win_inhibit, WIf_SELF_FOCUS))
+    {
+        ZcFocusTrace("PopupParent", sys_focus_task, parent);
         sys_focus_task = parent;
+    }
     if (_pu_task)
         *_pu_task = task;
     if (job)

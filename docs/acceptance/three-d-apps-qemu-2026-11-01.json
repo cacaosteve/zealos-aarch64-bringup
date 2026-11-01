@@ -1,0 +1,31 @@
+{
+  "date": "2026-11-01",
+  "command": "python3 scripts/check-compat.py --pci --probe-3d-apps --probe-keepaway-full-game",
+  "exit_code": 0,
+  "scope": "Automated PCI QEMU runtime acceptance on the current rebuilt ARM64 guest; this is not live UTM acceptance.",
+  "checks": {
+    "GrModels": {
+      "entry_and_form": "pass",
+      "Man_mesh_generation": "pass: 112 vertices, 168 triangles; repeat prompt and terminal recovery passed",
+      "Ball_mesh_generation": "pass: 58 vertices, 128 triangles; inline sprite rendered with 510 matching pixels; repeat prompt and terminal recovery passed"
+    },
+    "KeepAway": {
+      "court_hud_and_player_frame": "pass",
+      "space_and_mouse_input_with_frame_refresh": "pass",
+      "Escape_and_terminal_recovery": "pass: 40+2 returned 42",
+      "full_three_minute_game": "pass: graphical scanout continued changing through 183-second observation window; game ended and Escape returned to terminal, 40+2 returned 42"
+    },
+    "Titanium": {
+      "intro_and_game_frame": "pass",
+      "input_and_Escape_terminal_recovery": "pass: 40+2 returned 42"
+    },
+    "shared_sprite_mesh_and_interpolation_fixtures": "pass",
+    "standard_system_and_graphical_terminal_regressions": "pass"
+  },
+  "live_utm": {
+    "Titanium": "user-confirmed working, including plain left/right, Space, and Escape",
+    "KeepAway": "user previously reported a complete freeze around 2:15; QEMU full-game run stayed active past that point and completed, so the UTM-specific report remains unresolved.",
+    "GrModels": "user previously reported no obvious generated model after choosing colors; QEMU verifies Man and Ball generation, with the Ball inline sprite visible"
+  },
+  "probe_adjustment": "The graphical text matcher now accepts the stable 'y or n)?' suffix for GrModels' repeat prompt when framebuffer text capture drops letters. Mesh diagnostics and subsequent terminal recovery remain required checks. Long-run KeepAway probe observed changing scanout through the full 183-second window, followed by Escape recovery and a terminal 42 smoke test."
+}

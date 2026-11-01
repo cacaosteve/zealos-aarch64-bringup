@@ -778,6 +778,16 @@ check-vocabulary-program: check-upstream esp
 	python3 scripts/check-arm64-source.py
 	python3 scripts/check-compat.py --pci --probe-vocabulary
 
+.PHONY: check-demo-chess
+check-demo-chess: check-upstream esp
+	python3 scripts/check-arm64-source.py
+	python3 scripts/check-compat.py --pci --probe-demo-chess
+
+.PHONY: check-demo-tictactoe
+check-demo-tictactoe: check-upstream esp
+	python3 scripts/check-arm64-source.py
+	python3 scripts/check-compat.py --pci --probe-demo-tictactoe
+
 .PHONY: check-input-edges
 check-input-edges: esp
 	python3 scripts/check-compat.py --pci --probe-input-edges

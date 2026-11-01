@@ -1853,7 +1853,7 @@
        glbl_var->data_addr =
            A_CALLOC(glbl_var->var_class->sz * glbl_var->dim.total_cnt, NULL);
      if (flags & PRSF_IMPORT) {
-@@ -3170,19 +3738,40 @@
+@@ -3170,19 +3738,51 @@
      }
      HashAdd(glbl_var, Fs->hash_table);
    found_glbl:
@@ -1876,6 +1876,17 @@
 +          glbl_var->data_addr = extern_glbl->data_addr;
 +          glbl_var->base.type &= ~HTF_EXTERN;
 +          break;
++        }
++      }
++      /* Host data bindings are exported as system symbols so child compiler
++       * tasks can resolve them too. Unlike function imports, extern data has
++       * no trampoline: use the exported original pointer as its storage. */
++      if (!glbl_var->data_addr) {
++        CHashExport *host_data = (CHashExport *)HashFind(
++            glbl_var->base.str, Fs->hash_table, HTT_EXPORT_SYS_SYM, 1);
++        if (host_data && host_data->oval) {
++          glbl_var->data_addr = host_data->oval;
++          glbl_var->base.type &= ~HTF_EXTERN;
 +        }
 +      }
 +    } else {

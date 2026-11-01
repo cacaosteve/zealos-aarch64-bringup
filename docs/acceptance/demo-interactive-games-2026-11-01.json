@@ -1,0 +1,37 @@
+{
+  "date": "2026-11-01",
+  "target": "QEMU PCI ARM64 graphical terminal",
+  "checks": {
+    "TicTacToe": {
+      "command": "python3 scripts/check-compat.py --pci --probe-demo-tictactoe",
+      "result": "pass",
+      "verified": [
+        "board rendering",
+        "two mouse turns",
+        "Escape exit",
+        "terminal recovery and 40+2 result of 42"
+      ]
+    },
+    "Chess": {
+      "command": "python3 scripts/check-compat.py --pci --probe-demo-chess",
+      "result": "pass",
+      "verified": [
+        "board rendering",
+        "Escape cleanup",
+        "terminal recovery and 40+2 result of 42"
+      ]
+    },
+    "Pick3D": {
+      "command": "python3 scripts/check-compat.py --pci --probe-demo-pick3d",
+      "result": "pass",
+      "verified": [
+        "interactive window displays \u201cMove things around.\u201d",
+        "visible graphics exceed the color and pixel thresholds",
+        "Escape exit",
+        "terminal recovery and 40+2 result of 42"
+      ],
+      "fix": "Bootstrap TaskBridge now implements the stock task-local HashGenericAdd and FramePtr APIs used by Pick3D."
+    }
+  },
+  "scope": "QEMU evidence only; it does not establish live UTM acceptance."
+}

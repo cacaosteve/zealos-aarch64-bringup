@@ -976,7 +976,19 @@ def translate_xcaliber_held_input(source: bytes) -> bytes:
                    b'\t\t\tAI;')
     if source.count(anchor) != 1:
         raise ValueError('pinned X-Caliber frame update point changed')
-    return source.replace(anchor, replacement, 1)
+    traced = source
+    for code in (b'MESSAGE_KEY_DOWN', b'MESSAGE_KEY_UP'):
+        old_event = (b'case ' + code + b':\n'
+                     b'\t\t\t\t\t\tch = arg1;\n'
+                     b'\t\t\t\t\t\tsc = arg2;')
+        new_event = (b'case ' + code + b':\n'
+                     b'\t\t\t\t\t\tch = arg1;\n'
+                     b'\t\t\t\t\t\tsc = arg2;\n'
+                     b'\t\t\t\t\t\tZcXCaliberMessageTrace(message_code, ch, sc, Fs);')
+        if traced.count(old_event) != 1:
+            raise ValueError('pinned X-Caliber key event cases changed')
+        traced = traced.replace(old_event, new_event, 1)
+    return traced.replace(anchor, replacement, 1)
 
 
 def translate_tothefront_sentinel(source: bytes) -> bytes:
@@ -1606,6 +1618,37 @@ def translate_winmgr(source: bytes) -> bytes:
     return text.encode("utf-8")
 
 
+def translate_win_focus_trace(source: bytes) -> bytes:
+    """Trace upstream window-manager focus assignments during input routing."""
+    try:
+        text = source.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValueError("Win.ZC is not UTF-8") from exc
+    plain = "\tsys_focus_task = task;\n"
+    if text.count(plain) != 2:
+        raise ValueError("expected the two guarded Win.ZC focus assignments")
+    text = text.replace(
+        plain,
+        '\tZcFocusTrace("WinRefocus", sys_focus_task, task);\n' + plain,
+        1,
+    )
+    text = text.replace(
+        plain,
+        '\tZcFocusTrace("WinToTop", sys_focus_task, task);\n' + plain,
+        1,
+    )
+    inline = "\tWinToTop(sys_focus_task = task);"
+    if text.count(inline) != 1:
+        raise ValueError("expected the WinFocus assignment and raise call")
+    text = text.replace(
+        inline,
+        '\tZcFocusTrace("WinFocus", sys_focus_task, task);\n'
+        '\tWinToTop(sys_focus_task = task);',
+        1,
+    )
+    return text.encode("utf-8")
+
+
 def translate_filemgr(source: bytes) -> bytes:
     """Add the merged source volume to the unchanged ZealOS FileMgr tree.
 
@@ -2159,6 +2202,45 @@ def translate_wenceslas(source: bytes) -> bytes:
     return source
 
 
+def translate_job_focus_trace(source: bytes) -> bytes:
+    """Trace the pinned JobRunOne focus restore without changing its behavior."""
+    old = (b'\t\t\tif (Bt(&flags, JOBf_FOCUS_MASTER) && '
+           b'!Bt(&master->win_inhibit, WIf_SELF_FOCUS))\n'
+           b'\t\t\t\tsys_focus_task = master;')
+    new = (b'\t\t\tif (Bt(&flags, JOBf_FOCUS_MASTER) && '
+           b'!Bt(&master->win_inhibit, WIf_SELF_FOCUS))\n'
+           b'\t\t\t{\n'
+           b'\t\t\t\tZcFocusTrace("JobRunOne", sys_focus_task, master);\n'
+           b'\t\t\t\tsys_focus_task = master;\n'
+           b'\t\t\t}')
+    if source.count(old) != 1:
+        raise ValueError('pinned JobRunOne focus restore shape changed')
+    return source.replace(old, new)
+
+
+def translate_sched_focus_trace(source: bytes) -> bytes:
+    """Trace the pinned cooperative focus-ring walk without altering it."""
+    try:
+        text = source.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValueError("Sched.ZC is not UTF-8") from exc
+    clear = "\tsys_focus_task = NULL;\n"
+    select = "\t\t\tsys_focus_task = task;\n"
+    if text.count(clear) != 1 or text.count(select) != 1:
+        raise ValueError("expected the pinned TaskFocusNext focus assignments")
+    text = text.replace(
+        clear,
+        '\tZcFocusTrace("TaskFocusNextClear", sys_focus_task, NULL);\n' + clear,
+        1,
+    )
+    text = text.replace(
+        select,
+        '\t\t\tZcFocusTrace("TaskFocusNextSelect", sys_focus_task, task);\n' + select,
+        1,
+    )
+    return text.encode("utf-8")
+
+
 def translate_sysrep_processor(source: bytes) -> bytes:
     """Report firmware CPU family on ARM64 without inventing x86 CPUID data."""
     declaration = b'\t\t\t\t\tCRAXRBXRCXRDX regs;\n'
@@ -2588,6 +2670,7 @@ def translate_message(source: bytes) -> bytes:
     )
     new = (
         "\t\t\t\tI64 arg1 = tmpc->aux1, arg2 = tmpc->aux2;\n"
+        "\t\t\t\tZcXCaliberMessageTrace(res, arg1, arg2, task);\n"
         "\t\t\t\tif (_arg1)\n"
         "\t\t\t\t\t*_arg1 = arg1;\n"
         "\t\t\t\tif (_arg2)\n"
@@ -2598,4 +2681,56 @@ def translate_message(source: bytes) -> bytes:
     )
     if text.count(old) != 1:
         raise ValueError("expected unchanged SerialDev/Message.ZC message dequeue")
-    return text.replace(old, new, 1).encode("utf-8")
+    text = text.replace(old, new, 1)
+    scan_anchor = "\tif (!task)\n\t\ttask = Fs;\n\told_flags = RFlagsGet;"
+    scan_trace = ("\tif (!task)\n\t\ttask = Fs;\n"
+                  "\tZcXCaliberMessageScanTrace(task);\n"
+                  "\told_flags = RFlagsGet;")
+    if text.count(scan_anchor) != 1:
+        raise ValueError("expected unchanged SerialDev/Message.ZC MessageScan entry")
+    return text.replace(scan_anchor, scan_trace, 1).encode("utf-8")
+
+
+def translate_classmeta_callback(source: bytes) -> bytes:
+    """Adapt ClassMeta's numeric metadata and callback to ARM64 parser limits."""
+    old_meta = b'I64 rank\t\tprint_str "%1d" default_val 6/2 output_fun &RankOut;'
+    new_meta = b'I64 rank\t\tprint_str "%1d" default_val 6/2;'
+    old_percentile = b'\tI64 age \t\t\tprint_str "%2d" default_val 38 percentile 54.20;'
+    new_percentile = b'I64 age \t\t\tpercentile "54.20" print_str "%2d" default_val 38;'
+    old_decl = b'F64\t\t\t percentile;'
+    new_decl = b'U8\t\t\t *percentile_str;'
+    old_print = (b'\t\tif (MemberMetaFind("percentile", ml))\n'
+                 b'\t\t{//check if it exists\n'
+                 b'\t\t\t//We could use the $LK,\"CMemberListMeta\",A=\"MN:CMemberListMeta\"$ structure returned by\n'
+                 b'\t\t\t//$LK,\"MemberMetaFind\",A=\"MN:MemberMetaFind\"$() and save a search.\n'
+                 b'\t\t\tpercentile = MemberMetaData("percentile", ml)(F64);\n'
+                 b'\t\t\t" percentile: %5.2f", percentile;\n'
+                 b'\t\t}')
+    new_print = (b'\t\tif (percentile_str = MemberMetaData("percentile", ml))\n'
+                 b'\t\t\t" percentile: %s", percentile_str;')
+    old_call = (b'if (fp_output_fun = MemberMetaData("output_fun", ml))\n'
+                b'\t\t\t(*fp_output_fun)(*q);')
+    new_call = (b'if (!StrCompare(ml->str, "rank") &&\n'
+                b'\t\t    !StrCompare(class_name, "Test1Struct"))\n'
+                b'\t\t\tRankOut(*q);')
+    for old in (old_meta, old_percentile, old_decl, old_print, old_call):
+        if source.count(old) != 1:
+            raise ValueError('pinned ClassMeta shape changed')
+    return (source.replace(old_meta, new_meta, 1)
+            .replace(old_percentile, new_percentile, 1)
+            .replace(old_decl, new_decl, 1)
+            .replace(old_print, new_print, 1)
+            .replace(old_call, new_call, 1))
+
+
+def translate_pick3d_class_terminator(source: bytes) -> bytes:
+    """Repair the missing class terminator in the pinned Pick3D demo."""
+    old = (b'\tI64 \t*r, \n'
+           b'\t\t\t*dr; //Rounding error might eventually screw this up\n'
+           b'}\n\nclass PObj')
+    new = (b'\tI64 \t*r, \n'
+           b'\t\t\t*dr; //Rounding error might eventually screw this up\n'
+           b'};\n\nclass PObj')
+    if source.count(old) != 1:
+        raise ValueError('pinned Pick3D sprite class terminator changed')
+    return source.replace(old, new, 1)

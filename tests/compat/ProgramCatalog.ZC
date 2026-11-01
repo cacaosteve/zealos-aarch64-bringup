@@ -25,6 +25,47 @@ I64 StockCatalogBFieldChecks()
     return 0;
 }
 
+I64 StockCatalogMemoryPoolChecks()
+{//System pool statistics must track the bridge's real data/code arenas.
+    I64 before, during, after;
+    U8 *allocation;
+
+    if (!sys_data_bp || !sys_code_bp ||
+        sys_data_bp->alloced_u8s < 0x7000000 ||
+        sys_code_bp->alloced_u8s < 0x5000000 ||
+        sys_code_bp->used_u8s <= 0)
+        return 11;
+    before = sys_data_bp->used_u8s;
+    allocation = MAlloc(73);
+    during = sys_data_bp->used_u8s;
+    if (during <= before)
+        return 12;
+    Free(allocation);
+    after = sys_data_bp->used_u8s;
+    if (after != before)
+        return 13;
+    return 42;
+}
+
+I64 StockCatalogStaticArraySizeChecks()
+{//An inferred static-local array must publish its size after initialization.
+    class StockCatalogArrayItem
+    {
+        I32 value;
+        U8 name[8];
+    };
+    static StockCatalogArrayItem items[] =
+    {
+        {40, "Local1"},
+        {42, "Local2"},
+    };
+    if (sizeof(items) != 2 * sizeof(StockCatalogArrayItem) ||
+        items[0].value != 40 || items[1].value != 42 ||
+        items[1].name[5] != '2')
+        return 1;
+    return 42;
+}
+
 I64 StockCatalogExeDocFile(U8 *filename, I64 ccf_flags=0)
 {//Compile a source document with its inline DolDoc payloads intact.
     CDoc *doc = DocRead(filename);
@@ -274,6 +315,91 @@ I64 StockCatalogCompileWithProgramModules(U8 *path)
         "ExeFile2(\"/System/Gr/ScreenCast.ZC\",CCF_JUST_LOAD);"
         "ExeFile2(\"/Apps/Psalmody/JukePuppet.ZC\",CCF_JUST_LOAD);"
         "StockCatalogExeDocFile(\"%Q\",CCF_JUST_LOAD);42;", path);
+    job = TaskExe(task, Fs, source, 0);
+    Free(source);
+    if (!job)
+    {
+        Kill(task);
+        return -2;
+    }
+    result = JobResGet(job);
+    Kill(task);
+    return result == 42;
+}
+
+I64 StockCatalogCompileRawWithProgramModules(U8 *path)
+{//Compile plain source after stock dependencies; use this when DolDoc markup
+ // would otherwise transform a source-level token such as the class-layout $$.
+    CTask *task = Spawn(&StockCatalogServer);
+    CJob *job;
+    U8 *source;
+    I64 result;
+
+    if (!task)
+        return -1;
+    source = MStrPrint(
+        "ExeFile2(\"/System/Math/Math.ZC\",CCF_JUST_LOAD);"
+        "ExeFile2(\"/System/Sound.ZC\",CCF_JUST_LOAD);"
+        "ExeFile2(\"/System/Memory.ZC\",CCF_JUST_LOAD);"
+        "ExeFile2(\"/System/Utils/TaskRep.ZC\",CCF_JUST_LOAD);"
+        "ExeFile2(\"/System/Gr/GrDC.ZC\",CCF_JUST_LOAD);"
+        "ExeFile2(\"/System/Gr/GrMath.ZC\",CCF_JUST_LOAD);"
+        "ExeFile2(\"/System/Gr/GrPrimatives.ZC\",CCF_JUST_LOAD);"
+        "ExeFile2(\"/System/Gr/GrComposites.ZC\",CCF_JUST_LOAD);"
+        "U8 *CmdLinePrompt(){return StrNew(\"\\n\");}"
+        "ExeFile2(\"/Kernel/KernelA.HH\",CCF_JUST_LOAD);"
+        "ExeFile2(\"/Compiler/CompilerA.HH\",CCF_JUST_LOAD);"
+        "CCompGlobals cmp;"
+        "ExeFile2(\"/Compiler/CompilerB.HH\",CCF_JUST_LOAD);"
+        "extern U0 ParseStreamBlk(CCompCtrl *cc);"
+        "ExeFile2(\"/Compiler/LexLib.ZC\",CCF_JUST_LOAD);"
+        "ExeFile2(\"/Compiler/Lex.ZC\",CCF_JUST_LOAD);"
+        "ExeFile2(\"/System/Gr/SpriteNew.ZC\",CCF_JUST_LOAD);"
+        "ExeFile2(\"/System/Gr/SpriteCode.ZC\",CCF_JUST_LOAD);"
+        "ExeFile2(\"/System/Gr/ScreenCast.ZC\",CCF_JUST_LOAD);"
+        "ExeFile2(\"/Apps/Psalmody/JukePuppet.ZC\",CCF_JUST_LOAD);"
+        "ExeFile2(\"%Q\",CCF_JUST_LOAD);42;", path);
+    job = TaskExe(task, Fs, source, 0);
+    Free(source);
+    if (!job)
+    {
+        Kill(task);
+        return -2;
+    }
+    result = JobResGet(job);
+    Kill(task);
+    return result == 42;
+}
+
+I64 StockCatalogCompileWithProgramModulesAfterLoad(U8 *module, U8 *path)
+{//Compile a Demo source after the common modules and one source dependency.
+    CTask *task = Spawn(&StockCatalogServer);
+    CJob *job;
+    U8 *source;
+    I64 result;
+
+    if (!task)
+        return -1;
+    source = MStrPrint(
+        "ExeFile2(\"/System/Math/Math.ZC\",CCF_JUST_LOAD);"
+        "ExeFile2(\"/System/Sound.ZC\",CCF_JUST_LOAD);"
+        "ExeFile2(\"/System/Memory.ZC\",CCF_JUST_LOAD);"
+        "ExeFile2(\"/System/Utils/TaskRep.ZC\",CCF_JUST_LOAD);"
+        "ExeFile2(\"/System/Gr/GrDC.ZC\",CCF_JUST_LOAD);"
+        "ExeFile2(\"/System/Gr/GrMath.ZC\",CCF_JUST_LOAD);"
+        "ExeFile2(\"/System/Gr/GrPrimatives.ZC\",CCF_JUST_LOAD);"
+        "ExeFile2(\"/System/Gr/GrComposites.ZC\",CCF_JUST_LOAD);"
+        "ExeFile2(\"/System/Gr/ScreenCast.ZC\",CCF_JUST_LOAD);"
+        "ExeFile2(\"/Apps/Psalmody/JukePuppet.ZC\",CCF_JUST_LOAD);"
+        "ExeFile2(\"/System/Utils/LineRep.ZC\",CCF_JUST_LOAD);"
+        "ExeFile2(\"/System/BlkDev/ZDiskB.ZC\",CCF_JUST_LOAD);"
+        "ExeFile2(\"/System/BlkDev/DiskCheck.ZC\",CCF_JUST_LOAD);"
+        "ExeFile2(\"/Kernel/KernelA.HH\",CCF_JUST_LOAD);"
+        "ExeFile2(\"/Kernel/KernelB.HH\",CCF_JUST_LOAD);"
+        "DefinePrint(\"TOS_HDS\",\"\\\"CD\\\"\");"
+        "ExeFile2(\"%Q\",CCF_JUST_LOAD);"
+        "StockCatalogExeDocFile(\"%Q\",CCF_JUST_LOAD);42;",
+        module, path);
     job = TaskExe(task, Fs, source, 0);
     Free(source);
     if (!job)

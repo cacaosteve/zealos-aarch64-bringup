@@ -6,11 +6,11 @@ import json
 from pathlib import Path
 import sys
 import tarfile
-from arm64_source import translate_docfile, translate_debug_compat, extract_source_dates, extract_string_utilities, translate_budget_strings, translate_span_worker_cleanup, translate_keepaway_nearest_ball, translate_xcaliber_shot_return, translate_xcaliber_draw_visibility, translate_xcaliber_key_descriptors, translate_xcaliber_escape_scan, translate_xcaliber_held_input, translate_tothefront_draw, translate_tothefront_init, translate_tothefront_player_pick, translate_tothefront_ai, translate_tothefront_sentinel, extract_keyboard_helpers, translate_math, translate_sysrep_processor
+from arm64_source import translate_docfile, translate_debug_compat, extract_source_dates, extract_string_utilities, translate_budget_strings, translate_span_worker_cleanup, translate_keepaway_nearest_ball, translate_xcaliber_shot_return, translate_xcaliber_draw_visibility, translate_xcaliber_key_descriptors, translate_xcaliber_escape_scan, translate_xcaliber_held_input, translate_tothefront_draw, translate_tothefront_init, translate_tothefront_player_pick, translate_tothefront_ai, translate_tothefront_sentinel, extract_keyboard_helpers, translate_math, translate_sysrep_processor, translate_pick3d_class_terminator, translate_classmeta_callback
 
 from arm64_source import (extract_home_set, extract_home_startup, extract_home_startup_tasks, inject_home_startup_tasks, extract_version_scalars, extract_source_prompt, extract_source_training, extract_server_task, extract_user_task, translate_doctree, translate_registry, translate_docterm, translate_doced, translate_docfind, translate_docform, translate_docpopup, translate_docrecalc, translate_grbitmap,
                           translate_autocomplete_task, translate_grdc, translate_grscreen, translate_ktask, translate_mathode, translate_zsplash,
-                          translate_winmgr, translate_filemgr, translate_home_once,
+                          translate_winmgr, translate_win_focus_trace, translate_job_focus_trace, translate_sched_focus_trace, translate_filemgr, translate_home_once,
                           translate_grpalette, translate_message,
                           translate_stock_game_math_calls,
                           translate_empty_label_statement,
@@ -142,6 +142,16 @@ for name, expected in manifest['files'].items():
             data = translate_empty_label_statement(data, b'bd_done')
         except ValueError as exc:
             raise SystemExit(f'ARM64 BlackDiamond label overlay no longer applies: {exc}') from exc
+    if rel == 'Demo/ClassMeta.ZC':
+        try:
+            data = translate_classmeta_callback(data)
+        except ValueError as exc:
+            raise SystemExit(f'ARM64 ClassMeta overlay no longer applies: {exc}') from exc
+    if rel == 'Demo/Graphics/Pick3D.ZC':
+        try:
+            data = translate_pick3d_class_terminator(data)
+        except ValueError as exc:
+            raise SystemExit(f'ARM64 Pick3D source overlay no longer applies: {exc}') from exc
     if rel == 'Demo/Games/ZoneOut.ZC':
         try:
             data = translate_empty_label_statement(data, b'zo_done')
@@ -208,6 +218,21 @@ for name, expected in manifest['files'].items():
             data = translate_winmgr(data)
         except ValueError as exc:
             raise SystemExit(f'ARM64 window-manager overlay no longer applies: {exc}') from exc
+    elif rel == 'System/Win.ZC':
+        try:
+            data = translate_win_focus_trace(data)
+        except ValueError as exc:
+            raise SystemExit(f'ARM64 window focus trace no longer applies: {exc}') from exc
+    elif rel == 'Kernel/Job.ZC':
+        try:
+            data = translate_job_focus_trace(data)
+        except ValueError as exc:
+            raise SystemExit(f'ARM64 job focus trace no longer applies: {exc}') from exc
+    elif rel == 'Kernel/Sched.ZC':
+        try:
+            data = translate_sched_focus_trace(data)
+        except ValueError as exc:
+            raise SystemExit(f'ARM64 scheduler focus trace no longer applies: {exc}') from exc
     elif rel == 'System/BlkDev/FileMgr.ZC':
         try:
             data = translate_filemgr(data)

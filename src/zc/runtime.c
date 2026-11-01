@@ -123,6 +123,12 @@ _Static_assert(sizeof(struct block) % 16 == 0, "allocator alignment");
 static unsigned char data_arena[DATA_BYTES] __attribute__((aligned(16)));
 static unsigned char code_arena[CODE_BYTES] __attribute__((section(".jit"), aligned(4096)));
 static struct block *arenas[2];
+static uint64_t arena_used_bytes[2];
+/* ZealOS memory reports read the system CBlkPool counters. The ARM64 bridge
+ * allocates from fixed host arenas rather than upstream CMemBlk free lists,
+ * so these mirrors expose the actual arena capacities and live allocations. */
+static void *guest_sys_data_bp, *guest_sys_code_bp;
+static size_t guest_pool_alloced_off = SIZE_MAX, guest_pool_used_off = SIZE_MAX;
 /* Keep a separate address-ordered list of free blocks. First-fit allocation
  * stays byte-for-byte compatible with the original arena layout, while
  * avoiding a walk across every live compiler allocation on each request.
@@ -303,6 +309,7 @@ struct guest_fiber {
     uint64_t wait_deadline;
     int kill_requested;
     int ending;
+    int break_pending;
     int key_wait_active;
     int source_job_active;
     uint64_t irq_flags_stack[8];
@@ -353,6 +360,71 @@ static uint32_t guest_mesh_overlay_sample_scanout;
 static void set_guest_task(void *p);
 static int64_t guest_mp_count = 1;
 static int64_t guest_sys_cache_line_width = 64;
+/* KernelB normally exports this as the image's build date. The host-backed
+ * ARM64 runtime supplies the equivalent CDate so version/help documents can
+ * format the date without touching CMOS ports. CDate is { U32 time; I32 date; }.
+ */
+static struct guest_cdate {
+    uint32_t time;
+    int32_t date;
+} guest_sys_compile_time;
+static int parse_fixed_decimal(const char *text, unsigned digits, int *value) {
+    int result = 0;
+    for (unsigned i = 0; i < digits; i++) {
+        if (text[i] < '0' || text[i] > '9')
+            return 0;
+        result = result * 10 + text[i] - '0';
+    }
+    *value = result;
+    return 1;
+}
+static void init_guest_compile_time(void) {
+    static const char *const months[] = {
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+    };
+    int month = 0, day = 0, year = 0;
+    int hour = 0, minute = 0, second = 0;
+    const char *date = __DATE__;
+    const char *time = __TIME__;
+    for (int i = 0; i < 12; i++)
+        if (!strncmp(date, months[i], 3)) {
+            month = i + 1;
+            break;
+        }
+    date += 4;
+    while (*date == ' ')
+        date++;
+    if (!month || !parse_fixed_decimal(date, 1, &day))
+        return;
+    if (date[1] >= '0' && date[1] <= '9')
+        day = day * 10 + date[1] - '0';
+    date += date[1] >= '0' && date[1] <= '9' ? 2 : 1;
+    while (*date == ' ')
+        date++;
+    if (!parse_fixed_decimal(date, 4, &year) ||
+        !parse_fixed_decimal(time, 2, &hour) || time[2] != ':' ||
+        !parse_fixed_decimal(time + 3, 2, &minute) || time[5] != ':' ||
+        !parse_fixed_decimal(time + 6, 2, &second))
+        return;
+    if (!month || day < 1 || day > 31 || year < 1 ||
+        hour < 0 || hour > 23 || minute < 0 || minute > 59 ||
+        second < 0 || second > 60)
+        return;
+    int64_t prior_year = (int64_t)year - 1;
+    int64_t days = (int64_t)year * 365 + prior_year / 4 - prior_year / 100 +
+                   prior_year / 400 - prior_year / 4000;
+    static const int month_days[] =
+        {0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+    int leap = (year % 4 == 0 && year % 100 != 0) ||
+               (year % 400 == 0 && year % 4000 != 0);
+    for (int i = 1; i < month; i++)
+        days += month_days[i] + (i == 2 && leap);
+    days += day - 1;
+    uint64_t seconds = (uint64_t)hour * 3600 + minute * 60 + second;
+    guest_sys_compile_time.date = (int32_t)days;
+    guest_sys_compile_time.time = (uint32_t)((seconds << 32) / 86400);
+}
 static void *guest_cpu_structs;
 static void *guest_kbd_state;
 static void *guest_autocomplete_state;
@@ -389,6 +461,12 @@ static uint64_t guest_keyboard_route_polls;
 static uint64_t guest_keyboard_route_reads;
 static uint64_t guest_keyboard_route_posts;
 static uint64_t guest_keyboard_route_drops;
+static uint64_t guest_keyboard_focus_changes_during_poll;
+static int64_t guest_keyboard_focus_change_first_old;
+static int64_t guest_keyboard_focus_change_first_new;
+static int64_t guest_keyboard_focus_change_last_old;
+static int64_t guest_keyboard_focus_change_last_new;
+static void *guest_keyboard_focus_last_polled;
 static uint64_t guest_host_message_scan_calls;
 static uint64_t guest_host_key_scan_calls;
 static uint64_t guest_host_key_get_calls;
@@ -400,10 +478,51 @@ static int64_t guest_keyboard_route_last_type;
 static int64_t guest_keyboard_route_last_arg1;
 static int64_t guest_keyboard_route_last_arg2;
 static uint64_t guest_message_scan_key_hits[GUEST_TASKS][2];
+static uint64_t guest_xcal_key_dequeues;
+static uint64_t guest_xcal_key_deletes;
+static int64_t guest_xcal_last_dequeue_code;
+static int64_t guest_xcal_last_dequeue_ch;
+static int64_t guest_xcal_last_dequeue_scan;
+static int64_t guest_xcal_last_dequeue_task;
+static uint64_t guest_xcal_message_scans;
+static int64_t poll_guest_keys(void);
+static int64_t guest_xcal_last_scan_task;
+static uint64_t guest_xcal_scans_with_pending;
+static int64_t guest_xcal_last_pending_code;
+static uint64_t guest_xcal_focus_posts;
+static int64_t guest_xcal_last_focus_post_type;
+static int64_t guest_xcal_last_focus_post_scan;
+static int64_t guest_keyboard_last_final_target;
+static int64_t guest_keyboard_last_final_target_flags;
 static int64_t guest_message_scan_last_consumer;
 static int64_t guest_message_scan_last_code;
 static int64_t guest_message_scan_last_arg1;
 static int64_t guest_message_scan_last_arg2;
+static int64_t guest_message_scan_last_task;
+static int64_t guest_keyboard_route_last_target;
+static int64_t guest_keyboard_route_final_target;
+static int64_t guest_keyboard_route_event_target;
+static int64_t guest_keyboard_route_next_filter;
+static int64_t guest_keyboard_route_initial_flags;
+static int64_t guest_keyboard_route_next_flags;
+static int64_t guest_keyboard_post_initial_target;
+static int64_t guest_keyboard_post_initial_flags;
+static int64_t guest_keyboard_post_final_target;
+static int64_t guest_keyboard_post_final_flags;
+static int64_t guest_keyboard_post_filter_hops;
+#define GUEST_KEY_ROUTE_TRACE_MAX 32
+static uint64_t guest_key_route_trace_count;
+static int64_t guest_key_route_trace_type[GUEST_KEY_ROUTE_TRACE_MAX];
+static int64_t guest_key_route_trace_target[GUEST_KEY_ROUTE_TRACE_MAX];
+static int64_t guest_key_route_trace_recipient[GUEST_KEY_ROUTE_TRACE_MAX];
+static int64_t guest_key_route_trace_scan[GUEST_KEY_ROUTE_TRACE_MAX];
+static uint64_t guest_focus_next_calls;
+static int64_t guest_focus_next_old;
+static int64_t guest_focus_next_new;
+static uint64_t guest_focus_invalid_resets;
+static int64_t guest_focus_invalid_task;
+static uint64_t guest_focus_cancel_restores;
+static int64_t guest_focus_cancel_master;
 static int64_t guest_parent_off, guest_number_off, guest_name_off, guest_flags_off;
 static int64_t guest_gs_off;
 static int64_t guest_display_flags_off;
@@ -573,6 +692,22 @@ static void arena_init(unsigned i, void *p, size_t size) {
     arenas[i] = p;
     *arenas[i] = (struct block){.magic = BLOCK_MAGIC, .size = size - sizeof(struct block)};
     arena_free_heads[i] = arenas[i];
+    arena_used_bytes[i] = 0;
+}
+static void sync_guest_system_pools(void) {
+    void *pools[2] = {guest_sys_data_bp, guest_sys_code_bp};
+    const uint64_t capacity[2] = {DATA_BYTES - sizeof(struct block),
+                                  CODE_BYTES - sizeof(struct block)};
+    if (guest_pool_alloced_off == SIZE_MAX || guest_pool_used_off == SIZE_MAX)
+        return;
+    for (unsigned i = 0; i < 2; i++) {
+        if (!pools[i])
+            continue;
+        memcpy((unsigned char *)pools[i] + guest_pool_alloced_off,
+               &capacity[i], sizeof(capacity[i]));
+        memcpy((unsigned char *)pools[i] + guest_pool_used_off,
+               &arena_used_bytes[i], sizeof(arena_used_bytes[i]));
+    }
 }
 static struct block *free_prev(const struct block *b) {
     return (struct block *)(uintptr_t)b->owner;
@@ -672,7 +807,9 @@ static void *arena_alloc(int64_t count, void *t, uintptr_t caller_pc) {
          * retain the guest call site to make large arena diagnostics useful. */
         b->pad = caller_pc;
         owner->used_u8s += (int64_t)b->size;
+        arena_used_bytes[a] += b->size;
         sync_guest_heap(owner);
+        sync_guest_system_pools();
         return b + 1;
     }
     {
@@ -714,7 +851,9 @@ static struct block *release(struct block *b) {
     unsigned a = (uintptr_t)b >= (uintptr_t)code_arena &&
                  (uintptr_t)b < (uintptr_t)code_arena + CODE_BYTES;
     owner->used_u8s -= (int64_t)b->size;
+    arena_used_bytes[a] -= b->size;
     sync_guest_heap(owner);
+    sync_guest_system_pools();
     b->used = 0;
     b->owner = NULL;
     b->requested = 0;
@@ -2874,6 +3013,7 @@ static uint64_t deadline_after_milliseconds(uint64_t milliseconds);
 static int64_t poll_guest_keys(void);
 static uint64_t guest_ctrl_alt_callback(int64_t index);
 static int guest_ctrl_alt_callback_in_irq(int64_t index);
+static void host_guest_break_current_task(void);
 static void guest_executive_loop(void) __attribute__((noreturn));
 static void guest_input_filter_loop(void);
 static struct guest_job *guest_job_head(struct guest_fiber *f) {
@@ -2930,6 +3070,33 @@ static int64_t host_queue_remove(int64_t *a) {
     if (!entry || !entry->next || !entry->last || entry->next == entry ||
         entry->last->next != entry || entry->next->last != entry)
         zc_fail("QueueRemove requires a linked entry");
+    /* Observe X-Caliber key jobs at the same guest queue boundary used by
+     * stock MessageScan. This avoids binding or changing MessageScan itself. */
+    for (unsigned i = 0; i < GUEST_JOBS_MAX; i++) {
+        struct guest_job *job = guest_tracked_jobs[i];
+        if (job != (struct guest_job *)entry ||
+            job->job_code != GUEST_JOBT_MESSAGE ||
+            (job->message_code != 2 && job->message_code != 3) ||
+            !job->ctrl || guest_server_ctrl_off < 0)
+            continue;
+        struct guest_fiber *recipient = find_guest_task(
+            (unsigned char *)job->ctrl - guest_server_ctrl_off);
+        if (recipient && !strcmp((const char *)((unsigned char *)recipient->words +
+                                                guest_name_off), "X-Caliber")) {
+            guest_xcal_key_dequeues++;
+            guest_xcal_last_dequeue_code = job->message_code;
+            guest_xcal_last_dequeue_ch = job->aux1;
+            guest_xcal_last_dequeue_scan = job->aux2;
+            guest_xcal_last_dequeue_task = (int64_t)(recipient - guest_fibers);
+            fprintf(stderr,
+                    "xcal_guest_dequeue task=%ld type=%ld ch=%ld scan=0x%016lx\n",
+                    (long)guest_xcal_last_dequeue_task,
+                    (long)guest_xcal_last_dequeue_code,
+                    (long)guest_xcal_last_dequeue_ch,
+                    (unsigned long)guest_xcal_last_dequeue_scan);
+        }
+        break;
+    }
     entry->last->next = entry->next;
     entry->next->last = entry->last;
     entry->next = entry->last = NULL;
@@ -2969,6 +3136,20 @@ static int64_t host_job_del(int64_t *a) {
         zc_fail("JobDel requires a detached job");
     if (MSize(job) != sizeof(*job))
         zc_fail("JobDel requires a guest job allocation");
+    if (job->job_code == GUEST_JOBT_MESSAGE &&
+        (job->message_code == 2 || job->message_code == 3) &&
+        job->ctrl && guest_server_ctrl_off >= 0) {
+        struct guest_fiber *recipient = find_guest_task(
+            (unsigned char *)job->ctrl - guest_server_ctrl_off);
+        if (recipient && !strcmp((const char *)((unsigned char *)recipient->words +
+                                                guest_name_off), "X-Caliber")) {
+            guest_xcal_key_deletes++;
+            fprintf(stderr,
+                    "xcal_guest_jobdel task=%ld type=%ld ch=%ld scan=0x%016lx current=%u\n",
+                    (long)(recipient - guest_fibers), (long)job->message_code,
+                    (long)job->aux1, (unsigned long)job->aux2, guest_current);
+        }
+    }
     guest_job_delete(job);
     return 0;
 }
@@ -3357,8 +3538,19 @@ static struct guest_fiber *guest_job_waiter(struct guest_job *job) {
 static void cancel_active_job(struct guest_job *job) {
     struct guest_fiber *master = find_guest_task(job->master_task);
     if (master && (job->flags & GUEST_JOBF_FOCUS_MASTER) &&
-        !(*(uint32_t *)((unsigned char *)master->words + guest_win_inhibit_off) & 1u))
+        !(*(uint32_t *)((unsigned char *)master->words + guest_win_inhibit_off) & 1u)) {
+        struct guest_fiber *old_focus = find_guest_task(guest_focus_task);
+        if (guest_focus_task != master->words) {
+            fprintf(stderr, "guest_focus_mutation site=JobCancel old=%s/%ld new=%s/%ld flags=0x%08x\n",
+                old_focus ? (const char *)((unsigned char *)old_focus->words + guest_name_off) : "none",
+                old_focus ? (long)(old_focus - guest_fibers) : -1L,
+                (const char *)((unsigned char *)master->words + guest_name_off),
+                (long)(master - guest_fibers), job->flags);
+        }
+        guest_focus_cancel_restores++;
+        guest_focus_cancel_master = master - guest_fibers;
         guest_focus_task = master->words;
+    }
     struct guest_fiber *recipient = guest_job_waiter(job);
     if (job->job_code != GUEST_JOBT_EXE_STR ||
         (job->flags & GUEST_JOBF_FREE_ON_COMPLETE) || !recipient) {
@@ -3681,6 +3873,10 @@ static int64_t host_task_focus_next(int64_t *a) {
     void *start = valid_guest_task(guest_focus_task) &&
                   guest_focus_task != guest_fibers[GUEST_EXECUTIVE].words
         ? guest_focus_task : root;
+    struct guest_fiber *old_focus = find_guest_task(guest_focus_task);
+    guest_focus_next_calls++;
+    guest_focus_next_old = old_focus ? old_focus - guest_fibers : -1;
+    guest_focus_next_new = -1;
     void *task = *(void **)((unsigned char *)start + guest_next_task_off);
     guest_focus_task = NULL;
     for (unsigned hops = 0; hops < GUEST_TASKS; hops++) {
@@ -3688,6 +3884,7 @@ static int64_t host_task_focus_next(int64_t *a) {
             zc_fail("guest task ring corrupted");
         if (!(*(uint32_t *)((unsigned char *)task + guest_win_inhibit_off) & 1u)) {
             guest_focus_task = task;
+            guest_focus_next_new = find_guest_task(task) - guest_fibers;
             return 0;
         }
         if (task == start)
@@ -3789,10 +3986,10 @@ static int64_t host_task_yield(int64_t *a) {
         (void)host_time_cal(NULL);
         return 0;
     }
-    if (guest_task_exe_active)
-        zc_fail("yield during job dispatch is unsupported");
     unsigned me = guest_current;
     struct guest_fiber *self = &guest_fibers[me];
+    if (guest_task_exe_active)
+        zc_fail("yield during job dispatch is unsupported");
     /* Root's fallback jobs remain available to module-only sessions. The
      * dedicated source server dispatches its ordinary work in ServerTaskCont;
      * a yielding system job admits only nested internal Sys requests. Never
@@ -3800,6 +3997,9 @@ static int64_t host_task_yield(int64_t *a) {
     int serve_system = !me || (me == GUEST_SYSTEM &&
                               (self->source_job_active || self->active_jobs));
     uint32_t was_idle = *guest_flags(self) & GUEST_IDLE;
+    int park_server = !me ? 0 : self->wait_kind == GUEST_WAIT_NONE &&
+        (*guest_flags(self) & GUEST_AWAITING_MESSAGE) &&
+        guest_job_head(self)->next == guest_job_head(self);
     if (serve_system) {
         int64_t handle[2] = {0, 0};
         (void)host_jobs_handler_mode(handle, self->source_job_active || self->active_jobs);
@@ -3808,21 +4008,24 @@ static int64_t host_task_yield(int64_t *a) {
         if (!me)
             *guest_flags(self) |= GUEST_IDLE;
     }
-    /* Only poll device input for the explicitly focused task. A merely
-     * waiting background task must not steal serial-shell input. */
-    if (guest_focus_task)
-        poll_guest_keys();
-    int park_server = !me ? 0 : self->wait_kind == GUEST_WAIT_NONE &&
-        (*guest_flags(self) & GUEST_AWAITING_MESSAGE) &&
-        guest_job_head(self)->next == guest_job_head(self);
     if (park_server) {
         self->wait_target = self->words;
         self->wait_slot = &self->wait_target;
         self->wait_kind = GUEST_WAIT_SERVER;
     }
+    /* Only poll device input for the explicitly focused task. A merely
+     * waiting background task must not steal serial-shell input. */
+    if (guest_focus_task)
+        poll_guest_keys();
     unsigned next = next_guest(me);
     if (next != me && !setjmp(self->context))
         enter_guest(next);
+    /* Device IRQ actions are queued until their focused cooperative task is
+     * current. Never raise Break in the window-manager input poller. */
+    if (self->break_pending) {
+        self->break_pending = 0;
+        host_guest_break_current_task();
+    }
     /* A child can queue Sys work and suspend itself in the slice above.
      * Pump before returning to root's task-wait loop, which may otherwise
      * see no runnable child and stop before dispatching the request. */
@@ -3831,10 +4034,10 @@ static int64_t host_task_yield(int64_t *a) {
         (void)host_jobs_handler_mode(handle, self->source_job_active || self->active_jobs);
         *guest_flags(self) = (*guest_flags(self) & ~GUEST_IDLE) | was_idle;
     }
-    if (self->kill_requested && !self->ending)
-        end_guest_current(-1);
     if (park_server)
         self->wait_kind = GUEST_WAIT_NONE;
+    if (self->kill_requested && !self->ending)
+        end_guest_current(-1);
     return 0;
 }
 static int64_t host_task_exit(int64_t *a) {
@@ -3954,6 +4157,12 @@ static struct guest_job *post_guest_message(void *server_task, void *master,
     struct guest_fiber *server = find_guest_task(server_task);
     if (!server || (master && !valid_guest_task(master)))
         return NULL;
+    int is_device_key = master == NULL && (code == 2 || code == 3);
+    if (is_device_key) {
+        guest_keyboard_post_initial_target = server - guest_fibers;
+        guest_keyboard_post_initial_flags = *guest_flags(server);
+        guest_keyboard_post_filter_hops = 0;
+    }
     if (*(void **)((unsigned char *)server->words + guest_popup_off) &&
         !(*guest_flags(server) & GUEST_FILTER_INPUT))
         return NULL;
@@ -3966,8 +4175,18 @@ static struct guest_job *post_guest_message(void *server_task, void *master,
         server = find_guest_task(next);
         if (!server)
             return NULL;
+        if (is_device_key)
+            guest_keyboard_post_filter_hops++;
         if (hops + 1 == GUEST_TASKS)
             zc_fail("input filter cycle");
+    }
+    if (is_device_key) {
+        guest_keyboard_post_final_target = server - guest_fibers;
+        guest_keyboard_post_final_flags = *guest_flags(server);
+    }
+    if (master == NULL && (code == 2 || code == 3) && server) {
+        guest_keyboard_last_final_target = server - guest_fibers;
+        guest_keyboard_last_final_target_flags = *guest_flags(server);
     }
     int64_t first_code = code < 0 ? -code : code;
     int64_t second_code = code < 0 ? first_code + 1 : -1;
@@ -4043,11 +4262,18 @@ static int64_t host_message_post(int64_t *a) {
 }
 static int64_t host_message_scan(int64_t *a) {
     guest_host_message_scan_calls++;
+    guest_message_scan_last_task = guest_current;
     void *task = a[3] ? (void *)(uintptr_t)a[3] : guest_fibers[guest_current].words;
     struct guest_fiber *server = find_guest_task(task);
+    if (server && !strcmp((const char *)((unsigned char *)server->words + guest_name_off),
+                          "X-Caliber"))
+        fprintf(stderr,
+                "xcal_message_scan current=%u server=%ld explicit=%d task_exe=%d bg=%d\n",
+                guest_current, (long)(server - guest_fibers), a[3] != 0,
+                guest_task_exe_active, guest_background_dispatch);
     /* Until a focus/window router exists, the task reading its own queue
      * owns live keyboard input. Remote queue inspection never steals it. */
-    if (server == &guest_fibers[guest_current])
+    if (server && server->words == guest_focus_task)
         poll_guest_keys();
     /* Pinned SerialDev/Message.ZC calls JobsHandler before inspecting the
      * current task's message queue. A MessageGet server can therefore run a
@@ -4098,6 +4324,13 @@ static int64_t host_message_scan(int64_t *a) {
      * own the Yield path; polling and flushing must not schedule another task. */
     return 0;
 }
+static void host_guest_break_current_task(void) {
+    /* Host-polled keys have no keyboard IRQ to invoke pinned Break(). The
+     * host-backed source volume also has no native disk locks to release. */
+    if (guest_task_bound)
+        *guest_flags(&guest_fibers[guest_current]) &= ~GUEST_AWAITING_MESSAGE;
+    guest_raise(GUEST_EXCEPT_BREAK);
+}
 static int64_t host_ctrl_alt_dispatch(int64_t *a) {
     if (!guest_task_bound || a[0] != 2 ||
         (a[3] && (void *)(uintptr_t)a[3] !=
@@ -4115,10 +4348,73 @@ static int64_t host_ctrl_alt_dispatch(int64_t *a) {
         key_char = key_char - 'a' + 'A';
     int64_t letter = key_char - 'A';
     uint64_t callback = guest_ctrl_alt_callback(letter);
-    if (!callback || guest_ctrl_alt_callback_in_irq(letter))
+    if (!callback)
         return 0;
+    if (guest_ctrl_alt_callback_in_irq(letter)) {
+        /* The native keyboard IRQ normally handles Ctrl-Alt-C by arranging
+         * for the focused task to enter Break(). This runtime receives keys
+         * as queued messages instead, so there is no IRQ callback to run.
+         * Reproduce that registered break action while the recipient task is
+         * current; Break() preserves its lock, Shift-Escape and queue cleanup
+         * behavior before raising the catchable break exception. */
+        if (letter == ('C' - 'A')) {
+            host_guest_break_current_task();
+            return 1;
+        }
+        return 0;
+    }
     FFI_CALL_TOS_1((void *)(uintptr_t)callback, scan);
     return 1;
+}
+static int64_t host_xcaliber_message_trace(int64_t *a) {
+    struct guest_fiber *fiber = find_guest_task((void *)(uintptr_t)a[3]);
+    if (!fiber || strcmp((const char *)((unsigned char *)fiber->words +
+                                        guest_name_off), "X-Caliber"))
+        return 0;
+    const char *name = fiber ? (const char *)((unsigned char *)fiber->words +
+                                              guest_name_off) : "unknown";
+    fprintf(stderr, "xcal_guest_message task=%s raw_task=%016lx type=%ld ch=%ld scan=0x%016lx\n",
+            name, (unsigned long)a[3], (long)a[0], (long)a[1],
+            (unsigned long)a[2]);
+    return 0;
+}
+static int64_t host_xcaliber_message_scan_trace(int64_t *a) {
+    struct guest_fiber *fiber = find_guest_task((void *)(uintptr_t)a[0]);
+    /* Source-compiled MessageScan calls do not pass through the host-bound
+     * MessageScan implementation. Poll host input at the source entry hook
+     * so a focused graphical app can receive device events. A source task may
+     * be executing inside the System server's JobRunOne dispatch, so its
+     * logical task (Fs) can differ from guest_current. This is input
+     * collection only: it must never yield or switch tasks. */
+    if (fiber && fiber->words == guest_focus_task)
+        poll_guest_keys();
+    if (fiber && !strcmp((const char *)((unsigned char *)fiber->words +
+                                       guest_name_off), "X-Caliber")) {
+        guest_xcal_message_scans++;
+        guest_xcal_last_scan_task = fiber - guest_fibers;
+        struct guest_job *head = guest_job_head(fiber);
+        if (head->next != head) {
+            struct guest_job *job = (struct guest_job *)head->next;
+            guest_xcal_scans_with_pending++;
+            guest_xcal_last_pending_code = job->job_code == GUEST_JOBT_MESSAGE
+                ? job->message_code : -job->job_code;
+        }
+    }
+    return 0;
+}
+static int64_t host_focus_trace(int64_t *a) {
+    const char *site = (const char *)(uintptr_t)a[0];
+    if (a[1] == a[2])
+        return 0;
+    struct guest_fiber *old_focus = find_guest_task((void *)(uintptr_t)a[1]);
+    struct guest_fiber *new_focus = find_guest_task((void *)(uintptr_t)a[2]);
+    const char *old_name = old_focus ? (const char *)((unsigned char *)old_focus->words + guest_name_off) : "none";
+    const char *new_name = new_focus ? (const char *)((unsigned char *)new_focus->words + guest_name_off) : "none";
+    fprintf(stderr, "guest_focus_mutation site=%s old=%s/%ld new=%s/%ld\n",
+            site ? site : "?",
+            old_name, old_focus ? (long)(old_focus - guest_fibers) : -1L,
+            new_name, new_focus ? (long)(new_focus - guest_fibers) : -1L);
+    return 0;
 }
 static uint64_t guest_keyboard_bitmap_updates;
 static uint64_t guest_keyboard_bitmap_misses;
@@ -4191,10 +4487,38 @@ static int64_t poll_guest_keys(void) {
         return 0;
     guest_keyboard_route_polls++;
     void *task = guest_focus_task;
+    if (task != guest_keyboard_focus_last_polled) {
+        struct guest_fiber *old_fiber = find_guest_task(guest_keyboard_focus_last_polled);
+        struct guest_fiber *new_fiber = find_guest_task(task);
+        int64_t old_focus = old_fiber
+            ? (int64_t)(old_fiber - guest_fibers)
+            : -1;
+        int64_t new_focus = new_fiber ? (int64_t)(new_fiber - guest_fibers) : -1;
+        if (guest_keyboard_focus_changes_during_poll++ == 0) {
+            guest_keyboard_focus_change_first_old = old_focus;
+            guest_keyboard_focus_change_first_new = new_focus;
+        }
+        guest_keyboard_focus_change_last_old = old_focus;
+        guest_keyboard_focus_change_last_new = new_focus;
+        const char *old_name = old_fiber
+            ? (const char *)((unsigned char *)old_fiber->words + guest_name_off)
+            : "none";
+        const char *new_name = new_fiber
+            ? (const char *)((unsigned char *)new_fiber->words + guest_name_off)
+            : "none";
+        fprintf(stderr,
+                "guest_focus_poll_transition current=%u old=%s/%ld new=%s/%ld xcal_scans=%lu\n",
+                guest_current, old_name, (long)old_focus, new_name,
+                (long)new_focus, (unsigned long)guest_xcal_message_scans);
+        guest_keyboard_focus_last_polled = task;
+    }
     /* The shell retains its keyboard while it is idle. Only an explicitly
      * focused child may take device input during background dispatch. */
     if (guest_background_dispatch) {
         if (!valid_guest_task(task)) {
+            struct guest_fiber *invalid = find_guest_task(task);
+            guest_focus_invalid_resets++;
+            guest_focus_invalid_task = invalid ? invalid - guest_fibers : -1;
             guest_focus_task = NULL;
             return 0;
         }
@@ -4202,9 +4526,15 @@ static int64_t poll_guest_keys(void) {
             return 0;
     }
     if (!valid_guest_task(task)) {
+        struct guest_fiber *invalid = find_guest_task(task);
+        guest_focus_invalid_resets++;
+        guest_focus_invalid_task = invalid ? invalid - guest_fibers : -1;
         guest_focus_task = NULL;
         task = guest_fibers[guest_current].words;
     }
+    struct guest_fiber *target_fiber = find_guest_task(task);
+    guest_keyboard_route_last_target = target_fiber
+        ? (int64_t)(target_fiber - guest_fibers) : -1;
     int64_t last_code = 0;
     for (unsigned i = 0; i < 32; i++) {
         uint8_t type;
@@ -4217,16 +4547,78 @@ static int64_t poll_guest_keys(void) {
         guest_keyboard_route_last_arg2 = (int64_t)sc;
         if (type != 2 && type != 3)
             continue;
+        target_fiber = find_guest_task(task);
+        guest_keyboard_route_event_target = target_fiber
+            ? (int64_t)(target_fiber - guest_fibers) : -1;
+        fprintf(stderr,
+                "input_route current=%u focus=%ld target=%ld/%s type=%u ch=%lu scan=0x%016lx xcal_scans=%lu\n",
+                guest_current,
+                find_guest_task(guest_focus_task)
+                    ? (long)(find_guest_task(guest_focus_task) - guest_fibers) : -1L,
+                target_fiber ? (long)(target_fiber - guest_fibers) : -1L,
+                target_fiber ? (const char *)((unsigned char *)target_fiber->words + guest_name_off) : "none",
+                (unsigned)type, (unsigned long)ch, (unsigned long)sc,
+                (unsigned long)guest_xcal_message_scans);
+        /* Ctrl-Alt-C is handled by the native keyboard IRQ before a message
+         * reader runs. This bridge polls the device cooperatively instead, so
+         * deliver the registered IRQ break action while the focused task is
+         * current; otherwise graphics loops that only Refresh never dequeue
+         * the chord and cannot be broken. */
+        if (type == 2 && target_fiber &&
+            ((int64_t)ch == 3 || (int64_t)ch == 'c' || (int64_t)ch == 'C') &&
+            ((sc & ((1ull << 10) | (1ull << 11))) ==
+             ((1ull << 10) | (1ull << 11))) &&
+            guest_ctrl_alt_callback('C' - 'A') &&
+            guest_ctrl_alt_callback_in_irq('C' - 'A')) {
+            if (target_fiber == &guest_fibers[guest_current])
+                host_guest_break_current_task();
+            else
+                target_fiber->break_pending = 1;
+        }
+        int64_t route_target = guest_keyboard_route_event_target;
+        int64_t route_recipient = -1;
+        guest_keyboard_route_next_filter = -1;
+        guest_keyboard_route_initial_flags = target_fiber
+            ? *guest_flags(target_fiber) : 0;
+        guest_keyboard_route_next_flags = 0;
+        if (target_fiber) {
+            struct guest_fiber *next_filter = find_guest_task(
+                *(void **)((unsigned char *)target_fiber->words + guest_next_filter_off));
+            guest_keyboard_route_next_filter = next_filter
+                ? (int64_t)(next_filter - guest_fibers) : -1;
+            guest_keyboard_route_next_flags = next_filter
+                ? *guest_flags(next_filter) : 0;
+        }
         guest_keyboard_scan_state_update(type, sc);
         void *posted = post_guest_message(task, NULL,
                                           type, (int64_t)ch, (int64_t)sc, 0);
         if (posted)
         {
+            struct guest_job *job = posted;
+            struct guest_fiber *recipient = job->ctrl && guest_server_ctrl_off >= 0
+                ? find_guest_task((unsigned char *)job->ctrl - guest_server_ctrl_off)
+                : NULL;
+            route_recipient = recipient ? (int64_t)(recipient - guest_fibers) : -1;
+            if (target_fiber && !strcmp((const char *)((unsigned char *)target_fiber->words +
+                                                       guest_name_off), "X-Caliber")) {
+                guest_xcal_focus_posts++;
+                guest_xcal_last_focus_post_type = type;
+                guest_xcal_last_focus_post_scan = (int64_t)sc;
+            }
+            guest_keyboard_route_final_target = recipient
+                ? (int64_t)(recipient - guest_fibers) : -1;
             guest_keyboard_route_posts++;
             last_code = type;
         }
-        else
+        else {
+            guest_keyboard_route_final_target = -1;
             guest_keyboard_route_drops++;
+        }
+        uint64_t trace_slot = guest_key_route_trace_count++ % GUEST_KEY_ROUTE_TRACE_MAX;
+        guest_key_route_trace_type[trace_slot] = type;
+        guest_key_route_trace_target[trace_slot] = route_target;
+        guest_key_route_trace_recipient[trace_slot] = route_recipient;
+        guest_key_route_trace_scan[trace_slot] = (int64_t)sc;
     }
     return last_code;
 }
@@ -4549,6 +4941,20 @@ static int64_t host_message_self(int64_t *a) {
     int64_t post[5] = {(int64_t)(uintptr_t)guest_fibers[guest_current].words,
                        a[0], a[1], a[2], a[3]};
     return host_message_post(post);
+}
+static int64_t host_mouse_set(int64_t *a) {
+    if (!guest_task_bound || guest_current >= GUEST_TASKS)
+        return 0;
+    /* The native PS/2 MouseSet updates device state and emits a move event.
+     * This backend has no PS/2 device, so preserve the observable app-side
+     * behavior by delivering that synthetic move to the current task. */
+    int64_t x = a[0] == INT64_MAX ? 400 : a[0];
+    int64_t y = a[1] == INT64_MAX ? 300 : a[1];
+    if (x < 0 || x >= 800 || y < 0 || y >= 600)
+        return 0;
+    (void)post_guest_message(guest_fibers[guest_current].words, NULL,
+                             GUEST_MESSAGE_MS_MOVE, x, y, 0);
+    return 0;
 }
 struct dispatch_scope {
     struct guest_unwind unwind;
@@ -4960,8 +5366,17 @@ static int64_t host_jobs_handler_mode(int64_t *a, int system_only) {
         /* Pinned JobRunOne restores focus after dispatch, unless the master
          * has WIf_SELF_FOCUS set in win_inhibit. */
         if (master && (job->flags & GUEST_JOBF_FOCUS_MASTER) &&
-            !(*(uint32_t *)((unsigned char *)master->words + guest_win_inhibit_off) & 1u))
+            !(*(uint32_t *)((unsigned char *)master->words + guest_win_inhibit_off) & 1u)) {
+            struct guest_fiber *old_focus = find_guest_task(guest_focus_task);
+            if (guest_focus_task != master->words) {
+                fprintf(stderr, "guest_focus_mutation site=JobRunOne old=%s/%ld new=%s/%ld flags=0x%08x\n",
+                    old_focus ? (const char *)((unsigned char *)old_focus->words + guest_name_off) : "none",
+                    old_focus ? (long)(old_focus - guest_fibers) : -1L,
+                    (const char *)((unsigned char *)master->words + guest_name_off),
+                    (long)(master - guest_fibers), job->flags);
+            }
             guest_focus_task = master->words;
+        }
         /* Pinned TaskExe suspends its master for WAKE_MASTER. Native
          * TaskExe waits on the job instead; completing either form must
          * make that same master runnable again. */
@@ -4999,7 +5414,11 @@ static void guest_executive_loop(void) {
         (void)host_jobs_handler(args);
         struct guest_fiber *self = &guest_fibers[guest_current];
         *guest_flags(self) |= GUEST_IDLE | GUEST_AWAITING_MESSAGE;
+        self->wait_target = self->words;
+        self->wait_slot = &self->wait_target;
+        self->wait_kind = GUEST_WAIT_SERVER;
         (void)host_task_yield(NULL);
+        self->wait_kind = GUEST_WAIT_NONE;
     }
 }
 static int64_t host_task_run(int64_t *a) {
@@ -5774,6 +6193,7 @@ static void bind_guest_task(void) {
     uint64_t ctr;
     __asm__ volatile("mrs %0, ctr_el0" : "=r"(ctr));
     guest_sys_cache_line_width = (int64_t)(4ull << ((ctr >> 16) & 15));
+    init_guest_compile_time();
     init_guest_fiber(0, NULL, "Root");
     set_guest_task(guest_fibers[0].words);
     guest_task_bound = 1;
@@ -5781,6 +6201,7 @@ static void bind_guest_task(void) {
     PrsBindCSymbol("Gs", host_gs, 0);
     PrsBindCSymbol("mp_count", &guest_mp_count, 0);
     PrsBindCSymbol("sys_cache_line_width", &guest_sys_cache_line_width, 0);
+    PrsBindCSymbol("sys_compile_time", &guest_sys_compile_time, 0);
     PrsBindCSymbol("sys_focus_task", &guest_focus_task, 0);
     PrsBindCSymbol("sys_progresses", guest_progresses, 0);
     for (unsigned i = 0; i < 4; i++) {
@@ -6107,6 +6528,13 @@ static void compiler_checkpoint_restore(void) {
     memcpy(code_arena, compiler_saved_code, compiler_saved_bytes[1]);
     arena_free_heads[0] = compiler_saved_free_heads[0];
     arena_free_heads[1] = compiler_saved_free_heads[1];
+    for (unsigned a = 0; a < 2; a++) {
+        arena_used_bytes[a] = 0;
+        for (struct block *b = arenas[a]; b; b = b->next)
+            if (b->used)
+                arena_used_bytes[a] += b->size;
+    }
+    sync_guest_system_pools();
     memcpy(Fs, &compiler_saved_task, sizeof(compiler_saved_task));
     if (guest_task_bound)
         *(void **)((unsigned char *)guest_fibers[guest_current].words + guest_last_fun_off) =
@@ -6996,7 +7424,23 @@ static int load_source_path(const char *path, int merged, int recover) {
     int registered = guest_task_bound;
     if (registered)
         guest_unwind_enter(&load.unwind, source_load_cleanup, NULL);
+    if (!strcmp(path, "/Kernel/Job.ZC")) {
+        execute_source("<window focus trace bridge>",
+            "extern U0 ZcFocusTrace(U8 *site, CTask *old_focus, "
+            "CTask *new_focus);");
+        PrsBindCSymbol("ZcFocusTrace", host_focus_trace, 3);
+    }
+    if (!strcmp(path, "/Kernel/Sched.ZC")) {
+        execute_source("<scheduler focus trace bridge>",
+            "extern U0 ZcFocusTrace(U8 *site, CTask *old_focus, "
+            "CTask *new_focus);");
+        PrsBindCSymbol("ZcFocusTrace", host_focus_trace, 3);
+    }
     if (!strcmp(path, "/System/TaskBridge.ZC")) {
+        execute_source("<window focus trace bridge>",
+            "extern U0 ZcFocusTrace(U8 *site, CTask *old_focus, "
+            "CTask *new_focus);");
+        PrsBindCSymbol("ZcFocusTrace", host_focus_trace, 3);
         PrsBindCSymbol("ZcSystemTask", host_system_task, 0);
         /* KernelB-only callers need the text declaration before TaskBridge
          * is compiled. Re-declaring it inside the module creates a fresh,
@@ -7015,6 +7459,14 @@ static int load_source_path(const char *path, int merged, int recover) {
             "extern Bool ZcCtrlAltDispatch(I64 message_code, I64 ch, "
             "I64 scan_code, CTask *task);");
         PrsBindCSymbol("ZcCtrlAltDispatch", host_ctrl_alt_dispatch, 4);
+        execute_source("<X-Caliber input trace bridge>",
+            "extern U0 ZcXCaliberMessageTrace(I64 message_code, I64 ch, "
+            "I64 scan_code, CTask *task);");
+        PrsBindCSymbol("ZcXCaliberMessageTrace", host_xcaliber_message_trace, 4);
+        execute_source("<X-Caliber MessageScan trace bridge>",
+            "extern U0 ZcXCaliberMessageScanTrace(CTask *task);");
+        PrsBindCSymbol("ZcXCaliberMessageScanTrace",
+                       host_xcaliber_message_scan_trace, 1);
     }
     int compile_error = 0;
     (void)execute_source_mode(path, src, 0, 0, NULL, 0, 0, recover, &compile_error);
@@ -7138,6 +7590,7 @@ static int load_source_path(const char *path, int merged, int recover) {
     /* Source units can introduce fresh extern declarations after KernelC.HH
      * has been parsed. Rebind the timer hook after each unit so those calls
      * resolve to the same host implementation as the kernel declaration. */
+    PrsBindCSymbol("MouseSet", host_mouse_set, 5);
     PrsBindCSymbol("SleepUntil", host_sleep_until, 1);
     PrsBindCSymbol("Clamp", host_clamp_f64, 3);
     PrsBindCSymbol("Max", host_max_f64, 2);
@@ -7242,6 +7695,38 @@ static int load_source_path(const char *path, int merged, int recover) {
     if (!strcmp(path, "/Kernel/KernelB.HH")) {
         bind_guest_task();
         PrsBindCSymbol("sys_boot_src", &guest_boot_source, 0);
+        /* KernelB introduces this extern after the early host bindings run.
+         * Rebind now that its CDate declaration exists. */
+        PrsBindCSymbol("sys_compile_time", &guest_sys_compile_time, 0);
+        CHashGlblVar *compile_time = (CHashGlblVar *)HashFind(
+            "sys_compile_time", Fs->hash_table, HTT_GLBL_VAR, 1);
+        if (!compile_time || !compile_time->data_addr)
+            zc_fail("KernelB compile-time date binding failed");
+        /* KernelB exposes global CBlkPool counters to reports and diagnostics.
+         * Keep an ABI-sized view backed by the bridge's real fixed arenas;
+         * the free-list pointers stay empty because allocations are managed by
+         * arena_alloc above, not by upstream CMemBlk lists. */
+        CHashClass *pool = (CHashClass *)HashFind("CBlkPool", Fs->hash_table,
+                                                   HTT_CLASS, 1);
+        CMemberLst *pool_alloced, *pool_used;
+        if (!pool || pool->sz <= 0 || pool->sz > (1 << 20) ||
+            !(pool_alloced = MemberFind("alloced_u8s", pool)) ||
+            !(pool_used = MemberFind("used_u8s", pool)) ||
+            pool_alloced->off < 0 || pool_used->off < 0 ||
+            (size_t)pool_alloced->off + sizeof(uint64_t) > (size_t)pool->sz ||
+            (size_t)pool_used->off + sizeof(uint64_t) > (size_t)pool->sz)
+            zc_fail("pinned CBlkPool layout mismatch");
+        guest_pool_alloced_off = (size_t)pool_alloced->off;
+        guest_pool_used_off = (size_t)pool_used->off;
+        if (!guest_sys_data_bp)
+            guest_sys_data_bp = calloc(1, (size_t)pool->sz);
+        if (!guest_sys_code_bp)
+            guest_sys_code_bp = calloc(1, (size_t)pool->sz);
+        if (!guest_sys_data_bp || !guest_sys_code_bp)
+            zc_fail("CBlkPool compatibility storage allocation failed");
+        PrsBindCSymbol("sys_data_bp", &guest_sys_data_bp, 0);
+        PrsBindCSymbol("sys_code_bp", &guest_sys_code_bp, 0);
+        sync_guest_system_pools();
         /* ZealOS's Call invokes a zero-argument JIT entry point. Rebind it
          * after KernelB declares the _CALL import. */
         PrsBindCSymbol("Call", host_call, 1);
@@ -7642,6 +8127,19 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
     guest_keyboard_route_reads = 0;
     guest_keyboard_route_posts = 0;
     guest_keyboard_route_drops = 0;
+    guest_keyboard_focus_changes_during_poll = 0;
+    guest_keyboard_focus_change_first_old = -1;
+    guest_keyboard_focus_change_first_new = -1;
+    guest_keyboard_focus_change_last_old = -1;
+    guest_keyboard_focus_change_last_new = -1;
+    guest_keyboard_focus_last_polled = NULL;
+    guest_key_route_trace_count = 0;
+    guest_focus_next_calls = 0;
+    guest_focus_next_old = guest_focus_next_new = -1;
+    guest_focus_invalid_resets = 0;
+    guest_focus_invalid_task = -1;
+    guest_focus_cancel_restores = 0;
+    guest_focus_cancel_master = -1;
     guest_keyboard_route_last_type = 0;
     guest_keyboard_route_last_arg1 = 0;
     guest_keyboard_route_last_arg2 = 0;
@@ -7650,6 +8148,24 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
     guest_message_scan_last_code = 0;
     guest_message_scan_last_arg1 = 0;
     guest_message_scan_last_arg2 = 0;
+    guest_message_scan_last_task = -1;
+    guest_keyboard_route_last_target = -1;
+    guest_keyboard_route_final_target = -1;
+    guest_xcal_key_dequeues = 0;
+    guest_xcal_key_deletes = 0;
+    guest_xcal_last_dequeue_code = 0;
+    guest_xcal_last_dequeue_ch = 0;
+    guest_xcal_last_dequeue_scan = 0;
+    guest_xcal_last_dequeue_task = -1;
+    guest_xcal_message_scans = 0;
+    guest_xcal_last_scan_task = -1;
+    guest_xcal_scans_with_pending = 0;
+    guest_xcal_last_pending_code = 0;
+    guest_xcal_focus_posts = 0;
+    guest_xcal_last_focus_post_type = 0;
+    guest_xcal_last_focus_post_scan = 0;
+    guest_keyboard_last_final_target = -1;
+    guest_keyboard_last_final_target_flags = 0;
     guest_winmgr_tick_fun = NULL;
     guest_focus_task = NULL;
     /* The shared text object can point into the session's staging buffers.
@@ -8189,6 +8705,22 @@ void zc_status(void) {
            ? (const char *)((unsigned char *)keyboard_focus->words + guest_name_off)
            : "none", keyboard_focus
            ? (long)(keyboard_focus - guest_fibers) : -1L);
+    if (keyboard_focus) {
+        void *last_filter = *(void **)((unsigned char *)keyboard_focus->words +
+                                       guest_input_filter_off);
+        void *next_filter = *(void **)((unsigned char *)keyboard_focus->words +
+                                       guest_next_filter_off);
+        struct guest_fiber *last_fiber = find_guest_task(last_filter);
+        struct guest_fiber *next_fiber = find_guest_task(next_filter);
+        printf("keyboard_focus_filters: flags=0x%08x last=%s/%ld next=%s/%ld\n",
+               *guest_flags(keyboard_focus),
+               last_fiber ? (const char *)((unsigned char *)last_fiber->words +
+                                            guest_name_off) : "dead",
+               last_fiber ? (long)(last_fiber - guest_fibers) : -1L,
+               next_fiber ? (const char *)((unsigned char *)next_fiber->words +
+                                            guest_name_off) : "dead",
+               next_fiber ? (long)(next_fiber - guest_fibers) : -1L);
+    }
     for (unsigned i = 0; i < GUEST_TASKS; i++) {
         struct guest_fiber *fiber = &guest_fibers[i];
         if (fiber->state != GUEST_RUNNABLE)
@@ -8228,14 +8760,56 @@ void zc_status(void) {
            (unsigned)zc_virtio_keyboard_last_code(),
            (unsigned long)zc_virtio_keyboard_last_value());
     zc_usb_status();
-    printf("keyboard_route: polls=%lu read=%lu posted=%lu dropped=%lu last=%ld/%ld/%ld\n",
+    printf("keyboard_route: polls=%lu read=%lu posted=%lu dropped=%lu last=%ld/%ld/%ld target=%ld flags=0x%lx next=%ld next_flags=0x%lx\n",
            (unsigned long)guest_keyboard_route_polls,
            (unsigned long)guest_keyboard_route_reads,
            (unsigned long)guest_keyboard_route_posts,
            (unsigned long)guest_keyboard_route_drops,
            (long)guest_keyboard_route_last_type,
            (long)guest_keyboard_route_last_arg1,
-           (long)guest_keyboard_route_last_arg2);
+           (long)guest_keyboard_route_last_arg2,
+           (long)guest_keyboard_route_last_target,
+           (unsigned long)guest_keyboard_route_initial_flags,
+           (long)guest_keyboard_route_next_filter,
+           (unsigned long)guest_keyboard_route_next_flags);
+    printf("keyboard_focus_poll_changes: count=%lu first=%ld->%ld last=%ld->%ld current=%ld\n",
+           (unsigned long)guest_keyboard_focus_changes_during_poll,
+           (long)guest_keyboard_focus_change_first_old,
+           (long)guest_keyboard_focus_change_first_new,
+           (long)guest_keyboard_focus_change_last_old,
+           (long)guest_keyboard_focus_change_last_new,
+           find_guest_task(guest_focus_task)
+               ? (long)(find_guest_task(guest_focus_task) - guest_fibers) : -1L);
+    printf("keyboard_route_final_target: index=%ld\n",
+           (long)guest_keyboard_route_final_target);
+    printf("keyboard_route_event_target: index=%ld\n",
+           (long)guest_keyboard_route_event_target);
+    printf("keyboard_post_route: initial=%ld flags=0x%lx final=%ld flags=0x%lx hops=%ld\n",
+           (long)guest_keyboard_post_initial_target,
+           (unsigned long)guest_keyboard_post_initial_flags,
+           (long)guest_keyboard_post_final_target,
+           (unsigned long)guest_keyboard_post_final_flags,
+           (long)guest_keyboard_post_filter_hops);
+    printf("keyboard_event_routes: count=%lu\n",
+           (unsigned long)guest_key_route_trace_count);
+    printf("focus_change_trace: next_calls=%lu old=%ld new=%ld invalid_resets=%lu invalid_task=%ld cancel_restores=%lu master=%ld\n",
+           (unsigned long)guest_focus_next_calls,
+           (long)guest_focus_next_old, (long)guest_focus_next_new,
+           (unsigned long)guest_focus_invalid_resets,
+           (long)guest_focus_invalid_task,
+           (unsigned long)guest_focus_cancel_restores,
+           (long)guest_focus_cancel_master);
+    uint64_t route_trace_count = guest_key_route_trace_count < GUEST_KEY_ROUTE_TRACE_MAX
+        ? guest_key_route_trace_count : GUEST_KEY_ROUTE_TRACE_MAX;
+    uint64_t route_trace_start = guest_key_route_trace_count - route_trace_count;
+    for (uint64_t i = 0; i < route_trace_count; i++) {
+        uint64_t slot = (route_trace_start + i) % GUEST_KEY_ROUTE_TRACE_MAX;
+        printf("  key_route[%lu]: type=%ld target=%ld recipient=%ld scan=0x%016lx\n",
+               (unsigned long)i, (long)guest_key_route_trace_type[slot],
+               (long)guest_key_route_trace_target[slot],
+               (long)guest_key_route_trace_recipient[slot],
+               (unsigned long)guest_key_route_trace_scan[slot]);
+    }
     printf("host_key_path: message_scan=%lu key_scan=%lu key_get=%lu put_key=%lu last_char=%ld task=%ld doc_active=%d\n",
            (unsigned long)guest_host_message_scan_calls,
            (unsigned long)guest_host_key_scan_calls,
@@ -8244,7 +8818,8 @@ void zc_status(void) {
            (long)guest_host_put_key_last_char,
            (long)guest_host_put_key_last_task,
            guest_host_put_key_last_doc_active);
-    printf("message_scan_keys: last_consumer=%ld last=%ld/%ld/%016lx",
+    printf("message_scan_keys: last_task=%ld last_consumer=%ld last=%ld/%ld/%016lx",
+           (long)guest_message_scan_last_task,
            (long)guest_message_scan_last_consumer,
            (long)guest_message_scan_last_code,
            (long)guest_message_scan_last_arg1,
@@ -8262,6 +8837,32 @@ void zc_status(void) {
            guest_keyboard_bitmap_read("down_bitmap", 0x01),
            (unsigned long)guest_keyboard_bitmap_updates,
            (unsigned long)guest_keyboard_bitmap_misses);
+    printf("xcal_key_dequeues: count=%lu last=%ld/%ld/0x%016lx task=%ld\n",
+           (unsigned long)guest_xcal_key_dequeues,
+           (long)guest_xcal_last_dequeue_code,
+           (long)guest_xcal_last_dequeue_ch,
+           (unsigned long)guest_xcal_last_dequeue_scan,
+           (long)guest_xcal_last_dequeue_task);
+    printf("xcal_key_jobdels: count=%lu\n",
+           (unsigned long)guest_xcal_key_deletes);
+    printf("xcal_message_scans: count=%lu last_task=%ld\n",
+           (unsigned long)guest_xcal_message_scans,
+           (long)guest_xcal_last_scan_task);
+    printf("xcal_message_scan_queue: nonempty_scans=%lu first_code=%ld focused_posts=%lu last_post=%ld/0x%016lx\n",
+           (unsigned long)guest_xcal_scans_with_pending,
+           (long)guest_xcal_last_pending_code,
+           (unsigned long)guest_xcal_focus_posts,
+           (long)guest_xcal_last_focus_post_type,
+           (unsigned long)guest_xcal_last_focus_post_scan);
+    printf("keyboard_final_target: index=%ld flags=0x%08lx name=%s\n",
+           (long)guest_keyboard_last_final_target,
+           (unsigned long)guest_keyboard_last_final_target_flags,
+           guest_keyboard_last_final_target >= 0 &&
+                   guest_keyboard_last_final_target < GUEST_TASKS &&
+                   guest_fibers[guest_keyboard_last_final_target].state != GUEST_UNUSED
+               ? (const char *)((unsigned char *)guest_fibers[
+                     guest_keyboard_last_final_target].words + guest_name_off)
+               : "none");
     if (gui_terminal_active) {
         (void)zc_call("BootstrapGuiTerminalKeyEventCount", &gui_key_events);
         (void)zc_call("BootstrapGuiTerminalLastKeyChar", &gui_last_char);

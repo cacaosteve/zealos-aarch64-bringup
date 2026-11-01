@@ -485,15 +485,17 @@ U0 BootstrapGuiTerminalRunLightProgram(U8 *filename)
     CTask *app_task;
     U8 *title;
 
-    // Titanium and X-Caliber use blocking interactive loops. Launch them as
-    // normal guest tasks so KeyGet/MessageScan can run with an independent,
-    // visible window instead of holding the WinMgr frame on the root stack.
+    // Blocking interactive programs need independent guest tasks so their
+    // MessageGet/KeyGet wait loops do not hold the GUI terminal's WinMgr frame.
     if (!StrCompare(filename, "/Apps/Titanium/Run.ZC") ||
-        !StrCompare(filename, "/Apps/X-Caliber/Run.ZC"))
+        !StrCompare(filename, "/Apps/X-Caliber/Run.ZC") ||
+        !StrCompare(filename, "/Demo/Graphics/Pick3D.ZC"))
     {
         title = "X-Caliber";
         if (!StrCompare(filename, "/Apps/Titanium/Run.ZC"))
             title = "Titanium";
+        else if (!StrCompare(filename, "/Demo/Graphics/Pick3D.ZC"))
+            title = "Pick3D";
         app_task = Spawn(&BootstrapGuiTerminalGameTask, filename, title, -1, Fs);
         if (!TaskValidate(app_task))
             return;
@@ -504,6 +506,7 @@ U0 BootstrapGuiTerminalRunLightProgram(U8 *filename)
         app_task->win_top = 4;
         app_task->win_bottom = 34;
         WinDerivedValsUpdate(app_task);
+        ZcFocusTrace("GuiTerminalLaunch", sys_focus_task, app_task);
         sys_focus_task = app_task;
         return;
     }
@@ -1139,6 +1142,7 @@ I64 BootstrapGuiTerminalStart()
     WinDerivedValsUpdate(term);
     // The graphical display owns the VM keyboard from boot. The serial shell
     // continues to read its separate UART input path.
+    ZcFocusTrace("GuiTerminalInit", sys_focus_task, term);
     sys_focus_task = term;
     active_gr = ZcActiveGrGlobals();
     if (active_gr && active_gr->fp_final_screen_update != &BootstrapGuiTerminalFinalUpdate)

@@ -1,0 +1,19 @@
+{
+  "date": "2026-11-01",
+  "command": "python3 scripts/check-compat.py --pci --probe-stock-programs",
+  "target": "QEMU PCI ARM64 graphical terminal",
+  "result": "pass",
+  "programs": {
+    "/Demo/Graphics/NetOfDots.ZC": [
+      "original source loaded through its include path",
+      "visible red fan rendered",
+      "program waited for input and exited cleanly",
+      "terminal prompt recovered"
+    ],
+    "/Demo/Graphics/Lines.ZC": [
+      "original source animated with 11,221 changed channel bytes",
+      "input exit and terminal prompt recovery"
+    ]
+  },
+  "scope": "QEMU evidence only; live UTM behavior is not implied."
+}

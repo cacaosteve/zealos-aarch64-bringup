@@ -5,6 +5,24 @@ I64 msg_scan_peer_char_scans, msg_scan_peer_flushes, msg_scan_started;
 I64 msg_scan_yield_stage, msg_scan_early_peer, msg_scan_peer_bad_order;
 I64 msg_scan_after_yield, msg_scan_sleep_started;
 I64 msg_scan_sleep_peer, msg_scan_after_sleep;
+CTask *msg_get_waiter;
+I64 msg_get_started, msg_get_peer_ran, msg_get_result;
+
+U0 MessageGetSchedulerWaiter()
+{
+    I64 arg = 0;
+    msg_get_started = 1;
+    if (MessageGet(&arg, NULL, 1 << MESSAGE_CMD) == MESSAGE_CMD)
+        msg_get_result = arg;
+}
+
+U0 MessageGetSchedulerPeer()
+{
+    while (!msg_get_started)
+        Yield;
+    msg_get_peer_ran = 1;
+    MessagePost(msg_get_waiter, MESSAGE_CMD, 42, 0);
+}
 
 U0 MessageReceiver(U8 *data)
 {
@@ -94,6 +112,19 @@ I64 TaskMessageSchedulingChecks()
         return 7;
     if (msg_scan_after_sleep != 1)
         return 8;
+    // MessageGet is a wait operation: it yields so the next ready task can
+    // post the event, then resumes and consumes it. MessageScan above remains
+    // a pure poll and must not cause this handoff itself.
+    msg_get_started = msg_get_peer_ran = msg_get_result = 0;
+    msg_get_waiter = Spawn(&MessageGetSchedulerWaiter);
+    peer = Spawn(&MessageGetSchedulerPeer);
+    if (!msg_get_waiter || !peer)
+        return 9;
+    while (TaskValidate(msg_get_waiter) || TaskValidate(peer))
+        Yield;
+    msg_get_waiter = NULL;
+    if (!msg_get_peer_ran || msg_get_result != 42)
+        return 10;
     return 42;
 }
 

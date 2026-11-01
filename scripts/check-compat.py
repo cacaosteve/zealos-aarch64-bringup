@@ -43,6 +43,12 @@ p.add_argument('--demo-source-raw-path', action='append', default=[],
                help='with --probe-demo-source-catalog, compile this exact path via ExeFile2 instead of DocRead/ExeDoc')
 p.add_argument('--probe-demo-basics', action='store_true',
                help='run Print, DateTime, RadixSort, SubIntAccess and SubSwitch graphically')
+p.add_argument('--probe-demo-tictactoe', action='store_true',
+               help='exercise the original TicTacToe demo with pointer input and exit recovery')
+p.add_argument('--probe-demo-chess', action='store_true',
+               help='exercise the original Chess demo board rendering and Escape recovery')
+p.add_argument('--probe-demo-pick3d', action='store_true',
+               help='exercise the original Pick3D graphics demo and Escape recovery')
 p.add_argument('--probe-demo-system-context', action='store_true',
                help='compile representative Demo files with the boot kernel and graphics APIs loaded')
 p.add_argument('--demo-system-path', action='append', default=[],
@@ -192,6 +198,7 @@ if args.demo_system_module and not args.probe_demo_system_context:
     p.error('--demo-system-module requires --probe-demo-system-context')
 if (args.probe_stock_programs or args.probe_stock_interactive or args.probe_program_catalog or
         args.probe_doc_includes or args.probe_logic_program or args.probe_budget_program or
+        args.probe_demo_tictactoe or args.probe_demo_chess or args.probe_demo_pick3d or
         args.probe_3d_apps or args.probe_tothefront or args.probe_xcaliber or
         args.probe_timeclock or
         args.probe_vocabulary or args.probe_psalmody):
@@ -260,6 +267,9 @@ log_path = ROOT / 'build' / (f'check-usb-{usb_label}{"-budget" if args.probe_bud
                              'check-3d-apps-pci.log' if args.probe_3d_apps else
                              'check-logic-pci.log' if args.probe_logic_program else
                              'check-doc-includes-pci.log' if args.probe_doc_includes else
+                             'check-demo-pick3d-pci.log' if args.probe_demo_pick3d else
+                             'check-demo-chess-pci.log' if args.probe_demo_chess else
+                             'check-demo-tictactoe-pci.log' if args.probe_demo_tictactoe else
                              'check-program-catalog-pci.log' if args.probe_program_catalog else
                              'check-popup-menu-pci.log' if args.probe_popup_menu else
                              'check-stock-interactive-pci.log' if args.probe_stock_interactive else
@@ -466,6 +476,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 'vocabulary-' if args.probe_vocabulary else
                 'psalmody-' if args.probe_psalmody else
                 '3d-apps-' if args.probe_3d_apps else
+                'demo-pick3d-' if args.probe_demo_pick3d else
                 'tothefront-' if args.probe_tothefront else
                 'popup-menu-' if args.probe_popup_menu else
                 'doc-includes-' if args.probe_doc_includes else
@@ -960,6 +971,15 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         # Separate navigation-probe keystrokes and allow guest polling after
         # the explicit release; the typing gate accounts for the hold time.
         time.sleep(0.1)
+    def qmp_send_key_hold(qcode, hold_ms):
+        # The guest polls its VirtIO keyboard, so gameplay controls must use
+        # the same device-event path as the other guest key tests. QMP
+        # send-key injects through a different path and is not visible to this
+        # VirtIO input device.
+        qmp_key_edges([qcode], True)
+        time.sleep(hold_ms / 1000.0)
+        qmp_key_edges([qcode], False)
+        time.sleep(0.1)
     def focus_graphical_terminal():
         dismiss_home_splash_if_visible()
         location = command('zc Print("gui_click=%d,%d\\n", '
@@ -1452,11 +1472,14 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             focus_graphical_terminal()
             run_graphical_terminal_command(
                 'xcaliber-ready', '40+2;', 'ans=0x2A=42')
-            # Use the dedicated focused application task, matching the
-            # Titanium launch path and preserving the GUI terminal's input loop.
-            type_graphical_prompt_line(
-                'xcaliber-launch', 'BootstrapGuiTerminalXCaliberRun();')
-            qmp_send_key('ret')
+            # Submit the launcher as a task to the focused GUI terminal. Typing
+            # the long function name through QMP is flaky under the live
+            # graphics load and can duplicate characters before the app starts;
+            # this exercises the same GUI-terminal launcher without conflating
+            # that input path with X-Caliber's own event loop.
+            command('zc TaskExe(bootstrap_gui_terminal_task,NULL,'
+                    '"BootstrapGuiTerminalXCaliberRun();",'
+                    '1<<JOBf_FREE_ON_COMPLETE);', 'zc: executed')
             require_graphical_text('xcaliber-solar-storm',
                                    'Face away from Sun in solar storm', timeout=20)
             # Resolve the actual OKAY link in the game's one-time popup.
@@ -1591,10 +1614,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             ship_bounds = (340, 250, 460, 375)
             idle_motion = rgb_diff_count(idle, idle_after_wait, ship_bounds)
             xcaliber_control_failures = []
-            qmp_key_edges(['left'], True)
-            time.sleep(1.75)
+            qmp_send_key_hold('left', 1750)
             left_frame = graphical_screen('xcaliber-gameplay-left')
-            qmp_key_edges(['left'], False)
             left_motion = rgb_diff_count(idle_after_wait, left_frame, ship_bounds)
             if left_motion < max(12, idle_motion * 2):
                 xcaliber_control_failures.append(
@@ -1609,10 +1630,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             if len(rgb_coordinates_in(before_right, (0, 151, 162),
                                      player_bounds)) < 5:
                 raise RuntimeError('X-Caliber player ship disappeared before right input')
-            qmp_key_edges(['right'], True)
-            time.sleep(1.75)
+            qmp_send_key_hold('right', 1750)
             right_frame = graphical_screen('xcaliber-gameplay-right')
-            qmp_key_edges(['right'], False)
             right_motion = rgb_diff_count(before_right, right_frame, ship_bounds)
             if right_motion < max(12, idle_motion * 2):
                 xcaliber_control_failures.append(
@@ -1625,10 +1644,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             before_space = graphical_screen('xcaliber-gameplay-before-space')
             player_before_space = rgb_centroid_in(
                 before_space, (0, 151, 162), player_bounds)
-            qmp_key_edges(['spc'], True)
-            time.sleep(0.5)
+            qmp_send_key_hold('spc', 500)
             space_frame = graphical_screen('xcaliber-gameplay-space')
-            qmp_key_edges(['spc'], False)
             player_after_space = rgb_centroid_in(
                 space_frame, (0, 151, 162), player_bounds)
             if player_before_space is None or player_after_space is None:
@@ -1639,9 +1656,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             # X-Caliber spends most of each frame in its ODE update. Keep
             # Escape down long enough for its polling loop to sample the
             # transition instead of using the generic 100 ms key tap.
-            qmp_key_edges(['esc'], True)
-            time.sleep(1.0)
-            qmp_key_edges(['esc'], False)
+            qmp_send_key_hold('esc', 1000)
             time.sleep(0.5)
             # Probe return through scanout and the guest keyboard. A serial
             # `zstatus` request can stall while the graphical app owns the
@@ -1657,9 +1672,14 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     break
                 time.sleep(0.1)
             if returned is None:
+                try:
+                    input_diagnostics = command(
+                        'zstatus', 'xcal_key_dequeues', timeout=8)
+                except Exception as exc:
+                    input_diagnostics = f'\npost-input zstatus unavailable: {exc}'
                 raise RuntimeError('X-Caliber did not return after QMP Escape; see '
                                    f'{graphical_path("xcaliber-after-escape")}\n'
-                                   +candidate[3])
+                                   +candidate[3] + input_diagnostics)
             print('PASS X-Caliber Escape returned to the graphical terminal', flush=True)
             qmp_send_key('down')
             qmp_send_text('40+2;')
@@ -1858,10 +1878,10 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             while time.monotonic() < deadline:
                 span_exit_status = command(
                     'zstatus', 'keyboard_focus=', timeout=10)
-                if re.search(r'keyboard_focus=Terminal\r?\n', span_exit_status):
+                if re.search(r'keyboard_focus=Terminal(?:\s|$)', span_exit_status):
                     break
                 time.sleep(0.2)
-            if not re.search(r'keyboard_focus=Terminal\r?\n', span_exit_status):
+            if not re.search(r'keyboard_focus=Terminal(?:\s|$)', span_exit_status):
                 raise RuntimeError(
                     'Span did not return focus to terminal after Shift+Escape:\n' +
                     span_exit_status)
@@ -2151,7 +2171,13 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     # input and terminal recovery remain the real checks.
                     next_visible = next_marker in screen[3]
                     if next_marker == 'Do another':
-                        next_visible |= 'Do anot' in screen[3]
+                        # Some guest font/framebuffer captures lose a few
+                        # letters in this prompt even though the question
+                        # suffix is rendered. Treat its answer choices as the
+                        # stable marker; the caller also checks generated
+                        # mesh diagnostics before accepting the app path.
+                        next_visible |= ('Do anot' in screen[3] or
+                                         'y or n)?' in screen[3])
                     if next_visible:
                         return screen
                     if current_marker not in screen[3]:
@@ -2188,8 +2214,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             click_3d_color('3d-grmodels-man-shoes', 'Skin', 'Shoes')
             click_3d_color('3d-grmodels-man-generated', 'Shoes', 'Do another')
             man_generated = require_graphical_text(
-                '3d-grmodels-man-generated', 'Do another', timeout=20)
-            if 'Do another' not in man_generated[3]:
+                '3d-grmodels-man-generated', 'y or n)?', timeout=20)
+            if 'y or n)?' not in man_generated[3]:
                 raise RuntimeError('GrModels Man did not finish mesh generation')
             print('PASS GrModels Man mesh generation reached its repeat prompt',
                   flush=True)
@@ -2805,6 +2831,10 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     'catalog_endian64=EFCDAB8967452301')
             command('zcall StockCatalogBFieldChecks',
                 'zc => 0x000000000000002a')
+            command('zcall StockCatalogMemoryPoolChecks',
+                'zc => 0x000000000000002a')
+            command('zcall StockCatalogStaticArraySizeChecks',
+                'zc => 0x000000000000002a')
             if not args.demo_source_path and not args.demo_source_raw_path:
                 command('zload /Tests/SourceMacros.ZC', 'zc: loaded /Tests/SourceMacros.ZC')
                 command('zcall StockSourceMacroChecks', 'zc => 0x000000000000002a')
@@ -2831,66 +2861,68 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 command('zcall StockCatalogNullCaseChecks',
                         'zc => 0x000000000000002a')
                 focus_graphical_terminal()
-                print_screen = run_graphical_terminal_command(
-                    'demo-print', 'ExeFile2("/Demo/Print.ZC");',
-                    "With the ',' flag:", timeout=60)
-                if '123.457M' not in print_screen[3] or 'Floating Point:' not in print_screen[3]:
-                    raise RuntimeError('Demo Print output is incomplete; '
-                        f'see {graphical_path("demo-print-result")}\n'
-                        +print_screen[3])
+                if args.probe_demo_basics:
+                    print_screen = run_graphical_terminal_command(
+                        'demo-print', 'ExeFile2("/Demo/Print.ZC");',
+                        "With the ',' flag:", timeout=60)
+                    if '123.457M' not in print_screen[3] or 'Floating Point:' not in print_screen[3]:
+                        raise RuntimeError('Demo Print output is incomplete; '
+                            f'see {graphical_path("demo-print-result")}\n'
+                            +print_screen[3])
 
-                datetime_screen = run_graphical_terminal_command(
-                    'demo-datetime', 'ExeFile2("/Demo/DateTime.ZC");',
-                    'Hour:', timeout=60)
-                for expected in ('Day Name:', 'Month Name:'):
-                    if expected not in datetime_screen[3]:
-                        raise RuntimeError('Demo DateTime is missing '+expected+'; '
-                            f'see {graphical_path("demo-datetime-result")}\n'
-                            +datetime_screen[3])
+                    datetime_screen = run_graphical_terminal_command(
+                        'demo-datetime', 'ExeFile2("/Demo/DateTime.ZC");',
+                        'Hour:', timeout=60)
+                    for expected in ('Day Name:', 'Month Name:'):
+                        if expected not in datetime_screen[3]:
+                            raise RuntimeError('Demo DateTime is missing '+expected+'; '
+                                f'see {graphical_path("demo-datetime-result")}\n'
+                                +datetime_screen[3])
 
-                radix_screen = run_graphical_terminal_command(
-                    'demo-radix-sort', 'ExeFile2("/Demo/RadixSort.ZC");',
-                    '15:', timeout=60)
-                radix_rows = [(int(index), int(value)) for index, value in
-                    re.findall(r'^\s*(\d+):(\d+)', radix_screen[3], re.M)]
-                if (len(radix_rows) != 32 or
-                        [index for index, _ in radix_rows] != list(range(16))*2):
-                    raise RuntimeError('Demo RadixSort did not show two complete tables; '
-                        f'see {graphical_path("demo-radix-sort-result")}\n'
-                        +radix_screen[3])
-                radix_input = [value for _, value in radix_rows[:16]]
-                radix_output = [value for _, value in radix_rows[16:]]
-                if radix_output != sorted(radix_input):
-                    raise RuntimeError('Demo RadixSort output is not sorted input; '
-                        f'see {graphical_path("demo-radix-sort-result")}\n'
-                        +radix_screen[3])
+                    radix_screen = run_graphical_terminal_command(
+                        'demo-radix-sort', 'ExeFile2("/Demo/RadixSort.ZC");',
+                        '15:', timeout=60)
+                    radix_rows = [(int(index), int(value)) for index, value in
+                        re.findall(r'^\s*(\d+):(\d+)', radix_screen[3], re.M)]
+                    if (len(radix_rows) != 32 or
+                            [index for index, _ in radix_rows] != list(range(16))*2):
+                        raise RuntimeError('Demo RadixSort did not show two complete tables; '
+                            f'see {graphical_path("demo-radix-sort-result")}\n'
+                            +radix_screen[3])
+                    radix_input = [value for _, value in radix_rows[:16]]
+                    radix_output = [value for _, value in radix_rows[16:]]
+                    if radix_output != sorted(radix_input):
+                        raise RuntimeError('Demo RadixSort output is not sorted input; '
+                            f'see {graphical_path("demo-radix-sort-result")}\n'
+                            +radix_screen[3])
 
-                subint_screen = run_graphical_terminal_command(
-                    'demo-subint-access', 'ExeFile2("/Demo/SubIntAccess.ZC");',
-                    'q.i16[2]', timeout=60)
-                for expected in ('q.u8[5]', 'q.i32[1].u8[2]', 'q.i32[0].i8[1]'):
-                    if expected not in subint_screen[3]:
-                        raise RuntimeError('Demo SubIntAccess is missing '+expected+'; '
-                            f'see {graphical_path("demo-subint-access-result")}\n'
-                            +subint_screen[3])
+                    subint_screen = run_graphical_terminal_command(
+                        'demo-subint-access', 'ExeFile2("/Demo/SubIntAccess.ZC");',
+                        'q.i16[2]', timeout=60)
+                    for expected in ('q.u8[5]', 'q.i32[1].u8[2]', 'q.i32[0].i8[1]'):
+                        if expected not in subint_screen[3]:
+                            raise RuntimeError('Demo SubIntAccess is missing '+expected+'; '
+                                f'see {graphical_path("demo-subint-access-result")}\n'
+                                +subint_screen[3])
 
-                subswitch_screen = run_graphical_terminal_command(
-                    'demo-subswitch', 'ExeFile2("/Demo/SubSwitch.ZC");',
-                    'Zero', timeout=60)
-                for expected in ('One', 'Two', 'Three', 'Four', 'Five'):
-                    if expected not in subswitch_screen[3]:
-                        raise RuntimeError('Demo SubSwitch is missing '+expected+'; '
-                            f'see {graphical_path("demo-subswitch-result")}\n'
-                            +subswitch_screen[3])
+                    subswitch_screen = run_graphical_terminal_command(
+                        'demo-subswitch', 'ExeFile2("/Demo/SubSwitch.ZC");',
+                        'Zero', timeout=60)
+                    for expected in ('One', 'Two', 'Three', 'Four', 'Five'):
+                        if expected not in subswitch_screen[3]:
+                            raise RuntimeError('Demo SubSwitch is missing '+expected+'; '
+                                f'see {graphical_path("demo-subswitch-result")}\n'
+                                +subswitch_screen[3])
 
-                nullcase_screen = run_graphical_terminal_command(
-                    'demo-null-case', 'ExeFile2("/Demo/NullCase.ZC");',
-                    'Eleven', timeout=60)
-                for expected in ('Zero', 'One', 'Two', 'Three', 'Ten'):
-                    if expected not in nullcase_screen[3]:
-                        raise RuntimeError('Demo NullCase is missing '+expected+'; '
-                            f'see {graphical_path("demo-null-case-result")}\n'
-                            +nullcase_screen[3])
+                    nullcase_screen = run_graphical_terminal_command(
+                        'demo-null-case', 'ExeFile2("/Demo/NullCase.ZC");',
+                        'Eleven', timeout=60)
+                    for expected in ('Zero', 'One', 'Two', 'Three', 'Ten'):
+                        if expected not in nullcase_screen[3]:
+                            raise RuntimeError('Demo NullCase is missing '+expected+'; '
+                                f'see {graphical_path("demo-null-case-result")}\n'
+                                +nullcase_screen[3])
+
                 run_graphical_terminal_command(
                     'demo-terminal-recovery', '40+2;', 'ans=0x2A=42')
                 command('zstatus', 'failed=0')
@@ -2960,8 +2992,13 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                                 'total': len(results), 'sources': results},
                                indent=2)+'\n')
                 raise SystemExit(0)
+            run_program_catalog = (
+                args.probe_program_catalog or
+                (args.probe_demo_source_catalog and
+                 not args.demo_source_path and
+                 not args.demo_source_raw_path))
             paths = []
-            if not args.demo_source_path and not args.demo_source_raw_path:
+            if run_program_catalog:
                 for directory in sorted((ROOT/'upstream/pinned/Apps').iterdir()):
                     entry = directory/('Run.ZC' if (directory/'Run.ZC').exists() else 'Load.ZC')
                     paths.append('/'+entry.relative_to(ROOT/'upstream/pinned').as_posix())
@@ -2971,7 +3008,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             # RegExe identifies additional standalone programs outside Apps.
             # Compile these one by one in the same disposable namespace; this
             # is inventory evidence only, not interactive acceptance.
-            if not args.demo_source_path and not args.demo_source_raw_path:
+            if run_program_catalog:
                 paths += [
                     '/Demo/Games/BlackDiamond.ZC',
                     '/Demo/Games/BomberGolf.ZC',
@@ -3007,7 +3044,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 results.append({'path': path, 'compiled': passed, 'output': result})
                 print(('COMPILES ' if passed else 'BLOCKED ')+path, flush=True)
             normal_loads = []
-            for path in (() if (args.demo_source_path or args.demo_source_raw_path) else
+            for path in (() if not run_program_catalog else
                          ('/Apps/ToTheFront/Load.ZC', '/Apps/X-Caliber/Load.ZC')):
                 result = command('zc Print("normal_load=%d\\n", '
                                  f'StockCatalogNormalLoad("{path}"));',
@@ -3016,10 +3053,11 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 normal_loads.append({'path': path, 'loaded': passed, 'output': result})
                 print(('NORMAL LOADS ' if passed else 'NORMAL LOAD BLOCKED ')+path,
                       flush=True)
-            (ROOT/'build/program-catalog.json').write_text(json.dumps({
-                'commit': json.loads((ROOT/'upstream/pinned/UPSTREAM.json').read_text())['commit'],
-                'mode': 'CCF_JUST_LOAD in disposable task; no runtime acceptance',
-                'programs': results, 'normal_loads': normal_loads}, indent=2)+'\n')
+            if run_program_catalog:
+                (ROOT/'build/program-catalog.json').write_text(json.dumps({
+                    'commit': json.loads((ROOT/'upstream/pinned/UPSTREAM.json').read_text())['commit'],
+                    'mode': 'CCF_JUST_LOAD in disposable task; no runtime acceptance',
+                    'programs': results, 'normal_loads': normal_loads}, indent=2)+'\n')
             if args.probe_demo_source_catalog:
                 demo_results = []
                 demo_root = ROOT/'upstream/pinned/Demo'
@@ -3047,6 +3085,12 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     compile_expr = (
                         'StockCatalogCompileTreeCheckers()'
                         if path == '/Demo/Games/TreeCheckers.ZC' else
+                        f'StockCatalogCompileWithProgramModulesAfterLoad("/Demo/AcctExample/TOS/TOSMisc.ZC","{path}")'
+                        if path in {
+                            '/Demo/AcctExample/HomeKeyPlugIns.ZC',
+                            '/Demo/AcctExample/TOS/TOSMisc.ZC',
+                            '/Demo/AcctExample/TOS/TOSDistro.ZC',
+                        } else
                         f'StockCatalogCompileWithModules("{path}","/System/Utils/SysRep.ZC",'
                         '"/System/Utils/CPURep.ZC")'
                         if path in {
@@ -3086,6 +3130,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                             '/Demo/Graphics/ScreenCapture.ZC',
                             '/Demo/AcctExample/TOS/TOSMisc.ZC',
                         } else
+                        f'StockCatalogCompileRawWithProgramModules("{path}")'
+                        if path == '/Demo/Graphics/WallPapers/WallPaperDesktop.ZC' else
                         f'StockCatalogCompileWithMath("{path}")'
                         if path.startswith('/Demo/Games/') else
                         f'StockCatalogCompileDocWithMath("{path}")'
@@ -3126,6 +3172,127 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             else:
                 command('zstatus', 'failed=0')
             print('PASS isolated program compilation inventory saved', flush=True)
+            raise SystemExit(0)
+        if args.probe_demo_pick3d:
+            focus_graphical_terminal()
+            run_graphical_terminal_command(
+                'demo-pick3d-ready', '40+2;', 'ans=0x2A=42')
+            command('zc BootstrapGuiTerminalRunLightProgram('
+                    '"/Demo/Graphics/Pick3D.ZC");', 'zc: executed')
+            rendered = require_graphical_text(
+                'demo-pick3d-render', 'Move things around.', timeout=20)
+            colors = Counter(tuple(rendered[2][i:i+3])
+                             for i in range(0, len(rendered[2]), 3))
+            visible = sum(count for color, count in colors.items()
+                          if color != (0, 0, 0))
+            if len(colors) < 8 or visible < 1000:
+                raise RuntimeError('Pick3D reached its window but rendered too little '
+                    f'graphics: colors={len(colors)} visible={visible}')
+            qmp_send_key('esc')
+            time.sleep(.5)
+            run_graphical_terminal_command(
+                'demo-pick3d-exit-smoke', '40+2;', 'ans=0x2A=42', timeout=20)
+            command('zstatus', 'failed=0')
+            print('PASS Pick3D interactive graphics window, Escape and terminal recovery',
+                  flush=True)
+            raise SystemExit(0)
+        if args.probe_demo_tictactoe:
+            focus_graphical_terminal()
+            run_graphical_terminal_command(
+                'demo-tictactoe-ready', '40+2;', 'ans=0x2A=42')
+            type_graphical_prompt_line(
+                'demo-tictactoe-launch',
+                'ExeFile2("/Demo/Games/TicTacToe.ZC");')
+            qmp_send_key('ret')
+            # TicTacToe clears its terminal text and draws a full-window
+            # board, so its documented exit hint is not reliably visible in
+            # OCR. Confirm the game by checking the four rendered board lines.
+            time.sleep(.5)
+            before = graphical_screen('demo-tictactoe-before-move')
+            grid_pixels = (rgb_pixels_in(before, (255, 255, 255), (197, 100, 203, 400)) +
+                           rgb_pixels_in(before, (255, 255, 255), (297, 100, 303, 400)) +
+                           rgb_pixels_in(before, (255, 255, 255), (100, 197, 400, 203)) +
+                           rgb_pixels_in(before, (255, 255, 255), (100, 297, 400, 303)))
+            if grid_pixels < 500:
+                raise RuntimeError('TicTacToe did not render its four board lines; '
+                    f'grid_pixels={grid_pixels}, see '
+                    f'{graphical_path("demo-tictactoe-before-move")}')
+            move_graphical_pointer(150, 150)
+            graphical_mouse_button('left', True)
+            time.sleep(0.15)
+            graphical_mouse_button('left', False)
+            time.sleep(0.4)
+            first = graphical_screen('demo-tictactoe-first-move')
+            first_diff = sum(a != b for a, b in zip(before[2], first[2])) // 3
+            if first_diff < 100:
+                raise RuntimeError('TicTacToe did not redraw after the first move; '
+                    f'pixel_diff={first_diff}, see '
+                    f'{graphical_path("demo-tictactoe-first-move")}')
+            move_graphical_pointer(250, 150)
+            graphical_mouse_button('left', True)
+            time.sleep(0.15)
+            graphical_mouse_button('left', False)
+            time.sleep(0.4)
+            second = graphical_screen('demo-tictactoe-second-move')
+            second_diff = sum(a != b for a, b in zip(first[2], second[2])) // 3
+            if second_diff < 100:
+                raise RuntimeError('TicTacToe did not redraw after the second move; '
+                    f'pixel_diff={second_diff}, see '
+                    f'{graphical_path("demo-tictactoe-second-move")}')
+            # The in-tree interactive gate uses Escape as the host-side
+            # cooperative break path for included demos; Ctrl-Alt-C's native
+            # IRQ chord is not represented reliably by the emulated key queue.
+            qmp_send_key('esc')
+            time.sleep(0.5)
+            run_graphical_terminal_command(
+                'demo-tictactoe-exit-smoke', '40+2;', 'ans=0x2A=42',
+                timeout=20)
+            command('zstatus', 'failed=0')
+            print('PASS TicTacToe board drawing, two mouse turns, Escape '
+                  'exit and terminal recovery', flush=True)
+            raise SystemExit(0)
+        if args.probe_demo_chess:
+            focus_graphical_terminal()
+            run_graphical_terminal_command(
+                'demo-chess-ready', '40+2;', 'ans=0x2A=42')
+            run_graphical_terminal_command(
+                'demo-chess-launch',
+                'ExeFile2("/Demo/Games/Chess.ZC");', 'WHITE is human?')
+            # Chess asks whether each color is human before drawing the
+            # board. Accept both defaults so the probe exercises gameplay,
+            # rather than mistaking the setup popup for a frozen app.
+            for color in ('WHITE', 'BLACK'):
+                setup = graphical_screen('demo-chess-'+color.lower()+'-setup')
+                if f'{color} is human?' in setup[3]:
+                    # PopUpNoYes is a two-button DolDoc form. Return has no
+                    # default action there, so click the visible YES button.
+                    move_graphical_pointer(42, 36)
+                    graphical_mouse_button('left', True)
+                    time.sleep(.15)
+                    graphical_mouse_button('left', False)
+                    time.sleep(.4)
+            time.sleep(.5)
+            board = graphical_screen('demo-chess-board')
+            # Preserve task and window state in the failure log. Chess can
+            # reach its input loop while its DrawIt callback or CDC blit is
+            # still missing from the composed frame.
+            command('zstatus', 'desktop: winmgr=')
+            # The game switches to light palette and draws a full-window 3D
+            # chessboard. Require substantial non-black rendered content so a
+            # compile-only success or a blank task cannot pass this check.
+            board_pixels = sum(1 for offset in range(0, len(board[2]), 3)
+                               if board[2][offset:offset+3] != b'\x00\x00\x00')
+            if board_pixels < 10000:
+                raise RuntimeError('Chess did not render its board; '
+                    f'nonblack_pixels={board_pixels}, see '
+                    f'{graphical_path("demo-chess-board")}')
+            qmp_send_key('esc')
+            time.sleep(.5)
+            run_graphical_terminal_command(
+                'demo-chess-exit-smoke', '40+2;', '2A=42', timeout=20)
+            command('zstatus', 'failed=0')
+            print('PASS Chess board rendering, Escape cleanup and terminal recovery',
+                  flush=True)
             raise SystemExit(0)
         if args.probe_stock_interactive:
             command('zload /Tests/SourceMacros.ZC', 'zc: loaded /Tests/SourceMacros.ZC')

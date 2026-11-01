@@ -44,6 +44,27 @@ Record a separate result for each program at each level:
 
 ## Present status
 
+On 2026-11-01, the original `/Demo/Games/Chess.ZC` passed a PCI QEMU runtime
+probe: both player setup prompts were accepted, the board rendered, Escape
+cleaned up the game window, and the graphical terminal returned `40+2;` = 42.
+The ARM64 `MouseSet` bridge posts a guest mouse-move message for the active
+task; it does not warp the host pointer. UTM pointer interaction for Chess is
+still unverified. Reproduce with `make check-demo-chess`. A standard
+`check-demo-tictactoe` target also passes its board, two mouse turns, Escape
+exit and terminal-recovery probe. TicTacToe advertises Ctrl-Alt-C upstream,
+but that chord is not verified through the emulated key-event path. These game
+checks add runtime coverage; they do not complete the 206-file Demo corpus.
+
+On 2026-11-01, the task-message scheduling regression passed in PCI QEMU:
+empty `MessageScan`, `KeyScan`, `CharScan`, and `FlushMessages` polling kept
+the core, while explicit `Yield`, `Sleep`, and a blocked `MessageGet` handed
+off to the next ready task. This validates the current cooperative bridge; it
+does not mean the pinned upstream `Sched.ZC` is the scheduler currently
+running. The focused X-Caliber rerun still showed no measurable Left/Right
+motion and Escape did not return to the terminal, so that remains an
+X-Caliber/window-manager input-path issue, not a `MessageScan` scheduling
+failure.
+
 On 2026-10-29, the isolated compile catalog compiled all 12 app entry points
 and five shared/demo checks; the ToTheFront and X-Caliber loaders also passed
 normal-load checks. TimeClock's app compile and focused date/time formatter
@@ -65,12 +86,12 @@ to a terminal where `40+2;` returns 42. The phase gate checks visible scanout
 and map pixels rather than comparing OCR strings for graphics text. Unit
 movement/direct fire, broader AI play, and live UTM behavior remain unverified.
 
-On 2026-10-31, a refreshed source catalog compiled all 12 named app entry
-points. The dependency-aware Demo catalog covers all 206 upstream `.ZC`
+On 2026-11-01, a rebuilt PCI QEMU source catalog compiled all 12 named app
+entry points. The dependency-aware Demo catalog covers all 206 upstream `.ZC`
 sources in a fresh full PCI QEMU sweep. `/Demo/NullCase.ZC` and all three ToHtmlToTXTDemo generator sources were
 rechecked after the parser/resource fixes. HtmlGen compiles via normal file
 loading so its relative include resolves; TXTGen compiles after loading the
-stock ToTXT module. The latest full source catalog shows 168 compiled and 38 blocked out of 206. The lexer now preserves comment markers in quoted `#define` strings, fixing the stock `HomeWrappers.ZC` file-mask macro; loading `/System/Utils/Find.ZC` supplies its required `Find` routine. Loading stock dependencies also lets TOSTheme, InSetIP, UnusedSpaceRep, UnusedDefine, and SerializeTree compile in the isolated probe. Expanding the lexer literal buffer allows the long literals in `MemDemo.ZC` and `WaterFowl.ZC` to compile. `SpriteText.ZC` now compiles with the isolated probe’s compiler and sprite module setup. `PhoneNumWords.ZC` also compiles after changing its A–Z digit lookup to a 26-element explicit initializer in the ARM64 overlay. The `SysRep.ZC` ARM64 overlay removes x86 CPUID-specific reporting; `AndNotMod.ZC` and `FixedPoint.ZC` now compile with the stock `SysRep` and `CPURep` modules. `HomeSys.ZC` advances to a separate unresolved `sys_compile_time` runtime global.
+stock ToTXT module. The 2026-11-01 full source catalog now compiles 177 of 206 Demo sources, leaving 29 compile-blocked. The count includes the two targeted follow-ups for `Pick3D.ZC` and `ClassMeta.ZC`, plus `WallPaperDesktop.ZC`, which now compiles through a source-preserving loader with the stock compiler modules. `ClassMeta.ZC` remains runtime-broken or unresolved: its graphical launch and a follow-up explicit `DumpStruct` call produced no visible class output in QEMU. The guarded ARM64 overlay retains the rank callback and percentile display logic with supported metadata forms, but compile success does not establish runtime behavior. A shared host-data export resolution fix and build `CDate` binding removed the `sys_compile_time` blocker from both HomeSys sources. The lexer now preserves comment markers in quoted `#define` strings, fixing the stock `HomeWrappers.ZC` file-mask macro; loading `/System/Utils/Find.ZC` supplies its required `Find` routine. Loading stock dependencies also lets TOSTheme, InSetIP, UnusedSpaceRep, UnusedDefine, and SerializeTree compile in the isolated probe. Expanding the lexer literal buffer allows the long literals in `MemDemo.ZC` and `WaterFowl.ZC` to compile. `SpriteText.ZC` now compiles with the isolated probe’s compiler and sprite module setup. `PhoneNumWords.ZC` also compiles after changing its A–Z digit lookup to a 26-element explicit initializer in the ARM64 overlay. The `SysRep.ZC` ARM64 overlay removes x86 CPUID-specific reporting; `AndNotMod.ZC` and `FixedPoint.ZC` now compile with the stock `SysRep` and `CPURep` modules.
 FlatTops now compiles when its isolated source context loads the stock `GrDC`,
 `GrMath`, `GrPrimatives`, and `GrComposites` modules; its upstream source is
 unchanged. TreeCheckers also compiles in an isolated context with its required
@@ -173,7 +194,7 @@ all six SubSwitch branches, all six NullCase labels, and confirmed a subsequent
 | TimeClock | App compile, date/time formatter gates, and automated punch-in/out record write/read plus report-state round-trip pass. The graphical QEMU probe loads the stock app, submits both descriptions through `StrGet`, reads them back with `TimeRep;`, and recovers to a terminal where `40+2;` returns 42. The red `IN`/`OUT` report labels are below the probe's monochrome OCR threshold, so the probe asserts the saved descriptions instead. CMOS register access stays unavailable. | Verify report labels and clock behavior in live UTM; CMOS hardware clock access remains unavailable. |
 | ToTheFront | ARM64 source overlay fixes the Human player's indirect-fire unit-count loop; the stock `i > UNITS_NUM` condition skipped the artillery order phase. PCI runtime probe selects both player types, displays/dismisses help, renders the generated map, selects artillery and sees its range indicator, plots an order into an adjacent hex, advances a phase with Space, and returns through Escape to a working terminal (`40+2;` -> 42). | Exercise unit movement/direct fire, view controls and broader AI behavior in QEMU, then verify setup and turn flow live in UTM. |
 | Vocabulary | The PCI runtime probe launches `/Apps/Vocabulary/Run.ZC`, displays dictionary question content, accepts a numbered answer and advances, then Escape restores a terminal where `40+2;` returns 42. The autocomplete gate covers the bundled `ACDefs.DATA`/`ACWords.DATA`, boot indexing (`COMPUTER`), `ACDDefGet("Computer")`, completion popup startup and fixture completion. | Visually verify answer feedback and definition popup; check sound separately (ARM64 audio remains silent). |
-| X-Caliber | ARM64 `Freq2Ona`/`Ona2Freq` bindings resolve startup conversion calls. A generated-source overlay removes the stale task-ODE comparison that hid the scene. The GUI-terminal launcher now builds a visible, focused X-Caliber task; QEMU reaches the first-run help, starts gameplay, and confirms focus. In the latest focused-task probe, Left and Right produced no measurable ship motion, Space firing was inconclusive, and Escape did not restore the terminal. | Diagnose routed keyboard-message consumption, then retest Left/Right, Space and Escape recovery in QEMU and live UTM. |
+| X-Caliber | ARM64 `Freq2Ona`/`Ona2Freq` bindings resolve startup conversion calls. A generated-source overlay removes the stale task-ODE comparison that hid the scene. The GUI-terminal launcher builds a visible, focused X-Caliber task; QEMU reaches the first-run help and gameplay. On the fresh 2026-11-01 rerun, `keyboard_focus` is X-Caliber and source `MessageScan` executes, but the keyboard device reports only 19 total events (startup/launcher input) and the runtime records zero X-Caliber key dequeues. Left/Right show no measurable motion, Space is inconclusive, and Escape does not restore the terminal. QMP `send-key` also produces no new guest key events; QEMU 11.1 rejects the `input-send-event` per-device selector. The focus trace shows a temporary Server focus followed by `JobRunOne` restoring X-Caliber; it does not establish where subsequent QMP events are lost. Keep the input/device path unresolved rather than attributing this to the scheduler: the cooperative-message regression passes and empty `MessageScan` polling does not switch tasks. | Observe physical or device-level input while gameplay is active, then verify app queue consumption and UTM recovery. |
 
 The primary current named-app tracker is [PROGRAMS.md](../PROGRAMS.md). The
 latest Titanium automated result is stronger than the earlier status recorded
@@ -279,3 +300,24 @@ every file is a standalone application.
 | Templates (7) | Game1, Lex1, MultiCore1, ODE1, Registry1, Util1, Util2 |
 | ToHtmlToTXTDemo (4) | HtmlDirList, HtmlGen, TXTGen, ToHtml |
 | WebLogDemo (2) | WebLogRep, WebLogScramble |
+
+## 2026-11-01 follow-up
+
+The full PCI QEMU source sweep now compiles 177 of 206 Demo `.ZC` sources;
+29 remain blocked. One blocker was a compiler bookkeeping bug: inferred-size
+static local arrays kept an unknown total size after their initializer had
+computed the bound, so `sizeof(array)` failed. The parser now publishes the
+inferred total, and `StockCatalogStaticArraySizeChecks` verifies both the
+array size and initialized class-array contents. The original
+`/Demo/GlobalVars.ZC` now compiles. The focused regression and complete sweep
+are recorded in
+[`acceptance/demo-globalvars-array-size-2026-11-01.json`](acceptance/demo-globalvars-array-size-2026-11-01.json).
+The count is compile evidence only. Separate QEMU checks now bring the Demo
+runtime accepted count to eleven: unchanged TicTacToe and Chess both render,
+accept input where applicable, exit cleanly, and return to a terminal where
+`40+2;` evaluates to 42. The original NetOfDots and Lines programs also render, accept exit input, and recover the terminal; Lines animation was verified by changing scanout. See
+[`acceptance/demo-stock-graphics-2026-11-01.json`](acceptance/demo-stock-graphics-2026-11-01.json). Pick3D now passes its QEMU interactive graphics probe, including visible graphics, Escape, and terminal recovery. The failure was a missing bootstrap implementation of the stock task-local `HashGenericAdd` and `FramePtr` helpers. See
+[`acceptance/demo-interactive-games-2026-11-01.json`](acceptance/demo-interactive-games-2026-11-01.json).
+UTM-specific app freezes still require separate live checks.
+
+The refreshed 2026-11-01 sweep also fixed a source-catalog false negative for `/Demo/Graphics/WallPapers/WallPaperDesktop.ZC`: the stock compiler modules define `cmp`, and the source-preserving loader keeps the class-layout `$$` token intact. `StockCatalogCompileRawWithProgramModules` now verifies this path as part of the complete sweep. The original source remains unchanged; this is compile acceptance only, not runtime acceptance.

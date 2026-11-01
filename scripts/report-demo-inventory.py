@@ -12,7 +12,7 @@ import re
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 SOURCE_ROOT = ROOT / "upstream/pinned/Demo"
 CATALOG = ROOT / "build/demo-source-catalog.json"
-OUTPUT = ROOT / "docs/acceptance/demo-source-ledger-2026-10-31.json"
+OUTPUT = ROOT / "docs/acceptance/demo-source-ledger-2026-11-01.json"
 
 KINDS = {
     "AcctExample": "account/home-system integration examples",
@@ -33,6 +33,11 @@ RUNTIME_ACCEPTED = {
     "/Demo/RadixSort.ZC": "docs/acceptance/demo-runtime-basics-2026-10-31.json",
     "/Demo/SubIntAccess.ZC": "docs/acceptance/demo-runtime-basics-2026-10-31.json",
     "/Demo/SubSwitch.ZC": "docs/acceptance/demo-runtime-basics-2026-10-31.json",
+    "/Demo/Games/Chess.ZC": "docs/acceptance/demo-interactive-games-2026-11-01.json",
+    "/Demo/Games/TicTacToe.ZC": "docs/acceptance/demo-interactive-games-2026-11-01.json",
+    "/Demo/Graphics/Lines.ZC": "docs/acceptance/demo-stock-graphics-2026-11-01.json",
+    "/Demo/Graphics/NetOfDots.ZC": "docs/acceptance/demo-stock-graphics-2026-11-01.json",
+    "/Demo/Graphics/Pick3D.ZC": "docs/acceptance/demo-interactive-games-2026-11-01.json",
 }
 
 
@@ -80,7 +85,7 @@ def main():
         "runtime_accepted": sum(r["runtime"] == "pass" for r in records),
         "directories": {},
         "classification_note": "Directory-based kinds are triage hints, not final runnable-program classifications.",
-        "runtime_note": "Only explicit per-source evidence in the 2026-10-31 basic demo acceptance record is marked pass.",
+        "runtime_note": "Only sources with explicit per-program QEMU runtime evidence in the checked-in 2026-10-31 and 2026-11-01 acceptance records are marked pass. QEMU acceptance does not imply live UTM or Pi hardware acceptance.",
         "sources": records,
     }
     for directory in sorted({r["directory"] for r in records}):
