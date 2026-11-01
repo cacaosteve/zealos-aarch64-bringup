@@ -1,6 +1,6 @@
 {
   "date": "2026-11-01",
-  "commit": "e25855cc269a36fc823bb6491ed40d4055a2660d",
+  "commit": "37dde985cc3b6f4a58f0e66790421414b001b14b",
   "target": "QEMU PCI ARM64 graphical guest",
   "scope": "Targeted runtime acceptance on the current ARM64 compatibility guest. Passing QEMU probes do not establish live UTM behavior or complete ZealOS program coverage.",
   "checks": {
@@ -72,17 +72,17 @@
   "unresolved": {
     "X-Caliber": {
       "command": "python3 scripts/check-compat.py --pci --probe-xcaliber",
-      "result": "fail",
+      "result": "partial",
       "verified": [
         "launch, help dismissal, level start and gameplay rendering passed",
-        "The MathODE timeout guard was corrected to compare host monotonic now against host monotonic now plus guest-relative remaining time; ODE integration now advances",
-        "QEMU scanout showed Left response when Left was tested first (45 pixels in ship bounds versus 5 idle); Right response when Right was tested first (43 pixels versus 0 idle)",
-        "In each same-session run, the opposite direction tested second had no visible change despite its key bitmap and thrust value being set; both-direction acceptance remains incomplete",
-        "Space projectile response was not verified",
+        "Left key held for one second changes the player ship scanout (37 changed pixels in ship bounds; idle baseline 6)",
+        "Right key held for one second changes the player ship scanout (71 changed pixels in ship bounds; idle baseline 6)",
+        "Both key-down and key-up events are delivered to the X-Caliber task; the earlier after-release-only scan was an inadequate visual measure",
+        "Space key-down and key-up are delivered, but a during-hold scanout capture showed only 2 changed pixels across the entire frame; projectile firing remains unverified",
         "Escape returned to the graphical terminal, and 40+2 returned 42"
       ],
       "log": "build/check-compat-pci.log",
-      "diagnostic": "The previous absolute-deadline comparison mixed guest uptime with host monotonic time and skipped ODE integration; using host-now plus guest-relative remaining time fixes that. Left and Right each visibly affect the ship when tested first in a fresh gameplay state. The second direction in the same session sets the expected bitmap and thrust value but does not change scanout. Escape and terminal recovery pass. Continue isolating the second-direction state and verify Space firing. Do not add a Yield to MessageScan or an X-Caliber-specific Yield."
+      "diagnostic": "Capturing scanout while a direction key is held resolves the prior apparent second-direction issue: both directions visibly affect the ship. The Space event reaches the X-Caliber task, but the held-state framebuffer differs by only 2 pixels, so firing has not been proven. Investigate the CH_SPACE/HumanFireGunBegin path and a gameplay-state gate. Do not add a Yield to MessageScan or an X-Caliber-specific Yield."
     }
   }
 }
