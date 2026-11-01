@@ -1,0 +1,13 @@
+{
+  "date": "2026-11-01",
+  "repository_commit": "163bfb69803b4732d767c572dab7253bcf06dbef",
+  "command": "python3 scripts/check-compat.py --pci --probe-budget-program",
+  "target": "QEMU PCI ARM64 graphical guest",
+  "result": "pass",
+  "verified": [
+    "clock, calendar, UTC conversion, and keyboard scanner checks passed",
+    "Budget entry form created, edited, cancelled, saved, reopened, and persisted across cold disk-only boots",
+    "graphical terminal recovered and accepted 40+2; zstatus reported failed=0"
+  ],
+  "live_utm": "unresolved: user previously reported the Budget UI freezing in UTM; this automated QEMU pass does not establish live UTM acceptance"
+}
