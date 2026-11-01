@@ -1,7 +1,10 @@
 {
   "date": "2026-11-01",
-  "commit": "ea6d2362727cbc2291980350e1e38da5fec4d0ec",
+  "base_commit": "af1370ccf007a5245b09654b7b34c744430f0816",
+  "working_tree_changes_included": true,
   "target": "QEMU PCI ARM64 graphical guest",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "474847ba0e512a16c27c6b7c0ba41a05dd5c9896e729e4a72bdc28d69d11b78a",
   "scope": "Targeted runtime acceptance on the current ARM64 compatibility guest. Passing QEMU probes do not establish live UTM behavior or complete ZealOS program coverage.",
   "checks": {
     "ToTheFront": {
@@ -75,14 +78,15 @@
       "result": "partial",
       "verified": [
         "launch, help dismissal, level start and gameplay rendering passed",
-        "Left key held for one second changes the player ship scanout (37 changed pixels in ship bounds; idle baseline 6)",
-        "Right key held for one second changes the player ship scanout (71 changed pixels in ship bounds; idle baseline 6)",
+        "Left key held for one second changes the player ship scanout",
+        "Right key held for one second changes the player ship scanout",
         "Both key-down and key-up events are delivered to the X-Caliber task; the earlier after-release-only scan was an inadequate visual measure",
-        "Space key-down and key-up are delivered, but a during-hold scanout capture showed only 2 changed pixels across the entire frame; projectile firing remains unverified",
+        "Space calls HumanFireGunBegin at level 1 and increases the shot queue from 0 to 1",
+        "The scanout captured while Space was held changed 0-2 pixels in the ship bounds, so visible projectile rendering remains unverified",
         "Escape returned to the graphical terminal, and 40+2 returned 42"
       ],
       "log": "build/check-compat-pci.log",
-      "diagnostic": "Capturing scanout while a direction key is held resolves the prior apparent second-direction issue: both directions visibly affect the ship. The Space event reaches the X-Caliber task, but the held-state framebuffer differs by only 2 pixels, so firing has not been proven. Investigate the CH_SPACE/HumanFireGunBegin path and a gameplay-state gate. Do not add a Yield to MessageScan or an X-Caliber-specific Yield."
+      "diagnostic": "A QEMU regression now checks the shot queue around the upstream CH_SPACE firing call; it proves Space enqueues a projectile, though this capture does not prove the projectile is visible in scanout. Keep this QEMU evidence separate from live UTM acceptance. Do not add a Yield to MessageScan or an X-Caliber-specific Yield."
     }
   }
 }

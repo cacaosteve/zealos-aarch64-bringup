@@ -940,6 +940,27 @@ def translate_xcaliber_key_descriptors(source: bytes) -> bytes:
                           b'\t\tQueueInsert(ode, Fs->last_ode);', 1)
 
 
+def translate_xcaliber_fire_trace(source: bytes) -> bytes:
+    """Trace the Space firing gate and shot queue around the pinned fire call."""
+    old = (b'\t\t\t\t\t\t\tcase CH_SPACE:\n'
+           b'\t\t\t\t\t\t\t\tif (level < 4)\n'
+           b'\t\t\t\t\t\t\t\t\tHumanFireGunBegin;\n'
+           b'\t\t\t\t\t\t\t\telse\n'
+           b'\t\t\t\t\t\t\t\t\tHumanFireLaserBegin;\n'
+           b'\t\t\t\t\t\t\t\tbreak;')
+    new = (b'\t\t\t\t\t\t\tcase CH_SPACE:\n'
+           b'\t\t\t\t\t\t\t\tZcXCaliberFireTrace(0, level, QueueCount(&shot_head));\n'
+           b'\t\t\t\t\t\t\t\tif (level < 4)\n'
+           b'\t\t\t\t\t\t\t\t\tHumanFireGunBegin;\n'
+           b'\t\t\t\t\t\t\t\telse\n'
+           b'\t\t\t\t\t\t\t\t\tHumanFireLaserBegin;\n'
+           b'\t\t\t\t\t\t\t\tZcXCaliberFireTrace(1, level, QueueCount(&shot_head));\n'
+           b'\t\t\t\t\t\t\t\tbreak;')
+    if source.count(old) != 1:
+        raise ValueError('pinned X-Caliber Space firing case changed')
+    return source.replace(old, new, 1)
+
+
 def translate_xcaliber_escape_scan(source: bytes) -> bytes:
     """Treat the raw Escape scan code as the exit key in X-Caliber's loop."""
     anchor = b'\t\t\t\t\tcase SC_CURSOR_RIGHT:'
@@ -2093,7 +2114,8 @@ def translate_mathode(source: bytes) -> bytes:
         step + "\n\t\t\t\t\t\t\tZcXCaliberFrameTrace(25, task);", 1)
     text = ("extern U0 ZcXCaliberFrameTrace(I64 stage, CTask *task);\n"
             "extern U0 ZcXCaliberInputTrace(CTask *task, F64 t_left, F64 t_right, I64 key_left, I64 key_right, I64 left_flags, I64 right_flags, I64 exploding, F64 ship_x, F64 ship_y);\n"
-            "extern U0 ZcXCaliberOdeTrace(CTask *task, F64 timeout_time, F64 t_desired, F64 ode_time, F64 fps, F64 frame_d);\n\n" + text)
+            "extern U0 ZcXCaliberOdeTrace(CTask *task, F64 timeout_time, F64 t_desired, F64 ode_time, F64 fps, F64 frame_d);\n"
+            "extern U0 ZcXCaliberFireTrace(I64 phase, I64 level, I64 shot_count);\n\n" + text)
     return text.encode("utf-8")
 
 

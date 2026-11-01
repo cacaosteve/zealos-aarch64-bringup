@@ -11,7 +11,7 @@ from arm64_source import (extract_sprite_elem_base_sizes, inject_sprite_elem_bas
                           inject_sprite_wrappers)
 
 from arm64_source import (extract_home_set, extract_home_startup, extract_home_startup_tasks, inject_home_startup_tasks, extract_server_task, extract_user_task, extract_version_scalars, extract_source_prompt, extract_source_training, translate_autocomplete_task, translate_doctree, translate_registry, translate_docterm, translate_doced, translate_docfind, translate_docform, translate_docpopup, translate_docrecalc, translate_grbitmap, translate_tothefront_draw, translate_tothefront_init, translate_tothefront_sentinel, translate_math,
-translate_tothefront_player_pick, translate_tothefront_ai, translate_filemgr, translate_grdc, translate_grpalette, translate_message, translate_grscreen, translate_ktask, translate_winmgr, translate_win_focus_trace, translate_job_focus_trace, translate_sched_focus_trace, translate_zsplash, translate_home_once, translate_span_worker_cleanup, translate_keepaway_nearest_ball, translate_stock_game_math_calls, translate_empty_label_statement, translate_wenceslas, translate_progress, translate_xcaliber_shot_return, translate_xcaliber_draw_visibility, translate_xcaliber_key_descriptors, translate_xcaliber_escape_scan, translate_xcaliber_held_input)
+translate_tothefront_player_pick, translate_tothefront_ai, translate_filemgr, translate_grdc, translate_grpalette, translate_message, translate_grscreen, translate_ktask, translate_winmgr, translate_win_focus_trace, translate_job_focus_trace, translate_sched_focus_trace, translate_zsplash, translate_home_once, translate_span_worker_cleanup, translate_keepaway_nearest_ball, translate_stock_game_math_calls, translate_empty_label_statement, translate_wenceslas, translate_progress, translate_xcaliber_shot_return, translate_xcaliber_draw_visibility, translate_xcaliber_key_descriptors, translate_xcaliber_fire_trace, translate_xcaliber_escape_scan, translate_xcaliber_held_input)
 from arm64_source import translate_pick3d_class_terminator, translate_classmeta_callback
 from arm64_source import translate_mathode
 from arm64_source import translate_debug_compat
@@ -151,6 +151,10 @@ except ValueError:
     pass
 else:
     raise AssertionError('X-Caliber overlay accepted changed window input policy')
+xcaliber_input_overlay = translate_xcaliber_fire_trace(xcaliber_input_overlay)
+assert xcaliber_input_overlay.count(b'ZcXCaliberFireTrace(') == 2
+assert b'ZcXCaliberFireTrace(0, level, QueueCount(&shot_head));' in xcaliber_input_overlay
+assert b'ZcXCaliberFireTrace(1, level, QueueCount(&shot_head));' in xcaliber_input_overlay
 xcaliber_escape_overlay = translate_xcaliber_escape_scan(xcaliber_input_overlay)
 assert xcaliber_escape_overlay.count(b'case SC_ESC:\n\t\t\t\t\t\tch = CH_ESC;') == 2
 xcaliber_input_overlay = translate_xcaliber_held_input(xcaliber_escape_overlay)

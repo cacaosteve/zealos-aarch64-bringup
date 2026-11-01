@@ -4459,6 +4459,11 @@ static int64_t host_xcaliber_ode_trace(int64_t *a) {
     guest_xcal_ode_trace_budget--;
     return 0;
 }
+static int64_t host_xcaliber_fire_trace(int64_t *a) {
+    fprintf(stderr, "xcal_fire phase=%ld level=%ld shots=%ld\n",
+            (long)a[0], (long)a[1], (long)a[2]);
+    return 0;
+}
 static int64_t host_xcaliber_message_scan_trace(int64_t *a) {
     struct guest_fiber *fiber = find_guest_task((void *)(uintptr_t)a[0]);
     /* Source-compiled MessageScan calls do not pass through the host-bound
@@ -7527,6 +7532,9 @@ static int load_source_path(const char *path, int merged, int recover) {
         execute_source("<X-Caliber ODE trace bridge>",
             "extern U0 ZcXCaliberOdeTrace(CTask *task, F64 timeout_time, F64 t_desired, F64 ode_time, F64 fps, F64 frame_d);");
         PrsBindCSymbol("ZcXCaliberOdeTrace", host_xcaliber_ode_trace, 6);
+        execute_source("<X-Caliber fire trace bridge>",
+            "extern U0 ZcXCaliberFireTrace(I64 phase, I64 level, I64 shot_count);");
+        PrsBindCSymbol("ZcXCaliberFireTrace", host_xcaliber_fire_trace, 3);
     }
     if (!strcmp(path, "/Kernel/Job.ZC")) {
         execute_source("<window focus trace bridge>",

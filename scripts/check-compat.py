@@ -1696,6 +1696,26 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             print('X-Caliber Space held scanout diff in ship bounds: '
                   f'{space_motion} pixels (projectile check remains inconclusive)',
                   flush=True)
+            while select.select([guest.stdout], [], [], 0)[0]:
+                data = os.read(guest.stdout.fileno(), 65536)
+                if not data:
+                    break
+                buf.extend(data)
+                log.write(data)
+                log.flush()
+            fire_trace = re.findall(
+                r'xcal_fire phase=(\d+) level=(\d+) shots=(\d+)',
+                log_path.read_text(errors='replace'))
+            fired = any(
+                before_phase == '0' and after_phase == '1' and
+                before_level == after_level and int(after_shots) > int(before_shots)
+                for (before_phase, before_level, before_shots),
+                    (after_phase, after_level, after_shots)
+                in zip(fire_trace, fire_trace[1:]))
+            if not fired:
+                raise RuntimeError('X-Caliber Space did not enqueue a shot; '
+                                   f'fire trace={fire_trace[-8:]}')
+            print('PASS X-Caliber Space enqueues a projectile', flush=True)
             # X-Caliber spends most of each frame in its ODE update. Keep
             # Escape down long enough for its polling loop to sample the
             # transition instead of using the generic 100 ms key tap.
