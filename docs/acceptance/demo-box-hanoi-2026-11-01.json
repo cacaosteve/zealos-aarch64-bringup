@@ -1,0 +1,21 @@
+{
+  "date": "2026-11-01",
+  "base_commit": "5f36298",
+  "working_tree_changes_included": true,
+  "target": "QEMU PCI ARM64 graphical guest",
+  "command": "python3 scripts/check-compat.py --pci --probe-demo-box-hanoi",
+  "result": "pass",
+  "checks": {
+    "Box": {
+      "system_context": "loaded /System/Math/Math.ZC",
+      "rendering": "pass: rotating red wireframe detected in graphical scanout",
+      "exit_and_recovery": "pass: Escape returned to the terminal; 40+2 returned 42"
+    },
+    "Hanoi": {
+      "rendering": "pass: colored disk animation detected",
+      "exit_and_recovery": "pass: Escape unwound animation and restored the terminal; 40+2 returned 42"
+    },
+    "guest_status": "pass: zstatus reported failed=0"
+  },
+  "scope_note": "These two demos now have targeted QEMU runtime acceptance. This does not establish live UTM or Pi hardware acceptance, and says nothing about other demo sources."
+}

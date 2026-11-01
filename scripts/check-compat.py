@@ -55,6 +55,8 @@ p.add_argument('--probe-demo-circletrace', action='store_true',
                help='exercise CircleTrace circle rendering, mouse drawing and Escape recovery')
 p.add_argument('--probe-demo-pick3d', action='store_true',
                help='exercise the original Pick3D graphics demo and Escape recovery')
+p.add_argument('--probe-demo-box-hanoi', action='store_true',
+               help='exercise original rotating Box and animated Hanoi demos with terminal recovery')
 p.add_argument('--probe-demo-system-context', action='store_true',
                help='compile representative Demo files with the boot kernel and graphics APIs loaded')
 p.add_argument('--demo-system-path', action='append', default=[],
@@ -205,7 +207,7 @@ if args.demo_system_module and not args.probe_demo_system_context:
     p.error('--demo-system-module requires --probe-demo-system-context')
 if (args.probe_stock_programs or args.probe_stock_interactive or args.probe_program_catalog or
         args.probe_doc_includes or args.probe_logic_program or args.probe_budget_program or
-        args.probe_demo_tictactoe or args.probe_demo_chess or args.probe_demo_circletrace or args.probe_demo_pick3d or
+        args.probe_demo_tictactoe or args.probe_demo_chess or args.probe_demo_circletrace or args.probe_demo_pick3d or args.probe_demo_box_hanoi or
         args.probe_3d_apps or args.probe_tothefront or args.probe_xcaliber or
         args.probe_demo_global_vars or args.probe_demo_exceptions or args.probe_timeclock or
         args.probe_vocabulary or args.probe_psalmody):
@@ -275,6 +277,7 @@ log_path = ROOT / 'build' / (f'check-usb-{usb_label}{"-budget" if args.probe_bud
                              'check-logic-pci.log' if args.probe_logic_program else
                              'check-doc-includes-pci.log' if args.probe_doc_includes else
                              'check-demo-pick3d-pci.log' if args.probe_demo_pick3d else
+                             'check-demo-box-hanoi-pci.log' if args.probe_demo_box_hanoi else
                              'check-demo-chess-pci.log' if args.probe_demo_chess else
                              'check-demo-circletrace-pci.log' if args.probe_demo_circletrace else
                              'check-demo-tictactoe-pci.log' if args.probe_demo_tictactoe else
@@ -3320,6 +3323,57 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             else:
                 command('zstatus', 'failed=0')
             print('PASS isolated program compilation inventory saved', flush=True)
+            raise SystemExit(0)
+        if args.probe_demo_box_hanoi:
+            command('zload /System/Math/Math.ZC',
+                    'zc: loaded /System/Math/Math.ZC', timeout=30)
+            focus_graphical_terminal()
+            run_graphical_terminal_command(
+                'demo-box-hanoi-ready', '40+2;', 'ans=0x2A=42')
+
+            type_graphical_prompt_line(
+                'demo-box-launch', 'ExeFile2("/Demo/Graphics/Box.ZC");')
+            qmp_send_key('ret')
+            deadline = time.monotonic() + 10
+            while True:
+                box = graphical_screen('demo-box-frame')
+                if rgb_pixels_in(box, (170, 0, 0), (100, 100, 700, 500)) >= 80:
+                    break
+                if time.monotonic() >= deadline:
+                    raise RuntimeError('Box did not draw its rotating red wireframe; '
+                                       f'see {graphical_path("demo-box-frame")}\n'
+                                       +box[3])
+                time.sleep(.2)
+            print('PASS Box rotating wireframe rendered', flush=True)
+            qmp_send_key('esc')
+            time.sleep(.5)
+            run_graphical_terminal_command(
+                'demo-box-exit-smoke', '40+2;', 'ans=0x2A=42', timeout=20)
+
+            type_graphical_prompt_line(
+                'demo-hanoi-launch', 'ExeFile2("/Demo/Graphics/Hanoi.ZC");')
+            qmp_send_key('ret')
+            time.sleep(2)
+            hanoi = graphical_screen('demo-hanoi-animation')
+            hanoi_colors = Counter(
+                tuple(hanoi[2][offset:offset+3])
+                for offset in range(0, len(hanoi[2]), 3))
+            if sum(count for color, count in hanoi_colors.items()
+                   if color not in ((0, 0, 0), (255, 255, 255))) < 200:
+                raise RuntimeError('Hanoi did not display its animated colored disks; '
+                                   f'see {graphical_path("demo-hanoi-animation")}\n'
+                                   +hanoi[3])
+            print('PASS Hanoi animation rendered', flush=True)
+            # Hanoi checks CharScan during each animation step and unwinds via
+            # its own catch path when a key arrives, so Escape must restore the
+            # terminal instead of leaving its draw callback installed.
+            qmp_send_key('esc')
+            time.sleep(.5)
+            run_graphical_terminal_command(
+                'demo-hanoi-exit-smoke', '40+2;', 'ans=0x2A=42', timeout=20)
+            command('zstatus', 'failed=0')
+            print('PASS Box and Hanoi rendering, Escape cleanup and terminal recovery',
+                  flush=True)
             raise SystemExit(0)
         if args.probe_demo_pick3d:
             focus_graphical_terminal()
