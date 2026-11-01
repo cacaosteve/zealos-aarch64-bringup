@@ -1,0 +1,48 @@
+{
+  "date": "2026-11-01",
+  "repository_commit": "d6230848d9fab3786d0b86ef746f539640e10c79",
+  "command": "python3 scripts/check-compat.py --pci --probe-program-catalog",
+  "target": "QEMU PCI ARM64 graphical guest",
+  "result": "pass",
+  "scope": "Compile-only catalog; successful compilation is not runtime acceptance.",
+  "apps_compiled": [
+    "/Apps/Budget/Run.ZC",
+    "/Apps/GrModels/Run.ZC",
+    "/Apps/KeepAway/Run.ZC",
+    "/Apps/Logic/Run.ZC",
+    "/Apps/Psalmody/Run.ZC",
+    "/Apps/Span/Run.ZC",
+    "/Apps/Strut/Run.ZC",
+    "/Apps/TimeClock/Load.ZC",
+    "/Apps/Titanium/Run.ZC",
+    "/Apps/ToTheFront/Run.ZC",
+    "/Apps/Vocabulary/Run.ZC",
+    "/Apps/X-Caliber/Run.ZC"
+  ],
+  "normal_loads_passed": [
+    "/Apps/ToTheFront/Load.ZC",
+    "/Apps/X-Caliber/Load.ZC"
+  ],
+  "support_and_representative_programs_compiled": [
+    "/System/Gr/GrMath.ZC",
+    "/System/Gr/GrPrimatives.ZC",
+    "/Demo/Graphics/Doodle.ZC",
+    "/Demo/Graphics/Life.ZC",
+    "/Demo/Games/MassSpring.ZC",
+    "/Demo/Games/BlackDiamond.ZC",
+    "/Demo/Games/BomberGolf.ZC",
+    "/Demo/Games/CastleFrankenstein.ZC",
+    "/Demo/Games/CircleTrace.ZC",
+    "/Demo/Games/DunGen.ZC",
+    "/Demo/Games/FlapBat.ZC",
+    "/Demo/Games/RawHide.ZC",
+    "/Demo/Games/Talons.ZC",
+    "/Demo/Games/Varoom.ZC",
+    "/Demo/Games/Wenceslas.ZC",
+    "/Demo/Games/ZoneOut.ZC",
+    "/Demo/Progress.ZC",
+    "/Demo/RegistryDemo.ZC"
+  ],
+  "runtime_recovery": "pass: zstatus reported failed=0 after catalog run",
+  "source_result_count": 30
+}
