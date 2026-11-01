@@ -1683,8 +1683,33 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             player_before_space = rgb_centroid_in(
                 before_space, (0, 151, 162), player_bounds)
             qmp_key_edges(['spc'], True)
-            time.sleep(0.25)
-            space_held_frame = graphical_screen('xcaliber-gameplay-space-held')
+            # The Space key is consumed inside the app's frame/message loop.
+            # Wait for the guest-side trace before capturing; a fixed host
+            # sleep can snapshot the previous frame before the input is read.
+            until(b'xcal_fire phase=1', timeout=10)
+            until(b'\n', timeout=10)
+            firing_trace = re.findall(
+                r'xcal_fire phase=(\d+) level=(\d+) shots=(\d+) '
+                r'x=(-?\d+) y=(-?\d+)',
+                log_path.read_text(errors='replace'))
+            if not firing_trace or firing_trace[-1][0] != '1':
+                raise RuntimeError('X-Caliber firing trace has no completed shot '
+                                   f'record: {firing_trace[-4:]}')
+            shot_x, shot_y = (int(value) for value in firing_trace[-1][3:5])
+            shot_bounds = (max(0, shot_x - 12), max(0, shot_y - 12),
+                           min(800, shot_x + 13), min(600, shot_y + 13))
+            idle_shot_motion = rgb_diff_count(
+                idle, idle_after_wait, shot_bounds)
+            shot_motion = 0
+            space_held_frame = None
+            for sample in range(20):
+                space_held_frame = graphical_screen(
+                    f'xcaliber-gameplay-space-scanout-{sample}')
+                shot_motion = rgb_diff_count(
+                    before_space, space_held_frame, shot_bounds)
+                if shot_motion > idle_shot_motion:
+                    break
+                time.sleep(0.1)
             qmp_key_edges(['spc'], False)
             time.sleep(0.1)
             space_frame = graphical_screen('xcaliber-gameplay-space')
@@ -1704,18 +1729,28 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 log.write(data)
                 log.flush()
             fire_trace = re.findall(
-                r'xcal_fire phase=(\d+) level=(\d+) shots=(\d+)',
+                r'xcal_fire phase=(\d+) level=(\d+) shots=(\d+) '
+                r'x=(-?\d+) y=(-?\d+)',
                 log_path.read_text(errors='replace'))
             fired = any(
                 before_phase == '0' and after_phase == '1' and
                 before_level == after_level and int(after_shots) > int(before_shots)
-                for (before_phase, before_level, before_shots),
-                    (after_phase, after_level, after_shots)
+                for (before_phase, before_level, before_shots, _, _),
+                    (after_phase, after_level, after_shots, _, _)
                 in zip(fire_trace, fire_trace[1:]))
             if not fired:
                 raise RuntimeError('X-Caliber Space did not enqueue a shot; '
                                    f'fire trace={fire_trace[-8:]}')
-            print('PASS X-Caliber Space enqueues a projectile', flush=True)
+            print('X-Caliber projectile region motion: '
+                  f'baseline={idle_shot_motion} shot={shot_motion} '
+                  f'point=({shot_x},{shot_y})', flush=True)
+            if shot_motion <= idle_shot_motion:
+                print('INCONCLUSIVE X-Caliber projectile visibility: the guest '
+                      'enqueued a shot, but its local scanout did not change',
+                      flush=True)
+            else:
+                print('PASS X-Caliber Space projectile is visible in scanout',
+                      flush=True)
             # X-Caliber spends most of each frame in its ODE update. Keep
             # Escape down long enough for its polling loop to sample the
             # transition instead of using the generic 100 ms key tap.

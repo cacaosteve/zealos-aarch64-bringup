@@ -152,9 +152,9 @@ except ValueError:
 else:
     raise AssertionError('X-Caliber overlay accepted changed window input policy')
 xcaliber_input_overlay = translate_xcaliber_fire_trace(xcaliber_input_overlay)
-assert xcaliber_input_overlay.count(b'ZcXCaliberFireTrace(') == 2
-assert b'ZcXCaliberFireTrace(0, level, QueueCount(&shot_head));' in xcaliber_input_overlay
-assert b'ZcXCaliberFireTrace(1, level, QueueCount(&shot_head));' in xcaliber_input_overlay
+assert xcaliber_input_overlay.count(b'ZcXCaliberFireTrace(') == 3
+assert b'ZcXCaliberFireTrace(0, level, QueueCount(&shot_head), 0, 0);' in xcaliber_input_overlay
+assert b'ToI64(shot_head.last->p.x), ToI64(shot_head.last->p.y)' in xcaliber_input_overlay
 xcaliber_escape_overlay = translate_xcaliber_escape_scan(xcaliber_input_overlay)
 assert xcaliber_escape_overlay.count(b'case SC_ESC:\n\t\t\t\t\t\tch = CH_ESC;') == 2
 xcaliber_input_overlay = translate_xcaliber_held_input(xcaliber_escape_overlay)

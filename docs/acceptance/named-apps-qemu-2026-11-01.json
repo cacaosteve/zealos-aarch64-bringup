@@ -1,10 +1,10 @@
 {
   "date": "2026-11-01",
-  "base_commit": "af1370ccf007a5245b09654b7b34c744430f0816",
+  "base_commit": "175bd70f5f715b6d8756439bbde8d4433f42cc4c",
   "working_tree_changes_included": true,
   "target": "QEMU PCI ARM64 graphical guest",
   "iso": "build/zealos-aarch64-hello.iso",
-  "iso_sha256": "474847ba0e512a16c27c6b7c0ba41a05dd5c9896e729e4a72bdc28d69d11b78a",
+  "iso_sha256": "4ee5cd747803ca7dcd4bebb32566bbcb98ca5ddc5332526b0808ba30c9d7e83a",
   "scope": "Targeted runtime acceptance on the current ARM64 compatibility guest. Passing QEMU probes do not establish live UTM behavior or complete ZealOS program coverage.",
   "checks": {
     "ToTheFront": {
@@ -78,15 +78,14 @@
       "result": "partial",
       "verified": [
         "launch, help dismissal, level start and gameplay rendering passed",
-        "Left key held for one second changes the player ship scanout",
-        "Right key held for one second changes the player ship scanout",
-        "Both key-down and key-up events are delivered to the X-Caliber task; the earlier after-release-only scan was an inadequate visual measure",
-        "Space calls HumanFireGunBegin at level 1 and increases the shot queue from 0 to 1",
-        "The scanout captured while Space was held changed 0-2 pixels in the ship bounds, so visible projectile rendering remains unverified",
-        "Escape returned to the graphical terminal, and 40+2 returned 42"
+        "Left and Right held for one second each change the player ship scanout",
+        "Both key-down and key-up events are delivered to the X-Caliber task",
+        "Space calls HumanFireGunBegin at level 1 and appends a shot; source/host trace locates the appended shot at screen point (400,288)",
+        "After synchronizing to the fire event and sampling up to 20 scanout frames, local motion around the shot remained 0 pixels against a 0-pixel idle baseline; projectile visibility remains unverified",
+        "Escape returned to the graphical terminal, 40+2 returned 42, and runtime reported failed=0"
       ],
       "log": "build/check-compat-pci.log",
-      "diagnostic": "A QEMU regression now checks the shot queue around the upstream CH_SPACE firing call; it proves Space enqueues a projectile, though this capture does not prove the projectile is visible in scanout. Keep this QEMU evidence separate from live UTM acceptance. Do not add a Yield to MessageScan or an X-Caliber-specific Yield."
+      "diagnostic": "The QEMU probe waits for the guest-side Space firing trace, observes the newly appended tail shot (not an older queued solar flare), and samples the traced screen region for up to 20 frames. The queue gains a shot, but the sampled scanout did not change in the latest run. Keep this QEMU evidence separate from live UTM acceptance. Do not add a Yield to MessageScan or an X-Caliber-specific Yield."
     }
   }
 }

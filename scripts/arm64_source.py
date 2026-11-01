@@ -949,12 +949,16 @@ def translate_xcaliber_fire_trace(source: bytes) -> bytes:
            b'\t\t\t\t\t\t\t\t\tHumanFireLaserBegin;\n'
            b'\t\t\t\t\t\t\t\tbreak;')
     new = (b'\t\t\t\t\t\t\tcase CH_SPACE:\n'
-           b'\t\t\t\t\t\t\t\tZcXCaliberFireTrace(0, level, QueueCount(&shot_head));\n'
+           b'\t\t\t\t\t\t\t\tZcXCaliberFireTrace(0, level, QueueCount(&shot_head), 0, 0);\n'
            b'\t\t\t\t\t\t\t\tif (level < 4)\n'
            b'\t\t\t\t\t\t\t\t\tHumanFireGunBegin;\n'
            b'\t\t\t\t\t\t\t\telse\n'
            b'\t\t\t\t\t\t\t\t\tHumanFireLaserBegin;\n'
-           b'\t\t\t\t\t\t\t\tZcXCaliberFireTrace(1, level, QueueCount(&shot_head));\n'
+           b'\t\t\t\t\t\t\t\tif (QueueCount(&shot_head))\n'
+           b'\t\t\t\t\t\t\t\t\tZcXCaliberFireTrace(1, level, QueueCount(&shot_head), '\
+           b'ToI64(shot_head.last->p.x), ToI64(shot_head.last->p.y));\n'
+           b'\t\t\t\t\t\t\t\telse\n'
+           b'\t\t\t\t\t\t\t\t\tZcXCaliberFireTrace(1, level, QueueCount(&shot_head), 0, 0);\n'
            b'\t\t\t\t\t\t\t\tbreak;')
     if source.count(old) != 1:
         raise ValueError('pinned X-Caliber Space firing case changed')
@@ -2115,7 +2119,7 @@ def translate_mathode(source: bytes) -> bytes:
     text = ("extern U0 ZcXCaliberFrameTrace(I64 stage, CTask *task);\n"
             "extern U0 ZcXCaliberInputTrace(CTask *task, F64 t_left, F64 t_right, I64 key_left, I64 key_right, I64 left_flags, I64 right_flags, I64 exploding, F64 ship_x, F64 ship_y);\n"
             "extern U0 ZcXCaliberOdeTrace(CTask *task, F64 timeout_time, F64 t_desired, F64 ode_time, F64 fps, F64 frame_d);\n"
-            "extern U0 ZcXCaliberFireTrace(I64 phase, I64 level, I64 shot_count);\n\n" + text)
+            "extern U0 ZcXCaliberFireTrace(I64 phase, I64 level, I64 shot_count, I64 x, I64 y);\n\n" + text)
     return text.encode("utf-8")
 
 
