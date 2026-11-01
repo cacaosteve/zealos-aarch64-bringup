@@ -15,6 +15,7 @@ translate_tothefront_player_pick, translate_tothefront_ai, translate_filemgr, tr
 from arm64_source import translate_pick3d_class_terminator, translate_classmeta_callback
 from arm64_source import translate_mathode
 from arm64_source import translate_debug_compat
+from arm64_source import translate_mandel_single_cpu
 
 root = Path(__file__).resolve().parent.parent
 debug_overlay = translate_debug_compat(
@@ -48,6 +49,21 @@ except ValueError:
 else:
     raise AssertionError('Pick3D overlay accepted changed pinned source')
 print('PASS guarded Pick3D PCSprite class terminator overlay', flush=True)
+
+mandel_source = (root / 'upstream/pinned/Demo/Graphics/Mandel.ZC').read_bytes()
+mandel_overlay = translate_mandel_single_cpu(mandel_source)
+assert b'I64 numCores = mp_count > 1 ? mp_count - 1 : 1;' in mandel_overlay
+assert b'if (mp_count > 1)' in mandel_overlay
+assert b'JobQueue(&MandelFrame, i, i+1);' in mandel_overlay
+assert b'MandelFrame(0);' in mandel_overlay
+try:
+    translate_mandel_single_cpu(mandel_source.replace(
+        b'JobQueue(&MandelFrame, i, i+1);', b'JobQueue(&MandelFrame, i, i);', 1))
+except ValueError:
+    pass
+else:
+    raise AssertionError('Mandel overlay accepted changed worker dispatch')
+print('PASS guarded Mandel single-CPU fallback preserves multi-CPU dispatch', flush=True)
 
 math_source = (root / 'upstream/pinned/System/Math/Math.ZC').read_bytes()
 math_overlay = translate_math(math_source)

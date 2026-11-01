@@ -57,6 +57,8 @@ p.add_argument('--probe-demo-pick3d', action='store_true',
                help='exercise the original Pick3D graphics demo and Escape recovery')
 p.add_argument('--probe-demo-box-hanoi', action='store_true',
                help='exercise original rotating Box and animated Hanoi demos with terminal recovery')
+p.add_argument('--probe-demo-mandel', action='store_true',
+               help='exercise original Mandel demo rendering and Escape recovery on a single-CPU guest')
 p.add_argument('--probe-demo-system-context', action='store_true',
                help='compile representative Demo files with the boot kernel and graphics APIs loaded')
 p.add_argument('--demo-system-path', action='append', default=[],
@@ -207,7 +209,7 @@ if args.demo_system_module and not args.probe_demo_system_context:
     p.error('--demo-system-module requires --probe-demo-system-context')
 if (args.probe_stock_programs or args.probe_stock_interactive or args.probe_program_catalog or
         args.probe_doc_includes or args.probe_logic_program or args.probe_budget_program or
-        args.probe_demo_tictactoe or args.probe_demo_chess or args.probe_demo_circletrace or args.probe_demo_pick3d or args.probe_demo_box_hanoi or
+        args.probe_demo_tictactoe or args.probe_demo_chess or args.probe_demo_circletrace or args.probe_demo_pick3d or args.probe_demo_box_hanoi or args.probe_demo_mandel or
         args.probe_3d_apps or args.probe_tothefront or args.probe_xcaliber or
         args.probe_demo_global_vars or args.probe_demo_exceptions or args.probe_timeclock or
         args.probe_vocabulary or args.probe_psalmody):
@@ -277,6 +279,7 @@ log_path = ROOT / 'build' / (f'check-usb-{usb_label}{"-budget" if args.probe_bud
                              'check-logic-pci.log' if args.probe_logic_program else
                              'check-doc-includes-pci.log' if args.probe_doc_includes else
                              'check-demo-pick3d-pci.log' if args.probe_demo_pick3d else
+                             'check-demo-mandel-pci.log' if args.probe_demo_mandel else
                              'check-demo-box-hanoi-pci.log' if args.probe_demo_box_hanoi else
                              'check-demo-chess-pci.log' if args.probe_demo_chess else
                              'check-demo-circletrace-pci.log' if args.probe_demo_circletrace else
@@ -3374,6 +3377,38 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             command('zstatus', 'failed=0')
             print('PASS Box and Hanoi rendering, Escape cleanup and terminal recovery',
                   flush=True)
+            raise SystemExit(0)
+        if args.probe_demo_mandel:
+            command('zload /System/Math/Math.ZC',
+                    'zc: loaded /System/Math/Math.ZC', timeout=30)
+            focus_graphical_terminal()
+            run_graphical_terminal_command(
+                'demo-mandel-ready', '40+2;', 'ans=0x2A=42')
+            type_graphical_prompt_line(
+                'demo-mandel-launch', 'ExeFile2("/Demo/Graphics/Mandel.ZC");')
+            qmp_send_key('ret')
+            deadline = time.monotonic() + 60
+            while True:
+                mandel = graphical_screen('demo-mandel-frame')
+                colors = Counter(tuple(mandel[2][offset:offset+3])
+                                 for offset in range(0, len(mandel[2]), 3))
+                non_background = sum(
+                    count for color, count in colors.items()
+                    if color not in ((0, 0, 0), (255, 255, 255)))
+                if len(colors) >= 8 and non_background >= 1000:
+                    break
+                if time.monotonic() >= deadline:
+                    raise RuntimeError(
+                        'Mandel did not render its fractal image on the single-CPU guest; '
+                        f'see {graphical_path("demo-mandel-frame")}\n{mandel[3]}')
+                time.sleep(.5)
+            print('PASS Mandel fractal rendered on single-CPU guest', flush=True)
+            qmp_send_key('esc')
+            time.sleep(.5)
+            run_graphical_terminal_command(
+                'demo-mandel-exit-smoke', '40+2;', 'ans=0x2A=42', timeout=20)
+            command('zstatus', 'failed=0')
+            print('PASS Mandel Escape cleanup and terminal recovery', flush=True)
             raise SystemExit(0)
         if args.probe_demo_pick3d:
             focus_graphical_terminal()

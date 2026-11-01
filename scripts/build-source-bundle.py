@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 import sys
 import tarfile
-from arm64_source import translate_docfile, translate_debug_compat, extract_source_dates, extract_string_utilities, translate_budget_strings, translate_span_worker_cleanup, translate_keepaway_nearest_ball, translate_xcaliber_shot_return, translate_xcaliber_draw_visibility, translate_xcaliber_key_descriptors, translate_xcaliber_fire_trace, translate_xcaliber_escape_scan, translate_xcaliber_held_input, translate_tothefront_draw, translate_tothefront_init, translate_tothefront_player_pick, translate_tothefront_ai, translate_tothefront_sentinel, extract_keyboard_helpers, translate_math, translate_sysrep_processor, translate_pick3d_class_terminator, translate_classmeta_callback
+from arm64_source import translate_docfile, translate_debug_compat, extract_source_dates, extract_string_utilities, translate_budget_strings, translate_span_worker_cleanup, translate_keepaway_nearest_ball, translate_xcaliber_shot_return, translate_xcaliber_draw_visibility, translate_xcaliber_key_descriptors, translate_xcaliber_fire_trace, translate_xcaliber_escape_scan, translate_xcaliber_held_input, translate_tothefront_draw, translate_tothefront_init, translate_tothefront_player_pick, translate_tothefront_ai, translate_tothefront_sentinel, extract_keyboard_helpers, translate_math, translate_sysrep_processor, translate_pick3d_class_terminator, translate_classmeta_callback, translate_mandel_single_cpu
 
 from arm64_source import (extract_home_set, extract_home_startup, extract_home_startup_tasks, inject_home_startup_tasks, extract_version_scalars, extract_source_prompt, extract_source_training, extract_server_task, extract_user_task, translate_doctree, translate_registry, translate_docterm, translate_doced, translate_docfind, translate_docform, translate_docpopup, translate_docrecalc, translate_grbitmap,
                           translate_autocomplete_task, translate_grdc, translate_grscreen, translate_ktask, translate_mathode, translate_zsplash,
@@ -154,6 +154,11 @@ for name, expected in manifest['files'].items():
             data = translate_pick3d_class_terminator(data)
         except ValueError as exc:
             raise SystemExit(f'ARM64 Pick3D source overlay no longer applies: {exc}') from exc
+    if rel == 'Demo/Graphics/Mandel.ZC':
+        try:
+            data = translate_mandel_single_cpu(data)
+        except ValueError as exc:
+            raise SystemExit(f'ARM64 Mandel source overlay no longer applies: {exc}') from exc
     if rel == 'Demo/Games/ZoneOut.ZC':
         try:
             data = translate_empty_label_statement(data, b'zo_done')

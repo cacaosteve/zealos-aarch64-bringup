@@ -1,0 +1,14 @@
+{
+  "date": "2026-11-01",
+  "upstream_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "command": "python3 scripts/check-compat.py --pci --probe-demo-mandel",
+  "target": "QEMU PCI ARM64 graphical guest (single CPU; mp_count=1)",
+  "result": "pass",
+  "checks": {
+    "single_cpu_fallback": "pass: ARM64 source-bundle overlay invokes MandelFrame(0), avoiding the zero-worker division while retaining upstream JobQueue dispatch when mp_count>1",
+    "rendering": "pass: fractal image scanout detected",
+    "exit_and_recovery": "pass: Escape returned to the graphical terminal; 40+2 returned 42",
+    "guest_status": "pass: zstatus reported failed=0"
+  },
+  "scope_note": "The pinned upstream Demo/Graphics/Mandel.ZC remains unchanged. This verifies the single-CPU compatibility path in QEMU; the multi-CPU worker branch and live UTM/Pi hardware are not runtime-accepted by this probe."
+}

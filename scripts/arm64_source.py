@@ -244,6 +244,38 @@ Bool SpriteInterpolationStreamsCompatible(U8 *elems0, U8 *elems1,
             interpolation + b'\n')
 
 
+def translate_mandel_single_cpu(source: bytes) -> bytes:
+    """Keep the stock Mandel renderer usable when the guest has one CPU.
+
+    Upstream reserves CPU 0 for its UI and dispatches scanlines to CPUs
+    1..mp_count-1. A single-CPU ARM64 guest therefore has no workers and
+    divides by zero. Preserve the stock multi-CPU path, but run the same frame
+    worker synchronously on CPU 0 when no worker CPUs exist.
+    """
+    if source.count(b'I64 numCores = mp_count - 1;') != 1:
+        raise ValueError('pinned Mandel worker count changed')
+    if source.count(b'I64 rowsPerCore = height / numCores;') != 1:
+        raise ValueError('pinned Mandel row partition changed')
+    dispatch = b'''      for (i=0; i<numCores; i++) {
+        JobQueue(&MandelFrame, i, i+1);
+      }'''
+    if source.count(dispatch) != 1:
+        raise ValueError('pinned Mandel frame dispatch changed')
+    source = source.replace(
+        b'I64 numCores = mp_count - 1;',
+        b'I64 numCores = mp_count > 1 ? mp_count - 1 : 1;')
+    source = source.replace(
+        dispatch,
+        b'''      if (mp_count > 1) {
+        for (i=0; i<numCores; i++) {
+          JobQueue(&MandelFrame, i, i+1);
+        }
+      } else {
+        MandelFrame(0);
+      }''')
+    return source
+
+
 def inject_sprite_interpolation(bridge: bytes, sprite_new: bytes,
                                 sprite_plot: bytes) -> bytes:
     """Append size/interpolation APIs before helpers that depend on SpriteSize."""
