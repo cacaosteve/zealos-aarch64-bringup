@@ -2,14 +2,14 @@
   "source_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
   "generated_from": "build/demo-source-catalog.json",
   "source_count": 206,
-  "compile_pass": 177,
-  "compile_blocked": 29,
+  "compile_pass": 178,
+  "compile_blocked": 28,
   "runtime_accepted": 11,
   "directories": {
     ".": {
       "source_count": 34,
-      "compile_pass": 29,
-      "compile_blocked": 5,
+      "compile_pass": 30,
+      "compile_blocked": 4,
       "preliminary_kind": "root-level source; needs classification"
     },
     "AcctExample": {
@@ -341,8 +341,8 @@
       "directory": ".",
       "preliminary_kind": "root-level source; needs classification",
       "classification_confidence": "unclassified",
-      "compile": "blocked",
-      "first_compile_error": "ERR:/Demo/CompileDemo.ZC:14:40 Unknown symbol 'LexExpression2Bin'.",
+      "compile": "pass",
+      "first_compile_error": null,
       "runtime": "unverified",
       "runtime_evidence": null
     },
