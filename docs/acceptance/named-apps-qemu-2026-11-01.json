@@ -1,0 +1,34 @@
+{
+  "date": "2026-11-01",
+  "commit": "9d997a3ea5e8389a1d4466759f9f6460d6058ebc",
+  "target": "QEMU PCI ARM64 graphical guest",
+  "scope": "Targeted runtime acceptance for two named apps. This does not establish live UTM behavior or complete ZealOS program coverage.",
+  "checks": {
+    "ToTheFront": {
+      "command": "python3 scripts/check-compat.py --pci --probe-tothefront",
+      "result": "pass",
+      "verified": [
+        "player setup and help dismissal",
+        "map and active artillery rendering",
+        "plotted an artillery order to an adjacent hex",
+        "Space advanced the phase",
+        "Escape returned to the graphical terminal",
+        "40+2 returned 42 and runtime reported failed=0"
+      ],
+      "log": "build/check-compat-pci.log"
+    },
+    "Psalmody": {
+      "command": "python3 scripts/check-compat.py --pci --probe-psalmody",
+      "result": "pass",
+      "verified": [
+        "editor launch",
+        "record toggle and note entry",
+        "playback",
+        "Shift+Escape returned to the graphical terminal",
+        "40+2 returned 42 and runtime reported failed=0"
+      ],
+      "log": "build/check-psalmody-pci.log"
+    }
+  },
+  "catalog_note": "The 2026-10-27 isolated compile catalog marked Psalmody and ToTheFront blocked. These targeted runtime runs pass in their proper system context; the old catalog remains a historical compile-only snapshot and should not be read as the current runtime status."
+}
