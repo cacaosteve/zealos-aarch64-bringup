@@ -51,6 +51,8 @@ p.add_argument('--probe-demo-tictactoe', action='store_true',
                help='exercise the original TicTacToe demo with pointer input and exit recovery')
 p.add_argument('--probe-demo-chess', action='store_true',
                help='exercise the original Chess demo board rendering and Escape recovery')
+p.add_argument('--probe-demo-circletrace', action='store_true',
+               help='exercise CircleTrace circle rendering, mouse drawing and Escape recovery')
 p.add_argument('--probe-demo-pick3d', action='store_true',
                help='exercise the original Pick3D graphics demo and Escape recovery')
 p.add_argument('--probe-demo-system-context', action='store_true',
@@ -203,7 +205,7 @@ if args.demo_system_module and not args.probe_demo_system_context:
     p.error('--demo-system-module requires --probe-demo-system-context')
 if (args.probe_stock_programs or args.probe_stock_interactive or args.probe_program_catalog or
         args.probe_doc_includes or args.probe_logic_program or args.probe_budget_program or
-        args.probe_demo_tictactoe or args.probe_demo_chess or args.probe_demo_pick3d or
+        args.probe_demo_tictactoe or args.probe_demo_chess or args.probe_demo_circletrace or args.probe_demo_pick3d or
         args.probe_3d_apps or args.probe_tothefront or args.probe_xcaliber or
         args.probe_demo_global_vars or args.probe_demo_exceptions or args.probe_timeclock or
         args.probe_vocabulary or args.probe_psalmody):
@@ -274,6 +276,7 @@ log_path = ROOT / 'build' / (f'check-usb-{usb_label}{"-budget" if args.probe_bud
                              'check-doc-includes-pci.log' if args.probe_doc_includes else
                              'check-demo-pick3d-pci.log' if args.probe_demo_pick3d else
                              'check-demo-chess-pci.log' if args.probe_demo_chess else
+                             'check-demo-circletrace-pci.log' if args.probe_demo_circletrace else
                              'check-demo-tictactoe-pci.log' if args.probe_demo_tictactoe else
                              'check-demo-global-vars-pci.log' if args.probe_demo_global_vars else
                              'check-program-catalog-pci.log' if args.probe_program_catalog else
@@ -3329,6 +3332,52 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             command('zstatus', 'failed=0')
             print('PASS TicTacToe board drawing, two mouse turns, Escape '
                   'exit and terminal recovery', flush=True)
+            raise SystemExit(0)
+        if args.probe_demo_circletrace:
+            focus_graphical_terminal()
+            run_graphical_terminal_command(
+                'demo-circletrace-ready', '40+2;', 'ans=0x2A=42')
+            before = graphical_screen('demo-circletrace-terminal-before')
+            command('zc BootstrapGuiTerminalRunLightProgram('
+                    '"/Demo/Games/CircleTrace.ZC");', 'zc: executed')
+            deadline = time.monotonic() + 20
+            while True:
+                initial = graphical_screen('demo-circletrace-initial')
+                changed = rgb_diff_count(before, initial, (250, 150, 550, 450))
+                if changed >= 500:
+                    break
+                if time.monotonic() >= deadline:
+                    status = command('zstatus', 'keyboard_focus=')
+                    raise RuntimeError('CircleTrace did not draw its target; '
+                        f'pixel_diff={changed}\n{status}\n'
+                        f'see {graphical_path("demo-circletrace-initial")}')
+                time.sleep(.1)
+            # CircleTrace draws a centered 100-pixel target. Compare scanout
+            # against the terminal to ensure this is the app's actual graphic
+            # output rather than a successful source launch alone.
+            move_graphical_pointer(400, 200)
+            graphical_mouse_button('left', True)
+            for x, y in ((470, 230), (500, 300), (470, 370),
+                         (400, 400), (330, 370), (300, 300),
+                         (330, 230), (400, 200)):
+                move_graphical_pointer(x, y)
+                time.sleep(.12)
+            graphical_mouse_button('left', False)
+            time.sleep(.5)
+            drawn = graphical_screen('demo-circletrace-drawn')
+            red = rgb_pixels_in(drawn, (170, 0, 0), (250, 150, 550, 450))
+            if red < 100:
+                raise RuntimeError('CircleTrace did not retain a visible red trace; '
+                    f'red_pixels={red}, see '
+                    f'{graphical_path("demo-circletrace-drawn")}')
+            qmp_send_key('esc')
+            time.sleep(.5)
+            run_graphical_terminal_command(
+                'demo-circletrace-exit-smoke', '40+2;', 'ans=0x2A=42',
+                timeout=20)
+            command('zstatus', 'failed=0')
+            print('PASS CircleTrace target rendering, mouse trace, Escape cleanup '
+                  'and terminal recovery', flush=True)
             raise SystemExit(0)
         if args.probe_demo_chess:
             focus_graphical_terminal()

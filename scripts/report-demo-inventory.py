@@ -35,6 +35,7 @@ RUNTIME_ACCEPTED = {
     "/Demo/SubSwitch.ZC": "docs/acceptance/demo-runtime-basics-2026-11-01.json",
     "/Demo/Exceptions.ZC": "docs/acceptance/demo-exceptions-2026-11-01.json",
     "/Demo/Games/Chess.ZC": "docs/acceptance/demo-interactive-games-2026-11-01.json",
+    "/Demo/Games/CircleTrace.ZC": "docs/acceptance/demo-circletrace-qemu-2026-11-01.json",
     "/Demo/Games/TicTacToe.ZC": "docs/acceptance/demo-interactive-games-2026-11-01.json",
     "/Demo/Graphics/Lines.ZC": "docs/acceptance/demo-stock-graphics-2026-11-01.json",
     "/Demo/Graphics/NetOfDots.ZC": "docs/acceptance/demo-stock-graphics-2026-11-01.json",

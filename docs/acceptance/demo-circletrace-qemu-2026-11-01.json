@@ -1,0 +1,21 @@
+{
+  "date": "2026-11-01",
+  "command": "python3 scripts/check-compat.py --pci --probe-demo-circletrace",
+  "target": "QEMU PCI ARM64 graphical terminal",
+  "result": "pass",
+  "scope": "Runtime investigation of the unchanged upstream CircleTrace demo; a successful launch is not counted as a working program.",
+  "observed": [
+    "Current ARM64 QEMU PCI graphical guest launched CircleTrace as a focused CircleTrace game task, avoiding terminal autocomplete interception.",
+    "The centered 100-pixel target rendered in the app framebuffer.",
+    "Mouse drag produced a retained trace; Escape exited cleanly and terminal 40+2 returned 42.",
+    "Final zstatus reported failed=0."
+  ],
+  "unresolved": null,
+  "runtime_checks": {
+    "focused_game_task": "pass",
+    "target_render": "pass: framebuffer pixel-difference gate",
+    "mouse_trace": "pass: red trace retained after drag",
+    "Escape_terminal_recovery": "pass: 40+2 returned 42",
+    "compiler_runtime_health": "pass: failed=0"
+  }
+}

@@ -489,13 +489,16 @@ U0 BootstrapGuiTerminalRunLightProgram(U8 *filename)
     // MessageGet/KeyGet wait loops do not hold the GUI terminal's WinMgr frame.
     if (!StrCompare(filename, "/Apps/Titanium/Run.ZC") ||
         !StrCompare(filename, "/Apps/X-Caliber/Run.ZC") ||
-        !StrCompare(filename, "/Demo/Graphics/Pick3D.ZC"))
+        !StrCompare(filename, "/Demo/Graphics/Pick3D.ZC") ||
+        !StrCompare(filename, "/Demo/Games/CircleTrace.ZC"))
     {
         title = "X-Caliber";
         if (!StrCompare(filename, "/Apps/Titanium/Run.ZC"))
             title = "Titanium";
         else if (!StrCompare(filename, "/Demo/Graphics/Pick3D.ZC"))
             title = "Pick3D";
+        else if (!StrCompare(filename, "/Demo/Games/CircleTrace.ZC"))
+            title = "CircleTrace";
         app_task = Spawn(&BootstrapGuiTerminalGameTask, filename, title, -1, Fs);
         if (!TaskValidate(app_task))
             return;
