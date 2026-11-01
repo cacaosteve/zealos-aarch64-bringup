@@ -10,7 +10,7 @@
   "demo_sources": 206,
   "demo_compile_pass": 178,
   "demo_compile_blocked": 28,
-  "demo_runtime_accepted": 13,
+  "demo_runtime_accepted": 16,
   "areas": {
     "Apps": {
       "source_files": 70,
@@ -33,7 +33,7 @@
       "compile_pass": 178,
       "compile_blocked": 28,
       "compile_unverified": 0,
-      "runtime_pass": 13,
+      "runtime_pass": 16,
       "runtime_partial": 1
     },
     "Doc": {
@@ -1415,8 +1415,8 @@
       "area": "Demo",
       "kind": "demo_source_or_component",
       "compile": "pass",
-      "runtime": "unverified",
-      "evidence": "docs/acceptance/demo-source-ledger-2026-11-01.json"
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-stock-interactive-2026-11-01.json"
     },
     {
       "path": "/Demo/Games/Maze.ZC",
@@ -1663,8 +1663,8 @@
       "area": "Demo",
       "kind": "demo_source_or_component",
       "compile": "pass",
-      "runtime": "unverified",
-      "evidence": "docs/acceptance/demo-source-ledger-2026-11-01.json"
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-stock-interactive-2026-11-01.json"
     },
     {
       "path": "/Demo/Graphics/EdSprite.ZC",
@@ -1735,8 +1735,8 @@
       "area": "Demo",
       "kind": "demo_source_or_component",
       "compile": "pass",
-      "runtime": "unverified",
-      "evidence": "docs/acceptance/demo-source-ledger-2026-11-01.json"
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-stock-interactive-2026-11-01.json"
     },
     {
       "path": "/Demo/Graphics/LightTable.ZC",

@@ -37,9 +37,12 @@ RUNTIME_ACCEPTED = {
     "/Demo/Games/Chess.ZC": "docs/acceptance/demo-interactive-games-2026-11-01.json",
     "/Demo/Games/CircleTrace.ZC": "docs/acceptance/demo-circletrace-qemu-2026-11-01.json",
     "/Demo/Games/TicTacToe.ZC": "docs/acceptance/demo-interactive-games-2026-11-01.json",
+    "/Demo/Games/MassSpring.ZC": "docs/acceptance/demo-stock-interactive-2026-11-01.json",
     "/Demo/Graphics/Lines.ZC": "docs/acceptance/demo-stock-graphics-2026-11-01.json",
     "/Demo/Graphics/NetOfDots.ZC": "docs/acceptance/demo-stock-graphics-2026-11-01.json",
     "/Demo/Graphics/Pick3D.ZC": "docs/acceptance/demo-interactive-games-2026-11-01.json",
+    "/Demo/Graphics/Doodle.ZC": "docs/acceptance/demo-stock-interactive-2026-11-01.json",
+    "/Demo/Graphics/Life.ZC": "docs/acceptance/demo-stock-interactive-2026-11-01.json",
 }
 RUNTIME_PARTIAL = {
     "/Demo/AcctExample/HomeKeyPlugIns.ZC": "docs/acceptance/demo-global-vars-jit-2026-11-01.json",

@@ -4,7 +4,7 @@
   "source_count": 206,
   "compile_pass": 178,
   "compile_blocked": 28,
-  "runtime_accepted": 13,
+  "runtime_accepted": 16,
   "directories": {
     ".": {
       "source_count": 34,
@@ -743,8 +743,8 @@
       "classification_confidence": "provisional; based on directory only",
       "compile": "pass",
       "first_compile_error": null,
-      "runtime": "unverified",
-      "runtime_evidence": null
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-stock-interactive-2026-11-01.json"
     },
     {
       "path": "/Demo/Games/Maze.ZC",
@@ -1053,8 +1053,8 @@
       "classification_confidence": "provisional; based on directory only",
       "compile": "pass",
       "first_compile_error": null,
-      "runtime": "unverified",
-      "runtime_evidence": null
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-stock-interactive-2026-11-01.json"
     },
     {
       "path": "/Demo/Graphics/EdSprite.ZC",
@@ -1143,8 +1143,8 @@
       "classification_confidence": "provisional; based on directory only",
       "compile": "pass",
       "first_compile_error": null,
-      "runtime": "unverified",
-      "runtime_evidence": null
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-stock-interactive-2026-11-01.json"
     },
     {
       "path": "/Demo/Graphics/LightTable.ZC",

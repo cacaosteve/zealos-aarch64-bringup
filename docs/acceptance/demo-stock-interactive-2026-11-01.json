@@ -1,0 +1,31 @@
+{
+  "date": "2026-11-01",
+  "target": "QEMU PCI ARM64 graphical guest",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "c743ac437ddd183e94de52d895afdef46557bab9368b943d5d7547e03bd58a83",
+  "command": "python3 scripts/check-compat.py --pci --probe-stock-interactive",
+  "result": "pass",
+  "scope": "Original upstream interactive demo programs exercised through their graphical input, render/update, and cleanup paths. QEMU runtime evidence does not establish live UTM or Pi hardware behavior.",
+  "checks": {
+    "MassSpring": [
+      "placed two masses with pointer input and created a spring",
+      "verified visible masses and spring physics pulled the masses together",
+      "Return cleared the setup; Escape restored the graphical terminal and window geometry"
+    ],
+    "Doodle": [
+      "opened the upstream color picker and selected red",
+      "verified drag preview, committed stroke, and retained stroke after compositor refresh",
+      "Escape cleared the stroke and restored a working terminal prompt"
+    ],
+    "Life": [
+      "placed cells with pointer input",
+      "verified the green cell set evolved over time",
+      "Escape cleaned up and restored a working terminal prompt"
+    ],
+    "TicTacToe": [
+      "verified board grid, five legal pointer moves, and visible marks",
+      "Escape cleaned up and restored a working terminal prompt"
+    ]
+  },
+  "log": "build/check-stock-interactive-pci.log"
+}
