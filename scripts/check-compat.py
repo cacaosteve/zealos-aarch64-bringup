@@ -3415,7 +3415,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                         f'StockCatalogCompileWithModules("{path}","/System/Utils/LineRep.ZC",'
                         '"/System/BlkDev/ZDiskB.ZC")'
                         if path == '/Demo/Disk/SerializeTree.ZC' else
-                        f'StockCatalogCompileWithModules("{path}","/System/DevInfo.ZC")'
+                        f'StockCatalogCompileDocWithMath("{path}")'
                         if path == '/Demo/Graphics/LightTable.ZC' else
                         f'StockCatalogCompileWithModules("{path}","/System/InFile.ZC")'
                         if path == '/Demo/InFile/InSetIP.ZC' else

@@ -1727,6 +1727,29 @@ def translate_winmgr(source: bytes) -> bytes:
     return text.encode("utf-8")
 
 
+def translate_lighttable_memory_prompt(source: bytes) -> bytes:
+    """Remove LightTable's BIOS-only memory report from its ARM64 path.
+
+    LightTable allocates its refract/reflect bitmaps from the system heap, so
+    the x86 BIOS memory map printed by MemBIOSRep is unrelated to the storage
+    it uses. Keep the demo's own heap-size prompt and correct its description.
+    """
+    text = source.decode("utf-8")
+    call = "\tMemBIOSRep;\n"
+    old_prompt = (
+        '"You can choose up to the largest\\n"\n'
+        '\t\t\t\t\t"contiguous chunk of physical memory.\\n\\n"\n'
+    )
+    new_prompt = (
+        '"Choose the total bitmap memory in bytes;\\n"\n'
+        '\t\t\t\t\t"it is allocated from the system heap.\\n\\n"\n'
+    )
+    if text.count(call) != 1 or text.count(old_prompt) != 1:
+        raise ValueError("pinned LightTable BIOS memory prompt changed")
+    return text.replace(call, "\t\"ARM64 bitmap memory is allocated from the system heap.\\n\";\n", 1).replace(
+        old_prompt, new_prompt, 1).encode("utf-8")
+
+
 def translate_win_focus_trace(source: bytes) -> bytes:
     """Trace upstream window-manager focus assignments during input routing."""
     try:

@@ -1,0 +1,16 @@
+{
+  "date": "2026-11-02",
+  "repository_commit": "working tree",
+  "working_tree_changes_included": true,
+  "command": "python3 scripts/check-compat.py --pci --probe-demo-source-catalog --demo-source-path /Demo/Graphics/LightTable.ZC",
+  "target": "QEMU ARM64 graphical guest compile probe",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "e34393b6ceeaf3069209bc9cf29285dd0888c71edc74bae86b14acf17bea3ebd",
+  "source_path": "/Demo/Graphics/LightTable.ZC",
+  "source_sha256": "9bf6172c643dde0955c2509a05df381d6842a1b5a4ef407cc1c89dffaf4c9002",
+  "result": "pass",
+  "scope": "The pinned LightTable source compiles in the ARM64 source catalog with the guarded overlay; this is compile evidence only.",
+  "overlay": "Replaces the BIOS-specific MemBIOSRep call with a heap-allocation note and updates the prompt to describe the ARM64 heap-backed bitmap allocation.",
+  "runtime_acceptance": false,
+  "limitation": "LightTable runtime behavior is not verified by this compile probe."
+}

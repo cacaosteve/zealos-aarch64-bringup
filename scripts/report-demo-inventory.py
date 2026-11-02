@@ -6,6 +6,7 @@ proof that each file is a standalone program. Runtime acceptance is populated
 only from explicit evidence in the checked-in acceptance record.
 """
 import json
+import hashlib
 import pathlib
 import re
 
@@ -13,6 +14,10 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 SOURCE_ROOT = ROOT / "upstream/pinned/Demo"
 CATALOG = ROOT / "build/demo-source-catalog.json"
 OUTPUT = ROOT / "docs/acceptance/demo-source-ledger-2026-11-01.json"
+SUPPLEMENTAL_COMPILE = {
+    "/Demo/Graphics/LightTable.ZC":
+        "docs/acceptance/demo-lighttable-arm64-compile-2026-11-02.json",
+}
 
 KINDS = {
     "AcctExample": "account/home-system integration examples",
@@ -110,6 +115,16 @@ def main():
         result = by_path.get(guest_path)
         if result is None:
             raise SystemExit(f"catalog is missing {guest_path}")
+        supplemental_compile = None
+        evidence_path = SUPPLEMENTAL_COMPILE.get(guest_path)
+        if evidence_path:
+            evidence = json.loads((ROOT / evidence_path).read_text())
+            source_sha256 = hashlib.sha256(path.read_bytes()).hexdigest()
+            if evidence.get("source_path") != guest_path or evidence.get("source_sha256") != source_sha256:
+                raise SystemExit(f"stale supplemental compile evidence for {guest_path}")
+            if evidence.get("result") != "pass":
+                raise SystemExit(f"supplemental compile evidence is not a pass for {guest_path}")
+            supplemental_compile = evidence_path
         parts = path.relative_to(SOURCE_ROOT).parts
         directory = parts[0] if len(parts) > 1 else "."
         if directory in KINDS:
@@ -118,19 +133,23 @@ def main():
         else:
             kind = "root-level source; needs classification"
             confidence = "unclassified"
-        records.append({
+        record = {
             "path": guest_path,
             "directory": directory,
             "preliminary_kind": kind,
             "classification_confidence": confidence,
-            "compile": "pass" if result["compiled"] else "blocked",
-            "first_compile_error": first_error(result.get("output", "")),
+            "compile": "pass" if result["compiled"] or supplemental_compile else "blocked",
+            "first_compile_error": (None if result["compiled"] or supplemental_compile
+                                     else first_error(result.get("output", ""))),
             "runtime": ("pass" if guest_path in RUNTIME_ACCEPTED else
                         "partial" if guest_path in RUNTIME_PARTIAL else
                         "unverified"),
             "runtime_evidence": (RUNTIME_ACCEPTED.get(guest_path) or
                                  RUNTIME_PARTIAL.get(guest_path)),
-        })
+        }
+        if supplemental_compile:
+            record["compile_evidence"] = supplemental_compile
+        records.append(record)
     blocked = [r for r in records if r["compile"] == "blocked"]
     blocker_groups = {}
     for record in blocked:
@@ -138,7 +157,7 @@ def main():
         blocker_groups.setdefault(category, []).append(record["path"])
     report = {
         "source_commit": catalog["commit"],
-        "generated_from": "build/demo-source-catalog.json",
+        "generated_from": ["build/demo-source-catalog.json", *sorted(set(SUPPLEMENTAL_COMPILE.values()))],
         "source_count": len(records),
         "compile_pass": sum(r["compile"] == "pass" for r in records),
         "compile_blocked": sum(r["compile"] == "blocked" for r in records),
