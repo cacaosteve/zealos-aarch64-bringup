@@ -174,7 +174,7 @@ normal-load result is not runtime acceptance.
 | TicTacToe (Demo) | PCI QEMU runtime probe checks the board, two mouse turns, Escape exit, and terminal recovery. Live UTM interaction remains unverified. The source advertises Ctrl-Alt-C, but that chord is not yet verified through the emulated input path. Run `make check-demo-tictactoe`. |
 | ToTheFront | ARM64 source overlay fixes the Human player's indirect-fire unit-count loop; the stock `i > UNITS_NUM` condition skipped the artillery order phase. PCI runtime probe accepts both player-type selections, displays/dismisses help, renders the generated map, selects a visible artillery unit, confirms its range indicator, plots an order into an adjacent hex, advances a phase with Space, and returns through Escape to a working terminal (`40+2;` -> 42). Unit movement/direct fire, broader AI play, and live UTM behavior remain unverified. |
 | Vocabulary | QEMU PCI runtime probe launches the quiz, displays dictionary content, accepts a numbered answer and advances, then Escape returns to a terminal where `40+2;` returns 42. Dictionary indexing and lookup are covered by the autocomplete gate. The brief answer-feedback/definition popup is not yet visually verified; sound effects are silent. Run `make check-vocabulary-program`. |
-| X-Caliber | QEMU reaches gameplay. Fixed a MathODE timeout comparison that mixed guest uptime with host monotonic time; ODE integration now advances. In separate fresh-state probes, Left and Right each visibly move the ship when tested first (45 and 43 changed ship pixels); the opposite direction tested second in the same session sets its bitmap and thrust value but produces no visible change. Escape returns to the terminal and `40+2;` returns 42. Space firing and reliable sequential left/right control remain unverified. Do not add a `Yield` to `MessageScan` or an X-Caliber-specific `Yield`; the cooperative scheduler regression passes. |
+| X-Caliber | On ISO `e34393b6…`, the current PCI QEMU probe passed sequential plain Right then Left controls (70 and 37 changed ship pixels over a 9-pixel idle baseline), configured Space firing with a visible projectile, Escape recovery, and terminal `40+2;` -> 42. Live UTM input remains unverified. Keep the cooperative-scheduler invariant: no `Yield` in `MessageScan` and no X-Caliber-specific `Yield`. See [the current runtime record](docs/acceptance/xcaliber-qemu-2026-11-02.json). |
 
 The 2026-11-01 task-message regression passes in PCI QEMU. Empty polling through
 `MessageScan`, `KeyScan`, `CharScan`, and `FlushMessages` does not hand off the
@@ -185,11 +185,10 @@ mean the pinned upstream `Sched.ZC` is the scheduler currently running.
 The 2026-11-01 rebuilt PCI QEMU catalog reconfirmed compilation of all 12 named
 app entry points. A comprehensive PCI QEMU run of the named-app probes completed with
 exit status 0 for Logic, Budget, TimeClock, GrModels, KeepAway, Titanium,
-Span, Strut, ToTheFront, Vocabulary, and Psalmody. The separate X-Caliber
-probe still fails: although focus status reports X-Caliber at the end of the
-probe, a fresh-image trace shows a temporary Server focus and `JobRunOne`
-restoration; later input transitions route to the parent Terminal, and Escape
-does not return from gameplay.
+Span, Strut, ToTheFront, Vocabulary, and Psalmody. The X-Caliber focus and
+Escape issue recorded during an earlier trace is superseded by the current
+PCI QEMU probe: sequential Left/Right, Space firing, Escape, and terminal
+recovery pass on ISO `e34393b6…`; see its dated acceptance record.
 Runtime probes also passed for Digital Logic, ToTheFront, Span, Strut,
 TimeClock, Vocabulary and Psalmody. The dependency-aware Demo catalog covers
 all 206 upstream `.ZC` files in a fresh full PCI QEMU sweep. `/Demo/NullCase.ZC` was rechecked after

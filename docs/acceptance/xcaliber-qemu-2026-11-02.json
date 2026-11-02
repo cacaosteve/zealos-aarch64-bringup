@@ -1,0 +1,25 @@
+{
+  "date": "2026-11-02",
+  "repository_commit": "94031e9502e651de3262da971307a705fb1f9baa",
+  "source_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "command": "python3 scripts/check-compat.py --pci --probe-xcaliber",
+  "target": "QEMU PCI AArch64 graphical guest",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "e34393b6ceeaf3069209bc9cf29285dd0888c71edc74bae86b14acf17bea3ebd",
+  "result": "pass",
+  "checks": {
+    "gameplay": "pass: help and level-start prompt dismissed; gameplay and player ship rendered",
+    "sequential_arrows": {
+      "result": "pass",
+      "order": ["Right held 1 second", "Right released", "Left held 1 second", "Left released"],
+      "no_input_ship_diff_pixels": 9,
+      "right_ship_diff_pixels": 70,
+      "left_ship_diff_pixels": 37
+    },
+    "space_firing": "pass: set size and fuse controls through the UI; a shot was traced and visible projectile-region motion measured 35 pixels versus 11 baseline pixels",
+    "escape_and_shell": "pass: Escape returned to the graphical terminal; 40+2 returned 42",
+    "runtime_health": "pass: zstatus reported failed=0 and the full probe exited 0"
+  },
+  "scope_note": "This establishes the sequential controls and firing path in PCI QEMU on this ISO. Live UTM input and gameplay acceptance remain unverified.",
+  "log": "build/check-compat-pci.log"
+}
