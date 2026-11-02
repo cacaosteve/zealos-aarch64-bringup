@@ -32,7 +32,7 @@
     "date": "2026-11-01",
     "iso_sha256": "99b2520dc028aed92f20b48a7dea96005afbb91ccd9e51fd8fe013ff3505c126",
     "command": "python3 scripts/check-compat.py --pci --probe-3d-apps",
-    "exit_code": 1,
-    "result": "GrModels Man form opened and showed its default parameter fields, but the probe's Escape did not advance to the expected color picker within 12 seconds. The captured screen still showed the form. This does not establish whether the app or the probe input sequence is at fault; the prior successful full 3D acceptance remains historical evidence, and this sequence needs investigation before claiming a fresh pass."
+    "exit_code": 0,
+    "result": "The first probe attempt on this ISO stopped with the GrModels form still visible after Escape. A full rerun passed: Man generated 112 vertices and 168 triangles; Ball generated 58 vertices and 128 triangles with 649 matching inline-sprite pixels; KeepAway and Titanium input/Escape recovery passed; all final regressions reported failed=0. The first failure was intermittent and was not reproduced on the rerun."
   }
 }
