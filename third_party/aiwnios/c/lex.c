@@ -729,6 +729,24 @@ lex_ident: {
             lex->integer = source_line;
             return lex->cur_tok = TK_I64;
           }
+          if (!strcmp(lex->string, "__DATE__")) {
+            snprintf(lex->string, sizeof(lex->string), "%s", __DATE__);
+            lex->str_len = strlen(lex->string) + 1;
+            return lex->cur_tok = TK_STR;
+          }
+          if (!strcmp(lex->string, "__TIME__")) {
+            snprintf(lex->string, sizeof(lex->string), "%s", __TIME__);
+            lex->str_len = strlen(lex->string) + 1;
+            return lex->cur_tok = TK_STR;
+          }
+          if (!strcmp(lex->string, "__CMD_LINE__")) {
+            int64_t include_depth = 0;
+            for (CLexFile *file = lex->file; file; file = file->last)
+              include_depth += !!file->is_file;
+            lex->integer = lex->port_cc_flags &&
+                           (*lex->port_cc_flags & 1) && include_depth < 1;
+            return lex->cur_tok = TK_I64;
+          }
           define = HashFind(lex->string, Fs->hash_table, HTT_DEFINE_STR, 1);
           if (define) {
             //

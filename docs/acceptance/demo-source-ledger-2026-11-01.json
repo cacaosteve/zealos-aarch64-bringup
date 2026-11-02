@@ -2,14 +2,14 @@
   "source_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
   "generated_from": "build/demo-source-catalog.json",
   "source_count": 206,
-  "compile_pass": 179,
-  "compile_blocked": 27,
+  "compile_pass": 181,
+  "compile_blocked": 25,
   "runtime_accepted": 28,
   "directories": {
     ".": {
       "source_count": 34,
-      "compile_pass": 30,
-      "compile_blocked": 4,
+      "compile_pass": 31,
+      "compile_blocked": 3,
       "preliminary_kind": "root-level source; needs classification"
     },
     "AcctExample": {
@@ -98,8 +98,8 @@
     },
     "WebLogDemo": {
       "source_count": 2,
-      "compile_pass": 1,
-      "compile_blocked": 1,
+      "compile_pass": 2,
+      "compile_blocked": 0,
       "preliminary_kind": "root-level source; needs classification"
     }
   },
@@ -381,8 +381,8 @@
       "directory": ".",
       "preliminary_kind": "root-level source; needs classification",
       "classification_confidence": "unclassified",
-      "compile": "blocked",
-      "first_compile_error": "ERR __DATE__:1:8 Unexpected charactor '#'.",
+      "compile": "pass",
+      "first_compile_error": null,
       "runtime": "unverified",
       "runtime_evidence": null
     },
@@ -2141,8 +2141,8 @@
       "directory": "WebLogDemo",
       "preliminary_kind": "root-level source; needs classification",
       "classification_confidence": "unclassified",
-      "compile": "blocked",
-      "first_compile_error": "ERR __CMD_LINE__:1:7 Unexpected charactor '#'.",
+      "compile": "pass",
+      "first_compile_error": null,
       "runtime": "unverified",
       "runtime_evidence": null
     },

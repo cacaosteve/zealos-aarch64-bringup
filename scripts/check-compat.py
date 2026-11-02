@@ -3283,7 +3283,10 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                         f'StockCatalogCompileAfterLoad("/System/Utils/ToTXT.ZC","{path}")'
                         if path == '/Demo/ToHtmlToTXTDemo/TXTGen.ZC' else
                         f'StockCatalogCompile("{path}")'
-                        if (path == '/Demo/ToHtmlToTXTDemo/HtmlGen.ZC' or
+                        if (path in {
+                                '/Demo/ToHtmlToTXTDemo/HtmlGen.ZC',
+                                '/Demo/Directives.ZC',
+                            } or
                             path in args.demo_source_raw_path) else
                         f'StockCatalogCompileWithProgramModules("{path}")'
                         if path == '/Demo/MultiCore/LoadTest.ZC' else

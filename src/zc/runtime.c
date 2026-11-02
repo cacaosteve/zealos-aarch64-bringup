@@ -6509,6 +6509,7 @@ static void guest_context_enter(struct source_context *context, CLexer *lex,
     context->mirror = context->owned ? guest_context_new(flags) : guest_prompt_context();
     f->source_context = context;
     lex->port_options = (int64_t *)(context->mirror + guest_cc_opts_off);
+    lex->port_cc_flags = (int64_t *)(context->mirror + guest_cc_flags_off);
     lex->port_sync = guest_context_sync;
     guest_context_sync(lex);
 }
