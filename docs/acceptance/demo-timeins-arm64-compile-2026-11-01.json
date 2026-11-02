@@ -1,0 +1,9 @@
+{
+  "source": "/Demo/TimeIns.ZC",
+  "source_sha256": "748086d1b90d4a8477f211cc815fa477719e1e0936b2e7a0a8e9c2bbc7efa275",
+  "platform": "PCI QEMU, AArch64 guest",
+  "method": "Targeted demo-source-catalog compile probe against the rebuilt AArch64 ISO.",
+  "adaptation": "Replace x86 #exe/PassTrace instruction tracing with a ZealC empty-loop and floating-point expression timing comparison using TSCGet.",
+  "result": "PASS: Compiles",
+  "scope_note": "Compilation only. The three-run timing output, monotonic-counter behavior under UTM, and benchmark usefulness have not been runtime-accepted."
+}

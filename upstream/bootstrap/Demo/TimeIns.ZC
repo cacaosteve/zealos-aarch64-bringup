@@ -1,0 +1,30 @@
+/*
+ARM64-portable timing demo. The original uses #exe/PassTrace to measure an
+x86 instruction stream. This version compares an empty loop against a ZealC
+floating-point update loop using the guest's monotonic counter.
+*/
+#define SAMPLE_SIZE 1000000
+
+U0 TimeIns()
+{
+	I64 i, start, end, overhead_time, test_time;
+	F64 d = 5.0;
+
+	start = TSCGet;
+	for (i = 0; i < SAMPLE_SIZE; i++);
+	end = TSCGet;
+	overhead_time = end - start;
+	"\nLoop overhead ticks:%12.6f\n", ToF64(overhead_time) / SAMPLE_SIZE;
+
+	start = TSCGet;
+	for (i = 0; i < SAMPLE_SIZE; i++)
+		d *= 1.00001;
+	end = TSCGet;
+	test_time = end - start;
+	"Expression loop ticks:%12.6f\n", ToF64(test_time - overhead_time) / SAMPLE_SIZE;
+	"Final value:%f\n", d;
+}
+
+TimeIns;
+TimeIns;
+TimeIns;

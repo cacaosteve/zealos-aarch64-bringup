@@ -2,8 +2,8 @@
   "source_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
   "generated_from": "build/demo-source-catalog.json",
   "source_count": 206,
-  "compile_pass": 192,
-  "compile_blocked": 14,
+  "compile_pass": 193,
+  "compile_blocked": 13,
   "compile_blocker_groups": [
     {
       "category": "inline assembly unsupported or requires an ARM64 equivalent",
@@ -53,13 +53,6 @@
       ]
     },
     {
-      "category": "compile-time directive parse/context support",
-      "source_count": 1,
-      "paths": [
-        "/Demo/TimeIns.ZC"
-      ]
-    },
-    {
       "category": "missing TOS extension dependency",
       "source_count": 1,
       "paths": [
@@ -78,8 +71,8 @@
   "directories": {
     ".": {
       "source_count": 34,
-      "compile_pass": 32,
-      "compile_blocked": 2,
+      "compile_pass": 33,
+      "compile_blocked": 1,
       "preliminary_kind": "root-level source; needs classification"
     },
     "AcctExample": {
@@ -2161,8 +2154,8 @@
       "directory": ".",
       "preliminary_kind": "root-level source; needs classification",
       "classification_confidence": "unclassified",
-      "compile": "blocked",
-      "first_compile_error": "ERR /Demo/TimeIns.ZC:23:8 Unexpected charactor '#'.",
+      "compile": "pass",
+      "first_compile_error": null,
       "runtime": "unverified",
       "runtime_evidence": null
     },
