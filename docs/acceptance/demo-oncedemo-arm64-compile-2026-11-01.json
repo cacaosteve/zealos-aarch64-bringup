@@ -1,0 +1,9 @@
+{
+  "source": "/Demo/OnceDemo.ZC",
+  "source_sha256": "37193cd0d95122e97d36153dea2cb60acbf55aa57b120d6dc43a59ffcd5bd396",
+  "platform": "PCI QEMU, AArch64 guest",
+  "method": "Targeted demo-source-catalog compile probe against the rebuilt AArch64 ISO.",
+  "adaptation": "Replace the x86 boot-only BootRAM action with the normal ZealOS Reboot entry point while preserving Once command queueing and the confirmation prompt.",
+  "result": "PASS: Compiles",
+  "scope_note": "Compilation only. The affirmative path writes Once commands and reboots, so this probe did not execute that side effect."
+}

@@ -2,8 +2,8 @@
   "source_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
   "generated_from": "build/demo-source-catalog.json",
   "source_count": 206,
-  "compile_pass": 194,
-  "compile_blocked": 12,
+  "compile_pass": 195,
+  "compile_blocked": 11,
   "compile_blocker_groups": [
     {
       "category": "inline assembly unsupported or requires an ARM64 equivalent",
@@ -21,13 +21,6 @@
       "paths": [
         "/Demo/Lectures/PCIInterrupts.ZC",
         "/Demo/MultiCore/Interrupts.ZC"
-      ]
-    },
-    {
-      "category": "BootRAM symbol/context unavailable",
-      "source_count": 1,
-      "paths": [
-        "/Demo/OnceDemo.ZC"
       ]
     },
     {
@@ -70,8 +63,8 @@
   "directories": {
     ".": {
       "source_count": 34,
-      "compile_pass": 33,
-      "compile_blocked": 1,
+      "compile_pass": 34,
+      "compile_blocked": 0,
       "preliminary_kind": "root-level source; needs classification"
     },
     "AcctExample": {
@@ -1853,8 +1846,8 @@
       "directory": ".",
       "preliminary_kind": "root-level source; needs classification",
       "classification_confidence": "unclassified",
-      "compile": "blocked",
-      "first_compile_error": "ERR:/Demo/OnceDemo.ZC:7:11 Expected ':' after label candidate 'BootRAM'.",
+      "compile": "pass",
+      "first_compile_error": null,
       "runtime": "unverified",
       "runtime_evidence": null
     },

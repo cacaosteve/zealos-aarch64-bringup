@@ -360,7 +360,7 @@ The refreshed 2026-11-01 full catalog adds native lexer tokens for `__DATE__`,
 removes two false/compiler blockers: `Directives.ZC` is compiled through the
 source-preserving loader because it contains the `$$` instruction marker, and
 `WebLogRep.ZC` now compiles through its regular DocRead path. The 2026-11-01 full sweep plus targeted `/Demo/Asm/PutDec.ZC`, `/Demo/Asm/AsmHelloWorld.ZC`, `/Demo/Asm/BuzzFizz.ZC`, `/Demo/Asm/MulByHand.ZC`, and `/Demo/Asm/DivByHand.ZC` follow-ups is
-194/206. ARM64-portable equivalents for `/Demo/Asm/AsmAndC1.ZC` and
+195/206. ARM64-portable equivalents for `/Demo/Asm/AsmAndC1.ZC` and
 `/Demo/Asm/AsmAndC2.ZC` compile in the targeted guest catalog probe; their
 interactive sound behavior remains unverified. `/Demo/Lectures/Optimization.ZC`
 now has a ZealC loop-shape adaptation that compiles, and its four loop forms
@@ -369,11 +369,13 @@ performance remain unverified. `/Demo/DolDoc/DefineStr.ZC` now compiles after
 replacing its compile-time generated define with an equivalent runtime
 `DefinePrint`; rendered text substitution remains unverified. `/Demo/TimeIns.ZC`
 now compiles with an ARM64 timing-loop adaptation in place of x86 `PassTrace`
-instrumentation; live timing output remains unverified. The remaining 12 first
+instrumentation; live timing output remains unverified. The remaining 11 first
 failures group into 4 inline-assembly examples, 1 assembly-like parser case,
 2 interrupt-handler syntax cases, and 5 boot, TOS, or device-context blockers.
 `/Demo/Carry.ZC` now compiles with an ARM64 source overlay that
 explicitly computes the carry bits needed by its examples; runtime acceptance
 remains outstanding.
+
+`/Demo/OnceDemo.ZC` now compiles with `Reboot` in place of the x86 boot-only `BootRAM` path; its affirmative queue-and-reboot flow remains untested. See [`acceptance/demo-oncedemo-arm64-compile-2026-11-01.json`](acceptance/demo-oncedemo-arm64-compile-2026-11-01.json).
 
 `/Demo/Lectures/NegDisp.ZC` now compiles with an ARM64-portable biased-pointer example in place of unsupported x86 negative class displacement. This is compile-only evidence; the original unassembly behavior is not reproduced. See [`acceptance/demo-negdisp-arm64-compile-2026-11-01.json`](acceptance/demo-negdisp-arm64-compile-2026-11-01.json).
