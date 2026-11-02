@@ -1,0 +1,15 @@
+{
+  "source": "/Demo/Asm/DivByHand.ZC",
+  "source_sha256": "0802ad1f01b05d9fb38bcfe1d77392e702cae45e06a53c6d4fb502f950734b7f",
+  "platform": "PCI QEMU, AArch64 guest",
+  "method": "Loaded the ARM64 division routine in a disposable guest and called DivByHandChecks.",
+  "checks": [
+    "123456 / 10 == 12345",
+    "0xfedcba9876543210 / 0x12345 == 0xe0004fa01c4d",
+    "0xffffffffffffffff / 3 == 0x5555555555555555",
+    "0x8000000000000000 / 0xffffffffffffffff == 0",
+    "division by zero returns 0xffffffffffffffff"
+  ],
+  "result": "PASS: DivByHandChecks returned 0x2a",
+  "scope_note": "This validates the arithmetic routine. It does not claim full formatted-output acceptance of the original demo."
+}

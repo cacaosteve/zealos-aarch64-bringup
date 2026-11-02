@@ -1,0 +1,25 @@
+/* ARM64-portable version of the original restoring binary division loop. */
+U64 DivU64ByU64(U64 dividend, U64 divisor)
+{
+	U64 quotient = 0, remainder = 0, carry;
+	I64 bit;
+
+	if (!divisor)
+		return 0xFFFFFFFFFFFFFFFF;
+
+	for (bit = 0; bit < 64; bit++)
+	{
+		quotient <<= 1;
+		carry = remainder >> 63;
+		remainder = (remainder << 1) | (dividend >> 63);
+		dividend <<= 1;
+		if (carry || remainder >= divisor)
+		{
+			remainder -= divisor;
+			quotient |= 1;
+		}
+	}
+	return quotient;
+}
+
+"123456/10=%d\n", DivU64ByU64(123456, 10);

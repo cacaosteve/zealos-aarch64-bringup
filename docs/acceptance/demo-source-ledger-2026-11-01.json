@@ -2,17 +2,16 @@
   "source_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
   "generated_from": "build/demo-source-catalog.json",
   "source_count": 206,
-  "compile_pass": 187,
-  "compile_blocked": 19,
+  "compile_pass": 188,
+  "compile_blocked": 18,
   "compile_blocker_groups": [
     {
       "category": "inline assembly unsupported or requires an ARM64 equivalent",
-      "source_count": 8,
+      "source_count": 7,
       "paths": [
         "/Demo/AcctExample/MakeHome.ZC",
         "/Demo/Asm/AsmAndC1.ZC",
         "/Demo/Asm/AsmAndC2.ZC",
-        "/Demo/Asm/DivByHand.ZC",
         "/Demo/Lectures/FixedPointAdvanced.ZC",
         "/Demo/Lectures/InterruptDemo.ZC",
         "/Demo/Lectures/Optimization.ZC",
@@ -95,8 +94,8 @@
     },
     "Asm": {
       "source_count": 8,
-      "compile_pass": 5,
-      "compile_blocked": 3,
+      "compile_pass": 6,
+      "compile_blocked": 2,
       "preliminary_kind": "architecture-specific assembly examples"
     },
     "Disk": {
@@ -366,8 +365,8 @@
       "directory": "Asm",
       "preliminary_kind": "architecture-specific assembly examples",
       "classification_confidence": "provisional; based on directory only",
-      "compile": "blocked",
-      "first_compile_error": "ERR:/Demo/Asm/DivByHand.ZC:1:5 Unknown symbol 'asm'.",
+      "compile": "pass",
+      "first_compile_error": null,
       "runtime": "unverified",
       "runtime_evidence": null
     },
