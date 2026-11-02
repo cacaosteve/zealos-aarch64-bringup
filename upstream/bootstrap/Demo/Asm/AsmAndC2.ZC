@@ -1,0 +1,26 @@
+/* ARM64-portable source version of the global/register and C-call demo. */
+I64 global_ona = Freq2Ona(400), global_ona_step = 10,
+    global_ona_base = Freq2Ona(100);
+
+U0 Beeps2(I64 count)
+{
+	I64 i, start = counts.jiffies;
+	for (i = 0; i < count; i++)
+		Beep(global_ona, FALSE);
+	"Jiffies:%d\n", counts.jiffies - start;
+}
+
+U0 AsmAndC2()
+{
+	I64 i, count;
+	count = I64Get("$$PURPLE$$\n\nNum of beeps 1-5 (%d):$$FG$$", 3, 1, 5);
+	Beeps2(count);
+	for (i = 0; i < count; i++)
+	{
+		Sound(i * global_ona_step + global_ona_base);
+		Sleep(1);
+	}
+	Sound;
+}
+
+AsmAndC2;

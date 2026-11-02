@@ -1,0 +1,23 @@
+/* ARM64-portable source version of the assembly/C calling-convention demo. */
+U0 Beeps(I64 count)
+{
+	I64 i;
+	for (i = 0; i < count; i++)
+		Beep(62, FALSE);
+}
+
+I64 AsmAndC1()
+{
+	I64 i, count;
+	count = I64Get("Num of beeps 1-5 (%d):", 3, 1, 5);
+	Beeps(count);
+	for (i = 0; i < count; i++)
+	{
+		Sound(i * 10 + 40);
+		Sleep(1);
+	}
+	Sound;
+	return count;
+}
+
+"Beeps:%d\n", AsmAndC1;

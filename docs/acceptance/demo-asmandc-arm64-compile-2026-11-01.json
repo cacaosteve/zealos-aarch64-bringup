@@ -1,0 +1,17 @@
+{
+  "sources": [
+    {
+      "source": "/Demo/Asm/AsmAndC1.ZC",
+      "source_sha256": "ab3748afb801b91ad1775a1e9cf7275343191806e0d630c18c0edbf33c633cd2",
+      "method": "Targeted PCI QEMU demo-source-catalog compile probe against the rebuilt AArch64 ISO.",
+      "result": "PASS: Compiles"
+    },
+    {
+      "source": "/Demo/Asm/AsmAndC2.ZC",
+      "source_sha256": "141f02dac1a655e6b46807d7d0adf3696bcb06534df07378995175dd97177300",
+      "method": "Targeted PCI QEMU demo-source-catalog compile probe against the rebuilt AArch64 ISO.",
+      "result": "PASS: Compiles"
+    }
+  ],
+  "scope_note": "These ARM64-portable source equivalents replace inline assembly with ordinary ZealC. This is compile evidence only; interactive prompts, beep/audio output, and the complete demonstrations have not been runtime-accepted."
+}
