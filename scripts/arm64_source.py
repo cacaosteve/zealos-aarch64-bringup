@@ -263,7 +263,9 @@ def translate_mandel_single_cpu(source: bytes) -> bytes:
         raise ValueError('pinned Mandel frame dispatch changed')
     source = source.replace(
         b'I64 numCores = mp_count - 1;',
-        b'I64 numCores = mp_count > 1 ? mp_count - 1 : 1;')
+        # ZealC does not support C's conditional operator. mp_count is always
+        # at least one, so add one when it is the single-CPU case.
+        b'I64 numCores = mp_count - 1 + (mp_count <= 1);')
     source = source.replace(
         dispatch,
         b'''      if (mp_count > 1) {

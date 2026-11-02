@@ -2,8 +2,8 @@
   "source_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
   "generated_from": "build/demo-source-catalog.json",
   "source_count": 206,
-  "compile_pass": 178,
-  "compile_blocked": 28,
+  "compile_pass": 179,
+  "compile_blocked": 27,
   "runtime_accepted": 28,
   "directories": {
     ".": {
@@ -62,8 +62,8 @@
     },
     "MultiCore": {
       "source_count": 8,
-      "compile_pass": 6,
-      "compile_blocked": 2,
+      "compile_pass": 7,
+      "compile_blocked": 1,
       "preliminary_kind": "multicore and interrupt examples"
     },
     "RevFileDemo": {
@@ -1711,8 +1711,8 @@
       "directory": "MultiCore",
       "preliminary_kind": "multicore and interrupt examples",
       "classification_confidence": "provisional; based on directory only",
-      "compile": "blocked",
-      "first_compile_error": "ERR:/Demo/MultiCore/LoadTest.ZC:10:8 Expected ':' after label candidate 'Comp'.",
+      "compile": "pass",
+      "first_compile_error": null,
       "runtime": "unverified",
       "runtime_evidence": null
     },

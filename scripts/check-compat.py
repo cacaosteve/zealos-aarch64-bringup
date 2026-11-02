@@ -3285,6 +3285,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                         f'StockCatalogCompile("{path}")'
                         if (path == '/Demo/ToHtmlToTXTDemo/HtmlGen.ZC' or
                             path in args.demo_source_raw_path) else
+                        f'StockCatalogCompileWithProgramModules("{path}")'
+                        if path == '/Demo/MultiCore/LoadTest.ZC' else
                         f'StockCatalogCompileDocWithGraphics("{path}")'
                         if path == '/Demo/Games/FlatTops.ZC' else
                         f'StockCatalogCompileWithProgramModules("{path}")'
