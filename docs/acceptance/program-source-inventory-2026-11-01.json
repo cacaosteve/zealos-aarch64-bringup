@@ -17,8 +17,8 @@
       "compile_pass": 12,
       "compile_blocked": 0,
       "compile_unverified": 58,
-      "runtime_pass": 11,
-      "runtime_partial": 1
+      "runtime_pass": 12,
+      "runtime_partial": 0
     },
     "Compiler": {
       "source_files": 31,
@@ -638,7 +638,7 @@
       "area": "Apps",
       "kind": "app_entrypoint",
       "compile": "pass",
-      "runtime": "partial",
+      "runtime": "pass",
       "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
       "runtime_evidence": "docs/acceptance/named-apps-qemu-2026-11-01.json"
     },

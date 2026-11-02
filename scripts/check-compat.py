@@ -1698,6 +1698,18 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             else:
                 print('PASS X-Caliber left thruster changes the player ship: '
                       f'idle_diff={idle_motion}, left_diff={left_motion}', flush=True)
+            # The stock control panel starts both size and fuse sliders at
+            # zero. That makes a default gun shot a half-pixel-radius plot
+            # with a 1/30-second fuse; it can disappear between QMP scanout
+            # samples. Set both controls high through the visible UI so this
+            # probe checks the normal configured projectile path.
+            for control_x in (732, 766):
+                move_graphical_pointer(control_x, 539)
+                graphical_mouse_button('left', True)
+                time.sleep(0.05)
+                graphical_mouse_button('left', False)
+                time.sleep(0.1)
+            graphical_screen('xcaliber-gameplay-projectile-controls')
             before_space = graphical_screen('xcaliber-gameplay-before-space')
             player_before_space = rgb_centroid_in(
                 before_space, (0, 151, 162), player_bounds)
@@ -1715,8 +1727,11 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 raise RuntimeError('X-Caliber firing trace has no completed shot '
                                    f'record: {firing_trace[-4:]}')
             shot_x, shot_y = (int(value) for value in firing_trace[-1][3:5])
-            shot_bounds = (max(0, shot_x - 12), max(0, shot_y - 12),
-                           min(800, shot_x + 13), min(600, shot_y + 13))
+            # At maximum size/fuse the shot moves quickly across the screen.
+            # Include enough of its forward path for the first post-input
+            # scanout, instead of sampling only the spawn pixel.
+            shot_bounds = (max(0, shot_x - 64), max(0, shot_y - 64),
+                           min(800, shot_x + 65), min(600, shot_y + 65))
             idle_shot_motion = rgb_diff_count(
                 idle, idle_after_wait, shot_bounds)
             shot_motion = 0

@@ -39,10 +39,6 @@ def main():
         for name, result in named_apps["checks"].items()
         if result["result"] == "pass"
     }
-    app_runtime["/Apps/X-Caliber/Run.ZC"] = {
-        "status": "partial",
-        "evidence": str(NAMED_APPS.relative_to(ROOT)),
-    }
     three_d = read(THREE_D)
     for name in ("GrModels", "KeepAway", "Titanium"):
         app_runtime["/Apps/" + name + "/Run.ZC"] = {
