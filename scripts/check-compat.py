@@ -51,6 +51,8 @@ p.add_argument('--probe-demo-registry', action='store_true',
                help='run the original Demo RegistryDemo and verify its output/terminal recovery')
 p.add_argument('--probe-demo-interactive-basics', action='store_true',
                help='run original RandDemo and MessageLoop with graphical input and terminal recovery')
+p.add_argument('--probe-demo-prompt', action='store_true',
+               help='exercise original PromptDemo defaults and graphical-terminal recovery')
 p.add_argument('--probe-demo-exceptions', action='store_true',
                help='exercise nested exceptions and recovery in the original Demo')
 p.add_argument('--probe-demo-tictactoe', action='store_true',
@@ -228,6 +230,7 @@ if (args.probe_stock_programs or args.probe_stock_interactive or args.probe_prog
         args.probe_3d_apps or args.probe_tothefront or args.probe_xcaliber or
         args.probe_demo_global_vars or args.probe_demo_registry or
         args.probe_demo_interactive_basics or
+        args.probe_demo_prompt or
         args.probe_demo_exceptions or args.probe_timeclock or
         args.probe_vocabulary or args.probe_psalmody):
     args.pci = True
@@ -307,6 +310,7 @@ log_path = ROOT / 'build' / (f'check-usb-{usb_label}{"-budget" if args.probe_bud
                              'check-demo-global-vars-pci.log' if args.probe_demo_global_vars else
                              'check-demo-registry-pci.log' if args.probe_demo_registry else
                              'check-demo-interactive-basics-pci.log' if args.probe_demo_interactive_basics else
+                             'check-demo-prompt-pci.log' if args.probe_demo_prompt else
                              'check-program-catalog-pci.log' if args.probe_program_catalog else
                              'check-popup-menu-pci.log' if args.probe_popup_menu else
                              'check-stock-interactive-pci.log' if args.probe_stock_interactive else
@@ -3034,6 +3038,35 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             command('zstatus', 'failed=0')
             print('PASS Demo RandDemo seed/input flow and MessageLoop key/Escape flow; '
                   'both returned to a working graphical terminal', flush=True)
+            raise SystemExit(0)
+        if args.probe_demo_prompt:
+            focus_graphical_terminal()
+            run_graphical_terminal_command(
+                'demo-prompt-start', 'ExeFile2("/Demo/Prompt.ZC");',
+                'Enter int expression', timeout=20)
+            qmp_send_text('123')
+            qmp_send_key('ret')
+            require_graphical_text('demo-prompt-integer',
+                                   'Enter float expression', timeout=10)
+            qmp_send_text('12.5')
+            qmp_send_key('ret')
+            require_graphical_text('demo-prompt-float', 'Name (', timeout=10)
+            qmp_send_text('ZealOS')
+            qmp_send_key('ret')
+            require_graphical_text('demo-prompt-name', 'Date (', timeout=10)
+            qmp_send_key('ret')
+            require_graphical_text('demo-prompt-date', 'Date=', timeout=10)
+            prompt_result = graphical_screen('demo-prompt-results')
+            for expected in ('Int=123', 'Name:ZealOS', 'Float=', 'Date='):
+                if expected not in prompt_result[3]:
+                    raise RuntimeError('PromptDemo omitted default result '+expected+'; '
+                                       f'see {graphical_path("demo-prompt-results")}\n'
+                                       +prompt_result[3])
+            run_graphical_terminal_command(
+                'demo-prompt-terminal-recovery', '40+2;', 'ans=0x2A=42')
+            command('zstatus', 'failed=0')
+            print('PASS Demo Prompt integer/float/string/date default prompts and '
+                  'graphical-terminal recovery', flush=True)
             raise SystemExit(0)
         if args.probe_demo_exceptions:
             focus_graphical_terminal()

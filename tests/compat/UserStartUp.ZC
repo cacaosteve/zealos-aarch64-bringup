@@ -86,6 +86,12 @@ I64 UserStartUpChecks()
     repeat = MStrPrint("[%.3g][%.3G]", 0.0000125, 1234567.0);
     if (StrCompare(repeat, "[1.25e-05][1.23E+06]")) return 12;
     Free(repeat);
+    repeat = MStrPrint("%.2e/%.3E", 12.5, 0.125);
+    if (StrCompare(repeat, "1.25e+01/1.250E-01")) return 19;
+    Free(repeat);
+    repeat = MStrPrint("[%.2e][%.2e][%.2e][%.2e]", -0.0, -12.5, 9.999, 0.000001);
+    if (StrCompare(repeat, "[-0.00e+00][-1.25e+01][1.00e+01][1.00e-06]")) return 20;
+    Free(repeat);
     repeat = MStrPrint("[%15.7g]", 3.141592653589793);
     if (StrCompare(repeat, "[       3.141593]")) return 13;
     Free(repeat);

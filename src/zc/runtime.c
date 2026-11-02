@@ -6944,6 +6944,66 @@ static int64_t host_exe_puts2(int64_t *a) {
 }
 static size_t format_text(char *output, size_t capacity, const char *format,
                           int64_t argc, const int64_t *argv, int strip_markers);
+static size_t format_f64_exponent(char *output, size_t capacity,
+                                  uint64_t bits, int precision, int uppercase) {
+    size_t used = 0;
+#define EXP_BYTE(ch) do { \
+    if (used == capacity - 1) zc_fail("formatted exponent exceeds buffer"); \
+    output[used++] = (char)(ch); \
+} while (0)
+    unsigned exponent_bits = (unsigned)((bits >> 52) & 0x7ffu);
+    uint64_t fraction = bits & 0x000fffffffffffffULL;
+    int negative = (int)(bits >> 63);
+    if (exponent_bits == 0x7ffu) {
+        if (negative) EXP_BYTE('-');
+        const char *special = fraction ? (uppercase ? "NAN" : "nan")
+                                       : (uppercase ? "INF" : "inf");
+        while (*special) EXP_BYTE(*special++);
+        output[used] = 0;
+        return used;
+    }
+
+    if (precision < 0) precision = 0;
+    if (precision > 6) precision = 6;
+    double value;
+    memcpy(&value, &bits, sizeof(value));
+    if (negative) value = -value;
+    int exponent = 0;
+    if (value != 0.0) {
+        while (value >= 10.0) { value *= 0.1; exponent++; }
+        while (value < 1.0) { value *= 10.0; exponent--; }
+    }
+    double mantissa = value;
+    uint64_t mantissa_bits;
+    memcpy(&mantissa_bits, &mantissa, sizeof(mantissa_bits));
+    char formatted[32];
+    char *end = formatted;
+    hc_fmt_f64_bits(&end, mantissa_bits, precision);
+    *end = 0;
+    if (formatted[0] == '1' && formatted[1] == '0' &&
+        (formatted[2] == '.' || formatted[2] == 0)) {
+        exponent++;
+        mantissa = 1.0;
+        memcpy(&mantissa_bits, &mantissa, sizeof(mantissa_bits));
+        end = formatted;
+        hc_fmt_f64_bits(&end, mantissa_bits, precision);
+        *end = 0;
+    }
+    if (negative) EXP_BYTE('-');
+    for (const char *p = formatted; *p; p++) EXP_BYTE(*p);
+    EXP_BYTE(uppercase ? 'E' : 'e');
+    EXP_BYTE(exponent < 0 ? '-' : '+');
+    unsigned magnitude = exponent < 0 ? (unsigned)-exponent : (unsigned)exponent;
+    char digits[8];
+    unsigned count = 0;
+    do { digits[count++] = (char)('0' + magnitude % 10); magnitude /= 10; }
+    while (magnitude && count < sizeof(digits));
+    while (count < 2) digits[count++] = '0';
+    while (count) EXP_BYTE(digits[--count]);
+    output[used] = 0;
+#undef EXP_BYTE
+    return used;
+}
 static int64_t host_sys(int64_t *a) {
     if (!guest_task_bound ||
         (guest_task_exe_active && guest_current != GUEST_SYSTEM) ||
@@ -7151,6 +7211,7 @@ static size_t format_text(char *output, size_t capacity, const char *format,
             code != 'S' && code != 'z' && code != 'Z' && code != 'o' && code != 'D' && code != 'T' &&
             code != 'd' && code != 'u' && code != 'x' && code != 'X' &&
             code != 'b' && code != 'B' &&
+            code != 'e' && code != 'E' &&
             code != 'f' && code != 'F' && code != 'g' && code != 'G' &&
             code != 'n' && code != 'P')
         {
@@ -7366,6 +7427,11 @@ decoded_string_end: ;
                 hc_fmt_f64_g_bits(&end, bits, significant, code == 'G');
                 *end = 0;
                 length = (size_t)(end - number);
+            } else if (code == 'e' || code == 'E') {
+                uint64_t bits = (uint64_t)argv[arg++];
+                int decimals = has_precision ? precision : 6;
+                length = format_f64_exponent(number, sizeof(number), bits,
+                                             decimals, code == 'E');
             } else if (code == 'x' || code == 'X' || code == 'u' ||
                        code == 'b' || code == 'B') {
                 static const char lower_digits[] = "0123456789abcdef";

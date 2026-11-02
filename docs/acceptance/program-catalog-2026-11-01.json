@@ -1,9 +1,9 @@
 {
   "date": "2026-11-01",
-  "repository_commit": "d6230848d9fab3786d0b86ef746f539640e10c79",
+  "repository_commit": "78f9ba2",
   "command": "python3 scripts/check-compat.py --pci --probe-program-catalog",
   "target": "QEMU PCI ARM64 graphical guest",
-  "result": "pass",
+  "result": "pass: all 38 catalog source probes compiled; all 12 Apps entrypoints compiled",
   "scope": "Compile-only catalog; successful compilation is not runtime acceptance.",
   "apps_compiled": [
     "/Apps/Budget/Run.ZC",
@@ -55,5 +55,8 @@
     "/Apps/Psalmody/Examples/night.ZC",
     "/Apps/Psalmody/Examples/prosper.ZC"
   ],
-  "app_component_compile_mode": "Isolated compile-only probes; loader context used for Psalmody examples and ToTheFront AI modules; no runtime claim."
+  "app_component_compile_mode": "Isolated compile-only probes; loader context used for Psalmody examples and ToTheFront AI modules; no runtime claim.",
+  "working_tree_changes_included": true,
+  "iso_sha256": "5fba349ed31a421eee842a2ca2a5e9499d4c3e10f47845c406f03331b80a93e5",
+  "catalog_run_note": "Re-run on rebuilt kernel/source bundle after formatter change; catalog output at build/program-catalog.json and build/check-program-catalog-pci.log."
 }

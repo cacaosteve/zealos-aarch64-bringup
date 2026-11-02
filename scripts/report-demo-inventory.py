@@ -30,6 +30,7 @@ RUNTIME_ACCEPTED = {
     "/Demo/RandDemo.ZC": "docs/acceptance/demo-interactive-basics-qemu-2026-11-01.json",
     "/Demo/MessageLoop.ZC": "docs/acceptance/demo-interactive-basics-qemu-2026-11-01.json",
     "/Demo/RegistryDemo.ZC": "docs/acceptance/demo-registry-qemu-2026-11-01.json",
+    "/Demo/Prompt.ZC": "docs/acceptance/demo-prompt-qemu-2026-11-01.json",
     "/Demo/DateTime.ZC": "docs/acceptance/demo-runtime-basics-2026-11-01.json",
     "/Demo/NullCase.ZC": "docs/acceptance/demo-runtime-basics-2026-11-01.json",
     "/Demo/Print.ZC": "docs/acceptance/demo-runtime-basics-2026-11-01.json",

@@ -51,7 +51,7 @@
       ]
     }
   ],
-  "runtime_accepted": 31,
+  "runtime_accepted": 32,
   "directories": {
     ".": {
       "source_count": 34,
@@ -1890,8 +1890,8 @@
       "classification_confidence": "unclassified",
       "compile": "pass",
       "first_compile_error": null,
-      "runtime": "unverified",
-      "runtime_evidence": null
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-prompt-qemu-2026-11-01.json"
     },
     {
       "path": "/Demo/PullDownMenu.ZC",

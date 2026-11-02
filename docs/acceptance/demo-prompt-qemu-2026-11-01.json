@@ -1,0 +1,20 @@
+{
+  "date": "2026-11-01",
+  "repository_commit": "78f9ba2",
+  "working_tree_changes_included": true,
+  "command": "python3 scripts/check-compat.py --pci --probe-demo-prompt",
+  "target": "QEMU ARM64 graphical guest",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "a812351db4c0ec78406ba1f711233d243d5b53a2bc79b1359ad3af88c7e6fd7c",
+  "result": "pass",
+  "scope": "Original pinned Demo Prompt.ZC ran through graphical prompts and returned to the graphical terminal.",
+  "checks": {
+    "integer_prompt": "entered 123 and advanced",
+    "float_prompt": "entered 12.5 and advanced; %e scientific formatting accepted",
+    "string_prompt": "entered ZealOS and advanced",
+    "date_prompt": "accepted default and displayed Date=",
+    "terminal_recovery": "40+2; returned 42",
+    "guest_status": "failed=0"
+  },
+  "limitation": "QEMU acceptance only; live UTM behavior remains separate."
+}
