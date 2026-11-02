@@ -2,8 +2,8 @@
   "source_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
   "generated_from": "build/demo-source-catalog.json",
   "source_count": 206,
-  "compile_pass": 181,
-  "compile_blocked": 25,
+  "compile_pass": 182,
+  "compile_blocked": 24,
   "compile_blocker_groups": [
     {
       "category": "inline assembly unsupported or requires an ARM64 equivalent",
@@ -56,13 +56,6 @@
       ]
     },
     {
-      "category": "Carry intrinsic unsupported",
-      "source_count": 1,
-      "paths": [
-        "/Demo/Carry.ZC"
-      ]
-    },
-    {
       "category": "TOS boot-memory binding unavailable",
       "source_count": 1,
       "paths": [
@@ -95,8 +88,8 @@
   "directories": {
     ".": {
       "source_count": 34,
-      "compile_pass": 31,
-      "compile_blocked": 3,
+      "compile_pass": 32,
+      "compile_blocked": 2,
       "preliminary_kind": "root-level source; needs classification"
     },
     "AcctExample": {
@@ -408,8 +401,8 @@
       "directory": ".",
       "preliminary_kind": "root-level source; needs classification",
       "classification_confidence": "unclassified",
-      "compile": "blocked",
-      "first_compile_error": "ERR:/Demo/Carry.ZC:12:15 AArch64 intrinsic 'Carry' (IC_CARRY) is not implemented.",
+      "compile": "pass",
+      "first_compile_error": null,
       "runtime": "unverified",
       "runtime_evidence": null
     },
