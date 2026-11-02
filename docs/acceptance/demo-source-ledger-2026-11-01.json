@@ -4,7 +4,7 @@
   "source_count": 206,
   "compile_pass": 178,
   "compile_blocked": 28,
-  "runtime_accepted": 19,
+  "runtime_accepted": 23,
   "directories": {
     ".": {
       "source_count": 34,
@@ -953,8 +953,8 @@
       "classification_confidence": "provisional; based on directory only",
       "compile": "pass",
       "first_compile_error": null,
-      "runtime": "unverified",
-      "runtime_evidence": null
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-bounce-clock-3dpoly-2026-11-01.json"
     },
     {
       "path": "/Demo/Graphics/BSpline.ZC",
@@ -983,8 +983,8 @@
       "classification_confidence": "provisional; based on directory only",
       "compile": "pass",
       "first_compile_error": null,
-      "runtime": "unverified",
-      "runtime_evidence": null
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-bounce-clock-3dpoly-2026-11-01.json"
     },
     {
       "path": "/Demo/Graphics/Box.ZC",
@@ -1023,8 +1023,8 @@
       "classification_confidence": "provisional; based on directory only",
       "compile": "pass",
       "first_compile_error": null,
-      "runtime": "unverified",
-      "runtime_evidence": null
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-bounce-clock-3dpoly-2026-11-01.json"
     },
     {
       "path": "/Demo/Graphics/Collision.ZC",
@@ -1283,8 +1283,8 @@
       "classification_confidence": "provisional; based on directory only",
       "compile": "pass",
       "first_compile_error": null,
-      "runtime": "unverified",
-      "runtime_evidence": null
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-bounce-clock-3dpoly-2026-11-01.json"
     },
     {
       "path": "/Demo/Graphics/ScreenCapture.ZC",

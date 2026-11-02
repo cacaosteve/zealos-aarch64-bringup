@@ -59,6 +59,8 @@ p.add_argument('--probe-demo-box-hanoi', action='store_true',
                help='exercise original rotating Box and animated Hanoi demos with terminal recovery')
 p.add_argument('--probe-demo-mandel', action='store_true',
                help='exercise original Mandel demo rendering and Escape recovery on a single-CPU guest')
+p.add_argument('--probe-demo-bounce-clock', action='store_true',
+               help='exercise original Bounce and Clock graphics demos with terminal recovery')
 p.add_argument('--probe-demo-system-context', action='store_true',
                help='compile representative Demo files with the boot kernel and graphics APIs loaded')
 p.add_argument('--demo-system-path', action='append', default=[],
@@ -209,7 +211,7 @@ if args.demo_system_module and not args.probe_demo_system_context:
     p.error('--demo-system-module requires --probe-demo-system-context')
 if (args.probe_stock_programs or args.probe_stock_interactive or args.probe_program_catalog or
         args.probe_doc_includes or args.probe_logic_program or args.probe_budget_program or
-        args.probe_demo_tictactoe or args.probe_demo_chess or args.probe_demo_circletrace or args.probe_demo_pick3d or args.probe_demo_box_hanoi or args.probe_demo_mandel or
+        args.probe_demo_tictactoe or args.probe_demo_chess or args.probe_demo_circletrace or args.probe_demo_pick3d or args.probe_demo_box_hanoi or args.probe_demo_mandel or args.probe_demo_bounce_clock or
         args.probe_3d_apps or args.probe_tothefront or args.probe_xcaliber or
         args.probe_demo_global_vars or args.probe_demo_exceptions or args.probe_timeclock or
         args.probe_vocabulary or args.probe_psalmody):
@@ -279,6 +281,7 @@ log_path = ROOT / 'build' / (f'check-usb-{usb_label}{"-budget" if args.probe_bud
                              'check-logic-pci.log' if args.probe_logic_program else
                              'check-doc-includes-pci.log' if args.probe_doc_includes else
                              'check-demo-pick3d-pci.log' if args.probe_demo_pick3d else
+                             'check-demo-bounce-clock-pci.log' if args.probe_demo_bounce_clock else
                              'check-demo-mandel-pci.log' if args.probe_demo_mandel else
                              'check-demo-box-hanoi-pci.log' if args.probe_demo_box_hanoi else
                              'check-demo-chess-pci.log' if args.probe_demo_chess else
@@ -492,6 +495,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 'psalmody-' if args.probe_psalmody else
                 '3d-apps-' if args.probe_3d_apps else
                 'demo-pick3d-' if args.probe_demo_pick3d else
+                'demo-bounce-clock-' if args.probe_demo_bounce_clock else
                 'tothefront-' if args.probe_tothefront else
                 'popup-menu-' if args.probe_popup_menu else
                 'doc-includes-' if args.probe_doc_includes else
@@ -3409,6 +3413,92 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 'demo-mandel-exit-smoke', '40+2;', 'ans=0x2A=42', timeout=20)
             command('zstatus', 'failed=0')
             print('PASS Mandel Escape cleanup and terminal recovery', flush=True)
+            raise SystemExit(0)
+        if args.probe_demo_bounce_clock:
+            command('zload /System/Math/Math.ZC',
+                    'zc: loaded /System/Math/Math.ZC', timeout=30)
+            focus_graphical_terminal()
+            ready = run_graphical_terminal_command(
+                'demo-bounce-clock-ready', '40+2;', 'ans=0x2A=42')
+            type_graphical_prompt_line(
+                'demo-bounce-launch', 'ExeFile2("/Demo/Graphics/Bounce.ZC");')
+            qmp_send_key('ret')
+            deadline = time.monotonic() + 12
+            while True:
+                bounce = graphical_screen('demo-bounce-frame')
+                difference = rgb_diff_count(
+                    ready, bounce, (0, 0, bounce[0], bounce[1]))
+                if difference >= 500:
+                    break
+                if time.monotonic() >= deadline:
+                    raise RuntimeError(
+                        'Bounce did not change the graphical terminal scanout; '
+                        f'see {graphical_path("demo-bounce-frame")}\n{bounce[3]}')
+                time.sleep(.2)
+            print(f'PASS Bounce animation changed {difference} scanout pixels',
+                  flush=True)
+            qmp_send_key('esc')
+            time.sleep(.5)
+            run_graphical_terminal_command(
+                'demo-bounce-exit-smoke', '40+2;', 'ans=0x2A=42', timeout=20)
+
+            ready = graphical_screen('demo-clock-ready')
+            type_graphical_prompt_line(
+                'demo-clock-launch', 'ExeFile2("/Demo/Graphics/Clock.ZC");')
+            qmp_send_key('ret')
+            time.sleep(.8)
+            clock = graphical_screen('demo-clock-frame')
+            difference = rgb_diff_count(
+                ready, clock, (0, 0, clock[0], clock[1]))
+            if difference < 300:
+                raise RuntimeError(
+                    'Clock did not draw its face/hands; '
+                    f'scanout changed only {difference} pixels; '
+                    f'see {graphical_path("demo-clock-frame")}\n{clock[3]}')
+            print(f'PASS Clock face changed {difference} scanout pixels', flush=True)
+            qmp_send_keys(['shift', 'esc'])
+            time.sleep(.5)
+            run_graphical_terminal_command(
+                'demo-clock-exit-smoke', '40+2;', 'ans=0x2A=42', timeout=20)
+
+            for demo_name, demo_path in (
+                    ('3dpoly', '/Demo/Graphics/3DPoly.ZC'),
+                    ('rotate-tank', '/Demo/Graphics/RotateTank.ZC')):
+                ready = graphical_screen(f'demo-{demo_name}-ready')
+                type_graphical_prompt_line(
+                    f'demo-{demo_name}-launch',
+                    f'ExeFile2("{demo_path}");')
+                qmp_send_key('ret')
+                deadline = time.monotonic() + 12
+                while True:
+                    frame = graphical_screen(f'demo-{demo_name}-frame')
+                    difference = rgb_diff_count(
+                        ready, frame, (0, 0, frame[0], frame[1]))
+                    colors = Counter(
+                        tuple(frame[2][offset:offset+3])
+                        for offset in range(0, len(frame[2]), 3))
+                    non_background = sum(
+                        count for color, count in colors.items()
+                        if color not in ((0, 0, 0), (255, 255, 255)))
+                    if difference >= 500 and non_background >= 500:
+                        break
+                    if time.monotonic() >= deadline:
+                        raise RuntimeError(
+                            f'{demo_name} did not render visible graphics; '
+                            f'changed={difference} non_background={non_background}; '
+                            f'see {graphical_path(f"demo-{demo_name}-frame")}\n{frame[3]}')
+                    time.sleep(.2)
+                print(f'PASS {demo_name} rendered visible graphics '
+                      f'({non_background} non-background pixels)', flush=True)
+                qmp_send_key('esc')
+                time.sleep(.5)
+                run_graphical_terminal_command(
+                    f'demo-{demo_name}-exit-smoke', '40+2;',
+                    'ans=0x2A=42', timeout=20)
+
+            command('zstatus', 'failed=0')
+            print('PASS Bounce, Clock, 3DPoly and RotateTank rendering, exit cleanup and terminal recovery',
+                  flush=True)
             raise SystemExit(0)
         if args.probe_demo_pick3d:
             focus_graphical_terminal()

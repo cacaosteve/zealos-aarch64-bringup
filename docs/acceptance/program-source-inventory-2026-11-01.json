@@ -10,7 +10,7 @@
   "demo_sources": 206,
   "demo_compile_pass": 178,
   "demo_compile_blocked": 28,
-  "demo_runtime_accepted": 19,
+  "demo_runtime_accepted": 23,
   "areas": {
     "Apps": {
       "source_files": 70,
@@ -33,7 +33,7 @@
       "compile_pass": 178,
       "compile_blocked": 28,
       "compile_unverified": 0,
-      "runtime_pass": 19,
+      "runtime_pass": 23,
       "runtime_partial": 1
     },
     "Doc": {
@@ -1583,8 +1583,8 @@
       "area": "Demo",
       "kind": "demo_source_or_component",
       "compile": "pass",
-      "runtime": "unverified",
-      "evidence": "docs/acceptance/demo-source-ledger-2026-11-01.json"
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-bounce-clock-3dpoly-2026-11-01.json"
     },
     {
       "path": "/Demo/Graphics/BSpline.ZC",
@@ -1607,8 +1607,8 @@
       "area": "Demo",
       "kind": "demo_source_or_component",
       "compile": "pass",
-      "runtime": "unverified",
-      "evidence": "docs/acceptance/demo-source-ledger-2026-11-01.json"
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-bounce-clock-3dpoly-2026-11-01.json"
     },
     {
       "path": "/Demo/Graphics/Box.ZC",
@@ -1639,8 +1639,8 @@
       "area": "Demo",
       "kind": "demo_source_or_component",
       "compile": "pass",
-      "runtime": "unverified",
-      "evidence": "docs/acceptance/demo-source-ledger-2026-11-01.json"
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-bounce-clock-3dpoly-2026-11-01.json"
     },
     {
       "path": "/Demo/Graphics/Collision.ZC",
@@ -1847,8 +1847,8 @@
       "area": "Demo",
       "kind": "demo_source_or_component",
       "compile": "pass",
-      "runtime": "unverified",
-      "evidence": "docs/acceptance/demo-source-ledger-2026-11-01.json"
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-bounce-clock-3dpoly-2026-11-01.json"
     },
     {
       "path": "/Demo/Graphics/ScreenCapture.ZC",

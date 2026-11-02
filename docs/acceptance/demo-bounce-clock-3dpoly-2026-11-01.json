@@ -1,0 +1,27 @@
+{
+  "date": "2026-11-01",
+  "upstream_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "command": "python3 scripts/check-compat.py --pci --probe-demo-bounce-clock",
+  "target": "QEMU PCI ARM64 graphical guest",
+  "result": "pass",
+  "checks": {
+    "Bounce": {
+      "rendering": "pass: animation changed more than 36000 scanout pixels",
+      "exit_and_recovery": "pass: Escape returned to terminal; 40+2 returned 42"
+    },
+    "Clock": {
+      "rendering": "pass: clock face/hands changed more than 26000 scanout pixels",
+      "exit_and_recovery": "pass: Shift+Escape returned to terminal; 40+2 returned 42"
+    },
+    "3DPoly": {
+      "rendering": "pass: polygon graphics rendered with over 70000 non-background pixels",
+      "exit_and_recovery": "pass: Escape returned to terminal; 40+2 returned 42"
+    },
+    "RotateTank": {
+      "rendering": "pass: rotating tank sprite rendered with over 280000 non-background pixels",
+      "exit_and_recovery": "pass: Escape returned to terminal; 40+2 returned 42"
+    },
+    "guest_status": "pass: zstatus reported failed=0"
+  },
+  "scope_note": "This probe accepts these four original Demo sources in QEMU. It does not establish live UTM or Pi hardware behavior."
+}

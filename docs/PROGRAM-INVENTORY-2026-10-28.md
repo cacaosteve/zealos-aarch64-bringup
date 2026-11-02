@@ -314,7 +314,7 @@ array size and initialized class-array contents. The original
 are recorded in
 [`acceptance/demo-globalvars-array-size-2026-11-01.json`](acceptance/demo-globalvars-array-size-2026-11-01.json).
 The count is compile evidence only. Separate QEMU checks now bring the Demo
-runtime accepted count to nineteen: unchanged TicTacToe and Chess both render,
+runtime accepted count to twenty-three: unchanged TicTacToe and Chess both render,
 accept input where applicable, exit cleanly, and return to a terminal where
 `40+2;` evaluates to 42. The original NetOfDots and Lines programs also render, accept exit input, and recover the terminal; Lines animation was verified by changing scanout. See
 [`acceptance/demo-stock-graphics-2026-11-01.json`](acceptance/demo-stock-graphics-2026-11-01.json). Pick3D now passes its QEMU interactive graphics probe, including visible graphics, Escape, and terminal recovery. The failure was a missing bootstrap implementation of the stock task-local `HashGenericAdd` and `FramePtr` helpers. See
@@ -333,3 +333,5 @@ accepted Demo program count; see
 The 2026-11-01 `/Demo/Exceptions.ZC` PCI QEMU probe now passes the nested Point1 catch path, including ARM64 `%P` pointer-link formatting, final prompt completion, and recovery to a terminal where `40+2;` returns 42. See [`acceptance/demo-exceptions-2026-11-01.json`](acceptance/demo-exceptions-2026-11-01.json). This is one explicit runtime acceptance, not full coverage of every exception path or `%P` call site.
 
 The original `/Demo/Graphics/Mandel.ZC` now renders on the single-CPU ARM64 QEMU guest. Its guarded source-bundle overlay runs the stock frame worker synchronously on CPU 0 when there are no worker CPUs, and preserves the upstream `JobQueue` path for multi-CPU guests. Escape restores the terminal and `40+2;` returns 42. See [`acceptance/demo-mandel-qemu-2026-11-01.json`](acceptance/demo-mandel-qemu-2026-11-01.json).
+
+The original `/Demo/Graphics/Bounce.ZC`, `Clock.ZC`, `3DPoly.ZC`, and `RotateTank.ZC` also pass QEMU graphical rendering and exit recovery. Bounce, 3DPoly, and RotateTank return on Escape; Clock uses Shift+Escape. Each returned to a terminal where `40+2;` evaluated to 42. See [`acceptance/demo-bounce-clock-3dpoly-2026-11-01.json`](acceptance/demo-bounce-clock-3dpoly-2026-11-01.json).
