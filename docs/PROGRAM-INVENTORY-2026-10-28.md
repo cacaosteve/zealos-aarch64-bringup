@@ -314,7 +314,7 @@ array size and initialized class-array contents. The original
 are recorded in
 [`acceptance/demo-globalvars-array-size-2026-11-01.json`](acceptance/demo-globalvars-array-size-2026-11-01.json).
 The count is compile evidence only. Separate QEMU checks now bring the Demo
-runtime accepted count to twenty-six: unchanged TicTacToe and Chess both render,
+runtime accepted count to twenty-eight: unchanged TicTacToe and Chess both render,
 accept input where applicable, exit cleanly, and return to a terminal where
 `40+2;` evaluates to 42. MouseDemo, Grid, and Palette also passed pointer/palette interaction and terminal recovery in QEMU. Slider launches but its control was not visible in the captured guest screen and its value did not change; it is tracked as partial pending control rendering and hit-testing work. The original NetOfDots and Lines programs also render, accept exit input, and recover the terminal; Lines animation was verified by changing scanout. See
 [`acceptance/demo-stock-graphics-2026-11-01.json`](acceptance/demo-stock-graphics-2026-11-01.json). Pick3D now passes its QEMU interactive graphics probe, including visible graphics, Escape, and terminal recovery. The failure was a missing bootstrap implementation of the stock task-local `HashGenericAdd` and `FramePtr` helpers. See
@@ -337,3 +337,9 @@ The 2026-11-01 `/Demo/Exceptions.ZC` PCI QEMU probe now passes the nested Point1
 The original `/Demo/Graphics/Mandel.ZC` now renders on the single-CPU ARM64 QEMU guest. Its guarded source-bundle overlay runs the stock frame worker synchronously on CPU 0 when there are no worker CPUs, and preserves the upstream `JobQueue` path for multi-CPU guests. Escape restores the terminal and `40+2;` returns 42. See [`acceptance/demo-mandel-qemu-2026-11-01.json`](acceptance/demo-mandel-qemu-2026-11-01.json).
 
 The original `/Demo/Graphics/Bounce.ZC`, `Clock.ZC`, `3DPoly.ZC`, and `RotateTank.ZC` also pass QEMU graphical rendering and exit recovery. Bounce, 3DPoly, and RotateTank return on Escape; Clock uses Shift+Escape. Each returned to a terminal where `40+2;` evaluated to 42. See [`acceptance/demo-bounce-clock-3dpoly-2026-11-01.json`](acceptance/demo-bounce-clock-3dpoly-2026-11-01.json).
+
+The original `/Demo/Graphics/32BitColor.ZC` and `Blot.ZC` also pass PCI QEMU
+framebuffer rendering and terminal recovery: they changed 38,486 and 56,555
+scanout pixels respectively, and each returned to a terminal where `40+2;`
+evaluated to 42. See
+[`acceptance/demo-graphics-render-2026-11-01.json`](acceptance/demo-graphics-render-2026-11-01.json).

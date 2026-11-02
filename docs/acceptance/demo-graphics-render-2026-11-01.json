@@ -1,0 +1,30 @@
+{
+  "date": "2026-11-01",
+  "base_commit": "9d3986c0b04295eac8f8581facb35a639e1c2a49",
+  "target": "QEMU PCI ARM64 graphical guest",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "c93ffbd53e1e031f936e63bf8a1002ea8606355853a36a4035a4db528ed8a566",
+  "command": "python3 scripts/check-compat.py --pci --probe-demo-graphics-render",
+  "result": "pass",
+  "scope": "Framebuffer rendering and keyboard exit/recovery. QEMU evidence does not establish live UTM or Pi hardware behavior.",
+  "checks": {
+    "32BitColor": {
+      "result": "pass",
+      "verified": [
+        "program visibly changed 38,486 scanout pixels",
+        "key exit returned to the graphical terminal",
+        "40+2 returned 42"
+      ]
+    },
+    "Blot": {
+      "result": "pass",
+      "verified": [
+        "image and sprite visibly changed 56,555 scanout pixels",
+        "key exit returned to the graphical terminal",
+        "40+2 returned 42"
+      ]
+    },
+    "guest_status": "pass: zstatus reported failed=0"
+  },
+  "log": "build/check-demo-graphics-render-pci.log"
+}

@@ -43,6 +43,8 @@ RUNTIME_ACCEPTED = {
     "/Demo/Graphics/Bounce.ZC": "docs/acceptance/demo-bounce-clock-3dpoly-2026-11-01.json",
     "/Demo/Graphics/Clock.ZC": "docs/acceptance/demo-bounce-clock-3dpoly-2026-11-01.json",
     "/Demo/Graphics/RotateTank.ZC": "docs/acceptance/demo-bounce-clock-3dpoly-2026-11-01.json",
+    "/Demo/Graphics/32BitColor.ZC": "docs/acceptance/demo-graphics-render-2026-11-01.json",
+    "/Demo/Graphics/Blot.ZC": "docs/acceptance/demo-graphics-render-2026-11-01.json",
     "/Demo/Graphics/Box.ZC": "docs/acceptance/demo-box-hanoi-2026-11-01.json",
     "/Demo/Graphics/Hanoi.ZC": "docs/acceptance/demo-box-hanoi-2026-11-01.json",
     "/Demo/Graphics/Mandel.ZC": "docs/acceptance/demo-mandel-qemu-2026-11-01.json",
