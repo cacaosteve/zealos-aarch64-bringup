@@ -51,7 +51,7 @@
       ]
     }
   ],
-  "runtime_accepted": 29,
+  "runtime_accepted": 31,
   "directories": {
     ".": {
       "source_count": 34,
@@ -1740,8 +1740,8 @@
       "classification_confidence": "unclassified",
       "compile": "pass",
       "first_compile_error": null,
-      "runtime": "unverified",
-      "runtime_evidence": null
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-interactive-basics-qemu-2026-11-01.json"
     },
     {
       "path": "/Demo/MultiCore/Interrupts.ZC",
@@ -1920,8 +1920,8 @@
       "classification_confidence": "unclassified",
       "compile": "pass",
       "first_compile_error": null,
-      "runtime": "unverified",
-      "runtime_evidence": null
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-interactive-basics-qemu-2026-11-01.json"
     },
     {
       "path": "/Demo/RegistryDemo.ZC",

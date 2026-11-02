@@ -49,6 +49,8 @@ p.add_argument('--probe-demo-global-vars', action='store_true',
                help='run original Demo GlobalVars dynamic-initialization checks graphically')
 p.add_argument('--probe-demo-registry', action='store_true',
                help='run the original Demo RegistryDemo and verify its output/terminal recovery')
+p.add_argument('--probe-demo-interactive-basics', action='store_true',
+               help='run original RandDemo and MessageLoop with graphical input and terminal recovery')
 p.add_argument('--probe-demo-exceptions', action='store_true',
                help='exercise nested exceptions and recovery in the original Demo')
 p.add_argument('--probe-demo-tictactoe', action='store_true',
@@ -225,6 +227,7 @@ if (args.probe_stock_programs or args.probe_stock_interactive or args.probe_prog
         args.probe_demo_input_graphics or args.probe_demo_graphics_render or
         args.probe_3d_apps or args.probe_tothefront or args.probe_xcaliber or
         args.probe_demo_global_vars or args.probe_demo_registry or
+        args.probe_demo_interactive_basics or
         args.probe_demo_exceptions or args.probe_timeclock or
         args.probe_vocabulary or args.probe_psalmody):
     args.pci = True
@@ -303,6 +306,7 @@ log_path = ROOT / 'build' / (f'check-usb-{usb_label}{"-budget" if args.probe_bud
                              'check-demo-tictactoe-pci.log' if args.probe_demo_tictactoe else
                              'check-demo-global-vars-pci.log' if args.probe_demo_global_vars else
                              'check-demo-registry-pci.log' if args.probe_demo_registry else
+                             'check-demo-interactive-basics-pci.log' if args.probe_demo_interactive_basics else
                              'check-program-catalog-pci.log' if args.probe_program_catalog else
                              'check-popup-menu-pci.log' if args.probe_popup_menu else
                              'check-stock-interactive-pci.log' if args.probe_stock_interactive else
@@ -2996,6 +3000,40 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             command('zstatus', 'failed=0')
             print('PASS Demo RegistryDemo graphical execution '
                   f'(Val {value_match.group(1)}) and terminal recovery', flush=True)
+            raise SystemExit(0)
+        if args.probe_demo_interactive_basics:
+            focus_graphical_terminal()
+            rand_start = run_graphical_terminal_command(
+                'demo-rand-start', 'ExeFile2("/Demo/RandDemo.ZC");',
+                'Seed(0) will do timer XORed', timeout=20)
+            qmp_send_key('a')
+            require_graphical_text('demo-rand-second-pause',
+                                   'Seed(num) will do deterministic', timeout=15)
+            qmp_send_key('a')
+            rand_result = require_graphical_text(
+                'demo-rand-reproducible', 'Repeats earlier values.', timeout=15)
+            if 'Different, right?' not in rand_result[3]:
+                raise RuntimeError('RandDemo skipped its deterministic-seed comparison; '
+                                   f'see {graphical_path("demo-rand-reproducible")}\n'
+                                   +rand_result[3])
+            run_graphical_terminal_command(
+                'demo-rand-terminal-recovery', '40+2;', 'ans=0x2A=42')
+
+            loop_start = run_graphical_terminal_command(
+                'demo-message-loop-start', 'ExeFile2("/Demo/MessageLoop.ZC");',
+                '<ESC> to Exit', timeout=20)
+            qmp_send_key('x')
+            loop_result = require_graphical_text('demo-message-loop-key', 'CMD:', timeout=10)
+            if loop_result[3] == loop_start[3]:
+                raise RuntimeError('MessageLoop did not report the injected key message; '
+                                   f'see {graphical_path("demo-message-loop-key")}\n'
+                                   +loop_result[3])
+            qmp_send_key('esc')
+            run_graphical_terminal_command(
+                'demo-message-loop-terminal-recovery', '40+2;', 'ans=0x2A=42')
+            command('zstatus', 'failed=0')
+            print('PASS Demo RandDemo seed/input flow and MessageLoop key/Escape flow; '
+                  'both returned to a working graphical terminal', flush=True)
             raise SystemExit(0)
         if args.probe_demo_exceptions:
             focus_graphical_terminal()

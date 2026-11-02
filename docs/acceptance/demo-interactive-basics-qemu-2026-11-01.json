@@ -1,0 +1,18 @@
+{
+  "date": "2026-11-01",
+  "sources": [
+    "/Demo/RandDemo.ZC",
+    "/Demo/MessageLoop.ZC"
+  ],
+  "source_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "test": "python3 scripts/check-compat.py --probe-demo-interactive-basics",
+  "environment": "Disposable QEMU/HVF AArch64 guest, graphical terminal and VirtIO keyboard.",
+  "result": "pass",
+  "observations": [
+    "RandDemo accepted two graphical key presses, advanced through timer-seeded and deterministic random drawing phases, and displayed the deterministic-seed comparison output including \u201cRepeats earlier values.\u201d",
+    "MessageLoop displayed its Escape instructions and reported an injected key as a CMD message.",
+    "Escape exited MessageLoop; the graphical terminal then evaluated 40+2; as ans=0x2A=42.",
+    "zstatus reported failed=0."
+  ],
+  "runner_log": "build/check-demo-interactive-basics-pci.log"
+}
