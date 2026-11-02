@@ -1,0 +1,28 @@
+{
+  "date": "2026-11-02",
+  "source_commit": "02a8b518c5077b6d5b9ae1f27e734ac11e183ea9",
+  "iso_sha256": "e34393b6ceeaf3069209bc9cf29285dd0888c71edc74bae86b14acf17bea3ebd",
+  "command": "python3 scripts/check-compat.py --pci --probe-3d-apps --probe-keepaway-full-game",
+  "exit_code": 0,
+  "scope": "Automated PCI QEMU acceptance on the current rebuilt AArch64 ISO. It does not test UTM virtio-ramfb or Pi hardware.",
+  "checks": {
+    "GrModels": {
+      "Man": "pass: form accepted, 112 vertices and 168 triangles; drawing pixels verified; repeat prompt and terminal recovery passed",
+      "Ball": "pass: form accepted, 58 vertices and 128 triangles; inline sprite pixels verified; repeat prompt and terminal recovery passed"
+    },
+    "KeepAway": {
+      "gameplay": "pass: court/HUD/player rendered; Space and mouse input kept the frame active",
+      "long_run": "pass: scanout continued changing for the 183-second observation through game-over",
+      "Escape_recovery": "pass: Escape returned to terminal and 40+2 returned 42"
+    },
+    "Titanium": {
+      "gameplay": "pass: intro and game frame rendered; input and Escape returned to terminal; 40+2 returned 42"
+    },
+    "final_status": "failed=0"
+  },
+  "live_utm": {
+    "GrModels": "runtime remains visually unverified in UTM; user previously saw no obvious output after selecting color",
+    "KeepAway": "unresolved: user reported UTM freeze around the 2:15 remaining-time display; this QEMU rerun does not reproduce UTM display/input differences",
+    "Titanium": "user-confirmed working in UTM, including ordinary Left/Right, Space, and Escape"
+  }
+}
