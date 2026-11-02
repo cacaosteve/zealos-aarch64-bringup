@@ -1,0 +1,23 @@
+// ARM64 source translation of the original assembly loop. Keep the stock
+// range and spans: emit a hex value followed by FIZZ and/or BUZZ when due.
+#define RANGE_START 1
+#define RANGE_END 100
+#define FIZZ_SPAN 6
+#define BUZZ_SPAN 7
+
+U0 BuzzFizz()
+{
+	I64 i;
+
+	for (i = RANGE_START; i <= RANGE_END; i++)
+	{
+		Print("%016X ", i);
+		if (!(i % FIZZ_SPAN))
+			Print("FIZZ ");
+		if (!(i % BUZZ_SPAN))
+			Print("BUZZ ");
+		'\n';
+	}
+}
+
+BuzzFizz;
