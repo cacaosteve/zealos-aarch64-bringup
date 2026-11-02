@@ -152,7 +152,7 @@
       "preliminary_kind": "account/home-system integration examples",
       "classification_confidence": "provisional; based on directory only",
       "compile": "blocked",
-      "first_compile_error": "ERR /Demo/AcctExample/MakeHome.ZC:5:26 I can't find file '~/HomeLocalize.ZC'.",
+      "first_compile_error": "ERR:/System/Boot/BootDVD.ZC:6:5 Unknown symbol 'asm'.",
       "runtime": "unverified",
       "runtime_evidence": null
     },
