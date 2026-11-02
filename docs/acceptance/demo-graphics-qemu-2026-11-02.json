@@ -1,0 +1,74 @@
+{
+  "date": "2026-11-02",
+  "upstream_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "repository_commit": "94031e9502e651de3262da971307a705fb1f9baa",
+  "target": "QEMU PCI AArch64 graphical guest",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "e34393b6ceeaf3069209bc9cf29285dd0888c71edc74bae86b14acf17bea3ebd",
+  "result": "pass",
+  "program_count": 13,
+  "programs": [
+    {
+      "path": "/Demo/Graphics/Box.ZC",
+      "checks": ["rotating wireframe rendered", "Escape returned to terminal", "40+2 returned 42"]
+    },
+    {
+      "path": "/Demo/Graphics/Hanoi.ZC",
+      "checks": ["disk animation rendered", "Escape returned to terminal", "40+2 returned 42"]
+    },
+    {
+      "path": "/Demo/Games/CircleTrace.ZC",
+      "checks": ["target rendered", "mouse drag left a retained trace", "Escape returned to terminal", "40+2 returned 42"]
+    },
+    {
+      "path": "/Demo/Graphics/Pick3D.ZC",
+      "checks": ["interactive graphics window opened", "Escape returned to terminal", "40+2 returned 42"]
+    },
+    {
+      "path": "/Demo/Graphics/32BitColor.ZC",
+      "checks": ["framebuffer color writes changed 42,588 scanout pixels", "Escape returned to terminal", "40+2 returned 42"]
+    },
+    {
+      "path": "/Demo/Graphics/Blot.ZC",
+      "checks": ["image and sprite rendering changed 60,361 scanout pixels", "key exit returned to terminal", "40+2 returned 42"]
+    },
+    {
+      "path": "/Demo/Graphics/MouseDemo.ZC",
+      "checks": ["pointer interaction changed 18,814 scanout pixels", "exit returned to terminal", "40+2 returned 42"]
+    },
+    {
+      "path": "/Demo/Graphics/Grid.ZC",
+      "checks": ["pointer interaction changed 19,246 scanout pixels", "exit returned to terminal", "40+2 returned 42"]
+    },
+    {
+      "path": "/Demo/Graphics/Palette.ZC",
+      "checks": ["grayscale and custom-color phases ran", "settings popup cleanup returned to terminal", "40+2 returned 42"]
+    },
+    {
+      "path": "/Demo/Graphics/Bounce.ZC",
+      "checks": ["animation changed 36,754 scanout pixels", "Escape returned to terminal", "40+2 returned 42"]
+    },
+    {
+      "path": "/Demo/Graphics/Clock.ZC",
+      "checks": ["clock face changed 26,831 scanout pixels", "Shift+Escape returned to terminal", "40+2 returned 42"]
+    },
+    {
+      "path": "/Demo/Graphics/3DPoly.ZC",
+      "checks": ["rendered 71,015 non-background pixels", "Escape returned to terminal", "40+2 returned 42"]
+    },
+    {
+      "path": "/Demo/Graphics/RotateTank.ZC",
+      "checks": ["rendered 283,396 non-background pixels", "Escape returned to terminal", "40+2 returned 42"]
+    }
+  ],
+  "guest_status": "zstatus reported failed=0 for every completed probe",
+  "scope_note": "These runs establish graphical runtime and recovery in PCI QEMU only. They do not establish live UTM or Raspberry Pi behavior. Slider was not accepted by the input-graphics probe and remains unresolved.",
+  "logs": [
+    "build/check-demo-box-hanoi-pci.log",
+    "build/check-demo-circletrace-pci.log",
+    "build/check-demo-pick3d-pci.log",
+    "build/check-demo-graphics-render-pci.log",
+    "build/check-demo-input-graphics-pci.log",
+    "build/check-demo-bounce-clock-pci.log"
+  ]
+}

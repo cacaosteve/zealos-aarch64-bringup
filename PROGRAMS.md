@@ -221,6 +221,15 @@ records the 206 Demo `.ZC` compile results and first failures. It records 32 Dem
 sweep adds compile evidence, not runtime acceptance. Directory-derived categories remain
 provisional, and per-file runnable-versus-module classification is in progress.
 
+A fresh run on the current ISO (`e34393b6…`) rechecked 13 graphical Demo
+programs in PCI QEMU: Box, Hanoi, CircleTrace, Pick3D, 32BitColor, Blot,
+MouseDemo, Grid, Palette, Bounce, Clock, 3DPoly, and RotateTank. Each reached
+its drawing or interaction check, exited through its supported key path, and
+returned to a terminal where `40+2;` produced 42. This refreshes evidence for
+programs already included in the 32-source runtime tally; it does not increase
+that distinct-source count. Slider remains unresolved. See
+[`demo-graphics-qemu-2026-11-02.json`](docs/acceptance/demo-graphics-qemu-2026-11-02.json).
+
 The system-context probe now accepts ordered `--demo-system-module` options to
 load stock `/System/*.ZC` modules before compiling selected demos. The ARM64 overlay now lets the LightTable source compile in the isolated
 module-aware probe. Its runtime behavior remains unverified; compile success does
