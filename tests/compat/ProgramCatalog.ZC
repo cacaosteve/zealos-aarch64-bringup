@@ -516,6 +516,31 @@ I64 StockCatalogCompileAfterLoad(U8 *load_path, U8 *app_path)
     return result == 42;
 }
 
+I64 StockCatalogCompileDocAfterLoad(U8 *load_path, U8 *app_path)
+{//Compile a DolDoc app source after its app loader has declared dependencies.
+    CTask *task = Spawn(&StockCatalogServer);
+    CJob *job;
+    U8 *source;
+    I64 result;
+
+    if (!task)
+        return -1;
+    source = MStrPrint(
+        "ExeFile2(\"%Q\");"
+        "StockCatalogExeDocFile(\"%Q\",CCF_JUST_LOAD);42;",
+        load_path, app_path);
+    job = TaskExe(task, Fs, source, 0);
+    Free(source);
+    if (!job)
+    {
+        Kill(task);
+        return -2;
+    }
+    result = JobResGet(job);
+    Kill(task);
+    return result == 42;
+}
+
 I64 StockCatalogPsalmodyNoteMathChecks()
 {//The editor depends on the pure pitch/octave helpers from the sound module.
     CTask *task = Spawn(&StockCatalogServer);

@@ -7,6 +7,7 @@ App folders contain one launch entry point plus implementation modules.
 """
 import json
 import pathlib
+import re
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -24,11 +25,46 @@ def read(path):
     return json.loads(path.read_text())
 
 
+def included_app_sources(entrypoint):
+    """Return app-local sources transitively included by a compiled entrypoint.
+
+    The compile catalog compiles each app entrypoint with CCF_JUST_LOAD. Since
+    ZealOS #include compiles the included source into that unit, this is valid
+    compile evidence for those implementation components. It is not runtime
+    evidence and does not cover unreferenced examples or other data files.
+    """
+    app_root = PINNED / "Apps"
+    found = set()
+    pending = [entrypoint]
+    while pending:
+        source = pending.pop()
+        if source in found or not source.is_file():
+            continue
+        found.add(source)
+        for include in re.findall(
+                r'(?m)^\s*#include\s+["<]([^">]+)[">]',
+                source.read_text(errors="replace")):
+            include_path = pathlib.Path(include)
+            candidates = ([PINNED / include_path.as_posix().lstrip("/")]
+                          if include_path.is_absolute() else
+                          [source.parent / include_path])
+            if not include_path.suffix:
+                candidates = [candidate.with_suffix(ext)
+                              for candidate in candidates
+                              for ext in (".ZC", ".HH")]
+            resolved = next((candidate.resolve() for candidate in candidates
+                             if candidate.is_file()), None)
+            if resolved and resolved.is_relative_to(app_root.resolve()):
+                pending.append(resolved)
+    return found
+
+
 def main():
     demo_ledger = read(DEMO_LEDGER)
     demo_by_path = {item["path"]: item for item in demo_ledger["sources"]}
     app_catalog = read(PROGRAM_CATALOG)
     app_compile = {path: True for path in app_catalog["apps_compiled"]}
+    app_component_compile = set(app_catalog.get("app_components_compiled", []))
     named_apps = read(NAMED_APPS)
     app_runtime = {
         "/Apps/" + name + "/" + ("Run.ZC" if (PINNED / "Apps" / name / "Run.ZC").exists()
@@ -64,6 +100,13 @@ def main():
             candidate = app_dir / "Load.ZC"
         app_entrypoints["/" + candidate.relative_to(PINNED).as_posix()] = True
 
+    compiled_app_sources = set()
+    for entrypoint, passed in app_compile.items():
+        if not passed:
+            continue
+        source = PINNED / entrypoint.lstrip("/")
+        compiled_app_sources.update(included_app_sources(source))
+
     records = []
     for source in sorted(PINNED.rglob("*.ZC")):
         rel = source.relative_to(PINNED).as_posix()
@@ -85,6 +128,14 @@ def main():
                 record["compile"] = ("pass" if app_compile[guest_path]
                                       else "blocked")
                 record["evidence"] = str(PROGRAM_CATALOG.relative_to(ROOT))
+            elif guest_path in app_component_compile:
+                record["compile"] = "pass"
+                record["evidence"] = str(PROGRAM_CATALOG.relative_to(ROOT))
+                record["evidence_scope"] = "isolated compile-only component probe"
+            elif source.resolve() in compiled_app_sources:
+                record["compile"] = "pass"
+                record["evidence"] = str(PROGRAM_CATALOG.relative_to(ROOT))
+                record["evidence_scope"] = "transitively included by a compiled App entrypoint; compile only"
             if guest_path in app_runtime:
                 record["runtime"] = app_runtime[guest_path]["status"]
                 record["runtime_evidence"] = app_runtime[guest_path]["evidence"]
@@ -114,7 +165,7 @@ def main():
         "upstream_commit": read(PINNED / "UPSTREAM.json")["commit"],
         "scope": "All pinned upstream .ZC files; includes runnable entries and non-runnable support modules.",
         "classification_note": "A .ZC source is not necessarily a standalone program. Apps are grouped by Run.ZC/Load.ZC entry points; Demo files remain source-or-component until individually classified.",
-        "evidence_note": "Only statuses backed by the listed acceptance artifacts are marked pass/partial. Unlisted App components and non-Demo/non-App areas are unverified, not assumed broken or working.",
+        "evidence_note": "App implementation sources transitively included by a compiled entrypoint inherit compile-pass evidence only; this does not imply standalone launchability or runtime acceptance. Unreferenced App components and non-Demo/non-App areas remain unverified.",
         "source_files": len(records),
         "app_directories": len(app_dirs),
         "app_entrypoints": len(app_entrypoints),

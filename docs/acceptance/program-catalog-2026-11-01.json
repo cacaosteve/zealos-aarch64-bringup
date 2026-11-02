@@ -44,5 +44,16 @@
     "/Demo/RegistryDemo.ZC"
   ],
   "runtime_recovery": "pass: zstatus reported failed=0 after catalog run",
-  "source_result_count": 30
+  "source_result_count": 38,
+  "app_components_compiled": [
+    "/Apps/Psalmody/Install.ZC",
+    "/Apps/Span/Install.ZC",
+    "/Apps/ToTheFront/Install.ZC",
+    "/Apps/ToTheFront/AIs/Human.ZC",
+    "/Apps/ToTheFront/AIs/SimpleAI.ZC",
+    "/Apps/Psalmody/Examples/childish.ZC",
+    "/Apps/Psalmody/Examples/night.ZC",
+    "/Apps/Psalmody/Examples/prosper.ZC"
+  ],
+  "app_component_compile_mode": "Isolated compile-only probes; loader context used for Psalmody examples and ToTheFront AI modules; no runtime claim."
 }

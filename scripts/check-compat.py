@@ -3220,6 +3220,19 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     '/Demo/Progress.ZC',
                     '/Demo/RegistryDemo.ZC',
                 ]
+                # App implementation sources not reached by the normal
+                # Run/Load entrypoint compile. Keep this compile-only list
+                # separate from named app and runtime acceptance evidence.
+                paths += [
+                    '/Apps/Psalmody/Install.ZC',
+                    '/Apps/Span/Install.ZC',
+                    '/Apps/ToTheFront/Install.ZC',
+                    '/Apps/ToTheFront/AIs/Human.ZC',
+                    '/Apps/ToTheFront/AIs/SimpleAI.ZC',
+                    '/Apps/Psalmody/Examples/childish.ZC',
+                    '/Apps/Psalmody/Examples/night.ZC',
+                    '/Apps/Psalmody/Examples/prosper.ZC',
+                ]
             results = []
             for path in paths:
                 loader = {
@@ -3229,6 +3242,19 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 }.get(path)
                 if loader:
                     compile_expr = f'StockCatalogCompileAfterLoad("{loader}","{path}")'
+                elif path in {
+                        '/Apps/Psalmody/Examples/night.ZC',
+                        '/Apps/Psalmody/Examples/prosper.ZC'}:
+                    compile_expr = f'StockCatalogCompileDocAfterLoad("/Apps/Psalmody/Load.ZC","{path}")'
+                elif path == '/Apps/Psalmody/Examples/childish.ZC':
+                    compile_expr = f'StockCatalogCompileAfterLoad("/Apps/Psalmody/Load.ZC","{path}")'
+                elif path.startswith('/Apps/ToTheFront/AIs/'):
+                    compile_expr = f'StockCatalogCompileAfterLoad("/Apps/ToTheFront/Load.ZC","{path}")'
+                elif path in {
+                        '/Apps/Psalmody/Install.ZC',
+                        '/Apps/Span/Install.ZC',
+                        '/Apps/ToTheFront/Install.ZC'}:
+                    compile_expr = f'StockCatalogCompile("{path}")'
                 elif path.startswith('/Demo/Games/'):
                     compile_expr = f'StockCatalogCompileWithMath("{path}")'
                 else:

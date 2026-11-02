@@ -3,7 +3,7 @@
   "upstream_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
   "scope": "All pinned upstream .ZC files; includes runnable entries and non-runnable support modules.",
   "classification_note": "A .ZC source is not necessarily a standalone program. Apps are grouped by Run.ZC/Load.ZC entry points; Demo files remain source-or-component until individually classified.",
-  "evidence_note": "Only statuses backed by the listed acceptance artifacts are marked pass/partial. Unlisted App components and non-Demo/non-App areas are unverified, not assumed broken or working.",
+  "evidence_note": "App implementation sources transitively included by a compiled entrypoint inherit compile-pass evidence only; this does not imply standalone launchability or runtime acceptance. Unreferenced App components and non-Demo/non-App areas remain unverified.",
   "source_files": 615,
   "app_directories": 12,
   "app_entrypoints": 12,
@@ -14,9 +14,9 @@
   "areas": {
     "Apps": {
       "source_files": 70,
-      "compile_pass": 12,
+      "compile_pass": 70,
       "compile_blocked": 0,
-      "compile_unverified": 58,
+      "compile_unverified": 0,
       "runtime_pass": 12,
       "runtime_partial": 0
     },
@@ -90,73 +90,82 @@
       "path": "/Apps/Budget/BgtAccts.ZC",
       "area": "Apps",
       "kind": "app_component",
-      "compile": "unverified",
+      "compile": "pass",
       "runtime": "unverified",
-      "evidence": null
+      "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
     },
     {
       "path": "/Apps/Budget/BgtEntry.ZC",
       "area": "Apps",
       "kind": "app_component",
-      "compile": "unverified",
+      "compile": "pass",
       "runtime": "unverified",
-      "evidence": null
+      "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
     },
     {
       "path": "/Apps/Budget/BgtFile.ZC",
       "area": "Apps",
       "kind": "app_component",
-      "compile": "unverified",
+      "compile": "pass",
       "runtime": "unverified",
-      "evidence": null
+      "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
     },
     {
       "path": "/Apps/Budget/BgtMain.ZC",
       "area": "Apps",
       "kind": "app_component",
-      "compile": "unverified",
+      "compile": "pass",
       "runtime": "unverified",
-      "evidence": null
+      "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
     },
     {
       "path": "/Apps/Budget/BgtStrs.ZC",
       "area": "Apps",
       "kind": "app_component",
-      "compile": "unverified",
+      "compile": "pass",
       "runtime": "unverified",
-      "evidence": null
+      "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
     },
     {
       "path": "/Apps/Budget/BgtTemplate.ZC",
       "area": "Apps",
       "kind": "app_component",
-      "compile": "unverified",
+      "compile": "pass",
       "runtime": "unverified",
-      "evidence": null
+      "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
     },
     {
       "path": "/Apps/Budget/Budget.ZC",
       "area": "Apps",
       "kind": "app_component",
-      "compile": "unverified",
+      "compile": "pass",
       "runtime": "unverified",
-      "evidence": null
+      "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
     },
     {
       "path": "/Apps/Budget/Install.ZC",
       "area": "Apps",
       "kind": "app_component",
-      "compile": "unverified",
+      "compile": "pass",
       "runtime": "unverified",
-      "evidence": null
+      "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
     },
     {
       "path": "/Apps/Budget/Load.ZC",
       "area": "Apps",
       "kind": "app_component",
-      "compile": "unverified",
+      "compile": "pass",
       "runtime": "unverified",
-      "evidence": null
+      "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
     },
     {
       "path": "/Apps/Budget/Run.ZC",
@@ -171,33 +180,37 @@
       "path": "/Apps/GrModels/BallGen.ZC",
       "area": "Apps",
       "kind": "app_component",
-      "compile": "unverified",
+      "compile": "pass",
       "runtime": "unverified",
-      "evidence": null
+      "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
     },
     {
       "path": "/Apps/GrModels/Load.ZC",
       "area": "Apps",
       "kind": "app_component",
-      "compile": "unverified",
+      "compile": "pass",
       "runtime": "unverified",
-      "evidence": null
+      "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
     },
     {
       "path": "/Apps/GrModels/ManGen.ZC",
       "area": "Apps",
       "kind": "app_component",
-      "compile": "unverified",
+      "compile": "pass",
       "runtime": "unverified",
-      "evidence": null
+      "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
     },
     {
       "path": "/Apps/GrModels/Models.ZC",
       "area": "Apps",
       "kind": "app_component",
-      "compile": "unverified",
+      "compile": "pass",
       "runtime": "unverified",
-      "evidence": null
+      "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
     },
     {
       "path": "/Apps/GrModels/Run.ZC",
@@ -212,17 +225,19 @@
       "path": "/Apps/KeepAway/KeepAway.ZC",
       "area": "Apps",
       "kind": "app_component",
-      "compile": "unverified",
+      "compile": "pass",
       "runtime": "unverified",
-      "evidence": null
+      "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
     },
     {
       "path": "/Apps/KeepAway/Load.ZC",
       "area": "Apps",
       "kind": "app_component",
-      "compile": "unverified",
+      "compile": "pass",
       "runtime": "unverified",
-      "evidence": null
+      "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
     },
     {
       "path": "/Apps/KeepAway/Run.ZC",
@@ -237,17 +252,19 @@
       "path": "/Apps/Logic/Load.ZC",
       "area": "Apps",
       "kind": "app_component",
-      "compile": "unverified",
+      "compile": "pass",
       "runtime": "unverified",
-      "evidence": null
+      "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
     },
     {
       "path": "/Apps/Logic/Logic.ZC",
       "area": "Apps",
       "kind": "app_component",
-      "compile": "unverified",
+      "compile": "pass",
       "runtime": "unverified",
-      "evidence": null
+      "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
     },
     {
       "path": "/Apps/Logic/Run.ZC",
@@ -262,97 +279,109 @@
       "path": "/Apps/Psalmody/Examples/childish.ZC",
       "area": "Apps",
       "kind": "app_component",
-      "compile": "unverified",
+      "compile": "pass",
       "runtime": "unverified",
-      "evidence": null
+      "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
+      "evidence_scope": "isolated compile-only component probe"
     },
     {
       "path": "/Apps/Psalmody/Examples/night.ZC",
       "area": "Apps",
       "kind": "app_component",
-      "compile": "unverified",
+      "compile": "pass",
       "runtime": "unverified",
-      "evidence": null
+      "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
+      "evidence_scope": "isolated compile-only component probe"
     },
     {
       "path": "/Apps/Psalmody/Examples/prosper.ZC",
       "area": "Apps",
       "kind": "app_component",
-      "compile": "unverified",
+      "compile": "pass",
       "runtime": "unverified",
-      "evidence": null
+      "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
+      "evidence_scope": "isolated compile-only component probe"
     },
     {
       "path": "/Apps/Psalmody/Install.ZC",
       "area": "Apps",
       "kind": "app_component",
-      "compile": "unverified",
+      "compile": "pass",
       "runtime": "unverified",
-      "evidence": null
+      "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
+      "evidence_scope": "isolated compile-only component probe"
     },
     {
       "path": "/Apps/Psalmody/JukeBox.ZC",
       "area": "Apps",
       "kind": "app_component",
-      "compile": "unverified",
+      "compile": "pass",
       "runtime": "unverified",
-      "evidence": null
+      "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
     },
     {
       "path": "/Apps/Psalmody/JukePuppet.ZC",
       "area": "Apps",
       "kind": "app_component",
-      "compile": "unverified",
+      "compile": "pass",
       "runtime": "unverified",
-      "evidence": null
+      "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
     },
     {
       "path": "/Apps/Psalmody/Load.ZC",
       "area": "Apps",
       "kind": "app_component",
-      "compile": "unverified",
+      "compile": "pass",
       "runtime": "unverified",
-      "evidence": null
+      "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
     },
     {
       "path": "/Apps/Psalmody/Psalmody.ZC",
       "area": "Apps",
       "kind": "app_component",
-      "compile": "unverified",
+      "compile": "pass",
       "runtime": "unverified",
-      "evidence": null
+      "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
     },
     {
       "path": "/Apps/Psalmody/PsalmodyCtrls.ZC",
       "area": "Apps",
       "kind": "app_component",
-      "compile": "unverified",
+      "compile": "pass",
       "runtime": "unverified",
-      "evidence": null
+      "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
     },
     {
       "path": "/Apps/Psalmody/PsalmodyDraw.ZC",
       "area": "Apps",
       "kind": "app_component",
-      "compile": "unverified",
+      "compile": "pass",
       "runtime": "unverified",
-      "evidence": null
+      "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
     },
     {
       "path": "/Apps/Psalmody/PsalmodyFile.ZC",
       "area": "Apps",
       "kind": "app_component",
-      "compile": "unverified",
+      "compile": "pass",
       "runtime": "unverified",
-      "evidence": null
+      "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
     },
     {
       "path": "/Apps/Psalmody/PsalmodyMain.ZC",
       "area": "Apps",
       "kind": "app_component",
-      "compile": "unverified",
+      "compile": "pass",
       "runtime": "unverified",
-      "evidence": null
+      "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
     },
     {
       "path": "/Apps/Psalmody/Run.ZC",
@@ -367,17 +396,19 @@
       "path": "/Apps/Span/Install.ZC",
       "area": "Apps",
       "kind": "app_component",
-      "compile": "unverified",
+      "compile": "pass",
       "runtime": "unverified",
-      "evidence": null
+      "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
+      "evidence_scope": "isolated compile-only component probe"
     },
     {
       "path": "/Apps/Span/Load.ZC",
       "area": "Apps",
       "kind": "app_component",
-      "compile": "unverified",
+      "compile": "pass",
       "runtime": "unverified",
-      "evidence": null
+      "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
     },
     {
       "path": "/Apps/Span/Run.ZC",
@@ -392,41 +423,46 @@
       "path": "/Apps/Span/SpanBridge.ZC",
       "area": "Apps",
       "kind": "app_component",
-      "compile": "unverified",
+      "compile": "pass",
       "runtime": "unverified",
-      "evidence": null
+      "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
     },
     {
       "path": "/Apps/Span/SpanDerive.ZC",
       "area": "Apps",
       "kind": "app_component",
-      "compile": "unverified",
+      "compile": "pass",
       "runtime": "unverified",
-      "evidence": null
+      "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
     },
     {
       "path": "/Apps/Span/SpanMain.ZC",
       "area": "Apps",
       "kind": "app_component",
-      "compile": "unverified",
+      "compile": "pass",
       "runtime": "unverified",
-      "evidence": null
+      "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
     },
     {
       "path": "/Apps/Span/SpanNew.ZC",
       "area": "Apps",
       "kind": "app_component",
-      "compile": "unverified",
+      "compile": "pass",
       "runtime": "unverified",
-      "evidence": null
+      "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
     },
     {
       "path": "/Apps/Strut/Load.ZC",
       "area": "Apps",
       "kind": "app_component",
-      "compile": "unverified",
+      "compile": "pass",
       "runtime": "unverified",
-      "evidence": null
+      "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
     },
     {
       "path": "/Apps/Strut/Run.ZC",
@@ -441,17 +477,19 @@
       "path": "/Apps/Strut/Strut.ZC",
       "area": "Apps",
       "kind": "app_component",
-      "compile": "unverified",
+      "compile": "pass",
       "runtime": "unverified",
-      "evidence": null
+      "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
     },
     {
       "path": "/Apps/TimeClock/Install.ZC",
       "area": "Apps",
       "kind": "app_component",
-      "compile": "unverified",
+      "compile": "pass",
       "runtime": "unverified",
-      "evidence": null
+      "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
     },
     {
       "path": "/Apps/TimeClock/Load.ZC",
@@ -466,17 +504,19 @@
       "path": "/Apps/TimeClock/TimeClk.ZC",
       "area": "Apps",
       "kind": "app_component",
-      "compile": "unverified",
+      "compile": "pass",
       "runtime": "unverified",
-      "evidence": null
+      "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
     },
     {
       "path": "/Apps/Titanium/Load.ZC",
       "area": "Apps",
       "kind": "app_component",
-      "compile": "unverified",
+      "compile": "pass",
       "runtime": "unverified",
-      "evidence": null
+      "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
     },
     {
       "path": "/Apps/Titanium/Run.ZC",
@@ -491,41 +531,46 @@
       "path": "/Apps/Titanium/Titanium.ZC",
       "area": "Apps",
       "kind": "app_component",
-      "compile": "unverified",
+      "compile": "pass",
       "runtime": "unverified",
-      "evidence": null
+      "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
     },
     {
       "path": "/Apps/ToTheFront/AIs/Human.ZC",
       "area": "Apps",
       "kind": "app_component",
-      "compile": "unverified",
+      "compile": "pass",
       "runtime": "unverified",
-      "evidence": null
+      "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
+      "evidence_scope": "isolated compile-only component probe"
     },
     {
       "path": "/Apps/ToTheFront/AIs/SimpleAI.ZC",
       "area": "Apps",
       "kind": "app_component",
-      "compile": "unverified",
+      "compile": "pass",
       "runtime": "unverified",
-      "evidence": null
+      "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
+      "evidence_scope": "isolated compile-only component probe"
     },
     {
       "path": "/Apps/ToTheFront/Install.ZC",
       "area": "Apps",
       "kind": "app_component",
-      "compile": "unverified",
+      "compile": "pass",
       "runtime": "unverified",
-      "evidence": null
+      "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
+      "evidence_scope": "isolated compile-only component probe"
     },
     {
       "path": "/Apps/ToTheFront/Load.ZC",
       "area": "Apps",
       "kind": "app_component",
-      "compile": "unverified",
+      "compile": "pass",
       "runtime": "unverified",
-      "evidence": null
+      "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
     },
     {
       "path": "/Apps/ToTheFront/Run.ZC",
@@ -540,73 +585,82 @@
       "path": "/Apps/ToTheFront/TTFDraw.ZC",
       "area": "Apps",
       "kind": "app_component",
-      "compile": "unverified",
+      "compile": "pass",
       "runtime": "unverified",
-      "evidence": null
+      "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
     },
     {
       "path": "/Apps/ToTheFront/TTFFire.ZC",
       "area": "Apps",
       "kind": "app_component",
-      "compile": "unverified",
+      "compile": "pass",
       "runtime": "unverified",
-      "evidence": null
+      "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
     },
     {
       "path": "/Apps/ToTheFront/TTFGlobals.ZC",
       "area": "Apps",
       "kind": "app_component",
-      "compile": "unverified",
+      "compile": "pass",
       "runtime": "unverified",
-      "evidence": null
+      "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
     },
     {
       "path": "/Apps/ToTheFront/TTFInit.ZC",
       "area": "Apps",
       "kind": "app_component",
-      "compile": "unverified",
+      "compile": "pass",
       "runtime": "unverified",
-      "evidence": null
+      "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
     },
     {
       "path": "/Apps/ToTheFront/TTFLib.ZC",
       "area": "Apps",
       "kind": "app_component",
-      "compile": "unverified",
+      "compile": "pass",
       "runtime": "unverified",
-      "evidence": null
+      "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
     },
     {
       "path": "/Apps/ToTheFront/TTFMove.ZC",
       "area": "Apps",
       "kind": "app_component",
-      "compile": "unverified",
+      "compile": "pass",
       "runtime": "unverified",
-      "evidence": null
+      "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
     },
     {
       "path": "/Apps/ToTheFront/TTFVis.ZC",
       "area": "Apps",
       "kind": "app_component",
-      "compile": "unverified",
+      "compile": "pass",
       "runtime": "unverified",
-      "evidence": null
+      "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
     },
     {
       "path": "/Apps/ToTheFront/ToTheFront.ZC",
       "area": "Apps",
       "kind": "app_component",
-      "compile": "unverified",
+      "compile": "pass",
       "runtime": "unverified",
-      "evidence": null
+      "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
     },
     {
       "path": "/Apps/Vocabulary/Load.ZC",
       "area": "Apps",
       "kind": "app_component",
-      "compile": "unverified",
+      "compile": "pass",
       "runtime": "unverified",
-      "evidence": null
+      "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
     },
     {
       "path": "/Apps/Vocabulary/Run.ZC",
@@ -621,17 +675,19 @@
       "path": "/Apps/Vocabulary/VocabQuiz.ZC",
       "area": "Apps",
       "kind": "app_component",
-      "compile": "unverified",
+      "compile": "pass",
       "runtime": "unverified",
-      "evidence": null
+      "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
     },
     {
       "path": "/Apps/X-Caliber/Load.ZC",
       "area": "Apps",
       "kind": "app_component",
-      "compile": "unverified",
+      "compile": "pass",
       "runtime": "unverified",
-      "evidence": null
+      "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
     },
     {
       "path": "/Apps/X-Caliber/Run.ZC",
@@ -646,17 +702,19 @@
       "path": "/Apps/X-Caliber/X-Caliber.ZC",
       "area": "Apps",
       "kind": "app_component",
-      "compile": "unverified",
+      "compile": "pass",
       "runtime": "unverified",
-      "evidence": null
+      "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
     },
     {
       "path": "/Apps/X-Caliber/XCCtrls.ZC",
       "area": "Apps",
       "kind": "app_component",
-      "compile": "unverified",
+      "compile": "pass",
       "runtime": "unverified",
-      "evidence": null
+      "evidence": "docs/acceptance/program-catalog-2026-11-01.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
     },
     {
       "path": "/Compiler/Asm.ZC",
