@@ -70,7 +70,9 @@ p.add_argument('--probe-demo-mandel', action='store_true',
 p.add_argument('--probe-demo-bounce-clock', action='store_true',
                help='exercise original Bounce and Clock graphics demos with terminal recovery')
 p.add_argument('--probe-demo-input-graphics', action='store_true',
-               help='exercise original MouseDemo, Grid, and Palette demos')
+               help='exercise original MouseDemo, Grid, Palette, and Slider demos')
+p.add_argument('--probe-demo-slider', action='store_true',
+               help='exercise original Slider rendering, pointer control, and recovery')
 p.add_argument('--probe-demo-graphics-render', action='store_true',
                help='exercise original 32BitColor and Blot graphics demos')
 p.add_argument('--probe-demo-system-context', action='store_true',
@@ -226,7 +228,8 @@ if args.demo_system_module and not args.probe_demo_system_context:
 if (args.probe_stock_programs or args.probe_stock_interactive or args.probe_program_catalog or
         args.probe_doc_includes or args.probe_logic_program or args.probe_budget_program or
         args.probe_demo_tictactoe or args.probe_demo_chess or args.probe_demo_circletrace or args.probe_demo_pick3d or args.probe_demo_box_hanoi or args.probe_demo_mandel or args.probe_demo_bounce_clock or
-        args.probe_demo_input_graphics or args.probe_demo_graphics_render or
+        args.probe_demo_input_graphics or args.probe_demo_slider or
+        args.probe_demo_graphics_render or
         args.probe_3d_apps or args.probe_tothefront or args.probe_xcaliber or
         args.probe_demo_global_vars or args.probe_demo_registry or
         args.probe_demo_interactive_basics or
@@ -302,6 +305,7 @@ log_path = ROOT / 'build' / (f'check-usb-{usb_label}{"-budget" if args.probe_bud
                              'check-demo-graphics-render-pci.log' if args.probe_demo_graphics_render else
                              'check-demo-bounce-clock-pci.log' if args.probe_demo_bounce_clock else
                              'check-demo-input-graphics-pci.log' if args.probe_demo_input_graphics else
+                             'check-demo-slider-pci.log' if args.probe_demo_slider else
                              'check-demo-mandel-pci.log' if args.probe_demo_mandel else
                              'check-demo-box-hanoi-pci.log' if args.probe_demo_box_hanoi else
                              'check-demo-chess-pci.log' if args.probe_demo_chess else
@@ -521,6 +525,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 'demo-graphics-render-' if args.probe_demo_graphics_render else
                 'demo-bounce-clock-' if args.probe_demo_bounce_clock else
                 'demo-input-graphics-' if args.probe_demo_input_graphics else
+                'demo-slider-' if args.probe_demo_slider else
                 'tothefront-' if args.probe_tothefront else
                 'popup-menu-' if args.probe_popup_menu else
                 'doc-includes-' if args.probe_doc_includes else
@@ -3884,6 +3889,49 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             print('PASS Chess board rendering, Escape cleanup and terminal recovery',
                   flush=True)
             raise SystemExit(0)
+        if args.probe_demo_slider:
+            focus_graphical_terminal()
+            run_graphical_terminal_command(
+                'demo-slider-ready', '40+2;', 'ans=0x2A=42')
+            type_graphical_prompt_line(
+                'demo-slider-launch',
+                'ExeFile2("/Demo/Graphics/Slider.ZC");')
+            qmp_send_key('ret')
+            time.sleep(.5)
+            slider_prompt = require_graphical_text(
+                'demo-slider-key-prompt', 'PRESS A KEY', timeout=10)
+            slider_blue_pixels = rgb_pixels_in(
+                slider_prompt, (0, 0, 170), (140, 230, 270, 380))
+            if slider_blue_pixels < 1000:
+                raise RuntimeError(
+                    'Slider did not render its blue control; '
+                    f'blue_pixels={slider_blue_pixels}, see '
+                    f'{graphical_path("demo-slider-key-prompt")}')
+            move_graphical_pointer(190, 285)
+            graphical_mouse_button('left', True)
+            time.sleep(.1)
+            graphical_mouse_button('left', False)
+            qmp_send_key('a')
+            time.sleep(.5)
+            slider_values = graphical_screen('demo-slider-values')
+            if 'Left: 9' not in slider_values[3]:
+                raise RuntimeError(
+                    'Slider click did not move the left thumb to the '
+                    'expected value 9; see '
+                    f'{graphical_path("demo-slider-values")} and .txt\n'
+                    + slider_values[3])
+            if 'Right: 0' not in slider_values[3]:
+                raise RuntimeError(
+                    'Slider click changed the right thumb unexpectedly; '
+                    'see '
+                    f'{graphical_path("demo-slider-values")} and .txt\n'
+                    + slider_values[3])
+            run_graphical_terminal_command(
+                'demo-slider-exit-smoke', '40+2;', 'ans=0x2A=42', timeout=20)
+            command('zstatus', 'failed=0')
+            print('PASS Slider control rendered, left thumb updated on click, and terminal recovered',
+                  flush=True)
+            raise SystemExit(0)
         if args.probe_demo_input_graphics:
             focus_graphical_terminal()
             run_graphical_terminal_command(
@@ -3951,8 +3999,43 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     f'changed={restore_diff}')
             run_graphical_terminal_command(
                 'demo-palette-exit-smoke', '40+2;', 'ans=0x2A=42', timeout=20)
+            type_graphical_prompt_line(
+                'demo-slider-launch',
+                'ExeFile2("/Demo/Graphics/Slider.ZC");')
+            qmp_send_key('ret')
+            time.sleep(.5)
+            slider_prompt = require_graphical_text(
+                'demo-slider-key-prompt', 'PRESS A KEY', timeout=10)
+            slider_blue_pixels = rgb_pixels_in(
+                slider_prompt, (0, 0, 170), (140, 230, 270, 380))
+            if slider_blue_pixels < 1000:
+                raise RuntimeError(
+                    'Slider did not render its blue control; '
+                    f'blue_pixels={slider_blue_pixels}, see '
+                    f'{graphical_path("demo-slider-key-prompt")}')
+            move_graphical_pointer(190, 285)
+            graphical_mouse_button('left', True)
+            time.sleep(.1)
+            graphical_mouse_button('left', False)
+            qmp_send_key('a')
+            time.sleep(.5)
+            slider_values = graphical_screen('demo-slider-values')
+            if 'Left: 9' not in slider_values[3]:
+                raise RuntimeError(
+                    'Slider click did not move the left thumb to the '
+                    'expected value 9; see '
+                    f'{graphical_path("demo-slider-values")} and .txt\n'
+                    + slider_values[3])
+            if 'Right: 0' not in slider_values[3]:
+                raise RuntimeError(
+                    'Slider click changed the right thumb unexpectedly; '
+                    'see '
+                    f'{graphical_path("demo-slider-values")} and .txt\n'
+                    + slider_values[3])
+            run_graphical_terminal_command(
+                'demo-slider-exit-smoke', '40+2;', 'ans=0x2A=42', timeout=20)
             command('zstatus', 'failed=0')
-            print('PASS Palette grayscale and custom-color phases, SettingsPop cleanup and terminal recovery',
+            print('PASS Palette phases and Slider rendering, pointer update, and terminal recovery',
                   flush=True)
             raise SystemExit(0)
         if args.probe_stock_interactive:

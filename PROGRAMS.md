@@ -225,8 +225,11 @@ programs in PCI QEMU: Box, Hanoi, CircleTrace, Pick3D, 32BitColor, Blot,
 MouseDemo, Grid, Palette, Bounce, Clock, 3DPoly, and RotateTank. Each reached
 its drawing or interaction check, exited through its supported key path, and
 returned to a terminal where `40+2;` produced 42. This refreshes evidence for
-programs already included in the 32-source runtime tally; it does not increase
-that distinct-source count. Slider remains unresolved. See
+programs already included in the 32-source runtime tally. A separate focused
+gate now verifies Slider's visible custom control, left-track click changing
+the value to 9 while the right remains 0, and terminal recovery. This brings
+the explicit Demo runtime acceptance count to 33 distinct sources. See the
+[`Slider acceptance record`](docs/acceptance/demo-slider-qemu-2026-11-02.json) and
 [`demo-graphics-qemu-2026-11-02.json`](docs/acceptance/demo-graphics-qemu-2026-11-02.json).
 
 The system-context probe now accepts ordered `--demo-system-module` options to

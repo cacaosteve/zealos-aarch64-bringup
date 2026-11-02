@@ -1,0 +1,22 @@
+{
+  "date": "2026-11-02",
+  "base_commit": "199e5a02cd649208cabbaeeabe19295482c7712a",
+  "target": "QEMU PCI ARM64 graphical guest",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "e34393b6ceeaf3069209bc9cf29285dd0888c71edc74bae86b14acf17bea3ebd",
+  "command": "python3 scripts/check-compat.py --pci --probe-demo-slider",
+  "result": "pass",
+  "checks": {
+    "program": "/Demo/Graphics/Slider.ZC",
+    "control_rendered": "the blue custom slider control exceeded the 1000-pixel scanout threshold while PRESS A KEY was active",
+    "pointer_input": "a left click at the left slider track changed the displayed Left value to 9 while Right remained 0",
+    "exit_and_recovery": "the key prompt exited, terminal input recovered, 40+2 returned 42, and zstatus reported failed=0"
+  },
+  "live_utm_and_pi": "not verified by this QEMU run",
+  "artifacts": [
+    "build/check-demo-slider-pci.log",
+    "build/gui-demo-slider-demo-slider-key-prompt.ppm",
+    "build/gui-demo-slider-demo-slider-values.txt",
+    "build/gui-demo-slider-demo-slider-exit-smoke-result.ppm"
+  ]
+}
