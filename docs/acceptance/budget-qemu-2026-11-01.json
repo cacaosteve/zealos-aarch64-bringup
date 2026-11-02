@@ -1,6 +1,7 @@
 {
   "date": "2026-11-01",
-  "repository_commit": "163bfb69803b4732d767c572dab7253bcf06dbef",
+  "repository_commit": "0dd1ded5d718df6581e6b1cd1f7bd7eee72f61eb",
+  "iso_sha256": "99b2520dc028aed92f20b48a7dea96005afbb91ccd9e51fd8fe013ff3505c126",
   "command": "python3 scripts/check-compat.py --pci --probe-budget-program",
   "target": "QEMU PCI ARM64 graphical guest",
   "result": "pass",
