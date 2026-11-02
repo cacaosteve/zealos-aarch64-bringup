@@ -2,8 +2,8 @@
   "source_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
   "generated_from": "build/demo-source-catalog.json",
   "source_count": 206,
-  "compile_pass": 193,
-  "compile_blocked": 13,
+  "compile_pass": 194,
+  "compile_blocked": 12,
   "compile_blocker_groups": [
     {
       "category": "inline assembly unsupported or requires an ARM64 equivalent",
@@ -13,14 +13,6 @@
         "/Demo/Lectures/FixedPointAdvanced.ZC",
         "/Demo/Lectures/InterruptDemo.ZC",
         "/Demo/Lectures/Ring3.ZC"
-      ]
-    },
-    {
-      "category": "assembly-like label syntax parse",
-      "source_count": 2,
-      "paths": [
-        "/Demo/Lectures/MiniCompiler.ZC",
-        "/Demo/Lectures/NegDisp.ZC"
       ]
     },
     {
@@ -50,6 +42,13 @@
       "source_count": 1,
       "paths": [
         "/Demo/AcctExample/TOS/TOSDistro.ZC"
+      ]
+    },
+    {
+      "category": "assembly-like label syntax parse",
+      "source_count": 1,
+      "paths": [
+        "/Demo/Lectures/MiniCompiler.ZC"
       ]
     },
     {
@@ -119,8 +118,8 @@
     },
     "Lectures": {
       "source_count": 11,
-      "compile_pass": 5,
-      "compile_blocked": 6,
+      "compile_pass": 6,
+      "compile_blocked": 5,
       "preliminary_kind": "lecture and tutorial sources"
     },
     "MultiCore": {
@@ -1694,8 +1693,8 @@
       "directory": "Lectures",
       "preliminary_kind": "lecture and tutorial sources",
       "classification_confidence": "provisional; based on directory only",
-      "compile": "blocked",
-      "first_compile_error": "ERR:/Demo/Lectures/NegDisp.ZC:23:3 Expected ':' after label candidate 'U'.",
+      "compile": "pass",
+      "first_compile_error": null,
       "runtime": "unverified",
       "runtime_evidence": null
     },

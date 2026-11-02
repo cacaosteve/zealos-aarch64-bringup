@@ -1,0 +1,9 @@
+{
+  "source": "/Demo/Lectures/NegDisp.ZC",
+  "source_sha256": "6ab5fd8e698f050742890c59c1d663dcbcd25e2f481b35d6b02d9165f9fd6d53",
+  "platform": "PCI QEMU, AArch64 guest",
+  "method": "Targeted demo-source-catalog compile probe against the rebuilt AArch64 ISO.",
+  "adaptation": "Replace the interactive x86 U() unassembly calls with callable demo functions. Preserve the Person class-offset exercise, and replace the unsupported negative class displacement with a bounded 256-byte allocation and a biased base pointer using base[-128].",
+  "result": "PASS: Compiles",
+  "scope_note": "Compilation only. The Person field contents and signed-displacement demonstration have not been runtime-accepted; the original interactive unassembly behavior is not reproduced."
+}

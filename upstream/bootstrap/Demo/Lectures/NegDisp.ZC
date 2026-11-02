@@ -1,0 +1,51 @@
+class Person
+{
+	U8 first		[32];
+	U8 last 		[32];
+	U8 address1 	[64];
+	U8 address2 	[64];
+	U8 city 		[32];
+	U8 state_zip	[32];
+};
+
+U0 OffsetDemo1()
+{
+	Person *p = MAlloc(sizeof(Person));
+
+	StrCopy(p->first, 	  "Terry");
+	StrCopy(p->last,	  "Davis");
+	StrCopy(p->address1,  "8144 Sickle Lane");
+	StrCopy(p->address2,  "");
+	StrCopy(p->city,	  "Las Vegas");
+	StrCopy(p->state_zip, "NV 89128");
+}
+
+OffsetDemo1;
+PressAKey;
+
+/*
+
+x86 has signed 8-bit	displacements
+		and signed 32-bit displacements.
+
+This example uses 8-bit negative displacements.
+
+*/
+
+/*
+ARM64-portable version: use a biased base pointer and an explicit signed
+byte displacement. AArch64 compiler class layouts do not expose the original
+x86 negative class offset, so this demonstrates the same address calculation
+with a bounded allocation instead.
+*/
+U0 OffsetDemo2()
+{
+	U8 *block = MAlloc(256);
+	U8 *base = block + 128;
+	base[-128] = 0x5A;
+	"Byte at base-128:%02X\n", base[-128];
+	Free(block);
+}
+
+OffsetDemo2;
+PressAKey;
