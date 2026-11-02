@@ -61,6 +61,8 @@ p.add_argument('--probe-demo-mandel', action='store_true',
                help='exercise original Mandel demo rendering and Escape recovery on a single-CPU guest')
 p.add_argument('--probe-demo-bounce-clock', action='store_true',
                help='exercise original Bounce and Clock graphics demos with terminal recovery')
+p.add_argument('--probe-demo-input-graphics', action='store_true',
+               help='exercise original MouseDemo, Grid, and Palette demos')
 p.add_argument('--probe-demo-system-context', action='store_true',
                help='compile representative Demo files with the boot kernel and graphics APIs loaded')
 p.add_argument('--demo-system-path', action='append', default=[],
@@ -212,6 +214,7 @@ if args.demo_system_module and not args.probe_demo_system_context:
 if (args.probe_stock_programs or args.probe_stock_interactive or args.probe_program_catalog or
         args.probe_doc_includes or args.probe_logic_program or args.probe_budget_program or
         args.probe_demo_tictactoe or args.probe_demo_chess or args.probe_demo_circletrace or args.probe_demo_pick3d or args.probe_demo_box_hanoi or args.probe_demo_mandel or args.probe_demo_bounce_clock or
+        args.probe_demo_input_graphics or
         args.probe_3d_apps or args.probe_tothefront or args.probe_xcaliber or
         args.probe_demo_global_vars or args.probe_demo_exceptions or args.probe_timeclock or
         args.probe_vocabulary or args.probe_psalmody):
@@ -282,6 +285,7 @@ log_path = ROOT / 'build' / (f'check-usb-{usb_label}{"-budget" if args.probe_bud
                              'check-doc-includes-pci.log' if args.probe_doc_includes else
                              'check-demo-pick3d-pci.log' if args.probe_demo_pick3d else
                              'check-demo-bounce-clock-pci.log' if args.probe_demo_bounce_clock else
+                             'check-demo-input-graphics-pci.log' if args.probe_demo_input_graphics else
                              'check-demo-mandel-pci.log' if args.probe_demo_mandel else
                              'check-demo-box-hanoi-pci.log' if args.probe_demo_box_hanoi else
                              'check-demo-chess-pci.log' if args.probe_demo_chess else
@@ -496,6 +500,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 '3d-apps-' if args.probe_3d_apps else
                 'demo-pick3d-' if args.probe_demo_pick3d else
                 'demo-bounce-clock-' if args.probe_demo_bounce_clock else
+                'demo-input-graphics-' if args.probe_demo_input_graphics else
                 'tothefront-' if args.probe_tothefront else
                 'popup-menu-' if args.probe_popup_menu else
                 'doc-includes-' if args.probe_doc_includes else
@@ -3665,6 +3670,77 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 'demo-chess-exit-smoke', '40+2;', '2A=42', timeout=20)
             command('zstatus', 'failed=0')
             print('PASS Chess board rendering, Escape cleanup and terminal recovery',
+                  flush=True)
+            raise SystemExit(0)
+        if args.probe_demo_input_graphics:
+            focus_graphical_terminal()
+            run_graphical_terminal_command(
+                'demo-input-graphics-ready', '40+2;', 'ans=0x2A=42')
+
+            for name, path in (
+                    ('mouse-demo', '/Demo/Graphics/MouseDemo.ZC'),
+                    ('grid', '/Demo/Graphics/Grid.ZC')):
+                before = graphical_screen(f'demo-{name}-before')
+                type_graphical_prompt_line(
+                    f'demo-{name}-launch', f'ExeFile2("{path}");')
+                qmp_send_key('ret')
+                time.sleep(.35)
+                move_graphical_pointer(180, 180)
+                time.sleep(.25)
+                move_graphical_pointer(260, 240)
+                time.sleep(.35)
+                frame = graphical_screen(f'demo-{name}-pointer-frame')
+                changed = rgb_diff_count(
+                    before, frame, (100, 100, frame[0]-100, frame[1]-100))
+                if changed < 100:
+                    raise RuntimeError(
+                        f'{name} did not visibly respond to pointer movement; '
+                        f'changed={changed}, see '
+                        f'{graphical_path(f"demo-{name}-pointer-frame")}')
+                print(f'PASS {name} pointer interaction changed {changed} scanout pixels',
+                      flush=True)
+                graphical_mouse_button('left', True)
+                time.sleep(.15)
+                graphical_mouse_button('left', False)
+                time.sleep(.5)
+                run_graphical_terminal_command(
+                    f'demo-{name}-exit-smoke', '40+2;',
+                    'ans=0x2A=42', timeout=20)
+
+            before = graphical_screen('demo-palette-before')
+            type_graphical_prompt_line(
+                'demo-palette-launch',
+                'ExeFile2("/Demo/Graphics/Palette.ZC");')
+            qmp_send_key('ret')
+            time.sleep(.8)
+            gray = graphical_screen('demo-palette-gray')
+            gray_diff = rgb_diff_count(
+                before, gray, (0, 0, gray[0], gray[1]))
+            if gray_diff < 1000:
+                raise RuntimeError(
+                    f'Palette did not render its color table; changed={gray_diff}')
+            qmp_send_key('a')
+            time.sleep(.5)
+            yellow = graphical_screen('demo-palette-yellow')
+            palette_diff = rgb_diff_count(
+                gray, yellow, (0, 0, yellow[0], yellow[1]))
+            if palette_diff < 100:
+                raise RuntimeError(
+                    'Palette did not apply its changed palette; '
+                    f'changed={palette_diff}')
+            qmp_send_key('a')
+            time.sleep(.6)
+            restored = graphical_screen('demo-palette-restored')
+            restore_diff = rgb_diff_count(
+                yellow, restored, (0, 0, restored[0], restored[1]))
+            if restore_diff < 1000:
+                raise RuntimeError(
+                    'Palette did not return to the terminal after SettingsPop; '
+                    f'changed={restore_diff}')
+            run_graphical_terminal_command(
+                'demo-palette-exit-smoke', '40+2;', 'ans=0x2A=42', timeout=20)
+            command('zstatus', 'failed=0')
+            print('PASS Palette grayscale and custom-color phases, SettingsPop cleanup and terminal recovery',
                   flush=True)
             raise SystemExit(0)
         if args.probe_stock_interactive:

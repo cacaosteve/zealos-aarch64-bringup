@@ -314,11 +314,13 @@ array size and initialized class-array contents. The original
 are recorded in
 [`acceptance/demo-globalvars-array-size-2026-11-01.json`](acceptance/demo-globalvars-array-size-2026-11-01.json).
 The count is compile evidence only. Separate QEMU checks now bring the Demo
-runtime accepted count to twenty-three: unchanged TicTacToe and Chess both render,
+runtime accepted count to twenty-six: unchanged TicTacToe and Chess both render,
 accept input where applicable, exit cleanly, and return to a terminal where
-`40+2;` evaluates to 42. The original NetOfDots and Lines programs also render, accept exit input, and recover the terminal; Lines animation was verified by changing scanout. See
+`40+2;` evaluates to 42. MouseDemo, Grid, and Palette also passed pointer/palette interaction and terminal recovery in QEMU. Slider launches but its control was not visible in the captured guest screen and its value did not change; it is tracked as partial pending control rendering and hit-testing work. The original NetOfDots and Lines programs also render, accept exit input, and recover the terminal; Lines animation was verified by changing scanout. See
 [`acceptance/demo-stock-graphics-2026-11-01.json`](acceptance/demo-stock-graphics-2026-11-01.json). Pick3D now passes its QEMU interactive graphics probe, including visible graphics, Escape, and terminal recovery. The failure was a missing bootstrap implementation of the stock task-local `HashGenericAdd` and `FramePtr` helpers. See
 [`acceptance/demo-interactive-games-2026-11-01.json`](acceptance/demo-interactive-games-2026-11-01.json).
+The added pointer/palette batch is recorded in
+[`acceptance/demo-input-graphics-2026-11-01.json`](acceptance/demo-input-graphics-2026-11-01.json).
 UTM-specific app freezes still require separate live checks. `CompileDemo.ZC` now compiles when its isolated catalog context loads the stock compiler headers and program modules; its dynamic compiler output still needs runtime acceptance.
 
 The refreshed 2026-11-01 sweep also fixed a source-catalog false negative for `/Demo/Graphics/WallPapers/WallPaperDesktop.ZC`: the stock compiler modules define `cmp`, and the source-preserving loader keeps the class-layout `$$` token intact. `StockCatalogCompileRawWithProgramModules` now verifies this path as part of the complete sweep. The original source remains unchanged; this is compile acceptance only, not runtime acceptance.

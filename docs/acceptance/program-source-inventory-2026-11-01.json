@@ -10,7 +10,7 @@
   "demo_sources": 206,
   "demo_compile_pass": 178,
   "demo_compile_blocked": 28,
-  "demo_runtime_accepted": 23,
+  "demo_runtime_accepted": 26,
   "areas": {
     "Apps": {
       "source_files": 70,
@@ -33,8 +33,8 @@
       "compile_pass": 178,
       "compile_blocked": 28,
       "compile_unverified": 0,
-      "runtime_pass": 23,
-      "runtime_partial": 1
+      "runtime_pass": 26,
+      "runtime_partial": 2
     },
     "Doc": {
       "source_files": 1,
@@ -1711,8 +1711,8 @@
       "area": "Demo",
       "kind": "demo_source_or_component",
       "compile": "pass",
-      "runtime": "unverified",
-      "evidence": "docs/acceptance/demo-source-ledger-2026-11-01.json"
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-input-graphics-2026-11-01.json"
     },
     {
       "path": "/Demo/Graphics/Hanoi.ZC",
@@ -1783,8 +1783,8 @@
       "area": "Demo",
       "kind": "demo_source_or_component",
       "compile": "pass",
-      "runtime": "unverified",
-      "evidence": "docs/acceptance/demo-source-ledger-2026-11-01.json"
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-input-graphics-2026-11-01.json"
     },
     {
       "path": "/Demo/Graphics/NetOfDots.ZC",
@@ -1799,8 +1799,8 @@
       "area": "Demo",
       "kind": "demo_source_or_component",
       "compile": "pass",
-      "runtime": "unverified",
-      "evidence": "docs/acceptance/demo-source-ledger-2026-11-01.json"
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-input-graphics-2026-11-01.json"
     },
     {
       "path": "/Demo/Graphics/PanText.ZC",
@@ -1887,8 +1887,8 @@
       "area": "Demo",
       "kind": "demo_source_or_component",
       "compile": "pass",
-      "runtime": "unverified",
-      "evidence": "docs/acceptance/demo-source-ledger-2026-11-01.json"
+      "runtime": "partial",
+      "evidence": "docs/acceptance/demo-input-graphics-2026-11-01.json"
     },
     {
       "path": "/Demo/Graphics/Speedline.ZC",

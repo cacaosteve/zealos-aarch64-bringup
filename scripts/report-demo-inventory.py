@@ -39,6 +39,16 @@ RUNTIME_ACCEPTED = {
     "/Demo/Games/TicTacToe.ZC": "docs/acceptance/demo-interactive-games-2026-11-01.json",
     "/Demo/Games/MassSpring.ZC": "docs/acceptance/demo-stock-interactive-2026-11-01.json",
     "/Demo/Graphics/Lines.ZC": "docs/acceptance/demo-stock-graphics-2026-11-01.json",
+    "/Demo/Graphics/3DPoly.ZC": "docs/acceptance/demo-bounce-clock-3dpoly-2026-11-01.json",
+    "/Demo/Graphics/Bounce.ZC": "docs/acceptance/demo-bounce-clock-3dpoly-2026-11-01.json",
+    "/Demo/Graphics/Clock.ZC": "docs/acceptance/demo-bounce-clock-3dpoly-2026-11-01.json",
+    "/Demo/Graphics/RotateTank.ZC": "docs/acceptance/demo-bounce-clock-3dpoly-2026-11-01.json",
+    "/Demo/Graphics/Box.ZC": "docs/acceptance/demo-box-hanoi-2026-11-01.json",
+    "/Demo/Graphics/Hanoi.ZC": "docs/acceptance/demo-box-hanoi-2026-11-01.json",
+    "/Demo/Graphics/Mandel.ZC": "docs/acceptance/demo-mandel-qemu-2026-11-01.json",
+    "/Demo/Graphics/MouseDemo.ZC": "docs/acceptance/demo-input-graphics-2026-11-01.json",
+    "/Demo/Graphics/Grid.ZC": "docs/acceptance/demo-input-graphics-2026-11-01.json",
+    "/Demo/Graphics/Palette.ZC": "docs/acceptance/demo-input-graphics-2026-11-01.json",
     "/Demo/Graphics/NetOfDots.ZC": "docs/acceptance/demo-stock-graphics-2026-11-01.json",
     "/Demo/Graphics/Pick3D.ZC": "docs/acceptance/demo-interactive-games-2026-11-01.json",
     "/Demo/Graphics/Doodle.ZC": "docs/acceptance/demo-stock-interactive-2026-11-01.json",
@@ -46,6 +56,7 @@ RUNTIME_ACCEPTED = {
 }
 RUNTIME_PARTIAL = {
     "/Demo/AcctExample/HomeKeyPlugIns.ZC": "docs/acceptance/demo-global-vars-jit-2026-11-01.json",
+    "/Demo/Graphics/Slider.ZC": "docs/acceptance/demo-input-graphics-2026-11-01.json",
 }
 
 

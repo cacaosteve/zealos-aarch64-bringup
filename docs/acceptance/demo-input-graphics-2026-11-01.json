@@ -1,0 +1,47 @@
+{
+  "date": "2026-11-01",
+  "base_commit": "eeeb00bded412a39da6617fc0e1519da09af5834",
+  "target": "QEMU PCI ARM64 graphical guest",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "c93ffbd53e1e031f936e63bf8a1002ea8606355853a36a4035a4db528ed8a566",
+  "command": "python3 scripts/check-compat.py --pci --probe-demo-input-graphics",
+  "result": "pass with one partial program",
+  "scope": "Pointer tracking, snapped pointer drawing, palette changes, and terminal recovery. QEMU evidence does not establish live UTM or Pi hardware behavior.",
+  "checks": {
+    "MouseDemo": {
+      "result": "pass",
+      "verified": [
+        "pointer movement produced 22,421 changed scanout pixels",
+        "left-click exited",
+        "graphical terminal recovered and 40+2 returned 42"
+      ]
+    },
+    "Grid": {
+      "result": "pass",
+      "verified": [
+        "pointer movement produced 22,591 changed scanout pixels while the snapped grid demo was active",
+        "left-click exited and restored the terminal",
+        "40+2 returned 42"
+      ]
+    },
+    "Palette": {
+      "result": "pass",
+      "verified": [
+        "color-table screen rendered",
+        "grayscale palette phase and custom yellow palette phase both changed scanout",
+        "SettingsPop returned to the graphical terminal",
+        "40+2 returned 42 and runtime reported failed=0"
+      ]
+    },
+    "Slider": {
+      "result": "partial",
+      "verified": [
+        "program launched and printed its key prompt and default values",
+        "the captured guest screen showed no slider control while the program awaited input",
+        "the pointer click did not produce the expected changed left value"
+      ],
+      "next_step": "Trace CCtrl registration, DrawCtrls frame rendering, and pointer hit-testing in the ARM64 graphical terminal; accept only after visible thumb movement and updated value are verified."
+    }
+  },
+  "log": "build/check-demo-input-graphics-pci.log"
+}

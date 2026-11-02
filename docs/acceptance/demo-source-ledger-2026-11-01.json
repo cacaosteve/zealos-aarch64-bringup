@@ -4,7 +4,7 @@
   "source_count": 206,
   "compile_pass": 178,
   "compile_blocked": 28,
-  "runtime_accepted": 23,
+  "runtime_accepted": 26,
   "directories": {
     ".": {
       "source_count": 34,
@@ -1113,8 +1113,8 @@
       "classification_confidence": "provisional; based on directory only",
       "compile": "pass",
       "first_compile_error": null,
-      "runtime": "unverified",
-      "runtime_evidence": null
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-input-graphics-2026-11-01.json"
     },
     {
       "path": "/Demo/Graphics/Hanoi.ZC",
@@ -1203,8 +1203,8 @@
       "classification_confidence": "provisional; based on directory only",
       "compile": "pass",
       "first_compile_error": null,
-      "runtime": "unverified",
-      "runtime_evidence": null
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-input-graphics-2026-11-01.json"
     },
     {
       "path": "/Demo/Graphics/NetOfDots.ZC",
@@ -1223,8 +1223,8 @@
       "classification_confidence": "provisional; based on directory only",
       "compile": "pass",
       "first_compile_error": null,
-      "runtime": "unverified",
-      "runtime_evidence": null
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-input-graphics-2026-11-01.json"
     },
     {
       "path": "/Demo/Graphics/PanText.ZC",
@@ -1333,8 +1333,8 @@
       "classification_confidence": "provisional; based on directory only",
       "compile": "pass",
       "first_compile_error": null,
-      "runtime": "unverified",
-      "runtime_evidence": null
+      "runtime": "partial",
+      "runtime_evidence": "docs/acceptance/demo-input-graphics-2026-11-01.json"
     },
     {
       "path": "/Demo/Graphics/Speedline.ZC",
