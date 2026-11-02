@@ -47,6 +47,8 @@ p.add_argument('--probe-demo-basics', action='store_true',
                help='run Print, DateTime, RadixSort, SubIntAccess and SubSwitch graphically')
 p.add_argument('--probe-demo-global-vars', action='store_true',
                help='run original Demo GlobalVars dynamic-initialization checks graphically')
+p.add_argument('--probe-demo-registry', action='store_true',
+               help='run the original Demo RegistryDemo and verify its output/terminal recovery')
 p.add_argument('--probe-demo-exceptions', action='store_true',
                help='exercise nested exceptions and recovery in the original Demo')
 p.add_argument('--probe-demo-tictactoe', action='store_true',
@@ -222,7 +224,8 @@ if (args.probe_stock_programs or args.probe_stock_interactive or args.probe_prog
         args.probe_demo_tictactoe or args.probe_demo_chess or args.probe_demo_circletrace or args.probe_demo_pick3d or args.probe_demo_box_hanoi or args.probe_demo_mandel or args.probe_demo_bounce_clock or
         args.probe_demo_input_graphics or args.probe_demo_graphics_render or
         args.probe_3d_apps or args.probe_tothefront or args.probe_xcaliber or
-        args.probe_demo_global_vars or args.probe_demo_exceptions or args.probe_timeclock or
+        args.probe_demo_global_vars or args.probe_demo_registry or
+        args.probe_demo_exceptions or args.probe_timeclock or
         args.probe_vocabulary or args.probe_psalmody):
     args.pci = True
     args.probe_gui_keyboard = True
@@ -299,6 +302,7 @@ log_path = ROOT / 'build' / (f'check-usb-{usb_label}{"-budget" if args.probe_bud
                              'check-demo-circletrace-pci.log' if args.probe_demo_circletrace else
                              'check-demo-tictactoe-pci.log' if args.probe_demo_tictactoe else
                              'check-demo-global-vars-pci.log' if args.probe_demo_global_vars else
+                             'check-demo-registry-pci.log' if args.probe_demo_registry else
                              'check-program-catalog-pci.log' if args.probe_program_catalog else
                              'check-popup-menu-pci.log' if args.probe_popup_menu else
                              'check-stock-interactive-pci.log' if args.probe_stock_interactive else
@@ -2975,6 +2979,23 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                   'terminal recovery; AOT-only #ifjit section remains unverified '
                   'because the bootstrap does not expose Comp()',
                   flush=True)
+            raise SystemExit(0)
+        if args.probe_demo_registry:
+            focus_graphical_terminal()
+            result = run_graphical_terminal_command(
+                'demo-registry', 'ExeFile2("/Demo/RegistryDemo.ZC");',
+                'High Score:', timeout=20)
+            screen_text = result[3]
+            value_match = re.search(r'Val:\s*(\d+)', screen_text)
+            if value_match is None:
+                raise RuntimeError('Demo RegistryDemo did not print its Val result; '
+                                   f'see {graphical_path("demo-registry-result")}\n'
+                                   +screen_text)
+            run_graphical_terminal_command(
+                'demo-registry-terminal-recovery', '40+2;', 'ans=0x2A=42')
+            command('zstatus', 'failed=0')
+            print('PASS Demo RegistryDemo graphical execution '
+                  f'(Val {value_match.group(1)}) and terminal recovery', flush=True)
             raise SystemExit(0)
         if args.probe_demo_exceptions:
             focus_graphical_terminal()

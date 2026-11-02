@@ -10,7 +10,7 @@
   "demo_sources": 206,
   "demo_compile_pass": 197,
   "demo_compile_blocked": 9,
-  "demo_runtime_accepted": 28,
+  "demo_runtime_accepted": 29,
   "areas": {
     "Apps": {
       "source_files": 70,
@@ -33,7 +33,7 @@
       "compile_pass": 197,
       "compile_blocked": 9,
       "compile_unverified": 0,
-      "runtime_pass": 28,
+      "runtime_pass": 29,
       "runtime_partial": 3
     },
     "Doc": {
@@ -2385,8 +2385,8 @@
       "area": "Demo",
       "kind": "demo_source_or_component",
       "compile": "pass",
-      "runtime": "unverified",
-      "evidence": "docs/acceptance/demo-source-ledger-2026-11-01.json"
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-registry-qemu-2026-11-01.json"
     },
     {
       "path": "/Demo/RevFileDemo/Rev.ZC",

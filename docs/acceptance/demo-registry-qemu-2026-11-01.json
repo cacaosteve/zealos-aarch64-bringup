@@ -1,0 +1,15 @@
+{
+  "date": "2026-11-01",
+  "source": "/Demo/RegistryDemo.ZC",
+  "source_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "test": "python3 scripts/check-compat.py --probe-demo-registry",
+  "environment": "Disposable QEMU/HVF AArch64 guest, graphical terminal, VirtIO input; source read from boot media.",
+  "result": "pass",
+  "observations": [
+    "ExeFile2(\"/Demo/RegistryDemo.ZC\"); ran in the graphical terminal.",
+    "The demo printed High Score and Val:1234 on its first run.",
+    "After it returned, 40+2; evaluated to ans=0x2A=42.",
+    "zstatus reported failed=0."
+  ],
+  "runner_log": "build/check-demo-registry-pci.log"
+}
