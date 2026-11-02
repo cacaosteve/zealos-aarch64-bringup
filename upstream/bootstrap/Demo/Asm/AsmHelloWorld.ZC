@@ -1,0 +1,11 @@
+// ARM64 source translation of the original register-and-call assembly demo.
+// Keep its ten numbered "Hello World" lines while using the portable printer.
+U0 HelloWorld()
+{
+	I64 i;
+
+	for (i = 10; i > 0; i--)
+		Print("%02X Hello World\n", i);
+}
+
+HelloWorld;

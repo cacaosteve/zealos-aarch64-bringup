@@ -2,17 +2,16 @@
   "source_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
   "generated_from": "build/demo-source-catalog.json",
   "source_count": 206,
-  "compile_pass": 184,
-  "compile_blocked": 22,
+  "compile_pass": 185,
+  "compile_blocked": 21,
   "compile_blocker_groups": [
     {
       "category": "inline assembly unsupported or requires an ARM64 equivalent",
-      "source_count": 11,
+      "source_count": 10,
       "paths": [
         "/Demo/AcctExample/MakeHome.ZC",
         "/Demo/Asm/AsmAndC1.ZC",
         "/Demo/Asm/AsmAndC2.ZC",
-        "/Demo/Asm/AsmHelloWorld.ZC",
         "/Demo/Asm/BuzzFizz.ZC",
         "/Demo/Asm/DivByHand.ZC",
         "/Demo/Asm/MulByHand.ZC",
@@ -98,8 +97,8 @@
     },
     "Asm": {
       "source_count": 8,
-      "compile_pass": 2,
-      "compile_blocked": 6,
+      "compile_pass": 3,
+      "compile_blocked": 5,
       "preliminary_kind": "architecture-specific assembly examples"
     },
     "Disk": {
@@ -349,8 +348,8 @@
       "directory": "Asm",
       "preliminary_kind": "architecture-specific assembly examples",
       "classification_confidence": "provisional; based on directory only",
-      "compile": "blocked",
-      "first_compile_error": "ERR:/Demo/Asm/AsmHelloWorld.ZC:22:5 Unknown symbol 'asm'.",
+      "compile": "pass",
+      "first_compile_error": null,
       "runtime": "unverified",
       "runtime_evidence": null
     },
