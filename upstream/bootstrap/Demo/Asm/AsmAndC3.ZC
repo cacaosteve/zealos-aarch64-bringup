@@ -1,0 +1,21 @@
+// ARM64 source translation of the original x86 carry-flag example.
+//
+// The x86 version sets CF and then uses ADC to add it to 0x41. ZealC does not
+// expose x86 flags on AArch64, so compute the same byte result explicitly.
+// This keeps the example's observable output while making the architecture
+// difference clear in the source.
+
+U0 AsmAndC3()
+{
+	I64 i;
+	U8 value;
+
+	for (i = 0; i < 3; i++)
+	{
+		value = 0x41;
+		value += 1; // Equivalent result of STC followed by ADC AL, 0.
+		"Meaning of life:%02X\n", value;
+	}
+}
+
+AsmAndC3;

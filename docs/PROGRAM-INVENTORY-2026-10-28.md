@@ -92,7 +92,7 @@ entry points. The dependency-aware Demo catalog covers all 206 upstream `.ZC`
 sources in a fresh full PCI QEMU sweep. `/Demo/NullCase.ZC` and all three ToHtmlToTXTDemo generator sources were
 rechecked after the parser/resource fixes. HtmlGen compiles via normal file
 loading so its relative include resolves; TXTGen compiles after loading the
-stock ToTXT module. The latest 2026-11-01 full source catalog compiles 182 of 206 Demo sources, leaving 24 compile-blocked. The count includes `CompileDemo.ZC`, compiled with stock compiler headers and modules, plus the targeted follow-ups for `Pick3D.ZC` and `ClassMeta.ZC`, and `WallPaperDesktop.ZC`, which compiles through a source-preserving loader with the stock compiler modules. `ClassMeta.ZC` remains runtime-broken or unresolved: its graphical launch and a follow-up explicit `DumpStruct` call produced no visible class output in QEMU. The guarded ARM64 overlay retains the rank callback and percentile display logic with supported metadata forms, but compile success does not establish runtime behavior. A shared host-data export resolution fix and build `CDate` binding removed the `sys_compile_time` blocker from both HomeSys sources. The lexer now preserves comment markers in quoted `#define` strings, fixing the stock `HomeWrappers.ZC` file-mask macro; loading `/System/Utils/Find.ZC` supplies its required `Find` routine. Loading stock dependencies also lets TOSTheme, InSetIP, UnusedSpaceRep, UnusedDefine, and SerializeTree compile in the isolated probe. Expanding the lexer literal buffer allows the long literals in `MemDemo.ZC` and `WaterFowl.ZC` to compile. `SpriteText.ZC` now compiles with the isolated probe’s compiler and sprite module setup. `PhoneNumWords.ZC` also compiles after changing its A–Z digit lookup to a 26-element explicit initializer in the ARM64 overlay. The `SysRep.ZC` ARM64 overlay removes x86 CPUID-specific reporting; `AndNotMod.ZC` and `FixedPoint.ZC` now compile with the stock `SysRep` and `CPURep` modules.
+stock ToTXT module. The 2026-11-01 full PCI source sweep and targeted follow-up compile 184 of 206 Demo sources, leaving 22 compile-blocked. `/Demo/Asm/PutDec.ZC` now uses an ARM64-portable decimal conversion and compiles; this does not establish runtime acceptance. The count includes `CompileDemo.ZC`, compiled with stock compiler headers and modules, plus the targeted follow-ups for `Pick3D.ZC` and `ClassMeta.ZC`, and `WallPaperDesktop.ZC`, which compiles through a source-preserving loader with the stock compiler modules. `ClassMeta.ZC` remains runtime-broken or unresolved: its graphical launch and a follow-up explicit `DumpStruct` call produced no visible class output in QEMU. The guarded ARM64 overlay retains the rank callback and percentile display logic with supported metadata forms, but compile success does not establish runtime behavior. A shared host-data export resolution fix and build `CDate` binding removed the `sys_compile_time` blocker from both HomeSys sources. The lexer now preserves comment markers in quoted `#define` strings, fixing the stock `HomeWrappers.ZC` file-mask macro; loading `/System/Utils/Find.ZC` supplies its required `Find` routine. Loading stock dependencies also lets TOSTheme, InSetIP, UnusedSpaceRep, UnusedDefine, and SerializeTree compile in the isolated probe. Expanding the lexer literal buffer allows the long literals in `MemDemo.ZC` and `WaterFowl.ZC` to compile. `SpriteText.ZC` now compiles with the isolated probe’s compiler and sprite module setup. `PhoneNumWords.ZC` also compiles after changing its A–Z digit lookup to a 26-element explicit initializer in the ARM64 overlay. The `SysRep.ZC` ARM64 overlay removes x86 CPUID-specific reporting; `AndNotMod.ZC` and `FixedPoint.ZC` now compile with the stock `SysRep` and `CPURep` modules.
 FlatTops now compiles when its isolated source context loads the stock `GrDC`,
 `GrMath`, `GrPrimatives`, and `GrComposites` modules; its upstream source is
 unchanged. TreeCheckers also compiles in an isolated context with its required
@@ -326,7 +326,7 @@ UTM-specific app freezes still require separate live checks. `CompileDemo.ZC` no
 
 The refreshed 2026-11-01 sweep also fixed a source-catalog false negative for `/Demo/Graphics/WallPapers/WallPaperDesktop.ZC`: the stock compiler modules define `cmp`, and the source-preserving loader keeps the class-layout `$$` token intact. `StockCatalogCompileRawWithProgramModules` now verifies this path as part of the complete sweep. The original source remains unchanged; this is compile acceptance only, not runtime acceptance.
 
-The 2026-11-01 full sweep updated the source ledger to 182/206 compiling. The
+The 2026-11-01 full sweep and targeted PutDec follow-up updated the source ledger to 184/206 compiling. The
 isolated catalog now loads the stock compiler headers and program modules for
 `/Demo/MultiCore/LoadTest.ZC`, which was previously a probe-context false
 negative. The `Mandel.ZC` ARM64 overlay replaces its unsupported conditional
@@ -359,10 +359,9 @@ The refreshed 2026-11-01 full catalog adds native lexer tokens for `__DATE__`,
 `__TIME__`, and `__CMD_LINE__`, backed by the active guest compiler flags. This
 removes two false/compiler blockers: `Directives.ZC` is compiled through the
 source-preserving loader because it contains the `$$` instruction marker, and
-`WebLogRep.ZC` now compiles through its regular DocRead path. The 2026-11-01 full sweep is 182/206. The remaining 24 first failures group
-into 12 inline-assembly examples, 2 genuine `#exe` bodies (`DefineStr` and
-`TimeIns`), 3 legacy assembly/boot constructs, 2 home-system includes, 2
-unbound system globals, 2 interrupt intrinsics, and 1 TOS configuration
-context. `/Demo/Carry.ZC` now compiles with an ARM64 source overlay that
+`WebLogRep.ZC` now compiles through its regular DocRead path. The 2026-11-01 full sweep plus targeted `/Demo/Asm/PutDec.ZC` follow-up is
+184/206. The remaining 22 first failures group into 11 inline-assembly
+examples, 2 assembly-like parser cases, 2 compile-time directive cases, 2
+interrupt-handler syntax cases, and 5 boot, TOS, or device-context blockers. `/Demo/Carry.ZC` now compiles with an ARM64 source overlay that
 explicitly computes the carry bits needed by its examples; runtime acceptance
 remains outstanding.

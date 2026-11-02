@@ -1,0 +1,26 @@
+// ARM64 translation of the original hand-written x86 decimal printer.
+// Convert an unsigned value from right to left instead of relying on an
+// architecture-specific assembly routine.
+U0 PutDecU64(U64 value)
+{
+	U8 buf[24];
+	U8 *p = buf + sizeof(buf) - 1;
+
+	*p = 0;
+	do
+	{
+		*--p = '0' + value % 10;
+		value /= 10;
+	}
+	while (value);
+
+	Print("%s", p);
+}
+
+U0 DoIt()
+{
+	PutDecU64(122333221);
+	'\n';
+}
+
+DoIt;

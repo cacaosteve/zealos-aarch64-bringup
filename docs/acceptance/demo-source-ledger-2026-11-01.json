@@ -2,12 +2,12 @@
   "source_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
   "generated_from": "build/demo-source-catalog.json",
   "source_count": 206,
-  "compile_pass": 182,
-  "compile_blocked": 24,
+  "compile_pass": 184,
+  "compile_blocked": 22,
   "compile_blocker_groups": [
     {
       "category": "inline assembly unsupported or requires an ARM64 equivalent",
-      "source_count": 12,
+      "source_count": 11,
       "paths": [
         "/Demo/AcctExample/MakeHome.ZC",
         "/Demo/Asm/AsmAndC1.ZC",
@@ -16,7 +16,6 @@
         "/Demo/Asm/BuzzFizz.ZC",
         "/Demo/Asm/DivByHand.ZC",
         "/Demo/Asm/MulByHand.ZC",
-        "/Demo/Asm/PutDec.ZC",
         "/Demo/Lectures/FixedPointAdvanced.ZC",
         "/Demo/Lectures/InterruptDemo.ZC",
         "/Demo/Lectures/Optimization.ZC",
@@ -25,9 +24,8 @@
     },
     {
       "category": "assembly-like label syntax parse",
-      "source_count": 3,
+      "source_count": 2,
       "paths": [
-        "/Demo/Asm/AsmAndC3.ZC",
         "/Demo/Lectures/MiniCompiler.ZC",
         "/Demo/Lectures/NegDisp.ZC"
       ]
@@ -100,8 +98,8 @@
     },
     "Asm": {
       "source_count": 8,
-      "compile_pass": 0,
-      "compile_blocked": 8,
+      "compile_pass": 2,
+      "compile_blocked": 6,
       "preliminary_kind": "architecture-specific assembly examples"
     },
     "Disk": {
@@ -341,8 +339,8 @@
       "directory": "Asm",
       "preliminary_kind": "architecture-specific assembly examples",
       "classification_confidence": "provisional; based on directory only",
-      "compile": "blocked",
-      "first_compile_error": "ERR:/Demo/Asm/AsmAndC3.ZC:15:11 Expected ':' after label candidate 'MOV'.",
+      "compile": "pass",
+      "first_compile_error": null,
       "runtime": "unverified",
       "runtime_evidence": null
     },
@@ -391,8 +389,8 @@
       "directory": "Asm",
       "preliminary_kind": "architecture-specific assembly examples",
       "classification_confidence": "provisional; based on directory only",
-      "compile": "blocked",
-      "first_compile_error": "ERR:/Demo/Asm/PutDec.ZC:1:5 Unknown symbol 'asm'.",
+      "compile": "pass",
+      "first_compile_error": null,
       "runtime": "unverified",
       "runtime_evidence": null
     },
