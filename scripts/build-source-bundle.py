@@ -319,6 +319,11 @@ entries['System/DateBridge.ZC'] = extract_source_dates(
     entries['Kernel/KDate.ZC'], entries['Kernel/StrScan.ZC'], entries['Kernel/StrPrint.ZC'])
 entries['System/KeyboardBridge.ZC'] = extract_keyboard_helpers(
     entries['Kernel/SerialDev/Keyboard.ZC'], entries['Kernel/StrPrint.ZC'])
+# MakeHome's stock optional `~/...` includes fall back to root-level defaults
+# when a user's /Home override is absent. Keep those unchanged upstream files
+# available to the source resolver for that fallback.
+for name in ('HomeLocalize.ZC', 'HomeWrappers.ZC'):
+    entries[name] = (root / 'upstream/pinned' / name).read_bytes()
 # Factory account data is the same file installed by Budget/Install.ZC. The
 # source volume infers directories from their files; seed its default home
 # before the unchanged installer checks for it.

@@ -1405,13 +1405,16 @@ static int64_t host_doc_input_bytes(int64_t *a) {
 FILE *fopen(const char *path, const char *mode) {
     if (strcmp(mode, "rb") && strcmp(mode, "r"))
         return NULL;
+    const char *requested = path;
     /* The compiler already qualifies ordinary include names against their
      * source file. Only expand guest home/drive aliases here, so those names
      * work in #include as well as FileRead/ExeFile without double-joining cwd. */
     char resolved[134];
     if (guest_home_suffix(path) || !strncmp(path, "::", 2) || !strncmp(path, "~:", 2)) {
-        if (guest_path(path, resolved)) return NULL;
-        path = resolved;
+        /* A missing home directory must not prevent a source include from
+         * reaching its root-level fallback (for example ~/HomeLocalize). */
+        if (!guest_path(path, resolved))
+            path = resolved;
     }
     size_t n;
     char *owned = NULL;
@@ -1421,6 +1424,33 @@ FILE *fopen(const char *path, const char *mode) {
         data = (const unsigned char *)owned;
     } else {
         data = source_file_find(path, &n, &owned);
+        /* The stock account setup scripts include optional home overrides,
+         * then fall back to the corresponding root-level source file. Honor
+         * that convention for compiler includes when the home copy is absent. */
+        if (!data && guest_home_dir_ptr && *guest_home_dir_ptr &&
+            path[0] == '/') {
+            const char *home = *guest_home_dir_ptr;
+            size_t home_len = strlen(home);
+            if (home_len && !strncmp(path, home, home_len) &&
+                path[home_len] == '/') {
+                char root_path[134];
+                size_t suffix_len = strlen(path + home_len + 1);
+                if (suffix_len + 2 <= sizeof(root_path)) {
+                    root_path[0] = '/';
+                    memcpy(root_path + 1, path + home_len + 1,
+                           suffix_len + 1);
+                    data = source_file_find(root_path, &n, &owned);
+                }
+            }
+        }
+        /* A stock include such as "~/HomeLocalize" means “use the home
+         * override, or the root-level default if there is no override.” Keep
+         * the original spelling because path above has already been expanded. */
+        if (!data) {
+            const char *home_suffix = guest_home_suffix(requested);
+            if (home_suffix && *home_suffix == '/')
+                data = source_file_find(home_suffix, &n, &owned);
+        }
     }
     if (!data)
         return NULL;
