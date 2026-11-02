@@ -70,6 +70,32 @@ def first_error(output):
     return None
 
 
+def blocker_group(error):
+    if not error:
+        return "missing compiler diagnostic"
+    if "Unknown symbol 'asm'" in error:
+        return "inline assembly unsupported or requires an ARM64 equivalent"
+    if "Unknown symbol 'interrupt'" in error:
+        return "interrupt-handler syntax unsupported"
+    if "AArch64 intrinsic 'Carry'" in error:
+        return "Carry intrinsic unsupported"
+    if "AArch64 external data 'mem_boot_base'" in error:
+        return "TOS boot-memory binding unavailable"
+    if "AArch64 external data 'dev'" in error:
+        return "system device-global binding unavailable"
+    if "can't find file 'TOSExt.ZC'" in error:
+        return "missing TOS extension dependency"
+    if "Unknown symbol 'TOS_CONFIG'" in error:
+        return "TOS_CONFIG definition or include ordering"
+    if "Unexpected charactor '#'" in error:
+        return "compile-time directive parse/context support"
+    if "Expected ':' after label candidate" in error:
+        if "candidate 'BootRAM'" in error:
+            return "BootRAM symbol/context unavailable"
+        return "assembly-like label syntax parse"
+    return "other compiler or environment blocker"
+
+
 def main():
     catalog = json.loads(CATALOG.read_text())
     by_path = {source["path"]: source for source in catalog["sources"]}
@@ -100,12 +126,22 @@ def main():
             "runtime_evidence": (RUNTIME_ACCEPTED.get(guest_path) or
                                  RUNTIME_PARTIAL.get(guest_path)),
         })
+    blocked = [r for r in records if r["compile"] == "blocked"]
+    blocker_groups = {}
+    for record in blocked:
+        category = blocker_group(record["first_compile_error"])
+        blocker_groups.setdefault(category, []).append(record["path"])
     report = {
         "source_commit": catalog["commit"],
         "generated_from": "build/demo-source-catalog.json",
         "source_count": len(records),
         "compile_pass": sum(r["compile"] == "pass" for r in records),
         "compile_blocked": sum(r["compile"] == "blocked" for r in records),
+        "compile_blocker_groups": [
+            {"category": category, "source_count": len(paths), "paths": paths}
+            for category, paths in sorted(blocker_groups.items(),
+                                          key=lambda item: (-len(item[1]), item[0]))
+        ],
         "runtime_accepted": sum(r["runtime"] == "pass" for r in records),
         "directories": {},
         "classification_note": "Directory-based kinds are triage hints, not final runnable-program classifications.",

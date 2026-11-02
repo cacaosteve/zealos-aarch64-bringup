@@ -4,6 +4,93 @@
   "source_count": 206,
   "compile_pass": 181,
   "compile_blocked": 25,
+  "compile_blocker_groups": [
+    {
+      "category": "inline assembly unsupported or requires an ARM64 equivalent",
+      "source_count": 12,
+      "paths": [
+        "/Demo/AcctExample/MakeHome.ZC",
+        "/Demo/Asm/AsmAndC1.ZC",
+        "/Demo/Asm/AsmAndC2.ZC",
+        "/Demo/Asm/AsmHelloWorld.ZC",
+        "/Demo/Asm/BuzzFizz.ZC",
+        "/Demo/Asm/DivByHand.ZC",
+        "/Demo/Asm/MulByHand.ZC",
+        "/Demo/Asm/PutDec.ZC",
+        "/Demo/Lectures/FixedPointAdvanced.ZC",
+        "/Demo/Lectures/InterruptDemo.ZC",
+        "/Demo/Lectures/Optimization.ZC",
+        "/Demo/Lectures/Ring3.ZC"
+      ]
+    },
+    {
+      "category": "assembly-like label syntax parse",
+      "source_count": 3,
+      "paths": [
+        "/Demo/Asm/AsmAndC3.ZC",
+        "/Demo/Lectures/MiniCompiler.ZC",
+        "/Demo/Lectures/NegDisp.ZC"
+      ]
+    },
+    {
+      "category": "compile-time directive parse/context support",
+      "source_count": 2,
+      "paths": [
+        "/Demo/DolDoc/DefineStr.ZC",
+        "/Demo/TimeIns.ZC"
+      ]
+    },
+    {
+      "category": "interrupt-handler syntax unsupported",
+      "source_count": 2,
+      "paths": [
+        "/Demo/Lectures/PCIInterrupts.ZC",
+        "/Demo/MultiCore/Interrupts.ZC"
+      ]
+    },
+    {
+      "category": "BootRAM symbol/context unavailable",
+      "source_count": 1,
+      "paths": [
+        "/Demo/OnceDemo.ZC"
+      ]
+    },
+    {
+      "category": "Carry intrinsic unsupported",
+      "source_count": 1,
+      "paths": [
+        "/Demo/Carry.ZC"
+      ]
+    },
+    {
+      "category": "TOS boot-memory binding unavailable",
+      "source_count": 1,
+      "paths": [
+        "/Demo/AcctExample/TOS/TOSConfig.ZC"
+      ]
+    },
+    {
+      "category": "TOS_CONFIG definition or include ordering",
+      "source_count": 1,
+      "paths": [
+        "/Demo/AcctExample/TOS/TOSDistro.ZC"
+      ]
+    },
+    {
+      "category": "missing TOS extension dependency",
+      "source_count": 1,
+      "paths": [
+        "/Demo/AcctExample/TOS/MakeTOS.ZC"
+      ]
+    },
+    {
+      "category": "system device-global binding unavailable",
+      "source_count": 1,
+      "paths": [
+        "/Demo/Graphics/LightTable.ZC"
+      ]
+    }
+  ],
   "runtime_accepted": 28,
   "directories": {
     ".": {
