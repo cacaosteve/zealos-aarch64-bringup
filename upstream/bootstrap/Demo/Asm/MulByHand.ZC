@@ -1,0 +1,58 @@
+/* ARM64-portable source version of the original multiplication demo.
+   The byte product uses shift-and-add; the 64-bit product combines 32-bit
+   partial products into the same 128-bit result as the original routine. */
+
+U16 MulU8(U8 n1, U8 n2)
+{
+	U16 result = 0, addend = n1;
+	U8 bit;
+
+	for (bit = 0; bit < 8; bit++)
+	{
+		if (n2 & (1 << bit))
+			result += addend;
+		addend <<= 1;
+	}
+	return result;
+}
+
+class U128
+{
+	U64 lo, hi;
+};
+
+U0 MulU64(U64 n1, U64 n2, U128 *prod)
+{
+	U64 a0 = n1 & 0xFFFFFFFF, a1 = n1 >> 32;
+	U64 b0 = n2 & 0xFFFFFFFF, b1 = n2 >> 32;
+	U64 p00 = a0 * b0;
+	U64 p01 = a0 * b1;
+	U64 p10 = a1 * b0;
+	U64 p11 = a1 * b1;
+	U64 lo = p00, before, carry = 0;
+
+	before = lo;
+	lo += p01 << 32;
+	if (lo < before)
+		carry++;
+	before = lo;
+	lo += p10 << 32;
+	if (lo < before)
+		carry++;
+
+	prod->lo = lo;
+	prod->hi = p11 + (p01 >> 32) + (p10 >> 32) + carry;
+}
+
+U0 MulByHand()
+{
+	U128 p;
+
+	"2*7   =0x%X\n", MulU8(2, 7);
+	"100*10=0x%X\n", MulU8(100, 10);
+
+	MulU64(0x0123456789ABCDEF, 0x1000001, &p);
+	"0x0123466789ABCDEF*0x1000001=0x%016X%016X\n", p.hi, p.lo;
+}
+
+MulByHand;

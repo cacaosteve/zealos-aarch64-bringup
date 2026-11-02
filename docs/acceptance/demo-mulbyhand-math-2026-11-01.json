@@ -1,0 +1,14 @@
+{
+  "source": "/Demo/Asm/MulByHand.ZC",
+  "source_sha256": "efb273d29df0c02486f8be54a72940ae2b38c99f4a135b1b0b7c21830978f92a",
+  "platform": "PCI QEMU, AArch64 guest",
+  "method": "Loaded the ARM64 arithmetic routines in a disposable guest and called MulByHandChecks.",
+  "checks": [
+    "MulU8(2, 7) == 14",
+    "MulU8(100, 10) == 1000",
+    "MulU64(0xffffffffffffffff, 2) produces hi=1, lo=0xfffffffffffffffe",
+    "MulU64(0x100000001, 0x100000001) produces hi=1, lo=0x200000001"
+  ],
+  "result": "PASS: MulByHandChecks returned 0x2a",
+  "scope_note": "This validates the arithmetic routines. It does not claim full graphical or formatted-output acceptance of the original demo."
+}
