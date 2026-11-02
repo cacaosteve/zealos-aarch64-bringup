@@ -1,0 +1,9 @@
+{
+  "source": "/Demo/DolDoc/DefineStr.ZC",
+  "source_sha256": "f2b837983bc5e29e869d2c63d15211b80eebc61580e80fd0b44cb2e2b8c54e8e",
+  "platform": "PCI QEMU, AArch64 guest",
+  "method": "Targeted demo-source-catalog compile probe against rebuilt AArch64 ISO.",
+  "adaptation": "Replace the #exe-generated COMPANY_AGE definition with DefinePrint at runtime, retaining the $$TX define lookup in the document output.",
+  "result": "PASS: Compiles",
+  "scope_note": "Rendered COMPANY_AGE, COMPANY_TIME substitutions and displayed text are not yet runtime-accepted."
+}

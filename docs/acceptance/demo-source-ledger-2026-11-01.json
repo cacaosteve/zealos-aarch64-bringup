@@ -2,8 +2,8 @@
   "source_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
   "generated_from": "build/demo-source-catalog.json",
   "source_count": 206,
-  "compile_pass": 191,
-  "compile_blocked": 15,
+  "compile_pass": 192,
+  "compile_blocked": 14,
   "compile_blocker_groups": [
     {
       "category": "inline assembly unsupported or requires an ARM64 equivalent",
@@ -21,14 +21,6 @@
       "paths": [
         "/Demo/Lectures/MiniCompiler.ZC",
         "/Demo/Lectures/NegDisp.ZC"
-      ]
-    },
-    {
-      "category": "compile-time directive parse/context support",
-      "source_count": 2,
-      "paths": [
-        "/Demo/DolDoc/DefineStr.ZC",
-        "/Demo/TimeIns.ZC"
       ]
     },
     {
@@ -58,6 +50,13 @@
       "source_count": 1,
       "paths": [
         "/Demo/AcctExample/TOS/TOSDistro.ZC"
+      ]
+    },
+    {
+      "category": "compile-time directive parse/context support",
+      "source_count": 1,
+      "paths": [
+        "/Demo/TimeIns.ZC"
       ]
     },
     {
@@ -103,8 +102,8 @@
     },
     "DolDoc": {
       "source_count": 13,
-      "compile_pass": 12,
-      "compile_blocked": 1,
+      "compile_pass": 13,
+      "compile_blocked": 0,
       "preliminary_kind": "DolDoc examples and components"
     },
     "Games": {
@@ -552,8 +551,8 @@
       "directory": "DolDoc",
       "preliminary_kind": "DolDoc examples and components",
       "classification_confidence": "provisional; based on directory only",
-      "compile": "blocked",
-      "first_compile_error": "ERR /Demo/DolDoc/DefineStr.ZC:15:6 Unexpected charactor '#'.",
+      "compile": "pass",
+      "first_compile_error": null,
       "runtime": "unverified",
       "runtime_evidence": null
     },
