@@ -2,17 +2,16 @@
   "source_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
   "generated_from": "build/demo-source-catalog.json",
   "source_count": 206,
-  "compile_pass": 190,
-  "compile_blocked": 16,
+  "compile_pass": 191,
+  "compile_blocked": 15,
   "compile_blocker_groups": [
     {
       "category": "inline assembly unsupported or requires an ARM64 equivalent",
-      "source_count": 5,
+      "source_count": 4,
       "paths": [
         "/Demo/AcctExample/MakeHome.ZC",
         "/Demo/Lectures/FixedPointAdvanced.ZC",
         "/Demo/Lectures/InterruptDemo.ZC",
-        "/Demo/Lectures/Optimization.ZC",
         "/Demo/Lectures/Ring3.ZC"
       ]
     },
@@ -128,8 +127,8 @@
     },
     "Lectures": {
       "source_count": 11,
-      "compile_pass": 4,
-      "compile_blocked": 7,
+      "compile_pass": 5,
+      "compile_blocked": 6,
       "preliminary_kind": "lecture and tutorial sources"
     },
     "MultiCore": {
@@ -1713,8 +1712,8 @@
       "directory": "Lectures",
       "preliminary_kind": "lecture and tutorial sources",
       "classification_confidence": "provisional; based on directory only",
-      "compile": "blocked",
-      "first_compile_error": "ERR:/Demo/Lectures/Optimization.ZC:16:5 Unknown symbol 'asm'.",
+      "compile": "pass",
+      "first_compile_error": null,
       "runtime": "unverified",
       "runtime_evidence": null
     },

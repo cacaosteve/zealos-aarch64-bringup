@@ -360,10 +360,14 @@ The refreshed 2026-11-01 full catalog adds native lexer tokens for `__DATE__`,
 removes two false/compiler blockers: `Directives.ZC` is compiled through the
 source-preserving loader because it contains the `$$` instruction marker, and
 `WebLogRep.ZC` now compiles through its regular DocRead path. The 2026-11-01 full sweep plus targeted `/Demo/Asm/PutDec.ZC`, `/Demo/Asm/AsmHelloWorld.ZC`, `/Demo/Asm/BuzzFizz.ZC`, `/Demo/Asm/MulByHand.ZC`, and `/Demo/Asm/DivByHand.ZC` follow-ups is
-190/206. ARM64-portable equivalents for `/Demo/Asm/AsmAndC1.ZC` and
-`/Demo/Asm/AsmAndC2.ZC` now compile in the targeted guest catalog probe; their
-interactive sound behavior remains unverified. The remaining 16 first
-failures group into 5 inline-assembly examples, 2 assembly-like parser cases, 2 compile-time directive cases, 2
-interrupt-handler syntax cases, and 5 boot, TOS, or device-context blockers. `/Demo/Carry.ZC` now compiles with an ARM64 source overlay that
+191/206. ARM64-portable equivalents for `/Demo/Asm/AsmAndC1.ZC` and
+`/Demo/Asm/AsmAndC2.ZC` compile in the targeted guest catalog probe; their
+interactive sound behavior remains unverified. `/Demo/Lectures/Optimization.ZC`
+now has a ZealC loop-shape adaptation that compiles, and its four loop forms
+pass a small guest result-equivalence check. Full timing output and live UTM
+performance remain unverified. The remaining 15 first failures group into 4
+inline-assembly examples, 2 assembly-like parser cases, 2 compile-time
+directive cases, 2 interrupt-handler syntax cases, and 5 boot, TOS, or
+device-context blockers. `/Demo/Carry.ZC` now compiles with an ARM64 source overlay that
 explicitly computes the carry bits needed by its examples; runtime acceptance
 remains outstanding.

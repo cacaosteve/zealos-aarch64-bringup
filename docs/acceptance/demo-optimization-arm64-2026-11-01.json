@@ -1,0 +1,11 @@
+{
+  "source": "/Demo/Lectures/Optimization.ZC",
+  "source_sha256": "0c4e57f269b1c19086fd07e600fd19ace04799fb1129f029222000bfdc8dfcc9",
+  "platform": "PCI QEMU, AArch64 guest",
+  "method": "Targeted demo-source-catalog compile probe plus disposable guest runtime harness for the four loop forms.",
+  "checks": [
+    "Loop1 through Loop4 each return 320400 for limit 800, matching 800*801/2"
+  ],
+  "result": "PASS: OptimizationLoopChecks returned 0x2a",
+  "scope_note": "Compile and loop-result semantics are verified. Full 80-million-iteration interactive timing output and live UTM performance have not been accepted. The adaptation compares ZealC loop shapes; it does not claim to reproduce the original x86 assembly benchmark."
+}
