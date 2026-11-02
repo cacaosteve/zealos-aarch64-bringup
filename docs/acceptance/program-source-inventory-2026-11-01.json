@@ -8,8 +8,8 @@
   "app_directories": 12,
   "app_entrypoints": 12,
   "demo_sources": 206,
-  "demo_compile_pass": 196,
-  "demo_compile_blocked": 10,
+  "demo_compile_pass": 197,
+  "demo_compile_blocked": 9,
   "demo_runtime_accepted": 28,
   "areas": {
     "Apps": {
@@ -30,8 +30,8 @@
     },
     "Demo": {
       "source_files": 206,
-      "compile_pass": 196,
-      "compile_blocked": 10,
+      "compile_pass": 197,
+      "compile_blocked": 9,
       "compile_unverified": 0,
       "runtime_pass": 28,
       "runtime_partial": 3
@@ -2086,7 +2086,7 @@
       "path": "/Demo/Lectures/FixedPointAdvanced.ZC",
       "area": "Demo",
       "kind": "demo_source_or_component",
-      "compile": "blocked",
+      "compile": "pass",
       "runtime": "unverified",
       "evidence": "docs/acceptance/demo-source-ledger-2026-11-01.json"
     },
