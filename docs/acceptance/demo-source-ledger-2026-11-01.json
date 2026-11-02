@@ -2,8 +2,8 @@
   "source_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
   "generated_from": "build/demo-source-catalog.json",
   "source_count": 206,
-  "compile_pass": 195,
-  "compile_blocked": 11,
+  "compile_pass": 196,
+  "compile_blocked": 10,
   "compile_blocker_groups": [
     {
       "category": "inline assembly unsupported or requires an ARM64 equivalent",
@@ -35,13 +35,6 @@
       "source_count": 1,
       "paths": [
         "/Demo/AcctExample/TOS/TOSDistro.ZC"
-      ]
-    },
-    {
-      "category": "assembly-like label syntax parse",
-      "source_count": 1,
-      "paths": [
-        "/Demo/Lectures/MiniCompiler.ZC"
       ]
     },
     {
@@ -111,8 +104,8 @@
     },
     "Lectures": {
       "source_count": 11,
-      "compile_pass": 6,
-      "compile_blocked": 5,
+      "compile_pass": 7,
+      "compile_blocked": 4,
       "preliminary_kind": "lecture and tutorial sources"
     },
     "MultiCore": {
@@ -1666,10 +1659,10 @@
       "directory": "Lectures",
       "preliminary_kind": "lecture and tutorial sources",
       "classification_confidence": "provisional; based on directory only",
-      "compile": "blocked",
-      "first_compile_error": "ERR:/Demo/Lectures/MiniCompiler.ZC:257:8 Expected ':' after label candidate 'Un'.",
-      "runtime": "unverified",
-      "runtime_evidence": null
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "partial",
+      "runtime_evidence": "docs/acceptance/demo-mini-compiler-2026-11-01.json"
     },
     {
       "path": "/Demo/Lectures/MiniGrLib.ZC",

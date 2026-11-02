@@ -35,6 +35,8 @@ p.add_argument('--probe-stock-programs', action='store_true',
                help='run unchanged pinned NetOfDots and Lines in the graphical terminal')
 p.add_argument('--probe-program-catalog', action='store_true',
                help='report compile-only results for original application entry points in isolated tasks')
+p.add_argument('--probe-mini-compiler', action='store_true',
+               help='compile Demo MiniCompiler and execute its generated AArch64 expression checks')
 p.add_argument('--probe-demo-source-catalog', action='store_true',
                help='compile every pinned Demo .ZC source in an isolated task and save per-file results')
 p.add_argument('--demo-source-path', action='append', default=[],
@@ -205,6 +207,8 @@ if args.probe_titanium_only:
     args.probe_3d_apps = True
 if args.probe_keepaway_full_game:
     args.probe_3d_apps = True
+if args.probe_mini_compiler:
+    args.probe_program_catalog = True
 if (args.probe_demo_source_catalog or args.probe_demo_basics or
         args.probe_demo_exceptions or
         args.probe_demo_system_context):
@@ -3009,7 +3013,17 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 'zc => 0x000000000000002a')
             command('zcall StockCatalogStaticArraySizeChecks',
                 'zc => 0x000000000000002a')
-            if not args.demo_source_path and not args.demo_source_raw_path:
+            if args.probe_mini_compiler:
+                command('zc ExeFile2("/Demo/Lectures/MiniCompiler.ZC",CCF_JUST_LOAD);',
+                        'zc: executed', timeout=45)
+                for source, expected in (
+                        ('2+3*4', 14), ('(2+3)*4', 20),
+                        ('100/5/2', 10), ('20-7*2', 6)):
+                    command(f'zc Print("mini={source}:%d\\n",CompileAndRun("{source}"));',
+                            f'mini={source}:{expected}')
+                command('zreset', 'zc: native compiler ready')
+            if (not args.demo_source_path and not args.demo_source_raw_path and
+                    not args.probe_mini_compiler):
                 command('zload /Tests/SourceMacros.ZC', 'zc: loaded /Tests/SourceMacros.ZC')
                 command('zcall StockSourceMacroChecks', 'zc => 0x000000000000002a')
                 command('zcall StockNoWarnChecks', 'zc => 0x000000000000002a')
@@ -3026,6 +3040,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     not args.probe_demo_graphics_render and
                     not args.probe_demo_global_vars and
                     not args.probe_demo_exceptions and
+                    not args.probe_mini_compiler and
                     not args.demo_source_path and
                     not args.demo_source_raw_path):
                 command('zc Print("catalog_math=%d\\n",StockCatalogMathChecks());',

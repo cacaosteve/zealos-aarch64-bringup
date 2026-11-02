@@ -1,0 +1,15 @@
+{
+  "date": "2026-11-01",
+  "repository_commit": "cc1282d",
+  "command": "python3 scripts/check-compat.py --probe-mini-compiler",
+  "target": "QEMU ARM64 graphical guest",
+  "result": "pass for generated-code arithmetic checks",
+  "scope": "MiniCompiler source compiles, and generated AArch64 code executes with verified operator precedence, parentheses, left-associative division, subtraction, and repeated code-buffer reuse.",
+  "checks": {
+    "2+3*4": 14,
+    "(2+3)*4": 20,
+    "100/5/2": 10,
+    "20-7*2": 6
+  },
+  "limitation": "Interactive graphical-terminal prompt, invalid-expression recovery, and live UTM behavior have not been accepted yet."
+}

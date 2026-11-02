@@ -59,6 +59,7 @@ RUNTIME_ACCEPTED = {
 RUNTIME_PARTIAL = {
     "/Demo/AcctExample/HomeKeyPlugIns.ZC": "docs/acceptance/demo-global-vars-jit-2026-11-01.json",
     "/Demo/Graphics/Slider.ZC": "docs/acceptance/demo-input-graphics-2026-11-01.json",
+    "/Demo/Lectures/MiniCompiler.ZC": "docs/acceptance/demo-mini-compiler-2026-11-01.json",
 }
 
 

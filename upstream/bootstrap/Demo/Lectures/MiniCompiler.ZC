@@ -1,0 +1,202 @@
+/*$WW,1$
+$TR-C,"Main Compiler"$
+$ID,2$The main compiler lexes, parses, optimizes and emits native code. This
+small expression compiler demonstrates recursive-descent parsing and an
+AArch64 native-code backend for integers, parentheses, +, -, * and /.
+$ID,-2$$WW,0$*/
+
+#define TK_EOF      0
+#define TK_NUM      1
+#define TK_OP       2
+#define TK_LEFT     3
+#define TK_RIGHT    4
+
+#define OP_MUL      1
+#define OP_DIV      2
+#define OP_ADD      3
+#define OP_SUB      4
+
+U8 *compiler_src;
+U8 *compiler_dst;
+I64 compiler_token;
+I64 compiler_num;
+
+I64 Lex(U8 **_src, I64 *_num)
+{
+    U8 *src = *_src;
+    I64 i;
+
+    while (TRUE)
+        switch (*src)
+        {
+            case 0:
+            case ';':
+                *_src = src;
+                return TK_EOF;
+
+            case CH_SPACE:
+            case '\r':
+            case '\n':
+                src++;
+                break;
+
+            case '0'...'9':
+                i = 0;
+                do
+                {
+                    i = i * 10 + *src - '0';
+                    src++;
+                }
+                while ('0' <= *src <= '9');
+                *_num = i;
+                *_src = src;
+                return TK_NUM;
+
+            case '*': *_num = OP_MUL; *_src = src + 1; return TK_OP;
+            case '/': *_num = OP_DIV; *_src = src + 1; return TK_OP;
+            case '+': *_num = OP_ADD; *_src = src + 1; return TK_OP;
+            case '-': *_num = OP_SUB; *_src = src + 1; return TK_OP;
+            case '(': *_src = src + 1; return TK_LEFT;
+            case ')': *_src = src + 1; return TK_RIGHT;
+            default: throw;
+        }
+}
+
+U0 CompilerNext()
+{
+    compiler_token = Lex(&compiler_src, &compiler_num);
+}
+
+U0 EmitWord(U32 word)
+{
+    U32 *dst = compiler_dst;
+    *dst++ = word;
+    compiler_dst = dst;
+}
+
+U0 EmitImmediate(I64 value)
+{
+    I64 i;
+    U32 word;
+    for (i = 0; i < 4; i++)
+    {
+        if (!i)
+            word = 0xD2800000; // MOVZ X0, #imm16
+        else
+            word = 0xF2800000 | i << 21; // MOVK X0, #imm16, LSL #(16*i)
+        word |= (value >> (i * 16) & 0xFFFF) << 5;
+        EmitWord(word);
+    }
+}
+
+U0 EmitPushX0()
+{
+    EmitWord(0xD10043FF); // SUB SP, SP, #16
+    EmitWord(0xF90003E0); // STR X0, [SP]
+}
+
+U0 EmitBinary(I64 op)
+{
+    EmitWord(0xF94003E1); // LDR X1, [SP] -- right operand
+    EmitWord(0x910043FF); // ADD SP, SP, #16
+    EmitWord(0xF94003E0); // LDR X0, [SP] -- left operand
+    EmitWord(0x910043FF); // ADD SP, SP, #16
+
+    switch (op)
+    {
+        case OP_MUL: EmitWord(0x9B017C00); break; // MADD X0, X0, X1, XZR
+        case OP_DIV: EmitWord(0x9AC10C00); break; // SDIV X0, X0, X1
+        case OP_ADD: EmitWord(0x8B010000); break; // ADD X0, X0, X1
+        case OP_SUB: EmitWord(0xCB010000); break; // SUB X0, X0, X1
+        default: throw;
+    }
+    EmitPushX0();
+}
+
+U0 ParseExpression(I64 min_precedence)
+{
+    I64 op, precedence;
+
+    switch (compiler_token)
+    {
+        case TK_NUM:
+            EmitImmediate(compiler_num);
+            EmitPushX0();
+            CompilerNext();
+            break;
+
+        case TK_LEFT:
+            CompilerNext();
+            ParseExpression(1);
+            if (compiler_token != TK_RIGHT)
+                throw;
+            CompilerNext();
+            break;
+
+        default: throw;
+    }
+
+    while (compiler_token == TK_OP)
+    {
+        op = compiler_num;
+        if (op == OP_MUL || op == OP_DIV)
+            precedence = 2;
+        else if (op == OP_ADD || op == OP_SUB)
+            precedence = 1;
+        else
+            throw;
+        if (precedence < min_precedence)
+            break;
+
+        CompilerNext();
+        ParseExpression(precedence + 1);
+        EmitBinary(op);
+    }
+}
+
+I64 CompileAndRun(U8 *src)
+{
+    U8 *code = MAlloc((StrLen(src) + 1) * 64, Fs->code_heap);
+    I64 result;
+
+    compiler_src = src;
+    compiler_dst = code;
+    CompilerNext();
+    ParseExpression(1);
+    if (compiler_token != TK_EOF)
+        throw;
+    EmitWord(0xF94003E0); // LDR X0, [SP]
+    EmitWord(0x910043FF); // ADD SP, SP, #16
+    EmitWord(0xD65F03C0); // RET
+    result = Call(code);
+    Free(code);
+    return result;
+}
+
+U0 Main()
+{
+    U8 *src;
+    while (TRUE)
+    {
+        "Enter an integer expression with +, -, *, / and parentheses.\n";
+        src = StrGet;
+        if (!*src)
+        {
+            Free(src);
+            break;
+        }
+        try
+        {
+            "$$RED$$Generated AArch64 code; this simple compiler does not optimize.$$FG$$\n";
+            "Answer:%d\n", CompileAndRun(src);
+        }
+        catch
+        {
+            "$$RED$$Invalid expression.$$FG$$\n";
+            PutExcept;
+        }
+        Free(src);
+    }
+}
+
+Main;

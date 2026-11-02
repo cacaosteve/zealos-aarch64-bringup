@@ -7494,7 +7494,20 @@ static int64_t host_print(int64_t *a) {
 static int64_t host_call(int64_t *a) {
     if (!a[0])
         return -1;
-    return FFI_CALL_TOS_0((void *)(uintptr_t)a[0]);
+    void *code = (void *)(uintptr_t)a[0];
+    uintptr_t address = (uintptr_t)code;
+    /* ZealOS's Call executes code-heap allocations produced by runtime
+     * compilers. On AArch64, stores through the data cache are not guaranteed
+     * to become visible to instruction fetch until the range is synchronized.
+     * Use the allocation's requested size so generated code can span any
+     * number of cache lines without flushing the whole JIT arena. */
+    if (address >= (uintptr_t)code_arena &&
+        address < (uintptr_t)code_arena + CODE_BYTES) {
+        int64_t size = host_managed_allocation_size(a);
+        if (size > 0)
+            __clear_cache(code, (unsigned char *)code + (size_t)size);
+    }
+    return FFI_CALL_TOS_0(code);
 }
 static int64_t host_call_ext_str(int64_t *a) {
     const char *name = (const char *)(uintptr_t)a[0];
