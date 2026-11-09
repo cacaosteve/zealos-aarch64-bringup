@@ -250,6 +250,24 @@ because it could hang while draining session tasks. This verifies the current
 cooperative bridge behavior, but does not mean the pinned upstream `Sched.ZC` is
 the scheduler currently running. See
 [`task-message-scheduling-qemu-2026-11-08.json`](docs/acceptance/task-message-scheduling-qemu-2026-11-08.json).
+`BreakUnlock` now delivers an already-pending break to the current task or
+queues it for another task's cooperative resumption. QEMU checks cover
+sleeping and message-waiting tasks and the Shift-Escape option. A focused
+task also caught a real Ctrl-Alt-C after its break lock was released; when
+the chord arrived during MessageScan polling, handling waited for Yield. The
+workflow also passed with emulated QEMU and NEC USB controllers, including
+USB/VirtIO keyboard ownership changes.
+The bridge clears interrupted wait state, wake time, popup wait flags and
+queued messages on Break. Native drive and block-device lock release is not
+implemented; see
+[the pending-break record](docs/acceptance/task-break-pending-qemu-2026-11-09.json).
+The exploratory `--probe-terminal-output-yield` checks a remaining difference
+from upstream document output; it is not expected to pass on the current
+terminal implementation. A trial using `DocPrintPartial` passed that probe and
+the DebugDemo Ctrl-Alt-C check, but it is not included here: the UserText
+memory-growth check failed during the trial and also on the original terminal
+implementation. That failure needs investigation before changing the output
+path or claiming the demo is fixed.
 
 The 2026-11-01 rebuilt PCI QEMU catalog reconfirmed compilation of all 12 named
 app entry points. A comprehensive PCI QEMU run of the named-app probes completed with

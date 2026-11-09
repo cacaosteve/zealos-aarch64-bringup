@@ -21,7 +21,32 @@
     "command": "qemu-system-aarch64 -machine virt,gic-version=3,dumpdtb=build/virt-keyboard-irq.dtb -cpu cortex-a72 -m 1024 -nodefaults -display none; dtc -I dtb -O dts build/virt-keyboard-irq.dtb",
     "result": "The generated QEMU virt device tree assigns SPI numbers 16, 17, ... 47 to VirtIO MMIO slots at 0x0a000000, 0x0a000200, ... 0x0a003e00. GIC interrupt IDs for these SPIs are 48\u201379. The keyboard driver currently scans for an input-capable slot and polls it; current GIC initialization enables the timer PPI, not these input SPIs.",
     "dtb_sha256": "34fed8dabbcf0a191768e66f99b8d9a6901728f51532e3bede63b928f7413493",
-    "next_work": "Provide bounded interrupt-safe queue consumption and acknowledgment for the discovered MMIO input interrupt, route Ctrl-Alt-C to the focused task without reentering host/compiler/device critical sections, and deliver it without scheduler preemption. USB/xHCI and Pi use different interrupt routing and require separate support.",
-    "scope": "Generated QEMU virt device tree only; no keyboard IRQ delivery implemented or tested; no change to scheduler or MessageScan."
+    "next_work": "Develop safe focused-task break delivery without entering runtime/compiler critical sections from IRQ context or switching tasks in MessageScan. The queue remains finite, and interrupt recognition does not itself stop the app. USB/xHCI and Pi need separate implementations and tests.",
+    "scope": "Opt-in QEMU virt GICv3/MMIO observation acknowledges the keyboard interrupt and scans bounded completed events to count Ctrl-Alt-C; the ordinary polling path alone consumes and reoffers descriptors. It does not deliver a break or switch tasks. USB/xHCI, physical Pi and live UTM are not covered.",
+    "irq_observer_test": {
+      "command": "python3 -u scripts/check-compat.py --pci --quick --probe-virtio-keyboard-irq",
+      "result": "pass",
+      "kernel_sha256": "d5dca18f0740d8759be99fa7a24b5ca567d286caef2a52ce60ff3f6789c51adb",
+      "evidence": "QEMU HVF selected MMIO keyboard interrupt ID 79. A five-second non-yielding serial-invoked guest function with RFlagsGet 0x2 saw zero IRQs while a key was sent. A second function temporarily set IF and reported 0x202; it observed two IRQs during its loop. Both keys were delivered to the focused terminal after the loops. After disabling the observer, a further key left its count unchanged and the serial terminal returned 42. The original flags were restored. This does not prove the IRQ mask of the graphical DebugDemo task or that a Ctrl-Alt-C can safely abort it."
+    },
+    "debug_entry_recheck": {
+      "command": "python3 -u scripts/check-compat.py --pci --quick --probe-demo-debug",
+      "result": "fail: focused original DebugDemo continued printing dots after Ctrl-Alt-C; serial recovery timed out",
+      "entry_flags": "0x202",
+      "evidence": "A small prelude was sent to the same focused graphical terminal task immediately before loading the unmodified DebugDemo. It reported x86-compatible interrupt-enable bit set at entry. This does not prove the flag remained enabled throughout the demo. The IRQ observer remained disabled for this test.",
+      "runner_log": "build/debugdemo-irq-entry2.log",
+      "runner_log_sha256": "0a68078ca21b2abe2b9b56e34c0301f19ce859522b787a2d85ce3bffbf81a05d"
+    },
+    "chord_and_queue_recheck": {
+      "result": "pass",
+      "command": "python3 -u scripts/check-compat.py --pci --quick --probe-virtio-keyboard-irq",
+      "kernel_sha256": "df53bfd41d1909695121782cce622dfbcff4359100856c777645ac18908c1bf8",
+      "log": "build/check-virtio-keyboard-irq-pci.log",
+      "log_sha256": "a16ff4d000d0af15646889db37f9b086214194acce978a2b1621f7530772d7a9",
+      "runner_log": "build/virtio-keyboard-chord-final2.log",
+      "runner_log_sha256": "54aca7843f9fc6cd2edb3e44b0c29ea4414febbca7247065d66ac7b17dee3e6b",
+      "evidence": "With observer enabled, a non-yielding function detected one Ctrl-Alt-C chord before returning when IRQs were enabled. An ordinary key did not count as a chord. The later normal input poll delivered all chord releases; both Ctrl and Alt were clear, a following C was delivered without modifiers, and the terminal returned 42. The QEMU queue size was 32 and the observer reported zero overruns. The observer was then disabled and its interrupt count stayed unchanged. Earlier with eight descriptors, the same experiment left modifiers stuck; a larger bounded queue prevents that sequence but cannot guarantee arbitrary sustained input while polling is stopped.",
+      "device_limit_test": "make check-virtio-kbd-queue verifies power-of-two selection up to 32 and legacy DMA layout for advertised maxima 0 through 512. Smaller real device queues and legacy transport remain untested in a guest."
+    }
   }
 }

@@ -180,6 +180,8 @@ static int window_demo_restore_gui_terminal;
 static int gui_terminal_active;
 static void *guest_keydev_put_key;
 static uint64_t guest_ctrl_alt_cbs[26];
+/* Like SYS_CTRL_ALT_FLAGS, this is processed by the cooperative Yield path. */
+static int guest_ctrl_alt_break_requested;
 static char guest_ctrl_alt_no_shift_descs[26][96];
 static char guest_ctrl_alt_shift_descs[26][96];
 static void *guest_doc_recalc_stub;
@@ -573,6 +575,7 @@ static int64_t guest_focus_invalid_task;
 static uint64_t guest_focus_cancel_restores;
 static int64_t guest_focus_cancel_master;
 static int64_t guest_parent_off, guest_number_off, guest_name_off, guest_flags_off;
+static int64_t guest_wake_jiffy_off;
 static int64_t guest_gs_off;
 static int64_t guest_display_flags_off;
 static int64_t guest_put_doc_off, guest_display_doc_off, guest_border_doc_off;
@@ -3902,6 +3905,8 @@ static int64_t poll_guest_keys(void);
 static uint64_t guest_ctrl_alt_callback(int64_t index);
 static int guest_ctrl_alt_callback_in_irq(int64_t index);
 static void host_guest_break_current_task(void);
+static void guest_process_ctrl_alt_break(void);
+static int64_t host_flush_messages(int64_t *a);
 static void guest_executive_loop(void) __attribute__((noreturn));
 static void guest_input_filter_loop(void);
 static struct guest_job *guest_job_head(struct guest_fiber *f) {
@@ -4072,6 +4077,10 @@ static struct guest_job *guest_job_find(void *request) {
     return NULL;
 }
 static int wait_ready(struct guest_fiber *f) {
+    /* A queued Break is delivered on the task's existing Yield return path.
+     * It must be runnable even if it was sleeping or waiting for a message. */
+    if (f->break_pending)
+        return 1;
     if (f->wait_kind == GUEST_WAIT_NONE)
         return 1;
     if (f->wait_kind == GUEST_WAIT_TIMER)
@@ -4695,6 +4704,14 @@ static int64_t host_sound_timer_total_irqs(int64_t *a) {
     (void)a;
     return (int64_t)zc_sound_timer_total_irq_count();
 }
+static int64_t host_vk_irq_count(int64_t *a) {
+    (void)a;
+    return (int64_t)zc_vk_irq_count();
+}
+static int64_t host_vk_irq_chords(int64_t *a) {
+    (void)a;
+    return (int64_t)zc_vk_irq_chords();
+}
 static int64_t host_sound_timer_enabled(int64_t *a) {
     (void)a;
     return zc_sound_timer_enabled();
@@ -5022,6 +5039,7 @@ static int64_t host_task_yield(int64_t *a) {
      * waiting background task must not steal serial-shell input. */
     if (guest_focus_task)
         poll_guest_keys();
+    guest_process_ctrl_alt_break();
     unsigned next = next_guest(me);
     if (guest_xcal_yield_trace_budget) {
         struct guest_fiber *nf = &guest_fibers[next];
@@ -5341,11 +5359,64 @@ static int64_t host_message_scan(int64_t *a) {
     return 0;
 }
 static void host_guest_break_current_task(void) {
-    /* Host-polled keys have no keyboard IRQ to invoke pinned Break(). The
-     * host-backed source volume also has no native disk locks to release. */
-    if (guest_task_bound)
-        *guest_flags(&guest_fibers[guest_current]) &= ~GUEST_AWAITING_MESSAGE;
+    if (guest_task_bound) {
+        struct guest_fiber *self = &guest_fibers[guest_current];
+        *(int64_t *)((unsigned char *)self->words + guest_wake_jiffy_off) = 0;
+        /* A break can unwind past Sleep or MessageGet. Their stack-owned
+         * wait fields must not survive into the caller's catch handler. */
+        self->wait_kind = GUEST_WAIT_NONE;
+        self->wait_slot = self->wait_target = NULL;
+        self->wait_deadline = 0;
+        self->key_wait_active = 0;
+        struct guest_fiber *task = self;
+        for (unsigned hops = 0; task && hops < GUEST_TASKS; hops++) {
+            *guest_flags(task) &= ~GUEST_AWAITING_MESSAGE;
+            task = guest_popup_child(task);
+        }
+        /* Like the stock Break(), discard queued messages before throwing.
+         * The host source store has no native drive/block locks to release. */
+        int64_t flush[1] = {(int64_t)(uintptr_t)self->words};
+        (void)host_flush_messages(flush);
+    }
     guest_raise(GUEST_EXCEPT_BREAK);
+}
+/* BreakUnlock forwards a pending break here only after removing the lock.
+ * Other tasks receive it on their next normal cooperative resumption. */
+static int64_t host_guest_break_unlocked(int64_t *a) {
+    struct guest_fiber *target = find_guest_task((void *)(uintptr_t)a[0]);
+    if (!target || !valid_guest_task(target->words)) return 0;
+    if (*guest_flags(target) & (1u << 12)) {
+        (void)post_guest_message(target->words, NULL, 2, 0x1c,
+                                 INT64_C(0x20100000201), 0);
+        return 0;
+    }
+    *guest_flags(target) &= ~GUEST_AWAITING_MESSAGE;
+    if (guest_task_bound && target == &guest_fibers[guest_current])
+        host_guest_break_current_task();
+    target->break_pending = 1;
+    return 0;
+}
+static void guest_process_ctrl_alt_break(void) {
+    if (!guest_ctrl_alt_break_requested) return;
+    guest_ctrl_alt_break_requested = 0;
+    struct guest_fiber *target = find_guest_task(guest_focus_task);
+    if (!target || !valid_guest_task(target->words) ||
+        (*(uint32_t *)((unsigned char *)target->words + guest_win_inhibit_off) & 1u))
+        return;
+    uint32_t *flags = guest_flags(target);
+    if (*flags & (1u << 10)) {
+        *flags = (*flags & ~(1u << 10)) | (1u << 11);
+    } else if (*flags & (1u << 12)) {
+        (void)post_guest_message(target->words, NULL, 2, 0x1c,
+                                 INT64_C(0x20100000201), 0);
+    } else {
+        *flags &= ~GUEST_AWAITING_MESSAGE;
+        target->break_pending = 1;
+    }
+}
+static int64_t host_ctrl_alt_break_queued(int64_t *a) {
+    (void)a;
+    return guest_ctrl_alt_break_requested;
 }
 static int64_t host_ctrl_alt_dispatch(int64_t *a) {
     if (!guest_task_bound || a[0] != 2 ||
@@ -5367,14 +5438,10 @@ static int64_t host_ctrl_alt_dispatch(int64_t *a) {
     if (!callback)
         return 0;
     if (guest_ctrl_alt_callback_in_irq(letter)) {
-        /* The native keyboard IRQ normally handles Ctrl-Alt-C by arranging
-         * for the focused task to enter Break(). This runtime receives keys
-         * as queued messages instead, so there is no IRQ callback to run.
-         * Reproduce that registered break action while the recipient task is
-         * current; Break() preserves its lock, Shift-Escape and queue cleanup
-         * behavior before raising the catchable break exception. */
+        /* The stock IRQ sets a flag; the cooperative scheduler processes it
+         * at Yield. Do not raise Break or switch tasks in a message scan. */
         if (letter == ('C' - 'A')) {
-            host_guest_break_current_task();
+            guest_ctrl_alt_break_requested = 1;
             return 1;
         }
         return 0;
@@ -5645,21 +5712,19 @@ static int64_t poll_guest_keys(void) {
                 target_fiber ? (const char *)((unsigned char *)target_fiber->words + guest_name_off) : "none",
                 (unsigned)type, (unsigned long)ch, (unsigned long)sc,
                 (unsigned long)guest_xcal_message_scans);
-        /* Ctrl-Alt-C is handled by the native keyboard IRQ before a message
-         * reader runs. This bridge polls the device cooperatively instead, so
-         * deliver the registered IRQ break action while the focused task is
-         * current; otherwise graphics loops that only Refresh never dequeue
-         * the chord and cannot be broken. */
+        /* Stock keyboard IRQs flag Ctrl-Alt-C for the scheduler; this bridge
+         * observes the key by polling and defers its processing until Yield. */
         if (type == 2 && target_fiber &&
             ((int64_t)ch == 3 || (int64_t)ch == 'c' || (int64_t)ch == 'C') &&
             ((sc & ((1ull << 10) | (1ull << 11))) ==
              ((1ull << 10) | (1ull << 11))) &&
             guest_ctrl_alt_callback('C' - 'A') &&
             guest_ctrl_alt_callback_in_irq('C' - 'A')) {
-            if (target_fiber == &guest_fibers[guest_current])
-                host_guest_break_current_task();
-            else
-                target_fiber->break_pending = 1;
+            /* Scheduler handles SYS_CTRL_ALT_C on Yield. Consuming this key
+             * here also prevents MessageGet from dispatching it a second time. */
+            guest_ctrl_alt_break_requested = 1;
+            guest_keyboard_scan_state_update(type, sc);
+            continue;
         }
         int64_t route_target = guest_keyboard_route_event_target;
         int64_t route_recipient = -1;
@@ -7611,6 +7676,7 @@ static void bind_guest_task(void) {
         !task_field(cls, "addr", 8, 0) ||
         !task_field(cls, "task_signature", 4, 8) ||
         !task_field(cls, "win_inhibit", 4, 12) ||
+        !task_field(cls, "wake_jiffy", 8, 16) ||
         !task_field(cls, "task_flags", 4, 24) ||
         !task_field(cls, "display_flags", 4, 28) ||
         !task_field(cls, "rand_seed", 8, -1) ||
@@ -7724,6 +7790,7 @@ static void bind_guest_task(void) {
         !task_field(counts, "time_stamp_calibrated", 1, 40))
         zc_fail("pinned counts layout mismatch");
     guest_parent_off = MemberFind("parent_task", cls)->off;
+    guest_wake_jiffy_off = MemberFind("wake_jiffy", cls)->off;
     guest_gs_off = MemberFind("gs", cls)->off;
     guest_next_task_off = MemberFind("next_task", cls)->off;
     guest_last_task_off = MemberFind("last_task", cls)->off;
@@ -9312,6 +9379,9 @@ static int load_source_path(const char *path, int merged, int recover) {
             "extern U0 ZcFocusTrace(U8 *site, CTask *old_focus, "
             "CTask *new_focus);");
         PrsBindCSymbol("ZcFocusTrace", host_focus_trace, 3);
+        execute_source("<pending break bridge>",
+                       "extern U0 ZcGuestBreakUnlocked(CTask *task);");
+        PrsBindCSymbol("ZcGuestBreakUnlocked", host_guest_break_unlocked, 1);
         PrsBindCSymbol("ZcSystemTask", host_system_task, 0);
         /* KDebug's CheckPtr is used by the stock ClassRep/DocForm sources.
          * The ARM64 hosted runtime validates live managed data/code blocks. */
@@ -10092,6 +10162,7 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
     gui_terminal_active = 0;
     guest_keydev_put_key = NULL;
     memset(guest_ctrl_alt_cbs, 0, sizeof(guest_ctrl_alt_cbs));
+    guest_ctrl_alt_break_requested = 0;
     memset(guest_ctrl_alt_no_shift_descs, 0,
            sizeof(guest_ctrl_alt_no_shift_descs));
     memset(guest_ctrl_alt_shift_descs, 0,
@@ -10229,6 +10300,9 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
                     {"ZcSoundTimerEnable", host_sound_timer_enable, 0},
                     {"ZcSoundTimerIrqCount", host_sound_timer_irqs, 0},
                     {"ZcSoundTimerTotalIrqs", host_sound_timer_total_irqs, 0},
+                    {"ZcVkIrqCount", host_vk_irq_count, 0},
+                    {"ZcVkIrqChords", host_vk_irq_chords, 0},
+                    {"ZcCtrlAltBreakQueued", host_ctrl_alt_break_queued, 0},
                     {"ZcSoundTimerEnabled", host_sound_timer_enabled, 0},
                     {"ZcSoundCurrentHz", host_sound_current_hz, 0},
                     {"ZcVirtioNetReady", host_virtio_net_ready, 0},

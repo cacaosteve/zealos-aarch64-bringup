@@ -22,6 +22,9 @@ static void input_poll(void) {
      * fallback. The configured recovery devices remain in the VM. */
     if (usb_keyboard_ready() && g_vk.ready) {
         vk_poll();
+        /* A diagnostic IRQ must not outlive the MMIO queue it observes. */
+        if (g_vk_watch_active)
+            (void)vk_irq_observe(0);
         vk_rw(g_vk.mmio, VK_REG_STATUS, 0);
         vk_dsb();
         g_vk.ready = 0;

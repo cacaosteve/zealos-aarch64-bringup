@@ -72,6 +72,8 @@ int zc_sound_timer_enable(void);
 void zc_sound_timer_disable(void);
 uint64_t zc_sound_timer_irq_count(void);
 uint64_t zc_sound_timer_total_irq_count(void);
+uint64_t zc_vk_irq_count(void);
+uint64_t zc_vk_irq_chords(void);
 int zc_sound_timer_enabled(void);
 uint64_t zc_sound_current_hz(void);
 void zc_usb_status(void);

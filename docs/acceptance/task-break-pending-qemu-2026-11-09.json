@@ -1,0 +1,88 @@
+{
+  "date": "2026-11-09",
+  "target": "AArch64 PCI QEMU, cooperative host task bridge",
+  "kernel_sha256": "87d090222b01129a1bcaa03fd3a172e22f9a89a6b598dea83a9d4056ad1c459e",
+  "source_bundle_sha256": "735d63d833bd1992bfac441c30191c325a9174af2d0bea68136922db974361c4",
+  "fixture": "tests/compat/TaskBreakPending.ZC",
+  "fixture_sha256": "a1ca36f651265e33bdff83477f4f3f65abdb44cc86b8080a9a15842dcae73da8",
+  "command": "python3 -u scripts/check-compat.py --pci --quick --probe-source-fast --probe-source-kernel --probe-source tests/compat/TaskBreakPending.ZC --probe-source-call TaskBreakPendingChecks",
+  "result": "pass: 42 after compiler reset and kernel/TaskBridge reload",
+  "evidence": "The fixture sets TASKf_PENDING_BREAK directly. BreakUnlock delivered a catchable Break to the current task; generated the Shift-Escape message when requested; and queued breaks for sleeping and MessageGet-blocked child tasks, which caught them after the parent explicitly yielded. The children did not run during BreakUnlock.",
+  "runner_log": "build/task-break-pending-reset.log",
+  "runner_log_sha256": "8e52737ba1c12a5ac935a1fbef78e22f48a811bb2870f3f2cb4f80fdb91caf10",
+  "scheduling_control": {
+    "command": "python3 -u scripts/check-compat.py --pci --quick --probe-source-fast --probe-source tests/compat/TaskMessages.ZC --probe-source-call TaskMessageSchedulingChecks",
+    "result": "pass: 42; MessageScan, KeyScan, CharScan and FlushMessages did not schedule the peer, while Yield and blocked MessageGet did",
+    "runner_log": "build/task-break-scheduling-regression.log",
+    "runner_log_sha256": "c2955e1a10e828df36b30ab7837a086738e0e8f1324fc0c014b8a0753cdf4205"
+  },
+  "limitations": "The QEMU tests cover yielding focused VirtIO-input tasks, not live UTM or physical Pi/USB input. Non-yielding DebugDemo remains uninterruptible by this cooperative path. Pinned Sched.ZC is not the active scheduler. Native drive/block-device lock-release semantics remain unsupported; the host source store does not provide those locks.",
+  "actual_input_recheck": {
+    "command": "python3 -u scripts/check-compat.py --pci --quick --probe-locked-break-input",
+    "result": "pass",
+    "kernel_sha256": "f1b1e5f10b50405d457ca98584e9b191663b64d7b2170aebb24bd03fd74426c5",
+    "source_bundle_sha256": "6e21ab9f3b98130b781e352f01a3a0ddc14102db8cc03356b3bd8e4492425df9",
+    "evidence": "In a focused break-locked terminal task, QMP Ctrl-Alt-C set a pending break on Yield; the task observed the pending bit and caught Break on BreakUnlock. A second focused task polled MessageScan in a non-yielding timed loop: it observed the queued request but not TASKf_PENDING_BREAK before Yield; afterward it observed the pending bit and caught Break. The terminal returned 42 and zstatus reported failed=0.",
+    "runner_log": "build/locked-break-input-verified.log",
+    "runner_log_sha256": "d97a0c54c374ab4f01fe21b5c085aeefd225d95f3142879c4626974c64c84760",
+    "unlocked_control": "The stock OhGreat Play loop accepted Ctrl-Alt-C and recovered in a preceding QEMU build with the same break dispatch logic; build/ohgreat-cooperative-break.log SHA-256 26769dacc42344d358bc87c2c865bfe2ee13820277bd2b15c8c0c4a8ad97431d.",
+    "scheduling_control": {
+      "command": "python3 -u scripts/check-compat.py --pci --quick --probe-source-fast --probe-source tests/compat/TaskMessages.ZC --probe-source-call TaskMessageSchedulingChecks",
+      "result": "pass: 42 on the rechecked kernel; explicit Yield and MessageGet schedule the peer, MessageScan, KeyScan, CharScan and FlushMessages do not",
+      "runner_log": "build/task-ctrl-alt-scheduling.log",
+      "runner_log_sha256": "62b615ecfb9798919fa19b9bda3b553a07cf153ce043aeeedca27cdf852dfcf5"
+    }
+  },
+  "cleanup_recheck": {
+    "result": "pass",
+    "kernel_sha256": "a67a4e1816df22a29a4a0a78f3bf64479f9c2e4463fcf0d816a5423b7fe78225",
+    "source_bundle_sha256": "84af4227ccd7347a2eced3461fdee9a612fc9cb380ca41d8ad87e9ffd9cebb6a",
+    "fixture": "tests/compat/TaskBreakPending.ZC",
+    "fixture_sha256": "6e7c619d6d4eab0cbc1f21a3416bdf7f506d39bee39b697bb3611c93c05c2fc1",
+    "command": "python3 -u scripts/check-compat.py --pci --quick --probe-source-fast --probe-source-kernel --probe-source tests/compat/TaskBreakPending.ZC --probe-source-call TaskBreakPendingChecks",
+    "evidence": "After zreset and kernel/TaskBridge reload, the fixture verified wake_jiffy reset, queued-message flushing, popup awaiting-message reset, and that sleeping and MessageGet-waiting tasks can yield and run again after catching a Break. The earlier build failed the new cleanup check with return 2. The Shift-Escape case still passed without the Break cleanup.",
+    "negative_control_log": "build/task-break-cleanup-before.log",
+    "negative_control_sha256": "c9af2e048ab50f30c4ec276bb629caf7640773044329276c62c8fed347588a32",
+    "runner_log": "build/task-break-cleanup-final.log",
+    "runner_log_sha256": "6a1052b0f27bdf68e863bed2773f05e9689741438f5ad7a0a8269ed4ce536e96",
+    "real_input": "The QMP locked-break and MessageScan-with-chord workflow also passed on this kernel.",
+    "input_log": "build/check-locked-break-input-pci.log",
+    "input_log_sha256": "01abb645857cfee7a894f34dc73b589bb504fdaba1017c73dbd87bd2a7fc9f36",
+    "input_runner_log": "build/locked-break-cleanup.log",
+    "input_runner_sha256": "b4dd2cd19a9e91d396c384cd93dc0be091a54d8dc971ed373a8db3ed4c8a7933",
+    "stock_demo": {
+      "command": "python3 -u scripts/check-compat.py --pci --quick --probe-demo-ohgreat",
+      "result": "pass: stock Play loop, Ctrl-Alt-C and graphical terminal recovery",
+      "runner_log": "build/ohgreat-break-cleanup.log",
+      "runner_log_sha256": "96903274e29ab9e3b739e92a77cbb3c7eafe3e3fb9214258b1c554dee91b2061"
+    }
+  },
+  "usb_input_rechecks": [
+    {
+      "command": "python3 -u scripts/check-compat.py --pci --quick --usb-input qemu --probe-locked-break-input",
+      "result": "pass",
+      "kernel_sha256": "a67a4e1816df22a29a4a0a78f3bf64479f9c2e4463fcf0d816a5423b7fe78225",
+      "scope": "USB-only QEMU xHCI, USB tablet and keyboard. Both the locked-break and non-yielding MessageScan-with-chord checks passed, with two C key-down events for two chords and terminal recovery.",
+      "guest_log": "build/check-locked-break-qemu-tablet.log",
+      "guest_log_sha256": "2e37b2f969be2bde5c0cfea6c06d3aeb65c65edac495000f6dab6bff93991159",
+      "runner_log": "build/locked-break-usb-qemu.log",
+      "runner_log_sha256": "a219e86f4c30951d03b34ddfadb792687c673ff7830ab14067faf59c393abbfd"
+    },
+    {
+      "command": "python3 -u scripts/check-compat.py --pci --quick --usb-input nec --usb-with-virtio --probe-locked-break-input",
+      "result": "pass",
+      "kernel_sha256": "382f8154b12d75cbf4497a8c85e9f210df4c469f077f1bf718a3b832024ebc31",
+      "source_bundle_sha256": "8206313b0d8f0e3903729092b67c95d52880d1cd8a3dd30c8dcb08d6ca1798d9",
+      "scope": "Emulated NEC xHCI with USB and VirtIO inputs configured. The USB keyboard was unplugged, VirtIO fallback became ready, the opt-in VirtIO interrupt observer was enabled, and USB was reattached. USB regained ownership and the observer was disabled before its VirtIO queue was reset. Both break tests and terminal recovery then passed; the test asserts exactly two routed C key-down events for two chords. This is QEMU hardware emulation, not a live UTM or Pi test.",
+      "guest_log": "build/check-locked-break-nec-tablet-virtio.log",
+      "guest_log_sha256": "616fd85c4e40e5d04d57b023d763a86092f1cfa35825130e344567f2f2c2fee2",
+      "runner_log": "build/locked-break-usb-nec-hotplug.log",
+      "runner_log_sha256": "56fc424a2729c17cab70ab38ba9bc65c0493be9e3b6e8bdede6adcbf2e83a588"
+    }
+  ],
+  "host_input_checks": {
+    "command": "make check-pi4-keyboard check-usb-hid check-usb-route",
+    "result": "pass with AddressSanitizer and UndefinedBehaviorSanitizer",
+    "scope": "Host tests of Pi boot-keyboard decoding and generic HID/USB routing; these do not exercise a physical Pi or end-to-end guest break handling."
+  }
+}

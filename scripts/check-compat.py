@@ -406,6 +406,12 @@ p.add_argument('--probe-xcaliber', action='store_true',
                help='exercise original X-Caliber gameplay, controls, and Escape recovery')
 p.add_argument('--probe-demo-debug', action='store_true',
                help='run the original busy-loop DebugDemo and verify Ctrl-Alt-C recovery')
+p.add_argument('--probe-virtio-keyboard-irq', action='store_true',
+               help='observe QEMU virtio-mmio keyboard interrupts without consuming input')
+p.add_argument('--probe-locked-break-input', action='store_true',
+               help='exercise a real Ctrl-Alt-C against a break-locked focused task')
+p.add_argument('--probe-terminal-output-yield', action='store_true',
+               help='check terminal output yielding and DOCF_DONT_SWAP_OUT')
 p.add_argument('--probe-titanium-only', action='store_true',
                help='run only Titanium compile and graphical input/gameplay checks')
 p.add_argument('--probe-stock-interactive', action='store_true',
@@ -557,7 +563,8 @@ if args.probe_keepaway_audio:
     args.probe_keepaway_full_game = True
 if args.probe_keepaway_full_game:
     args.probe_3d_apps = True
-if args.probe_demo_debug:
+if (args.probe_demo_debug or args.probe_virtio_keyboard_irq or
+        args.probe_locked_break_input or args.probe_terminal_output_yield):
     args.pci = True
     args.probe_user_startup = True
 if args.probe_demo_file_read:
@@ -746,7 +753,12 @@ if args.probe_live_window_control and not (
             '--probe-winmgr --probe-grscreen --probe-live-winmgr')
 if args.probe_dvd_live and args.pci:
     p.error('--probe-dvd-live requires ISO boot, not --pci')
-log_path = ROOT / 'build' / (f'check-usb-{usb_label}{"-budget" if args.probe_budget_program else "-logic" if args.probe_logic_program else "-program-catalog" if args.probe_program_catalog else "-psalmody" if args.probe_psalmody else "-stock-interactive" if args.probe_stock_interactive else "-stock-programs" if args.probe_stock_programs else "-lattice-controls" if args.probe_lattice_controls else "-windowdemo-input" if args.probe_gui_windowdemo_input else "-home-once" if args.probe_home_once else "-input-edges" if args.probe_input_edges else "-registry" if args.probe_registry else "-home-path" if args.probe_home_path else "-user-text" if args.probe_user_text else "-user-startup" if args.probe_user_startup else ""}.log' if args.usb_input else
+log_path = ROOT / 'build' / ('check-terminal-output-yield.log' if args.probe_terminal_output_yield else
+                             f'check-locked-break-{usb_label}.log' if args.probe_locked_break_input and usb_label else
+                             'check-locked-break-input-pci.log' if args.probe_locked_break_input else
+                             'check-virtio-keyboard-irq-pci.log' if args.probe_virtio_keyboard_irq else
+                             'check-demo-debug-pci.log' if args.probe_demo_debug else
+                             f'check-usb-{usb_label}{"-budget" if args.probe_budget_program else "-logic" if args.probe_logic_program else "-program-catalog" if args.probe_program_catalog else "-psalmody" if args.probe_psalmody else "-stock-interactive" if args.probe_stock_interactive else "-stock-programs" if args.probe_stock_programs else "-lattice-controls" if args.probe_lattice_controls else "-windowdemo-input" if args.probe_gui_windowdemo_input else "-home-once" if args.probe_home_once else "-input-edges" if args.probe_input_edges else "-registry" if args.probe_registry else "-home-path" if args.probe_home_path else "-user-text" if args.probe_user_text else "-user-startup" if args.probe_user_startup else ""}.log' if args.usb_input else
                              'check-budget-pci.log' if args.probe_budget_program else
                              'check-timeclock-pci.log' if args.probe_timeclock else
                              'check-3d-apps-pci.log' if args.probe_3d_apps else
@@ -12859,6 +12871,168 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             print('PASS original User startup text, XTalk ordering, long input, target compiler recovery and no-growth cleanup: '
                   f'{before_usage} -> {after_usage}', flush=True)
             raise SystemExit(0)
+        if args.probe_terminal_output_yield:
+            focus_graphical_terminal()
+            command('zc I64 terminal_output_peer,terminal_output_done,terminal_output_result; '
+                    'U0 TerminalOutputPeer(U8 *){terminal_output_peer=1;}', 'zc: executed')
+            command('zc U0 TerminalOutputYieldProbe(){I64 i,old;CTask *peer;'
+                    'old=Fs->put_doc->flags;peer=Spawn(&TerminalOutputPeer);'
+                    'if(!peer){terminal_output_result=1;terminal_output_done=1;return;}'
+                    'Fs->put_doc->flags=old|DOCF_DONT_SWAP_OUT;Print("no swap\\n");'
+                    'if(terminal_output_peer) terminal_output_result=2;'
+                    'Fs->put_doc->flags=old&~DOCF_DONT_SWAP_OUT;'
+                    'for(i=0;i<32&&!terminal_output_peer;i++) Print("swap\\n");'
+                    'if(!terminal_output_peer) terminal_output_result=3;'
+                    'Fs->put_doc->flags=old;terminal_output_done=1;}', 'zc: executed')
+            command('zc XTalk(bootstrap_gui_terminal_task,' +
+                    json.dumps('TerminalOutputYieldProbe;\n') + ');', 'zc: executed')
+            deadline = time.monotonic() + 30
+            while True:
+                state = command('zc Print("terminal_output=%d,%d,%d\\n",'
+                                'terminal_output_done,terminal_output_result,terminal_output_peer);',
+                                'terminal_output=')
+                if 'terminal_output=1,0,1' in state:
+                    break
+                if 'terminal_output=1,' in state or time.monotonic() >= deadline:
+                    raise RuntimeError('terminal output yielded contrary to document flags: ' + state)
+            command('zc Print("terminal_output_recovery=%d\\n",40+2);',
+                    'terminal_output_recovery=42')
+            command('zstatus', 'failed=0')
+            print('PASS terminal output yields only when the document permits it', flush=True)
+            raise SystemExit(0)
+        if args.probe_locked_break_input:
+            if args.usb_with_virtio:
+                # An opt-in MMIO IRQ observer must be detached before USB
+                # ownership parks and resets the VirtIO keyboard queue.
+                qmp_command('device_del', {'id': 'usb-kbd'})
+                time.sleep(0.3)
+                command('zstatus', 'keyboard=virtio/serial')
+                command('vkirq on', 'vkirq: enabled id=')
+                qmp_command('device_add', {'driver': 'usb-kbd', 'id': 'usb-kbd',
+                                           'bus': 'usb.0', 'port': usb_prefix + '1'})
+                deadline = time.monotonic() + 30
+                while True:
+                    ownership = command('zstatus', '')
+                    if 'keyboard=usb' in ownership:
+                        break
+                    if time.monotonic() >= deadline:
+                        raise RuntimeError('USB keyboard did not regain ownership: ' + ownership)
+                command('vkirq status', 'vkirq: enabled=0')
+            focus_graphical_terminal()
+            command('zc I64 locked_break_phase,locked_break_caught,locked_break_pending; '
+                    'U0 LockedBreakProbe(){try{BreakLock;locked_break_phase=1;'
+                    'while(!Bt(&Fs->task_flags,TASKf_PENDING_BREAK)) Yield;'
+                    'locked_break_pending=1;locked_break_phase=2;BreakUnlock;locked_break_phase=99;}'
+                    'catch{locked_break_caught=Fs->except_ch==\'Break\';'
+                    'Fs->catch_except=TRUE;}locked_break_phase=3;}',
+                    'zc: executed')
+            command('zc XTalk(bootstrap_gui_terminal_task,' +
+                    json.dumps('LockedBreakProbe;\n') + ');', 'zc: executed')
+            deadline = time.monotonic() + 30
+            while True:
+                state = command('zc Print("locked_break_phase=%d caught=%d pending=%d\\n",'
+                                'locked_break_phase,locked_break_caught,locked_break_pending);',
+                                'locked_break_phase=')
+                if 'locked_break_phase=1 caught=0 pending=0' in state:
+                    break
+                if time.monotonic() >= deadline:
+                    raise RuntimeError('focused task did not enter BreakLock: ' + state)
+            qmp_send_keys(['ctrl', 'alt', 'c'])
+            deadline = time.monotonic() + 30
+            while True:
+                state = command('zc Print("locked_break_phase=%d caught=%d pending=%d\\n",'
+                                'locked_break_phase,locked_break_caught,locked_break_pending);',
+                                'locked_break_phase=')
+                if 'locked_break_phase=3 caught=1 pending=1' in state:
+                    break
+                if time.monotonic() >= deadline:
+                    raise RuntimeError('locked Ctrl-Alt-C did not reach BreakUnlock: ' + state)
+            # A focused task can poll MessageScan without yielding. The key
+            # must remain a scheduler request until its first explicit Yield.
+            command('zc extern I64 ZcCtrlAltBreakQueued(); '
+                    'I64 locked_scan_early,locked_scan_seen,locked_scan_pending,locked_scan_done,locked_scan_caught;',
+                    'zc: executed')
+            command('zc U0 LockedScanProbe(){I64 a,b;F64 end;try{BreakLock;'
+                    'end=tS+5.0;Print("locked_scan_begin\\n");while(tS<end){'
+                    'MessageScan(&a,&b,1<<MESSAGE_CMD);'
+                    'if(ZcCtrlAltBreakQueued) locked_scan_seen=1;'
+                    'if(Bt(&Fs->task_flags,TASKf_PENDING_BREAK)) locked_scan_early=1;}'
+                    'locked_scan_done=1;while(!Bt(&Fs->task_flags,TASKf_PENDING_BREAK)) Yield;'
+                    'locked_scan_pending=1;BreakUnlock;}catch{'
+                    'locked_scan_caught=Fs->except_ch==\'Break\';Fs->catch_except=TRUE;}}',
+                    'zc: executed')
+            queued = command('zc XTalk(bootstrap_gui_terminal_task,' +
+                             json.dumps('LockedScanProbe;\n') + ');', 'zc: executed')
+            if 'locked_scan_begin' not in queued:
+                until(b'locked_scan_begin\r\n', timeout=30)
+            qmp_send_keys(['ctrl', 'alt', 'c'])
+            deadline = time.monotonic() + 30
+            while True:
+                state = command('zc Print("locked_scan=%d,%d,%d,%d,%d\\n",'
+                                'locked_scan_early,locked_scan_seen,locked_scan_pending,locked_scan_done,locked_scan_caught);',
+                                'locked_scan=')
+                if 'locked_scan=0,1,1,1,1' in state:
+                    break
+                if time.monotonic() >= deadline:
+                    raise RuntimeError('MessageScan processed the break before Yield or failed recovery: ' + state)
+            command('zc Print("locked_break_recovery=%d\\n",40+2);',
+                    'locked_break_recovery=42')
+            command('zstatus', 'failed=0')
+            log.flush()
+            route_log = log_path.read_text(errors='replace')
+            chord_downs = re.findall(r'input_route [^\n]*type=2 ch=3 scan=', route_log)
+            if len(chord_downs) != 2:
+                raise RuntimeError(f'expected one routed C key-down for each chord, got {len(chord_downs)}')
+            print('PASS focused locked Ctrl-Alt-C, pending break, unlock and terminal recovery', flush=True)
+            raise SystemExit(0)
+        if args.probe_virtio_keyboard_irq:
+            focus_graphical_terminal()
+            command('vkirq on', 'vkirq: enabled id=')
+            command('zc extern I64 ZcVkIrqCount(); extern I64 ZcVkIrqChords(); I64 VkIrqBusy(I64 enable){F64 end=tS+5.0; I64 flags=RFlagsGet,before=ZcVkIrqCount,chords=ZcVkIrqChords; if(enable) RFlagsSet(flags|0x200); Print("irq_busy_flags=%X\\n",RFlagsGet); Print("irq_busy_begin\\n"); while(tS<end){} Print("irq_busy_count=%d chord=%d\\n",ZcVkIrqCount-before,ZcVkIrqChords-chords); RFlagsSet(flags); Print("irq_busy_end\\n"); return 42;}',
+                    'zc: executed')
+            def irq_busy(enable, key):
+                begin_command(f'zc VkIrqBusy({enable});')
+                busy_begin = until(b'irq_busy_begin\r\n', timeout=30)
+                qmp_send_keys(key if isinstance(key, list) else [key])
+                busy_output = until(b'irq_busy_end\r\n', timeout=30)
+                until(b'\n> ', timeout=30)
+                flags = re.search(r'irq_busy_flags=([0-9a-fA-F]+)', busy_begin)
+                count = re.search(r'irq_busy_count=(\d+)', busy_output)
+                chords = re.search(r'chord=(\d+)', busy_output)
+                if not flags or not count or not chords:
+                    raise RuntimeError('missing busy IRQ diagnostics: ' + busy_begin + busy_output)
+                return int(flags.group(1), 16), int(count.group(1)), int(chords.group(1))
+            masked_flags, masked_count, masked_chords = irq_busy(0, 'a')
+            if masked_flags & 0x200 or masked_count or masked_chords:
+                raise RuntimeError(f'expected masked guest IRQs, flags={masked_flags:x} count={masked_count}')
+            command('vkirq off', 'vkirq: disabled')
+            command('vkirq on', 'vkirq: enabled id=')
+            enabled_flags, enabled_count, enabled_chords = irq_busy(1, 'b')
+            status = command('vkirq status', 'vkirq: enabled=1')
+            if not enabled_flags & 0x200 or not enabled_count or enabled_chords:
+                raise RuntimeError(f'no IRQ with guest interrupts enabled: flags={enabled_flags:x} busy_count={enabled_count}; ' + status)
+            chord_flags, chord_irqs, chord_count = irq_busy(1, ['ctrl', 'alt', 'c'])
+            if not chord_flags & 0x200 or not chord_irqs or chord_count != 1:
+                raise RuntimeError(f'Ctrl-Alt-C observation failed: flags={chord_flags:x} IRQs={chord_irqs} chords={chord_count}')
+            status = command('vkirq status', 'vkirq: enabled=1')
+            if 'overruns=0' not in status:
+                raise RuntimeError('IRQ observer overran its bounded input ring: ' + status)
+            if 'ctrl=0 alt=0' not in status:
+                raise RuntimeError('keyboard modifiers remained stuck after the chord: ' + status)
+            count = re.search(r'count=(\d+)', status)
+            if not count or int(count.group(1)) == 0:
+                raise RuntimeError('keyboard IRQ was not observed: ' + status)
+            command('vkirq off', 'vkirq: disabled')
+            qmp_send_key('c')
+            after = command('vkirq status', 'vkirq: enabled=0')
+            count_after = re.search(r'count=(\d+)', after)
+            if not count_after or count_after.group(1) != count.group(1):
+                raise RuntimeError('keyboard IRQ count changed after disable: ' + after)
+            if 'chords=1' not in after or 'ctrl=0 alt=0' not in after:
+                raise RuntimeError('plain C left modifiers stuck or changed the chord count: ' + after)
+            command('zc Print("irq_recovery=%d\\n",40+2);', 'irq_recovery=42')
+            print(f'PASS keyboard IRQ, Ctrl-Alt-C observation during busy code, disable and terminal recovery: {count.group(1)} IRQs', flush=True)
+            raise SystemExit(0)
         if args.probe_demo_debug:
             # Drain serial while the original busy loop runs so a full host
             # pipe cannot masquerade as a guest input failure. Require its
@@ -12867,8 +13041,10 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             # same focus as an interactive user before starting the busy loop,
             # since the loop itself prevents subsequent focus changes.
             focus_graphical_terminal()
+            command('zc I64 DebugEntryFlags(){Print("debug_entry_flags=%X\\n",RFlagsGet);return 0;}',
+                    'zc: executed', timeout=30)
             command('zc XTalk(bootstrap_gui_terminal_task,' +
-                    json.dumps('#include "/Demo/DebugDemo";\n') + ');',
+                    json.dumps('DebugEntryFlags;\n#include "/Demo/DebugDemo";\n') + ');',
                     'zc: executed', timeout=30)
             dots = 0
             first_output = None

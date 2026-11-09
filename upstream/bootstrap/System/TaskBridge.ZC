@@ -685,8 +685,7 @@ CDoc *DocDisplay(CTask *task=NULL)
         return res;
     return NULL;
 }
-// DocNew.ZC DocLock uses these around exclusive doc ownership. Pending breaks
-// are not delivered until a debugger/Ctrl-Alt-C path exists.
+// DocNew.ZC DocLock uses these around exclusive doc ownership.
 Bool BreakLock(CTask *task=NULL)
 {
     if (!task)
@@ -700,7 +699,8 @@ Bool BreakUnlock(CTask *task=NULL)
     if (!task)
         task = Fs;
     res = LBtr(&task->task_flags, TASKf_BREAK_LOCKED);
-    LBtr(&task->task_flags, TASKf_PENDING_BREAK);
+    if (LBtr(&task->task_flags, TASKf_PENDING_BREAK))
+        ZcGuestBreakUnlocked(task);
     return res;
 }
 // MakeDoc.ZC owns the real doldoc tables; zeroed defaults let DocNew compile.

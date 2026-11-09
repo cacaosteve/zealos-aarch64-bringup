@@ -314,6 +314,12 @@ static volatile uint32_t g_svc_hits;
 volatile uint64_t g_arm64_svc_bench_hits;
 /* 1 = use GICv2 MMIO CPU interface (Pi); 0 = GICv3 system regs (virt). */
 static volatile uint32_t g_gic_v2;
+/* Opt-in QEMU virt keyboard interrupt observation. The handler only
+ * acknowledges the transport; it never consumes input or switches tasks. */
+static volatile uint32_t g_vk_irq_id, g_vk_irq_count;
+static volatile uint32_t *g_vk_irq_mmio;
+uint64_t zc_vk_irq_count(void) { return g_vk_irq_count; }
+uint64_t zc_vk_irq_chords(void) { return g_vk_watch_chords; }
 /* When set, non-SVC sync advances ELR by 4 and returns (probe CNTP under UTM/HVF). */
 static volatile uint32_t g_sync_recover;
 static volatile uint32_t g_sync_skipped;
@@ -1004,6 +1010,7 @@ static void pi4_xhci_route_hex(int, uint32_t);
 static int pi4_usb_mouse_sample(uint32_t w, uint32_t h, uint32_t *x, uint32_t *y,
                                 int *buttons, int *wheel);
 #endif
+static int vk_irq_observe(int enable);
 #include "usb_input.h"
 
 static void fb_putpixel(uint32_t x, uint32_t y, uint32_t bgr) {
@@ -10383,6 +10390,11 @@ void exc_handle_irq(uint64_t *frame) {
             uart_puts(g_uart, "\n");
         }
         timer_arm();
+    } else if (g_vk_irq_mmio && id == g_vk_irq_id) {
+        vk_watch_used();
+        uint32_t status = vk_rr(g_vk_irq_mmio, VK_REG_INTERRUPT_STATUS);
+        if (status) vk_rw(g_vk_irq_mmio, VK_REG_INTERRUPT_ACK, status);
+        g_vk_irq_count++;
     } else if (g_uart && id < 1020) {
         uart_puts(g_uart, "irq: id=");
         uart_put_u32_dec(g_uart, id);
@@ -10404,6 +10416,63 @@ void exc_handle_irq(uint64_t *frame) {
 static void enable_irq(void) {
     __asm__ volatile("msr daifclr, #2");
     __asm__ volatile("isb");
+}
+
+/* QEMU virt describes its virtio-mmio slots as edge-triggered SPIs 16..47.
+ * This diagnostic is deliberately disabled by default and does not implement
+ * asynchronous guest input or task interruption. */
+static int vk_irq_observe(int enable) {
+    uint64_t flags = sound_irq_lock();
+    volatile uint32_t *gicd = mmio(GICD_BASE_PHYS);
+    if (!enable) {
+        if (g_vk_irq_mmio) {
+            uint32_t id = g_vk_irq_id;
+            gicd[(0x180 / 4) + id / 32] = 1u << (id % 32);
+            __asm__ volatile("dsb sy" ::: "memory");
+            uint32_t status = vk_rr(g_vk_irq_mmio, VK_REG_INTERRUPT_STATUS);
+            if (status) vk_rw(g_vk_irq_mmio, VK_REG_INTERRUPT_ACK, status);
+            gicd[(0x280 / 4) + id / 32] = 1u << (id % 32);
+            g_vk_watch_active = 0;
+            g_vk_irq_mmio = NULL;
+        }
+        sound_irq_unlock(flags);
+        return 0;
+    }
+    uint64_t phys = virtio_kbd_mmio_phys();
+    if (g_gic_v2 || !phys || phys < VK_MMIO_BASE ||
+        phys >= VK_MMIO_BASE + VK_MMIO_SLOTS * VK_MMIO_STRIDE ||
+        (phys - VK_MMIO_BASE) % VK_MMIO_STRIDE || g_vk_irq_mmio) {
+        sound_irq_unlock(flags);
+        return -1;
+    }
+    uint32_t id = 48u + (uint32_t)((phys - VK_MMIO_BASE) / VK_MMIO_STRIDE);
+    uint32_t bit = 1u << (id % 32);
+    gicd[(0x180 / 4) + id / 32] = bit;
+    uint32_t status = vk_rr(g_vk.mmio, VK_REG_INTERRUPT_STATUS);
+    if (status) vk_rw(g_vk.mmio, VK_REG_INTERRUPT_ACK, status);
+    gicd[(0x280 / 4) + id / 32] = bit;
+    gicd[(0x080 / 4) + id / 32] |= bit;
+    ((volatile uint8_t *)gicd)[0x400 + id] = 0x80;
+    unsigned shift = (id % 16) * 2;
+    uint32_t cfg = gicd[(0xc00 / 4) + id / 16];
+    gicd[(0xc00 / 4) + id / 16] = (cfg & ~(3u << shift)) | (2u << shift);
+    uint64_t mpidr;
+    __asm__ volatile("mrs %0, mpidr_el1" : "=r"(mpidr));
+    *(volatile uint64_t *)((uintptr_t)gicd + 0x6000 + id * 8) =
+        mpidr & 0xff00ffffffULL;
+    g_vk_irq_id = id;
+    g_vk_irq_count = 0;
+    g_vk_watch_used = g_vk.last_used;
+    g_vk_watch_ctrl = g_vk.ctrl;
+    g_vk_watch_alt = g_vk.alt;
+    g_vk_watch_chords = g_vk_watch_overruns = 0;
+    g_vk_watch_active = 1;
+    g_vk_irq_mmio = g_vk.mmio;
+    __asm__ volatile("dsb sy" ::: "memory");
+    gicd[(0x100 / 4) + id / 32] = bit;
+    __asm__ volatile("dsb sy" ::: "memory");
+    sound_irq_unlock(flags);
+    return 0;
 }
 
 static void shell_run(const struct zeal_handoff *h);
@@ -14593,6 +14662,22 @@ static void shell_handle(const char *line, int *done) {
         line[4]=='t' && line[5]==' ') { zedit_start(line+6); return; }
     if (streq(line, "zcheck")) { (void)zc_selftest(); return; }
     if (streq(line, "zstatus")) { zc_status(); return; }
+    if (streq(line, "vkirq on")) {
+        if (vk_irq_observe(1)) con_puts("vkirq: unavailable or already enabled\n");
+        else { con_puts("vkirq: enabled id="); zc_print_decimal(g_vk_irq_id); con_puts("\n"); }
+        return;
+    }
+    if (streq(line, "vkirq off")) { (void)vk_irq_observe(0); con_puts("vkirq: disabled\n"); return; }
+    if (streq(line, "vkirq status")) {
+        con_puts("vkirq: enabled="); zc_print_decimal(g_vk_irq_mmio != NULL);
+        con_puts(" id="); zc_print_decimal(g_vk_irq_id);
+        con_puts(" count="); zc_print_decimal(g_vk_irq_count);
+        con_puts(" chords="); zc_print_decimal(g_vk_watch_chords);
+        con_puts(" overruns="); zc_print_decimal(g_vk_watch_overruns);
+        con_puts(" ctrl="); zc_print_decimal(g_vk.ctrl);
+        con_puts(" alt="); zc_print_decimal(g_vk.alt);
+        con_puts(" qsize="); zc_print_decimal(g_vk.qsize); con_puts("\n"); return;
+    }
     if (streq(line, "paudio")) { zc_pi4_audio_status(); return; }
     if (streq(line, "paudiobeep")) { zc_pi4_audio_test_beep(); return; }
 #ifdef ZEAL_FORCE_PI4

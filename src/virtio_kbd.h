@@ -7,6 +7,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include "virtio_kbd_queue.h"
 
 #define VK_MAGIC            0x74726976u /* "virt" */
 #define VK_MMIO_BASE        0x0a000000ull
@@ -29,6 +30,8 @@
 #define VK_REG_QUEUE_PFN       0x040 /* legacy */
 #define VK_REG_QUEUE_READY  0x044
 #define VK_REG_QUEUE_NOTIFY 0x050
+#define VK_REG_INTERRUPT_STATUS 0x060
+#define VK_REG_INTERRUPT_ACK    0x064
 #define VK_REG_STATUS       0x070
 #define VK_REG_DESC_LO      0x080
 #define VK_REG_DESC_HI      0x084
@@ -50,7 +53,6 @@
 #define VK_EV_ABS_T         0x03u
 
 #define VK_EV_KEY           0x01u
-#define VK_QSIZE            8u
 
 #define VK_KEY_LEFTSHIFT    42u
 #define VK_KEY_RIGHTSHIFT   54u
@@ -89,6 +91,7 @@ struct vk_dev {
     uint8_t *events;
     uint16_t last_used;
     uint16_t avail_idx;
+    uint16_t qsize;
     uint8_t shift;
     uint8_t ctrl;
     uint8_t alt;
@@ -106,6 +109,12 @@ static uint64_t g_vk_key_event_count;
 static uint16_t g_vk_last_key_code;
 static uint32_t g_vk_last_key_value;
 static int g_vk_input_suppressed;
+/* IRQ observation is independent of the normal consumer. Both readers are
+ * serialized by the local IRQ mask; no descriptor is consumed here. */
+static volatile int g_vk_watch_active;
+static volatile uint16_t g_vk_watch_used;
+static volatile uint8_t g_vk_watch_ctrl, g_vk_watch_alt;
+static volatile uint32_t g_vk_watch_chords, g_vk_watch_overruns;
 
 static inline uint32_t vk_rr(volatile uint32_t *m, unsigned off) {
     return m[off / 4];
@@ -251,7 +260,7 @@ static int vk_keycode_ascii(uint16_t code, int shift, int ctrl) {
 
 static void vk_offer(struct vk_dev *d, uint16_t id) {
     uint16_t *ring = (uint16_t *)(void *)(d->avail + 4);
-    ring[d->avail_idx % VK_QSIZE] = id;
+    ring[d->avail_idx % d->qsize] = id;
     d->avail_idx++;
     vk_dsb();
     *(volatile uint16_t *)(void *)(d->avail + 2) = d->avail_idx;
@@ -338,18 +347,57 @@ static void vk_handle(struct vk_dev *d, struct vk_event ev) {
     if (!g_vk_input_suppressed) vk_decode_key(d, ev);
 }
 
+static void vk_watch_used(void) {
+    if (!g_vk_watch_active || !g_vk.ready) return;
+    struct vk_dev *d = &g_vk;
+    uint16_t end = *(volatile uint16_t *)(void *)(d->used + 2);
+    vk_dsb();
+    if ((uint16_t)(end - g_vk_watch_used) > d->qsize) {
+        g_vk_watch_overruns++;
+        g_vk_watch_used = end;
+        g_vk_watch_ctrl = g_vk_watch_alt = 0;
+        return;
+    }
+    while (g_vk_watch_used != end) {
+        uint32_t id = *(volatile uint32_t *)(void *)(d->used + 4 +
+                                (g_vk_watch_used % d->qsize) * 8);
+        g_vk_watch_used++;
+        if (id >= d->qsize) { g_vk_watch_overruns++; continue; }
+        volatile uint8_t *ep = d->events + id * 8;
+        uint16_t type = (uint16_t)ep[0] | ((uint16_t)ep[1] << 8);
+        uint16_t code = (uint16_t)ep[2] | ((uint16_t)ep[3] << 8);
+        uint32_t value = (uint32_t)ep[4] | ((uint32_t)ep[5] << 8) |
+                         ((uint32_t)ep[6] << 16) | ((uint32_t)ep[7] << 24);
+        if (type != VK_EV_KEY) continue;
+        if (code == VK_KEY_LEFTCTRL || code == VK_KEY_RIGHTCTRL) {
+            uint8_t bit = code == VK_KEY_LEFTCTRL ? 1 : 2;
+            g_vk_watch_ctrl = value ? g_vk_watch_ctrl | bit : g_vk_watch_ctrl & ~bit;
+        } else if (code == VK_KEY_LEFTALT || code == VK_KEY_RIGHTALT) {
+            uint8_t bit = code == VK_KEY_LEFTALT ? 1 : 2;
+            g_vk_watch_alt = value ? g_vk_watch_alt | bit : g_vk_watch_alt & ~bit;
+        } else if (code == 46 && value == 1 && g_vk_watch_ctrl && g_vk_watch_alt) {
+            g_vk_watch_chords++;
+        }
+    }
+}
+
 static void vk_poll(void) {
     if (!g_vk.ready) {
         return;
+    }
+    uint64_t flags = 0;
+    if (g_vk_watch_active) {
+        __asm__ volatile("mrs %0, daif\n\tmsr daifset, #2" : "=r"(flags) :: "memory");
+        vk_watch_used();
     }
     struct vk_dev *d = &g_vk;
     uint16_t uidx = *(volatile uint16_t *)(void *)(d->used + 2);
     while (d->last_used != uidx) {
         uint32_t id =
-            *(volatile uint32_t *)(void *)(d->used + 4 + (d->last_used % VK_QSIZE) * 8);
+            *(volatile uint32_t *)(void *)(d->used + 4 + (d->last_used % d->qsize) * 8);
         __asm__ volatile("" ::: "memory");
         struct vk_event ev;
-        uint8_t *ep = d->events + (id % VK_QSIZE) * 8;
+        uint8_t *ep = d->events + (id % d->qsize) * 8;
         ev.type = (uint16_t)ep[0] | ((uint16_t)ep[1] << 8);
         ev.code = (uint16_t)ep[2] | ((uint16_t)ep[3] << 8);
         ev.value = (uint32_t)ep[4] | ((uint32_t)ep[5] << 8) | ((uint32_t)ep[6] << 16) |
@@ -359,6 +407,8 @@ static void vk_poll(void) {
         vk_offer(d, (uint16_t)id);
     }
     vk_notify(d);
+    if (g_vk_watch_active)
+        __asm__ volatile("msr daif, %0\n\tisb" :: "r"(flags) : "memory");
 }
 
 static int virtio_kbd_init(uint64_t hhdm) {
@@ -411,11 +461,12 @@ static int virtio_kbd_init(uint64_t hhdm) {
     }
 
     vk_rw(found, VK_REG_QUEUE_SEL, 0);
-    if (vk_rr(found, VK_REG_QUEUE_NUM_MAX) == 0) {
+    unsigned n = vk_queue_size(vk_rr(found, VK_REG_QUEUE_NUM_MAX));
+    if (!n) {
         vk_rw(found, VK_REG_STATUS, 0);
         return 0;
     }
-    vk_rw(found, VK_REG_QUEUE_NUM, VK_QSIZE);
+    vk_rw(found, VK_REG_QUEUE_NUM, n);
 
     uint8_t *desc;
     uint8_t *avail;
@@ -424,12 +475,12 @@ static int virtio_kbd_init(uint64_t hhdm) {
 
     if (found_ver == 2) {
         desc = mem;
-        avail = mem + VK_QSIZE * 16;
-        uintptr_t used_u = ((uintptr_t)avail + 6 + VK_QSIZE * 2 + 15) & ~(uintptr_t)15;
+        avail = mem + n * 16;
+        uintptr_t used_u = ((uintptr_t)avail + 6 + n * 2 + 15) & ~(uintptr_t)15;
         used = (uint8_t *)used_u;
-        uintptr_t ev_u = ((uintptr_t)used + 6 + VK_QSIZE * 8 + 15) & ~(uintptr_t)15;
+        uintptr_t ev_u = ((uintptr_t)used + 6 + n * 8 + 15) & ~(uintptr_t)15;
         events = (uint8_t *)ev_u;
-        if (events + VK_QSIZE * 8 > mem + sizeof(g_vk_dma)) {
+        if (events + n * 8 > mem + sizeof(g_vk_dma)) {
             return 0;
         }
 
@@ -445,7 +496,7 @@ static int virtio_kbd_init(uint64_t hhdm) {
             return 0;
         }
 
-        for (unsigned i = 0; i < VK_QSIZE; i++) {
+        for (unsigned i = 0; i < n; i++) {
             uint64_t addr = vk_v2p(events + i * 8);
             uint8_t *d = desc + i * 16;
             for (int b = 0; b < 8; b++) {
@@ -474,7 +525,6 @@ static int virtio_kbd_init(uint64_t hhdm) {
         vk_rw(found, VK_REG_GUEST_PAGE_SIZE, 4096);
         vk_rw(found, VK_REG_QUEUE_ALIGN, 4096);
 
-        unsigned n = VK_QSIZE;
         unsigned avail_off = n * 16;
         unsigned used_off = (avail_off + (6 + n * 2) + 4095) & ~4095u;
         unsigned ev_off = used_off + 6 + n * 8;
@@ -511,9 +561,10 @@ static int virtio_kbd_init(uint64_t hhdm) {
     g_vk.events = events;
     g_vk.last_used = 0;
     g_vk.avail_idx = 0;
+    g_vk.qsize = (uint16_t)n;
     g_vk.shift = g_vk.ctrl = 0;
 
-    for (uint16_t i = 0; i < VK_QSIZE; i++) {
+    for (uint16_t i = 0; i < n; i++) {
         vk_offer(&g_vk, i);
     }
     vk_notify(&g_vk);

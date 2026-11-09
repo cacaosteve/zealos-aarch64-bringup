@@ -1,0 +1,103 @@
+// BreakUnlock must deliver a pending break without switching during polling.
+I64 pending_break_child_started, pending_break_child_caught, pending_break_child_resumed;
+I64 pending_break_message_started, pending_break_message_caught, pending_break_message_resumed;
+
+U0 PendingBreakSleeper(U8 *)
+{
+    pending_break_child_started = 1;
+    try {
+        Sleep(60000);
+    } catch {
+        pending_break_child_caught = Fs->except_ch == 'Break';
+        Fs->catch_except = TRUE;
+    }
+    Yield;
+    pending_break_child_resumed = 1;
+}
+
+U0 PendingBreakMessageWaiter(U8 *)
+{
+    pending_break_message_started = 1;
+    try {
+        MessageGet;
+    } catch {
+        pending_break_message_caught = Fs->except_ch == 'Break';
+        Fs->catch_except = TRUE;
+    }
+    Yield;
+    pending_break_message_resumed = 1;
+}
+
+I64 TaskBreakPendingChecks()
+{
+    I64 caught = 0, ch = 0, sc = 0;
+    CTask *child;
+    try {
+        FlushMessages;
+        MessagePost(Fs, MESSAGE_CMD, 17, 0);
+        Fs->wake_jiffy = 12345;
+        BreakLock;
+        LBts(&Fs->task_flags, TASKf_PENDING_BREAK);
+        BreakUnlock;
+        return 1;
+    } catch {
+        caught = Fs->except_ch == 'Break';
+        Fs->catch_except = TRUE;
+    }
+    if (!caught || Bt(&Fs->task_flags, TASKf_PENDING_BREAK) ||
+        Bt(&Fs->task_flags, TASKf_BREAK_LOCKED) || Fs->wake_jiffy ||
+        MessageScan(&ch, &sc, 1 << MESSAGE_CMD)) return 2;
+
+    FlushMessages;
+    LBts(&Fs->task_flags, TASKf_BREAK_TO_SHIFT_ESC);
+    LBts(&Fs->task_flags, TASKf_PENDING_BREAK);
+    BreakUnlock;
+    LBtr(&Fs->task_flags, TASKf_BREAK_TO_SHIFT_ESC);
+    if (MessageScan(&ch, &sc, 1 << MESSAGE_KEY_DOWN) != MESSAGE_KEY_DOWN ||
+        ch != CH_SHIFT_ESC || sc != 0x20100000201) return 7;
+
+    child = Spawn(&PendingBreakSleeper);
+    if (!child) return 14;
+    Suspend(child, TRUE);
+    Fs->popup_task = child;
+    LBts(&child->task_flags, TASKf_AWAITING_MESSAGE);
+    caught = 0;
+    try {
+        LBts(&Fs->task_flags, TASKf_PENDING_BREAK);
+        BreakUnlock;
+    } catch {
+        caught = Fs->except_ch == 'Break';
+        Fs->catch_except = TRUE;
+    }
+    Fs->popup_task = NULL;
+    if (!caught || Bt(&child->task_flags, TASKf_AWAITING_MESSAGE)) return 15;
+    if (!Kill(child)) return 16;
+
+    pending_break_child_started = pending_break_child_caught = pending_break_child_resumed = 0;
+    child = Spawn(&PendingBreakSleeper);
+    if (!child) return 3;
+    Yield;
+    if (!pending_break_child_started || pending_break_child_caught) return 4;
+    BreakLock(child);
+    LBts(&child->task_flags, TASKf_PENDING_BREAK);
+    BreakUnlock(child);
+    if (pending_break_child_caught) return 5;
+    Yield;
+    if (!pending_break_child_caught || pending_break_child_resumed || !TaskValidate(child)) return 6;
+    Yield;
+    if (!pending_break_child_resumed || TaskValidate(child)) return 12;
+    pending_break_message_started = pending_break_message_caught = pending_break_message_resumed = 0;
+    child = Spawn(&PendingBreakMessageWaiter);
+    if (!child) return 8;
+    Yield;
+    if (!pending_break_message_started || pending_break_message_caught) return 9;
+    BreakLock(child);
+    LBts(&child->task_flags, TASKf_PENDING_BREAK);
+    BreakUnlock(child);
+    if (pending_break_message_caught) return 10;
+    Yield;
+    if (!pending_break_message_caught || pending_break_message_resumed || !TaskValidate(child)) return 11;
+    Yield;
+    if (!pending_break_message_resumed || TaskValidate(child)) return 13;
+    return 42;
+}
