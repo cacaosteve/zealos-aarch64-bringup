@@ -18,7 +18,7 @@ SOURCE_CONTEXT_CATALOG = ROOT / "docs/acceptance/source-context-catalog-qemu-202
 NAMED_APPS = ROOT / "docs/acceptance/named-apps-qemu-2026-11-02.json"
 THREE_D = ROOT / "docs/acceptance/three-d-apps-qemu-1vcpu-2026-11-08.json"
 SPAN_STRUT = ROOT / "docs/acceptance/span-strut-qemu-2026-11-07.json"
-BUDGET = ROOT / "docs/acceptance/budget-qemu-2026-11-01.json"
+BUDGET = ROOT / "docs/acceptance/budget-hash-followup-qemu-2026-11-09.json"
 LOGIC = ROOT / "docs/acceptance/utm-logic-prompt-fix-2026-10-26.json"
 VOCABULARY = ROOT / "docs/acceptance/vocabulary-qemu-2026-11-02.json"
 NETWORK = ROOT / "docs/acceptance/network-programs-qemu-2026-11-03.json"
@@ -322,6 +322,8 @@ def main():
             "compile_unverified": sum(r["compile"] == "unverified" for r in subset),
             "runtime_pass": sum(r["runtime"] == "pass" for r in subset),
             "runtime_partial": sum(r["runtime"] == "partial" for r in subset),
+            "runtime_failed": sum(r["runtime"] == "fail" for r in subset),
+            "runtime_unverified": sum(r["runtime"] == "unverified" for r in subset),
         }
     report = {
         "date": "2026-11-08",

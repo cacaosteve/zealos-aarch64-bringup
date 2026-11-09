@@ -8,10 +8,17 @@ extern CHash *ZcHashFindFallback(char *str, CHashTable *table, int64_t type,
                                 int64_t inst);
 #endif
 int64_t HashStr(char *str) {
-  int64_t res = 5381;
-  while (*str)
-    res += (res << 5) + res + *str++;
-  return res;
+  /* Match ZealOS SYS_HASH_STR so compiler and guest tables use the same
+   * buckets. Unsigned arithmetic preserves the original 64-bit carry and
+   * wraparound without signed-overflow undefined behavior. */
+  uint64_t res = 0;
+  if (!str)
+    return 0;
+  while (*str) {
+    uint64_t carry = res >> 63;
+    res = (res << 1) + (unsigned char)*str++ + carry;
+  }
+  return (int64_t)(res + (res >> 16) + ((res >> 15) & 1));
 }
 
 void HashDel(CHash *h) {

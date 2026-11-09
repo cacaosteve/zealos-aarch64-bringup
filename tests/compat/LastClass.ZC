@@ -37,6 +37,112 @@ I64 LastClassGeneric(U8 *value, U8 *name=lastclass)
     return !StrCompare(name, "CLastClassProbe");
 }
 
+I64 LastClassHashShadowChecks()
+{
+    // Exercise the current task's ZealOS table in front of its separate
+    // compiler table, then restore the original bucket before returning.
+    CHash *compiler_entry = HashFind("CTask", Fs->hash_table, HTT_CLASS);
+    I64 bucket;
+    CHashGeneric *shadow;
+    I64 result = 42;
+
+    if (!compiler_entry)
+        return 1;
+    shadow = HashGenericAdd("CTask", HTT_CLASS);
+    if (!shadow)
+        return 1;
+    for (bucket = 0; bucket <= Fs->hash_table->mask; bucket++)
+        if (Fs->hash_table->body[bucket] == shadow)
+            break;
+    if (bucket > Fs->hash_table->mask)
+        return 5;
+    if (HashFind("CTask", Fs->hash_table, HTT_CLASS, 1) != shadow)
+        result = 2;
+    else if (shadow->use_count != 1)
+        result = 7;
+    else if (HashFind("CTask", Fs->hash_table, HTT_CLASS, 2) != compiler_entry)
+        result = 3;
+    else if (shadow->use_count != 1)
+        result = 8; // Skipped instances do not count as successful lookups.
+    else if (HashSingleTableFind("CTask", Fs->hash_table, HTT_CLASS, 1) != shadow)
+        result = 6;
+    else if (shadow->use_count != 2)
+        result = 9;
+    Fs->hash_table->body[bucket] = shadow->next;
+    Free(shadow->str);
+    Free(shadow);
+    if (HashFind("CTask", Fs->hash_table, HTT_CLASS) != compiler_entry)
+        result = 4;
+    return result;
+}
+
+I64 LastClassHashStrChecks()
+{
+    // SYS_HASH_STR returns zero for NULL/empty and folds its 64-bit state.
+    if (HashStr(NULL) || HashStr(""))
+        return 1;
+    if (HashStr("abc") != 0x2AB || HashStr("CTask") != 0x9A5)
+        return 2;
+    if (HashStr("zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz") != 0x1E5FA4)
+        return 3;
+    return 42;
+}
+
+I64 LastClassFramePtrChecks()
+{
+    CHashGeneric *first, *second, *other;
+    CHashTable *child;
+    CTask *child_task;
+    I64 bucket;
+    U8 *name = "ZcFramePtrRemovalFixture";
+    I64 result = 42;
+
+    if (FramePtr(name))
+        return 1;
+    first = FramePtrAdd(name, 11);
+    second = FramePtrAdd(name, 22);
+    if (!first || !second)
+        return 2;
+    // Removing an older instance using instance 1 must leave both intact.
+    if (ZcGuestFramePtrRemove(first, Fs->hash_table))
+        result = 3;
+    if (FramePtr(name) != 22)
+        result = 4;
+    // HashRemDel matches all of the target entry's non-flag type bits before
+    // checking its identity. A newer same-name matching type blocks removal.
+    second->type |= HTT_FILE;
+    other = HashGenericAdd(name, HTT_FILE);
+    if (!other)
+        return 8;
+    for (bucket = 0; bucket <= Fs->hash_table->mask; bucket++)
+        if (Fs->hash_table->body[bucket] == other)
+            break;
+    if (bucket > Fs->hash_table->mask)
+        return 9;
+    if (FramePtrDel(name) != 22 || FramePtr(name) != 22)
+        result = 10;
+    Fs->hash_table->body[bucket] = other->next;
+    Free(other->str);
+    Free(other);
+    second->type &= ~HTT_FILE;
+    child = HashTableNew(16);
+    child->next = Fs->hash_table;
+    child_task = CAlloc(sizeof(CTask));
+    child_task->hash_table = child;
+    // A match inherited through the table chain belongs to the parent.
+    if (ZcGuestFramePtrRemove(second, child) ||
+        FramePtrDel(name, child_task) != 22 || FramePtr(name) != 22)
+        result = 5;
+    Free(child_task);
+    child->next = NULL;
+    HashTableDel(child);
+    if (FramePtrDel(name) != 22 || FramePtr(name) != 11)
+        result = 6;
+    if (FramePtrDel(name) != 11 || FramePtr(name))
+        result = 7;
+    return result;
+}
+
 I64 LastClassChecks()
 {
     CLastClassProbe value;

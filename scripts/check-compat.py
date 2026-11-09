@@ -1301,11 +1301,14 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
     def run_graphical_terminal_command(name, source, expected, timeout=12,
                                       foreground_threshold=240000,
                                       accept_autocomplete=False,
-                                      prompt_required=True, key_delay=0.5):
+                                      prompt_required=True, key_delay=0.5,
+                                      prior_break_expected=False):
         # Keep the long GUI workflow deterministic: wait for the whole command
         # to be visible before Return, then require one new result line.
-        before_count = graphical_screen(
-            name+'-before', foreground_threshold=foreground_threshold)[3].count(expected)
+        before_text = graphical_screen(
+            name+'-before', foreground_threshold=foreground_threshold)[3]
+        before_count = before_text.count(expected)
+        prior_break_count = before_text.count('Except:') if prior_break_expected else 0
         type_graphical_prompt_line(name+'-command', source,
                                    command_timeout=timeout,
                                    prompt_required=prompt_required,
@@ -1318,7 +1321,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         while True:
             screen = graphical_screen(name+'-result',
                                       foreground_threshold=foreground_threshold)
-            if 'Except:' in screen[3] and 'Except:' not in expected:
+            if (screen[3].count('Except:') > prior_break_count and
+                    'Except:' not in expected):
                 raise RuntimeError(f'graphical terminal command {source!r} raised an '
                                    f'exception; see {graphical_path(name+"-result")}\n' +
                                    screen[3])
@@ -4812,10 +4816,49 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     'zc: loaded /Tests/LastClass.ZC')
             command('zcall LastClassChecks',
                     'zc => 0x000000000000002a')
+            command('zcall LastClassHashStrChecks',
+                    'zc => 0x000000000000002a')
             focus_graphical_terminal()
-            first = run_graphical_terminal_command(
-                'demo-last-class-start', 'ExeFile2("/Demo/LastClass.ZC");',
-                'is a', timeout=20)
+            # ClassRep2 resolves its class name using the executing task's
+            # hash table. Sample that exact table before running the demo so
+            # missing metadata can be distinguished from a bad lastclass value.
+            command('zc I64 lc_hash_cpu=-1,lc_hash_task=-1,lc_hash_private=-1,lc_hash_shadow=-1,lc_frame=-1;',
+                    'zc: executed')
+            diag = ('lc_hash_cpu=!!HashFind("CCPU",Fs->hash_table,HTT_CLASS);'
+                    'lc_hash_task=!!HashFind("CTask",Fs->hash_table,HTT_CLASS);'
+                    'CHashTable *lc_private=HashTableNew(16);'
+                    'lc_hash_private=!!HashFind("CTask",lc_private,HTT_CLASS);'
+                    'HashTableDel(lc_private);\n')
+            command('zc XTalk(bootstrap_gui_terminal_task,' + json.dumps(diag) + ');',
+                    'zc: executed', timeout=30)
+            result = command('zc {I64 i=0;while(lc_hash_private<0 && i++<200) Sleep(5);'
+                             'Print("lastclass_hash=%d,%d,%d\\n",'
+                             'lc_hash_cpu,lc_hash_task,lc_hash_private);};',
+                             'lastclass_hash=1,1,0', timeout=60)
+            print('INFO focused terminal class lookup: ' +
+                  re.search(r'lastclass_hash=-?\d+,-?\d+,-?\d+', result).group(0), flush=True)
+            command('zc XTalk(bootstrap_gui_terminal_task,' +
+                    json.dumps('lc_hash_shadow=LastClassHashShadowChecks;\n') + ');',
+                    'zc: executed', timeout=30)
+            command('zc {I64 i=0;while(lc_hash_shadow<0 && i++<200) Sleep(5);'
+                    'Print("lastclass_shadow=%d\\n",lc_hash_shadow);};',
+                    'lastclass_shadow=42', timeout=60)
+            command('zc XTalk(bootstrap_gui_terminal_task,' +
+                    json.dumps('lc_frame=LastClassFramePtrChecks;\n') + ');',
+                    'zc: executed', timeout=30)
+            command('zc {I64 i=0;while(lc_frame<0 && i++<200) Sleep(5);'
+                    'Print("frame_ptr_removal=%d\\n",lc_frame);};',
+                    'frame_ptr_removal=42', timeout=60)
+            # Launch through the same focused terminal task. This separates
+            # class-reflection coverage from long QMP typing retries, which
+            # can leave old partially erased text in the terminal transcript.
+            command('zc XTalk(bootstrap_gui_terminal_task,' +
+                    json.dumps('ExeFile2("/Demo/LastClass.ZC");\n') + ');',
+                    'zc: executed', timeout=30)
+            # Startup tips can already contain the generic phrase "is a";
+            # wait for the demo-specific second class instead of mistaking an
+            # older document line for the first completed demo output.
+            first = require_graphical_text('demo-last-class-start', 'Student', timeout=30)
             if first[3].count('is a') < 2:
                 raise RuntimeError('LastClass did not print multiple default class '
                     f'names; see {graphical_path("demo-last-class-start")}\n'+first[3])
@@ -5112,7 +5155,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             qmp_send_keys(['ctrl', 'alt', 'c'])
             run_graphical_terminal_command(
                 'demo-ohgreat-terminal-recovery', '40+2;', 'ans=0x2A=42',
-                timeout=30)
+                timeout=30, prior_break_expected=True)
             command('zstatus', 'failed=0')
             print('PASS Demo OhGreat stock Play loop, Ctrl-Alt-C and terminal recovery',
                   flush=True)
@@ -7439,10 +7482,16 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 run_graphical_terminal_command(
                     'demo-dol-doc-unused-define-cd-demo',
                     'Cd("/Demo/DolDoc");42;', 'ans=0x2A=42', timeout=20)
-                run_graphical_terminal_command(
-                    'demo-dol-doc-unused-define',
-                    'ExeFile2("UnusedDefine.ZC");42;',
-                    'ans=0x2A=42', timeout=args.probe_unused_define_timeout)
+                # The long scan runs in the focused terminal task, but use
+                # XTalk for its launch so partial QMP typing retries cannot
+                # corrupt the source line before the scan even begins. A
+                # unique result marks completion, not merely launch/output.
+                command('zc XTalk(bootstrap_gui_terminal_task,' +
+                        json.dumps('ExeFile2("UnusedDefine.ZC");0x5544;\n') + ');',
+                        'zc: executed', timeout=30)
+                require_graphical_text('demo-dol-doc-unused-define',
+                                       'ans=0x5544=21828',
+                                       timeout=args.probe_unused_define_timeout)
                 run_graphical_terminal_command(
                     'demo-dol-doc-unused-define-recovery', '40+2;',
                     'ans=0x2A=42', timeout=20)
@@ -12164,6 +12213,10 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             # Drain serial while the original busy loop runs so a full host
             # pipe cannot masquerade as a guest input failure. Require its
             # actual output before sending the documented break chord.
+            # Ctrl-Alt-C is directed to the focused guest task. Establish the
+            # same focus as an interactive user before starting the busy loop,
+            # since the loop itself prevents subsequent focus changes.
+            focus_graphical_terminal()
             command('zc XTalk(bootstrap_gui_terminal_task,' +
                     json.dumps('#include "/Demo/DebugDemo";\n') + ');',
                     'zc: executed', timeout=30)

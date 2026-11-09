@@ -1,0 +1,21 @@
+{
+  "date": "2026-11-09",
+  "result": "pass",
+  "target": "AArch64 PCI QEMU with VirtIO sound and WAV backend",
+  "source_path": "upstream/pinned/Apps/Psalmody/Run.ZC",
+  "source_sha256": "4e0fc73f3980d9c23222d18423637cf902cc681a01d8796c41fa5fa0438aa588",
+  "kernel_sha256": "126eb4ba2af0979d83a7f7f06881569433d7741907d3e4bbd702cbd0ded6121a",
+  "boot_disk_sha256": "bef34c3e447515efbca90f5d20a449f18c14145f7c5e862fb86031089e10e2ae",
+  "working_tree_changes_included": true,
+  "command": "QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device -audiodev wav,id=sound0,path=/tmp/zeal-hash-psalmody.wav -device virtio-sound-pci,audiodev=sound0' python3 scripts/check-compat.py --pci --quick --probe-psalmody",
+  "checks": [
+    "The original Psalmody editor opened, accepted note input and playback, and returned to a terminal after Shift-Escape.",
+    "A subsequent 40+2 returned 42 and zstatus reported failed=0.",
+    "The WAV backend captured 15,876 stereo frames of signed 16-bit 44.1 kHz PCM, including 24,696 nonzero samples and peak amplitude 7,000."
+  ],
+  "log": "build/hash-unified-psalmody.log",
+  "log_sha256": "46165b7c491c0ae6c576ac023abb7a2021e298fde07e967d531760553b5d4681",
+  "wav": "/tmp/zeal-hash-psalmody.wav",
+  "wav_sha256": "0a75c1398d558cfca731b940d4def161890b2b6205d61eeeeac3fdbc1ff84998",
+  "scope_note": "This verifies a QEMU VirtIO sound capture after the shared hash change. It does not prove audible output in live UTM or application audio on physical Pi hardware. The QEMU WAV uses zero streaming length fields; sample counts were derived from the captured data payload."
+}

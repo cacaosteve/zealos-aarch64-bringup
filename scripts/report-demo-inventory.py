@@ -263,7 +263,8 @@ RUNTIME_ACCEPTED = {
     "/Demo/Lectures/PCIInterrupts.ZC": "docs/acceptance/demo-arm64-irq-adaptations-qemu-2026-11-03.json",
     "/Demo/MultiCore/Interrupts.ZC": "docs/acceptance/demo-arm64-irq-adaptations-qemu-2026-11-03.json",
     "/Demo/ClassMeta.ZC": "docs/acceptance/demo-class-meta-qemu-2026-11-02.json",
-    "/Demo/LastClass.ZC": "docs/acceptance/demo-last-class-qemu-2026-11-02.json",
+    "/Demo/LastClass.ZC": "docs/acceptance/demo-last-class-hash-fix-qemu-2026-11-08.json",
+    "/Demo/DolDoc/UnusedDefine.ZC": "docs/acceptance/demo-unused-define-qemu-2026-11-09.json",
     "/Demo/Lectures/MiniCompiler.ZC": "docs/acceptance/demo-mini-compiler-interactive-qemu-2026-11-02.json",
     "/Demo/Progress.ZC": "docs/acceptance/demo-progress-qemu-2026-11-03.json",
     "/Demo/Games/BattleLines.ZC": "docs/acceptance/demo-battle-lines-qemu-2026-11-03.json",
@@ -306,8 +307,6 @@ RUNTIME_PARTIAL = {
         "docs/acceptance/demo-tosmisc-qemu-2026-11-08.json",
     "/Demo/MultiCore/MPRadix.ZC":
         "docs/acceptance/demo-mpradix-qemu-2vcpu-partial-2026-11-08.json",
-    "/Demo/DolDoc/UnusedDefine.ZC":
-        "docs/acceptance/demo-unused-define-qemu-2026-11-08.json",
 }
 RUNTIME_FAILED = {
     "/Demo/DebugDemo.ZC":

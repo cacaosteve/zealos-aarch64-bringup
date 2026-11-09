@@ -71,7 +71,7 @@
     "docs/acceptance/demo-interactive-games-2026-11-01.json",
     "docs/acceptance/demo-interrupt-demo-svc-qemu-2026-11-02.json",
     "docs/acceptance/demo-keybitmap-qemu-2026-11-02.json",
-    "docs/acceptance/demo-last-class-qemu-2026-11-02.json",
+    "docs/acceptance/demo-last-class-hash-fix-qemu-2026-11-08.json",
     "docs/acceptance/demo-lattice-qemu-2026-11-03.json",
     "docs/acceptance/demo-lex-demo-qemu-2026-11-06.json",
     "docs/acceptance/demo-lex1-qemu-2026-11-08.json",
@@ -148,6 +148,7 @@
     "docs/acceptance/demo-transform-qemu-2026-11-04.json",
     "docs/acceptance/demo-tree-checkers-qemu-2026-11-04.json",
     "docs/acceptance/demo-txt-gen-qemu-2026-11-06.json",
+    "docs/acceptance/demo-unused-define-qemu-2026-11-09.json",
     "docs/acceptance/demo-unused-space-qemu-2026-11-07.json",
     "docs/acceptance/demo-usage-qemu-2026-11-03.json",
     "docs/acceptance/demo-util1-qemu-2026-11-08.json",
@@ -167,7 +168,6 @@
     "docs/acceptance/demo-mpradix-qemu-2vcpu-partial-2026-11-08.json",
     "docs/acceptance/demo-tos-extern-qemu-2026-11-08.json",
     "docs/acceptance/demo-tosmisc-qemu-2026-11-08.json",
-    "docs/acceptance/demo-unused-define-qemu-2026-11-08.json",
     "docs/acceptance/demo-wallpaper-desktop-qemu-2026-11-08.json",
     "docs/acceptance/demo-debug-demo-qemu-2026-11-09.json",
     "docs/acceptance/demo-stack-grow-qemu-2026-11-06.json"
@@ -176,8 +176,8 @@
   "compile_pass": 206,
   "compile_blocked": 0,
   "compile_blocker_groups": [],
-  "runtime_accepted": 196,
-  "runtime_partial": 5,
+  "runtime_accepted": 197,
+  "runtime_partial": 4,
   "runtime_failed": 1,
   "directories": {
     ".": {
@@ -738,8 +738,8 @@
       "classification_confidence": "provisional; based on directory only",
       "compile": "pass",
       "first_compile_error": null,
-      "runtime": "partial",
-      "runtime_evidence": "docs/acceptance/demo-unused-define-qemu-2026-11-08.json"
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-unused-define-qemu-2026-11-09.json"
     },
     {
       "path": "/Demo/Exceptions.ZC",
@@ -1730,7 +1730,7 @@
       "compile": "pass",
       "first_compile_error": null,
       "runtime": "pass",
-      "runtime_evidence": "docs/acceptance/demo-last-class-qemu-2026-11-02.json"
+      "runtime_evidence": "docs/acceptance/demo-last-class-hash-fix-qemu-2026-11-08.json"
     },
     {
       "path": "/Demo/Lectures/AndNotMod.ZC",

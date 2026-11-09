@@ -10,7 +10,7 @@
   "demo_sources": 206,
   "demo_compile_pass": 206,
   "demo_compile_blocked": 0,
-  "demo_runtime_accepted": 195,
+  "demo_runtime_accepted": 197,
   "areas": {
     "Apps": {
       "source_files": 70,
@@ -18,7 +18,9 @@
       "compile_blocked": 0,
       "compile_unverified": 0,
       "runtime_pass": 12,
-      "runtime_partial": 0
+      "runtime_partial": 0,
+      "runtime_failed": 0,
+      "runtime_unverified": 58
     },
     "Compiler": {
       "source_files": 31,
@@ -26,15 +28,19 @@
       "compile_blocked": 1,
       "compile_unverified": 11,
       "runtime_pass": 0,
-      "runtime_partial": 0
+      "runtime_partial": 0,
+      "runtime_failed": 0,
+      "runtime_unverified": 31
     },
     "Demo": {
       "source_files": 206,
       "compile_pass": 206,
       "compile_blocked": 0,
       "compile_unverified": 0,
-      "runtime_pass": 195,
-      "runtime_partial": 5
+      "runtime_pass": 197,
+      "runtime_partial": 4,
+      "runtime_failed": 1,
+      "runtime_unverified": 4
     },
     "Doc": {
       "source_files": 1,
@@ -42,7 +48,9 @@
       "compile_blocked": 0,
       "compile_unverified": 1,
       "runtime_pass": 0,
-      "runtime_partial": 0
+      "runtime_partial": 0,
+      "runtime_failed": 0,
+      "runtime_unverified": 1
     },
     "Home": {
       "source_files": 77,
@@ -50,7 +58,9 @@
       "compile_blocked": 5,
       "compile_unverified": 0,
       "runtime_pass": 6,
-      "runtime_partial": 0
+      "runtime_partial": 0,
+      "runtime_failed": 0,
+      "runtime_unverified": 71
     },
     "Kernel": {
       "source_files": 72,
@@ -58,7 +68,9 @@
       "compile_blocked": 0,
       "compile_unverified": 72,
       "runtime_pass": 0,
-      "runtime_partial": 0
+      "runtime_partial": 0,
+      "runtime_failed": 0,
+      "runtime_unverified": 72
     },
     "Misc": {
       "source_files": 14,
@@ -66,7 +78,9 @@
       "compile_blocked": 0,
       "compile_unverified": 11,
       "runtime_pass": 0,
-      "runtime_partial": 0
+      "runtime_partial": 0,
+      "runtime_failed": 0,
+      "runtime_unverified": 14
     },
     "Root": {
       "source_files": 7,
@@ -74,7 +88,9 @@
       "compile_blocked": 0,
       "compile_unverified": 4,
       "runtime_pass": 0,
-      "runtime_partial": 0
+      "runtime_partial": 0,
+      "runtime_failed": 0,
+      "runtime_unverified": 7
     },
     "System": {
       "source_files": 137,
@@ -82,7 +98,9 @@
       "compile_blocked": 5,
       "compile_unverified": 18,
       "runtime_pass": 6,
-      "runtime_partial": 0
+      "runtime_partial": 0,
+      "runtime_failed": 0,
+      "runtime_unverified": 131
     }
   },
   "sources": [
@@ -174,7 +192,7 @@
       "compile": "pass",
       "runtime": "pass",
       "evidence": "docs/acceptance/program-catalog-qemu-2026-11-03.json",
-      "runtime_evidence": "docs/acceptance/budget-qemu-2026-11-01.json"
+      "runtime_evidence": "docs/acceptance/budget-hash-followup-qemu-2026-11-09.json"
     },
     {
       "path": "/Apps/GrModels/BallGen.ZC",
@@ -1190,8 +1208,8 @@
       "area": "Demo",
       "kind": "demo_source_or_component",
       "compile": "pass",
-      "runtime": "unverified",
-      "evidence": "docs/acceptance/demo-source-ledger-2026-11-08.json"
+      "runtime": "fail",
+      "evidence": "docs/acceptance/demo-debug-demo-qemu-2026-11-09.json"
     },
     {
       "path": "/Demo/Define.ZC",
@@ -1350,8 +1368,8 @@
       "area": "Demo",
       "kind": "demo_source_or_component",
       "compile": "pass",
-      "runtime": "partial",
-      "evidence": "docs/acceptance/demo-unused-define-qemu-2026-11-08.json"
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-unused-define-qemu-2026-11-09.json"
     },
     {
       "path": "/Demo/Exceptions.ZC",
@@ -2070,8 +2088,8 @@
       "area": "Demo",
       "kind": "demo_source_or_component",
       "compile": "pass",
-      "runtime": "unverified",
-      "evidence": "docs/acceptance/demo-source-ledger-2026-11-08.json"
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-wallpaper-desktop-qemu-2026-11-08.json"
     },
     {
       "path": "/Demo/Graphics/WallPapers/WallPaperDesktop/Install.ZC",
@@ -2143,7 +2161,7 @@
       "kind": "demo_source_or_component",
       "compile": "pass",
       "runtime": "pass",
-      "evidence": "docs/acceptance/demo-last-class-qemu-2026-11-02.json"
+      "evidence": "docs/acceptance/demo-last-class-hash-fix-qemu-2026-11-08.json"
     },
     {
       "path": "/Demo/Lectures/AndNotMod.ZC",

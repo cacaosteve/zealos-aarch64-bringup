@@ -706,6 +706,7 @@ extern U0 ZcGuestHashTableDel(CHashTable *table);
 extern CHash *ZcGuestHashFind(U8 *needle_str, CHashTable *haystack_table,
                               I64 mask, I64 instance=1);
 extern U0 ZcGuestHashAdd(CHash *tmph, CHashTable *table);
+extern Bool ZcGuestFramePtrRemove(CHash *tmph, CHashTable *table);
 // The freestanding bootstrap does not load Kernel/KHashB.ZC, but GUI demos
 // use these stock task-local hash helpers for per-task frame state. Keep the
 // same ZealOS layouts and lookup semantics here so demos can run unchanged.
@@ -765,10 +766,10 @@ I64 FramePtrDel(U8 *name, CTask *task=NULL)
     if (!entry)
         return 0;
     old = entry->user_data0;
-    // HashRemDel is part of the full kernel hash module, not this bootstrap.
-    // Invalid entries are ignored by HashFind and replaced by a fresh head
-    // entry on the next add; task teardown reclaims their heap storage.
-    entry->type = HTT_INVALID;
+    // FramePtr entries own a name and a generic hash entry. Remove only a
+    // matching entry in the requested task's local table; an inherited entry
+    // must remain owned by its parent, as with HashRemDel.
+    ZcGuestFramePtrRemove(entry, task->hash_table);
     return old;
 }
 I64 HashTypeNum(CHash *tmph)

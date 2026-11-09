@@ -1,0 +1,29 @@
+{
+  "date": "2026-11-08",
+  "command": "python3 scripts/check-compat.py --pci --quick --probe-demo-last-class",
+  "target": "AArch64 PCI QEMU, focused graphical terminal",
+  "result": "pass",
+  "source_path": "upstream/pinned/Demo/LastClass.ZC",
+  "source_sha256": "9e3e91271d4d5971f25df837a97f0dc825b252e3e2232e8077c813356dc29ac9",
+  "kernel_sha256": "def683d5248824242f10eacd7e06e67ab4da4f5d88739f01530dc1c95817dec6",
+  "boot_disk_sha256": "20fe47f2b939a133d053378c2ff848edaeafb4cd56f6c9cd5072a5ae5afbd53c",
+  "working_tree_changes_included": true,
+  "checks": [
+    "The focused guest terminal found CCPU and CTask through its task hash chain; an independent empty application hash table did not find CTask.",
+    "The original demo was launched in the terminal through XTalk and printed the inferred CTask, Student, School, and I64i names.",
+    "Return key events advanced the two prompts; both CCPU and CTask class reports appeared without Bad Pointer.",
+    "The graphical terminal accepted 40+2 and returned 42; zstatus reported failed=0.",
+    "A separate --pci --quick --probe-user-startup run passed HomeSys document startup, task hooks, capacity, and cleanup after the hash change."
+  ],
+  "log": "build/last-class-hash-isolation.log",
+  "log_sha256": "77d0f19cbc2674d6b6f0cfc0746272fee6f39d7b394209fa47d0eb0f684de1f9",
+  "shadow_retest": {
+    "result": "pass",
+    "kernel_sha256": "947cc6bfc939c16aa6b39855ea9e537d9ecf3e3b8386285e5cdd29d4757f9cd5",
+    "boot_disk_sha256": "a40cb5443d5e63c2a18d6987d20f69b261b49d55ad9df546fee26dc19104f3b5",
+    "evidence": "A focused terminal test inserted a task-local CTask entry, verified it was the first match and the prior class entry was the second, removed the test entry, and verified the original lookup was restored. The original LastClass demo and terminal recovery then passed.",
+    "log": "build/last-class-hash-shadow-retry.log",
+    "log_sha256": "f952cc5d16b17a9f15b6c24c60490356e4282316876d847317c111d37d3c9651"
+  },
+  "scope_note": "This tests the task-hash/compiler-hash bridge, one independent empty table, one task-local shadow/second-instance case, and the original demo in QEMU. Direct typing of the long launch command, broader hash-table cases, live UTM, and physical Pi remain unverified. A prior fixture using the stock HashStr external did not compile because that external is not bound; it was rewritten to locate its bucket without HashStr. The earlier failed demo retest is retained in demo-last-class-qemu-2026-11-08-retest.json."
+}

@@ -1,0 +1,18 @@
+{
+  "date": "2026-11-08",
+  "command": "python3 scripts/check-compat.py --pci --quick --probe-demo-last-class",
+  "target": "AArch64 PCI QEMU, graphical terminal",
+  "result": "partial",
+  "boot_disk_sha256": "62dae1f4ccf85a89991d9f431724b1a2940005c5803f82af9d51a5be37be8189",
+  "evidence": "The guest booted, loaded /Tests/LastClass.ZC, and LastClassChecks returned 42. The GUI typing helper then failed before submitting the original demo: the captured prompt contained duplicated prefixes in the ExeFile2 command. The automated test exited with a graphical-prompt mismatch.",
+  "scope": "The first run verifies the preliminary compiler test only; it did not submit the demo. The earlier recorded successful runtime check remains historical evidence; live UTM and Pi behavior remain unverified.",
+  "log": "build/last-class-current-check.log",
+  "log_sha256": "66232c482b5cf0dacad2e314e366d64dfd50798c372b085b2e98304e36cd5ecb",
+  "xtalk_retest": {
+    "result": "partial",
+    "evidence": "A second disposable-guest run delivered the original ExeFile2 call to the focused terminal via XTalk. The demo printed CTask, Student, School, and I64i, and two physical Return key events advanced its prompts. Both subsequent reports displayed Class Not Found instead of the expected CCPU and CTask metadata. The probe failed at that point; its final terminal-recovery check did not run.",
+    "scope": "The failure is observed using the XTalk launch path on this QEMU image. The failed direct-typing launch did not establish whether direct interactive execution behaves identically.",
+    "log": "build/last-class-xtalk-check.log",
+    "log_sha256": "cdbf00dcdb1d525e489a6aac2ff68d676881dfa9bcb3a6c3a5d292b57278a6c9"
+  }
+}

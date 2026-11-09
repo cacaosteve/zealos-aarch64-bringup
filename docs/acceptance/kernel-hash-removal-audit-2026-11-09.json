@@ -1,0 +1,36 @@
+{
+  "date": "2026-11-09",
+  "result": "unverified",
+  "scope": "Source audit of the pinned ZealOS hash removal path and ARM64 bootstrap, not a guest runtime test.",
+  "observations": [
+    "Pinned Kernel/KHashA.ZC HashRemDel finds a matching instance in a single table, checks pointer identity, unlinks it, and calls HashDel.",
+    "Pinned Kernel/KHashB.ZC HashDel handles additional allocations depending on entry type, including source symbols, define data, and dictionary words.",
+    "Before the targeted follow-up, bootstrap FramePtrDel invalidated a matching entry and deferred reclamation until task teardown. A FramePtr-specific removal path now unlinks and frees local generic entries; the full HashRemDel implementation is still not present.",
+    "The vendored Aiwnios HashRemDel uses a different delete-and-add sequence; it must not be assumed equivalent to the pinned kernel routine. No guest caller or live failure was established by this source audit."
+  ],
+  "frameptr_followup": {
+    "result": "pass",
+    "target": "AArch64 PCI QEMU",
+    "kernel_sha256": "a76d9f8c3c22bf8f8053582cac0060f94d87d6da1bf57e2cc382838b3078af72",
+    "boot_disk_sha256": "421ae39c9a1656ebb55745976d288079ef11feb14be368358e1b3943f54a57f1",
+    "evidence": "The focused terminal test verified that an older duplicate cannot be removed as instance one, that FramePtrDel on a child task leaves an inherited parent entry intact, and that local duplicates are removed in order. LastClass and terminal recovery passed; a separate HomeSys startup and task cleanup run passed.",
+    "commands": [
+      "python3 scripts/check-compat.py --pci --quick --probe-demo-last-class",
+      "python3 scripts/check-compat.py --pci --quick --probe-user-startup"
+    ],
+    "logs": {
+      "targeted": "build/frame-ptr-inherited-retry.log (SHA-256 7f90309c8e0f08dc0b04dd6c859af282d8a7521bb8e7bde729b64bee851f521d)",
+      "startup": "build/frame-ptr-user-startup.log (SHA-256 2b4e118394afc3a3ef93b997de2580be19b913c0220db2601985475446dd93b9)"
+    },
+    "type_mask_retest": {
+      "result": "pass",
+      "kernel_sha256": "8b71a96fcb38419b3e7881f76bef2c04c49e672e49630d140254ecf3cd0dceb6",
+      "boot_disk_sha256": "50c1300d8503f5c04c6d1c665f78a20ba50f16967a486f5eea212bc64d8fdb2e",
+      "evidence": "A newer same-name entry matching a second type bit blocked removal of the FramePtr entry, preserving both until the blocker was removed. The original LastClass demo and terminal recovery also passed.",
+      "log": "build/frame-ptr-type-mask-check.log",
+      "log_sha256": "391273aab86fe39bb7fa1cb05a63056ec7e3bcbb9dc4f712949928ed48525980"
+    },
+    "scope": "FramePtr generic entries in the tested QEMU cases only; arbitrary hash entry types and live UTM/Pi are not verified."
+  },
+  "remaining": "Exercise general guest hash removal on isolated tables with duplicate names, types, instance and pointer-identity mismatches, and type-specific cleanup; implement the complete guest behavior before claiming full-kernel parity."
+}

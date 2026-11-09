@@ -1,0 +1,10 @@
+{
+  "date": "2026-11-09",
+  "result": "inconclusive",
+  "target": "AArch64 PCI QEMU on a disposable disk",
+  "command": "python3 scripts/check-compat.py --pci --quick --probe-demo-dol-doc --probe-unused-define-timeout 1200",
+  "evidence": "Prerequisite DolDoc tests and Find.ZC loading reached their expected terminal outputs. The automated QMP typing helper duplicated the prefix of the UnusedDefine launch command and failed its prompt check before submitting it. The 1200-second scan timeout therefore was never exercised.",
+  "log": "build/unused-define-extended.log",
+  "log_sha256": "ff4ed063caa5bd362187c6b2849d32f25bb62c874e36bd75301ac6e964970303",
+  "scope_note": "This is a launcher failure, not evidence that UnusedDefine itself passed or failed. The follow-up launcher uses XTalk and a unique completion sentinel; long-command GUI typing remains a separate unresolved issue."
+}

@@ -1,0 +1,17 @@
+{
+  "date": "2026-11-09",
+  "result": "pass",
+  "target": "AArch64 PCI QEMU, graphical terminal, disposable disk",
+  "working_tree_changes_included": true,
+  "command": "python3 scripts/check-compat.py --pci --quick --probe-demo-dol-doc --probe-unused-define-timeout 1200",
+  "source_path": "upstream/pinned/Demo/DolDoc/UnusedDefine.ZC",
+  "source_sha256": "869a5031c9d9f2621851ba70f6c999b538d7199c35566001950cbfdcb31a52f4",
+  "checks": [
+    "The stock Find.ZC dependency loaded in the focused GUI task and the unchanged UnusedDefine source was launched through XTalk.",
+    "The scan produced linked search output and reached the unique 0x5544 completion expression; the terminal then returned 42 for 40+2 and zstatus reported failed=0.",
+    "No exception marker was found in the captured guest serial log."
+  ],
+  "log": "build/unused-define-xtalk-extended.log",
+  "log_sha256": "28270d1bc3170c8e5c7ea1a4eba61444cb8401f1e517dab6ea2d19e73963561b",
+  "scope_note": "A full scan and terminal recovery completed in this QEMU run with an extended timeout. Individual search-result completeness was not independently audited. The long GUI typing path failed in a previous launch attempt and was bypassed with XTalk; live UTM and Pi behavior remain unverified."
+}

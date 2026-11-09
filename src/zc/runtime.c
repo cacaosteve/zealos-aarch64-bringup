@@ -2423,6 +2423,11 @@ static int64_t host_compiler_hash_mask(int64_t mask) {
     mapped |= types & ~0x0027fu;
     return (int64_t)mapped;
 }
+static int64_t host_guest_hash_result(CHash *found) {
+    if (found)
+        found->use_cnt = (int32_t)((uint32_t)found->use_cnt + 1u);
+    return (int64_t)(uintptr_t)found;
+}
 static int64_t host_hash_find(int64_t *a) {
     CHashTable *table = (CHashTable *)(uintptr_t)a[1];
     int64_t mask = a[2];
@@ -2433,8 +2438,29 @@ static int64_t host_hash_find(int64_t *a) {
     if (table_bytes >= (int64_t)sizeof(*table) && table->mask >= 0 &&
         table->mask < (1 << 20) && table->body &&
         host_managed_allocation_size_ptr((uintptr_t)table->body) >=
-            (int64_t)(((uint64_t)table->mask + 1) * sizeof(*table->body)))
-        return (int64_t)(uintptr_t)HashFind(name, table, mask, a[3]);
+            (int64_t)(((uint64_t)table->mask + 1) * sizeof(*table->body))) {
+        CHash *found = HashFind(name, table, mask, a[3]);
+        if (found)
+            return host_guest_hash_result(found);
+        /* A guest task's private ZealOS definitions and its compiler names
+         * live in separate chains. Search the latter only after the task's
+         * own chain, and only for compiler symbol types; arbitrary application
+         * hash tables must retain their own namespace. */
+        if (!guest_task_bound || guest_current >= GUEST_TASKS || a[3] < 1 ||
+            table != *(CHashTable **)((unsigned char *)
+                     guest_fibers[guest_current].words + guest_hash_table_off) ||
+            (mask != -1 && !(mask & 0x0027f)))
+            return 0;
+        CHashTable *compiler = host_active_task_hash_table();
+        if (!compiler)
+            return 0;
+        int64_t remaining = a[3];
+        for (int64_t n = 1; n < a[3] && HashFind(name, table, mask, n); n++)
+            remaining--;
+        return host_guest_hash_result(HashFind(name, compiler,
+                                              host_compiler_hash_mask(mask),
+                                              remaining));
+    }
 
     /* Some guest CTask mirrors carry addresses outside the managed host
      * arena. Resolve those through the active compiler task's validated
@@ -2447,8 +2473,8 @@ static int64_t host_hash_find(int64_t *a) {
             : task.hash_table;
     if (compiler_table) {
         if (mask == -1 || (mask & 0x0027f))
-            return (int64_t)(uintptr_t)HashFind(
-                name, compiler_table, host_compiler_hash_mask(mask), a[3]);
+            return host_guest_hash_result(HashFind(
+                name, compiler_table, host_compiler_hash_mask(mask), a[3]));
         return 0;
     }
     return 0;
@@ -2466,27 +2492,28 @@ CHash *ZcHashFindFallback(char *name, CHashTable *table, int64_t mask,
     return HashFind(name, compiler_table, host_compiler_hash_mask(mask),
                     instance);
 }
+/* Kernel/KHashA.ZC SYS_HASH_STR: 64-bit rotate-through-carry addition,
+ * then fold the upper bits with the carry from the 16-bit shift. */
+static uint64_t guest_hash_str(const unsigned char *needle) {
+    return (uint64_t)HashStr((char *)needle);
+}
+static int64_t host_guest_hash_str(int64_t *a) {
+    return (int64_t)guest_hash_str((const unsigned char *)(uintptr_t)a[0]);
+}
 static int64_t host_hash_single_table_find(int64_t *a) {
     const unsigned char *needle = (const unsigned char *)(uintptr_t)a[0];
     CHashTable *table = (CHashTable *)(uintptr_t)a[1];
-    uint64_t hash = 0;
     int64_t mask = a[2], instance = a[3];
     CHash **bucket;
     CHash *entry;
 
     if (!needle || !table || !table->body || instance <= 0)
         return 0;
-    while (*needle) {
-        uint64_t carry = hash >> 63;
-        hash = (hash << 1) + *needle++ + carry;
-    }
-    hash += (hash >> 16) + ((hash >> 15) & 1);
-    bucket = &table->body[hash & table->mask];
+    bucket = &table->body[guest_hash_str(needle) & table->mask];
     for (entry = *bucket; entry; entry = entry->next) {
         if ((entry->type & mask) && !strcmp(entry->str, (const char *)(uintptr_t)a[0])) {
             if (!--instance) {
-                entry->use_cnt++;
-                return (int64_t)(uintptr_t)entry;
+                return host_guest_hash_result(entry);
             }
         }
     }
@@ -2494,6 +2521,35 @@ static int64_t host_hash_single_table_find(int64_t *a) {
 }
 static int64_t host_hash_add(int64_t *a) {
     HashAdd((CHash *)(uintptr_t)a[0], (CHashTable *)(uintptr_t)a[1]);
+    return 0;
+}
+/* FramePtr entries own only their name and the generic entry itself. Match
+ * the first local entry by name/type and identity, as HashRemDel does; an
+ * inherited match must not be removed from its parent's table. */
+static int64_t host_frame_ptr_remove(int64_t *a) {
+    CHash *wanted = (CHash *)(uintptr_t)a[0];
+    CHashTable *table = (CHashTable *)(uintptr_t)a[1];
+    int64_t table_bytes = host_managed_allocation_size_ptr((uintptr_t)table);
+    if (!wanted || table_bytes < (int64_t)sizeof(*table) || table->mask < 0 ||
+        table->mask >= (1 << 20) || !table->body ||
+        host_managed_allocation_size_ptr((uintptr_t)table->body) <
+            (int64_t)(((uint64_t)table->mask + 1) * sizeof(*table->body)) ||
+        host_managed_allocation_size_ptr((uintptr_t)wanted) < (int64_t)sizeof(*wanted) ||
+        !(wanted->type & 0x10000) || !wanted->str)
+        return 0;
+    CHash **link = &table->body[(uint64_t)HashStr(wanted->str) & table->mask];
+    uint32_t match_types = (uint32_t)wanted->type & 0x00ffffffu;
+    for (CHash *entry = *link; entry; link = &entry->next, entry = *link) {
+        if (!((uint32_t)entry->type & match_types) || strcmp(entry->str, wanted->str))
+            continue;
+        (void)host_guest_hash_result(entry);
+        if (entry != wanted)
+            return 0;
+        *link = entry->next;
+        __AIWNIOS_Free(entry->str);
+        __AIWNIOS_Free(entry);
+        return 1;
+    }
     return 0;
 }
 static int64_t host_hash_add_after(int64_t *a) {
@@ -9119,6 +9175,7 @@ static int load_source_path(const char *path, int merged, int recover) {
         PrsBindCSymbol("ZcGuestHashTableDel", host_hash_table_del, 1);
         PrsBindCSymbol("ZcGuestHashFind", host_hash_find, 4);
         PrsBindCSymbol("ZcGuestHashAdd", host_hash_add, 2);
+        PrsBindCSymbol("ZcGuestFramePtrRemove", host_frame_ptr_remove, 2);
         /* Keep the source-backed tS() function intact here. Binding a global
          * with the same name shadows the zero-argument clock function and
          * freezes elapsed-time reads at the last TimeCal update. */
@@ -9266,6 +9323,7 @@ static int load_source_path(const char *path, int merged, int recover) {
         PrsBindCSymbol("StrIMatch", host_str_imatch, 2);
         /* KernelC declares the compiler's ordered hash insertion primitive. */
         PrsBindCSymbol("HashAddAfter", host_hash_add_after, 3);
+        PrsBindCSymbol("HashStr", host_guest_hash_str, 1);
         /* Keep the compiler's single-table lookup distinct from HashFind,
          * which also walks the CHashTable::next chain. */
         PrsBindCSymbol("HashSingleTableFind", host_hash_single_table_find, 4);

@@ -1,0 +1,15 @@
+{
+  "date": "2026-11-08",
+  "target": "AArch64 PCI QEMU guest compiler",
+  "result": "pass",
+  "symbol": "HashStr",
+  "evidence": "An earlier compatibility fixture failed to compile because HashStr (_HASH_STR) was unbound. After binding the pinned SYS_HASH_STR algorithm, the guest compiler loaded the fixture and verified NULL, empty string, abc, CTask, and a 78-byte carry/fold vector. The class lookup, private-table isolation, shadowing and LastClass terminal recovery checks also passed.",
+  "prior_failure_log": "build/last-class-hash-shadow.log",
+  "prior_failure_log_sha256": "5836812da627589c5bb7c3b46ea106b7b535ad87e2a21814458dbde0df9d2754",
+  "command": "python3 scripts/check-compat.py --pci --quick --probe-demo-last-class",
+  "kernel_sha256": "e9c7abd7e1c3c9f20f858f1d47d66c37318f04e0b0a6fe173c1bc56784c99f5a",
+  "boot_disk_sha256": "03d8e08133150941ca2b6b3b44b8b8d3fbf3b4a50a3d4987855d9fdd79162e51",
+  "log": "build/hash-str-guest-check-retry.log",
+  "log_sha256": "74429dec06cdb722e9695c84a96bf4ebff5dbddb3e5a2172ab04d946d33d6bc8",
+  "scope_note": "This run verifies standalone HashStr values and the named regression cases in QEMU. The subsequent shared-table hash fix and its interoperability tests are recorded in kernel-hash-table-qemu-2026-11-09.json. Live UTM and physical Pi remain unverified."
+}

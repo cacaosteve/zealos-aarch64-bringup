@@ -1,0 +1,15 @@
+{
+  "date": "2026-11-09",
+  "result": "pass",
+  "target": "AArch64 PCI QEMU on a disposable disk",
+  "working_tree_changes_included": true,
+  "command": "python3 scripts/check-compat.py --pci --quick --probe-budget-program",
+  "checks": [
+    "Calendar, UTC clock, keyboard scanner, and supporting form and hash checks passed.",
+    "Budget's form create, edit, cancel, save, abort and clean-exit paths passed.",
+    "The saved entry was visible after reopening and a cold disk-only reboot; the terminal then evaluated 40+2 as 42 with zstatus failed=0."
+  ],
+  "log": "build/budget-hash-current.log",
+  "log_sha256": "bf6de4bce5afc1c95a4b0e6d470657d2ae1b8bc2a5367c30ee844061262ec6c5",
+  "scope_note": "QEMU regression coverage after the hash changes. The user's earlier report of a frozen Budget screen in live UTM remains unresolved by this test; Pi behavior is also unverified."
+}

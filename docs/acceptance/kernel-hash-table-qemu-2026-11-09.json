@@ -1,0 +1,37 @@
+{
+  "date": "2026-11-09",
+  "result": "pass",
+  "target": "AArch64 PCI QEMU",
+  "kernel_sha256": "126eb4ba2af0979d83a7f7f06881569433d7741907d3e4bbd702cbd0ded6121a",
+  "boot_disk_sha256": "bef34c3e447515efbca90f5d20a449f18c14145f7c5e862fb86031089e10e2ae",
+  "working_tree_changes_included": true,
+  "prior_failure": "A task-local CTask entry inserted through HashGenericAdd was found by HashFind, but HashSingleTableFind failed to find it because insertion and single-table lookup computed different buckets. The regression returned 6 in build/hash-single-before.log, SHA-256 a362ebdf6825ef61236adf675e7b36df7f2f8cf5cd31e176cb8faa4a675f2239.",
+  "checks": [
+    "Compiler and guest hash primitives use the same pinned ZealOS string hash; the upstream vendor patch is reversible and validates against the pinned originals.",
+    "The focused task test inserted a local CTask shadow, found it through HashFind and HashSingleTableFind, resolved the next instance, restored its bucket, and then passed the original LastClass demo and terminal recovery.",
+    "The autocomplete corpus indexing, suggestion, Ctrl+F1 completion, and task teardown suite passed.",
+    "The HomeSys startup, task hook, capacity, and cleanup suite passed."
+  ],
+  "commands": [
+    "python3 scripts/check-upstream.py",
+    "python3 scripts/check-compat.py --pci --quick --probe-demo-last-class",
+    "python3 scripts/check-compat.py --pci --quick --probe-autocomplete",
+    "python3 scripts/check-compat.py --pci --quick --probe-user-startup"
+  ],
+  "logs": {
+    "lastclass": "build/hash-unified-lastclass.log (SHA-256 65892388e09124457bc9f8de9e12c3543f995ab61d2d71ca440c8feebbc96f22)",
+    "autocomplete": "build/hash-unified-autocomplete.log (SHA-256 af18da19b22ca9d14b35a3693a84ff4cf2895b7f2bdcc7eb2f16a79f902fed50)",
+    "startup": "build/hash-unified-user-startup.log (SHA-256 baf2d11386f7a978df1a061e385b290ee4d988d434c17563b0221909f9a0f01d)"
+  },
+  "use_count_followup": {
+    "result": "pass",
+    "kernel_sha256": "8e41ffd8308d1082ab8c31b586566a67fec5e4f0f2538736305273d001bf1856",
+    "boot_disk_sha256": "78b7cc2bea7f0646aad14f475ca3c0ba3e71fe13c4e0a6ecb9e8fbdd5fdf612a",
+    "evidence": "Guest HashFind and HashSingleTableFind increment the returned entry's use count. The shadow test checked that a skipped first entry was not incremented when requesting the second instance. The LastClass and autocomplete QEMU suites passed after the change.",
+    "lastclass_log": "build/hash-use-count-lastclass.log",
+    "lastclass_log_sha256": "3b1ca54e7bf2ee9b09a38407b9dc0cae80be717492f1eac38313a7376fcbde2f",
+    "autocomplete_log": "build/hash-use-count-autocomplete.log",
+    "autocomplete_log_sha256": "c2ab7e91fa19547e099e7ebea224e28f2f95baf6bd0d8100c05638c7e7703601"
+  },
+  "scope_note": "QEMU coverage of the listed workflows and one task-local shadow; not exhaustive proof of all hash operations or of live UTM and Pi behavior."
+}
