@@ -1,0 +1,26 @@
+{
+  "date": "2026-11-09",
+  "target": "AArch64 PCI QEMU, one vCPU, VirtIO keyboard/tablet and WAV-backed VirtIO sound",
+  "kernel_sha256": "db898897746b5a5efc4398f1b14855829ef95ce78951f84a1b4e913d8fd4e093",
+  "source_bundle_sha256": "e8ebb800ed78a902c0324914b61d94e62a1e44149384f3938d312d4718f862eb",
+  "command": "ZEAL_AUDIO_CAPTURE_PATH=build/keepaway-bracketed2.wav QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device -audiodev wav,id=sound0,path=build/keepaway-bracketed2.wav -device virtio-sound-pci,audiodev=sound0' python3 -u scripts/check-compat.py --pci --quick --probe-keepaway-audio",
+  "result": "pass: game frame, input, 183 seconds of changing scanout, Escape and terminal recovery; nonzero audio captured between game launch and exit",
+  "audio": "Byte offsets 20480\u201311382784 contained 5,542,922 nonzero signed 16-bit samples with peak 7000. Offsets are WAV file sizes observed by the test before launching the game and after exiting it, and can include backend buffering and the exit smoke check. WAV header sizes were zero after test termination.",
+  "logs": {
+    "build/keepaway-bracketed2.log": "45b56ff4a4afdc65cc04f17e4a84984bd224edafdee7996725334333a7c84e77",
+    "build/keepaway-bracketed2.wav": "9e499ce86ab0582be6e57986a9d0bdcb3fc87bad5ee99ed33e510f4454fb5595"
+  },
+  "limits": "Nonzero output during gameplay does not identify individual Noise or Sound events, establish accurate effect duration, or verify audible UTM or Pi output. Screenshot updates do not prove full gameplay correctness.",
+  "timer_followup": {
+    "kernel_sha256": "faa1e67b7ebffb5ea968e403e02ad5ff6d60b05bf0792d6bdaec599d86a49257",
+    "source_bundle_sha256": "e8ebb800ed78a902c0324914b61d94e62a1e44149384f3938d312d4718f862eb",
+    "command": "ZEAL_AUDIO_CAPTURE_PATH=build/keepaway-timer2.wav QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device -audiodev wav,id=sound0,path=build/keepaway-timer2.wav -device virtio-sound-pci,audiodev=sound0' python3 -u scripts/check-compat.py --pci --quick --probe-keepaway-audio-timer",
+    "result": "pass: opt-in audio timer enabled, game updated through 183 seconds, Escape returned to terminal, 1567 cumulative timer IRQs were observed and current tone frequency was zero after exit",
+    "audio": "The bracketed capture held 5,521,850 nonzero 16-bit samples with peak 7000. Byte offsets 20480\u201311460608 include potential backend buffering and exit checks.",
+    "logs": {
+      "build/keepaway-timer2.log": "f256c4607b2466c8360f6437b12f139e89759a7058de760b8a40ee8f3cdcd971",
+      "build/keepaway-timer2.wav": "3af32491bbbf581aaac8ca0771142f63213a535f760a976195fa4dc4509e42bc"
+    },
+    "limits": "Timer is explicitly opt-in, not default. This does not establish uninterrupted audible output, individual effect timing, live UTM, or Pi audio."
+  }
+}

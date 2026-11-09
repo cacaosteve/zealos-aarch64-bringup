@@ -4,6 +4,32 @@ extern I64 ZcSoundSubmittedFrames();
 extern I64 ZcSoundTimerEnable();
 extern I64 ZcSoundTimerIrqCount();
 extern I64 ZcSoundTimerEnabled();
+extern I64 ZcSoundTimerTotalIrqs();
+
+I64 SoundTimerEnableDuringToneChecks()
+{
+    I64 flags = RFlagsGet, count;
+    F64 until;
+    if (ZcSoundTimerEnabled)
+        return 1;
+    RFlagsSet(flags | (1 << 9));
+    Sound(60);
+    if (!ZcSoundTimerEnable)
+    {
+        Sound(0);
+        RFlagsSet(flags);
+        return 2;
+    }
+    until = tS + 0.15;
+    while (tS < until) {}
+    count = ZcSoundTimerTotalIrqs;
+    Sound(0);
+    RFlagsSet(flags);
+    Print("enabled_during_tone_irqs=%d\n", count);
+    if (count >= 3)
+        return 42;
+    return 3;
+}
 extern I64 ZcSoundCurrentHz();
 I64 SoundTimerUnavailableChecks()
 {

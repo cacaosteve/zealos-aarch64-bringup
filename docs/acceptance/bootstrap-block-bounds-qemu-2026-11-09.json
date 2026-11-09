@@ -1,0 +1,23 @@
+{
+  "date": "2026-11-09",
+  "change": "Validate nonempty bootstrap block ranges using subtraction instead of overflow-prone start + count, for both the RAM disk and VirtIO-backed range.",
+  "kernel_sha256": "01dc56e246cf0f40f2590a60381ff5f718d58508578bf703ca0e9bbdd22b1089",
+  "source_bundle_sha256": "7bf1f26f71420222735149609f017824be916de2c2d8c989b548ce8b41d5ff98",
+  "checks": [
+    {
+      "command": "make check-block-range",
+      "result": "pass under ASan/UBSan for valid boundaries, empty ranges, out-of-range sectors and unsigned wraparound"
+    },
+    {
+      "command": "python3 -u scripts/check-compat.py --pci --quick --probe-hc-block-range",
+      "result": "pass: desktop boot and existing bootstrap block selftest, wrapping bootstrap BlkRead and BlkWrite requests and oversized count rejected; zstatus failed=0",
+      "log": "build/block-range-qemu2.log",
+      "sha256": "b188b16c4f96477ba78c45142cd281277a8064aab09e0d98c81a8be0fe14102b"
+    },
+    {
+      "command": "make esp pi-desktop pi-diag",
+      "result": "pass"
+    }
+  ],
+  "scope": "PCI QEMU uses a disposable disk clone. Host range tests cover RAM-disk boundary arithmetic, but an invalid RAM-disk request was not executed inside the guest. This does not fix DebugDemo break handling."
+}

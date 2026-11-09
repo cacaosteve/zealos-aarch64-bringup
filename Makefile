@@ -435,7 +435,8 @@ $(BUILD)/kernel_stub-pi.o: src/kernel_stub.c src/zc/runtime.h Makefile src/hando
 $(BUILD)/kernel_stub-pi.o: src/pi4_dma_probe.h src/pi4_xhci_probe.h src/pi4_xhci_dma_probe.h src/pi4_xhci_dma_alias.h
 
 $(BUILD)/kernel_stub.o $(BUILD)/kernel_stub-pi.o $(BUILD)/kernel_stub-pi-desktop.o: src/pi4_audio.h
-$(BUILD)/kernel_stub-pi-desktop.o: src/pi4_hdmi_audio.inc
+$(BUILD)/kernel_stub.o $(BUILD)/kernel_stub-pi.o $(BUILD)/kernel_stub-pi-desktop.o: src/block_range.h
+$(BUILD)/kernel_stub-pi-desktop.o: src/pi4_hdmi_audio.inc src/pi4_audio_policy.h
 
 $(BOOT_PI): $(BUILD)/zealbooter-pi.o src/linker-booter.ld
 	$(CLANG) $(CFLAGS) $(CFLAGS_PI) $(LDFLAGS_BOOT) $(BUILD)/zealbooter-pi.o -o $@
@@ -609,7 +610,17 @@ check-pi4-desktop-fb: | $(BUILD)
 	$(HOST_CC) -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined tests/pi4_desktop_fb_test.c -o $(BUILD)/pi4-desktop-fb-test
 	$(BUILD)/pi4-desktop-fb-test
 
-check-pi4-platform: check-pi4-pcie-fdt check-pi4-pcie-cfg check-pi4-dma check-pi4-xhci-probe check-pi4-xhci-dma check-pi4-fat32 check-pi4-keyboard check-pi4-mouse check-pi4-usb-bus check-pi4-desktop-fb
+.PHONY: check-pi4-hdmi-audio
+check-pi4-hdmi-audio: | $(BUILD)
+	$(HOST_CC) -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined -I$(ROOT)/src tests/pi4_hdmi_audio_policy.c -o $(BUILD)/pi4-hdmi-audio-policy
+	$(BUILD)/pi4-hdmi-audio-policy
+
+.PHONY: check-block-range
+check-block-range: | $(BUILD)
+	$(HOST_CC) -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined -I$(ROOT)/src tests/block_range_test.c -o $(BUILD)/block-range-test
+	$(BUILD)/block-range-test
+
+check-pi4-platform: check-pi4-pcie-fdt check-pi4-pcie-cfg check-pi4-dma check-pi4-xhci-probe check-pi4-xhci-dma check-pi4-fat32 check-pi4-keyboard check-pi4-mouse check-pi4-usb-bus check-pi4-desktop-fb check-pi4-hdmi-audio
 
 .PHONY: check-usb-hid check-usb-route check-usb-input check-usb-topology
 check-usb-hid: | $(BUILD)

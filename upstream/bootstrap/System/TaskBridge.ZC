@@ -94,6 +94,7 @@ extern Bool Cd(U8 *dirname=NULL, Bool make_dirs=FALSE);
 extern U8 *DirCur(CTask *task=NULL, CTask *mem_task=NULL);
 extern Bool ZcSourceFileAt(I64 index, U8 *path, I64 path_cap, I64 *_size);
 extern Bool ZcRedSeaFileAt(I64 index, U8 *path, I64 path_cap, I64 *_size);
+extern Bool ZcRedSeaDirAt(I64 index, U8 *path, I64 path_cap);
 extern Bool ZcSourceVolumeStats(U64 *_capacity_bytes, U64 *_free_bytes);
 extern Bool FilesFindMatch(U8 *test_name, U8 *files_find_mask,
                            I64 fuf_flags=0);
@@ -2307,7 +2308,8 @@ Bool BootstrapFilesFindAppend(CDirEntry **head, CDirEntry **tail,
     *tail = de;
     return TRUE;
 }
-Bool BootstrapFilesFindInCurrent(U8 *full_name, U8 *cur_dir, U8 **remainder)
+Bool BootstrapFilesFindInCurrent(U8 *full_name, U8 *cur_dir, U8 **remainder,
+                                 Bool ignore_case=FALSE)
 {
     I64 cur_len, i;
 
@@ -2320,7 +2322,9 @@ Bool BootstrapFilesFindInCurrent(U8 *full_name, U8 *cur_dir, U8 **remainder)
         return TRUE;
     }
     for (i = 0; i < cur_len; i++)
-        if (full_name[i] != cur_dir[i])
+        if (!full_name[i] ||
+            ignore_case && ToUpper(full_name[i]) != ToUpper(cur_dir[i]) ||
+            !ignore_case && full_name[i] != cur_dir[i])
             return FALSE;
     if (full_name[cur_len] != '/')
         return FALSE;
@@ -2454,12 +2458,60 @@ CDirEntry *FilesFind(U8 *files_find_mask, I64 fuf_flags=0)
                 full_name[0] = '/';
                 for (i = 0; i <= file_len; i++)
                     full_name[i + 1] = path[i];
-                if (BootstrapFilesFindInCurrent(full_name, cur_dir, &remainder) &&
-                    !(fuf_flags & FUF_JUST_DIRS) &&
+                if (BootstrapFilesFindInCurrent(full_name, cur_dir, &remainder, TRUE))
+                {
+                    if (!(fuf_flags & FUF_JUST_DIRS) &&
+                        (recurse || !StrOcc(remainder, '/')))
+                    {
+                        added = BootstrapFilesFindAppend(&head, &tail, full_name,
+                            size, FALSE, mask_leaf, fuf_flags);
+                        if (added && (fuf_flags & FUF_SINGLE))
+                            break;
+                    }
+                    if (!(fuf_flags & FUF_JUST_FILES))
+                    {
+                        end = remainder;
+                        while ((slash = StrMatch("/", end)) != NULL)
+                        {
+                            if (slash == end)
+                                break;
+                            j = slash - full_name;
+                            if (j >= sizeof(path))
+                                break;
+                            for (i = 0; i < j; i++)
+                                path[i] = full_name[i];
+                            path[j] = 0;
+                            added = BootstrapFilesFindAppend(&head, &tail, path,
+                                0, TRUE, mask_leaf, fuf_flags);
+                            if (added && (fuf_flags & FUF_SINGLE))
+                                break;
+                            if (!recurse)
+                                break;
+                            end = slash + 1;
+                        }
+                    }
+                    if (added && (fuf_flags & FUF_SINGLE))
+                        break;
+                }
+            }
+        }
+    }
+    if (!(fuf_flags & FUF_JUST_FILES) && (!(fuf_flags & FUF_SINGLE) || !head))
+    {
+        index = 0;
+        while (ZcRedSeaDirAt(index++, path, sizeof(path)))
+        {
+            file_len = StrLen(path);
+            if (file_len + 2 < sizeof(full_name))
+            {
+                full_name[0] = '/';
+                for (i = 0; i <= file_len; i++)
+                    full_name[i + 1] = path[i];
+                if (BootstrapFilesFindInCurrent(full_name, cur_dir, &remainder, TRUE) &&
                     (recurse || !StrOcc(remainder, '/')))
                 {
                     added = BootstrapFilesFindAppend(&head, &tail, full_name,
-                        size, FALSE, mask_leaf, fuf_flags);
+                        0, TRUE, mask_leaf, fuf_flags);
                     if (added && (fuf_flags & FUF_SINGLE))
                         break;
                 }

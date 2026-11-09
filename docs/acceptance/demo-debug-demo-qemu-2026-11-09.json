@@ -7,5 +7,21 @@
   "command": "python3 scripts/check-compat.py --pci --quick --probe-demo-debug",
   "result": "fail",
   "evidence": "A disposable PCI QEMU guest launched the bundled DebugDemo through XTalk. The original loop emitted a sustained stream of dots. The test drained serial output continuously for at least five seconds after observing the dots, then sent Ctrl-Alt-C through QMP. The guest continued emitting dots and did not respond to a subsequent serial command within 30 seconds. A focused-terminal retest explicitly confirmed sys_focus_task was bootstrap_gui_terminal_task before launch and reproduced the same timeout. An earlier break sent after only three seconds returned control, but did not prove the loop had started and is not counted as a pass.",
-  "scope": "A separate PCI QEMU positive control, python3 scripts/check-compat.py --pci --quick --probe-demo-ohgreat, passed Ctrl-Alt-C and terminal recovery while the stock OhGreat loop yielded. This validates chord delivery in that responsive case, not audio output. The busy-loop result demonstrates that the current input-polling path cannot reliably break DebugDemo. It does not establish whether Ctrl-Alt-D debugger entry works, and does not validate live UTM or physical Pi behavior. No scheduler yield was added to MessageScan or to the original demo. An experimental print-boundary input poll was removed after a boot timeout; its cause was not established."
+  "scope": "A separate PCI QEMU positive control, python3 scripts/check-compat.py --pci --quick --probe-demo-ohgreat, passed Ctrl-Alt-C and terminal recovery while the stock OhGreat loop yielded. This validates chord delivery in that responsive case, not audio output. The busy-loop result demonstrates that the current input-polling path cannot reliably break DebugDemo. It does not establish whether Ctrl-Alt-D debugger entry works, and does not validate live UTM or physical Pi behavior. No scheduler yield was added to MessageScan or to the original demo. An experimental print-boundary input poll was removed after a boot timeout; its cause was not established.",
+  "current_recheck": {
+    "kernel_sha256": "8c8bfff505e10c34782c2f1ae37be36219ba93418b5d69bc826b9b530a964704",
+    "source_bundle_sha256": "7bf1f26f71420222735149609f017824be916de2c2d8c989b548ce8b41d5ff98",
+    "command": "python3 -u scripts/check-compat.py --pci --quick --probe-demo-debug",
+    "result": "fail: after the focused original busy loop produced sustained dots and Ctrl-Alt-C was sent, serial recovery timed out while dots continued",
+    "log": "build/debugdemo-current.log",
+    "log_sha256": "f520779f51f83e1121cd35c20254c8b190210fea5224406844f27ccbfb099d56",
+    "analysis": "Current input break is dispatched from cooperative device polling; the general timer interrupt is not an always-on keyboard interrupt. A non-yielding guest loop cannot reliably poll the break chord. Any interrupt delivery must preserve the focused task context and avoid corrupting interrupted kernel or compiler state; MessageScan must remain non-switching."
+  },
+  "qemu_interrupt_investigation": {
+    "command": "qemu-system-aarch64 -machine virt,gic-version=3,dumpdtb=build/virt-keyboard-irq.dtb -cpu cortex-a72 -m 1024 -nodefaults -display none; dtc -I dtb -O dts build/virt-keyboard-irq.dtb",
+    "result": "The generated QEMU virt device tree assigns SPI numbers 16, 17, ... 47 to VirtIO MMIO slots at 0x0a000000, 0x0a000200, ... 0x0a003e00. GIC interrupt IDs for these SPIs are 48\u201379. The keyboard driver currently scans for an input-capable slot and polls it; current GIC initialization enables the timer PPI, not these input SPIs.",
+    "dtb_sha256": "34fed8dabbcf0a191768e66f99b8d9a6901728f51532e3bede63b928f7413493",
+    "next_work": "Provide bounded interrupt-safe queue consumption and acknowledgment for the discovered MMIO input interrupt, route Ctrl-Alt-C to the focused task without reentering host/compiler/device critical sections, and deliver it without scheduler preemption. USB/xHCI and Pi use different interrupt routing and require separate support.",
+    "scope": "Generated QEMU virt device tree only; no keyboard IRQ delivery implemented or tested; no change to scheduler or MessageScan."
+  }
 }

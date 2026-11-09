@@ -1,0 +1,16 @@
+{
+  "date": "2026-11-09",
+  "target": "Pi 4B HDMI0 audio driver",
+  "change": "A repeated Sound call for the active note reuses the existing HDMI DMA stream only when HDMI is selected, the stream is marked running, and the DMA controller reports active without error. A different note, stop, analog output selection, inactive DMA or DMA error follows the existing restart/stop path.",
+  "evidence": [
+    {
+      "command": "make check-pi4-hdmi-audio",
+      "result": "pass under address and undefined-behavior sanitizers for the tone-reuse decision and its stopped, switched-output, changed-note, inactive-DMA and DMA-error cases"
+    },
+    {
+      "command": "make esp pi-desktop pi-diag",
+      "result": "pass; Pi desktop kernel SHA-256 438dd534340d62fcd0a38cd1c3d211a8dfb7ec89ecfe8dfa507ccfc530f56b67"
+    }
+  ],
+  "scope": "Host decision tests and cross-build only. No physical Pi test, audible timing measurement, DMA fault injection on hardware, or microSD staging was performed."
+}

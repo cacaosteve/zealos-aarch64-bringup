@@ -14,6 +14,7 @@
 #define PI4_HDMI_RATE 48000u
 #define PI4_HDMI_DMA_SEGMENTS 6u
 #define PI4_HDMI_SEGMENT_BYTES (PI4_HDMI_RATE * 8u / PI4_HDMI_DMA_SEGMENTS)
+#include "pi4_audio_policy.h"
 
 struct pi4_hdmi_dma_cb {
     uint32_t info, source, destination, length, stride, next, reserved[2];
@@ -30,6 +31,14 @@ static uint32_t g_pi4_hdmi_last_dma_source;
 static uint32_t g_pi4_hdmi_last_hz;
 static unsigned g_pi4_hdmi_starts;
 static int g_pi4_hdmi_dma_stuck;
+static int8_t g_pi4_hdmi_active_note;
+
+static int pi4_hdmi_reuses_tone(int8_t ona) {
+    if (!g_pi4_hdmi_running || !g_pi4_hdmi_dma) return 0;
+    return pi4_hdmi_can_reuse_tone(
+        g_pi4_hdmi_running, g_pi4_hdmi_selected, g_pi4_hdmi_active_note,
+        ona, g_pi4_hdmi_dma[0]);
+}
 
 static volatile uint32_t *pi4_hdmi_regs(uint64_t phys) {
     return (volatile uint32_t *)(uintptr_t)(g_hhdm + phys);
@@ -198,6 +207,7 @@ static int pi4_hdmi_tone(int8_t ona) {
         if ((cs & PI4_DMA_ACTIVE) && source > first_source &&
             source < first_source + PI4_HDMI_RATE * 8u) {
             g_pi4_hdmi_last_hz = hz;
+            g_pi4_hdmi_active_note = ona;
             g_pi4_hdmi_starts++;
             g_pi4_hdmi_stage = 7;
             return 1;

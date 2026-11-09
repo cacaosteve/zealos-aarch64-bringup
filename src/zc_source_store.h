@@ -147,7 +147,7 @@ static int zss_decode_record(const uint8_t sector[512], uint32_t pos,
     if ((!is_file && !is_delete) || !name_len || name_len > ZSS_MAX_NAME ||
         pos + 1u + blocks > g_zss_sectors ||
         (is_delete ? (length || checksum || blocks) :
-                     (!length || length > ZSS_MAX_FILE ||
+                     (length > ZSS_MAX_FILE ||
                       blocks != (length + 511u) / 512u))) return -1;
     for (uint32_t i = 0; i < name_len; i++) name[i] = (char)sector[32 + i];
     name[name_len] = 0;
@@ -297,7 +297,7 @@ static int zss_put(const char *name, const char *src, size_t len) {
     uint8_t sector[512];
     uint32_t tail = 0, blocks, crc = 0xffffffffu;
     unsigned name_len = 0;
-    if (!src || !len || len > ZSS_MAX_FILE || !zss_name_ok(name, &name_len)) return -1;
+    if ((!src && len) || len > ZSS_MAX_FILE || !zss_name_ok(name, &name_len)) return -1;
     int scan = zss_find(NULL, NULL, &tail, NULL);
     if (scan < 0) return scan;
     blocks = (uint32_t)((len + 511u) / 512u);
@@ -418,7 +418,7 @@ static int zss_stream_begin(struct zss_stream *s, const char *name,
                             uint32_t length, uint32_t expected_crc) {
     uint32_t tail = 0;
     unsigned name_len = 0;
-    if (!s || !length || length > ZSS_MAX_FILE ||
+    if (!s || length > ZSS_MAX_FILE ||
         !zss_name_ok(name, &name_len)) return -1;
     int scan = zss_find(NULL, NULL, &tail, NULL);
     if (scan < 0) return scan;

@@ -7,7 +7,7 @@
   "result": "pass: disk:ARMTEST.ZC was read from a stock absolute-LBA RedSea fixture, compiled and returned 42; FileRead refused an out-of-range extent, directory, deleted entry and non-contiguous file; zstatus failed=0",
   "log": "build/stock-redsea-file-boundaries-qemu.log",
   "log_sha256": "d2a3d79c6091cea97ee707fc7a9a624c10c014b9cfda6d51a828256ffd7656b2",
-  "limits": "This is the read-only disk: source-provider fallback, not general D: filesystem access. It supports nonempty contiguous files and traversal of contiguous directories in the selected PCI VirtIO stock absolute-LBA RedSea window. Chained files, enumeration, writes, hotplug, and Pi media are not implemented by this path. The fixture modified only a disposable disk clone.",
+  "limits": "The disk: stock RedSea source-provider fallback is read-only and not general D: filesystem access. It reads direct file extents and enumerates reachable files and directories to depth 8 in the selected PCI VirtIO stock absolute-LBA RedSea window. Stock RedSea writes, hotplug and Pi media are not implemented by this path. The fixture modified only a disposable disk clone.",
   "followup": {
     "kernel_sha256": "bbf4cbd914448fbbaded100c82bb94399a451cc41588d0a7d6b24df05df000bf",
     "source_bundle_sha256": "65174a115220c201fe24c71db35ece340237e159c5b4419712fed85760be5460",
@@ -15,5 +15,97 @@
     "result": "pass: loaded and executed contiguous source files from the first and second root directory sectors and a nested directory; invalid and unsupported file entries rejected; zstatus failed=0",
     "log": "build/stock-redsea-path-qemu.log",
     "log_sha256": "aa06d44952362fcacae889dc82c0e5d97bc884105cc1e7bd4a6c0530eb3ff04c"
+  },
+  "boundary_followup": {
+    "command": "python3 scripts/check-compat.py --pci --probe-stock-redsea-file",
+    "result": "pass: mixed-case nested path loaded and returned 42; rejected an overrun file extent, an overrun directory extent, traversal through a file and reading a directory as a file; existing checks and zstatus also passed",
+    "log": "build/stock-redsea-path-boundaries-qemu.log",
+    "log_sha256": "9fc2b51b71f42e8738b53ebf286b83d4d47d361842303821678560f77961351a",
+    "fixture": "Only a disposable VirtIO disk clone was modified."
+  },
+  "attribute_followup": {
+    "kernel_sha256": "e0adfd2ffc56480410879fcd8b9628da5c8ef35b25d3672c3647918458c86d91",
+    "source_bundle_sha256": "65174a115220c201fe24c71db35ece340237e159c5b4419712fed85760be5460",
+    "command": "python3 scripts/check-compat.py --pci --probe-stock-redsea-file",
+    "result": "pass: stock direct-extent file read and nested directory traversal work without the contiguous attribute; out-of-volume and invalid file and directory cases are rejected; zstatus failed=0",
+    "reference": "upstream/pinned/Kernel/BlkDev/FileSysRedSea.ZC RedSeaFileFind and RedSeaFileRead use directory and file extents without requiring the contiguous flag.",
+    "log": "build/stock-redsea-attr-qemu.log",
+    "log_sha256": "57544f92270187dc03e7f503bc11db31cefba38436c7f73b75a409757e0e6058"
+  },
+  "empty_file_followup": {
+    "kernel_sha256": "eb76c7c380b1636585f2799ef79777cd0f9d6407edf0028a628c00ef0519536c",
+    "source_bundle_sha256": "65174a115220c201fe24c71db35ece340237e159c5b4419712fed85760be5460",
+    "command": "python3 scripts/check-compat.py --pci --probe-stock-redsea-file",
+    "result": "pass: FileRead of an empty stock RedSea file with INVALID_CLUS returns a non-null NUL-terminated buffer and size zero; earlier file, directory and bounds checks also pass",
+    "reference": "upstream/pinned/Kernel/BlkDev/FileSysRedSea.ZC RedSeaFileWrite uses INVALID_CLUS for zero-length files",
+    "log": "build/stock-redsea-empty-qemu.log",
+    "log_sha256": "61595de33bacc2f22349a89747e1871242bcd2980ca144d3584c73bf5c6b6c7b"
+  },
+  "empty_source_write_followup": {
+    "kernel_sha256": "976286c4d9cf5c8bd7b6e48f317e55038f20001ead7a77383ab2f82f7bdb8702",
+    "source_bundle_sha256": "65174a115220c201fe24c71db35ece340237e159c5b4419712fed85760be5460",
+    "command": "python3 scripts/check-compat.py --pci --probe-stock-redsea-file",
+    "result": "pass: created nonempty source-store file, overwrote with zero-byte FileWrite using NULL buffer, read non-null empty data and length zero, and repeated read after cold QEMU restart; previous stock RedSea and bounds checks passed",
+    "log": "build/empty-source-write-qemu.log",
+    "log_sha256": "a9cc90a88ec9774f24427e9c4bf02b4b49eda796f8bdce49d5e0013aeedef25a",
+    "scope": "PCI VirtIO disposable disk clone only; does not establish writable stock RedSea, Pi storage or serial upload of empty files."
+  },
+  "empty_compaction_followup": {
+    "command": "python3 scripts/check-compat.py --pci --probe-stock-redsea-file",
+    "result": "pass: zverify accepted empty file, guest zgc compacted it, host inspect listed zero bytes with CRC 00000000, host offline compaction preserved it, and FileRead returned an empty file after cold reboot",
+    "log": "build/empty-source-gc-qemu.log",
+    "log_sha256": "827750b578095fa101a60646658de440bfcf6b7e22708b5e256c545018c1286c",
+    "scope": "Disposable PCI VirtIO QEMU disk only; does not establish Pi media or writable stock RedSea."
+  },
+  "empty_override_followup": {
+    "command": "python3 scripts/check-compat.py --pci --probe-stock-redsea-file",
+    "result": "pass: an empty source-store override hides an existing bundled source; its deletion marker continues to hide it through guest compaction, host offline compaction and a cold reboot; an independent empty file remains readable",
+    "log": "build/empty-source-overlay-qemu.log",
+    "log_sha256": "e81ae48bee1b62679027e75066d456b7817164ee0f6d4294bab31e71389a42c7",
+    "scope": "PCI VirtIO disposable QEMU disk clone; no Pi or writable stock RedSea validation."
+  },
+  "empty_serial_followup": {
+    "kernel_sha256": "232c72a3a184d59319b7c18f3acaf577743f6a414cdda3f9629f8c298e3b395d",
+    "command": "python3 scripts/check-compat.py --pci --probe-stock-redsea-file",
+    "result": "pass: serial transfer accepted a zero-byte file, rejected a bad CRC without replacing it, and verified it after guest and host compaction and a cold reboot",
+    "log": "build/empty-serial-qemu.log",
+    "log_sha256": "e7f07ad67120b162021a90135e35933f29b5c1ffcde075aad1113931a1bba5b2",
+    "scope": "Disposable PCI VirtIO QEMU disk; not a Pi storage or writable stock RedSea test."
+  },
+  "enumeration_followup": {
+    "kernel_sha256": "0b0f05a7201ab5141cff4c4d5df0434ed7ceaccc063a2a5d1cf2078abd138124",
+    "source_bundle_sha256": "7fe7153422dd0a81ce1d1dd8f1af15f3d1cb44b3b299a20dd65c3ce59739484a",
+    "command": "python3 scripts/check-compat.py --pci --probe-stock-redsea-file",
+    "result": "pass: source bridge enumerated stock root and nested files including a zero-length file, bounded a cyclic directory reference, and FilesFind located the nested file; prior read, bounds, compaction and persistence checks passed",
+    "log": "build/stock-redsea-enumerate-qemu.log",
+    "log_sha256": "d80b3ea1596a2c1fba76f53a22f56ac0ebe24037b59bf2105878b5d7df524810",
+    "scope": "PCI VirtIO QEMU disposable disk clone only; source bridge enumerates reachable readable files and derives directories from them, not empty directories; depth limited to 8; not general D: filesystem, Pi media, or stock RedSea writing."
+  },
+  "directory_lookup_followup": {
+    "kernel_sha256": "95fe9a9af8d3a56018af8d2ad0f914ec027d2b7cb84c515b8bfba3f3039a6aad",
+    "source_bundle_sha256": "7fe7153422dd0a81ce1d1dd8f1af15f3d1cb44b3b299a20dd65c3ce59739484a",
+    "command": "python3 scripts/check-compat.py --pci --probe-stock-redsea-file",
+    "result": "pass: source-directory checks recognize an empty stock directory and a mixed-case nested directory, reject invalid directory extents and files, and Cd enters the empty directory; prior enumeration and cold persistence checks pass",
+    "log": "build/stock-redsea-cd-qemu.log",
+    "log_sha256": "507c066d84ba10d272aea69264c41423d5343f298a84469d53ef5ede3800781d",
+    "scope": "PCI VirtIO QEMU disposable disk clone only. Empty directories remain absent from directory listings, and Pi media and writable stock RedSea are not covered."
+  },
+  "directory_listing_followup": {
+    "kernel_sha256": "db898897746b5a5efc4398f1b14855829ef95ce78951f84a1b4e913d8fd4e093",
+    "source_bundle_sha256": "1d8cdac61a6af7a4d4fd161052e5d710ad8881e58413585d886f7f0bf962d1a5",
+    "command": "python3 scripts/check-compat.py --pci --probe-stock-redsea-file",
+    "result": "pass: FilesFind with FUF_JUST_DIRS locates an empty stock directory; direct enumeration includes valid empty and nested directories, excludes invalid directory extents, and terminates on a cyclic fixture; earlier read, compaction and cold reboot tests pass",
+    "log": "build/stock-redsea-dirs-qemu.log",
+    "log_sha256": "3e1a2dbeef7af5dbcf805a11ccbc80a48642c94099f1bf76abac4741e01246da",
+    "scope": "Disposable PCI VirtIO QEMU disk; depth capped at 8. Not full D: filesystem, Pi media, or stock RedSea writes."
+  },
+  "relative_path_followup": {
+    "kernel_sha256": "db898897746b5a5efc4398f1b14855829ef95ce78951f84a1b4e913d8fd4e093",
+    "source_bundle_sha256": "e8ebb800ed78a902c0324914b61d94e62a1e44149384f3938d312d4718f862eb",
+    "command": "python3 scripts/check-compat.py --pci --probe-stock-redsea-file",
+    "result": "pass: Cd into differently cased stock directory, relative FileRead and FilesFind discover the same file; existing directory, bounds, compaction and cold-boot checks pass",
+    "log": "build/stock-redsea-relative-qemu.log",
+    "log_sha256": "aaafff5dbc81033b04e36da5d0992d1b19c637dc6c63ab4f5882d5a130b55ea1",
+    "scope": "PCI VirtIO disposable QEMU disk; not full D: filesystem, Pi media, or stock RedSea writes."
   }
 }

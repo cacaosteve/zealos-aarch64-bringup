@@ -88,7 +88,7 @@ def scan(f, with_deleted=False):
         length, checksum, blocks, name_len = struct.unpack_from('<IIII', header, 8)
         deleted = header[:8] == DELETE_MAGIC
         valid_body = ((length, checksum, blocks) == (0, 0, 0) if deleted else
-                      0 < length <= MAX_FILE and blocks == (length + 511) // 512)
+                      length <= MAX_FILE and blocks == (length + 511) // 512)
         if not (valid_body and 0 < name_len <= MAX_NAME and
                 pos + 1 + blocks <= SECTORS):
             raise ValueError(f'invalid record size at source sector {pos}')
@@ -106,8 +106,8 @@ def scan(f, with_deleted=False):
 
 def append(f, pos, name, data):
     encoded = valid_name(name)
-    if not data or len(data) > MAX_FILE:
-        raise ValueError('source must contain 1 byte to 4 MiB')
+    if len(data) > MAX_FILE:
+        raise ValueError(f'source exceeds {MAX_FILE} bytes')
     blocks = (len(data) + 511) // 512
     if pos + 1 + blocks > SECTORS:
         raise ValueError('source partition is full')

@@ -37,6 +37,7 @@
 #include "zc_source_store.h"
 #endif
 #include "disk_layout.h"
+#include "block_range.h"
 
 int zc_virtio_keyboard_ready(void) { return virtio_kbd_ready(); }
 uint64_t zc_virtio_keyboard_event_count(void) { return virtio_kbd_key_event_count(); }
@@ -54,6 +55,7 @@ static int g_audio_is_pi;
 /* Experimental opt-in audio service: IRQs never change guest task. */
 static volatile int g_audio_timer_mode, g_audio_timer_active;
 static volatile uint64_t g_audio_timer_irqs;
+static volatile uint64_t g_audio_timer_total_irqs;
 static void sound_timer_set_locked(int active);
 static inline uint64_t sound_irq_lock(void) {
     uint64_t flags;
@@ -66,6 +68,7 @@ static inline void sound_irq_unlock(uint64_t flags) {
 #if defined(ZEAL_FORCE_PI4) && !defined(ZEAL_PI_DIAG)
 static int pi4_hdmi_tone(int8_t ona);
 static void pi4_hdmi_stop(void);
+static int pi4_hdmi_reuses_tone(int8_t ona);
 static int g_pi4_hdmi_selected = 1;
 static int g_pi4_hdmi_running;
 static uint64_t g_pi4_hdmi_deadline;
@@ -77,6 +80,8 @@ void zc_virtio_sound_set_tone(int8_t ona) {
 #if defined(ZEAL_FORCE_PI4) && !defined(ZEAL_PI_DIAG)
     if (g_audio_is_pi) {
         g_pi4_hdmi_deadline = 0;
+        if (g_pi4_hdmi_selected && pi4_hdmi_reuses_tone(ona))
+            return;
         if (g_pi4_hdmi_running) {
             pi4_hdmi_stop();
             if (!ona)
@@ -134,6 +139,7 @@ void zc_virtio_sound_pump(void) {
     }
 }
 uint64_t zc_sound_timer_irq_count(void) { return g_audio_timer_irqs; }
+uint64_t zc_sound_timer_total_irq_count(void) { return g_audio_timer_total_irqs; }
 int zc_sound_timer_enabled(void) { return g_audio_timer_mode; }
 uint64_t zc_sound_current_hz(void) { return g_audio_is_pi ? 0 : g_vs_hz; }
 uint64_t zc_virtio_sound_max_pump_gap_us(void) {
@@ -10167,7 +10173,12 @@ static void sound_timer_set_locked(int active) {
 int zc_sound_timer_enable(void) {
     uint64_t flags = sound_irq_lock();
     int supported = !g_audio_is_pi && g_timer_irqs >= 3 && virtio_snd_ready();
-    if (supported) g_audio_timer_mode = 1;
+    if (supported && !g_audio_timer_mode) {
+        g_audio_timer_total_irqs = 0;
+        g_audio_timer_mode = 1;
+    }
+    if (supported && g_vs_hz)
+        sound_timer_set_locked(1);
     sound_irq_unlock(flags);
     return supported;
 }
@@ -10358,6 +10369,7 @@ void exc_handle_irq(uint64_t *frame) {
     if ((id == TIMER_PPI || id == (uint32_t)PI4_CNTP_PPI) && g_audio_timer_mode) {
         if (g_audio_timer_active) {
             g_audio_timer_irqs++;
+            g_audio_timer_total_irqs++;
             virtio_snd_pump();
             timer_arm();
         } else {
@@ -11897,12 +11909,12 @@ uint64_t hc_builtin_blkwrite(uint64_t buf, uint64_t blk, uint64_t count) {
         return 0;
     }
     if (virtio_blk_ready()) {
-        if (blk + count > virtio_blk_capacity()) {
+        if (!zeal_block_range_valid(blk, count, virtio_blk_capacity())) {
             return 0;
         }
         return (uint64_t)virtio_blk_write(src, blk, count);
     }
-    if (blk + count > HC_RAM_N_BLKS) {
+    if (!zeal_block_range_valid(blk, count, HC_RAM_N_BLKS)) {
         return 0;
     }
     hc_builtin_memcpy((uint64_t)(uintptr_t)(g_ram_dsk + blk * HC_RAM_BLK_SIZE), buf,
@@ -11916,12 +11928,12 @@ uint64_t hc_builtin_blkread(uint64_t buf, uint64_t blk, uint64_t count) {
         return 0;
     }
     if (virtio_blk_ready()) {
-        if (blk + count > virtio_blk_capacity()) {
+        if (!zeal_block_range_valid(blk, count, virtio_blk_capacity())) {
             return 0;
         }
         return (uint64_t)virtio_blk_read(dst, blk, count);
     }
-    if (blk + count > HC_RAM_N_BLKS) {
+    if (!zeal_block_range_valid(blk, count, HC_RAM_N_BLKS)) {
         return 0;
     }
     hc_builtin_memcpy(buf, (uint64_t)(uintptr_t)(g_ram_dsk + blk * HC_RAM_BLK_SIZE),
@@ -13074,7 +13086,7 @@ static int rs_file_exists(const char *name, uint64_t *out_len) {
 }
 
 #ifndef ZEAL_PI_DIAG
-/* Read contiguous files from stock absolute-LBA RedSea directories.
+/* Read files from stock absolute-LBA RedSea directories.
  * This is deliberately separate from the legacy relative-LBA writer: it must
  * never cause that writer to modify a volume whose layout it cannot update. */
 static uint64_t rs_stock_u64(const uint8_t *p) {
@@ -13091,7 +13103,7 @@ static int rs_stock_find(uint64_t base, uint64_t sectors, uint64_t directory,
         !zc_raw_disk_read(block, directory, 1)) return 0;
     uint16_t root_attr = (uint16_t)block[0] | (uint16_t)block[1] << 8;
     uint64_t dir_size = rs_stock_u64(block + 48);
-    if ((root_attr & 0x410u) != 0x410u || (root_attr & 0x100u) ||
+    if (!(root_attr & 0x10u) || (root_attr & 0x100u) ||
         block[2] != '.' || block[3] ||
         rs_stock_u64(block + 40) != directory || !dir_size ||
         (dir_size & 511u) || dir_size / 512 > sectors - (directory - base))
@@ -13141,17 +13153,18 @@ static int rs_stock_root_read(const char *name, char *dst, size_t cap,
         if (!n || (name[n] && name[n] != '/')) return -1;
         component[n] = 0;
         name += n;
-        if (!rs_stock_find(base, sectors, root, component, &first, &length, &attr) ||
-            !(attr & 0x400u) || first < base || first - base >= sectors)
+        if (!rs_stock_find(base, sectors, root, component, &first, &length, &attr))
             return -1;
         if (*name == '/') {
-            if (!(attr & 0x10u) || !name[1]) return -1;
+            if (!(attr & 0x10u) || !name[1] || first < base ||
+                first - base >= sectors) return -1;
             root = first;
             name++;
             continue;
         }
-        if ((attr & 0x10u) || !length || length > 65536 ||
-            (length + 511) / 512 > sectors - (first - base)) return -1;
+        if ((attr & 0x10u) || length > 65536 ||
+            (length && (first < base || first - base >= sectors ||
+             (length + 511) / 512 > sectors - (first - base)))) return -1;
         if (out_len) *out_len = (size_t)length;
         if (!dst) return 0;
         if (length >= cap) return -1;
@@ -13165,6 +13178,109 @@ static int rs_stock_root_read(const char *name, char *dst, size_t cap,
         return 0;
     }
     return -1;
+}
+
+int zeal_redsea_dir_exists(const char *name) {
+    uint8_t boot[512];
+    uint64_t base, sectors, directory, first, length;
+    uint16_t attr;
+    if (!name || !*name || !zc_raw_redsea_geometry(&base, &sectors) ||
+        !base || !zc_raw_disk_read(boot, base, 1) || rs_stock_u64(boot + 8) != base)
+        return 0;
+    directory = rs_stock_u64(boot + 24);
+    while (*name) {
+        char component[38];
+        size_t n = 0;
+        while (n < sizeof(component) - 1 && name[n] && name[n] != '/') {
+            component[n] = name[n];
+            n++;
+        }
+        if (!n || (name[n] && name[n] != '/')) return 0;
+        component[n] = 0;
+        if (!rs_stock_find(base, sectors, directory, component, &first, &length, &attr) ||
+            !(attr & 0x10u) || first < base || first - base >= sectors)
+            return 0;
+        directory = first;
+        name += n;
+        if (*name == '/') name++;
+    }
+    /* Validate the target's own header, including an empty directory. */
+    return rs_stock_find(base, sectors, directory, ".", &first, &length, &attr) &&
+           first == directory && (attr & 0x10u);
+}
+
+/* Enumerate only paths that the stock read-only source provider can open.
+ * Ancestor checks and a depth limit keep corrupt directory graphs bounded. */
+static int rs_stock_file_at(uint64_t base, uint64_t sectors, uint64_t directory,
+                            char path[96], size_t prefix, uint64_t *index,
+                            uint64_t ancestors[8], unsigned depth,
+                            char *dst, size_t cap, size_t *out_size, int want_dirs) {
+    uint8_t block[512];
+    if (depth >= 8 || directory < base || directory - base >= sectors)
+        return 0;
+    for (unsigned i = 0; i < depth; i++)
+        if (ancestors[i] == directory) return 0;
+    ancestors[depth] = directory;
+    if (!zc_raw_disk_read(block, directory, 1)) return 0;
+    uint16_t dot_attr = (uint16_t)block[0] | (uint16_t)block[1] << 8;
+    uint64_t bytes = rs_stock_u64(block + 48);
+    if (!(dot_attr & 0x10u) || (dot_attr & 0x100u) || block[2] != '.' ||
+        block[3] || rs_stock_u64(block + 40) != directory || !bytes ||
+        (bytes & 511u) || bytes / 512 > sectors - (directory - base)) return 0;
+    for (uint64_t s = 0; s < bytes / 512; s++) {
+        if (s && !zc_raw_disk_read(block, directory + s, 1)) return 0;
+        for (unsigned i = 0; i < 8; i++) {
+            const uint8_t *e = block + i * 64;
+            uint16_t attr = (uint16_t)e[0] | (uint16_t)e[1] << 8;
+            size_t n = 0;
+            if (!e[2]) return 0;
+            if (attr & 0x100u) continue;
+            while (n < 37 && e[2 + n] >= 33 && e[2 + n] <= 126 &&
+                   e[2 + n] != '/' && e[2 + n] != '\\' && e[2 + n] != ':') n++;
+            if (!n || e[2 + n] || (n == 1 && e[2] == '.') ||
+                (n == 2 && e[2] == '.' && e[3] == '.') ||
+                prefix + n >= 96) continue;
+            for (size_t j = 0; j < n; j++) path[prefix + j] = (char)e[2 + j];
+            path[prefix + n] = 0;
+            uint64_t first = rs_stock_u64(e + 40), length = rs_stock_u64(e + 48);
+            if (attr & 0x10u) {
+                if (prefix + n + 1 >= 96) continue;
+                uint64_t self, dir_length;
+                uint16_t dir_attr;
+                int cycle = depth + 1 >= 8;
+                for (unsigned j = 0; j <= depth; j++)
+                    if (ancestors[j] == first) cycle = 1;
+                if (cycle || !rs_stock_find(base, sectors, first, ".", &self,
+                                            &dir_length, &dir_attr) || self != first)
+                    continue;
+                if (want_dirs && !(*index)--) {
+                    if (prefix + n + 1 > cap) return 0;
+                    for (size_t j = 0; j <= prefix + n; j++) dst[j] = path[j];
+                    return 1;
+                }
+                path[prefix + n] = '/';
+                if (rs_stock_file_at(base, sectors, first, path, prefix + n + 1,
+                                     index, ancestors, depth + 1, dst, cap, out_size,
+                                     want_dirs))
+                    return 1;
+                path[prefix + n] = 0;
+            } else {
+                if (want_dirs) continue;
+                struct zss_entry native;
+                int status = zss_find(path, &native, NULL, NULL);
+                if (status == 1 || status == -3 || status == -1 ||
+                    length > 65536 || (length && (first < base ||
+                    first - base >= sectors || (length + 511) / 512 >
+                    sectors - (first - base)))) continue;
+                if ((*index)--) continue;
+                if (prefix + n + 1 > cap) return 0;
+                for (size_t j = 0; j <= prefix + n; j++) dst[j] = path[j];
+                if (out_size) *out_size = (size_t)length;
+                return 1;
+            }
+        }
+    }
+    return 0;
 }
 
 /* The native compiler's disk: provider must never fall back to the boot RAM disk. */
@@ -13196,8 +13312,16 @@ int zeal_redsea_file_at(uint64_t index, char *dst, size_t cap,
     uint64_t visible = 0;
     unsigned i;
 
-    if (!virtio_blk_ready() || !dst || cap < 2 ||
-        rs_read_root(br, dir, NULL, &sectors) != 0)
+    uint64_t base, stock_sectors;
+    if (!virtio_blk_ready() || !dst || cap < 2) return 0;
+    if (zc_raw_redsea_geometry(&base, &stock_sectors) && base &&
+        zc_raw_disk_read(br, base, 1) && rs_stock_u64(br + 8) == base) {
+        uint64_t ancestors[8] = {0};
+        char path[96];
+        return rs_stock_file_at(base, stock_sectors, rs_stock_u64(br + 24),
+                                path, 0, &index, ancestors, 0, dst, cap, out_size, 0);
+    }
+    if (rs_read_root(br, dir, NULL, &sectors) != 0)
         return 0;
     for (i = 0; i < 8; i++) {
         const uint8_t *entry = dir + i * 64;
@@ -13245,9 +13369,20 @@ int zeal_redsea_file_at(uint64_t index, char *dst, size_t cap,
     return 0;
 }
 
+int zeal_redsea_dir_at(uint64_t index, char *dst, size_t cap) {
+    uint8_t boot[512];
+    uint64_t base, sectors, ancestors[8] = {0};
+    char path[96];
+    if (!dst || cap < 2 || !zc_raw_redsea_geometry(&base, &sectors) ||
+        !base || !zc_raw_disk_read(boot, base, 1) || rs_stock_u64(boot + 8) != base)
+        return 0;
+    return rs_stock_file_at(base, sectors, rs_stock_u64(boot + 24), path, 0,
+                            &index, ancestors, 0, dst, cap, NULL, 1);
+}
+
 static int zc_write_source(const char *path, const char *src, size_t len) {
     const char *name = path;
-    if (!path || !src || !len || len > ZSS_MAX_FILE)
+    if (!path || (!src && len) || len > ZSS_MAX_FILE)
         return -1;
     if (str_startswith(name, "disk:"))
         name += 5;
@@ -13260,7 +13395,7 @@ static int zc_write_source(const char *path, const char *src, size_t len) {
     /* Legacy RedSea only supports a root filename without a directory. */
     for (const char *p = name; *p; p++)
         if (*p == '/') return -1;
-    if (len > 65536 || !virtio_blk_ready())
+    if (!len || len > 65536 || !virtio_blk_ready())
         return -1;
     return rs_put_file(name, src, len);
 }
@@ -14102,7 +14237,6 @@ static int zrecv_args(const char *p, char name[ZSS_MAX_NAME + 1],
         if (size > (ZSS_MAX_FILE - digit) / 10u) return -1;
         size = size * 10u + digit;
     }
-    if (!size) return -1;
     while (*p == ' ' || *p == '\t') p++;
     uint32_t checksum = 0;
     for (unsigned i = 0; i < 8; i++) {

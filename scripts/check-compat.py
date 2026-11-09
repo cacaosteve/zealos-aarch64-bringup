@@ -15,6 +15,8 @@ def copyfile_cow(src, dst):
 
 p = argparse.ArgumentParser()
 p.add_argument('--pci', action='store_true')
+p.add_argument('--probe-hc-block-range', action='store_true',
+               help='check bootstrap block reads and overflow rejection on a disposable guest')
 p.add_argument('--usb-input', choices=('nec', 'qemu'),
                help='test native USB HID on NEC (UTM default) or QEMU xHCI, without VirtIO input')
 p.add_argument('--usb-with-virtio', action='store_true',
@@ -392,6 +394,10 @@ p.add_argument('--probe-3d-apps', action='store_true',
                help='check original GrModels, KeepAway and Titanium 3D sprite services and runtime paths')
 p.add_argument('--probe-keepaway-full-game', action='store_true',
                help='leave KeepAway running through its three-minute game and verify scanout and exit')
+p.add_argument('--probe-keepaway-audio', action='store_true',
+               help='run the full KeepAway game and bracket a WAV capture with byte offsets')
+p.add_argument('--probe-keepaway-audio-timer', action='store_true',
+               help='enable opt-in timer-based audio service for the KeepAway audio probe')
 p.add_argument('--probe-span-strut', action='store_true',
                help='exercise original Span bridge and Strut ship apps through entry, input and exit')
 p.add_argument('--probe-tothefront', action='store_true',
@@ -545,6 +551,10 @@ if args.probe_gui_editor_text:
     args.probe_gui_keyboard = True
 if args.probe_titanium_only:
     args.probe_3d_apps = True
+if args.probe_keepaway_audio_timer:
+    args.probe_keepaway_audio = True
+if args.probe_keepaway_audio:
+    args.probe_keepaway_full_game = True
 if args.probe_keepaway_full_game:
     args.probe_3d_apps = True
 if args.probe_demo_debug:
@@ -928,6 +938,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 root_dir = bytearray(1024 if args.probe_raw_redsea_geometry == 'stockfile' else 512)
                 file_data = bytearray(512)
                 child_dir = bytearray(512)
+                broken_dir = bytearray(512)
+                empty_dir = bytearray(512)
                 if args.probe_raw_redsea_geometry in ('present', 'legacy', 'invalid', 'stockfile'):
                     boot[3] = 0x88
                     offset = 0 if args.probe_raw_redsea_geometry == 'legacy' else 130911
@@ -944,30 +956,46 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                         struct.pack_into('<H', root_dir, 64, 0x420)
                         root_dir[66:77] = b'ARMTEST.ZC\0'
                         struct.pack_into('<qqq', root_dir, 104, offset + 10, len(source), 0)
-                        # Refuse an out-of-range extent, directory, deleted
-                        # entry and non-contiguous file, even if names match.
+                        # Match stock RedSea's direct-extent reads even when
+                        # the contiguous attribute is absent. Refuse invalid
+                        # extents, directories as files, and deleted entries.
                         for slot, name, attr, first in (
                             (2, b'BADTEST.ZC', 0x420, offset + 128),
                             (3, b'DIRTEST.ZC', 0x410, offset + 10),
                             (4, b'CHAIN.ZC', 0x020, offset + 10),
                             (5, b'DELETE.ZC', 0x520, offset + 10),
                             (6, b'FILL.ZC', 0x420, offset + 10),
-                            (7, b'NEST', 0x410, offset + 5),
+                            (7, b'NEST', 0x010, offset + 5),
                             (8, b'LATE.ZC', 0x420, offset + 10),
+                            (9, b'BROKENDIR', 0x410, offset + 127),
+                            (10, b'OVERRUN.ZC', 0x420, offset + 127),
+                            (11, b'EMPTY.ZC', 0x420, -1),
+                            (12, b'EMPTYDIR', 0x410, offset + 7),
                         ):
                             entry = slot * 64
                             struct.pack_into('<H', root_dir, entry, attr)
                             root_dir[entry + 2:entry + 3 + len(name)] = name + b'\0'
                             struct.pack_into('<qqq', root_dir, entry + 40,
                                              first, len(source), 0)
+                        struct.pack_into('<q', root_dir, 10 * 64 + 48, 513)
+                        struct.pack_into('<q', root_dir, 11 * 64 + 48, 0)
                         file_data[:len(source)] = source
-                        struct.pack_into('<H', child_dir, 0, 0x410)
+                        struct.pack_into('<H', child_dir, 0, 0x010)
                         child_dir[2:4] = b'.\0'
                         struct.pack_into('<qqq', child_dir, 40, offset + 5, 512, 0)
                         struct.pack_into('<H', child_dir, 64, 0x420)
                         child_dir[66:77] = b'INNER.ZC\0\0\0'
                         struct.pack_into('<qqq', child_dir, 104, offset + 10, len(source), 0)
-                        bitmap[0] |= 0x28
+                        struct.pack_into('<H', child_dir, 128, 0x010)
+                        child_dir[130:135] = b'LOOP\0'
+                        struct.pack_into('<qqq', child_dir, 168, offset + 2, 1024, 0)
+                        struct.pack_into('<H', broken_dir, 0, 0x410)
+                        broken_dir[2:4] = b'.\0'
+                        struct.pack_into('<qqq', broken_dir, 40, offset + 127, 1024, 0)
+                        struct.pack_into('<H', empty_dir, 0, 0x410)
+                        empty_dir[2:4] = b'.\0'
+                        struct.pack_into('<qqq', empty_dir, 40, offset + 7, 512, 0)
+                        bitmap[0] |= 0xa8
                         bitmap[1] |= 0x04
                 disk.write(boot)
                 disk.write(bitmap)
@@ -977,6 +1005,10 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     disk.write(child_dir)
                     disk.seek((130911 + 10) * 512)
                     disk.write(file_data)
+                    disk.seek((130911 + 7) * 512)
+                    disk.write(empty_dir)
+                    disk.seek((130911 + 127) * 512)
+                    disk.write(broken_dir)
                 else:
                     disk.write(file_data)
         # A torn shadow-bank superblock must never supersede the valid A bank.
@@ -2185,6 +2217,13 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         if int(scanout.group(1)) < 1000:
             raise RuntimeError('boot graphical terminal is not painting visible pixels:\n' + desktop)
         print('PASS boot graphical terminal window and framebuffer diagnostics', flush=True)
+        if args.probe_hc_block_range:
+            command('hc U8 b[8];return BlkRead(b,-1,2);', '0x0000000000000000')
+            command('hc U8 b[8];return BlkWrite(b,-1,2);', '0x0000000000000000')
+            command('hc U8 b[8];return BlkRead(b,0,-1);', '0x0000000000000000')
+            command('zstatus', 'failed=0')
+            print('PASS bootstrap block range overflow checks', flush=True)
+            raise SystemExit(0)
         if args.probe_task_reset_context:
             command('zreset', 'native compiler ready')
             command('zload /Kernel/KernelA.HH', 'zc: loaded /Kernel/KernelA.HH')
@@ -4187,262 +4226,274 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 print('PASS Titanium press-a-key, game frame, input and Escape recovery',
                       flush=True)
                 raise SystemExit(0)
-            type_graphical_prompt_line(
-                '3d-grmodels-launch',
-                'ExeFile2("/Apps/GrModels/Run.ZC");')
-            qmp_send_key('ret')
-            time.sleep(1)
-            grmodels = graphical_screen('3d-grmodels-entry')
-            print('GRMODELS ENTRY SCREEN\n'+grmodels[3], flush=True)
-            move_graphical_pointer(53, 52)
-            graphical_mouse_button('left', True)
-            time.sleep(0.2)
-            graphical_mouse_button('left', False)
-            time.sleep(1)
-            man_form = graphical_screen('3d-grmodels-man-form')
-            print('GRMODELS MAN FORM\n'+man_form[3], flush=True)
-            qmp_send_key('esc')
-            require_graphical_text(
-                '3d-grmodels-man-color-shirt', 'Single-Sided means', timeout=12)
-
-            def click_3d_color(name, current_marker, next_marker):
-                # Select the red entry in the first (single-sided, full-range)
-                # column. In the 800x600 UI it is the fifth eight-pixel row
-                # below the section header.
-                deadline = time.monotonic() + 12
-                attempt = 0
-                while True:
-                    screen = graphical_screen(name+'-before')
-                    # The first framebuffer read after the color-popup
-                    # closes can capture the prompt while its DolDoc text is
-                    # still being repainted. Accept the stable prefix for
-                    # this particular repeat prompt; the subsequent `n`
-                    # input and terminal recovery remain the real checks.
-                    next_visible = next_marker in screen[3]
-                    if next_marker == 'Do another':
-                        # Some guest font/framebuffer captures lose a few
-                        # letters in this prompt even though the question
-                        # suffix is rendered. Treat its answer choices as the
-                        # stable marker; the caller also checks generated
-                        # mesh diagnostics before accepting the app path.
-                        next_visible |= ('Do anot' in screen[3] or
-                                         'y or n)?' in screen[3])
-                    if next_visible:
-                        return screen
-                    if current_marker not in screen[3]:
-                        raise RuntimeError(
-                            f'{name}: color picker changed without showing '
-                            f'{next_marker!r}:\n'+screen[3])
-                    if time.monotonic() >= deadline:
-                        diagnostic = command('zstatus', 'failed=')
-                        raise RuntimeError(
-                            f'{name}: color choice did not advance from '
-                            f'{current_marker!r} to {next_marker!r}:\n'+
-                            screen[3]+'\n'+diagnostic)
-                    attempt += 1
-                    time.sleep(0.25)
-                    if attempt == 1:
-                        move_graphical_pointer(100, 124)
-                        graphical_mouse_button('left', True)
-                        time.sleep(0.15)
-                        graphical_mouse_button('left', False)
-                    elif attempt == 2:
-                        # PopUpMenu also supports Return on the highlighted
-                        # DolDoc link; use it once if the click only hovered.
-                        qmp_send_key('ret')
-                    else:
-                        move_graphical_pointer(100, 124)
-                        graphical_mouse_button('left', True)
-                        time.sleep(0.15)
-                        graphical_mouse_button('left', False)
-                    print(f'3D color selection {name} attempt {attempt}', flush=True)
-                    time.sleep(0.35)
-
-            click_3d_color('3d-grmodels-man-pants', 'Shirt', 'Pants')
-            click_3d_color('3d-grmodels-man-skin', 'Pants', 'Skin')
-            click_3d_color('3d-grmodels-man-shoes', 'Skin', 'Shoes')
-            click_3d_color('3d-grmodels-man-generated', 'Shoes', 'Do another')
-            man_generated = require_graphical_text(
-                '3d-grmodels-man-generated', 'y or n)?', timeout=20)
-            if 'y or n)?' not in man_generated[3]:
-                raise RuntimeError('GrModels Man did not finish mesh generation')
-            print('PASS GrModels Man mesh generation reached its repeat prompt',
-                  flush=True)
-            qmp_send_key('n')
-            time.sleep(0.5)
-            graphical_screen('3d-grmodels-man-after-exit')
-            run_graphical_terminal_command(
-                '3d-grmodels-man-exit-smoke', '40+2;', 'ans=0x2A=42', timeout=20)
-            command('zstatus', 'failed=0')
-            mesh_diag = ''.join(command(
-                line, 'zc: executed', timeout=20)
-                for line in (
-                    'zc Print("3d_live_mesh=%d,%d,%d,%d\\n",'
-                    'sprite_debug_mesh_last_vertices,'
-                    'sprite_debug_mesh_last_triangles,'
-                    'sprite_debug_mesh_last_result,'
-                    'sprite_debug_mesh_last_work);',
-                    'zc Print("3d_live_color_pixels=%d,%d,%d,%d,%d,%d\\n",'
-                    'sprite_debug_mesh_last_color,'
-                    'sprite_debug_mesh_last_lit_color,'
-                    'sprite_debug_mesh_pixel_attempts,'
-                    'sprite_debug_mesh_pixel_writes,'
-                    'sprite_debug_mesh_pixel_min_x,'
-                    'sprite_debug_mesh_pixel_min_y);',
-                    'zc Print("3d_live_color_masks=%d,%d,%d\\n",'
-                    'sprite_debug_mesh_raw_color_mask,'
-                    'sprite_debug_mesh_lit_color_mask,'
-                    'sprite_debug_mesh_pixel_color_mask);',
-                    'zc Print("3d_live_bounds_masks=%d,%d,%d,%d,%d\\n",'
-                    'sprite_debug_mesh_pixel_max_x,'
-                    'sprite_debug_mesh_pixel_max_y,'
-                    'sprite_debug_type_mask_failures,'
-                    'sprite_debug_type_mask_last_type,'
-                    'sprite_debug_type_mask_last_size);',
-                    'zc Print("3d_live_choices=%d,%d,%d,%d,%d\\n",'
-                    'sprite_debug_lighting_choice_count,'
-                    'sprite_debug_lighting_choices[0],'
-                    'sprite_debug_lighting_choices[1],'
-                    'sprite_debug_lighting_choices[2],'
-                    'sprite_debug_lighting_choices[3]);',
-                    'zc Print("3d_live_target=%d,%d,%d,%d,%d,%d,%d\\n",'
-                    'sprite_debug_mesh_target_dc_is_bootstrap,'
-                    'sprite_debug_mesh_target_body_is_graphics,'
-                    'sprite_debug_mesh_target_body_is_foreground,'
-                    'sprite_debug_mesh_target_last_x,'
-                    'sprite_debug_mesh_target_last_y,'
-                    'sprite_debug_mesh_target_last_pixel,'
-                    'sprite_debug_mesh_target_last_index);',
-                    'zc Print("3d_live_target_window=%d,%d,%d,%d,%d,%d\\n",'
-                    'sprite_debug_mesh_target_left,'
-                    'sprite_debug_mesh_target_right,'
-                    'sprite_debug_mesh_target_top,'
-                    'sprite_debug_mesh_target_bottom,'
-                    'sprite_debug_mesh_target_scroll_x,'
-                    'sprite_debug_mesh_target_scroll_y);'))
-            print('GRMODELS MAN RASTER DIAGNOSTIC\n'+mesh_diag, flush=True)
-
-            type_graphical_prompt_line(
-                '3d-grmodels-ball-launch',
-                'ExeFile2("/Apps/GrModels/Run.ZC");')
-            qmp_send_key('ret')
-            require_graphical_text('3d-grmodels-ball-entry', 'Make a CSprite model',
-                                   timeout=12)
-            ball_form = None
-            for attempt in range(3):
-                move_graphical_pointer(53, 84)
+            if not args.probe_keepaway_audio:
+                type_graphical_prompt_line(
+                    '3d-grmodels-launch',
+                    'ExeFile2("/Apps/GrModels/Run.ZC");')
+                qmp_send_key('ret')
+                time.sleep(1)
+                grmodels = graphical_screen('3d-grmodels-entry')
+                print('GRMODELS ENTRY SCREEN\n'+grmodels[3], flush=True)
+                move_graphical_pointer(53, 52)
                 graphical_mouse_button('left', True)
-                time.sleep(0.15)
+                time.sleep(0.2)
                 graphical_mouse_button('left', False)
-                try:
-                    ball_form = require_graphical_text(
-                        '3d-grmodels-ball-form', 'Longitude Faces', timeout=3)
-                    break
-                except RuntimeError:
-                    if attempt == 0:
-                        # If the mouse event only moved the DolDoc highlight,
-                        # Return activates the highlighted Ball link.
-                        qmp_send_key('ret')
-                    elif attempt == 1:
-                        # Retry the click after the document has repainted.
-                        time.sleep(0.5)
-                    else:
-                        raise
-            if ball_form is None:
-                raise RuntimeError('GrModels Ball form did not open')
-            if 'Radius' not in ball_form[3] or 'Lattitude Rings' not in ball_form[3]:
-                raise RuntimeError('GrModels Ball form is missing expected fields:\n'+
-                                   ball_form[3])
-            qmp_send_key('esc')
-            require_graphical_text('3d-grmodels-ball-color', 'Single-Sided means',
-                                   timeout=12)
-            click_3d_color('3d-grmodels-ball-generated',
-                           'Single-Sided means', 'Vertices:')
-            ball_generated = require_graphical_text(
-                '3d-grmodels-ball-generated', 'Vertices:', timeout=25)
-            require_graphical_text('3d-grmodels-ball-repeat', 'Do another', timeout=10)
-            ball_sprite_pixels = rgb_pixels_in(
-                ball_generated, (170, 0, 170), (8, 16, 400, 591))
-            if ball_sprite_pixels < 100:
-                raise RuntimeError('GrModels Ball generated a sprite entry but its '
-                                   'purple mesh was not visible in the document: '
-                                   f'{ball_sprite_pixels} matching pixels')
-            print('PASS GrModels Ball sprite visible inline: '
-                  f'{ball_sprite_pixels} purple pixels', flush=True)
-            print('PASS GrModels Ball mesh generation; '+
-                  next((line.strip() for line in ball_generated[3].splitlines()
-                        if 'Vertices:' in line), 'Vertices reported'), flush=True)
-            ball_render_diag = command(
-                'zc Print("3d_ball_doc_sprite=%d,%d,%d,%d,%d,%d,%d\\n",'
-                'sprite_debug_doc_sprite_calls,sprite_debug_doc_sprite_doc_is_put,'
-                'sprite_debug_doc_sprite_doc_is_display,'
-                'sprite_debug_doc_sprite_doc_window_is_current,'
-                'sprite_debug_doc_sprite_entry_type,sprite_debug_doc_sprite_has_bin,'
-                'sprite_debug_mesh_calls);', 'zc: executed', timeout=20)
-            print('GRMODELS BALL DOCUMENT/RENDER DIAGNOSTIC\\n'+ball_render_diag,
-                  flush=True)
-            command(
-                'zc I64 GrModelsBallSpriteEntryCheck(){'
-                'if (sprite_debug_doc_sprite_calls>0 && '
-                '(sprite_debug_doc_sprite_entry_type&0xFF)==DOCT_SPRITE && '
-                'sprite_debug_doc_sprite_has_bin) return 42; return 0;};',
-                'zc: executed')
-            command('zcall GrModelsBallSpriteEntryCheck',
-                    'zc => 0x000000000000002a')
-            qmp_send_key('n')
-            time.sleep(0.5)
-            graphical_screen('3d-grmodels-ball-after-exit')
-            run_graphical_terminal_command(
-                '3d-grmodels-ball-exit-smoke', '40+2;', 'ans=0x2A=42', timeout=20)
-            command('zstatus', 'failed=0')
-            mesh_diag = ''.join(command(
-                line, 'zc: executed', timeout=20)
-                for line in (
-                    'zc Print("3d_live_mesh=%d,%d,%d,%d\\n",'
-                    'sprite_debug_mesh_last_vertices,'
-                    'sprite_debug_mesh_last_triangles,'
-                    'sprite_debug_mesh_last_result,'
-                    'sprite_debug_mesh_last_work);',
-                    'zc Print("3d_live_color_pixels=%d,%d,%d,%d,%d,%d\\n",'
-                    'sprite_debug_mesh_last_color,'
-                    'sprite_debug_mesh_last_lit_color,'
-                    'sprite_debug_mesh_pixel_attempts,'
-                    'sprite_debug_mesh_pixel_writes,'
-                    'sprite_debug_mesh_pixel_min_x,'
-                    'sprite_debug_mesh_pixel_min_y);',
-                    'zc Print("3d_live_color_masks=%d,%d,%d\\n",'
-                    'sprite_debug_mesh_raw_color_mask,'
-                    'sprite_debug_mesh_lit_color_mask,'
-                    'sprite_debug_mesh_pixel_color_mask);',
-                    'zc Print("3d_live_bounds_masks=%d,%d,%d,%d,%d\\n",'
-                    'sprite_debug_mesh_pixel_max_x,'
-                    'sprite_debug_mesh_pixel_max_y,'
-                    'sprite_debug_type_mask_failures,'
-                    'sprite_debug_type_mask_last_type,'
-                    'sprite_debug_type_mask_last_size);',
-                    'zc Print("3d_live_choices=%d,%d,%d,%d,%d\\n",'
-                    'sprite_debug_lighting_choice_count,'
-                    'sprite_debug_lighting_choices[0],'
-                    'sprite_debug_lighting_choices[1],'
-                    'sprite_debug_lighting_choices[2],'
-                    'sprite_debug_lighting_choices[3]);',
-                    'zc Print("3d_live_target=%d,%d,%d,%d,%d,%d,%d\\n",'
-                    'sprite_debug_mesh_target_dc_is_bootstrap,'
-                    'sprite_debug_mesh_target_body_is_graphics,'
-                    'sprite_debug_mesh_target_body_is_foreground,'
-                    'sprite_debug_mesh_target_last_x,'
-                    'sprite_debug_mesh_target_last_y,'
-                    'sprite_debug_mesh_target_last_pixel,'
-                    'sprite_debug_mesh_target_last_index);',
-                    'zc Print("3d_live_target_window=%d,%d,%d,%d,%d,%d\\n",'
-                    'sprite_debug_mesh_target_left,'
-                    'sprite_debug_mesh_target_right,'
-                    'sprite_debug_mesh_target_top,'
-                    'sprite_debug_mesh_target_bottom,'
-                    'sprite_debug_mesh_target_scroll_x,'
-                    'sprite_debug_mesh_target_scroll_y);'))
-            print('GRMODELS BALL RASTER DIAGNOSTIC\n'+mesh_diag, flush=True)
+                time.sleep(1)
+                man_form = graphical_screen('3d-grmodels-man-form')
+                print('GRMODELS MAN FORM\n'+man_form[3], flush=True)
+                qmp_send_key('esc')
+                require_graphical_text(
+                    '3d-grmodels-man-color-shirt', 'Single-Sided means', timeout=12)
 
+                def click_3d_color(name, current_marker, next_marker):
+                    # Select the red entry in the first (single-sided, full-range)
+                    # column. In the 800x600 UI it is the fifth eight-pixel row
+                    # below the section header.
+                    deadline = time.monotonic() + 12
+                    attempt = 0
+                    while True:
+                        screen = graphical_screen(name+'-before')
+                        # The first framebuffer read after the color-popup
+                        # closes can capture the prompt while its DolDoc text is
+                        # still being repainted. Accept the stable prefix for
+                        # this particular repeat prompt; the subsequent `n`
+                        # input and terminal recovery remain the real checks.
+                        next_visible = next_marker in screen[3]
+                        if next_marker == 'Do another':
+                            # Some guest font/framebuffer captures lose a few
+                            # letters in this prompt even though the question
+                            # suffix is rendered. Treat its answer choices as the
+                            # stable marker; the caller also checks generated
+                            # mesh diagnostics before accepting the app path.
+                            next_visible |= ('Do anot' in screen[3] or
+                                             'y or n)?' in screen[3])
+                        if next_visible:
+                            return screen
+                        if current_marker not in screen[3]:
+                            raise RuntimeError(
+                                f'{name}: color picker changed without showing '
+                                f'{next_marker!r}:\n'+screen[3])
+                        if time.monotonic() >= deadline:
+                            diagnostic = command('zstatus', 'failed=')
+                            raise RuntimeError(
+                                f'{name}: color choice did not advance from '
+                                f'{current_marker!r} to {next_marker!r}:\n'+
+                                screen[3]+'\n'+diagnostic)
+                        attempt += 1
+                        time.sleep(0.25)
+                        if attempt == 1:
+                            move_graphical_pointer(100, 124)
+                            graphical_mouse_button('left', True)
+                            time.sleep(0.15)
+                            graphical_mouse_button('left', False)
+                        elif attempt == 2:
+                            # PopUpMenu also supports Return on the highlighted
+                            # DolDoc link; use it once if the click only hovered.
+                            qmp_send_key('ret')
+                        else:
+                            move_graphical_pointer(100, 124)
+                            graphical_mouse_button('left', True)
+                            time.sleep(0.15)
+                            graphical_mouse_button('left', False)
+                        print(f'3D color selection {name} attempt {attempt}', flush=True)
+                        time.sleep(0.35)
+
+                click_3d_color('3d-grmodels-man-pants', 'Shirt', 'Pants')
+                click_3d_color('3d-grmodels-man-skin', 'Pants', 'Skin')
+                click_3d_color('3d-grmodels-man-shoes', 'Skin', 'Shoes')
+                click_3d_color('3d-grmodels-man-generated', 'Shoes', 'Do another')
+                man_generated = require_graphical_text(
+                    '3d-grmodels-man-generated', 'y or n)?', timeout=20)
+                if 'y or n)?' not in man_generated[3]:
+                    raise RuntimeError('GrModels Man did not finish mesh generation')
+                print('PASS GrModels Man mesh generation reached its repeat prompt',
+                      flush=True)
+                qmp_send_key('n')
+                time.sleep(0.5)
+                graphical_screen('3d-grmodels-man-after-exit')
+                run_graphical_terminal_command(
+                    '3d-grmodels-man-exit-smoke', '40+2;', 'ans=0x2A=42', timeout=20)
+                command('zstatus', 'failed=0')
+                mesh_diag = ''.join(command(
+                    line, 'zc: executed', timeout=20)
+                    for line in (
+                        'zc Print("3d_live_mesh=%d,%d,%d,%d\\n",'
+                        'sprite_debug_mesh_last_vertices,'
+                        'sprite_debug_mesh_last_triangles,'
+                        'sprite_debug_mesh_last_result,'
+                        'sprite_debug_mesh_last_work);',
+                        'zc Print("3d_live_color_pixels=%d,%d,%d,%d,%d,%d\\n",'
+                        'sprite_debug_mesh_last_color,'
+                        'sprite_debug_mesh_last_lit_color,'
+                        'sprite_debug_mesh_pixel_attempts,'
+                        'sprite_debug_mesh_pixel_writes,'
+                        'sprite_debug_mesh_pixel_min_x,'
+                        'sprite_debug_mesh_pixel_min_y);',
+                        'zc Print("3d_live_color_masks=%d,%d,%d\\n",'
+                        'sprite_debug_mesh_raw_color_mask,'
+                        'sprite_debug_mesh_lit_color_mask,'
+                        'sprite_debug_mesh_pixel_color_mask);',
+                        'zc Print("3d_live_bounds_masks=%d,%d,%d,%d,%d\\n",'
+                        'sprite_debug_mesh_pixel_max_x,'
+                        'sprite_debug_mesh_pixel_max_y,'
+                        'sprite_debug_type_mask_failures,'
+                        'sprite_debug_type_mask_last_type,'
+                        'sprite_debug_type_mask_last_size);',
+                        'zc Print("3d_live_choices=%d,%d,%d,%d,%d\\n",'
+                        'sprite_debug_lighting_choice_count,'
+                        'sprite_debug_lighting_choices[0],'
+                        'sprite_debug_lighting_choices[1],'
+                        'sprite_debug_lighting_choices[2],'
+                        'sprite_debug_lighting_choices[3]);',
+                        'zc Print("3d_live_target=%d,%d,%d,%d,%d,%d,%d\\n",'
+                        'sprite_debug_mesh_target_dc_is_bootstrap,'
+                        'sprite_debug_mesh_target_body_is_graphics,'
+                        'sprite_debug_mesh_target_body_is_foreground,'
+                        'sprite_debug_mesh_target_last_x,'
+                        'sprite_debug_mesh_target_last_y,'
+                        'sprite_debug_mesh_target_last_pixel,'
+                        'sprite_debug_mesh_target_last_index);',
+                        'zc Print("3d_live_target_window=%d,%d,%d,%d,%d,%d\\n",'
+                        'sprite_debug_mesh_target_left,'
+                        'sprite_debug_mesh_target_right,'
+                        'sprite_debug_mesh_target_top,'
+                        'sprite_debug_mesh_target_bottom,'
+                        'sprite_debug_mesh_target_scroll_x,'
+                        'sprite_debug_mesh_target_scroll_y);'))
+                print('GRMODELS MAN RASTER DIAGNOSTIC\n'+mesh_diag, flush=True)
+
+                type_graphical_prompt_line(
+                    '3d-grmodels-ball-launch',
+                    'ExeFile2("/Apps/GrModels/Run.ZC");')
+                qmp_send_key('ret')
+                require_graphical_text('3d-grmodels-ball-entry', 'Make a CSprite model',
+                                       timeout=12)
+                ball_form = None
+                for attempt in range(3):
+                    move_graphical_pointer(53, 84)
+                    graphical_mouse_button('left', True)
+                    time.sleep(0.15)
+                    graphical_mouse_button('left', False)
+                    try:
+                        ball_form = require_graphical_text(
+                            '3d-grmodels-ball-form', 'Longitude Faces', timeout=3)
+                        break
+                    except RuntimeError:
+                        if attempt == 0:
+                            # If the mouse event only moved the DolDoc highlight,
+                            # Return activates the highlighted Ball link.
+                            qmp_send_key('ret')
+                        elif attempt == 1:
+                            # Retry the click after the document has repainted.
+                            time.sleep(0.5)
+                        else:
+                            raise
+                if ball_form is None:
+                    raise RuntimeError('GrModels Ball form did not open')
+                if 'Radius' not in ball_form[3] or 'Lattitude Rings' not in ball_form[3]:
+                    raise RuntimeError('GrModels Ball form is missing expected fields:\n'+
+                                       ball_form[3])
+                qmp_send_key('esc')
+                require_graphical_text('3d-grmodels-ball-color', 'Single-Sided means',
+                                       timeout=12)
+                click_3d_color('3d-grmodels-ball-generated',
+                               'Single-Sided means', 'Vertices:')
+                ball_generated = require_graphical_text(
+                    '3d-grmodels-ball-generated', 'Vertices:', timeout=25)
+                require_graphical_text('3d-grmodels-ball-repeat', 'Do another', timeout=10)
+                ball_sprite_pixels = rgb_pixels_in(
+                    ball_generated, (170, 0, 170), (8, 16, 400, 591))
+                if ball_sprite_pixels < 100:
+                    raise RuntimeError('GrModels Ball generated a sprite entry but its '
+                                       'purple mesh was not visible in the document: '
+                                       f'{ball_sprite_pixels} matching pixels')
+                print('PASS GrModels Ball sprite visible inline: '
+                      f'{ball_sprite_pixels} purple pixels', flush=True)
+                print('PASS GrModels Ball mesh generation; '+
+                      next((line.strip() for line in ball_generated[3].splitlines()
+                            if 'Vertices:' in line), 'Vertices reported'), flush=True)
+                ball_render_diag = command(
+                    'zc Print("3d_ball_doc_sprite=%d,%d,%d,%d,%d,%d,%d\\n",'
+                    'sprite_debug_doc_sprite_calls,sprite_debug_doc_sprite_doc_is_put,'
+                    'sprite_debug_doc_sprite_doc_is_display,'
+                    'sprite_debug_doc_sprite_doc_window_is_current,'
+                    'sprite_debug_doc_sprite_entry_type,sprite_debug_doc_sprite_has_bin,'
+                    'sprite_debug_mesh_calls);', 'zc: executed', timeout=20)
+                print('GRMODELS BALL DOCUMENT/RENDER DIAGNOSTIC\\n'+ball_render_diag,
+                      flush=True)
+                command(
+                    'zc I64 GrModelsBallSpriteEntryCheck(){'
+                    'if (sprite_debug_doc_sprite_calls>0 && '
+                    '(sprite_debug_doc_sprite_entry_type&0xFF)==DOCT_SPRITE && '
+                    'sprite_debug_doc_sprite_has_bin) return 42; return 0;};',
+                    'zc: executed')
+                command('zcall GrModelsBallSpriteEntryCheck',
+                        'zc => 0x000000000000002a')
+                qmp_send_key('n')
+                time.sleep(0.5)
+                graphical_screen('3d-grmodels-ball-after-exit')
+                run_graphical_terminal_command(
+                    '3d-grmodels-ball-exit-smoke', '40+2;', 'ans=0x2A=42', timeout=20)
+                command('zstatus', 'failed=0')
+                mesh_diag = ''.join(command(
+                    line, 'zc: executed', timeout=20)
+                    for line in (
+                        'zc Print("3d_live_mesh=%d,%d,%d,%d\\n",'
+                        'sprite_debug_mesh_last_vertices,'
+                        'sprite_debug_mesh_last_triangles,'
+                        'sprite_debug_mesh_last_result,'
+                        'sprite_debug_mesh_last_work);',
+                        'zc Print("3d_live_color_pixels=%d,%d,%d,%d,%d,%d\\n",'
+                        'sprite_debug_mesh_last_color,'
+                        'sprite_debug_mesh_last_lit_color,'
+                        'sprite_debug_mesh_pixel_attempts,'
+                        'sprite_debug_mesh_pixel_writes,'
+                        'sprite_debug_mesh_pixel_min_x,'
+                        'sprite_debug_mesh_pixel_min_y);',
+                        'zc Print("3d_live_color_masks=%d,%d,%d\\n",'
+                        'sprite_debug_mesh_raw_color_mask,'
+                        'sprite_debug_mesh_lit_color_mask,'
+                        'sprite_debug_mesh_pixel_color_mask);',
+                        'zc Print("3d_live_bounds_masks=%d,%d,%d,%d,%d\\n",'
+                        'sprite_debug_mesh_pixel_max_x,'
+                        'sprite_debug_mesh_pixel_max_y,'
+                        'sprite_debug_type_mask_failures,'
+                        'sprite_debug_type_mask_last_type,'
+                        'sprite_debug_type_mask_last_size);',
+                        'zc Print("3d_live_choices=%d,%d,%d,%d,%d\\n",'
+                        'sprite_debug_lighting_choice_count,'
+                        'sprite_debug_lighting_choices[0],'
+                        'sprite_debug_lighting_choices[1],'
+                        'sprite_debug_lighting_choices[2],'
+                        'sprite_debug_lighting_choices[3]);',
+                        'zc Print("3d_live_target=%d,%d,%d,%d,%d,%d,%d\\n",'
+                        'sprite_debug_mesh_target_dc_is_bootstrap,'
+                        'sprite_debug_mesh_target_body_is_graphics,'
+                        'sprite_debug_mesh_target_body_is_foreground,'
+                        'sprite_debug_mesh_target_last_x,'
+                        'sprite_debug_mesh_target_last_y,'
+                        'sprite_debug_mesh_target_last_pixel,'
+                        'sprite_debug_mesh_target_last_index);',
+                        'zc Print("3d_live_target_window=%d,%d,%d,%d,%d,%d\\n",'
+                        'sprite_debug_mesh_target_left,'
+                        'sprite_debug_mesh_target_right,'
+                        'sprite_debug_mesh_target_top,'
+                        'sprite_debug_mesh_target_bottom,'
+                        'sprite_debug_mesh_target_scroll_x,'
+                        'sprite_debug_mesh_target_scroll_y);'))
+                print('GRMODELS BALL RASTER DIAGNOSTIC\n'+mesh_diag, flush=True)
+
+            if args.probe_keepaway_audio:
+                if args.probe_keepaway_audio_timer:
+                    command('zc extern I64 ZcSoundTimerEnable(); '
+                            'extern I64 ZcSoundTimerTotalIrqs(); '
+                            'extern I64 ZcSoundCurrentHz();', 'zc: executed')
+                    command('zc Print("keepaway_timer=%d\\n",ZcSoundTimerEnable);',
+                            'keepaway_timer=1')
+                keepaway_audio_path = pathlib.Path(os.environ['ZEAL_AUDIO_CAPTURE_PATH'])
+                print('KEEP_AWAY_AUDIO_START=' + str(
+                    keepaway_audio_path.stat().st_size if keepaway_audio_path.exists() else 44),
+                      flush=True)
             type_graphical_prompt_line(
                 '3d-keepaway-launch',
                 'ExeFile2("/Apps/KeepAway/Run.ZC");')
@@ -4539,6 +4590,20 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             run_graphical_terminal_command(
                 '3d-keepaway-exit-smoke', '40+2;', 'ans=0x2A=', timeout=20)
             command('zstatus', 'failed=0')
+            if args.probe_keepaway_audio:
+                if args.probe_keepaway_audio_timer:
+                    status = command('zc Print("keepaway_irqs=%d hz=%d\\n",'
+                                     'ZcSoundTimerTotalIrqs,ZcSoundCurrentHz);',
+                                     'keepaway_irqs=')
+                    match = re.search(r'keepaway_irqs=(\d+) hz=(\d+)', status)
+                    if not match or int(match.group(1)) == 0 or int(match.group(2)) != 0:
+                        raise RuntimeError('KeepAway timer did not service sound or stop: '+status)
+                    print('PASS KeepAway audio timer service and stopped tone: '
+                          + match.group(0), flush=True)
+                time.sleep(1)
+                print('KEEP_AWAY_AUDIO_END=' + str(keepaway_audio_path.stat().st_size),
+                      flush=True)
+                raise SystemExit(0)
 
             # Isolate the same blocking primitive Titanium uses before
             # attributing its apparent freeze to the renderer/game loop.
@@ -7666,15 +7731,125 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                                 'zc: loaded disk:ARMTEST.ZC')
                         command('zcall StockRedSeaFileChecks',
                                 'zc => 0x000000000000002a')
-                        for path in ('disk:LATE.ZC', 'disk:NEST/INNER.ZC'):
+                        for path in ('disk:LATE.ZC', 'disk:CHAIN.ZC', 'disk:NEST/INNER.ZC',
+                                     'disk:nest/inner.zc'):
                             command('zload ' + path, 'zc: loaded ' + path)
                             command('zcall StockRedSeaFileChecks',
                                     'zc => 0x000000000000002a')
-                        for name in ('BADTEST.ZC', 'DIRTEST.ZC', 'CHAIN.ZC', 'DELETE.ZC'):
+                        for name in ('BADTEST.ZC', 'DIRTEST.ZC',
+                                     'DELETE.ZC', 'OVERRUN.ZC', 'BROKENDIR/X.ZC',
+                                     'ARMTEST.ZC/INNER.ZC', 'NEST'):
                             command('zc Print("refused=%d\\n", '
                                     f'FileRead("disk:{name}")==NULL);', 'refused=1')
+                        command('zc I64 empty_size=-1; U8 *empty_data='
+                                'FileRead("disk:EMPTY.ZC",&empty_size); '
+                                'Print("empty_ok=%d\\n",empty_data!=NULL && '
+                                'empty_size==0 && *empty_data==0); Free(empty_data);',
+                                'empty_ok=1')
+                        command('zc I64 rs_enum_i=0,rs_enum_size=0,rs_enum_bits=0; '
+                                'U8 rs_enum_name[96]; '
+                                'while(ZcRedSeaFileAt(rs_enum_i++,rs_enum_name,96,&rs_enum_size)) {'
+                                'if(!StrCompare(rs_enum_name,"LATE.ZC")) rs_enum_bits|=1; '
+                                'if(!StrCompare(rs_enum_name,"NEST/INNER.ZC")) rs_enum_bits|=2; '
+                                'if(!StrCompare(rs_enum_name,"EMPTY.ZC") && !rs_enum_size) rs_enum_bits|=4; '
+                                'if(rs_enum_i>30) break; } '
+                                'Print("rs_enum_ok=%d\\n",rs_enum_bits==7 && rs_enum_i<=30);',
+                                'rs_enum_ok=1')
+                        command('zc CDirEntry *rs_found=FilesFind("disk:/NEST/INNER.ZC",FUF_JUST_FILES); '
+                                'Print("rs_find_ok=%d\\n",rs_found!=NULL); DirTreeDel(rs_found);',
+                                'rs_find_ok=1')
+                        command('zc Print("rs_dirs_ok=%d\\n", '
+                                'ZcSourceDirExists("disk:/EMPTYDIR") && '
+                                'ZcSourceDirExists("disk:/nest") && '
+                                '!ZcSourceDirExists("disk:/BROKENDIR") && '
+                                '!ZcSourceDirExists("disk:/ARMTEST.ZC"));',
+                                'rs_dirs_ok=1')
+                        command('zc Bool rs_cd_ok=Cd("/EMPTYDIR"); '
+                                'U8 *rs_cd_path=DirCur; '
+                                'Print("rs_cd_ok=%d\\n",rs_cd_ok && '
+                                '!StrCompare(rs_cd_path,"/EMPTYDIR")); '
+                                'Cd("/"); Free(rs_cd_path);', 'rs_cd_ok=1')
+                        command('zc Bool rs_case_cd=Cd("/nest"); I64 rs_case_len=-1; '
+                                'U8 *rs_case_file=FileRead("inner.zc",&rs_case_len); '
+                                'CDirEntry *rs_case_find=FilesFind("*.ZC",FUF_JUST_FILES); '
+                                'Print("rs_relative_ok=%d\\n",rs_case_cd && '
+                                'rs_case_file!=NULL && rs_case_len>0 && rs_case_find!=NULL && '
+                                '!StrCompare(rs_case_find->full_name,"/NEST/INNER.ZC")); '
+                                'Free(rs_case_file); DirTreeDel(rs_case_find); Cd("/");',
+                                'rs_relative_ok=1')
+                        command('zc CDirEntry *rs_empty_dir='
+                                'FilesFind("disk:/EMPTYDIR",FUF_JUST_DIRS); '
+                                'Print("rs_empty_dir_ok=%d\\n",rs_empty_dir!=NULL && '
+                                '(rs_empty_dir->attr & RS_ATTR_DIR)); '
+                                'DirTreeDel(rs_empty_dir);', 'rs_empty_dir_ok=1')
+                        command('zc I64 rs_di=0,rs_db=0; U8 rs_dn[96]; '
+                                'while(ZcRedSeaDirAt(rs_di++,rs_dn,96)) {'
+                                'if(!StrCompare(rs_dn,"EMPTYDIR")) rs_db|=1; '
+                                'if(!StrCompare(rs_dn,"NEST")) rs_db|=2; '
+                                'if(!StrCompare(rs_dn,"BROKENDIR")) rs_db|=4; '
+                                'if(rs_di>30) break; } '
+                                'Print("rs_dir_enum_ok=%d\\n",rs_db==3 && rs_di<=30);',
+                                'rs_dir_enum_ok=1')
+                        command('zc U8 empty_old[4]="old"; '
+                                'Print("empty_write_old=%d\\n",'
+                                'FileWrite("/Tests/EmptyPersist.ZC",empty_old,3));',
+                                'empty_write_old=3')
+                        command('zc Print("empty_write=%d\\n",'
+                                'FileWrite("/Tests/EmptyPersist.ZC",NULL,0));',
+                                'empty_write=0')
+                        if 'zrecv: saved Tests/SerialEmpty.ZC bytes=0' not in upload_source(
+                                'Tests/SerialEmpty.ZC', b''):
+                            raise RuntimeError('empty serial upload did not save')
+                        if 'zrecv: checksum mismatch; old file intact' not in upload_source(
+                                'Tests/SerialEmpty.ZC', b'', 1):
+                            raise RuntimeError('empty serial upload accepted wrong CRC')
+                        command('zverify Tests/SerialEmpty.ZC', 'zverify: OK bytes=0')
+                        command('zc Print("empty_override=%d\\n",'
+                                'FileWrite("/Tests/SourceMacros.ZC",NULL,0));',
+                                'empty_override=0')
+                        command('zc I64 override_size=-1; U8 *override_data='
+                                'FileRead("/Tests/SourceMacros.ZC",&override_size); '
+                                'Print("override_empty_ok=%d\\n",override_data!=NULL && '
+                                'override_size==0 && *override_data==0); Free(override_data);',
+                                'override_empty_ok=1')
+                        command('zrm Tests/SourceMacros.ZC', 'zrm: deleted Tests/SourceMacros.ZC')
+                        command('zc Print("override_deleted=%d\\n", '
+                                'FileRead("/Tests/SourceMacros.ZC")==NULL);',
+                                'override_deleted=1')
+                        def check_saved_empty():
+                            command('zc I64 saved_empty_size=-1; U8 *saved_empty='
+                                    'FileRead("/Tests/EmptyPersist.ZC",&saved_empty_size); '
+                                    'Print("saved_empty_ok=%d\\n",saved_empty!=NULL && '
+                                    'saved_empty_size==0 && *saved_empty==0); '
+                                    'Free(saved_empty);', 'saved_empty_ok=1')
+                        check_saved_empty()
+                        command('zverify Tests/EmptyPersist.ZC', 'zverify: OK bytes=0')
+                        command('zgc', 'zgc: OK sectors=')
+                        command('zverify Tests/EmptyPersist.ZC', 'zverify: OK bytes=0')
+                        guest.terminate()
+                        guest.wait(timeout=10)
+                        offline = subprocess.check_output(
+                            ['python3', str(ROOT/'scripts/source-volume.py'),
+                             'inspect', str(tmp/'disk.img')], text=True)
+                        if 'Tests/EmptyPersist.ZC\t0\tcrc32=00000000' not in offline:
+                            raise RuntimeError('offline inspect missed empty file:\n' + offline)
+                        subprocess.check_call(
+                            ['python3', str(ROOT/'scripts/source-volume.py'),
+                             'compact', str(tmp/'disk.img')])
+                        print('PASS host inspect and compaction of empty file', flush=True)
+                        buf.clear()
+                        guest = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                                 stderr=subprocess.STDOUT, bufsize=0)
+                        reboot = until(b'\n> ', timeout=180)
+                        if 'zc: graphical terminal started at boot' not in reboot:
+                            raise RuntimeError('empty-file cold boot did not reach desktop')
+                        check_saved_empty()
+                        command('zverify Tests/SerialEmpty.ZC', 'zverify: OK bytes=0')
+                        command('zc Print("override_deleted=%d\\n", '
+                                'FileRead("/Tests/SourceMacros.ZC")==NULL);',
+                                'override_deleted=1')
                         command('zstatus', 'failed=0')
-                        print('PASS stock RedSea contiguous root source loaded and executed',
+                        print('PASS stock RedSea file reads and empty source-store cold persistence',
                               flush=True)
                         raise SystemExit(0)
                     if args.probe_diskraw_live:

@@ -1234,6 +1234,8 @@ struct source_list_entry {
 };
 extern int zeal_redsea_file_at(uint64_t index, char *dst, size_t cap,
                                size_t *out_size);
+extern int zeal_redsea_dir_exists(const char *name);
+extern int zeal_redsea_dir_at(uint64_t index, char *dst, size_t cap);
 struct source_overlay_entry {
     char name[96];
     size_t size;
@@ -1371,6 +1373,10 @@ static int64_t host_redsea_file_at(int64_t *a) {
         *(int64_t *)(uintptr_t)a[3] = (int64_t)size;
     return 1;
 }
+static int64_t host_redsea_dir_at(int64_t *a) {
+    if (a[0] < 0 || a[2] <= 0) return 0;
+    return zeal_redsea_dir_at((uint64_t)a[0], (char *)(uintptr_t)a[1], (size_t)a[2]);
+}
 static int64_t host_source_volume_stats(int64_t *a) {
     if (!a[0] || !a[1]) return 0;
     return zeal_zss_volume_stats((uint64_t *)(uintptr_t)a[0],
@@ -1433,7 +1439,7 @@ static int source_dir_exists(const char *path) {
     for (size_t i = 0; i < source_list_cache_count; i++)
         if (!strncmp(source_list_cache[i].path, prefix, name_len + 1))
             return 1;
-    return 0;
+    return zeal_redsea_dir_exists(name);
 }
 static int64_t host_file_dir_exists(int64_t *a) {
     char path[134];
@@ -1467,7 +1473,7 @@ static char *disk_copy(const char *path, size_t *length, int *tombstoned) {
     int status = disk_reader(name, NULL, 0, &n);
     if (status == -3 && tombstoned)
         *tombstoned = 1;
-    if (status || !n || n > 8u * 1024u * 1024u)
+    if (status || n > 8u * 1024u * 1024u)
         return NULL;
     char *src = malloc(n + 1);
     /* DolDoc files carry packed resources after their text NUL. Callers use
@@ -1560,7 +1566,7 @@ static int64_t host_file_write(int64_t *a) {
     const char *src = (const char *)(uintptr_t)a[1];
     int64_t length = a[2];
     if (guest_path((const char *)(uintptr_t)a[0], path) ||
-        !src || length <= 0 || !disk_writer)
+        (!src && length) || length < 0 || !disk_writer)
         return -1;
     int result = disk_writer(path, src, (size_t)length);
     if (strstr(path, "DataBaseDemo.BIN"))
@@ -4684,6 +4690,10 @@ static int64_t host_sound_timer_enable(int64_t *a) {
 static int64_t host_sound_timer_irqs(int64_t *a) {
     (void)a;
     return (int64_t)zc_sound_timer_irq_count();
+}
+static int64_t host_sound_timer_total_irqs(int64_t *a) {
+    (void)a;
+    return (int64_t)zc_sound_timer_total_irq_count();
 }
 static int64_t host_sound_timer_enabled(int64_t *a) {
     (void)a;
@@ -9418,6 +9428,7 @@ static int load_source_path(const char *path, int merged, int recover) {
         guest_home_dir_ptr = (char **)((unsigned char *)blkdev->data_addr + home->off);
         PrsBindCSymbol("ZcSourceFileAt", host_source_file_at, 4);
         PrsBindCSymbol("ZcRedSeaFileAt", host_redsea_file_at, 4);
+        PrsBindCSymbol("ZcRedSeaDirAt", host_redsea_dir_at, 3);
         PrsBindCSymbol("ZcSourceVolumeStats", host_source_volume_stats, 2);
         PrsBindCSymbol("ZcRawDiskSectors", host_raw_disk_sectors, 0);
         PrsBindCSymbol("ZcRawDiskRead", host_raw_disk_read, 3);
@@ -10217,6 +10228,7 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
                     {"ZcSoundSubmittedFrames", host_sound_submitted_frames, 0},
                     {"ZcSoundTimerEnable", host_sound_timer_enable, 0},
                     {"ZcSoundTimerIrqCount", host_sound_timer_irqs, 0},
+                    {"ZcSoundTimerTotalIrqs", host_sound_timer_total_irqs, 0},
                     {"ZcSoundTimerEnabled", host_sound_timer_enabled, 0},
                     {"ZcSoundCurrentHz", host_sound_current_hz, 0},
                     {"ZcVirtioNetReady", host_virtio_net_ready, 0},

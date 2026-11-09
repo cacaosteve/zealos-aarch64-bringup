@@ -1,0 +1,14 @@
+{
+  "date": "2026-11-09",
+  "target": "AArch64 PCI QEMU, one vCPU, VirtIO keyboard and VirtIO sound WAV backend",
+  "kernel_sha256": "db898897746b5a5efc4398f1b14855829ef95ce78951f84a1b4e913d8fd4e093",
+  "source_bundle_sha256": "e8ebb800ed78a902c0324914b61d94e62a1e44149384f3938d312d4718f862eb",
+  "command": "QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device -audiodev wav,id=sound0,path=build/titanium-audio-current.wav -device virtio-sound-pci,audiodev=sound0' python3 -u scripts/check-compat.py --pci --quick --probe-titanium-only",
+  "result": "pass for gameplay frame, arrow movement, Space input and Escape/terminal recovery; nonzero PCM captured during run",
+  "audio": "Capture contained 15,876 stereo frames and 22,932 nonzero 16-bit samples. Positive-crossing periods predominantly 22\u201323 and 44\u201345 frames at 44,100 Hz, consistent with the approximately 1976 Hz and 988 Hz pitches of Sound(86) and Sound(74) in the original Titanium source. QEMU termination left zero WAV header lengths; the measurements use PCM after the 44-byte header.",
+  "logs": {
+    "build/titanium-audio-current.log": "3864cedc734d8913726d3db46f74f1f62a33cb6cf4c35c3a8f3c79024c3510f5",
+    "build/titanium-audio-current.wav": "28c4fe5635068d7c9ba8bea75c28daeb1785a24a08e0b0422c7ea8f87cdb64c6"
+  },
+  "limits": "Capture is for the whole test and was not synchronized to individual game actions; it does not verify exact effect timing, audible real-time UTM output or Pi output."
+}

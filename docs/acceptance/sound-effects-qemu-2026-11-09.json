@@ -170,6 +170,56 @@
       "The F64 check does not exhaustively verify all SIMD registers, nested interrupt conditions or longer workloads.",
       "One HVF run observed a 69918 us gap against an 80000 us queue; latency under host load is not yet bounded.",
       "No timer-driven task switching or MessageScan handoff has been added."
-    ]
+    ],
+    "current_scheduler_recheck": {
+      "kernel_sha256": "faa1e67b7ebffb5ea968e403e02ad5ff6d60b05bf0792d6bdaec599d86a49257",
+      "source_bundle_sha256": "e8ebb800ed78a902c0324914b61d94e62a1e44149384f3938d312d4718f862eb",
+      "command": "QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device -audiodev wav,id=sound0,path=build/sound-timer-scheduler-current.wav -device virtio-sound-pci,audiodev=sound0' python3 -u scripts/check-compat.py --pci --quick --probe-source-fast --probe-sound-quiet --probe-source-module tests/compat/TaskMessages.ZC --probe-source tests/compat/SoundTimerMessages.ZC --probe-source-call SoundTimerMessageChecks",
+      "result": "pass: audio IRQs occurred during MessageScan polling without running a witness until explicit Yield; existing scan-no-switch, Yield and MessageGet regression returned 42",
+      "log": "build/sound-timer-scheduler-current.log",
+      "log_sha256": "76ef0de9d9222cec7c00fbb971bbc6577287dc73e470d69614302dbcabbf4d3c",
+      "scope": "QEMU, desktop stopped, timer explicitly enabled; active runtime is still the bootstrap scheduler, not pinned Sched.ZC; no UTM or Pi audio validation."
+    },
+    "enable_during_tone_fix": {
+      "kernel_sha256": "8c8bfff505e10c34782c2f1ae37be36219ba93418b5d69bc826b9b530a964704",
+      "source_bundle_sha256": "7bf1f26f71420222735149609f017824be916de2c2d8c989b548ce8b41d5ff98",
+      "before": "With Sound(60) already active, enabling the timer and busy-waiting 150 ms produced zero timer IRQs and returned 3.",
+      "after": "Same QEMU probe returned 42, requiring at least three cumulative timer IRQs during the active tone; separate blocking and nonblocking Beep regression returned 42 and verified interrupts stop after each beep.",
+      "before_log": "build/sound-enable-active-before2.log",
+      "before_sha256": "c3397d40ecd1897417755f562ca3cf50cbebcf49d7e1b5ef95429a39402ebdd1",
+      "after_log": "build/sound-enable-active-after.log",
+      "after_sha256": "dca798fad9925c1b8af4ba05cc48741745c05fab92851b3212f9d9b4f59bbb84",
+      "beep_log": "build/sound-enable-beep-regression.log",
+      "beep_sha256": "6765de76d89560c9fbeb0b3c62b8c49424e5a07e58d13623832f5624dd7a872e",
+      "scope": "Opt-in QEMU PCI audio timer; no task scheduling change and no live UTM or Pi audio validation."
+    },
+    "current_transition_recheck": {
+      "kernel_sha256": "8c8bfff505e10c34782c2f1ae37be36219ba93418b5d69bc826b9b530a964704",
+      "source_bundle_sha256": "7bf1f26f71420222735149609f017824be916de2c2d8c989b548ce8b41d5ff98",
+      "command": "QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device -audiodev wav,id=sound0,path=build/sound-transitions-current.wav -device virtio-sound-pci,audiodev=sound0' python3 -u scripts/check-compat.py --pci --quick --probe-source-fast --probe-sound-quiet --probe-source tests/compat/SoundEffects.ZC --probe-source-call SoundTransitionChecks; python3 scripts/check-sound-transitions-wav.py build/sound-transitions-current.wav",
+      "result": "pass: timer-enabled sequence returned 42, reported zero current frequency on stops, and WAV analyzer found sustained A4, A5 and E5 in order",
+      "log": "build/sound-transitions-current.log",
+      "log_sha256": "48ffa34d0bec0f2a58069f22a75124eea7ac4516e8ccf6dc344e7ff5883982ad",
+      "wav": "build/sound-transitions-current.wav",
+      "wav_sha256": "dae7e9af3595dd80292444c2529dc6f5c4414607305befff81ea0f175c95470b",
+      "scope": "Desktop stopped, QEMU only. Capture establishes sample order, not wall-clock silence, transition latency, live UTM or physical Pi audio."
+    },
+    "current_psalmody_recheck": {
+      "kernel_sha256": "8c8bfff505e10c34782c2f1ae37be36219ba93418b5d69bc826b9b530a964704",
+      "source_bundle_sha256": "7bf1f26f71420222735149609f017824be916de2c2d8c989b548ce8b41d5ff98",
+      "command": "QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device -audiodev wav,id=sound0,path=build/psalmody-timer-current.wav -device virtio-sound-pci,audiodev=sound0' python3 -u scripts/check-compat.py --pci --quick --probe-psalmody --probe-psalmody-audio-timer",
+      "result": "pass: Psalmody editor, note entry, playback, Shift+Escape and terminal recovery; nine timer IRQs and nonzero PCM observed",
+      "wav_summary": "15,876 stereo frames, 24,696 nonzero signed 16-bit samples, peak 7000; WAV header lengths remain zero on test termination.",
+      "log": "build/psalmody-timer-current.log",
+      "log_sha256": "2b16efbc99b81ff1b3bfd561065210d669e088f46b8a5f0640e9347a4fee8df4",
+      "wav_sha256": "0a75c1398d558cfca731b940d4def161890b2b6205d61eeeeac3fdbc1ff84998",
+      "scope": "QEMU PCI, opt-in timer; does not establish audible UTM output, Pi playback, effect timing, or musical accuracy.",
+      "pitch_followup": {
+        "command": "python3 scripts/check-psalmody-wav.py build/psalmody-timer-current.wav",
+        "result": "pass: five 50 ms windows at 500\u2013550 Hz, consistent with default-octave H-key C5 (Note2Ona(3,5)=63, approximately 523 Hz); a generated 440 Hz A4 negative control was rejected",
+        "analyzer_sha256": "31ca66e507fa8e14881f3dbaff1688dd5e9ac79361d6b42f1210dd19003459cb",
+        "scope": "Pitch in the recorded PCM only; does not establish real-time latency, note duration, physical UTM/Pi sound, or other keys."
+      }
+    }
   }
 }
