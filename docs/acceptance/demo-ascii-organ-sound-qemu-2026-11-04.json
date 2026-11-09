@@ -1,0 +1,17 @@
+{
+  "date": "2026-11-04",
+  "source_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "target": "AArch64 QEMU virt with PCI VirtIO sound and WAV backend",
+  "command": "QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device -audiodev wav,id=sound0,path=/tmp/zeal-ascii-organ.wav -device virtio-sound-pci,audiodev=sound0' python3 scripts/check-compat.py --probe-demo-ascii-organ",
+  "source_path": "/Demo/Sound/ASCIIOrgan.ZC",
+  "source_sha256": "12f5d0ff857a8536b0078727becbc3db5d612a2780ea7ed8491d2a9a558a1c8e",
+  "iso_sha256": "7b19699101bc157276da131f6e6fb84bf60eb159a335b291b2756d0197c5f44c",
+  "result": "pass",
+  "checks": [
+    "ASCIIOrgan displayed its character table and sound-key prompt.",
+    "The injected 'a' key generated a note through the stock Sound(ch - CH_ESC) call.",
+    "The QEMU WAV backend captured 17,640 stereo frames at 44.1 kHz (0.4 s); channels matched, peak amplitude was 7,000, and sign transitions measured about 786 Hz, matching the requested note after resampling.",
+    "Shift-Escape returned to the graphical terminal, 40+2 evaluated to 42, and zstatus reported failed=0."
+  ],
+  "scope_note": "This supersedes the keyboard-only partial result in demo-ascii-organ-qemu-2026-11-03.json for QEMU VirtIO sound. It does not verify audible host output in live UTM or Raspberry Pi hardware."
+}

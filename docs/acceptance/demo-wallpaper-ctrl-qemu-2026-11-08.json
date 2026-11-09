@@ -1,0 +1,19 @@
+{
+  "date": "2026-11-08",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "working_tree_changes_included": true,
+  "target": "AArch64 native ZealC in PCI QEMU graphical desktop",
+  "boot_medium": "Disposable copy of build/disk.img",
+  "command": "python3 scripts/check-compat.py --pci --quick --probe-demo-wallpaper-ctrl",
+  "exit_code": 0,
+  "result": "pass",
+  "checks": [
+    {
+      "source": "/Demo/Graphics/WallPapers/WallPaperCtrl.ZC",
+      "method": "System Include in the graphical desktop, with a plain black wallpaper behind the stock control. Compare before and after scanout and inspect the slider state.",
+      "result": "pass",
+      "evidence": "The red and blue control and yellow handle appeared in scanout. Clicking the left track changed the slider state from 0,0 to 20,0 and moved the visible handle centroid from (390.25, 315.75) to (388.17, 294.33). The terminal subsequently returned 42."
+    }
+  ],
+  "scope_note": "The isolated check supersedes the earlier inconclusive capture, where the desktop splash overlapped the control. This records the tested left slider in QEMU. The disk image was regenerated after the run, so this record does not assign it a current build hash."
+}

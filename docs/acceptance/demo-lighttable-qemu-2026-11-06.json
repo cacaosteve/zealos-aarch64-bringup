@@ -1,0 +1,27 @@
+{
+  "date": "2026-11-06",
+  "source_commit": "working tree",
+  "working_tree_changes_included": true,
+  "kernel_sha256": "d4dd0e1e3475043101ca6ed9430c3f6f64f675a96b94337289732d81db461fb5",
+  "source_bundle_sha256": "6ecaa711649a83f14e6bad988a1c4075e0383536a88bc5c6ef47bfc4161a3401",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "f85c0c9447da2ecb032e7d42847b142607566f61ab9bfdaabaef9d38f0d15135",
+  "command": "python3 scripts/check-compat.py --quick --probe-demo-lighttable",
+  "exit_code": 0,
+  "source_path": "/Demo/Graphics/LightTable.ZC",
+  "result": "pass",
+  "checks": [
+    "The ARM64 graphical terminal loaded /System/Math/Math.ZC, which LightTable requires for ACos, and launched the demo.",
+    "LightTable displayed the ARM64 heap-backed bitmap memory prompt and accepted the 16 MiB default.",
+    "The labeled LightTable scene rendered, and RandomBurst changed the scanout by more than 100 pixels.",
+    "Escape returned to the graphical terminal, which evaluated 40+2; as 42.",
+    "zstatus reported failed=0."
+  ],
+  "screenshots": [
+    "build/gui-demo-lighttable-memory-prompt.ppm",
+    "build/gui-demo-lighttable-scene.ppm",
+    "build/gui-demo-lighttable-random-burst.ppm",
+    "build/gui-demo-lighttable-terminal-recovery-result.ppm"
+  ],
+  "scope_note": "Automated QEMU ISO runtime evidence only. This test explicitly loads the Math library required by LightTable and accepts the default heap-backed bitmap allocation. It does not establish live UTM or Raspberry Pi behavior."
+}

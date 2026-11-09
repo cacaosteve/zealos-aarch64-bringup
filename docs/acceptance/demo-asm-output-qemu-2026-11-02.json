@@ -1,0 +1,36 @@
+{
+  "date": "2026-11-02",
+  "command": "python3 scripts/check-compat.py --pci --probe-demo-asm-helloworld",
+  "target": "QEMU PCI graphical terminal",
+  "result": "pass",
+  "programs": [
+    {
+      "path": "/Demo/Asm/AsmHelloWorld.ZC",
+      "source_path": "upstream/bootstrap/Demo/Asm/AsmHelloWorld.ZC",
+      "source_sha256": "3c467ed0783cfa098199197fb55186a45a5e4515c8ac1fa1e6f1c0be3e3203f3",
+      "result": "pass",
+      "checks": ["all ten numbered Hello World lines appear in descending order"]
+    },
+    {
+      "path": "/Demo/Asm/BuzzFizz.ZC",
+      "source_path": "upstream/bootstrap/Demo/Asm/BuzzFizz.ZC",
+      "source_sha256": "da7cf1966b2a9fcb29d96057c678a154ec5412d5a145ec13939762e23c128ebe",
+      "result": "pass",
+      "checks": [
+        "the visible final 53 values from 0x30 through 0x64 match the stock FIZZ/BUZZ spans",
+        "ARM64 overlay prints each result on a separate line"
+      ]
+    },
+    {
+      "path": "/Demo/Asm/PutDec.ZC",
+      "source_path": "upstream/bootstrap/Demo/Asm/PutDec.ZC",
+      "source_sha256": "8a3305536ae68dbfd5672813adc25d0275453a02654237f93a22cc1564d27455",
+      "result": "pass",
+      "checks": ["the unsigned decimal conversion displays 122333221 on its own line"]
+    }
+  ],
+  "recovery": "40+2; returned 42 after all three demos; zstatus failed=0",
+  "kernel_sha256": "4daaabe6cc3e9e21bfe3b17b3671c782206d4977ab1bbca62b00f24034d32197",
+  "iso_sha256": "0b03196016aa2c6192ce390675a5e141a641a99d30cc1c1675d5d7340202de3f",
+  "scope_note": "Automated QEMU evidence only; live UTM and physical Pi behavior are not established."
+}

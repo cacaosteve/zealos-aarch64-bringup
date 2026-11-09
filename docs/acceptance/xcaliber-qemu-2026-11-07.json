@@ -1,0 +1,21 @@
+{
+  "date": "2026-11-07",
+  "base_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "working_tree_changes_included": true,
+  "target": "QEMU PCI ARM64 graphical guest",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "1600244fa2b13cf546e6f454e70a3cdcb877f1f0e3ef405d7ef10206ab2633e9",
+  "command": "python3 scripts/check-compat.py --pci --probe-xcaliber",
+  "entrypoint": "/Apps/X-Caliber/Run.ZC",
+  "result": "pass",
+  "verified": [
+    "X-Caliber reached gameplay after dismissing its one-time help popup",
+    "plain Right visibly moved the ship (67 changed pixels; 2-pixel idle baseline)",
+    "plain Left visibly moved the ship after Right in the same session (37 changed pixels)",
+    "Space fired a projectile visible in scanout",
+    "Escape returned to the graphical terminal",
+    "terminal accepted 40+2; and returned 42"
+  ],
+  "scope_note": "All X-Caliber-specific assertions passed. The enclosing check-compat run subsequently failed a separate graphical-terminal typing check: the prompt contained `4help` where that check expected `help`. That later wrapper failure is outside X-Caliber and is not a pass for the entire compatibility suite. Live UTM/Pi input and audible ARM64 sound remain unverified.",
+  "scheduler_invariant": "Do not yield inside MessageScan and do not add an X-Caliber-specific Yield; scheduling remains cooperative at the existing Yield/Sleep/MessageGet/Refresh points."
+}

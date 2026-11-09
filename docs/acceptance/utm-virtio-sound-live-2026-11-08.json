@@ -1,0 +1,24 @@
+{
+  "date": "2026-11-08",
+  "target": "UTM on macOS, ZealOS AArch64 Sound Acceptance",
+  "result": "pass",
+  "utmctl_uuid": "6BD8B81C-D7FD-4E01-8652-A32690B19A9C",
+  "utm_config": "/Users/steve/Library/Containers/com.utmapp.UTM/Data/Documents/ZealOS AArch64 Current ISO Acceptance 2.utm/config.plist",
+  "iso_path": "/Users/steve/Library/Containers/com.utmapp.UTM/Data/Documents/ZealOS AArch64 Current ISO Acceptance 2.utm/Data/zealos-wallpaper-acceptance.iso",
+  "iso_sha256": "4d3dbea6a4d653226448a180b3f145984f21241cfa595fb5718891d0abb06199",
+  "sound_device": "virtio-sound-pci",
+  "host_audio_backend": "SPICE",
+  "verified": [
+    "The dedicated UTM VM is started and its live QEMU command line includes virtio-sound-pci with a SPICE audio backend.",
+    "The current ISO replaced the prior CD after the old image was saved as a hash-verified rollback copy.",
+    "The live QEMU command line references the refreshed CD path; its file SHA-256 matches the current build ISO.",
+    "User reported hearing the short beep after running Beep(60); in the live UTM guest."
+  ],
+  "not_verified": [],
+  "scope_note": "Live UTM device/image wiring and audible basic tone are accepted. This does not establish full PCM/music support or Pi hardware audio acceptance.",
+  "audible_confirmation": {
+    "command": "Beep(60);",
+    "result": "heard a beep",
+    "reported_by": "user"
+  }
+}

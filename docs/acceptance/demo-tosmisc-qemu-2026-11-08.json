@@ -1,0 +1,28 @@
+{
+  "date": "2026-11-08",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "working_tree_changes_included": true,
+  "command": "QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device' python3 scripts/check-compat.py --pci --probe-demo-system-context --demo-system-path /Demo/AcctExample/TOS/TOSMisc.ZC --demo-system-module /Demo/AcctExample/TOS/TOSConfig.ZC --demo-system-module /System/Gr/ScreenCast.ZC --demo-system-module /Apps/Psalmody/JukePuppet.ZC --demo-system-module /System/BlkDev/DiskCheck.ZC --demo-system-module /Demo/AcctExample/TOS/TOSMisc.ZC",
+  "target": "AArch64 QEMU virt, one vCPU, booted ZealC kernel/system namespace",
+  "result": "partial",
+  "program": "/Demo/AcctExample/TOS/TOSMisc.ZC",
+  "source_path": "upstream/pinned/Demo/AcctExample/TOS/TOSMisc.ZC",
+  "source_sha256": "ee141104e1476df4a08925447be33fa7ba42dbc4c989ec0d374851263af1f616",
+  "kernel_sha256": "e19ca93460f780cb437dad273238989c52885e9527f670336b81242f5f370847",
+  "iso_sha256": "e5d4653c02c9d095bad079e87a3fe2b454152bb0ca435d565d2f384e40619687",
+  "probe_catalog": "build/source-context-catalog-modules-targeted.json",
+  "probe_catalog_sha256": "7780ff9133e1e6576e982775e361356cc6925885b6879de0d4190337fc52bfa6",
+  "verified": [
+    "The booted guest completed baseline startup and exposed the source volume.",
+    "TOSConfig loaded and TOSInit ran, reporting the expected default CD/C drive definitions (tos-config=CD|C||).",
+    "ScreenCast, JukePuppet, DiskCheck, and TOSMisc loaded into the guest namespace.",
+    "TOSMisc recompiled with CCF_JUST_LOAD and returned to the command prompt.",
+    "TOSMisc DC2Doc converted a synthesized exact system-font A glyph and reported zero OCR mismatch (tosmisc-dc2doc=1|0)."
+  ],
+  "not_verified": [
+    "Other TOSMisc routines, including network-backed forms and media routines, were not invoked.",
+    "Destructive disk checks were not invoked.",
+    "Live UTM, Pi hardware, and audio behavior."
+  ],
+  "scope_note": "Partial source-level runtime coverage. This verifies the DC2Doc glyph-to-document path only, not the complete TOSMisc demo."
+}

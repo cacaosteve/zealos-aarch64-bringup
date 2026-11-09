@@ -1,0 +1,31 @@
+{
+  "date": "2026-11-03",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "target": "AArch64 QEMU virt, PCI, graphical terminal",
+  "command": "python3 -m py_compile scripts/check-compat.py && python3 scripts/check-compat.py --pci --probe-demo-zoneout",
+  "source_path": "/Demo/Games/ZoneOut.ZC",
+  "source_sha256": "ac1df6fec654cf83606222e81e3004eae8b29f0725ffca2a4e919579bea94414",
+  "result": "pass",
+  "checks": [
+    "The ZoneOut launch command ran and its help popup was dismissed",
+    "The 3D landscape and game objects rendered in the guest framebuffer",
+    "A Left arrow input changed the rendered scene",
+    "Escape closed ZoneOut and restored the graphical terminal",
+    "The terminal evaluated 40+2 as 42 after returning from ZoneOut",
+    "The guest remained healthy with zstatus failed=0"
+  ],
+  "artifacts": {
+    "build/zealos-aarch64-hello.iso": "612b01502ba5523fab4409658058a55e0ddd1a3212f8ea136b83d83da315c6d2",
+    "build/disk.img": "b4c1d164cdfef9a64435e1c0f9c19302a6f29666bea351551f25ac7f546efd00",
+    "build/sources.tar": "daf71942deace6c7a65c54ee2eae4a43852086cdfa4bd467d213de411c7cbdb8",
+    "scripts/check-compat.py": "c1e9e99fbddb80cbbadfd0da0fd8fa31734d860dd8fd32af0bff104a0390e19f"
+  },
+  "screenshots": [
+    "build/gui-demo-zoneout-demo-zoneout-help-popup.ppm",
+    "build/gui-demo-zoneout-demo-zoneout-scene.ppm",
+    "build/gui-demo-zoneout-demo-zoneout-before-input.ppm",
+    "build/gui-demo-zoneout-demo-zoneout-after-input.ppm",
+    "build/gui-demo-zoneout-demo-zoneout-exit-smoke-result.ppm"
+  ],
+  "scope_note": "QEMU runtime acceptance only; live UTM or Pi hardware acceptance is not implied."
+}

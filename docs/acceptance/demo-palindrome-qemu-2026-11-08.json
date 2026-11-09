@@ -1,0 +1,18 @@
+{
+  "date": "2026-11-08",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "working_tree_changes_included": true,
+  "command": "python3 scripts/check-compat.py --pci --quick --probe-demo-palindrome",
+  "target": "AArch64 QEMU virt with PCI graphical terminal, single guest CPU",
+  "result": "pass",
+  "source_path": "upstream/pinned/Demo/MultiCore/Palindrome.ZC",
+  "source_sha256": "01559dd5bfe0e5011af1dd27c65df4fa3524c776289a886446dc74316aa2eb8d",
+  "kernel_sha256": "4bfeab8f4e8e60962823e2360364231dc13f4ec7187264a8e642864c0113d1fd",
+  "iso_sha256": "8f007016b0b82cd376c61e1906ea80d0bea1a9890d7a89268322fc40ffff50fc",
+  "verified": [
+    "Palindrome ran in a separate graphical task created with BootstrapGuiTerminalRunDocProgram, providing its expected DolDoc put_doc context.",
+    "The worker emitted a CPU00 Len result and the program reached its completion output.",
+    "Escape returned to the graphical terminal, where 40+2 returned 42 and zstatus reported failed=0."
+  ],
+  "scope_note": "Runtime acceptance for the single-CPU path in the intended DolDoc-backed task context. Does not establish SMP behavior."
+}

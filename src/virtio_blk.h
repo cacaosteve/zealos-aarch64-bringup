@@ -466,8 +466,7 @@ static int vb_init_pci(uint64_t hhdm) {
         if (vend != PCI_VENDOR_VIRTIO) {
             continue;
         }
-        if (did != PCI_DEVICE_BLK_MODERN && did != PCI_DEVICE_BLK_TRANS &&
-            did != 0x1041u) {
+        if (did != PCI_DEVICE_BLK_MODERN && did != PCI_DEVICE_BLK_TRANS) {
             g_vb_pci_dbg = 0x10 | (did & 0xff);
             continue;
         }

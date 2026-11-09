@@ -39,31 +39,31 @@ I64 Sprite3DMeshChecks()
     vertices = 3;
     triangles = 2;
     Sprite3DWriteMesh(mesh, vertices, triangles);
-    mesh_size = SpriteElemSize(mesh, SPT_MESH);
+    mesh_size = SpriteElemSizeRaw(mesh, SPT_MESH);
     mesh_expected = sizeof(CSpriteMeshU8s) + 12 * vertices + 16 * triangles;
     if (mesh_size != mesh_expected)
         return mesh_size * 10000 + mesh_expected;
 
     vertices = triangles = 0;
     Sprite3DWriteMesh(mesh, vertices, triangles);
-    if (SpriteElemSize(mesh, SPT_MESH) != sizeof(CSpriteMeshU8s))
+    if (SpriteElemSizeRaw(mesh, SPT_MESH) != sizeof(CSpriteMeshU8s))
         return 3;
     vertices = -1;
     Sprite3DWriteMesh(mesh, vertices, triangles);
-    if (SpriteElemSize(mesh, SPT_MESH) >= 0)
+    if (SpriteElemSizeRaw(mesh, SPT_MESH) >= 0)
         return 4;
     vertices = 1048577;
     Sprite3DWriteMesh(mesh, vertices, triangles);
-    if (SpriteElemSize(mesh, SPT_MESH) >= 0)
+    if (SpriteElemSizeRaw(mesh, SPT_MESH) >= 0)
         return 5;
     vertices = 3;
     triangles = -1;
     Sprite3DWriteMesh(mesh, vertices, triangles);
-    if (SpriteElemSize(mesh, SPT_MESH) >= 0)
+    if (SpriteElemSizeRaw(mesh, SPT_MESH) >= 0)
         return 6;
     triangles = 1048577;
     Sprite3DWriteMesh(mesh, vertices, triangles);
-    if (SpriteElemSize(mesh, SPT_MESH) >= 0)
+    if (SpriteElemSizeRaw(mesh, SPT_MESH) >= 0)
         return 7;
 
     // Shiftable records preserve their packed type/xyz/count field order.
@@ -71,17 +71,17 @@ I64 Sprite3DMeshChecks()
     vertices = 2;
     triangles = 1;
     Sprite3DWriteShiftableMesh(shiftable, 5, 6, 7, vertices, triangles);
-    if (SpriteElemSize(shiftable, SPT_SHIFTABLE_MESH) !=
+    if (SpriteElemSizeRaw(shiftable, SPT_SHIFTABLE_MESH) !=
             sizeof(CSpritePtMeshU8s) + 12 * vertices + 16 * triangles)
         return 8;
     vertices = -1;
     Sprite3DWriteShiftableMesh(shiftable, 5, 0, 0, vertices, triangles);
-    if (SpriteElemSize(shiftable, SPT_SHIFTABLE_MESH) >= 0)
+    if (SpriteElemSizeRaw(shiftable, SPT_SHIFTABLE_MESH) >= 0)
         return 9;
     vertices = 2;
     triangles = 1048577;
     Sprite3DWriteShiftableMesh(shiftable, 5, 0, 0, vertices, triangles);
-    if (SpriteElemSize(shiftable, SPT_SHIFTABLE_MESH) >= 0)
+    if (SpriteElemSizeRaw(shiftable, SPT_SHIFTABLE_MESH) >= 0)
         return 10;
     return 0x2a;
 }

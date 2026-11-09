@@ -1,0 +1,25 @@
+{
+  "date": "2026-11-03",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "target": "AArch64 QEMU virt, graphical terminal",
+  "command": "python3 scripts/check-compat.py --probe-demo-usage",
+  "source_path": "/Demo/Graphics/Usage.ZC",
+  "source_sha256": "e8537b5a43d5508331f2dbedec09aeacd3a35d4f66ef80ed2c69d72b84911e70",
+  "result": "pass",
+  "checks": [
+    "Usage launched and visibly rendered CPU and RAM graphs, changing 35,470 scanout pixels",
+    "Shift-Escape exited the graph view",
+    "The recovered graphical terminal accepted and evaluated 40+2 as 42"
+  ],
+  "artifacts": {
+    "build/zealos-aarch64-hello.iso": "eb3a1db2e684287cf39ff03a04c23287ac9da4d0f9358a02df2234ee50ae1fd4",
+    "build/disk.img": "5c3e4d6aa61f1ffb4e3174dc4e5bce82598c65df18421b322ef96122c1acfc0e",
+    "build/sources.tar": "b89426e6ae2dad802ac5e1aa8239bbbb78d502b6695bbba8e008123f0ed2f7d9",
+    "scripts/check-compat.py": "a1c3326e85d517b4fa130d41218d2c9a602857294ff703b464ff63cd40aad46f"
+  },
+  "screenshots": [
+    "build/gui-demo-usage-demo-usage-active.ppm",
+    "build/gui-demo-usage-demo-usage-terminal-recovery.ppm"
+  ],
+  "scope_note": "QEMU runtime acceptance only; live UTM or Pi hardware acceptance is not implied."
+}

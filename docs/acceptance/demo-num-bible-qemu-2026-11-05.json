@@ -1,0 +1,17 @@
+{
+  "date": "2026-11-05",
+  "program": "/Demo/DolDoc/NumBible.ZC",
+  "target": "AArch64 native ZealC/QEMU guest",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "416a232df4fefe845da9427938589762512995cea9239b98d3653d7fc1bb5096",
+  "command": "python3 scripts/check-compat.py --pci --probe-demo-num-bible",
+  "result": "pass",
+  "checks": [
+    "NumBible loaded the bundled 4.34 MB Misc/Bible.TXT through the ARM64 plain-text DolDoc path",
+    "NumBible wrote its numbered output to the writable guest source volume",
+    "An in-guest verifier read back the output, confirmed it exceeds 4 MiB, and checked its numbered-text prefix",
+    "The graphical terminal remained usable after NumBible returned",
+    "40+2; evaluated to 42 and zstatus reported failed=0"
+  ],
+  "implementation_note": "Plain-text DocLoad now feeds DocPutS in bounded chunks. The writable source-volume per-file limit is 8 MiB so the larger generated document can be persisted and read back."
+}

@@ -1,0 +1,36 @@
+#include "/System/Math/NDArray"
+
+I64 StockNDArrayChecks()
+{
+	CArray i32_array, i64_array, f32_array, f64_array;
+
+	ArrayInit(&i32_array, NDARRAY_I32, TRUE, 2, 3);
+	if (i32_array.dims != 2 || i32_array.dimLens[0] != 2 ||
+		i32_array.dimLens[1] != 3 || i32_array.size != 6 ||
+		i32_array.I32Buf[0] != 0 || i32_array.I32Buf[5] != 0)
+		return 1;
+	i32_array.I32Buf[5] = 42;
+	if (i32_array.I32Buf[5] != 42)
+		return 2;
+	ArrayFree(&i32_array);
+
+	ArrayInit(&i64_array, NDARRAY_I64, TRUE, 3);
+	if (i64_array.dims != 1 || i64_array.dimLens[0] != 3 ||
+		i64_array.size != 3 || i64_array.I64Buf[2] != 0)
+		return 3;
+	ArrayFree(&i64_array);
+
+	ArrayInit(&f32_array, NDARRAY_F32, TRUE, 4);
+	if (f32_array.size != 4 || f32_array.F32Buf[3] != 0)
+		return 4;
+	ArrayFree(&f32_array);
+
+	ArrayInit(&f64_array, NDARRAY_F64, TRUE, 5);
+	if (f64_array.size != 5 || f64_array.F64Buf[4] != 0)
+		return 5;
+	f64_array.F64Buf[4] = 42.5;
+	if (f64_array.F64Buf[4] != 42.5)
+		return 6;
+	ArrayFree(&f64_array);
+	return 42;
+}

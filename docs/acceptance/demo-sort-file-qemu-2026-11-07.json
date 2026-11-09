@@ -1,0 +1,32 @@
+{
+  "date": "2026-11-07",
+  "command": "python3 scripts/check-compat.py --quick --probe-demo-sort-file --pci",
+  "target": "AArch64 QEMU virt, PCI graphical terminal with serial command probe",
+  "result": "pass",
+  "programs": [
+    {
+      "program": "/Demo/SortFileDemo/F64FileGen.ZC",
+      "source_path": "upstream/pinned/Demo/SortFileDemo/F64FileGen.ZC",
+      "source_sha256": "cf62fd27e0ccdc357b57d7d08aa9f5fb18567fb82e184375bb8738f0935a627b"
+    },
+    {
+      "program": "/Demo/SortFileDemo/F64FileSort.ZC",
+      "source_path": "upstream/pinned/Demo/SortFileDemo/F64FileSort.ZC",
+      "source_sha256": "681b7fcf60d41e46ae79542cd42f708166fa997480ebad8d45f6e8e57621c554"
+    }
+  ],
+  "verified": [
+    "F64FileGen.ZC generated ten random F64 values in the unsorted text and binary files",
+    "F64FileSort.ZC read, sorted, and emitted ten ascending values in DemoSortedF64.DATA",
+    "Terminal command execution recovered; 40+2 printed 42 and zstatus reported failed=0"
+  ],
+  "not_verified": [
+    "AOT-only compilation path",
+    "Live UTM behavior and physical Pi behavior"
+  ],
+  "kernel_sha256": "09b6206c317576499f503cb0f9339890943837ae6f146e2a083cf555c603bdd7",
+  "iso_sha256": "d0acfb5070649c65de040ecc65397698121302960f45208a8af86dec2d05955c",
+  "scope_note": "Automated QEMU evidence only; the two stock demo sources passed without source changes.",
+  "log_sha256": "a3c50f54d9daf7a997d6cc4633d8efa960e601620a61ecc6ae0f3b682ceab422",
+  "log": "build/check-demo-sort-file-pci.log"
+}

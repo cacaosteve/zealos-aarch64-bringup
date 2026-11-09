@@ -1,8 +1,8 @@
 {
-  "date": "2026-11-01",
+  "date": "2026-11-02",
   "target": "QEMU PCI ARM64 graphical guest",
   "iso": "build/zealos-aarch64-hello.iso",
-  "iso_sha256": "c743ac437ddd183e94de52d895afdef46557bab9368b943d5d7547e03bd58a83",
+  "iso_sha256": "6931116bb886e34938cdc7b2c1756df8b2f1af4eb1e580e4dda06db2e2fa55c7",
   "command": "python3 scripts/check-compat.py --pci --probe-stock-interactive",
   "result": "pass",
   "scope": "Original upstream interactive demo programs exercised through their graphical input, render/update, and cleanup paths. QEMU runtime evidence does not establish live UTM or Pi hardware behavior.",
@@ -25,7 +25,19 @@
     "TicTacToe": [
       "verified board grid, five legal pointer moves, and visible marks",
       "Escape cleaned up and restored a working terminal prompt"
+    ],
+    "MathAudioDemo": [
+      "original source rendered the red Sin, blue Saw, and green FullSaw plots",
+      "advanced through the remaining cosine, caw, and triangle plot checkpoints",
+      "cleared its window and restored a working terminal prompt",
+      "pure waveform-math and graphics path only; audio output is not covered"
+    ],
+    "PredatorPrey": [
+      "original source queued trajectory jobs and rendered both green and red plot data",
+      "Escape exited the wait loop, cleaned up the plot window and restored a working terminal prompt",
+      "QEMU cooperative-job check; live UTM and Pi hardware behavior not established"
     ]
   },
-  "log": "build/check-stock-interactive-pci.log"
+  "log": "build/check-stock-interactive-pci.log",
+  "revalidated_on_current_iso": true
 }

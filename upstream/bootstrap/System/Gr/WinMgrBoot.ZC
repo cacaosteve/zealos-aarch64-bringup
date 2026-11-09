@@ -14,6 +14,12 @@ I64 BootstrapWinMgrStart()
     // WinMgrTask calls GrSetUpTables before its first refresh. Bind the
     // display surfaces and packed tables before creating that task.
     BootstrapGrContextInit();
+    // The host frame pump must distinguish a real fullscreen owner (such as
+    // 32BitPaint) from the pre-compositor startup state. GrUpdateScreen used
+    // to clear this flag on its first ordinary frame; initialize it before
+    // the direct-framebuffer fast path can see stale startup data.
+    text.is_fb_busy = FALSE;
+    bootstrap_gr_direct_fb_active = FALSE;
 
     // WinMgrTask uses sys_winmgr_task as the task-ring sentinel while Spawn
     // inserts the new manager. Yield once so the real source task reaches its

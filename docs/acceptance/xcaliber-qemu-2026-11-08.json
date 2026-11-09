@@ -1,0 +1,27 @@
+{
+  "date": "2026-11-08",
+  "target": "QEMU PCI ARM64 graphical guest",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "kernel_sha256": "4bfeab8f4e8e60962823e2360364231dc13f4ec7187264a8e642864c0113d1fd",
+  "iso_sha256": "fd42cae1f7bc340e6bf71e3e2fce41c8c32894d62bdb45f745ea580f5ccdc447",
+  "command": "python3 scripts/check-compat.py --pci --probe-xcaliber",
+  "result": "partial",
+  "verified": [
+    "X-Caliber opened its help popup and reached the focused gameplay task",
+    "Plain Right changed the visible player ship (67 changed pixels over a 0-pixel idle baseline)",
+    "Plain Left changed the visible player ship (37 changed pixels over a 0-pixel idle baseline)",
+    "Space projectile appeared in scanout",
+    "Escape returned to the graphical terminal",
+    "The terminal accepted and evaluated 40+2 as 42 after Escape"
+  ],
+  "failed_or_unverified": [
+    "The complete check-compat process exited 1 during a later shared graphical-terminal smoke check: a stale leading '4' appeared before the expected 'help' command; this happened after the X-Caliber-specific checks passed"
+  ],
+  "scope_note": "The X-Caliber-specific control, projectile, Escape, and terminal-recovery checks passed on this rebuilt ISO. The overall harness is partial because a later shared graphical-terminal smoke check received a stale leading character; isolate that follow-up separately. host_message_scan and X-Caliber sources were unchanged in this ODE responsiveness work.",
+  "disk_retest": {
+    "command": "python3 scripts/check-compat.py --pci --probe-xcaliber",
+    "boot_disk_sha256": "2d875c422743a90706734d56f66a9e0b724f3574bb94f23765d1872f3b0cdb24",
+    "exit_code": 0,
+    "evidence": "Plain Left and Right changed the ship, Space produced a visible projectile, and Escape returned to the terminal. The test submitted 40+7 with Return and obtained 47. The later graphical help and window-demo checks also passed."
+  }
+}

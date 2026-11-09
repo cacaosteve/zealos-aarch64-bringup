@@ -1,0 +1,31 @@
+{
+  "date": "2026-11-07",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "working_tree_changes_included": true,
+  "kernel_sha256": "d16c6e09cd2f9b5c9c31cba821163608224376a6624463fdf5924afe270a8e48",
+  "iso_sha256": "1600244fa2b13cf546e6f454e70a3cdcb877f1f0e3ef405d7ef10206ab2633e9",
+  "command": "python3 scripts/check-compat.py --probe-3d-apps --probe-keepaway-full-game",
+  "qemu_profile": "QEMU_VIRT default: machine virt, HVF acceleration, 1 GiB RAM, ramfb, VirtIO keyboard and tablet",
+  "exit_code": 0,
+  "scope": "Fresh automated QEMU acceptance against the current worktree ISO. Covers GrModels Man and Ball, KeepAway gameplay/input/Escape including a 183-second observation, Titanium controls, and broad GUI/runtime regressions. This is not UTM or Pi hardware acceptance.",
+  "checks": {
+    "GrModels": {
+      "Man": "pass: form accepted; 112 vertices and 168 triangles; raster writes verified; repeat prompt and terminal recovery passed",
+      "Ball": "pass: form accepted; 58 vertices and 128 triangles; inline sprite pixels verified; repeat prompt and terminal recovery passed"
+    },
+    "KeepAway": {
+      "gameplay": "pass: court, HUD, and player rendered; Space/mouse input kept frames active",
+      "long_run": "pass: scanout changed throughout the 183-second observation; Escape returned to the terminal; no Animate child task remained",
+      "terminal_recovery": "pass: graphical terminal recovered and 40+2 returned 42"
+    },
+    "Titanium": {
+      "gameplay": "pass: intro and gameplay frame rendered; arrow/Space input and Escape recovery passed; 40+2 returned 42"
+    },
+    "final_status": "All emitted checks passed; failed=0"
+  },
+  "live_utm": {
+    "GrModels": "User confirmed Man/Ball forms and generation in UTM; inline Ball sprite is confirmed in QEMU",
+    "KeepAway": "Still open: the user previously reported a full input/display freeze in UTM; this QEMU run does not resolve the UTM-specific report",
+    "Titanium": "User confirmed plain Left/Right, Space, and Escape work in UTM"
+  }
+}

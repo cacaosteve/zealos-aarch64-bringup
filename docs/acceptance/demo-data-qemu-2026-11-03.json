@@ -1,0 +1,30 @@
+{
+  "date": "2026-11-03",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "target": "AArch64 QEMU virt, PCI, graphical terminal",
+  "command": "python3 scripts/check-compat.py --probe-demo-data",
+  "source": "/Demo/DolDoc/Data.ZC",
+  "source_sha256": "2159b0e03900d414e2f14120f00dd81aa69383589cf2c83834c01b3c32116d32",
+  "result": "pass",
+  "checks": [
+    "Data opened from the graphical terminal and displayed its editor instructions",
+    "The numeric widget rendered immediately above the string widget",
+    "The numeric widget changed across the background task update interval",
+    "The string widget remained visible after the update interval",
+    "The graphical terminal accepted 40+2 and returned 42 after the demo",
+    "The guest ended with zstatus failed=0"
+  ],
+  "artifacts": {
+    "build/zealos-aarch64-hello.iso": "337538503e8c4fcb6c5fb66a436c2e1478f82bcc9b5494808b7481fcc18eb7b8",
+    "build/disk.img": "b924e7af4e407f272ae4e419145025676915510e08adfd5b4cb80ee50250ebb9",
+    "build/sources.tar": "a8259ac89d9e1fe42a21a757d1d4834a44b052060b59f12219d1de20e551ddbf",
+    "esp/boot/kernel.elf": "9a5289b49fcc87c991d089cbef97190a1eb9d1fba83418bc927437f3d0f8424a",
+    "scripts/check-compat.py": "a5cab213adda3e4159897b3ea7ba291c1b5edcc98216c1c878f56cbe19afa048"
+  },
+  "screenshots": [
+    "build/gui-demo-data-demo-data-launch-result.ppm",
+    "build/gui-demo-data-demo-data-live-refresh.ppm",
+    "build/gui-demo-data-demo-data-terminal-recovery-result.ppm"
+  ],
+  "scope_note": "QEMU runtime acceptance only; live UTM or Pi hardware acceptance is not implied."
+}

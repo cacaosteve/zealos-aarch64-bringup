@@ -1,0 +1,31 @@
+{
+  "date": "2026-11-06",
+  "source_commit": "working tree",
+  "working_tree_changes_included": true,
+  "kernel_sha256": "d4dd0e1e3475043101ca6ed9430c3f6f64f675a96b94337289732d81db461fb5",
+  "disk": "build/disk.img",
+  "disk_sha256": "786aafff1604cbc42ef606a8e6267fd50c2ed5b6b043cd55b8eeab6489466c06",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "624b2459bb81be2945821894f36e3e7696fa8c6b9d1265136aebb5682106f09a",
+  "command": "python3 scripts/check-compat.py --pci --quick --probe-demo-and-not-mod",
+  "exit_code": 0,
+  "source_path": "/Demo/Lectures/AndNotMod.ZC",
+  "result": "pass",
+  "checks": [
+    "CPURep.ZC loaded and ran without the unavailable x86 SMBIOS dependency.",
+    "AndNotMod displayed both remainder and mask timing results using AArch64 generic-timer ticks.",
+    "The program returned to the graphical terminal; 40+2; produced 42.",
+    "zstatus reported failed=0."
+  ],
+  "arm64_adaptations": [
+    "The guarded CPURep overlay reports AArch64 core count and generic-timer frequency instead of calling the x86 SMBIOS processor-report path.",
+    "The AndNotMod sample count is reduced from 100 million to 1 million for practical execution under AArch64 TCG; displayed measurements are timer ticks, not x86 CPU cycles."
+  ],
+  "screenshots": [
+    "build/gui-demo-and-not-mod-cpurep-smoke-result.ppm",
+    "build/gui-demo-and-not-mod-remainder.ppm",
+    "build/gui-demo-and-not-mod-mask.ppm",
+    "build/gui-demo-and-not-mod-terminal-recovery-result.ppm"
+  ],
+  "scope_note": "Automated UEFI QEMU runtime acceptance. It does not establish live UTM or Raspberry Pi hardware behavior. The benchmark's workload and units are explicitly adapted for AArch64 TCG."
+}

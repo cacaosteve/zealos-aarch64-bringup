@@ -1,0 +1,17 @@
+{
+  "date": "2026-11-02",
+  "command": "python3 scripts/check-compat.py --pci --probe-demo-screencodes",
+  "target": "QEMU PCI graphical terminal",
+  "result": "pass",
+  "program": "/Demo/ScreenCodes.ZC",
+  "source_path": "upstream/pinned/Demo/ScreenCodes.ZC",
+  "source_sha256": "31e3e1744dcef4b8cab984ab29b4617e21b38a09dce246ddd285348f801e8bbd",
+  "verified": [
+    "Launching ScreenCodes changes the visible framebuffer by more than 5000 pixel channels and renders its character grid",
+    "A keypress exits the ScreenCodes view",
+    "40+2 evaluates as 42 and zstatus reports failed=0"
+  ],
+  "kernel_sha256": "4daaabe6cc3e9e21bfe3b17b3671c782206d4977ab1bbca62b00f24034d32197",
+  "iso_sha256": "0b03196016aa2c6192ce390675a5e141a641a99d30cc1c1675d5d7340202de3f",
+  "scope_note": "Automated QEMU evidence only; live UTM and physical Pi behavior are not established."
+}

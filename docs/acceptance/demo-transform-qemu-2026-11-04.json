@@ -1,0 +1,11 @@
+{
+  "date": "2026-11-04",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "working_tree_changes_included": true,
+  "kernel_sha256": "a65d2847344fa04d8ee3144343562e61a4c98222d970d67bfc5e979391ec7316",
+  "iso_sha256": "eea97283db691f48360432a3d5e93e9e1bc24a8e64ebd3dde87c694df0706fd8",
+  "command": "python3 scripts/check-compat.py --pci --probe-demo-transform",
+  "exit_code": 0,
+  "scope": "Automated PCI QEMU runtime acceptance of the pinned Demo/Graphics/Transform.ZC from the ARM64 source volume. Verified the transformed tree map rendered, the scale slider accepted a mouse click and changed 14,155 framebuffer pixels, Escape returned to the graphical terminal, 40+2 evaluated to 42, and zstatus reported failed=0. UTM and Pi hardware are not covered.",
+  "result": "pass"
+}

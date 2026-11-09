@@ -1,0 +1,22 @@
+{
+  "date": "2026-11-08",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "working_tree_changes_included": true,
+  "command": "QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device' python3 scripts/check-compat.py --quick --probe-demo-system-context --demo-system-module /Demo/AcctExample/TOS/TOSConfig.ZC --demo-system-path /Demo/AcctExample/TOS/TOSConfig.ZC",
+  "target": "AArch64 QEMU virt, one vCPU, booted ZealC kernel/system namespace",
+  "result": "accepted",
+  "program": "/Demo/AcctExample/TOS/TOSConfig.ZC",
+  "source_path": "upstream/pinned/Demo/AcctExample/TOS/TOSConfig.ZC",
+  "source_sha256": "c29cfc2b4988313a947694d83c9af5a67906b474bb821548cc0aa7d479d51afb",
+  "kernel_sha256": "4bfeab8f4e8e60962823e2360364231dc13f4ec7187264a8e642864c0113d1fd",
+  "iso_sha256": "fd42cae1f7bc340e6bf71e3e2fce41c8c32894d62bdb45f745ea580f5ccdc447",
+  "verified": [
+    "The pinned TOSConfig module loaded in the booted ZealC kernel/system namespace.",
+    "TOSInit executed without a guest runtime failure.",
+    "The generated default machine configuration evaluated to TOS_HDS=CD, TOS_MASTER_BOOT_DRIVES=C, and empty hard-drive and DVD-drive definitions (tos-config=CD|C||).",
+    "The source recompiled with CCF_JUST_LOAD and the guest returned to its command prompt."
+  ],
+  "log_sha256": "8cc223c1e80ad02dee52b2f9a9b273ac88e01ae2f4536d9207ce498d9a2e29a1",
+  "log": "build/demo-tos-config-qemu-2026-11-08.log",
+  "scope_note": "QEMU runtime evidence only. This covers TOSConfig initialization and the default machine configuration, not any destructive TOS distribution or disk-install routine."
+}

@@ -1,0 +1,28 @@
+{
+  "date": "2026-11-08",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "working_tree_changes_included": true,
+  "command": "python3 scripts/check-compat.py --pci --quick --probe-demo-mpprint",
+  "target": "AArch64 QEMU virt, one vCPU, PCI graphical terminal",
+  "result": "pass",
+  "program": "/Demo/MultiCore/MPPrint.ZC",
+  "source_path": "upstream/pinned/Demo/MultiCore/MPPrint.ZC",
+  "source_sha256": "9d655fcf0c05de49ad911f06d4d887f981df7acb933d2edd09102569a1885c61",
+  "kernel_sha256": "3b732636c2f92ad85e39b89a3a42a72a99f90ec3de85103a99c69ac3dd8e2d24",
+  "iso_sha256": "e5d4653c02c9d095bad079e87a3fe2b454152bb0ca435d565d2f384e40619687",
+  "log": "build/check-compat-pci.log",
+  "log_sha256": "0c2e81bc7a25fc0474b40256d598887e78a2720be5655cf5f62640f7523d8509",
+  "capture": "build/gui-demo-mpprint-worker-output.ppm",
+  "capture_sha256": "74f90edbe583e194ff7ee92d4b4a4becab5c17536bd9b23c64839176bfd1003b",
+  "verified": [
+    "Graphical terminal received keyboard focus and the 40+2 smoke check returned 42.",
+    "The stock MPPrint source was included in the graphical terminal; scanout visibly contained repeated blue CPU0 callback output from its queued jobs.",
+    "The text probe uses a lower luminance threshold for the deliberate blue foreground, so it detects the visible CPU0 output.",
+    "After MPPrint completed, the terminal recovered, a second 40+2 command returned 42, and zstatus reported failed=0."
+  ],
+  "limitations": [
+    "This verifies CPU0 callback and queue behavior only. It does not establish SMP execution or CPU1 worker output.",
+    "This is automated QEMU acceptance; live UTM and Raspberry Pi behavior are not established by this record."
+  ],
+  "scope_note": "MPPrint runtime is accepted for the one-vCPU supported execution path. SMP worker execution remains unsupported/unverified."
+}

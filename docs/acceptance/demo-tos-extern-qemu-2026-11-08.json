@@ -1,0 +1,22 @@
+{
+  "date": "2026-11-08",
+  "source_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "working_tree_changes_included": true,
+  "command": "QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device' python3 scripts/check-compat.py --quick --probe-demo-system-context --demo-system-path /Demo/AcctExample/TOS/TOSExtern.ZC --demo-system-module /Demo/AcctExample/TOS/TOSConfig.ZC",
+  "target": "AArch64 QEMU virt, one vCPU, booted ZealC kernel/system namespace",
+  "result": "partial",
+  "program": "/Demo/AcctExample/TOS/TOSExtern.ZC",
+  "source_path": "upstream/pinned/Demo/AcctExample/TOS/TOSExtern.ZC",
+  "source_sha256": "0b8da399c31d0651b617e7fb804a580f82a009730d6fa7e6832fd11c2a2ae606",
+  "kernel_sha256": "e19ca93460f780cb437dad273238989c52885e9527f670336b81242f5f370847",
+  "iso_sha256": "e5d4653c02c9d095bad079e87a3fe2b454152bb0ca435d565d2f384e40619687",
+  "verified": [
+    "TOSConfig loaded and TOSInit ran in the booted guest, producing the expected default CD/C drive definitions.",
+    "TOSExtern compiled and loaded in the TOSConfig namespace with CCF_JUST_LOAD. Its form classes and external declarations are available to subsequent sources."
+  ],
+  "not_verified": [
+    "The file contains form declarations and external routine declarations, not standalone application behavior; the externally declared network/media helpers were not invoked.",
+    "Live UTM and Pi behavior."
+  ],
+  "scope_note": "Partial module acceptance: source compilation and namespace loading are verified, but external helper implementations and end-to-end TOS application workflows are not covered."
+}

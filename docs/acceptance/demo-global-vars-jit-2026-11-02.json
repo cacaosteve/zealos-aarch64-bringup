@@ -1,0 +1,19 @@
+{
+  "date": "2026-11-02",
+  "command": "python3 scripts/check-compat.py --pci --probe-demo-global-vars",
+  "target": "QEMU PCI ARM64 graphical terminal",
+  "result": "partial",
+  "program": "/Demo/GlobalVars.ZC",
+  "source_path": "upstream/pinned/Demo/GlobalVars.ZC",
+  "source_sha256": "18c0a2fa23115a2aaaa5166715da35fc77443ddad8848e292ef2867b60255ae9",
+  "verified": [
+    "JIT run prints Time 1 and Time 2 for dynamically initialized global and static arrays",
+    "Graphical terminal recovers and evaluates 40+2 as 42 with failed=0"
+  ],
+  "not_verified": [
+    "AOT-only #ifjit section (Time 3 and Time 4); the current bootstrap does not expose the stock Comp() command"
+  ],
+  "kernel_sha256": "4daaabe6cc3e9e21bfe3b17b3671c782206d4977ab1bbca62b00f24034d32197",
+  "iso_sha256": "0b03196016aa2c6192ce390675a5e141a641a99d30cc1c1675d5d7340202de3f",
+  "scope_note": "Automated QEMU evidence only; live UTM and physical Pi behavior are not established."
+}

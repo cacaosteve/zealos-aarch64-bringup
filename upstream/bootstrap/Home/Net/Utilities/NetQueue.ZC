@@ -1,0 +1,81 @@
+/*
+ * ARM64 cooperative network queue adapter.
+ *
+ * The pinned implementation signals NetHandler through an x86 local-APIC
+ * interrupt. The AArch64 bring-up is single-core and cooperative, so queued
+ * packets are drained directly instead of manufacturing an interrupt.
+ */
+
+class CNetQueueEntry:CQueue
+{
+	I64 packet_length;
+	U8 frame[ETHERNET_FRAME_SIZE];
+};
+
+CQueue *net_queue;
+extern U0 NetHandlerDispatch();
+
+U0 NetQueueInit()
+{
+	net_queue = CAlloc(sizeof(CQueue));
+	QueueInit(net_queue);
+}
+
+CNetQueueEntry *NetQueuePull()
+{
+	CNetQueueEntry *entry;
+
+	if (net_queue->next != net_queue)
+	{
+		entry = net_queue->next;
+		NetLog("NETQUEUE PULL: Removing entry from queue.");
+		QueueRemove(entry);
+	}
+	else
+		entry = NULL;
+
+	return entry;
+}
+
+U0 NetQueuePush(U8 *data, I64 length)
+{
+	CNetQueueEntry *entry = CAlloc(sizeof(CNetQueueEntry));
+
+	if (length > ETHERNET_FRAME_SIZE)
+	{
+		Free(entry);
+		return;
+	}
+	entry->packet_length = length;
+	MemCopy(entry->frame, data, length);
+	QueueInsert(entry, net_queue->last);
+
+	NetLog("NETQUEUE PUSH COPY: Dispatching queued packet.");
+	NetHandlerDispatch();
+}
+
+U0 NetQueueLazyPull()
+{
+	if (net_queue->next != net_queue)
+	{
+		NetLog("NETQUEUE LAZY PULL: Dispatching queued packets.");
+		NetHandlerDispatch();
+	}
+}
+
+U0 NetQueueLazyPush(U8 *data, I64 length)
+{
+	CNetQueueEntry *entry = CAlloc(sizeof(CNetQueueEntry));
+
+	if (length > ETHERNET_FRAME_SIZE)
+	{
+		Free(entry);
+		return;
+	}
+	entry->packet_length = length;
+	MemCopy(entry->frame, data, length);
+	QueueInsert(entry, net_queue->last);
+	Spawn(&NetQueueLazyPull,, "NetQueueLazyPull");
+}
+
+NetQueueInit;

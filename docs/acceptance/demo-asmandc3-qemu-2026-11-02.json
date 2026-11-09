@@ -1,0 +1,18 @@
+{
+  "date": "2026-11-02",
+  "command": "python3 scripts/check-compat.py --pci --probe-demo-asmandc3",
+  "target": "QEMU PCI graphical terminal",
+  "result": "pass",
+  "program": "/Demo/Asm/AsmAndC3.ZC",
+  "source_path": "upstream/pinned/Demo/Asm/AsmAndC3.ZC",
+  "source_sha256": "488b52908fddc292848ba82060e440e593e1dde34fb3f17f4a4acd110b6ac964",
+  "verified": [
+    "inline assembly sets carry and adds zero to produce 0x42",
+    "the demo displays three Meaning of life results",
+    "graphical terminal recovers and evaluates 40+2 as 42",
+    "zstatus failed=0"
+  ],
+  "kernel_sha256": "4daaabe6cc3e9e21bfe3b17b3671c782206d4977ab1bbca62b00f24034d32197",
+  "iso_sha256": "0b03196016aa2c6192ce390675a5e141a641a99d30cc1c1675d5d7340202de3f",
+  "scope_note": "Automated QEMU evidence only; live UTM and physical Pi behavior are not established."
+}

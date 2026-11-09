@@ -1,0 +1,100 @@
+{
+  "date": "2026-11-02",
+  "base_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "working_tree_changes_included": true,
+  "target": "QEMU PCI ARM64 graphical guest",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "4a3923debc11104efef766359fe1ddc4360cf14a29209ff83744152778197ded",
+  "scope": "Runtime acceptance for all 12 named ZealOS Apps entrypoints against the same current-worktree ISO. QEMU only; this record does not establish complete Demo, Home, System, or live UTM/Pi coverage.",
+  "checks": {
+    "Budget": {
+      "entrypoint": "/Apps/Budget/Run.ZC",
+      "command": "python3 scripts/check-compat.py --pci --probe-budget-program",
+      "log": "build/check-budget-pci.log",
+      "result": "pass",
+      "verified": ["forms and create/edit/cancel/abort flows", "saved entry survived disk-only cold boot", "runtime ready=1 failed=0"]
+    },
+    "Digital Logic": {
+      "entrypoint": "/Apps/Logic/Run.ZC",
+      "command": "python3 scripts/check-compat.py --pci --probe-logic-program",
+      "log": "build/check-logic-pci.log",
+      "result": "pass",
+      "verified": ["gate sprites and AND/OR circuit rendering", "prompt editing and malformed input recovery", "abort/relaunch/clean exit", "runtime ready=1 failed=0"]
+    },
+    "GrModels": {
+      "entrypoint": "/Apps/GrModels/Run.ZC",
+      "command": "python3 scripts/check-compat.py --pci --probe-3d-apps",
+      "log": "build/check-3d-apps-pci.log",
+      "result": "pass",
+      "verified": ["Man mesh generation and raster output", "Ball mesh and sprite document output", "terminal recovery"]
+    },
+    "KeepAway": {
+      "entrypoint": "/Apps/KeepAway/Run.ZC",
+      "command": "python3 scripts/check-compat.py --pci --probe-3d-apps --probe-keepaway-full-game",
+      "log": "build/check-3d-apps-pci.log",
+      "result": "pass",
+      "verified": ["input and HUD update", "three-minute game/scanout run", "game-over and Escape recovery"]
+    },
+    "Psalmody": {
+      "entrypoint": "/Apps/Psalmody/Run.ZC",
+      "command": "python3 scripts/check-compat.py --pci --probe-psalmody",
+      "log": "build/check-psalmody-pci.log",
+      "result": "pass",
+      "verified": ["editor and note entry", "playback and stop/exit controls", "terminal recovery", "runtime ready=1 failed=0"]
+    },
+    "Span": {
+      "entrypoint": "/Apps/Span/Run.ZC",
+      "command": "python3 scripts/check-compat.py --pci --probe-span-strut",
+      "log": "build/check-compat-pci.log",
+      "result": "pass",
+      "verified": ["bridge input and drawing", "Escape recovery"]
+    },
+    "Strut": {
+      "entrypoint": "/Apps/Strut/Run.ZC",
+      "command": "python3 scripts/check-compat.py --pci --probe-span-strut",
+      "log": "build/check-compat-pci.log",
+      "result": "pass",
+      "verified": ["ship input and rendering", "Escape recovery", "runtime ready=1 failed=0"]
+    },
+    "TimeClock": {
+      "entrypoint": "/Apps/TimeClock/Load.ZC",
+      "command": "python3 scripts/check-compat.py --pci --probe-timeclock",
+      "log": "build/check-timeclock-pci.log",
+      "result": "pass",
+      "verified": ["punch-in/out form entry", "saved report", "terminal recovery", "runtime ready=1 failed=0"]
+    },
+    "Titanium": {
+      "entrypoint": "/Apps/Titanium/Run.ZC",
+      "command": "python3 scripts/check-compat.py --pci --probe-3d-apps",
+      "log": "build/check-3d-apps-pci.log",
+      "result": "pass",
+      "verified": ["gameplay input", "Escape recovery", "terminal recovery", "runtime ready=1 failed=0"]
+    },
+    "ToTheFront": {
+      "entrypoint": "/Apps/ToTheFront/Run.ZC",
+      "command": "python3 scripts/check-compat.py --pci --probe-tothefront",
+      "log": "build/check-compat-pci.log",
+      "result": "pass",
+      "verified": ["setup and map generation", "turn/phase input", "Escape recovery"]
+    },
+    "Vocabulary": {
+      "entrypoint": "/Apps/Vocabulary/Run.ZC",
+      "command": "python3 scripts/check-compat.py --pci --probe-vocabulary",
+      "log": "build/check-vocabulary-pci.log",
+      "result": "pass",
+      "verified": ["answer/advance interaction", "Escape recovery", "runtime ready=1 failed=0"]
+    },
+    "X-Caliber": {
+      "entrypoint": "/Apps/X-Caliber/Run.ZC",
+      "command": "python3 scripts/check-compat.py --pci --probe-xcaliber",
+      "log": "build/check-compat-pci.log",
+      "result": "pass",
+      "verified": ["gameplay and Left/Right/Space input", "projectile behavior", "Escape and terminal recovery"]
+    }
+  },
+  "limitations": [
+    "All 12 named Apps entrypoints have QEMU runtime evidence on this ISO; this is not proof that every Demo or every .ZC source is a standalone program or has runtime acceptance.",
+    "UTM and Raspberry Pi 4B behavior are not established by these QEMU runs. The user reported a KeepAway freeze in UTM; that environment-specific issue remains open until the current build is rechecked there.",
+    "The source inventory has 206 Demo sources (201 compile passes, 5 blocked), but many are components, architecture-specific examples, or installer helpers; standalone classification and runtime coverage remain incomplete."
+  ]
+}

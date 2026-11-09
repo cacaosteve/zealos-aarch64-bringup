@@ -1,0 +1,24 @@
+{
+  "date": "2026-11-03",
+  "target": "AArch64 native ZealC/QEMU guest with PCI VirtIO-net and QEMU user networking",
+  "command": "python3 scripts/check-compat.py --pci --quick --probe-network-runtime",
+  "result": "pass",
+  "checks": {
+    "network_stack": "PASS: native VirtIO-net initialized and DHCP configured 10.0.2.15",
+    "listen": "PASS: TCPChatServer reached Socket now listening on a guest port forwarded from the host",
+    "accept": "PASS: the host connected through QEMU user-network host forwarding and the guest accepted the client",
+    "greeting": "PASS: host received Connected clients: 1",
+    "broadcast": "PASS: host sent ARM64 TCP chat payload probe and received the same payload in the server broadcast",
+    "runtime_health": "PASS: guest returned to a healthy command session after the exchange"
+  },
+  "source_bundle_sha256": "213554e8a2cb4daea83faddc6b7199e85fd673064145441190a77a68508fea61",
+  "tested_boot_disk_sha256": "f4ec7b7aed99662be90a526b9cd85e7eca360b18440e8ac732a6d4227c1de5f8",
+  "arm64_overlay_script_sha256": "80b7afad272e18cee222b5c79bd2ce5ff8951f3100ccdca0ba9028c8ffaec78b",
+  "arm64_adaptations": [
+    "TCP listen backlog uses QueueCount, which matches backlog semantics and is available in the ARM64 bootstrap; QueueSize measured allocation bytes and was not exported.",
+    "TCPChatServer initializes globals when loaded with CCF_JUST_LOAD and checks heap pointers against NULL rather than signed integer positivity.",
+    "TCPChatServer extracts the peer IPv4 address through a typed pointer to the inline sockaddr storage."
+  ],
+  "scope_note": "This verifies one client accept, greeting, payload receive, and self-broadcast in QEMU user networking. It does not verify multiple clients, UTM networking, arbitrary external interfaces, or the other TCP/UDP clients.",
+  "working_tree_changes_included": true
+}

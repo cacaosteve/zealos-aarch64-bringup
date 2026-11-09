@@ -1,0 +1,20 @@
+{
+  "date": "2026-11-02",
+  "target": "QEMU PCI ARM64 graphical guest",
+  "source_path": "/Demo/Graphics/ScreenCapture.ZC",
+  "source_sha256": "3e261fe3ad0480f48cda7f2b5d68810c0ac6ffa300df70452d6913c2653a1a40",
+  "kernel_sha256": "5711d81f7268c2c61857d8259bc42299afb5df69eae50ba749134c4d606e9c4a",
+  "command": "python3 scripts/check-compat.py --pci --probe-demo-screencapture",
+  "result": "pass",
+  "scope": "The unchanged upstream ScreenCapture demo completed in the ARM64 graphical terminal using the current QEMU kernel. This does not establish live UTM or Pi hardware behavior.",
+  "checks": [
+    "loaded the stock GrComposites module and launched /Demo/Graphics/ScreenCapture.ZC",
+    "captured the display and wrote the GR file",
+    "read the captured GR file back and verified visible scanout changed",
+    "Escape returned to the graphical terminal and 40+2; evaluated to 42",
+    "zstatus reported failed=0"
+  ],
+  "log": "build/check-demo-screencapture-pci.log",
+  "host_summary": "build/check-demo-screencapture-pci-summary.txt",
+  "readback_frame": "build/gui-demo-screencapture-demo-screencapture-readback.ppm"
+}

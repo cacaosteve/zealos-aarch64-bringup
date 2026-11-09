@@ -16,6 +16,10 @@
 #define PAUSE ;
 extern U0 RFlagsPush();
 extern U0 RFlagsPop();
+extern U0 DCTransform(CDC *dc, I64 *x, I64 *y, I64 *z);
+extern U0 DCLighting(CDC *dc, CD3I32 *p1, CD3I32 *p2, CD3I32 *p3,
+                     CColorROPU32 color);
+extern F64 ZcEvalExpression(U8 *source);
 // Native AArch64 user-compiler hooks used by the ARM64 DocTree overlay.
 extern CCompCtrl *ZcUserCompCtrlNew(U8 *buf=NULL, I64 flags=0);
 extern U0 ZcUserCompCtrlDel(CCompCtrl *cc);
@@ -27,6 +31,7 @@ extern U0 ZcUserOutputSet(U0 (*writer)(U8 *text));
 extern U0 ZcUserPutExcept();
 extern Bool ZcUserInputComplete(U8 *text);
 extern U0 ArmLexAttachDoc(CCompCtrl *cc, CDoc *doc);
+extern F64 ZcEvalExpression(U8 *source);
 // Compiler/ParseLib.ZC's target-independent keyword lookup. The full stock
 // parser module also contains x86-specific label/compiler machinery, so keep
 // this small helper available to ARM64 programs such as DolDoc's code tools.
@@ -75,11 +80,13 @@ extern I64 FileWrite(U8 *filename, U8 *fbuf, I64 size, I64 cdt=0, I64 attr=0);
 extern Bool ZcSourceDirExists(U8 *path);
 extern U8 *ZcSourcePath(U8 *path);
 extern Bool ZcSourceWritable(U8 *path);
+extern Bool ZcSourceHasOverride(U8 *path);
 extern U8 *ZcDocInputBytes(U8 *src, I64 size, I64 *_decoded_size);
 extern Bool Cd(U8 *dirname=NULL, Bool make_dirs=FALSE);
 extern U8 *DirCur(CTask *task=NULL, CTask *mem_task=NULL);
 extern Bool ZcSourceFileAt(I64 index, U8 *path, I64 path_cap, I64 *_size);
 extern Bool ZcRedSeaFileAt(I64 index, U8 *path, I64 path_cap, I64 *_size);
+extern Bool ZcSourceVolumeStats(U64 *_capacity_bytes, U64 *_free_bytes);
 extern Bool FilesFindMatch(U8 *test_name, U8 *files_find_mask,
                            I64 fuf_flags=0);
 extern CDoc *DocNew(U8 *filename=NULL, CTask *task=NULL);
@@ -200,6 +207,17 @@ class CArmDocFormField
     I64 data, offset, elements, raw_type, pointer, is_array, is_internal;
 };
 extern Bool ZcDocFormField(U8 *class_name, I64 index, CArmDocFormField *field);
+// Aiwnios compiler reflection uses a different CHashClass/CMemberList ABI
+// from ZealOS. Keep ClassMeta on this explicit, checked field-description ABI.
+class CArmClassMetaField
+{
+    U8 *name, *print_str;
+    I64 offset, default_val, has_default_val, has_percentile;
+    F64 percentile;
+    I64 output_fun;
+};
+extern Bool ZcClassMetaField(U8 *class_name, I64 index,
+                             CArmClassMetaField *field);
 extern Bool ZcMouseStateUpdate(I64 x, I64 y, I64 text_x, I64 text_y,
                                I64 now_ns);
 extern Bool ZcMouseButtonsUpdate(Bool left, Bool right);
@@ -281,6 +299,7 @@ extern U0 TaskFocusNext();
 // Cooperative generic-timer wait. Other ready tasks run until mS elapses;
 // parsing and code emission remain non-switching.
 extern U0 Sleep(I64 mS);
+extern U0 Sound(I8 ona=0);
 // The native bridge exits a child on its own stack, running task_end_cb once
 // before reclaiming its task-owned allocations. The root shell cannot exit.
 extern U0 Exit();
@@ -551,6 +570,22 @@ U8 Drive2Letter(CDrive *drive=NULL)
 // registers DocPutKey. The bootstrap shell reports its supported key map;
 // Ctrl-Alt callbacks use the guarded message bridge below.
 CKeyDevGlobals keydev;
+
+Bool BootstrapGuiTerminalKeyDevPutKey(I64 ch, I64 sc)
+{//Run the normal ZealOS keyboard-device interception chain before GUI editing.
+    CKeyDevEntry *entry = keydev.put_key_head.next;
+
+    if ((!ch && !sc) || Bt(&Fs->display_flags, DISPLAYf_SILENT))
+        return FALSE;
+    while (entry != &keydev.put_key_head)
+    {
+        if ((!(sc & SCF_KEY_DESC) || entry->flags & KDF_HAS_DESCS) &&
+                entry->put_key && (*entry->put_key)(ch, sc))
+            return TRUE;
+        entry = entry->next;
+    }
+    return FALSE;
+}
 CKbdStateGlobals kbd;
 I64 sys_ctrl_alt_flags = 0;
 extern U0 Puts(U8 *text);
@@ -664,12 +699,13 @@ class CDolDocGlobals
                  clean_scan_codes			[4];
     I32			 default_type_flags			[DOCT_TYPES_NUM];
 } doldoc;
-// Aiwnios Hash* match ZealOS CHash/CHashTable; bound after TaskBridge loads.
-extern CHashTable *HashTableNew(I64 size, CTask *mem_task=NULL);
-extern U0 HashTableDel(CHashTable *table);
-extern CHash *HashFind(U8 *needle_str, CHashTable *haystack_table,
-                       I64 mask, I64 instance=1);
-extern U0 HashAdd(CHash *tmph, CHashTable *table);
+// Use task-aware host adapters. The native Aiwnios hash routines expect host
+// heap pointers, while a guest task can carry a source-created CHashTable.
+extern CHashTable *ZcGuestHashTableNew(I64 size, CTask *mem_task=NULL);
+extern U0 ZcGuestHashTableDel(CHashTable *table);
+extern CHash *ZcGuestHashFind(U8 *needle_str, CHashTable *haystack_table,
+                              I64 mask, I64 instance=1);
+extern U0 ZcGuestHashAdd(CHash *tmph, CHashTable *table);
 // The freestanding bootstrap does not load Kernel/KHashB.ZC, but GUI demos
 // use these stock task-local hash helpers for per-task frame state. Keep the
 // same ZealOS layouts and lookup semantics here so demos can run unchanged.
@@ -686,7 +722,7 @@ CHashGeneric *HashGenericAdd(U8 *name, I64 type, I64 u0=0, I64 u1=0,
     entry->user_data1 = u1;
     entry->user_data2 = u2;
     entry->str = StrNew(name, task);
-    HashAdd(entry, task->hash_table);
+    ZcGuestHashAdd(entry, task->hash_table);
     return entry;
 }
 I64 FramePtr(U8 *name, CTask *task=NULL)
@@ -695,7 +731,7 @@ I64 FramePtr(U8 *name, CTask *task=NULL)
 
     if (!task)
         task = Fs;
-    entry = HashFind(name, task->hash_table, HTT_FRAME_PTR);
+    entry = ZcGuestHashFind(name, task->hash_table, HTT_FRAME_PTR);
     if (entry)
         return entry->user_data0;
     return 0;
@@ -711,7 +747,7 @@ I64 FramePtrSet(U8 *name, I64 val, CTask *task=NULL)
 
     if (!task)
         task = Fs;
-    entry = HashFind(name, task->hash_table, HTT_FRAME_PTR);
+    entry = ZcGuestHashFind(name, task->hash_table, HTT_FRAME_PTR);
     if (!entry)
         return 0;
     old = entry->user_data0;
@@ -725,7 +761,7 @@ I64 FramePtrDel(U8 *name, CTask *task=NULL)
 
     if (!task)
         task = Fs;
-    entry = HashFind(name, task->hash_table, HTT_FRAME_PTR);
+    entry = ZcGuestHashFind(name, task->hash_table, HTT_FRAME_PTR);
     if (!entry)
         return 0;
     old = entry->user_data0;
@@ -759,7 +795,7 @@ CHashDefineStr *DefineLoad(U8 *dname, U8 *st, I64 caller_num=1)
     tmph->data = StrNew(st);
     tmph->count = -1;
     tmph->src_link = StrNew("AD:");
-    HashAdd(tmph, Fs->hash_table);
+    ZcGuestHashAdd(tmph, Fs->hash_table);
     ZcDefineMirror(dname, st);
     return tmph;
 }
@@ -775,7 +811,7 @@ U0 DefinePrint(U8 *dname, U8 *format, ...)
 // stays in the full ZealOS compiler and is not yet implemented by this bridge.
 CHashGeneric *HashPublic(U8 *name, I64 mask, Bool val=TRUE)
 {
-    CHashGeneric *entry = HashFind(name, Fs->hash_table, mask);
+    CHashGeneric *entry = ZcGuestHashFind(name, Fs->hash_table, mask);
 
     if (entry)
     {
@@ -820,14 +856,14 @@ CHashDefineStr *DefineListLoad(U8 *dname, U8 *list)
             *idx++ = ptr;
         while (*ptr++);
     }
-    HashAdd(tmph, Fs->hash_table);
+    ZcGuestHashAdd(tmph, Fs->hash_table);
     return tmph;
 }
 U8 *Define(U8 *dname)
 {
     CHashDefineStr *tmph;
 
-    if (tmph = HashFind(dname, Fs->hash_table, HTT_DEFINE_STR))
+    if (tmph = ZcGuestHashFind(dname, Fs->hash_table, HTT_DEFINE_STR))
         return tmph->data;
     else if (dname)
         UndefinedDefine(dname);
@@ -838,7 +874,7 @@ U8 *DefineSub(I64 sub, U8 *dname)
 {
     CHashDefineStr *tmph;
 
-    if (tmph = HashFind(dname, Fs->hash_table, HTT_DEFINE_STR))
+    if (tmph = ZcGuestHashFind(dname, Fs->hash_table, HTT_DEFINE_STR))
     {
         if (0 <= sub < tmph->count)
             return tmph->sub_idx[sub];
@@ -854,7 +890,7 @@ I64 DefineCount(U8 *dname)
 {
     CHashDefineStr *tmph;
 
-    if (tmph = HashFind(dname, Fs->hash_table, HTT_DEFINE_STR))
+    if (tmph = ZcGuestHashFind(dname, Fs->hash_table, HTT_DEFINE_STR))
         return tmph->count;
     else if (dname)
         UndefinedDefine(dname);
@@ -928,6 +964,44 @@ I64 ListMatch(U8 *needle, U8 *haystack_list, I64 flags=0)
     }
     return res;
 }
+U0 FlagsScan(U8 *_dst_flags, U8 *list, U8 *src)
+{// ARM64 bootstrap implementation of the pinned Kernel/StrB.ZC parser.
+    I64 index, bit;
+    U8 token[256], *out;
+
+    if (!src || !list || !_dst_flags)
+        return;
+    while (*src)
+    {
+        while (*src && *src != '+' && *src != '-')
+            src++;
+        if (!*src)
+            break;
+        bit = *src++ == '+';
+        if (!*src)
+            break;
+        out = token;
+        while (*src && *src != '+' && *src != '-' && *src != ' ' &&
+               out < token + sizeof(token) - 1)
+            *out++ = *src++;
+        *out = 0;
+        index = ListMatch(token, list);
+        if (index < 0)
+            throw('ScanFlag');
+        if (bit)
+            _dst_flags[index >> 3] |= 1 << (index & 7);
+        else
+            _dst_flags[index >> 3] &= ~(1 << (index & 7));
+    }
+}
+U0 DirEntryDel(CDirEntry *entry)
+{// Match pinned Kernel/BlkDev/DiskDirA.ZC ownership for one FilesFind node.
+    if (entry)
+    {
+        Free(entry->full_name);
+        Free(entry);
+    }
+}
 I64 DefineMatch(U8 *needle, U8 *haystack_list_dname, I64 flags=0)
 {
     return ListMatch(needle, Define(haystack_list_dname), flags);
@@ -950,7 +1024,7 @@ I64 HashListAdd(U8 *list, I64 type, CHashTable *table)
             tmph->user_data0 = i - 1;
             tmph->str = StrNew(list);
             tmph->type = type;
-            HashAdd(tmph, table);
+            ZcGuestHashAdd(tmph, table);
             while (*list++);
         }
     }
@@ -960,7 +1034,7 @@ I64 HashDefineListAdd(U8 *dname, I64 type, CHashTable *table)
 {
     CHashDefineStr *tmph;
 
-    if (tmph = HashFind(dname, Fs->hash_table, HTT_DEFINE_STR))
+    if (tmph = ZcGuestHashFind(dname, Fs->hash_table, HTT_DEFINE_STR))
         return HashListAdd(tmph->data, type, table);
     else
         return 0;
@@ -978,6 +1052,11 @@ I64 BootstrapDefinesLoad()
                    "Sun\0Mon\0Tue\0Wed\0Thu\0Fri\0Sat\0");
     DefineListLoad("ST_MONTHS",
                    "Jan\0Feb\0Mar\0Apr\0May\0Jun\0Jul\0Aug\0Sep\0Oct\0Nov\0Dec\0");
+    // Match the pinned Kernel/KDefine.ZC flag list used by FlagsScan in
+    // stock file utilities such as Demo/DolDoc/TreeDemo.ZC.
+    DefineListLoad("ST_FILE_UTIL_FLAGS",
+                   "r\0d\0i\0a\0c\0R\0p\0m\0s\0D\0F\0T\0"
+                   "$$\0S\0A\0J\0G\0O\0P\0f\0l\0lb\0la\0");
     return 0;
 }
 // Minimal CompCtrl/Lex so DocInit can parse default flag strings. Full
@@ -1168,7 +1247,7 @@ I64 LexExpressionI64(CCompCtrl *cc)
     {
         name = cc->cur_str;
         if (name && doldoc.hash &&
-            (tmph = HashFind(name, doldoc.hash, DHT_COLOR)))
+            (tmph = ZcGuestHashFind(name, doldoc.hash, DHT_COLOR)))
             res = tmph->user_data0;
         else if (name && (value = ZcLexDefineText(name)))
         {
@@ -1197,7 +1276,7 @@ I64 ParseDocFlagSingle(CCompCtrl *cc, I64 *_de_flags, U32 *_type, Bool turn_on)
     CHashGeneric *tmph;
 
     if (cc->token == TK_IDENT &&
-        (tmph = HashFind(cc->cur_str, doldoc.hash, DHT_DOC_FLAG)))
+        (tmph = ZcGuestHashFind(cc->cur_str, doldoc.hash, DHT_DOC_FLAG)))
     {
         res = tmph->user_data0;
         if (res < 64)
@@ -2401,47 +2480,80 @@ I64 KbdMouseEventTime()
     return 0;
 }
 
-// Read-only CFile bridge for the source-backed ARM64 bootstrap. The x86
-// kernel's block-file implementation is not available here; expose the same
-// block-oriented reads over FileRead so bundled ISO assets and writable disk
-// files can use consumers such as AutoComplete's dictionary definition API.
+// Block-file bridge for the source-backed ARM64 bootstrap. The x86 kernel's
+// filesystem implementation is not available here, so map CFile reads and
+// writes onto the source-volume FileRead/FileWrite hooks.
 #define BOOTSTRAP_CFILE_READ_TAG 0x5A434649
+#define BOOTSTRAP_CFILE_WRITE_TAG 0x5A434657
 
-CFile *FOpen(U8 *filename, U8 *flags, I64 count=0)
+public CFile *FOpen(U8 *filename, U8 *flags, I64 count=0)
 {
     CFile *f;
-    U8 *data;
+    U8 *data, *absolute;
     I64 size;
+    Bool writing, preserve;
 
-    if (!filename || !flags ||
-        (StrCompare(flags, "r") && StrCompare(flags, "rb")))
+    if (!filename || !flags || !*filename)
         return NULL;
-    data = FileRead(filename, &size);
-    if (!data || size <= 0)
+    writing = StrOcc(flags, 'w');
+    preserve = writing && StrOcc(flags, '+');
+    if (!writing && StrCompare(flags, "r") && StrCompare(flags, "rb"))
+        return NULL;
+    absolute = ZcSourcePath(filename);
+    if (!absolute)
+        return NULL;
+    data = NULL;
+    size = 0;
+    if (!writing || preserve)
+        data = FileRead(absolute, &size);
+    if (data && size <= 0)
     {
         Free(data);
+        data = NULL;
+    }
+    if (!data && writing && count > 0 && count <= I64_MAX / BLK_SIZE)
+        size = count * BLK_SIZE;
+    if (!data && !size)
+    {
+        Free(absolute);
         return NULL;
     }
     f = MAlloc(sizeof(CFile));
     if (!f)
     {
         Free(data);
+        Free(absolute);
         return NULL;
     }
     MemSet(f, 0, sizeof(CFile));
-    f->flags = BOOTSTRAP_CFILE_READ_TAG;
+    if (writing)
+        f->flags = BOOTSTRAP_CFILE_WRITE_TAG;
+    else
+        f->flags = BOOTSTRAP_CFILE_READ_TAG;
     f->max_blk = size; // byte length for this source-backed CFile
     f->clus_buf = data;
+    if (!data)
+        f->clus_buf = CAlloc(size);
+    f->de.full_name = absolute;
+    if (!f->clus_buf)
+    {
+        Free(absolute);
+        Free(f);
+        return NULL;
+    }
     return f;
 }
 
-Bool FBlkRead(CFile *f, U8 *buf, I64 blk=FFB_NEXT_BLK, I64 count=1)
+public Bool FBlkRead(CFile *f, U8 *buf, I64 blk=FFB_NEXT_BLK, I64 count=1)
 {
     I64 byte_offset, bytes, available, copy_size;
 
-    if (!f || f->flags != BOOTSTRAP_CFILE_READ_TAG || !f->clus_buf ||
-        !buf || count <= 0 || count > I64_MAX / BLK_SIZE)
+    if (!f || (f->flags != BOOTSTRAP_CFILE_READ_TAG &&
+               f->flags != BOOTSTRAP_CFILE_WRITE_TAG) || !f->clus_buf ||
+        !buf || count < 0 || count > I64_MAX / BLK_SIZE)
         return FALSE;
+    if (!count)
+        return TRUE;
     if (blk == FFB_NEXT_BLK)
         blk = f->fblk_num;
     if (blk < 0 || blk > I64_MAX / BLK_SIZE ||
@@ -2461,18 +2573,47 @@ Bool FBlkRead(CFile *f, U8 *buf, I64 blk=FFB_NEXT_BLK, I64 count=1)
     return TRUE;
 }
 
-U0 FClose(CFile *f)
+public Bool FBlkWrite(CFile *f, U8 *buf, I64 blk=FFB_NEXT_BLK, I64 count=1)
 {
-    if (!f || f->flags != BOOTSTRAP_CFILE_READ_TAG)
+    I64 byte_offset, bytes;
+
+    if (!f || f->flags != BOOTSTRAP_CFILE_WRITE_TAG || !f->clus_buf ||
+        !buf || count < 0 || count > I64_MAX / BLK_SIZE)
+        return FALSE;
+    if (!count)
+        return TRUE;
+    if (blk == FFB_NEXT_BLK)
+        blk = f->fblk_num;
+    if (blk < 0 || blk > I64_MAX / BLK_SIZE ||
+        blk + count < blk || blk + count > I64_MAX / BLK_SIZE)
+        return FALSE;
+    byte_offset = blk * BLK_SIZE;
+    bytes = count * BLK_SIZE;
+    if (byte_offset > f->max_blk || bytes > f->max_blk - byte_offset)
+        return FALSE;
+    MemCopy(f->clus_buf + byte_offset, buf, bytes);
+    f->fblk_num = blk + count;
+    return TRUE;
+}
+
+public U0 FClose(CFile *f)
+{
+    if (!f || (f->flags != BOOTSTRAP_CFILE_READ_TAG &&
+               f->flags != BOOTSTRAP_CFILE_WRITE_TAG))
         return;
+    if (f->flags == BOOTSTRAP_CFILE_WRITE_TAG &&
+        FileWrite(f->de.full_name, f->clus_buf, f->max_blk) != f->max_blk)
+        throw('File');
     Free(f->clus_buf);
+    Free(f->de.full_name);
     f->flags = 0;
     Free(f);
 }
 
-I64 FSize(CFile *f)
+public I64 FSize(CFile *f)
 {
-    if (!f || f->flags != BOOTSTRAP_CFILE_READ_TAG)
+    if (!f || (f->flags != BOOTSTRAP_CFILE_READ_TAG &&
+               f->flags != BOOTSTRAP_CFILE_WRITE_TAG))
         return 0;
     return f->max_blk;
 }
@@ -2609,14 +2750,145 @@ public I8 Ona2Octave(I8 ona)
         return octave - 1;
     return octave;
 }
-// Audio hardware/PSG emulation is not part of the ARM64 bring-up yet. Keep
-// source applications that treat sound as an optional effect loadable; this
-// compatibility hook deliberately produces silence.
-U0 Play(U8 *music=NULL, ...)
+// Portable subset of pinned System/Sound.ZC's music-string player. The ARM64
+// Sound binding routes note values to the active VirtIO PCM device.
+class CBootstrapMusicGlobals
 {
-    if (music) {}
-    // Keep silent music loops cooperative until ARM64 audio is implemented.
-    Sleep(1);
+    U8 *cur_song;
+    CTask *cur_song_task;
+    I64 octave;
+    F64 note_len;
+    U8 note_map[7];
+    Bool mute;
+    I64 meter_top, meter_bottom;
+    F64 tempo, stacatto_factor;
+    I64 play_note_num;
+    F64 tM_correction, last_Beat, last_tM;
+} music = {NULL, NULL, 4, 1.0, {0, 2, 3, 5, 7, 8, 10}, FALSE,
+           4, 4, 2.5, 0.9, 0, 0, 0, 0};
+U8 *BootstrapMusicSetOctave(U8 *st)
+{
+    I64 ch = *st++;
+    while ('0' <= ch <= '9')
+    {
+        music.octave = ch - '0';
+        ch = *st++;
+    }
+    return --st;
+}
+U8 *BootstrapMusicSetMeter(U8 *st)
+{
+    I64 ch = *st++;
+    while (ch == 'M')
+    {
+        ch = *st++;
+        if ('0' <= ch <= '9')
+        {
+            music.meter_top = ch - '0';
+            ch = *st++;
+        }
+        if (ch == '/')
+            ch = *st++;
+        if ('0' <= ch <= '9')
+        {
+            music.meter_bottom = ch - '0';
+            ch = *st++;
+        }
+    }
+    return --st;
+}
+U8 *BootstrapMusicSetNoteLen(U8 *st)
+{
+    Bool cont = TRUE;
+    do
+    {
+        switch (*st++)
+        {
+            case 'w': music.note_len = 4.0; break;
+            case 'h': music.note_len = 2.0; break;
+            case 'q': music.note_len = 1.0; break;
+            case 'e': music.note_len = 0.5; break;
+            case 's': music.note_len = 0.25; break;
+            case 't': music.note_len = 2.0 * music.note_len / 3.0; break;
+            case '.': music.note_len = 1.5 * music.note_len; break;
+            default:
+                st--;
+                cont = FALSE;
+        }
+    }
+    while (cont);
+    return st;
+}
+public U0 Play(U8 *st, U8 *words=NULL)
+{
+    U8  *word, *last_st;
+    I64  note, i = 0, ona, on_mS, off_mS;
+    Bool tie;
+    F64  duration_mS, on_mS_f, off_mS_f;
+
+    music.play_note_num = 0;
+    while (st && *st)
+    {
+        tie = FALSE;
+        do
+        {
+            last_st = st;
+            if (*st == '(')
+            {
+                tie = TRUE;
+                st++;
+            }
+            else
+            {
+                st = BootstrapMusicSetMeter(st);
+                st = BootstrapMusicSetOctave(st);
+                st = BootstrapMusicSetNoteLen(st);
+            }
+        }
+        while (st != last_st);
+
+        if (!*st)
+            break;
+        note = *st++ - 'A';
+        if (0 <= note < 7)
+        {
+            note = music.note_map[note];
+            ona = Note2Ona(note, music.octave);
+            if (*st == 'b')
+            {
+                ona--;
+                st++;
+            }
+            else if (*st == '#')
+            {
+                ona++;
+                st++;
+            }
+        }
+        else
+            ona = 0;
+
+        if (words && (word = ListSub(i++, words)) && StrCompare(word, " "))
+            "%s", word;
+
+        if (!music.tempo)
+            music.tempo = 2.5;
+        duration_mS = 1000.0 * music.note_len / music.tempo;
+        on_mS_f = duration_mS * music.stacatto_factor;
+        off_mS_f = duration_mS - on_mS_f;
+        on_mS = ToI64(on_mS_f);
+        off_mS = ToI64(off_mS_f);
+
+        if (!music.mute)
+            Sound(ona);
+        Sleep(on_mS);
+        music.tM_correction += on_mS_f - on_mS;
+        if (!music.mute && !tie)
+            Sound(0);
+        Sleep(off_mS);
+        music.tM_correction += off_mS_f - off_mS;
+        music.play_note_num++;
+    }
 }
 U0 SoundTaskEndCB()
 {
@@ -2737,12 +3009,21 @@ U0 FindWiz()
 // text-plane constants declared below so the forward CDC stub can use it.
 U8 bootstrap_graphics_pixels[800 * 600];
 CDC bootstrap_graphics_dc;
+I64 bootstrap_graphics_r[16];
+Bool bootstrap_graphics_dc_defaults_ready;
+CBGR24 bootstrap_graphics_std_palette[COLORS_NUM] = {
+    0x000000, 0x0000AA, 0x00AA00, 0x00AAAA,
+    0xAA0000, 0xAA00AA, 0xAA5500, 0xAAAAAA,
+    0x555555, 0x5555FF, 0x55FF55, 0x55FFFF,
+    0xFF5555, 0xFF55FF, 0xFFFF55, 0xFFFFFF
+};
 // Upstream gr.dc is retained foreground; gr.dc2 is the compositor target.
 U8 bootstrap_foreground_pixels[800 * 600];
 CDC bootstrap_foreground_dc;
 // Meshes are rasterized into a per-frame overlay, then composed after task
 // windows so later window paints cannot erase them and old frames cannot leak.
 U8 bootstrap_mesh_pixels[800 * 600];
+Bool bootstrap_mesh_overlay_clear = FALSE;
 Bool bootstrap_foreground_ready;
 I32 bootstrap_graphics_depth_pixels[800 * 600];
 I64 bootstrap_graphics_depth_width;
@@ -2757,6 +3038,10 @@ U64 bootstrap_planar_cache[800 * 600 / 8];
 CDC bootstrap_planar_dc, bootstrap_planar_cache_dc;
 U8 bootstrap_empty_sprite[1];
 U32 bootstrap_present_raw[800 * 600];
+// Stock 32-bit framebuffer programs write through text.fb_alias while they
+// own the screen. Keep their retained image separate from the compositor's
+// per-frame RGBA staging buffer, which is refreshed from scanout each frame.
+U32 bootstrap_direct_fb_pixels[800 * 600];
 U8 bootstrap_present_cache[800 * 600];
 U64 bootstrap_text_colors[256];
 U64 bootstrap_text_bits[256];
@@ -2767,6 +3052,7 @@ I64 bootstrap_gr_screen_updates = 0;
 I64 bootstrap_gr_planar_updates = 0;
 Bool bootstrap_present_cache_ready = FALSE;
 Bool bootstrap_present_ready = FALSE;
+Bool bootstrap_gr_direct_fb_active = FALSE;
 Bool bootstrap_gr_packed_tables_ready = FALSE;
 Bool bootstrap_gr_zoom_tables_ready = FALSE;
 bootstrap_foreground_dc.body = bootstrap_foreground_pixels;
@@ -2879,8 +3165,48 @@ I32 *BootstrapScreenDepthReset(CDC *dc)
                 width);
     return depth;
 }
+U0 BootstrapDCTransform(CDC *dc, I64 *x, I64 *y, I64 *z)
+{
+    DCTransform(dc, x, y, z);
+}
+U0 BootstrapDCLighting(CDC *dc, CD3I32 *p1, CD3I32 *p2, CD3I32 *p3,
+                       CColorROPU32 color)
+{
+    DCLighting(dc, p1, p2, p3, color);
+}
 U0 DCReset(CDC *dc)
 {
+    if (!dc)
+        return;
+    dc->color = BLACK;
+    dc->color2 = BLACK;
+    dc->bkcolor = BLACK;
+    dc->collision_count = 0;
+    dc->thick = 1;
+    dc->ls.x = 37837;
+    dc->ls.y = 37837;
+    dc->ls.z = 37837;
+    dc->dither_probability_u16 = 0;
+    dc->x = 0;
+    dc->y = 0;
+    dc->z = 0;
+    // ZealC cannot take the address of an external declaration from this
+    // early-loaded bridge. Local wrappers give this CDC the pinned defaults
+    // while still delegating to the stock implementations once loaded.
+    dc->transform = &BootstrapDCTransform;
+    dc->lighting = &BootstrapDCLighting;
+    if (dc->r)
+    {
+        MemSet(dc->r, 0, 16 * sizeof(I64));
+        dc->r[0] = 0x100000000;
+        dc->r[5] = 0x100000000;
+        dc->r[10] = 0x100000000;
+        dc->r[15] = 0x100000000;
+        dc->r_norm = 0x100000000;
+    }
+    dc->flags &= ~(DCF_SYMMETRY | DCF_TRANSFORMATION | DCF_JUST_MIRROR);
+    MemCopy(dc->palette, bootstrap_graphics_std_palette,
+            sizeof(CBGR24) * COLORS_NUM);
 }
 U0 DCDel(CDC *dc)
 {
@@ -3264,6 +3590,11 @@ U0 BootstrapWinPaper(CTask *task)
         return;
     BootstrapWallpaperApply();
 }
+U0 BootstrapEnsureWinPaper(CGrGlobals *active_gr)
+{//Install the fallback only until a system-included wallpaper replaces it.
+    if (active_gr && !active_gr->fp_wall_paper)
+        active_gr->fp_wall_paper = &BootstrapWinPaper;
+}
 I64 BootstrapWallpaperChecks()
 {//Verify desktop tinting preserves foregrounds and leaves window cells alone.
     CGrGlobals *active_gr = ZcActiveGrGlobals();
@@ -3501,9 +3832,9 @@ U0 BootstrapGrSpriteHashInit(CGrGlobals *active_gr)
 
     if (!active_gr)
         return;
-    have_types = HashFind("ST_SPRITE_ELEM_TYPES", Fs->hash_table,
+    have_types = ZcGuestHashFind("ST_SPRITE_ELEM_TYPES", Fs->hash_table,
             HTT_DEFINE_STR) != NULL;
-    have_codes = HashFind("ST_SPRITE_ELEM_CODES", Fs->hash_table,
+    have_codes = ZcGuestHashFind("ST_SPRITE_ELEM_CODES", Fs->hash_table,
             HTT_DEFINE_STR) != NULL;
     // GrInitA.ZC is the single source of these lists. Its file-scope call
     // initializes the boot task; a later task with a private define table
@@ -3517,7 +3848,7 @@ U0 BootstrapGrSpriteHashInit(CGrGlobals *active_gr)
         throw('Sprite');
     if (!active_gr->sprite_hash)
     {
-        active_gr->sprite_hash = HashTableNew(512);
+        active_gr->sprite_hash = ZcGuestHashTableNew(512);
         if (!active_gr->sprite_hash ||
                 HashDefineListAdd("ST_SPRITE_ELEM_CODES", 1,
                         active_gr->sprite_hash) != SPT_TYPES_NUM)
@@ -3538,11 +3869,24 @@ U0 BootstrapGrContextInit()
     if (!active_gr)
         active_gr = &gr;
     bootstrap_graphics_dc.dc_signature = DCS_SIGNATURE_VAL;
+    // DCCopy clones a CDC's rotation matrix even for a 2D screen capture.
+    // The static framebuffer CDC is not created by DCNew, so give it the
+    // same identity matrix that DCNew/DCReset would have installed.
+    if (!bootstrap_graphics_dc.r)
+    {
+        Mat4x4IdentEqu(bootstrap_graphics_r);
+        bootstrap_graphics_dc.r = bootstrap_graphics_r;
+    }
+    if (!bootstrap_graphics_dc_defaults_ready)
+    {
+        DCReset(&bootstrap_graphics_dc);
+        bootstrap_graphics_dc_defaults_ready = TRUE;
+    }
     bootstrap_planar_dc.dc_signature = DCS_SIGNATURE_VAL;
     bootstrap_planar_cache_dc.dc_signature = DCS_SIGNATURE_VAL;
     bootstrap_zoom_dc.dc_signature = DCS_SIGNATURE_VAL;
     active_gr->screen_image = &bootstrap_graphics_dc;
-    active_gr->fp_wall_paper = &BootstrapWinPaper;
+    BootstrapEnsureWinPaper(active_gr);
     active_gr->dc = &bootstrap_foreground_dc;
     active_gr->dc2 = &bootstrap_graphics_dc;
     if (!bootstrap_foreground_ready)
@@ -3604,21 +3948,6 @@ U0 BootstrapWinMgrTimingInit()
     active_winmgr->last_refresh_tS = tS;
     active_winmgr->ideal_refresh_tS = tS;
 }
-// Music playback is not part of the bootstrap; DocRecalc only tracks its current song tag.
-class CBootstrapMusicGlobals
-{
-    U8 *cur_song;
-    CTask *cur_song_task;
-    I64 octave;
-    F64 note_len;
-    U8 note_map[7];
-    Bool mute;
-    I64 meter_top, meter_bottom;
-    F64 tempo, stacatto_factor;
-    I64 play_note_num;
-    F64 tM_correction, last_Beat, last_tM;
-} music = {NULL, NULL, 4, 1.0, {0, 2, 3, 5, 7, 8, 10}, FALSE,
-           4, 4, 2.5, 0.9, 0, 0, 0, 0};
 U0 CurSongTask() {}
 U0 MusicSettingsReset()
 {
@@ -3629,6 +3958,10 @@ U0 MusicSettingsReset()
     music.note_len = 1.0;
     music.meter_top = 4;
     music.meter_bottom = 4;
+    music.tM_correction = 0;
+    music.last_Beat = 0;
+    music.last_tM = 0;
+    Sound(0);
 }
 // The full kernel's SystemTask sets these run-level flags during startup.
 I64 sys_run_level;
@@ -3755,6 +4088,40 @@ U32 char_bmp_displayable[16] =
     0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF,
     0, 0, 0, 0, 0, 0, 0, 0
 };
+// ARM64 implementation of the pinned Kernel/StrA.ZC StrFind API. The
+// bootstrapped compiler does not load StrA.ZC's x86 assembly, but stock
+// utilities such as System/Utils/Find.ZC depend on this source-level helper.
+public U8 *StrFind(U8 *needle, U8 *haystack_str, I64 flags=0)
+{
+    U8 *candidate, *scan = haystack_str;
+    I64 needle_len;
+    Bool valid;
+
+    if (!needle || !haystack_str)
+        return NULL;
+    needle_len = StrLen(needle);
+    while (TRUE)
+    {
+        if (flags & 1)
+            candidate = BootstrapStrIMatch(needle, scan);
+        else
+            candidate = StrMatch(needle, scan);
+        if (!candidate)
+            return NULL;
+        valid = TRUE;
+        if (flags & 2 && candidate != haystack_str &&
+            Bt(char_bmp_alpha_numeric, *(candidate - 1)))
+            valid = FALSE;
+        if (flags & 4 &&
+            Bt(char_bmp_alpha_numeric, *(candidate + needle_len)))
+            valid = FALSE;
+        if (valid)
+            return candidate;
+        scan = candidate + 1;
+        if (!*scan)
+            return NULL;
+    }
+}
 // StrA / DocGet / DocRecalc helpers used by DocPutS before those modules load.
 U8 *StrUtil(U8 *_src, I64 flags)
 {
@@ -3869,9 +4236,15 @@ Bool BootstrapWinPixelVisible(CTask *task, I64 x, I64 y)
         return TRUE;
     return bootstrap_win_pixel_z_buf[y * 800 + x] <= task->win_z_num;
 }
+I64 sprite_debug_mesh_buffer_valid = 0;
+I64 sprite_debug_mesh_buffer_nonzero = 0;
+I64 sprite_debug_mesh_buffer_last_color = TRANSPARENT;
 U0 BootstrapMeshLayerClear()
 {//Mesh pixels are a transient screen-composition layer, never retained state.
     MemSet(bootstrap_mesh_pixels, TRANSPARENT, sizeof(bootstrap_mesh_pixels));
+    sprite_debug_mesh_buffer_valid = 0;
+    sprite_debug_mesh_buffer_nonzero = 0;
+    sprite_debug_mesh_buffer_last_color = TRANSPARENT;
 }
 Bool TextChar(CTask *task, Bool allow_border=FALSE, I64 x=0, I64 y=0, I64 d=0)
 {//Single-cell framebuffer path; border mode permits the adjacent outer row/column.
@@ -4254,6 +4627,10 @@ Bool BootstrapSpriteMeshPixel(CDC *dc, I64 x, I64 y, I64 color)
         return FALSE;
     index = y * dc->width_internal + x;
     bootstrap_mesh_pixels[index] = color & 0xff;
+    sprite_debug_mesh_buffer_valid++;
+    if (color & 0xff)
+        sprite_debug_mesh_buffer_nonzero++;
+    sprite_debug_mesh_buffer_last_color = color & 0xff;
     sprite_debug_mesh_target_dc_is_bootstrap = dc == &bootstrap_graphics_dc;
     sprite_debug_mesh_target_body_is_graphics =
             dc->body == bootstrap_graphics_pixels;
@@ -5984,7 +6361,12 @@ U0 BootstrapCtrlInputPoll(Bool source_manager=FALSE)
         BootstrapMouseHardSample(sample, now_ns);
     else
         BootstrapCtrlInputSubmit(task, sample, now_ns);
-    ZcWinMouseUpdate();
+    // Once the source WinMgr is running, it must consume this hard sample
+    // itself after WinQueueIPMessages has captured the previous mouse state.
+    // Updating it here collapses the button edge before the manager can route
+    // the click to a window document.
+    if (!BootstrapSourceWinMgrActive())
+        ZcWinMouseUpdate();
     BootstrapCtrlWheelZoom(ctrl_down, wheel);
 }
 public Bool CtrlDispatchWheel(CTask *task, I64 delta)
@@ -6472,7 +6854,7 @@ Bool BootstrapTryUpstreamGrUpdateScreen()
     bootstrap_present_ready = TRUE;
     active_gr->dc = &bootstrap_foreground_dc;
     active_gr->dc2 = &bootstrap_graphics_dc;
-    active_gr->fp_wall_paper = &BootstrapWinPaper;
+    BootstrapEnsureWinPaper(active_gr);
     active_gr->dc1 = &bootstrap_planar_dc;
     active_gr->dc_cache = &bootstrap_planar_cache_dc;
     active_gr->zoomed_dc = &bootstrap_zoom_dc;
@@ -6591,7 +6973,7 @@ U0 BootstrapGrUpdateTasks()
     else
         ZcFbTextFlush(gr.text_base, TEXT_COLS, TEXT_ROWS);
     WinZBufUpdate();
-    active_gr->fp_wall_paper = &BootstrapWinPaper;
+    BootstrapEnsureWinPaper(active_gr);
     BootstrapWallpaperApply();
     // Match GrUpdateScreen's final overlay stage: run after the window draw
     // callbacks with DCF_ON_TOP and screen-space coordinates. The bootstrap
@@ -6619,6 +7001,15 @@ U0 BootstrapGrUpdateTasks()
                 break;
         }
         ode_count = BootstrapTaskRingCount(cpu_structs[0].executive_task);
+        // WinZBufUpdate can leave the desktop manager at z=0 in the
+        // bootstrap layout. The pinned GrUpdateTasks visibility gate still
+        // checks the manager's bitmap bit before drawing its wallpaper and
+        // controls, so mark that shown background layer visible here, after
+        // z-buffer construction and before entering the pinned traversal.
+        if (TaskValidate(sys_winmgr_task) &&
+            (sys_winmgr_task->display_flags & (1 << DISPLAYf_SHOW)))
+            Bts(active_gr->win_uncovered_bitmap,
+                sys_winmgr_task->win_z_num);
         source_ready = ZcGrUpdateTasks();
         if (source_ready)
         {
@@ -6629,6 +7020,12 @@ U0 BootstrapGrUpdateTasks()
     }
     if (!source_ready)
     {
+        // The unchanged GrUpdateTaskWin path draws controls on
+        // sys_winmgr_task after its wallpaper callback. The bounded bridge
+        // traversal below omits that root task, so preserve the same layer
+        // explicitly for wallpaper controls such as WallPaperCtrl.
+        if (TaskValidate(sys_winmgr_task))
+            DrawCtrls(sys_winmgr_task);
         // Bounded visible window traversal, drawn in ZealOS task/z order.
         visited = 0;
         task = root;
@@ -6697,6 +7094,26 @@ public U0 BootstrapWinMgrTick()
     BootstrapWinMgrTimingUpdate;
     bootstrap_winmgr_ticks++;
     bootstrap_gr_fullscreen_active = FALSE;
+    BootstrapCtrlInputPoll();
+    // Match the upstream WinMgr/GrUpdateScreen contract: framebuffer-owning
+    // programs set this while drawing directly (for example 32BitPaint).
+    // Do not rebind fb_alias or compose desktop windows over their pixels.
+    if (text.is_fb_busy)
+    {
+        if (!bootstrap_gr_direct_fb_active)
+            MemSet(bootstrap_direct_fb_pixels, WHITE32,
+                   sizeof(bootstrap_direct_fb_pixels));
+        text.fb_alias = bootstrap_direct_fb_pixels;
+        bootstrap_gr_direct_fb_active = TRUE;
+        bootstrap_gr_fullscreen_active = TRUE;
+        return;
+    }
+    // A fullscreen owner leaves fb_alias bound to the direct surface. Restore
+    // the normal physical alias before entering either compositor path; the
+    // source GrUpdateScreen path will replace it with its staged surface.
+    if (bootstrap_gr_direct_fb_active)
+        text.fb_alias = sys_framebuffer_addr;
+    bootstrap_gr_direct_fb_active = FALSE;
     BootstrapMeshLayerClear();
     if (BootstrapTryUpstreamGrUpdateScreen())
         return;
@@ -6969,6 +7386,54 @@ I64 PopUpPrint(U8 *format, ...)
 }
 // DocTerm.ZC / DocBorderNew dependency stubs until DocEd/DocForm/Menu/Win load.
 extern CDocEntry *DocPutS(CDoc *doc, U8 *st);
+public U0 PutFileLink(U8 *filename, U8 *full_name=NULL, I64 line=0,
+                     Bool plain_text=FALSE)
+{//DolDoc file/line links for Find and other standard utilities.
+    U8 *resolved=NULL, *markup;
+    CDoc *doc;
+
+    if (!filename)
+        return;
+    if (IsRaw())
+    {
+        if (line)
+            Print("%s,%04d", filename, line);
+        else
+            Print("%s", filename);
+        return;
+    }
+    if (!full_name)
+    {
+        resolved = FileNameAbs(filename);
+        full_name = resolved;
+    }
+    if (!full_name)
+    {
+        Print("%s", filename);
+        return;
+    }
+    if (plain_text)
+    {
+        if (line)
+            markup = MStrPrint("$$LK,\"%s,%04d\",A=\"PL:%s,%d\"$$",
+                               filename, line, full_name, line);
+        else
+            markup = MStrPrint("$$LK,\"%s\",A=\"PI:%s\"$$",
+                               filename, full_name);
+    }
+    else if (line)
+        markup = MStrPrint("$$LK,\"%s,%04d\",A=\"FL:%s,%d\"$$",
+                           filename, line, full_name, line);
+    else
+        markup = MStrPrint("$$LK,\"%s\",A=\"FI:%s\"$$",
+                           filename, full_name);
+    if ((doc = DocPut()))
+        DocPutS(doc, markup);
+    else
+        Print("%s", filename);
+    Free(markup);
+    Free(resolved);
+}
 CAutoCompleteGlobals ac;
 CAutoCompleteDictGlobals acd;
 I64 MemberMetaData(U8 *needle, CMemberList *member)
@@ -6985,6 +7450,21 @@ I64 MemberMetaData(U8 *needle, CMemberList *member)
         meta = meta->next;
     }
     return 0;
+}
+CMemberListMeta *MemberMetaFind(U8 *needle, CMemberList *member)
+{
+    CMemberListMeta *meta;
+
+    if (!needle || !member)
+        return NULL;
+    meta = member->meta;
+    while (meta)
+    {
+        if (!StrCompare(meta->str, needle))
+            return meta;
+        meta = meta->next;
+    }
+    return NULL;
 }
 
 CHashClass *OptClassFwd(CHashClass *tmpc)
@@ -7094,7 +7574,7 @@ U0 DocDataFormat(CDoc *doc, CDocEntry *doc_e, I64 d=DOCM_CANCEL)
 		else if (doc_e->de_flags & DOCEF_LIST)
 		{
 			if (doc_e->de_flags & DOCEF_DEFINE &&
-				(tmph = HashFind(doc_e->define_str, doc->win_task->hash_table, HTT_DEFINE_STR)) &&
+				(tmph = ZcGuestHashFind(doc_e->define_str, doc->win_task->hash_table, HTT_DEFINE_STR)) &&
 				0 <= d < tmph->count)
 			{
 				ptr = MStrPrint("[%s]", tmph->sub_idx[d]);
@@ -7175,7 +7655,7 @@ U0 DocDataScan(CDoc *doc, CDocEntry *doc_e)
 		{
 			d = 0;
 			if (doc_e->tag && doc_e->de_flags & DOCEF_DEFINE &&
-				(tmph = HashFind(doc_e->define_str, doc->win_task->hash_table, HTT_DEFINE_STR)))
+				(tmph = ZcGuestHashFind(doc_e->define_str, doc->win_task->hash_table, HTT_DEFINE_STR)))
 			{
 				ptr1 = ptr2 = StrNew(doc_e->tag);
 				if (*ptr2 == '[')
@@ -7439,6 +7919,14 @@ U0 WinZBufUpdate()
     }
     while (task && task != root && visited < BOOTSTRAP_WIN_MAX);
 
+    // The window-manager task is the z=0 background layer, not an ordinary
+    // covered window. Upstream GrUpdateTasks tests its uncovered bitmap bit
+    // before calling GrUpdateTaskWin; without bit zero it skips the wallpaper
+    // callback and controls (for example WallPaperCtrl) on every source frame.
+    if (TaskValidate(sys_winmgr_task) &&
+        (sys_winmgr_task->display_flags & (1 << DISPLAYf_SHOW)))
+        gr.win_uncovered_bitmap[0] |= 1;
+
     for (i = 0; i < z_count; i++)
     {
         if (bootstrap_win_uncovered_cells[i])
@@ -7534,11 +8022,65 @@ Bool DocEd(CDoc *doc, I64 dof_flags=0)
     if (dof_flags) {}
     return FALSE;
 }
+Bool BootstrapCopyFile(U8 *source, U8 *destination)
+{
+    U8 *contents, *src_path = ZcSourcePath(source);
+    U8 *dst_path = ZcSourcePath(destination);
+    U8 *src_name, *dst_name;
+    I64 size, attr;
+    Bool copied = FALSE;
+
+    if (src_path && dst_path)
+    {
+        src_name = src_path;
+        dst_name = dst_path;
+        if (!StrNCompare(src_path, "disk:", 5))
+            src_name += 5;
+        if (!StrNCompare(dst_path, "disk:", 5))
+            dst_name += 5;
+        if (StrCompare(src_name, dst_name) && !ZcSourceDirExists(dst_path))
+        {
+            contents = FileRead(src_path, &size, &attr);
+            if (contents)
+            {
+                copied = FileWrite(dst_path, contents, size, 0, attr) == size;
+                Free(contents);
+            }
+        }
+    }
+    Free(src_path);
+    Free(dst_path);
+    return copied;
+}
 Bool Copy(U8 *src_files_find_mask, U8 *dst_files_find_mask=".")
 {
-    if (src_files_find_mask) {}
-    if (dst_files_find_mask) {}
-    return FALSE;
+    CDirEntry *files, *entry;
+    U8 *leaf, *destination;
+    Bool copied = TRUE;
+
+    if (!src_files_find_mask || !*src_files_find_mask ||
+        !dst_files_find_mask || !*dst_files_find_mask)
+        return FALSE;
+    if (!ZcSourceDirExists(dst_files_find_mask))
+        return BootstrapCopyFile(src_files_find_mask, dst_files_find_mask);
+
+    files = FilesFind(src_files_find_mask, FUF_JUST_FILES);
+    if (!files)
+        return FALSE;
+    for (entry = files; entry; entry = entry->next)
+    {
+        leaf = StrLastOcc(entry->full_name, "/");
+        if (leaf)
+            leaf++;
+        else
+            leaf = entry->full_name;
+        destination = MStrPrint("%s/%s", dst_files_find_mask, leaf);
+        if (!BootstrapCopyFile(entry->full_name, destination))
+            copied = FALSE;
+        Free(destination);
+    }
+    DirTreeDel(files);
+    return copied;
 }
 Bool Move(U8 *f1, U8 *f2)
 {

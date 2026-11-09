@@ -1,0 +1,19 @@
+{
+  "date": "2026-11-08",
+  "command": "QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device' python3 scripts/check-compat.py --pci --quick --probe-source-fast --probe-source-module disk:/Demo/MultiCore/Primes.ZC --probe-source tests/compat/MultiCore1Runtime.ZC",
+  "target": "AArch64 QEMU virt, PCI graphical terminal, single guest CPU; bundled ARM64 source module",
+  "result": "accepted",
+  "program": "/Demo/MultiCore/Primes.ZC",
+  "source_path": "build/sources.tar:Demo/MultiCore/Primes.ZC",
+  "source_sha256": "73f92ef7b89412b22f1b61fae7276c839b35d4c6d5e98e3cd111eab34bc9178f",
+  "verified": [
+    "The source loads and runs all four configured sieve invocations with guest mp_count=1.",
+    "The 100-value range reports 25 primes, and the 1,000,000-value range reports 78,498 primes for both the explicit one-worker and mp_count calls.",
+    "The demo returns to the terminal prompt, and the follow-up compatibility probe completes with the native compiler ready."
+  ],
+  "kernel_sha256": "c3d720cbc40efcfe6e5546cd8018d71a7daaf47f39016b168bb2e03b1062ce59",
+  "iso_sha256": "22e30c318e666fb88a4ecc4654398395abbc3e53b633614104d410f863f24230",
+  "log_sha256": "7612c495eb40d30182f7c68f92f760c1d25f80c9ffb2cce5b79b932cd605c7c8",
+  "log": "build/demo-primes-single-cpu-qemu-2026-11-08.log",
+  "scope_note": "QEMU runtime evidence only. The guest reports mp_count=1, so this verifies functional single-worker execution but does not verify multi-CPU parallelism, live UTM behavior, or Pi hardware behavior."
+}

@@ -1,0 +1,39 @@
+{
+  "date": "2026-11-08",
+  "target": "Raspberry Pi 4B native desktop, PWM1 analog tone output",
+  "result": "diagnostic_candidate_staged_hash_verified",
+  "build_command": "make pi-desktop-sd",
+  "image_check": "python3 scripts/check-pi-desktop-image.py build/pi-desktop-esp",
+  "payload": {
+    "kernel": "build/pi-desktop-esp/boot/kernel.elf",
+    "kernel_sha256": "9965f2c8b60d0653baa68557a3d5ceba9a41d5d3394097bba72d49f83581a6be",
+    "diagnostic_kernel_sha256": "96de7671730212504a3b79d4b7435769618c7481cbfbae0e5b97a29f6b3058f4",
+    "booter_sha256": "607ff9cec18122e651f5d03e0d239f0c6095169209c21947db479c93ffe193ca",
+    "sources_sha256": "29e4b2effeb4178e00aeffb4f97f1aba648c3f6a755f52b76f53eaa1766ed341"
+  },
+  "changes": [
+    "PWM tone range math uses the BCM2711 54 MHz oscillator.",
+    "zstatus prints the Pi audio diagnostic last and unconditionally, including target_pi, so a missing Pi platform flag is visible.",
+    "The diagnostic reports initialization stage, beep/tone counters, GPIO mux, clock manager, PWM control, range, and duty registers.",
+    "The diagnostic kernel accepts the lowercase paudio command for a direct register snapshot."
+  ],
+  "verified": [
+    "make pi-desktop-sd completed and scripts/check-pi-desktop-image.py passed for build/pi-desktop-esp.",
+    "The built kernel contains the paudio command; its SHA-256 is 9965f2c8b60d0653baa68557a3d5ceba9a41d5d3394097bba72d49f83581a6be.",
+    "On 2026-11-08, ZEALPI boot/kernel.elf matched the candidate hash byte-for-byte; the card boot-chain checker passed. The card's STAGED-PI-AUDIO-PAUDIO-20261108.json records the prior kernel backup."
+  ],
+  "not_verified": [
+    "Physical Pi 4B analog audio output through the 3.5 mm jack.",
+    "HDMI audio, PCM, and music playback on Pi remain unimplemented; this backend currently targets simple PWM tones through analog output."
+  ],
+  "manual_check": {
+    "commands": [
+      "paudio",
+      "zc Beep(60,FALSE);",
+      "paudio",
+      "zstatus"
+    ],
+    "expected": "Before Beep, paudio reports target_pi=1, ready=1, and init_stage=9; after Beep, beep_calls increments and the last note/hz plus PWM registers are reported. Test audible output through the Pi 3.5 mm jack; HDMI audio is not implemented."
+  },
+  "scope_note": "The candidate kernel is staged and hash-verified on ZEALPI. Physical Pi 4B analog audio acceptance remains open."
+}

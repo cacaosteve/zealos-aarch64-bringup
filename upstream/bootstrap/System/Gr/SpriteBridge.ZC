@@ -40,12 +40,16 @@ I64 sprite_debug_type_mask_failures = 0;
 I64 sprite_debug_type_mask_last_type = 0;
 I64 sprite_debug_type_mask_last_size = 0;
 
-I64 SpriteElemSize(U8 *p, I64 type)
+I64 SpriteElemSizeRaw(U8 *p, I64 type)
 {
     I64 size;
     I32 a, b, packed_a, packed_b, aligned_a, aligned_b;
     U8 ch;
     Bool aligned_header;
+
+    if (type < 0 || type >= SPT_TYPES_NUM)
+        return -1;
+    size = sprite_elem_base_sizes[type];
 
     // Use the pinned base-size table. Embedded sprite streams are tightly
     // packed: CSpritePtPt is 17 bytes and CSpriteNumU8s is 5 bytes, even when
@@ -53,44 +57,44 @@ I64 SpriteElemSize(U8 *p, I64 type)
     // MemCopy so the guest compiler cannot synthesize unaligned loads.
     if (type == SPT_COLOR || type == SPT_DITHER_COLOR ||
             type == SPT_THICK || type == SPT_PLANAR_SYMMETRY)
-        return sprite_elem_base_sizes[type];
+        return size;
     if (type == SPT_TRANSFORM_ON || type == SPT_TRANSFORM_OFF)
-        return sprite_elem_base_sizes[type];
+        return size;
     if (type == SPT_SHIFT || type == SPT_PT ||
             type == SPT_FLOOD_FILL || type == SPT_FLOOD_FILL_NOT)
-        return sprite_elem_base_sizes[type];
+        return size;
     if (type == SPT_LINE || type == SPT_RECT || type == SPT_ARROW)
-        return sprite_elem_base_sizes[type];
+        return size;
     if (type == SPT_ROTATED_RECT)
-        return sprite_elem_base_sizes[type];
+        return size;
     if (type == SPT_CIRCLE)
-        return sprite_elem_base_sizes[type];
+        return size;
     if (type == SPT_ELLIPSE)
-        return sprite_elem_base_sizes[type];
+        return size;
     if (type == SPT_POLYGON)
-        return sprite_elem_base_sizes[type];
+        return size;
     if (type == SPT_POLYLINE || type == SPT_BSPLINE2 ||
             type == SPT_BSPLINE2_CLOSED || type == SPT_BSPLINE3 ||
             type == SPT_BSPLINE3_CLOSED) {
-        MemCopy(&a, p + 4, sizeof(I32));
+        MemCopy(&a, p + 1, sizeof(I32));
         if (a < 0 || a > 1048576)
             return -1;
         if (type == SPT_POLYLINE)
-            return sprite_elem_base_sizes[type] + a * 8;
-        return sprite_elem_base_sizes[type] + a * 12;
+            return size + a * 8;
+        return size + a * 12;
     }
     if (type == SPT_POLYPT) {
-        MemCopy(&a, p + 4, sizeof(I32));
+        MemCopy(&a, p + 1, sizeof(I32));
         if (a < 0 || a > 1048576)
             return -1;
-        return sprite_elem_base_sizes[type] + (a * 3 + 7) / 8;
+        return size + (a * 3 + 7) / 8;
     }
     if (type == SPT_BITMAP) {
         MemCopy(&a, p + 9, sizeof(I32));
         MemCopy(&b, p + 13, sizeof(I32));
         if (a < 0 || a > I32_MAX - 7 || b < 0 || b > 1048576)
             return -1;
-        return sprite_elem_base_sizes[type] + ((a + 7) & ~7) * b;
+        return size + ((a + 7) & ~7) * b;
     }
     if (type == SPT_MESH || type == SPT_SHIFTABLE_MESH) {
         aligned_header = p[1] == 0 && p[2] == 0 && p[3] == 0;
@@ -148,6 +152,335 @@ I64 SpriteElemSize(U8 *p, I64 type)
     return -1;
 }
 
+public I64 SpriteElemSize(CSprite *sprite)
+{//Keep the upstream one-argument API for sprite documents and apps.
+    if (!sprite)
+        return -1;
+    // A CSprite pointer addresses the queue header; the encoded element begins
+    // at its zero-sized `start` marker. Keep raw-size parsing based at the
+    // element bytes, as SpriteTypeMask does when it walks an embedded stream.
+    return SpriteElemSizeRaw(sprite(U8 *) + offset(CSprite.start),
+                             sprite->type & SPG_TYPE_MASK);
+}
+
+U8 *SpriteColor2Str(U8 *buf, CColorROPU32 color)
+{//Provide the color description used by the stock sprite code viewer.
+    *buf = 0;
+    if (color.c0.rop & ROPBF_TWO_SIDED)
+        CatPrint(buf, "TWO|");
+    if (color.c0.rop & ROPBF_HALF_RANGE_COLOR)
+        CatPrint(buf, "HALF|");
+    if (0 <= color.c0.color < 16)
+        CatPrint(buf, DefineSub(color.c0.color, "ST_COLORS"));
+    else if (color.c0.color == TRANSPARENT)
+        CatPrint(buf, "TRANSPARENT");
+    else
+        CatPrint(buf, "INVALID");
+    if (color & ROPF_DITHER)
+    {
+        CatPrint(buf, "/");
+        if (color.c1.rop & ROPBF_TWO_SIDED)
+            CatPrint(buf, "TWO|");
+        if (color.c1.rop & ROPBF_HALF_RANGE_COLOR)
+            CatPrint(buf, "HALF|");
+        if (0 <= color.c1.color < 16)
+            CatPrint(buf, DefineSub(color.c1.color, "ST_COLORS"));
+        else if (color.c1.color == TRANSPARENT)
+            CatPrint(buf, "TRANSPARENT");
+        else
+            CatPrint(buf, "INVALID");
+    }
+    return buf;
+}
+
+public U8 *SpriteElem2Summary(CSprite *tmpg)
+{//Match the upstream sprite-text demo while using the ARM64 sprite bridge.
+    U8 buf[STR_LEN], buf2[STR_LEN];
+    I32 *ptr;
+
+    StrPrint(buf, "%Z", tmpg->type & SPG_TYPE_MASK,
+             "ST_SPRITE_ELEM_TYPES");
+    switch (tmpg->type & SPG_TYPE_MASK)
+    {
+        case SPT_COLOR:
+            CatPrint(buf, " %s", SpriteColor2Str(buf2, tmpg->c.color));
+            break;
+        case SPT_DITHER_COLOR:
+            CatPrint(buf, " %s", SpriteColor2Str(buf2,
+                    ROPF_DITHER | tmpg->d.dither_color.u8[0] |
+                    tmpg->d.dither_color.u8[1] << COLORROP_BITS));
+            break;
+        case SPT_PT:
+        case SPT_FLOOD_FILL:
+        case SPT_FLOOD_FILL_NOT:
+        case SPT_SHIFT:
+            CatPrint(buf, " (%d,%d)", tmpg->p.x1, tmpg->p.y1);
+            break;
+        case SPT_LINE:
+        case SPT_ARROW:
+        case SPT_PLANAR_SYMMETRY:
+        case SPT_RECT:
+        case SPT_ROTATED_RECT:
+            CatPrint(buf, " (%d,%d),(%d,%d)", tmpg->pp.x1, tmpg->pp.y1,
+                     tmpg->pp.x2, tmpg->pp.y2);
+            break;
+        case SPT_CIRCLE:
+            CatPrint(buf, " (%d,%d):%dR", tmpg->pr.x1, tmpg->pr.y1,
+                     tmpg->pr.radius);
+            break;
+        case SPT_THICK:
+            CatPrint(buf, " %d", tmpg->t.thick);
+            break;
+        case SPT_TEXT:
+        case SPT_TEXT_BOX:
+        case SPT_TEXT_DIAMOND:
+            CatPrint(buf, " %d,%d:%-16t$$Q", tmpg->ps.x1, tmpg->ps.y1,
+                     tmpg->ps.st);
+            break;
+        case SPT_POLYLINE:
+        case SPT_POLYPT:
+            ptr = &tmpg->npu.x;
+            CatPrint(buf, " %d (%d,%d)", tmpg->npu.num, ptr[0], ptr[1]);
+            break;
+        case SPT_ELLIPSE:
+        case SPT_POLYGON:
+        case SPT_BITMAP:
+            CatPrint(buf, " (%d,%d):%dW,%dH", tmpg->pwhu.x1,
+                     tmpg->pwhu.y1, tmpg->pwhu.width, tmpg->pwhu.height);
+            break;
+        case SPT_BSPLINE2:
+        case SPT_BSPLINE3:
+        case SPT_BSPLINE2_CLOSED:
+        case SPT_BSPLINE3_CLOSED:
+            CatPrint(buf, " %d", tmpg->nu.num);
+            break;
+        case SPT_MESH:
+            CatPrint(buf, " %dV,%dT", tmpg->mu.vertex_count,
+                     tmpg->mu.tri_count);
+            break;
+        case SPT_SHIFTABLE_MESH:
+            CatPrint(buf, " %dV,%dT", tmpg->pmu.vertex_count,
+                     tmpg->pmu.tri_count);
+            break;
+    }
+    return StrNew(buf);
+}
+
+U0 SpriteElem2Code(CDoc *doc, CSprite *sprite)
+{//Port the pinned SpriteCode.ZC source formatter to ARM64 sprite streams.
+    U8 buf[STR_LEN], *packed;
+    I32 *ptr;
+    CD3I32 *point;
+    I64 type = sprite->type & SPG_TYPE_MASK;
+    I64 i, j, k, col, bit, value, width_internal;
+
+    if (!doc)
+        doc = DocPut;
+    DocPrint(doc, "%Z", type, "ST_SPRITE_ELEM_CODES");
+    switch (type)
+    {
+        case SPT_COLOR:
+            DocPrint(doc, "{%s}", SpriteColor2Str(buf, sprite->c.color));
+            break;
+        case SPT_DITHER_COLOR:
+            DocPrint(doc, "{%s}", SpriteColor2Str(buf,
+                    ROPF_DITHER | sprite->d.dither_color.u8[0] |
+                    sprite->d.dither_color.u8[1] << COLORROP_BITS));
+            break;
+        case SPT_TRANSFORM_ON:
+            DocPrint(doc, "{ON}");
+            break;
+        case SPT_TRANSFORM_OFF:
+            DocPrint(doc, "{OFF}");
+            break;
+        case SPT_THICK:
+            DocPrint(doc, "{%d}", sprite->t.thick);
+            break;
+        case SPT_LINE:
+        case SPT_ARROW:
+        case SPT_PLANAR_SYMMETRY:
+            DocPrint(doc, "{(%d,%d),(%d,%d)}", sprite->pp.x1,
+                     sprite->pp.y1, sprite->pp.x2, sprite->pp.y2);
+            break;
+        case SPT_RECT:
+            DocPrint(doc, "{(%d,%d):(%d,%d)}", sprite->pp.x1,
+                     sprite->pp.y1, sprite->pp.x2 - sprite->pp.x1,
+                     sprite->pp.y2 - sprite->pp.y1);
+            break;
+        case SPT_ROTATED_RECT:
+            DocPrint(doc, "{(%d,%d):(%d,%d),%0.4f}", sprite->ppa.x1,
+                     sprite->ppa.y1, sprite->ppa.x2 - sprite->ppa.x1,
+                     sprite->ppa.y2 - sprite->ppa.y1,
+                     180 / π * Wrap(sprite->ppa.angle));
+            break;
+        case SPT_CIRCLE:
+            DocPrint(doc, "{(%d,%d):%d}", sprite->pr.x1, sprite->pr.y1,
+                     sprite->pr.radius);
+            break;
+        case SPT_ELLIPSE:
+            DocPrint(doc, "{(%d,%d):(%d,%d),%0.4f}", sprite->pwha.x1,
+                     sprite->pwha.y1, sprite->pwha.width, sprite->pwha.height,
+                     180 / π * Wrap(sprite->pwha.angle));
+            break;
+        case SPT_POLYGON:
+            DocPrint(doc, "{%d,(%d,%d):(%d,%d),%0.4f}",
+                     sprite->pwhas.sides, sprite->pwhas.x1,
+                     sprite->pwhas.y1, sprite->pwhas.width,
+                     sprite->pwhas.height,
+                     180 / π * Wrap(sprite->pwhas.angle));
+            break;
+        case SPT_PT:
+        case SPT_SHIFT:
+        case SPT_FLOOD_FILL:
+            DocPrint(doc, "{(%d,%d)}", sprite->p.x1, sprite->p.y1);
+            break;
+        case SPT_FLOOD_FILL_NOT:
+            DocPrint(doc, "{(%d,%d),TRUE}", sprite->p.x1, sprite->p.y1);
+            break;
+        case SPT_TEXT:
+        case SPT_TEXT_BOX:
+        case SPT_TEXT_DIAMOND:
+            DocPrint(doc, "{(%d,%d),\"%Q\"}", sprite->ps.x1,
+                     sprite->ps.y1, sprite->ps.st);
+            break;
+        case SPT_POLYLINE:
+            ptr = &sprite->nu.u;
+            DocPrint(doc, "{");
+            for (i = 0; i < sprite->nu.num; i++, ptr += 2)
+            {
+                DocPrint(doc, "(%d,%d)", ptr[0], ptr[1]);
+                if (i + 1 < sprite->nu.num)
+                    DocPrint(doc, ",");
+                if ((i & 3) == 3 && i + 1 < sprite->nu.num)
+                    DocPrint(doc, "\n");
+            }
+            DocPrint(doc, "}");
+            break;
+        case SPT_BSPLINE2:
+        case SPT_BSPLINE3:
+        case SPT_BSPLINE2_CLOSED:
+        case SPT_BSPLINE3_CLOSED:
+            ptr = &sprite->nu.u;
+            DocPrint(doc, "{");
+            for (i = 0; i < sprite->nu.num; i++, ptr += 3)
+            {
+                DocPrint(doc, "(%d,%d,%d)", ptr[0], ptr[1], ptr[2]);
+                if (i + 1 < sprite->nu.num)
+                    DocPrint(doc, ",");
+                if ((i & 3) == 3 && i + 1 < sprite->nu.num)
+                    DocPrint(doc, "\n");
+            }
+            if (type == SPT_BSPLINE2 || type == SPT_BSPLINE3)
+                DocPrint(doc, ",FALSE}");
+            else
+                DocPrint(doc, ",TRUE}");
+            break;
+        case SPT_POLYPT:
+            DocPrint(doc, "{(%d,%d),", sprite->npu.x, sprite->npu.y);
+            packed = &sprite->npu.u;
+            col = 16;
+            for (i = 0; i < sprite->npu.num; i++)
+            {
+                bit = i * 3;
+                value = packed[bit >> 3] >> (bit & 7);
+                if ((bit & 7) > 5)
+                    value |= packed[(bit >> 3) + 1] << (8 - (bit & 7));
+                DocPrint(doc, "%d", value & 7);
+                if (++col >= 64 && i + 1 < sprite->npu.num)
+                {
+                    DocPrint(doc, "\n");
+                    col = 0;
+                }
+            }
+            DocPrint(doc, "}");
+            break;
+        case SPT_BITMAP:
+            DocPrint(doc, "{(%d,%d):(%d,%d),\n", sprite->pwhu.x1,
+                     sprite->pwhu.y1, sprite->pwhu.width,
+                     sprite->pwhu.height);
+            width_internal = (sprite->pwhu.width + 7) & ~7;
+            if (width_internal < 80)
+                k = width_internal;
+            else
+                k = 64;
+            packed = &sprite->pwhu.u;
+            col = 0;
+            for (j = 0; j < sprite->pwhu.height; j++)
+                for (i = 0; i < width_internal; i++, packed++)
+                {
+                    if (i >= sprite->pwhu.width)
+                        DocPrint(doc, "_");
+                    else if (*packed < 16)
+                        DocPrint(doc, "%X", *packed);
+                    else
+                        DocPrint(doc, " ");
+                    if (++col >= k &&
+                            (i + 1 < width_internal ||
+                             j + 1 < sprite->pwhu.height))
+                    {
+                        DocPrint(doc, "\n");
+                        col = 0;
+                    }
+                }
+            DocPrint(doc, "}");
+            break;
+        case SPT_MESH:
+            DocPrint(doc, "{FALSE,");
+            point = &sprite->mu.u;
+            col = 0;
+            for (i = 0; i < sprite->mu.vertex_count; i++, point++)
+            {
+                DocPrint(doc, "(%d,%d,%d)", point->x, point->y, point->z);
+                if (i + 1 < sprite->mu.vertex_count)
+                    DocPrint(doc, ",");
+                if (++col == 4)
+                {
+                    DocPrint(doc, "\t//%d\n", i);
+                    col = 0;
+                }
+            }
+            DocPrint(doc, ":/* %d triangles */", sprite->mu.tri_count);
+            DocPrint(doc, "}");
+            break;
+        case SPT_SHIFTABLE_MESH:
+            DocPrint(doc, "{TRUE,(%d,%d,%d):", sprite->pmu.x,
+                     sprite->pmu.y, sprite->pmu.z);
+            point = &sprite->pmu.u;
+            col = 1;
+            for (i = 0; i < sprite->pmu.vertex_count; i++, point++)
+            {
+                DocPrint(doc, "(%d,%d,%d)", point->x, point->y, point->z);
+                if (i + 1 < sprite->pmu.vertex_count)
+                    DocPrint(doc, ",");
+                if (++col == 4)
+                {
+                    DocPrint(doc, "\t//%d\n", i);
+                    col = 0;
+                }
+            }
+            DocPrint(doc, ":/* %d triangles */", sprite->pmu.tri_count);
+            DocPrint(doc, "}");
+            break;
+        default:
+            DocPrint(doc, "{/* unknown sprite element %d */}", type);
+            break;
+    }
+    DocPrint(doc, ";\n");
+}
+
+public U0 Sprite2Code(CDoc *doc=NULL, U8 *elems)
+{//Render the embedded sprite stream as editable source code.
+    CSprite *sprite = elems - offset(CSprite.start);
+
+    if (!doc)
+        doc = DocPut;
+    while (sprite->type & SPG_TYPE_MASK)
+    {
+        SpriteElem2Code(doc, sprite);
+        sprite(U8 *) += SpriteElemSize(sprite);
+    }
+}
+
 I64 SpriteTypeMask(U8 *elems)
 {
     I64 result = 0, records = 0, size, type;
@@ -169,7 +502,7 @@ I64 SpriteTypeMask(U8 *elems)
             sprite_debug_type_mask_last_size = -1;
             return 1 << SPT_TYPES_NUM;
         }
-        size = SpriteElemSize(p, type);
+        size = SpriteElemSizeRaw(p, type);
         if (size < 1 || size > 16777216)
         {
             sprite_debug_type_mask_failures++;

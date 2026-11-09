@@ -1,0 +1,29 @@
+{
+  "date": "2026-11-02",
+  "target": "QEMU PCI ARM64 graphical guest",
+  "purpose": "Ensure compile-only Demo source catalog probes reach the source loop instead of exiting through the runtime Carry probe tail.",
+  "change": "scripts/check-compat.py gates the generic Demo terminal-recovery exit on the runtime demo flags that use it.",
+  "checks": [
+    {
+      "command": "python3 scripts/check-compat.py --probe-demo-source-catalog --demo-source-path /Demo/Print.ZC",
+      "result": "pass",
+      "evidence": "COMPILES /Demo/Print.ZC; Demo source compile sweep: 1/1 compiled"
+    },
+    {
+      "command": "python3 scripts/check-compat.py --probe-demo-source-catalog --demo-source-path /Demo/Lectures/PCIInterrupts.ZC",
+      "result": "blocked_at_source_compile",
+      "evidence": "ERR:/Demo/Lectures/PCIInterrupts.ZC:11:11 Unknown symbol 'interrupt'."
+    },
+    {
+      "command": "python3 scripts/check-compat.py --probe-demo-source-catalog --demo-source-path /Demo/AcctExample/TOS/MakeTOS.ZC",
+      "result": "probe_fault_before_compile_result",
+      "evidence": "Guest synchronous fault in BootstrapStrLen while setting up the TOS source-specific dependency context; no compile result was produced."
+    },
+    {
+      "command": "python3 scripts/check-compat.py --probe-demo-source-catalog --demo-source-path /Demo/AcctExample/TOS/TOSDistro.ZC",
+      "result": "probe_fault_before_compile_result",
+      "evidence": "Guest synchronous fault in BootstrapStrLen while setting up the TOS source-specific dependency context; no compile result was produced."
+    }
+  ],
+  "scope_note": "These targeted checks validate catalog control flow and the named source probes only. They do not replace the full 206-source sweep or change its 201/206 compile inventory."
+}

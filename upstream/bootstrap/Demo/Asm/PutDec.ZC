@@ -20,7 +20,7 @@ U0 PutDecU64(U64 value)
 U0 DoIt()
 {
 	PutDecU64(122333221);
-	'\n';
+	Print("\n");
 }
 
 DoIt;

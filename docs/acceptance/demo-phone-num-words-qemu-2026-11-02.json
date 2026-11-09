@@ -1,0 +1,18 @@
+{
+  "date": "2026-11-02",
+  "command": "python3 scripts/check-compat.py --pci --probe-demo-phone-num-words",
+  "target": "QEMU PCI graphical terminal",
+  "result": "pass",
+  "program": "/Demo/PhoneNumWords.ZC",
+  "source_path": "upstream/pinned/Demo/PhoneNumWords.ZC",
+  "source_sha256": "3bcd1533db0a4f82c5a76f26513cacc0b39f21e5c5acff2785c4a5c14ecbcb08",
+  "verified": [
+    "Program prompts for a phone number in the graphical terminal",
+    "Input 43556 visibly returns the bundled dictionary match Hello",
+    "Enter at the next prompt exits the program cleanly",
+    "40+2 evaluates as 42 after recovery and zstatus reports failed=0"
+  ],
+  "kernel_sha256": "4daaabe6cc3e9e21bfe3b17b3671c782206d4977ab1bbca62b00f24034d32197",
+  "iso_sha256": "0b03196016aa2c6192ce390675a5e141a641a99d30cc1c1675d5d7340202de3f",
+  "scope_note": "Automated QEMU evidence only; live UTM and physical Pi behavior are not established."
+}

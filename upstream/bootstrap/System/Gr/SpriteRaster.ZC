@@ -28,6 +28,7 @@ I64 sprite_debug_mesh_last_result = 0;
 I64 sprite_debug_mesh_last_work = 0;
 I64 sprite_debug_mesh_last_color = 0;
 I64 sprite_debug_mesh_last_lit_color = 0;
+I64 sprite_debug_mesh_lighting_present = 0;
 I64 sprite_debug_mesh_raw_color_mask = 0;
 I64 sprite_debug_mesh_lit_color_mask = 0;
 I64 sprite_debug_mesh_pixel_color_mask = 0;
@@ -1588,7 +1589,7 @@ I64 SpriteMesh0(CDC *dc, U8 *sprite, I64 base_x, I64 base_y, I64 base_z,
     U8 *vertices, *triangles, *triangle_record;
     I64 old_color;
     U8 *clip_counts;
-    Bool perspective_transform;
+    Bool perspective_transform, extents_only;
 
     sprite_debug_mesh_calls++;
     sprite_debug_mesh_last_vertices = 0;
@@ -1598,9 +1599,18 @@ I64 SpriteMesh0(CDC *dc, U8 *sprite, I64 base_x, I64 base_y, I64 base_z,
     sprite_debug_mesh_last_work = 0;
     sprite_debug_mesh_last_color = 0;
     sprite_debug_mesh_last_lit_color = 0;
+    sprite_debug_mesh_lighting_present = dc && dc->lighting != NULL;
     sprite_debug_mesh_raw_color_mask = 0;
     sprite_debug_mesh_lit_color_mask = 0;
     sprite_debug_mesh_pixel_color_mask = 0;
+    // SpriteExtents uses an intentionally huge, bitmap-free DCF_DONT_DRAW
+    // context and centers the sprite near I32_MAX/2. Preserve the normal
+    // bounded mesh coordinates for drawing, but allow that known extents-only
+    // translation so GrPlot can record the sprite bounds before discarding
+    // the pixel write.
+    extents_only = dc && !dc->body &&
+            (dc->flags & (DCF_RECORD_EXTENTS | DCF_DONT_DRAW)) ==
+            (DCF_RECORD_EXTENTS | DCF_DONT_DRAW);
     if ((sprite[0] & 0x7F) == 24)
     {
         // GrModels serializes the canonical packed mesh header immediately
@@ -1686,8 +1696,13 @@ I64 SpriteMesh0(CDC *dc, U8 *sprite, I64 base_x, I64 base_y, I64 base_z,
         tx = base_x + vx;
         ty = base_y + vy;
         tz = base_z + vz;
-        if (SpriteAbsI64(tx) > 100000 || SpriteAbsI64(ty) > 100000 ||
-                SpriteAbsI64(tz) > 100000)
+        if ((!extents_only &&
+                (SpriteAbsI64(tx) > 100000 || SpriteAbsI64(ty) > 100000 ||
+                SpriteAbsI64(tz) > 100000)) ||
+                (extents_only &&
+                (tx < I32_MIN || tx > I32_MAX ||
+                ty < I32_MIN || ty > I32_MAX ||
+                tz < I32_MIN || tz > I32_MAX)))
         {
             SpriteMeshFree0(points, mesh_points, clip_tri_points, clip_counts);
             return -1;
@@ -1713,11 +1728,28 @@ I64 SpriteMesh0(CDC *dc, U8 *sprite, I64 base_x, I64 base_y, I64 base_z,
                 return -1;
             }
         }
+        // The mesh rasterizer fills triangles directly and does not pass
+        // their vertices through GrPlot. SpriteExtents therefore needs the
+        // projected mesh vertices recorded here; otherwise its sentinel
+        // bounds survive and callers such as Wenceslas compute invalid
+        // sprite placement coordinates.
+        if (extents_only)
+        {
+            if (tx < dc->min_x) dc->min_x = tx;
+            if (tx > dc->max_x) dc->max_x = tx;
+            if (ty < dc->min_y) dc->min_y = ty;
+            if (ty > dc->max_y) dc->max_y = ty;
+        }
         // The upstream splash anchors its 3D mesh at GR_Z_ALL (half the
         // signed I32 depth range). Screen coordinates stay tightly bounded,
         // while transformed depth must retain that valid large offset for
         // the depth buffer instead of being rejected by the 2D coordinate cap.
-        if (SpriteAbsI64(tx) > 1000000 || SpriteAbsI64(ty) > 1000000 ||
+        if ((!extents_only &&
+                (SpriteAbsI64(tx) > 1000000 ||
+                SpriteAbsI64(ty) > 1000000)) ||
+                (extents_only &&
+                (tx < I32_MIN || tx > I32_MAX ||
+                ty < I32_MIN || ty > I32_MAX)) ||
                 (!perspective_transform && (tz < I32_MIN || tz > I32_MAX)))
         {
             SpriteMeshFree0(points, mesh_points, clip_tri_points, clip_counts);
@@ -2204,12 +2236,12 @@ U0 SpriteQuadLines0(CDC *dc, I64 *x, I64 *y)
     }
 }
 
-I64 SpriteTextSize0(U8 *sprite)
+I64 SpriteTextSize0(U8 *sprite, I64 text_offset)
 {
     I64 scan_pos;
     U8 ch;
 
-    for (scan_pos = 12; scan_pos < 4108; scan_pos++)
+    for (scan_pos = text_offset; scan_pos < text_offset + 4096; scan_pos++)
     {
         MemCopy(&ch, sprite + scan_pos, sizeof(U8));
         if (!ch)
@@ -3670,14 +3702,14 @@ fill_done:
     return work;
 }
 
-U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
+U0 BootstrapSprite3Raster(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite, Bool packed)
 {
     I64 row, col, stride, old_color, old_thick, old_x, old_y, size, records, pixel_budget;
     I64 mesh_work, line_result;
     I64 symmetry_x1, symmetry_y1, symmetry_x2, symmetry_y2;
     I64 old_flags, screen_x1, screen_y1, screen_x2, screen_y2;
-    Bool symmetry_enabled, transform_enabled, projective_transform;
-    I64 text_len;
+    Bool symmetry_enabled, transform_enabled, projective_transform, extents_only;
+    I64 text_len, coord_offset = 4, dither_offset = 2;
     I64 circle_x, circle_y, circle_err;
     I64 poly_i, poly_x1, poly_y1, poly_dx, poly_dy, poly_work, poly_total;
     I64 polypt_bit, polypt_code;
@@ -3693,6 +3725,11 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
     old_color = dc->color;
     old_thick = dc->thick;
     old_flags = dc->flags;
+    if (packed)
+        coord_offset = dither_offset = 1;
+    extents_only = !dc->body &&
+            (dc->flags & (DCF_RECORD_EXTENTS | DCF_DONT_DRAW)) ==
+            (DCF_RECORD_EXTENTS | DCF_DONT_DRAW);
     // Bool is an 8-bit value; normalize the flag mask before storing it.
     transform_enabled = (dc->flags & DCF_TRANSFORMATION) != 0;
     old_x = old_y = 0;
@@ -3708,6 +3745,9 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
         type &= 0x7F; // SPG_TYPE_MASK
         if (!type) // SPT_END
             break;
+        if (packed && type != 1 && type != 2 && type != 12 && type != 23 &&
+                type != 27 && type != 28 && type != 29)
+            break; // Only read records whose packed layout is handled below.
         if (type == 15) // SPT_ELLIPSE, bounded arbitrary-angle outline
         {
             MemCopy(&x1, sprite + 4, sizeof(I32));
@@ -3811,10 +3851,10 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
             // The record is a packed CColorROPU16: first color in the low
             // byte, second color in the high byte. GrPlot handles the
             // deterministic ROPBF_DITHER checkerboard mode.
-            MemCopy(&width, sprite + 2, sizeof(U16));
+            MemCopy(&width, sprite + dither_offset, sizeof(U16));
             dc->color = (dc->color & ~0x00FF00FF) | 0x40000000 |
                     (width & 0xFF) | ((width & 0xFF00) << 8);
-            size = 4;
+            size = dither_offset + sizeof(U16);
         }
         else if (type == 3) // SPT_THICK
         {
@@ -3915,18 +3955,41 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
             MemCopy(&y1, sprite + 8, sizeof(I32));
             MemCopy(&x2, sprite + 12, sizeof(I32));
             MemCopy(&y2, sprite + 16, sizeof(I32));
-            line_result = SpriteTransformLine0(dc, transform_enabled,
-                    x + old_x + x1, y + old_y + y1, z,
-                    x + old_x + x2, y + old_y + y2, z,
-                    &screen_x1, &screen_y1, &screen_x2, &screen_y2);
-            if (line_result > 0)
+            if (extents_only && !transform_enabled)
             {
-                BootstrapSpriteLine(dc, screen_x1, screen_y1, screen_x2, screen_y2);
-                if (symmetry_enabled)
-                    SpriteMirrorLine0(dc, screen_x1, screen_y1,
-                            screen_x2, screen_y2,
-                            symmetry_x1, symmetry_y1,
-                            symmetry_x2, symmetry_y2);
+                screen_x1 = x + old_x + x1;
+                screen_y1 = y + old_y + y1;
+                screen_x2 = x + old_x + x2;
+                screen_y2 = y + old_y + y2;
+                if (screen_x1 < I32_MIN || screen_x1 > I32_MAX ||
+                        screen_y1 < I32_MIN || screen_y1 > I32_MAX ||
+                        screen_x2 < I32_MIN || screen_x2 > I32_MAX ||
+                        screen_y2 < I32_MIN || screen_y2 > I32_MAX)
+                    break;
+                if (screen_x1 < dc->min_x) dc->min_x = screen_x1;
+                if (screen_x2 < dc->min_x) dc->min_x = screen_x2;
+                if (screen_y1 < dc->min_y) dc->min_y = screen_y1;
+                if (screen_y2 < dc->min_y) dc->min_y = screen_y2;
+                if (screen_x1 > dc->max_x) dc->max_x = screen_x1;
+                if (screen_x2 > dc->max_x) dc->max_x = screen_x2;
+                if (screen_y1 > dc->max_y) dc->max_y = screen_y1;
+                if (screen_y2 > dc->max_y) dc->max_y = screen_y2;
+            }
+            else
+            {
+                line_result = SpriteTransformLine0(dc, transform_enabled,
+                        x + old_x + x1, y + old_y + y1, z,
+                        x + old_x + x2, y + old_y + y2, z,
+                        &screen_x1, &screen_y1, &screen_x2, &screen_y2);
+                if (line_result > 0)
+                {
+                    BootstrapSpriteLine(dc, screen_x1, screen_y1, screen_x2, screen_y2);
+                    if (symmetry_enabled)
+                        SpriteMirrorLine0(dc, screen_x1, screen_y1,
+                                screen_x2, screen_y2,
+                                symmetry_x1, symmetry_y1,
+                                symmetry_x2, symmetry_y2);
+                }
             }
             size = 20;
         }
@@ -3945,11 +4008,25 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
         }
         else if (type == 12) // SPT_RECT
         {
-            MemCopy(&x1, sprite + 4, sizeof(I32));
-            MemCopy(&y1, sprite + 8, sizeof(I32));
-            MemCopy(&x2, sprite + 12, sizeof(I32));
-            MemCopy(&y2, sprite + 16, sizeof(I32));
-            if (transform_enabled && SpritePerspectiveMatrix0(dc) &&
+            MemCopy(&x1, sprite + coord_offset, sizeof(I32));
+            MemCopy(&y1, sprite + coord_offset + 4, sizeof(I32));
+            MemCopy(&x2, sprite + coord_offset + 8, sizeof(I32));
+            MemCopy(&y2, sprite + coord_offset + 12, sizeof(I32));
+            if (extents_only && !transform_enabled && !symmetry_enabled)
+            {
+                if (x2 > x1 && y2 > y1)
+                {
+                    screen_x1 = x + old_x + x1;
+                    screen_y1 = y + old_y + y1;
+                    screen_x2 = x + old_x + x2 - 1;
+                    screen_y2 = y + old_y + y2 - 1;
+                    if (screen_x1 < dc->min_x) dc->min_x = screen_x1;
+                    if (screen_y1 < dc->min_y) dc->min_y = screen_y1;
+                    if (screen_x2 > dc->max_x) dc->max_x = screen_x2;
+                    if (screen_y2 > dc->max_y) dc->max_y = screen_y2;
+                }
+            }
+            else if (transform_enabled && SpritePerspectiveMatrix0(dc) &&
                     SpriteMatrixTransformDefault0(dc))
             {
                 size = SpritePerspectiveRect0(dc,
@@ -4032,7 +4109,7 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
                             symmetry_x1, symmetry_y1, symmetry_x2, symmetry_y2);
                 }
             }
-            size = 20;
+            size = coord_offset + 16;
         }
         else if (type == 14) // SPT_CIRCLE
         {
@@ -4296,28 +4373,41 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
             if (stride * height > 480000 - pixel_budget)
                 break;
             pixel_budget += stride * height;
-            for (row = 0; row < height; row++)
-                for (col = 0; col < width; col++)
-                {
-                    MemCopy(&pixel, sprite + 17 + row * stride + col, sizeof(U8));
-                    if (pixel != TRANSPARENT)
-                    {
-                        dc->color.c0 = pixel;
-                        SpritePlotTransform0(dc, transform_enabled,
-                                x + old_x + sprite_x + col,
-                                y + old_y + sprite_y + row, z);
-                    }
-                }
             size = 17 + stride * height;
+            if (extents_only && !transform_enabled)
+            {
+                screen_x1 = x + old_x + sprite_x;
+                screen_y1 = y + old_y + sprite_y;
+                screen_x2 = screen_x1 + width - 1;
+                screen_y2 = screen_y1 + height - 1;
+                if (screen_x1 < dc->min_x) dc->min_x = screen_x1;
+                if (screen_y1 < dc->min_y) dc->min_y = screen_y1;
+                if (screen_x2 > dc->max_x) dc->max_x = screen_x2;
+                if (screen_y2 > dc->max_y) dc->max_y = screen_y2;
+            }
+            else
+                for (row = 0; row < height; row++)
+                    for (col = 0; col < width; col++)
+                    {
+                        MemCopy(&pixel, sprite + 17 + row * stride + col, sizeof(U8));
+                        if (pixel != TRANSPARENT)
+                        {
+                            dc->color.c0 = pixel;
+                            SpritePlotTransform0(dc, transform_enabled,
+                                    x + old_x + sprite_x + col,
+                                    y + old_y + sprite_y + row, z);
+                        }
+                    }
         }
         else if (type == 27 || type == 28 || type == 29)
         {
-            MemCopy(&x1, sprite + 4, sizeof(I32));
-            MemCopy(&y1, sprite + 8, sizeof(I32));
-            size = SpriteTextSize0(sprite);
-            if (size < 13 || size > 4108)
+            U8 *text = sprite + coord_offset + 8;
+            MemCopy(&x1, sprite + coord_offset, sizeof(I32));
+            MemCopy(&y1, sprite + coord_offset + 4, sizeof(I32));
+            size = SpriteTextSize0(sprite, coord_offset + 8);
+            if (size < coord_offset + 9)
                 break;
-            text_len = size - 13; // exclude x/y and the terminating NUL
+            text_len = size - coord_offset - 9;
             // GrPutChar can touch at most one 8x8 glyph per input byte.
             // Reserve the full worst case before allowing any writes.
             if (text_len > 4095 || 64 * text_len > 480000 - pixel_budget)
@@ -4328,32 +4418,31 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
                 if (transform_enabled)
                 {
                     if (SpriteTextTransform0(dc, x + old_x + x1,
-                            y + old_y + y1, sprite + 12, text_len, z) < 0)
+                            y + old_y + y1, text, text_len, z) < 0)
                         break;
                 }
                 else
-                    GrPutS(dc, x + old_x + x1, y + old_y + y1, sprite + 12);
-                size = text_len + 13;
+                    GrPutS(dc, x + old_x + x1, y + old_y + y1, text);
             }
             else if (type == 28) // SPT_TEXT_BOX
             {
                 size = SpriteTextBox0(dc, x + old_x + x1,
-                        y + old_y + y1, sprite + 12, text_len,
+                        y + old_y + y1, text, text_len,
                         transform_enabled, z, 480000 - pixel_budget);
                 if (size < 0)
                     break;
                 pixel_budget += size;
-                size = text_len + 13;
+                size = coord_offset + 9 + text_len;
             }
             else // SPT_TEXT_DIAMOND
             {
                 size = SpriteTextDiamond0(dc, x + old_x + x1,
-                        y + old_y + y1, sprite + 12, text_len,
+                        y + old_y + y1, text, text_len,
                         transform_enabled, z, 480000 - pixel_budget);
                 if (size < 0)
                     break;
                 pixel_budget += size;
-                size = text_len + 13;
+                size = coord_offset + 9 + text_len;
             }
         }
         else
@@ -4364,4 +4453,14 @@ U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
     dc->thick = old_thick;
     dc->flags = dc->flags & ~(DCF_SYMMETRY | DCF_TRANSFORMATION) |
             old_flags & (DCF_SYMMETRY | DCF_TRANSFORMATION);
+}
+
+U0 Sprite3(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
+{
+    BootstrapSprite3Raster(dc, x, y, z, sprite, FALSE);
+}
+
+U0 Sprite3Packed(CDC *dc, I64 x, I64 y, I64 z, U8 *sprite)
+{//Packed colors, rectangles, bitmaps and text from the desktop's DolDoc icons.
+    BootstrapSprite3Raster(dc, x, y, z, sprite, TRUE);
 }

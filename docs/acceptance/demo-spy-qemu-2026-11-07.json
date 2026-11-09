@@ -1,0 +1,28 @@
+{
+  "date": "2026-11-07",
+  "command": "python3 scripts/check-compat.py --pci --probe-demo-spy",
+  "target": "AArch64 QEMU virt, PCI graphical terminal with serial command probe",
+  "result": "pass",
+  "programs": [
+    {
+      "program": "/Demo/Spy.ZC",
+      "source_path": "upstream/pinned/Demo/Spy.ZC",
+      "source_sha256": "bffc103dff71138571273e180972df5b7104f90f771ba73c053f520fb6c38872"
+    }
+  ],
+  "verified": [
+    "The Spy task list rendered in the graphical terminal.",
+    "StackRep rendered a visible report for the selected terminal task.",
+    "CallerRep rendered a visible report for the selected terminal task.",
+    "Spy exited back to the graphical terminal; 40+2 printed 42 and zstatus reported failed=0."
+  ],
+  "not_verified": [
+    "Live UTM behavior and physical Pi behavior."
+  ],
+  "kernel_sha256": "89111b7fb49ba1bfdea3e5c11ac417a8a95c77e5f1159c112e6020d3f292d7f9",
+  "source_bundle_sha256": "fef49e8770723bcacd347319051e5dbecfc648dee6f58a3b7caabd43138573e7",
+  "iso_sha256": "11406a456d7eb5215322cda16f113fbfbec0c9e876aec545e8ae96809725e434",
+  "scope_note": "Spy's upstream source compiled unchanged. ARM64 StackRep and CallerRep implementations are provided by the Debug.ZC compatibility overlay; this accepts the guest runtime path, not live UTM or Pi behavior.",
+  "log_sha256": "e5377c7242f8b5a86221dbc720e204ec554650cbd16671072063cb94e75c505d",
+  "log": "build/check-demo-dol-doc-pci.log"
+}

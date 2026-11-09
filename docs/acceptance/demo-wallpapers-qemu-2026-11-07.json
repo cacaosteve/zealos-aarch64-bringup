@@ -1,0 +1,43 @@
+{
+  "date": "2026-11-07",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "working_tree_changes_included": true,
+  "target": "AArch64 native ZealC running in PCI QEMU guest",
+  "tested_iso": "build/zealos-aarch64-hello.iso",
+  "tested_iso_sha256": "a315a3f08cbae3880cb0ae41e89e110b6cc7d63a13a84252c62fd4f7c57909b3",
+  "kernel_sha256": "aec909390e832524bef61259dc01fe8a1a48e90f6f954a75fbb06deb7c6b8b2b",
+  "command": "python3 scripts/check-compat.py --pci --quick --probe-demo-wallpapers",
+  "exit_code": 0,
+  "result": "pass",
+  "checks": [
+    {
+      "source": "/Demo/Graphics/WallPapers/WallPaperStars.ZC",
+      "method": "System Include with SysFile(path,FALSE)",
+      "result": "pass",
+      "evidence": "callback runs in sys_task; successive framebuffer captures differ (4307 pixels), proving animated scanout"
+    },
+    {
+      "source": "/Demo/Graphics/WallPapers/WallPaperFish.ZC",
+      "method": "System Include with SysFile(path,FALSE)",
+      "result": "pass",
+      "evidence": "callback changes visible framebuffer scanout (6250 pixels) while window manager remains live"
+    },
+    {
+      "check": "terminal recovery",
+      "result": "pass",
+      "evidence": "40+2 returned 42 after both callbacks were installed"
+    },
+    {
+      "check": "system status",
+      "result": "pass",
+      "evidence": "zstatus reported failed=0"
+    }
+  ],
+  "captures": [
+    "build/gui-demo-wallpaper-baseline.ppm",
+    "build/gui-demo-wallpaper-stars-first.ppm",
+    "build/gui-demo-wallpaper-stars-later.ppm",
+    "build/gui-demo-wallpaper-fish.ppm"
+  ],
+  "scope_note": "Automated PCI QEMU runtime evidence for the wallpaper callbacks and visible scanout. This does not establish live UTM or Raspberry Pi hardware behavior."
+}

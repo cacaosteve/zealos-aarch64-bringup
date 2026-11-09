@@ -20,7 +20,9 @@ def elf(path):
             assert size <= memory and off+size <= len(data)
             loads.append((va, va+memory, flags))
     assert any(lo <= entry < hi and flags & 1 for lo, hi, flags in loads)
-    assert max(hi for _, hi, _ in loads) < 512*1024*1024, 'oversized Pi kernel span'
+    # Keep the full 1 GiB minimum Pi 4B model viable: reserve at least 256 MiB
+    # for firmware, boot modules, and runtime headroom beyond the kernel span.
+    assert max(hi for _, hi, _ in loads) <= 768*1024*1024, 'oversized Pi kernel span'
     sections = [struct.unpack_from('<IIQQQQIIQQ', data, shoff+i*shent) for i in range(shnum)]
     names = set()
     for s in sections:

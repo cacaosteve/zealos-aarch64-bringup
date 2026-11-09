@@ -1,0 +1,2 @@
+// Reproduce the second project global from Compiler.PRJ for isolated source probes.
+CUAsmGlobals uasm;

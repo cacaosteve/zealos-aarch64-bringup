@@ -1,0 +1,22 @@
+{
+  "date": "2026-11-03",
+  "source_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "target": "AArch64 QEMU virt, PCI, graphical terminal",
+  "command": "python3 scripts/check-compat.py --probe-demo-battle-lines",
+  "source_path": "/Demo/Games/BattleLines.ZC",
+  "source_sha256": "4995133f4b92f5a9b17f8231a5340c92b37d4ffd97bc34c84e2e819abb0d2b44",
+  "result": "pass",
+  "checks": [
+    "ExeFile2 launched the pinned BattleLines source from the graphical terminal",
+    "The mouse wheel and attract/repel controls dialog rendered and was dismissed by clicking its visible OKAY button",
+    "Escape returned to the graphical terminal and 40+2 evaluated to 42",
+    "zstatus reported failed=0"
+  ],
+  "scope_note": "QEMU runtime acceptance for launch and exit recovery. Mouse-driven troop interaction was not exercised; this does not imply live UTM or Pi hardware acceptance.",
+  "artifacts": {
+    "build/zealos-aarch64-hello.iso": "d86fd810858d63b04884e259641e797228c28419401ab0746b022f8962515d03",
+    "scripts/check-compat.py": "5721580af4b759b2ea27c8dc14ef5d3c222e536d8c49721b9e86ce443cd12bad",
+    "build/check-demo-battle-lines-pci.log": "4a8692ec6e4b36673cd17da2d47458beb96a7c02f00317bd7e901c9ee85004a5"
+  },
+  "log": "build/check-demo-battle-lines-pci.log"
+}

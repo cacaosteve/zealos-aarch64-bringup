@@ -1,0 +1,115 @@
+{
+  "date": "2026-11-05",
+  "source_commit": "working tree",
+  "working_tree_changes_included": true,
+  "kernel_sha256": "d4dd0e1e3475043101ca6ed9430c3f6f64f675a96b94337289732d81db461fb5",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "f338afe96dcfefc5cbb317a6e6b0756f20620f1c0def4dee342636a6b110457f",
+  "compile_mode": "CCF_JUST_LOAD in the live booted ZealC kernel/system namespace; compile-only, not runtime acceptance",
+  "result": "partial pass",
+  "compiled_sources": [
+    "/System/AutoComplete/ACDictGen.ZC",
+    "/System/AutoComplete/ACFill.ZC",
+    "/System/AutoComplete/ACInit.ZC",
+    "/System/AutoComplete/ACTask.ZC",
+    "/System/AutoComplete/MakeAC.ZC",
+    "/System/Ctrls/CtrlsA.ZC",
+    "/System/Ctrls/CtrlsBttn.ZC",
+    "/System/Ctrls/CtrlsSlider.ZC",
+    "/System/Ctrls/MakeCtrls.ZC",
+    "/System/DolDoc/DocBin.ZC",
+    "/System/DolDoc/DocChar.ZC",
+    "/System/DolDoc/DocClipBoard.ZC",
+    "/System/DolDoc/DocCodeTools.ZC",
+    "/System/DolDoc/DocDblBuf.ZC",
+    "/System/DolDoc/DocEd.ZC",
+    "/System/DolDoc/DocExterns.ZC",
+    "/System/DolDoc/DocFile.ZC",
+    "/System/DolDoc/DocFind.ZC",
+    "/System/DolDoc/DocForm.ZC",
+    "/System/DolDoc/DocGet.ZC",
+    "/System/DolDoc/DocGr.ZC",
+    "/System/DolDoc/DocHighlight.ZC",
+    "/System/DolDoc/DocInit.ZC",
+    "/System/DolDoc/DocLink.ZC",
+    "/System/DolDoc/DocMacro.ZC",
+    "/System/DolDoc/DocNew.ZC",
+    "/System/DolDoc/DocPlain.ZC",
+    "/System/DolDoc/DocPopUp.ZC",
+    "/System/DolDoc/DocPutKey.ZC",
+    "/System/DolDoc/DocPutS.ZC",
+    "/System/DolDoc/DocRecalcLib.ZC",
+    "/System/DolDoc/DocRun.ZC",
+    "/System/DolDoc/DocTerm.ZC",
+    "/System/DolDoc/DocTree.ZC",
+    "/System/DolDoc/DocWidgetWiz.ZC",
+    "/System/God/GodBible.ZC",
+    "/System/God/GodDoodle.ZC",
+    "/System/God/GodExterns.ZC",
+    "/System/God/GodSong.ZC",
+    "/System/God/HolySpirit.ZC",
+    "/System/God/MakeGod.ZC",
+    "/System/Gr/GrBitMap.ZC",
+    "/System/Gr/GrComposites.ZC",
+    "/System/Gr/GrDC.ZC",
+    "/System/Gr/GrPalette.ZC",
+    "/System/Gr/GrScreen.ZC",
+    "/System/Gr/GrSpritePlot.ZC",
+    "/System/Gr/ScreenCast.ZC",
+    "/System/Gr/SpriteBitMap.ZC",
+    "/System/Gr/SpriteCode.ZC",
+    "/System/Gr/SpriteMesh.ZC",
+    "/System/Math/Tests/TestMat4.ZC",
+    "/System/Math/Tests/TestVec.ZC",
+    "/System/Sound.ZC"
+  ],
+  "blocked_sources": [
+    "/System/DolDoc/DocRecalc.ZC",
+    "/System/DolDoc/MakeDoc.ZC"
+  ],
+  "commands": [
+    {
+      "command": "Math test / AutoComplete / Controls source-context batches",
+      "result": "pass",
+      "exit_code": 0
+    },
+    {
+      "command": "DolDoc source-context batches, then isolated DocCodeTools with CompilerA/CompilerB headers",
+      "result": "partial pass",
+      "exit_code": 1,
+      "detail": "25 DolDoc sources reported SOURCE COMPILES in grouped batches; DocCodeTools compiled after loading the compiler headers. The other two paths faulted the guest while DocRecalc was rendering or resolving stock source/compiler context."
+    },
+    {
+      "command": "Graphics component source-context batches with CompilerA/CompilerB, GrDC/GrComposites, SpriteNew, and GrSpriteProbeContext",
+      "result": "pass",
+      "exit_code": 0,
+      "detail": "All 10 targeted graphics modules compiled with their actual dependent definitions loaded."
+    },
+    {
+      "command": "God and Sound aggregate source-context probe: tests/compat/StockGodCompile.ZC",
+      "result": "pass",
+      "exit_code": 0,
+      "detail": "Live CCF_JUST_LOAD probe compiled GodExterns, GodBible, HolySpirit, GodSong, GodDoodle, aggregate MakeGod, and Sound. The probe loads KernelC.HH, Gr.HH, Sound, and GodExterns in stock dependency order. The compile-only context defines ST_BIBLE_LINES to the value derived by GodBible startup because compile-only mode skips startup initializers. The probe exposed an unspaced nonzero integer case-range lexer bug (`3...7`); the shared lexer lookahead was fixed before this pass."
+    }
+  ],
+  "probe_diagnostics": {
+    "/System/DolDoc/DocRecalc.ZC": "guest synchronous fault during compile probe; FAR=0xb; trace: BootstrapStrLen -> StrNew -> DocRecalc. Underlying source compilation remains unverified.",
+    "/System/DolDoc/MakeDoc.ZC": "guest synchronous fault during compile probe; trace entered DocRecalc while compiling the aggregate MakeDoc module. Underlying source compilation remains unverified."
+  },
+  "scope_note": "Evidence is per-source SOURCE COMPILES output. Grouped batches may exit nonzero after earlier source paths have already compiled. Blocked entries indicate incomplete live compile evidence, not proof that the upstream source cannot compile.",
+  "god_sound_compile_probe": {
+    "source": "tests/compat/StockGodCompile.ZC",
+    "compiled_sources": [
+      "/System/God/GodBible.ZC",
+      "/System/God/GodDoodle.ZC",
+      "/System/God/GodExterns.ZC",
+      "/System/God/GodSong.ZC",
+      "/System/God/HolySpirit.ZC",
+      "/System/God/MakeGod.ZC",
+      "/System/Sound.ZC"
+    ],
+    "result": "pass",
+    "scope": "live ZealC CCF_JUST_LOAD compilation; compile evidence only, not runtime acceptance",
+    "lexer_regression": "unspaced integer case ranges beginning with nonzero digits now tokenize correctly; verified through GodDoodle.ZC."
+  }
+}

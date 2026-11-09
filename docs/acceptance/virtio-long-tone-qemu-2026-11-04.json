@@ -1,0 +1,15 @@
+{
+  "date": "2026-11-04",
+  "target": "QEMU AArch64 virt machine with PCI VirtIO sound and WAV audio backend",
+  "iso_sha256": "adf37d8477a18b60f24239520292197127ae7e3ca4f0b73ce4604a59507ec856",
+  "source": "tests/compat/VirtioSoundProbe.ZC",
+  "probe": "VirtioLongToneProbe, run as part of VirtioSoundSuiteProbe",
+  "command": "QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device -audiodev wav,id=sound0,path=/tmp/zeal-sound-suite-final.wav -device virtio-sound-pci,audiodev=sound0' python3 scripts/check-compat.py --probe-source-fast --probe-source tests/compat/VirtioSoundProbe.ZC --probe-source-call VirtioSoundSuiteProbe",
+  "result": "pass",
+  "checks": [
+    "The combined guest probe called the short Sound probe, normal Beep, busy Beep, a sustained Sound(60) with Sleep(1600), and stock Play; it returned 0x2a.",
+    "The QEMU WAV backend captured 251,370 stereo frames at 44.1 kHz (5.70 seconds); left and right channels matched, peak amplitude was 7,000, and 248,724 left-channel samples were nonzero.",
+    "The ISO booted, the probe compiled, the guest call completed, and the compatibility runner reset the compiler successfully."
+  ],
+  "scope_note": "The sustained-playback stall was caused by virtio-snd reading QueueNumMax as the active queue size: the driver capped only its local ring size and did not program the selected size in the device. The driver now writes and verifies QueueSize before enabling each queue. The combined sound paths pass in QEMU with the WAV backend. Audible output in live UTM and Raspberry Pi hardware remains unverified."
+}

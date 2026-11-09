@@ -1,0 +1,28 @@
+{
+  "date": "2026-11-02",
+  "command": "python3 scripts/check-compat.py --pci --probe-demo-word-search",
+  "target": "QEMU PCI graphical terminal",
+  "result": "pass",
+  "program": "/Demo/WordSearch.ZC",
+  "source_path": "upstream/pinned/Demo/WordSearch.ZC",
+  "source_sha256": "ba825ee9fa59bb2b2807483043b01d73cd8319eb0eee3e7fd59f2a92acf267b9",
+  "expected": [
+    "WordSearch displays its generated letter grid, simple search results and alphabetized dictionary matches",
+    "The application returns to the graphical terminal",
+    "A subsequent 40+2 expression returns 42 and zstatus reports failed=0"
+  ],
+  "observed": [
+    "The screen contained the randomized letter-grid/search output and more than 50 decoded dictionary words",
+    "After waiting for the upstream full dictionary scan, the graphical terminal accepted 40+2; and displayed ans=0x2A=42",
+    "zstatus reported failed=0"
+  ],
+  "evidence_artifacts": [
+    "build/gui-catalog-demo-word-search-output.txt",
+    "build/gui-catalog-demo-word-search-output.ppm",
+    "build/gui-catalog-demo-word-search-terminal-recovery.txt",
+    "build/gui-catalog-demo-word-search-terminal-recovery.ppm"
+  ],
+  "kernel_sha256": "128a98164a3c5940b88e8a401d06d441f57ffc87d7d061cea070b36e99160df3",
+  "iso_sha256": "f9b50081e2de125f878e7338aa8819fef27acdccddfbcfdc720f25204139e515",
+  "scope_note": "Automated QEMU evidence only; live UTM and Pi behavior are not established. The full 3,200-path dictionary search is slow in the current guest, so the probe waits 30 seconds before checking terminal recovery."
+}

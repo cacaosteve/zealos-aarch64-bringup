@@ -1,0 +1,23 @@
+{
+  "date": "2026-11-02",
+  "target": "QEMU PCI ARM64 graphical guest",
+  "source_bundle_id": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "command": "python3 scripts/check-compat.py --pci --probe-demo-source-catalog",
+  "result": "pass_with_compile_blockers",
+  "scope": "Fresh compile-only sweep of all 206 pinned Demo .ZC sources, each in the catalog's disposable compiler task and source-specific stock-module context. This establishes source compilation only, not standalone program classification or runtime acceptance.",
+  "compiled": 201,
+  "blocked": 5,
+  "blocked_paths": [
+    "/Demo/AcctExample/MakeHome.ZC",
+    "/Demo/AcctExample/TOS/MakeTOS.ZC",
+    "/Demo/AcctExample/TOS/TOSDistro.ZC",
+    "/Demo/Lectures/PCIInterrupts.ZC",
+    "/Demo/MultiCore/Interrupts.ZC"
+  ],
+  "runtime_accepted_demo_sources": 36,
+  "runtime_scope_note": "Runtime acceptance is maintained separately per source; 36 explicit QEMU runtime records do not imply that the other 170 sources are standalone programs or runtime-tested.",
+  "kernel_sha256": "5711d81f7268c2c61857d8259bc42299afb5df69eae50ba749134c4d606e9c4a",
+  "log": "build/check-program-catalog-pci.log",
+  "source_catalog": "build/demo-source-catalog.json",
+  "ledger": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+}

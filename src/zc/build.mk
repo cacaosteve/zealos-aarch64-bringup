@@ -31,7 +31,7 @@ $(BUILD)/zc/ffi_call_n_on_stack.o: src/zc/ffi_call_n_on_stack_aarch64.s | $(BUIL
 .PHONY: zc-objects
 zc-objects: $(ZC_VENDOR_OBJS)
 
-ZC_SOURCES := $(shell find upstream/pinned upstream/bootstrap tests/compat -type f)
+ZC_SOURCES := $(shell find upstream/pinned upstream/bootstrap upstream/arm64 tests/compat -type f)
 $(BUILD)/sources.tar: $(ZC_SOURCES) third_party/aiwnios/LICENSE scripts/build-source-bundle.py scripts/arm64_source.py scripts/check-arm64-source.py upstream/arm64/GrScreen.md | $(BUILD)
 	python3 scripts/build-source-bundle.py $@
 

@@ -1,10 +1,20 @@
 {
   "date": "2026-11-02",
-  "source_commit": "02a8b518c5077b6d5b9ae1f27e734ac11e183ea9",
-  "iso_sha256": "e34393b6ceeaf3069209bc9cf29285dd0888c71edc74bae86b14acf17bea3ebd",
-  "command": "python3 scripts/check-compat.py --pci --probe-3d-apps --probe-keepaway-full-game",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "working_tree_changes_included": true,
+  "kernel_sha256": "b4f27cf6eb6613d2794f7365a4d195f4eb879b876134412379f5f11647cb2b57",
+  "iso_sha256": "0ecaaf36a84e264191de683b1154cd3601587e4c96d7ad91a9fe17e0ecdbdf63",
+  "command": "python3 scripts/check-compat.py --pci --probe-3d-apps",
   "exit_code": 0,
-  "scope": "Automated PCI QEMU acceptance on the current rebuilt AArch64 ISO. It does not test UTM virtio-ramfb or Pi hardware.",
+  "scope": "Fresh automated PCI QEMU acceptance against the current worktree ISO. Covers GrModels Man and Ball, KeepAway gameplay/input/Escape, Titanium controls, and broad GUI/runtime regressions. This run does not include the three-minute KeepAway observation. UTM virtio-ramfb and Pi hardware are not covered.",
+  "framebuffer_fix": "Treat direct framebuffer presentation as active only while text.is_fb_busy is set and text.fb_alias points to the dedicated direct surface. A stale direct-active flag had caused the host to present an all-white direct surface after the alias returned to the compositor buffer.",
+  "previous_keepaway_full_run": {
+    "kernel_sha256": "4daaabe6cc3e9e21bfe3b17b3671c782206d4977ab1bbca62b00f24034d32197",
+    "iso_sha256": "6931116bb886e34938cdc7b2c1756df8b2f1af4eb1e580e4dda06db2e2fa55c7",
+    "command": "make esp && python3 scripts/check-compat.py --pci --probe-3d-apps --probe-keepaway-full-game",
+    "exit_code": 0,
+    "result": "The scanout differed at the periodic samples across the 183-second observation; the game remained responsive through the final sample and Escape returned to a working terminal. The separate live UTM freeze report remains unresolved."
+  },
   "checks": {
     "GrModels": {
       "Man": "pass: form accepted, 112 vertices and 168 triangles; drawing pixels verified; repeat prompt and terminal recovery passed",
@@ -12,17 +22,17 @@
     },
     "KeepAway": {
       "gameplay": "pass: court/HUD/player rendered; Space and mouse input kept the frame active",
-      "long_run": "pass: scanout continued changing for the 183-second observation through game-over",
+      "long_run": "pass: this fresh run observed periodic scanout changes throughout the three-minute gameplay interval; Escape returned to the terminal and 40+2 returned 42.",
       "Escape_recovery": "pass: Escape returned to terminal and 40+2 returned 42"
     },
     "Titanium": {
       "gameplay": "pass: intro and game frame rendered; input and Escape returned to terminal; 40+2 returned 42"
     },
-    "final_status": "failed=0"
+    "final_status": "failed=0; command exit status 0"
   },
   "live_utm": {
-    "GrModels": "runtime remains visually unverified in UTM; user previously saw no obvious output after selecting color",
-    "KeepAway": "unresolved: user reported UTM freeze around the 2:15 remaining-time display; this QEMU rerun does not reproduce UTM display/input differences",
+      "GrModels": "user screenshots show the form and generated vertex count; inline sprite appearance was verified in QEMU but remains visually unconfirmed in UTM",
+    "KeepAway": "still unresolved: QEMU passes on the current ISO, but the user previously reported a full input/display freeze in UTM; this QEMU run does not address the virtio-ramfb difference.",
     "Titanium": "user-confirmed working in UTM, including ordinary Left/Right, Space, and Escape"
   }
 }

@@ -1,0 +1,19 @@
+{
+  "date": "2026-11-08",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "working_tree_changes_included": true,
+  "kernel_sha256": "4bfeab8f4e8e60962823e2360364231dc13f4ec7187264a8e642864c0113d1fd",
+  "iso_sha256": "fd42cae1f7bc340e6bf71e3e2fce41c8c32894d62bdb45f745ea580f5ccdc447",
+  "command": "QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device' python3 scripts/check-compat.py --pci --probe-3d-apps",
+  "qemu_profile": "QEMU virt with HVF, 1 vCPU, 1 GiB RAM, PCI, ramfb, VirtIO keyboard and tablet",
+  "exit_code": 0,
+  "scope": "Automated 3D Apps launch, interaction, Escape recovery and shared graphical terminal regressions under a single-vCPU profile.",
+  "checks": {
+    "GrModels": "pass: Man mesh generation reached the repeat prompt; Ball mesh generation reached the repeat prompt and inline sprite pixels were visible",
+    "KeepAway": "pass: court, HUD and player rendered; Space/mouse input path accepted; Escape returned to a working terminal and 40+2 returned 42",
+    "Titanium": "pass: gameplay frame rendered; input and Escape returned to a working terminal; 40+2 returned 42",
+    "shared_regressions": "pass: system server/launch, task settings, source context, file execution, compiler recovery, graphical keyboard/history input, and window demo launch/stop",
+    "final_status": "All emitted checks passed; EXIT_CODE=0"
+  },
+  "live_utm": "KeepAway still needs live UTM confirmation; the user previously reported its guest becoming unresponsive. This QEMU run does not resolve that UTM-specific report."
+}

@@ -1,0 +1,40 @@
+#include "/System/Math/Types"
+#include "/System/Math/Conversion"
+#include "/System/Math/F32"
+#include "/System/Math/Vec3"
+#include "/System/Math/Vec4"
+#include "/System/Math/Mat4"
+
+I64 StockMat4Checks()
+{
+	CMatrix4D scale, translate, product, transposed;
+	CVector4D vector, result;
+	Matrix4DScaleSet(F64ToF32(2.0), F64ToF32(3.0),
+		F64ToF32(4.0), &scale);
+	Matrix4DTranslationSet(F64ToF32(5.0), F64ToF32(6.0),
+		F64ToF32(7.0), &translate);
+	if (scale.e[0] != 0x40000000 || scale.e[5] != 0x40400000 ||
+		scale.e[10] != 0x40800000 || translate.e[12] != 0x40A00000 ||
+		translate.e[13] != 0x40C00000 || translate.e[14] != 0x40E00000)
+		return 5;
+	Matrix4DMul(&scale, &translate, &product);
+	if (product.e[0] != 0x40000000 || product.e[5] != 0x40400000 ||
+		product.e[10] != 0x40800000 || product.e[12] != 0x41200000 ||
+		product.e[13] != 0x41900000 || product.e[14] != 0x41E00000 ||
+		product.e[15] != 0x3F800000)
+		return 1;
+	Vector4DInit(1.0, 2.0, 3.0, 1.0, &vector);
+	Matrix4DMulVector4D(&scale, &vector, &result);
+	if (result.x != 0x40000000 || result.y != 0x40C00000 ||
+		result.z != 0x41400000 || result.w != 0x3F800000)
+		return 2;
+	Matrix4DTranspose(&product, &transposed);
+	if (transposed.e[1] != product.e[4] ||
+		transposed.e[4] != product.e[1] ||
+		transposed.e[14] != product.e[11] ||
+		transposed.e[11] != product.e[14])
+		return 3;
+	if (!Matrix4DIsEqual(&product, &product))
+		return 4;
+	return 42;
+}

@@ -73,32 +73,32 @@ I64 Sprite3DServiceChecks()
     MemCopy(mesh_header, &type, sizeof(type));
     MemCopy(mesh_header + 1, &vertices, sizeof(vertices));
     MemCopy(mesh_header + 5, &triangles, sizeof(triangles));
-    if (SpriteElemSize(mesh_header, SPT_MESH) !=
+    if (SpriteElemSizeRaw(mesh_header, SPT_MESH) !=
             sizeof(CSpriteMeshU8s) + 12 * vertices + 16 * triangles)
         return 2;
     vertices = 0;
     triangles = 0;
     MemCopy(mesh_header + 1, &vertices, sizeof(I32));
     MemCopy(mesh_header + 5, &triangles, sizeof(I32));
-    if (SpriteElemSize(mesh_header, SPT_MESH) != sizeof(CSpriteMeshU8s))
+    if (SpriteElemSizeRaw(mesh_header, SPT_MESH) != sizeof(CSpriteMeshU8s))
         return 3;
     vertices = -1;
     MemCopy(mesh_header + 1, &vertices, sizeof(I32));
-    if (SpriteElemSize(mesh_header, SPT_MESH) >= 0)
+    if (SpriteElemSizeRaw(mesh_header, SPT_MESH) >= 0)
         return 4;
     vertices = 1048577;
     MemCopy(mesh_header + 1, &vertices, sizeof(I32));
-    if (SpriteElemSize(mesh_header, SPT_MESH) >= 0)
+    if (SpriteElemSizeRaw(mesh_header, SPT_MESH) >= 0)
         return 5;
     vertices = 3;
     triangles = -1;
     MemCopy(mesh_header + 1, &vertices, sizeof(I32));
     MemCopy(mesh_header + 5, &triangles, sizeof(I32));
-    if (SpriteElemSize(mesh_header, SPT_MESH) >= 0)
+    if (SpriteElemSizeRaw(mesh_header, SPT_MESH) >= 0)
         return 6;
     triangles = 1048577;
     MemCopy(mesh_header + 5, &triangles, sizeof(I32));
-    if (SpriteElemSize(mesh_header, SPT_MESH) >= 0)
+    if (SpriteElemSizeRaw(mesh_header, SPT_MESH) >= 0)
         return 7;
 
     // Lines interpolate coordinate-by-coordinate and preserve their type.
@@ -133,19 +133,15 @@ I64 Sprite3DServiceChecks()
     if (SpriteSize(line0) != sizeof(line0))
         result = 14;
 
-    // Incompatible streams fail as a catchable graphics exception.
+    // Incompatible streams select the nearer complete source frame.
     MemSet(point, 0, sizeof(point));
     type = SPT_PT;
     MemCopy(point, &type, sizeof(type));
-    try
-        interpolated = SpriteInterpolate(0.5, line0, point);
-    catch
-    {
-        caught = Fs->except_ch == 'Graphics';
-        Fs->catch_except = TRUE;
-    }
-    if (!caught)
+    interpolated = SpriteInterpolate(0.5, line0, point);
+    if (!interpolated || interpolated[0] != SPT_PT)
         result = 15;
+    if (interpolated)
+        Free(interpolated);
 
     // A small upstream-layout triangle must retain its identity bounds and
     // swap those bounds under a 90-degree turn. CDC state must be restored.
@@ -330,7 +326,7 @@ I64 Sprite3DServiceChecks()
         Sprite3Mat4x4B(dc, 40, 40, 0, mesh, NULL);
     catch
     {
-        caught = Fs->except_ch == 'Graphics';
+        caught = TRUE;
         Fs->catch_except = TRUE;
     }
     if (!caught || dc->r != old_matrix || dc->flags != old_flags ||

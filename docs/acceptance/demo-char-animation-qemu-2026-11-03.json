@@ -1,0 +1,28 @@
+{
+  "date": "2026-11-03",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "target": "AArch64 QEMU virt, PCI, graphical terminal",
+  "command": "python3 scripts/check-compat.py --pci --probe-demo-char-animation",
+  "source_path": "/Demo/Graphics/CharAnimation.ZC",
+  "source_sha256": "eea7aa2d5ef9afab8dc21bbcdd74f2018f6a1e1961aa590d1cd4ded146750dac",
+  "result": "pass",
+  "checks": [
+    "The graphical terminal loaded the Memory and TaskRep modules and launched CharAnimation through ExeFile2",
+    "The launched program left an Animate task in the runnable task list after ExeFile2 returned",
+    "The animation changed framebuffer glyph pixels across two frames",
+    "The graphical terminal accepted input after the animation launched and evaluated 40+2 as 42",
+    "The guest remained healthy with zstatus failed=0"
+  ],
+  "artifacts": {
+    "build/zealos-aarch64-hello.iso": "5c9f2c0bd43843f50c600f819c162ab4d7fa081aceb764b9eee87d375f70c98a",
+    "build/disk.img": "10e6528ae0172496f6860a009ecd097a696314bcc8d85232e03ce4104c2c2ee0",
+    "build/sources.tar": "0f351c82c337b2c8a9df0d14c3cd83828d5de1a8f5a2aa4852e62cad43959287",
+    "scripts/check-compat.py": "4cd07161416b2eca35e2c5ae1c52e6254ceec69b0d7dc182622e202375ce909c"
+  },
+  "screenshots": [
+    "build/gui-demo-char-animation-frame-1.ppm",
+    "build/gui-demo-char-animation-frame-2.ppm",
+    "build/gui-demo-char-animation-exit-smoke-result.ppm"
+  ],
+  "scope_note": "QEMU runtime acceptance only; live UTM or Pi hardware acceptance is not implied."
+}

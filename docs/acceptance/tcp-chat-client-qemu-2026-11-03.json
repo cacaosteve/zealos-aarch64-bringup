@@ -1,0 +1,25 @@
+{
+  "date": "2026-11-03",
+  "target": "AArch64 native ZealC/QEMU guest with PCI VirtIO-net and QEMU user networking",
+  "command": "python3 scripts/check-compat.py --pci --quick --probe-network-runtime",
+  "result": "pass",
+  "checks": {
+    "network_stack": "PASS: native VirtIO-net initialized and DHCP configured 10.0.2.15",
+    "connect": "PASS: TCPChatClient connected to host fixture at 10.0.2.2 using a typed IPv4 entry",
+    "greeting": "PASS: the client displayed the fixture greeting in its chat window",
+    "send": "PASS: the host fixture received the exact user-entered message",
+    "echo": "PASS: the client displayed the fixture echo response",
+    "exit": "PASS: Shift+Escape returned to the terminal and closed the socket",
+    "runtime_health": "PASS: guest remained healthy after the exchange"
+  },
+  "source_bundle_sha256": "44be0f7687978e6882da4e41b0910e3d552dad74a9186161a879f613fb34ee00",
+  "tested_boot_disk_sha256": "86bed6d4f4d92875dbb2b8969ed69e572a79da458b3cce3d23e2f1d95a1b673c",
+  "arm64_overlay_script_sha256": "a51fc7067757943c172a17dd46af5f34ef7c88e0164806bf97dd6e92a0e6a64c",
+  "arm64_adaptations": [
+    "Initialize the TCP socket lazily because CCF_JUST_LOAD skips the stock top-level initializer.",
+    "Parse numeric IPv4 dotted-quad text locally because the stock runtime parser depends on an unavailable compiler lexer helper.",
+    "Use a byte receive buffer with an explicit trailing NUL before passing received data to DocPrint as a string."
+  ],
+  "scope_note": "This verifies one client connection, greeting, one user-entered message and echoed response, and normal Shift+Escape cleanup in QEMU user networking. It does not verify UTM networking, arbitrary external interfaces, multiple simultaneous clients, or reconnection after server loss.",
+  "working_tree_changes_included": true
+}

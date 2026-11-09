@@ -1,0 +1,44 @@
+{
+  "date": "2026-11-05",
+  "source_commit": "working tree",
+  "working_tree_changes_included": true,
+  "kernel_sha256": "5e63aead946d2a07242ecfa1ec0303521fc9311058346dfffb9c4b5a703a7a1f",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "ce5fac65ac4977eb21b711702e60a147798e96d63ce52f3f5a096634bcb831d3",
+  "command": "python3 scripts/check-compat.py --pci --quick --probe-demo-makehome",
+  "exit_code": 0,
+  "source_path": "/Demo/AcctExample/TOS/MakeTOS.ZC",
+  "result": "pass",
+  "source_sha256": "04624f1ba06fec86aaaacdb627392b8a4ef62e14b29354e720ff31659b0f1724",
+  "checks": [
+    "QEMU boot and legacy regression markers passed.",
+    "zstatus reported the graphical terminal and window manager ready.",
+    "ProgramCatalog endianness, stock symbol/math, source macro, and warning checks passed.",
+    "The splash cleared and the graphical terminal regained focus.",
+    "zload /Demo/AcctExample/MakeHome.ZC completed successfully.",
+    "zload /Demo/AcctExample/TOS/MakeTOS.ZC completed successfully in the same session.",
+    "TOS_HDS was defined as \"CD\".",
+    "Graphical terminal input/recovery returned to the visible 40+2; prompt.",
+    "Final zstatus reported failed=0."
+  ],
+  "screenshots": [
+    "build/gui-catalog-demo-makehome-launch-result.ppm"
+  ],
+  "scope_note": "This confirms MakeHome and MakeTOS module loading plus graphical terminal recovery under QEMU. It does not invoke disk-writing functions, and does not establish UTM or Raspberry Pi behavior.",
+  "previous_failed_attempt": {
+    "iso_sha256": "986033e2a52a5fc4cad251834a9cda6dd0cd698b9c082207b55c0b3a144228fe",
+    "command": "python3 scripts/check-compat.py --probe-demo-makehome",
+    "exit_code": 1,
+    "result": "failed"
+  },
+  "latest_recheck": {
+    "date": "2026-11-05",
+    "kernel_sha256": "5e63aead946d2a07242ecfa1ec0303521fc9311058346dfffb9c4b5a703a7a1f",
+    "iso_sha256": "ce5fac65ac4977eb21b711702e60a147798e96d63ce52f3f5a096634bcb831d3",
+    "command": "python3 scripts/check-compat.py --pci --quick --probe-demo-makehome",
+    "exit_code": 0,
+    "result": "pass",
+    "observed": "MakeHome and MakeTOS source modules loaded; TOS_HDS matched CD; the graphical terminal returned to the prompt and final status reported failed=0.",
+    "scope": "QEMU module-load/runtime-path acceptance; does not imply execution of MakeTOS disk-writing functions or UTM/Pi hardware behavior."
+  }
+}

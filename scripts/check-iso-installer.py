@@ -187,6 +187,25 @@ def main() -> None:
             if "presented_frames=" not in status.decode(errors="replace"):
                 raise RuntimeError("installed disk did not start the graphical desktop")
             installed_guest.command(
+                'zc BootstrapGuiTerminalRunLightProgram('
+                '"/Demo/Games/Stadium/StadiumGen.ZC");',
+                "zc: executed")
+            deadline = time.monotonic() + 30
+            while True:
+                status = installed_guest.command("zstatus", "guest_task[")
+                if "name=StadiumGen" not in status.decode(errors="replace"):
+                    break
+                if time.monotonic() >= deadline:
+                    raise RuntimeError("StadiumGen GUI task did not return after 30 seconds")
+                time.sleep(0.25)
+            installed_guest.command(
+                'zc Print("stadium_gen_readable=%d\\n", '
+                '!!GRRead("/Demo/Games/Stadium/StadiumBG.GR"));',
+                "stadium_gen_readable=1")
+            installed_guest.command(
+                'zc Print("stadium_gen_arithmetic=%d\\n", 40+2);',
+                "stadium_gen_arithmetic=42")
+            installed_guest.command(
                 "zput Tests/InstallerPersist.ZC I64 InstallerPersist(){return 40+2;}",
                 "zput: saved Tests/InstallerPersist.ZC")
             installed_guest.command("zload disk:Tests/InstallerPersist.ZC",

@@ -1,0 +1,20 @@
+{
+  "date": "2026-11-08",
+  "command": "QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -smp 2 -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device' python3 scripts/check-compat.py --pci --quick --probe-demo-multicore1 --probe-source tests/compat/MultiCore1Runtime.ZC",
+  "target": "AArch64 QEMU virt, PCI graphical terminal; QEMU requested 2 vCPUs but guest mp_count is 1",
+  "result": "accepted",
+  "program": "/Demo/Templates/MultiCore1.ZC",
+  "source_path": "upstream/pinned/Demo/Templates/MultiCore1.ZC",
+  "source_sha256": "0d73ebb8904f39b7f89d6ddb63e2672c332b500371e0cc6eac177ca95f0d09cd",
+  "verified": [
+    "The stock worker computes the expected single-worker 0..99 range and local sum 4950.",
+    "Spawned tasks execute, clear their completion bit, and preserve the worker's local result.",
+    "The locked shared-total reduction returns 4950 with one active guest worker.",
+    "All 15 checks pass for mp_count=1 (mask 0x7fff); this does not establish multi-CPU execution."
+  ],
+  "kernel_sha256": "c3d720cbc40efcfe6e5546cd8018d71a7daaf47f39016b168bb2e03b1062ce59",
+  "iso_sha256": "4ab9e7221d81a48d9e2ad7496686ea1f1f4ff7af7fddbe1b2ee959ff2d422a39",
+  "log_sha256": "a967165d9b041c9794124f4135465e4642aecacd45e23578dbb0585009a39eb2",
+  "log": "build/check-demo-multicore1-pci.log",
+  "scope_note": "QEMU runtime evidence only. Although QEMU was configured with -smp 2, the guest runtime currently hardcodes mp_count=1, so this validates only single-worker behavior and the lock path; SMP worker distribution and full ZealOS round-robin scheduler equivalence remain unverified."
+}

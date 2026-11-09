@@ -1,0 +1,51 @@
+#include "/System/Math/Types"
+#include "/System/Math/Conversion"
+#include "/System/Math/F32"
+#include "/System/Math/Vec3"
+
+I64 StockVec3Checks()
+{
+	CVector3D a, b, dest, copy;
+	F32 scalar = F64ToF32(1.0);
+	Vector3DInit(1.0, 2.0, 3.0, &a);
+	Vector3DInit(4.0, 5.0, 6.0, &b);
+	Vector3DCopy(&a, &copy);
+	if (!Vector3DIsEqual(&a, &copy))
+		return 1;
+	Vector3DAdd(&a, &b, &dest);
+	if (dest.x != 0x40A00000 || dest.y != 0x40E00000 ||
+		dest.z != 0x41100000)
+		return 2;
+	Vector3DAddS(&a, scalar, &dest);
+	if (dest.x != 0x40000000 || dest.y != 0x40400000 ||
+		dest.z != 0x40800000)
+		return 3;
+	Vector3DSub(&a, &b, &dest);
+	if (dest.x != -1069547520 || dest.y != -1069547520 ||
+		dest.z != -1069547520)
+		return 4;
+	Vector3DSubS(&a, scalar, &dest);
+	if (dest.x != 0 || dest.y != 0x3F800000 || dest.z != 0x40000000)
+		return 5;
+	Vector3DMul(&a, &b, &dest);
+	if (dest.x != 0x40800000 || dest.y != 0x41200000 ||
+		dest.z != 0x41900000)
+		return 6;
+	Vector3DMulS(&a, scalar, &dest);
+	if (!Vector3DIsEqual(&a, &dest))
+		return 7;
+	Vector3DDivS(&a, scalar, &dest);
+	if (!Vector3DIsEqual(&a, &dest))
+		return 8;
+	if (Vector3DDot(&a, &b) != 0x42000000)
+		return 9;
+	Vector3DCross(&a, &b, &dest);
+	if (dest.x != -1069547520 || dest.y != 0x40C00000 ||
+		dest.z != -1069547520)
+		return 10;
+	Vector3DInit(3.0, 0.0, 4.0, &a);
+	Vector3DNormalize(&a, &dest);
+	if (dest.x != 0x3F19999A || dest.y != 0 || dest.z != 0x3F4CCCCD)
+		return 11;
+	return 42;
+}

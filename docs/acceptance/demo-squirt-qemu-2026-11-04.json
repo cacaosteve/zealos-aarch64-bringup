@@ -1,0 +1,28 @@
+{
+  "date": "2026-11-04",
+  "source_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "target": "AArch64 QEMU virt with ramfb and VirtIO keyboard/tablet",
+  "source_path": "/Demo/Games/Squirt.ZC",
+  "source_sha256": "a1ce5e764114a6aa0653a1fbf69dc0d7b6fe90b1702373a98c829517ebe21de4",
+  "iso_path": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "078e7be044a8618a03fd0aef25f8bbe534c12f0f1382dd76225d78e6cd4cf1b7",
+  "command": "QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device' python3 scripts/check-compat.py --probe-demo-squirt",
+  "result": "pass",
+  "checks": [
+    "Launched the unchanged pinned /Demo/Games/Squirt.ZC from the graphical terminal in a focused application task.",
+    "The animated scene rendered with visible graphics.",
+    "Arrow-key input changed the rendered scene.",
+    "Escape restored the graphical terminal; 40+2 evaluated to 42 and zstatus reported failed=0."
+  ],
+  "artifacts": {
+    "files": [
+      "build/check-demo-squirt-pci.log",
+      "build/gui-demo-squirt-demo-squirt-initial.ppm",
+      "build/gui-demo-squirt-demo-squirt-left.ppm",
+      "build/gui-demo-squirt-demo-squirt-up.ppm",
+      "build/gui-demo-squirt-demo-squirt-exit-smoke-result.ppm"
+    ],
+    "probe_sha256": "4ef9dfaaa0eb6f2e7ac68085ed32ff7d800742abd565165a007769de78d50b01"
+  },
+  "scope_note": "QEMU runtime acceptance only; live UTM and Pi hardware behavior are not implied."
+}

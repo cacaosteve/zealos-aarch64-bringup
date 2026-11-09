@@ -1,0 +1,27 @@
+{
+  "date": "2026-11-04",
+  "source_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "target": "AArch64 QEMU virt with ramfb and VirtIO keyboard/tablet",
+  "source_path": "/Demo/Games/Stadium/StadiumGen.ZC",
+  "source_sha256": "5782a4afcf3fd6cec601acbfd37150af5746aa5d8ea54739372c690eb80adc7b",
+  "iso_path": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "7dfac9d26605debae26f1b3b6e8c905ef88f064d4f4781da353bfef935be5eaf",
+  "command": "python3 scripts/check-iso-installer.py",
+  "result": "pass",
+  "checks": [
+    "Installed the ISO onto a disposable 128 MiB VirtIO disk; the installer reported full read-back verification and the installed disk matched the source image byte-for-byte.",
+    "Cold-booted from the installed VirtIO disk with the CD detached and started the graphical desktop.",
+    "Launched unchanged StadiumGen.ZC as a GUI task; it returned within the 30-second acceptance deadline.",
+    "GRRead(\"/Demo/Games/Stadium/StadiumBG.GR\") returned a valid device context after StadiumGen completed, proving generated output was written and readable from the installed disk.",
+    "The graphical guest command evaluated 40+2 to 42, and installer persistence returned 0x2a both before and after another cold reboot."
+  ],
+  "artifacts": {
+    "files": [
+      "build/check-iso-installer-live.log",
+      "build/check-iso-installer-disk-boot.log",
+      "build/check-iso-installer-reboot.log"
+    ],
+    "installed_disk_sha256": "a8fb8a9781fcb74e5a95675fe2bd507946c57367218dbf2fa100ebc05e010ead"
+  },
+  "scope_note": "StadiumGen output generation and read-back, installed-disk desktop operation, and persistent storage verified under QEMU. Live UTM and Pi hardware behavior are not implied."
+}

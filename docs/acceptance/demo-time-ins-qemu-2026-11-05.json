@@ -1,0 +1,26 @@
+{
+  "date": "2026-11-05",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "working_tree_changes_included": true,
+  "kernel_sha256": "5e63aead946d2a07242ecfa1ec0303521fc9311058346dfffb9c4b5a703a7a1f",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "be190bd6aa350d7e8c3a28068132e0aa3819b02af9150b311c371ee4c9226932",
+  "command": "python3 scripts/check-compat.py --pci --probe-demo-time-ins",
+  "exit_code": 0,
+  "source_path": "/Demo/TimeIns.ZC",
+  "result": "pass",
+  "runtime_source": "upstream/bootstrap/Demo/TimeIns.ZC",
+  "runtime_source_sha256": "748086d1b90d4a8477f211cc815fa477719e1e0936b2e7a0a8e9c2bbc7efa275",
+  "pinned_source_sha256": "a1bc618f384baff16e973717483308d08ec53d57f9db3f5f9aa2ca310e968ff6",
+  "checks": [
+    "The bundled ARM64 adaptation ran three empty-loop and floating-point-loop benchmark samples.",
+    "Each sample printed positive loop-overhead ticks and the expected final value 110126.8.",
+    "The graphical terminal evaluated 40+2; as 42 after the demo returned.",
+    "zstatus reported failed=0."
+  ],
+  "screenshots": [
+    "build/gui-catalog-demo-time-ins-launch-result.ppm",
+    "build/gui-catalog-demo-time-ins-terminal-recovery-result.ppm"
+  ],
+  "scope_note": "The ARM64 adaptation compares elapsed guest monotonic-timer ticks. These are not hardware instruction-cycle measurements. Small adjusted expression-loop readings may vary because they subtract two timing samples."
+}

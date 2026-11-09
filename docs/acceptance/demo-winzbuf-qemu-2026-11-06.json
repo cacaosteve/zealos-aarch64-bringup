@@ -1,0 +1,26 @@
+{
+  "date": "2026-11-06",
+  "source_commit": "working tree",
+  "working_tree_changes_included": true,
+  "kernel_sha256": "d4dd0e1e3475043101ca6ed9430c3f6f64f675a96b94337289732d81db461fb5",
+  "source_bundle_sha256": "6ecaa711649a83f14e6bad988a1c4075e0383536a88bc5c6ef47bfc4161a3401",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "f85c0c9447da2ecb032e7d42847b142607566f61ab9bfdaabaef9d38f0d15135",
+  "command": "python3 scripts/check-compat.py --quick --pci --probe-demo-winzbuf",
+  "exit_code": 0,
+  "source_path": "/Demo/Graphics/WinZBuf.ZC",
+  "result": "pass",
+  "checks": [
+    "The ARM64 graphical terminal booted under QEMU and accepted the WinZBuf launch command.",
+    "The active graphical terminal installed its draw callback while the demo waited for input.",
+    "The demo drew the colored window z-buffer map; the top-left terminal region changed by more than 500 pixels and contained more than 1,000 green map pixels.",
+    "Escape returned to the graphical terminal, which evaluated 40+2; as 42.",
+    "zstatus reported failed=0."
+  ],
+  "screenshots": [
+    "build/gui-demo-winzbuf-demo-winzbuf-before-launch.ppm",
+    "build/gui-demo-winzbuf-demo-winzbuf-visible.ppm",
+    "build/gui-demo-winzbuf-demo-winzbuf-terminal-recovery-result.ppm"
+  ],
+  "scope_note": "Automated QEMU ISO runtime evidence only. The demo's source draws its instruction in black on the terminal's black background, so acceptance verifies the colored z-buffer map rather than the instruction text. This does not establish live UTM or Raspberry Pi behavior."
+}

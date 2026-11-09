@@ -1,0 +1,34 @@
+{
+  "date": "2026-11-07",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "working_tree_changes_included": true,
+  "target": "AArch64 native ZealC in PCI QEMU guest",
+  "tested_iso": "build/zealos-aarch64-hello.iso",
+  "tested_iso_sha256": "a9d1be0fec0e509f1c8694531f42ebdaf40d6f1e113574f60bf81d7d905a9af1",
+  "kernel_sha256": "9c266698222e7b3f9cd188e6cd484ba02cdd9159fb3ed9bd01226df8e5fbea14",
+  "checks": {
+    "wallpapers": {
+      "command": "python3 scripts/check-compat.py --pci --probe-demo-wallpapers",
+      "result": "pass",
+      "sources": {
+        "/Demo/Graphics/WallPapers/WallPaperStars.ZC": "System Include installed the callback; successive scanout captures differed by 5022 pixels, confirming animation",
+        "/Demo/Graphics/WallPapers/WallPaperFish.ZC": "System Include changed visible scanout by 7358 pixels while the window manager remained live"
+      },
+      "terminal_recovery": "pass: graphical terminal remained usable"
+    },
+    "weblog_report": {
+      "command": "python3 scripts/check-compat.py --pci --quick --probe-demo-weblog-report",
+      "result": "pass",
+      "source": "/Demo/WebLogDemo/WebLogRep.ZC",
+      "evidence": "Parsed two synthetic requests, rendered and wrote a report, returned to the guest shell, and 40+2 returned 42"
+    },
+    "html_directory_list": {
+      "command": "python3 scripts/check-compat.py --pci --quick --probe-demo-html-dir-list",
+      "result": "pass",
+      "source": "/Demo/ToHtmlToTXTDemo/HtmlDirList.ZC",
+      "evidence": "Loaded the source, enumerated a known demo file with link count 1, returned to the shell, and 40+2 returned 42"
+    }
+  },
+  "exit_code": 0,
+  "scope_note": "These are QEMU runtime checks for the listed sources. They do not establish live UTM or Raspberry Pi hardware behavior."
+}

@@ -1,0 +1,30 @@
+{
+  "date": "2026-11-03",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "target": "AArch64 QEMU virt, PCI, graphical terminal",
+  "command": "python3 -m py_compile scripts/check-compat.py && python3 scripts/check-compat.py --pci --probe-demo-halogen",
+  "source_path": "/Demo/Games/Halogen.ZC",
+  "source_sha256": "648b2412eafec69c9422362f46a12c9fe93985d3fbacfe74126a369a2595770e",
+  "result": "pass",
+  "checks": [
+    "The Halogen source launched from the graphical terminal",
+    "The road and car rendered in the guest framebuffer",
+    "A Left arrow input changed the rendered scene",
+    "Escape closed Halogen and restored the graphical terminal",
+    "The terminal evaluated 40+2 as 42 after returning from Halogen",
+    "The guest remained healthy with zstatus failed=0"
+  ],
+  "artifacts": {
+    "build/zealos-aarch64-hello.iso": "612b01502ba5523fab4409658058a55e0ddd1a3212f8ea136b83d83da315c6d2",
+    "build/disk.img": "b4c1d164cdfef9a64435e1c0f9c19302a6f29666bea351551f25ac7f546efd00",
+    "build/sources.tar": "daf71942deace6c7a65c54ee2eae4a43852086cdfa4bd467d213de411c7cbdb8",
+    "scripts/check-compat.py": "1a77cdf1e57f2afa309537b3987c8c0bc21bc93e60744071af3f19edbd4ce5df"
+  },
+  "screenshots": [
+    "build/gui-demo-halogen-demo-halogen-initial.ppm",
+    "build/gui-demo-halogen-demo-halogen-before-input.ppm",
+    "build/gui-demo-halogen-demo-halogen-after-input.ppm",
+    "build/gui-demo-halogen-demo-halogen-exit-smoke-result.ppm"
+  ],
+  "scope_note": "QEMU runtime acceptance only; live UTM or Pi hardware acceptance is not implied."
+}

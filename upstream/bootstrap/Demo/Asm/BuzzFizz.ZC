@@ -16,7 +16,7 @@ U0 BuzzFizz()
 			Print("FIZZ ");
 		if (!(i % BUZZ_SPAN))
 			Print("BUZZ ");
-		'\n';
+		Print("\n");
 	}
 }
 

@@ -1,0 +1,17 @@
+{
+  "date": "2026-11-04",
+  "source_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "target": "AArch64 QEMU virt with PCI VirtIO sound and WAV backend",
+  "source_path": "/Demo/Sound/OhGreat.ZC",
+  "source_sha256": "80e2a161d3302cf08b452ac5dff2be140c7911a0bb029b3d88750b2040ea6969",
+  "iso_path": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "7d1fd33f5830079057e71f79cb802c6d60be8fbaea3260fdeea83936d60540aa",
+  "command": "QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device -audiodev wav,id=sound0,path=/tmp/zeal-ohgreat-final.wav -device virtio-sound-pci,audiodev=sound0' python3 scripts/check-compat.py --probe-demo-ohgreat",
+  "result": "pass",
+  "checks": [
+    "Launched the unchanged stock /Demo/Sound/OhGreat.ZC from the graphical terminal; its first lyric line appeared.",
+    "The stock Play loop generated 111132 stereo frames at 44.1 kHz (2.52 s of captured PCM); 218736 samples were nonzero and peak amplitude was 7000.",
+    "Ctrl-Alt-C exited the song and returned to the graphical terminal; 40+2 evaluated to 42 and zstatus reported failed=0."
+  ],
+  "scope_note": "Verifies OhGreat runtime playback through the QEMU VirtIO sound device and terminal recovery. It does not establish audible live UTM or Raspberry Pi sound output."
+}

@@ -1,0 +1,57 @@
+U8 StackGrowRuntimeTestStack[65536];
+
+I64 StackGrowRuntimeRecurse(I64 depth)
+{
+    if (depth)
+        return 1 + CallStackGrow(0x800, 65536,
+                                 &StackGrowRuntimeRecurse, depth - 1);
+    return 0;
+}
+
+I64 StackGrowRuntimeSum10(I64 a, I64 b, I64 c, I64 d, I64 e,
+                          I64 f, I64 g, I64 h, I64 i, I64 j)
+{
+    return a + 2 * b + 3 * c + 4 * d + 5 * e +
+           6 * f + 7 * g + 8 * h + 9 * i + 10 * j;
+}
+
+I64 StackGrowRuntimeDirectChecks()
+{
+    I64 args[10] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+    U8 *stack = &StackGrowRuntimeTestStack;
+    I64 result = ZcCallNOnStack(stack, stack + sizeof(StackGrowRuntimeTestStack),
+                                &StackGrowRuntimeSum10, 10, args);
+    if (result == 385)
+        return 0x2a;
+    return 1;
+}
+
+I64 StackGrowRuntimeAllocatedStackChecks()
+{
+    CTaskStack *stack = MAlloc(65536 + offset(CTaskStack.stack_base), Fs);
+    if (!stack)
+        return 1;
+    stack->stack_size = MSize(stack) - offset(CTaskStack.stack_base);
+    I64 size = stack->stack_size;
+    Free(stack);
+    if (size >= 65536)
+        return 0x2a;
+    return 2;
+}
+
+I64 StackGrowRuntimeArgChecks()
+{
+    I64 sum = CallStackGrow(0x7FFFFFFFFFFFFFFF, 65536,
+                            &StackGrowRuntimeSum10,
+                            1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
+    if (sum == 385)
+        return 0x2a;
+    return 1;
+}
+
+I64 StackGrowRuntimeRecurseChecks()
+{
+    if (StackGrowRuntimeRecurse(10000) != 10000)
+        return 1;
+    return 0x2a;
+}

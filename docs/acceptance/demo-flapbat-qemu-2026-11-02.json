@@ -1,0 +1,24 @@
+{
+  "date": "2026-11-02",
+  "target": "QEMU PCI ARM64 graphical guest",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "251700f8afbe0543d1764d1795e13ca0bcb699676eeeeab2bb2f447b6c635043",
+  "source_path": "/Demo/Games/FlapBat.ZC",
+  "source_sha256": "e3072dcdfec744071c5ed20cecc7e9b6fac61ec9aed7e82c9e638b674588ac4f",
+  "command": "python3 scripts/check-compat.py --pci --probe-demo-flapbat",
+  "result": "pass",
+  "scope": "Original FlapBat demo launched through the graphical terminal. ARM64 Sound/Play effects are silent no-ops; this check accepts game rendering and controls, not audible output. QEMU runtime acceptance does not establish live UTM or Pi hardware behavior.",
+  "checks": [
+    "verified the gray game canvas and FlapBat window",
+    "verified the animation task changed 210 pixels between frames",
+    "verified Space input changed 128 pixels in the bat area",
+    "Escape returned to the graphical terminal and 40+2; evaluated to 42",
+    "zstatus reported failed=0"
+  ],
+  "log": "build/check-demo-flapbat-pci.log",
+  "screenshots": [
+    "build/gui-demo-flapbat-demo-flapbat-first-frame.ppm",
+    "build/gui-demo-flapbat-demo-flapbat-animation-frame.ppm",
+    "build/gui-demo-flapbat-demo-flapbat-space-frame.ppm"
+  ]
+}

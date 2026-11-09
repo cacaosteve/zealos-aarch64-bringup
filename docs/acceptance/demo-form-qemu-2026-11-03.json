@@ -1,0 +1,29 @@
+{
+  "date": "2026-11-03",
+  "command": "python3 scripts/check-compat.py --pci --probe-demo-form",
+  "target": "AArch64 QEMU virt, PCI, graphical terminal",
+  "result": "pass",
+  "program": "/Demo/DolDoc/Form.ZC",
+  "source_path": "upstream/pinned/Demo/DolDoc/Form.ZC",
+  "source_sha256": "b10e41f39989d7fa389852445f36bd542568e1c3c46c233cfe6083be56abdd1a",
+  "checks": [
+    "DocForm displayed its numeric, list, string, date, and checkbox fields, including a NULL optional string rendered as blank",
+    "Shift-Escape canceled the form and printed Cancel; plain Escape accepts the form in ZealOS",
+    "ClassRep inspected the local FDStruct on the guest task stack without reporting Bad Pointer",
+    "After the form returned, the graphical terminal accepted 40+2 and returned 42",
+    "The guest ended with zstatus failed=0"
+  ],
+  "artifacts": {
+    "build/zealos-aarch64-hello.iso": "d86fd810858d63b04884e259641e797228c28419401ab0746b022f8962515d03",
+    "esp/boot/kernel.elf": "4dc365bbe747f1b22a44e4e121a8197ca4b132c785e58336f42a794f063afb16",
+    "scripts/check-compat.py": "c64f02457c26cd4fdc6ba93a8f4249e43075964bbc60ff39f3d86f91f938b632",
+    "scripts/arm64_source.py": "e4d849d12a433e46b905fc4c66ccaf56cbc9ed8da1c1692e2bdd91b116e66fe6",
+    "src/zc/runtime.c": "532a6f32f838f5339d3f6b883a2bf8f16c4a36e6310d48f7c051d0f457308eda"
+  },
+  "screenshots": [
+    "build/gui-demo-form-demo-form-fields.ppm",
+    "build/gui-demo-form-demo-form-cancel-result.ppm",
+    "build/gui-demo-form-demo-form-terminal-recovery-result.ppm"
+  ],
+  "scope_note": "Automated QEMU acceptance only; live UTM and Pi hardware acceptance are not implied."
+}

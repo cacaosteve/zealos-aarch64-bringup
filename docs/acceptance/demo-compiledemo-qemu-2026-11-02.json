@@ -1,0 +1,29 @@
+{
+  "date": "2026-11-02",
+  "command": "python3 scripts/check-compat.py --pci --probe-demo-compiledemo",
+  "target": "QEMU PCI graphical terminal",
+  "result": "pass",
+  "program": "/Demo/CompileDemo.ZC",
+  "source_path": "upstream/pinned/Demo/CompileDemo.ZC",
+  "source_sha256": "b8b8c45d83c2522b61c5774e41e71b3da09f19d79d07f8528e4648e85bd7b91c",
+  "expected": [
+    "CompileDemo evaluates each semicolon-separated expression through the native AArch64 compiler and prints its result",
+    "Assignments and expressions preserve state across fragments",
+    "The final ExePrint example returns to the graphical terminal"
+  ],
+  "observed": [
+    "Compile 2 + Cos(\u03c0) -> 1.0000",
+    "Compile 1; 2 + 4 -> 1.0000 then 6.0000",
+    "Compile global = 1; global * 2; global / 3; Sin(global) -> 1.0000, 2.0000, 0.3333, 0.8415",
+    "The final loop prints 0 through 9 and returns to the graphical terminal",
+    "40+2; returns 42 and zstatus reports failed=0"
+  ],
+  "diagnosis": "The stock x86 expression-to-machine-code function is not part of the ARM64 bootstrap. The ARM64 source overlay splits the demo's expression stream at semicolons and evaluates each fragment with the native guest compiler/JIT bridge, preserving expression side effects, output and final result.",
+  "evidence_artifacts": [
+    "build/gui-catalog-demo-compile-demo-result.txt",
+    "build/gui-catalog-demo-compile-demo-result.ppm"
+  ],
+  "kernel_sha256": "128a98164a3c5940b88e8a401d06d441f57ffc87d7d061cea070b36e99160df3",
+  "iso_sha256": "f9b50081e2de125f878e7338aa8819fef27acdccddfbcfdc720f25204139e515",
+  "scope_note": "Automated QEMU evidence only; live UTM behavior is not established."
+}

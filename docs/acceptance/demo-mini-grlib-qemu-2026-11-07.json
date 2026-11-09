@@ -1,0 +1,23 @@
+{
+  "date": "2026-11-07",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "working_tree_changes_included": true,
+  "kernel_sha256": "89111b7fb49ba1bfdea3e5c11ac417a8a95c77e5f1159c112e6020d3f292d7f9",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "c576174d7aa923497501d62d8adbcebf2264dd1ab69b795c64578dcbc21606dc",
+  "command": "python3 scripts/check-compat.py --pci --probe-demo-graphics-render",
+  "exit_code": 0,
+  "source_path": "/Demo/Lectures/MiniGrLib.ZC",
+  "result": "pass",
+  "checks": [
+    "MiniGrLibDemo ran in the PCI QEMU graphical terminal and visibly wrote its generated framebuffer image to scanout (42,483 changed pixels).",
+    "The graphical terminal accepted 40+2; after the demo and returned 42.",
+    "The complete graphics-render probe also passed 32BitColor, Blot, PanText, and SunMoon checks.",
+    "zstatus reported failed=0."
+  ],
+  "screenshots": [
+    "build/gui-demo-mini-grlib-active.ppm",
+    "build/gui-demo-mini-grlib-terminal-recovery-result.ppm"
+  ],
+  "scope_note": "QEMU runtime acceptance for framebuffer output and terminal recovery. This does not establish live UTM or Raspberry Pi behavior."
+}

@@ -25,6 +25,9 @@
 #define ZEAL_MEM_KERNEL   9 /* loaded kernel image (reserved for runtime) */
 #define ZEAL_MEM_PAGETABLE 10 /* boot-reserved 4KiB translation-table pool */
 #define ZEAL_MEM_USB_DMA  11 /* boot-reserved DMA region; not a general allocator */
+#define ZEAL_MEM_PI4_AUDIO 12 /* boot-reserved property and HDMI DMA buffers */
+#define ZEAL_PI4_AUDIO_BYTES 0x60000ull
+#define ZEAL_PI4_AUDIO_PHYS_LIMIT 0x40000000ull
 
 #define PI4_PCIE_FDT_PRESENT  (1u << 0)
 #define PI4_PCIE_FDT_ENABLED  (1u << 1)

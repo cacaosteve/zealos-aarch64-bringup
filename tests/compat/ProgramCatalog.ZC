@@ -25,6 +25,18 @@ I64 StockCatalogBFieldChecks()
     return 0;
 }
 
+I64 StockCatalogExtStrTarget(I64 a, I64 b)
+{
+    return a + b;
+}
+
+I64 StockCatalogExtStrChecks()
+{//The ARM64 CallExtStr bridge must resolve names and forward ordinary arguments.
+    if (CallExtStr("StockCatalogExtStrTarget", 40, 2) != 42)
+        return 1;
+    return 42;
+}
+
 I64 StockCatalogMemoryPoolChecks()
 {//System pool statistics must track the bridge's real data/code arenas.
     I64 before, during, after;
@@ -147,6 +159,43 @@ I64 StockCatalogCompileDoc(U8 *path)
     return result == 42;
 }
 
+I64 StockCatalogCompileDocInDir(U8 *dir, U8 *path)
+{//Compile a document from the directory its relative includes expect.
+    CTask *task = Spawn(&StockCatalogServer);
+    CJob *job;
+    U8 *source;
+    I64 result;
+
+    if (!task)
+        return -1;
+    source = MStrPrint(
+        "ExeFile2(\"/System/Math/Math.ZC\",CCF_JUST_LOAD);"
+        "ExeFile2(\"/System/Sound.ZC\",CCF_JUST_LOAD);"
+        "ExeFile2(\"/System/Memory.ZC\",CCF_JUST_LOAD);"
+        "ExeFile2(\"/System/Gr/ScreenCast.ZC\",CCF_JUST_LOAD);"
+        "ExeFile2(\"/Apps/Psalmody/JukePuppet.ZC\",CCF_JUST_LOAD);"
+        "ExeFile2(\"/System/Utils/LineRep.ZC\",CCF_JUST_LOAD);"
+        "ExeFile2(\"/System/BlkDev/ZDiskB.ZC\",CCF_JUST_LOAD);"
+        "ExeFile2(\"/System/BlkDev/DiskCheck.ZC\",CCF_JUST_LOAD);"
+        "ExeFile2(\"/Kernel/KernelA.HH\",CCF_JUST_LOAD);"
+        "ExeFile2(\"/Kernel/KernelB.HH\",CCF_JUST_LOAD);"
+        "ExeFile2(\"/Demo/AcctExample/TOS/TOSExtern.ZC\",CCF_JUST_LOAD);"
+        "ExeFile2(\"/Demo/AcctExample/TOS/TOSConfig.ZC\",CCF_JUST_LOAD);"
+        "TOSInit;"
+        "Cd(\"%Q\");StockCatalogExeDocFile(\"%Q\",CCF_JUST_LOAD);42;",
+        dir, path);
+    job = TaskExe(task, Fs, source, 0);
+    Free(source);
+    if (!job)
+    {
+        Kill(task);
+        return -2;
+    }
+    result = JobResGet(job);
+    Kill(task);
+    return result == 42;
+}
+
 I64 StockCatalogCompileWithMath(U8 *path)
 {//Some demos rely on Math.ZC functions that are absent from the raw task.
     CTask *task = Spawn(&StockCatalogServer);
@@ -171,8 +220,9 @@ I64 StockCatalogCompileWithMath(U8 *path)
     return result == 42;
 }
 
-I64 StockCatalogCompileWithModules(U8 *path, U8 *module1, U8 *module2=NULL)
-{//Compile a Demo source with the stock modules it normally imports.
+I64 StockCatalogCompileWithModules(U8 *path, U8 *module1, U8 *module2=NULL,
+                                   U8 *module3=NULL)
+{//Compile a stock source with the modules it normally imports.
     CTask *task = Spawn(&StockCatalogServer);
     CJob *job;
     U8 *source;
@@ -180,7 +230,13 @@ I64 StockCatalogCompileWithModules(U8 *path, U8 *module1, U8 *module2=NULL)
 
     if (!task)
         return -1;
-    if (module2)
+    if (module3)
+        source = MStrPrint("ExeFile2(\"%Q\",CCF_JUST_LOAD);"
+                           "ExeFile2(\"%Q\",CCF_JUST_LOAD);"
+                           "ExeFile2(\"%Q\",CCF_JUST_LOAD);"
+                           "StockCatalogExeDocFile(\"%Q\",CCF_JUST_LOAD);42;",
+                           module1, module2, module3, path);
+    else if (module2)
         source = MStrPrint("ExeFile2(\"%Q\",CCF_JUST_LOAD);"
                            "ExeFile2(\"%Q\",CCF_JUST_LOAD);"
                            "StockCatalogExeDocFile(\"%Q\",CCF_JUST_LOAD);42;",
@@ -189,6 +245,38 @@ I64 StockCatalogCompileWithModules(U8 *path, U8 *module1, U8 *module2=NULL)
         source = MStrPrint("ExeFile2(\"%Q\",CCF_JUST_LOAD);"
                            "StockCatalogExeDocFile(\"%Q\",CCF_JUST_LOAD);42;",
                            module1, path);
+    job = TaskExe(task, Fs, source, 0);
+    Free(source);
+    if (!job)
+    {
+        Kill(task);
+        return -2;
+    }
+    result = JobResGet(job);
+    Kill(task);
+    return result == 42;
+}
+
+I64 StockCatalogCompileDoDistro()
+{//The original utility's BootDVDIns implementation is 16-bit BIOS assembly.
+ //Compile the distro builder's ARM64-relevant body with that legacy-only
+ //installer entry stubbed; this is compile evidence, not install acceptance.
+    CTask *task = Spawn(&StockCatalogServer);
+    CJob *job;
+    U8 *source;
+    I64 result;
+
+    if (!task)
+        return -1;
+    source = StrNew(
+        "ExeFile2(\"/System/Utils/LineRep.ZC\",CCF_JUST_LOAD);\n"
+        "ExeFile2(\"/System/BlkDev/ZDiskB.ZC\",CCF_JUST_LOAD);\n"
+        "#define KERNEL_ZXE \"Kernel.ZXE\"\n"
+        "#define BOOT_DIR \"/Boot\"\n"
+        "#define BOOT_DIR_KERNEL_ZXE BOOT_DIR \"/\" KERNEL_ZXE\n"
+        "#define BOOT_DIR_DVD_KERNEL_ZXE BOOT_DIR \"/DVD\" KERNEL_ZXE\n"
+        "U0 BootDVDIns(U8 drv_let=0){};\n"
+        "StockCatalogExeDocFile(\"/Home/DoDistro.ZC\",CCF_JUST_LOAD);42;");
     job = TaskExe(task, Fs, source, 0);
     Free(source);
     if (!job)
@@ -303,7 +391,6 @@ I64 StockCatalogCompileWithProgramModules(U8 *path)
         "ExeFile2(\"/System/Gr/GrPrimatives.ZC\",CCF_JUST_LOAD);"
         "ExeFile2(\"/System/Gr/GrComposites.ZC\",CCF_JUST_LOAD);"
         "U8 *CmdLinePrompt(){return StrNew(\"\\n\");}"
-        "ExeFile2(\"/Kernel/KernelA.HH\",CCF_JUST_LOAD);"
         "ExeFile2(\"/Compiler/CompilerA.HH\",CCF_JUST_LOAD);"
         "CCompGlobals cmp;"
         "ExeFile2(\"/Compiler/CompilerB.HH\",CCF_JUST_LOAD);"
@@ -314,6 +401,38 @@ I64 StockCatalogCompileWithProgramModules(U8 *path)
         "ExeFile2(\"/System/Gr/SpriteCode.ZC\",CCF_JUST_LOAD);"
         "ExeFile2(\"/System/Gr/ScreenCast.ZC\",CCF_JUST_LOAD);"
         "ExeFile2(\"/Apps/Psalmody/JukePuppet.ZC\",CCF_JUST_LOAD);"
+        "StockCatalogExeDocFile(\"%Q\",CCF_JUST_LOAD);42;", path);
+    job = TaskExe(task, Fs, source, 0);
+    Free(source);
+    if (!job)
+    {
+        Kill(task);
+        return -2;
+    }
+    result = JobResGet(job);
+    Kill(task);
+    return result == 42;
+}
+
+I64 StockCatalogCompileWithCompiler(U8 *path)
+{//Compile a compiler Demo with only the compiler and math dependencies it uses.
+    CTask *task = Spawn(&StockCatalogServer);
+    CJob *job;
+    U8 *source;
+    I64 result;
+
+    if (!task)
+        return -1;
+    source = MStrPrint(
+        "ExeFile2(\"/System/Math/Math.ZC\",CCF_JUST_LOAD);"
+        "ExeFile2(\"/System/Memory.ZC\",CCF_JUST_LOAD);"
+        "ExeFile2(\"/Compiler/CompilerA.HH\",CCF_JUST_LOAD);"
+        "U8 *CmdLinePrompt(){return StrNew(\"\\n\");}"
+        "CCompGlobals cmp;"
+        "ExeFile2(\"/Compiler/CompilerB.HH\",CCF_JUST_LOAD);"
+        "extern U0 ParseStreamBlk(CCompCtrl *cc);"
+        "ExeFile2(\"/Compiler/LexLib.ZC\",CCF_JUST_LOAD);"
+        "ExeFile2(\"/Compiler/Lex.ZC\",CCF_JUST_LOAD);"
         "StockCatalogExeDocFile(\"%Q\",CCF_JUST_LOAD);42;", path);
     job = TaskExe(task, Fs, source, 0);
     Free(source);
@@ -347,7 +466,6 @@ I64 StockCatalogCompileRawWithProgramModules(U8 *path)
         "ExeFile2(\"/System/Gr/GrPrimatives.ZC\",CCF_JUST_LOAD);"
         "ExeFile2(\"/System/Gr/GrComposites.ZC\",CCF_JUST_LOAD);"
         "U8 *CmdLinePrompt(){return StrNew(\"\\n\");}"
-        "ExeFile2(\"/Kernel/KernelA.HH\",CCF_JUST_LOAD);"
         "ExeFile2(\"/Compiler/CompilerA.HH\",CCF_JUST_LOAD);"
         "CCompGlobals cmp;"
         "ExeFile2(\"/Compiler/CompilerB.HH\",CCF_JUST_LOAD);"
@@ -371,37 +489,92 @@ I64 StockCatalogCompileRawWithProgramModules(U8 *path)
     return result == 42;
 }
 
-I64 StockCatalogCompileWithProgramModulesAfterLoad(U8 *module, U8 *path)
+I64 StockCatalogCompileWithProgramModulesAfterLoad(U8 *module, U8 *path,
+        Bool load_tos_config=FALSE)
 {//Compile a Demo source after the common modules and one source dependency.
     CTask *task = Spawn(&StockCatalogServer);
     CJob *job;
     U8 *source;
+    U8 *module_load = "";
+    U8 *common_modules = "";
+    U8 *tos_config_modules = "";
+    U8 *tos_init = "";
+    U8 *tos_boot_externs = "";
     I64 result;
 
     if (!task)
         return -1;
+    if (!load_tos_config || StrCompare(module, path))
+        module_load = MStrPrint("ExeFile2(\"%Q\",CCF_JUST_LOAD);", module);
+    else
+        module_load = StrNew("");
+    if (!load_tos_config)
+        common_modules =
+            "ExeFile2(\"/System/Math/Math.ZC\",CCF_JUST_LOAD);"
+            "ExeFile2(\"/System/Sound.ZC\",CCF_JUST_LOAD);"
+            "ExeFile2(\"/System/Memory.ZC\",CCF_JUST_LOAD);"
+            "ExeFile2(\"/System/Utils/TaskRep.ZC\",CCF_JUST_LOAD);"
+            "ExeFile2(\"/System/Gr/GrDC.ZC\",CCF_JUST_LOAD);"
+            "ExeFile2(\"/System/Gr/GrMath.ZC\",CCF_JUST_LOAD);"
+            "ExeFile2(\"/System/Gr/GrPrimatives.ZC\",CCF_JUST_LOAD);"
+            "ExeFile2(\"/System/Gr/GrComposites.ZC\",CCF_JUST_LOAD);"
+            "ExeFile2(\"/System/Gr/ScreenCast.ZC\",CCF_JUST_LOAD);"
+            "ExeFile2(\"/Apps/Psalmody/JukePuppet.ZC\",CCF_JUST_LOAD);"
+            "ExeFile2(\"/System/Utils/LineRep.ZC\",CCF_JUST_LOAD);"
+            "ExeFile2(\"/System/BlkDev/ZDiskB.ZC\",CCF_JUST_LOAD);"
+            "ExeFile2(\"/System/BlkDev/DiskCheck.ZC\",CCF_JUST_LOAD);";
+    if (load_tos_config)
+        tos_config_modules =
+            "ExeFile2(\"/Demo/AcctExample/TOS/TOSExtern.ZC\",CCF_JUST_LOAD);"
+            "ExeFile2(\"/Demo/AcctExample/TOS/TOSConfig.ZC\",CCF_JUST_LOAD);"
+            "ExeFile2(\"/Kernel/KGlobals.ZC\",CCF_JUST_LOAD);"
+            "ExeFile2(\"/System/Memory.ZC\",CCF_JUST_LOAD);"
+            "ExeFile2(\"/System/StringUtilities.ZC\",CCF_JUST_LOAD);"
+            "ExeFile2(\"/Compiler/CompilerA.HH\",CCF_JUST_LOAD);"
+            "ExeFile2(\"/Compiler/CompilerB.HH\",CCF_JUST_LOAD);"
+            "ExeFile2(\"/System/Hash.ZC\",CCF_JUST_LOAD);"
+            "ExeFile2(\"/System/God/GodBible.ZC\",CCF_JUST_LOAD);"
+            "ExeFile2(\"/System/Utils/LineRep.ZC\",CCF_JUST_LOAD);"
+            "ExeFile2(\"/System/BlkDev/ZDiskB.ZC\",CCF_JUST_LOAD);"
+            "ExeFile2(\"/System/BlkDev/ZDiskA.ZC\",CCF_JUST_LOAD);"
+            "ExeFile2(\"/System/BlkDev/DiskCheck.ZC\",CCF_JUST_LOAD);"
+            "ExeFile2(\"/System/Utils/StrUtils.ZC\",CCF_JUST_LOAD);"
+            "ExeFile2(\"/System/Utils/DocUtils.ZC\",CCF_JUST_LOAD);"
+            "ExeFile2(\"/Apps/Psalmody/JukePuppet.ZC\",CCF_JUST_LOAD);"
+            "Cd(\"/Demo/AcctExample/TOS\");";
+    if (load_tos_config)
+        tos_init = "TOSInit;TOSDebugDistro1;TOSDebugDistro2;";
+    if (load_tos_config)
+        tos_boot_externs =
+            "#define KERNEL_ZXE \"Kernel.ZXE\"\n"
+            "#define BOOT_DIR \"/Boot\"\n"
+            "#define BOOT_DIR_KERNEL_ZXE BOOT_DIR \"/\" KERNEL_ZXE\n"
+            "#define INS_REG_PERSONAL_INITIALS \"TAD\"\n"
+            "class CSoundData { CSoundData *next,*last; F64 tS; I8 ona; };"
+            "class CScreenCastGlobals { CSoundData sound_head; CDate t0_now; F64 t0_tS; U8 *print_format; CDC *dc,*dc2_alias; Bool record,just_audio; I8 ona; };"
+            "extern CScreenCastGlobals screencast;"
+            "extern U0 SoundShift(CSoundData *head, F64 dt=0);"
+            "extern I64 AUWrite(U8 *filename, CSoundData *head, CDate *t0_now, F64 t0_tS);"
+            "extern I64 GR2MV(U8 *print_format, U8 *files_find_mask, U8 *fu_flags=NULL);"
+            "extern U0 BootHDIns(U8 drv_let);"
+            "extern Bool BootMHDIns(U8 drv_let, U8 *drv_list=NULL);"
+            "extern U0 BootDVDIns(U8 drv_let);"
+            "extern U0 BootRAM(U8 *filename=NULL);"
+            "extern U0 DiskCheckAll();"
+            "extern I64 F2(U8 *needle_str, U8 *fu_flags=NULL);";
     source = MStrPrint(
-        "ExeFile2(\"/System/Math/Math.ZC\",CCF_JUST_LOAD);"
-        "ExeFile2(\"/System/Sound.ZC\",CCF_JUST_LOAD);"
-        "ExeFile2(\"/System/Memory.ZC\",CCF_JUST_LOAD);"
-        "ExeFile2(\"/System/Utils/TaskRep.ZC\",CCF_JUST_LOAD);"
-        "ExeFile2(\"/System/Gr/GrDC.ZC\",CCF_JUST_LOAD);"
-        "ExeFile2(\"/System/Gr/GrMath.ZC\",CCF_JUST_LOAD);"
-        "ExeFile2(\"/System/Gr/GrPrimatives.ZC\",CCF_JUST_LOAD);"
-        "ExeFile2(\"/System/Gr/GrComposites.ZC\",CCF_JUST_LOAD);"
-        "ExeFile2(\"/System/Gr/ScreenCast.ZC\",CCF_JUST_LOAD);"
-        "ExeFile2(\"/Apps/Psalmody/JukePuppet.ZC\",CCF_JUST_LOAD);"
-        "ExeFile2(\"/System/Utils/LineRep.ZC\",CCF_JUST_LOAD);"
-        "ExeFile2(\"/System/BlkDev/ZDiskB.ZC\",CCF_JUST_LOAD);"
-        "ExeFile2(\"/System/BlkDev/DiskCheck.ZC\",CCF_JUST_LOAD);"
-        "ExeFile2(\"/Kernel/KernelA.HH\",CCF_JUST_LOAD);"
-        "ExeFile2(\"/Kernel/KernelB.HH\",CCF_JUST_LOAD);"
+        "%s"
+        "%s"
+        "%s"
         "DefinePrint(\"TOS_HDS\",\"\\\"CD\\\"\");"
-        "ExeFile2(\"%Q\",CCF_JUST_LOAD);"
+        "%s"
+        "%s"
         "StockCatalogExeDocFile(\"%Q\",CCF_JUST_LOAD);42;",
-        module, path);
+        common_modules, tos_config_modules, tos_boot_externs, tos_init,
+        module_load, path);
     job = TaskExe(task, Fs, source, 0);
     Free(source);
+    Free(module_load);
     if (!job)
     {
         Kill(task);
@@ -516,6 +689,58 @@ I64 StockCatalogCompileAfterLoad(U8 *load_path, U8 *app_path)
     return result == 42;
 }
 
+I64 StockCatalogCompilePaletteEditor()
+{//Load the same God services and initializer used by MakeSystem, then compile.
+    CTask *task = Spawn(&StockCatalogServer);
+    CJob *job;
+    U8 *source;
+    I64 result;
+
+    if (!task)
+        return -1;
+    source = StrNew("ExeFile2(\"/Kernel/KGlobals.ZC\",CCF_JUST_LOAD);"
+                    "ExeFile2(\"/System/StringUtilities.ZC\",CCF_JUST_LOAD);"
+                    "ExeFile2(\"/System/God/GodBible.ZC\");"
+                    "ExeFile2(\"/System/God/HolySpirit.ZC\",CCF_JUST_LOAD);"
+                    "ExeFile2(\"/Home/PaletteEditor/Load.ZC\");"
+                    "ExeFile2(\"/Home/PaletteEditor/Run.ZC\",CCF_JUST_LOAD);42;");
+    job = TaskExe(task, Fs, source, 0);
+    Free(source);
+    if (!job)
+    {
+        Kill(task);
+        return -2;
+    }
+    result = JobResGet(job);
+    Kill(task);
+    return result == 42;
+}
+
+I64 StockCatalogCompileNetProgram(U8 *path)
+{//Load network definitions normally before compiling a client against the stack.
+    CTask *task = Spawn(&StockCatalogServer);
+    CJob *job;
+    U8 *source;
+    I64 result;
+
+    if (!task)
+        return -1;
+    source = MStrPrint("ExeFile2(\"/Home/Net/Utilities/Net.HH\");"
+                       "ExeFile2(\"/Home/Net/Load.ZC\",CCF_JUST_LOAD);"
+                       "StockCatalogExeDocFile(\"%Q\",CCF_JUST_LOAD);42;",
+                       path);
+    job = TaskExe(task, Fs, source, 0);
+    Free(source);
+    if (!job)
+    {
+        Kill(task);
+        return -2;
+    }
+    result = JobResGet(job);
+    Kill(task);
+    return result == 42;
+}
+
 I64 StockCatalogCompileDocAfterLoad(U8 *load_path, U8 *app_path)
 {//Compile a DolDoc app source after its app loader has declared dependencies.
     CTask *task = Spawn(&StockCatalogServer);
@@ -526,6 +751,7 @@ I64 StockCatalogCompileDocAfterLoad(U8 *load_path, U8 *app_path)
     if (!task)
         return -1;
     source = MStrPrint(
+        "ExeFile2(\"/System/Sound.ZC\",CCF_JUST_LOAD);"
         "ExeFile2(\"%Q\");"
         "StockCatalogExeDocFile(\"%Q\",CCF_JUST_LOAD);42;",
         load_path, app_path);

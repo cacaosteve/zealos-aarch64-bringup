@@ -1,7 +1,9 @@
 {
-  "date": "2026-11-01",
+  "date": "2026-11-02",
   "command": "python3 scripts/check-compat.py --pci --probe-stock-programs",
   "target": "QEMU PCI ARM64 graphical terminal",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "6931116bb886e34938cdc7b2c1756df8b2f1af4eb1e580e4dda06db2e2fa55c7",
   "result": "pass",
   "programs": {
     "/Demo/Graphics/NetOfDots.ZC": [
@@ -15,5 +17,7 @@
       "input exit and terminal prompt recovery"
     ]
   },
-  "scope": "QEMU evidence only; live UTM behavior is not implied."
+  "scope": "QEMU evidence only; live UTM behavior is not implied.",
+  "log": "build/check-stock-programs-pci.log",
+  "revalidated_on_current_iso": true
 }

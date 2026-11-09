@@ -1,0 +1,20 @@
+{
+  "date": "2026-11-04",
+  "target": "QEMU AArch64 virt machine with PCI VirtIO sound and WAV audio backend",
+  "source": "tests/compat/VirtioSoundProbe.ZC",
+  "source_sha256": "bcb1fcce29de9cfc5da39413f14360dae3c280728a5f1bdcc98fa4b5bc012483",
+  "iso_sha256": "035e0eaeb26f781583f437d89468eadbf6f252eb320d4b23a5bd7428fe99bcec",
+  "command": "QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device -audiodev wav,id=sound0,path=/tmp/zeal-beep-normal.wav -device virtio-sound-pci,audiodev=sound0' python3 scripts/check-compat.py --probe-source-fast --probe-source tests/compat/VirtioSoundProbe.ZC --probe-source-call VirtioBeepProbe",
+  "busy_command": "QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device -audiodev wav,id=sound0,path=/tmp/zeal-beep-busy.wav -device virtio-sound-pci,audiodev=sound0' python3 scripts/check-compat.py --probe-source-fast --probe-source tests/compat/VirtioSoundProbe.ZC --probe-source-call VirtioBusyBeepProbe",
+  "result": "partial",
+  "checks": [
+    "VirtioBeepProbe compiled and returned 0x2a from the guest.",
+    "VirtioBusyBeepProbe compiled and returned 0x2a from the guest.",
+    "For both normal and busy probes, QEMU's WAV backend captured 22,932 stereo frames (0.520 seconds at 44.1 kHz), matching left/right channels and peak amplitude 7,000. FFT over the first 450 ms measured a dominant 784.4 Hz tone for Beep(70). The additional 20 ms is the queued audio tail after the 500 ms generated tone."
+  ],
+  "open_items": [
+    "Measure the stock 200 ms trailing wait independently; source review confirms the wait is implemented, but the guest return value is not timestamped in this capture.",
+    "Verify audible playback in live UTM and on Raspberry Pi hardware."
+  ],
+  "scope_note": "QEMU confirms normal and busy Beep calls emit the expected 500 ms, approximately 784 Hz tone through VirtIO and return successfully. The 200 ms trailing delay is implemented but not independently measured here. Live audible output on UTM and Pi remains unverified."
+}

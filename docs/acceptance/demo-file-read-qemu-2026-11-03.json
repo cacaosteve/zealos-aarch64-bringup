@@ -1,0 +1,30 @@
+{
+  "date": "2026-11-03",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "target": "AArch64 QEMU virt, PCI, graphical terminal",
+  "command": "python3 -m py_compile scripts/check-compat.py && python3 scripts/check-compat.py --probe-demo-file-read",
+  "source": "/Demo/DolDoc/FileRead.ZC",
+  "source_sha256": "4c8456c5dcef9686bc269212c69c174c6bc5066ca46189027190db0e2012e28f",
+  "result": "pass",
+  "checks": [
+    "The rich DocProfile pass rendered its type/flag counters and reached the first PRESS A KEY wait",
+    "After a keypress, the plain-text DocProfile pass rendered its counters and reached the second PRESS A KEY wait",
+    "After a second keypress, ExeFile2 returned and the 0x4652 shell marker appeared",
+    "After FileRead returned, the graphical terminal evaluated 40+2 as 42",
+    "The guest ended with zstatus failed=0"
+  ],
+  "artifacts": {
+    "build/zealos-aarch64-hello.iso": "337538503e8c4fcb6c5fb66a436c2e1478f82bcc9b5494808b7481fcc18eb7b8",
+    "build/disk.img": "b924e7af4e407f272ae4e419145025676915510e08adfd5b4cb80ee50250ebb9",
+    "build/sources.tar": "a8259ac89d9e1fe42a21a757d1d4834a44b052060b59f12219d1de20e551ddbf",
+    "esp/boot/kernel.elf": "9a5289b49fcc87c991d089cbef97190a1eb9d1fba83418bc927437f3d0f8424a",
+    "scripts/check-compat.py": "16462542b9f89e7682a8257db66390f8fc57c167800712b901041b54a97cac72"
+  },
+  "screenshots": [
+    "build/gui-demo-file-read-demo-file-read-rich-profile.ppm",
+    "build/gui-demo-file-read-demo-file-read-plain-profile.ppm",
+    "build/gui-demo-file-read-demo-file-read-return.ppm",
+    "build/gui-demo-file-read-demo-file-read-terminal-recovery-result.ppm"
+  ],
+  "scope_note": "QEMU runtime acceptance only; live UTM or Pi hardware acceptance is not implied."
+}

@@ -1,0 +1,18 @@
+{
+  "date": "2026-11-08",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "working_tree_changes_included": true,
+  "command": "python3 scripts/check-compat.py --quick --probe-source-fast --probe-source upstream/bootstrap/Demo/Lectures/FixedPointAdvanced.ZC",
+  "target": "AArch64 QEMU virt with PCI graphical terminal, single guest CPU",
+  "result": "pass",
+  "source_path": "upstream/bootstrap/Demo/Lectures/FixedPointAdvanced.ZC",
+  "source_sha256": "e17ea99a4cf836ebc34eafef401637da12fb390ef73a0babee2581e92c856360",
+  "kernel_sha256": "4bfeab8f4e8e60962823e2360364231dc13f4ec7187264a8e642864c0113d1fd",
+  "iso_sha256": "8f007016b0b82cd376c61e1906ea80d0bea1a9890d7a89268322fc40ffff50fc",
+  "verified": [
+    "The AArch64 adaptation ran to completion and returned to the graphical terminal.",
+    "Overhead, floating-point, and fixed-point loops each reported nonzero elapsed time.",
+    "Both computed sums were emitted; no compiler error or guest hang occurred."
+  ],
+  "scope_note": "Automated runtime acceptance of the bootstrap AArch64 adaptation in QEMU. Does not establish live UTM or Raspberry Pi hardware behavior."
+}

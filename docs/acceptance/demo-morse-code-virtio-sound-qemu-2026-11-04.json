@@ -1,0 +1,18 @@
+{
+  "date": "2026-11-04",
+  "source_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "target": "AArch64 QEMU virt with PCI VirtIO sound and WAV backend",
+  "source_path": "/Demo/Sound/MorseCode.ZC",
+  "source_sha256": "b6be88531b82c1fb09fed379da123a1127f76e5558d23c1d40634bd743de032c",
+  "iso_path": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "7d1fd33f5830079057e71f79cb802c6d60be8fbaea3260fdeea83936d60540aa",
+  "command": "QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device -audiodev wav,id=sound0,path=/tmp/zeal-morse-final.wav -device virtio-sound-pci,audiodev=sound0' python3 scripts/check-compat.py --probe-demo-morse-code",
+  "result": "pass",
+  "checks": [
+    "Launched the unchanged stock /Demo/Sound/MorseCode.ZC and rendered its Morse table.",
+    "Injected a short key-down/key-up pulse; the key was sampled through the stock MessageScan/CharGet path and caused the Morse dot tone.",
+    "QEMU WAV captured 10584 stereo frames at 44.1 kHz (0.24 s); 19404 samples were nonzero and peak amplitude was 7000.",
+    "Shift-Escape exited MorseCode and returned to the graphical terminal; 40+2 evaluated to 42 and zstatus reported failed=0."
+  ],
+  "scope_note": "Verifies MorseCode keyboard timing, sound generation through QEMU VirtIO sound, and terminal recovery. Live UTM and Raspberry Pi sound output remain unverified."
+}

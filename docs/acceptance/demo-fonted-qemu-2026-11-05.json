@@ -1,0 +1,25 @@
+{
+  "date": "2026-11-05",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "target": "AArch64 QEMU virt, PCI, graphical terminal",
+  "command": "python3 scripts/check-compat.py --pci --probe-demo-fonted",
+  "source_path": "/Demo/Graphics/FontEd.ZC",
+  "source_sha256": "3eedba4ed39c03b41ade49ddf7c8e7cbc399cfa2ad4bfefc9e72503ffaa7ddb3",
+  "result": "pass",
+  "checks": [
+    "The FontEd glyph grid rendered and responded to arrow-key selection",
+    "Escape saved the font source without truncating the task's draw callback",
+    "Escape returned to the graphical terminal and 40+2 evaluated to 42",
+    "Guest zstatus reported failed=0"
+  ],
+  "fix": "The ARM64 source-bundle overlay preserves FontEd's draw callback as its full function-pointer type instead of truncating it to U8.",
+  "artifacts": {
+    "build/zealos-aarch64-hello.iso": "888650f553d4b04e61f701f3a967add0d6bda9e8e9f9db3b05c1f06ce6006156",
+    "build/disk.img": "1dc34c39c14d8a1d7f7b1030c2f3cd435cd116ff4167c98ec88415ad325a763f",
+    "build/sources.tar": "4916e7bfd6c7353bac8393c1fbe5e802384f6887a48c60f571fad8855c29b7e4",
+    "scripts/check-compat.py": "7441e875a2cbfbc4116c749cc01fd4f98d6fc0152f9dbfc72ff4282cb57c1391",
+    "scripts/build-source-bundle.py": "3fc53784d9fa057e0093a13a94ae628d04550d2ef110b8efe1e4ce8e8cb69218",
+    "scripts/arm64_source.py": "18186d9c1c7674215ca4d301ee7d0ee4bddb18053e17ab92ed51dcf3f2e0ac10"
+  },
+  "scope_note": "QEMU runtime acceptance only; live UTM or Pi hardware acceptance is not implied."
+}

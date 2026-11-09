@@ -3,7 +3,7 @@
   "base_commit": "199e5a02cd649208cabbaeeabe19295482c7712a",
   "target": "QEMU PCI ARM64 graphical guest",
   "iso": "build/zealos-aarch64-hello.iso",
-  "iso_sha256": "e34393b6ceeaf3069209bc9cf29285dd0888c71edc74bae86b14acf17bea3ebd",
+  "iso_sha256": "da1c153a2f6b19fd8ea8ea1c7659ef87c7cf6404dd0806e19ea5c93c09a58fc6",
   "command": "python3 scripts/check-compat.py --pci --probe-demo-slider",
   "result": "pass",
   "checks": {
@@ -18,5 +18,6 @@
     "build/gui-demo-slider-demo-slider-key-prompt.ppm",
     "build/gui-demo-slider-demo-slider-values.txt",
     "build/gui-demo-slider-demo-slider-exit-smoke-result.ppm"
-  ]
+  ],
+  "working_tree_changes_included": true
 }

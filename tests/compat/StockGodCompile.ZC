@@ -1,0 +1,9 @@
+#include "/Kernel/KernelC.HH"
+#include "/System/Gr/Gr.HH"
+#include "/System/Sound"
+#include "/System/God/GodExterns"
+/* GodBible's startup initializer normally derives this count from its final
+ * ST_BIBLE_BOOK_LINES entry. Compile-only mode skips that initializer, so
+ * expose the matching constant while parsing HolySpirit. */
+#define ST_BIBLE_LINES 100110
+#include "/System/God/MakeGod"

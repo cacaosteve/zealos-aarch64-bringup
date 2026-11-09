@@ -30,6 +30,9 @@
 #include "virtio_kbd.h"
 #include "virtio_tablet.h"
 #include "virtio_blk.h"
+#include "virtio_net.h"
+#include "virtio_snd.h"
+#include "pi4_audio.h"
 #ifndef ZEAL_PI_DIAG
 #include "zc_source_store.h"
 #endif
@@ -39,6 +42,67 @@ int zc_virtio_keyboard_ready(void) { return virtio_kbd_ready(); }
 uint64_t zc_virtio_keyboard_event_count(void) { return virtio_kbd_key_event_count(); }
 uint16_t zc_virtio_keyboard_last_code(void) { return virtio_kbd_last_key_code(); }
 uint32_t zc_virtio_keyboard_last_value(void) { return virtio_kbd_last_key_value(); }
+int zc_virtio_net_ready(void) { return virtio_net_ready(); }
+int zc_virtio_net_mac(uint8_t *out) { return virtio_net_mac(out); }
+int zc_virtio_net_send(const void *frame, uint32_t len) {
+    return virtio_net_send(frame, len);
+}
+int zc_virtio_net_recv(void *frame, uint32_t cap) {
+    return virtio_net_recv(frame, cap);
+}
+static int g_audio_is_pi;
+#if defined(ZEAL_FORCE_PI4) && !defined(ZEAL_PI_DIAG)
+static int pi4_hdmi_tone(int8_t ona);
+static void pi4_hdmi_stop(void);
+static int g_pi4_hdmi_selected = 1;
+static int g_pi4_hdmi_running;
+static uint64_t g_pi4_hdmi_deadline;
+#endif
+uint64_t zc_pi4_audio_debug(unsigned index) {
+    return index == 0 ? (uint64_t)g_audio_is_pi : pi4_audio_debug(index - 1);
+}
+void zc_virtio_sound_set_tone(int8_t ona) {
+#if defined(ZEAL_FORCE_PI4) && !defined(ZEAL_PI_DIAG)
+    if (g_audio_is_pi) {
+        g_pi4_hdmi_deadline = 0;
+        if (g_pi4_hdmi_running) {
+            pi4_hdmi_stop();
+            if (!ona)
+                return;
+        }
+        if (ona && g_pi4_hdmi_selected && pi4_hdmi_tone(ona))
+            return;
+    }
+#endif
+    if (g_audio_is_pi) pi4_audio_set_tone(ona);
+    else virtio_snd_set_tone(ona);
+}
+void zc_virtio_sound_beep(int8_t ona) {
+#if defined(ZEAL_FORCE_PI4) && !defined(ZEAL_PI_DIAG)
+    if (g_audio_is_pi) {
+        if (g_pi4_hdmi_running)
+            pi4_hdmi_stop();
+        g_pi4_hdmi_deadline = 0;
+        if (ona && g_pi4_hdmi_selected && pi4_hdmi_tone(ona)) {
+            g_pi4_hdmi_deadline = pi4_audio_counter() + g_pi4_audio_cntfrq / 2u;
+            return;
+        }
+    }
+#endif
+    if (g_audio_is_pi) pi4_audio_beep(ona);
+    else virtio_snd_beep(ona);
+}
+int zc_virtio_sound_beep_done(void) {
+#if defined(ZEAL_FORCE_PI4) && !defined(ZEAL_PI_DIAG)
+    if (g_pi4_hdmi_deadline)
+        return (int64_t)(pi4_audio_counter() - g_pi4_hdmi_deadline) >= 0;
+#endif
+    return g_audio_is_pi ? pi4_audio_beep_done() : virtio_snd_beep_done();
+}
+void zc_virtio_sound_pump(void) {
+    if (g_audio_is_pi) pi4_audio_pump();
+    else virtio_snd_pump();
+}
 
 #include "netofdots_zc.h"
 #include "lines_zc.h"
@@ -202,6 +266,7 @@ extern char exception_vectors[];
 static volatile uint8_t *g_uart;
 static volatile uint32_t g_timer_irqs;
 static volatile uint32_t g_svc_hits;
+volatile uint64_t g_arm64_svc_bench_hits;
 /* 1 = use GICv2 MMIO CPU interface (Pi); 0 = GICv3 system regs (virt). */
 static volatile uint32_t g_gic_v2;
 /* When set, non-SVC sync advances ELR by 4 and returns (probe CNTP under UTM/HVF). */
@@ -10082,6 +10147,12 @@ void exc_handle_sync(uint64_t *frame) {
     __asm__ volatile("mrs %0, far_el1" : "=r"(far));
     uint64_t ec = (esr >> 26) & 0x3f;
     if (ec == 0x15) {
+        /* Private immediate used by the AArch64 InterruptDemo benchmark.
+         * Keep this path quiet: the sample loop measures exception latency. */
+        if ((esr & 0xffff) == 0x42) {
+            g_arm64_svc_bench_hits++;
+            return;
+        }
         g_svc_hits++;
         if (g_uart) {
             uart_puts(g_uart, "sync: SVC ok (hits=");
@@ -10160,6 +10231,30 @@ void exc_handle_sync(uint64_t *frame) {
                 uart_puts(g_uart, name);
                 uart_puts(g_uart, "+");
                 uart_put_hex_raw(g_uart, offset);
+            }
+            /* One more frame identifies the function that called CALLER.
+             * Exception frames contain the guest's x29, whose AArch64 frame
+             * record is [previous x29, saved x30]. Validate the HHDM range
+             * before reading it so a corrupt frame cannot recursively fault. */
+            uintptr_t fp = (uintptr_t)frame[29];
+            const uintptr_t stack_map_lo = UINT64_C(0xffff000000000000);
+            const uintptr_t stack_map_hi = UINT64_C(0xffff000080000000);
+            if (fp >= stack_map_lo && fp + 16 > fp &&
+                fp + 16 < stack_map_hi && !(fp & 7)) {
+                uintptr_t parent_fp =
+                    *(volatile const uintptr_t *)(uintptr_t)fp;
+                if (parent_fp >= stack_map_lo && parent_fp + 16 > parent_fp &&
+                    parent_fp + 16 < stack_map_hi && !(parent_fp & 7)) {
+                    uintptr_t caller2 = *(volatile const uintptr_t *)(
+                        (uintptr_t)parent_fp + sizeof(uintptr_t));
+                    name = zc_debug_function_for_pc(caller2, &offset);
+                    if (name) {
+                        uart_puts(g_uart, " UP_CALLER=");
+                        uart_puts(g_uart, name);
+                        uart_puts(g_uart, "+");
+                        uart_put_hex_raw(g_uart, offset);
+                    }
+                }
             }
         }
 #endif
@@ -13451,6 +13546,195 @@ static void zc_print_decimal(uint64_t value) {
     do { buf[n++] = (char)('0' + value % 10); value /= 10; } while (value);
     while (n) con_write(buf[--n]);
 }
+static void zc_print_hex64(uint64_t value) {
+    static const char digits[] = "0123456789abcdef";
+    for (int shift = 60; shift >= 0; shift -= 4)
+        con_write(digits[(value >> shift) & 15]);
+}
+
+static void zc_pi4_audio_status(void) {
+    con_puts("pi4_audio: target_pi="); zc_print_decimal(zc_pi4_audio_debug(0));
+    con_puts(" ready="); zc_print_decimal(zc_pi4_audio_debug(1));
+    con_puts(" beep_calls="); zc_print_decimal(zc_pi4_audio_debug(2));
+    con_puts(" tone_calls="); zc_print_decimal(zc_pi4_audio_debug(3));
+    con_puts(" note="); zc_print_decimal(zc_pi4_audio_debug(4));
+    con_puts(" hz="); zc_print_decimal(zc_pi4_audio_debug(5));
+    con_puts(" init_stage="); zc_print_decimal(zc_pi4_audio_debug(14));
+    con_puts("\npi4_audio_regs: fsel4="); zc_print_hex64(zc_pi4_audio_debug(6));
+    con_puts(" cmctl="); zc_print_hex64(zc_pi4_audio_debug(7));
+    con_puts(" cmdiv="); zc_print_hex64(zc_pi4_audio_debug(8));
+    con_puts(" pwmctl="); zc_print_hex64(zc_pi4_audio_debug(9));
+    con_puts("\npi4_audio_pwm: rng1="); zc_print_hex64(zc_pi4_audio_debug(10));
+    con_puts(" dat1="); zc_print_hex64(zc_pi4_audio_debug(11));
+    con_puts(" rng2="); zc_print_hex64(zc_pi4_audio_debug(12));
+    con_puts(" dat2="); zc_print_hex64(zc_pi4_audio_debug(13));
+    con_puts("\npi4_audio_active: sta="); zc_print_hex64(zc_pi4_audio_debug(15));
+    con_puts(" ctl="); zc_print_hex64(zc_pi4_audio_debug(16));
+    con_puts(" dat1="); zc_print_hex64(zc_pi4_audio_debug(17));
+    con_puts(" dat2="); zc_print_hex64(zc_pi4_audio_debug(18));
+    con_puts("\npi4_audio_status: cleared="); zc_print_hex64(zc_pi4_audio_debug(19));
+    con_puts(" pre_enable="); zc_print_hex64(zc_pi4_audio_debug(20));
+    con_puts(" pre_mute="); zc_print_hex64(zc_pi4_audio_debug(21));
+    con_puts("\n");
+}
+
+static void zc_pi4_audio_test_beep(void) {
+    uint64_t deadline;
+    if (!g_audio_is_pi || !g_pi4_audio_ready || !g_pi4_audio_cntfrq) {
+        con_puts("paudiobeep: Pi PWM audio is not ready\n");
+        return;
+    }
+    /* Bypass the ZealC Sound/Beep bindings to isolate GPIO/PWM output. */
+    pi4_audio_beep(60);
+    deadline = pi4_audio_counter() + g_pi4_audio_cntfrq / 2u;
+    while ((int64_t)(pi4_audio_counter() - deadline) < 0)
+        __asm__ volatile("yield");
+    pi4_audio_set_tone(0);
+    zc_pi4_audio_status();
+}
+
+#ifdef ZEAL_FORCE_PI4
+static uint64_t g_pi4_mailbox_phys;
+static int g_pi4_mailbox_reply_pending;
+
+static void pi4_mailbox_find_buffer(const struct zeal_handoff *h) {
+    for (uint32_t i = 0; i < h->mem_count; i++) {
+        const struct zeal_mem_entry *entry = &h->mem[i];
+        if (entry->type == ZEAL_MEM_PI4_AUDIO && entry->length == ZEAL_PI4_AUDIO_BYTES &&
+            entry->base && !(entry->base & 0xfffu) &&
+            entry->base <= ZEAL_PI4_AUDIO_PHYS_LIMIT - entry->length) {
+            g_pi4_mailbox_phys = entry->base;
+            return;
+        }
+    }
+}
+
+static int pi4_mailbox_wait(volatile uint32_t *reg, uint32_t mask,
+                            uint64_t deadline) {
+    do {
+        if (!(*reg & mask))
+            return 1;
+        __asm__ volatile("yield");
+    } while ((int64_t)(pi4_audio_counter() - deadline) < 0);
+    return 0;
+}
+
+static int pi4_hdmi_firmware_resources(uint32_t *pixel_hz, uint32_t *dma_channels) {
+    struct {
+        uint32_t size, status;
+        uint32_t clock_tag, clock_capacity, clock_length, clock_id, rate;
+        uint32_t dma_tag, dma_capacity, dma_length, dma_mask;
+        uint32_t end;
+    } volatile *message;
+    uint64_t counter_hz, cache_type;
+    if (!g_pi4_mailbox_phys || g_pi4_mailbox_reply_pending ||
+        g_hhdm > UINT64_MAX - PI4_MAILBOX_PHYS - PI4_MAILBOX_TX_STATUS ||
+        mmio_map_2m(g_hhdm, PI4_MAILBOX_PHYS) != 0)
+        return 0;
+    __asm__ volatile("mrs %0, cntfrq_el0" : "=r"(counter_hz));
+    __asm__ volatile("mrs %0, ctr_el0" : "=r"(cache_type));
+    if (counter_hz < 10)
+        return 0;
+    uintptr_t cache_line = 4u << ((cache_type >> 16) & 15u);
+    if (cache_line > 4096)
+        return 0;
+    volatile uint32_t *regs = (volatile uint32_t *)(uintptr_t)(g_hhdm + PI4_MAILBOX_PHYS);
+    uint64_t deadline = pi4_audio_counter() + counter_hz / 10;
+    if (!(regs[PI4_MAILBOX_RX_STATUS / 4] & PI4_MAILBOX_EMPTY) ||
+        !pi4_mailbox_wait(&regs[PI4_MAILBOX_TX_STATUS / 4], PI4_MAILBOX_FULL, deadline))
+        return 0;
+
+    message = (void *)(uintptr_t)(g_hhdm + g_pi4_mailbox_phys);
+    message->size = sizeof(*message);
+    message->status = 0;
+    message->clock_tag = PI4_PROPERTY_GET_CLOCK_RATE;
+    message->clock_capacity = 2 * sizeof(uint32_t);
+    message->clock_length = sizeof(uint32_t);
+    message->clock_id = PI4_PROPERTY_PIXEL_BVB_CLOCK;
+    message->rate = 0;
+    message->dma_tag = PI4_PROPERTY_GET_DMA_CHANNELS;
+    message->dma_capacity = sizeof(uint32_t);
+    message->dma_length = 0;
+    message->dma_mask = 0;
+    message->end = 0;
+    for (uintptr_t p = (uintptr_t)message; p < (uintptr_t)message + sizeof(*message);
+         p += cache_line)
+        __asm__ volatile("dc civac, %0" :: "r"(p) : "memory");
+    pi4_audio_dsb();
+
+    uint32_t request = (uint32_t)g_pi4_mailbox_phys | PI4_MAILBOX_GPU_ALIAS |
+                       PI4_MAILBOX_PROPERTY_CHANNEL;
+    regs[PI4_MAILBOX_WRITE / 4] = request;
+    pi4_audio_dsb();
+    g_pi4_mailbox_reply_pending = 1;
+    if (!pi4_mailbox_wait(&regs[PI4_MAILBOX_RX_STATUS / 4], PI4_MAILBOX_EMPTY, deadline) ||
+        regs[PI4_MAILBOX_READ / 4] != request)
+        return 0; /* A late firmware reply may still write to this buffer. */
+    g_pi4_mailbox_reply_pending = 0;
+    for (uintptr_t p = (uintptr_t)message; p < (uintptr_t)message + sizeof(*message);
+         p += cache_line)
+        __asm__ volatile("dc ivac, %0" :: "r"(p) : "memory");
+    pi4_audio_dsb();
+    if (message->status != 0x80000000u)
+        return 0;
+    if (message->clock_length == 0x80000008u &&
+        message->clock_id == PI4_PROPERTY_PIXEL_BVB_CLOCK)
+        *pixel_hz = message->rate;
+    if (message->dma_length == 0x80000004u)
+        *dma_channels = message->dma_mask & 0xffffu;
+    return 1;
+}
+
+#include "pi4_hdmi_audio.inc"
+
+/* Inspect the firmware's HDMI setup without changing the video or audio path. */
+static void pi4_hdmi_audio_status(void) {
+    static const uint64_t controllers[] = {PI4_HDMI0_PHYS, PI4_HDMI1_PHYS};
+    if (!g_audio_is_pi || !g_hhdm ||
+        g_hhdm > UINT64_MAX - PI4_HDMI1_PHYS - PI4_HDMI_REG_SIZE) {
+        con_puts("phdmi: Pi 4B HDMI registers unavailable\n");
+        return;
+    }
+    if (mmio_map_2m(g_hhdm, PI4_HDMI0_PHYS) != 0) {
+        con_puts("phdmi: HDMI MMIO mapping unavailable\n");
+        return;
+    }
+    for (unsigned port = 0; port < sizeof(controllers) / sizeof(controllers[0]); port++) {
+        volatile uint8_t *base = (volatile uint8_t *)(uintptr_t)(g_hhdm + controllers[port]);
+        uint32_t scheduler, packet, status, clock, cts;
+        con_puts("pi4_hdmi"); zc_print_decimal(port);
+        if (pi4_xhci_read_mmio32(base, PI4_HDMI_SCHEDULER_CONTROL, PI4_HDMI_REG_SIZE, &scheduler) ||
+            pi4_xhci_read_mmio32(base, PI4_HDMI_PACKET_CONFIG, PI4_HDMI_REG_SIZE, &packet) ||
+            pi4_xhci_read_mmio32(base, PI4_HDMI_PACKET_STATUS, PI4_HDMI_REG_SIZE, &status) ||
+            pi4_xhci_read_mmio32(base, PI4_HDMI_AUDIO_CLOCK_CONFIG, PI4_HDMI_REG_SIZE, &clock) ||
+            pi4_xhci_read_mmio32(base, PI4_HDMI_AUDIO_CTS, PI4_HDMI_REG_SIZE, &cts)) {
+            con_puts(": controller read failed\n");
+            continue;
+        }
+        con_puts(": active="); zc_print_decimal(!!(scheduler & PI4_HDMI_LINK_ACTIVE));
+        con_puts(" packets="); zc_print_decimal(!!(packet & PI4_HDMI_PACKET_ENABLE));
+        con_puts("\n  scheduler="); zc_print_hex64(scheduler);
+        con_puts(" packet_config="); zc_print_hex64(packet);
+        con_puts(" packet_status="); zc_print_hex64(status);
+        con_puts("\n  audio_clock="); zc_print_hex64(clock);
+        con_puts(" cts="); zc_print_hex64(cts);
+        con_puts("\n");
+    }
+    uint32_t pixel_hz = 0, dma_channels = 0;
+    int firmware_ok = pi4_hdmi_firmware_resources(&pixel_hz, &dma_channels);
+    con_puts("pi4_hdmi: firmware_ok="); zc_print_decimal(firmware_ok);
+    con_puts(" pixel_bvb_hz="); zc_print_decimal(pixel_hz);
+    con_puts("\n  dma_available="); zc_print_hex64(dma_channels);
+    con_puts("\n");
+    con_puts("pi4_hdmi_audio: stage="); zc_print_decimal(g_pi4_hdmi_stage);
+    con_puts(" starts="); zc_print_decimal(g_pi4_hdmi_starts);
+    con_puts(" hz="); zc_print_decimal(g_pi4_hdmi_last_hz);
+    con_puts("\n  dma_status="); zc_print_hex64(g_pi4_hdmi_last_dma_status);
+    con_puts(" dma_debug="); zc_print_hex64(g_pi4_hdmi_last_dma_debug);
+    con_puts("\n  dma_source="); zc_print_hex64(g_pi4_hdmi_last_dma_source);
+    con_puts("\n");
+}
+#endif
 
 void zc_usb_status(void) {
     unsigned devices = 0, hubs = 0, quarantined = 0;
@@ -13672,6 +13956,9 @@ int zeal_zss_entry_at(uint32_t index, char *name, size_t name_cap,
                       size_t *size_out) {
     return zss_entry_at(index, name, name_cap, size_out);
 }
+int zeal_zss_volume_stats(uint64_t *capacity_bytes, uint64_t *free_bytes) {
+    return zss_volume_stats(capacity_bytes, free_bytes);
+}
 uint64_t zeal_zss_catalog_revision(void) { return g_zss_catalog_revision; }
 int zeal_zss_writable(void) { return zss_available(); }
 #include "zc_source_editor.h"
@@ -13679,6 +13966,9 @@ int zeal_zss_writable(void) { return zss_available(); }
 int zeal_zss_entry_at(uint32_t index, char *name, size_t name_cap,
                       size_t *size_out) {
     (void)index; (void)name; (void)name_cap; (void)size_out; return 0;
+}
+int zeal_zss_volume_stats(uint64_t *capacity_bytes, uint64_t *free_bytes) {
+    (void)capacity_bytes; (void)free_bytes; return 0;
 }
 uint64_t zeal_zss_catalog_revision(void) { return 0; }
 int zeal_zss_writable(void) { return 0; }
@@ -13926,6 +14216,18 @@ static void shell_handle(const char *line, int *done) {
         line[4]=='t' && line[5]==' ') { zedit_start(line+6); return; }
     if (streq(line, "zcheck")) { (void)zc_selftest(); return; }
     if (streq(line, "zstatus")) { zc_status(); return; }
+    if (streq(line, "paudio")) { zc_pi4_audio_status(); return; }
+    if (streq(line, "paudiobeep")) { zc_pi4_audio_test_beep(); return; }
+#ifdef ZEAL_FORCE_PI4
+    if (streq(line, "phdmi")) { pi4_hdmi_audio_status(); return; }
+    if (streq(line, "paudio analog") || streq(line, "paudio hdmi")) {
+        zc_virtio_sound_set_tone(0);
+        g_pi4_hdmi_selected = streq(line, "paudio hdmi");
+        con_puts(g_pi4_hdmi_selected ? "Audio output: HDMI0 preferred\n" :
+                 "Audio output: 3.5 mm jack\n");
+        return;
+    }
+#endif
     if (streq(line, "zinstall")) { zinstall_handle(""); return; }
     if (line[0] == 'z' && line[1] == 'i' && line[2] == 'n' &&
         line[3] == 's' && line[4] == 't' && line[5] == 'a' &&
@@ -14133,7 +14435,7 @@ static void shell_handle(const char *line, int *done) {
 
     if (streq(line, "help")) {
 #ifndef ZEAL_PI_DIAG
-        con_puts("Native compiler: zcheck | zvol | zls | zgc | zedit <path> | zrm <path> | zverify <path> | zload /path.ZC | zput Name.ZC <source> | zrecv Name.ZC <bytes> <crc32> | zload disk:Name.ZC | zc <source> | zcall Function | zstatus | zreset | zinstall [ERASE] (ISO only) | winmgr | gterm | gtermstop | winmgrstop | windowdemo | windowdemostop | fbquiet | fbshow\n");
+        con_puts("Native compiler: zcheck | zvol | zls | zgc | zedit <path> | zrm <path> | zverify <path> | zload /path.ZC | zput Name.ZC <source> | zrecv Name.ZC <bytes> <crc32> | zload disk:Name.ZC | zc <source> | zcall Function | zstatus | paudio | paudiobeep | zreset | zinstall [ERASE] (ISO only) | winmgr | gterm | gtermstop | winmgrstop | windowdemo | windowdemostop | fbquiet | fbshow\n");
         con_puts("Window test order: zreset -> zload /Kernel/KernelA.HH -> zload /Kernel/KernelB.HH\n");
         con_puts("  -> zload /Tests/WindowDragLive.ZC -> zcall WindowDragLiveStart; stop: zcall WindowDragLiveStop\n");
         con_puts("UTM window demo: windowdemo (drag/raise/resize; Ctrl+C exits) | windowdemostop\n");
@@ -15714,6 +16016,7 @@ int64_t zc_gui_shell_exec(int64_t *a) {
             "Graphical commands: status (zstatus) | zvol | zls | zgc | zverify <path> | zload <path> | zput <name> <source> | zrm <name> | edit <path> | zc <source> | zcall <function> | zinstall [ERASE] (ISO only) | windowdemo | latticeplay | stockplay | paint\n"
 #ifdef ZEAL_FORCE_PI4
             "Pi USB diagnostics: usbstatus | usbread (media remains read-only).\n"
+            "Pi audio: paudio hdmi | paudio analog | paudio | phdmi.\n"
 #endif
             "OS menu: hold the pointer button, drag, then release on an item.\n"
             "Lattice controls: Esc exit | Enter restart | Space step | c colors | L-click place | R-drag aim\n"
@@ -15729,6 +16032,8 @@ int64_t zc_gui_shell_exec(int64_t *a) {
     if (!(
 #ifdef ZEAL_FORCE_PI4
           streq(command, "usbstatus") || streq(command, "usbread") ||
+          streq(command, "paudio") || streq(command, "phdmi") ||
+          streq(command, "paudio analog") || streq(command, "paudio hdmi") ||
 #endif
           streq(command, "zstatus") ||
           streq(command, "zvol") || streq(command, "zls") ||
@@ -18510,6 +18815,7 @@ void kernel_entry(const struct zeal_handoff *h) {
 #ifdef ZEAL_FORCE_PI4
     is_pi = 1;
 #endif
+    g_audio_is_pi = is_pi;
 
     g_hhdm = h->hhdm_offset;
     g_uart = NULL;
@@ -19710,15 +20016,19 @@ void kernel_entry(const struct zeal_handoff *h) {
                                     __asm__ volatile("isb");
                                     pl011_rx_prep();
 #ifndef ZEAL_PI_DIAG
+                                    pi4_mailbox_find_buffer(h);
+                                    if (pi4_audio_init(h->hhdm_offset))
+                                        con_puts("pi4-audio: PWM1 tone output ready (GPIO40/41)\n");
+                                    else
+                                        con_puts("pi4-audio: PWM1 init failed; sound unavailable\n");
                                     con_puts("\nPI-DESKTOP-2: accepted Pi hardware startup\n");
                                     input_poll(); /* Runs the accepted automatic USB probe. */
                                     pi4_usb_bus_report(1);
                                     if (!h->sources_virt || !h->sources_size)
                                         con_puts("PI-DESKTOP-2: missing source archive; native desktop skipped\n");
                                     else if (!pi4_usb_bus_keyboard_ready() ||
-                                             !pi4_usb_bus_pointer_ready() ||
-                                             !g_pi4_bus.storage_ready)
-                                        con_puts("PI-DESKTOP-2: combined USB gate failed; native desktop skipped\n");
+                                             !pi4_usb_bus_pointer_ready())
+                                        con_puts("PI-DESKTOP-2: USB keyboard or pointer unavailable; native desktop skipped\n");
                                     else if (!pi4_desktop_prepare())
                                         con_puts("PI-DESKTOP-2: unsupported framebuffer; use diagnostic recovery\n");
                                     else
@@ -19894,6 +20204,25 @@ void kernel_entry(const struct zeal_handoff *h) {
         } else {
             uart_puts(g_uart, "virtio-blk: none (RAM Blk* only) dbg=");
             uart_put_u64_hex(g_uart, (uint64_t)(uint32_t)g_vb_pci_dbg);
+            uart_puts(g_uart, "\n");
+        }
+        if (virtio_net_init(h->hhdm_offset)) {
+            uart_puts(g_uart, "virtio-net: OK mac=");
+            for (unsigned i = 0; i < 6; i++) {
+                uart_put_u64_hex(g_uart, g_vn_mac[i]);
+                if (i != 5) uart_puts(g_uart, ":");
+            }
+            uart_puts(g_uart, " pci\n");
+        } else {
+            uart_puts(g_uart, "virtio-net: none dbg=");
+            uart_put_u64_hex(g_uart, (uint64_t)(uint32_t)virtio_net_debug());
+            uart_puts(g_uart, "\n");
+        }
+        if (virtio_snd_init(h->hhdm_offset)) {
+            uart_puts(g_uart, "virtio-snd: PCM playback ready (S16 48kHz stereo)\n");
+        } else {
+            uart_puts(g_uart, "virtio-snd: none dbg=");
+            uart_put_u64_hex(g_uart, (uint64_t)(uint32_t)virtio_snd_debug());
             uart_puts(g_uart, "\n");
         }
     }

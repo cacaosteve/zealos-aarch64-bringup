@@ -1,0 +1,132 @@
+{
+  "date": "2026-11-08",
+  "target": "AArch64 native ZealC on PCI QEMU",
+  "boot_disk_sha256": "43742bcc61b0eabc2b92fd3b86855aba295837dabdceb2e9d7e3db7321165c1a",
+  "command": "python3 scripts/check-compat.py --pci --quick --probe-demo-wallpaper-desktop",
+  "exit_code": 0,
+  "result": "partial",
+  "checks": [
+    {
+      "source": "/Demo/Graphics/WallPapers/WallPaperDesktop.ZC",
+      "result": "partial",
+      "evidence": "A freshly seeded disk retained the default backdrop. The installer copied all three files. A cold disk-only boot loaded the saved wallpaper, registered all six controls, and dismissed the animated splash with Escape. The test independently hid each control and verified visible pixels within its nonoverlapping hit area. QMP clicks on Home and Terminal opened focused shells. Each returned 42 after keyboard input, and the serial terminal returned 42 independently. Clicking Stats hid and restored the rendered desktop statistics. Clicking NetLog opened the stock Network Log window, which rendered and contained a message written through NetLog. Further clicks closed, reopened, and closed the window again."
+    },
+    {
+      "source": "/Demo/Graphics/WallPapers/WallPaperDesktop/HomeSys.ZC",
+      "result": "pass",
+      "evidence": "A disposable QEMU disk installed the unmodified HomeSys with the wallpaper assets, cold-booted, and produced exactly one live terminal at bounds 22,78,19,55 with keyboard focus. A command delivered to that terminal set a guest value to 42. The same run exercised all six desktop controls, the palette editor, and the Telnet form with a local connection and clean close."
+    }
+  ],
+  "scope_note": "The test hides existing terminal layers to expose the wallpaper. Home, Terminal, Stats and NetLog actions were exercised. A QMP click on Palette launched the editor. The random-color key changed the live palette and scanout, Escape closed the editor and retained the change, and the serial shell still returned 42. The latest combined run covers the Telnet launcher, a local connection, and the installed HomeSys layout on cold boot. Full Palette Editor workflows, arbitrary HomeSys customizations, and live UTM and Pi behavior remain unverified.",
+  "icon_hit_areas": {
+    "home": {
+      "rect": [
+        8,
+        24,
+        48,
+        77
+      ],
+      "changed_pixels": 1306
+    },
+    "telnet": {
+      "rect": [
+        8,
+        85,
+        61,
+        132
+      ],
+      "changed_pixels": 1830
+    },
+    "palette": {
+      "rect": [
+        8,
+        140,
+        69,
+        188
+      ],
+      "changed_pixels": 1482
+    },
+    "netlog": {
+      "rect": [
+        722,
+        532,
+        799,
+        559
+      ],
+      "changed_pixels": 423
+    },
+    "stats": {
+      "rect": [
+        722,
+        492,
+        799,
+        519
+      ],
+      "changed_pixels": 405
+    },
+    "terminal": {
+      "rect": [
+        722,
+        572,
+        799,
+        599
+      ],
+      "changed_pixels": 471
+    }
+  },
+  "telnet_startup_retest": {
+    "date": "2026-11-08",
+    "boot_disk_sha256": "2d40a0e8259b6e39e7b48cd01fbbb0a9e8f62edd35f85f34d41c20b038d48403",
+    "result": "partial",
+    "evidence": "On a disposable QEMU disk with the desktop wallpaper preinstalled, QMP opened and closed NetLog, then clicked Telnet. The ZealOS Telnet client splash appeared with no guest failure reported immediately after the click. A subsequent focused run opened the Host and Port form with Alt+N and retained failed=0.",
+    "scope": "The combined desktop regression covers DHCP, form entry, a local fixture connection, input, socket close and client exit in QEMU. Live UTM and broader Telnet protocol compatibility remain unverified.",
+    "full_desktop_run": {
+      "command": "python3 scripts/check-compat.py --pci --quick --probe-demo-wallpaper-desktop",
+      "boot_disk_sha256": "7a1fbe7e29ff7d1364fee13c8f27adf7ac67171d6392339e227e2654cfd3632c",
+      "exit_code": 0,
+      "evidence": "The installer copied the wallpaper assets and a cold boot registered the desktop controls. A click on Telnet opened the client, DHCP configured a nonzero IPv4 address, and Shift+Escape closed the client task."
+    },
+    "form_fixture_retest": {
+      "boot_disk_sha256": "2d40a0e8259b6e39e7b48cd01fbbb0a9e8f62edd35f85f34d41c20b038d48403",
+      "result": "pass",
+      "evidence": "Clicked Telnet, opened its Host/Port form, populated it using document field geometry, submitted it, received FORM-CONNECTED from a local QEMU network fixture, and sent a typed x to that fixture. With the server held open, Shift+Escape returned to the splash and the server observed the client close its socket. A second Shift+Escape left failed=0.",
+      "scope": "Focused QEMU diagnostic; live UTM and additional reconnect cases remain unverified."
+    },
+    "no_nic_retest": {
+      "boot_disk_sha256": "2d40a0e8259b6e39e7b48cd01fbbb0a9e8f62edd35f85f34d41c20b038d48403",
+      "result": "pass",
+      "evidence": "A focused QEMU boot without a VirtIO network device displayed the network-configuration error when the Telnet icon was clicked. Escape dismissed the message and the serial command channel evaluated 40+2 to 42 with failed=0."
+    },
+    "combined_retest": {
+      "date": "2026-11-08",
+      "command": "python3 scripts/check-compat.py --pci --quick --probe-demo-wallpaper-desktop",
+      "boot_disk_sha256": "7a1fbe7e29ff7d1364fee13c8f27adf7ac67171d6392339e227e2654cfd3632c",
+      "exit_code": 0,
+      "evidence": "After installing the desktop assets and a cold boot, the test exercised wallpaper controls and opened Telnet. The guest obtained an IPv4 address, accepted Host and Port through the form, connected to the local fixture, sent keyboard input, closed the socket and returned to the splash on Shift+Escape. A second Shift+Escape closed the client task."
+    }
+  },
+  "home_layout_diagnostic": {
+    "date": "2026-11-08",
+    "result": "fail",
+    "boot_disk_sha256": "ce74e21fed11dcde94116c9bf11b502c2fdb2ff0f0a0061b42f2a81536747a7a",
+    "evidence": "On a disposable QEMU disk with the wallpaper and its HomeSys installed, a cold boot reported ZcSourceHasOverride(\"/Home/HomeSys.ZC\")=1. The first terminal retained the built-in tiled bounds 1,49,2,73 and the second built-in terminal remained present. The wallpaper-specific centered startup layout was not applied.",
+    "scope": "This identifies the boot customization gap. It does not establish general support for arbitrary user HomeSys files.",
+    "screen_update_guard": {
+      "result": "partial",
+      "evidence": "Pinned TaskEnd defers a task's teardown while sys_task_being_screen_updated refers to it. The ARM64 bridge now defers explicit kills in that condition and retries normal teardown after the drawing pass; TaskScreenUpdateKillChecks returned 42 in a live QEMU desktop, confirming a non-waiting kill leaves the target valid with its kill flag set until the marker is released. A broader TaskEndChecks run timed out in the same desktop because it uses ZcTaskRun, which waits for the other persistent desktop tasks. The natural-return and callback-yield cases have not been isolated in this test.",
+      "scope": "This is a separate scheduler safeguard. In an earlier instrumented reproduction the screen-update marker was null when the wallpaper-related Server task exited and when the invalid free occurred, so this does not establish a fix for the HomeSys failure."
+    },
+    "direct_include_retest": {
+      "result": "pass",
+      "evidence": "The original direct include failed with an invalid or duplicate free after a newly spawned Terminal exited. Its HomeSys UserStartUp created a document but did not install the ARM64 prompt reader, so UserTaskCont returned immediately. A controlled source probe attaching the reader kept the Terminal alive and the include completed. The user-task bridge now attaches missing prompt/output handlers after any document-creating UserStartUp, without replacing handlers supplied by the hook. With the original unmodified HomeSys restored, Sys include completed and zstatus reported failed=0. The QEMU UserStartUp suite also passed a custom document-only hook, command execution in its new terminal, the original hook, capacity, fairness, lock, and cleanup checks.",
+      "scope": "This fixes the tested direct include and custom user prompt setup."
+    },
+    "cold_boot_retest": {
+      "result": "pass",
+      "command": "python3 scripts/check-compat.py --pci --quick --probe-demo-wallpaper-desktop",
+      "boot_disk_sha256": "e6eb2a150f58eb1d53aecbc6bb178647377502e179f5a1d3fd84bbe9e5cba19e",
+      "evidence": "The installer copied the three assets to a disposable disk. After a cold reboot, the original saved HomeSys ran, selected one focused terminal at bounds 22,78,19,55, and accepted a command returning 42. Wallpaper controls, palette editing and Telnet connection/cleanup also passed. The HomeSys intentionally does not show the default splash.",
+      "scope": "QEMU with this saved HomeSys; arbitrary startup files and live UTM/Pi remain unverified. The earlier failing diagnostic above is retained as history."
+    }
+  }
+}

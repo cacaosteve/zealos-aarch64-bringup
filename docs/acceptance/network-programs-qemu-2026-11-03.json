@@ -1,0 +1,40 @@
+{
+  "date": "2026-11-03",
+  "target": "AArch64 native ZealC/QEMU guest",
+  "command": "python3 scripts/check-compat.py --pci --quick --probe-program-catalog --program-catalog-path /Home/Net/Load.ZC --program-catalog-path /Home/Net/Programs/FTPClient.ZC --program-catalog-path /Home/Net/Programs/Gopher.ZC --program-catalog-path /Home/Net/Programs/TCPChatClient.ZC --program-catalog-path /Home/Net/Programs/TCPChatServer.ZC --program-catalog-path /Home/Net/Programs/Telnet/Telnet.ZC --program-catalog-path /Home/Net/Programs/UDPChat.ZC",
+  "result": "The stock network stack loader and all six network program sources compile in one fresh ARM64 QEMU guest compiler session. Native VirtIO-net obtains DHCP configuration from QEMU user networking. Gopher, TCPChatServer, TCPChatClient, UDPChat, FTPClient, and Telnet pass local fixture runtime tests. Telnet also loads its splash art, returns to the terminal, and can be launched again successfully.",
+  "scope": "Runtime evidence covers native VirtIO-net transmission/reception and DHCP; Gopher request/response; TCPChatServer accept/greeting/broadcast; TCPChatClient connect/receive/send/echo; UDPChat send/receive/exit; FTPClient control greeting/PWD/QUIT plus passive-mode LIST transfer; and Telnet splash loading, terminal recovery, repeated launch, terminal-type negotiation, received text, keyboard send, echoed response, clean exit, and healthy guest recovery. UTM host-network connectivity remains unverified.",
+  "runtime_command": "python3 scripts/check-compat.py --pci --quick --probe-network-runtime",
+  "runtime_result": "PASS: native VirtIO-net initialized and DHCP configured 10.0.2.15; Gopher connected to a local host TCP fixture, sent the exact selector /\\r\\n, and received/displayed its response; TCPChatServer accepted a host-forwarded client, greeted it, and broadcast its payload; TCPChatClient connected to a host fixture, displayed its greeting and echo, sent a typed payload, exited via Shift+Escape, and closed its socket; UDPChat sent an exact typed datagram to a host fixture, displayed the fixture reply, exited via Shift+Escape, and left the guest healthy; FTPClient connected to a host FTP fixture, displayed the greeting, completed PWD, connected to the advertised passive data port, received and displayed ZEALTEST.TXT through LIST, sent QUIT, and returned to a healthy guest; Telnet loaded and displayed its splash art, returned to the terminal, relaunched, negotiated terminal type, displayed TELNET-READY, sent keyboard input, received ECHO-OK, exited, and returned to a healthy guest.",
+  "tested_boot_disk": "build/disk.img",
+  "tested_boot_disk_sha256": "149963ee917141b94aaedce1d1b0e4aa8a28b94a9da3d2badca0cc208670d26b",
+  "tested_source_bundle_sha256": "c4a2974a9dc8e7a454414690812332138a1f37f8dd3a1a1c82c0a745a9837658",
+  "compiled_sources": [
+    "/Home/Net/Load.ZC",
+    "/Home/Net/Programs/FTPClient.ZC",
+    "/Home/Net/Programs/Gopher.ZC",
+    "/Home/Net/Programs/TCPChatClient.ZC",
+    "/Home/Net/Programs/TCPChatServer.ZC",
+    "/Home/Net/Programs/Telnet/Telnet.ZC",
+    "/Home/Net/Programs/UDPChat.ZC"
+  ],
+  "arm64_adaptation": "Bootstrap overlays replace the pinned x86 APIC interrupt handoff with direct cooperative packet dispatch, select native VirtIO PCI transport, declare its interface before dependent sources, fix UDP/TCP local include paths, use connection count for TCP listen backlog, initialize TCPChatServer and TCPChatClient state after CCF_JUST_LOAD, parse the client\u2019s numeric IPv4 address without compiler-lexer runtime dependencies, null-terminate the client receive buffer, and use typed IPv4 sockaddr pointers in the server message path. The UDPChat overlay defers prompts and socket setup to the Chat entry point, parses IPv4 numerically, binds the wildcard local address, and uses a byte receive buffer with explicit termination. FTPClient overlay uses bounded NUL-terminated reads, inline reply-code parsing and plain reply output to avoid unresolved string-helper calls; IPv4/PASV address fields are converted with EndianU32. Telnet uses typed CTCPSocket pointers, numeric IPv4 parsing, an explicit finite TCP connect timeout, and delays releasing the receive task until after the initial terminal clear so the server greeting is not erased.",
+  "working_tree_changes_included": true,
+  "runtime_clients": {
+    "/Home/Net/Programs/Gopher.ZC": "pass: connected through VirtIO-net, sent selector, parsed and displayed local fixture response",
+    "/Home/Net/Programs/TCPChatServer.ZC": "pass: accepted host-forwarded client, greeted it, received its payload, broadcast the payload back, and returned to a healthy guest",
+    "/Home/Net/Programs/TCPChatClient.ZC": "pass: connected through native VirtIO-net to a local host TCP fixture, displayed greeting and echoed response, sent typed message, exited by Shift+Escape, closed socket and returned to healthy guest",
+    "/Home/Net/Programs/UDPChat.ZC": "pass: sent a guest datagram to a local host fixture, displayed the reply in the guest chat window, exited via Shift+Escape, and returned to a healthy guest",
+    "/Home/Net/Programs/FTPClient.ZC": "pass: parsed numeric IPv4, connected over VirtIO-net, displayed FTP greeting, completed PWD, opened passive data channel, received/displayed ZEALTEST.TXT via LIST, sent QUIT, and returned to a healthy guest",
+    "/Home/Net/Programs/Telnet/Telnet.ZC": "pass: splash graphic loads and displays, terminal is recovered, repeated launch works, client connects through VirtIO-net, negotiates terminal type, displays server text, sends typed input, displays echoed response, exits cleanly, and returns to a healthy guest"
+  },
+  "telnet_lifecycle_retest": {
+    "date": "2026-11-08",
+    "command": "python3 scripts/check-compat.py --pci --quick --probe-telnet-runtime",
+    "boot_disk_sha256": "9355e73118df7c555b5678cf62099eaa3c8cbf0e69343c758b12277cb1ab26b8",
+    "exit_code": 0,
+    "scope": "From the graphical terminal, the guest reopened the stock Telnet client, connected over DHCP-configured VirtIO-net, negotiated terminal type, displayed the host greeting and echo, and forwarded the typed input and Enter. The host fixture observed socket EOF after Shift+Escape. The guest showed the splash again, then returned to a graphical terminal that evaluated 40+2 to 42. This run used a direct IPv4 address and port in the launch expression."
+  },
+  "adaptation_note": "AArch64 Gopher overlay uses typed CTCPSocket pointers with NULL checks (the ZealOS kernel heap pointer is a high canonical address and appears negative as I64), builds its request in a local buffer, parses tab-separated menu fields locally, and escapes output without unavailable StrFind/StrFirstOcc helpers.",
+  "arm64_overlay_script_sha256": "74b8f12e4e5331489b9ad680db55f65f8899a38c7180c92945b3c3b6d7894b89"
+}

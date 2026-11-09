@@ -414,6 +414,25 @@ static int handoff_reserve_pt_pool(struct zeal_handoff *h) {
     return -1;
 }
 
+static void handoff_reserve_pi4_audio(struct zeal_handoff *h) {
+    const uint64_t size = ZEAL_PI4_AUDIO_BYTES;
+    if (h->mem_count >= ZEAL_MEM_MAX)
+        return;
+    for (uint32_t i = 0; i < h->mem_count; i++) {
+        struct zeal_mem_entry *entry = &h->mem[i];
+        if (entry->type != ZEAL_MEM_USABLE || entry->length <= size ||
+            entry->base < 0x400000 || (entry->base & 0xfffu) ||
+            entry->base > ZEAL_PI4_AUDIO_PHYS_LIMIT - size)
+            continue;
+        h->mem[h->mem_count++] = (struct zeal_mem_entry){
+            .base = entry->base, .length = size, .type = ZEAL_MEM_PI4_AUDIO
+        };
+        entry->base += size;
+        entry->length -= size;
+        return;
+    }
+}
+
 static void icache_flush(void *addr, uint64_t size) {
     uintptr_t start = (uintptr_t)addr & ~63ull;
     uintptr_t end = ((uintptr_t)addr + size + 63) & ~63ull;
@@ -737,6 +756,7 @@ void kmain(void) {
             uart_put_u64_hex(uart, (uint64_t)(int64_t)dma_rc);
             uart_puts(uart, "\n");
         }
+        handoff_reserve_pi4_audio(&g_handoff);
     }
     uart_puts(uart, "kernel phys=");
     uart_put_u64_hex(uart, g_kernel_phys);

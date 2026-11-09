@@ -1,0 +1,18 @@
+{
+  "date": "2026-11-02",
+  "target": "QEMU PCI ARM64 graphical guest",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "8ba8308ebcb706194935473db1432d1754f510f59dbeae40a20978db98f8bf70",
+  "source_path": "/Demo/Games/BlackDiamond.ZC",
+  "source_sha256": "15fecdc4ad9b74c63ac57f14e97f4f8d788c474a796bd3eeba5db806d937fb75",
+  "command": "python3 scripts/check-compat.py --pci --probe-demo-blackdiamond",
+  "result": "pass",
+  "scope": "Original upstream BlackDiamond game launched in the ARM64 graphical terminal. The guarded source overlay loads the stock Math module for Cosh and clears the light-palette canvas before drawing. QEMU runtime acceptance does not establish live UTM or Pi hardware behavior.",
+  "checks": [
+    "verified the HUD and ski course rendered in the graphical window",
+    "sent Right input and verified the rendered frame updated",
+    "Escape returned to the graphical terminal and 40+2; evaluated to 42",
+    "zstatus reported failed=0"
+  ],
+  "log": "build/check-demo-blackdiamond-pci.log"
+}

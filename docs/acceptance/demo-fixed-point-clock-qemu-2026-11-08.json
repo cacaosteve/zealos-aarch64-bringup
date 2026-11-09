@@ -1,0 +1,19 @@
+{
+  "date": "2026-11-08",
+  "command": "python3 scripts/check-compat.py --quick --probe-source-fast --probe-source upstream/pinned/Demo/Lectures/FixedPoint.ZC --probe-source-module disk:/System/Utils/CPURep.ZC",
+  "target": "AArch64 QEMU virt, PCI graphical terminal, single guest CPU; current ARM64 source bundle",
+  "result": "accepted",
+  "program": "/Demo/Lectures/FixedPoint.ZC",
+  "source_path": "upstream/pinned/Demo/Lectures/FixedPoint.ZC",
+  "source_sha256": "2070a2dd748793807813b338fdf0aae9fe021459abd16e62d073878aac746858",
+  "verified": [
+    "The stock FixedPoint.ZC source ran after loading the stock CPURep module.",
+    "The integer and floating-point loops both reported nonzero elapsed times (2.160s and 2.090s) using the source-backed tS clock.",
+    "The fixed-point and floating-point sums matched the expected output within the program's displayed precision.",
+    "The compiler returned to the ready state after the program completed."
+  ],
+  "kernel_sha256": "4bfeab8f4e8e60962823e2360364231dc13f4ec7187264a8e642864c0113d1fd",
+  "log_sha256": "1e2193ae3c07d64f7a69b0b9a2c83b1066eb5ad5e8ca1589cbeec1304c502788",
+  "log": "build/check-compat-pci.log",
+  "scope_note": "QEMU runtime acceptance on the built source volume. This does not establish UTM or Raspberry Pi hardware behavior."
+}

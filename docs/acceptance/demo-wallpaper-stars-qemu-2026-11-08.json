@@ -1,0 +1,24 @@
+{
+  "date": "2026-11-08",
+  "target": "AArch64 QEMU virt, one vCPU, graphical terminal and window manager",
+  "result": "failed_visible_animation",
+  "command": "QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device' python3 scripts/check-compat.py --pci --probe-demo-wallpapers",
+  "program": "/Demo/Graphics/WallPapers/WallPaperStars.ZC",
+  "source_sha256": "7562f8ce7d69531be2bbbb0b1cac77aa5b2c526b0244f6a7646b8563a3774954",
+  "kernel_sha256": "91bfb4fdc580610ee1e7de0b60e5849e00d2c26f0814a38006ecc9aae6ebef61",
+  "iso_sha256": "e349f0ab8665d5075d50c5f5f017f19a989242022210e94478726c38ff3e421a",
+  "verified": [
+    "Guest startup and graphical terminal/window-manager checks passed.",
+    "SysFile loaded WallPaperStars.ZC and returned to the command prompt.",
+    "The window manager remained active and reported presented_frames in zstatus.",
+    "The first wallpaper capture differed from the boot baseline by 101356 pixels."
+  ],
+  "failed": [
+    "Two scanout captures 350 ms apart were identical (frames_diff=0), although WallPaperStars increments star positions on each callback."
+  ],
+  "not_verified": [
+    "Whether the wallpaper callback runs and mutates its star state; the current acceptance harness only captured scanout and did not inspect wall_stars[].",
+    "WallPaperFish and WallPaperCtrl, because the combined check stops on the Stars animation failure."
+  ],
+  "scope_note": "This is evidence of a visible animation failure in the guest scanout path, not proof that the source fails to compile or that its callback is not called. The next diagnostic should compare wall_stars state across forced window-manager refreshes, then distinguish callback scheduling from framebuffer composition/presentation."
+}

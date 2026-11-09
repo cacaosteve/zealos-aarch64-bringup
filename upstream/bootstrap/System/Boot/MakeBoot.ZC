@@ -1,0 +1,28 @@
+// ARM64 source bridge for the legacy BIOS boot-image helpers.
+//
+// MakeHome and the TOS distribution sources include these names. Their x86
+// implementations emit 16-bit BIOS boot code and must never be executed by
+// the AArch64 build. Keep the API visible to those sources and fail through
+// ZealOS's normal exception path until an EFI image writer is provided.
+
+#help_index "Boot/ARM64"
+
+U0 BootDVDIns(U8 drv_let=0)
+{
+    throw('ArmBoot');
+}
+
+U0 BootHDIns(U8 drv_let=0)
+{
+    throw('ArmBoot');
+}
+
+Bool BootMHDIns(U8 drv_let, U8 *drv_list=NULL)
+{
+    throw('ArmBoot');
+}
+
+U0 BootRAM(U8 *filename=NULL)
+{
+    throw('ArmBoot');
+}

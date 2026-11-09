@@ -1,0 +1,33 @@
+{
+  "date": "2026-11-08",
+  "target": "Raspberry Pi 4B native desktop, PWM1 analog tone output",
+  "result": "diagnostic_candidate_staged_hash_verified",
+  "kernel_path": "build/pi-desktop-esp/boot/kernel.elf",
+  "kernel_sha256": "9965f2c8b60d0653baa68557a3d5ceba9a41d5d3394097bba72d49f83581a6be",
+  "booter_sha256": "607ff9cec18122e651f5d03e0d239f0c6095169209c21947db479c93ffe193ca",
+  "build_command": "make pi-desktop-sd",
+  "image_check": "python3 scripts/check-pi-desktop-image.py build/pi-desktop-esp",
+  "verified": [
+    "Diagnostic candidate Pi desktop image builds successfully and passes the Pi boot-chain/image checker.",
+    "Candidate prints pi4_audio status unconditionally from zstatus so platform routing and PWM initialization can be distinguished.",
+    "Candidate reports PWM1/GPIO40/41 register state, tone counters, and PWM clock initialization stage.",
+    "Rebuilt the candidate and rechecked the image: kernel SHA-256 9965f2c8b60d0653baa68557a3d5ceba9a41d5d3394097bba72d49f83581a6be; diagnostic kernel 96de7671730212504a3b79d4b7435769618c7481cbfbae0e5b97a29f6b3058f4; booter 607ff9cec18122e651f5d03e0d239f0c6095169209c21947db479c93ffe193ca; sources 29e4b2effeb4178e00aeffb4f97f1aba648c3f6a755f52b76f53eaa1766ed341.",
+    "The rebuilt kernel contains the lowercase paudio diagnostic command.",
+    "On 2026-11-08, ZEALPI boot/kernel.elf matched the candidate hash byte-for-byte; the card boot-chain checker passed. The card's STAGED-PI-AUDIO-PAUDIO-20261108.json records the prior kernel backup."
+  ],
+  "not_verified": [
+    "Physical Pi 4B analog audio output from the 3.5 mm jack.",
+    "Full PCM or music playback; this backend currently provides simple PWM tones.",
+    "HDMI audio, which remains unimplemented."
+  ],
+  "manual_check": {
+    "commands": [
+      "paudio",
+      "zc Beep(60,FALSE);",
+      "paudio",
+      "zstatus"
+    ],
+    "expected": "pi4_audio: target_pi=1 ready=1 beep_calls increments and init_stage=9; a short tone should then be audible through the Pi 3.5 mm jack. HDMI audio is not implemented."
+  },
+  "scope_note": "The diagnostic candidate is staged and hash-verified on ZEALPI; physical analog audio acceptance remains open. HDMI audio is unimplemented."
+}

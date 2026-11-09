@@ -1,0 +1,26 @@
+{
+  "date": "2026-11-04",
+  "source_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "target": "AArch64 QEMU virt with ramfb and VirtIO keyboard/tablet",
+  "source_path": "/Demo/Games/RawHide.ZC",
+  "source_sha256": "8fceb5a95095d47915a14fd0ea512d990e4eaaf2cd235aad712381f10981624f",
+  "iso_path": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "5ffb185418167b9bc8694af98abda4c871591d3e9f27dda18165522bd837cfeb",
+  "command": "QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device' python3 scripts/check-compat.py --probe-demo-rawhide",
+  "result": "pass",
+  "checks": [
+    "Launched the unchanged pinned /Demo/Games/RawHide.ZC from the graphical terminal in a focused application task and dismissed its startup instructions.",
+    "The game scene rendered with visible graphics and continued animating.",
+    "Escape restored the graphical terminal; 40+2 evaluated to 42 and zstatus reported failed=0."
+  ],
+  "artifacts": {
+    "files": [
+      "build/check-demo-rawhide-pci.log",
+      "build/gui-demo-rawhide-demo-rawhide-initial.ppm",
+      "build/gui-demo-rawhide-demo-rawhide-animated.ppm",
+      "build/gui-demo-rawhide-demo-rawhide-exit-smoke-result.ppm"
+    ],
+    "probe_sha256": "bf5eb3ed0613ce2c6d4b429af40f88a3fa9191fc0af93cef67ac0bd4cc29d5fa"
+  },
+  "scope_note": "QEMU startup/render/exit acceptance only; full playability and live UTM or Pi hardware behavior are not implied."
+}

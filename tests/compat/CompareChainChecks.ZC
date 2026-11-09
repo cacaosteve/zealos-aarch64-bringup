@@ -1,0 +1,14 @@
+I64 CompareChainChecks()
+{
+	if (!(100 <= 200 < 300))
+		return 1;
+	if (100 <= 300 < 200)
+		return 2;
+    if (!(100 <= 200 <= 200))
+		return 3;
+    if (100 <= 201 <= 200)
+		return 4;
+    if (!(200 <= 200 < 201))
+		return 5;
+	return 42;
+}

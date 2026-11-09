@@ -1,0 +1,21 @@
+{
+  "date": "2026-11-02",
+  "repository_commit": "working tree",
+  "working_tree_changes_included": true,
+  "command": "python3 scripts/check-compat.py --probe-demo-interrupt",
+  "target": "QEMU ARM64 graphical-terminal Demo runtime probe",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "a15cedd1eea57491a9509488c0ca6f5aa87ee9f9402a877c80a8dd4dc6c46373",
+  "source_path": "/Demo/Lectures/InterruptDemo.ZC",
+  "source_sha256": "721f1f747e10020a21110dfd0f885bb3c7f010579ef49a0abb25864ded04917b",
+  "result": "pass",
+  "checks": [
+    "guest source compiled and ran",
+    "10,000 SVC #0x42 exceptions completed",
+    "SVC generic-timer benchmark and direct-call comparison were displayed",
+    "terminal recovered and 40+2 returned 42",
+    "zstatus reported failed=0"
+  ],
+  "implementation": "The ARM64 source overlay replaces the x86 INT benchmark with an AArch64 SVC benchmark. The ARM backend emits SVC #0x42 directly and reads the exception-vector counter through a backend intrinsic.",
+  "limitation": "This validates the guest EL1 SVC exception path; it does not validate x86 interrupt/APIC behavior."
+}

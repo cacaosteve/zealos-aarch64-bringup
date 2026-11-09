@@ -6,7 +6,7 @@
 #include <stdint.h>
 #include "disk_layout.h"
 
-#define ZSS_MAX_FILE (4u * 1024u * 1024u)
+#define ZSS_MAX_FILE (8u * 1024u * 1024u)
 #define ZSS_MAX_NAME 95u
 
 /* Bank A is the original 32 MiB partition. Bank B occupies the previously
@@ -228,6 +228,17 @@ static int zss_entry_at(uint32_t wanted, char *name, size_t name_cap,
     for (size_t i = 0; i <= length; i++) name[i] = item->name[i];
     if (size_out) *size_out = item->size;
     return item->status;
+}
+/* Report append capacity in the active source bank. Sector zero holds the
+ * bank header; each file needs one record-header sector before its payload. */
+static int zss_volume_stats(uint64_t *capacity_bytes, uint64_t *free_bytes) {
+    uint32_t tail = 0;
+    if (!capacity_bytes || !free_bytes ||
+        zss_find(NULL, NULL, &tail, NULL) < 0 || tail >= g_zss_sectors)
+        return 0;
+    *capacity_bytes = (uint64_t)(g_zss_sectors - 1u) * 512u;
+    *free_bytes = (uint64_t)(g_zss_sectors - tail - 1u) * 512u;
+    return 1;
 }
 /* 0 deleted, -2 unavailable, -3 full, -4 missing, -1 invalid/I/O. */
 static int zss_delete(const char *name) {

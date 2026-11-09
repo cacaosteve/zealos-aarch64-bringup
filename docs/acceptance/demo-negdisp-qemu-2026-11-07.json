@@ -1,0 +1,29 @@
+{
+  "date": "2026-11-07",
+  "command": "python3 scripts/check-compat.py --probe-demo-negdisp",
+  "target": "AArch64 QEMU virt, PCI graphical terminal with serial command probe",
+  "result": "pass",
+  "programs": [
+    {
+      "program": "/Demo/Lectures/NegDisp.ZC",
+      "stock_source_path": "upstream/pinned/Demo/Lectures/NegDisp.ZC",
+      "stock_source_sha256": "7f09a8909f0dddc047634a233c3e33026f0344ce2f04be0d501bdf83c263916c",
+      "arm64_source_path": "upstream/bootstrap/Demo/Lectures/NegDisp.ZC",
+      "arm64_source_sha256": "6ab5fd8e698f050742890c59c1d663dcbcd25e2f481b35d6b02d9165f9fd6d53"
+    }
+  ],
+  "verified": [
+    "The first Person example runs and reaches its key wait without an exception.",
+    "The ARM64 adaptation performs a byte access at a biased base plus displacement -128 and reads back 0x5A.",
+    "Both key waits complete and the terminal remains usable: 40+2 returns 42 and zstatus reports failed=0."
+  ],
+  "not_verified": [
+    "The original x86-specific negative class-member layout cannot be reproduced as an AArch64 class ABI; the bootstrap source demonstrates an equivalent signed address displacement instead.",
+    "Live UTM behavior and physical Pi behavior."
+  ],
+  "kernel_sha256": "478278fd9961c701a069ec91b9d2ef748fb81a2681be7aa767e7a5dbd80f62ca",
+  "iso_sha256": "d76f0b5edc34c5cb7fdd34e821ec94d638515016d4793e85a7a8f6e4114b17eb",
+  "log_sha256": "9db0c87814d6cb37cb837d2366f4e25f0d63636c4ddd03f904134456152164e0",
+  "log": "build/check-demo-negdisp-pci.log",
+  "scope_note": "Runtime acceptance covers the ARM64 source adaptation, not the unchanged x86 class layout semantics."
+}

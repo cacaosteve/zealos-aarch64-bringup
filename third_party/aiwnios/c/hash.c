@@ -3,6 +3,10 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
+#ifdef __aarch64__
+extern CHash *ZcHashFindFallback(char *str, CHashTable *table, int64_t type,
+                                int64_t inst);
+#endif
 int64_t HashStr(char *str) {
   int64_t res = 5381;
   while (*str)
@@ -29,6 +33,16 @@ CHashTable *HashTableNew(int64_t sz, void *task) {
 }
 
 CHash *HashFind(char *str, CHashTable *table, int64_t type, int64_t inst) {
+  if (!table)
+    return NULL;
+#ifdef __aarch64__
+  /* The ARM64 guest-task bridge can receive a ZealOS task-table mirror whose
+   * bucket body is a guest address, not a host-mapped pointer. Let the runtime
+   * resolve those lookups through the active managed compiler table. */
+  if ((uintptr_t)table < UINT64_C(0x100000000) || !table->body ||
+      (uintptr_t)table->body < UINT64_C(0x100000000))
+    return ZcHashFindFallback(str, table, type, inst);
+#endif
   int64_t b = HashStr(str) & table->mask;
   CHash *h;
   for (h = table->body[b]; h; h = h->next) {

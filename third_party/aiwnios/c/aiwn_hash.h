@@ -11,6 +11,9 @@ typedef struct CMemberMeta {
   struct CMemberMeta *next;
   char *name, *string;
   int64_t value;
+  double f64;
+  /* 0 = I64/pointer expression, 1 = string, 2 = F64 expression. */
+  int64_t kind;
 } CMemberMeta;
 typedef struct CMemberLst {
   struct CMemberLst *next, *last;

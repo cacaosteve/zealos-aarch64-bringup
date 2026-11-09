@@ -1,0 +1,102 @@
+/*
+ * ARM64 network driver adapter.
+ * The native kernel owns the modern VirtIO PCI queues; this source adapter
+ * keeps the stock ZealOS Ethernet packet/queue APIs for the protocol stack.
+ */
+
+#define VN_TX_SLOTS 16
+#define VN_ETHERNET_FRAME_SIZE 1518
+#define VN_ETHERNET_HEADER_SIZE 14
+#define VN_MAC_ADDRESS_LENGTH 6
+#define VN_ETHERTYPE_OFFSET 12
+#define VN_MIN_ETHERNET_PAYLOAD 46
+
+extern I64 ZcVirtioNetReady();
+extern I64 ZcVirtioNetGetMac(U8 *out);
+extern I64 ZcVirtioNetSend(U8 *frame, U32 length);
+extern I64 ZcVirtioNetRecv(U8 *frame, U32 capacity);
+extern U0 NetQueuePush(U8 *frame, I64 length);
+
+U8 virtio_net_mac[VN_MAC_ADDRESS_LENGTH];
+U8 *virtio_net_tx_frames;
+I64 virtio_net_tx_lengths[VN_TX_SLOTS];
+I64 virtio_net_tx_sequence;
+
+U8 *EthernetMACGet()
+{
+    return virtio_net_mac;
+}
+
+I64 NetDriverPacketBufferGet(I64 de_index)
+{
+    return virtio_net_tx_frames + (de_index % VN_TX_SLOTS) * VN_ETHERNET_FRAME_SIZE;
+}
+
+I64 NetDriverPacketLengthGet(I64 de_index)
+{
+    return virtio_net_tx_lengths[de_index % VN_TX_SLOTS];
+}
+
+I64 NetDriverTransmitPacketFinish(I64 de_index)
+{
+    U8 *frame = NetDriverPacketBufferGet(de_index);
+    I64 length = NetDriverPacketLengthGet(de_index);
+    if (!length)
+        return -1;
+
+    I64 sent = ZcVirtioNetSend(frame, length);
+    virtio_net_tx_lengths[de_index % VN_TX_SLOTS] = 0;
+    if (sent == length)
+        return 0;
+    return -1;
+}
+
+I64 EthernetFrameAllocate(U8 **buffer_out, U8 *src_addr, U8 *dst_addr,
+                          U16 ethertype, I64 length)
+{
+    if (length < 0 || length > VN_ETHERNET_FRAME_SIZE - VN_ETHERNET_HEADER_SIZE)
+        return -1;
+
+    if (length < VN_MIN_ETHERNET_PAYLOAD)
+        length = VN_MIN_ETHERNET_PAYLOAD;
+
+    I64 index = virtio_net_tx_sequence++;
+    I64 slot = index % VN_TX_SLOTS;
+    U8 *frame = NetDriverPacketBufferGet(index);
+    MemSet(frame, 0, VN_ETHERNET_FRAME_SIZE);
+    MemCopy(frame, dst_addr, VN_MAC_ADDRESS_LENGTH);
+    MemCopy(frame + VN_MAC_ADDRESS_LENGTH, src_addr, VN_MAC_ADDRESS_LENGTH);
+    frame[VN_ETHERTYPE_OFFSET] = ethertype >> 8;
+    frame[VN_ETHERTYPE_OFFSET + 1] = ethertype;
+    virtio_net_tx_lengths[slot] = VN_ETHERNET_HEADER_SIZE + length;
+    *buffer_out = frame + VN_ETHERNET_HEADER_SIZE;
+    return index;
+}
+
+U0 @virtio_net_receive_task()
+{
+    U8 *frame = MAlloc(VN_ETHERNET_FRAME_SIZE);
+    while (TRUE)
+    {
+        I64 length = ZcVirtioNetRecv(frame, VN_ETHERNET_FRAME_SIZE);
+        if (length > 0)
+            NetQueuePush(frame, length);
+        else
+            Sleep(2);
+    }
+}
+
+I64 VirtioNetInit()
+{
+    if (!virtio_net_tx_frames)
+        virtio_net_tx_frames = MAlloc(VN_TX_SLOTS * VN_ETHERNET_FRAME_SIZE);
+    if (!virtio_net_tx_frames)
+        return -1;
+
+    if (!ZcVirtioNetReady() || !ZcVirtioNetGetMac(virtio_net_mac))
+        return -1;
+
+    Spawn(&@virtio_net_receive_task,, "Virtio-net RX");
+    "Modern VirtIO-net adapter ready.\n";
+    return 0;
+}

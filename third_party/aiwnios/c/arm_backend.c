@@ -9,6 +9,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* The host exception-vector probe counter is read by the AArch64-only
+ * _ARM64_SVC_BENCH_COUNT intrinsic below. */
+extern volatile uint64_t g_arm64_svc_bench_hits;
+
 static int64_t ARM_mrsDAIF(int64_t rt) {
   /* MRS Xt, DAIF */
   return 0xd53b4220 | rt;
@@ -1026,6 +1030,23 @@ static int64_t __ICFCallTOS(CCmpCtrl *cctrl, CRPN *rpn, char *bin,
   if (rpn2->type == IC_GLOBAL &&
       (rpn2->global_var->base.type & HTT_FUN)) {
     CHashFun *fun = (CHashFun *)rpn2->global_var;
+    /* A guest SVC probe must execute at its call site. Routing it through an
+     * imported C helper leaves a normal unresolved external in generated ZC.
+     * Encode SVC #0x42 directly; the EL1 vector counts and returns from it. */
+    if (!rpn->length && fun->import_name &&
+        !strcmp(fun->import_name, "_ARM64_SVC_BENCH")) {
+      AIWNIOS_ADD_CODE(0xd4000841); /* SVC #0x42 */
+      goto after_call;
+    }
+    /* Read the same counter incremented by the SVC exception handler without
+     * crossing the guest/native FFI boundary. */
+    if (!rpn->length && fun->import_name &&
+        !strcmp(fun->import_name, "_ARM64_SVC_BENCH_COUNT")) {
+      code_off = __ICMoveI64(cctrl, 8,
+          (uint64_t)(uintptr_t)&g_arm64_svc_bench_hits, bin, code_off);
+      AIWNIOS_ADD_CODE(ARM_ldrRegImmX(MIR(cctrl, 0), 8, 0));
+      goto after_call;
+    }
     if (!rpn->length && fun->import_name &&
         !strcmp(fun->import_name, "IC_RSP_GET")) {
       AIWNIOS_ADD_CODE(ARM_addImmX(0, ARM_REG_SP, 0));
@@ -2317,11 +2338,67 @@ static int64_t __SexyAssignOp(CCmpCtrl *cctrl, CRPN *rpn,
     defacto2:
       if ((rpn->flags & ICF_LOCK_EXPR) && next->raw_type != RT_F64) {
         code_off = __OptPassFinal(cctrl, next2, bin, code_off);
+        /* ATOMIC_LOAD uses x0/x1 as its value/address scratch registers.
+         * Keep the already-computed RHS out of those registers before
+         * evaluating the lvalue: PutICArgIntoReg is only a fallback and
+         * leaves an existing MD_REG value in place, even when it aliases
+         * one of the atomic scratch registers. */
+        if (b->res.mode != MD_REG || b->res.reg != 3) {
+          tmp2.mode = MD_REG;
+          tmp2.reg = 3;
+          tmp2.raw_type = next->raw_type;
+          code_off = ICMov(cctrl, &tmp2, &b->res, bin, code_off);
+          b->res = tmp2;
+        }
         code_off = DerefToICArg(cctrl, &derefed, next, 1, bin, code_off);
-        code_off = PutICArgIntoReg(cctrl, &b->res, next->raw_type, 3, bin,
-                                   code_off); // 1
-        if (derefed.mode != __MD_ARM_SHIFT && derefed.mode != MD_INDIR_REG)
+        /* Atomic operations below consume a base address in x1. Turn other
+         * addressable lvalues into that form instead of silently compiling
+         * a locked update as an ordinary load/add/store. */
+        if (derefed.mode == MD_STATIC) {
+          if (cctrl->code_ctrl->final_pass) {
+            AIWNIOS_ADD_CODE(ARM_adrX(MIR(cctrl, 1), 0));
+            CCodeMiscRef *ref = CodeMiscAddRef(cctrl->statics_label,
+                                               bin + code_off - 4);
+            ref->patch_cond_br = ARM_adrX;
+            ref->user_data1 = 1;
+            ref->offset = derefed.off;
+          } else {
+            AIWNIOS_ADD_CODE(0);
+          }
+          derefed.mode = MD_INDIR_REG;
+          derefed.reg = 1;
+          derefed.off = 0;
+        } else if (derefed.mode == MD_FRAME) {
+          int64_t frame_off = derefed.off;
+          if (frame_off >= 0 &&
+              ARM_addImmX(1, ARM_REG_FP, frame_off) != ARM_ERR_INV_OFF) {
+            AIWNIOS_ADD_CODE(ARM_addImmX(MIR(cctrl, 1), ARM_REG_FP,
+                                         frame_off));
+          } else if (frame_off < 0 &&
+                     ARM_subImmX(1, ARM_REG_FP, -frame_off) !=
+                         ARM_ERR_INV_OFF) {
+            AIWNIOS_ADD_CODE(ARM_subImmX(MIR(cctrl, 1), ARM_REG_FP,
+                                         -frame_off));
+          } else {
+            uint64_t magnitude = frame_off < 0 ? -frame_off : frame_off;
+            code_off = __ICMoveI64(cctrl, MIR(cctrl, 2), magnitude, bin,
+                                   code_off);
+            AIWNIOS_ADD_CODE((frame_off < 0 ? ARM_subRegX : ARM_addRegX)(
+                MIR(cctrl, 1), ARM_REG_FP, 2));
+          }
+          derefed.mode = MD_INDIR_REG;
+          derefed.reg = 1;
+          derefed.off = 0;
+        } else if (derefed.mode == MD_PTR) {
+          code_off = __ICMoveI64(cctrl, MIR(cctrl, 1), derefed.off, bin,
+                                 code_off);
+          derefed.mode = MD_INDIR_REG;
+          derefed.reg = 1;
+          derefed.off = 0;
+        } else if (derefed.mode != __MD_ARM_SHIFT &&
+                   derefed.mode != MD_INDIR_REG) {
           goto normal;
+        }
         ATOMIC_LOAD(derefed);
         AIWNIOS_ADD_CODE(i_op(MIR(cctrl, 0), 0, b->res.reg));
         tmp2.mode = MD_REG;

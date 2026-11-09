@@ -1,0 +1,27 @@
+{
+  "date": "2026-11-05",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "working_tree_changes_included": true,
+  "kernel_sha256": "5e63aead946d2a07242ecfa1ec0303521fc9311058346dfffb9c4b5a703a7a1f",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "be190bd6aa350d7e8c3a28068132e0aa3819b02af9150b311c371ee4c9226932",
+  "command": "python3 scripts/check-compat.py --pci --quick --probe-demo-home-key-plugins",
+  "exit_code": 0,
+  "source_path": "/Demo/AcctExample/HomeKeyPlugIns.ZC",
+  "result": "partial",
+  "checks": [
+    "The graphical terminal loaded TOSConfig, JukeSongsPuppet, ScreenCast, DiskCheck, and TOSMisc before loading HomeKeyPlugIns.",
+    "HomeKeyPlugIns registered its keyboard hook in the graphical terminal context.",
+    "Alt+1 changed the graphical terminal input as expected for the plug-in character shortcut.",
+    "Backspace cleanup and the subsequent 40+2; command succeeded; zstatus reported failed=0."
+  ],
+  "limitations": [
+    "The other Alt-key handlers, including frame-grabber and file/directory picker actions, were not exercised.",
+    "This is automated PCI QEMU evidence; live UTM and Raspberry Pi behavior were not checked by this run."
+  ],
+  "screenshots": [
+    "build/gui-demo-home-key-plugins-demo-home-key-plugins-after-hotkey.ppm",
+    "build/gui-demo-home-key-plugins-demo-home-key-plugins-terminal-recovery-result.ppm"
+  ],
+  "scope_note": "Automated PCI QEMU partial runtime evidence with the upstream TOSMisc dependency loaded; this does not establish all HomeKeyPlugIns shortcuts or live UTM/Raspberry Pi behavior."
+}

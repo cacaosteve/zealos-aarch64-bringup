@@ -1,0 +1,10 @@
+{
+  "date": "2026-11-05",
+  "source_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "working_tree_changes_included": true,
+  "kernel_sha256": "c39893919459fb6d3fd89cc576eff5a911c86c9ae9cb3d48016f96d36507331a",
+  "command": "python3 scripts/check-compat.py --pci --probe-demo-common-ancestor",
+  "exit_code": 0,
+  "scope": "Automated PCI QEMU runtime acceptance of the pinned Demo/Graphics/CommonAncestor.ZC on the ARM64 graphical terminal. The probe allows the original tree builder to finish, confirms the colored tree rendered, sends a key to complete PressAKey, verifies terminal recovery where 40+2 evaluates to 42, and confirms zstatus failed=0. This does not establish live UTM or Raspberry Pi behavior.",
+  "result": "pass"
+}

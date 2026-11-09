@@ -1,0 +1,33 @@
+{
+  "date": "2026-11-08",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "working_tree_changes_included": true,
+  "command": "QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device' python3 scripts/check-compat.py --pci --quick --probe-demo-mpprint",
+  "target": "AArch64 QEMU virt, one vCPU, PCI graphical terminal",
+  "result": "inconclusive",
+  "program": "/Demo/MultiCore/MPPrint.ZC",
+  "source_path": "upstream/pinned/Demo/MultiCore/MPPrint.ZC",
+  "source_sha256": "9d655fcf0c05de49ad911f06d4d887f981df7acb933d2edd09102569a1885c61",
+  "kernel_sha256": "9ba7456e00b4bb334c731f5f95f9db26a79aca2104556a9e16c051b28b81214d",
+  "iso_sha256": "77477417f9704000cd1f647f11e5a9fbd440347a162fde88dad9be7553dae165",
+  "log": "build/check-compat-pci.log",
+  "log_sha256": "b2b12326df52a3c66055fc80ceaef5cdb024c5e3bde973d13135ce754f37995d",
+  "captures": [
+    {
+      "path": "build/gui-demo-mpprint-doc-scope-result.ppm",
+      "sha256": "f0ca4db6c945a8c20c9372a800571c9e0db1787deea6fa3a5f43b36303f312aa"
+    },
+    {
+      "path": "build/gui-demo-mpprint-launch-result.ppm",
+      "sha256": "21391c5d5816edc0c984e088561b07e08853ba19390d147f299377f20440b412"
+    }
+  ],
+  "observed": [
+    "Graphical terminal focus was acquired and a 40+2 arithmetic command returned 42.",
+    "The graphical terminal evaluation reported mpprint_doc_matches_terminal=1, so the DocPut pointer at the launch prompt is the visible terminal document.",
+    "The stock source was then run by including /Demo/MultiCore/MPPrint directly in that terminal.",
+    "The include command returned to an empty prompt within the capture window, but the expected CPU0 job text was not visible.",
+    "No guest exception was reported; the captured output does not reveal whether the 500 queued callbacks were dispatched or whether DocPrint from the executive reached scanout."
+  ],
+  "scope_note": "Still unverified. This rules out both the earlier ExeFile2 server-document hypothesis and a stale bootstrap terminal DocPut pointer, but does not distinguish job dispatch from callback document rendering. Keep MPPrint runtime-unverified until a bounded callback-count/output probe identifies and fixes the remaining path."
+}

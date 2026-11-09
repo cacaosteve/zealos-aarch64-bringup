@@ -1,0 +1,16 @@
+{
+  "date": "2026-11-04",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "working_tree_changes_included": true,
+  "kernel_sha256": "a65d2847344fa04d8ee3144343562e61a4c98222d970d67bfc5e979391ec7316",
+  "iso_sha256": "dc6342b281812aea6ac01fe255657b589a9201be4643702eb0c1a10f3ddfaecc",
+  "commands": [
+    "python3 scripts/check-compat.py --pci --probe-demo-wenceslas",
+    "python3 scripts/check-compat.py --pci --probe-demo-wenceslas --wenceslas-space-first",
+    "python3 scripts/check-compat.py --pci --probe-demo-wenceslas --wenceslas-escape-first"
+  ],
+  "exit_codes": [0, 0, 0],
+  "scope": "Automated PCI QEMU runtime acceptance against one rebuilt ARM64 ISO. Verified the game renders, Right movement remains responsive, Space is handled, Escape works both before movement and after input, cleanup returns to the graphical terminal, 40+2 evaluates to 42, and zstatus reports failed=0. The ARM64 overlay replaces the shared allocator-backed trail queues with bounded static rings; the king-step and footprint drawing/follower code paths remain present. UTM and Pi hardware are not covered, and follower behavior was not independently measured in these probes.",
+  "arm64_adaptation": "Bounded static rings retain recent king positions and footprints, avoid allocator/linked-queue mutation from the input task, and preserve the original three-second/two-second/five-second age behavior for follower selection and trail rendering.",
+  "result": "pass"
+}

@@ -1,0 +1,38 @@
+{
+  "date": "2026-11-08",
+  "target": "Raspberry Pi 4B native desktop, PWM1 analog tone diagnostics",
+  "result": "staged_hash_verified_pending_physical_test",
+  "build_command": "make pi-desktop-sd",
+  "image_check": "python3 scripts/check-pi-desktop-image.py build/pi-desktop-esp",
+  "payload": {
+    "kernel": "build/pi-desktop-esp/boot/kernel.elf",
+    "kernel_sha256": "9259a916f8d46e38c4cd6b9fdfe7e0b26ef69e43110a6ed24b5e545af8d2d5da",
+    "diagnostic_kernel_sha256": "96de7671730212504a3b79d4b7435769618c7481cbfbae0e5b97a29f6b3058f4",
+    "booter_sha256": "607ff9cec18122e651f5d03e0d239f0c6095169209c21947db479c93ffe193ca",
+    "sources_sha256": "2456da95995344719fbb8dee7fc91348fa85c49eb908b990536ef27878c90bbd"
+  },
+  "changes": [
+    "The paudio command now reports the PWM status register captured after tone enable, in addition to PWM control, range/data, GPIO mux, clock, initialization stage, and beep counters.",
+    "PWM_CTL is the channel-enable register; PWM_STA is reported as status/FIFO flags and is not described as a channel-running indicator."
+  ],
+  "verified": [
+    "make pi-desktop-sd completed successfully.",
+    "scripts/check-pi-desktop-image.py passed for build/pi-desktop-esp.",
+    "The built desktop kernel contains the paudio command and Pi PWM setup message.",
+    "Kernel, diagnostic kernel, booter, and source archive hashes recorded above.",
+    "On 2026-11-08, all seven active boot payload files on ZEALPI matched build/pi-desktop-esp byte-for-byte; prior payload was copied to ZEALOS-BACKUP-20261108-PI-AUDIO-STATUS-FOLLOWUP-PRE and the card manifest STAGED-PI-AUDIO-STATUS-FOLLOWUP-20261108.json was written."
+  ],
+  "not_verified": [
+    "Physical Pi 4B analog output through the 3.5 mm jack remains unverified.",
+    "HDMI audio and PCM/music playback remain unimplemented by this PWM tone backend.",
+    "Physical Pi 4B analog output through the 3.5 mm jack remains unverified on this follow-up candidate; HDMI audio and PCM/music playback remain unimplemented by this PWM tone backend."
+  ],
+  "manual_check": {
+    "commands": [
+      "paudio",
+      "zc Beep(60,FALSE);",
+      "paudio"
+    ],
+    "expected": "target_pi=1, ready=1, init_stage=9; beep_calls increments after Beep and last_sta exposes PWM status flags. Listen on the 3.5 mm analog output."
+  }
+}

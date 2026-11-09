@@ -1,0 +1,29 @@
+{
+  "date": "2026-11-04",
+  "target": "AArch64 QEMU virt, PCI, graphical terminal",
+  "command": "python3 scripts/check-compat.py --quick --probe-demo-menu-bttn --pci",
+  "source_path": "/Demo/DolDoc/MenuBttn.ZC",
+  "source_sha256": "ceb936043422c08fbb609423834ce5ae3ca917b8792720249716bfed20e57db0",
+  "result": "partial",
+  "checks": [
+    "MenuBttn compiles, launches, and renders Sound On, Set Freq, Nothing, and Done",
+    "A mouse-down at the visible Done button selects the DolDoc entry (tag=Done)",
+    "After mouse release, the selected entry returns to Sound On (tag=Sound On), including after a fresh pointer motion",
+    "Escape after the click runs the Sound On selection and restarts the menu as Sound Off; it does not execute Done or return to the terminal"
+  ],
+  "unverified": [
+    "Reliable pointer selection and activation of Done",
+    "Set Freq and Nothing actions",
+    "Live UTM or Pi interaction"
+  ],
+  "artifacts": {
+    "build/zealos-aarch64-hello.iso": "5c9f2c0bd43843f50c600f819c162ab4d7fa081aceb764b9eee87d375f70c98a",
+    "scripts/check-compat.py": "539f2da82ada98eb3d639d9295a278885d4460df036fa4be2ba1f54f35bc31bb"
+  },
+  "screenshots": [
+    "build/gui-demo-menu-bttn-demo-menu-bttn-title.ppm",
+    "build/gui-demo-menu-bttn-demo-menu-bttn-done-release.ppm",
+    "build/gui-demo-menu-bttn-demo-menu-bttn-sound-on.ppm"
+  ],
+  "scope_note": "QEMU runtime evidence only. The visible button hit-test works on mouse-down, but release loses the selected entry; keyboard and live UTM/Pi behavior remain unverified."
+}

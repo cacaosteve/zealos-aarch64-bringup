@@ -27,9 +27,9 @@ Keep existing Pi UEFI/firmware/DTBs. The seven payload files are:
   limine.conf
 
 The first Limine entry starts the desktop after five seconds. The second
-entry retains the USB diagnostic shell. Use the same three devices and ports,
-SanDisk in a black USB2 port. The accepted automatic USB probe must pass
-before the native compiler/window manager/graphical terminals start.
+entry retains the USB diagnostic shell. Connect a supported USB keyboard
+and pointer for the native desktop. The bundled source archive supplies
+the apps, and the USB storage test stick is optional.
 
 Expect PI-DESKTOP-2 progress text, then the native terminals and centered
 animated Z splash. In a guest terminal try 40+2; then Dir; and usbstatus.

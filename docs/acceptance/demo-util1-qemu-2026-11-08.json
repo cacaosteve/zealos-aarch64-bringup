@@ -1,0 +1,20 @@
+{
+  "date": "2026-11-08",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "working_tree_changes_included": true,
+  "command": "python3 scripts/check-compat.py --pci --quick --probe-demo-system-context --demo-system-module /Demo/Templates/Util1.ZC",
+  "target": "AArch64 QEMU virt, one vCPU, booted ZealC kernel/system namespace",
+  "result": "accepted",
+  "program": "/Demo/Templates/Util1.ZC",
+  "source_path": "upstream/pinned/Demo/Templates/Util1.ZC",
+  "source_sha256": "f4a63829fc24c395135106255fd3d565469cfeed227293f3defdc3dfc99f94b4",
+  "kernel_sha256": "4bfeab8f4e8e60962823e2360364231dc13f4ec7187264a8e642864c0113d1fd",
+  "iso_sha256": "fd42cae1f7bc340e6bf71e3e2fce41c8c32894d62bdb45f745ea580f5ccdc447",
+  "verified": [
+    "The unchanged Util1 module loaded in the running guest.",
+    "MyUtil found the requested source file through FilesFind and emitted its file link in the active raw/serial document output."
+  ],
+  "log_sha256": "c1bad57f854dd827ab3fd2aac102f79d75d2fb2789b501d0d5effab90d2fcd35",
+  "log": "build/demo-util1-qemu-2026-11-08.log",
+  "scope_note": "QEMU runtime evidence only; validates one exact source-file lookup and link emission. It does not validate recursive directory traversal over a full tree or live UTM/Pi hardware behavior."
+}

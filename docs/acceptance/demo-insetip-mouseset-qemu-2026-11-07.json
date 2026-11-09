@@ -1,0 +1,37 @@
+{
+  "date": "2026-11-07",
+  "command": "python3 scripts/check-compat.py --pci --quick --probe-source tests/compat/MouseSetChecks.ZC --probe-source-module disk:/System/InFile.ZC --probe-source-module disk:/Demo/InFile/InSetIP.ZC --probe-source-call MouseSetChecks --probe-source-fast",
+  "target": "AArch64 QEMU virt, PCI graphical terminal with serial command probe",
+  "result": "pass",
+  "programs": [
+    {
+      "program": "/Demo/InFile/InSetIP.ZC",
+      "stock_source_path": "upstream/pinned/Demo/InFile/InSetIP.ZC",
+      "stock_source_sha256": "5820508459dbe753ec283286777b46e813d5c27cbd6f2fb3d85d979bb00a6093"
+    },
+    {
+      "program": "/System/InFile.ZC",
+      "stock_source_path": "upstream/pinned/System/InFile.ZC",
+      "stock_source_sha256": "f7401e33de74d82aa960e95e4c006ae5546a6fa4fb1dc6655a27f16771ccd381"
+    }
+  ],
+  "regression_probe": {
+    "source_path": "tests/compat/MouseSetChecks.ZC",
+    "source_sha256": "aa402b4fa42306d9a36d1129ae71880449edbeb12e6a34a85d889a5e714ca641"
+  },
+  "verified": [
+    "System/InFile.ZC and Demo/InFile/InSetIP.ZC both load in the guest with dependency order satisfied.",
+    "The InSetIP top-level demonstration completes its mouse interpolation and button transition sequence and returns to the command prompt.",
+    "MouseSet preserves omitted coordinates and z, applies supplied button state, updates the guest mouse button scan bits, and emits move/down/up messages checked by the regression probe.",
+    "MouseSetChecks returns 0x2a (42); the guest resets to the bootstrap prompt cleanly."
+  ],
+  "not_verified": [
+    "Live UTM interaction and pointer rendering.",
+    "Physical Raspberry Pi behavior."
+  ],
+  "kernel_sha256": "44438f24fbdc0d970d9fa884d11a406a1347d585c8acffa714532c6c0777565a",
+  "iso_sha256": "e7d11ff245e2c637bafec9d2f2bd998b5618760b9b80d7ac5bcce14d30879418",
+  "log_sha256": "fe63e0fa0f9f6778994f3d049bc36129121c98d0407a8067ac4ae55f4767e8ca",
+  "log": "build/check-compat-pci.log",
+  "scope_note": "Automated PCI QEMU runtime evidence for the ARM64 guest MouseSet path used by InSetIP; does not establish live UTM or physical Pi behavior."
+}

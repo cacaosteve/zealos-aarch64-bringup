@@ -1,0 +1,18 @@
+{
+  "date": "2026-11-05",
+  "source_commit": "working tree",
+  "working_tree_changes_included": true,
+  "kernel_sha256": "401716910d612f84bd13cd17380bc55185f194e92e0c15a89bd443398022325f",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "7373b56af277a72ce87ab99badb874f83ad4d3885aa0f373b693f8ac9f7e8981",
+  "command": "python3 scripts/check-compat.py --pci --quick --probe-source-fast --probe-source-exefile --probe-source tests/compat/StockConversionChecks.ZC --probe-source-call StockConversionChecks",
+  "exit_code": 0,
+  "result": "pass",
+  "compiled_sources": [
+    "/System/Math/Types.ZC",
+    "/System/Math/Conversion.ZC",
+    "/System/Math/F32.ZC"
+  ],
+  "runtime_check": "StockConversionChecks returned 0x2a after checking F64ToF32, F32ToF64, signed conversion, the pinned rad/deg operations, and CosF32 at zero and pi/2.",
+  "scope_note": "QEMU compile and scalar-math smoke acceptance for these three modules. This does not imply the full MakeMath.ZC set or the remaining math demos are complete."
+}

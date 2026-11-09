@@ -1,0 +1,14 @@
+{
+  "date": "2026-11-04",
+  "target": "QEMU AArch64 virt machine with PCI VirtIO sound and WAV audio backend",
+  "source": "tests/compat/VirtioSoundProbe.ZC",
+  "iso_sha256": "2d2a9d9e70ee870f70d0d1de9a2be1dd01d02d84e6bdfdfd252baefafe1c2c3c",
+  "command": "QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device -audiodev wav,id=sound0,path=/tmp/zeal-short-tone-bridge-regression.wav -device virtio-sound-pci,audiodev=sound0' python3 scripts/check-compat.py --probe-source-fast --probe-source tests/compat/VirtioSoundProbe.ZC --probe-source-call VirtioSoundProbe",
+  "result": "pass",
+  "checks": [
+    "Guest UART reported virtio-snd PCM playback ready (S16 48 kHz stereo).",
+    "On this rebuilt ISO, the source probe called Sound(60), waited 250 ms, stopped the tone, and returned 0x2a.",
+    "The QEMU WAV backend captured 12,348 stereo frames at 44.1 kHz (about 0.28 s); left and right channels matched, peak amplitude was 7,000, and sign transitions measured about 441 Hz after backend resampling."
+  ],
+  "scope_note": "This verifies the QEMU VirtIO sound transport, stream setup, tone sample generation, and WAV-backend capture. It does not verify audible output in live UTM or on Raspberry Pi hardware, nor runtime behavior of every sound-dependent application. The QEMU WAV header retains streaming zero-length fields, so the PCM payload was inspected directly."
+}

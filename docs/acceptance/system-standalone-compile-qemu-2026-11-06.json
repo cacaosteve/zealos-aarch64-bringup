@@ -1,0 +1,108 @@
+{
+  "date": "2026-11-06",
+  "target": "AArch64 native ZealC in QEMU guest",
+  "probe": "Isolated source compilation of each then-unverified /System/*.ZC path with StockCatalogCompile; no normal loader/modules were preloaded.",
+  "result": "21 of 39 targeted System sources compiled standalone. The other 18 did not compile in this intentionally minimal context; the diagnostics include missing architecture bindings, x86 assembly, and missing module dependencies. They remain unverified pending correct dependency-aware probes or ARM64 adaptations.",
+  "tested_iso": "build/zealos-aarch64-hello.iso",
+  "tested_iso_sha256": "f6a0df3c8636885d5cb0599c649b3fba5a5d628556dcf8234137804a28f88bd6",
+  "tested_source_bundle_sha256": "6ecaa711649a83f14e6bad988a1c4075e0383536a88bc5c6ef47bfc4161a3401",
+  "compiled_sources": [
+    "/System/BlkDev/DiskPart.ZC",
+    "/System/BlkDev/FileMgr.ZC",
+    "/System/BlkDev/ZDiskB.ZC",
+    "/System/Debug.ZC",
+    "/System/Externs.ZC",
+    "/System/Gr/GrEnd.ZC",
+    "/System/Gr/GrExterns.ZC",
+    "/System/Gr/GrGlobals.ZC",
+    "/System/Gr/GrInitA.ZC",
+    "/System/Gr/GrInitB.ZC",
+    "/System/Gr/SpriteNew.ZC",
+    "/System/InFile.ZC",
+    "/System/Menu.ZC",
+    "/System/Mouse.ZC",
+    "/System/PCILookUpSingle.ZC",
+    "/System/Registry.ZC",
+    "/System/TaskSettings.ZC",
+    "/System/Training.ZC",
+    "/System/Win.ZC",
+    "/System/WinMgr.ZC",
+    "/System/ZSplash.ZC"
+  ],
+  "unresolved_in_standalone_context": [
+    {
+      "path": "/System/BlkDev/MakeZBlkDev.ZC",
+      "diagnostic": "/System/BlkDev/Mount.ZC:32:19 AArch64 external data 'dev' is not bound."
+    },
+    {
+      "path": "/System/BlkDev/Mount.ZC",
+      "diagnostic": "/System/BlkDev/Mount.ZC:32:19 AArch64 external data 'dev' is not bound."
+    },
+    {
+      "path": "/System/Boot/BootDVD.ZC",
+      "diagnostic": "/System/Boot/BootDVD.ZC:6:5 Unknown symbol 'asm'."
+    },
+    {
+      "path": "/System/Boot/BootHD.ZC",
+      "diagnostic": "/System/Boot/BootHD.ZC:6:5 Unknown symbol 'asm'."
+    },
+    {
+      "path": "/System/Boot/BootMHD.ZC",
+      "diagnostic": "/System/Boot/BootMHD.ZC:6:5 Unknown symbol 'asm'."
+    },
+    {
+      "path": "/System/Boot/BootMHD2.ZC",
+      "diagnostic": "/System/Boot/BootMHD2.ZC:6:5 Unknown symbol 'asm'."
+    },
+    {
+      "path": "/System/Boot/DiskISO9660.ZC",
+      "diagnostic": "/System/Boot/DiskISO9660.ZC:26:20 Expected ':' after label candidate 'FillU16Palindrome'."
+    },
+    {
+      "path": "/System/Boot/DiskISORedSea.ZC",
+      "diagnostic": "/System/Boot/DiskISORedSea.ZC:36:34 Unknown symbol 'BDVD_START'."
+    },
+    {
+      "path": "/System/Boot/LimineMHDIns.ZC",
+      "diagnostic": "/System/Boot/LimineMHDIns.ZC:73:57 sizeof expression size is invalid."
+    },
+    {
+      "path": "/System/Define.ZC",
+      "diagnostic": "/System/Define.ZC:5:43 AArch64 external data 'mem_boot_base' is not bound."
+    },
+    {
+      "path": "/System/DevInfo.ZC",
+      "diagnostic": "/System/DevInfo.ZC:9:19 AArch64 external data 'dev' is not bound."
+    },
+    {
+      "path": "/System/Gr/GrAsm.ZC",
+      "diagnostic": "/System/Gr/GrAsm.ZC:2:5 Unknown symbol 'asm'."
+    },
+    {
+      "path": "/System/Gr/SpriteEd.ZC",
+      "diagnostic": "/System/Gr/SpriteEd.ZC:70:50 Unknown symbol 'SpriteElemQueuedBaseSize'."
+    },
+    {
+      "path": "/System/Gr/SpriteMain.ZC",
+      "diagnostic": "/System/Gr/SpriteMain.ZC:71:38 Unknown symbol 'SpriteSideBar2SpriteQueue'."
+    },
+    {
+      "path": "/System/Gr/SpriteSideBar.ZC",
+      "diagnostic": "standalone compile did not complete"
+    },
+    {
+      "path": "/System/Hash.ZC",
+      "diagnostic": "/System/Hash.ZC:317:23 Unknown symbol 'HashEntrySize'."
+    },
+    {
+      "path": "/System/MakeSystem.ZC",
+      "diagnostic": "/System/Math/MathODE.ZC:658:24 AArch64 external data 'winmgr' is not bound."
+    },
+    {
+      "path": "/System/WallPaper.ZC",
+      "diagnostic": "/System/WallPaper.ZC:39:10 Unknown symbol 'cmp'."
+    }
+  ],
+  "compile_evidence": "each source was independently compiled in a disposable task; no runtime acceptance is implied",
+  "worktree_changes_included": true
+}

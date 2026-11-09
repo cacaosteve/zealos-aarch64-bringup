@@ -1,0 +1,45 @@
+// MouseSet omitted-coordinate and button semantics used by InSetMouse.
+I64 MouseSetChecks()
+{
+    I64 arg1, arg2;
+    I64 x = mouse.pos.x, y = mouse.pos.y, z = mouse.pos.z;
+    Bool left = mouse.lb, right = mouse.rb;
+
+    MouseSet(111, 222, 3, FALSE, FALSE);
+    if (mouse.pos.x != 111 || mouse.pos.y != 222 || mouse.pos.z != 3 ||
+        mouse.lb || mouse.rb)
+        return mouse.pos.x * 1000000 + mouse.pos.y * 1000 + mouse.pos.z;
+    if (MessageScan(&arg1, &arg2, 1 << MESSAGE_MS_MOVE) != MESSAGE_MS_MOVE)
+        return 4;
+
+    MouseSet(,,, TRUE, TRUE);
+    if (mouse.pos.x != 111 || mouse.pos.y != 222 || mouse.pos.z != 3 ||
+        !mouse.lb || !mouse.rb ||
+        !(kbd.scan_code & SCF_MS_L_DOWN) || !(kbd.scan_code & SCF_MS_R_DOWN))
+    {
+        I64 fail = 100;
+        if (mouse.pos.x != 111) fail += 1;
+        if (mouse.pos.y != 222) fail += 2;
+        if (mouse.pos.z != 3) fail += 4;
+        if (!mouse.lb) fail += 8;
+        if (!mouse.rb) fail += 16;
+        if (!(kbd.scan_code & SCF_MS_L_DOWN)) fail += 32;
+        if (!(kbd.scan_code & SCF_MS_R_DOWN)) fail += 64;
+        return fail;
+    }
+    if (MessageScan(&arg1, &arg2, 1 << MESSAGE_MS_L_DOWN) != MESSAGE_MS_L_DOWN ||
+        MessageScan(&arg1, &arg2, 1 << MESSAGE_MS_R_DOWN) != MESSAGE_MS_R_DOWN)
+        return 5;
+
+    MouseSet(,,, FALSE, FALSE);
+    if (mouse.pos.x != 111 || mouse.pos.y != 222 || mouse.pos.z != 3 ||
+        mouse.lb || mouse.rb ||
+        (kbd.scan_code & (SCF_MS_L_DOWN | SCF_MS_R_DOWN)))
+        return 3;
+    if (MessageScan(&arg1, &arg2, 1 << MESSAGE_MS_L_UP) != MESSAGE_MS_L_UP ||
+        MessageScan(&arg1, &arg2, 1 << MESSAGE_MS_R_UP) != MESSAGE_MS_R_UP)
+        return 6;
+
+    MouseSet(x, y, z, left, right);
+    return 42;
+}

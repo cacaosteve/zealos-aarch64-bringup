@@ -1,0 +1,25 @@
+{
+  "date": "2026-11-05",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "working_tree_changes_included": true,
+  "kernel_sha256": "c39893919459fb6d3fd89cc576eff5a911c86c9ae9cb3d48016f96d36507331a",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "416a232df4fefe845da9427938589762512995cea9239b98d3653d7fc1bb5096",
+  "command": "python3 scripts/check-compat.py --usb-input nec --usb-pointer mouse --probe-demo-menu-sprite",
+  "exit_code": 0,
+  "source_path": "/Demo/DolDoc/MenuSprite.ZC",
+  "result": "pass",
+  "checks": [
+    "Booted the ARM64 graphical terminal with the QEMU xHCI keyboard and mouse enumerated and USB command/event ring checks passing",
+    "MenuSprite launched and rendered its sprite-button 50 Hz entry, plain 100 Hz and 200 Hz entries, and CANCEL",
+    "Mouse selection of 100 Hz returned to the repeated frequency menu without hanging",
+    "Mouse selection of CANCEL exited MenuSprite back to its graphical terminal",
+    "The returned graphical terminal evaluated 40+2; as 42 and zstatus reported failed=0"
+  ],
+  "screenshots": [
+    "build/gui-usb-nec-mouse-demo-menu-sprite-demo-menu-sprite-first-menu.ppm",
+    "build/gui-usb-nec-mouse-demo-menu-sprite-demo-menu-sprite-repeated-menu.ppm",
+    "build/gui-usb-nec-mouse-demo-menu-sprite-demo-menu-sprite-terminal-recovery-result.ppm"
+  ],
+  "scope_note": "Automated QEMU runtime evidence only. The source invokes Sound(Freq2Ona(i)); the guest menu choice path was exercised, but audible output was not independently loopback-verified. This does not establish live UTM or Raspberry Pi behavior."
+}

@@ -52,8 +52,14 @@ int64_t zc_tablet_sample(void);
 int zc_focus_owns_input(void);
 int zc_selftest(void);
 void zc_status(void);
+uint64_t zc_pi4_audio_debug(unsigned index);
 int zc_virtio_keyboard_ready(void);
 uint64_t zc_virtio_keyboard_event_count(void);
 uint16_t zc_virtio_keyboard_last_code(void);
 uint32_t zc_virtio_keyboard_last_value(void);
+/* Optional VirtIO PCM output; tone 0 silences the stream. */
+void zc_virtio_sound_set_tone(int8_t ona);
+void zc_virtio_sound_beep(int8_t ona);
+int zc_virtio_sound_beep_done(void);
+void zc_virtio_sound_pump(void);
 void zc_usb_status(void);

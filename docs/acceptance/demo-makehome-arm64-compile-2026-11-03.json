@@ -1,0 +1,19 @@
+{
+  "date": "2026-11-03",
+  "repository_commit": "working tree",
+  "working_tree_changes_included": true,
+  "command": "python3 scripts/check-compat.py --probe-demo-source-catalog --demo-source-path /Demo/AcctExample/MakeHome.ZC",
+  "target": "QEMU ARM64 graphical guest compile probe",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "dae11502e725bf64c32ae51ec445aac3806820206487b6647cf51f3d0a687536",
+  "source_path": "/Demo/AcctExample/MakeHome.ZC",
+  "source_sha256": "f87a55ded0eda9ef16b4b6d57bf35a765c86b6d0063c478867730250736687a3",
+  "result": "pass",
+  "scope": "The pinned MakeHome source compiles with the stock TOS and system module context in an isolated ARM64 guest task. This is compile evidence only.",
+  "adaptations": [
+    "The source bundle exposes the ARM64-adapted stock TOS files at the root-level paths used by MakeHome's ~/TOS include fallback.",
+    "The isolated compile context loads the stock Hash and God Bible modules and the kernel global declarations required by MakeHome's dependency tree."
+  ],
+  "runtime_acceptance": false,
+  "limitation": "MakeHome installation and runtime behavior are not verified by this compile probe."
+}

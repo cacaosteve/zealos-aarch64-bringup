@@ -1,0 +1,28 @@
+{
+  "date": "2026-11-02",
+  "command": "python3 scripts/check-compat.py --pci --probe-demo-suggest-spelling",
+  "target": "QEMU PCI graphical terminal",
+  "result": "pass",
+  "program": "/Demo/SuggestSpelling.ZC",
+  "source_path": "upstream/pinned/Demo/SuggestSpelling.ZC",
+  "source_sha256": "9e8459bc4194d6965370f42df9fabb326566b8d4e023e89db10bbd534dd455b2",
+  "expected": [
+    "The app accepts a misspelled word and displays dictionary-backed spelling suggestions",
+    "An empty word exits to the graphical terminal",
+    "A subsequent 40+2 expression returns 42 and zstatus reports failed=0"
+  ],
+  "observed": [
+    "Entered Helo; the app displayed Hello among the matching suggestions and retained the submitted word",
+    "Two Return presses submitted an empty word and returned to the graphical terminal",
+    "40+2; returned ans=0x2A=42 and zstatus reported failed=0"
+  ],
+  "evidence_artifacts": [
+    "build/gui-catalog-demo-suggest-spelling-hello.txt",
+    "build/gui-catalog-demo-suggest-spelling-hello.ppm",
+    "build/gui-catalog-demo-suggest-spelling-terminal-recovery.txt",
+    "build/gui-catalog-demo-suggest-spelling-terminal-recovery.ppm"
+  ],
+  "kernel_sha256": "128a98164a3c5940b88e8a401d06d441f57ffc87d7d061cea070b36e99160df3",
+  "iso_sha256": "f9b50081e2de125f878e7338aa8819fef27acdccddfbcfdc720f25204139e515",
+  "scope_note": "Automated QEMU evidence only; live UTM and Pi behavior are not established."
+}

@@ -1,0 +1,20 @@
+{
+  "date": "2026-11-03",
+  "command": "python3 scripts/check-compat.py --quick --probe-demo-paren-warn --pci",
+  "target": "AArch64 QEMU virt, PCI graphical terminal",
+  "program": "/Demo/ParenWarn.ZC",
+  "result": "pass",
+  "checks": [
+    "Option(3, ON) and OptionGet(3) verified the parenthesis-warning option in the interactive compiler context",
+    "Interactive 1+(2+3); returned 6 and displayed the unnecessary-parentheses warning",
+    "ExePutS(\"Option(3,ON);1+(2+3);\") returned 6",
+    "ExeFile2(\"/Demo/ParenWarn.ZC\") displayed source-file warnings for the redundant parentheses and returned normally",
+    "After the demo, 40+2; returned 42 and zstatus reported failed=0"
+  ],
+  "source_sha256": "f3a06b91e600fbbcdbadfe5c4f55360f130cc3ac4386bce8d3ac4ac55676c613",
+  "iso_sha256": "5c9f2c0bd43843f50c600f819c162ab4d7fa081aceb764b9eee87d375f70c98a",
+  "check_script_sha256": "0ed18b6fa4eb156e0f345e6aeaca3445915a19d4beb95d1dd306ade3df052f60",
+  "log": "build/check-program-catalog-pci.log",
+  "log_sha256": "340a3a06b3787336cc499681bc597997ee556804643487442752d76737cb80f6",
+  "scope_note": "Automated QEMU runtime evidence. Compiler warnings, source execution and terminal recovery passed; this does not establish live UTM or Pi hardware behavior."
+}

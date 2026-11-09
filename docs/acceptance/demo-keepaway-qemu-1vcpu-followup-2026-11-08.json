@@ -1,0 +1,21 @@
+{
+  "date": "2026-11-08",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "working_tree_changes_included": true,
+  "command": "QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device' python3 scripts/check-compat.py --pci --probe-3d-apps --probe-keepaway-full-game",
+  "target": "AArch64 QEMU virt, PCI graphical terminal, one vCPU",
+  "kernel_sha256": "9ba7456e00b4bb334c731f5f95f9db26a79aca2104556a9e16c051b28b81214d",
+  "iso_sha256": "77477417f9704000cd1f647f11e5a9fbd440347a162fde88dad9be7553dae165",
+  "scoped_result": "KeepAway full-game and recovery checks passed; the combined 3D suite later failed while typing the subsequent Titanium launch command.",
+  "keepaway_checks": {
+    "render_and_input": "pass: court, HUD and player rendered; Space and mouse input accepted; HUD refreshed",
+    "full_game": "pass: remained active for 185 seconds; scanout changed throughout the run",
+    "escape_recovery": "pass: Escape returned to the graphical terminal; 40+2 returned 42",
+    "task_cleanup": "pass: no live Animate child remained after exit",
+    "runtime_status": "pass: zstatus reported failed=0"
+  },
+  "combined_run_note": "The command exited 1 after KeepAway passed. The later Titanium launch prompt had duplicated text from the automated terminal typer and did not match its expected input. This is a harness/input-entry failure after the scoped KeepAway checks, not evidence of a KeepAway failure.",
+  "log": "build/check-3d-apps-pci.log",
+  "log_sha256": "b6b9165496d4c244af27a46075434d8733e0538fd1d480431b4156da4c38bcdd",
+  "scope_note": "QEMU one-vCPU acceptance only. It narrows the earlier KeepAway freeze to UTM or its configuration; live UTM confirmation remains open."
+}

@@ -1,0 +1,27 @@
+{
+  "date": "2026-11-06",
+  "source_commit": "working tree",
+  "working_tree_changes_included": true,
+  "kernel_sha256": "d75af5b9dc23c41c19b92c1f32c123bedad9e9614efc1df2a187a00a549b68d7",
+  "disk": "build/disk.img",
+  "disk_sha256": "495cead36550049a7a1021c9de58f832811e6cd5dc1c75c7da2a00d11c734c84",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "86fea5e182b2f12b03861722b0b1cd2afe6128943c7256252c2ebc4a40e9e3b2",
+  "command": "python3 scripts/check-compat.py --pci --quick --probe-demo-txt-gen",
+  "exit_code": 0,
+  "source_path": "/Demo/ToHtmlToTXTDemo/HtmlGen.ZC",
+  "result": "pass",
+  "checks": [
+    "Executed HtmlGen from its stock demo directory using the stock ToHtml module.",
+    "HtmlGen wrote ~/DemoOutPage.html; the guest displayed the expected TempleOS heading and File Downloads content.",
+    "The guest returned to the graphical terminal; 40+2; produced 42 and zstatus reported failed=0."
+  ],
+  "screenshots": [
+    "build/gui-demo-html-gen-launch-result.ppm",
+    "build/gui-demo-html-gen-output-check-result.ppm",
+    "build/gui-demo-html-gen-output-temple.ppm",
+    "build/gui-demo-html-gen-output-downloads.ppm",
+    "build/gui-demo-txt-gen-terminal-recovery-result.ppm"
+  ],
+  "scope_note": "Automated UEFI QEMU runtime acceptance. It does not establish live UTM or Raspberry Pi hardware behavior."
+}

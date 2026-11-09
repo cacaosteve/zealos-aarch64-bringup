@@ -1,0 +1,18 @@
+{
+  "date": "2026-11-03",
+  "repository_commit": "working tree",
+  "working_tree_changes_included": true,
+  "command": "python3 scripts/check-compat.py --probe-demo-arm64-irq-adaptations",
+  "target": "QEMU ARM64 graphical-terminal demo runtime probe",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "39824a72b9a7f6cef536a5db7009a8054a8b08fb1743e1f1979969bf22ae6607",
+  "result": "pass",
+  "checks": [
+    "Demo/Lectures/PCIInterrupts.ZC overlay compiled and ran; it stated that x86 IOAPIC/LAPIC routing is unavailable on AArch64 and guest device IRQ registration and PCI INTx routing are not implemented",
+    "PCIInterrupts adaptation did not access x86 MMIO addresses",
+    "Demo/MultiCore/Interrupts.ZC overlay compiled and ran as a cooperative AArch64 task-ring example with one logical guest CPU; Yield produced the expected ABCD order",
+    "Terminal recovered after each demo and 40+2 returned 42",
+    "zstatus reported failed=0"
+  ],
+  "limitation": "This accepts the ARM64 capability-reporting and cooperative-scheduling adaptations. It does not implement guest PCI INTx/GIC device routing, SMP, LAPIC IPIs, or interrupt-driven sound, and does not claim the original x86 demonstrations run unchanged."
+}

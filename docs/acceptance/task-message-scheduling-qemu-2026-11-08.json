@@ -1,0 +1,15 @@
+{
+  "date": "2026-11-08",
+  "target": "QEMU PCI ARM64 graphical guest",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "8f007016b0b82cd376c61e1906ea80d0bea1a9890d7a89268322fc40ffff50fc",
+  "command": "python3 scripts/check-compat.py --quick --probe-source-fast --probe-source tests/compat/TaskMessages.ZC --probe-source-call TaskMessageSchedulingChecks",
+  "result": "pass",
+  "verified": [
+    "Five consecutive MessageScan, KeyScan, CharScan, and FlushMessages polls do not run the peer task",
+    "Explicit Yield runs the next ready peer task",
+    "A task blocked in MessageGet yields to a ready peer, receives its posted command, and resumes",
+    "The source probe returns 0x2a"
+  ],
+  "scope_note": "This validates the current cooperative host bridge, not the pinned upstream Sched.ZC as the active runtime scheduler. No host_message_scan or X-Caliber source change was made for this check."
+}

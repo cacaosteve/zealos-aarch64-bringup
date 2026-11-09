@@ -30,3 +30,18 @@ I64 BudgetEntryPoint()
         }
     return -1;
 }
+
+I64 BudgetFormReadDatabaseWord()
+{
+    CFile *f = FOpen("~/DataBaseDemo.BIN", "r");
+    U8 block[BLK_SIZE];
+    I64 word = 0;
+    MemSet(block, 0, sizeof(block));
+    if (f)
+    {
+        FBlkRead(f, block, 0, 1);
+        MemCopy(&word, block, sizeof(word));
+        FClose(f);
+    }
+    return word;
+}

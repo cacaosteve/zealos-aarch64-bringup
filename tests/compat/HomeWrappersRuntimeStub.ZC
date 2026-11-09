@@ -1,0 +1,18 @@
+public I64 HomeWrappersStrFindCheck()
+{
+    U8 *sample = "UserStartUp";
+
+    if (StrFind("Start", sample) != sample + 4)
+        return 1;
+    if (StrFind("start", sample, 1) != sample + 4)
+        return 2;
+    if (StrFind("User", sample, 2) != sample)
+        return 3;
+    if (StrFind("Start", sample, 2))
+        return 4;
+    if (StrFind("Start", sample, 4))
+        return 5;
+    if (StrFind("missing", sample))
+        return 6;
+    return 42;
+}

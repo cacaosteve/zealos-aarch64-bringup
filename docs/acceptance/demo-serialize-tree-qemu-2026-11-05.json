@@ -1,0 +1,26 @@
+{
+  "date": "2026-11-05",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "working_tree_changes_included": true,
+  "kernel_sha256": "5e63aead946d2a07242ecfa1ec0303521fc9311058346dfffb9c4b5a703a7a1f",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "be190bd6aa350d7e8c3a28068132e0aa3819b02af9150b311c371ee4c9226932",
+  "command": "python3 scripts/check-compat.py --probe-demo-serialize-tree",
+  "exit_code": 0,
+  "source_path": "/Demo/Disk/SerializeTree.ZC",
+  "result": "pass",
+  "pinned_source_sha256": "20867ea9773848e87821307e2421c52943d1866308a3bbe59ae759015a9b6aad",
+  "checks": [
+    "Loaded the demo's LineRep and ZDiskB runtime dependencies.",
+    "Executed SerializeTree from the graphical terminal and observed normal return to the prompt.",
+    "Serialized /Demo/*.DD* recursively, unserialized it, and compared the rebuilt tree against the source tree recursively, including entry attributes, names, cluster numbers, sizes, and timestamps.",
+    "The round-trip check returned 0x2a, confirming a non-empty byte stream and matching rebuilt tree.",
+    "The graphical terminal evaluated 40+2; as 42 after the demo returned.",
+    "zstatus reported failed=0."
+  ],
+  "screenshots": [
+    "build/gui-catalog-demo-serialize-tree-launch-result.ppm",
+    "build/gui-catalog-demo-serialize-tree-terminal-recovery-result.ppm"
+  ],
+  "scope_note": "QEMU runtime acceptance for the pinned SerializeTree source and the current AArch64 image; this is not a live UTM or Raspberry Pi hardware check."
+}

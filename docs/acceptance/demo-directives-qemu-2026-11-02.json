@@ -1,0 +1,17 @@
+{
+  "date": "2026-11-02",
+  "command": "python3 scripts/check-compat.py --pci --probe-demo-directives",
+  "target": "QEMU PCI graphical terminal",
+  "result": "pass",
+  "program": "/Demo/Directives.ZC",
+  "source_path": "upstream/pinned/Demo/Directives.ZC",
+  "source_sha256": "18459e4957ce72fd4ca6cb9cc780ebadf31c7b6e7acaf32d2c9261b2772a39ac",
+  "verified": [
+    "Program's built-in output includes Date, Time, File, Dir, Line, CmdLine, Inst1 and Inst2",
+    "Program returns to the graphical terminal",
+    "40+2 evaluates as 42 and zstatus reports failed=0"
+  ],
+  "kernel_sha256": "4daaabe6cc3e9e21bfe3b17b3671c782206d4977ab1bbca62b00f24034d32197",
+  "iso_sha256": "0b03196016aa2c6192ce390675a5e141a641a99d30cc1c1675d5d7340202de3f",
+  "scope_note": "Automated QEMU evidence only; live UTM and physical Pi behavior are not established."
+}

@@ -15,6 +15,7 @@ struct user_compiler {
     char *doc_filename;
     int primed;
 };
+static uint64_t user_compiler_lex_calls, user_compiler_statement_calls;
 static void **user_doc_state(CLexFile *file) {
     return ((struct user_doc_stream *)file->port_data)->input;
 }
@@ -242,6 +243,7 @@ static int64_t user_compiler_step(struct user_compiler *c, int prime, int64_t *t
     f->source_context = &parse.context;
     c->lex->port_options = (int64_t *)(c->mirror + guest_cc_opts_off);
     c->lex->port_sync = guest_context_sync;
+    c->lex->port_warning = guest_parser_warning;
     c->lex->port_fun_complete = guest_function_complete;
     f->user_diagnostic_length = 0;
     f->user_diagnostic_active = 1;
@@ -320,6 +322,7 @@ static int64_t host_user_lex(int64_t *a) {
     if (compiler_recovery_active) AIWNIOS_throw(0);
     struct user_compiler *c = user_compiler_find((void *)(uintptr_t)a[0]);
     struct guest_fiber *f = &guest_fibers[guest_current];
+    user_compiler_lex_calls++;
     if (c->native) guest_raise(GUEST_EXCEPT_COMPILER);
     /* Input may Yield; it must complete before entering the shared parser or
      * taking a checkpoint. The reader returns a task-owned, NUL-ended chunk. */
@@ -381,6 +384,7 @@ static int64_t host_user_lex(int64_t *a) {
 static int64_t host_user_statement(int64_t *a) {
     if (compiler_recovery_active) AIWNIOS_throw(0);
     struct user_compiler *c = user_compiler_find((void *)(uintptr_t)a[0]);
+    user_compiler_statement_calls++;
     if (c->native && !c->lex->cur_tok &&
         (*(int64_t *)(c->mirror + guest_cc_flags_off) & 0x002)) {
         compiler_source_cleanup(c->native, c->lex);
@@ -409,6 +413,14 @@ static int64_t host_user_prompt_set(int64_t *a) {
 static int64_t host_user_output_set(int64_t *a) {
     if (compiler_recovery_active) AIWNIOS_throw(0);
     guest_fibers[guest_current].user_output_writer = (void *)(uintptr_t)a[0];
+    return 0;
+}
+static int64_t host_user_terminal_attach(int64_t *a) {
+    struct guest_fiber *f = &guest_fibers[guest_current];
+    if (!f->user_prompt_reader)
+        f->user_prompt_reader = (void *)(uintptr_t)a[0];
+    if (!f->user_output_writer)
+        f->user_output_writer = (void *)(uintptr_t)a[1];
     return 0;
 }
 struct user_output_scope {

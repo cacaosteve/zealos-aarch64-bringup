@@ -1,0 +1,30 @@
+{
+  "date": "2026-11-04",
+  "source_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "target": "AArch64 QEMU virt with ramfb and VirtIO keyboard/tablet",
+  "source_path": "/Demo/Games/DunGen.ZC",
+  "source_sha256": "47afe84982bca183980fca70441425a5493ca4313a989344f8dbeb742219bff7",
+  "iso_path": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "259cd8d535378a8b54ca12d8db75a3f30d62270bd66caa07fad4a6997284fd22",
+  "command": "QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device' python3 scripts/check-compat.py --probe-demo-dungen",
+  "result": "pass",
+  "checks": [
+    "Launched the unchanged pinned /Demo/Games/DunGen.ZC from the graphical terminal in a focused application task.",
+    "The dungeon scene rendered with visible graphics.",
+    "Arrow-key input changed the rendered scene.",
+    "Escape restored the graphical terminal; 40+2 evaluated to 42 and zstatus reported failed=0."
+  ],
+  "artifacts": {
+    "files": [
+      "build/check-demo-dungen-pci.log",
+      "build/gui-demo-dungen-demo-dungen-initial.ppm",
+      "build/gui-demo-dungen-demo-dungen-right.ppm",
+      "build/gui-demo-dungen-demo-dungen-down.ppm",
+      "build/gui-demo-dungen-demo-dungen-left.ppm",
+      "build/gui-demo-dungen-demo-dungen-up.ppm",
+      "build/gui-demo-dungen-demo-dungen-exit-smoke-result.ppm"
+    ],
+    "probe_sha256": "2bc95a8cd2f0c757b4feaf09856abd593f04f0d190a0f271f1fb30f7c3dc1a71"
+  },
+  "scope_note": "QEMU runtime acceptance only; live UTM and Pi hardware behavior are not implied."
+}

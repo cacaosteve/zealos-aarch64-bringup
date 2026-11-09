@@ -1,0 +1,27 @@
+{
+  "date": "2026-11-03",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "target": "AArch64 QEMU virt, PCI, graphical terminal",
+  "command": "python3 -m py_compile scripts/check-compat.py && python3 scripts/check-compat.py --pci --probe-demo-sprite-plot3d",
+  "source_path": "/Demo/Graphics/SpritePlot3D.ZC",
+  "source_sha256": "b7ac2e5e81a3f54d6aa3ae1a2bdabacb22cb6d0c6694327548f68fcb58bd3dc5",
+  "result": "pass",
+  "checks": [
+    "SpritePlot3D visibly rendered its sprite, changing 46,279 scanout pixels",
+    "The sprite rotated between two frames, changing 6,090 scanout pixels",
+    "Escape exited the demo and the graphical terminal evaluated 40+2 as 42",
+    "The guest remained healthy with zstatus failed=0"
+  ],
+  "artifacts": {
+    "build/zealos-aarch64-hello.iso": "eb3a1db2e684287cf39ff03a04c23287ac9da4d0f9358a02df2234ee50ae1fd4",
+    "build/disk.img": "5c3e4d6aa61f1ffb4e3174dc4e5bce82598c65df18421b322ef96122c1acfc0e",
+    "build/sources.tar": "b89426e6ae2dad802ac5e1aa8239bbbb78d502b6695bbba8e008123f0ed2f7d9",
+    "scripts/check-compat.py": "3a45a163fea8f2c9f7646c1cb6e1a636f4763f0fd7f5bfa6555482496e3e2d5e"
+  },
+  "screenshots": [
+    "build/gui-demo-sprite-plot3d-demo-sprite-plot3d-active.ppm",
+    "build/gui-demo-sprite-plot3d-demo-sprite-plot3d-rotated.ppm",
+    "build/gui-demo-sprite-plot3d-demo-sprite-plot3d-terminal-recovery-result.ppm"
+  ],
+  "scope_note": "QEMU runtime acceptance only; live UTM or Pi hardware acceptance is not implied."
+}

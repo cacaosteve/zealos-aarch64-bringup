@@ -1,0 +1,32 @@
+{
+  "date": "2026-11-07",
+  "target": "AArch64 QEMU virt, PCI graphical terminal",
+  "command": "python3 scripts/check-compat.py --quick --probe-demo-menu-bttn --pci",
+  "source_path": "/Demo/DolDoc/MenuBttn.ZC",
+  "source_sha256": "ceb936043422c08fbb609423834ce5ae3ca917b8792720249716bfed20e57db0",
+  "result": "pass",
+  "exit_code": 0,
+  "checks": [
+    "MenuBttn compiles, launches, and the Sound On button changes to Sound Off.",
+    "DolDoc parses both LE=DOCM_CANCEL and the literal LE=-1 as -1.",
+    "Selecting Done and pressing Escape dismisses the menu.",
+    "After dismissal, the graphical terminal accepts input and 40+2; evaluates to 42.",
+    "zstatus reports failed=0."
+  ],
+  "unverified": [
+    "Live UTM and physical Raspberry Pi behavior.",
+    "Independent activation checks for Set Freq and Nothing."
+  ],
+  "artifacts": {
+    "build/zealos-aarch64-hello.iso": "46808090b6d36271ce63a8d683d0f4404d15a79fa9c3c6704b1e00fa36b27e48",
+    "scripts/check-compat.py": "897574b25c5bd46d25c95a697da3ad7d523e753324e5d6f2e4cba6b472fafbd6",
+    "build/check-demo-menu-bttn-pci.log": "25de5f24deee12be9fd62272eaf02f4bcec026ba57d449cbdec8f87d7aa49cf5"
+  },
+  "log": "build/check-demo-menu-bttn-pci.log",
+  "screenshots": [
+    "build/gui-demo-menu-bttn-demo-menu-bttn-sound-off.ppm",
+    "build/gui-demo-menu-bttn-demo-menu-bttn-done-dismissed.ppm",
+    "build/gui-demo-menu-bttn-demo-menu-bttn-return-result.ppm"
+  ],
+  "scope_note": "QEMU runtime acceptance for this menu flow. Does not claim live UTM or Pi acceptance or cover every button."
+}

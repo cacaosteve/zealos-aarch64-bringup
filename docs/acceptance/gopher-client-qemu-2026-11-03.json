@@ -1,0 +1,18 @@
+{
+  "date": "2026-11-03",
+  "target": "AArch64 native ZealC/QEMU guest with PCI VirtIO-net and QEMU user networking",
+  "command": "python3 scripts/check-compat.py --pci --quick --probe-network-runtime",
+  "result": "pass",
+  "checks": {
+    "network_stack": "PASS: native VirtIO-net initialized; DHCP configured the guest (10.0.2.15); zstatus zc: ready=1",
+    "tcp_connect": "PASS: Gopher connected to a host-side local TCP fixture through the QEMU user-network host gateway (10.0.2.2)",
+    "request": "PASS: fixture received the exact Gopher selector /\\r\\n",
+    "response": "PASS: guest parsed and displayed \u201cQEMU Gopher fixture reached\u201d",
+    "runtime_health": "PASS: probe exited 0 after the fixture request and response"
+  },
+  "worktree_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "source_bundle_sha256": "213554e8a2cb4daea83faddc6b7199e85fd673064145441190a77a68508fea61",
+  "tested_boot_disk_sha256": "f4ec7b7aed99662be90a526b9cd85e7eca360b18440e8ac732a6d4227c1de5f8",
+  "scope_note": "This validates Gopher against a local TCP fixture and its basic request, menu parsing, display, and guest recovery path. It does not establish arbitrary Internet Gopher compatibility, UTM networking, or runtime acceptance of the other network clients.",
+  "working_tree_changes_included": true
+}

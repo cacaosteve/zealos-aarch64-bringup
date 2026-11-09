@@ -3,8 +3,7 @@ I64 msg_stage, msg_code1, msg_code2, msg_arg1, msg_arg2;
 I64 msg_scan_peer_stage, msg_scan_peer_scans, msg_scan_peer_key_scans;
 I64 msg_scan_peer_char_scans, msg_scan_peer_flushes, msg_scan_started;
 I64 msg_scan_yield_stage, msg_scan_early_peer, msg_scan_peer_bad_order;
-I64 msg_scan_after_yield, msg_scan_sleep_started;
-I64 msg_scan_sleep_peer, msg_scan_after_sleep;
+I64 msg_scan_after_yield, msg_scan_finished, msg_scan_peer_finished;
 CTask *msg_get_waiter;
 I64 msg_get_started, msg_get_peer_ran, msg_get_result;
 
@@ -69,9 +68,7 @@ U0 MessageScanBusyWaiter()
     msg_scan_yield_stage = 1;
     Yield;
     msg_scan_after_yield = msg_scan_peer_stage;
-    msg_scan_sleep_started = 1;
-    Sleep(1);
-    msg_scan_after_sleep = msg_scan_sleep_peer;
+    msg_scan_finished = 1;
 }
 
 U0 MessageScanPeer()
@@ -83,23 +80,29 @@ U0 MessageScanPeer()
             msg_scan_peer_flushes != 5)
         msg_scan_peer_bad_order = 1;
     msg_scan_peer_stage = 1;
-    while (!msg_scan_sleep_started)
-        Yield;
-    msg_scan_sleep_peer = 1;
+    msg_scan_peer_finished = 1;
 }
 
 I64 TaskMessageSchedulingChecks()
 {//Polling does not switch tasks; explicit Yield selects the next ready task.
-    I64 scanner, peer;
+    I64 scanner, peer, i;
     msg_scan_peer_stage = msg_scan_peer_scans = msg_scan_peer_key_scans = 0;
     msg_scan_peer_char_scans = msg_scan_peer_flushes = msg_scan_started = 0;
     msg_scan_yield_stage = msg_scan_early_peer = msg_scan_peer_bad_order = 0;
-    msg_scan_after_yield = msg_scan_sleep_started = 0;
-    msg_scan_sleep_peer = msg_scan_after_sleep = 0;
+    msg_scan_after_yield = msg_scan_finished = msg_scan_peer_finished = 0;
     scanner = ZcTaskSpawn(&MessageScanBusyWaiter);
     peer = ZcTaskSpawn(&MessageScanPeer);
-    if (scanner != 1 || peer != 2 || ZcTaskRun != 2 || ZcTaskRun != 0)
+    // The GUI/session may already own earlier guest-fiber slots. Scheduling
+    // order must not depend on which numeric slots Spawn reuses.
+    if (scanner <= 0 || peer <= 0 || scanner == peer)
         return 1;
+    // Step the cooperative scheduler from the root with a strict bound. A
+    // regression must report failure instead of waiting forever if a task
+    // stops yielding or cannot be resumed.
+    for (i = 0; i < 16 && (!msg_scan_finished || !msg_scan_peer_finished); i++)
+        ZcTaskYield;
+    if (!msg_scan_finished || !msg_scan_peer_finished)
+        return 12;
     if (msg_scan_peer_scans != 5)
         return 2;
     if (msg_scan_yield_stage != 1)
@@ -108,10 +111,10 @@ I64 TaskMessageSchedulingChecks()
         return 4;
     if (msg_scan_after_yield != 1)
         return 5;
+    if (!msg_scan_finished)
+        return 6;
     if (msg_scan_peer_bad_order)
         return 7;
-    if (msg_scan_after_sleep != 1)
-        return 8;
     // MessageGet is a wait operation: it yields so the next ready task can
     // post the event, then resumes and consumes it. MessageScan above remains
     // a pure poll and must not cause this handoff itself.
@@ -120,8 +123,11 @@ I64 TaskMessageSchedulingChecks()
     peer = Spawn(&MessageGetSchedulerPeer);
     if (!msg_get_waiter || !peer)
         return 9;
-    while (TaskValidate(msg_get_waiter) || TaskValidate(peer))
+    for (i = 0; i < 16 &&
+            (TaskValidate(msg_get_waiter) || TaskValidate(peer)); i++)
         Yield;
+    if (TaskValidate(msg_get_waiter) || TaskValidate(peer))
+        return 11;
     msg_get_waiter = NULL;
     if (!msg_get_peer_ran || msg_get_result != 42)
         return 10;

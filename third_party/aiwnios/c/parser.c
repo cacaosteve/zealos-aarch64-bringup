@@ -232,8 +232,6 @@ CCmpCtrl *CmpCtrlNew(CLexer *lex) {
 CRPN *ICFwd(CRPN *rpn) {
   CRPN *orig_rpn = rpn;
   int64_t idx;
-  if (rpn->ic_fwd)
-    return rpn->ic_fwd;
   switch (rpn->type) {
     break;
   case IC_GS:
@@ -1586,6 +1584,105 @@ static int64_t IsRightAssoc(int64_t ic) {
   return 0;
 }
 
+static int64_t ParseParenOperatorPrec(int64_t tok) {
+  switch (tok) {
+  case '`': return 1;
+  case '*': case '/': case '%': return 2;
+  case '&': return 3;
+  case '^': return 4;
+  case '|': return 5;
+  case '+': case '-': return 6;
+  case TK_LSH: case TK_RSH: return 6;
+  case '<': case '>': case TK_LE: case TK_GE: return 7;
+  case TK_EQ_EQ: case TK_NE: return 8;
+  case TK_AND_AND: return 9;
+  case TK_XOR_XOR: return 10;
+  case TK_OR_OR: return 11;
+  case '=': case TK_ADD_EQ: case TK_SUB_EQ: case TK_MUL_EQ:
+  case TK_DIV_EQ: case TK_MOD_EQ: case TK_LSH_EQ: case TK_RSH_EQ:
+  case TK_AND_EQ: case TK_OR_EQ: case TK_XOR_EQ: return 12;
+  default: return INT_MAX;
+  }
+}
+
+static int64_t ParseParenOperator(int64_t tok) {
+  switch (tok) {
+  case '`': return IC_POW;
+  case '*': return IC_MUL;
+  case '/': return IC_DIV;
+  case '%': return IC_MOD;
+  case '&': return IC_AND;
+  case '^': return IC_XOR;
+  case '|': return IC_OR;
+  case '+': return IC_ADD;
+  case '-': return IC_SUB;
+  case '<': return IC_LT;
+  case '>': return IC_GT;
+  case TK_LE: return IC_LE;
+  case TK_GE: return IC_GE;
+  case TK_EQ_EQ: return IC_EQ_EQ;
+  case TK_NE: return IC_NE;
+  case TK_AND_AND: return IC_AND_AND;
+  case TK_XOR_XOR: return IC_XOR_XOR;
+  case TK_OR_OR: return IC_OR_OR;
+  case '=': return IC_EQ;
+  case TK_ADD_EQ: return IC_ADD_EQ;
+  case TK_SUB_EQ: return IC_SUB_EQ;
+  case TK_MUL_EQ: return IC_MUL_EQ;
+  case TK_DIV_EQ: return IC_DIV_EQ;
+  case TK_MOD_EQ: return IC_MOD_EQ;
+  case TK_LSH_EQ: return IC_LSH_EQ;
+  case TK_RSH_EQ: return IC_RSH_EQ;
+  case TK_AND_EQ: return IC_AND_EQ;
+  case TK_OR_EQ: return IC_OR_EQ;
+  case TK_XOR_EQ: return IC_XOR_EQ;
+  default: return 0;
+  }
+}
+
+static void ParseWarnUnnecessaryParen(CCmpCtrl *ccmp, int64_t *ic_stk,
+                                      int64_t *prec_stk, int64_t stk_ptr,
+                                      int64_t open_idx) {
+  int64_t i, inner_prec = -2, inner_op = 0, left_prec = INT_MAX;
+  int64_t left_op = 0, right_prec, right_op, parent_prec, parent_op;
+  int right_child;
+  if (!ccmp->lex->port_options ||
+      !(*ccmp->lex->port_options & (1LL << 3)))
+    return;
+  for (i = open_idx + 1; i < stk_ptr; i++) {
+    if (ic_stk[i] == IC_PAREN || ic_stk[i] == IC_ARRAY_ACC)
+      break;
+    if (prec_stk[i] < 0)
+      continue;
+    if (prec_stk[i] > inner_prec) {
+      inner_prec = prec_stk[i];
+      inner_op = ic_stk[i];
+    }
+  }
+  for (i = open_idx - 1; i >= 0; i--) {
+    if (ic_stk[i] == IC_PAREN || ic_stk[i] == IC_ARRAY_ACC)
+      break;
+    if (prec_stk[i] >= 0) {
+      left_prec = prec_stk[i];
+      left_op = ic_stk[i];
+      break;
+    }
+  }
+  right_prec = ParseParenOperatorPrec(ccmp->lex->cur_tok);
+  right_op = ParseParenOperator(ccmp->lex->cur_tok);
+  /* The pending operator consumes this group on its right. A following
+   * operator consumes it on its left. If both exist, the tighter operator
+   * owns the group; ties belong to the pending (left-associative) operator. */
+  right_child = left_op && (!right_op || left_prec <= right_prec);
+  parent_prec = right_child ? left_prec : right_prec;
+  parent_op = right_child ? left_op : right_op;
+  if (inner_op && parent_op &&
+      (inner_prec < parent_prec ||
+       (inner_prec == parent_prec &&
+        (right_child ? IsRightAssoc(parent_op) : !IsRightAssoc(parent_op)))))
+    ParseWarn(ccmp, "Unnecessary parentheses");
+}
+
 CMemberLst *MemberFind(char *needle, CHashClass *cls) {
   CMemberLst *lst;
   for (lst = cls->members_lst; lst; lst = lst->next)
@@ -2043,6 +2140,7 @@ next:
       for (idx = 0; idx != stk_ptr; idx++) {
         if (ic_stk[idx] == IC_PAREN) {
           Lex(ccmp->lex);
+          ParseWarnUnnecessaryParen(ccmp, ic_stk, prec_stk, stk_ptr, idx);
           while (ic_stk[--stk_ptr] != IC_PAREN) {
             (ic = A_CALLOC(sizeof(CRPN), NULL))->type = ic_stk[stk_ptr];
             QueIns(ic, ccmp->code_ctrl->ir_code);
@@ -2493,6 +2591,8 @@ int64_t ParseWarn(CCmpCtrl *ctrl, char *fmt, ...) {
   fprintf(AIWNIOS_OSTREAM, "WARN:%s:%d:%d %s\n", ctrl->lex->file ? ctrl->lex->file->filename : "<eof>",
           ctrl->lex->file ? ctrl->lex->file->ln + 1 : 0,
           ctrl->lex->file ? ctrl->lex->file->col + 1 : 0, buf);
+  if (ctrl->lex->port_warning)
+    ctrl->lex->port_warning(ctrl->lex, buf);
 }
 
 int64_t ParseErr(CCmpCtrl *ctrl, char *fmt, ...) {
@@ -3196,17 +3296,20 @@ char *PrsArray(CCmpCtrl *ccmp, CHashClass *base, CArrayDim *dim,
   CMemberLst *cur_mem;
   int64_t i, cap, ptr_width = base->sz;
   char *string;
+  int has_brace = ccmp->lex->cur_tok == '{';
   if (dim)
     if (dim->next)
       ptr_width *= dim->next->total_cnt;
-  if (ccmp->lex->cur_tok == '{') {
+  if (has_brace) {
     Lex(ccmp->lex);
-  } else if (!(dim && allow_implicit_open)) {
+  } else if (!(dim && allow_implicit_open) ||
+             (dim && base->raw_type == RT_U8i && ccmp->lex->cur_tok == TK_STR)) {
     if (dim) {
       if (base->raw_type == RT_U8i && ccmp->lex->cur_tok == TK_STR) {
         cap = dim->cnt;
         string = PrsString(ccmp, &i);
-        if (i + 1 > cap) {
+        /* PrsString reports its extent including the terminating NUL. */
+        if (i > cap) {
           ParseWarn(ccmp, "String excedes array dim.");
           memcpy(write_to, string, cap);
         } else {
@@ -3249,13 +3352,17 @@ char *PrsArray(CCmpCtrl *ccmp, CHashClass *base, CArrayDim *dim,
           // All is good,not expecting other item
         } else
           ParseErr(ccmp, "Expected another array element.");
+      } else if (i + 1 == cap && !has_brace && allow_implicit_open == 2) {
+        /* An unbraced array member shares its trailing comma with the
+         * enclosing class initializer. Leave it for the member loop. */
+        break;
       } else
         Lex(ccmp->lex);
     }
   } else {
     for (cur_mem = base->members_lst; cur_mem; cur_mem = cur_mem->next) {
       PrsArray(ccmp, cur_mem->member_class, cur_mem->dim.next,
-               write_to + cur_mem->off, 0);
+               write_to + cur_mem->off, 2);
       if (ccmp->lex->cur_tok != ',') {
         if (!cur_mem->next) {
           // class {I64 a,b,c;}={1,2,3,};
@@ -3267,9 +3374,11 @@ char *PrsArray(CCmpCtrl *ccmp, CHashClass *base, CArrayDim *dim,
     }
     write_to += base->sz;
   }
-  if (ccmp->lex->cur_tok != '}')
-    ParseErr(ccmp, "Expected a '}'.");
-  Lex(ccmp->lex);
+  if (has_brace || allow_implicit_open != 2) {
+    if (ccmp->lex->cur_tok != '}')
+      ParseErr(ccmp, "Expected a '}'.");
+    Lex(ccmp->lex);
+  }
   return write_to;
 }
 
@@ -3524,6 +3633,21 @@ int64_t PrsDecl(CCmpCtrl *ccmp, CHashClass *base, CHashClass *add_to,
           else
             fun->base.flags |= CLSF_FORWARD_ALIAS;
           break;
+        }
+      }
+      /* Host C symbols may be registered before their first ZealC
+       * declaration. PrsBindCSymbol exports a callable FFI trampoline in
+       * that case; resolve this late extern declaration against it instead
+       * of leaving the default DoNothing stub in generated code. */
+      if ((fun->base.base.type & HTF_EXTERN) &&
+          (!fun->fun_ptr || fun->fun_ptr == DoNothing ||
+           fun->fun_ptr == INVALID_PTR)) {
+        CHashExport *host_fun = (CHashExport *)HashFind(
+            name, Fs->hash_table, HTT_EXPORT_SYS_SYM, 1);
+        if (host_fun && host_fun->val) {
+          fun->fun_ptr = host_fun->val;
+          fun->base.base.type &= ~(HTF_EXTERN | HTF_INTRINSIC);
+          fun->base.flags |= CLSF_NATIVE_BINDING;
         }
       }
     }
@@ -4142,7 +4266,9 @@ int64_t AssignRawTypeToNode(CCmpCtrl *ccmp, CRPN *rpn) {
                                !strcmp(fun->import_name, "IC_RDTSC") ||
                                !strcmp(fun->import_name, "IC_RFLAGS_GET") ||
                                !strcmp(fun->import_name, "IC_RSP_GET") ||
-                               !strcmp(fun->import_name, "IC_RBP_GET"))))
+                               !strcmp(fun->import_name, "IC_RBP_GET") ||
+                               !strcmp(fun->import_name, "_ARM64_SVC_BENCH") ||
+                               !strcmp(fun->import_name, "_ARM64_SVC_BENCH_COUNT"))))
       ParseErr(ccmp, "AArch64 intrinsic '%s' (%s) is not implemented.",
                fun->base.base.str, fun->import_name);
     if ((fun->base.base.type & HTF_EXTERN) && fun->import_name &&
@@ -4162,7 +4288,9 @@ int64_t AssignRawTypeToNode(CCmpCtrl *ccmp, CRPN *rpn) {
                                !strcmp(fun->import_name, "IC_RDTSC") ||
                                !strcmp(fun->import_name, "IC_RFLAGS_GET") ||
                                !strcmp(fun->import_name, "IC_RSP_GET") ||
-                               !strcmp(fun->import_name, "IC_RBP_GET"))))
+                               !strcmp(fun->import_name, "IC_RBP_GET") ||
+                               !strcmp(fun->import_name, "_ARM64_SVC_BENCH") ||
+                               !strcmp(fun->import_name, "_ARM64_SVC_BENCH_COUNT"))))
       ParseErr(ccmp, "AArch64 external '%s' (%s) is not bound.",
                fun->base.base.str, fun->import_name);
     if (arg > fun->argc && !(fun->base.flags & CLSF_VARGS)) {
@@ -4647,10 +4775,18 @@ static void PrsMembers(CCmpCtrl *cctrl, CHashClass *bungis, int64_t flags,
             Lex(cctrl->lex);
             if (cctrl->lex->cur_tok == TK_STR) {
               int64_t length;
+              meta->kind = 1;
               meta->string = PrsString(cctrl, &length);
+            } else if (cctrl->lex->cur_tok == TK_F64) {
+              meta->kind = 2;
+              meta->f64 = PrsF64(cctrl);
             } else if (cctrl->lex->cur_tok == TK_I64 ||
                        cctrl->lex->cur_tok == TK_CHR ||
-                       cctrl->lex->cur_tok == '-') {
+                       cctrl->lex->cur_tok == '-' ||
+                       cctrl->lex->cur_tok == '&' ||
+                       cctrl->lex->cur_tok == '(' ||
+                       cctrl->lex->cur_tok == TK_NAME) {
+              meta->kind = 0;
               meta->value = PrsI64(cctrl);
             } else ParseErr(cctrl, "Unexpected member metadata.");
           }

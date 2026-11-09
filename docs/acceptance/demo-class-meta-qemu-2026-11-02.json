@@ -1,0 +1,21 @@
+{
+  "date": "2026-11-02",
+  "command": "python3 scripts/check-compat.py --pci --probe-demo-class-meta",
+  "target": "QEMU PCI ARM64 graphical terminal",
+  "result": "pass",
+  "program": "/Demo/ClassMeta.ZC",
+  "source_path": "upstream/pinned/Demo/ClassMeta.ZC",
+  "source_sha256": "93f509d3ac68f93485d0108e13e1bfca77b59f6f1b5ceb72b988cec1f4fdc6ce",
+  "verified": [
+    "Included ClassMeta in the graphical shell task using the explicit ARM64 compiler-reflection field ABI",
+    "Visible output included age:, serial_num:, and the set value 55555",
+    "Terminal recovered after the include; 40+2 returned 42 and zstatus reported failed=0"
+  ],
+  "failed_checks": [],
+  "kernel_sha256": "3d0c51c9adc0a075daf6770f8e94e42395bdc32ad917e028fbd6e6bfe0af6e01",
+  "iso_sha256": "25bd4eb17c3815b2e3af2fb41a16afc9b7c4cc2e5693f37b8341ad0d6d5f42db",
+  "source_volume_sha256": "27156ab455c8c2492936b8bceef9861d0afa5bbc84d256860252304c6226c960",
+  "source_bundle_sha256": "5dcdc69d56dd0e2eed0d79b6a4c0ae96853ec938c474f472856053f1ef56855a",
+  "capture": "build/gui-catalog-demo-class-meta-result.ppm",
+  "scope_note": "The ARM64 source overlay preserves the displayed default and percentile annotations, with RankOut rendered inline. Aiwnios expression metadata cannot safely contain a following metadata key; the overlay keeps numeric metadata values separate. This pass verifies this adapted demo behavior, not general callback-pointer metadata compatibility."
+}

@@ -12,13 +12,27 @@ import re
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 PINNED = ROOT / "upstream/pinned"
-DEMO_LEDGER = ROOT / "docs/acceptance/demo-source-ledger-2026-11-01.json"
-PROGRAM_CATALOG = ROOT / "docs/acceptance/program-catalog-2026-11-01.json"
-NAMED_APPS = ROOT / "docs/acceptance/named-apps-qemu-2026-11-01.json"
-THREE_D = ROOT / "docs/acceptance/three-d-apps-qemu-2026-11-01.json"
+DEMO_LEDGER = ROOT / "docs/acceptance/demo-source-ledger-2026-11-08.json"
+PROGRAM_CATALOG = ROOT / "docs/acceptance/program-catalog-qemu-2026-11-03.json"
+SOURCE_CONTEXT_CATALOG = ROOT / "docs/acceptance/source-context-catalog-qemu-2026-11-02.json"
+NAMED_APPS = ROOT / "docs/acceptance/named-apps-qemu-2026-11-02.json"
+THREE_D = ROOT / "docs/acceptance/three-d-apps-qemu-1vcpu-2026-11-08.json"
+SPAN_STRUT = ROOT / "docs/acceptance/span-strut-qemu-2026-11-07.json"
 BUDGET = ROOT / "docs/acceptance/budget-qemu-2026-11-01.json"
 LOGIC = ROOT / "docs/acceptance/utm-logic-prompt-fix-2026-10-26.json"
-OUTPUT = ROOT / "docs/acceptance/program-source-inventory-2026-11-01.json"
+VOCABULARY = ROOT / "docs/acceptance/vocabulary-qemu-2026-11-02.json"
+NETWORK = ROOT / "docs/acceptance/network-programs-qemu-2026-11-03.json"
+NETWORK_COMPILE = ROOT / "docs/acceptance/network-compile-qemu-2026-11-06.json"
+SYSTEM_STANDALONE_COMPILE = ROOT / "docs/acceptance/system-standalone-compile-qemu-2026-11-06.json"
+ROOT_BOOTSTRAP_COMPILE = ROOT / "docs/acceptance/root-bootstrap-compile-qemu-2026-11-06.json"
+MISC_STANDALONE_COMPILE = ROOT / "docs/acceptance/misc-standalone-compile-qemu-2026-11-06.json"
+MAKEHOME = ROOT / "docs/acceptance/demo-makehome-qemu-2026-11-05.json"
+MATH = ROOT / "docs/acceptance/math-conversion-f32-qemu-2026-11-05.json"
+MATH_VECTORS = ROOT / "docs/acceptance/math-vectors-matrix-qemu-2026-11-05.json"
+MATH_NDARRAY = ROOT / "docs/acceptance/math-ndarray-qemu-2026-11-05.json"
+MATH_TESTS = ROOT / "docs/acceptance/math-test-compile-qemu-2026-11-05.json"
+TARGETED_SYSTEM = ROOT / "docs/acceptance/targeted-system-compile-qemu-2026-11-05.json"
+OUTPUT = ROOT / "docs/acceptance/program-source-inventory-2026-11-08.json"
 
 
 def read(path):
@@ -65,6 +79,20 @@ def main():
     app_catalog = read(PROGRAM_CATALOG)
     app_compile = {path: True for path in app_catalog["apps_compiled"]}
     app_component_compile = set(app_catalog.get("app_components_compiled", []))
+    catalog_compile = set(app_catalog.get("program_sources_compiled", []))
+    catalog_blocked = set(app_catalog.get("program_sources_blocked", []))
+    source_context_compile = set()
+    source_context_blocked = set()
+    if SOURCE_CONTEXT_CATALOG.exists():
+        source_context = read(SOURCE_CONTEXT_CATALOG)
+        source_context_compile.update(
+            source["path"] for source in source_context["sources"]
+            if source["compile"] == "pass"
+        )
+        source_context_blocked.update(
+            source["path"] for source in source_context["sources"]
+            if source["compile"] == "blocked"
+        )
     named_apps = read(NAMED_APPS)
     app_runtime = {
         "/Apps/" + name + "/" + ("Run.ZC" if (PINNED / "Apps" / name / "Run.ZC").exists()
@@ -91,6 +119,61 @@ def main():
         "status": "pass",
         "evidence": str(LOGIC.relative_to(ROOT)),
     }
+    app_runtime["/Apps/Vocabulary/Run.ZC"] = {
+        "status": "pass",
+        "evidence": str(VOCABULARY.relative_to(ROOT)),
+    }
+    for name in ("Span", "Strut"):
+        app_runtime["/Apps/" + name + "/Run.ZC"] = {
+            "status": "pass",
+            "evidence": str(SPAN_STRUT.relative_to(ROOT)),
+        }
+    network = read(NETWORK)
+    network_compile = set()
+    network_compile_blocked = {}
+    if NETWORK_COMPILE.exists():
+        network_compile_evidence = read(NETWORK_COMPILE)
+        network_compile.update(network_compile_evidence.get("compiled_sources", []))
+        network_compile_blocked = network_compile_evidence.get("blocked_sources", {})
+    system_standalone_compile = set()
+    if SYSTEM_STANDALONE_COMPILE.exists():
+        system_standalone_compile.update(
+            read(SYSTEM_STANDALONE_COMPILE).get("compiled_sources", []))
+    root_bootstrap_compile = set()
+    if ROOT_BOOTSTRAP_COMPILE.exists():
+        root_bootstrap_compile.update(
+            read(ROOT_BOOTSTRAP_COMPILE).get("compiled_sources", []))
+    misc_standalone_compile = set()
+    if MISC_STANDALONE_COMPILE.exists():
+        misc_standalone_compile.update(
+            read(MISC_STANDALONE_COMPILE).get("compiled_sources", []))
+    network_runtime = {
+        path: {"status": "pass", "evidence": str(NETWORK.relative_to(ROOT))}
+        for path, result in network.get("runtime_clients", {}).items()
+        if result.startswith("pass:")
+    }
+    makehome = read(MAKEHOME)
+    makehome_compile = set(makehome.get("compiled_sources", []))
+    math = read(MATH)
+    math_compile = set(math.get("compiled_sources", []))
+    math_runtime = {"/System/Math/Conversion.ZC", "/System/Math/F32.ZC"}
+    if MATH_VECTORS.exists():
+        math_vectors = read(MATH_VECTORS)
+        math_compile.update(math_vectors.get("compiled_sources", []))
+        math_runtime.update(math_vectors.get("runtime_sources", []))
+    if MATH_NDARRAY.exists():
+        math_ndarray = read(MATH_NDARRAY)
+        math_compile.update(math_ndarray.get("compiled_sources", []))
+        math_runtime.update(math_ndarray.get("runtime_sources", []))
+    if MATH_TESTS.exists():
+        math_tests = read(MATH_TESTS)
+        math_compile.update(math_tests.get("compiled_sources", []))
+    if TARGETED_SYSTEM.exists():
+        targeted_system = read(TARGETED_SYSTEM)
+        math_compile.update(targeted_system.get("compiled_sources", []))
+        targeted_system_blocked = set(targeted_system.get("blocked_sources", []))
+    else:
+        targeted_system_blocked = set()
 
     app_dirs = sorted(p for p in (PINNED / "Apps").iterdir() if p.is_dir())
     app_entrypoints = {}
@@ -106,6 +189,16 @@ def main():
             continue
         source = PINNED / entrypoint.lstrip("/")
         compiled_app_sources.update(included_app_sources(source))
+
+    # Palette Editor is a Home tool, not an /Apps entrypoint. Its successful
+    # Run.ZC probe loads Load.ZC normally, which includes these source files.
+    compiled_home_sources = set()
+    if "/Home/PaletteEditor/Run.ZC" in catalog_compile:
+        compiled_home_sources.update(
+            (PINNED / "Home/PaletteEditor" / name).resolve()
+            for name in ("Load.ZC", "PaletteSelect.ZC", "PaletteGod.ZC",
+                         "PaletteEdit.ZC")
+        )
 
     records = []
     for source in sorted(PINNED.rglob("*.ZC")):
@@ -147,6 +240,76 @@ def main():
                 record["runtime"] = demo_record["runtime"]
                 record["evidence"] = demo_record["runtime_evidence"] or str(
                     DEMO_LEDGER.relative_to(ROOT))
+        elif top == "Home" and source.resolve() in compiled_home_sources:
+            record["compile"] = "pass"
+            record["evidence"] = str(PROGRAM_CATALOG.relative_to(ROOT))
+            record["evidence_scope"] = "transitively included by a compiled Home tool entrypoint; compile only"
+        if guest_path in network_runtime:
+            record["runtime"] = network_runtime[guest_path]["status"]
+            record["runtime_evidence"] = network_runtime[guest_path]["evidence"]
+        if guest_path in network_compile and record["compile"] == "unverified":
+            record["compile"] = "pass"
+            record["evidence"] = str(NETWORK_COMPILE.relative_to(ROOT))
+            record["evidence_scope"] = "compiled in the accepted network stack or Telnet source-load probe; compile only"
+        if guest_path in network_compile_blocked and record["compile"] == "unverified":
+            record["compile"] = "blocked"
+            record["evidence"] = str(NETWORK_COMPILE.relative_to(ROOT))
+            record["evidence_scope"] = network_compile_blocked[guest_path]
+        if guest_path in system_standalone_compile and record["compile"] == "unverified":
+            record["compile"] = "pass"
+            record["evidence"] = str(SYSTEM_STANDALONE_COMPILE.relative_to(ROOT))
+            record["evidence_scope"] = "compiled standalone in a disposable AArch64 guest task; compile only"
+        if guest_path in root_bootstrap_compile and record["compile"] == "unverified":
+            record["compile"] = "pass"
+            record["evidence"] = str(ROOT_BOOTSTRAP_COMPILE.relative_to(ROOT))
+            record["evidence_scope"] = "compiled standalone in a disposable AArch64 guest task; compile only"
+        if guest_path in misc_standalone_compile and record["compile"] == "unverified":
+            record["compile"] = "pass"
+            record["evidence"] = str(MISC_STANDALONE_COMPILE.relative_to(ROOT))
+            record["evidence_scope"] = "compiled standalone in a disposable AArch64 guest task; compile only"
+        if guest_path in makehome_compile:
+            record["compile"] = "pass"
+            record["evidence"] = str(MAKEHOME.relative_to(ROOT))
+            record["evidence_scope"] = "compiled transitively through the accepted MakeHome source-load path; compile evidence only"
+        elif guest_path in math_compile:
+            record["compile"] = "pass"
+            vector_math_evidence = (MATH_VECTORS.exists() and guest_path in
+                                    set(math_vectors.get("compiled_sources", [])))
+            ndarray_evidence = (MATH_NDARRAY.exists() and guest_path in
+                                set(math_ndarray.get("compiled_sources", [])))
+            math_test_evidence = (MATH_TESTS.exists() and guest_path in
+                                  set(math_tests.get("compiled_sources", [])))
+            targeted_system_evidence = (TARGETED_SYSTEM.exists() and guest_path in
+                                        set(targeted_system.get("compiled_sources", [])))
+            math_evidence = (TARGETED_SYSTEM if targeted_system_evidence else
+                             MATH_TESTS if math_test_evidence else
+                             MATH_NDARRAY if ndarray_evidence else
+                             MATH_VECTORS if vector_math_evidence else MATH)
+            record["evidence"] = str(math_evidence.relative_to(ROOT))
+            record["evidence_scope"] = "compiled in the accepted system ExeFile2 source probe"
+            if guest_path in math_runtime:
+                record["runtime"] = "pass"
+                record["runtime_evidence"] = str(math_evidence.relative_to(ROOT))
+        if guest_path in targeted_system_blocked:
+            record["compile"] = "blocked"
+            record["evidence"] = str(TARGETED_SYSTEM.relative_to(ROOT))
+            record["evidence_scope"] = "compile probe faulted or reported a source compiler error; source-specific diagnostics are in the acceptance record"
+        elif guest_path in source_context_compile and record["compile"] == "unverified":
+            record["compile"] = "pass"
+            record["evidence"] = str(SOURCE_CONTEXT_CATALOG.relative_to(ROOT))
+            record["evidence_scope"] = "live-kernel namespace compile-only probe"
+        elif guest_path in source_context_blocked and record["compile"] == "unverified":
+            record["compile"] = "blocked"
+            record["evidence"] = str(SOURCE_CONTEXT_CATALOG.relative_to(ROOT))
+            record["evidence_scope"] = "compile probe failed; see source-context diagnostic"
+        elif guest_path in catalog_compile and record["compile"] == "unverified":
+            record["compile"] = "pass"
+            record["evidence"] = str(PROGRAM_CATALOG.relative_to(ROOT))
+            record["evidence_scope"] = "isolated compile-only program catalog probe"
+        elif guest_path in catalog_blocked and record["compile"] == "unverified":
+            record["compile"] = "blocked"
+            record["evidence"] = str(PROGRAM_CATALOG.relative_to(ROOT))
+            record["evidence_scope"] = "compile probe failed; see catalog diagnostic"
         records.append(record)
 
     areas = {}
@@ -161,11 +324,11 @@ def main():
             "runtime_partial": sum(r["runtime"] == "partial" for r in subset),
         }
     report = {
-        "date": "2026-11-01",
+        "date": "2026-11-08",
         "upstream_commit": read(PINNED / "UPSTREAM.json")["commit"],
         "scope": "All pinned upstream .ZC files; includes runnable entries and non-runnable support modules.",
         "classification_note": "A .ZC source is not necessarily a standalone program. Apps are grouped by Run.ZC/Load.ZC entry points; Demo files remain source-or-component until individually classified.",
-        "evidence_note": "App implementation sources transitively included by a compiled entrypoint inherit compile-pass evidence only; this does not imply standalone launchability or runtime acceptance. Unreferenced App components and non-Demo/non-App areas remain unverified.",
+        "evidence_note": "App implementation sources transitively included by a compiled entrypoint inherit compile-pass evidence only; this does not imply standalone launchability or runtime acceptance. Additional standalone app/demo/support source compile results and compile blockers are linked individually to the 2026-11-02 program and source-context catalogs. Other unreferenced sources remain unverified.",
         "source_files": len(records),
         "app_directories": len(app_dirs),
         "app_entrypoints": len(app_entrypoints),

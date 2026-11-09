@@ -1,0 +1,26 @@
+{
+  "date": "2026-11-07",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "working_tree_changes_included": true,
+  "kernel_sha256": "89111b7fb49ba1bfdea3e5c11ac417a8a95c77e5f1159c112e6020d3f292d7f9",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "c576174d7aa923497501d62d8adbcebf2264dd1ab69b795c64578dcbc21606dc",
+  "command": "python3 scripts/check-compat.py --pci --probe-demo-database",
+  "exit_code": 0,
+  "source_path": "/Demo/Disk/DataBase.ZC",
+  "result": "pass",
+  "checks": [
+    "The graphical terminal launched the stock database demo and opened its write form.",
+    "The form saved account 0 with name 'ARM64 account' and address 'QEMU disk round trip'.",
+    "The database file was read back and the stock application reopened the saved account with both fields visible.",
+    "The app exited to a working terminal where 40+2; returned 42.",
+    "zstatus reported failed=0."
+  ],
+  "adaptation": "The ARM64 source bundle replaces the stock ClassRep(&a) display call with direct formatting of the same two fields because the current ARM64 reflection layout does not match the x86 ZealOS ClassRep ABI.",
+  "screenshots": [
+    "build/gui-demo-dol-doc-demo-database-write-form-fields.ppm",
+    "build/gui-demo-dol-doc-demo-database-readback.ppm",
+    "build/gui-demo-dol-doc-demo-database-final-recovery-result.ppm"
+  ],
+  "scope_note": "QEMU runtime acceptance for same-boot file write/read and terminal recovery. This does not establish power-cycle persistence, live UTM behavior, or Raspberry Pi behavior."
+}

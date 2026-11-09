@@ -1,0 +1,4 @@
+// KernelB.HH cannot be loaded wholesale in the native guest because its _intern
+// declarations are x86-specific. Preserve the boot-base symbol's declared width
+// for compile-only probes of compiler sources that reference it.
+U32 mem_boot_base;

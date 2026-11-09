@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-04",
+  "upstream_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "working_tree_changes_included": true,
+  "kernel_sha256": "567509becb518174eb7e630829e509c3d2f6222f29d99b2fdd2c82e193d54e26",
+  "iso_sha256": "d74708670fc60ce9d5d23139f18fc701dd64913ea6dd109a5a8f4daa9fc2440c",
+  "command": "python3 scripts/check-compat.py --probe-demo-the-dead",
+  "exit_code": 0,
+  "scope": "Fresh automated PCI QEMU runtime acceptance of TheDead on the current ARM64 ISO. The probe verified that the game replaced the terminal with a rendered frame, Down visibly moved the player, Space visibly changed the firing region, Escape returned to the graphical terminal, `40+2;` returned 42, and `zstatus failed=0`. UTM and Pi hardware are not covered.",
+  "arm64_adaptations": "The ARM64 source bundle sets the bullet drawing color to WHITE before TheDead draws its queued bullets, making firing visible in the ARM64 build.",
+  "result": "pass"
+}

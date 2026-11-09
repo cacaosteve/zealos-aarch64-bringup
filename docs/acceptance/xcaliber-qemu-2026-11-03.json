@@ -1,0 +1,23 @@
+{
+  "date": "2026-11-03",
+  "repository_commit": "working tree",
+  "source_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "working_tree_changes_included": true,
+  "command": "python3 scripts/check-compat.py --pci --probe-xcaliber",
+  "target": "QEMU PCI AArch64 graphical guest",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "39824a72b9a7f6cef536a5db7009a8054a8b08fb1743e1f1979969bf22ae6607",
+  "result": "pass",
+  "checks": {
+    "gameplay": "pass: help and level-start prompts dismissed; gameplay rendered",
+    "sequential_arrows": {
+      "result": "pass",
+      "right_ship_diff_pixels": 36,
+      "left_ship_diff_pixels": 37
+    },
+    "space_firing": "pass: projectile trace completed and the projectile was visible in scanout",
+    "escape_and_shell": "pass: Escape returned to the graphical terminal; 40+2 returned 42",
+    "runtime_health": "pass: zstatus reported failed=0; the full probe exited 0"
+  },
+  "scope_note": "This rechecks X-Caliber after the MessageScan scheduling change and the IRQ demo adaptations. The QEMU path passes; it does not establish UTM or Pi hardware acceptance."
+}

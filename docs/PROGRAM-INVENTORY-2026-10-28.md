@@ -100,11 +100,12 @@ constants and stock Math/Sound modules. The ARM64 bridge now provides the stock
 `Blink(F64 Hz=2.5)` API. CharAnimation,
 outside the Demo tree, also compiled with its required stock `Memory.ZC` and
 `Utils/TaskRep.ZC` modules. The 2026-10-31 system-launch runtime gate also
-passes numeric checks for the original `Log10` import. ToHtml's large generated
-code now fits the 96 MiB executable arena; the linker reserves that zeroed
-arena in RAM, keeping the ISO small. The enlarged data/code arenas and
-recovery copies reserve about 448 MiB of RAM; the QEMU image boots with 1 GiB,
-but physical Pi validation is still needed for this memory footprint.
+passes numeric checks for the original `Log10` import. ToHtml's generated
+code exceeded the 96 MiB executable arena when loaded alongside the running
+system, so the arena and its recovery copy are now 192 MiB each. With the
+existing data arenas and recovery copies, this reserves about 640 MiB of RAM;
+the QEMU image boots with 1 GiB, but physical Pi validation is still needed
+for this memory footprint.
 The graphics probes found missing ARM64 bridge services: `GridInit`, `DCFill`,
 and `TextPrint`. Grid and MouseDemo also needed ARM64 overlays to pass `gr.dc`
 explicitly to `GrPlot`; the default first argument is not carried into the
@@ -196,7 +197,7 @@ all six SubSwitch branches, all six NullCase labels, and confirmed a subsequent
 | TimeClock | App compile, date/time formatter gates, and automated punch-in/out record write/read plus report-state round-trip pass. The graphical QEMU probe loads the stock app, submits both descriptions through `StrGet`, reads them back with `TimeRep;`, and recovers to a terminal where `40+2;` returns 42. The red `IN`/`OUT` report labels are below the probe's monochrome OCR threshold, so the probe asserts the saved descriptions instead. CMOS register access stays unavailable. | Verify report labels and clock behavior in live UTM; CMOS hardware clock access remains unavailable. |
 | ToTheFront | ARM64 source overlay fixes the Human player's indirect-fire unit-count loop; the stock `i > UNITS_NUM` condition skipped the artillery order phase. PCI runtime probe selects both player types, displays/dismisses help, renders the generated map, selects artillery and sees its range indicator, plots an order into an adjacent hex, advances a phase with Space, and returns through Escape to a working terminal (`40+2;` -> 42). | Exercise unit movement/direct fire, view controls and broader AI behavior in QEMU, then verify setup and turn flow live in UTM. |
 | Vocabulary | The PCI runtime probe launches `/Apps/Vocabulary/Run.ZC`, displays dictionary question content, accepts a numbered answer and advances, then Escape restores a terminal where `40+2;` returns 42. The autocomplete gate covers the bundled `ACDefs.DATA`/`ACWords.DATA`, boot indexing (`COMPUTER`), `ACDDefGet("Computer")`, completion popup startup and fixture completion. | Visually verify answer feedback and definition popup; check sound separately (ARM64 audio remains silent). |
-| X-Caliber | QEMU reaches gameplay. Fixed a MathODE timeout comparison that mixed guest uptime with host monotonic time; ODE integration now advances. In separate fresh-state probes, Left and Right each visibly move the ship when tested first (45 and 43 changed ship pixels); the opposite direction tested second in the same session sets its bitmap and thrust value but produces no visible change. Escape returns to the terminal and `40+2;` returns 42. Space firing and reliable sequential left/right control remain unverified. Do not add a `Yield` to `MessageScan` or an X-Caliber-specific `Yield`; the cooperative scheduler regression passes. | Isolate the second-direction state and verify Space firing, then repeat live UTM gameplay/Escape. |
+| X-Caliber | Fresh QEMU PCI run on ISO `1600244f…` confirms plain Right and Left visibly move the ship sequentially (67 and 37 changed ship pixels over a 2-pixel idle baseline), Space creates a visible projectile, and Escape returns to a working terminal where `40+2;` returns 42. The `--probe-xcaliber` checks all passed. Its enclosing compatibility run later failed in an unrelated graphical-terminal typing check (`4help` appeared where `help` was expected); do not count that wrapper failure as an X-Caliber failure. Do not add a `Yield` to `MessageScan` or an X-Caliber-specific `Yield`. | Repeat the controls in live UTM and check longer gameplay; ARM64 speaker effects remain unverified. |
 
 The primary current named-app tracker is [PROGRAMS.md](../PROGRAMS.md). The
 latest Titanium automated result is stronger than the earlier status recorded
@@ -379,3 +380,13 @@ remains outstanding.
 `/Demo/OnceDemo.ZC` now compiles with `Reboot` in place of the x86 boot-only `BootRAM` path; its affirmative queue-and-reboot flow remains untested. See [`acceptance/demo-oncedemo-arm64-compile-2026-11-01.json`](acceptance/demo-oncedemo-arm64-compile-2026-11-01.json).
 
 `/Demo/Lectures/NegDisp.ZC` now compiles with an ARM64-portable biased-pointer example in place of unsupported x86 negative class displacement. This is compile-only evidence; the original unassembly behavior is not reproduced. See [`acceptance/demo-negdisp-arm64-compile-2026-11-01.json`](acceptance/demo-negdisp-arm64-compile-2026-11-01.json).
+
+## 2026-11-02 follow-up
+
+The fresh PCI QEMU compile sweep covers all 206 pinned Demo sources: 201
+compile, with five remaining blockers recorded in
+[`acceptance/demo-source-sweep-qemu-2026-11-02.json`](acceptance/demo-source-sweep-qemu-2026-11-02.json).
+The ScreenCapture demo now also passes a graphical QEMU write/read round-trip,
+visible scanout verification, Escape recovery, and terminal smoke check. The
+explicit runtime-accepted Demo count is 36; compile and runtime totals measure
+different coverage.

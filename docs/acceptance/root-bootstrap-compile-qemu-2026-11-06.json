@@ -1,0 +1,33 @@
+{
+  "date": "2026-11-06",
+  "target": "AArch64 native ZealC in QEMU guest",
+  "probe": "Isolated source compilation of then-unverified root-level bootstrap .ZC files via StockCatalogCompile. The StartOS candidate faulted the guest during DolDoc recalculation, so that probe was not completed.",
+  "result": "3 of 7 root-level candidates compiled in disposable tasks; the other four remain unverified pending dependency-aware probes or investigation. These are bootstrap/support sources rather than ordinary applications.",
+  "tested_iso": "build/zealos-aarch64-hello.iso",
+  "tested_iso_sha256": "f6a0df3c8636885d5cb0599c649b3fba5a5d628556dcf8234137804a28f88bd6",
+  "tested_source_bundle_sha256": "6ecaa711649a83f14e6bad988a1c4075e0383536a88bc5c6ef47bfc4161a3401",
+  "compiled_sources": [
+    "/HomeLocalize.ZC",
+    "/HomeSys.ZC",
+    "/Once.ZC"
+  ],
+  "unverified_in_standalone_context": [
+    {
+      "path": "/HomeKeyPlugIns.ZC",
+      "diagnostic": "line 129: Expected ':' after label candidate 'BootRAM' (legacy compiler does not resolve the boot helper call in the standalone task)."
+    },
+    {
+      "path": "/HomeWrappers.ZC",
+      "diagnostic": "Unknown symbol 'Find'; this helper is provided by /System/Utils/Find.ZC."
+    },
+    {
+      "path": "/MakeHome.ZC",
+      "diagnostic": "transitive source load reached /System/Utils/MemRep.ZC, where DriveUnused is not bound in the minimal task."
+    },
+    {
+      "path": "/StartOS.ZC",
+      "diagnostic": "guest synchronous fault during DolDoc recalculation (BootstrapStrLen called by StrNew/DocRecalc); probe aborted."
+    }
+  ],
+  "compile_evidence": "A source compile in a disposable task; no boot/runtime behavior implied."
+}

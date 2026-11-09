@@ -1,0 +1,22 @@
+{
+  "date": "2026-11-07",
+  "command": "python3 scripts/check-compat.py --quick --probe-demo-global-vars --pci",
+  "target": "AArch64 QEMU virt, PCI graphical terminal",
+  "result": "pass",
+  "program": "/Demo/GlobalVars.ZC",
+  "source_path": "upstream/pinned/Demo/GlobalVars.ZC",
+  "source_sha256": "18c0a2fa23115a2aaaa5166715da35fc77443ddad8848e292ef2867b60255ae9",
+  "verified": [
+    "Focused source regression executes a #exe block and reaches the following data-heap global declaration without skipping its type token",
+    "GlobalVars.ZC JIT run prints Time 1, Time 2, Time 3, and Time 4 dynamic-initialization results",
+    "Graphical terminal recovers; 40+2 returns 42 and zstatus reports failed=0"
+  ],
+  "not_verified": [
+    "AOT-only compilation path; this probe covers the ordinary JIT execution path"
+  ],
+  "kernel_sha256": "09b6206c317576499f503cb0f9339890943837ae6f146e2a083cf555c603bdd7",
+  "iso_sha256": "d0acfb5070649c65de040ecc65397698121302960f45208a8af86dec2d05955c",
+  "scope_note": "Automated QEMU evidence only; live UTM and physical Pi behavior are not established.",
+  "log_sha256": "2b77c6c4ac2c1ce8dd8ba812fc91de47a45688657e3a651d89bf590f1cf7ceb9",
+  "log": "build/check-demo-global-vars-pci.log"
+}

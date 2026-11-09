@@ -1,0 +1,76 @@
+{
+  "date": "2026-11-08",
+  "target": "AArch64 QEMU virt, PCI graphical guest, 1 vCPU",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "kernel_sha256": "4bfeab8f4e8e60962823e2360364231dc13f4ec7187264a8e642864c0113d1fd",
+  "iso_sha256": "fd42cae1f7bc340e6bf71e3e2fce41c8c32894d62bdb45f745ea580f5ccdc447",
+  "results": {
+    "TimeClock": {
+      "command": "python3 scripts/check-compat.py --pci --quick --probe-timeclock",
+      "result": "pass",
+      "verified": [
+        "Punch-in and punch-out description forms opened and accepted input",
+        "TimeRep report reopened with saved entries",
+        "Escape returned to graphical terminal and 40+2 evaluated to 42",
+        "Runtime reported failed=0"
+      ],
+      "log": "build/check-timeclock-pci.log",
+      "log_sha256": "c6e56d0bffa5dba1413a877176c940a7929822464923710b945d7ec1c1792457"
+    },
+    "ToTheFront": {
+      "command": "python3 scripts/check-compat.py --pci --quick --probe-timeclock --probe-tothefront --probe-vocabulary --probe-psalmody --probe-span-strut",
+      "effective_probe": "--probe-tothefront (the harness exits after the first selected probe)",
+      "result": "pass",
+      "verified": [
+        "Setup, map generation, and player phase input completed",
+        "Artillery selection rendered range and accepted a plotted adjacent-hex order",
+        "Escape returned to a working graphical terminal; 40+2 evaluated to 42"
+      ],
+      "captured_outputs": [
+        "build/gui-tothefront-tothefront-turn.png",
+        "build/gui-tothefront-tothefront-exit-smoke-result.txt"
+      ]
+    },
+    "Span": {
+      "command": "python3 scripts/check-compat.py --pci --quick --probe-span-strut",
+      "result": "pass",
+      "verified": [
+        "Bridge entry, instructions, and rendered gameplay frame",
+        "Shift+Escape returned to terminal; 40+2 evaluated to 42"
+      ]
+    },
+    "Strut": {
+      "command": "python3 scripts/check-compat.py --pci --quick --probe-span-strut",
+      "result": "pass",
+      "verified": [
+        "Help, edit/play input, and graphics rendered",
+        "Escape returned to terminal; 40+2 evaluated to 42",
+        "Runtime reported failed=0"
+      ]
+    },
+    "Vocabulary": {
+      "command": "python3 scripts/check-compat.py --pci --quick --probe-vocabulary",
+      "result": "pass",
+      "verified": [
+        "Quiz accepted an answer and advanced",
+        "Escape returned to terminal; 40+2 evaluated to 42",
+        "Runtime reported failed=0"
+      ],
+      "log": "build/check-vocabulary-pci.log",
+      "log_sha256": "cae916342a62e85d8aa06f5df980dddca300d1e2d8ad9cfdc0df8ecbe71ba999"
+    },
+    "Psalmody": {
+      "command": "python3 scripts/check-compat.py --pci --quick --probe-psalmody",
+      "result": "pass",
+      "verified": [
+        "Editor and note entry completed",
+        "Playback and stop/exit controls completed",
+        "Shift+Escape returned to terminal; 40+2 evaluated to 42",
+        "Runtime reported failed=0"
+      ],
+      "log": "build/check-psalmody-pci.log",
+      "log_sha256": "bcb95b523498e6267afdc92e1109973b001d223b149c5df9eaf711e535eb4da6"
+    }
+  },
+  "scope_note": "These are automated QEMU results on the recorded ISO. They do not close live UTM or Pi hardware acceptance. The first multi-flag invocation ran ToTheFront only because the probe handler exits after its selected probe; the other applications were run separately as recorded above."
+}

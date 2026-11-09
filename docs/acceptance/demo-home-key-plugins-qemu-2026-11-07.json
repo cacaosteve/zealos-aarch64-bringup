@@ -1,0 +1,28 @@
+{
+  "date": "2026-11-07",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "working_tree_changes_included": true,
+  "kernel_sha256": "44438f24fbdc0d970d9fa884d11a406a1347d585c8acffa714532c6c0777565a",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "7d89f2924a3e92e8e6b76b4a763da976e558f382661cb7a4f9fad1fdc8403019",
+  "command": "python3 scripts/check-compat.py --pci --quick --probe-demo-home-key-plugins",
+  "exit_code": 0,
+  "source_path": "/Demo/AcctExample/HomeKeyPlugIns.ZC",
+  "result": "pass",
+  "checks": [
+    "The graphical terminal reached its prompt, accepted 40+2;, and returned 42.",
+    "The HomeKeyPlugIns module and related TOS example modules loaded in the graphical terminal context.",
+    "Alt+1 was exercised and changed the graphical terminal, confirming the registered HomeKeyPlugIns hook handled the key.",
+    "The graphical terminal accepted 40+2; after the hotkey and returned 42."
+  ],
+  "limitations": [
+    "The stock HomeKeyPlugIns source has no Alt+F8 file-picker binding; this probe covers its registered Alt+1 hook, not file or directory selection.",
+    "Other Alt-key handlers remain unverified.",
+    "This is automated PCI QEMU evidence; live UTM and Raspberry Pi behavior were not checked by this run."
+  ],
+  "screenshots": [
+    "build/gui-demo-home-key-plugins-demo-home-key-plugins-after-hotkey.ppm",
+    "build/gui-demo-home-key-plugins-demo-home-key-plugins-terminal-recovery-result.ppm"
+  ],
+  "scope_note": "Focused PCI QEMU acceptance for the stock HomeKeyPlugIns registration and Alt+1 key hook. This does not establish live UTM or Raspberry Pi behavior, nor acceptance of other Alt-key handlers."
+}

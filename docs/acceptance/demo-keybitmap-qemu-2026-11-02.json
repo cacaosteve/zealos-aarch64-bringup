@@ -1,0 +1,24 @@
+{
+  "date": "2026-11-02",
+  "command": "python3 scripts/check-compat.py --pci --probe-demo-keybitmap",
+  "target": "QEMU PCI graphical terminal",
+  "result": "pass",
+  "program": "/Demo/KeyBitMap.ZC",
+  "source_path": "upstream/pinned/Demo/KeyBitMap.ZC",
+  "source_sha256": "598bd88011098ca64abf5401a1e36eaa2a666dc9cde39651ac331ca1f5b1dfe7",
+  "verified": [
+    "KeyBitMap displayed its hold-key prompt",
+    "Holding the documented i key advanced the sprite visibly across consecutive framebuffer captures",
+    "Releasing i exited cleanly to the graphical terminal",
+    "40+2 evaluated as 42 and zstatus reported failed=0"
+  ],
+  "captures": [
+    "build/gui-demo-keybitmap-demo-keybitmap-ready.ppm",
+    "build/gui-demo-keybitmap-demo-keybitmap-held-1.ppm",
+    "build/gui-demo-keybitmap-demo-keybitmap-held-2.ppm",
+    "build/gui-demo-keybitmap-demo-keybitmap-terminal-recovery-result.ppm"
+  ],
+  "kernel_sha256": "4daaabe6cc3e9e21bfe3b17b3671c782206d4977ab1bbca62b00f24034d32197",
+  "iso_sha256": "0b03196016aa2c6192ce390675a5e141a641a99d30cc1c1675d5d7340202de3f",
+  "scope_note": "Automated QEMU evidence only; live UTM and physical Pi behavior are not established."
+}

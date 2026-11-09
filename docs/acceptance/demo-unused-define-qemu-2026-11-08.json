@@ -1,0 +1,28 @@
+{
+  "date": "2026-11-08",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "working_tree_changes_included": true,
+  "command": "python3 scripts/check-compat.py --pci --probe-demo-dol-doc",
+  "target": "AArch64 QEMU virt with PCI graphical terminal, single guest CPU",
+  "result": "partial",
+  "source_path": "upstream/pinned/Demo/DolDoc/UnusedDefine.ZC",
+  "source_sha256": "869a5031c9d9f2621851ba70f6c999b538d7199c35566001950cbfdcb31a52f4",
+  "dependency_path": "upstream/pinned/System/Utils/Find.ZC",
+  "kernel_sha256": "9ba7456e00b4bb334c731f5f95f9db26a79aca2104556a9e16c051b28b81214d",
+  "iso_sha256": "35236ad35dd83dc52deff79e60a18b27a290e2ec775e825dfd75f4f3ee269ec9",
+  "verified": [
+    "Loaded the stock Find.ZC dependency in the GUI task's compiler context and confirmed the terminal returned 42.",
+    "Launched the unchanged UnusedDefine.ZC source. Linked search results and source matches were visible in its DolDoc at the timeout.",
+    "The prompt wrapper now accepts a wrapped command only when the guest editor reports the expected input length and the visible text matches, preventing duplicate retries."
+  ],
+  "not_verified": [
+    "UnusedDefine's full symbol and source scan did not finish within the 300-second runtime bound.",
+    "Terminal recovery and the trailing 42 sentinel were not reached.",
+    "Live UTM and Pi behavior."
+  ],
+  "framebuffer_capture": "build/gui-demo-dol-doc-demo-dol-doc-unused-define-result.ppm",
+  "framebuffer_capture_sha256": "153ffd7cb8d3d3eed5260517f67488cb8040caa7ec800d5d643bd0bf2fc2a975",
+  "log": "build/check-demo-dol-doc-pci.log",
+  "log_sha256": "cea37176339ba2c175025caf0240abbd919ee56d2a0939d91e312f49ee402838",
+  "scope_note": "Partial runtime evidence only. The stock source describes this full-table, all-files search as a slow brute-force approach; its output was observed, but completion and interactive recovery are not accepted."
+}

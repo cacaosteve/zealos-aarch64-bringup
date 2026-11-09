@@ -1,0 +1,22 @@
+{
+  "date": "2026-11-08",
+  "command": "QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device' python3 scripts/check-compat.py --pci --quick --probe-source-fast --probe-source-module disk:/Demo/MultiCore/MPRadix.ZC --probe-source tests/compat/MultiCore1Runtime.ZC --probe-source-call MultiCore1RuntimeAcceptance",
+  "target": "AArch64 QEMU virt, PCI graphical terminal, single guest CPU; bundled ARM64 source overlay",
+  "result": "single_cpu_runtime_accepted",
+  "program": "/Demo/MultiCore/MPRadix.ZC",
+  "source_path": "build/sources.tar:Demo/MultiCore/MPRadix.ZC",
+  "source_sha256": "d414f5d3f93588e193c9833e3ae48c7828c322d731b9bfa8aef6ce0ccfd1e5ef",
+  "test_source": "tests/compat/MultiCore1Runtime.ZC",
+  "test_source_sha256": "aeefa516d3b549059fa59cd271017b84dcf623ad5d51a6d8f2bd67735651fbf0",
+  "verified": [
+    "The bundled MPRadix source loads and runs QuickSort, QuickSortU32, and the radix stage on a guest reporting one CPU.",
+    "All three sort demonstrations print identical sorted sample bytes.",
+    "MultiCore1RuntimeAcceptance exercises the one-CPU worker, Spawn, Yield, result aggregation, and completion paths; it returns 0x2a only when all 15 internal checks pass.",
+    "The source probe completes and the native compiler resets to ready state."
+  ],
+  "kernel_sha256": "d4e68214ece2a41f79caad3513e2f7ef90a2f5ce234b47887ea759f6a28221c1",
+  "iso_sha256": "e349f0ab8665d5075d50c5f5f017f19a989242022210e94478726c38ff3e421a",
+  "log_sha256": "43861809e30a4cc205a53241f25666958d5741ebc4aefc69d76e719bb7fd2db2",
+  "log": "build/check-compat-pci.log",
+  "scope_note": "This verifies the single-CPU fallback and cooperative task checks in QEMU only. It does not establish multi-CPU radix distribution, full scheduler equivalence, live UTM behavior, or Pi hardware behavior."
+}

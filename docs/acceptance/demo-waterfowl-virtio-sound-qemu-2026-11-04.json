@@ -1,0 +1,17 @@
+{
+  "date": "2026-11-04",
+  "source_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "target": "AArch64 QEMU virt with PCI VirtIO sound and WAV backend",
+  "source_path": "/Demo/Sound/WaterFowl.ZC",
+  "source_sha256": "ba057970d44a491ced347bade4700693b17f5268f55faf1d5403427b4533bbce",
+  "iso_path": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "7d1fd33f5830079057e71f79cb802c6d60be8fbaea3260fdeea83936d60540aa",
+  "command": "QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device -audiodev wav,id=sound0,path=/tmp/zeal-waterfowl-final.wav -device virtio-sound-pci,audiodev=sound0' python3 scripts/check-compat.py --probe-demo-waterfowl",
+  "result": "pass",
+  "checks": [
+    "Launched the unchanged stock /Demo/Sound/WaterFowl.ZC; its poem and animated bird frame rendered in the graphical window.",
+    "The background SongTask produced 79380 stereo frames at 44.1 kHz (1.80 s); 155232 samples were nonzero and peak amplitude was 7000.",
+    "A key exited WaterFowl and returned to the graphical terminal; 40+2 evaluated to 42 and zstatus reported failed=0."
+  ],
+  "scope_note": "Verifies the WaterFowl graphics loop, background Play through QEMU VirtIO sound, key exit, and terminal recovery. Live UTM and Raspberry Pi audio remain unverified."
+}

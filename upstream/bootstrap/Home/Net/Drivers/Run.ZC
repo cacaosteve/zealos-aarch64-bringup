@@ -1,0 +1,12 @@
+/* ARM64 native transport selection. Legacy port-I/O NIC drivers are x86-only. */
+
+extern I64 VirtioNetInit();
+
+U0 NetDriverInit()
+{
+    if (!ZcVirtioNetReady())
+        throw('NODRIVER');
+
+    if (VirtioNetInit() < 0)
+        throw('NODRIVER');
+}

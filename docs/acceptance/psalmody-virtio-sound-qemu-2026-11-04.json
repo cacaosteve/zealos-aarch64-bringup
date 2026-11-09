@@ -1,0 +1,15 @@
+{
+  "date": "2026-11-04",
+  "source_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "target": "AArch64 QEMU virt with PCI VirtIO sound and WAV backend",
+  "command": "QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device -audiodev wav,id=sound0,path=/tmp/zeal-psalmody.wav -device virtio-sound-pci,audiodev=sound0' python3 scripts/check-compat.py --probe-psalmody",
+  "source_path": "/Apps/Psalmody/Run.ZC",
+  "iso_sha256": "7b19699101bc157276da131f6e6fb84bf60eb159a335b291b2756d0197c5f44c",
+  "result": "pass",
+  "checks": [
+    "The stock Psalmody editor opened, accepted a note, exercised playback, and exited with Shift-Escape.",
+    "The QEMU WAV backend captured 10,584 stereo frames at 44.1 kHz (0.24 s); channels matched, 7,938 left-channel samples were nonzero, peak amplitude was 7,000, and the measured note was about 392 Hz.",
+    "The graphical terminal recovered, 40+2 evaluated to 42, and zstatus reported failed=0."
+  ],
+  "scope_note": "This verifies Psalmody note playback through QEMU VirtIO sound and WAV capture. Audible output in live UTM or Raspberry Pi hardware remains unverified."
+}

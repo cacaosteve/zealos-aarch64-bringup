@@ -47,12 +47,12 @@ U0 Branch()
 	for (j = 0; j < 64; j++)
 	{
 		if (i >> 63)
-			'1';
+			Print("%c", '1');
 		else
-			'0';
+			Print("%c", '0');
 		i <<= 1;
 	}
-	'\n';
+	Print("\n");
 }
 
 Branch;

@@ -1,0 +1,61 @@
+{
+  "date": "2026-11-06",
+  "target": "AArch64 native ZealC in QEMU guest",
+  "probe": "Isolated source compilation of then-unverified /Misc/*.ZC sources via StockCatalogCompile; no installer or distro operations executed.",
+  "result": "3 of 14 Misc sources compiled standalone. The remaining 11 are left unverified pending context-aware checks or ARM64-specific treatment; diagnostics include legacy BIOS/PATA installer paths, missing mounted-volume helpers, and x86 assembly.",
+  "tested_iso": "build/zealos-aarch64-hello.iso",
+  "tested_iso_sha256": "f6a0df3c8636885d5cb0599c649b3fba5a5d628556dcf8234137804a28f88bd6",
+  "tested_source_bundle_sha256": "6ecaa711649a83f14e6bad988a1c4075e0383536a88bc5c6ef47bfc4161a3401",
+  "compiled_sources": [
+    "/Misc/Auto/AutoFullDistro4.ZC",
+    "/Misc/Auto/HomeSys.ZC",
+    "/Misc/Auto/Once.ZC"
+  ],
+  "unverified_in_standalone_context": [
+    {
+      "path": "/Misc/Auto/AutoDistro.ZC",
+      "diagnostic": "/Misc/Auto/AutoDistro.ZC:20:13 Expected ':' after label candidate 'BootDVDIns'."
+    },
+    {
+      "path": "/Misc/Auto/AutoFullDistro0.ZC",
+      "diagnostic": "/Misc/Auto/AutoFullDistro0.ZC:22:13 Expected ':' after label candidate 'BootMHDIns'."
+    },
+    {
+      "path": "/Misc/Auto/AutoFullDistro1.ZC",
+      "diagnostic": "/Misc/Auto/AutoFullDistro1.ZC:22:13 Expected ':' after label candidate 'BootMHDIns'."
+    },
+    {
+      "path": "/Misc/Auto/AutoFullDistro2.ZC",
+      "diagnostic": "/Misc/Auto/AutoFullDistro2.ZC:22:13 Expected ':' after label candidate 'BootMHDIns'."
+    },
+    {
+      "path": "/Misc/Auto/AutoFullDistro3.ZC",
+      "diagnostic": "/Misc/Auto/AutoFullDistro3.ZC:26:12 Expected ':' after label candidate 'BootHDIns'."
+    },
+    {
+      "path": "/Misc/Auto/AutoFullDistro5.ZC",
+      "diagnostic": "/Misc/Auto/AutoFullDistro5.ZC:7:28 Unknown symbol 'LineRep'."
+    },
+    {
+      "path": "/Misc/Auto/AutoInstall.ZC",
+      "diagnostic": "/Misc/Auto/AutoInstall.ZC:66:10 Expected ':' after label candidate 'SATARep'."
+    },
+    {
+      "path": "/Misc/Auto/BootMHD2.ZC",
+      "diagnostic": "/Misc/Auto/BootMHD2.ZC:6:5 Unknown symbol 'asm'."
+    },
+    {
+      "path": "/Misc/DoDistro.ZC",
+      "diagnostic": "/Misc/DoDistro.ZC:19:13 Expected ':' after label candidate 'BootDVDIns'."
+    },
+    {
+      "path": "/Misc/OSInstall.ZC",
+      "diagnostic": "standalone compile did not complete"
+    },
+    {
+      "path": "/Misc/OSTestSuite.ZC",
+      "diagnostic": "/Misc/OSTestSuite.ZC:545:13 Expected ':' after label candidate 'InSetMouse'."
+    }
+  ],
+  "compile_evidence": "A source compile in a disposable task; no install/runtime behavior implied."
+}

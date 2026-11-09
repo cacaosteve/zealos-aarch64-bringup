@@ -1,0 +1,26 @@
+{
+  "date": "2026-11-05",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "working_tree_changes_included": true,
+  "kernel_sha256": "5e63aead946d2a07242ecfa1ec0303521fc9311058346dfffb9c4b5a703a7a1f",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "be190bd6aa350d7e8c3a28068132e0aa3819b02af9150b311c371ee4c9226932",
+  "command": "python3 scripts/check-compat.py --pci --quick --probe-demo-home-wrappers",
+  "exit_code": 0,
+  "source_path": "/Demo/AcctExample/HomeWrappers.ZC",
+  "result": "partial",
+  "checks": [
+    "HomeWrappers FD alias and FindFile lookup path ran under QEMU without an unresolved StrFind call.",
+    "The ARM64 StrFind implementation passed case-sensitive, case-insensitive, whole-label-boundary, and no-match checks.",
+    "The terminal recovered and reported failed=0."
+  ],
+  "limitations": [
+    "PutFileLink was a no-op test stub, so visual link generation was not verified.",
+    "This is automated PCI QEMU evidence; live UTM and Raspberry Pi behavior were not checked by this run."
+  ],
+  "screenshots": [
+    "build/gui-demo-home-wrappers-demo-home-wrappers-after-find.ppm",
+    "build/gui-demo-home-wrappers-demo-home-wrappers-terminal-recovery-result.ppm"
+  ],
+  "scope_note": "Partial runtime evidence for the tested HomeWrappers search path; not full app or physical-target acceptance."
+}

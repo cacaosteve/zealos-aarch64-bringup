@@ -1,0 +1,22 @@
+{
+  "date": "2026-11-05",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "target": "AArch64 QEMU virt, PCI, graphical terminal",
+  "command": "python3 scripts/check-compat.py --pci --probe-demo-elephant",
+  "source_path": "/Demo/Graphics/Elephant.ZC",
+  "source_sha256": "132e9d9c6e959d170a74d2f708c0fe50c764c97060060c824b479de0892f6fd7",
+  "result": "pass",
+  "checks": [
+    "Elephant sprite mesh rendered with 568 mesh calls and 14,706 mesh pixel writes",
+    "Visible scanout changed 470,710 pixels across six colors",
+    "Escape returned to the graphical terminal and 40+2 evaluated to 42",
+    "Guest zstatus reported failed=0"
+  ],
+  "artifacts": {
+    "build/zealos-aarch64-hello.iso": "1719dc4adf549271a3049a7c8ba3121ed3c583b66755884b310f666b9f8ecff7",
+    "build/disk.img": "f2ca6a8b5a58d35ff33070348809ea9c21da45ce99eb70371989cf84b8a93579",
+    "build/sources.tar": "5c4bfa4c09bd25199579c392626f5447f3688db9118b38353ed912e78f60a74e",
+    "scripts/check-compat.py": "c226058548f7bff02d2f95362b7058514e64d8d37adcdfa5e28d1e67dca93821"
+  },
+  "scope_note": "QEMU runtime acceptance only; live UTM or Pi hardware acceptance is not implied."
+}

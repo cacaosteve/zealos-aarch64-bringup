@@ -1,0 +1,189 @@
+// Runtime acceptance helper for the stock /Demo/Templates/MultiCore1.ZC
+// worker distribution and completion pattern.
+I64 MultiCore1RuntimeFlags, MultiCore1RuntimeTotal;
+I64 MultiCore1RuntimeLocalSum;
+I64 MultiCore1RuntimeFourLocalSum;
+I64 MultiCore1RuntimeStockLocalsSum;
+I64 MultiCore1RuntimeBareTaskSum, MultiCore1RuntimeBareTaskDone;
+I64 MultiCore1RuntimeGsTaskSum, MultiCore1RuntimeGsTaskDone;
+I64 MultiCore1RuntimeGsTaskTotal, MultiCore1RuntimeGsTaskFlags;
+I64 MultiCore1RuntimeWorkerSum;
+I64 MultiCore1RuntimeWorkerNum, MultiCore1RuntimeWorkerLo;
+I64 MultiCore1RuntimeWorkerHi;
+I64 MultiCore1RuntimeWorkerSums[64];
+I64 MultiCore1RuntimeWorkerLos[64];
+I64 MultiCore1RuntimeWorkerHis[64];
+
+#define MULTICORE1_NUM 100
+
+I64 MultiCore1RuntimeFourLocal()
+{
+    I64 i, accum = 0, lo = 0, hi = 100;
+    for (i = lo; i < hi; i++)
+        accum += i;
+    return accum;
+}
+
+I64 MultiCore1RuntimeParamLocal(CDoc *doc)
+{
+    I64 i, accum = 0, lo = 0, hi = 100;
+    for (i = lo; i < hi; i++)
+        accum += i;
+    return accum;
+}
+
+I64 MultiCore1RuntimeStockLocals(CDoc *doc)
+{
+    I64 i, accum = 0,
+        lo = MULTICORE1_NUM * Gs->num / mp_count,
+        hi = MULTICORE1_NUM * (Gs->num + 1) / mp_count;
+    for (i = lo; i < hi; i++)
+        accum += i;
+    return accum;
+}
+
+U0 MultiCore1RuntimeBareTask(CDoc *doc)
+{
+    I64 i, sum = 0;
+    for (i = 0; i < 100; i++)
+        sum += i;
+    MultiCore1RuntimeBareTaskSum = sum;
+    MultiCore1RuntimeBareTaskDone = TRUE;
+}
+
+U0 MultiCore1RuntimeGsTask(CDoc *doc)
+{
+    I64 i, sum = 0,
+        lo = MULTICORE1_NUM * Gs->num / mp_count,
+        hi = MULTICORE1_NUM * (Gs->num + 1) / mp_count;
+    for (i = lo; i < hi; i++)
+        sum += i;
+    MultiCore1RuntimeGsTaskSum = sum;
+    DocPrint(doc, "Core#%d:%d-%d:%d\n", Gs->num, lo, hi - 1, sum);
+    lock { MultiCore1RuntimeGsTaskTotal += sum; }
+    LBtr(&MultiCore1RuntimeGsTaskFlags, Gs->num);
+    MultiCore1RuntimeGsTaskDone = TRUE;
+}
+
+U0 MultiCore1RuntimeWorker(CDoc *doc)
+{
+    I64 i, sum = 0,
+        lo = MULTICORE1_NUM * Gs->num / mp_count,
+        hi = MULTICORE1_NUM * (Gs->num + 1) / mp_count;
+
+    for (i = lo; i < hi; i++)
+        sum += i;
+    MultiCore1RuntimeWorkerSum = sum;
+    MultiCore1RuntimeWorkerNum = Gs->num;
+    MultiCore1RuntimeWorkerLo = lo;
+    MultiCore1RuntimeWorkerHi = hi;
+    MultiCore1RuntimeWorkerSums[Gs->num] = sum;
+    MultiCore1RuntimeWorkerLos[Gs->num] = lo;
+    MultiCore1RuntimeWorkerHis[Gs->num] = hi;
+    DocPrint(doc, "Core#%d:%d-%d:%d\n", Gs->num, lo, hi - 1,
+             sum);
+    lock { MultiCore1RuntimeTotal += sum; }
+    LBtr(&MultiCore1RuntimeFlags, Gs->num);
+}
+
+I64 MultiCore1RuntimeChecks()
+{
+    I64 i, local_sum = 0, checks = 0, expected_local = 0;
+    I64 expected_total = 0, workers_ok = TRUE;
+    CTask *worker;
+
+    MultiCore1RuntimeTotal = 0;
+    if (mp_count <= 0 || mp_count > 64)
+        return 0;
+    for (i = 0; i < mp_count; i++) {
+        MultiCore1RuntimeWorkerSums[i] = 0;
+        MultiCore1RuntimeWorkerLos[i] = -1;
+        MultiCore1RuntimeWorkerHis[i] = -1;
+    }
+    for (i = 0; i < MULTICORE1_NUM / mp_count; i++)
+        expected_local += i;
+    for (i = 0; i < MULTICORE1_NUM; i++)
+        expected_total += i;
+    for (i = 0; i < 100; i++)
+        local_sum += i;
+    MultiCore1RuntimeLocalSum = local_sum;
+    MultiCore1RuntimeFourLocalSum = MultiCore1RuntimeFourLocal();
+    MultiCore1RuntimeFourLocalSum = MultiCore1RuntimeFourLocalSum +
+                                   MultiCore1RuntimeParamLocal(DocPut);
+    MultiCore1RuntimeStockLocalsSum = MultiCore1RuntimeStockLocals(DocPut);
+    MultiCore1RuntimeBareTaskDone = FALSE;
+    worker = Spawn(&MultiCore1RuntimeBareTask, DocPut, NULL, 0);
+    if (!TaskValidate(worker))
+        return 1;
+    while (!MultiCore1RuntimeBareTaskDone)
+        Yield;
+    MultiCore1RuntimeGsTaskDone = FALSE;
+    MultiCore1RuntimeGsTaskTotal = 0;
+    MultiCore1RuntimeGsTaskFlags = 1;
+    worker = Spawn(&MultiCore1RuntimeGsTask, DocPut, NULL, 0);
+    if (!TaskValidate(worker))
+        return 1;
+    while (MultiCore1RuntimeGsTaskFlags)
+        Yield;
+    MultiCore1RuntimeTotal = 0;
+    MultiCore1RuntimeFlags = 1 << (mp_count - 1);
+    for (i = 0; i < mp_count; i++) {
+        worker = Spawn(&MultiCore1RuntimeWorker, DocPut, NULL, i);
+        if (!TaskValidate(worker))
+            return 1;
+    }
+    while (MultiCore1RuntimeFlags)
+        Yield;
+    if (MultiCore1RuntimeLocalSum == 4950)
+        checks = checks | 1;
+    if (MultiCore1RuntimeFourLocalSum == 9900)
+        checks = checks | 2;
+    if (MultiCore1RuntimeStockLocalsSum == expected_local)
+        checks = checks | 4;
+    if (MultiCore1RuntimeBareTaskSum == 4950)
+        checks = checks | 8;
+    if (MultiCore1RuntimeGsTaskSum == expected_local)
+        checks = checks | 16;
+    if (!MultiCore1RuntimeFlags)
+        checks = checks | 32;
+    for (i = 0; i < mp_count; i++) {
+        I64 lo = MULTICORE1_NUM * i / mp_count;
+        I64 hi = MULTICORE1_NUM * (i + 1) / mp_count;
+        I64 expected_sum = 0, j;
+        for (j = lo; j < hi; j++)
+            expected_sum += j;
+        if (MultiCore1RuntimeWorkerSums[i] != expected_sum ||
+            MultiCore1RuntimeWorkerLos[i] != lo ||
+            MultiCore1RuntimeWorkerHis[i] != hi)
+            workers_ok = FALSE;
+    }
+    if (workers_ok)
+        checks = checks | 64;
+    if (MultiCore1RuntimeTotal == expected_total)
+        checks = checks | 128;
+    if (MultiCore1RuntimeWorkerNum >= 0 &&
+        MultiCore1RuntimeWorkerNum < mp_count)
+        checks = checks | 256;
+    if (MultiCore1RuntimeWorkerLo >= 0 &&
+        MultiCore1RuntimeWorkerLo < MULTICORE1_NUM)
+        checks = checks | 512;
+    if (MultiCore1RuntimeWorkerHi > 0 &&
+        MultiCore1RuntimeWorkerHi <= MULTICORE1_NUM)
+        checks = checks | 1024;
+    if (MultiCore1RuntimeGsTaskTotal == expected_local)
+        checks = checks | 2048;
+    if (MultiCore1RuntimeTotal == expected_total)
+        checks = checks | 4096;
+    if (workers_ok)
+        checks = checks | 8192;
+    if (MultiCore1RuntimeFlags == 0)
+        checks = checks | 16384;
+    return checks * 100000 + MultiCore1RuntimeTotal;
+}
+
+I64 MultiCore1RuntimeAcceptance()
+{
+    if (MultiCore1RuntimeChecks() == 3276704950)
+        return 42;
+    return 0;
+}

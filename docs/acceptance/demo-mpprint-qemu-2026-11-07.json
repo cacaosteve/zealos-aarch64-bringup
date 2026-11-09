@@ -1,0 +1,18 @@
+{
+  "date": "2026-11-07",
+  "command": "QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -smp 2 -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device' python3 scripts/check-compat.py --pci --quick --probe-demo-mpprint",
+  "target": "AArch64 QEMU virt, PCI graphical terminal, two vCPUs",
+  "result": "superseded",
+  "program": "/Demo/MultiCore/MPPrint.ZC",
+  "source_path": "upstream/pinned/Demo/MultiCore/MPPrint.ZC",
+  "source_sha256": "9d655fcf0c05de49ad911f06d4d887f981df7acb933d2edd09102569a1885c61",
+  "verified": [
+    "The recorded QEMU run completed with zstatus reporting failed=0"
+  ],
+  "kernel_sha256": "a8bef958581d425bdb658eb536702d357b94b24551b69e5256a169ed65a21d31",
+  "iso_sha256": "a626320c7793cc0a3182e0a4e29d8803751f5dd9bc306b5f873afd6ffd664cff",
+  "scope_note": "Superseded: the claimed CPU1 worker output was inferred from changed blue pixels, not a CPU1 label. The current runtime binds mp_count=1 and rejects CPU IDs other than 0, so a two-vCPU QEMU command does not establish CPU1 execution. A later single-vCPU graphical probe did not capture the expected CPU0 text; MPPrint runtime behavior remains unverified pending a focused dispatch/output investigation.",
+  "log_sha256": "704dd89f4f1579db38536003ded3759addb8dd9e231876b92e3d15659c91a424",
+  "log": "build/demo-mpprint-smp2-qemu-2026-11-07.log",
+  "superseded_by": "docs/acceptance/demo-mpprint-single-cpu-followup-qemu-2026-11-08.json"
+}

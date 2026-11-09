@@ -1,0 +1,2179 @@
+{
+  "source_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "generated_from": [
+    "build/demo-source-catalog.json",
+    "docs/acceptance/demo-lighttable-arm64-compile-2026-11-02.json",
+    "docs/acceptance/demo-makehome-arm64-compile-2026-11-03.json"
+  ],
+  "source_count": 206,
+  "compile_pass": 206,
+  "compile_blocked": 0,
+  "compile_blocker_groups": [],
+  "runtime_accepted": 169,
+  "runtime_partial": 0,
+  "runtime_failed": 0,
+  "directories": {
+    ".": {
+      "source_count": 34,
+      "compile_pass": 34,
+      "compile_blocked": 0,
+      "preliminary_kind": "root-level source; needs classification"
+    },
+    "AcctExample": {
+      "source_count": 13,
+      "compile_pass": 13,
+      "compile_blocked": 0,
+      "preliminary_kind": "account/home-system integration examples"
+    },
+    "Asm": {
+      "source_count": 8,
+      "compile_pass": 8,
+      "compile_blocked": 0,
+      "preliminary_kind": "architecture-specific assembly examples"
+    },
+    "Disk": {
+      "source_count": 5,
+      "compile_pass": 5,
+      "compile_blocked": 0,
+      "preliminary_kind": "disk and storage examples"
+    },
+    "DolDoc": {
+      "source_count": 13,
+      "compile_pass": 13,
+      "compile_blocked": 0,
+      "preliminary_kind": "DolDoc examples and components"
+    },
+    "Games": {
+      "source_count": 33,
+      "compile_pass": 33,
+      "compile_blocked": 0,
+      "preliminary_kind": "interactive game sources"
+    },
+    "Graphics": {
+      "source_count": 59,
+      "compile_pass": 59,
+      "compile_blocked": 0,
+      "preliminary_kind": "graphics examples and components"
+    },
+    "InFile": {
+      "source_count": 2,
+      "compile_pass": 2,
+      "compile_blocked": 0,
+      "preliminary_kind": "root-level source; needs classification"
+    },
+    "Lectures": {
+      "source_count": 11,
+      "compile_pass": 11,
+      "compile_blocked": 0,
+      "preliminary_kind": "lecture and tutorial sources"
+    },
+    "MultiCore": {
+      "source_count": 8,
+      "compile_pass": 8,
+      "compile_blocked": 0,
+      "preliminary_kind": "multicore and interrupt examples"
+    },
+    "RevFileDemo": {
+      "source_count": 1,
+      "compile_pass": 1,
+      "compile_blocked": 0,
+      "preliminary_kind": "root-level source; needs classification"
+    },
+    "SortFileDemo": {
+      "source_count": 2,
+      "compile_pass": 2,
+      "compile_blocked": 0,
+      "preliminary_kind": "root-level source; needs classification"
+    },
+    "Sound": {
+      "source_count": 4,
+      "compile_pass": 4,
+      "compile_blocked": 0,
+      "preliminary_kind": "sound examples"
+    },
+    "Templates": {
+      "source_count": 7,
+      "compile_pass": 7,
+      "compile_blocked": 0,
+      "preliminary_kind": "templates"
+    },
+    "ToHtmlToTXTDemo": {
+      "source_count": 4,
+      "compile_pass": 4,
+      "compile_blocked": 0,
+      "preliminary_kind": "root-level source; needs classification"
+    },
+    "WebLogDemo": {
+      "source_count": 2,
+      "compile_pass": 2,
+      "compile_blocked": 0,
+      "preliminary_kind": "root-level source; needs classification"
+    }
+  },
+  "classification_note": "Directory-based kinds are triage hints, not final runnable-program classifications.",
+  "runtime_note": "Only sources with explicit per-program QEMU runtime evidence in checked-in acceptance records are marked pass. Reproduced runtime failures are marked fail with evidence. Architecture adaptations are described in their evidence and do not imply the original x86 behavior is available. QEMU acceptance does not imply live UTM or Pi hardware acceptance.",
+  "sources": [
+    {
+      "path": "/Demo/AcctExample/HomeKeyPlugIns.ZC",
+      "directory": "AcctExample",
+      "preliminary_kind": "account/home-system integration examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/AcctExample/HomeLocalize.ZC",
+      "directory": "AcctExample",
+      "preliminary_kind": "account/home-system integration examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-home-localize-qemu-2026-11-05.json"
+    },
+    {
+      "path": "/Demo/AcctExample/HomeSys.ZC",
+      "directory": "AcctExample",
+      "preliminary_kind": "account/home-system integration examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-home-sys-qemu-2026-11-05.json"
+    },
+    {
+      "path": "/Demo/AcctExample/HomeWrappers.ZC",
+      "directory": "AcctExample",
+      "preliminary_kind": "account/home-system integration examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-home-wrappers-dol-doc-links-qemu-2026-11-07.json"
+    },
+    {
+      "path": "/Demo/AcctExample/MakeHome.ZC",
+      "directory": "AcctExample",
+      "preliminary_kind": "account/home-system integration examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-makehome-qemu-2026-11-05.json",
+      "compile_evidence": "docs/acceptance/demo-makehome-arm64-compile-2026-11-03.json"
+    },
+    {
+      "path": "/Demo/AcctExample/Once.ZC",
+      "directory": "AcctExample",
+      "preliminary_kind": "account/home-system integration examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-acct-once-qemu-2026-11-05.json"
+    },
+    {
+      "path": "/Demo/AcctExample/Registry.ZC",
+      "directory": "AcctExample",
+      "preliminary_kind": "account/home-system integration examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-acct-registry-qemu-2026-11-05.json"
+    },
+    {
+      "path": "/Demo/AcctExample/TOS/MakeTOS.ZC",
+      "directory": "AcctExample",
+      "preliminary_kind": "account/home-system integration examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-maketos-qemu-2026-11-05.json"
+    },
+    {
+      "path": "/Demo/AcctExample/TOS/TOSConfig.ZC",
+      "directory": "AcctExample",
+      "preliminary_kind": "account/home-system integration examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/AcctExample/TOS/TOSDistro.ZC",
+      "directory": "AcctExample",
+      "preliminary_kind": "account/home-system integration examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/AcctExample/TOS/TOSExtern.ZC",
+      "directory": "AcctExample",
+      "preliminary_kind": "account/home-system integration examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/AcctExample/TOS/TOSMisc.ZC",
+      "directory": "AcctExample",
+      "preliminary_kind": "account/home-system integration examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/AcctExample/TOS/TOSTheme.ZC",
+      "directory": "AcctExample",
+      "preliminary_kind": "account/home-system integration examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Asm/AsmAndC1.ZC",
+      "directory": "Asm",
+      "preliminary_kind": "architecture-specific assembly examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-asmandc12-qemu-2026-11-05.json"
+    },
+    {
+      "path": "/Demo/Asm/AsmAndC2.ZC",
+      "directory": "Asm",
+      "preliminary_kind": "architecture-specific assembly examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-asmandc12-qemu-2026-11-05.json"
+    },
+    {
+      "path": "/Demo/Asm/AsmAndC3.ZC",
+      "directory": "Asm",
+      "preliminary_kind": "architecture-specific assembly examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-asmandc3-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Asm/AsmHelloWorld.ZC",
+      "directory": "Asm",
+      "preliminary_kind": "architecture-specific assembly examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-asm-output-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Asm/BuzzFizz.ZC",
+      "directory": "Asm",
+      "preliminary_kind": "architecture-specific assembly examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-asm-output-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Asm/DivByHand.ZC",
+      "directory": "Asm",
+      "preliminary_kind": "architecture-specific assembly examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-asm-arithmetic-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Asm/MulByHand.ZC",
+      "directory": "Asm",
+      "preliminary_kind": "architecture-specific assembly examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-asm-arithmetic-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Asm/PutDec.ZC",
+      "directory": "Asm",
+      "preliminary_kind": "architecture-specific assembly examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-asm-output-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Carry.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-carry-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/ClassMeta.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-class-meta-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/CompileDemo.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-compiledemo-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/DateTime.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-runtime-basics-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/DebugDemo.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Define.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-define-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Directives.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-directives-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Disk/DataBase.ZC",
+      "directory": "Disk",
+      "preliminary_kind": "disk and storage examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Disk/DiskRaw.ZC",
+      "directory": "Disk",
+      "preliminary_kind": "disk and storage examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Disk/FPrintF.ZC",
+      "directory": "Disk",
+      "preliminary_kind": "disk and storage examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-dol-doc-qemu-2026-11-03.json"
+    },
+    {
+      "path": "/Demo/Disk/SerializeTree.ZC",
+      "directory": "Disk",
+      "preliminary_kind": "disk and storage examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-serialize-tree-qemu-2026-11-05.json"
+    },
+    {
+      "path": "/Demo/Disk/UnusedSpaceRep.ZC",
+      "directory": "Disk",
+      "preliminary_kind": "disk and storage examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-unused-space-qemu-2026-11-07.json"
+    },
+    {
+      "path": "/Demo/DolDoc/CallBack.ZC",
+      "directory": "DolDoc",
+      "preliminary_kind": "DolDoc examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-callback-qemu-2026-11-05.json"
+    },
+    {
+      "path": "/Demo/DolDoc/ClickCallBack.ZC",
+      "directory": "DolDoc",
+      "preliminary_kind": "DolDoc examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-click-callback-qemu-2026-11-05.json"
+    },
+    {
+      "path": "/Demo/DolDoc/CursorMove.ZC",
+      "directory": "DolDoc",
+      "preliminary_kind": "DolDoc examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-dol-doc-qemu-2026-11-03.json"
+    },
+    {
+      "path": "/Demo/DolDoc/Data.ZC",
+      "directory": "DolDoc",
+      "preliminary_kind": "DolDoc examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-data-qemu-2026-11-03.json"
+    },
+    {
+      "path": "/Demo/DolDoc/DefineStr.ZC",
+      "directory": "DolDoc",
+      "preliminary_kind": "DolDoc examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-dol-doc-qemu-2026-11-03.json"
+    },
+    {
+      "path": "/Demo/DolDoc/FileRead.ZC",
+      "directory": "DolDoc",
+      "preliminary_kind": "DolDoc examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-file-read-qemu-2026-11-03.json"
+    },
+    {
+      "path": "/Demo/DolDoc/Form.ZC",
+      "directory": "DolDoc",
+      "preliminary_kind": "DolDoc examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-form-qemu-2026-11-03.json"
+    },
+    {
+      "path": "/Demo/DolDoc/MenuBttn.ZC",
+      "directory": "DolDoc",
+      "preliminary_kind": "DolDoc examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-menu-bttn-qemu-2026-11-07.json"
+    },
+    {
+      "path": "/Demo/DolDoc/MenuSprite.ZC",
+      "directory": "DolDoc",
+      "preliminary_kind": "DolDoc examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-menu-sprite-qemu-2026-11-06.json"
+    },
+    {
+      "path": "/Demo/DolDoc/NumBible.ZC",
+      "directory": "DolDoc",
+      "preliminary_kind": "DolDoc examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-num-bible-qemu-2026-11-05.json"
+    },
+    {
+      "path": "/Demo/DolDoc/TextDemo.ZC",
+      "directory": "DolDoc",
+      "preliminary_kind": "DolDoc examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-dol-doc-qemu-2026-11-03.json"
+    },
+    {
+      "path": "/Demo/DolDoc/TreeDemo.ZC",
+      "directory": "DolDoc",
+      "preliminary_kind": "DolDoc examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-dol-doc-qemu-2026-11-03.json"
+    },
+    {
+      "path": "/Demo/DolDoc/UnusedDefine.ZC",
+      "directory": "DolDoc",
+      "preliminary_kind": "DolDoc examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Exceptions.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-exceptions-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/ExtChars.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-extchars-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Games/BattleLines.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-battle-lines-qemu-2026-11-03.json"
+    },
+    {
+      "path": "/Demo/Games/BigGuns.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-big-guns-qemu-2026-11-03.json"
+    },
+    {
+      "path": "/Demo/Games/BlackDiamond.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-blackdiamond-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Games/BomberGolf.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-bomber-golf-qemu-2026-11-04.json"
+    },
+    {
+      "path": "/Demo/Games/CastleFrankenstein.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-castle-frankenstein-qemu-2026-11-04.json"
+    },
+    {
+      "path": "/Demo/Games/CharDemo.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-char-demo-qemu-2026-11-03.json"
+    },
+    {
+      "path": "/Demo/Games/Chess.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-interactive-games-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/Games/CircleTrace.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-circletrace-qemu-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/Games/Collision.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-collision-qemu-2026-11-04.json"
+    },
+    {
+      "path": "/Demo/Games/Digits.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-digits-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Games/DunGen.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-dungen-qemu-2026-11-04.json"
+    },
+    {
+      "path": "/Demo/Games/ElephantWalk.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-elephant-walk-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Games/FlapBat.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-flapbat-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Games/FlatTops.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-flattops-qemu-2026-11-04.json"
+    },
+    {
+      "path": "/Demo/Games/Halogen.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-halogen-qemu-2026-11-03.json"
+    },
+    {
+      "path": "/Demo/Games/MassSpring.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-stock-interactive-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/Games/Maze.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-maze-qemu-2026-11-04.json"
+    },
+    {
+      "path": "/Demo/Games/RainDrops.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-raindrops-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Games/RawHide.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-rawhide-qemu-2026-11-04.json"
+    },
+    {
+      "path": "/Demo/Games/Rocket.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-rocket-qemu-2026-11-03.json"
+    },
+    {
+      "path": "/Demo/Games/RocketScience.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-rocket-science-qemu-2026-11-03.json"
+    },
+    {
+      "path": "/Demo/Games/Squirt.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-squirt-qemu-2026-11-04.json"
+    },
+    {
+      "path": "/Demo/Games/Stadium/Stadium.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-stadium-qemu-2026-11-04.json"
+    },
+    {
+      "path": "/Demo/Games/Stadium/StadiumGen.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-stadium-gen-qemu-2026-11-04.json"
+    },
+    {
+      "path": "/Demo/Games/Talons.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-talons-qemu-2026-11-04.json"
+    },
+    {
+      "path": "/Demo/Games/TheDead.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-the-dead-qemu-2026-11-04.json"
+    },
+    {
+      "path": "/Demo/Games/TicTacToe.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-interactive-games-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/Games/TreeCheckers.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-tree-checkers-qemu-2026-11-04.json"
+    },
+    {
+      "path": "/Demo/Games/Varoom.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-varoom-qemu-2026-11-04.json"
+    },
+    {
+      "path": "/Demo/Games/Wenceslas.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-wenceslas-qemu-2026-11-04.json"
+    },
+    {
+      "path": "/Demo/Games/Whap.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-whap-qemu-2026-11-04.json"
+    },
+    {
+      "path": "/Demo/Games/Zing.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-zing-qemu-2026-11-04.json"
+    },
+    {
+      "path": "/Demo/Games/ZoneOut.ZC",
+      "directory": "Games",
+      "preliminary_kind": "interactive game sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-zoneout-qemu-2026-11-03.json"
+    },
+    {
+      "path": "/Demo/GlobalVars.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-global-vars-jit-2026-11-07.json"
+    },
+    {
+      "path": "/Demo/Graphics/32BitColor.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-32bit-color-qemu-2026-11-04.json"
+    },
+    {
+      "path": "/Demo/Graphics/32BitPaint.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-32bit-paint-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Graphics/3DPoly.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-bounce-clock-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Graphics/BSpline.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-bspline-qemu-2026-11-03.json"
+    },
+    {
+      "path": "/Demo/Graphics/Blot.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-graphics-render-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/Graphics/Bounce.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-bounce-clock-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Graphics/Box.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-box-hanoi-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/Graphics/Cartesian.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-cartesian-qemu-2026-11-03.json"
+    },
+    {
+      "path": "/Demo/Graphics/CharAnimation.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-char-animation-qemu-2026-11-03.json"
+    },
+    {
+      "path": "/Demo/Graphics/Clock.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-bounce-clock-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Graphics/Collision.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-collision-qemu-2026-11-03.json"
+    },
+    {
+      "path": "/Demo/Graphics/CommonAncestor.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-common-ancestor-qemu-2026-11-05.json"
+    },
+    {
+      "path": "/Demo/Graphics/Doodle.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-stock-interactive-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/Graphics/EdSprite.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-edsprite-qemu-2026-11-04.json"
+    },
+    {
+      "path": "/Demo/Graphics/Elephant.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-elephant-qemu-2026-11-05.json"
+    },
+    {
+      "path": "/Demo/Graphics/Extents.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-extents-qemu-2026-11-03.json"
+    },
+    {
+      "path": "/Demo/Graphics/FontEd.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-fonted-qemu-2026-11-05.json"
+    },
+    {
+      "path": "/Demo/Graphics/GrDir.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-grdir-qemu-2026-11-06.json"
+    },
+    {
+      "path": "/Demo/Graphics/Grid.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-input-graphics-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/Graphics/Hanoi.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-box-hanoi-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/Graphics/Lattice.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-lattice-qemu-2026-11-03.json"
+    },
+    {
+      "path": "/Demo/Graphics/Life.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-stock-interactive-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/Graphics/LightTable.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-lighttable-qemu-2026-11-06.json",
+      "compile_evidence": "docs/acceptance/demo-lighttable-arm64-compile-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Graphics/Lines.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-stock-graphics-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/Graphics/LowPassFilter.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-low-pass-filter-qemu-2026-11-03.json"
+    },
+    {
+      "path": "/Demo/Graphics/Mandel.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-mandel-qemu-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/Graphics/MathAudioDemo.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-stock-interactive-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/Graphics/MouseDemo.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-input-graphics-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/Graphics/NetOfDots.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-stock-graphics-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/Graphics/Palette.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-input-graphics-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/Graphics/PanText.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-pan-text-qemu-2026-11-03.json"
+    },
+    {
+      "path": "/Demo/Graphics/Pick.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-pick-qemu-2026-11-05.json"
+    },
+    {
+      "path": "/Demo/Graphics/Pick3D.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-interactive-games-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/Graphics/PoleZeros.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-polezeros-qemu-2026-11-05.json"
+    },
+    {
+      "path": "/Demo/Graphics/PredatorPrey.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-stock-interactive-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/Graphics/RotateTank.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-bounce-clock-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Graphics/ScreenCapture.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-screencapture-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Graphics/ScrollBars.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-scrollbars-qemu-2026-11-03.json"
+    },
+    {
+      "path": "/Demo/Graphics/Shading.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-shading-qemu-2026-11-03.json"
+    },
+    {
+      "path": "/Demo/Graphics/Shadow.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-shadow-qemu-2026-11-03.json"
+    },
+    {
+      "path": "/Demo/Graphics/Slider.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-slider-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Graphics/Speedline.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-speedline-qemu-2026-11-04.json"
+    },
+    {
+      "path": "/Demo/Graphics/SpritePlot.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-sprite-put-family-qemu-2026-11-03.json"
+    },
+    {
+      "path": "/Demo/Graphics/SpritePlot3D.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-sprite-plot3d-qemu-2026-11-03.json"
+    },
+    {
+      "path": "/Demo/Graphics/SpritePut.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-sprite-put-qemu-2026-11-03.json"
+    },
+    {
+      "path": "/Demo/Graphics/SpritePutExt.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-sprite-put-family-qemu-2026-11-03.json"
+    },
+    {
+      "path": "/Demo/Graphics/SpriteRaw.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-sprite-put-family-qemu-2026-11-03.json"
+    },
+    {
+      "path": "/Demo/Graphics/SpriteText.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-sprite-text-qemu-2026-11-06.json"
+    },
+    {
+      "path": "/Demo/Graphics/SunMoon.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-sun-moon-qemu-2026-11-03.json"
+    },
+    {
+      "path": "/Demo/Graphics/Symmetry.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-symmetry-qemu-2026-11-05.json"
+    },
+    {
+      "path": "/Demo/Graphics/Transform.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-transform-qemu-2026-11-04.json"
+    },
+    {
+      "path": "/Demo/Graphics/Usage.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-usage-qemu-2026-11-03.json"
+    },
+    {
+      "path": "/Demo/Graphics/WallPapers/WallPaperCtrl.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/WallPapers/WallPaperDesktop/HomeSys.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/WallPapers/WallPaperDesktop/Install.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/WallPapers/WallPaperDesktop.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/WallPapers/WallPaperFish.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/WallPapers/WallPaperStars.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Graphics/WinZBuf.ZC",
+      "directory": "Graphics",
+      "preliminary_kind": "graphics examples and components",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-winzbuf-qemu-2026-11-06.json"
+    },
+    {
+      "path": "/Demo/InFile/InPopUp.ZC",
+      "directory": "InFile",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-inpopup-qemu-2026-11-05.json"
+    },
+    {
+      "path": "/Demo/InFile/InSetIP.ZC",
+      "directory": "InFile",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-insetip-mouseset-qemu-2026-11-07.json"
+    },
+    {
+      "path": "/Demo/KeyBitMap.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-keybitmap-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/LastClass.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-last-class-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Lectures/AndNotMod.ZC",
+      "directory": "Lectures",
+      "preliminary_kind": "lecture and tutorial sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-and-not-mod-qemu-2026-11-06.json"
+    },
+    {
+      "path": "/Demo/Lectures/FixedPoint.ZC",
+      "directory": "Lectures",
+      "preliminary_kind": "lecture and tutorial sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Lectures/FixedPointAdvanced.ZC",
+      "directory": "Lectures",
+      "preliminary_kind": "lecture and tutorial sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Lectures/InterruptDemo.ZC",
+      "directory": "Lectures",
+      "preliminary_kind": "lecture and tutorial sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-interrupt-demo-svc-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Lectures/LexDemo.ZC",
+      "directory": "Lectures",
+      "preliminary_kind": "lecture and tutorial sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-lex-demo-qemu-2026-11-06.json"
+    },
+    {
+      "path": "/Demo/Lectures/MiniCompiler.ZC",
+      "directory": "Lectures",
+      "preliminary_kind": "lecture and tutorial sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-mini-compiler-interactive-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Lectures/MiniGrLib.ZC",
+      "directory": "Lectures",
+      "preliminary_kind": "lecture and tutorial sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Lectures/NegDisp.ZC",
+      "directory": "Lectures",
+      "preliminary_kind": "lecture and tutorial sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-negdisp-qemu-2026-11-07.json"
+    },
+    {
+      "path": "/Demo/Lectures/Optimization.ZC",
+      "directory": "Lectures",
+      "preliminary_kind": "lecture and tutorial sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Lectures/PCIInterrupts.ZC",
+      "directory": "Lectures",
+      "preliminary_kind": "lecture and tutorial sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-arm64-irq-adaptations-qemu-2026-11-03.json"
+    },
+    {
+      "path": "/Demo/Lectures/Ring3.ZC",
+      "directory": "Lectures",
+      "preliminary_kind": "lecture and tutorial sources",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-ring3-svc-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/MagicPairs.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-magicpairs-qemu-2026-11-05.json"
+    },
+    {
+      "path": "/Demo/MemDemo.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-runtime-basics-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/MessageLoop.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-interactive-basics-qemu-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/MultiCore/Interrupts.ZC",
+      "directory": "MultiCore",
+      "preliminary_kind": "multicore and interrupt examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-arm64-irq-adaptations-qemu-2026-11-03.json"
+    },
+    {
+      "path": "/Demo/MultiCore/LoadTest.ZC",
+      "directory": "MultiCore",
+      "preliminary_kind": "multicore and interrupt examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/MultiCore/Lock.ZC",
+      "directory": "MultiCore",
+      "preliminary_kind": "multicore and interrupt examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/MultiCore/MPAdd.ZC",
+      "directory": "MultiCore",
+      "preliminary_kind": "multicore and interrupt examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/MultiCore/MPPrint.ZC",
+      "directory": "MultiCore",
+      "preliminary_kind": "multicore and interrupt examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/MultiCore/MPRadix.ZC",
+      "directory": "MultiCore",
+      "preliminary_kind": "multicore and interrupt examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/MultiCore/Palindrome.ZC",
+      "directory": "MultiCore",
+      "preliminary_kind": "multicore and interrupt examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/MultiCore/Primes.ZC",
+      "directory": "MultiCore",
+      "preliminary_kind": "multicore and interrupt examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/NullCase.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-runtime-basics-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/OnceDemo.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-oncedemo-qemu-2026-11-06.json"
+    },
+    {
+      "path": "/Demo/ParenWarn.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-paren-warn-qemu-2026-11-03.json"
+    },
+    {
+      "path": "/Demo/PhoneNumWords.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-phone-num-words-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Print.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-runtime-basics-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/Progress.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-progress-qemu-2026-11-03.json"
+    },
+    {
+      "path": "/Demo/Prompt.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-prompt-qemu-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/PullDownMenu.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-pulldown-menu-qemu-2026-11-03.json"
+    },
+    {
+      "path": "/Demo/RadixSort.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-runtime-basics-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/RandDemo.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-interactive-basics-qemu-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/RegistryDemo.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-registry-qemu-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/RevFileDemo/Rev.ZC",
+      "directory": "RevFileDemo",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-revfile-qemu-2026-11-05.json"
+    },
+    {
+      "path": "/Demo/ScreenCodes.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-screencodes-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/SortFileDemo/F64FileGen.ZC",
+      "directory": "SortFileDemo",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-sort-file-qemu-2026-11-07.json"
+    },
+    {
+      "path": "/Demo/SortFileDemo/F64FileSort.ZC",
+      "directory": "SortFileDemo",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-sort-file-qemu-2026-11-07.json"
+    },
+    {
+      "path": "/Demo/Sound/ASCIIOrgan.ZC",
+      "directory": "Sound",
+      "preliminary_kind": "sound examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-ascii-organ-virtio-sound-qemu-2026-11-07.json"
+    },
+    {
+      "path": "/Demo/Sound/MorseCode.ZC",
+      "directory": "Sound",
+      "preliminary_kind": "sound examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-morse-code-virtio-sound-qemu-2026-11-04.json"
+    },
+    {
+      "path": "/Demo/Sound/OhGreat.ZC",
+      "directory": "Sound",
+      "preliminary_kind": "sound examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-ohgreat-virtio-sound-qemu-2026-11-04.json"
+    },
+    {
+      "path": "/Demo/Sound/WaterFowl.ZC",
+      "directory": "Sound",
+      "preliminary_kind": "sound examples",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-waterfowl-virtio-sound-qemu-2026-11-04.json"
+    },
+    {
+      "path": "/Demo/Spy.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/StackGrow.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-stack-grow-qemu-2026-11-06.json"
+    },
+    {
+      "path": "/Demo/SubIntAccess.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-runtime-basics-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/SubSwitch.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-runtime-basics-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/SuggestSpelling.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-suggest-spelling-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Templates/Game1.ZC",
+      "directory": "Templates",
+      "preliminary_kind": "templates",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-template-game1-qemu-2026-11-07.json"
+    },
+    {
+      "path": "/Demo/Templates/Lex1.ZC",
+      "directory": "Templates",
+      "preliminary_kind": "templates",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Templates/MultiCore1.ZC",
+      "directory": "Templates",
+      "preliminary_kind": "templates",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Templates/ODE1.ZC",
+      "directory": "Templates",
+      "preliminary_kind": "templates",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Templates/Registry1.ZC",
+      "directory": "Templates",
+      "preliminary_kind": "templates",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-template-registry1-qemu-2026-11-07.json"
+    },
+    {
+      "path": "/Demo/Templates/Util1.ZC",
+      "directory": "Templates",
+      "preliminary_kind": "templates",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/Templates/Util2.ZC",
+      "directory": "Templates",
+      "preliminary_kind": "templates",
+      "classification_confidence": "provisional; based on directory only",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/TimeIns.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-time-ins-qemu-2026-11-05.json"
+    },
+    {
+      "path": "/Demo/ToHtmlToTXTDemo/HtmlDirList.ZC",
+      "directory": "ToHtmlToTXTDemo",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/ToHtmlToTXTDemo/HtmlGen.ZC",
+      "directory": "ToHtmlToTXTDemo",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-html-gen-qemu-2026-11-06.json"
+    },
+    {
+      "path": "/Demo/ToHtmlToTXTDemo/TXTGen.ZC",
+      "directory": "ToHtmlToTXTDemo",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-txt-gen-qemu-2026-11-06.json"
+    },
+    {
+      "path": "/Demo/ToHtmlToTXTDemo/ToHtml.ZC",
+      "directory": "ToHtmlToTXTDemo",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/WebLogDemo/WebLogRep.ZC",
+      "directory": "WebLogDemo",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/WebLogDemo/WebLogScramble.ZC",
+      "directory": "WebLogDemo",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "unverified",
+      "runtime_evidence": null
+    },
+    {
+      "path": "/Demo/WordSearch.ZC",
+      "directory": ".",
+      "preliminary_kind": "root-level source; needs classification",
+      "classification_confidence": "unclassified",
+      "compile": "pass",
+      "first_compile_error": null,
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-word-search-qemu-2026-11-02.json"
+    }
+  ]
+}

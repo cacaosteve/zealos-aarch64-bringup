@@ -1,0 +1,21 @@
+{
+  "date": "2026-11-03",
+  "source_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "target": "AArch64 QEMU virt, PCI, graphical terminal",
+  "command": "python3 scripts/check-compat.py --pci --quick --probe-demo-extents",
+  "source_path": "/Demo/Graphics/Extents.ZC",
+  "source_sha256": "5dcdd323cb8effc7fe79608d1a7b4f55453fdf82ac45976a97792be590e015d8",
+  "result": "pass",
+  "checks": [
+    "Extents launches from the graphical terminal and visibly renders its sprite with the computed bounds (13,980 changed scanout pixels)",
+    "After key input, the demo prints its X and Y bounds",
+    "The guest returns to the graphical terminal, which evaluates 40+2 as 42",
+    "The guest remains healthy with zstatus failed=0"
+  ],
+  "artifacts": {
+    "build/disk.img": "5c3e4d6aa61f1ffb4e3174dc4e5bce82598c65df18421b322ef96122c1acfc0e",
+    "build/sources.tar": "b89426e6ae2dad802ac5e1aa8239bbbb78d502b6695bbba8e008123f0ed2f7d9",
+    "scripts/check-compat.py": "4410ffdd8bf1b07f771cbf4f0e1cc446fc67b46ea19a9d1c2466778fd088c924"
+  },
+  "scope_note": "QEMU runtime acceptance only; live UTM or Pi hardware acceptance is not implied."
+}

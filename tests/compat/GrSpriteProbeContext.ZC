@@ -1,0 +1,3 @@
+#define SPE_ABORT (-1)
+#define SPE_CONT 1
+#define SPE_EXIT 0

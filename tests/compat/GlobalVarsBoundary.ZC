@@ -1,0 +1,35 @@
+class Test
+{
+    I32 time;
+    U8 name[8];
+};
+
+Test g1[] = {
+    {10, "Name1"},
+    {(tS % 10.0) * 100, "Name2"},
+    {30, "Name3"}
+};
+
+U0 Main1()
+{
+    static Test s1[] = {
+        {10, "Static1"},
+        {(tS % 10.0) * 100, "Static2"},
+        {30, "Static3"}
+    };
+    Dump(s1, sizeof(s1));
+    "Time 2:%d\n", s1[1].time;
+}
+
+Main1;
+"Time 4:%d\n", 42;
+
+#ifjit
+#exe {Option(OPTf_GLOBALS_ON_DATA_HEAP, ON);};
+Test g2[] = {
+    {10, "data1"},
+    {20, "data2"},
+    {30, "data3"}
+};
+"Data heap declaration reached: %d\n", g2[1].time;
+#endif

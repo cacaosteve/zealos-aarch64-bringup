@@ -1,0 +1,30 @@
+{
+  "date": "2026-11-03",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "target": "AArch64 QEMU virt, PCI, graphical terminal",
+  "command": "make -j2 all && python3 scripts/check-compat.py --pci --probe-demo-char",
+  "source_path": "/Demo/Games/CharDemo.ZC",
+  "arm64_overlay_path": "upstream/bootstrap/Demo/Games/CharDemo.ZC",
+  "arm64_overlay_sha256": "1b89a8994c935378c55e426eacf02658f903dc7473c3d72107c19ec816de4ff8",
+  "result": "pass",
+  "checks": [
+    "CharDemo started and rendered the character map in its graphical terminal",
+    "A Right arrow key event visibly panned the map",
+    "Escape closed CharDemo and restored the graphical terminal",
+    "The terminal evaluated 40+2 as 42 after returning from CharDemo",
+    "The guest remained healthy with zstatus failed=0"
+  ],
+  "artifacts": {
+    "build/zealos-aarch64-hello.iso": "7b81224c2d33fdcfbe9a1afff97f8e65a263870d482222df47f79f5f3ba1f6d6",
+    "build/disk.img": "58c76a1b12d7ca708158ee1292a4973e56c3ce15a1316bb1efbc9ea082519023",
+    "build/sources.tar": "daf71942deace6c7a65c54ee2eae4a43852086cdfa4bd467d213de411c7cbdb8",
+    "scripts/check-compat.py": "52eb229321c2bf8ee5bb46140bccd7ffd7cf67bf14938890752e3578778cff99"
+  },
+  "screenshots": [
+    "build/gui-demo-char-demo-char-map.ppm",
+    "build/gui-demo-char-demo-char-before-right.ppm",
+    "build/gui-demo-char-demo-char-after-right.ppm",
+    "build/gui-demo-char-demo-char-exit-smoke-result.ppm"
+  ],
+  "scope_note": "QEMU runtime acceptance only; live UTM or Pi hardware acceptance is not implied."
+}

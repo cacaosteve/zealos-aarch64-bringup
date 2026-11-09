@@ -1,0 +1,16 @@
+{
+  "date": "2026-11-07",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "working_tree_changes_included": true,
+  "kernel_sha256": "9c266698222e7b3f9cd188e6cd484ba02cdd9159fb3ed9bd01226df8e5fbea14",
+  "iso_sha256": "a9d1be0fec0e509f1c8694531f42ebdaf40d6f1e113574f60bf81d7d905a9af1",
+  "command": "python3 scripts/check-compat.py --pci --probe-span-strut",
+  "qemu_profile": "QEMU_VIRT default: machine virt, 1 GiB RAM, ramfb, VirtIO keyboard and tablet",
+  "exit_code": 0,
+  "scope": "Runtime acceptance for the original Span and Strut app entrypoints in the current worktree ISO. This is QEMU evidence, not live UTM or Pi hardware acceptance.",
+  "checks": {
+    "Span": "pass: bridge entry and instructions rendered; graphical frame verified; Shift+Escape returned to terminal; 40+2 returned 42",
+    "Strut": "pass: help rendered; edit/play input exercised; graphics verified; Escape returned to terminal; 40+2 returned 42",
+    "final_status": "All emitted checks passed; failed=0"
+  }
+}

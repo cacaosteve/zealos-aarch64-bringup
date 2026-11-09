@@ -1,0 +1,26 @@
+{
+  "date": "2026-11-07",
+  "command": "python3 scripts/check-compat.py --probe-demo-template-registry1",
+  "target": "AArch64 QEMU virt, PCI graphical terminal with serial command probe",
+  "result": "pass",
+  "programs": [
+    {
+      "program": "/Demo/Templates/Registry1.ZC",
+      "source_path": "upstream/pinned/Demo/Templates/Registry1.ZC",
+      "source_sha256": "f9969682f8c15ade2f4b5eb10f2dc730ecc88ea9fb895be8bf23e18d0fcb8d87"
+    }
+  ],
+  "verified": [
+    "The program launched from the graphical terminal, accepted its key wait, and returned control.",
+    "The MyCompany/MyApp registry branch could be re-executed and exposed best_score=9999.",
+    "The terminal remained usable after exit: 40+2 returned 42 and zstatus reported failed=0."
+  ],
+  "not_verified": [
+    "Cold-boot persistence of the registry write."
+  ],
+  "kernel_sha256": "478278fd9961c701a069ec91b9d2ef748fb81a2681be7aa767e7a5dbd80f62ca",
+  "iso_sha256": "d76f0b5edc34c5cb7fdd34e821ec94d638515016d4793e85a7a8f6e4114b17eb",
+  "log_sha256": "74e65316d35abb463d5db98c747f5669116be80a512e7fb0f37bd9b51ff663a0",
+  "log": "build/check-demo-template-registry1-pci.log",
+  "scope_note": "This is runtime acceptance of the template's in-session registry workflow; it does not establish saved registry data after reboot."
+}

@@ -1,0 +1,46 @@
+{
+  "date": "2026-11-03",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "target": "AArch64 QEMU virt, PCI, graphical terminal",
+  "command": "python3 -m py_compile scripts/check-compat.py && python3 scripts/check-compat.py --probe-demo-dol-doc",
+  "sources": {
+    "/Demo/DolDoc/DefineStr.ZC": "98a884bac8bf3f35c68ba50946b9b8e6e334c72864a0a47166791f3d8198ecc3",
+    "/Demo/DolDoc/TextDemo.ZC": "af8bb743c0b98debc1a6c280446106e82411dc5cac8ccf9c9236ebea5e1f0b52",
+    "/Demo/DolDoc/CursorMove.ZC": "f8a256dd76c034c4462d5289d298c24fef4e8907451bc9ee960cbc90ae8c9cc9",
+    "/Demo/DolDoc/TreeDemo.ZC": "6f8eee4d4db890fbbaf39182902757de61873c17de08397637411188b931b5a0",
+    "upstream/bootstrap/System/TaskBridge.ZC": "d0ba71762e75b211baafaac63bb52731ef53c03b499100eeb10b1f12e32063e9",
+    "/Demo/Disk/FPrintF.ZC": "895ebeacaaf55dc06b30581b9eaf6c050752adc8d8d06b2baf9e5184bb52984e"
+  },
+  "result": "pass",
+  "checks": [
+    "DefineStr substituted the Acme Inc define and rendered generated age and time fields",
+    "After DefineStr returned, the graphical terminal evaluated 40+2 as 42",
+    "TextDemo rendered its underline, link, and button examples in the graphical terminal",
+    "CursorMove rendered its numbered cursor-movement example through 099",
+    "TreeDemo parsed the pinned ST_FILE_UTIL_FLAGS list, rendered the root directory tree including Apps and System, and returned",
+    "After each demo returned, the graphical terminal evaluated 40+2 as 42",
+    "The guest ended with zstatus failed=0",
+    "After FPrintF returned, the graphical terminal evaluated 40+2 as 42; zstatus failed=0",
+    "Disk/FPrintF rendered the root file tree in its temporary DolDoc window; Escape closed the document and returned to the terminal",
+    "After FPrintF returned, the graphical terminal evaluated 40+2 as 42; zstatus failed=0"
+  ],
+  "artifacts": {
+    "build/zealos-aarch64-hello.iso": "337538503e8c4fcb6c5fb66a436c2e1478f82bcc9b5494808b7481fcc18eb7b8",
+    "build/disk.img": "b924e7af4e407f272ae4e419145025676915510e08adfd5b4cb80ee50250ebb9",
+    "build/sources.tar": "a8259ac89d9e1fe42a21a757d1d4834a44b052060b59f12219d1de20e551ddbf",
+    "scripts/check-compat.py": "446eda2e1ea502ec1e157439040a03046e64d1f9efebefa85a3acb800ea7f731"
+  },
+  "screenshots": [
+    "build/gui-demo-dol-doc-demo-dol-doc-define-str-result.ppm",
+    "build/gui-demo-dol-doc-demo-dol-doc-define-str-recovery-result.ppm",
+    "build/gui-demo-dol-doc-demo-dol-doc-text-result.ppm",
+    "build/gui-demo-dol-doc-demo-dol-doc-text-recovery-result.ppm",
+    "build/gui-demo-dol-doc-demo-dol-doc-cursor-move-result.ppm",
+    "build/gui-demo-dol-doc-demo-dol-doc-cursor-recovery-result.ppm",
+    "build/gui-demo-dol-doc-demo-dol-doc-tree-result.ppm",
+    "build/gui-demo-dol-doc-demo-dol-doc-tree-recovery-result.ppm",
+    "build/gui-demo-dol-doc-demo-dol-doc-fprintf.ppm",
+    "build/gui-demo-dol-doc-demo-dol-doc-fprintf-return.ppm"
+  ],
+  "scope_note": "QEMU runtime acceptance only; live UTM or Pi hardware acceptance is not implied."
+}

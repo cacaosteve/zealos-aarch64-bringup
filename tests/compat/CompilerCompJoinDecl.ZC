@@ -1,0 +1,6 @@
+// CMain.ZC provides the implementation, but its current source-context load
+// reaches an unresolved CompCtrlDel call. This declaration lets later
+// Compiler.PRJ units be compile-checked independently of CMain's body.
+extern CAOT *CompJoin(CCompCtrl *cc, I64 comp_flags, U8 *map_name=NULL,
+                      U8 mapfile_drive_let=0);
+extern U0 CompFixUpJITAsm(CCompCtrl *cc, CAOT *tmpaot);

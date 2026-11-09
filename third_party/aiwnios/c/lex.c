@@ -39,6 +39,10 @@ int64_t LexAdvChr(CLexer *lex) {
     lex->flags &= ~LEXF_USE_LAST_CHAR;
     return lex->cur_char;
   }
+  if (lex->pushback_valid) {
+    lex->pushback_valid = 0;
+    return lex->cur_char = lex->pushback_char;
+  }
 enter:;
   CLexFile *file = lex->file, *last;
   int64_t ret;
@@ -81,6 +85,14 @@ static void LexErr(CLexer *lex, char *fmt, ...) {
   va_start(lst, fmt);
   vsnprintf(buffer, sizeof(buffer), fmt, lst);
   va_end(lst);
+  if (lex->port_warning) {
+    char trace[STR_LEN];
+    snprintf(trace, sizeof(trace), "TRACE LexErr at %s:%ld:%ld: %s",
+             lex->file ? lex->file->filename : "<eof>",
+             lex->file ? (long)lex->file->ln + 1 : 0,
+             lex->file ? (long)lex->file->col + 1 : 0, buffer);
+    lex->port_warning(lex, trace);
+  }
   if (lex->file) {
     fprintf(AIWNIOS_OSTREAM, "ERR %s:%d:%d %s", lex->file->filename,
             lex->file->ln + 1, lex->file->col + 1, buffer);
@@ -415,6 +427,19 @@ re_enter:;
         return lex->cur_tok = TK_F64;
         break;
       case '.':
+        /* In `0...7`, this is the first dot of the range operator, not a
+         * decimal point. Preserve both dots already consumed so the next
+         * lexer call can read the full `...` token. */
+        if ('.' == LexAdvChr(lex)) {
+          lex->pushback_char = '.';
+          lex->pushback_valid = 1;
+          lex->cur_char = '.';
+          lex->flags |= LEXF_USE_LAST_CHAR;
+          lex->integer = integer;
+          return lex->cur_tok = TK_I64;
+        }
+        lex->flags |= LEXF_USE_LAST_CHAR;
+        goto decimal_chk;
       decimal_chk:
         switch (chr1 = LexAdvChr(lex)) {
           break;
@@ -455,6 +480,22 @@ re_enter:;
     lex->integer = integer;
     if (lex->cur_char == '.') {
       lex->flags &= ~LEXF_USE_LAST_CHAR;
+      /* An integer followed by `...` is a case-range endpoint, while a
+       * single dot starts a floating-point literal. Peek past the first dot
+       * and preserve that lookahead so the next Lex call sees the complete
+       * range token. The leading-zero path above has the same distinction. */
+      int64_t next = LexAdvChr(lex);
+      if (next == '.') {
+        lex->pushback_char = '.';
+        lex->pushback_valid = 1;
+        lex->cur_char = '.';
+        lex->flags |= LEXF_USE_LAST_CHAR;
+        lex->integer = integer;
+        return lex->cur_tok = TK_I64;
+      }
+      lex->pushback_char = next;
+      lex->pushback_valid = 1;
+      lex->cur_char = '.';
       goto decimal_chk;
     }
     if (lex->cur_char == 'e' || lex->cur_char == 'E') {
@@ -862,6 +903,55 @@ lex_ident: {
         if (!ret)
           LexErr(lex, "#assert failed.");
         goto re_enter;
+      } else if (!strcmp(lex->string, "exe")) {
+        /* Execute a compile-time statement block, as stock Lex.ZC does.
+         * This is needed for source such as GlobalVars.ZC, where #exe
+         * changes compiler options before the following declarations. */
+        CCmpCtrl *cc = CmpCtrlNew(lex);
+        char *code;
+        int64_t old_defer = lex->port_defer_statement_lex;
+        int64_t old_pending = lex->port_lex_pending;
+        /* The nested statement parser owns its own semicolon advancement.
+         * Shell parsing normally defers that advancement to the outer source
+         * loop; allowing that mode through here leaves a pending Lex after
+         * the #exe block and consumes the following declaration's type. */
+        lex->port_defer_statement_lex = 0;
+        lex->port_lex_pending = 0;
+        CodeCtrlPush(cc);
+        int64_t block_tok = Lex(lex);
+        if (block_tok != '{' || !PrsStmt(cc)) {
+          CodeCtrlPop(cc);
+          CmpCtrlDel(cc);
+          lex->port_defer_statement_lex = old_defer;
+          lex->port_lex_pending = old_pending;
+          LexErr(lex, "Expected a statement block after #exe.");
+          return lex->cur_tok = ERR;
+        }
+        if (lex->cur_tok == ';')
+          Lex(lex);
+        CRPN *ret = A_CALLOC(sizeof(CRPN), cc->hc);
+        ret->type = IC_RET;
+        QueIns(ret, cc->code_ctrl->ir_code);
+        code = Compile(cc, NULL, NULL, NULL);
+        if (!code) {
+          CodeCtrlPop(cc);
+          CmpCtrlDel(cc);
+          lex->port_defer_statement_lex = old_defer;
+          lex->port_lex_pending = old_pending;
+          LexErr(lex, "Could not compile #exe block.");
+          return lex->cur_tok = ERR;
+        }
+        if (lex->port_sync)
+          lex->port_sync(lex);
+        FFI_CALL_TOS_0(code);
+        A_FREE(code);
+        CodeCtrlPop(cc);
+        CmpCtrlDel(cc);
+        lex->port_defer_statement_lex = old_defer;
+        lex->port_lex_pending = old_pending;
+        /* PrsScope and the optional trailing-semicolon handling above have
+         * already lexed the next token. Re-entering here skips it. */
+        return lex->cur_tok;
       } else if (!strcmp(lex->string, "if")) {
         old_flags = lex->flags;
         lex->flags |= LEXF_UNTIL_NEWLINE;
@@ -888,13 +978,12 @@ lex_ident: {
         in_else = 0;
         goto if_fail;
       } else if (!strcmp(lex->string, "ifaot")) {
-        // AIWN will only AOT compile for you,the JIT will be
-        // handled by the newly compiled compiler
-        goto re_enter;
-      } else if (!strcmp(lex->string, "ifjit")) {
-        // AIWN will only AOT compile for you,the JIT will be
-        // handled by the newly compiled compiler
+        /* The ARM64 bootstrap executes source through the JIT front end.
+         * It does not produce AOT modules, so select the opposite branch. */
         goto if_fail;
+      } else if (!strcmp(lex->string, "ifjit")) {
+        /* Include JIT-only source in the compiler that actually runs here. */
+        goto re_enter;
       } else if (!strcmp(lex->string, "endif")) {
         goto re_enter;
       } else if (!strcmp(lex->string, "else"
@@ -1124,6 +1213,9 @@ lex_ident: {
             lex->string[idx++] = chr1;
           }
         }
+        /* A final #define need not have a trailing newline. EOF closes its
+         * replacement text just like the newline and comment terminators. */
+        goto add_macro;
       }
     } else {
       LexErr(lex, "Stray '#' in program.");
@@ -1133,6 +1225,10 @@ lex_ident: {
   case 0:
     return lex->cur_tok = 0;
   }
+  if (chr1 < 32 || chr1 == 127)
+    LexErr(lex, "Unexpected control character 0x%02llX (cur=0x%02llX flags=0x%X pushback=%d).",
+           (long long)chr1, (long long)lex->cur_char, lex->flags,
+           lex->pushback_valid);
   LexErr(lex, "Unexpected charactor '%c'.", chr1);
   return lex->cur_tok = ERR;
 }

@@ -1,0 +1,16 @@
+{
+  "date": "2026-11-02",
+  "repository_commit": "working tree",
+  "working_tree_changes_included": true,
+  "command": "python3 scripts/check-compat.py --pci --probe-demo-source-catalog --demo-source-path /Demo/Lectures/InterruptDemo.ZC",
+  "target": "QEMU ARM64 source catalog compile probe",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "da1c153a2f6b19fd8ea8ea1c7659ef87c7cf6404dd0806e19ea5c93c09a58fc6",
+  "source_path": "/Demo/Lectures/InterruptDemo.ZC",
+  "source_sha256": "721f1f747e10020a21110dfd0f885bb3c7f010579ef49a0abb25864ded04917b",
+  "result": "pass",
+  "scope": "The transformed ARM64 InterruptDemo source compiled successfully in the QEMU guest compiler. The separate graphical runtime benchmark probe did not produce its expected visible output and is not accepted as runtime evidence.",
+  "overlay": "Replaces the pinned x86 INT benchmark with an AArch64 SVC #0x42 benchmark routed through the guest EL1 synchronous exception vector; labels measurements as generic timer ticks.",
+  "runtime_acceptance": false,
+  "limitation": "Compilation only. Live execution/runtime of the benchmark remains unverified."
+}

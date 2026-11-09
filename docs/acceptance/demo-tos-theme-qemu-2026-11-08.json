@@ -1,0 +1,25 @@
+{
+  "date": "2026-11-08",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "working_tree_changes_included": true,
+  "command": "python3 scripts/check-compat.py --pci --quick --probe-demo-tos-theme",
+  "target": "AArch64 QEMU virt with PCI graphical terminal, single guest CPU",
+  "result": "pass",
+  "source_path": "upstream/pinned/Demo/AcctExample/TOS/TOSTheme.ZC",
+  "source_sha256": "4c4b3b00e4b52f4149dad14f09fb1c5a5a6b27cc3e8e21cdfd45ca199da26009",
+  "module_path": "upstream/pinned/System/Sound.ZC",
+  "module_sha256": "62a5741879eba0af6879d36fb0749fe9272a8485e7e92d444ffdd131326286e7",
+  "kernel_sha256": "4bfeab8f4e8e60962823e2360364231dc13f4ec7187264a8e642864c0113d1fd",
+  "iso_sha256": "fd42cae1f7bc340e6bf71e3e2fce41c8c32894d62bdb45f745ea580f5ccdc447",
+  "verified": [
+    "The upstream Sound.ZC module loaded before launching TOSTheme, matching its compile dependency.",
+    "TOSTheme completed its finite animation/song routine without a compiler exception.",
+    "The command following TOSTheme returned to the graphical terminal and evaluated 40+2 as 42.",
+    "QEMU reported failed=0 after terminal recovery."
+  ],
+  "log": "build/check-compat-pci.log",
+  "log_sha256": "c9ecb8ee9b3f79b8b062f2fb096e8fc83f9d43143f93442394ae14aebf378e7a",
+  "framebuffer_capture": "build/gui-tos-theme-run-and-recover-result.ppm",
+  "framebuffer_capture_sha256": "c53d070a3663e372d556ebebc4ff1452b82e0ecb8a152484ac4b7539a0d9590e",
+  "scope_note": "QEMU runtime acceptance of the source's animation, sound API path, and recovery. No QEMU audio device was configured, so audible output and physical sound hardware remain unverified; UTM and Pi hardware behavior are not established."
+}

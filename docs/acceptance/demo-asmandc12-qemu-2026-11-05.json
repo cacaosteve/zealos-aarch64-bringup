@@ -1,0 +1,29 @@
+{
+  "date": "2026-11-05",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "working_tree_changes_included": true,
+  "kernel_sha256": "5e63aead946d2a07242ecfa1ec0303521fc9311058346dfffb9c4b5a703a7a1f",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "be190bd6aa350d7e8c3a28068132e0aa3819b02af9150b311c371ee4c9226932",
+  "command": "python3 scripts/check-compat.py --pci --quick --probe-demo-asmandc12",
+  "exit_code": 0,
+  "source_paths": [
+    "/Demo/Asm/AsmAndC1.ZC",
+    "/Demo/Asm/AsmAndC2.ZC"
+  ],
+  "result": "pass",
+  "checks": [
+    "AsmAndC1 displayed its numeric prompt; accepting the default count produced Beeps:3.",
+    "AsmAndC2 displayed its colored numeric prompt; accepting the default count produced Jiffies: output.",
+    "The graphical terminal accepted 40+2; as 42 after both demos returned.",
+    "zstatus reported failed=0."
+  ],
+  "screenshots": [
+    "build/gui-catalog-demo-asm-and-c-1-launch-result.ppm",
+    "build/gui-catalog-demo-asm-and-c-1-output.ppm",
+    "build/gui-catalog-demo-asm-and-c-2-launch-result.ppm",
+    "build/gui-catalog-demo-asm-and-c-2-output.ppm",
+    "build/gui-catalog-demo-asm-and-c-12-terminal-recovery-result.ppm"
+  ],
+  "scope_note": "Automated UEFI QEMU runtime acceptance for prompt handling, source execution, and terminal recovery. Output confirms the demos invoked Beep/Sound and jiffies paths; it does not establish audible output on a physical audio device or live UTM behavior."
+}

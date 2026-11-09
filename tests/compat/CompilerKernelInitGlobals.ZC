@@ -1,0 +1,6 @@
+// KernelB.HH's AArch64-incompatible _intern section is omitted from the
+// compile-only Compiler.PRJ context; these are the ordinary data globals
+// ParseVar/ParseStatement and BackC read from it.
+U8 sys_var_init_flag;
+U8 sys_var_init_val;
+extern I64 PopCount(I64 bit_field_val);

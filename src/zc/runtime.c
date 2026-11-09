@@ -17,8 +17,14 @@ int64_t TempleOS_CallNOnStack(uint64_t stack_top, void (*fptr)(),
                               int64_t argc, int64_t *argv);
 extern int zeal_zss_entry_at(uint32_t index, char *name, size_t name_cap,
                              size_t *size_out);
+extern int zeal_zss_volume_stats(uint64_t *capacity_bytes,
+                                 uint64_t *free_bytes);
 extern uint64_t zeal_zss_catalog_revision(void);
 extern int zeal_zss_writable(void);
+extern int zc_virtio_net_ready(void);
+extern int zc_virtio_net_mac(uint8_t *out);
+extern int zc_virtio_net_send(const void *frame, uint32_t len);
+extern int zc_virtio_net_recv(void *frame, uint32_t cap);
 
 /* ZealOS KernelA.HH currently defines EXT_EXTS_NUM as five. Keep a stable
  * pointer/table pair for its kernel-owned function dispatch slots; guest
@@ -39,6 +45,8 @@ void zc_set_boot_media(uint32_t media_type) {
 }
 static uint64_t guest_fb_addr, guest_fb_width, guest_fb_height, guest_fb_pitch;
 static uint64_t guest_fb_bpp;
+struct guest_video_mode { uint16_t width, height; };
+static struct guest_video_mode guest_fb_modes[32];
 static uint64_t guest_text_globals[16];
 /* The first graphics slice uses the kernel's compact 8x8 ASCII font as the
  * guest CTextGlobals.font table. Entries are U64 so unchanged ZealOS code can
@@ -47,6 +55,12 @@ static uint64_t guest_gr_font[256];
 static uint64_t guest_gr_aux_font[256];
 static uint64_t guest_gr_colors[256];
 static int guest_gr_tables_ready;
+/* KernelC.HH exposes the bit-reversal lookup used by God/Sprite helpers.
+ * Keep the guest ABI as a pointer global while backing it with a host-owned
+ * table initialized with the same bit order as Kernel/KMain.ZC. */
+static uint8_t guest_rev_bits[256];
+static uint8_t *guest_rev_bits_ptr = guest_rev_bits;
+static int guest_rev_bits_ready;
 static void *guest_fp_set_std_palette;
 static void *guest_fp_update_ctrls;
 
@@ -110,7 +124,7 @@ extern int64_t zc_tablet_sample(void);
 /* Separate arenas from legacy hc_* so its per-demo reset cannot invalidate
  * modules loaded here. Both use splitting/coalescing and arbitrary-order Free. */
 #define DATA_BYTES (128u * 1024u * 1024u)
-#define CODE_BYTES (96u * 1024u * 1024u)
+#define CODE_BYTES (192u * 1024u * 1024u)
 #define BLOCK_MAGIC 0x5a43424c4f434b31ull
 struct block {
     uint64_t magic;
@@ -124,6 +138,11 @@ static unsigned char data_arena[DATA_BYTES] __attribute__((aligned(16)));
 static unsigned char code_arena[CODE_BYTES] __attribute__((section(".jit"), aligned(4096)));
 static struct block *arenas[2];
 static uint64_t arena_used_bytes[2];
+struct aligned_guest_allocation {
+    void *user, *base;
+    size_t requested;
+};
+static struct aligned_guest_allocation aligned_guest_allocations[4096];
 /* ZealOS memory reports read the system CBlkPool counters. The ARM64 bridge
  * allocates from fixed host arenas rather than upstream CMemBlk free lists,
  * so these mirrors expose the actual arena capacities and live allocations. */
@@ -138,6 +157,9 @@ static CTask task;
 CTask *Fs;
 static CHeapCtrl data_heap, code_heap;
 static zc_output_fn output_cb;
+static int output_cb_faulted;
+static char last_runtime_failure[256];
+static char last_unresolved_symbol[256];
 static zc_key_event_fn key_reader;
 static zc_key_reset_fn key_reset;
 static const unsigned char *source_archive;
@@ -150,6 +172,7 @@ static jmp_buf compiler_recovery_guard;
 static int compiler_recovery_active;
 static uint64_t compiler_recovery_errors;
 static int64_t compiler_recovery_exception;
+static CLexer *guest_active_compile_lex;
 #define GUEST_EXCEPT_COMPILER INT64_C(0x72656c69706d6f43)
 #define GUEST_EXCEPT_BREAK INT64_C(0x6b61657242)
 static int window_demo_loaded;
@@ -213,9 +236,15 @@ static double *pow10_I64_host = pow10_values;
 #define GUEST_TASKS (GUEST_APP_TASKS + 2)
 #define GUEST_STACK_BYTES (64u * 1024u)
 #define GUEST_STACK_MAX_BYTES (2u * 1024u * 1024u)
-#define GUEST_JOBS_MAX 128u
+/* Stock ZealOS demos can queue 500 callbacks before their first Yield
+ * (Demo/MultiCore/MPPrint.ZC). Keep the bridge pool above that burst size. */
+#define GUEST_JOBS_MAX 1024u
 #define GUEST_JOB_DEPTH_MAX 8u
 #define GUEST_MESSAGE_MS_MOVE 4
+#define GUEST_MESSAGE_MS_L_DOWN 5
+#define GUEST_MESSAGE_MS_L_UP 6
+#define GUEST_MESSAGE_MS_R_DOWN 9
+#define GUEST_MESSAGE_MS_R_UP 10
 #define GUEST_INPUT_FILTER_TASK (1u << 5) /* TASKf_INPUT_FILTER_TASK */
 /* KernelA.HH CJob: keep the queue links and message fields at their original
  * offsets so guest code may inspect the pending queue through CTask. */
@@ -276,7 +305,12 @@ struct guest_unwind {
     uint64_t irq_flags, irq_stack[8];
     unsigned irq_depth;
 };
-struct source_context;
+struct source_context {
+    struct source_context *previous;
+    unsigned char *mirror;
+    unsigned char *option_target;
+    int owned;
+};
 struct user_compiler;
 struct guest_fiber {
     uint64_t words[2048];
@@ -330,6 +364,9 @@ static struct guest_fiber guest_fibers[GUEST_TASKS];
 static CHeapCtrl guest_stack_heap;
 static unsigned guest_current, guest_completed;
 static uint64_t guest_task_serial;
+/* The ARM64 runtime's linear data heap is the closest valid counterpart to
+ * ZealOS's legacy contiguous heap bounds. */
+static uint64_t guest_mem_heap_base, guest_mem_heap_limit;
 static unsigned guest_job_count;
 static struct guest_job *guest_tracked_jobs[GUEST_JOBS_MAX];
 /* Parsing and code emission share one CPU and cannot switch tasks. Emitted
@@ -341,6 +378,10 @@ static int guest_job_call_active;
 static int guest_background_dispatch;
 static unsigned guest_idle_frame_divider;
 static uint64_t guest_task_frame_count;
+static uint64_t guest_direct_fb_frames, guest_direct_fb_missing;
+static uint64_t guest_direct_fb_nonzero;
+static uint32_t guest_direct_fb_first_pixel, guest_direct_fb_center_pixel;
+static int guest_direct_fb_latched;
 static CHashFun *guest_winmgr_tick_fun;
 /* Keep source graphics updates inside the staged framebuffer transaction. */
 static int guest_task_frame_active;
@@ -352,6 +393,8 @@ static uint64_t guest_mesh_overlay_resource_skips;
 static uint64_t guest_mesh_overlay_range_skips;
 static uint64_t guest_mesh_overlay_applied_frames;
 static uint64_t guest_mesh_overlay_pixels;
+static uint64_t guest_mesh_overlay_zero_pixels;
+static uint64_t guest_mesh_overlay_nonzero_pixels;
 static uint64_t guest_mesh_overlay_rgba_frames;
 static uint64_t guest_mesh_overlay_indexed_frames;
 static size_t guest_mesh_overlay_sample_index = SIZE_MAX;
@@ -604,8 +647,18 @@ extern int64_t zc_source_editor_overlay_render(int64_t *);
 void zc_fail(const char *s) __attribute__((noreturn));
 
 void zc_output(const char *s) {
+    uintptr_t callback = (uintptr_t)output_cb;
+    if (output_cb && callback < UINT64_C(0xffff000000000000)) {
+        fprintf(stderr,
+                "guest_runtime_callback_corrupt output=%p task=%u Fs=%p\n",
+                (void *)callback, guest_current, (void *)Fs);
+        output_cb = NULL;
+        output_cb_faulted = 1;
+    }
     if (output_cb)
         output_cb(s);
+    else if (output_cb_faulted && s)
+        fprintf(stderr, "%s", s);
     if (guest_task_bound && s) {
         struct guest_fiber *f = &guest_fibers[guest_current];
         if (f->user_diagnostic_active) {
@@ -624,6 +677,8 @@ void zc_set_key_reader(zc_key_event_fn read, zc_key_reset_fn reset) {
     key_reset = reset;
 }
 void zc_fail(const char *s) {
+    snprintf(last_runtime_failure, sizeof(last_runtime_failure), "%s",
+             s ? s : "(no reason)");
     compiler_recovery_active = 0;
     if (guest_task_bound && guest_fibers[guest_current].irq_flags_depth) {
         struct guest_fiber *f = &guest_fibers[guest_current];
@@ -685,6 +740,83 @@ void DoNothing(void) {
     uintptr_t return_pc = (uintptr_t)__builtin_return_address(0);
     uintptr_t offset = 0;
     const char *function = zc_debug_function_for_pc(return_pc, &offset);
+    if (return_pc >= (uintptr_t)code_arena + 16 &&
+        return_pc < (uintptr_t)code_arena + sizeof(code_arena)) {
+        const uint32_t *insn = (const uint32_t *)(return_pc - 16);
+        printf("zc: unresolved callsite pc=%p insn=%08x,%08x,%08x,%08x\n",
+               (void *)return_pc, insn[0], insn[1], insn[2], insn[3]);
+        /* Imported calls load CHashFun.fun_ptr through MOVZ/MOVK/LDR.
+         * Resolve the loaded slot back to its hash entry so the guest error
+         * tells us which symbol still points at DoNothing. */
+        {
+            const uint32_t *call = (const uint32_t *)(return_pc - 32);
+            unsigned ldr_index;
+            for (ldr_index = 5; ldr_index < 7; ++ldr_index) {
+                uint32_t ldr = call[ldr_index];
+                unsigned base_reg, dest_reg, j, start;
+                uint64_t slot_value = 0;
+                int have_movz = 0;
+                if ((ldr & 0xffc00000) != 0xf9400000)
+                    continue;
+                base_reg = (ldr >> 5) & 31;
+                dest_reg = ldr & 31;
+                if (base_reg != dest_reg)
+                    continue;
+                start = ldr_index > 4 ? ldr_index - 4 : 0;
+                for (j = start; j < ldr_index; ++j) {
+                    uint32_t wide = call[j];
+                    unsigned rd = wide & 31;
+                    unsigned shift = ((wide >> 21) & 3) * 16;
+                    uint64_t mask = UINT64_C(0xffff) << shift;
+                    uint64_t imm16 = (wide >> 5) & 0xffff;
+                    if (rd != dest_reg)
+                        continue;
+                    if ((wide & 0xff800000) == 0xd2800000) {
+                        slot_value = imm16 << shift;
+                        have_movz = 1;
+                    } else if ((wide & 0xff800000) == 0xf2800000 &&
+                               have_movz) {
+                        slot_value = (slot_value & ~mask) | (imm16 << shift);
+                    }
+                }
+                if (!have_movz)
+                    continue;
+            {
+            uintptr_t slot = (uintptr_t)slot_value +
+                             (uintptr_t)(((ldr >> 10) & 0xfff) * 8);
+            CHashTable *table;
+            for (table = Fs ? Fs->hash_table : NULL; table;
+                 table = table->next) {
+                int64_t i;
+                if (!table->body || table->mask < 0 || table->mask > 65535)
+                    continue;
+                for (i = 0; i <= table->mask; ++i) {
+                    CHash *entry;
+                    for (entry = table->body[i]; entry; entry = entry->next) {
+                        if ((entry->type & HTT_FUN) &&
+                            (uintptr_t)&((CHashFun *)entry)->fun_ptr == slot) {
+                            snprintf(last_unresolved_symbol,
+                                     sizeof(last_unresolved_symbol), "%s",
+                                     entry->str ? entry->str : "(unnamed)");
+                            printf("zc: unresolved symbol=%s target=%p\n",
+                                   entry->str, ((CHashFun *)entry)->fun_ptr);
+                            goto unresolved_symbol_reported;
+                        }
+                    }
+                }
+            }
+            snprintf(last_unresolved_symbol, sizeof(last_unresolved_symbol),
+                     "slot=%p target=%p not in hash table", (void *)slot,
+                     *(void **)slot);
+            printf("zc: unresolved symbol slot=%p target=%p not in hash table\n",
+                   (void *)slot, *(void **)slot);
+            }
+            break;
+        }
+unresolved_symbol_reported:
+        ;
+    }
+    }
     if (function)
         printf("zc: unresolved external call from %s+0x%lx\n", function,
                (unsigned long)offset);
@@ -848,8 +980,11 @@ static struct block *get_block(void *p) {
     if (!valid || v % 16)
         zc_fail("invalid heap pointer");
     struct block *b = (struct block *)p - 1;
-    if (b->magic != BLOCK_MAGIC || !b->used)
+    if (b->magic != BLOCK_MAGIC || !b->used) {
+        printf("zc: invalid free pointer=%p header=%p magic=%lx used=%d\n",
+               p, (void *)b, (unsigned long)b->magic, b->used);
         zc_fail("invalid or duplicate free");
+    }
     return b;
 }
 static struct block *release(struct block *b) {
@@ -1236,6 +1371,11 @@ static int64_t host_redsea_file_at(int64_t *a) {
         *(int64_t *)(uintptr_t)a[3] = (int64_t)size;
     return 1;
 }
+static int64_t host_source_volume_stats(int64_t *a) {
+    if (!a[0] || !a[1]) return 0;
+    return zeal_zss_volume_stats((uint64_t *)(uintptr_t)a[0],
+                                 (uint64_t *)(uintptr_t)a[1]);
+}
 static int source_dir_exists(const char *path) {
     char name[128];
     char prefix[130];
@@ -1313,7 +1453,7 @@ static char *disk_copy(const char *path, size_t *length, int *tombstoned) {
     int status = disk_reader(name, NULL, 0, &n);
     if (status == -3 && tombstoned)
         *tombstoned = 1;
-    if (status || !n || n > 4u * 1024u * 1024u)
+    if (status || !n || n > 8u * 1024u * 1024u)
         return NULL;
     char *src = malloc(n + 1);
     /* DolDoc files carry packed resources after their text NUL. Callers use
@@ -1326,6 +1466,21 @@ static char *disk_copy(const char *path, size_t *length, int *tombstoned) {
     src[n] = 0;
     *length = n;
     return src;
+}
+static int64_t host_source_has_override(int64_t *a) {
+    char disk_path[139] = "disk:";
+    char *path = disk_path + 5;
+    if (guest_path((const char *)(uintptr_t)a[0], path) || path[0] != '/')
+        return 0;
+    size_t saved_size = 0, bundled_size = 0;
+    char *saved = disk_copy(disk_path, &saved_size, NULL);
+    if (!saved)
+        return 0;
+    const unsigned char *bundled = source_find(path, &bundled_size);
+    int changed = !bundled || saved_size != bundled_size ||
+                  memcmp(saved, bundled, saved_size) != 0;
+    free(saved);
+    return changed;
 }
 static const unsigned char *source_file_find(const char *path, size_t *length,
                                               char **owned) {
@@ -1363,6 +1518,13 @@ static int64_t host_file_read(int64_t *a) {
     if (guest_path((const char *)(uintptr_t)a[0], path))
         return 0;
     const unsigned char *data = source_file_find(path, &length, &owned);
+    if (strstr(path, "DataBaseDemo.BIN"))
+        printf("zc: db FileRead path=%s size=%lu first=%02x%02x%02x%02x\n",
+               path, (unsigned long)length,
+               data && length > 0 ? data[0] : 0,
+               data && length > 1 ? data[1] : 0,
+               data && length > 2 ? data[2] : 0,
+               data && length > 3 ? data[3] : 0);
     if (!data || length > INT64_MAX || length == SIZE_MAX) {
         free(owned);
         return 0;
@@ -1384,8 +1546,16 @@ static int64_t host_file_write(int64_t *a) {
     const char *src = (const char *)(uintptr_t)a[1];
     int64_t length = a[2];
     if (guest_path((const char *)(uintptr_t)a[0], path) ||
-        !src || length <= 0 || !disk_writer ||
-        disk_writer(path, src, (size_t)length))
+        !src || length <= 0 || !disk_writer)
+        return -1;
+    int result = disk_writer(path, src, (size_t)length);
+    if (strstr(path, "DataBaseDemo.BIN"))
+        printf("zc: db FileWrite path=%s size=%ld first=%02x%02x%02x%02x result=%d\n",
+               path, (long)length, (unsigned char)src[0],
+               length > 1 ? (unsigned char)src[1] : 0,
+               length > 2 ? (unsigned char)src[2] : 0,
+               length > 3 ? (unsigned char)src[3] : 0, result);
+    if (result)
         return -1;
     return length;
 }
@@ -1517,7 +1687,13 @@ static CHeapCtrl *guest_allocation_owner(int64_t selector) {
             struct guest_fiber *f = &guest_fibers[i];
             if (f->state == GUEST_RUNNABLE &&
                 ((void *)(uintptr_t)selector == f->words ||
-                 (void *)(uintptr_t)selector == f->heap_words))
+                 (void *)(uintptr_t)selector == f->heap_words ||
+                 (void *)(uintptr_t)selector == &f->compiler_task ||
+                 /* The guest's MAlloc(count, task) wrapper passes task->heap
+                  * to the host binding. Fs points at this fiber's compiler
+                  * task while its guest code runs, so translate that heap
+                  * selector back to the fiber's guest-owned heap. */
+                 (void *)(uintptr_t)selector == &f->compiler_heap))
                 return &f->heap_owner;
         }
         CHeapCtrl *owner = guest_task_record_owner((void *)(uintptr_t)selector);
@@ -1835,26 +2011,154 @@ static int64_t host_calloc(int64_t *a) {
     memset(p, 0, (size_t)a[0]);
     return (int64_t)(uintptr_t)p;
 }
+static struct aligned_guest_allocation *host_find_aligned_allocation(void *p) {
+    for (size_t i = 0; i < sizeof(aligned_guest_allocations) /
+                            sizeof(aligned_guest_allocations[0]); i++)
+        if (aligned_guest_allocations[i].user == p)
+            return &aligned_guest_allocations[i];
+    return NULL;
+}
+static int64_t host_aligned_alloc(int64_t *a, int clear) {
+    int64_t count = a[0], alignment = a[1], misalignment = a[3];
+    if (count < 0 || alignment <= 0 || (alignment & (alignment - 1)) ||
+        misalignment < 0 || (uint64_t)count + (uint64_t)alignment +
+            sizeof(void *) + (uint64_t)misalignment > DATA_BYTES)
+        zc_fail("aligned allocation arguments are invalid");
+    size_t slot;
+    for (slot = 0; slot < sizeof(aligned_guest_allocations) /
+                        sizeof(aligned_guest_allocations[0]); slot++)
+        if (!aligned_guest_allocations[slot].user)
+            break;
+    if (slot == sizeof(aligned_guest_allocations) /
+                 sizeof(aligned_guest_allocations[0]))
+        zc_fail("aligned allocation registry exhausted");
+    size_t extra = (size_t)alignment - 1 + sizeof(void *) +
+                   (size_t)misalignment;
+    void *base = arena_alloc(count + (int64_t)extra,
+                             guest_allocation_owner(a[2]),
+                             (uintptr_t)__builtin_return_address(0));
+    uintptr_t user = (uintptr_t)base + sizeof(void *);
+    user = (user + (uintptr_t)alignment - 1) & ~((uintptr_t)alignment - 1);
+    user += (uintptr_t)misalignment;
+    if (clear)
+        memset((void *)user, 0, (size_t)count);
+    aligned_guest_allocations[slot] = (struct aligned_guest_allocation){
+        .user = (void *)user, .base = base, .requested = (size_t)count};
+    return (int64_t)user;
+}
+static int64_t host_malloc_aligned(int64_t *a) {
+    return host_aligned_alloc(a, 0);
+}
+static int64_t host_calloc_aligned(int64_t *a) {
+    return host_aligned_alloc(a, 1);
+}
 static int64_t host_free(int64_t *a) {
-    free((void *)(uintptr_t)a[0]);
+    void *p = (void *)(uintptr_t)a[0];
+    struct aligned_guest_allocation *aligned = host_find_aligned_allocation(p);
+    if (aligned) {
+        void *base = aligned->base;
+        memset(aligned, 0, sizeof(*aligned));
+        __AIWNIOS_Free(base);
+    } else {
+        free(p);
+    }
     return 0;
 }
-static int64_t host_msize(int64_t *a) { return MSize((void *)(uintptr_t)a[0]); }
+static int64_t host_msize(int64_t *a) {
+    struct aligned_guest_allocation *aligned =
+        host_find_aligned_allocation((void *)(uintptr_t)a[0]);
+    return aligned ? (int64_t)aligned->requested
+                   : MSize((void *)(uintptr_t)a[0]);
+}
+static int64_t host_managed_allocation_size_ptr(uintptr_t value) {
+    struct aligned_guest_allocation *aligned =
+        host_find_aligned_allocation((void *)value);
+    if (aligned)
+        return (int64_t)aligned->requested;
+    int valid = value >= (uintptr_t)data_arena + sizeof(struct block) &&
+                value < (uintptr_t)data_arena + DATA_BYTES;
+    valid |= value >= (uintptr_t)code_arena + sizeof(struct block) &&
+             value < (uintptr_t)code_arena + CODE_BYTES;
+    if (!valid || value % 16)
+        return 0;
+    struct block *b = (struct block *)value - 1;
+    if (b->magic != BLOCK_MAGIC || !b->used)
+        return 0;
+    return (int64_t)b->requested;
+}
+static int64_t host_mheap_ctrl(int64_t *a) {
+    uintptr_t value = (uintptr_t)a[0];
+    struct aligned_guest_allocation *aligned =
+        host_find_aligned_allocation((void *)value);
+    if (aligned)
+        value = (uintptr_t)aligned->base;
+    int valid = value >= (uintptr_t)data_arena + sizeof(struct block) &&
+                value < (uintptr_t)data_arena + DATA_BYTES;
+    valid |= value >= (uintptr_t)code_arena + sizeof(struct block) &&
+             value < (uintptr_t)code_arena + CODE_BYTES;
+    if (!valid || value % 16)
+        return 0;
+    struct block *b = (struct block *)value - 1;
+    return b->magic == BLOCK_MAGIC && b->used
+        ? (int64_t)(uintptr_t)b->owner : 0;
+}
 /* Return the requested extent only when p is the start of one of our live
  * managed allocations. Unlike MSize this is safe for stack/static pointers
  * and arbitrary addresses; zero means the allocation extent is unknown. */
 static int64_t host_managed_allocation_size(int64_t *a) {
-    uintptr_t v = (uintptr_t)a[0];
-    int valid = v >= (uintptr_t)data_arena + sizeof(struct block) &&
-                v < (uintptr_t)data_arena + DATA_BYTES;
-    valid |= v >= (uintptr_t)code_arena + sizeof(struct block) &&
-             v < (uintptr_t)code_arena + CODE_BYTES;
-    if (!valid || v % 16)
-        return 0;
-    struct block *b = (struct block *)v - 1;
-    if (b->magic != BLOCK_MAGIC || !b->used)
-        return 0;
-    return (int64_t)b->requested;
+    return host_managed_allocation_size_ptr((uintptr_t)a[0]);
+}
+static CHashTable *host_valid_task_hash_table(CTask *context) {
+    int known = context == &task;
+    for (unsigned i = 0; !known && i < GUEST_TASKS; i++)
+        known = context == &guest_fibers[i].compiler_task;
+    if (!known || !context->hash_table)
+        return NULL;
+    CHashTable *table = context->hash_table;
+    int64_t table_bytes =
+        host_managed_allocation_size_ptr((uintptr_t)table);
+    if (table_bytes < 0 || (uint64_t)table_bytes < sizeof(*table) ||
+        table->mask < 0 || table->mask >= (1 << 20) || !table->body)
+        return NULL;
+    uint64_t body_bytes = ((uint64_t)table->mask + 1) * sizeof(*table->body);
+    if (host_managed_allocation_size_ptr((uintptr_t)table->body) <
+        (int64_t)body_bytes)
+        return NULL;
+    return table;
+}
+static CHashTable *host_active_task_hash_table(void) {
+    CHashTable *table = host_valid_task_hash_table(Fs);
+    /* Window-manager and input globals are inherited from the root module
+     * context. A transient child context with a stale table must not make a
+     * shared GUI callback dereference an arbitrary body pointer. */
+    if (!table && Fs != &task)
+        table = host_valid_task_hash_table(&task);
+    return table;
+}
+static int64_t host_check_ptr(int64_t *a) {
+    uintptr_t value = (uintptr_t)a[0];
+    /* ZealOS CheckPtr tests whether an address is mapped, not whether it is
+     * the start of a live allocation. The guest arenas and compiler task
+     * records are mapped; Fs points at one of those host-side CTask records. */
+    if ((value >= (uintptr_t)data_arena &&
+         value < (uintptr_t)data_arena + DATA_BYTES) ||
+        (value >= (uintptr_t)code_arena &&
+         value < (uintptr_t)code_arena + CODE_BYTES) ||
+        (value >= (uintptr_t)&task &&
+         value < (uintptr_t)&task + sizeof(task)))
+        return 1;
+    for (unsigned i = 0; i < GUEST_TASKS; i++)
+        if ((value >= (uintptr_t)guest_fibers[i].words &&
+             value < (uintptr_t)guest_fibers[i].words +
+                     sizeof(guest_fibers[i].words)) ||
+            (value >= (uintptr_t)guest_fibers[i].stack &&
+             value < (uintptr_t)guest_fibers[i].stack +
+                     sizeof(guest_fibers[i].stack)) ||
+            (value >= (uintptr_t)&guest_fibers[i].compiler_task &&
+             value < (uintptr_t)&guest_fibers[i].compiler_task +
+                     sizeof(guest_fibers[i].compiler_task)))
+            return 1;
+    return 0;
 }
 static int64_t host_copy(int64_t *a) {
     return (int64_t)(uintptr_t)memcpy((void *)(uintptr_t)a[0], (void *)(uintptr_t)a[1],
@@ -2096,13 +2400,109 @@ static int64_t host_hash_table_del(int64_t *a) {
         HashTableDel((CHashTable *)(uintptr_t)a[0]);
     return 0;
 }
+/* ZealOS and Aiwnios use different CHash type bits. Guest code that searches
+ * the active compiler table supplies ZealOS HTT_* masks, while entries in
+ * that table were created by the Aiwnios parser. Keep task-private and
+ * application-owned hash tables in their native guest namespace. */
+static int64_t host_compiler_hash_mask(int64_t mask) {
+    if (mask == -1)
+        return mask;
+    uint64_t guest = (uint64_t)mask;
+    uint64_t types = guest & 0x1ffffu; /* ZealOS HTG_TYPE_MASK */
+    uint64_t mapped = guest & ~0x1ffffULL;
+    if (types & 0x00004u) mapped |= 0x00001u; /* DEFINE_STR */
+    if (types & 0x00200u) mapped |= 0x00002u; /* KEYWORD */
+    if (types & 0x00010u) mapped |= 0x00004u; /* CLASS */
+    if (types & 0x00008u) mapped |= 0x00008u; /* GLOBAL_VAR */
+    if (types & 0x00040u) mapped |= 0x00010u; /* FUN */
+    if (types & 0x00001u) mapped |= 0x00100u; /* EXPORT_SYS_SYM */
+    if (types & 0x00002u) mapped |= 0x00080u; /* IMPORT_SYS_SYM */
+    if (types & 0x00020u) mapped |= 0x00004u; /* INTERNAL_TYPE class */
+    /* Preserve task/application-specific kinds such as FRAME_PTR and the
+     * custom autocomplete and DolDoc hash types. */
+    mapped |= types & ~0x0027fu;
+    return (int64_t)mapped;
+}
 static int64_t host_hash_find(int64_t *a) {
-    return (int64_t)(uintptr_t)HashFind((char *)(uintptr_t)a[0],
-                                        (CHashTable *)(uintptr_t)a[1], a[2],
-                                        a[3]);
+    CHashTable *table = (CHashTable *)(uintptr_t)a[1];
+    int64_t mask = a[2];
+    char *name = (char *)(uintptr_t)a[0];
+    /* Only pass a table to native HashFind after validating its complete
+     * managed allocation, including the body extent implied by its mask. */
+    int64_t table_bytes = host_managed_allocation_size_ptr((uintptr_t)table);
+    if (table_bytes >= (int64_t)sizeof(*table) && table->mask >= 0 &&
+        table->mask < (1 << 20) && table->body &&
+        host_managed_allocation_size_ptr((uintptr_t)table->body) >=
+            (int64_t)(((uint64_t)table->mask + 1) * sizeof(*table->body)))
+        return (int64_t)(uintptr_t)HashFind(name, table, mask, a[3]);
+
+    /* Some guest CTask mirrors carry addresses outside the managed host
+     * arena. Resolve those through the active compiler task's validated
+     * table, which is where DefineLoad mirrors task-local string defines. */
+    CHashTable *compiler_table = host_active_task_hash_table();
+    if (!compiler_table && guest_task_bound && guest_current < GUEST_TASKS &&
+        guest_fibers[guest_current].state == GUEST_RUNNABLE)
+        compiler_table = guest_current
+            ? guest_fibers[guest_current].compiler_task.hash_table
+            : task.hash_table;
+    if (compiler_table) {
+        if (mask == -1 || (mask & 0x0027f))
+            return (int64_t)(uintptr_t)HashFind(
+                name, compiler_table, host_compiler_hash_mask(mask), a[3]);
+        return 0;
+    }
+    return 0;
+}
+/* Native HashFind calls can bypass the FFI adapter when a stock source extern
+ * was resolved before TaskBridge. The ARM64 hash implementation calls this
+ * only when its table/body is a guest address; redirect to the validated
+ * active task compiler table and translate ZealOS type bits. */
+CHash *ZcHashFindFallback(char *name, CHashTable *table, int64_t mask,
+                          int64_t instance) {
+    (void)table;
+    CHashTable *compiler_table = host_active_task_hash_table();
+    if (!compiler_table || (mask != -1 && !(mask & 0x0027f)))
+        return NULL;
+    return HashFind(name, compiler_table, host_compiler_hash_mask(mask),
+                    instance);
+}
+static int64_t host_hash_single_table_find(int64_t *a) {
+    const unsigned char *needle = (const unsigned char *)(uintptr_t)a[0];
+    CHashTable *table = (CHashTable *)(uintptr_t)a[1];
+    uint64_t hash = 0;
+    int64_t mask = a[2], instance = a[3];
+    CHash **bucket;
+    CHash *entry;
+
+    if (!needle || !table || !table->body || instance <= 0)
+        return 0;
+    while (*needle) {
+        uint64_t carry = hash >> 63;
+        hash = (hash << 1) + *needle++ + carry;
+    }
+    hash += (hash >> 16) + ((hash >> 15) & 1);
+    bucket = &table->body[hash & table->mask];
+    for (entry = *bucket; entry; entry = entry->next) {
+        if ((entry->type & mask) && !strcmp(entry->str, (const char *)(uintptr_t)a[0])) {
+            if (!--instance) {
+                entry->use_cnt++;
+                return (int64_t)(uintptr_t)entry;
+            }
+        }
+    }
+    return 0;
 }
 static int64_t host_hash_add(int64_t *a) {
     HashAdd((CHash *)(uintptr_t)a[0], (CHashTable *)(uintptr_t)a[1]);
+    return 0;
+}
+static int64_t host_hash_add_after(int64_t *a) {
+    CHash *entry = (CHash *)(uintptr_t)a[0];
+    CHash *predecessor = (CHash *)(uintptr_t)a[1];
+    if (!entry || !predecessor)
+        return 0;
+    entry->next = predecessor->next;
+    predecessor->next = entry;
     return 0;
 }
 static uint32_t *guest_text_plane(int64_t address, int64_t stride,
@@ -2158,12 +2558,31 @@ static uint32_t *guest_graphics_rgba_surface(void) {
         return (uint32_t *)p;
     return NULL;
 }
+static uint32_t *guest_graphics_direct_fb_surface(void) {
+    CHashGlblVar *global = (CHashGlblVar *)HashFind(
+        "bootstrap_direct_fb_pixels", Fs->hash_table, HTT_GLBL_VAR, 1);
+    uintptr_t p;
+    size_t bytes = 800u * 600u * sizeof(uint32_t);
+    if (!global || !global->data_addr)
+        return NULL;
+    p = (uintptr_t)global->data_addr;
+    if (p > UINTPTR_MAX - bytes)
+        return NULL;
+    if ((p >= (uintptr_t)data_arena &&
+         p + bytes <= (uintptr_t)data_arena + sizeof(data_arena)) ||
+        (p >= (uintptr_t)code_arena &&
+         p + bytes <= (uintptr_t)code_arena + sizeof(code_arena)))
+        return (uint32_t *)p;
+    return NULL;
+}
 static void guest_mesh_overlay_present(void) {
     CHashGlblVar *mesh_global, *palette_global;
+    CHashGlblVar *clear_global;
     uint8_t *surface, *mesh;
     uint32_t *rgba, *palette;
     uintptr_t mesh_addr, palette_addr;
     const size_t count = 800u * 600u;
+    int mesh_frame_present = 0;
     guest_mesh_overlay_calls++;
     if ((!guest_task_frame_rgba_ready && !guest_source_full_screen_active()) ||
         !Fs || !Fs->hash_table) {
@@ -2200,21 +2619,53 @@ static void guest_mesh_overlay_present(void) {
     }
     mesh = (uint8_t *)mesh_addr;
     palette = (uint32_t *)palette_addr;
-    // Restore the prior frame's overlay from current window composition, then
-    // stage this frame's mesh. The CDC and its screen cache stay unmodified.
+    clear_global = (CHashGlblVar *)HashFind(
+        "bootstrap_mesh_overlay_clear", Fs->hash_table, HTT_GLBL_VAR, 1);
+    int clear_mesh = clear_global && clear_global->data_addr &&
+                     *(uint64_t *)clear_global->data_addr;
+    guest_mesh_overlay_zero_pixels = 0;
+    guest_mesh_overlay_nonzero_pixels = 0;
+    // Restore the prior overlay from the freshly composed indexed desktop.
     for (size_t i = 0; i < count; i++) {
         if (guest_mesh_previous_mask[i]) {
             uint8_t base_color = surface[i];
             rgba[i] = palette[base_color < 16 ? base_color : 0];
-            guest_mesh_previous_mask[i] = 0;
         }
     }
+    if (clear_mesh) {
+        memset(guest_mesh_previous_mask, 0, sizeof(guest_mesh_previous_mask));
+        *(uint64_t *)clear_global->data_addr = 0;
+    } else {
+        // Mesh documents may redraw only when their window is dirty. Keep the
+        // last completed mesh layer when this frame contains no new mesh data.
+        for (size_t i = 0; i < count; i++) {
+            if (mesh[i] != 0xff && mesh[i] < 16) {
+                mesh_frame_present = 1;
+                break;
+            }
+        }
+        if (mesh_frame_present) {
+            memset(guest_mesh_previous_mask, 0,
+                   sizeof(guest_mesh_previous_mask));
+            for (size_t i = 0; i < count; i++) {
+                uint8_t color = mesh[i];
+                if (color != 0xff && color < 16)
+                    guest_mesh_previous_mask[i] = color + 1;
+            }
+        }
+    }
+    // Store palette index + 1 in the mask so palette entry zero remains
+    // drawable, then composite the retained layer above the task windows.
     for (size_t i = 0; i < count; i++) {
-        uint8_t color = mesh[i];
-        if (color != 0xff && color < 16) {
+        uint8_t encoded = guest_mesh_previous_mask[i];
+        if (encoded) {
+            uint8_t color = encoded - 1;
             rgba[i] = palette[color];
-            guest_mesh_previous_mask[i] = 1;
             guest_mesh_overlay_pixels++;
+            if (color)
+                guest_mesh_overlay_nonzero_pixels++;
+            else
+                guest_mesh_overlay_zero_pixels++;
             if (color && guest_mesh_overlay_sample_index == SIZE_MAX) {
                 guest_mesh_overlay_sample_index = i;
                 guest_mesh_overlay_sample_rgba = rgba[i];
@@ -2224,17 +2675,39 @@ static void guest_mesh_overlay_present(void) {
     guest_mesh_overlay_applied_frames++;
 }
 static int guest_source_full_screen_active(void) {
+    if (!Fs || !Fs->hash_table)
+        return 0;
     CHashGlblVar *global = (CHashGlblVar *)HashFind(
         "bootstrap_gr_fullscreen_active", Fs->hash_table, HTT_GLBL_VAR, 1);
     return global && global->data_addr && *(uint64_t *)global->data_addr;
 }
+static int guest_source_direct_framebuffer_active(void) {
+    if (!Fs || !Fs->hash_table)
+        return 0;
+    CHashGlblVar *global = (CHashGlblVar *)HashFind(
+        "bootstrap_gr_direct_fb_active", Fs->hash_table, HTT_GLBL_VAR, 1);
+    uint32_t *direct;
+    if (!global || !global->data_addr || !*(uint64_t *)global->data_addr ||
+        !guest_text_globals[12])
+        return 0;
+    direct = guest_graphics_direct_fb_surface();
+    return direct && guest_text_globals[3] == (uint64_t)(uintptr_t)direct;
+}
 static int64_t guest_task_frame_run(void) {
     if (guest_task_frame_active)
         return 0;
+    /* The compositor always executes against the root module/task context.
+     * A frame may be requested from a child task's Sleep/Refresh path, and
+     * cooperative callbacks can return after task identity has changed. Keep
+     * both the compiler context and guest TLS canonical before resolving any
+     * source symbols. */
+    guest_current = 0;
+    Fs = &task;
+    set_guest_task(guest_fibers[0].words);
     uint8_t *surface = guest_graphics_surface();
     uint32_t *rgba = guest_graphics_rgba_surface();
     CHashFun *present;
-    uint64_t presented;
+    uint64_t presented = 0;
     if (!guest_winmgr_tick_fun)
         guest_winmgr_tick_fun = (CHashFun *)HashFind(
             "BootstrapWinMgrTick", Fs->hash_table, HTT_FUN, 1);
@@ -2255,6 +2728,44 @@ static int64_t guest_task_frame_run(void) {
         !(z_update->base.base.type & HTF_EXTERN))
         FFI_CALL_TOS_0(z_update->fun_ptr);
     FFI_CALL_TOS_0(guest_winmgr_tick_fun->fun_ptr);
+    /* Source frame callbacks must not leak a borrowed or stale task context
+     * back into the host compositor. */
+    guest_current = 0;
+    Fs = &task;
+    set_guest_task(guest_fibers[0].words);
+    /* A stock source program may own text.fb_alias directly while
+     * text.is_fb_busy is set. In that mode its writes already target scanout;
+     * publishing our pre-tick staging copy would erase them. */
+    if (guest_source_direct_framebuffer_active()) {
+        uint32_t *direct = guest_graphics_direct_fb_surface();
+        if (direct) {
+            /* The source compiler's byte MemSet does not reliably initialize
+             * this U32 framebuffer global. Seed the host-owned surface on the
+             * first frame; subsequent application writes remain authoritative. */
+            if (!guest_direct_fb_latched) {
+                for (size_t i = 0; i < 800u * 600u; i++)
+                    direct[i] = 0x00ffffffu;
+                guest_direct_fb_latched = 1;
+            }
+            guest_direct_fb_frames++;
+            guest_direct_fb_first_pixel = direct[0];
+            guest_direct_fb_center_pixel = direct[300u * 800u + 400u];
+            guest_direct_fb_nonzero = 0;
+            for (size_t i = 0; i < 800u * 600u; i++)
+                guest_direct_fb_nonzero += direct[i] != 0;
+            memcpy(rgba, direct, 800u * 600u * sizeof(*rgba));
+            presented = zeal_fb_task_frame_end(1) != 0;
+            if (presented)
+                guest_task_frame_count++;
+        } else {
+            guest_direct_fb_missing++;
+            zeal_fb_task_frame_cancel();
+        }
+        guest_task_frame_active = 0;
+        guest_task_frame_rgba_ready = 0;
+        return presented;
+    }
+    guest_direct_fb_latched = 0;
     /* The source incremental screen pass must finish in the staging buffer
      * before scanout. Running it after frame_end caused visible pixel-by-pixel
      * updates when overlapping windows changed beneath one another. */
@@ -2312,13 +2823,14 @@ static int64_t host_task_frame_run(int64_t *a) {
     return presented;
 }
 static int64_t host_gr_text_update(int64_t *a) {
+    CHashTable *table = host_active_task_hash_table();
     CHashFun *background, *foreground;
     (void)a;
-    if (!Fs || !Fs->hash_table)
+    if (!table)
         return 0;
-    background = (CHashFun *)HashFind("GrUpdateTextBG", Fs->hash_table,
+    background = (CHashFun *)HashFind("GrUpdateTextBG", table,
                                      HTT_FUN, 1);
-    foreground = (CHashFun *)HashFind("GrUpdateTextFG", Fs->hash_table,
+    foreground = (CHashFun *)HashFind("GrUpdateTextFG", table,
                                       HTT_FUN, 1);
     if (!background || !background->fun_ptr || background->argc ||
         (background->base.base.type & HTF_EXTERN) ||
@@ -2330,18 +2842,19 @@ static int64_t host_gr_text_update(int64_t *a) {
     return 1;
 }
 static int64_t host_gr_screen_update(int64_t *a) {
+    CHashTable *table = host_active_task_hash_table();
     CHashFun *update;
     CHashFun *palette_set;
     CHashGlblVar *raw_screen;
     CHashGlblVar *standard_palette;
     CHashGlblVar *palette;
     (void)a;
-    if (!Fs || !Fs->hash_table || !guest_fb_addr || guest_fb_width != 800 ||
+    if (!table || !guest_fb_addr || guest_fb_width != 800 ||
         guest_fb_height != 600 || guest_fb_pitch != 800 * sizeof(uint32_t) ||
         guest_fb_bpp != 32)
         return 0;
     raw_screen = (CHashGlblVar *)HashFind(
-        "bootstrap_present_raw", Fs->hash_table, HTT_GLBL_VAR, 1);
+        "bootstrap_present_raw", table, HTT_GLBL_VAR, 1);
     if (!raw_screen || !raw_screen->data_addr)
         return 0;
     /* Convert through the validated staging plane and keep source scanout
@@ -2352,11 +2865,11 @@ static int64_t host_gr_screen_update(int64_t *a) {
         : guest_fb_addr;
     guest_text_globals[9] = guest_fb_pitch * guest_fb_height;
     {
-        palette_set = (CHashFun *)HashFind("GrPaletteSet", Fs->hash_table,
+        palette_set = (CHashFun *)HashFind("GrPaletteSet", table,
                                            HTT_FUN, 1);
         standard_palette = (CHashGlblVar *)HashFind(
-            "gr32_palette_std", Fs->hash_table, HTT_GLBL_VAR, 1);
-        palette = (CHashGlblVar *)HashFind("gr_palette", Fs->hash_table,
+            "gr32_palette_std", table, HTT_GLBL_VAR, 1);
+        palette = (CHashGlblVar *)HashFind("gr_palette", table,
                                            HTT_GLBL_VAR, 1);
         if (!palette || !palette->data_addr)
             return 0;
@@ -2376,7 +2889,7 @@ static int64_t host_gr_screen_update(int64_t *a) {
                            (int64_t)(uintptr_t)standard_palette->data_addr);
         }
     }
-    update = (CHashFun *)HashFind("GrUpdateScreen32", Fs->hash_table,
+    update = (CHashFun *)HashFind("GrUpdateScreen32", table,
                                   HTT_FUN, 1);
     if (!update || !update->fun_ptr || update->argc ||
         (update->base.base.type & HTF_EXTERN))
@@ -2392,12 +2905,13 @@ static int64_t host_gr_screen_update(int64_t *a) {
     return 1;
 }
 static int64_t host_gr_update_task_win(int64_t *a) {
+    CHashTable *table = host_active_task_hash_table();
     CHashFun *draw;
     CHashFun *redraw;
     CHashFun *terminal_state;
-    if (!Fs || !Fs->hash_table || !a[0])
+    if (!table || !a[0])
         return 0;
-    draw = (CHashFun *)HashFind("GrUpdateTaskWin", Fs->hash_table,
+    draw = (CHashFun *)HashFind("GrUpdateTaskWin", table,
                                 HTT_FUN, 1);
     if (!draw || !draw->fun_ptr || draw->argc != 1 ||
         (draw->base.base.type & HTF_EXTERN))
@@ -2409,9 +2923,9 @@ static int64_t host_gr_update_task_win(int64_t *a) {
      * visible frames independent of early forward stubs. */
     if (gui_terminal_active) {
         terminal_state = (CHashFun *)HashFind(
-            "BootstrapGuiTerminalState", Fs->hash_table, HTT_FUN, 1);
+            "BootstrapGuiTerminalState", table, HTT_FUN, 1);
         redraw = (CHashFun *)HashFind("BootstrapGuiTerminalRedraw",
-                                     Fs->hash_table, HTT_FUN, 1);
+                                     table, HTT_FUN, 1);
         if (terminal_state && terminal_state->fun_ptr && terminal_state->argc == 1 &&
             !(terminal_state->base.base.type & HTF_EXTERN) &&
             FFI_CALL_TOS_1(terminal_state->fun_ptr, a[0]) &&
@@ -2422,11 +2936,12 @@ static int64_t host_gr_update_task_win(int64_t *a) {
     return 1;
 }
 static int64_t host_gr_update_tasks(int64_t *a) {
+    CHashTable *table = host_active_task_hash_table();
     CHashFun *update;
     (void)a;
-    if (!Fs || !Fs->hash_table)
+    if (!table)
         return 0;
-    update = (CHashFun *)HashFind("GrUpdateTasks", Fs->hash_table,
+    update = (CHashFun *)HashFind("GrUpdateTasks", table,
                                   HTT_FUN, 1);
     if (!update || !update->fun_ptr || update->argc ||
         (update->base.base.type & HTF_EXTERN))
@@ -2435,11 +2950,12 @@ static int64_t host_gr_update_tasks(int64_t *a) {
     return 1;
 }
 static int64_t host_gr_screen_full_update(int64_t *a) {
+    CHashTable *table = host_active_task_hash_table();
     CHashFun *update;
     (void)a;
-    if (!Fs || !Fs->hash_table)
+    if (!table)
         return 0;
-    update = (CHashFun *)HashFind("GrUpdateScreen", Fs->hash_table,
+    update = (CHashFun *)HashFind("GrUpdateScreen", table,
                                   HTT_FUN, 1);
     if (!update || !update->fun_ptr || update->argc ||
         (update->base.base.type & HTF_EXTERN))
@@ -2450,10 +2966,11 @@ static int64_t host_gr_screen_full_update(int64_t *a) {
     return 1;
 }
 static int64_t host_ode_update_task(int64_t *a) {
+    CHashTable *table = host_active_task_hash_table();
     CHashFun *update;
-    if (!Fs || !Fs->hash_table || !a[0])
+    if (!table || !a[0])
         return 0;
-    update = (CHashFun *)HashFind("ODEsUpdate", Fs->hash_table, HTT_FUN, 1);
+    update = (CHashFun *)HashFind("ODEsUpdate", table, HTT_FUN, 1);
     if (!update || !update->fun_ptr || update->argc != 1 ||
         (update->base.base.type & HTF_EXTERN))
         return 0;
@@ -2461,19 +2978,20 @@ static int64_t host_ode_update_task(int64_t *a) {
     return 1;
 }
 static int64_t host_gr_update_task_odes(int64_t *a) {
+    CHashTable *table = host_active_task_hash_table();
     CHashFun *update;
     CHashFun *ode_update;
-    if (!Fs || !Fs->hash_table || !a[0])
+    if (!table || !a[0])
         return 0;
     /* GrScreen may be loaded before MathODE. Its ODE wrapper cannot run until
      * the source integrator exists; calling the wrapper early resolves its
      * optional bridge from an incomplete source graph. */
-    ode_update = (CHashFun *)HashFind("ODEsUpdate", Fs->hash_table,
+    ode_update = (CHashFun *)HashFind("ODEsUpdate", table,
                                       HTT_FUN, 1);
     if (!ode_update || !ode_update->fun_ptr || ode_update->argc != 1 ||
         (ode_update->base.base.type & HTF_EXTERN))
         return 0;
-    update = (CHashFun *)HashFind("GrUpdateTaskODEs", Fs->hash_table,
+    update = (CHashFun *)HashFind("GrUpdateTaskODEs", table,
                                   HTT_FUN, 1);
     if (!update || !update->fun_ptr || update->argc != 1 ||
         (update->base.base.type & HTF_EXTERN))
@@ -2482,24 +3000,30 @@ static int64_t host_gr_update_task_odes(int64_t *a) {
     return 1;
 }
 static int64_t host_doc_recalc(int64_t *a) {
+    CHashTable *table = host_active_task_hash_table();
+    if (!table)
+        return 0;
     CHashFun *fun = (CHashFun *)HashFind(
-        "DocRecalc", Fs->hash_table, HTT_FUN, 1);
+        "DocRecalc", table, HTT_FUN, 1);
     if (!fun || !fun->fun_ptr || fun->fun_ptr == guest_doc_recalc_stub ||
         fun->argc != 2 || (fun->base.base.type & HTF_EXTERN))
         return 0;
     return FFI_CALL_TOS_2(fun->fun_ptr, a[0], a[1]);
 }
 static int64_t host_doc_update_task_docs(int64_t *a) {
+    CHashTable *table = host_active_task_hash_table();
+    if (!table)
+        return 0;
     if (gui_terminal_active) {
         CHashFun *available = (CHashFun *)HashFind(
-            "BootstrapGuiTerminalDocumentsAvailable", Fs->hash_table, HTT_FUN, 1);
+            "BootstrapGuiTerminalDocumentsAvailable", table, HTT_FUN, 1);
         if (available && available->fun_ptr && available->argc == 1 &&
             !(available->base.base.type & HTF_EXTERN) &&
             !FFI_CALL_TOS_1(available->fun_ptr, a[0]))
             return 1;
     }
     CHashFun *fun = (CHashFun *)HashFind(
-        "DocUpdateTaskDocs", Fs->hash_table, HTT_FUN, 1);
+        "DocUpdateTaskDocs", table, HTT_FUN, 1);
     if (!fun || !fun->fun_ptr || fun->argc != 1 ||
         (fun->base.base.type & HTF_EXTERN))
         return 0;
@@ -2508,30 +3032,33 @@ static int64_t host_doc_update_task_docs(int64_t *a) {
 }
 static int64_t host_active_gr_globals(int64_t *a) {
     CHashGlblVar *global;
+    CHashTable *table = host_active_task_hash_table();
     (void)a;
-    if (!Fs || !Fs->hash_table)
+    if (!table)
         return 0;
-    global = (CHashGlblVar *)HashFind("gr", Fs->hash_table, HTT_GLBL_VAR, 1);
+    global = (CHashGlblVar *)HashFind("gr", table, HTT_GLBL_VAR, 1);
     return global && global->data_addr
                ? (int64_t)(uintptr_t)global->data_addr
                : 0;
 }
 static int64_t host_active_mouse_globals(int64_t *a) {
     CHashGlblVar *global;
+    CHashTable *table = host_active_task_hash_table();
     (void)a;
-    if (!Fs || !Fs->hash_table)
+    if (!table)
         return 0;
-    global = (CHashGlblVar *)HashFind("mouse", Fs->hash_table, HTT_GLBL_VAR, 1);
+    global = (CHashGlblVar *)HashFind("mouse", table, HTT_GLBL_VAR, 1);
     return global && global->data_addr
                ? (int64_t)(uintptr_t)global->data_addr
                : 0;
 }
 static int64_t host_active_mouse_hard_globals(int64_t *a) {
     CHashGlblVar *global;
+    CHashTable *table = host_active_task_hash_table();
     (void)a;
-    if (!Fs || !Fs->hash_table)
+    if (!table)
         return 0;
-    global = (CHashGlblVar *)HashFind("mouse_hard", Fs->hash_table,
+    global = (CHashGlblVar *)HashFind("mouse_hard", table,
                                      HTT_GLBL_VAR, 1);
     return global && global->data_addr
                ? (int64_t)(uintptr_t)global->data_addr
@@ -2539,10 +3066,11 @@ static int64_t host_active_mouse_hard_globals(int64_t *a) {
 }
 static int64_t host_active_winmgr_globals(int64_t *a) {
     CHashGlblVar *global;
+    CHashTable *table = host_active_task_hash_table();
     (void)a;
-    if (!Fs || !Fs->hash_table)
+    if (!table)
         return 0;
-    global = (CHashGlblVar *)HashFind("winmgr", Fs->hash_table,
+    global = (CHashGlblVar *)HashFind("winmgr", table,
                                      HTT_GLBL_VAR, 1);
     return global && global->data_addr
                ? (int64_t)(uintptr_t)global->data_addr
@@ -2592,6 +3120,12 @@ struct arm_doc_form_field {
     const char *format;
     int64_t data, offset, elements, raw_type, pointer, is_array, is_internal;
 };
+struct arm_class_meta_field {
+    const char *name, *print_str;
+    int64_t offset, default_val, has_default_val, has_percentile;
+    double percentile;
+    int64_t output_fun;
+};
 static CMemberLst *guest_form_member(CHashClass *cls, int64_t *index, unsigned depth) {
     if (!cls || depth > 32) return NULL;
     CMemberLst *member = guest_form_member(cls->base_class, index, depth + 1);
@@ -2627,6 +3161,34 @@ static int64_t host_doc_form_field(int64_t *a) {
     field->raw_type = field->is_internal ? raw_types[type->raw_type] : 0;
     return 1;
 }
+static int64_t host_class_meta_field(int64_t *a) {
+    const char *name = (const char *)(uintptr_t)a[0];
+    int64_t index = a[1];
+    if (!name || index < 0 || !a[2]) return 0;
+    CHashClass *cls = (CHashClass *)HashFind((char *)name, Fs->hash_table,
+                                             HTT_CLASS, 1);
+    CMemberLst *member = cls ? cls->members_lst : NULL;
+    while (member && index-- > 0) member = member->next;
+    if (!member) return 0;
+    struct arm_class_meta_field *field =
+        (struct arm_class_meta_field *)(uintptr_t)a[2];
+    memset(field, 0, sizeof(*field));
+    field->name = member->str;
+    field->offset = member->off;
+    for (CMemberMeta *meta = member->meta; meta; meta = meta->next) {
+        if (!strcmp(meta->name, "print_str") && meta->kind == 1)
+            field->print_str = meta->string;
+        else if (!strcmp(meta->name, "default_val") && meta->kind == 0) {
+            field->default_val = meta->value;
+            field->has_default_val = 1;
+        } else if (!strcmp(meta->name, "percentile") && meta->kind == 2) {
+            field->percentile = meta->f64;
+            field->has_percentile = 1;
+        } else if (!strcmp(meta->name, "output_fun") && meta->kind == 0)
+            field->output_fun = meta->value;
+    }
+    return 1;
+}
 static int guest_store_i64_member(void *data, CHashClass *cls,
                                   CMemberLst *member, int64_t value) {
     int64_t size;
@@ -2638,6 +3200,70 @@ static int guest_store_i64_member(void *data, CHashClass *cls,
         member->off > cls->sz - size)
         return 0;
     memcpy((uint8_t *)data + member->off, &value, (size_t)size);
+    return 1;
+}
+static int guest_load_i64_member(const void *data, CHashClass *cls,
+                                CMemberLst *member, int64_t *value) {
+    int64_t size;
+    if (!data || !cls || !member || !member->member_class || !value ||
+        member->off < 0 || member->off > cls->sz)
+        return 0;
+    size = member->member_class->sz;
+    if (size <= 0 || size > (int64_t)sizeof(*value) ||
+        member->off > cls->sz - size)
+        return 0;
+    *value = 0;
+    memcpy(value, (const uint8_t *)data + member->off, (size_t)size);
+    return 1;
+}
+static int guest_member_path_i64(const void *data, CHashClass *cls,
+                                 const char *outer, const char *inner,
+                                 int64_t *value) {
+    CMemberLst *member = guest_class_member(cls, outer);
+    if (!member || !member->member_class || !data || member->off < 0 ||
+        member->off > cls->sz - member->member_class->sz)
+        return 0;
+    CMemberLst *field = guest_class_member(member->member_class, inner);
+    return guest_load_i64_member((const uint8_t *)data + member->off,
+                                 member->member_class, field, value);
+}
+static int guest_member_path_store_i64(void *data, CHashClass *cls,
+                                       const char *outer, const char *inner,
+                                       int64_t value) {
+    CMemberLst *member = guest_class_member(cls, outer);
+    if (!member || !member->member_class || !data || member->off < 0 ||
+        member->off > cls->sz - member->member_class->sz)
+        return 0;
+    CMemberLst *field = guest_class_member(member->member_class, inner);
+    return guest_store_i64_member((uint8_t *)data + member->off,
+                                  member->member_class, field, value);
+}
+static int guest_member_path_f64(const void *data, CHashClass *cls,
+                                 const char *outer, const char *inner,
+                                 double *value) {
+    CMemberLst *member = guest_class_member(cls, outer);
+    if (!member || !member->member_class || !data || member->off < 0 ||
+        member->off > cls->sz - member->member_class->sz)
+        return 0;
+    CMemberLst *field = guest_class_member(member->member_class, inner);
+    if (!field || !field->member_class ||
+        field->member_class->sz != (int64_t)sizeof(*value) ||
+        field->off < 0 ||
+        field->off > member->member_class->sz - (int64_t)sizeof(*value))
+        return 0;
+    memcpy(value, (const uint8_t *)data + member->off + field->off,
+           sizeof(*value));
+    return 1;
+}
+static int guest_global_i64(CHashTable *table, const char *name, int64_t *value) {
+    CHashGlblVar *global = table ? (CHashGlblVar *)HashFind((char *)name, table,
+                                                             HTT_GLBL_VAR, 1)
+                                  : NULL;
+    if (!global || !global->data_addr || !global->var_class ||
+        global->var_class->sz <= 0 || global->var_class->sz > sizeof(*value))
+        return 0;
+    *value = 0;
+    memcpy(value, global->data_addr, (size_t)global->var_class->sz);
     return 1;
 }
 static int64_t host_mouse_state_update(int64_t *a) {
@@ -2859,8 +3485,15 @@ static void guest_unwind_flags(struct guest_unwind *scope) {
 }
 static void guest_unwind_leave(struct guest_unwind *scope) {
     struct guest_fiber *f = &guest_fibers[guest_current];
-    if (f->unwind != scope)
+    if (f->unwind != scope) {
+        fprintf(stderr, "guest_unwind mismatch task=%u expected=%p current=%p expected_prev=%p current_prev=%p cleanup=%p ret=%p sp=%p\n",
+                guest_current, (void *)scope, (void *)f->unwind,
+                (void *)scope->previous,
+                f->unwind ? (void *)f->unwind->previous : NULL,
+                (void *)scope->cleanup, __builtin_return_address(0),
+                __builtin_frame_address(0));
         zc_fail("native exception scope order mismatch");
+    }
     /* A scope being abandoned cannot leave pads whose saved stacks belong
      * to it. Well-formed normal returns already removed these pads. */
     while (f->except_top != scope->top) {
@@ -2945,8 +3578,20 @@ static void guest_raise(int64_t code) {
         }
         guest_unwind_abandon(scope);
     }
-    if (!pad)
+    if (!pad) {
+        const char *task_name = guest_task_bound
+            ? (const char *)((unsigned char *)f->words + guest_name_off)
+            : "unbound";
+        uintptr_t return_pc = (uintptr_t)__builtin_return_address(0);
+        uintptr_t function_offset = 0;
+        const char *function = zc_debug_function_for_pc(return_pc,
+                                                        &function_offset);
+        printf("zc: uncaught exception detail code=%ld task=%s index=%u pc=0x%lx function=%s+0x%lx\n",
+               (long)code, task_name, guest_current,
+               (unsigned long)return_pc, function ? function : "unknown",
+               (unsigned long)function_offset);
         zc_fail("uncaught guest exception");
+    }
     /* A catch already unwound past the next handler cannot remain active.
      * Keep an outer catch when a nested try inside it throws. */
     while (f->except_caught && f->except_caught->depth >= pad->depth) {
@@ -3296,6 +3941,8 @@ static unsigned next_guest(unsigned from) {
     for (unsigned step = 1; step <= GUEST_TASKS; step++) {
         unsigned i = (from + step) % GUEST_TASKS;
         if (guest_fibers[i].state == GUEST_RUNNABLE &&
+            !(guest_fibers[i].kill_requested &&
+              guest_fibers[i].words == guest_task_being_screen_updated) &&
             (guest_fibers[i].kill_requested ||
              (!(*guest_flags(&guest_fibers[i]) & GUEST_SUSPENDED) &&
               wait_ready(&guest_fibers[i]))))
@@ -3681,11 +4328,22 @@ static void finish_guest(unsigned i, int64_t result) {
 }
 static void end_guest_current(int64_t result) __attribute__((noreturn));
 static int64_t host_task_yield(int64_t *a);
+static void wait_for_screen_update(struct guest_fiber *f) {
+    while (f->words == guest_task_being_screen_updated) {
+        f->kill_requested = 1;
+        *guest_flags(f) |= GUEST_KILL_TASK;
+        (void)host_task_yield(NULL);
+    }
+}
 static void end_guest_current(int64_t result) {
     unsigned me = guest_current;
     struct guest_fiber *f = &guest_fibers[me];
     if (!me || me == GUEST_EXECUTIVE || me == GUEST_SYSTEM || f->state != GUEST_RUNNABLE)
         zc_fail("cannot end root, executive or system task");
+    /* Pinned TaskEnd leaves a task alive while GrUpdateTaskWin/ODEs still
+     * hold references to its window and documents. Retry only after that
+     * drawing pass has released the task. */
+    wait_for_screen_update(f);
     if (f->ending) {
         guest_unwind_all();
         longjmp(f->end_context, 1); /* Exit inside a callback resumes teardown. */
@@ -3718,6 +4376,8 @@ static void end_guest_current(int64_t result) {
         }
         (void)host_task_yield(NULL);
     }
+    /* An end callback or child cleanup may have yielded to a new frame. */
+    wait_for_screen_update(f);
     finish_guest(me, result);
     enter_guest(next_guest(me));
 }
@@ -3758,8 +4418,13 @@ static int64_t host_call_n_on_stack(int64_t *a) {
     spill_bytes = (spill_bytes + 15) & ~UINT64_C(15);
     if (stack_top - stack_low < spill_bytes)
         return -1;
-    return TempleOS_CallNOnStack(stack_top, (void (*)(void))(uintptr_t)a[2],
-                                 argc, argv);
+    struct guest_fiber *fiber = guest_task_bound ? &guest_fibers[guest_current] : NULL;
+    struct guest_unwind *unwind_before = fiber ? fiber->unwind : NULL;
+    int64_t result = TempleOS_CallNOnStack(stack_top, (void (*)(void))(uintptr_t)a[2],
+                                           argc, argv);
+    if (fiber && fiber->unwind != unwind_before)
+        zc_fail("CallNOnStack changed native unwind scope order");
+    return result;
 }
 static struct guest_fiber *find_guest_task(void *task) {
     for (unsigned i = 0; i < GUEST_TASKS; i++)
@@ -3799,19 +4464,90 @@ static int64_t host_dir_cur(int64_t *a) {
     return dir ? (int64_t)(uintptr_t)__AIWNIOS_StrDup(dir, &owner->heap_owner) : 0;
 }
 static int64_t host_sound(int64_t *a) {
-    /* There is no audio device on this platform. Keep speaker-dependent apps
-     * callable while silently omitting their optional sound effects. */
-    (void)a;
+    /* Preserve the stock ona note interface and drive the optional PCM device. */
+    zc_virtio_sound_set_tone((int8_t)a[0]);
     return 0;
 }
+static int64_t host_sleep(int64_t *a);
+static void host_beep_busy_wait(uint64_t milliseconds) {
+    uint64_t frequency;
+    __asm__ volatile("mrs %0, cntfrq_el0" : "=r"(frequency));
+    if (!frequency)
+        zc_fail("generic timer frequency unavailable");
+    uint64_t seconds = milliseconds / 1000;
+    if (seconds > (uint64_t)INT64_MAX / frequency)
+        zc_fail("Beep duration too long");
+    uint64_t ticks = seconds * frequency +
+        (milliseconds % 1000) * frequency / 1000;
+    if (ticks > (uint64_t)INT64_MAX)
+        zc_fail("Beep duration too long");
+    uint64_t deadline = counter_now() + ticks;
+    uint64_t next_pump = counter_now();
+    uint64_t pump_interval = frequency / 100;
+    if (!pump_interval)
+        pump_interval = 1;
+    while ((int64_t)(counter_now() - deadline) < 0) {
+        uint64_t now = counter_now();
+        if ((int64_t)(now - next_pump) >= 0) {
+            zc_virtio_sound_pump();
+            next_pump = now + pump_interval;
+        }
+        __asm__ volatile("yield");
+    }
+}
+static void host_beep_wait(uint64_t milliseconds, int busy) {
+    /* Sleep's compiler-dispatch path cannot yield and therefore cannot pump
+     * device queues. Service VirtIO audio explicitly in that context. */
+    if (busy || guest_task_exe_active) {
+        host_beep_busy_wait(milliseconds);
+    } else {
+        int64_t delay[1] = {(int64_t)milliseconds};
+        (void)host_sleep(delay);
+    }
+}
+static void host_beep_wait_tone(int busy) {
+    uint64_t frequency;
+    __asm__ volatile("mrs %0, cntfrq_el0" : "=r"(frequency));
+    if (!frequency)
+        zc_fail("generic timer frequency unavailable");
+    uint64_t start = counter_now();
+    uint64_t minimum = start + frequency / 2;
+    uint64_t timeout = start + frequency * 2;
+    uint64_t next_pump = start;
+    uint64_t pump_interval = frequency / 100;
+    if (!pump_interval)
+        pump_interval = 1;
+    while (!zc_virtio_sound_beep_done() ||
+           (int64_t)(counter_now() - minimum) < 0) {
+        uint64_t now = counter_now();
+        if ((int64_t)(now - timeout) >= 0)
+            break;
+        /* Source compilation can't hand the scheduler away. Keep the device
+         * queue moving explicitly in that path and in Beep(..., TRUE). */
+        if (busy || guest_task_exe_active) {
+            if ((int64_t)(now - next_pump) >= 0) {
+                zc_virtio_sound_pump();
+                next_pump = now + pump_interval;
+            }
+            __asm__ volatile("yield");
+        } else {
+            int64_t delay[1] = {5};
+            (void)host_sleep(delay);
+        }
+    }
+}
 static int64_t host_beep(int64_t *a) {
-    /* Beep is also a speaker-only effect; preserve callers without audio. */
-    (void)a;
+    /* KMisc.ZC Beep emits 500 ms of tone, then waits 200 ms before returning.
+     * Preserve its busy/non-busy wait choice while routing sound to VirtIO. */
+    zc_virtio_sound_beep((int8_t)a[0]);
+    host_beep_wait_tone(a[1] != 0);
+    zc_virtio_sound_set_tone(0);
+    host_beep_wait(200, a[1] != 0);
     return 0;
 }
 static int64_t host_sound_reset(int64_t *a) {
-    /* There is no speaker device state to reset on the ARM64 bridge. */
     (void)a;
+    zc_virtio_sound_set_tone(0);
     return 0;
 }
 static int64_t host_noise(int64_t *a) {
@@ -3987,7 +4723,8 @@ static int64_t host_kill(int64_t *a) {
     if (f->ending)
         return 1; /* The callback already started; DeathWait waits for teardown. */
     int has_callback = !!*(void **)((unsigned char *)f->words + guest_end_cb_off);
-    if (has_callback || guest_has_children(f)) {
+    if (has_callback || guest_has_children(f) ||
+        f->words == guest_task_being_screen_updated) {
         /* ExeFile/source jobs may yield while their compiled body runs.
          * Their parser flag is clear here, and child teardown must be able
          * to run callbacks (popup cleanup and application worker tasks).
@@ -4012,6 +4749,8 @@ static int64_t host_kill(int64_t *a) {
 }
 static int64_t host_task_yield(int64_t *a) {
     (void)a;
+    /* Keep queued PCM buffers filled while cooperative guest tasks yield. */
+    zc_virtio_sound_pump();
     /* A frame can borrow root's identity while running on WinMgr's stack.
      * Saving a scheduler context here would replace root's suspended shell
      * context with that borrowed stack. Let DocRecalc's short lock deadline
@@ -4082,7 +4821,8 @@ static int64_t host_task_yield(int64_t *a) {
     }
     if (park_server)
         self->wait_kind = GUEST_WAIT_NONE;
-    if (self->kill_requested && !self->ending)
+    if (self->kill_requested && !self->ending &&
+        self->words != guest_task_being_screen_updated)
         end_guest_current(-1);
     return 0;
 }
@@ -4850,6 +5590,12 @@ static int64_t host_put_key(int64_t *a) {
     guest_host_put_key_last_doc_active = 0;
     if (!guest_task_bound)
         return 0;
+    if (a[0] == 0x1b) {
+        CHashGlblVar *clear = (CHashGlblVar *)HashFind(
+            "bootstrap_mesh_overlay_clear", Fs->hash_table, HTT_GLBL_VAR, 1);
+        if (clear && clear->data_addr)
+            *(uint64_t *)clear->data_addr = 1;
+    }
     uint64_t scan = (uint64_t)a[1];
     if ((*(uint32_t *)((unsigned char *)guest_fibers[guest_current].words +
                        guest_display_flags_off) & (1u << 2)) ||
@@ -4919,6 +5665,64 @@ static int64_t host_str_len(int64_t *a) {
             return (int64_t)n;
     zc_fail("StrLen exceeds 1 MiB");
     return 0;
+}
+void zc_task_caller_entry(void);
+
+uintptr_t zc_task_caller(void *task_ptr, int64_t depth, int64_t saved_context,
+                        uintptr_t frame, uintptr_t return_pc) {
+    if (!guest_task_bound || guest_current >= GUEST_TASKS || depth < 0)
+        return 0;
+    struct guest_fiber *current = &guest_fibers[guest_current];
+    struct guest_fiber *fiber = task_ptr ? find_guest_task(task_ptr) : current;
+    if (!fiber)
+        return 0;
+
+    unsigned char *stack = fiber->large_stack ? fiber->large_stack : fiber->stack;
+    size_t stack_size = fiber->large_stack ? fiber->stack_size : sizeof(fiber->stack);
+    uintptr_t low = (uintptr_t)stack;
+    uintptr_t high = low + stack_size;
+    if (fiber != current || saved_context) {
+        frame = (uintptr_t)fiber->context[10]; /* x29 */
+        return_pc = (uintptr_t)fiber->context[11]; /* x30 */
+        uintptr_t saved_sp = (uintptr_t)fiber->context[12];
+        if (saved_sp > low)
+            low = saved_sp;
+    }
+
+    /* Guest frames and native FFI frames both save x29/x30 as a pair.
+     * Follow only aligned, ascending frame records within the owned stack. */
+    while (depth--) {
+        if ((frame & 15) || frame < low || frame > high - 2 * sizeof(uintptr_t))
+            return 0;
+        const uintptr_t *record = (const uintptr_t *)frame;
+        return_pc = record[1];
+        low = frame + 2 * sizeof(uintptr_t);
+        frame = record[0];
+    }
+    return return_pc;
+}
+
+static int64_t host_unused_stack(int64_t *a) {
+    struct guest_fiber *fiber = a[0]
+        ? find_guest_task((void *)(uintptr_t)a[0])
+        : guest_task_bound && guest_current < GUEST_TASKS
+            ? &guest_fibers[guest_current] : NULL;
+    if (!fiber)
+        return 0;
+
+    uintptr_t stack_pointer;
+    if (fiber == (guest_task_bound && guest_current < GUEST_TASKS
+                  ? &guest_fibers[guest_current] : NULL)) {
+        __asm__ volatile("mov %0, sp" : "=r"(stack_pointer));
+    } else {
+        stack_pointer = (uintptr_t)fiber->context[12];
+    }
+    unsigned char *stack = fiber->large_stack ? fiber->large_stack : fiber->stack;
+    size_t stack_size = fiber->large_stack ? fiber->stack_size : sizeof(fiber->stack);
+    uintptr_t stack_base = (uintptr_t)stack;
+    if (stack_pointer < stack_base || stack_pointer > stack_base + stack_size)
+        return 0;
+    return (int64_t)(stack_pointer - stack_base);
 }
 static int64_t host_key_scan(int64_t *a) {
     guest_host_key_scan_calls++;
@@ -5059,17 +5863,134 @@ static int64_t host_message_self(int64_t *a) {
     return host_message_post(post);
 }
 static int64_t host_mouse_set(int64_t *a) {
-    if (!guest_task_bound || guest_current >= GUEST_TASKS)
+    if (!guest_task_bound || guest_current >= GUEST_TASKS || !Fs || !Fs->hash_table)
         return 0;
-    /* The native PS/2 MouseSet updates device state and emits a move event.
-     * This backend has no PS/2 device, so preserve the observable app-side
-     * behavior by delivering that synthetic move to the current task. */
-    int64_t x = a[0] == INT64_MAX ? 400 : a[0];
-    int64_t y = a[1] == INT64_MAX ? 300 : a[1];
-    if (x < 0 || x >= 800 || y < 0 || y >= 600)
+    /* Match MouseSet's omitted/out-of-range arguments: retain the current
+     * position, wheel and button state. The previous host shim substituted
+     * the screen center for omitted coordinates and ignored button changes,
+     * which broke InSetMouse and other scripted pointer interactions. */
+    CHashGlblVar *global = (CHashGlblVar *)HashFind("mouse", Fs->hash_table,
+                                                    HTT_GLBL_VAR, 1);
+    if (!global || !global->data_addr || !global->var_class)
         return 0;
-    (void)post_guest_message(guest_fibers[guest_current].words, NULL,
-                             GUEST_MESSAGE_MS_MOVE, x, y, 0);
+    uint8_t *mouse = global->data_addr;
+    CHashClass *cls = global->var_class;
+    int64_t old_x, old_y, old_z, old_l, old_r;
+    if (!guest_member_path_i64(mouse, cls, "pos", "x", &old_x) ||
+        !guest_member_path_i64(mouse, cls, "pos", "y", &old_y) ||
+        !guest_member_path_i64(mouse, cls, "pos", "z", &old_z) ||
+        !guest_load_i64_member(mouse, cls, guest_class_member(cls, "lb"), &old_l) ||
+        !guest_load_i64_member(mouse, cls, guest_class_member(cls, "rb"), &old_r))
+        return 0;
+    int64_t width = 800, height = 600;
+    int64_t configured_width = 0, configured_height = 0;
+    if (guest_global_i64(Fs->hash_table, "sys_framebuffer_width", &configured_width) &&
+        configured_width > 0)
+        width = configured_width;
+    if (guest_global_i64(Fs->hash_table, "sys_framebuffer_height", &configured_height) &&
+        configured_height > 0)
+        height = configured_height;
+    int64_t x = a[0], y = a[1], z = a[2];
+    int64_t l = a[3], r = a[4];
+    if (x < 0 || x >= width) x = old_x;
+    if (y < 0 || y >= height) y = old_y;
+    if (z == INT64_MAX) z = old_z;
+    if (l != 0 && l != 1) l = old_l;
+    if (r != 0 && r != 1) r = old_r;
+
+    double scale_x = 1.0, scale_y = 1.0, scale_z = 1.0;
+    int64_t offset_x = 0, offset_y = 0, offset_z = 0;
+    (void)guest_member_path_f64(mouse, cls, "scale", "x", &scale_x);
+    (void)guest_member_path_f64(mouse, cls, "scale", "y", &scale_y);
+    (void)guest_member_path_f64(mouse, cls, "scale", "z", &scale_z);
+    (void)guest_member_path_i64(mouse, cls, "offset", "x", &offset_x);
+    (void)guest_member_path_i64(mouse, cls, "offset", "y", &offset_y);
+    (void)guest_member_path_i64(mouse, cls, "offset", "z", &offset_z);
+    if (!(scale_x > 0.0 && scale_x <= 64.0)) scale_x = 1.0;
+    if (!(scale_y > 0.0 && scale_y <= 64.0)) scale_y = 1.0;
+    if (!(scale_z > 0.0 && scale_z <= 64.0)) scale_z = 1.0;
+    int64_t presnap_x = (int64_t)(scale_x * x) + offset_x;
+    int64_t presnap_y = (int64_t)(scale_y * y) + offset_y;
+    int64_t presnap_z = (int64_t)(scale_z * z) + offset_z;
+    int64_t pos_x = presnap_x, pos_y = presnap_y, pos_z = presnap_z;
+    int64_t snap = 0;
+    CHashGlblVar *grid = (CHashGlblVar *)HashFind("mouse_grid", Fs->hash_table,
+                                                  HTT_GLBL_VAR, 1);
+    if (grid && grid->data_addr && grid->var_class) {
+        CMemberLst *snap_member = guest_class_member(grid->var_class, "snap");
+        (void)guest_load_i64_member(grid->data_addr, grid->var_class, snap_member, &snap);
+        if (snap) {
+            int64_t gx = 8, gy = 8, gz = 8, gox = 0, goy = 0, goz = 0;
+            (void)guest_load_i64_member(grid->data_addr, grid->var_class,
+                                        guest_class_member(grid->var_class, "x"), &gx);
+            (void)guest_load_i64_member(grid->data_addr, grid->var_class,
+                                        guest_class_member(grid->var_class, "y"), &gy);
+            (void)guest_load_i64_member(grid->data_addr, grid->var_class,
+                                        guest_class_member(grid->var_class, "z"), &gz);
+            (void)guest_load_i64_member(grid->data_addr, grid->var_class,
+                                        guest_class_member(grid->var_class, "x_offset"), &gox);
+            (void)guest_load_i64_member(grid->data_addr, grid->var_class,
+                                        guest_class_member(grid->var_class, "y_offset"), &goy);
+            (void)guest_load_i64_member(grid->data_addr, grid->var_class,
+                                        guest_class_member(grid->var_class, "z_offset"), &goz);
+            if (gx) pos_x = (int64_t)(presnap_x / (double)gx) * gx + gox;
+            if (gy) pos_y = (int64_t)(presnap_y / (double)gy) * gy + goy;
+            if (gz) pos_z = (int64_t)(presnap_z / (double)gz) * gz + goz;
+        }
+    }
+    if (width > 0) { if (pos_x < 0) pos_x = 0; if (pos_x >= width) pos_x = width - 1; }
+    if (height > 0) { if (pos_y < 0) pos_y = 0; if (pos_y >= height) pos_y = height - 1; }
+    if (!guest_member_path_store_i64(mouse, cls, "presnap", "x", presnap_x) ||
+        !guest_member_path_store_i64(mouse, cls, "presnap", "y", presnap_y) ||
+        !guest_member_path_store_i64(mouse, cls, "presnap", "z", presnap_z) ||
+        !guest_member_path_store_i64(mouse, cls, "pos", "x", pos_x) ||
+        !guest_member_path_store_i64(mouse, cls, "pos", "y", pos_y) ||
+        !guest_member_path_store_i64(mouse, cls, "pos", "z", pos_z) ||
+        !guest_store_i64_member(mouse, cls, guest_class_member(cls, "lb"), l) ||
+        !guest_store_i64_member(mouse, cls, guest_class_member(cls, "rb"), r))
+        return 0;
+    CMemberLst *pos = guest_class_member(cls, "pos");
+    CMemberLst *pos_text = guest_class_member(cls, "pos_text");
+    if (pos && pos_text && pos->member_class && pos_text->member_class &&
+        pos->off >= 0 && pos_text->off >= 0 &&
+        pos->off <= cls->sz - pos->member_class->sz &&
+        pos_text->off <= cls->sz - pos_text->member_class->sz) {
+        uint8_t *pt = mouse + pos_text->off;
+        (void)guest_store_i64_member(pt, pos_text->member_class,
+                                     guest_class_member(pos_text->member_class, "x"), pos_x / 8);
+        (void)guest_store_i64_member(pt, pos_text->member_class,
+                                     guest_class_member(pos_text->member_class, "y"), pos_y / 16);
+    }
+    int64_t button_bits = 0;
+    CHashGlblVar *kbd = (CHashGlblVar *)HashFind("kbd", Fs->hash_table,
+                                                 HTT_GLBL_VAR, 1);
+    CMemberLst *scan = kbd && kbd->var_class
+        ? guest_class_member(kbd->var_class, "scan_code") : NULL;
+    if (kbd && kbd->data_addr && scan)
+        (void)guest_load_i64_member(kbd->data_addr, kbd->var_class, scan, &button_bits);
+    button_bits = l ? (button_bits | (1ll << 16)) : (button_bits & ~(1ll << 16));
+    button_bits = r ? (button_bits | (1ll << 17)) : (button_bits & ~(1ll << 17));
+    if (kbd && kbd->data_addr && scan)
+        (void)guest_store_i64_member(kbd->data_addr, kbd->var_class, scan, button_bits);
+
+    struct guest_fiber *fiber = &guest_fibers[guest_current];
+    void *task = fiber->words;
+    int64_t rel_x = x, rel_y = y;
+    if (guest_win_left_off >= 0 && guest_win_top_off >= 0) {
+        rel_x -= *(int64_t *)((uint8_t *)task + guest_win_left_off);
+        rel_y -= *(int64_t *)((uint8_t *)task + guest_win_top_off);
+    }
+    if (pos_x != old_x || pos_y != old_y)
+        (void)post_guest_message(task, NULL, GUEST_MESSAGE_MS_MOVE,
+                                 rel_x + pos_x - x, rel_y + pos_y - y, 0);
+    if (l != old_l)
+        (void)post_guest_message(task, NULL, l ? GUEST_MESSAGE_MS_L_DOWN
+                                               : GUEST_MESSAGE_MS_L_UP,
+                                 rel_x + pos_x - x, rel_y + pos_y - y, 0);
+    if (r != old_r)
+        (void)post_guest_message(task, NULL, r ? GUEST_MESSAGE_MS_R_DOWN
+                                               : GUEST_MESSAGE_MS_R_UP,
+                                 rel_x + pos_x - x, rel_y + pos_y - y, 0);
     return 0;
 }
 struct dispatch_scope {
@@ -5762,6 +6683,16 @@ static int64_t host_tsc(int64_t *a) {
     __asm__ volatile("mrs %0, cntpct_el0" : "=r"(ticks));
     return (int64_t)ticks;
 }
+extern volatile uint64_t g_arm64_svc_bench_hits;
+static int64_t host_arm64_svc_bench(int64_t *a) {
+    (void)a;
+    __asm__ volatile("svc #0x42" ::: "memory");
+    return 0;
+}
+static int64_t host_arm64_svc_bench_count(int64_t *a) {
+    (void)a;
+    return (int64_t)g_arm64_svc_bench_hits;
+}
 static uint64_t counter_now(void) {
     uint64_t ticks;
     __asm__ volatile("mrs %0, cntpct_el0" : "=r"(ticks));
@@ -5969,6 +6900,327 @@ static int64_t host_to_i64(int64_t *a) {
 static int64_t host_abs_i64(int64_t *a) {
     /* KernelB declares AbsI64 as _intern IC_ABS_I64; Aiwnios has no that opcode. */
     return a[0] < 0 ? -a[0] : a[0];
+}
+static int64_t host_pop_count(int64_t *a) {
+    return __builtin_popcountll((uint64_t)a[0]);
+}
+static float host_f32_from_bits(uint32_t bits) {
+    float value;
+    memcpy(&value, &bits, sizeof(value));
+    return value;
+}
+static uint32_t host_f32_to_bits(float value) {
+    uint32_t bits;
+    memcpy(&bits, &value, sizeof(bits));
+    return bits;
+}
+static int host_f32_is_nan(float value) {
+    uint32_t bits = host_f32_to_bits(value);
+    return (bits & UINT32_C(0x7f800000)) == UINT32_C(0x7f800000) &&
+           (bits & UINT32_C(0x007fffff)) != 0;
+}
+static int64_t host_f64_to_f32(int64_t *a) {
+    double source;
+    memcpy(&source, &a[0], sizeof(source));
+    return (int64_t)host_f32_to_bits((float)source);
+}
+static int64_t host_f32_to_f64(int64_t *a) {
+    float source = host_f32_from_bits((uint32_t)a[0]);
+    double result = (double)source;
+    int64_t bits;
+    memcpy(&bits, &result, sizeof(bits));
+    return bits;
+}
+static int64_t host_f32_rad_to_deg(int64_t *a) {
+    float radians = host_f32_from_bits((uint32_t)a[0]);
+    float scale = host_f32_from_bits(UINT32_C(0x3c8efa35));
+    return (int64_t)host_f32_to_bits(radians * scale);
+}
+static int64_t host_f32_deg_to_rad(int64_t *a) {
+    float degrees = host_f32_from_bits((uint32_t)a[0]);
+    float scale = host_f32_from_bits(UINT32_C(0x42652ee1));
+    return (int64_t)host_f32_to_bits(degrees * scale);
+}
+static int64_t host_cos_f32(int64_t *a) {
+    float angle = host_f32_from_bits((uint32_t)a[0]);
+    uint64_t cosine_bits = (uint64_t)hc_builtin_cos(
+        host_f64_to_bits((double)angle));
+    return (int64_t)host_f32_to_bits((float)host_f64_from_bits(cosine_bits));
+}
+static void host_vec4_read(uintptr_t address, float out[4]) {
+    unsigned i;
+    if (!address)
+        zc_fail("Vector4D source pointer is null");
+    for (i = 0; i < 4; ++i) {
+        uint32_t bits;
+        memcpy(&bits, (const void *)(address + i * sizeof(bits)), sizeof(bits));
+        out[i] = host_f32_from_bits(bits);
+    }
+}
+static void host_vec4_write(uintptr_t address, const float value[4]) {
+    unsigned i;
+    if (!address)
+        zc_fail("Vector4D destination pointer is null");
+    for (i = 0; i < 4; ++i) {
+        uint32_t bits = host_f32_to_bits(value[i]);
+        memcpy((void *)(address + i * sizeof(bits)), &bits, sizeof(bits));
+    }
+}
+static int64_t host_vec4_init(int64_t *a) {
+    float value[4];
+    unsigned i;
+    for (i = 0; i < 4; ++i)
+        value[i] = (float)host_f64_from_bits((uint64_t)a[i]);
+    host_vec4_write((uintptr_t)a[4], value);
+    return 0;
+}
+static int64_t host_vec4_copy(int64_t *a) {
+    float value[4];
+    host_vec4_read((uintptr_t)a[0], value);
+    host_vec4_write((uintptr_t)a[1], value);
+    return 0;
+}
+static int64_t host_vec4_equal(int64_t *a) {
+    float left[4], right[4];
+    unsigned i;
+    host_vec4_read((uintptr_t)a[0], left);
+    host_vec4_read((uintptr_t)a[1], right);
+    for (i = 0; i < 4; ++i)
+        if (!(left[i] == right[i]))
+            return 0;
+    return 1;
+}
+enum HostVec4Op { HOST_VEC4_ADD, HOST_VEC4_SUB, HOST_VEC4_MUL,
+                  HOST_VEC4_DIV, HOST_VEC4_MIN, HOST_VEC4_MAX };
+static int64_t host_vec4_binary(int64_t *a, enum HostVec4Op op) {
+    float left[4], right[4], result[4];
+    unsigned i;
+    host_vec4_read((uintptr_t)a[0], left);
+    host_vec4_read((uintptr_t)a[1], right);
+    for (i = 0; i < 4; ++i) {
+        switch (op) {
+        case HOST_VEC4_ADD: result[i] = left[i] + right[i]; break;
+        case HOST_VEC4_SUB: result[i] = left[i] - right[i]; break;
+        case HOST_VEC4_MUL: result[i] = left[i] * right[i]; break;
+        case HOST_VEC4_DIV: result[i] = left[i] / right[i]; break;
+        /* Intel MINPS/MAXPS return the second source for unordered inputs and
+         * ties; spell that out instead of inheriting fmin/fmax semantics. */
+        case HOST_VEC4_MIN:
+            result[i] = (host_f32_is_nan(left[i]) || host_f32_is_nan(right[i]) ||
+                         !(left[i] < right[i])) ? right[i] : left[i];
+            break;
+        case HOST_VEC4_MAX:
+            result[i] = (host_f32_is_nan(left[i]) || host_f32_is_nan(right[i]) ||
+                         !(left[i] > right[i])) ? right[i] : left[i];
+            break;
+        }
+    }
+    host_vec4_write((uintptr_t)a[2], result);
+    return 0;
+}
+static int64_t host_vec4_add(int64_t *a) {
+    return host_vec4_binary(a, HOST_VEC4_ADD);
+}
+static int64_t host_vec4_sub(int64_t *a) {
+    return host_vec4_binary(a, HOST_VEC4_SUB);
+}
+static int64_t host_vec4_mul(int64_t *a) {
+    return host_vec4_binary(a, HOST_VEC4_MUL);
+}
+static int64_t host_vec4_div(int64_t *a) {
+    return host_vec4_binary(a, HOST_VEC4_DIV);
+}
+static int64_t host_vec4_min(int64_t *a) {
+    return host_vec4_binary(a, HOST_VEC4_MIN);
+}
+static int64_t host_vec4_max(int64_t *a) {
+    return host_vec4_binary(a, HOST_VEC4_MAX);
+}
+enum HostVec4ScalarOp { HOST_VEC4_ADD_S, HOST_VEC4_SUB_S,
+                        HOST_VEC4_MUL_S, HOST_VEC4_DIV_S };
+static int64_t host_vec4_scalar(int64_t *a, enum HostVec4ScalarOp op) {
+    float value[4], scalar = host_f32_from_bits((uint32_t)a[1]);
+    unsigned i;
+    host_vec4_read((uintptr_t)a[0], value);
+    for (i = 0; i < 4; ++i) {
+        switch (op) {
+        case HOST_VEC4_ADD_S: value[i] = value[i] + scalar; break;
+        case HOST_VEC4_SUB_S: value[i] = value[i] - scalar; break;
+        case HOST_VEC4_MUL_S: value[i] = value[i] * scalar; break;
+        case HOST_VEC4_DIV_S: value[i] = value[i] / scalar; break;
+        }
+    }
+    host_vec4_write((uintptr_t)a[2], value);
+    return 0;
+}
+static int64_t host_vec4_add_s(int64_t *a) {
+    return host_vec4_scalar(a, HOST_VEC4_ADD_S);
+}
+static int64_t host_vec4_sub_s(int64_t *a) {
+    return host_vec4_scalar(a, HOST_VEC4_SUB_S);
+}
+static int64_t host_vec4_mul_s(int64_t *a) {
+    return host_vec4_scalar(a, HOST_VEC4_MUL_S);
+}
+static int64_t host_vec4_div_s(int64_t *a) {
+    return host_vec4_scalar(a, HOST_VEC4_DIV_S);
+}
+static int64_t host_vec4_negate(int64_t *a) {
+    float value[4];
+    unsigned i;
+    host_vec4_read((uintptr_t)a[0], value);
+    for (i = 0; i < 4; ++i)
+        value[i] = -value[i];
+    host_vec4_write((uintptr_t)a[1], value);
+    return 0;
+}
+static int64_t host_vec4_dot(int64_t *a) {
+    float left[4], right[4];
+    float xz, yw;
+    host_vec4_read((uintptr_t)a[0], left);
+    host_vec4_read((uintptr_t)a[1], right);
+    xz = left[0] * right[0] + left[2] * right[2];
+    yw = left[1] * right[1] + left[3] * right[3];
+    return (int64_t)host_f32_to_bits(xz + yw);
+}
+static int64_t host_vec3_init(int64_t *a) {
+    float value[4];
+    unsigned i;
+    for (i = 0; i < 3; ++i)
+        value[i] = (float)host_f64_from_bits((uint64_t)a[i]);
+    /* The pinned Vec3 initializer writes xyz only; deterministic SIMD padding
+     * avoids inheriting uninitialized stack data on ARM64. */
+    value[3] = 0.0f;
+    host_vec4_write((uintptr_t)a[3], value);
+    return 0;
+}
+static int64_t host_vec3_equal(int64_t *a) {
+    float left[4], right[4];
+    unsigned i;
+    host_vec4_read((uintptr_t)a[0], left);
+    host_vec4_read((uintptr_t)a[1], right);
+    for (i = 0; i < 3; ++i)
+        if (!(left[i] == right[i]))
+            return 0;
+    return 1;
+}
+static int64_t host_vec3_normalize(int64_t *a) {
+    float value[4], result[4];
+    volatile float partial, length_squared;
+    float length;
+    unsigned i;
+    host_vec4_read((uintptr_t)a[0], value);
+    partial = value[2] * value[2] + value[0] * value[0];
+    length_squared = value[1] * value[1] + partial;
+    length = (float)host_f64_from_bits(hc_builtin_sqrt(
+        host_f64_to_bits((double)length_squared)));
+    for (i = 0; i < 4; ++i)
+        result[i] = value[i] / length;
+    host_vec4_write((uintptr_t)a[1], result);
+    return 0;
+}
+static int64_t host_vec3_dot(int64_t *a) {
+    float left[4], right[4];
+    volatile float partial, result;
+    host_vec4_read((uintptr_t)a[0], left);
+    host_vec4_read((uintptr_t)a[1], right);
+    partial = left[2] * right[2] + left[0] * right[0];
+    result = left[1] * right[1] + partial;
+    return (int64_t)host_f32_to_bits(result);
+}
+static int64_t host_vec3_cross(int64_t *a) {
+    float left[4], right[4], result[4];
+    host_vec4_read((uintptr_t)a[0], left);
+    host_vec4_read((uintptr_t)a[1], right);
+    result[0] = left[1] * right[2] - left[2] * right[1];
+    result[1] = left[2] * right[0] - left[0] * right[2];
+    result[2] = left[0] * right[1] - left[1] * right[0];
+    result[3] = left[3] * right[3] - left[3] * right[3];
+    host_vec4_write((uintptr_t)a[2], result);
+    return 0;
+}
+static void host_mat4_read(uintptr_t address, float value[16]) {
+    unsigned i;
+    if (!address)
+        zc_fail("Matrix4D source pointer is null");
+    for (i = 0; i < 16; ++i) {
+        uint32_t bits;
+        memcpy(&bits, (const void *)(address + i * sizeof(bits)), sizeof(bits));
+        value[i] = host_f32_from_bits(bits);
+    }
+}
+static void host_mat4_write(uintptr_t address, const float value[16]) {
+    unsigned i;
+    if (!address)
+        zc_fail("Matrix4D destination pointer is null");
+    for (i = 0; i < 16; ++i) {
+        uint32_t bits = host_f32_to_bits(value[i]);
+        memcpy((void *)(address + i * sizeof(bits)), &bits, sizeof(bits));
+    }
+}
+static int64_t host_mat4_mul_vector(int64_t *a) {
+    float matrix[16], vector[4], result[4];
+    unsigned row;
+    host_mat4_read((uintptr_t)a[0], matrix);
+    host_vec4_read((uintptr_t)a[1], vector);
+    for (row = 0; row < 4; ++row) {
+        float p0 = matrix[row] * vector[0];
+        float p1 = matrix[4 + row] * vector[1];
+        float p2 = matrix[8 + row] * vector[2];
+        float p3 = matrix[12 + row] * vector[3];
+        volatile float pair0 = p0 + p1;
+        volatile float pair1 = p2 + p3;
+        result[row] = pair0 + pair1;
+    }
+    host_vec4_write((uintptr_t)a[2], result);
+    return 0;
+}
+static int64_t host_mat4_mul(int64_t *a) {
+    float left[16], right[16], result[16];
+    unsigned row, column;
+    host_mat4_read((uintptr_t)a[0], left);
+    host_mat4_read((uintptr_t)a[1], right);
+    for (column = 0; column < 4; ++column) {
+        for (row = 0; row < 4; ++row) {
+            float p0 = left[row] * right[column * 4];
+            float p1 = left[4 + row] * right[column * 4 + 1];
+            float p2 = left[8 + row] * right[column * 4 + 2];
+            float p3 = left[12 + row] * right[column * 4 + 3];
+            volatile float pair0 = p0 + p1;
+            volatile float pair1 = p2 + p3;
+            result[column * 4 + row] = pair0 + pair1;
+        }
+    }
+    host_mat4_write((uintptr_t)a[2], result);
+    return 0;
+}
+static int64_t host_mat4_transpose(int64_t *a) {
+    float matrix[16], result[16];
+    unsigned row, column;
+    host_mat4_read((uintptr_t)a[0], matrix);
+    for (column = 0; column < 4; ++column)
+        for (row = 0; row < 4; ++row)
+            result[column * 4 + row] = matrix[row * 4 + column];
+    host_mat4_write((uintptr_t)a[1], result);
+    return 0;
+}
+static int64_t host_mat4_translation_set(int64_t *a) {
+    float result[16] = {0};
+    result[0] = result[5] = result[10] = result[15] = 1.0f;
+    result[12] = host_f32_from_bits((uint32_t)a[0]);
+    result[13] = host_f32_from_bits((uint32_t)a[1]);
+    result[14] = host_f32_from_bits((uint32_t)a[2]);
+    host_mat4_write((uintptr_t)a[3], result);
+    return 0;
+}
+static int64_t host_mat4_scale_set(int64_t *a) {
+    float result[16] = {0};
+    result[0] = host_f32_from_bits((uint32_t)a[0]);
+    result[5] = host_f32_from_bits((uint32_t)a[1]);
+    result[10] = host_f32_from_bits((uint32_t)a[2]);
+    result[15] = 1.0f;
+    host_mat4_write((uintptr_t)a[3], result);
+    return 0;
 }
 static int64_t host_mod_u64(int64_t *a) {
     uint64_t *quotient = (uint64_t *)(uintptr_t)a[0];
@@ -6309,6 +7561,8 @@ static void bind_guest_task(void) {
     uint64_t ctr;
     __asm__ volatile("mrs %0, ctr_el0" : "=r"(ctr));
     guest_sys_cache_line_width = (int64_t)(4ull << ((ctr >> 16) & 15));
+    guest_mem_heap_base = (uintptr_t)data_arena;
+    guest_mem_heap_limit = (uintptr_t)data_arena + DATA_BYTES - 1;
     init_guest_compile_time();
     init_guest_fiber(0, NULL, "Root");
     set_guest_task(guest_fibers[0].words);
@@ -6360,10 +7614,54 @@ static void bind_guest_task(void) {
     PrsBindCSymbol("RFlagsGet", host_rflags_get, 0);
     PrsBindCSymbol("RFlagsSet", host_rflags_set, 1);
     PrsBindCSymbol("TSCGet", host_tsc, 0);
+    PrsBindCSymbol("Arm64SvcBench", host_arm64_svc_bench, 0);
+    PrsBindCSymbol("Arm64SvcBenchCount", host_arm64_svc_bench_count, 0);
     PrsBindCSymbol("ZcMonotonicNs", host_monotonic_ns, 0);
     PrsBindCSymbol("ToF64", host_to_f64, 1);
     PrsBindCSymbol("ToI64", host_to_i64, 1);
     PrsBindCSymbol("AbsI64", host_abs_i64, 1);
+    PrsBindCSymbol("F64ToF32", host_f64_to_f32, 1);
+    PrsBindCSymbol("F32ToF64", host_f32_to_f64, 1);
+    PrsBindCSymbol("F32RadToDeg", host_f32_rad_to_deg, 1);
+    PrsBindCSymbol("F32DegToRad", host_f32_deg_to_rad, 1);
+    PrsBindCSymbol("CosF32", host_cos_f32, 1);
+    PrsBindCSymbol("Vector4DInit", host_vec4_init, 5);
+    PrsBindCSymbol("Vector4DCopy", host_vec4_copy, 2);
+    PrsBindCSymbol("Vector4DIsEqual", host_vec4_equal, 2);
+    PrsBindCSymbol("Vector4DAdd", host_vec4_add, 3);
+    PrsBindCSymbol("Vector4DAddS", host_vec4_add_s, 3);
+    PrsBindCSymbol("Vector4DSub", host_vec4_sub, 3);
+    PrsBindCSymbol("Vector4DSubS", host_vec4_sub_s, 3);
+    PrsBindCSymbol("Vector4DMul", host_vec4_mul, 3);
+    PrsBindCSymbol("Vector4DMulS", host_vec4_mul_s, 3);
+    PrsBindCSymbol("Vector4DDiv", host_vec4_div, 3);
+    PrsBindCSymbol("Vector4DDivS", host_vec4_div_s, 3);
+    PrsBindCSymbol("Vector4DMin", host_vec4_min, 3);
+    PrsBindCSymbol("Vector4DMax", host_vec4_max, 3);
+    PrsBindCSymbol("Vector4DNegate", host_vec4_negate, 2);
+    PrsBindCSymbol("Vector4DDot", host_vec4_dot, 2);
+    PrsBindCSymbol("Vector3DInit", host_vec3_init, 4);
+    PrsBindCSymbol("Vector3DCopy", host_vec4_copy, 2);
+    PrsBindCSymbol("Vector3DIsEqual", host_vec3_equal, 2);
+    PrsBindCSymbol("Vector3DAdd", host_vec4_add, 3);
+    PrsBindCSymbol("Vector3DAddS", host_vec4_add_s, 3);
+    PrsBindCSymbol("Vector3DSub", host_vec4_sub, 3);
+    PrsBindCSymbol("Vector3DSubS", host_vec4_sub_s, 3);
+    PrsBindCSymbol("Vector3DMul", host_vec4_mul, 3);
+    PrsBindCSymbol("Vector3DMulS", host_vec4_mul_s, 3);
+    PrsBindCSymbol("Vector3DDiv", host_vec4_div, 3);
+    PrsBindCSymbol("Vector3DDivS", host_vec4_div_s, 3);
+    PrsBindCSymbol("Vector3DMin", host_vec4_min, 3);
+    PrsBindCSymbol("Vector3DMax", host_vec4_max, 3);
+    PrsBindCSymbol("Vector3DNegate", host_vec4_negate, 2);
+    PrsBindCSymbol("Vector3DNormalize", host_vec3_normalize, 2);
+    PrsBindCSymbol("Vector3DDot", host_vec3_dot, 2);
+    PrsBindCSymbol("Vector3DCross", host_vec3_cross, 3);
+    PrsBindCSymbol("Matrix4DMulVector4D", host_mat4_mul_vector, 3);
+    PrsBindCSymbol("Matrix4DMul", host_mat4_mul, 3);
+    PrsBindCSymbol("Matrix4DTranspose", host_mat4_transpose, 2);
+    PrsBindCSymbol("Matrix4DTranslationSet", host_mat4_translation_set, 4);
+    PrsBindCSymbol("Matrix4DScaleSet", host_mat4_scale_set, 4);
     PrsBindCSymbol("ModU64", host_mod_u64, 2);
     PrsBindCSymbol("InU8", host_in_u8_unsupported, 1);
     PrsBindCSymbol("OutU8", host_out_u8_unsupported, 2);
@@ -6438,14 +7736,30 @@ static int64_t host_last_fun(int64_t *a) {
  * owns its separate CCmpCtrl. Only the queue, flags, opts, error count and
  * include-file metadata are exposed here; native IR/hash fields are not cast
  * to the incompatible upstream compiler structures. */
-struct source_context {
-    struct source_context *previous;
-    unsigned char *mirror;
-    unsigned char *option_target;
-    int owned;
-};
 static void **user_doc_state(CLexFile *file);
 static void user_doc_include(CLexer *lex, CLexFile *file, int64_t size);
+static void guest_parser_warning(CLexer *lex, const char *message) {
+    char output[STR_LEN + 192];
+    snprintf(output, sizeof(output), "WARN:%s:%d:%d %s\n",
+             lex->file ? lex->file->filename : "<eof>",
+             lex->file ? (int)lex->file->ln + 1 : 0,
+             lex->file ? (int)lex->file->col + 1 : 0, message);
+    zc_output(output);
+    if (guest_task_bound) {
+        struct guest_fiber *f = &guest_fibers[guest_current];
+        /* ExeFile2 compiles source statements outside user_compiler_step, so
+         * parser warnings are not held in the deferred diagnostic buffer.
+         * Its GUI terminal suppresses ordinary task output while capturing
+         * the command result; send an immediate compiler warning through the
+         * same terminal writer instead of the obscured framebuffer text. */
+        if (!f->user_diagnostic_active && f->user_output_writer) {
+            FFI_CALL_TOS_2(f->user_output_writer, (int64_t)(uintptr_t)output,
+                           (int64_t)(uintptr_t)f->words);
+            return;
+        }
+    }
+    guest_task_text_output(output);
+}
 static unsigned char *guest_context_new(int64_t flags) {
     struct guest_fiber *f = &guest_fibers[guest_current];
     unsigned char *head = (unsigned char *)f->words + guest_next_cc_off;
@@ -6541,6 +7855,7 @@ static void guest_context_enter(struct source_context *context, CLexer *lex,
     lex->port_options = (int64_t *)(context->mirror + guest_cc_opts_off);
     lex->port_cc_flags = (int64_t *)(context->mirror + guest_cc_flags_off);
     lex->port_sync = guest_context_sync;
+    lex->port_warning = guest_parser_warning;
     guest_context_sync(lex);
 }
 static void guest_context_leave(struct source_context *context) {
@@ -6595,9 +7910,24 @@ static void compiler_checkpoint_save(void) {
     for (unsigned a = 0; a < 2; a++) {
         compiler_saved_free_heads[a] = arena_free_heads[a];
         size_t span = 0;
-        for (struct block *b = arenas[a]; b; b = b->next)
+        struct block *previous = NULL;
+        size_t blocks = 0;
+        uintptr_t base = (uintptr_t)arenas[a];
+        uintptr_t limit = base + (a ? CODE_BYTES : DATA_BYTES);
+        for (struct block *b = arenas[a]; b; b = b->next) {
+            uintptr_t address = (uintptr_t)b;
+            if (++blocks > (a ? CODE_BYTES : DATA_BYTES) / sizeof(*b) ||
+                address < base || address > limit - sizeof(*b) ||
+                b->magic != BLOCK_MAGIC || b->prev != previous ||
+                b->size > (a ? CODE_BYTES : DATA_BYTES) ||
+                address + sizeof(*b) + b->size > limit ||
+                (b->next && (uintptr_t)b->next != address + sizeof(*b) + b->size)) {
+                zc_fail("allocator block chain invalid during compiler checkpoint");
+            }
             span = (unsigned char *)(b + 1) - (unsigned char *)arenas[a] +
                    (b->used ? b->size : 0);
+            previous = b;
+        }
         /* Include every existing block header and live payload. The last
          * free block's unused tail cannot affect the restored allocation
          * chain, so copying those bytes serves no recovery purpose. */
@@ -6697,10 +8027,12 @@ struct source_execution {
     char *volatile code;
     int previous_compiling;
     int registered;
+    CLexer *previous_active_lex;
 };
 static void source_execution_cleanup(struct guest_unwind *scope) {
     struct source_execution *execution = (struct source_execution *)scope;
     guest_task_exe_active = execution->previous_compiling;
+    guest_active_compile_lex = execution->previous_active_lex;
     free(execution->code);
     guest_context_leave(&execution->context);
     compiler_source_cleanup(execution->cc, execution->lex);
@@ -6746,8 +8078,9 @@ static int64_t execute_source_mode(const char *path, const char *src,
     CodeCtrlPush(cc);
     struct source_execution execution = {
         .lex = lex, .cc = cc, .previous_compiling = guest_task_exe_active,
-        .registered = guest_task_bound
+        .registered = guest_task_bound, .previous_active_lex = guest_active_compile_lex
     };
+    guest_active_compile_lex = lex;
     guest_context_enter(&execution.context, lex, !strcmp(path, "<shell>"), guest_flags);
     lex->port_fun_complete = guest_function_complete;
     int previous_compiling = guest_task_exe_active;
@@ -7213,7 +8546,7 @@ static size_t format_text(char *output, size_t capacity, const char *format,
             code != 'b' && code != 'B' &&
             code != 'e' && code != 'E' &&
             code != 'f' && code != 'F' && code != 'g' && code != 'G' &&
-            code != 'n' && code != 'P')
+            code != 'n' && code != 'p' && code != 'P')
         {
             printf("zc: unsupported format conversion '%c' in %s\n", code, format);
             zc_fail("format code is unsupported");
@@ -7274,6 +8607,9 @@ static size_t format_text(char *output, size_t capacity, const char *format,
                 arg++;
                 if (!s) s = "";
             } else s = (const char *)(uintptr_t)argv[arg++];
+            /* ZealOS forms use NULL string fields to represent an empty
+             * value (for example Form.ZC's optional second address). */
+            if (!s && code == 's') s = "";
             if (!s) zc_fail("format %s argument is null");
             for (size_t j = 0; s[j]; j++) {
                 if (truncate && width && used - field_start >= width) break;
@@ -7432,6 +8768,39 @@ decoded_string_end: ;
                 int decimals = has_precision ? precision : 6;
                 length = format_f64_exponent(number, sizeof(number), bits,
                                              decimals, code == 'E');
+            } else if (code == 'p') {
+                uintptr_t address = (uintptr_t)argv[arg++];
+                uintptr_t offset = 0;
+                const char *symbol = zc_debug_function_for_pc(address, &offset);
+                if (symbol) {
+                    /* The diagnostic lookup finds the nearest preceding name.
+                     * Only use it for addresses within the same live allocation. */
+                    uintptr_t entry = address - offset;
+                    struct block *block;
+                    for (block = arenas[1]; block; block = block->next) {
+                        uintptr_t start = (uintptr_t)(block + 1);
+                        if (block->used && entry >= start && address - start < block->requested)
+                            break;
+                    }
+                    if (!block)
+                        symbol = NULL;
+                }
+                if (symbol) {
+                    size_t name_length = strlen(symbol);
+                    if (name_length > 96)
+                        name_length = 96;
+                    number[0] = '&';
+                    memcpy(number + 1, symbol, name_length);
+                    number[name_length + 1] = 0;
+                    if (!group_commas)
+                        snprintf(number + name_length + 1,
+                                 sizeof(number) - name_length - 1, "+0x%04lX",
+                                 (unsigned long)offset);
+                } else if (group_commas)
+                    snprintf(number, sizeof(number), ".");
+                else
+                    snprintf(number, sizeof(number), "%lX", (unsigned long)address);
+                length = strlen(number);
             } else if (code == 'x' || code == 'X' || code == 'u' ||
                        code == 'b' || code == 'B') {
                 static const char lower_digits[] = "0123456789abcdef";
@@ -7557,6 +8926,10 @@ static int64_t host_print(int64_t *a) {
     guest_task_text_output(output);
     return 0;
 }
+static int64_t host_print_err(int64_t *a) {
+    zc_output("Err: ");
+    return host_print(a);
+}
 static int64_t host_call(int64_t *a) {
     if (!a[0])
         return -1;
@@ -7575,15 +8948,23 @@ static int64_t host_call(int64_t *a) {
     }
     return FFI_CALL_TOS_0(code);
 }
-static int64_t host_call_ext_str(int64_t *a) {
-    const char *name = (const char *)(uintptr_t)a[0];
+static int64_t call_ext_str(const char *name, int64_t argc, int64_t *argv) {
     CHashFun *fun;
-    if (!name || !Fs || !Fs->hash_table)
+    if (!name || !Fs || !Fs->hash_table || argc < 0 || argc > 64 ||
+        (argc && !argv))
         return -1;
     fun = (CHashFun *)HashFind((char *)name, Fs->hash_table, HTT_FUN, 1);
-    if (!fun || fun->argc || !fun->fun_ptr || (fun->base.base.type & HTF_EXTERN))
+    if (!fun || !fun->fun_ptr || (fun->base.base.type & HTF_EXTERN))
         return -1;
-    return FFI_CALL_TOS_0(fun->fun_ptr);
+    return TempleOS_CallN(fun->fun_ptr, argc, argv);
+}
+static int64_t host_call_ext_str(int64_t *a) {
+    return call_ext_str((const char *)(uintptr_t)a[0], a[1],
+                        (int64_t *)(uintptr_t)a[2]);
+}
+/* ZcCallExtStr is a separate one-argument bridge used by TaskBridge. */
+static int64_t host_call_ext_str_zero(int64_t *a) {
+    return call_ext_str((const char *)(uintptr_t)a[0], 0, NULL);
 }
 static int64_t host_progress_reset(int64_t *a) {
     /* KMisc.ProgressBarsReset saves elapsed times before clearing the shared
@@ -7664,6 +9045,9 @@ static int load_source_path(const char *path, int merged, int recover) {
             "CTask *new_focus);");
         PrsBindCSymbol("ZcFocusTrace", host_focus_trace, 3);
         PrsBindCSymbol("ZcSystemTask", host_system_task, 0);
+        /* KDebug's CheckPtr is used by the stock ClassRep/DocForm sources.
+         * The ARM64 hosted runtime validates live managed data/code blocks. */
+        PrsBindCSymbol("CheckPtr", host_check_ptr, 1);
         /* KernelB-only callers need the text declaration before TaskBridge
          * is compiled. Re-declaring it inside the module creates a fresh,
          * unbound external slot before its function bodies are emitted. */
@@ -7697,6 +9081,25 @@ static int load_source_path(const char *path, int merged, int recover) {
         else free(src);
         return -1;
     }
+    /* KernelB declares CallExtStr with the legacy _CALLEXTSTR varargs
+     * convention. On AArch64 the native call trampoline accepts an argument
+     * vector, so bind that declaration once it enters the live hash table.
+     * This keeps stock callers (including MemoryRep and disk/startup hooks)
+     * using the same name lookup and forwarded argument list. */
+    CHashFun *call_ext_str = (CHashFun *)HashFind(
+        "CallExtStr", Fs->hash_table, HTT_FUN, 1);
+    if (call_ext_str && call_ext_str->import_name &&
+        !strcmp(call_ext_str->import_name, "_CALLEXTSTR") &&
+        (call_ext_str->base.base.type & HTF_EXTERN))
+        PrsBindCSymbol("CallExtStr", host_call_ext_str, 3);
+    CHashGlblVar *mem_heap_base = (CHashGlblVar *)HashFind(
+        "mem_heap_base", Fs->hash_table, HTT_GLBL_VAR, 1);
+    if (mem_heap_base && (mem_heap_base->base.type & HTF_EXTERN))
+        PrsBindCSymbol("mem_heap_base", &guest_mem_heap_base, 0);
+    CHashGlblVar *mem_heap_limit = (CHashGlblVar *)HashFind(
+        "mem_heap_limit", Fs->hash_table, HTT_GLBL_VAR, 1);
+    if (mem_heap_limit && (mem_heap_limit->base.type & HTF_EXTERN))
+        PrsBindCSymbol("mem_heap_limit", &guest_mem_heap_limit, 0);
     if (!strcmp(path, "/Kernel/SerialDev/Message.ZC")) {
         /* Message.ZC's source MessageScan reads a key job's aux2 after
          * JobDel(tmpc) frees that job. Rebind the interactive readers after
@@ -7709,11 +9112,16 @@ static int load_source_path(const char *path, int merged, int recover) {
         PrsBindCSymbol("KeyGet", host_key_get, 3);
     }
     if (!strcmp(path, "/System/TaskBridge.ZC")) {
-        /* TaskBridge is loaded again after KernelC and redeclares the early
-         * clock global. Bind that new symbol to the same live timer storage;
-         * otherwise later applications capture a permanent zero tS while
-         * TimeCal continues updating only the preceding declaration. */
-        PrsBindCSymbol("tS", &guest_tS_bits, 0);
+        /* TaskBridge's early hash helpers must use the managed task-table
+         * adapters. Binding the stock Hash* names is too late when those
+         * names were already imported by the bootstrap compiler. */
+        PrsBindCSymbol("ZcGuestHashTableNew", host_hash_table_new, 2);
+        PrsBindCSymbol("ZcGuestHashTableDel", host_hash_table_del, 1);
+        PrsBindCSymbol("ZcGuestHashFind", host_hash_find, 4);
+        PrsBindCSymbol("ZcGuestHashAdd", host_hash_add, 2);
+        /* Keep the source-backed tS() function intact here. Binding a global
+         * with the same name shadows the zero-argument clock function and
+         * freezes elapsed-time reads at the last TimeCal update. */
         PrsBindCSymbol("ProgressBarsReset", host_progress_reset, 1);
         CHashFun *recalc = (CHashFun *)HashFind("DocRecalc", Fs->hash_table,
                                                HTT_FUN, 1);
@@ -7731,10 +9139,11 @@ static int load_source_path(const char *path, int merged, int recover) {
         /* PopUp's server bridge probes the source-backed desktop loop before
          * UserTask.ZC is loaded, so make dynamic source calls available at
          * the initial TaskBridge load as well. */
-        PrsBindCSymbol("ZcCallExtStr", host_call_ext_str, 1);
+        PrsBindCSymbol("ZcCallExtStr", host_call_ext_str_zero, 1);
         PrsBindCSymbol("ZcSourceDirExists", host_file_dir_exists, 1);
         PrsBindCSymbol("ZcSourcePath", host_source_path, 1);
         PrsBindCSymbol("ZcSourceWritable", host_source_writable, 1);
+        PrsBindCSymbol("ZcSourceHasOverride", host_source_has_override, 1);
         PrsBindCSymbol("ZcDocInputBytes", host_doc_input_bytes, 3);
         PrsBindCSymbol("Cd", host_cd, 2);
         PrsBindCSymbol("DirCur", host_dir_cur, 2);
@@ -7749,6 +9158,7 @@ static int load_source_path(const char *path, int merged, int recover) {
         guest_home_dir_ptr = (char **)((unsigned char *)blkdev->data_addr + home->off);
         PrsBindCSymbol("ZcSourceFileAt", host_source_file_at, 4);
         PrsBindCSymbol("ZcRedSeaFileAt", host_redsea_file_at, 4);
+        PrsBindCSymbol("ZcSourceVolumeStats", host_source_volume_stats, 2);
         PrsBindCSymbol("LowPass1", host_low_pass1, 4);
         /* These functions were pre-registered before TaskBridge introduced
          * their extern declarations, so bind them again now that the symbols
@@ -7774,7 +9184,7 @@ static int load_source_path(const char *path, int merged, int recover) {
         PrsBindCSymbol("ZcServerJobsHandler", host_server_jobs_handler, 1);
     }
     if (!strcmp(path, "/System/UserTask.ZC")) {
-        PrsBindCSymbol("ZcCallExtStr", host_call_ext_str, 1);
+        PrsBindCSymbol("ZcCallExtStr", host_call_ext_str_zero, 1);
         PrsBindCSymbol("ZcUserCompCtrlNew", host_user_compiler_new, 2);
         PrsBindCSymbol("ZcUserCompCtrlDel", host_user_compiler_del, 1);
         PrsBindCSymbol("ZcUserLex", host_user_lex, 1);
@@ -7782,8 +9192,24 @@ static int load_source_path(const char *path, int merged, int recover) {
         PrsBindCSymbol("ZcUserCodeFree", host_user_code_free, 2);
         PrsBindCSymbol("ZcUserPromptSet", host_user_prompt_set, 1);
         PrsBindCSymbol("ZcUserOutputSet", host_user_output_set, 1);
+        PrsBindCSymbol("ZcUserTerminalAttach", host_user_terminal_attach, 2);
         PrsBindCSymbol("ZcUserPutExcept", host_user_put_except, 0);
         PrsBindCSymbol("ZcUserInputComplete", host_user_input_complete, 1);
+        /* Compile this guest wrapper only after the UserTask C hooks have
+         * concrete bindings. TaskBridge loads earlier, when these externs
+         * still point at unresolved call stubs. */
+        execute_source("<CompileDemo expression bridge>",
+            "F64 ZcEvalExpression(U8 *source) {"
+            " U8 *terminated=MStrPrint(\"%s;\",source);"
+            " CCompCtrl *cc=ZcUserCompCtrlNew(terminated); Free(terminated);"
+            " I64 type;"
+            " U8 *machine_code; F64 result=0; ZcUserLex(cc);"
+            " machine_code=ZcUserStatement2Bin(cc,&type);"
+            " if(machine_code) { if(type==RT_F64)"
+            " result=Call(machine_code)(F64);"
+            " else result=ToF64(Call(machine_code));"
+            " ZcUserCodeFree(cc,machine_code); }"
+            " ZcUserCompCtrlDel(cc); return result; }");
     }
     if (!strcmp(path, "/System/GuiTerminal.ZC")) {
         PrsBindCSymbol("ZcGuiShellExec", host_gui_shell_exec, 1);
@@ -7804,7 +9230,8 @@ static int load_source_path(const char *path, int merged, int recover) {
             guest_keydev_put_key = put->fun_ptr;
     }
     if (!strcmp(path, "/Kernel/KTask.ZC")) {
-        PrsBindCSymbol("ZcCallExtStr", host_call_ext_str, 1);
+        PrsBindCSymbol("ZcCallNOnStack", host_call_n_on_stack, 5);
+        PrsBindCSymbol("ZcCallExtStr", host_call_ext_str_zero, 1);
         PrsBindCSymbol("ZcTaskValidate", host_task_validate, 1);
         PrsBindCSymbol("ZcTaskKill", host_kill, 3);
         PrsBindCSymbol("ZcSpawn", host_spawn, 7);
@@ -7821,11 +9248,27 @@ static int load_source_path(const char *path, int merged, int recover) {
     PrsBindCSymbol("MaxU64", host_max_u64, 2);
     PrsBindCSymbol("MinU64", host_min_u64, 2);
     if (!strcmp(path, "/Kernel/KernelC.HH")) {
+        if (!guest_rev_bits_ready) {
+            for (unsigned i = 0; i < 256; i++) {
+                uint8_t reversed = 0;
+                for (unsigned bit = 0; bit < 8; bit++)
+                    if (i & (1u << (7 - bit)))
+                        reversed |= (uint8_t)(1u << bit);
+                guest_rev_bits[i] = reversed;
+            }
+            guest_rev_bits_ready = 1;
+        }
+        PrsBindCSymbol("rev_bits_table", &guest_rev_bits_ptr, 0);
         /* KernelC introduces the pinned case-insensitive string externs.
          * Bind after their declarations exist so source-backed modules can
          * compile against the same ASCII matching semantics as ZealOS. */
         PrsBindCSymbol("StrNICompare", host_str_nicompare, 3);
         PrsBindCSymbol("StrIMatch", host_str_imatch, 2);
+        /* KernelC declares the compiler's ordered hash insertion primitive. */
+        PrsBindCSymbol("HashAddAfter", host_hash_add_after, 3);
+        /* Keep the compiler's single-table lookup distinct from HashFind,
+         * which also walks the CHashTable::next chain. */
+        PrsBindCSymbol("HashSingleTableFind", host_hash_single_table_find, 4);
         PrsBindCSymbol("FileRead", host_file_read, 3);
         PrsBindCSymbol("FileWrite", host_file_write, 5);
         PrsBindCSymbol("Cd", host_cd, 2);
@@ -7847,7 +9290,6 @@ static int load_source_path(const char *path, int merged, int recover) {
         if (!spawned_tasks->data_addr)
             zc_fail("KernelC task serial binding failed");
         PrsBindCSymbol("counts", &guest_counts, 0);
-        PrsBindCSymbol("tS", &guest_tS_bits, 0);
         PrsBindCSymbol("TimeCal", host_time_cal, 0);
         PrsBindCSymbol("FifoI64Flush", host_fifo_i64_flush, 1);
         CHashClass *kbd = (CHashClass *)HashFind("CKbdStateGlobals",
@@ -7899,9 +9341,12 @@ static int load_source_path(const char *path, int merged, int recover) {
          * implementations instead of unresolved x86 import labels. */
         PrsBindCSymbol("MAlloc", host_malloc, 2);
         PrsBindCSymbol("CAlloc", host_calloc, 2);
+        PrsBindCSymbol("MAllocAligned", host_malloc_aligned, 4);
+        PrsBindCSymbol("CAllocAligned", host_calloc_aligned, 4);
         PrsBindCSymbol("Free", host_free, 1);
         PrsBindCSymbol("MSize", host_msize, 1);
         PrsBindCSymbol("MSize2", host_msize, 1);
+        PrsBindCSymbol("MHeapCtrl", host_mheap_ctrl, 1);
         PrsBindCSymbol("ZcManagedAllocationSize", host_managed_allocation_size, 1);
         /* KernelC declares keyboard shortcut registration after KernelB has
          * bound the guest task bridge. Keep early Win.ZC initialization from
@@ -7912,6 +9357,8 @@ static int load_source_path(const char *path, int merged, int recover) {
         if (load_inner("/System/Gr/SpriteRaster.ZC"))
             zc_fail("sprite raster bridge source missing");
     }
+    if (!strcmp(path, "/Tests/CompilerKernelInitGlobals.ZC"))
+        PrsBindCSymbol("PopCount", host_pop_count, 1);
     if (!strcmp(path, "/System/Externs.ZC"))
         PrsBindCSymbol("Noise", host_noise, 3);
     if (!strcmp(path, "/Kernel/KernelB.HH")) {
@@ -7994,6 +9441,14 @@ static int load_source_path(const char *path, int merged, int recover) {
         PrsBindCSymbol("sys_framebuffer_height", &guest_fb_height, 0);
         PrsBindCSymbol("sys_framebuffer_pitch", &guest_fb_pitch, 0);
         PrsBindCSymbol("sys_framebuffer_bpp", &guest_fb_bpp, 0);
+        /* Limine exposes the active framebuffer mode, not the legacy VBE
+         * mode catalogue. Report that one supported mode to source utilities. */
+        memset(guest_fb_modes, 0, sizeof(guest_fb_modes));
+        if (guest_fb_width <= UINT16_MAX && guest_fb_height <= UINT16_MAX) {
+            guest_fb_modes[0].width = (uint16_t)guest_fb_width;
+            guest_fb_modes[0].height = (uint16_t)guest_fb_height;
+        }
+        PrsBindCSymbol("sys_framebuffer_list", guest_fb_modes, 0);
         if (load_inner("/System/TaskBridge.ZC"))
             zc_fail("task bridge source missing");
         CHashClass *form_field = (CHashClass *)HashFind(
@@ -8002,6 +9457,15 @@ static int load_source_path(const char *path, int merged, int recover) {
             !task_field(form_field, "format", 8, 0) ||
             !task_field(form_field, "is_internal", 8, 56))
             zc_fail("form reflection ABI mismatch");
+        CHashClass *class_meta_field = (CHashClass *)HashFind(
+            "CArmClassMetaField", Fs->hash_table, HTT_CLASS, 1);
+        if (!class_meta_field ||
+            class_meta_field->sz != sizeof(struct arm_class_meta_field) ||
+            !task_field(class_meta_field, "name", 8, 0) ||
+            !task_field(class_meta_field, "offset", 8, 16) ||
+            !task_field(class_meta_field, "percentile", 8, 48) ||
+            !task_field(class_meta_field, "output_fun", 8, 56))
+            zc_fail("ClassMeta reflection ABI mismatch");
         PrsBindCSymbol("ZcGrTextUpdate", host_gr_text_update, 0);
         PrsBindCSymbol("ZcWinMouseUpdate", host_win_mouse_update, 0);
         PrsBindCSymbol("ZcGrScreenUpdate", host_gr_screen_update, 0);
@@ -8045,6 +9509,7 @@ static int load_source_path(const char *path, int merged, int recover) {
         PrsBindCSymbol("ZcMonotonicNs", host_monotonic_ns, 0);
         PrsBindCSymbol("ZcUnixTimeNs", host_unix_time_ns, 0);
         PrsBindCSymbol("ZcDocFormField", host_doc_form_field, 3);
+        PrsBindCSymbol("ZcClassMetaField", host_class_meta_field, 3);
         PrsBindCSymbol("ZcTryEnter", host_sys_try, 0);
         PrsBindCSymbol("ZcTryLeave", host_sys_untry, 0);
         PrsBindCSymbol("ZcTryCatchEnd", host_end_catch, 0);
@@ -8053,10 +9518,13 @@ static int load_source_path(const char *path, int merged, int recover) {
         PrsBindCSymbol("ExePrint", host_exe_print, 3);
         PrsBindCSymbol("ExePrint2", host_exe_print2, 3);
         PrsBindCSymbol("Print", host_print, 3);
+        PrsBindCSymbol("PrintErr", host_print_err, 3);
         PrsBindCSymbol("ZcGuiShellExec", host_gui_shell_exec, 1);
         PrsBindCSymbol("StrPrintJoin", host_str_print_join, 4);
         PrsBindCSymbol("PutKey", host_put_key, 2);
         PrsBindCSymbol("StrLen", host_str_len, 1);
+        PrsBindCSymbolNaked("TaskCaller", zc_task_caller_entry, 3);
+        PrsBindCSymbol("UnusedStack", host_unused_stack, 1);
         PrsBindCSymbol("RFlagsPush", host_rflags_push, 0);
         PrsBindCSymbol("RFlagsPop", host_rflags_pop, 0);
         PrsBindCSymbol("KbdMouseHandler", host_kbd_mouse_handler, 2);
@@ -8146,10 +9614,19 @@ static int command_exception(struct command_scope *command) {
     return -1;
 }
 static void command_failed(struct command_scope *command) {
-    /* zc_fail restored the root task before jumping here. Never walk a
-     * failed parser's scopes, or another fiber's stacks, in that context. */
-    if (command->owner)
+    /* zc_fail returns to task zero before longjmp. This setjmp may belong to
+     * a non-root task (for example the graphical terminal), whose stack is
+     * where execution resumes. Restore its context before touching its
+     * unwind chain or returning to its caller. */
+    if (command->owner) {
+        unsigned owner_index = (unsigned)(command->owner - guest_fibers);
+        if (owner_index < GUEST_TASKS) {
+            guest_current = owner_index;
+            Fs = owner_index ? command->owner->words : &task;
+            set_guest_task(command->owner->words);
+        }
         command->owner->unwind = command->unwind.previous;
+    }
     guarded = 0;
 }
 int zc_exec(const char *src) {
@@ -8296,13 +9773,34 @@ int zc_focus_owns_input(void) {
            guest_focus_task != guest_fibers[0].words &&
            valid_guest_task(guest_focus_task);
 }
+static int64_t host_virtio_net_ready(int64_t *a) {
+    (void)a;
+    return zc_virtio_net_ready();
+}
+
+static int64_t host_virtio_net_mac(int64_t *a) {
+    return zc_virtio_net_mac((uint8_t *)(uintptr_t)a[0]);
+}
+
+static int64_t host_virtio_net_send(int64_t *a) {
+    if (a[1] < 0 || (uint64_t)a[1] > UINT32_MAX) return -1;
+    return zc_virtio_net_send((const void *)(uintptr_t)a[0], (uint32_t)a[1]);
+}
+
+static int64_t host_virtio_net_recv(int64_t *a) {
+    if (a[1] < 0 || (uint64_t)a[1] > UINT32_MAX) return -1;
+    return zc_virtio_net_recv((void *)(uintptr_t)a[0], (uint32_t)a[1]);
+}
+
 void zc_init(const void *archive, size_t size, zc_output_fn output) {
     if (archive) {
         source_archive = archive;
         archive_size = size;
     }
-    if (output)
+    if (output) {
         output_cb = output;
+        output_cb_faulted = 0;
+    }
     ready = failed = loaded_modules = 0;
     window_demo_loaded = 0;
     window_demo_restore_gui_terminal = 0;
@@ -8416,6 +9914,9 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
         return;
     }
     task.hash_table = HashTableNew(1024, NULL);
+    /* Bootstrap.ZC defines tS() in terms of this host monotonic clock. Bind it
+     * before compiling Bootstrap so its zero-argument callsite resolves. */
+    PrsBindCSymbol("ZcMonotonicNs", host_monotonic_ns, 0);
     if (load_inner("/System/Bootstrap.ZC")) {
         guarded = 0;
         return;
@@ -8430,9 +9931,16 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
         const char *name;
         int64_t (*fn)(int64_t *);
         int arity;
-    } bindings[] = {{"MAlloc", host_malloc, 2}, {"CAlloc", host_calloc, 2},
+    } bindings[] = {{"ZcVirtioNetReady", host_virtio_net_ready, 0},
+                    {"ZcVirtioNetGetMac", host_virtio_net_mac, 1},
+                    {"ZcVirtioNetSend", host_virtio_net_send, 2},
+                    {"ZcVirtioNetRecv", host_virtio_net_recv, 2},
+                    {"MAlloc", host_malloc, 2}, {"CAlloc", host_calloc, 2},
+                    {"MAllocAligned", host_malloc_aligned, 4},
+                    {"CAllocAligned", host_calloc_aligned, 4},
                     {"ZcSystemTask", host_system_task, 0},
-                    {"Call", host_call, 1}, {"ZcCallExtStr", host_call_ext_str, 1},
+                    {"Call", host_call, 1},
+                    {"ZcCallExtStr", host_call_ext_str_zero, 1},
                     {"ZcTaskValidate", host_task_validate, 1},
                     {"ZcTaskKill", host_kill, 3},
                     {"ZcSpawn", host_spawn, 7},
@@ -8897,11 +10405,27 @@ void zc_status(void) {
     printf("zc: ready=%d failed=%d modules=%lu data=%lu/%u code=%lu/%u allocations=%lu\n", ready,
            failed, (unsigned long)loaded_modules, (unsigned long)used[0], DATA_BYTES,
            (unsigned long)used[1], CODE_BYTES, (unsigned long)(blocks[0] + blocks[1]));
+    if (last_runtime_failure[0])
+        printf("last_runtime_failure: %s\n", last_runtime_failure);
+    if (last_unresolved_symbol[0])
+        printf("last_unresolved_symbol: %s\n", last_unresolved_symbol);
     printf("compiler_recovery: errors=%lu active=%d\n",
            (unsigned long)compiler_recovery_errors, compiler_recovery_active);
     printf("desktop: winmgr=%d gterm=%d windowdemo=%d presented_frames=%lu\n",
            source_winmgr_active, gui_terminal_active, window_demo_loaded,
            (unsigned long)guest_task_frame_count);
+    printf("text_framebuffer: raw=%08lx alias=%08lx bytes=%lu busy=%lu direct=%d\n",
+           (unsigned long)guest_text_globals[2],
+           (unsigned long)guest_text_globals[3],
+           (unsigned long)guest_text_globals[9],
+           (unsigned long)guest_text_globals[12],
+           guest_source_direct_framebuffer_active());
+    printf("direct_framebuffer: frames=%lu missing=%lu first=%08lx center=%08lx nonzero=%lu\n",
+           (unsigned long)guest_direct_fb_frames,
+           (unsigned long)guest_direct_fb_missing,
+           (unsigned long)guest_direct_fb_first_pixel,
+           (unsigned long)guest_direct_fb_center_pixel,
+           (unsigned long)guest_direct_fb_nonzero);
     printf("mesh_overlay: calls=%lu gate_skips=%lu resource_skips=%lu range_skips=%lu applied=%lu pixels=%lu\n",
            (unsigned long)guest_mesh_overlay_calls,
            (unsigned long)guest_mesh_overlay_gate_skips,
@@ -8915,6 +10439,9 @@ void zc_status(void) {
            (unsigned long)guest_mesh_overlay_sample_index,
            (unsigned long)guest_mesh_overlay_sample_rgba,
            (unsigned long)guest_mesh_overlay_sample_scanout);
+    printf("mesh_overlay_colors: zero=%lu nonzero=%lu\n",
+           (unsigned long)guest_mesh_overlay_zero_pixels,
+           (unsigned long)guest_mesh_overlay_nonzero_pixels);
     struct guest_fiber *system_server = &guest_fibers[GUEST_SYSTEM];
     printf("system_server: running=%d separate=%d idle=%d queued=%d\n",
            system_server->state == GUEST_RUNNABLE,
@@ -8964,6 +10491,14 @@ void zc_status(void) {
                parent ? (const char *)((unsigned char *)parent->words + guest_name_off) : "none",
                fiber->kill_requested, fiber->ending, fiber->wait_kind,
                fiber->key_wait_active, queued);
+        struct guest_fiber *wait_target = fiber->wait_slot
+            ? find_guest_task(*(void **)fiber->wait_slot) : NULL;
+        if (fiber->wait_kind != GUEST_WAIT_NONE)
+            printf("  wait_target=%s/%ld active_job=%p source_job=%d\n",
+                   wait_target ? (const char *)((unsigned char *)wait_target->words +
+                                                  guest_name_off) : "none",
+                   wait_target ? (long)(wait_target - guest_fibers) : -1L,
+                   (void *)fiber->active_jobs, fiber->source_job_active);
         printf("  task_docs: put=%p display=%p border=%p\n",
                *(void **)((unsigned char *)fiber->words + guest_put_doc_off),
                *(void **)((unsigned char *)fiber->words + guest_display_doc_off),
@@ -8980,6 +10515,25 @@ void zc_status(void) {
         printf("user_command: original_loop=%d statements=%lu\n",
                keyboard_focus->user_prompt_reader != NULL,
                (unsigned long)keyboard_focus->user_statements);
+    printf("user_compiler_calls: lex=%lu statement=%lu\n",
+           (unsigned long)user_compiler_lex_calls,
+           (unsigned long)user_compiler_statement_calls);
+    if (keyboard_focus) {
+        unsigned count = 0;
+        for (struct user_compiler *compiler = keyboard_focus->user_compilers;
+             compiler && count < 8; compiler = compiler->next, count++) {
+            int64_t flags = *(int64_t *)(compiler->mirror + guest_cc_flags_off);
+            int64_t token = *(int64_t *)(compiler->mirror + guest_cc_token_off);
+            printf("user_compiler[%u]: prompt=%d flags=0x%lx token=%ld native=%d lex=%d pending=%d defer=%d input=%d doc=%d code=%p statements=%lu\n",
+                   count, !!(flags & 0x002), (unsigned long)flags, (long)token,
+                   compiler->native != NULL, compiler->lex != NULL,
+                   compiler->lex ? compiler->lex->port_lex_pending : -1,
+                   compiler->lex ? compiler->lex->port_defer_statement_lex : -1,
+                   compiler->input != NULL, compiler->doc.input != NULL,
+                   (void *)compiler->code,
+                   (unsigned long)keyboard_focus->user_statements);
+        }
+    }
     printf("virtio_keyboard: ready=%d key_events=%lu last_code=%u last_value=%lu\n",
            zc_virtio_keyboard_ready(),
            (unsigned long)zc_virtio_keyboard_event_count(),
@@ -9108,6 +10662,29 @@ void zc_status(void) {
     printf("scanout: nonblack_pixels=%lu of %lu\n",
            (unsigned long)scanout_nonblack,
            (unsigned long)(zeal_fb_screen_width() * zeal_fb_screen_height()));
+    /* Keep audio diagnostics last and unconditional. A missing Pi platform
+     * flag is itself important evidence: the sound hook would otherwise be
+     * routed to VirtIO and the Pi PWM state would never be initialized. */
+    {
+        printf("pi4_audio: target_pi=%llu ready=%llu beep_calls=%llu tone_calls=%llu note=%llu hz=%llu "
+               "fsel4=%08llx cmctl=%08llx cmdiv=%08llx pwmctl=%08llx "
+               "rng1=%08llx dat1=%08llx rng2=%08llx dat2=%08llx init_stage=%llu\n",
+               (unsigned long long)zc_pi4_audio_debug(0),
+               (unsigned long long)zc_pi4_audio_debug(1),
+               (unsigned long long)zc_pi4_audio_debug(2),
+               (unsigned long long)zc_pi4_audio_debug(3),
+               (unsigned long long)zc_pi4_audio_debug(4),
+               (unsigned long long)zc_pi4_audio_debug(5),
+               (unsigned long long)zc_pi4_audio_debug(6),
+               (unsigned long long)zc_pi4_audio_debug(7),
+               (unsigned long long)zc_pi4_audio_debug(8),
+               (unsigned long long)zc_pi4_audio_debug(9),
+               (unsigned long long)zc_pi4_audio_debug(10),
+               (unsigned long long)zc_pi4_audio_debug(11),
+               (unsigned long long)zc_pi4_audio_debug(12),
+               (unsigned long long)zc_pi4_audio_debug(13),
+               (unsigned long long)zc_pi4_audio_debug(14));
+    }
 }
 int zc_selftest(void) {
     int64_t result = 0;

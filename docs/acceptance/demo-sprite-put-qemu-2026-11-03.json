@@ -1,0 +1,21 @@
+{
+  "date": "2026-11-03",
+  "source_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "target": "AArch64 QEMU virt, PCI, graphical terminal",
+  "command": "python3 scripts/check-compat.py --pci --quick --probe-demo-sprite-put",
+  "source_path": "/Demo/Graphics/SpritePut.ZC",
+  "source_sha256": "170736333e9deaa969a6816717efeaf1f9c494239267e2d2f47b77b0a1a652a5",
+  "result": "pass",
+  "checks": [
+    "SpritePut launches in the graphical terminal and prints the US Flag and US Map labels",
+    "Embedded sprites visibly changed 33,620 scanout pixels",
+    "The graphical terminal remains usable and evaluates 40+2 as 42",
+    "The guest remains healthy with zstatus failed=0"
+  ],
+  "artifacts": {
+    "build/disk.img": "5c3e4d6aa61f1ffb4e3174dc4e5bce82598c65df18421b322ef96122c1acfc0e",
+    "build/sources.tar": "b89426e6ae2dad802ac5e1aa8239bbbb78d502b6695bbba8e008123f0ed2f7d9",
+    "scripts/check-compat.py": "f479623d258e6efaeec138f2e1e1a2be3e15656f6d0a7ebd7d721232ba065f90"
+  },
+  "scope_note": "QEMU runtime acceptance only; live UTM or Pi hardware acceptance is not implied."
+}

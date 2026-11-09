@@ -1,0 +1,29 @@
+{
+  "date": "2026-11-03",
+  "source_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "target": "AArch64 QEMU virt, PCI, graphical terminal",
+  "command": "python3 scripts/check-compat.py --pci --quick --probe-demo-sprite-family",
+  "source_paths": [
+    "/Demo/Graphics/SpritePutExt.ZC",
+    "/Demo/Graphics/SpriteRaw.ZC",
+    "/Demo/Graphics/SpritePlot.ZC"
+  ],
+  "source_sha256": {
+    "/Demo/Graphics/SpritePutExt.ZC": "2b05346b21e271774506fed3d7c1d3cf81d58067cbde0c12523620a2c7fcb77d",
+    "/Demo/Graphics/SpriteRaw.ZC": "627ba4685e1427f22f12a44d91234d8fadc9a4d29c329e333982d60aa9ed0bf2",
+    "/Demo/Graphics/SpritePlot.ZC": "18d897173868891cb4a899631107c7e06e3505f0e5e7ed49e48a53c33ef5341b"
+  },
+  "result": "pass",
+  "checks": [
+    "SpritePutExt launched and displayed its external US Map sprite, changing 32,661 scanout pixels",
+    "SpriteRaw launched and rendered its raw sprite elements, changing 20,188 scanout pixels",
+    "SpritePlot animated its inline sprite, printed its size, and reached its key prompt; scanout changed by 9,007 pixels",
+    "After each demo, the graphical terminal remained responsive and evaluated 40+2 as 42",
+    "The guest remained healthy with zstatus failed=0"
+  ],
+  "artifacts": {
+    "build/disk.img": "5c3e4d6aa61f1ffb4e3174dc4e5bce82598c65df18421b322ef96122c1acfc0e",
+    "scripts/check-compat.py": "7880e4e8a09e59522a66072144101982113b5f9ad5ea7dd3ddcb1bf0c60553f0"
+  },
+  "scope_note": "QEMU runtime acceptance only; live UTM or Pi hardware acceptance is not implied. SpriteText is not covered by this record."
+}

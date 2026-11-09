@@ -1,0 +1,34 @@
+{
+  "date": "2026-11-03",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "target": "AArch64 QEMU virt, PCI, graphical terminal",
+  "command": "make iso && python3 scripts/check-compat.py --pci --probe-demo-low-pass-filter",
+  "source_path": "/Demo/Graphics/LowPassFilter.ZC",
+  "source_sha256": "715d67d2d3af616c49cc5301d0e1434c1e8b44701817dc3385e1ce68df46f260",
+  "result": "pass",
+  "checks": [
+    "The original LowPassFilter source compiled and launched from the graphical terminal",
+    "The initial axes, cyan curve, and randomized red and green curves rendered as the five PressAKey stages advanced",
+    "The ARM64 source bundle applies a bounded-step overlay to the two randomized curves so their synchronous plotting does not starve guest input",
+    "Escape closed the demo and restored the graphical terminal",
+    "The terminal evaluated 40+2 as 42 after returning from LowPassFilter",
+    "The guest remained healthy with zstatus failed=0"
+  ],
+  "artifacts": {
+    "build/zealos-aarch64-hello.iso": "5c9f2c0bd43843f50c600f819c162ab4d7fa081aceb764b9eee87d375f70c98a",
+    "build/disk.img": "10e6528ae0172496f6860a009ecd097a696314bcc8d85232e03ce4104c2c2ee0",
+    "build/sources.tar": "0f351c82c337b2c8a9df0d14c3cd83828d5de1a8f5a2aa4852e62cad43959287",
+    "scripts/check-compat.py": "b4eb1307599c711ba7eafb8bb051c53c7fd615b263ace49401533c790d8edae0",
+    "scripts/arm64_source.py": "a9fa34906a8254e3f61297f45700c4b95e98ae1aaeff8fec765ff747dda86f06",
+    "scripts/build-source-bundle.py": "5d2d30d68a8524330559a6fc78cc609801bb3cc913c503be00aa16ceb46b3905"
+  },
+  "screenshots": [
+    "build/gui-demo-low-pass-filter-demo-low-pass-filter-stage-0.ppm",
+    "build/gui-demo-low-pass-filter-demo-low-pass-filter-stage-1.ppm",
+    "build/gui-demo-low-pass-filter-demo-low-pass-filter-stage-2.ppm",
+    "build/gui-demo-low-pass-filter-demo-low-pass-filter-stage-3.ppm",
+    "build/gui-demo-low-pass-filter-demo-low-pass-filter-stage-4.ppm",
+    "build/gui-demo-low-pass-filter-demo-low-pass-filter-exit-smoke-result.ppm"
+  ],
+  "scope_note": "QEMU runtime acceptance uses the raw disk built by make iso; the ISO is built with the same source bundle but was not separately booted in this check. Live UTM or Pi hardware acceptance is not implied."
+}

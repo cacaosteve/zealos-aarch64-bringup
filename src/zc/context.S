@@ -43,3 +43,11 @@ zc_longjmp:
     csinc x0, x1, xzr, ne
     ret
 .section .note.GNU-stack,"",%progbits
+.text
+.global zc_task_caller_entry
+.type zc_task_caller_entry, %function
+zc_task_caller_entry:
+    // Pass the guest's frame and return address before the C prologue.
+    mov x3, x29
+    mov x4, x30
+    b zc_task_caller

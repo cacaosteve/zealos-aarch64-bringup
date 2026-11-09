@@ -1,0 +1,21 @@
+{
+  "date": "2026-11-03",
+  "command": "python3 scripts/check-compat.py --quick --probe-demo-global-vars --pci",
+  "target": "AArch64 QEMU virt, PCI graphical terminal",
+  "result": "partial",
+  "program": "/Demo/GlobalVars.ZC",
+  "source_path": "upstream/pinned/Demo/GlobalVars.ZC",
+  "source_sha256": "18c0a2fa23115a2aaaa5166715da35fc77443ddad8848e292ef2867b60255ae9",
+  "verified": [
+    "Fresh QEMU run executed GlobalVars.ZC through ExeFile2 and observed both Time 1 and Time 2 dynamic-initialization output",
+    "Graphical terminal recovered; 40+2 returned 42 and zstatus reported failed=0"
+  ],
+  "not_verified": [
+    "AOT-only #ifjit section (Time 3 and Time 4); the bootstrap does not expose the stock Comp() command"
+  ],
+  "kernel_sha256": "4daaabe6cc3e9e21bfe3b17b3671c782206d4977ab1bbca62b00f24034d32197",
+  "iso_sha256": "5c9f2c0bd43843f50c600f819c162ab4d7fa081aceb764b9eee87d375f70c98a",
+  "scope_note": "Automated QEMU evidence only. JIT dynamic initialization and shell recovery passed; AOT-only behavior is still unverified, and this does not establish live UTM or Pi hardware behavior.",
+  "log_sha256": "d25f2c8aed5672b31b5ba8b5f3691f40951b1e28dda19faaa27485c193f3e974",
+  "log": "build/check-demo-global-vars-pci.log"
+}

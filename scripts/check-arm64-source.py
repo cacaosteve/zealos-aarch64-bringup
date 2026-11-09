@@ -5,19 +5,97 @@ import re
 import struct
 import sys
 from arm64_source import extract_keyboard_helpers
+from arm64_source import extract_string_utilities
 from arm64_source import (extract_sprite_elem_base_sizes, inject_sprite_elem_base_sizes,
                           extract_sprite_interpolation, inject_sprite_interpolation,
                           extract_sprite_matrix_draw, inject_sprite_matrix_draw,
                           inject_sprite_wrappers)
 
-from arm64_source import (extract_home_set, extract_home_startup, extract_home_startup_tasks, inject_home_startup_tasks, extract_server_task, extract_user_task, extract_version_scalars, extract_source_prompt, extract_source_training, translate_autocomplete_task, translate_doctree, translate_registry, translate_docterm, translate_doced, translate_docfind, translate_docform, translate_docpopup, translate_docrecalc, translate_grbitmap, translate_tothefront_draw, translate_tothefront_init, translate_tothefront_sentinel, translate_math,
+from arm64_source import (extract_home_set, extract_home_startup, extract_home_startup_tasks, inject_home_startup_tasks, extract_server_task, extract_user_task, extract_ktask_stack_grow, extract_version_scalars, extract_source_prompt, extract_source_training, translate_autocomplete_task, translate_doctree, translate_registry, translate_docterm, translate_doced, translate_docfind, translate_docform, translate_docpopup, translate_docrecalc, translate_grbitmap, translate_tothefront_draw, translate_tothefront_init, translate_tothefront_sentinel, translate_math,
 translate_tothefront_player_pick, translate_tothefront_ai, translate_filemgr, translate_grdc, translate_grpalette, translate_message, translate_grscreen, translate_ktask, translate_winmgr, translate_win_focus_trace, translate_job_focus_trace, translate_sched_focus_trace, translate_zsplash, translate_home_once, translate_span_worker_cleanup, translate_keepaway_nearest_ball, translate_stock_game_math_calls, translate_empty_label_statement, translate_wenceslas, translate_progress, translate_xcaliber_shot_return, translate_xcaliber_draw_visibility, translate_xcaliber_key_descriptors, translate_xcaliber_fire_trace, translate_xcaliber_escape_scan, translate_xcaliber_held_input)
-from arm64_source import translate_pick3d_class_terminator, translate_classmeta_callback
-from arm64_source import translate_mathode
+from arm64_source import (translate_pick3d_class_terminator,
+                          translate_classmeta_callback,
+                          translate_database_classrep)
+from arm64_source import translate_blackdiamond_math_dependency
+from arm64_source import translate_polezeros_math_dependency
+from arm64_source import (translate_mathode, translate_conversion_math,
+                          translate_f32_math, translate_vec3_math,
+                          translate_vec4_math, translate_mat4_math,
+                          translate_ndarray_math, translate_math_test_dependencies)
 from arm64_source import translate_debug_compat
-from arm64_source import translate_mandel_single_cpu
+from arm64_source import (translate_mandel_single_cpu,
+                          translate_make_tos_dependency,
+                          translate_interrupt_demo_svc, translate_andnotmod_benchmark,
+                          translate_cpurep_arm64,
+                          translate_pci_interrupts_gic_note,
+                          translate_multicore_interrupts_cooperative,
+                          translate_multicore_radix_single_cpu,
+                          translate_ring3_svc)
+from arm64_source import translate_tos_config_boot_memory
+from arm64_source import translate_elephant_walk_default_dc
+from arm64_source import translate_fonted_draw_callback, translate_wallpaper_compiler_stat
 
 root = Path(__file__).resolve().parent.parent
+cpurep_source = (root / 'upstream/pinned/System/Utils/CPURep.ZC').read_bytes()
+cpurep_overlay = translate_cpurep_arm64(cpurep_source)
+assert b'SysRep(SMBIOSt_PROCESSOR)' not in cpurep_overlay
+assert b'SMBIOS processor details are unavailable on this AArch64 platform.' in cpurep_overlay
+assert b'AArch64 %03X active cores' in cpurep_overlay
+try:
+    translate_cpurep_arm64(cpurep_source.replace(b'SysRep(', b'Wrong(', 1))
+except ValueError:
+    pass
+else:
+    raise AssertionError('CPURep overlay must reject a changed SMBIOS call site')
+print('PASS ARM64 CPURep avoids the x86 SMBIOS dependency and reports core/timer facts',
+      flush=True)
+
+string_utilities = extract_string_utilities(
+    (root / 'upstream/pinned/Kernel/StrA.ZC').read_bytes(),
+    (root / 'upstream/pinned/Kernel/StrB.ZC').read_bytes())
+assert re.search(rb'U32\s+char_bmp_word\[16\]', string_utilities)
+assert re.search(rb'U32\s+char_bmp_hex_numeric\[16\]', string_utilities)
+assert re.search(rb'U32\s+char_bmp_white_space\[16\]', string_utilities)
+print('PASS ARM64 string utility overlay exports pinned word/hex/whitespace bitmaps',
+      flush=True)
+
+fonted_source = (root / 'upstream/pinned/Demo/Graphics/FontEd.ZC').read_bytes()
+fonted_overlay = translate_fonted_draw_callback(fonted_source)
+assert b'U0\t\t(*old_draw_it)(CTask *task, CDC *dc) = Fs->draw_it;' in fonted_overlay
+assert b'U8\t\t old_draw_it = Fs->draw_it;' not in fonted_overlay
+try:
+    translate_fonted_draw_callback(fonted_source.replace(b'old_draw_it', b'old_draw_fn', 1))
+except ValueError:
+    pass
+else:
+    raise AssertionError('FontEd overlay accepted changed callback save declaration')
+print('PASS guarded FontEd ARM64 callback-width overlay', flush=True)
+
+wallpaper_source = (root / 'upstream/pinned/System/WallPaper.ZC').read_bytes()
+wallpaper_overlay = translate_wallpaper_compiler_stat(wallpaper_source)
+assert wallpaper_overlay.count(b'"N/A"') == 2
+assert b'cmp.compiled_lines' not in wallpaper_overlay
+assert wallpaper_overlay.count(b'%12ts%12td%12td') == 2
+assert b'WallPaperTaskMemAlloced(task)' in wallpaper_overlay
+assert b'WallPaperTaskMemUsed(task)' in wallpaper_overlay
+assert b'= TaskMemAlloced(task)' not in wallpaper_overlay
+assert b'= TaskMemUsed(task)' not in wallpaper_overlay
+assert b'return WallPaperTaskMemUsed(task);' in wallpaper_overlay
+assert b'CSMBIOSSystemInfo' not in wallpaper_overlay
+assert b'sys_bootloader_id' not in wallpaper_overlay
+assert b"wall->host_ch = '?';" in wallpaper_overlay
+assert b"wall->bootm_ch = 'U';" in wallpaper_overlay
+assert b"wall->bootl_ch = 'L';" in wallpaper_overlay
+assert b"wall->boots_ch = '?';" in wallpaper_overlay
+try:
+    translate_wallpaper_compiler_stat(wallpaper_source.replace(
+        b'cmp.compiled_lines', b'compiler.lines', 1))
+except ValueError:
+    pass
+else:
+    raise AssertionError('Wallpaper overlay accepted changed compiler counter source')
+print('PASS guarded ARM64 wallpaper with unavailable compiler counter shown as N/A', flush=True)
+
 debug_overlay = translate_debug_compat(
     (root / 'upstream/pinned/System/Debug.ZC').read_bytes(),
     (root / 'upstream/pinned/Kernel/KDebug.ZC').read_bytes())
@@ -29,8 +107,16 @@ print('PASS ARM64 portable debugger overlay includes upstream Dump without x86 r
 classmeta_source = (root / 'upstream/pinned/Demo/ClassMeta.ZC').read_bytes()
 classmeta_overlay = translate_classmeta_callback(classmeta_source)
 assert b'output_fun &RankOut' not in classmeta_overlay
-assert b'percentile "54.20"' in classmeta_overlay
-assert b'" percentile: %s", percentile_str;' in classmeta_overlay
+
+database_source = (root / 'upstream/pinned/Demo/Disk/DataBase.ZC').read_bytes()
+database_overlay = translate_database_classrep(database_source)
+assert b'DocPrint(DocPut' in database_overlay
+assert b'a.name, a.addr' in database_overlay
+assert b'ClassRep(&a)' not in database_overlay
+print('PASS ARM64 DataBase field display overlay preserves the stock record layout',
+      flush=True)
+assert b'percentile 54.20;' in classmeta_overlay
+assert b'" percentile: %.2f", field.percentile;' in classmeta_overlay
 assert b'RankOut(*q);' in classmeta_overlay
 try:
     translate_classmeta_callback(classmeta_source.replace(b'&RankOut', b'&Other', 1))
@@ -52,7 +138,7 @@ print('PASS guarded Pick3D PCSprite class terminator overlay', flush=True)
 
 mandel_source = (root / 'upstream/pinned/Demo/Graphics/Mandel.ZC').read_bytes()
 mandel_overlay = translate_mandel_single_cpu(mandel_source)
-assert b'I64 numCores = mp_count > 1 ? mp_count - 1 : 1;' in mandel_overlay
+assert b'I64 numCores = mp_count - 1 + (mp_count <= 1);' in mandel_overlay
 assert b'if (mp_count > 1)' in mandel_overlay
 assert b'JobQueue(&MandelFrame, i, i+1);' in mandel_overlay
 assert b'MandelFrame(0);' in mandel_overlay
@@ -64,6 +150,50 @@ except ValueError:
 else:
     raise AssertionError('Mandel overlay accepted changed worker dispatch')
 print('PASS guarded Mandel single-CPU fallback preserves multi-CPU dispatch', flush=True)
+
+elephant_source = (root / 'upstream/pinned/Demo/Games/ElephantWalk.ZC').read_bytes()
+elephant_overlay = translate_elephant_walk_default_dc(elephant_source)
+assert b'DCSymmetrySet(gr.dc, x, y, x, y - 1);' in elephant_overlay
+try:
+    translate_elephant_walk_default_dc(elephant_source.replace(
+        b'DCSymmetrySet(, x, y, x, y - 1);',
+        b'DCSymmetrySet(gr.dc, x, y, x, y - 1);', 1))
+except ValueError:
+    pass
+else:
+    raise AssertionError('ElephantWalk overlay accepted a changed symmetry call')
+print('PASS guarded ElephantWalk active-CDC symmetry overlay', flush=True)
+
+blackdiamond_source = (root / 'upstream/pinned/Demo/Games/BlackDiamond.ZC').read_bytes()
+blackdiamond_overlay = translate_blackdiamond_math_dependency(blackdiamond_source)
+blackdiamond_draw = b'U0 DrawIt(CTask *, CDC *dc)\n{\n\tI64  i;'
+blackdiamond_expected = (b'#include "/System/Math/Math"\n' +
+                         blackdiamond_source.replace(
+                             blackdiamond_draw,
+                             b'U0 DrawIt(CTask *, CDC *dc)\n{\n'
+                             b'\tDCFill(dc, WHITE);\n\tI64  i;', 1))
+assert blackdiamond_overlay == blackdiamond_expected
+try:
+    translate_blackdiamond_math_dependency(blackdiamond_source.replace(
+        b'Cosh(', b'Cos(', 1))
+except ValueError:
+    pass
+else:
+    raise AssertionError('BlackDiamond overlay accepted changed math dependency')
+print('PASS guarded BlackDiamond stock math dependency overlay', flush=True)
+
+polezeros_source = (root / 'upstream/pinned/Demo/Graphics/PoleZeros.ZC').read_bytes()
+polezeros_overlay = translate_polezeros_math_dependency(polezeros_source)
+assert polezeros_overlay.startswith(b'#include "/System/Math/Math"\n')
+assert polezeros_overlay.count(b'CPoly(') == 2
+try:
+    translate_polezeros_math_dependency(polezeros_source.replace(
+        b'CPoly(', b'ComplexPoly(', 1))
+except ValueError:
+    pass
+else:
+    raise AssertionError('PoleZeros overlay accepted changed complex-math dependency')
+print('PASS guarded PoleZeros shared complex-math dependency overlay', flush=True)
 
 math_source = (root / 'upstream/pinned/System/Math/Math.ZC').read_bytes()
 math_overlay = translate_math(math_source)
@@ -80,6 +210,125 @@ assert b'public F64 Arm64Tri(F64 t, F64 period)' in math_overlay
 assert b'public F64 Arm64FullTri(F64 t, F64 period)' in math_overlay
 assert b'public F64 Arm64Log2(F64 value)' in math_overlay
 assert b'public F64 Arm64Sign(F64 value)' in math_overlay
+
+make_tos_source = (root/'upstream/pinned/Demo/AcctExample/TOS/MakeTOS.ZC').read_bytes()
+make_tos_overlay = translate_make_tos_dependency(make_tos_source)
+assert b'#include "TOSExtern"' in make_tos_overlay
+assert b'#include "TOSExt"' not in make_tos_overlay
+try:
+    translate_make_tos_dependency(make_tos_source.replace(
+        b'#include "TOSExt"', b'#include "OtherExt"', 1))
+except ValueError:
+    pass
+else:
+    raise AssertionError('MakeTOS overlay accepted a changed include')
+print('PASS guarded MakeTOS extension dependency correction')
+tos_config_source = (root/'upstream/pinned/Demo/AcctExample/TOS/TOSConfig.ZC').read_bytes()
+tos_config_overlay = translate_tos_config_boot_memory(tos_config_source)
+assert b'CZXE *zxe = mem_boot_base' not in tos_config_overlay
+assert b'switch (INS_REG_MACHINE_NUM)' not in tos_config_overlay
+assert b'switch (0)' in tos_config_overlay
+assert b'DefinePrint("TOS_DEBUG_DISTRO", "0");' in tos_config_overlay
+assert b'DefinePrint("TOS_DEBUG_DISTRO_END", "0");' in tos_config_overlay
+assert b'DefinePrint("CONFIG_DEBUG_DISTRO_FILE"' in tos_config_overlay
+try:
+    translate_tos_config_boot_memory(tos_config_source.replace(
+        b'mem_boot_base', b'boot_image_base', 1))
+except ValueError:
+    pass
+else:
+    raise AssertionError('TOSConfig overlay accepted changed boot-memory source')
+print('PASS guarded ARM64 TOSConfig disabled-debug-distro overlay')
+interrupt_demo_source = (root/'upstream/pinned/Demo/Lectures/InterruptDemo.ZC').read_bytes()
+interrupt_demo_overlay = translate_interrupt_demo_svc(interrupt_demo_source)
+assert b'\nasm {' not in interrupt_demo_overlay
+assert b'_extern _ARM64_SVC_BENCH U0 Arm64SvcBench();' in interrupt_demo_overlay
+assert b'_extern _ARM64_SVC_BENCH_COUNT U64 Arm64SvcBenchCount();' in interrupt_demo_overlay
+assert b'Arm64SvcBench;' in interrupt_demo_overlay
+assert b'Arm64SvcBenchCount' in interrupt_demo_overlay
+assert b'AArch64 SVC timer ticks:' in interrupt_demo_overlay
+assert b'IntEntrySet' not in interrupt_demo_overlay
+try:
+    translate_interrupt_demo_svc(interrupt_demo_source.replace(
+        b'I_F_UNARY_MINUS', b'I_F_NEGATE', 1))
+except ValueError:
+    pass
+else:
+    raise AssertionError('InterruptDemo overlay accepted a changed benchmark')
+print('PASS guarded AArch64 InterruptDemo SVC benchmark overlay')
+andnotmod_source = (root/'upstream/pinned/Demo/Lectures/AndNotMod.ZC').read_bytes()
+andnotmod_overlay = translate_andnotmod_benchmark(andnotmod_source)
+assert b'#define SAMPLE_SIZE \t\t1000000' in andnotmod_overlay
+assert b'Remainder Version #1 Timer Ticks' in andnotmod_overlay
+assert b'Remainder Version #2 Timer Ticks' in andnotmod_overlay
+assert b'#define SAMPLE_SIZE \t\t100000000' not in andnotmod_overlay
+try:
+    translate_andnotmod_benchmark(andnotmod_source.replace(
+        b'#define SAMPLE_SIZE \t\t100000000',
+        b'#define SAMPLE_SIZE \t\t10000000', 1))
+except ValueError:
+    pass
+else:
+    raise AssertionError('AndNotMod overlay accepted changed sample size')
+print('PASS guarded ARM64 AndNotMod timing and bounded TCG sample overlay')
+pcie_source = (root/'upstream/pinned/Demo/Lectures/PCIInterrupts.ZC').read_bytes()
+pcie_overlay = translate_pci_interrupts_gic_note(pcie_source)
+assert b'IOAPIC' in pcie_overlay and b'GIC' in pcie_overlay
+assert b'LAPIC_EOI' not in pcie_overlay and b'IOAPIC_REG' not in pcie_overlay
+try:
+    translate_pci_interrupts_gic_note(pcie_source.replace(
+        b'#assert I_USER == 0x40', b'#assert I_USER == 0x41', 1))
+except ValueError:
+    pass
+else:
+    raise AssertionError('PCIInterrupts overlay accepted a changed source')
+print('PASS guarded PCIInterrupts AArch64 GIC capability note')
+multicore_interrupt_source = (root/'upstream/pinned/Demo/MultiCore/Interrupts.ZC').read_bytes()
+multicore_interrupt_overlay = translate_multicore_interrupts_cooperative(
+    multicore_interrupt_source)
+assert b'RoundRobinTaskA' in multicore_interrupt_overlay
+assert b'Yield;' in multicore_interrupt_overlay
+assert b'MPInt(' not in multicore_interrupt_overlay
+assert b'Guest logical CPUs: %d' in multicore_interrupt_overlay
+try:
+    translate_multicore_interrupts_cooperative(multicore_interrupt_source.replace(
+        b'MPInt(int_on, 1);', b'MPInt(int_on, 2);', 1))
+except ValueError:
+    pass
+else:
+    raise AssertionError('MultiCore/Interrupts overlay accepted a changed source')
+print('PASS guarded cooperative AArch64 MultiCore/Interrupts overlay')
+multicore_radix_source = (root/'upstream/pinned/Demo/MultiCore/MPRadix.ZC').read_bytes()
+multicore_radix_overlay = translate_multicore_radix_single_cpu(multicore_radix_source)
+assert b'One guest CPU: running the radix stage with one worker.' in multicore_radix_overlay
+assert b'b[0] = MAlloc(NUM * sizeof(I32));' in multicore_radix_overlay
+assert b'MemCopy(b[0], arg1, NUM * sizeof(I32));' in multicore_radix_overlay
+assert b'if (my_mp_count > 1)' in multicore_radix_overlay
+assert b'throw(\'MultCore\')' not in multicore_radix_overlay
+try:
+    translate_multicore_radix_single_cpu(multicore_radix_source.replace(
+        b'if (my_mp_count < 2)', b'if (my_mp_count < 3)', 1))
+except ValueError:
+    pass
+else:
+    raise AssertionError('MPRadix overlay accepted a changed source')
+print('PASS guarded single-worker ARM64 MPRadix fallback')
+ring3_source = (root/'upstream/pinned/Demo/Lectures/Ring3.ZC').read_bytes()
+ring3_overlay = translate_ring3_svc(ring3_source)
+assert b'asm {' not in ring3_overlay
+assert b'_extern _ARM64_SVC_BENCH U0 Arm64SvcBench();' in ring3_overlay
+assert b'_extern _ARM64_SVC_BENCH_COUNT U64 Arm64SvcBenchCount();' in ring3_overlay
+assert b'Arm64SvcBench;' in ring3_overlay
+assert b'EL0 user tasks are not implemented' in ring3_overlay
+assert b'R3_START' not in ring3_overlay and b'INT_TO_RING0' not in ring3_overlay
+try:
+    translate_ring3_svc(ring3_source.replace(
+        b'INT_TO_RING0::', b'INT_TO_PRIVILEGE::', 1))
+except ValueError:
+    pass
+else:
+    raise AssertionError('Ring3 overlay accepted changed pinned source')
+print('PASS guarded AArch64 Ring3 SVC adaptation')
 assert translate_stock_game_math_calls(
     b'x=Tri(t,1);y=FullTri(t,1);z=Log2(x);q=Sign(y);', tri_count=1,
     full_tri_count=1, log2_count=1, sign_count=1) == (
@@ -101,6 +350,16 @@ wenceslas_overlay = translate_wenceslas(wenceslas_source)
 assert b'Sire, the night is darker now' in wenceslas_overlay
 assert wenceslas_overlay.count(b'PopUpOk("') > wenceslas_source.count(b'PopUpOk("')
 assert max(len(chunk) for chunk in re.findall(rb'PopUpOk\("(.*?)"\);', wenceslas_overlay, re.S)) < 144
+assert b'if (sc.u8[0] == SC_CURSOR_RIGHT)' in wenceslas_overlay
+assert b'switch (sc.u8[0])' not in wenceslas_overlay
+assert all(code in wenceslas_overlay for code in (
+    b'SC_CURSOR_LEFT', b'SC_CURSOR_DOWN', b'SC_CURSOR_UP'))
+assert b'StepNew(Fs, king_x, king_y, king_' in wenceslas_overlay
+assert b'#define ARM64_STEP_CAP 256' in wenceslas_overlay
+assert b'#define ARM64_KING_STEP_CAP 128' in wenceslas_overlay
+assert b'MAlloc(sizeof(Step), task)' not in wenceslas_overlay
+assert b'QueueInsert(tmps, king_step_head.last)' not in wenceslas_overlay
+assert b'QueueInsert(tmps, step_head.last)' not in wenceslas_overlay
 progress_source = (root / 'upstream/pinned/Demo/Progress.ZC').read_bytes()
 progress_overlay = translate_progress(progress_source)
 assert b'asm {' not in progress_overlay and b'Yield;' in progress_overlay
@@ -193,6 +452,9 @@ assert (b'monotonic_timeout_ns = ZcMonotonicNs() + '
         b'(timeout_time - tS) * 1000000000.0;') in mathode_overlay
 assert b'monotonic_timeout_ns = timeout_time * 1000000000.0;' not in mathode_overlay
 assert b'if (ZcMonotonicNs() > monotonic_timeout_ns)' in mathode_overlay
+assert (b'ode_steps = 0;\n'
+        b'\t\t\t\t\t\twhile (ode->t < t_desired)' in mathode_overlay)
+assert b'if (++ode_steps >= 16 && ode->t < t_desired)' in mathode_overlay
 try:
     translate_mathode(mathode_source.replace(
         b'timeout_time = start_time +', b'timeout_time = other_epoch +', 1))
@@ -200,7 +462,7 @@ except ValueError:
     pass
 else:
     raise AssertionError('MathODE overlay accepted changed guest timeout calculation')
-print('PASS guarded MathODE host/guest monotonic deadline overlay', flush=True)
+print('PASS guarded MathODE monotonic deadline and bounded RK-step overlay', flush=True)
 
 tothefront_players = (root / 'upstream/pinned/Apps/ToTheFront/ToTheFront.ZC').read_bytes()
 tothefront_player_overlay = translate_tothefront_player_pick(tothefront_players)
@@ -356,7 +618,7 @@ assert ('if (clear)\n    {\n        bootstrap_menu_focus_task = NULL;\n'
         '        ZcFocusTrace("MenuRestore", sys_focus_task, bootstrap_menu_focus_task);\n'
         '        sys_focus_task = bootstrap_menu_focus_task;') in menu_focus
 assert 'I64 best_score, best_score0, best_score1;' in task_bridge
-for sound_compat in ('U0 Play(U8 *music=NULL, ...)', 'U0 SoundTaskEndCB()',
+for sound_compat in ('public U0 Play(U8 *st, U8 *words=NULL)', 'U0 SoundTaskEndCB()',
                      'U0 Sweep(I64 frequency, I64 duration, I64 end_frequency)',
                      'Bool FileOcc(U8 *needle, U8 *filename, U8 *flags="")'):
     assert sound_compat in task_bridge
@@ -391,7 +653,8 @@ assert 'U32 BootstrapWallpaperCell(U32 cell, I64 x, I64 y)' in wallpaper
 assert 'if (!z_buf[index + x])' in wallpaper
 assert 'cells[index + x] = BootstrapWallpaperCell(' in wallpaper
 assert 'active_gr->fp_wall_paper != &BootstrapWinPaper' in wallpaper
-assert 'active_gr->fp_wall_paper = &BootstrapWinPaper;' in task_bridge
+assert 'if (active_gr && !active_gr->fp_wall_paper)' in task_bridge
+assert 'BootstrapEnsureWinPaper(active_gr);' in task_bridge
 assert task_bridge.count('BootstrapWallpaperApply();') >= 3
 assert 'BootstrapWallpaperChecks() != 0x2a' in (root / 'tests/compat/GrScreenFinalUpdate.ZC').read_text()
 upstream_grscreen = (root / 'upstream/pinned/System/Gr/GrScreen.ZC').read_text()
@@ -407,6 +670,14 @@ for path, transform, original, changed in (
     ('System/DolDoc/DocTree.ZC', translate_doctree, b'LexAttachDoc(cc,, doc);', b'LexAttachDoc(cc,, other);'),
     ('System/Registry.ZC', translate_registry, b'if (!sys_registry_doc)', b'if (sys_registry_doc)'),
     ('Kernel/KGlobals.ZC', extract_version_scalars, b'sys_os_version_sub', b'other_version_sub'),
+    ('System/Math/Conversion.ZC', translate_conversion_math, b'asm\n{', b'legacy block\n{'),
+    ('System/Math/F32.ZC', translate_f32_math, b'asm\n{', b'legacy block\n{'),
+    ('System/Math/Vec3.ZC', translate_vec3_math, b'asm\n{', b'legacy block\n{'),
+    ('System/Math/Vec4.ZC', translate_vec4_math, b'asm\n{', b'legacy block\n{'),
+    ('System/Math/Mat4.ZC', translate_mat4_math, b'asm\n{', b'legacy block\n{'),
+    ('System/Math/NDArray.ZC', translate_ndarray_math,
+     b'switch (type)\n\t{\n\t\tcase NDARRAY_I32:\n\t\t\tFree(arr->I32Buf);',
+     b'switch (other_type)\n\t{\n\t\tcase NDARRAY_I32:\n\t\t\tFree(arr->I32Buf);'),
 ):
     source = (root / 'upstream/pinned' / path).read_bytes()
     translated = transform(source)
@@ -423,6 +694,85 @@ for path, transform, original, changed in (
         pass
     else:
         raise AssertionError('overlay accepted changed dependency: ' + path)
+conversion = translate_conversion_math(
+    (root / 'upstream/pinned/System/Math/Conversion.ZC').read_bytes()).decode('utf-8')
+assert 'asm\n{' not in conversion
+for name in ('F64ToF32', 'F32ToF64', 'F32RadToDeg', 'F32DegToRad'):
+    assert f'extern ' in conversion and name in conversion
+f32_math = translate_f32_math(
+    (root / 'upstream/pinned/System/Math/F32.ZC').read_bytes()).decode('utf-8')
+assert 'asm\n{' not in f32_math
+assert 'extern F32 CosF32(F32 theta);' in f32_math
+vec3_math = translate_vec3_math(
+    (root / 'upstream/pinned/System/Math/Vec3.ZC').read_bytes()).decode()
+assert 'asm\n{' not in vec3_math
+assert 'U0 Vector3DPrint(CVector3D *v)' in vec3_math
+for name in ('Vector3DInit', 'Vector3DCopy', 'Vector3DIsEqual', 'Vector3DAdd',
+             'Vector3DAddS', 'Vector3DSub', 'Vector3DSubS', 'Vector3DMul',
+             'Vector3DMulS', 'Vector3DDiv', 'Vector3DDivS', 'Vector3DMin',
+             'Vector3DMax', 'Vector3DNegate', 'Vector3DNormalize',
+             'Vector3DDot', 'Vector3DCross'):
+    assert name in vec3_math
+vec4_math = translate_vec4_math(
+    (root / 'upstream/pinned/System/Math/Vec4.ZC').read_bytes()).decode('utf-8')
+assert 'asm\n{' not in vec4_math
+assert 'U0 Vector4DPrint(CVector4D *v)' in vec4_math
+for name in ('Vector4DInit', 'Vector4DCopy', 'Vector4DIsEqual', 'Vector4DAdd',
+             'Vector4DAddS', 'Vector4DSub', 'Vector4DSubS', 'Vector4DMul',
+             'Vector4DMulS', 'Vector4DDiv', 'Vector4DDivS', 'Vector4DMin',
+             'Vector4DMax', 'Vector4DNegate', 'Vector4DDot'):
+    assert f'extern ' in vec4_math and name in vec4_math
+mat4_math = translate_mat4_math(
+    (root / 'upstream/pinned/System/Math/Mat4.ZC').read_bytes()).decode('utf-8')
+assert 'asm\n{' not in mat4_math
+assert 'U0 Matrix4DPrint(CMatrix4D *m)' in mat4_math
+for name in ('Matrix4DMulVector4D', 'Matrix4DMul', 'Matrix4DTranspose'):
+    assert 'extern ' in mat4_math and name in mat4_math
+assert 'extern U0 Matrix4DTranslationSet(' in mat4_math
+assert 'extern U0 Matrix4DScaleSet(' in mat4_math
+ndarray_math = translate_ndarray_math(
+    (root / 'upstream/pinned/System/Math/NDArray.ZC').read_bytes()).decode('utf-8')
+assert ndarray_math.startswith('#include "Types"\n')
+array_free = ndarray_math[ndarray_math.index('U0 ArrayFree('):]
+assert 'switch (arr->type)' in array_free
+assert 'arr->I64Buf = MAllocAligned(sizeof(I64) * arr->size, 16);' in ndarray_math
+assert 'arr->F32Buf = MAllocAligned(sizeof(F32) * arr->size, 16);' in ndarray_math
+assert 'arr->F64Buf = CAllocAligned(sizeof(F64) * arr->size, 16);' in ndarray_math
+assert 'arr->F64Buf = MAllocAligned(sizeof(F64) * arr->size, 16);' in ndarray_math
+math_test_dependencies = {
+    'TestVec.ZC': ('Types', 'Conversion', 'F32', 'Vec4', 'Vec3'),
+    'TestMat4.ZC': ('Types', 'Conversion', 'F32', 'Vec4', 'Vec3', 'Mat4'),
+    'TestF32.ZC': ('Types', 'Conversion', 'F32', 'Math'),
+}
+for name, dependencies in math_test_dependencies.items():
+    pinned_math_test = (root / 'upstream/pinned/System/Math/Tests' / name).read_bytes()
+    translated_math_test = translate_math_test_dependencies(pinned_math_test, name)
+    assert translated_math_test.startswith(
+        ''.join(f'#include "/System/Math/{dep}"\n' for dep in dependencies).encode())
+    assert translated_math_test.endswith(pinned_math_test)
+    try:
+        translate_math_test_dependencies(pinned_math_test.replace(b'Cd(__DIR__);;', b'Cd("/");;', 1), name)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError('Math test overlay accepted changed source boundary: ' + name)
+    for dependency in dependencies:
+        try:
+            translate_math_test_dependencies(
+                pinned_math_test.replace(b'Cd(__DIR__);;',
+                    f'#include "/System/Math/{dependency}"\nCd(__DIR__);;'.encode(), 1), name)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError('Math test overlay accepted duplicate include: ' + name)
+version_scalars = extract_version_scalars(
+    (root / 'upstream/pinned/Kernel/KGlobals.ZC').read_bytes()).decode('utf-8')
+version_match = re.search(r'sys_os_version = ([0-9.]+);\nU64\s+'
+                          r'sys_os_version_sub = ([0-9]+);', version_scalars)
+assert version_match
+for name in ('sys_os_version_str', 'sys_os_version_full', 'sys_os_version_nice'):
+    assert (f'U8 *{name} = "ZealOS ARM64 V{version_match[1]}.'
+            f'{version_match[2]}' in version_scalars)
 docterm = (root / 'upstream/pinned/System/DolDoc/DocTerm.ZC').read_bytes()
 assert b'SCX=15$$", STR_LEN - 1);' in translate_docterm(docterm)
 try:
@@ -823,6 +1173,11 @@ ktask_overlay = translate_ktask(ktask_source).decode('utf-8')
 assert ktask_overlay != ktask_source.decode('utf-8')
 assert 'result = ZcCallNOnStack(&tmp->stack_base,' in ktask_overlay
 assert 'fp_addr, argc, argv);' in ktask_overlay
+stack_grow_bridge = extract_ktask_stack_grow(ktask_overlay.encode('utf-8')).decode('utf-8')
+assert 'extern I64 ZcCallNOnStack(' in stack_grow_bridge
+assert 'CTaskStack *TaskStackNew(' in stack_grow_bridge
+assert 'argpop I64 CallStackGrow(' in stack_grow_bridge
+assert 'CallStackGrow: entered' not in stack_grow_bridge
 assert 'asm {' not in ktask_overlay
 assert '#exe {Option(OPTf_NO_REG_VAR, ON);};' not in ktask_overlay
 assert '#exe {Option(OPTf_NO_REG_VAR, OFF);};' not in ktask_overlay
@@ -1055,13 +1410,15 @@ else:
     raise AssertionError('ZSplash overlay accepted changed inline sprite call')
 print('PASS guarded upstream animated ZSplash sprite with native pointer ownership')
 
-# Only raw source-display metadata is removed; program tokens remain pinned.
 docpopup_source = (root / 'upstream/pinned/System/DolDoc/DocPopUp.ZC').read_bytes()
-assert translate_docpopup(docpopup_source) == docpopup_source.replace(b'$WW,0$', b'')
+docpopup_overlay = translate_docpopup(docpopup_source)
+assert b'$WW,0$' not in docpopup_overlay
+assert b'BootstrapGuiTerminalExeDocFile(\\"%Q\\");' in docpopup_overlay
+assert b'res = Sys("#include \\"%s\\";", name2);' in docpopup_overlay
 try:
     translate_docpopup(docpopup_source.replace(b'$WW,0$', b'$WW,1$'))
 except ValueError:
     pass
 else:
     raise AssertionError('DocPopUp overlay accepted changed source metadata')
-print('PASS guarded DocPopUp display-metadata overlay')
+print('PASS guarded DocPopUp overlay retains text and packed document include paths')

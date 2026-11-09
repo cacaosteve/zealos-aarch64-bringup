@@ -1,0 +1,27 @@
+{
+  "date": "2026-11-04",
+  "source_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "target": "AArch64 QEMU virt, PCI, graphical terminal with VirtIO keyboard/tablet",
+  "source_path": "/Demo/Games/Zing.ZC",
+  "source_sha256": "bbdc145b5cd7e3103e202d5afaf741eff583cf6af36e50eb011e585f35f94269",
+  "iso_path": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "7d1fd33f5830079057e71f79cb802c6d60be8fbaea3260fdeea83936d60540aa",
+  "command": "QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device' python3 scripts/check-compat.py --probe-demo-zing",
+  "result": "pass",
+  "checks": [
+    "Launched the unchanged stock /Demo/Games/Zing.ZC from the graphical terminal.",
+    "The expected graphical scene rendered and changed in response to its animation or control input.",
+    "A left-button mouse drag fired an arrow and changed the rendered playfield.",
+    "The terminal evaluated 40+2 as 42 and zstatus reported failed=0."
+  ],
+  "artifacts": {
+    "files": [
+      "build/check-demo-zing-pci.log",
+      "build/gui-demo-zing-initial.ppm",
+      "build/gui-demo-zing-after-shot.ppm",
+      "build/gui-demo-zing-exit-smoke-result.ppm"
+    ],
+    "probe_sha256": "7c28850fa7dc2a3db0e555e1333b3b230ffc22b00d381091cca21d2dd96beeb4"
+  },
+  "scope_note": "QEMU runtime acceptance only; live UTM and Pi hardware behavior are not implied."
+}

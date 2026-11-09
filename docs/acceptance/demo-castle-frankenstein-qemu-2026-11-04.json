@@ -1,0 +1,28 @@
+{
+  "date": "2026-11-04",
+  "source_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "target": "AArch64 QEMU virt with ramfb and VirtIO keyboard/tablet",
+  "source_path": "/Demo/Games/CastleFrankenstein.ZC",
+  "source_sha256": "681658b28d0d0a511d57347b7c77c22902ab412827e8aa6faafc538cde36d72b",
+  "iso_path": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "37d668867af125968664328f83c84c1d6a2d9d02b141a7ca2af530adc89757ef",
+  "command": "QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device' python3 scripts/check-compat.py --probe-demo-castle-frankenstein",
+  "result": "pass",
+  "checks": [
+    "Launched the unchanged pinned /Demo/Games/CastleFrankenstein.ZC from the graphical terminal in a focused application task.",
+    "The game scene rendered with visible graphics.",
+    "Left and Right input each changed the rendered scene.",
+    "Escape restored the graphical terminal; 40+2 evaluated to 42 and zstatus reported failed=0."
+  ],
+  "artifacts": {
+    "files": [
+      "build/check-demo-castle-frankenstein-pci.log",
+      "build/gui-demo-castle-frankenstein-demo-castle-frankenstein-initial.ppm",
+      "build/gui-demo-castle-frankenstein-demo-castle-frankenstein-left.ppm",
+      "build/gui-demo-castle-frankenstein-demo-castle-frankenstein-right.ppm",
+      "build/gui-demo-castle-frankenstein-demo-castle-frankenstein-exit-smoke-result.ppm"
+    ],
+    "probe_sha256": "b51969ffa96e8209ab25899131a938dd959c4419098e19fad37af44462662b55"
+  },
+  "scope_note": "QEMU runtime acceptance only; live UTM and Pi hardware behavior are not implied."
+}

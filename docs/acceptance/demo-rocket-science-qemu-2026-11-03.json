@@ -1,0 +1,22 @@
+{
+  "date": "2026-11-04",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "target": "AArch64 QEMU virt, PCI, graphical terminal",
+  "command": "python3 scripts/check-compat.py --quick --probe-demo-rocket-science --pci",
+  "source_path": "/Demo/Games/RocketScience.ZC",
+  "source_sha256": "1759ad67e28fdab8408c3cb851f1d591ec3c693a83934670a160e99cd10288b6",
+  "result": "pass",
+  "checks": [
+    "RocketScience opened the Anti-spin Coefficient setup and accepted its default value",
+    "A distinct start key reached the app after command-to-app focus transfer; the rocket scene rendered and changed during simulation",
+    "Escape reached the running app (after the distinct start key), completed QueueRemove, ODEDel, DocClear, SettingsPop, DCFill, DCDel, and MenuPop, and returned focus to the graphical Terminal",
+    "The graphical terminal accepted 40+2; after app exit and displayed ans=0x2A=42; zstatus reported failed=0"
+  ],
+  "artifacts": {
+    "build/zealos-aarch64-hello.iso": "5765b8d4c11185330059a15ca3963e2fe009277243a6e06715b35f0d9e1453a1",
+    "scripts/check-compat.py": "b4e8157c3edeec95af7e790a8b83c3eb8de0c0430267c97c2e9f85c4ea5fad51"
+  },
+  "log": "build/check-demo-rocket-science-pci.log",
+  "log_sha256": "0bed2922612238d589cc939948cefaffd02ccce64e8515f59d92a25b623b4e5c",
+  "scope_note": "Automated AArch64 QEMU virt, PCI, graphical-terminal acceptance. This confirms this probe sequence on the current build; no UTM or Pi hardware acceptance is implied."
+}

@@ -1,0 +1,18 @@
+{
+  "date": "2026-11-02",
+  "command": "python3 scripts/check-compat.py --pci --probe-demo-define",
+  "target": "QEMU PCI graphical terminal",
+  "result": "pass",
+  "program": "/Demo/Define.ZC",
+  "source_path": "upstream/pinned/Demo/Define.ZC",
+  "source_sha256": "9b3ff083db7f616e169288a001a9c5d8e4e136a27d96b62348a3f3d1c3434f01",
+  "verified": [
+    "Spanish localization prompt accepted Yes",
+    "localized Exit prompt rendered as Salida (Si or No)",
+    "Si exited the program and returned to the graphical terminal",
+    "40+2 evaluated as 42 and zstatus failed=0"
+  ],
+  "kernel_sha256": "4daaabe6cc3e9e21bfe3b17b3671c782206d4977ab1bbca62b00f24034d32197",
+  "iso_sha256": "0b03196016aa2c6192ce390675a5e141a641a99d30cc1c1675d5d7340202de3f",
+  "scope_note": "Automated QEMU evidence only; live UTM and physical Pi behavior are not established."
+}

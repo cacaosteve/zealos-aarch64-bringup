@@ -1,0 +1,7 @@
+// The stock WebLogScramble source invokes its interactive demo on load.
+// Decline that automatic whole-directory action in the headless probe; the
+// probe then calls the stock WebLogScramble function on one disposable log.
+Bool AreYouSure()
+{
+	return FALSE;
+}

@@ -1,0 +1,25 @@
+{
+  "date": "2026-11-02",
+  "command": "python3 scripts/check-compat.py --pci --probe-demo-paren-warn",
+  "target": "QEMU PCI graphical terminal",
+  "result": "partial",
+  "scope": "Compares OPTf_WARN_PAREN behavior for interactive expressions, ExePutS source text, and the original ParenWarn.ZC executed through ExeFile2; checks terminal recovery.",
+  "programs": [
+    {
+      "path": "/Demo/ParenWarn.ZC",
+      "result": "partial",
+      "checks": [
+        "Option(3, ON) followed by OptionGet(3) returned 1, confirming the warning option can be enabled in the interactive compiler context",
+        "Interactive 1+(2+3); emitted WARN:<command>:1:9 Unnecessary parentheses and returned 6",
+        "ExePutS(\"Option(3,ON);1+(2+3);\") returned 6 but no fresh warning appeared in the captured graphical terminal output",
+        "ExeFile2(\"/Demo/ParenWarn.ZC\") returned 1 and control returned to the graphical terminal prompt, but no fresh WARN:/Demo/ParenWarn.ZC diagnostic appeared",
+        "40+2; returned 42 after the demo and zstatus reported failed=0"
+      ]
+    }
+  ],
+  "source_sha256": "f3a06b91e600fbbcdbadfe5c4f55360f130cc3ac4386bce8d3ac4ac55676c613",
+  "kernel_sha256": "b825023863546ad327a8ef5f6b92ddc12e7c1392453a1a6b401182984f285812",
+  "iso_sha256": "7144b76ac31c388b3e64ddb8a41b5c82e46fc17bb7b9f17b14a4a59a85080228",
+  "terminal_capture": "build/gui-catalog-demo-paren-warn-result.txt",
+  "limitation": "ParenWarn compiles and executes; interactive parser warnings work, but warning delivery for ExePutS and ExeFile2 source execution remains unresolved. This is a warning-path partial, not a compile blocker."
+}

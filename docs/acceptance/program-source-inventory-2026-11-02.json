@@ -1,0 +1,5152 @@
+{
+  "date": "2026-11-02",
+  "upstream_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "scope": "All pinned upstream .ZC files; includes runnable entries and non-runnable support modules.",
+  "classification_note": "A .ZC source is not necessarily a standalone program. Apps are grouped by Run.ZC/Load.ZC entry points; Demo files remain source-or-component until individually classified.",
+  "evidence_note": "App implementation sources transitively included by a compiled entrypoint inherit compile-pass evidence only; this does not imply standalone launchability or runtime acceptance. Additional standalone app/demo/support source compile results and compile blockers are linked individually to the 2026-11-02 program and source-context catalogs. Other unreferenced sources remain unverified.",
+  "source_files": 615,
+  "app_directories": 12,
+  "app_entrypoints": 12,
+  "demo_sources": 206,
+  "demo_compile_pass": 206,
+  "demo_compile_blocked": 0,
+  "demo_runtime_accepted": 67,
+  "areas": {
+    "Apps": {
+      "source_files": 70,
+      "compile_pass": 70,
+      "compile_blocked": 0,
+      "compile_unverified": 0,
+      "runtime_pass": 12,
+      "runtime_partial": 0
+    },
+    "Compiler": {
+      "source_files": 31,
+      "compile_pass": 19,
+      "compile_blocked": 1,
+      "compile_unverified": 11,
+      "runtime_pass": 0,
+      "runtime_partial": 0
+    },
+    "Demo": {
+      "source_files": 206,
+      "compile_pass": 206,
+      "compile_blocked": 0,
+      "compile_unverified": 0,
+      "runtime_pass": 67,
+      "runtime_partial": 2
+    },
+    "Doc": {
+      "source_files": 1,
+      "compile_pass": 0,
+      "compile_blocked": 0,
+      "compile_unverified": 1,
+      "runtime_pass": 0,
+      "runtime_partial": 0
+    },
+    "Home": {
+      "source_files": 77,
+      "compile_pass": 18,
+      "compile_blocked": 1,
+      "compile_unverified": 58,
+      "runtime_pass": 0,
+      "runtime_partial": 0
+    },
+    "Kernel": {
+      "source_files": 72,
+      "compile_pass": 0,
+      "compile_blocked": 0,
+      "compile_unverified": 72,
+      "runtime_pass": 0,
+      "runtime_partial": 0
+    },
+    "Misc": {
+      "source_files": 14,
+      "compile_pass": 0,
+      "compile_blocked": 0,
+      "compile_unverified": 14,
+      "runtime_pass": 0,
+      "runtime_partial": 0
+    },
+    "Root": {
+      "source_files": 7,
+      "compile_pass": 0,
+      "compile_blocked": 0,
+      "compile_unverified": 7,
+      "runtime_pass": 0,
+      "runtime_partial": 0
+    },
+    "System": {
+      "source_files": 137,
+      "compile_pass": 15,
+      "compile_blocked": 18,
+      "compile_unverified": 104,
+      "runtime_pass": 0,
+      "runtime_partial": 0
+    }
+  },
+  "sources": [
+    {
+      "path": "/Apps/Budget/BgtAccts.ZC",
+      "area": "Apps",
+      "kind": "app_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
+    },
+    {
+      "path": "/Apps/Budget/BgtEntry.ZC",
+      "area": "Apps",
+      "kind": "app_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
+    },
+    {
+      "path": "/Apps/Budget/BgtFile.ZC",
+      "area": "Apps",
+      "kind": "app_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
+    },
+    {
+      "path": "/Apps/Budget/BgtMain.ZC",
+      "area": "Apps",
+      "kind": "app_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
+    },
+    {
+      "path": "/Apps/Budget/BgtStrs.ZC",
+      "area": "Apps",
+      "kind": "app_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
+    },
+    {
+      "path": "/Apps/Budget/BgtTemplate.ZC",
+      "area": "Apps",
+      "kind": "app_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
+    },
+    {
+      "path": "/Apps/Budget/Budget.ZC",
+      "area": "Apps",
+      "kind": "app_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
+    },
+    {
+      "path": "/Apps/Budget/Install.ZC",
+      "area": "Apps",
+      "kind": "app_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
+    },
+    {
+      "path": "/Apps/Budget/Load.ZC",
+      "area": "Apps",
+      "kind": "app_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
+    },
+    {
+      "path": "/Apps/Budget/Run.ZC",
+      "area": "Apps",
+      "kind": "app_entrypoint",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "runtime_evidence": "docs/acceptance/budget-qemu-2026-11-01.json"
+    },
+    {
+      "path": "/Apps/GrModels/BallGen.ZC",
+      "area": "Apps",
+      "kind": "app_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
+    },
+    {
+      "path": "/Apps/GrModels/Load.ZC",
+      "area": "Apps",
+      "kind": "app_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
+    },
+    {
+      "path": "/Apps/GrModels/ManGen.ZC",
+      "area": "Apps",
+      "kind": "app_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
+    },
+    {
+      "path": "/Apps/GrModels/Models.ZC",
+      "area": "Apps",
+      "kind": "app_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
+    },
+    {
+      "path": "/Apps/GrModels/Run.ZC",
+      "area": "Apps",
+      "kind": "app_entrypoint",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "runtime_evidence": "docs/acceptance/three-d-apps-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Apps/KeepAway/KeepAway.ZC",
+      "area": "Apps",
+      "kind": "app_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
+    },
+    {
+      "path": "/Apps/KeepAway/Load.ZC",
+      "area": "Apps",
+      "kind": "app_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
+    },
+    {
+      "path": "/Apps/KeepAway/Run.ZC",
+      "area": "Apps",
+      "kind": "app_entrypoint",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "runtime_evidence": "docs/acceptance/three-d-apps-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Apps/Logic/Load.ZC",
+      "area": "Apps",
+      "kind": "app_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
+    },
+    {
+      "path": "/Apps/Logic/Logic.ZC",
+      "area": "Apps",
+      "kind": "app_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
+    },
+    {
+      "path": "/Apps/Logic/Run.ZC",
+      "area": "Apps",
+      "kind": "app_entrypoint",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "runtime_evidence": "docs/acceptance/utm-logic-prompt-fix-2026-10-26.json"
+    },
+    {
+      "path": "/Apps/Psalmody/Examples/childish.ZC",
+      "area": "Apps",
+      "kind": "app_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "isolated compile-only component probe"
+    },
+    {
+      "path": "/Apps/Psalmody/Examples/night.ZC",
+      "area": "Apps",
+      "kind": "app_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "isolated compile-only component probe"
+    },
+    {
+      "path": "/Apps/Psalmody/Examples/prosper.ZC",
+      "area": "Apps",
+      "kind": "app_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "isolated compile-only component probe"
+    },
+    {
+      "path": "/Apps/Psalmody/Install.ZC",
+      "area": "Apps",
+      "kind": "app_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "isolated compile-only component probe"
+    },
+    {
+      "path": "/Apps/Psalmody/JukeBox.ZC",
+      "area": "Apps",
+      "kind": "app_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
+    },
+    {
+      "path": "/Apps/Psalmody/JukePuppet.ZC",
+      "area": "Apps",
+      "kind": "app_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
+    },
+    {
+      "path": "/Apps/Psalmody/Load.ZC",
+      "area": "Apps",
+      "kind": "app_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
+    },
+    {
+      "path": "/Apps/Psalmody/Psalmody.ZC",
+      "area": "Apps",
+      "kind": "app_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
+    },
+    {
+      "path": "/Apps/Psalmody/PsalmodyCtrls.ZC",
+      "area": "Apps",
+      "kind": "app_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
+    },
+    {
+      "path": "/Apps/Psalmody/PsalmodyDraw.ZC",
+      "area": "Apps",
+      "kind": "app_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
+    },
+    {
+      "path": "/Apps/Psalmody/PsalmodyFile.ZC",
+      "area": "Apps",
+      "kind": "app_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
+    },
+    {
+      "path": "/Apps/Psalmody/PsalmodyMain.ZC",
+      "area": "Apps",
+      "kind": "app_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
+    },
+    {
+      "path": "/Apps/Psalmody/Run.ZC",
+      "area": "Apps",
+      "kind": "app_entrypoint",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "runtime_evidence": "docs/acceptance/named-apps-qemu-2026-11-01.json"
+    },
+    {
+      "path": "/Apps/Span/Install.ZC",
+      "area": "Apps",
+      "kind": "app_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "isolated compile-only component probe"
+    },
+    {
+      "path": "/Apps/Span/Load.ZC",
+      "area": "Apps",
+      "kind": "app_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
+    },
+    {
+      "path": "/Apps/Span/Run.ZC",
+      "area": "Apps",
+      "kind": "app_entrypoint",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "runtime_evidence": "docs/acceptance/named-apps-qemu-2026-11-01.json"
+    },
+    {
+      "path": "/Apps/Span/SpanBridge.ZC",
+      "area": "Apps",
+      "kind": "app_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
+    },
+    {
+      "path": "/Apps/Span/SpanDerive.ZC",
+      "area": "Apps",
+      "kind": "app_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
+    },
+    {
+      "path": "/Apps/Span/SpanMain.ZC",
+      "area": "Apps",
+      "kind": "app_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
+    },
+    {
+      "path": "/Apps/Span/SpanNew.ZC",
+      "area": "Apps",
+      "kind": "app_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
+    },
+    {
+      "path": "/Apps/Strut/Load.ZC",
+      "area": "Apps",
+      "kind": "app_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
+    },
+    {
+      "path": "/Apps/Strut/Run.ZC",
+      "area": "Apps",
+      "kind": "app_entrypoint",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "runtime_evidence": "docs/acceptance/named-apps-qemu-2026-11-01.json"
+    },
+    {
+      "path": "/Apps/Strut/Strut.ZC",
+      "area": "Apps",
+      "kind": "app_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
+    },
+    {
+      "path": "/Apps/TimeClock/Install.ZC",
+      "area": "Apps",
+      "kind": "app_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
+    },
+    {
+      "path": "/Apps/TimeClock/Load.ZC",
+      "area": "Apps",
+      "kind": "app_entrypoint",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "runtime_evidence": "docs/acceptance/named-apps-qemu-2026-11-01.json"
+    },
+    {
+      "path": "/Apps/TimeClock/TimeClk.ZC",
+      "area": "Apps",
+      "kind": "app_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
+    },
+    {
+      "path": "/Apps/Titanium/Load.ZC",
+      "area": "Apps",
+      "kind": "app_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
+    },
+    {
+      "path": "/Apps/Titanium/Run.ZC",
+      "area": "Apps",
+      "kind": "app_entrypoint",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "runtime_evidence": "docs/acceptance/three-d-apps-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Apps/Titanium/Titanium.ZC",
+      "area": "Apps",
+      "kind": "app_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
+    },
+    {
+      "path": "/Apps/ToTheFront/AIs/Human.ZC",
+      "area": "Apps",
+      "kind": "app_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "isolated compile-only component probe"
+    },
+    {
+      "path": "/Apps/ToTheFront/AIs/SimpleAI.ZC",
+      "area": "Apps",
+      "kind": "app_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "isolated compile-only component probe"
+    },
+    {
+      "path": "/Apps/ToTheFront/Install.ZC",
+      "area": "Apps",
+      "kind": "app_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "isolated compile-only component probe"
+    },
+    {
+      "path": "/Apps/ToTheFront/Load.ZC",
+      "area": "Apps",
+      "kind": "app_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
+    },
+    {
+      "path": "/Apps/ToTheFront/Run.ZC",
+      "area": "Apps",
+      "kind": "app_entrypoint",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "runtime_evidence": "docs/acceptance/named-apps-qemu-2026-11-01.json"
+    },
+    {
+      "path": "/Apps/ToTheFront/TTFDraw.ZC",
+      "area": "Apps",
+      "kind": "app_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
+    },
+    {
+      "path": "/Apps/ToTheFront/TTFFire.ZC",
+      "area": "Apps",
+      "kind": "app_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
+    },
+    {
+      "path": "/Apps/ToTheFront/TTFGlobals.ZC",
+      "area": "Apps",
+      "kind": "app_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
+    },
+    {
+      "path": "/Apps/ToTheFront/TTFInit.ZC",
+      "area": "Apps",
+      "kind": "app_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
+    },
+    {
+      "path": "/Apps/ToTheFront/TTFLib.ZC",
+      "area": "Apps",
+      "kind": "app_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
+    },
+    {
+      "path": "/Apps/ToTheFront/TTFMove.ZC",
+      "area": "Apps",
+      "kind": "app_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
+    },
+    {
+      "path": "/Apps/ToTheFront/TTFVis.ZC",
+      "area": "Apps",
+      "kind": "app_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
+    },
+    {
+      "path": "/Apps/ToTheFront/ToTheFront.ZC",
+      "area": "Apps",
+      "kind": "app_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
+    },
+    {
+      "path": "/Apps/Vocabulary/Load.ZC",
+      "area": "Apps",
+      "kind": "app_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
+    },
+    {
+      "path": "/Apps/Vocabulary/Run.ZC",
+      "area": "Apps",
+      "kind": "app_entrypoint",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "runtime_evidence": "docs/acceptance/vocabulary-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Apps/Vocabulary/VocabQuiz.ZC",
+      "area": "Apps",
+      "kind": "app_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
+    },
+    {
+      "path": "/Apps/X-Caliber/Load.ZC",
+      "area": "Apps",
+      "kind": "app_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
+    },
+    {
+      "path": "/Apps/X-Caliber/Run.ZC",
+      "area": "Apps",
+      "kind": "app_entrypoint",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "runtime_evidence": "docs/acceptance/named-apps-qemu-2026-11-01.json"
+    },
+    {
+      "path": "/Apps/X-Caliber/X-Caliber.ZC",
+      "area": "Apps",
+      "kind": "app_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
+    },
+    {
+      "path": "/Apps/X-Caliber/XCCtrls.ZC",
+      "area": "Apps",
+      "kind": "app_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "transitively included by a compiled App entrypoint; compile only"
+    },
+    {
+      "path": "/Compiler/Asm.ZC",
+      "area": "Compiler",
+      "kind": "support_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "live-kernel namespace compile-only probe"
+    },
+    {
+      "path": "/Compiler/AsmInit.ZC",
+      "area": "Compiler",
+      "kind": "support_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "live-kernel namespace compile-only probe"
+    },
+    {
+      "path": "/Compiler/AsmLib.ZC",
+      "area": "Compiler",
+      "kind": "support_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "live-kernel namespace compile-only probe"
+    },
+    {
+      "path": "/Compiler/AsmResolve.ZC",
+      "area": "Compiler",
+      "kind": "support_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "live-kernel namespace compile-only probe"
+    },
+    {
+      "path": "/Compiler/BackA.ZC",
+      "area": "Compiler",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Compiler/BackB.ZC",
+      "area": "Compiler",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Compiler/BackC.ZC",
+      "area": "Compiler",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Compiler/BackFA.ZC",
+      "area": "Compiler",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Compiler/BackFB.ZC",
+      "area": "Compiler",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Compiler/BackLib.ZC",
+      "area": "Compiler",
+      "kind": "support_or_component",
+      "compile": "blocked",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "compile probe failed; see source-context diagnostic"
+    },
+    {
+      "path": "/Compiler/CExcept.ZC",
+      "area": "Compiler",
+      "kind": "support_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "live-kernel namespace compile-only probe"
+    },
+    {
+      "path": "/Compiler/CExterns.ZC",
+      "area": "Compiler",
+      "kind": "support_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "live-kernel namespace compile-only probe"
+    },
+    {
+      "path": "/Compiler/CHash.ZC",
+      "area": "Compiler",
+      "kind": "support_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "live-kernel namespace compile-only probe"
+    },
+    {
+      "path": "/Compiler/CInit.ZC",
+      "area": "Compiler",
+      "kind": "support_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "live-kernel namespace compile-only probe"
+    },
+    {
+      "path": "/Compiler/CMain.ZC",
+      "area": "Compiler",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Compiler/CMisc.ZC",
+      "area": "Compiler",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Compiler/Lex.ZC",
+      "area": "Compiler",
+      "kind": "support_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "live-kernel namespace compile-only probe"
+    },
+    {
+      "path": "/Compiler/LexLib.ZC",
+      "area": "Compiler",
+      "kind": "support_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "live-kernel namespace compile-only probe"
+    },
+    {
+      "path": "/Compiler/OptLib.ZC",
+      "area": "Compiler",
+      "kind": "support_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "live-kernel namespace compile-only probe"
+    },
+    {
+      "path": "/Compiler/OptPass012.ZC",
+      "area": "Compiler",
+      "kind": "support_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "live-kernel namespace compile-only probe"
+    },
+    {
+      "path": "/Compiler/OptPass3.ZC",
+      "area": "Compiler",
+      "kind": "support_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "live-kernel namespace compile-only probe"
+    },
+    {
+      "path": "/Compiler/OptPass4.ZC",
+      "area": "Compiler",
+      "kind": "support_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "live-kernel namespace compile-only probe"
+    },
+    {
+      "path": "/Compiler/OptPass5.ZC",
+      "area": "Compiler",
+      "kind": "support_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "live-kernel namespace compile-only probe"
+    },
+    {
+      "path": "/Compiler/OptPass6.ZC",
+      "area": "Compiler",
+      "kind": "support_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "live-kernel namespace compile-only probe"
+    },
+    {
+      "path": "/Compiler/OptPass789A.ZC",
+      "area": "Compiler",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Compiler/ParseExp.ZC",
+      "area": "Compiler",
+      "kind": "support_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "live-kernel namespace compile-only probe"
+    },
+    {
+      "path": "/Compiler/ParseLib.ZC",
+      "area": "Compiler",
+      "kind": "support_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "live-kernel namespace compile-only probe"
+    },
+    {
+      "path": "/Compiler/ParseStatement.ZC",
+      "area": "Compiler",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Compiler/ParseVar.ZC",
+      "area": "Compiler",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Compiler/Templates.ZC",
+      "area": "Compiler",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Compiler/UAsm.ZC",
+      "area": "Compiler",
+      "kind": "support_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "live-kernel namespace compile-only probe"
+    },
+    {
+      "path": "/Demo/AcctExample/HomeKeyPlugIns.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/AcctExample/HomeLocalize.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/AcctExample/HomeSys.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/AcctExample/HomeWrappers.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/AcctExample/MakeHome.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/AcctExample/Once.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/AcctExample/Registry.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/AcctExample/TOS/MakeTOS.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/AcctExample/TOS/TOSConfig.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/AcctExample/TOS/TOSDistro.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/AcctExample/TOS/TOSExtern.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/AcctExample/TOS/TOSMisc.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/AcctExample/TOS/TOSTheme.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Asm/AsmAndC1.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Asm/AsmAndC2.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Asm/AsmAndC3.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-asmandc3-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Asm/AsmHelloWorld.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-asm-output-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Asm/BuzzFizz.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-asm-output-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Asm/DivByHand.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-asm-arithmetic-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Asm/MulByHand.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-asm-arithmetic-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Asm/PutDec.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-asm-output-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Carry.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-carry-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/ClassMeta.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-class-meta-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/CompileDemo.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-compiledemo-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/DateTime.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-runtime-basics-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/DebugDemo.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Define.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-define-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Directives.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-directives-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Disk/DataBase.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Disk/DiskRaw.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Disk/FPrintF.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Disk/SerializeTree.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Disk/UnusedSpaceRep.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/DolDoc/CallBack.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/DolDoc/ClickCallBack.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/DolDoc/CursorMove.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/DolDoc/Data.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/DolDoc/DefineStr.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/DolDoc/FileRead.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/DolDoc/Form.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/DolDoc/MenuBttn.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/DolDoc/MenuSprite.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/DolDoc/NumBible.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/DolDoc/TextDemo.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/DolDoc/TreeDemo.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/DolDoc/UnusedDefine.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Exceptions.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-exceptions-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/ExtChars.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-extchars-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Games/BattleLines.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Games/BigGuns.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Games/BlackDiamond.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-blackdiamond-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Games/BomberGolf.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Games/CastleFrankenstein.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Games/CharDemo.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Games/Chess.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-interactive-games-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/Games/CircleTrace.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-circletrace-qemu-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/Games/Collision.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Games/Digits.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-digits-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Games/DunGen.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Games/ElephantWalk.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-elephant-walk-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Games/FlapBat.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-flapbat-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Games/FlatTops.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Games/Halogen.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Games/MassSpring.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-stock-interactive-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/Games/Maze.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-maze-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Games/RainDrops.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-raindrops-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Games/RawHide.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Games/Rocket.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Games/RocketScience.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Games/Squirt.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Games/Stadium/Stadium.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Games/Stadium/StadiumGen.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Games/Talons.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Games/TheDead.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Games/TicTacToe.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-interactive-games-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/Games/TreeCheckers.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Games/Varoom.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Games/Wenceslas.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Games/Whap.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Games/Zing.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Games/ZoneOut.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/GlobalVars.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "partial",
+      "evidence": "docs/acceptance/demo-global-vars-jit-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Graphics/32BitColor.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-graphics-render-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/Graphics/32BitPaint.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-32bit-paint-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Graphics/3DPoly.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-bounce-clock-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Graphics/BSpline.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Graphics/Blot.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-graphics-render-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/Graphics/Bounce.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-bounce-clock-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Graphics/Box.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-box-hanoi-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/Graphics/Cartesian.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Graphics/CharAnimation.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Graphics/Clock.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-bounce-clock-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Graphics/Collision.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Graphics/CommonAncestor.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Graphics/Doodle.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-stock-interactive-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/Graphics/EdSprite.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Graphics/Elephant.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Graphics/Extents.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Graphics/FontEd.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Graphics/GrDir.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Graphics/Grid.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-input-graphics-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/Graphics/Hanoi.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-box-hanoi-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/Graphics/Lattice.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Graphics/Life.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-stock-interactive-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/Graphics/LightTable.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Graphics/Lines.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-stock-graphics-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/Graphics/LowPassFilter.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Graphics/Mandel.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-mandel-qemu-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/Graphics/MathAudioDemo.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-stock-interactive-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/Graphics/MouseDemo.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-input-graphics-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/Graphics/NetOfDots.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-stock-graphics-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/Graphics/Palette.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-input-graphics-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/Graphics/PanText.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Graphics/Pick.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Graphics/Pick3D.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-interactive-games-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/Graphics/PoleZeros.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Graphics/PredatorPrey.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-stock-interactive-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/Graphics/RotateTank.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-bounce-clock-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Graphics/ScreenCapture.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-screencapture-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Graphics/ScrollBars.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Graphics/Shading.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Graphics/Shadow.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Graphics/Slider.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-slider-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Graphics/Speedline.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Graphics/SpritePlot.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Graphics/SpritePlot3D.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Graphics/SpritePut.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Graphics/SpritePutExt.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Graphics/SpriteRaw.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Graphics/SpriteText.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Graphics/SunMoon.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Graphics/Symmetry.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Graphics/Transform.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Graphics/Usage.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Graphics/WallPapers/WallPaperCtrl.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Graphics/WallPapers/WallPaperDesktop/HomeSys.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Graphics/WallPapers/WallPaperDesktop/Install.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Graphics/WallPapers/WallPaperDesktop.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Graphics/WallPapers/WallPaperFish.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Graphics/WallPapers/WallPaperStars.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Graphics/WinZBuf.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/InFile/InPopUp.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/InFile/InSetIP.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/KeyBitMap.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-keybitmap-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/LastClass.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-last-class-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Lectures/AndNotMod.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Lectures/FixedPoint.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Lectures/FixedPointAdvanced.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Lectures/InterruptDemo.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-interrupt-demo-svc-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Lectures/LexDemo.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Lectures/MiniCompiler.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-mini-compiler-interactive-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Lectures/MiniGrLib.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Lectures/NegDisp.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Lectures/Optimization.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Lectures/PCIInterrupts.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-arm64-irq-adaptations-qemu-2026-11-03.json"
+    },
+    {
+      "path": "/Demo/Lectures/Ring3.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-ring3-svc-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/MagicPairs.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/MemDemo.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-runtime-basics-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/MessageLoop.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-interactive-basics-qemu-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/MultiCore/Interrupts.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-arm64-irq-adaptations-qemu-2026-11-03.json"
+    },
+    {
+      "path": "/Demo/MultiCore/LoadTest.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/MultiCore/Lock.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/MultiCore/MPAdd.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/MultiCore/MPPrint.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/MultiCore/MPRadix.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/MultiCore/Palindrome.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/MultiCore/Primes.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/NullCase.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-runtime-basics-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/OnceDemo.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/ParenWarn.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "partial",
+      "evidence": "docs/acceptance/demo-paren-warn-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/PhoneNumWords.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-phone-num-words-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Print.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-runtime-basics-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/Progress.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Prompt.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-prompt-qemu-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/PullDownMenu.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/RadixSort.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-runtime-basics-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/RandDemo.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-interactive-basics-qemu-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/RegistryDemo.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-registry-qemu-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/RevFileDemo/Rev.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/ScreenCodes.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-screencodes-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/SortFileDemo/F64FileGen.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/SortFileDemo/F64FileSort.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Sound/ASCIIOrgan.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Sound/MorseCode.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Sound/OhGreat.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Sound/WaterFowl.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Spy.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/StackGrow.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/SubIntAccess.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-runtime-basics-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/SubSwitch.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-runtime-basics-2026-11-01.json"
+    },
+    {
+      "path": "/Demo/SuggestSpelling.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-suggest-spelling-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Templates/Game1.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Templates/Lex1.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Templates/MultiCore1.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Templates/ODE1.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Templates/Registry1.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Templates/Util1.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/Templates/Util2.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/TimeIns.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/ToHtmlToTXTDemo/HtmlDirList.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/ToHtmlToTXTDemo/HtmlGen.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/ToHtmlToTXTDemo/TXTGen.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/ToHtmlToTXTDemo/ToHtml.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/WebLogDemo/WebLogRep.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/WebLogDemo/WebLogScramble.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/demo-source-ledger-2026-11-02.json"
+    },
+    {
+      "path": "/Demo/WordSearch.ZC",
+      "area": "Demo",
+      "kind": "demo_source_or_component",
+      "compile": "pass",
+      "runtime": "pass",
+      "evidence": "docs/acceptance/demo-word-search-qemu-2026-11-02.json"
+    },
+    {
+      "path": "/Doc/Comm.ZC",
+      "area": "Doc",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/DoDistro.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "isolated compile-only program catalog probe"
+    },
+    {
+      "path": "/Home/HtmlGen.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "isolated compile-only program catalog probe"
+    },
+    {
+      "path": "/Home/Net/Drivers/E1000.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/Net/Drivers/PCNet.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/Net/Drivers/RTL8139.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/Net/Drivers/Run.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "isolated compile-only program catalog probe"
+    },
+    {
+      "path": "/Home/Net/Drivers/VirtIONet.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/Net/Load.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/Net/Programs/FTPClient.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/Net/Programs/Gopher.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/Net/Programs/TCPChatClient.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/Net/Programs/TCPChatServer.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/Net/Programs/Telnet/Extra/TelnetGr.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/Net/Programs/Telnet/Telnet.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/Net/Programs/Telnet/TelnetANSI.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/Net/Programs/Telnet/TelnetClass.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/Net/Programs/Telnet/TelnetHelpers.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/Net/Programs/Telnet/TelnetNegotiation.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/Net/Programs/UDPChat.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/Net/Protocols/ARP.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/Net/Protocols/DHCP.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/Net/Protocols/DNS.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/Net/Protocols/Ethernet.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/Net/Protocols/ICMP.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/Net/Protocols/IPV4.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/Net/Protocols/Sockets.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/Net/Protocols/TCP/MakeTCP.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/Net/Protocols/TCP/TCP.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/Net/Protocols/TCP/TCPHandler.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/Net/Protocols/TCP/TCPTree.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/Net/Protocols/UDP/MakeUDP.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/Net/Protocols/UDP/UDP.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/Net/Protocols/UDP/UDPTree.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/Net/Start.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/Net/Tests/ARPTest.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/Net/Tests/DHCPTest0.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/Net/Tests/DHCPTest1.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/Net/Tests/DHCPTest2.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/Net/Tests/DNSTest.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/Net/Tests/EthernetTest.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/Net/Tests/HostTest0.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/Net/Tests/HostTest1.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/Net/Tests/ICMPTest.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/Net/Tests/ICMPTest0.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/Net/Tests/ICMPTest1.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/Net/Tests/IPV4Test.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/Net/Tests/PCNetTest.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/Net/Tests/TCPEchoClient.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/Net/Tests/TCPEchoServer.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/Net/Tests/TCPTest0.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/Net/Tests/TCPTest1.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/Net/Tests/TCPTest2.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/Net/Tests/UDPSocketTest0.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/Net/Tests/UDPSocketTest1.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/Net/Tests/UDPSocketTest2.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/Net/Tests/UDPTest0.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/Net/Tests/UDPTest1.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/Net/Utilities/BST.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "live-kernel namespace compile-only probe"
+    },
+    {
+      "path": "/Home/Net/Utilities/JSON/JSON.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "live-kernel namespace compile-only probe"
+    },
+    {
+      "path": "/Home/Net/Utilities/NetHandler.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/Net/Utilities/NetLog.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/Net/Utilities/NetQueue.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/Net/Utilities/Ping.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Home/PaletteEditor/Load.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "transitively included by a compiled Home tool entrypoint; compile only"
+    },
+    {
+      "path": "/Home/PaletteEditor/PaletteEdit.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "transitively included by a compiled Home tool entrypoint; compile only"
+    },
+    {
+      "path": "/Home/PaletteEditor/PaletteGod.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "transitively included by a compiled Home tool entrypoint; compile only"
+    },
+    {
+      "path": "/Home/PaletteEditor/PaletteSelect.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "transitively included by a compiled Home tool entrypoint; compile only"
+    },
+    {
+      "path": "/Home/PaletteEditor/Palettes/Amicus.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "live-kernel namespace compile-only probe"
+    },
+    {
+      "path": "/Home/PaletteEditor/Palettes/Commander.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "live-kernel namespace compile-only probe"
+    },
+    {
+      "path": "/Home/PaletteEditor/Palettes/SandyBeach.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "live-kernel namespace compile-only probe"
+    },
+    {
+      "path": "/Home/PaletteEditor/Palettes/Slate.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "live-kernel namespace compile-only probe"
+    },
+    {
+      "path": "/Home/PaletteEditor/Palettes/Temple.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "live-kernel namespace compile-only probe"
+    },
+    {
+      "path": "/Home/PaletteEditor/Palettes/Tradition.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "live-kernel namespace compile-only probe"
+    },
+    {
+      "path": "/Home/PaletteEditor/Palettes/Vapor.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "live-kernel namespace compile-only probe"
+    },
+    {
+      "path": "/Home/PaletteEditor/Palettes/Zsnes.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "live-kernel namespace compile-only probe"
+    },
+    {
+      "path": "/Home/PaletteEditor/Run.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "isolated compile-only program catalog probe"
+    },
+    {
+      "path": "/Home/SSE.ZC",
+      "area": "Home",
+      "kind": "support_or_component",
+      "compile": "blocked",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "compile probe failed; see catalog diagnostic"
+    },
+    {
+      "path": "/HomeKeyPlugIns.ZC",
+      "area": "Root",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/HomeLocalize.ZC",
+      "area": "Root",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/HomeSys.ZC",
+      "area": "Root",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/HomeWrappers.ZC",
+      "area": "Root",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/BlkDev/DiskAHCI.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/BlkDev/DiskATAId.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/BlkDev/DiskAddDev.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/BlkDev/DiskBlk.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/BlkDev/DiskBlkDev.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/BlkDev/DiskCDDVD.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/BlkDev/DiskCFile.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/BlkDev/DiskCache.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/BlkDev/DiskClus.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/BlkDev/DiskCopy.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/BlkDev/DiskDirA.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/BlkDev/DiskDirB.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/BlkDev/DiskDirContext.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/BlkDev/DiskDrive.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/BlkDev/DiskFile.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/BlkDev/DiskFind.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/BlkDev/DiskFormat.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/BlkDev/DiskStrA.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/BlkDev/DiskStrB.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/BlkDev/FileSysFAT.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/BlkDev/FileSysISO.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/BlkDev/FileSysRedSea.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/BlkDev/MakeBlkDev.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/Display.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/EdLite.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/FontAux.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/FontStd.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/FunSeg.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/Job.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/KConfig.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/KDataTypes.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/KDate.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/KDebug.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/KDefine.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/KExcept.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/KExterns.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/KGlobals.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/KHashA.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/KHashB.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/KInterrupts.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/KLoad.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/KMain.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/KMathA.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/KMathB.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/KMisc.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/KStart16.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/KStart32.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/KStart64.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/KTask.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/KUtils.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/KeyDev.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/Memory/BlkPool.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/Memory/HeapCtrl.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/Memory/MAllocFree.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/Memory/MakeMemory.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/Memory/MemPag.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/Memory/MemPhysical.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/Memory/PageTables.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/MultiProc.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/PCI.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/PCIBIOS.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/QuickSort.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/SMBIOS.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/Sched.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/SerialDev/Keyboard.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/SerialDev/MakeSerialDev.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/SerialDev/Message.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/SerialDev/Mouse.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/StrA.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/StrB.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/StrPrint.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Kernel/StrScan.ZC",
+      "area": "Kernel",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/MakeHome.ZC",
+      "area": "Root",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Misc/Auto/AutoDistro.ZC",
+      "area": "Misc",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Misc/Auto/AutoFullDistro0.ZC",
+      "area": "Misc",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Misc/Auto/AutoFullDistro1.ZC",
+      "area": "Misc",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Misc/Auto/AutoFullDistro2.ZC",
+      "area": "Misc",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Misc/Auto/AutoFullDistro3.ZC",
+      "area": "Misc",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Misc/Auto/AutoFullDistro4.ZC",
+      "area": "Misc",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Misc/Auto/AutoFullDistro5.ZC",
+      "area": "Misc",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Misc/Auto/AutoInstall.ZC",
+      "area": "Misc",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Misc/Auto/BootMHD2.ZC",
+      "area": "Misc",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Misc/Auto/HomeSys.ZC",
+      "area": "Misc",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Misc/Auto/Once.ZC",
+      "area": "Misc",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Misc/DoDistro.ZC",
+      "area": "Misc",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Misc/OSInstall.ZC",
+      "area": "Misc",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Misc/OSTestSuite.ZC",
+      "area": "Misc",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/Once.ZC",
+      "area": "Root",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/StartOS.ZC",
+      "area": "Root",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/AutoComplete/ACDictGen.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/AutoComplete/ACFill.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/AutoComplete/ACInit.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/AutoComplete/ACTask.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/AutoComplete/MakeAC.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/BlkDev/DiskCheck.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/BlkDev/DiskPart.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/BlkDev/FileMgr.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/BlkDev/MakeZBlkDev.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/BlkDev/Mount.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/BlkDev/ZDiskA.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/BlkDev/ZDiskB.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/Boot/BootDVD.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/Boot/BootDVDIns.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/Boot/BootHD.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/Boot/BootHDIns.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/Boot/BootMHD.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/Boot/BootMHD2.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/Boot/BootMHDIns.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/Boot/BootRAM.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/Boot/DiskISO9660.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/Boot/DiskISORedSea.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/Boot/LimineMHDIns.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/Boot/MakeBoot.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/Ctrls/CtrlsA.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/Ctrls/CtrlsBttn.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/Ctrls/CtrlsSlider.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/Ctrls/MakeCtrls.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/Debug.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/Define.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/DevInfo.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/DolDoc/DocBin.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/DolDoc/DocChar.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/DolDoc/DocClipBoard.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/DolDoc/DocCodeTools.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/DolDoc/DocDblBuf.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/DolDoc/DocEd.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/DolDoc/DocExterns.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/DolDoc/DocFile.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/DolDoc/DocFind.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/DolDoc/DocForm.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/DolDoc/DocGet.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/DolDoc/DocGr.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/DolDoc/DocHighlight.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/DolDoc/DocInit.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/DolDoc/DocLink.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/DolDoc/DocMacro.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/DolDoc/DocNew.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/DolDoc/DocPlain.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/DolDoc/DocPopUp.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/DolDoc/DocPutKey.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/DolDoc/DocPutS.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/DolDoc/DocRecalc.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/DolDoc/DocRecalcLib.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/DolDoc/DocRun.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/DolDoc/DocTerm.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/DolDoc/DocTree.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/DolDoc/DocWidgetWiz.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/DolDoc/MakeDoc.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/Externs.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/God/GodBible.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/God/GodDoodle.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/God/GodExterns.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/God/GodSong.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/God/HolySpirit.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/God/MakeGod.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/Gr/GrAsm.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/Gr/GrBitMap.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/Gr/GrComposites.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/Gr/GrDC.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/Gr/GrEnd.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/Gr/GrExterns.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/Gr/GrGlobals.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/Gr/GrInitA.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/Gr/GrInitB.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/Gr/GrMath.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "isolated compile-only program catalog probe"
+    },
+    {
+      "path": "/System/Gr/GrPalette.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/Gr/GrPrimatives.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/program-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "isolated compile-only program catalog probe"
+    },
+    {
+      "path": "/System/Gr/GrScreen.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/Gr/GrSpritePlot.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/Gr/GrTextBase.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "blocked",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "compile probe failed; see source-context diagnostic"
+    },
+    {
+      "path": "/System/Gr/MakeGr.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "blocked",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "compile probe failed; see source-context diagnostic"
+    },
+    {
+      "path": "/System/Gr/ScreenCast.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/Gr/SpriteBitMap.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/Gr/SpriteCode.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/Gr/SpriteEd.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/Gr/SpriteMain.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/Gr/SpriteMesh.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/Gr/SpriteNew.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/Gr/SpriteSideBar.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/Hash.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/InFile.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/MakeSystem.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/Math/Conversion.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "blocked",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "compile probe failed; see source-context diagnostic"
+    },
+    {
+      "path": "/System/Math/F32.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/Math/MakeMath.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/Math/Mat4.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "blocked",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "compile probe failed; see source-context diagnostic"
+    },
+    {
+      "path": "/System/Math/Math.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "live-kernel namespace compile-only probe"
+    },
+    {
+      "path": "/System/Math/MathODE.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "live-kernel namespace compile-only probe"
+    },
+    {
+      "path": "/System/Math/NDArray.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "blocked",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "compile probe failed; see source-context diagnostic"
+    },
+    {
+      "path": "/System/Math/Tests/TestF32.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "blocked",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "compile probe failed; see source-context diagnostic"
+    },
+    {
+      "path": "/System/Math/Tests/TestMat4.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "blocked",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "compile probe failed; see source-context diagnostic"
+    },
+    {
+      "path": "/System/Math/Tests/TestVec.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "blocked",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "compile probe failed; see source-context diagnostic"
+    },
+    {
+      "path": "/System/Math/Types.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "live-kernel namespace compile-only probe"
+    },
+    {
+      "path": "/System/Math/Vec3.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "blocked",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "compile probe failed; see source-context diagnostic"
+    },
+    {
+      "path": "/System/Math/Vec4.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/Memory.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/Menu.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/Mouse.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/PCILookUpSingle.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/Registry.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/Sound.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/TaskSettings.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/Training.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/Utils/CPURep.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "blocked",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "compile probe failed; see source-context diagnostic"
+    },
+    {
+      "path": "/System/Utils/ConversionScript.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "live-kernel namespace compile-only probe"
+    },
+    {
+      "path": "/System/Utils/Diff.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "live-kernel namespace compile-only probe"
+    },
+    {
+      "path": "/System/Utils/DocUtils.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "blocked",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "compile probe failed; see source-context diagnostic"
+    },
+    {
+      "path": "/System/Utils/Find.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "live-kernel namespace compile-only probe"
+    },
+    {
+      "path": "/System/Utils/HeapLog.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "blocked",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "compile probe failed; see source-context diagnostic"
+    },
+    {
+      "path": "/System/Utils/LineRep.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "live-kernel namespace compile-only probe"
+    },
+    {
+      "path": "/System/Utils/LinkCheck.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "live-kernel namespace compile-only probe"
+    },
+    {
+      "path": "/System/Utils/MakeUtils.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "blocked",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "compile probe failed; see source-context diagnostic"
+    },
+    {
+      "path": "/System/Utils/MemRep.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "blocked",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "compile probe failed; see source-context diagnostic"
+    },
+    {
+      "path": "/System/Utils/Merge.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "live-kernel namespace compile-only probe"
+    },
+    {
+      "path": "/System/Utils/Profiler.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "blocked",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "compile probe failed; see source-context diagnostic"
+    },
+    {
+      "path": "/System/Utils/StrUtils.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "blocked",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "compile probe failed; see source-context diagnostic"
+    },
+    {
+      "path": "/System/Utils/SysRep.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "live-kernel namespace compile-only probe"
+    },
+    {
+      "path": "/System/Utils/TaskRep.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "blocked",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "compile probe failed; see source-context diagnostic"
+    },
+    {
+      "path": "/System/Utils/ToDolDoc.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "live-kernel namespace compile-only probe"
+    },
+    {
+      "path": "/System/Utils/ToTXT.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "live-kernel namespace compile-only probe"
+    },
+    {
+      "path": "/System/Utils/VideoRep.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "blocked",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "compile probe failed; see source-context diagnostic"
+    },
+    {
+      "path": "/System/Utils/ZXERep.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "pass",
+      "runtime": "unverified",
+      "evidence": "docs/acceptance/source-context-catalog-qemu-2026-11-02.json",
+      "evidence_scope": "live-kernel namespace compile-only probe"
+    },
+    {
+      "path": "/System/WallPaper.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/Win.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/WinMgr.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    },
+    {
+      "path": "/System/ZSplash.ZC",
+      "area": "System",
+      "kind": "support_or_component",
+      "compile": "unverified",
+      "runtime": "unverified",
+      "evidence": null
+    }
+  ]
+}

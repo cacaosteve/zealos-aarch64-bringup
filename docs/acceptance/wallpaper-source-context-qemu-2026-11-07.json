@@ -1,0 +1,13 @@
+{
+  "date": "2026-11-07",
+  "target": "AArch64 native ZealC in QEMU guest",
+  "probe": "CCF_JUST_LOAD compile-only in booted kernel/system namespace",
+  "result": "pass",
+  "path": "/System/WallPaper.ZC",
+  "compiled": true,
+  "compiler_output": "WARN /System/WallPaper.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nzc: executed\r\n> ",
+  "tested_iso": "build/zealos-aarch64-hello.iso",
+  "tested_iso_sha256": "fa127b3d2e17e925eea83fad6819c34dec58458a843d1dbf5ba9fcbfbcbfa845",
+  "tested_source_bundle_sha256": "c0072713469c7585fc504510cf701c37ba36946bca88dd078aa4a82316349778",
+  "scope_note": "Compilation evidence only; Wallpaper rendering/runtime behavior was not exercised. ARM64 overlay reports the unavailable compiler-line counter as N/A, uses host task heap counters, and reports the known Limine UEFI path while leaving unavailable SMBIOS host and boot-source identity as ?. Allocated task memory equals live task-owned allocations in the shared-arena runtime."
+}

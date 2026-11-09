@@ -46,6 +46,9 @@ typedef struct CLexer {
 #define LEXF_UNTIL_NEWLINE 8
   int64_t flags, cur_char;
   int64_t cur_tok;
+  /* One-character lookahead retained when an integer literal is followed by
+   * an unspaced ZealOS range operator, e.g. `case 0...7:`. */
+  int64_t pushback_char, pushback_valid;
   struct CHeapCtrl *hc;
   int64_t *layout_off; /* Current class byte offset for ZealC $$. */
   /* ARM64 host bridge: options belong to the active guest CCompCtrl. */
@@ -53,6 +56,7 @@ typedef struct CLexer {
   /* ARM64 host bridge: current guest CCompCtrl flags. */
   int64_t *port_cc_flags;
   void (*port_sync)(struct CLexer *);
+  void (*port_warning)(struct CLexer *, const char *);
   void (*port_fun_complete)(struct CHashFun *);
   /* Convert nested source files to the host's document-aware input stream. */
   void (*port_include)(struct CLexer *, struct CLexFile *, int64_t);

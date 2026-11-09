@@ -1,0 +1,18 @@
+{
+  "date": "2026-11-08",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "working_tree_changes_included": true,
+  "command": "python3 scripts/check-compat.py --quick --probe-source-fast --probe-source upstream/bootstrap/Demo/Lectures/Optimization.ZC",
+  "target": "AArch64 QEMU virt with PCI graphical terminal, single guest CPU",
+  "result": "pass",
+  "source_path": "upstream/bootstrap/Demo/Lectures/Optimization.ZC",
+  "source_sha256": "0c4e57f269b1c19086fd07e600fd19ace04799fb1129f029222000bfdc8dfcc9",
+  "kernel_sha256": "4bfeab8f4e8e60962823e2360364231dc13f4ec7187264a8e642864c0113d1fd",
+  "iso_sha256": "8f007016b0b82cd376c61e1906ea80d0bea1a9890d7a89268322fc40ffff50fc",
+  "verified": [
+    "Dependency, descending, eight-way-unrolled, and for-loop benchmarks all completed.",
+    "All four loops returned the expected sum 3200000040000000.",
+    "The source returned to the graphical terminal without compiler error or guest hang."
+  ],
+  "scope_note": "Automated runtime acceptance of the bootstrap AArch64 adaptation in QEMU. Does not establish live UTM or Raspberry Pi hardware behavior."
+}

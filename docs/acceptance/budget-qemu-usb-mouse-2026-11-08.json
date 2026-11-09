@@ -1,0 +1,19 @@
+{
+  "date": "2026-11-08",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "working_tree_changes_included": true,
+  "kernel_sha256": "4bfeab8f4e8e60962823e2360364231dc13f4ec7187264a8e642864c0113d1fd",
+  "iso_sha256": "8f007016b0b82cd376c61e1906ea80d0bea1a9890d7a89268322fc40ffff50fc",
+  "command": "python3 scripts/check-compat.py --quick --probe-budget-program --usb-input qemu --usb-pointer mouse",
+  "qemu_profile": "QEMU virt with HVF, 1 vCPU, 1 GiB RAM, PCI and xHCI USB keyboard/mouse",
+  "exit_code": 0,
+  "scope": "Budget graphical workflow, mouse-driven menu selection, input, form persistence, and cold disk-only reboot regression using the current worktree ISO.",
+  "checks": {
+    "mouse_menu": "pass: root mouse-down, held drag to submenu, and release opened the selected Budget menu item; File/Edit/View hover continued presenting frames",
+    "budget_workflow": "pass: created, saved, reopened, edited, cancelled without saving, cleanly exited, and returned to a working terminal",
+    "persistence": "pass: saved Budget entry survived a QEMU cold disk-only reboot; persistence check returned 42",
+    "system": "pass: graphical input diagnostics and zstatus failed=0",
+    "final_status": "All emitted checks passed"
+  },
+  "live_utm": "Still needs live UTM confirmation: user previously reported the Budget UI freezing; this QEMU pass does not prove UTM acceptance."
+}

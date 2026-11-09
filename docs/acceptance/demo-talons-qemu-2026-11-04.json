@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-04",
+  "upstream_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "working_tree_changes_included": true,
+  "kernel_sha256": "567509becb518174eb7e630829e509c3d2f6222f29d99b2fdd2c82e193d54e26",
+  "iso_sha256": "e802bb1d17cd21064a064c7d6dde069933ff08b1a930d2e97b7e849981408e81",
+  "command": "python3 scripts/check-compat.py --probe-demo-talons",
+  "exit_code": 0,
+  "scope": "Fresh automated PCI QEMU runtime acceptance of Talons on the current ARM64 ISO. The probe verified terrain rendering, visible flight-frame changes after Right and Up input, Escape cleanup, terminal recovery (`40+2;` returned 42), and `zstatus failed=0`. UTM and Pi hardware are not covered.",
+  "arm64_adaptations": "The bundled Talons source uses a 64x64 map and proportionally reduced initial speed to keep its terrain generation practical on the ARM64 target while preserving the stock map-to-speed ratio. The single-vCPU path runs panel generation synchronously. Parentheses were added around center-coordinate shifts and fixed-point 1<<16 divisors to preserve intended arithmetic.",
+  "result": "pass"
+}

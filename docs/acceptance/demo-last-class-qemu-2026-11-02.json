@@ -1,0 +1,28 @@
+{
+  "date": "2026-11-02",
+  "command": "python3 scripts/check-compat.py --pci --probe-demo-last-class",
+  "target": "QEMU PCI graphical terminal",
+  "result": "pass",
+  "program": "/Demo/LastClass.ZC",
+  "source_path": "upstream/pinned/Demo/LastClass.ZC",
+  "source_sha256": "9e3e91271d4d5971f25df837a97f0dc825b252e3e2232e8077c813356dc29ac9",
+  "expected": [
+    "lastclass infers and prints the type name for each preceding argument",
+    "ClassRepD(Gs) and ClassRep(Fs) display the matching runtime class metadata",
+    "The program returns to the graphical terminal and a subsequent 40+2 expression returns 42"
+  ],
+  "observed": [
+    "StructName printed CTask, Student, School and I64i for its four arguments",
+    "ClassRepD(Gs) printed Class:\"CCPU\" and ClassRep(Fs) printed Class:\"CTask\" without Bad Pointer",
+    "The program returned to the graphical terminal; 40+2; returned ans=0x2A=42 and zstatus reported failed=0"
+  ],
+  "evidence_artifacts": [
+    "build/gui-catalog-demo-last-class-report.txt",
+    "build/gui-catalog-demo-last-class-report.ppm",
+    "build/gui-catalog-demo-last-class-terminal-recovery-result.txt",
+    "build/gui-catalog-demo-last-class-terminal-recovery-result.ppm"
+  ],
+  "kernel_sha256": "3ce2926a98005d3c48a9b572ef07eaf9fa04136517711914dda072bbcea97463",
+  "iso_sha256": "598c325cbc6d77444eec8316168e79919710c8f093129f617e31f0afd19a3345",
+  "scope_note": "Automated QEMU evidence only. The current image resolves and displays the CCPU and CTask class metadata, then returns to the terminal and evaluates 40+2 as 42. UTM and Pi behavior remain unverified."
+}

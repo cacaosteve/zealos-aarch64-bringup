@@ -1,0 +1,24 @@
+{
+  "date": "2026-11-08",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "working_tree_changes_included": true,
+  "command": "QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device' python3 scripts/check-compat.py --pci --quick --probe-demo-mpprint",
+  "target": "AArch64 QEMU virt, one vCPU, PCI graphical terminal",
+  "result": "inconclusive",
+  "program": "/Demo/MultiCore/MPPrint.ZC",
+  "source_path": "upstream/pinned/Demo/MultiCore/MPPrint.ZC",
+  "source_sha256": "9d655fcf0c05de49ad911f06d4d887f981df7acb933d2edd09102569a1885c61",
+  "kernel_sha256": "9ba7456e00b4bb334c731f5f95f9db26a79aca2104556a9e16c051b28b81214d",
+  "iso_sha256": "77477417f9704000cd1f647f11e5a9fbd440347a162fde88dad9be7553dae165",
+  "log": "build/check-compat-pci.log",
+  "log_sha256": "d7e5bc3a7d70c27ffda2724f187778478a879be0d7dbb08721df6c280ad1a1a9",
+  "capture": "build/gui-demo-mpprint-launch-result.ppm",
+  "capture_sha256": "29cee3382b05731fd0bd4a134163ce7ca0e396a6978372be44b443089c9d8d9e",
+  "observed": [
+    "The guest booted, the graphical terminal received keyboard focus, the arithmetic smoke check returned 42, and the MPPrint launch command became visible in the terminal input buffer.",
+    "The output capture after the launch did not show the expected CPU0 worker text.",
+    "The capture instead showed the System Keys Quick Guide popup covering part of the terminal and leftover-looking prompt text, so this run does not isolate MPPrint callback output from guest input or popup handling.",
+    "The probe stopped before it could establish MPPrint completion or terminal recovery."
+  ],
+  "scope_note": "Inconclusive QEMU one-vCPU run. Do not treat this as an MPPrint source failure or acceptance. The guest runtime still reports mp_count=1; investigate popup/input routing and DocPut visibility in the graphical terminal before repeating."
+}

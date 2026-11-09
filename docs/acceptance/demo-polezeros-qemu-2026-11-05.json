@@ -1,0 +1,26 @@
+{
+  "date": "2026-11-05",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "target": "AArch64 QEMU virt, PCI, graphical terminal",
+  "command": "python3 scripts/check-compat.py --pci --probe-demo-polezeros",
+  "source_path": "/Demo/Graphics/PoleZeros.ZC",
+  "source_sha256": "bd5f5edf7d19f1f30be279c902c487ba717369dce4737eb2d08859fe9b40d15f",
+  "result": "pass",
+  "checks": [
+    "PoleZeros compiled after its ARM64 source bundle loaded the shared System/Math/Math module",
+    "The PopUpOk help dialog was dismissed and the complex magnitude plot rendered with 15 grayscale values",
+    "Right mouse input redrew the plot for phase display",
+    "Escape returned to the graphical terminal and 40+2 evaluated to 42",
+    "Guest zstatus reported failed=0"
+  ],
+  "fix": "The pinned source calls CPoly but does not include System/Math/Math; the ARM64 source-bundle overlay adds this missing shared math dependency.",
+  "artifacts": {
+    "build/zealos-aarch64-hello.iso": "2d4cb702a9891f6dde643e279ab8ea01dfcd9496554d237c8279b20b91ad0d49",
+    "build/disk.img": "962440955799a8b01320980a073110f9d409372cbc7a49a444a204ede1cd0441",
+    "build/sources.tar": "694062d14fb73f287fd957fc83c54d8277ccbbcce1ba876232f475c37ea1b970",
+    "scripts/check-compat.py": "88c6800510a0f931c79c6f475bc8b6b330b3e21d79f546d757cabaed6e9ad29f",
+    "scripts/build-source-bundle.py": "3fbaaf789efb4db7eaa960902a10016973bdc264b1c2764d0e20b1097ac5cb32",
+    "scripts/arm64_source.py": "8fcd1a3c4288edab76833640e8816570f931fd0b0c56755ff1a4d967d721c54c"
+  },
+  "scope_note": "QEMU runtime acceptance only; live UTM or Pi hardware acceptance is not implied."
+}

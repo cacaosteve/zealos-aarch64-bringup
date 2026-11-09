@@ -1,0 +1,23 @@
+{
+  "date": "2026-11-02",
+  "target": "QEMU PCI ARM64 graphical guest",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "8c43ed3b8f929926e9c43412bed58d9a2f5bb982dd7e746f511a5046c2aafaa5",
+  "source_path": "/Demo/Games/Digits.ZC",
+  "source_sha256": "0e0f34e1ea2a2d07ef09997fbc614ee10fef3b126df0e255d41f6ed01f553386",
+  "command": "python3 scripts/check-compat.py --pci --probe-demo-digits",
+  "result": "pass",
+  "scope": "Original upstream Digits memory game launched in the ARM64 graphical terminal. The test advances from instructions to the first random pattern, enters a deliberately invalid character, confirms the score/retry prompt, and checks Escape cleanup. QEMU acceptance does not establish live UTM or Pi hardware behavior.",
+  "checks": [
+    "visible game instructions and first pattern prompt rendered",
+    "guess prompt accepted a character and showed the score/retry path for an invalid guess",
+    "Escape returned to the graphical terminal and 40+2; evaluated to 42",
+    "zstatus reported failed=0"
+  ],
+  "log": "build/check-demo-digits-pci.log",
+  "screenshots": [
+    "build/gui-demo-digits-demo-digits-pattern.ppm",
+    "build/gui-demo-digits-demo-digits-guess.ppm",
+    "build/gui-demo-digits-demo-digits-response.ppm"
+  ]
+}

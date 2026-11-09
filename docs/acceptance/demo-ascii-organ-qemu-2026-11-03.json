@@ -1,0 +1,22 @@
+{
+  "date": "2026-11-03",
+  "source_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "target": "AArch64 QEMU virt, PCI, graphical terminal",
+  "command": "python3 scripts/check-compat.py --probe-demo-ascii-organ",
+  "source_path": "/Demo/Sound/ASCIIOrgan.ZC",
+  "source_sha256": "12f5d0ff857a8536b0078727becbc3db5d612a2780ea7ed8491d2a9a558a1c8e",
+  "result": "partial",
+  "checks": [
+    "ASCIIOrgan displayed its character table and sound-key prompt",
+    "A keypress was accepted while the demo was active",
+    "Shift-Escape returned to the graphical terminal, 40+2 evaluated to 42, and zstatus reported failed=0"
+  ],
+  "limitation": "ARM64 Sound/Sweep hooks are silent stubs; audible output is not implemented, so this is not full runtime acceptance.",
+  "scope_note": "QEMU keyboard/exit-path evidence only; audible sound and live UTM or Pi hardware behavior remain unverified.",
+  "artifacts": {
+    "build/zealos-aarch64-hello.iso": "d86fd810858d63b04884e259641e797228c28419401ab0746b022f8962515d03",
+    "scripts/check-compat.py": "9f398f3d74b5318999fc1abf61279e2da6a220ba56672153e4d6351c67ac6411",
+    "build/check-demo-ascii-organ-pci.log": "a5fc30766c3a3f58da7d761478997b96e107fcee2a1199475e3b37c0bf82d824"
+  },
+  "log": "build/check-demo-ascii-organ-pci.log"
+}

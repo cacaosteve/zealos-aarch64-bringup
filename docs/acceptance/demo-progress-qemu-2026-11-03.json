@@ -1,0 +1,24 @@
+{
+  "date": "2026-11-03",
+  "source_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "target": "AArch64 QEMU virt, PCI, graphical terminal",
+  "command": "python3 scripts/check-compat.py --pci --probe-demo-progress",
+  "source_path": "/Demo/Progress.ZC",
+  "source_sha256": "d56d5a52d0c9249d96967145ad03ac5660b39095ca2832cb22e01749e762bdf3",
+  "result": "pass",
+  "checks": [
+    "Progress launched from the graphical terminal and displayed all four timed-description stages",
+    "The translated final countdown stage ran to progress1=0, yielding between 16,384-tick display updates",
+    "The terminal recovered after the demo and evaluated 40+2 as 42",
+    "zstatus reported failed=0"
+  ],
+  "arm64_adaptation": "The pinned demo uses an x86 assembly loop that updates progress1 and yields on every tick. The ARM64 source overlay preserves the 12,000,000-to-zero countdown and cooperative handoffs, updating the visible counter in 16,384-tick intervals so the interpreted demo completes in practical time.",
+  "artifacts": {
+    "build/zealos-aarch64-hello.iso": "7bef065d65c489be5374bb3f65b6f93538b9e30705c74f5a40453cc0a8d299c1",
+    "build/disk.img": "838572f82134df161e5d73881895a963726fc5643da7a395d3500d10ed01dc7b",
+    "build/sources.tar": "3c679a70baba028da51343bf71b6d9c6b6aa7defc826fec9f8e9a689d49e3d4c",
+    "scripts/arm64_source.py": "e4ba101e0dec0a1e12d3bd0c54ebc444b369df22351b91e060af4f8415783b57"
+  },
+  "log": "build/check-demo-progress-pci.log",
+  "scope_note": "QEMU runtime acceptance only; this does not imply live UTM or Pi hardware acceptance."
+}

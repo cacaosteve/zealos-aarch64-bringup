@@ -1,0 +1,27 @@
+{
+  "date": "2026-11-04",
+  "source_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "target": "AArch64 QEMU virt with ramfb and VirtIO keyboard/tablet",
+  "source_path": "/Demo/Games/Stadium/Stadium.ZC",
+  "source_sha256": "e8e6ba62e5e8dc03a3087d14b90f97db5ac8f35d704dbac8fb11b8a1a9f12c66",
+  "asset_path": "/Demo/Games/Stadium/StadiumBG.GR",
+  "asset_sha256": "18bd27ad4817b661e0e05064fca0fcb455bccaeedd770fcc8871d799a6081130",
+  "iso_path": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "ecbfc9809d7657ffa8765306f3e88b4fc2222f281fabf4151f645577fc55bcc3",
+  "command": "QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device' python3 scripts/check-compat.py --probe-demo-stadium",
+  "result": "pass",
+  "checks": [
+    "Launched unchanged pinned /Demo/Games/Stadium/Stadium.ZC in a focused application task; registered Stadium with the GUI terminal launcher after the first attempt exposed that it otherwise ran synchronously.",
+    "The Stadium scene rendered with visible graphics.",
+    "A left click triggered a pitch and changed the rendered scene.",
+    "Escape restored the graphical terminal; 40+2 evaluated to 42 and zstatus reported failed=0."
+  ],
+  "artifacts": {
+    "files": [
+      "build/gui-demo-stadium-initial.ppm",
+      "build/gui-demo-stadium-pitch.ppm",
+      "build/gui-demo-stadium-exit-smoke-result.ppm"
+    ]
+  },
+  "scope_note": "QEMU game launch/render/mouse/exit acceptance; StadiumGen execution and live UTM or Pi hardware behavior are not implied."
+}

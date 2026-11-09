@@ -1,0 +1,35 @@
+{
+  "date": "2026-11-03",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "target": "AArch64 QEMU virt, PCI, graphical terminal",
+  "command": "python3 scripts/check-compat.py --pci --probe-lattice-controls",
+  "source": "/Demo/Graphics/Lattice.ZC",
+  "source_sha256": "050789d80092714fb096d988f44fe23772beb5c7cc79c2a1c8e34ea4185c002f",
+  "result": "pass",
+  "checks": [
+    "Lattice opened and displayed its Layer/Speed/angle/width HUD",
+    "Left-click placed the red head and right-drag changed its aim",
+    "Color controls updated both visible swatches",
+    "Restart restored the initial pose and colors",
+    "Space advanced the turtle and left a visible step mark",
+    "Escape returned to the graphical terminal and reported latticeplay ok",
+    "The guest ended with zstatus failed=0"
+  ],
+  "artifacts": {
+    "build/zealos-aarch64-hello.iso": "337538503e8c4fcb6c5fb66a436c2e1478f82bcc9b5494808b7481fcc18eb7b8",
+    "build/disk.img": "b924e7af4e407f272ae4e419145025676915510e08adfd5b4cb80ee50250ebb9",
+    "build/sources.tar": "a8259ac89d9e1fe42a21a757d1d4834a44b052060b59f12219d1de20e551ddbf",
+    "esp/boot/kernel.elf": "9a5289b49fcc87c991d089cbef97190a1eb9d1fba83418bc927437f3d0f8424a",
+    "scripts/check-compat.py": "16462542b9f89e7682a8257db66390f8fc57c167800712b901041b54a97cac72"
+  },
+  "screenshots": [
+    "build/gui-lattice-live-hud.ppm",
+    "build/gui-lattice-live-place.ppm",
+    "build/gui-lattice-live-aim.ppm",
+    "build/gui-lattice-live-colors.ppm",
+    "build/gui-lattice-live-restart.ppm",
+    "build/gui-lattice-live-space-step.ppm",
+    "build/gui-lattice-returns-to-terminal.ppm"
+  ],
+  "scope_note": "QEMU runtime acceptance only; live UTM or Pi hardware acceptance is not implied."
+}

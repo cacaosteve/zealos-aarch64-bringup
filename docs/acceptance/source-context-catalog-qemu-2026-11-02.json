@@ -1,0 +1,373 @@
+{
+  "date": "2026-11-02",
+  "target": "AArch64 native ZealC/QEMU guest",
+  "iso_sha256": "5b2187b6421750c3f52176a51b81020c2f23bd29d51ec8edccf6faeda3fb9448",
+  "command": "Ordered Compiler.PRJ CCF_JUST_LOAD source-context probe through OptPass6; fixtures supply project globals and AArch64 declarations. OptPass012, OptPass3, OptPass4, OptPass5, and OptPass6 loaded; BackLib then stopped at its legacy x86 typed-pointer cast.",
+  "compile_mode": "CCF_JUST_LOAD in the booted ZealC kernel/system namespace",
+  "scope": "Pinned-source compile-only; runtime unverified.",
+  "compiled": 42,
+  "blocked": 19,
+  "total": 61,
+  "sources": [
+    {
+      "path": "/Compiler/Asm.ZC",
+      "runtime": "unverified",
+      "compile": "pass",
+      "diagnostic": "CCF_JUST_LOAD passed in the Compiler.PRJ declaration and dependency context; compile only, runtime unverified."
+    },
+    {
+      "path": "/Compiler/AsmInit.ZC",
+      "runtime": "unverified",
+      "compile": "pass",
+      "diagnostic": "CCF_JUST_LOAD passed in the Compiler.PRJ declaration and dependency context; compile only, runtime unverified."
+    },
+    {
+      "path": "/Compiler/AsmLib.ZC",
+      "runtime": "unverified",
+      "compile": "pass",
+      "diagnostic": "CCF_JUST_LOAD passed in the Compiler.PRJ declaration and dependency context; compile only, runtime unverified."
+    },
+    {
+      "path": "/Compiler/AsmResolve.ZC",
+      "runtime": "unverified",
+      "compile": "pass",
+      "diagnostic": "CCF_JUST_LOAD passed in the Compiler.PRJ declaration and dependency context; compile only, runtime unverified."
+    },
+    {
+      "path": "/Compiler/BackLib.ZC",
+      "compile": "blocked",
+      "runtime": "unverified",
+      "diagnostic": "CCF_JUST_LOAD stops at line 37:46 with 'Can't derefernce a non-pointer/array.' This is the pinned legacy x86 machine-code backend source; the AArch64 backend is separate. Compile evidence only, no app/runtime implication."
+    },
+    {
+      "path": "/Compiler/CExcept.ZC",
+      "compile": "pass",
+      "runtime": "unverified",
+      "diagnostic": "CCF_JUST_LOAD passed after loading CompilerA.HH, CExterns.ZC, the project-global cmp fixture, CompilerB.HH, and CInit.ZC; compile only, runtime unverified."
+    },
+    {
+      "path": "/Compiler/CExterns.ZC",
+      "compile": "pass",
+      "runtime": "unverified",
+      "diagnostic": "CCF_JUST_LOAD passed as a Compiler.PRJ module after /Kernel/KernelA.HH and /Compiler/CompilerA.HH; compile only, runtime unverified."
+    },
+    {
+      "path": "/Compiler/CHash.ZC",
+      "runtime": "unverified",
+      "compile": "pass",
+      "diagnostic": "CCF_JUST_LOAD passed after loading the compiler project declarations and boot-base data fixture (U32 mem_boot_base); compile only, runtime unverified."
+    },
+    {
+      "path": "/Compiler/CInit.ZC",
+      "compile": "pass",
+      "runtime": "unverified",
+      "diagnostic": "CCF_JUST_LOAD passed in the booted AArch64 ZealC namespace after loading /Kernel/KernelA.HH, /Tests/CompilerProjectGlobals.ZC (CCompGlobals cmp;), /Compiler/CompilerA.HH, and /Compiler/CompilerB.HH; compile only, runtime unverified."
+    },
+    {
+      "path": "/Compiler/Lex.ZC",
+      "compile": "pass",
+      "runtime": "unverified",
+      "diagnostic": "CCF_JUST_LOAD passed after loading CExterns.ZC and the preceding compiler project context; this resolves CmdLinePrompt from the project extern declarations; compile only, runtime unverified."
+    },
+    {
+      "path": "/Compiler/LexLib.ZC",
+      "compile": "pass",
+      "runtime": "unverified",
+      "diagnostic": "CCF_JUST_LOAD passed after loading the preceding Compiler.PRJ context through CExcept.ZC; compile only, runtime unverified."
+    },
+    {
+      "path": "/Compiler/OptLib.ZC",
+      "compile": "pass",
+      "runtime": "unverified",
+      "diagnostic": "CCF_JUST_LOAD passed in the ordered Compiler.PRJ context after KernelA.HH, CompilerA.HH, compiler/boot global fixtures, KernelC.HH, CExterns.ZC, CompilerB.HH, CInit.ZC, CExcept.ZC, LexLib.ZC, Lex.ZC, CHash.ZC, UAsm.ZC, ParseLib.ZC, and the assembler modules; compile only, runtime unverified."
+    },
+    {
+      "path": "/Compiler/OptPass012.ZC",
+      "compile": "pass",
+      "runtime": "unverified",
+      "diagnostic": "CCF_JUST_LOAD passed in the ordered Compiler.PRJ source context under the current AArch64 ZealC guest; compile only, runtime unverified."
+    },
+    {
+      "path": "/Compiler/OptPass3.ZC",
+      "compile": "pass",
+      "runtime": "unverified",
+      "diagnostic": "CCF_JUST_LOAD passed in the ordered Compiler.PRJ source context under the current AArch64 ZealC guest; compile only, runtime unverified."
+    },
+    {
+      "path": "/Compiler/OptPass4.ZC",
+      "compile": "pass",
+      "runtime": "unverified",
+      "diagnostic": "CCF_JUST_LOAD passed in the ordered Compiler.PRJ source context under the current AArch64 ZealC guest; compile only, runtime unverified."
+    },
+    {
+      "path": "/Compiler/OptPass5.ZC",
+      "compile": "pass",
+      "runtime": "unverified",
+      "diagnostic": "CCF_JUST_LOAD passed in the ordered Compiler.PRJ source context under the current AArch64 ZealC guest; compile only, runtime unverified."
+    },
+    {
+      "path": "/Compiler/OptPass6.ZC",
+      "compile": "pass",
+      "runtime": "unverified",
+      "diagnostic": "CCF_JUST_LOAD passed in the ordered Compiler.PRJ source context under the current AArch64 ZealC guest; compile only, runtime unverified."
+    },
+    {
+      "path": "/Compiler/ParseExp.ZC",
+      "compile": "pass",
+      "runtime": "unverified",
+      "diagnostic": "CCF_JUST_LOAD passed in the ordered Compiler.PRJ context after KernelA.HH, CompilerA.HH, compiler/boot global fixtures, KernelC.HH, CExterns.ZC, CompilerB.HH, CInit.ZC, CExcept.ZC, LexLib.ZC, Lex.ZC, CHash.ZC, UAsm.ZC, ParseLib.ZC, and the assembler modules; compile only, runtime unverified."
+    },
+    {
+      "path": "/Compiler/ParseLib.ZC",
+      "runtime": "unverified",
+      "compile": "pass",
+      "diagnostic": "CCF_JUST_LOAD passed after loading preceding compiler project modules through UAsm.ZC; compile only, runtime unverified."
+    },
+    {
+      "path": "/Compiler/UAsm.ZC",
+      "runtime": "unverified",
+      "compile": "pass",
+      "diagnostic": "CCF_JUST_LOAD passed after loading the Compiler.PRJ UASM global fixture; required lexer support for unspaced range cases such as `case 0...7:`; compile only, runtime unverified."
+    },
+    {
+      "path": "/Home/Net/Utilities/BST.ZC",
+      "compile": "pass",
+      "runtime": "unverified",
+      "diagnostic": "CCF_JUST_LOAD returned source_context_compile=1 in the booted AArch64 ZealC kernel/system namespace."
+    },
+    {
+      "path": "/Home/Net/Utilities/JSON/JSON.ZC",
+      "compile": "pass",
+      "runtime": "unverified",
+      "diagnostic": "CCF_JUST_LOAD returned source_context_compile=1 after loading the pinned compiler declarations /Compiler/CompilerA.HH and /Compiler/CompilerB.HH; compile only, runtime unverified."
+    },
+    {
+      "path": "/Home/PaletteEditor/Palettes/Amicus.ZC",
+      "compile": "pass",
+      "runtime": "unverified",
+      "diagnostic": "CCF_JUST_LOAD returned source_context_compile=1 in the booted AArch64 ZealC kernel/system namespace; compile only, runtime unverified."
+    },
+    {
+      "path": "/Home/PaletteEditor/Palettes/Commander.ZC",
+      "compile": "pass",
+      "runtime": "unverified",
+      "diagnostic": "CCF_JUST_LOAD returned source_context_compile=1 in the booted AArch64 ZealC kernel/system namespace; compile only, runtime unverified."
+    },
+    {
+      "path": "/Home/PaletteEditor/Palettes/SandyBeach.ZC",
+      "compile": "pass",
+      "runtime": "unverified",
+      "diagnostic": "CCF_JUST_LOAD returned source_context_compile=1 in the booted AArch64 ZealC kernel/system namespace; compile only, runtime unverified."
+    },
+    {
+      "path": "/Home/PaletteEditor/Palettes/Slate.ZC",
+      "compile": "pass",
+      "runtime": "unverified",
+      "diagnostic": "CCF_JUST_LOAD returned source_context_compile=1 in the booted AArch64 ZealC kernel/system namespace; compile only, runtime unverified."
+    },
+    {
+      "path": "/Home/PaletteEditor/Palettes/Temple.ZC",
+      "compile": "pass",
+      "runtime": "unverified",
+      "diagnostic": "CCF_JUST_LOAD returned source_context_compile=1 in the booted AArch64 ZealC kernel/system namespace; compile only, runtime unverified."
+    },
+    {
+      "path": "/Home/PaletteEditor/Palettes/Tradition.ZC",
+      "compile": "pass",
+      "runtime": "unverified",
+      "diagnostic": "CCF_JUST_LOAD returned source_context_compile=1 in the booted AArch64 ZealC kernel/system namespace; compile only, runtime unverified."
+    },
+    {
+      "path": "/Home/PaletteEditor/Palettes/Vapor.ZC",
+      "compile": "pass",
+      "runtime": "unverified",
+      "diagnostic": "CCF_JUST_LOAD returned source_context_compile=1 in the booted AArch64 ZealC kernel/system namespace; compile only, runtime unverified."
+    },
+    {
+      "path": "/Home/PaletteEditor/Palettes/Zsnes.ZC",
+      "compile": "pass",
+      "runtime": "unverified",
+      "diagnostic": "CCF_JUST_LOAD returned source_context_compile=1 in the booted AArch64 ZealC kernel/system namespace; compile only, runtime unverified."
+    },
+    {
+      "path": "/System/Gr/GrTextBase.ZC",
+      "compile": "blocked",
+      "runtime": "unverified",
+      "diagnostic": "ERR:/System/Gr/GrTextBase.ZC:4:5 Unknown symbol 'asm'. This upstream file uses x86 assembly and the ARM64 desktop uses the TaskBridge text-plane implementation."
+    },
+    {
+      "path": "/System/Gr/MakeGr.ZC",
+      "compile": "blocked",
+      "runtime": "unverified",
+      "diagnostic": "The loader stopped while compiling included /System/Gr/GrTextBase.ZC: ERR:/System/Gr/GrTextBase.ZC:4:5 Unknown symbol 'asm'. The current ARM64 desktop supplies text-plane behavior through the TaskBridge implementation instead of this upstream x86-assembly module; this source-load result is not evidence that the runtime path is broken."
+    },
+    {
+      "path": "/System/Math/Conversion.ZC",
+      "compile": "blocked",
+      "runtime": "unverified",
+      "diagnostic": "ERR:/System/Math/Conversion.ZC:2:1 Unknown symbol 'asm'."
+    },
+    {
+      "path": "/System/Math/Mat4.ZC",
+      "compile": "blocked",
+      "runtime": "unverified",
+      "diagnostic": "ERR:/System/Math/Mat4.ZC:12:1 Unknown symbol 'asm'."
+    },
+    {
+      "path": "/System/Math/Math.ZC",
+      "compile": "pass",
+      "runtime": "unverified"
+    },
+    {
+      "path": "/System/Math/MathODE.ZC",
+      "compile": "pass",
+      "runtime": "unverified"
+    },
+    {
+      "path": "/System/Math/NDArray.ZC",
+      "compile": "blocked",
+      "runtime": "unverified",
+      "diagnostic": "ERR:/System/Math/NDArray.ZC:11:21 Expected a type name."
+    },
+    {
+      "path": "/System/Math/Tests/TestF32.ZC",
+      "compile": "blocked",
+      "runtime": "unverified",
+      "diagnostic": "ERR:/System/Math/Tests/TestF32.ZC:8:8 Expected ':' after label candidate 'F32'."
+    },
+    {
+      "path": "/System/Math/Tests/TestMat4.ZC",
+      "compile": "blocked",
+      "runtime": "unverified",
+      "diagnostic": "ERR:/System/Math/Tests/TestMat4.ZC:6:7 Expected ':' after label candidate 'F32'."
+    },
+    {
+      "path": "/System/Math/Tests/TestVec.ZC",
+      "compile": "blocked",
+      "runtime": "unverified",
+      "diagnostic": "ERR:/System/Math/Tests/TestVec.ZC:6:7 Expected ':' after label candidate 'F32'."
+    },
+    {
+      "path": "/System/Math/Types.ZC",
+      "compile": "pass",
+      "runtime": "unverified"
+    },
+    {
+      "path": "/System/Math/Vec3.ZC",
+      "compile": "blocked",
+      "runtime": "unverified",
+      "diagnostic": "ERR:/System/Math/Vec3.ZC:3:1 Unknown symbol 'asm'."
+    },
+    {
+      "path": "/System/Utils/CPURep.ZC",
+      "compile": "blocked",
+      "runtime": "unverified",
+      "diagnostic": "ERR:/System/Utils/CPURep.ZC:34:9 Expected ':' after label candidate 'SysRep'."
+    },
+    {
+      "path": "/System/Utils/ConversionScript.ZC",
+      "compile": "pass",
+      "runtime": "unverified"
+    },
+    {
+      "path": "/System/Utils/Diff.ZC",
+      "compile": "pass",
+      "runtime": "unverified"
+    },
+    {
+      "path": "/System/Utils/DocUtils.ZC",
+      "compile": "blocked",
+      "runtime": "unverified",
+      "diagnostic": "ERR:/System/Utils/DocUtils.ZC:22:9 Expected ':' after label candidate 'Touch'."
+    },
+    {
+      "path": "/System/Utils/Find.ZC",
+      "compile": "pass",
+      "runtime": "unverified"
+    },
+    {
+      "path": "/System/Utils/HeapLog.ZC",
+      "compile": "blocked",
+      "runtime": "unverified",
+      "diagnostic": "ERR:/System/Utils/HeapLog.ZC:32:24 AArch64 external 'MHeapCtrl' (_MHEAP_CTRL) is not bound."
+    },
+    {
+      "path": "/System/Utils/LineRep.ZC",
+      "compile": "pass",
+      "runtime": "unverified"
+    },
+    {
+      "path": "/System/Utils/LinkCheck.ZC",
+      "compile": "pass",
+      "runtime": "unverified"
+    },
+    {
+      "path": "/System/Utils/MakeUtils.ZC",
+      "compile": "blocked",
+      "runtime": "unverified",
+      "diagnostic": "ERR:/System/Utils/HeapLog.ZC:32:24 AArch64 external 'MHeapCtrl' (_MHEAP_CTRL) is not bound."
+    },
+    {
+      "path": "/System/Utils/MemRep.ZC",
+      "compile": "blocked",
+      "runtime": "unverified",
+      "diagnostic": "ERR:/System/Utils/MemRep.ZC:86:72 Unknown symbol 'DriveUnused'."
+    },
+    {
+      "path": "/System/Utils/Merge.ZC",
+      "compile": "pass",
+      "runtime": "unverified"
+    },
+    {
+      "path": "/System/Utils/Profiler.ZC",
+      "compile": "blocked",
+      "runtime": "unverified",
+      "diagnostic": "ERR:/System/Utils/Profiler.ZC:19:21 Unknown symbol 'SYS_IDLE_PT'."
+    },
+    {
+      "path": "/System/Utils/StrUtils.ZC",
+      "compile": "blocked",
+      "runtime": "unverified",
+      "diagnostic": "ERR:/System/Utils/StrUtils.ZC:119:75 AArch64 external data 'char_bmp_alpha' is not bound."
+    },
+    {
+      "path": "/System/Utils/SysRep.ZC",
+      "compile": "pass",
+      "runtime": "unverified",
+      "load_attempt_diagnostic": "zload attempt: ERR:/System/Utils/SysRep.ZC:289:24 Expected an argument. This load-mode failure is recorded separately; CCF_JUST_LOAD probe passed."
+    },
+    {
+      "path": "/System/Utils/TaskRep.ZC",
+      "compile": "blocked",
+      "runtime": "unverified",
+      "diagnostic": "ERR:/System/Utils/TaskRep.ZC:18:26 Unknown symbol 'TaskMemAlloced'."
+    },
+    {
+      "path": "/System/Utils/ToDolDoc.ZC",
+      "compile": "pass",
+      "runtime": "unverified"
+    },
+    {
+      "path": "/System/Utils/ToTXT.ZC",
+      "compile": "pass",
+      "runtime": "unverified"
+    },
+    {
+      "path": "/System/Utils/VideoRep.ZC",
+      "compile": "blocked",
+      "runtime": "unverified",
+      "diagnostic": "ERR:/System/Utils/VideoRep.ZC:22:35 AArch64 external data 'sys_framebuffer_list' is not bound."
+    },
+    {
+      "path": "/System/Utils/ZXERep.ZC",
+      "compile": "pass",
+      "runtime": "unverified"
+    }
+  ],
+  "limitations": "Compile-only evidence. This does not prove standalone launchability or runtime acceptance. GrTextBase/MakeGr compile blocks are architecture-specific; active desktop text rendering is supplied by TaskBridge and requires separate runtime acceptance. JSON evidence is compile-only after its compiler headers are loaded; Compiler/CInit.ZC has a separate compiler initializer failure.",
+  "latest_probe": {
+    "command": "Ordered Compiler.PRJ CCF_JUST_LOAD probe: KernelA.HH, CompilerA.HH, CompilerBootstrapGraphicsDC.ZC fixture, KernelC.HH, CExterns.ZC, CompilerProjectGlobals.ZC, CompilerB.HH, CInit.ZC, CExcept.ZC, LexLib.ZC, Lex.ZC, CompilerProjectUAsmGlobals.ZC, CompilerKernelBootGlobal.ZC, CHash.ZC, UAsm.ZC, ParseLib.ZC, AsmInit.ZC, AsmLib.ZC, AsmResolve.ZC, Asm.ZC, OptLib.ZC, then ParseExp.ZC.",
+    "iso_sha256": "5b2187b6421750c3f52176a51b81020c2f23bd29d51ec8edccf6faeda3fb9448",
+    "result": "All 21 ordered context modules loaded; OptLib.ZC loaded and ParseExp.ZC compiled with CCF_JUST_LOAD. Compile-only, runtime unverified."
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "date": "2026-11-04",
+  "source_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "target": "AArch64 QEMU virt with ramfb and VirtIO keyboard/tablet",
+  "source_path": "/Demo/Games/BomberGolf.ZC",
+  "source_sha256": "2d5c37b387c0f46d0e2ece85cc9ac09551077fce8b6ace17fcef25d3ff89bb47",
+  "iso_path": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "132f01964fe1d6aa97fa7ec5e886e5567dcc50f1436f666e84247be11b922fa5",
+  "command": "QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device' python3 scripts/check-compat.py --probe-demo-bomber-golf",
+  "result": "pass",
+  "checks": [
+    "Launched the unchanged pinned /Demo/Games/BomberGolf.ZC from the graphical terminal.",
+    "The 3D game field rendered without a graphics exception.",
+    "Left and Right input each updated the game HUD.",
+    "Space triggered a bomb drop and the scene advanced.",
+    "Escape restored the graphical terminal; 40+2 evaluated to 42 and zstatus reported failed=0."
+  ],
+  "artifacts": {
+    "files": [
+      "build/check-demo-bomber-golf-pci.log",
+      "build/gui-demo-bomber-golf-demo-bomber-golf-initial.ppm",
+      "build/gui-demo-bomber-golf-demo-bomber-golf-left.ppm",
+      "build/gui-demo-bomber-golf-demo-bomber-golf-right.ppm",
+      "build/gui-demo-bomber-golf-demo-bomber-golf-bomb-after.ppm",
+      "build/gui-demo-bomber-golf-demo-bomber-golf-exit-smoke-result.ppm"
+    ],
+    "probe_sha256": "92f5cfa30631f6345cfdcbb0ffaab58a27be94d21306ad994d854a01f2f25884"
+  },
+  "scope_note": "QEMU runtime acceptance only; live UTM and Pi hardware behavior are not implied."
+}

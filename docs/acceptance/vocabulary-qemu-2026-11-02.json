@@ -1,0 +1,19 @@
+{
+  "date": "2026-11-02",
+  "target": "QEMU PCI ARM64 graphical guest",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "f9b50081e2de125f878e7338aa8819fef27acdccddfbcfdc720f25204139e515",
+  "source_path": "/Apps/Vocabulary/Run.ZC",
+  "source_sha256": "36c578510595691f35bf2ba7b341a228d7d74c53103e91ebb1188ac52a9f6bed",
+  "command": "python3 scripts/check-compat.py --pci --probe-vocabulary",
+  "result": "pass",
+  "checks": [
+    "boot autocomplete/dictionary checks passed",
+    "Vocabulary launched through the graphical terminal",
+    "quiz accepted an answer and advanced to the next question",
+    "Escape returned to the terminal and 40+2; evaluated to 42",
+    "zstatus reported failed=0"
+  ],
+  "log": "build/check-vocabulary-pci.log",
+  "scope_note": "QEMU runtime acceptance for this exact worktree image; does not establish live UTM or Pi hardware behavior."
+}

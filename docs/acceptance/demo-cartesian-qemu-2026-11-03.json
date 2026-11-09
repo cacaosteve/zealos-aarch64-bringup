@@ -1,0 +1,23 @@
+{
+  "date": "2026-11-03",
+  "source_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "target": "AArch64 QEMU virt, PCI, graphical terminal",
+  "command": "make esp && python3 scripts/check-compat.py --pci --quick --probe-demo-cartesian",
+  "source_path": "/Demo/Graphics/Cartesian.ZC",
+  "source_sha256": "1b561eeaf0d73304bd97ef2bcbe12d190b612c9fed2079f8a2782b9a5a820091",
+  "result": "pass",
+  "checks": [
+    "Cartesian launches from the graphical terminal and accepts the equation x",
+    "The graph renders red axes and a visible white plotted curve",
+    "Escape returns to the graphical terminal, which evaluates 40+2 as 42",
+    "The guest remains healthy with zstatus failed=0"
+  ],
+  "arm64_overlay": "scripts/arm64_source.py translate_cartesian_plot_color changes the curve from black to white because the ARM64 graphical terminal clears the drawing surface to black.",
+  "artifacts": {
+    "build/disk.img": "5c3e4d6aa61f1ffb4e3174dc4e5bce82598c65df18421b322ef96122c1acfc0e",
+    "build/sources.tar": "b89426e6ae2dad802ac5e1aa8239bbbb78d502b6695bbba8e008123f0ed2f7d9",
+    "scripts/arm64_source.py": "3fea34579d41da658d59c2f824d172425c0cc160a6acdb4b04b948fd348b88ff",
+    "scripts/build-source-bundle.py": "c04276ff3ab59cef490979399ee98e117eb698d2d7b9b9dd4d5704c841a79861"
+  },
+  "scope_note": "QEMU runtime acceptance only; live UTM acceptance is not implied."
+}

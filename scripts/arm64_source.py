@@ -59,6 +59,78 @@ def _extract_between(source: bytes, start: bytes, end: bytes, label: str) -> byt
     return source[first:last].rstrip()
 
 
+def translate_compile_demo(source: bytes) -> bytes:
+    """Run each CompileDemo expression through the native AArch64 compiler.
+
+    The pinned Compiler/LexExpression2Bin ABI uses the x86 compiler's
+    CCompCtrl layout. The ARM64 runtime instead evaluates one source
+    expression through its native Aiwnios parser/JIT, preserving the demo's
+    supplied expression stream, side effects, per-expression result output,
+    and final value.
+    """
+    old = b'''F64 CompileDemo(U8 *st)
+{
+	I64			 type;
+	U8			*machine_code;
+	CCompCtrl	*cc = CompCtrlNew(st, CCF_DONT_FREE_BUF);
+	F64			 res = 0;
+
+	Lex(cc);	//Gotta get it started
+	"Compile \\"%s\\"\\n", st;
+	do
+	{
+		if (machine_code = LexExpression2Bin(cc, &type))
+		{
+			if (type != RT_F64)
+				res = ToF64(Call(machine_code));
+			else
+				res = Call(machine_code)(F64);
+			Free(machine_code);
+		}
+		"res=%9.4f\\n", res;
+		if (cc->token == ';')
+			Lex(cc);
+	}
+	while (cc->token != TK_EOF);	//end of file?
+
+	CompCtrlDel(cc);
+
+	return res;
+}'''
+    new = b'''F64 CompileDemo(U8 *st)
+{
+	U8 *copy = StrNew(st), *p = copy, *start;
+	F64 res = 0;
+	Bool more;
+
+	"Compile \\"%s\\"\\n", st;
+	do
+	{
+		start = p;
+		while (*p && *p != ';')
+			p++;
+		more = *p == ';';
+		if (more)
+			*p = 0;
+		while (*start == ' ' || *start == '\\t' || *start == '\\r' || *start == '\\n')
+			start++;
+		if (*start)
+		{
+			res = ZcEvalExpression(start);
+			"res=%9.4f\\n", res;
+		}
+		if (more)
+			p++;
+	}
+	while (more);
+	Free(copy);
+	return res;
+}'''
+    if source.count(old) != 1:
+        raise ValueError('pinned CompileDemo function changed')
+    return source.replace(old, new, 1)
+
+
 def extract_sprite_interpolation(sprite_new: bytes, sprite_plot: bytes) -> bytes:
     """Generate bounded sprite sizing plus pinned upstream interpolation.
 
@@ -97,7 +169,7 @@ public I64 SpriteSize(U8 *elems)
     I64 records = 0, total = 0, size, type, available;
 
     if (!elems)
-        throw('Graphics');
+        throw('SizNull');
     record_bytes = elems;
     record = record_bytes - offset(CSprite.start);
     available = ZcManagedAllocationSize(elems);
@@ -108,20 +180,20 @@ public I64 SpriteSize(U8 *elems)
         if (!type)
         {
             if (available && total + sprite_elem_base_sizes[SPT_END] > available)
-                throw('Graphics');
+                throw('SizTerm');
             return total + sprite_elem_base_sizes[SPT_END];
         }
         if (type >= SPT_TYPES_NUM)
-            throw('Graphics');
-        size = SpriteElemSize(record_bytes, type);
+            throw('SizType');
+        size = SpriteElemSizeRaw(record_bytes, type);
         if (size < 1 || size > 16777216 - total ||
                 (available && total + size + sprite_elem_base_sizes[SPT_END] > available))
-            throw('Graphics');
+            throw('SizRecBd');
         total += size;
         record_bytes += size;
         record = record_bytes - offset(CSprite.start);
     }
-    throw('Graphics');
+    throw('SizLimit');
 }
 
 Bool SpriteInterpolationStreamsCompatible(U8 *elems0, U8 *elems1,
@@ -144,8 +216,8 @@ Bool SpriteInterpolationStreamsCompatible(U8 *elems0, U8 *elems1,
             return byte_offset == size0 - 1;
         if (type0 >= SPT_TYPES_NUM)
             return FALSE;
-        elem_size0 = SpriteElemSize(p0, type0);
-        elem_size1 = SpriteElemSize(p1, type1);
+        elem_size0 = SpriteElemSizeRaw(p0, type0);
+        elem_size1 = SpriteElemSizeRaw(p1, type1);
         if (elem_size0 < 1 || elem_size0 != elem_size1 ||
                 elem_size0 > 16777216 || byte_offset + elem_size0 >= size0)
             return FALSE;
@@ -201,7 +273,24 @@ Bool SpriteInterpolationStreamsCompatible(U8 *elems0, U8 *elems1,
 	size0 = SpriteSize(elems0);
 	size1 = SpriteSize(elems1);
 	if (!SpriteInterpolationStreamsCompatible(elems0, elems1, size0, size1))
-		throw('Graphics');
+	{
+		// Some stock animations change sprite record layouts between frames.
+		// Interpolate compatible streams; for incompatible frames, render the
+		// nearer complete frame instead of failing the entire window draw.
+		if (t < 0.5)
+		{
+			i = size0;
+			res = MAlloc(i);
+			MemCopy(res, elems0, i);
+		}
+		else
+		{
+			i = size1;
+			res = MAlloc(i);
+			MemCopy(res, elems1, i);
+		}
+		return res;
+	}
 	t1 = GR_SCALE * t;
 	t0 = GR_SCALE - t1;
 '''
@@ -218,9 +307,9 @@ Bool SpriteInterpolationStreamsCompatible(U8 *elems0, U8 *elems1,
     old_step1 = b'tmpg1(U8 *) += SpriteElemSize(tmpg1);'
     old_step_result = b'tmpgr(U8 *) += SpriteElemSize(tmpgr);'
     for old, new in (
-        (old_step0, b'bytes0 += SpriteElemSize(bytes0, tmpg0->type & SPG_TYPE_MASK); tmpg0 = bytes0 - offset(CSprite.start);'),
-        (old_step1, b'bytes1 += SpriteElemSize(bytes1, tmpg1->type & SPG_TYPE_MASK); tmpg1 = bytes1 - offset(CSprite.start);'),
-        (old_step_result, b'bytesr += SpriteElemSize(bytesr, tmpgr->type & SPG_TYPE_MASK); tmpgr = bytesr - offset(CSprite.start);'),
+        (old_step0, b'bytes0 += SpriteElemSizeRaw(bytes0, tmpg0->type & SPG_TYPE_MASK); tmpg0 = bytes0 - offset(CSprite.start);'),
+        (old_step1, b'bytes1 += SpriteElemSizeRaw(bytes1, tmpg1->type & SPG_TYPE_MASK); tmpg1 = bytes1 - offset(CSprite.start);'),
+        (old_step_result, b'bytesr += SpriteElemSizeRaw(bytesr, tmpgr->type & SPG_TYPE_MASK); tmpgr = bytesr - offset(CSprite.start);'),
     ):
         if interpolation.count(old) != 1:
             raise ValueError('pinned SpriteInterpolate record walk changed')
@@ -278,6 +367,15 @@ def translate_mandel_single_cpu(source: bytes) -> bytes:
     return source
 
 
+def translate_elephant_walk_default_dc(source: bytes) -> bytes:
+    """Pass the active CDC explicitly through the stock symmetry helper."""
+    old = b'DCSymmetrySet(, x, y, x, y - 1);'
+    new = b'DCSymmetrySet(gr.dc, x, y, x, y - 1);'
+    if source.count(old) != 1:
+        raise ValueError('pinned ElephantWalk symmetry call changed')
+    return source.replace(old, new, 1)
+
+
 def inject_sprite_interpolation(bridge: bytes, sprite_new: bytes,
                                 sprite_plot: bytes) -> bytes:
     """Append size/interpolation APIs before helpers that depend on SpriteSize."""
@@ -299,7 +397,15 @@ def inject_sprite_interpolation(bridge: bytes, sprite_new: bytes,
 
 def extract_sprite_matrix_draw() -> bytes:
     """Generate bounded matrix-based mesh drawing and axis-rotation adapters."""
-    return b'''\n#define SPRITE3_MATRIX_LIMIT (64 * SPRITE_INTERPOLATION_SCALE)
+    return b'''\n#define SPRITE3_MATRIX_LIMIT (1024 * SPRITE_INTERPOLATION_SCALE)
+
+U0 BootstrapSpriteDCTransform(CDC *dc, I64 *x, I64 *y, I64 *z)
+{//Match the default CDC transform when a static framebuffer CDC has no callback.
+    I64 x0 = *x, y0 = *y, z0 = *z;
+    *x = ((dc->r[0] * x0 + dc->r[1] * y0 + dc->r[2] * z0 + dc->r[3]) >> 32) + dc->x;
+    *y = ((dc->r[4] * x0 + dc->r[5] * y0 + dc->r[6] * z0 + dc->r[7]) >> 32) + dc->y;
+    *z = ((dc->r[8] * x0 + dc->r[9] * y0 + dc->r[10] * z0 + dc->r[11]) >> 32) + dc->z;
+}
 
 Bool Sprite3MatrixBounded(I64 *matrix)
 {
@@ -316,20 +422,37 @@ Bool Sprite3MatrixBounded(I64 *matrix)
 public U0 Sprite3Mat4x4B(CDC *dc=gr.dc, I64 x, I64 y, I64 z,
         U8 *elems, I64 *matrix)
 {//Bounded upstream matrix-composition wrapper for the ARM64 sprite rasterizer.
-    I64 composed[16], local[16], *old_matrix, old_flags, old_x, old_y, old_z;
+    I64 composed[16], local[16], identity[16], *old_matrix, old_flags, old_x, old_y, old_z;
+    U0 (*old_transform)(CDC *, I64 *, I64 *, I64 *);
     I64 i, sprite_size;
 
-    if (!dc || dc->dc_signature != DCS_SIGNATURE_VAL || !dc->r ||
-            !elems || !matrix || x < -1073741824 || x > 1073741824 ||
-            y < -1073741824 || y > 1073741824 ||
-            z < -1073741824 || z > 1073741824 ||
-            !Sprite3MatrixBounded(matrix) || !Sprite3MatrixBounded(dc->r))
-        throw('Graphics');
+    if (!dc)
+        throw('MatDC0');
+    if (dc->dc_signature != DCS_SIGNATURE_VAL)
+        throw('MatDCSig');
+    if (!elems)
+        throw('MatElem');
+    if (!matrix)
+        throw('MatNull');
+    if (x < -1073741824 || x > 1073741824)
+    {
+        Print("Sprite3Mat4x4B coords=%d,%d,%d\\n", x, y, z);
+        throw('MatX');
+    }
+    if (y < -1073741824 || y > 1073741824)
+        throw('MatY');
+    if (z < -1073741824 || z > 1073741824)
+        throw('MatZ');
+    if (!Sprite3MatrixBounded(matrix))
+        throw('MatBound');
+    old_matrix = dc->r;
+    old_transform = dc->transform;
+    if (old_matrix && !Sprite3MatrixBounded(old_matrix))
+        throw('MatPar');
     sprite_size = SpriteSize(elems);
     if (sprite_size < 1)
-        throw('Graphics');
+        throw('MatSize');
 
-    old_matrix = dc->r;
     old_flags = dc->flags;
     old_x = dc->x;
     old_y = dc->y;
@@ -339,14 +462,23 @@ public U0 Sprite3Mat4x4B(CDC *dc=gr.dc, I64 x, I64 y, I64 z,
     local[7] += y << 32;
     local[11] += z << 32;
     local[15] = SPRITE_INTERPOLATION_SCALE;
-    BootstrapMat4x4Mul(composed, old_matrix, local);
+    if (old_matrix)
+        BootstrapMat4x4Mul(composed, old_matrix, local);
+    else
+    {
+        Mat4x4IdentEqu(identity);
+        BootstrapMat4x4Mul(composed, identity, local);
+    }
     dc->r = composed;
+    if (!old_transform)
+        dc->transform = &BootstrapSpriteDCTransform;
     dc->flags |= DCF_TRANSFORMATION;
     try
         Sprite3(dc, 0, 0, 0, elems);
     catch
     {
         dc->r = old_matrix;
+        dc->transform = old_transform;
         dc->flags = old_flags;
         dc->x = old_x;
         dc->y = old_y;
@@ -354,6 +486,7 @@ public U0 Sprite3Mat4x4B(CDC *dc=gr.dc, I64 x, I64 y, I64 z,
         throw;
     }
     dc->r = old_matrix;
+    dc->transform = old_transform;
     dc->flags = old_flags;
     dc->x = old_x;
     dc->y = old_y;
@@ -417,6 +550,8 @@ def inject_sprite_wrappers(bridge: bytes, sprite_plot: bytes) -> bytes:
             b'DCExtentsInit(dc);' not in extents or
             b'Sprite3(dc, I32_MAX / 2' not in extents):
         raise ValueError('pinned sprite wrapper implementation changed')
+    packed_extents = extents.replace(b'SpriteExtents(', b'SpriteExtentsPacked(', 1)
+    packed_extents = packed_extents.replace(b'Sprite3(dc,', b'Sprite3Packed(dc,', 1)
     # GrDC isn't part of the boot source bundle. Keep this upstream helper's
     # small CDC state initialization available to SpriteExtents.
     dc_extents_init = b'''public U0 DCExtentsInit(CDC *dc=NULL)
@@ -495,7 +630,7 @@ def inject_sprite_wrappers(bridge: bytes, sprite_plot: bytes) -> bytes:
         else if (type != SPT_COLOR && type != SPT_DITHER_COLOR &&
                 type != SPT_THICK)
             throw('Graphics');
-        i = SpriteElemSize(cursor, type);
+        i = SpriteElemSizeRaw(cursor, type);
         if (i < 1 || cursor - res > size - i)
             throw('Graphics');
         cursor += i;
@@ -504,7 +639,8 @@ def inject_sprite_wrappers(bridge: bytes, sprite_plot: bytes) -> bytes:
 }
 '''
     return (bridge + b'\n\n' + dc_extents_init + b'\n' + sprite3b +
-            b'\n\n' + extents + b'\n\n' + sprite_to_dc + b'\n\n' +
+            b'\n\n' + extents + b'\n\n' + packed_extents + b'\n\n' +
+            sprite_to_dc + b'\n\n' +
             sprite_transform + b'\n')
 
 
@@ -578,7 +714,8 @@ extern Bool ZcUserInputComplete(U8 *text);
             raise ValueError(f"pinned user entry changed: {old}")
     entry = entry.replace('\tno_warn dummy;', '\tif (dummy) {}', 1)
     entry = entry.replace('CallExtStr("UserStartUp");',
-                          'ZcCallExtStr("UserStartUp");', 1)
+                          'ZcCallExtStr("UserStartUp");\n'
+                          '\tZcCallExtStr("BootstrapGuiTerminalAttachUser");', 1)
     # This port has bounded task slots. Fail before TaskWait(NULL) would wait
     # for the caller itself when all application slots are in use.
     entry = entry.replace('CTask\t*task = Spawn(&UserCmdLine,, "Terminal");',
@@ -854,8 +991,15 @@ def extract_version_scalars(source: bytes) -> bytes:
                       r'U64\s+(sys_os_version_sub = [0-9]+;)', text)
     if not match:
         raise ValueError('pinned kernel version scalars changed')
+    version = re.search(r'[0-9.]+', match[1]).group(0)
+    version_sub = re.search(r'[0-9]+', match[2]).group(0)
+    version_text = f'ZealOS ARM64 V{version}.{version_sub}'
     return ('// Version values from pinned Kernel/KGlobals.ZC.\nF64 ' +
-            match[1] + '\nU64 ' + match[2] + '\n').encode()
+            match[1] + '\nU64 ' + match[2] +
+            '\n// ARM64 has no boot-time KMain formatter; keep its public version strings available.\n'
+            f'U8 *sys_os_version_str = "{version_text}";\n'
+            f'U8 *sys_os_version_full = "{version_text}\\n";\n'
+            f'U8 *sys_os_version_nice = "{version_text}";\n').encode()
 
 
 def extract_source_prompt(source: bytes) -> bytes:
@@ -1287,18 +1431,40 @@ def extract_keyboard_helpers(source: bytes, printer: bytes) -> bytes:
             + cat_print+b'\n'+b''.join(tables)+b'\n'+b'\n'.join(bodies)+b'\n')
 
 
+def translate_home_localize(source: bytes) -> bytes:
+    """Drop the legacy PS/2 typematic write from the ARM64 home settings."""
+    old = b'KbdTypeMatic(0);'
+    if source.count(old) != 1:
+        raise ValueError('pinned HomeLocalize typematic call changed')
+    return source.replace(
+        old,
+        b'// USB keyboards provide repeat; there is no PS/2 typematic controller.\n'
+        b'// KbdTypeMatic(0);', 1)
+
+
 def extract_string_utilities(str_a: bytes, str_b: bytes) -> bytes:
-    """Keep the pinned allocating string transforms used by date/application input."""
+    """Keep pinned string transforms and character bitmaps used by source apps."""
     begin, end = b'I64 Spaces2Tabs(U8 *dst, U8 *src)\n', b'\nU8 *StrFirstOcc('
     if str_a.count(begin) != 1 or str_a.count(end) != 1:
         raise ValueError('pinned string utility boundaries changed')
     inplace = begin + str_a.split(begin, 1)[1].split(end, 1)[0]
+    bitmaps = []
+    for name in (b'char_bmp_alpha', b'char_bmp_alpha_numeric',
+                 b'char_bmp_alpha_numeric_no_at', b'char_bmp_word',
+                 b'char_bmp_filename', b'char_bmp_dec_numeric',
+                 b'char_bmp_hex_numeric'):
+        pattern = rb'(?m)^\s*' + name + rb'\[16\]\s*=\s*\{[^}]*\}'
+        found = re.findall(pattern, str_a)
+        if len(found) != 1:
+            raise ValueError(f'pinned {name.decode()} bitmap changed')
+        bitmaps.append(found[0])
     end = b'\nU0 GetOutOfDollar()'
     if not str_b.startswith(b'U8 *Tabs2Spaces(') or str_b.count(end) != 1:
         raise ValueError('pinned allocating string utility boundaries changed')
     allocating = str_b.split(end, 1)[0]
     return (b'// Original StrA/StrB string transforms and whitespace bitmap.\n'
             b'U32 char_bmp_white_space[16] = {0x80002600, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};\n'
+            + b'U32 ' + b';\nU32 '.join(bitmaps) + b';\n'
             + inplace + b'\n' + allocating + b'\n')
 
 
@@ -1444,17 +1610,59 @@ def translate_debug_compat(source: bytes, kernel_debug_source: bytes) -> bytes:
         raise ValueError('Debug.ZC portable ClassRep boundary changed')
     portable_debug = text.split(helper_boundary, 1)[0].rstrip().encode('utf-8') + b'\n'
 
-    # The portable debugger overlay is loaded at graphical startup, and stock
-    # demos such as GlobalVars call Dump(). Pull that one architecture-neutral
-    # routine from KDebug without compiling KDebug's x86-only register and
-    # memory-map helpers into the ARM64 source bundle.
+    # The portable debugger overlay is loaded at graphical startup. Pull the
+    # architecture-neutral Dump routine and stack bounds helper from KDebug,
+    # then provide ARM64 stack/frame-pointer reports. The full KDebug module
+    # contains x86 register and disassembly helpers that cannot be loaded here.
     kernel_text = kernel_debug_source.decode('utf-8')
     dump_start = 'U0 Dump(U8 *addr, I64 count=0x80, Bool show_offset=TRUE)'
     dump_end = '\nU0 DumpMem('
     if kernel_text.count(dump_start) != 1 or kernel_text.count(dump_end) != 1:
         raise ValueError('KDebug.ZC portable Dump extraction boundary changed')
     dump_body = kernel_text[kernel_text.index(dump_start):kernel_text.index(dump_end)]
-    return portable_debug + dump_body.rstrip().encode('utf-8') + b'\n'
+    stack_reports = r'''
+U0 StackRep(CTask *task=NULL)
+{//AArch64 stack report using the task's saved stack pointer.
+    if (!task)
+        task = Fs;
+    if (!TaskValidate(task) || !task->stack)
+        return;
+    if (!task->rsp ||
+            task->rsp(U8 *) < (&task->stack->stack_base)(U8 *) ||
+            task->rsp(U8 *) >= (&task->stack->stack_base)(U8 *) + task->stack->stack_size)
+        return;
+    if (!IsRaw)
+        "$$LTCYAN$$";
+    "AArch64 StackRep, saved SP=%016X\n", task->rsp;
+    if (!IsRaw)
+        "$$FG$$";
+    Dump(task->rsp(U8 *), 0x100, FALSE);
+}
+
+U0 CallerRep(U8 **rbp=NULL, CTask *task=NULL)
+{//AArch64 caller report using the task's saved frame pointer.
+    if (!task)
+        task = Fs;
+    if (!TaskValidate(task) || !task->stack)
+        return;
+    if (!rbp)
+    {
+        if (task == Fs)
+            rbp = RBPGet;
+        else
+            rbp = task->rbp;
+    }
+    if (!rbp || rbp(U8 *) < (&task->stack->stack_base)(U8 *) ||
+            rbp(U8 *) + 16 > (&task->stack->stack_base)(U8 *) + task->stack->stack_size)
+        return;
+    "AArch64 CallerRep, saved FP=%016X SP=%016X\n", rbp, task->rsp;
+    if (!IsRaw)
+        "$$LTCYAN$$Frame record and return address:\n$$FG$$";
+    Dump(rbp(U8 *), 0x40, FALSE);
+}
+'''
+    return (portable_debug + dump_body.rstrip().encode('utf-8') + b'\n' +
+            stack_reports.encode('utf-8'))
 
 
 def translate_doctree(source: bytes) -> bytes:
@@ -2122,9 +2330,9 @@ def translate_mathode(source: bytes) -> bytes:
     """Adapt the pinned ODE source to the ARM64 cooperative runtime.
 
     The bit-test expression workaround keeps the pinned source compiling.
-    The monotonic deadline keeps ODE work bounded when the guest's cooperative
-    clock task cannot run while the integrator owns the CPU. The guarded
-    replacements keep the upstream mirror pristine.
+    The monotonic deadline and RK-step cap keep ODE work bounded when a stiff
+    solve needs extremely many tiny steps before the guest's cooperative clock
+    can advance. The guarded replacements keep the upstream mirror pristine.
     """
     try:
         text = source.decode("utf-8")
@@ -2149,7 +2357,7 @@ def translate_mathode(source: bytes) -> bytes:
     text = text.replace(call, "\t\twhile (!Bt(mp_flags, Gs->num))", 1)
     text = text.replace(reset, "\t\tLBtr(mp_flags, Gs->num);", 1)
     text = text.replace(update_declarations,
-        update_declarations + "\tI64\t\t\t monotonic_timeout_ns;\n", 1)
+        update_declarations + "\tI64\t\t\t monotonic_timeout_ns, ode_steps;\n", 1)
     text = text.replace(timeout_calculation,
         timeout_calculation +
         # `timeout_time` is in the guest's uptime epoch, while
@@ -2163,6 +2371,26 @@ def translate_mathode(source: bytes) -> bytes:
         "\t\t\t\t\t\t\t\tode->base_t += t_desired - ode->t; //Slip\n"
         "\t\t\t\t\t\t\t\tgoto ode_done;\n"
         "\t\t\t\t\t\t\t}\n", 1)
+    step = "\t\t\t\t\t\t\tODERK5OneStep(ode);"
+    if text.count(step) != 1:
+        raise ValueError("expected one MathODE integration step site")
+    step_counter_reset = (
+        "\t\t\t\t\t\tODEState2Internal(ode);\n"
+        "\t\t\t\t\t\tMemCopy(ode->initial_state, ode->state_internal, ode->n_internal * sizeof(F64));\n"
+        "\t\t\t\t\t\twhile (ode->t < t_desired)")
+    if text.count(step_counter_reset) != 1:
+        raise ValueError("expected one MathODE integration-loop setup")
+    text = text.replace(step_counter_reset,
+        "\t\t\t\t\t\tODEState2Internal(ode);\n"
+        "\t\t\t\t\t\tMemCopy(ode->initial_state, ode->state_internal, ode->n_internal * sizeof(F64));\n"
+        "\t\t\t\t\t\tode_steps = 0;\n"
+        "\t\t\t\t\t\twhile (ode->t < t_desired)", 1)
+    text = text.replace(step, step + "\n"
+        "\t\t\t\t\t\t\tif (++ode_steps >= 16 && ode->t < t_desired)\n"
+        "\t\t\t\t\t\t\t{\n"
+        "\t\t\t\t\t\t\t\tode->base_t += t_desired - ode->t; //Slip\n"
+        "\t\t\t\t\t\t\t\tgoto ode_done;\n"
+        "\t\t\t\t\t\t\t}", 1)
     derivative = "\t\t\t\t\t\t\tODECallDerivative(ode, ode->t, ode->state_internal, ode->DstateDt);"
     step = "\t\t\t\t\t\t\tODERK5OneStep(ode);"
     if text.count(derivative) != 1 or text.count(step) != 1:
@@ -2282,6 +2510,192 @@ def translate_math(source: bytes) -> bytes:
         b'}\n')
 
 
+def translate_conversion_math(source: bytes) -> bytes:
+    """Route the four legacy x86/SSE conversion imports through the ARM64 ABI bridge."""
+    text = source.decode('utf-8')
+    if text.count('asm\n{') != 4:
+        raise ValueError('pinned Conversion.ZC no longer has four x86 assembly blocks')
+    labels = ('_F64_TO_F32', '_F32_TO_F64', '_F32_RAD_TO_DEG',
+              '_F32_DEG_TO_RAD')
+    for label in labels:
+        if text.count(label) != 2:
+            raise ValueError('pinned Conversion.ZC import label changed: ' + label)
+    text, count = re.subn(r'asm\n\{.*?\n\}\n', '', text, flags=re.S)
+    if count != 4:
+        raise ValueError('failed to remove all pinned x86 Conversion.ZC blocks')
+    for label in labels:
+        text = text.replace('_extern ' + label + ' ', 'extern ', 1)
+    if '_extern ' in text or 'asm\n{' in text:
+        raise ValueError('legacy conversion assembly/import annotation remains')
+    return ('// ARM64 replaces the pinned x86/SSE bodies with runtime ABI imports.\n' +
+            text).encode('utf-8')
+
+
+def translate_f32_math(source: bytes) -> bytes:
+    """Replace the pinned x86/SSE CosF32 body with its ARM64 runtime import."""
+    text = source.decode('utf-8')
+    if (text.count('asm\n{') != 1 or
+            text.count('_extern _F32_COS F32 CosF32(F32 theta);') != 1 or
+            text.count('_F32_COS::') != 1):
+        raise ValueError('pinned F32 source shape changed')
+    start = text.index('asm\n{')
+    end = text.index('\n}\n', start) + 2
+    text = text[:start] + '// ARM64 runtime import replaces the pinned x86/SSE cosine body.\n' + text[end:]
+    text = text.replace('_extern _F32_COS F32 CosF32(F32 theta);',
+                        'extern F32 CosF32(F32 theta);', 1)
+    if '_extern ' in text or 'asm\n{' in text:
+        raise ValueError('legacy F32 assembly/import annotation remains')
+    return text.encode('utf-8')
+
+
+def translate_vec4_math(source: bytes) -> bytes:
+    """Replace pinned x86/SSE vector code with guarded ARM64 ABI imports."""
+    text = source.decode('utf-8')
+    symbols = (
+        '_VECTOR_4D_INIT', '_VECTOR_4D_COPY', '_VECTOR_4D_IS_EQUAL',
+        '_VECTOR_4D_ADD', '_VECTOR_4D_ADDS', '_VECTOR_4D_SUB',
+        '_VECTOR_4D_SUBS', '_VECTOR_4D_MUL', '_VECTOR_4D_MULS',
+        '_VECTOR_4D_DIV', '_VECTOR_4D_DIVS', '_VECTOR_4D_MIN',
+        '_VECTOR_4D_MAX', '_VECTOR_4D_NEGATE', '_VECTOR_4D_DOT',
+    )
+    names = (
+        'Vector4DInit', 'Vector4DCopy', 'Vector4DIsEqual', 'Vector4DAdd',
+        'Vector4DAddS', 'Vector4DSub', 'Vector4DSubS', 'Vector4DMul',
+        'Vector4DMulS', 'Vector4DDiv', 'Vector4DDivS', 'Vector4DMin',
+        'Vector4DMax', 'Vector4DNegate', 'Vector4DDot',
+    )
+    if (text.count('asm\n{') != 16 or
+            any(text.count(symbol + '::') != 1 for symbol in symbols) or
+            any(text.count('_extern ' + symbol + ' ') != 1 for symbol in symbols) or
+            text.count('U0 Vector4DPrint(CVector4D *v)') != 1):
+        raise ValueError('pinned Vec4 source shape changed')
+    print_start = text.index('U0 Vector4DPrint(CVector4D *v)')
+    print_end = text.index('\n\nasm\n{', print_start)
+    text = (text[:print_start] +
+            'U0 Vector4DPrint(CVector4D *v)\n{\n'
+            '\tPrint("%n\\t%n\\t%n\\t%n\\n\\n",\n'
+            '\t\tF32ToF64(v->x), F32ToF64(v->y),\n'
+            '\t\tF32ToF64(v->z), F32ToF64(v->w));\n'
+            '}\n' + text[print_end:])
+    text, count = re.subn(r'(?ms)^asm\s*\{\n.*?^\}',
+                          '/* ARM64 vector operation is bound by the runtime. */',
+                          text)
+    if count != 15:
+        raise ValueError(f'expected 15 Vec4 assembly blocks, found {count}')
+    for symbol in symbols:
+        text = text.replace('_extern ' + symbol + ' ', 'extern ', 1)
+    if '_extern ' in text or 'asm\n{' in text:
+        raise ValueError('legacy Vec4 assembly/import annotation remains')
+    for name in names:
+        if text.count('extern ') == 0 or text.count(name + '(') != 1:
+            raise ValueError(f'Vec4 runtime import {name} missing or duplicated')
+    return text.encode('utf-8')
+
+
+def translate_vec3_math(source: bytes) -> bytes:
+    """Replace pinned x86/SSE Vec3 bodies with ARM64 runtime imports."""
+    text = source.decode('utf-8')
+    symbols = (
+        '_VECTOR_3D_INIT', '_VECTOR_3D_IS_EQUAL', '_VECTOR_3D_NORMALIZE',
+        '_VECTOR_3D_DOT', '_VECTOR_3D_CROSS',
+    )
+    names = (
+        'Vector3DInit', 'Vector3DIsEqual', 'Vector3DNormalize',
+        'Vector3DDot', 'Vector3DCross',
+    )
+    imported = (
+        'Vector3DInit', 'Vector3DCopy', 'Vector3DIsEqual', 'Vector3DAdd',
+        'Vector3DAddS', 'Vector3DSub', 'Vector3DSubS', 'Vector3DMul',
+        'Vector3DMulS', 'Vector3DDiv', 'Vector3DDivS', 'Vector3DMin',
+        'Vector3DMax', 'Vector3DNegate', 'Vector3DNormalize',
+        'Vector3DDot', 'Vector3DCross',
+    )
+    if (text.count('asm\n{') != 6 or
+            any(text.count(symbol + '::') != 1 for symbol in symbols) or
+            any(text.count('_extern ' + symbol + ' ') != 1 for symbol in symbols) or
+            text.count('U0 Vector3DPrint(CVector3D *v)') != 1):
+        raise ValueError('pinned Vec3 source shape changed')
+    print_start = text.index('U0 Vector3DPrint(CVector3D *v)')
+    print_end = text.index('\n\n/**', print_start)
+    text = (text[:print_start] +
+            'U0 Vector3DPrint(CVector3D *v)\n{\n'
+            '\tPrint("%n\\t%n\\t%n\\n\\n", F32ToF64(v->x),\n'
+            '\t\tF32ToF64(v->y), F32ToF64(v->z));\n'
+            '}\n' + text[print_end:])
+    text, count = re.subn(r'(?ms)^asm\s*\{\n.*?^\}',
+                          '/* ARM64 vector operation is bound by the runtime. */',
+                          text)
+    if count != 5:
+        raise ValueError(f'expected 5 Vec3 assembly blocks, found {count}')
+    for symbol in symbols:
+        text = text.replace('_extern ' + symbol + ' ', 'extern ', 1)
+    # The remaining operations share the same 128-bit behavior as Vec4.
+    for symbol in ('_VECTOR_4D_COPY', '_VECTOR_4D_ADD', '_VECTOR_4D_ADDS',
+                   '_VECTOR_4D_SUB', '_VECTOR_4D_SUBS', '_VECTOR_4D_MUL',
+                   '_VECTOR_4D_MULS', '_VECTOR_4D_DIV', '_VECTOR_4D_DIVS',
+                   '_VECTOR_4D_MIN', '_VECTOR_4D_MAX', '_VECTOR_4D_NEGATE'):
+        text = text.replace('_extern ' + symbol + ' ', 'extern ', 1)
+    if '_extern ' in text or 'asm\n{' in text:
+        raise ValueError('legacy Vec3 assembly/import annotation remains')
+    for name in imported:
+        if text.count(name + '(') != 1:
+            raise ValueError(f'Vec3 runtime import {name} missing or duplicated')
+    return text.encode('utf-8')
+
+
+def translate_mat4_math(source: bytes) -> bytes:
+    """Replace pinned x86/SSE Mat4 bodies with native runtime imports."""
+    text = source.decode('utf-8')
+    symbols = ('_MATRIX_4D_MUL_VECTOR_4D', '_MATRIX_4D_MUL',
+               '_MATRIX_4D_TRANSPOSE')
+    names = ('Matrix4DMulVector4D', 'Matrix4DMul', 'Matrix4DTranspose')
+    if (text.count('asm\n{') != 4 or
+            any(text.count(symbol + '::') != 1 for symbol in symbols) or
+            any(text.count('_extern ' + symbol + ' ') != 1 for symbol in symbols) or
+            text.count('U0 Matrix4DPrint(CMatrix4D *m)') != 1 or
+            text.count('U0 Matrix4DTranslationSet(F32 x, F32 y, F32 z, CMatrix4D *dest)') != 1 or
+            text.count('U0 Matrix4DScaleSet(F32 x, F32 y, F32 z, CMatrix4D *dest)') != 1):
+        raise ValueError('pinned Mat4 source shape changed')
+    print_start = text.index('U0 Matrix4DPrint(CMatrix4D *m)')
+    print_end = text.index('\n\n/**', print_start)
+    text = (text[:print_start] +
+            'U0 Matrix4DPrint(CMatrix4D *m)\n{\n'
+            '\tPrint("%n\\t%n\\t%n\\t%n\\n",\n'
+            '\t\tF32ToF64(m->e[0]), F32ToF64(m->e[4]),\n'
+            '\t\tF32ToF64(m->e[8]), F32ToF64(m->e[12]));\n'
+            '\tPrint("%n\\t%n\\t%n\\t%n\\n",\n'
+            '\t\tF32ToF64(m->e[1]), F32ToF64(m->e[5]),\n'
+            '\t\tF32ToF64(m->e[9]), F32ToF64(m->e[13]));\n'
+            '\tPrint("%n\\t%n\\t%n\\t%n\\n",\n'
+            '\t\tF32ToF64(m->e[2]), F32ToF64(m->e[6]),\n'
+            '\t\tF32ToF64(m->e[10]), F32ToF64(m->e[14]));\n'
+            '\tPrint("%n\\t%n\\t%n\\t%n\\n\\n",\n'
+            '\t\tF32ToF64(m->e[3]), F32ToF64(m->e[7]),\n'
+            '\t\tF32ToF64(m->e[11]), F32ToF64(m->e[15]));\n'
+            '}\n' + text[print_end:])
+    for function, signature in (
+            ('Matrix4DTranslationSet',
+             'extern U0 Matrix4DTranslationSet(F32 x, F32 y, F32 z, CMatrix4D *dest);'),
+            ('Matrix4DScaleSet',
+             'extern U0 Matrix4DScaleSet(F32 x, F32 y, F32 z, CMatrix4D *dest);')):
+        start = text.index('U0 ' + function + '(')
+        end = text.index('\n}', start) + 2
+        text = text[:start] + signature + text[end:]
+    text, count = re.subn(r'(?ms)^asm\s*\{\n.*?^\}',
+                          '/* ARM64 matrix operation is bound by the runtime. */',
+                          text)
+    if count != 3:
+        raise ValueError(f'expected 3 Mat4 assembly blocks, found {count}')
+    for symbol in symbols:
+        text = text.replace('_extern ' + symbol + ' ', 'extern ', 1)
+    if '_extern ' in text or 'asm\n{' in text:
+        raise ValueError('legacy Mat4 assembly/import annotation remains')
+    for name in names:
+        if text.count(name + '(') != 1:
+            raise ValueError(f'Mat4 runtime import {name} missing or duplicated')
+    return text.encode('utf-8')
+
+
 def translate_stock_game_math_calls(source: bytes, *, blink_count: int = 0,
                                     clamp_u64_count: int = 0, tri_count: int = 0,
                                     full_tri_count: int = 0,
@@ -2305,8 +2719,29 @@ def translate_stock_game_math_calls(source: bytes, *, blink_count: int = 0,
             .replace(b'ClampU64(', b'Arm64ClampU64('))
 
 
+def translate_blackdiamond_math_dependency(source: bytes) -> bytes:
+    """Load stock math and paint BlackDiamond's expected light canvas."""
+    include = b'#include "/System/Math/Math"\n'
+    draw_it = b'U0 DrawIt(CTask *, CDC *dc)\n{\n\tI64  i;'
+    draw_with_canvas = (b'U0 DrawIt(CTask *, CDC *dc)\n{\n'
+                        b'\tDCFill(dc, WHITE);\n\tI64  i;')
+    if (source.count(b'Cosh(') != 1 or source.count(include) or
+            source.count(draw_it) != 1):
+        raise ValueError('pinned BlackDiamond math dependency shape changed')
+    return include + source.replace(draw_it, draw_with_canvas, 1)
+
+
+def translate_polezeros_math_dependency(source: bytes) -> bytes:
+    """Load the shared complex-math definitions used by PoleZeros."""
+    include = b'#include "/System/Math/Math"\n'
+    if (source.count(b'CPoly(') != 2 or source.count(b'Complex zeros[ZEROS_NUM]') != 1 or
+            include in source):
+        raise ValueError('pinned PoleZeros math dependency shape changed')
+    return include + source
+
+
 def translate_wenceslas(source: bytes) -> bytes:
-    """Split oversized Wenceslas lyric prompts into STR_LEN-safe pages."""
+    """Apply AArch64 Wenceslas prompt and extended-key compatibility fixes."""
     starts = []
     offset = 0
     marker = b'PopUpOk("'
@@ -2351,6 +2786,201 @@ def translate_wenceslas(source: bytes) -> bytes:
         raise ValueError('expected exactly two oversized Wenceslas prompts')
     for start, finish, replacement in reversed(chunks):
         source = source[:start] + replacement + source[finish:]
+
+    # The pinned game shares allocator-backed linked queues between its
+    # keyboard task and animation task. On AArch64, inserting a king trail
+    # record from the keyboard task wedges the guest. Keep the same trail
+    # data and lifetimes in bounded static rings instead; this avoids
+    # cross-task allocator and linked-queue mutation while retaining the
+    # footprints and peasant-follow behavior.
+    queue_decl = b'} step_head, king_step_head;'
+    ring_decl = (b'} step_head, king_step_head;\n'
+                 b'\n'
+                 b'#define ARM64_STEP_CAP 256\n'
+                 b'#define ARM64_KING_STEP_CAP 128\n'
+                 b'Step arm64_steps[ARM64_STEP_CAP], arm64_king_steps[ARM64_KING_STEP_CAP];\n'
+                 b'U16 arm64_step_head, arm64_step_count, arm64_king_step_head, arm64_king_step_count;\n'
+                 b'\n'
+                 b'U0 StepRingPush(Step *ring, U16 cap, U16 *head, U16 *count, I64 x, I64 y)\n'
+                 b'{\n'
+                 b'\tU16 idx;\n'
+                 b'\tif (*count < cap)\n'
+                 b'\t{\n'
+                 b'\t\tidx = (*head + *count) % cap;\n'
+                 b'\t\t(*count)++;\n'
+                 b'\t}\n'
+                 b'\telse\n'
+                 b'\t{\n'
+                 b'\t\tidx = *head;\n'
+                 b'\t\t*head = (*head + 1) % cap;\n'
+                 b'\t}\n'
+                 b'\tring[idx].x = x;\n'
+                 b'\tring[idx].y = y;\n'
+                 b'\tring[idx].t0 = tS;\n'
+                 b'}\n')
+    if source.count(queue_decl) != 1:
+        raise ValueError('expected one Wenceslas trail queue declaration')
+    source = source.replace(queue_decl, ring_decl, 1)
+
+    # Draw only recent generic footprints, retaining their dark/light age
+    # transition and four-pixel marker thickness.
+    draw_start = b'\ttmpst = step_head.next;\n\twhile (tmpst != &step_head)\n\t{'
+    draw_end = b'\n\tDCDepthBufAlloc(dc);'
+    if source.count(draw_start) != 1 or source.count(draw_end) != 1:
+        raise ValueError('Wenceslas footprint drawing boundary changed')
+    start = source.index(draw_start)
+    finish = source.index(draw_end, start)
+    draw_ring = (b'\tfor (i = 0; i < arm64_step_count; i++)\n'
+                 b'\t{\n'
+                 b'\t\ttmpst = &arm64_steps[(arm64_step_head + i) % ARM64_STEP_CAP];\n'
+                 b'\t\tif (tS - tmpst->t0 < 5.0)\n'
+                 b'\t\t{\n'
+                 b'\t\t\tif (tS - tmpst->t0 < 2.0)\n'
+                 b'\t\t\t\tdc->color = DKGRAY;\n'
+                 b'\t\t\telse\n'
+                 b'\t\t\t\tdc->color = LTGRAY;\n'
+                 b'\t\t\tdc->thick = 4;\n'
+                 b'\t\t\tGrPlot3(dc, tmpst->x, tmpst->y, 0);\n'
+                 b'\t\t}\n'
+                 b'\t}')
+    source = source[:start] + draw_ring + source[finish:]
+
+    # Replace the entire allocator-backed insertion routine with ring writes.
+    step_start = b'U0 StepNew(CTask *task, I64 x, I64 y, F64 '
+    step_finish = b'\nU0 Init()'
+    if source.count(step_start) != 1 or source.count(step_finish) != 1:
+        raise ValueError('Wenceslas StepNew boundary changed')
+    start = source.index(step_start)
+    finish = source.index(step_finish, start)
+    step_ring = '''U0 StepNew(CTask *, I64 x, I64 y, F64 Θ, Bool left_right, Bool king)
+{
+\tif (king)
+\t\tStepRingPush(arm64_king_steps, ARM64_KING_STEP_CAP,
+\t\t\t\t&arm64_king_step_head, &arm64_king_step_count, x, y);
+
+\tif (left_right)
+\t{
+\t\tStepRingPush(arm64_steps, ARM64_STEP_CAP, &arm64_step_head, &arm64_step_count,
+\t\t\t\tx - 3.5 * Sin(Θ) + 2.0 * Cos(Θ), y + 3.5 * Cos(Θ) + 2.0 * Sin(Θ));
+\t\tStepRingPush(arm64_steps, ARM64_STEP_CAP, &arm64_step_head, &arm64_step_count,
+\t\t\t\tx - 3.5 * Sin(Θ) + 5.0 * Cos(Θ), y + 3.5 * Cos(Θ) + 5.0 * Sin(Θ));
+\t}
+\telse
+\t{
+\t\tStepRingPush(arm64_steps, ARM64_STEP_CAP, &arm64_step_head, &arm64_step_count,
+\t\t\t\tx + 3.5 * Sin(Θ), y - 3.5 * Cos(Θ));
+\t\tStepRingPush(arm64_steps, ARM64_STEP_CAP, &arm64_step_head, &arm64_step_count,
+\t\t\t\tx + 3.5 * Sin(Θ) + 3.0 * Cos(Θ), y - 3.5 * Cos(Θ) + 3.0 * Sin(Θ));
+\t}
+}
+'''.encode('utf-8')
+    source = source[:start] + step_ring + source[finish:]
+
+    follow_start = b'\tStep *tmps = king_step_head.next;\n\tF64\t  d, best_d = F64_MAX;\n\n\twhile (tmps != &king_step_head)\n\t{'
+    follow_end = b'\n}\n\nU0 AnimateTask'
+    if source.count(follow_start) != 1 or source.count(follow_end) != 1:
+        raise ValueError('Wenceslas follower queue boundary changed')
+    start = source.index(follow_start)
+    finish = source.index(follow_end, start)
+    follow_ring = (b'\tStep *tmps;\n\tI64 i;\n\tF64 d, best_d = F64_MAX;\n\n'
+                   b'\tfor (i = 0; i < arm64_king_step_count; i++)\n'
+                   b'\t{\n'
+                   b'\t\ttmps = &arm64_king_steps[(arm64_king_step_head + i) % ARM64_KING_STEP_CAP];\n'
+                   b'\t\tif (tS - tmps->t0 < 3.0 &&\n'
+                   b'\t\t\t\t(d = Sqr(tmps->x - tmpp->x) + Sqr(tmps->y - tmpp->y)) && d < 15 * 15)\n'
+                   b'\t\t{\n'
+                   b'\t\t\td += 1000 * Sqr(tS - tmps->t0);\n'
+                   b'\t\t\tif (d < best_d)\n'
+                   b'\t\t\t{\n'
+                   b'\t\t\t\tbest_d = d;\n'
+                   b'\t\t\t\ttmpp->\xce\x98 = Arg(tmps->x - tmpp->x, tmps->y - tmpp->y);\n'
+                   b'\t\t\t}\n'
+                   b'\t\t}\n'
+                   b'\t}')
+    source = source[:start] + follow_ring + source[finish:]
+
+    init_queues = b'\tQueueInit(&step_head);\n\tQueueInit(&king_step_head);'
+    reset_rings = (b'\tarm64_step_head = arm64_step_count = 0;\n'
+                   b'\tarm64_king_step_head = arm64_king_step_count = 0;')
+    if source.count(init_queues) != 1:
+        raise ValueError('Wenceslas trail queue initialization changed')
+    source = source.replace(init_queues, reset_rings, 1)
+
+    cleanup_queues = b'\tQueueDel(&step_head, TRUE);\n\tQueueDel(&king_step_head, TRUE);'
+    if source.count(cleanup_queues) != 1:
+        raise ValueError('Wenceslas trail queue cleanup changed')
+    source = source.replace(cleanup_queues, b'', 1)
+
+    # The animation task used to prune both linked queues. Ring readers now
+    # filter records by age, so there is no shared-list mutation to perform.
+    prune_start = b'\t\ttmps = step_head.next;\n\t\twhile (tmps != &step_head)\n\t\t{'
+    prune_finish = b'\n\t\tnot_stopped_count = 0;'
+    if source.count(prune_start) != 1 or source.count(prune_finish) != 1:
+        raise ValueError('Wenceslas trail pruning boundary changed')
+    start = source.index(prune_start)
+    finish = source.index(prune_finish, start)
+    source = source[:start] + source[finish:]
+
+    # The pinned nested start:/end: cursor sub-switch wedges this AArch64
+    # guest after a cursor event. Lower the complete input switch to explicit
+    # conditions while retaining the original key actions.
+    declaration = b'U0 Wenceslas()\n{\n\tI64 sc;'
+    if source.count(declaration) != 1:
+        raise ValueError('expected one Wenceslas input function declaration')
+    source = source.replace(declaration,
+                            b'U0 Wenceslas()\n{\n\tI64 sc, ch;', 1)
+    switch_start = b'\t\t\tswitch (KeyGet(&sc))\n'
+    switch_end = b'\n\t\t\t}\n\t\t}\nws_done:'
+    if source.count(switch_start) != 1 or source.count(switch_end) != 1:
+        raise ValueError('Wenceslas input switch boundary changed')
+    start = source.index(switch_start)
+    finish = source.index(switch_end, start) + len(b'\n\t\t\t}')
+    replacement = '''\t\t\tch = KeyGet(&sc);
+\t\t\tif (ch == '\\n')
+\t\t\t{
+\t\t\t\tCleanUp;
+\t\t\t\tInit;
+\t\t\t}
+\t\t\telse if (ch == CH_ESC || ch == CH_SHIFT_ESC)
+\t\t\t\tgoto ws_done;
+\t\t\telse if (ch == CH_SPACE)
+\t\t\t\tBurnTrees;
+\t\t\telse if (!ch)
+\t\t\t{
+\t\t\t\tif (sc.u8[0] == SC_CURSOR_RIGHT)
+\t\t\t\t{
+\t\t\t\t\tif (king_x + KING_STEP < Fs->pix_width - BORDER)
+\t\t\t\t\t\tking_x += KING_STEP;
+\t\t\t\t\tking_Θ = 0;
+\t\t\t\t}
+\t\t\t\telse if (sc.u8[0] == SC_CURSOR_LEFT)
+\t\t\t\t{
+\t\t\t\t\tif (king_x - KING_STEP >= BORDER)
+\t\t\t\t\t\tking_x -= KING_STEP;
+\t\t\t\t\tking_Θ = π;
+\t\t\t\t}
+\t\t\t\telse if (sc.u8[0] == SC_CURSOR_DOWN)
+\t\t\t\t{
+\t\t\t\t\tif (king_y + KING_STEP < Fs->pix_height - BORDER)
+\t\t\t\t\t\tking_y += KING_STEP;
+\t\t\t\t\tking_Θ = -π / 2;
+\t\t\t\t}
+\t\t\t\telse if (sc.u8[0] == SC_CURSOR_UP)
+\t\t\t\t{
+\t\t\t\t\tif (king_y - KING_STEP >= BORDER)
+\t\t\t\t\t\tking_y -= KING_STEP;
+\t\t\t\t\tking_Θ = π / 2;
+\t\t\t\t}
+\t\t\t\tif (sc.u8[0] == SC_CURSOR_RIGHT || sc.u8[0] == SC_CURSOR_LEFT ||
+\t\t\t\t\t\tsc.u8[0] == SC_CURSOR_DOWN || sc.u8[0] == SC_CURSOR_UP)
+\t\t\t\t{
+\t\t\t\t\tking_mS = 0;
+\t\t\t\t\tking_phase = (king_phase + 2) & 2;
+\t\t\t\t\tStepNew(Fs, king_x, king_y, king_Θ, king_phase & 2, TRUE);
+\t\t\t\t\tking_timeout = tS + 0.5;
+\t\t\t\t}
+\t\t\t}'''.encode('utf-8')
+    source = source[:start] + replacement + source[finish:]
     return source
 
 
@@ -2393,6 +3023,65 @@ def translate_sched_focus_trace(source: bytes) -> bytes:
     return text.encode("utf-8")
 
 
+def translate_ndarray_math(source: bytes) -> bytes:
+    """Make the stock NDArray module self-contained and repair its allocator paths.
+
+    The pinned module is normally loaded after Types.ZC, but isolated ARM64
+    source probes and direct use need its CArray definition. The original
+    F64 clear path allocates half the required storage, the non-clearing I64
+    and F32 paths still zero-fill, and ArrayFree switches on an undeclared
+    identifier instead of the array's recorded element type.
+    """
+    try:
+        text = source.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValueError("NDArray.ZC is not UTF-8") from exc
+    if '#include "Types"' in text or '#include "/System/Math/Types"' in text:
+        raise ValueError("NDArray.ZC already includes its Types dependency")
+    replacements = (
+        ("arr->I64Buf = CAllocAligned(sizeof(I64) * arr->size, 16);\n\t\t\tbreak;",
+         "arr->I64Buf = MAllocAligned(sizeof(I64) * arr->size, 16);\n\t\t\tbreak;"),
+        ("\t\t\telse\n\t\t\t\tarr->F32Buf = CAllocAligned(sizeof(F32) * arr->size, 16);",
+         "\t\t\telse\n\t\t\t\tarr->F32Buf = MAllocAligned(sizeof(F32) * arr->size, 16);"),
+        ("arr->F64Buf = CAllocAligned(sizeof(I32) * arr->size, 16);",
+         "arr->F64Buf = CAllocAligned(sizeof(F64) * arr->size, 16);"),
+        ("arr->F64Buf = MAllocAligned(sizeof(I64) * arr->size, 16);",
+         "arr->F64Buf = MAllocAligned(sizeof(F64) * arr->size, 16);"),
+        ("\tswitch (type)\n\t{\n\t\tcase NDARRAY_I32:\n\t\t\tFree(arr->I32Buf);",
+         "\tswitch (arr->type)\n\t{\n\t\tcase NDARRAY_I32:\n\t\t\tFree(arr->I32Buf);"),
+    )
+    for old, new in replacements:
+        if text.count(old) != 1:
+            raise ValueError("NDArray.ZC allocator/free source no longer matches expected stock code")
+        text = text.replace(old, new, 1)
+    return ('#include "Types"\n' + text).encode("utf-8")
+
+
+def translate_math_test_dependencies(source: bytes, module: str) -> bytes:
+    """Give the stock Math test scripts their explicit support-module imports."""
+    dependencies = {
+        "TestVec.ZC": ("Types", "Conversion", "F32", "Vec4", "Vec3"),
+        "TestMat4.ZC": ("Types", "Conversion", "F32", "Vec4", "Vec3", "Mat4"),
+        "TestF32.ZC": ("Types", "Conversion", "F32", "Math"),
+    }
+    name = module.rsplit("/", 1)[-1]
+    if name not in dependencies:
+        raise ValueError("unknown pinned Math test module")
+    try:
+        text = source.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValueError(f"{name} is not UTF-8") from exc
+    for dependency in dependencies[name]:
+        if f'#include "/System/Math/{dependency}"' in text:
+            raise ValueError(f"{name} already includes {dependency}")
+    boundary = re.match(r"\A\s*Cd\(__DIR__\);;", text)
+    if not boundary:
+        raise ValueError(f"{name} no longer starts at the expected source boundary")
+    includes = "".join(f'#include "/System/Math/{dep}"\n'
+                        for dep in dependencies[name])
+    return (text[:boundary.start()] + includes + text[boundary.start():]).encode("utf-8")
+
+
 def translate_sysrep_processor(source: bytes) -> bytes:
     """Report firmware CPU family on ARM64 without inventing x86 CPUID data."""
     declaration = b'\t\t\t\t\tCRAXRBXRCXRDX regs;\n'
@@ -2423,8 +3112,30 @@ def translate_sysrep_processor(source: bytes) -> bytes:
     return source
 
 
+def translate_cpurep_arm64(source: bytes) -> bytes:
+    """Report ARM64 scheduler/timer facts without requiring x86 SMBIOS data."""
+    old = b'\tSysRep(SMBIOSt_PROCESSOR);'
+    new = (b'\t"SMBIOS processor details are unavailable on this AArch64 platform.\\n";')
+    if source.count(old) != 1:
+        raise ValueError('pinned CPURep SMBIOS call changed')
+    source = source.replace(old, new, 1)
+    old = b'"%03X Active Cores at %6h?nHz\\n", mp_count, ToF64(counts.time_stamp_freq);'
+    new = (b'"AArch64 %03X active cores at %6h?nHz\\n", '
+           b'mp_count, ToF64(counts.time_stamp_freq);')
+    if source.count(old) != 1:
+        raise ValueError('pinned CPURep active-core report changed')
+    return source.replace(old, new, 1)
+
+
 def translate_progress(source: bytes) -> bytes:
-    """Replace Progress's x86-only countdown routine with the same C loop."""
+    """Replace Progress's x86-only countdown with an ARM64-friendly loop.
+
+    The original assembly yields on every counter tick. A C translation of all
+    12 million iterations is prohibitively slow in the current interpreter,
+    even when yielding periodically. Preserve the full counter range and
+    visible countdown while advancing it in coarse steps, yielding between
+    updates so other cooperative tasks still run.
+    """
     asm = (
         b'asm {\n_PROGRESS_DEMO::\n'
         b'\t\t\t\tMOV \t\tRCX, 12000000\n'
@@ -2440,7 +3151,7 @@ def translate_progress(source: bytes) -> bytes:
     source = source.replace(asm,
         b'U0 AsmProgressDemo()\n{\n'
         b'\tI64 i;\n'
-        b'\tfor (i = 12000000; i > 0; i--)\n'
+        b'\tfor (i = 12000000; i > 0; i -= 16384)\n'
         b'\t{\n'
         b'\t\tprogress1 = i;\n'
         b'\t\tYield;\n'
@@ -2462,15 +3173,34 @@ def translate_empty_label_statement(source: bytes, label: bytes) -> bytes:
 
 
 def translate_docpopup(source: bytes) -> bytes:
-    """Remove DocPopUp's one inline DolDoc word-wrap directive.
+    """Keep System Include's packed DolDoc resources available to the lexer.
 
-    It controls source-document display, not program evaluation. The native
-    text lexer has no raw DolDoc mode; retain every executable token.
+    Remove the source-only word-wrap directive and use document compilation
+    for source files that have a binary section after their text terminator.
+    Plain text retains the existing include path and its include context.
     """
     directive = b'return $WW,0$PopUp2("YES", 1, "NO", 0, header, footer) > 0;'
     if source.count(directive) != 1 or source.count(b'$WW,0$') != 1:
         raise ValueError("expected the single pinned PopUpNoYes word-wrap directive")
-    return source.replace(directive, directive.replace(b'$WW,0$', b''), 1)
+    source = source.replace(directive, directive.replace(b'$WW,0$', b''), 1)
+    include = b'\tif (okay)\n\t\tres = Sys("#include \\"%s\\";", name2);'
+    if source.count(include) != 1:
+        raise ValueError("expected the pinned SysFile include")
+    document_include = b'''\
+	if (okay)
+	{
+		I64 size, text_size = 0;
+		U8 *bytes = FileRead(name2, &size);
+		while (bytes && text_size < size && bytes[text_size])
+			text_size++;
+		Bool packed = bytes && text_size + 1 < size;
+		Free(bytes);
+		if (packed)
+			res = Sys("BootstrapGuiTerminalExeDocFile(\\"%Q\\");", name2);
+		else
+			res = Sys("#include \\"%s\\";", name2);
+	}'''
+    return source.replace(include, document_include, 1)
 
 
 def translate_docform(source: bytes) -> bytes:
@@ -2501,6 +3231,7 @@ def translate_docform(source: bytes) -> bytes:
         '\tml = tmpc->member_list_and_root;\n\twhile (ml)':
             '\twhile (ZcDocFormField(class_name, arm_index++, &arm_field))',
         'MemberMetaData("format", ml)': 'arm_field.format',
+        'DocPrint(doc, "%s", format)': 'DocPutS(doc, format)',
         '\t\t\ttmpc2 = ml->member_class;\n': '',
         '!tmpc2->ptr_stars_count': '!arm_field.pointer',
         '\t\t\t\ttmpc2 = OptClassFwd(tmpc2);\n\t\t\t\ttmpc2 -= tmpc2->ptr_stars_count;\n': '',
@@ -2570,20 +3301,38 @@ def translate_ktask(source: bytes) -> bytes:
                    r"(?m)^\s*CALL\s+U64 &fp_addr\[RBP\]"):
         if not re.search(anchor, block):
             raise ValueError(f"CallStackGrow assembly anchor changed: {anchor!r}")
-    replacement = """// ARM64: run the variadic target on a temporary task-owned stack.
+    replacement = """// ARM64: preserve the stock threshold check and grow only near the
+// current task stack's low boundary. The trampoline also gives the target a
+// fresh call frame when the current stack already has enough room.
 argpop I64 CallStackGrow(I64 stack_size_threshold, I64 stack_size,
                          /*argpop*/I64 (*fp_addr)(...), ...)
 {
-    CTaskStack *tmp;
-    I64 result;
+    CTaskStack *tmp, *old_stack;
+    U8 *stack_base, *stack_top;
+    I64 result, unused;
     if (stack_size <= 0 || !fp_addr)
         return -1;
+    old_stack = Fs->stack;
+    if (old_stack) {
+        stack_base = &old_stack->stack_base;
+        unused = RSPGet()(U8 *) - stack_base;
+        if (unused >= stack_size_threshold) {
+            // Keep a little room for the bridge's own call frames below this SP.
+            stack_top = RSPGet()(U8 *) - 0x200;
+            return ZcCallNOnStack(stack_base, stack_top, fp_addr, argc, argv);
+        }
+    }
     tmp = TaskStackNew(stack_size, Fs);
     if (!tmp)
         return -1;
+    tmp->next_stack = old_stack;
+    if (old_stack)
+        old_stack->stack_ptr = RSPGet;
+    Fs->stack = tmp;
     result = ZcCallNOnStack(&tmp->stack_base,
                             (&tmp->stack_base)(U8 *) + tmp->stack_size,
                             fp_addr, argc, argv);
+    Fs->stack = old_stack;
     Free(tmp);
     return result;
 }"""
@@ -2704,6 +3453,35 @@ argpop I64 CallStackGrow(I64 stack_size_threshold, I64 stack_size,
     return text.encode("utf-8")
 
 
+def extract_ktask_stack_grow(source: bytes) -> bytes:
+    """Expose the transformed stock stack-growth API in the ARM64 task bridge.
+
+    The host-fiber runtime does not load all of Kernel/KTask.ZC, so the stock
+    KernelC.HH declaration otherwise resolves CallStackGrow to the unresolved
+    external stub. Keep the implementation sourced from the pinned KTask
+    translation while adding only its two required functions to TaskBridge.
+    """
+    try:
+        text = source.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValueError("KTask.ZC is not UTF-8") from exc
+    start = text.find("CTaskStack *TaskStackNew(")
+    grow = text.find("argpop I64 CallStackGrow(", start)
+    end = text.find("\nI64 TaskInit(", grow)
+    if start < 0 or grow <= start or end <= grow:
+        raise ValueError("expected TaskStackNew and CallStackGrow before TaskInit")
+    stack_new = text[start:grow].strip()
+    grow_fn = text[grow:end].strip()
+    if (stack_new.count("CTaskStack *TaskStackNew(") != 1 or
+            grow_fn.count("argpop I64 CallStackGrow(") != 1 or
+            "ZcCallNOnStack(" not in grow_fn or
+            "CallStackGrow: entered" in grow_fn):
+        raise ValueError("unexpected transformed KTask stack-growth functions")
+    return ("extern I64 ZcCallNOnStack(U8 *stack_low, U8 *stack_top, "
+            "I64 (*fp_addr)(...), I64 argc, I64 *argv);\n\n" +
+            stack_new + "\n\n" + grow_fn + "\n").encode("utf-8")
+
+
 def translate_grscreen(source: bytes) -> bytes:
     """Apply the narrow AArch64 compatibility overlay to GrScreen.ZC.
 
@@ -2801,6 +3579,54 @@ def translate_grscreen(source: bytes) -> bytes:
     return replaced.encode("utf-8")
 
 
+def extract_god_timer_pick(source: bytes) -> bytes:
+    """Expose the original timer picker without loading the God FIFO and Bible."""
+    start = b'U8 *TimeStampCB('
+    end = b'public U0 GodBitsInsert('
+    if source.count(start) != 1 or source.count(end) != 1:
+        raise ValueError('expected the pinned God timer picker')
+    return source[source.index(start):source.index(end)]
+
+
+def translate_palette_editor(source: bytes) -> bytes:
+    """Publish live edits and let SettingsPop restore the editor window."""
+    edits = (
+        (b'\t\t\t\t\tgr_palette[selected_color] = Str2I64(manual_value, 16);',
+         b'\t\t\t\t\tgr_palette[selected_color] = Str2I64(manual_value, 16);\n'
+         b'\t\t\t\t\tGrPaletteSet(gr_palette);'),
+        (b'\t\t\t\t\tgr_palette[selected_color] = ColorGod;',
+         b'\t\t\t\t\tgr_palette[selected_color] = ColorGod;\n'
+         b'\t\t\t\t\tSelectColor(selected_color, c);\n'
+         b'\t\t\t\t\tGrPaletteSet(gr_palette);'),
+        (b'\t\t\t\t\tPaletteGod;',
+         b'\t\t\t\t\tPaletteGod;\n'
+         b'\t\t\t\t\tSelectColor(selected_color, c);\n'
+         b'\t\t\t\t\tGrPaletteSet(gr_palette);'),
+        (b'I64 /*arg1, arg2,*/ sc = 0,\n'
+         b'\t\toriginal_left, original_right, original_top, original_bottom;',
+         b'I64 sc = 0;'),
+        (b'\toriginal_left\t= c->win_task->win_left;\n'
+         b'\toriginal_right\t= c->win_task->win_right;\n'
+         b'\toriginal_top\t= c->win_task->win_top;\n'
+         b'\toriginal_bottom\t= c->win_task->win_bottom;\n',
+         b''),
+        (b'\tc->win_task->win_left\t= original_left;\n'
+         b'\tc->win_task->win_right\t= original_right;\n'
+         b'\tc->win_task->win_top \t= original_top;\n'
+         b'\tc->win_task->win_bottom = original_bottom;\n',
+         b''),
+        (b'\tMenuPop;\n\tSettingsPop;',
+         b'\tSliderDel(c);\n\tMenuPop;\n\tSettingsPop;'),
+        (b'\n\tSliderDel(c);\n\tDocBottom;',
+         b'\n\tDocBottom;'),
+    )
+    for old, new in edits:
+        if source.count(old) != 1:
+            raise ValueError('expected pinned Palette Editor block: ' + repr(old[:64]))
+        source = source.replace(old, new, 1)
+    return source
+
+
 def translate_grpalette(source: bytes) -> bytes:
     """Mirror upstream palette changes into the ARM64 framebuffer bridge."""
     try:
@@ -2864,35 +3690,58 @@ def translate_message(source: bytes) -> bytes:
 
 
 def translate_classmeta_callback(source: bytes) -> bytes:
-    """Adapt ClassMeta's numeric metadata and callback to ARM64 parser limits."""
+    # Adapt expression metadata, then use the checked ARM64 reflection ABI.
     old_meta = b'I64 rank\t\tprint_str "%1d" default_val 6/2 output_fun &RankOut;'
-    new_meta = b'I64 rank\t\tprint_str "%1d" default_val 6/2;'
+    # The native runtime cannot call a guest function pointer embedded in
+    # compiler metadata, so preserve the display behavior in DumpStruct below.
+    new_meta = b'I64 rank\t\tprint_str "%1d" default_val (6/2);'
     old_percentile = b'\tI64 age \t\t\tprint_str "%2d" default_val 38 percentile 54.20;'
-    new_percentile = b'I64 age \t\t\tpercentile "54.20" print_str "%2d" default_val 38;'
-    old_decl = b'F64\t\t\t percentile;'
-    new_decl = b'U8\t\t\t *percentile_str;'
-    old_print = (b'\t\tif (MemberMetaFind("percentile", ml))\n'
-                 b'\t\t{//check if it exists\n'
-                 b'\t\t\t//We could use the $LK,\"CMemberListMeta\",A=\"MN:CMemberListMeta\"$ structure returned by\n'
-                 b'\t\t\t//$LK,\"MemberMetaFind\",A=\"MN:MemberMetaFind\"$() and save a search.\n'
-                 b'\t\t\tpercentile = MemberMetaData("percentile", ml)(F64);\n'
-                 b'\t\t\t" percentile: %5.2f", percentile;\n'
-                 b'\t\t}')
-    new_print = (b'\t\tif (percentile_str = MemberMetaData("percentile", ml))\n'
-                 b'\t\t\t" percentile: %s", percentile_str;')
-    old_call = (b'if (fp_output_fun = MemberMetaData("output_fun", ml))\n'
-                b'\t\t\t(*fp_output_fun)(*q);')
-    new_call = (b'if (!StrCompare(ml->str, "rank") &&\n'
-                b'\t\t    !StrCompare(class_name, "Test1Struct"))\n'
-                b'\t\t\tRankOut(*q);')
-    for old in (old_meta, old_percentile, old_decl, old_print, old_call):
-        if source.count(old) != 1:
-            raise ValueError('pinned ClassMeta shape changed')
-    return (source.replace(old_meta, new_meta, 1)
-            .replace(old_percentile, new_percentile, 1)
-            .replace(old_decl, new_decl, 1)
-            .replace(old_print, new_print, 1)
-            .replace(old_call, new_call, 1))
+    # Aiwnios's generic expression parser treats following metadata names as
+    # identifiers. Keep percentile as this field's sole metadata key; the
+    # renderer below preserves the stock display annotation for Test2Struct.age.
+    new_percentile = b'\tI64 age \t\t\tpercentile 54.20;'
+    if source.count(old_meta) != 1 or source.count(old_percentile) != 1:
+        raise ValueError('pinned ClassMeta metadata declarations changed')
+    source = source.replace(old_meta, new_meta, 1).replace(old_percentile, new_percentile, 1)
+    start_marker = b'U0 DumpStruct(U8 *_d, U8 *class_name=lastclass)'
+    end_marker = b'\n\nTest1Struct t1;'
+    if source.count(start_marker) != 1 or source.count(end_marker) != 1:
+        raise ValueError('pinned ClassMeta DumpStruct boundaries changed')
+    start = source.index(start_marker)
+    end = source.index(end_marker, start)
+    old = source[start:end]
+    required = (b'MemberMetaData("default_val", ml)',
+                b'MemberMetaData("percentile", ml)(F64)',
+                b'MemberMetaData("output_fun", ml)')
+    if any(token not in old for token in required):
+        raise ValueError('pinned ClassMeta metadata behavior changed')
+    replacement = b'''U0 DumpStruct(U8 *_d, U8 *class_name=lastclass)
+{//Use the ARM64 reflection ABI; native compiler reflection structs differ.
+    CArmClassMetaField field;
+    I64 i, *q;
+
+    for (i = 0; ZcClassMetaField(class_name, i, &field); i++)
+    {
+        "%s:", field.name;
+        q = _d + field.offset;
+        if (field.print_str)
+            "" field.print_str, *q;
+        else
+            "%d", *q;
+        if (field.has_default_val)
+            " default:%d", field.default_val;
+        else if (!StrCompare(class_name, "Test2Struct") &&
+                !StrCompare(field.name, "age"))
+            " default:%d", 38;
+        if (field.has_percentile)
+            " percentile: %.2f", field.percentile;
+        if (!StrCompare(field.name, "rank") &&
+                !StrCompare(class_name, "Test1Struct"))
+            RankOut(*q);
+        '\n';
+    }
+}'''
+    return source[:start] + replacement + source[end:]
 
 
 def translate_pick3d_class_terminator(source: bytes) -> bytes:
@@ -2906,3 +3755,683 @@ def translate_pick3d_class_terminator(source: bytes) -> bytes:
     if source.count(old) != 1:
         raise ValueError('pinned Pick3D sprite class terminator changed')
     return source.replace(old, new, 1)
+
+
+def translate_database_classrep(source: bytes) -> bytes:
+    """Render the database record fields without x86 ZealOS reflection layout."""
+    old = b'\t\tClassRep(&a);'
+    new = (b'\t\tDocPrint(DocPut, '
+           b'"$$GREEN$$Name:$$FG$$%s\\n$$GREEN$$Addr:$$FG$$%s\\n", '
+           b'a.name, a.addr);')
+    if source.count(old) != 1:
+        raise ValueError('pinned DataBase.ZC ClassRep call changed')
+    return source.replace(old, new, 1)
+
+
+def translate_home_wrappers(source: bytes) -> bytes:
+    """Provide the stock F2/FD2 wrappers required by the TOS distro loader."""
+    old = (b'public I64 R(U8 *needle_str, U8 *replace_text = NULL, '
+           b'U8 *fu_flags = "+l-i")')
+    new = (b'#define FILEMASK_OFF_LIMITS "!*/Misc/PCIDevices.DD*;!*/Misc/Bible.TXT*;"\\\n'
+           b'\t\t\t\t\t\t\t"!*/Books?/*;!*/Sup1/Sup1Words/*;!*/Sup1/Sup1Bin/*;"\\\n'
+           b'\t\t\t\t\t\t\t"!*/God/Vocab.DD*"\n'
+           b'public I64 F2(U8 *needle_str, U8 *fu_flags=NULL)\n'
+           b'{\n\treturn Find(needle_str, "/*;" FILEMASK_OFF_LIMITS, fu_flags);\n}\n\n'
+           b'public I64 FD2(U8 *needle_str, U8 *fu_flags=NULL)\n'
+           b'{\n\treturn Find(needle_str, "*;" FILEMASK_OFF_LIMITS, fu_flags);\n}\n\n'
+           + old)
+    if source.count(old) != 1 or b'public I64 F2(' in source:
+        raise ValueError('pinned root HomeWrappers shape changed')
+    return source.replace(old, new, 1)
+
+
+def translate_make_tos_dependency(source: bytes) -> bytes:
+    """Load MakeTOS's extension and ScreenCast dependencies on ARM64."""
+    old = b'#include "TOSExt"'
+    new = (b'#define KERNEL_ZXE "Kernel.ZXE"\n'
+           b'#define BOOT_DIR "/Boot"\n'
+           b'#define BOOT_DIR_KERNEL_ZXE BOOT_DIR "/" KERNEL_ZXE\n'
+           b'#define TOS_HDS "CD"\n'
+           b'#ifndef INS_REG_PERSONAL_INITIALS\n'
+           b'#define INS_REG_PERSONAL_INITIALS "TAD"\n'
+           b'#endif\n'
+           b'#ifndef INS_REG_MACHINE_NUM\n'
+           b'#define INS_REG_MACHINE_NUM 0\n'
+           b'#endif\n'
+           b'#include "/HomeWrappers"\n'
+           b'#include "TOSExtern"\n'
+           b'#include "/Apps/Psalmody/JukePuppet"\n'
+           b'#include "/System/BlkDev/DiskCheck"\n'
+           b'#include "/System/BlkDev/ZDiskA"\n'
+           b'#include "/System/BlkDev/ZDiskB"\n'
+           b'#include "/System/Utils/DocUtils"\n'
+           b'#include "/System/Utils/StrUtils"\n'
+           b'#include "/System/Gr/ScreenCast"')
+    if source.count(old) != 1:
+        raise ValueError('pinned MakeTOS extension include changed')
+    return source.replace(old, new, 1)
+
+
+def translate_make_home_dependency(source: bytes) -> bytes:
+    """Load MakeHome's kernel/compiler and disk helpers before MakeUtils."""
+    old = (b'#include "/System/Boot/MakeBoot"\n'
+           b'#include "/System/Utils/MakeUtils"\n'
+           b'#include "~/HomeWrappers"\n'
+           b'MapFileLoad("::/Kernel/Kernel");\n'
+           b'MapFileLoad("::/Compiler/Compiler");')
+    new = (b'#include "/System/Boot/MakeBoot"\n'
+           b'#include "/System/BlkDev/DiskCheck"\n'
+           b'#include "/System/BlkDev/ZDiskA"\n'
+           b'#include "/System/Memory"\n'
+           b'#include "::/Compiler/CompilerA.HH"\n'
+           b'#include "::/Compiler/CompilerB.HH"\n'
+           # ARM64's kernel APIs are already registered by the native source
+           # runtime. Only the compiler's public declarations replace its
+           # legacy x86 CZXE .MAP export table here.
+           b'#include "/System/God/GodBible"\n'
+           b'#include "/System/Utils/MakeUtils"\n'
+           b'#include "~/HomeWrappers"')
+    if source.count(old) != 1:
+        raise ValueError('pinned MakeHome boot/utils includes changed')
+    return source.replace(old, new, 1)
+
+
+def translate_legacy_kernel_header(source: bytes) -> bytes:
+    """Drop x86 kernel-map labels used as extern declaration annotations.
+
+    The pinned KernelB/KernelC headers put fixed-address map labels between
+    ``_extern`` and the declared type (for example ``_extern SYS_CODE_BP
+    CBlkPool *sys_code_bp``). ARM64 boots from an ELF image and has no such
+    x86 map labels, so these tokens are not types in the source compiler.
+    Convert those map-annotated declarations to ordinary extern declarations
+    so source modules can parse the legacy API names against ARM64 bindings.
+    """
+    pattern = re.compile(rb'_extern\s+(?:SYS|MEM|C32)_[A-Z0-9_]+(\s+)')
+    translated, count = pattern.subn(rb'extern\1', source)
+    if count == 0:
+        raise ValueError('no legacy kernel-map annotations found')
+    return translated
+
+
+def translate_cartesian_plot_color(source: bytes) -> bytes:
+    """Keep the Cartesian curve visible on the ARM64 terminal's black canvas."""
+    old = b'\t\t\t\tdc->color = BLACK;'
+    new = (b'\t\t\t\t// The ARM64 graphical terminal clears this surface to black.\n'
+           b'\t\t\t\t// Keep the plotted curve visible against that background.\n'
+           b'\t\t\t\tdc->color = WHITE;')
+    if source.count(old) != 1:
+        raise ValueError('pinned Cartesian curve color assignment changed')
+    return source.replace(old, new, 1)
+
+
+def translate_low_pass_filter_sampling(source: bytes) -> bytes:
+    """Bound the randomized graph's synchronous work on the ARM64 desktop.
+
+    The upstream 0..0.1 pixel step draws tens of thousands of subpixel lines
+    per curve. That monopolizes the single-core ARM64 guest and prevents input
+    and window-manager tasks from running. Keep the random jitter while using
+    approximately pixel-sized steps, so the demo stays interactive.
+    """
+    old = b'dt = Rand / 10;'
+    new = b'dt = 1.0 + Rand / 10;'
+    if source.count(old) != 2:
+        raise ValueError('pinned LowPassFilter randomized curve loops changed')
+    return source.replace(old, new)
+
+
+def translate_symmetry_message_masks(source: bytes) -> bytes:
+    """Use explicit event-mask unions for Symmetry's pointer and key waits.
+
+    The pinned source chains shifts and additions, relying on upstream
+    operator parsing to produce a union of event bits. The ARM64 source
+    compiler follows C precedence, where addition binds before shifts, so
+    those expressions create the wrong mask and the demo silently discards
+    pointer events. Keep the upstream file pinned and normalize its three
+    masks in the generated source bundle.
+    """
+    replacements = (
+        (b'1 << MESSAGE_KEY_DOWN + 1 << MESSAGE_MS_L_DOWN + 1 << MESSAGE_MS_R_DOWN',
+         b'(1 << MESSAGE_KEY_DOWN) | (1 << MESSAGE_MS_L_DOWN) | (1 << MESSAGE_MS_R_DOWN)'),
+        (b'1 << MESSAGE_MS_R_UP + 1<< MESSAGE_MS_MOVE',
+         b'(1 << MESSAGE_MS_R_UP) | (1 << MESSAGE_MS_MOVE)'),
+        (b'1 << MESSAGE_MS_L_UP + 1 << MESSAGE_MS_MOVE',
+         b'(1 << MESSAGE_MS_L_UP) | (1 << MESSAGE_MS_MOVE)'),
+    )
+    for old, new in replacements:
+        if source.count(old) != 1:
+            raise ValueError('pinned Symmetry message mask changed')
+        source = source.replace(old, new, 1)
+    return source
+
+
+def translate_fonted_draw_callback(source: bytes) -> bytes:
+    """Preserve FontEd's task draw callback across its temporary DocWrite.
+
+    The upstream local was declared U8, truncating the 64-bit callback
+    pointer. After saving from FontEd, the window manager could jump to the
+    truncated address while redrawing the task. Use the callback's real type.
+    """
+    old = b'\tU8\t\t old_draw_it = Fs->draw_it;'
+    new = b'\tU0\t\t(*old_draw_it)(CTask *task, CDC *dc) = Fs->draw_it;'
+    if source.count(old) != 1:
+        raise ValueError('pinned FontEd callback save declaration changed')
+    return source.replace(old, new, 1)
+
+
+def translate_tos_config_boot_memory(source: bytes) -> bytes:
+    """Keep the stock TOS config module loadable without the x86 boot-image map.
+
+    The optional debug distro initializer derives a RAM-disk range from the
+    x86 ``mem_boot_base`` image layout. The ARM64 boot path has no equivalent
+    address map in this user-space source runtime, and MAKE_DEBUG is disabled
+    in the stock TOS distro. Preserve the initializer names and generated
+    config symbols while reserving an empty range for that disabled feature.
+    """
+    old = b'''U0 TOSDebugDistro1()
+{
+	CZXE *zxe = mem_boot_base - sizeof(CZXE);
+
+	zxe(I64) += zxe->file_size - 1;
+	DefinePrint("TOS_DEBUG_DISTRO", "0x%X", CeilI64(SYS_KERNEL_END  + SLOP, BLK_SIZE));
+	DefinePrint("TOS_DEBUG_DISTRO_END", "0x%X",
+			FloorI64((BOOT_RAM_LIMIT - (BOOT_STACK_SIZE + DVD_BOOT_LOADER_SIZE)) >> 4 << 4 -
+			(zxe(I64) - SYS_KERNEL_END) - SLOP, BLK_SIZE));
+	DefinePrint("CONFIG_DEBUG_DISTRO_FILE", "\\\"/Tmp/DebugDistro.BIN\\\"");
+
+} TOSDebugDistro1;'''
+    new = b'''U0 TOSDebugDistro1()
+{
+	// The legacy debug distro occupies x86 boot-image RAM; ARM64 has no
+	// compatible mem_boot_base mapping. MAKE_DEBUG remains disabled here.
+	DefinePrint("TOS_DEBUG_DISTRO", "0");
+	DefinePrint("TOS_DEBUG_DISTRO_END", "0");
+	DefinePrint("CONFIG_DEBUG_DISTRO_FILE", "\\\"/Tmp/DebugDistro.BIN\\\"");
+
+} TOSDebugDistro1;'''
+    if source.count(old) != 1:
+        raise ValueError('pinned TOS debug distro boot-memory initializer changed')
+    source = source.replace(old, new, 1)
+    marker = b'#define SLOP\t\tBLK_SIZE'
+    replacement = (marker + b'\n'
+                   b'// Compile-time defaults for the disabled x86 debug-distro path.\n'
+                   b'#define TOS_DEBUG_DISTRO\t\t0\n'
+                   b'#define TOS_DEBUG_DISTRO_END\t0\n'
+                   b'// TOSDistro expands these while compiling its nested include;\n'
+                   b'// the runtime DefinePrint calls in TOSInit are too late there.\n'
+                   b'#define CONFIG_RAM_DRIVES\t"B\\nScale2Mem(2048,0x100000,4*1024*1024*1024)\\n"\n'
+                   b'#define CONFIG_HARD_DRIVES\t""\n'
+                   b'#define CONFIG_DVD_DRIVES\t""\n'
+                   b'#define CONFIG_DISK_CACHE\t"Scale2Mem(0x80000,0x8000000)\\n"')
+    if source.count(marker) != 1:
+        raise ValueError('pinned TOSConfig SLOP definition changed')
+    source = source.replace(marker, replacement, 1)
+    machine_switch = b'switch (INS_REG_MACHINE_NUM)'
+    if source.count(machine_switch) != 1:
+        raise ValueError('pinned TOSConfig machine selector changed')
+    # The host ARM64 profile is not the legacy TAD installation target. Use
+    # TOSConfig's portable default drive layout instead of Registry.ZC state.
+    return source.replace(machine_switch, b'switch (0)', 1)
+
+
+def translate_memrep_arm64(source: bytes) -> bytes:
+    """Replace legacy x86/compiler memory-report fields with ARM64 equivalents."""
+    old = (b'\tCZXE\t\t*zxe = mem_boot_base - sizeof(CZXE);\n\n'
+           b'\tzxe(I64) += zxe->file_size - 1;\n\n'
+           b'\t"$$BLACK$$Low Memory\\t:00100000$$FG$$\\n$$ID,2$$";\n'
+           b'\t"Kernel\\t:%08X-%08X\\n", mem_boot_base - sizeof(CZXE), zxe;\n')
+    new = (b'\t"Kernel image\\t:Limine-loaded AArch64 ELF (no CZXE header)\\n";\n'
+           b'\t"$$ID,2$$";\n')
+    if source.count(old) != 1:
+        raise ValueError('pinned MemRep CZXE boot-image report changed')
+    source = source.replace(old, new, 1)
+    compiler_control = b'\tCCompCtrl\t*cc;'
+    if source.count(compiler_control) != 1:
+        raise ValueError('pinned MemRep compiler-control local changed')
+    source = source.replace(compiler_control, b'', 1)
+    compiler_loop = (b'\tcc = task->next_cc;\n'
+                     b'\twhile (cc != &task->next_cc)\n'
+                     b'\t{\n'
+                     b'\t\t"CompCtrl\\t:%010X\\n", CompCtrlSize(cc);\n'
+                     b'\t\tcc = cc->next;\n'
+                     b'\t}\n')
+    if source.count(compiler_loop) != 1:
+        raise ValueError('pinned MemRep compiler-control report loop changed')
+    return source.replace(
+        compiler_loop,
+        b'\t// ARM64 uses the host-native compiler; its internal control blocks\n'
+        b'\t// are not ZealOS CCompCtrl allocations and are not reported here.\n',
+        1)
+
+
+def translate_profiler_idle_sentinel(source: bytes) -> bytes:
+    """Give the legacy profiler a stable idle-sample token on ARM64."""
+    marker = b'#define PF_ARRAY_COUNT 0x100000'
+    replacement = (b'// No x86 SYS_IDLE_PT assembly label exists on AArch64.\n'
+                   b'#define SYS_IDLE_PT 0\n' + marker)
+    if source.count(marker) != 1:
+        raise ValueError('pinned Profiler sample-array definition changed')
+    if b'#define SYS_IDLE_PT' in source:
+        raise ValueError('pinned Profiler already defines SYS_IDLE_PT')
+    return source.replace(marker, replacement, 1)
+
+
+def translate_interrupt_demo_svc(source: bytes) -> bytes:
+    """Port the x86 INT-vs-call benchmark to the guest's AArch64 SVC path."""
+    required = (
+        b'#define I_F_UNARY_MINUS I_USER',
+        b'IntEntrySet(I_F_UNARY_MINUS, F_UNARY_MINUS_INT, IDTET_TRAP)',
+        b'#define SAMPLE_SIZE \t\t1000000',
+        b'_extern _F_UM_INT  F64 UnaryMinusInt(F64 d);',
+        b'F_UNARY_MINUS_INT::',
+    )
+    if any(source.count(marker) != 1 for marker in required):
+        raise ValueError('pinned InterruptDemo benchmark structure changed')
+    return b'''// AArch64 equivalent of the pinned x86 software-interrupt benchmark.
+// Arm64SvcBench executes SVC #0x42 in the guest and returns through the EL1
+// exception vector. TSCGet reads the guest generic timer, so the values below
+// are timer ticks per operation, not CPU cycles.
+_extern _ARM64_SVC_BENCH U0 Arm64SvcBench();
+_extern _ARM64_SVC_BENCH_COUNT U64 Arm64SvcBenchCount();
+
+#define SAMPLE_SIZE 10000
+
+F64 UnaryMinusInt(F64 d)
+{
+    Arm64SvcBench;
+    return -d;
+}
+
+F64 UnaryMinusCall(F64 d)
+{
+    return -d;
+}
+
+U0 TimeIns()
+{
+    U64 start, end, hits_before, hits_after;
+    I64 i;
+
+    hits_before = Arm64SvcBenchCount;
+    start = TSCGet;
+    for (i = 0; i < SAMPLE_SIZE; i++)
+        UnaryMinusInt(3.141592653589793);
+    end = TSCGet;
+    hits_after = Arm64SvcBenchCount;
+    "AArch64 SVC timer ticks: %10.5f\\n", ToF64(end - start) / SAMPLE_SIZE;
+    "SVC count: %d\\n", hits_after - hits_before;
+
+    start = TSCGet;
+    for (i = 0; i < SAMPLE_SIZE; i++)
+        UnaryMinusCall(3.141592653589793);
+    end = TSCGet;
+    "Direct call timer ticks: %10.5f\\n", ToF64(end - start) / SAMPLE_SIZE;
+}
+
+TimeIns;
+'''
+
+
+def translate_andnotmod_benchmark(source: bytes) -> bytes:
+    """Scale the stock timing sample for usable execution under AArch64 TCG.
+
+    The pinned 100-million-iteration remainder pass does not reach its first
+    result in a five-minute UTM/QEMU run. One million iterations still gives a
+    useful averaged timing comparison while letting the demo return promptly.
+    TSCGet is the guest generic timer on this target, so label the reported
+    measurements as timer ticks instead of x86 CPU cycles.
+    """
+    old = b'#define SAMPLE_SIZE \t\t100000000'
+    if source.count(old) != 1:
+        raise ValueError('pinned AndNotMod sample-size definition changed')
+    source = source.replace(old,
+                            b'// AArch64 TCG keeps the comparison interactive.\n'
+                            b'#define SAMPLE_SIZE \t\t1000000', 1)
+    replacements = (
+        (b'Remainder Version #1 Cycles',
+         b'Remainder Version #1 Timer Ticks'),
+        (b'Remainder Version #2 Cycles',
+         b'Remainder Version #2 Timer Ticks'),
+    )
+    for old_label, new_label in replacements:
+        # Each label appears in the displayed output format and its sample
+        # output comment; keep both copies consistent with the target timer.
+        if source.count(old_label) != 2:
+            raise ValueError(f'pinned AndNotMod output label changed: {old_label!r}')
+        source = source.replace(old_label, new_label)
+    return source
+
+
+def translate_wallpaper_stats(source: bytes) -> bytes:
+    """Adapt Wallpaper statistics to the ARM64 compiler/task model.
+
+    Upstream reads ``cmp.compiled_lines`` from its compiler project. The
+    AArch64 native compiler does not publish that project global in the
+    system namespace, so render an explicit N/A. Its task-memory helpers
+    live in System/Memory.ZC, which is not loaded into this source context;
+    calculate those same counters from each task's public heap controls.
+    """
+    if source.count(b'cmp.compiled_lines') != 2:
+        raise ValueError('expected the two upstream wallpaper compiler counters')
+    if source.count(b'%12td%12td%12td') != 2:
+        raise ValueError('expected the two upstream wallpaper counter formats')
+    if source.count(b'TaskMemAlloced(task)') != 1 or \
+            source.count(b'TaskMemUsed(task)') != 1:
+        raise ValueError('expected the two upstream wallpaper task-memory counters')
+    if source.count(b'U0 WallPaper(CTask *_task)') != 1:
+        raise ValueError('expected the upstream Wallpaper entry point')
+    source = source.replace(b'%12td%12td%12td', b'%12ts%12td%12td')
+    source = source.replace(b'cmp.compiled_lines', b'"N/A"')
+    source = source.replace(b'TaskMemAlloced(task)',
+                            b'WallPaperTaskMemAlloced(task)')
+    source = source.replace(b'TaskMemUsed(task)',
+                            b'WallPaperTaskMemUsed(task)')
+    helpers = b'''\
+I64 WallPaperTaskMemUsed(CTask *task)
+{
+    I64 res = task->code_heap->used_u8s;
+    if (task->code_heap != task->data_heap)
+        res += task->data_heap->used_u8s;
+    return res;
+}
+
+I64 WallPaperTaskMemAlloced(CTask *task)
+{
+    // The ARM64 host uses a shared arena and retains no per-task free pages;
+    // task-owned capacity therefore equals its currently live allocations.
+    return WallPaperTaskMemUsed(task);
+}
+
+'''
+    return source.replace(b'U0 WallPaper(CTask *_task)', helpers +
+                          b'U0 WallPaper(CTask *_task)', 1)
+
+
+def translate_wallpaper_desktop(source: bytes) -> bytes:
+    """Use packed sprites and stable hit boxes for the desktop launchers."""
+    text, separator, sprites = translate_wallpaper_stats(source).partition(b'\0')
+    if not separator or text.count(b'Sprite3(dc,') != 6 or text.count(b'SpriteExtents(') != 6:
+        raise ValueError('expected six desktop sprite draws and extent calls')
+    text = text.replace(b'Sprite3(dc,', b'Sprite3Packed(dc,')
+    text = text.replace(b'SpriteExtents(', b'SpriteExtentsPacked(')
+    offset = b'Sprite3Packed(dc, c->left-8, c->top-8, 0,'
+    if text.count(offset) != 3:
+        raise ValueError('expected three offset desktop sprites')
+    text = text.replace(offset, b'Sprite3Packed(dc, c->left, c->top, 0,')
+    wallpaper = b'U0 WallPaper(CTask *_task)\n{'
+    stats_click = b'Sys("WallPaperToggle;");'
+    if text.count(wallpaper) != 1 or text.count(stats_click) != 1:
+        raise ValueError('expected the desktop stats renderer and launcher')
+    text = text.replace(wallpaper,
+                        b'Bool wallpaper_desktop_stats = TRUE;\n\n' + wallpaper +
+                        b'\n\tif (!wallpaper_desktop_stats) return;', 1)
+    text = text.replace(stats_click,
+                        b'wallpaper_desktop_stats = !wallpaper_desktop_stats;', 1)
+    netlog_click = b'\tif(down)\n\t\tSys("NetLogToggle;");'
+    if text.count(netlog_click) != 1:
+        raise ValueError('expected the desktop NetLog launcher')
+    text = text.replace(netlog_click, b'''\
+\tif (down)
+\t\tSys("if (ZcCallExtStr(\\"BootstrapNetLogToggle\\") == -1) { \
+ExeFile2(\\"/Home/Net/Utilities/NetLog.ZC\\"); ZcCallExtStr(\\"BootstrapNetLogToggle\\"); }");''', 1)
+    telnet_click = b'PopUp("ExeFile2(\\"~/Net/Programs/Telnet/Telnet.ZC\\");");'
+    if text.count(telnet_click) != 1:
+        raise ValueError('expected the pinned desktop Telnet launcher')
+    text = text.replace(telnet_click, b'''\
+TaskExe(sys_task, NULL,
+    "if (ZcCallExtStr(\\"BootstrapDesktopTelnet\\") == -1) "
+    "{ ExeFile2(\\"/Home/Net/Load.ZC\\"); ZcCallExtStr(\\"BootstrapDesktopTelnet\\"); }",
+    1 << JOBf_FREE_ON_COMPLETE);''', 1)
+
+    # The ARM64 System task has full-screen logical bounds even when hidden.
+    # Lay out the left column from its own geometry and keep each draw inside
+    # the corresponding hit box. The pinned draw callbacks changed only part
+    # of each box after the screen coordinates had already been derived.
+    for name, sprite in ((b'Home', b'2'), (b'Telnet', b'3'), (b'Palette', b'4')):
+        draw = rb'U0 Draw' + name + rb'Icon\(CDC \*dc, CCtrl \*c\)\n\{.*?\n\}'
+        updated_draw = (b'U0 Draw' + name + b'Icon(CDC *dc, CCtrl *c)\n{\n'
+                        b'\tI64 *origin = c->state;\n'
+                        b'\tSprite3Packed(dc, c->left - origin[0], c->top - origin[1], -1, '
+                        b'$IB,"<' + sprite + b'>",BI=' + sprite + b'$);\n}')
+        text, count = re.subn(draw, lambda _: updated_draw, text, flags=re.S)
+        start = b'CCtrl *' + name + b'IconNew()'
+        if count != 1 or text.count(start) != 1:
+            raise ValueError(f'desktop {name.decode()} icon callback changed')
+        begin = text.index(start)
+        end = text.index(b'\n}', begin) + 2
+        block = text[begin:end].replace(start, start[:-1] + b'I64 top)')
+        extents = re.compile(rb'\tSpriteExtentsPacked\(.*?\n\tQueueInsert', re.S)
+        placement = (b'\tSpriteExtentsPacked($IB,"<' + sprite + b'>",BI=' + sprite +
+                     b'$, &min_x, &max_x, &min_y, &max_y);\n'
+                     b'\tc->left = FONT_WIDTH;\n'
+                     b'\tc->right = c->left + max_x - min_x;\n'
+                     b'\tc->top = top;\n'
+                     b'\tc->bottom = c->top + max_y - min_y;\n'
+                     b'\tI64 *origin = SysCAlloc(2 * sizeof(I64));\n'
+                     b'\torigin[0] = min_x;\n'
+                     b'\torigin[1] = min_y;\n'
+                     b'\tc->state = origin;\n\n'
+                     b'\tQueueInsert')
+        block, count = extents.subn(lambda _: placement, block)
+        if count != 1:
+            raise ValueError(f'desktop {name.decode()} icon geometry changed')
+        text = text[:begin] + block + text[end:]
+
+    launchers = b'    \tHomeIconNew;\n    \tTelnetIconNew;\n\t\tPaletteIconNew;'
+    if text.count(launchers) != 1:
+        raise ValueError('expected the pinned desktop launcher initialization')
+    text = text.replace(launchers,
+                        b'\t\tCCtrl *home = HomeIconNew(3 * FONT_HEIGHT);\n'
+                        b'\t\tCCtrl *telnet = TelnetIconNew(home->bottom + FONT_HEIGHT);\n'
+                        b'\t\tPaletteIconNew(telnet->bottom + FONT_HEIGHT);', 1)
+    return text + separator + sprites
+
+
+def translate_wallpaper_compiler_stat(source: bytes) -> bytes:
+    """Adapt the standard wallpaper's statistics and host identification."""
+    source = translate_wallpaper_stats(source)
+    metadata_start = b'\tCSMBIOSSystemInfo\t*sys_info = SMBIOSStructGet(SMBIOSt_SYSTEM);'
+    metadata_end = b'\t// # of chars in resolution string in top bar'
+    if source.count(metadata_start) != 1 or source.count(metadata_end) != 1:
+        raise ValueError('expected the upstream Wallpaper platform-identification block')
+    metadata_begin = source.index(metadata_start)
+    metadata_finish = source.index(metadata_end, metadata_begin)
+    metadata = b'''\
+    // The AArch64 build has a fixed Limine UEFI boot path and no SMBIOS
+    // service. Keep unavailable host and boot-device details explicit.
+    wall->host_ch = '?';
+    wall->bootm_ch = 'U';
+    wall->bootl_ch = 'L';
+    wall->boots_ch = '?';
+
+'''
+    source = source[:metadata_begin] + metadata + source[metadata_finish:]
+    return source
+
+
+def translate_pci_interrupts_gic_note(source: bytes) -> bytes:
+    """Replace the x86 IOAPIC/LAPIC demo with an honest ARM64 capability view.
+
+    The current guest has no guest-level GIC device-interrupt registration
+    API.  Keep this source runnable and explicit about that gap rather than
+    compiling x86 MMIO writes against unrelated AArch64 addresses.
+    """
+    required = (
+        b'#assert I_USER == 0x40',
+        b'U8  *da = dev.uncached_alias + IOAPIC_REG;',
+        b'Main;\n',
+    )
+    if any(source.count(marker) != 1 for marker in required) or \
+            source.count(b'LAPIC_EOI') != 4:
+        raise ValueError('pinned PCIInterrupts source structure changed')
+    return b'''// AArch64 adaptation of the pinned x86 PCI interrupt-routing demo.
+// The pinned example programs IOAPIC redirection entries and acknowledges
+// LAPIC vectors. ARM64 uses a GIC, and this guest does not yet expose a
+// guest-level GIC device-interrupt registration/routing API.
+U0 Main()
+{
+    "PCI interrupt demo: x86 IOAPIC/LAPIC routing is unavailable on AArch64.\\n"
+    "The ARM64 kernel handles its GIC timer interrupt; guest device IRQ\\n"
+    "registration and PCI INTx routing remain unimplemented.\\n"
+    "No x86 MMIO addresses were accessed.\\n";
+}
+
+Main;
+'''
+
+
+def translate_multicore_interrupts_cooperative(source: bytes) -> bytes:
+    """Adapt the x86 IPI demo into a real cooperative ARM64 task-ring demo.
+
+    The host currently exposes one logical guest CPU and does not implement
+    MPInt/LAPIC.  Demonstrate the supported ZealOS round-robin Yield path and
+    state the SMP limitation in the program output.
+    """
+    required = (
+        b'*(dev.uncached_alias + LAPIC_EOI)(U32 *) = 0; //signal end of interrupt',
+        b'MPInt(int_on, 1);',
+        b'IntTest;\n',
+    )
+    if any(source.count(marker) != 1 for marker in required):
+        raise ValueError('pinned MultiCore/Interrupts source structure changed')
+    return b'''// AArch64 adaptation of the pinned x86 multicore IPI demonstration.
+// This guest currently exposes one logical CPU and no LAPIC/MPInt API.
+// Show the supported cooperative ZealOS task ring: a task runs until Yield.
+I64 round_robin_order[4], round_robin_count;
+
+U0 RoundRobinTaskA(U8 *data=NULL)
+{
+    round_robin_order[round_robin_count++] = 'A';
+    Yield;
+    round_robin_order[round_robin_count++] = 'C';
+}
+
+U0 RoundRobinTaskB(U8 *data=NULL)
+{
+    round_robin_order[round_robin_count++] = 'B';
+    Yield;
+    round_robin_order[round_robin_count++] = 'D';
+}
+
+U0 IntTest()
+{
+    I64 i;
+
+    round_robin_count = 0;
+    Spawn(&RoundRobinTaskA, NULL, "RoundRobinA",, Fs);
+    Spawn(&RoundRobinTaskB, NULL, "RoundRobinB",, Fs);
+    for (i = 0; i < 4; i++)
+        Yield;
+
+    "AArch64 cooperative round-robin task demo\\n"
+    "Guest logical CPUs: %d\\n", mp_count;
+    "The x86 LAPIC IPI and interrupt-driven sound path are unavailable.\\n"
+    "Task order after explicit Yield calls: ";
+    for (i = 0; i < round_robin_count; i++)
+        "%c", round_robin_order[i];
+    "\\n";
+}
+
+IntTest;
+'''
+
+
+def translate_multicore_radix_single_cpu(source: bytes) -> bytes:
+    """Keep the pinned radix-sort demo complete with one guest CPU.
+
+    The one-CPU fallback puts the input in one bucket, then runs the same
+    worker, Yield, and final bucket-copy path as a parallel run. Multi-CPU
+    guests retain the stock radix distribution and per-core workers.
+    """
+    block = b'''\tfor (i = 0; i < my_mp_count; i++)
+\t{
+\t\t//$WW,0$We must do full size, just in case.
+\t\t//There will be uneven split between cores
+\t\t//depending on the distribution of rand numbers.
+\t\tb[i] = MAlloc(NUM * sizeof(I32));
+\t\tbn[i] = 0;
+\t}
+
+\tif (my_mp_count < 2)
+\t\tthrow('MultCore');
+'''
+    if source.count(block) != 1:
+        raise ValueError('pinned MPRadix single-core guard changed')
+    data = source.replace(
+        block,
+        b'''\tif (my_mp_count < 2)
+\t{
+\t\t"One guest CPU: running the radix stage with one worker.\\n";
+\t\tb[0] = MAlloc(NUM * sizeof(I32));
+\t\tbn[0] = NUM;
+\t\tMemCopy(b[0], arg1, NUM * sizeof(I32));
+\t}
+\telse
+\t{
+\t\tfor (i = 0; i < my_mp_count; i++)
+\t\t{
+\t\t//$WW,0$We must do full size, just in case.
+\t\t//There will be uneven split between cores
+\t\t//depending on the distribution of rand numbers.
+\t\tb[i] = MAlloc(NUM * sizeof(I32));
+\t\tbn[i] = 0;
+\t\t}
+\t}
+''')
+    distribution = b'''\tfor (i = 0; i < NUM; i++)
+\t{
+\t\tj = arg1[i] >> k1 + k2; //This is a preliminary radix sort.
+\t\tb[j][bn[j]++] = arg1[i];
+\t}
+'''
+    if data.count(distribution) != 1:
+        raise ValueError('pinned MPRadix radix-distribution loop changed')
+    return data.replace(
+        distribution,
+        b'''\tif (my_mp_count > 1)
+\t{
+\t\tfor (i = 0; i < NUM; i++)
+\t\t{
+\t\t\tj = arg1[i] >> k1 + k2; //This is a preliminary radix sort.
+\t\t\tb[j][bn[j]++] = arg1[i];
+\t\t}
+\t}
+''')
+
+
+def translate_ring3_svc(source: bytes) -> bytes:
+    """Replace the x86 ring-transition demo with an honest AArch64 SVC demo.
+
+    The current ARM64 host does not run guest ZC in EL0, so this demonstrates
+    the supported exception transition instead of pretending to switch to an
+    unprivileged execution level.
+    """
+    required = (
+        b'INT_TO_RING0::',
+        b'CLI //This causes general protection fault #13',
+        b'R3_CALLBACK:',
+        b'Ring3Demo;\n',
+    )
+    if any(source.count(marker) != 1 for marker in required):
+        raise ValueError('pinned Ring3 demo structure changed')
+    return b'''// AArch64 adaptation of the pinned x86 Ring3 demonstration.
+// This guest executes ZC through the host runtime and has no EL0 task mode.
+// Demonstrate the supported synchronous exception path with an SVC and make
+// the platform limitation explicit instead of attempting x86 IRET/GDT setup.
+_extern _ARM64_SVC_BENCH U0 Arm64SvcBench();
+_extern _ARM64_SVC_BENCH_COUNT U64 Arm64SvcBenchCount();
+
+U0 Ring3Demo()
+{
+    U64 before, after;
+
+    before = Arm64SvcBenchCount;
+    "AArch64 privilege transition demo\\n"
+    "EL0 user tasks are not implemented by this ARM64 guest runtime.\\n"
+    "Testing the supported EL1 SVC exception and return path.\\n";
+    Arm64SvcBench;
+    after = Arm64SvcBenchCount;
+    "SVC exception count: %d\\n", after - before;
+}
+
+Ring3Demo;
+'''

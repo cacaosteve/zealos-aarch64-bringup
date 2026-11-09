@@ -1,0 +1,16 @@
+/* The ARM64 source-volume image uses an append-only native store rather than
+ * the stock FAT32/RedSea CDrive table. Report its actual append capacity. */
+#help_index "Info;File/Cmd Line (Typically);Cmd Line (Typically)"
+U0 UnusedSpaceRep()
+{
+	U64 capacity_bytes, free_bytes;
+	if (ZcSourceVolumeStats(&capacity_bytes, &free_bytes) && capacity_bytes)
+		"Source Volume: %7.3f%% Free (%8.3f MiB / %8.3f MiB)\n",
+			free_bytes * 100.0 / capacity_bytes,
+			free_bytes / (1024.0 * 1024.0),
+			capacity_bytes / (1024.0 * 1024.0);
+	else
+		"Source Volume unavailable\n";
+}
+
+UnusedSpaceRep;

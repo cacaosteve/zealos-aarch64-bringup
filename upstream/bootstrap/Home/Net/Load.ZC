@@ -1,0 +1,64 @@
+Cd(__DIR__);;
+#include "Utilities/Net.HH"
+
+#include "Utilities/NetLog"
+
+#include "Utilities/NetQueue"
+
+#include "Drivers/VirtIONet"
+
+#include "Drivers/Run"
+
+#include "Protocols/Ethernet"
+
+#include "Protocols/ARP"
+#include "Protocols/IPV4"
+#include "Protocols/ICMP"
+
+#include "Protocols/Sockets"
+
+#include "Utilities/BST"
+#include "Protocols/UDP/MakeUDP"
+#include "Protocols/DNS"
+#include "Utilities/Ping"
+
+#include "Protocols/TCP/MakeTCP"
+
+#include "Protocols/DHCP"
+
+#include "Utilities/NetHandler" // needs IPV4, UDP, ICMP
+
+Bool bootstrap_net_driver_started = FALSE;
+
+I64 BootstrapNetworkStart()
+{//One receiver owns the NIC for all clients spawned from System.
+    if (!ZcVirtioNetReady())
+        return FALSE;
+    if (!bootstrap_net_driver_started)
+    {
+        NetDriverInit;
+        bootstrap_net_driver_started = TRUE;
+    }
+    if (!ipv4_globals.local_ip)
+        NetConfigure;
+    return ipv4_globals.local_ip != 0;
+}
+
+I64 BootstrapDesktopTelnet()
+{
+    if (!BootstrapNetworkStart())
+    {
+        PopUp("PopUpOk(\"Telnet could not configure the VirtIO network.\");");
+        return FALSE;
+    }
+    CTask *client = Spawn(&ServerCmdLine, NULL, "Telnet", -1, Fs);
+    if (!TaskValidate(client))
+        return FALSE;
+    if (!TaskExe(client, NULL, "ExeFile2(\"/Home/Net/Programs/Telnet/Telnet.ZC\");",
+                 1 << JOBf_EXIT_ON_COMPLETE | 1 << JOBf_FREE_ON_COMPLETE))
+    {
+        Kill(client);
+        return FALSE;
+    }
+    return TRUE;
+}

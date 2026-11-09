@@ -1,0 +1,27 @@
+{
+  "date": "2026-11-06",
+  "source_commit": "working tree",
+  "working_tree_changes_included": true,
+  "kernel_sha256": "d4dd0e1e3475043101ca6ed9430c3f6f64f675a96b94337289732d81db461fb5",
+  "source_bundle_sha256": "6ecaa711649a83f14e6bad988a1c4075e0383536a88bc5c6ef47bfc4161a3401",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "f85c0c9447da2ecb032e7d42847b142607566f61ab9bfdaabaef9d38f0d15135",
+  "command": "python3 scripts/check-compat.py --pci --probe-demo-lex-demo",
+  "exit_code": 0,
+  "source_path": "/Demo/Lectures/LexDemo.ZC",
+  "result": "pass",
+  "checks": [
+    "The ARM64 graphical terminal launched LexDemo through ExeFile2.",
+    "LexDemo accepted the expression 40+2 and emitted three token records: integer, plus operator, integer.",
+    "Return exited the input loop and restored the graphical terminal; ExeFile2 returned 0.",
+    "The terminal evaluated 40+2; as 42 after the demo returned.",
+    "zstatus reported failed=0."
+  ],
+  "screenshots": [
+    "build/gui-demo-lex-demo-instructions.ppm",
+    "build/gui-demo-lex-demo-expression.ppm",
+    "build/gui-demo-lex-demo-tokens.ppm",
+    "build/gui-demo-lex-demo-terminal-recovery-result.ppm"
+  ],
+  "scope_note": "Automated QEMU ISO runtime evidence only. This confirms tokenization of one expression and return to the terminal; broader lexical edge cases and live UTM or Raspberry Pi behavior remain unverified."
+}

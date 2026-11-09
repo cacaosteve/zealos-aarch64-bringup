@@ -1,0 +1,22 @@
+{
+  "date": "2026-11-05",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "working_tree_changes_included": true,
+  "kernel_sha256": "5e63aead946d2a07242ecfa1ec0303521fc9311058346dfffb9c4b5a703a7a1f",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "be190bd6aa350d7e8c3a28068132e0aa3819b02af9150b311c371ee4c9226932",
+  "command": "python3 scripts/check-compat.py --pci --probe-demo-revfile",
+  "exit_code": 0,
+  "source_path": "/Demo/RevFileDemo/Rev.ZC",
+  "result": "pass",
+  "checks": [
+    "RevFileDemo executed and generated the output document under /Home.",
+    "The output document began with 'To a Waterfowl;' and ended with 'Will lead my steps aright.', confirming the expected reversed line order.",
+    "The graphical terminal evaluated 40+2; as 42 after the demo and file read completed.",
+    "zstatus reported failed=0."
+  ],
+  "screenshots": [
+    "build/gui-catalog-demo-revfile-output-result.ppm",
+    "build/gui-catalog-demo-revfile-terminal-recovery-result.ppm"
+  ]
+}

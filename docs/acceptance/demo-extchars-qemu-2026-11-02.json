@@ -1,0 +1,18 @@
+{
+  "date": "2026-11-02",
+  "command": "python3 scripts/check-compat.py --pci --probe-demo-extchars",
+  "target": "QEMU PCI graphical terminal",
+  "result": "pass",
+  "program": "/Demo/ExtChars.ZC",
+  "source_path": "upstream/pinned/Demo/ExtChars.ZC",
+  "source_sha256": "99547978d07e6c3b101dd682947bb85d492aaf3c837d2d1c4a2b4adc96a93055",
+  "verified": [
+    "Extended-character bitmap demo prints Face:",
+    "Non-ASCII source identifier example prints value 12345",
+    "Program returns to the graphical terminal",
+    "40+2 evaluates as 42 and zstatus reports failed=0"
+  ],
+  "kernel_sha256": "4daaabe6cc3e9e21bfe3b17b3671c782206d4977ab1bbca62b00f24034d32197",
+  "iso_sha256": "0b03196016aa2c6192ce390675a5e141a641a99d30cc1c1675d5d7340202de3f",
+  "scope_note": "Automated QEMU evidence only; live UTM and physical Pi behavior are not established."
+}

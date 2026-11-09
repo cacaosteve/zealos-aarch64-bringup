@@ -3291,8 +3291,15 @@ changed again following these photos.
    report-mode/secondary-click/scroll support is an additional input feature.
 2. Integrate a writable system disk with the normal filesystem/source store;
    current physical FAT32 access is read-only validation. Verify file saves,
-   settings and repeat cold-boot persistence. A USB system disk can be the
-   first target; native SD block access is a separate driver task.
+   settings and repeat cold-boot persistence. The finished setup should let
+   the user choose a USB disk or a data volume on microSD. The microSD's
+   firmware/EFI boot partition remains FAT32; OS data can live in a separate
+   writable partition. FAT32 is the practical interchange format for removable
+   media, while RedSea remains an option for a native ZealOS system volume.
+   Whichever format is chosen still needs a writable block/filesystem path and
+   reboot-persistence acceptance. A USB system disk can be the first target;
+   native SD block access is a separate driver task. Current physical FAT32
+   USB support only reads and validates files; it cannot yet save them.
 3. Run the full ARM64 compiler, source tasks, startup and graphical desktop on
    Pi hardware. The current Pi payload is still the separate diagnostic/
    bootstrap build, without the normal linked `zc` runtime. Validate desktop,
@@ -4113,3 +4120,89 @@ ISO that installs on both UTM and Pi.
 - Apple Silicon / SystemReady PC (decide after Pi serial).
 - Replacing Limine on Pi with bare `kernel8.img`.
 - Claiming full ZealOS parity on either target.
+
+**Pi PWM audio diagnostic card status (2026-11-08):** ZEALPI was reconnected
+after the user reported that `paudio` returned `?`. The card already contains
+the diagnostic candidate: `boot/kernel.elf` SHA-256
+`9965f2c8b60d0653baa68557a3d5ceba9a41d5d3394097bba72d49f83581a6be`, matching
+`build/pi-desktop-esp/boot/kernel.elf`; the booter and recovery kernel also
+match the build, and `scripts/check-pi-desktop-image.py /Volumes/ZEALPI` passes.
+The staged manifest records a backup of the replaced kernel. The default Limine
+entry points at this kernel. No files needed replacement during this reconnect.
+The next physical check is a fresh boot from ZEALPI followed by the exact
+lowercase shell command `paudio` (without `zc` or a semicolon). If it still
+prints `?`, capture that prompt and `zstatus` so we can determine which entry
+actually booted. A successful diagnostic will print a `pi4_audio:` line; then
+run `zc Beep(60,FALSE);` and `paudio` again. This diagnostic build targets
+PWM tone output through the 3.5 mm analog jack.
+
+The PLLD audio test card carries the native desktop and shared app archive in
+the first Limine entry. Its desktop gate still requires the combined USB
+probe, including the test stick. The follow-up kernel at
+`build/kernel-pi-desktop.elf` (SHA-256
+`96bafcbf00568b4bde6711e537c91c8681c55248a730686fdd88a6231ec1e292`)
+allows desktop startup with the supported keyboard and pointer alone and
+exposes `paudio` in the graphical terminal. The boot-image checker passed
+with this kernel substituted into the staged payload. Physical boot with
+only input devices remains to be verified.
+
+The input-only startup follow-up is now on ZEALPI. The previous PLLD test
+kernel was saved and hash-verified in
+`ZEALOS-BACKUP-20261108-DESKTOP-HID-3xm0cvex/kernel.elf`. The boot-image
+checker passed on the mounted card and the card was safely ejected.
+
+Physical follow-up (IMG_9432 and IMG_9433) shows the graphical terminals
+and Z splash. The user reported that Doodle worked, and the returned card
+still had the verified input-only kernel. The photos establish graphical
+startup and command input, with Doodle interaction confirmed by the user.
+The exact USB devices attached during the run were not recorded.
+
+The photographed `Beep(60;` entry was missing the closing parenthesis.
+The terminal remained at the continuation prompt and `paudio` reported
+`beep_calls=0`, with clock control `0x96` and divider `0x6000`. The
+card was safely ejected for a retest.
+
+**Physical 3.5 mm tone confirmed (2026-11-08):** On the same staged kernel,
+`Beep(60);` produced an audible tone in the headphones. IMG_9434 shows the
+graphical terminal back at its prompt and `paudio` reporting `ready=1`,
+`beep_calls=1`, `tone_calls=2`, `note=60` and `hz=440`. The PWM active
+sample was `0x602`, with both channels transmitting and no bus-error bit.
+The live registers show both channels muted after the beep. This verifies
+the native PWM tone path through the 3.5 mm jack. HDMI audio requires a
+separate output backend.
+
+The Pi desktop build exposes `phdmi` to inspect both firmware-configured
+HDMI controllers. It reports link activity, packet enable, and audio clock
+recovery registers through guarded reads. It does not program the encoder
+or send audio samples. Once HDMI playback is verified, prefer an available
+HDMI audio sink by default and offer a manual 3.5 mm output setting.
+The same command queries the firmware's PIXEL_BVB clock rate and available
+DMA channel mask. The booter reserves a low-memory page for the property
+message. The request times out after 100 ms, and a page with an outstanding
+reply stays reserved. The Pi image checker passed. The reported values
+still need to be checked on the physical board.
+The controller addresses and offsets follow the
+[BCM2711 device tree](https://github.com/raspberrypi/linux/blob/rpi-6.12.y/arch/arm/boot/dts/broadcom/bcm2711.dtsi)
+and the [VC4 HDMI register map](https://github.com/raspberrypi/linux/blob/rpi-6.12.y/drivers/gpu/drm/vc4/vc4_hdmi_regs.h).
+The request layout follows the [firmware property interface](https://github.com/raspberrypi/firmware/wiki/Mailbox-property-interface).
+
+The HDMI0 playback candidate prefers the HDMI port nearest USB-C. It sets
+up 48 kHz stereo, emits IEC 60958 subframes through a firmware-available
+legacy DMA channel, and falls back to PWM if the link or DMA setup fails.
+`paudio analog` selects the 3.5 mm jack and `paudio hdmi` restores HDMI0
+preference for the session. The physical test is `Beep(60);` followed by
+`phdmi`. Stage 7 means the DMA source address advanced through the sample
+buffer. Audible playback requires confirmation from the display.
+
+The seven boot files were byte-verified on ZEALPI. The desktop kernel hash
+is `c58ad3df72a3570f5060b22e6f870c46504969ec080cbb84bbfe0eb25f4d5433`.
+The previous booter, kernel and source archive are in
+`ZEALOS-BACKUP-HDMI0-vjsws8gy`. Boot-image validation and host checks of
+the low-memory reservation and PCM subframe encoding passed.
+
+**Physical HDMI0 tone confirmed (2026-11-08).** On this kernel, `Beep(60);`
+produced an audible tone through the TV connected to HDMI0. IMG_9436 and
+IMG_9437 show `phdmi` reporting HDMI0 `active=1 packets=1` and
+`pi4_hdmi_audio` reporting `stage=7 starts=1 hz=440`. This run verifies
+HDMI0 tone playback. The physical analog tone check above used the
+preceding kernel.

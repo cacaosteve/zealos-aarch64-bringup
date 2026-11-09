@@ -1,0 +1,24 @@
+{
+  "date": "2026-11-05",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "working_tree_changes_included": true,
+  "kernel_sha256": "5e63aead946d2a07242ecfa1ec0303521fc9311058346dfffb9c4b5a703a7a1f",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "be190bd6aa350d7e8c3a28068132e0aa3819b02af9150b311c371ee4c9226932",
+  "command": "python3 scripts/check-compat.py --pci --quick --probe-demo-home-sys",
+  "exit_code": 0,
+  "source_path": "/Demo/AcctExample/HomeSys.ZC",
+  "result": "pass",
+  "checks": [
+    "The graphical terminal loaded the source volume SysRep.ZC and CPURep.ZC utilities before launching HomeSys.ZC.",
+    "HomeSys.ZC executed and returned the 0xD4 sentinel.",
+    "The captured desktop showed the startup user terminals tiled, with Boot Time, AutoComplete Time, ZealOS version/date, and terminal command output.",
+    "The graphical terminal accepted 40+2; after HomeSys returned and displayed 42.",
+    "zstatus reported failed=0."
+  ],
+  "screenshots": [
+    "build/gui-demo-home-sys-demo-home-sys-after-launch.ppm",
+    "build/gui-demo-home-sys-demo-home-sys-terminal-recovery-result.ppm"
+  ],
+  "scope_note": "Automated PCI QEMU runtime evidence. This does not establish live UTM or Raspberry Pi behavior. The separate wallpaper source /Demo/Graphics/WallPapers/WallPaperDesktop/HomeSys.ZC remains unverified."
+}

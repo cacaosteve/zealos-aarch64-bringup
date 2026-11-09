@@ -1,0 +1,22 @@
+{
+  "date": "2026-11-04",
+  "command": "QEMU_VIRT=virt+ramfb+VirtIO keyboard/tablet python3 scripts/check-compat.py --probe-demo-tree-checkers",
+  "target": "QEMU ARM64 GUI guest booted from the freshly rebuilt ISO",
+  "result": "pass",
+  "scope": "TreeCheckers standalone runtime acceptance, including focused game task, board scanout, pointer movement, startup popup dismissal, Escape cleanup, and terminal recovery.",
+  "observed": [
+    "The pinned TreeCheckers source compiled in a fresh isolated guest (1/1).",
+    "The rebuilt GUI terminal launched TreeCheckers as a focused application task; its startup popup was dismissed with Return.",
+    "The game board rendered non-background content and pointer movement changed the board scanout.",
+    "Escape returned to the graphical terminal and 40+2 returned 42.",
+    "Final zstatus reported failed=0."
+  ],
+  "runtime_checks": {
+    "source_compile": "pass: targeted isolated catalog compile",
+    "focused_game_task": "pass",
+    "board_render": "pass: non-background scanout gate",
+    "pointer_move": "pass: scanout pixel-difference gate",
+    "Escape_terminal_recovery": "pass: 40+2 returned 42",
+    "compiler_runtime_health": "pass: failed=0"
+  }
+}

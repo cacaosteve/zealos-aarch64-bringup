@@ -1,0 +1,109 @@
+{
+  "date": "2026-11-08",
+  "target": "Raspberry Pi 4B native ZealOS, PWM1 analog audio isolation diagnostic",
+  "result": "physical-test-no-audible-tone-pwm-bus-error",
+  "build_command": "make pi-desktop-sd",
+  "image_check": "python3 scripts/check-pi-desktop-image.py build/pi-desktop-esp (passed)",
+  "kernel_sha256": "a09e187edadeaf57d45632c3f4fcdf7f8d00338ebe8b9a5d015b55b18869acf1",
+  "change": "Added paudiobeep shell command. It calls the Pi PWM beep backend directly for 500 ms, bypasses ZealC Sound/Beep, then prints paudio status.",
+  "card_update": {
+    "volume": "ZEALPI",
+    "kernel_backup": "ZEALOS-BACKUP-20261108-PAUDIO-DIRECT/kernel.elf",
+    "previous_kernel_sha256": "9259a916f8d46e38c4cd6b9fdfe7e0b26ef69e43110a6ed24b5e545af8d2d5da",
+    "staged_kernel_sha256": "a09e187edadeaf57d45632c3f4fcdf7f8d00338ebe8b9a5d015b55b18869acf1",
+    "verified": "The staged kernel and build/pi-desktop-esp/boot/kernel.elf were byte-for-byte identical before safe eject.",
+    "scope_note": "Only boot/kernel.elf was intentionally updated. The current build source archive has changed since the card\u2019s prior source archive; this kernel-only diagnostic does not claim the full boot payload matches."
+  },
+  "manual_test": {
+    "command": "paudiobeep",
+    "output": "3.5 mm TRRS jack; use powered speakers or a headphone amplifier because the jack is line-level.",
+    "expected": "A 440 Hz tone for about 0.5 seconds, then beep_calls=1, tone_calls=2, note=60 and hz=440. last_sta records the sample after enable; the live control and data fields are read after mute.",
+    "interpretation": "The direct command reached the PWM driver independently of ZealC Sound/Beep. The PWM sample contained the bus error flag, with neither channel reporting transmission. The error could have been latched before the sample.",
+    "observed": {
+      "heard_tone": false,
+      "photos": [
+        "IMG_9425.heic",
+        "IMG_9426.heic",
+        "IMG_9427.heic",
+        "IMG_9428.heic"
+      ],
+      "ready": 1,
+      "beep_calls": 1,
+      "tone_calls": 2,
+      "note": 60,
+      "hz": 440,
+      "init_stage": 9,
+      "fsel4": "0x64",
+      "cmctl": "0x91",
+      "cmdiv": "0x1000",
+      "pwmctl_after_mute": "0x8080",
+      "rng1": "0x1df67",
+      "rng2": "0x1df67",
+      "dat1_after_mute": "0x0",
+      "dat2_after_mute": "0x0",
+      "last_sta": "0x102"
+    }
+  },
+  "limitations": [
+    "HDMI audio is supported by Pi 4 hardware but not implemented by this bare-metal ZealOS build.",
+    "No ZealOS software volume control is implemented for the Pi PWM backend."
+  ],
+  "next_candidate": {
+    "kernel_sha256": "be0a84d748d3a98a671b6047cda033d9004dcc3611f99736bee304f744573845",
+    "change": "Pace MMIO writes by 10 microseconds, clear sticky PWM errors before programming a tone, and print PWM status, control and data readbacks captured after enabling both channels.",
+    "verification": "Pi boot image layout and active PWM diagnostic output passed local checks.",
+    "state": "Physical test completed. A slight click or buzz was heard, without a sustained tone.",
+    "card_update": {
+      "backup_directory": "ZEALOS-BACKUP-20261108-PAUDIO-PACED-d2yaxt8m",
+      "updated": [
+        "boot/kernel.elf",
+        "boot/sources.tar"
+      ],
+      "sources_sha256": "db2034fafc47f86ed05cb70d5f74d10a4528f18e1edc6a4ccc26dba24294bb68",
+      "verification": "All seven boot payload files match build/pi-desktop-esp. Both replaced files are backed up and hash-verified.",
+      "ejected": true
+    },
+    "observed": {
+      "photos": [
+        "IMG_9429.heic",
+        "IMG_9430.heic"
+      ],
+      "audible_result": "Brief click or buzz as audio switched on and off.",
+      "note": 60,
+      "hz": 440,
+      "init_stage": 9,
+      "clock_control": "0x91",
+      "clock_divider": "0x1000",
+      "active_status": "0x102",
+      "active_control": "0x8181",
+      "active_dat1": "0xefb3",
+      "active_dat2": "0xefb3",
+      "interpretation": "The duty registers and both enable bits latched. The early sample had the bus-error flag and no transmitting bits. The diagnostic then stopped polling on the error, so this sample does not describe the full half-second interval."
+    }
+  },
+  "plld_candidate": {
+    "kernel_sha256": "dd588d7795a568b2ca83a2e939a998f0fcde903597b3976064812c71046bb54b",
+    "sources_sha256": "055d7b7c9cf2c426dc3c46a55f4e06d6695b210d858fc77babf43c5953ac7bc9",
+    "backup_directory": "ZEALOS-BACKUP-20261108-PAUDIO-PLLD-1rxf5r7e",
+    "change": "Use PLLD divided by six for 125 MHz. Keep polling despite an early bus error and report status after W1C, before channel enable, and before mute.",
+    "state": "All seven boot payload files matched the validated build. ZEALPI unmounted and safely ejected. The physical test was subsequently performed on the desktop HID follow-up kernel with the same audio backend."
+  },
+  "physical_analog_acceptance": {
+    "kernel_sha256": "96bafcbf00568b4bde6711e537c91c8681c55248a730686fdd88a6231ec1e292",
+    "photo": "IMG_9434.heic",
+    "commands": ["Beep(60);", "paudio"],
+    "heard_tone": true,
+    "output": "Pi 4B 3.5 mm jack with headphones",
+    "ready": 1,
+    "beep_calls": 1,
+    "tone_calls": 2,
+    "note": 60,
+    "hz": 440,
+    "clock_control": "0x96",
+    "clock_divider": "0x6000",
+    "pwm_active_status": "0x602",
+    "pwm_active_control": "0x8181",
+    "pwm_control_after_mute": "0x8080",
+    "scope": "Audible stock ZealC Beep through the native analog PWM path. HDMI audio remains a separate, unimplemented backend."
+  }
+}

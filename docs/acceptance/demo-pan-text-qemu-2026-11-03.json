@@ -1,0 +1,26 @@
+{
+  "date": "2026-11-03",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "target": "AArch64 QEMU virt, PCI, graphical terminal",
+  "command": "python3 -m py_compile scripts/check-compat.py && python3 scripts/check-compat.py --pci --probe-demo-graphics-render",
+  "source_path": "/Demo/Graphics/PanText.ZC",
+  "source_sha256": "b2e0ba6786645d892928689349c4f5910bb6913b373646a531a95133f5ce64ec",
+  "result": "pass",
+  "checks": [
+    "PanText launched from the graphical terminal and visibly panned terminal text, changing 38,183 scanout pixels",
+    "The graphical terminal remained responsive after PanText completed and evaluated 40+2 as 42",
+    "The guest remained healthy with zstatus failed=0"
+  ],
+  "artifacts": {
+    "build/zealos-aarch64-hello.iso": "eb3a1db2e684287cf39ff03a04c23287ac9da4d0f9358a02df2234ee50ae1fd4",
+    "build/disk.img": "5c3e4d6aa61f1ffb4e3174dc4e5bce82598c65df18421b322ef96122c1acfc0e",
+    "build/sources.tar": "b89426e6ae2dad802ac5e1aa8239bbbb78d502b6695bbba8e008123f0ed2f7d9",
+    "scripts/check-compat.py": "adfa8c8ef5689b90731c54699106ee170b788892ee27931ba83f19aa5fe47879"
+  },
+  "screenshots": [
+    "build/gui-demo-graphics-render-demo-pantex-ready.ppm",
+    "build/gui-demo-graphics-render-demo-pantex-active.ppm",
+    "build/gui-demo-graphics-render-demo-pantex-terminal-recovery-result.ppm"
+  ],
+  "scope_note": "QEMU runtime acceptance only; live UTM or Pi hardware acceptance is not implied."
+}

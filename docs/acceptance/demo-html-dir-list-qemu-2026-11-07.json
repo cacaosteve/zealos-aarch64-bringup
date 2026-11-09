@@ -1,0 +1,36 @@
+{
+  "date": "2026-11-07",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "working_tree_changes_included": true,
+  "target": "AArch64 native ZealC running in PCI QEMU guest",
+  "tested_iso": "build/zealos-aarch64-hello.iso",
+  "command": "python3 scripts/check-compat.py --pci --quick --probe-demo-html-dir-list",
+  "exit_code": 0,
+  "result": "pass",
+  "source": "/Demo/ToHtmlToTXTDemo/HtmlDirList.ZC",
+  "checks": [
+    {
+      "check": "source loads in booted guest",
+      "result": "pass"
+    },
+    {
+      "check": "DirIndexList enumeration and DolDoc file link",
+      "result": "pass",
+      "input": "/Demo/Games/TicTacToe.ZC",
+      "result_detail": "one expected file link rendered; returned count 1"
+    },
+    {
+      "check": "terminal recovery",
+      "result": "pass",
+      "result_detail": "40+2 evaluated to 42"
+    },
+    {
+      "check": "system status",
+      "result": "pass",
+      "result_detail": "zstatus reported failed=0"
+    }
+  ],
+  "scope_note": "Automated PCI QEMU runtime evidence for HtmlDirList source enumeration/link rendering. No live UTM or Raspberry Pi hardware claim.",
+  "tested_iso_sha256": "a315a3f08cbae3880cb0ae41e89e110b6cc7d63a13a84252c62fd4f7c57909b3",
+  "kernel_sha256": "aec909390e832524bef61259dc01fe8a1a48e90f6f954a75fbb06deb7c6b8b2b"
+}

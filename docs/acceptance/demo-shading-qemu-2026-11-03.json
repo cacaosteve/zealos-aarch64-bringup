@@ -1,0 +1,29 @@
+{
+  "date": "2026-11-03",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "target": "AArch64 QEMU virt, PCI, graphical terminal",
+  "command": "python3 -m py_compile scripts/check-compat.py && python3 scripts/check-compat.py --pci --probe-demo-shading",
+  "source_path": "/Demo/Graphics/Shading.ZC",
+  "source_sha256": "10dd3de511fe043a8f08ccb01de3d3df9ce91c1cd8a61907ce8fd02f7b1fff3a",
+  "result": "pass",
+  "checks": [
+    "The Shading demo launched from the graphical terminal and rendered its shaded 3D model",
+    "Moving the pointer changed the model's mouse-controlled lighting",
+    "Escape closed the demo and restored the graphical terminal",
+    "The terminal evaluated 40+2 as 42 after returning from Shading",
+    "The guest remained healthy with zstatus failed=0"
+  ],
+  "artifacts": {
+    "build/zealos-aarch64-hello.iso": "612b01502ba5523fab4409658058a55e0ddd1a3212f8ea136b83d83da315c6d2",
+    "build/disk.img": "b4c1d164cdfef9a64435e1c0f9c19302a6f29666bea351551f25ac7f546efd00",
+    "build/sources.tar": "daf71942deace6c7a65c54ee2eae4a43852086cdfa4bd467d213de411c7cbdb8",
+    "scripts/check-compat.py": "4741ca78e608b9f4ea83b71bc22ec46acfb5a976762367a9836da7bbfff72993"
+  },
+  "screenshots": [
+    "build/gui-demo-shading-demo-shading-initial.ppm",
+    "build/gui-demo-shading-demo-shading-before-light-input.ppm",
+    "build/gui-demo-shading-demo-shading-after-light-input.ppm",
+    "build/gui-demo-shading-demo-shading-exit-smoke-result.ppm"
+  ],
+  "scope_note": "QEMU runtime acceptance only; live UTM or Pi hardware acceptance is not implied."
+}

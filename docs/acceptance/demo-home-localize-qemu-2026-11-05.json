@@ -1,0 +1,25 @@
+{
+  "date": "2026-11-05",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "working_tree_changes_included": true,
+  "kernel_sha256": "5e63aead946d2a07242ecfa1ec0303521fc9311058346dfffb9c4b5a703a7a1f",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "be190bd6aa350d7e8c3a28068132e0aa3819b02af9150b311c371ee4c9226932",
+  "command": "python3 scripts/check-compat.py --pci --quick --probe-demo-home-localize",
+  "exit_code": 0,
+  "source_path": "/Demo/AcctExample/HomeLocalize.ZC",
+  "result": "pass",
+  "checks": [
+    "HomeLocalize executed from the source volume in the graphical terminal.",
+    "The local time offset equals -7*60*60*CDATE_FREQ.",
+    "Mouse hard scales equal x=0.5, y=0.5, and wheel z=5.0.",
+    "The graphical terminal accepted 40+2; and displayed 42 after the app returned.",
+    "zstatus reported failed=0."
+  ],
+  "adaptation": "The ARM64 source overlay omits the legacy PS/2 KbdTypeMatic write; repeat behavior is supplied by the USB keyboard/input path. Timezone and mouse-scale statements are unchanged.",
+  "screenshots": [
+    "build/gui-demo-home-localize-demo-home-localize-launch-result.ppm",
+    "build/gui-demo-home-localize-demo-home-localize-terminal-recovery-result.ppm"
+  ],
+  "scope_note": "Automated PCI QEMU runtime evidence. This does not establish live UTM or Raspberry Pi behavior."
+}

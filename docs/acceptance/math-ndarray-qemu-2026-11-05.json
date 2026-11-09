@@ -1,0 +1,20 @@
+{
+  "date": "2026-11-05",
+  "source_commit": "working tree",
+  "working_tree_changes_included": true,
+  "kernel_sha256": "f177a107ce08db261e88278fa5622dd6bce1bcc63bb8b714eae9605fc5ec1cd2",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "ba281a4bbf6ec0a90484a27653a22f0f9028345ecf00589c7be23374e0fdde8c",
+  "command": "python3 scripts/check-compat.py --pci --quick --probe-source-fast --probe-source-exefile --probe-source tests/compat/StockNDArrayChecks.ZC --probe-source-call StockNDArrayChecks",
+  "exit_code": 0,
+  "result": "pass",
+  "compiled_sources": [
+    "/System/Math/NDArray.ZC"
+  ],
+  "runtime_sources": [
+    "/System/Math/NDArray.ZC"
+  ],
+  "runtime_check": "StockNDArrayChecks returned 0x2a after checking the I32, I64, F32, and F64 array paths, dimension metadata, clear allocation, writes, and ArrayFree cleanup.",
+  "runtime_changes": "The ARM64 source overlay adds the Types dependency, uses the recorded array type during free, and corrects aligned allocation sizes/clear behavior. The compiler runtime now binds MAllocAligned and CAllocAligned with aligned guest pointers that remain freeable and report their requested size.",
+  "scope_note": "Targeted QEMU compile and runtime acceptance for NDArray only. This does not imply the remaining Math tests or the complete collection of ZealOS programs are complete."
+}

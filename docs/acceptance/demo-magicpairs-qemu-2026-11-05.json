@@ -1,0 +1,24 @@
+{
+  "date": "2026-11-05",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "working_tree_changes_included": true,
+  "kernel_sha256": "5e63aead946d2a07242ecfa1ec0303521fc9311058346dfffb9c4b5a703a7a1f",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "be190bd6aa350d7e8c3a28068132e0aa3819b02af9150b311c371ee4c9226932",
+  "command": "python3 scripts/check-compat.py --pci --quick --probe-demo-magicpairs",
+  "exit_code": 0,
+  "source_path": "/Demo/MagicPairs.ZC",
+  "result": "pass",
+  "checks": [
+    "The demo completed its one-million-value search and reported all 16 known amicable pairs below one million.",
+    "The output ended with Found:16 and an elapsed-time value.",
+    "The graphical terminal evaluated 40+2; as 42 after the demo returned.",
+    "zstatus reported failed=0.",
+    "The guest exposed mp_count=1. A separate QEMU run offered two vCPUs, but the guest still reported mp_count=1."
+  ],
+  "screenshots": [
+    "build/gui-catalog-demo-magicpairs-complete.ppm",
+    "build/gui-catalog-demo-magicpairs-terminal-recovery-result.ppm"
+  ],
+  "scope_note": "This accepts MagicPairs on the current single-CPU ARM64 guest runtime. It does not validate parallel execution; src/zc/runtime.c currently initializes the guest mp_count binding to 1, and QEMU -smp 2 did not make a second guest CPU available."
+}

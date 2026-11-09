@@ -184,6 +184,36 @@ I64 UserStartUpHookChecks()
     return result;
 }
 
+I64 user_startup_custom_answer;
+I64 UserStartUpCustomDocumentChecks()
+{//A HomeSys hook may create a document without knowing ARM64 input bridges.
+    CTask *term = NULL;
+    I64 i, result = 42;
+    user_startup_custom_answer = 0;
+    Sys("U0 UserStartUp(){DocTermNew;LBts(&Fs->display_flags,DISPLAYf_SHOW);}");
+    try
+    {
+        term = User;
+        if (!TaskValidate(term) || !BootstrapGuiTerminalState(term))
+            result = 1;
+        else
+        {
+            XTalk(term, "user_startup_custom_answer=42;\n");
+            for (i = 0; i < 200 && user_startup_custom_answer != 42; i++)
+                Sleep(5);
+            if (user_startup_custom_answer != 42) result = 2;
+        }
+        if (TaskValidate(term)) Kill(term);
+    }
+    catch
+    {
+        Sys("U0 UserStartUp(){BootstrapGuiTerminalUserStartUp;}");
+    }
+    Sys("U0 UserStartUp(){BootstrapGuiTerminalUserStartUp;}");
+    WinToTop(bootstrap_gui_terminal_task);
+    return result;
+}
+
 I64 UserStartUpCapacityChecks()
 {
     CTask *terms[4];

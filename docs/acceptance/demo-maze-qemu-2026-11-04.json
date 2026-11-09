@@ -1,0 +1,27 @@
+{
+  "date": "2026-11-04",
+  "upstream_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "target": "QEMU PCI ARM64 graphical guest",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "7dfac9d26605debae26f1b3b6e8c905ef88f064d4f4781da353bfef935be5eaf",
+  "kernel_sha256": "a65d2847344fa04d8ee3144343562e61a4c98222d970d67bfc5e979391ec7316",
+  "source_path": "/Demo/Games/Maze.ZC",
+  "source_sha256": "c3007477777fe3ab9a356e82ca7693db53f5a79b3d14d17ce7c880e0f25ba2bc",
+  "command": "python3 scripts/check-compat.py --pci --probe-demo-maze",
+  "result": "pass",
+  "checks": [
+    "booted the graphical terminal with keyboard focus",
+    "launched Maze directly from the graphical terminal and verified visible instruction: Draw a maze with left button.",
+    "verified mouse drawing changed the Maze canvas",
+    "Escape returned to the graphical terminal",
+    "40+2; evaluated to 42 after exit",
+    "zstatus reported failed=0"
+  ],
+  "log": "build/check-demo-maze-pci.log",
+  "screenshots": [
+    "build/gui-demo-maze-before-draw.ppm",
+    "build/gui-demo-maze-after-draw.ppm",
+    "build/gui-demo-maze-exit-smoke-result.ppm"
+  ],
+  "scope_note": "Fresh QEMU acceptance of the original Maze demo. This proves launch, drawing, Escape cleanup, and terminal recovery in this guest; it does not establish live UTM or Pi hardware behavior."
+}

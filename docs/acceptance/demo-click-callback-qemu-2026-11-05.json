@@ -1,0 +1,24 @@
+{
+  "date": "2026-11-05",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "working_tree_changes_included": true,
+  "kernel_sha256": "5e63aead946d2a07242ecfa1ec0303521fc9311058346dfffb9c4b5a703a7a1f",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "be190bd6aa350d7e8c3a28068132e0aa3819b02af9150b311c371ee4c9226932",
+  "command": "python3 scripts/check-compat.py --pci --quick --probe-demo-click-callback",
+  "exit_code": 0,
+  "source_path": "/Demo/DolDoc/ClickCallBack.ZC",
+  "result": "pass",
+  "checks": [
+    "ClickCallBack opened all three Jiffies popups and each left-click callback returned the current jiffies count.",
+    "The blue Click Me DolDoc link rendered and was clicked with the emulated pointer.",
+    "The graphical terminal remained responsive after the click and evaluated 40+2; as 42.",
+    "zstatus reported failed=0."
+  ],
+  "screenshots": [
+    "build/gui-demo-click-callback-demo-click-callback-jiffies-3.ppm",
+    "build/gui-demo-click-callback-demo-click-callback-visible.ppm",
+    "build/gui-demo-click-callback-demo-click-callback-terminal-recovery-result.ppm"
+  ],
+  "scope_note": "Automated PCI QEMU runtime evidence only; the harness does not capture audible output from Click Me\u2019s Sound sweep. Live UTM and Raspberry Pi behavior are not established."
+}

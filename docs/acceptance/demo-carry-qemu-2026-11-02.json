@@ -1,0 +1,24 @@
+{
+  "date": "2026-11-02",
+  "command": "python3 scripts/check-compat.py --pci --probe-demo-carry",
+  "target": "QEMU PCI graphical terminal",
+  "result": "pass",
+  "programs": [
+    {
+      "path": "/Demo/Carry.ZC",
+      "source_path": "upstream/bootstrap/Demo/Carry.ZC",
+      "source_sha256": "e85e2a1d2243a8353d3050d1fed1e4a24e6ddd1247d67713ec4c4ad90a847a09",
+      "result": "pass",
+      "checks": [
+        "two-word carry count reaches high word 0x10",
+        "two-word shift carries across the 64-bit boundary",
+        "branch demo prints all 64 expected bits from 0xFFCC3311",
+        "wrapped terminal output preserves the complete bit sequence"
+      ]
+    }
+  ],
+  "recovery": "40+2; returned 42 after the demo; zstatus failed=0",
+  "kernel_sha256": "4daaabe6cc3e9e21bfe3b17b3671c782206d4977ab1bbca62b00f24034d32197",
+  "iso_sha256": "ca3f1f8d437774121c3791d5a66885f9dd03013d07a8222e603857b9f565a253",
+  "scope_note": "Automated QEMU evidence only; live UTM behavior is not established."
+}

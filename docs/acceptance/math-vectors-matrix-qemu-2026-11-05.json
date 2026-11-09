@@ -1,0 +1,62 @@
+{
+  "date": "2026-11-05",
+  "source_commit": "working tree",
+  "working_tree_changes_included": true,
+  "kernel_sha256": "a77ceb5c71b1ae4810950836497c5ad8689cbb3a16b8f3de5b9b5f3413b78a3b",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "e150958bf2cd86f19c29cd46eba5127468898d9af6be4115aa096c145fc75411",
+  "result": "pass",
+  "compile_check": {
+    "command": "python3 scripts/check-compat.py --pci --quick --probe-demo-system-context --demo-system-path /System/Math/MakeMath.ZC",
+    "exit_code": 0,
+    "result": "MakeMath.ZC compiled successfully in the live system ExeFile2 context.",
+    "compiled_sources": [
+      "/System/Math/Types.ZC",
+      "/System/Math/Conversion.ZC",
+      "/System/Math/F32.ZC",
+      "/System/Math/Vec4.ZC",
+      "/System/Math/Vec3.ZC",
+      "/System/Math/Mat4.ZC",
+      "/System/Math/Math.ZC",
+      "/System/Math/MathODE.ZC",
+      "/System/Math/MakeMath.ZC"
+    ]
+  },
+  "runtime_checks": [
+    {
+      "command": "python3 scripts/check-compat.py --pci --quick --probe-source-fast --probe-source-exefile --probe-source tests/compat/StockVec3Checks.ZC --probe-source-call StockVec3Checks",
+      "exit_code": 0,
+      "return_value": "0x2a",
+      "coverage": "Vector3D initialization, copy/equality, add/subtract/multiply and scalar variants, scalar divide, dot, cross, and normalize."
+    },
+    {
+      "command": "python3 scripts/check-compat.py --pci --quick --probe-source-fast --probe-source-exefile --probe-source tests/compat/StockVec4Checks.ZC --probe-source-call StockVec4Checks",
+      "exit_code": 0,
+      "return_value": "0x2a",
+      "coverage": "Vector4D initialization, copy/equality, add/subtract/multiply/divide, min/max, negate, and dot."
+    },
+    {
+      "command": "python3 scripts/check-compat.py --pci --quick --probe-source-fast --probe-source-exefile --probe-source tests/compat/StockMat4Checks.ZC --probe-source-call StockMat4Checks",
+      "exit_code": 0,
+      "return_value": "0x2a",
+      "coverage": "Matrix scale and translation setters, matrix multiply, matrix-vector multiply, transpose, and equality."
+    }
+  ],
+  "runtime_sources": [
+    "/System/Math/Vec3.ZC",
+    "/System/Math/Vec4.ZC",
+    "/System/Math/Mat4.ZC"
+  ],
+  "scope_note": "QEMU compile acceptance of the complete MakeMath source-load path and targeted runtime smoke checks for Vec3, Vec4, and Mat4. The full MakeMath interactive demo and other Math demos are not claimed runtime-accepted.",
+  "compiled_sources": [
+    "/System/Math/Types.ZC",
+    "/System/Math/Conversion.ZC",
+    "/System/Math/F32.ZC",
+    "/System/Math/Vec4.ZC",
+    "/System/Math/Vec3.ZC",
+    "/System/Math/Mat4.ZC",
+    "/System/Math/Math.ZC",
+    "/System/Math/MathODE.ZC",
+    "/System/Math/MakeMath.ZC"
+  ]
+}

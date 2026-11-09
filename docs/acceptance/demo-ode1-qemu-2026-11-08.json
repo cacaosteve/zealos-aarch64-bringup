@@ -1,0 +1,24 @@
+{
+  "date": "2026-11-08",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "working_tree_changes_included": true,
+  "command": "QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device' python3 scripts/check-compat.py --quick --probe-demo-system-context --demo-system-module /System/Math/MathODE.ZC --demo-system-module /Demo/Templates/ODE1.ZC --demo-system-path /Demo/Templates/ODE1.ZC",
+  "target": "AArch64 QEMU virt, one vCPU, booted ZealC kernel/system namespace",
+  "result": "accepted",
+  "program": "/Demo/Templates/ODE1.ZC",
+  "source_path": "upstream/pinned/Demo/Templates/ODE1.ZC",
+  "source_sha256": "b1dcf4d1e4477807a908485c625610e3e97d38914b38cfdb4f8e978e6a0b3c9d",
+  "dependency": "/System/Math/MathODE.ZC",
+  "dependency_sha256": "24a0d15370a9b5f42b894ed4ae44852f262325593bcac3c5bc9795d68b0e0c5c",
+  "kernel_sha256": "4bfeab8f4e8e60962823e2360364231dc13f4ec7187264a8e642864c0113d1fd",
+  "iso_sha256": "fd42cae1f7bc340e6bf71e3e2fce41c8c32894d62bdb45f745ea580f5ccdc447",
+  "verified": [
+    "The pinned MathODE dependency and ODE1 module loaded in the running guest.",
+    "The unchanged ODE1 source compiled in the booted ZealC kernel/system namespace.",
+    "Init created an ODE instance and linked it as Fs->last_ode.",
+    "CleanUp detached the ODE instance from Fs->last_ode and returned without a guest runtime failure."
+  ],
+  "log_sha256": "6301dfe94c260ac980ae0fc45ada29bef9d7df6e5bbb5d89eede13d88a1b4b72",
+  "log": "build/demo-ode1-qemu-2026-11-08.log",
+  "scope_note": "QEMU runtime evidence only; this validates ODE1 lifecycle with no added masses or springs and does not imply true SMP or live UTM/Pi hardware acceptance."
+}

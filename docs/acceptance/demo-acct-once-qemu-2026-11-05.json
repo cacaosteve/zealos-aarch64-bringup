@@ -1,0 +1,23 @@
+{
+  "date": "2026-11-05",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "working_tree_changes_included": true,
+  "kernel_sha256": "5e63aead946d2a07242ecfa1ec0303521fc9311058346dfffb9c4b5a703a7a1f",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "be190bd6aa350d7e8c3a28068132e0aa3819b02af9150b311c371ee4c9226932",
+  "command": "python3 scripts/check-compat.py --quick --probe-demo-acct-once",
+  "exit_code": 0,
+  "source_path": "/Demo/AcctExample/Once.ZC",
+  "result": "pass",
+  "checks": [
+    "The live ISO boot reported sys_boot_src=4 (BOOT_SRC_DVD).",
+    "Once.ZC displayed its install prompt; the probe answered No, so OSInstall was not run.",
+    "The graphical terminal evaluated 40+2; as 42 after the source returned.",
+    "zstatus reported failed=0."
+  ],
+  "screenshots": [
+    "build/gui-demo-acct-once-launch-demo-acct-once-launch-result.ppm",
+    "build/gui-demo-acct-once-terminal-recovery-result.ppm"
+  ],
+  "scope_note": "Automated UEFI ISO/DVD QEMU runtime evidence. This does not establish live UTM or Raspberry Pi behavior."
+}

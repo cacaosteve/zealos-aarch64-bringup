@@ -1,0 +1,18 @@
+{
+  "date": "2026-11-08",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "working_tree_changes_included": true,
+  "target": "AArch64 native ZealC on PCI QEMU",
+  "boot_disk_sha256": "1bf38b6c50426a41a813259de67e2a457823edfce988a68fc5692f54f2ed1fcf",
+  "command": "python3 scripts/check-compat.py --pci --quick --probe-demo-wallpaper-install",
+  "exit_code": 0,
+  "result": "pass",
+  "checks": [
+    {
+      "source": "/Demo/Graphics/WallPapers/WallPaperDesktop/Install.ZC",
+      "result": "pass",
+      "evidence": "The unmodified installer ran on a disposable boot disk. Reads using the disk: prefix confirmed byte-for-byte copies at /Home/HomeSys.ZC, /Home/DesktopIcons.DD, and /System/WallPaper.ZC. The copy operation rejected a self-copy through a disk-qualified alias. The terminal returned 42 afterward."
+    }
+  ],
+  "scope_note": "This run verifies installer writes and read-back within one boot. Desktop activation, the installed HomeSys startup, and reboot behavior require separate checks."
+}

@@ -1,0 +1,22 @@
+{
+  "date": "2026-11-07",
+  "command": "python3 scripts/check-compat.py --pci --quick --probe-demo-mpadd",
+  "target": "AArch64 QEMU virt, PCI graphical terminal, single vCPU",
+  "result": "accepted",
+  "program": "/Demo/MultiCore/MPAdd.ZC",
+  "source_path": "upstream/pinned/Demo/MultiCore/MPAdd.ZC",
+  "source_sha256": "b129fa07d092d0f963249dd2252fab545d24df2aea5147d416d26ea454a2cbd4",
+  "verified": [
+    "The unchanged MPAdd source launches from the graphical terminal",
+    "The stock serial and queued-job benchmark completes all five input sizes and displays ten sum result rows",
+    "The performance chart renders its red plot and green axis labels",
+    "The benchmark exits back to the graphical terminal",
+    "The follow-up expression 40+2; returns 42",
+    "zstatus reports failed=0"
+  ],
+  "kernel_sha256": "a8bef958581d425bdb658eb536702d357b94b24551b69e5256a169ed65a21d31",
+  "iso_sha256": "a626320c7793cc0a3182e0a4e29d8803751f5dd9bc306b5f873afd6ffd664cff",
+  "scope_note": "QEMU runtime evidence only; live UTM and physical Pi behavior are not established.",
+  "log_sha256": "2394789dc037a52a1d13690e039ea2172770992d6da18cb6493585f77a5d7ade",
+  "log": "build/demo-mpadd-qemu-2026-11-07.log"
+}

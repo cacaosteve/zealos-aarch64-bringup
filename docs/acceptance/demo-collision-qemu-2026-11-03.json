@@ -1,0 +1,21 @@
+{
+  "date": "2026-11-03",
+  "source_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "target": "AArch64 QEMU virt, PCI, graphical terminal",
+  "command": "python3 scripts/check-compat.py --pci --quick --probe-demo-collision",
+  "source_path": "/Demo/Graphics/Collision.ZC",
+  "source_sha256": "81b69683fae8dec3ccffcdfc8328bed1bba6e9377d52a3790c4b7340c2dcaab3",
+  "result": "pass",
+  "checks": [
+    "Collision launches from the graphical terminal and displays its key prompt",
+    "Pointer movement changes 16,670 scanout pixels while the sprite collision demo is running",
+    "A key returns to the graphical terminal, which evaluates 40+2 as 42",
+    "The guest remains healthy with zstatus failed=0"
+  ],
+  "artifacts": {
+    "build/disk.img": "5c3e4d6aa61f1ffb4e3174dc4e5bce82598c65df18421b322ef96122c1acfc0e",
+    "build/sources.tar": "b89426e6ae2dad802ac5e1aa8239bbbb78d502b6695bbba8e008123f0ed2f7d9",
+    "scripts/check-compat.py": "dd08d7da4df6df1adfa7ffccf1f8e099d5a744fd0251ea14e27e16f55301c382"
+  },
+  "scope_note": "QEMU runtime acceptance only; live UTM or Pi hardware acceptance is not implied."
+}

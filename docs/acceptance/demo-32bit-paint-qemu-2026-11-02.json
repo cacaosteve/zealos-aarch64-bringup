@@ -1,0 +1,24 @@
+{
+  "date": "2026-11-02",
+  "target": "QEMU PCI ARM64 graphical guest",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "251700f8afbe0543d1764d1795e13ca0bcb699676eeeeab2bb2f447b6c635043",
+  "source_path": "/Demo/Graphics/32BitPaint.ZC",
+  "source_sha256": "ee6689c2d0eeea02237b044a01e1894b9fc8971766f5c559cd8dbad41a4a3ade",
+  "command": "python3 scripts/check-compat.py --pci --probe-demo-32bit-paint",
+  "result": "pass",
+  "scope": "Original 32BitPaint demo launched in the ARM64 graphical terminal. The probe verifies the framebuffer HUD by pixels (OCR is unreliable for the overlapped GUI), retained mouse drawing, End clear, Shift+Escape cleanup and terminal recovery. QEMU runtime acceptance does not establish live UTM or Pi hardware behavior.",
+  "checks": [
+    "verified the graphical help text and color HUD pixels",
+    "verified a retained mouse stroke on the canvas",
+    "verified End cleared the stroke",
+    "Shift+Escape returned to the graphical terminal and 40+2; evaluated to 42",
+    "zstatus reported failed=0"
+  ],
+  "log": "build/check-demo-32bit-paint-pci.log",
+  "screenshots": [
+    "build/gui-demo-32bit-paint-demo-32bit-paint-before-draw.ppm",
+    "build/gui-demo-32bit-paint-demo-32bit-paint-after-draw.ppm",
+    "build/gui-demo-32bit-paint-demo-32bit-paint-after-clear.ppm"
+  ]
+}

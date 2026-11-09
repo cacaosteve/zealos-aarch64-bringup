@@ -1,0 +1,28 @@
+{
+  "date": "2026-11-03",
+  "target": "AArch64 QEMU virt, PCI, graphical terminal",
+  "command": "python3 scripts/check-compat.py --quick --probe-demo-menu-bttn --pci",
+  "source_path": "/Demo/DolDoc/MenuBttn.ZC",
+  "source_sha256": "ceb936043422c08fbb609423834ce5ae3ca917b8792720249716bfed20e57db0",
+  "result": "partial",
+  "checks": [
+    "MenuBttn launched and rendered its title and Sound On, Set Freq, Nothing, and Done buttons",
+    "Shift-Escape canceled the DocMenu and returned to the graphical terminal",
+    "The terminal evaluated 40+2 as 42 and zstatus reported failed=0",
+    "A QEMU pointer click over the visible Done button did not dismiss the menu; the Menu Demo screen remained active and the terminal recovery command could not be entered"
+  ],
+  "unverified": [
+    "Menu button activation through pointer or keyboard remains unresolved; the click did not produce a reliable DocMenu selection",
+    "Sound On and Set Freq actions were not exercised"
+  ],
+  "artifacts": {
+    "build/zealos-aarch64-hello.iso": "5c9f2c0bd43843f50c600f819c162ab4d7fa081aceb764b9eee87d375f70c98a",
+    "scripts/check-compat.py": "0ed18b6fa4eb156e0f345e6aeaca3445915a19d4beb95d1dd306ade3df052f60"
+  },
+  "screenshots": [
+    "build/gui-demo-menu-bttn-demo-menu-bttn-title.ppm",
+    "build/gui-demo-menu-bttn-demo-menu-bttn-sound-on.ppm",
+    "build/gui-demo-menu-bttn-demo-menu-bttn-done-dismissed.ppm"
+  ],
+  "scope_note": "Partial QEMU runtime evidence only. Launch, rendering, Shift-Escape cancellation and terminal recovery passed. Pointer activation of a visible button did not dismiss the menu; sound/frequency actions and live UTM/Pi behavior remain unverified."
+}

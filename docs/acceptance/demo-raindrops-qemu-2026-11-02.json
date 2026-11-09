@@ -1,0 +1,22 @@
+{
+  "date": "2026-11-02",
+  "target": "QEMU PCI ARM64 graphical guest",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "8c43ed3b8f929926e9c43412bed58d9a2f5bb982dd7e746f511a5046c2aafaa5",
+  "source_path": "/Demo/Games/RainDrops.ZC",
+  "source_sha256": "ffa2dedc4e7b560da31b57f227acbfb61306a8e284708903241c48ef05a50671",
+  "command": "python3 scripts/check-compat.py --pci --probe-demo-raindrops",
+  "result": "pass",
+  "scope": "Original upstream RainDrops demo launched in the ARM64 graphical terminal. A guarded source overlay paints its empty canvas white because the original drop physics and labels treat white as the empty-space color. This is QEMU runtime acceptance, not live UTM or Pi hardware acceptance.",
+  "checks": [
+    "verified the white drawing surface, red geometry and visible blue drops",
+    "verified blue drop pixels changed positions across consecutive frames",
+    "Escape returned to the graphical terminal and 40+2; evaluated to 42",
+    "zstatus reported failed=0"
+  ],
+  "log": "build/check-demo-raindrops-pci.log",
+  "screenshots": [
+    "build/gui-demo-raindrops-demo-raindrops-frame.ppm",
+    "build/gui-demo-raindrops-demo-raindrops-advance.ppm"
+  ]
+}

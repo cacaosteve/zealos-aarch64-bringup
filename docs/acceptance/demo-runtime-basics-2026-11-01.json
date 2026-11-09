@@ -1,5 +1,5 @@
 {
-  "date": "2026-11-01",
+  "date": "2026-11-02",
   "command": "python3 scripts/check-compat.py --pci --probe-demo-basics",
   "target": "QEMU PCI graphical terminal",
   "result": "pass",
@@ -55,9 +55,20 @@
         "explicit switch cases 10 and 11",
         "visible terminal output for all six cases"
       ]
+    },
+    {
+      "path": "/Demo/MemDemo.ZC",
+      "result": "pass",
+      "checks": [
+        "task-owned chunk table output",
+        "system-owned 512-byte page table output",
+        "system powers-of-two table output",
+        "completed output returned to graphical terminal prompt"
+      ]
     }
   ],
-  "recovery": "40+2; returned 42 in the graphical terminal after all six demos",
+  "recovery": "40+2; returned 42 in the graphical terminal after all seven demos",
   "scope_note": "Automated QEMU evidence only; this does not establish live UTM behavior or acceptance of other Demo sources.",
-  "revalidation_note": "Fresh run on the current worktree passed all six visible demo checks and terminal recovery; the run also completed the Exceptions smoke path."
+  "revalidation_note": "Fresh 2026-11-02 PCI QEMU run passed all seven visible demo checks, including MemDemo output through the final powers-of-two row, followed by terminal recovery and zstatus failed=0. The run also completed the Exceptions smoke path.",
+  "kernel_sha256": "4daaabe6cc3e9e21bfe3b17b3671c782206d4977ab1bbca62b00f24034d32197"
 }

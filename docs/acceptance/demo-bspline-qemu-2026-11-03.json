@@ -1,0 +1,21 @@
+{
+  "date": "2026-11-03",
+  "source_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "target": "AArch64 QEMU virt, PCI, graphical terminal",
+  "command": "python3 scripts/check-compat.py --pci --quick --probe-demo-bspline",
+  "source_path": "/Demo/Graphics/BSpline.ZC",
+  "source_sha256": "71831956d922f2f355895cecc8504431e5effaac7ff1bf4ed3c88dea4fe274ee",
+  "result": "pass",
+  "checks": [
+    "BSpline launches from the graphical terminal and displays the control-point instructions",
+    "Mouse control points are accepted and the guest renders the control points and spline curves",
+    "Escape returns to the graphical terminal, which evaluates 40+2 as 42",
+    "The guest remains healthy with zstatus failed=0"
+  ],
+  "artifacts": {
+    "build/disk.img": "5c3e4d6aa61f1ffb4e3174dc4e5bce82598c65df18421b322ef96122c1acfc0e",
+    "build/sources.tar": "b89426e6ae2dad802ac5e1aa8239bbbb78d502b6695bbba8e008123f0ed2f7d9",
+    "scripts/check-compat.py": "ed1b90dd17feec16aaaa1f56a42f47907b62a723317889f26512850bafcb8b8c"
+  },
+  "scope_note": "QEMU runtime acceptance only; live UTM or Pi hardware acceptance is not implied."
+}

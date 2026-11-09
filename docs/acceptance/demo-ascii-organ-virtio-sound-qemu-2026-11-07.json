@@ -1,0 +1,33 @@
+{
+  "date": "2026-11-07",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "working_tree_changes_included": true,
+  "target": "AArch64 QEMU virt with PCI VirtIO sound and WAV backend",
+  "source_path": "/Demo/Sound/ASCIIOrgan.ZC",
+  "source_sha256": "12f5d0ff857a8536b0078727becbc3db5d612a2780ea7ed8491d2a9a558a1c8e",
+  "kernel_sha256": "d16c6e09cd2f9b5c9c31cba821163608224376a6624463fdf5924afe270a8e48",
+  "iso_path": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "1600244fa2b13cf546e6f454e70a3cdcb877f1f0e3ef405d7ef10206ab2633e9",
+  "command": "QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device -audiodev wav,id=sound0,path=/tmp/zeal-ascii-organ.wav -device virtio-sound-pci,audiodev=sound0' python3 scripts/check-compat.py --probe-demo-ascii-organ",
+  "exit_code": 0,
+  "result": "pass",
+  "checks": [
+    "Loaded the stock ASCIIOrgan source and accepted the 'a' key through its CharGet loop.",
+    "VirtIO sound produced a measurable 784 Hz square-wave tone at peak sample amplitude 7000.",
+    "Captured 17,640 stereo frames at 44.1 kHz; all 35,280 samples were nonzero.",
+    "Shift-Escape returned to the graphical terminal; 40+2 evaluated to 42 and zstatus reported failed=0."
+  ],
+  "audio_capture": {
+    "path": "build/zeal-ascii-organ.wav",
+    "sha256": "bbafb33153f678628c9c9be4e718678bcfa496cbecabb1980839110d18503715",
+    "format": "PCM 16-bit stereo, 44.1 kHz",
+    "frames": 17640,
+    "duration_seconds": 0.4,
+    "peak_amplitude": 7000,
+    "nonzero_samples": 35280,
+    "estimated_fundamental_hz": 784
+  },
+  "log": "build/check-demo-ascii-organ-pci.log",
+  "log_sha256": "880b1d2325d0f6e11f077ad463856df9f29b0739927fb638c9e2ec932533a232",
+  "scope_note": "Automated QEMU VirtIO audio and keyboard evidence. Live UTM and Raspberry Pi audio output are not established."
+}

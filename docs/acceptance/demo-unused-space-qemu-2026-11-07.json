@@ -1,0 +1,28 @@
+{
+  "date": "2026-11-07",
+  "command": "python3 scripts/check-compat.py --probe-demo-unused-space",
+  "target": "AArch64 QEMU virt, PCI graphical terminal with serial command probe",
+  "result": "pass",
+  "programs": [
+    {
+      "program": "/Demo/Disk/UnusedSpaceRep.ZC",
+      "stock_source_path": "upstream/pinned/Demo/Disk/UnusedSpaceRep.ZC",
+      "arm64_source_path": "upstream/bootstrap/Demo/Disk/UnusedSpaceRep.ZC",
+      "arm64_source_sha256": "177aaffddee27f07630995c86b57ffb005960c75fac04f706e8612fcacc0e3c6"
+    }
+  ],
+  "verified": [
+    "The ARM64 adaptation reports the active native source volume's append capacity from the on-disk catalog tail.",
+    "QEMU output reported Source Volume: 78.514% Free (25.124 MiB / 32.000 MiB).",
+    "The terminal recovered after execution; 40+2 printed 42 and zstatus reported failed=0."
+  ],
+  "not_verified": [
+    "Stock ZealOS FAT32/RedSea drive enumeration; this port uses a native source-volume store instead of CDrive.",
+    "Live UTM behavior and physical Pi behavior."
+  ],
+  "kernel_sha256": "478278fd9961c701a069ec91b9d2ef748fb81a2681be7aa767e7a5dbd80f62ca",
+  "iso_sha256": "c369673d370ef79b983b5316d6cfb22f748a25a2190b04dc0e2f09da7aa0a641",
+  "scope_note": "Runtime acceptance is for the ARM64 source-volume adaptation, not the unchanged upstream FAT32/RedSea implementation.",
+  "log_sha256": "3dafe57c7f8f479d14e0620309998b17e9556c5b306bd4d3c0cbd9fd9547a750",
+  "log": "build/check-demo-unused-space-pci.log"
+}

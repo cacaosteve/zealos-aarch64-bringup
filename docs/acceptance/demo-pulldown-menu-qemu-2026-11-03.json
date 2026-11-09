@@ -1,0 +1,23 @@
+{
+  "date": "2026-11-03",
+  "target": "QEMU PCI ARM64 graphical guest",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "337538503e8c4fcb6c5fb66a436c2e1478f82bcc9b5494808b7481fcc18eb7b8",
+  "source_path": "/Demo/PullDownMenu.ZC",
+  "source_sha256": "349f384ac33b3a2c03117498cc4653c61371dfcfdf79b427e6d2326acc500325",
+  "command": "python3 scripts/check-compat.py --pci --probe-demo-pulldown-menu",
+  "result": "pass",
+  "scope": "Original upstream PullDownMenu demo launched from the ARM64 graphical terminal. This checks message dispatch for the Space key and Escape recovery; it does not validate every mouse-driven menu item. QEMU runtime acceptance, not live UTM or Pi hardware acceptance.",
+  "checks": [
+    "the demo's pull-down menu instructions appeared in the graphical terminal",
+    "Space produced a MESSAGE_KEY_DOWN report with ARG1:20",
+    "Escape returned to the graphical terminal and 40+2; evaluated to 42",
+    "zstatus reported failed=0"
+  ],
+  "log": "build/check-demo-pulldown-menu-pci.log",
+  "screenshots": [
+    "build/gui-demo-pulldown-menu-demo-pulldown-menu-help.ppm",
+    "build/gui-demo-pulldown-menu-demo-pulldown-menu-space-message.ppm",
+    "build/gui-demo-pulldown-menu-demo-pulldown-menu-return-result.ppm"
+  ]
+}

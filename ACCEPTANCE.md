@@ -2815,3 +2815,10 @@ The rebuilt combined ISO is `build/zealos-aarch64-hello.iso`, SHA-256
 3D probe details are in `build/3d-apps-compile.json` and
 `build/check-3d-apps-pci.log`. The source translation regression is checked by
 `python3 scripts/check-arm64-source.py`.
+
+The 2026-11-08 Telnet launcher build of `build/zealos-aarch64-hello.iso`
+has SHA-256 `47568ad4869d736cf2fcdad73c20a91491ce7f2c1c115ae63dfe44c648a1991d`.
+The QEMU NEC USB CD installer test passed full read-back to a disposable
+128 MiB VirtIO disk. The installed disk booted without the CD, loaded the
+Stadium graphic, and retained the `InstallerPersist` result of 42 across
+a second cold boot. This image still needs a live UTM acceptance run.

@@ -2,6 +2,31 @@
 I64 end_seen, end_after, end_error, end_started;
 CTask *end_expected;
 
+I64 screen_guard_runs;
+U0 ScreenGuardWorker(U8 *data)
+{
+    screen_guard_runs++;
+    while (TRUE) Yield;
+}
+I64 TaskScreenUpdateKillChecks()
+{//Pinned TaskEnd defers cleanup until the window manager releases the task.
+    CTask *child, *saved = sys_task_being_screen_updated;
+    I64 i, result = 42;
+    screen_guard_runs = 0;
+    child = Spawn(&ScreenGuardWorker);
+    if (!child) return 1;
+    for (i = 0; i < 32 && !screen_guard_runs; i++) Yield;
+    if (screen_guard_runs != 1) result = 2;
+    sys_task_being_screen_updated = child;
+    if (!Kill(child, FALSE) || !TaskValidate(child) ||
+        !Bt(&child->task_flags, TASKf_KILL_TASK)) result = 3;
+    if (!TaskValidate(child) || screen_guard_runs != 1) result = 4;
+    sys_task_being_screen_updated = saved;
+    DeathWait(&child);
+    if (TaskValidate(child)) result = 5;
+    return result;
+}
+
 U0 EndCallback()
 {
     if (Fs != end_expected || !TaskValidate(Fs) ||

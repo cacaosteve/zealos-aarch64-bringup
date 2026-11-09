@@ -1,0 +1,19 @@
+{
+  "date": "2026-11-05",
+  "source_commit": "working tree",
+  "working_tree_changes_included": true,
+  "kernel_sha256": "f177a107ce08db261e88278fa5622dd6bce1bcc63bb8b714eae9605fc5ec1cd2",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "6c767c4d044f0ad29f19edeb4b47669f910e323d12562fa24071606b15d4633f",
+  "command": "python3 scripts/check-compat.py --pci --quick --probe-demo-system-context --demo-system-path /System/Math/Tests/TestVec.ZC --demo-system-path /System/Math/Tests/TestMat4.ZC --demo-system-path /System/Math/Tests/TestF32.ZC",
+  "exit_code": 0,
+  "result": "partial pass",
+  "compiled_sources": [
+    "/System/Math/Tests/TestVec.ZC",
+    "/System/Math/Tests/TestMat4.ZC"
+  ],
+  "blocked_sources": [
+    "/System/Math/Tests/TestF32.ZC"
+  ],
+  "scope_note": "The two vector/matrix test programs compiled with CCF_JUST_LOAD in the live booted ZealC system namespace. TestF32 remains blocked because its stock source depends on the external HolyGL CGLTex2D API, which is absent from this ARM64 source image."
+}

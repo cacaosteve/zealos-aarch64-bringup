@@ -15,16 +15,37 @@ static I64 DocFileStrOcc(U8 *src, U8 ch)
 
 public U0 DocLoad(CDoc *doc, U8 *src2, I64 size)
 {//Fetch doc from raw mem buf.
-	I64		 i;
-	U8		*src;
+	I64		 i, text_len, chunk_len;
+	U8		*src, *chunk;
 	Bool	 unlock = DocLock(doc);
 	CDocBin	*tmpb;
 
 	doc->find_replace->filter_lines = 0;
 	if (src2)
 	{
-		DocPutS(doc, src2); //Too big $LK,"DocPrint",A="MN:DocPrint"$() is wasteful.
-		src = src2 + StrLen(src2) + 1;
+		if (doc->flags & (DOCF_PLAIN_TEXT | DOCF_PLAIN_TEXT_TABS))
+		{//Plain text files can be larger than StrLen's bounded string limit.
+			text_len = 0;
+			while (text_len < size && src2[text_len])
+				text_len++;
+			for (i = 0; i < text_len; i += chunk_len)
+			{
+				chunk_len = text_len - i;
+				if (chunk_len > 0x10000)
+					chunk_len = 0x10000;
+				chunk = MAlloc(chunk_len + 1);
+				MemCopy(chunk, src2 + i, chunk_len);
+				chunk[chunk_len] = 0;
+				DocPutS(doc, chunk); //Keep each temporary string below StrLen's limit.
+				Free(chunk);
+			}
+			src = src2 + text_len + 1;
+		}
+		else
+		{
+			DocPutS(doc, src2); //Too big $LK,"DocPrint",A="MN:DocPrint"$() is wasteful.
+			src = src2 + StrLen(src2) + 1;
+		}
 		i = size - (offset(CDocBin.end) - offset(CDocBin.start));
 		while (src <= src2 + i)
 		{

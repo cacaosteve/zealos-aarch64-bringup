@@ -1,0 +1,29 @@
+{
+  "date": "2026-11-07",
+  "source_commit": "working tree",
+  "working_tree_changes_included": true,
+  "kernel_sha256": "d16c6e09cd2f9b5c9c31cba821163608224376a6624463fdf5924afe270a8e48",
+  "disk": "build/disk.img",
+  "disk_sha256": "3f900c18c2e9af840b7693f8500e9f485d231083abeb4ab729327bd117d20be7",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "1600244fa2b13cf546e6f454e70a3cdcb877f1f0e3ef405d7ef10206ab2633e9",
+  "command": "python3 scripts/check-compat.py --pci --quick --probe-demo-stack-grow",
+  "exit_code": 0,
+  "source_path": "/Demo/StackGrow.ZC",
+  "result": "pass",
+  "checks": [
+    "The stock StackGrow source compiled in the QEMU guest.",
+    "The 64 KiB task-stack allocation check and direct ten-argument stack trampoline check each returned 0x2a.",
+    "CallStackGrow's variadic ten-argument path returned 0x2a and preserved the native unwind chain.",
+    "The threshold path completed 10,000 recursive calls across reused and grown stacks; StackGrowRuntimeRecurseChecks returned 0x2a.",
+    "After stack growth and recursion, graphical-terminal input recovered and 40+2; returned 42."
+  ],
+  "screenshots": [
+    "build/gui-demo-stack-grow-allocated-stack-check-result.ppm",
+    "build/gui-demo-stack-grow-direct-trampoline-check-result.ppm",
+    "build/gui-demo-stack-grow-args-check-result.ppm",
+    "build/gui-demo-stack-grow-recursion-check-result.ppm",
+    "build/gui-demo-stack-grow-terminal-recovery-result.ppm"
+  ],
+  "scope_note": "Automated UEFI QEMU reproduction. This demonstrates the source-backed StackGrow path in the ARM64 host-fiber runtime; no live UTM or Raspberry Pi hardware claim is made."
+}

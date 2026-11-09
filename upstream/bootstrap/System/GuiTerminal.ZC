@@ -22,6 +22,7 @@ Bool bootstrap_gui_paint_have_last = FALSE;
 I32 bootstrap_gui_paint_x[GUI_PAINT_MAX_POINTS];
 I32 bootstrap_gui_paint_y[GUI_PAINT_MAX_POINTS];
 extern U8 *ZcGuiShellExec(U8 *line);
+extern Bool BootstrapGuiTerminalKeyDevPutKey(I64 ch, I64 sc);
 extern I64 ZcSourceEditorOverlayRender();
 extern CDoc *DocRead(U8 *name=NULL, I64 flags=0);
 extern U0 BootstrapGuiTerminalDocBottom(CDoc *doc=NULL);
@@ -308,7 +309,7 @@ Bool BootstrapGuiTerminalMenuBindLeaf(CMenuEntry *root, U8 *source_name,
                                       U8 *display_name, I64 action)
 {
     CMenuEntry *entry;
-    if (!root || !source_name || !display_name || action < 1 || action > 27)
+    if (!root || !source_name || !display_name || action < 1 || action > 29)
         return FALSE;
     entry = root->sub;
     while (entry)
@@ -352,15 +353,17 @@ U0 BootstrapGuiTerminalMenuInstall()
     CMenu *menu = MenuNew("File { Files(); Disk(); }");
     BootstrapGuiTerminalMenuAppendRoot(menu, MenuNew("Windows { Demo(); TileHorz(); TileVert(); TileGrid(); }"));
     BootstrapGuiTerminalMenuAppendRoot(menu, MenuNew("Apps { LatticePlay(); StockPlay(); PaintDemo(); NetOfDots(); Lines(); Doodle(); MassSpring(); Life(); Logic(); Budget(); Titanium(); }"));
+    BootstrapGuiTerminalMenuAppendRoot(menu, MenuNew("Games { Maze(); CharDemo(); }"));
     BootstrapGuiTerminalMenuAppendRoot(menu, MenuNew("View { ViewAngles(); ZoomIn(); ZoomOut(); ResetView(); PanLeft(); PanRight(); PanUp(); PanDown(); }"));
     BootstrapGuiTerminalMenuAppendRoot(menu, MenuNew("OS { Help(); Status(); }"));
     CMenuEntry *file = BootstrapGuiTerminalMenuRoot(menu, "File");
     CMenuEntry *windows = BootstrapGuiTerminalMenuRoot(menu, "Windows");
     CMenuEntry *apps = BootstrapGuiTerminalMenuRoot(menu, "Apps");
+    CMenuEntry *games = BootstrapGuiTerminalMenuRoot(menu, "Games");
     CMenuEntry *view = BootstrapGuiTerminalMenuRoot(menu, "View");
     CMenuEntry *os = BootstrapGuiTerminalMenuRoot(menu, "OS");
 
-    if (!file || !windows || !apps || !view || !os)
+    if (!file || !windows || !apps || !games || !view || !os)
         throw('Menu');
     if (!BootstrapGuiTerminalMenuBindLeaf(file, "Files", "Files", 3) ||
         !BootstrapGuiTerminalMenuBindLeaf(file, "Disk", "Disk", 4) ||
@@ -379,6 +382,8 @@ U0 BootstrapGuiTerminalMenuInstall()
         !BootstrapGuiTerminalMenuBindLeaf(apps, "Logic", "Digital Logic", 25) ||
         !BootstrapGuiTerminalMenuBindLeaf(apps, "Budget", "Budget", 26) ||
         !BootstrapGuiTerminalMenuBindLeaf(apps, "Titanium", "Titanium", 27) ||
+        !BootstrapGuiTerminalMenuBindLeaf(games, "Maze", "Maze", 28) ||
+        !BootstrapGuiTerminalMenuBindLeaf(games, "CharDemo", "Character Demo", 29) ||
         !BootstrapGuiTerminalMenuBindLeaf(view, "ViewAngles", "View Angles", 11) ||
         !BootstrapGuiTerminalMenuBindLeaf(view, "ZoomIn", "Zoom In", 12) ||
         !BootstrapGuiTerminalMenuBindLeaf(view, "ZoomOut", "Zoom Out", 13) ||
@@ -480,6 +485,45 @@ U0 BootstrapGuiTerminalGameTask(U8 *filename)
     SettingsPop;
 }
 
+U0 BootstrapGuiTerminalDocTask(U8 *filename)
+{//Run a DolDoc program in a visible task so its document output is presented.
+    CDoc *doc = DocRead(filename);
+
+    Fs->win_inhibit = WIG_USER_TASK_DEFAULT;
+    BootstrapGuiTerminalUserStartUp();
+    if (!LBts(&Fs->display_flags, DISPLAYf_SHOW))
+        Debug;
+    if (!doc)
+        return;
+    try
+    {
+        ExeDoc(doc);
+        KeyGet;
+    }
+    catch
+        PutExcept;
+    DocDel(doc);
+}
+
+U0 BootstrapGuiTerminalRunDocProgram(U8 *filename)
+{//Show a finite DolDoc demo in a normal focused application window.
+    CTask *app_task;
+
+    app_task = Spawn(&BootstrapGuiTerminalDocTask, filename, "SpriteText", -1,
+                     bootstrap_gui_terminal_task);
+    if (!TaskValidate(app_task))
+        return;
+    app_task->display_flags = 1 << DISPLAYf_SHOW;
+    app_task->border_attr = CYAN;
+    app_task->win_left = 4;
+    app_task->win_right = 70;
+    app_task->win_top = 4;
+    app_task->win_bottom = 34;
+    WinDerivedValsUpdate(app_task);
+    ZcFocusTrace("GuiTerminalDocLaunch", sys_focus_task, app_task);
+    sys_focus_task = app_task;
+}
+
 U0 BootstrapGuiTerminalRunLightProgram(U8 *filename)
 {//These original programs use black ink against ZealOS's light task surface.
     CTask *app_task;
@@ -489,17 +533,66 @@ U0 BootstrapGuiTerminalRunLightProgram(U8 *filename)
     // MessageGet/KeyGet wait loops do not hold the GUI terminal's WinMgr frame.
     if (!StrCompare(filename, "/Apps/Titanium/Run.ZC") ||
         !StrCompare(filename, "/Apps/X-Caliber/Run.ZC") ||
+        !StrCompare(filename, "/Demo/Graphics/Symmetry.ZC") ||
+        !StrCompare(filename, "/Demo/Graphics/Pick.ZC") ||
+        !StrCompare(filename, "/Demo/Graphics/CommonAncestor.ZC") ||
         !StrCompare(filename, "/Demo/Graphics/Pick3D.ZC") ||
-        !StrCompare(filename, "/Demo/Games/CircleTrace.ZC"))
+        !StrCompare(filename, "/Demo/Games/CircleTrace.ZC") ||
+        !StrCompare(filename, "/Demo/Games/TreeCheckers.ZC") ||
+        !StrCompare(filename, "/Demo/Games/BomberGolf.ZC") ||
+        !StrCompare(filename, "/Demo/Games/CastleFrankenstein.ZC") ||
+        !StrCompare(filename, "/Demo/Games/DunGen.ZC") ||
+        !StrCompare(filename, "/Demo/Games/FlatTops.ZC") ||
+        !StrCompare(filename, "/Demo/Games/Squirt.ZC") ||
+        !StrCompare(filename, "/Demo/Games/RawHide.ZC") ||
+        !StrCompare(filename, "/Demo/Games/Varoom.ZC") ||
+        !StrCompare(filename, "/Demo/Games/Stadium/Stadium.ZC") ||
+        !StrCompare(filename, "/Demo/Games/Talons.ZC") ||
+        !StrCompare(filename, "/Demo/Games/Wenceslas.ZC") ||
+        !StrCompare(filename, "/Demo/Games/Maze.ZC") ||
+        !StrCompare(filename, "/Demo/Games/CharDemo.ZC"))
     {
         title = "X-Caliber";
         if (!StrCompare(filename, "/Apps/Titanium/Run.ZC"))
             title = "Titanium";
+        else if (!StrCompare(filename, "/Demo/Graphics/Symmetry.ZC"))
+            title = "Symmetry";
+        else if (!StrCompare(filename, "/Demo/Graphics/Pick.ZC"))
+            title = "Pick";
+        else if (!StrCompare(filename, "/Demo/Graphics/CommonAncestor.ZC"))
+            title = "CommonAncestor";
         else if (!StrCompare(filename, "/Demo/Graphics/Pick3D.ZC"))
             title = "Pick3D";
         else if (!StrCompare(filename, "/Demo/Games/CircleTrace.ZC"))
             title = "CircleTrace";
-        app_task = Spawn(&BootstrapGuiTerminalGameTask, filename, title, -1, Fs);
+        else if (!StrCompare(filename, "/Demo/Games/TreeCheckers.ZC"))
+            title = "TreeCheckers";
+        else if (!StrCompare(filename, "/Demo/Games/BomberGolf.ZC"))
+            title = "BomberGolf";
+        else if (!StrCompare(filename, "/Demo/Games/CastleFrankenstein.ZC"))
+            title = "CastleFrankenstein";
+        else if (!StrCompare(filename, "/Demo/Games/DunGen.ZC"))
+            title = "DunGen";
+        else if (!StrCompare(filename, "/Demo/Games/FlatTops.ZC"))
+            title = "FlatTops";
+        else if (!StrCompare(filename, "/Demo/Games/Squirt.ZC"))
+            title = "Squirt";
+        else if (!StrCompare(filename, "/Demo/Games/RawHide.ZC"))
+            title = "RawHide";
+        else if (!StrCompare(filename, "/Demo/Games/Varoom.ZC"))
+            title = "Varoom";
+        else if (!StrCompare(filename, "/Demo/Games/Stadium/Stadium.ZC"))
+            title = "Stadium";
+        else if (!StrCompare(filename, "/Demo/Games/Talons.ZC"))
+            title = "Talons";
+        else if (!StrCompare(filename, "/Demo/Games/Wenceslas.ZC"))
+            title = "Wenceslas";
+        else if (!StrCompare(filename, "/Demo/Games/Maze.ZC"))
+            title = "Maze";
+        else if (!StrCompare(filename, "/Demo/Games/CharDemo.ZC"))
+            title = "CharDemo";
+        app_task = Spawn(&BootstrapGuiTerminalGameTask, filename, title, -1,
+                         bootstrap_gui_terminal_task);
         if (!TaskValidate(app_task))
             return;
         app_task->display_flags = 1 << DISPLAYf_SHOW;
@@ -541,12 +634,21 @@ U8 *BootstrapGuiTerminalMenuSource(I64 action)
         return "BootstrapGuiTerminalRunLightProgram(\"/Apps/Budget/Run.ZC\");";
     if (action == 27)
         return "BootstrapGuiTerminalTitaniumRun();";
+    if (action == 28)
+        return "BootstrapGuiTerminalRunLightProgram(\"/Demo/Games/Maze.ZC\");";
+    if (action == 29)
+        return "BootstrapGuiTerminalRunLightProgram(\"/Demo/Games/CharDemo.ZC\");";
     return NULL;
 }
 
 U0 BootstrapGuiTerminalTitaniumRun()
 {//Keep the menu action and command-line acceptance path identical.
     BootstrapGuiTerminalRunLightProgram("/Apps/Titanium/Run.ZC");
+}
+
+U0 BootstrapGuiTerminalSymmetryRun()
+{//Run the blocking symmetry demo on its own focused task.
+    BootstrapGuiTerminalRunLightProgram("/Demo/Graphics/Symmetry.ZC");
 }
 
 U0 BootstrapGuiTerminalXCaliberRun()
@@ -855,7 +957,12 @@ U8 *BootstrapGuiTerminalReadLine2(Bool continuation)
                 bootstrap_gui_terminal_key_events++;
                 bootstrap_gui_terminal_last_key_char = ch;
                 bootstrap_gui_terminal_last_scan = sc.u8[0];
-                if (ch == '\r' || ch == '\n')
+                if ((sc & SCF_ALT) && BootstrapGuiTerminalKeyDevPutKey(ch, sc))
+                {
+                    // Preserve the normal ZealOS keyboard-device hook before
+                    // falling back to the graphical command-line editor.
+                }
+                else if (ch == '\r' || ch == '\n')
                 {
                     BootstrapGuiTerminalDocBottom(DocPut);
                     DocPutKey(DocPut, ch, sc);
@@ -991,6 +1098,16 @@ U8 *BootstrapGuiTerminalReadLine(Bool continuation)
     return result;
 }
 
+extern U0 ZcUserTerminalAttach(U8 *(*reader)(Bool), U0 (*writer)(U8 *, CTask *));
+U0 BootstrapGuiTerminalAttachUser()
+{//HomeSys may supply its own UserStartUp. Attach the ARM64 input bridge
+ //after that hook has created a document, without replacing custom readers.
+    if (!DocPut)
+        return;
+    BootstrapGuiTerminalRegister;
+    ZcUserTerminalAttach(&BootstrapGuiTerminalReadLine, &BootstrapGuiTerminalPrintOutput);
+}
+
 U8 *BootstrapGuiTerminalGetStr2(I64 flags=0)
 {//MakeDoc installs DocGetStr2 once the real document/key services exist.
     if (!IsRaw && DocPut)
@@ -1057,7 +1174,7 @@ U0 BootstrapGuiTerminalTileHomeWindows(CTask *first, CTask *second)
 
 public I64 BootstrapGuiTerminalExeDocFile(U8 *filename, I64 ccf_flags=0)
 {//Execute a source file as DolDoc so inline binary entries remain available.
-    CDoc *doc = DocRead(filename);
+    CDoc *doc = DocRead(filename, DOCF_DBL_DOLLARS);
     I64 result = 0;
     if (!doc)
         return 0;
@@ -1075,6 +1192,7 @@ public I64 BootstrapGuiTerminalExeDocFile(U8 *filename, I64 ccf_flags=0)
 
 I64 BootstrapGuiTerminalHomeStart()
 {//Run the supported first-terminal portion of HomeSys after the shell exists.
+    CTask *initial, *chosen;
     if (bootstrap_gui_terminal_home_started)
         return 0x2a;
 
@@ -1083,6 +1201,28 @@ I64 BootstrapGuiTerminalHomeStart()
     // dependent commands there instead of issuing them from the C boot stack.
     // The DVD Once overlay opens a live session and explains that installation
     // is not yet supported on ARM64.
+    if (ZcSourceHasOverride("/Home/HomeSys.ZC"))
+    {
+        initial = bootstrap_gui_terminal_task;
+        if (ZcSourceHasOverride("/System/WallPaper.ZC"))
+            SysFile("/System/WallPaper.ZC", FALSE);
+        SysFile("/Home/HomeSys.ZC", FALSE);
+        // A custom HomeSys can create its own user task. Retire the bootstrap
+        // shell only if startup selected another registered live terminal.
+        chosen = sys_focus_task;
+        if (chosen != initial && TaskValidate(chosen) &&
+            BootstrapGuiTerminalState(chosen))
+        {
+            bootstrap_gui_terminal_task = chosen;
+            if (TaskValidate(initial)) Kill(initial);
+        }
+        LBts(&sys_run_level, RLf_HOME);
+        bootstrap_gui_terminal_home_started = TRUE;
+        return 0x2a;
+    }
+    if (ZcSourceHasOverride("/System/WallPaper.ZC"))
+        XTalk(bootstrap_gui_terminal_task,
+              "SysFile(\"/System/WallPaper.ZC\",FALSE);\n");
     if (BootstrapHomeStartUpTasks() != 0x2a)
         return 1;
     LBts(&sys_run_level, RLf_HOME);
@@ -1581,7 +1721,9 @@ I64 BootstrapGuiTerminalSmoke()
         root = root->next;
         if (!root || StrCompare(root->name, "Apps") || !root->dir) return 70;
         root = root->next;
-        if (!root || StrCompare(root->name, "View") || !root->dir) return 71;
+        if (!root || StrCompare(root->name, "Games") || !root->dir) return 71;
+        root = root->next;
+        if (!root || StrCompare(root->name, "View") || !root->dir) return 76;
         root = root->next;
         if (!root || StrCompare(root->name, "OS") || !root->dir || root->next)
             return 72;
@@ -1602,6 +1744,8 @@ I64 BootstrapGuiTerminalSmoke()
             !BootstrapGuiTerminalMenuActionValid(menu, "Apps", "Digital Logic", 25) ||
             !BootstrapGuiTerminalMenuActionValid(menu, "Apps", "Budget", 26) ||
             !BootstrapGuiTerminalMenuActionValid(menu, "Apps", "Titanium", 27) ||
+            !BootstrapGuiTerminalMenuActionValid(menu, "Games", "Maze", 28) ||
+            !BootstrapGuiTerminalMenuActionValid(menu, "Games", "Character Demo", 29) ||
             !BootstrapGuiTerminalMenuActionValid(menu, "View", "View Angles", 11) ||
             !BootstrapGuiTerminalMenuActionValid(menu, "View", "Zoom In", 12) ||
             !BootstrapGuiTerminalMenuActionValid(menu, "View", "Zoom Out", 13) ||

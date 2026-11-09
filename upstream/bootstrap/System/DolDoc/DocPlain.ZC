@@ -1,6 +1,64 @@
 // ARM64 bootstrap overlay: export Doc2PlainText for separately loaded DocFile.ZC.
 #help_index "DolDoc"
 
+extern U8 *ZcLexDefineText(U8 *name);
+
+I64 DocActionExp(CCompCtrl *cc)
+{//DolDoc action values commonly name signed integer defines such as DOCM_CANCEL.
+	I64			 neg = 1, depth, res;
+	U8			*value, *end, *scan, *close = NULL;
+
+	if (cc->token == TK_IDENT && (value = ZcLexDefineText(cc->cur_str)))
+	{
+		while (*value == CH_SPACE || *value == '\t' || *value == '\r' || *value == '\n')
+			value++;
+		while (*value == '(')
+		{
+			depth = 0;
+			close = NULL;
+			for (scan = value; *scan; scan++)
+			{
+				if (*scan == '(')
+					depth++;
+				else if (*scan == ')' && --depth == 0)
+				{
+					close = scan;
+					break;
+				}
+			}
+			if (!close)
+				break;
+			scan = close + 1;
+			while (*scan == CH_SPACE || *scan == '\t' || *scan == '\r' || *scan == '\n')
+				scan++;
+			if (*scan)
+				break;
+			value++;
+			while (*value == CH_SPACE || *value == '\t' || *value == '\r' || *value == '\n')
+				value++;
+		}
+		if (*value == '-')
+		{
+			neg = -1;
+			value++;
+		}
+		else if (*value == '+')
+			value++;
+		if ('0' <= *value <= '9')
+		{
+			res = Str2I64(value, 10, &end);
+			while (*end == CH_SPACE || *end == '\t' || *end == '\r' || *end == '\n')
+				end++;
+			if (!*end || (close && end == close))
+			{
+				Lex(cc);
+				return res * neg;
+			}
+		}
+	}
+	return LexExpressionI64(cc);
+}
+
 I64 ParseDocFlagSingle(CCompCtrl *cc, I64 *_de_flags, U32 *_type, Bool turn_on)
 {
 	I64				 res = -1;
@@ -472,7 +530,7 @@ CDocEntry *ParseDollarCmd(CDoc *doc, U8 *st)
 
 					case DOCEf_LEFT_EXP:
 						if (cc->token)
-							doc_e->left_exp = LexExpression(cc);
+							doc_e->left_exp = DocActionExp(cc);
 						else
 							goto pd_err;
 						break;
@@ -492,7 +550,7 @@ CDocEntry *ParseDollarCmd(CDoc *doc, U8 *st)
 
 					case DOCEf_RIGHT_EXP:
 						if (cc->token)
-							doc_e->right_exp = LexExpression(cc);
+							doc_e->right_exp = DocActionExp(cc);
 						else
 							goto pd_err;
 						break;

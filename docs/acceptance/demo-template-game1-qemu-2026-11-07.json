@@ -1,0 +1,27 @@
+{
+  "date": "2026-11-07",
+  "command": "python3 scripts/check-compat.py --probe-demo-template-game1",
+  "target": "AArch64 QEMU virt, PCI graphical terminal with serial command probe",
+  "result": "pass",
+  "programs": [
+    {
+      "program": "/Demo/Templates/Game1.ZC",
+      "source_sha256": "b0531fb1469e92021afdbfb7e9f10d9004d62a99c97aace48117793881cb772b"
+    }
+  ],
+  "verified": [
+    "The template launches through the graphical terminal without an unresolved runtime call.",
+    "Its Song and Animate background tasks are present while the game loop is active.",
+    "Escape exits the loop and removes both background tasks.",
+    "The terminal remains usable after exit: 40+2 returns 42 and zstatus reports failed=0."
+  ],
+  "not_verified": [
+    "The source is a gameplay scaffold with empty Init, CleanUp, and DrawIt hooks; this does not claim a finished game.",
+    "Audible output on physical hardware and live UTM behavior."
+  ],
+  "kernel_sha256": "478278fd9961c701a069ec91b9d2ef748fb81a2681be7aa767e7a5dbd80f62ca",
+  "iso_sha256": "24ddfb4ef105c425116afafeca460a75fb651a5e82da6859c7b8333e9330ae0b",
+  "log_sha256": "3fc73068f24c85d62def7cbc7313afff7e8eb19f797fafef94bc46b9e55f3f61",
+  "log": "build/check-demo-template-game1-pci.log",
+  "scope_note": "Runtime acceptance covers the ARM64 execution scaffold and cleanup path; Game1 remains a template, not a completed game."
+}

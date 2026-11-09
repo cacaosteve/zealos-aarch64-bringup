@@ -1,0 +1,9 @@
+// Compile-context storage for KernelC.HH's eager SpriteRaster source load.
+// The production TaskBridge.ZC owns the real framebuffer-backed CDC; this
+// fixture only supplies its declaration while probing compiler sources.
+CDC bootstrap_graphics_dc;
+
+// KernelB.HH cannot be loaded by the AArch64 CCF_JUST_LOAD probe because its
+// x86-only _intern declarations are not part of this compiler-source check.
+// Compiler/Lex.ZC reads only blkdev.tmp_filename from this global.
+CBlkDevGlobals blkdev;

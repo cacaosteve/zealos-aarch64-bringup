@@ -1,0 +1,4 @@
+// The upstream Compiler.PRJ defines this project global between the compiler
+// headers and CInit.ZC. Load this fixture to reproduce that symbol context when
+// compiling compiler sources independently in the booted ZealC namespace.
+CCompGlobals cmp;

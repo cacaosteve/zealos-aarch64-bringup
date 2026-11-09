@@ -1,0 +1,23 @@
+{
+  "date": "2026-11-08",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "working_tree_changes_included": true,
+  "command": "python3 scripts/check-compat.py --pci --quick --probe-demo-system-context --demo-system-module /Tests/WebLogScrambleAccept.ZC --demo-system-module /Demo/WebLogDemo/WebLogScramble.ZC",
+  "target": "AArch64 QEMU virt, one vCPU, booted ZealC kernel/system namespace",
+  "result": "accepted",
+  "program": "/Demo/WebLogDemo/WebLogScramble.ZC",
+  "source_path": "upstream/pinned/Demo/WebLogDemo/WebLogScramble.ZC",
+  "source_sha256": "8cb79d4a5c773fa02571c3b8b477d80fb41baca9dd5c608a680a91018f9d8715",
+  "test_shim": "tests/compat/WebLogScrambleAccept.ZC",
+  "test_shim_sha256": "4789baed82ba5226bcb3eab8a7c20dd39e10684349c85818b5e59ee01fb50b0a",
+  "kernel_sha256": "4bfeab8f4e8e60962823e2360364231dc13f4ec7187264a8e642864c0113d1fd",
+  "iso_sha256": "fd42cae1f7bc340e6bf71e3e2fce41c8c32894d62bdb45f745ea580f5ccdc447",
+  "verified": [
+    "The unchanged WebLogScramble module loaded in the guest; a test-only AreYouSure shim declined the stock module's automatic whole-directory demo action.",
+    "The stock WebLogScramble function found one isolated fixture log and printed its Scrambling message.",
+    "The guest saved non-empty output, and the original fixture IP address was absent from the saved bytes."
+  ],
+  "log_sha256": "bad87d40baefbebf3db12d6df3a2aaec0df18ec5100fe8cf54f1ae41fdc5a246",
+  "log": "build/demo-weblog-scramble-qemu-2026-11-08.log",
+  "scope_note": "QEMU runtime evidence only; tests one disposable log path. It does not validate batch processing across multiple log files or live UTM/Pi hardware behavior."
+}

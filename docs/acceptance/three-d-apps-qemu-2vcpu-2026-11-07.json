@@ -1,0 +1,32 @@
+{
+  "date": "2026-11-07",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "working_tree_changes_included": true,
+  "kernel_sha256": "9c266698222e7b3f9cd188e6cd484ba02cdd9159fb3ed9bd01226df8e5fbea14",
+  "iso_sha256": "a9d1be0fec0e509f1c8694531f42ebdaf40d6f1e113574f60bf81d7d905a9af1",
+  "command": "QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -smp 2 -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device' python3 scripts/check-compat.py --pci --probe-3d-apps --probe-keepaway-full-game",
+  "qemu_profile": "QEMU virt with HVF, 2 vCPUs, 1 GiB RAM, PCI enabled, ramfb, VirtIO keyboard and tablet",
+  "exit_code": 0,
+  "scope": "Fresh automated QEMU acceptance against the current worktree ISO. Checks GrModels Man and Ball generation, KeepAway full-game/input/Escape recovery, Titanium input/Escape recovery, terminal and source/runtime regressions. This is not UTM or Pi hardware acceptance.",
+  "checks": {
+    "GrModels": {
+      "Man": "pass: form accepted; 112 vertices and 168 triangles; raster writes verified; repeat prompt and terminal recovery passed",
+      "Ball": "pass: form accepted; 58 vertices and 128 triangles; inline sprite pixels verified; repeat prompt and terminal recovery passed"
+    },
+    "KeepAway": {
+      "gameplay": "pass: court, HUD, and player rendered; Space/mouse input checks passed",
+      "long_run": "pass: full 187-second game probe completed; scanout changed at completion; Escape returned to a working graphical terminal; no Animate child task remained",
+      "terminal_recovery": "pass: graphical terminal recovered and 40+2 returned 42"
+    },
+    "Titanium": {
+      "gameplay": "pass: intro and gameplay frame rendered; left/right/Space input and Escape recovery passed; 40+2 returned 42"
+    },
+    "system_and_gui_regressions": "pass: system server/launch, task settings, source context, file execution, compiler recovery, graphical terminal key/history input, and window-demo launch/stop checks passed",
+    "final_status": "All emitted checks passed; failed=0"
+  },
+  "live_utm": {
+    "GrModels": "User confirmed Man/Ball forms and generation in UTM; inline Ball sprite is confirmed in QEMU",
+    "KeepAway": "Still open: user previously reported a full input/display freeze in UTM. The two-vCPU QEMU run did not reproduce it, but does not resolve the UTM-specific report",
+    "Titanium": "User confirmed plain Left/Right, Space, and Escape work in UTM"
+  }
+}

@@ -1,0 +1,63 @@
+// QEMU VirtIO sound playback smoke probe.
+// Run only with virtio-sound-pci attached; the host WAV backend captures output.
+extern U0 Sound(I8 ona);
+extern U0 Beep(I8 ona, Bool busy);
+extern U0 Play(U8 *music, U8 *words=NULL);
+extern U0 MusicSettingsReset();
+extern U0 Sleep(I64 mS);
+
+I64 VirtioSoundProbe()
+{
+    Sound(60);
+    Sleep(250);
+    Sound(0);
+    Sleep(50);
+    return 40 + 2;
+}
+
+I64 VirtioBeepProbe()
+{
+    Beep(70, FALSE);
+    Sleep(1000);
+    return 40 + 2;
+}
+
+I64 VirtioBusyBeepProbe()
+{
+    Beep(70, TRUE);
+    return 40 + 2;
+}
+
+I64 VirtioLongToneProbe()
+{
+    Sound(60);
+    Sleep(1600);
+    Sound(0);
+    Sleep(1000);
+    return 40 + 2;
+}
+
+I64 VirtioLongSleepProbe()
+{
+    Sleep(1600);
+    return 40 + 2;
+}
+
+I64 VirtioPlayProbe()
+{
+    MusicSettingsReset();
+    // A whole note at the default tempo is 1.6 s, with 1.44 s of tone.
+    Play("4wC");
+    Sleep(1000);
+    return 40 + 2;
+}
+
+I64 VirtioSoundSuiteProbe()
+{
+    VirtioSoundProbe();
+    VirtioBeepProbe();
+    VirtioBusyBeepProbe();
+    VirtioLongToneProbe();
+    VirtioPlayProbe();
+    return 40 + 2;
+}

@@ -1,0 +1,19 @@
+{
+  "date": "2026-11-08",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "working_tree_changes_included": true,
+  "command": "QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -smp 2 -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device' python3 scripts/check-compat.py --quick --probe-source-fast --probe-source upstream/pinned/Demo/MultiCore/MPRadix.ZC",
+  "target": "AArch64 QEMU virt requested with two vCPUs, PCI graphical terminal",
+  "result": "partial",
+  "source_path": "upstream/pinned/Demo/MultiCore/MPRadix.ZC",
+  "source_sha256": "bc57b0eee6e4c19158b8dc30ea6d195ffe967a392292c97768d914a989522f8e",
+  "kernel_sha256": "4bfeab8f4e8e60962823e2360364231dc13f4ec7187264a8e642864c0113d1fd",
+  "iso_sha256": "8f007016b0b82cd376c61e1906ea80d0bea1a9890d7a89268322fc40ffff50fc",
+  "observed": [
+    "The one-vCPU sort paths completed and printed sorted sample data.",
+    "The multicore path threw the expected MultCore exception despite QEMU being launched with -smp 2.",
+    "The current guest runtime binds mp_count to a constant value of 1, so its reported processor count does not reflect the QEMU vCPU count."
+  ],
+  "remaining": "Enable and verify multiple guest CPUs before claiming the parallel radix-sort path works. The check-compat source probe currently reports compile success even after a guest exception, so this probe is recorded as partial, not pass.",
+  "scope_note": "This demonstrates a current SMP runtime limitation; it is not evidence that the MPRadix implementation itself is incorrect."
+}

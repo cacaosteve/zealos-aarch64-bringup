@@ -19,7 +19,7 @@ U0 Main()
         coordinates[i] = RandU32;
 
     start = TSCGet;
-    for (i = SAMPLE_SIZE - 1; i >= 0; i++)
+    for (i = SAMPLE_SIZE - 1; i >= 0; i--)
     {
     }
     end = TSCGet;

@@ -1,0 +1,26 @@
+{
+  "date": "2026-11-03",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "target": "AArch64 QEMU virt, PCI, graphical terminal",
+  "command": "python3 -m py_compile scripts/check-compat.py && python3 scripts/check-compat.py --pci --probe-demo-graphics-render",
+  "source_path": "/Demo/Graphics/SunMoon.ZC",
+  "source_sha256": "9ee6e919358d69b21625409549c33545d2795f5fea56cc8899af9382694e7426",
+  "result": "pass",
+  "checks": [
+    "SunMoon visibly rendered the sun and moon into the graphical terminal, changing 262,835 scanout pixels",
+    "The finite animation completed and the graphical terminal evaluated 40+2 as 42",
+    "The guest remained healthy with zstatus failed=0"
+  ],
+  "artifacts": {
+    "build/zealos-aarch64-hello.iso": "eb3a1db2e684287cf39ff03a04c23287ac9da4d0f9358a02df2234ee50ae1fd4",
+    "build/disk.img": "5c3e4d6aa61f1ffb4e3174dc4e5bce82598c65df18421b322ef96122c1acfc0e",
+    "build/sources.tar": "b89426e6ae2dad802ac5e1aa8239bbbb78d502b6695bbba8e008123f0ed2f7d9",
+    "scripts/check-compat.py": "b6e4f162b9d8e633e56d56b2bcec05e637994a9ca08622eb7f12894130b978ac"
+  },
+  "screenshots": [
+    "build/gui-demo-graphics-render-demo-sunmoon-ready.ppm",
+    "build/gui-demo-graphics-render-demo-sunmoon-active.ppm",
+    "build/gui-demo-graphics-render-demo-sunmoon-terminal-recovery-result.ppm"
+  ],
+  "scope_note": "QEMU runtime acceptance only; live UTM or Pi hardware acceptance is not implied."
+}

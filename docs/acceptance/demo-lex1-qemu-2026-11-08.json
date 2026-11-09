@@ -1,0 +1,21 @@
+{
+  "date": "2026-11-08",
+  "source_commit": "b0c793e7f65f43473f952f6a650203c235cabb1c",
+  "working_tree_changes_included": true,
+  "command": "QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device' python3 scripts/check-compat.py --quick --probe-demo-system-context --demo-system-module /Demo/Templates/Lex1.ZC --demo-system-path /Demo/Templates/Lex1.ZC",
+  "target": "AArch64 QEMU virt, one vCPU, booted ZealC kernel/system namespace",
+  "result": "accepted",
+  "program": "/Demo/Templates/Lex1.ZC",
+  "source_path": "upstream/pinned/Demo/Templates/Lex1.ZC",
+  "source_sha256": "984416542e2ccd583e9099550b1d7173216403ccae9385b4d4fdc652d90e20ca",
+  "kernel_sha256": "4bfeab8f4e8e60962823e2360364231dc13f4ec7187264a8e642864c0113d1fd",
+  "iso_sha256": "fd42cae1f7bc340e6bf71e3e2fce41c8c32894d62bdb45f745ea580f5ccdc447",
+  "verified": [
+    "The pinned Lex1 module loaded and compiled in the booted ZealC kernel/system namespace.",
+    "MyRead executed and emitted the expected lexer tokens for its generated #include directive and filename: IDENT:include and STR:/Demo/Templates/Lex1.ZC.",
+    "The guest returned to its command prompt without a runtime failure."
+  ],
+  "log_sha256": "2cbaa6fdd8eaf4e69de9e4677a172f0586c39f143f301774b6aae3b25a0b1e94",
+  "log": "build/demo-lex1-qemu-2026-11-08.log",
+  "scope_note": "QEMU runtime evidence only. The MyRead source constructs and lexes an include directive; this check does not claim recursive include expansion or validate Lex1 as a standalone menu application."
+}
