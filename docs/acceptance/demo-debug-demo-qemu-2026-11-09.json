@@ -1,0 +1,11 @@
+{
+  "date": "2026-11-09",
+  "target": "AArch64 PCI QEMU, graphical terminal and VirtIO keyboard",
+  "source_path": "/Demo/DebugDemo.ZC",
+  "source_sha256": "e5d460ebe73709a1f3fae3b49f3b56016d7bb2a82c8a9997ea49dcf21f3c5c48",
+  "tested_commit": "dfea684b51a6e71f9675468de264885825662f9a",
+  "command": "python3 scripts/check-compat.py --pci --quick --probe-demo-debug",
+  "result": "fail",
+  "evidence": "A disposable PCI QEMU guest launched the bundled DebugDemo through XTalk. The original loop emitted a sustained stream of dots. The test drained serial output continuously for at least five seconds after observing the dots, then sent Ctrl-Alt-C through QMP. The guest continued emitting dots and did not respond to a subsequent serial command within 30 seconds. An earlier break sent after only three seconds returned control, but did not prove the loop had started and is not counted as a pass.",
+  "scope": "This demonstrates that the current input-polling path cannot reliably break this busy loop. It does not establish whether Ctrl-Alt-D debugger entry works, and does not validate live UTM or physical Pi behavior. No scheduler yield was added to MessageScan or to the original demo. An experimental print-boundary input poll was removed after a boot timeout; its cause was not established."
+}

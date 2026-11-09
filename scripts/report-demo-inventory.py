@@ -310,6 +310,8 @@ RUNTIME_PARTIAL = {
         "docs/acceptance/demo-unused-define-qemu-2026-11-08.json",
 }
 RUNTIME_FAILED = {
+    "/Demo/DebugDemo.ZC":
+        "docs/acceptance/demo-debug-demo-qemu-2026-11-09.json",
     "/Demo/StackGrow.ZC":
         "docs/acceptance/demo-stack-grow-qemu-2026-11-06.json",
 }

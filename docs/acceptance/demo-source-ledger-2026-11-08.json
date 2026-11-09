@@ -169,6 +169,7 @@
     "docs/acceptance/demo-tosmisc-qemu-2026-11-08.json",
     "docs/acceptance/demo-unused-define-qemu-2026-11-08.json",
     "docs/acceptance/demo-wallpaper-desktop-qemu-2026-11-08.json",
+    "docs/acceptance/demo-debug-demo-qemu-2026-11-09.json",
     "docs/acceptance/demo-stack-grow-qemu-2026-11-06.json"
   ],
   "source_count": 206,
@@ -177,7 +178,7 @@
   "compile_blocker_groups": [],
   "runtime_accepted": 196,
   "runtime_partial": 5,
-  "runtime_failed": 0,
+  "runtime_failed": 1,
   "directories": {
     ".": {
       "source_count": 34,
@@ -537,8 +538,8 @@
       "classification_confidence": "unclassified",
       "compile": "pass",
       "first_compile_error": null,
-      "runtime": "unverified",
-      "runtime_evidence": null
+      "runtime": "fail",
+      "runtime_evidence": "docs/acceptance/demo-debug-demo-qemu-2026-11-09.json"
     },
     {
       "path": "/Demo/Define.ZC",

@@ -372,6 +372,8 @@ p.add_argument('--probe-tothefront', action='store_true',
                help='exercise original ToTheFront setup, map, phase input and exit')
 p.add_argument('--probe-xcaliber', action='store_true',
                help='exercise original X-Caliber gameplay, controls, and Escape recovery')
+p.add_argument('--probe-demo-debug', action='store_true',
+               help='run the original busy-loop DebugDemo and verify Ctrl-Alt-C recovery')
 p.add_argument('--probe-titanium-only', action='store_true',
                help='run only Titanium compile and graphical input/gameplay checks')
 p.add_argument('--probe-stock-interactive', action='store_true',
@@ -511,6 +513,9 @@ if args.probe_titanium_only:
     args.probe_3d_apps = True
 if args.probe_keepaway_full_game:
     args.probe_3d_apps = True
+if args.probe_demo_debug:
+    args.pci = True
+    args.probe_user_startup = True
 if args.probe_demo_file_read:
     # Reuse the PCI graphical-terminal boot and compiler integration setup,
     # but take the isolated FileRead branch below instead of the full DolDoc
@@ -12154,6 +12159,37 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                                    f'{before_usage} -> {after_usage}')
             print('PASS original User startup text, XTalk ordering, long input, target compiler recovery and no-growth cleanup: '
                   f'{before_usage} -> {after_usage}', flush=True)
+            raise SystemExit(0)
+        if args.probe_demo_debug:
+            # Drain serial while the original busy loop runs so a full host
+            # pipe cannot masquerade as a guest input failure. Require its
+            # actual output before sending the documented break chord.
+            command('zc XTalk(bootstrap_gui_terminal_task,' +
+                    json.dumps('#include "/Demo/DebugDemo";\n') + ');',
+                    'zc: executed', timeout=30)
+            dots = 0
+            first_output = None
+            deadline = time.monotonic() + 120
+            while time.monotonic() < deadline:
+                if select.select([guest.stdout], [], [], .1)[0]:
+                    data = os.read(guest.stdout.fileno(), 65536)
+                    if not data:
+                        raise RuntimeError('guest exited during DebugDemo')
+                    dots += data.count(b'.')
+                    log.write(data)
+                    log.flush()
+                    if dots >= 8 and first_output is None:
+                        first_output = time.monotonic()
+                if first_output is not None and time.monotonic() - first_output >= 5:
+                    break
+            if dots < 8:
+                raise RuntimeError(f'DebugDemo did not visibly enter its loop: {dots} dots')
+            qmp_send_keys(['ctrl', 'alt', 'c'])
+            command('zc Print("debug_recovery=%d\\n",40+2);',
+                    'debug_recovery=42', timeout=30)
+            command('zstatus', 'failed=0', timeout=20)
+            print(f'PASS DebugDemo printed {dots} dots, Ctrl-Alt-C and terminal recovery',
+                  flush=True)
             raise SystemExit(0)
         if args.probe_user_startup:
             focus_graphical_terminal()
