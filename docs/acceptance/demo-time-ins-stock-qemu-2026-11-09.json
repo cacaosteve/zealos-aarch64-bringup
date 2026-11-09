@@ -1,0 +1,14 @@
+{
+  "date": "2026-11-09",
+  "target": "AArch64 PCI QEMU, native compiler",
+  "kernel_sha256": "860a2b119815f5406d4b3d1b527b29ed6ec498f240ff933e9748b75d9f639ec5",
+  "source_bundle_sha256": "884b7383b944e61fce2c81384629a20a73edad335f16fb2be52d54454dfcd6fe",
+  "source": "upstream/pinned/Demo/TimeIns.ZC",
+  "source_sha256": "a1bc618f384baff16e973717483308d08ec53d57f9db3f5f9aa2ca310e968ff6",
+  "command": "python3 scripts/check-compat.py --pci --probe-module /Demo/TimeIns.ZC --probe-module-override upstream/pinned/Demo/TimeIns.ZC",
+  "result": "failed compiling the stock source at line 23: Expected ':' after label candidate 'PassTrace'",
+  "meaning": "The native source loader did not recognize PassTrace in the compile-time block. Pinned Compiler/CMisc.ZC describes PassTrace as controlling optimizer pass diagnostics; a no-op would not reproduce that behavior.",
+  "log": "build/timeins-stock-native-qemu.log",
+  "log_sha256": "7977e40fb32c13e738345f7fa999c89e15be414e8ffda3a1da12ca3e8eb4c716",
+  "limits": "The probe stopped at the first compile error, so later compiler or runtime failures remain unknown. The existing bundled ARM64 adaptation has separate runtime acceptance; this does not validate stock optimizer trace output or physical hardware."
+}

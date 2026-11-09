@@ -1,0 +1,16 @@
+{
+  "date": "2026-11-09",
+  "target": "AArch64 PCI QEMU, one vCPU, native compiler",
+  "kernel_sha256": "860a2b119815f5406d4b3d1b527b29ed6ec498f240ff933e9748b75d9f639ec5",
+  "source_bundle_sha256": "884b7383b944e61fce2c81384629a20a73edad335f16fb2be52d54454dfcd6fe",
+  "probe": "tests/compat/ExeDirectiveLookahead.ZC",
+  "probe_sha256": "8ac78594ea708e7d6ec1528a1bc06e8868226a9d6b02c6362a60b6c3a336cd5d",
+  "command": "python3 scripts/check-compat.py --pci --probe-demo-definestr-xtalk --probe-exe-directive-lookahead",
+  "expected": "0x29 (41), inferred from pinned ZealOS source",
+  "observed": "0x29 (41): the nested directive incremented the value before the preceding if assignment overwrote it",
+  "basis": "Pinned ParseIf calls ParseStatement with its default semicolon processing, which calls Lex to look for else. Lex dispatches KW_EXE to ParseStreamBlk before LexStatement2Bin returns to ExeCmdLine to execute the if.",
+  "log": "build/exe-directive-lookahead-after.log",
+  "log_sha256": "b3e0492bdbc649d016cda185144d4dc5454e87f414812c19cf63a02c61673922",
+  "status": "QEMU passes source-inferred behavior; upstream x86 runtime comparison outstanding",
+  "limits": "This case checks execution order of a nested directive after an if; it does not establish behavior for already-expanded macro redefinition or other control-flow forms. Prior characterization as a confirmed bug was incorrect."
+}

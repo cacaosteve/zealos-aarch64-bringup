@@ -20,6 +20,14 @@ extern U0 DCTransform(CDC *dc, I64 *x, I64 *y, I64 *z);
 extern U0 DCLighting(CDC *dc, CD3I32 *p1, CD3I32 *p2, CD3I32 *p3,
                      CColorROPU32 color);
 extern F64 ZcEvalExpression(U8 *source);
+extern I64 ZcRawDiskSectors();
+extern I64 ZcRawDiskRead(U8 *dst, I64 sector, I64 count);
+extern I64 ZcRawRedSeaGeometry(U64 *base, U64 *sectors);
+// Explicitly mounted read-only legacy volume; 0x100 is an ARM64 extension,
+// not an assertion that the VirtIO device is an x86 ATA controller.
+#define BDT_ARM_VIRTIO 0x100
+CDrive zc_legacy_redsea_drive;
+CBlkDev zc_legacy_redsea_device;
 // Native AArch64 user-compiler hooks used by the ARM64 DocTree overlay.
 extern CCompCtrl *ZcUserCompCtrlNew(U8 *buf=NULL, I64 flags=0);
 extern U0 ZcUserCompCtrlDel(CCompCtrl *cc);
@@ -572,7 +580,9 @@ U8 *ExtDefault(U8 *filename, U8 *extension)
 }
 U8 Drive2Letter(CDrive *drive=NULL)
 {
-    if (drive) {}
+    if (drive == &zc_legacy_redsea_drive &&
+        drive->drive_signature == DRIVE_SIGNATURE_VAL)
+        return drive->drv_let;
     return 'C';
 }
 // KeyDev.ZC StdOut chain. RawPutChar is the text-console sink until DolDoc
@@ -2977,21 +2987,133 @@ Bool WinBorder(Bool val=OFF, CTask *task=NULL)
     if (task) {}
     return val;
 }
+Bool ZcMountLegacyRedSeaReadOnly()
+{//Explicit opt-in: do not alter the boot source store or current drive.
+    U64 base, sectors, recorded_base = 0, root = 0, bitmap = 0;
+    U8 *boot;
+    I64 i;
+    if (zc_legacy_redsea_drive.drive_signature == DRIVE_SIGNATURE_VAL)
+        return TRUE;
+    if (!ZcRawRedSeaGeometry(&base, &sectors))
+        return FALSE;
+    boot = CAlloc(512);
+    if (!boot)
+        return FALSE;
+    if (!ZcRawDiskRead(boot, base, 1))
+    {
+        Free(boot);
+        return FALSE;
+    }
+    for (i = 0; i < 8; i++)
+    {
+        recorded_base |= boot[8 + i](U64) << (i * 8);
+        root |= boot[24 + i](U64) << (i * 8);
+        bitmap |= boot[32 + i](U64) << (i * 8);
+    }
+    // The bootstrap formatter records a relative root, stock RedSea an
+    // absolute one. Geometry validation already checked the appropriate form.
+    if (!recorded_base)
+        root += base;
+    Free(boot);
+    MemSet(&zc_legacy_redsea_device, 0, sizeof(CBlkDev));
+    MemSet(&zc_legacy_redsea_drive, 0, sizeof(CDrive));
+    zc_legacy_redsea_device.bd_signature = BD_SIGNATURE_VAL;
+    zc_legacy_redsea_device.type = BDT_ARM_VIRTIO;
+    zc_legacy_redsea_device.flags = BDF_INITIALIZED | BDF_READ_ONLY;
+    zc_legacy_redsea_device.blk_size = BLK_SIZE;
+    zc_legacy_redsea_device.first_drive_let = 'D';
+    zc_legacy_redsea_device.max_blk = ZcRawDiskSectors - 1;
+    zc_legacy_redsea_drive.drive_signature = DRIVE_SIGNATURE_VAL;
+    zc_legacy_redsea_drive.drv_let = 'D';
+    zc_legacy_redsea_drive.fs_type = FSt_REDSEA;
+    zc_legacy_redsea_drive.drv_offset = base;
+    zc_legacy_redsea_drive.size = sectors;
+    zc_legacy_redsea_drive.root_clus = root;
+    zc_legacy_redsea_drive.spc = 1;
+    zc_legacy_redsea_drive.data_area = base + bitmap;
+    zc_legacy_redsea_drive.fat1 = base + 1;
+    zc_legacy_redsea_drive.fat2 = base + 1;
+    zc_legacy_redsea_drive.cur_fat_blk_num = -1;
+    zc_legacy_redsea_drive.bd = &zc_legacy_redsea_device;
+    return TRUE;
+}
+
+CDrive *Letter2Drive(U8 drv_let=0, Bool except=TRUE)
+{
+    if ((drv_let == 'D' || drv_let == 'd') &&
+        zc_legacy_redsea_drive.drive_signature == DRIVE_SIGNATURE_VAL)
+        return &zc_legacy_redsea_drive;
+    if (!drv_let && Fs->cur_dv == &zc_legacy_redsea_drive &&
+        zc_legacy_redsea_drive.drive_signature == DRIVE_SIGNATURE_VAL)
+        return &zc_legacy_redsea_drive;
+    if (except)
+        throw('Drive');
+    return NULL;
+}
+
+Bool BlkRead(CDrive *drive, U8 *buf, I64 blk, I64 count)
+{//Upstream uses absolute device LBAs within the drive's partition bounds.
+    if (count <= 0)
+        return TRUE;
+    if (drive != &zc_legacy_redsea_drive ||
+        drive->drive_signature != DRIVE_SIGNATURE_VAL || !buf ||
+        drive->drv_offset < 0 || drive->size < 0 || blk < drive->drv_offset ||
+        count > drive->size || blk - drive->drv_offset > drive->size - count)
+        throw('Drive');
+    return ZcRawDiskRead(buf, blk, count);
+}
+
+Bool RedSeaValidate(U8 drv_let)
+{//Same boot-signature check as Kernel/BlkDev/FileSysRedSea.ZC.
+    CDrive *drive = Letter2Drive(drv_let, FALSE);
+    CRedSeaBoot *boot;
+    Bool valid = FALSE;
+    if (!drive || drive->fs_type != FSt_REDSEA)
+        return FALSE;
+    boot = CAlloc(BLK_SIZE);
+    if (!boot)
+        return FALSE;
+    if (BlkRead(drive, boot(U8 *), drive->drv_offset, 1) &&
+        boot->signature == MBR_PT_REDSEA && boot->signature2 == 0xAA55)
+        valid = TRUE;
+    Free(boot);
+    return valid;
+}
+
 CBlkDev *DriveIsWritable(U8 drv_let=0, Bool except=FALSE)
 {
     if (drv_let) {}
-    if (except) {}
+    // No guest block-device objects are exposed yet. Match the upstream
+    // missing-drive contract until real device lookup is implemented.
+    if (except)
+        throw('Drive');
     return NULL;
 }
 CBlkDev *Letter2BlkDev(U8 drv_let=0, Bool except=TRUE)
 {
-    if (drv_let) {}
-    if (except) {}
+    CDrive *drive = Letter2Drive(drv_let, except);
+    if (drive)
+        return drive->bd;
     return NULL;
+}
+U0 DriveRep()
+{//Report only real drive objects currently registered by this bridge.
+    "\nDefined Drives:\n";
+    if (zc_legacy_redsea_drive.drive_signature == DRIVE_SIGNATURE_VAL)
+    {
+        "D RedSea    VirtIO (read-only)\n";
+        "   Offset: %016X  Offset + Size: %016X\n",
+            zc_legacy_redsea_drive.drv_offset,
+            zc_legacy_redsea_drive.drv_offset + zc_legacy_redsea_drive.size - 1;
+    }
 }
 U0 Unmount(U8 drv_let=0)
 {
-    if (drv_let) {}
+    if (drv_let == 'D' || drv_let == 'd')
+    {
+        MemSet(&zc_legacy_redsea_drive, 0, sizeof(CDrive));
+        MemSet(&zc_legacy_redsea_device, 0, sizeof(CBlkDev));
+    }
 }
 U0 DiskChange(U8 drv_let=0)
 {

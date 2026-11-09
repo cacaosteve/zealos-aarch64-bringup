@@ -13,6 +13,10 @@ typedef int (*zc_source_read_fn)(const char *name, char *dst, size_t cap, size_t
 void zc_set_source_reader(zc_source_read_fn read);
 typedef int (*zc_source_write_fn)(const char *name, const char *src, size_t length);
 void zc_set_source_writer(zc_source_write_fn write);
+/* Read-only complete PCI VirtIO block device; zero capacity means unavailable. */
+uint64_t zc_raw_disk_sectors(void);
+int zc_raw_disk_read(void *dst, uint64_t sector, uint64_t count);
+int zc_raw_redsea_geometry(uint64_t *base, uint64_t *sectors);
 /* Actual boot module media, from Limine (generic disk/optical/TFTP). */
 void zc_set_boot_media(uint32_t media_type);
 /* UTC boot epoch, or -1 when unavailable, paired with its counter sample. */

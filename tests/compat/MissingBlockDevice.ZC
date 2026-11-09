@@ -1,0 +1,17 @@
+// A nonexistent drive must not masquerade as a valid block-device pointer.
+I64 MissingBlockDeviceChecks()
+{
+    I64 caught = 0;
+    if (Letter2BlkDev('#', FALSE) || DriveIsWritable('#', FALSE))
+        return 1;
+    try { Letter2BlkDev('#', TRUE); }
+    catch { caught = Fs->except_ch; Fs->catch_except = TRUE; }
+    if (caught != 'Drive')
+        return 2;
+    caught = 0;
+    try { DriveIsWritable('#', TRUE); }
+    catch { caught = Fs->except_ch; Fs->catch_except = TRUE; }
+    if (caught != 'Drive')
+        return 3;
+    return 42;
+}

@@ -1,0 +1,33 @@
+{
+  "date": "2026-11-09",
+  "target": "AArch64 PCI QEMU, disposable VirtIO disk clones",
+  "kernel_sha256": "9a886d41ca0f4460c104ebe95fb9525b0a4391c98318f07d897c5706697354ba",
+  "source_bundle_sha256": "5adbe95ff7e01fb4a5a4c515b41827cf6caa8f66bf34e13b17311e2ff3dcb636",
+  "task_bridge_sha256": "869f4a0464a7dcc2f1dfdcf685fc020cbd9e09e0e3c27d34a2e1689a53b95ef6",
+  "probe_sha256": "6e8320a18fd0b6c372abeda4fd9fb566641dbd8e1f2e7d6c0e8840a9e7a40f8d",
+  "commands": [
+    "python3 scripts/check-compat.py --pci --probe-raw-redsea-geometry present",
+    "python3 scripts/check-compat.py --pci --probe-raw-redsea-geometry legacy",
+    "python3 scripts/check-compat.py --pci --probe-raw-redsea-geometry absent",
+    "python3 scripts/check-compat.py --pci --probe-missing-block-device"
+  ],
+  "result": "pass: explicit read-only D drive exposes validated stock and legacy geometry, partition reads, bounds checks, deliberate whole-device reads and unmount; unformatted and invalid drives remain unavailable",
+  "logs": {
+    "build/redsea-guest-drive-stock-final.log": "0dec12f1a05cfdaccee913a24b33019ef2e66221e632811a4913fe8bce8f4802",
+    "build/redsea-guest-drive-legacy.log": "aa8fb7d22705893db515d651e9d22087e058c2b7169462393086d74227787f5c",
+    "build/redsea-guest-drive-absent.log": "9e8e4b3c2340bc3d450d78352da4fe060c7e24b8b59d2ff68079b1f8aebf5afe",
+    "build/redsea-guest-drive-missing.log": "7fddd4661bf43a4086d1be63e967201682117ebcb9a343123c2e7b405b7a783c"
+  },
+  "validation_followup": {
+    "source_bundle_sha256": "65174a115220c201fe24c71db35ece340237e159c5b4419712fed85760be5460",
+    "task_bridge_sha256": "3545179ce7152e68a25c368ad831ad10960d2f1cebfe0ee4fdb24ba5952aa564",
+    "probe_sha256": "1219ed8ccdf463d0bf7ecc7eef67d11d35b578cb421e633c0b9d08d5eee4d3e7",
+    "result": "pass: bitmap geometry and RedSeaValidate match the formatted fixture; validation fails when unformatted and after unmount; original DiskRaw read and range restoration pass",
+    "logs": {
+      "build/redsea-validation-present.log": "0dec12f1a05cfdaccee913a24b33019ef2e66221e632811a4913fe8bce8f4802",
+      "build/redsea-validation-absent.log": "6832c6d070c8ab663032ca03735f7ec0a9ad3b4b482c9fc684b666728026aedc",
+      "build/redsea-validation-diskraw.log": "24b877fdd4590d4855d78835ad32ba91c14877f119ca284e7ba99b08da478157"
+    }
+  },
+  "limits": "This is explicitly mounted and read-only, uses an ARM-specific VirtIO device type and does not set the current drive. It is not integrated with stock drive registries, file operations, locks, cache, hotplug, writes, DiskRaw's full UI or installer workflows. The existing boot source store is separate. Pi builds compile but have no native Pi raw-disk backend in this interface, and neither Pi nor live UTM has been tested."
+}

@@ -1,0 +1,26 @@
+{
+  "date": "2026-11-09",
+  "target": "AArch64 PCI QEMU, disposable VirtIO disk clones",
+  "kernel_sha256": "c494c547b273b992943b7c2e6e9ef5d4986d3325ab753dd19575b19867924e24",
+  "source_bundle_sha256": "1235b13cf9d8316aff4c21302d3f0ccb9b2a1abd852570f27837b2b0eebdc5f2",
+  "probe_sha256": "e0bde362eb7f1a4b9a88d70e8a569a9202843fe30095079cbd9db54065a73717",
+  "command": "python3 scripts/check-compat.py --pci --probe-raw-redsea-geometry {absent,present,invalid} (three individual runs)",
+  "result": "pass: absent and out-of-bounds-root fixtures were rejected without modifying output variables; a legacy formatted fixture returned LBA 130911 and 128 sectors",
+  "logs": {
+    "build/raw-redsea-geometry-absent.log": "66d53d203b6fc102434ccf20c24b0e3539b13d14ef81eda06aebbb5c96b32805",
+    "build/raw-redsea-geometry-present.log": "5936f89b0a02e3ac291b8c51e80d81970c899a6dae7f882523737ce0bc73ffca",
+    "build/raw-redsea-geometry-invalid.log": "6832c6d070c8ab663032ca03735f7ec0a9ad3b4b482c9fc684b666728026aedc"
+  },
+  "layout_followup": {
+    "kernel_sha256": "9a886d41ca0f4460c104ebe95fb9525b0a4391c98318f07d897c5706697354ba",
+    "result": "pass: the source-derived stock absolute-offset/root fixture and the bootstrap relative fixture both return the expected geometry; absent and out-of-bounds-root fixtures are rejected",
+    "note": "The earlier present fixture represented the bootstrap relative layout only. Pinned RedSeaFormat stores the drive offset and an absolute root sector; the follow-up tests both layouts.",
+    "logs": {
+      "build/raw-redsea-layout-present.log": "76b983e3e7b46db8a22be382cb4f9ebac4276858ef07fdbb4c7937f3eca6e90f",
+      "build/raw-redsea-layout-legacy.log": "5936f89b0a02e3ac291b8c51e80d81970c899a6dae7f882523737ce0bc73ffca",
+      "build/raw-redsea-layout-invalid.log": "6832c6d070c8ab663032ca03735f7ec0a9ad3b4b482c9fc684b666728026aedc",
+      "build/raw-redsea-layout-absent.log": "b8ea08a5b6a54f83f67287d2d95747e54fd4d2e72895472ab2c1799033a0917f"
+    }
+  },
+  "limits": "This checks a legacy RedSea boot header, limited geometry and root-sector readability. It does not validate the entire filesystem, mount a drive, support block writes, discover arbitrary partitions, or support Pi storage. The test modifies disposable QEMU copies only."
+}

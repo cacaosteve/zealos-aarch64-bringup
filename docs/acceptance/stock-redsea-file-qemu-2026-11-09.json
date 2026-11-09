@@ -1,0 +1,19 @@
+{
+  "date": "2026-11-09",
+  "target": "AArch64 PCI QEMU, disposable VirtIO disk clone",
+  "kernel_sha256": "7858b6f232cfc0bda1c997db26788876ab2d06516c68136e4d5e18d706215cb0",
+  "source_bundle_sha256": "65174a115220c201fe24c71db35ece340237e159c5b4419712fed85760be5460",
+  "command": "python3 scripts/check-compat.py --pci --probe-stock-redsea-file",
+  "result": "pass: disk:ARMTEST.ZC was read from a stock absolute-LBA RedSea fixture, compiled and returned 42; FileRead refused an out-of-range extent, directory, deleted entry and non-contiguous file; zstatus failed=0",
+  "log": "build/stock-redsea-file-boundaries-qemu.log",
+  "log_sha256": "d2a3d79c6091cea97ee707fc7a9a624c10c014b9cfda6d51a828256ffd7656b2",
+  "limits": "This is the read-only disk: source-provider fallback, not general D: filesystem access. It supports nonempty contiguous files and traversal of contiguous directories in the selected PCI VirtIO stock absolute-LBA RedSea window. Chained files, enumeration, writes, hotplug, and Pi media are not implemented by this path. The fixture modified only a disposable disk clone.",
+  "followup": {
+    "kernel_sha256": "bbf4cbd914448fbbaded100c82bb94399a451cc41588d0a7d6b24df05df000bf",
+    "source_bundle_sha256": "65174a115220c201fe24c71db35ece340237e159c5b4419712fed85760be5460",
+    "command": "python3 scripts/check-compat.py --pci --probe-stock-redsea-file",
+    "result": "pass: loaded and executed contiguous source files from the first and second root directory sectors and a nested directory; invalid and unsupported file entries rejected; zstatus failed=0",
+    "log": "build/stock-redsea-path-qemu.log",
+    "log_sha256": "aa06d44952362fcacae889dc82c0e5d97bc884105cc1e7bd4a6c0530eb3ff04c"
+  }
+}

@@ -103,6 +103,22 @@ p.add_argument('--probe-demo-definestr', action='store_true',
                help='check DefineStr document substitution and terminal recovery')
 p.add_argument('--probe-demo-definestr-xtalk', action='store_true',
                help='with the DefineStr probe, isolate the demo from long graphical command entry')
+p.add_argument('--probe-exe-directive-lookahead', action='store_true',
+               help='check #exe directives following a compile-time control statement')
+p.add_argument('--probe-gui-long-input', action='store_true',
+               help='check repeated real-keyboard long terminal input without retries')
+p.add_argument('--probe-missing-block-device', action='store_true',
+               help='check the missing block-device exception contract')
+p.add_argument('--probe-raw-disk-read', action='store_true',
+               help='check read-only physical VirtIO sector access')
+p.add_argument('--probe-raw-redsea-geometry', choices=('absent', 'present', 'legacy', 'invalid', 'stockfile'),
+               help='check legacy RedSea geometry against an isolated fixture')
+p.add_argument('--probe-stock-redsea-file', action='store_true',
+               help='load one contiguous stock-layout RedSea root file on a disposable disk')
+p.add_argument('--probe-diskraw-context', action='store_true',
+               help='report DiskRaw compile result in the current desktop context')
+p.add_argument('--probe-diskraw-live', action='store_true',
+               help='run stock DiskRaw on a disposable read-only RedSea fixture')
 p.add_argument('--probe-unused-define-timeout', type=int, default=300,
                help='runtime limit in seconds for the slow UnusedDefine scan')
 p.add_argument('--probe-demo-callbacks', action='store_true',
@@ -542,6 +558,24 @@ if args.probe_demo_file_read:
     args.probe_demo_dol_doc = True
 if args.probe_demo_definestr_xtalk:
     args.probe_demo_definestr = True
+if args.probe_exe_directive_lookahead:
+    args.probe_demo_definestr = True
+if args.probe_gui_long_input:
+    args.probe_demo_definestr = True
+if args.probe_missing_block_device:
+    args.probe_demo_definestr = True
+if args.probe_raw_disk_read:
+    args.probe_demo_definestr = True
+if args.probe_raw_redsea_geometry:
+    args.probe_demo_definestr = True
+if args.probe_diskraw_context:
+    args.probe_demo_definestr = True
+if args.probe_diskraw_live:
+    args.probe_raw_redsea_geometry = 'present'
+    args.probe_demo_definestr = True
+if args.probe_stock_redsea_file:
+    args.probe_raw_redsea_geometry = 'stockfile'
+    args.probe_demo_definestr = True
 if args.probe_demo_global_vars_xtalk:
     args.probe_demo_global_vars = True
 if args.probe_demo_definestr:
@@ -885,6 +919,66 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
     cmd += ['-qmp', f'unix:{qmp_path},server=on,wait=off']
     if args.pci:
         copyfile_cow(ROOT/'build/disk.img', tmp/'disk.img')
+        if args.probe_raw_redsea_geometry:
+            # Modify only the disposable clone, never the host image or SD.
+            with (tmp/'disk.img').open('r+b') as disk:
+                disk.seek(130911 * 512)
+                boot = bytearray(512)
+                bitmap = bytearray(512)
+                root_dir = bytearray(1024 if args.probe_raw_redsea_geometry == 'stockfile' else 512)
+                file_data = bytearray(512)
+                child_dir = bytearray(512)
+                if args.probe_raw_redsea_geometry in ('present', 'legacy', 'invalid', 'stockfile'):
+                    boot[3] = 0x88
+                    offset = 0 if args.probe_raw_redsea_geometry == 'legacy' else 130911
+                    struct.pack_into('<qqqqq', boot, 8, offset, 128, offset + 2, 1, 7)
+                    if args.probe_raw_redsea_geometry == 'invalid':
+                        struct.pack_into('<q', boot, 24, offset + 129)  # root past end
+                    boot[510:512] = b'\x55\xaa'
+                    bitmap[0] = 7
+                    if args.probe_raw_redsea_geometry == 'stockfile':
+                        source = b'I64 StockRedSeaFileChecks(){return 42;}\n'
+                        struct.pack_into('<H', root_dir, 0, 0x410)
+                        root_dir[2:4] = b'.\0'
+                        struct.pack_into('<qqq', root_dir, 40, offset + 2, 1024, 0)
+                        struct.pack_into('<H', root_dir, 64, 0x420)
+                        root_dir[66:77] = b'ARMTEST.ZC\0'
+                        struct.pack_into('<qqq', root_dir, 104, offset + 10, len(source), 0)
+                        # Refuse an out-of-range extent, directory, deleted
+                        # entry and non-contiguous file, even if names match.
+                        for slot, name, attr, first in (
+                            (2, b'BADTEST.ZC', 0x420, offset + 128),
+                            (3, b'DIRTEST.ZC', 0x410, offset + 10),
+                            (4, b'CHAIN.ZC', 0x020, offset + 10),
+                            (5, b'DELETE.ZC', 0x520, offset + 10),
+                            (6, b'FILL.ZC', 0x420, offset + 10),
+                            (7, b'NEST', 0x410, offset + 5),
+                            (8, b'LATE.ZC', 0x420, offset + 10),
+                        ):
+                            entry = slot * 64
+                            struct.pack_into('<H', root_dir, entry, attr)
+                            root_dir[entry + 2:entry + 3 + len(name)] = name + b'\0'
+                            struct.pack_into('<qqq', root_dir, entry + 40,
+                                             first, len(source), 0)
+                        file_data[:len(source)] = source
+                        struct.pack_into('<H', child_dir, 0, 0x410)
+                        child_dir[2:4] = b'.\0'
+                        struct.pack_into('<qqq', child_dir, 40, offset + 5, 512, 0)
+                        struct.pack_into('<H', child_dir, 64, 0x420)
+                        child_dir[66:77] = b'INNER.ZC\0\0\0'
+                        struct.pack_into('<qqq', child_dir, 104, offset + 10, len(source), 0)
+                        bitmap[0] |= 0x28
+                        bitmap[1] |= 0x04
+                disk.write(boot)
+                disk.write(bitmap)
+                disk.write(root_dir)
+                if args.probe_raw_redsea_geometry == 'stockfile':
+                    disk.seek((130911 + 5) * 512)
+                    disk.write(child_dir)
+                    disk.seek((130911 + 10) * 512)
+                    disk.write(file_data)
+                else:
+                    disk.write(file_data)
         # A torn shadow-bank superblock must never supersede the valid A bank.
         if not args.probe_source and not args.probe_upstream:
             with (tmp/'disk.img').open('r+b') as f:
@@ -7567,6 +7661,148 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                           flush=True)
                     raise SystemExit(0)
                 if args.probe_demo_definestr:
+                    if args.probe_stock_redsea_file:
+                        command('zload disk:ARMTEST.ZC',
+                                'zc: loaded disk:ARMTEST.ZC')
+                        command('zcall StockRedSeaFileChecks',
+                                'zc => 0x000000000000002a')
+                        for path in ('disk:LATE.ZC', 'disk:NEST/INNER.ZC'):
+                            command('zload ' + path, 'zc: loaded ' + path)
+                            command('zcall StockRedSeaFileChecks',
+                                    'zc => 0x000000000000002a')
+                        for name in ('BADTEST.ZC', 'DIRTEST.ZC', 'CHAIN.ZC', 'DELETE.ZC'):
+                            command('zc Print("refused=%d\\n", '
+                                    f'FileRead("disk:{name}")==NULL);', 'refused=1')
+                        command('zstatus', 'failed=0')
+                        print('PASS stock RedSea contiguous root source loaded and executed',
+                              flush=True)
+                        raise SystemExit(0)
+                    if args.probe_diskraw_live:
+                        command('zc Print("diskraw_mount=%d\\n", '
+                                'ZcMountLegacyRedSeaReadOnly);', 'diskraw_mount=1')
+                        focus_graphical_terminal()
+                        source = ('CDrive *diskraw_saved_drive=Fs->cur_dv; '
+                                  'try {Fs->cur_dv=Letter2Drive(\'D\'); '
+                                  'ExeFile2("/Demo/Disk/DiskRaw.ZC");} '
+                                  'catch {Fs->catch_except=TRUE;} '
+                                  'Fs->cur_dv=diskraw_saved_drive;')
+                        command('zc XTalk(bootstrap_gui_terminal_task,' +
+                                json.dumps(source + '\n') + ');',
+                                'zc: executed', timeout=30)
+                        require_graphical_text('diskraw-drive-report',
+                                               'Defined Drives:', timeout=30)
+                        require_graphical_text('diskraw-first-key', 'PRESS A KEY', timeout=20)
+                        qmp_send_key('spc')
+                        require_graphical_text('diskraw-drive-class', 'last_free', timeout=30)
+                        qmp_send_key('spc')
+                        # Internal member names are green on black; the
+                        # standard near-white OCR threshold omits them.
+                        require_graphical_text('diskraw-device-class', 'last_time',
+                                               timeout=30, foreground_threshold=60000)
+                        qmp_send_key('spc')
+                        require_graphical_text('diskraw-block-prompt', 'Block to Read:', timeout=30)
+                        qmp_send_text('1')
+                        qmp_send_key('ret')
+                        require_graphical_text('diskraw-gpt-dump', '45 46 49 20 50 41 52 54', timeout=45)
+                        run_graphical_terminal_command('diskraw-recovery', '40+2;',
+                                                      'ans=0x2A=42', timeout=20)
+                        command('zc Print("diskraw_range=%d,%d\\n", '
+                                'zc_legacy_redsea_drive.drv_offset, '
+                                'zc_legacy_redsea_drive.size);',
+                                'diskraw_range=130911,128')
+                        command('zstatus', 'failed=0')
+                        print('PASS stock DiskRaw report, classes, GPT read and recovery', flush=True)
+                        raise SystemExit(0)
+                    if args.probe_diskraw_context:
+                        output = command('zc Print("diskraw_compile=%d\\n", '
+                                         'StockCatalogCompile("/Demo/Disk/DiskRaw.ZC"));',
+                                         'diskraw_compile=', timeout=60)
+                        print('DISKRAW COMPILE RESULT\n' + output, flush=True)
+                        raise SystemExit(0)
+                    if args.probe_raw_redsea_geometry:
+                        command('zload /Tests/RawRedSeaGeometry.ZC',
+                                'zc: loaded /Tests/RawRedSeaGeometry.ZC')
+                        suffix = ('Present' if args.probe_raw_redsea_geometry in ('present', 'legacy')
+                                  else 'Absent')
+                        report = command('zcall RawRedSea' + suffix + 'Checks',
+                                         'zc => 0x000000000000002a')
+                        if suffix == 'Present' and 'D RedSea    VirtIO (read-only)' not in report:
+                            raise RuntimeError('DriveRep omitted the mounted RedSea drive:\n' + report)
+                        command('zstatus', 'failed=0')
+                        print('PASS raw RedSea geometry ' + suffix.lower(), flush=True)
+                        raise SystemExit(0)
+                    if args.probe_raw_disk_read:
+                        command('zload /Tests/RawDiskRead.ZC',
+                                'zc: loaded /Tests/RawDiskRead.ZC')
+                        command('zcall RawDiskReadChecks',
+                                'zc => 0x000000000000002a')
+                        command('zstatus', 'failed=0')
+                        print('PASS raw VirtIO GPT read and bounds', flush=True)
+                        raise SystemExit(0)
+                    if args.probe_missing_block_device:
+                        command('zload /Tests/MissingBlockDevice.ZC',
+                                'zc: loaded /Tests/MissingBlockDevice.ZC')
+                        command('zcall MissingBlockDeviceChecks',
+                                'zc => 0x000000000000002a')
+                        command('zstatus', 'failed=0')
+                        print('PASS missing block-device null and exception behavior',
+                              flush=True)
+                        raise SystemExit(0)
+                    if args.probe_gui_long_input:
+                        text = 'Print("Typing 1234567890 abcdefghijklmnopqrstuvwxyz");'
+                        for delay in (0.15, 0.05):
+                            for iteration in range(3):
+                                type_graphical_prompt_line(
+                                    f'long-input-{delay}-{iteration}', text,
+                                    attempts=1, key_delay=delay)
+                        qmp_send_key('down')
+                        command('zc Print("gui_input_length=%d\\n", '
+                                'BootstrapGuiTerminalInputDiag() & 255);',
+                                'gui_input_length=0')
+                        executed = 'Print("%s-%d\\n","abcdefghijklmnopqrstuvwxyz",1234567890);'
+                        type_graphical_prompt_line(
+                            'long-input-execute', executed, attempts=1,
+                            key_delay=0.15)
+                        qmp_send_key('ret')
+                        require_graphical_text('long-input-execute-result',
+                            'abcdefghijklmnopqrstuvwxyz-1234567890', timeout=20)
+                        type_graphical_prompt_line(
+                            'long-input-history-replace', text, attempts=1,
+                            key_delay=0.15)
+                        qmp_send_key('up')
+                        time.sleep(0.5)
+                        state = command('zc Print("gui_input_length=%d\\n", '
+                                        'BootstrapGuiTerminalInputDiag() & 255);',
+                                        'gui_input_length=')
+                        if f'gui_input_length={len(executed)}' not in state:
+                            raise RuntimeError('history recall has unexpected input length:\n' + state)
+                        before = graphical_screen('long-input-history-before')[3]
+                        expected = 'abcdefghijklmnopqrstuvwxyz-1234567890'
+                        before_count = before.count(expected)
+                        qmp_send_key('ret')
+                        deadline = time.monotonic() + 20
+                        while True:
+                            after = graphical_screen('long-input-history-result')[3]
+                            if after.count(expected) > before_count:
+                                break
+                            if time.monotonic() >= deadline:
+                                raise RuntimeError('recalled long command did not produce '
+                                                   'a second result:\n' + after)
+                            time.sleep(0.1)
+                        print('PASS wrapped input replaced with command history and executed',
+                              flush=True)
+                        run_graphical_terminal_command(
+                            'long-input-recovery', '40+2;', 'ans=0x2A=42',
+                            timeout=15)
+                        command('zstatus', 'failed=0')
+                        print('PASS six long input lines, exact command output '
+                              'and terminal recovery', flush=True)
+                        raise SystemExit(0)
+                    if args.probe_exe_directive_lookahead:
+                        command('zload /Tests/ExeDirectiveLookahead.ZC',
+                                'zc: loaded /Tests/ExeDirectiveLookahead.ZC')
+                        command('zcall ExeDirectiveLookaheadChecks',
+                                'zc => 0x0000000000000029')
                     command('zload /Tests/ExeOrder.ZC',
                             'zc: loaded /Tests/ExeOrder.ZC')
                     command('zcall ExeOrderChecks',

@@ -1,0 +1,12 @@
+// Pinned ParseIf lexes past its nested statement while looking for else.
+// This executes the following directive before the outer if is called.
+I64 exe_directive_lookahead_value;
+#exe {
+    if (TRUE)
+        exe_directive_lookahead_value = 41;
+    #exe { exe_directive_lookahead_value += 1; };
+};
+I64 ExeDirectiveLookaheadChecks()
+{
+    return exe_directive_lookahead_value;
+}

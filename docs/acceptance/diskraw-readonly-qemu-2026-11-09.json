@@ -1,0 +1,19 @@
+{
+  "date": "2026-11-09",
+  "target": "AArch64 PCI QEMU, disposable VirtIO disk clone, graphical terminal",
+  "kernel_sha256": "9a886d41ca0f4460c104ebe95fb9525b0a4391c98318f07d897c5706697354ba",
+  "source_bundle_sha256": "8b0f3e45142a0108e99056103acc82946b880a69cae14d89372a293e85eca642",
+  "pinned_source_sha256": "d409fb40309e49d2c227a6fe11f561ba5a268843aac8025754cb9c0e01d4908e",
+  "bridge_sha256": "6fa9d5cad674f333fded243577d42eb6c19e4281b416969e92426d2122227270",
+  "command": "python3 scripts/check-compat.py --pci --probe-diskraw-live",
+  "result": "pass: stock DiskRaw showed the drive report and both class reports, accepted block 1, dumped the GPT signature, restored the drive's original range, and returned to a terminal that evaluated 40+2 as 42; zstatus failed=0",
+  "setup": "The harness creates a RedSea fixture on a disposable disk clone, explicitly mounts the read-only D bridge, and temporarily selects it as the task current drive before launching the original source via XTalk. It is not automatic OS drive discovery.",
+  "log": "build/diskraw-live-qemu-final.log",
+  "log_sha256": "6e24d1b6a8e9cfe01c76124a63b37ee4b261e193504a1e18f3e2fc8ed02a7b46",
+  "color_followup": {
+    "result": "pass: green last_time field recognized using a lower brightness threshold; GPT dump, terminal recovery and restored drive range also passed",
+    "log": "build/diskraw-live-color-qemu.log",
+    "log_sha256": "dcdfcfd78a96a680c94c826c05f45518fc60217504437ec622f60a4f41bc9dc9"
+  },
+  "limits": "This checks one read on one PCI VirtIO fixture. The drive report lists only bridge-registered drives, and the custom VirtIO type is not integrated into stock block-device registries. Filesystem operations, writes, generic mounting, other device types, hotplug, Pi storage and live UTM/Pi remain unverified. Green class-field labels are visible in the framebuffer but omitted by the monochrome OCR used by the automated checkpoint."
+}

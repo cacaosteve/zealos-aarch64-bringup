@@ -1,0 +1,24 @@
+{
+  "date": "2026-11-09",
+  "target": "AArch64 PCI QEMU, one vCPU, graphical terminal with emulated keyboard",
+  "kernel_sha256": "860a2b119815f5406d4b3d1b527b29ed6ec498f240ff933e9748b75d9f639ec5",
+  "source_bundle_sha256": "884b7383b944e61fce2c81384629a20a73edad335f16fb2be52d54454dfcd6fe",
+  "command": "python3 scripts/check-compat.py --pci --probe-gui-long-input",
+  "result": "failure on second of three 54-character entries at 0.15-second nominal pacing",
+  "observed": "The first entry had the expected visible text and length. After Down cleared its input buffer, the second entry reported length 54, but the visible document retained a prefix of the first line ahead of the second. The faster 0.05-second cases were not reached.",
+  "log": "build/gui-long-input-qemu.log",
+  "log_sha256": "57c82f69c44d115ba5d65d1bd94c2d07d8c6ee77c73194084304ae2c38934ba5",
+  "screenshot": "build/gui-demo-dol-doc-long-input-0.15-1.ppm",
+  "after": {
+    "source_sha256": "372442f53ba949b0da771a2b71d8180eeb3b63f4405f34b5230919f23d940a2f",
+    "source_bundle_sha256": "8cc7bf78575d28d915077336ff62a90574df9ce1e17d0d714b6bf6e18d854323",
+    "result": "Six repeated 54-character lines passed visible text and buffer-length checks at nominal 0.15 and 0.05 second key pacing, with a clear between lines. A separate long command produced the exact expected formatted output. A second wrapped line was replaced using Up, and the recalled command produced a second result. The terminal then evaluated 40+2 as 42. Two-terminal typing, history and prompt recovery also passed.",
+    "logs": {
+      "build/gui-long-input-anchor-qemu.log": "d4ac070601a81374a878d2abe8eeb5d836f50f7cfba9d99a51b0c65ec28dbc97",
+      "build/gui-long-input-history-qemu.log": "c36b0173837fccbce1f7b5c5f268e6929d7e14e018a07744b72ea055a256b78b",
+      "build/gui-long-input-execution-qemu.log": "82592e0ff5e495a876ebe63ed0c8eb52fd8bcc5e84def269dbaa54c7c7ce9f21",
+      "build/gui-wrapped-history-qemu.log": "0273067cf2a1a71757bc2c67f75fe93de3d8f3d4a6e7362f99407b434d6d1835"
+    }
+  },
+  "limits": "The input diagnostic measures length, not exact contents. The visible test covers the checked string and rates; it does not prove all keyboard events are reliable. No live UTM or physical Pi test was performed."
+}

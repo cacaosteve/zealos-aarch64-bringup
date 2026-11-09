@@ -1,0 +1,14 @@
+{
+  "date": "2026-11-09",
+  "target": "AArch64 PCI QEMU, one vCPU, VirtIO keyboard and VirtIO sound WAV backend",
+  "kernel_sha256": "860a2b119815f5406d4b3d1b527b29ed6ec498f240ff933e9748b75d9f639ec5",
+  "source_bundle_sha256": "8cc7bf78575d28d915077336ff62a90574df9ce1e17d0d714b6bf6e18d854323",
+  "command": "QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device -audiodev wav,id=sound0,path=build/vocabulary-gui-clear-fix.wav -device virtio-sound-pci,audiodev=sound0' python3 -u scripts/check-compat.py --pci --quick --probe-vocabulary",
+  "result": "pass for typed graphical launch, answer input, tone capture, Escape and terminal recovery",
+  "audio": "Capture held 25578 stereo frames, with 51156 nonzero signed 16-bit samples. Positive crossing periods were predominantly 44 or 45 frames at 44100 Hz, approximately 988 Hz, consistent with the source's correct-answer Sound(74). The QEMU WAV header had zero sizes after test shutdown, so samples were read from the PCM data following the 44-byte header.",
+  "logs": {
+    "build/vocabulary-gui-clear-fix.log": "30c0bc18a774b07b951b63760e88cdf0ad6486b6d3250885ede34e6c6376b65e",
+    "build/vocabulary-gui-clear-fix.wav": "a5a19ece049cfb0e08be2257f084e4a5f2a6ac2fb600556afd3620246cf2cc76"
+  },
+  "limits": "A randomized question makes the tested answer branch non-deterministic; this run's captured tone is consistent with the correct branch, but feedback and definition popup were not visually verified. Sample capture alone does not establish real-time audio or live UTM/Pi behavior."
+}

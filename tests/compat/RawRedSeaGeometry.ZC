@@ -1,0 +1,69 @@
+extern I64 ZcRawRedSeaGeometry(U64 *base, U64 *sectors);
+extern Bool ZcMountLegacyRedSeaReadOnly();
+
+I64 RawRedSeaAbsentChecks()
+{
+    U64 base = 123, sectors = 456;
+    if (ZcRawRedSeaGeometry(&base, &sectors) || base != 123 || sectors != 456)
+        return 1;
+    if (ZcRawRedSeaGeometry(NULL, &sectors) ||
+        ZcRawRedSeaGeometry(&base, NULL))
+        return 2;
+    if (ZcMountLegacyRedSeaReadOnly() || Letter2Drive('D', FALSE))
+        return 3;
+    if (RedSeaValidate('D'))
+        return 4;
+    return 42;
+}
+
+I64 RawRedSeaPresentChecks()
+{
+    U64 base = 0, sectors = 0;
+    CDrive *drive;
+    CBlkDev *bd;
+    U8 *buf;
+    I64 caught = 0;
+    if (!ZcRawRedSeaGeometry(&base, &sectors))
+        return 1;
+    if (base != 130911 || sectors != 128)
+        return 2;
+    if (!ZcMountLegacyRedSeaReadOnly() || !(drive = Letter2Drive('D')) ||
+        !(bd = Letter2BlkDev('D')) || drive->bd != bd ||
+        Drive2Letter(drive) != 'D' || drive->drv_offset != base ||
+        drive->size != sectors || drive->root_clus != base + 2 ||
+        drive->fs_type != FSt_REDSEA || drive->fat1 != base + 1 ||
+        drive->fat2 != base + 1 || drive->data_area != base + 1 ||
+        drive->cur_fat_blk_num != -1 || !RedSeaValidate('D') ||
+        !(bd->flags & BDF_READ_ONLY) ||
+        DriveIsWritable('D', FALSE))
+        return 3;
+    DriveRep;
+    buf = CAlloc(512);
+    if (!buf || !BlkRead(drive, buf, base, 1) ||
+        buf[3] != 0x88 || buf[510] != 0x55 || buf[511] != 0xAA)
+    {
+        Free(buf);
+        return 4;
+    }
+    try { BlkRead(drive, buf, base - 1, 1); }
+    catch { caught = Fs->except_ch; Fs->catch_except = TRUE; }
+    if (caught != 'Drive')
+    {
+        Free(buf);
+        return 5;
+    }
+    // DiskRaw deliberately broadens its drive range to inspect sector 1.
+    drive->drv_offset = 0;
+    drive->size = bd->max_blk + 1;
+    if (!BlkRead(drive, buf, 1, 1) || buf[0] != 'E' || buf[1] != 'F' ||
+        buf[2] != 'I' || buf[3] != ' ')
+    {
+        Free(buf);
+        return 6;
+    }
+    Free(buf);
+    Unmount('D');
+    if (Letter2Drive('D', FALSE) || RedSeaValidate('D'))
+        return 7;
+    return 42;
+}

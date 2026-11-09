@@ -1028,9 +1028,13 @@ U8 *BootstrapGuiTerminalReadLine2(Bool continuation)
                 }
                 else if (!ch && sc.u8[0] == SC_CURSOR_UP && state->history_len)
                 {
-                    BootstrapGuiTerminalDocBottom(DocPut);
                     for (i = 0; i < command_len; i++)
+                    {
+                        // Re-anchor after each deletion: recalculation can
+                        // merge wrapped document entries and move the cursor.
+                        BootstrapGuiTerminalDocBottom(DocPut);
                         DocPutKey(DocPut, 8, 0);
+                    }
                     BootstrapGuiTerminalHistoryRecall(command, &command_len,
                                                       state->history, state->history_len);
                     command_pos = command_len;
@@ -1039,9 +1043,11 @@ U8 *BootstrapGuiTerminalReadLine2(Bool continuation)
                 }
                 else if (!ch && sc.u8[0] == SC_CURSOR_DOWN)
                 {
-                    BootstrapGuiTerminalDocBottom(DocPut);
                     for (i = 0; i < command_len; i++)
+                    {
+                        BootstrapGuiTerminalDocBottom(DocPut);
                         DocPutKey(DocPut, 8, 0);
+                    }
                     command_len = 0;
                     command_pos = 0;
                     command[0] = 0;

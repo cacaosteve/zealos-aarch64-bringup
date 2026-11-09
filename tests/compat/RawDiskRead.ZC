@@ -1,0 +1,40 @@
+extern I64 ZcRawDiskSectors();
+extern I64 ZcRawDiskRead(U8 *dst, I64 sector, I64 count);
+
+I64 RawDiskReadChecks()
+{
+    I64 sectors = ZcRawDiskSectors;
+    // More than the native DMA buffer forces the host to split the request.
+    U8 *buf = CAlloc(256 * 512 + 16);
+    I64 result = 0;
+    if (!buf || sectors < 2)
+        result = 1;
+    else if (!ZcRawDiskRead(buf, 0, 2))
+        result = 2;
+    else if (buf[512] != 'E' || buf[513] != 'F' || buf[514] != 'I' ||
+             buf[515] != ' ' || buf[516] != 'P' || buf[517] != 'A' ||
+             buf[518] != 'R' || buf[519] != 'T')
+        result = 3;
+    else if (ZcRawDiskRead(NULL, 0, 1) || ZcRawDiskRead(buf, -1, 1) ||
+             ZcRawDiskRead(buf, 0, 0) || ZcRawDiskRead(buf, sectors, 1) ||
+             ZcRawDiskRead(buf, sectors - 1, 2))
+        result = 4;
+    else if (sectors < 256)
+        result = 5;
+    else
+    {
+        MemSet(buf, 0x5A, 256 * 512 + 16);
+        if (!ZcRawDiskRead(buf, sectors - 256, 256))
+            result = 6;
+        else if (buf[255 * 512] != 'E' || buf[255 * 512 + 1] != 'F' ||
+                 buf[255 * 512 + 2] != 'I' || buf[255 * 512 + 3] != ' ' ||
+                 buf[255 * 512 + 4] != 'P' || buf[255 * 512 + 5] != 'A' ||
+                 buf[255 * 512 + 6] != 'R' || buf[255 * 512 + 7] != 'T' ||
+                 buf[256 * 512] != 0x5A || buf[256 * 512 + 15] != 0x5A)
+            result = 7;
+        else
+            result = 42;
+    }
+    Free(buf);
+    return result;
+}

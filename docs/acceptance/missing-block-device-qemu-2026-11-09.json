@@ -1,0 +1,13 @@
+{
+  "date": "2026-11-09",
+  "target": "AArch64 PCI QEMU, native source task bridge",
+  "kernel_sha256": "860a2b119815f5406d4b3d1b527b29ed6ec498f240ff933e9748b75d9f639ec5",
+  "source_bundle_sha256": "dcf0266f6b1b76b2fe5aa0d4d6ad605fa112e51fc4fe6e9a8bd407d42f115aea",
+  "bridge_sha256": "ced1189a4669e7a199adc3bba6ada21f6c50a1f0e9569d94a759f79646a0323a",
+  "probe_sha256": "989f3afdd8b1054fa2bef3124270a8f45f4b3677e391fa17cb76b1a572894349",
+  "command": "python3 scripts/check-compat.py --pci --probe-missing-block-device",
+  "result": "pass: invalid-drive non-throwing calls return null; throwing calls raise catchable Drive; zstatus failed=0",
+  "log": "build/missing-block-device-qemu.log",
+  "log_sha256": "dffb34631d831fb0bacd42065d8b4dacd7e4c494f35f8996441ea361ff48da91",
+  "limits": "This only verifies the missing-device contract. The bridge still exposes no real CDrive or CBlkDev objects, so valid-drive lookup, raw disk reads, DiskRaw and the storage installer workflows are not implemented or validated by this check. Pi payloads built but were not tested on hardware."
+}

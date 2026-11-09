@@ -1,0 +1,19 @@
+{
+  "date": "2026-11-09",
+  "target": "AArch64 PCI QEMU, disposable VirtIO disk",
+  "kernel_sha256": "effd0814a57c060476b4671eb4f0b504addceb103c72fa4292a32c02b4d512ec",
+  "source_bundle_sha256": "1c4540879d679466eba091ce98ce4deccf666d72f58a145b0992883d0363ceba",
+  "probe_sha256": "47efab9bba7053165655b20cd931a1e06355a8f5f3d4eb17abd0d3acc4d3ec67",
+  "command": "python3 scripts/check-compat.py --pci --probe-raw-disk-read",
+  "result": "pass: guest read sectors 0 and 1 and verified the GPT header signature, invalid pointers and out-of-range requests were rejected, and zstatus reported failed=0",
+  "log": "build/raw-disk-read-qemu-final.log",
+  "log_sha256": "acce0ccfbc4f62bf347e856a5f79ebb3793639b6db60ed9942a355ceec8f0bca",
+  "larger_read": {
+    "source_bundle_sha256": "28259b635989e46f66c782641d209f526412806a2f4c477e96de270b163ca1b6",
+    "probe_sha256": "4026b684e58437b7c6945a50a42abfc74061eb6b0bdad60a762babae8e5919c2",
+    "result": "pass: a 256-sector read crossing DMA batches reaches the last sector, verifies the backup GPT signature and preserves the guard after the destination",
+    "log": "build/raw-disk-batch-qemu.log",
+    "log_sha256": "5275644837ce16fb57be77b0d96621329c5a1c4f2c5612197ca6d4f8ace5a5ab"
+  },
+  "limits": "This exposes read-only absolute sectors of the PCI VirtIO backing device, not a ZealOS drive object or a filesystem. DiskRaw, writes, installation, media removal, concurrency and transfers larger than the 256-sector test remain unverified. The Pi builds compile but do not have a supported raw PCI VirtIO boot disk through this API and were not tested on hardware."
+}

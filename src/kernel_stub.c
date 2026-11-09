@@ -11867,6 +11867,30 @@ uint64_t hc_builtin_call1(uint64_t fp, uint64_t a0) {
 #define HC_RAM_N_BLKS   128u
 static uint8_t g_ram_dsk[HC_RAM_N_BLKS * HC_RAM_BLK_SIZE] __attribute__((aligned(16)));
 
+uint64_t zc_raw_disk_sectors(void) {
+    return virtio_blk_absolute_ready() ? virtio_blk_full_capacity() : 0;
+}
+
+int zc_raw_disk_read(void *dst, uint64_t sector, uint64_t count) {
+    uint64_t capacity = zc_raw_disk_sectors();
+    if (!dst || !count || sector >= capacity || count > capacity - sector ||
+        count > SIZE_MAX / 512u)
+        return 0;
+    uint8_t *out = dst;
+    while (count) {
+        uint32_t limit = virtio_blk_max_sectors();
+        if (!limit)
+            return 0;
+        uint32_t batch = count < limit ? (uint32_t)count : limit;
+        if (!virtio_blk_read_abs_many(out, sector, batch))
+            return 0;
+        sector += batch;
+        count -= batch;
+        out += (size_t)batch * 512u;
+    }
+    return 1;
+}
+
 uint64_t hc_builtin_blkwrite(uint64_t buf, uint64_t blk, uint64_t count) {
     uint8_t *src = (uint8_t *)(uintptr_t)buf;
     if (!src || count == 0) {
@@ -12784,6 +12808,46 @@ static int rs_read_root(uint8_t *br, uint8_t *dir, uint64_t *out_root, uint64_t 
     return 0;
 }
 
+int zc_raw_redsea_geometry(uint64_t *base, uint64_t *sectors) {
+    uint8_t br[512], dir[512];
+    int64_t words[4];
+    uint64_t root;
+    if (!base || !sectors || !virtio_blk_absolute_ready() ||
+        !zc_raw_disk_read(br, g_vb.lba_base, 1) ||
+        br[3] != 0x88 || br[510] != 0x55 || br[511] != 0xaa)
+        return 0;
+    for (unsigned i = 0; i < 4; i++) {
+        uint64_t value = 0;
+        for (unsigned j = 0; j < 8; j++)
+            value |= (uint64_t)br[8 + i * 8 + j] << (j * 8);
+        words[i] = (int64_t)value;
+    }
+    if (words[1] < 4 || (uint64_t)words[1] > g_vb.capacity ||
+        words[3] <= 0 || (uint64_t)words[3] >= (uint64_t)words[1] ||
+        g_vb.lba_base > g_vb.full_capacity ||
+        (uint64_t)words[1] > g_vb.full_capacity - g_vb.lba_base)
+        return 0;
+    /* Stock RedSeaFormat records absolute root sectors and the partition's
+     * drv_offset; the older bootstrap formatter records both relative to 0. */
+    if (words[0] == 0) {
+        if (words[2] <= words[3] || words[2] >= words[1])
+            return 0;
+        root = g_vb.lba_base + (uint64_t)words[2];
+    } else if (words[0] > 0 && (uint64_t)words[0] == g_vb.lba_base) {
+        if (words[2] < 0 || (uint64_t)words[2] < g_vb.lba_base ||
+            (uint64_t)words[2] - g_vb.lba_base <= (uint64_t)words[3] ||
+            (uint64_t)words[2] - g_vb.lba_base >= (uint64_t)words[1])
+            return 0;
+        root = (uint64_t)words[2];
+    } else
+        return 0;
+    if (!zc_raw_disk_read(dir, root, 1))
+        return 0;
+    *base = g_vb.lba_base;
+    *sectors = (uint64_t)words[1];
+    return 1;
+}
+
 /* Case-insensitive find; returns slot or -1. */
 static int rs_find_slot(uint8_t *dir, const char *name, uint64_t *out_blk, uint64_t *out_len) {
     unsigned i;
@@ -13010,6 +13074,99 @@ static int rs_file_exists(const char *name, uint64_t *out_len) {
 }
 
 #ifndef ZEAL_PI_DIAG
+/* Read contiguous files from stock absolute-LBA RedSea directories.
+ * This is deliberately separate from the legacy relative-LBA writer: it must
+ * never cause that writer to modify a volume whose layout it cannot update. */
+static uint64_t rs_stock_u64(const uint8_t *p) {
+    uint64_t value = 0;
+    for (unsigned j = 0; j < 8; j++) value |= (uint64_t)p[j] << (j * 8);
+    return value;
+}
+
+static int rs_stock_find(uint64_t base, uint64_t sectors, uint64_t directory,
+                         const char *name, uint64_t *first, uint64_t *length,
+                         uint16_t *attributes) {
+    uint8_t block[512];
+    if (directory < base || directory - base >= sectors ||
+        !zc_raw_disk_read(block, directory, 1)) return 0;
+    uint16_t root_attr = (uint16_t)block[0] | (uint16_t)block[1] << 8;
+    uint64_t dir_size = rs_stock_u64(block + 48);
+    if ((root_attr & 0x410u) != 0x410u || (root_attr & 0x100u) ||
+        block[2] != '.' || block[3] ||
+        rs_stock_u64(block + 40) != directory || !dir_size ||
+        (dir_size & 511u) || dir_size / 512 > sectors - (directory - base))
+        return 0;
+    for (uint64_t sector = 0; sector < dir_size / 512; sector++) {
+        if (sector && !zc_raw_disk_read(block, directory + sector, 1)) return 0;
+        for (unsigned i = 0; i < 8; i++) {
+            const uint8_t *entry = block + i * 64;
+            uint16_t attr = (uint16_t)entry[0] | (uint16_t)entry[1] << 8;
+            char filename[38];
+            size_t n = 0;
+            if (!entry[2]) return 0;
+            if (attr & 0x100u) continue;
+            while (n < sizeof(filename) - 1 && entry[2 + n]) {
+                filename[n] = (char)entry[2 + n];
+                n++;
+            }
+            if (!n || entry[2 + n]) continue;
+            filename[n] = 0;
+            if (!str_ieq(filename, name)) continue;
+            *first = rs_stock_u64(entry + 40);
+            *length = rs_stock_u64(entry + 48);
+            *attributes = attr;
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static int rs_stock_root_read(const char *name, char *dst, size_t cap,
+                              size_t *out_len) {
+    uint8_t boot[512], data[512];
+    uint64_t base, sectors, root, first = 0, length = 0;
+    uint16_t attr = 0;
+    if (!name || !*name || !zc_raw_redsea_geometry(&base, &sectors) ||
+        !base || !zc_raw_disk_read(boot, base, 1))
+        return -1;
+    root = rs_stock_u64(boot + 24);
+    if (rs_stock_u64(boot + 8) != base)
+        return -1;
+    while (*name) {
+        char component[38];
+        size_t n = 0;
+        while (name[n] && name[n] != '/' && n < sizeof(component) - 1) {
+            component[n] = name[n]; n++;
+        }
+        if (!n || (name[n] && name[n] != '/')) return -1;
+        component[n] = 0;
+        name += n;
+        if (!rs_stock_find(base, sectors, root, component, &first, &length, &attr) ||
+            !(attr & 0x400u) || first < base || first - base >= sectors)
+            return -1;
+        if (*name == '/') {
+            if (!(attr & 0x10u) || !name[1]) return -1;
+            root = first;
+            name++;
+            continue;
+        }
+        if ((attr & 0x10u) || !length || length > 65536 ||
+            (length + 511) / 512 > sectors - (first - base)) return -1;
+        if (out_len) *out_len = (size_t)length;
+        if (!dst) return 0;
+        if (length >= cap) return -1;
+        for (uint64_t off = 0; off < length; off += 512) {
+            size_t chunk = (size_t)(length - off);
+            if (chunk > 512) chunk = 512;
+            if (!zc_raw_disk_read(data, first + off / 512, 1)) return -1;
+            for (size_t j = 0; j < chunk; j++) dst[off + j] = (char)data[j];
+        }
+        dst[length] = 0;
+        return 0;
+    }
+    return -1;
+}
+
 /* The native compiler's disk: provider must never fall back to the boot RAM disk. */
 static int zc_read_redsea(const char *name, char *dst, size_t cap, size_t *out_len) {
     struct zss_entry entry;
@@ -13019,9 +13176,11 @@ static int zc_read_redsea(const char *name, char *dst, size_t cap, size_t *out_l
     if (found == -1) return -1;
     /* The old eight-entry RedSea catalog stays readable during migration. */
     uint64_t len = 0;
-    if (!virtio_blk_ready() || str_len(name) > 37 ||
-        !rs_file_exists(name, &len) || !len || len > 65536)
+    if (!virtio_blk_ready())
         return -1;
+    if (str_len(name) > 37 || !rs_file_exists(name, &len))
+        return rs_stock_root_read(name, dst, cap, out_len);
+    if (!len || len > 65536) return -1;
     if (out_len) *out_len = (size_t)len;
     if (!dst) return 0;
     return rs_load_file(name, dst, cap, out_len);
