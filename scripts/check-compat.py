@@ -29,6 +29,8 @@ p.add_argument('--quick', action='store_true', help='only compiler integration g
 p.add_argument('--window-frame-only', action='store_true',
                help='stop after the window demo frame diagnostic')
 p.add_argument('--probe-upstream', action='store_true', help='check current full-header/subsystem compiler results')
+p.add_argument('--probe-task-reset-context', action='store_true',
+               help='isolate task bridge header context after compiler reset')
 p.add_argument('--probe-module', metavar='ARCHIVE_PATH',
                help='load an unchanged upstream source after KernelA/B in a disposable guest')
 p.add_argument('--probe-module-override', type=pathlib.Path,
@@ -2062,6 +2064,15 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         if int(scanout.group(1)) < 1000:
             raise RuntimeError('boot graphical terminal is not painting visible pixels:\n' + desktop)
         print('PASS boot graphical terminal window and framebuffer diagnostics', flush=True)
+        if args.probe_task_reset_context:
+            command('zreset', 'native compiler ready')
+            command('zload /Kernel/KernelA.HH', 'zc: loaded /Kernel/KernelA.HH')
+            command('zc I64 TaskResetTextSize(){return sizeof(CTextGlobals);}',
+                    'zc: executed')
+            command('zcall TaskResetTextSize', 'zc => 0x')
+            command('zload /System/TaskBridge.ZC', 'zc: loaded /System/TaskBridge.ZC')
+            command('zstatus', 'failed=0')
+            raise SystemExit(0)
         if args.probe_demo_system_context:
             command('zvol', 'bank=A generation=0')
             # The exact source loads below exercise source-volume reads. Avoid
@@ -2148,6 +2159,26 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                         + output)
                 runtime_checks.append({
                     'name': 'TOSMisc DC2Doc converts a synthesized exact A glyph with zero OCR mismatch',
+                    'passed': True,
+                    'output': output,
+                })
+                output = command(
+                    'zc CDC *dc2=DCNew(2*FONT_WIDTH,FONT_HEIGHT); '
+                    'I64 score2=-1,i2,j2,k2,ch2=\'A\'; CDoc *doc2; U8 *saved2; '
+                    'for(k2=0;k2<2;k2++){if(k2)ch2=\'Z\';for(i2=0;i2<FONT_HEIGHT;i2++)'
+                    'for(j2=0;j2<FONT_WIDTH;j2++){'
+                    'if(Bt(&text.font[ch2],i2*8+j2))'
+                    'dc2->body[i2*dc2->width_internal+k2*FONT_WIDTH+j2]=BLACK; '
+                    'else dc2->body[i2*dc2->width_internal+k2*FONT_WIDTH+j2]=WHITE;}} '
+                    'doc2=DC2Doc(dc2,0,0,&score2); saved2=DocSave(doc2); '
+                    'Print("tosmisc-ocr-text=%d|%d\\n", '
+                    '!!StrMatch("AZ",saved2),score2); '
+                    'Free(saved2); DocDel(doc2); DCDel(dc2);',
+                    'tosmisc-ocr-text=', timeout=45)
+                if 'tosmisc-ocr-text=1|0' not in output:
+                    raise RuntimeError('TOSMisc OCR did not preserve both glyphs:\n' + output)
+                runtime_checks.append({
+                    'name': 'TOSMisc DC2Doc preserves two adjacent exact glyphs in its saved document',
                     'passed': True,
                     'output': output,
                 })
@@ -4812,12 +4843,24 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                   flush=True)
             raise SystemExit(0)
         if args.probe_demo_last_class:
+            command('zload /Tests/DocTreeMarker.ZC',
+                    'zc: loaded /Tests/DocTreeMarker.ZC')
+            command('zcall DocTreeMarkerChecks',
+                    'zc => 0x000000000000002a')
+            command('zload /Tests/PostfixArgument.ZC',
+                    'zc: loaded /Tests/PostfixArgument.ZC')
+            command('zcall PostfixArgumentChecks',
+                    'zc => 0x000000000000002a')
             command('zload /Tests/LastClass.ZC',
                     'zc: loaded /Tests/LastClass.ZC')
             command('zcall LastClassChecks',
                     'zc => 0x000000000000002a')
             command('zcall LastClassHashStrChecks',
                     'zc => 0x000000000000002a')
+            command('zcall LastClassReportFieldChecks',
+                    'zc => 0x000000000000002a', timeout=60)
+            command('zcall LastClassInheritedReportChecks',
+                    'zc => 0x000000000000002a', timeout=60)
             focus_graphical_terminal()
             # ClassRep2 resolves its class name using the executing task's
             # hash table. Sample that exact table before running the demo so
@@ -4862,21 +4905,39 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             if first[3].count('is a') < 2:
                 raise RuntimeError('LastClass did not print multiple default class '
                     f'names; see {graphical_path("demo-last-class-start")}\n'+first[3])
+            def lastclass_doc_status():
+                out = command(
+                    'zc {U8 *s=DocSave(bootstrap_gui_terminal_task->put_doc),*p=s; '
+                    'I64 n=0; while(p=StrMatch("PRESS A KEY",p)){n++;p+=11;} '
+                    'Print("lc_doc=%d|%d|%d|%d\\n",n,'
+                    '!!StrMatch("Class:\\\"CCPU\\\"",s),'
+                    '!!StrMatch("Class:\\\"CTask\\\"",s),'
+                    '!!StrMatch("Bad Pointer:",s)); Free(s);};',
+                    'lc_doc=', timeout=60)
+                match = re.search(r'lc_doc=(\d+)\|(\d+)\|(\d+)\|(\d+)', out)
+                if not match:
+                    raise RuntimeError('LastClass document status missing: '+out)
+                return tuple(map(int, match.groups()))
+            before = lastclass_doc_status()
             qmp_send_key('ret')
-            class_report = require_graphical_text(
-                'demo-last-class-report', 'Student', timeout=15)
-            if 'School' not in class_report[3]:
-                raise RuntimeError('LastClass reflection output omitted School; see '
-                    f'{graphical_path("demo-last-class-report")}\n'+class_report[3])
+            deadline = time.monotonic() + 40
+            while True:
+                status = lastclass_doc_status()
+                if status[0] > before[0] and status[1] and not status[3]:
+                    break
+                if time.monotonic() >= deadline:
+                    raise RuntimeError(f'LastClass did not complete the CCPU report: {status}')
+                time.sleep(.3)
             qmp_send_key('ret')
-            dynamic_report = require_graphical_text(
-                'demo-last-class-dynamic-report', 'Class:"CTask"', timeout=10)
-            if 'Class:"CCPU"' not in dynamic_report[3] or \
-                    'Bad Pointer:' in dynamic_report[3]:
-                raise RuntimeError('LastClass dynamic reflection did not display valid '
-                    'CCPU and CTask metadata; see '
-                    f'{graphical_path("demo-last-class-dynamic-report")}\n'
-                    + dynamic_report[3])
+            deadline = time.monotonic() + 40
+            while True:
+                status = lastclass_doc_status()
+                if status[2] and not status[3]:
+                    break
+                if time.monotonic() >= deadline:
+                    raise RuntimeError(f'LastClass did not produce the CTask report: {status}')
+                time.sleep(.3)
+            time.sleep(2)
             run_graphical_terminal_command(
                 'demo-last-class-terminal-recovery', '40+2;',
                 'ans=0x2A=42', timeout=20)
@@ -6764,6 +6825,24 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                           flush=True)
                     raise SystemExit(0)
                 if args.probe_demo_database:
+                    def database_record_visible(label):
+                        deadline = time.monotonic() + 30
+                        while True:
+                            out = command(
+                                'zc {U8 *s=DocSave(bootstrap_gui_terminal_task->put_doc); '
+                                'Print("database_classrep=%d|%d|%d|%d\\n",'
+                                '!!StrMatch("Class:\\\"Acct\\\"",s),'
+                                '!!StrMatch("41 52 4D 36 34",s),'
+                                '!!StrMatch("51 45 4D 55 20 64 69 73 6B",s),'
+                                '!!StrMatch("Bad Pointer:",s)); Free(s);};',
+                                'database_classrep=', timeout=60)
+                            if 'database_classrep=1|1|1|0' in out:
+                                graphical_screen(label)
+                                return
+                            if time.monotonic() >= deadline:
+                                raise RuntimeError('DataBase ClassRep did not show both '
+                                                   'record byte sequences: '+out)
+                            time.sleep(.3)
                     run_graphical_terminal_command(
                         'demo-database-ready', '40+2;', 'ans=0x2A=42')
                     database = run_graphical_terminal_command(
@@ -6826,26 +6905,47 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     require_graphical_text('demo-database-read-index', 'Acct #', timeout=15)
                     qmp_send_text('0', delay=.15, dismiss_splash=False)
                     qmp_send_key('ret')
-                    deadline = time.monotonic() + 20
-                    while True:
-                        readback = graphical_screen('demo-database-readback')
-                        if ('ARM64 account' in readback[3] and
-                                'QEMU disk round trip' in readback[3]):
-                            break
-                        if time.monotonic() >= deadline:
-                            raise RuntimeError(
-                                'DataBase did not read back both saved account fields; see '
-                                f'{graphical_path("demo-database-readback")}\n'
-                                + readback[3])
-                        time.sleep(.1)
+                    database_record_visible('demo-database-readback')
                     qmp_send_key('esc')
                     qmp_send_key('esc')
                     run_graphical_terminal_command(
                         'demo-database-final-recovery', '40+2;',
                         'ans=0x2A=42', timeout=20)
+                    command('zvol', 'flush=yes')
+                    command('zstatus', 'failed=0')
+                    # Power down the disposable QEMU guest and start a fresh
+                    # process with the same disk, so cached guest state cannot
+                    # satisfy the subsequent application read.
+                    guest.terminate()
+                    guest.wait(timeout=10)
+                    buf.clear()
+                    guest = subprocess.Popen(cmd, stdin=subprocess.PIPE,
+                                             stdout=subprocess.PIPE,
+                                             stderr=subprocess.STDOUT, bufsize=0)
+                    reboot = until(b'\n> ', timeout=180)
+                    if 'zc: graphical terminal started at boot' not in reboot:
+                        raise RuntimeError('DataBase cold boot did not reach the desktop')
+                    focus_graphical_terminal()
+                    # XTalk executes in the same focused GUI task without a
+                    # long QMP typing race immediately after desktop startup.
+                    command('zc XTalk(bootstrap_gui_terminal_task,' +
+                            json.dumps('ExeFile2("/Demo/Disk/DataBase.ZC");\n') + ');',
+                            'zc: executed', timeout=30)
+                    require_graphical_text('demo-database-cold-launch', 'ead acct', timeout=45)
+                    qmp_send_key('r')
+                    require_graphical_text('demo-database-cold-index', 'Acct #', timeout=15)
+                    qmp_send_text('0', delay=.15, dismiss_splash=False)
+                    qmp_send_key('ret')
+                    database_record_visible('demo-database-cold-readback')
+                    qmp_send_key('esc')
+                    qmp_send_key('esc')
+                    run_graphical_terminal_command(
+                        'demo-database-cold-recovery', '40+2;',
+                        'ans=0x2A=42', timeout=20)
                     command('zstatus', 'failed=0')
                     print('PASS DataBase initialized its file, wrote account 0 through '
-                          'the stock form, read both fields back, and returned to a '
+                          'the stock form, read both fields back before and after a '
+                          'cold boot, and returned to a '
                           'working terminal', flush=True)
                     raise SystemExit(0)
                 if args.probe_demo_once:

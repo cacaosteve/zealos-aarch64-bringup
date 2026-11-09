@@ -2158,7 +2158,23 @@ static int64_t host_check_ptr(int64_t *a) {
              value < (uintptr_t)&guest_fibers[i].compiler_task +
                      sizeof(guest_fibers[i].compiler_task)))
             return 1;
-    return 0;
+    if (!value)
+        return 0;
+    /* The root shell runs on the boot stack, outside the managed arenas and
+     * fiber stacks above. Ask the EL1 translation regime instead of guessing
+     * a stack range. AT reports a translation fault in PAR_EL1 without
+     * dereferencing the address. Preserve DAIF while PAR_EL1 is in use. */
+    uint64_t saved_daif, par;
+    __asm__ volatile("mrs %0, daif\n"
+                     "msr daifset, #2\n"
+                     "at s1e1r, %2\n"
+                     "isb\n"
+                     "mrs %1, par_el1\n"
+                     "msr daif, %0\n"
+                     "isb\n"
+                     : "=&r"(saved_daif), "=&r"(par)
+                     : "r"(value) : "memory");
+    return !(par & 1);
 }
 static int64_t host_copy(int64_t *a) {
     return (int64_t)(uintptr_t)memcpy((void *)(uintptr_t)a[0], (void *)(uintptr_t)a[1],
@@ -3176,6 +3192,10 @@ struct arm_doc_form_field {
     const char *format;
     int64_t data, offset, elements, raw_type, pointer, is_array, is_internal;
 };
+struct arm_class_rep_field {
+    const char *name, *type_name;
+    int64_t offset, elements, raw_type, pointer, is_internal;
+};
 struct arm_class_meta_field {
     const char *name, *print_str;
     int64_t offset, default_val, has_default_val, has_percentile;
@@ -3189,6 +3209,72 @@ static CMemberLst *guest_form_member(CHashClass *cls, int64_t *index, unsigned d
     for (member = cls->members_lst; member; member = member->next)
         if ((*index)-- == 0) return member;
     return NULL;
+}
+static CHashClass *guest_class_rep_class(const char *name, int64_t types) {
+    int64_t compiler_types = 0;
+    if (types & 0x10) compiler_types |= HTT_CLASS;
+    if (types & 0x40) compiler_types |= HTT_FUN;
+    if (!name || !compiler_types || !Fs || !Fs->hash_table) return NULL;
+    CHashClass *cls = (CHashClass *)HashFind((char *)name, Fs->hash_table,
+                                             compiler_types, 1);
+    for (unsigned depth = 0; cls && cls->fwd_class && depth < 32; depth++)
+        cls = cls->fwd_class;
+    return cls && !cls->fwd_class ? cls : NULL;
+}
+static int64_t host_class_rep_size(int64_t *a) {
+    CHashClass *cls = guest_class_rep_class((const char *)(uintptr_t)a[0], a[1]);
+    return cls ? cls->sz : -1;
+}
+static int64_t host_class_rep_field(int64_t *a) {
+    CHashClass *cls = guest_class_rep_class((const char *)(uintptr_t)a[0], a[1]);
+    int64_t index = a[2];
+    if (!cls || index < 0 || !a[3]) return 0;
+    CMemberLst *member = guest_form_member(cls, &index, 0);
+    if (!member || !member->member_class) return 0;
+    CHashClass *type = member->member_class;
+    int64_t stars = type->ptr_star_cnt;
+    if (stars < 0 || stars >= STAR_CNT) return 0;
+    uintptr_t type_address = (uintptr_t)type;
+    uintptr_t star_bytes = (uintptr_t)stars * sizeof(*type);
+    if (type_address < star_bytes) return 0;
+    type = (CHashClass *)(type_address - star_bytes);
+    int opaque = 0;
+    for (unsigned depth = 0; depth < 32; depth++) {
+        uintptr_t address = (uintptr_t)type;
+        int64_t first = (int64_t)address;
+        int64_t last = (int64_t)(address + sizeof(*type) - 1);
+        if (!type || address > UINTPTR_MAX - sizeof(*type) + 1 ||
+            !host_check_ptr(&first) || !host_check_ptr(&last)) {
+            opaque = 1;
+            break;
+        }
+        if (!type->fwd_class) break;
+        type = type->fwd_class;
+        if (depth == 31) opaque = 1;
+    }
+    static const int raw_types[] = {0, 4, 5, 6, 7, 8, 9, 10, 11, 10, 14, 10};
+    struct arm_class_rep_field *field = (void *)(uintptr_t)a[3];
+    memset(field, 0, sizeof(*field));
+    field->name = member->str;
+    field->offset = member->off;
+    field->elements = member->dim.total_cnt;
+    field->pointer = stars;
+    if (opaque) {
+        /* Some compiler-only function-pointer metadata does not have the
+         * ZealOS class layout. Display it as an opaque pointer or byte rather
+         * than following an unvalidated metadata address. */
+        field->type_name = "<opaque>";
+        field->is_internal = 1;
+        field->raw_type = stars ? 10 : 5;
+        if (!stars) field->elements = 1;
+        return 1;
+    }
+    field->type_name = type->base.str;
+    field->is_internal = type->raw_type == RT_U0 ||
+        (type->raw_type > 0 && type->raw_type <= RT_F64 && type->raw_type != RT_PTR);
+    field->raw_type = type->raw_type == RT_U0 ? 3 :
+        (field->is_internal ? raw_types[type->raw_type] : 0);
+    return 1;
 }
 static int64_t host_doc_form_field(int64_t *a) {
     const char *name = (const char *)(uintptr_t)a[0];
@@ -9515,6 +9601,12 @@ static int load_source_path(const char *path, int merged, int recover) {
             !task_field(form_field, "format", 8, 0) ||
             !task_field(form_field, "is_internal", 8, 56))
             zc_fail("form reflection ABI mismatch");
+        CHashClass *rep_field = (CHashClass *)HashFind(
+            "CArmClassRepField", Fs->hash_table, HTT_CLASS, 1);
+        if (!rep_field || rep_field->sz != sizeof(struct arm_class_rep_field) ||
+            !task_field(rep_field, "name", 8, 0) ||
+            !task_field(rep_field, "is_internal", 8, 48))
+            zc_fail("ClassRep reflection ABI mismatch");
         CHashClass *class_meta_field = (CHashClass *)HashFind(
             "CArmClassMetaField", Fs->hash_table, HTT_CLASS, 1);
         if (!class_meta_field ||
@@ -9567,6 +9659,8 @@ static int load_source_path(const char *path, int merged, int recover) {
         PrsBindCSymbol("ZcMonotonicNs", host_monotonic_ns, 0);
         PrsBindCSymbol("ZcUnixTimeNs", host_unix_time_ns, 0);
         PrsBindCSymbol("ZcDocFormField", host_doc_form_field, 3);
+        PrsBindCSymbol("ZcClassRepSize", host_class_rep_size, 2);
+        PrsBindCSymbol("ZcClassRepField", host_class_rep_field, 4);
         PrsBindCSymbol("ZcClassMetaField", host_class_meta_field, 3);
         PrsBindCSymbol("ZcTryEnter", host_sys_try, 0);
         PrsBindCSymbol("ZcTryLeave", host_sys_untry, 0);
@@ -10213,6 +10307,9 @@ int zc_start_gui_terminal(void) {
         /* Make the pinned document/file/editor stack available to the normal
          * graphical shell instead of leaving Ed as a source-load-only path. */
         "/System/DolDoc/DocFile.ZC",
+        /* Debug's initial load precedes the full DolDoc parser. Rebind the
+         * report renderer now that DocPrint and tree commands are available. */
+        "/System/Debug.ZC",
         "/System/DolDoc/DocRun.ZC",
         "/System/DolDoc/DocForm.ZC",
         /* DocTop must select the first real form field, rather than the

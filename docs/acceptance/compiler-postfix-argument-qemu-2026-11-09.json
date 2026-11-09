@@ -1,0 +1,30 @@
+{
+  "date": "2026-11-09",
+  "result": "pass",
+  "target": "AArch64 QEMU virt, one vCPU, PCI VirtIO disk and input",
+  "kernel_sha256": "5223a3f82c11ca1af75f9d691f3f0cb1dde6be457aa72e5309b812bf4b967ebf",
+  "baseline": "Before the backend change, PostfixArgumentChecks returned 2: a guest function received the incremented value rather than the old value in its third argument.",
+  "change": "The ARM64 call emitter keeps the allocated spill for direct postfix increment and decrement arguments instead of placing the old value into an argument register that may be overwritten by the postfix scratch register.",
+  "checks": [
+    "PostfixArgumentChecks returned 42 for a single argument, third argument, decrement, parenthesized increment, pointer lvalue, and a native metadata bridge argument.",
+    "The original LastClass demo completed and the terminal accepted 40+2.",
+    "Budget completed form create/edit/cancel, save/abort and cold-boot persistence.",
+    "DataBase saved and reopened both fields after a cold QEMU reboot.",
+    "python3 scripts/check-upstream.py passed."
+  ],
+  "logs": {
+    "postfix_expanded": {
+      "path": "build/postfix-expanded-qemu.log",
+      "sha256": "6670cee012da0ee9d7316a83f4e01e74ecb1e611088427caa035879c317eec74"
+    },
+    "budget": {
+      "path": "build/postfix-budget-qemu.log",
+      "sha256": "403a14ee9479b1fb56833e6e565c77e3389504669ef08b7381fe95f217c8a28d"
+    },
+    "database": {
+      "path": "build/postfix-database-qemu.log",
+      "sha256": "f5fd16a491b499ffb6fc7e787329be5cf023145b3ffe9d58592bee4f4e58a3dc"
+    }
+  },
+  "scope": "The regression covers these concrete integer cases. It does not establish all nested expression forms, floating-point or atomic postfix semantics, live UTM, or Pi behavior."
+}

@@ -570,6 +570,11 @@ check-pi4-dma: | $(BUILD)
 	$(HOST_CC) -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined tests/pi4_dma_test.c -o $(BUILD)/pi4-dma-test
 	$(BUILD)/pi4-dma-test
 
+.PHONY: check-aiwn-hash-remove
+check-aiwn-hash-remove: | $(BUILD)
+	$(HOST_CC) -std=c11 -D_POSIX_C_SOURCE=200809L -DAIWN_BOOTSTRAP -Wall -Wextra -Werror -fsanitize=address,undefined -Ithird_party/aiwnios/c tests/aiwn_hash_remove_test.c third_party/aiwnios/c/hash.c -o $(BUILD)/aiwn-hash-remove-test
+	$(BUILD)/aiwn-hash-remove-test
+
 .PHONY: check-pi4-xhci-dma
 check-pi4-xhci-dma: | $(BUILD)
 	$(HOST_CC) -std=c11 -Wall -Wextra -Werror -Wno-unused-function -fsanitize=address,undefined tests/pi4_xhci_dma_test.c -o $(BUILD)/pi4-xhci-dma-test

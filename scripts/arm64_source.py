@@ -1608,7 +1608,39 @@ def translate_debug_compat(source: bytes, kernel_debug_source: bytes) -> bytes:
     helper_boundary = '\nU0 UpdateRegVarImg('
     if text.count(helper_boundary) != 1:
         raise ValueError('Debug.ZC portable ClassRep boundary changed')
-    portable_debug = text.split(helper_boundary, 1)[0].rstrip().encode('utf-8') + b'\n'
+    portable_text = text.split(helper_boundary, 1)[0]
+    # Keep the original renderer and its dynamic/static field formatting, but
+    # obtain class data through the compiler's ABI rather than interpreting
+    # Aiwnios CHashClass/CMemberLst as the different ZealOS structures.
+    rep_end = portable_text.index('\npublic U0 ClassRep(')
+    rep = portable_text[:rep_end]
+    rep_replacements = {
+        '\tCMemberList *ml;': '\tCArmClassRepField arm_field;\n\tI64 arm_index = 0, arm_size;',
+        '\tCHashClass\t*tmpc, *tmpc2;\n': '',
+        'if (!(tmpc = HashFind(class_name, Fs->hash_table, types)))':
+            'if ((arm_size = ZcClassRepSize(class_name, types)) < 0)',
+        '_d(U8 *) + tmpc->size': '_d(U8 *) + arm_size',
+        '\tif (tmpc->base_class && !ClassRep2(doc, _d, tmpc->base_class->str, depth, max_depth, dynamic, types, base_offset))\n\t\treturn FALSE;\n': '',
+        '\tml = tmpc->member_list_and_root;\n\twhile (ml)':
+            '\twhile (ZcClassRepField(class_name, types, arm_index, &arm_field))',
+        '\t\ttmpc2 = ml->member_class;\n': '',
+        'ml->offset': 'arm_field.offset',
+        'stars = tmpc2->ptr_stars_count;': 'stars = arm_field.pointer;',
+        '\t\ttmpc2 = OptClassFwd(tmpc2);\n\t\ttmpc2 -= tmpc2->ptr_stars_count;\n': '',
+        'tmpc2->type & HTT_INTERNAL_TYPE': 'arm_field.is_internal',
+        'tmpc2->raw_type': 'arm_field.raw_type',
+        'ml->dim.total_count': 'arm_field.elements',
+        'ml->str': 'arm_field.name',
+        'tmpc2->str': 'arm_field.type_name',
+        '\t\tml = ml->next;\n': '',
+    }
+    for old, new in rep_replacements.items():
+        if old not in rep:
+            raise ValueError('pinned ClassRep reflection changed: '+old)
+        rep = rep.replace(old, new)
+    rep = rep.replace('\t\tptr = _d(U8 *) + arm_field.offset;',
+        '\t\tarm_index++;\n\t\tptr = _d(U8 *) + arm_field.offset;', 1)
+    portable_debug = (rep + portable_text[rep_end:]).rstrip().encode('utf-8') + b'\n'
 
     # The portable debugger overlay is loaded at graphical startup. Pull the
     # architecture-neutral Dump routine and stack bounds helper from KDebug,
@@ -3754,17 +3786,6 @@ def translate_pick3d_class_terminator(source: bytes) -> bytes:
            b'};\n\nclass PObj')
     if source.count(old) != 1:
         raise ValueError('pinned Pick3D sprite class terminator changed')
-    return source.replace(old, new, 1)
-
-
-def translate_database_classrep(source: bytes) -> bytes:
-    """Render the database record fields without x86 ZealOS reflection layout."""
-    old = b'\t\tClassRep(&a);'
-    new = (b'\t\tDocPrint(DocPut, '
-           b'"$$GREEN$$Name:$$FG$$%s\\n$$GREEN$$Addr:$$FG$$%s\\n", '
-           b'a.name, a.addr);')
-    if source.count(old) != 1:
-        raise ValueError('pinned DataBase.ZC ClassRep call changed')
     return source.replace(old, new, 1)
 
 

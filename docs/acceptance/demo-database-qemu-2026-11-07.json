@@ -22,5 +22,27 @@
     "build/gui-demo-dol-doc-demo-database-readback.ppm",
     "build/gui-demo-dol-doc-demo-database-final-recovery-result.ppm"
   ],
-  "scope_note": "QEMU runtime acceptance for same-boot file write/read and terminal recovery. This does not establish power-cycle persistence, live UTM behavior, or Raspberry Pi behavior."
+  "scope_note": "QEMU runtime acceptance for same-boot file write/read and terminal recovery. This does not establish power-cycle persistence, live UTM behavior, or Raspberry Pi behavior.",
+  "cold_boot_followup": {
+    "date": "2026-11-09",
+    "result": "pass",
+    "target": "AArch64 QEMU virt, one vCPU, VirtIO disk",
+    "kernel_sha256": "8b71a96fcb38419b3e7881f76bef2c04c49e672e49630d140254ecf3cd0dceb6",
+    "command": "python3 scripts/check-compat.py --pci --probe-demo-database",
+    "evidence": "The probe saved account 0, checked both fields in the app, flushed the source volume, terminated QEMU, started a new QEMU process with the same temporary disk, and reopened the adapted app. Both fields appeared and the terminal again evaluated 40+2; as 42; zstatus reported failed=0.",
+    "log": "build/demo-database-cold-boot.log",
+    "log_sha256": "de6e998d8005dd42ac7eba474cc7a406b39d81cbe82e5dd8593581f2239a6c81",
+    "scope": "QEMU virtual disk only; the ClassRep display adaptation remains, and live UTM and Pi are unverified."
+  },
+  "stock_classrep_followup": {
+    "date": "2026-11-09",
+    "result": "pass",
+    "target": "AArch64 QEMU virt, one vCPU, PCI VirtIO disk and input",
+    "source_sha256": "060cf124843f3f11ea50355b34bbe72dac0d91c41fb909144e7a3d22b2677e3a",
+    "kernel_sha256": "fb47f835659db09a04d0595af3755a6e6d14aaaeba63d0c2f310191c45adb5d4",
+    "evidence": "The source archive included DataBase.ZC byte-for-byte identical to the pinned file. The app wrote both fields, reported them as hexadecimal bytes through ClassRep, and reopened the record after stopping and restarting QEMU on the same disposable disk. The terminal accepted 40+2; and zstatus reported failed=0. The cold launch used XTalk after a QMP typing race; the first launch used graphical keyboard input.",
+    "log": "build/classrep-stock-database-retry.log",
+    "log_sha256": "2455cf5e9c8dc06ba80f0af775a1930806455b587228172e57e88fc3a8a73d07",
+    "scope": "Shared ClassRep is an ARM64 metadata adaptation, not complete ZealOS debugger or reflection parity. UTM and Pi remain unverified."
+  }
 }

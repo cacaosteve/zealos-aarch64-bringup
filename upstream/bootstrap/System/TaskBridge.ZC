@@ -207,6 +207,15 @@ class CArmDocFormField
     I64 data, offset, elements, raw_type, pointer, is_array, is_internal;
 };
 extern Bool ZcDocFormField(U8 *class_name, I64 index, CArmDocFormField *field);
+// ClassRep needs names and nested class types as well as field offsets.
+class CArmClassRepField
+{
+    U8 *name, *type_name;
+    I64 offset, elements, raw_type, pointer, is_internal;
+};
+extern I64 ZcClassRepSize(U8 *class_name, I64 types);
+extern Bool ZcClassRepField(U8 *class_name, I64 types, I64 index,
+                            CArmClassRepField *field);
 // Aiwnios compiler reflection uses a different CHashClass/CMemberList ABI
 // from ZealOS. Keep ClassMeta on this explicit, checked field-description ABI.
 class CArmClassMetaField

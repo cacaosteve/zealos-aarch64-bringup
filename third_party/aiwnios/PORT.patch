@@ -2994,7 +2994,9 @@
          if (freg - AIWNIOS_FREG_START < AIWNIOS_FREG_CNT) {
 --- a/c/hash.c
 +++ b/c/hash.c
-@@ -5,7 +5,18 @@
+@@ -3,11 +3,22 @@
+ #include <stddef.h>
+ #include <stdint.h>
  #include <string.h>
 +#ifdef __aarch64__
 +extern CHash *ZcHashFindFallback(char *str, CHashTable *table, int64_t type,
@@ -3017,7 +3019,11 @@
 +  }
 +  return (int64_t)(res + (res >> 16) + ((res >> 15) & 1));
  }
-@@ -31,2 +42,12 @@
+ 
+ void HashDel(CHash *h) {
+@@ -29,6 +40,16 @@
+ }
+ 
  CHash *HashFind(char *str, CHashTable *table, int64_t type, int64_t inst) {
 +  if (!table)
 +    return NULL;
@@ -3030,6 +3036,57 @@
 +    return ZcHashFindFallback(str, table, type, inst);
 +#endif
    int64_t b = HashStr(str) & table->mask;
+   CHash *h;
+   for (h = table->body[b]; h; h = h->next) {
+@@ -65,30 +86,28 @@
+   *b = h;
+ }
+ 
+-static int64_t _HashDelStr(char *str, CHashTable *table, int64_t inst) {
+-  CHash **b = HashBucketFind(str, table), *h2;
+-  CHash *prev = NULL;
+-  for (h2 = *b; h2; h2 = h2->next) {
+-    if (!strcmp(h2->str, str)) {
+-      if (!--inst) {
+-        if (prev)
+-          prev->next = h2->next;
+-        HashDel(h2);
+-        return 1;
+-      }
+-    }
+-  next:
+-    prev = h2;
++int64_t HashRemDel(CHash *h, CHashTable *table, int64_t inst) {
++  /* ZealOS selects an instance by name and non-flag type bits in this
++   * table alone, then removes it only if it is the exact supplied entry. */
++  if (!h || !h->str || !table || !table->body || inst <= 0)
++    return 0;
++  uint32_t types = (uint32_t)h->type & UINT32_C(0x00ffffff);
++  CHash **link = HashBucketFind(h->str, table);
++  for (CHash *cur = *link; cur; link = &cur->next, cur = *link) {
++    if (!((uint32_t)cur->type & types) || strcmp(cur->str, h->str))
++      continue;
++    if (--inst)
++      continue;
++    cur->use_cnt = (int32_t)((uint32_t)cur->use_cnt + 1u);
++    if (cur != h)
++      return 0;
++    *link = cur->next;
++    HashDel(cur);
++    return 1;
+   }
+   return 0;
+ }
+ 
+-int64_t HashRemDel(CHash *h, CHashTable *table, int64_t inst) {
+-  int64_t res = _HashDelStr(h->str, table, inst);
+-  HashAdd(h, table);
+-  return res;
+-}
+-
+ void HashTableDel(CHashTable *table) {
+   int64_t i;
+   CHash *next, *cur;
 --- a/c/ffi_gen.c
 +++ b/c/ffi_gen.c
 @@ -124,20 +124,30 @@
@@ -3132,7 +3189,21 @@
    case IC_POS:
      goto unop;
      break;
-@@ -1008,6 +1024,55 @@
+@@ -990,7 +1006,12 @@
+   for (i = 0; i < rpn->length; i++) {
+     rpn2 = ICArgN(rpn, i);
+     if (!WONT_CHANGE(rpn2->type)) {
+-      if (!ArgRPNMutatesArgumentRegister(rpn, rpn->length - i - 1,
++      /* Postfix emission uses x2 as a scratch register while saving the old
++       * value. Writing that old value directly into argument register x2
++       * lets the increment overwrite it before the call. Keep the allocated
++       * spill for postfix operands instead of applying this optimization. */
++      if (rpn2->type != IC_POST_INC && rpn2->type != IC_POST_DEC &&
++          !ArgRPNMutatesArgumentRegister(rpn, rpn->length - i - 1,
+                                          rpn2->res.raw_type == RT_F64) &&
+           rpn->length - i - 1 < 8) {
+         // Favor storing in argument registers if they arent changed
+@@ -1008,6 +1029,55 @@
      }
    }
    rpn2 = ICArgN(rpn, rpn->length);
@@ -3188,7 +3259,7 @@
    if (rpn2->type == IC_SHORT_ADDR) {
      rpn2->code_misc->addr = code_off + bin;
      BEFORE_CALL;
-@@ -1016,6 +1081,14 @@
+@@ -1016,6 +1086,14 @@
    }
    if (rpn2->type == IC_GLOBAL) {
      if (rpn2->global_var->base.type & HTT_FUN) {
@@ -3203,7 +3274,7 @@
        fptr = ((CHashFun *)rpn2->global_var)->fun_ptr;
        if (cctrl->code_ctrl->final_pass && fptr != &DoNothing && fptr) {
          if (ARM_ERR_INV_OFF != ARM_bl((char *)fptr - (bin + code_off))) {
-@@ -1671,6 +1744,8 @@
+@@ -1671,6 +1749,8 @@
      return SpillsTmpRegs(rpn->base.next);
      break;
    case IC_SQR:
@@ -3212,7 +3283,7 @@
    case IC_POS:
      goto unop;
      break;
-@@ -2263,11 +2338,67 @@
+@@ -2263,11 +2343,67 @@
      defacto2:
        if ((rpn->flags & ICF_LOCK_EXPR) && next->raw_type != RT_F64) {
          code_off = __OptPassFinal(cctrl, next2, bin, code_off);
@@ -3283,7 +3354,7 @@
          ATOMIC_LOAD(derefed);
          AIWNIOS_ADD_CODE(i_op(MIR(cctrl, 0), 0, b->res.reg));
          tmp2.mode = MD_REG;
-@@ -2888,6 +3019,20 @@
+@@ -2888,6 +3024,20 @@
        if (rpn->res.keep_in_tmp)
          rpn->res = tmp;
  
@@ -3304,7 +3375,7 @@
        code_off = ICMov(cctrl, &rpn->res, &tmp, bin, code_off);
      }
      break;
-@@ -3192,6 +3337,36 @@
+@@ -3192,6 +3342,36 @@
        AIWNIOS_ADD_CODE(ARM_fmulReg(tmp.reg, next->res.reg, next->res.reg));
        code_off =
            ICMov(cctrl, &rpn->res, &tmp, bin, code_off); // Move tmp into result.
@@ -3341,7 +3412,7 @@
      }
      break;
    case IC_NAME:
-@@ -3258,29 +3433,18 @@
+@@ -3258,29 +3438,18 @@
      break;
      break;
    case IC_UNBOUNDED_SWITCH:
@@ -3377,7 +3448,7 @@
      code_off = __OptPassFinal(cctrl, next2, bin, code_off);
      tmp.raw_type = RT_I64i;
      tmp.mode = MD_REG;
-@@ -3294,7 +3458,6 @@
+@@ -3294,7 +3463,6 @@
      AIWNIOS_ADD_CODE(ARM_cmpRegX(tmp.reg, 2));
      fail2_addr = bin + code_off;
      AIWNIOS_ADD_CODE(ARM_bcc(ARM_GT, 0));
@@ -3385,7 +3456,7 @@
      //
      // See LAMA snail
      //
-@@ -3315,7 +3478,7 @@
+@@ -3315,7 +3483,7 @@
      AIWNIOS_ADD_CODE(ARM_ldrRegRegShiftX(MIR(cctrl, tmp.reg), 2, tmp.reg));
      // Load the function base address
      AIWNIOS_ADD_CODE(ARM_br(tmp.reg));
@@ -3394,7 +3465,7 @@
        ref = CodeMiscAddRef(rpn->code_misc->dft_lab, fail1_addr);
        ref->patch_cond_br = ARM_bcc;
        ref->user_data1 = ARM_LT;
-@@ -3693,6 +3856,7 @@
+@@ -3693,6 +3861,7 @@
        goto restore_reg;
        break;
      case IC_DEREF:
@@ -3402,7 +3473,7 @@
        next = rpn->base.next;
        code_off = __OptPassFinal(cctrl, next, bin, code_off);
        code_off = PutICArgIntoReg(cctrl, &next->res, RT_PTR, 1, bin, code_off);
-@@ -3720,13 +3884,13 @@
+@@ -3720,13 +3889,13 @@
          into_reg = 8;
        if (cctrl->code_ctrl->final_pass) {
          i = ARM_adrX(MIR(cctrl, into_reg),
@@ -3418,7 +3489,7 @@
        goto restore_reg;
      case IC_GLOBAL:
      get_glbl_ptr:
-@@ -3741,7 +3905,9 @@
+@@ -3741,7 +3910,9 @@
        } else
          abort();
        // Undefined?
@@ -3429,7 +3500,7 @@
          if (next->global_var->base.type & HTT_GLBL_VAR) {
            enter_addr = &next->global_var->data_addr;
          } else if (next->global_var->base.type & HTT_FUN) {
-@@ -4473,6 +4639,9 @@
+@@ -4473,6 +4644,9 @@
      break;
    case IC_GS:
    case IC_FS: {
@@ -3439,7 +3510,7 @@
      next = rpn->base.next;
      if (next->type != IC_RELOC && next->type != IC_I64) {
        printf("Expected a relocation at IC_FS,aborting(Contact nrootcoauto for "
-@@ -4768,6 +4937,7 @@
+@@ -4768,6 +4942,7 @@
    case IC_BASE_PTR:
    case IC_STR:
    case IC_CHR:
@@ -3447,7 +3518,7 @@
    case IC_FS:
    case IC_GS:
      if (spilled)
-@@ -4817,6 +4987,12 @@
+@@ -4817,6 +4992,12 @@
    case IC_NEG:
      goto unop;
      break;
@@ -3460,7 +3531,7 @@
    case IC_POS:
    case IC_SQR:
      goto unop;
-@@ -5155,6 +5331,10 @@
+@@ -5155,6 +5336,10 @@
            obin); // For OpenBSD sexy mapping(see mem.c or ask nroot)
        code_off = 0;
      }
@@ -3471,7 +3542,7 @@
      code_off = FuncProlog(cctrl, bin, code_off);
      for (cnt = 0; cnt < cnt2; cnt++) {
      enter:
-@@ -5162,10 +5342,14 @@
+@@ -5162,10 +5347,14 @@
        cctrl->backend_user_data2 = 0;
        cctrl->backend_user_data3 = 0;
        r = forwards[cnt];

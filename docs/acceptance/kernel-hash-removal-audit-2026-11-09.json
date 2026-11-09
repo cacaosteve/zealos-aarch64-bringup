@@ -6,7 +6,7 @@
     "Pinned Kernel/KHashA.ZC HashRemDel finds a matching instance in a single table, checks pointer identity, unlinks it, and calls HashDel.",
     "Pinned Kernel/KHashB.ZC HashDel handles additional allocations depending on entry type, including source symbols, define data, and dictionary words.",
     "Before the targeted follow-up, bootstrap FramePtrDel invalidated a matching entry and deferred reclamation until task teardown. A FramePtr-specific removal path now unlinks and frees local generic entries; the full HashRemDel implementation is still not present.",
-    "The vendored Aiwnios HashRemDel uses a different delete-and-add sequence; it must not be assumed equivalent to the pinned kernel routine. No guest caller or live failure was established by this source audit."
+    "The vendored Aiwnios HashRemDel previously deleted by name and re-added the supplied pointer. Its native table unlinking now checks the local instance and pointer identity; no live guest caller has been established."
   ],
   "frameptr_followup": {
     "result": "pass",
@@ -32,5 +32,18 @@
     },
     "scope": "FramePtr generic entries in the tested QEMU cases only; arbitrary hash entry types and live UTM/Pi are not verified."
   },
-  "remaining": "Exercise general guest hash removal on isolated tables with duplicate names, types, instance and pointer-identity mismatches, and type-specific cleanup; implement the complete guest behavior before claiming full-kernel parity."
+  "remaining": "Exercise general guest hash removal on isolated tables with duplicate names, types, instance and pointer-identity mismatches, and type-specific cleanup; implement the complete guest behavior before claiming full-kernel parity.",
+  "native_followup": {
+    "result": "pass",
+    "scope": "Host-compiled native generic entries and table unlinking; does not establish general guest HashRemDel or type-specific HashDel cleanup. The AArch64 kernel hash is unchanged because the routine is currently removed by linker garbage collection.",
+    "checks": [
+      "make check-aiwn-hash-remove (address and undefined-behavior sanitizers)",
+      "python3 scripts/check-upstream.py",
+      "make esp",
+      "QEMU --pci --quick --probe-demo-last-class"
+    ],
+    "kernel_sha256": "8b71a96fcb38419b3e7881f76bef2c04c49e672e49630d140254ecf3cd0dceb6",
+    "qemu_log": "build/native-hash-remove-lastclass.log",
+    "qemu_log_sha256": "4b62febf31ebe6e027d4ce7d2fb8f48f84b453cecd3ae298e1c3d"
+  }
 }

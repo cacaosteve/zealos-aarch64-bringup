@@ -1006,7 +1006,12 @@ static int64_t __ICFCallTOS(CCmpCtrl *cctrl, CRPN *rpn, char *bin,
   for (i = 0; i < rpn->length; i++) {
     rpn2 = ICArgN(rpn, i);
     if (!WONT_CHANGE(rpn2->type)) {
-      if (!ArgRPNMutatesArgumentRegister(rpn, rpn->length - i - 1,
+      /* Postfix emission uses x2 as a scratch register while saving the old
+       * value. Writing that old value directly into argument register x2
+       * lets the increment overwrite it before the call. Keep the allocated
+       * spill for postfix operands instead of applying this optimization. */
+      if (rpn2->type != IC_POST_INC && rpn2->type != IC_POST_DEC &&
+          !ArgRPNMutatesArgumentRegister(rpn, rpn->length - i - 1,
                                          rpn2->res.raw_type == RT_F64) &&
           rpn->length - i - 1 < 8) {
         // Favor storing in argument registers if they arent changed

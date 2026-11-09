@@ -86,28 +86,26 @@ void HashAdd(CHash *h, CHashTable *table) {
   *b = h;
 }
 
-static int64_t _HashDelStr(char *str, CHashTable *table, int64_t inst) {
-  CHash **b = HashBucketFind(str, table), *h2;
-  CHash *prev = NULL;
-  for (h2 = *b; h2; h2 = h2->next) {
-    if (!strcmp(h2->str, str)) {
-      if (!--inst) {
-        if (prev)
-          prev->next = h2->next;
-        HashDel(h2);
-        return 1;
-      }
-    }
-  next:
-    prev = h2;
+int64_t HashRemDel(CHash *h, CHashTable *table, int64_t inst) {
+  /* ZealOS selects an instance by name and non-flag type bits in this
+   * table alone, then removes it only if it is the exact supplied entry. */
+  if (!h || !h->str || !table || !table->body || inst <= 0)
+    return 0;
+  uint32_t types = (uint32_t)h->type & UINT32_C(0x00ffffff);
+  CHash **link = HashBucketFind(h->str, table);
+  for (CHash *cur = *link; cur; link = &cur->next, cur = *link) {
+    if (!((uint32_t)cur->type & types) || strcmp(cur->str, h->str))
+      continue;
+    if (--inst)
+      continue;
+    cur->use_cnt = (int32_t)((uint32_t)cur->use_cnt + 1u);
+    if (cur != h)
+      return 0;
+    *link = cur->next;
+    HashDel(cur);
+    return 1;
   }
   return 0;
-}
-
-int64_t HashRemDel(CHash *h, CHashTable *table, int64_t inst) {
-  int64_t res = _HashDelStr(h->str, table, inst);
-  HashAdd(h, table);
-  return res;
 }
 
 void HashTableDel(CHashTable *table) {

@@ -24,5 +24,15 @@
     "Destructive disk checks were not invoked.",
     "Live UTM, Pi hardware, and audio behavior."
   ],
-  "scope_note": "Partial source-level runtime coverage. This verifies the DC2Doc glyph-to-document path only, not the complete TOSMisc demo."
+  "scope_note": "Partial source-level runtime coverage. This verifies the DC2Doc glyph-to-document path only, not the complete TOSMisc demo.",
+  "two_glyph_followup": {
+    "date": "2026-11-09",
+    "result": "pass",
+    "target": "AArch64 PCI QEMU, one vCPU",
+    "kernel_sha256": "8b71a96fcb38419b3e7881f76bef2c04c49e672e49630d140254ecf3cd0dceb6",
+    "evidence": "A bitmap of adjacent system-font A and Z glyphs produced a saved DolDoc containing AZ and reported zero mismatch; the probe asserted tosmisc-ocr-text=1|0. TOSConfig and the existing single-glyph check also passed.",
+    "log": "build/tosmisc-two-glyph-retest.log",
+    "log_sha256": "73c4c0a67aabadb06824ac213866214cdf267c069b6d901f5be8bca5d95b6985",
+    "scope": "Non-destructive OCR helper only; the remaining TOSMisc routines and physical Pi/UTM remain unverified."
+  }
 }

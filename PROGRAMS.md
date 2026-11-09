@@ -108,12 +108,12 @@ unverified. See
 [`demo-mini-grlib-qemu-2026-11-07.json`](docs/acceptance/demo-mini-grlib-qemu-2026-11-07.json).
 
 `/Demo/Disk/DataBase.ZC` now passes a focused PCI QEMU form and storage round
-trip: it saves account 0, reopens the stock app, reads both fields from disk,
-and returns to a working terminal. The ARM64 source bundle formats those two
-fields directly because the stock x86 `ClassRep` reflection layout is not
-compatible with the current ARM64 reflection ABI. The check covers a same-boot
-readback, not persistence across a power cycle; live UTM and Pi behavior remain
-unverified. See
+trip: it saves account 0, reopens the original source, reads both fields from
+disk using the shared ARM64 `ClassRep` bridge, and returns to a working
+terminal. A QEMU check also reopened both fields after a cold boot from the
+same virtual disk. The bridge adapts the compiler metadata layout and treats
+some unresolved function-pointer metadata conservatively; complete reflection
+parity, live UTM and Pi behavior remain unverified. See
 [`demo-database-qemu-2026-11-07.json`](docs/acceptance/demo-database-qemu-2026-11-07.json).
 
 ## Digital Logic and embedded resources

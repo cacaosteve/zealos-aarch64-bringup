@@ -3,6 +3,97 @@ class CLastClassProbe
     I64 value;
 };
 
+class CLastClassInner
+{
+    I64 number;
+};
+class CLastClassOuter
+{
+    CLastClassInner inner;
+    U8 text[8];
+};
+class CLastClassBase
+{
+    I64 base_value;
+};
+class CLastClassDerived:CLastClassBase
+{
+    I64 own_value;
+    U8 *label;
+    CLastClassInner *nested;
+};
+
+I64 LastClassInheritedReportChecks()
+{
+    CLastClassDerived value;
+    CLastClassInner child;
+    CArmClassRepField field;
+    CDoc *doc = DocNew;
+    U8 *saved;
+    I64 result = 42;
+    I64 saved_flags, masked_flags;
+    MemSet(&value, 0, sizeof(value));
+    child.number = 0x789A;
+    if (!CheckPtr(&child) || CheckPtr(NULL) ||
+        CheckPtr(0xD00002619114AC68))
+        result = 4;
+    saved_flags = RFlagsGet;
+    RFlagsSet(saved_flags & ~(1 << 9));
+    CheckPtr(&child);
+    masked_flags = RFlagsGet;
+    RFlagsSet(saved_flags);
+    if (masked_flags & (1 << 9) || RFlagsGet != saved_flags)
+        result = 5;
+    value.base_value = 0x1234;
+    value.own_value = 0x5678;
+    value.label = "pointer-text";
+    value.nested = &child;
+    if (!ZcClassRepField("CLastClassDerived", HTT_CLASS, 0, &field) ||
+        StrCompare(field.name, "base_value") || field.offset != 0)
+        result = 1;
+    if (!ClassRep2(doc, &value, "CLastClassDerived", TRUE, TRUE, 0, 3, FALSE))
+        result = 2;
+    saved = DocSave(doc);
+    Print("classrep-inherited=[%s]\n", saved);
+    if (!saved || !StrMatch("base_value", saved) ||
+        !StrMatch("0000000000001234", saved) || !StrMatch("own_value", saved) ||
+        !StrMatch("0000000000005678", saved) || !StrMatch("pointer-text", saved) ||
+        !StrMatch("nested", saved) || !StrMatch("000000000000789A", saved) ||
+        StrMatch("$ER$", saved))
+        result = 3;
+    Free(saved);
+    DocDel(doc);
+    return result;
+}
+
+I64 LastClassReportFieldChecks()
+{
+    CLastClassOuter value;
+    CDoc *doc = DocNew;
+    U8 *saved;
+    I64 result = 42;
+    CArmClassRepField f0, f1;
+    I64 r0 = ZcClassRepField("CLastClassOuter", HTT_CLASS, 0, &f0);
+    I64 r1 = ZcClassRepField("CLastClassOuter", HTT_CLASS, 1, &f1);
+    if (!r0 || !r1 || StrCompare(f0.name, "inner") ||
+        StrCompare(f1.name, "text"))
+        result = 3;
+    MemSet(&value, 0, sizeof(value));
+    value.inner.number = 42;
+    StrCopy(value.text, "TEST");
+    if (!ClassRep2(doc, &value, "CLastClassOuter", TRUE, TRUE, 0, 3, FALSE))
+        result = 1;
+    saved = DocSave(doc);
+    Print("classrep-fields=[%s]\n", saved);
+    if (!saved || !StrMatch("inner", saved) || !StrMatch("CLastClassInner", saved) || !StrMatch("number", saved) ||
+        !StrMatch("000000000000002A", saved) || !StrMatch("text", saved) ||
+        !StrMatch("TEST", saved) || StrMatch("$ER$", saved))
+        result = 2;
+    Free(saved);
+    DocDel(doc);
+    return result;
+}
+
 I64 LastClassU8(U8 *value, U8 *name=lastclass)
 {
     // The KernelA bootstrap macro expands U8 to the compiler's U8i class.

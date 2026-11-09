@@ -1,0 +1,17 @@
+I64 DocTreeMarkerChecks()
+{
+    CDoc *doc = DocNew;
+    U8 *saved;
+    I64 result = 42;
+    DocPrint(doc, "$$TR,\"inner\"$$\n$$ID,2$$Nested text\n$$ID,-2$$");
+    DocPrint(doc, "$$TR,\"%s\"$$\n", "formatted_branch");
+    saved = DocSave(doc);
+    Print("tree-marker-saved=[%s]\n", saved);
+    if (!saved || !StrMatch("inner", saved) ||
+        !StrMatch("Nested text", saved) || !StrMatch("formatted_branch", saved) ||
+        StrMatch("$ER$", saved))
+        result = 1;
+    Free(saved);
+    DocDel(doc);
+    return result;
+}
