@@ -31,6 +31,8 @@ p.add_argument('--window-frame-only', action='store_true',
 p.add_argument('--probe-upstream', action='store_true', help='check current full-header/subsystem compiler results')
 p.add_argument('--probe-task-reset-context', action='store_true',
                help='isolate task bridge header context after compiler reset')
+p.add_argument('--probe-sound-quiet', action='store_true',
+               help='stop the graphical terminal and window manager before a fast source sound probe')
 p.add_argument('--probe-module', metavar='ARCHIVE_PATH',
                help='load an unchanged upstream source after KernelA/B in a disposable guest')
 p.add_argument('--probe-module-override', type=pathlib.Path,
@@ -442,6 +444,8 @@ p.add_argument('--probe-vocabulary', action='store_true',
                help='exercise the original Vocabulary quiz, answer feedback, definition popup and exit')
 p.add_argument('--probe-psalmody', action='store_true',
                help='exercise the original Psalmody editor, note entry, playback and exit')
+p.add_argument('--probe-psalmody-audio-timer', action='store_true',
+               help='run the Psalmody probe with the experimental audio timer enabled')
 p.add_argument('--probe-demo-tos-theme', action='store_true',
                help='run the original TOSTheme animation and song, then check terminal recovery')
 p.add_argument('--probe-input-edges', action='store_true',
@@ -489,7 +493,11 @@ p.add_argument('--probe-source-kernel', action='store_true',
 p.add_argument('--probe-source-fast', action='store_true',
                help='after boot/framebuffer checks, run source probes before the longer PCI suite')
 args = p.parse_args()
-if args.probe_source_fast and len(args.probe_source) > 1 and not args.probe_source_kernel:
+if args.probe_psalmody_audio_timer and not args.probe_psalmody:
+    p.error('--probe-psalmody-audio-timer requires --probe-psalmody')
+if args.probe_sound_quiet and not args.probe_source_fast:
+    p.error('--probe-sound-quiet requires --probe-source-fast')
+if args.probe_source_fast and args.probe_source and len(args.probe_source) > 1 and not args.probe_source_kernel:
     p.error("multiple fast source probes require --probe-source-kernel because each probe resets the compiler")
 explicit_program_catalog = args.probe_program_catalog
 if args.probe_source_fast:
@@ -2067,9 +2075,13 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         if args.probe_task_reset_context:
             command('zreset', 'native compiler ready')
             command('zload /Kernel/KernelA.HH', 'zc: loaded /Kernel/KernelA.HH')
+            for typename in ('CDirEntry', 'CMemUnused', 'CTask'):
+                command('zc I64 TaskReset' + typename + 'Size(){return sizeof(' +
+                        typename + ');}', 'zc: executed')
             command('zc I64 TaskResetTextSize(){return sizeof(CTextGlobals);}',
                     'zc: executed')
             command('zcall TaskResetTextSize', 'zc => 0x')
+            command('zload /Kernel/KernelB.HH', 'zc: loaded /Kernel/KernelB.HH')
             command('zload /System/TaskBridge.ZC', 'zc: loaded /System/TaskBridge.ZC')
             command('zstatus', 'failed=0')
             raise SystemExit(0)
@@ -2306,6 +2318,9 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             boot_sources = ()
             if args.probe_source_kernel:
                 command('zreset', 'zc: native compiler ready')
+            if args.probe_sound_quiet:
+                command('gtermstop', 'gterm: graphical terminal stopped')
+                command('winmgrstop', 'winmgr: stopped')
             command('zvol', 'source partition ready')
             # Avoid listing the entire source volume here. The direct zload
             # below is the authoritative check for the requested probe file.
@@ -2349,9 +2364,35 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 print(('SOURCE COMPILES ' if passed else 'SOURCE BLOCKED ')
                       +str(source)+'\n'+result, flush=True)
                 if args.probe_source_call:
-                    command('zcall '+args.probe_source_call,
-                            'zc => 0x000000000000002a')
+                    called = command('zcall '+args.probe_source_call,
+                                     'zc => 0x000000000000002a')
+                    if ('sound_pump_max_gap_us=' in called or
+                            'sound_timer_cycle_max_gap_us=' in called):
+                        print(called, flush=True)
+                    if ((args.probe_sound_quiet and args.probe_source_call == 'SoundDurationChecks') or
+                            args.probe_source_call == 'SoundDurationSettledChecks'):
+                        duration = re.search(r'sound_duration_ms=(\d+)', called)
+                        gap = re.search(r'sound_pump_max_gap_us=(\d+)', called)
+                        if not duration or not 600 <= int(duration.group(1)) <= 900:
+                            raise RuntimeError('quiet audio wait duration outside 600–900 ms: '+called)
+                        if not gap or int(gap.group(1)) >= 80000:
+                            raise RuntimeError('quiet audio refill gap exceeds its 80 ms queue: '+called)
+                    if args.probe_source_call == 'SoundBusyChecks':
+                        gap = re.search(r'sound_pump_max_gap_us=(\d+)', called)
+                        if not gap or int(gap.group(1)) < 400000:
+                            raise RuntimeError('busy-task probe did not observe the expected refill gap: '+called)
                 command('zreset', 'native compiler ready')
+                if args.probe_source_call in ('SoundBusyTimerChecks',
+                                              'SoundBusyTimerSettledChecks',
+                                              'SoundTimerResetActiveChecks'):
+                    command('zc extern I64 ZcSoundTimerEnabled(); '
+                            'I64 SoundTimerResetChecks(){return ZcSoundTimerEnabled;}',
+                            'zc: executed')
+                    command('zcall SoundTimerResetChecks', 'zc => 0x0000000000000000')
+                    command('zc extern I64 ZcSoundCurrentHz(); '
+                            'I64 SoundTimerResetTone(){return ZcSoundCurrentHz;}',
+                            'zc: executed')
+                    command('zcall SoundTimerResetTone', 'zc => 0x0000000000000000')
                 if index + 1 < len(args.probe_source):
                     for kernel_source in boot_sources:
                         command('zload '+kernel_source,
@@ -12067,6 +12108,10 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             print('PASS Vocabulary quiz Escape and shell recovery', flush=True)
             raise SystemExit(0)
         if args.probe_psalmody:
+            if args.probe_psalmody_audio_timer:
+                command('zc extern I64 ZcSoundTimerEnable(); '
+                        'Print("sound_timer_enabled=%d\\n",ZcSoundTimerEnable);',
+                        'sound_timer_enabled=1')
             focus_graphical_terminal()
             run_graphical_terminal_command(
                 'psalmody-ready', '40+2;', 'ans=0x2A=42')
@@ -12109,6 +12154,14 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             run_graphical_terminal_command(
                 'psalmody-exit-smoke', '40+2;', 'ans=0x2A=42', timeout=20)
             command('zstatus', 'failed=0')
+            if args.probe_psalmody_audio_timer:
+                timer_status = command('zc extern I64 ZcSoundTimerIrqCount(); '
+                                       'Print("psalmody_audio_irqs=%d\\n",ZcSoundTimerIrqCount);',
+                                       'psalmody_audio_irqs=')
+                count = re.search(r'psalmody_audio_irqs=(\d+)', timer_status)
+                if not count or int(count.group(1)) == 0:
+                    raise RuntimeError('Psalmody did not receive any audio timer IRQs: '+timer_status)
+                print('PASS Psalmody audio timer IRQ count: '+count.group(1), flush=True)
             print('PASS Psalmody editor, note entry, playback, Shift+Escape and terminal recovery',
                   flush=True)
             raise SystemExit(0)
@@ -14578,10 +14631,9 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             raise SystemExit(0)
         if args.probe_task_jobs:
             command('zload /Kernel/KernelA.HH', 'zc: loaded /Kernel/KernelA.HH')
-            # KernelB.HH contains legacy SYS_CODE_BP/SYS_DATA_BP linker names
-            # that have no ARM64 assembly definitions. They are irrelevant to
-            # the cooperative JobQueue check and make this focused probe stop
-            # before it reaches the task runtime.
+            # KernelB binds the guest task and supplies the bit operations and
+            # other declarations consumed by the current TaskBridge source.
+            command('zload /Kernel/KernelB.HH', 'zc: loaded /Kernel/KernelB.HH')
             command('zload /System/TaskBridge.ZC',
                     'zc: loaded /System/TaskBridge.ZC')
             command('zload /Tests/TaskJobs.ZC', 'zc: loaded /Tests/TaskJobs.ZC')
@@ -14596,6 +14648,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             raise SystemExit(0)
         if args.probe_task_job_queue:
             command('zload /Kernel/KernelA.HH', 'zc: loaded /Kernel/KernelA.HH')
+            command('zload /Kernel/KernelB.HH', 'zc: loaded /Kernel/KernelB.HH')
             command('zload /System/TaskBridge.ZC',
                     'zc: loaded /System/TaskBridge.ZC')
             command('zload /Tests/TaskJobQueue.ZC',

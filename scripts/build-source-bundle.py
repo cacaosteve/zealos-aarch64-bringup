@@ -38,6 +38,13 @@ for name, expected in manifest['files'].items():
             data = translate_legacy_kernel_header(data)
         except ValueError as exc:
             raise SystemExit(f'ARM64 legacy kernel header overlay no longer applies: {exc}') from exc
+    if rel == 'System/Sound.ZC':
+        # The music bridge supplies shared globals; reuse the pinned noise and
+        # sweep tasks after the kernel audio and task interfaces are bound.
+        marker = b'#define SE_NOISE\t\t0\n'
+        if data.count(marker) != 1:
+            raise SystemExit('pinned sound effects section changed')
+        entries['System/SoundEffects.ZC'] = data[data.index(marker):]
     if rel == 'Demo/Graphics/FontEd.ZC':
         data = translate_fonted_draw_callback(data)
     if rel == 'System/God/HolySpirit.ZC':

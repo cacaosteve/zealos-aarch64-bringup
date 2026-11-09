@@ -1,0 +1,271 @@
+// Exercises the stock asynchronous sound-effect tasks with a WAV backend.
+extern I64 ZcSoundMaxPumpGapUs();
+extern I64 ZcSoundSubmittedFrames();
+extern I64 ZcSoundTimerEnable();
+extern I64 ZcSoundTimerIrqCount();
+extern I64 ZcSoundTimerEnabled();
+extern I64 ZcSoundCurrentHz();
+I64 SoundTimerUnavailableChecks()
+{
+    if (ZcSoundTimerEnable || ZcSoundTimerEnabled)
+        return 1;
+    return 42;
+}
+I64 SoundNoiseChecks()
+{
+    CTask *effect;
+
+    if (Noise(0, 60, 84) || music.mute)
+        return 1;
+    effect = Noise(600, 60, 84);
+    if (!effect || music.mute != 1)
+        return 2;
+    Sleep(1000);
+    if (music.mute)
+        return 3;
+    Sleep(300);
+    return 42;
+}
+
+I64 SoundSweepChecks()
+{
+    CTask *effect;
+
+    if (Sweep(0, 60, 84) || music.mute)
+        return 1;
+    effect = Sweep(600, 60, 84);
+    if (!effect || music.mute != 1)
+        return 2;
+    Sleep(1000);
+    if (music.mute)
+        return 3;
+    Sleep(300);
+    return 42;
+}
+
+I64 SoundEffectTimerChecks()
+{
+    I64 result;
+    if (!ZcSoundTimerEnable)
+        return 1;
+    result = SoundNoiseChecks;
+    if (result != 42)
+        return result;
+    result = SoundSweepChecks;
+    if (result != 42)
+        return result;
+    if (!ZcSoundTimerIrqCount)
+        return 2;
+    return 42;
+}
+
+// Compare PCM duration with a steady note held for the same interval.
+I64 SoundDurationChecks()
+{
+    I64 start = ToI64(tS * 1000.0);
+    Sound(60);
+    Sleep(600);
+    Sound(0);
+    Print("sound_duration_ms=%d\n", ToI64(tS * 1000.0) - start);
+    Print("sound_pump_max_gap_us=%d\n", ZcSoundMaxPumpGapUs);
+    Print("sound_submitted_frames=%d\n", ZcSoundSubmittedFrames);
+    Sleep(1000);
+    return 42;
+}
+
+I64 SoundDurationSettledChecks()
+{
+    // Allow startup tasks and the splash screen to finish first.
+    Sleep(15000);
+    return SoundDurationChecks;
+}
+
+I64 sound_busy_complete;
+I64 sound_busy_running, sound_busy_interleaved;
+U0 SoundBusyWorker(U8 *unused)
+{
+    F64 until = tS + 0.5;
+    F64 sum = 0.0;
+    I64 iterations = 0;
+    if (unused) {}
+    sound_busy_running = 1;
+    while (tS < until)
+    {
+        sum += 0.5;
+        iterations++;
+    }
+    sound_busy_running = 0;
+    if (iterations && sum == iterations * 0.5)
+        sound_busy_complete = 42;
+    else
+        sound_busy_complete = 4;
+}
+U0 SoundBusyWitness(U8 *unused)
+{
+    if (unused) {}
+    if (sound_busy_running)
+        sound_busy_interleaved = 1;
+}
+
+// A non-yielding task must not be preemptively rotated, but should not
+// prevent hardware-backed sound from continuing to play.
+I64 SoundBusyChecks()
+{
+    sound_busy_complete = 0;
+    sound_busy_running = sound_busy_interleaved = 0;
+    Sound(60);
+    if (!Spawn(&SoundBusyWorker, NULL, "AudioBusy", -1, Fs))
+        return 1;
+    if (!Spawn(&SoundBusyWitness, NULL, "AudioWitness", -1, Fs))
+        return 2;
+    Sleep(800);
+    Sound(0);
+    Print("sound_pump_max_gap_us=%d\n", ZcSoundMaxPumpGapUs);
+    Print("sound_submitted_frames=%d\n", ZcSoundSubmittedFrames);
+    Sleep(300);
+    if (sound_busy_interleaved)
+        return 3;
+    return sound_busy_complete;
+}
+
+I64 SoundBusyTimerChecks()
+{
+    I64 result;
+    if (!ZcSoundTimerEnable)
+        return 1;
+    result = SoundBusyChecks;
+    Print("sound_timer_irqs=%d\n", ZcSoundTimerIrqCount);
+    if (ZcSoundTimerIrqCount < 10)
+        return 2;
+    if (ZcSoundMaxPumpGapUs >= 80000)
+        return 3;
+    return result;
+}
+
+I64 SoundBusyTimerSettledChecks()
+{
+    Sleep(15000);
+    return SoundBusyTimerChecks;
+}
+
+I64 SoundTimerCycleChecks()
+{
+    I64 flags, i, count, max_gap = 0, gap;
+    if (!ZcSoundTimerEnable)
+        return 1;
+    flags = RFlagsGet;
+    RFlagsSet(flags | (1 << 9));
+    for (i = 0; i < 40; i++)
+    {
+        Sound(60 + i % 12);
+        Sleep(50);
+        gap = ZcSoundMaxPumpGapUs;
+        if (gap > max_gap)
+            max_gap = gap;
+        Sound(0);
+        count = ZcSoundTimerIrqCount;
+        if (!count)
+        {
+            RFlagsSet(flags);
+            return 2;
+        }
+        Sleep(20);
+        if (ZcSoundTimerIrqCount != count)
+        {
+            RFlagsSet(flags);
+            return 3;
+        }
+    }
+    RFlagsSet(flags);
+    Print("sound_timer_cycle_max_gap_us=%d\n", max_gap);
+    if (max_gap >= 80000)
+        return 4;
+    return 42;
+}
+
+I64 SoundTimerBeepChecks()
+{
+    I64 flags, count;
+    if (!ZcSoundTimerEnable)
+        return 1;
+    flags = RFlagsGet;
+    RFlagsSet(flags | (1 << 9));
+    Beep(70, FALSE);
+    count = ZcSoundTimerIrqCount;
+    if (count < 10 || ZcSoundCurrentHz)
+    {
+        RFlagsSet(flags);
+        return 2;
+    }
+    Sleep(50);
+    if (ZcSoundTimerIrqCount != count)
+    {
+        RFlagsSet(flags);
+        return 3;
+    }
+    Beep(65, TRUE);
+    count = ZcSoundTimerIrqCount;
+    if (count < 10 || ZcSoundCurrentHz)
+    {
+        RFlagsSet(flags);
+        return 4;
+    }
+    Sleep(50);
+    if (ZcSoundTimerIrqCount != count)
+    {
+        RFlagsSet(flags);
+        return 5;
+    }
+    RFlagsSet(flags);
+    return 42;
+}
+
+I64 SoundTimerResetActiveChecks()
+{
+    if (!ZcSoundTimerEnable)
+        return 1;
+    Sound(60);
+    if (!ZcSoundTimerEnabled || ZcSoundCurrentHz != 440)
+        return 2;
+    // Deliberately leave the timer and tone active for the host reset check.
+    return 42;
+}
+
+I64 SoundTimerMaskChecks()
+{
+    I64 flags, count;
+    F64 until;
+    if (!ZcSoundTimerEnable)
+        return 1;
+    flags = RFlagsGet;
+    RFlagsSet(flags | (1 << 9));
+    RFlagsSet(flags & ~(1 << 9));
+    Sound(60);
+    until = tS + 0.1;
+    while (tS < until) {}
+    count = ZcSoundTimerIrqCount;
+    RFlagsSet(flags | (1 << 9));
+    if (count)
+    {
+        Sound(0);
+        RFlagsSet(flags);
+        return 3;
+    }
+    Sleep(200);
+    if (ZcSoundTimerIrqCount < 10)
+    {
+        Sound(0);
+        RFlagsSet(flags);
+        return 4;
+    }
+    Sound(0);
+    count = ZcSoundTimerIrqCount;
+    Sleep(100);
+    if (ZcSoundTimerIrqCount != count)
+    {
+        RFlagsSet(flags);
+        return 5;
+    }
+    RFlagsSet(flags);
+    return 42;
+}

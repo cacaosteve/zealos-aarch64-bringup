@@ -1,0 +1,67 @@
+extern I64 ZcSoundTimerEnable();
+extern I64 ZcSoundTimerIrqCount();
+
+I64 sound_scan_started, sound_scan_finished, sound_scan_peer_early, sound_scan_peer_done;
+I64 sound_scan_irqs;
+U0 SoundTimerScanner(U8 *unused)
+{
+    I64 start_irqs = ZcSoundTimerIrqCount;
+    F64 until = tS + 0.12;
+    if (unused) {}
+    sound_scan_started = 1;
+    while (tS < until)
+    {
+        MessageScan;
+        if (sound_scan_peer_early)
+            break;
+    }
+    sound_scan_irqs = ZcSoundTimerIrqCount - start_irqs;
+    sound_scan_finished = 1;
+    Yield;
+}
+U0 SoundTimerPeer(U8 *unused)
+{
+    if (unused) {}
+    while (!sound_scan_started)
+        Yield;
+    if (!sound_scan_finished)
+        sound_scan_peer_early = 1;
+    sound_scan_peer_done = 1;
+}
+
+I64 SoundTimerMessageChecks()
+{
+    I64 result, flags, irqs, i;
+    CTask *scanner, *peer;
+    if (!ZcSoundTimerEnable)
+        return 1;
+    flags = RFlagsGet;
+    RFlagsSet(flags | (1 << 9));
+    Sound(60);
+    sound_scan_started = sound_scan_finished = sound_scan_peer_early = sound_scan_peer_done = 0;
+    sound_scan_irqs = 0;
+    scanner = Spawn(&SoundTimerScanner);
+    peer = Spawn(&SoundTimerPeer);
+    if (!scanner || !peer)
+    {
+        Sound(0);
+        RFlagsSet(flags);
+        return 3;
+    }
+    for (i = 0; i < 16 && (TaskValidate(scanner) || TaskValidate(peer)); i++)
+        Yield;
+    if (!sound_scan_finished || !sound_scan_peer_done || sound_scan_peer_early || sound_scan_irqs < 2)
+    {
+        Sound(0);
+        RFlagsSet(flags);
+        return 4;
+    }
+    result = TaskMessageSchedulingChecks;
+    Sleep(200);
+    Sound(0);
+    irqs = ZcSoundTimerIrqCount;
+    RFlagsSet(flags);
+    if (irqs < 5)
+        return 2;
+    return result;
+}

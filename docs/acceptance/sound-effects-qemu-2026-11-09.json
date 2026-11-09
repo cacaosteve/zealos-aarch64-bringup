@@ -1,0 +1,138 @@
+{
+  "date": "2026-11-09",
+  "target": "AArch64 QEMU virt, one vCPU, PCI VirtIO sound with WAV backend",
+  "kernel_sha256": "08274825468ab5649f7854bbd6e6750c94924afd49e92ec48341a24dc93c194c",
+  "source": "Pinned System/Sound.ZC effect section, bundled as System/SoundEffects.ZC",
+  "result": "partial",
+  "verified": [
+    "Separate Noise(600,60,84) and Sweep(600,60,84) source probes returned 42, rejected zero durations, started tasks, and restored music.mute after task exit.",
+    "Separate WAV captures contained 24696 and 22932 nonzero 16-bit stereo samples respectively, each with peak amplitude 7000 at 44100 Hz.",
+    "A steady Sound(60) plus Sleep(600) control also returned 42 but captured about 0.32 seconds of PCM, suggesting that the duration discrepancy is not confined to the new effect tasks.",
+    "Psalmody editor, note entry, playback and Shift+Escape recovery passed with VirtIO sound; its WAV capture contained 22932 nonzero samples."
+  ],
+  "commands": [
+    "QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device -audiodev wav,id=sound0,path=build/sound-noise.wav -device virtio-sound-pci,audiodev=sound0' python3 scripts/check-compat.py --pci --probe-source-fast --probe-source tests/compat/SoundEffects.ZC --probe-source-call SoundNoiseChecks",
+    "Repeat with path=build/sound-sweep.wav and --probe-source-call SoundSweepChecks, then with path=build/sound-duration.wav and --probe-source-call SoundDurationChecks.",
+    "python3 scripts/check-sound-effects-wav.py build/sound-noise.wav build/sound-sweep.wav build/sound-effects-psalmody.wav"
+  ],
+  "logs_sha256": {
+    "build/sound-noise.log": "9d8825c00933035a9db45f10cad92f543b66607d180b9ce07a519e64c47325b1",
+    "build/sound-sweep.log": "2ba92c89c72577ebb781cf1a410c95ba68fbd3cfe61df74ee53e72df4cae1bef",
+    "build/sound-effects-psalmody.log": "ae687f89ec7fa0b859de45b16a713b527f3a0f63b676aa085fba1ffe454f37bd",
+    "build/sound-duration.log": "f624a092245dff0b04e828ef487926c541f3f1ff50b49ae14572240f373a9fb4"
+  },
+  "not_verified": [
+    "The separate WAV payloads last about 0.28 and 0.26 seconds despite 600 ms requested effects; the reason and timing fidelity are not established.",
+    "Live UTM output, real Pi HDMI and headphone output, game integration, overlapping effects and exact sound characteristics are not verified."
+  ],
+  "timing_investigation": {
+    "quiet": "With the graphical terminal and window manager stopped, the 600 ms guest wait measured 600 ms, maximum sound-pump gap was 88 microseconds, and WAV contained about 680 ms of PCM including queued tail.",
+    "desktop": "With the desktop active, the same wait measured 1110 ms, a 665516 microsecond maximum sound-pump gap was observed when the Terminal task next yielded, and the WAV held about 320 ms. The identity of the code that occupied that interval remains unconfirmed.",
+    "limits": "Diagnostic builds were used for the pump-gap and task trace; this is evidence of delayed service rather than proof of the precise cause or live UTM/Pi behavior. No scheduling or MessageScan handoff was added.",
+    "logs": [
+      "build/sound-gap-quiet.log",
+      "build/sound-task-trace.log"
+    ],
+    "clean_quiet_followup": {
+      "kernel_sha256": "78a3b5418ec6594e712ba3079c3f532af3f95d6bee0a19a0d111305e97a38533",
+      "log": "build/sound-gap-quiet-final.log",
+      "log_sha256": "c46505680609d952ffa1fbd6ee2395968a1d0fcf8aad46de4f96d5afa111922c",
+      "wait_ms": 600,
+      "max_refill_gap_us": 114,
+      "nonzero_stereo_samples": 59976,
+      "result": "pass"
+    },
+    "pi_desktop_build": "build/kernel-pi-desktop.elf sha256 7d8edcfa91f2205dc72f95a3bda6ed340daee534b2e48aff2b495b5460332305; build only",
+    "desktop_settled": {
+      "kernel_sha256": "78a3b5418ec6594e712ba3079c3f532af3f95d6bee0a19a0d111305e97a38533",
+      "log": "build/sound-settled.log",
+      "log_sha256": "2b450bcd9ae066fe7d1f0985352c7d46b8f312f7e0537e0b59590cbecd36c7d0",
+      "result": "After a 15-second guest settling wait, a 600 ms tone measured 600 ms with a 15456 us maximum refill gap; the WAV contained 58212 nonzero stereo samples (~660 ms).",
+      "limitation": "This does not establish uninterrupted sound under arbitrary CPU-bound tasks or identify the startup task that caused the earlier long gap."
+    },
+    "non_yielding_worker": {
+      "kernel_sha256": "691a3e43e039763da8a8503d38b9eb3952a139502a552434c00d6f5a5361b60c",
+      "log": "build/sound-busy-counted.log",
+      "log_sha256": "da30f441f6e5544e9286b6708d980a81df701c7bd937b01f21137c5b060f84d8",
+      "results": [
+        "A 500 ms non-yielding task and a witness verified that the witness did not run during the busy interval.",
+        "The maximum audio refill gap was 502071 microseconds, exceeding the four-buffer 80 ms queue.",
+        "The guest submitted 40320 frames at 48000 Hz, and the QEMU WAV contained 0.84 seconds of nonzero audio."
+      ],
+      "interpretation": "The WAV records sample payload rather than proving when samples played; its continuous waveform cannot rule out a real-time underrun during the 502 ms service gap. Physical Pi and live UTM output have not been tested."
+    }
+  },
+  "interrupt_refill_prototype": {
+    "status": "opt-in only; not enabled by default",
+    "design": "On supported QEMU systems with real boot-time timer IRQs, a 10 ms physical-timer interrupt refills the existing VirtIO sound queue without switching guest tasks. Sound queue updates mask IRQs against re-entry; IRQ entry preserves GPR, SIMD and FP control/status. The timer respects the guest interrupt mask and stops with sound; a session reset disables the opt-in mode and stops its tone. Pi is deliberately excluded.",
+    "qemu_evidence": [
+      {
+        "kernel_sha256": "0c6abb39d385523b2e1fb09da13b63fe3b07453db4263e94013a006ae406c82f",
+        "log": "build/sound-busy-timer-f64.log",
+        "sha256": "35735ab142470c527aa693bc0b5773dd10b74009233436a4e2b723c229ea5d9e",
+        "result": "Busy task and witness passed with floating-point arithmetic; 50 timer IRQs and 10060 us maximum refill gap."
+      },
+      {
+        "kernel_sha256": "0c6abb39d385523b2e1fb09da13b63fe3b07453db4263e94013a006ae406c82f",
+        "log": "build/sound-timer-mask-retry.log",
+        "sha256": "9192ebc329f78fc7ac29c698ed4b3ee36d697156c50a294457466aad7f5a28de",
+        "result": "No timer IRQs while masked; service resumed on unmask, and stopped after the tone."
+      },
+      {
+        "kernel_sha256": "0c6abb39d385523b2e1fb09da13b63fe3b07453db4263e94013a006ae406c82f",
+        "log": "build/sound-timer-messages-retry.log",
+        "sha256": "c5c5f5dfec42bace63fc1b1e6676b8a95626c3861ec9686e0d2cc4e8dde19b6f",
+        "result": "Existing MessageScan, KeyScan, CharScan and FlushMessages no-switch, explicit Yield, and blocked MessageGet checks passed with sound timer enabled."
+      },
+      {
+        "kernel_sha256": "6699cda637447ceb3ccd6f4aa95b4178d8acf0f50d3be0d151d5632dc638ff50",
+        "log": "build/sound-effects-timer.log",
+        "sha256": "934cd390b4d062f772e8d841ad69c76de7dea318137aaa182115584cb8ae4d93",
+        "result": "Noise and Sweep effect tasks passed and generated captured PCM."
+      },
+      {
+        "kernel_sha256": "26478073ca06b0297d7f06eaf07497129f9f593a436609abad9c6dcdd564e4db",
+        "log": "build/sound-active-reset-verified.log",
+        "sha256": "dc88c1df3a116b7a81e331c06cee500a0940938a6c66d180b21a0449d5374b86",
+        "result": "Reset while timer and 440 Hz tone were active turned both off."
+      },
+      {
+        "kernel_sha256": "26478073ca06b0297d7f06eaf07497129f9f593a436609abad9c6dcdd564e4db",
+        "log": "build/sound-timer-messages-overlap.log",
+        "sha256": "4debee21eae9d4ca3d5e4381a46689d66e6ba4151b1c626ca7a9f4024717342c",
+        "result": "At least two audio timer IRQs occurred during a 120 ms MessageScan polling loop while a witness peer remained unscheduled until explicit Yield; the existing message scheduling regression also passed."
+      },
+      {
+        "kernel_sha256": "26478073ca06b0297d7f06eaf07497129f9f593a436609abad9c6dcdd564e4db",
+        "log": "build/sound-timer-messages-witness.log",
+        "sha256": "a350d5a2fca48f36f5f3dc4bf93b7889179137aa63a966401c7bcbf9b70a5633",
+        "result": "At least two audio timer IRQs occurred during a MessageScan polling loop; a peer confirmed it ran only after the scanner finished polling and yielded. The existing message scheduling regression also passed."
+      },
+      {
+        "kernel_sha256": "26478073ca06b0297d7f06eaf07497129f9f593a436609abad9c6dcdd564e4db",
+        "log": "build/sound-timer-unavailable.log",
+        "sha256": "78caef618b63a2136689349a3ceb7e871b3cd74cad3b5aa56c02d6377c7bf494",
+        "result": "With no VirtIO sound device, the opt-in request returned unavailable and left the timer mode disabled."
+      },
+      {
+        "kernel_sha256": "26478073ca06b0297d7f06eaf07497129f9f593a436609abad9c6dcdd564e4db",
+        "log": "build/psalmody-irq.log",
+        "sha256": "e2befb88fc59c17ac9b47ac441126f8ce254079abfd7b4c809166e401c1ffc78",
+        "result": "With the timer explicitly enabled, the Psalmody editor accepted a note, performed playback, returned via Shift+Escape to a working terminal, generated 24696 nonzero stereo samples, and recorded nine audio timer IRQs."
+      },
+      {
+        "kernel_sha256": "26478073ca06b0297d7f06eaf07497129f9f593a436609abad9c6dcdd564e4db",
+        "log": "build/sound-timer-desktop-busy.log",
+        "sha256": "2b2d49182db557003034bf302f3bddbed74d117bdd59352b1a301f111856c06a",
+        "result": "With the desktop running after a 15-second settling wait, the CPU-bound F64 task and non-switch witness passed while the timer ran; 77 timer IRQs and a 12944 us maximum refill gap were recorded, and captured PCM was nonzero."
+      }
+    ],
+    "limits": [
+      "The WAV backend does not prove real-time audible continuity.",
+      "Not yet tested on live UTM or Pi; Pi audio uses a different backend and this timer path is disabled there.",
+      "The F64 check does not exhaustively verify all SIMD registers, nested interrupt conditions or longer workloads.",
+      "One HVF run observed a 69918 us gap against an 80000 us queue; latency under host load is not yet bounded.",
+      "No timer-driven task switching or MessageScan handoff has been added."
+    ]
+  }
+}

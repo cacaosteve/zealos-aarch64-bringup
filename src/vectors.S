@@ -2,6 +2,7 @@
  * AArch64 exception vectors (VBAR_EL1).
  * Each entry is 0x80 bytes; table must be 2KiB-aligned.
  */
+.arch armv8-a+fp+simd
 .section .text.vectors, "ax"
 .align 11
 .global exception_vectors
@@ -47,9 +48,13 @@ exception_vectors:
 .align 7
     b exc_serror_invalid
 
-.macro EXC_ENTRY name, handler
+.macro EXC_ENTRY name, handler, simd=0
 \name:
+    .if \simd
+    sub sp, sp, #800
+    .else
     sub sp, sp, #256
+    .endif
     stp x0, x1, [sp, #0]
     stp x2, x3, [sp, #16]
     stp x4, x5, [sp, #32]
@@ -66,8 +71,52 @@ exception_vectors:
     stp x26, x27, [sp, #208]
     stp x28, x29, [sp, #224]
     str x30, [sp, #240]
+    .if \simd
+    stp q0, q1, [sp, #256]
+    stp q2, q3, [sp, #288]
+    stp q4, q5, [sp, #320]
+    stp q6, q7, [sp, #352]
+    stp q8, q9, [sp, #384]
+    stp q10, q11, [sp, #416]
+    stp q12, q13, [sp, #448]
+    stp q14, q15, [sp, #480]
+    stp q16, q17, [sp, #512]
+    stp q18, q19, [sp, #544]
+    stp q20, q21, [sp, #576]
+    stp q22, q23, [sp, #608]
+    stp q24, q25, [sp, #640]
+    stp q26, q27, [sp, #672]
+    stp q28, q29, [sp, #704]
+    stp q30, q31, [sp, #736]
+    mrs x1, fpcr
+    mrs x2, fpsr
+    str x1, [sp, #768]
+    str x2, [sp, #776]
+    .endif
     mov x0, sp
     bl \handler
+    .if \simd
+    ldr x1, [sp, #768]
+    ldr x2, [sp, #776]
+    msr fpcr, x1
+    msr fpsr, x2
+    ldp q0, q1, [sp, #256]
+    ldp q2, q3, [sp, #288]
+    ldp q4, q5, [sp, #320]
+    ldp q6, q7, [sp, #352]
+    ldp q8, q9, [sp, #384]
+    ldp q10, q11, [sp, #416]
+    ldp q12, q13, [sp, #448]
+    ldp q14, q15, [sp, #480]
+    ldp q16, q17, [sp, #512]
+    ldp q18, q19, [sp, #544]
+    ldp q20, q21, [sp, #576]
+    ldp q22, q23, [sp, #608]
+    ldp q24, q25, [sp, #640]
+    ldp q26, q27, [sp, #672]
+    ldp q28, q29, [sp, #704]
+    ldp q30, q31, [sp, #736]
+    .endif
     ldr x30, [sp, #240]
     ldp x28, x29, [sp, #224]
     ldp x26, x27, [sp, #208]
@@ -84,12 +133,16 @@ exception_vectors:
     ldp x4, x5, [sp, #32]
     ldp x2, x3, [sp, #16]
     ldp x0, x1, [sp, #0]
+    .if \simd
+    add sp, sp, #800
+    .else
     add sp, sp, #256
+    .endif
     eret
 .endm
 
 EXC_ENTRY exc_sync_el1, exc_handle_sync
-EXC_ENTRY exc_irq_el1, exc_handle_irq
+EXC_ENTRY exc_irq_el1, exc_handle_irq, 1
 
 exc_sync_invalid:
 exc_irq_invalid:

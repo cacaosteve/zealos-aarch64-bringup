@@ -4610,6 +4610,30 @@ static int64_t host_sound(int64_t *a) {
     zc_virtio_sound_set_tone((int8_t)a[0]);
     return 0;
 }
+static int64_t host_sound_max_pump_gap(int64_t *a) {
+    (void)a;
+    return (int64_t)zc_virtio_sound_max_pump_gap_us();
+}
+static int64_t host_sound_submitted_frames(int64_t *a) {
+    (void)a;
+    return (int64_t)zc_virtio_sound_submitted_frames();
+}
+static int64_t host_sound_timer_enable(int64_t *a) {
+    (void)a;
+    return zc_sound_timer_enable();
+}
+static int64_t host_sound_timer_irqs(int64_t *a) {
+    (void)a;
+    return (int64_t)zc_sound_timer_irq_count();
+}
+static int64_t host_sound_timer_enabled(int64_t *a) {
+    (void)a;
+    return zc_sound_timer_enabled();
+}
+static int64_t host_sound_current_hz(int64_t *a) {
+    (void)a;
+    return (int64_t)zc_sound_current_hz();
+}
 static int64_t host_sleep(int64_t *a);
 static void host_beep_busy_wait(uint64_t milliseconds) {
     uint64_t frequency;
@@ -4690,11 +4714,6 @@ static int64_t host_beep(int64_t *a) {
 static int64_t host_sound_reset(int64_t *a) {
     (void)a;
     zc_virtio_sound_set_tone(0);
-    return 0;
-}
-static int64_t host_noise(int64_t *a) {
-    /* Noise is the asynchronous PC-speaker hook used by several games. */
-    (void)a;
     return 0;
 }
 static double host_log2_positive(double x) {
@@ -9503,8 +9522,6 @@ static int load_source_path(const char *path, int merged, int recover) {
     }
     if (!strcmp(path, "/Tests/CompilerKernelInitGlobals.ZC"))
         PrsBindCSymbol("PopCount", host_pop_count, 1);
-    if (!strcmp(path, "/System/Externs.ZC"))
-        PrsBindCSymbol("Noise", host_noise, 3);
     if (!strcmp(path, "/Kernel/KernelB.HH")) {
         bind_guest_task();
         PrsBindCSymbol("sys_boot_src", &guest_boot_source, 0);
@@ -9945,6 +9962,8 @@ static int64_t host_virtio_net_recv(int64_t *a) {
 }
 
 void zc_init(const void *archive, size_t size, zc_output_fn output) {
+    /* Opt-in timer experiments do not survive compiler/session resets. */
+    zc_sound_timer_disable();
     if (archive) {
         source_archive = archive;
         archive_size = size;
@@ -10047,6 +10066,11 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
     /* The shared text object can point into the session's staging buffers.
      * Drop those addresses before reclaiming/reusing the compiler arenas. */
     memset(guest_text_globals, 0, sizeof(guest_text_globals));
+    /* KernelB allocates these accounting mirrors in the compiler arena.
+     * The arena is about to be reinitialized, so they must not be written
+     * again until KernelB has allocated fresh mirrors for this session. */
+    guest_sys_data_bp = guest_sys_code_bp = NULL;
+    guest_pool_alloced_off = guest_pool_used_off = SIZE_MAX;
     memset(guest_fibers, 0, sizeof(guest_fibers));
     set_guest_task(NULL);
     memset(&task, 0, sizeof(task));
@@ -10083,7 +10107,13 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
         const char *name;
         int64_t (*fn)(int64_t *);
         int arity;
-    } bindings[] = {{"ZcVirtioNetReady", host_virtio_net_ready, 0},
+    } bindings[] = {{"ZcSoundMaxPumpGapUs", host_sound_max_pump_gap, 0},
+                    {"ZcSoundSubmittedFrames", host_sound_submitted_frames, 0},
+                    {"ZcSoundTimerEnable", host_sound_timer_enable, 0},
+                    {"ZcSoundTimerIrqCount", host_sound_timer_irqs, 0},
+                    {"ZcSoundTimerEnabled", host_sound_timer_enabled, 0},
+                    {"ZcSoundCurrentHz", host_sound_current_hz, 0},
+                    {"ZcVirtioNetReady", host_virtio_net_ready, 0},
                     {"ZcVirtioNetGetMac", host_virtio_net_mac, 1},
                     {"ZcVirtioNetSend", host_virtio_net_send, 2},
                     {"ZcVirtioNetRecv", host_virtio_net_recv, 2},
@@ -10162,6 +10192,7 @@ int zc_start_graphics(void) {
         "/Kernel/QueueBridge.ZC",
         "/System/TaskBridge.ZC",
         "/System/Externs.ZC",
+        "/System/SoundEffects.ZC",
         /* Make the stock ZealOS structure inspector and debugger helpers
          * available to apps and demos, just as MakeSystem loads Debug.ZC. */
         "/System/Debug.ZC",

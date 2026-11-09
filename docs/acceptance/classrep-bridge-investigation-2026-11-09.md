@@ -86,11 +86,26 @@ The separate normal-boot task-settings check passed
 (`build/classrep-checkptr-tasksettings.log`, SHA-256
 `f483bbe8446728f3516464114b24dff84a0f3eccc17eb5981db07e8fa39b63da`).
 
-The broader `--probe-task-jobs` run did not reach its intended task checks:
-after `zreset`, loading TaskBridge failed to resolve `CTextGlobals`. The cause
-and whether it predates this change are not established. Its local log is
+An earlier `--probe-task-jobs` run did not reach its intended task checks:
+after `zreset`, loading TaskBridge failed to resolve `CTextGlobals`. Its log is
 `build/classrep-checkptr-task-qemu.log` (SHA-256
 `6dc3b7c75e57f7e4c1a664fddca49c40739e636f9b25bcf837da2fea8a2e2b01`).
 The translation query verifies readable mapping, not allocation lifetime or
 the safety of dereferencing a device mapping. Physical Pi behavior remains
 unverified.
+
+The reset failure was traced to stale pointers to KernelB heap-accounting
+mirrors allocated in the old compiler arena. After that arena was reset,
+accounting writes corrupted newly allocated source text. Clearing the pointers
+and offsets before reusing the arena fixes the observed premature end of
+KernelA. With kernel SHA-256
+`5b761241d456c7a4039148ca16f8185222b17d182351b7c77b25f56de546b613`,
+the focused PCI QEMU reset check loaded KernelA, compiled early and late
+header types including `CTextGlobals`, and loaded KernelB and TaskBridge
+(`build/task-reset-fixed-bridge.log`). The task-jobs probe also needed KernelB
+before the current TaskBridge; its old KernelA-only setup lacked the `BEqual`
+declaration. The corrected broader probe passed source-task cooperation,
+nested execution, task exit, job queues and popup checks after reset
+(`build/task-jobs-reset-fix.log`, SHA-256
+`3cc942d112128271e1a476047302c833757ae77e6e6278c7a2acd7dfa4d42caf`).
+Physical Pi and live UTM behavior remain unverified.

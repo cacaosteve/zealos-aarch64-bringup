@@ -97,6 +97,28 @@ static uint8_t g_vs_beep_slot[VS_PCM_SLOTS];
 static uint8_t g_vs_beep_inflight;
 static uint8_t g_vs_slots;
 static int g_vs_ready, g_vs_stream_started, g_vs_debug;
+static uint64_t g_vs_pump_previous, g_vs_pump_max_gap;
+static uint64_t g_vs_submitted_frames;
+
+static uint64_t vs_counter(void) {
+    uint64_t counter;
+    __asm__ volatile("mrs %0, cntpct_el0" : "=r"(counter));
+    return counter;
+}
+static void vs_record_pump_gap(void) {
+    uint64_t now = vs_counter();
+    if (g_vs_pump_previous && now - g_vs_pump_previous > g_vs_pump_max_gap)
+        g_vs_pump_max_gap = now - g_vs_pump_previous;
+    g_vs_pump_previous = now;
+}
+static uint64_t virtio_snd_pump_max_gap_us(void) {
+    uint64_t frequency;
+    __asm__ volatile("mrs %0, cntfrq_el0" : "=r"(frequency));
+    if (!frequency) return 0;
+    return g_vs_pump_max_gap / frequency * 1000000u +
+           (g_vs_pump_max_gap % frequency) * 1000000u / frequency;
+}
+static uint64_t virtio_snd_submitted_frames(void) { return g_vs_submitted_frames; }
 
 static inline void vs_dsb(void) { __asm__ volatile("dsb sy" ::: "memory"); }
 static inline uint8_t vs_r8(volatile uint8_t *p) { return *p; }
@@ -307,6 +329,7 @@ static void vs_submit_tone(unsigned slot) {
     unsigned base = slot * 3u;
     uint32_t phase = g_vs_phase;
     uint32_t hz = g_vs_hz;
+    g_vs_submitted_frames += VS_FRAMES;
     int beep_slot = 0;
     for (unsigned i = 0; i < VS_FRAMES; i++) {
         int16_t sample;
@@ -344,6 +367,13 @@ static void vs_submit_tone(unsigned slot) {
     g_vs_busy[slot] = 1;
 }
 static void virtio_snd_set_tone(int8_t ona) {
+    if (ona && !g_vs_hz) {
+        g_vs_pump_previous = vs_counter();
+        g_vs_pump_max_gap = 0;
+        g_vs_submitted_frames = 0;
+    } else if (!ona && g_vs_hz) {
+        vs_record_pump_gap();
+    }
     g_vs_tone_bounded = 0;
     g_vs_tone_frames = 0;
     g_vs_hz = ona ? vs_note_hz(ona) : 0;
@@ -365,6 +395,9 @@ static int virtio_snd_beep_done(void) {
 static void virtio_snd_pump(void) {
     struct vs_queue *q = &g_vs_q[VS_Q_TX];
     if (!g_vs_ready || !g_vs_stream_started) return;
+    if (g_vs_hz) {
+        vs_record_pump_gap();
+    }
     vs_cache(q->used, sizeof(*q->used), 1);
     while (q->last_used != q->used->idx) {
         struct vs_used_elem e = q->used->ring[q->last_used % q->size];

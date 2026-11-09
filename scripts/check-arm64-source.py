@@ -611,9 +611,15 @@ assert ('if (clear)\n    {\n        bootstrap_menu_focus_task = NULL;\n'
         '        sys_focus_task = bootstrap_menu_focus_task;') in menu_focus
 assert 'I64 best_score, best_score0, best_score1;' in task_bridge
 for sound_compat in ('public U0 Play(U8 *st, U8 *words=NULL)', 'U0 SoundTaskEndCB()',
-                     'U0 Sweep(I64 frequency, I64 duration, I64 end_frequency)',
                      'Bool FileOcc(U8 *needle, U8 *filename, U8 *flags="")'):
     assert sound_compat in task_bridge
+assert 'U0 SoundTaskEndCB()\n{\n    Sound;\n    Exit;\n}' in task_bridge
+assert 'U0 Sweep(I64 frequency, I64 duration, I64 end_frequency)' not in task_bridge
+sound_source = (root / 'upstream/pinned/System/Sound.ZC').read_bytes()
+assert sound_source.count(b'#define SE_NOISE\t\t0\n') == 1
+assert b'public CTask *Noise(I64 mS, F64 min_ona, F64 max_ona)' in sound_source
+assert b'public CTask *Sweep(I64 mS, F64 ona1, F64 ona2)' in sound_source
+print('PASS pinned asynchronous sound effect entry points and task cleanup')
 full_compositor_start = task_bridge.index('Bool BootstrapTryUpstreamGrUpdateScreen()')
 full_compositor_end = task_bridge.index('\nU0 BootstrapGrUpdateTasks()', full_compositor_start)
 full_compositor = task_bridge[full_compositor_start:full_compositor_end]

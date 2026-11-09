@@ -51,6 +51,18 @@ int zc_virtio_net_recv(void *frame, uint32_t cap) {
     return virtio_net_recv(frame, cap);
 }
 static int g_audio_is_pi;
+/* Experimental opt-in audio service: IRQs never change guest task. */
+static volatile int g_audio_timer_mode, g_audio_timer_active;
+static volatile uint64_t g_audio_timer_irqs;
+static void sound_timer_set_locked(int active);
+static inline uint64_t sound_irq_lock(void) {
+    uint64_t flags;
+    __asm__ volatile("mrs %0, daif\n\tmsr daifset, #2" : "=r"(flags) :: "memory");
+    return flags;
+}
+static inline void sound_irq_unlock(uint64_t flags) {
+    __asm__ volatile("msr daif, %0\n\tisb" :: "r"(flags) : "memory");
+}
 #if defined(ZEAL_FORCE_PI4) && !defined(ZEAL_PI_DIAG)
 static int pi4_hdmi_tone(int8_t ona);
 static void pi4_hdmi_stop(void);
@@ -75,7 +87,12 @@ void zc_virtio_sound_set_tone(int8_t ona) {
     }
 #endif
     if (g_audio_is_pi) pi4_audio_set_tone(ona);
-    else virtio_snd_set_tone(ona);
+    else {
+        uint64_t flags = sound_irq_lock();
+        virtio_snd_set_tone(ona);
+        sound_timer_set_locked(ona != 0);
+        sound_irq_unlock(flags);
+    }
 }
 void zc_virtio_sound_beep(int8_t ona) {
 #if defined(ZEAL_FORCE_PI4) && !defined(ZEAL_PI_DIAG)
@@ -90,18 +107,40 @@ void zc_virtio_sound_beep(int8_t ona) {
     }
 #endif
     if (g_audio_is_pi) pi4_audio_beep(ona);
-    else virtio_snd_beep(ona);
+    else {
+        uint64_t flags = sound_irq_lock();
+        virtio_snd_beep(ona);
+        sound_timer_set_locked(ona != 0);
+        sound_irq_unlock(flags);
+    }
 }
 int zc_virtio_sound_beep_done(void) {
 #if defined(ZEAL_FORCE_PI4) && !defined(ZEAL_PI_DIAG)
     if (g_pi4_hdmi_deadline)
         return (int64_t)(pi4_audio_counter() - g_pi4_hdmi_deadline) >= 0;
 #endif
-    return g_audio_is_pi ? pi4_audio_beep_done() : virtio_snd_beep_done();
+    if (g_audio_is_pi) return pi4_audio_beep_done();
+    uint64_t flags = sound_irq_lock();
+    int done = virtio_snd_beep_done();
+    sound_irq_unlock(flags);
+    return done;
 }
 void zc_virtio_sound_pump(void) {
     if (g_audio_is_pi) pi4_audio_pump();
-    else virtio_snd_pump();
+    else {
+        uint64_t flags = sound_irq_lock();
+        virtio_snd_pump();
+        sound_irq_unlock(flags);
+    }
+}
+uint64_t zc_sound_timer_irq_count(void) { return g_audio_timer_irqs; }
+int zc_sound_timer_enabled(void) { return g_audio_timer_mode; }
+uint64_t zc_sound_current_hz(void) { return g_audio_is_pi ? 0 : g_vs_hz; }
+uint64_t zc_virtio_sound_max_pump_gap_us(void) {
+    return g_audio_is_pi ? 0 : virtio_snd_pump_max_gap_us();
+}
+uint64_t zc_virtio_sound_submitted_frames(void) {
+    return g_audio_is_pi ? 0 : virtio_snd_submitted_frames();
 }
 
 #include "netofdots_zc.h"
@@ -10104,6 +10143,43 @@ static void timer_arm(void) {
     __asm__ volatile("isb");
 }
 
+/* Called with IRQs masked, so an interrupted foreground queue update cannot
+ * race the timer handler. Boot's timer smoke must have delivered real IRQs;
+ * trapped/soft-only platforms retain the existing polling implementation. */
+static void sound_timer_set_locked(int active) {
+    if (!g_audio_timer_mode)
+        return;
+    if (!active) {
+        g_audio_timer_active = 0;
+        __asm__ volatile("msr cntp_ctl_el0, %0\n\tisb" :: "r"(0ull) : "memory");
+        return;
+    }
+    if (!g_audio_timer_active) {
+        uint64_t frequency;
+        __asm__ volatile("mrs %0, cntfrq_el0" : "=r"(frequency));
+        g_timer_ticks = frequency / 100;
+        if (!g_timer_ticks) g_timer_ticks = 1;
+        g_audio_timer_irqs = 0;
+        g_audio_timer_active = 1;
+        timer_arm();
+    }
+}
+int zc_sound_timer_enable(void) {
+    uint64_t flags = sound_irq_lock();
+    int supported = !g_audio_is_pi && g_timer_irqs >= 3 && virtio_snd_ready();
+    if (supported) g_audio_timer_mode = 1;
+    sound_irq_unlock(flags);
+    return supported;
+}
+void zc_sound_timer_disable(void) {
+    uint64_t flags = sound_irq_lock();
+    if (g_audio_timer_mode)
+        virtio_snd_set_tone(0);
+    sound_timer_set_locked(0);
+    g_audio_timer_mode = 0;
+    sound_irq_unlock(flags);
+}
+
 static void vectors_install(void) {
     __asm__ volatile(
         "mov x0, sp\n"
@@ -10279,7 +10355,15 @@ void exc_handle_irq(uint64_t *frame) {
         id = (uint32_t)(iar & 0x3ff);
     }
 
-    if (id == TIMER_PPI || id == (uint32_t)PI4_CNTP_PPI) {
+    if ((id == TIMER_PPI || id == (uint32_t)PI4_CNTP_PPI) && g_audio_timer_mode) {
+        if (g_audio_timer_active) {
+            g_audio_timer_irqs++;
+            virtio_snd_pump();
+            timer_arm();
+        } else {
+            __asm__ volatile("msr cntp_ctl_el0, %0\n\tisb" :: "r"(0ull) : "memory");
+        }
+    } else if (id == TIMER_PPI || id == (uint32_t)PI4_CNTP_PPI) {
         g_timer_irqs++;
         if (g_uart) {
             uart_puts(g_uart, "irq: CNTP tick ");

@@ -2902,12 +2902,8 @@ public U0 Play(U8 *st, U8 *words=NULL)
 }
 U0 SoundTaskEndCB()
 {
-}
-U0 Sweep(I64 frequency, I64 duration, I64 end_frequency)
-{//Silence optional sound effects until an ARM64 audio device is implemented.
-    if (frequency) {}
-    if (duration) {}
-    if (end_frequency) {}
+    Sound;
+    Exit;
 }
 U0 GodBiblePassage(I64 num_lines=20)
 {
