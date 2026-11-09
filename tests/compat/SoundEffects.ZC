@@ -80,11 +80,50 @@ I64 SoundDurationSettledChecks()
     return SoundDurationChecks;
 }
 
+// QEMU's 16-descriptor TX queue has room for the driver's four periods.
+// Check the initial submission before yielding or waiting for an IRQ.
+I64 SoundPrimeChecks()
+{
+    I64 frames;
+    Sound(60);
+    frames = ZcSoundSubmittedFrames;
+    Sound(0);
+    Print("sound_initial_frames=%d\n", frames);
+    if (frames != 3840)
+        return 1;
+    return 42;
+}
+
+// Capture distinct notes across a pitch change and after a stop/restart.
+// WAV captures preserve sample order but cannot prove wall-clock silence.
+I64 SoundTransitionChecks()
+{
+    if (!ZcSoundTimerEnable)
+        return 1;
+    Sound(60);
+    Sleep(300);
+    Sound(72);
+    Sleep(300);
+    Sound(0);
+    if (ZcSoundCurrentHz)
+        return 2;
+    Sleep(200);
+    Sound(67);
+    Sleep(300);
+    Sound(0);
+    if (ZcSoundCurrentHz)
+        return 3;
+    Sleep(200);
+    return 42;
+}
+
 I64 sound_busy_complete;
-I64 sound_busy_running, sound_busy_interleaved;
+I64 sound_busy_running, sound_busy_interleaved, sound_busy_witness_ran;
+I64 sound_busy_witness_after;
+F64 sound_busy_duration;
 U0 SoundBusyWorker(U8 *unused)
 {
-    F64 until = tS + 0.5;
+    F64 until = tS + sound_busy_duration;
     F64 sum = 0.0;
     I64 iterations = 0;
     if (unused) {}
@@ -103,29 +142,40 @@ U0 SoundBusyWorker(U8 *unused)
 U0 SoundBusyWitness(U8 *unused)
 {
     if (unused) {}
+    sound_busy_witness_ran = 1;
+    sound_busy_witness_after = sound_busy_complete == 42;
     if (sound_busy_running)
         sound_busy_interleaved = 1;
 }
 
 // A non-yielding task must not be preemptively rotated, but should not
 // prevent hardware-backed sound from continuing to play.
-I64 SoundBusyChecks()
+I64 SoundBusyRun(F64 seconds, I64 wait_ms)
 {
     sound_busy_complete = 0;
-    sound_busy_running = sound_busy_interleaved = 0;
+    sound_busy_running = sound_busy_interleaved = sound_busy_witness_ran = 0;
+    sound_busy_witness_after = 0;
+    sound_busy_duration = seconds;
     Sound(60);
     if (!Spawn(&SoundBusyWorker, NULL, "AudioBusy", -1, Fs))
         return 1;
     if (!Spawn(&SoundBusyWitness, NULL, "AudioWitness", -1, Fs))
         return 2;
-    Sleep(800);
+    Sleep(wait_ms);
     Sound(0);
     Print("sound_pump_max_gap_us=%d\n", ZcSoundMaxPumpGapUs);
     Print("sound_submitted_frames=%d\n", ZcSoundSubmittedFrames);
     Sleep(300);
     if (sound_busy_interleaved)
         return 3;
+    if (!sound_busy_witness_ran || !sound_busy_witness_after)
+        return 5;
     return sound_busy_complete;
+}
+
+I64 SoundBusyChecks()
+{
+    return SoundBusyRun(0.5, 800);
 }
 
 I64 SoundBusyTimerChecks()
@@ -146,6 +196,28 @@ I64 SoundBusyTimerSettledChecks()
 {
     Sleep(15000);
     return SoundBusyTimerChecks;
+}
+
+// Exercise service throughout a longer non-yielding guest task. The witness
+// must still wait for the task to yield or finish.
+I64 SoundLongBusyTimerChecks()
+{
+    I64 result;
+    if (!ZcSoundTimerEnable)
+        return 1;
+    result = SoundBusyRun(3.0, 3300);
+    Print("sound_timer_irqs=%d\n", ZcSoundTimerIrqCount);
+    if (ZcSoundTimerIrqCount < 100)
+        return 2;
+    if (ZcSoundMaxPumpGapUs >= 80000)
+        return 3;
+    return result;
+}
+
+I64 SoundLongBusyTimerSettledChecks()
+{
+    Sleep(15000);
+    return SoundLongBusyTimerChecks;
 }
 
 I64 SoundTimerCycleChecks()
@@ -267,5 +339,23 @@ I64 SoundTimerMaskChecks()
         return 5;
     }
     RFlagsSet(flags);
+    return 42;
+}
+
+I64 SoundTimerPlaybackRegression()
+{
+    I64 result;
+    result = SoundPrimeChecks;
+    if (result != 42)
+        return 100 + result;
+    result = SoundTimerCycleChecks;
+    if (result != 42)
+        return 200 + result;
+    result = SoundTimerBeepChecks;
+    if (result != 42)
+        return 300 + result;
+    result = SoundLongBusyTimerSettledChecks;
+    if (result != 42)
+        return 400 + result;
     return 42;
 }

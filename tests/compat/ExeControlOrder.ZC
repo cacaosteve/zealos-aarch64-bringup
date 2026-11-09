@@ -1,0 +1,17 @@
+// The statement after an if must be lexed after the if has run.
+#exe {
+    if (TRUE)
+        DefineLoad("EXE_CONTROL_NEXT", "StreamPrint(\"#define EXE_CONTROL_RESULT 42\\n\")");
+    EXE_CONTROL_NEXT;
+};
+#exe {
+    if (FALSE)
+        DefineLoad("EXE_ELSE_NEXT", "StreamPrint(\"#define EXE_ELSE_RESULT 1\\n\")");
+    else
+        DefineLoad("EXE_ELSE_NEXT", "StreamPrint(\"#define EXE_ELSE_RESULT 42\\n\")");
+    EXE_ELSE_NEXT;
+};
+I64 ExeControlOrderChecks()
+{
+    return EXE_CONTROL_RESULT + EXE_ELSE_RESULT - 42;
+}

@@ -1,0 +1,26 @@
+{
+  "date": "2026-11-09",
+  "target": "AArch64 PCI QEMU, one vCPU, graphical desktop and VirtIO keyboard",
+  "kernel_sha256": "968c71f1db2daccf6cb94675969fec240ef2f094f37561c3d19cac9304ee4bbe",
+  "source_bundle_sha256": "6c0e095e26f6e03e634a10c298ee31b4af7ff21753d7e90acf3ca2930519cf45",
+  "pinned_demo_sha256": "98a884bac8bf3f35c68ba50946b9b8e6e334c72864a0a47166791f3d8198ecc3",
+  "command": "python3 -u scripts/check-compat.py --pci --quick --probe-demo-definestr-xtalk",
+  "result": "partial pass",
+  "verified": [
+    "A generated function returned 42 in the initial focused QEMU probe, and a separate probe used multiple StreamPrint calls plus a generated nested #exe block to define constants whose sum was 42.",
+    "On the final kernel, StreamPrintDefineChecks verified generated definitions through guest Define(), a DefinePrint update, and a guest-only shadow taking priority over the compiler entry.",
+    "The bundle contains the byte-identical pinned DefineStr source, with the prior bootstrap workaround removed. Its graphical output showed Acme Inc, a numeric age, and a time; the terminal then evaluated 40+2 as 42 and zstatus reported failed=0.",
+    "The static ARM64 source overlay check and QEMU/Pi builds passed."
+  ],
+  "logs": {
+    "build/stream-print-impl.log": "80970861901f5d459b321be6602ca165e0073bdceeacc241479cbffbb18fbfd2",
+    "build/stream-print-advanced.log": "ec466154cf916ed159ce4c29bd8f891cf9b8ddf64798f67e724a3d0ad72bcf55",
+    "build/stream-final-definestr.log": "5644fab078108015695057e110faf950b0d8cfdce31d6bcf3478789ec17319e4",
+    "build/definestr-local-gui.log": "03dd2e8b0a530e229c2ceffe059da2c6cbdfd7ecf0dbef24dad5d5503a4d2314"
+  },
+  "limits": [
+    "The final demo run used XTalk after an earlier graphical typing attempt dropped characters; it does not establish reliable long-command keyboard input.",
+    "The port now executes simple #exe statements individually; see exe-statement-order-qemu-2026-11-09.json. Full control-flow lookahead, nested, exception, concurrency, AOT and formatting semantics are not established.",
+    "TimeIns, live UTM and physical Pi behavior remain unverified."
+  ]
+}

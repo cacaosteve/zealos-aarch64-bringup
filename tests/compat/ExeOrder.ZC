@@ -1,0 +1,8 @@
+// Compile-time blocks must execute in source order before lexing the next one.
+I64 exe_order_value;
+#exe { exe_order_value = 41; };
+#exe { exe_order_value += 1; };
+I64 ExeOrderChecks()
+{
+    return exe_order_value;
+}

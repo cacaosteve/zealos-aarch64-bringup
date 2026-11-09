@@ -1,0 +1,24 @@
+{
+  "date": "2026-11-09",
+  "target": "AArch64 PCI QEMU, native boot-context compiler",
+  "source": "tests/compat/ExeOrder.ZC",
+  "source_sha256": "c0083e6d8cbd38767559809418f74c8401eb6ee8ef5d5fec182af34562d30b48",
+  "before": {
+    "kernel_sha256": "c9c14e2413228459eebdb6ef2f871aacc1d15670ee437e5c86d52272096327a0",
+    "result": "Two consecutive #exe blocks that set a global to 41 then increment it returned 41, indicating the later block ran first.",
+    "log": "build/exe-order-before-uninit.log",
+    "log_sha256": "a53c6c4f6f13efc64988afbd29580b03d68f04df48e917681a926362d1a600e5"
+  },
+  "after": {
+    "kernel_sha256": "ff59988f5a6bfb60b61fe05d8b03aa7fd114d950bae26f3a591d4030c08f1df7",
+    "result": "The same probe returned 42 after the lexer executed each block before reading the following token. The existing graphical GlobalVars JIT and declaration-boundary regression also passed, including terminal recovery.",
+    "logs": {
+      "build/exe-order-after.log": "ff4347f2c3a4f5f0e13c692100901c983a8514eef06b38166ba4d7d2f5b11b67",
+      "build/exe-order-globalvars.log": "e366e76bdbf339d2c25999b9ef1b30fe124eb40a1d2df5f9fb0fa6d572f61e7a"
+    }
+  },
+  "limits": [
+    "StreamPrint-generated source is still unsupported; this change does not establish complete #exe or AOT semantics.",
+    "Nested stream blocks, exceptions and physical Pi behavior need separate verification."
+  ]
+}

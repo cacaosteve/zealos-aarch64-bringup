@@ -808,6 +808,8 @@ assert b'", STR_LEN - 1);' in translate_doced(doced)
 docrecalc_source = (root / 'upstream/pinned/System/DolDoc/DocRecalc.ZC').read_bytes()
 docrecalc_overlay = translate_docrecalc(docrecalc_source)
 assert docrecalc_overlay != docrecalc_source
+assert b'ZcTaskLexDefineText(doc_e->define_str, win_task)' in docrecalc_overlay
+assert b'StrNew(compiler_define, mem_task)' in docrecalc_overlay
 assert docrecalc_overlay.count(b'DCDel(dc);') == docrecalc_source.count(b'DCDel(dc);') + 2
 assert docrecalc_overlay.count(b'Free(depth_buf);') == docrecalc_source.count(b'Free(depth_buf);') + 2
 entry_trim = docrecalc_overlay.index(b'DocDelToEntry')

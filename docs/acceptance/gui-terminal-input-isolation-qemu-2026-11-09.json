@@ -1,0 +1,19 @@
+{
+  "date": "2026-11-09",
+  "target": "AArch64 PCI QEMU, graphical desktop and VirtIO keyboard",
+  "kernel_sha256": "c9c14e2413228459eebdb6ef2f871aacc1d15670ee437e5c86d52272096327a0",
+  "source_bundle_sha256": "1fdc49c4f2d89846ca1b8ddd752ef65e6cf84539aba95fe7afcf35c063fb9f6a",
+  "command": "python3 -u scripts/check-compat.py --pci --probe-user-startup --probe-gui-keyboard",
+  "result": "pass",
+  "evidence": [
+    "The test verified focus was on a second User terminal, typed three characters through the emulated keyboard, and observed primary/second input lengths of 0/3. The focused input diagnostic returned 3, then 0 after Down cleared the second line.",
+    "Typing, execution, history isolation and terminal recovery passed in both terminal windows; the primary terminal evaluated 40+2 as 42.",
+    "An earlier test attempt incorrectly refocused the primary terminal before its supposed second-terminal input. The helper was corrected to preserve focus for that check, and the new run explicitly verified the second terminal was focused."
+  ],
+  "log": "build/gui-input-per-task-isolation.log",
+  "log_sha256": "172033f00e8ff99578fe347d3b22275122f24f2c05765e66554cee9cbd3d4f9a",
+  "limits": [
+    "The earlier Vocabulary long-command entry failure has not been conclusively explained; this test does not prove repeated long-command reliability.",
+    "Live UTM and Pi input behavior were not tested."
+  ]
+}

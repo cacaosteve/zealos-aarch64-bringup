@@ -714,6 +714,8 @@ extern CHashTable *ZcGuestHashTableNew(I64 size, CTask *mem_task=NULL);
 extern U0 ZcGuestHashTableDel(CHashTable *table);
 extern CHash *ZcGuestHashFind(U8 *needle_str, CHashTable *haystack_table,
                               I64 mask, I64 instance=1);
+extern CHash *ZcGuestHashFindLocal(U8 *needle_str, CHashTable *haystack_table,
+                                   I64 mask, I64 instance=1);
 extern U0 ZcGuestHashAdd(CHash *tmph, CHashTable *table);
 extern Bool ZcGuestFramePtrRemove(CHash *tmph, CHashTable *table);
 // The freestanding bootstrap does not load Kernel/KHashB.ZC, but GUI demos
@@ -793,6 +795,7 @@ U0 UndefinedDefine(U8 *dname)
     throw('UndefDef');
 }
 extern U0 ZcDefineMirror(U8 *dname, U8 *st);
+extern U8 *ZcLexDefineText(U8 *name);
 CHashDefineStr *DefineLoad(U8 *dname, U8 *st, I64 caller_num=1)
 {
     CHashDefineStr *tmph;
@@ -872,9 +875,14 @@ CHashDefineStr *DefineListLoad(U8 *dname, U8 *list)
 U8 *Define(U8 *dname)
 {
     CHashDefineStr *tmph;
+    U8 *compiler_define;
 
-    if (tmph = ZcGuestHashFind(dname, Fs->hash_table, HTT_DEFINE_STR))
+    if (tmph = ZcGuestHashFindLocal(dname, Fs->hash_table, HTT_DEFINE_STR))
         return tmph->data;
+    else if (dname && (compiler_define = ZcLexDefineText(dname)))
+        // Compiler and guest hash layouts differ in this port. Stock ZealOS
+        // uses one table, so a preprocessor define must be visible here too.
+        return compiler_define;
     else if (dname)
         UndefinedDefine(dname);
     else
@@ -1094,7 +1102,6 @@ U0 CompCtrlDel(CCompCtrl *cc)
     Free(cc);
 }
 extern I64 Str2I64(U8 *st, I64 radix=10, U8 **_end_ptr=NULL);
-extern U8 *ZcLexDefineText(U8 *name);
 I64 BootstrapLexQuotedByte(U8 **_ptr)
 {
     U8 *ptr = *_ptr;

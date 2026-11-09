@@ -99,6 +99,10 @@ p.add_argument('--probe-demo-usage', action='store_true',
                help='exercise Usage CPU/RAM graph rendering and Shift-Escape recovery')
 p.add_argument('--probe-demo-dol-doc', action='store_true',
                help='exercise DolDoc TextDemo and CursorMove rendering and terminal recovery')
+p.add_argument('--probe-demo-definestr', action='store_true',
+               help='check DefineStr document substitution and terminal recovery')
+p.add_argument('--probe-demo-definestr-xtalk', action='store_true',
+               help='with the DefineStr probe, isolate the demo from long graphical command entry')
 p.add_argument('--probe-unused-define-timeout', type=int, default=300,
                help='runtime limit in seconds for the slow UnusedDefine scan')
 p.add_argument('--probe-demo-callbacks', action='store_true',
@@ -183,6 +187,8 @@ p.add_argument('--probe-demo-last-class', action='store_true',
                help='run LastClass and verify default class names, reflection output, and recovery')
 p.add_argument('--probe-demo-global-vars', action='store_true',
                help='run original Demo GlobalVars dynamic-initialization checks graphically')
+p.add_argument('--probe-demo-global-vars-xtalk', action='store_true',
+               help='launch GlobalVars checks through XTalk to isolate long-command typing')
 p.add_argument('--probe-demo-class-meta', action='store_true',
                help='run ClassMeta and verify field metadata output and terminal recovery')
 p.add_argument('--probe-demo-registry', action='store_true',
@@ -442,6 +448,8 @@ p.add_argument('--probe-autocomplete', action='store_true',
                help='verify upstream autocomplete indexes a source corpus and stops cleanly')
 p.add_argument('--probe-vocabulary', action='store_true',
                help='exercise the original Vocabulary quiz, answer feedback, definition popup and exit')
+p.add_argument('--probe-vocabulary-xtalk', action='store_true',
+               help='with --probe-vocabulary, launch through XTalk to isolate app behavior from graphical command typing')
 p.add_argument('--probe-psalmody', action='store_true',
                help='exercise the original Psalmody editor, note entry, playback and exit')
 p.add_argument('--probe-psalmody-audio-timer', action='store_true',
@@ -531,6 +539,12 @@ if args.probe_demo_file_read:
     # but take the isolated FileRead branch below instead of the full DolDoc
     # batch. This keeps its two PressAKey checkpoints independent of other UI
     # demos and their buffered input.
+    args.probe_demo_dol_doc = True
+if args.probe_demo_definestr_xtalk:
+    args.probe_demo_definestr = True
+if args.probe_demo_global_vars_xtalk:
+    args.probe_demo_global_vars = True
+if args.probe_demo_definestr:
     args.probe_demo_dol_doc = True
 if args.probe_demo_data:
     args.probe_demo_dol_doc = True
@@ -1216,7 +1230,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                                    f'see {graphical_path(name)} and .txt\n'+screen[3])
             time.sleep(0.1)
     def type_graphical_prompt_line(name, text, attempts=3, prompt_required=True,
-                                   command_timeout=120, key_delay=0.5):
+                                   command_timeout=120, key_delay=0.5,
+                                   focus_primary=True):
         # After focus changes, a guest may miss one early key edge even when
         # QMP accepted the event. Clear and verify the guest's input buffer
         # before each attempt so a retry never appends to a partial command.
@@ -1226,7 +1241,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         focus = command('zc Print("primary_terminal_focus=%d\\n", '
                         'sys_focus_task==bootstrap_gui_terminal_task);',
                         'primary_terminal_focus=', timeout=command_timeout)
-        if 'primary_terminal_focus=1' not in focus:
+        if focus_primary and 'primary_terminal_focus=1' not in focus:
             focus_graphical_terminal()
         for attempt in range(attempts):
             qmp_send_key('down')
@@ -1303,6 +1318,10 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     print(f'PASS visible graphical terminal input buffer: {text!r}',
                           flush=True)
                     return screen
+                print(f'graphical input mismatch: attempt={attempt + 1} '
+                      f'expected_length={len(text)} '
+                      f'guest_length={match.group(1) if match else "unavailable"} '
+                      f'visible={visible}', flush=True)
                 return require_graphical_prompt_text(name, text, timeout=8)
             except RuntimeError:
                 if attempt + 1 == attempts:
@@ -2288,7 +2307,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     f'zc ExeFile2("{path}",CCF_JUST_LOAD);',
                     None, timeout=60)
                 passed = not re.search(
-                    r'(?m)^ERR(?::| )|zc: compile failed|out of memory',
+                    r'(?m)^ERR(?::| )|zc: compile failed|zc: unresolved|out of memory',
                     output, re.I)
                 results.append({'path': path, 'compiled': passed,
                                 'output': output})
@@ -2340,7 +2359,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 guest.stdin.flush()
                 module_output = until(b'\n> ')
                 print('SOURCE MODULE '+str(module)+'\n'+module_output, flush=True)
-                if re.search(r'(?m)^ERR:|zc: compile failed|out of memory',
+                if re.search(r'(?m)^ERR:|zc: compile failed|zc: unresolved|out of memory',
                              module_output, re.I):
                     raise RuntimeError('stock source module failed to load: '
                                        +str(module))
@@ -2357,12 +2376,14 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     result = until(b'\n> ')
                 print('SOURCE PROBE '+str(source)+'\n'+result, flush=True)
                 passed = not re.search(
-                    r'(?m)^ERR(?::| )|zc: compile failed|out of memory',
+                    r'(?m)^ERR(?::| )|zc: compile failed|zc: unresolved|out of memory',
                     result, re.I)
                 fast_results.append({'path': str(source), 'compiled': passed,
                                      'output': result})
                 print(('SOURCE COMPILES ' if passed else 'SOURCE BLOCKED ')
                       +str(source)+'\n'+result, flush=True)
+                if args.probe_source_call and not passed:
+                    raise RuntimeError('source failed before requested call: ' + str(source))
                 if args.probe_source_call:
                     called = command('zcall '+args.probe_source_call,
                                      'zc => 0x000000000000002a')
@@ -2406,7 +2427,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                         module_output = until(b'\n> ')
                         print('SOURCE MODULE '+str(module)+'\n'+module_output,
                               flush=True)
-                        if re.search(r'(?m)^ERR:|zc: compile failed|out of memory',
+                        if re.search(r'(?m)^ERR:|zc: compile failed|zc: unresolved|out of memory',
                                      module_output, re.I):
                             raise RuntimeError('stock source module failed to load: '
                                                +str(module))
@@ -5107,13 +5128,34 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             # program catalog: that catalog runs unrelated task-owned app
             # probes, which can obscure whether GlobalVars itself completed.
             focus_graphical_terminal()
-            run_graphical_terminal_command(
-                'demo-global-vars-boundary',
-                'ExeFile2("/Tests/GlobalVarsBoundary.ZC");',
-                'Data heap declaration reached: 20', timeout=20)
-            globalvars_screen = run_graphical_terminal_command(
-                'demo-global-vars', 'ExeFile2("/Demo/GlobalVars.ZC");',
-                'Time 4:', timeout=20)
+            if args.probe_demo_global_vars_xtalk:
+                command('zc XTalk(bootstrap_gui_terminal_task,' +
+                        json.dumps('ExeFile2("/Tests/GlobalVarsBoundary.ZC");\n') + ');',
+                        'zc: executed')
+                require_graphical_text('demo-global-vars-boundary',
+                                       'Data heap declaration reached: 20', timeout=20)
+                command('zc XTalk(bootstrap_gui_terminal_task,' +
+                        json.dumps('ExeFile2("/Demo/GlobalVars.ZC");\n') + ');',
+                        'zc: executed')
+                deadline = time.monotonic() + 20
+                while True:
+                    globalvars_screen = graphical_screen('demo-global-vars')
+                    text = globalvars_screen[3]
+                    # The boundary fixture also prints Time 4. Require a
+                    # Time 4 after the stock demo's unique Time 3 output.
+                    if 'Time 3:' in text and 'Time 4:' in text.split('Time 3:')[-1]:
+                        break
+                    if time.monotonic() >= deadline:
+                        raise RuntimeError('GlobalVars did not reach Time 4 after Time 3:\n' + text)
+                    time.sleep(.1)
+            else:
+                run_graphical_terminal_command(
+                    'demo-global-vars-boundary',
+                    'ExeFile2("/Tests/GlobalVarsBoundary.ZC");',
+                    'Data heap declaration reached: 20', timeout=20)
+                globalvars_screen = run_graphical_terminal_command(
+                    'demo-global-vars', 'ExeFile2("/Demo/GlobalVars.ZC");',
+                    'Time 4:', timeout=20)
             # #ifjit is the ordinary just-in-time execution branch, so it
             # must include the data-heap globals too. The previous probe only
             # asserted the first, code-heap-backed dynamic globals and could
@@ -7524,20 +7566,53 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                           'through the key wait, and returned to a working terminal',
                           flush=True)
                     raise SystemExit(0)
+                if args.probe_demo_definestr:
+                    command('zload /Tests/ExeOrder.ZC',
+                            'zc: loaded /Tests/ExeOrder.ZC')
+                    command('zcall ExeOrderChecks',
+                            'zc => 0x000000000000002a')
+                    command('zload /Tests/ExeStatementOrder.ZC',
+                            'zc: loaded /Tests/ExeStatementOrder.ZC')
+                    command('zcall ExeStatementOrderChecks',
+                            'zc => 0x000000000000002a')
+                    command('zload /Tests/ExeControlOrder.ZC',
+                            'zc: loaded /Tests/ExeControlOrder.ZC')
+                    command('zcall ExeControlOrderChecks',
+                            'zc => 0x000000000000002a')
+                    command('zload /Tests/StreamPrintAdvanced.ZC',
+                            'zc: loaded /Tests/StreamPrintAdvanced.ZC')
+                    command('zcall StreamPrintDefineChecks',
+                            'zc => 0x000000000000002a')
                 run_graphical_terminal_command(
                     'demo-dol-doc-ready', '40+2;', 'ans=0x2A=42')
-                define_demo = run_graphical_terminal_command(
-                    'demo-dol-doc-define-str',
-                    'ExeFile2("/Demo/DolDoc/DefineStr.ZC");',
-                    'Acme Inc', timeout=30)
+                if args.probe_demo_definestr_xtalk:
+                    focus_graphical_terminal()
+                    command('zc XTalk(bootstrap_gui_terminal_task,' +
+                            json.dumps('ExeFile2("/Demo/DolDoc/DefineStr.ZC");\n') + ');',
+                            'zc: executed', timeout=30)
+                    define_demo = require_graphical_text(
+                        'demo-dol-doc-define-str-result', 'Acme Inc', timeout=30)
+                else:
+                    define_demo = run_graphical_terminal_command(
+                        'demo-dol-doc-define-str',
+                        'ExeFile2("/Demo/DolDoc/DefineStr.ZC");',
+                        'Acme Inc', timeout=30)
                 if ('Age :' not in define_demo[3] or
                         'Time:' not in define_demo[3]):
                     raise RuntimeError(
                         'DefineStr did not render its generated age and time fields; see '
                         f'{graphical_path("demo-dol-doc-define-str-result")}\n'
                         + define_demo[3])
+                if args.probe_demo_definestr and not re.search(
+                        r'Age\s*:\s*\d+\.\d+', define_demo[3]):
+                    raise RuntimeError('DefineStr age was not rendered as a number:\n' +
+                                       define_demo[3])
                 run_graphical_terminal_command(
                     'demo-dol-doc-define-str-recovery', '40+2;', 'ans=0x2A=42')
+                if args.probe_demo_definestr:
+                    command('zstatus', 'failed=0')
+                    print('PASS original DefineStr substitution and terminal recovery', flush=True)
+                    raise SystemExit(0)
 
                 text_demo = run_graphical_terminal_command(
                     'demo-dol-doc-text',
@@ -11399,6 +11474,12 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             time.sleep(.5)
             run_graphical_terminal_command(
                 'demo-flapbat-return', '40+2;', 'ans=0x2A=42', timeout=25)
+            audio_state = command(
+                'zc extern I64 ZcSoundCurrentHz(); '
+                'Print("flapbat_audio_hz=%d song_alive=%d\\n",'
+                'ZcSoundCurrentHz,TaskValidate(bootstrap_gui_terminal_task->song_task));',
+                'flapbat_audio_hz=0 song_alive=0')
+            print(audio_state, flush=True)
             command('zstatus', 'failed=0')
             print(f'PASS FlapBat HUD, animation ({animation_diff} changed pixels), '
                   f'Space input ({flap_diff} changed pixels), Escape cleanup and terminal recovery',
@@ -12074,10 +12155,15 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             command('zcall AutoCompleteBootChecks',
                     'zc => 0x000000000000002a')
             focus_graphical_terminal()
-            type_graphical_prompt_line(
-                'vocabulary-launch',
-                'ExeFile2("/Apps/Vocabulary/Run.ZC");')
-            qmp_send_key('ret')
+            if args.probe_vocabulary_xtalk:
+                command('zc XTalk(bootstrap_gui_terminal_task,' +
+                        json.dumps('ExeFile2("/Apps/Vocabulary/Run.ZC");\n') + ');',
+                        'zc: executed', timeout=30)
+            else:
+                type_graphical_prompt_line(
+                    'vocabulary-launch',
+                    'ExeFile2("/Apps/Vocabulary/Run.ZC");')
+                qmp_send_key('ret')
             time.sleep(1)
             question_screen = graphical_screen('vocabulary-first-question')
             if 'Uncompressed dictionary not present' in question_screen[3]:
@@ -12429,8 +12515,25 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 command('zcall UserStartUpOpenChecks', 'zc => 0x000000000000002a', timeout=30)
                 move_graphical_pointer(600,360)
                 # User() leaves its new task focused; type through real devices.
+                command('zc Print("second_terminal_focus=%d\\n",'
+                        'sys_focus_task==user_startup_second);',
+                        'second_terminal_focus=1')
+                qmp_send_text('abc')
+                command('zc Print("terminal_input_state=%d/%d\\n",'
+                        'BootstrapGuiTerminalState(bootstrap_gui_terminal_task)->input_len,'
+                        'BootstrapGuiTerminalState(user_startup_second)->input_len);',
+                        'terminal_input_state=0/3')
+                command('zc Print("focused_input_len=%d\\n",'
+                        'BootstrapGuiTerminalInputDiag() & 255);',
+                        'focused_input_len=3')
+                qmp_send_key('down')
+                command('zc Print("focused_input_len=%d\\n",'
+                        'BootstrapGuiTerminalInputDiag() & 255);',
+                        'focused_input_len=0')
+                print('PASS secondary input diagnostics preserve the primary terminal state', flush=True)
                 typed = type_graphical_prompt_line(
-                    'user-second-typing', 'Print("Second %d\\n",40+2);')
+                    'user-second-typing', 'Print("Second %d\\n",40+2);',
+                    focus_primary=False)
                 require_graphical_caret(typed,'Print("Second %d\\n",40+2);')
                 qmp_send_key('ret')
                 require_graphical_text('user-second-answer','Second 42')

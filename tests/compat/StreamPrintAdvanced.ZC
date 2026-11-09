@@ -1,0 +1,38 @@
+// Multiple writes form one generated input; that input can itself contain
+// an #exe block, and its definitions must remain visible after it ends.
+#exe {
+    StreamPrint("#define STREAM_%s ", "A");
+    StreamPrint("%d\n", 40);
+};
+#exe {
+    StreamPrint("#exe {StreamPrint(\"#define STREAM_B 2\\n\");};\n");
+};
+I64 StreamPrintAdvancedChecks()
+{
+    return STREAM_A + STREAM_B;
+}
+I64 StreamPrintDefineChecks()
+{
+    U8 *a = Define("STREAM_A"), *b = Define("STREAM_B");
+    U64 addr_a = a, addr_b = b;
+    I64 total;
+    CHashDefineStr *shadow;
+    Print("stream_define_ptrs=%X/%X\n", addr_a, addr_b);
+    if (!a || !b || addr_a < 0x1000 || addr_b < 0x1000)
+        return 1;
+    total = Str2I64(a, 10, NULL) + Str2I64(b, 10, NULL);
+    if (total != 42)
+        return 2;
+    DefinePrint("STREAM_A", "value=%d", 42);
+    if (StrCompare(Define("STREAM_A"), "value=42"))
+        return 3;
+    // A guest-only entry can shadow the compiler mirror without updating it.
+    shadow = CAlloc(0x80);
+    shadow->type = HTT_DEFINE_STR;
+    shadow->str = StrNew("STREAM_A");
+    shadow->data = StrNew("guest-shadow");
+    ZcGuestHashAdd(shadow, Fs->hash_table);
+    if (StrCompare(Define("STREAM_A"), "guest-shadow"))
+        return 4;
+    return 42;
+}

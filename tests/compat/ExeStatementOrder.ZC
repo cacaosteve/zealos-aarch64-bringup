@@ -1,0 +1,11 @@
+// The first compile-time statement creates a define needed when the next
+// statement is parsed. The generated definition is consumed after the block.
+#exe {
+    DefineLoad("EXE_STATEMENT_VALUE", "42");
+    StreamPrint("#define EXE_STATEMENT_RESULT %d\n", EXE_STATEMENT_VALUE);
+};
+I64 ExeStatementOrderChecks()
+{
+    #exe { DefineLoad("EXE_INNER_VALUE", "2"); }
+    return EXE_STATEMENT_RESULT + EXE_INNER_VALUE - 2;
+}

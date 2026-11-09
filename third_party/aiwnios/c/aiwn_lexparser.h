@@ -7,6 +7,11 @@ typedef struct CRPN CRPN;
 #include <stdint.h>
 struct CTask;
 struct CLexer;
+typedef struct CExeStream {
+  struct CExeStream *previous;
+  char *text;
+  int64_t length;
+} CExeStream;
 // This represents a peice of text being lexed(it could be a file macro, or
 // such)
 typedef struct CLexFile {
@@ -50,6 +55,8 @@ typedef struct CLexer {
    * an unspaced ZealOS range operator, e.g. `case 0...7:`. */
   int64_t pushback_char, pushback_valid;
   struct CHeapCtrl *hc;
+  /* Active #exe-generated source, stacked per lexer for nested blocks. */
+  CExeStream *port_exe_stream;
   int64_t *layout_off; /* Current class byte offset for ZealC $$. */
   /* ARM64 host bridge: options belong to the active guest CCompCtrl. */
   int64_t *port_options;

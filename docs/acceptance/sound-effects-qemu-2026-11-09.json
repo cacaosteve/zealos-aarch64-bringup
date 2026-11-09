@@ -67,6 +67,42 @@
     "design": "On supported QEMU systems with real boot-time timer IRQs, a 10 ms physical-timer interrupt refills the existing VirtIO sound queue without switching guest tasks. Sound queue updates mask IRQs against re-entry; IRQ entry preserves GPR, SIMD and FP control/status. The timer respects the guest interrupt mask and stops with sound; a session reset disables the opt-in mode and stops its tone. Pi is deliberately excluded.",
     "qemu_evidence": [
       {
+        "kernel_sha256": "c9c14e2413228459eebdb6ef2f871aacc1d15670ee437e5c86d52272096327a0",
+        "log": "build/sound-transitions.log",
+        "sha256": "c9f84a4a8462c66315f01875a8bdf0ebf1f9b68036a148e14b22004f53e8ff8b",
+        "result": "An opt-in timer probe changed A4 to A5, stopped, then restarted at E5. The guest returned 42 and the captured waveform contained sustained samples of those pitches in order; scripts/check-sound-transitions-wav.py rejected a truncated one-note negative control. The WAV capture cannot establish wall-clock silence or note-stop latency."
+      },
+      {
+        "kernel_sha256": "c9c14e2413228459eebdb6ef2f871aacc1d15670ee437e5c86d52272096327a0",
+        "log": "build/sound-prime-regression.log",
+        "sha256": "119bc9cabf85015f833c8edd9fcf07b2c3d81f293d5328864d2e739b6c332326",
+        "result": "Tone startup submitted all four 960-frame periods before yielding. Forty start/stop cycles, blocking and nonblocking Beep, and the settled-desktop three-second non-yielding worker and ordered witness all passed; maximum busy-worker refill gap was 13151 us and captured PCM was nonzero."
+      },
+      {
+        "kernel_sha256": "26478073ca06b0297d7f06eaf07497129f9f593a436609abad9c6dcdd564e4db",
+        "log": "build/sound-timer-long-desktop-ordered.log",
+        "sha256": "421ca96d37f5fb980d70852df41b566149ae3d8ac4397919f00f92a53b5611a4",
+        "result": "After desktop settling, a three-second CPU-bound F64 worker completed and a witness ran afterward rather than during it. There were 216 timer IRQs, a 61630 us maximum refill gap against the 80000 us queue, and nonzero captured PCM. This narrow timing margin is not proof of uninterrupted audible output."
+      },
+      {
+        "kernel_sha256": "26478073ca06b0297d7f06eaf07497129f9f593a436609abad9c6dcdd564e4db",
+        "log": "build/sound-timer-long-busy.log",
+        "sha256": "3b5d90cb71a8e2eb8e13e445d9cdb45661c1cf2590efe41a883c915784f5ea60",
+        "result": "A three-second non-yielding F64 worker completed with no witness interleaving recorded; 299 timer IRQs, a 10054 us maximum refill gap, and nonzero captured PCM were observed with the desktop stopped. This version of the test did not independently assert that the witness actually ran."
+      },
+      {
+        "kernel_sha256": "26478073ca06b0297d7f06eaf07497129f9f593a436609abad9c6dcdd564e4db",
+        "log": "build/sound-timer-cycles.log",
+        "sha256": "6564c6e95df47f5cdb571a8908d028d081f5ea94b85a5dd68fc6d806bed16013",
+        "result": "Forty tone start/stop cycles passed, with interrupts observed during each tone and no further interrupts after each stop; maximum measured refill gap was 141 us."
+      },
+      {
+        "kernel_sha256": "26478073ca06b0297d7f06eaf07497129f9f593a436609abad9c6dcdd564e4db",
+        "log": "build/sound-timer-beeps.log",
+        "sha256": "48dac7341110c404fc3559ee8a13c49116940c2dec4244d67bac3d209ded9d19",
+        "result": "Both blocking and nonblocking Beep paths passed with timer interrupts, stopped the tone and produced captured PCM."
+      },
+      {
         "kernel_sha256": "0c6abb39d385523b2e1fb09da13b63fe3b07453db4263e94013a006ae406c82f",
         "log": "build/sound-busy-timer-f64.log",
         "sha256": "35735ab142470c527aa693bc0b5773dd10b74009233436a4e2b723c229ea5d9e",
@@ -129,6 +165,7 @@
     ],
     "limits": [
       "The WAV backend does not prove real-time audible continuity.",
+      "Priming all available periods can leave queued audio after a note change or stop; its audible response latency is not yet verified.",
       "Not yet tested on live UTM or Pi; Pi audio uses a different backend and this timer path is disabled there.",
       "The F64 check does not exhaustively verify all SIMD registers, nested interrupt conditions or longer workloads.",
       "One HVF run observed a 69918 us gap against an 80000 us queue; latency under host load is not yet bounded.",

@@ -2308,6 +2308,23 @@ static int64_t host_lex_define_text(int64_t *a) {
     /* Borrow the compiler-owned text; source hash layouts/types differ. */
     return define ? (int64_t)(uintptr_t)define->data : 0;
 }
+static int64_t host_task_lex_define_text(int64_t *a) {
+    const char *name = (const char *)(uintptr_t)a[0];
+    void *guest_task = (void *)(uintptr_t)a[1];
+    if (!name || !guest_task)
+        return 0;
+    for (unsigned i = 0; i < GUEST_TASKS; i++) {
+        if (guest_fibers[i].words != guest_task ||
+            guest_fibers[i].state != GUEST_RUNNABLE)
+            continue;
+        CTask *compiler = i ? &guest_fibers[i].compiler_task : &task;
+        CHashTable *table = host_valid_task_hash_table(compiler);
+        CHashDefineStr *define = table ? (CHashDefineStr *)HashFind(
+            (char *)name, table, HTT_DEFINE_STR, 1) : NULL;
+        return define ? (int64_t)(uintptr_t)define->data : 0;
+    }
+    return 0;
+}
 static int64_t host_define_mirror(int64_t *a) {
     const char *name = (const char *)(uintptr_t)a[0];
     const char *value = (const char *)(uintptr_t)a[1];
@@ -2443,6 +2460,34 @@ static int64_t host_guest_hash_result(CHash *found) {
     if (found)
         found->use_cnt = (int32_t)((uint32_t)found->use_cnt + 1u);
     return (int64_t)(uintptr_t)found;
+}
+/* Search only the guest-format table. Callers that inspect guest-only fields
+ * must not receive the fallback compiler-format object from host_hash_find. */
+static int64_t host_hash_find_local(int64_t *a) {
+    CHashTable *table = (CHashTable *)(uintptr_t)a[1];
+    if (!a[0] || a[3] != 1)
+        return 0;
+    for (unsigned depth = 0; table && depth < 64; depth++) {
+        /* A linked compiler table uses different entry layouts and type bits. */
+        if (table == task.hash_table)
+            return 0;
+        for (unsigned i = 0; i < GUEST_TASKS; i++)
+            if (guest_fibers[i].state == GUEST_RUNNABLE &&
+                table == guest_fibers[i].compiler_task.hash_table)
+                return 0;
+        int64_t bytes = host_managed_allocation_size_ptr((uintptr_t)table);
+        if (bytes < (int64_t)sizeof(*table) || table->mask < 0 ||
+            table->mask >= (1 << 20) || !table->body ||
+            host_managed_allocation_size_ptr((uintptr_t)table->body) <
+                (int64_t)(((uint64_t)table->mask + 1) * sizeof(*table->body)))
+            return 0;
+        CHash *found = HashSingleTableFind((char *)(uintptr_t)a[0], table,
+                                           a[2], 1);
+        if (found)
+            return host_guest_hash_result(found);
+        table = table->next;
+    }
+    return 0;
 }
 static int64_t host_hash_find(int64_t *a) {
     CHashTable *table = (CHashTable *)(uintptr_t)a[1];
@@ -9077,6 +9122,44 @@ static int64_t host_str_print_join(int64_t *a) {
     memcpy(dst, stack, used + 1);
     return (int64_t)(uintptr_t)dst;
 }
+static int64_t host_stream_print(int64_t *a) {
+    CLexer *lex = NULL;
+    if (guest_task_bound) {
+        /* A different task can compile while this one is yielded. Find the
+         * current task's innermost source, not the process-global last lexer. */
+        for (struct guest_unwind *scope = guest_fibers[guest_current].unwind;
+             scope; scope = scope->previous) {
+            if (scope->cleanup == source_execution_cleanup) {
+                lex = ((struct source_execution *)scope)->lex;
+                break;
+            }
+        }
+    } else {
+        lex = guest_active_compile_lex;
+    }
+    if (!lex || !lex->port_exe_stream) {
+        zc_output("Err: No exe{} block\n");
+        return 0;
+    }
+    CExeStream *stream = lex->port_exe_stream;
+    char output[4097];
+    size_t n = format_text(output, sizeof(output),
+                           (const char *)(uintptr_t)a[0], a[1],
+                           (const int64_t *)(uintptr_t)a[2], 0);
+    if (stream->length < 0 || (uint64_t)stream->length > INT64_MAX - n - 1)
+        zc_fail("#exe stream size overflow");
+    size_t old = (size_t)stream->length;
+    char *next = __AIWNIOS_MAlloc((int64_t)(old + n + 1), lex->hc);
+    if (!next)
+        zc_fail("#exe stream allocation failed");
+    if (old)
+        memcpy(next, stream->text, old);
+    memcpy(next + old, output, n + 1);
+    __AIWNIOS_Free(stream->text);
+    stream->text = next;
+    stream->length = (int64_t)(old + n);
+    return 0;
+}
 static int64_t host_print(int64_t *a) {
     const char *format = (const char *)(uintptr_t)a[0];
     int64_t argc = a[1];
@@ -9279,6 +9362,7 @@ static int load_source_path(const char *path, int merged, int recover) {
         PrsBindCSymbol("ZcGuestHashTableNew", host_hash_table_new, 2);
         PrsBindCSymbol("ZcGuestHashTableDel", host_hash_table_del, 1);
         PrsBindCSymbol("ZcGuestHashFind", host_hash_find, 4);
+        PrsBindCSymbol("ZcGuestHashFindLocal", host_hash_find_local, 4);
         PrsBindCSymbol("ZcGuestHashAdd", host_hash_add, 2);
         PrsBindCSymbol("ZcGuestFramePtrRemove", host_frame_ptr_remove, 2);
         /* Keep the source-backed tS() function intact here. Binding a global
@@ -9648,6 +9732,7 @@ static int load_source_path(const char *path, int merged, int recover) {
         PrsBindCSymbol("ClampI64", host_clamp_i64, 3);
         PrsBindCSymbol("ZcDefineMirror", host_define_mirror, 2);
         PrsBindCSymbol("ZcLexDefineText", host_lex_define_text, 1);
+        PrsBindCSymbol("ZcTaskLexDefineText", host_task_lex_define_text, 2);
         /* The bridge declares counts for KernelB-stage task tests. KernelC
          * later rebinds the same object after its own declaration is loaded. */
         PrsBindCSymbol("counts", &guest_counts, 0);
@@ -9688,6 +9773,7 @@ static int load_source_path(const char *path, int merged, int recover) {
         PrsBindCSymbol("ExePrint2", host_exe_print2, 3);
         PrsBindCSymbol("Print", host_print, 3);
         PrsBindCSymbol("PrintErr", host_print_err, 3);
+        PrsBindCSymbol("StreamPrint", host_stream_print, 3);
         PrsBindCSymbol("ZcGuiShellExec", host_gui_shell_exec, 1);
         PrsBindCSymbol("StrPrintJoin", host_str_print_join, 4);
         PrsBindCSymbol("PutKey", host_put_key, 2);

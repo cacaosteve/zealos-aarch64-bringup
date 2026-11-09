@@ -1,0 +1,19 @@
+{
+  "date": "2026-11-09",
+  "target": "AArch64 PCI QEMU, native boot-context compiler",
+  "kernel_sha256": "c9c14e2413228459eebdb6ef2f871aacc1d15670ee437e5c86d52272096327a0",
+  "probe": "tests/compat/StreamPrintProbe.ZC",
+  "probe_sha256": "78da3224a151f21de61079c1b7f8dbef0934f546d10a7d9ac27403524986d123",
+  "command": "python3 -u scripts/check-compat.py --pci --probe-source-fast --probe-source tests/compat/StreamPrintProbe.ZC --probe-source-call StreamPrintProbe",
+  "result": "blocked: unresolved StreamPrint external call",
+  "evidence": [
+    "A #exe block attempted to generate a function declaration with StreamPrint; the guest reported an unresolved StreamPrint external before it could load the later function.",
+    "The original fast source probe incorrectly printed SOURCE COMPILES despite that unresolved-call message. The corrected probe reports SOURCE BLOCKED and exits before invoking the requested function."
+  ],
+  "log": "build/stream-print-classified.log",
+  "log_sha256": "767df242fcf03231ba721becf71e77bf2aefad7f3406128caf073abad3c337ed",
+  "limits": [
+    "No StreamPrint implementation is provided by this change. The pinned compiler appends formatted text to the active stream block and feeds it back into the lexer; implementing that behavior needs correct nested-block, lookahead, ownership and exception handling.",
+    "This probe does not validate TimeIns, AOT compilation, or physical targets. Historical catalog results have not been re-audited for this particular error class."
+  ]
+}

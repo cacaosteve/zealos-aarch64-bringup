@@ -1,0 +1,22 @@
+{
+  "date": "2026-11-09",
+  "target": "AArch64 PCI QEMU, one vCPU, native compiler",
+  "kernel_sha256": "860a2b119815f5406d4b3d1b527b29ed6ec498f240ff933e9748b75d9f639ec5",
+  "source_bundle_sha256": "aeca17ef54aba0ce89c90a3aa901fee48bd0390db51eeafe68d2b8fa5d093dda",
+  "probe": "tests/compat/ExeControlOrder.ZC",
+  "probe_sha256": "2dfed44979ba7ec2d406376caf121c4ee7b024a89293beffd0c4a3cd0cc1bdfe",
+  "before": "The first control-flow case failed because the identifier after if was lexed before the if statement defined it; the parser reported Expected ':' after label candidate EXE_CONTROL_NEXT.",
+  "after": [
+    "The extended if and if/else cases returned 42 after the newly defined lookahead name was expanded, preserving the following semicolon.",
+    "Consecutive and per-statement #exe ordering, inside-function directives, generated streams, define lookup and shadowing, and original DefineStr document rendering passed in the combined QEMU check.",
+    "ARM64 source checks and QEMU/Pi builds passed."
+  ],
+  "logs": {
+    "build/exe-control-before.log": "d1fdd82e5a195641098847e560cf0cdc2907b759676244909e7d218339d9fb95",
+    "build/exe-control-final-full.log": "3340ef85df89f998a30be0111aea71d457274d3ec12b4238897d87fb5f908b74"
+  },
+  "limits": [
+    "This fixes the tested newly-created identifier case. Changes to an already-expanded macro, a following directive, non-byte DolDoc lookahead, nested control-flow and exception paths need separate verification.",
+    "The stock demo was launched through XTalk; long-command graphical input and physical Pi behavior remain unverified."
+  ]
+}

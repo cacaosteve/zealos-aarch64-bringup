@@ -1,0 +1,10 @@
+// A stock #exe block can inject declarations into the surrounding stream.
+// The ordinary declaration after it must remain visible too.
+#exe {
+    StreamPrint("I64 StreamGenerated(){return 40+2;}\n");
+};
+
+I64 StreamPrintProbe()
+{
+    return StreamGenerated;
+}

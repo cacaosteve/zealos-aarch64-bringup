@@ -366,6 +366,7 @@ static void vs_submit_tone(unsigned slot) {
     vs_w16(q->notify, 0);
     g_vs_busy[slot] = 1;
 }
+static void virtio_snd_pump(void);
 static void virtio_snd_set_tone(int8_t ona) {
     if (ona && !g_vs_hz) {
         g_vs_pump_previous = vs_counter();
@@ -378,10 +379,16 @@ static void virtio_snd_set_tone(int8_t ona) {
     g_vs_tone_frames = 0;
     g_vs_hz = ona ? vs_note_hz(ona) : 0;
     if (g_vs_ready && g_vs_stream_started) {
-        for (unsigned i = 0; i < g_vs_slots; i++) if (!g_vs_busy[i]) { vs_submit_tone(i); break; }
+        if (ona) {
+            /* Reclaim completed descriptors and prime every free period now.
+             * Waiting for the next poll/IRQ leaves just 20 ms queued at the
+             * start of a tone, even when the stream supports more periods. */
+            virtio_snd_pump();
+        } else {
+            for (unsigned i = 0; i < g_vs_slots; i++) if (!g_vs_busy[i]) { vs_submit_tone(i); break; }
+        }
     }
 }
-static void virtio_snd_pump(void);
 static void virtio_snd_beep(int8_t ona) {
     g_vs_hz = ona ? vs_note_hz(ona) : 0;
     g_vs_tone_frames = VS_RATE / 2u;

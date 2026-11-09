@@ -11,8 +11,6 @@ I64 bootstrap_gui_terminal_editor_raw = -1;
 Bool bootstrap_gui_terminal_devices_ready = FALSE;
 Bool bootstrap_gui_terminal_home_started = FALSE;
 U8 bootstrap_gui_terminal_last_command[256];
-I64 bootstrap_gui_terminal_input_len;
-I64 bootstrap_gui_terminal_last_edit_result;
 U0 (*bootstrap_gui_terminal_final_update)(CDC *dc);
 #define GUI_PAINT_MAX_POINTS 8192
 Bool bootstrap_gui_paint_active = FALSE;
@@ -42,6 +40,8 @@ class CBootstrapTerminalState
     I64 task_num;
     U8 history[256];
     I64 history_len;
+    I64 input_len;
+    I64 last_edit_result;
 };
 CBootstrapTerminalState bootstrap_terminal_states[8];
 
@@ -914,8 +914,8 @@ U8 *BootstrapGuiTerminalReadLine2(Bool continuation)
     U8 *output, *edit_path;
 
     command[0] = 0;
-    bootstrap_gui_terminal_input_len = 0;
-    bootstrap_gui_terminal_last_edit_result = 0;
+    state->input_len = 0;
+    state->last_edit_result = 0;
     BootstrapGuiTerminalPrompt(continuation);
 
     while (TRUE)
@@ -1063,13 +1063,13 @@ U8 *BootstrapGuiTerminalReadLine2(Bool continuation)
                         DocPutKey(DocPut, 0, SC_CURSOR_LEFT);
                     if (ch >= 32 && ch < 127 && command_len == 255)
                         overflow = TRUE;
-                    bootstrap_gui_terminal_last_edit_result =
+                    state->last_edit_result =
                         BootstrapGuiTerminalCommandKey(command, &command_len,
                                                        &command_pos, ch, sc);
-                    if (bootstrap_gui_terminal_last_edit_result == 1)
+                    if (state->last_edit_result == 1)
                         DocPutKey(DocPut, ch, sc);
                 }
-                bootstrap_gui_terminal_input_len = command_len;
+                state->input_len = command_len;
             }
         }
         // User() waits for this task to reach its input prompt. Incoming
@@ -1375,9 +1375,13 @@ I64 BootstrapGuiTerminalKeyEventCount()
 }
 
 I64 BootstrapGuiTerminalInputDiag()
-{//Pack live line length and last editing result for cross-console diagnostics.
-    return bootstrap_gui_terminal_input_len |
-           bootstrap_gui_terminal_last_edit_result << 8;
+{//Report the focused terminal, with the primary as fallback for nonterminals.
+    CBootstrapTerminalState *state = BootstrapGuiTerminalState(sys_focus_task);
+    if (!state)
+        state = BootstrapGuiTerminalState(bootstrap_gui_terminal_task);
+    if (!state)
+        return -1;
+    return state->input_len | state->last_edit_result << 8;
 }
 
 I64 BootstrapGuiTerminalEditorActive()

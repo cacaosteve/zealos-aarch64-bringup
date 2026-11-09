@@ -2153,7 +2153,7 @@ def translate_grdc(source: bytes) -> bytes:
 
 
 def translate_docrecalc(source: bytes) -> bytes:
-    """Release per-frame depth buffers before recursive document trimming.
+    """Adapt define lookup and release depth buffers before recursive trimming.
 
     The pinned full-refresh path recursively recalculates after deleting old
     entries. A mesh sprite allocates a screen-sized depth buffer in each
@@ -2180,6 +2180,19 @@ def translate_docrecalc(source: bytes) -> bytes:
     for anchor, trim in zip(anchors, ('DocDelToEntry', 'DocDelToNum')):
         before, recurse = anchor.split('\n', 1)
         text = text.replace(anchor, before + '\n' + cleanup + recurse, 1)
+    local = '\tCHashDefineStr\t*tmph;'
+    lookup = ('\t\t\t\t\tif (tmph = HashFind(doc_e->define_str, win_task->hash_table, HTT_DEFINE_STR))\n'
+              '\t\t\t\t\t\tdoc_e->tag = StrNew(tmph->data, mem_task);')
+    if text.count(local) != 1 or text.count(lookup) != 1:
+        raise ValueError('expected the pinned DocRecalc define lookup')
+    text = text.replace(local, local + '\n\tU8 *compiler_define;', 1)
+    text = text.replace(lookup,
+        ('\t\t\t\t\tif (tmph = ZcGuestHashFindLocal(doc_e->define_str, win_task->hash_table, HTT_DEFINE_STR, 1))\n'
+         '\t\t\t\t\t\tdoc_e->tag = StrNew(tmph->data, mem_task);\n'
+         '\t\t\t\t\telse if (compiler_define = ZcTaskLexDefineText(doc_e->define_str, win_task))\n'
+         '\t\t\t\t\t\tdoc_e->tag = StrNew(compiler_define, mem_task);'), 1)
+    text = ('extern U8 *ZcTaskLexDefineText(U8 *name, CTask *task);\n'
+            'extern CHash *ZcGuestHashFindLocal(U8 *name, CHashTable *table, I64 mask, I64 instance=1);\n' + text)
     return text.encode('utf-8')
 
 

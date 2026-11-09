@@ -1,0 +1,19 @@
+{
+  "date": "2026-11-09",
+  "target": "AArch64 PCI QEMU, one vCPU, VirtIO input and VirtIO sound WAV backend",
+  "kernel_sha256": "c9c14e2413228459eebdb6ef2f871aacc1d15670ee437e5c86d52272096327a0",
+  "source_bundle_sha256": "1fdc49c4f2d89846ca1b8ddd752ef65e6cf84539aba95fe7afcf35c063fb9f6a",
+  "command": "QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device -audiodev wav,id=sound0,path=build/flapbat-sound-cleanup.wav -device virtio-sound-pci,audiodev=sound0' python3 -u scripts/check-compat.py --pci --quick --probe-demo-flapbat",
+  "result": "partial pass",
+  "evidence": [
+    "The game drew its canvas, animated, responded to Space, exited through Escape and returned to a graphical terminal where 40+2 returned 42; zstatus reported failed=0.",
+    "The QEMU WAV capture contained 186984 nonzero stereo samples at 44100 Hz and several distinct pitches while the game ran. The experimental audio timer was not explicitly enabled.",
+    "After game exit, the guest reported flapbat_audio_hz=0 and song_alive=0. The probe now requires both values."
+  ],
+  "log": "build/flapbat-sound-cleanup.log",
+  "log_sha256": "6dedda49277311dd5b2a12529577ec36573743afbc70f9d3d8786440f288fb57",
+  "limits": [
+    "Captured samples do not verify audible host output, real-time continuity, or exact melody and timing.",
+    "The catch-a-bug effect, full gameplay, live UTM and physical Pi audio were not verified."
+  ]
+}

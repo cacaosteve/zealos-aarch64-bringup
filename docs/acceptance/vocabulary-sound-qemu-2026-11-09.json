@@ -1,0 +1,23 @@
+{
+  "date": "2026-11-09",
+  "target": "AArch64 PCI QEMU, one vCPU, VirtIO keyboard and VirtIO sound WAV backend",
+  "kernel_sha256": "c9c14e2413228459eebdb6ef2f871aacc1d15670ee437e5c86d52272096327a0",
+  "command": "QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device -audiodev wav,id=sound0,path=build/vocabulary-sound-xtalk.wav -device virtio-sound-pci,audiodev=sound0' python3 -u scripts/check-compat.py --pci --quick --probe-vocabulary --probe-vocabulary-xtalk",
+  "result": "partial pass, including a subsequent graphical-launch pass",
+  "evidence": [
+    "With the quiz launched via XTalk, the automated keyboard entered an answer, the displayed content changed, Escape returned to the graphical terminal, 40+2 returned 42, and zstatus reported failed=0.",
+    "The WAV capture contained 51156 nonzero stereo samples; five consecutive 100 ms windows had approximately 195 Hz square-wave frequency, consistent with the stock Sound(46) incorrect-answer tone. The experimental audio timer was not explicitly enabled.",
+    "The first run, which attempted to type the launcher in the graphical terminal, failed before launching the quiz; retries left partial command text visible. Its cause is not established.",
+    "After restricting the shared input-length diagnostic to the primary terminal task, a later QEMU run typed the original launcher through the graphical terminal on its first attempt, answered, exited, and returned 42. The capture had 51156 nonzero stereo samples. One passing run does not establish that the diagnostic change caused the earlier failure to disappear. The diagnostic was subsequently improved to track each terminal independently; see gui-terminal-input-isolation-qemu-2026-11-09.json."
+  ],
+  "logs": {
+    "build/vocabulary-sound-xtalk.log": "d958dbf44bb4c17c8236c52bd804ae456e34620e704616aafc4377c12fd0e643",
+    "build/vocabulary-sound.log": "609fa632950b207d6fccb7e84b7e49163d280b97a2f874afcb34d3fd677a9844",
+    "build/vocabulary-gui-diag.log": "d960f62d518bcf71b2a0058d295e277de0ea86c67c6f9d423433c6da9ec88ef8"
+  },
+  "limits": [
+    "The brief feedback and definition popup were not visually verified, nor was the correct-answer tone.",
+    "WAV sample output does not verify real-time continuity, audible host output, or live UTM and Pi behavior.",
+    "The XTalk run does not validate graphical typing of the launcher; the subsequent GUI run provides one positive check but not repeated reliability evidence."
+  ]
+}

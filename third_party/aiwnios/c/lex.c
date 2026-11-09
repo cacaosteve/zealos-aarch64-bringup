@@ -20,6 +20,42 @@ static double LexDecimalScale(uint64_t value, int64_t zeros) {
   while (zeros-- > 0) scale *= 0.1;
   return scale;
 }
+
+/* A control-flow parser may have read the next identifier to look for an
+ * optional else before the current #exe statement executes. If that
+ * statement just created a matching define, expand the saved name now.
+ * Preserve the character after the name as a tiny input frame: document
+ * readers cannot in general be rewound by more than one character. */
+static int LexExpandDeferredName(CLexer *lex) {
+  if (lex->cur_tok != TK_NAME || (lex->flags & LEXF_NO_EXPAND) ||
+      lex->pushback_valid ||
+      ((lex->flags & LEXF_USE_LAST_CHAR) &&
+       (lex->cur_char < 0 || lex->cur_char > 255)))
+    return 0;
+  CHashDefineStr *define = HashFind(lex->string, Fs->hash_table,
+                                    HTT_DEFINE_STR, 1);
+  if (!define)
+    return 0;
+  if (lex->flags & LEXF_USE_LAST_CHAR) {
+    int64_t ch = lex->cur_char;
+    lex->flags &= ~LEXF_USE_LAST_CHAR;
+    if (ch) {
+      CLexFile *replay = A_CALLOC(sizeof(*replay), NULL);
+      char text[2] = {(char)ch, 0};
+      replay->last = lex->file;
+      replay->filename = A_STRDUP("<lookahead>", NULL);
+      replay->text = A_STRDUP(text, NULL);
+      lex->file = replay;
+    }
+  }
+  CLexFile *expanded = A_CALLOC(sizeof(*expanded), NULL);
+  expanded->last = lex->file;
+  expanded->filename = A_STRDUP(define->base.str, NULL);
+  expanded->text = A_STRDUP(define->data, NULL);
+  lex->file = expanded;
+  Lex(lex);
+  return 1;
+}
 char *LexSrcLink(CLexer *lex, void *task) {
   char buf[STR_LEN];
   if (!lex->file)
@@ -911,46 +947,89 @@ lex_ident: {
         char *code;
         int64_t old_defer = lex->port_defer_statement_lex;
         int64_t old_pending = lex->port_lex_pending;
-        /* The nested statement parser owns its own semicolon advancement.
-         * Shell parsing normally defers that advancement to the outer source
-         * loop; allowing that mode through here leaves a pending Lex after
-         * the #exe block and consumes the following declaration's type. */
-        lex->port_defer_statement_lex = 0;
+        int64_t old_depth = lex->port_statement_depth;
+        /* Each #exe statement must execute before the next is lexed. Use a
+         * private top-level statement depth even when this directive occurs
+         * while an enclosing function is being parsed. */
+        lex->port_defer_statement_lex = 1;
         lex->port_lex_pending = 0;
-        CodeCtrlPush(cc);
+        lex->port_statement_depth = 0;
+        CExeStream *stream = A_CALLOC(sizeof(*stream), lex->hc);
+        stream->previous = lex->port_exe_stream;
+        lex->port_exe_stream = stream;
         int64_t block_tok = Lex(lex);
-        if (block_tok != '{' || !PrsStmt(cc)) {
-          CodeCtrlPop(cc);
+        int block_ok = block_tok == '{';
+        if (block_ok) {
+          Lex(lex);
+          while (lex->cur_tok && lex->cur_tok != ERR && lex->cur_tok != '}') {
+            CodeCtrlPush(cc);
+            if (!PrsStmt(cc)) {
+              CodeCtrlPop(cc);
+              block_ok = 0;
+              break;
+            }
+            CRPN *ret = A_CALLOC(sizeof(CRPN), cc->hc);
+            ret->type = IC_RET;
+            QueIns(ret, cc->code_ctrl->ir_code);
+            code = Compile(cc, NULL, NULL, NULL);
+            if (!code) {
+              CodeCtrlPop(cc);
+              block_ok = 0;
+              break;
+            }
+            if (lex->port_sync)
+              lex->port_sync(lex);
+            FFI_CALL_TOS_0(code);
+            A_FREE(code);
+            CodeCtrlPop(cc);
+            if (lex->port_lex_pending) {
+              lex->port_lex_pending = 0;
+              Lex(lex);
+            } else
+              LexExpandDeferredName(lex);
+          }
+          if (lex->cur_tok != '}')
+            block_ok = 0;
+        }
+        if (!block_ok) {
+          lex->port_exe_stream = stream->previous;
+          A_FREE(stream->text);
+          A_FREE(stream);
           CmpCtrlDel(cc);
           lex->port_defer_statement_lex = old_defer;
           lex->port_lex_pending = old_pending;
+          lex->port_statement_depth = old_depth;
           LexErr(lex, "Expected a statement block after #exe.");
           return lex->cur_tok = ERR;
         }
-        if (lex->cur_tok == ';')
-          Lex(lex);
-        CRPN *ret = A_CALLOC(sizeof(CRPN), cc->hc);
-        ret->type = IC_RET;
-        QueIns(ret, cc->code_ctrl->ir_code);
-        code = Compile(cc, NULL, NULL, NULL);
-        if (!code) {
-          CodeCtrlPop(cc);
-          CmpCtrlDel(cc);
-          lex->port_defer_statement_lex = old_defer;
-          lex->port_lex_pending = old_pending;
-          LexErr(lex, "Could not compile #exe block.");
-          return lex->cur_tok = ERR;
-        }
-        if (lex->port_sync)
-          lex->port_sync(lex);
-        FFI_CALL_TOS_0(code);
-        A_FREE(code);
-        CodeCtrlPop(cc);
+        lex->port_exe_stream = stream->previous;
         CmpCtrlDel(cc);
         lex->port_defer_statement_lex = old_defer;
         lex->port_lex_pending = old_pending;
-        /* PrsScope and the optional trailing-semicolon handling above have
-         * already lexed the next token. Re-entering here skips it. */
+        lex->port_statement_depth = old_depth;
+        if (stream->length) {
+          /* Feed generated text to this lexer before returning to the file
+           * containing the closing brace and its following source. */
+          new_file = A_CALLOC(sizeof(*new_file), lex->hc);
+          if (!new_file) {
+            LexErr(lex, "Could not allocate #exe input.");
+            return lex->cur_tok = ERR;
+          }
+          new_file->last = lex->file;
+          new_file->filename = A_STRDUP("<StreamBlk>", lex->hc);
+          new_file->text = stream->text;
+          stream->text = NULL;
+          lex->file = new_file;
+        }
+        A_FREE(stream->text);
+        A_FREE(stream);
+        /* Do not lex beyond the closing brace until the block has executed:
+         * the following token can itself be an #exe directive. */
+        Lex(lex);
+        if (lex->cur_tok == ';')
+          Lex(lex);
+        /* The optional trailing-semicolon handling already lexed the next
+         * token. Re-entering here would skip it. */
         return lex->cur_tok;
       } else if (!strcmp(lex->string, "if")) {
         old_flags = lex->flags;

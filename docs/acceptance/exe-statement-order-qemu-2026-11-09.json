@@ -1,0 +1,25 @@
+{
+  "date": "2026-11-09",
+  "target": "AArch64 PCI QEMU, one vCPU, graphical desktop",
+  "kernel_sha256": "afa7709f7512278bf86af485d58fe609a12358d8b0286b6048eca2e2142e523e",
+  "source_bundle_sha256": "81771b43d087ad26d67cbb2195fdf3e86f9f6f399d685ba0ce39f187e672ac3a",
+  "probe": "tests/compat/ExeStatementOrder.ZC",
+  "probe_sha256": "4a536acd1d3dbc5412972ee013d2ba8c6108a4611567e8c69ed42f14e1978198",
+  "before": "A probe with DefineLoad in the first #exe statement and its define in the next statement failed with Unknown symbol EXE_STATEMENT_VALUE because the whole block was compiled before execution.",
+  "after": [
+    "The extended probe returned 42 after executing statements separately; it also checked a directive inside a function without a trailing semicolon.",
+    "Consecutive #exe ordering, multiple StreamPrint writes, a generated nested block, guest define lookup and shadowing passed in the combined check.",
+    "The pinned DefineStr demo rendered a numeric age and the GlobalVars demo reached Time 1 through Time 4 and its data-heap boundary check; both returned to a working terminal. Both GUI launches used XTalk.",
+    "ARM64 source checks and QEMU/Pi builds passed."
+  ],
+  "logs": {
+    "build/exe-statement-before.log": "65b7999716e1f45d9a6093fd1ec23b7323debb35ef21d4db0755a7573c735c04",
+    "build/exe-statements-full.log": "b76f54997f3a1aa607dc582a8b0d3a2cf2eb61165a53d8aff45ee03f2777b973",
+    "build/exe-statements-globalvars-xtalk-ordered.log": "65db5fdf22500e8bcb115702484233dfe877f2ce2d11ec256fdf8897b314200e",
+    "build/exe-statements-globalvars.log": "947707bd5bab173aaa49bb27fb21b185f7b9f41c883839f250e06380d357fd5b"
+  },
+  "limits": [
+    "The normal keyboard-driven GlobalVars launch failed to enter its long command reliably in this run, before the demo started; XTalk was used to isolate the compiler check.",
+    "Control-flow lookahead, more complex nested blocks, exceptions, concurrency, AOT and physical Pi behavior remain unverified."
+  ]
+}
