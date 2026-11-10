@@ -16,11 +16,14 @@ DEMO_LEDGER = ROOT / "docs/acceptance/demo-source-ledger-2026-11-10.json"
 PROGRAM_CATALOG = ROOT / "docs/acceptance/program-catalog-qemu-2026-11-03.json"
 SOURCE_CONTEXT_CATALOG = ROOT / "docs/acceptance/source-context-catalog-qemu-2026-11-02.json"
 NAMED_APPS = ROOT / "docs/acceptance/named-apps-qemu-2026-11-02.json"
-THREE_D = ROOT / "docs/acceptance/three-d-apps-utm-qemu-current-2026-11-09.json"
+THREE_D = ROOT / "docs/acceptance/three-d-apps-utm-qemu-current-2026-11-10.json"
 SPAN_STRUT = ROOT / "docs/acceptance/span-strut-qemu-2026-11-07.json"
-BUDGET = ROOT / "docs/acceptance/budget-current-utm-hvf-2026-11-09.json"
-LOGIC = ROOT / "docs/acceptance/utm-logic-prompt-fix-2026-10-26.json"
-VOCABULARY = ROOT / "docs/acceptance/vocabulary-qemu-2026-11-02.json"
+BUDGET = ROOT / "docs/acceptance/budget-current-qemu-2026-11-10.json"
+LOGIC = ROOT / "docs/acceptance/digital-logic-current-qemu-2026-11-10.json"
+VOCABULARY = ROOT / "docs/acceptance/vocabulary-current-qemu-sound-2026-11-10.json"
+PSALMODY = ROOT / "docs/acceptance/psalmody-current-qemu-2026-11-10.json"
+TIMECLOCK = ROOT / "docs/acceptance/timeclock-current-qemu-2026-11-10.json"
+XCALIBER = ROOT / "docs/acceptance/scheduler-xcaliber-current-2026-11-10.json"
 NETWORK = ROOT / "docs/acceptance/network-programs-qemu-2026-11-03.json"
 NETWORK_COMPILE = ROOT / "docs/acceptance/network-compile-qemu-2026-11-06.json"
 SYSTEM_STANDALONE_COMPILE = ROOT / "docs/acceptance/system-standalone-compile-qemu-2026-11-06.json"
@@ -113,8 +116,8 @@ def main():
         "status": "pass",
         "evidence": str(BUDGET.relative_to(ROOT)),
     }
-    # Digital Logic's live UTM acceptance is also recorded with its exact-image
-    # checks; its QEMU/UTM input and rendering probes are described there.
+    # Prefer the current exact-image QEMU run for the inventory. Live UTM
+    # acceptance is described separately in PROGRAMS.md.
     app_runtime["/Apps/Logic/Run.ZC"] = {
         "status": "pass",
         "evidence": str(LOGIC.relative_to(ROOT)),
@@ -122,6 +125,18 @@ def main():
     app_runtime["/Apps/Vocabulary/Run.ZC"] = {
         "status": "pass",
         "evidence": str(VOCABULARY.relative_to(ROOT)),
+    }
+    app_runtime["/Apps/Psalmody/Run.ZC"] = {
+        "status": "pass",
+        "evidence": str(PSALMODY.relative_to(ROOT)),
+    }
+    app_runtime["/Apps/TimeClock/Load.ZC"] = {
+        "status": "pass",
+        "evidence": str(TIMECLOCK.relative_to(ROOT)),
+    }
+    app_runtime["/Apps/X-Caliber/Run.ZC"] = {
+        "status": "pass",
+        "evidence": str(XCALIBER.relative_to(ROOT)),
     }
     for name in ("Span", "Strut"):
         app_runtime["/Apps/" + name + "/Run.ZC"] = {

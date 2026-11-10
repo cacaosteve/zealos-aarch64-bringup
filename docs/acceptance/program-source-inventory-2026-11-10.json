@@ -192,7 +192,7 @@
       "compile": "pass",
       "runtime": "pass",
       "evidence": "docs/acceptance/program-catalog-qemu-2026-11-03.json",
-      "runtime_evidence": "docs/acceptance/budget-current-utm-hvf-2026-11-09.json"
+      "runtime_evidence": "docs/acceptance/budget-current-qemu-2026-11-10.json"
     },
     {
       "path": "/Apps/GrModels/BallGen.ZC",
@@ -237,7 +237,7 @@
       "compile": "pass",
       "runtime": "pass",
       "evidence": "docs/acceptance/program-catalog-qemu-2026-11-03.json",
-      "runtime_evidence": "docs/acceptance/three-d-apps-utm-qemu-current-2026-11-09.json"
+      "runtime_evidence": "docs/acceptance/three-d-apps-utm-qemu-current-2026-11-10.json"
     },
     {
       "path": "/Apps/KeepAway/KeepAway.ZC",
@@ -264,7 +264,7 @@
       "compile": "pass",
       "runtime": "pass",
       "evidence": "docs/acceptance/program-catalog-qemu-2026-11-03.json",
-      "runtime_evidence": "docs/acceptance/three-d-apps-utm-qemu-current-2026-11-09.json"
+      "runtime_evidence": "docs/acceptance/three-d-apps-utm-qemu-current-2026-11-10.json"
     },
     {
       "path": "/Apps/Logic/Load.ZC",
@@ -291,7 +291,7 @@
       "compile": "pass",
       "runtime": "pass",
       "evidence": "docs/acceptance/program-catalog-qemu-2026-11-03.json",
-      "runtime_evidence": "docs/acceptance/utm-logic-prompt-fix-2026-10-26.json"
+      "runtime_evidence": "docs/acceptance/digital-logic-current-qemu-2026-11-10.json"
     },
     {
       "path": "/Apps/Psalmody/Examples/childish.ZC",
@@ -408,7 +408,7 @@
       "compile": "pass",
       "runtime": "pass",
       "evidence": "docs/acceptance/program-catalog-qemu-2026-11-03.json",
-      "runtime_evidence": "docs/acceptance/named-apps-qemu-2026-11-02.json"
+      "runtime_evidence": "docs/acceptance/psalmody-current-qemu-2026-11-10.json"
     },
     {
       "path": "/Apps/Span/Install.ZC",
@@ -516,7 +516,7 @@
       "compile": "pass",
       "runtime": "pass",
       "evidence": "docs/acceptance/program-catalog-qemu-2026-11-03.json",
-      "runtime_evidence": "docs/acceptance/named-apps-qemu-2026-11-02.json"
+      "runtime_evidence": "docs/acceptance/timeclock-current-qemu-2026-11-10.json"
     },
     {
       "path": "/Apps/TimeClock/TimeClk.ZC",
@@ -543,7 +543,7 @@
       "compile": "pass",
       "runtime": "pass",
       "evidence": "docs/acceptance/program-catalog-qemu-2026-11-03.json",
-      "runtime_evidence": "docs/acceptance/three-d-apps-utm-qemu-current-2026-11-09.json"
+      "runtime_evidence": "docs/acceptance/three-d-apps-utm-qemu-current-2026-11-10.json"
     },
     {
       "path": "/Apps/Titanium/Titanium.ZC",
@@ -687,7 +687,7 @@
       "compile": "pass",
       "runtime": "pass",
       "evidence": "docs/acceptance/program-catalog-qemu-2026-11-03.json",
-      "runtime_evidence": "docs/acceptance/vocabulary-qemu-2026-11-02.json"
+      "runtime_evidence": "docs/acceptance/vocabulary-current-qemu-sound-2026-11-10.json"
     },
     {
       "path": "/Apps/Vocabulary/VocabQuiz.ZC",
@@ -714,7 +714,7 @@
       "compile": "pass",
       "runtime": "pass",
       "evidence": "docs/acceptance/program-catalog-qemu-2026-11-03.json",
-      "runtime_evidence": "docs/acceptance/named-apps-qemu-2026-11-02.json"
+      "runtime_evidence": "docs/acceptance/scheduler-xcaliber-current-2026-11-10.json"
     },
     {
       "path": "/Apps/X-Caliber/X-Caliber.ZC",
