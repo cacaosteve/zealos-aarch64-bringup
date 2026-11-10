@@ -1,0 +1,27 @@
+{
+  "date": "2026-11-09",
+  "target": "AArch64 native ZealC on PCI QEMU",
+  "repository_commit": "002f7fc86681e5210314adbcfb929a9c890a53f0",
+  "upstream_source_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "source": "/Demo/AcctExample/TOS/TOSDistro.ZC",
+  "source_sha256": "4ffbd1877c58bdd11aeb8de69785a35fa7065f3ff25cf97db86bc2e49c2de94e",
+  "boot_iso": "build/zealos-aarch64-hello.iso",
+  "boot_iso_sha256": "133c712ca3e69a827029f9607d7def2f14a3aff88ddd4e1c6a5a968ea1632fd5",
+  "command": "python3 scripts/check-compat.py --pci --quick --probe-demo-makehome",
+  "result": "pass for module initialization; full distribution regeneration remains unverified",
+  "checks": [
+    {
+      "step": "ExeFile2(\"/Demo/AcctExample/TOS/TOSDistro.ZC\");",
+      "result": "pass",
+      "evidence": "The program executed its top-level initialization, including UpdateISODocDefines, and returned with zc: executed."
+    },
+    {
+      "step": "terminal recovery",
+      "result": "pass",
+      "evidence": "The graphical terminal recovered and accepted 40+2 with result 42; zstatus reported failed=0."
+    }
+  ],
+  "scope_note": "This safe probe did not call TOSRegen, TOSRegen2, any DistroPrep function, Format, TOSBootHDIns, or drive copy operations. Those functions can erase or reformat volumes. Full distro generation still needs an explicitly isolated guest with disposable scratch disks and source/configured guest drives.",
+  "log": "build/check-program-catalog-pci.log",
+  "log_sha256": "92f850bf4e906aed6fb5d67940d8d15bb3259e9d58c83639cc8fedbfbab6aa24"
+}

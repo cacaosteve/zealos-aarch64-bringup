@@ -9144,12 +9144,18 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                         'zc: loaded /Demo/AcctExample/TOS/MakeTOS.ZC', timeout=180)
                 command('zc Print("tos_hds_ok=%d\\n",StrCompare(Define("TOS_HDS"),"\\\"CD\\\"")==0);',
                         'tos_hds_ok=1')
+                # TOSDistro's top-level path only updates ISO documentation
+                # defines. Its disk-formatting/copy/reinstall routines are
+                # explicit functions and must not be invoked by this probe.
+                command('zc ExeFile2("/Demo/AcctExample/TOS/TOSDistro.ZC");',
+                        'zc: executed', timeout=180)
                 run_graphical_terminal_command(
                     'demo-makehome-terminal-recovery', '40+2;',
                     'ans=0x2A=42', timeout=30)
                 command('zstatus', 'failed=0')
-                print('PASS MakeHome and MakeTOS loaded their stock module sets and '
-                      'returned to the terminal', flush=True)
+                print('PASS MakeHome and MakeTOS loaded their stock module sets; '
+                      'TOSDistro executed its non-destructive initialization; '
+                      'terminal recovery and failed=0', flush=True)
                 raise SystemExit(0)
 
             if args.probe_demo_asmandc12 or args.probe_demo_asmandc2:
