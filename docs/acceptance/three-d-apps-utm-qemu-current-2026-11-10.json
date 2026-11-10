@@ -25,6 +25,28 @@
         "KeepAway gameplay and Escape recovery passed.",
         "Titanium gameplay frame, input, Space, Escape, and terminal recovery passed."
       ]
+    },
+    {
+      "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-3d-apps-current.log python3 -u scripts/check-compat.py --pci --quick --probe-3d-apps",
+      "exit_code": 0,
+      "log": "build/check-3d-apps-current.log",
+      "log_sha256": "9ef6b6bea2cabc1832e9461c1aa39bc8f03bf50b8c5e221c7390dfd42aa5ca9e",
+      "checks": [
+        "GrModels Man form accepted color choices, generated a 112-vertex, 168-triangle mesh, and reached the repeat prompt; the terminal recovered.",
+        "GrModels Ball form generated a 58-vertex, 128-triangle mesh and rendered an inline sprite; the source sprite entry was verified and the terminal recovered.",
+        "KeepAway court, HUD and player rendered; Space/mouse input and HUD refresh worked; Escape returned focus and the terminal evaluated 40+2 as 42.",
+        "Titanium intro, gameplay frame, input, Escape and terminal recovery passed."
+      ]
+    },
+    {
+      "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-3d-current-followup.log python3 -u scripts/check-compat.py --pci --quick --probe-3d-apps --probe-keepaway-full-game",
+      "exit_code": 0,
+      "log": "build/check-3d-current-followup.log",
+      "log_sha256": "c3b24983a0e0eca75665b5d65471e27f98f645eb4146118f55b8199f051c91d1",
+      "checks": [
+        "KeepAway rendered, accepted Space/mouse input and refreshed its HUD throughout the 184-second full-game observation; scanout continued changing.",
+        "Escape restored terminal focus, 40+2 returned 42, and no Animate child remained after exit."
+      ]
     }
   ],
   "limits": "This is a headless run with UTM's bundled QEMU framework and display/input models, not a test in the visible UTM application window. It confirms this current ISO survives the previously reported KeepAway interval in that accelerated setup, but the live-window freeze report and physical Pi behavior remain open. Audio output was not tested."
