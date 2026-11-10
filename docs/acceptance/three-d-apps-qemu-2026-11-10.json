@@ -1,0 +1,25 @@
+{
+  "date": "2026-11-10",
+  "target": "AArch64 native ZealC on PCI QEMU",
+  "iso_sha256": "deca048d86257281089779d0b681bef8a6c6b9c0c32146c984881992d62ebd2e",
+  "command": "python3 -u scripts/check-compat.py --pci --probe-3d-apps",
+  "exit_code": 0,
+  "result": "pass in automated PCI QEMU",
+  "checks": {
+    "GrModels": {
+      "Man": "pass: form accepted; generated 112 vertices and 168 triangles; rendered pixels verified; repeat prompt and terminal recovery passed",
+      "Ball": "pass: form accepted; generated 58 vertices and 128 triangles; inline sprite pixels verified; repeat prompt and terminal recovery passed"
+    },
+    "KeepAway": "pass: court, HUD and players rendered; gameplay frame and Space/mouse input passed; Escape returned to the terminal",
+    "Titanium": "pass: gameplay frame and input passed; Escape returned to a working terminal",
+    "desktop_recovery": "pass: keyboard-focused terminal input/history, window demo launch/stop, and final zstatus checks completed"
+  },
+  "live_host_status": {
+    "UTM": {
+      "Titanium": "user-confirmed working, including ordinary Left/Right, Space, and Escape",
+      "GrModels": "QEMU forms, generated meshes, rendered pixels and recovery passed; live UTM appearance not confirmed",
+      "KeepAway": "QEMU launch/gameplay/recovery passed; a prior live UTM report described a complete freeze, so the host-specific issue remains open"
+    },
+    "Pi4B": "User is testing the current staged card; this QEMU run does not cover Pi hardware"
+  }
+}
