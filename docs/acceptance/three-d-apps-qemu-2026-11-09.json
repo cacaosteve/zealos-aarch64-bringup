@@ -1,0 +1,30 @@
+{
+  "date": "2026-11-09",
+  "target": "AArch64 native ZealC on PCI QEMU",
+  "iso_sha256": "1ea68e3459f8f29be1f84f5eb05f60992796412661f9d2be797764e707e75abe",
+  "command": "make esp && python3 scripts/check-compat.py --pci --probe-3d-apps --probe-keepaway-full-game",
+  "exit_code": 0,
+  "result": "pass in automated PCI QEMU",
+  "checks": {
+    "GrModels": {
+      "Man": "pass: input form accepted; generated 112 vertices and 168 triangles; rendered pixels were verified; repeat prompt, Escape, and terminal recovery passed",
+      "Ball": "pass: input form accepted; generated 58 vertices and 128 triangles; inline sprite pixels were verified; repeat prompt, Escape, and terminal recovery passed"
+    },
+    "KeepAway": {
+      "gameplay": "pass: court, HUD, and players rendered; Space/mouse input preserved the game frame",
+      "long_run": "pass: remained in gameplay for the 183-second observation; Escape returned to the terminal and 40+2 returned 42"
+    },
+    "Titanium": {
+      "gameplay": "pass: intro and game frame rendered; left/right, Space, and Escape returned to a working terminal"
+    },
+    "final_status": "failed=0; command completed successfully"
+  },
+  "live_host_status": {
+    "UTM": {
+      "Titanium": "user-confirmed working, including ordinary Left/Right, Space, and Escape",
+      "GrModels": "QEMU forms and generated mesh passed; the user had not confirmed the generated model appearance in UTM",
+      "KeepAway": "QEMU passes; a previous UTM report described a complete input/display freeze, so the host-specific issue is still open"
+    },
+    "Pi4B": "This QEMU run does not cover Pi hardware; current microSD retest is pending user feedback"
+  }
+}
