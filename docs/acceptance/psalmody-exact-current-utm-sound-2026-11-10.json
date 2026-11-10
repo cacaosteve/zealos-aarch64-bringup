@@ -1,0 +1,25 @@
+{
+  "date": "2026-11-10",
+  "repository_commit": "d598f6c",
+  "upstream_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "target": "UTM-bundled QEMU framework with HVF, virtio-ramfb, VirtIO keyboard/tablet, and WAV-backed VirtIO sound",
+  "source": "/Apps/Psalmody/Run.ZC",
+  "source_sha256": "4e0fc73f3980d9c23222d18423637cf902cc681a01d8796c41fa5fa0438aa588",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "4bc484338001b2a4d460844c11f0ea397554dac9250c378885f8a8a7ff1be4ea",
+  "kernel_sha256": "c7cff83246dde72296135862518d65574ebc482171cc7286935153fa282d53d9",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device -audiodev wav,id=sound0,path=build/psalmody-exact-current-utm.wav -device virtio-sound-pci,audiodev=sound0' ZEAL_COMPAT_LOG_PATH=build/check-psalmody-exact-current-utm.log python3 -u scripts/check-compat.py --pci --quick --probe-psalmody --probe-psalmody-audio-timer",
+  "result": "pass",
+  "exit_code": 0,
+  "verified": [
+    "Psalmody opened, recording was enabled, and H entered a C5 note.",
+    "WAV capture contains a sustained 50 ms tone at approximately 520 Hz (expected C5, 523.25 Hz) in three consecutive windows; each window has RMS amplitude about 6949 and peak 7000.",
+    "Shift+Escape exited playback, the graphical terminal evaluated 40+2 as 42, and zstatus reported failed=0.",
+    "The experimental audio timer delivered nine IRQs."
+  ],
+  "log": "build/check-psalmody-exact-current-utm.log",
+  "log_sha256": "730af1463e75494a7c886f86d22c112af64da0d20246b00828db7cbab3fc67c1",
+  "wav": "build/psalmody-exact-current-utm.wav",
+  "wav_sha256": "6fde75acb5ba338508d3fa15d5859843ab3e834c6b8bc527791cb8607ac01a2e",
+  "scope_note": "This automated check uses UTM's bundled QEMU hardware profile; it verifies PCM output and app interaction in the emulated sound model. It does not substitute for confirming audible playback in the live UTM app. The generic long-effect WAV checker is not suitable for Psalmody's 260 ms note probe."
+}
