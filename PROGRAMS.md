@@ -23,6 +23,19 @@ This is compile evidence only. It does not establish runtime acceptance or
 feature parity. Per-source output is recorded in
 [`program-catalog-full-qemu-2026-11-10.json`](docs/acceptance/program-catalog-full-qemu-2026-11-10.json).
 
+The dependency-aware Demo inventory is separate from that 290-source sample:
+all 206 pinned Demo `.ZC` files compile, and 199 have explicit QEMU runtime
+acceptance; seven remain partial. Those are `TimeIns`, `WallPaperDesktop`,
+three TOS account examples, `MultiCore/Lock`, and `MultiCore/MPRadix`. The
+multicore examples are partial because the current guest runtime exposes one
+CPU; the stock `TimeIns` optimizer trace is not implemented by the ARM64
+compiler; the account examples and desktop still have workflow coverage gaps.
+These are source entries, not necessarily seven independently launchable apps.
+The read-only `DiskRaw` workflow is now counted as accepted for its tested
+VirtIO fixture; general block-device registration, writes, filesystem mounts,
+hotplug, Pi storage and live-target behavior remain separate storage gaps.
+See the [per-source ledger](docs/acceptance/demo-source-ledger-2026-11-09.json).
+
 ## Unchanged graphics programs
 
 The source bundle now contains these original files, with no program edits:

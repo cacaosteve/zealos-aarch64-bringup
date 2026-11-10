@@ -300,10 +300,14 @@ RUNTIME_ACCEPTED = {
         "docs/acceptance/demo-primes-single-cpu-qemu-2026-11-08.json",
     "/Demo/DebugDemo.ZC":
         "docs/acceptance/demo-debugdemo-qemu-2026-11-09.json",
-}
-RUNTIME_PARTIAL = {
+    # DiskRaw's complete program workflow is read-only: it reports the active
+    # drive/device, reads and dumps a selected block, then restores the
+    # partition range. Broader block-device registration and write support
+    # are separate storage-integration gaps, not missing steps in this demo.
     "/Demo/Disk/DiskRaw.ZC":
         "docs/acceptance/diskraw-readonly-qemu-2026-11-09.json",
+}
+RUNTIME_PARTIAL = {
     "/Demo/TimeIns.ZC":
         "docs/acceptance/demo-time-ins-stock-qemu-2026-11-09.json",
     "/Demo/Graphics/WallPapers/WallPaperDesktop.ZC":

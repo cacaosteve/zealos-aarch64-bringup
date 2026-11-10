@@ -10,7 +10,7 @@
   "demo_sources": 206,
   "demo_compile_pass": 206,
   "demo_compile_blocked": 0,
-  "demo_runtime_accepted": 198,
+  "demo_runtime_accepted": 199,
   "areas": {
     "Apps": {
       "source_files": 70,
@@ -37,8 +37,8 @@
       "compile_pass": 206,
       "compile_blocked": 0,
       "compile_unverified": 0,
-      "runtime_pass": 198,
-      "runtime_partial": 8,
+      "runtime_pass": 199,
+      "runtime_partial": 7,
       "runtime_failed": 0,
       "runtime_unverified": 0
     },
@@ -1240,7 +1240,7 @@
       "area": "Demo",
       "kind": "demo_source_or_component",
       "compile": "pass",
-      "runtime": "partial",
+      "runtime": "pass",
       "evidence": "docs/acceptance/diskraw-readonly-qemu-2026-11-09.json"
     },
     {
