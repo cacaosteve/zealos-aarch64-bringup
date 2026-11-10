@@ -192,7 +192,7 @@
       "compile": "pass",
       "runtime": "pass",
       "evidence": "docs/acceptance/program-catalog-qemu-2026-11-03.json",
-      "runtime_evidence": "docs/acceptance/budget-hash-followup-qemu-2026-11-09.json"
+      "runtime_evidence": "docs/acceptance/budget-utm-framework-qemu-2026-11-09.json"
     },
     {
       "path": "/Apps/GrModels/BallGen.ZC",

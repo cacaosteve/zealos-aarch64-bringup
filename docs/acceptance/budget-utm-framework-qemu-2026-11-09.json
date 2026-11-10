@@ -1,0 +1,21 @@
+{
+  "date": "2026-11-09",
+  "result": "pass",
+  "target": "UTM-bundled QEMU framework, HVF, 1 vCPU, 1 GiB RAM, virtio-ramfb, VirtIO keyboard and tablet",
+  "source_commit": "7d3df98b796f6495591b2871ffc06e0832f58b43",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "sha256": {
+    "iso": "133c712ca3e69a827029f9607d7def2f14a3aff88ddd4e1c6a5a968ea1632fd5",
+    "kernel": "f0e10e88f3c6a04817e910bf692892fe1bf1db2826f1c6af601574c492601225",
+    "source_bundle": "e6eb01b02a3b9429bca20a6df9027242512e525076a52ad01e8c7d72cbfe0e9b",
+    "log": "624662dc6802bb308d06e43454fd387cf1820c25040370784ddac68ec0c7d078"
+  },
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/budget-utm-framework-current.log python3 -u scripts/check-compat.py --pci --quick --probe-budget-program",
+  "checks": [
+    "Guest boot and desktop startup passed; graphical keyboard focus and input were confirmed.",
+    "Budget form creation, entry save/reopen, edits, cancellation, abort, and clean exit passed.",
+    "The saved transaction remained visible after a cold disk-only reboot.",
+    "The guest accepted 40+2 as 42 after recovery and reported zstatus failed=0."
+  ],
+  "limits": "This is a headless QEMU probe using UTM's bundled QEMU framework, not a test in the live UTM window. It does not resolve the user's earlier live UTM Budget freeze report or establish Pi behavior."
+}
