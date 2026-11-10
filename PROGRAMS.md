@@ -468,6 +468,10 @@ The current ISO revalidated the Wallpaper Desktop installer, cold-boot layout,
 six controls, palette editing, palette source save/list/reload, and Telnet
 client/local fixture workflow; arbitrary startup customizations and live
 UTM/Pi use remain open ([acceptance](docs/acceptance/demo-wallpaper-desktop-current-qemu-2026-11-10.json)).
+That workflow also exercises the Home tool entrypoint
+`/Home/PaletteEditor/Run.ZC` for color changes, hexadecimal RGB entry, Save As,
+Open listing, reload, and task recovery. Other Palette Editor controls and the
+rest of `/Home` are not covered by that result.
 These are source-level counts, not a
 count of standalone programs; several entries are support modules or need
 feature-specific test setups. `DiskRaw` is accepted for its isolated read-only

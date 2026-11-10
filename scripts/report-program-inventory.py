@@ -25,6 +25,7 @@ VOCABULARY = ROOT / "docs/acceptance/vocabulary-current-qemu-sound-2026-11-10.js
 PSALMODY = ROOT / "docs/acceptance/psalmody-current-qemu-2026-11-10.json"
 TIMECLOCK = ROOT / "docs/acceptance/timeclock-current-qemu-2026-11-10.json"
 XCALIBER = ROOT / "docs/acceptance/scheduler-xcaliber-current-2026-11-10.json"
+PALETTE_EDITOR = ROOT / "docs/acceptance/demo-wallpaper-desktop-current-qemu-2026-11-10.json"
 NETWORK = ROOT / "docs/acceptance/network-programs-qemu-2026-11-03.json"
 NETWORK_COMPILE = ROOT / "docs/acceptance/network-compile-qemu-2026-11-06.json"
 SYSTEM_STANDALONE_COMPILE = ROOT / "docs/acceptance/system-standalone-compile-qemu-2026-11-06.json"
@@ -148,6 +149,15 @@ def main():
         "status": "pass",
         "evidence": str(TOTHEFRONT_CURRENT.relative_to(ROOT)),
     }
+    # The stock wallpaper desktop launches this exact Home tool entrypoint.
+    # Its acceptance covers drawing/color editing, hex entry, Save As, Open
+    # listing, reload, and terminal task recovery.
+    home_tool_runtime = {
+        "/Home/PaletteEditor/Run.ZC": {
+            "status": "pass",
+            "evidence": str(PALETTE_EDITOR.relative_to(ROOT)),
+        },
+    }
     network = read(NETWORK)
     network_compile = set()
     network_compile_blocked = {}
@@ -229,7 +239,8 @@ def main():
         record = {
             "path": guest_path,
             "area": top,
-            "kind": "support_or_component",
+            "kind": ("home_tool_entrypoint" if guest_path in home_tool_runtime
+                     else "support_or_component"),
             "compile": "unverified",
             "runtime": "unverified",
             "evidence": None,
@@ -267,6 +278,9 @@ def main():
         if guest_path in network_runtime:
             record["runtime"] = network_runtime[guest_path]["status"]
             record["runtime_evidence"] = network_runtime[guest_path]["evidence"]
+        if guest_path in home_tool_runtime:
+            record["runtime"] = home_tool_runtime[guest_path]["status"]
+            record["runtime_evidence"] = home_tool_runtime[guest_path]["evidence"]
         if guest_path in network_compile and record["compile"] == "unverified":
             record["compile"] = "pass"
             record["evidence"] = str(NETWORK_COMPILE.relative_to(ROOT))
@@ -350,10 +364,11 @@ def main():
         "upstream_commit": read(PINNED / "UPSTREAM.json")["commit"],
         "scope": "All pinned upstream .ZC files; includes runnable entries and non-runnable support modules.",
         "classification_note": "A .ZC source is not necessarily a standalone program. Apps are grouped by Run.ZC/Load.ZC entry points; Demo files remain source-or-component until individually classified.",
-        "evidence_note": "App implementation sources transitively included by a compiled entrypoint inherit compile-pass evidence only; this does not imply standalone launchability or runtime acceptance. Additional standalone app/demo/support source compile results and compile blockers are linked individually to the 2026-11-02 program and source-context catalogs. Other unreferenced sources remain unverified.",
+        "evidence_note": "App implementation sources transitively included by a compiled entrypoint inherit compile-pass evidence only; this does not imply standalone launchability or runtime acceptance. Home tool entrypoints are listed separately and require explicit runtime evidence. Additional standalone app/demo/support source compile results and compile blockers are linked individually to the 2026-11-02 program and source-context catalogs. Other unreferenced sources remain unverified.",
         "source_files": len(records),
         "app_directories": len(app_dirs),
         "app_entrypoints": len(app_entrypoints),
+        "home_tool_entrypoints": len(home_tool_runtime),
         "demo_sources": sum(r["area"] == "Demo" for r in records),
         "demo_compile_pass": demo_ledger["compile_pass"],
         "demo_compile_blocked": demo_ledger["compile_blocked"],

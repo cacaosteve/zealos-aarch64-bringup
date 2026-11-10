@@ -3,10 +3,11 @@
   "upstream_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
   "scope": "All pinned upstream .ZC files; includes runnable entries and non-runnable support modules.",
   "classification_note": "A .ZC source is not necessarily a standalone program. Apps are grouped by Run.ZC/Load.ZC entry points; Demo files remain source-or-component until individually classified.",
-  "evidence_note": "App implementation sources transitively included by a compiled entrypoint inherit compile-pass evidence only; this does not imply standalone launchability or runtime acceptance. Additional standalone app/demo/support source compile results and compile blockers are linked individually to the 2026-11-02 program and source-context catalogs. Other unreferenced sources remain unverified.",
+  "evidence_note": "App implementation sources transitively included by a compiled entrypoint inherit compile-pass evidence only; this does not imply standalone launchability or runtime acceptance. Home tool entrypoints are listed separately and require explicit runtime evidence. Additional standalone app/demo/support source compile results and compile blockers are linked individually to the 2026-11-02 program and source-context catalogs. Other unreferenced sources remain unverified.",
   "source_files": 615,
   "app_directories": 12,
   "app_entrypoints": 12,
+  "home_tool_entrypoints": 1,
   "demo_sources": 206,
   "demo_compile_pass": 206,
   "demo_compile_blocked": 0,
@@ -57,10 +58,10 @@
       "compile_pass": 72,
       "compile_blocked": 5,
       "compile_unverified": 0,
-      "runtime_pass": 6,
+      "runtime_pass": 7,
       "runtime_partial": 0,
       "runtime_failed": 0,
-      "runtime_unverified": 71
+      "runtime_unverified": 70
     },
     "Kernel": {
       "source_files": 72,
@@ -3343,10 +3344,11 @@
     {
       "path": "/Home/PaletteEditor/Run.ZC",
       "area": "Home",
-      "kind": "support_or_component",
+      "kind": "home_tool_entrypoint",
       "compile": "pass",
-      "runtime": "unverified",
+      "runtime": "pass",
       "evidence": "docs/acceptance/program-catalog-qemu-2026-11-03.json",
+      "runtime_evidence": "docs/acceptance/demo-wallpaper-desktop-current-qemu-2026-11-10.json",
       "evidence_scope": "isolated compile-only program catalog probe"
     },
     {
