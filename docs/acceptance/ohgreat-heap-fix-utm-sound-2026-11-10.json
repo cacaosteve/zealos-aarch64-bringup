@@ -1,0 +1,23 @@
+{
+  "date": "2026-11-10",
+  "repository_commit": "656cb3d",
+  "upstream_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "source": "/Demo/Sound/OhGreat.ZC",
+  "target": "UTM-bundled QEMU with HVF, virtio-ramfb, VirtIO keyboard/tablet, and WAV-backed VirtIO sound",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "f17ed84eac4984ac68981f84bf611f7de33a65621318c3e18e8cd71040178e35",
+  "kernel_sha256": "1e935ad0382daa66bb704f2d197052d4af78b408d1512aaf7c95ed4781945db6",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device -audiodev wav,id=sound0,path=build/ohgreat-heap-fix-utm-final.wav -device virtio-sound-pci,audiodev=sound0' ZEAL_COMPAT_LOG_PATH=build/check-ohgreat-heap-fix-utm-final.log python3 -u scripts/check-compat.py --pci --quick --probe-demo-ohgreat-full",
+  "wav_check": "python3 scripts/check-sound-effects-wav.py --minimum-seconds 10 build/ohgreat-heap-fix-utm-final.wav",
+  "log": "build/check-ohgreat-heap-fix-utm-final.log",
+  "log_sha256": "9e59db76f67429067daf22fa38adcf5deef22deeb3ef0c8023fd8d7890fbd3c1",
+  "wav": "build/ohgreat-heap-fix-utm-final.wav",
+  "wav_sha256": "8cb09adc77b6975f55ebf7533d96c329be4945359644cff516467b84ce9b7b85",
+  "result": "pass",
+  "verified": [
+    "The stock song reached its late lyric; a normal key ended playback and returned to the graphical prompt.",
+    "The graphical task evaluated a follow-up 40+2 expression as 42 and zstatus reported failed=0.",
+    "WAV contained 4,168,334 nonzero PCM samples over 47.30 seconds at 44.1 kHz, with peak amplitude 7000; the 10-second check passed."
+  ],
+  "limits": "Automated UTM-bundled QEMU WAV evidence confirms PCM output, not audible output from the live UTM application. The user reported Oh Great playing through Pi 4B HDMI on a card whose exact image provenance was not verified."
+}
