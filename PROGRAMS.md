@@ -23,6 +23,10 @@ This is compile evidence only. It does not establish runtime acceptance or
 feature parity. Per-source output is recorded in
 [`program-catalog-full-qemu-2026-11-10.json`](docs/acceptance/program-catalog-full-qemu-2026-11-10.json).
 
+The refreshed compile sweep on the current ISO (`f17ed84e…`) reproduced the
+same 193/290 result; the current-image manifest and per-file output are in
+[`program-catalog-full-qemu-current-2026-11-10.json`](docs/acceptance/program-catalog-full-qemu-current-2026-11-10.json).
+
 The dependency-aware Demo inventory is separate from that 290-source sample:
 all 206 pinned Demo `.ZC` files compile, and 201 have explicit QEMU runtime
 acceptance; five remain partial. Those are `TimeIns`, two TOS account
