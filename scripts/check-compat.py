@@ -2916,6 +2916,12 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 hex_editor = graphical_screen('wallpaper-desktop-palette-hex')
                 if rgb_diff_count(changed_editor, hex_editor, (150, 40, 520, 460)) < 100:
                     raise RuntimeError('Palette Editor hex input changed data without updating scanout')
+                qmp_send_keys(['ctrl', 'a'])
+                time.sleep(0.5)
+                graphical_screen('wallpaper-desktop-palette-save-as')
+                qmp_send_key('esc')
+                time.sleep(0.5)
+                print('Palette Editor Save As cancel attempted', flush=True)
                 qmp_send_key('esc')
                 command('zc Print("wallpaper_palette_kept=%d\\n",'
                         '!TaskValidate(wp_palette_task)&&gr_palette[0]!=wp_palette_before&&'

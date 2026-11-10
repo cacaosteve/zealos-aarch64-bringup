@@ -2,7 +2,7 @@
   "date": "2026-11-09",
   "target": "AArch64 native ZealC on PCI QEMU",
   "boot_iso": "build/zealos-aarch64-hello.iso",
-  "boot_iso_sha256": "1ea68e3459f8f29be1f84f5eb05f60992796412661f9d2be797764e707e75abe",
+  "boot_iso_sha256": "440b0bcf4f23c9a8bdbb67e17a66017a1ec51ef370761aca3fd7b7c9608404d2",
   "command": "python3 scripts/check-compat.py --pci --quick --probe-demo-wallpaper-desktop",
   "exit_code": 0,
   "result": "pass for tested palette workflows",
@@ -18,13 +18,13 @@
       "evidence": "The combined test also passed the installed desktop, all six controls, focused Home and Terminal shells, Stats toggle, NetLog open/write/close/reopen, and Telnet form, local fixture connection, typed input, socket close, and task exit."
     }
   ],
-  "scope_note": "Automated disposable-disk QEMU acceptance only. It covers Palette Editor random-color and hex-entry workflows. Arrow-key selection, successful save persistence, opening a saved palette, arbitrary HomeSys customization, and live UTM/Pi desktop behavior remain unverified. Save As cancellation failed in the follow-up below. The application remains partial in the source ledger because its full workflow and host-specific live coverage are not complete.",
+  "scope_note": "Automated disposable-disk QEMU acceptance only. It covers Palette Editor random-color and hex-entry workflows, opening the filename form, returning from it with Escape, exiting the editor, and terminal recovery. Successful save persistence, opening a saved palette, arbitrary HomeSys customization, and live UTM/Pi desktop behavior remain unverified. The application remains partial in the source ledger because its full workflow and host-specific live coverage are not complete.",
   "save_as_follow_up": {
     "date": "2026-11-09",
-    "result": "failed",
+    "result": "pass for filename-form Escape and guest recovery",
     "steps": "From the installed Wallpaper Desktop, open Palette Editor, change a color, enter Ctrl+A, then press Escape in the filename form.",
-    "observed": "The FileName form renders. Escape reaches an unresolved external call in PESave (one baseline run reported PESave+0xd8); the serial session then reports that it is unavailable. No palette file was verified as saved, and Save As remains unaccepted.",
+    "observed": "The FileName form rendered. Escape returned without an unresolved external call; a second Escape closed the editor, and the terminal accepted the recovery expression (40+2=42). The test did not inspect whether a palette file was created or verify its contents.",
     "target": "AArch64 native ZealC on PCI QEMU, disposable disk",
-    "source_change": "None; upstream/pinned source and runtime were not changed by the follow-up probe."
+    "source_change": "The source bundle now includes the pinned portable StrFind and StrReplace implementations used by PESave. DoNothing's unresolved imported-call decoder now searches the full supported load sequence, which reports the actual missing symbol when one remains."
   }
 }

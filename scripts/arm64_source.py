@@ -1505,10 +1505,41 @@ def extract_string_utilities(str_a: bytes, str_b: bytes) -> bytes:
     if not str_b.startswith(b'U8 *Tabs2Spaces(') or str_b.count(end) != 1:
         raise ValueError('pinned allocating string utility boundaries changed')
     allocating = str_b.split(end, 1)[0]
+    find = _extract_between(
+        str_a, b'U8 *StrFind(U8 *needle, U8 *haystack_str, I64 flags=0)\n',
+        b'\nU8 *StrReplace(', 'StrFind')
+    replace = _extract_between(
+        str_a,
+        b'U8 *StrReplace(U8 *str, U8 *old, U8 *new, I64 sff_flags=NONE, Bool free_str=FALSE)\n',
+        b'\nBool WildMatch(', 'StrReplace')
+    match = b'''U8 *StrMatch(U8 *needle, U8 *haystack_str)
+{
+    U8 *p, *n, *h;
+    if (!needle || !haystack_str)
+        return NULL;
+    if (!*needle)
+        return haystack_str;
+    for (p = haystack_str; *p; p++)
+    {
+        n = needle;
+        h = p;
+        while (*n && *h && *n == *h)
+        {
+            n++;
+            h++;
+        }
+        if (!*n)
+            return p;
+    }
+    return NULL;
+}
+'''
     return (b'// Original StrA/StrB string transforms and whitespace bitmap.\n'
             b'U32 char_bmp_white_space[16] = {0x80002600, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};\n'
             + b'U32 ' + b';\nU32 '.join(bitmaps) + b';\n'
-            + inplace + b'\n' + allocating + b'\n')
+            + inplace + b'\n' + allocating + b'\n'
+            + b'// Portable AArch64 implementations of the pinned StrA helpers.\n'
+            + match + find + b'\n' + replace + b'\n')
 
 
 def extract_source_dates(calendar: bytes, scan: bytes, printer: bytes) -> bytes:

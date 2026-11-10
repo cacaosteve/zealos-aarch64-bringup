@@ -754,7 +754,7 @@ void DoNothing(void) {
         {
             const uint32_t *call = (const uint32_t *)(return_pc - 32);
             unsigned ldr_index;
-            for (ldr_index = 5; ldr_index < 7; ++ldr_index) {
+            for (ldr_index = 0; ldr_index < 7; ++ldr_index) {
                 uint32_t ldr = call[ldr_index];
                 unsigned base_reg, dest_reg, j, start;
                 uint64_t slot_value = 0;
