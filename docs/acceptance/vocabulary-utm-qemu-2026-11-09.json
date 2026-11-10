@@ -1,0 +1,17 @@
+{
+  "date": "2026-11-09",
+  "result": "pass",
+  "target": "UTM bundled QEMU profile, AArch64 PCI, virtio-ramfb, disposable disk",
+  "working_tree_changes_included": true,
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "1ea68e3459f8f29be1f84f5eb05f60992796412661f9d2be797764e707e75abe",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-vocabulary-utm-qemu-2026-11-09.log python3 -u scripts/check-compat.py --pci --quick --probe-vocabulary",
+  "checks": [
+    "Boot dictionary/autocomplete service checks passed.",
+    "The original Vocabulary quiz accepted an answer and advanced to the next question.",
+    "Escape returned to the graphical terminal, 40+2; returned 42, and zstatus reported failed=0."
+  ],
+  "log": "build/check-vocabulary-utm-qemu-2026-11-09.log",
+  "log_sha256": "a4eb927684b1e391350dc8b9cdcc112b3a503654d27f15fb6877a6d54e45307f",
+  "scope_note": "This is a headless run using UTM's bundled QEMU profile, not a visible UTM app-window retest. The transient randomized answer-feedback/definition popup was not directly asserted; live UTM and Pi behavior remain open."
+}
