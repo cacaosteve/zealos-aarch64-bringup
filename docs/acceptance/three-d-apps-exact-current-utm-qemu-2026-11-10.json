@@ -1,22 +1,34 @@
 {
   "date": "2026-11-10",
-  "repository_commit": "f813189",
   "upstream_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
   "target": "UTM-bundled QEMU framework, HVF, virtio-ramfb, 1 vCPU, 1 GiB RAM, VirtIO keyboard/tablet",
   "iso": "build/zealos-aarch64-hello.iso",
   "iso_sha256": "4bc484338001b2a4d460844c11f0ea397554dac9250c378885f8a8a7ff1be4ea",
   "kernel_sha256": "c7cff83246dde72296135862518d65574ebc482171cc7286935153fa282d53d9",
-  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-3d-utm-qemu-exact-current.log python3 -u scripts/check-compat.py --pci --quick --probe-3d-apps",
-  "exit_code": 0,
-  "result": "pass",
-  "log": "build/check-3d-utm-qemu-exact-current.log",
-  "log_sha256": "25fcff18ed03374bbd3aa22e923d5bda5dd832de3f2bee0919e8fdbbb4c55fbc",
-  "verified": [
-    "GrModels Man generated a 112-vertex, 168-triangle mesh and reached its repeat prompt.",
-    "GrModels Ball generated a 58-vertex, 128-triangle mesh; 536 purple inline-sprite pixels were visible in the graphical terminal.",
-    "KeepAway rendered its court, HUD and player, accepted mouse and Space input, and returned to the terminal without leaving an Animate task.",
-    "Titanium displayed gameplay, accepted input, and Escape restored a working terminal.",
-    "Post-app terminal, compiler, launch, and window-demo regression checks completed with exit code 0."
+  "runs": [
+    {
+      "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-3d-exact-current-utm.log python3 -u scripts/check-compat.py --pci --quick --probe-3d-apps --probe-keepaway-full-game",
+      "exit_code": 0,
+      "log": "build/check-3d-exact-current-utm.log",
+      "log_sha256": "e0a51b8beb6cda6ac1e844c558fea34212e8efde6c39dd85a07dd2de9d2ed68c",
+      "checks": [
+        "All three 3D app entrypoints and the sprite mesh, interpolation, height-format and service fixtures compiled; service fixture passed.",
+        "KeepAway rendered its court and HUD, accepted Space and mouse input, and maintained its game through 184 seconds of observation.",
+        "Escape returned to the graphical terminal, 40+2 returned 42, zstatus reported failed=0, and no Animate child task remained."
+      ]
+    },
+    {
+      "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-3d-app-interactive-exact-current-utm.log python3 -u scripts/check-compat.py --pci --quick --probe-3d-apps",
+      "exit_code": 0,
+      "log": "build/check-3d-app-interactive-exact-current-utm.log",
+      "log_sha256": "634df4bec37a9fed5f74b7debd4e50d59eb6e0ee2daa06a51a86417ef2542d7a",
+      "checks": [
+        "GrModels Man accepted the color choices, generated a 112-vertex, 168-triangle mesh, reached its repeat prompt, and recovered to the terminal.",
+        "GrModels Ball generated a 58-vertex, 128-triangle mesh, rendered its inline sprite (502 purple pixels), and recovered to the terminal.",
+        "KeepAway rendered and accepted Space/mouse input; Escape restored terminal input and the 40+2 check returned 42.",
+        "Titanium rendered gameplay, accepted input, exited with Escape, and returned to a working terminal."
+      ]
+    }
   ],
-  "scope_note": "Automated headless test using UTM's bundled QEMU framework and display/input models, not the visible UTM application. It does not resolve the earlier live UTM KeepAway freeze report or establish Pi behavior."
+  "scope_note": "These checks ran in UTM's bundled QEMU framework with its emulated devices, not the visible UTM application window. They show the exact current ISO's app paths pass in this accelerated profile; the prior visible-UTM KeepAway freeze report remains a separate live-window retest, as do Pi hardware checks."
 }
