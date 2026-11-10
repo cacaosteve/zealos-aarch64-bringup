@@ -4521,3 +4521,29 @@ U0 Ring3Demo()
 
 Ring3Demo;
 '''
+
+
+def translate_multicore_loadtest_jit(source: bytes) -> bytes:
+    """Run LoadTest workers on the ARM64 bridge's cooperative CPU-0 ring.
+
+    The pinned worker calls Comp("Compiler"), which asks the x86 ZealOS AOT
+    compiler to produce Compiler.ZXE. The ARM64 guest currently executes ZC
+    through its native JIT and has no AOT ZXE backend. Preserve the worker's
+    repeated compiler-load stress using a small stock source that can be
+    compiled by the supported JIT path. The task bridge currently schedules
+    only on CPU 0, so move these workers there; explicit Yield preserves
+    cooperative round-robin progress and lets each worker observe app_done.
+    """
+    old_compile = b'\t\tComp("Compiler");'
+    new_compile = (b'\t\tExeFile2("::/Demo/Print.ZC", CCF_JUST_LOAD);\n'
+                   b'\t\tYield;')
+    old_cpu = b'Spawn(&Job%d,,, 1);'
+    if (source.count(old_compile) != 1 or
+            sum(source.count(old_cpu % job) for job in (1, 2, 3)) != 3 or
+            source.count(b'while (!app_done)') < 3):
+        raise ValueError('pinned LoadTest compiler worker changed')
+    translated = source.replace(old_compile, new_compile)
+    for job in (1, 2, 3):
+        translated = translated.replace(old_cpu % job,
+                                        b'Spawn(&Job%d,,, 0);' % job)
+    return translated

@@ -30,6 +30,7 @@ from arm64_source import (translate_mandel_single_cpu,
                           translate_pci_interrupts_gic_note,
                           translate_multicore_interrupts_cooperative,
                           translate_multicore_radix_single_cpu,
+                          translate_multicore_loadtest_jit,
                           translate_ring3_svc)
 from arm64_source import translate_tos_config_boot_memory
 from arm64_source import translate_elephant_walk_default_dc
@@ -306,6 +307,22 @@ except ValueError:
 else:
     raise AssertionError('MPRadix overlay accepted a changed source')
 print('PASS guarded single-worker ARM64 MPRadix fallback')
+loadtest_source = (root/'upstream/pinned/Demo/MultiCore/LoadTest.ZC').read_bytes()
+loadtest_overlay = translate_multicore_loadtest_jit(loadtest_source)
+assert b'ExeFile2("::/Demo/Print.ZC", CCF_JUST_LOAD);' in loadtest_overlay
+assert (b'ExeFile2("::/Demo/Print.ZC", CCF_JUST_LOAD);\n'
+        b'\t\tYield;') in loadtest_overlay
+for job in (1, 2, 3):
+    assert loadtest_overlay.count(b'Spawn(&Job%d,,, 0);' % job) == 1
+assert b'Comp("Compiler")' not in loadtest_overlay
+try:
+    translate_multicore_loadtest_jit(loadtest_source.replace(
+        b'Comp("Compiler");', b'Comp("Kernel");', 1))
+except ValueError:
+    pass
+else:
+    raise AssertionError('LoadTest overlay accepted a changed AOT compile call')
+print('PASS guarded ARM64 LoadTest uses JIT and cooperative CPU-0 workers')
 ring3_source = (root/'upstream/pinned/Demo/Lectures/Ring3.ZC').read_bytes()
 ring3_overlay = translate_ring3_svc(ring3_source)
 assert b'asm {' not in ring3_overlay

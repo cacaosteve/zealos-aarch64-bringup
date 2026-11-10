@@ -384,6 +384,8 @@ p.add_argument('--probe-task-job-queue', action='store_true',
                help='verify cooperative JobQueue callbacks on the single-CPU guest')
 p.add_argument('--probe-demo-mpadd', action='store_true',
                help='run the stock MultiCore MPAdd benchmark/chart and verify terminal recovery')
+p.add_argument('--probe-demo-loadtest', action='store_true',
+               help='run the stock MultiCore LoadTest and verify key exit and terminal recovery')
 p.add_argument('--probe-demo-multicore1', action='store_true',
                help='run the stock MultiCore template job demo and verify its total and recovery')
 p.add_argument('--probe-demo-weblog-report', action='store_true',
@@ -866,6 +868,7 @@ log_path = ROOT / 'build' / ('check-partial-callback-cleanup.log' if args.probe_
                              'check-demo-dol-doc-pci.log' if args.probe_demo_dol_doc else
                              'check-demo-scrollbars-pci.log' if args.probe_demo_scrollbars else
                              'check-demo-multicore1-pci.log' if args.probe_demo_multicore1 else
+                             'check-demo-loadtest-pci.log' if args.probe_demo_loadtest else
                              'check-demo-mpadd-pci.log' if args.probe_demo_mpadd else
                              'check-demo-bounce-clock-pci.log' if args.probe_demo_bounce_clock else
                              'check-demo-input-graphics-pci.log' if args.probe_demo_input_graphics else
@@ -3361,6 +3364,39 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                   f'all-worker-ranges-and-sums={bool(checks & 12288)}, '
                   f'shared-total={total}', flush=True)
             print('PASS MultiCore1 stock worker and shared reduction', flush=True)
+            raise SystemExit(0)
+        if args.probe_demo_loadtest:
+            # The ARM64 bundle maps the stock CPU-1 requests onto the current
+            # bridge's single cooperative CPU-0 ring. Exercise the key-stop
+            # path and verify terminal recovery in the focused app task.
+            # The graphical terminal's standby autocomplete window can cover
+            # this manual command and consume its first key, so close it first.
+            command('zc AutoComplete(OFF);', 'zc: executed', timeout=20)
+            command('zc BootstrapGuiTerminalRunLightProgram('
+                    '"/Demo/MultiCore/LoadTest.ZC");', 'zc: executed')
+            require_graphical_text(
+                'demo-loadtest-start', 'Running MultiCore Test...', timeout=60)
+            time.sleep(0.5)
+            qmp_send_key('a')
+            deadline = time.monotonic() + 20
+            status = ''
+            while time.monotonic() < deadline:
+                status = command('zstatus', 'failed=0')
+                if not re.search(r'guest_task\[\d+\]: name=LoadTest\b', status):
+                    break
+                time.sleep(0.5)
+            if re.search(r'guest_task\[\d+\]: name=LoadTest\b', status):
+                raise RuntimeError('LoadTest app task did not exit after its key prompt:\n' +
+                                   '\n'.join(line for line in status.splitlines()
+                                             if 'LoadTest' in line or
+                                             'guest_task[' in line))
+            focus_graphical_terminal()
+            run_graphical_terminal_command(
+                'demo-loadtest-terminal-recovery', '40+2;', 'ans=0x2A=42',
+                timeout=60)
+            command('zstatus', 'failed=0')
+            print('PASS stock MultiCore LoadTest key exit and terminal recovery',
+                  flush=True)
             raise SystemExit(0)
         if args.probe_demo_weblog_report:
             # Use an isolated fixture on the disposable guest disk. WebLogRep

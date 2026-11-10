@@ -1,0 +1,22 @@
+{
+  "date": "2026-11-09",
+  "command": "make check-demo-loadtest",
+  "target": "AArch64 PCI QEMU, one guest CPU, focused graphical terminal",
+  "result": "pass",
+  "source_path": "upstream/pinned/Demo/MultiCore/LoadTest.ZC",
+  "source_sha256": "290bd5839d682900ebeb9fd510c84e3aebf87700e5b72f47b75c0b47e994025e",
+  "kernel_sha256": "f70227b29698dde541153b7f7c0985e08a0ecd5ae89b3ae6e1506eac7942a579",
+  "iso_path": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "47568ad4869d736cf2fcdad73c20a91491ce7f2c1c115ae63dfe44c648a1991d",
+  "working_tree_changes_included": true,
+  "checks": [
+    "The stock LoadTest source ran in the focused graphical app task and displayed its running status and PRESS A KEY prompt.",
+    "A key event stopped the app; cooperative worker tasks completed, the app task exited, and focus returned to the graphical terminal.",
+    "The terminal evaluated 40+2 as 42, and zstatus reported failed=0.",
+    "The ARM64 source bundle replaces the unavailable x86 AOT Compiler.ZXE worker with repeated JIT loading of stock Demo/Print.ZC and Yield, retaining a cooperative compile-worker stress loop.",
+    "The overlay maps stock CPU-1 worker requests to CPU 0 because the current guest bridge schedules only CPU 0; this run does not test SMP."
+  ],
+  "log": "build/check-demo-loadtest-pci.log",
+  "log_sha256": "8f8272d308ae22d1eb49d215d936dc54f3f98ad30c09cd3ac950969cc9693cb2",
+  "scope_note": "QEMU runtime acceptance of the ARM64-adapted LoadTest path only. This does not establish SMP scheduling, availability of the stock x86 AOT compiler, live UTM acceptance, or physical Pi acceptance."
+}

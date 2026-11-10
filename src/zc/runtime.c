@@ -4914,7 +4914,11 @@ static int64_t host_task_focus_next(int64_t *a) {
 }
 static int64_t host_spawn(int64_t *a) {
     void *entry = (void *)(uintptr_t)a[0];
-    void *parent = a[4] ? (void *)(uintptr_t)a[4] : guest_fibers[0].words;
+    /* Upstream Spawn defaults parent=NULL to the current task (Fs). Default
+     * here to the calling guest task too, so nested apps can spawn their own
+     * local worker functions without failing code-owner validation. */
+    void *parent = a[4] ? (void *)(uintptr_t)a[4]
+                        : guest_fibers[guest_current].words;
     /* UTM exposes one guest CPU, so explicit CPU 0 and the upstream default
      * (-1, any CPU) have identical scheduling semantics here. */
     if (!guest_task_bound || (a[3] != -1 && a[3] != 0) ||
