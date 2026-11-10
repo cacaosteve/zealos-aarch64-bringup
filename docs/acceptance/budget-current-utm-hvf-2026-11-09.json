@@ -1,0 +1,21 @@
+{
+  "date": "2026-11-09",
+  "result": "pass",
+  "target": "UTM-bundled QEMU on AArch64 PCI machine with HVF and one vCPU",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "133c712ca3e69a827029f9607d7def2f14a3aff88ddd4e1c6a5a968ea1632fd5",
+  "kernel_sha256": "f0e10e88f3c6a04817e910bf692892fe1bf1db2826f1c6af601574c492601225",
+  "entrypoint": "upstream/pinned/Apps/Budget/Run.ZC",
+  "entrypoint_sha256": "60bd9e5b69525ef0e94c197a86725760a261865ef7c2bdf3e401f9b101de2a1b",
+  "qemu_sha256": "96baa6e880021c67b2aa713cd51d56c0f4d6c6859d8b08c3c9cd26c0f1578d53",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' python3 -u scripts/check-compat.py --pci --quick --probe-budget-program",
+  "checks": [
+    "Calendar, UTC clock, keyboard scanner, form behavior and hash support checks passed.",
+    "Budget create, edit, cancel, save, abort and clean-exit paths passed.",
+    "The saved transaction was visible after reopening Budget.",
+    "After a cold disk-only reboot, the saved transaction remained visible and 40+2 evaluated to 42 with zstatus failed=0."
+  ],
+  "log": "build/check-budget-pci.log",
+  "log_sha256": "9a5fb2f1cb0fd10eba77a669d00375349f56de7f68af9123ee2ee5d83e8d4902",
+  "scope_note": "This automated UTM-framework QEMU run passes Budget form, persistence, and terminal recovery coverage. It does not reproduce or resolve the user's reported freeze in the interactive UTM window. Physical Pi behavior is pending the user's current hardware test."
+}
