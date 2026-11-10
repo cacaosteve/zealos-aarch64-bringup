@@ -1,0 +1,28 @@
+{
+  "date": "2026-11-10",
+  "source_commit": "5bff319be34e5ed6a89a795f0eba76e1ac190ed5",
+  "result": "prepared and statically validated; physical card test pending",
+  "payload_directory": "build/pi-desktop-esp",
+  "files_sha256": {
+    "boot/kernel.elf": "ba5d40ca250a560b15dd700567b0109d3d9d4a00083e1d7e56f77c035f892e16",
+    "boot/kernel-diag.elf": "2af5238ac275a1277bbd9b0ab75a47325925c4658a02edaa1d0841cbece4068b",
+    "boot/zealbooter.elf": "3da84dcb4c5dfb2a292c529111e813497fd89f52462db71618622c523b5500f5",
+    "boot/demo.hcbc": "e37c1b530962064c451fac288327f7ae799d3e344cc5c77dc2ba55625c0042d0",
+    "boot/sources.tar": "d74f4a1ba3a05f3b8bf17e0ab6b06651d0703f2b3b1945b25a633b2365cfac8e",
+    "EFI/BOOT/BOOTAA64.EFI": "3f51768c5eb8a0818b8e7aa2ac9a9caef3c64707b5b6db15d1e612de23236b8c",
+    "limine.conf": "a8981abc3cda174982db0e510a1bce180b2cefa74973789cd49c481ef92b5bc4"
+  },
+  "checks": [
+    "scripts/pi-desktop-stage.sh rebuilt the Pi desktop and diagnostic kernels, refreshed the source bundle, and passed scripts/check-pi-desktop-image.py",
+    "The boot-chain validator confirmed both entries and 1044 source modules",
+    "make check-pi4-platform passed: FDT/PCIe/DMA/xHCI, read-only FAT32, USB keyboard/mouse and desktop framebuffer tests",
+    "make check-pi4-platform passed the HDMI audio policy test"
+  ],
+  "card_status": "No files copied to microSD; ZEALPI was not mounted on the Mac during preparation.",
+  "known_scope": [
+    "The user already confirmed keyboard and pointer input on a prior Pi desktop boot; that check does not need repeating for the same image.",
+    "This refreshed payload has not yet been booted on the Pi, so its updated desktop image and HDMI audio behavior still need physical confirmation.",
+    "Requires existing Pi UEFI firmware and device-tree files.",
+    "USB storage is read-only and the native source writer is disabled in this Pi build; writable SD or USB persistence remains future work."
+  ]
+}
