@@ -317,10 +317,7 @@ RUNTIME_PARTIAL = {
     "/Demo/MultiCore/Lock.ZC":
         "docs/acceptance/demo-lock-single-cpu-qemu-2026-11-09.json",
 }
-RUNTIME_FAILED = {
-    "/Demo/StackGrow.ZC":
-        "docs/acceptance/demo-stack-grow-qemu-2026-11-06.json",
-}
+RUNTIME_FAILED = {}
 
 
 def first_error(output):
