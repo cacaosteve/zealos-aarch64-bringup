@@ -2411,6 +2411,28 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     'output': output,
                 })
             if (all(m['loaded'] for m in module_loads) and
+                    '/Demo/AcctExample/TOS/TOSExtern.ZC' in args.demo_system_module):
+                # TOSExtern is an interface module: its whole contract is
+                # exposing form layouts and external function declarations to
+                # later TOS sources. It has no standalone entry point, so
+                # accept the declarations themselves without pretending that
+                # network/media implementations have been exercised.
+                output = command(
+                    'zc Print("tos-extern-interface=%d|%d|%d\\n", '
+                    'HashFind("GodBooksPassageU32",Fs->hash_table,HTT_FUN)!=NULL, '
+                    'HashFind("TOSGodDoodle",Fs->hash_table,HTT_FUN)!=NULL, '
+                    'sizeof(CRandExtDec5Form)>0 && sizeof(CGodVideoForm)>0);',
+                    'tos-extern-interface=1|1|1')
+                if 'tos-extern-interface=1|1|1' not in output:
+                    raise RuntimeError(
+                        'TOSExtern did not expose its representative form layouts '
+                        'and external declarations:\n' + output)
+                runtime_checks.append({
+                    'name': 'TOSExtern interface module exposes form layouts and external function declarations',
+                    'passed': True,
+                    'output': output,
+                })
+            if (all(m['loaded'] for m in module_loads) and
                     '/Demo/AcctExample/TOS/TOSMisc.ZC' in args.demo_system_module):
                 # Exercise the non-destructive OCR helper with a one-glyph
                 # bitmap synthesized from the active system font. The source

@@ -145,6 +145,7 @@
     "docs/acceptance/demo-template-registry1-qemu-2026-11-07.json",
     "docs/acceptance/demo-the-dead-qemu-2026-11-04.json",
     "docs/acceptance/demo-tos-config-qemu-2026-11-08.json",
+    "docs/acceptance/demo-tos-extern-interface-qemu-2026-11-10.json",
     "docs/acceptance/demo-tos-theme-qemu-2026-11-08.json",
     "docs/acceptance/demo-transform-qemu-2026-11-04.json",
     "docs/acceptance/demo-tree-checkers-qemu-2026-11-04.json",
@@ -171,7 +172,6 @@
     "docs/acceptance/demo-lock-single-cpu-qemu-2026-11-09.json",
     "docs/acceptance/demo-mpradix-qemu-2vcpu-partial-2026-11-08.json",
     "docs/acceptance/demo-time-ins-stock-qemu-2026-11-09.json",
-    "docs/acceptance/demo-tos-extern-qemu-2026-11-08.json",
     "docs/acceptance/demo-tosdistro-safe-load-qemu-2026-11-09.json",
     "docs/acceptance/demo-tosmisc-qemu-2026-11-08.json"
   ],
@@ -179,8 +179,8 @@
   "compile_pass": 206,
   "compile_blocked": 0,
   "compile_blocker_groups": [],
-  "runtime_accepted": 200,
-  "runtime_partial": 6,
+  "runtime_accepted": 201,
+  "runtime_partial": 5,
   "runtime_failed": 0,
   "directories": {
     ".": {
@@ -391,8 +391,8 @@
       "classification_confidence": "provisional; based on directory only",
       "compile": "pass",
       "first_compile_error": null,
-      "runtime": "partial",
-      "runtime_evidence": "docs/acceptance/demo-tos-extern-qemu-2026-11-08.json"
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-tos-extern-interface-qemu-2026-11-10.json"
     },
     {
       "path": "/Demo/AcctExample/TOS/TOSMisc.ZC",

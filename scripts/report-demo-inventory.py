@@ -36,6 +36,8 @@ KINDS = {
 RUNTIME_ACCEPTED = {
     "/Demo/AcctExample/TOS/TOSConfig.ZC":
         "docs/acceptance/demo-tos-config-qemu-2026-11-08.json",
+    "/Demo/AcctExample/TOS/TOSExtern.ZC":
+        "docs/acceptance/demo-tos-extern-interface-qemu-2026-11-10.json",
     "/Demo/AcctExample/TOS/TOSTheme.ZC":
         "docs/acceptance/demo-tos-theme-qemu-2026-11-08.json",
     "/Demo/Templates/Lex1.ZC":
@@ -312,8 +314,6 @@ RUNTIME_ACCEPTED = {
 RUNTIME_PARTIAL = {
     "/Demo/TimeIns.ZC":
         "docs/acceptance/demo-time-ins-stock-qemu-2026-11-09.json",
-    "/Demo/AcctExample/TOS/TOSExtern.ZC":
-        "docs/acceptance/demo-tos-extern-qemu-2026-11-08.json",
     "/Demo/AcctExample/TOS/TOSMisc.ZC":
         "docs/acceptance/demo-tosmisc-qemu-2026-11-08.json",
     "/Demo/AcctExample/TOS/TOSDistro.ZC":

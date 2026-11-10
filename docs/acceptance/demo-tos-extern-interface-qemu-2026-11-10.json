@@ -1,0 +1,26 @@
+{
+  "date": "2026-11-10",
+  "source_commit": "1f6d39904a0466f5f6f5bc021a032bd929406ab8",
+  "working_tree_changes_included": true,
+  "command": "QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device' python3 -u scripts/check-compat.py --pci --quick --probe-demo-system-context --demo-system-path /Demo/AcctExample/TOS/TOSExtern.ZC --demo-system-module /Demo/AcctExample/TOS/TOSConfig.ZC --demo-system-module /Demo/AcctExample/TOS/TOSExtern.ZC",
+  "target": "AArch64 PCI QEMU, one vCPU, booted ZealC kernel/system namespace",
+  "result": "pass for the interface-module scope",
+  "program": "/Demo/AcctExample/TOS/TOSExtern.ZC",
+  "source_path": "upstream/pinned/Demo/AcctExample/TOS/TOSExtern.ZC",
+  "source_sha256": "0b8da399c31d0651b617e7fb804a580f82a009730d6fa7e6832fd11c2a2ae606",
+  "kernel_sha256": "aa3da46af6580885cd5a813b2124fc2cc03b69c87b4e402ab4b54b3dfe082f97",
+  "iso_sha256": "deca048d86257281089779d0b681bef8a6c6b9c0c32146c984881992d62ebd2e",
+  "probe_catalog": "build/source-context-catalog-modules-targeted.json",
+  "probe_catalog_sha256": "e65f4798bca6d66e04b09e27be94b42993c9b9e8f85e5e01b3f7309ac5c66606",
+  "verified": [
+    "TOSConfig loaded and TOSInit ran in the booted guest with the expected CD/C drive definitions.",
+    "TOSExtern loaded with CCF_JUST_LOAD and its source compiled successfully.",
+    "The guest found representative GodBooksPassageU32 and TOSGodDoodle external declarations in the task namespace.",
+    "Representative CRandExtDec5Form and CGodVideoForm layouts had nonzero sizes."
+  ],
+  "not_verified": [
+    "The declared network, web, and media helper implementations and their calling workflows; those are outside this declaration-only source.",
+    "Live UTM and physical Pi behavior."
+  ],
+  "scope_note": "TOSExtern.ZC is an interface module containing form declarations and external signatures, not a standalone runnable app. This accepts the module contract only; it does not claim that the external routines are implemented or that dependent application workflows are complete."
+}

@@ -24,13 +24,16 @@ feature parity. Per-source output is recorded in
 [`program-catalog-full-qemu-2026-11-10.json`](docs/acceptance/program-catalog-full-qemu-2026-11-10.json).
 
 The dependency-aware Demo inventory is separate from that 290-source sample:
-all 206 pinned Demo `.ZC` files compile, and 200 have explicit QEMU runtime
-acceptance; six remain partial. Those are `TimeIns`, three TOS account
+all 206 pinned Demo `.ZC` files compile, and 201 have explicit QEMU runtime
+acceptance; five remain partial. Those are `TimeIns`, two TOS account
 examples, `MultiCore/Lock`, and `MultiCore/MPRadix`. The multicore examples
 are partial because the current guest runtime exposes one CPU; the stock
 `TimeIns` optimizer trace is not implemented by the ARM64 compiler; the TOS
-account examples still have workflow coverage gaps. These are source entries,
-not necessarily six independently launchable apps. The installed
+account examples still have workflow coverage gaps. `TOSExtern` is accepted
+at its interface-module scope: its forms and external declarations load and
+resolve, while the external routines and dependent workflows remain
+unverified. These are source entries, not necessarily five independently
+launchable apps. The installed
 `WallPaperDesktop` workflows now pass QEMU coverage for all six controls,
 palette save/reopen, Home and Terminal shells, NetLog, and a local Telnet
 round-trip; live UTM and Pi behavior remain separate checks. See
@@ -453,11 +456,14 @@ in [the program inventory](docs/PROGRAM-INVENTORY-2026-10-28.md). The
 source-level ledger at
 [`demo-source-ledger-2026-11-10.json`](docs/acceptance/demo-source-ledger-2026-11-10.json)
 records the 206 Demo `.ZC` compile results. Its current totals are 206 compile
-passes, zero compile blockers, 200 runtime-accepted sources, six partial
-runtime results, and zero recorded runtime failures. The six partial sources
-are `/Demo/TimeIns.ZC`, the three TOS account examples
-(`/Demo/AcctExample/TOS/TOSDistro.ZC`, `TOSExtern.ZC`, and `TOSMisc.ZC`),
-and the two multicore examples (`/Demo/MultiCore/Lock.ZC` and `MPRadix.ZC`).
+passes, zero compile blockers, 201 runtime-accepted sources, five partial
+runtime results, and zero recorded runtime failures. The five partial sources
+are `/Demo/TimeIns.ZC`, two TOS account examples
+(`/Demo/AcctExample/TOS/TOSDistro.ZC` and `TOSMisc.ZC`), and the two multicore
+examples (`/Demo/MultiCore/Lock.ZC` and `MPRadix.ZC`). `TOSExtern.ZC` is
+accepted as a declaration-only interface module; its external implementations
+and dependent workflows are not thereby accepted. See its
+[`interface acceptance`](docs/acceptance/demo-tos-extern-interface-qemu-2026-11-10.json).
 The current ISO revalidated the Wallpaper Desktop installer, cold-boot layout,
 six controls, palette editing, palette source save/list/reload, and Telnet
 client/local fixture workflow; arbitrary startup customizations and live
