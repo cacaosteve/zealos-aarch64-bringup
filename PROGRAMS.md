@@ -486,11 +486,13 @@ full Lock acceptance still requires SMP contention testing. Runtime evidence for
 checks that saved dollar glyphs are encoded as literal DolDoc text. Its
 `SoundShift` queue cleanup and `AUWrite`/`FileRead` AU-record round trip also
 pass in QEMU. Stock `GRWrite`, `GR2MV`, and `GRRead` also pass a synthetic
-single-frame movie round trip. The stock
+single-frame movie round trip. A live ScreenCast probe in the same QEMU guest
+currently fails at runtime because the `ScreenCast` kernel symbol is unresolved
+in the compatibility runtime; no frame capture is claimed. The stock
 `DiskCheck('D',FALSE,FALSE)` path also returns zero on the disposable,
 explicitly mounted read-only RedSea fixture; `DiskCheckAll`, repair behavior,
-and its configured-drive workflow remain unverified. Live ScreenCast capture,
-JukePuppet media playback, and allocation stress also remain unverified
+and its configured-drive workflow remain unverified. JukePuppet media playback
+and allocation stress also remain unverified
 ([acceptance](docs/acceptance/demo-tosmisc-current-qemu-2026-11-10.json)).
 The TimeIns ARM64 adaptation now has a fresh three-sample QEMU runtime check
 with terminal recovery. The stock source still fails at `PassTrace`, so this
