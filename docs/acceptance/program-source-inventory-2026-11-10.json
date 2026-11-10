@@ -2321,7 +2321,7 @@
       "kind": "demo_source_or_component",
       "compile": "pass",
       "runtime": "partial",
-      "evidence": "docs/acceptance/demo-mpradix-qemu-2vcpu-partial-2026-11-08.json"
+      "evidence": "docs/acceptance/demo-mpradix-current-qemu-2026-11-10.json"
     },
     {
       "path": "/Demo/MultiCore/Palindrome.ZC",

@@ -319,7 +319,7 @@ RUNTIME_PARTIAL = {
     "/Demo/AcctExample/TOS/TOSDistro.ZC":
         "docs/acceptance/demo-tosdistro-safe-load-qemu-2026-11-09.json",
     "/Demo/MultiCore/MPRadix.ZC":
-        "docs/acceptance/demo-mpradix-qemu-2vcpu-partial-2026-11-08.json",
+        "docs/acceptance/demo-mpradix-current-qemu-2026-11-10.json",
     "/Demo/MultiCore/Lock.ZC":
         "docs/acceptance/demo-lock-single-cpu-qemu-2026-11-09.json",
 }
