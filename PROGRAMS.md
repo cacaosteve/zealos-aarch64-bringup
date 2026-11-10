@@ -485,10 +485,11 @@ full Lock acceptance still requires SMP contention testing. Runtime evidence for
 `TOSMisc` now verifies `DC2Doc` against all 94 printable ASCII glyphs and
 checks that saved dollar glyphs are encoded as literal DolDoc text. Its
 `SoundShift` queue cleanup and `AUWrite`/`FileRead` AU-record round trip also
-pass in QEMU. The stock
+pass in QEMU. Stock `GRWrite`, `GR2MV`, and `GRRead` also pass a synthetic
+single-frame movie round trip. The stock
 `DiskCheck('D',FALSE,FALSE)` path also returns zero on the disposable,
 explicitly mounted read-only RedSea fixture; `DiskCheckAll`, repair behavior,
-and its configured-drive workflow remain unverified. ScreenCast/movie capture,
+and its configured-drive workflow remain unverified. Live ScreenCast capture,
 JukePuppet media playback, and allocation stress also remain unverified
 ([acceptance](docs/acceptance/demo-tosmisc-current-qemu-2026-11-10.json)).
 The TimeIns ARM64 adaptation now has a fresh three-sample QEMU runtime check

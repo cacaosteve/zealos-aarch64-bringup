@@ -2561,6 +2561,45 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     'passed': True,
                     'output': output,
                 })
+                output = command(
+                    'zc CDC *movie_src=DCNew(4,4);I64 gr_size;'
+                    'movie_src->body[0]=0x56;'
+                    'gr_size=GRWrite("/Tests/TOSMiscFrame.GR",movie_src);'
+                    'DCDel(movie_src);'
+                    'Print("tosmisc-gr-write=%d\\n",gr_size>0);',
+                    'tosmisc-gr-write=1', timeout=30)
+                if 'tosmisc-gr-write=1' not in output:
+                    raise RuntimeError(
+                        'TOSMisc movie fixture could not write its GR frame:\n'
+                        + output)
+                output = command(
+                    'zc I64 movie_count;'
+                    'movie_count=GR2MV("/Tests/TOSMisc%03d.MV",'
+                    '"/Tests/TOSMiscFrame.GR","+d");'
+                    'Print("tosmisc-movie-count=%d\\n",movie_count);',
+                    'tosmisc-movie-count=1', timeout=30)
+                if 'tosmisc-movie-count=1' not in output:
+                    raise RuntimeError(
+                        'TOSMisc GR2MV did not create one movie frame:\n'
+                        + output)
+                output = command(
+                    'zc CDC *movie_frame=GRRead("/Tests/TOSMisc000.MV");'
+                    'I64 movie_size=0;U8 *movie=FileRead("/Tests/TOSMisc000.MV",'
+                    '&movie_size);'
+                    'Print("tosmisc-movie=%d|%d\\n",movie_size>0,'
+                    'movie_frame && movie_frame->body[0]==0x56);'
+                    'DCDel(movie_frame);Free(movie);'
+                    'Del("/Tests/TOSMisc000.MV");',
+                    'tosmisc-movie=1|1', timeout=30)
+                if 'tosmisc-movie=1|1' not in output:
+                    raise RuntimeError(
+                        'TOSMisc generated movie file failed GRRead verification:\n'
+                        + output)
+                runtime_checks.append({
+                    'name': 'TOSMisc GR2MV merges a GR frame into an MV file that GRRead reopens with the original pixels',
+                    'passed': True,
+                    'output': output,
+                })
             if (all(m['loaded'] for m in module_loads) and
                     '/Demo/Templates/Lex1.ZC' in args.demo_system_module):
                 output = command(
