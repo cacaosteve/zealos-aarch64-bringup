@@ -13,5 +13,16 @@
     "Titanium gameplay/input path, Escape, and return to the graphical terminal.",
     "Compiler and GUI terminal recovery after the app checks."
   ],
+  "keepaway_full_game": {
+    "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-3d-heap-fix-full-game.log python3 -u scripts/check-compat.py --pci --quick --probe-3d-apps --probe-keepaway-full-game",
+    "exit_code": 0,
+    "log": "build/check-3d-heap-fix-full-game.log",
+    "log_sha256": "21cba363cb58f37bc70c330a4e53ca8c82bec768bbff18f3ff43436827268186",
+    "checks": [
+      "KeepAway ran through 184 seconds of observation after rendering and accepting Space/mouse input.",
+      "Escape returned to the graphical terminal; the terminal passed its 40+2 check and zstatus reported failed=0.",
+      "No Animate child task remained after exit."
+    ]
+  },
   "scope_note": "This automated UTM-bundled QEMU probe is not a live UTM-window or physical Pi retest. The Pi desktop input check was completed earlier; this record concerns an independent shared-heap runtime regression."
 }
