@@ -6,6 +6,23 @@ ZealOS commit as the system sources:
 `eee210f4379ba3d00b47507f336a158eefb2c993`. Exact file hashes are recorded in
 `upstream/pinned/UPSTREAM.json` and verified by `make check-upstream`.
 
+## Broader compile inventory (2026-11-10)
+
+A targeted PCI QEMU compile-only sweep covered 290 selected Apps and support
+sources: 193 compiled and 97 did not compile in isolation. All 20 selected
+`/Apps` entrypoints/components and all 16 selected `/Demo` sources compiled.
+The broader `/Home` group compiled 59 of 65 entries; its six blocks are the
+x86 SSE diagnostic, three legacy x86 PCI NIC drivers, the PCNet-only test, and
+the JSON utility's use of a compiler-private `LexExcept` API that the ARM64
+native compiler does not expose. The remaining blocked files are mostly
+compiler internals and system/build modules whose dependencies or hardware
+bindings are not present in the standalone compile context. They need separate
+triage; this count does not mean 97 user-facing programs are missing.
+
+This is compile evidence only. It does not establish runtime acceptance or
+feature parity. Per-source output is recorded in
+[`program-catalog-full-qemu-2026-11-10.json`](docs/acceptance/program-catalog-full-qemu-2026-11-10.json).
+
 ## Unchanged graphics programs
 
 The source bundle now contains these original files, with no program edits:

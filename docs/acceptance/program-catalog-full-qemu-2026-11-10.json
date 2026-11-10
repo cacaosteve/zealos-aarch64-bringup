@@ -1,0 +1,1501 @@
+{
+  "date": "2026-11-10",
+  "repository_commit": "5b0256a",
+  "command": "python3 scripts/check-compat.py --pci --quick --probe-program-catalog with --program-catalog-path restricted to the complete selected catalog",
+  "target": "QEMU PCI ARM64 graphical guest",
+  "scope": "Compile-only inventory, including selected Apps, Demo, network, compiler, and System sources. A successful compile is not runtime acceptance.",
+  "counts": {
+    "total": 290,
+    "compiled": 193,
+    "blocked": 97,
+    "apps": {
+      "total": 20,
+      "compiled": 20,
+      "blocked": 0
+    },
+    "demos": {
+      "total": 16,
+      "compiled": 16,
+      "blocked": 0
+    },
+    "home": {
+      "total": 65,
+      "compiled": 59,
+      "blocked": 6
+    },
+    "compiler": {
+      "total": 31,
+      "compiled": 0,
+      "blocked": 31
+    },
+    "misc": {
+      "total": 14,
+      "compiled": 3,
+      "blocked": 11
+    },
+    "system": {
+      "total": 137,
+      "compiled": 92,
+      "blocked": 45
+    }
+  },
+  "blocked_notes": [
+    "Three legacy x86 PCI NIC drivers and the PCNet-only test are outside the ARM64 VirtIO-net hardware path.",
+    "The x86 SSE diagnostic is not an ARM64 program.",
+    "The JSON utility references compiler-private LexExcept, which is not exposed by the ARM64 native compiler.",
+    "Many Compiler, Misc, and System modules are internal components, not standalone applications; their isolated failures reflect missing compiler context, source dependencies, or platform bindings and require triage."
+  ],
+  "programs": [
+    {
+      "path": "/Apps/Budget/Run.ZC",
+      "compiled": true,
+      "output": "zc Print(\"catalog_compile=%d\\n\", StockCatalogCompile(\"/Apps/Budget/Run.ZC\"));\r\nWARN /Apps/Budget/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Budget/Load.ZC:12:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/GrModels/Run.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/GrModels/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/GrModels/Load.ZC:8:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/KeepAway/Run.ZC",
+      "compiled": true,
+      "output": "Compile(\"/Apps/KeepAway/Run.ZC\"));\r\nWARN /Apps/KeepAway/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/KeepAway/Load.ZC:6:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/Logic/Run.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/Logic/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Logic/Load.ZC:6:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/Psalmody/Run.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/Psalmody/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Psalmody/Load.ZC:12:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Psalmody/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Psalmody/Load.ZC:12:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/Span/Run.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/Span/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Span/Load.ZC:10:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/Strut/Run.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/Strut/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Strut/Load.ZC:6:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/TimeClock/Load.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/TimeClock/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/TimeClock/Load.ZC:7:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/Titanium/Run.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/Titanium/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Titanium/Load.ZC:6:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/ToTheFront/Run.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/ToTheFront/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/ToTheFront/Load.ZC:13:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/ToTheFront/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/ToTheFront/Load.ZC:13:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/Vocabulary/Run.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/Vocabulary/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Vocabulary/Load.ZC:6:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/X-Caliber/Run.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/X-Caliber/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/X-Caliber/Load.ZC:7:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/X-Caliber/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/X-Caliber/Load.ZC:7:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Gr/GrMath.ZC",
+      "compiled": true,
+      "output": "WARN /System/Gr/GrMath.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Gr/GrMath.ZC:103:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Gr/GrMath.ZC:338:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Gr/GrMath.ZC:533:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Gr/GrMath.ZC:554:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Gr/GrPrimatives.ZC",
+      "compiled": true,
+      "output": "WARN /System/Gr/GrPrimatives.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Gr/GrPrimatives.ZC:980:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Gr/GrPrimatives.ZC:1016:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Gr/GrPrimatives.ZC:1159:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Gr/GrPrimatives.ZC:1474:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Demo/Graphics/Doodle.ZC",
+      "compiled": true,
+      "output": "catalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Demo/Graphics/Life.ZC",
+      "compiled": true,
+      "output": "catalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Demo/Games/MassSpring.ZC",
+      "compiled": true,
+      "output": "WARN /System/Math/Math.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Math/Math.ZC:74:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:8:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:101:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:122:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:149:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:376:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Demo/Games/BlackDiamond.ZC",
+      "compiled": true,
+      "output": "WARN /System/Math/Math.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Math/Math.ZC:74:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:8:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:101:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:122:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:149:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:376:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Math/Math.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Math/Math.ZC:74:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Demo/Games/BomberGolf.ZC",
+      "compiled": true,
+      "output": "WARN /System/Math/Math.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Math/Math.ZC:74:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:8:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:101:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:122:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:149:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:376:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Math/Math.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Math/Math.ZC:74:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Demo/Games/CastleFrankenstein.ZC",
+      "compiled": true,
+      "output": "WARN /System/Math/Math.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Math/Math.ZC:74:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:8:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:101:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:122:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:149:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:376:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Demo/Games/CircleTrace.ZC",
+      "compiled": true,
+      "output": "WARN /System/Math/Math.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Math/Math.ZC:74:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:8:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:101:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:122:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:149:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:376:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Demo/Games/DunGen.ZC",
+      "compiled": true,
+      "output": "WARN /System/Math/Math.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Math/Math.ZC:74:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:8:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:101:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:122:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:149:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:376:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Demo/Games/FlapBat.ZC",
+      "compiled": true,
+      "output": "WARN /System/Math/Math.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Math/Math.ZC:74:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:8:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:101:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:122:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:149:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:376:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Demo/Games/RawHide.ZC",
+      "compiled": true,
+      "output": "WARN /System/Math/Math.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Math/Math.ZC:74:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:8:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:101:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:122:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:149:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:376:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Demo/Games/Talons.ZC",
+      "compiled": true,
+      "output": "WARN /System/Math/Math.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Math/Math.ZC:74:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:8:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:101:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:122:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:149:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:376:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Math/Math.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Math/Math.ZC:74:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Demo/Games/Varoom.ZC",
+      "compiled": true,
+      "output": "WARN /System/Math/Math.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Math/Math.ZC:74:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:8:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:101:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:122:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:149:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:376:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Demo/Games/Wenceslas.ZC",
+      "compiled": true,
+      "output": "WARN /System/Math/Math.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Math/Math.ZC:74:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:8:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:101:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:122:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:149:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:376:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Demo/Games/ZoneOut.ZC",
+      "compiled": true,
+      "output": "WARN /System/Math/Math.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Math/Math.ZC:74:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:8:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:101:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:122:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:149:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:376:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Demo/Progress.ZC",
+      "compiled": true,
+      "output": "catalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Demo/RegistryDemo.ZC",
+      "compiled": true,
+      "output": "catalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/Psalmody/Install.ZC",
+      "compiled": true,
+      "output": "catalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/Span/Install.ZC",
+      "compiled": true,
+      "output": "catalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/ToTheFront/Install.ZC",
+      "compiled": true,
+      "output": "catalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/ToTheFront/AIs/Human.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/ToTheFront/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/ToTheFront/Load.ZC:13:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/ToTheFront/AIs/SimpleAI.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/ToTheFront/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/ToTheFront/Load.ZC:13:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/Psalmody/Examples/childish.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/Psalmody/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Psalmody/Load.ZC:12:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/Psalmody/Examples/night.ZC",
+      "compiled": true,
+      "output": "WARN /System/Sound.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:8:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:101:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:122:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:149:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:376:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Psalmody/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Psalmody/Load.ZC:12:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/Psalmody/Examples/prosper.ZC",
+      "compiled": true,
+      "output": "WARN /System/Sound.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:8:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:101:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:122:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:149:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:376:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Psalmody/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Psalmody/Load.ZC:12:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Home/HtmlGen.ZC",
+      "compiled": true,
+      "output": "WARN /System/BlkDev/ZDiskB.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/BlkDev/ZDiskB.ZC:79:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/BlkDev/ZDiskB.ZC:153:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Demo/ToHtmlToTXTDemo/ToHtml.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Demo/ToHtmlToTXTDemo/ToHtml.ZC:399:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Home/DoDistro.ZC",
+      "compiled": true,
+      "output": "WARN /System/Utils/LineRep.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/BlkDev/ZDiskB.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/BlkDev/ZDiskB.ZC:79:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/BlkDev/ZDiskB.ZC:153:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Home/Net/Load.ZC",
+      "compiled": true,
+      "output": "zc: executed\r\n> "
+    },
+    {
+      "path": "/Home/Net/Drivers/Run.ZC",
+      "compiled": true,
+      "output": "network_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Home/Net/Drivers/VirtIONet.ZC",
+      "compiled": true,
+      "output": "network_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Home/Net/Programs/FTPClient.ZC",
+      "compiled": true,
+      "output": "network_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Home/Net/Programs/Gopher.ZC",
+      "compiled": true,
+      "output": "network_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Home/Net/Programs/TCPChatClient.ZC",
+      "compiled": true,
+      "output": "network_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Home/Net/Programs/TCPChatServer.ZC",
+      "compiled": true,
+      "output": "network_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Home/Net/Programs/Telnet/Telnet.ZC",
+      "compiled": true,
+      "output": "network_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Home/Net/Programs/UDPChat.ZC",
+      "compiled": true,
+      "output": "network_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Home/PaletteEditor/Run.ZC",
+      "compiled": true,
+      "output": "WARN /System/God/GodBible.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/God/HolySpirit.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Home/SSE.ZC",
+      "compiled": false,
+      "output": "not compiled: this upstream diagnostic specifically uses x86 SSE instructions; it is not an ARM64 program"
+    },
+    {
+      "path": "/Home/Net/Drivers/E1000.ZC",
+      "compiled": false,
+      "output": "not compiled: stock driver requires a legacy x86 PCI NIC; ARM64 target network path is VirtIO-net"
+    },
+    {
+      "path": "/Home/Net/Drivers/PCNet.ZC",
+      "compiled": false,
+      "output": "not compiled: stock driver requires a legacy x86 PCI NIC; ARM64 target network path is VirtIO-net"
+    },
+    {
+      "path": "/Home/Net/Drivers/RTL8139.ZC",
+      "compiled": false,
+      "output": "not compiled: stock driver requires a legacy x86 PCI NIC; ARM64 target network path is VirtIO-net"
+    },
+    {
+      "path": "/Home/Net/Programs/Telnet/Extra/TelnetGr.ZC",
+      "compiled": true,
+      "output": "network_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Home/Net/Programs/Telnet/TelnetANSI.ZC",
+      "compiled": true,
+      "output": "checked through including program; standalone compile lacks parent context"
+    },
+    {
+      "path": "/Home/Net/Programs/Telnet/TelnetClass.ZC",
+      "compiled": true,
+      "output": "checked through including program; standalone compile lacks parent context"
+    },
+    {
+      "path": "/Home/Net/Programs/Telnet/TelnetHelpers.ZC",
+      "compiled": true,
+      "output": "checked through including program; standalone compile lacks parent context"
+    },
+    {
+      "path": "/Home/Net/Programs/Telnet/TelnetNegotiation.ZC",
+      "compiled": true,
+      "output": "checked through including program; standalone compile lacks parent context"
+    },
+    {
+      "path": "/Home/Net/Protocols/ARP.ZC",
+      "compiled": true,
+      "output": "network_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Home/Net/Protocols/DHCP.ZC",
+      "compiled": true,
+      "output": "network_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Home/Net/Protocols/DNS.ZC",
+      "compiled": true,
+      "output": "network_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Home/Net/Protocols/Ethernet.ZC",
+      "compiled": true,
+      "output": "network_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Home/Net/Protocols/ICMP.ZC",
+      "compiled": true,
+      "output": "network_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Home/Net/Protocols/IPV4.ZC",
+      "compiled": true,
+      "output": "network_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Home/Net/Protocols/Sockets.ZC",
+      "compiled": true,
+      "output": "network_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Home/Net/Protocols/TCP/MakeTCP.ZC",
+      "compiled": true,
+      "output": "network_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Home/Net/Protocols/TCP/TCP.ZC",
+      "compiled": true,
+      "output": "network_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Home/Net/Protocols/TCP/TCPHandler.ZC",
+      "compiled": true,
+      "output": "network_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Home/Net/Protocols/TCP/TCPTree.ZC",
+      "compiled": true,
+      "output": "network_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Home/Net/Protocols/UDP/MakeUDP.ZC",
+      "compiled": true,
+      "output": "network_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Home/Net/Protocols/UDP/UDP.ZC",
+      "compiled": true,
+      "output": "network_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Home/Net/Protocols/UDP/UDPTree.ZC",
+      "compiled": true,
+      "output": "network_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Home/Net/Start.ZC",
+      "compiled": true,
+      "output": "network_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Home/Net/Tests/ARPTest.ZC",
+      "compiled": true,
+      "output": "network_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Home/Net/Tests/DHCPTest0.ZC",
+      "compiled": true,
+      "output": "network_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Home/Net/Tests/DHCPTest1.ZC",
+      "compiled": true,
+      "output": "network_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Home/Net/Tests/DHCPTest2.ZC",
+      "compiled": true,
+      "output": "network_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Home/Net/Tests/DNSTest.ZC",
+      "compiled": true,
+      "output": "network_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Home/Net/Tests/EthernetTest.ZC",
+      "compiled": true,
+      "output": "network_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Home/Net/Tests/HostTest0.ZC",
+      "compiled": true,
+      "output": "network_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Home/Net/Tests/HostTest1.ZC",
+      "compiled": true,
+      "output": "network_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Home/Net/Tests/ICMPTest.ZC",
+      "compiled": true,
+      "output": "network_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Home/Net/Tests/ICMPTest0.ZC",
+      "compiled": true,
+      "output": "network_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Home/Net/Tests/ICMPTest1.ZC",
+      "compiled": true,
+      "output": "network_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Home/Net/Tests/IPV4Test.ZC",
+      "compiled": true,
+      "output": "network_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Home/Net/Tests/PCNetTest.ZC",
+      "compiled": false,
+      "output": "not compiled: test calls PCNet driver symbols; the ARM64 target uses VirtIO-net"
+    },
+    {
+      "path": "/Home/Net/Tests/TCPEchoClient.ZC",
+      "compiled": true,
+      "output": "network_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Home/Net/Tests/TCPEchoServer.ZC",
+      "compiled": true,
+      "output": "network_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Home/Net/Tests/TCPTest0.ZC",
+      "compiled": true,
+      "output": "network_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Home/Net/Tests/TCPTest1.ZC",
+      "compiled": true,
+      "output": "network_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Home/Net/Tests/TCPTest2.ZC",
+      "compiled": true,
+      "output": "network_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Home/Net/Tests/UDPSocketTest0.ZC",
+      "compiled": true,
+      "output": "network_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Home/Net/Tests/UDPSocketTest1.ZC",
+      "compiled": true,
+      "output": "network_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Home/Net/Tests/UDPSocketTest2.ZC",
+      "compiled": true,
+      "output": "network_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Home/Net/Tests/UDPTest0.ZC",
+      "compiled": true,
+      "output": "network_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Home/Net/Tests/UDPTest1.ZC",
+      "compiled": true,
+      "output": "network_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Home/Net/Utilities/BST.ZC",
+      "compiled": true,
+      "output": "network_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Home/Net/Utilities/JSON/JSON.ZC",
+      "compiled": false,
+      "output": "not compiled: upstream source depends on compiler-private LexExcept API not exposed by the ARM64 native compiler"
+    },
+    {
+      "path": "/Home/Net/Utilities/NetHandler.ZC",
+      "compiled": true,
+      "output": "network_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Home/Net/Utilities/NetLog.ZC",
+      "compiled": true,
+      "output": "network_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Home/Net/Utilities/NetQueue.ZC",
+      "compiled": true,
+      "output": "network_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Home/Net/Utilities/Ping.ZC",
+      "compiled": true,
+      "output": "network_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Compiler/Asm.ZC",
+      "compiled": false,
+      "output": "ERR:/Compiler/Asm.ZC:4:13 Expected ':' after label candidate 'LexExcept'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Compiler/AsmInit.ZC",
+      "compiled": false,
+      "output": "ERR:/Compiler/AsmInit.ZC:64:18 Expected ':' after label candidate 'CInternalType'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Compiler/AsmLib.ZC",
+      "compiled": false,
+      "output": "ERR:/Compiler/AsmLib.ZC:155:27 Unknown symbol 'IsLexExpression2Bin'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Compiler/AsmResolve.ZC",
+      "compiled": false,
+      "output": "ERR:/Compiler/AsmResolve.ZC:32:14 Expected ':' after label candidate 'LexExcept'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Compiler/BackA.ZC",
+      "compiled": false,
+      "output": "ERR:/Compiler/BackA.ZC:21:9 Expected ':' after label candidate 'ICMov'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Compiler/BackB.ZC",
+      "compiled": false,
+      "output": "ERR:/Compiler/BackB.ZC:3:8 Expected ':' after label candidate 'ICMov'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Compiler/BackC.ZC",
+      "compiled": false,
+      "output": "ERR:/Compiler/BackC.ZC:35:9 Expected ':' after label candidate 'ICMov'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Compiler/BackFA.ZC",
+      "compiled": false,
+      "output": "ERR:/Compiler/BackFA.ZC:29:35 Unknown symbol 'intermediate_code_table'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Compiler/BackFB.ZC",
+      "compiled": false,
+      "output": "ERR:/Compiler/BackFB.ZC:10:24 Expected ':' after label candidate 'CompSetFloatOpPushPop'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Compiler/BackLib.ZC",
+      "compiled": false,
+      "output": "ERR:/Compiler/BackLib.ZC:37:46 Can't derefernce a non-pointer/array.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Compiler/CExcept.ZC",
+      "compiled": false,
+      "output": "ERR:/Compiler/CExcept.ZC:213:27 Unknown symbol 'IC_END_EXP'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Compiler/CExterns.ZC",
+      "compiled": false,
+      "output": "ERR:/Compiler/CExterns.ZC:18:48 Expected a type name.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Compiler/CHash.ZC",
+      "compiled": false,
+      "output": "ERR:/Compiler/CHash.ZC:30:40 AArch64 external data 'mem_boot_base' is not bound.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Compiler/CInit.ZC",
+      "compiled": false,
+      "output": "ERR:/Compiler/CInit.ZC:26:45 Expected ':' after label candidate 'CIntermediateStruct'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Compiler/CMain.ZC",
+      "compiled": false,
+      "output": "ERR:/Compiler/CMain.ZC:10:11 Expected ':' after label candidate 'COCPush'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Compiler/CMisc.ZC",
+      "compiled": false,
+      "output": "ERR:/Compiler/CMisc.ZC:11:5 Unknown symbol 'asm'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Compiler/Lex.ZC",
+      "compiled": false,
+      "output": "ERR:/Compiler/Lex.ZC:175:14 Expected ':' after label candidate 'cmp'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Compiler/LexLib.ZC",
+      "compiled": false,
+      "output": "ERR:/Compiler/LexLib.ZC:128:13 Expected ':' after label candidate 'LexExcept'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Compiler/OptLib.ZC",
+      "compiled": false,
+      "output": "ERR:/Compiler/OptLib.ZC:23:26 Unknown symbol 'IC_NOP1'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Compiler/OptPass012.ZC",
+      "compiled": false,
+      "output": "ERR:/Compiler/OptPass012.ZC:48:35 Unknown symbol 'intermediate_code_table'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Compiler/OptPass3.ZC",
+      "compiled": false,
+      "output": "ERR:/Compiler/OptPass3.ZC:1:36 Expected a type name.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Compiler/OptPass4.ZC",
+      "compiled": false,
+      "output": "ERR:/Compiler/OptPass4.ZC:6:33 Unknown symbol 'IC_IMM_I64'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Compiler/OptPass5.ZC",
+      "compiled": false,
+      "output": "ERR:/Compiler/OptPass5.ZC:13:21 Unknown symbol 'IC_NOP2'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Compiler/OptPass6.ZC",
+      "compiled": false,
+      "output": "ERR:/Compiler/OptPass6.ZC:5:33 Unknown symbol 'IC_IMM_I64'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Compiler/OptPass789A.ZC",
+      "compiled": false,
+      "output": "ERR:/Compiler/OptPass789A.ZC:1:41 Expected a type name.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Compiler/ParseExp.ZC",
+      "compiled": false,
+      "output": "ERR:/Compiler/ParseExp.ZC:22:15 Unknown symbol 'IC_ADD'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Compiler/ParseLib.ZC",
+      "compiled": false,
+      "output": "ERR:/Compiler/ParseLib.ZC:26:27 Unknown symbol 'IC_DEREF'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Compiler/ParseStatement.ZC",
+      "compiled": false,
+      "output": "ERR:/Compiler/ParseStatement.ZC:6:13 Expected ':' after label candidate 'LexExcept'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Compiler/ParseVar.ZC",
+      "compiled": false,
+      "output": "ERR:/Compiler/ParseVar.ZC:17:14 Expected ':' after label candidate 'LexExcept'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Compiler/Templates.ZC",
+      "compiled": false,
+      "output": "ERR:/Compiler/Templates.ZC:1:5 Unknown symbol 'asm'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Compiler/UAsm.ZC",
+      "compiled": false,
+      "output": "ERR:/Compiler/UAsm.ZC:34:18 Unknown symbol 'uasm'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Misc/Auto/AutoDistro.ZC",
+      "compiled": false,
+      "output": "ERR:/Misc/Auto/AutoDistro.ZC:20:13 Expected ':' after label candidate 'BootDVDIns'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Misc/Auto/AutoFullDistro0.ZC",
+      "compiled": false,
+      "output": "ERR:/Misc/Auto/AutoFullDistro0.ZC:22:13 Expected ':' after label candidate 'BootMHDIns'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Misc/Auto/AutoFullDistro1.ZC",
+      "compiled": false,
+      "output": "ERR:/Misc/Auto/AutoFullDistro1.ZC:22:13 Expected ':' after label candidate 'BootMHDIns'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Misc/Auto/AutoFullDistro2.ZC",
+      "compiled": false,
+      "output": "ERR:/Misc/Auto/AutoFullDistro2.ZC:22:13 Expected ':' after label candidate 'BootMHDIns'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Misc/Auto/AutoFullDistro3.ZC",
+      "compiled": false,
+      "output": "ERR:/Misc/Auto/AutoFullDistro3.ZC:26:12 Expected ':' after label candidate 'BootHDIns'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Misc/Auto/AutoFullDistro4.ZC",
+      "compiled": true,
+      "output": "catalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Misc/Auto/AutoFullDistro5.ZC",
+      "compiled": false,
+      "output": "ERR:/Misc/Auto/AutoFullDistro5.ZC:7:28 Unknown symbol 'LineRep'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Misc/Auto/AutoInstall.ZC",
+      "compiled": false,
+      "output": "ERR:/Misc/Auto/AutoInstall.ZC:66:10 Expected ':' after label candidate 'SATARep'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Misc/Auto/BootMHD2.ZC",
+      "compiled": false,
+      "output": "ERR:/Misc/Auto/BootMHD2.ZC:6:5 Unknown symbol 'asm'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Misc/Auto/HomeSys.ZC",
+      "compiled": true,
+      "output": "catalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Misc/Auto/Once.ZC",
+      "compiled": true,
+      "output": "catalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Misc/DoDistro.ZC",
+      "compiled": false,
+      "output": "ERR:/Misc/DoDistro.ZC:19:13 Expected ':' after label candidate 'BootDVDIns'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Misc/OSInstall.ZC",
+      "compiled": false,
+      "output": "WARN:LIMINE_HDD_FILE:1:30 TRACE LexErr at LIMINE_HDD_FILE:1:30: I can't find file '/Boot/Limine-BIOS-HDD.HH'.\r\nERR LIMINE_HDD_FILE:1:30 I can't find file '/Boot/Limine-BIOS-HDD.HH'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Misc/OSTestSuite.ZC",
+      "compiled": false,
+      "output": "ERR:/Misc/OSTestSuite.ZC:545:13 Expected ':' after label candidate 'InSetMouse'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/AutoComplete/ACDictGen.ZC",
+      "compiled": true,
+      "output": "catalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/AutoComplete/ACFill.ZC",
+      "compiled": true,
+      "output": "WARN /System/AutoComplete/ACFill.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/AutoComplete/ACFill.ZC:239:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/AutoComplete/ACInit.ZC",
+      "compiled": true,
+      "output": "WARN /System/AutoComplete/ACInit.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/AutoComplete/ACInit.ZC:50:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/AutoComplete/ACTask.ZC",
+      "compiled": true,
+      "output": "WARN /System/AutoComplete/ACTask.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/AutoComplete/ACTask.ZC:23:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/AutoComplete/MakeAC.ZC",
+      "compiled": true,
+      "output": "WARN /System/AutoComplete/ACFill.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/AutoComplete/ACFill.ZC:239:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/AutoComplete/ACTask.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/AutoComplete/ACTask.ZC:23:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/AutoComplete/ACInit.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/AutoComplete/ACInit.ZC:50:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/BlkDev/DiskCheck.ZC",
+      "compiled": true,
+      "output": "WARN /System/BlkDev/DiskCheck.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/BlkDev/DiskPart.ZC",
+      "compiled": true,
+      "output": "WARN /System/BlkDev/DiskPart.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/BlkDev/FileMgr.ZC",
+      "compiled": true,
+      "output": "WARN /System/BlkDev/FileMgr.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/BlkDev/FileMgr.ZC:25:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/BlkDev/MakeZBlkDev.ZC",
+      "compiled": false,
+      "output": "WARN /System/BlkDev/ZDiskA.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/BlkDev/ZDiskB.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/BlkDev/ZDiskB.ZC:79:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/BlkDev/ZDiskB.ZC:153:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/BlkDev/DiskPart.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/BlkDev/Mount.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nERR:/System/BlkDev/Mount.ZC:32:19 AArch64 external data 'dev' is not bound.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/BlkDev/Mount.ZC",
+      "compiled": false,
+      "output": "WARN /System/BlkDev/Mount.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nERR:/System/BlkDev/Mount.ZC:32:19 AArch64 external data 'dev' is not bound.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/BlkDev/ZDiskA.ZC",
+      "compiled": true,
+      "output": "WARN /System/BlkDev/ZDiskA.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/BlkDev/ZDiskB.ZC",
+      "compiled": true,
+      "output": "WARN /System/BlkDev/ZDiskB.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/BlkDev/ZDiskB.ZC:79:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/BlkDev/ZDiskB.ZC:153:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Boot/BootDVD.ZC",
+      "compiled": false,
+      "output": "ERR:/System/Boot/BootDVD.ZC:6:5 Unknown symbol 'asm'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Boot/BootDVDIns.ZC",
+      "compiled": false,
+      "output": "ERR:/System/Boot/BootDVD.ZC:6:5 Unknown symbol 'asm'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Boot/BootHD.ZC",
+      "compiled": false,
+      "output": "ERR:/System/Boot/BootHD.ZC:6:5 Unknown symbol 'asm'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Boot/BootHDIns.ZC",
+      "compiled": false,
+      "output": "ERR:/System/Boot/BootHD.ZC:6:5 Unknown symbol 'asm'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Boot/BootMHD.ZC",
+      "compiled": false,
+      "output": "ERR:/System/Boot/BootMHD.ZC:6:5 Unknown symbol 'asm'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Boot/BootMHD2.ZC",
+      "compiled": false,
+      "output": "ERR:/System/Boot/BootMHD2.ZC:6:5 Unknown symbol 'asm'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Boot/BootMHDIns.ZC",
+      "compiled": false,
+      "output": "ERR:/System/Boot/BootMHD.ZC:6:5 Unknown symbol 'asm'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Boot/BootRAM.ZC",
+      "compiled": false,
+      "output": "WARN /System/Boot/BootRAM.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nERR:/System/Boot/BootRAM.ZC:2:5 Unknown symbol 'asm'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Boot/DiskISO9660.ZC",
+      "compiled": false,
+      "output": "WARN /System/Boot/DiskISO9660.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nERR:/System/Boot/DiskISO9660.ZC:26:20 Expected ':' after label candidate 'FillU16Palindrome'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Boot/DiskISORedSea.ZC",
+      "compiled": false,
+      "output": "WARN /System/Boot/DiskISORedSea.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nERR:/System/Boot/DiskISORedSea.ZC:36:34 Unknown symbol 'BDVD_START'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Boot/LimineMHDIns.ZC",
+      "compiled": false,
+      "output": "ERR:/System/Boot/LimineMHDIns.ZC:73:57 sizeof expression size is invalid.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Boot/MakeBoot.ZC",
+      "compiled": true,
+      "output": "WARN /System/Boot/MakeBoot.ZC:8:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Ctrls/CtrlsA.ZC",
+      "compiled": true,
+      "output": "catalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Ctrls/CtrlsBttn.ZC",
+      "compiled": true,
+      "output": "catalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Ctrls/CtrlsSlider.ZC",
+      "compiled": true,
+      "output": "catalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Ctrls/MakeCtrls.ZC",
+      "compiled": true,
+      "output": "WARN /System/Ctrls/MakeCtrls.ZC:3:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Ctrls/MakeCtrls.ZC:4:12 AIWN ignore's #help_file's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Debug.ZC",
+      "compiled": true,
+      "output": "WARN /System/Debug.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Define.ZC",
+      "compiled": false,
+      "output": "WARN /System/Define.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nERR:/System/Define.ZC:5:43 AArch64 external data 'mem_boot_base' is not bound.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/DevInfo.ZC",
+      "compiled": false,
+      "output": "WARN /System/DevInfo.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nERR:/System/DevInfo.ZC:9:19 AArch64 external data 'dev' is not bound.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/DolDoc/DocBin.ZC",
+      "compiled": true,
+      "output": "WARN /System/DolDoc/DocBin.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/DolDoc/DocChar.ZC",
+      "compiled": true,
+      "output": "WARN /System/DolDoc/DocChar.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/DolDoc/DocClipBoard.ZC",
+      "compiled": true,
+      "output": "WARN /System/DolDoc/DocClipBoard.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/DolDoc/DocCodeTools.ZC",
+      "compiled": false,
+      "output": "WARN /System/DolDoc/DocCodeTools.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nERR:/System/DolDoc/DocCodeTools.ZC:84:36 Unknown symbol 'KW_ELSE'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/DolDoc/DocDblBuf.ZC",
+      "compiled": true,
+      "output": "WARN /System/DolDoc/DocDblBuf.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/DolDoc/DocEd.ZC",
+      "compiled": true,
+      "output": "WARN /System/DolDoc/DocEd.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/DolDoc/DocEd.ZC:13:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/DolDoc/DocEd.ZC:227:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/DolDoc/DocEd.ZC:294:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/DolDoc/DocExterns.ZC",
+      "compiled": true,
+      "output": "WARN /System/DolDoc/DocExterns.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/DolDoc/DocFile.ZC",
+      "compiled": true,
+      "output": "WARN /System/DolDoc/DocFile.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/DolDoc/DocFile.ZC:259:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/DolDoc/DocFile.ZC:304:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/DolDoc/DocFile.ZC:325:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/DolDoc/DocFile.ZC:385:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/DolDoc/DocFile.ZC:413:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/DolDoc/DocFile.ZC:421:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/DolDoc/DocFind.ZC",
+      "compiled": true,
+      "output": "WARN /System/DolDoc/DocFind.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/DolDoc/DocForm.ZC",
+      "compiled": true,
+      "output": "WARN /System/DolDoc/DocForm.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/DolDoc/DocForm.ZC:262:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/DolDoc/DocGet.ZC",
+      "compiled": true,
+      "output": "WARN /System/DolDoc/DocGet.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/DolDoc/DocGet.ZC:47:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/DolDoc/DocGet.ZC:205:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/DolDoc/DocGr.ZC",
+      "compiled": true,
+      "output": "WARN /System/DolDoc/DocGr.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/DolDoc/DocGr.ZC:70:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/DolDoc/DocGr.ZC:106:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/DolDoc/DocHighlight.ZC",
+      "compiled": true,
+      "output": "WARN /System/DolDoc/DocHighlight.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/DolDoc/DocInit.ZC",
+      "compiled": true,
+      "output": "WARN /System/DolDoc/DocInit.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/DolDoc/DocLink.ZC",
+      "compiled": true,
+      "output": "WARN /System/DolDoc/DocLink.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/DolDoc/DocMacro.ZC",
+      "compiled": true,
+      "output": "WARN /System/DolDoc/DocMacro.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/DolDoc/DocNew.ZC",
+      "compiled": true,
+      "output": "WARN /System/DolDoc/DocNew.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/DolDoc/DocNew.ZC:398:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/DolDoc/DocPlain.ZC",
+      "compiled": true,
+      "output": "WARN /System/DolDoc/DocPlain.ZC:2:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/DolDoc/DocPopUp.ZC",
+      "compiled": true,
+      "output": "WARN /System/DolDoc/DocPopUp.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/DolDoc/DocPopUp.ZC:28:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/DolDoc/DocPopUp.ZC:88:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/DolDoc/DocPopUp.ZC:105:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/DolDoc/DocPopUp.ZC:129:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/DolDoc/DocPopUp.ZC:135:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/DolDoc/DocPopUp.ZC:304:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/DolDoc/DocPutKey.ZC",
+      "compiled": true,
+      "output": "WARN /System/DolDoc/DocPutKey.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/DolDoc/DocPutS.ZC",
+      "compiled": true,
+      "output": "WARN /System/DolDoc/DocPutS.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/DolDoc/DocPutS.ZC:366:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/DolDoc/DocRecalc.ZC",
+      "compiled": false,
+      "output": "WARN /System/DolDoc/DocRecalc.ZC:3:13 AIWN ignore's #help_index's ignored by the C side\r\nERR:/System/DolDoc/DocRecalc.ZC:331:12 Expected an expression before operator.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/DolDoc/DocRecalcLib.ZC",
+      "compiled": true,
+      "output": "WARN /System/DolDoc/DocRecalcLib.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/DolDoc/DocRecalcLib.ZC:202:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/DolDoc/DocRecalcLib.ZC:222:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/DolDoc/DocRun.ZC",
+      "compiled": true,
+      "output": "WARN /System/DolDoc/DocRun.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/DolDoc/DocTerm.ZC",
+      "compiled": true,
+      "output": "WARN /System/DolDoc/DocTerm.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/DolDoc/DocTerm.ZC:57:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/DolDoc/DocTree.ZC",
+      "compiled": true,
+      "output": "WARN /System/DolDoc/DocTree.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/DolDoc/DocTree.ZC:228:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/DolDoc/DocTree.ZC:268:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/DolDoc/DocWidgetWiz.ZC",
+      "compiled": true,
+      "output": "WARN /System/DolDoc/DocWidgetWiz.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/DolDoc/MakeDoc.ZC",
+      "compiled": false,
+      "output": "WARN /System/DolDoc/MakeDoc.ZC:3:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/DolDoc/MakeDoc.ZC:4:12 AIWN ignore's #help_file's ignored by the C side\r\nWARN /System/DolDoc/MakeDoc.ZC:34:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/DolDoc/DocExterns.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/DolDoc/DocBin.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/DolDoc/DocNew.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/DolDoc/DocNew.ZC:398:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/DolDoc/DocForm.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/DolDoc/DocForm.ZC:262:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/DolDoc/DocDblBuf.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/DolDoc/DocPlain.ZC:2:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/DolDoc/DocInit.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/DolDoc/DocHighlight.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/DolDoc/DocRecalcLib.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/DolDoc/DocRecalcLib.ZC:202:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/DolDoc/DocRecalcLib.ZC:222:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/DolDoc/DocRecalc.ZC:3:13 AIWN ignore's #help_index's ignored by the C side\r\nERR:/System/DolDoc/DocRecalc.ZC:331:12 Expected an expression before operator.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Externs.ZC",
+      "compiled": true,
+      "output": "catalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/God/GodBible.ZC",
+      "compiled": true,
+      "output": "WARN /System/God/GodBible.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/God/GodDoodle.ZC",
+      "compiled": false,
+      "output": "WARN /System/God/GodDoodle.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nERR:/System/God/GodDoodle.ZC:31:24 Class 'U8i' is missing member 'width'\r\n\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/God/GodExterns.ZC",
+      "compiled": true,
+      "output": "WARN /System/God/GodExterns.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/God/GodSong.ZC",
+      "compiled": false,
+      "output": "WARN /System/God/GodSong.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nERR:/System/God/GodSong.ZC:102:21 Unknown symbol 'GodBitsRemove'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/God/HolySpirit.ZC",
+      "compiled": false,
+      "output": "WARN /System/God/HolySpirit.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nERR:/System/God/HolySpirit.ZC:181:51 Unknown symbol 'ST_BIBLE_LINES'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/God/MakeGod.ZC",
+      "compiled": false,
+      "output": "WARN /System/God/MakeGod.ZC:3:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/God/GodBible.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/God/HolySpirit.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nERR:/System/God/HolySpirit.ZC:181:51 Unknown symbol 'ST_BIBLE_LINES'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Gr/GrAsm.ZC",
+      "compiled": false,
+      "output": "WARN /System/Gr/GrAsm.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nERR:/System/Gr/GrAsm.ZC:2:5 Unknown symbol 'asm'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Gr/GrBitMap.ZC",
+      "compiled": true,
+      "output": "WARN /System/Gr/GrBitMap.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Gr/GrBitMap.ZC:91:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Gr/GrBitMap.ZC:756:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Gr/GrBitMap.ZC:904:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Gr/GrBitMap.ZC:1305:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Gr/GrComposites.ZC",
+      "compiled": true,
+      "output": "WARN /System/Gr/GrComposites.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Gr/GrComposites.ZC:196:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Gr/GrComposites.ZC:317:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Gr/GrComposites.ZC:395:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Gr/GrDC.ZC",
+      "compiled": true,
+      "output": "WARN /System/Gr/GrDC.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Gr/GrDC.ZC:2:12 AIWN ignore's #help_file's ignored by the C side\r\nWARN /System/Gr/GrDC.ZC:61:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Gr/GrDC.ZC:132:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Gr/GrDC.ZC:398:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Gr/GrDC.ZC:399:12 AIWN ignore's #help_file's ignored by the C side\r\nWARN /System/Gr/GrDC.ZC:400:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Gr/GrDC.ZC:427:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Gr/GrDC.ZC:438:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Gr/GrEnd.ZC",
+      "compiled": true,
+      "output": "WARN /System/Gr/GrEnd.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Gr/GrExterns.ZC",
+      "compiled": true,
+      "output": "WARN /System/Gr/GrExterns.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Gr/GrGlobals.ZC",
+      "compiled": true,
+      "output": "WARN /System/Gr/GrGlobals.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Gr/GrGlobals.ZC:54:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Gr/GrInitA.ZC",
+      "compiled": true,
+      "output": "WARN /System/Gr/GrInitA.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Gr/GrInitB.ZC",
+      "compiled": true,
+      "output": "WARN /System/Gr/GrInitB.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Gr/GrInitB.ZC:93:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Gr/GrInitB.ZC:177:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Gr/GrPalette.ZC",
+      "compiled": true,
+      "output": "WARN /System/Gr/GrPalette.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Gr/GrScreen.ZC",
+      "compiled": true,
+      "output": "WARN /System/Gr/GrScreen.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Gr/GrSpritePlot.ZC",
+      "compiled": false,
+      "output": "WARN /System/Gr/GrSpritePlot.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nERR:/System/Gr/GrSpritePlot.ZC:78:16 Expected ':' after label candidate 'GrTextBox3'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Gr/GrTextBase.ZC",
+      "compiled": false,
+      "output": "WARN /System/Gr/GrTextBase.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Gr/GrTextBase.ZC:2:12 AIWN ignore's #help_file's ignored by the C side\r\nERR:/System/Gr/GrTextBase.ZC:4:5 Unknown symbol 'asm'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Gr/MakeGr.ZC",
+      "compiled": false,
+      "output": "WARN /System/Gr/GrInitA.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Gr/Gr.HH:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Gr/Gr.HH:153:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Gr/GrExterns.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Gr/GrGlobals.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Gr/GrGlobals.ZC:54:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Gr/GrTextBase.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Gr/GrTextBase.ZC:2:12 AIWN ignore's #help_file's ignored by the C side\r\nERR:/System/Gr/GrTextBase.ZC:4:5 Unknown symbol 'asm'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Gr/ScreenCast.ZC",
+      "compiled": true,
+      "output": "WARN /System/Gr/ScreenCast.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Gr/ScreenCast.ZC:66:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Gr/SpriteBitMap.ZC",
+      "compiled": false,
+      "output": "WARN /System/Gr/SpriteBitMap.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nERR:/System/Gr/SpriteBitMap.ZC:283:24 Unknown symbol 'SPE_ABORT'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Gr/SpriteCode.ZC",
+      "compiled": false,
+      "output": "WARN /System/Gr/SpriteCode.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nERR:/System/Gr/SpriteCode.ZC:253:25 Unknown symbol 'LexFirstRemove'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Gr/SpriteEd.ZC",
+      "compiled": false,
+      "output": "WARN /System/Gr/SpriteEd.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nERR:/System/Gr/SpriteEd.ZC:70:50 Unknown symbol 'SpriteElemQueuedBaseSize'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Gr/SpriteMain.ZC",
+      "compiled": false,
+      "output": "WARN /System/Gr/SpriteMain.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nERR:/System/Gr/SpriteMain.ZC:71:38 Unknown symbol 'SpriteSideBar2SpriteQueue'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Gr/SpriteMesh.ZC",
+      "compiled": true,
+      "output": "WARN /System/Gr/SpriteMesh.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Gr/SpriteNew.ZC",
+      "compiled": true,
+      "output": "WARN /System/Gr/SpriteNew.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Gr/SpriteNew.ZC:2:12 AIWN ignore's #help_file's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Gr/SpriteSideBar.ZC",
+      "compiled": false,
+      "output": "WARN /System/Gr/SpriteSideBar.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\ncompiler abort at third_party/aiwnios/c/arm_backend.c:3959\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Hash.ZC",
+      "compiled": false,
+      "output": "WARN /System/Hash.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nERR:/System/Hash.ZC:317:23 Unknown symbol 'HashEntrySize'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/InFile.ZC",
+      "compiled": true,
+      "output": "WARN /System/InFile.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/InFile.ZC:2:12 AIWN ignore's #help_file's ignored by the C side\r\nWARN /System/InFile.ZC:141:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/MakeSystem.ZC",
+      "compiled": false,
+      "output": "WARN /System/Training.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN:/System/Training.ZC:53:74 Can't address of extern symbol\r\nWARN:/System/Training.ZC:53:74 Can't address of extern symbol\r\nWARN /System/Training.ZC:169:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Memory.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Memory.ZC:36:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Memory.ZC:105:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Memory.ZC:185:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Math/Math.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Math/Math.ZC:74:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Math/MathODE.ZC:6:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Math/MathODE.ZC:7:12 AIWN ignore's #help_file's ignored by the C side\r\nERR:/System/Math/MathODE.ZC:658:24 AArch64 external data 'winmgr' is not bound.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Math/Conversion.ZC",
+      "compiled": false,
+      "output": "ERR:/System/Math/Conversion.ZC:27:12 Expected a type name.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Math/F32.ZC",
+      "compiled": false,
+      "output": "ERR:/System/Math/F32.ZC:31:12 Expected a type name.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Math/MakeMath.ZC",
+      "compiled": true,
+      "output": "WARN /System/Math/Math.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Math/Math.ZC:74:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Math/MathODE.ZC:6:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Math/MathODE.ZC:7:12 AIWN ignore's #help_file's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Math/Mat4.ZC",
+      "compiled": false,
+      "output": "ERR:/System/Math/Mat4.ZC:8:28 Expected a type name.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Math/Math.ZC",
+      "compiled": true,
+      "output": "WARN /System/Math/Math.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Math/Math.ZC:74:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Math/MathODE.ZC",
+      "compiled": true,
+      "output": "WARN /System/Math/MathODE.ZC:6:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Math/MathODE.ZC:7:12 AIWN ignore's #help_file's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Math/NDArray.ZC",
+      "compiled": true,
+      "output": "catalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Math/Tests/TestF32.ZC",
+      "compiled": false,
+      "output": "WARN /System/Math/Math.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Math/Math.ZC:74:13 AIWN ignore's #help_index's ignored by the C side\r\nERR:/System/Math/Tests/TestF32.ZC:21:16 Expected ':' after label candidate 'CGLTex2D'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Math/Tests/TestMat4.ZC",
+      "compiled": true,
+      "output": "catalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Math/Tests/TestVec.ZC",
+      "compiled": true,
+      "output": "catalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Math/Types.ZC",
+      "compiled": true,
+      "output": "catalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Math/Vec3.ZC",
+      "compiled": false,
+      "output": "ERR:/System/Math/Vec3.ZC:12:55 Expected a type name.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Math/Vec4.ZC",
+      "compiled": false,
+      "output": "ERR:/System/Math/Vec4.ZC:12:62 Expected a type name.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Memory.ZC",
+      "compiled": true,
+      "output": "WARN /System/Memory.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Memory.ZC:36:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Memory.ZC:105:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Memory.ZC:185:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Menu.ZC",
+      "compiled": true,
+      "output": "WARN /System/Menu.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Menu.ZC:2:12 AIWN ignore's #help_file's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Mouse.ZC",
+      "compiled": true,
+      "output": "WARN /System/Mouse.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/PCILookUpSingle.ZC",
+      "compiled": true,
+      "output": "WARN /System/PCILookUpSingle.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Registry.ZC",
+      "compiled": true,
+      "output": "WARN /System/Registry.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Registry.ZC:150:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Registry.ZC:151:12 AIWN ignore's #help_file's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Sound.ZC",
+      "compiled": true,
+      "output": "WARN /System/Sound.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:8:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:101:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:122:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:149:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:376:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/TaskSettings.ZC",
+      "compiled": true,
+      "output": "WARN /System/TaskSettings.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Training.ZC",
+      "compiled": true,
+      "output": "WARN /System/Training.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN:/System/Training.ZC:53:74 Can't address of extern symbol\r\nWARN:/System/Training.ZC:53:74 Can't address of extern symbol\r\nWARN /System/Training.ZC:169:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Utils/CPURep.ZC",
+      "compiled": true,
+      "output": "WARN /System/Utils/CPURep.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Utils/ConversionScript.ZC",
+      "compiled": false,
+      "output": "ERR:/System/Utils/ConversionScript.ZC:3:5 Expected ':' after label candidate 'FR'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Utils/Diff.ZC",
+      "compiled": true,
+      "output": "WARN /System/Utils/Diff.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Utils/DocUtils.ZC",
+      "compiled": false,
+      "output": "WARN /System/Utils/DocUtils.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nERR:/System/Utils/DocUtils.ZC:22:9 Expected ':' after label candidate 'Touch'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Utils/Find.ZC",
+      "compiled": true,
+      "output": "WARN /System/Utils/Find.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Utils/HeapLog.ZC",
+      "compiled": true,
+      "output": "WARN /System/Utils/HeapLog.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Utils/HeapLog.ZC:2:12 AIWN ignore's #help_file's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Utils/LineRep.ZC",
+      "compiled": true,
+      "output": "WARN /System/Utils/LineRep.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Utils/LinkCheck.ZC",
+      "compiled": true,
+      "output": "WARN /System/Utils/LinkCheck.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Utils/MakeUtils.ZC",
+      "compiled": false,
+      "output": "WARN /System/Utils/ZXERep.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Utils/CPURep.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Utils/Diff.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Utils/Find.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Utils/HeapLog.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Utils/HeapLog.ZC:2:12 AIWN ignore's #help_file's ignored by the C side\r\nWARN /System/Utils/LineRep.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Utils/LinkCheck.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Utils/MemRep.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nERR:/System/Utils/MemRep.ZC:86:72 Unknown symbol 'DriveUnused'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Utils/MemRep.ZC",
+      "compiled": false,
+      "output": "WARN /System/Utils/MemRep.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nERR:/System/Utils/MemRep.ZC:86:72 Unknown symbol 'DriveUnused'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Utils/Merge.ZC",
+      "compiled": false,
+      "output": "WARN /System/Utils/Merge.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nERR:/System/Utils/Merge.ZC:19:53 Unknown symbol 'DF_ABORT_ALL_FILES'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Utils/Profiler.ZC",
+      "compiled": true,
+      "output": "WARN /System/Utils/Profiler.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Utils/Profiler.ZC:2:12 AIWN ignore's #help_file's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Utils/StrUtils.ZC",
+      "compiled": true,
+      "output": "WARN /System/Utils/StrUtils.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Utils/SysRep.ZC",
+      "compiled": true,
+      "output": "catalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Utils/TaskRep.ZC",
+      "compiled": false,
+      "output": "WARN /System/Utils/TaskRep.ZC:3:13 AIWN ignore's #help_index's ignored by the C side\r\nERR:/System/Utils/TaskRep.ZC:18:26 Unknown symbol 'TaskMemAlloced'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Utils/ToDolDoc.ZC",
+      "compiled": true,
+      "output": "WARN /System/Utils/ToDolDoc.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Utils/ToTXT.ZC",
+      "compiled": true,
+      "output": "WARN /System/Utils/ToTXT.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Utils/ToTXT.ZC:124:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Utils/VideoRep.ZC",
+      "compiled": true,
+      "output": "catalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Utils/ZXERep.ZC",
+      "compiled": true,
+      "output": "WARN /System/Utils/ZXERep.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/WallPaper.ZC",
+      "compiled": true,
+      "output": "WARN /System/WallPaper.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/Win.ZC",
+      "compiled": true,
+      "output": "WARN /System/Win.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Win.ZC:2:12 AIWN ignore's #help_file's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/WinMgr.ZC",
+      "compiled": true,
+      "output": "WARN /System/WinMgr.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/WinMgr.ZC:36:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/System/ZSplash.ZC",
+      "compiled": true,
+      "output": "catalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/HomeKeyPlugIns.ZC",
+      "compiled": false,
+      "output": "ERR:/HomeKeyPlugIns.ZC:129:17 Expected ':' after label candidate 'BootRAM'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/HomeLocalize.ZC",
+      "compiled": true,
+      "output": "catalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/HomeSys.ZC",
+      "compiled": true,
+      "output": "catalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/HomeWrappers.ZC",
+      "compiled": false,
+      "output": "WARN /HomeWrappers.ZC:4:13 AIWN ignore's #help_index's ignored by the C side\r\nERR:/HomeWrappers.ZC:10:14 Unknown symbol 'Find'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/MakeHome.ZC",
+      "compiled": false,
+      "output": "WARN /System/Boot/MakeBoot.ZC:8:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Utils/ZXERep.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Utils/CPURep.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Utils/Diff.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Utils/Find.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Utils/HeapLog.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Utils/HeapLog.ZC:2:12 AIWN ignore's #help_file's ignored by the C side\r\nWARN /System/Utils/LineRep.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Utils/LinkCheck.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Utils/MemRep.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nERR:/System/Utils/MemRep.ZC:86:72 Unknown symbol 'DriveUnused'.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Once.ZC",
+      "compiled": true,
+      "output": "catalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/StartOS.ZC",
+      "compiled": false,
+      "output": "WARN /StartOS.ZC:4:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:3:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:61:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:113:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:119:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:125:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:135:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:153:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:159:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:171:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:186:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:205:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:215:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:229:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:319:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:429:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:445:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:497:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:548:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:630:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:694:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:695:12 AIWN ignore's #help_file's ignored by the C side\r\nWARN /Kernel/KernelA.HH:722:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:749:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:785:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:801:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:920:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:974:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:1039:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:1552:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:1634:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:1651:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:1683:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:1706:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:1883:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:2105:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:2114:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:2181:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:2366:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:2381:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:2393:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:2636:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:2705:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:3024:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:3032:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:3235:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:3240:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:3257:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:3314:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:3452:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:3482:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:3489:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:3508:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:3545:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:3546:12 AIWN ignore's #help_file's ignored by the C side\r\nWARN /Kernel/KernelA.HH:3594:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:3612:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:3624:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:3649:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:3696:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:3722:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:3790:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:3842:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:3861:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:3881:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:3925:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:3948:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:3968:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:4141:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:4164:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:4179:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:4287:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:4307:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:4313:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:4437:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:4458:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:4460:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:4485:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:4496:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:4519:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:4534:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:4544:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:4554:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelA.HH:4568:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Compiler/CompilerA.HH:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Compiler/CompilerA.HH:407:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelB.HH:7:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Kernel/KernelB.HH:8:12 AIWN ignore's #help_file's ignored by the C side\r\nERR:IC_BSF:2:1 Expected an intrinsic name after _intern.\r\nzc: compile failed; current statement discarded\r\ncatalog_compile=0\r\nzc: executed\r\n> "
+    }
+  ],
+  "normal_loads": []
+}
