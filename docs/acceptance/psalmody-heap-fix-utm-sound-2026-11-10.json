@@ -1,0 +1,23 @@
+{
+  "date": "2026-11-10",
+  "repository_commit": "21ae0b8",
+  "upstream_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "source": "/Apps/Psalmody/Run.ZC",
+  "target": "UTM-bundled QEMU with HVF, virtio-ramfb, VirtIO keyboard/tablet, and WAV-backed VirtIO sound",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "f17ed84eac4984ac68981f84bf611f7de33a65621318c3e18e8cd71040178e35",
+  "kernel_sha256": "1e935ad0382daa66bb704f2d197052d4af78b408d1512aaf7c95ed4781945db6",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device -audiodev wav,id=sound0,path=build/psalmody-heap-fix-utm-final.wav -device virtio-sound-pci,audiodev=sound0' ZEAL_COMPAT_LOG_PATH=build/check-psalmody-heap-fix-utm-final.log python3 -u scripts/check-compat.py --pci --quick --probe-psalmody --probe-psalmody-audio-timer",
+  "log": "build/check-psalmody-heap-fix-utm-final.log",
+  "log_sha256": "4f9421e2ce9a14fe8d8906dad7df4c619c59d9b201bdfa27074debb32052161a",
+  "wav": "build/psalmody-heap-fix-utm-final.wav",
+  "wav_sha256": "4e83214067c68eee08db3375c48bbae6261a6376fc4acf8a6fa00e811f47ee04",
+  "result": "pass",
+  "verified": [
+    "The stock editor remained visible through redraw-aware scans, accepted recording and H-key C5 note entry, and entered playback.",
+    "WAV capture contains C5 in three consecutive 50 ms windows.",
+    "Shift+Escape exited playback; the graphical terminal evaluated 40+2 as 42 and zstatus reported failed=0.",
+    "The experimental audio timer delivered 10 IRQs."
+  ],
+  "limits": "Automated UTM-bundled QEMU and WAV evidence; it does not verify audible output in the live UTM application. The user previously reported hearing a Psalmody note and Oh Great through Pi 4B HDMI, but the exact Pi card image provenance was not verified."
+}

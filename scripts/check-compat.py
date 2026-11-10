@@ -13748,15 +13748,23 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 'psalmody-editor', 'Deletes Last Note', timeout=20)
 
             def psalmody_editor_step(name):
-                screen = graphical_screen(name)
-                text = screen[3]
-                if 'Except:' in text or 'except:' in text:
-                    raise RuntimeError(
-                        f'Psalmody raised an exception during {name}:\n{text}')
-                if 'Deletes Last Note' not in text:
-                    raise RuntimeError(
-                        f'Psalmody editor disappeared during {name}:\n{text}')
-                return screen
+                deadline = time.monotonic() + 5
+                while True:
+                    # A screen capture can land between the app's document
+                    # redraw and its frame callback. Check both scanline
+                    # alignments and require the same editor help to return.
+                    for offset in (1, 0):
+                        screen = graphical_screen(name, scanline_offset=offset)
+                        text = screen[3]
+                        if 'Except:' in text or 'except:' in text:
+                            raise RuntimeError(
+                                f'Psalmody raised an exception during {name}:\n{text}')
+                        if 'Deletes Last Note' in text:
+                            return screen
+                    if time.monotonic() >= deadline:
+                        raise RuntimeError(
+                            f'Psalmody editor disappeared during {name}:\n{text}')
+                    time.sleep(0.1)
 
             psalmody_editor_step('psalmody-after-launch')
             # Enable recording, then enter a C note with the upstream keyboard
