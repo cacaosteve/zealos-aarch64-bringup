@@ -1237,7 +1237,17 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     break
                 except (FileNotFoundError, ConnectionRefusedError):
                     if time.monotonic() >= deadline:
-                        raise RuntimeError('QEMU QMP socket did not become ready')
+                        status = guest.poll()
+                        detail = ''
+                        if status is not None:
+                            tail = guest.stdout.read()
+                            if tail:
+                                log.write(tail)
+                                log.flush()
+                                detail = '\nQEMU final output:\n' + tail[-4000:].decode(
+                                    errors='replace')
+                            detail = f' (process exited with status {status})' + detail
+                        raise RuntimeError('QEMU QMP socket did not become ready' + detail)
                     time.sleep(0.05)
             stream = sock.makefile('rwb')
             greeting = json.loads(stream.readline())

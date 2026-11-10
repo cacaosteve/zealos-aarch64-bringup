@@ -1,0 +1,19 @@
+{
+  "date": "2026-11-09",
+  "source_commit": "41a9db825464d89c35ad369d207dd1850fa3de9c",
+  "kernel_sha256": "f70227b29698dde541153b7f7c0985e08a0ecd5ae89b3ae6e1506eac7942a579",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "1ea68e3459f8f29be1f84f5eb05f60992796412661f9d2be797764e707e75abe",
+  "target": "UTM-bundled QEMU framework, headless probe runner, HVF, virtio-ramfb, 1 vCPU, 1 GiB RAM, VirtIO keyboard/tablet",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-3d-utm-qemu-probe-2026-11-09-rerun.log python3 -u scripts/check-compat.py --pci --quick --probe-3d-apps --probe-keepaway-full-game",
+  "scoped_3d_result": "pass",
+  "checks": {
+    "GrModels": "Man mesh generation reached the repeat prompt with raster output; Ball mesh generation produced an inline sprite with visible pixels; both returned to a working terminal.",
+    "KeepAway": "Court, HUD and players rendered; Space and mouse input were accepted; scanout changed at each 30-second sample throughout 185 seconds; Escape returned to a terminal where 40+2 returned 42; no Animate child remained.",
+    "Titanium": "Gameplay frame and input advanced; Escape returned to a terminal where 40+2 returned 42.",
+    "runtime_status": "The scoped 3D checks reported zstatus failed=0."
+  },
+  "scope_note": "This used UTM's bundled QEMU framework and virtio-ramfb in a separate headless probe, not the user's live UTM window. It narrows the reported KeepAway freeze to a live-UTM/configuration difference but does not resolve that report. The combined script continued into broad GUI checks after the 3D slice; its final process status was not captured.",
+  "log": "build/check-3d-utm-qemu-probe-2026-11-09-rerun.log",
+  "log_sha256": "330263bc04340c6b5d970335d3c45e9298a37250d034b96e46974ad74de5a2a5"
+}
