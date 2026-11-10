@@ -22,8 +22,8 @@
   "save_as_follow_up": {
     "date": "2026-11-09",
     "result": "pass for filename-form cancellation, editor continuity, and guest recovery",
-    "steps": "From the installed Wallpaper Desktop, open Palette Editor, change a color, enter Ctrl+A, then press Escape in the filename form.",
-    "observed": "The FileName form rendered. Escape canceled the form and the Palette Editor task remained valid. A second Escape closed the editor, and the terminal accepted the recovery expression (40+2=42). PESave now returns immediately on a canceled DocForm, so this path does not write a palette file. Successful save contents were not verified.",
+    "steps": "From the installed Wallpaper Desktop, open Palette Editor, change a color, enter Ctrl+A, then press Shift+Escape in the filename form.",
+    "observed": "The FileName form rendered. Shift+Escape canceled the form and the Palette Editor task remained valid. A second Escape closed the editor, and the terminal accepted the recovery expression (40+2=42). PESave now returns immediately on a canceled DocForm, so this path does not write a palette file. Successful save contents were not verified.",
     "target": "AArch64 native ZealC on PCI QEMU, disposable disk",
     "source_change": "The ARM64 Palette Editor overlay now deletes its temporary document and returns when DocForm is canceled. The source bundle includes the pinned portable StrFind and StrReplace implementations used by PESave. DoNothing's unresolved imported-call decoder searches the full supported load sequence."
   }
