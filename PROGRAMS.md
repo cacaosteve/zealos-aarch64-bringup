@@ -509,6 +509,10 @@ explicitly mounted read-only RedSea fixture; `DiskCheckAll`, repair behavior,
 and its configured-drive workflow remain unverified. JukePuppet media playback
 and other TOS workflows remain unverified
 ([acceptance](docs/acceptance/demo-tosmisc-current-qemu-2026-11-10.json)).
+On the exact current ISO (`f17ed84e…`), TOSMisc's helper checks and the
+`JukeSongsPuppet` call with a disposable one-song fixture returned cleanly to
+the terminal. The short WAV and QEMU backend warning do not prove the song
+played ([current-image check](docs/acceptance/demo-jukepuppet-exact-current-f17-2026-11-10.json)).
 The same heap-routing fix preserves the GrModels, KeepAway and Titanium QEMU
 app checks; the fresh regression log is recorded
 [here](docs/acceptance/three-d-apps-heap-fix-qemu-2026-11-10.json).
