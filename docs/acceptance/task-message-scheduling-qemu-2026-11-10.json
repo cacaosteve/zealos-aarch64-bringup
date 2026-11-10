@@ -1,0 +1,15 @@
+{
+  "date": "2026-11-10",
+  "target": "AArch64 PCI QEMU, cooperative host task bridge",
+  "iso_path": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "deca048d86257281089779d0b681bef8a6c6b9c0c32146c984881992d62ebd2e",
+  "kernel_sha256": "aa3da46af6580885cd5a813b2124fc2cc03b69c87b4e402ab4b54b3dfe082f97",
+  "fixture": "tests/compat/TaskMessages.ZC",
+  "fixture_sha256": "03c51938e3bcbbef89fd278c6161e983bab3bfb342dbe58494b57290d646c84b",
+  "command": "python3 -u scripts/check-compat.py --pci --quick --probe-source-fast --probe-source tests/compat/TaskMessages.ZC --probe-source-call TaskMessageSchedulingChecks",
+  "result": "pass: TaskMessageSchedulingChecks returned 0x2a after the compiler reset",
+  "evidence": "A task that only polls MessageScan, KeyScan, CharScan, and FlushMessages kept the CPU and the peer did not run. Explicit Yield and a blocked MessageGet did hand off to the next ready task. This confirms that message scanning itself does not switch tasks in the host task bridge.",
+  "runner_log": "build/check-compat-pci.log",
+  "runner_log_sha256": "79b44d5ad56ddb43e7b35a3b6e217aa2253cdc0374ca616196723a4e27c2af63",
+  "limitations": "This is a focused PCI QEMU regression for the cooperative host task bridge. It does not establish that pinned Kernel/Sched.ZC is active, that the guest uses the full ZealOS scheduler, or that the live UTM/Pi X-Caliber input behavior has changed."
+}
