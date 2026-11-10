@@ -8606,6 +8606,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                         print('DISKRAW COMPILE RESULT\n' + output, flush=True)
                         raise SystemExit(0)
                     if args.probe_raw_redsea_geometry:
+                        command('zload /System/BlkDev/DiskCheck.ZC',
+                                'zc: loaded /System/BlkDev/DiskCheck.ZC', timeout=45)
                         command('zload /Tests/RawRedSeaGeometry.ZC',
                                 'zc: loaded /Tests/RawRedSeaGeometry.ZC')
                         suffix = ('Present' if args.probe_raw_redsea_geometry in ('present', 'legacy')

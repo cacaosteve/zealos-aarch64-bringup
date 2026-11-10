@@ -11,13 +11,14 @@
     "TOSConfig initialized the expected CD/C drive definitions (tos-config=CD|C||).",
     "DC2Doc recognized an exact A bitmap with zero mismatch and saved adjacent AZ text with zero mismatch.",
     "DC2Doc returned zero bitmap mismatch for each of the 94 printable ASCII glyph bitmaps (0x21 through 0x7E), including the dollar glyph.",
-    "For the dollar glyph, DocSave produced leading bytes 36, 36, 10, 5, 0, confirming the literal dollar encoding and saved text prefix."
+    "For the dollar glyph, DocSave produced leading bytes 36, 36, 10, 5, 0, confirming the literal dollar encoding and saved text prefix.",
+    "Stock DiskCheck('D',FALSE,FALSE) returned zero on the disposable explicitly mounted read-only RedSea fixture; see the disk-check follow-up in redsea-guest-drive-qemu-2026-11-09.json."
   ],
   "not_verified": [
-    "Other TOSMisc routines, including ScreenCast/movie capture, JukePuppet media playback, memory allocation stress and disk checks, were not invoked.",
+    "Other TOSMisc routines, including ScreenCast/movie capture, JukePuppet media playback, memory allocation stress and the DiskCheckAll configured-drive workflow, were not invoked.",
     "Live UTM, Pi hardware and audio behavior."
   ],
   "log": "build/check-tosmisc-dollar-current.log",
   "log_sha256": "647e3a4eb800fcbcb18339aa42f2d6c5538d4ef2cf25377e3bdd4fbdeec8d6b4",
-  "scope_note": "Expanded non-destructive OCR helper coverage, including the saved DolDoc dollar encoding; TOSMisc remains partial because its other source routines are not yet runtime-tested."
+  "scope_note": "Expanded non-destructive OCR helper coverage, including saved DolDoc dollar encoding, plus a separate read-only DiskCheck check on the RedSea guest-drive fixture; TOSMisc remains partial because its other source routines and configured-drive workflow are not yet runtime-tested."
 }

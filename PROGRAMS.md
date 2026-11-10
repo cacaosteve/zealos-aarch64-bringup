@@ -483,8 +483,11 @@ counts, terminal recovery, and no failed tasks; CPU-1 requests map to CPU 0, so
 full Lock acceptance still requires SMP contention testing. Runtime evidence for
 `TOSDistro` covers safe loading only, not its destructive installer workflow.
 `TOSMisc` now verifies `DC2Doc` against all 94 printable ASCII glyphs and
-checks that saved dollar glyphs are encoded as literal DolDoc text; its capture,
-media playback, allocation stress and disk-check routines remain unverified
+checks that saved dollar glyphs are encoded as literal DolDoc text. The stock
+`DiskCheck('D',FALSE,FALSE)` path also returns zero on the disposable,
+explicitly mounted read-only RedSea fixture; `DiskCheckAll`, repair behavior,
+and its configured-drive workflow remain unverified. Capture, media playback,
+and allocation stress also remain unverified
 ([acceptance](docs/acceptance/demo-tosmisc-current-qemu-2026-11-10.json)).
 The TimeIns ARM64 adaptation now has a fresh three-sample QEMU runtime check
 with terminal recovery. The stock source still fails at `PassTrace`, so this

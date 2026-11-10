@@ -29,5 +29,15 @@
       "build/redsea-validation-diskraw.log": "24b877fdd4590d4855d78835ad32ba91c14877f119ca284e7ba99b08da478157"
     }
   },
-  "limits": "This is explicitly mounted and read-only, uses an ARM-specific VirtIO device type and does not set the current drive. It is not integrated with stock drive registries, file operations, locks, cache, hotplug, writes, DiskRaw's full UI or installer workflows. The existing boot source store is separate. Pi builds compile but have no native Pi raw-disk backend in this interface, and neither Pi nor live UTM has been tested."
+  "limits": "This is explicitly mounted and read-only, uses an ARM-specific VirtIO device type and does not set the current drive. It is not integrated with stock drive registries, file operations, locks, cache, hotplug, writes, DiskRaw's full UI or installer workflows. The existing boot source store is separate. Pi builds compile but have no native Pi raw-disk backend in this interface, and neither Pi nor live UTM has been tested.",
+  "disk_check_followup": {
+    "date": "2026-11-10",
+    "command": "ZEAL_COMPAT_LOG_PATH=build/check-redsea-diskcheck-current.log QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device' python3 -u scripts/check-compat.py --pci --probe-raw-redsea-geometry present",
+    "result": "pass: stock DiskCheck('D',FALSE,FALSE) returned zero on the explicit read-only RedSea fixture before the existing bounds, whole-device read and unmount checks",
+    "log": "build/check-redsea-diskcheck-current.log",
+    "log_sha256": "a58e561d8577e23b39d80a99c1fcbd0aedb637e94f81fba234ebe0e1aae7568a",
+    "limits": "Disposable PCI QEMU RedSea fixture only; this does not validate DiskCheckAll, repair behavior, or TOSMisc configured-drive workflow.",
+    "check_compat_sha256": "08db163366a232e783cee2995e885a1241b1fae8e2eeb15d47ec3b63e879b900",
+    "raw_redsea_test_sha256": "a478f314548525296d67da40f88be83b0f6c4553aa0c1622b52d66c0c9a6686d"
+  }
 }

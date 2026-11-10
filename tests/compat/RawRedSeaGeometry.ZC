@@ -1,5 +1,6 @@
 extern I64 ZcRawRedSeaGeometry(U64 *base, U64 *sectors);
 extern Bool ZcMountLegacyRedSeaReadOnly();
+extern I64 DiskCheck(U8 drv_let=0, Bool fix=FALSE, Bool confirm=TRUE);
 
 I64 RawRedSeaAbsentChecks()
 {
@@ -45,12 +46,19 @@ I64 RawRedSeaPresentChecks()
         Free(buf);
         return 4;
     }
+    // Exercise the stock checker against this disposable, explicitly mounted
+    // volume. Both repair and confirmation stay disabled, so the scan is read-only.
+    if (DiskCheck('D', FALSE, FALSE) != 0)
+    {
+        Free(buf);
+        return 5;
+    }
     try { BlkRead(drive, buf, base - 1, 1); }
     catch { caught = Fs->except_ch; Fs->catch_except = TRUE; }
     if (caught != 'Drive')
     {
         Free(buf);
-        return 5;
+        return 6;
     }
     // DiskRaw deliberately broadens its drive range to inspect sector 1.
     drive->drv_offset = 0;
@@ -59,11 +67,11 @@ I64 RawRedSeaPresentChecks()
         buf[2] != 'I' || buf[3] != ' ')
     {
         Free(buf);
-        return 6;
+        return 7;
     }
     Free(buf);
     Unmount('D');
     if (Letter2Drive('D', FALSE) || RedSeaValidate('D'))
-        return 7;
+        return 8;
     return 42;
 }
