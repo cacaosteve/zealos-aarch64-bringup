@@ -4837,27 +4837,26 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 require_graphical_text('3d-grmodels-ball-entry', 'Make a CSprite model',
                                        timeout=12)
                 ball_form = None
-                for attempt in range(3):
-                    move_graphical_pointer(53, 84)
+                # The GrModels chooser is a DolDoc menu in the left terminal;
+                # keyboard arrows go to the command prompt, so select the Ball
+                # link with the pointer and verify the form before continuing.
+                for y in (84, 88, 80, 92):
+                    move_graphical_pointer(54, y)
                     graphical_mouse_button('left', True)
                     time.sleep(0.15)
                     graphical_mouse_button('left', False)
                     try:
                         ball_form = require_graphical_text(
-                            '3d-grmodels-ball-form', 'Longitude Faces', timeout=3)
+                            '3d-grmodels-ball-form', 'Longitude Faces', timeout=2)
                         break
                     except RuntimeError:
-                        if attempt == 0:
-                            # If the mouse event only moved the DolDoc highlight,
-                            # Return activates the highlighted Ball link.
-                            qmp_send_key('ret')
-                        elif attempt == 1:
-                            # Retry the click after the document has repainted.
-                            time.sleep(0.5)
-                        else:
-                            raise
+                        screen = graphical_screen('3d-grmodels-ball-entry-retry')
+                        if 'Make a CSprite model' not in screen[3]:
+                            raise RuntimeError('GrModels chooser left its entry screen '
+                                               'without opening the Ball form:\n'+screen[3])
                 if ball_form is None:
-                    raise RuntimeError('GrModels Ball form did not open')
+                    raise RuntimeError('GrModels Ball form did not open after clicking '
+                                       'the Ball link')
                 if 'Radius' not in ball_form[3] or 'Lattitude Rings' not in ball_form[3]:
                     raise RuntimeError('GrModels Ball form is missing expected fields:\n'+
                                        ball_form[3])
