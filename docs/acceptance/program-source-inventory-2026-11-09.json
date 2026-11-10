@@ -38,9 +38,9 @@
       "compile_blocked": 0,
       "compile_unverified": 0,
       "runtime_pass": 197,
-      "runtime_partial": 7,
+      "runtime_partial": 8,
       "runtime_failed": 0,
-      "runtime_unverified": 2
+      "runtime_unverified": 1
     },
     "Doc": {
       "source_files": 1,
@@ -2296,8 +2296,8 @@
       "area": "Demo",
       "kind": "demo_source_or_component",
       "compile": "pass",
-      "runtime": "unverified",
-      "evidence": "docs/acceptance/demo-source-ledger-2026-11-09.json"
+      "runtime": "partial",
+      "evidence": "docs/acceptance/demo-lock-single-cpu-qemu-2026-11-09.json"
     },
     {
       "path": "/Demo/MultiCore/MPAdd.ZC",

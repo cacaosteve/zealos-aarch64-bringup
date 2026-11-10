@@ -1,0 +1,21 @@
+{
+  "date": "2026-11-09",
+  "command": "make check-demo-lock",
+  "target": "AArch64 PCI QEMU, one guest CPU, focused graphical terminal",
+  "result": "partial",
+  "source_path": "upstream/pinned/Demo/MultiCore/Lock.ZC",
+  "source_sha256": "6dd15bf9c17f7ea72699e2074d9a1ca20a72a3ebd4aa819827900ecb577308d2",
+  "kernel_sha256": "f70227b29698dde541153b7f7c0985e08a0ecd5ae89b3ae6e1506eac7942a579",
+  "iso_path": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "1ea68e3459f8f29be1f84f5eb05f60992796412661f9d2be797764e707e75abe",
+  "working_tree_changes_included": true,
+  "checks": [
+    "The stock Lock source ran its unlocked and locked increment loops in a focused graphical app task.",
+    "Both runs displayed Correct Count:2000000 Actual Count:2000000.",
+    "The app exited, focus returned to the graphical terminal, 40+2 evaluated as 42, and zstatus reported failed=0.",
+    "The guarded ARM64 source overlay maps CPU-1 worker requests to CPU 0 because the current guest bridge schedules only CPU 0. This validates the serial worker path and LOCK instruction execution, not inter-CPU contention or SMP lock correctness."
+  ],
+  "log": "build/check-demo-lock-pci.log",
+  "log_sha256": "d8bb00767ba5155449f85af13086084548641921e7286b86cf95f0a07893f7eb",
+  "scope_note": "Partial runtime acceptance only. Full Lock acceptance requires real SMP execution with workers on distinct CPUs; live UTM and physical Pi behavior are unverified."
+}

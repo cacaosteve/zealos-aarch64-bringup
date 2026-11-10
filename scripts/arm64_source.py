@@ -4547,3 +4547,18 @@ def translate_multicore_loadtest_jit(source: bytes) -> bytes:
         translated = translated.replace(old_cpu % job,
                                         b'Spawn(&Job%d,,, 0);' % job)
     return translated
+
+
+def translate_multicore_lock_single_cpu(source: bytes) -> bytes:
+    """Route the stock Lock jobs onto the bridge's only cooperative CPU.
+
+    This makes the demo runnable for single-CPU acceptance, but cannot create
+    concurrent read-modify-write contention. SMP correctness remains a separate
+    acceptance requirement.
+    """
+    unlocked = b'JobQueue(&MPUnlockedInc, NULL, 1, 0);'
+    locked = b'JobQueue(&MPLockedInc, NULL, 1, 0);'
+    if source.count(unlocked) != 1 or source.count(locked) != 1:
+        raise ValueError('pinned Lock job calls changed')
+    return source.replace(unlocked, unlocked.replace(b', 1,', b', 0,')).replace(
+        locked, locked.replace(b', 1,', b', 0,'))

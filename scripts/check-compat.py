@@ -386,6 +386,8 @@ p.add_argument('--probe-demo-mpadd', action='store_true',
                help='run the stock MultiCore MPAdd benchmark/chart and verify terminal recovery')
 p.add_argument('--probe-demo-loadtest', action='store_true',
                help='run the stock MultiCore LoadTest and verify key exit and terminal recovery')
+p.add_argument('--probe-demo-lock', action='store_true',
+               help='run the ARM64 single-CPU Lock demo and verify both counts and terminal recovery')
 p.add_argument('--probe-demo-multicore1', action='store_true',
                help='run the stock MultiCore template job demo and verify its total and recovery')
 p.add_argument('--probe-demo-weblog-report', action='store_true',
@@ -741,6 +743,7 @@ if (args.probe_stock_programs or args.probe_stock_interactive or args.probe_demo
         args.probe_demo_digits or args.probe_demo_elephant_walk or
         args.probe_doc_includes or args.probe_logic_program or args.probe_budget_program or
         args.probe_demo_tictactoe or args.probe_demo_chess or args.probe_demo_blackdiamond or args.probe_demo_circletrace or args.probe_demo_maze or args.probe_demo_char or args.probe_demo_the_dead or args.probe_demo_wenceslas or args.probe_demo_pick3d or args.probe_demo_box_hanoi or args.probe_demo_mandel or args.probe_demo_bounce_clock or args.probe_demo_and_not_mod or args.probe_demo_txt_gen or
+        args.probe_demo_lock or
         args.probe_demo_input_graphics or args.probe_demo_slider or
         args.probe_demo_stadium_gen or
         args.probe_demo_screencapture or
@@ -869,6 +872,7 @@ log_path = ROOT / 'build' / ('check-partial-callback-cleanup.log' if args.probe_
                              'check-demo-scrollbars-pci.log' if args.probe_demo_scrollbars else
                              'check-demo-multicore1-pci.log' if args.probe_demo_multicore1 else
                              'check-demo-loadtest-pci.log' if args.probe_demo_loadtest else
+                             'check-demo-lock-pci.log' if args.probe_demo_lock else
                              'check-demo-mpadd-pci.log' if args.probe_demo_mpadd else
                              'check-demo-bounce-clock-pci.log' if args.probe_demo_bounce_clock else
                              'check-demo-input-graphics-pci.log' if args.probe_demo_input_graphics else
@@ -3397,6 +3401,36 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             command('zstatus', 'failed=0')
             print('PASS stock MultiCore LoadTest key exit and terminal recovery',
                   flush=True)
+            raise SystemExit(0)
+        if args.probe_demo_lock:
+            # The ARM64 source bundle maps both nominal workers onto CPU 0.
+            # This checks the stock loops and lock code path, but deliberately
+            # cannot claim inter-CPU contention or SMP correctness.
+            command('zc AutoComplete(OFF);', 'zc: executed', timeout=20)
+            command('zc BootstrapGuiTerminalRunLightProgram('
+                    '"/Demo/MultiCore/Lock.ZC");', 'zc: executed')
+            # Both stock routines print the complete expected/actual pair on
+            # one line. A single scanout assertion avoids racing the short
+            # interval between the two runs and the app returning to the shell.
+            require_graphical_text(
+                'demo-lock-result',
+                'Correct Count:2000000 Actual Count:2000000', timeout=90)
+            deadline = time.monotonic() + 90
+            status = ''
+            while time.monotonic() < deadline:
+                status = command('zstatus', 'failed=0')
+                if not re.search(r'guest_task\[\d+\]: name=Lock\b', status):
+                    break
+                time.sleep(0.5)
+            if re.search(r'guest_task\[\d+\]: name=Lock\b', status):
+                raise RuntimeError('Lock app did not complete its worker loops')
+            focus_graphical_terminal()
+            run_graphical_terminal_command(
+                'demo-lock-terminal-recovery', '40+2;', 'ans=0x2A=42',
+                timeout=60)
+            command('zstatus', 'failed=0')
+            print('PASS ARM64 single-CPU Lock jobs and terminal recovery; '
+                  'SMP contention remains untested', flush=True)
             raise SystemExit(0)
         if args.probe_demo_weblog_report:
             # Use an isolated fixture on the disposable guest disk. WebLogRep

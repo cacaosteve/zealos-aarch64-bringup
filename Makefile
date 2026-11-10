@@ -839,6 +839,11 @@ check-demo-loadtest: check-upstream esp
 	python3 scripts/check-arm64-source.py
 	QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device -netdev user,id=net0 -device virtio-net-pci,netdev=net0,disable-legacy=on' python3 scripts/check-compat.py --pci --quick --probe-demo-loadtest
 
+.PHONY: check-demo-lock
+check-demo-lock: check-upstream esp
+	python3 scripts/check-arm64-source.py
+	QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device -netdev user,id=net0 -device virtio-net-pci,netdev=net0,disable-legacy=on' python3 scripts/check-compat.py --pci --quick --probe-demo-lock
+
 .PHONY: check-input-edges
 check-input-edges: esp
 	python3 scripts/check-compat.py --pci --probe-input-edges

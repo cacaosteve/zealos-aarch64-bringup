@@ -553,7 +553,8 @@ U0 BootstrapGuiTerminalRunLightProgram(U8 *filename)
         !StrCompare(filename, "/Demo/Games/Wenceslas.ZC") ||
         !StrCompare(filename, "/Demo/Games/Maze.ZC") ||
         !StrCompare(filename, "/Demo/Games/CharDemo.ZC") ||
-        !StrCompare(filename, "/Demo/MultiCore/LoadTest.ZC"))
+        !StrCompare(filename, "/Demo/MultiCore/LoadTest.ZC") ||
+        !StrCompare(filename, "/Demo/MultiCore/Lock.ZC"))
     {
         title = "X-Caliber";
         if (!StrCompare(filename, "/Apps/Titanium/Run.ZC"))
@@ -596,6 +597,8 @@ U0 BootstrapGuiTerminalRunLightProgram(U8 *filename)
             title = "CharDemo";
         else if (!StrCompare(filename, "/Demo/MultiCore/LoadTest.ZC"))
             title = "LoadTest";
+        else if (!StrCompare(filename, "/Demo/MultiCore/Lock.ZC"))
+            title = "Lock";
         app_task = Spawn(&BootstrapGuiTerminalGameTask, filename, title, -1,
                          bootstrap_gui_terminal_task);
         if (!TaskValidate(app_task))

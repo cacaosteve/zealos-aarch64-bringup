@@ -31,6 +31,7 @@ from arm64_source import (translate_mandel_single_cpu,
                           translate_multicore_interrupts_cooperative,
                           translate_multicore_radix_single_cpu,
                           translate_multicore_loadtest_jit,
+                          translate_multicore_lock_single_cpu,
                           translate_ring3_svc)
 from arm64_source import translate_tos_config_boot_memory
 from arm64_source import translate_elephant_walk_default_dc
@@ -323,6 +324,20 @@ except ValueError:
 else:
     raise AssertionError('LoadTest overlay accepted a changed AOT compile call')
 print('PASS guarded ARM64 LoadTest uses JIT and cooperative CPU-0 workers')
+lock_source = (root/'upstream/pinned/Demo/MultiCore/Lock.ZC').read_bytes()
+lock_overlay = translate_multicore_lock_single_cpu(lock_source)
+assert lock_overlay.count(b'JobQueue(&MPUnlockedInc, NULL, 0, 0);') == 2
+assert lock_overlay.count(b'JobQueue(&MPLockedInc, NULL, 0, 0);') == 2
+assert b'COUNT \t0x1000000' in lock_overlay
+try:
+    translate_multicore_lock_single_cpu(lock_source.replace(
+        b'JobQueue(&MPLockedInc, NULL, 1, 0);',
+        b'JobQueue(&MPLockedInc, NULL, 2, 0);', 1))
+except ValueError:
+    pass
+else:
+    raise AssertionError('Lock overlay accepted a changed job target')
+print('PASS guarded ARM64 Lock maps stock worker CPUs onto CPU 0')
 ring3_source = (root/'upstream/pinned/Demo/Lectures/Ring3.ZC').read_bytes()
 ring3_overlay = translate_ring3_svc(ring3_source)
 assert b'asm {' not in ring3_overlay
