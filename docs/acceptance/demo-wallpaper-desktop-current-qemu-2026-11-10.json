@@ -1,0 +1,23 @@
+{
+  "date": "2026-11-10",
+  "target": "AArch64 PCI QEMU, one vCPU, disposable disk, graphical terminal",
+  "source": "/Demo/Graphics/WallPapers/WallPaperDesktop.ZC",
+  "upstream_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "deca048d86257281089779d0b681bef8a6c6b9c0c32146c984881992d62ebd2e",
+  "command": "python3 -u scripts/check-compat.py --pci --quick --probe-demo-wallpaper-desktop",
+  "exit_code": 0,
+  "result": "partial",
+  "verified": [
+    "wallpaper installer copied its HomeSys, DesktopIcons, and WallPaper source files to the disposable guest disk",
+    "cold-booted desktop showed exactly one focused Home terminal at bounds 22,78,19,55, and the Home and Terminal icons opened prompt-ready shells that accepted commands returning 42",
+    "all six desktop controls were registered and their icon hit areas produced visible pixels",
+    "Stats hid and restored the rendered statistics; NetLog opened, displayed text, closed, and reopened",
+    "Palette opened, edited the active palette to RGB 18,52,86, exited, and retained the change in the live session",
+    "Telnet obtained a nonzero DHCP address, accepted host/port form input, connected to a local fixture, sent a character, closed the socket, and exited cleanly",
+    "terminal recovery checks returned 42 and zstatus reported failed=0"
+  ],
+  "log": "build/check-compat-pci.log",
+  "log_sha256": "ad2feb04130092ebd306a8acf93cdab1cc56dde1ec49a007253609a24761c0cd",
+  "limits": "Full Palette Editor workflows, arbitrary HomeSys customizations, and live UTM/Pi desktop interaction remain unverified. This probe establishes the tested installer and desktop workflows on QEMU, not exhaustive parity."
+}
