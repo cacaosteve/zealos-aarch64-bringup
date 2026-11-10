@@ -14,6 +14,16 @@
     "The graphical terminal accepted 40+2 after the demo returned, and zstatus reported failed=0."
   ],
   "log": "build/check-program-catalog-pci.log",
-  "log_sha256": "80a098ed7fff9d1750a3e72a5b1b5f168577ecdd8a893afdc961546d4f0a0a81",
+  "log_sha256": "9d87c807398b3dc9f897514b9ae8362aefc9cb678244386a9ccb1708378ba513",
+  "latest_recheck": {
+    "command": "python3 -u scripts/check-compat.py --pci --quick --probe-demo-time-ins",
+    "exit_code": 0,
+    "result": "pass on the current ISO",
+    "checks": [
+      "The adaptation emitted all three loop-overhead and expression-loop samples.",
+      "All three samples had positive timing values and final value 110126.8.",
+      "Terminal recovery returned 42 and zstatus reported failed=0."
+    ]
+  },
   "limits": "This accepts the ARM64 timing adaptation only. The pinned stock source uses compile-time PassTrace optimizer diagnostics, which the native compiler does not implement; the adaptation is not behaviorally equivalent to those optimizer traces. UTM and Pi timing behavior remain unverified."
 }
