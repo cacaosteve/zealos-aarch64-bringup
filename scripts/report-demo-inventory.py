@@ -307,7 +307,7 @@ RUNTIME_PARTIAL = {
     "/Demo/DebugDemo.ZC":
         "docs/acceptance/terminal-output-investigation-2026-11-09.json",
     "/Demo/Graphics/WallPapers/WallPaperDesktop.ZC":
-        "docs/acceptance/demo-wallpaper-desktop-qemu-2026-11-08.json",
+        "docs/acceptance/demo-wallpaper-palette-qemu-2026-11-09.json",
     "/Demo/AcctExample/TOS/TOSExtern.ZC":
         "docs/acceptance/demo-tos-extern-qemu-2026-11-08.json",
     "/Demo/AcctExample/TOS/TOSMisc.ZC":
