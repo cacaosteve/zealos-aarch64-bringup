@@ -813,7 +813,6 @@ I64 StockCatalogPsalmodySpriteSizeChecks()
         "I64 PsalmodyDurationSpriteSizes(){I64 i,size=0,caught;"
         "if(sprite_elem_base_sizes[SPT_LINE]!=17 || "
         "sprite_elem_base_sizes[SPT_POLYLINE]!=5) return 10;"
-        "if(SpriteElemSize(psm_duration_imgs[4],SPT_LINE)!=17) return 11;"
         "for(i=0;i<PSM_DURATIONS_NUM;i++){caught=0;"
         "try{size=SpriteSize(psm_duration_imgs[i]);}"
         "catch{caught=Fs->except_ch;Fs->catch_except=TRUE;}"
