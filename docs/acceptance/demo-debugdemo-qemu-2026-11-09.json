@@ -1,0 +1,20 @@
+{
+  "date": "2026-11-09",
+  "target": "AArch64 PCI QEMU using the UTM-bundled QEMU framework, one vCPU, VirtIO ramfb and keyboard",
+  "source_path": "upstream/pinned/Demo/DebugDemo.ZC",
+  "source_sha256": "e5d460ebe73709a1f3fae3b49f3b56016d7bb2a82c8a9997ea49dcf21f3c5c48",
+  "iso_path": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "133c712ca3e69a827029f9607d7def2f14a3aff88ddd4e1c6a5a968ea1632fd5",
+  "kernel_sha256": "f0e10e88f3c6a04817e910bf692892fe1bf1db2826f1c6af601574c492601225",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' python3 -u scripts/check-compat.py --pci --quick --probe-demo-debug-repeat",
+  "runner_log": "build/check-demo-debug-pci.log",
+  "runner_log_sha256": "0fe4056061f437bcb8f066c9fabafcdda4be81ed1d28cfea2e1c9915c0547abd",
+  "result": "pass",
+  "verified": [
+    "The original DebugDemo busy loop printed dots for more than five seconds in the graphical terminal on three consecutive runs.",
+    "Ctrl-Alt-C interrupted each run while keeping the graphical terminal alive; a fresh XTalk command ran after every interruption.",
+    "The serial-side recovery expression 40+2 returned 42 and zstatus reported failed=0 after each run.",
+    "Plain Ctrl-C stopped the graphical terminal as documented and returned control to the serial shell, which evaluated 40+2 as 42."
+  ],
+  "scope_note": "This accepts the original DebugDemo behavior on the UTM-bundled QEMU framework. It does not verify Ctrl-Alt-D entering the debugger, quantify terminal document growth, or establish live UTM-window or Pi hardware input behavior."
+}

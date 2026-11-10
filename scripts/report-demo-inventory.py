@@ -298,14 +298,14 @@ RUNTIME_ACCEPTED = {
         "docs/acceptance/demo-palindrome-qemu-2026-11-08.json",
     "/Demo/MultiCore/Primes.ZC":
         "docs/acceptance/demo-primes-single-cpu-qemu-2026-11-08.json",
+    "/Demo/DebugDemo.ZC":
+        "docs/acceptance/demo-debugdemo-qemu-2026-11-09.json",
 }
 RUNTIME_PARTIAL = {
     "/Demo/Disk/DiskRaw.ZC":
         "docs/acceptance/diskraw-readonly-qemu-2026-11-09.json",
     "/Demo/TimeIns.ZC":
         "docs/acceptance/demo-time-ins-stock-qemu-2026-11-09.json",
-    "/Demo/DebugDemo.ZC":
-        "docs/acceptance/terminal-output-investigation-2026-11-09.json",
     "/Demo/Graphics/WallPapers/WallPaperDesktop.ZC":
         "docs/acceptance/demo-wallpaper-palette-qemu-2026-11-09.json",
     "/Demo/AcctExample/TOS/TOSExtern.ZC":
