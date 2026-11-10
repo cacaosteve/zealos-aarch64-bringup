@@ -1,0 +1,30 @@
+{
+  "date": "2026-11-10",
+  "upstream_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "deca048d86257281089779d0b681bef8a6c6b9c0c32146c984881992d62ebd2e",
+  "qemu_probe": {
+    "command": "python3 -u scripts/check-compat.py --pci --quick --probe-logic-program",
+    "log": "build/check-logic-pci.log",
+    "log_sha256": "7aaac83dc9d5a8b7e8537aa7da3aefdab46d6b9221e2ff81b2d56a216cf8bfa6",
+    "exit_code": 0,
+    "result": "pass"
+  },
+  "verified": [
+    "all ten original gate sprites render",
+    "AND and OR truth-table circuits render",
+    "Backspace and forward Delete edit prompt input visibly",
+    "setup aborts and Shift+Escape return to the terminal",
+    "terminal geometry and drawing state restore after exit",
+    "40+2 returns 42 and zstatus reports failed=0 after app exits"
+  ],
+  "known_limitations": [
+    {
+      "case": "A single apostrophe entered as an output-table value",
+      "result": "PCI QEMU exploratory run produced a lexer literal-capacity error followed by runtime failure 'yield during job dispatch is unsupported' while the app was running through TaskExe; this invalid-input path is not accepted.",
+      "scope": "The normal AND/OR paths, editing keys, setup aborts and Shift+Escape pass. The second malformed-value case was not tested after the first caused runtime failure. This finding is specific to the task-launched QEMU path and has not been reproduced in live UTM."
+    }
+  ],
+  "live_utm": "The user confirmed the repaired prompt/editing path and AND circuit on 2026-10-26 using an earlier ISO (SHA-256 9c5e90c9...). This record's newer ISO has QEMU acceptance only; it has not been separately confirmed live in UTM.",
+  "pi_media": "not staged in this check"
+}

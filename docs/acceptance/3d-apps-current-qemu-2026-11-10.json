@@ -1,0 +1,21 @@
+{
+  "date": "2026-11-10",
+  "upstream_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "deca048d86257281089779d0b681bef8a6c6b9c0c32146c984881992d62ebd2e",
+  "qemu_probe": {
+    "command": "python3 -u scripts/check-compat.py --pci --quick --probe-3d-apps",
+    "log": "build/check-3d-apps-pci.log",
+    "log_sha256": "03ff45be6ca38713d8b6c563bb42f96b70f6499f36481791080ed56c1b306952",
+    "exit_code": null,
+    "result": "app-specific checks passed; the run was interrupted during a later generic terminal-focus check"
+  },
+  "verified": [
+    "GrModels Man and Ball setup forms, color selection, and generated mesh workflow",
+    "KeepAway renders its court, HUD, and players; mouse and Space input update the game; Escape restores the terminal",
+    "Titanium renders gameplay; Left and Right move the player; Space and Escape work",
+    "terminal input recovery after the app checks"
+  ],
+  "live_utm": "Titanium controls were confirmed by the user on a previous ISO. KeepAway previously froze in live UTM, so the current ISO still needs a live retest. GrModels visibility also needs confirmation in live UTM.",
+  "pi_media": "not staged in this check"
+}

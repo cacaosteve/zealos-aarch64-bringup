@@ -1,0 +1,21 @@
+{
+  "date": "2026-11-10",
+  "upstream_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "deca048d86257281089779d0b681bef8a6c6b9c0c32146c984881992d62ebd2e",
+  "qemu_probe": {
+    "command": "python3 -u scripts/check-compat.py --pci --quick --probe-timeclock",
+    "log": "build/check-timeclock-pci.log",
+    "log_sha256": "b33d60a3df9c3bf3c1273729dc47d6ae4fc04a6f8614bd877c79063f239b557d",
+    "exit_code": 0,
+    "result": "pass"
+  },
+  "verified": [
+    "launch original TimeClock app from the desktop",
+    "enter and save PunchIn and PunchOut descriptions",
+    "TimeRep displays both saved descriptions",
+    "40+2 returns 42 and zstatus reports failed=0 after exit"
+  ],
+  "live_utm": "Not tested on this ISO.",
+  "pi_media": "not staged in this check"
+}
