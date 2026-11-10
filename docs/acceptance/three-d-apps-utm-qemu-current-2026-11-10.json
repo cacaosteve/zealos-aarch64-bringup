@@ -1,0 +1,31 @@
+{
+  "date": "2026-11-10",
+  "target": "UTM-bundled QEMU framework, HVF, virtio-ramfb, 1 vCPU, 1 GiB RAM, VirtIO keyboard/tablet",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "deca048d86257281089779d0b681bef8a6c6b9c0c32146c984881992d62ebd2e",
+  "runs": [
+    {
+      "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-3d-utm-qemu-probe-current-nov10.log python3 -u scripts/check-compat.py --pci --quick --probe-3d-apps --probe-keepaway-full-game",
+      "exit_code": 0,
+      "log": "build/check-3d-utm-qemu-probe-current-nov10.log",
+      "log_sha256": "e063a96e9819820e7bc0fb9a48bf7597f6e97f66ab85b9551085dc00072b5905",
+      "checks": [
+        "GrModels Man generated 112 vertices and 168 triangles; raster diagnostics recorded 2,886 pixel writes.",
+        "GrModels Ball generated 58 vertices and 128 triangles; 489 purple inline-sprite pixels were visible.",
+        "KeepAway court/HUD/player rendered, mouse and Space input were accepted, scanout changed through 184 seconds with no idle gap, and Escape returned to a working terminal with no Animate child task and zstatus failed=0."
+      ]
+    },
+    {
+      "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-3d-utm-qemu-probe-current-nov10-quick.log python3 -u scripts/check-compat.py --pci --quick --probe-3d-apps",
+      "exit_code": 0,
+      "log": "build/check-3d-utm-qemu-probe-current-nov10-quick.log",
+      "log_sha256": "aa732bb058b6b5609bda2713275775416a01f7aff6349231cb80f21ccb8da66f",
+      "checks": [
+        "GrModels Man and Ball generation and rendering passed.",
+        "KeepAway gameplay and Escape recovery passed.",
+        "Titanium gameplay frame, input, Space, Escape, and terminal recovery passed."
+      ]
+    }
+  ],
+  "limits": "This is a headless run with UTM's bundled QEMU framework and display/input models, not a test in the visible UTM application window. It confirms this current ISO survives the previously reported KeepAway interval in that accelerated setup, but the live-window freeze report and physical Pi behavior remain open. Audio output was not tested."
+}

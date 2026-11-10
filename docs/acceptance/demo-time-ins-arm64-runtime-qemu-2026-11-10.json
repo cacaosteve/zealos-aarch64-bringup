@@ -1,0 +1,19 @@
+{
+  "date": "2026-11-10",
+  "target": "AArch64 PCI QEMU, one vCPU, graphical terminal",
+  "source": "upstream/bootstrap/Demo/TimeIns.ZC",
+  "source_sha256": "748086d1b90d4a8477f211cc815fa477719e1e0936b2e7a0a8e9c2bbc7efa275",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "deca048d86257281089779d0b681bef8a6c6b9c0c32146c984881992d62ebd2e",
+  "command": "python3 -u scripts/check-compat.py --pci --quick --probe-demo-time-ins",
+  "exit_code": 0,
+  "result": "pass for the ARM64-portable timing adaptation",
+  "checks": [
+    "All three loop-overhead and expression-loop samples were positive.",
+    "All three runs produced the expected final value 110126.8.",
+    "The graphical terminal accepted 40+2 after the demo returned, and zstatus reported failed=0."
+  ],
+  "log": "build/check-program-catalog-pci.log",
+  "log_sha256": "80a098ed7fff9d1750a3e72a5b1b5f168577ecdd8a893afdc961546d4f0a0a81",
+  "limits": "This accepts the ARM64 timing adaptation only. The pinned stock source uses compile-time PassTrace optimizer diagnostics, which the native compiler does not implement; the adaptation is not behaviorally equivalent to those optimizer traces. UTM and Pi timing behavior remain unverified."
+}
