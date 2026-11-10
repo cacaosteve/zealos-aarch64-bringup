@@ -1,0 +1,44 @@
+{
+  "date": "2026-11-10",
+  "repository_commit": "80fbd5ebce31f576c0f0dc46ccbb106c007e8f33",
+  "upstream_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "target": "UTM-bundled QEMU framework, HVF, virtio-ramfb, 1 vCPU, 1 GiB RAM, VirtIO keyboard/tablet",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "f17ed84eac4984ac68981f84bf611f7de33a65621318c3e18e8cd71040178e35",
+  "kernel_sha256": "1e935ad0382daa66bb704f2d197052d4af78b408d1512aaf7c95ed4781945db6",
+  "runs": [
+    {
+      "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-3d-exact-current-f17.log python3 -u scripts/check-compat.py --pci --quick --probe-3d-apps --probe-keepaway-full-game",
+      "exit_code": 0,
+      "log": "build/check-3d-exact-current-f17.log",
+      "log_sha256": "4561c51ce7480555adee82e25ffb8859b1010af4103c5a3f14e05b8696c615b1",
+      "checks": [
+        "3D mesh/interpolation, service and height-format fixtures passed; all three named 3D app entrypoints compiled.",
+        "KeepAway gameplay input and HUD refresh passed; scanout continued changing throughout a 184-second observation, Escape returned to a working terminal, zstatus reported failed=0, and no Animate child task remained."
+      ]
+    },
+    {
+      "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-3d-interactive-exact-current-f17.log python3 -u scripts/check-compat.py --pci --quick --probe-3d-apps",
+      "exit_code": 0,
+      "log": "build/check-3d-interactive-exact-current-f17.log",
+      "log_sha256": "a69effe996b50a73999dbe06251b4db2d010fa7265a0e6bd55bce0adda05b64b",
+      "checks": [
+        "GrModels Man generated a 112-vertex, 168-triangle mesh and completed terminal recovery; raster diagnostic observed 4,182 pixel writes.",
+        "GrModels Ball generated a 58-vertex, 128-triangle mesh, rendered its inline sprite, and completed terminal recovery.",
+        "KeepAway rendered gameplay, accepted Space/mouse input, refreshed its HUD, and returned via Escape to a working terminal.",
+        "Titanium rendered gameplay, accepted input, exited with Escape, and returned to a working terminal."
+      ]
+    },
+    {
+      "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-titanium-arrows-exact-current-f17.log python3 -u scripts/check-compat.py --pci --quick --probe-titanium-only",
+      "exit_code": 0,
+      "log": "build/check-titanium-arrows-exact-current-f17.log",
+      "log_sha256": "df383115d0056d94c33683953585aae71b93d50dc6d87f9e322db00fdd7cbdb1",
+      "checks": [
+        "Titanium key-start prompt advanced into gameplay; the exact current image accepted ordinary Left and Right keys and moved the player in the corresponding directions.",
+        "Escape returned to the graphical terminal, 40+2 returned 42, and zstatus reported failed=0."
+      ]
+    }
+  ],
+  "scope_note": "These checks use UTM's bundled QEMU framework with emulated devices, not the visible UTM app window. They validate the exact current ISO in this profile. The previously reported visible-window KeepAway freeze and physical Pi behavior remain separate acceptance items; audio was not exercised."
+}
