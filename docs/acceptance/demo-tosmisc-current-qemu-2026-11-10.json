@@ -15,10 +15,21 @@
     "Stock DiskCheck('D',FALSE,FALSE) returned zero on the disposable explicitly mounted read-only RedSea fixture; see the disk-check follow-up in redsea-guest-drive-qemu-2026-11-09.json."
   ],
   "not_verified": [
-    "Other TOSMisc routines, including ScreenCast/movie capture, JukePuppet media playback, memory allocation stress and the DiskCheckAll configured-drive workflow, were not invoked.",
-    "Live UTM, Pi hardware and audio behavior."
+    "ScreenCast/movie capture, JukePuppet media playback, memory allocation stress and the DiskCheckAll configured-drive workflow were not invoked.",
+    "Live UTM, Pi hardware and audio capture/playback behavior."
   ],
   "log": "build/check-tosmisc-dollar-current.log",
   "log_sha256": "647e3a4eb800fcbcb18339aa42f2d6c5538d4ef2cf25377e3bdd4fbdeec8d6b4",
-  "scope_note": "Expanded non-destructive OCR helper coverage, including saved DolDoc dollar encoding, plus a separate read-only DiskCheck check on the RedSea guest-drive fixture; TOSMisc remains partial because its other source routines and configured-drive workflow are not yet runtime-tested."
+  "audio_followup": {
+    "command": "ZEAL_COMPAT_LOG_PATH=build/check-tosmisc-audio-current.log QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device' python3 -u scripts/check-compat.py --pci --quick --probe-demo-system-context --demo-system-path /Demo/AcctExample/TOS/TOSMisc.ZC --demo-system-module /Demo/AcctExample/TOS/TOSConfig.ZC --demo-system-module /System/Gr/ScreenCast.ZC --demo-system-module /Apps/Psalmody/JukePuppet.ZC --demo-system-module /System/BlkDev/DiskCheck.ZC --demo-system-module /Demo/AcctExample/TOS/TOSMisc.ZC",
+    "result": "pass",
+    "verified": [
+      "SoundShift removes a sound event after its shifted time falls before its predecessor and preserves the later event.",
+      "AUWrite writes an 18-byte AU file containing the sentinel and retained sound event; FileRead reopens it and verifies a nonzero timestamp and the event's ona value."
+    ],
+    "log": "build/check-tosmisc-audio-current.log",
+    "log_sha256": "ae7810245a1049f394af551d3228cd8c77a3cc45691fa103af6aed37bb5cdb18",
+    "check_compat_sha256": "f8eafbdc721eff8564c17edc989c0525a5ae55512d62cc076a0deb19103305fd"
+  },
+  "scope_note": "Expanded non-destructive OCR helper coverage, including saved DolDoc dollar encoding, plus a separate read-only DiskCheck check on the RedSea guest-drive fixture and a SoundShift/AUWrite AU-file round trip. TOSMisc remains partial because capture, media playback, allocation stress and the configured-drive DiskCheckAll workflow are not yet runtime-tested."
 }

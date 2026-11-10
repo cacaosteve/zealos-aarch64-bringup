@@ -2520,6 +2520,47 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     'passed': True,
                     'output': output,
                 })
+                output = command(
+                    'zc CSoundData *head=&screencast.sound_head;'
+                    'CSoundData *expired=CAlloc(sizeof(CSoundData));'
+                    'CSoundData *kept=CAlloc(sizeof(CSoundData));'
+                    'QueueInit(head);QueueInsert(expired,head);'
+                    'QueueInsert(kept,expired);expired->tS=0.1;expired->ona=44;'
+                    'kept->tS=0.3;kept->ona=55;SoundShift(head,0.15);'
+                    'Print("tosmisc-au-shift=%d\\n",'
+                    'QueueCount(head)==1 && head->next==kept);',
+                    'tosmisc-au-shift=1', timeout=30)
+                if 'tosmisc-au-shift=1' not in output:
+                    raise RuntimeError(
+                        'TOSMisc SoundShift did not drop the expired event:\n'
+                        + output)
+                output = command(
+                    'zc CDate now=12345;I64 written;'
+                    'written=AUWrite("/Tests/TOSMiscAudio.AU",head,&now,0.0);'
+                    'Print("tosmisc-au-write=%d\\n",written);',
+                    'tosmisc-au-write=18', timeout=30)
+                if 'tosmisc-au-write=18' not in output:
+                    raise RuntimeError(
+                        'TOSMisc AUWrite did not write sentinel and event records:\n'
+                        + output)
+                output = command(
+                    'zc I64 saved_size=0;U8 *saved;'
+                    'saved=FileRead("/Tests/TOSMiscAudio.AU",&saved_size);'
+                    'Print("tosmisc-au-read=%d|%d|%d\\n",saved_size,'
+                    'saved && saved[9]!=0,'
+                    'saved && saved[17]==55);'
+                    'Free(saved);Del("/Tests/TOSMiscAudio.AU");'
+                    'Free(kept);QueueInit(head);',
+                    'tosmisc-au-read=18|1|1', timeout=30)
+                if 'tosmisc-au-read=18|1|1' not in output:
+                    raise RuntimeError(
+                        'TOSMisc AUWrite records did not round-trip through FileRead:\n'
+                        + output)
+                runtime_checks.append({
+                    'name': 'TOSMisc SoundShift removes an expired event and AUWrite saves two valid records that FileRead reopens',
+                    'passed': True,
+                    'output': output,
+                })
             if (all(m['loaded'] for m in module_loads) and
                     '/Demo/Templates/Lex1.ZC' in args.demo_system_module):
                 output = command(
