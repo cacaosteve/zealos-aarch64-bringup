@@ -9568,6 +9568,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                             '/Demo/AcctExample/TOS/MakeTOS.ZC',
                             '/Demo/AcctExample/TOS/TOSDistro.ZC',
                         } else
+                        f'StockCatalogCompile("{path}")'
+                        if path == '/Demo/DolDoc/DefineStr.ZC' else
                         'StockCatalogCompileTreeCheckers()'
                         if path == '/Demo/Games/TreeCheckers.ZC' else
                         f'StockCatalogCompileWithProgramModulesAfterLoad("/Demo/AcctExample/TOS/TOSMisc.ZC","{path}")'
