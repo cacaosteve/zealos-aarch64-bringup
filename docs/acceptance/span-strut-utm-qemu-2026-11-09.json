@@ -1,0 +1,17 @@
+{
+  "date": "2026-11-09",
+  "result": "pass",
+  "target": "UTM bundled QEMU profile, AArch64 PCI, virtio-ramfb, disposable disk",
+  "working_tree_changes_included": true,
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "1ea68e3459f8f29be1f84f5eb05f60992796412661f9d2be797764e707e75abe",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-span-strut-utm-qemu-2026-11-09.log python3 -u scripts/check-compat.py --pci --quick --probe-span-strut",
+  "checks": [
+    "Span launched, displayed its instructions and graphical bridge view, then Shift+Escape returned to the terminal.",
+    "Strut launched, accepted edit/play interaction and displayed graphics; Escape returned to the terminal.",
+    "The terminal evaluated 40+2; as 42 and zstatus reported failed=0."
+  ],
+  "log": "build/check-span-strut-utm-qemu-2026-11-09.log",
+  "log_sha256": "22735e17c8eca3f74cc9b901f9285d55cddce86fbf883181213fa71ae6e28893",
+  "scope_note": "This is a headless run using UTM's bundled QEMU profile, not visible UTM app-window or Pi hardware acceptance. Complete bridge construction, physics coverage and persistence in this profile remain unverified."
+}
