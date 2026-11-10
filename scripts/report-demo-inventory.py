@@ -321,7 +321,7 @@ RUNTIME_PARTIAL = {
     "/Demo/MultiCore/MPRadix.ZC":
         "docs/acceptance/demo-mpradix-current-qemu-2026-11-10.json",
     "/Demo/MultiCore/Lock.ZC":
-        "docs/acceptance/demo-lock-single-cpu-qemu-2026-11-09.json",
+        "docs/acceptance/demo-lock-single-cpu-current-qemu-2026-11-10.json",
 }
 RUNTIME_FAILED = {}
 

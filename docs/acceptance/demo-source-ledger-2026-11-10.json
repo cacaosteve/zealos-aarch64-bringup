@@ -169,7 +169,7 @@
     "docs/acceptance/demo-zing-qemu-2026-11-04.json",
     "docs/acceptance/demo-zoneout-qemu-2026-11-03.json",
     "docs/acceptance/diskraw-readonly-qemu-2026-11-09.json",
-    "docs/acceptance/demo-lock-single-cpu-qemu-2026-11-09.json",
+    "docs/acceptance/demo-lock-single-cpu-current-qemu-2026-11-10.json",
     "docs/acceptance/demo-mpradix-current-qemu-2026-11-10.json",
     "docs/acceptance/demo-time-ins-stock-qemu-2026-11-09.json",
     "docs/acceptance/demo-tosdistro-safe-load-qemu-2026-11-09.json",
@@ -1903,7 +1903,7 @@
       "compile": "pass",
       "first_compile_error": null,
       "runtime": "partial",
-      "runtime_evidence": "docs/acceptance/demo-lock-single-cpu-qemu-2026-11-09.json"
+      "runtime_evidence": "docs/acceptance/demo-lock-single-cpu-current-qemu-2026-11-10.json"
     },
     {
       "path": "/Demo/MultiCore/MPAdd.ZC",

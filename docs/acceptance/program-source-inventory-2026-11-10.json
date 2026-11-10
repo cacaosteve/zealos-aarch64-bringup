@@ -2297,7 +2297,7 @@
       "kind": "demo_source_or_component",
       "compile": "pass",
       "runtime": "partial",
-      "evidence": "docs/acceptance/demo-lock-single-cpu-qemu-2026-11-09.json"
+      "evidence": "docs/acceptance/demo-lock-single-cpu-current-qemu-2026-11-10.json"
     },
     {
       "path": "/Demo/MultiCore/MPAdd.ZC",

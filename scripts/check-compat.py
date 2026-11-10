@@ -3491,28 +3491,27 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             # The ARM64 source bundle maps both nominal workers onto CPU 0.
             # This checks the stock loops and lock code path, but deliberately
             # cannot claim inter-CPU contention or SMP correctness.
-            command('zc AutoComplete(OFF);', 'zc: executed', timeout=20)
-            command('zc BootstrapGuiTerminalRunLightProgram('
-                    '"/Demo/MultiCore/Lock.ZC");', 'zc: executed')
-            # Both stock routines print the complete expected/actual pair on
-            # one line. A single scanout assertion avoids racing the short
-            # interval between the two runs and the app returning to the shell.
-            require_graphical_text(
-                'demo-lock-result',
-                'Correct Count:2000000 Actual Count:2000000', timeout=90)
-            deadline = time.monotonic() + 90
-            status = ''
-            while time.monotonic() < deadline:
-                status = command('zstatus', 'failed=0')
-                if not re.search(r'guest_task\[\d+\]: name=Lock\b', status):
-                    break
-                time.sleep(0.5)
-            if re.search(r'guest_task\[\d+\]: name=Lock\b', status):
-                raise RuntimeError('Lock app did not complete its worker loops')
             focus_graphical_terminal()
+            command('zc AutoComplete(OFF);', 'zc: executed', timeout=20)
+            # The boot-time AutoComplete guide can remain stacked over the
+            # desktop even after the terminal has keyboard focus. Close it
+            # before launching the short Lock demo, otherwise its output may
+            # be hidden and the scanout assertion will observe the guide.
+            qmp_send_key('esc')
+            time.sleep(0.3)
+            # Lock finishes too quickly to inspect its separate app window;
+            # run it in the visible terminal so both output rows persist on
+            # scanout for a meaningful user-facing acceptance check.
+            lock_result = run_graphical_terminal_command(
+                'demo-lock-result', 'ExeFile2("/Demo/MultiCore/Lock.ZC");',
+                'Correct Count:2000000 Actual Count:2000000', timeout=90)
+            if lock_result[3].count(
+                    'Correct Count:2000000 Actual Count:2000000') < 2:
+                raise RuntimeError('Lock did not visibly report both unlocked and '
+                    'locked results; see ' + graphical_path('demo-lock-result-result')
+                    + '\n' + lock_result[3])
             run_graphical_terminal_command(
-                'demo-lock-terminal-recovery', '40+2;', 'ans=0x2A=42',
-                timeout=60)
+                'demo-lock-terminal-recovery', '40+2;', 'ans=0x2A=42', timeout=60)
             command('zstatus', 'failed=0')
             print('PASS ARM64 single-CPU Lock jobs and terminal recovery; '
                   'SMP contention remains untested', flush=True)
