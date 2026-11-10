@@ -2920,8 +2920,9 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 time.sleep(0.5)
                 graphical_screen('wallpaper-desktop-palette-save-as')
                 qmp_send_key('esc')
-                time.sleep(0.5)
-                print('Palette Editor Save As cancel attempted', flush=True)
+                command('zc Print("wallpaper_palette_cancel_kept_editor=%d\\n",'
+                        'TaskValidate(wp_palette_task));',
+                        'wallpaper_palette_cancel_kept_editor=1')
                 qmp_send_key('esc')
                 command('zc Print("wallpaper_palette_kept=%d\\n",'
                         '!TaskValidate(wp_palette_task)&&gr_palette[0]!=wp_palette_before&&'

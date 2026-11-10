@@ -3719,6 +3719,9 @@ def extract_god_timer_pick(source: bytes) -> bytes:
 def translate_palette_editor(source: bytes) -> bytes:
     """Publish live edits and let SettingsPop restore the editor window."""
     edits = (
+        (b'\tif (prompt)\n\t\tDocForm(&doc->filename);',
+         b'\tif (prompt && !DocForm(&doc->filename))\n'
+         b'\t{\n\t\tDocDel(doc);\n\t\treturn;\n\t}'),
         (b'\t\t\t\t\tgr_palette[selected_color] = Str2I64(manual_value, 16);',
          b'\t\t\t\t\tgr_palette[selected_color] = Str2I64(manual_value, 16);\n'
          b'\t\t\t\t\tGrPaletteSet(gr_palette);'),
