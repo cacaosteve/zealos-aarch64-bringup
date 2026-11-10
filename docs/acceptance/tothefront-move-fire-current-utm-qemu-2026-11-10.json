@@ -1,0 +1,26 @@
+{
+  "date": "2026-11-10",
+  "program": "ToTheFront",
+  "target": "UTM-bundled QEMU framework, HVF, virtio-ramfb, 1 vCPU, 1 GiB RAM, NEC USB keyboard/tablet plus VirtIO keyboard/tablet",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "4bc484338001b2a4d460844c11f0ea397554dac9250c378885f8a8a7ff1be4ea",
+  "kernel_sha256": "c7cff83246dde72296135862518d65574ebc482171cc7286935153fa282d53d9",
+  "source_bundle_sha256": "83240f8e1b91b68294eb985a0ce609b59fe12e1c4e62655c24b9b57a054276a1",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_TEST_DISK=build/tothefront-current-instrumented.img ZEAL_COMPAT_LOG_PATH=build/check-tothefront-current-move-fire-usb-2026-11-10.log python3 -u scripts/check-compat.py --pci --quick --usb-input nec --usb-with-virtio --probe-tothefront-fire-diag",
+  "exit_code": 0,
+  "result": "pass",
+  "base_disk_sha256": "fa19e2df4f9c6f020fd1aef39dcf413b639acac5278d0cd79ed1df60429a6f4c",
+  "instrumented_fixture_sha256": "5961bd21da170995c68d6665c73a0972a3177824dc3df42ea17e60100d3319d6",
+  "log": "build/check-tothefront-current-move-fire-usb-2026-11-10.log",
+  "log_sha256": "5eba99b2f7781063d7e9db028340989f11caa6719cd43bfd1c88222b48c88d0b",
+  "verified": [
+    "Launched ToTheFront, selected Human for both players, generated a map, dismissed help, selected Artillery, plotted an adjacent order, and advanced phases.",
+    "The disposable Human.ZC fixture reported one legal infantry move; the real graphical drag moved unit 0 from cell (40,4) to (38,4).",
+    "The disposable fixture placed a live opponent in an adjacent cell and reported both player 0 and player 1 completing the actual direct-fire input path.",
+    "Escape returned to the terminal, 40+2 returned 42, and zstatus reported failed=0."
+  ],
+  "limitations": [
+    "Movement and direct fire used a disposable, instrumented Human.ZC fixture that chooses/reports legal targets; this does not establish natural full-match or AI behavior.",
+    "This headless QEMU run uses UTM's bundled framework; it is not a visible UTM app or Pi hardware test."
+  ]
+}
