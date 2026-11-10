@@ -1,0 +1,38 @@
+{
+  "date": "2026-11-10",
+  "target": "AArch64 native ZealC on PCI QEMU",
+  "repository_commit": "11068ac96c50b761aec16a6a9a3f3f4695d0722e",
+  "upstream_source_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "source": "/Demo/AcctExample/TOS/TOSDistro.ZC",
+  "source_sha256": "4ffbd1877c58bdd11aeb8de69785a35fa7065f3ff25cf97db86bc2e49c2de94e",
+  "boot_iso": "build/zealos-aarch64-hello.iso",
+  "boot_iso_sha256": "4bc484338001b2a4d460844c11f0ea397554dac9250c378885f8a8a7ff1be4ea",
+  "kernel_sha256": "c7cff83246dde72296135862518d65574ebc482171cc7286935153fa282d53d9",
+  "command": "python3 scripts/check-compat.py --pci --quick --probe-demo-makehome",
+  "result": "pass for non-destructive module initialization; full distribution regeneration remains unverified",
+  "checks": [
+    {
+      "step": "load MakeHome.ZC and MakeTOS.ZC",
+      "result": "pass",
+      "evidence": "Both modules loaded in the guest namespace."
+    },
+    {
+      "step": "TOS_HDS setup",
+      "result": "pass",
+      "evidence": "TOS_HDS resolved to the expected CD configuration."
+    },
+    {
+      "step": "ExeFile2(\"/Demo/AcctExample/TOS/TOSDistro.ZC\");",
+      "result": "pass",
+      "evidence": "Top-level initialization, including UpdateISODocDefines, returned with zc: executed."
+    },
+    {
+      "step": "terminal recovery",
+      "result": "pass",
+      "evidence": "The graphical terminal accepted 40+2 and returned 42; zstatus reported failed=0."
+    }
+  ],
+  "scope_note": "The probe did not call TOSRegen, TOSRegen2, DistroPrep, Format, TOSBootHDIns, or drive-copy routines. Those paths can erase or reformat volumes and require explicit disposable source and scratch drives. This result is QEMU automation, not a live UTM or Pi check.",
+  "log": "build/check-program-catalog-pci.log",
+  "log_sha256": "fef5fecadf765355d8f8ba62c7d1424c872a72b3b992b133bd8d9fc1b5cc188b"
+}

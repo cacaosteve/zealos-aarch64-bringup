@@ -482,8 +482,10 @@ acceptance. `DebugDemo` is accepted for its QEMU busy-loop interruption and
 graphical terminal recovery, while debugger and live hardware checks remain
 open. `Lock` passes the single-CPU worker path with matching expected and actual
 counts, terminal recovery, and no failed tasks; CPU-1 requests map to CPU 0, so
-full Lock acceptance still requires SMP contention testing. Runtime evidence for
-`TOSDistro` covers safe loading only, not its destructive installer workflow.
+full Lock acceptance still requires SMP contention testing. The current ISO
+revalidates `TOSDistro` module initialization and terminal recovery in QEMU;
+this excludes its destructive installer and distribution-regeneration workflow
+([acceptance](docs/acceptance/demo-tosdistro-safe-load-current-qemu-2026-11-10.json)).
 `TOSMisc` now verifies `DC2Doc` against all 94 printable ASCII glyphs and
 checks that saved dollar glyphs are encoded as literal DolDoc text. Its
 `SoundShift` queue cleanup and `AUWrite`/`FileRead` AU-record round trip also
