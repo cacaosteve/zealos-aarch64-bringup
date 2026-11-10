@@ -38,7 +38,7 @@ round-trip; live UTM and Pi behavior remain separate checks. See
 The read-only `DiskRaw` workflow is now counted as accepted for its tested
 VirtIO fixture; general block-device registration, writes, filesystem mounts,
 hotplug, Pi storage and live-target behavior remain separate storage gaps.
-See the [per-source ledger](docs/acceptance/demo-source-ledger-2026-11-09.json).
+See the [per-source ledger](docs/acceptance/demo-source-ledger-2026-11-10.json).
 
 ## Unchanged graphics programs
 
@@ -451,17 +451,17 @@ See [`virtio-sound-qemu-2026-11-04.json`](docs/acceptance/virtio-sound-qemu-2026
 results are in `build/demo-source-catalog.json`; see the detailed run record
 in [the program inventory](docs/PROGRAM-INVENTORY-2026-10-28.md). The
 source-level ledger at
-[`demo-source-ledger-2026-11-09.json`](docs/acceptance/demo-source-ledger-2026-11-09.json)
+[`demo-source-ledger-2026-11-10.json`](docs/acceptance/demo-source-ledger-2026-11-10.json)
 records the 206 Demo `.ZC` compile results. Its current totals are 206 compile
-passes, zero compile blockers, 199 runtime-accepted sources, seven partial
-runtime results, and zero recorded runtime failures. The seven partial sources
+passes, zero compile blockers, 200 runtime-accepted sources, six partial
+runtime results, and zero recorded runtime failures. The six partial sources
 are `/Demo/TimeIns.ZC`, the three TOS account examples
 (`/Demo/AcctExample/TOS/TOSDistro.ZC`, `TOSExtern.ZC`, and `TOSMisc.ZC`),
-`/Demo/Graphics/WallPapers/WallPaperDesktop.ZC`, and the two multicore examples
-`/Demo/MultiCore/Lock.ZC` and `MPRadix.ZC`. The current ISO revalidated the
-Wallpaper Desktop installer, cold-boot layout, six controls, palette editing,
-palette source save/list/reload, and Telnet client/local fixture workflow;
-arbitrary startup customizations and live UTM/Pi use remain open ([acceptance](docs/acceptance/demo-wallpaper-desktop-current-qemu-2026-11-10.json)).
+and the two multicore examples (`/Demo/MultiCore/Lock.ZC` and `MPRadix.ZC`).
+The current ISO revalidated the Wallpaper Desktop installer, cold-boot layout,
+six controls, palette editing, palette source save/list/reload, and Telnet
+client/local fixture workflow; arbitrary startup customizations and live
+UTM/Pi use remain open ([acceptance](docs/acceptance/demo-wallpaper-desktop-current-qemu-2026-11-10.json)).
 These are source-level counts, not a
 count of standalone programs; several entries are support modules or need
 feature-specific test setups. `DiskRaw` is accepted for its isolated read-only

@@ -13,7 +13,7 @@ import re
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 SOURCE_ROOT = ROOT / "upstream/pinned/Demo"
 CATALOG = ROOT / "build/demo-source-catalog.json"
-OUTPUT = ROOT / "docs/acceptance/demo-source-ledger-2026-11-09.json"
+OUTPUT = ROOT / "docs/acceptance/demo-source-ledger-2026-11-10.json"
 SUPPLEMENTAL_COMPILE = {
     "/Demo/AcctExample/MakeHome.ZC":
         "docs/acceptance/demo-makehome-arm64-compile-2026-11-03.json",

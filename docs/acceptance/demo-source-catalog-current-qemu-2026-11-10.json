@@ -17,5 +17,5 @@
   "catalog_sha256": "373aaf5507a7aedee54ae12b1c7cdb543888adeeaf8a35f0b08e651cc95ea762",
   "runner_log": "build/check-program-catalog-pci.log",
   "runner_log_sha256": "c5cfa59dc885c32b054219332fdac8910cce31205973fc9b85b3fd1fb7fe1936",
-  "scope_note": "This is a compile-only refresh. It does not change the existing count of 199 runtime-accepted Demo sources and seven partial runtime records, and it does not establish UTM or physical Pi behavior."
+  "scope_note": "This is a compile-only refresh. Runtime totals are tracked separately in demo-source-ledger-2026-11-10.json: 200 runtime-accepted Demo sources and six partial runtime records. It does not establish UTM or physical Pi behavior."
 }

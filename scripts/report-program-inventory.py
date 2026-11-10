@@ -12,7 +12,7 @@ import re
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 PINNED = ROOT / "upstream/pinned"
-DEMO_LEDGER = ROOT / "docs/acceptance/demo-source-ledger-2026-11-09.json"
+DEMO_LEDGER = ROOT / "docs/acceptance/demo-source-ledger-2026-11-10.json"
 PROGRAM_CATALOG = ROOT / "docs/acceptance/program-catalog-qemu-2026-11-03.json"
 SOURCE_CONTEXT_CATALOG = ROOT / "docs/acceptance/source-context-catalog-qemu-2026-11-02.json"
 NAMED_APPS = ROOT / "docs/acceptance/named-apps-qemu-2026-11-02.json"
@@ -32,7 +32,7 @@ MATH_VECTORS = ROOT / "docs/acceptance/math-vectors-matrix-qemu-2026-11-05.json"
 MATH_NDARRAY = ROOT / "docs/acceptance/math-ndarray-qemu-2026-11-05.json"
 MATH_TESTS = ROOT / "docs/acceptance/math-test-compile-qemu-2026-11-05.json"
 TARGETED_SYSTEM = ROOT / "docs/acceptance/targeted-system-compile-qemu-2026-11-05.json"
-OUTPUT = ROOT / "docs/acceptance/program-source-inventory-2026-11-09.json"
+OUTPUT = ROOT / "docs/acceptance/program-source-inventory-2026-11-10.json"
 
 
 def read(path):
@@ -326,7 +326,7 @@ def main():
             "runtime_unverified": sum(r["runtime"] == "unverified" for r in subset),
         }
     report = {
-        "date": "2026-11-09",
+        "date": "2026-11-10",
         "upstream_commit": read(PINNED / "UPSTREAM.json")["commit"],
         "scope": "All pinned upstream .ZC files; includes runnable entries and non-runnable support modules.",
         "classification_note": "A .ZC source is not necessarily a standalone program. Apps are grouped by Run.ZC/Load.ZC entry points; Demo files remain source-or-component until individually classified.",
