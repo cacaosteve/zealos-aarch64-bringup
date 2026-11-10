@@ -58,6 +58,8 @@ RUNTIME_ACCEPTED = {
         "docs/acceptance/demo-multicore1-qemu-2026-11-08.json",
     "/Demo/Graphics/WallPapers/WallPaperCtrl.ZC":
         "docs/acceptance/demo-wallpaper-ctrl-qemu-2026-11-08.json",
+    "/Demo/Graphics/WallPapers/WallPaperDesktop.ZC":
+        "docs/acceptance/demo-wallpaper-desktop-current-qemu-2026-11-10.json",
     "/Demo/Graphics/WallPapers/WallPaperDesktop/Install.ZC":
         "docs/acceptance/demo-wallpaper-install-qemu-2026-11-08.json",
     "/Demo/Graphics/WallPapers/WallPaperStars.ZC":
@@ -310,8 +312,6 @@ RUNTIME_ACCEPTED = {
 RUNTIME_PARTIAL = {
     "/Demo/TimeIns.ZC":
         "docs/acceptance/demo-time-ins-stock-qemu-2026-11-09.json",
-    "/Demo/Graphics/WallPapers/WallPaperDesktop.ZC":
-        "docs/acceptance/demo-wallpaper-palette-qemu-2026-11-09.json",
     "/Demo/AcctExample/TOS/TOSExtern.ZC":
         "docs/acceptance/demo-tos-extern-qemu-2026-11-08.json",
     "/Demo/AcctExample/TOS/TOSMisc.ZC":

@@ -24,13 +24,17 @@ feature parity. Per-source output is recorded in
 [`program-catalog-full-qemu-2026-11-10.json`](docs/acceptance/program-catalog-full-qemu-2026-11-10.json).
 
 The dependency-aware Demo inventory is separate from that 290-source sample:
-all 206 pinned Demo `.ZC` files compile, and 199 have explicit QEMU runtime
-acceptance; seven remain partial. Those are `TimeIns`, `WallPaperDesktop`,
-three TOS account examples, `MultiCore/Lock`, and `MultiCore/MPRadix`. The
-multicore examples are partial because the current guest runtime exposes one
-CPU; the stock `TimeIns` optimizer trace is not implemented by the ARM64
-compiler; the account examples and desktop still have workflow coverage gaps.
-These are source entries, not necessarily seven independently launchable apps.
+all 206 pinned Demo `.ZC` files compile, and 200 have explicit QEMU runtime
+acceptance; six remain partial. Those are `TimeIns`, three TOS account
+examples, `MultiCore/Lock`, and `MultiCore/MPRadix`. The multicore examples
+are partial because the current guest runtime exposes one CPU; the stock
+`TimeIns` optimizer trace is not implemented by the ARM64 compiler; the TOS
+account examples still have workflow coverage gaps. These are source entries,
+not necessarily six independently launchable apps. The installed
+`WallPaperDesktop` workflows now pass QEMU coverage for all six controls,
+palette save/reopen, Home and Terminal shells, NetLog, and a local Telnet
+round-trip; live UTM and Pi behavior remain separate checks. See
+[`demo-wallpaper-desktop-current-qemu-2026-11-10.json`](docs/acceptance/demo-wallpaper-desktop-current-qemu-2026-11-10.json).
 The read-only `DiskRaw` workflow is now counted as accepted for its tested
 VirtIO fixture; general block-device registration, writes, filesystem mounts,
 hotplug, Pi storage and live-target behavior remain separate storage gaps.

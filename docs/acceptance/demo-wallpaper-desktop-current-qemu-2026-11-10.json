@@ -1,24 +1,22 @@
 {
   "date": "2026-11-10",
-  "target": "AArch64 PCI QEMU, one vCPU, disposable disk, graphical terminal",
-  "source": "/Demo/Graphics/WallPapers/WallPaperDesktop.ZC",
-  "upstream_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
-  "iso": "build/zealos-aarch64-hello.iso",
-  "iso_sha256": "deca048d86257281089779d0b681bef8a6c6b9c0c32146c984881992d62ebd2e",
+  "target": "AArch64 native ZealC on PCI QEMU, disposable VirtIO disk",
   "command": "python3 -u scripts/check-compat.py --pci --quick --probe-demo-wallpaper-desktop",
   "exit_code": 0,
-  "result": "partial",
+  "result": "pass for the tested installed desktop workflows",
+  "source": "/Demo/Graphics/WallPapers/WallPaperDesktop.ZC",
+  "source_sha256": "23621e8e0826465103f131fff520f8844ce1a0368b982554498d0e1288cd0a4b",
+  "kernel_sha256": "aa3da46af6580885cd5a813b2124fc2cc03b69c87b4e402ab4b54b3dfe082f97",
+  "iso_sha256": "deca048d86257281089779d0b681bef8a6c6b9c0c32146c984881992d62ebd2e",
   "verified": [
-    "wallpaper installer copied its HomeSys, DesktopIcons, and WallPaper source files to the disposable guest disk",
-    "cold-booted desktop showed exactly one focused Home terminal at bounds 22,78,19,55, and the Home and Terminal icons opened prompt-ready shells that accepted commands returning 42",
-    "all six desktop controls were registered and their icon hit areas produced visible pixels",
-    "Stats hid and restored the rendered statistics; NetLog opened, displayed text, closed, and reopened",
-    "Palette Editor changed the active palette to RGB 18,52,86, saved a named palette source under the guest home directory, and verified the file contents",
-    "Palette Editor Open listed the saved palette; after canceling the chooser, the generated source was loaded and its setter restored RGB 18,52,86",
-    "Telnet obtained a nonzero DHCP address, accepted host/port form input, connected to a local fixture, sent a character, closed the socket, and exited cleanly",
-    "terminal recovery checks returned 42 and zstatus reported failed=0"
+    "The stock desktop installer copied HomeSys.ZC, DesktopIcons.DD, and WallPaperDesktop.ZC to the expected disk paths and returned to a working terminal.",
+    "All six desktop controls were visible in their expected, non-overlapping hit areas; Stats hid and restored its rendered statistics.",
+    "NetLog opened, displayed written output, and closed and reopened cleanly.",
+    "Home and Terminal icons opened working command shells; each evaluated 40+2 as 42.",
+    "Palette Editor changed a palette entry, accepted hexadecimal RGB 123456, saved a named palette, listed it in Open, and reloaded it with the saved RGB value.",
+    "Telnet opened its form, connected to a local fixture, sent typed input, closed its socket, exited its task, and left networking initialized."
   ],
-  "log": "build/check-compat-pci.log",
-  "log_sha256": "3fa12bbd45e8a24d394037bcf13e6df33a2e3ce3b0e144b10449143b4d7c9d8a",
-  "limits": "The probe verified Palette Editor save, chooser listing, generated-source execution, and RGB restoration; selecting the listed palette with the pointer was not verified. Arbitrary HomeSys customizations and live UTM/Pi desktop interaction remain unverified. This establishes the tested installer and desktop workflows on QEMU, not exhaustive parity."
+  "log": "build/wallpaper-desktop-current-run.log",
+  "log_sha256": "3d2b10d943c8f684cbc2ee5b2594aba08753cf849e223f8434ef225d1b7b198f",
+  "scope_note": "QEMU runtime acceptance for the listed stock desktop workflows on this ISO. Arbitrary HomeSys customization and physical Pi/live UTM behavior are separate and are not implied."
 }

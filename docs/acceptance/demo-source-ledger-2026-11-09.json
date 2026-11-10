@@ -156,6 +156,7 @@
     "docs/acceptance/demo-util2-qemu-2026-11-08.json",
     "docs/acceptance/demo-varoom-qemu-2026-11-04.json",
     "docs/acceptance/demo-wallpaper-ctrl-qemu-2026-11-08.json",
+    "docs/acceptance/demo-wallpaper-desktop-current-qemu-2026-11-10.json",
     "docs/acceptance/demo-wallpaper-desktop-qemu-2026-11-08.json",
     "docs/acceptance/demo-wallpaper-install-qemu-2026-11-08.json",
     "docs/acceptance/demo-waterfowl-virtio-sound-qemu-2026-11-04.json",
@@ -172,15 +173,14 @@
     "docs/acceptance/demo-time-ins-stock-qemu-2026-11-09.json",
     "docs/acceptance/demo-tos-extern-qemu-2026-11-08.json",
     "docs/acceptance/demo-tosdistro-safe-load-qemu-2026-11-09.json",
-    "docs/acceptance/demo-tosmisc-qemu-2026-11-08.json",
-    "docs/acceptance/demo-wallpaper-palette-qemu-2026-11-09.json"
+    "docs/acceptance/demo-tosmisc-qemu-2026-11-08.json"
   ],
   "source_count": 206,
   "compile_pass": 206,
   "compile_blocked": 0,
   "compile_blocker_groups": [],
-  "runtime_accepted": 199,
-  "runtime_partial": 7,
+  "runtime_accepted": 200,
+  "runtime_partial": 6,
   "runtime_failed": 0,
   "directories": {
     ".": {
@@ -1662,8 +1662,8 @@
       "classification_confidence": "provisional; based on directory only",
       "compile": "pass",
       "first_compile_error": null,
-      "runtime": "partial",
-      "runtime_evidence": "docs/acceptance/demo-wallpaper-palette-qemu-2026-11-09.json"
+      "runtime": "pass",
+      "runtime_evidence": "docs/acceptance/demo-wallpaper-desktop-current-qemu-2026-11-10.json"
     },
     {
       "path": "/Demo/Graphics/WallPapers/WallPaperFish.ZC",
