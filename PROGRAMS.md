@@ -486,9 +486,10 @@ full Lock acceptance still requires SMP contention testing. Runtime evidence for
 checks that saved dollar glyphs are encoded as literal DolDoc text. Its
 `SoundShift` queue cleanup and `AUWrite`/`FileRead` AU-record round trip also
 pass in QEMU. Stock `GRWrite`, `GR2MV`, and `GRRead` also pass a synthetic
-single-frame movie round trip. A live ScreenCast probe in the same QEMU guest
-currently fails at runtime because the `ScreenCast` kernel symbol is unresolved
-in the compatibility runtime; no frame capture is claimed. The stock
+single-frame movie round trip. Stock `ScreenCast(ON/OFF)` now toggles recording
+in the QEMU compatibility runtime, produces a nonempty GR frame that `GRRead`
+reopens, and records note changes into an AU file that `AUWrite` writes and
+`FileRead` verifies. The stock
 `DiskCheck('D',FALSE,FALSE)` path also returns zero on the disposable,
 explicitly mounted read-only RedSea fixture; `DiskCheckAll`, repair behavior,
 and its configured-drive workflow remain unverified. JukePuppet media playback

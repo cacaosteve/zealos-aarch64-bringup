@@ -3,24 +3,25 @@
   "target": "AArch64 PCI QEMU, one guest CPU, current desktop ISO",
   "source": "/Demo/AcctExample/TOS/TOSMisc.ZC",
   "source_sha256": "ee141104e1476df4a08925447be33fa7ba42dbc4c989ec0d374851263af1f616",
-  "kernel_sha256": "aa3da46af6580885cd5a813b2124fc2cc03b69c87b4e402ab4b54b3dfe082f97",
-  "iso_sha256": "deca048d86257281089779d0b681bef8a6c6b9c0c32146c984881992d62ebd2e",
-  "command": "ZEAL_COMPAT_LOG_PATH=build/check-tosmisc-dollar-current.log QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device' python3 -u scripts/check-compat.py --pci --quick --probe-demo-system-context --demo-system-path /Demo/AcctExample/TOS/TOSMisc.ZC --demo-system-module /Demo/AcctExample/TOS/TOSConfig.ZC --demo-system-module /System/Gr/ScreenCast.ZC --demo-system-module /Apps/Psalmody/JukePuppet.ZC --demo-system-module /System/BlkDev/DiskCheck.ZC --demo-system-module /Demo/AcctExample/TOS/TOSMisc.ZC",
+  "kernel_sha256": "c7cff83246dde72296135862518d65574ebc482171cc7286935153fa282d53d9",
+  "iso_sha256": "48e974a0e5efff69845a9694c264473e2fcc112e30b7048fc16ce67b02d8c777",
+  "command": "ZEAL_COMPAT_LOG_PATH=build/check-tosmisc-screencast-audio-final.log QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device' python3 -u scripts/check-compat.py --pci --quick --probe-demo-system-context --demo-system-path /Demo/AcctExample/TOS/TOSMisc.ZC --demo-system-module /Demo/AcctExample/TOS/TOSConfig.ZC --demo-system-module /System/Gr/ScreenCast.ZC --demo-system-module /Apps/Psalmody/JukePuppet.ZC --demo-system-module /System/BlkDev/DiskCheck.ZC --demo-system-module /Demo/AcctExample/TOS/TOSMisc.ZC",
   "result": "partial",
   "verified": [
     "TOSConfig initialized the expected CD/C drive definitions (tos-config=CD|C||).",
     "DC2Doc recognized an exact A bitmap with zero mismatch and saved adjacent AZ text with zero mismatch.",
     "DC2Doc returned zero bitmap mismatch for each of the 94 printable ASCII glyph bitmaps (0x21 through 0x7E), including the dollar glyph.",
     "For the dollar glyph, DocSave produced leading bytes 36, 36, 10, 5, 0, confirming the literal dollar encoding and saved text prefix.",
-    "Stock DiskCheck('D',FALSE,FALSE) returned zero on the disposable explicitly mounted read-only RedSea fixture; see the disk-check follow-up in redsea-guest-drive-qemu-2026-11-09.json."
+    "Stock DiskCheck('D',FALSE,FALSE) returned zero on the disposable explicitly mounted read-only RedSea fixture; see the disk-check follow-up in redsea-guest-drive-qemu-2026-11-09.json.",
+    "Stock ScreenCast(ON/OFF) toggled recording and produced a nonempty GR frame that GRRead reopened.",
+    "ScreenCast captured its baseline and Sound(60)/Sound(0) events; AUWrite wrote 36 bytes and FileRead verified the expected ona sequence at the record offsets."
   ],
   "not_verified": [
-    "Live ScreenCast frame capture is blocked: calling the stock ScreenCast API in the QEMU guest reports an unresolved external symbol, so it cannot toggle the recording state or exercise frame capture.",
     "JukePuppet media playback, memory allocation stress and the DiskCheckAll configured-drive workflow remain unverified.",
     "Live UTM, Pi hardware and audio capture/playback behavior."
   ],
-  "log": "build/check-tosmisc-dollar-current.log",
-  "log_sha256": "647e3a4eb800fcbcb18339aa42f2d6c5538d4ef2cf25377e3bdd4fbdeec8d6b4",
+  "log": "build/check-tosmisc-screencast-audio-final.log",
+  "log_sha256": "f854ab5dae52d2b7a69fa0fc41f7e3fa992b71f873c055977cdea83bba548227",
   "audio_followup": {
     "command": "ZEAL_COMPAT_LOG_PATH=build/check-tosmisc-audio-current.log QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device' python3 -u scripts/check-compat.py --pci --quick --probe-demo-system-context --demo-system-path /Demo/AcctExample/TOS/TOSMisc.ZC --demo-system-module /Demo/AcctExample/TOS/TOSConfig.ZC --demo-system-module /System/Gr/ScreenCast.ZC --demo-system-module /Apps/Psalmody/JukePuppet.ZC --demo-system-module /System/BlkDev/DiskCheck.ZC --demo-system-module /Demo/AcctExample/TOS/TOSMisc.ZC",
     "result": "pass",
@@ -44,11 +45,12 @@
     "check_compat_sha256": "b6d5b7144481453b29e1ad24e6b9c44df0caf46f20677645621f0e840992427e"
   },
   "screen_capture_probe": {
-    "command": "ZEAL_COMPAT_LOG_PATH=build/check-tosmisc-screencast-current.log QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device' python3 -u scripts/check-compat.py --pci --quick --probe-demo-system-context --demo-system-path /Demo/AcctExample/TOS/TOSMisc.ZC --demo-system-module /Demo/AcctExample/TOS/TOSConfig.ZC --demo-system-module /System/Gr/ScreenCast.ZC --demo-system-module /Apps/Psalmody/JukePuppet.ZC --demo-system-module /System/BlkDev/DiskCheck.ZC --demo-system-module /Demo/AcctExample/TOS/TOSMisc.ZC",
-    "result": "blocked",
-    "observed": "Earlier TOSMisc checks passed through GR2MV/readback. The subsequent ScreenCast call failed with `zc: unresolved symbol=ScreenCast` and `unresolved external call`; no frame-capture result was claimed.",
-    "log": "build/check-tosmisc-screencast-current.log",
-    "log_sha256": "b5b951804904ed7732abaa235e90c0f21ca79e1c03b2ab249474b7dc19b1ef39"
+    "command": "ZEAL_COMPAT_LOG_PATH=build/check-tosmisc-screencast-audio-final.log QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device' python3 -u scripts/check-compat.py --pci --quick --probe-demo-system-context --demo-system-path /Demo/AcctExample/TOS/TOSMisc.ZC --demo-system-module /Demo/AcctExample/TOS/TOSConfig.ZC --demo-system-module /System/Gr/ScreenCast.ZC --demo-system-module /Apps/Psalmody/JukePuppet.ZC --demo-system-module /System/BlkDev/DiskCheck.ZC --demo-system-module /Demo/AcctExample/TOS/TOSMisc.ZC",
+    "result": "pass",
+    "observed": "ScreenCast recording toggled off cleanly; GRRead reopened a nonzero captured frame. AUWrite emitted a 36-byte event stream, and FileRead confirmed the initial baseline, captured note 60, and final rest event.",
+    "log": "build/check-tosmisc-screencast-audio-final.log",
+    "log_sha256": "f854ab5dae52d2b7a69fa0fc41f7e3fa992b71f873c055977cdea83bba548227",
+    "check_compat_sha256": "3594f3bcd5d789d89a1706aec2bfa80caa590c0975789c5ab59397ac59e8f1b7"
   },
-  "scope_note": "Expanded non-destructive OCR helper coverage, including saved DolDoc dollar encoding, plus a separate read-only DiskCheck check on the RedSea guest-drive fixture, SoundShift/AUWrite AU-file round trip, and GRWrite/GR2MV/MV-readback round trip. A live ScreenCast probe exposed a missing QEMU runtime binding for the stock ScreenCast symbol; it remains a feature gap along with JukePuppet playback, allocation stress and the configured-drive DiskCheckAll workflow."
+  "scope_note": "Expanded non-destructive OCR helper coverage, including saved DolDoc dollar encoding, plus a separate read-only DiskCheck check on the RedSea guest-drive fixture, SoundShift/AUWrite AU-file round trip, GRWrite/GR2MV/MV-readback round trip, and live ScreenCast GR/AU capture and readback. JukePuppet playback, memory allocation stress and the configured-drive DiskCheckAll workflow remain unverified; live UTM, Pi hardware and physical audio capture/playback behavior are separate checks."
 }

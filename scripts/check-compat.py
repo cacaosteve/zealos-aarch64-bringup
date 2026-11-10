@@ -2600,6 +2600,67 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     'passed': True,
                     'output': output,
                 })
+                output = command(
+                    'zc ScreenCast(ON,FALSE,"/Tests/TOSMiscCapture.GR");'
+                    'Sleep(400);Sound(60);Sleep(100);Sound(0);ScreenCast(OFF);'
+                    'Print("tosmisc-screencast-stopped=%d\\n",!screencast.record);',
+                    'tosmisc-screencast-stopped=1', timeout=30)
+                if 'tosmisc-screencast-stopped=1' not in output:
+                    raise RuntimeError(
+                        'TOSMisc ScreenCast did not stop recording cleanly:\n'
+                        + output)
+                output = command(
+                    'zc CDC *capture=GRRead("/Tests/TOSMiscCapture.GR");'
+                    'Print("tosmisc-screencast-frame=%d|%d\\n",'
+                    'capture!=NULL,capture && capture->width>0 && capture->height>0);'
+                    'DCDel(capture);Del("/Tests/TOSMiscCapture.GR");',
+                    'tosmisc-screencast-frame=1|1', timeout=30)
+                if 'tosmisc-screencast-frame=1|1' not in output:
+                    raise RuntimeError(
+                        'TOSMisc ScreenCast did not write a readable GR frame:\n'
+                        + output)
+                runtime_checks.append({
+                    'name': 'TOSMisc ScreenCast enables capture, stops recording, and produces a GR frame that GRRead reopens',
+                    'passed': True,
+                    'output': output,
+                })
+                output = command(
+                    'zc I64 captured_audio_size=AUWrite('
+                    '"/Tests/TOSMiscCaptureAudio.AU",&screencast.sound_head,'
+                    'screencast.t0_now,screencast.t0_tS);'
+                    'Print("tosmisc-screencast-au-written=%d\\n",captured_audio_size);',
+                    'tosmisc-screencast-au-written=36', timeout=30)
+                if 'tosmisc-screencast-au-written=36' not in output:
+                    raise RuntimeError(
+                        'TOSMisc ScreenCast did not write the expected AU event sequence:\n'
+                        + output)
+                output = command(
+                    'zc I64 audio_size=0,a8=-1,a17=-1,a26=-1,a35=-1;'
+                    'U8 *audio=FileRead('
+                    '"/Tests/TOSMiscCaptureAudio.AU",&audio_size);'
+                    'if(audio){a8=audio[8];a17=audio[17];a26=audio[26];'
+                    'a35=audio[35];}'
+                    'Print("tosmisc-screencast-audio=%d|%d|%d|%d|%d\\n",'
+                    'audio_size,a8,a17,a26,a35);Free(audio);',
+                    'tosmisc-screencast-audio=36|0|0|60|0', timeout=30)
+                if 'tosmisc-screencast-audio=36|0|0|60|0' not in output:
+                    raise RuntimeError(
+                        'TOSMisc ScreenCast AU capture did not preserve the note events:\n'
+                        + output)
+                output = command(
+                    'zc Del("/Tests/TOSMiscCaptureAudio.AU");'
+                    'QueueDel(&screencast.sound_head,TRUE);'
+                    'QueueInit(&screencast.sound_head);',
+                    'zc: executed', timeout=30)
+                if 'zc: executed' not in output:
+                    raise RuntimeError(
+                        'TOSMisc ScreenCast AU capture did not preserve the note events:\n'
+                        + output)
+                runtime_checks.append({
+                    'name': 'TOSMisc ScreenCast records sound changes to an AU file that FileRead reopens with the expected note events',
+                    'passed': True,
+                    'output': output,
+                })
             if (all(m['loaded'] for m in module_loads) and
                     '/Demo/Templates/Lex1.ZC' in args.demo_system_module):
                 output = command(

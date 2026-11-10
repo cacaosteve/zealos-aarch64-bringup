@@ -475,6 +475,13 @@ static void *guest_kbd_state;
 static void *guest_autocomplete_state;
 static void *guest_task_being_screen_updated;
 static void *guest_screencast_state;
+struct guest_screencast_layout {
+    size_t state_size, sound_head_off;
+    size_t t0_now_off, t0_tS_off, print_format_off;
+    size_t dc_off, dc2_alias_off, record_off, just_audio_off, ona_off;
+    size_t sound_size, sound_next_off, sound_last_off, sound_tS_off, sound_ona_off;
+    int ready;
+} guest_screencast_layout;
 static struct guest_counts {
     int64_t jiffies, timer, time_stamp_freq, time_stamp_kHz_freq;
     int64_t time_stamp_freq_initial;
@@ -4682,7 +4689,120 @@ static int64_t host_dir_cur(int64_t *a) {
 static int64_t host_sound(int64_t *a) {
     /* Preserve the stock ona note interface and drive the optional PCM device. */
     zc_virtio_sound_set_tone((int8_t)a[0]);
+    if (guest_screencast_state && guest_screencast_layout.ready) {
+        unsigned char *state = guest_screencast_state;
+        int8_t ona = (int8_t)a[0];
+        memcpy(state + guest_screencast_layout.ona_off, &ona, sizeof(ona));
+        if (*(uint8_t *)(state + guest_screencast_layout.record_off)) {
+            unsigned char *head = state + guest_screencast_layout.sound_head_off;
+            void *next = NULL, *last = NULL;
+            memcpy(&next, head + guest_screencast_layout.sound_next_off,
+                   sizeof(next));
+            memcpy(&last, head + guest_screencast_layout.sound_last_off,
+                   sizeof(last));
+            uintptr_t arena_start = (uintptr_t)data_arena;
+            uintptr_t arena_end = arena_start + DATA_BYTES;
+            if (!next || !last ||
+                (next != head && ((uintptr_t)next < arena_start ||
+                                  (uintptr_t)next >= arena_end)) ||
+                (last != head && ((uintptr_t)last < arena_start ||
+                                  (uintptr_t)last >= arena_end))) {
+                next = last = head;
+                memcpy(head + guest_screencast_layout.sound_next_off,
+                       &next, sizeof(next));
+                memcpy(head + guest_screencast_layout.sound_last_off,
+                       &last, sizeof(last));
+            }
+            struct block *node_block = arena_alloc(
+                (int64_t)guest_screencast_layout.sound_size, &data_heap,
+                (uintptr_t)__builtin_return_address(0));
+            unsigned char *node = (unsigned char *)node_block;
+            memset(node, 0, guest_screencast_layout.sound_size);
+            double seconds = (double)host_monotonic_ns(NULL) / 1000000000.0;
+            memcpy(node + guest_screencast_layout.sound_next_off,
+                   &head, sizeof(head));
+            memcpy(node + guest_screencast_layout.sound_last_off,
+                   &last, sizeof(last));
+            memcpy(node + guest_screencast_layout.sound_tS_off,
+                   &seconds, sizeof(seconds));
+            memcpy(node + guest_screencast_layout.sound_ona_off,
+                   &ona, sizeof(ona));
+            memcpy((unsigned char *)last + guest_screencast_layout.sound_next_off,
+                   &node, sizeof(node));
+            memcpy(head + guest_screencast_layout.sound_last_off,
+                   &node, sizeof(node));
+            if (next == head)
+                memcpy(head + guest_screencast_layout.sound_next_off,
+                       &node, sizeof(node));
+        }
+    }
     return 0;
+}
+static double host_screencast_seconds(void) {
+    return (double)host_monotonic_ns(NULL) / 1000000000.0;
+}
+static int64_t host_screencast_now(int64_t *a) {
+    (void)a;
+    /* CDate deltas in captured GR/AU records are relative to this call. A
+     * zero epoch preserves monotonic elapsed-time naming without pretending
+     * the compatibility guest has a wall-clock RTC. */
+    return 0;
+}
+static int64_t host_screencast(int64_t *a) {
+    if (!guest_screencast_state || !guest_screencast_layout.ready)
+        zc_fail("ScreenCast state is not initialized");
+    unsigned char *state = guest_screencast_state;
+    uint8_t old = *(uint8_t *)(state + guest_screencast_layout.record_off) & 1;
+    *(uint8_t *)(state + guest_screencast_layout.just_audio_off) = a[1] != 0;
+    if (a[0]) {
+        if (!old) {
+            char *format = (char *)(uintptr_t)a[2];
+            if (!format)
+                format = "B:/Tmp/%X.GR";
+            size_t length = strlen(format);
+            if (length >= DATA_BYTES)
+                zc_fail("ScreenCast print format is too large");
+            char *copy = arena_alloc((int64_t)length + 1, &data_heap,
+                                     (uintptr_t)__builtin_return_address(0));
+            memcpy(copy, format, length + 1);
+            char *prior = NULL;
+            memcpy(&prior, state + guest_screencast_layout.print_format_off,
+                   sizeof(prior));
+            if (prior)
+                __AIWNIOS_Free(prior);
+            memcpy(state + guest_screencast_layout.print_format_off,
+                   &copy, sizeof(copy));
+            CHashFun *now = (CHashFun *)HashFind("ZcScreenCastNow",
+                                                 Fs->hash_table, HTT_FUN, 1);
+            if (!now || !now->fun_ptr ||
+                (now->base.base.type & HTF_EXTERN))
+                zc_fail("ScreenCast relative timestamp callback is unavailable");
+            memcpy(state + guest_screencast_layout.t0_now_off,
+                   &now->fun_ptr, sizeof(now->fun_ptr));
+            double seconds = host_screencast_seconds();
+            memcpy(state + guest_screencast_layout.t0_tS_off,
+                   &seconds, sizeof(seconds));
+            unsigned char *head = state + guest_screencast_layout.sound_head_off;
+            void *next = head, *last = head;
+            memcpy(head + guest_screencast_layout.sound_next_off,
+                   &next, sizeof(next));
+            memcpy(head + guest_screencast_layout.sound_last_off,
+                   &last, sizeof(last));
+            memcpy(head + guest_screencast_layout.sound_tS_off,
+                   &seconds, sizeof(seconds));
+            int8_t ona = *(int8_t *)(state + guest_screencast_layout.ona_off);
+            memcpy(head + guest_screencast_layout.sound_ona_off,
+                   &ona, sizeof(ona));
+        }
+        *(uint8_t *)(state + guest_screencast_layout.record_off) = 1;
+    } else {
+        *(uint8_t *)(state + guest_screencast_layout.record_off) = 0;
+    }
+    /* KMisc.ZC calls Sound after changing recording state. */
+    int64_t sound_args[1] = {
+        *(int8_t *)(state + guest_screencast_layout.ona_off)};
+    host_sound(sound_args);
+    return old;
 }
 static int64_t host_sound_max_pump_gap(int64_t *a) {
     (void)a;
@@ -7663,6 +7783,46 @@ static int task_field(CHashClass *cls, const char *name, int64_t size, int64_t e
            m->off >= 0 && m->off <= cls->sz - size &&
            (expected_off < 0 || m->off == expected_off);
 }
+static size_t required_field_offset(CHashClass *cls, const char *name,
+                                    size_t field_size) {
+    CMemberLst *member = cls ? MemberFind((char *)name, cls) : NULL;
+    if (!member || member->off < 0 ||
+        (uint64_t)member->off > (uint64_t)cls->sz ||
+        field_size > (uint64_t)cls->sz - (uint64_t)member->off)
+        zc_fail("pinned ScreenCast field layout mismatch");
+    return (size_t)member->off;
+}
+static void bind_screencast_layout(void) {
+    CHashClass *state = (CHashClass *)HashFind(
+        "CScreenCastGlobals", Fs->hash_table, HTT_CLASS, 1);
+    CHashClass *sound = (CHashClass *)HashFind(
+        "CSoundData", Fs->hash_table, HTT_CLASS, 1);
+    CMemberLst *head;
+    if (!state || !sound || state->sz <= 0 || state->sz > (1 << 20) ||
+        sound->sz <= 0 || sound->sz > 1024)
+        zc_fail("invalid pinned ScreenCast class layout");
+    head = MemberFind("sound_head", state);
+    if (!head || head->off < 0 || head->member_class != sound ||
+        (uint64_t)head->off > (uint64_t)state->sz ||
+        (uint64_t)sound->sz > (uint64_t)state->sz - (uint64_t)head->off)
+        zc_fail("pinned ScreenCast sound-head layout mismatch");
+    guest_screencast_layout.state_size = (size_t)state->sz;
+    guest_screencast_layout.sound_head_off = (size_t)head->off;
+    guest_screencast_layout.t0_now_off = required_field_offset(state, "t0_now", 8);
+    guest_screencast_layout.t0_tS_off = required_field_offset(state, "t0_tS", 8);
+    guest_screencast_layout.print_format_off = required_field_offset(state, "print_format", 8);
+    guest_screencast_layout.dc_off = required_field_offset(state, "dc", 8);
+    guest_screencast_layout.dc2_alias_off = required_field_offset(state, "dc2_alias", 8);
+    guest_screencast_layout.record_off = required_field_offset(state, "record", 1);
+    guest_screencast_layout.just_audio_off = required_field_offset(state, "just_audio", 1);
+    guest_screencast_layout.ona_off = required_field_offset(state, "ona", 1);
+    guest_screencast_layout.sound_size = (size_t)sound->sz;
+    guest_screencast_layout.sound_next_off = required_field_offset(sound, "next", 8);
+    guest_screencast_layout.sound_last_off = required_field_offset(sound, "last", 8);
+    guest_screencast_layout.sound_tS_off = required_field_offset(sound, "tS", 8);
+    guest_screencast_layout.sound_ona_off = required_field_offset(sound, "ona", 1);
+    guest_screencast_layout.ready = 1;
+}
 static void bind_guest_task(void) {
     CHashClass *cls = (CHashClass *)HashFind("CTask", Fs->hash_table, HTT_CLASS, 1);
     CHashClass *heap = (CHashClass *)HashFind("CHeapCtrl", Fs->hash_table, HTT_CLASS, 1);
@@ -9625,6 +9785,10 @@ static int load_source_path(const char *path, int merged, int recover) {
         PrsBindCSymbol("Sound", host_sound, 1);
         PrsBindCSymbol("Beep", host_beep, 2);
         PrsBindCSymbol("SoundReset", host_sound_reset, 0);
+        PrsBindCSymbol("ScreenCast", host_screencast, 3);
+        execute_source("<ScreenCast timestamp declaration>",
+                       "extern CDate ZcScreenCastNow();");
+        PrsBindCSymbol("ZcScreenCastNow", host_screencast_now, 0);
         /* Keep tone conversion available to unchanged speaker-dependent
          * programs even though this framebuffer target has no audio device. */
         PrsBindCSymbol("Freq2Ona", host_freq2ona, 1);
@@ -9667,6 +9831,15 @@ static int load_source_path(const char *path, int merged, int recover) {
         if (!guest_screencast_state)
             zc_fail("screencast compatibility storage allocation failed");
         PrsBindCSymbol("screencast", guest_screencast_state, 0);
+        bind_screencast_layout();
+        unsigned char *screencast_head =
+            (unsigned char *)guest_screencast_state +
+            guest_screencast_layout.sound_head_off;
+        void *screencast_self = screencast_head;
+        memcpy(screencast_head + guest_screencast_layout.sound_next_off,
+               &screencast_self, sizeof(screencast_self));
+        memcpy(screencast_head + guest_screencast_layout.sound_last_off,
+               &screencast_self, sizeof(screencast_self));
         PrsBindCSymbol("fp_set_std_palette", &guest_fp_set_std_palette, 0);
         /* KTask's floating-point control hook is optional, matching the
          * upstream null check before dispatch. Keep null storage available
