@@ -4683,7 +4683,11 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 print('PASS Titanium press-a-key, game frame, input and Escape recovery',
                       flush=True)
                 raise SystemExit(0)
-            if not args.probe_keepaway_audio:
+            # A dedicated full-game run should isolate KeepAway instead of
+            # first running the separate GrModels color-popup interaction.
+            # That popup has its own live acceptance path and can fail before
+            # the long-running game probe is reached.
+            if not (args.probe_keepaway_audio or args.probe_keepaway_full_game):
                 type_graphical_prompt_line(
                     '3d-grmodels-launch',
                     'ExeFile2("/Apps/GrModels/Run.ZC");')
@@ -5054,6 +5058,20 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             print('KeepAway post-exit Animate tasks: '
                   + keepaway_task_scan[-1200:].replace('\r', ''),
                   flush=True)
+            if args.probe_keepaway_full_game:
+                status = command('zstatus', 'failed=0', timeout=20)
+                if not re.search(r'desktop: winmgr=1 gterm=1\b', status):
+                    raise RuntimeError('KeepAway Escape did not restore the desktop terminal: '
+                                       + status)
+                if not re.search(r'keyboard_focus=Terminal\b', status):
+                    raise RuntimeError('KeepAway Escape did not restore terminal focus: '
+                                       + status)
+                if 'live_animate_task=' in keepaway_task_scan:
+                    raise RuntimeError('KeepAway Animate task survived Escape: '
+                                       + keepaway_task_scan)
+                print('PASS KeepAway full-game animation, input, Escape, terminal focus, '
+                      'and Animate-task cleanup', flush=True)
+                raise SystemExit(0)
             run_graphical_terminal_command(
                 '3d-keepaway-exit-smoke', '40+2;', 'ans=0x2A=', timeout=20)
             command('zstatus', 'failed=0')

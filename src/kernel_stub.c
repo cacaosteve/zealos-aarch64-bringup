@@ -287,6 +287,7 @@ uint64_t zc_virtio_sound_submitted_frames(void) {
 #define GICD_CTLR      0x0000
 #define GICR_WAKER     0x0014
 #define GICR_TYPER     0x0008
+#define GICR_PIDR2     0xFFE8
 #define GICR_IGROUPR0  0x10080
 #define GICR_ISENABLER0 0x10100
 #define GICR_ICENABLER0 0x10180
@@ -9982,7 +9983,7 @@ static inline void *mmio(uint64_t phys) {
     return (void *)(uintptr_t)(g_hhdm + phys);
 }
 
-static void gic_init(void) {
+static void gicv3_init(void) {
     volatile uint32_t *gicd = mmio(GICD_BASE_PHYS);
 
     uint64_t mpidr;
@@ -10089,15 +10090,20 @@ static int gicv2_probe_read(uint64_t hhdm, uint64_t gicd_phys) {
     return g_uart_dead ? -1 : 0;
 }
 
-static int gicv2_init(uint64_t hhdm) {
+static int gicv2_init_at(uint64_t hhdm, uint64_t gicd_phys,
+                         uint64_t gicc_phys, unsigned ppi) {
     volatile uint32_t *gicd;
     volatile uint32_t *gicc;
-    unsigned ppi = (unsigned)PI4_CNTP_PPI;
 
-    g_gicd_phys = PI4_GICD_PHYS;
-    g_gicc_phys = PI4_GICC_PHYS;
+    g_gicd_phys = gicd_phys;
+    g_gicc_phys = gicc_phys;
 
     if (gicv2_probe_read(hhdm, g_gicd_phys) != 0) {
+        /* QEMU virt places GICD at 0x08000000 and GICC at 0x08010000.
+         * Those addresses should already be mapped by the firmware HHDM. */
+        if (gicd_phys != PI4_GICD_PHYS) {
+            return -1;
+        }
         /* Punch Device 2MiB covering GICD+GICC (same as UART fix path). */
         if (!g_pt_pool_phys || mmio_map_2m(hhdm, PI4_GICD_PHYS) != 0) {
             return -1;
@@ -10146,6 +10152,52 @@ static int gicv2_init(uint64_t hhdm) {
 
     g_gic_v2 = 1;
     return 0;
+}
+
+static int gicv2_init(uint64_t hhdm) {
+    return gicv2_init_at(hhdm, PI4_GICD_PHYS, PI4_GICC_PHYS,
+                         (unsigned)PI4_CNTP_PPI);
+}
+
+/* UTM's ARM virt machine may expose GICv2, while other QEMU profiles expose
+ * GICv3.  Probe the architected redistributor ID instead of TYPER: on a
+ * single-vCPU GICv3, TYPER can be zero and is not enough to identify it. */
+static int gicv3_probe_read(uint64_t hhdm) {
+    volatile uint32_t *gicr =
+        (volatile uint32_t *)(uintptr_t)(hhdm + GICR_BASE_PHYS);
+    g_uart_probe = 1;
+    g_sync_recover = 1;
+    g_uart_dead = 0;
+    uint32_t pidr2 = gicr[GICR_PIDR2 / 4];
+    __asm__ volatile("dsb sy");
+    g_sync_recover = 0;
+    g_uart_probe = 0;
+    /* PIDR2.ArchRev is 3 for a GICv3 redistributor; absent windows can return
+     * zero without aborting, so require the architectural revision. */
+    return (g_uart_dead || ((pidr2 >> 4) & 0xFu) != 3) ? -1 : 0;
+}
+
+static int gic_init(uint64_t hhdm, int is_pi) {
+    if (gicv3_probe_read(hhdm) == 0) {
+        gicv3_init();
+        return 0;
+    }
+    g_sync_recover = 0;
+    g_uart_probe = 0;
+    int gicv2_ok = is_pi
+        ? gicv2_init(hhdm)
+        : gicv2_init_at(hhdm, 0x08000000ull, 0x08010000ull,
+                        (unsigned)TIMER_PPI);
+    if (gicv2_ok == 0) {
+        if (g_uart) {
+            uart_puts(g_uart, "interrupt controller: GICv2 fallback\n");
+        }
+        return 0;
+    }
+    if (g_uart) {
+        uart_puts(g_uart, "interrupt controller: GICv2/GICv3 init failed\n");
+    }
+    return -1;
 }
 
 static void timer_arm(void) {
@@ -20570,8 +20622,13 @@ void kernel_entry(const struct zeal_handoff *h) {
     uart_puts(g_uart, "  timer ~4Hz\n");
 
     if (!is_pi) {
-        gic_init();
-        {
+        if (gic_init(h->hhdm_offset, is_pi) != 0) {
+            uart_puts(g_uart, "GIC init failed; interrupt-driven guest halted\n");
+            for (;;) {
+                __asm__ volatile("wfi");
+            }
+        }
+        if (!g_gic_v2) {
             uint64_t sre, grp1;
             MRS_ICC(5, sre);
             MRS_ICC(7, grp1);
@@ -20580,6 +20637,8 @@ void kernel_entry(const struct zeal_handoff *h) {
             uart_puts(g_uart, " IGRPEN1=");
             uart_put_u64_hex(g_uart, grp1);
             uart_puts(g_uart, "\n");
+        } else {
+            uart_puts(g_uart, "GICv2 CPU interface initialized\n");
         }
 
         g_sync_recover = 1;
