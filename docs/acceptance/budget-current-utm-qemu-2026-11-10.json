@@ -1,0 +1,22 @@
+{
+  "date": "2026-11-10",
+  "program": "Budget",
+  "target": "UTM-bundled QEMU framework, HVF, virtio-ramfb, 1 vCPU, 1 GiB RAM, VirtIO keyboard/tablet, disposable writable disk",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "4bc484338001b2a4d460844c11f0ea397554dac9250c378885f8a8a7ff1be4ea",
+  "kernel_sha256": "c7cff83246dde72296135862518d65574ebc482171cc7286935153fa282d53d9",
+  "source_bundle_sha256": "83240f8e1b91b68294eb985a0ce609b59fe12e1c4e62655c24b9b57a054276a1",
+  "base_disk_sha256": "fa19e2df4f9c6f020fd1aef39dcf413b639acac5278d0cd79ed1df60429a6f4c",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-budget-current-utm-qemu-2026-11-10.log python3 -u scripts/check-compat.py --pci --quick --probe-budget-program",
+  "exit_code": 0,
+  "result": "pass",
+  "log": "build/check-budget-current-utm-qemu-2026-11-10.log",
+  "log_sha256": "c4c29acfc3836e932928c2b0b99b09a1929e9da35cf3bae15b1b38c13facb9b3",
+  "verified": [
+    "Calendar and UTC clock initialization and scanner checks completed without failed tasks or leaks.",
+    "Budget File/Edit/View shortcuts remained responsive; entry creation, editing, cancellation and abort paths returned cleanly.",
+    "Created and edited a transaction, saved it, reopened it, and confirmed it persisted after a cold disk-only reboot.",
+    "The terminal recovered and evaluated 40+2 as 42; zstatus reported failed=0."
+  ],
+  "scope_note": "Automated headless QEMU acceptance using UTM's bundled framework and a disposable writable disk. The prior visible UTM Budget freeze report remains to be retested live; this does not establish Pi hardware behavior."
+}
