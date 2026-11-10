@@ -1,0 +1,29 @@
+{
+  "date": "2026-11-09",
+  "target": "Physical Raspberry Pi 4B, built-in audio outputs",
+  "result": "user-confirmed audible output through both analog headphone jack and HDMI",
+  "checks": [
+    {
+      "path": "3.5 mm analog headphone output",
+      "test": "ZealOS Beep(60);",
+      "result": "User confirmed the beep works through the headphone jack."
+    },
+    {
+      "path": "HDMI0 audio to TV",
+      "test": "ZealOS Beep(60);",
+      "result": "User confirmed the HDMI beep works."
+    },
+    {
+      "path": "HDMI0 audio to TV",
+      "test": "ExeFile2(\"/Demo/Sound/OhGreat.ZC\");",
+      "result": "User confirmed Oh Great plays successfully and a key eventually stops it; the response may wait for the current phrase/sequence to finish."
+    },
+    {
+      "path": "HDMI0 audio to TV",
+      "test": "Psalmody, key sequence z, h, x",
+      "result": "User confirmed hearing a note."
+    }
+  ],
+  "image_provenance": "The image and kernel hashes for these physical listening tests were not captured in the reports. Do not attribute the results to a specific current build. A new Pi boot and audio check is pending.",
+  "scope_note": "This supersedes earlier diagnostic records that said HDMI audio was unimplemented or that physical output was unverified. It accepts audible basic tones on the user's Pi 4B over both analog and HDMI, and audible Oh Great/Psalmody playback over HDMI. It does not verify audio quality, latency, continuous PCM fidelity, every sound program, other Pi revisions, or the image currently staged on the microSD."
+}
