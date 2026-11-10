@@ -1,0 +1,21 @@
+{
+  "date": "2026-11-10",
+  "upstream_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "target": "AArch64 native ZealC on PCI QEMU, one vCPU",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "deca048d86257281089779d0b681bef8a6c6b9c0c32146c984881992d62ebd2e",
+  "kernel_sha256": "aa3da46af6580885cd5a813b2124fc2cc03b69c87b4e402ab4b54b3dfe082f97",
+  "command": "python3 -u scripts/check-compat.py --pci --quick --probe-demo-source-catalog",
+  "result": "pass",
+  "counts": {
+    "total_demo_sources": 206,
+    "compiled": 206,
+    "blocked": 0
+  },
+  "mode": "CCF_JUST_LOAD per Demo .ZC source in a disposable task, using DocRead/ExeDoc or ExeFile2 and source-specific stock module context",
+  "catalog": "build/demo-source-catalog.json",
+  "catalog_sha256": "373aaf5507a7aedee54ae12b1c7cdb543888adeeaf8a35f0b08e651cc95ea762",
+  "runner_log": "build/check-program-catalog-pci.log",
+  "runner_log_sha256": "c5cfa59dc885c32b054219332fdac8910cce31205973fc9b85b3fd1fb7fe1936",
+  "scope_note": "This is a compile-only refresh. It does not change the existing count of 199 runtime-accepted Demo sources and seven partial runtime records, and it does not establish UTM or physical Pi behavior."
+}
