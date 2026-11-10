@@ -21,5 +21,22 @@
       "build/tothefront-direct-install.img": "f9ffd3168ee98468772e054c9ec03f13596122c945c228353d40a7acde7f8813"
     },
     "limits": "Emulated execution through UTM framework, not a live UTM interface or Pi test; no optimizer-trace compatibility is demonstrated."
+  },
+  "arm64_port_runtime_followup": {
+    "result": "pass",
+    "target": "AArch64 PCI QEMU, one vCPU, graphical terminal",
+    "source_path": "upstream/bootstrap/Demo/TimeIns.ZC",
+    "source_sha256": "748086d1b90d4a8477f211cc815fa477719e1e0936b2e7a0a8e9c2bbc7efa275",
+    "iso_path": "build/zealos-aarch64-hello.iso",
+    "iso_sha256": "1ea68e3459f8f29be1f84f5eb05f60992796412661f9d2be797764e707e75abe",
+    "command": "python3 scripts/check-compat.py --pci --quick --probe-demo-time-ins",
+    "checks": [
+      "The ARM64-portable benchmark ran three samples and printed positive loop-overhead and expression-loop timings.",
+      "All three runs produced the expected final value 110126.8.",
+      "The graphical terminal accepted 40+2 after the app returned, and zstatus reported failed=0."
+    ],
+    "log": "build/gui-catalog-demo-time-ins-launch-result.txt",
+    "log_sha256": "ba87e1a0dfee0d55152519b419cbf359336f90f4ee10b64d037bafbb870b839e",
+    "scope_note": "This accepts the ARM64-portable TimeIns adaptation. The pinned stock source remains partial because the native compiler does not implement its optimizer PassTrace compile-time diagnostic; the adaptation measures a floating-point loop with the guest monotonic counter instead."
   }
 }
