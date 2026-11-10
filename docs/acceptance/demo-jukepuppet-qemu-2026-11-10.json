@@ -1,0 +1,25 @@
+{
+  "date": "2026-11-10",
+  "target": "UTM-bundled QEMU framework, HVF, one vCPU, disposable copy-on-write PCI disk",
+  "source": "/Apps/Psalmody/Load.ZC and /Apps/Psalmody/JukePuppet.ZC",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "4bc484338001b2a4d460844c11f0ea397554dac9250c378885f8a8a7ff1be4ea",
+  "repository_commit": "4119c33",
+  "source_sha256": "7c61437ffada59acb1db4c98c9c4b7b9ee2b98d6ec2176a8f2812b1b3379562b",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-juke-puppet-completion.log python3 -u scripts/check-compat.py --pci --quick --probe-demo-system-context --demo-system-path /Apps/Psalmody/JukePuppet.ZC --demo-system-module /Apps/Psalmody/Load.ZC",
+  "result": "pass for chooser/task helper completion and terminal recovery; audible playback itself was not measured",
+  "verified": [
+    "The bundled Psalmody Load.ZC module loaded in the guest.",
+    "The disposable guest disk accepted the JukePuppetProbe.ZC fixture and Copy placed it in /Tests/JukePuppet/childish.ZC.",
+    "The GUI terminal ran JukeSongsPuppet with the staged one-song fixture and printed an explicit completion marker after the call returned.",
+    "The graphical terminal then accepted 40+2 and returned 42; zstatus reported failed=0.",
+    "The independent serial-shell diagnostic remains in the harness for future timeout cases. The earlier 45-second timeout was a false failure: the graphical test waited for the serial-only marker 'zc: executed' instead of checking for a GUI completion marker."
+  ],
+  "not_verified": [
+    "Whether the chooser reached the song, whether the Song task played, and the exact task wait or puppet operation where execution stopped.",
+    "Visible UTM GUI and Pi hardware behavior."
+  ],
+  "log": "build/check-juke-puppet-completion.log",
+  "log_sha256": "6116a3ae97f6bfd285043e232f71eaf8eb6abbdac82ffd5e7033449e0c7129ce",
+  "scope_note": "The test used only the disposable COW guest disk. A first attempt pointed FilesFind at the ISO source partition and was invalid because FilesFind enumerates the guest filesystem. A subsequent apparent timeout was a harness expectation error; the corrected run stages the song fixture on the writable guest disk, checks an explicit GUI completion marker, verifies terminal recovery, and verifies compiler health. This does not assess audible sound output or physical UTM/Pi behavior. The harness also captures zstatus over the independent serial shell when a GUI command truly times out."
+}

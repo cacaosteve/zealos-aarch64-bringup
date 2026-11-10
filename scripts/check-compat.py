@@ -2723,6 +2723,54 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     'output': output,
                 })
             if (all(m['loaded'] for m in module_loads) and
+                    '/Apps/Psalmody/Load.ZC' in args.demo_system_module):
+                # Run the stock JukeSongsPuppet against the bundled one-song
+                # example. zrecv stages it on the disposable COW disk because
+                # FilesFind enumerates the guest filesystem, not the read-only
+                # source partition. The probe verifies the chooser/task path
+                # without touching any user media.
+                song_fixture = (ROOT/'upstream/pinned/Apps/Psalmody/Examples/childish.ZC').read_bytes()
+                uploaded = upload_source('JukePuppetProbe.ZC', song_fixture)
+                if 'zrecv: saved JukePuppetProbe.ZC' not in uploaded:
+                    raise RuntimeError(
+                        'JukePuppet fixture was not saved on the disposable disk:\n'
+                        + uploaded)
+                command(
+                    'zc DirMake("/Tests/JukePuppet"); '
+                    'Copy("/JukePuppetProbe.ZC","/Tests/JukePuppet/childish.ZC");',
+                    'zc: executed')
+                run_graphical_terminal_command(
+                    'demo-juke-puppet-ready', '40+2;', 'ans=0x2A=42')
+                try:
+                    run_graphical_terminal_command(
+                        'demo-juke-puppet-run',
+                        'JukeSongsPuppet("/Tests/JukePuppet",1,0,1); '
+                        'Print("juke-puppet-done\\n");',
+                        'juke-puppet-done', timeout=60)
+                except RuntimeError as exc:
+                    # The serial shell is independent of the GUI terminal.
+                    # Capture guest-side task/window diagnostics before the
+                    # harness tears down its disposable VM on a GUI timeout.
+                    try:
+                        status = command('zstatus', None, timeout=8)
+                    except Exception as status_exc:
+                        status = f'zstatus unavailable: {status_exc}'
+                    raise RuntimeError(
+                        f'{exc}\npost-timeout guest zstatus:\n{status}') from exc
+                run_graphical_terminal_command(
+                    'demo-juke-puppet-terminal-recovery', '40+2;',
+                    'ans=0x2A=42', timeout=30)
+                output = command('zstatus', 'failed=0')
+                runtime_checks.append({
+                    'name': 'JukeSongsPuppet selects and runs the bundled childish song, then returns control to the terminal',
+                    'passed': 'failed=0' in output,
+                    'output': output,
+                })
+                if 'failed=0' not in output:
+                    raise RuntimeError(
+                        'JukeSongsPuppet did not leave the guest compiler healthy:\n'
+                        + output)
+            if (all(m['loaded'] for m in module_loads) and
                     '/Demo/WebLogDemo/WebLogScramble.ZC' in args.demo_system_module):
                 output = command(
                     'zc U8 *fixture="192.168.0.1 GET /index.html 200 42\\n",*saved; '
