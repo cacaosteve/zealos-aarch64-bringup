@@ -13,7 +13,7 @@ import re
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 SOURCE_ROOT = ROOT / "upstream/pinned/Demo"
 CATALOG = ROOT / "build/demo-source-catalog.json"
-OUTPUT = ROOT / "docs/acceptance/demo-source-ledger-2026-11-08.json"
+OUTPUT = ROOT / "docs/acceptance/demo-source-ledger-2026-11-09.json"
 SUPPLEMENTAL_COMPILE = {
     "/Demo/AcctExample/MakeHome.ZC":
         "docs/acceptance/demo-makehome-arm64-compile-2026-11-03.json",
@@ -66,6 +66,8 @@ RUNTIME_ACCEPTED = {
         "docs/acceptance/demo-runtime-followup-qemu-2026-11-07.json",
     "/Demo/MultiCore/MPPrint.ZC":
         "docs/acceptance/demo-mpprint-qemu-2026-11-08-cpu0-color.json",
+    "/Demo/MultiCore/LoadTest.ZC":
+        "docs/acceptance/demo-loadtest-qemu-2026-11-09.json",
     "/Demo/WebLogDemo/WebLogRep.ZC":
         "docs/acceptance/demo-runtime-followup-qemu-2026-11-07.json",
     "/Demo/ToHtmlToTXTDemo/HtmlDirList.ZC":
@@ -298,6 +300,8 @@ RUNTIME_ACCEPTED = {
         "docs/acceptance/demo-primes-single-cpu-qemu-2026-11-08.json",
 }
 RUNTIME_PARTIAL = {
+    "/Demo/Disk/DiskRaw.ZC":
+        "docs/acceptance/diskraw-readonly-qemu-2026-11-09.json",
     "/Demo/TimeIns.ZC":
         "docs/acceptance/demo-time-ins-stock-qemu-2026-11-09.json",
     "/Demo/DebugDemo.ZC":
