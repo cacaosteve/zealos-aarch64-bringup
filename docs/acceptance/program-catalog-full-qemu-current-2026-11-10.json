@@ -1,0 +1,1323 @@
+{
+  "date": "2026-11-10",
+  "repository_commit": "2dcced7b50233c930e84c7fdd1ee83c469dff815",
+  "command": "python3 -u scripts/check-compat.py --pci --quick --probe-program-catalog --program-catalog-path <290 paths from docs/acceptance/program-catalog-full-qemu-2026-11-10.json>",
+  "target": "QEMU PCI ARM64 graphical guest, isolated standalone source compilation",
+  "scope": "Fresh sweep of the same 290 selected source paths as the prior catalog. A successful isolated compile is not runtime acceptance. Compiler, boot, installer, and internal System modules can require source context or platform implementations; counts do not mean these are user apps.",
+  "artifacts": {
+    "iso": "build/zealos-aarch64-hello.iso",
+    "iso_sha256": "deca048d86257281089779d0b681bef8a6c6b9c0c32146c984881992d62ebd2e",
+    "kernel": "build/kernel.elf",
+    "kernel_sha256": "aa3da46af6580885cd5a813b2124fc2cc03b69c87b4e402ab4b54b3dfe082f97",
+    "machine_results_sha256": "0020892fe45a7a6e56f0855361659f5ed8e9ba8ebf0ec3c3fa9d942eea59bc9f",
+    "runner_log": "build/check-program-catalog-pci.log",
+    "runner_log_sha256": "f8dfd6efde4d4dd93425ca175b1ce7243dbfb6f44f73348a42c2cad7b6482574"
+  },
+  "counts": {
+    "total": 290,
+    "compiled": 193,
+    "blocked": 97,
+    "areas": {
+      "Apps": {
+        "total": 20,
+        "compiled": 20,
+        "blocked": 0
+      },
+      "System": {
+        "total": 137,
+        "compiled": 92,
+        "blocked": 45
+      },
+      "Demo": {
+        "total": 16,
+        "compiled": 16,
+        "blocked": 0
+      },
+      "Home": {
+        "total": 65,
+        "compiled": 59,
+        "blocked": 6
+      },
+      "Compiler": {
+        "total": 31,
+        "compiled": 0,
+        "blocked": 31
+      },
+      "Misc": {
+        "total": 14,
+        "compiled": 3,
+        "blocked": 11
+      },
+      "root": {
+        "total": 7,
+        "compiled": 3,
+        "blocked": 4
+      }
+    }
+  },
+  "blocked_notes": [
+    "The 6 Home blockers are the x86 SSE sample, three legacy PCI NIC drivers and PCNet test, and the JSON utility requiring private LexExcept.",
+    "Compiler sources are internal compiler implementation files and do not compile as isolated app entry points in the ARM64 native runtime.",
+    "Misc and System include installer/boot and internal modules; isolated failures often reflect missing dependencies, prior definitions, or x86-specific/platform context, so they need per-module triage rather than blanket exclusion.",
+    "This sweep is compile coverage only. App runtime acceptance is recorded separately; user reported UTM KeepAway freeze remains unresolved, and current Pi hardware test is pending."
+  ],
+  "programs": [
+    {
+      "path": "/Apps/Budget/Run.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Apps/GrModels/Run.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Apps/KeepAway/Run.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Apps/Logic/Run.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Apps/Psalmody/Run.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Apps/Span/Run.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Apps/Strut/Run.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Apps/TimeClock/Load.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Apps/Titanium/Run.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Apps/ToTheFront/Run.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Apps/Vocabulary/Run.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Apps/X-Caliber/Run.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/Gr/GrMath.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/Gr/GrPrimatives.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/Doodle.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/Life.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Games/MassSpring.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Games/BlackDiamond.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Games/BomberGolf.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Games/CastleFrankenstein.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Games/CircleTrace.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Games/DunGen.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Games/FlapBat.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Games/RawHide.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Games/Talons.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Games/Varoom.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Games/Wenceslas.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Games/ZoneOut.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Progress.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/RegistryDemo.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Apps/Psalmody/Install.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Apps/Span/Install.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Apps/ToTheFront/Install.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Apps/ToTheFront/AIs/Human.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Apps/ToTheFront/AIs/SimpleAI.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Apps/Psalmody/Examples/childish.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Apps/Psalmody/Examples/night.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Apps/Psalmody/Examples/prosper.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/HtmlGen.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/DoDistro.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/Net/Load.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/Net/Drivers/Run.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/Net/Drivers/VirtIONet.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/Net/Programs/FTPClient.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/Net/Programs/Gopher.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/Net/Programs/TCPChatClient.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/Net/Programs/TCPChatServer.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/Net/Programs/Telnet/Telnet.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/Net/Programs/UDPChat.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/PaletteEditor/Run.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/SSE.ZC",
+      "compiled": false,
+      "reason": "not compiled: this upstream diagnostic specifically uses x86 SSE instructions; it is not an ARM64 program"
+    },
+    {
+      "path": "/Home/Net/Drivers/E1000.ZC",
+      "compiled": false,
+      "reason": "not compiled: stock driver requires a legacy x86 PCI NIC; ARM64 target network path is VirtIO-net"
+    },
+    {
+      "path": "/Home/Net/Drivers/PCNet.ZC",
+      "compiled": false,
+      "reason": "not compiled: stock driver requires a legacy x86 PCI NIC; ARM64 target network path is VirtIO-net"
+    },
+    {
+      "path": "/Home/Net/Drivers/RTL8139.ZC",
+      "compiled": false,
+      "reason": "not compiled: stock driver requires a legacy x86 PCI NIC; ARM64 target network path is VirtIO-net"
+    },
+    {
+      "path": "/Home/Net/Programs/Telnet/Extra/TelnetGr.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/Net/Programs/Telnet/TelnetANSI.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/Net/Programs/Telnet/TelnetClass.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/Net/Programs/Telnet/TelnetHelpers.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/Net/Programs/Telnet/TelnetNegotiation.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/Net/Protocols/ARP.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/Net/Protocols/DHCP.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/Net/Protocols/DNS.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/Net/Protocols/Ethernet.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/Net/Protocols/ICMP.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/Net/Protocols/IPV4.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/Net/Protocols/Sockets.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/Net/Protocols/TCP/MakeTCP.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/Net/Protocols/TCP/TCP.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/Net/Protocols/TCP/TCPHandler.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/Net/Protocols/TCP/TCPTree.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/Net/Protocols/UDP/MakeUDP.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/Net/Protocols/UDP/UDP.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/Net/Protocols/UDP/UDPTree.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/Net/Start.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/Net/Tests/ARPTest.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/Net/Tests/DHCPTest0.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/Net/Tests/DHCPTest1.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/Net/Tests/DHCPTest2.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/Net/Tests/DNSTest.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/Net/Tests/EthernetTest.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/Net/Tests/HostTest0.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/Net/Tests/HostTest1.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/Net/Tests/ICMPTest.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/Net/Tests/ICMPTest0.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/Net/Tests/ICMPTest1.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/Net/Tests/IPV4Test.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/Net/Tests/PCNetTest.ZC",
+      "compiled": false,
+      "reason": "not compiled: test calls PCNet driver symbols; the ARM64 target uses VirtIO-net"
+    },
+    {
+      "path": "/Home/Net/Tests/TCPEchoClient.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/Net/Tests/TCPEchoServer.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/Net/Tests/TCPTest0.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/Net/Tests/TCPTest1.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/Net/Tests/TCPTest2.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/Net/Tests/UDPSocketTest0.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/Net/Tests/UDPSocketTest1.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/Net/Tests/UDPSocketTest2.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/Net/Tests/UDPTest0.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/Net/Tests/UDPTest1.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/Net/Utilities/BST.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/Net/Utilities/JSON/JSON.ZC",
+      "compiled": false,
+      "reason": "not compiled: upstream source depends on compiler-private LexExcept API not exposed by the ARM64 native compiler"
+    },
+    {
+      "path": "/Home/Net/Utilities/NetHandler.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/Net/Utilities/NetLog.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/Net/Utilities/NetQueue.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Home/Net/Utilities/Ping.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Compiler/Asm.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/Compiler/AsmInit.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/Compiler/AsmLib.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/Compiler/AsmResolve.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/Compiler/BackA.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/Compiler/BackB.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/Compiler/BackC.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/Compiler/BackFA.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/Compiler/BackFB.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/Compiler/BackLib.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/Compiler/CExcept.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/Compiler/CExterns.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/Compiler/CHash.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/Compiler/CInit.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/Compiler/CMain.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/Compiler/CMisc.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/Compiler/Lex.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/Compiler/LexLib.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/Compiler/OptLib.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/Compiler/OptPass012.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/Compiler/OptPass3.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/Compiler/OptPass4.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/Compiler/OptPass5.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/Compiler/OptPass6.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/Compiler/OptPass789A.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/Compiler/ParseExp.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/Compiler/ParseLib.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/Compiler/ParseStatement.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/Compiler/ParseVar.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/Compiler/Templates.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/Compiler/UAsm.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/Misc/Auto/AutoDistro.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/Misc/Auto/AutoFullDistro0.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/Misc/Auto/AutoFullDistro1.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/Misc/Auto/AutoFullDistro2.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/Misc/Auto/AutoFullDistro3.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/Misc/Auto/AutoFullDistro4.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Misc/Auto/AutoFullDistro5.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/Misc/Auto/AutoInstall.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/Misc/Auto/BootMHD2.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/Misc/Auto/HomeSys.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Misc/Auto/Once.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Misc/DoDistro.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/Misc/OSInstall.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/Misc/OSTestSuite.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/System/AutoComplete/ACDictGen.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/AutoComplete/ACFill.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/AutoComplete/ACInit.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/AutoComplete/ACTask.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/AutoComplete/MakeAC.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/BlkDev/DiskCheck.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/BlkDev/DiskPart.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/BlkDev/FileMgr.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/BlkDev/MakeZBlkDev.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/System/BlkDev/Mount.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/System/BlkDev/ZDiskA.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/BlkDev/ZDiskB.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/Boot/BootDVD.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/System/Boot/BootDVDIns.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/System/Boot/BootHD.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/System/Boot/BootHDIns.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/System/Boot/BootMHD.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/System/Boot/BootMHD2.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/System/Boot/BootMHDIns.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/System/Boot/BootRAM.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/System/Boot/DiskISO9660.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/System/Boot/DiskISORedSea.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/System/Boot/LimineMHDIns.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/System/Boot/MakeBoot.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/Ctrls/CtrlsA.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/Ctrls/CtrlsBttn.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/Ctrls/CtrlsSlider.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/Ctrls/MakeCtrls.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/Debug.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/Define.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/System/DevInfo.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/System/DolDoc/DocBin.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/DolDoc/DocChar.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/DolDoc/DocClipBoard.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/DolDoc/DocCodeTools.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/System/DolDoc/DocDblBuf.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/DolDoc/DocEd.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/DolDoc/DocExterns.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/DolDoc/DocFile.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/DolDoc/DocFind.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/DolDoc/DocForm.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/DolDoc/DocGet.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/DolDoc/DocGr.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/DolDoc/DocHighlight.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/DolDoc/DocInit.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/DolDoc/DocLink.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/DolDoc/DocMacro.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/DolDoc/DocNew.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/DolDoc/DocPlain.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/DolDoc/DocPopUp.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/DolDoc/DocPutKey.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/DolDoc/DocPutS.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/DolDoc/DocRecalc.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/System/DolDoc/DocRecalcLib.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/DolDoc/DocRun.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/DolDoc/DocTerm.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/DolDoc/DocTree.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/DolDoc/DocWidgetWiz.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/DolDoc/MakeDoc.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/System/Externs.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/God/GodBible.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/God/GodDoodle.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/System/God/GodExterns.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/God/GodSong.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/System/God/HolySpirit.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/System/God/MakeGod.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/System/Gr/GrAsm.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/System/Gr/GrBitMap.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/Gr/GrComposites.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/Gr/GrDC.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/Gr/GrEnd.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/Gr/GrExterns.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/Gr/GrGlobals.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/Gr/GrInitA.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/Gr/GrInitB.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/Gr/GrPalette.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/Gr/GrScreen.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/Gr/GrSpritePlot.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/System/Gr/GrTextBase.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/System/Gr/MakeGr.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/System/Gr/ScreenCast.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/Gr/SpriteBitMap.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/System/Gr/SpriteCode.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/System/Gr/SpriteEd.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/System/Gr/SpriteMain.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/System/Gr/SpriteMesh.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/Gr/SpriteNew.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/Gr/SpriteSideBar.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/System/Hash.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/System/InFile.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/MakeSystem.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/System/Math/Conversion.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/System/Math/F32.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/System/Math/MakeMath.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/Math/Mat4.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/System/Math/Math.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/Math/MathODE.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/Math/NDArray.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/Math/Tests/TestF32.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/System/Math/Tests/TestMat4.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/Math/Tests/TestVec.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/Math/Types.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/Math/Vec3.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/System/Math/Vec4.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/System/Memory.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/Menu.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/Mouse.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/PCILookUpSingle.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/Registry.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/Sound.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/TaskSettings.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/Training.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/Utils/CPURep.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/Utils/ConversionScript.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/System/Utils/Diff.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/Utils/DocUtils.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/System/Utils/Find.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/Utils/HeapLog.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/Utils/LineRep.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/Utils/LinkCheck.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/Utils/MakeUtils.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/System/Utils/MemRep.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/System/Utils/Merge.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/System/Utils/Profiler.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/Utils/StrUtils.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/Utils/SysRep.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/Utils/TaskRep.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/System/Utils/ToDolDoc.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/Utils/ToTXT.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/Utils/VideoRep.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/Utils/ZXERep.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/WallPaper.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/Win.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/WinMgr.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/System/ZSplash.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/HomeKeyPlugIns.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/HomeLocalize.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/HomeSys.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/HomeWrappers.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/MakeHome.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    },
+    {
+      "path": "/Once.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/StartOS.ZC",
+      "compiled": false,
+      "reason": "catalog_compile=0 | zc: executed | >"
+    }
+  ]
+}
