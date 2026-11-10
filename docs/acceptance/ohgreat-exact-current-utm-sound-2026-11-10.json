@@ -1,0 +1,24 @@
+{
+  "date": "2026-11-10",
+  "repository_commit": "89a665bc6d9d54b2638f6725939992326180f0d0",
+  "upstream_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "target": "UTM-bundled QEMU framework with HVF, virtio-ramfb, VirtIO keyboard/tablet, and WAV-backed VirtIO sound",
+  "source": "/Demo/Sound/OhGreat.ZC",
+  "source_sha256": "80e2a161d3302cf08b452ac5dff2be140c7911a0bb029b3d88750b2040ea6969",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "4bc484338001b2a4d460844c11f0ea397554dac9250c378885f8a8a7ff1be4ea",
+  "kernel_sha256": "c7cff83246dde72296135862518d65574ebc482171cc7286935153fa282d53d9",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device -audiodev wav,id=sound0,path=build/ohgreat-exact-current-utm.wav -device virtio-sound-pci,audiodev=sound0' ZEAL_COMPAT_LOG_PATH=build/check-ohgreat-exact-current-utm.log python3 -u scripts/check-compat.py --pci --quick --probe-demo-ohgreat-full",
+  "result": "pass",
+  "exit_code": 0,
+  "verified": [
+    "Stock OhGreat reached its late lyric and returned to the graphical prompt after a normal key.",
+    "A follow-up command evaluated 40+2 as 42; zstatus reported failed=0.",
+    "WAV capture passed the 10-second sound check with 4,173,626 nonzero samples at 44.1 kHz and peak amplitude 7000."
+  ],
+  "log": "build/check-ohgreat-exact-current-utm.log",
+  "log_sha256": "b6445c31c69ef61a97310978a281a001e3fb7f87e866852d9eaf3c612aa16336",
+  "wav": "build/ohgreat-exact-current-utm.wav",
+  "wav_sha256": "52e65ffa7bde5553ff6fd188ffeac120ee6ea83746682bc27cf9586b0e3d2c3b",
+  "scope_note": "The exact current ISO emitted sustained audio through UTM's bundled QEMU VirtIO sound model. WAV capture proves PCM generation, not that the live UTM app played it audibly or with correct timing. The user separately confirmed hearing a short UTM Beep and OhGreat through Pi HDMI on a card whose exact image was not independently verified."
+}
