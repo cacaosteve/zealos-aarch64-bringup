@@ -5,19 +5,19 @@
   "source_sha256": "ee141104e1476df4a08925447be33fa7ba42dbc4c989ec0d374851263af1f616",
   "kernel_sha256": "aa3da46af6580885cd5a813b2124fc2cc03b69c87b4e402ab4b54b3dfe082f97",
   "iso_sha256": "deca048d86257281089779d0b681bef8a6c6b9c0c32146c984881992d62ebd2e",
-  "command": "ZEAL_COMPAT_LOG_PATH=build/check-tosmisc-ascii-current.log QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device' python3 -u scripts/check-compat.py --pci --quick --probe-demo-system-context --demo-system-path /Demo/AcctExample/TOS/TOSMisc.ZC --demo-system-module /Demo/AcctExample/TOS/TOSConfig.ZC --demo-system-module /System/Gr/ScreenCast.ZC --demo-system-module /Apps/Psalmody/JukePuppet.ZC --demo-system-module /System/BlkDev/DiskCheck.ZC --demo-system-module /Demo/AcctExample/TOS/TOSMisc.ZC",
+  "command": "ZEAL_COMPAT_LOG_PATH=build/check-tosmisc-dollar-current.log QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device' python3 -u scripts/check-compat.py --pci --quick --probe-demo-system-context --demo-system-path /Demo/AcctExample/TOS/TOSMisc.ZC --demo-system-module /Demo/AcctExample/TOS/TOSConfig.ZC --demo-system-module /System/Gr/ScreenCast.ZC --demo-system-module /Apps/Psalmody/JukePuppet.ZC --demo-system-module /System/BlkDev/DiskCheck.ZC --demo-system-module /Demo/AcctExample/TOS/TOSMisc.ZC",
   "result": "partial",
   "verified": [
     "TOSConfig initialized the expected CD/C drive definitions (tos-config=CD|C||).",
     "DC2Doc recognized an exact A bitmap with zero mismatch and saved adjacent AZ text with zero mismatch.",
-    "DC2Doc returned zero bitmap mismatch for each of the 94 printable ASCII glyph bitmaps (0x21 through 0x7E), including the dollar glyph."
+    "DC2Doc returned zero bitmap mismatch for each of the 94 printable ASCII glyph bitmaps (0x21 through 0x7E), including the dollar glyph.",
+    "For the dollar glyph, DocSave produced leading bytes 36, 36, 10, 5, 0, confirming the literal dollar encoding and saved text prefix."
   ],
   "not_verified": [
     "Other TOSMisc routines, including ScreenCast/movie capture, JukePuppet media playback, memory allocation stress and disk checks, were not invoked.",
-    "Dollar-sign serialization into saved DolDoc text was not asserted separately.",
     "Live UTM, Pi hardware and audio behavior."
   ],
-  "log": "build/check-tosmisc-ascii-current.log",
-  "log_sha256": "b2efebb06c2564d9ecb3d95f2405f09cd653a366ccecf62f0d4aec7ad16dc536",
-  "scope_note": "Expanded non-destructive OCR helper coverage only; TOSMisc remains partial because the other source routines are not yet runtime-tested."
+  "log": "build/check-tosmisc-dollar-current.log",
+  "log_sha256": "647e3a4eb800fcbcb18339aa42f2d6c5538d4ef2cf25377e3bdd4fbdeec8d6b4",
+  "scope_note": "Expanded non-destructive OCR helper coverage, including the saved DolDoc dollar encoding; TOSMisc remains partial because its other source routines are not yet runtime-tested."
 }

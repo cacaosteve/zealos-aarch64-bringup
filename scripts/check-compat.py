@@ -2499,6 +2499,27 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     'passed': True,
                     'output': output,
                 })
+                output = command(
+                    'zc CDC *dd=DCNew(FONT_WIDTH,FONT_HEIGHT);'
+                    'I64 ii,jj,ss=-1;CDoc *de;U8 *sv;'
+                    'for(ii=0;ii<FONT_HEIGHT;ii++)for(jj=0;jj<FONT_WIDTH;jj++)'
+                    'if(Bt(&text.font[36],ii*8+jj))'
+                    'dd->body[ii*dd->width_internal+jj]=BLACK;else '
+                    'dd->body[ii*dd->width_internal+jj]=WHITE;'
+                    'de=DC2Doc(dd,0,0,&ss);sv=DocSave(de);'
+                    'Print("tosmisc-dollar-save=%d|%d|%d|%d|%d|%d\\n",'
+                    'ss,sv[0],sv[1],sv[2],sv[3],sv[4]);'
+                    'Free(sv);DocDel(de);DCDel(dd);',
+                    'tosmisc-dollar-save=0|36|36|10|5|0', timeout=30)
+                if 'tosmisc-dollar-save=0|36|36|10|5|0' not in output:
+                    raise RuntimeError(
+                        'TOSMisc DC2Doc did not serialize a literal dollar as two dollar bytes plus newline:\n'
+                        + output)
+                runtime_checks.append({
+                    'name': 'TOSMisc DC2Doc saves the dollar glyph as two literal dollar bytes followed by newline',
+                    'passed': True,
+                    'output': output,
+                })
             if (all(m['loaded'] for m in module_loads) and
                     '/Demo/Templates/Lex1.ZC' in args.demo_system_module):
                 output = command(
