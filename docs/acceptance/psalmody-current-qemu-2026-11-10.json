@@ -1,0 +1,20 @@
+{
+  "date": "2026-11-10",
+  "upstream_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "deca048d86257281089779d0b681bef8a6c6b9c0c32146c984881992d62ebd2e",
+  "target": "AArch64 PCI QEMU, one vCPU, VirtIO keyboard and VirtIO sound WAV backend",
+  "command": "QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device -audiodev wav,id=sound0,path=build/psalmody-current-retest.wav -device virtio-sound-pci,audiodev=sound0' python3 -u scripts/check-compat.py --pci --quick --probe-psalmody --probe-psalmody-audio-timer",
+  "log": "build/check-psalmody-pci.log",
+  "log_sha256": "e8ed3bd952a80a80728860f922a53c003fae19df535f364d7c3b5185932cd732",
+  "wav": "build/psalmody-current-retest.wav",
+  "wav_sha256": "82a0616f7c74db43b5e71687af750cc7e6ab7b00d0ac6c4c2db14102694e89c6",
+  "result": "pass",
+  "verified": [
+    "Psalmody editor opens, recording is enabled, and H enters a C note",
+    "QEMU WAV capture contains C5 in four 50 ms windows",
+    "Shift+Escape exits playback, the graphical terminal evaluates 40+2 as 42, and zstatus reports failed=0",
+    "the experimental sound timer delivered nine IRQs"
+  ],
+  "limits": "Automated QEMU/WAV evidence only. Live UTM audible Psalmody playback is not confirmed by this run. The Pi user previously reported hearing a short note and Oh Great through HDMI, but the tested card's exact image provenance was not verified."
+}

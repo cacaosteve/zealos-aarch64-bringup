@@ -1,0 +1,19 @@
+{
+  "date": "2026-11-10",
+  "upstream_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "deca048d86257281089779d0b681bef8a6c6b9c0c32146c984881992d62ebd2e",
+  "target": "AArch64 PCI QEMU, one vCPU, VirtIO keyboard and VirtIO sound WAV backend",
+  "command": "QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device -audiodev wav,id=sound0,path=build/ohgreat-current.wav -device virtio-sound-pci,audiodev=sound0' python3 -u scripts/check-compat.py --pci --quick --probe-demo-ohgreat-full",
+  "log": "build/check-demo-ohgreat-pci.log",
+  "log_sha256": "2a9eda14ca500d6340e2b17450cef3f12cb5ba1f12376638d0799dca84a0ef02",
+  "wav": "build/ohgreat-current.wav",
+  "wav_sha256": "ad8fb5e0cd27be71cef29a2be669cf8259ced9f36b3597f12bb29ba54f18e4c0",
+  "result": "pass",
+  "verified": [
+    "unmodified Oh Great runs through the late lyric smack and completes after a normal key",
+    "the graphical terminal accepts a follow-up 40+2 command and zstatus reports failed=0",
+    "WAV contains 4,145,402 nonzero samples at 44.1 kHz with peak 7000; the 10-second audio check passes"
+  ],
+  "limits": "QEMU WAV evidence confirms sustained changing output, not audible output through live UTM. The user reported a successful Oh Great HDMI playback on Pi 4B on 2026-11-09; the exact microSD image provenance was not independently verified."
+}

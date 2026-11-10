@@ -13470,7 +13470,13 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             psalmody_editor_step('psalmody-note-entered')
             qmp_send_key('x')
             time.sleep(0.3)
-            psalmody_editor_step('psalmody-playback')
+            playback = graphical_screen('psalmody-playback')
+            if 'Except:' in playback[3] or 'except:' in playback[3]:
+                raise RuntimeError('Psalmody raised an exception during playback:\n'+playback[3])
+            # The song view replaces the editor help while playback runs, so
+            # do not require the static editor text in this frame. The WAV
+            # capture validates the note and Shift+Escape below validates
+            # that the playback loop still handles and exits on input.
             qmp_send_keys(['shift', 'esc'])
             run_graphical_terminal_command(
                 'psalmody-exit-smoke', '40+2;', 'ans=0x2A=42', timeout=20)

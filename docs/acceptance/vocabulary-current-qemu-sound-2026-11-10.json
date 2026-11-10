@@ -1,0 +1,19 @@
+{
+  "date": "2026-11-10",
+  "upstream_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "deca048d86257281089779d0b681bef8a6c6b9c0c32146c984881992d62ebd2e",
+  "target": "AArch64 PCI QEMU, one vCPU, VirtIO keyboard and VirtIO sound WAV backend",
+  "command": "QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device -audiodev wav,id=sound0,path=build/vocabulary-current.wav -device virtio-sound-pci,audiodev=sound0' python3 -u scripts/check-compat.py --pci --quick --probe-vocabulary",
+  "log": "build/check-vocabulary-pci.log",
+  "log_sha256": "cac393d8135f894a00f357cd9fd637e7fc7e56907ae19ea5cba248b0e9271422",
+  "wav": "build/vocabulary-current.wav",
+  "wav_sha256": "cf44ffaf8bb6d1ef94fc7e2abe43420502b650236e936f417d13e9e4e9460fbc",
+  "result": "pass",
+  "verified": [
+    "Vocabulary launches from the graphical terminal, accepts an answer and advances the quiz",
+    "the app exits with Escape and the terminal evaluates 40+2 as 42 with zstatus failed=0",
+    "WAV capture contains active tone windows at approximately 190-200 Hz, consistent with the app's incorrect-answer feedback tone"
+  ],
+  "limits": "Automated QEMU/WAV evidence only. The randomized quiz means this run captured the incorrect-answer branch; it does not verify the transient feedback popup or live UTM/Pi sound."
+}

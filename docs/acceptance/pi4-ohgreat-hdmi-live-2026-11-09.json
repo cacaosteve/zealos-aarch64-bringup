@@ -39,5 +39,9 @@
       "WAV capture establishes emitted PCM, not real-time playback fidelity or audible output through a live UTM window.",
       "This is one song and one virtual sound-device setup; physical Pi behavior on the newer candidate and other programs are not established."
     ]
+  },
+  "follow_up_user_report_2026_11_10": {
+    "result": "The user again confirmed Oh Great played through Pi 4B HDMI and clarified that it stops after about a minute.",
+    "limits": "The exact microSD image provenance was not independently inspected during this follow-up."
   }
 }
