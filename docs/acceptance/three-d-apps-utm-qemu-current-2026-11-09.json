@@ -1,0 +1,20 @@
+{
+  "date": "2026-11-09",
+  "source_commit": "53e9b8dda08846476d93864136a26acf594847b3",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "133c712ca3e69a827029f9607d7def2f14a3aff88ddd4e1c6a5a968ea1632fd5",
+  "target": "UTM-bundled QEMU framework, headless probe runner, HVF, virtio-ramfb, 1 vCPU, 1 GiB RAM, VirtIO keyboard/tablet",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-3d-utm-qemu-probe-current.log python3 -u scripts/check-compat.py --pci --quick --probe-3d-apps --probe-keepaway-full-game",
+  "exit_code": 0,
+  "result": "pass",
+  "checks": {
+    "GrModels": "Man mesh generation reached the repeat prompt; Ball mesh generation rendered an inline sprite with 723 purple pixels. Both returned to the graphical terminal.",
+    "KeepAway": "Court, HUD and player frame rendered; Space and mouse input were accepted; the full-game probe ran for 184 seconds with scanout changing through the observation; Escape returned to a working terminal where 40+2 returned 42; no Animate child remained.",
+    "Titanium": "Gameplay frame and input advanced; Escape returned to a terminal where 40+2 returned 42.",
+    "runtime_status": "The scoped 3D checks reported zstatus failed=0.",
+    "follow_on_regressions": "System server and launch queues, task settings, source contexts, home paths, source execution and exceptions, compiler recovery/contexts, graphical terminal keyboard editing/history, and window-demo launch/stop returned their expected checks. The process exited 0."
+  },
+  "log": "build/check-3d-utm-qemu-probe-current.log",
+  "log_sha256": "32ce1b9926c186bdff9387d81ddaeb8ed3044a3190856a68c80b1e1b9716fe10",
+  "scope_note": "This is a headless run using UTM's bundled QEMU framework and virtio-ramfb, not the user's live UTM window. It passes the reported KeepAway freeze interval in this setup but does not identify or resolve the live-window-specific failure. Pi hardware acceptance for the currently staged desktop image is also pending."
+}
