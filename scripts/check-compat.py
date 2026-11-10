@@ -2918,18 +2918,51 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 if rgb_diff_count(changed_editor, hex_editor, (150, 40, 520, 460)) < 100:
                     raise RuntimeError('Palette Editor hex input changed data without updating scanout')
                 qmp_send_keys(['ctrl', 'a'])
+                require_graphical_text('wallpaper-desktop-palette-save-as', 'FileName:',
+                                       timeout=20, foreground_threshold=100000)
+                qmp_send_text('~/PaletteEditor/Palettes/paletteaccept.ZC',
+                              delay=0.15, dismiss_splash=False)
+                save_form = graphical_screen('wallpaper-desktop-palette-save-name',
+                                             foreground_threshold=100000)
+                if 'paletteaccept.ZC' not in save_form[3]:
+                    raise RuntimeError('Palette Editor Save As did not retain typed filename:\n'
+                                       +save_form[3])
+                qmp_send_key('esc')
                 time.sleep(0.5)
-                graphical_screen('wallpaper-desktop-palette-save-as')
-                qmp_send_keys(['shift', 'esc'])
+                save_result = command(
+                    'zc U8 *wp_palette_saved=FileRead('
+                    '"~/PaletteEditor/Palettes/paletteaccept.ZC");'
+                    'Print("wallpaper_palette_saved=%d,%d,%d\\n",'
+                    'wp_palette_saved!=NULL,wp_palette_saved&&'
+                    'StrFind("PaletteSetPaletteaccept",wp_palette_saved)!=NULL,'
+                    'wp_palette_saved&&StrFind("paletteaccept",wp_palette_saved)!=NULL);'
+                    'if(wp_palette_saved)Free(wp_palette_saved);',
+                    'wallpaper_palette_saved=')
+                if 'wallpaper_palette_saved=1,1,1' not in save_result:
+                    raise RuntimeError('Palette Editor Save As did not write the expected palette: '
+                                       +save_result)
+                print('PASS Palette Editor Save As wrote the named palette and edited color',
+                      flush=True)
+                qmp_send_keys(['ctrl', 'o'])
+                require_graphical_text('wallpaper-desktop-palette-open', 'paletteaccept',
+                                       timeout=30, foreground_threshold=100000)
+                qmp_send_key('esc')
+                command('zc Print("wallpaper_palette_open_cancel_kept_editor=%d\\n",'
+                        'TaskValidate(wp_palette_task));',
+                        'wallpaper_palette_open_cancel_kept_editor=1')
+                print('PASS Palette Editor Open lists the newly saved palette', flush=True)
                 command('zc Print("wallpaper_palette_cancel_kept_editor=%d\\n",'
                         'TaskValidate(wp_palette_task));',
                         'wallpaper_palette_cancel_kept_editor=1')
                 qmp_send_key('esc')
-                command('zc Print("wallpaper_palette_kept=%d\\n",'
-                        '!TaskValidate(wp_palette_task)&&gr_palette[0]!=wp_palette_before&&'
-                        'gr_palette[0].r==0x12&&gr_palette[0].g==0x34&&'
-                        'gr_palette[0].b==0x56);',
-                        'wallpaper_palette_kept=1')
+                command('zc ExeFile("~/PaletteEditor/Palettes/paletteaccept.ZC");'
+                        'PaletteSetPaletteaccept(FALSE);', 'zc: executed')
+                command('zc Print("wallpaper_palette_reopened=%d\\n",'
+                        '!TaskValidate(wp_palette_task)&&gr_palette[0].r==0x12&&'
+                        'gr_palette[0].g==0x34&&gr_palette[0].b==0x56);',
+                        'wallpaper_palette_reopened=1')
+                print('PASS generated palette source reloaded and restored its RGB value',
+                      flush=True)
                 command('zc Print("wallpaper_palette_recovery=%d\\n",40+2);',
                         'wallpaper_palette_recovery=42')
                 command('zc gr_palette[0]=wp_palette_before; GrPaletteSet(gr_palette);',

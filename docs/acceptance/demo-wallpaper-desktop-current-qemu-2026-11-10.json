@@ -13,11 +13,12 @@
     "cold-booted desktop showed exactly one focused Home terminal at bounds 22,78,19,55, and the Home and Terminal icons opened prompt-ready shells that accepted commands returning 42",
     "all six desktop controls were registered and their icon hit areas produced visible pixels",
     "Stats hid and restored the rendered statistics; NetLog opened, displayed text, closed, and reopened",
-    "Palette opened, edited the active palette to RGB 18,52,86, exited, and retained the change in the live session",
+    "Palette Editor changed the active palette to RGB 18,52,86, saved a named palette source under the guest home directory, and verified the file contents",
+    "Palette Editor Open listed the saved palette; after canceling the chooser, the generated source was loaded and its setter restored RGB 18,52,86",
     "Telnet obtained a nonzero DHCP address, accepted host/port form input, connected to a local fixture, sent a character, closed the socket, and exited cleanly",
     "terminal recovery checks returned 42 and zstatus reported failed=0"
   ],
   "log": "build/check-compat-pci.log",
-  "log_sha256": "ad2feb04130092ebd306a8acf93cdab1cc56dde1ec49a007253609a24761c0cd",
-  "limits": "Full Palette Editor workflows, arbitrary HomeSys customizations, and live UTM/Pi desktop interaction remain unverified. This probe establishes the tested installer and desktop workflows on QEMU, not exhaustive parity."
+  "log_sha256": "3fa12bbd45e8a24d394037bcf13e6df33a2e3ce3b0e144b10449143b4d7c9d8a",
+  "limits": "The probe verified Palette Editor save, chooser listing, generated-source execution, and RGB restoration; selecting the listed palette with the pointer was not verified. Arbitrary HomeSys customizations and live UTM/Pi desktop interaction remain unverified. This establishes the tested installer and desktop workflows on QEMU, not exhaustive parity."
 }

@@ -455,9 +455,9 @@ are `/Demo/TimeIns.ZC`, the three TOS account examples
 (`/Demo/AcctExample/TOS/TOSDistro.ZC`, `TOSExtern.ZC`, and `TOSMisc.ZC`),
 `/Demo/Graphics/WallPapers/WallPaperDesktop.ZC`, and the two multicore examples
 `/Demo/MultiCore/Lock.ZC` and `MPRadix.ZC`. The current ISO revalidated the
-Wallpaper Desktop installer, cold-boot layout, six controls, palette change, and
-Telnet client/local fixture workflow; full palette workflows, arbitrary startup
-customizations, and live UTM/Pi use remain open ([acceptance](docs/acceptance/demo-wallpaper-desktop-current-qemu-2026-11-10.json)).
+Wallpaper Desktop installer, cold-boot layout, six controls, palette editing,
+palette source save/list/reload, and Telnet client/local fixture workflow;
+arbitrary startup customizations and live UTM/Pi use remain open ([acceptance](docs/acceptance/demo-wallpaper-desktop-current-qemu-2026-11-10.json)).
 These are source-level counts, not a
 count of standalone programs; several entries are support modules or need
 feature-specific test setups. `DiskRaw` is accepted for its isolated read-only
