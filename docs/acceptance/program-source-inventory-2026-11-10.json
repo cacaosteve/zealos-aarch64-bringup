@@ -1097,7 +1097,7 @@
       "kind": "demo_source_or_component",
       "compile": "pass",
       "runtime": "partial",
-      "evidence": "docs/acceptance/demo-tosmisc-qemu-2026-11-08.json"
+      "evidence": "docs/acceptance/demo-tosmisc-current-qemu-2026-11-10.json"
     },
     {
       "path": "/Demo/AcctExample/TOS/TOSTheme.ZC",

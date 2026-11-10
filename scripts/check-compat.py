@@ -2477,6 +2477,28 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     'passed': True,
                     'output': output,
                 })
+                output = command(
+                    'zc CDC *dc3=DCNew(FONT_WIDTH,FONT_HEIGHT); '
+                    'I64 score3=-1,i3,j3,ch3,count3=0,failed3=FALSE; CDoc *doc3; '
+                    'for(ch3=33;ch3<=126;ch3++){'
+                    'for(i3=0;i3<FONT_HEIGHT;i3++)for(j3=0;j3<FONT_WIDTH;j3++)'
+                    'if(Bt(&text.font[ch3],i3*8+j3))'
+                    'dc3->body[i3*dc3->width_internal+j3]=BLACK;else '
+                    'dc3->body[i3*dc3->width_internal+j3]=WHITE;'
+                    'doc3=DC2Doc(dc3,0,0,&score3);'
+                    'if(!doc3||score3){failed3=TRUE;DocDel(doc3);break;}'
+                    'count3++;DocDel(doc3);}DCDel(dc3);'
+                    'Print("tosmisc-ascii-ocr=%d|%d\\n",count3,!failed3);',
+                    'tosmisc-ascii-ocr=94|1', timeout=90)
+                if 'tosmisc-ascii-ocr=94|1' not in output:
+                    raise RuntimeError(
+                        'TOSMisc DC2Doc did not match all 94 printable ASCII glyphs '
+                        'with zero pixel mismatch:\n' + output)
+                runtime_checks.append({
+                    'name': 'TOSMisc DC2Doc matched all 94 printable ASCII glyph bitmaps, including dollar, with zero bitmap mismatch',
+                    'passed': True,
+                    'output': output,
+                })
             if (all(m['loaded'] for m in module_loads) and
                     '/Demo/Templates/Lex1.ZC' in args.demo_system_module):
                 output = command(
