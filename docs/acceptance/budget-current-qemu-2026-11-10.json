@@ -1,0 +1,20 @@
+{
+  "date": "2026-11-10",
+  "target": "AArch64 native ZealC on PCI QEMU, VirtIO keyboard/tablet, disposable writable disk",
+  "kernel_sha256": "aa3da46af6580885cd5a813b2124fc2cc03b69c87b4e402ab4b54b3dfe082f97",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "deca048d86257281089779d0b681bef8a6c6b9c0c32146c984881992d62ebd2e",
+  "command": "python3 -u scripts/check-compat.py --pci --quick --probe-budget-program",
+  "exit_code": 0,
+  "result": "pass",
+  "verified": [
+    "Calendar and UTC clock initialization completed without task or heap leaks.",
+    "Budget File/Edit/View keyboard shortcuts and hover presentation remained responsive.",
+    "New entry and edit forms accepted populated fields and rendered the saved entry.",
+    "Cancel and abort paths returned to the app/terminal cleanly.",
+    "Budget data was saved, reopened, and checked after a cold disk-only reboot.",
+    "Terminal recovered and evaluated 40+2 as 42; zstatus reported failed=0."
+  ],
+  "scope_note": "This is automated QEMU acceptance with a disposable writable guest disk. It does not close the earlier live UTM freeze report, recurring-template workflows, or Pi hardware acceptance.",
+  "log": "build/check-budget-pci.log"
+}
