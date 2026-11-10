@@ -1,0 +1,77 @@
+{
+  "date": "2026-11-10",
+  "repository_commit": "9ef74d6ea6739723ea7b25e3f2eb4dd3025de654",
+  "upstream_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "target": "UTM-bundled QEMU framework, HVF, virtio-ramfb, 1 vCPU, 1 GiB RAM, VirtIO keyboard/tablet",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "f17ed84eac4984ac68981f84bf611f7de33a65621318c3e18e8cd71040178e35",
+  "kernel_sha256": "1e935ad0382daa66bb704f2d197052d4af78b408d1512aaf7c95ed4781945db6",
+  "runs": [
+    {
+      "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-named-apps-exact-current-f17.log python3 -u scripts/check-compat.py --pci --quick --probe-logic-program --probe-timeclock --probe-span-strut --probe-tothefront --probe-xcaliber --probe-vocabulary --probe-demo-tictactoe --probe-demo-chess",
+      "exit_code": 0,
+      "log": "build/check-named-apps-exact-current-f17.log",
+      "log_sha256": "58b64e3b074e62ed1e79e6c4f139a267223a985d1cd0a5fb8c8359241bdc0141",
+      "checks": [
+        "X-Caliber left/right thrusters changed the ship, Space produced a visible projectile, and Escape restored terminal command execution (40+7 returned 47).",
+        "ToTheFront selected both human players, entered the map, plotted artillery to an adjacent hex, and returned through Escape to a working shell. The harness exits after this branch, so this run did not execute the other flags in the command."
+      ]
+    },
+    {
+      "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-span-strut-exact-current-f17.log python3 -u scripts/check-compat.py --pci --quick --probe-span-strut",
+      "exit_code": 0,
+      "log": "build/check-span-strut-exact-current-f17.log",
+      "log_sha256": "fa158b178af087bee2f43126386ce1cb72096be7a72bbb2ee3f11f29ab2a5977",
+      "checks": [
+        "Span opened its help and bridge canvas, drew a frame, and recovered from Shift+Escape.",
+        "Strut opened its selection prompt, accepted input, drew graphics, and exited to a terminal where 40+2 returned 42; zstatus reported failed=0."
+      ]
+    },
+    {
+      "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-logic-exact-current-f17.log python3 -u scripts/check-compat.py --pci --quick --probe-logic-program",
+      "exit_code": 0,
+      "log": "build/check-logic-exact-current-f17.log",
+      "log_sha256": "3cd917a480fdf8595d847d4ed188ea4873e5603e20731f39c72d5ebe3211f90d",
+      "checks": [
+        "Digital Logic rendered the AND circuit and passed visible prompt editing, deletion, abort/cancel cleanup, relaunch, and clean exit checks; zstatus reported failed=0."
+      ]
+    },
+    {
+      "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-timeclock-exact-current-f17.log python3 -u scripts/check-compat.py --pci --quick --probe-timeclock",
+      "exit_code": 0,
+      "log": "build/check-timeclock-exact-current-f17.log",
+      "log_sha256": "b19ae5d5573a94fdea1cc22362b1cf2fb3ad0f8c56df9408e2f9f8aecaed7994",
+      "checks": [
+        "TimeClock saved and reread punch-in/out descriptions and returned to a working terminal; zstatus reported failed=0."
+      ]
+    },
+    {
+      "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-vocabulary-exact-current-f17.log python3 -u scripts/check-compat.py --pci --quick --probe-vocabulary",
+      "exit_code": 0,
+      "log": "build/check-vocabulary-exact-current-f17.log",
+      "log_sha256": "46bf54021c8fcdc935da8652bf51f254ef6d3e2e9179d7122d7774ea82702922",
+      "checks": [
+        "Vocabulary accepted an answer, advanced the quiz, and recovered via Escape to a terminal where 40+2 returned 42; zstatus reported failed=0."
+      ]
+    },
+    {
+      "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-tictactoe-exact-current-f17.log python3 -u scripts/check-compat.py --pci --quick --probe-demo-tictactoe-win",
+      "exit_code": 0,
+      "log": "build/check-tictactoe-exact-current-f17.log",
+      "log_sha256": "817ca4e52f4cd00b5bc32f2b6c2069c9a283ce0ac41ee875648a279d5d7ef312",
+      "checks": [
+        "TicTacToe passed a five-move win, board reset/replay, mouse input, Escape, and graphical terminal recovery; zstatus reported failed=0."
+      ]
+    },
+    {
+      "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-chess-exact-current-f17.log python3 -u scripts/check-compat.py --pci --quick --probe-demo-chess-ai",
+      "exit_code": 0,
+      "log": "build/check-chess-exact-current-f17.log",
+      "log_sha256": "19d6081bc03ed0de72d781a9bb8ac90f8f64a018297fd523d1be80e394a3cf99",
+      "checks": [
+        "Chess rendered its board, accepted a dragged pawn move, verified the computer's E7-E5 reply, and recovered through Escape to a working terminal; zstatus reported failed=0."
+      ]
+    }
+  ],
+  "scope_note": "These are headless runs using UTM's bundled QEMU framework and emulated devices against the exact current ISO. They do not establish visible UTM app-window behavior, live audio output, Pi hardware behavior, complete gameplay, or general hardware parity."
+}
