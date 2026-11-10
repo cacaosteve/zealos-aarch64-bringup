@@ -1,0 +1,21 @@
+{
+  "date": "2026-11-10",
+  "target": "UTM-bundled QEMU framework, HVF, virtio-ramfb, 1 vCPU, 1 GiB RAM, VirtIO keyboard/tablet",
+  "upstream_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "repository_commit": "a5c91f5",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "4bc484338001b2a4d460844c11f0ea397554dac9250c378885f8a8a7ff1be4ea",
+  "kernel_sha256": "c7cff83246dde72296135862518d65574ebc482171cc7286935153fa282d53d9",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-span-cold-current.log python3 -u scripts/check-compat.py --pci --quick --probe-span-cold",
+  "result": "pass",
+  "log": "build/check-span-cold-current.log",
+  "log_sha256": "df7682623112e1fe7e4900db2f240ff49e718da7d8d137f35b4e94de13bfa444",
+  "verified": [
+    "Span created a bridge mass through the normal graphical editor and visibly changed the frame.",
+    "The stock Save dialog wrote /Home/Span/Game.DATA to the disposable VirtIO disk.",
+    "The stock Open chooser restored the edited bridge after New cleared it.",
+    "Escape cleanup returned to a working terminal; 40+2 returned 42 and zstatus reported failed=0.",
+    "After flushing and cold-booting from the VirtIO disk, Span reopened Game.DATA and restored the saved mass."
+  ],
+  "scope_note": "Headless automated acceptance with UTM's bundled QEMU framework. This proves the save/reopen path on this disposable VirtIO disk, not physical Pi storage or interaction in the visible UTM window."
+}
