@@ -1,0 +1,31 @@
+{
+  "date": "2026-11-10",
+  "target": "AArch64 native ZealC on PCI QEMU",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "deca048d86257281089779d0b681bef8a6c6b9c0c32146c984881992d62ebd2e",
+  "checks": {
+    "cooperative_message_scheduling": {
+      "command": "python3 -u scripts/check-compat.py --quick --probe-source-fast --probe-source tests/compat/TaskMessages.ZC --probe-source-call TaskMessageSchedulingChecks",
+      "result": "pass",
+      "probe_result": "0x2a",
+      "verified": [
+        "Repeated MessageScan, KeyScan, CharScan, and FlushMessages polling does not switch to a peer task",
+        "Explicit Yield runs the next ready task",
+        "A blocked MessageGet yields to a ready peer, receives its message, and resumes"
+      ]
+    },
+    "xcaliber": {
+      "command": "python3 -u scripts/check-compat.py --pci --quick --probe-xcaliber",
+      "result": "pass; process exited 0",
+      "verified": [
+        "X-Caliber reached gameplay after its startup popup",
+        "Left and Right control input, the left and right thrusters, and Space projectile input were observed",
+        "Escape returned to the graphical terminal and terminal input/execution worked",
+        "The enclosing compatibility command exited 0"
+      ],
+      "log": "build/check-compat-pci.log",
+      "log_sha256": "03bac4491fbcfc177e2d679a0c01eaaf2dcee2e97adb423705ecc507ba459c77"
+    }
+  },
+  "scope_note": "The scheduler result validates the current cooperative host bridge, not the pinned upstream Sched.ZC as the active runtime scheduler. No Yield was added to MessageScan or X-Caliber. Automated QEMU success does not resolve the earlier live UTM-specific X-Caliber input/Escape failure, and does not cover Pi hardware."
+}
