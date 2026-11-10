@@ -3,8 +3,8 @@
   "upstream_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
   "target": "AArch64 native ZealC on PCI QEMU, one vCPU",
   "iso": "build/zealos-aarch64-hello.iso",
-  "iso_sha256": "deca048d86257281089779d0b681bef8a6c6b9c0c32146c984881992d62ebd2e",
-  "kernel_sha256": "aa3da46af6580885cd5a813b2124fc2cc03b69c87b4e402ab4b54b3dfe082f97",
+  "iso_sha256": "f17ed84eac4984ac68981f84bf611f7de33a65621318c3e18e8cd71040178e35",
+  "kernel_sha256": "1e935ad0382daa66bb704f2d197052d4af78b408d1512aaf7c95ed4781945db6",
   "command": "python3 -u scripts/check-compat.py --pci --quick --probe-demo-source-catalog",
   "result": "pass",
   "counts": {
@@ -16,6 +16,6 @@
   "catalog": "build/demo-source-catalog.json",
   "catalog_sha256": "373aaf5507a7aedee54ae12b1c7cdb543888adeeaf8a35f0b08e651cc95ea762",
   "runner_log": "build/check-program-catalog-pci.log",
-  "runner_log_sha256": "c5cfa59dc885c32b054219332fdac8910cce31205973fc9b85b3fd1fb7fe1936",
+  "runner_log_sha256": "0069eb73ddca079860d2749532e6a13140a62c4c5bb87534cf6c6250d950226b",
   "scope_note": "This is a compile-only refresh. Runtime totals are tracked separately in demo-source-ledger-2026-11-10.json: 201 runtime-accepted Demo sources and five partial runtime records. It does not establish UTM or physical Pi behavior."
 }

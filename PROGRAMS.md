@@ -46,6 +46,8 @@ The read-only `DiskRaw` workflow is now counted as accepted for its tested
 VirtIO fixture; general block-device registration, writes, filesystem mounts,
 hotplug, Pi storage and live-target behavior remain separate storage gaps.
 See the [per-source ledger](docs/acceptance/demo-source-ledger-2026-11-10.json).
+The 206/206 compile-only sweep was rerun against the current ISO
+(`f17ed84e…`); see the [current-image compile record](docs/acceptance/demo-source-catalog-current-qemu-2026-11-10.json).
 
 ## Unchanged graphics programs
 
