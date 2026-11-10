@@ -318,14 +318,16 @@ A subsequent Vocabulary run using the graphical launcher captured a tone
 consistent with its correct-answer `Sound(74)` as well; see the
 [QEMU record](docs/acceptance/vocabulary-correct-sound-qemu-2026-11-09.json).
 
-The 2026-11-08 task-message regression passes in PCI QEMU. Five rounds of empty
+The 2026-11-08 task-message regression and a fresh run on the current ISO
+(`4bc48433…`) pass in PCI QEMU. Five rounds of empty
 `MessageScan`, `KeyScan`, `CharScan`, and `FlushMessages` polling do not hand off
 the core; explicit `Yield` and a blocked `MessageGet` let the next ready task
 run. The earlier timer-sleep handshake was removed from this focused regression
 because it could hang while draining session tasks. This verifies the current
 cooperative bridge behavior, but does not mean the pinned upstream `Sched.ZC` is
 the scheduler currently running. See
-[`task-message-scheduling-qemu-2026-11-08.json`](docs/acceptance/task-message-scheduling-qemu-2026-11-08.json).
+[`current ISO acceptance`](docs/acceptance/task-message-scheduling-current-qemu-2026-11-10.json)
+and the [initial regression](docs/acceptance/task-message-scheduling-qemu-2026-11-08.json).
 `BreakUnlock` now delivers an already-pending break to the current task or
 queues it for another task's cooperative resumption. QEMU checks cover
 sleeping and message-waiting tasks and the Shift-Escape option. A focused
