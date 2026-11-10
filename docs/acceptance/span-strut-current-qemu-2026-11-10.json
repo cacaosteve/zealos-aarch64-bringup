@@ -1,0 +1,17 @@
+{
+  "date": "2026-11-10",
+  "target": "UTM-bundled QEMU framework, HVF, virtio-ramfb, 1 vCPU, 1 GiB RAM, VirtIO keyboard/tablet",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "deca048d86257281089779d0b681bef8a6c6b9c0c32146c984881992d62ebd2e",
+  "kernel_sha256": "aa3da46af6580885cd5a813b2124fc2cc03b69c87b4e402ab4b54b3dfe082f97",
+  "command": "ZEAL_COMPAT_LOG_PATH=build/check-span-strut-current.log python3 -u scripts/check-compat.py --pci --quick --probe-span-strut",
+  "exit_code": 0,
+  "log": "build/check-span-strut-current.log",
+  "log_sha256": "35f332a8e11bc7c5f5bc91c51f0c20468c899ef3129bdca23be18cf1a53f7bc8",
+  "checks": {
+    "Span": "pass: entry and instructions rendered; graphical frame verified; Shift+Escape returned to terminal; terminal evaluated 40+2 as 42",
+    "Strut": "pass: help rendered; edit/play input and graphics exercised; Escape returned to terminal; terminal evaluated 40+2 as 42",
+    "final_status": "All emitted checks passed; failed=0"
+  },
+  "limits": "Headless QEMU runtime acceptance using UTM's bundled QEMU framework, not a visible UTM app or Pi hardware test."
+}

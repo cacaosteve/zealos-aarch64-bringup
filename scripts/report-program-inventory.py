@@ -17,7 +17,8 @@ PROGRAM_CATALOG = ROOT / "docs/acceptance/program-catalog-qemu-2026-11-03.json"
 SOURCE_CONTEXT_CATALOG = ROOT / "docs/acceptance/source-context-catalog-qemu-2026-11-02.json"
 NAMED_APPS = ROOT / "docs/acceptance/named-apps-qemu-2026-11-02.json"
 THREE_D = ROOT / "docs/acceptance/three-d-apps-utm-qemu-current-2026-11-10.json"
-SPAN_STRUT = ROOT / "docs/acceptance/span-strut-qemu-2026-11-07.json"
+SPAN_STRUT_CURRENT = ROOT / "docs/acceptance/span-strut-current-qemu-2026-11-10.json"
+TOTHEFRONT_CURRENT = ROOT / "docs/acceptance/tothefront-current-qemu-2026-11-10.json"
 BUDGET = ROOT / "docs/acceptance/budget-current-qemu-2026-11-10.json"
 LOGIC = ROOT / "docs/acceptance/digital-logic-current-qemu-2026-11-10.json"
 VOCABULARY = ROOT / "docs/acceptance/vocabulary-current-qemu-sound-2026-11-10.json"
@@ -141,8 +142,12 @@ def main():
     for name in ("Span", "Strut"):
         app_runtime["/Apps/" + name + "/Run.ZC"] = {
             "status": "pass",
-            "evidence": str(SPAN_STRUT.relative_to(ROOT)),
+            "evidence": str(SPAN_STRUT_CURRENT.relative_to(ROOT)),
         }
+    app_runtime["/Apps/ToTheFront/Run.ZC"] = {
+        "status": "pass",
+        "evidence": str(TOTHEFRONT_CURRENT.relative_to(ROOT)),
+    }
     network = read(NETWORK)
     network_compile = set()
     network_compile_blocked = {}

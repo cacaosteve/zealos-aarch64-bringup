@@ -435,7 +435,7 @@
       "compile": "pass",
       "runtime": "pass",
       "evidence": "docs/acceptance/program-catalog-qemu-2026-11-03.json",
-      "runtime_evidence": "docs/acceptance/span-strut-qemu-2026-11-07.json"
+      "runtime_evidence": "docs/acceptance/span-strut-current-qemu-2026-11-10.json"
     },
     {
       "path": "/Apps/Span/SpanBridge.ZC",
@@ -489,7 +489,7 @@
       "compile": "pass",
       "runtime": "pass",
       "evidence": "docs/acceptance/program-catalog-qemu-2026-11-03.json",
-      "runtime_evidence": "docs/acceptance/span-strut-qemu-2026-11-07.json"
+      "runtime_evidence": "docs/acceptance/span-strut-current-qemu-2026-11-10.json"
     },
     {
       "path": "/Apps/Strut/Strut.ZC",
@@ -597,7 +597,7 @@
       "compile": "pass",
       "runtime": "pass",
       "evidence": "docs/acceptance/program-catalog-qemu-2026-11-03.json",
-      "runtime_evidence": "docs/acceptance/named-apps-qemu-2026-11-02.json"
+      "runtime_evidence": "docs/acceptance/tothefront-current-qemu-2026-11-10.json"
     },
     {
       "path": "/Apps/ToTheFront/TTFDraw.ZC",
