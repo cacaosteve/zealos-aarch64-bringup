@@ -2906,9 +2906,21 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 changed_editor = graphical_screen('wallpaper-desktop-palette-changed')
                 if rgb_diff_count(editor, changed_editor, (150, 40, 520, 460)) < 100:
                     raise RuntimeError('Palette Editor changed a color without updating scanout')
+                qmp_send_keys(['shift', '3'])
+                time.sleep(0.5)
+                qmp_send_text('123456', delay=0.15, dismiss_splash=False)
+                qmp_send_key('ret')
+                command('zc Print("wallpaper_palette_hex=%d,%d,%d\\n",'
+                        'gr_palette[0].r,gr_palette[0].g,gr_palette[0].b);',
+                        'wallpaper_palette_hex=18,52,86')
+                hex_editor = graphical_screen('wallpaper-desktop-palette-hex')
+                if rgb_diff_count(changed_editor, hex_editor, (150, 40, 520, 460)) < 100:
+                    raise RuntimeError('Palette Editor hex input changed data without updating scanout')
                 qmp_send_key('esc')
                 command('zc Print("wallpaper_palette_kept=%d\\n",'
-                        '!TaskValidate(wp_palette_task)&&gr_palette[0]!=wp_palette_before);',
+                        '!TaskValidate(wp_palette_task)&&gr_palette[0]!=wp_palette_before&&'
+                        'gr_palette[0].r==0x12&&gr_palette[0].g==0x34&&'
+                        'gr_palette[0].b==0x56);',
                         'wallpaper_palette_kept=1')
                 command('zc Print("wallpaper_palette_recovery=%d\\n",40+2);',
                         'wallpaper_palette_recovery=42')

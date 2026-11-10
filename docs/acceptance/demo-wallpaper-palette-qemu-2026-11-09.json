@@ -1,0 +1,22 @@
+{
+  "date": "2026-11-09",
+  "target": "AArch64 native ZealC on PCI QEMU",
+  "boot_iso": "build/zealos-aarch64-hello.iso",
+  "boot_iso_sha256": "1ea68e3459f8f29be1f84f5eb05f60992796412661f9d2be797764e707e75abe",
+  "command": "python3 scripts/check-compat.py --pci --quick --probe-demo-wallpaper-desktop",
+  "exit_code": 0,
+  "result": "pass for tested palette workflows",
+  "checks": [
+    {
+      "source": "/Home/PaletteEditor/PaletteEdit.ZC",
+      "result": "pass",
+      "evidence": "The installed Wallpaper Desktop Palette icon launched the editor. The random-color key changed palette entry 0 and scanout. The # hex-entry path accepted 123456; the live entry's R/G/B channels were 18/52/86 and scanout changed. Escape closed the editor, retained the edited value, and the terminal recovered with 40+2=42."
+    },
+    {
+      "source": "/Demo/Graphics/WallPapers/WallPaperDesktop.ZC",
+      "result": "partial",
+      "evidence": "The combined test also passed the installed desktop, all six controls, focused Home and Terminal shells, Stats toggle, NetLog open/write/close/reopen, and Telnet form, local fixture connection, typed input, socket close, and task exit."
+    }
+  ],
+  "scope_note": "Automated disposable-disk QEMU acceptance only. It now covers Palette Editor random-color and hex-entry workflows. Arrow-key selection, save-as/open palette workflows, arbitrary HomeSys customization, and live UTM/Pi desktop behavior remain unverified. The application remains partial in the source ledger because its full workflow and host-specific live coverage are not complete."
+}
