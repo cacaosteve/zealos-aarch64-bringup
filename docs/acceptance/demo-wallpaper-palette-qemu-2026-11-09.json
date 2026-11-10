@@ -18,5 +18,13 @@
       "evidence": "The combined test also passed the installed desktop, all six controls, focused Home and Terminal shells, Stats toggle, NetLog open/write/close/reopen, and Telnet form, local fixture connection, typed input, socket close, and task exit."
     }
   ],
-  "scope_note": "Automated disposable-disk QEMU acceptance only. It now covers Palette Editor random-color and hex-entry workflows. Arrow-key selection, save-as/open palette workflows, arbitrary HomeSys customization, and live UTM/Pi desktop behavior remain unverified. The application remains partial in the source ledger because its full workflow and host-specific live coverage are not complete."
+  "scope_note": "Automated disposable-disk QEMU acceptance only. It covers Palette Editor random-color and hex-entry workflows. Arrow-key selection, successful save persistence, opening a saved palette, arbitrary HomeSys customization, and live UTM/Pi desktop behavior remain unverified. Save As cancellation failed in the follow-up below. The application remains partial in the source ledger because its full workflow and host-specific live coverage are not complete.",
+  "save_as_follow_up": {
+    "date": "2026-11-09",
+    "result": "failed",
+    "steps": "From the installed Wallpaper Desktop, open Palette Editor, change a color, enter Ctrl+A, then press Escape in the filename form.",
+    "observed": "The FileName form renders. Escape reaches an unresolved external call in PESave (one baseline run reported PESave+0xd8); the serial session then reports that it is unavailable. No palette file was verified as saved, and Save As remains unaccepted.",
+    "target": "AArch64 native ZealC on PCI QEMU, disposable disk",
+    "source_change": "None; upstream/pinned source and runtime were not changed by the follow-up probe."
+  }
 }
