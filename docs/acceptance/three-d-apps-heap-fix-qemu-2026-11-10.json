@@ -1,0 +1,17 @@
+{
+  "date": "2026-11-10",
+  "target": "AArch64 PCI QEMU using UTM-bundled QEMU/HVF, one vCPU, 1 GiB guest RAM, VirtIO keyboard/tablet and disposable COW disk",
+  "kernel_sha256": "1e935ad0382daa66bb704f2d197052d4af78b408d1512aaf7c95ed4781945db6",
+  "iso_sha256": "f17ed84eac4984ac68981f84bf611f7de33a65621318c3e18e8cd71040178e35",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-3d-heap-regression.log python3 -u scripts/check-compat.py --pci --quick --probe-3d-apps",
+  "result": "pass",
+  "log": "build/check-3d-heap-regression.log",
+  "log_sha256": "5150e6a2d6c3710280d78bd259dfea62b5ad715ac77f544b2c9de25bcbc4a0cb",
+  "verified": [
+    "GrModels Man and Ball form/mesh workflows and source compilation.",
+    "KeepAway gameplay/input path and return to the graphical terminal.",
+    "Titanium gameplay/input path, Escape, and return to the graphical terminal.",
+    "Compiler and GUI terminal recovery after the app checks."
+  ],
+  "scope_note": "This automated UTM-bundled QEMU probe is not a live UTM-window or physical Pi retest. The Pi desktop input check was completed earlier; this record concerns an independent shared-heap runtime regression."
+}

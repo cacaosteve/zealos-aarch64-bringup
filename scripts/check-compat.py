@@ -2661,6 +2661,18 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     'passed': True,
                     'output': output,
                 })
+                output = command(
+                    'zc MemTest();Print("tosmisc-memtest-done\\n");',
+                    'tosmisc-memtest-done', timeout=240)
+                if 'tosmisc-memtest-done' not in output:
+                    raise RuntimeError(
+                        'TOSMisc MemTest did not complete both data- and code-heap stress loops:\n'
+                        + output)
+                runtime_checks.append({
+                    'name': 'TOSMisc MemTest fills the data arena and separate code arena, then returns to the compiler',
+                    'passed': True,
+                    'output': output,
+                })
             if (all(m['loaded'] for m in module_loads) and
                     '/Demo/Templates/Lex1.ZC' in args.demo_system_module):
                 output = command(

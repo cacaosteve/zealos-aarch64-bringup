@@ -1,22 +1,23 @@
 {
   "date": "2026-11-10",
-  "target": "AArch64 PCI QEMU, one vCPU, UTM QEMU/HVF, 1 GiB guest RAM, disposable copy-on-write disk",
+  "target": "AArch64 PCI QEMU using UTM-bundled QEMU/HVF, one vCPU, 1 GiB guest RAM, disposable COW disk",
   "source": "/Demo/AcctExample/TOS/TOSMisc.ZC",
   "function": "MemTest",
-  "kernel_sha256": "c7cff83246dde72296135862518d65574ebc482171cc7286935153fa282d53d9",
-  "iso_sha256": "4bc484338001b2a4d460844c11f0ea397554dac9250c378885f8a8a7ff1be4ea",
-  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-tosmisc-memtest-qemu.log python3 -u scripts/check-compat.py --pci --quick --probe-demo-system-context --demo-system-path /Demo/AcctExample/TOS/TOSMisc.ZC --demo-system-module /Demo/AcctExample/TOS/TOSConfig.ZC --demo-system-module /System/Gr/ScreenCast.ZC --demo-system-module /Apps/Psalmody/JukePuppet.ZC --demo-system-module /System/BlkDev/DiskCheck.ZC --demo-system-module /Demo/AcctExample/TOS/TOSMisc.ZC",
-  "result": "partial; MemTest exhausted the guest data arena during the code-heap allocation phase before the completion marker",
-  "verified_before_failure": [
-    "The TOSMisc configuration and non-destructive OCR, AU-write/readback, GR-to-MV conversion, and ScreenCast recording checks passed earlier in this same run.",
-    "MemTest allocated and filled 1 MiB blocks through its data-heap loop and entered its code-heap loop."
+  "kernel_sha256": "1e935ad0382daa66bb704f2d197052d4af78b408d1512aaf7c95ed4781945db6",
+  "iso_sha256": "f17ed84eac4984ac68981f84bf611f7de33a65621318c3e18e8cd71040178e35",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-tosmisc-memtest-fixed.log python3 -u scripts/check-compat.py --pci --quick --probe-demo-system-context --demo-system-path /Demo/AcctExample/TOS/TOSMisc.ZC --demo-system-module /Demo/AcctExample/TOS/TOSConfig.ZC --demo-system-module /System/Gr/ScreenCast.ZC --demo-system-module /Apps/Psalmody/JukePuppet.ZC --demo-system-module /System/BlkDev/DiskCheck.ZC --demo-system-module /Demo/AcctExample/TOS/TOSMisc.ZC",
+  "result": "pass for stock MemTest data-heap and code-heap stress loops and compiler recovery",
+  "verified": [
+    "The data-heap loop allocated and filled 1 MiB blocks until the reported remaining pool crossed the stock 16 MiB threshold.",
+    "The code-heap loop independently allocated and filled 1 MiB blocks until its remaining pool crossed the stock 16 MiB threshold.",
+    "MemTest returned and printed the explicit tosmisc-memtest-done marker; the following stock TOSMisc source compilation passed.",
+    "All preceding non-destructive TOSConfig, OCR, AU-write/readback, GR-to-MV, and ScreenCast checks also passed in this run."
   ],
-  "failure": "The allocator reported `zc: data arena exhausted (request=1048576 aligned=1048576 owner_used=90543872 free=602368 largest=549008 blocks=8)`; MemTest did not print its completion marker.",
   "not_verified": [
-    "Completion of the code-heap allocation loop and post-stress compiler health.",
-    "Live UTM interface or physical Pi behavior."
+    "TOSMisc destructive disk-formatting, repair, installer, and configured-drive workflows.",
+    "Audible output or interactive behavior on physical Pi or UTM GUI."
   ],
-  "log": "build/check-tosmisc-memtest-qemu.log",
-  "log_sha256": "3cab9da9e6127f625769e1915911236f05636c6567a01322d227c173a57aa269",
-  "scope_note": "The run modified only a disposable COW guest disk. This exposes a mismatch between the stock MemTest stress assumptions and the port's current arena allocation behavior. The failure is not evidence that filesystems or user storage were damaged."
+  "log": "build/check-tosmisc-memtest-fixed.log",
+  "log_sha256": "17da0e9d856f0e7711c3dd64c74ff3346b611d436a88e2e05b82efe8824bbe08",
+  "scope_note": "The previous partial run revealed that the synthetic root task exposed a zero-initialized per-fiber code heap. The root now points to the shared code arena, while child fibers keep separate code-heap controls. This run used only a disposable COW guest disk; no user media was modified."
 }

@@ -1710,6 +1710,13 @@ static CHeapCtrl *guest_task_record_owner(void *task) {
     return NULL;
 }
 static CHeapCtrl *guest_allocation_owner(int64_t selector) {
+    /* The bootstrap compiler task uses the bridge's process-wide heaps. Keep
+     * an explicit Fs->code_heap allocation in the code arena even before the
+     * guest task scheduler is bound (for example, the serial ZealC prompt). */
+    if ((void *)(uintptr_t)selector == &data_heap)
+        return &data_heap;
+    if ((void *)(uintptr_t)selector == &code_heap)
+        return &code_heap;
     if (guest_task_bound) {
         if (!selector)
             return &guest_fibers[guest_current].heap_owner;
@@ -1725,6 +1732,8 @@ static CHeapCtrl *guest_allocation_owner(int64_t selector) {
                   * selector back to the fiber's guest-owned heap. */
                  (void *)(uintptr_t)selector == &f->compiler_heap))
                 return &f->heap_owner;
+            if ((void *)(uintptr_t)selector == &f->compiler_code_heap)
+                return &f->compiler_code_heap;
         }
         CHeapCtrl *owner = guest_task_record_owner((void *)(uintptr_t)selector);
         if (owner)
@@ -4280,7 +4289,12 @@ static void init_guest_fiber(unsigned i, void *parent, const char *name) {
     *(void **)(ctrl + 24) = ctrl + 16;
     *(int64_t *)(words + guest_number_off) = i ? (int64_t)++guest_task_serial : 0;
     *(void **)(words + guest_data_heap_off) = heap;
-    *(void **)(words + guest_code_heap_off) = heap;
+    /* Guest data and code allocations share a task heap owner only on the
+     * data side. Preserve the separate code-pool handle so Fs->code_heap
+     * allocations are charged to the code arena and reclaimed with this
+     * fiber's compiler code heap. */
+    *(void **)(words + guest_code_heap_off) =
+        i ? (void *)&f->compiler_code_heap : (void *)&code_heap;
     /* Guest DEFINE/FramePtr tables are separate from the Aiwnios compiler
      * hash. Inherit the parent's definitions just as compiler names do;
      * DolDoc callbacks need the root's ST_DOC_CMDS and related lists.

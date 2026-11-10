@@ -493,12 +493,18 @@ pass in QEMU. Stock `GRWrite`, `GR2MV`, and `GRRead` also pass a synthetic
 single-frame movie round trip. Stock `ScreenCast(ON/OFF)` now toggles recording
 in the QEMU compatibility runtime, produces a nonempty GR frame that `GRRead`
 reopens, and records note changes into an AU file that `AUWrite` writes and
-`FileRead` verifies. The stock
+`FileRead` verifies. Stock `MemTest` now fills the data and separate code
+arenas through their expected 16 MiB reserve thresholds, then returns to a
+working compiler; the earlier failure was the synthetic root task pointing at
+an uninitialized per-fiber code heap ([acceptance](docs/acceptance/demo-tosmisc-memtest-qemu-2026-11-10.json)). The stock
 `DiskCheck('D',FALSE,FALSE)` path also returns zero on the disposable,
 explicitly mounted read-only RedSea fixture; `DiskCheckAll`, repair behavior,
 and its configured-drive workflow remain unverified. JukePuppet media playback
-and allocation stress also remain unverified
+and other TOS workflows remain unverified
 ([acceptance](docs/acceptance/demo-tosmisc-current-qemu-2026-11-10.json)).
+The same heap-routing fix preserves the GrModels, KeepAway and Titanium QEMU
+app checks; the fresh regression log is recorded
+[here](docs/acceptance/three-d-apps-heap-fix-qemu-2026-11-10.json).
 The TimeIns ARM64 adaptation now has a fresh three-sample QEMU runtime check
 with terminal recovery. The stock source still fails at `PassTrace`, so this
 does not reproduce its optimizer traces ([runtime acceptance](docs/acceptance/demo-time-ins-arm64-runtime-qemu-2026-11-10.json),
