@@ -21,7 +21,7 @@
     "command": "qemu-system-aarch64 -machine virt,gic-version=3,dumpdtb=build/virt-keyboard-irq.dtb -cpu cortex-a72 -m 1024 -nodefaults -display none; dtc -I dtb -O dts build/virt-keyboard-irq.dtb",
     "result": "The generated QEMU virt device tree assigns SPI numbers 16, 17, ... 47 to VirtIO MMIO slots at 0x0a000000, 0x0a000200, ... 0x0a003e00. GIC interrupt IDs for these SPIs are 48\u201379. The keyboard driver currently scans for an input-capable slot and polls it; current GIC initialization enables the timer PPI, not these input SPIs.",
     "dtb_sha256": "34fed8dabbcf0a191768e66f99b8d9a6901728f51532e3bede63b928f7413493",
-    "next_work": "Develop safe focused-task break delivery without entering runtime/compiler critical sections from IRQ context or switching tasks in MessageScan. The queue remains finite, and interrupt recognition does not itself stop the app. USB/xHCI and Pi need separate implementations and tests.",
+    "next_work": "Verify Ctrl-Alt-D, live UTM and Pi behavior. Later checks pass repeated Ctrl-Alt-C with graphical terminal recovery using QEMU VirtIO and USB keyboards, without adding a yield to MessageScan; see terminal-output-investigation-2026-11-09.json. The queue remains finite, and interrupt recognition does not itself stop the app. Physical Pi interrupt behavior remains unverified.",
     "scope": "Opt-in QEMU virt GICv3/MMIO observation acknowledges the keyboard interrupt and scans bounded completed events to count Ctrl-Alt-C; the ordinary polling path alone consumes and reoffers descriptors. It does not deliver a break or switch tasks. USB/xHCI, physical Pi and live UTM are not covered.",
     "irq_observer_test": {
       "command": "python3 -u scripts/check-compat.py --pci --quick --probe-virtio-keyboard-irq",

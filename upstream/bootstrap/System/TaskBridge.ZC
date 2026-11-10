@@ -7555,8 +7555,11 @@ I64 PopUp(U8 *buf, CTask *parent=NULL, CTask **_pu_task=NULL)
     }
     if (_pu_task)
         *_pu_task = task;
+    // TaskExe normally suspends its caller for WAKE_MASTER. The bootstrap
+    // root and system tasks cannot be suspended, so wait for this exact job
+    // even when the first scan would otherwise return before it is done.
     if (job)
-        JobResScan(job, &res);
+        res = JobResGet(job);
     Fs->popup_task = NULL;
     Kill(task);
     if (_pu_task)

@@ -17,6 +17,25 @@ I64 LockBlockRuntime()
     return LockBlockValue;
 }
 
+I64 LockGlobalInstructionProbe()
+{
+    LockBlockValue = 40;
+    lock { LockBlockValue += 1; }
+    lock { LockBlockValue++; }
+    if (LockBlockValue != 42) return 1;
+    return 42;
+}
+
+I64 LockLocalInstructionProbe()
+{
+    I64 value = 40;
+    I64 *p = &value;
+    lock { value += 1; }
+    lock { value++; }
+    if (*p != 42) return 1;
+    return 42;
+}
+
 I64 LockBlockConcurrentRuntime()
 {
     I64 i;

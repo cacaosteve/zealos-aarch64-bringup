@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-09",
+  "program": "Budget",
+  "result": "pass",
+  "environment": "QEMU AArch64 virt, PCI storage, emulated NEC xHCI USB keyboard and tablet, disposable virtual disk",
+  "command": "python3 -u scripts/check-compat.py --pci --quick --usb-input nec --probe-budget-program",
+  "kernel_sha256": "ab08ea01aa1769c22f5b4ef2e3b99e805d92e21ba1c313474657278fd785f525",
+  "log": "build/budget-current-usb-nec.log",
+  "log_sha256": "a9b2f7861578b733c1c87c72eabbabefbb2fecbcf0dea3d5f5ead41f6d7b4569",
+  "checks": ["form creation and field editing", "cancel and abort paths", "save and reopen", "saved entry visible after cold disk-only reboot", "graphical terminal evaluates 40+2 after exit", "failed task count zero"],
+  "limitations": ["This is QEMU, not a live UTM retest", "Physical Pi behavior unverified", "Does not establish coverage of every Budget operation", "No claim is made about a separate ISO artifact"]
+}

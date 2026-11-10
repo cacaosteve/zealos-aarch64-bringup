@@ -104,6 +104,22 @@ all: $(BOOT) $(KERNEL) iso esp
 include src/zc/build.mk
 KERNEL_OBJS += $(ZC_OBJS)
 
+.PHONY: check-lock-width
+check-lock-width: all
+	python3 scripts/check-compat.py --pci --quick --probe-source-fast --probe-sound-quiet --probe-source-module tests/compat/LockBlockRuntime.ZC --probe-source-module tests/compat/LockWidthRuntime.ZC --probe-source-module tests/compat/LockIncDecRuntime.ZC --probe-source tests/compat/LockRegression.ZC --probe-source-call LockRegressionChecks
+
+.PHONY: check-budget-templates
+check-budget-templates: all
+	python3 scripts/check-compat.py --pci --quick --probe-source-fast --probe-source tests/compat/BudgetTemplates.ZC --probe-source-call BudgetTemplateAllChecks --probe-source-cold-call BudgetTemplateColdReadChecks
+
+.PHONY: check-budget-template-ui
+check-budget-template-ui: all
+	python3 scripts/check-compat.py --pci --quick --usb-input nec --probe-budget-template-ui
+
+.PHONY: check-budget-template-edit
+check-budget-template-edit: all
+	python3 scripts/check-compat.py --pci --quick --usb-input nec --probe-budget-template-edit
+
 check-time-format: all
 	python3 scripts/check-compat.py --pci --quick --probe-source tests/compat/TimeFormatChecks.ZC --probe-source-call TimeFormatChecks --probe-source-kernel
 

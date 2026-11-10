@@ -1,0 +1,14 @@
+{
+  "date": "2026-11-09",
+  "target": "QEMU AArch64 virt, HVF, one vCPU, VirtIO keyboard/tablet and WAV-backed VirtIO sound",
+  "disk_sha256": "c1efb740bbaf41944f4f6c5a1f4c0dc818653963fbbe6b09ba0df57fb47c25a6",
+  "source": "/Demo/Games/FlapBat.ZC",
+  "command": "ZEAL_AUDIO_CAPTURE_PATH=build/flapbat-bracketed2.wav QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device -audiodev wav,id=sound0,path=build/flapbat-bracketed2.wav -device virtio-sound-pci,audiodev=sound0' python3 -u scripts/check-compat.py --pci --quick --probe-demo-flapbat",
+  "result": "pass: instruction popup, animation, Space, Escape, terminal recovery, stopped tone and no live song task",
+  "capture": "WAV file offsets 0 to 1052672 were recorded immediately before launching and before Escape; after the 44-byte WAV header this interval held 526314 signed 16-bit samples, 524550 nonzero, peak 7000. Backend buffering may straddle the boundary.",
+  "logs": {
+    "build/flapbat-bracketed2.log": "28a4f6c5d5977ef93cc069c998253dfb771898d3ef044f9b4b6bcdde599dcfe5",
+    "build/flapbat-bracketed2.wav": "b4726b00422ce83526645e4180e213671d472ea82dbdc2c6bd8661922bc38ecc"
+  },
+  "limits": "Nonzero gameplay audio does not prove note accuracy or a specific collision sound. This does not establish audible UTM or Raspberry Pi behavior. The test waited four seconds to capture the game song; it did not deliberately trigger a collision."
+}

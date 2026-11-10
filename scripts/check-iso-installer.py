@@ -143,11 +143,16 @@ def main() -> None:
                         default=ROOT / "build/zealos-aarch64-hello.iso")
     parser.add_argument("--usb-cd", action="store_true",
                         help="use NEC xHCI USB CD, keyboard and tablet alongside VirtIO recovery input")
+    parser.add_argument("--source-disk", type=pathlib.Path,
+                        default=ROOT / "build/disk.img",
+                        help="disk image packaged in the ISO, for byte-for-byte comparison")
     args = parser.parse_args()
     iso = args.iso
     if not iso.is_absolute():
         iso = ROOT / iso
-    source_disk = ROOT / "build/disk.img"
+    source_disk = args.source_disk
+    if not source_disk.is_absolute():
+        source_disk = ROOT / source_disk
     if not iso.exists() or not source_disk.exists():
         raise SystemExit(f"missing {iso} or {source_disk}; run `make iso` first")
     fw_vars = pathlib.Path(os.environ.get("FW_VARS_IN", "/opt/homebrew/share/qemu/edk2-arm-vars.fd"))

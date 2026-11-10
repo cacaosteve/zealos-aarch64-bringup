@@ -1,0 +1,59 @@
+I64 lock_incdec_value;
+U16 lock_incdec_half;
+U32 lock_incdec_word;
+
+I64 LockCollect(I64 a, I64 b, I64 c, I64 d, I64 e, I64 f, I64 g, I64 h)
+{
+    return a + b + c + d + e + f + g + h;
+}
+
+I64 LockSpillProbe()
+{
+    I64 *p = &lock_incdec_value, result;
+    lock_incdec_value = 40;
+    lock { result = LockCollect(1, 2, 3, 4, 5, 6, 7, (*p)++); }
+    if (result != 68 || lock_incdec_value != 41) return 1;
+    return 42;
+}
+
+I64 LockBoundaryProbe()
+{
+    I64 *p = &lock_incdec_value;
+    lock_incdec_value = 38;
+    (*p)++;
+    lock { (*p)++; }
+    lock (*p)++;
+    (*p)++;
+    if (lock_incdec_value != 42) return 1;
+    return 42;
+}
+
+I64 LockIncDecRuntimeChecks()
+{
+    I64 *p = &lock_incdec_value;
+    U16 *p16 = &lock_incdec_half;
+    U32 *p32 = &lock_incdec_word;
+    I64 result;
+    lock_incdec_value = 40;
+    lock { (*p)++; }
+    if (lock_incdec_value != 41) return 1;
+    lock { (*p)--; }
+    if (lock_incdec_value != 40) return 2;
+    lock { result = ++(*p); }
+    if (lock_incdec_value != 41 || result != 41) return 3;
+    lock { result = (*p)++; }
+    if (lock_incdec_value != 42 || result != 41) return 4;
+    lock { result = --(*p); }
+    if (lock_incdec_value != 41 || result != 41) return 5;
+    lock { result = (*p)--; }
+    if (lock_incdec_value != 40 || result != 41) return 6;
+    lock_incdec_half = 0x8000;
+    lock { result = (*p16)++; }
+    if (lock_incdec_half != 0x8001 || result != 0x8000) return 7;
+    lock_incdec_word = 0x0000FFFF;
+    lock { result = ++(*p32); }
+    if (lock_incdec_word != 0x00010000 || result != 0x00010000) return 8;
+    if (LockSpillProbe != 42) return 9;
+    if (LockBoundaryProbe != 42) return 10;
+    return 42;
+}

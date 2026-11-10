@@ -1944,15 +1944,54 @@ static int64_t __SexyWriteIntoDst(CCmpCtrl *cctrl, CRPN *deref, CICArg *arg,
   }
   return code_off;
 }
+/* Convert addressable static, frame and absolute lvalues into an indirect
+ * address. The atomic paths already understand indirect and indexed modes. */
+static int64_t AtomicAddress(CCmpCtrl *cctrl, CICArg *arg, char *bin,
+                             int64_t code_off) {
+  if (arg->mode == MD_STATIC) {
+    if (cctrl->code_ctrl->final_pass) {
+      AIWNIOS_ADD_CODE(ARM_adrX(MIR(cctrl, 1), 0));
+      CCodeMiscRef *ref = CodeMiscAddRef(cctrl->statics_label, bin + code_off - 4);
+      ref->patch_cond_br = ARM_adrX;
+      ref->user_data1 = 1;
+      ref->offset = arg->off;
+    } else {
+      AIWNIOS_ADD_CODE(0);
+    }
+  } else if (arg->mode == MD_FRAME) {
+    int64_t frame_off = arg->off;
+    if (frame_off >= 0 && ARM_addImmX(1, ARM_REG_FP, frame_off) != ARM_ERR_INV_OFF) {
+      AIWNIOS_ADD_CODE(ARM_addImmX(MIR(cctrl, 1), ARM_REG_FP, frame_off));
+    } else if (frame_off < 0 && ARM_subImmX(1, ARM_REG_FP, -frame_off) != ARM_ERR_INV_OFF) {
+      AIWNIOS_ADD_CODE(ARM_subImmX(MIR(cctrl, 1), ARM_REG_FP, -frame_off));
+    } else {
+      uint64_t magnitude = frame_off < 0 ? -frame_off : frame_off;
+      code_off = __ICMoveI64(cctrl, MIR(cctrl, 2), magnitude, bin, code_off);
+      AIWNIOS_ADD_CODE((frame_off < 0 ? ARM_subRegX : ARM_addRegX)(MIR(cctrl, 1), ARM_REG_FP, 2));
+    }
+  } else if (arg->mode == MD_PTR) {
+    code_off = __ICMoveI64(cctrl, MIR(cctrl, 1), arg->off, bin, code_off);
+  } else {
+    return code_off;
+  }
+  arg->mode = MD_INDIR_REG;
+  arg->reg = 1;
+  arg->off = 0;
+  return code_off;
+}
+
+/* Resolve the address once into x1, then retry from LDAXR. This keeps retry
+ * independent of the registers used to calculate an indexed address. */
 #define ATOMIC_LOAD(derefed)                                                   \
   {                                                                            \
-    int64_t retry = code_off;                                                  \
+    int64_t retry = -1;                                                        \
     if (derefed.mode == __MD_ARM_SHIFT) {                                      \
       switch (derefed.raw_type) {                                              \
       case RT_I8i:                                                             \
       case RT_U8i:                                                             \
         AIWNIOS_ADD_CODE(                                                      \
             ARM_addRegX(MIR(cctrl, 1), derefed.reg2, derefed.reg));            \
+        retry = code_off;                                                      \
         AIWNIOS_ADD_CODE(ARM_ldaxrb(MIR(cctrl, 0), 1));                        \
         if (RT_U8i == derefed.raw_type)                                        \
           AIWNIOS_ADD_CODE(ARM_uxtbX(0, 0))                                    \
@@ -1963,8 +2002,9 @@ static int64_t __SexyWriteIntoDst(CCmpCtrl *cctrl, CRPN *deref, CICArg *arg,
       case RT_U16i:                                                            \
         AIWNIOS_ADD_CODE(ARM_lslImmX(MIR(cctrl, 0), derefed.reg2, 1));         \
         AIWNIOS_ADD_CODE(ARM_addRegX(MIR(cctrl, 1), 0, derefed.reg));          \
+        retry = code_off;                                                      \
         AIWNIOS_ADD_CODE(ARM_ldaxrh(0, 1));                                    \
-        if (RT_U8i == derefed.raw_type)                                        \
+        if (RT_U16i == derefed.raw_type)                                       \
           AIWNIOS_ADD_CODE(ARM_uxthX(0, 0))                                    \
         else                                                                   \
           AIWNIOS_ADD_CODE(ARM_sxthX(0, 0))                                    \
@@ -1973,8 +2013,9 @@ static int64_t __SexyWriteIntoDst(CCmpCtrl *cctrl, CRPN *deref, CICArg *arg,
       case RT_U32i:                                                            \
         AIWNIOS_ADD_CODE(ARM_lslImmX(MIR(cctrl, 0), derefed.reg2, 2));         \
         AIWNIOS_ADD_CODE(ARM_addRegX(MIR(cctrl, 1), 0, derefed.reg));          \
+        retry = code_off;                                                      \
         AIWNIOS_ADD_CODE(ARM_ldaxr(0, 1));                                     \
-        if (RT_U8i == derefed.raw_type)                                        \
+        if (RT_U32i == derefed.raw_type)                                       \
           AIWNIOS_ADD_CODE(ARM_uxtwX(0, 0))                                    \
         else                                                                   \
           AIWNIOS_ADD_CODE(ARM_sxtwX(0, 0))                                    \
@@ -1983,6 +2024,7 @@ static int64_t __SexyWriteIntoDst(CCmpCtrl *cctrl, CRPN *deref, CICArg *arg,
       case RT_U64i:                                                            \
         AIWNIOS_ADD_CODE(ARM_lslImmX(MIR(cctrl, 0), derefed.reg2, 3));         \
         AIWNIOS_ADD_CODE(ARM_addRegX(MIR(cctrl, 1), 0, derefed.reg));          \
+        retry = code_off;                                                      \
         AIWNIOS_ADD_CODE(ARM_ldaxrX(0, 1));                                    \
         break;                                                                 \
       }                                                                        \
@@ -1997,6 +2039,7 @@ static int64_t __SexyWriteIntoDst(CCmpCtrl *cctrl, CRPN *deref, CICArg *arg,
       switch (derefed.raw_type) {                                              \
       case RT_I8i:                                                             \
       case RT_U8i:                                                             \
+        retry = code_off;                                                      \
         AIWNIOS_ADD_CODE(ARM_ldaxrb(MIR(cctrl, 0), 1));                        \
         if (RT_U8i == derefed.raw_type)                                        \
           AIWNIOS_ADD_CODE(ARM_uxtbX(0, 0))                                    \
@@ -2005,46 +2048,51 @@ static int64_t __SexyWriteIntoDst(CCmpCtrl *cctrl, CRPN *deref, CICArg *arg,
         break;                                                                 \
       case RT_I16i:                                                            \
       case RT_U16i:                                                            \
+        retry = code_off;                                                      \
         AIWNIOS_ADD_CODE(ARM_ldaxrh(MIR(cctrl, 0), 1));                        \
-        if (RT_U8i == derefed.raw_type)                                        \
+        if (RT_U16i == derefed.raw_type)                                       \
           AIWNIOS_ADD_CODE(ARM_uxthX(0, 0))                                    \
         else                                                                   \
           AIWNIOS_ADD_CODE(ARM_sxthX(0, 0))                                    \
         break;                                                                 \
       case RT_I32i:                                                            \
       case RT_U32i:                                                            \
+        retry = code_off;                                                      \
         AIWNIOS_ADD_CODE(ARM_ldaxr(MIR(cctrl, 0), 1));                         \
-        if (RT_U8i == derefed.raw_type)                                        \
+        if (RT_U32i == derefed.raw_type)                                       \
           AIWNIOS_ADD_CODE(ARM_uxtwX(0, 0))                                    \
         else                                                                   \
           AIWNIOS_ADD_CODE(ARM_sxtwX(0, 0))                                    \
         break;                                                                 \
       case RT_I64i:                                                            \
       case RT_U64i:                                                            \
+        retry = code_off;                                                      \
         AIWNIOS_ADD_CODE(ARM_ldaxrX(MIR(cctrl, 0), 1));                        \
         break;                                                                 \
       }                                                                        \
     }
+/* Arm forbids overlap of STLXR's status register with its data/base. x16 is
+ * marked clobbered for register allocation; x0 contains data and x1 address. */
 #define ATOMIC_STORE(derefed, r)                                               \
   switch (derefed.raw_type) {                                                  \
   case RT_I8i:                                                                 \
   case RT_U8i:                                                                 \
-    AIWNIOS_ADD_CODE(ARM_stlxrb(MIR(cctrl, 0), r, 1));                         \
+    AIWNIOS_ADD_CODE(ARM_stlxrb(MIR(cctrl, 16), r, 1));                         \
     break;                                                                     \
   case RT_I16i:                                                                \
   case RT_U16i:                                                                \
-    AIWNIOS_ADD_CODE(ARM_stlxrh(MIR(cctrl, 0), r, 1));                         \
+    AIWNIOS_ADD_CODE(ARM_stlxrh(MIR(cctrl, 16), r, 1));                         \
     break;                                                                     \
   case RT_I32i:                                                                \
   case RT_U32i:                                                                \
-    AIWNIOS_ADD_CODE(ARM_stlxrh(MIR(cctrl, 0), r, 1));                         \
+    AIWNIOS_ADD_CODE(ARM_stlxr(MIR(cctrl, 16), r, 1));                          \
     break;                                                                     \
   case RT_I64i:                                                                \
   case RT_U64i:                                                                \
-    AIWNIOS_ADD_CODE(ARM_stlxrX(MIR(cctrl, 0), r, 1));                         \
+    AIWNIOS_ADD_CODE(ARM_stlxrX(MIR(cctrl, 16), r, 1));                         \
     break;                                                                     \
   }                                                                            \
-  AIWNIOS_ADD_CODE(ARM_cbnz(0, retry - code_off));                             \
+  AIWNIOS_ADD_CODE(ARM_cbnz(16, retry - code_off));                             \
   }
 static int64_t __SexyPreOp(CCmpCtrl *cctrl, CRPN *rpn,
                            int64_t (*i_imm_op)(int64_t, int64_t, int64_t),
@@ -2122,13 +2170,14 @@ static int64_t __SexyPreOp(CCmpCtrl *cctrl, CRPN *rpn,
       code_off = ICMov(cctrl, &rpn->res, &tmp, bin, code_off);
     } else {
       code_off = DerefToICArg(cctrl, &derefed, next, 3, bin, code_off);
+      if (rpn->flags & ICF_LOCK_EXPR)
+        code_off = AtomicAddress(cctrl, &derefed, bin, code_off);
       tmp = derefed;
       if ((rpn->flags & ICF_LOCK_EXPR) &&
           (tmp.mode == MD_INDIR_REG || tmp.mode == __MD_ARM_SHIFT)) {
         ATOMIC_LOAD(derefed);
         tmp.mode = MD_REG;
         tmp.reg = 0;
-        code_off = ICMov(cctrl, &rpn->res, &tmp, bin, code_off);
         code = i_imm_op(MIR(cctrl, 0), 0, rpn->integer);
         if (code != ARM_ERR_INV_OFF) {
           AIWNIOS_ADD_CODE(code);
@@ -2137,6 +2186,8 @@ static int64_t __SexyPreOp(CCmpCtrl *cctrl, CRPN *rpn,
           AIWNIOS_ADD_CODE(i_reg_op(MIR(cctrl, 0), 0, 2))
         }
         ATOMIC_STORE(derefed, 0);
+        /* Publish the new value only after the successful exclusive store. */
+        code_off = ICMov(cctrl, &rpn->res, &tmp, bin, code_off);
         return code_off;
       }
       code_off = PutICArgIntoReg(cctrl, &tmp, tmp.raw_type, 2, bin, code_off);
@@ -2198,23 +2249,30 @@ static int64_t __SexyPostOp(CCmpCtrl *cctrl, CRPN *rpn,
       code_off = ICMov(cctrl, &derefed, &tmp, bin, code_off);
     } else {
       code_off = DerefToICArg(cctrl, &derefed, next, 3, bin, code_off);
+      if (rpn->flags & ICF_LOCK_EXPR)
+        code_off = AtomicAddress(cctrl, &derefed, bin, code_off);
       tmp = derefed;
-      code_off = ICMov(cctrl, &rpn->res, &tmp, bin, code_off);
       if ((rpn->flags & ICF_LOCK_EXPR) &&
           (tmp.mode == MD_INDIR_REG || tmp.mode == __MD_ARM_SHIFT)) {
         ATOMIC_LOAD(derefed);
+        /* Preserve the loaded value in a register, without another memory
+         * access inside the exclusive window. A failed store retries and
+         * refreshes this value before publishing the result. */
+        AIWNIOS_ADD_CODE(ARM_movRegX(MIR(cctrl, 2), 0));
         tmp.mode = MD_REG;
-        tmp.reg = 1;
-        code = i_imm_op(MIR(cctrl, 1), 1, rpn->integer);
+        tmp.reg = 2;
+        code = i_imm_op(MIR(cctrl, 0), 0, rpn->integer);
         if (code != ARM_ERR_INV_OFF) {
           AIWNIOS_ADD_CODE(code);
         } else {
-          code_off = __ICMoveI64(cctrl, 2, rpn->integer, bin, code_off);
-          AIWNIOS_ADD_CODE(i_reg_op(MIR(cctrl, 1), 1, 2))
+          code_off = __ICMoveI64(cctrl, MIR(cctrl, 3), rpn->integer, bin, code_off);
+          AIWNIOS_ADD_CODE(i_reg_op(MIR(cctrl, 0), 0, 3))
         }
         ATOMIC_STORE(derefed, 0);
+        code_off = ICMov(cctrl, &rpn->res, &tmp, bin, code_off);
         return code_off;
       }
+      code_off = ICMov(cctrl, &rpn->res, &tmp, bin, code_off);
       code_off = PutICArgIntoReg(cctrl, &tmp, tmp.raw_type, 2, bin, code_off);
       code = i_imm_op(MIR(cctrl, tmp.reg), tmp.reg, rpn->integer);
       if (code != ARM_ERR_INV_OFF) {
@@ -2299,6 +2357,8 @@ static int64_t __SexyAssignOp(CCmpCtrl *cctrl, CRPN *rpn,
       if (next->raw_type == RT_F64 || rpn->raw_type == RT_F64)
         goto defacto2;
       code_off = DerefToICArg(cctrl, &derefed, next, 2, bin, code_off);
+      if (rpn->flags & ICF_LOCK_EXPR)
+        code_off = AtomicAddress(cctrl, &derefed, bin, code_off);
       tmp2 = derefed;
       if (!(rpn->flags & ICF_LOCK_EXPR)) {
       not_lock_const:;
@@ -2315,8 +2375,8 @@ static int64_t __SexyAssignOp(CCmpCtrl *cctrl, CRPN *rpn,
         tmp2.mode = MD_REG;
         tmp2.reg = 0;
         tmp2.raw_type = RT_I64i;
-        code_off = ICMov(cctrl, &rpn->res, &tmp2, bin, code_off);
         ATOMIC_STORE(derefed, 0);
+        code_off = ICMov(cctrl, &rpn->res, &tmp2, bin, code_off);
       }
     }
     return code_off;
@@ -2356,61 +2416,16 @@ static int64_t __SexyAssignOp(CCmpCtrl *cctrl, CRPN *rpn,
           b->res = tmp2;
         }
         code_off = DerefToICArg(cctrl, &derefed, next, 1, bin, code_off);
-        /* Atomic operations below consume a base address in x1. Turn other
-         * addressable lvalues into that form instead of silently compiling
-         * a locked update as an ordinary load/add/store. */
-        if (derefed.mode == MD_STATIC) {
-          if (cctrl->code_ctrl->final_pass) {
-            AIWNIOS_ADD_CODE(ARM_adrX(MIR(cctrl, 1), 0));
-            CCodeMiscRef *ref = CodeMiscAddRef(cctrl->statics_label,
-                                               bin + code_off - 4);
-            ref->patch_cond_br = ARM_adrX;
-            ref->user_data1 = 1;
-            ref->offset = derefed.off;
-          } else {
-            AIWNIOS_ADD_CODE(0);
-          }
-          derefed.mode = MD_INDIR_REG;
-          derefed.reg = 1;
-          derefed.off = 0;
-        } else if (derefed.mode == MD_FRAME) {
-          int64_t frame_off = derefed.off;
-          if (frame_off >= 0 &&
-              ARM_addImmX(1, ARM_REG_FP, frame_off) != ARM_ERR_INV_OFF) {
-            AIWNIOS_ADD_CODE(ARM_addImmX(MIR(cctrl, 1), ARM_REG_FP,
-                                         frame_off));
-          } else if (frame_off < 0 &&
-                     ARM_subImmX(1, ARM_REG_FP, -frame_off) !=
-                         ARM_ERR_INV_OFF) {
-            AIWNIOS_ADD_CODE(ARM_subImmX(MIR(cctrl, 1), ARM_REG_FP,
-                                         -frame_off));
-          } else {
-            uint64_t magnitude = frame_off < 0 ? -frame_off : frame_off;
-            code_off = __ICMoveI64(cctrl, MIR(cctrl, 2), magnitude, bin,
-                                   code_off);
-            AIWNIOS_ADD_CODE((frame_off < 0 ? ARM_subRegX : ARM_addRegX)(
-                MIR(cctrl, 1), ARM_REG_FP, 2));
-          }
-          derefed.mode = MD_INDIR_REG;
-          derefed.reg = 1;
-          derefed.off = 0;
-        } else if (derefed.mode == MD_PTR) {
-          code_off = __ICMoveI64(cctrl, MIR(cctrl, 1), derefed.off, bin,
-                                 code_off);
-          derefed.mode = MD_INDIR_REG;
-          derefed.reg = 1;
-          derefed.off = 0;
-        } else if (derefed.mode != __MD_ARM_SHIFT &&
-                   derefed.mode != MD_INDIR_REG) {
+        code_off = AtomicAddress(cctrl, &derefed, bin, code_off);
+        if (derefed.mode != __MD_ARM_SHIFT && derefed.mode != MD_INDIR_REG)
           goto normal;
-        }
         ATOMIC_LOAD(derefed);
         AIWNIOS_ADD_CODE(i_op(MIR(cctrl, 0), 0, b->res.reg));
         tmp2.mode = MD_REG;
         tmp2.reg = 0;
         tmp2.raw_type = RT_I64i;
-        code_off = ICMov(cctrl, &rpn->res, &tmp2, bin, code_off);
         ATOMIC_STORE(derefed, 0);
+        code_off = ICMov(cctrl, &rpn->res, &tmp2, bin, code_off);
         return code_off;
       }
       //

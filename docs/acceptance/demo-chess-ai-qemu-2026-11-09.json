@@ -1,0 +1,23 @@
+{
+  "date": "2026-11-09",
+  "program": "/Demo/Games/Chess.ZC",
+  "environment": "QEMU AArch64 virt, PCI storage, one vCPU",
+  "command": "python3 -u scripts/check-compat.py --pci --quick --probe-demo-chess-ai",
+  "result": "passed",
+  "evidence": {
+    "log": "build/chess-ai-final.log",
+    "log_sha256": "3a51c918ee1b771aec112395069520fb77b3f1e713604dedcfc8b8ee44a846cc",
+    "reply_frame": "build/gui-demo-chess-ai-reply.ppm",
+    "reply_frame_sha256": "37f2499d935495663a0e8b47709f5972b709fe9ce8c612ee2c070bd5a4eabfe5",
+    "observed": ["human white and computer black selected", "white pawn moved by drag", "black position changed", "computer move notation 02)P:E7-E6 visible", "Escape returned to a working graphical terminal"]
+  },
+  "usb_mouse_run": {
+    "command": "python3 -u scripts/check-compat.py --pci --quick --usb-input qemu --usb-pointer mouse --probe-demo-chess-ai",
+    "log": "build/chess-ai-usb-retry.log",
+    "log_sha256": "41ffd7e999861fd32d6791910baaf8edf99bc8458c06927f00b58cf4ccbbc1d2",
+    "reply_frame": "build/gui-usb-qemu-mouse-demo-chess-ai-reply.ppm",
+    "reply_frame_sha256": "3c7acda0ae19f11ccf2d2f80ff8dc4475dfc8420f60809e762b9e79041236526",
+    "observed": ["human pawn dragged with relative USB mouse", "computer move notation 02)P:E7-E5 visible", "Escape returned to a working graphical terminal"]
+  },
+  "limitations": ["One computer reply only", "Full games and broader rules untested", "No live UTM or Pi verification", "Does not validate SMP AI execution"]
+}

@@ -1,0 +1,13 @@
+{
+  "date": "2026-11-09",
+  "program": "/Demo/Games/Chess.ZC",
+  "environment": "QEMU AArch64 virt, PCI storage and VirtIO pointer",
+  "command": "python3 -u scripts/check-compat.py --pci --quick --probe-demo-chess-move",
+  "result": "passed",
+  "evidence": {
+    "log": "build/chess-move-final.log",
+    "log_sha256": "abadd30559fe733378ae1a26560912cc777bea3f46c2c04467f1eb3dd2a8a84f",
+    "observed": ["both human-player prompts selected", "board rendered", "pawn source and destination changed after drag", "Escape returned to a working graphical terminal"]
+  },
+  "limitations": ["One pawn move only", "AI and complete games untested", "No live UTM or Pi verification", "Screen-coordinate drag can land on either of two legal destinations"]
+}

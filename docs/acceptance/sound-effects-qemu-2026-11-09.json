@@ -220,6 +220,58 @@
         "analyzer_sha256": "31ca66e507fa8e14881f3dbaff1688dd5e9ac79361d6b42f1210dd19003459cb",
         "scope": "Pitch in the recorded PCM only; does not establish real-time latency, note duration, physical UTM/Pi sound, or other keys."
       }
+    },
+    "utm_framework_repeatability_2026_11_09": {
+      "environment": "UTM-bundled QEMU framework, HVF, one virtual CPU, VirtIO sound WAV capture, installed candidate disk; timer explicitly enabled.",
+      "first_suite": "Failed with guest result 0xcc: one of 40 tone start/stop cycles measured a 97067 microsecond refill gap against the 80000 microsecond queue. Captured WAV had 492234 nonzero samples; an audible underrun was not established.",
+      "repeat_suite": "Passed with guest result 42: cycle maximum 40189 microseconds; three-second non-yielding worker maximum 57309 microseconds with 322 timer IRQs, ordered witness, and reset left timer disabled and tone stopped. Captured WAV had 797328 nonzero samples.",
+      "scheduler": "Passed with guest result 42: audio interrupts occurred during MessageScan polling and a peer ran only after explicit Yield. The existing message scheduling checks passed. Desktop was stopped for this check.",
+      "scope": "Both waveform captures contain nonzero PCM at 44100 Hz; they do not prove uninterrupted wall-clock output. The cause of the intermittent long refill gap is not established. This does not validate live UTM playback or Pi; the timer stays opt-in and does not implement the pinned scheduler.",
+      "sha256": {
+        "build/candidate-utm-timer-suite.log": "769d4a92121e178858518936753e90a09a8d125d7a96d3931adc1b89b372ad75",
+        "build/candidate-utm-timer-suite-uart.log": "48507c7555903f5e37919e93e162b21851144623da20e7f50c832128227865e9",
+        "build/candidate-utm-timer-suite.wav": "54db6fbfc9528987a06453a313d220997c0dbadbc443056a7e885ed8746ba319",
+        "build/candidate-utm-timer-suite2.log": "f02349a61950d1cdb79c505dc73f46d7ece578ab2873cd988cc8704bbb24b7eb",
+        "build/candidate-utm-timer-suite2-uart.log": "158d672d03d802a06153c7db7e2e9eee4466bfe42e3bf9f4eca804039d622d53",
+        "build/candidate-utm-timer-suite2.wav": "6e8137523c5171bc0b55f252390d3897aa72b510ecd40b29c2b042601c73519f",
+        "build/candidate-utm-timer-scheduler.log": "5f08098c7790593d6d32272651c8bb1d6b20bb98c50562519b867954ce98de63",
+        "build/candidate-utm-timer-scheduler-uart.log": "439a7814be86289af5525533563e34a4d499024713091874840447b0530339c4"
+      }
     }
+  },
+  "utm_qemu_candidate_busy_followup": {
+    "date": "2026-11-09",
+    "target": "UTM bundled QEMU framework, AArch64 HVF, virtio-ramfb and VirtIO PCI sound with WAV backend, desktop active",
+    "disk": "build/tothefront-direct-install.img",
+    "disk_sha256": "f9ffd3168ee98468772e054c9ec03f13596122c945c228353d40a7acde7f8813",
+    "default_polling": {
+      "test": "SoundBusyChecks",
+      "result": "returned 42; 500 ms non-yielding worker finished before the witness ran",
+      "maximum_refill_gap_us": 662323,
+      "submitted_frames": 27840,
+      "uart_log": "build/candidate-utm-busy-default-uart.log",
+      "uart_sha256": "af12090cb312925719d13e422b9f1e2b7173833fcab73628bc297f5b69ca4e9d",
+      "wav": "build/candidate-utm-busy-default.wav",
+      "wav_sha256": "c19727ce750f7dea1a1cfb2048ccdef1a7533ba926fe80829a93ba5e2c417b05",
+      "wav_summary": "51156 nonzero 16-bit stereo samples, 44.1 kHz, peak 7000"
+    },
+    "opt_in_timer_repeat": {
+      "test": "SoundLongBusyTimerSettledChecks",
+      "result": "returned 42; 3-second non-yielding worker finished before witness ran",
+      "maximum_refill_gap_us": 14326,
+      "timer_irqs": 326,
+      "submitted_frames": 162240,
+      "uart_log": "build/candidate-utm-busy-timer2-uart.log",
+      "uart_sha256": "fc05d8da458630298aa9d4d3011c1cbe510d693ee7de1e76b705b71cfd1f1c48",
+      "wav": "build/candidate-utm-busy-timer2.wav",
+      "wav_sha256": "7b18fd38248f8deb93951cf066de54000116e09e1f55d9c762021eb0986abc59",
+      "wav_summary": "298116 nonzero 16-bit stereo samples, 44.1 kHz, peak 7000"
+    },
+    "inconsistent_capture": "The first timer-enabled run also returned 42, reported 321 IRQs and a 30663 us refill gap, but the WAV file was zero bytes. Its shared UART log was overwritten before preservation, so only the zero-byte capture and partial outer log remain; treat it as an unresolved observation rather than a reproducible timer failure.",
+    "limitations": [
+      "The two workloads differ in length and are not a controlled wall-clock audio comparison.",
+      "A WAV capture does not prove uninterrupted real-time output or stop latency.",
+      "Timer remains opt-in; this did not modify scheduler behavior and does not establish Pi or live UTM-window output."
+    ]
   }
 }

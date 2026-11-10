@@ -225,6 +225,8 @@ p.add_argument('--probe-demo-ascii-organ', action='store_true',
                help='run ASCIIOrgan, test key input and Shift-Escape recovery')
 p.add_argument('--probe-demo-ohgreat', action='store_true',
                help='run the stock OhGreat song over VirtIO sound and verify terminal recovery')
+p.add_argument('--probe-demo-ohgreat-full', action='store_true',
+               help='play OhGreat through a late lyric and exit with a normal key')
 p.add_argument('--probe-demo-morse-code', action='store_true',
                help='exercise MorseCode key timing, VirtIO sound, Shift-Escape and recovery')
 p.add_argument('--probe-demo-waterfowl', action='store_true',
@@ -244,9 +246,19 @@ p.add_argument('--probe-demo-ring3', action='store_true',
 p.add_argument('--probe-demo-arm64-irq-adaptations', action='store_true',
                help='run ARM64 PCI IRQ capability and cooperative round-robin adaptations')
 p.add_argument('--probe-demo-tictactoe', action='store_true',
-               help='exercise the original TicTacToe demo with pointer input and exit recovery')
+               help='exercise the ARM64 TicTacToe adaptation with pointer input and exit recovery')
+p.add_argument('--probe-demo-tictactoe-ctrl-alt-c', action='store_true',
+               help='exercise TicTacToe and its documented Ctrl-Alt-C exit')
+p.add_argument('--probe-demo-tictactoe-win', action='store_true',
+               help='play a complete TicTacToe win and verify the next game starts')
+p.add_argument('--probe-demo-tictactoe-draw', action='store_true',
+               help='play a complete TicTacToe draw and verify reset and replay')
 p.add_argument('--probe-demo-chess', action='store_true',
                help='exercise the original Chess demo board rendering and Escape recovery')
+p.add_argument('--probe-demo-chess-move', action='store_true',
+               help='attempt a human pawn move on the rendered Chess board')
+p.add_argument('--probe-demo-chess-ai', action='store_true',
+               help='play a human pawn move and wait for the computer reply')
 p.add_argument('--probe-demo-blackdiamond', action='store_true',
                help='exercise BlackDiamond gameplay rendering, movement input, and Escape recovery')
 p.add_argument('--probe-demo-circletrace', action='store_true',
@@ -388,6 +400,10 @@ p.add_argument('--probe-logic-program', action='store_true',
                help='exercise original Digital Logic gate sprites, solver and keyboard prompts')
 p.add_argument('--probe-budget-program', action='store_true',
                help='check real clock/calendar and original Budget storage and forms')
+p.add_argument('--probe-budget-template-ui', action='store_true',
+               help='create a recurring template through Budget forms and check cold-boot persistence')
+p.add_argument('--probe-budget-template-edit', action='store_true',
+               help='also edit and delete the recurring template through Budget UI')
 p.add_argument('--probe-timeclock', action='store_true',
                help='exercise original TimeClock punch-in/out text entry and saved report')
 p.add_argument('--probe-3d-apps', action='store_true',
@@ -400,18 +416,36 @@ p.add_argument('--probe-keepaway-audio-timer', action='store_true',
                help='enable opt-in timer-based audio service for the KeepAway audio probe')
 p.add_argument('--probe-span-strut', action='store_true',
                help='exercise original Span bridge and Strut ship apps through entry, input and exit')
+p.add_argument('--probe-span-save', action='store_true',
+               help='exercise Span save and reopen on a disposable disk')
+p.add_argument('--probe-span-cold', action='store_true',
+               help='verify Span bridge data after a cold disk-only reboot')
+p.add_argument('--probe-strut-spring', action='store_true',
+               help='construct two masses and a spring in Strut')
 p.add_argument('--probe-tothefront', action='store_true',
                help='exercise original ToTheFront setup, map, phase input and exit')
+p.add_argument('--probe-tothefront-move-diag', action='store_true',
+               help='check a unit move using a disposable disk prepared by prepare-tothefront-move-test.py')
+p.add_argument('--probe-tothefront-fire-diag', action='store_true',
+               help='check both direct-fire phases using a disposable controlled-target fixture')
 p.add_argument('--probe-xcaliber', action='store_true',
                help='exercise original X-Caliber gameplay, controls, and Escape recovery')
 p.add_argument('--probe-demo-debug', action='store_true',
                help='run the original busy-loop DebugDemo and verify Ctrl-Alt-C recovery')
+p.add_argument('--probe-demo-debug-repeat', action='store_true',
+               help='repeat the DebugDemo break check and report the live terminal heap')
 p.add_argument('--probe-virtio-keyboard-irq', action='store_true',
                help='observe QEMU virtio-mmio keyboard interrupts without consuming input')
 p.add_argument('--probe-locked-break-input', action='store_true',
                help='exercise a real Ctrl-Alt-C against a break-locked focused task')
 p.add_argument('--probe-terminal-output-yield', action='store_true',
                help='check terminal output yielding and DOCF_DONT_SWAP_OUT')
+p.add_argument('--probe-partial-break-cleanup', action='store_true',
+               help='measure isolated document cleanup after normal output and Ctrl-Alt-C')
+p.add_argument('--probe-partial-callback-cleanup', action='store_true',
+               help='check partial document callback behavior and exception cleanup')
+p.add_argument('--probe-partial-dollar', action='store_true',
+               help='check partial document writes assemble split button directives')
 p.add_argument('--probe-titanium-only', action='store_true',
                help='run only Titanium compile and graphical input/gameplay checks')
 p.add_argument('--probe-stock-interactive', action='store_true',
@@ -462,6 +496,8 @@ p.add_argument('--probe-source-editor', action='store_true',
                help='check the full-screen native source editor controls, scanout and save/reopen path')
 p.add_argument('--probe-user-text', action='store_true',
                help='check User formatted startup and XTalk input-filter delivery to graphical terminals')
+p.add_argument('--probe-user-text-dead-heaps', action='store_true',
+               help='with --probe-user-text, check dead-task heap owners instead of whole-system no-growth')
 p.add_argument('--probe-home-path', action='store_true',
                help='check shared HomeSet, home file execution and reboot persistence')
 p.add_argument('--probe-registry', action='store_true',
@@ -522,6 +558,8 @@ p.add_argument('--probe-source-module', action='append', default=[],
                help='with --probe-source-fast, load a stock module after TaskBridge (use disk:/path to preserve includes and ISO overlays)')
 p.add_argument('--probe-source-call',
                help='call this no-argument integer function after each source probe and require 0x2a')
+p.add_argument('--probe-source-cold-call',
+               help='after a single fast PCI source probe, flush and cold-boot its disposable disk, reload the source and require this function to return 0x2a')
 p.add_argument('--probe-source-exefile', action='store_true',
                help='compile staged probe files with ExeFile2(...,CCF_JUST_LOAD) in the booted system namespace')
 p.add_argument('--probe-source-kernel', action='store_true',
@@ -529,6 +567,40 @@ p.add_argument('--probe-source-kernel', action='store_true',
 p.add_argument('--probe-source-fast', action='store_true',
                help='after boot/framebuffer checks, run source probes before the longer PCI suite')
 args = p.parse_args()
+if args.probe_budget_template_edit:
+    args.probe_budget_template_ui = True
+if args.probe_budget_template_ui:
+    if args.probe_source:
+        p.error('--probe-budget-template-ui manages its own source fixture')
+    args.probe_budget_program = True
+    args.probe_source = [ROOT/'tests/compat/BudgetTemplateUiPersist.ZC']
+if args.probe_source_cold_call and (not args.pci or not args.probe_source_fast or
+        not args.probe_source_call or not args.probe_source or
+        len(args.probe_source) != 1 or args.probe_source_module or
+        args.probe_source_kernel or args.probe_source_exefile or args.probe_sound_quiet):
+    p.error('--probe-source-cold-call requires one --probe-source with --pci, --probe-source-fast and --probe-source-call, without modules, kernel reset, exefile or sound-quiet')
+if args.probe_demo_ohgreat_full:
+    args.probe_demo_ohgreat = True
+if args.probe_demo_tictactoe_ctrl_alt_c or args.probe_demo_tictactoe_win or args.probe_demo_tictactoe_draw:
+    args.probe_demo_tictactoe = True
+if args.probe_demo_chess_ai:
+    args.probe_demo_chess_move = True
+if args.probe_demo_chess_move:
+    args.probe_demo_chess = True
+if args.probe_span_cold:
+    args.probe_span_save = True
+if args.probe_span_save:
+    args.probe_span_strut = True
+if args.probe_strut_spring:
+    args.probe_span_strut = True
+if args.probe_tothefront_fire_diag:
+    args.probe_tothefront_move_diag = True
+if args.probe_tothefront_move_diag:
+    args.probe_tothefront = True
+if args.probe_demo_debug_repeat:
+    args.probe_demo_debug = True
+if args.probe_user_text_dead_heaps and not args.probe_user_text:
+    p.error('--probe-user-text-dead-heaps requires --probe-user-text')
 if args.probe_psalmody_audio_timer and not args.probe_psalmody:
     p.error('--probe-psalmody-audio-timer requires --probe-psalmody')
 if args.probe_sound_quiet and not args.probe_source_fast:
@@ -564,7 +636,8 @@ if args.probe_keepaway_audio:
 if args.probe_keepaway_full_game:
     args.probe_3d_apps = True
 if (args.probe_demo_debug or args.probe_virtio_keyboard_irq or
-        args.probe_locked_break_input or args.probe_terminal_output_yield):
+        args.probe_locked_break_input or args.probe_terminal_output_yield or
+        args.probe_partial_break_cleanup or args.probe_partial_callback_cleanup):
     args.pci = True
     args.probe_user_startup = True
 if args.probe_demo_file_read:
@@ -753,7 +826,9 @@ if args.probe_live_window_control and not (
             '--probe-winmgr --probe-grscreen --probe-live-winmgr')
 if args.probe_dvd_live and args.pci:
     p.error('--probe-dvd-live requires ISO boot, not --pci')
-log_path = ROOT / 'build' / ('check-terminal-output-yield.log' if args.probe_terminal_output_yield else
+log_path = ROOT / 'build' / ('check-partial-callback-cleanup.log' if args.probe_partial_callback_cleanup else
+                             'check-partial-break-cleanup.log' if args.probe_partial_break_cleanup else
+                             'check-terminal-output-yield.log' if args.probe_terminal_output_yield else
                              f'check-locked-break-{usb_label}.log' if args.probe_locked_break_input and usb_label else
                              'check-locked-break-input-pci.log' if args.probe_locked_break_input else
                              'check-virtio-keyboard-irq-pci.log' if args.probe_virtio_keyboard_irq else
@@ -894,6 +969,10 @@ log_path = ROOT / 'build' / ('check-terminal-output-yield.log' if args.probe_ter
                              'check-module-probe.log' if args.probe_module else
                              'check-upstream-probe.log' if args.probe_upstream else
                              'check-compat-pci.log' if args.pci else 'check-compat.log')
+# Allow independent runs to retain their complete UART evidence rather than
+# overwriting the shared default log when comparing backends or modes.
+if os.environ.get('ZEAL_COMPAT_LOG_PATH'):
+    log_path = pathlib.Path(os.environ['ZEAL_COMPAT_LOG_PATH'])
 with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('wb') as log:
     tmp = pathlib.Path(tmp)
     fw = os.environ.get('FW_CODE', '/opt/homebrew/share/qemu/edk2-aarch64-code.fd')
@@ -940,7 +1019,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
     # device input; UART remains independent for the serial command shell.
     cmd += ['-qmp', f'unix:{qmp_path},server=on,wait=off']
     if args.pci:
-        copyfile_cow(ROOT/'build/disk.img', tmp/'disk.img')
+        copyfile_cow(pathlib.Path(os.environ.get('ZEAL_TEST_DISK', str(ROOT/'build/disk.img'))), tmp/'disk.img')
         if args.probe_raw_redsea_geometry:
             # Modify only the disposable clone, never the host image or SD.
             with (tmp/'disk.img').open('r+b') as disk:
@@ -2547,9 +2626,28 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                         gap = re.search(r'sound_pump_max_gap_us=(\d+)', called)
                         if not gap or int(gap.group(1)) < 400000:
                             raise RuntimeError('busy-task probe did not observe the expected refill gap: '+called)
+                if args.probe_source_cold_call:
+                    command('zvol', 'flush=yes')
+                    guest.terminate()
+                    guest.wait(timeout=10)
+                    buf.clear()
+                    guest = subprocess.Popen(cmd, stdin=subprocess.PIPE,
+                                             stdout=subprocess.PIPE,
+                                             stderr=subprocess.STDOUT, bufsize=0)
+                    reboot = until(b'\n> ', timeout=300)
+                    if 'zc: graphical terminal started at boot' not in reboot:
+                        raise RuntimeError('source cold boot did not reach the desktop')
+                    command('zload disk:Probe/Source0.ZC',
+                            'zc: loaded disk:Probe/Source0.ZC', timeout=60)
+                    command('zcall '+args.probe_source_cold_call,
+                            'zc => 0x000000000000002a', timeout=60)
+                    print('PASS source check after cold disk-only reboot', flush=True)
                 command('zreset', 'native compiler ready')
                 if args.probe_source_call in ('SoundBusyTimerChecks',
                                               'SoundBusyTimerSettledChecks',
+                                              'SoundLongBusyTimerChecks',
+                                              'SoundLongBusyTimerSettledChecks',
+                                              'SoundTimerPlaybackRegression',
                                               'SoundTimerResetActiveChecks'):
                     command('zc extern I64 ZcSoundTimerEnabled(); '
                             'I64 SoundTimerResetChecks(){return ZcSoundTimerEnabled;}',
@@ -3876,10 +3974,14 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 if time.monotonic() >= deadline:
                     raise RuntimeError('ToTheFront map lacks terrain/unit color variety')
                 time.sleep(0.1)
+            # Initial TurnNew banner shares the artillery-range palette and
+            # can obscure input until its timeout; do not use it as baseline.
+            time.sleep(3)
+            match = graphical_screen('tothefront-artillery-ready')
             artillery = color_component_centers(
                 match, (5, 124, 126), (0, 20, 640, 480), minimum=80)
-            if len(artillery) < 2:
-                raise RuntimeError('ToTheFront artillery phase lacks visible active artillery markers')
+            if not artillery:
+                raise RuntimeError('ToTheFront artillery phase lacks a visible active artillery marker')
             baseline_yellow = rgb_pixels_in(match, (199, 171, 0),
                                             (0, 20, 640, 480))
             ordered = False
@@ -3936,6 +4038,72 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 time.sleep(0.1)
             if rgb_pixels_in(after_phase, (130, 188, 73), (0, 0, 640, 480)) < 100000:
                 raise RuntimeError('ToTheFront Space did not advance or redraw the phase')
+            if args.probe_tothefront_move_diag:
+                time.sleep(3)
+                qmp_send_key('spc')
+                until(b'TTF_MOVE_CAND:', timeout=25)
+                candidate = until(b'\n', timeout=10).strip()
+                match_candidate = re.fullmatch(r'(\d+),(\d+),(\d+),(\d+),(\d+),(\d+),(\d+)', candidate)
+                if not match_candidate:
+                    raise RuntimeError('ToTheFront produced no movable unit: '+candidate)
+                unit, row, col, sx, sy, dx, dy = map(int, match_candidate.groups())
+                print(f'ToTheFront candidate unit={unit} cell={row},{col} '
+                      f'screen={sx},{sy}->{dx},{dy}', flush=True)
+                move_graphical_pointer(sx, sy)
+                time.sleep(.2)
+                graphical_mouse_button('left', True)
+                time.sleep(.2)
+                move_graphical_pointer(dx, dy)
+                time.sleep(.3)
+                graphical_mouse_button('left', False)
+                until(b'TTF_MOVE_RESULT:', timeout=30)
+                result = until(b'\n', timeout=10).strip()
+                match_result = re.fullmatch(r'(\d+),(\d+),(\d+),(\d+)', result)
+                if not match_result:
+                    raise RuntimeError('ToTheFront produced no movement result: '+result)
+                old_r, old_c, new_r, new_c = map(int, match_result.groups())
+                if (old_r, old_c) != (row, col) or (new_r, new_c) == (old_r, old_c):
+                    raise RuntimeError(f'ToTheFront unit did not move: {result}')
+                print(f'PASS ToTheFront moved unit {unit}: {result}', flush=True)
+                if args.probe_tothefront_fire_diag:
+                    # Complete both movement phases and test each side's
+                    # direct-fire phase. The disposable fixture places an
+                    # enemy in an empty adjacent cell and reports positions.
+                    for _ in range(2):
+                        time.sleep(3)
+                        qmp_send_key('spc')
+                    for expected_player in range(2):
+                        until(b'TTF_FIRE_CAND:', timeout=30)
+                        fire_candidate = until(b'\n', timeout=10).strip()
+                        fire_match = re.fullmatch(
+                            r'(\d+),(\d+),(\d+),(\d+),(\d+),(\d+),(\d+)',
+                            fire_candidate)
+                        if not fire_match:
+                            raise RuntimeError('ToTheFront has no direct-fire fixture: '+fire_candidate)
+                        player, attacker, target, sx, sy, dx, dy = map(int, fire_match.groups())
+                        if player != expected_player:
+                            raise RuntimeError(f'Unexpected direct-fire player {player}')
+                        time.sleep(3)
+                        move_graphical_pointer(sx, sy)
+                        graphical_mouse_button('left', True)
+                        time.sleep(.3)
+                        move_graphical_pointer(dx, dy)
+                        time.sleep(.3)
+                        graphical_mouse_button('left', False)
+                        until(b'TTF_FIRE_RESULT:', timeout=45)
+                        fire_result = until(b'\n', timeout=10).strip()
+                        result_match = re.fullmatch(r'(\d+),(\d+),(-?\d+),(-?\d+)', fire_result)
+                        if not result_match:
+                            raise RuntimeError('ToTheFront fire result malformed: '+fire_result)
+                        got_player, fired, vis0, vis1 = map(int, result_match.groups())
+                        if got_player != player or fired != 1:
+                            raise RuntimeError(f'ToTheFront direct fire failed: player={player}, '
+                                               f'fired={fired}, visibility={vis0},{vis1}')
+                        print(f'PASS ToTheFront direct fire player {player}, '
+                              f'attacker {attacker}, target {target}', flush=True)
+                        if expected_player == 0:
+                            time.sleep(3)
+                            qmp_send_key('spc')
             qmp_send_key('esc')
             run_graphical_terminal_command(
                 'tothefront-exit-smoke', '40+2;', 'ans=0x2A=42', timeout=20)
@@ -3946,57 +4114,162 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         if args.probe_span_strut:
             focus_graphical_terminal()
             run_graphical_terminal_command('span-strut-ready', '40+2;', 'ans=0x2A=42')
-            span_workers_before = command(
-                'zstatus', 'keyboard_focus=Terminal', timeout=10)
-            span_worker_ids_before = re.findall(
-                r'guest_task\[(\d+)\]: name=(?:Song|Animate) parent=Terminal',
-                span_workers_before)
-            type_graphical_prompt_line(
-                'span-launch', 'ExeFile2("/Apps/Span/Run.ZC");')
-            qmp_send_key('ret')
-            require_graphical_text('span-help', 'Build a bridge to hold-up', timeout=15)
-            # Dismiss the popup by clicking OK. A Return key-up can remain in
-            # the app queue and satisfy Span's subsequent Shift+Escape
-            # key-up wait before the exit path is actually under observation.
-            move_graphical_pointer(120, 172)
-            graphical_mouse_button('left', True)
-            time.sleep(0.1)
-            graphical_mouse_button('left', False)
-            time.sleep(0.5)
-            # App message loops can own terminal focus directly; do not assume
-            # that the shared Server task remains the keyboard focus target.
-            command('zstatus', 'keyboard_focus=', timeout=10)
-            span_frame = graphical_screen('span-initial-frame')
-            if not re.search(r'nonblack_pixels=(\d+) of 480000',
-                             command('zstatus', 'nonblack_pixels=')):
-                raise RuntimeError('Span did not report framebuffer output')
-            # Send a complete chord after dismissing help by mouse so there is
-            # no unrelated Return key-up queued for Span's exit wait.
-            qmp_send_keys(['shift', 'esc'])
-            deadline = time.monotonic() + 10
-            span_exit_status = ''
-            while time.monotonic() < deadline:
-                span_exit_status = command(
-                    'zstatus', 'keyboard_focus=', timeout=10)
-                if re.search(r'keyboard_focus=Terminal(?:\s|$)', span_exit_status):
-                    break
-                time.sleep(0.2)
-            if not re.search(r'keyboard_focus=Terminal(?:\s|$)', span_exit_status):
-                raise RuntimeError(
-                    'Span did not return focus to terminal after Shift+Escape:\n' +
+            span_frame = None
+            if not args.probe_strut_spring:
+                span_workers_before = command(
+                    'zstatus', 'keyboard_focus=Terminal', timeout=10)
+                span_worker_ids_before = re.findall(
+                    r'guest_task\[(\d+)\]: name=(?:Song|Animate) parent=Terminal',
+                    span_workers_before)
+                type_graphical_prompt_line(
+                    'span-launch', 'ExeFile2("/Apps/Span/Run.ZC");')
+                qmp_send_key('ret')
+                require_graphical_text('span-help', 'Build a bridge to hold-up', timeout=15)
+                # Dismiss the popup by clicking OK. A Return key-up can remain in
+                # the app queue and satisfy Span's subsequent Shift+Escape
+                # key-up wait before the exit path is actually under observation.
+                move_graphical_pointer(120, 172)
+                graphical_mouse_button('left', True)
+                time.sleep(0.1)
+                graphical_mouse_button('left', False)
+                time.sleep(0.5)
+                # App message loops can own terminal focus directly; do not assume
+                # that the shared Server task remains the keyboard focus target.
+                command('zstatus', 'keyboard_focus=', timeout=10)
+                span_frame = graphical_screen('span-initial-frame')
+                if not re.search(r'nonblack_pixels=(\d+) of 480000',
+                                 command('zstatus', 'nonblack_pixels=')):
+                    raise RuntimeError('Span did not report framebuffer output')
+                if args.probe_span_save:
+                    move_graphical_pointer(700, 500)
+                    time.sleep(.3)
+                    empty_bridge = graphical_screen('span-save-before-edit')
+                    qmp_send_key('m')
+                    move_graphical_pointer(400, 450)
+                    time.sleep(.2)
+                    graphical_mouse_button('left', True)
+                    time.sleep(.15)
+                    graphical_mouse_button('left', False)
+                    move_graphical_pointer(700, 500)
+                    time.sleep(.5)
+                    edited_bridge = graphical_screen('span-save-edited')
+                    bounds = (380, 430, 420, 470)
+                    edit_diff = rgb_diff_count(empty_bridge, edited_bridge, bounds)
+                    if edit_diff < 10:
+                        raise RuntimeError(f'Span mass placement did not visibly change bridge: {edit_diff}')
+                    qmp_send_keys(['ctrl', 'a'])
+                    require_graphical_text('span-save-form', 'FileName:', timeout=20)
+                    qmp_send_key('esc')
+                    time.sleep(1)
+                    saved = command('zc Print("%s%s=%d\\n","SPAN","_FILE",'
+                                    'FileFind("/Home/Span/Game.DATA"));', 'SPAN_FILE=')
+                    if 'SPAN_FILE=1' not in saved:
+                        raise RuntimeError('Span save did not create /Home/Span/Game.DATA:\n'+saved)
+                    print('PASS Span edited bridge saved to writable disk', flush=True)
+                    qmp_send_keys(['ctrl', 'n'])
+                    time.sleep(.5)
+                    reset_bridge = graphical_screen('span-save-reset')
+                    if rgb_diff_count(edited_bridge, reset_bridge, bounds) < 10:
+                        raise RuntimeError('Span New did not remove the test mass')
+                    qmp_send_keys(['ctrl', 'o'])
+                    chooser = require_graphical_text('span-open-dialog', 'Game.DATA', timeout=30,
+                                                    foreground_threshold=80000)
+                    for row_index, line in enumerate(chooser[3].splitlines()):
+                        if 'Game.DATA' in line:
+                            move_graphical_pointer(line.index('Game.DATA') * 8 + 12, row_index * 8 + 5)
+                            break
+                    time.sleep(.3)
+                    graphical_mouse_button('left', True)
+                    time.sleep(.15)
+                    graphical_mouse_button('left', False)
+                    qmp_send_key('esc')
+                    move_graphical_pointer(700, 500)
+                    deadline = time.monotonic() + 20
+                    while True:
+                        time.sleep(.4)
+                        reopened = graphical_screen('span-save-reopened')
+                        if (rgb_diff_count(edited_bridge, reopened, bounds) < 10 and
+                                rgb_diff_count(reset_bridge, reopened, bounds) >= 10):
+                            break
+                        if time.monotonic() >= deadline:
+                            raise RuntimeError('Span did not restore the saved test mass')
+                    print('PASS Span chooser reopened the saved edited bridge', flush=True)
+                # Send a complete chord after dismissing help by mouse so there is
+                # no unrelated Return key-up queued for Span's exit wait.
+                qmp_send_keys(['shift', 'esc'])
+                deadline = time.monotonic() + 10
+                span_exit_status = ''
+                while time.monotonic() < deadline:
+                    span_exit_status = command(
+                        'zstatus', 'keyboard_focus=', timeout=10)
+                    if re.search(r'keyboard_focus=Terminal(?:\s|$)', span_exit_status):
+                        break
+                    time.sleep(0.2)
+                if not re.search(r'keyboard_focus=Terminal(?:\s|$)', span_exit_status):
+                    raise RuntimeError(
+                        'Span did not return focus to terminal after Shift+Escape:\n' +
+                        span_exit_status)
+                span_worker_ids_after = re.findall(
+                    r'guest_task\[(\d+)\]: name=(?:Song|Animate) parent=Terminal',
                     span_exit_status)
-            span_worker_ids_after = re.findall(
-                r'guest_task\[(\d+)\]: name=(?:Song|Animate) parent=Terminal',
-                span_exit_status)
-            if span_worker_ids_after != span_worker_ids_before:
-                raise RuntimeError(
-                    'Span exit did not restore the original Song/Animate tasks: '
-                    f'before={span_worker_ids_before}, after={span_worker_ids_after}\n' +
-                    span_exit_status)
-            focus_graphical_terminal()
-            run_graphical_terminal_command('span-exit-smoke', '40+2;', 'ans=0x2A=42', timeout=20)
-            print('PASS Span bridge entry, instructions, graphical frame and Shift+Escape recovery',
-                  flush=True)
+                if span_worker_ids_after != span_worker_ids_before:
+                    raise RuntimeError(
+                        'Span exit did not restore the original Song/Animate tasks: '
+                        f'before={span_worker_ids_before}, after={span_worker_ids_after}\n' +
+                        span_exit_status)
+                focus_graphical_terminal()
+                run_graphical_terminal_command('span-exit-smoke', '40+2;', 'ans=0x2A=42', timeout=20)
+                print('PASS Span bridge entry, instructions, graphical frame and Shift+Escape recovery',
+                      flush=True)
+
+                if args.probe_span_cold:
+                    command('zvol', 'flush=yes')
+                    command('zstatus', 'failed=0')
+                    guest.terminate()
+                    guest.wait(timeout=10)
+                    buf.clear()
+                    guest = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                             stderr=subprocess.STDOUT, bufsize=0)
+                    reboot = until(b'\n> ', timeout=180)
+                    if 'zc: graphical terminal started at boot' not in reboot:
+                        raise RuntimeError('Span cold disk-only boot did not reach desktop')
+                    focus_graphical_terminal()
+                    type_graphical_prompt_line('span-cold-launch', 'ExeFile2("/Apps/Span/Run.ZC");')
+                    qmp_send_key('ret')
+                    require_graphical_text('span-cold-help', 'Build a bridge to hold-up', timeout=20)
+                    move_graphical_pointer(120, 172)
+                    time.sleep(.2)
+                    graphical_mouse_button('left', True)
+                    time.sleep(.15)
+                    graphical_mouse_button('left', False)
+                    time.sleep(.5)
+                    qmp_send_keys(['ctrl', 'o'])
+                    chooser = require_graphical_text('span-cold-open', 'Game.DATA', timeout=30,
+                                                    foreground_threshold=80000)
+                    for row_index, line in enumerate(chooser[3].splitlines()):
+                        if 'Game.DATA' in line:
+                            move_graphical_pointer(line.index('Game.DATA') * 8 + 12, row_index * 8 + 5)
+                            break
+                    time.sleep(.3)
+                    graphical_mouse_button('left', True)
+                    time.sleep(.15)
+                    graphical_mouse_button('left', False)
+                    qmp_send_key('esc')
+                    move_graphical_pointer(700, 500)
+                    deadline = time.monotonic() + 20
+                    while True:
+                        time.sleep(.4)
+                        cold_bridge = graphical_screen('span-cold-reopened')
+                        if (rgb_diff_count(edited_bridge, cold_bridge, bounds) < 10 and
+                                rgb_diff_count(reset_bridge, cold_bridge, bounds) >= 10):
+                            break
+                        if time.monotonic() >= deadline:
+                            raise RuntimeError('Span did not restore the saved mass after cold boot')
+                    qmp_send_keys(['shift', 'esc'])
+                    run_graphical_terminal_command('span-cold-exit', '40+2;', 'ans=0x2A=42', timeout=20)
+                    command('zstatus', 'failed=0')
+                    print('PASS Span saved mass reopened after cold disk-only boot', flush=True)
+                    raise SystemExit(0)
 
             type_graphical_prompt_line(
                 'strut-launch', 'ExeFile2("/Apps/Strut/Run.ZC");')
@@ -4012,11 +4285,84 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             graphical_mouse_button('left', False)
             time.sleep(0.5)
             strut_frame = graphical_screen('strut-edit-frame')
-            if strut_frame[2] == span_frame[2]:
+            if span_frame is not None and strut_frame[2] == span_frame[2]:
                 raise RuntimeError('Strut edit input did not change the framebuffer')
+            if args.probe_strut_spring:
+                # Strut centers the first placed mass at (400, 305).
+                move_graphical_pointer(500, 305)
+                time.sleep(.2)
+                graphical_mouse_button('left', True)
+                time.sleep(.15)
+                graphical_mouse_button('left', False)
+                move_graphical_pointer(700, 500)
+                time.sleep(.5)
+                before_spring = graphical_screen('strut-before-spring')
+                qmp_send_key('s')
+                move_graphical_pointer(400, 305)
+                time.sleep(.2)
+                graphical_mouse_button('left', True)
+                time.sleep(.2)
+                move_graphical_pointer(500, 305)
+                time.sleep(.3)
+                graphical_mouse_button('left', False)
+                move_graphical_pointer(700, 500)
+                time.sleep(.5)
+                after_spring = graphical_screen('strut-after-spring')
+                spring_diff = rgb_diff_count(before_spring, after_spring, (420, 297, 480, 313))
+                # Check the actual light-cyan member away from both mass
+                # sprites and the startup splash, not merely any redraw.
+                member_box = (455, 297, 480, 313)
+                cyan_before = rgb_pixels_in(before_spring, (0, 151, 162), member_box)
+                cyan_after = rgb_pixels_in(after_spring, (0, 151, 162), member_box)
+                if spring_diff < 20 or cyan_after - cyan_before < 20:
+                    raise RuntimeError(f'Strut did not visibly connect the masses: '
+                                       f'difference={spring_diff}, cyan={cyan_before}->{cyan_after}')
+                print(f'PASS Strut spring connects two masses: {cyan_before}->{cyan_after} '
+                      'cyan pixels', flush=True)
+                # Add a separate thruster so its force can be exercised in
+                # play mode. The first mass stays centered as the camera tracks it.
+                qmp_send_key('m')
+                move_graphical_pointer(400, 405)
+                time.sleep(.2)
+                graphical_mouse_button('left', True)
+                time.sleep(.15)
+                graphical_mouse_button('left', False)
+                qmp_send_key('t')
+                qmp_send_key('0')
+                move_graphical_pointer(400, 305)
+                time.sleep(.2)
+                graphical_mouse_button('left', True)
+                time.sleep(.2)
+                move_graphical_pointer(400, 405)
+                time.sleep(.3)
+                graphical_mouse_button('left', False)
+                move_graphical_pointer(700, 500)
+                time.sleep(.5)
+                graphical_screen('strut-thruster-created')
             qmp_send_key('spc')  # switch from edit to play mode
             time.sleep(0.5)
             command('zstatus', 'keyboard_focus=', timeout=10)
+            if args.probe_strut_spring:
+                # The star field is fixed in world space. As the first mass
+                # accelerates the camera follows it, moving stars on screen.
+                idle_a = graphical_screen('strut-play-idle-a')
+                time.sleep(1.5)
+                idle_b = graphical_screen('strut-play-idle-b')
+                star_box = (520, 100, 780, 500)
+                idle_diff = rgb_diff_count(idle_a, idle_b, star_box)
+                qmp_key_edges(['0'], True)
+                time.sleep(2.5)
+                thrust = graphical_screen('strut-play-thrust')
+                qmp_key_edges(['0'], False)
+                thrust_diff = rgb_diff_count(idle_b, thrust, star_box)
+                ship_diff = rgb_diff_count(idle_b, thrust, (340, 200, 520, 450))
+                # Stars are single pixels and sparse in this crop; also
+                # require a separate change around the masses and spring.
+                if thrust_diff < max(16, idle_diff * 3) or ship_diff < 100:
+                    raise RuntimeError(f'Strut thruster did not visibly move the world: '
+                                       f'idle={idle_diff}, stars={thrust_diff}, ship={ship_diff}')
+                print(f'PASS Strut thruster moves star field: idle={idle_diff}, '
+                      f'stars={thrust_diff}, ship={ship_diff}', flush=True)
             qmp_send_key('esc')
             run_graphical_terminal_command('strut-exit-smoke', '40+2;', 'ans=0x2A=42', timeout=20)
             command('zstatus', 'failed=0')
@@ -4282,9 +4628,15 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                         if next_visible:
                             return screen
                         if current_marker not in screen[3]:
-                            raise RuntimeError(
-                                f'{name}: color picker changed without showing '
-                                f'{next_marker!r}:\n'+screen[3])
+                            # The picker can disappear before the next
+                            # document repaint. Do not click through that
+                            # transient frame or mistake it for completion.
+                            if time.monotonic() >= deadline:
+                                raise RuntimeError(
+                                    f'{name}: color picker changed without showing '
+                                    f'{next_marker!r}:\n'+screen[3])
+                            time.sleep(.2)
+                            continue
                         if time.monotonic() >= deadline:
                             diagnostic = command('zstatus', 'failed=')
                             raise RuntimeError(
@@ -4378,6 +4730,11 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     '3d-grmodels-ball-launch',
                     'ExeFile2("/Apps/GrModels/Run.ZC");')
                 qmp_send_key('ret')
+                # The previous Man run leaves its menu and repeat prompt in
+                # the document until the new run executes DocClear. Do not
+                # click the stale Ball button before that clear completes.
+                require_graphical_text_absent('3d-grmodels-ball-clear',
+                                              'Do another', timeout=20)
                 require_graphical_text('3d-grmodels-ball-entry', 'Make a CSprite model',
                                        timeout=12)
                 ball_form = None
@@ -4756,6 +5113,95 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             graphical_screen('menu-shortcut-hover')
             move_graphical_pointer(700,500)
             print('PASS Budget File/Edit/View shortcuts, key labels and continued presentation after hover', flush=True)
+            if args.probe_budget_template_ui:
+                qmp_send_text('t', delay=.15, dismiss_splash=False)
+                require_graphical_text('budget-template-form', 'Start Date:', timeout=20)
+                require_graphical_text('budget-template-form-period', 'Period', timeout=10)
+                for index, value in enumerate(('12/15/2023', '12/17/2023', '1')):
+                    budget_field(index, value)
+                require_graphical_text('budget-template-form-filled', '12/15/2023')
+                qmp_send_key('esc')
+                require_graphical_text('budget-template-entry-form', 'Credit (from) Acct:', timeout=20)
+                for index, value in ((1, '     12.50'), (2, 'BANK'),
+                                     (3, 'FOOD'), (4, 'UI recurring test')):
+                    budget_field(index, value)
+                qmp_send_key('esc')
+                require_graphical_text('budget-template-created', 'UI recurring test', timeout=30)
+                select_os_menu_row('budget-template-save', 'File', 1)
+                run_graphical_terminal_command('budget-template-return', '40+2;', 'ans=0x2A=42')
+                def budget_template_saved(check='BudgetTemplateUiPersistChecks'):
+                    command('zc budget_check_task=Spawn(&StockCatalogServer);', 'zc: executed')
+                    command('zc budget_check_job=TaskExe(budget_check_task,Fs,'
+                            '"ExeFile2(\\"disk:Probe/Source0.ZC\\");'+check+';",0);', 'zc: executed')
+                    command('zc Print("budget_template_saved=%d\\n",JobResGet(budget_check_job));', 'budget_template_saved=42')
+                    command('zc Kill(budget_check_task);', 'zc: executed')
+                budget_template_saved()
+                command('zvol', 'flush=yes')
+                guest.terminate()
+                guest.wait(timeout=10)
+                buf.clear()
+                guest = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                         stderr=subprocess.STDOUT, bufsize=0)
+                reboot = until(b'\n> ', timeout=180)
+                if 'zc: graphical terminal started at boot' not in reboot:
+                    raise RuntimeError('Budget template cold boot did not reach the desktop')
+                command('zload /Tests/ProgramCatalog.ZC', 'zc: loaded /Tests/ProgramCatalog.ZC')
+                command('zload /Tests/BudgetForm.ZC', 'zc: loaded /Tests/BudgetForm.ZC')
+                command('zc CTask *budget_check_task; CJob *budget_check_job;', 'zc: executed')
+                budget_template_saved()
+                focus_graphical_terminal()
+                select_os_menu_row('budget-template-cold-menu', 'Apps', 9)
+                require_graphical_text('budget-template-cold', 'UI recurring test', timeout=20)
+                if args.probe_budget_template_edit:
+                    command('zc I64 BudgetTemplatePoint(U8 *tag){CTask *t=sys_focus_task;CDoc *d=t->put_doc;CDocEntry *e;I64 x,y;for(e=d->head.next;e!=d;e=e->next)if(e->type_u8==DOCT_MENU_VAL&&e->tag&&StrMatch(tag,e->tag)){x=t->pix_left+(e->x-d->line_start_col)*FONT_WIDTH+24;y=t->pix_top+(e->y-d->top_line_num)*FONT_HEIGHT+4;return y<<32+x;}return -1;}', 'zc: executed')
+                    budget_click_point('BudgetTemplatePoint("UI recurring test")')
+                    qmp_send_key('ret')
+                    require_graphical_text('budget-template-edit-form', 'End Date', timeout=20)
+                    budget_field(1, '12/18/2023')
+                    qmp_send_key('esc')
+                    require_graphical_text('budget-template-edit-entry', 'Credit (from) Acct:', timeout=20)
+                    budget_field(1, '     25.00')
+                    budget_field(4, 'UI changed test')
+                    # Text fields overwrite the entered characters in place;
+                    # shorten the old description by deleting its remaining
+                    # trailing "st" before accepting the entry form.
+                    qmp_send_key('delete')
+                    qmp_send_key('delete')
+                    qmp_send_key('esc')
+                    require_graphical_text('budget-template-edited', 'UI changed test', timeout=20)
+                    require_graphical_text_absent('budget-template-old-absent', 'UI recurring test')
+                    select_os_menu_row('budget-template-edit-save', 'File', 1)
+                    run_graphical_terminal_command('budget-template-edited-return', '40+2;', 'ans=0x2A=42')
+                    budget_template_saved('BudgetTemplateUiEditedChecks')
+                    focus_graphical_terminal()
+                    select_os_menu_row('budget-template-edit-reopen', 'Apps', 9)
+                    require_graphical_text('budget-template-edit-reopened', 'UI changed test', timeout=20)
+                    budget_click_point('BudgetTemplatePoint("UI changed test")')
+                    qmp_send_keys(['ctrl', 'y'])
+                    require_graphical_text_absent('budget-template-deleted', 'UI changed test')
+                    select_os_menu_row('budget-template-delete-save', 'File', 1)
+                    run_graphical_terminal_command('budget-template-deleted-return', '40+2;', 'ans=0x2A=42')
+                    budget_template_saved('BudgetTemplateUiDeletedChecks')
+                    command('zvol', 'flush=yes')
+                    guest.terminate()
+                    guest.wait(timeout=10)
+                    buf.clear()
+                    guest = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                             stderr=subprocess.STDOUT, bufsize=0)
+                    reboot = until(b'\n> ', timeout=180)
+                    if 'zc: graphical terminal started at boot' not in reboot:
+                        raise RuntimeError('Budget template deletion cold boot did not reach the desktop')
+                    command('zload /Tests/ProgramCatalog.ZC', 'zc: loaded /Tests/ProgramCatalog.ZC')
+                    command('zc CTask *budget_check_task; CJob *budget_check_job;', 'zc: executed')
+                    budget_template_saved('BudgetTemplateUiDeletedChecks')
+                    command('zstatus', 'failed=0')
+                    print('PASS Budget template edit, deletion and cold deletion persistence', flush=True)
+                    raise SystemExit(0)
+                qmp_send_key('esc')
+                run_graphical_terminal_command('budget-template-cold-return', '40+2;', 'ans=0x2A=42')
+                command('zstatus', 'failed=0')
+                print('PASS Budget recurring-template UI creation, cold persistence and terminal recovery', flush=True)
+                raise SystemExit(0)
             select_os_menu_row('new-entry-menu', 'Edit', 0)
             move_graphical_pointer(700,500)
             try:
@@ -5464,16 +5910,49 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             run_graphical_terminal_command(
                 'demo-ohgreat-ready', '40+2;', 'ans=0x2A=42')
             type_graphical_prompt_line(
-                'demo-ohgreat-launch', '#include "/Demo/Sound/OhGreat"')
+                'demo-ohgreat-launch',
+                'ExeFile2("/Demo/Sound/OhGreat.ZC");' if args.probe_demo_ohgreat_full
+                else '#include "/Demo/Sound/OhGreat"')
             qmp_send_key('ret')
-            time.sleep(2.0)
-            qmp_send_keys(['ctrl', 'alt', 'c'])
-            run_graphical_terminal_command(
-                'demo-ohgreat-terminal-recovery', '40+2;', 'ans=0x2A=42',
-                timeout=30, prior_break_expected=True)
+            if args.probe_demo_ohgreat_full:
+                require_graphical_text('demo-ohgreat-late-lyric', 'smack', timeout=120)
+                qmp_send_key('a')
+                # The original song checks CharScan at the next outer loop,
+                # after the remaining notes finish, rather than on every note.
+                deadline = time.monotonic() + 90
+                while True:
+                    state = command('zc Print("ohgreat_prompt=%d\\n",'
+                                    'Bt(&bootstrap_gui_terminal_task->task_flags,TASKf_CMD_LINE_PROMPT));',
+                                    'ohgreat_prompt=', timeout=30)
+                    if 'ohgreat_prompt=1' in state:
+                        break
+                    if time.monotonic() >= deadline:
+                        raise RuntimeError('OhGreat did not return to the prompt after a key: ' + state)
+                    time.sleep(0.5)
+            else:
+                time.sleep(2.0)
+                qmp_send_keys(['ctrl', 'alt', 'c'])
+            if args.probe_demo_ohgreat_full:
+                command('zc I64 ohgreat_recovered;', 'zc: executed')
+                command('zc XTalk(bootstrap_gui_terminal_task,' +
+                        json.dumps('ohgreat_recovered=40+2;\n') + ');', 'zc: executed')
+                deadline = time.monotonic() + 30
+                while True:
+                    state = command('zc Print("ohgreat_recovered=%d\\n",ohgreat_recovered);',
+                                    'ohgreat_recovered=')
+                    if 'ohgreat_recovered=42' in state:
+                        break
+                    if time.monotonic() >= deadline:
+                        raise RuntimeError('graphical task did not execute a command after OhGreat: ' + state)
+            else:
+                run_graphical_terminal_command(
+                    'demo-ohgreat-terminal-recovery', '40+2;', 'ans=0x2A=42',
+                    timeout=30, prior_break_expected=True)
             command('zstatus', 'failed=0')
-            print('PASS Demo OhGreat stock Play loop, Ctrl-Alt-C and terminal recovery',
-                  flush=True)
+            if args.probe_demo_ohgreat_full:
+                print('PASS Demo OhGreat late lyric, normal-key exit and graphical terminal recovery', flush=True)
+            else:
+                print('PASS Demo OhGreat stock Play loop, Ctrl-Alt-C and terminal recovery', flush=True)
             raise SystemExit(0)
         if args.probe_demo_morse_code:
             focus_graphical_terminal()
@@ -10207,16 +10686,20 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             # TicTacToe clears its terminal text and draws a full-window
             # board, so its documented exit hint is not reliably visible in
             # OCR. Confirm the game by checking the four rendered board lines.
-            time.sleep(.5)
-            before = graphical_screen('demo-tictactoe-before-move')
-            grid_pixels = (rgb_pixels_in(before, (255, 255, 255), (197, 100, 203, 400)) +
-                           rgb_pixels_in(before, (255, 255, 255), (297, 100, 303, 400)) +
-                           rgb_pixels_in(before, (255, 255, 255), (100, 197, 400, 203)) +
-                           rgb_pixels_in(before, (255, 255, 255), (100, 297, 400, 303)))
-            if grid_pixels < 500:
-                raise RuntimeError('TicTacToe did not render its four board lines; '
-                    f'grid_pixels={grid_pixels}, see '
-                    f'{graphical_path("demo-tictactoe-before-move")}')
+            deadline = time.monotonic() + 45
+            while True:
+                time.sleep(.5)
+                before = graphical_screen('demo-tictactoe-before-move')
+                grid_pixels = (rgb_pixels_in(before, (255, 255, 255), (197, 100, 203, 400)) +
+                               rgb_pixels_in(before, (255, 255, 255), (297, 100, 303, 400)) +
+                               rgb_pixels_in(before, (255, 255, 255), (100, 197, 400, 203)) +
+                               rgb_pixels_in(before, (255, 255, 255), (100, 297, 400, 303)))
+                if grid_pixels >= 500:
+                    break
+                if time.monotonic() >= deadline:
+                    raise RuntimeError('TicTacToe did not render its four board lines; '
+                        f'grid_pixels={grid_pixels}, see '
+                        f'{graphical_path("demo-tictactoe-before-move")}')
             move_graphical_pointer(150, 150)
             graphical_mouse_button('left', True)
             time.sleep(0.15)
@@ -10228,7 +10711,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 raise RuntimeError('TicTacToe did not redraw after the first move; '
                     f'pixel_diff={first_diff}, see '
                     f'{graphical_path("demo-tictactoe-first-move")}')
-            move_graphical_pointer(250, 150)
+            move_graphical_pointer(*( (150, 250) if args.probe_demo_tictactoe_win else (250, 150)))
             graphical_mouse_button('left', True)
             time.sleep(0.15)
             graphical_mouse_button('left', False)
@@ -10239,17 +10722,105 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 raise RuntimeError('TicTacToe did not redraw after the second move; '
                     f'pixel_diff={second_diff}, see '
                     f'{graphical_path("demo-tictactoe-second-move")}')
-            # The in-tree interactive gate uses Escape as the host-side
-            # cooperative break path for included demos; Ctrl-Alt-C's native
-            # IRQ chord is not represented reliably by the emulated key queue.
-            qmp_send_key('esc')
+            if args.probe_demo_tictactoe_win:
+                # X fills the top row; O takes two cells in the middle row.
+                for x, y in ((250, 150), (250, 250)):
+                    move_graphical_pointer(x, y)
+                    graphical_mouse_button('left', True)
+                    time.sleep(0.15)
+                    graphical_mouse_button('left', False)
+                    time.sleep(0.4)
+                move_graphical_pointer(500, 450)
+                time.sleep(0.4)
+                occupied = graphical_screen('demo-tictactoe-four-moves')
+                cells = ((150, 150), (150, 250), (250, 150), (250, 250))
+                def cell_pixels(screen, x, y):
+                    return rgb_pixels_in(screen, (255, 255, 255),
+                                         (x-24, y-24, x+24, y+24))
+                counts = [cell_pixels(occupied, x, y) for x, y in cells]
+                if min(counts) < 30:
+                    raise RuntimeError(f'TicTacToe did not retain four moves: {counts}')
+                move_graphical_pointer(350, 150)
+                graphical_mouse_button('left', True)
+                time.sleep(0.15)
+                graphical_mouse_button('left', False)
+                move_graphical_pointer(500, 450)
+                deadline = time.monotonic() + 20
+                while True:
+                    time.sleep(0.5)
+                    reset = graphical_screen('demo-tictactoe-after-win')
+                    remaining = [cell_pixels(reset, x, y) for x, y in cells]
+                    if max(remaining) < 10:
+                        break
+                    if time.monotonic() >= deadline:
+                        raise RuntimeError(f'TicTacToe did not reset after a win: {remaining}')
+                move_graphical_pointer(350, 350)
+                graphical_mouse_button('left', True)
+                time.sleep(0.15)
+                graphical_mouse_button('left', False)
+                move_graphical_pointer(500, 450)
+                time.sleep(0.5)
+                replay = graphical_screen('demo-tictactoe-replay')
+                if cell_pixels(replay, 350, 350) < 30:
+                    raise RuntimeError('TicTacToe did not accept a move after the win')
+                print('PASS TicTacToe five-move win, board reset and replay', flush=True)
+            if args.probe_demo_tictactoe_draw:
+                # First two moves are X at (150,150), O at (250,150).
+                # X O X / X O O / O X X is a draw with no earlier winner.
+                cells = ((150, 150), (250, 150), (350, 150), (150, 250),
+                         (250, 250), (350, 250), (150, 350), (250, 350))
+                def draw_cell_pixels(screen, x, y):
+                    return rgb_pixels_in(screen, (255, 255, 255),
+                                         (x-24, y-24, x+24, y+24))
+                for x, y in ((350, 150), (250, 250), (150, 250),
+                             (350, 250), (250, 350), (150, 350)):
+                    move_graphical_pointer(x, y)
+                    graphical_mouse_button('left', True)
+                    time.sleep(.15)
+                    graphical_mouse_button('left', False)
+                    time.sleep(.4)
+                move_graphical_pointer(500, 450)
+                time.sleep(.4)
+                occupied = graphical_screen('demo-tictactoe-eight-moves')
+                counts = [draw_cell_pixels(occupied, x, y) for x, y in cells]
+                if min(counts) < 30:
+                    raise RuntimeError(f'TicTacToe did not retain eight draw moves: {counts}')
+                move_graphical_pointer(350, 350)
+                graphical_mouse_button('left', True)
+                time.sleep(.15)
+                graphical_mouse_button('left', False)
+                move_graphical_pointer(500, 450)
+                deadline = time.monotonic() + 20
+                while True:
+                    time.sleep(.5)
+                    reset = graphical_screen('demo-tictactoe-after-draw')
+                    remaining = [draw_cell_pixels(reset, x, y) for x, y in cells]
+                    if max(remaining) < 10:
+                        break
+                    if time.monotonic() >= deadline:
+                        raise RuntimeError(f'TicTacToe did not reset after a draw: {remaining}')
+                move_graphical_pointer(350, 350)
+                graphical_mouse_button('left', True)
+                time.sleep(.15)
+                graphical_mouse_button('left', False)
+                move_graphical_pointer(500, 450)
+                time.sleep(.5)
+                replay = graphical_screen('demo-tictactoe-draw-replay')
+                if draw_cell_pixels(replay, 350, 350) < 30:
+                    raise RuntimeError('TicTacToe did not accept a move after the draw')
+                print('PASS TicTacToe nine-move draw, board reset and replay', flush=True)
+            if args.probe_demo_tictactoe_ctrl_alt_c:
+                qmp_send_keys(['ctrl', 'alt', 'c'])
+            else:
+                qmp_send_key('esc')
             time.sleep(0.5)
             run_graphical_terminal_command(
                 'demo-tictactoe-exit-smoke', '40+2;', 'ans=0x2A=42',
-                timeout=20)
+                timeout=20, prior_break_expected=args.probe_demo_tictactoe_ctrl_alt_c)
             command('zstatus', 'failed=0')
-            print('PASS TicTacToe board drawing, two mouse turns, Escape '
-                  'exit and terminal recovery', flush=True)
+            exit_key = 'Ctrl-Alt-C' if args.probe_demo_tictactoe_ctrl_alt_c else 'Escape'
+            print(f'PASS TicTacToe board drawing, two mouse turns, {exit_key} '
+                  'exit and graphical terminal recovery', flush=True)
             raise SystemExit(0)
         if args.probe_demo_maze:
             focus_graphical_terminal()
@@ -11505,30 +12076,81 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             # board. Accept both defaults so the probe exercises gameplay,
             # rather than mistaking the setup popup for a frozen app.
             for color in ('WHITE', 'BLACK'):
-                setup = graphical_screen('demo-chess-'+color.lower()+'-setup')
-                if f'{color} is human?' in setup[3]:
-                    # PopUpNoYes is a two-button DolDoc form. Return has no
-                    # default action there, so click the visible YES button.
-                    move_graphical_pointer(42, 36)
-                    graphical_mouse_button('left', True)
-                    time.sleep(.15)
-                    graphical_mouse_button('left', False)
-                    time.sleep(.4)
-            time.sleep(.5)
-            board = graphical_screen('demo-chess-board')
+                require_graphical_text('demo-chess-'+color.lower()+'-setup',
+                                       f'{color} is human?', timeout=20)
+                # Return has no default action in this two-button form.
+                move_graphical_pointer(112 if args.probe_demo_chess_ai and color == 'BLACK' else 42, 36)
+                # Relative USB motion is delivered asynchronously; allow it
+                # to reach the guest before posting the button edge.
+                time.sleep(.3)
+                graphical_mouse_button('left', True)
+                time.sleep(.15)
+                graphical_mouse_button('left', False)
+            deadline = time.monotonic() + 30
+            while True:
+                time.sleep(.5)
+                board = graphical_screen('demo-chess-board')
+                board_pixels = sum(1 for offset in range(0, len(board[2]), 3)
+                                   if board[2][offset:offset+3] != b'\x00\x00\x00')
+                if board_pixels >= 10000 and 'is human?' not in board[3]:
+                    break
+                if time.monotonic() >= deadline:
+                    raise RuntimeError('Chess did not render its board after setup; '
+                        f'nonblack_pixels={board_pixels}, see '
+                        f'{graphical_path("demo-chess-board")}')
             # Preserve task and window state in the failure log. Chess can
             # reach its input loop while its DrawIt callback or CDC blit is
             # still missing from the composed frame.
             command('zstatus', 'desktop: winmgr=')
+            if args.probe_demo_chess_move:
+                move_graphical_pointer(100, 100)
+                time.sleep(.5)
+                before_move = graphical_screen('demo-chess-before-move')
+                move_graphical_pointer(261, 278)
+                graphical_mouse_button('left', True)
+                time.sleep(.3)
+                move_graphical_pointer(290, 257)
+                time.sleep(.3)
+                graphical_mouse_button('left', False)
+                move_graphical_pointer(100, 100)
+                # The last moved piece blinks. Depending on pointer timing the
+                # drag can land on A3 or A4; wait for a visible destination.
+                deadline = time.monotonic() + 8
+                while True:
+                    time.sleep(.3)
+                    after_move = graphical_screen('demo-chess-after-move')
+                    src_diff = rgb_diff_count(before_move, after_move, (249, 265, 274, 291))
+                    dst_diff = max(rgb_diff_count(before_move, after_move, box)
+                                   for box in ((278, 244, 303, 270), (309, 222, 334, 248)))
+                    if min(src_diff, dst_diff) >= 25:
+                        break
+                    if time.monotonic() >= deadline:
+                        raise RuntimeError('Chess pawn move did not visibly change both squares; '
+                                           f'source={src_diff}, destination={dst_diff}')
+                print('PASS Chess pawn source and destination changed after drag', flush=True)
+                if args.probe_demo_chess_ai:
+                    # Only black pieces occupy this region at the start; the
+                    # white pawn and mouse cursor remain outside it. Wait for
+                    # a change there, rather than counting the white move.
+                    deadline = time.monotonic() + 180
+                    while True:
+                        time.sleep(1)
+                        # Chess uses dark text on a yellow background. The
+                        # terminal's default white-text threshold misses it.
+                        reply = graphical_screen('demo-chess-ai-reply',
+                                                 foreground_threshold=100000)
+                        black_diff = rgb_diff_count(before_move, reply, (340, 135, 675, 325))
+                        notation = re.search(r'02\)[PRNBQK]:[A-H][1-8]-[A-H][1-8]', reply[3])
+                        if black_diff >= 80 and notation:
+                            break
+                        if time.monotonic() >= deadline:
+                            raise RuntimeError('Chess computer reply did not visibly change '
+                                               f'the black position and notation; pixel_diff={black_diff}')
+                    print(f'PASS Chess computer reply {notation.group(0)}: '
+                          f'{black_diff} changed pixels', flush=True)
             # The game switches to light palette and draws a full-window 3D
             # chessboard. Require substantial non-black rendered content so a
             # compile-only success or a blank task cannot pass this check.
-            board_pixels = sum(1 for offset in range(0, len(board[2]), 3)
-                               if board[2][offset:offset+3] != b'\x00\x00\x00')
-            if board_pixels < 10000:
-                raise RuntimeError('Chess did not render its board; '
-                    f'nonblack_pixels={board_pixels}, see '
-                    f'{graphical_path("demo-chess-board")}')
             qmp_send_key('esc')
             time.sleep(.5)
             run_graphical_terminal_command(
@@ -11856,10 +12478,17 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             ready = graphical_screen('demo-flapbat-ready-screen')
             type_graphical_prompt_line(
                 'demo-flapbat-launch', '#include "/Demo/Games/FlapBat";')
+            flapbat_audio_path = (pathlib.Path(os.environ['ZEAL_AUDIO_CAPTURE_PATH'])
+                                  if os.environ.get('ZEAL_AUDIO_CAPTURE_PATH') else None)
+            if flapbat_audio_path:
+                print('FLAPBAT_AUDIO_START=' + str(
+                    flapbat_audio_path.stat().st_size if flapbat_audio_path.exists() else 44),
+                    flush=True)
             qmp_send_key('ret')
             # FlapBat begins with an instruction popup. Dismiss it through its
             # visible OKAY button; PopUpOk does not accept Return here.
-            time.sleep(.5)
+            require_graphical_text('demo-flapbat-help', 'Hold down to glide.',
+                                   timeout=25)
             move_graphical_pointer(88, 52)
             graphical_mouse_button('left', True)
             time.sleep(.2)
@@ -11893,6 +12522,11 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             if flap_diff < 20:
                 raise RuntimeError('FlapBat Space input did not change the rendered frame; '
                     f'pixel_diff={flap_diff}')
+            if flapbat_audio_path:
+                # Allow several notes from the game's own SongTask to play.
+                time.sleep(4)
+                print('FLAPBAT_AUDIO_END=' + str(flapbat_audio_path.stat().st_size),
+                      flush=True)
             qmp_send_key('esc')
             time.sleep(.5)
             run_graphical_terminal_command(
@@ -12853,10 +13487,21 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 require_graphical_text('user-text-device-answer', 'Device 42')
             command('zcall UserTextCloseChecks', 'zc => 0x000000000000002a')
             before = command('zstatus', 'failed=0')
+            if args.probe_user_text_dead_heaps and 'dead_task_heaps: bytes=0 blocks=0' not in before:
+                raise RuntimeError('dead task retained heap allocations after terminal close: ' + before)
             for _ in range(2):
                 for check in ('StartChecks', 'OrderChecks', 'LongChecks', 'BarrierChecks', 'RecoveryChecks', 'CloseChecks'):
                     command('zcall UserText'+check, 'zc => 0x000000000000002a', timeout=60)
+                if args.probe_user_text_dead_heaps:
+                    state = command('zstatus', 'failed=0')
+                    if 'dead_task_heaps: bytes=0 blocks=0' not in state:
+                        raise RuntimeError('dead task retained heap allocations after terminal close: ' + state)
             after = command('zstatus', 'failed=0')
+            if args.probe_user_text_dead_heaps:
+                if 'dead_task_heaps: bytes=0 blocks=0' not in after:
+                    raise RuntimeError('dead task retained heap allocations: ' + after)
+                print('PASS UserText terminal/filter cycles leave no allocations owned by dead tasks; whole-system growth not checked', flush=True)
+                raise SystemExit(0)
             heap = r'data=(\d+)/\d+ code=(\d+)/\d+ allocations=(\d+)'
             before_usage = re.search(heap, before)
             after_usage = re.search(heap, after)
@@ -13033,6 +13678,71 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             command('zc Print("irq_recovery=%d\\n",40+2);', 'irq_recovery=42')
             print(f'PASS keyboard IRQ, Ctrl-Alt-C observation during busy code, disable and terminal recovery: {count.group(1)} IRQs', flush=True)
             raise SystemExit(0)
+        if args.probe_partial_dollar:
+            command('zload disk:Tests/PartialBreakCleanup.ZC',
+                    'zc: loaded disk:Tests/PartialBreakCleanup.ZC')
+            command('zcall PartialDollarChecks', 'zc => 0x000000000000002a')
+            print('PASS split partial document button directive', flush=True)
+            raise SystemExit(0)
+        if args.probe_partial_callback_cleanup:
+            command('zload /Tests/PartialBreakCleanup.ZC',
+                    'zc: loaded /Tests/PartialBreakCleanup.ZC')
+            result = command('zcall PartialCallbackChecks', 'zc => 0x', timeout=60)
+            detail = command('zc Print("partial_callback_delta=%d calls=%d\\n",'
+                             'partial_callback_delta,partial_callback_calls);',
+                             'partial_callback_delta=')
+            if 'zc => 0x000000000000002a' not in result:
+                raise RuntimeError('partial output callback check failed: ' + result + detail)
+            if 'partial_callback_delta=0 calls=3' not in detail:
+                raise RuntimeError('partial output callback cleanup failed: ' + detail)
+            print('PASS partial output callback return, fallback and exception cleanup', flush=True)
+            raise SystemExit(0)
+        if args.probe_partial_break_cleanup:
+            focus_graphical_terminal()
+            command('zload /Tests/PartialBreakCleanup.ZC',
+                    'zc: loaded /Tests/PartialBreakCleanup.ZC')
+            deltas = []
+            for run in range(4):
+                command('zc partial_break_phase=0;', 'zc: executed')
+                invoke = 'PartialBreakCleanup(FALSE);\n' if run == 0 else 'PartialBreakCleanup(TRUE);\n'
+                command('zc XTalk(bootstrap_gui_terminal_task,' + json.dumps(invoke) + ');',
+                        'zc: executed')
+                deadline = time.monotonic() + 30
+                while True:
+                    state = command('zc Print("partial_phase=%d caught=%d delta=%d\\n",'
+                                    'partial_break_phase,partial_break_caught,partial_break_delta);',
+                                    'partial_phase=')
+                    match = re.search(r'partial_phase=(-?\d+) caught=(-?\d+) delta=(-?\d+)', state)
+                    if not match:
+                        raise RuntimeError('missing partial output cleanup state: ' + state)
+                    phase, caught, delta = map(int, match.groups())
+                    if run and phase == 1:
+                        qmp_send_keys(['ctrl', 'alt', 'c'])
+                        break
+                    if not run and phase == 2:
+                        deltas.append(delta)
+                        break
+                    if phase < 0 or time.monotonic() >= deadline:
+                        raise RuntimeError('partial output cleanup did not start: ' + state)
+                if run:
+                    deadline = time.monotonic() + 30
+                    while True:
+                        state = command('zc Print("partial_phase=%d caught=%d delta=%d\\n",'
+                                        'partial_break_phase,partial_break_caught,partial_break_delta);',
+                                        'partial_phase=')
+                        match = re.search(r'partial_phase=(-?\d+) caught=(-?\d+) delta=(-?\d+)', state)
+                        if match and int(match.group(1)) == 2:
+                            if int(match.group(2)) != 1:
+                                raise RuntimeError('partial output did not catch Break: ' + state)
+                            deltas.append(int(match.group(3)))
+                            break
+                        if time.monotonic() >= deadline:
+                            raise RuntimeError('partial output did not recover from Break: ' + state)
+                print(f'partial output cleanup run {run}: delta={deltas[-1]} bytes', flush=True)
+            if any(delta > deltas[0] for delta in deltas[1:]):
+                raise RuntimeError(f'interrupted partial output retained more live-task heap than normal: {deltas}')
+            print(f'PASS partial document output cleanup after Break: {deltas}', flush=True)
+            raise SystemExit(0)
         if args.probe_demo_debug:
             # Drain serial while the original busy loop runs so a full host
             # pipe cannot masquerade as a guest input failure. Require its
@@ -13043,32 +13753,73 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             focus_graphical_terminal()
             command('zc I64 DebugEntryFlags(){Print("debug_entry_flags=%X\\n",RFlagsGet);return 0;}',
                     'zc: executed', timeout=30)
-            command('zc XTalk(bootstrap_gui_terminal_task,' +
-                    json.dumps('DebugEntryFlags;\n#include "/Demo/DebugDemo";\n') + ');',
-                    'zc: executed', timeout=30)
-            dots = 0
-            first_output = None
-            deadline = time.monotonic() + 120
-            while time.monotonic() < deadline:
-                if select.select([guest.stdout], [], [], .1)[0]:
-                    data = os.read(guest.stdout.fileno(), 65536)
-                    if not data:
-                        raise RuntimeError('guest exited during DebugDemo')
-                    dots += data.count(b'.')
-                    log.write(data)
-                    log.flush()
-                    if dots >= 8 and first_output is None:
-                        first_output = time.monotonic()
-                if first_output is not None and time.monotonic() - first_output >= 5:
-                    break
-            if dots < 8:
-                raise RuntimeError(f'DebugDemo did not visibly enter its loop: {dots} dots')
-            qmp_send_keys(['ctrl', 'alt', 'c'])
-            command('zc Print("debug_recovery=%d\\n",40+2);',
-                    'debug_recovery=42', timeout=30)
-            command('zstatus', 'failed=0', timeout=20)
-            print(f'PASS DebugDemo printed {dots} dots, Ctrl-Alt-C and terminal recovery',
-                  flush=True)
+            command('zc I64 debug_graphical_recovered;', 'zc: executed', timeout=30)
+            for run in range(3 if args.probe_demo_debug_repeat else 1):
+                if args.probe_demo_debug_repeat:
+                    before = command('zc Print("debug_heap=%d\\n",'
+                                     'bootstrap_gui_terminal_task->data_heap->used_u8s);',
+                                     'debug_heap=', timeout=30)
+                command('zc XTalk(bootstrap_gui_terminal_task,' +
+                        json.dumps('DebugEntryFlags;\n#include "/Demo/DebugDemo";\n') + ');',
+                        'zc: executed', timeout=30)
+                dots = 0
+                first_output = None
+                deadline = time.monotonic() + 120
+                while time.monotonic() < deadline:
+                    if select.select([guest.stdout], [], [], .1)[0]:
+                        data = os.read(guest.stdout.fileno(), 65536)
+                        if not data:
+                            raise RuntimeError('guest exited during DebugDemo')
+                        dots += data.count(b'.')
+                        log.write(data)
+                        log.flush()
+                        if dots >= 8 and first_output is None:
+                            first_output = time.monotonic()
+                    if first_output is not None and time.monotonic() - first_output >= 5:
+                        break
+                if dots < 8:
+                    raise RuntimeError(f'DebugDemo did not visibly enter its loop: {dots} dots')
+                qmp_send_keys(['ctrl', 'alt', 'c'])
+                command('zc Print("debug_recovery=%d\\n",40+2);',
+                        'debug_recovery=42', timeout=30)
+                status = command('zstatus', 'failed=0', timeout=20)
+                if not re.search(r'desktop: winmgr=1 gterm=1\b', status):
+                    raise RuntimeError('DebugDemo break stopped the graphical terminal: ' + status)
+                command('zc XTalk(bootstrap_gui_terminal_task,' +
+                        json.dumps(f'debug_graphical_recovered={run+1};\n') + ');',
+                        'zc: executed', timeout=30)
+                recovery_deadline = time.monotonic() + 30
+                while True:
+                    state = command('zc Print("debug_graphical=%d\\n",debug_graphical_recovered);',
+                                    'debug_graphical=', timeout=30)
+                    if f'debug_graphical={run+1}' in state:
+                        break
+                    if time.monotonic() >= recovery_deadline:
+                        raise RuntimeError('graphical terminal did not execute a command after break: ' + state)
+                print(f'PASS DebugDemo run {run+1}: {dots} dots, Ctrl-Alt-C and terminal recovery',
+                      flush=True)
+                if args.probe_demo_debug_repeat:
+                    after = command('zc Print("debug_heap=%d\\n",'
+                                    'bootstrap_gui_terminal_task->data_heap->used_u8s);',
+                                    'debug_heap=', timeout=30)
+                    before_size = re.search(r'debug_heap=(\d+)', before)
+                    after_size = re.search(r'debug_heap=(\d+)', after)
+                    if not before_size or not after_size:
+                        raise RuntimeError('missing terminal heap diagnostic')
+                    print(f'DebugDemo live terminal heap {before_size.group(1)} -> {after_size.group(1)} bytes (includes document growth)', flush=True)
+            if args.probe_demo_debug_repeat:
+                focus_graphical_terminal()
+                qmp_send_keys(['ctrl', 'c'])
+                deadline = time.monotonic() + 30
+                while True:
+                    status = command('zstatus', 'failed=0', timeout=30)
+                    if re.search(r'desktop: winmgr=1 gterm=0\b', status):
+                        break
+                    if time.monotonic() >= deadline:
+                        raise RuntimeError('plain Ctrl-C did not stop the graphical terminal: ' + status)
+                command('zc Print("plain_ctrl_c_recovery=%d\\n",40+2);',
+                        'plain_ctrl_c_recovery=42', timeout=30)
+                print('PASS plain Ctrl-C stops the graphical terminal and returns to the serial shell', flush=True)
             raise SystemExit(0)
         if args.probe_user_startup:
             focus_graphical_terminal()

@@ -13847,8 +13847,16 @@ static int zc_key_read(uint8_t *type, uint64_t *arg1, uint64_t *arg2) {
         return 1;
     }
     if (input_keyboard_msg_nb(type, arg1, arg2)) {
-        if (*type == 2 && *arg1 > 0 && *arg1 < 256)
+        if (*type == 2 && *arg1 > 0 && *arg1 < 256) {
+            /* GUI polling may consume the message before shell_run can
+             * inspect the parallel byte queue. Preserve its Ctrl-C escape,
+             * but leave Ctrl-Alt-C to the focused ZealOS task. */
+            if (*arg1 == 3 && !(*arg2 & (1ull << 11)) &&
+                zc_focus_owns_input() &&
+                (zc_window_demo_active() || zc_gui_terminal_active()))
+                g_vk_gui_ctrl_c_pending = 1;
             (void)input_keyboard_getc_nb(); /* same down event in shell char ring */
+        }
         return 1;
     }
     /* When a GUI task owns the virtio keyboard, leave UART bytes exclusively
@@ -14437,7 +14445,11 @@ static int zinstall_image_valid(uint64_t *sectors_out, uint32_t *extents_out,
     uint64_t data_start, data_bytes = 0, previous_end = 0;
     uint32_t count;
     static const uint8_t magic[8] = {'Z','I','N','S','T','0','0','1'};
-    if (!image || g_install_image_size < 40 || g_install_image_size > 64ull * 1024 * 1024)
+    /* At most one extent per disk sector is possible. The payload can contain
+     * the entire target disk plus its extent table; a fixed 64 MiB ceiling
+     * rejects valid installers as the bundled source tree grows. */
+    uint64_t max_image_size = 40ull + expected_sectors * (VB_SECT + 16ull);
+    if (!image || g_install_image_size < 40 || g_install_image_size > max_image_size)
         return 0;
     for (unsigned i = 0; i < sizeof(magic); i++)
         if (image[i] != magic[i]) return 0;

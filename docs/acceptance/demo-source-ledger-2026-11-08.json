@@ -142,7 +142,6 @@
     "docs/acceptance/demo-template-game1-qemu-2026-11-07.json",
     "docs/acceptance/demo-template-registry1-qemu-2026-11-07.json",
     "docs/acceptance/demo-the-dead-qemu-2026-11-04.json",
-    "docs/acceptance/demo-time-ins-qemu-2026-11-05.json",
     "docs/acceptance/demo-tos-config-qemu-2026-11-08.json",
     "docs/acceptance/demo-tos-theme-qemu-2026-11-08.json",
     "docs/acceptance/demo-transform-qemu-2026-11-04.json",
@@ -166,19 +165,20 @@
     "docs/acceptance/demo-zing-qemu-2026-11-04.json",
     "docs/acceptance/demo-zoneout-qemu-2026-11-03.json",
     "docs/acceptance/demo-mpradix-qemu-2vcpu-partial-2026-11-08.json",
+    "docs/acceptance/demo-time-ins-stock-qemu-2026-11-09.json",
     "docs/acceptance/demo-tos-extern-qemu-2026-11-08.json",
     "docs/acceptance/demo-tosmisc-qemu-2026-11-08.json",
     "docs/acceptance/demo-wallpaper-desktop-qemu-2026-11-08.json",
-    "docs/acceptance/demo-debug-demo-qemu-2026-11-09.json",
+    "docs/acceptance/terminal-output-investigation-2026-11-09.json",
     "docs/acceptance/demo-stack-grow-qemu-2026-11-06.json"
   ],
   "source_count": 206,
   "compile_pass": 206,
   "compile_blocked": 0,
   "compile_blocker_groups": [],
-  "runtime_accepted": 197,
-  "runtime_partial": 4,
-  "runtime_failed": 1,
+  "runtime_accepted": 196,
+  "runtime_partial": 6,
+  "runtime_failed": 0,
   "directories": {
     ".": {
       "source_count": 34,
@@ -538,8 +538,8 @@
       "classification_confidence": "unclassified",
       "compile": "pass",
       "first_compile_error": null,
-      "runtime": "fail",
-      "runtime_evidence": "docs/acceptance/demo-debug-demo-qemu-2026-11-09.json"
+      "runtime": "partial",
+      "runtime_evidence": "docs/acceptance/terminal-output-investigation-2026-11-09.json"
     },
     {
       "path": "/Demo/Define.ZC",
@@ -2269,8 +2269,8 @@
       "classification_confidence": "unclassified",
       "compile": "pass",
       "first_compile_error": null,
-      "runtime": "pass",
-      "runtime_evidence": "docs/acceptance/demo-time-ins-qemu-2026-11-05.json"
+      "runtime": "partial",
+      "runtime_evidence": "docs/acceptance/demo-time-ins-stock-qemu-2026-11-09.json"
     },
     {
       "path": "/Demo/ToHtmlToTXTDemo/HtmlDirList.ZC",

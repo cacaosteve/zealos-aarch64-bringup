@@ -84,7 +84,7 @@ extern I64 ZcFbTextPixel(I64 x, I64 y);
 #define GUI_MENU_ACTION_TAG 0x475549
 
 U0 BootstrapGuiTerminalPrintOutput(U8 *output, CTask *terminal)
-{//Keep each DocPrint below the runtime formatter limit for long command output.
+{//Keep each formatted output below the runtime formatter limit.
     CDoc *doc;
     I64 i = 0;
     I64 n;
@@ -103,7 +103,9 @@ U0 BootstrapGuiTerminalPrintOutput(U8 *output, CTask *terminal)
         for (n = 0; n < 1023 && output[i]; n++, i++)
             chunk[n] = output[i];
         chunk[n] = 0;
-        DocPrint(doc, "%s", chunk);
+        // KDDocPutS uses partial output and yields unless the document opts
+        // out. Preserve both behaviors for programs that print in a loop.
+        DocPrintPartial(doc, "%s", chunk);
     }
 }
 

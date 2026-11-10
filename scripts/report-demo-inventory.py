@@ -175,7 +175,6 @@ RUNTIME_ACCEPTED = {
     "/Demo/Asm/AsmAndC2.ZC": "docs/acceptance/demo-asmandc12-qemu-2026-11-05.json",
     "/Demo/MagicPairs.ZC": "docs/acceptance/demo-magicpairs-qemu-2026-11-05.json",
     "/Demo/RevFileDemo/Rev.ZC": "docs/acceptance/demo-revfile-qemu-2026-11-05.json",
-    "/Demo/TimeIns.ZC": "docs/acceptance/demo-time-ins-qemu-2026-11-05.json",
     "/Demo/InFile/InPopUp.ZC": "docs/acceptance/demo-inpopup-qemu-2026-11-05.json",
     "/Demo/Disk/SerializeTree.ZC": "docs/acceptance/demo-serialize-tree-qemu-2026-11-05.json",
     "/Demo/Define.ZC": "docs/acceptance/demo-define-qemu-2026-11-02.json",
@@ -299,6 +298,10 @@ RUNTIME_ACCEPTED = {
         "docs/acceptance/demo-primes-single-cpu-qemu-2026-11-08.json",
 }
 RUNTIME_PARTIAL = {
+    "/Demo/TimeIns.ZC":
+        "docs/acceptance/demo-time-ins-stock-qemu-2026-11-09.json",
+    "/Demo/DebugDemo.ZC":
+        "docs/acceptance/terminal-output-investigation-2026-11-09.json",
     "/Demo/Graphics/WallPapers/WallPaperDesktop.ZC":
         "docs/acceptance/demo-wallpaper-desktop-qemu-2026-11-08.json",
     "/Demo/AcctExample/TOS/TOSExtern.ZC":
@@ -309,8 +312,6 @@ RUNTIME_PARTIAL = {
         "docs/acceptance/demo-mpradix-qemu-2vcpu-partial-2026-11-08.json",
 }
 RUNTIME_FAILED = {
-    "/Demo/DebugDemo.ZC":
-        "docs/acceptance/demo-debug-demo-qemu-2026-11-09.json",
     "/Demo/StackGrow.ZC":
         "docs/acceptance/demo-stack-grow-qemu-2026-11-06.json",
 }

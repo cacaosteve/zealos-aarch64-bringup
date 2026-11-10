@@ -1,0 +1,44 @@
+{
+  "date": "2026-11-09",
+  "program": "Strut",
+  "result": "pass",
+  "environment": "QEMU AArch64 virt, PCI storage and VirtIO input",
+  "command": "python3 -u scripts/check-compat.py --pci --quick --probe-strut-spring",
+  "log": "build/strut-spring-final.log",
+  "log_sha256": "17e9991039d47e51ced908a54580e78acfa654975e7b1145dfcbd502e3df9d31",
+  "frame": "build/gui-strut-after-spring.ppm",
+  "frame_sha256": "517ae9927e6a706cd39f92731a632764904fe8622c6d946030c89992198e5022",
+  "checks": [
+    "placed two masses",
+    "dragged a spring between them",
+    "verified the member's light-cyan pixels",
+    "switched to play mode",
+    "Escape returned to a working terminal"
+  ],
+  "limitations": [
+    "Simulation physics and thrusters not verified by this test",
+    "Live UTM and Pi behavior unverified",
+    "Pinned Strut source has no save or open command"
+  ],
+  "thruster_followup": {
+    "date": "2026-11-09",
+    "environment": "QEMU AArch64 virt, HVF, one vCPU, PCI storage and VirtIO input",
+    "disk_sha256": "c1efb740bbaf41944f4f6c5a1f4c0dc818653963fbbe6b09ba0df57fb47c25a6",
+    "command": "QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device' python3 -u scripts/check-compat.py --pci --quick --probe-strut-spring",
+    "result": "pass",
+    "checks": [
+      "Placed a third mass and dragged a thruster from the first mass to it, with action key 0.",
+      "After switching to play, two idle captures were identical in the star-field crop. Holding 0 for 2.5 seconds changed 25 pixels in that crop and 339 pixels in the ship/mass crop.",
+      "Escape returned to the graphical terminal; 40+2 returned 42 and zstatus reported failed=0."
+    ],
+    "log": "build/strut-thruster-verified.log",
+    "log_sha256": "6565eabfce3115bae2800622df3da9769d17421fbbf85b4520de41fb22f4f1c9",
+    "screenshots": {
+      "build/gui-strut-thruster-created.ppm": "3fd15c9b202b1989c7e5d13d58034036999994e8bf8b0a49d991a6d8120d5688",
+      "build/gui-strut-play-idle-a.ppm": "fa7ff950b23ac12fa493f2bc6453d3a5a3f9e0a5fa51b2a02fbc3726829404a9",
+      "build/gui-strut-play-idle-b.ppm": "fa7ff950b23ac12fa493f2bc6453d3a5a3f9e0a5fa51b2a02fbc3726829404a9",
+      "build/gui-strut-play-thrust.ppm": "00d744df29f4634deef667b9b211ded664e9530887aa5a618045b693cdd33d19"
+    },
+    "limits": "The visual comparison establishes a response to the control in this setup, not numerical force accuracy, connector mechanics, every thrust direction, live UTM, or Pi behavior."
+  }
+}

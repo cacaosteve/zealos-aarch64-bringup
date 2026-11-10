@@ -1,0 +1,42 @@
+{
+  "date": "2026-11-09",
+  "result": "pass for UTM QEMU installer, persistence and uninstrumented ToTheFront setup/artillery",
+  "iso": "build/zealos-aarch64-tothefront-fix.iso",
+  "iso_sha256": "af97aab33b2d034b58a5183de602f120766098bcb31e385b43b85bf418189a6a",
+  "source_disk": "build/tothefront-direct-install.img",
+  "source_disk_sha256": "f9ffd3168ee98468772e054c9ec03f13596122c945c228353d40a7acde7f8813",
+  "source_bundle_sha256": "d5646abf79ef090f838cc704f3c982c527c81843bd41c00595a14a644f909c19",
+  "packed_install_sha256": "2f38f003a98ed7f07a1761f8290aaecc098a46109415f9f04be9c32c5a3fb425",
+  "environment": "UTM bundled QEMU framework, HVF, virtio-ramfb, one vCPU, NEC USB CD and input with VirtIO recovery input, 1 GiB",
+  "checks": [
+    "ISO source bundle and packed installer hashes matched their build inputs.",
+    "EFI partition source bundle and the source-volume Human.ZC were individually read back and matched the intended fixed files.",
+    "Host sparse installer payload round trip matched the complete raw source disk.",
+    "Live USB-CD boot, unconfirmed-install protection, full installer read-back and byte-for-byte installed disk comparison passed.",
+    "Disk-only boot generated Stadium data, persisted a test source, and reloaded and executed it after a second disk-only boot.",
+    "An uninstrumented ToTheFront game on a disposable clone of the packaged disk accepted both player choices, plotted an artillery order, advanced a phase and returned to a terminal."
+  ],
+  "installer_log": "build/tothefront-direct-installer3.log",
+  "installer_log_sha256": "b74b173fb238ee4456f6d48fe4da4924e6a0c68c7b80ce43507072fe3b1a34eb",
+  "game_log": "build/tothefront-direct-utm-game.log",
+  "game_log_sha256": "f30b9c3d2fcc2f3ac5a952beb4e48ba0d734638d73a3291e03092f5cbe1e96b0",
+  "pi_candidate": {
+    "path": "build/pi-desktop-tothefront-fix",
+    "files_sha256": {
+      "boot/kernel.elf": "202411d3f47717ecae5600cd3ff105efcb7f532a46d989982a8e426af9efb14c",
+      "boot/kernel-diag.elf": "2af5238ac275a1277bbd9b0ab75a47325925c4658a02edaa1d0841cbece4068b",
+      "boot/zealbooter.elf": "3da84dcb4c5dfb2a292c529111e813497fd89f52462db71618622c523b5500f5",
+      "boot/demo.hcbc": "e37c1b530962064c451fac288327f7ae799d3e344cc5c77dc2ba55625c0042d0",
+      "boot/sources.tar": "d5646abf79ef090f838cc704f3c982c527c81843bd41c00595a14a644f909c19",
+      "EFI/BOOT/BOOTAA64.EFI": "3f51768c5eb8a0818b8e7aa2ac9a9caef3c64707b5b6db15d1e612de23236b8c",
+      "limine.conf": "a8981abc3cda174982db0e510a1bce180b2cefa74973789cd49c481ef92b5bc4"
+    },
+    "validation": "Pi native/recovery ELF and boot-chain validation passed with 1039 bundled source modules. No microSD was written."
+  },
+  "limitations": [
+    "The direct-fire regression used an instrumented controlled-target fixture, as described in tothefront-candidate-qemu-2026-11-09.json; the uninstrumented game check did not exercise direct fire.",
+    "No live UTM UI retest or physical Pi test of this exact payload.",
+    "No claim that all programs, complete ToTheFront gameplay, or Pi writable storage work.",
+    "Earlier normal ISO and disk were preserved."
+  ]
+}

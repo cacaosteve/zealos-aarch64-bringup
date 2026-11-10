@@ -139,10 +139,13 @@ U0 TicTacToe()
 	WinBorder;
 	WinMax;
 	DocClear;
-	"$$GREEN$$ESC$$FG$$ to exit.\n";
+	"$$GREEN$$ESC or CTRL-ALT-c$$FG$$ to exit.\n";
 	ttt_exit = FALSE;
-	while (!ttt_exit)
-		DoGame;
+	try
+		while (!ttt_exit)
+			DoGame;
+	catch
+		PutExcept;
 	DCFill;
 	SettingsPop;
 }

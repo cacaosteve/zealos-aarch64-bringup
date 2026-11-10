@@ -1,0 +1,24 @@
+{
+  "date": "2026-11-09",
+  "result": "pass for the tested installer and 3D workflows",
+  "iso": "build/zealos-aarch64-candidate-2026-11-09.iso",
+  "iso_sha256": "bc66ab3b6ca4d31a5ab24d49a3c82d1f256b830ee7475c7f4ff23ecf831a60d7",
+  "source_disk": "build/candidate-install-disk.img",
+  "source_disk_sha256": "1ec363d1c1d37a5f001f94090457ec89a8969c8396d7e8acc51cc239b4f66236",
+  "packed_installer_bytes": 72903672,
+  "kernel_sha256": "da9b0fd26f417cc35c995a403718a892073d1169c863b30fa43973af500def7b",
+  "source_bundle_sha256": "fba44cc9fb2303dfb066402ac65ab7099294d813b2bf131fede3f561a1e33cc0",
+  "environment": "UTM's QEMU framework, HVF, virtio-ramfb, NEC USB CD and input, VirtIO target disk, 1024 MiB",
+  "installer": {
+    "log": "build/candidate-installer-final.log",
+    "sha256": "dac0b1b11349e9c0cdc16c41e964cf4dd2fdd1a34996f0f9731d05ce480169a2",
+    "checks": ["live ISO boot", "unconfirmed install leaves target unchanged", "installation and full read-back", "raw installed disk matches packaged source byte for byte", "disk-only boot", "saved source survives a second disk-only boot"]
+  },
+  "apps": {
+    "log": "build/candidate-3d-final.log",
+    "sha256": "cf8fa56dc9ac5c080b50f9e1bd8e7cee42bdb292d0e3d8b35033be14104d3a64",
+    "checks": ["GrModels Man and Ball", "Ball sprite visibly rendered", "KeepAway gameplay input", "Titanium gameplay input and Escape", "SystemLaunchPopupChecks", "graphical terminal recovery"]
+  },
+  "pi_desktop_kernel_build_sha256": "202411d3f47717ecae5600cd3ff105efcb7f532a46d989982a8e426af9efb14c",
+  "limitations": ["No live UTM UI retest", "Pi kernel build only; no card staging or physical test", "These focused checks do not establish all-program compatibility", "Existing normal ISO and disk were not overwritten"]
+}

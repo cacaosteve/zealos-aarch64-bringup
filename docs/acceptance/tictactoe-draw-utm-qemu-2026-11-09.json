@@ -1,0 +1,25 @@
+{
+  "date": "2026-11-09",
+  "program": "/Demo/Games/TicTacToe.ZC ARM64 adaptation",
+  "environment": "UTM-bundled QEMU framework, AArch64 virt with HVF, one vCPU, virtio-ramfb, VirtIO keyboard and tablet",
+  "command": "ZEAL_TEST_DISK=build/tothefront-direct-install.img python3 -u scripts/check-compat.py --pci --quick --probe-demo-tictactoe-draw (QEMU and QEMU_VIRT select the UTM framework runner and devices)",
+  "result": "pass",
+  "checks": [
+    "Eight legal moves in a no-winner position remained visible.",
+    "The ninth move completed a draw and the occupied cells cleared.",
+    "A new move appeared after reset.",
+    "Escape returned to a graphical terminal where 40+2 returned 42; zstatus reported failed=0."
+  ],
+  "sha256": {
+    "build/tictactoe-draw-utm.log": "2ebe060c2dcef293e39949aa3fc4faa9372b9e60205438006fed87e8975fcae5",
+    "build/tictactoe-draw-utm-uart.log": "a0761df1bd4c5d98ffa8f556fec4545f497626e57f72b4bdea45898e44d33ec7",
+    "build/gui-demo-tictactoe-eight-moves.ppm": "e2ed368ef1923641a1698e983b8f4d0fdbfe39a55c65a2ed1f71f9586f292efd",
+    "build/gui-demo-tictactoe-after-draw.ppm": "63bdbfa629cd4007ce9ffcc3e881524167c07fa32f317803298f1dc87614603b",
+    "build/gui-demo-tictactoe-draw-replay.ppm": "4998f352b073dd6cc0bfbf6de59ed1dbdd25321beaa137e375624ec51f9e982a",
+    "build/tothefront-direct-install.img": "f9ffd3168ee98468772e054c9ec03f13596122c945c228353d40a7acde7f8813"
+  },
+  "limitations": [
+    "The observed game is one draw sequence using VirtIO tablet input; other draw positions, occupied-square rejection and all win paths are not covered.",
+    "This is emulation using the UTM framework; it is not live UTM window interaction or a Pi hardware test."
+  ]
+}

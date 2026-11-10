@@ -1,0 +1,169 @@
+// Exercise the stock recurring-entry expansion without writing user data.
+#include "/Apps/Budget/Load.ZC"
+
+I64 BudgetTemplateChecks()
+{
+    CBgtTemplate *tmpt = CAlloc(sizeof(CBgtTemplate));
+    CBgtEntry *entry, *next;
+    I64 count;
+    QueueInit(&b_head);
+    QueueInit(&t_head);
+    tmpt->b.credit = StrNew("BANK");
+    tmpt->b.debit = StrNew("FOOD");
+    tmpt->b.desc = StrNew("Recurring test");
+    tmpt->b.amount = 12.5;
+    tmpt->type = BT_INTERVAL;
+    tmpt->period = 1.0;
+    StrCopy(tmpt->start_date, "01/01/2024");
+    StrCopy(tmpt->end_date, "01/03/2024");
+    BgtTemplateExpand(tmpt);
+    if (QueueCount(&b_head) != 3) return 1;
+    entry = b_head.next;
+    if ((entry->date >> 32) != (Str2Date("01/01/2024") >> 32)) return 21;
+    if (entry->type != BE_TEMPLATE_COPY) return 22;
+    if (entry->template != tmpt) return 23;
+    entry = entry->next;
+    if ((entry->date >> 32) != (Str2Date("01/02/2024") >> 32) || entry->amount != 12.5) return 3;
+    entry = entry->next;
+    if ((entry->date >> 32) != (Str2Date("01/03/2024") >> 32)) return 4;
+    BgtTemplatePurge(tmpt);
+    if (QueueCount(&b_head)) return 5;
+
+    tmpt->type = BT_MONTHLY;
+    StrCopy(tmpt->start_date, "12/15/2023");
+    StrCopy(tmpt->end_date, "02/15/2024");
+    BgtTemplateExpand(tmpt);
+    if (QueueCount(&b_head) != 3) return 6;
+    entry = b_head.next;
+    if ((entry->date >> 32) != (Str2Date("12/15/2023") >> 32)) return 7;
+    entry = entry->next;
+    if ((entry->date >> 32) != (Str2Date("01/15/2024") >> 32)) return 8;
+    entry = entry->next;
+    if ((entry->date >> 32) != (Str2Date("02/15/2024") >> 32)) return 9;
+    BgtTemplatePurge(tmpt);
+
+    BgtTemplateExpand(tmpt, TRUE);
+    if (QueueCount(&b_head) != 2) return 10;
+    entry = b_head.next;
+    if ((entry->date >> 32) != (Str2Date("01/15/2024") >> 32) || entry->template ||
+        entry->credit == tmpt->b.credit || StrCompare(entry->credit, "BANK")) return 11;
+    count = 0;
+    while (entry != &b_head)
+    {
+        next = entry->next;
+        QueueRemove(entry);
+        BgtEntryDel(entry);
+        entry = next;
+        count++;
+    }
+    if (count != 2) return 12;
+    BgtTemplateDel(tmpt);
+    return 42;
+}
+
+I64 BudgetTemplatePersistenceChecks()
+{
+    U8 *old_dir = DirCur;
+    I64 size, result = 42;
+    U8 *accounts = FileRead("/Apps/Budget/Accts.DD", &size);
+    CBgtTemplate *tmpt;
+    CBgtEntry *entry;
+    if (!accounts) return 1;
+    FileWrite("/Home/BudgetTemplateCheck/Accts.DD", accounts, size);
+    Free(accounts);
+    if (!Cd("/Home/BudgetTemplateCheck")) return 2;
+    bgt_string_file = FileNameAbs("Strs.DD");
+    bgt_accts_file = FileNameAbs("Accts.DD");
+    bgt_data_file = FileNameAbs("Bgt.DATA");
+    BgtAcctsRead;
+    BgtDataRead;
+    if (QueueCount(&b_head) || QueueCount(&t_head)) return 3;
+    tmpt = CAlloc(sizeof(CBgtTemplate));
+    tmpt->type = BT_MONTHLY;
+    StrCopy(tmpt->start_date, "12/15/2023");
+    StrCopy(tmpt->end_date, "02/15/2024");
+    tmpt->b.amount = 12.5;
+    tmpt->b.credit = StrNew("BANK");
+    tmpt->b.debit = StrNew("FOOD");
+    tmpt->b.desc = StrNew("Recurring persistence");
+    QueueInsert(tmpt, t_head.last);
+    BgtTemplateExpand(tmpt);
+    if (QueueCount(&b_head) != 3) return 4;
+    BgtDataWrite;
+    BgtAcctsWrite;
+    BgtDel;
+    BgtAcctsRead;
+    BgtDataRead;
+    if (QueueCount(&t_head) != 1 || QueueCount(&b_head)) result = 5;
+    else
+    {
+        tmpt = t_head.next;
+        if (tmpt->type != BT_MONTHLY || StrCompare(tmpt->start_date, "12/15/2023") ||
+            StrCompare(tmpt->end_date, "02/15/2024") || tmpt->b.amount != 12.5 ||
+            StrCompare(tmpt->b.credit, "BANK") || StrCompare(tmpt->b.debit, "FOOD") ||
+            StrCompare(tmpt->b.desc, "Recurring persistence")) result = 6;
+        else
+        {
+            CBgtTemplatesExpand;
+            if (QueueCount(&b_head) != 3) result = 7;
+            else
+            {
+                entry = b_head.last;
+                if ((entry->date >> 32) != (Str2Date("02/15/2024") >> 32) ||
+                    entry->type != BE_TEMPLATE_COPY || entry->template != tmpt) result = 8;
+            }
+        }
+    }
+    BgtDel;
+    Free(bgt_string_file); Free(bgt_accts_file); Free(bgt_data_file);
+    Cd(old_dir); Free(old_dir);
+    return result;
+}
+
+I64 BudgetTemplateAllChecks()
+{
+    I64 result = BudgetTemplateChecks;
+    if (result != 42) return 100 + result;
+    result = BudgetTemplatePersistenceChecks;
+    if (result != 42) return 200 + result;
+    return 42;
+}
+
+// Called only after a separate guest boot, against the same test disk.
+I64 BudgetTemplateColdReadChecks()
+{
+    U8 *old_dir = DirCur;
+    I64 result = 42;
+    CBgtTemplate *tmpt;
+    CBgtEntry *entry;
+    if (!Cd("/Home/BudgetTemplateCheck")) return 1;
+    bgt_string_file = FileNameAbs("Strs.DD");
+    bgt_accts_file = FileNameAbs("Accts.DD");
+    bgt_data_file = FileNameAbs("Bgt.DATA");
+    BgtAcctsRead;
+    BgtDataRead;
+    if (QueueCount(&t_head) != 1 || QueueCount(&b_head)) result = 2;
+    else
+    {
+        tmpt = t_head.next;
+        if (tmpt->type != BT_MONTHLY || StrCompare(tmpt->start_date, "12/15/2023") ||
+            StrCompare(tmpt->end_date, "02/15/2024") || tmpt->b.amount != 12.5 ||
+            StrCompare(tmpt->b.credit, "BANK") || StrCompare(tmpt->b.debit, "FOOD") ||
+            StrCompare(tmpt->b.desc, "Recurring persistence")) result = 3;
+        else
+        {
+            CBgtTemplatesExpand;
+            if (QueueCount(&b_head) != 3) result = 4;
+            else
+            {
+                entry = b_head.last;
+                if ((entry->date >> 32) != (Str2Date("02/15/2024") >> 32) ||
+                    entry->type != BE_TEMPLATE_COPY || entry->template != tmpt) result = 5;
+            }
+        }
+    }
+    BgtDel;
+    Free(bgt_string_file); Free(bgt_accts_file); Free(bgt_data_file);
+    Cd(old_dir); Free(old_dir);
+    return result;
+}

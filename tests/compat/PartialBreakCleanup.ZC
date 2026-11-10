@@ -1,0 +1,93 @@
+// Isolate partial-document output from the live terminal document, whose
+// normal growth would otherwise obscure temporary allocations after Break.
+I64 partial_break_phase, partial_break_caught, partial_break_delta;
+
+U0 PartialBreakCleanup(Bool interrupt)
+{
+    CDoc *doc;
+    I64 before = Fs->data_heap->used_u8s, count = 0;
+
+    partial_break_phase = 0;
+    partial_break_caught = 0;
+    doc = DocNew(NULL, Fs);
+    if (!doc)
+    {
+        partial_break_phase = -1;
+        return;
+    }
+    try
+    {
+        partial_break_phase = 1;
+        while (interrupt || count < 10)
+        {
+            DocPrintPartial(doc, ".");
+            count++;
+        }
+    }
+    catch
+    {
+        partial_break_caught = Fs->except_ch == 'Break';
+        Fs->catch_except = TRUE;
+    }
+    DocDel(doc);
+    partial_break_delta = Fs->data_heap->used_u8s - before;
+    partial_break_phase = 2;
+}
+
+I64 partial_callback_mode, partial_callback_calls, partial_callback_delta;
+
+Bool PartialOutputCallback(CDoc *doc, U8 *data, U8 *text)
+{
+    partial_callback_calls++;
+    if (partial_callback_mode == 2)
+        throw('CBad');
+    return partial_callback_mode == 1;
+}
+
+I64 PartialCallbackChecks()
+{
+    CDoc *doc = DocNew(NULL, Fs);
+    I64 result = 42, before;
+    Bool caught = FALSE;
+    if (!doc) return 1;
+    doc->user_put_s = &PartialOutputCallback;
+    partial_callback_calls = 0;
+    partial_callback_mode = 1;
+    DocPrintPartial(doc, "abc");
+    if (partial_callback_calls != 1 || doc->cur_col != 0) result = 2;
+    partial_callback_mode = 0;
+    DocPrintPartial(doc, "abc");
+    if (partial_callback_calls != 2 || doc->cur_col != 3) result = 3;
+    partial_callback_mode = 2;
+    before = Fs->data_heap->used_u8s;
+    try
+        DocPrintPartial(doc, "abc");
+    catch
+    {
+        caught = Fs->except_ch == 'CBad';
+        Fs->catch_except = TRUE;
+    }
+    partial_callback_delta = Fs->data_heap->used_u8s - before;
+    if (!caught || partial_callback_calls != 3) result = 4;
+    if (partial_callback_delta) result = 5;
+    doc->user_put_s = NULL;
+    DocDel(doc);
+    return result;
+}
+
+I64 PartialDollarChecks()
+{
+    CDoc *doc = DocNew(NULL, Fs);
+    CDocEntry *entry;
+    I64 count = 0;
+    if (!doc) return 1;
+    // Split an actual button directive across two writes, as KDDocPutS can.
+    DocPrintPartial(doc, "$$BT,\"Man\",");
+    DocPrintPartial(doc, "LE=0$$");
+    for (entry = doc->head.next; entry != doc; entry = entry->next)
+        if (entry->type_u8 == DOCT_BTTN)
+            count++;
+    DocDel(doc);
+    if (count == 1) return 42;
+    return 2;
+}

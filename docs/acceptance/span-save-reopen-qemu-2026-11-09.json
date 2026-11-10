@@ -1,0 +1,19 @@
+{
+  "date": "2026-11-09",
+  "program": "Span",
+  "result": "pass",
+  "environment": "QEMU AArch64 virt, PCI storage, VirtIO input and disposable writable disk",
+  "command": "python3 -u scripts/check-compat.py --pci --quick --probe-span-save",
+  "log": "build/span-save-reopen.log",
+  "log_sha256": "6f37846665635dda66c33e8b7229ec49e11cc112f01f824dfd1d4d1e25001464",
+  "checks": ["added a mass to the bridge", "saved /Home/Span/Game.DATA", "started a new bridge and verified the mass was removed", "selected Game.DATA in the original file chooser and reopened it", "verified the saved mass returned", "Shift+Escape returned to a working graphical terminal"],
+  "cold_reboot_run": {
+    "command": "python3 -u scripts/check-compat.py --pci --quick --probe-span-cold",
+    "log": "build/span-cold-investigation.log",
+    "log_sha256": "4e5ed633d416eb53a5c231bd4a799c64855709bc88d4bd7654c42bed096d8603",
+    "cold_reopened_frame": "build/gui-span-cold-reopened.ppm",
+    "cold_reopened_frame_sha256": "78b2a3cb3b654758632f079a2602da50f50fbf1037593819687a1d01cc9e6019",
+    "checks": ["flushed disposable disk", "cold-booted from the same disk", "reopened Game.DATA and verified the saved mass", "returned to a working terminal"]
+  },
+  "limitations": ["One mass only; springs and complete bridges not covered", "Live UTM and Pi behavior unverified"]
+}

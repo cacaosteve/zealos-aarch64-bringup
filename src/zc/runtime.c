@@ -10581,6 +10581,10 @@ int zc_start_gui_terminal(void) {
          * EdCharIns/EdCursorLeft/etc. to bootstrap stand-ins. Recompile after
          * their real definitions exist, before installing KDDocPutKey. */
         "/System/DolDoc/DocPutKey.ZC",
+        /* DocPrintPartial calls DocPutKey directly. Recompile it after the
+         * final key handler, otherwise partial dollar directives still use
+         * the cycle-breaking editor and render as text instead of buttons. */
+        "/System/DolDoc/DocPutS.ZC",
         "/System/SourcePrompt.ZC",
         "/System/SourceTraining.ZC",
         "/System/HomeStartUp.ZC",
@@ -10767,6 +10771,7 @@ int zc_reset_session(void) {
 }
 void zc_status(void) {
     size_t used[2] = {0}, blocks[2] = {0};
+    size_t dead_task_bytes = 0, dead_task_blocks = 0;
     int64_t gui_terminal_window = 0;
     int64_t gui_key_events = 0, gui_last_char = 0, gui_last_scan = 0;
     int64_t gui_editor_active = 0;
@@ -10779,10 +10784,26 @@ void zc_status(void) {
             if (b->used) {
                 used[a] += b->size;
                 blocks[a]++;
+                uintptr_t owner = (uintptr_t)b->owner;
+                uintptr_t base = (uintptr_t)guest_fibers;
+                if (owner >= base && owner < base + sizeof(guest_fibers)) {
+                    size_t delta = owner - base;
+                    unsigned index = (unsigned)(delta / sizeof(struct guest_fiber));
+                    size_t field = delta % sizeof(struct guest_fiber);
+                    if (guest_fibers[index].state == GUEST_DONE &&
+                        (field == offsetof(struct guest_fiber, heap_owner) ||
+                         field == offsetof(struct guest_fiber, compiler_heap) ||
+                         field == offsetof(struct guest_fiber, compiler_code_heap))) {
+                        dead_task_bytes += b->size;
+                        dead_task_blocks++;
+                    }
+                }
             }
     printf("zc: ready=%d failed=%d modules=%lu data=%lu/%u code=%lu/%u allocations=%lu\n", ready,
            failed, (unsigned long)loaded_modules, (unsigned long)used[0], DATA_BYTES,
            (unsigned long)used[1], CODE_BYTES, (unsigned long)(blocks[0] + blocks[1]));
+    printf("dead_task_heaps: bytes=%lu blocks=%lu\n",
+           (unsigned long)dead_task_bytes, (unsigned long)dead_task_blocks);
     if (last_runtime_failure[0])
         printf("last_runtime_failure: %s\n", last_runtime_failure);
     if (last_unresolved_symbol[0])

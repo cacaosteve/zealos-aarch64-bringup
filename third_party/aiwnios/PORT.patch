@@ -1,6 +1,6 @@
 --- a/c/lex.c
 +++ b/c/lex.c
-@@ -9,11 +9,22 @@
+@@ -9,11 +9,58 @@
  #include <stdint.h>
  #include <stdio.h>
  #include <string.h>
@@ -15,6 +15,42 @@
 +  while (zeros-- > 0) scale *= 0.1;
 +  return scale;
 +}
++
++/* A control-flow parser may have read the next identifier to look for an
++ * optional else before the current #exe statement executes. If that
++ * statement just created a matching define, expand the saved name now.
++ * Preserve the character after the name as a tiny input frame: document
++ * readers cannot in general be rewound by more than one character. */
++static int LexExpandDeferredName(CLexer *lex) {
++  if (lex->cur_tok != TK_NAME || (lex->flags & LEXF_NO_EXPAND) ||
++      lex->pushback_valid ||
++      ((lex->flags & LEXF_USE_LAST_CHAR) &&
++       (lex->cur_char < 0 || lex->cur_char > 255)))
++    return 0;
++  CHashDefineStr *define = HashFind(lex->string, Fs->hash_table,
++                                    HTT_DEFINE_STR, 1);
++  if (!define)
++    return 0;
++  if (lex->flags & LEXF_USE_LAST_CHAR) {
++    int64_t ch = lex->cur_char;
++    lex->flags &= ~LEXF_USE_LAST_CHAR;
++    if (ch) {
++      CLexFile *replay = A_CALLOC(sizeof(*replay), NULL);
++      char text[2] = {(char)ch, 0};
++      replay->last = lex->file;
++      replay->filename = A_STRDUP("<lookahead>", NULL);
++      replay->text = A_STRDUP(text, NULL);
++      lex->file = replay;
++    }
++  }
++  CLexFile *expanded = A_CALLOC(sizeof(*expanded), NULL);
++  expanded->last = lex->file;
++  expanded->filename = A_STRDUP(define->base.str, NULL);
++  expanded->text = A_STRDUP(define->data, NULL);
++  lex->file = expanded;
++  Lex(lex);
++  return 1;
++}
  char *LexSrcLink(CLexer *lex, void *task) {
    char buf[STR_LEN];
    if (!lex->file)
@@ -24,7 +60,7 @@
            lex->file->col + 1);
    return A_STRDUP(buf, task);
  }
-@@ -28,13 +39,18 @@
+@@ -28,13 +75,18 @@
      lex->flags &= ~LEXF_USE_LAST_CHAR;
      return lex->cur_char;
    }
@@ -45,7 +81,7 @@
      lex->file->pos++;
      if (ret == 5 || ret == '\r') // TempleOS cursor charactor
        goto enter;
-@@ -46,6 +62,8 @@
+@@ -46,6 +98,8 @@
    } else {
      // Free all the assets of the previous file
      last = file->last;
@@ -54,7 +90,7 @@
      A_FREE(file->text);
      A_FREE(file->dir);
      A_FREE(file->filename);
-@@ -65,14 +83,23 @@
+@@ -65,14 +119,23 @@
    va_list lst;
    char buffer[STR_LEN];
    va_start(lst, fmt);
@@ -79,7 +115,7 @@
    throw(*(int64_t *)"Lex\0\0\0\0\0");
  }
  
-@@ -80,7 +107,7 @@
+@@ -80,7 +143,7 @@
    va_list lst;
    char buffer[STR_LEN];
    va_start(lst, fmt);
@@ -88,7 +124,7 @@
    va_end(lst);
    if (lex->file) {
      fprintf(AIWNIOS_OSTREAM, "WARN %s:%d:%d %s\n", lex->file->filename,
-@@ -139,8 +166,20 @@
+@@ -139,8 +202,20 @@
  
  static int64_t LexString(CLexer *lex, int64_t till) {
    int64_t idx, chr1, hex;
@@ -109,7 +145,7 @@
      case '\\':
        switch (chr1 = LexAdvChr(lex)) {
          break;
-@@ -200,8 +239,8 @@
+@@ -200,8 +275,8 @@
        break;
      default:
      ins:
@@ -120,7 +156,7 @@
          return ERR;
        }
        lex->string[idx++] = chr1;
-@@ -214,6 +253,7 @@
+@@ -214,6 +289,7 @@
      }
    }
  fin:
@@ -128,7 +164,7 @@
    lex->str_len = idx;
    lex->string[idx++] = 0;
    return 0;
-@@ -257,16 +297,47 @@
+@@ -257,16 +333,47 @@
  re_enter:;
    int64_t chr1 = LexAdvChr(lex), chr2;
    int64_t has_base = 0, base = 10, integer = 0, decimal = 0, exponet = 0,
@@ -177,7 +213,7 @@
    case ';':
      return lex->cur_tok = ';';
      break;
-@@ -277,7 +348,10 @@
+@@ -277,7 +384,10 @@
      return lex->cur_tok = ',';
      break;
    case '\n':
@@ -189,7 +225,7 @@
        lex->flags &= ~LEXF_UNTIL_NEWLINE;
        return lex->cur_tok = '\n';
      }
-@@ -293,11 +367,15 @@
+@@ -293,11 +403,15 @@
          break;
        case 'x':
        case 'X':
@@ -205,7 +241,7 @@
          chr1 = LexAdvChr(lex);
          base = 2;
          lex->flags |= LEXF_USE_LAST_CHAR;
-@@ -338,15 +416,30 @@
+@@ -338,15 +452,30 @@
            return lex->cur_tok = ERR;
          }
        fin_f64:
@@ -237,7 +273,7 @@
        decimal_chk:
          switch (chr1 = LexAdvChr(lex)) {
            break;
-@@ -387,6 +480,22 @@
+@@ -387,6 +516,22 @@
      lex->integer = integer;
      if (lex->cur_char == '.') {
        lex->flags &= ~LEXF_USE_LAST_CHAR;
@@ -260,7 +296,7 @@
        goto decimal_chk;
      }
      if (lex->cur_char == 'e' || lex->cur_char == 'E') {
-@@ -459,6 +568,12 @@
+@@ -459,6 +604,12 @@
        }
        return lex->cur_tok = TK_DOT_DOT_DOT;
        break;
@@ -273,7 +309,7 @@
      default:
        lex->flags |= LEXF_USE_LAST_CHAR;
        return lex->cur_tok = '.';
-@@ -582,15 +697,58 @@
+@@ -582,15 +733,58 @@
    case '@':
    case 'a' ... 'z':
    case 'A' ... 'Z':
@@ -313,7 +349,7 @@
      lex->flags |= LEXF_USE_LAST_CHAR;
      for (;;) {
        switch (chr1 = LexAdvChr(lex)) {
-         break;
++        break;
 +      case 1:
 +        lex->string[idx++] = '>';
 +        break;
@@ -322,7 +358,7 @@
 +        break;
 +      case 3:
 +        lex->string[idx++] = '=';
-+        break;
+         break;
        case '_':
        case '@':
        case 'a' ... 'z':
@@ -332,7 +368,7 @@
          if (idx + 1 >= STR_LEN) {
            LexErr(lex, "Name is too long.");
            return lex->cur_tok = ERR;
-@@ -601,6 +759,35 @@
+@@ -601,6 +795,35 @@
          lex->flags |= LEXF_USE_LAST_CHAR;
          lex->string[idx++] = 0;
          if (!(lex->flags & LEXF_NO_EXPAND)) {
@@ -368,7 +404,7 @@
            define = HashFind(lex->string, Fs->hash_table, HTT_DEFINE_STR, 1);
            if (define) {
              //
-@@ -610,11 +797,17 @@
+@@ -610,11 +833,17 @@
              //   to
              // --->(at plus)
              //
@@ -387,7 +423,7 @@
              new_file->dir = NULL;
              new_file->last = lex->file;
              new_file->filename = A_STRDUP(define->base.str, NULL);
-@@ -629,20 +822,138 @@
+@@ -629,20 +858,181 @@
        }
      }
      break;
@@ -483,53 +519,96 @@
 +        char *code;
 +        int64_t old_defer = lex->port_defer_statement_lex;
 +        int64_t old_pending = lex->port_lex_pending;
-+        /* The nested statement parser owns its own semicolon advancement.
-+         * Shell parsing normally defers that advancement to the outer source
-+         * loop; allowing that mode through here leaves a pending Lex after
-+         * the #exe block and consumes the following declaration's type. */
-+        lex->port_defer_statement_lex = 0;
++        int64_t old_depth = lex->port_statement_depth;
++        /* Each #exe statement must execute before the next is lexed. Use a
++         * private top-level statement depth even when this directive occurs
++         * while an enclosing function is being parsed. */
++        lex->port_defer_statement_lex = 1;
 +        lex->port_lex_pending = 0;
-+        CodeCtrlPush(cc);
++        lex->port_statement_depth = 0;
++        CExeStream *stream = A_CALLOC(sizeof(*stream), lex->hc);
++        stream->previous = lex->port_exe_stream;
++        lex->port_exe_stream = stream;
 +        int64_t block_tok = Lex(lex);
-+        if (block_tok != '{' || !PrsStmt(cc)) {
-+          CodeCtrlPop(cc);
++        int block_ok = block_tok == '{';
++        if (block_ok) {
++          Lex(lex);
++          while (lex->cur_tok && lex->cur_tok != ERR && lex->cur_tok != '}') {
++            CodeCtrlPush(cc);
++            if (!PrsStmt(cc)) {
++              CodeCtrlPop(cc);
++              block_ok = 0;
++              break;
++            }
++            CRPN *ret = A_CALLOC(sizeof(CRPN), cc->hc);
++            ret->type = IC_RET;
++            QueIns(ret, cc->code_ctrl->ir_code);
++            code = Compile(cc, NULL, NULL, NULL);
++            if (!code) {
++              CodeCtrlPop(cc);
++              block_ok = 0;
++              break;
++            }
++            if (lex->port_sync)
++              lex->port_sync(lex);
++            FFI_CALL_TOS_0(code);
++            A_FREE(code);
++            CodeCtrlPop(cc);
++            if (lex->port_lex_pending) {
++              lex->port_lex_pending = 0;
++              Lex(lex);
++            } else
++              LexExpandDeferredName(lex);
++          }
++          if (lex->cur_tok != '}')
++            block_ok = 0;
++        }
++        if (!block_ok) {
++          lex->port_exe_stream = stream->previous;
++          A_FREE(stream->text);
++          A_FREE(stream);
 +          CmpCtrlDel(cc);
 +          lex->port_defer_statement_lex = old_defer;
 +          lex->port_lex_pending = old_pending;
++          lex->port_statement_depth = old_depth;
 +          LexErr(lex, "Expected a statement block after #exe.");
 +          return lex->cur_tok = ERR;
 +        }
-+        if (lex->cur_tok == ';')
-+          Lex(lex);
-+        CRPN *ret = A_CALLOC(sizeof(CRPN), cc->hc);
-+        ret->type = IC_RET;
-+        QueIns(ret, cc->code_ctrl->ir_code);
-+        code = Compile(cc, NULL, NULL, NULL);
-+        if (!code) {
-+          CodeCtrlPop(cc);
-+          CmpCtrlDel(cc);
-+          lex->port_defer_statement_lex = old_defer;
-+          lex->port_lex_pending = old_pending;
-+          LexErr(lex, "Could not compile #exe block.");
-+          return lex->cur_tok = ERR;
-+        }
-+        if (lex->port_sync)
-+          lex->port_sync(lex);
-+        FFI_CALL_TOS_0(code);
-+        A_FREE(code);
-+        CodeCtrlPop(cc);
++        lex->port_exe_stream = stream->previous;
 +        CmpCtrlDel(cc);
 +        lex->port_defer_statement_lex = old_defer;
 +        lex->port_lex_pending = old_pending;
-+        /* PrsScope and the optional trailing-semicolon handling above have
-+         * already lexed the next token. Re-entering here skips it. */
++        lex->port_statement_depth = old_depth;
++        if (stream->length) {
++          /* Feed generated text to this lexer before returning to the file
++           * containing the closing brace and its following source. */
++          new_file = A_CALLOC(sizeof(*new_file), lex->hc);
++          if (!new_file) {
++            LexErr(lex, "Could not allocate #exe input.");
++            return lex->cur_tok = ERR;
++          }
++          new_file->last = lex->file;
++          new_file->filename = A_STRDUP("<StreamBlk>", lex->hc);
++          new_file->text = stream->text;
++          stream->text = NULL;
++          lex->file = new_file;
++        }
++        A_FREE(stream->text);
++        A_FREE(stream);
++        /* Do not lex beyond the closing brace until the block has executed:
++         * the following token can itself be an #exe directive. */
++        Lex(lex);
++        if (lex->cur_tok == ';')
++          Lex(lex);
++        /* The optional trailing-semicolon handling already lexed the next
++         * token. Re-entering here would skip it. */
 +        return lex->cur_tok;
        } else if (!strcmp(lex->string, "if")) {
 +        old_flags = lex->flags;
          lex->flags |= LEXF_UNTIL_NEWLINE;
          CCmpCtrl *cc = CmpCtrlNew(lex);
          char *code;
-@@ -654,6 +965,8 @@
+@@ -654,6 +1044,8 @@
            rtrn->type = IC_RET;
            QueIns(rtrn, cc->code_ctrl->ir_code);
            if (code = Compile(cc, NULL, NULL, NULL)) {
@@ -538,7 +617,7 @@
              ret = FFI_CALL_TOS_0(code);
            }
            A_FREE(code);
-@@ -662,15 +975,15 @@
+@@ -662,15 +1054,15 @@
          CmpCtrlDel(cc);
          if (ret)
            goto re_enter;
@@ -547,20 +626,20 @@
        } else if (!strcmp(lex->string, "ifaot")) {
 -        // AIWN will only AOT compile for you,the JIT will be
 -        // handled by the newly compiled compiler
--        goto re_enter;
++        /* The ARM64 bootstrap executes source through the JIT front end.
++         * It does not produce AOT modules, so select the opposite branch. */
++        goto if_fail;
++      } else if (!strcmp(lex->string, "ifjit")) {
++        /* Include JIT-only source in the compiler that actually runs here. */
+         goto re_enter;
 -      } else if (!strcmp(lex->string, "ifjit")) {
 -        // AIWN will only AOT compile for you,the JIT will be
 -        // handled by the newly compiled compiler
-+        /* The ARM64 bootstrap executes source through the JIT front end.
-+         * It does not produce AOT modules, so select the opposite branch. */
-         goto if_fail;
-+      } else if (!strcmp(lex->string, "ifjit")) {
-+        /* Include JIT-only source in the compiler that actually runs here. */
-+        goto re_enter;
+-        goto if_fail;
        } else if (!strcmp(lex->string, "endif")) {
          goto re_enter;
        } else if (!strcmp(lex->string, "else"
-@@ -745,10 +1058,23 @@
+@@ -745,9 +1137,22 @@
          goto re_enter;
        }
        if (!strcmp(lex->string, "include")) {
@@ -568,7 +647,7 @@
          if (TK_STR != Lex(lex)) {
            LexErr(lex, "Expected a string for #include.");
            return lex->cur_tok = ERR;
-         }
++        }
 +        /* ZealOS Lex.ZC applies ExtDefault(name, "ZC") before resolving
 +         * every include. Keep explicit extensions and dot path components. */
 +        char *ext = lex->string;
@@ -580,11 +659,10 @@
 +            return lex->cur_tok = ERR;
 +          }
 +          memcpy(lex->string + len, ".ZC", 4);
-+        }
+         }
          actual_file = lex->file;
          while (actual_file) {
-           if (actual_file->is_file)
-@@ -756,11 +1082,15 @@
+@@ -756,11 +1161,15 @@
            actual_file = actual_file->last;
          }
          if (actual_file) {
@@ -603,7 +681,7 @@
              dir = __AIWNIOS_StrDup(buf, NULL);
              *strrchr(dir, '/') = 0;
              f = fopen(buf, "rb");
-@@ -768,9 +1098,15 @@
+@@ -768,9 +1177,15 @@
              goto normal;
          } else {
          normal:
@@ -620,7 +698,7 @@
            } else {
              dir = __AIWNIOS_StrDup(lex->string, NULL);
              *strrchr(dir, '/') = 0;
-@@ -786,6 +1122,10 @@
+@@ -786,6 +1201,10 @@
          fseek(f, 0, SEEK_SET);
          idx -= ftell(f);
          new_file = A_MALLOC(sizeof(CLexFile), NULL);
@@ -631,7 +709,7 @@
          new_file->text = A_MALLOC(idx + 1, NULL);
          new_file->text[idx] = 0;
          new_file->dir = dir;
-@@ -793,17 +1133,26 @@
+@@ -793,17 +1212,26 @@
          fclose(f);
          new_file->is_file = 1;
          new_file->last = lex->file;
@@ -661,7 +739,7 @@
          strcpy(macro_name, lex->string);
          strcpy(lex->string, "");
          define = A_CALLOC(sizeof(CHashDefineStr), NULL);
-@@ -811,7 +1160,24 @@
+@@ -811,7 +1239,24 @@
          define->base.type = HTT_DEFINE_STR;
          define->src_link = LexSrcLink(lex, NULL);
          idx = 0;
@@ -686,7 +764,7 @@
            switch (chr1) {
              break;
            //
-@@ -847,6 +1213,9 @@
+@@ -847,6 +1292,9 @@
              lex->string[idx++] = chr1;
            }
          }
@@ -696,7 +774,7 @@
        }
      } else {
        LexErr(lex, "Stray '#' in program.");
-@@ -856,13 +1225,16 @@
+@@ -856,13 +1304,16 @@
    case 0:
      return lex->cur_tok = 0;
    }
@@ -715,15 +793,13 @@
      struct {
        char *name;
        int64_t tok;
-@@ -919,13 +1291,25 @@
+@@ -919,13 +1370,25 @@
      int64_t i;
      CHashKeyword *kw;
      for (i = 0; i != sizeof(kws) / sizeof(*kws); i++) {
 -      kw = A_CALLOC(sizeof *kw, NULL);
 -      kw->base.type = HTT_KEYWORD;
 -      kw->base.str = A_STRDUP(kws[i].name, NULL);
--      kw->tk = kws[i].tok;
--      HashAdd(kw, Fs->hash_table);
 +      kw = HashFind(kws[i].name, Fs->hash_table, HTT_KEYWORD, 1);
 +      if (!kw) {
 +        kw = A_CALLOC(sizeof *kw, NULL);
@@ -731,9 +807,11 @@
 +        kw->base.str = A_STRDUP(kws[i].name, NULL);
 +        HashAdd(kw, Fs->hash_table);
 +      }
-+      kw->tk = kws[i].tok;
-     }
+       kw->tk = kws[i].tok;
+-      HashAdd(kw, Fs->hash_table);
+-    }
 -    init = 1;
++    }
 +  }
 +  /* A bootstrapped lexer may already have installed the core keyword table
 +   * before this port adds HolyC-specific tokens. Install lastclass even when
@@ -747,7 +825,7 @@
    }
    CLexer *new = A_CALLOC(sizeof(CLexer), NULL);
    new->hc = HeapCtrlInit(NULL, Fs, 0);
-@@ -936,6 +1320,7 @@
+@@ -936,6 +1399,7 @@
  }
  
  void LexerDel(CLexer *lex) {
@@ -755,7 +833,7 @@
    HeapCtrlDel(lex->hc);
    A_FREE(lex);
  }
-@@ -1132,7 +1517,9 @@
+@@ -1132,7 +1596,9 @@
                                   "#define onion 1 \\ \n"
                                   "2 \\ \n"
                                   "3 \n"
@@ -766,7 +844,7 @@
    assert(TK_NAME == Lex(lex));
    assert(HashFind("if", Fs->hash_table, HTT_KEYWORD, 1));
    assert(TK_NAME == Lex(lex));
-@@ -1219,5 +1606,8 @@
+@@ -1219,5 +1685,8 @@
    assert(lex->integer == 2);
    assert(TK_I64 == Lex(lex));
    assert(lex->integer == 3);
@@ -849,17 +927,17 @@
      return rpn->base.next;
      break;
    case __IC_SET_FRAME_SIZE:
-@@ -1499,6 +1523,10 @@
-     goto ret;
-   case IC_SQRT:
+@@ -1501,6 +1525,10 @@
      len = AddBytes(to, len, "$PURPLE$SQRT$FD$\n");
-+    goto unop;
-+    break;
-+  case IC_ABS:
-+    len = AddBytes(to, len, "$PURPLE$ABS$FD$\n");
      goto unop;
      break;
++  case IC_ABS:
++    len = AddBytes(to, len, "$PURPLE$ABS$FD$\n");
++    goto unop;
++    break;
    case IC_SQR:
+     len = AddBytes(to, len, "$PURPLE$SQR$FD$\n");
+     goto unop;
 @@ -1539,6 +1567,7 @@
    case IC_POS:
    case IC_NEG:
@@ -868,7 +946,7 @@
    case IC_EQ:
    case IC_ADD_EQ:
    case IC_SUB_EQ:
-@@ -1553,8 +1582,107 @@
+@@ -1553,6 +1582,105 @@
      return 1;
    }
    return 0;
@@ -928,8 +1006,8 @@
 +  case TK_XOR_EQ: return IC_XOR_EQ;
 +  default: return 0;
 +  }
- }
- 
++}
++
 +static void ParseWarnUnnecessaryParen(CCmpCtrl *ccmp, int64_t *ic_stk,
 +                                      int64_t *prec_stk, int64_t stk_ptr,
 +                                      int64_t open_idx) {
@@ -971,11 +1049,9 @@
 +       (inner_prec == parent_prec &&
 +        (right_child ? IsRightAssoc(parent_op) : !IsRightAssoc(parent_op)))))
 +    ParseWarn(ccmp, "Unnecessary parentheses");
-+}
-+
+ }
+ 
  CMemberLst *MemberFind(char *needle, CHashClass *cls) {
-   CMemberLst *lst;
-   for (lst = cls->members_lst; lst; lst = lst->next)
 @@ -1635,13 +1763,14 @@
        }                                                                        \
      }                                                                          \
@@ -1205,13 +1281,10 @@
                // Do nothing
                if (ic->global_var->base.type & HTF_EXTERN)
                  ParseWarn(ccmp, "Can't address of extern symbol");
-@@ -2084,7 +2300,38 @@
-       misc->str = string;
-       ic->code_misc = misc;
-     found_str:
-+      QueIns(ic, ccmp->code_ctrl->ir_code);
-+      goto next;
-+      break;
+@@ -2087,6 +2303,37 @@
+       QueIns(ic, ccmp->code_ctrl->ir_code);
+       goto next;
+       break;
 +    case TK_INS_BIN:
 +      binop_before = 0;
 +      string = ccmp->lex->port_doc_binary;
@@ -1239,15 +1312,18 @@
 +      misc->str = string;
 +      ic->code_misc = misc;
 +    found_binary:
-       QueIns(ic, ccmp->code_ctrl->ir_code);
++      QueIns(ic, ccmp->code_ctrl->ir_code);
 +      Lex(ccmp->lex);
-       goto next;
-       break;
++      goto next;
++      break;
      case TK_CHR:
-@@ -2276,6 +2523,21 @@
+       binop_before = 0;
+       ic = A_CALLOC(sizeof(CRPN), NULL);
+@@ -2275,6 +2522,21 @@
+       break;
      default:
        goto fin;
-     }
++    }
 +    /* Do not emit a binary operator without its left operand. Likewise,
 +     * prefix operators cannot follow an already complete value. Invalid
 +     * RPN otherwise reaches pointer expansion with a missing ic_class. */
@@ -1262,10 +1338,9 @@
 +    default:
 +      if (want_operand)
 +        ParseErr(ccmp, "Expected an expression before operator.");
-+    }
+     }
      if (type == IC_PAREN || type == IC_ARRAY_ACC) {
        prec_stk[stk_ptr] = prec;
-       ic_stk[stk_ptr++] = type;
 @@ -2303,7 +2565,12 @@
      }
    }
@@ -1323,21 +1398,21 @@
    return 0;
  }
  static int64_t PeekKw(CCmpCtrl *ccmp, int64_t kwt) {
-@@ -2356,6 +2628,14 @@
+@@ -2354,6 +2626,14 @@
+         return 1;
+       }
    return 0;
- }
- 
++}
++
 +static void PrsStatementEnd(CCmpCtrl *ccmp) {
 +  if (ccmp->lex->port_defer_statement_lex &&
 +      ccmp->lex->port_statement_depth == 1)
 +    ccmp->lex->port_lex_pending = 1;
 +  else
 +    Lex(ccmp->lex);
-+}
-+
+ }
+ 
  int64_t PrsGoto(CCmpCtrl *ccmp) {
-   CRPN *rpn;
-   CCodeMisc *misc;
 @@ -2385,7 +2665,7 @@
        ParseErr(ccmp, "Expected a ';'.");
        return 0;
@@ -1347,7 +1422,7 @@
      return 1;
    }
    return 0;
-@@ -2427,15 +2707,80 @@
+@@ -2427,15 +2707,82 @@
      rpn->code_misc->flags |= CMF_DEFINED;
      Lex(ccmp->lex);
      if (ccmp->lex->cur_tok != ':') {
@@ -1390,17 +1465,19 @@
 +    return 1;
 +  }
 +  if (PrsKw(ccmp, TK_KW_LOCK)) {
-+    CRPN *body_start, *body_end, *stmt;
++    CRPN *body_end, *stmt;
 +    if (ccmp->lex->cur_tok == '{') {
 +      Lex(ccmp->lex);
 +      while (ccmp->lex->cur_tok != '}') {
-+        body_start = ccmp->code_ctrl->ir_code->next;
++        /* QueIns adds new nodes immediately after the list head. Remember
++         * the first old node so only this statement's nodes are marked. */
++        body_end = ccmp->code_ctrl->ir_code->next;
 +        if (!PrsStmt(ccmp))
 +          ParseErr(ccmp, "Expected a statement in lock block.");
-+        body_end = ccmp->code_ctrl->ir_code;
 +        /* AArch64 lowers HolyC's lock block by making each read-modify-write
 +         * operation in its body use the backend's LDAXR/STLXR retry loop. */
-+        for (stmt = body_start; stmt != body_end; stmt = stmt->base.next)
++        for (stmt = ccmp->code_ctrl->ir_code->next; stmt != body_end;
++             stmt = stmt->base.next)
 +          stmt->flags |= ICF_LOCK_EXPR;
 +      }
 +      Lex(ccmp->lex);
@@ -1408,15 +1485,15 @@
 +    }
 +    /* Stock HolyC also permits `lock expression;` without braces. Parse the
 +     * expression as a statement and use the same per-operation atomic flag. */
-+    body_start = ccmp->code_ctrl->ir_code->next;
++    body_end = ccmp->code_ctrl->ir_code->next;
 +    if (!ParseExpr(ccmp, 0))
 +      ParseErr(ccmp, "Expected an expression after lock.");
 +    if (ccmp->lex->cur_tok != ';')
 +      ParseErr(ccmp, "Expected a ';' after locked expression.");
 +    PrsStatementEnd(ccmp);
-+    body_end = ccmp->code_ctrl->ir_code;
 +    /* The backend consumes this flag on supported read-modify-write nodes. */
-+    for (stmt = body_start; stmt != body_end; stmt = stmt->base.next)
++    for (stmt = ccmp->code_ctrl->ir_code->next; stmt != body_end;
++         stmt = stmt->base.next)
 +      stmt->flags |= ICF_LOCK_EXPR;
 +    return 1;
 +  }
@@ -1430,7 +1507,7 @@
        ParseErr(ccmp, "Expected a statement for a label.");
      }
      return 1;
-@@ -2449,7 +2794,7 @@
+@@ -2449,7 +2796,7 @@
        ParseErr(ccmp, "Expected a ';'.");
        return 0;
      }
@@ -1439,7 +1516,7 @@
      if (ccmp->flags & CCF_IN_SUBSWITCH_START_BLOCK) {
        rpn = A_CALLOC(sizeof(CRPN), NULL);
        rpn->type = IC_SUB_RET;
-@@ -2492,7 +2837,7 @@
+@@ -2492,7 +2839,7 @@
      else { // cls was declared if we reach here
        // Don't whine about class declaration without variable declared also
        if (ccmp->lex->cur_tok == ';') {
@@ -1448,7 +1525,7 @@
          return 1;
        }
      }
-@@ -2510,12 +2855,26 @@
+@@ -2510,11 +2857,25 @@
      }
      if (import_name)
        A_FREE(import_name);
@@ -1460,7 +1537,7 @@
        ParseErr(ccmp, "Expected a extern name.");
      import_name = A_STRDUP(ccmp->lex->string, NULL);
 +    Lex(ccmp->lex);
-     goto prs_global;
++    goto prs_global;
 +  } else if (PrsKw(ccmp, TK_KW__INTERN)) {
 +    /* An intrinsic name describes compiler semantics, not an executable
 +     * x86 address. Keep its declaration visible, but unbound on ARM64. */
@@ -1471,11 +1548,10 @@
 +      ParseErr(ccmp, "Expected an intrinsic name after _intern.");
 +    import_name = A_STRDUP(ccmp->lex->string, NULL);
 +    Lex(ccmp->lex);
-+    goto prs_global;
+     goto prs_global;
    } else if (PrsKw(ccmp, TK_KW_IMPORT)) {
      flags = PRSF_IMPORT;
-     goto prs_global;
-@@ -2524,14 +2883,24 @@
+@@ -2524,14 +2885,24 @@
      if (ccmp->lex->cur_tok != TK_NAME)
        ParseErr(ccmp, "Expected a import name.");
      import_name = A_STRDUP(ccmp->lex->string, NULL);
@@ -1501,7 +1577,7 @@
      if (cls = HashFind(ccmp->lex->string, Fs->hash_table, HTT_CLASS, 1)) {
        Lex(ccmp->lex);
        // Here's the deal,TempleOS lets you put a fallback type a class/union
-@@ -2544,6 +2913,10 @@
+@@ -2544,6 +2915,10 @@
          cls2->fwd_class = cls;
          cls2->raw_type = cls->raw_type;
          cls = cls2;
@@ -1512,7 +1588,7 @@
        } else if (PeekKw(ccmp, TK_KW_UNION)) {
          goto ye;
        }
-@@ -2566,7 +2939,7 @@
+@@ -2566,7 +2941,7 @@
          ParseErr(ccmp, "Expected ';'");
          return 0;
        }
@@ -1521,7 +1597,7 @@
        return 1;
      }
    }
-@@ -2579,22 +2952,31 @@
+@@ -2579,22 +2954,31 @@
      if (!rpn->global_var)
        ParseErr(ccmp, "'Print' function doesnt exist yet.");
      QueIns(rpn, ccmp->code_ctrl->ir_code);
@@ -1533,6 +1609,12 @@
 -          if (0 == memcmp(misc->str, string, str_len)) {
 -            goto found_str;
 -          }
+-    }
+-    misc = CodeMiscNew(ccmp, CMT_STRING);
+-    misc->str_len = str_len;
+-    misc->str = string;
+-  found_str:
+-    rpn->code_misc = misc;
 +    if (!*string && ccmp->lex->cur_tok != ';') {
 +      /* ZealC's "" prefix takes the next expression as the format string:
 +       * "" prompt, value; is Print(prompt, value). */
@@ -1556,18 +1638,13 @@
 +    found_str:
 +      rpn->code_misc = misc;
 +      QueIns(rpn, ccmp->code_ctrl->ir_code);
-     }
--    misc = CodeMiscNew(ccmp, CMT_STRING);
--    misc->str_len = str_len;
--    misc->str = string;
--  found_str:
--    rpn->code_misc = misc;
++    }
      argc = 1;
 -    QueIns(rpn, ccmp->code_ctrl->ir_code);
      for (;;) {
        switch (ccmp->lex->cur_tok) {
          break;
-@@ -2606,7 +2988,7 @@
+@@ -2606,7 +2990,7 @@
          argc++;
          break;
        case ';':
@@ -1576,7 +1653,7 @@
          goto fin_str;
          break;
        default:
-@@ -2622,7 +3004,7 @@
+@@ -2622,7 +3006,7 @@
      return 1;
    }
    if (ccmp->lex->cur_tok == ';') {
@@ -1585,7 +1662,7 @@
      (rpn = A_CALLOC(sizeof(CRPN), NULL))->type = IC_NOP;
      QueIns(rpn, ccmp->code_ctrl->ir_code);
      return 1;
-@@ -2630,7 +3012,7 @@
+@@ -2630,7 +3014,7 @@
    if (ParseExpr(ccmp, 0)) {
      if (ccmp->lex->cur_tok != ';')
        ParseErr(ccmp, "Expected a ';'.");
@@ -1594,7 +1671,7 @@
      return 1;
    }
    return 0;
-@@ -2638,7 +3020,10 @@
+@@ -2638,7 +3022,10 @@
  
  int64_t PrsStmt(CCmpCtrl *ccmp) {
    CRPN *old = ccmp->code_ctrl->ir_code->next, *cur, *new;
@@ -1605,7 +1682,7 @@
    if (old == ccmp->code_ctrl->ir_code->next) {
      (old = A_CALLOC(sizeof(CRPN), 0))->type = IC_NOP;
      QueIns(old, ccmp->code_ctrl->ir_code);
-@@ -2726,14 +3111,23 @@
+@@ -2726,14 +3113,23 @@
    return res;
  }
  
@@ -1631,7 +1708,7 @@
      if (ccmp->lex->cur_tok != ']') {
        ParseErr(ccmp, "Expected a ']'.");
        return 0;
-@@ -2742,9 +3136,13 @@
+@@ -2742,9 +3138,13 @@
      to->next = A_CALLOC(sizeof(CArrayDim), NULL);
      to->next->total_cnt = 1;
      to->next->cnt = dim;
@@ -1648,7 +1725,7 @@
      return 1;
    }
    return 0;
-@@ -2781,7 +3179,10 @@
+@@ -2781,7 +3181,10 @@
        Lex(ccmp->lex);
        PrsDecl(ccmp, cls, fun, NULL, PRSF_FUN_ARGS, NULL);
        fun->argc++;
@@ -1660,7 +1737,7 @@
          Lex(ccmp->lex);
          continue;
        } else if (ccmp->lex->cur_tok == ')') {
-@@ -2826,6 +3227,17 @@
+@@ -2826,6 +3229,17 @@
                      CHashFun **fun, CArrayDim *dim) {
    int64_t star_cnt = 0, star_cnt2 = 0;
    int64_t is_func_ptr = 0;
@@ -1678,7 +1755,7 @@
    if (name)
      *name = NULL;
    if (fun)
-@@ -2852,7 +3264,7 @@
+@@ -2852,7 +3266,7 @@
        *name = A_STRDUP(ccmp->lex->string, NULL);
      Lex(ccmp->lex);
    }
@@ -1687,7 +1764,7 @@
    if (is_func_ptr) {
      if (ccmp->lex->cur_tok != ')') {
        ParseErr(ccmp, "Expected a ')'!");
-@@ -2862,7 +3274,11 @@
+@@ -2862,7 +3276,11 @@
      fun[0] = A_CALLOC(sizeof(CHashFun), NULL);
      fun[0]->base.flags |= CLSF_FUNPTR;
      fun[0]->return_class = base + star_cnt;
@@ -1700,7 +1777,7 @@
      fun[0]->base.sz = sizeof(void *);
      fun[0]->base.ptr_star_cnt = star_cnt2;
      PrsFunArgs(ccmp, *fun);
-@@ -2876,19 +3292,24 @@
+@@ -2876,19 +3294,24 @@
  //  array's data directy
  //
  char *PrsArray(CCmpCtrl *ccmp, CHashClass *base, CArrayDim *dim,
@@ -1728,7 +1805,7 @@
            ParseWarn(ccmp, "String excedes array dim.");
            memcpy(write_to, string, cap);
          } else {
-@@ -2920,25 +3341,28 @@
+@@ -2920,25 +3343,28 @@
        }
      }
      return write_to + ptr_width;
@@ -1761,11 +1838,10 @@
        if (ccmp->lex->cur_tok != ',') {
          if (!cur_mem->next) {
            // class {I64 a,b,c;}={1,2,3,};
-@@ -2950,20 +3374,182 @@
+@@ -2950,20 +3376,182 @@
      }
      write_to += base->sz;
    }
--  if (ccmp->lex->cur_tok != '}')
 +  if (has_brace || allow_implicit_open != 2) {
 +    if (ccmp->lex->cur_tok != '}')
 +      ParseErr(ccmp, "Expected a '}'.");
@@ -1833,16 +1909,15 @@
 +    }
 +  }
 +  if (ccmp->lex->cur_tok != '}') {
-     ParseErr(ccmp, "Expected a '}'.");
++    ParseErr(ccmp, "Expected a '}'.");
 +    A_FREE(data);
 +    return NULL;
 +  }
-   Lex(ccmp->lex);
--  return write_to;
++  Lex(ccmp->lex);
 +  dim->cnt = count;
 +  dim->total_cnt = dim->next ? dim->next->total_cnt : 1;
 +  return data;
- }
++}
 +
 +/* Emit stores at the declaration, so expressions and repeated calls use the
 + * current frame. The bootstrap extension is limited to one scalar dimension;
@@ -1873,9 +1948,11 @@
 +    else if (i + 1 != dim->cnt)
 +      ParseErr(ccmp, "Expected another local array element.");
 +  }
-+  if (ccmp->lex->cur_tok != '}')
+   if (ccmp->lex->cur_tok != '}')
+-    ParseErr(ccmp, "Expected a '}'.");
 +    ParseErr(ccmp, "Expected '}' after local array initializer.");
-+  Lex(ccmp->lex);
+   Lex(ccmp->lex);
+-  return write_to;
 +}
 +static int PrsSameFunctionABIDepth(CHashFun *a, CHashFun *b, int depth);
 +static int PrsSameCallTypeDepth(CHashClass *a, CHashClass *b, int depth) {
@@ -1933,7 +2010,7 @@
 +}
 +static int PrsSameFunctionABI(CHashFun *a, CHashFun *b) {
 +  return PrsSameFunctionABIDepth(a, b, 0);
-+}
+ }
  int64_t PrsDecl(CCmpCtrl *ccmp, CHashClass *base, CHashClass *add_to,
                  int64_t *is_func_decl, int64_t flags, char *import_name) {
    if (is_func_decl)
@@ -1948,7 +2025,7 @@
    CHashGlblVar *glbl_var, *import_var, *extern_glbl;
    CRPN *rpn;
    char *name;
-@@ -2973,8 +3559,13 @@
+@@ -2973,8 +3561,13 @@
        reg = REG_NONE;
      else if (PrsKw(ccmp, TK_KW_REG)) {
        reg = REG_ALLOC;
@@ -1964,7 +2041,7 @@
          Lex(ccmp->lex);
        }
      }
-@@ -3010,20 +3601,61 @@
+@@ -3010,20 +3603,61 @@
  #endif
                     .return_class = cls};
      HashAdd(fun, Fs->hash_table);
@@ -2029,7 +2106,7 @@
        if (ccmp->lex->cur_tok == '{') {
          ParseErr(ccmp, "Function body on a extern/import.");
          return 0;
-@@ -3042,7 +3674,9 @@
+@@ -3042,7 +3676,9 @@
        }
      }
      CodeCtrlPush(ccmp);
@@ -2039,7 +2116,7 @@
      //
      // Here's the deal. The function will stay "extern" so if it call's
      // itself a CMT_RELOC_U64 will be made and the function address will be
-@@ -3051,18 +3685,45 @@
+@@ -3051,18 +3687,45 @@
      ccmp->cur_fun->base.base.type |= HTF_EXTERN;
      ccmp->cur_fun->fun_ptr = Compile(ccmp, NULL, NULL, NULL);
      ccmp->cur_fun->base.base.type &= ~HTF_EXTERN;
@@ -2061,7 +2138,7 @@
 +        decl->fun_ptr = ccmp->cur_fun->fun_ptr;
 +        decl->base.base.type &= ~(HTF_EXTERN | HTF_INTRINSIC);
 +      }
-     }
++    }
 +    /* A redeclared forward may initially use a previous implementation.
 +     * Its callers load this slot, so a later definition in the same task
 +     * must replace that binding without rewriting ordinary direct calls. */
@@ -2072,7 +2149,7 @@
 +          (decl->base.flags & CLSF_FORWARD_ALIAS) &&
 +          PrsSameFunctionABI(decl, ccmp->cur_fun))
 +        decl->fun_ptr = ccmp->cur_fun->fun_ptr;
-+    }
+     }
      if (ccmp->cur_fun->base.base.str)
        SysSymImportsResolve(ccmp->cur_fun->base.base.str, 0);
 +    if (ccmp->lex->port_fun_complete)
@@ -2088,7 +2165,7 @@
    if (add_to) {
      if (flags & PRSF_STATIC)
        lst->flags |= MLF_STATIC;
-@@ -3076,7 +3737,9 @@
+@@ -3076,7 +3739,9 @@
      if ((flags & PRSF_FUN_ARGS) || (flags & PRSF_STATIC)) {
        Lex(ccmp->lex);
        lst->flags |= MLF_DFT_AVAILABLE;
@@ -2099,19 +2176,19 @@
          switch (lst->member_class->raw_type) {
            break;
          case RT_U8i:
-@@ -3087,7 +3750,6 @@
+@@ -3087,8 +3752,21 @@
          case RT_I32i:
          case RT_U64i:
          case RT_I64i:
--        case RT_PTR:
-         case RT_FUNC: // func ptr
-           tmpi = lst->dft_val = PrsI64(ccmp);
-           if (flags & PRSF_STATIC) {
-@@ -3095,6 +3757,20 @@
-             *(int64_t *)lst->static_bytes = tmpi;
-           }
-           break;
-+        case RT_PTR:
++        case RT_FUNC: // func ptr
++          tmpi = lst->dft_val = PrsI64(ccmp);
++          if (flags & PRSF_STATIC) {
++            lst->static_bytes = A_CALLOC(8, NULL);
++            *(int64_t *)lst->static_bytes = tmpi;
++          }
++          break;
+         case RT_PTR:
+-        case RT_FUNC: // func ptr
 +          /* Aggregate class values share RT_PTR with actual pointers.
 +           * They have no pointer stars and own a member list; static class
 +           * initializers must take the recursive layout path below. */
@@ -2119,16 +2196,10 @@
 +              !lst->member_class->ptr_star_cnt &&
 +              lst->member_class->members_lst)
 +            goto static_array;
-+          tmpi = lst->dft_val = PrsI64(ccmp);
-+          if (flags & PRSF_STATIC) {
-+            lst->static_bytes = A_CALLOC(8, NULL);
-+            *(int64_t *)lst->static_bytes = tmpi;
-+          }
-+          break;
-         case RT_F64:
-           tmpf = lst->dft_val_flt = PrsF64(ccmp);
+           tmpi = lst->dft_val = PrsI64(ccmp);
            if (flags & PRSF_STATIC) {
-@@ -3108,20 +3784,39 @@
+             lst->static_bytes = A_CALLOC(8, NULL);
+@@ -3108,20 +3786,39 @@
          }
        } else {
        static_array: // Also applies to classes
@@ -2179,7 +2250,7 @@
      }
    }
    if (!add_to && lst->str) {
-@@ -3136,7 +3831,8 @@
+@@ -3136,7 +3833,8 @@
      glbl_var->fun_ptr = lst->fun_ptr;
      lst->fun_ptr = NULL; // We steal this
      // lst will be Free'd at ret
@@ -2189,7 +2260,7 @@
        glbl_var->data_addr =
            A_CALLOC(glbl_var->var_class->sz * glbl_var->dim.total_cnt, NULL);
      if (flags & PRSF_IMPORT) {
-@@ -3170,19 +3866,51 @@
+@@ -3170,19 +3868,51 @@
      }
      HashAdd(glbl_var, Fs->hash_table);
    found_glbl:
@@ -2247,7 +2318,7 @@
        } else {
          *(rpn = A_CALLOC(sizeof(CRPN), NULL)) = (CRPN){
              .type = IC_GLOBAL,
-@@ -3193,6 +3921,14 @@
+@@ -3193,6 +3923,14 @@
          (rpn = A_CALLOC(sizeof(CRPN), NULL))->type = IC_EQ;
          QueIns(rpn, ccmp->code_ctrl->ir_code);
        }
@@ -2262,7 +2333,7 @@
      }
      goto ret;
    }
-@@ -3415,6 +4151,7 @@
+@@ -3415,6 +4153,7 @@
      return rpn->raw_type;
    switch (rpn->type) {
    case IC_SQRT:
@@ -2270,7 +2341,7 @@
      AssignRawTypeToNode(ccmp, ICArgN(rpn, 0));
      rpn->ic_class = HashFind("F64", Fs->hash_table, HTT_CLASS, 1);
      return rpn->raw_type = RT_F64;
-@@ -3441,9 +4178,12 @@
+@@ -3441,9 +4180,12 @@
      return rpn->raw_type = RT_F64;
      break;
    case IC_FS:
@@ -2285,7 +2356,7 @@
      break;
    case IC_LOCK: // Lock means "lock *ptr++;",it operates on expressions as a
                  // whole
-@@ -3508,6 +4248,51 @@
+@@ -3508,6 +4250,51 @@
    got_fun:
      if (!fun)
        ParseErr(ccmp, "Invalid type to call."); // TODO add type name
@@ -2337,7 +2408,7 @@
      if (arg > fun->argc && !(fun->base.flags & CLSF_VARGS)) {
        ParseErr(ccmp, "Excess arguments for function");
      }
-@@ -3519,7 +4304,8 @@
+@@ -3519,7 +4306,8 @@
        rpn = ICArgN(orig_rpn, orig_rpn->length - arg - 1);
        if (rpn->type == IC_NOP)
          if (!(mlst->flags & MLF_DFT_AVAILABLE)) {
@@ -2347,7 +2418,7 @@
          }
        mlst = mlst->next;
      }
-@@ -3527,7 +4313,8 @@
+@@ -3527,7 +4315,8 @@
        if (fun->base.flags & CLSF_VARGS && arg >= fun->argc - 2)
          break;
        if (!(mlst->flags & MLF_DFT_AVAILABLE)) {
@@ -2357,7 +2428,7 @@
        }
        mlst = mlst->next;
      }
-@@ -3545,6 +4332,10 @@
+@@ -3545,6 +4334,10 @@
      break;
    case IC_GLOBAL:
      if (rpn->global_var->base.type & HTT_GLBL_VAR) {
@@ -2368,7 +2439,7 @@
        rpn->ic_class = rpn->global_var->var_class;
        rpn->ic_dim = rpn->global_var->dim.next;
        rpn->ic_fun = rpn->global_var->fun_ptr;
-@@ -3655,20 +4446,30 @@
+@@ -3655,20 +4448,30 @@
      break;
    case IC_DEREF:
      AssignRawTypeToNode(ccmp, rpn->base.next);
@@ -2400,15 +2471,16 @@
 -      rpn->ic_class = ((CRPN *)rpn->base.next)->ic_class - 1;
 -    } else {
 -      rpn->ic_dim = rpn->ic_dim->next;
+-    }
 +    if (((CRPN *)rpn->base.next)->ic_class->flags & CLSF_FUNPTR) {
 +      rpn->ic_class = ((CRPN *)rpn->base.next)->ic_class;
 +      return rpn->raw_type = RT_FUNC;
-     }
++    }
 +    rpn->ic_class = ((CRPN *)rpn->base.next)->ic_class - 1;
      rpn->raw_type = rpn->ic_class->raw_type;
      return rpn->raw_type;
      break;
-@@ -3782,6 +4583,8 @@
+@@ -3782,6 +4585,8 @@
      rpn->ic_class = ICFwd(rpn->base.next)->ic_class;
      rpn->ic_fun = ICFwd(rpn->base.next)->ic_fun;
      rpn->ic_dim = ICFwd(rpn->base.next)->ic_dim;
@@ -2417,7 +2489,7 @@
      rpn->raw_type = rpn->ic_class->raw_type;
      return rpn->raw_type;
      break;
-@@ -3824,6 +4627,11 @@
+@@ -3824,6 +4629,11 @@
      rpn->raw_type = RT_I64i;
      goto ret;
      break;
@@ -2429,7 +2501,7 @@
    case IC_F64:
      rpn->raw_type = RT_F64;
      goto ret;
-@@ -3839,6 +4647,12 @@
+@@ -3839,6 +4649,12 @@
      if (ICFwd(rpn->base.next)->ic_dim) {
        rpn->ic_class = ICFwd(rpn->base.next)->ic_class;
        rpn->ic_dim = ICFwd(rpn->base.next)->ic_dim->next;
@@ -2442,7 +2514,7 @@
      } else
        rpn->ic_class = ICFwd(rpn->base.next)->ic_class - 1;
      rpn->ic_fun = ICFwd(rpn->base.next)->ic_fun;
-@@ -3909,9 +4723,11 @@
+@@ -3909,9 +4725,11 @@
  static void PrsMembers(CCmpCtrl *cctrl, CHashClass *bungis, int64_t flags,
                         int64_t *off) {
    int64_t is_func, union_end;
@@ -2454,7 +2526,7 @@
      Lex(cctrl->lex);
      while (cctrl->lex->cur_tok != '}') {
        if (cctrl->lex->cur_tok == ';') {
-@@ -3920,10 +4736,24 @@
+@@ -3920,10 +4738,24 @@
          if (cctrl->lex->cur_tok == '{') {
            PrsMembers(cctrl, bungis, flags | PRSF_UNION, off);
          }
@@ -2480,7 +2552,7 @@
          //
          // Here's the deal,I store the last member in last_m,once I find the
          // members I assign their offsets
-@@ -3934,29 +4764,31 @@
+@@ -3934,29 +4766,31 @@
          do {
            Lex(cctrl->lex);
            PrsDecl(cctrl, base_class, bungis, &is_func, PRSF_CLASS, NULL);
@@ -2535,7 +2607,7 @@
            }
          } while (cctrl->lex->cur_tok == ',');
          if (last_m)
-@@ -3983,6 +4815,7 @@
+@@ -3983,6 +4817,7 @@
          return;
        }
      }
@@ -2543,7 +2615,7 @@
      Lex(cctrl->lex);
    }
    if (flags & PRSF_UNION)
-@@ -4043,6 +4876,8 @@
+@@ -4043,6 +4878,8 @@
        HashAdd(bungis, Fs->hash_table);
    PrsMembers(cctrl, bungis, flags, &off); // This consumes '{'
    // Compute size
@@ -2552,7 +2624,7 @@
    for (last_m = bungis->members_lst; last_m; last_m = last_m->next) {
      if (bungis->sz < (off = last_m->off +
                              last_m->member_class->sz * last_m->dim.total_cnt)) {
-@@ -4101,6 +4936,8 @@
+@@ -4101,6 +4938,8 @@
    int64_t val;
    CCodeMisc *label;
  } CSwitchCase;
@@ -2561,7 +2633,7 @@
  int64_t PrsSwitch(CCmpCtrl *cctrl) {
    if (!PrsKw(cctrl, TK_KW_SWITCH))
      return 0;
-@@ -4113,6 +4950,7 @@
+@@ -4113,6 +4952,7 @@
    int64_t k_low = INT_MAX, k_hi = INT_MIN, last, lo, hi, idx;
    old_break_to = cctrl->code_ctrl->break_to;
    cctrl->code_ctrl->break_to = lb_exit;
@@ -2569,7 +2641,7 @@
    //
    // When we encounter the start: block,we enter a secret function call
    // So when we `break` or we implictly break by hitting the first sub-switch
-@@ -4134,12 +4972,14 @@
+@@ -4134,12 +4974,14 @@
      //
      if (!ParseExpr(cctrl, 0)) {
        ParseErr(cctrl, "Expected an expression.");
@@ -2584,7 +2656,7 @@
        return 0;
      } else
        Lex(cctrl->lex);
-@@ -4147,6 +4987,7 @@
+@@ -4147,6 +4989,7 @@
      Lex(cctrl->lex);
      if (!ParseExpr(cctrl, 0)) {
        ParseErr(cctrl, "Expected an expression.");
@@ -2592,7 +2664,7 @@
        return 0;
      }
      (switch_ir = A_CALLOC(sizeof(CRPN), NULL))->type = IC_BOUNDED_SWITCH;
-@@ -4155,12 +4996,14 @@
+@@ -4155,12 +4998,14 @@
      // start,(cond),end,BOUNDED_SWITCH
      if (cctrl->lex->cur_tok != ')') {
        ParseErr(cctrl, "Expected a ')'.");
@@ -2607,7 +2679,7 @@
      return 0;
    } else
      Lex(cctrl->lex);
-@@ -4208,10 +5051,16 @@
+@@ -4208,10 +5053,16 @@
    }
        tmps->label = label->code_misc;
        if (cctrl->lex->cur_tok == ':') {
@@ -2626,7 +2698,7 @@
        } else {
          lo = last = tmps->val = PrsI64(cctrl);
          if (lo < k_low)
-@@ -4236,11 +5085,13 @@
+@@ -4236,11 +5087,13 @@
          } else {
            hi = lo;
            INS_TMPSS;
@@ -2640,7 +2712,7 @@
            return 0;
          }
        }
-@@ -4251,6 +5102,7 @@
+@@ -4251,6 +5104,7 @@
        }
        if (cctrl->lex->cur_tok != ':') {
          ParseErr(cctrl, "Expected a ':'.");
@@ -2648,7 +2720,7 @@
          return 0;
        }
        lb_dft->flags |= CMF_DEFINED;
-@@ -4268,6 +5120,7 @@
+@@ -4268,6 +5122,7 @@
      } else if (PrsKw(cctrl, TK_KW_START)) {
        if (cctrl->lex->cur_tok != ':') {
          ParseErr(cctrl, "Expected a ':'.");
@@ -2656,7 +2728,7 @@
          return 0;
        } else
          Lex(cctrl->lex);
-@@ -4293,6 +5146,7 @@
+@@ -4293,6 +5148,7 @@
      } else if (PrsKw(cctrl, TK_KW_END)) {
        if (subs.base.last == &subs) {
          ParseErr(cctrl, "Unexpected 'end' statement.");
@@ -2664,7 +2736,7 @@
          return 0;
        }
        QueRem(tmpss = subs.base.last);
-@@ -4309,6 +5163,7 @@
+@@ -4309,6 +5165,7 @@
        A_FREE(tmpss);
        if (cctrl->lex->cur_tok != ':') {
          ParseErr(cctrl, "Expected a ':'.");
@@ -2672,7 +2744,7 @@
          return 0;
        } else
          Lex(cctrl->lex);
-@@ -4317,6 +5172,7 @@
+@@ -4317,6 +5174,7 @@
        goto add_stmt;
      } else {
        ParseErr(cctrl, "Expected a statement.");
@@ -2680,7 +2752,7 @@
        return 0;
      }
    }
-@@ -4362,6 +5218,7 @@
+@@ -4362,6 +5220,7 @@
      switch_ir->code_misc = jmp_tab;
    }
    cctrl->flags = old_flags;
@@ -2688,7 +2760,7 @@
    return 1;
  }
  static void __PrsBindCSymbol(char *name, void *ptr, int64_t naked,
-@@ -4378,12 +5235,14 @@
+@@ -4378,12 +5237,14 @@
          abort();
        }
        if (!fun->fun_ptr || fun->fun_ptr == &DoNothing ||
@@ -2704,7 +2776,7 @@
        }
      }
      SysSymImportsResolve(name, 0);
-@@ -4417,7 +5276,15 @@
+@@ -4417,7 +5278,15 @@
              *exit_misc = CodeMiscNew(cctrl, CMT_LABEL);
    if (!PrsKw(cctrl, TK_KW_TRY))
      return 0;
@@ -2721,7 +2793,7 @@
    *(rpn = A_CALLOC(sizeof(CRPN), NULL)) = (CRPN){
        .type = IC_GLOBAL,
        .global_var = HashFind("AIWNIOS_SetJmp", Fs->hash_table, HTT_FUN, 1),
-@@ -4425,7 +5292,7 @@
+@@ -4425,7 +5294,7 @@
    QueIns(rpn, cctrl->code_ctrl->ir_code);
    *(rpn = A_CALLOC(sizeof(CRPN), NULL)) = (CRPN){
        .type = IC_GLOBAL,
@@ -2730,7 +2802,7 @@
    };
    QueIns(rpn, cctrl->code_ctrl->ir_code);
    (rpn = A_CALLOC(sizeof(CRPN), NULL))->type = IC_CALL;
-@@ -4442,10 +5309,10 @@
+@@ -4442,10 +5311,10 @@
    QueIns(rpn, cctrl->code_ctrl->ir_code);
    // See below note
    PrsStmt(cctrl);
@@ -2743,7 +2815,7 @@
    };
    QueIns(rpn, cctrl->code_ctrl->ir_code);
    (rpn = A_CALLOC(sizeof(CRPN), NULL))->type = IC_CALL;
-@@ -4466,10 +5333,10 @@
+@@ -4466,10 +5335,10 @@
    QueIns(rpn, cctrl->code_ctrl->ir_code);
    // Our catch block
    PrsStmt(cctrl);
@@ -2756,7 +2828,7 @@
    };
    QueIns(rpn, cctrl->code_ctrl->ir_code);
    (rpn = A_CALLOC(sizeof(CRPN), NULL))->type = IC_CALL;
-@@ -4585,6 +5452,7 @@
+@@ -4585,6 +5454,7 @@
      QueIns(rpn, cc->ir_code);                                                  \
      return rpn;                                                                \
    }
@@ -2774,7 +2846,7 @@
  
  static int64_t IsConst(CRPN *rpn) {
    switch (rpn->type) {
-@@ -18,9 +19,14 @@
+@@ -18,8 +19,13 @@
  static int64_t PtrWidthOfRPN(CRPN *rpn) {
    int64_t r = 1;
    if (rpn->ic_dim) {
@@ -2784,13 +2856,12 @@
 +     * Its total_cnt already contains the product of the trailing dimensions;
 +     * skipping another node drops one row stride for multidimensional arrays. */
 +    r *= rpn->ic_dim->total_cnt;
-     r *= rpn->ic_class->sz;
++    r *= rpn->ic_class->sz;
 +  } else if (rpn->ic_class->flags & CLSF_FUNPTR) {
 +    /* Funptrs are CHashFun, not a CHashClass star array — never use [-1]. */
-+    r *= rpn->ic_class->sz;
+     r *= rpn->ic_class->sz;
    } else
      r *= rpn->ic_class[-1].sz;
- 
 @@ -32,6 +38,9 @@
    CRPN *rpn2 = rpn->base.next, *ic, *last;
    CHashFun *ic_fun;
@@ -2921,19 +2992,19 @@
        new->ic_fun = rpn->ic_fun;
        new->ic_dim = rpn->ic_dim;
        new2 = A_CALLOC(sizeof(CRPN), cctrl->hc);
-@@ -475,6 +522,12 @@
-         MulComConstsI642(cctrl, rpn, rpn->type, 1, 1);
-     }
+@@ -477,6 +524,12 @@
    }
-+}
-+
+ }
+ 
 +/* Relational chains must reach the backend intact. Folding their inner
 + * comparison turns a<b<c into (a<b)<c and silently changes HolyC semantics. */
 +static int IsRelational(int64_t type) {
 +  return type == IC_LT || type == IC_GT || type == IC_LE || type == IC_GE;
- }
- 
++}
++
  void OptPassConstFold(CCmpCtrl *cctrl) {
+ #define SET_AB                                                                 \
+   if (next->type == IC_F64)                                                    \
 @@ -505,6 +558,11 @@
    changed = 0;
    for (rpn = cctrl->code_ctrl->ir_code->next;
@@ -2967,16 +3038,16 @@
        mv[i].m->reg = REG_NONE;
      mv[i++].score = 1;
    }
-@@ -1087,6 +1150,9 @@
-     case IC_GLOBAL:
-       continue;
+@@ -1085,6 +1148,9 @@
+       }
        break;
-+    case IC_PC_GET:
+     case IC_GLOBAL:
 +      continue;
 +      break;
-     case IC_NOP:
++    case IC_PC_GET:
        continue;
        break;
+     case IC_NOP:
 @@ -1259,6 +1325,14 @@
    }
  #else
@@ -3038,7 +3109,7 @@
    int64_t b = HashStr(str) & table->mask;
    CHash *h;
    for (h = table->body[b]; h; h = h->next) {
-@@ -65,30 +86,28 @@
+@@ -65,28 +86,26 @@
    *b = h;
  }
  
@@ -3076,17 +3147,15 @@
 +    return 1;
    }
    return 0;
- }
- 
+-}
+-
 -int64_t HashRemDel(CHash *h, CHashTable *table, int64_t inst) {
 -  int64_t res = _HashDelStr(h->str, table, inst);
 -  HashAdd(h, table);
 -  return res;
--}
--
+ }
+ 
  void HashTableDel(CHashTable *table) {
-   int64_t i;
-   CHash *next, *cur;
 --- a/c/ffi_gen.c
 +++ b/c/ffi_gen.c
 @@ -124,20 +124,30 @@
@@ -3105,6 +3174,9 @@
 -    if (arg >= 8)
 -      break;
 -    blob[ptr++] = ARM_strRegImmX(arg, 31, arg * 8 + pad);
+-  }
+-  blob[ptr++] =
+-      ARM_addImmX(0, 31, pad); // 31 is stack pointer,0 is 1st argument
 +  if (arity <= 8) {
 +    if (arity & 1)
 +      arity++, pad = 8;
@@ -3126,37 +3198,40 @@
 +      blob[ptr++] = ARM_strRegImmX(9, 31, arg * 8);
 +    }
 +    blob[ptr++] = ARM_movRegX(0, 31);
-   }
--  blob[ptr++] =
--      ARM_addImmX(0, 31, pad); // 31 is stack pointer,0 is 1st argument
++  }
    blob[ptr++] = ARM_stpPreImmX(29, 30, 31, -16);
    blob[ptr++] = ARM_movRegX(29, 31);
    fill = ptr;
 --- a/c/arm64_asm.c
 +++ b/c/arm64_asm.c
-@@ -840,12 +840,22 @@
- 
- int64_t ARM_fnegReg(int64_t d, int64_t s) {
+@@ -842,8 +842,18 @@
    return FpDataProc1Reg(0, 0, 1, 2, d, s);
-+}
-+
+ }
+ 
 +int64_t ARM_fabsReg(int64_t d, int64_t s) {
 +  /* FABS Dd, Dn. */
 +  return 0x1e60c000 | (s << 5) | d;
- }
- 
++}
++
  int64_t ARM_fmovReg(int64_t d, int64_t s) {
    return FpDataProc1Reg(0, 0, 1, 0, d, s);
- }
- 
++}
++
 +int64_t ARM_fsqrtReg(int64_t d, int64_t s) {
 +  /* FSQRT Dd, Dn. */
 +  return 0x1e61c000 | (s << 5) | d;
-+}
-+
- int64_t ARM_fcmp(int64_t a, int64_t b) {
-   return FpComp(0, 0, 1, 0, 0, a, b);
  }
+ 
+ int64_t ARM_fcmp(int64_t a, int64_t b) {
+@@ -1212,7 +1222,7 @@
+ 
+ static int64_t LdExclusive(int64_t sz, int64_t o0, int64_t d, int64_t s) {
+   return (sz << 30) | (0x8 << 24) | (1 << 22) | (0x1f << 16) | (0x1f << 10) |
+-         (s << 5) | d;
++         (o0 << 15) | (s << 5) | d;
+ }
+ 
+ int64_t ARM_ldaxrb(int64_t d, int64_t s) {
 --- a/c/arm_backend.c
 +++ b/c/arm_backend.c
 @@ -8,6 +8,20 @@
@@ -3283,7 +3358,240 @@
    case IC_POS:
      goto unop;
      break;
-@@ -2263,11 +2343,67 @@
+@@ -1864,15 +1944,54 @@
+   }
+   return code_off;
+ }
++/* Convert addressable static, frame and absolute lvalues into an indirect
++ * address. The atomic paths already understand indirect and indexed modes. */
++static int64_t AtomicAddress(CCmpCtrl *cctrl, CICArg *arg, char *bin,
++                             int64_t code_off) {
++  if (arg->mode == MD_STATIC) {
++    if (cctrl->code_ctrl->final_pass) {
++      AIWNIOS_ADD_CODE(ARM_adrX(MIR(cctrl, 1), 0));
++      CCodeMiscRef *ref = CodeMiscAddRef(cctrl->statics_label, bin + code_off - 4);
++      ref->patch_cond_br = ARM_adrX;
++      ref->user_data1 = 1;
++      ref->offset = arg->off;
++    } else {
++      AIWNIOS_ADD_CODE(0);
++    }
++  } else if (arg->mode == MD_FRAME) {
++    int64_t frame_off = arg->off;
++    if (frame_off >= 0 && ARM_addImmX(1, ARM_REG_FP, frame_off) != ARM_ERR_INV_OFF) {
++      AIWNIOS_ADD_CODE(ARM_addImmX(MIR(cctrl, 1), ARM_REG_FP, frame_off));
++    } else if (frame_off < 0 && ARM_subImmX(1, ARM_REG_FP, -frame_off) != ARM_ERR_INV_OFF) {
++      AIWNIOS_ADD_CODE(ARM_subImmX(MIR(cctrl, 1), ARM_REG_FP, -frame_off));
++    } else {
++      uint64_t magnitude = frame_off < 0 ? -frame_off : frame_off;
++      code_off = __ICMoveI64(cctrl, MIR(cctrl, 2), magnitude, bin, code_off);
++      AIWNIOS_ADD_CODE((frame_off < 0 ? ARM_subRegX : ARM_addRegX)(MIR(cctrl, 1), ARM_REG_FP, 2));
++    }
++  } else if (arg->mode == MD_PTR) {
++    code_off = __ICMoveI64(cctrl, MIR(cctrl, 1), arg->off, bin, code_off);
++  } else {
++    return code_off;
++  }
++  arg->mode = MD_INDIR_REG;
++  arg->reg = 1;
++  arg->off = 0;
++  return code_off;
++}
++
++/* Resolve the address once into x1, then retry from LDAXR. This keeps retry
++ * independent of the registers used to calculate an indexed address. */
+ #define ATOMIC_LOAD(derefed)                                                   \
+   {                                                                            \
+-    int64_t retry = code_off;                                                  \
++    int64_t retry = -1;                                                        \
+     if (derefed.mode == __MD_ARM_SHIFT) {                                      \
+       switch (derefed.raw_type) {                                              \
+       case RT_I8i:                                                             \
+       case RT_U8i:                                                             \
+         AIWNIOS_ADD_CODE(                                                      \
+             ARM_addRegX(MIR(cctrl, 1), derefed.reg2, derefed.reg));            \
++        retry = code_off;                                                      \
+         AIWNIOS_ADD_CODE(ARM_ldaxrb(MIR(cctrl, 0), 1));                        \
+         if (RT_U8i == derefed.raw_type)                                        \
+           AIWNIOS_ADD_CODE(ARM_uxtbX(0, 0))                                    \
+@@ -1883,8 +2002,9 @@
+       case RT_U16i:                                                            \
+         AIWNIOS_ADD_CODE(ARM_lslImmX(MIR(cctrl, 0), derefed.reg2, 1));         \
+         AIWNIOS_ADD_CODE(ARM_addRegX(MIR(cctrl, 1), 0, derefed.reg));          \
++        retry = code_off;                                                      \
+         AIWNIOS_ADD_CODE(ARM_ldaxrh(0, 1));                                    \
+-        if (RT_U8i == derefed.raw_type)                                        \
++        if (RT_U16i == derefed.raw_type)                                       \
+           AIWNIOS_ADD_CODE(ARM_uxthX(0, 0))                                    \
+         else                                                                   \
+           AIWNIOS_ADD_CODE(ARM_sxthX(0, 0))                                    \
+@@ -1893,8 +2013,9 @@
+       case RT_U32i:                                                            \
+         AIWNIOS_ADD_CODE(ARM_lslImmX(MIR(cctrl, 0), derefed.reg2, 2));         \
+         AIWNIOS_ADD_CODE(ARM_addRegX(MIR(cctrl, 1), 0, derefed.reg));          \
++        retry = code_off;                                                      \
+         AIWNIOS_ADD_CODE(ARM_ldaxr(0, 1));                                     \
+-        if (RT_U8i == derefed.raw_type)                                        \
++        if (RT_U32i == derefed.raw_type)                                       \
+           AIWNIOS_ADD_CODE(ARM_uxtwX(0, 0))                                    \
+         else                                                                   \
+           AIWNIOS_ADD_CODE(ARM_sxtwX(0, 0))                                    \
+@@ -1903,6 +2024,7 @@
+       case RT_U64i:                                                            \
+         AIWNIOS_ADD_CODE(ARM_lslImmX(MIR(cctrl, 0), derefed.reg2, 3));         \
+         AIWNIOS_ADD_CODE(ARM_addRegX(MIR(cctrl, 1), 0, derefed.reg));          \
++        retry = code_off;                                                      \
+         AIWNIOS_ADD_CODE(ARM_ldaxrX(0, 1));                                    \
+         break;                                                                 \
+       }                                                                        \
+@@ -1917,6 +2039,7 @@
+       switch (derefed.raw_type) {                                              \
+       case RT_I8i:                                                             \
+       case RT_U8i:                                                             \
++        retry = code_off;                                                      \
+         AIWNIOS_ADD_CODE(ARM_ldaxrb(MIR(cctrl, 0), 1));                        \
+         if (RT_U8i == derefed.raw_type)                                        \
+           AIWNIOS_ADD_CODE(ARM_uxtbX(0, 0))                                    \
+@@ -1925,46 +2048,51 @@
+         break;                                                                 \
+       case RT_I16i:                                                            \
+       case RT_U16i:                                                            \
++        retry = code_off;                                                      \
+         AIWNIOS_ADD_CODE(ARM_ldaxrh(MIR(cctrl, 0), 1));                        \
+-        if (RT_U8i == derefed.raw_type)                                        \
++        if (RT_U16i == derefed.raw_type)                                       \
+           AIWNIOS_ADD_CODE(ARM_uxthX(0, 0))                                    \
+         else                                                                   \
+           AIWNIOS_ADD_CODE(ARM_sxthX(0, 0))                                    \
+         break;                                                                 \
+       case RT_I32i:                                                            \
+       case RT_U32i:                                                            \
++        retry = code_off;                                                      \
+         AIWNIOS_ADD_CODE(ARM_ldaxr(MIR(cctrl, 0), 1));                         \
+-        if (RT_U8i == derefed.raw_type)                                        \
++        if (RT_U32i == derefed.raw_type)                                       \
+           AIWNIOS_ADD_CODE(ARM_uxtwX(0, 0))                                    \
+         else                                                                   \
+           AIWNIOS_ADD_CODE(ARM_sxtwX(0, 0))                                    \
+         break;                                                                 \
+       case RT_I64i:                                                            \
+       case RT_U64i:                                                            \
++        retry = code_off;                                                      \
+         AIWNIOS_ADD_CODE(ARM_ldaxrX(MIR(cctrl, 0), 1));                        \
+         break;                                                                 \
+       }                                                                        \
+     }
++/* Arm forbids overlap of STLXR's status register with its data/base. x16 is
++ * marked clobbered for register allocation; x0 contains data and x1 address. */
+ #define ATOMIC_STORE(derefed, r)                                               \
+   switch (derefed.raw_type) {                                                  \
+   case RT_I8i:                                                                 \
+   case RT_U8i:                                                                 \
+-    AIWNIOS_ADD_CODE(ARM_stlxrb(MIR(cctrl, 0), r, 1));                         \
++    AIWNIOS_ADD_CODE(ARM_stlxrb(MIR(cctrl, 16), r, 1));                         \
+     break;                                                                     \
+   case RT_I16i:                                                                \
+   case RT_U16i:                                                                \
+-    AIWNIOS_ADD_CODE(ARM_stlxrh(MIR(cctrl, 0), r, 1));                         \
++    AIWNIOS_ADD_CODE(ARM_stlxrh(MIR(cctrl, 16), r, 1));                         \
+     break;                                                                     \
+   case RT_I32i:                                                                \
+   case RT_U32i:                                                                \
+-    AIWNIOS_ADD_CODE(ARM_stlxrh(MIR(cctrl, 0), r, 1));                         \
++    AIWNIOS_ADD_CODE(ARM_stlxr(MIR(cctrl, 16), r, 1));                          \
+     break;                                                                     \
+   case RT_I64i:                                                                \
+   case RT_U64i:                                                                \
+-    AIWNIOS_ADD_CODE(ARM_stlxrX(MIR(cctrl, 0), r, 1));                         \
++    AIWNIOS_ADD_CODE(ARM_stlxrX(MIR(cctrl, 16), r, 1));                         \
+     break;                                                                     \
+   }                                                                            \
+-  AIWNIOS_ADD_CODE(ARM_cbnz(0, retry - code_off));                             \
++  AIWNIOS_ADD_CODE(ARM_cbnz(16, retry - code_off));                             \
+   }
+ static int64_t __SexyPreOp(CCmpCtrl *cctrl, CRPN *rpn,
+                            int64_t (*i_imm_op)(int64_t, int64_t, int64_t),
+@@ -2042,13 +2170,14 @@
+       code_off = ICMov(cctrl, &rpn->res, &tmp, bin, code_off);
+     } else {
+       code_off = DerefToICArg(cctrl, &derefed, next, 3, bin, code_off);
++      if (rpn->flags & ICF_LOCK_EXPR)
++        code_off = AtomicAddress(cctrl, &derefed, bin, code_off);
+       tmp = derefed;
+       if ((rpn->flags & ICF_LOCK_EXPR) &&
+           (tmp.mode == MD_INDIR_REG || tmp.mode == __MD_ARM_SHIFT)) {
+         ATOMIC_LOAD(derefed);
+         tmp.mode = MD_REG;
+         tmp.reg = 0;
+-        code_off = ICMov(cctrl, &rpn->res, &tmp, bin, code_off);
+         code = i_imm_op(MIR(cctrl, 0), 0, rpn->integer);
+         if (code != ARM_ERR_INV_OFF) {
+           AIWNIOS_ADD_CODE(code);
+@@ -2057,6 +2186,8 @@
+           AIWNIOS_ADD_CODE(i_reg_op(MIR(cctrl, 0), 0, 2))
+         }
+         ATOMIC_STORE(derefed, 0);
++        /* Publish the new value only after the successful exclusive store. */
++        code_off = ICMov(cctrl, &rpn->res, &tmp, bin, code_off);
+         return code_off;
+       }
+       code_off = PutICArgIntoReg(cctrl, &tmp, tmp.raw_type, 2, bin, code_off);
+@@ -2118,23 +2249,30 @@
+       code_off = ICMov(cctrl, &derefed, &tmp, bin, code_off);
+     } else {
+       code_off = DerefToICArg(cctrl, &derefed, next, 3, bin, code_off);
++      if (rpn->flags & ICF_LOCK_EXPR)
++        code_off = AtomicAddress(cctrl, &derefed, bin, code_off);
+       tmp = derefed;
+-      code_off = ICMov(cctrl, &rpn->res, &tmp, bin, code_off);
+       if ((rpn->flags & ICF_LOCK_EXPR) &&
+           (tmp.mode == MD_INDIR_REG || tmp.mode == __MD_ARM_SHIFT)) {
+         ATOMIC_LOAD(derefed);
++        /* Preserve the loaded value in a register, without another memory
++         * access inside the exclusive window. A failed store retries and
++         * refreshes this value before publishing the result. */
++        AIWNIOS_ADD_CODE(ARM_movRegX(MIR(cctrl, 2), 0));
+         tmp.mode = MD_REG;
+-        tmp.reg = 1;
+-        code = i_imm_op(MIR(cctrl, 1), 1, rpn->integer);
++        tmp.reg = 2;
++        code = i_imm_op(MIR(cctrl, 0), 0, rpn->integer);
+         if (code != ARM_ERR_INV_OFF) {
+           AIWNIOS_ADD_CODE(code);
+         } else {
+-          code_off = __ICMoveI64(cctrl, 2, rpn->integer, bin, code_off);
+-          AIWNIOS_ADD_CODE(i_reg_op(MIR(cctrl, 1), 1, 2))
++          code_off = __ICMoveI64(cctrl, MIR(cctrl, 3), rpn->integer, bin, code_off);
++          AIWNIOS_ADD_CODE(i_reg_op(MIR(cctrl, 0), 0, 3))
+         }
+         ATOMIC_STORE(derefed, 0);
++        code_off = ICMov(cctrl, &rpn->res, &tmp, bin, code_off);
+         return code_off;
+       }
++      code_off = ICMov(cctrl, &rpn->res, &tmp, bin, code_off);
+       code_off = PutICArgIntoReg(cctrl, &tmp, tmp.raw_type, 2, bin, code_off);
+       code = i_imm_op(MIR(cctrl, tmp.reg), tmp.reg, rpn->integer);
+       if (code != ARM_ERR_INV_OFF) {
+@@ -2219,6 +2357,8 @@
+       if (next->raw_type == RT_F64 || rpn->raw_type == RT_F64)
+         goto defacto2;
+       code_off = DerefToICArg(cctrl, &derefed, next, 2, bin, code_off);
++      if (rpn->flags & ICF_LOCK_EXPR)
++        code_off = AtomicAddress(cctrl, &derefed, bin, code_off);
+       tmp2 = derefed;
+       if (!(rpn->flags & ICF_LOCK_EXPR)) {
+       not_lock_const:;
+@@ -2235,8 +2375,8 @@
+         tmp2.mode = MD_REG;
+         tmp2.reg = 0;
+         tmp2.raw_type = RT_I64i;
++        ATOMIC_STORE(derefed, 0);
+         code_off = ICMov(cctrl, &rpn->res, &tmp2, bin, code_off);
+-        ATOMIC_STORE(derefed, 0);
+       }
+     }
+     return code_off;
+@@ -2263,9 +2403,20 @@
      defacto2:
        if ((rpn->flags & ICF_LOCK_EXPR) && next->raw_type != RT_F64) {
          code_off = __OptPassFinal(cctrl, next2, bin, code_off);
@@ -3302,59 +3610,21 @@
          code_off = DerefToICArg(cctrl, &derefed, next, 1, bin, code_off);
 -        code_off = PutICArgIntoReg(cctrl, &b->res, next->raw_type, 3, bin,
 -                                   code_off); // 1
--        if (derefed.mode != __MD_ARM_SHIFT && derefed.mode != MD_INDIR_REG)
-+        /* Atomic operations below consume a base address in x1. Turn other
-+         * addressable lvalues into that form instead of silently compiling
-+         * a locked update as an ordinary load/add/store. */
-+        if (derefed.mode == MD_STATIC) {
-+          if (cctrl->code_ctrl->final_pass) {
-+            AIWNIOS_ADD_CODE(ARM_adrX(MIR(cctrl, 1), 0));
-+            CCodeMiscRef *ref = CodeMiscAddRef(cctrl->statics_label,
-+                                               bin + code_off - 4);
-+            ref->patch_cond_br = ARM_adrX;
-+            ref->user_data1 = 1;
-+            ref->offset = derefed.off;
-+          } else {
-+            AIWNIOS_ADD_CODE(0);
-+          }
-+          derefed.mode = MD_INDIR_REG;
-+          derefed.reg = 1;
-+          derefed.off = 0;
-+        } else if (derefed.mode == MD_FRAME) {
-+          int64_t frame_off = derefed.off;
-+          if (frame_off >= 0 &&
-+              ARM_addImmX(1, ARM_REG_FP, frame_off) != ARM_ERR_INV_OFF) {
-+            AIWNIOS_ADD_CODE(ARM_addImmX(MIR(cctrl, 1), ARM_REG_FP,
-+                                         frame_off));
-+          } else if (frame_off < 0 &&
-+                     ARM_subImmX(1, ARM_REG_FP, -frame_off) !=
-+                         ARM_ERR_INV_OFF) {
-+            AIWNIOS_ADD_CODE(ARM_subImmX(MIR(cctrl, 1), ARM_REG_FP,
-+                                         -frame_off));
-+          } else {
-+            uint64_t magnitude = frame_off < 0 ? -frame_off : frame_off;
-+            code_off = __ICMoveI64(cctrl, MIR(cctrl, 2), magnitude, bin,
-+                                   code_off);
-+            AIWNIOS_ADD_CODE((frame_off < 0 ? ARM_subRegX : ARM_addRegX)(
-+                MIR(cctrl, 1), ARM_REG_FP, 2));
-+          }
-+          derefed.mode = MD_INDIR_REG;
-+          derefed.reg = 1;
-+          derefed.off = 0;
-+        } else if (derefed.mode == MD_PTR) {
-+          code_off = __ICMoveI64(cctrl, MIR(cctrl, 1), derefed.off, bin,
-+                                 code_off);
-+          derefed.mode = MD_INDIR_REG;
-+          derefed.reg = 1;
-+          derefed.off = 0;
-+        } else if (derefed.mode != __MD_ARM_SHIFT &&
-+                   derefed.mode != MD_INDIR_REG) {
++        code_off = AtomicAddress(cctrl, &derefed, bin, code_off);
+         if (derefed.mode != __MD_ARM_SHIFT && derefed.mode != MD_INDIR_REG)
            goto normal;
-+        }
          ATOMIC_LOAD(derefed);
-         AIWNIOS_ADD_CODE(i_op(MIR(cctrl, 0), 0, b->res.reg));
+@@ -2273,8 +2424,8 @@
          tmp2.mode = MD_REG;
-@@ -2888,6 +3024,20 @@
+         tmp2.reg = 0;
+         tmp2.raw_type = RT_I64i;
++        ATOMIC_STORE(derefed, 0);
+         code_off = ICMov(cctrl, &rpn->res, &tmp2, bin, code_off);
+-        ATOMIC_STORE(derefed, 0);
+         return code_off;
+       }
+       //
+@@ -2888,6 +3039,20 @@
        if (rpn->res.keep_in_tmp)
          rpn->res = tmp;
  
@@ -3375,12 +3645,10 @@
        code_off = ICMov(cctrl, &rpn->res, &tmp, bin, code_off);
      }
      break;
-@@ -3192,6 +3342,36 @@
-       AIWNIOS_ADD_CODE(ARM_fmulReg(tmp.reg, next->res.reg, next->res.reg));
-       code_off =
+@@ -3194,6 +3359,36 @@
            ICMov(cctrl, &rpn->res, &tmp, bin, code_off); // Move tmp into result.
-+    }
-+    break;
+     }
+     break;
 +  case IC_SQRT:
 +    next = ICArgN(rpn, 0);
 +    code_off = __OptPassFinal(cctrl, next, bin, code_off);
@@ -3409,10 +3677,12 @@
 +      tmp.reg = MFR(cctrl, 0);
 +      AIWNIOS_ADD_CODE(ARM_fabsReg(tmp.reg, next->res.reg));
 +      code_off = ICMov(cctrl, &rpn->res, &tmp, bin, code_off);
-     }
-     break;
++    }
++    break;
    case IC_NAME:
-@@ -3258,29 +3438,18 @@
+     abort();
+     break;
+@@ -3258,29 +3453,18 @@
      break;
      break;
    case IC_UNBOUNDED_SWITCH:
@@ -3448,7 +3718,7 @@
      code_off = __OptPassFinal(cctrl, next2, bin, code_off);
      tmp.raw_type = RT_I64i;
      tmp.mode = MD_REG;
-@@ -3294,7 +3463,6 @@
+@@ -3294,7 +3478,6 @@
      AIWNIOS_ADD_CODE(ARM_cmpRegX(tmp.reg, 2));
      fail2_addr = bin + code_off;
      AIWNIOS_ADD_CODE(ARM_bcc(ARM_GT, 0));
@@ -3456,7 +3726,7 @@
      //
      // See LAMA snail
      //
-@@ -3315,7 +3483,7 @@
+@@ -3315,7 +3498,7 @@
      AIWNIOS_ADD_CODE(ARM_ldrRegRegShiftX(MIR(cctrl, tmp.reg), 2, tmp.reg));
      // Load the function base address
      AIWNIOS_ADD_CODE(ARM_br(tmp.reg));
@@ -3465,7 +3735,7 @@
        ref = CodeMiscAddRef(rpn->code_misc->dft_lab, fail1_addr);
        ref->patch_cond_br = ARM_bcc;
        ref->user_data1 = ARM_LT;
-@@ -3693,6 +3861,7 @@
+@@ -3693,6 +3876,7 @@
        goto restore_reg;
        break;
      case IC_DEREF:
@@ -3473,7 +3743,7 @@
        next = rpn->base.next;
        code_off = __OptPassFinal(cctrl, next, bin, code_off);
        code_off = PutICArgIntoReg(cctrl, &next->res, RT_PTR, 1, bin, code_off);
-@@ -3720,13 +3889,13 @@
+@@ -3720,13 +3904,13 @@
          into_reg = 8;
        if (cctrl->code_ctrl->final_pass) {
          i = ARM_adrX(MIR(cctrl, into_reg),
@@ -3489,7 +3759,7 @@
        goto restore_reg;
      case IC_GLOBAL:
      get_glbl_ptr:
-@@ -3741,7 +3910,9 @@
+@@ -3741,7 +3925,9 @@
        } else
          abort();
        // Undefined?
@@ -3500,7 +3770,7 @@
          if (next->global_var->base.type & HTT_GLBL_VAR) {
            enter_addr = &next->global_var->data_addr;
          } else if (next->global_var->base.type & HTT_FUN) {
-@@ -4473,6 +4644,9 @@
+@@ -4473,6 +4659,9 @@
      break;
    case IC_GS:
    case IC_FS: {
@@ -3510,7 +3780,7 @@
      next = rpn->base.next;
      if (next->type != IC_RELOC && next->type != IC_I64) {
        printf("Expected a relocation at IC_FS,aborting(Contact nrootcoauto for "
-@@ -4768,6 +4942,7 @@
+@@ -4768,6 +4957,7 @@
    case IC_BASE_PTR:
    case IC_STR:
    case IC_CHR:
@@ -3518,20 +3788,20 @@
    case IC_FS:
    case IC_GS:
      if (spilled)
-@@ -4817,6 +4992,12 @@
-   case IC_NEG:
+@@ -4815,6 +5005,12 @@
      goto unop;
      break;
+   case IC_NEG:
++    goto unop;
++    break;
 +  case IC_SQRT:
 +    goto unop;
 +    break;
 +  case IC_ABS:
-+    goto unop;
-+    break;
-   case IC_POS:
-   case IC_SQR:
      goto unop;
-@@ -5155,6 +5336,10 @@
+     break;
+   case IC_POS:
+@@ -5155,6 +5351,10 @@
            obin); // For OpenBSD sexy mapping(see mem.c or ask nroot)
        code_off = 0;
      }
@@ -3542,7 +3812,7 @@
      code_off = FuncProlog(cctrl, bin, code_off);
      for (cnt = 0; cnt < cnt2; cnt++) {
      enter:
-@@ -5162,10 +5347,14 @@
+@@ -5162,10 +5362,14 @@
        cctrl->backend_user_data2 = 0;
        cctrl->backend_user_data3 = 0;
        r = forwards[cnt];
@@ -3620,15 +3890,20 @@
    struct CHashClass *base_class;
 --- a/c/aiwn_lexparser.h
 +++ b/c/aiwn_lexparser.h
-@@ -6,6 +6,7 @@
+@@ -6,6 +6,12 @@
  #include "aiwn_asm.h"
  #include <stdint.h>
  struct CTask;
 +struct CLexer;
++typedef struct CExeStream {
++  struct CExeStream *previous;
++  char *text;
++  int64_t length;
++} CExeStream;
  // This represents a peice of text being lexed(it could be a file macro, or
  // such)
  typedef struct CLexFile {
-@@ -16,8 +17,14 @@
+@@ -16,8 +22,14 @@
    struct CLexFile *last;
    char *filename, *text, *dir;
    int64_t ln, col, pos, is_file;
@@ -3643,7 +3918,7 @@
  typedef struct CLexer {
    CLexFile *file;
    //
-@@ -27,7 +34,7 @@
+@@ -27,7 +39,7 @@
    union {
      int64_t integer;
      double flt;
@@ -3652,7 +3927,7 @@
    };
    //
    // Sometimes we are lexing and want to go back a charactor
-@@ -39,10 +46,31 @@
+@@ -39,10 +51,33 @@
  #define LEXF_UNTIL_NEWLINE 8
    int64_t flags, cur_char;
    int64_t cur_tok;
@@ -3660,6 +3935,8 @@
 +   * an unspaced ZealOS range operator, e.g. `case 0...7:`. */
 +  int64_t pushback_char, pushback_valid;
    struct CHeapCtrl *hc;
++  /* Active #exe-generated source, stacked per lexer for nested blocks. */
++  CExeStream *port_exe_stream;
 +  int64_t *layout_off; /* Current class byte offset for ZealC $$. */
 +  /* ARM64 host bridge: options belong to the active guest CCompCtrl. */
 +  int64_t *port_options;
@@ -3684,7 +3961,7 @@
    TK_F64,
    TK_NAME,
    TK_STR,
-@@ -108,6 +136,7 @@
+@@ -108,6 +143,7 @@
    TK_KW_HASERRCODE,
    TK_KW_ARGPOP,
    TK_KW_NOARGPOP,
@@ -3692,7 +3969,7 @@
  } LexTok;
  typedef struct CCodeCtrl {
    struct CCodeCtrl *next;
-@@ -224,6 +253,7 @@
+@@ -224,6 +260,7 @@
  #define PRSF_IMPORT   0x20
  #define PRSF__IMPORT  0x40
  #define PRSF_STATIC   0x80
@@ -3700,7 +3977,7 @@
  enum {
    IC_GOTO,
    IC_SQR,
-@@ -345,6 +375,7 @@
+@@ -345,6 +382,7 @@
    IC_GS,
    IC_TO_BOOL,
    IC_SQRT,
@@ -3708,7 +3985,7 @@
    IC_CNT, // MUST BE THE LAST ITEM
  };
  typedef struct CICArg {
-@@ -441,9 +472,9 @@
+@@ -441,9 +479,9 @@
  void ICFree(CRPN *ic);
  CHashClass *PrsClassNew();
  char *PrsArray(CCmpCtrl *ccmp, CHashClass *base, CArrayDim *dim,
@@ -3720,7 +3997,7 @@
  double PrsF64(CCmpCtrl *ccmp);
  int64_t PrsI64(CCmpCtrl *ccmp);
  int64_t _PrsStmt(CCmpCtrl *ccmp);
-@@ -567,7 +598,7 @@
+@@ -567,7 +605,7 @@
  #  define AIWNIOS_TMP_FREG_START 3
  #  define AIWNIOS_TMP_FREG_CNT   (5 - 3 + 1)
  #  define AIWNIOS_FREG_CNT       (15 - 6 + 1)
@@ -3729,7 +4006,7 @@
      (defined(_M_ARM64) || defined(__aarch64__))
  #  define AIWNIOS_IREG_START     19
  #  define AIWNIOS_IREG_CNT       (27 - 19 + 1)
-@@ -767,3 +798,8 @@
+@@ -767,3 +805,8 @@
  
  void CacheRPNArgs(CCmpCtrl *cctrl);
  extern int64_t DolDocDumpIR(char *to, int64_t, CRPN *);

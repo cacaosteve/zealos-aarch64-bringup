@@ -1,0 +1,21 @@
+{
+  "date": "2026-11-09",
+  "result": "pass for the tested 3D and popup workflows",
+  "change": "Recompile the partial document writer after the final DocPutKey binding, so split DolDoc directives reach the real editor.",
+  "kernel_sha256": "d7070e6e03a8df251c223acc9ee260c6491ae6b58dec92ce4250010604c65636",
+  "test_disk": "A disposable clone of build/disk.img with the candidate kernel and test fixture; the original was not replaced.",
+  "checks": [
+    {"name": "split button directive before fix", "result": "failed with 2 instead of 42", "log": "build/partial-dollar-before.log", "sha256": "f7147dc41f07447b2a9fdb7f6338c1b7dba4d500b26c6b6c0783c9aada232ca5"},
+    {"name": "split button directive after fix", "result": "pass", "log": "build/partial-dollar-after.log", "sha256": "a1a477adb196ffa72c1e118f6c1a295b133ffaf81308ea322b1e3fb0ba2f9275"},
+    {"name": "partial output callback and exception cleanup", "result": "pass", "log": "build/grmodels-partial-callback.log", "sha256": "5463310b80c1555e69d5458be6e7dde8fcd3351602f63a11fe858f4ea148cf86"},
+    {"name": "repeated DebugDemo interrupt and graphical terminal recovery", "result": "pass", "log": "build/grmodels-debug-repeat.log", "sha256": "f7dc272ba9ff8d4eb4cf417c335065c5845876915c0785cbb5ad9f594c221316"},
+    {"name": "UTM QEMU virtio-ramfb 3D app interaction", "result": "GrModels Man and Ball, visible Ball sprite, KeepAway and Titanium app checks pass; later SystemLaunchPopupChecks fails", "log": "build/utm-virtio-ramfb-3d-fixed.log", "sha256": "44818356c6b9922619c7ae8c10656104e030234952d264ecaa8e412bcc33eead"},
+    {"name": "SystemLaunchPopupChecks baseline and initial candidate", "result": "both fail with return 1", "baseline_log": "build/grmodels-system-launch-baseline.log", "candidate_log": "build/grmodels-system-launch.log"},
+    {"name": "SystemLaunchPopupChecks after synchronous wait correction", "result": "pass, including queue and memory cleanup checks", "log": "build/popup-system-launch-fixed.log", "sha256": "605e7322132521412c5acb99f314b072933ada7ad6ff371eee26e274120a9257"},
+    {"name": "complete UTM QEMU virtio-ramfb 3D gate after popup correction", "result": "pass", "log": "build/utm-virtio-ramfb-popup-final.log", "sha256": "5aa39cd81f165772503fe0e69eaffd84742c9ad9534862836ce7a4c0f32a0bcc"}
+  ],
+  "utm_engine": "UTM's installed qemu-aarch64-softmmu framework, virtio-ramfb, HVF, 1024 MiB, VirtIO keyboard and tablet; launched independently via scripts/build-utm-qemu-runner.sh",
+  "popup_fix": "Wait for the synchronous popup's exact job result before destroying its task; the bootstrap root cannot be suspended. This does not add a yield to MessageScan.",
+  "source_bundle_sha256": "e434f07887c424752425529146e98edb1c292f03607af45561bf882fca37c273",
+  "limitations": ["No live UTM UI or Pi test", "The normal ISO and original build disk were not updated", "The candidate test bundle included temporary diagnostics in the SystemLaunch test fixture"]
+}

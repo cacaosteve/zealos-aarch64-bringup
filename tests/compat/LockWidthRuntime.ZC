@@ -1,0 +1,44 @@
+// Exercise locked updates through pointers so the backend must emit
+// width-matched exclusive loads and stores, including a carry above bit 15.
+U32 lock_width_words[2];
+U16 lock_width_half;
+
+I64 LockWidthRuntimeChecks()
+{
+    U32 *p = &lock_width_words[0];
+    lock_width_words[0] = 0x0000FFFF;
+    lock_width_words[1] = 0x76543210;
+    lock { *p += 1; }
+    if (lock_width_words[0] != 0x00010000) return 1;
+    if (lock_width_words[1] != 0x76543210) return 2;
+    lock { *p += 0x10000; }
+    if (lock_width_words[0] != 0x00020000) return 3;
+    if (lock_width_words[1] != 0x76543210) return 4;
+    return 42;
+}
+
+I64 LockWidthSignednessChecks()
+{
+    U16 *p16 = &lock_width_half;
+    U32 *p32 = &lock_width_words[0];
+    I64 result;
+    lock_width_half = 0x8000;
+    lock { result = (*p16 += 1); }
+    if (lock_width_half != 0x8001 || result != 0x8001) return 1;
+    lock_width_words[0] = 0x80000000;
+    lock { result = (*p32 += 1); }
+    if (lock_width_words[0] != 0x80000001 || result != 0x80000001) return 2;
+    return 42;
+}
+
+extern I64 LockBlockRuntime();
+I64 LockWidthAllChecks()
+{
+    I64 result = LockWidthRuntimeChecks;
+    if (result != 42) return 100 + result;
+    result = LockWidthSignednessChecks;
+    if (result != 42) return 200 + result;
+    result = LockBlockRuntime;
+    if (result != 42) return 300 + result;
+    return 42;
+}

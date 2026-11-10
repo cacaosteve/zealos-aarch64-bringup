@@ -1,0 +1,18 @@
+{
+  "date": "2026-11-09",
+  "result": "prepared and statically validated; hardware test pending",
+  "payload_directory": "build/pi-desktop-candidate-2026-11-09",
+  "files_sha256": {
+    "boot/kernel.elf": "202411d3f47717ecae5600cd3ff105efcb7f532a46d989982a8e426af9efb14c",
+    "boot/kernel-diag.elf": "2af5238ac275a1277bbd9b0ab75a47325925c4658a02edaa1d0841cbece4068b",
+    "boot/zealbooter.elf": "3da84dcb4c5dfb2a292c529111e813497fd89f52462db71618622c523b5500f5",
+    "boot/demo.hcbc": "e37c1b530962064c451fac288327f7ae799d3e344cc5c77dc2ba55625c0042d0",
+    "boot/sources.tar": "fba44cc9fb2303dfb066402ac65ab7099294d813b2bf131fede3f561a1e33cc0",
+    "EFI/BOOT/BOOTAA64.EFI": "3f51768c5eb8a0818b8e7aa2ac9a9caef3c64707b5b6db15d1e612de23236b8c",
+    "limine.conf": "a8981abc3cda174982db0e510a1bce180b2cefa74973789cd49c481ef92b5bc4"
+  },
+  "checks": ["Pi desktop and diagnostic recovery ELF and boot-chain validator passed", "1039 source modules checked", "source bundle contains synchronous popup correction", "make check-pi4-platform passed, including HDMI audio policy, USB and desktop framebuffer host tests"],
+  "platform_log": "build/pi-candidate-platform.log",
+  "platform_log_sha256": "4ce145f4ec41ff01630b1232b0544e5e2f3eac19a692242662f3098bd5dffd2d",
+  "limitations": ["No files copied to microSD", "Requires existing Pi UEFI firmware and device-tree files", "The current payload has not been booted or audio-tested on physical hardware", "Host tests do not establish all application behavior or writable storage"]
+}

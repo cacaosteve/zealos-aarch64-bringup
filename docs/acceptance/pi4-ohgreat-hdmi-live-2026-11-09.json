@@ -1,0 +1,43 @@
+{
+  "date": "2026-11-09",
+  "target": "Physical Raspberry Pi 4B, HDMI audio",
+  "source": "/Demo/Sound/OhGreat.ZC",
+  "entry_command": "ExeFile2(\"/Demo/Sound/OhGreat.ZC\");",
+  "result": "User reported that Oh Great played successfully through Pi 4B HDMI. A key stopped it after a delay of about a minute.",
+  "related_check": "The user also reported hearing a note using the Psalmody z, h, x sequence on the same setup.",
+  "interpretation": "The pinned song checks CharScan between complete playthroughs, so a key can wait until the current sequence finishes. The report confirms audible app playback and eventual stop, not precise timing or fidelity.",
+  "image_provenance": "The running microSD image and kernel hash were not independently inspected during this report; do not attribute it to the current QEMU source bundle or a specific commit.",
+  "qemu_followup": {
+    "target": "QEMU HVF with VirtIO sound and WAV backend",
+    "command": "python3 scripts/check-compat.py --pci --quick --probe-demo-ohgreat-full",
+    "result": "The same ExeFile2 command played until a late lyric, accepted a normal key, returned to the prompt after the remaining notes and executed 40+2 in the graphical terminal task. zstatus reported failed=0. The WAV contained 48.36 seconds of 44.1 kHz stereo PCM, 4261826 nonzero samples and a peak of 7000; frequency-window analysis found multiple pitches. This is evidence of sustained changing tones, not an exact audio-fidelity comparison.",
+    "kernel_sha256": "ab08ea01aa1769c22f5b4ef2e3b99e805d92e21ba1c313474657278fd785f525",
+    "source_bundle_sha256": "04b9d20e72f7b87a032fb74c47c08ba296cbdcd9832cbef7f88c74c99597a4e8",
+    "runner_log": "build/ohgreat-exefile-final.log",
+    "runner_sha256": "86f2714305d1eaed89739a61d22922213a9cfcf0aeb31154bebd1d990847973a",
+    "wav": "build/ohgreat-exefile-final.wav",
+    "wav_sha256": "5bbb407dcd6d8dfeea6af72b527500d78f292815771d9c99803b8feb0ba7ed4e",
+    "wav_check": "python3 scripts/check-sound-effects-wav.py --minimum-seconds 10 build/ohgreat-exefile-final.wav"
+  },
+  "limits": "One Pi, one HDMI output and these two app-audio paths. Full music fidelity, other songs, headphone output for this song, live UTM playback and other Pi hardware remain unverified.",
+  "utm_qemu_candidate_followup": {
+    "result": "pass",
+    "target": "UTM QEMU framework, AArch64 virt with HVF, virtio-ramfb, VirtIO input and WAV-backed VirtIO PCI sound",
+    "disk": "build/tothefront-direct-install.img",
+    "disk_sha256": "f9ffd3168ee98468772e054c9ec03f13596122c945c228353d40a7acde7f8813",
+    "command": "QEMU=build/utm-qemu-probe/qemu-probe ZEAL_TEST_DISK=build/tothefront-direct-install.img QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device -audiodev wav,id=sound0,path=build/tothefront-utm-ohgreat.wav -device virtio-sound-pci,audiodev=sound0' python3 -u scripts/check-compat.py --pci --quick --probe-demo-ohgreat-full",
+    "checks": [
+      "The unmodified OhGreat source reached the late lyric smack.",
+      "After a normal key, the original song completed its remaining notes and returned to the graphical prompt; a task command evaluated 40+2 as 42 and zstatus reported failed=0.",
+      "The WAV contained 49.04 seconds of 44.1 kHz 16-bit stereo PCM, 4321802 nonzero samples and peak 7000; scripts/check-sound-effects-wav.py --minimum-seconds 10 passed."
+    ],
+    "log": "build/tothefront-utm-ohgreat.log",
+    "log_sha256": "c79d83586143bd25de12bc47442c0138d2f50a114a8db4a9aae302a7b3dfb0ce",
+    "wav": "build/tothefront-utm-ohgreat.wav",
+    "wav_sha256": "9f100f917c915b62c9ed9237f1706e76266faa67cc491e74af4c8f084dc0c709",
+    "limitations": [
+      "WAV capture establishes emitted PCM, not real-time playback fidelity or audible output through a live UTM window.",
+      "This is one song and one virtual sound-device setup; physical Pi behavior on the newer candidate and other programs are not established."
+    ]
+  }
+}

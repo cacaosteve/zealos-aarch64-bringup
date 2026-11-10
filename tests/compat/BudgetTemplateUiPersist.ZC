@@ -1,0 +1,66 @@
+#include "/Apps/Budget/Load.ZC"
+
+I64 BudgetTemplateUiCheck(I64 phase)
+{
+    CBgtTemplate *tmpt;
+    CBgtEntry *entry;
+    U8 *expected_end, *expected_desc;
+    F64 expected_amount;
+    I64 expected_count;
+    I64 result = 42;
+    Cd("~/Budget");
+    bgt_string_file = FileNameAbs("Strs.DD");
+    bgt_accts_file = FileNameAbs("Accts.DD");
+    bgt_data_file = FileNameAbs("Bgt.DATA");
+    BgtAcctsRead;
+    BgtDataRead;
+    if (phase == 2)
+    {
+        if (QueueCount(&t_head) || QueueCount(&b_head)) result = 5;
+    }
+    else if (QueueCount(&t_head) != 1 || QueueCount(&b_head)) result = 1;
+    else
+    {
+        if (phase)
+        {
+            expected_end = "12/18/2023";
+            expected_desc = "UI changed test";
+            expected_amount = 25.0;
+            expected_count = 4;
+        }
+        else
+        {
+            expected_end = "12/17/2023";
+            expected_desc = "UI recurring test";
+            expected_amount = 12.5;
+            expected_count = 3;
+        }
+        tmpt = t_head.next;
+        if (tmpt->type != BT_INTERVAL) result = 21;
+        else if (tmpt->period != 1.0) result = 22;
+        else if (StrCompare(tmpt->start_date, "12/15/2023")) result = 23;
+        else if (StrCompare(tmpt->end_date, expected_end)) result = 24;
+        else if (tmpt->b.amount != expected_amount) result = 25;
+        else if (StrCompare(tmpt->b.credit, "BANK")) result = 26;
+        else if (StrCompare(tmpt->b.debit, "FOOD")) result = 27;
+        else if (StrCompare(tmpt->b.desc, expected_desc)) result = 28;
+        else
+        {
+            CBgtTemplatesExpand;
+            if (QueueCount(&b_head) != expected_count) result = 3;
+            else
+            {
+                entry = b_head.last;
+                if ((entry->date >> 32) != (Str2Date(expected_end) >> 32) ||
+                    entry->template != tmpt) result = 4;
+            }
+        }
+    }
+    BgtDel;
+    Free(bgt_string_file); Free(bgt_accts_file); Free(bgt_data_file);
+    return result;
+}
+
+I64 BudgetTemplateUiPersistChecks() { return BudgetTemplateUiCheck(0); }
+I64 BudgetTemplateUiEditedChecks() { return BudgetTemplateUiCheck(1); }
+I64 BudgetTemplateUiDeletedChecks() { return BudgetTemplateUiCheck(2); }

@@ -2745,17 +2745,19 @@ not_label:
     return 1;
   }
   if (PrsKw(ccmp, TK_KW_LOCK)) {
-    CRPN *body_start, *body_end, *stmt;
+    CRPN *body_end, *stmt;
     if (ccmp->lex->cur_tok == '{') {
       Lex(ccmp->lex);
       while (ccmp->lex->cur_tok != '}') {
-        body_start = ccmp->code_ctrl->ir_code->next;
+        /* QueIns adds new nodes immediately after the list head. Remember
+         * the first old node so only this statement's nodes are marked. */
+        body_end = ccmp->code_ctrl->ir_code->next;
         if (!PrsStmt(ccmp))
           ParseErr(ccmp, "Expected a statement in lock block.");
-        body_end = ccmp->code_ctrl->ir_code;
         /* AArch64 lowers HolyC's lock block by making each read-modify-write
          * operation in its body use the backend's LDAXR/STLXR retry loop. */
-        for (stmt = body_start; stmt != body_end; stmt = stmt->base.next)
+        for (stmt = ccmp->code_ctrl->ir_code->next; stmt != body_end;
+             stmt = stmt->base.next)
           stmt->flags |= ICF_LOCK_EXPR;
       }
       Lex(ccmp->lex);
@@ -2763,15 +2765,15 @@ not_label:
     }
     /* Stock HolyC also permits `lock expression;` without braces. Parse the
      * expression as a statement and use the same per-operation atomic flag. */
-    body_start = ccmp->code_ctrl->ir_code->next;
+    body_end = ccmp->code_ctrl->ir_code->next;
     if (!ParseExpr(ccmp, 0))
       ParseErr(ccmp, "Expected an expression after lock.");
     if (ccmp->lex->cur_tok != ';')
       ParseErr(ccmp, "Expected a ';' after locked expression.");
     PrsStatementEnd(ccmp);
-    body_end = ccmp->code_ctrl->ir_code;
     /* The backend consumes this flag on supported read-modify-write nodes. */
-    for (stmt = body_start; stmt != body_end; stmt = stmt->base.next)
+    for (stmt = ccmp->code_ctrl->ir_code->next; stmt != body_end;
+         stmt = stmt->base.next)
       stmt->flags |= ICF_LOCK_EXPR;
     return 1;
   }

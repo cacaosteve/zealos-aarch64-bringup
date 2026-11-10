@@ -1,0 +1,72 @@
+{
+  "date": "2026-11-09",
+  "program": "Budget",
+  "target": "Integrated candidate on UTM QEMU framework, AArch64 HVF, one vCPU",
+  "gui_workflow": "PASS NEC USB keyboard/tablet: Budget form create/edit/cancel, save/abort, exit, reopen and cold disk-only persistence; terminal recovery and failed=0.",
+  "template_data": "PASS stock Budget BgtTemplateExpand and BgtTemplatePurge: three daily entries, three monthly entries spanning December to February, purge, and periodic copies with independent account string and expected dates. Test used a disposable virtual disk and wrote no user Budget data.",
+  "fixture": "tests/compat/BudgetTemplates.ZC",
+  "test_evolution": "A first attempt stopped during harness setup after a compiler reset. A subsequent initial assertion incorrectly required bit-identical date/time values; the first date differed by four fractional-day ticks. The pinned date routines include this conversion behavior. The corrected assertion checks calendar-day values, matching the displayed dates.",
+  "sha256": {
+    "build/lock-integrated/budget.log": "83955a6839672ad55e1549efb50209aa3cc2cba07415dd871be89ba09be68302",
+    "build/lock-integrated/budget-uart.log": "b1fc4bd596c104a4714e5ea8b8302b09eeff13e8ef58f1d7912e45c8ee85d9db",
+    "build/lock-integrated/budget-template.log": "e5acbd3bfc486c5184e368056038cb799b5373aee309edab296c6c929b942309",
+    "build/lock-integrated/budget-template-retry.log": "cc3484983131e4d2452f45a481f6447d1a637b6bd115692e3e1161043971d865",
+    "build/lock-integrated/budget-template-diag.log": "30d6f252af42aa6611852220315b332a0df379619ad711ab70c534ca28037310",
+    "build/lock-integrated/budget-template-diag-uart.log": "d16bb16ec381118fcfefac060d6faf48ca1bead6956ccf20a1811ef38209bb15",
+    "build/lock-integrated/budget-template-days.log": "1e05d6c082b992613e28f78b3ae1b2a5471f1a94b4c1b8a2133fa07c524303b9",
+    "build/lock-integrated/budget-template-days-uart.log": "307843a53be4df0cb53a2d6a05ad1329044188d21d0858b3a50dc904eb8527d0"
+  },
+  "limitations": [
+    "Data-level recurring-entry checks do not test the template editing UI, persistent template save/reopen, all recurrence types, or every edge date.",
+    "Automated QEMU results do not resolve the user-reported older live UTM freeze or prove physical Pi behavior."
+  ],
+  "template_persistence_followup": {
+    "result": "pass: one monthly template with account strings and amount was written, released, reopened in the same guest session and expanded to three entries with correct association; a combined expansion and persistence gate also returned 42.",
+    "test_location": "Isolated /Home/BudgetTemplateCheck in a disposable guest disk clone.",
+    "sha256": {
+      "build/lock-integrated/budget-template-persist.log": "f0c1a9ffc98b0e40df91bea5df1e0ae945077c5b5f7878062a67cf9fe15cc49a",
+      "build/lock-integrated/budget-template-persist-uart.log": "45525ad8aad4c3f2e46b13d87debba5566a0ef293631519425f43d0a4e43bb2a",
+      "build/lock-integrated/budget-template-all.log": "4abd5eafa52c12619ea5579702534025d90006f9601460d0ec9303c4ea8cade2",
+      "build/lock-integrated/budget-template-all-uart.log": "f6de9d6615ed9bc82d57c8c3c4fe57dd1736e04aee0e5fd49db42b17ac258ea6",
+      "tests/compat/BudgetTemplates.ZC": "835c4d7dc5d6fdac76670ad65115e46e31123ad01990144a2f461c0ea58dc522"
+    },
+    "limits": "The check uses direct stock Budget data routines; it does not exercise the editing UI, all recurrence types, a cold reboot of the template, a live UTM window, or physical Pi."
+  },
+  "cold_boot_followup": {
+    "result": "pass: saved monthly template data was flushed, the guest process terminated, a fresh guest booted the same disposable disk, and the reader returned 42 after validating the saved template and regenerating three associated entries.",
+    "negative_control": "On a fresh candidate disk without the test directory, the same reader returned 1; it does not manufacture the saved template.",
+    "sha256": {
+      "build/lock-integrated/budget-template-cold.log": "42a3e747b6e68118c4faa1f1fa0713d39df1c7480e27b32703b72abb17925aee",
+      "build/lock-integrated/budget-template-cold-uart.log": "3ff6929a812187ce7a0baa59311767260b71e6a03058b71f57520459515936d8",
+      "build/lock-integrated/budget-template-empty.log": "40fadd49ac78c48e5e0dabc25d3454584f8f44c929c3d4ea944ec7632d6555bf",
+      "build/lock-integrated/budget-template-empty-uart.log": "0466b062d310592146deb0e8c8e267f8553bb8332329a30ec287485b7ecc9a96",
+      "tests/compat/BudgetTemplates.ZC": "b57d887ab9177d1ebbc168749c44d00a7c223e97255724c7c41a7f392e68aa6a",
+      "scripts/check-compat.py": "21efd6bf277171125ff4aeb64d0ea32f3cc57ba36a733da80948f6f3a2a25492"
+    },
+    "limits": "Direct data routines on one virtual disk; does not verify template UI, other recurrence types, live UTM, or physical Pi. A guest-level flush was confirmed before QEMU termination; this is not a simulated power loss during a write."
+  },
+  "template_ui_cold_boot_followup": {
+    "result": "pass: original Budget NewTemplate shortcut opened interval form; emulated NEC USB input entered a three-day range and period, then filled account, amount and description in entry form. After saving, an independent guest task reloaded and checked the persisted template and three expanded entries. After flush, guest termination and cold reboot, the reader returned 42 again; Budget visibly displayed the recurring entry and Escape returned to a working terminal with failed=0.",
+    "target": "UTM QEMU framework with HVF, 1 vCPU, VirtIO storage and NEC USB keyboard/tablet; disposable disk clone",
+    "sha256": {
+      "build/lock-integrated/budget-template-ui.log": "016bd330480dca40ac5456b51d0771485014a864c2d3ab2935891638c8cc63d2",
+      "build/lock-integrated/budget-template-ui-uart.log": "872da4f94d241eec6d6cb144d523eb987412616c576a8ef1f2092dbe2f270d43",
+      "tests/compat/BudgetTemplateUiPersist.ZC": "ee07b09d69c6bb8d956dabd715fa65b837c82bd424560d3f8a33610dc5a3b23e",
+      "scripts/check-compat.py": "3872c0d9084d42c6e787ae2d4dbb8185ba4dbf1c0dc08da591468db29fafdf2e"
+    },
+    "limits": "One interval template creation and reopen path only. Does not verify UI template editing/deletion, other recurrence types, live UTM or physical Pi. The reboot occurred after an acknowledged disk flush, not during a write."
+  },
+  "template_ui_edit_delete_followup": {
+    "result": "pass: created and saved an interval template through the Budget UI, verified it after cold boot, edited its end date, amount and description, saved and verified all four generated daily entries with an independent guest task, reopened the edited template, deleted it with Ctrl-Y, verified template and generated entries were absent, then flushed and cold-booted again to verify the empty state persisted. The terminal returned to 40+2=42 and zstatus reported failed=0.",
+    "target": "UTM QEMU framework with HVF, 1 vCPU, VirtIO storage and NEC USB keyboard/tablet; disposable disk clone",
+    "test": "make check-budget-template-edit",
+    "test_evolution": "An initial attempt used unsupported ZealC conditional-expression syntax in the fixture. A later attempt omitted reloading the form-point helper after reboot. Field assertions then showed that replacing the description with shorter text leaves the previous trailing characters, consistent with in-place text editing; the automated test now presses Delete to clear them before accepting the field.",
+    "sha256": {
+      "build/lock-integrated/budget-template-edit6.log": "d79f04a78ccb1cf1a62b51983569064b468beffc2e82cbdcd9cb53d8f11edbe0",
+      "build/lock-integrated/budget-template-edit6-uart.log": "3efe5ffa688712baf94f9e0bd7b5248b69d8b38d108ed3543ecd676c7aff137b",
+      "tests/compat/BudgetTemplateUiPersist.ZC": "c7d156b8cd21f093d0bd53d3e5cd261ac48ce67eedf11c7a355496a2e7f78973",
+      "scripts/check-compat.py": "fcc202ca9d95dcf3e332cee4021452100423ba40393a9b7af15657bda73d5f15"
+    },
+    "limits": "One interval recurrence and one description edit path in a disposable UTM QEMU disk. Does not verify every recurrence type, account editing, live UTM UI, or physical Pi behavior. Disk flush completed before each cold restart."
+  }
+}

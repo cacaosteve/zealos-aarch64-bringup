@@ -1,0 +1,119 @@
+{
+  "date": "2026-11-09",
+  "scope": "Native ARM64 ZealC compiler, locked pointer updates; UTM-bundled QEMU with HVF, one virtual CPU",
+  "failure": "The unmodified installed candidate returned 1 when a locked U32 pointer increment should have carried 0x0000ffff to 0x00010000. A separate check returned 1 for unsigned U16 arithmetic above its sign bit.",
+  "change": "Use a 32-bit store-exclusive for 32-bit locked updates and select unsigned zero-extension by U16/U32 type in both supported indirect-address modes.",
+  "result": "On a disposable copy of the candidate disk with the rebuilt kernel, the carry/adjacent-word check and a combined unsigned U16/U32 and existing I64 lock check each returned 42. The copied kernel was read back with an identical SHA-256.",
+  "test": "tests/compat/LockWidthRuntime.ZC; make check-lock-width reproduces the combined test against a built image.",
+  "limitations": [
+    "Single-vCPU execution does not prove atomicity under contention or SMP support.",
+    "The test exercises pointer updates and does not exhaust all locked operators or addressing modes.",
+    "No live UTM window or physical Pi verification; the Pi card and installed candidate disk were not modified.",
+    "This does not implement the pinned scheduler or address MessageScan behavior."
+  ],
+  "sha256": {
+    "build/lock-width-before.log": "b87cd148660fc52d22a553b2884a6ed532c02d8859fd31c9eae20882d4fe21a0",
+    "build/lock-width-before-uart.log": "14a3134298c0d0d400ab6d0b2b1e2ac52c0d909bfbd16101cee7044baabe9d69",
+    "build/lock-signedness-before.log": "95ee1d304bef13ea1c34fb67c58255fb65fd235246428395cff61d4b0b8d11a2",
+    "build/lock-signedness-before-uart.log": "593afe831c1dc3b7eb6c7f1f758f63d94ecf896e3987307d8e548970fb78f152",
+    "build/lock-width-after.log": "7d5ed15347bb5071d8a2ac43f8a7c56f0c878586aef5b1e80ad996b115366d2d",
+    "build/lock-width-after-uart.log": "1f56c82e931012bd34f4bf92c8b8e7bb66d5747f5d97a3fed89cda7f147a84bf",
+    "build/lock-signedness-after.log": "d9a97e05f927188241c12d0d29d1754ca7317d342e935af85ded54b7bc02c490",
+    "build/lock-signedness-after-uart.log": "248a8a1a7411c04d6f86ff9061e03400db036bc7f0c00bb2ece2bc285cbced17",
+    "build/kernel.elf": "83829ca941f99cd5e5e8ba66dc99b19a68981a0f056a05acf4c07deebd947de9",
+    "build/lock-width-test.img": "6315a7c7122e2b66e2bdca53945323fee76e350a1db269ec232ada2f4b5eefc7",
+    "tests/compat/LockWidthRuntime.ZC": "b6d2ba5e686ea68f91c3347909d9602d74408566aa10a608bbf86a6f1015ba24",
+    "third_party/aiwnios/c/arm_backend.c": "f0d984e9cadd8f8066e68aa7583083fdb3097ae77cf060b6cf99780109e46a7b"
+  },
+  "increment_decrement_followup": {
+    "before": "The width-fixed kernel returned 1: a locked postfix increment through an I64 pointer did not update the target.",
+    "change": "Use the loaded value instead of the address in the exclusive increment/decrement loop. Preserve the loaded value as the postfix expression result and the computed value as the prefix result.",
+    "after": "The initial I64 increment/decrement and return-value probe returned 42. A separate combined run of U16, U32, and I64 increment cases, the width/carry checks, and the existing I64 lock check returned 42 and reset the compiler.",
+    "sha256": {
+      "build/lock-incdec-before.log": "b46f532e4633796414b5feb8e0e9e407a52b08d5fed452d970c0d66fbb54e977",
+      "build/lock-incdec-before-uart.log": "cee815fad4ff26aaa2801ed1ffb15d330b00245a7470ca4bdba5aa8df4b85d1b",
+      "build/lock-incdec-after.log": "003df54e0c46e5cfc7d8f35ce0cde6c4c5f21b9a8db0436c252294ea6da652a7",
+      "build/lock-incdec-after-uart.log": "9450c090f1b44246a5e29fa4e206064adade3ed30becf837dbe996ef6fdd9009",
+      "build/lock-regression-after.log": "18771d2cfec7407941180b874b1e7866afcf002f4c4be3089a86935cd42d416c",
+      "build/lock-regression-after-uart.log": "ed3cb084ba997203b174e4e10e26891714a7431fc5fc9376b92c2b5e3b0dbdbf",
+      "build/lock-incdec-test.img": "3fa74f6e11e7df70bbe3317de5543fad8f7f4099b8cbcafcbbf9d127083af89d",
+      "build/lock-incdec-readback.elf": "81854a1255eb9cb003c2886c1769ad9cafd97c65297d6ffa358f0af875e279a0",
+      "tests/compat/LockIncDecRuntime.ZC": "e631458ac684329e5dd14834610b0db6da86840fce3f8085723b042483955c37",
+      "tests/compat/LockRegression.ZC": "30d954dfba83491d5d3e1743a040537fb1cd4132f6a33d1844a531985b8ec2bf",
+      "third_party/aiwnios/c/arm_backend.c": "14c09cf77235c652c7d7ff447cde1ae0737dca40204f4c4c951706aa71183018"
+    },
+    "limits": "One virtual CPU and pointer-address cases only; no proof of exclusive retry under contention, SMP, all operand widths/operators, live UTM, or Pi hardware."
+  },
+  "instruction_encoding_followup": {
+    "architecture_references": [
+      "https://support.arm.com/documentation/ddi0602/2025-12/Base-Instructions/STLXRB--Store-release-exclusive-register-byte-?lang=en",
+      "https://support.arm.com/documentation/dui0802/a/A64-Data-Transfer-Instructions/LDAXR",
+      "https://support.arm.com/documentation/ddi0487/mb/-Part-B-The-AArch64-Application-Level-Architecture/-Chapter-B2-The-AArch64-Application-Level-Memory-Model/-B2-12-Synchronization-and-semaphores/-B2-12-5-Load-Exclusive-and-Store-Exclusive-instruction-usage-restrictions"
+    ],
+    "baseline": "Instruction inspection returned 1 on the prior candidate because store-exclusive status overlapped data; functional QEMU results alone did not reveal the architecturally constrained encoding.",
+    "first_change": "Resolve the target address before the retry loop and use marked-clobbered x16 as a distinct store-exclusive status register; branch on x16 back to the exclusive load.",
+    "acquire_negative_control": "After that change, instruction inspection returned 5 because the helper named LDAXR emitted the non-acquire LDXR encoding. LLVM llvm-mc independently gave ldaxr x0,[x1] as c85ffc20 and ldxr x0,[x1] as c85f7c20.",
+    "final_change": "Encode the load-acquire bit in the exclusive-load helper.",
+    "final_result": "Combined functional regression and generated-instruction inspection returned 42. The check verifies distinct status/data/base registers, a backward retry to a same-width acquire exclusive load and the same base register for the selected generated function.",
+    "sha256": {
+      "build/lock-encoding-before.log": "518b144d97b70a4d2f50aa4c2e004522e3b46a0159eaa242023e40e10f01eb46",
+      "build/lock-encoding-before-uart.log": "565bc14a267a466dcdb4fea4b3b300ef3ca3e31dd2859af4576d31d30976cb29",
+      "build/lock-encoding-after.log": "2a2b352ed78268a2d66497b1aeaa3687fec45adc038d8850d6d53dec3edca0c3",
+      "build/lock-encoding-after-uart.log": "afa82ba8d36e2f42a4c05449ae73e722e1f6ebc10a834fedd7339db8c3d1f469",
+      "build/lock-acquire-before.log": "8ab15bc1b9dc6461cd688ddbbe365e83f712ee5a657a1f690547fa01d121ff4f",
+      "build/lock-acquire-before-uart.log": "67665af7cd13fc962b6897e41a01bbb2a8ec782abc23cb0330b579240ed6fd94",
+      "build/lock-acquire-after.log": "acecdf4d85dc7f9b12897b0fedde3d61c44cba912f80f4eb6d45182f8e5e0ece",
+      "build/lock-acquire-after-uart.log": "40c10648d5f8fb782bfc5282924405147cc37886320636bd0137f2595517c590",
+      "build/lock-acquire-readback.elf": "4e2a3c3b2043aea4d5a2df75fc3468038ef3a2ebd054df6f72bc6e4d81f274a9",
+      "build/lock-acquire-test.img": "64e83e7eb9d02617b5448f1616d38946d8d7c33f21ce3d8fb273cb399469dcef",
+      "tests/compat/LockRegression.ZC": "ab38848111ed5d7ee9e6097f9f65c08ea185b75da7ec36214cdff29cbfc34226",
+      "third_party/aiwnios/c/arm_backend.c": "79a5c96df7bb328ed198cf80cd8e98e9b7daed685bc995dee5e38666c0b5f83f",
+      "third_party/aiwnios/c/arm64_asm.c": "774674d2aa042aa9e13a95206192aea438fcde50fda493006ef4900f3b0895a9"
+    },
+    "limits": "One virtual CPU: encoding inspection and functional execution do not prove real SMP contention, all code-generation cases, or live UTM/Pi behavior. The Pi card and original candidate disk were not modified."
+  },
+  "parser_and_exclusive_window_followup": {
+    "initial_observation": "A simple instruction inspection found no ordinary memory accesses inside its exclusive window; it did not reproduce the potential spill problem.",
+    "negative_control": "A function-call argument containing a locked postfix update produced no store-exclusive instruction on the previous kernel; the instruction check returned 102 (100 + missing instruction).",
+    "parser_change": "Mark the newly inserted instruction-list nodes for each lock statement instead of marking pre-existing nodes. The list inserts new nodes immediately after the head.",
+    "backend_change": "Move publication of prefix, postfix, and compound-update expression results after the successful store-exclusive; preserve the postfix old value in a register on each retry.",
+    "result": "On the rebuilt one-vCPU UTM QEMU framework candidate, the combined regression returned 42. It checks nested postfix in a function call, prefix/postfix values, unsigned widths, acquire/release encodings, retry target, and no ordinary memory operations between the tested exclusive pair. A separate boundary case verifies exactly two exclusive stores for adjacent braced and unbraced lock statements, with ordinary increments surrounding them.",
+    "sha256": {
+      "build/lock-window-before.log": "184621d0d3dcd383a9d0f32d6278ba1f6b1e68a99643e5077a72dcca79424f16",
+      "build/lock-spill-before.log": "67073a3ad0c4aade97afc1223ea73162939b4aebad10e573ce9f07bcd54a3902",
+      "build/lock-spill-before-uart.log": "72fbd33c80f83990ac9930b2c14af077f7cb1b9e369bf5e78fbf6815f34ec461",
+      "build/lock-parser-after.log": "b8284aae0f3649297bad2316dc2b3d3618bd1e87820089e7d76f5ae46263ee24",
+      "build/lock-parser-after-uart.log": "64d3576f8704c20d8ed488b12555db67f6fd3238651597b2a8b48d04aa05bcf8",
+      "build/lock-boundary2-after.log": "68a64fb3de188dadfb7e1113e8fdb504e6c6d81565dc4826a7c9281e3047af68",
+      "build/lock-boundary2-after-uart.log": "6c2123737400018dde91125d46ba4c7d16dd17990cee23e4a7895694567f49ab",
+      "build/lock-parser-test.img": "a9dcf6e2b9eec0788ba894e4519311eca0a174c6c1d541f7d9e625456285f3c5",
+      "build/lock-parser-readback.elf": "3396d613ebb73653a352c6e6392379593d019e23e4baa398daa078bf5f4f1acd",
+      "tests/compat/LockRegression.ZC": "91c17e62af1d43d07487c0d06ddabaeac95c88f7ec9183dae3d06947d90de7f9",
+      "tests/compat/LockIncDecRuntime.ZC": "57702339de26fbb55a82b032c10a820f5b27f269d9f49750db7a8decdad56728",
+      "third_party/aiwnios/c/parser.c": "eb7a3cd93ca460e73790309bbf8e655fa4d364da7323e719ce76f302852d65dd",
+      "third_party/aiwnios/c/arm_backend.c": "173effb4b8c48de639d3deaa0c9295867a9baa7f2a3bb42c4f658788bb971805"
+    },
+    "limits": "Instruction inspection covers the tested generated functions, not every expression or operator. No forced exclusive-store failure, multicore contention, live UTM window, or physical Pi test. Source and installed candidate disk remained unchanged on hardware."
+  },
+  "global_local_address_followup": {
+    "before": "The preceding kernel returned 3302: functional global updates ran but the instruction check did not find the two required store-exclusive operations.",
+    "change": "Reuse address normalization for static, frame, and absolute-pointer lvalues in prefix, postfix, constant compound, and nonconstant compound locked paths.",
+    "after": "UTM-framework QEMU returned 42 for global and address-exposed stack-local compound increment and postfix increment, including instruction inspection; prior pointer, signedness, width, and parser-boundary checks also passed. A separate TaskMessageSchedulingChecks returned 42.",
+    "sha256": {
+      "build/lock-global-before.log": "402182eefff1d9902ad420cbf45b34e68b3349fef76f9129a927e533929094ef",
+      "build/lock-global-before-uart.log": "9d0e6c89df1917e9e116b3c91ac054dcd5d27f20524da5ba11a57d7bf1bdb2b2",
+      "build/lock-global-after.log": "b2315c64622e9b2136bad33acc189a328c7b88b3325568254d3d0549db5820f8",
+      "build/lock-global-after-uart.log": "75be595bbef1c60fb3bb48eaeff0148a0b38b80c81d88902d3c5add2e19d60d6",
+      "build/lock-local-after.log": "68a64fb3de188dadfb7e1113e8fdb504e6c6d81565dc4826a7c9281e3047af68",
+      "build/lock-local-after-uart.log": "4b8e17a5517cdaed453b34e308e4f3afbe8d42369a3eb8fa6d726776ce30586c",
+      "build/lock-scheduler-after.log": "a8b3866eccbdbe2b68833b5222f98f58277ef62d3ce4dbd73224d59481360a60",
+      "build/lock-scheduler-after-uart.log": "6960285fe5306b92a98fd995f94afa1afd7bd8768df839ee1d40d155673b7be9",
+      "build/lock-global-test.img": "1370178f5541f91e0e61b0780d8a62af049e5f76abca721f2c3715c1e1db34e5",
+      "build/lock-global-readback.elf": "83493f3e7a3998b53b5641d3e95e5b1174bdfea26d984fcdced4c7d9bb9f8046",
+      "tests/compat/LockBlockRuntime.ZC": "ad68e3c05b10a87fcec163a6265cfe4842a143caafa6a26238e63e437eaae76a",
+      "tests/compat/LockRegression.ZC": "93b515548a491d6bb5ec977c20f94b2e754520c9978a3993509ff10f78cba8a4",
+      "third_party/aiwnios/c/arm_backend.c": "75d2c111baf7451c5ee434210c02ab7de7447a778b4fa54056152d6a58c7ea4d"
+    },
+    "limits": "Single-vCPU tests with selected integer operators; do not establish forced exclusive failure, multicore contention, all address modes, actual live UTM or physical Pi behavior. MessageScan and scheduler implementation were not modified."
+  }
+}

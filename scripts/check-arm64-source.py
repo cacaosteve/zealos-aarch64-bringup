@@ -5,6 +5,7 @@ import re
 import struct
 import sys
 from arm64_source import extract_keyboard_helpers
+from arm64_source import translate_docputs_exception_cleanup
 from arm64_source import extract_string_utilities
 from arm64_source import (extract_sprite_elem_base_sizes, inject_sprite_elem_base_sizes,
                           extract_sprite_interpolation, inject_sprite_interpolation,
@@ -474,6 +475,8 @@ for ai_name in ('Human.ZC', 'SimpleAI.ZC'):
         expected_ai_source = ai_source.replace(
             b'for (i = 0; i > UNITS_NUM; i++)',
             b'for (i = 0; i < UNITS_NUM; i++)', 1)
+        expected_ai_source = expected_ai_source.replace(
+            b'!Bt(&target->vis, 0)', b'!Bt(&target->vis[cur_player], 0)', 1)
         assert ai_overlay.startswith(expected_ai_source)
     else:
         assert ai_overlay.startswith(ai_source)
@@ -486,6 +489,8 @@ for ai_name in ('Human.ZC', 'SimpleAI.ZC'):
         assert b'for (i = 0; i > UNITS_NUM; i++)' in ai_source
         assert b'for (i = 0; i < UNITS_NUM; i++)' in ai_overlay
         assert ai_overlay.count(b'for (i = 0; i < UNITS_NUM; i++)') == 1
+        assert ai_source.count(b'!Bt(&target->vis, 0)') == 1
+        assert ai_overlay.count(b'!Bt(&target->vis[cur_player], 0)') == 1
     else:
         assert b'for (i = 0; i > UNITS_NUM; i++)' not in ai_overlay
 try:
@@ -1422,3 +1427,19 @@ except ValueError:
 else:
     raise AssertionError('DocPopUp overlay accepted changed source metadata')
 print('PASS guarded DocPopUp overlay retains text and packed document include paths')
+
+docputs_source = (root / 'upstream/pinned/System/DolDoc/DocPutS.ZC').read_bytes()
+docputs_overlay = translate_docputs_exception_cleanup(docputs_source)
+partial = docputs_overlay.split(b'public U0 DocPrintPartial(', 1)[1].split(b'\nBool KDDocPutS(', 1)[0]
+assert b'catch\n\t{' in partial and b'throw(except_ch);' in partial
+assert b'if (unlock)\n\t\t\tDocUnlock(doc);\n\t\tFree(buf);' in partial
+assert partial.index(b'try\n\t{') < partial.index(b'(*doc->user_put_s)')
+assert b'Free(buf);\n\t\tbuf = NULL;' in partial
+assert b'if (!(doc->flags & DOCF_DONT_SWAP_OUT))\n\t\tYield;' in partial
+try:
+    translate_docputs_exception_cleanup(docputs_source.replace(b'unlock = DocLock(doc);', b'unlock = OtherLock(doc);'))
+except ValueError:
+    pass
+else:
+    raise AssertionError('DocPrintPartial overlay accepted changed locking')
+print('PASS guarded DocPrintPartial cleanup preserves its conditional yield')

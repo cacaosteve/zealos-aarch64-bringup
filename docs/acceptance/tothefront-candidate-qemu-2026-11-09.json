@@ -1,0 +1,61 @@
+{
+  "date": "2026-11-09",
+  "program": "ToTheFront",
+  "target": "QEMU AArch64 virt, HVF, one vCPU, PCI storage and VirtIO input",
+  "disk": "build/candidate-install-disk.img",
+  "disk_sha256": "1ec363d1c1d37a5f001f94090457ec89a8969c8396d7e8acc51cc239b4f66236",
+  "command": "ZEAL_TEST_DISK=build/candidate-install-disk.img QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device' python3 -u scripts/check-compat.py --pci --quick --probe-tothefront",
+  "result": "pass for setup and one artillery order",
+  "checks": [
+    "Accepted default seed, selected Human for both players and dismissed help.",
+    "Rendered the generated map, selected an artillery unit and showed its yellow range.",
+    "Plotted an order into an adjacent hex, advanced a phase with Space and returned through Escape to a terminal evaluating 40+2 as 42.",
+    "zstatus reported zero failed tasks."
+  ],
+  "test_change": "Wait three seconds after map rendering before using the yellow range baseline; the initial Turn banner uses the same color.",
+  "diagnostics": "The terminal input harness retried graphical input before confirming the exact launch command. An earlier separate movement investigation used an inaccessible app-private variable and is not counted as a movement check. An older default disk failed its seed prompt; this test uses the newer candidate.",
+  "log": "build/tothefront-candidate-clean.log",
+  "log_sha256": "e77a01b384e4002120fe33b9ea9cfa300ecf93a4807794a5d2cd0a0213d63ed1",
+  "limitations": [
+    "Broader direct fire, a full match and AI behavior remain unverified. One controlled direct-fire interaction per player passed with the later source overlay, as detailed below.",
+    "QEMU result does not establish live UTM or Pi behavior."
+  ],
+  "movement_followup": {
+    "result": "pass",
+    "method": "A disposable candidate-disk copy has reporting-only additions to Human.ZC that choose a legal adjacent move and print the unit grid coordinates before and after. The harness drove the actual mouse-down, drag and mouse-up path. The shipped candidate disk and source remain unchanged.",
+    "setup": "Extract boot/sources.tar from build/zealos-aarch64-candidate-2026-11-09.iso and run python3 scripts/prepare-tothefront-move-test.py --disk build/candidate-install-disk.img --sources build/tothefront-candidate-sources.tar --output build/tothefront-instrumented-repro.img. Recreated source matched tested fixture byte-for-byte.",
+    "command": "ZEAL_TEST_DISK=build/tothefront-instrumented.img QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device' python3 -u scripts/check-compat.py --pci --quick --probe-tothefront-move-diag",
+    "checks": [
+      "Selected artillery and plotted an order, then advanced past the second artillery phase.",
+      "The game reported a legal move for unit 0 from grid cell (17,4), with screen drag (163,179) to (163,160).",
+      "After mouse input the game reported unit 0 moved from (17,4) to (15,4).",
+      "Escape returned to the graphical terminal; 40+2 returned 42 and zstatus reported failed=0."
+    ],
+    "fixture_sha256": "49c145ce64e971f94698bfbebb20a441492b107609655f5e11fbeac8ea3a4194",
+    "test_disk_sha256": "a0c739221025714c533c30939b8142ec089a2a0c987fa9f0f38fe09ec4c5de55",
+    "log": "build/tothefront-move-instrumented2.log",
+    "log_sha256": "9d3dddcce46c55fd841e5a272d425b96d9ac67448c2719d18e619bf86771b9e3",
+    "limitations": "The fixture changes the game source to report state and select an eligible move; this is not an unmodified-binary movement test. One legal move is covered, not direct fire, AI, a complete match, or live UTM/Pi."
+  },
+  "direct_fire_followup": {
+    "date": "2026-11-09",
+    "result": "pass with source overlay; baseline reproduces player 2 failure",
+    "method": "A disposable instrumented disk places a live enemy unit in a legal adjacent empty cell for each side, clears old visibility flags and reports selected units and fire result. Actual selection, visibility recalculation and firing use the game mouse-input path.",
+    "baseline": "Player 0 fired; player 1 reported fired=0 with visibility flags 0,1, showing the original condition used the other player's flag.",
+    "baseline_log": "build/tothefront-direct-baseline2.log",
+    "baseline_log_sha256": "a2f4317fe893a18e50d021bfbb5603afd928fdec12beaa68f9cbde001e8d19ad",
+    "fix": "The Human AI source overlay uses target->vis[cur_player] in the direct-fire test. The new source bundle differs from the earlier candidate bundle only in this check.",
+    "fixed_result": "Both player 0 and player 1 fired, followed by Escape, terminal 40+2 = 42 and zstatus failed=0.",
+    "fixed_log": "build/tothefront-direct-fixed.log",
+    "fixed_log_sha256": "ee67d7cabb62c06f9198e100c49a0b2478b970e316c10c6c6488969a4b1856a0",
+    "fixed_bundle": "build/sources-direct-fix.tar",
+    "fixed_bundle_sha256": "d5646abf79ef090f838cc704f3c982c527c81843bd41c00595a14a644f909c19",
+    "fixture": "python3 scripts/prepare-tothefront-move-test.py --disk build/candidate-install-disk.img --sources build/tothefront-candidate-sources.tar --output build/tothefront-direct-fixed.img --direct-fire --fix-visibility",
+    "command": "ZEAL_TEST_DISK=build/tothefront-direct-fixed.img QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device' python3 -u scripts/check-compat.py --pci --quick --probe-tothefront-fire-diag",
+    "limitations": [
+      "The controlled fixture relocates opponents and modifies the source for reporting; it does not prove firing in a natural full match.",
+      "An uninstrumented source-volume regression was attempted twice: the first could not select overlapping artillery markers; the second exhausted graphical launcher input retries. Neither establishes a game failure or a clean uninstrumented pass.",
+      "The earlier candidate ISO does not include this fix; live UTM and Pi remain unverified."
+    ]
+  }
+}

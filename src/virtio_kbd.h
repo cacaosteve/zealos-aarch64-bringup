@@ -101,6 +101,10 @@ struct vk_dev {
 __attribute__((aligned(4096))) static uint8_t g_vk_dma[8192];
 static struct vk_dev g_vk;
 static uint8_t g_vk_ring[64];
+/* Preserve modifiers at key-down: they may already be released by the time
+ * the bootstrap shell examines its byte queue. */
+static uint8_t g_vk_ring_alt[64];
+static int g_vk_gui_ctrl_c_pending;
 static unsigned g_vk_rh, g_vk_rt;
 static struct vk_msg g_vk_msg[32];
 static unsigned g_vk_mh, g_vk_mt;
@@ -137,10 +141,11 @@ static uint8_t vk_cfg_size(volatile uint32_t *m, uint8_t select, uint8_t subsel)
     return cfg[2];
 }
 
-static void vk_ring_push(uint8_t b) {
+static void vk_ring_push(uint8_t b, uint8_t alt) {
     unsigned n = (g_vk_rh + 1) % sizeof(g_vk_ring);
     if (n != g_vk_rt) {
         g_vk_ring[g_vk_rh] = b;
+        g_vk_ring_alt[g_vk_rh] = alt;
         g_vk_rh = n;
     }
 }
@@ -328,7 +333,7 @@ static void vk_decode_key(struct vk_dev *d, struct vk_event ev) {
     if (d->ctrl) sc_flags |= 1 << 10; /* SCF_CTRL */
     if (d->alt) sc_flags |= 1 << 11; /* SCF_ALT */
     if (pressed) {
-        vk_ring_push((uint8_t)ch);
+        vk_ring_push((uint8_t)ch, !!d->alt);
     vk_msg_push(2, (uint64_t)(int64_t)ch,
                 vk_linux_to_scan_event(ev.code, ev.code) |
                 (uint64_t)(unsigned)sc_flags); /* MESSAGE_KEY_DOWN */
@@ -416,6 +421,7 @@ static int virtio_kbd_init(uint64_t hhdm) {
     g_vk.ready = 0;
     g_vk.shift = g_vk.ctrl = g_vk.alt = 0;
     g_vk_rh = g_vk_rt = 0;
+    g_vk_gui_ctrl_c_pending = 0;
     g_vk_key_event_count = 0;
     g_vk_last_key_code = 0;
     g_vk_last_key_value = 0;
@@ -581,8 +587,12 @@ static int virtio_kbd_getc_nb(void) {
  * for the focused ZealOS task's GetKey path. */
 static int virtio_kbd_take_ctrl_c(void) {
     vk_poll();
+    if (g_vk_gui_ctrl_c_pending) {
+        g_vk_gui_ctrl_c_pending = 0;
+        return 1;
+    }
     for (unsigned i = g_vk_rt; i != g_vk_rh; i = (i + 1) % sizeof(g_vk_ring)) {
-        if (g_vk_ring[i] == 3) {
+        if (g_vk_ring[i] == 3 && !g_vk_ring_alt[i]) {
             unsigned j = i;
             unsigned next;
             for (;;) {
@@ -590,6 +600,7 @@ static int virtio_kbd_take_ctrl_c(void) {
                 if (next == g_vk_rh)
                     break;
                 g_vk_ring[j] = g_vk_ring[next];
+                g_vk_ring_alt[j] = g_vk_ring_alt[next];
                 j = next;
             }
             g_vk_rh = (g_vk_rh + sizeof(g_vk_ring) - 1) % sizeof(g_vk_ring);

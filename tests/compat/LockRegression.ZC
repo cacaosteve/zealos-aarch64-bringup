@@ -1,0 +1,78 @@
+extern I64 LockWidthAllChecks();
+extern I64 LockIncDecRuntimeChecks();
+extern I64 LockSpillProbe();
+extern I64 LockBoundaryProbe();
+extern I64 LockGlobalInstructionProbe();
+extern I64 LockLocalInstructionProbe();
+
+I64 LockCheckCode(U32 *code, I64 minimum)
+{
+    I64 i, j, count = 0, status, data, base, offset, target;
+    U32 ins, branch, load;
+    for (i = 0; i < 2048; i++)
+    {
+        ins = code[i];
+        // STLXRB/H and 32/64-bit STLXR share this encoding pattern.
+        if ((ins & 0x3FE0FC00) == 0x0800FC00)
+        {
+            status = (ins >> 16) & 31;
+            base = (ins >> 5) & 31;
+            data = ins & 31;
+            if (status == data || (status == base && base != 31)) return 1;
+            branch = code[i + 1];
+            if ((branch & 0x7F00001F) != (0x35000000 | status)) return 3;
+            offset = (branch >> 5) & 0x7FFFF;
+            if (offset & 0x40000) offset -= 0x80000;
+            target = i + 1 + offset;
+            if (target < 0 || target >= i) return 4;
+            load = code[target];
+            // The retry must return to a same-width acquire load of the
+            // same address, rather than recalculating an indexed address.
+            if ((load & 0x3FFFFC00) != 0x085FFC00) return 5;
+            if ((load >> 30) != (ins >> 30) || ((load >> 5) & 31) != base)
+                return 6;
+            // Keep ordinary loads/stores out of the exclusive window.
+            for (j = target + 1; j < i; j++)
+                if ((code[j] & 0x0A000000) == 0x08000000) return 7;
+            count++;
+        }
+        if (ins == 0xD65F03C0) break;
+    }
+    if (i == 2048 || count < minimum) return 2;
+    return 42;
+}
+
+I64 LockInstructionChecks()
+{
+    U32 *code = &LockBoundaryProbe;
+    I64 i, count = 0;
+    I64 result = LockCheckCode(&LockIncDecRuntimeChecks, 6);
+    if (result != 42) return result;
+    result = LockCheckCode(&LockSpillProbe, 1);
+    if (result != 42) return 100 + result;
+    result = LockCheckCode(code, 2);
+    if (result != 42) return 200 + result;
+    result = LockCheckCode(&LockGlobalInstructionProbe, 2);
+    if (result != 42) return 300 + result;
+    result = LockCheckCode(&LockLocalInstructionProbe, 2);
+    if (result != 42) return 400 + result;
+    for (i = 0; i < 2048 && code[i] != 0xD65F03C0; i++)
+        if ((code[i] & 0x3FE0FC00) == 0x0800FC00) count++;
+    if (i == 2048 || count != 2) return 250;
+    return 42;
+}
+
+I64 LockRegressionChecks()
+{
+    I64 result = LockWidthAllChecks;
+    if (result != 42) return 1000 + result;
+    result = LockIncDecRuntimeChecks;
+    if (result != 42) return 2000 + result;
+    result = LockGlobalInstructionProbe;
+    if (result != 42) return 2500 + result;
+    result = LockLocalInstructionProbe;
+    if (result != 42) return 2600 + result;
+    result = LockInstructionChecks;
+    if (result != 42) return 3000 + result;
+    return 42;
+}

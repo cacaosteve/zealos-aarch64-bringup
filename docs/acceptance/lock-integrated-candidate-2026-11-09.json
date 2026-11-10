@@ -1,0 +1,97 @@
+{
+  "date": "2026-11-09",
+  "candidate": "Fresh standalone UTM ISO and separate Pi desktop/recovery payload including ARM64 locked-update fixes",
+  "utm": "UTM QEMU framework HVF one CPU with NEC USB CD, keyboard, tablet and VirtIO disk: live boot, unconfirmed install left disk untouched, confirmed installation read-back verified, byte-identical target, disk-only boot, Stadium generation and readback, persistent source write, second disk-only reboot and persisted return 42 all passed.",
+  "sound": "Separate UTM-framework VirtIO input/sound run: FlapBat gameplay and Space input, nonzero WAV audio, Escape, stopped tone and song task, and working terminal passed. The WAV contained 550368 nonzero signed samples at 44100 Hz, peak 7000.",
+  "pi": "Separately built Pi desktop/recovery payload passed check-pi-desktop-image.py structural checks on ELF identity, load boundaries, boot config, and 1042 source modules. No card writes or hardware boot were performed.",
+  "integrity": "scripts/check-upstream.py passed after the port patch was regenerated from the exact pinned Aiwnios commit and its manifest hashes checked; scripts/check-arm64-source.py passed.",
+  "limitations": [
+    "Emulation and captured PCM do not prove sound from a live UTM session or its real-time fidelity.",
+    "The current Pi payload is not physically validated; previous Pi HDMI song report was on an unverified older image.",
+    "No live UTM or Pi validation of the new compiler fixes; no proof of SMP contention or complete ZealOS program compatibility.",
+    "Pi writable SD/USB storage remains a separate uncompleted feature."
+  ],
+  "sha256": {
+    "build/lock-integrated/zealos-aarch64.iso": "58ba5d324b6eeb6f7b52e8f346b354ec329d8d0830ff2cd2fd83926e226ac3df",
+    "build/lock-integrated/disk.img": "57ae06d9c10d1c95bd29d8c03aecfaf1476cf9d6777421f0631b2ccf65741bc0",
+    "build/lock-integrated/install.img": "5923a73e653156fabd77f03fb3e8c7f142343dbb31582d53eeefa95484913757",
+    "build/lock-integrated/kernel.elf": "9057f2b95ec453c3efaa7d6b2b3ea4fa5a162b8ff1029bfc6ad139748e5c5fd0",
+    "build/lock-integrated/kernel-pi-desktop.elf": "6ad174c794b18991c17253c29d7a70bbc2f227711e0e4faa9e17a2e66f2ea326",
+    "build/lock-integrated/sources.tar": "6457ae3f197ffccd2bf795c2b9fa1458a5b0ffdc7a6f29a43a0a1a000b830daf",
+    "build/lock-integrated/pi-payload/boot/kernel.elf": "6ad174c794b18991c17253c29d7a70bbc2f227711e0e4faa9e17a2e66f2ea326",
+    "build/lock-integrated/pi-payload/boot/kernel-diag.elf": "2af5238ac275a1277bbd9b0ab75a47325925c4658a02edaa1d0841cbece4068b",
+    "build/lock-integrated/pi-payload/boot/zealbooter.elf": "3da84dcb4c5dfb2a292c529111e813497fd89f52462db71618622c523b5500f5",
+    "build/lock-integrated/pi-payload/boot/sources.tar": "6457ae3f197ffccd2bf795c2b9fa1458a5b0ffdc7a6f29a43a0a1a000b830daf",
+    "build/lock-integrated/pi-payload/boot/demo.hcbc": "e37c1b530962064c451fac288327f7ae799d3e344cc5c77dc2ba55625c0042d0",
+    "build/lock-integrated/pi-payload/EFI/BOOT/BOOTAA64.EFI": "3f51768c5eb8a0818b8e7aa2ac9a9caef3c64707b5b6db15d1e612de23236b8c",
+    "build/lock-integrated/pi-payload/limine.conf": "a8981abc3cda174982db0e510a1bce180b2cefa74973789cd49c481ef92b5bc4",
+    "build/lock-integrated/build.log": "d7f3a957be476c14fb3665df43b3adfa7a0a20cd1afa34f7a232ed411e3d2686",
+    "build/lock-integrated/installer.log": "3693fc75de3ff6013ffe3255e337b598a1eb672d703548d7f0dd6c987ba50a81",
+    "build/lock-integrated/installer-live-uart.log": "d864e0cbc6ff4d225912e7e527c2214727db49b266d548b4f7140dfed3e088dd",
+    "build/lock-integrated/installer-disk-uart.log": "d9fdbe34b7e02fd4a4c658e755a620867d2b5a37ca94a8daaa9535f76dc30cba",
+    "build/lock-integrated/installer-reboot-uart.log": "1f43bd14f6f74301c5a326cc5042e951b574eedf13f099e74f970efc01306fab",
+    "build/lock-integrated/flapbat.log": "2c2c5f46b31270151455386362063bf06f44760894a1be7c87fa074e9392f519",
+    "build/lock-integrated/flapbat-uart.log": "3dfb72922eba3297f64730c7e7434ee68129e91ee5bfcfa369dba6189a30cf91",
+    "build/lock-integrated/flapbat.wav": "9644eb150af6c6b4d6a0a472573c8e3e0f405ffc61c2214c70ac282354cf263a"
+  },
+  "pi_stage": {
+    "result": "Seven payload files backed up, copied and read-back verified on ZEALPI; a later normal diskutil eject succeeded.",
+    "volume_uuid": "A5F20C1B-7A08-33D9-ABB7-0EDFC70E751E",
+    "device": "disk28s1",
+    "backup": "build/lock-integrated/pi-backup-20261109-lock",
+    "stage_record": "build/lock-integrated/pi-stage.json",
+    "files": {
+      "boot/kernel.elf": {
+        "before": "c58ad3df72a3570f5060b22e6f870c46504969ec080cbb84bbfe0eb25f4d5433",
+        "after": "6ad174c794b18991c17253c29d7a70bbc2f227711e0e4faa9e17a2e66f2ea326"
+      },
+      "boot/kernel-diag.elf": {
+        "before": "96de7671730212504a3b79d4b7435769618c7481cbfbae0e5b97a29f6b3058f4",
+        "after": "2af5238ac275a1277bbd9b0ab75a47325925c4658a02edaa1d0841cbece4068b"
+      },
+      "boot/zealbooter.elf": {
+        "before": "3da84dcb4c5dfb2a292c529111e813497fd89f52462db71618622c523b5500f5",
+        "after": "3da84dcb4c5dfb2a292c529111e813497fd89f52462db71618622c523b5500f5"
+      },
+      "boot/sources.tar": {
+        "before": "a2ca785f045ec07440cc424171817cb706b44f1bdec0998dd4a2e180f3abf424",
+        "after": "6457ae3f197ffccd2bf795c2b9fa1458a5b0ffdc7a6f29a43a0a1a000b830daf"
+      },
+      "boot/demo.hcbc": {
+        "before": "e37c1b530962064c451fac288327f7ae799d3e344cc5c77dc2ba55625c0042d0",
+        "after": "e37c1b530962064c451fac288327f7ae799d3e344cc5c77dc2ba55625c0042d0"
+      },
+      "EFI/BOOT/BOOTAA64.EFI": {
+        "before": "3f51768c5eb8a0818b8e7aa2ac9a9caef3c64707b5b6db15d1e612de23236b8c",
+        "after": "3f51768c5eb8a0818b8e7aa2ac9a9caef3c64707b5b6db15d1e612de23236b8c"
+      },
+      "limine.conf": {
+        "before": "a8981abc3cda174982db0e510a1bce180b2cefa74973789cd49c481ef92b5bc4",
+        "after": "a8981abc3cda174982db0e510a1bce180b2cefa74973789cd49c481ef92b5bc4"
+      }
+    },
+    "limitations": "No physical Pi boot or hardware/audio validation of this candidate yet.",
+    "eject": "diskutil eject /Volumes/ZEALPI: Disk /Volumes/ZEALPI ejected"
+  },
+  "locked_program_followup": {
+    "result": "PASS stock-style MultiCore1Runtime worker setup, completion and locked shared reduction: mask 0x7fff, total 4950.",
+    "target": "UTM QEMU framework, one vCPU, VirtIO input",
+    "setup_note": "The first command omitted --probe-source tests/compat/MultiCore1Runtime.ZC and failed because the source was not staged. The corrected command included the fixture and passed.",
+    "sha256": {
+      "build/lock-integrated/multicore1.log": "796ec734fb6a02ece25d8f019e6361272bf5bd88e0cd93c4f0d6fd665c472210",
+      "build/lock-integrated/multicore1-retry.log": "50dd6868c740aba123237a7d811d7749e160f5aaa45b6592370d7e84b37db706",
+      "build/lock-integrated/multicore1-retry-uart.log": "eae1f41fd562160ed038c4edad0e7f6949a2d2bd9e709e6be044b73d83f459df",
+      "tests/compat/MultiCore1Runtime.ZC": "aeefa516d3b549059fa59cd271017b84dcf623ad5d51a6d8f2bd67735651fbf0"
+    },
+    "limits": "This uses a one-CPU compatibility helper, not a demonstration of SMP execution, all application paths, a live UTM window, or Pi."
+  },
+  "three_dimensional_program_recheck": {
+    "result": "pass: GrModels Man mesh and repeat prompt, Ball mesh and visible inline sprite; KeepAway court/HUD, Space and mouse input, animation task cleanup and terminal recovery; Titanium game, input, Escape and terminal recovery. The remaining window and compiler checks completed with exit status zero.",
+    "target": "UTM-bundled QEMU framework, one vCPU, HVF, virtio-ramfb and VirtIO input; installed candidate disk",
+    "sha256": {
+      "build/lock-integrated/3d.log": "6356a871d09839f209f48a48d64fcb831c50cacdc7ddaff57a0fb180e86ca40d",
+      "build/lock-integrated/3d-uart.log": "a723d4e89ce9d18a2235c53b6fd28a29d00f4dd0ebdec4813008222589abfb23"
+    },
+    "limits": "Automated QEMU interaction only; does not prove complete gameplay, long-duration stability, live UTM UI, or Pi hardware behavior."
+  }
+}

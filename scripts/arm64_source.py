@@ -17,6 +17,41 @@ _KTASK_GROW_BEGIN = "#exe {Option(OPTf_NO_REG_VAR, ON);};"
 _KTASK_GROW_END = "#exe {Option(OPTf_NO_REG_VAR, OFF);};"
 
 
+def translate_docputs_exception_cleanup(source: bytes) -> bytes:
+    """Release partial-output scratch memory and its lock on exceptions."""
+    start = b'public U0 DocPrintPartial('
+    end = b'\nBool KDDocPutS('
+    if source.count(start) != 1 or source.count(end) != 1:
+        raise ValueError('DocPrintPartial function boundaries changed')
+    first = source.index(start)
+    last = source.index(end, first)
+    body = source[first:last]
+    callback_and_lock = (
+        b'\tif (doc->user_put_s && (*doc->user_put_s)(doc, doc->user_put_data, buf))\n'
+        b'\t{\n\t\tFree(buf);\n\t\treturn;\n\t}\n'
+        b'\tunlock = DocLock(doc);\n')
+    finish = (b'\tif (unlock)\n\t\tDocUnlock(doc);\n'
+              b'\tif (!(doc->flags & DOCF_DONT_SWAP_OUT))\n\t\tYield;\n'
+              b'\tFree(buf);\n}')
+    if body.count(callback_and_lock) != 1 or body.count(finish) != 1:
+        raise ValueError('DocPrintPartial lock or cleanup sequence changed')
+    body = body.replace(callback_and_lock,
+        b'\tunlock = FALSE;\n\ttry\n\t{\n'
+        b'\tif (doc->user_put_s && (*doc->user_put_s)(doc, doc->user_put_data, buf))\n'
+        b'\t{\n\t\tFree(buf);\n\t\tbuf = NULL;\n\t}\n'
+        b'\telse\n\t{\n\tunlock = DocLock(doc);\n', 1)
+    body = body.replace(finish,
+        b'\tif (unlock)\n\t\tDocUnlock(doc);\n'
+        b'\tunlock = FALSE;\n'
+        b'\tif (!(doc->flags & DOCF_DONT_SWAP_OUT))\n\t\tYield;\n'
+        b'\t}\n\t}\n\tcatch\n\t{\n'
+        b'\t\tI64 except_ch = Fs->except_ch;\n'
+        b'\t\tif (unlock)\n\t\t\tDocUnlock(doc);\n'
+        b'\t\tFree(buf);\n\t\tthrow(except_ch);\n\t}\n'
+        b'\tif (buf) Free(buf);\n}', 1)
+    return source[:first] + body + source[last:]
+
+
 def extract_sprite_elem_base_sizes(source: bytes) -> bytes:
     """Extract the exact pinned ZealOS packed sprite size declaration."""
     text = source.decode('utf-8')
@@ -1371,6 +1406,14 @@ def translate_tothefront_ai(source: bytes) -> bytes:
             raise ValueError('pinned ToTheFront indirect-fire loop changed')
         source = source.replace(indirect_loop,
                                 b'for (i = 0; i < UNITS_NUM; i++)', 1)
+        # Visibility is tracked separately for each player. The original
+        # Human direct-fire check always reads player zero's flag, so player
+        # two cannot fire at targets only visible to that player.
+        visibility = b'!Bt(&target->vis, 0)'
+        if source.count(visibility) != 1:
+            raise ValueError('pinned ToTheFront direct-fire visibility check changed')
+        source = source.replace(visibility,
+                                b'!Bt(&target->vis[cur_player], 0)', 1)
     registration = (
         b'\nplayer_indirect[ttf_ai_load_slot] = &PlayerIndirect;\n'
         b'player_move[ttf_ai_load_slot] = &PlayerMove;\n'
@@ -3030,7 +3073,7 @@ def translate_wenceslas(source: bytes) -> bytes:
 
 
 def translate_job_focus_trace(source: bytes) -> bytes:
-    """Trace the pinned JobRunOne focus restore without changing its behavior."""
+    """Trace focus restore and wait for synchronous popup completion."""
     old = (b'\t\t\tif (Bt(&flags, JOBf_FOCUS_MASTER) && '
            b'!Bt(&master->win_inhibit, WIf_SELF_FOCUS))\n'
            b'\t\t\t\tsys_focus_task = master;')
@@ -3042,7 +3085,16 @@ def translate_job_focus_trace(source: bytes) -> bytes:
            b'\t\t\t}')
     if source.count(old) != 1:
         raise ValueError('pinned JobRunOne focus restore shape changed')
-    return source.replace(old, new)
+    source = source.replace(old, new)
+    popup = (b'\t\tJobResScan(tmpc, &res);\n'
+             b'\t\tFs->popup_task = NULL;\n'
+             b'\t\tKill(task);')
+    if source.count(popup) != 1:
+        raise ValueError('pinned synchronous PopUp completion shape changed')
+    return source.replace(popup,
+        b'\t\tres = JobResGet(tmpc);\n'
+        b'\t\tFs->popup_task = NULL;\n'
+        b'\t\tKill(task);', 1)
 
 
 def translate_sched_focus_trace(source: bytes) -> bytes:

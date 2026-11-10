@@ -74,8 +74,11 @@ Escape cleanup and terminal recovery. See
 `/Demo/Games/FlapBat.ZC` now passes a QEMU ARM64 runtime probe for its game
 canvas, animation, Space flap, Escape cleanup and terminal recovery. The
 scripted gameplay path did not trigger a collision sound, so FlapBat's collision
-effect remains unverified. The VirtIO driver and stock `Sound()`/`Beep()` paths
-are tested separately; see the sound records below and
+effect remains unverified. A 2026-11-09 QEMU VirtIO-sound follow-up captured
+nonzero audio during gameplay and verified that the song task and tone stop
+after Escape; it does not establish musical fidelity or live UTM/Pi behavior.
+See [`flapbat-audio-qemu-2026-11-09.json`](docs/acceptance/flapbat-audio-qemu-2026-11-09.json).
+The VirtIO driver and stock `Sound()`/`Beep()` paths are tested separately; see the sound records below and
 [`demo-flapbat-qemu-2026-11-02.json`](docs/acceptance/demo-flapbat-qemu-2026-11-02.json).
 
 `/Demo/Graphics/32BitPaint.ZC` now passes a QEMU ARM64 interaction probe for
@@ -115,6 +118,23 @@ same virtual disk. The bridge adapts the compiler metadata layout and treats
 some unresolved function-pointer metadata conservatively; complete reflection
 parity, live UTM and Pi behavior remain unverified. See
 [`demo-database-qemu-2026-11-07.json`](docs/acceptance/demo-database-qemu-2026-11-07.json).
+
+The ARM64 compiler now emits matching 32-bit exclusive loads and stores for
+locked updates, and zero-extends unsigned 16- and 32-bit operands. A
+UTM-framework QEMU probe reproduced the previous 32-bit carry and unsigned
+16-bit failures, then passed the corrected pointer checks and an existing
+64-bit check. A follow-up fixed the separate locked prefix/postfix update
+path and passed combined 16-, 32-, and 64-bit pointer checks. The exclusive
+store now uses distinct status and data registers, retries from the stable
+address, and its load has the acquire encoding; generated instructions are
+checked in the same regression. See [the lock-width record](docs/acceptance/lock-width-utm-qemu-2026-11-09.json).
+The parser now marks the current locked statement rather than preceding
+instruction-list nodes. A nested function-call argument and neighboring
+braced/unbraced lock statements pass generated-code and functional checks;
+expression results are published after the exclusive store. A later test found
+global locked updates lacked exclusive instructions; address normalization
+now covers tested globals and address-exposed stack locals as well as pointers.
+This single-vCPU test does not establish SMP contention behavior.
 
 ## Digital Logic and embedded resources
 
@@ -193,8 +213,20 @@ menu selection and cold disk-only entry persistence. See
 The current combined Logic/Budget/3D image is at
 `build/zealos-aarch64-hello.iso`; its shared `DocForm` correction is described
 below. Live UTM acceptance of the corrected Budget workflow is still pending.
-Periodic/template, account-file editing and account-filter UI workflows have
-not been accepted; live UTM acceptance of this candidate also remains pending.
+A later integrated-candidate check covers daily and monthly template expansion,
+purge and periodic copies at the data level, including a year boundary; see
+[the Budget template check](docs/acceptance/budget-integrated-template-qemu-2026-11-09.json).
+A direct data-routine check also writes, reopens and expands a monthly template
+after a cold guest reboot; an empty-disk negative control fails as expected.
+A separate NEC USB test creates an interval template through Budget’s forms,
+saves it and reopens it after a cold boot. Template modification/deletion is
+covered below; account-file editing and account-filter UI remain unverified,
+and live UTM acceptance remains open.
+The follow-up [template edit/delete acceptance](docs/acceptance/budget-integrated-template-qemu-2026-11-09.json)
+now covers changing the end date, amount and description, saving and reopening
+the edited template, deleting it with Ctrl-Y, and verifying that deletion
+survives a cold disk-only reboot. Account-file editing, account-filter UI and
+the older reported live UTM freeze still need separate checks.
 
 Budget records dated transfers between accounts and displays a balance.
 An empty white ledger is expected before the first transaction. Choose
@@ -215,6 +247,12 @@ installer. Saving requires a writable installed VirtIO source volume.
 
 ## Current named-app status — 2026-11-02
 
+A separate [installer candidate](docs/acceptance/candidate-installer-utm-qemu-2026-11-09.json) includes the current document and popup fixes. It passed an automated USB-CD install, full disk read-back and disk-only persistence, plus the 3D gate using UTM's QEMU framework and `virtio-ramfb`. The Pi desktop kernel builds, but this candidate has not been tested in the live UTM UI or on the Pi.
+
+The matching [Pi desktop payload](docs/acceptance/pi-desktop-candidate-2026-11-09.json) is prepared separately and passed its boot-chain validator and host platform tests. It has not been written to microSD or tested on physical hardware.
+
+The follow-up [ToTheFront-fix candidate](docs/acceptance/tothefront-installer-utm-qemu-2026-11-09.json) includes the player-2 visibility correction in both its live bundle and installed disk. Its USB-CD installer, disk-only persistence and uninstrumented ToTheFront artillery workflow pass using UTM's QEMU engine. A matching Pi payload has been prepared, but neither candidate has been checked in live UTM UI or on physical Pi hardware.
+
 The pinned upstream `src/Apps` and `src/Demo` mirror contains 294 files,
 including source, documents and binary resources. It is complete and
 hash-checked; that file count is not a count of supported programs. This
@@ -223,17 +261,18 @@ normal-load result is not runtime acceptance.
 
 | Application | Current verified status |
 |--|--|
-| Budget | Graphical entry form, field editing, save/abort, reopen and cold disk-only persistence pass in the latest [PCI QEMU workflow](docs/acceptance/budget-hash-followup-qemu-2026-11-09.json); live UTM retest of the corrected image is pending. |
-| GrModels | The 2026-11-02 PCI rerun on ISO `e34393b6…` passed both Man and Ball forms and mesh generation; the Ball path created a 58-vertex mesh and rendered 566 purple pixels inline under QEMU `ramfb`. A fresh 1 GiB rerun on ISO `321232fb…` rendered 406 purple pixels and completed. The user's live UTM screenshot showed the repeat prompt without an obvious sprite, so visual UTM acceptance remains open. The screenshot does not establish which swatch was chosen. UTM launches `virtio-ramfb`, while the automated gate uses plain `ramfb`; a local `virtio-gpu-device` attempt fails the framebuffer self-check at `GrPeek`. The UTM VM is also configured with 512 MiB, while the 1 GiB QEMU run passes; see [the RAM comparison](docs/acceptance/utm-ram-headroom-qemu-2026-11-02.json). At `Do another(y or n)?`, enter `n` to finish the current model and return. |
+| Budget | Graphical entry form, field editing, save/abort, reopen and cold disk-only persistence pass in the latest [PCI QEMU workflow](docs/acceptance/budget-hash-followup-qemu-2026-11-09.json), including a [current-build NEC USB input run](docs/acceptance/budget-current-nec-usb-qemu-2026-11-09.json). Interval templates can be created, edited, deleted, and verified across cold disk-only boots in the [NEC USB template UI run](docs/acceptance/budget-integrated-template-qemu-2026-11-09.json). Account-file editing, account-filter UI, and a live UTM retest of the previously reported freeze remain open. |
+| GrModels | The current candidate fixes a partial-document output regression that rendered the Man and Ball button directives as text. With UTM's QEMU engine and `virtio-ramfb`, Man and Ball reach mesh generation and Ball renders visibly inline. The full gate passes after correcting an early return from synchronous popups; live UTM and Pi retests remain open. See [the display and regression record](docs/acceptance/partial-dollars-utm-ramfb-2026-11-09.json) and [RAM comparison](docs/acceptance/utm-ram-headroom-qemu-2026-11-02.json). At `Do another(y or n)?`, enter `n` to finish the current model and return. |
 | KeepAway | PCI gameplay frame renders; Space and mouse input leave the court active, Escape returns to the terminal, and the `40+2;` smoke check passes. The 2026-11-02 183-second run on ISO `e34393b6…` kept scanout active through game-over and Escape recovery. A fresh 1 GiB rerun on ISO `321232fb…` also passed gameplay and terminal recovery; see [the current 3D acceptance record](docs/acceptance/three-d-apps-qemu-2026-11-02.json) and [RAM comparison](docs/acceptance/utm-ram-headroom-qemu-2026-11-02.json). The source overlay guards nearest-player selection. ARM64 `Beep()` emits a VirtIO tone and `SoundReset()` stops it. The pinned `Noise()` and `Sweep()` tasks now produce PCM in isolated QEMU captures, but effect timing and the earlier live UTM freeze need further verification; see [sound effects](docs/acceptance/sound-effects-qemu-2026-11-09.json). A later full-game QEMU run captured nonzero audio bracketed around KeepAway gameplay and passed Escape recovery; individual effects and live UTM/Pi sound remain unverified ([audio check](docs/acceptance/keepaway-audio-qemu-2026-11-09.json)). |
-| Psalmody | PCI graphical probe enters the editor, accepts a note, exercises playback, and returns with Shift+Escape to a working terminal. QEMU VirtIO sound note playback now passes with WAV capture; audible host output and live UTM/Pi behavior remain unverified. See [`psalmody-virtio-sound-qemu-2026-11-04.json`](docs/acceptance/psalmody-virtio-sound-qemu-2026-11-04.json). |
-| Span | QEMU graphical entry/help/frame, bridge editing, Shift+Escape worker cleanup, and return to a working terminal pass; `40+2;` returns 42. Live UTM bridge editing/save still pending. |
-| Strut | QEMU help, mass placement/frame change, Space play-mode switch, Escape recovery, and terminal `40+2;` -> 42 pass. Live UTM editing/play and save/reopen still pending. |
+| Psalmody | PCI graphical probe enters the editor, accepts a note, exercises playback, and returns with Shift+Escape to a working terminal. QEMU VirtIO sound note playback passes with WAV capture. The user also heard a note from the z, h, x sequence through Pi 4B HDMI; see [the live report](docs/acceptance/pi4-ohgreat-hdmi-live-2026-11-09.json). Sustained playback, other features and live UTM app audio remain unverified. |
+| Oh Great (Demo) | The user confirmed the song plays through Pi 4B HDMI and stops after a delay when a key is pressed. A UTM-QEMU run of the newer ToTheFront-fix disk captured 49 seconds of PCM, reached a late lyric, stopped after a key and executed a command in the terminal task. The Pi image hash was not independently verified, and the UTM-QEMU capture is not a live audible UTM check; see [the sound record](docs/acceptance/pi4-ohgreat-hdmi-live-2026-11-09.json). |
+| Span | QEMU graphical entry/help/frame, bridge editing, Shift+Escape worker cleanup, and return to a working terminal pass; `40+2;` returns 42. An edited mass survives Save As, New, Open and a cold disk-only reboot; see [the save/reopen check](docs/acceptance/span-save-reopen-qemu-2026-11-09.json). Complete bridges and live UTM/Pi behavior remain unverified. |
+| Strut | QEMU help, two masses connected by a visible spring, Space play-mode switch, Escape recovery, and terminal `40+2;` -> 42 pass. A follow-up added a third mass and a digit-controlled thruster: holding the digit changed the ship area and star field while the preceding idle frames were identical. See [the spring and thruster checks](docs/acceptance/strut-spring-qemu-2026-11-09.json). This checks one simulated thrust path, not complete physics or live UTM/Pi behavior. The pinned app exposes no save or open command. |
 | TimeClock | App compile, date/time formatter gates, and automated punch-in/out record write/read plus report-state round-trip pass. The graphical QEMU probe loads the stock app, submits both descriptions through `StrGet`, reads them back with `TimeRep;`, and recovers to a terminal where `40+2;` returns 42. The red `IN`/`OUT` report labels are below the probe's monochrome OCR threshold, so it asserts the saved descriptions instead. Verify clock behavior in live UTM; CMOS hardware clock access is unavailable. |
 | Titanium | Live UTM confirms gameplay, Space firing and Escape recovery; the user confirms ordinary Left/Right move the ship on ISO `219d751c…`. A fresh 1 GiB PCI rerun on ISO `321232fb…` passes gameplay and terminal recovery. The VirtIO keyboard bridge updates both merged and raw scan-code bitmaps. A later gameplay run captured PCM at pitches consistent with Titanium effects in QEMU; exact effect timing and live UTM/Pi audio remain unverified. See [the audio check](docs/acceptance/titanium-audio-qemu-2026-11-09.json). |
-| Chess (Demo) | PCI QEMU runtime probe now renders the board, handles Escape cleanup, and returns to a terminal where `40+2;` returns 42. Live UTM pointer interaction remains unverified. The ARM64 `MouseSet` bridge posts a guest mouse-move message; it does not warp the host pointer. Run `make check-demo-chess`. |
-| TicTacToe (Demo) | PCI QEMU runtime probe checks the board, two mouse turns, Escape exit, and terminal recovery. Live UTM interaction remains unverified. The source advertises Ctrl-Alt-C, but that chord is not yet verified through the emulated input path. Run `make check-demo-tictactoe`. |
-| ToTheFront | ARM64 source overlay fixes the Human player's indirect-fire unit-count loop; the stock `i > UNITS_NUM` condition skipped the artillery order phase. PCI runtime probe accepts both player-type selections, displays/dismisses help, renders the generated map, selects a visible artillery unit, confirms its range indicator, plots an order into an adjacent hex, advances a phase with Space, and returns through Escape to a working terminal (`40+2;` -> 42). Unit movement/direct fire, broader AI play, and live UTM behavior remain unverified. |
+| Chess (Demo) | PCI QEMU runtime probes using VirtIO and emulated USB mouse input render the board, move a pawn by dragging, and verify a computer reply with its move notation. Escape returns to a terminal where `40+2;` returns 42. Other moves, complete games, and live UTM/Pi interaction remain unverified. The ARM64 `MouseSet` bridge posts a guest mouse-move message; it does not warp the host pointer. See [the pawn-move check](docs/acceptance/demo-chess-pawn-qemu-2026-11-09.json) and [computer-reply check](docs/acceptance/demo-chess-ai-qemu-2026-11-09.json). |
+| TicTacToe (Demo) | The ARM64 adaptation passes a five-move win, board reset, replay, and Escape recovery in QEMU with VirtIO input. Ctrl-Alt-C recovery also passed with VirtIO and emulated USB input. A nine-move draw, board reset and replay also passed using the UTM QEMU framework ([draw check](docs/acceptance/tictactoe-draw-utm-qemu-2026-11-09.json)). Other game outcomes and live UTM/Pi interaction remain unverified. See [the cleanup check](docs/acceptance/tictactoe-break-cleanup-qemu-2026-11-09.json). |
+| ToTheFront | ARM64 source overlays fix the Human player's indirect-fire unit-count loop and direct-fire visibility check. The latter previously rejected player 2's shot at a target visible only to that player. A controlled QEMU fixture reproduces that failure and passes mouse-driven direct fire for both players with the fix; it places adjacent targets for the test. A separate candidate check covers setup, artillery and a mouse-driven move. See [the checks](docs/acceptance/tothefront-candidate-qemu-2026-11-09.json). The follow-up ISO includes the fix; broader AI play and live UTM/Pi behavior remain unverified. |
 | Vocabulary | QEMU PCI runtime probe launches the quiz, displays dictionary content, accepts a numbered answer and advances, then Escape returns to a terminal where `40+2;` returns 42. Dictionary indexing and lookup are covered by the autocomplete gate. A sound-device run captured the 196 Hz incorrect-answer tone. A later run typed the launcher successfully after a prior command-entry failure; see [the sound check](docs/acceptance/vocabulary-sound-qemu-2026-11-09.json). The feedback popup, live UTM and Pi sound remain unverified. Run `make check-vocabulary-program`. |
 
 | X-Caliber | The newer 2026-11-08 PCI QEMU run on ISO `fd42cae1…` verified both plain arrows, a visible Space projectile, and Escape back to the graphical terminal. It later failed a shared terminal check after a stale `4` appeared in the prompt. A fresh run on disk `2d875c42…` passed both arrows, firing, and Escape again. The revised probe submitted `40+7;` with Return and verified a new result of 47. The shared terminal then accepted and executed `help`. See [the earlier run record](docs/acceptance/xcaliber-qemu-2026-11-08.json). |
@@ -261,13 +300,36 @@ The bridge clears interrupted wait state, wake time, popup wait flags and
 queued messages on Break. Native drive and block-device lock release is not
 implemented; see
 [the pending-break record](docs/acceptance/task-break-pending-qemu-2026-11-09.json).
-The exploratory `--probe-terminal-output-yield` checks a remaining difference
-from upstream document output; it is not expected to pass on the current
-terminal implementation. A trial using `DocPrintPartial` passed that probe and
-the DebugDemo Ctrl-Alt-C check, but it is not included here: the UserText
-memory-growth check failed during the trial and also on the original terminal
-implementation. That failure needs investigation before changing the output
-path or claiming the demo is fixed.
+The terminal output bridge now uses the pinned `DocPrintPartial`, matching the
+upstream output path's partial-document behavior and its conditional yield.
+The first Ctrl-Alt-C check only verified serial recovery and missed that the
+bootstrap shell stopped the graphical terminal. The keyboard byte queue now
+retains the Alt modifier so that Ctrl-Alt-C reaches the guest without invoking
+the shell's Ctrl-C escape. Three QEMU VirtIO DebugDemo runs then preserved the
+graphical terminal and executed a new command in it after each break. A further
+keyboard handoff fix also preserved the separate plain Ctrl-C shell escape;
+both behaviors passed with QEMU VirtIO and emulated xHCI USB keyboards. The
+`DOCF_DONT_SWAP_OUT` and message-polling scheduler checks also passed. Ctrl-Alt-D,
+live UTM and Pi remain unverified. This is not the pinned `Sched.ZC` scheduler.
+The unchanged output path also failed the no-growth check (+96 data bytes
+across two cycles); a separate diagnostic run timed out during long input before
+a second heap snapshot. The cause remains unconfirmed. See
+[`terminal-output-investigation-2026-11-09.json`](docs/acceptance/terminal-output-investigation-2026-11-09.json).
+An exploratory repeat with per-task heap totals found that the separate
+AutoComplete task's live allocation size fluctuated while global heap use and
+allocation count remained constant. The aggregate test therefore cannot by
+itself attribute its variation to terminal teardown.
+An independent check of three UserText terminal/filter cycles found no live
+allocations owned by finished tasks. It does not cover shared allocations or
+allocations retained by live tasks, so the aggregate no-growth failure remains
+open.
+An isolated live-task test found that interrupting partial document output
+retained 16–32 bytes per run. A guarded ARM64 overlay now releases its scratch
+buffer and acquired document lock when document processing throws, then
+rethrows the same exception. Normal completion and three interrupted QEMU
+runs retained zero bytes in that focused test. A callback that throws also
+previously retained 16 bytes; the extended overlay now cleans that path, and
+QEMU checks passed for callbacks that handle, decline or throw on output.
 
 The 2026-11-01 rebuilt PCI QEMU catalog reconfirmed compilation of all 12 named
 app entry points. A comprehensive PCI QEMU run of the named-app probes completed with
@@ -356,7 +418,7 @@ results are in `build/demo-source-catalog.json`; see the detailed run record
 in [the program inventory](docs/PROGRAM-INVENTORY-2026-10-28.md). The
 source-level ledger at
 [`demo-source-ledger-2026-11-08.json`](docs/acceptance/demo-source-ledger-2026-11-08.json)
-records the 206 Demo `.ZC` compile results. The refreshed ledger records 206 compile passes, zero compile blockers, 197 runtime-accepted sources, 4 partial runtime results, 1 runtime failure, and 4 sources whose runtime remains unverified. The partial results are `/Demo/AcctExample/TOS/TOSExtern.ZC`, `TOSMisc.ZC`, `/Demo/Graphics/WallPapers/WallPaperDesktop.ZC`, and `/Demo/MultiCore/MPRadix.ZC`. `/Demo/DolDoc/UnusedDefine.ZC` completed its scan and returned to the terminal in an extended QEMU run; see [`demo-unused-define-qemu-2026-11-09.json`](docs/acceptance/demo-unused-define-qemu-2026-11-09.json). The later DiskRaw read-only QEMU workflow is described above. Runtime evidence is still needed for `/Demo/AcctExample/TOS/TOSDistro.ZC`, `/Demo/MultiCore/LoadTest.ZC` and `Lock.ZC`. The original `/Demo/DebugDemo.ZC` busy loop ran in QEMU but did not respond to Ctrl-Alt-C after 20 seconds; see [`demo-debug-demo-qemu-2026-11-09.json`](docs/acceptance/demo-debug-demo-qemu-2026-11-09.json). These are source-level counts, not a count of standalone programs; several remaining files are support modules or have destructive/device-specific behavior that needs an isolated test setup. Runtime acceptance is also not proof of complete feature parity, and each evidence record states its scope and limitations. `/Demo/CompileDemo.ZC` now passes a focused QEMU run through the native guest compiler/JIT bridge, including multi-expression side effects, printed results, the final 0–9 loop, and terminal recovery; see [`demo-compiledemo-qemu-2026-11-02.json`](docs/acceptance/demo-compiledemo-qemu-2026-11-02.json). `/Demo/MultiCore/MPAdd.ZC` completes the stock serial-versus-queued benchmark, renders its performance chart, and returns to a working terminal in QEMU; see [`demo-mpadd-qemu-2026-11-07.json`](docs/acceptance/demo-mpadd-qemu-2026-11-07.json). `/Demo/MultiCore/MPPrint.ZC` visibly prints CPU0 queued-job output and returns to a working graphical terminal in one-vCPU QEMU; SMP worker execution remains unsupported and unverified. See [`demo-mpprint-qemu-2026-11-08-cpu0-color.json`](docs/acceptance/demo-mpprint-qemu-2026-11-08-cpu0-color.json). `/Demo/WordSearch.ZC` now renders its random grid and dictionary matches before returning to a working terminal; `/Demo/SuggestSpelling.ZC` returns dictionary matches for `Helo` and exits cleanly. `/Demo/LastClass.ZC` now displays CCPU and CTask class reports and returns to the terminal in QEMU after fixing task-to-compiler hash lookup; see [`demo-last-class-hash-fix-qemu-2026-11-08.json`](docs/acceptance/demo-last-class-hash-fix-qemu-2026-11-08.json). `/Demo/ParenWarn.ZC` displays source-file warnings and returns to the terminal in QEMU; see the later [`demo-paren-warn-qemu-2026-11-03.json`](docs/acceptance/demo-paren-warn-qemu-2026-11-03.json). Neither record establishes live UTM or Pi behavior. The 2026-11-02 QEMU probes add BlackDiamond, ScreenCapture, MathAudioDemo, PredatorPrey, ElephantWalk, FlapBat and 32BitPaint. BlackDiamond loads stock Math for `Cosh`, paints its light canvas, and verifies the HUD, movement, Escape cleanup, and terminal recovery. ScreenCapture writes a GR capture, reads it back into visible scanout, and returns to the graphical terminal. MathAudioDemo verifies its stock waveform plotting path, not audio output. PredatorPrey verifies queued trajectory rendering and Escape recovery. ElephantWalk verifies sprite rendering and keyboard-driven redraw. FlapBat verifies its game canvas, animation and Space input; a later QEMU sound-device run captured multiple pitches and confirmed the song task and tone stopped after exit (see `docs/acceptance/demo-flapbat-sound-qemu-2026-11-09.json`). 32BitPaint verifies mouse drawing, clear and exit. Directory-derived categories remain
+records the 206 Demo `.ZC` compile results. The refreshed ledger records 206 compile passes, zero compile blockers, 196 runtime-accepted sources, 6 partial runtime results, zero recorded runtime failures, and 4 sources whose runtime remains unverified. The partial results are `/Demo/TimeIns.ZC`, `/Demo/DebugDemo.ZC`, `/Demo/AcctExample/TOS/TOSExtern.ZC`, `TOSMisc.ZC`, `/Demo/Graphics/WallPapers/WallPaperDesktop.ZC`, and `/Demo/MultiCore/MPRadix.ZC`. `/Demo/DolDoc/UnusedDefine.ZC` completed its scan and returned to the terminal in an extended QEMU run; see [`demo-unused-define-qemu-2026-11-09.json`](docs/acceptance/demo-unused-define-qemu-2026-11-09.json). The later DiskRaw read-only QEMU workflow is described above. Runtime evidence is still needed for `/Demo/AcctExample/TOS/TOSDistro.ZC`, `/Demo/MultiCore/LoadTest.ZC` and `Lock.ZC`. The TimeIns ARM64 adaptation runs, but the stock source fails at `PassTrace` and optimizer tracing remains unsupported; see [`the stock-source probe`](docs/acceptance/demo-time-ins-stock-qemu-2026-11-09.json). The original `/Demo/DebugDemo.ZC` busy loop was interrupted three times by Ctrl-Alt-C in QEMU, with graphical terminal recovery after each; its debugger and live hardware checks remain open. See [`terminal-output-investigation-2026-11-09.json`](docs/acceptance/terminal-output-investigation-2026-11-09.json). These are source-level counts, not a count of standalone programs; several remaining files are support modules or have destructive/device-specific behavior that needs an isolated test setup. Runtime acceptance is also not proof of complete feature parity, and each evidence record states its scope and limitations. `/Demo/CompileDemo.ZC` now passes a focused QEMU run through the native guest compiler/JIT bridge, including multi-expression side effects, printed results, the final 0–9 loop, and terminal recovery; see [`demo-compiledemo-qemu-2026-11-02.json`](docs/acceptance/demo-compiledemo-qemu-2026-11-02.json). `/Demo/MultiCore/MPAdd.ZC` completes the stock serial-versus-queued benchmark, renders its performance chart, and returns to a working terminal in QEMU; see [`demo-mpadd-qemu-2026-11-07.json`](docs/acceptance/demo-mpadd-qemu-2026-11-07.json). `/Demo/MultiCore/MPPrint.ZC` visibly prints CPU0 queued-job output and returns to a working graphical terminal in one-vCPU QEMU; SMP worker execution remains unsupported and unverified. See [`demo-mpprint-qemu-2026-11-08-cpu0-color.json`](docs/acceptance/demo-mpprint-qemu-2026-11-08-cpu0-color.json). `/Demo/WordSearch.ZC` now renders its random grid and dictionary matches before returning to a working terminal; `/Demo/SuggestSpelling.ZC` returns dictionary matches for `Helo` and exits cleanly. `/Demo/LastClass.ZC` now displays CCPU and CTask class reports and returns to the terminal in QEMU after fixing task-to-compiler hash lookup; see [`demo-last-class-hash-fix-qemu-2026-11-08.json`](docs/acceptance/demo-last-class-hash-fix-qemu-2026-11-08.json). `/Demo/ParenWarn.ZC` displays source-file warnings and returns to the terminal in QEMU; see the later [`demo-paren-warn-qemu-2026-11-03.json`](docs/acceptance/demo-paren-warn-qemu-2026-11-03.json). Neither record establishes live UTM or Pi behavior. The 2026-11-02 QEMU probes add BlackDiamond, ScreenCapture, MathAudioDemo, PredatorPrey, ElephantWalk, FlapBat and 32BitPaint. BlackDiamond loads stock Math for `Cosh`, paints its light canvas, and verifies the HUD, movement, Escape cleanup, and terminal recovery. ScreenCapture writes a GR capture, reads it back into visible scanout, and returns to the graphical terminal. MathAudioDemo verifies its stock waveform plotting path, not audio output. PredatorPrey verifies queued trajectory rendering and Escape recovery. ElephantWalk verifies sprite rendering and keyboard-driven redraw. FlapBat verifies its game canvas, animation and Space input; a later QEMU sound-device run captured multiple pitches and confirmed the song task and tone stopped after exit (see `docs/acceptance/demo-flapbat-sound-qemu-2026-11-09.json`). 32BitPaint verifies mouse drawing, clear and exit. Directory-derived categories remain
 provisional, and per-file runnable-versus-module classification is in progress.
 
 `/Demo/MemDemo.ZC` and `/Demo/Carry.ZC` now have QEMU runtime acceptance.
@@ -400,12 +462,9 @@ module-aware probe. Its runtime behavior remains unverified; compile success doe
 not establish that the graphical demo works. The six baseline system-context demos still
 compile in the fresh module-aware run.
 
-The 29 current first failures include x86 assembly and interrupt-specific
-syntax, missing dependencies and platform globals, preprocessor/parser gaps,
-and ARM64 backend work such as the `Carry` intrinsic.
-They are source-file failures, not a count of standalone programs; some need
-the right stock module, while others require ARM64 behavior or a platform
-specific disposition.
+An earlier sweep found 29 first compile failures. The later dependency-aware
+source sweep resolved those catalog failures, as described above; compilation
+alone does not verify original architecture-specific behavior or runtime parity.
 
 The graphical QEMU probe `python3 scripts/check-compat.py --pci --probe-demo-basics`
 runs the original Print, DateTime, RadixSort, SubIntAccess, SubSwitch and
@@ -424,10 +483,10 @@ its mode is `CCF_JUST_LOAD` plus selected normal-load checks. The sprite service
 are `build/3d-apps-compile.json`. Neither report proves interactive app
 behavior. The user confirmed live UTM drawing/simulation and Escape recovery
 for Doodle, Mass Spring and Game of Life, and confirmed the Digital Logic
-prompt fix. Their acceptance records are above. The wider demo/game collection
-still includes Chess, Varoom and many other programs that have not
-been accepted on ARM64. Assembly demos require architecture-specific
-implementations.
+prompt fix. Their acceptance records are above. Chess and Varoom have focused
+QEMU runtime checks, but those checks do not establish all their features or
+live UTM/Pi behavior. Other sources also need broader acceptance. Assembly
+demos require architecture-specific implementations.
 
 The apparent Budget and GrModels form failures were traced to the generated
 ARM64 `DocForm` adapter: its replacement left behind the original

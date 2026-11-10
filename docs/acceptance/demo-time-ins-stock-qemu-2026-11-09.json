@@ -10,5 +10,16 @@
   "meaning": "The native source loader did not recognize PassTrace in the compile-time block. Pinned Compiler/CMisc.ZC describes PassTrace as controlling optimizer pass diagnostics; a no-op would not reproduce that behavior.",
   "log": "build/timeins-stock-native-qemu.log",
   "log_sha256": "7977e40fb32c13e738345f7fa999c89e15be414e8ffda3a1da12ca3e8eb4c716",
-  "limits": "The probe stopped at the first compile error, so later compiler or runtime failures remain unknown. The existing bundled ARM64 adaptation has separate runtime acceptance; this does not validate stock optimizer trace output or physical hardware."
+  "limits": "The probe stopped at the first compile error, so later compiler or runtime failures remain unknown. The existing bundled ARM64 adaptation has separate runtime acceptance; this does not validate stock optimizer trace output or physical hardware.",
+  "utm_framework_current_candidate_recheck": {
+    "result": "failed: native compiler again rejected stock source at line 23, Expected colon after label candidate PassTrace; later behavior remains untested",
+    "environment": "UTM-bundled QEMU framework, HVF, one CPU, VirtIO display and input, installed candidate disk",
+    "source_override": "upstream/pinned/Demo/TimeIns.ZC",
+    "sha256": {
+      "build/timeins-stock-current-utm.log": "6afa23d686e73f3fd777536ec1b1c826862f6feee762b13b0240e5a25cba8381",
+      "build/timeins-stock-current-utm-uart.log": "64300654c8d09c88156dba3187c5b1e43760a810d6832e35343ec6d90200c6e4",
+      "build/tothefront-direct-install.img": "f9ffd3168ee98468772e054c9ec03f13596122c945c228353d40a7acde7f8813"
+    },
+    "limits": "Emulated execution through UTM framework, not a live UTM interface or Pi test; no optimizer-trace compatibility is demonstrated."
+  }
 }
