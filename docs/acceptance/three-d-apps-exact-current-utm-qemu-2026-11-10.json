@@ -1,0 +1,22 @@
+{
+  "date": "2026-11-10",
+  "repository_commit": "f813189",
+  "upstream_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "target": "UTM-bundled QEMU framework, HVF, virtio-ramfb, 1 vCPU, 1 GiB RAM, VirtIO keyboard/tablet",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "4bc484338001b2a4d460844c11f0ea397554dac9250c378885f8a8a7ff1be4ea",
+  "kernel_sha256": "c7cff83246dde72296135862518d65574ebc482171cc7286935153fa282d53d9",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-3d-utm-qemu-exact-current.log python3 -u scripts/check-compat.py --pci --quick --probe-3d-apps",
+  "exit_code": 0,
+  "result": "pass",
+  "log": "build/check-3d-utm-qemu-exact-current.log",
+  "log_sha256": "25fcff18ed03374bbd3aa22e923d5bda5dd832de3f2bee0919e8fdbbb4c55fbc",
+  "verified": [
+    "GrModels Man generated a 112-vertex, 168-triangle mesh and reached its repeat prompt.",
+    "GrModels Ball generated a 58-vertex, 128-triangle mesh; 536 purple inline-sprite pixels were visible in the graphical terminal.",
+    "KeepAway rendered its court, HUD and player, accepted mouse and Space input, and returned to the terminal without leaving an Animate task.",
+    "Titanium displayed gameplay, accepted input, and Escape restored a working terminal.",
+    "Post-app terminal, compiler, launch, and window-demo regression checks completed with exit code 0."
+  ],
+  "scope_note": "Automated headless test using UTM's bundled QEMU framework and display/input models, not the visible UTM application. It does not resolve the earlier live UTM KeepAway freeze report or establish Pi behavior."
+}
