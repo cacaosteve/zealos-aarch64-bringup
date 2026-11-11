@@ -77,14 +77,15 @@ along with the
 and [empty-root repair check](docs/acceptance/demo-tosmisc-diskcheck-repair-redsea-qemu-2026-11-11.json)
 and [populated-root repair check](docs/acceptance/demo-tosmisc-diskcheck-populated-redsea-qemu-2026-11-11.json),
 plus the [nested-tree repair check](docs/acceptance/demo-tosmisc-diskcheck-nested-redsea-qemu-2026-11-11.json).
-On the fresh `80cd189a…` image,
-TOSDistro's `DistroPrep` now copies and text-converts the full source tree and
-recovers cleanly. The subsequent `MakeStdDistro` flow remains incomplete:
-`BootDVDIns` is an explicit `ArmBoot` stub for x86 BIOS image generation, and
-the legacy RedSea ISO boot path has not been replaced with ARM64 UEFI boot
-integration. See the [DistroPrep acceptance](docs/acceptance/tos-distro-prep-current-qemu-2026-11-11.json),
+On the current `9a0d1433…` image, the standard distro workflow reaches
+`BootDVDIns` after selecting source drive C, formatting its virtual RAM drive
+B, and converting source files. It then raises `ArmBoot`: the legacy boot-image
+writer is an explicit x86 BIOS stub, and ARM64 UEFI distro-image generation
+has not been implemented. An earlier record blamed a missing `Drive` binding;
+that diagnosis was stale, and this run confirms the current drive bridge works
+for this workflow. See the [DistroPrep acceptance](docs/acceptance/tos-distro-prep-current-qemu-2026-11-11.json),
 [TOSMisc probes](docs/acceptance/demo-tosmisc-jukepuppet-current-qemu-2026-11-11.json),
-and [earlier full-build failure](docs/acceptance/demo-tosdistro-std-current-qemu-2026-11-11.json).
+and [current full-build result](docs/acceptance/demo-tosdistro-std-current-qemu-2026-11-11.json).
 The ARM64
 `TimeIns` adaptation has runtime acceptance, while the pinned stock source's
 optimizer `PassTrace` diagnostic is not implemented. `TOSExtern` is accepted

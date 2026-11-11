@@ -1,26 +1,26 @@
 {
   "date": "2026-11-11",
-  "repository_commit": "aba7d541bd214da1e2bb90b693a7297ac8d654b7",
-  "working_tree_changes_included": true,
+  "repository_commit": "f21c0b9f5435c1f081f1e97c6812c720b2deb34c",
+  "working_tree_changes_included": false,
   "upstream_source_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
-  "target": "AArch64 native ZealC in macOS QEMU/HVF with the UTM-shaped PCI profile",
+  "target": "AArch64 native ZealC in macOS QEMU/HVF with UTM's bundled QEMU and UTM-shaped PCI profile",
   "source": "/Demo/AcctExample/TOS/TOSDistro.ZC",
   "source_sha256": "4ffbd1877c58bdd11aeb8de69785a35fa7065f3ff25cf97db86bc2e49c2de94e",
   "iso": "build/zealos-aarch64-hello.iso",
-  "iso_sha256": "93cb3d3eec000a3b482922d17bcdb37077b42650ff2ddb5e34650f4495b37149",
-  "kernel_sha256": "c211b0ecb262d8aae9ee9656de819fdd4c13466c0e57d7b3bcd2963dfb29be4a",
-  "command": "ZEAL_COMPAT_LOG_PATH=build/check-tos-distro-std-latest.log QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device' python3 -u scripts/check-compat.py --pci --quick --probe-demo-tos-distro-std",
-  "test_harness_sha256": "b1154266455aa8fee511102014ac426dd6fda7abd6ef00e0aa9baab8ff0f62c6",
+  "iso_sha256": "9a0d1433529e41b2cda6c36daef7255a7afdbe40c7f4f875bb305784fc56556a",
+  "kernel_sha256": "261bafde12c94029ebc46064a7fc650b66b3ec98e0a9ae0f5eaf9a774d3235d9",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-tos-distro-std-current-9a0d.log python3 -u scripts/check-compat.py --pci --quick --probe-demo-tos-distro-std",
+  "test_harness_sha256": "92bf054963823678c69c6090ac28409bdc1b12fac40a8763553956c4f2e31b96c",
   "exit_code": 1,
-  "result": "partial: standard distro generation stops at the missing Drive binding",
+  "result": "partial: standard distro generation reaches the explicit ARM64 ArmBoot stub while creating a legacy BIOS boot image",
   "verified": [
-    "The current ISO booted and initialized the graphical terminal.",
+    "The current ISO booted and initialized the graphical terminal under the UTM-bundled QEMU/HVF profile.",
     "The stock MakeHome and MakeTOS module sets loaded, and TOS_HDS was CD.",
-    "TOSDistro top-level initialization ran.",
-    "The MakeStdDistro wrapper compiled and began execution."
+    "TOSDistro initialization and the MakeStdDistro wrapper compiled and ran.",
+    "The flow selected source drive C, formatted its virtual RAM drive B, and logged source-tree text conversions before reaching BootDVDIns."
   ],
-  "failure_evidence": "zcall TOSStdDistroBuild raised uncaught guest exception 0x0000006576697244 (ASCII 'Drive') during StdDistroPrep before formatting, copying, or ISO generation.",
-  "log": "build/check-tos-distro-std-latest.log",
-  "log_sha256": "aeb8e22bc288df2956384b2462ddc3faa4a46c1762f69fd27f348e8ae6b686a2",
-  "scope_note": "The failure reproduces on the current 93cb3d3e ISO. The test used an isolated disposable QEMU disk and did not expose any host or removable volume. It does not establish live UTM behavior. The missing generic Drive binding is shared with TOSMisc's configured-drive DiskCheckAll workflow."
+  "failure_evidence": "The guest raised uncaught exception 0x00746f6f426d7241 (ASCII 'ArmBoot'). Upstream System/Boot/MakeBoot.ZC explicitly throws ArmBoot for BootDVDIns because the stock path generates an x86 legacy BIOS image; ARM64 UEFI boot-image generation is not implemented.",
+  "log": "build/check-tos-distro-std-current-9a0d.log",
+  "log_sha256": "6f1efbf0f67c15530265cf5a4477c5f2f9589177fe3a918e39fceaac617855c3",
+  "scope_note": "This current run supersedes the stale missing-Drive diagnosis in the previous record: generic Drive selection and virtual B formatting are present and worked in this flow. It exercised only an isolated disposable QEMU disk and did not expose host or removable volumes. It does not produce or boot an ARM64 UEFI distro image and does not establish live UTM UI behavior."
 }
