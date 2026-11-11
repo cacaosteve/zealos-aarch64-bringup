@@ -1,0 +1,24 @@
+{
+  "date": "2026-11-11",
+  "target": "AArch64 native ZealC under UTM-bundled QEMU with HVF, one vCPU, virtio-ramfb, VirtIO keyboard and tablet",
+  "iso_sha256": "923ae07d75b734b9e882f4bbeab608f81aed502fc49d3b25adac30409c0741d5",
+  "kernel_sha256": "cfa2202f654a4d5d76768c957384b93a50e34a58fd2ecc6793c43d47bf9276cd",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-3d-apps-current-2026-11-11.log python3 -u scripts/check-compat.py --pci --quick --probe-3d-apps",
+  "log_sha256": "3f20d2f915be6cd71d74e7b52b59d12d339e3b456aff9172c0604ace70cd485f",
+  "exit_code": 0,
+  "result": "pass in automated UTM-bundled QEMU profile",
+  "checks": {
+    "GrModels": {
+      "Man": "form and color selections completed; generated a 112-vertex, 168-triangle mesh; raster work and terminal recovery passed",
+      "Ball": "form and color selections completed; generated a 58-vertex, 128-triangle mesh; inline sprite entry and terminal recovery passed"
+    },
+    "KeepAway": "gameplay, HUD/input path, Escape recovery, and terminal 40+2 => 42 passed",
+    "Titanium": "intro/gameplay, Space input, Escape recovery, and terminal recovery passed"
+  },
+  "live_utm_status": {
+    "GrModels": "Open: the user reported no visible model after color selection. This automated run verifies mesh generation and raster work, not the visible UTM window's Man-model presentation.",
+    "KeepAway": "Open: the user reported a complete freeze in the visible UTM session. This automated QEMU run did not reproduce or resolve that issue.",
+    "Titanium": "The user confirmed ordinary Left/Right, Space, and Escape work with the rebuilt ISO."
+  },
+  "scope_note": "The run used UTM's bundled QEMU engine in a separate automated guest, not the visible UTM application window or Raspberry Pi hardware. It was a quick current-image regression, not a full-duration game soak."
+}
