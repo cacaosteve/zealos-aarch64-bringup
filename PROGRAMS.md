@@ -63,8 +63,13 @@ broader read-only stock RedSea file probe: D: selection, relative current-drive
 enumeration, nested/case-insensitive reads, empty-file semantics and source
 store persistence across a cold boot. The probe expects the ARM64 bridge's
 `disk:/` current-directory spelling; it does not validate writable RedSea or
-general drive mounting. The Beep fixture check does not measure audio
-output. A new read-only check confirms stock `DiskCheck` completes against a
+general drive mounting. The Beep fixture now also passes with UTM-bundled
+QEMU's VirtIO-sound WAV backend: its disposable tone fixture completed
+JukePuppet playback and cleanup, and the 2.76-second capture contains a strong
+tone near 659 Hz. This is generated PCM evidence, not audible live-UTM or Pi
+playback; see the
+[JukePuppet audio check](docs/acceptance/demo-tosmisc-jukepuppet-audio-current-qemu-2026-11-11.json).
+A new read-only check confirms stock `DiskCheck` completes against a
 malformed bounded RedSea fixture, reports one consistency error, and does not
 fail the guest; a separate cyclic-directory fixture confirms `FilesFind`
 omits an ancestor back-edge and the stock scan returns cleanly. Neither check
