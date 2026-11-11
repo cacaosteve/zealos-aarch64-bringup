@@ -9972,6 +9972,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                             'zc: loaded /Kernel/KernelC.HH')
                     command('zload /System/TaskBridge.ZC',
                             'zc: loaded /System/TaskBridge.ZC')
+                    command('zload /System/Externs.ZC',
+                            'zc: loaded /System/Externs.ZC')
                     command('zload /Tests/ProgramCatalog.ZC',
                             'zc: loaded /Tests/ProgramCatalog.ZC')
                     command('zload /Tests/SourceMacros.ZC',
