@@ -1,0 +1,26 @@
+{
+  "date": "2026-11-11",
+  "repository_commit": "7f30cb9",
+  "target": "UTM-bundled QEMU, ARM64 PCI graphical guest, HVF, one vCPU, virtio-ramfb, VirtIO keyboard and tablet",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-3d-apps-rebuilt-current.log python3 -u scripts/check-compat.py --pci --quick --probe-3d-apps --probe-keepaway-full-game",
+  "result": "pass",
+  "artifacts": {
+    "iso": "build/zealos-aarch64-hello.iso",
+    "iso_sha256": "9ba0f5c877626dc9675b865e87cdf50ed82d8a5ab4399c677d03fe01e6fa8190",
+    "kernel": "build/kernel.elf",
+    "kernel_sha256": "411623ed6d0779007f7d0f436ba7d26d60d40d4551660b5c1db61746d271e28e",
+    "runner_log": "build/check-3d-apps-rebuilt-current.log",
+    "runner_log_sha256": "93f999b0ce1c25e4e01a3ab247039dfa5b8257b7c91c62867695ce94f37c044a"
+  },
+  "checks": {
+    "GrModels": "Man and Ball forms completed; generated/rasterized the expected meshes and recovered to the terminal.",
+    "KeepAway": "Court, HUD, and player rendered; Space and mouse input updated the game. Full 186-second game run completed with 18 repeated input cycles and changing scanout at every sample. Escape restored terminal focus, removed the Animate task, and zstatus reported failed=0.",
+    "Titanium": "Intro and gameplay path, Space input, Escape, and terminal recovery passed."
+  },
+  "live_utm_status": {
+    "GrModels": "Automated model generation/raster work passes; the user has reported not seeing the Man model in the visible UTM session.",
+    "KeepAway": "Automated full-game run passes; the user previously reported a freeze in the visible UTM session, which this separate automated guest does not resolve.",
+    "Titanium": "The user confirmed Left, Right, Space, and Escape with the rebuilt ISO."
+  },
+  "scope_note": "The check ran against the exact rebuilt ISO in a separate UTM-bundled QEMU guest. It does not prove behavior in the visible UTM application window or on Raspberry Pi hardware."
+}
