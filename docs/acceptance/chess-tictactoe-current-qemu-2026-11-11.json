@@ -1,0 +1,37 @@
+{
+  "date": "2026-11-11",
+  "repository_commit": "2354f2a66f4c6908e0e2b39188b9374b4ffac4e2",
+  "target": "AArch64 native ZealC in UTM-bundled QEMU with HVF, one vCPU, virtio-ramfb, VirtIO keyboard and tablet",
+  "iso_path": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "9a0d1433529e41b2cda6c36daef7255a7afdbe40c7f4f875bb305784fc56556a",
+  "kernel_sha256": "261bafde12c94029ebc46064a7fc650b66b3ec98e0a9ae0f5eaf9a774d3235d9",
+  "harness_sha256": "92bf054963823678c69c6090ac28409bdc1b12fac40a8763553956c4f2e31b96",
+  "result": "pass",
+  "checks": {
+    "Chess (Demo)": {
+      "result": "pass",
+      "scope": "board rendered, pawn drag accepted, Escape returned to a working graphical terminal, 40+2 returned 42, zstatus failed=0",
+      "serial_log": "build/check-current-chess-9a0d.log",
+      "serial_log_sha256": "a19d5aa3af40d83d61eca224405b1254dc3b345de4e5770f9db9000960ba4502"
+    },
+    "Chess AI (Demo)": {
+      "result": "pass",
+      "scope": "pawn drag accepted, AI answered with E7-E5 and produced a visible board change, Escape returned to a working graphical terminal, 40+2 returned 42, zstatus failed=0",
+      "serial_log": "build/check-current-chess-ai-9a0d.log",
+      "serial_log_sha256": "0bdf5745caee0fc4fa19bf7c897290f5980c051be77d304c313bae1037a526fd"
+    },
+    "TicTacToe (Demo)": {
+      "result": "pass",
+      "scope": "board rendered, two mouse turns accepted, Escape returned to a working graphical terminal, 40+2 returned 42, zstatus failed=0",
+      "serial_log": "build/check-current-tictactoe-9a0d.log",
+      "serial_log_sha256": "4be49a8336680efa61a41f94ee00a616b88fb6528526e326b068cc3f725e547c"
+    },
+    "TicTacToe win/reset (Demo)": {
+      "result": "pass",
+      "scope": "five-move win detected, board reset and replay worked, Escape returned to a working graphical terminal, 40+2 returned 42, zstatus failed=0",
+      "serial_log": "build/check-current-tictactoe-win-9a0d.log",
+      "serial_log_sha256": "f15017558c3774ccaa0fef65dedaca112a2df49760fd01f6e269c4a01fb1eb3f"
+    }
+  },
+  "scope_note": "Automated UTM-bundled QEMU acceptance, not visible UTM-window or Pi hardware acceptance. Chess AI coverage exercises one legal reply, not full-game chess strength."
+}
