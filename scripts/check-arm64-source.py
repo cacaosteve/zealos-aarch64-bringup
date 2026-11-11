@@ -420,6 +420,8 @@ jukepuppet_source = (root/'upstream/pinned/Apps/Psalmody/JukePuppet.ZC').read_by
 jukepuppet_overlay = translate_jukepuppet_song_mask(jukepuppet_source)
 assert b'FilesFind("*.ZC", FUF_RECURSE | FUF_JUST_FILES)' in jukepuppet_overlay
 assert b'FUF_JUST_TXT' not in jukepuppet_overlay
+assert (b'MessagePost(juke_task->popup_task, MESSAGE_KEY_DOWN_UP, CH_ESC, 0);\n'
+        b'\tTaskWait(juke_task->popup_task);\n\tSleep(500);') in jukepuppet_overlay
 try:
     translate_jukepuppet_song_mask(jukepuppet_source.replace(
         b'FUF_JUST_TXT', b'FUF_JUST_DD', 1))
@@ -427,7 +429,15 @@ except ValueError:
     pass
 else:
     raise AssertionError('JukePuppet overlay accepted a changed text-only song filter')
-print('PASS guarded JukePuppet enumerates ZealOS .ZC song sources', flush=True)
+try:
+    translate_jukepuppet_song_mask(jukepuppet_source.replace(
+        b'MessagePost(juke_task->popup_task, MESSAGE_KEY_DOWN_UP, CH_SPACE, 0);',
+        b'MessagePost(juke_task->popup_task, MESSAGE_KEY_DOWN_UP, CH_ENTER, 0);', 1))
+except ValueError:
+    pass
+else:
+    raise AssertionError('JukePuppet overlay accepted a changed song-start gesture')
+print('PASS guarded JukePuppet song discovery and Space/Escape run gesture', flush=True)
 xcaliber_source = (root / 'upstream/pinned/Apps/X-Caliber/X-Caliber.ZC').read_bytes()
 xcaliber_overlay = translate_xcaliber_shot_return(xcaliber_source)
 assert xcaliber_overlay != xcaliber_source

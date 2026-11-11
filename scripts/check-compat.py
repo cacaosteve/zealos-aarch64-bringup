@@ -2792,30 +2792,34 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     raise RuntimeError(
                         'JukeBox fixture does not pass its exact dynamic mask and song checks:\n'
                         + fixture_check)
-                jukebox_screen = run_graphical_terminal_command(
-                    'demo-jukebox-open',
-                    'JukeBox("/Tests/JukePuppet"); '
-                    'Print("juke-box-done\\n");',
-                    'DONE', timeout=20)
-                if rgb_pixels_in(jukebox_screen, (255, 255, 85),
-                                 (0, 54, 120, 68)) < 20:
-                    raise RuntimeError(
-                        'JukeBox did not visibly render the selected song; '
-                        f'see {graphical_path("demo-jukebox-open-result")}')
-                qmp_send_key('esc')
-                require_graphical_text(
-                    'demo-jukebox-return', 'juke-box-done', timeout=10)
-                run_graphical_terminal_command(
-                    'demo-jukebox-graphical-fixture',
-                    'zcall JukePuppetFixtureCheck',
-                    'juke_fixture=1|591|1|childish.ZC|1|1|//9 has',
-                    timeout=30)
                 run_graphical_terminal_command(
                     'demo-jukebox-terminal-recovery', '40+2;',
                     'ans=0x2A=42', timeout=30)
+                playback_check = (ROOT/'tests/compat/JukePuppetPlaybackCheck.ZC').read_bytes()
+                uploaded = upload_source('JukePuppetPlaybackCheck.ZC', playback_check)
+                if 'zrecv: saved JukePuppetPlaybackCheck.ZC' not in uploaded:
+                    raise RuntimeError(
+                        'JukePuppet playback checker was not uploaded to the disposable disk:\n'
+                        + uploaded)
+                command('zload disk:JukePuppetPlaybackCheck.ZC',
+                        'zc: loaded disk:JukePuppetPlaybackCheck.ZC', timeout=30)
+                # This is a short command, but the graphical prompt autocompletes
+                # function names as they are typed and can append a `?` before
+                # Return. Invoke the loaded checker over the independent UART
+                # shell so this probe measures song playback, not GUI editing.
+                playback_output = command(
+                    'zcall JukePuppetPlaybackCheck',
+                    'juke-puppet-returned=42', timeout=120)
+                if 'juke-puppet-returned=42' not in playback_output:
+                    raise RuntimeError(
+                        'JukePuppet checker did not return after playback:\n'
+                        + playback_output)
+                run_graphical_terminal_command(
+                    'demo-jukepuppet-terminal-recovery', '40+2;',
+                    'ans=0x2A=42', timeout=30)
                 output = command('zstatus', 'failed=0')
                 runtime_checks.append({
-                    'name': 'JukeBox lists a real .ZC song fixture in its popup and Escape returns to the graphical terminal',
+                    'name': 'JukeBox lists a real song fixture; JukeSongsPuppet returns to a responsive graphical terminal and leaves the compiler healthy',
                     'passed': 'failed=0' in output,
                     'output': output,
                 })

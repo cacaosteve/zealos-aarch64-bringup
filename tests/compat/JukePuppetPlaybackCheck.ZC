@@ -1,0 +1,6 @@
+I64 JukePuppetPlaybackCheck()
+{
+	JukeSongsPuppet("/Tests/JukePuppet", 1, 0, 1);
+	Print("juke-puppet-returned=%d\n", 40 + 2);
+	return 1;
+}

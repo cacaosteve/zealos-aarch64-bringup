@@ -3933,12 +3933,24 @@ def translate_make_tos_dependency(source: bytes) -> bytes:
 
 
 def translate_jukepuppet_song_mask(source: bytes) -> bytes:
-    """Allow JukeSongsPuppet to enumerate Psalmody's .ZC song files."""
+    """Enumerate .ZC songs and complete JukeBox's two-key run gesture."""
     old = b'FilesFind("*", FUF_RECURSE | FUF_JUST_TXT | FUF_JUST_FILES)'
     new = b'FilesFind("*.ZC", FUF_RECURSE | FUF_JUST_FILES)'
     if source.count(old) != 1:
         raise ValueError('pinned JukePuppet text-file filter changed')
-    return source.replace(old, new, 1)
+    source = source.replace(old, new, 1)
+    old = (b'MessagePost(juke_task->popup_task, MESSAGE_KEY_DOWN_UP, CH_SPACE, 0);\n'
+           b'\tTaskWait(juke_task->popup_task);\n'
+           b'\tSleep(500);')
+    new = (b'MessagePost(juke_task->popup_task, MESSAGE_KEY_DOWN_UP, CH_SPACE, 0);\n'
+           b'\tTaskWait(juke_task->popup_task);\n'
+           b'\tMessagePost(juke_task->popup_task, MESSAGE_KEY_DOWN_UP, CH_ESC, 0);\n'
+           b'\tTaskWait(juke_task->popup_task);\n'
+           b'\tSleep(500);')
+    if source.count(old) != 1:
+        raise ValueError('pinned JukePuppet song start gesture changed')
+    source = source.replace(old, new, 1)
+    return source
 
 
 def translate_make_home_dependency(source: bytes) -> bytes:
