@@ -1,0 +1,25 @@
+{
+  "date": "2026-11-11",
+  "target": "UTM-bundled QEMU, AArch64 PCI, one vCPU, disposable writable RedSea VirtIO fixture",
+  "iso_sha256": "dc13e9cb64a324a6cc86d485da143628f909caa89da4de8b27c12cd1f0a2df52",
+  "kernel_sha256": "55536307b44768abf98ab8eb64369448394ff78e24b46cbbddd5dd09d4ef5ae1",
+  "source_bundle_sha256": "6e9c48b5c714505530880e5822ac6b629ab5410c1b55741ddc33b2fbbdb476a2",
+  "probe_sha256": "2a793c407358a62fb333197045d1744d7aaf6739d6cc97566544de9b90165a76",
+  "check_compat_sha256": "10f61fd237b40117f273e0c4b09d3ad965002fe4adcaa1b244dc0625eb55b006",
+  "command": "ZEAL_COMPAT_LOG_PATH=build/tosmisc-diskcheck-redsea-current-qemu-2026-11-11.log python3 -u scripts/check-compat.py --pci --probe-raw-redsea-geometry present",
+  "result": "pass: the adapted TOSMisc DiskCheckAll skips source-only C and runs the stock checker on mounted RedSea D; the clean scan and guest recovery pass",
+  "verified": [
+    "The fixture mounts D as a writable RedSea drive with valid bounded geometry.",
+    "The stock DiskCheck('D', FALSE, FALSE) returns zero on the clean fixture.",
+    "The loaded TOSConfig sets TOS_HDS to CD; the actual ARM64-overlaid TOSMisc DiskCheckAll skips unregistered source-backed C and checks mounted D without prompting or modifying the clean disk.",
+    "Raw RedSea geometry, bounded read/write/restore checks, unmount, and filesystem validation return the expected result.",
+    "Final zstatus reports failed=0."
+  ],
+  "limits": [
+    "Repair of a deliberately corrupted allocation table or directory was not tested.",
+    "The fixture has an empty root directory; populated RedSea volumes and FAT32 remain untested by this probe.",
+    "This headless QEMU result does not establish live UTM UI or physical Pi behavior."
+  ],
+  "log": "build/tosmisc-diskcheck-redsea-current-qemu-2026-11-11.log",
+  "log_sha256": "d37fdf6b278b5371c1fb262b23327eb2ebe21707f90e5adfbd0e873083129c91"
+}

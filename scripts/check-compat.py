@@ -1064,7 +1064,9 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     if args.probe_raw_redsea_geometry == 'invalid':
                         struct.pack_into('<q', boot, 24, offset + 129)  # root past end
                     boot[510:512] = b'\x55\xaa'
-                    bitmap[0] = 7
+                    # The present-drive RedSea fixture has only its root
+                    # directory allocated; keep it clean for DiskCheck.
+                    bitmap[0] = 3 if args.probe_raw_redsea_geometry == 'present' else 7
                     if args.probe_raw_redsea_geometry == 'stockfile':
                         source = b'I64 StockRedSeaFileChecks(){return 42;}\n'
                         struct.pack_into('<H', root_dir, 0, 0x410)
@@ -8967,8 +8969,16 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                         print('DISKRAW COMPILE RESULT\n' + output, flush=True)
                         raise SystemExit(0)
                     if args.probe_raw_redsea_geometry:
+                        command('zload /Demo/AcctExample/TOS/TOSConfig.ZC',
+                                'zc: loaded /Demo/AcctExample/TOS/TOSConfig.ZC', timeout=45)
+                        command('zload /System/Gr/ScreenCast.ZC',
+                                'zc: loaded /System/Gr/ScreenCast.ZC', timeout=45)
                         command('zload /System/BlkDev/DiskCheck.ZC',
                                 'zc: loaded /System/BlkDev/DiskCheck.ZC', timeout=45)
+                        command('zload /Apps/Psalmody/Load.ZC',
+                                'zc: loaded /Apps/Psalmody/Load.ZC', timeout=45)
+                        command('zload /Demo/AcctExample/TOS/TOSMisc.ZC',
+                                'zc: loaded /Demo/AcctExample/TOS/TOSMisc.ZC', timeout=60)
                         command('zload /Tests/RawRedSeaGeometry.ZC',
                                 'zc: loaded /Tests/RawRedSeaGeometry.ZC')
                         suffix = ('Present' if args.probe_raw_redsea_geometry in ('present', 'legacy')

@@ -1,5 +1,10 @@
 extern I64 ZcRawRedSeaGeometry(U64 *base, U64 *sectors);
 extern Bool ZcMountLegacyRedSea();
+extern U0 DiskCheckAll();
+
+// The focused checker probe doesn't load the full StrPrint stack. The clean
+// fixture should never warn; this stub only supplies DiskCheck's log symbol.
+U0 PrintWarn(U8 *format, ...) {}
 
 I64 RawRedSeaAbsentChecks()
 {
@@ -37,6 +42,13 @@ I64 RawRedSeaPresentChecks()
         drive->cur_fat_blk_num != -1 || !RedSeaValidate('D') ||
         (bd->flags & BDF_READ_ONLY) || DriveIsWritable('D', FALSE) != bd)
         return 3;
+    // Exercise the stock, read-only consistency scan against a clean mounted
+    // RedSea fixture before changing the drive bounds for the raw-sector test.
+    if (DiskCheck('D', FALSE, FALSE))
+        return 10;
+    // Run the actual TOSMisc dispatcher too: it must skip source-only C and
+    // invoke the stock checker on the mounted RedSea D drive.
+    DiskCheckAll();
     DriveRep;
     buf = CAlloc(512);
     saved = CAlloc(512);
