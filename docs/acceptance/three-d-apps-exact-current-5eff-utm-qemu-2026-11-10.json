@@ -1,0 +1,48 @@
+{
+  "date": "2026-11-10",
+  "repository_commit": "74b58ea1569d06d8276e39081fa00b88853213fd",
+  "working_tree_probe_change": "scripts/check-compat.py was adjusted to focus a GrModels form field and accept DocForm with Escape; this is test-harness-only and is not part of the ISO.",
+  "probe_script_sha256": "b84a2845cb6002579200460a6380f741e7198554e043de417e317b0f9b205d31",
+  "target": "UTM-bundled QEMU framework, HVF, virtio-ramfb, 1 vCPU, 1 GiB RAM, VirtIO keyboard/tablet",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "5effe8cb5a69344d078a89b758ea94571239d72ce99e5dd60d4e393e7ce5199d",
+  "kernel_sha256": "cfa2202f654a4d5d76768c957384b93a50e34a58fd2ecc6793c43d47bf9276cd",
+  "runs": [
+    {
+      "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-3d-interactive-current-5eff.log python3 -u scripts/check-compat.py --pci --quick --probe-3d-apps",
+      "exit_code": 0,
+      "log": "build/check-3d-interactive-current-5eff.log",
+      "log_sha256": "c2dfa0a081e61bb1e7c9004ae99ac052514e26697b530ee900421468b87a4a44",
+      "runner_output": "build/check-3d-interactive-current-5eff.stdout.log",
+      "runner_output_sha256": "92db4dfbe55b9db035be982e1826a363e527c50185196984cabda00909266e86",
+      "checks": [
+        "GrModels Man accepted its default DocForm values and color choices, generated 112 vertices and 168 triangles, rendered 3,676 pixels in the raster diagnostic, then returned to a terminal with zstatus failed=0.",
+        "GrModels Ball accepted its default form and color, generated 58 vertices and 128 triangles, rendered a visible inline sprite (1,755 pixel writes), then returned to a terminal with zstatus failed=0.",
+        "KeepAway rendered its court, HUD and player frame, accepted Space and mouse input, refreshed its HUD, and exited with Escape to a working terminal.",
+        "Titanium rendered a gameplay frame, accepted input and Escape, and returned to a working terminal.",
+        "Shared graphical keyboard, terminal recovery, QMP input routing, and window-demo launch/stop regressions passed; final runner exit status was 0."
+      ]
+    },
+    {
+      "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-3d-current-5eff.log python3 -u scripts/check-compat.py --pci --quick --probe-3d-apps --probe-keepaway-full-game",
+      "exit_code": 0,
+      "log": "build/check-3d-current-5eff.log",
+      "log_sha256": "ff65abcd4f7c2d78c860fee4208277ccacb4185e6fec0172b6d7412cd5972802",
+      "checks": [
+        "3D mesh/interpolation and height-format fixtures passed; all three named app entrypoints compiled.",
+        "KeepAway gameplay input and HUD passed a 184-second run with continuous scanout; Escape returned to a working terminal, zstatus reported failed=0, and no Animate child task remained."
+      ]
+    },
+    {
+      "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-titanium-arrows-current-5eff.log python3 -u scripts/check-compat.py --pci --quick --probe-titanium-only",
+      "exit_code": 0,
+      "log": "build/check-titanium-arrows-current-5eff.log",
+      "log_sha256": "8265b8741ab41bf098f4615d6309e9c3b3e799f590933b34a1a4ad29920eaa01",
+      "checks": [
+        "Titanium ordinary Left and Right moved the player in the corresponding directions; Space advanced gameplay.",
+        "Escape recovered the graphical terminal, 40+2 returned 42, and zstatus reported failed=0."
+      ]
+    }
+  ],
+  "scope_note": "These are automated runs with UTM's bundled QEMU profile, not tests in the visible UTM application window or on a physical Pi. The previously reported visible-window KeepAway freeze remains unresolved. App audio is not covered."
+}

@@ -5036,6 +5036,13 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 time.sleep(1)
                 man_form = graphical_screen('3d-grmodels-man-form')
                 print('GRMODELS MAN FORM\n'+man_form[3], flush=True)
+                # Escape accepts DocForm's default dimensions and opens its
+                # first color picker. Focus a form field first: the launch
+                # button can leave keyboard focus on the terminal behind it.
+                move_graphical_pointer(280, 18)
+                graphical_mouse_button('left', True)
+                time.sleep(0.15)
+                graphical_mouse_button('left', False)
                 qmp_send_key('esc')
                 require_graphical_text(
                     '3d-grmodels-man-color-shirt', 'Single-Sided means', timeout=12)
