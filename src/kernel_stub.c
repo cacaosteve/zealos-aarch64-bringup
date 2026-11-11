@@ -4188,6 +4188,60 @@ static int pi4_xhci_dma_storage_command(struct pi4_xhci_bot_transport *t,
     return r->transport_ok;
 }
 
+/* Live-session, single-logical-block WRITE(10). This deliberately has no
+ * shell entry point: the future mounted-volume writer must first validate the
+ * selected data partition, then call this with an in-range sector. The caller
+ * is responsible for a post-write READ(10) and byte-for-byte verification. */
+static int __attribute__((unused)) pi4_xhci_dma_storage_write10(
+        struct pi4_xhci_bot_transport *t, uint32_t lba, const uint8_t *payload) {
+    unsigned number, bytes;
+    struct pi4_xhci_storage_command_report *r;
+    uint8_t *cbw, *data, *csw;
+    if (!t || !t->in_producer || !t->out_producer || !t->buffers || !payload ||
+        !t->cursor || !t->op || !t->rt || !t->db || !t->events ||
+        lba > g_pi4_xhci_storage.last_lba ||
+        t->sequence >= UINT32_MAX - PI4_XHCI_DMA_BOT_INQUIRY_TAG - 1u)
+        return 0;
+    bytes = g_pi4_xhci_storage.block_bytes;
+    if (!pi4_xhci_dma_bot_block_size_ok(bytes) ||
+        bytes > PI4_XHCI_DMA_BOT_MAX_BLOCK_BYTES) return 0;
+    cbw = t->buffers + PI4_XHCI_DMA_BOT_CBW_OFFSET;
+    data = t->buffers + PI4_XHCI_DMA_BOT_SECTOR_OFFSET;
+    csw = t->buffers + PI4_XHCI_DMA_BOT_CSW_OFFSET;
+    number = t->sequence++;
+    r = &t->last;
+    pi4_dma_zero_bytes((uint8_t *)(void *)r, sizeof(*r));
+    r->opcode = 0x2au; r->bytes = bytes; r->lba = lba;
+    r->tag = PI4_XHCI_DMA_BOT_INQUIRY_TAG + number + 1u;
+    r->scsi_status = UINT32_MAX;
+    r->sense_key = r->sense_asc = r->sense_ascq = UINT32_MAX;
+    for (unsigned i = 0; i < 3u; i++) {
+        r->io.rc[i] = r->io.status[i] = r->io.control[i] = UINT32_MAX;
+        r->io.parameter[i] = UINT64_MAX;
+    }
+    if (pi4_xhci_dma_bot_write10_cbw_seed(cbw, PI4_XHCI_DMA_BOT_CBW_BYTES,
+            r->tag, lba, g_pi4_xhci_storage.last_lba, bytes) != 0)
+        return 0;
+    for (unsigned i = 0; i < bytes; i++) data[i] = payload[i];
+    if (!pi4_xhci_dma_bot_transfer(t->op, t->rt, t->db, t->events, t->event_bus,
+            t->cursor, t->slot, t->out_dci, t->out_ring, t->out_bus, 0u,
+            cbw, t->buffers_bus + PI4_XHCI_DMA_BOT_CBW_OFFSET,
+            PI4_XHCI_DMA_BOT_CBW_BYTES, 0u, 0u, 0u, t->out_producer, &r->io) ||
+        !pi4_xhci_dma_bot_transfer(t->op, t->rt, t->db, t->events, t->event_bus,
+            t->cursor, t->slot, t->out_dci, t->out_ring, t->out_bus, 0u,
+            data, t->buffers_bus + PI4_XHCI_DMA_BOT_SECTOR_OFFSET,
+            bytes, 1u, 0u, 0u, t->out_producer, &r->io) ||
+        !pi4_xhci_dma_bot_transfer(t->op, t->rt, t->db, t->events, t->event_bus,
+            t->cursor, t->slot, t->in_dci, t->in_ring, t->in_bus, 0u,
+            csw, t->buffers_bus + PI4_XHCI_DMA_BOT_CSW_OFFSET,
+            PI4_XHCI_DMA_BOT_CSW_BYTES, 2u, 1u, 0u, t->in_producer, &r->io))
+        return 0;
+    for (unsigned i = 0; i < PI4_XHCI_DMA_BOT_CSW_BYTES; i++) r->csw[i] = csw[i];
+    r->transport_ok = pi4_xhci_dma_bot_csw_valid(csw, r->io.actual[2],
+        r->tag, bytes, r->io.actual[1], &r->scsi_status);
+    return r->transport_ok && r->scsi_status == 0u && r->io.actual[1] == bytes;
+}
+
 static int pi4_xhci_dma_storage_read_retry(struct pi4_xhci_bot_transport *t,
         unsigned opcode, uint32_t lba) {
     for (unsigned attempt = 0; attempt < 3u; attempt++) {

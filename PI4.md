@@ -24,6 +24,15 @@ GICv2, framebuffer, VL805 DMA, read-only USB storage and basic input now have
 physical evidence below, and the native desktop/basic input milestone is accepted.
 Native SD, writable persistence and Pi installation remain work.
 
+The current checkout adds an internal one-block USB BOT WRITE(10) transport
+path for a retained live xHCI session. `make check-pi4-xhci-dma` passes the
+bounded WRITE(10) CBW encoding checks, and the Pi desktop kernel compiles with
+the transfer path. This is only transport groundwork: the Pi filesystem and
+ZealC source writer still have no write callback, the path is not exposed as a
+shell command, and no physical write/read-back has been accepted. The Pi
+storage route therefore remains read-only until a mounted-volume writer,
+durability handling, and read-back verification are integrated.
+
 ## Boot-stage HDMI bars (PI-DIAG-1)
 
 `make pi-sd` ships **distinct** ELFs (`zealbooter-pi.elf` / `kernel-pi.elf`) built with
