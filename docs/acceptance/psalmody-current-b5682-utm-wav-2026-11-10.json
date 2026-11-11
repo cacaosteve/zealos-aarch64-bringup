@@ -1,0 +1,33 @@
+{
+  "date": "2026-11-10",
+  "repository_commit": "5246528",
+  "upstream_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "target": "UTM-bundled QEMU, HVF, AArch64 PCI guest, one vCPU, 1 GiB RAM, VirtIO keyboard/tablet and VirtIO sound WAV backend",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "b5682ca299f6709d456e82e69cce5ee565a3efb043b413b668233cda6afbdd68",
+  "kernel_sha256": "cfa2202f654a4d5d76768c957384b93a50e34a58fd2ecc6793c43d47bf9276cd",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device -audiodev wav,id=sound0,path=build/psalmody-current-b5682-rerun.wav -device virtio-sound-pci,audiodev=sound0' ZEAL_COMPAT_LOG_PATH=build/check-psalmody-current-b5682-rerun.log python3 -u scripts/check-compat.py --pci --quick --probe-psalmody --probe-psalmody-audio-timer",
+  "exit_code": 0,
+  "result": "pass",
+  "verified": [
+    "Psalmody opened in the graphical terminal, recording toggled on, and H entered a C note.",
+    "QEMU WAV captured a 520 Hz tone in the three 50 ms windows after the leading transition; the note is C5.",
+    "Shift+Escape exited playback, the graphical terminal evaluated 40+2 as 42, and zstatus reported failed=0.",
+    "The experimental audio timer delivered nine IRQs during the run."
+  ],
+  "log": "build/check-psalmody-current-b5682-rerun.log",
+  "log_sha256": "813d0147a0d5e76a870e37d18876b93aa0dce82f8337b6dbff092197997bc9e0",
+  "wav": "build/psalmody-current-b5682-rerun.wav",
+  "wav_sha256": "6fde75acb5ba338508d3fa15d5859843ab3e834c6b8bc527791cb8607ac01a2e",
+  "audio_capture": {
+    "sample_rate_hz": 44100,
+    "channels": 2,
+    "sample_width_bits": 16,
+    "frames": 11466,
+    "seconds": 0.26,
+    "peak": 7000,
+    "rms": 5781.9,
+    "positive_zero_crossing_frequency_hz_by_50ms_window": [320, 520, 520, 520]
+  },
+  "scope_note": "This is automated QEMU/WAV evidence for the exact current ISO, not a live UTM audible-output check. The 0.26-second capture includes the generated C5 note but does not establish extended song playback. The user previously reported hearing a Psalmody note through Pi HDMI, but that report was not reproduced against this exact image in this run."
+}
