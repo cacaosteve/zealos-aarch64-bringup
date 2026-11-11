@@ -1,0 +1,53 @@
+{
+  "date": "2026-11-11",
+  "repository_commit": "e1376177efc1742f1bf90325882a1a967a870f18",
+  "target": "AArch64 guest in UTM-bundled QEMU/HVF, one vCPU, virtio-ramfb, VirtIO keyboard and tablet",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "9a0d1433529e41b2cda6c36daef7255a7afdbe40c7f4f875bb305784fc56556a",
+  "kernel_sha256": "261bafde12c94029ebc46064a7fc650b66b3ec98e0a9ae0f5eaf9a774d3235d9",
+  "check_compat_sha256": "92bf054963823678c69c6090ac28409bdc1b12fac40a8763553956c4f2e31b96c",
+  "results": [
+    {
+      "apps": ["Span", "Strut"],
+      "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-current-span-strut-9a0d.log python3 -u scripts/check-compat.py --pci --quick --probe-span-strut",
+      "log": "build/check-current-span-strut-9a0d.log",
+      "log_sha256": "87d56fee85ef6593a13387d1920cbc48667b91e354df19b112b2828f192056d9",
+      "exit_code": 0,
+      "checks": [
+        "Span opened its help and bridge canvas, rendered a frame, and returned to the graphical terminal with Shift+Escape.",
+        "Strut accepted edit/play input, rendered and connected two masses with a spring, moved its world with the thruster, and returned through Escape with zstatus failed=0."
+      ]
+    },
+    {
+      "apps": ["Vocabulary"],
+      "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-current-vocabulary-9a0d.log python3 -u scripts/check-compat.py --pci --quick --probe-vocabulary",
+      "log": "build/check-current-vocabulary-9a0d.log",
+      "log_sha256": "3ba3bc3fef11d8916767298d00c8a1bb0c765172893d18067c7136c85795f5ad",
+      "exit_code": 0,
+      "checks": [
+        "Vocabulary accepted an answer, advanced the quiz, exited through Escape, and recovered to a graphical terminal with zstatus failed=0."
+      ]
+    },
+    {
+      "apps": ["TimeClock"],
+      "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-current-timeclock-9a0d.log python3 -u scripts/check-compat.py --pci --quick --probe-timeclock",
+      "log": "build/check-current-timeclock-9a0d.log",
+      "log_sha256": "61c50a1041b2133a04ae1f92eacd8f02989e21a40d3bb2d8e561b86aa62c8dad",
+      "exit_code": 0,
+      "checks": [
+        "TimeClock loaded, accepted punch-in/out descriptions, saved and reread the report, then recovered to the graphical terminal with zstatus failed=0."
+      ]
+    },
+    {
+      "apps": ["Psalmody"],
+      "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-current-psalmody-9a0d.log python3 -u scripts/check-compat.py --pci --quick --probe-psalmody",
+      "log": "build/check-current-psalmody-9a0d.log",
+      "log_sha256": "ed6963738a7cb1fa9e509fdc1ade477164afc990be40d78ed41c44de7b5cb224",
+      "exit_code": 0,
+      "checks": [
+        "Psalmody opened its editor, accepted note entry and playback input, handled Shift+Escape, and recovered to the graphical terminal with zstatus failed=0."
+      ]
+    }
+  ],
+  "scope_note": "These are current-image automated interaction and recovery checks using UTM-bundled QEMU. They do not establish visible UTM-window behavior or audible Psalmody output."
+}
