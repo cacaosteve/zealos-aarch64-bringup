@@ -59,7 +59,11 @@ enumeration, nested/case-insensitive reads, empty-file semantics and source
 store persistence across a cold boot. The probe expects the ARM64 bridge's
 `disk:/` current-directory spelling; it does not validate writable RedSea or
 general drive mounting. The Beep fixture check does not measure audio
-output. See the
+output. A new read-only check confirms stock `DiskCheck` completes against a
+malformed bounded RedSea fixture, reports one consistency error, and does not
+fail the guest; it does not enable repair on malformed metadata. See the
+[malformed scan check](docs/acceptance/demo-tosmisc-diskcheck-malformed-redsea-qemu-2026-11-11.json),
+along with the
 [absent-drive check](docs/acceptance/demo-tosmisc-diskcheckall-current-qemu-2026-11-11.json),
 [mounted-RedSea check](docs/acceptance/demo-tosmisc-diskcheckall-redsea-qemu-2026-11-11.json),
 and [empty-root repair check](docs/acceptance/demo-tosmisc-diskcheck-repair-redsea-qemu-2026-11-11.json)
