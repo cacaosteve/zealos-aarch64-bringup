@@ -1,0 +1,27 @@
+{
+  "date": "2026-11-11",
+  "target": "AArch64 native ZealC under UTM-bundled QEMU with HVF, one vCPU, virtio-ramfb, VirtIO keyboard and tablet",
+  "source_bundle_revision": "eee210f4379b",
+  "iso_path": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "36969fffef6a40dd9bb66153422b7ac4a69a632aa8306de5caafca60b8bef117",
+  "kernel_sha256": "cfa2202f654a4d5d76768c957384b93a50e34a58fd2ecc6793c43d47bf9276cd",
+  "source_sha256": "f9649e95680f0cb91bb91c7ee5b43bd54d48ec287ddce6b2b38d4425f8535ceb",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-keepaway-clean-iso.log python3 -u scripts/check-compat.py --pci --quick --probe-3d-apps --probe-keepaway-full-game",
+  "exit_code": 0,
+  "result": "pass in automated UTM-bundled QEMU profile",
+  "checks": {
+    "GrModels": "The quick 3D app path completed its forms, mesh generation, raster work and terminal recovery checks.",
+    "KeepAway": [
+      "The court, HUD and player rendered; Space/mouse input and HUD refresh passed.",
+      "The full game ran for 186 seconds through 18 repeated input cycles; scanout continued updating.",
+      "Escape restored the desktop terminal and focus; no Animate task remained; zstatus reported failed=0."
+    ],
+    "Titanium": "The quick 3D app launch/gameplay/input/Escape checks completed in the same regression. Live UTM testing separately confirmed Left, Right, Space and Escape."
+  },
+  "log": "build/check-keepaway-clean-iso.log",
+  "log_sha256": "c54a57743d14c436f76c4a30786613d05fe91e8775a2e1174529f43202eebbc2",
+  "live_utm_status": {
+    "KeepAway": "Still open: an earlier visible UTM session froze according to the user. This separate automated QEMU run did not reproduce it, so it does not close live UTM acceptance."
+  },
+  "scope_note": "Full-game automated QEMU acceptance of the rebuilt ISO, not live UTM UI or physical Pi acceptance."
+}
