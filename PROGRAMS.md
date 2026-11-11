@@ -28,15 +28,16 @@ same 193/290 result; the current-image manifest and per-file output are in
 [`program-catalog-full-qemu-current-2026-11-10.json`](docs/acceptance/program-catalog-full-qemu-current-2026-11-10.json).
 
 The dependency-aware Demo inventory is separate from that 290-source sample:
-all 206 pinned Demo `.ZC` files compile, and 201 have explicit QEMU runtime
-acceptance; five remain partial. Those are `TimeIns`, two TOS account
-examples, `MultiCore/Lock`, and `MultiCore/MPRadix`. The multicore examples
-are partial because the current guest runtime exposes one CPU; the stock
-`TimeIns` optimizer trace is not implemented by the ARM64 compiler; the TOS
-account examples still have workflow coverage gaps. `TOSExtern` is accepted
+all 206 pinned Demo `.ZC` files compile, and 202 have explicit QEMU runtime
+acceptance; four remain partial. Those are the two TOS account examples
+(`TOSDistro` and `TOSMisc`) and `MultiCore/Lock`/`MultiCore/MPRadix`. The
+multicore examples are partial because the current guest runtime exposes one
+CPU; the TOS account examples still have workflow coverage gaps. The ARM64
+`TimeIns` adaptation has runtime acceptance, while the pinned stock source's
+optimizer `PassTrace` diagnostic is not implemented. `TOSExtern` is accepted
 at its interface-module scope: its forms and external declarations load and
 resolve, while the external routines and dependent workflows remain
-unverified. These are source entries, not necessarily five independently
+unverified. These are source entries, not necessarily four independently
 launchable apps. The installed
 `WallPaperDesktop` workflows now pass QEMU coverage for all six controls,
 palette save/reopen, Home and Terminal shells, NetLog, and a local Telnet
@@ -465,10 +466,10 @@ in [the program inventory](docs/PROGRAM-INVENTORY-2026-10-28.md). The
 source-level ledger at
 [`demo-source-ledger-2026-11-10.json`](docs/acceptance/demo-source-ledger-2026-11-10.json)
 records the 206 Demo `.ZC` compile results. Its current totals are 206 compile
-passes, zero compile blockers, 201 runtime-accepted sources, five partial
-runtime results, and zero recorded runtime failures. The five partial sources
-are `/Demo/TimeIns.ZC`, two TOS account examples
-(`/Demo/AcctExample/TOS/TOSDistro.ZC` and `TOSMisc.ZC`), and the two multicore
+passes, zero compile blockers, 202 runtime-accepted sources, four partial
+runtime results, and zero recorded runtime failures. The four partial sources
+are the two TOS account examples
+(`/Demo/AcctExample/TOS/TOSDistro.ZC` and `TOSMisc.ZC`) and the two multicore
 examples (`/Demo/MultiCore/Lock.ZC` and `MPRadix.ZC`). `TOSExtern.ZC` is
 accepted as a declaration-only interface module; its external implementations
 and dependent workflows are not thereby accepted. See its
