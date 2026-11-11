@@ -513,10 +513,14 @@ its label in the popup, and returns with Escape to a healthy terminal; this is
 automated QEMU evidence, not a visible UTM or Pi test. JukePuppet song playback
 and audible output remain unverified ([JukeBox acceptance](docs/acceptance/jukebox-current-qemu-2026-11-10.json)). Other TOS workflows remain unverified
 ([acceptance](docs/acceptance/demo-tosmisc-current-qemu-2026-11-10.json)).
-On an earlier ISO (`f17ed84e…`), TOSMisc's helper checks and the
-`JukeSongsPuppet` call with a disposable one-song fixture returned cleanly to
-the terminal. The short WAV and QEMU backend warning do not prove the song
-played ([earlier-image check](docs/acceptance/demo-jukepuppet-exact-current-f17-2026-11-10.json)).
+JukePuppet is still open. A corrected completion probe with a disposable
+one-song fixture shows `JukeSongsPuppet` selecting the song and launching
+JukeBox, but it does not return within 120 seconds; the earlier apparent pass
+matched its sentinel in the typed command itself. The configured QEMU sound
+backend also reports that it cannot create `virtio-sound.in`, so its short WAV
+does not prove the song played. Inspect ARM64 `TaskCaller`/debug-info progress
+and rerun with a working audio backend before accepting this path
+([latest check](docs/acceptance/demo-jukepuppet-timeout-qemu-2026-11-10.json)).
 The same heap-routing fix preserves the GrModels, KeepAway and Titanium QEMU
 app checks; the fresh regression log is recorded
 [here](docs/acceptance/three-d-apps-heap-fix-qemu-2026-11-10.json).

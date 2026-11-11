@@ -1,0 +1,32 @@
+{
+  "date": "2026-11-10",
+  "target": "UTM-bundled QEMU framework, HVF, one vCPU, 1 GiB RAM, virtio-ramfb, VirtIO keyboard/tablet, virtio-sound WAV backend",
+  "repository_commit": "8928775392815c4b6cd6b1e898612bff266a8978",
+  "sources": {
+    "/Demo/AcctExample/TOS/TOSMisc.ZC": "ee141104e1476df4a08925447be33fa7ba42dbc4c989ec0d374851263af1f616",
+    "/Apps/Psalmody/JukePuppet.ZC": "9fcfb2ebd77050c93166b14078870a0ea104ce3bd9b923f580a92fdbd909e5ae",
+    "/Apps/Psalmody/Examples/childish.ZC": "ae4049d7fe73c91f7a0854c7549f15ca6ad6114f9775001a53724c325393deb9"
+  },
+  "result": "incomplete: JukeSongsPuppet launched JukeBox and printed the selected song path, but did not return or print the post-call sentinel within 120 seconds; graphical-terminal recovery could not be tested",
+  "verified": [
+    "The disposable guest received /Tests/TOSMiscJuke/childish.ZC, and JukeSongsPuppet selected that path; QEMU's guest trace contains the JukeBox invocation.",
+    "A corrected completion sentinel was absent from the graphical output after 120 seconds. The earlier probe was a false positive because its expected text also appeared inside the typed command; that result must not be treated as a pass.",
+    "The QEMU log reports that it could not create a backend for virtio-sound.in. The 0.28-second WAV capture is not attributable to the song and does not verify audible playback.",
+    "Other TOSMisc checks in this run passed: printable ASCII OCR, literal dollar encoding, SoundShift/AUWrite/FileRead, synthetic GR movie round trip, ScreenCast GR/AU capture, and MemTest."
+  ],
+  "next": "Inspect the ARM64 guest TaskCaller/debug-info progress used by JukePuppet's SongPuppet loop, then rerun with a sound backend that actually accepts virtio-sound output. Keep JukePuppet song playback and terminal recovery marked open until both return and attributable PCM are verified.",
+  "log": "build/check-tosmisc-jukepuppet-current.log",
+  "log_sha256": "8c0ae11d2a62f960839d9585015f3930745de058570d94dd4ae1265e0178a1d8",
+  "wav": "build/tosmisc-jukepuppet-current.wav",
+  "wav_sha256": "64d5abba4e5e6352a94d441d5d42b5b66e00d9a1e4fe358194b7f5c482b04957",
+  "audio_capture": {
+    "sample_rate_hz": 44100,
+    "channels": 2,
+    "frames": 12348,
+    "seconds": 0.28,
+    "nonzero_samples": 24696,
+    "peak": 7000,
+    "qemu_warning": "Could not create a backend for voice virtio-sound.in"
+  },
+  "scope_note": "Automated UTM-bundled QEMU run only; not a live UTM UI or physical Pi result. The user separately confirmed Psalmody playback through Pi HDMI, but that does not validate JukeSongsPuppet's automatic song-selection/completion path."
+}
