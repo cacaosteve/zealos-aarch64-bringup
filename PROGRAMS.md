@@ -34,8 +34,11 @@ acceptance; four remain partial. Those are the two TOS account examples
 multicore examples are partial because the current guest runtime exposes one
 CPU. On the 2026-11-11 ISO, TOSMisc's MemTest and Psalmody JukePuppet's
 stock-song and Beep-fixture execution/cleanup pass on a disposable QEMU disk.
-Its DiskCheckAll path still needs a stock drive-registry workflow; the Beep
-fixture check does not measure audio output. On the fresh `80cd189a…` image,
+Its ARM64 `DiskCheckAll` adaptation skips the source-backed C volume and an
+absent optional D drive without throwing; checking or repairing an attached
+RedSea/FAT32 drive remains open. The Beep fixture check does not measure audio
+output. See the [DiskCheckAll follow-up](docs/acceptance/demo-tosmisc-diskcheckall-current-qemu-2026-11-11.json).
+On the fresh `80cd189a…` image,
 TOSDistro's `DistroPrep` now copies and text-converts the full source tree and
 recovers cleanly. The subsequent `MakeStdDistro` flow remains incomplete:
 `BootDVDIns` is an explicit `ArmBoot` stub for x86 BIOS image generation, and

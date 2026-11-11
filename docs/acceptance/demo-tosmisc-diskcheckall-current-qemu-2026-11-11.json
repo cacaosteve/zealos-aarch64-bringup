@@ -1,0 +1,27 @@
+{
+  "date": "2026-11-11",
+  "target": "UTM-bundled QEMU, AArch64 PCI, one vCPU, disposable ISO source volume",
+  "iso_sha256": "dc13e9cb64a324a6cc86d485da143628f909caa89da4de8b27c12cd1f0a2df52",
+  "kernel_sha256": "55536307b44768abf98ab8eb64369448394ff78e24b46cbbddd5dd09d4ef5ae1",
+  "source_bundle_sha256": "6e9c48b5c714505530880e5822ac6b629ab5410c1b55741ddc33b2fbbdb476a2",
+  "source_sha256": "ee141104e1476df4a08925447be33fa7ba42dbc4c989ec0d374851263af1f616",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device -netdev user,id=net0 -device virtio-net-pci,netdev=net0,disable-legacy=on' ZEAL_COMPAT_LOG_PATH=build/check-tosmisc-diskcheckall-current-latest.log python3 -u scripts/check-compat.py --pci --quick --probe-demo-system-context --demo-system-path /Demo/AcctExample/TOS/TOSMisc.ZC --demo-system-module /Demo/AcctExample/TOS/TOSConfig.ZC --demo-system-module /System/Gr/ScreenCast.ZC --demo-system-module /System/BlkDev/DiskCheck.ZC --demo-system-module /Apps/Psalmody/Load.ZC --demo-system-module /Demo/AcctExample/TOS/TOSMisc.ZC",
+  "result": "pass: DiskCheckAll safely skips non-block source volume C and absent optional D; other TOSMisc/JukePuppet runtime checks passed",
+  "verified": [
+    "TOSInit reports the default TOS drive configuration.",
+    "DiskCheckAll returns without a Drive exception when the configured C volume is source-backed and no D block drive is mounted.",
+    "TOSMisc exact-font OCR and MemTest pass.",
+    "JukePuppet stock-song and Beep-fixture execution/cleanup pass.",
+    "The graphical terminal recovers and final zstatus reports failed=0."
+  ],
+  "limits": [
+    "The ARM64 adaptation only invokes the stock checker for present RedSea/FAT32 drives; this run had no physical RedSea/FAT32 drive mounted.",
+    "Repair behavior and DiskCheckAll with an attached writable drive remain unverified.",
+    "Live UTM UI and physical Pi behavior are not established by this headless QEMU run."
+  ],
+  "log": "build/check-tosmisc-diskcheckall-current-latest.log",
+  "log_sha256": "c801328091c9d81cc007af259cbe6d0e43ac14d12215f10f8d307734b06447a2",
+  "check_compat_sha256": "8281051f9a1e7297aaf98cf6c67e66efed71ef3ee13fe41d0dfa2fc5127c3dde",
+  "source_overlay_sha256": "610dc2af90c9d9426b107f70a5ae421d08bfce1a2f1e2b833350343d8fee7bb8",
+  "source_bundle_builder_sha256": "83a46cda1d7ed8b84c6af140fd4874fedd2519e346c1fe1982e4c99bcd75d6b1"
+}

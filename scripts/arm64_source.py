@@ -3975,6 +3975,47 @@ def translate_jukepuppet_song_mask(source: bytes) -> bytes:
     return source
 
 
+def translate_tos_misc_diskcheck(source: bytes) -> bytes:
+    """Run TOSMisc's DiskCheckAll only on available supported filesystems.
+
+    The stock TOS drive list includes C and D. In the ARM64 source-backed
+    runtime, C is the boot/source namespace rather than a block filesystem,
+    and D is optional. Passing an absent D to the stock checker throws a
+    Drive exception. Keep the stock checker for attached RedSea/FAT32 drives,
+    while skipping unregistered or non-checkable volumes.
+    """
+    old = (b'public U0 DiskCheckAll()\n'
+           b'{//DiskCheck on C & D.\n'
+           b'\tU8 *ptr = TOS_HDS;\n'
+           b'\n'
+           b'\twhile (*ptr)\n'
+           b'\t{\n'
+           b'\t\t"DiskCheck(\'%c\')\\n", *ptr;\n'
+           b'\t\tDiskCheck(*ptr++, TRUE);\n'
+           b'\t}\n'
+           b'}')
+    new = (b'public U0 DiskCheckAll()\n'
+           b'{//DiskCheck on configured C & D drives.\n'
+           b'\tU8 *ptr = TOS_HDS;\n'
+           b'\tCDrive *drive;\n'
+           b'\n'
+           b'\twhile (*ptr)\n'
+           b'\t{\n'
+           b'\t\tdrive = Letter2Drive(*ptr, FALSE);\n'
+           b'\t\tif (drive && drive->drive_signature == DRIVE_SIGNATURE_VAL &&\n'
+           b'\t\t\t(drive->fs_type == FSt_REDSEA || drive->fs_type == FSt_FAT32))\n'
+           b'\t\t{\n'
+           b'\t\t\t"DiskCheck(\'%c\')\\n", *ptr;\n'
+           b'\t\t\tDiskCheck(*ptr, TRUE);\n'
+           b'\t\t}\n'
+           b'\t\tptr++;\n'
+           b'\t}\n'
+           b'}')
+    if source.count(old) != 1:
+        raise ValueError('pinned TOSMisc DiskCheckAll body changed')
+    return source.replace(old, new, 1)
+
+
 def translate_make_home_dependency(source: bytes) -> bytes:
     """Load MakeHome's kernel/compiler and disk helpers before MakeUtils."""
     old = (b'#include "/System/Boot/MakeBoot"\n'

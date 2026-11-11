@@ -10,6 +10,7 @@ import tarfile
 from arm64_source import translate_docputs_exception_cleanup
 from arm64_source import translate_docfile, translate_debug_compat, extract_source_dates, extract_string_utilities, translate_budget_strings, translate_span_worker_cleanup, translate_keepaway_nearest_ball, translate_xcaliber_shot_return, translate_xcaliber_draw_visibility, translate_xcaliber_key_descriptors, translate_xcaliber_fire_trace, translate_xcaliber_escape_scan, translate_xcaliber_held_input, translate_tothefront_draw, translate_tothefront_init, translate_tothefront_player_pick, translate_tothefront_ai, translate_tothefront_sentinel, extract_keyboard_helpers, translate_math, translate_conversion_math, translate_f32_math, translate_vec3_math, translate_vec4_math, translate_mat4_math, translate_ndarray_math, translate_math_test_dependencies, translate_sysrep_processor, translate_cpurep_arm64, translate_pick3d_class_terminator, translate_classmeta_callback, translate_mandel_single_cpu, translate_lighttable_memory_prompt, translate_make_tos_dependency, translate_make_home_dependency, translate_legacy_kernel_header, translate_tos_config_boot_memory, translate_memrep_arm64, translate_profiler_idle_sentinel, translate_interrupt_demo_svc, translate_andnotmod_benchmark, translate_pci_interrupts_gic_note, translate_multicore_interrupts_cooperative, translate_multicore_radix_single_cpu, translate_multicore_loadtest_jit, translate_multicore_lock_single_cpu, translate_blackdiamond_math_dependency, translate_elephant_walk_default_dc, translate_compile_demo, translate_cartesian_plot_color, translate_low_pass_filter_sampling, translate_polezeros_math_dependency, translate_symmetry_message_masks, translate_home_localize, translate_home_wrappers
 from arm64_source import translate_jukepuppet_song_mask
+from arm64_source import translate_tos_misc_diskcheck
 from arm64_source import (extract_god_timer_pick, translate_palette_editor,
                           translate_fonted_draw_callback,
                           translate_wallpaper_compiler_stat, translate_wallpaper_desktop)
@@ -916,6 +917,11 @@ U0 TelnetDisconnect()
             data = translate_jukepuppet_song_mask(data)
         except ValueError as exc:
             raise SystemExit(f'ARM64 JukePuppet song-file overlay no longer applies: {exc}') from exc
+    if rel == 'Demo/AcctExample/TOS/TOSMisc.ZC':
+        try:
+            data = translate_tos_misc_diskcheck(data)
+        except ValueError as exc:
+            raise SystemExit(f'ARM64 TOSMisc overlay no longer applies: {exc}') from exc
     if rel == 'Demo/MultiCore/MPPrint.ZC':
         # CPU 0 is the only active worker in the current ARM64 runtime. The
         # stock color expression maps it to BLACK, invisible on the graphical

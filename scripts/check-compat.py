@@ -2480,6 +2480,17 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 })
             if (all(m['loaded'] for m in module_loads) and
                     '/Demo/AcctExample/TOS/TOSMisc.ZC' in args.demo_system_module):
+                output = command('zc DiskCheckAll;', 'zc: executed', timeout=45)
+                if 'zc: executed' not in output:
+                    raise RuntimeError(
+                        'TOSMisc DiskCheckAll did not safely skip the source volume and absent optional D drive:\n'
+                        + output)
+                runtime_checks.append({
+                    'name': 'TOSMisc DiskCheckAll skips the source-backed C volume and absent optional D drive without throwing',
+                    'passed': True,
+                    'output': output,
+                    'scope': 'no physical RedSea/FAT32 drive mounted; this does not exercise DiskCheck on an attached filesystem',
+                })
                 # Exercise the non-destructive OCR helper with a one-glyph
                 # bitmap synthesized from the active system font. The source
                 # also contains disk-formatting and capture helpers, so avoid

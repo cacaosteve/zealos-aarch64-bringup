@@ -34,7 +34,8 @@ from arm64_source import (translate_mandel_single_cpu,
                           translate_multicore_lock_single_cpu,
                           translate_ring3_svc)
 from arm64_source import (translate_tos_config_boot_memory,
-                          translate_jukepuppet_song_mask)
+                          translate_jukepuppet_song_mask,
+                          translate_tos_misc_diskcheck)
 from arm64_source import translate_elephant_walk_default_dc
 from arm64_source import translate_fonted_draw_callback, translate_wallpaper_compiler_stat
 
@@ -235,6 +236,21 @@ except ValueError:
 else:
     raise AssertionError('TOSConfig overlay accepted changed boot-memory source')
 print('PASS guarded ARM64 TOSConfig disabled-debug-distro overlay')
+tos_misc_source = (root/'upstream/pinned/Demo/AcctExample/TOS/TOSMisc.ZC').read_bytes()
+tos_misc_overlay = translate_tos_misc_diskcheck(tos_misc_source)
+assert b'drive = Letter2Drive(*ptr, FALSE);' in tos_misc_overlay
+assert b'drive->drive_signature == DRIVE_SIGNATURE_VAL' in tos_misc_overlay
+assert b'drive->fs_type == FSt_REDSEA || drive->fs_type == FSt_FAT32' in tos_misc_overlay
+assert b'DiskCheck(*ptr, TRUE);' in tos_misc_overlay
+assert b'DiskCheck(*ptr++, TRUE);' not in tos_misc_overlay
+try:
+    translate_tos_misc_diskcheck(tos_misc_source.replace(
+        b'DiskCheck(*ptr++, TRUE);', b'DiskCheck(*ptr++, FALSE);', 1))
+except ValueError:
+    pass
+else:
+    raise AssertionError('TOSMisc overlay accepted a changed DiskCheckAll body')
+print('PASS guarded TOSMisc DiskCheckAll skips absent/unsupported ARM64 drives')
 interrupt_demo_source = (root/'upstream/pinned/Demo/Lectures/InterruptDemo.ZC').read_bytes()
 interrupt_demo_overlay = translate_interrupt_demo_svc(interrupt_demo_source)
 assert b'\nasm {' not in interrupt_demo_overlay
@@ -420,8 +436,10 @@ jukepuppet_source = (root/'upstream/pinned/Apps/Psalmody/JukePuppet.ZC').read_by
 jukepuppet_overlay = translate_jukepuppet_song_mask(jukepuppet_source)
 assert b'FilesFind("*.ZC", FUF_RECURSE | FUF_JUST_FILES)' in jukepuppet_overlay
 assert b'FUF_JUST_TXT' not in jukepuppet_overlay
-assert (b'MessagePost(juke_task->popup_task, MESSAGE_KEY_DOWN_UP, CH_ESC, 0);\n'
-        b'\tTaskWait(juke_task->popup_task);\n\tSleep(500);') in jukepuppet_overlay
+assert b'task = SingleSong(st, st2);' in jukepuppet_overlay
+assert b'SongPuppet(task, passes);' in jukepuppet_overlay
+assert b'Kill(task);' in jukepuppet_overlay
+assert b'JukeBox(' not in jukepuppet_overlay
 try:
     translate_jukepuppet_song_mask(jukepuppet_source.replace(
         b'FUF_JUST_TXT', b'FUF_JUST_DD', 1))
@@ -429,15 +447,7 @@ except ValueError:
     pass
 else:
     raise AssertionError('JukePuppet overlay accepted a changed text-only song filter')
-try:
-    translate_jukepuppet_song_mask(jukepuppet_source.replace(
-        b'MessagePost(juke_task->popup_task, MESSAGE_KEY_DOWN_UP, CH_SPACE, 0);',
-        b'MessagePost(juke_task->popup_task, MESSAGE_KEY_DOWN_UP, CH_ENTER, 0);', 1))
-except ValueError:
-    pass
-else:
-    raise AssertionError('JukePuppet overlay accepted a changed song-start gesture')
-print('PASS guarded JukePuppet song discovery and Space/Escape run gesture', flush=True)
+print('PASS guarded JukePuppet song discovery and direct puppet cleanup', flush=True)
 xcaliber_source = (root / 'upstream/pinned/Apps/X-Caliber/X-Caliber.ZC').read_bytes()
 xcaliber_overlay = translate_xcaliber_shot_return(xcaliber_source)
 assert xcaliber_overlay != xcaliber_source
