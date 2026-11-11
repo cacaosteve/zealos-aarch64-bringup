@@ -8854,7 +8854,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                                 'U8 *rs_saved_dir=StrNew(Fs->cur_dir); '
                                 'Bool rs_drive_selected=Drive(\'D\'); '
                                 'Print("rs_drive_select_ok=%d\\n",rs_drive_selected && '
-                                'Fs->cur_dv==&zc_legacy_redsea_drive && !StrCompare(Fs->cur_dir,"/")); '
+                                'Fs->cur_dv==&zc_legacy_redsea_drive && !StrCompare(Fs->cur_dir,"disk:/")); '
                                 'Fs->cur_dv=rs_saved_drive; Free(Fs->cur_dir); Fs->cur_dir=rs_saved_dir;',
                                 'rs_drive_select_ok=1')
                         command('zc CDrive *rs_saved_drive=Fs->cur_dv; '

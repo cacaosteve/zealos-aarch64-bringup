@@ -53,9 +53,12 @@ repair scan to retain an allocated `KEEP.ZC` file while reclaiming a separate
 orphan allocation; read-back and a second clean scan pass. A nested `SUB/KEEP.ZC`
 fixture now also confirms directory enumeration preserves both the nested
 directory and file allocations while reclaiming only the orphan. Malformed
-directory repair and FAT32 remain open. A separate broader stock-file probe
-still stops at its `Drive('D')` selection assertion; that failure reproduces
-against the pre-change source. The Beep fixture check does not measure audio
+directory repair and FAT32 remain open. The current image also passes the
+broader read-only stock RedSea file probe: D: selection, relative current-drive
+enumeration, nested/case-insensitive reads, empty-file semantics and source
+store persistence across a cold boot. The probe expects the ARM64 bridge's
+`disk:/` current-directory spelling; it does not validate writable RedSea or
+general drive mounting. The Beep fixture check does not measure audio
 output. See the
 [absent-drive check](docs/acceptance/demo-tosmisc-diskcheckall-current-qemu-2026-11-11.json),
 [mounted-RedSea check](docs/acceptance/demo-tosmisc-diskcheckall-redsea-qemu-2026-11-11.json),
