@@ -515,8 +515,11 @@ passes the TOSMisc checks, MemTest, and stock plus looping-fixture
 `JukeSongsPuppet` paths; the terminal recovers and `zstatus` reports no failed
 tasks. The module-context harness now fails explicitly if a requested module
 does not load. See the [current TOSMisc check](docs/acceptance/tosmisc-current-song-memory-qemu-2026-11-11.json).
-`DiskCheckAll`, repair behavior, and its configured-drive workflow remain
-unverified. The ARM64 `JukeSongsPuppet` adapter launches stock `.ZC`
+The `DiskCheckAll` follow-up probe currently fails at `DiskCheck('C')` with an
+uncaught `Drive` exception: the ARM64 bridge has no writable C drive object or
+stock `Drive()` implementation. The probe stopped before disk repair or mutation;
+implementing the shared block-device/filesystem bridge is required before the
+configured-drive workflow can pass ([acceptance](docs/acceptance/tosmisc-current-song-memory-qemu-2026-11-11.json)). The ARM64 `JukeSongsPuppet` adapter launches stock `.ZC`
 songs directly through JukeBox's `SingleSong` path. The QEMU regression
 returned from both the stock song and a looping Beep fixture; the fixture wrote
 markers before and after entering `Song`, the graphical terminal recovered,

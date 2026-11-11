@@ -9,7 +9,7 @@
   "iso_sha256": "0e816d41ec5570054ac10e40a401691bb6a4c2bbcba03ca7e045184014408af2",
   "kernel_sha256": "411623ed6d0779007f7d0f436ba7d26d60d40d4551660b5c1db61746d271e28e",
   "command": "ZEAL_COMPAT_LOG_PATH=build/check-tosmisc-current-song-and-memory-2026-11-11.log QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device' python3 -u scripts/check-compat.py --pci --quick --probe-demo-system-context --demo-system-path /Demo/AcctExample/TOS/TOSMisc.ZC --demo-system-module /Demo/AcctExample/TOS/TOSConfig.ZC --demo-system-module /System/Gr/ScreenCast.ZC --demo-system-module /Apps/Psalmody/Load.ZC --demo-system-module /Apps/Psalmody/JukePuppet.ZC --demo-system-module /System/BlkDev/DiskCheck.ZC --demo-system-module /Demo/AcctExample/TOS/TOSMisc.ZC",
-  "result": "pass for the listed checks; DiskCheckAll is not exercised",
+  "result": "pass for the listed checks; a separate DiskCheckAll probe exposed the unresolved Drive() block-device bridge",
   "verified": [
     "All explicitly requested modules loaded, including Psalmody's loader before JukePuppet.",
     "TOSConfig initialized the expected CD/C drive definitions.",
@@ -23,11 +23,20 @@
     "TOSMisc.ZC compiled in the loaded source context."
   ],
   "not_verified": [
-    "DiskCheckAll's configured-drive workflow and repair path.",
+    "DiskCheckAll's configured-drive workflow and repair path; the follow-up probe fails at DiskCheck('C') because no CDrive/Drive() is registered in the ARM64 bridge.",
     "Live UTM UI, Pi hardware, and audible playback for this exact ISO. The separate JukePuppet audio capture is recorded in jukepuppet-direct-play-qemu-2026-11-11.json."
   ],
   "runner_log": "build/check-tosmisc-current-song-and-memory-2026-11-11.log",
   "runner_log_sha256": "1a115d0f9c9e6dd4730d49067a26ee977a2fb5e19323d16234e1ef7d5a2e444a",
   "source_context_report_sha256": "6f1f7d8d8452b429859e30833bff19bc1bcf04e2356f893ef0efdb93426c28be",
-  "check_compat_sha256": "5d20fbbfa14eb7e168d93fbcec64c80b185f98199958edbf959c025511d0fb29"
+  "check_compat_sha256": "5d20fbbfa14eb7e168d93fbcec64c80b185f98199958edbf959c025511d0fb29",
+  "diskcheckall_followup": {
+    "date": "2026-11-11",
+    "result": "fail: uncaught guest exception at Drive() lookup",
+    "iso_sha256": "0e816d41ec5570054ac10e40a401691bb6a4c2bbcba03ca7e045184014408af2",
+    "runner_log": "build/check-tosmisc-current-diskcheckall-2026-11-11.log",
+    "runner_log_sha256": "860fa3db9b3947b28895c29e2ff80fff988eca18484bd7bc983881a35132a7e9",
+    "evidence": "DiskCheckAll printed DiskCheck('C') then raised guest exception 0x0000006576697244 (little-endian ASCII 'Drive') before the completion sentinel. No repair or disk mutation occurred.",
+    "harness_change": "A temporary probe call was added to scripts/check-compat.py for this run; it has been removed so the normal accepted-check command remains unchanged."
+  }
 }
