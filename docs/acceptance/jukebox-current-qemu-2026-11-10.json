@@ -1,7 +1,7 @@
 {
   "date": "2026-11-10",
   "target": "UTM-bundled QEMU framework, HVF, one vCPU, virtio-ramfb, disposable copy-on-write PCI disk",
-  "repository_commit": "69be282e3012449b03c95dc55623fec2554e7495",
+  "repository_commit": "2196f6f",
   "upstream_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
   "source_sha256": {
     "/Apps/Psalmody/JukeBox.ZC": "92c1075d9027b9b2c7ba453a7935f9b37be5ff8faae6c9e92e64f6b1981adeaf",
