@@ -1,0 +1,28 @@
+{
+  "date": "2026-11-11",
+  "repository_commit": "259409ba47bde54ec5aa94776bc35469d1514922",
+  "target": "UTM-bundled QEMU framework, HVF, one vCPU, 1 GiB RAM, virtio-ramfb, VirtIO keyboard/tablet, VirtIO sound WAV backend",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "4ba080db47244041dce5e1a6996dc1da2c10d961b0bf27a172c8102b31584255",
+  "kernel_sha256": "cfa2202f654a4d5d76768c957384b93a50e34a58fd2ecc6793c43d47bf9276cd",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device -audiodev wav,id=sound0,path=build/juke-puppet-current-4ba.wav -device virtio-sound-pci,audiodev=sound0,streams=1' ZEAL_COMPAT_LOG_PATH=build/check-juke-puppet-current-4ba.log python3 -u scripts/check-compat.py --pci --quick --probe-demo-system-context --demo-system-path /Apps/Psalmody/JukePuppet.ZC --demo-system-module /Apps/Psalmody/Load.ZC",
+  "result": "JukeSongsPuppet returned to the graphical terminal and the guest compiler remained healthy; song playback was not audible in the captured QEMU WAV",
+  "verified": [
+    "The disposable guest received the stock childish.ZC song fixture, and JukeBox enumerated it through the .ZC mask.",
+    "The exact loaded JukeSongsPuppet path returned and printed juke-puppet-returned=42; afterward the graphical terminal evaluated 40+2 as 42 and zstatus reported failed=0.",
+    "The WAV backend produced only 0.04 seconds of stereo PCM with zero nonzero samples, so this run does not prove the song started or produced sound."
+  ],
+  "log": "build/check-juke-puppet-current-4ba.log",
+  "log_sha256": "b4961ff09529c610db10e13303e9edda7baa4e9069139a74a0c8f3919c7421af",
+  "wav": "build/juke-puppet-current-4ba.wav",
+  "wav_sha256": "bbdddd0c58e4a7fd9626ee6485cb2e12cc365c6b73eb9f9b8d1fec87cb4507c3",
+  "audio_capture": {
+    "sample_rate_hz": 44100,
+    "channels": 2,
+    "frames": 1764,
+    "seconds": 0.04,
+    "nonzero_samples": 0,
+    "peak": 0
+  },
+  "scope_note": "Automated QEMU only; this is not a visible UTM-window or physical Pi acceptance. It closes the function-return ambiguity for this fixture but leaves actual JukePuppet playback and attributable audio open."
+}
