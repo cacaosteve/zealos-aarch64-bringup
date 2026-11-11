@@ -1,0 +1,23 @@
+{
+  "date": "2026-11-10",
+  "source_commit": "c90661271fa1cf29ffab3c7af57f81ce386abec0",
+  "payload_directory": "build/pi-desktop-esp",
+  "volume": "ZEALPI",
+  "result": "staged, byte-for-byte verified, and safely ejected; physical Pi boot pending",
+  "files_sha256": {
+    "boot/kernel.elf": "432c0d51af1aa7c9cd0d6e12d69b386f88bf3c95e1a29aa3260f671873d2a08c",
+    "boot/zealbooter.elf": "a23ed91daff4a61f11d832fb198d623208635bb1b0bb0292082c4e302eee15d7",
+    "boot/demo.hcbc": "e37c1b530962064c451fac288327f7ae799d3e344cc5c77dc2ba55625c0042d0",
+    "boot/sources.tar": "639aecdd6a914eb0fdca13c6f31da248b7810835cd28dfcb8d848a1c85224a3a",
+    "boot/kernel-diag.elf": "d5bd6c5ae9396fe82df48ca741f17ba6a25a7c4888fb90eda4f37dcbf7d2c752",
+    "EFI/BOOT/BOOTAA64.EFI": "3f51768c5eb8a0818b8e7aa2ac9a9caef3c64707b5b6db15d1e612de23236b8c",
+    "limine.conf": "a8981abc3cda174982db0e510a1bce180b2cefa74973789cd49c481ef92b5bc4"
+  },
+  "backup": "ZEALOS-BACKUP-PRE-SDHCI-RO-PROBE-20261110",
+  "checks": [
+    "The complete pre-copy boot, EFI, and Limine configuration matched the mounted card before replacement.",
+    "All seven staged candidate files were SHA-256 verified against build/pi-desktop-esp.",
+    "diskutil eject /dev/disk20 completed successfully."
+  ],
+  "next_physical_check": "Boot ZEALPI on the Pi 4B and capture the early eMMC2 SDHCI diagnostic line over serial. The probe is read-only and does not yet provide SD block I/O or writable persistence."
+}

@@ -4229,8 +4229,13 @@ booter SHA-256: `a23ed91daff4a61f11d832fb198d623208635bb1b0bb0292082c4e302eee15d
 The candidate payload was rebuilt after the previous safe eject and is not
 yet on ZEALPI. ZEALPI was safely ejected with its previous boot files intact;
 a dated backup of those files is present at
-`ZEALOS-BACKUP-SDHCI-RO-PROBE-20261110/`. Reconnect the card to copy and verify
-the rebuilt seven-file payload. After booting it, capture the early Pi eMMC2
-probe line over the serial console. This is controller discovery only; native
-SD block I/O, a writable data partition, persistence, disconnect recovery and
-Pi installation remain unimplemented.
+`ZEALOS-BACKUP-SDHCI-RO-PROBE-20261110/`; an additional exact pre-copy backup
+is at `ZEALOS-BACKUP-PRE-SDHCI-RO-PROBE-20261110/`. The rebuilt seven-file
+payload was copied to ZEALPI, each destination SHA-256 was matched to the
+candidate, and the card was safely ejected. The exact staged files and rollback
+location are recorded in
+[`docs/acceptance/pi-desktop-staged-sdhci-probe-2026-11-10.json`](docs/acceptance/pi-desktop-staged-sdhci-probe-2026-11-10.json).
+After booting it, capture the early Pi eMMC2 probe line over the serial
+console. This is controller discovery only; native SD block I/O, a writable
+data partition, persistence, disconnect recovery and Pi installation remain
+unimplemented.

@@ -5381,8 +5381,22 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 started = time.monotonic()
                 last_report = started
                 last_change = started
+                input_count = 0
                 while time.monotonic() - started < 185:
                     time.sleep(10)
+                    # Keep the same pointer/key activity that can expose a
+                    # live-input stall, instead of only watching an idle game
+                    # after one initial click. Move to a bounded, repeatable
+                    # set of positions, shoot once, and release both inputs.
+                    move_graphical_pointer(120 + (input_count % 7) * 80,
+                                           110 + (input_count % 5) * 65)
+                    graphical_mouse_button('left', True)
+                    time.sleep(0.05)
+                    graphical_mouse_button('left', False)
+                    qmp_key_edges(['spc'], True)
+                    time.sleep(0.05)
+                    qmp_key_edges(['spc'], False)
+                    input_count += 1
                     sample = graphical_screen('3d-keepaway-long-run')
                     changed = sum(a != b for a, b in zip(previous, sample[2]))
                     if changed >= 100:
@@ -5391,11 +5405,13 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     if time.monotonic() - last_report >= 30:
                         print('KeepAway full-game probe: '
                               f'{time.monotonic() - started:.0f}s elapsed, '
-                              f'{time.monotonic() - last_change:.0f}s since scanout changed',
+                              f'{time.monotonic() - last_change:.0f}s since scanout changed, '
+                              f'{input_count} repeated input cycles',
                               flush=True)
                         last_report = time.monotonic()
                 print('KeepAway full-game probe finished; '
-                      f'last scanout change was {time.monotonic() - last_change:.0f}s ago',
+                      f'last scanout change was {time.monotonic() - last_change:.0f}s ago; '
+                      f'{input_count} repeated input cycles',
                       flush=True)
             qmp_send_key('esc')
             # Inspect the task tree before any terminal smoke command. The
