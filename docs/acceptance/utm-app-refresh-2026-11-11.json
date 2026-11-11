@@ -1,0 +1,49 @@
+{
+  "date": "2026-11-11",
+  "target": "AArch64 native ZealC in UTM-bundled QEMU with HVF, one vCPU, virtio-ramfb, VirtIO keyboard and tablet",
+  "iso_path": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "9a0d1433529e41b2cda6c36daef7255a7afdbe40c7f4f875bb305784fc56556a",
+  "kernel_sha256": "55536307b44768abf98ab8eb64369448394ff78e24b46cbbddd5dd09d4ef5ae1",
+  "result": "pass",
+  "runs": [
+    {
+      "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-current-utm-app-refresh-2026-11-11.log python3 -u scripts/check-compat.py --pci --quick --probe-logic-program --probe-budget-program --probe-3d-apps --probe-keepaway-full-game --probe-span-strut --probe-strut-spring --probe-timeclock --probe-tothefront --probe-xcaliber --probe-vocabulary --probe-demo-tictactoe --probe-demo-tictactoe-win --probe-demo-chess --probe-demo-chess-ai",
+      "serial_log": "build/check-current-utm-app-refresh-2026-11-11.log",
+      "serial_log_sha256": "ae3798abd129f20595b801f2827c7c0fcf4c1753a90a934cca8605f8f6ca0ffa",
+      "exit_code": 0,
+      "checks": [
+        "X-Caliber plain-arrow thrusters, visible Space projectile, Escape recovery, terminal input and zstatus failed=0 passed.",
+        "ToTheFront human-player setup, map, artillery selection/order, Escape recovery, terminal input and zstatus failed=0 passed."
+      ],
+      "scope_note": "The harness exits after ToTheFront, so this combined invocation did not execute the other app flags listed in the command."
+    },
+    {
+      "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-current-utm-3d-refresh-2026-11-11.log python3 -u scripts/check-compat.py --pci --quick --probe-3d-apps --probe-keepaway-full-game",
+      "serial_log": "build/check-current-utm-3d-refresh-2026-11-11.log",
+      "serial_log_sha256": "128d8934a1d91216086bef9476f4d13a92ea418336600336ee83440f90279c60",
+      "exit_code": 0,
+      "checks": [
+        "GrModels, KeepAway and Titanium current-image runtime checks passed.",
+        "KeepAway remained animated and responsive during 186 seconds and 18 repeated input cycles, then recovered through Escape with animation-task cleanup and zstatus failed=0."
+      ],
+      "scope_note": "Automated UTM-bundled QEMU only; this does not resolve the visible UTM freeze report or confirm GrModels appearance in the live window."
+    },
+    {
+      "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-current-utm-budget-refresh-2026-11-11.log python3 -u scripts/check-compat.py --pci --quick --probe-budget-program",
+      "serial_log": "build/check-current-utm-budget-refresh-2026-11-11.log",
+      "serial_log_sha256": "d7912b853aba3be84282545f7c913569c5514483bb37f7cc1135b9e6086afe96",
+      "exit_code": 0,
+      "checks": [
+        "Budget form, menu, create/edit/cancel/abort/save/reopen, cold disk-only persistence, terminal recovery and zstatus failed=0 passed."
+      ],
+      "scope_note": "Automated UTM-bundled QEMU only; the earlier visible UTM freeze report remains open."
+    }
+  ],
+  "live_utm_status": {
+    "Titanium": "User-confirmed plain Left/Right, Space and Escape work in the live UTM window.",
+    "KeepAway": "Automated 186-second current-image run passed; visible freeze report remains unresolved.",
+    "GrModels": "Automated render check passed; live visual confirmation remains open.",
+    "Budget": "Automated current-image workflow passed; visible freeze report remains unresolved."
+  },
+  "scope_note": "This updates automated acceptance for the exact current ISO. It is not visible UTM app-window acceptance, full ZealOS application parity, or Pi hardware acceptance."
+}

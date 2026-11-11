@@ -27,6 +27,17 @@ The refreshed compile sweep on the current ISO (`f17ed84e…`) reproduced the
 same 193/290 result; the current-image manifest and per-file output are in
 [`program-catalog-full-qemu-current-2026-11-10.json`](docs/acceptance/program-catalog-full-qemu-current-2026-11-10.json).
 
+After the nested RedSea allocation repair, the rebuilt ISO (`9a0d1433…`)
+passed current-image UTM-bundled QEMU runs for GrModels, KeepAway, Titanium,
+Budget, X-Caliber and ToTheFront. KeepAway completed a 186-second run with 18
+repeated input cycles, Escape recovery, and animation-task cleanup. Budget
+passed create/edit/cancel/abort/save/reopen and cold disk-only persistence.
+These refresh automated evidence only; visible UTM freeze reports for
+KeepAway and Budget and live GrModels visual confirmation remain open. The
+combined named-app invocation exited after ToTheFront, so its unexecuted
+flags are not counted as current-image checks. See
+[`UTM app refresh`](docs/acceptance/utm-app-refresh-2026-11-11.json).
+
 The dependency-aware Demo inventory is separate from that 290-source sample:
 all 206 pinned Demo `.ZC` files compile, and 202 have explicit QEMU runtime
 acceptance; four remain partial. Those are the two TOS account examples
