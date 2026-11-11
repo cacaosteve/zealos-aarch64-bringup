@@ -1,4 +1,4 @@
-/* Read-only BCM2711 PCIe host description from a firmware FDT. */
+/* Read-only BCM2711 platform descriptions from a firmware FDT. */
 #pragma once
 
 #include <stddef.h>
@@ -147,6 +147,7 @@ static int pi4_fdt_decode_pcie_node(const struct pi4_fdt_node *stack, unsigned d
     if (!pi4_fdt_string_list_has(node->compatible, node->compatible_size,
                                  "brcm,bcm2711-pcie")) return 0;
     out->flags = PI4_PCIE_FDT_PRESENT;
+    out->fdt_status = PI4_FDT_STATUS_OK;
     if (!node->have_status || pi4_fdt_string_eq(node->status, node->status_size, "okay") ||
         pi4_fdt_string_eq(node->status, node->status_size, "ok"))
         out->flags |= PI4_PCIE_FDT_ENABLED;
@@ -176,22 +177,52 @@ static int pi4_fdt_decode_pcie_node(const struct pi4_fdt_node *stack, unsigned d
     return 1;
 }
 
+static int pi4_fdt_decode_sd_node(const struct pi4_fdt_node *stack, unsigned depth,
+                                  struct zeal_pi4_sd *out) {
+    const struct pi4_fdt_node *node = &stack[depth - 1];
+    const struct pi4_fdt_node *parent = depth > 1 ? &stack[depth - 2] : NULL;
+    uint64_t address, size;
+
+    if (!pi4_fdt_string_list_has(node->compatible, node->compatible_size,
+                                 "brcm,bcm2711-emmc2")) return 0;
+    out->flags = PI4_SD_FDT_PRESENT;
+    if (!node->have_status || pi4_fdt_string_eq(node->status, node->status_size, "okay") ||
+        pi4_fdt_string_eq(node->status, node->status_size, "ok"))
+        out->flags |= PI4_SD_FDT_ENABLED;
+    if (parent && node->reg && parent->address_cells > 0 && parent->address_cells <= 2 &&
+        parent->size_cells > 0 && parent->size_cells <= 2) {
+        uint32_t reg_stride = (parent->address_cells + parent->size_cells) * 4;
+        if (reg_stride && node->reg_size >= reg_stride &&
+            pi4_fdt_cells(node->reg, parent->address_cells, &address) &&
+            pi4_fdt_cells(node->reg + parent->address_cells * 4, parent->size_cells, &size) &&
+            size && pi4_fdt_translate_reg(stack, depth, &address) &&
+            address <= UINT64_MAX - size) {
+            out->reg_base = address;
+            out->reg_size = size;
+            out->flags |= PI4_SD_FDT_REG;
+        }
+    }
+    return 1;
+}
+
 /*
- * Parse the first BCM2711 PCIe host bridge from a Limine FDT. This does not
- * touch MMIO or enable PCIe: the returned addresses/windows are descriptive
- * inputs for a later, separately validated host-controller backend.
+ * Parse BCM2711 PCIe and eMMC2 nodes from a Limine FDT. This does not touch
+ * MMIO or enable either controller: these addresses are descriptive inputs
+ * for separately validated hardware backends.
  */
-static int pi4_fdt_find_pcie(const void *blob, size_t available,
-                             struct zeal_pi4_pcie *out) {
+static int pi4_fdt_find_platform(const void *blob, size_t available,
+                                 struct zeal_pi4_pcie *pcie,
+                                 struct zeal_pi4_sd *sd) {
     const uint8_t *fdt = (const uint8_t *)blob;
     const uint8_t *structure, *strings;
     uint32_t total, off_struct, size_struct, off_strings, size_strings;
     uint32_t cursor = 0;
     struct pi4_fdt_node stack[PI4_FDT_MAX_DEPTH];
     unsigned depth = 0;
-    int found = 0;
+    int found_pcie = 0, found_sd = 0;
 
-    if (!fdt || !out || available < 40 || pi4_fdt_be32(fdt) != 0xd00dfeedu) return -1;
+    if (!fdt || (!pcie && !sd) || available < 40 || pi4_fdt_be32(fdt) != 0xd00dfeedu)
+        return -1;
     total = pi4_fdt_be32(fdt + 4);
     off_struct = pi4_fdt_be32(fdt + 8);
     off_strings = pi4_fdt_be32(fdt + 12);
@@ -202,10 +233,18 @@ static int pi4_fdt_find_pcie(const void *blob, size_t available,
         !pi4_fdt_span(off_strings, size_strings, total)) return -2;
     structure = fdt + off_struct;
     strings = fdt + off_strings;
-    out->flags = 0;
-    out->reg_base = out->reg_size = 0;
-    out->mem_bus_base = out->mem_cpu_base = out->mem_size = 0;
-    out->dma_bus_base = out->dma_cpu_base = out->dma_size = 0;
+    if (pcie) {
+        pcie->flags = 0;
+        pcie->fdt_status = PI4_FDT_STATUS_NODE_NOT_FOUND;
+        pcie->reg_base = pcie->reg_size = 0;
+        pcie->mem_bus_base = pcie->mem_cpu_base = pcie->mem_size = 0;
+        pcie->dma_bus_base = pcie->dma_cpu_base = pcie->dma_size = 0;
+    }
+    if (sd) {
+        sd->flags = 0;
+        sd->fdt_status = PI4_FDT_STATUS_NODE_NOT_FOUND;
+        sd->reg_base = sd->reg_size = 0;
+    }
 
     while (cursor + 4 <= size_struct) {
         uint32_t token = pi4_fdt_be32(structure + cursor);
@@ -220,7 +259,12 @@ static int pi4_fdt_find_pcie(const void *blob, size_t available,
             depth++;
         } else if (token == 2) { /* FDT_END_NODE */
             if (!depth) return -5;
-            if (!found && pi4_fdt_decode_pcie_node(stack, depth, out)) found = 1;
+            if (!found_pcie && pcie &&
+                pi4_fdt_decode_pcie_node(stack, depth, pcie)) found_pcie = 1;
+            if (!found_sd && sd && pi4_fdt_decode_sd_node(stack, depth, sd)) {
+                found_sd = 1;
+                sd->fdt_status = PI4_FDT_STATUS_OK;
+            }
             depth--;
         } else if (token == 3) { /* FDT_PROP */
             uint32_t len, nameoff;
@@ -256,10 +300,20 @@ static int pi4_fdt_find_pcie(const void *blob, size_t available,
             continue;
         } else if (token == 9) { /* FDT_END */
             if (depth != 0) return -10;
-            return found ? 0 : -13;
+            /* A well-formed tree can describe either controller independently. */
+            (void)found_pcie;
+            (void)found_sd;
+            return 0;
         } else {
             return -11;
         }
     }
     return -12;
+}
+
+static inline int pi4_fdt_find_pcie(const void *blob, size_t available,
+                                    struct zeal_pi4_pcie *out) {
+    int rc = pi4_fdt_find_platform(blob, available, out, NULL);
+    if (rc != 0) return rc;
+    return (out->flags & PI4_PCIE_FDT_PRESENT) ? 0 : -13;
 }

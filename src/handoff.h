@@ -35,6 +35,10 @@
 #define PI4_PCIE_FDT_MEM      (1u << 3)
 #define PI4_PCIE_FDT_DMA      (1u << 4)
 
+#define PI4_SD_FDT_PRESENT (1u << 0)
+#define PI4_SD_FDT_ENABLED (1u << 1)
+#define PI4_SD_FDT_REG     (1u << 2)
+
 /* Stored in the old reserved word so the handoff size and offsets stay stable. */
 #define PI4_FDT_STATUS_OK             0u
 #define PI4_FDT_STATUS_NO_RESPONSE    1u
@@ -55,6 +59,15 @@ struct zeal_pi4_pcie {
     uint64_t dma_bus_base;
     uint64_t dma_cpu_base;
     uint64_t dma_size;
+};
+
+/* Read-only eMMC2 description parsed from the firmware FDT. The kernel still
+ * owns controller initialization and card I/O; this only reports its window. */
+struct zeal_pi4_sd {
+    uint32_t flags; /* PI4_SD_FDT_* */
+    uint32_t fdt_status; /* PI4_FDT_STATUS_* or PARSE_BASE + parser error */
+    uint64_t reg_base;
+    uint64_t reg_size;
 };
 
 #define PI4_USB_DMA_RESERVED (1u << 0)
@@ -79,7 +92,7 @@ struct zeal_handoff {
     uint64_t magic0;
     uint64_t magic1;
     uint32_t size; /* sizeof(struct zeal_handoff) */
-    uint32_t revision; /* 8; extensions are appended */
+    uint32_t revision; /* 9; extensions are appended */
     uint32_t bootloader_id; /* ZEAL_BL_* */
     uint32_t flags;
     uint64_t hhdm_offset;
@@ -114,4 +127,6 @@ struct zeal_handoff {
      * A negative timestamp means the bootloader supplied no wall clock. */
     int64_t boot_timestamp;
     uint64_t boot_counter;
+    /* revision >= 9; onboard BCM2711 eMMC2 SD-card controller window. */
+    struct zeal_pi4_sd pi4_sd;
 };

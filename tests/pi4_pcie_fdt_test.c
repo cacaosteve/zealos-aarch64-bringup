@@ -4,6 +4,7 @@
 #include "../src/pi4_dma.h"
 #include "../src/pi4_dma_probe.h"
 #include "../src/pi4_pcie_fdt.h"
+#include "../src/pi4_sdhci_probe.h"
 
 #define TEST_BLOB_BYTES 4096
 #define TEST_STRUCT_OFF 56
@@ -65,13 +66,15 @@ static void property_string(const char *name, const char *value) {
     while (structure_size & 3u) structure[structure_size++] = 0;
 }
 
-static size_t make_tree(const char *status, const char *compatible) {
+static size_t make_tree(const char *status, const char *compatible,
+                        const char *sd_status) {
     static const uint32_t root_ac[] = {2}, root_sc[] = {1};
     static const uint32_t scb_ac[] = {2}, scb_sc[] = {1};
     static const uint32_t scb_ranges[] = {
         0x00000000, 0x7c000000, 0x00000000, 0xfc000000, 0x03800000
     };
     static const uint32_t reg[] = {0x00000000, 0x7d500000, 0x00009310};
+    static const uint32_t sd_reg[] = {0x00000000, 0x7e340000, 0x00000100};
     static const uint32_t pcie_ac[] = {3}, pcie_sc[] = {2};
     static const uint32_t ranges[] = {
         0x02000000, 0x00000000, 0xf8000000,
@@ -101,7 +104,17 @@ static size_t make_tree(const char *status, const char *compatible) {
     property("ranges", ranges, 7);
     property("dma-ranges", dma_ranges, 7);
     if (status) property_string("status", status);
-    end_node(); end_node(); end_node(); token(9);
+    end_node(); /* PCIe */
+    if (sd_status) {
+        begin_node("mmc@7e340000");
+        property_string("compatible", "brcm,bcm2711-emmc2");
+        property("reg", sd_reg, 3);
+        property_string("status", sd_status);
+        end_node(); /* eMMC2 */
+    }
+    end_node(); /* SCB */
+    end_node(); /* root */
+    token(9);
 
     off_strings = TEST_STRUCT_OFF + structure_size;
     memcpy(blob + off_strings, names, sizeof(names));
@@ -121,9 +134,20 @@ static size_t make_tree(const char *status, const char *compatible) {
 
 int main(void) {
     struct zeal_pi4_pcie pcie;
+    struct zeal_pi4_sd sd;
     struct zeal_handoff handoff = {0};
     struct pi4_dma_probe_plan plan;
-    size_t size = make_tree("okay", "brcm,bcm2711-pcie");
+    struct pi4_sdhci_probe_plan sd_plan;
+    size_t size = make_tree("okay", "brcm,bcm2711-pcie", "okay");
+    if (pi4_fdt_find_platform(blob, size, &pcie, &sd) != 0 ||
+        sd.flags != (PI4_SD_FDT_PRESENT | PI4_SD_FDT_ENABLED | PI4_SD_FDT_REG) ||
+        sd.reg_base != 0xfe340000ull || sd.reg_size != 0x100ull ||
+        sd.fdt_status != PI4_FDT_STATUS_OK) {
+        fprintf(stderr, "BCM2711 eMMC2 FDT decode mismatch: flags=%x status=%u reg=%llx/%llx\n",
+                sd.flags, sd.fdt_status, (unsigned long long)sd.reg_base,
+                (unsigned long long)sd.reg_size);
+        return 6;
+    }
     if (pi4_fdt_find_pcie(blob, size, &pcie) != 0 ||
         pcie.flags != (PI4_PCIE_FDT_PRESENT | PI4_PCIE_FDT_ENABLED |
                        PI4_PCIE_FDT_REG | PI4_PCIE_FDT_MEM | PI4_PCIE_FDT_DMA) ||
@@ -143,8 +167,27 @@ int main(void) {
         return 1;
     }
 
+    handoff.revision = 9;
+    handoff.size = sizeof(handoff);
+    handoff.pi4_sd = sd;
+    if (pi4_sdhci_probe_plan_make(&handoff, &sd_plan) != 0 ||
+        sd_plan.phys_base != 0xfe340000ull || sd_plan.reg_size != 0x100u ||
+        !pi4_sdhci_probe_offset_valid(&sd_plan, PI4_SDHCI_CAPABILITIES) ||
+        !pi4_sdhci_probe_offset_valid(&sd_plan, PI4_SDHCI_HOST_VERSION_WORD) ||
+        pi4_sdhci_probe_offset_valid(&sd_plan, 0x100u) ||
+        pi4_sdhci_probe_offset_valid(&sd_plan, PI4_SDHCI_CAPABILITIES + 2u)) {
+        fprintf(stderr, "eMMC2 probe plan did not bound its register window\n");
+        return 8;
+    }
+    handoff.pi4_sd.flags &= ~PI4_SD_FDT_ENABLED;
+    if (pi4_sdhci_probe_plan_make(&handoff, &sd_plan) == 0) {
+        fprintf(stderr, "disabled eMMC2 controller produced a probe plan\n");
+        return 9;
+    }
+    handoff.pi4_sd = sd;
+
     /* Exercise the exact Pi FDT -> reserved arena path used by ZealBooter. */
-    handoff.revision = 6;
+    handoff.revision = 9;
     handoff.size = sizeof(handoff);
     handoff.pi4_pcie = pcie;
     handoff.mem_count = 1;
@@ -161,21 +204,41 @@ int main(void) {
         fprintf(stderr, "Pi 4B parsed identity DMA map did not produce identity arena\n");
         return 5;
     }
-    size = make_tree("disabled", "brcm,bcm2711-pcie");
+    size = make_tree("disabled", "brcm,bcm2711-pcie", "okay");
     if (pi4_fdt_find_pcie(blob, size, &pcie) != 0 ||
         !(pcie.flags & PI4_PCIE_FDT_PRESENT) || (pcie.flags & PI4_PCIE_FDT_ENABLED)) {
         fprintf(stderr, "disabled PCIe node was not rejected\n");
         return 2;
     }
-    size = make_tree("okay", "brcm,bcm2711-pcie");
+    size = make_tree("okay", "brcm,bcm2711-pcie", "disabled");
+    if (pi4_fdt_find_platform(blob, size, &pcie, &sd) != 0 ||
+        !(sd.flags & PI4_SD_FDT_PRESENT) || (sd.flags & PI4_SD_FDT_ENABLED) ||
+        !(sd.flags & PI4_SD_FDT_REG)) {
+        fprintf(stderr, "disabled eMMC2 node status was not preserved\n");
+        return 7;
+    }
+    size = make_tree("okay", "brcm,bcm2711-pcie", "okay");
     if (pi4_fdt_find_pcie(blob, size - 1, &pcie) == 0) {
         fprintf(stderr, "truncated FDT was accepted\n");
         return 3;
     }
-    size = make_tree("okay", "brcm,other-pcie");
-    if (pi4_fdt_find_pcie(blob, size, &pcie) != -13) {
+    size = make_tree("okay", "brcm,other-pcie", "okay");
+    if (pi4_fdt_find_platform(blob, size, &pcie, &sd) != 0 ||
+        pcie.fdt_status != PI4_FDT_STATUS_NODE_NOT_FOUND ||
+        !(sd.flags & PI4_SD_FDT_PRESENT) ||
+        sd.fdt_status != PI4_FDT_STATUS_OK ||
+        pi4_fdt_find_pcie(blob, size, &pcie) != -13) {
         fprintf(stderr, "valid FDT without BCM2711 PCIe node was not distinguished\n");
         return 4;
+    }
+    size = make_tree("okay", "brcm,bcm2711-pcie", NULL);
+    if (pi4_fdt_find_platform(blob, size, &pcie, &sd) != 0 ||
+        !(pcie.flags & PI4_PCIE_FDT_PRESENT) ||
+        pcie.fdt_status != PI4_FDT_STATUS_OK ||
+        sd.flags != 0 || sd.fdt_status != PI4_FDT_STATUS_NODE_NOT_FOUND ||
+        pi4_fdt_find_pcie(blob, size, &pcie) != 0) {
+        fprintf(stderr, "valid FDT without eMMC2 lost the PCIe descriptor\n");
+        return 10;
     }
     puts("PASS BCM2711 FDT decode and identity DMA arena reservation");
     return 0;

@@ -4215,3 +4215,22 @@ IMG_9437 show `phdmi` reporting HDMI0 `active=1 packets=1` and
 `pi4_hdmi_audio` reporting `stage=7 starts=1 hz=440`. This run verifies
 HDMI0 tone playback. The physical analog tone check above used the
 preceding kernel.
+
+**Native SD controller discovery candidate (2026-11-10):** The shared FDT
+parser now carries the Pi 4B eMMC2 register range and enabled state into the
+kernel handoff. A guarded, read-only SDHCI probe reads the controller's
+capabilities, present state, clock, interrupt status and host version. It
+does not issue SD commands or write controller/media state. The FDT and
+probe-bound tests pass, and `make pi-desktop` plus the staged-image checker
+pass. Candidate kernel SHA-256:
+`432c0d51af1aa7c9cd0d6e12d69b386f88bf3c95e1a29aa3260f671873d2a08c`;
+booter SHA-256: `a23ed91daff4a61f11d832fb198d623208635bb1b0bb0292082c4e302eee15d7`.
+
+The candidate payload was rebuilt after the previous safe eject and is not
+yet on ZEALPI. ZEALPI was safely ejected with its previous boot files intact;
+a dated backup of those files is present at
+`ZEALOS-BACKUP-SDHCI-RO-PROBE-20261110/`. Reconnect the card to copy and verify
+the rebuilt seven-file payload. After booting it, capture the early Pi eMMC2
+probe line over the serial console. This is controller discovery only; native
+SD block I/O, a writable data partition, persistence, disconnect recovery and
+Pi installation remain unimplemented.

@@ -23,6 +23,7 @@
 #include "pi4_xhci_dma_probe.h"
 #include "pi4_xhci_dma_alias.h"
 #include "pi4_fat32.h"
+#include "pi4_sdhci_probe.h"
 #include "pi4_usb_keyboard.h"
 #include "pi4_usb_mouse.h"
 #include "pi4_usb_bus.h"
@@ -2388,6 +2389,76 @@ static int pi4_pcie_read_mmio32(const struct zeal_handoff *h, unsigned offset,
     }
     *value = result;
     return 0;
+}
+
+/* Read only: inspect the firmware-configured eMMC2 SDHCI window, without
+ * changing clock, power, reset, interrupt, or card state. */
+static int pi4_sdhci_read32(const struct zeal_handoff *h,
+                            const struct pi4_sdhci_probe_plan *plan,
+                            unsigned offset, uint32_t *value) {
+    uint64_t phys, virt;
+    uint32_t result = 0;
+    volatile uint32_t *reg;
+
+    if (!h || !value || !pi4_sdhci_probe_offset_valid(plan, offset) ||
+        plan->phys_base > UINT64_MAX - offset)
+        return -1;
+    phys = plan->phys_base + offset;
+    if (phys >= (1ull << 48) || h->hhdm_offset > UINT64_MAX - phys ||
+        !h->hhdm_offset || mmio_map_2m(h->hhdm_offset, phys) != 0)
+        return -2;
+    virt = h->hhdm_offset + phys;
+    reg = (volatile uint32_t *)(uintptr_t)virt;
+
+    g_uart_probe = 1;
+    g_sync_recover = 1;
+    g_uart_dead = 0;
+    g_probe_esr = 0;
+    g_probe_far = 0;
+    __asm__ volatile("ldr %w0, [%1]" : "+&r"(result) : "r"(reg) : "memory");
+    __asm__ volatile("dsb sy" ::: "memory");
+    g_sync_recover = 0;
+    g_uart_probe = 0;
+    if (g_uart_dead) {
+        g_uart_dead = 0;
+        return -3;
+    }
+    *value = result;
+    return 0;
+}
+
+static void pi4_sdhci_readonly_probe(const struct zeal_handoff *h) {
+    struct pi4_sdhci_probe_plan plan;
+    uint32_t caps, caps1, present, clock, interrupt, version_word;
+    int rc;
+
+    if (!h || h->revision < 9 ||
+        h->size < offsetof(struct zeal_handoff, pi4_sd) + sizeof(h->pi4_sd))
+        return;
+    if (pi4_sdhci_probe_plan_make(h, &plan) != 0) {
+        uart_puts(g_uart, "Pi eMMC2: FDT descriptor unavailable/disabled\n");
+        return;
+    }
+    if (pi4_sdhci_read32(h, &plan, PI4_SDHCI_CAPABILITIES, &caps) != 0 ||
+        pi4_sdhci_read32(h, &plan, PI4_SDHCI_CAPABILITIES_1, &caps1) != 0 ||
+        pi4_sdhci_read32(h, &plan, PI4_SDHCI_PRESENT_STATE, &present) != 0 ||
+        pi4_sdhci_read32(h, &plan, PI4_SDHCI_CLOCK_CONTROL, &clock) != 0 ||
+        pi4_sdhci_read32(h, &plan, PI4_SDHCI_INTERRUPT_STATUS, &interrupt) != 0 ||
+        pi4_sdhci_read32(h, &plan, PI4_SDHCI_HOST_VERSION_WORD, &version_word) != 0) {
+        uart_puts(g_uart, "Pi eMMC2: guarded SDHCI MMIO read failed\n");
+        return;
+    }
+    uart_puts(g_uart, "Pi eMMC2 SDHCI read-only: base=");
+    uart_put_u64_hex(g_uart, plan.phys_base);
+    uart_puts(g_uart, " caps="); uart_put_u64_hex(g_uart, caps);
+    uart_puts(g_uart, " caps1="); uart_put_u64_hex(g_uart, caps1);
+    uart_puts(g_uart, " present="); uart_put_u64_hex(g_uart, present);
+    uart_puts(g_uart, " clock="); uart_put_u64_hex(g_uart, clock);
+    uart_puts(g_uart, " int="); uart_put_u64_hex(g_uart, interrupt);
+    uart_puts(g_uart, " version="); uart_put_u64_hex(g_uart, version_word >> 16);
+    rc = (present & (1u << 16)) != 0;
+    uart_puts(g_uart, rc ? " card-detect=1 (no card commands sent)\n" :
+                           " card-detect=0 (no card commands sent)\n");
 }
 
 /* Guarded 32-bit write for a bounded, save/restore PCIe bridge probe. */
@@ -19600,6 +19671,7 @@ void kernel_entry(const struct zeal_handoff *h) {
          * its probe fails. The endpoint remains read-only and bus mastering
          * and xHCI are deliberately untouched. */
         pi4_pcie_probe_readonly(h);
+        pi4_sdhci_readonly_probe(h);
         pi4_dma_cpu_cache_probe(h);
         pi4_xhci_dma_noop_probe(h);
         pi4_pcie_readback_after(h);

@@ -84,6 +84,7 @@ static volatile uint64_t limine_requests_end_marker[] = LIMINE_REQUESTS_END_MARK
 
 static struct zeal_handoff g_handoff;
 static struct zeal_pi4_pcie g_pi4_pcie;
+static struct zeal_pi4_sd g_pi4_sd;
 
 typedef void (*kernel_entry_fn)(const struct zeal_handoff *h);
 
@@ -602,11 +603,19 @@ void kmain(void) {
     if (is_pi) {
         const uint8_t *fdt = NULL;
         uint32_t fdt_bytes = dtb_size_status(&fdt, &g_pi4_pcie.fdt_status);
-        int parse_rc = fdt_bytes ? pi4_fdt_find_pcie(fdt, fdt_bytes, &g_pi4_pcie) : -1;
+        int parse_rc = fdt_bytes ?
+            pi4_fdt_find_platform(fdt, fdt_bytes, &g_pi4_pcie, &g_pi4_sd) : -1;
         if (fdt_bytes && parse_rc != 0) {
-            g_pi4_pcie.fdt_status = parse_rc == -13 ? PI4_FDT_STATUS_NODE_NOT_FOUND :
-                                    PI4_FDT_STATUS_PARSE_BASE + (uint32_t)(-parse_rc);
+            g_pi4_pcie.fdt_status = PI4_FDT_STATUS_PARSE_BASE + (uint32_t)(-parse_rc);
             g_pi4_pcie.flags = 0;
+            g_pi4_sd.fdt_status = PI4_FDT_STATUS_PARSE_BASE + (uint32_t)(-parse_rc);
+            g_pi4_sd.flags = 0;
+        }
+        if (!fdt_bytes) {
+            g_pi4_sd.fdt_status = g_pi4_pcie.fdt_status;
+        } else if (parse_rc < 0 && parse_rc != -13) {
+            g_pi4_sd.fdt_status = PI4_FDT_STATUS_PARSE_BASE + (uint32_t)(-parse_rc);
+            g_pi4_sd.flags = 0;
         }
     }
 
@@ -644,7 +653,7 @@ void kmain(void) {
     g_handoff.magic0 = ZEAL_HANDOFF_MAGIC_0;
     g_handoff.magic1 = ZEAL_HANDOFF_MAGIC_1;
     g_handoff.size = (uint32_t)sizeof(g_handoff);
-    g_handoff.revision = 8;
+    g_handoff.revision = 9;
     g_handoff.boot_timestamp = date_request.response ? date_request.response->timestamp : -1;
     __asm__ volatile("mrs %0, cntpct_el0" : "=r"(g_handoff.boot_counter));
     g_handoff.bootloader_id = ZEAL_BL_LIMINE;
@@ -653,6 +662,7 @@ void kmain(void) {
     g_handoff.uart_phys = uart_phys;
     g_handoff.boot_el = current_el();
     g_handoff.pi4_pcie = g_pi4_pcie;
+    g_handoff.pi4_sd = g_pi4_sd;
 
     if (framebuffer_request.response &&
         framebuffer_request.response->framebuffer_count > 0) {
