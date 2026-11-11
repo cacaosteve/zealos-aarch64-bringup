@@ -256,3 +256,32 @@ I64 RawRedSeaMalformedChecks()
         return 4;
     return 42;
 }
+
+I64 RawRedSeaCycleChecks()
+{
+    U64 base = 0, sectors = 0;
+    CDrive *drive;
+    CDirEntry *entry;
+    if (!ZcRawRedSeaGeometry(&base, &sectors) || base != 130911 || sectors != 128)
+        return 1;
+    if (!ZcMountLegacyRedSea() || !(drive = Letter2Drive('D')) ||
+        drive->drv_offset != base || drive->fs_type != FSt_REDSEA ||
+        !DriveIsWritable('D', FALSE))
+        return 2;
+    entry = FilesFind("D:/SUB", FUF_JUST_DIRS | FUF_SINGLE);
+    if (!entry || !entry->full_name || StrCompare(entry->full_name, "/SUB"))
+    {
+        DirTreeDel(entry);
+        return 3;
+    }
+    DirTreeDel(entry);
+    entry = FilesFind("D:/SUB/LOOP", FUF_JUST_DIRS | FUF_SINGLE);
+    if (entry)
+    {
+        DirTreeDel(entry);
+        return 4;
+    }
+    if (DiskCheck('D', FALSE, FALSE))
+        return 5;
+    return 42;
+}

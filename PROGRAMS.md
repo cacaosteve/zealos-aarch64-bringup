@@ -61,8 +61,11 @@ store persistence across a cold boot. The probe expects the ARM64 bridge's
 general drive mounting. The Beep fixture check does not measure audio
 output. A new read-only check confirms stock `DiskCheck` completes against a
 malformed bounded RedSea fixture, reports one consistency error, and does not
-fail the guest; it does not enable repair on malformed metadata. See the
+fail the guest; a separate cyclic-directory fixture confirms `FilesFind`
+omits an ancestor back-edge and the stock scan returns cleanly. Neither check
+enables repair on malformed metadata. See the
 [malformed scan check](docs/acceptance/demo-tosmisc-diskcheck-malformed-redsea-qemu-2026-11-11.json),
+the [cyclic-directory check](docs/acceptance/demo-tosmisc-diskcheck-cycle-redsea-qemu-2026-11-11.json),
 along with the
 [absent-drive check](docs/acceptance/demo-tosmisc-diskcheckall-current-qemu-2026-11-11.json),
 [mounted-RedSea check](docs/acceptance/demo-tosmisc-diskcheckall-redsea-qemu-2026-11-11.json),

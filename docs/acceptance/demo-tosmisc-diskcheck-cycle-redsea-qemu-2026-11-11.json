@@ -1,0 +1,22 @@
+{
+  "date": "2026-11-11",
+  "target": "UTM-bundled QEMU, AArch64 PCI, one vCPU, disposable writable RedSea VirtIO fixture",
+  "iso_path": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "9a0d1433529e41b2cda6c36daef7255a7afdbe40c7f4f875bb305784fc56556a",
+  "probe_path": "tests/compat/RawRedSeaGeometry.ZC",
+  "probe_sha256": "55601b54ca934964e2ed88dfc0d3f5e7e71342c23a6514ed7bc142f7cca3167a",
+  "check_compat_sha256": "6d2cf0b9658d7fd9084047997d988be7876f011cab202809f0fbfc56bd300009",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/tosmisc-cycle-redsea-current-qemu.log python3 -u scripts/check-compat.py --pci --quick --probe-raw-redsea-geometry cycle",
+  "result": "pass: recursive enumeration omitted a directory back-edge, and stock DiskCheck returned cleanly",
+  "verified": [
+    "The probe ran against a private copy-on-write disk with a 128-sector RedSea fixture containing a valid root and SUB directory.",
+    "SUB contains a LOOP directory entry that points back to the root directory.",
+    "FilesFind('D:/SUB', FUF_JUST_DIRS | FUF_SINGLE) returns SUB, while FilesFind('D:/SUB/LOOP', FUF_JUST_DIRS | FUF_SINGLE) returns no entry.",
+    "DiskCheck('D', FALSE, FALSE) returns zero; the probe returns 42 and zstatus reports failed=0."
+  ],
+  "log": "build/tosmisc-cycle-redsea-current-qemu.log",
+  "log_sha256": "5ea71fb09f756ac2beb134a219280e4de0ad4cb0ab65b09ab9fb07031c125d8a",
+  "limits": [
+    "This covers one read-only ancestor back-edge; directory repair, malformed metadata repair, FAT32, live UTM UI, and physical Raspberry Pi behavior remain unverified."
+  ]
+}

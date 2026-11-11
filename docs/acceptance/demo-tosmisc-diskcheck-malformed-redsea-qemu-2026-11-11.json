@@ -18,6 +18,6 @@
   "log_sha256": "2d0c09dd6e32b6d8c481ee748c9cca6edeb0661473a054f01fc68ca9ef2222d0",
   "limits": [
     "This validates a read-only scan only; DiskCheck repair with malformed directory metadata remains untested.",
-    "It does not cover cyclic but in-bounds directories, directory allocation repair, FAT32, live UTM UI, or physical Raspberry Pi behavior."
+    "It does not cover directory allocation repair, FAT32, live UTM UI, or physical Raspberry Pi behavior. Cyclic-directory coverage is recorded separately."
   ]
 }

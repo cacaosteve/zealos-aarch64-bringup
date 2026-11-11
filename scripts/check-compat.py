@@ -117,7 +117,7 @@ p.add_argument('--probe-raw-disk-read', action='store_true',
                help='check read-only physical VirtIO sector access')
 p.add_argument('--probe-raw-disk-write', action='store_true',
                help='check bounded, flushed absolute VirtIO writes on a disposable disk clone')
-p.add_argument('--probe-raw-redsea-geometry', choices=('absent', 'present', 'repair', 'malformed', 'legacy', 'invalid', 'stockfile'),
+p.add_argument('--probe-raw-redsea-geometry', choices=('absent', 'present', 'repair', 'malformed', 'cycle', 'legacy', 'invalid', 'stockfile'),
                help='check bounded legacy RedSea reads, writes, or repair against an isolated fixture')
 p.add_argument('--probe-stock-redsea-file', action='store_true',
                help='load one contiguous stock-layout RedSea root file on a disposable disk')
@@ -1066,7 +1066,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 child_dir = bytearray(512)
                 broken_dir = bytearray(512)
                 empty_dir = bytearray(512)
-                if args.probe_raw_redsea_geometry in ('present', 'repair', 'malformed', 'legacy', 'invalid', 'stockfile'):
+                if args.probe_raw_redsea_geometry in ('present', 'repair', 'malformed', 'cycle', 'legacy', 'invalid', 'stockfile'):
                     boot[3] = 0x88
                     offset = 0 if args.probe_raw_redsea_geometry == 'legacy' else 130911
                     struct.pack_into('<qqqqq', boot, 8, offset, 128, offset + 2, 1, 7)
@@ -1076,7 +1076,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     # The present-drive fixture has only its root allocated.
                     # The repair fixture contains a nested directory and file
                     # plus one independent orphan allocation for DiskCheck.
-                    bitmap[0] = 3 if args.probe_raw_redsea_geometry == 'present' else 7
+                    bitmap[0] = 3 if args.probe_raw_redsea_geometry in ('present', 'cycle') else 7
                     if args.probe_raw_redsea_geometry in ('present', 'repair'):
                         # The root directory occupies one cluster in both
                         # fixtures. Repair exercises nested allocations.
@@ -1108,6 +1108,20 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                         root_dir[66:76] = b'BROKENDIR\0'
                         struct.pack_into('<qqq', root_dir, 104, offset + 127, 1024, 0)
                         bitmap[15] |= 0x40  # The invalid directory's first cluster.
+                    if args.probe_raw_redsea_geometry == 'cycle':
+                        struct.pack_into('<H', root_dir, 0, 0x410)
+                        root_dir[2:4] = b'.\0'
+                        struct.pack_into('<qqq', root_dir, 40, offset + 2, 512, 0)
+                        struct.pack_into('<H', root_dir, 64, 0x410)
+                        root_dir[66:70] = b'SUB\0'
+                        struct.pack_into('<qqq', root_dir, 104, offset + 10, 512, 0)
+                        struct.pack_into('<H', sub_dir, 0, 0x410)
+                        sub_dir[2:4] = b'.\0'
+                        struct.pack_into('<qqq', sub_dir, 40, offset + 10, 512, 0)
+                        struct.pack_into('<H', sub_dir, 64, 0x410)
+                        sub_dir[66:71] = b'LOOP\0'
+                        struct.pack_into('<qqq', sub_dir, 104, offset + 2, 512, 0)
+                        bitmap[1] |= 0x02  # SUB occupies cluster index 9.
                     if args.probe_raw_redsea_geometry == 'stockfile':
                         source = b'I64 StockRedSeaFileChecks(){return 42;}\n'
                         struct.pack_into('<H', root_dir, 0, 0x410)
@@ -1174,6 +1188,9 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     disk.write(sub_dir)
                     disk.seek((offset + 20) * 512)
                     disk.write(file_data)
+                elif args.probe_raw_redsea_geometry == 'cycle':
+                    disk.seek((offset + 10) * 512)
+                    disk.write(sub_dir)
                 else:
                     disk.write(file_data)
         # A torn shadow-bank superblock must never supersede the valid A bank.
@@ -9030,6 +9047,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                         suffix = ('Present' if args.probe_raw_redsea_geometry in ('present', 'legacy')
                                   else 'Repair' if args.probe_raw_redsea_geometry == 'repair'
                                   else 'Malformed' if args.probe_raw_redsea_geometry == 'malformed'
+                                  else 'Cycle' if args.probe_raw_redsea_geometry == 'cycle'
                                   else 'Absent')
                         report = command('zcall RawRedSea' + suffix + 'Checks',
                                          'zc => 0x000000000000002a')
