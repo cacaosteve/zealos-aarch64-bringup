@@ -1,0 +1,23 @@
+{
+  "date": "2026-11-11",
+  "target": "AArch64 native ZealC in UTM-bundled QEMU with HVF, one vCPU, virtio-ramfb, VirtIO keyboard and tablet",
+  "iso_path": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "93cb3d3eec000a3b482922d17bcdb37077b42650ff2ddb5e34650f4495b37149",
+  "kernel_sha256": "c211b0ecb262d8aae9ee9656de819fdd4c13466c0e57d7b3bcd2963dfb29be4a",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-3d-apps-current-utm-qemu.log python3 -u scripts/check-compat.py --pci --quick --probe-3d-apps --probe-keepaway-full-game",
+  "qemu": "UTM-bundled QEMU profile; one AArch64 vCPU with HVF and virtio-ramfb",
+  "serial_log": "build/check-3d-apps-current-utm-qemu.log",
+  "serial_log_sha256": "dd91f6cd74439b8225ffc704b113d9bce3821511017b497b39fddb40d1fe2cb8",
+  "result": "pass",
+  "checks": {
+    "GrModels": "Man and Ball forms/color selection, mesh generation and inline rendering passed; Man generated 112 vertices/168 triangles and has 1,146 nonblack pixels in the expected sprite region; Ball generated 58 vertices/128 triangles and has 417 purple sprite pixels; terminal recovery passed.",
+    "KeepAway": "Court, HUD and player rendered; Space/mouse input updated gameplay. Full 187-second run completed 18 repeated input cycles; scanout changed at every sample, including after the previously reported freeze interval. Escape restored terminal focus, removed the Animate task, and zstatus reported failed=0.",
+    "Titanium": "Intro/gameplay, Space input, Escape recovery and terminal return passed."
+  },
+  "live_utm_status": {
+    "GrModels": "Visible UTM visual confirmation remains open; user previously reported not seeing the model.",
+    "KeepAway": "Visible UTM freeze report remains open; current full-game automated run did not reproduce it.",
+    "Titanium": "User confirmed plain Left/Right, Space and Escape work in a live UTM session."
+  },
+  "scope_note": "This is an automated run using UTM bundled QEMU, not a visible UTM app-window or Pi hardware test. The full-game soak reduces the likelihood of a deterministic long-play freeze but does not explain the earlier visible-UTM report."
+}

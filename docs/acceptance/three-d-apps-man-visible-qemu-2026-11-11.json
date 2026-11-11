@@ -1,0 +1,26 @@
+{
+  "date": "2026-11-11",
+  "target": "AArch64 native ZealC in macOS QEMU 11.1.3 with HVF, one vCPU, virtio-ramfb, VirtIO keyboard and tablet (UTM-shaped guest profile)",
+  "iso_sha256": "93cb3d3eec000a3b482922d17bcdb37077b42650ff2ddb5e34650f4495b37149",
+  "kernel_sha256": "c211b0ecb262d8aae9ee9656de819fdd4c13466c0e57d7b3bcd2963dfb29be4a",
+  "command": "python3 -u scripts/check-compat.py --pci --quick --probe-3d-apps",
+  "qemu": "/opt/homebrew/bin/qemu-system-aarch64, QEMU emulator version 11.1.3; platform defaults use accel=hvf, gic-version=3, -cpu host, virtio-ramfb, VirtIO keyboard and tablet",
+  "log": "build/check-3d-apps-pci.log",
+  "log_sha256": "c28cd33f9ad497499e86aa878337cd2e980ac1708256cfc23dcbe630383543ff",
+  "exit_code": 0,
+  "result": "pass",
+  "checks": {
+    "GrModels": {
+      "Man": "form and color selections completed; generated 112 vertices and 168 triangles; inline model visible in generated-document framebuffer (1,146 nonblack pixels in the expected model region); terminal recovery passed",
+      "Ball": "form and color selection completed; generated 58 vertices and 128 triangles; 417 purple inline-sprite pixels; terminal recovery passed"
+    },
+    "KeepAway": "gameplay frame, HUD/input path, Escape recovery, task cleanup and terminal recovery passed in quick QEMU scenario",
+    "Titanium": "intro/gameplay, Space input, Escape recovery and terminal recovery passed in quick QEMU scenario"
+  },
+  "live_status": {
+    "GrModels": "Earlier live UTM report said the model was not apparent after color selection; automated framebuffer evidence now shows a small figure near the upper-left of the app pane. Live UTM visual confirmation remains open.",
+    "KeepAway": "Earlier visible UTM session reportedly froze; this automated run did not reproduce it. Live UTM retest remains open.",
+    "Titanium": "User previously confirmed plain Left/Right, Space and Escape work in a live UTM session."
+  },
+  "scope_note": "This is a macOS HVF QEMU regression using the UTM-shaped device profile, not a run in the UTM app window or on Pi hardware. The quick KeepAway check is not a full-game soak."
+}

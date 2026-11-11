@@ -1,0 +1,105 @@
+{
+  "date": "2026-11-11",
+  "target": "AArch64 native ZealC in UTM-bundled QEMU with HVF, one vCPU, virtio-ramfb, VirtIO keyboard and tablet",
+  "iso_path": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "93cb3d3eec000a3b482922d17bcdb37077b42650ff2ddb5e34650f4495b37149",
+  "kernel_sha256": "c211b0ecb262d8aae9ee9656de819fdd4c13466c0e57d7b3bcd2963dfb29be4a",
+  "result": "pass",
+  "checks": {
+    "X-Caliber": {
+      "result": "pass",
+      "scope": "left/right thrusters visibly changed ship scanout; Space projectile appeared; Escape returned to terminal; 40+7 returned 47; zstatus failed=0"
+    },
+    "ToTheFront": {
+      "result": "pass",
+      "scope": "selected human players, opened map, plotted artillery order to adjacent hex, Escape returned to terminal; zstatus failed=0"
+    },
+    "Span": {
+      "result": "pass",
+      "scope": "opened bridge help, rendered bridge frame and returned through Shift+Escape to working terminal"
+    },
+    "Strut": {
+      "result": "pass",
+      "scope": "placed two masses and visibly connected spring (cyan pixels 0 to 25); thruster moved star field and ship (24 and 313 changed pixels); Escape returned to terminal with zstatus failed=0"
+    },
+    "TimeClock": {
+      "result": "pass",
+      "scope": "saved and reread punch-in/out descriptions and report; returned to prompt; zstatus failed=0"
+    },
+    "Digital Logic": {
+      "result": "pass",
+      "scope": "drew an AND circuit; prompt editing and deletion worked; setup aborts and Shift+Escape cleaned drawing state; relaunch/exit returned to a working terminal; zstatus failed=0",
+      "serial_log": "build/check-logic-current-utm-qemu.log",
+      "serial_log_sha256": "44f2739136abdf9cc3dc94f2f684696087f4be10db9f0815697b48833cf2b864"
+    },
+    "Chess (Demo)": {
+      "result": "pass",
+      "scope": "dragged a pawn, verified the AI E7-E5 reply, Escape returned to working terminal; zstatus failed=0",
+      "serial_log": "build/check-chess-current-utm-qemu.log",
+      "serial_log_sha256": "4d229410ba7ae3b65953b04d21747e66854cb7853d7739e5792116d80883efae"
+    },
+    "TicTacToe (Demo)": {
+      "result": "pass",
+      "scope": "five-move win, board reset/replay, mouse input, Escape, terminal recovery; zstatus failed=0",
+      "serial_log": "build/check-tictactoe-current-utm-qemu.log",
+      "serial_log_sha256": "f367d44ec005c786efa07ad4798905cd719967d4df6483c993ae6fe16b249f58"
+    },
+    "Vocabulary": {
+      "result": "pass",
+      "scope": "accepted an answer, advanced the quiz, Escape returned to the graphical terminal; zstatus failed=0",
+      "serial_log": "build/check-vocabulary-current-utm-qemu.log",
+      "serial_log_sha256": "5b925fb10a141185d2b9f6a3552c25281374bff03c5a35fdcc20eac88ef9d86d"
+    }
+  },
+  "runs": [
+    {
+      "command": "python3 -u scripts/check-compat.py --pci --quick --probe-span-strut --probe-strut-spring",
+      "serial_log": "build/check-span-strut-current-utm-qemu.log",
+      "serial_log_sha256": "8f008dc072a044a1b0e2111ab8acb0545c994dfa149fa94779ab9e2eb6d5b092",
+      "exit_code": 0
+    },
+    {
+      "command": "python3 -u scripts/check-compat.py --pci --quick --probe-span-strut",
+      "serial_log": "build/check-span-current-utm-qemu.log",
+      "serial_log_sha256": "13c160cf29a193f25c3b3e35d3dd42e31ce8de9e6b1dfb87b2f69bb6fbcc8963",
+      "exit_code": 0
+    },
+    {
+      "command": "python3 -u scripts/check-compat.py --pci --quick --probe-timeclock",
+      "serial_log": "build/check-timeclock-current-utm-qemu.log",
+      "serial_log_sha256": "d7e7533c98f61021684b7cc30657effa6718191ad313e99bc93411f8af0fbfc6",
+      "exit_code": 0
+    },
+    {
+      "command": "python3 -u scripts/check-compat.py --pci --quick --probe-span-strut --probe-tothefront --probe-xcaliber --probe-timeclock",
+      "serial_log": "build/check-named-app-batch-current-utm-qemu.log",
+      "serial_log_sha256": "bc5bf97d9d4ca6082a1523b4b52dac2bd3930c0636bd8ecacaca89e3c5447eb6",
+      "exit_code": 0
+    },
+    {
+      "command": "python3 -u scripts/check-compat.py --pci --quick --probe-logic-program",
+      "serial_log": "build/check-logic-current-utm-qemu.log",
+      "serial_log_sha256": "44f2739136abdf9cc3dc94f2f684696087f4be10db9f0815697b48833cf2b864",
+      "exit_code": 0
+    },
+    {
+      "command": "python3 -u scripts/check-compat.py --pci --quick --probe-demo-chess --probe-demo-chess-ai",
+      "serial_log": "build/check-chess-current-utm-qemu.log",
+      "serial_log_sha256": "4d229410ba7ae3b65953b04d21747e66854cb7853d7739e5792116d80883efae",
+      "exit_code": 0
+    },
+    {
+      "command": "python3 -u scripts/check-compat.py --pci --quick --probe-demo-tictactoe --probe-demo-tictactoe-win",
+      "serial_log": "build/check-tictactoe-current-utm-qemu.log",
+      "serial_log_sha256": "f367d44ec005c786efa07ad4798905cd719967d4df6483c993ae6fe16b249f58",
+      "exit_code": 0
+    },
+    {
+      "command": "python3 -u scripts/check-compat.py --pci --quick --probe-vocabulary",
+      "serial_log": "build/check-vocabulary-current-utm-qemu.log",
+      "serial_log_sha256": "5b925fb10a141185d2b9f6a3552c25281374bff03c5a35fdcc20eac88ef9d86d",
+      "exit_code": 0
+    }
+  ],
+  "scope_note": "These are automated runs under UTM-bundled QEMU, not visible UTM app-window checks or Pi hardware acceptance. The harness exits after ToTheFront, so the combined invocation exercised X-Caliber and ToTheFront only; Span/Strut and TimeClock were independently run and passed. This record does not claim full application feature parity."
+}

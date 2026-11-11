@@ -1640,6 +1640,13 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         color = bytes(rgb)
         return sum(pixels[(y*width+x)*3:(y*width+x)*3+3] == color
                    for y in range(top, bottom) for x in range(left, right))
+    def nonblack_pixels_in(screen, bounds):
+        width, height, pixels, _ = screen
+        left, top, right, bottom = bounds
+        left, right = max(0, left), min(width, right)
+        top, bottom = max(0, top), min(height, bottom)
+        return sum(pixels[(y*width+x)*3:(y*width+x)*3+3] != b'\0\0\0'
+                   for y in range(top, bottom) for x in range(left, right))
     def rgb_coordinates_in(screen, rgb, bounds):
         width, height, pixels, _ = screen
         left, top, right, bottom = bounds
@@ -5160,8 +5167,14 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     '3d-grmodels-man-generated', 'y or n)?', timeout=20)
                 if 'y or n)?' not in man_generated[3]:
                     raise RuntimeError('GrModels Man did not finish mesh generation')
-                print('PASS GrModels Man mesh generation reached its repeat prompt',
-                      flush=True)
+                man_sprite_pixels = nonblack_pixels_in(man_generated, (48, 48, 152, 184))
+                if man_sprite_pixels < 100:
+                    raise RuntimeError('GrModels Man completed mesh generation but its '
+                                       'inline sprite is not visible near the document '
+                                       f'origin: {man_sprite_pixels} nonblack pixels')
+                print('PASS GrModels Man inline sprite visible: '
+                      f'{man_sprite_pixels} nonblack pixels; mesh generation reached '
+                      'its repeat prompt', flush=True)
                 qmp_send_key('n')
                 time.sleep(0.5)
                 graphical_screen('3d-grmodels-man-after-exit')
