@@ -1,0 +1,25 @@
+{
+  "date": "2026-11-11",
+  "repository_commit": "2354f2a66f4c6908e0e2b39188b9374b4ffac4e2",
+  "program": "/Apps/Psalmody/Run.ZC",
+  "target": "UTM-bundled QEMU, HVF, one vCPU, VirtIO keyboard/tablet and WAV-backed virtio-sound-pci",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "9a0d1433529e41b2cda6c36daef7255a7afdbe40c7f4f875bb305784fc56556a",
+  "kernel_sha256": "261bafde12c94029ebc46064a7fc650b66b3ec98e0a9ae0f5eaf9a774d3235d9",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device -audiodev wav,id=sound0,path=build/psalmody-current-9a0d.wav -device virtio-sound-pci,audiodev=sound0' ZEAL_COMPAT_LOG_PATH=build/check-current-psalmody-audio-9a0d.log python3 -u scripts/check-compat.py --pci --quick --probe-psalmody --probe-psalmody-audio-timer",
+  "result": "pass",
+  "verified": [
+    "Psalmody launched, accepted recording and C-note input, played the note, and exited with Shift+Escape.",
+    "The WAV-backed VirtIO sound device captured 11,466 stereo frames at 44,100 Hz; 15,876 samples were nonzero and the peak amplitude was 7,000.",
+    "The strongest sustained tone measured about 516.8 Hz, consistent with the expected C5 note.",
+    "The experimental sound timer delivered 10 IRQs.",
+    "After exit, the graphical terminal evaluated 40+2 as 42 and zstatus reported failed=0."
+  ],
+  "artifacts": {
+    "serial_log": "build/check-current-psalmody-audio-9a0d.log",
+    "serial_log_sha256": "84021a4eacdef1981e2c95c8fc5792741edded93b8ca347cd00a48ae7d8cf757",
+    "wav": "build/psalmody-current-9a0d.wav",
+    "wav_sha256": "6fde75acb5ba338508d3fa15d5859843ab3e834c6b8bc527791cb8607ac01a2e"
+  },
+  "scope_note": "This verifies generated PCM and app interaction under UTM's bundled QEMU with a WAV sink. It does not verify audible playback through the live UTM window, all Psalmody editing workflows, or Pi hardware output."
+}
