@@ -3131,6 +3131,16 @@ CDrive *Letter2Drive(U8 drv_let=0, Bool except=TRUE)
         throw('Drive');
     return NULL;
 }
+Bool Drive(U8 drv_let=0)
+{//Select the one RedSea drive currently exposed by the ARM bridge.
+    CDrive *drive = Letter2Drive(drv_let, FALSE);
+    if (!drive)
+        return FALSE;
+    Fs->cur_dv = drive;
+    Free(Fs->cur_dir);
+    Fs->cur_dir = StrNew("/");
+    return TRUE;
+}
 
 Bool BlkRead(CDrive *drive, U8 *buf, I64 blk, I64 count)
 {//Upstream uses absolute device LBAs within the drive's partition bounds.
