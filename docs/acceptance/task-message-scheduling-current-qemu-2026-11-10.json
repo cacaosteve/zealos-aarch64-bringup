@@ -1,23 +1,24 @@
 {
   "date": "2026-11-10",
-  "repository_commit": "297b7e7b37f3b8ea99bf6ae693bc98896e702fca",
+  "repository_commit": "ab9061dd9e501809265de4b86492c1588ae7a1dc",
   "upstream_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
-  "target": "AArch64 PCI QEMU graphical guest, one vCPU",
+  "target": "UTM-bundled QEMU framework, HVF, PCI ARM64 graphical guest, 1 vCPU, 1 GiB RAM, VirtIO keyboard/tablet",
   "iso": "build/zealos-aarch64-hello.iso",
-  "iso_sha256": "4bc484338001b2a4d460844c11f0ea397554dac9250c378885f8a8a7ff1be4ea",
-  "kernel_sha256": "c7cff83246dde72296135862518d65574ebc482171cc7286935153fa282d53d9",
+  "iso_sha256": "b5682ca299f6709d456e82e69cce5ee565a3efb043b413b668233cda6afbdd68",
+  "kernel": "build/kernel.elf",
+  "kernel_sha256": "cfa2202f654a4d5d76768c957384b93a50e34a58fd2ecc6793c43d47bf9276cd",
   "source": "tests/compat/TaskMessages.ZC",
   "source_sha256": "03c51938e3bcbbef89fd278c6161e983bab3bfb342dbe58494b57290d646c84b",
-  "command": "ZEAL_COMPAT_LOG_PATH=build/check-task-message-current.log python3 -u scripts/check-compat.py --pci --quick --probe-source-fast --probe-source tests/compat/TaskMessages.ZC --probe-source-call TaskMessageSchedulingChecks",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-task-message-scheduling-current.log python3 -u scripts/check-compat.py --pci --quick --probe-source-fast --probe-source tests/compat/TaskMessages.ZC --probe-source-call TaskMessageSchedulingChecks",
   "exit_code": 0,
   "result": "pass",
   "verified": [
-    "Five rounds of MessageScan, KeyScan, CharScan, and FlushMessages polling did not run the peer task.",
-    "An explicit Yield handed execution to the next ready peer.",
-    "A blocked MessageGet yielded, received the peer's posted command, and resumed.",
-    "TaskMessageSchedulingChecks returned 0x2a and the native compiler reset successfully."
+    "Five consecutive MessageScan, KeyScan, CharScan and FlushMessages polls did not run the peer task.",
+    "An explicit Yield selected the next ready peer.",
+    "A blocked MessageGet yielded to a ready peer, received its posted command and resumed.",
+    "TaskMessageSchedulingChecks returned 0x2a."
   ],
-  "log": "build/check-task-message-current.log",
-  "log_sha256": "da87d9e2fe06d1ae8dc10647adf6f300d59a0f2c98a35c1bc5c33423f8fd1a2b",
-  "scope_note": "This verifies the current cooperative compatibility bridge on the recorded ISO. It does not make the pinned upstream Sched.ZC the active scheduler or prove live UTM/Pi scheduling behavior."
+  "log": "build/check-task-message-scheduling-current.log",
+  "log_sha256": "6bbaea7ab229b53d5d9fec019d0de9585fc8c6059c9b4c7b103a6e73e63c0982",
+  "scope_note": "This validates the cooperative host bridge on the current image, not the pinned upstream Sched.ZC as the active runtime scheduler. It does not verify multi-CPU scheduling or visible UTM-app behavior."
 }

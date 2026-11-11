@@ -1,0 +1,22 @@
+{
+  "date": "2026-11-10",
+  "repository_commit": "ab9061dd9e501809265de4b86492c1588ae7a1dc",
+  "upstream_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "target": "UTM-bundled QEMU framework, HVF, PCI ARM64 graphical guest, 1 vCPU, 1 GiB RAM, VirtIO keyboard/tablet",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "b5682ca299f6709d456e82e69cce5ee565a3efb043b413b668233cda6afbdd68",
+  "kernel": "build/kernel.elf",
+  "kernel_sha256": "cfa2202f654a4d5d76768c957384b93a50e34a58fd2ecc6793c43d47bf9276cd",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-xcaliber-current-after-scheduler.log python3 -u scripts/check-compat.py --pci --quick --probe-xcaliber",
+  "exit_code": 0,
+  "result": "pass",
+  "verified": [
+    "X-Caliber left and right thrusters changed the ship; Space produced a visible projectile.",
+    "Escape returned to the graphical terminal, which accepted and executed 40+7 as 47.",
+    "zstatus reported failed=0.",
+    "The follow-on graphical terminal input and window-demo launch/stop smoke checks passed."
+  ],
+  "log": "build/check-xcaliber-current-after-scheduler.log",
+  "log_sha256": "c88d43048f79b7263e61dc888085cf29c37e79c7badeddffcbd864c6ade395c1",
+  "scope_note": "This is QEMU acceptance after the current MessageScan scheduling regression. X-Caliber input/Escape succeeded in this emulated profile; it does not resolve or reproduce any failure seen in the visible UTM app window. No X-Caliber-specific Yield was added."
+}
