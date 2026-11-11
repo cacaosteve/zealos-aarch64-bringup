@@ -1,0 +1,23 @@
+{
+  "date": "2026-11-10",
+  "repository_commit": "f410387b43b114e7c58286b392a9d8b5edc8c4ea",
+  "upstream_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "target": "UTM-bundled QEMU framework, HVF, PCI ARM64 graphical guest, 1 vCPU, 1 GiB RAM, VirtIO keyboard/tablet and VirtIO sound WAV backend",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "b5682ca299f6709d456e82e69cce5ee565a3efb043b413b668233cda6afbdd68",
+  "kernel": "build/iso_root/boot/kernel.elf",
+  "kernel_sha256": "cfa2202f654a4d5d76768c957384b93a50e34a58fd2ecc6793c43d47bf9276cd",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device -audiodev wav,id=sound0,path=build/ohgreat-current-b5682.wav -device virtio-sound-pci,audiodev=sound0' ZEAL_COMPAT_LOG_PATH=build/check-ohgreat-current-b5682-wav.log python3 -u scripts/check-compat.py --pci --quick --probe-demo-ohgreat-full",
+  "exit_code": 0,
+  "result": "pass",
+  "verified": [
+    "Unmodified /Demo/Sound/OhGreat.ZC played through the late lyric 'smack' and completed after a normal key press.",
+    "The graphical terminal accepted and executed a follow-up 40+2 command; zstatus reported failed=0.",
+    "The WAV backend emitted 47.94 seconds of stereo 16-bit PCM at 44.1 kHz, with peak sample 7000 and RMS 6902."
+  ],
+  "log": "build/check-ohgreat-current-b5682-wav.log",
+  "log_sha256": "67a5d4c19ad6cebe97030d7626910b8289f9e819b2af42de2fa6f798686418a2",
+  "wav": "build/ohgreat-current-b5682.wav",
+  "wav_sha256": "7772042caf2dcc3137e00db4301b5d73407d9a6887c0fdfe39d43ad49e3fdf9b",
+  "scope_note": "This verifies the current ISO's VirtIO sound output in QEMU and successful demo/terminal recovery. It does not establish audible output from this WAV test itself. The user previously reported successful OhGreat HDMI playback on the Pi 4B; that physical report is not independently repeated here."
+}
