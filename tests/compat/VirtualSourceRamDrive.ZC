@@ -1,0 +1,71 @@
+I64 VirtualSourceRamDriveChecks()
+{
+    CDrive *source, *ram;
+    CDirEntry *found;
+    U8 *contents;
+    I64 size;
+
+    source = Letter2Drive('C', FALSE);
+    ram = Letter2Drive('B', FALSE);
+    if (!source || !ram || source->drv_let != 'C' || ram->drv_let != 'B')
+        return 1;
+    if (!Drive('C') || !Drive('B'))
+        return 2;
+    if (FileWrite("C:/compat-touch-probe.txt", "x", 1) != 1)
+        return 15;
+    if (!Drive('C'))
+        return 16;
+    Touch("/compat-touch-probe.txt", "+T");
+    if (!Del("/compat-touch-probe.txt"))
+        return 17;
+    Format('B',, FALSE, FSt_REDSEA);
+    if (FileWrite("B:/probe.txt", "abc", 3) != 3)
+        return 3;
+    contents = FileRead("B:/probe.txt", &size);
+    if (!contents || size != 3 || StrCompare(contents, "abc"))
+    {
+        Free(contents);
+        return 4;
+    }
+    Free(contents);
+    contents = FileRead("probe.txt", &size);
+    if (!contents || size != 3 || StrCompare(contents, "abc"))
+    {
+        Free(contents);
+        return 5;
+    }
+    Free(contents);
+    if (!DirMake("B:/copy-source")) return 6;
+    if (FileWrite("B:/copy-source/child.txt", "copy", 4) != 4)
+        return 7;
+    if (!CopyTree("B:/copy-source", "B:/copy-dest"))
+        return 8;
+    contents = FileRead("B:/copy-dest/child.txt", &size);
+    if (!contents || size != 4 || StrCompare(contents, "copy"))
+    {
+        Free(contents);
+        return 9;
+    }
+    Free(contents);
+    found = FilesFind("B:/copy-dest/child.txt", FUF_JUST_FILES | FUF_SINGLE);
+    if (!found || StrCompare(found->full_name, "B:/copy-dest/child.txt"))
+    {
+        DirTreeDel(found);
+        return 10;
+    }
+    DirTreeDel(found);
+    if (!DelTree("B:/copy-dest"))
+        return 11;
+    if (FileFind("B:/copy-dest/child.txt"))
+        return 12;
+    if (!CopyTree("B:/", "B:/root-copy"))
+        return 13;
+    contents = FileRead("B:/root-copy/probe.txt", &size);
+    if (!contents || size != 3 || StrCompare(contents, "abc"))
+    {
+        Free(contents);
+        return 14;
+    }
+    Free(contents);
+    return 42;
+}

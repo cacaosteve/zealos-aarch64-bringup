@@ -14610,6 +14610,7 @@ int zeal_zss_entry_at(uint32_t index, char *name, size_t name_cap,
                       size_t *size_out) {
     return zss_entry_at(index, name, name_cap, size_out);
 }
+int zeal_zss_delete(const char *name) { return zss_delete(name); }
 int zeal_zss_volume_stats(uint64_t *capacity_bytes, uint64_t *free_bytes) {
     return zss_volume_stats(capacity_bytes, free_bytes);
 }
@@ -14621,6 +14622,7 @@ int zeal_zss_entry_at(uint32_t index, char *name, size_t name_cap,
                       size_t *size_out) {
     (void)index; (void)name; (void)name_cap; (void)size_out; return 0;
 }
+int zeal_zss_delete(const char *name) { (void)name; return -2; }
 int zeal_zss_volume_stats(uint64_t *capacity_bytes, uint64_t *free_bytes) {
     (void)capacity_bytes; (void)free_bytes; return 0;
 }

@@ -189,6 +189,8 @@ p.add_argument('--probe-demo-makehome', action='store_true',
                help='run MakeHome stock module loader and verify terminal recovery')
 p.add_argument('--probe-demo-tos-distro-std', action='store_true',
                help='run the full standard TOS distro build in a disposable PCI QEMU guest')
+p.add_argument('--probe-demo-tos-distro-prep', action='store_true',
+               help='run the source-tree DistroPrep stage in a disposable PCI QEMU guest')
 p.add_argument('--probe-demo-define', action='store_true',
                help='run the interactive Define demo and verify localized prompts/recovery')
 p.add_argument('--probe-demo-compiledemo', action='store_true',
@@ -577,7 +579,7 @@ p.add_argument('--probe-source-kernel', action='store_true',
 p.add_argument('--probe-source-fast', action='store_true',
                help='after boot/framebuffer checks, run source probes before the longer PCI suite')
 args = p.parse_args()
-if args.probe_demo_tos_distro_std:
+if args.probe_demo_tos_distro_std or args.probe_demo_tos_distro_prep:
     # This path executes stock format/copy routines. Force the PCI harness,
     # which clones build/disk.img into its private temporary directory before
     # booting, so no host or removable volume can be modified.
@@ -9616,7 +9618,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                       'terminal recovery', flush=True)
                 raise SystemExit(0)
 
-            if args.probe_demo_makehome or args.probe_demo_tos_distro_std:
+            if (args.probe_demo_makehome or args.probe_demo_tos_distro_std or
+                    args.probe_demo_tos_distro_prep):
                 command('zload /Demo/AcctExample/MakeHome.ZC',
                         'zc: loaded /Demo/AcctExample/MakeHome.ZC', timeout=180)
                 command('zload /Demo/AcctExample/TOS/MakeTOS.ZC',
@@ -9628,12 +9631,36 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 # explicit functions and must not be invoked by this probe.
                 command('zc ExeFile2("/Demo/AcctExample/TOS/TOSDistro.ZC");',
                         'zc: executed', timeout=180)
+                if args.probe_demo_tos_distro_prep:
+                    prep_steps = [
+                        'SysOnceFlush', 'OnceFlush', 'Del("/Home/Demo*")',
+                        'DelTree("/Home/*Tmp.DD")', 'DelTree("/Tmp")',
+                        'DirMake("/Tmp")', 'DirMake("/Tmp/ScreenShots")',
+                        'Touch("/PersonalMenu.DD","+T")',
+                        'Touch("/Home/PersonalMenu.DD","+T")',
+                        'DelTree("/Demo/AcctExample")',
+                        'if(CopyTree("/Home","/Demo/AcctExample"))return 42;return 40;',
+                        'DelTree("/Demo/AcctExample/TAD")',
+                        'DelTree("/Demo/AcctExample/Sup1")',
+                        'DelTree("/Demo/AcctExample/Sup2")',
+                        'DelTree("/Demo/AcctExample/Sup3")',
+                        'Del("/Demo/AcctExample/Test*")',
+                        'CursorRemove("/*")',
+                        'DelTree("/Demo/*.BI*")', 'S2T("/*","+r+S")',
+                    ]
+                    for step, expression in enumerate(prep_steps):
+                        command(f'zc I64 TOSPrepStep{step}(){{{expression};return 42;}}',
+                                'zc: executed', timeout=300 if step == 18 else 60)
+                        command(f'zcall TOSPrepStep{step}',
+                                'zc => 0x000000000000002a',
+                                timeout=300 if step == 18 else 60)
+                    command('zc I64 TOSPrepTreeExists(){if(FileFind("/Demo/AcctExample/TOS/TOSDistro.ZC")&&FileFind("/Demo/AcctExample/HomeSys.ZC"))return 42;return 40;}',
+                            'zc: executed', timeout=60)
+                    command('zcall TOSPrepTreeExists',
+                            'zc => 0x000000000000002a', timeout=60)
+                    print('PASS TOSDistro DistroPrep rebuilt the account source tree',
+                          flush=True)
                 if args.probe_demo_tos_distro_std:
-                    # Blocker reproducer: the current ARM64 bridge exposes the
-                    # source store and optional bounded RedSea D: fixture,
-                    # but does not register stock C: or RAM B: drives. The
-                    # first Drive('C') therefore faults before any format,
-                    # erase, copy, or ISO-generation operation can run.
                     command('zc I64 TOSStdDistroBuild(){MakeStdDistro;if(Size(TOS_ISO_NAME,"+s")>1048576)return 42;return 0;}',
                             'zc: executed', timeout=180)
                     command('zcall TOSStdDistroBuild',
@@ -9648,6 +9675,10 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     print('PASS TOSDistro built a nonempty standard RedSea ISO '
                           'on the guest RAM drive; terminal recovery and failed=0',
                           flush=True)
+                    raise SystemExit(0)
+                if args.probe_demo_tos_distro_prep:
+                    print('PASS TOSDistro preparation completed; terminal recovery '
+                          'and failed=0', flush=True)
                     raise SystemExit(0)
                 print('PASS MakeHome and MakeTOS loaded their stock module sets; '
                       'TOSDistro executed its non-destructive initialization; '

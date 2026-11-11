@@ -29,6 +29,8 @@ extern I64 ZcRawRedSeaGeometry(U64 *base, U64 *sectors);
 #define BDT_ARM_VIRTIO 0x100
 CDrive zc_legacy_redsea_drive;
 CBlkDev zc_legacy_redsea_device;
+CDrive zc_source_drive, zc_ram_drive;
+CBlkDev zc_source_device, zc_ram_device;
 // Native AArch64 user-compiler hooks used by the ARM64 DocTree overlay.
 extern CCompCtrl *ZcUserCompCtrlNew(U8 *buf=NULL, I64 flags=0);
 extern U0 ZcUserCompCtrlDel(CCompCtrl *cc);
@@ -89,11 +91,16 @@ extern I64 FileWrite(U8 *filename, U8 *fbuf, I64 size, I64 cdt=0, I64 attr=0);
 extern Bool ZcSourceDirExists(U8 *path);
 extern U8 *ZcSourcePath(U8 *path);
 extern Bool ZcSourceWritable(U8 *path);
+extern Bool ZcSourceMetaGet(U8 *path, U16 *attr, CDate *datetime);
+extern Bool ZcSourceMetaSet(U8 *path, U16 attr, CDate datetime);
 extern Bool ZcSourceHasOverride(U8 *path);
 extern U8 *ZcDocInputBytes(U8 *src, I64 size, I64 *_decoded_size);
 extern Bool Cd(U8 *dirname=NULL, Bool make_dirs=FALSE);
 extern U8 *DirCur(CTask *task=NULL, CTask *mem_task=NULL);
 extern Bool ZcSourceFileAt(I64 index, U8 *path, I64 path_cap, I64 *_size);
+extern Bool ZcRamFileAt(I64 index, U8 *path, I64 path_cap, I64 *_size);
+extern Bool ZcRamVolumeFormat(U8 drv_let);
+extern Bool ZcVirtualFileDelete(U8 *path);
 extern Bool ZcRedSeaFileAt(I64 index, U8 *path, I64 path_cap, I64 *_size);
 extern Bool ZcRedSeaDirAt(I64 index, U8 *path, I64 path_cap);
 extern Bool ZcSourceVolumeStats(U64 *_capacity_bytes, U64 *_free_bytes);
@@ -1083,6 +1090,8 @@ I64 BootstrapDefinesLoad()
                    "Sun\0Mon\0Tue\0Wed\0Thu\0Fri\0Sat\0");
     DefineListLoad("ST_MONTHS",
                    "Jan\0Feb\0Mar\0Apr\0May\0Jun\0Jul\0Aug\0Sep\0Oct\0Nov\0Dec\0");
+    DefineListLoad("ST_FILE_ATTRS",
+                   "R\0H\0S\0V\0D\0A\0 \0 \0X\0T\0C\0F\0");
     // Match the pinned Kernel/KDefine.ZC flag list used by FlagsScan in
     // stock file utilities such as Demo/DolDoc/TreeDemo.ZC.
     DefineListLoad("ST_FILE_UTIL_FLAGS",
@@ -2158,10 +2167,12 @@ public Bool FileFind(U8 *filename, CDirEntry *_de=NULL, I64 fuf_flags=0)
         _de->name[filename_len] = 0;
         _de->clus = 0;
         _de->attr = RS_ATTR_ARCHIVE;
+        _de->datetime = 0;
         if (fuf_flags & FUF_JUST_DIRS)
             _de->attr = RS_ATTR_DIR;
+        else
+            ZcSourceMetaGet(resolved, &_de->attr, &_de->datetime);
         _de->size = size;
-        _de->datetime = 0;
     }
     return TRUE;
 }
@@ -2335,12 +2346,12 @@ Bool BootstrapFilesFindInCurrent(U8 *full_name, U8 *cur_dir, U8 **remainder,
 }
 CDirEntry *FilesFind(U8 *files_find_mask, I64 fuf_flags=0)
 {
-    CDirEntry *head = NULL, *tail = NULL;
+    CDirEntry *head = NULL, *tail = NULL, *entry;
     U8 path[256], full_name[258], cur_dir[128];
     U8 *remainder, *slash, *end, *mask_dir = NULL, *mask_leaf, *disk_mask;
     U8 *absolute_dir = NULL, *root_dir = NULL;
     I64 index = 0, size, cur_len, i, j, file_len, dir_len;
-    Bool recurse, added;
+    Bool recurse, added, ram_only = FALSE;
     Bool disk_only = Fs && Fs->cur_dv == &zc_legacy_redsea_drive &&
         zc_legacy_redsea_drive.drive_signature == DRIVE_SIGNATURE_VAL;
 
@@ -2359,6 +2370,23 @@ CDirEntry *FilesFind(U8 *files_find_mask, I64 fuf_flags=0)
             disk_mask = MStrPrint("disk:/%s", files_find_mask + 2);
         head = FilesFind(disk_mask, fuf_flags);
         Free(disk_mask);
+        return head;
+    }
+    if ((files_find_mask[0] == 'B' || files_find_mask[0] == 'b') &&
+        files_find_mask[1] == ':')
+    {
+        if (files_find_mask[2] == '/')
+            disk_mask = MStrPrint("ram:%s", files_find_mask + 2);
+        else
+            disk_mask = MStrPrint("ram:/%s", files_find_mask + 2);
+        head = FilesFind(disk_mask, fuf_flags);
+        Free(disk_mask);
+        for (entry = head; entry; entry = entry->next)
+        {
+            U8 *qualified = MStrPrint("B:%s", entry->full_name);
+            Free(entry->full_name);
+            entry->full_name = qualified;
+        }
         return head;
     }
     // A root-level disk:mask is equivalent to disk:/mask.
@@ -2420,6 +2448,12 @@ CDirEntry *FilesFind(U8 *files_find_mask, I64 fuf_flags=0)
                 disk_only = TRUE;
                 absolute_path += 5;
             }
+            else if (absolute_path[0] == 'r' && absolute_path[1] == 'a' &&
+                     absolute_path[2] == 'm' && absolute_path[3] == ':')
+            {
+                ram_only = TRUE;
+                absolute_path += 4;
+            }
             for (i = 0; absolute_path[i] && i < sizeof(cur_dir) - 1; i++)
                 cur_dir[i] = absolute_path[i];
             cur_dir[i] = 0;
@@ -2431,7 +2465,8 @@ CDirEntry *FilesFind(U8 *files_find_mask, I64 fuf_flags=0)
     while (cur_len > 1 && cur_dir[cur_len - 1] == '/')
         cur_dir[--cur_len] = 0;
     recurse = fuf_flags & FUF_RECURSE;
-    while (!disk_only && ZcSourceFileAt(index++, path, sizeof(path), &size))
+    while (!disk_only && !ram_only &&
+           ZcSourceFileAt(index++, path, sizeof(path), &size))
     {
         added = FALSE;
         file_len = StrLen(path);
@@ -2474,6 +2509,55 @@ CDirEntry *FilesFind(U8 *files_find_mask, I64 fuf_flags=0)
                 }
                 if (added && (fuf_flags & FUF_SINGLE))
                     break;
+            }
+        }
+    }
+    if (ram_only && (!(fuf_flags & FUF_SINGLE) || !head))
+    {
+        index = 0;
+        while (ZcRamFileAt(index++, path, sizeof(path), &size))
+        {
+            file_len = StrLen(path);
+            if (file_len > 5 && file_len - 4 < sizeof(full_name))
+            {
+                full_name[0] = '/';
+                for (i = 0; i <= file_len - 5; i++)
+                    full_name[i + 1] = path[i + 5];
+                if (BootstrapFilesFindInCurrent(full_name, cur_dir, &remainder))
+                {
+                    if (!(fuf_flags & FUF_JUST_DIRS) &&
+                        (recurse || !StrOcc(remainder, '/')))
+                    {
+                        added = BootstrapFilesFindAppend(&head, &tail, full_name,
+                            size, FALSE, mask_leaf, fuf_flags);
+                        if (added && (fuf_flags & FUF_SINGLE))
+                            break;
+                    }
+                    if (!(fuf_flags & FUF_JUST_FILES))
+                    {
+                        end = remainder;
+                        while ((slash = StrMatch("/", end)) != NULL)
+                        {
+                            if (slash == end)
+                                break;
+                            j = slash - full_name;
+                            if (j >= sizeof(path))
+                                break;
+                            for (i = 0; i < j; i++)
+                                path[i] = full_name[i];
+                            path[j] = 0;
+                            added = BootstrapFilesFindAppend(&head, &tail, path,
+                                0, TRUE, mask_leaf, fuf_flags);
+                            if (added && (fuf_flags & FUF_SINGLE))
+                                break;
+                            if (!recurse)
+                                break;
+                            end = slash + 1;
+                        }
+                    }
+                    if (added && (fuf_flags & FUF_SINGLE))
+                        break;
+                }
             }
         }
     }
@@ -2568,7 +2652,7 @@ U0 DirTreeDel(CDirEntry *entry)
 }
 public Bool IsDir(U8 *dir_name)
 {// Match stock IsDir for source files and the mounted read-only RedSea drive.
-    U8 *name;
+    U8 *name, *absolute;
     I64 length;
     CDirEntry *entry;
     Bool result;
@@ -2587,9 +2671,15 @@ public Bool IsDir(U8 *dir_name)
         result = zc_legacy_redsea_drive.drive_signature == DRIVE_SIGNATURE_VAL;
     else
     {
-        entry = FilesFind(name, FUF_JUST_DIRS | FUF_SINGLE);
-        result = entry != NULL;
-        DirTreeDel(entry);
+        absolute = ZcSourcePath(name);
+        result = absolute && ZcSourceDirExists(absolute);
+        Free(absolute);
+        if (!result)
+        {
+            entry = FilesFind(name, FUF_JUST_DIRS | FUF_SINGLE);
+            result = entry != NULL;
+            DirTreeDel(entry);
+        }
     }
     Free(name);
     return result;
@@ -3149,8 +3239,53 @@ Bool ZcMountLegacyRedSea()
     return TRUE;
 }
 
+U0 ZcVirtualDrivesInit()
+{
+    if (zc_source_drive.drive_signature == DRIVE_SIGNATURE_VAL &&
+        zc_ram_drive.drive_signature == DRIVE_SIGNATURE_VAL)
+        return;
+    MemSet(&zc_source_device, 0, sizeof(CBlkDev));
+    MemSet(&zc_ram_device, 0, sizeof(CBlkDev));
+    MemSet(&zc_source_drive, 0, sizeof(CDrive));
+    MemSet(&zc_ram_drive, 0, sizeof(CDrive));
+    zc_source_device.bd_signature = BD_SIGNATURE_VAL;
+    zc_source_device.type = BDT_RAM;
+    zc_source_device.flags = BDF_INITIALIZED;
+    zc_source_device.blk_size = BLK_SIZE;
+    zc_source_device.first_drive_let = 'C';
+    zc_ram_device.bd_signature = BD_SIGNATURE_VAL;
+    zc_ram_device.type = BDT_RAM;
+    zc_ram_device.flags = BDF_INITIALIZED;
+    zc_ram_device.blk_size = BLK_SIZE;
+    zc_ram_device.first_drive_let = 'B';
+    zc_source_drive.drive_signature = DRIVE_SIGNATURE_VAL;
+    zc_source_drive.drv_let = 'C';
+    zc_source_drive.bd = &zc_source_device;
+    zc_ram_drive.drive_signature = DRIVE_SIGNATURE_VAL;
+    zc_ram_drive.drv_let = 'B';
+    zc_ram_drive.bd = &zc_ram_device;
+}
+
 CDrive *Letter2Drive(U8 drv_let=0, Bool except=TRUE)
 {
+    ZcVirtualDrivesInit;
+    if (drv_let == 'C' || drv_let == 'c')
+        return &zc_source_drive;
+    if (drv_let == 'B' || drv_let == 'b')
+        return &zc_ram_drive;
+    // FilesFind in the source-backed namespace returns rooted names such as
+    // "/Home/FILE.DD". Stock TouchFile passes the first character of that
+    // path to Letter2Drive, where a leading slash means the current volume.
+    if (drv_let == '/' && Fs && Fs->cur_dv)
+        return Fs->cur_dv;
+    if (drv_let == '/' && Fs && !Fs->cur_dv)
+        return &zc_source_drive;
+    if (!drv_let && Fs && !Fs->cur_dv)
+        return &zc_source_drive;
+    if (!drv_let && Fs->cur_dv == &zc_source_drive)
+        return &zc_source_drive;
+    if (!drv_let && Fs->cur_dv == &zc_ram_drive)
+        return &zc_ram_drive;
     if ((drv_let == 'D' || drv_let == 'd') &&
         zc_legacy_redsea_drive.drive_signature == DRIVE_SIGNATURE_VAL)
         return &zc_legacy_redsea_drive;
@@ -3161,14 +3296,28 @@ CDrive *Letter2Drive(U8 drv_let=0, Bool except=TRUE)
         throw('Drive');
     return NULL;
 }
+public Bool DirNew(CDrive *drive, U8 *cur_dir, CDirEntry *tmpde,
+                   Bool free_old_chain=TRUE)
+{//Persist source-volume file attributes/dates in the hidden ZSS metadata table.
+    if (!cur_dir || !tmpde || !tmpde->full_name || free_old_chain) {}
+    ZcVirtualDrivesInit;
+    if (drive != &zc_source_drive)
+        return FALSE;
+    return ZcSourceMetaSet(tmpde->full_name, tmpde->attr, tmpde->datetime);
+}
 Bool Drive(U8 drv_let=0)
-{//Select the one RedSea drive currently exposed by the ARM bridge.
+{//Select a virtual source/RAM volume or the bounded RedSea volume.
     CDrive *drive = Letter2Drive(drv_let, FALSE);
     if (!drive)
         return FALSE;
     Fs->cur_dv = drive;
     Free(Fs->cur_dir);
-    Fs->cur_dir = StrNew("/");
+    if (drive == &zc_ram_drive)
+        Fs->cur_dir = StrNew("ram:/");
+    else if (drive == &zc_legacy_redsea_drive)
+        Fs->cur_dir = StrNew("disk:/");
+    else
+        Fs->cur_dir = StrNew("/");
     return TRUE;
 }
 
@@ -3235,8 +3384,11 @@ CBlkDev *Letter2BlkDev(U8 drv_let=0, Bool except=TRUE)
     return NULL;
 }
 U0 DriveRep()
-{//Report only real drive objects currently registered by this bridge.
+{//Report source, volatile RAM and bounded RedSea volumes.
     "\nDefined Drives:\n";
+    ZcVirtualDrivesInit;
+    "C Source    persistent ZSS overlay\n";
+    "B RAM       volatile bridge memory\n";
     if (zc_legacy_redsea_drive.drive_signature == DRIVE_SIGNATURE_VAL)
     {
         "D RedSea    VirtIO (bounded writable window)\n";
@@ -3247,7 +3399,18 @@ U0 DriveRep()
 }
 U0 Unmount(U8 drv_let=0)
 {
-    if (drv_let == 'D' || drv_let == 'd')
+    if (drv_let == 'B' || drv_let == 'b')
+    {
+        ZcRamVolumeFormat('B');
+        MemSet(&zc_ram_drive, 0, sizeof(CDrive));
+        MemSet(&zc_ram_device, 0, sizeof(CBlkDev));
+    }
+    else if (drv_let == 'C' || drv_let == 'c')
+    {
+        MemSet(&zc_source_drive, 0, sizeof(CDrive));
+        MemSet(&zc_source_device, 0, sizeof(CBlkDev));
+    }
+    else if (drv_let == 'D' || drv_let == 'd')
     {
         MemSet(&zc_legacy_redsea_drive, 0, sizeof(CDrive));
         MemSet(&zc_legacy_redsea_device, 0, sizeof(CBlkDev));
@@ -3260,6 +3423,13 @@ U0 DiskChange(U8 drv_let=0)
 U0 Format(U8 drv_let, Bool quick=TRUE, Bool confirm=TRUE,
           I64 type=FSt_FAT32)
 {
+    if (drv_let == 'B' || drv_let == 'b')
+    {
+        if (!ZcRamVolumeFormat(drv_let))
+            throw('Drive');
+        ZcVirtualDrivesInit;
+        return;
+    }
     if (drv_let) {}
     if (quick) {}
     if (confirm) {}
@@ -8328,6 +8498,41 @@ Bool BootstrapCopyFile(U8 *source, U8 *destination)
     Free(dst_path);
     return copied;
 }
+public Bool CopySingle(U8 *source, U8 *destination)
+{//Copy one file and retain its source metadata where the destination supports it.
+    CDirEntry entry;
+    U8 *contents, *source_path, *destination_path;
+    I64 size, attr, written;
+    Bool copied = FALSE;
+
+    if (!source || !*source || !destination || !*destination)
+        return FALSE;
+    source_path = ZcSourcePath(source);
+    destination_path = ZcSourcePath(destination);
+    if (!source_path || !destination_path || !StrCompare(source_path, destination_path))
+    {
+        Free(source_path);
+        Free(destination_path);
+        return FALSE;
+    }
+    Free(source_path);
+    Free(destination_path);
+    if (FileFind(source, &entry, FUF_JUST_FILES))
+    {
+        attr = entry.attr;
+        contents = FileRead(source, &size, &attr);
+        if (contents)
+        {
+            written = FileWrite(destination, contents, size, entry.datetime, attr);
+            copied = written == size;
+            if (copied)
+                ZcSourceMetaSet(destination, attr, entry.datetime);
+            Free(contents);
+        }
+        Free(entry.full_name);
+    }
+    return copied;
+}
 Bool Copy(U8 *src_files_find_mask, U8 *dst_files_find_mask=".")
 {
     CDirEntry *files, *entry;
@@ -8366,23 +8571,121 @@ Bool Move(U8 *f1, U8 *f2)
 }
 Bool CopyTree(U8 *src, U8 *dst)
 {
-    if (src) {}
-    if (dst) {}
-    return FALSE;
+    CDirEntry *files, *entry;
+    U8 *source_abs, *dest_abs, *source_prefix, *mask, *relative;
+    U8 *destination, *parent, *slash;
+    Bool ok = TRUE, prefix_has_slash;
+    I64 prefix_len;
+
+    if (!src || !*src || !dst || !*dst)
+        return FALSE;
+    if (!IsDir(src))
+        return BootstrapCopyFile(src, dst);
+    source_abs = ZcSourcePath(src);
+    dest_abs = ZcSourcePath(dst);
+    if (!source_abs || !dest_abs)
+    {
+        Free(source_abs);
+        Free(dest_abs);
+        return FALSE;
+    }
+    if (StrMatch("ram:", source_abs) == source_abs)
+        source_prefix = MStrPrint("B:%s", source_abs + 4);
+    else
+        source_prefix = StrNew(source_abs);
+    prefix_len = StrLen(source_prefix);
+    prefix_has_slash = prefix_len && source_prefix[prefix_len - 1] == '/';
+    if (!DirMake(dst))
+        ok = FALSE;
+    if (src[StrLen(src) - 1] == '/')
+        mask = MStrPrint("%s*", src);
+    else
+        mask = MStrPrint("%s/*", src);
+    files = FilesFind(mask, FUF_RECURSE | FUF_JUST_FILES);
+    Free(mask);
+    for (entry = files; entry; entry = entry->next)
+    {
+        if (StrNCompare(entry->full_name, source_prefix, prefix_len) ||
+            (!prefix_has_slash && entry->full_name[prefix_len] &&
+             entry->full_name[prefix_len] != '/'))
+            ok = FALSE;
+        else
+        {
+            relative = entry->full_name + prefix_len;
+            while (*relative == '/')
+                relative++;
+            if (dest_abs[StrLen(dest_abs) - 1] == '/')
+                destination = MStrPrint("%s%s", dest_abs, relative);
+            else
+                destination = MStrPrint("%s/%s", dest_abs, relative);
+            slash = StrLastOcc(destination, "/");
+            if (slash && slash != destination)
+            {
+                parent = StrNew(destination);
+                parent[slash - destination] = 0;
+                if (!DirMake(parent))
+                    ok = FALSE;
+                Free(parent);
+            }
+            if (!BootstrapCopyFile(entry->full_name, destination))
+                ok = FALSE;
+            Free(destination);
+        }
+    }
+    DirTreeDel(files);
+    Free(source_prefix);
+    Free(source_abs);
+    Free(dest_abs);
+    return ok;
 }
 Bool DelTree(U8 *path)
 {
-    if (path) {}
-    return FALSE;
+    CDirEntry *files, *entry;
+    U8 *mask;
+    Bool ok = TRUE, wildcard;
+    I64 count = 0;
+
+    if (!path || !*path)
+        return FALSE;
+    wildcard = StrOcc(path, '*') || StrOcc(path, '?');
+    if (!wildcard && IsDir(path))
+    {
+        if (path[StrLen(path) - 1] == '/')
+            mask = MStrPrint("%s*", path);
+        else
+            mask = MStrPrint("%s/*", path);
+    }
+    else
+        mask = StrNew(path);
+    files = FilesFind(mask, FUF_RECURSE | FUF_JUST_FILES);
+    Free(mask);
+    for (entry = files; entry; entry = entry->next)
+    {
+        if (!ZcVirtualFileDelete(entry->full_name))
+            ok = FALSE;
+        else
+            count++;
+    }
+    DirTreeDel(files);
+    return ok && (count > 0 || !IsDir(path));
 }
 I64 Del(U8 *files_find_mask, Bool make_mask=FALSE, Bool del_dir=FALSE,
         Bool print_message=TRUE)
 {
-    if (files_find_mask) {}
+    CDirEntry *files, *entry;
+    I64 count = 0;
+
+    if (!files_find_mask || !*files_find_mask)
+        return 0;
+    files = FilesFind(files_find_mask, FUF_JUST_FILES);
+    for (entry = files; entry; entry = entry->next)
+        if (ZcVirtualFileDelete(entry->full_name))
+            count++;
+    DirTreeDel(files);
     if (make_mask) {}
     if (del_dir) {}
     if (print_message) {}
-    return 0;
+    return count;
 }
 Bool Type(U8 *filename, I64 trailing_new_lines=1)
 {

@@ -17,6 +17,7 @@ int64_t TempleOS_CallNOnStack(uint64_t stack_top, void (*fptr)(),
                               int64_t argc, int64_t *argv);
 extern int zeal_zss_entry_at(uint32_t index, char *name, size_t name_cap,
                              size_t *size_out);
+extern int zeal_zss_delete(const char *name);
 extern int zeal_zss_volume_stats(uint64_t *capacity_bytes,
                                  uint64_t *free_bytes);
 extern uint64_t zeal_zss_catalog_revision(void);
@@ -164,6 +165,14 @@ static zc_key_event_fn key_reader;
 static zc_key_reset_fn key_reset;
 static const unsigned char *source_archive;
 static size_t archive_size;
+struct source_archive_entry {
+    char path[256];
+    size_t size;
+    const unsigned char *data;
+};
+static struct source_archive_entry *source_archive_index;
+static size_t source_archive_index_count;
+static int source_archive_index_state;
 static zc_source_read_fn disk_reader;
 static zc_source_write_fn disk_writer;
 static jmp_buf guard;
@@ -1138,7 +1147,22 @@ static int guest_path(const char *path, char out[134]) {
     if (!path || !*path)
         return -1;
     int disk = !strncmp(path, "disk:", 5);
-    const char *src = path + (disk ? 5 : 0);
+    int ram = !strncmp(path, "ram:", 4);
+    const char *src = path + (disk ? 5 : ram ? 4 : 0);
+    if (!disk && !ram && src[1] == ':') {
+        unsigned char drive = (unsigned char)src[0];
+        if (drive >= 'a' && drive <= 'z') drive -= 'a' - 'A';
+        if (drive == 'D') {
+            disk = 1;
+            src += 2;
+        } else if (drive == 'B') {
+            ram = 1;
+            src += 2;
+        } else if (drive == 'C') {
+            src += 2;
+        }
+        if (!*src) src = "/";
+    }
     /* Boot/home drive roots both name the sole source volume. This does not
      * introduce other drive letters or mounted-volume services. */
     if (!disk && ((!strncmp(src, "::", 2) || !strncmp(src, "~:", 2)) &&
@@ -1149,8 +1173,15 @@ static int guest_path(const char *path, char out[134]) {
     size_t length = strlen(src);
     if (length >= 128 || strchr(src, ':') || strchr(src, '\\'))
         return -1;
-    if (!disk && src[0] != '/') {
+    if (!disk && !ram && src[0] != '/') {
         const char *dir = guest_current_dir();
+        if (!strncmp(dir, "disk:", 5)) {
+            disk = 1;
+            dir += 5;
+        } else if (!strncmp(dir, "ram:", 4)) {
+            ram = 1;
+            dir += 4;
+        }
         size_t dir_len = strlen(dir);
         if (dir_len + length + 2 > sizeof(joined))
             return -1;
@@ -1175,9 +1206,11 @@ static int guest_path(const char *path, char out[134]) {
     }
     if (normal_path(src, name))
         return -1;
-    size_t prefix = disk ? 5 : 0;
+    size_t prefix = disk ? 5 : ram ? 4 : 0;
     if (disk)
         memcpy(out, "disk:", prefix);
+    else if (ram)
+        memcpy(out, "ram:", prefix);
     out[prefix] = '/';
     memcpy(out + prefix + 1, name, strlen(name) + 1);
     return 0;
@@ -1207,36 +1240,100 @@ static int octal(const unsigned char *p, size_t n, size_t *out) {
     *out = r;
     return 0;
 }
-static const unsigned char *source_find(const char *path, size_t *size) {
+static int source_archive_entry_compare(const void *left, const void *right) {
+    const struct source_archive_entry *a = left;
+    const struct source_archive_entry *b = right;
+    return strcmp(a->path, b->path);
+}
+static int source_archive_index_build(void) {
+    if (source_archive_index_state)
+        return source_archive_index_state > 0;
+    source_archive_index_state = -1;
+    source_archive_index_count = 0;
     if (!source_archive)
-        return NULL;
-    char name[128];
-    if (normal_path(path, name))
-        return NULL;
+        return 0;
+    size_t capacity = 0;
     for (size_t off = 0; off <= archive_size && archive_size - off >= 512;) {
-        const unsigned char *h = source_archive + off;
-        if (!*h)
-            return NULL;
-        size_t n, check;
-        if (!memchr(h, 0, 100))
-            return NULL;
-        if (memcmp(h + 257, "ustar", 5) || octal(h + 124, 12, &n) || octal(h + 148, 8, &check))
-            return NULL;
-        size_t sum = 0;
+        const unsigned char *header = source_archive + off;
+        if (!*header)
+            break;
+        size_t size, expected, name_len = 0, prefix_len = 0;
+        while (name_len < 100 && header[name_len]) name_len++;
+        while (prefix_len < 155 && header[345 + prefix_len]) prefix_len++;
+        if (name_len == 100 || prefix_len == 155 ||
+            memcmp(header + 257, "ustar", 5) ||
+            octal(header + 124, 12, &size) ||
+            octal(header + 148, 8, &expected) ||
+            size > archive_size - off - 512)
+            goto fail;
+        size_t checksum = 0;
         for (unsigned i = 0; i < 512; i++)
-            sum += i >= 148 && i < 156 ? ' ' : h[i];
-        if (sum != check || n > archive_size - off - 512)
-            return NULL;
-        if ((h[156] == '0' || !h[156]) && !strcmp(name, (const char *)h)) {
-            *size = n;
-            return h + 512;
+            checksum += i >= 148 && i < 156 ? ' ' : header[i];
+        if (checksum != expected)
+            goto fail;
+        if ((header[156] == '0' || !header[156]) && name_len) {
+            size_t prefix_bytes = prefix_len ? prefix_len + 1 : 0;
+            if (prefix_bytes + name_len >= sizeof(source_archive_index[0].path))
+                goto fail;
+            if (source_archive_index_count == capacity) {
+                size_t next = capacity ? capacity * 2 : 256;
+                if (next > SIZE_MAX / sizeof(*source_archive_index))
+                    goto fail;
+                struct source_archive_entry *grown = realloc(
+                    source_archive_index, next * sizeof(*source_archive_index));
+                if (!grown)
+                    goto fail;
+                source_archive_index = grown;
+                capacity = next;
+            }
+            struct source_archive_entry *entry =
+                &source_archive_index[source_archive_index_count++];
+            size_t path_len = 0;
+            if (prefix_len) {
+                memcpy(entry->path, header + 345, prefix_len);
+                entry->path[prefix_len] = '/';
+                path_len = prefix_len + 1;
+            }
+            memcpy(entry->path + path_len, header, name_len);
+            entry->path[path_len + name_len] = 0;
+            entry->size = size;
+            entry->data = header + 512;
         }
-        if (n > SIZE_MAX - 511)
-            return NULL;
-        size_t padded = (n + 511) & ~(size_t)511;
+        if (size > SIZE_MAX - 511)
+            goto fail;
+        size_t padded = (size + 511) & ~(size_t)511;
         if (padded > archive_size - off - 512)
-            return NULL;
+            goto fail;
         off += 512 + padded;
+    }
+    if (source_archive_index_count > 1)
+        qsort(source_archive_index, source_archive_index_count,
+              sizeof(*source_archive_index), source_archive_entry_compare);
+    source_archive_index_state = 1;
+    return 1;
+fail:
+    free(source_archive_index);
+    source_archive_index = NULL;
+    source_archive_index_count = 0;
+    source_archive_index_state = -1;
+    return 0;
+}
+static const unsigned char *source_find(const char *path, size_t *size) {
+    char name[128];
+    if (!size || normal_path(path, name) || !source_archive_index_build())
+        return NULL;
+    size_t lo = 0, hi = source_archive_index_count;
+    while (lo < hi) {
+        size_t mid = lo + (hi - lo) / 2;
+        int order = strcmp(name, source_archive_index[mid].path);
+        if (!order) {
+            *size = source_archive_index[mid].size;
+            return source_archive_index[mid].data;
+        }
+        if (order < 0)
+            hi = mid;
+        else
+            lo = mid + 1;
     }
     return NULL;
 }
@@ -1248,6 +1345,8 @@ extern int zeal_redsea_file_at(uint64_t index, char *dst, size_t cap,
                                size_t *out_size);
 extern int zeal_redsea_dir_exists(const char *name);
 extern int zeal_redsea_dir_at(uint64_t index, char *dst, size_t cap);
+#define ZC_SOURCE_META_FILE ".ZCFS.META"
+#define ZC_SOURCE_META_CAP 4096
 struct source_overlay_entry {
     char name[96];
     size_t size;
@@ -1259,6 +1358,89 @@ static size_t source_list_cache_count;
 static size_t source_overlay_cache_count;
 static int source_list_cache_ready;
 static uint64_t source_list_cache_revision;
+#define ZC_RAM_FILE_CAP 4096
+#define ZC_RAM_FILE_MAX (256u * 1024u * 1024u)
+struct zc_ram_file {
+    char name[96];
+    unsigned char *data;
+    size_t size;
+};
+static struct zc_ram_file zc_ram_files[ZC_RAM_FILE_CAP];
+static size_t zc_ram_file_count;
+static int64_t zc_ram_find(const char *path) {
+    char name[128];
+    if (!path || strncmp(path, "ram:", 4) || normal_path(path + 4, name) ||
+        !*name || strlen(name) > sizeof(zc_ram_files[0].name) - 1)
+        return -1;
+    for (size_t i = 0; i < zc_ram_file_count; i++)
+        if (!strcmp(zc_ram_files[i].name, name))
+            return (int64_t)i;
+    return -1;
+}
+static const unsigned char *zc_ram_read(const char *path, size_t *size) {
+    int64_t index = zc_ram_find(path);
+    if (index < 0) return NULL;
+    *size = zc_ram_files[index].size;
+    return zc_ram_files[index].data;
+}
+static int zc_ram_write(const char *path, const char *data, size_t size) {
+    char name[128];
+    int64_t index;
+    unsigned char *copy;
+    if (!path || strncmp(path, "ram:", 4) || normal_path(path + 4, name) ||
+        !*name || strlen(name) > sizeof(zc_ram_files[0].name) - 1 ||
+        size > ZC_RAM_FILE_MAX || (!data && size))
+        return -1;
+    copy = malloc(size ? size : 1);
+    if (!copy) return -1;
+    if (size) memcpy(copy, data, size);
+    index = zc_ram_find(path);
+    if (index < 0) {
+        if (zc_ram_file_count >= ZC_RAM_FILE_CAP) {
+            free(copy);
+            return -1;
+        }
+        index = (int64_t)zc_ram_file_count++;
+        memcpy(zc_ram_files[index].name, name, strlen(name) + 1);
+    } else {
+        free(zc_ram_files[index].data);
+    }
+    zc_ram_files[index].data = copy;
+    zc_ram_files[index].size = size;
+    return 0;
+}
+static int zc_ram_dir_exists(const char *path) {
+    char name[128], prefix[130];
+    if (!path || strncmp(path, "ram:", 4) || normal_path(path + 4, name))
+        return 0;
+    if (!*name) return 1;
+    size_t length = strlen(name);
+    if (length + 1 >= sizeof(prefix)) return 0;
+    memcpy(prefix, name, length);
+    prefix[length] = '/';
+    prefix[length + 1] = 0;
+    for (size_t i = 0; i < zc_ram_file_count; i++)
+        if (!strncmp(zc_ram_files[i].name, prefix, length + 1))
+            return 1;
+    return 0;
+}
+static void zc_ram_clear(void) {
+    for (size_t i = 0; i < zc_ram_file_count; i++) {
+        free(zc_ram_files[i].data);
+        memset(&zc_ram_files[i], 0, sizeof(zc_ram_files[i]));
+    }
+    zc_ram_file_count = 0;
+}
+static int zc_ram_delete(const char *path) {
+    int64_t index = zc_ram_find(path);
+    if (index < 0) return -1;
+    size_t i = (size_t)index;
+    free(zc_ram_files[i].data);
+    for (; i + 1 < zc_ram_file_count; i++)
+        zc_ram_files[i] = zc_ram_files[i + 1];
+    memset(&zc_ram_files[--zc_ram_file_count], 0, sizeof(zc_ram_files[0]));
+    return 0;
+}
 static void source_list_cache_add(const char *path, size_t size) {
     size_t length = strlen(path);
     if (source_list_cache_count >=
@@ -1326,7 +1508,7 @@ static void source_list_cache_build(void) {
                         break;
                     }
                 }
-                if (status != -3) {
+                if (status != -3 && strcmp(native_path, ZC_SOURCE_META_FILE)) {
                     size = status == 1 ? native_size : n;
                     source_list_cache_add(path, size);
                 }
@@ -1340,7 +1522,8 @@ static void source_list_cache_build(void) {
     for (size_t index = 0; index < source_overlay_cache_count; index++) {
         const struct source_overlay_entry *overlay =
             &source_overlay_cache[index];
-        if (overlay->status != 1)
+        if (overlay->status != 1 ||
+            !strcmp(overlay->name, ZC_SOURCE_META_FILE))
             continue;
         size_t native_length = strlen(overlay->name);
         if (native_length + 1 > sizeof(path)) continue;
@@ -1373,6 +1556,32 @@ static int64_t host_source_file_at(int64_t *a) {
     if (a[3])
         *(int64_t *)(uintptr_t)a[3] = (int64_t)entry->size;
     return 1;
+}
+static int64_t host_ram_file_at(int64_t *a) {
+    if (a[0] < 0 || a[2] <= 0 || (uint64_t)a[0] >= zc_ram_file_count)
+        return 0;
+    const struct zc_ram_file *entry = &zc_ram_files[a[0]];
+    size_t name_len = strlen(entry->name);
+    if (name_len + 6 > (size_t)a[2]) return 0;
+    memcpy((char *)(uintptr_t)a[1], "ram:/", 5);
+    memcpy((char *)(uintptr_t)a[1] + 5, entry->name, name_len + 1);
+    if (a[3]) *(int64_t *)(uintptr_t)a[3] = (int64_t)entry->size;
+    return 1;
+}
+static int64_t host_ram_volume_format(int64_t *a) {
+    (void)a;
+    zc_ram_clear();
+    return 1;
+}
+static int64_t host_virtual_file_delete(int64_t *a) {
+    char path[134];
+    if (guest_path((const char *)(uintptr_t)a[0], path)) return 0;
+    if (!strncmp(path, "ram:", 4)) return zc_ram_delete(path) == 0;
+    if (!strncmp(path, "disk:", 5)) return 0;
+    char name[128];
+    if (normal_path(path, name) || !*name) return 0;
+    int status = zeal_zss_delete(name);
+    return status == 0 || status == -4;
 }
 static int64_t host_redsea_file_at(int64_t *a) {
     size_t size = 0;
@@ -1463,11 +1672,158 @@ static int64_t host_file_dir_exists(int64_t *a) {
     char path[134];
     if (guest_path((const char *)(uintptr_t)a[0], path))
         return 0;
+    if (!strncmp(path, "ram:", 4))
+        return zc_ram_dir_exists(path);
     return source_dir_exists(path + (!strncmp(path, "disk:", 5) ? 5 : 0));
+}
+
+struct zc_source_meta_entry {
+    char path[96];
+    uint16_t attr;
+    uint64_t datetime;
+};
+static struct zc_source_meta_entry zc_source_meta[ZC_SOURCE_META_CAP];
+static size_t zc_source_meta_count;
+static int zc_source_meta_loaded;
+static int zc_source_meta_hex(const char *text, uint64_t *value) {
+    uint64_t result = 0;
+    if (!text || !*text || !value) return -1;
+    while (*text) {
+        unsigned char c = (unsigned char)*text++;
+        unsigned digit;
+        if (c >= '0' && c <= '9') digit = c - '0';
+        else if (c >= 'A' && c <= 'F') digit = c - 'A' + 10;
+        else if (c >= 'a' && c <= 'f') digit = c - 'a' + 10;
+        else return -1;
+        result = (result << 4) | digit;
+    }
+    *value = result;
+    return 0;
+}
+static int zc_source_meta_path(const char *guest, char out[96]) {
+    char normalized[134];
+    if (guest_path(guest, normalized) || !normalized[0] ||
+        !strncmp(normalized, "disk:", 5) ||
+        !strncmp(normalized, "ram:", 4))
+        return -1;
+    const char *name = normalized[0] == '/' ? normalized + 1 : normalized;
+    size_t length = strlen(name);
+    if (!length || length > sizeof(zc_source_meta[0].path) - 1)
+        return -1;
+    memcpy(out, name, length + 1);
+    return 0;
+}
+static void zc_source_meta_load(void) {
+    size_t length = 0, got = 0;
+    char *data;
+    zc_source_meta_loaded = 1;
+    zc_source_meta_count = 0;
+    if (!disk_reader || disk_reader(ZC_SOURCE_META_FILE, NULL, 0, &length) ||
+        !length || length > ZC_SOURCE_META_CAP * 128u)
+        return;
+    data = malloc(length + 1);
+    if (!data || disk_reader(ZC_SOURCE_META_FILE, data, length + 1, &got) ||
+        got != length) {
+        free(data);
+        return;
+    }
+    data[length] = 0;
+    char *line = strchr(data, '\n');
+    if (!line || (size_t)(line - data) != 7 || memcmp(data, "ZCFS1\t1", 7)) {
+        free(data);
+        return;
+    }
+    line++;
+    while (*line && zc_source_meta_count < ZC_SOURCE_META_CAP) {
+        char *end = strchr(line, '\n');
+        if (!end) break;
+        *end = 0;
+        char *attr_text = strrchr(line, '\t');
+        char *date_text = attr_text ? strrchr(line, '\t') : NULL;
+        /* Records are path<TAB>date<TAB>attr; split from the right so paths
+         * remain unambiguous even if future filename rules permit tabs. */
+        if (attr_text) {
+            *attr_text = 0;
+            date_text = strrchr(line, '\t');
+        }
+        if (date_text) {
+            *date_text++ = 0;
+            attr_text++;
+            uint64_t datetime, attr;
+            size_t path_len = strlen(line);
+            if (path_len && path_len < sizeof(zc_source_meta[0].path) &&
+                !zc_source_meta_hex(date_text, &datetime) &&
+                !zc_source_meta_hex(attr_text, &attr) && attr <= UINT16_MAX) {
+                struct zc_source_meta_entry *entry =
+                    &zc_source_meta[zc_source_meta_count++];
+                memcpy(entry->path, line, path_len + 1);
+                entry->datetime = datetime;
+                entry->attr = (uint16_t)attr;
+            }
+        }
+        line = end + 1;
+    }
+    free(data);
+}
+static int zc_source_meta_save(void) {
+    if (!disk_writer) return -1;
+    size_t capacity = 16 + zc_source_meta_count * 128u;
+    char *data = malloc(capacity);
+    if (!data) return -1;
+    size_t used = (size_t)snprintf(data, capacity, "ZCFS1\t1\n");
+    for (size_t i = 0; i < zc_source_meta_count; i++) {
+        const struct zc_source_meta_entry *entry = &zc_source_meta[i];
+        int n = snprintf(data + used, capacity - used, "%s\t%016llX\t%04X\n",
+                         entry->path,
+                         (unsigned long long)entry->datetime,
+                         (unsigned)entry->attr);
+        if (n < 0 || (size_t)n >= capacity - used) {
+            free(data);
+            return -1;
+        }
+        used += (size_t)n;
+    }
+    int result = disk_writer(ZC_SOURCE_META_FILE, data, used);
+    free(data);
+    return result;
+}
+static int64_t host_source_meta_get(int64_t *a) {
+    char path[96];
+    if (!a[0] || !a[1] || !a[2] ||
+        zc_source_meta_path((const char *)(uintptr_t)a[0], path))
+        return 0;
+    if (!zc_source_meta_loaded) zc_source_meta_load();
+    for (size_t i = 0; i < zc_source_meta_count; i++)
+        if (!strcmp(zc_source_meta[i].path, path)) {
+            *(uint16_t *)(uintptr_t)a[1] = zc_source_meta[i].attr;
+            *(uint64_t *)(uintptr_t)a[2] = zc_source_meta[i].datetime;
+            return 1;
+        }
+    return 0;
+}
+static int64_t host_source_meta_set(int64_t *a) {
+    char path[96];
+    if (!a[0] || zc_source_meta_path((const char *)(uintptr_t)a[0], path))
+        return 0;
+    if (!zc_source_meta_loaded) zc_source_meta_load();
+    size_t i;
+    for (i = 0; i < zc_source_meta_count; i++)
+        if (!strcmp(zc_source_meta[i].path, path))
+            break;
+    if (i == zc_source_meta_count) {
+        if (i >= ZC_SOURCE_META_CAP) return 0;
+        memcpy(zc_source_meta[i].path, path, strlen(path) + 1);
+        zc_source_meta_count++;
+    }
+    zc_source_meta[i].attr = (uint16_t)a[1];
+    zc_source_meta[i].datetime = (uint64_t)a[2];
+    return zc_source_meta_save() == 0;
 }
 static int64_t host_source_writable(int64_t *a) {
     char path[134];
     if (guest_path((const char *)(uintptr_t)a[0], path)) return 0;
+    if (!strncmp(path, "ram:", 4))
+        return !strncmp(path, "ram:/", 5) && path[5] != 0;
     const char *name = path + (!strncmp(path, "disk:", 5) ? 6 : 1);
     return *name && strlen(name) <= 95 && zeal_zss_writable();
 }
@@ -1527,6 +1883,8 @@ static const unsigned char *source_file_find(const char *path, size_t *length,
     *owned = NULL;
     if (!path)
         return NULL;
+    if (!strncmp(path, "ram:", 4))
+        return zc_ram_read(path, length);
     if (!strncmp(path, "disk:", 5)) {
         *owned = disk_copy(path, length, NULL);
         return (const unsigned char *)*owned;
@@ -1584,8 +1942,11 @@ static int64_t host_file_write(int64_t *a) {
     const char *src = (const char *)(uintptr_t)a[1];
     int64_t length = a[2];
     if (guest_path((const char *)(uintptr_t)a[0], path) ||
-        (!src && length) || length < 0 || !disk_writer)
+        (!src && length) || length < 0)
         return -1;
+    if (!strncmp(path, "ram:", 4))
+        return zc_ram_write(path, src, (size_t)length) ? -1 : length;
+    if (!disk_writer) return -1;
     int result = disk_writer(path, src, (size_t)length);
     if (strstr(path, "DataBaseDemo.BIN"))
         printf("zc: db FileWrite path=%s size=%ld first=%02x%02x%02x%02x result=%d\n",
@@ -4688,8 +5049,10 @@ static int64_t host_cd(int64_t *a) {
      * unavailable; missing paths fail without changing the current dir. */
     if (guest_path(requested ? requested : "~", path))
         return 0;
-    const char *dir = path + (!strncmp(path, "disk:", 5) ? 5 : 0);
-    if (!source_dir_exists(dir))
+    const char *dir = path;
+    if ((!strncmp(path, "ram:", 4) && !zc_ram_dir_exists(path)) ||
+        (strncmp(path, "ram:", 4) &&
+         !source_dir_exists(path + (!strncmp(path, "disk:", 5) ? 5 : 0))))
         return 0;
     struct guest_fiber *f = &guest_fibers[guest_current];
     char **current = (char **)((unsigned char *)f->words + guest_cur_dir_off);
@@ -9685,6 +10048,8 @@ static int load_source_path(const char *path, int merged, int recover) {
         PrsBindCSymbol("ZcSourcePath", host_source_path, 1);
         PrsBindCSymbol("ZcSourceWritable", host_source_writable, 1);
         PrsBindCSymbol("ZcSourceHasOverride", host_source_has_override, 1);
+        PrsBindCSymbol("ZcSourceMetaGet", host_source_meta_get, 3);
+        PrsBindCSymbol("ZcSourceMetaSet", host_source_meta_set, 3);
         PrsBindCSymbol("ZcDocInputBytes", host_doc_input_bytes, 3);
         PrsBindCSymbol("Cd", host_cd, 2);
         PrsBindCSymbol("DirCur", host_dir_cur, 2);
@@ -9698,9 +10063,14 @@ static int load_source_path(const char *path, int merged, int recover) {
             zc_fail("pinned home directory globals missing");
         guest_home_dir_ptr = (char **)((unsigned char *)blkdev->data_addr + home->off);
         PrsBindCSymbol("ZcSourceFileAt", host_source_file_at, 4);
+        PrsBindCSymbol("ZcRamFileAt", host_ram_file_at, 4);
+        PrsBindCSymbol("ZcRamVolumeFormat", host_ram_volume_format, 1);
+        PrsBindCSymbol("ZcVirtualFileDelete", host_virtual_file_delete, 1);
         PrsBindCSymbol("ZcRedSeaFileAt", host_redsea_file_at, 4);
         PrsBindCSymbol("ZcRedSeaDirAt", host_redsea_dir_at, 3);
         PrsBindCSymbol("ZcSourceVolumeStats", host_source_volume_stats, 2);
+        PrsBindCSymbol("ZcSourceMetaGet", host_source_meta_get, 3);
+        PrsBindCSymbol("ZcSourceMetaSet", host_source_meta_set, 3);
         PrsBindCSymbol("ZcRawDiskSectors", host_raw_disk_sectors, 0);
         PrsBindCSymbol("ZcRawDiskRead", host_raw_disk_read, 3);
         PrsBindCSymbol("ZcRawDiskWrite", host_raw_disk_write, 3);
@@ -10363,6 +10733,7 @@ static int64_t host_virtio_net_recv(int64_t *a) {
 void zc_init(const void *archive, size_t size, zc_output_fn output) {
     /* Opt-in timer experiments do not survive compiler/session resets. */
     zc_sound_timer_disable();
+    zc_ram_clear();
     if (archive) {
         source_archive = archive;
         archive_size = size;

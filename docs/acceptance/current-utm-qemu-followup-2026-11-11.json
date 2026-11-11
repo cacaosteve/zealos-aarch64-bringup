@@ -1,0 +1,36 @@
+{
+  "date": "2026-11-11",
+  "target": "AArch64 native ZealC in UTM-bundled QEMU with HVF, one vCPU, virtio-ramfb, VirtIO keyboard and tablet",
+  "iso_path": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "80cd189a30616728668a941cedae134e24345e8864009f8bd5784f40962ee5f4",
+  "kernel_sha256": "55536307b44768abf98ab8eb64369448394ff78e24b46cbbddd5dd09d4ef5ae1",
+  "result": "pass",
+  "runs": [
+    {
+      "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-3d-apps-current-latest-qemu.log python3 -u scripts/check-compat.py --pci --quick --probe-3d-apps --probe-keepaway-full-game",
+      "serial_log": "build/check-3d-apps-current-latest-qemu.log",
+      "serial_log_sha256": "5bbd74e4a1f986092158798e3d236144a1bc2dcc4fc8ea776c9551b23675c658",
+      "exit_code": 0,
+      "checks": {
+        "GrModels": "Man and Ball forms and mesh paths compile and pass the existing mesh/render runtime probes.",
+        "KeepAway": "Gameplay, HUD, mouse/Space input, 186-second full-game run with 18 repeated input cycles, active scanout, Escape recovery, Animate-task cleanup, and zstatus failed=0 passed.",
+        "Titanium": "Existing compile and sprite/runtime checks passed."
+      }
+    },
+    {
+      "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-budget-current-latest-qemu.log python3 -u scripts/check-compat.py --pci --quick --probe-budget-program",
+      "serial_log": "build/check-budget-current-latest-qemu.log",
+      "serial_log_sha256": "682a993f5d058d8553fa02dd1fbca6a269e50ef56f995e4c155bf773ff4cc32b",
+      "exit_code": 0,
+      "checks": [
+        "Calendar, UTC clock and scanner setup",
+        "Form reflection and malformed-form recovery",
+        "File/Edit/View shortcuts, menu hover and continued presentation",
+        "Budget entry creation, editing, cancellation, abort and save/reopen",
+        "Cold disk-only persistence",
+        "Terminal recovery and zstatus failed=0"
+      ]
+    }
+  ],
+  "scope_note": "Automated checks using UTM's bundled QEMU profile, not visible UTM window acceptance. They do not resolve the earlier user-reported live UTM Budget/KeepAway freezes or confirm visible GrModels output."
+}

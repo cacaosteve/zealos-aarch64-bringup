@@ -32,16 +32,17 @@ all 206 pinned Demo `.ZC` files compile, and 202 have explicit QEMU runtime
 acceptance; four remain partial. Those are the two TOS account examples
 (`TOSDistro` and `TOSMisc`) and `MultiCore/Lock`/`MultiCore/MPRadix`. The
 multicore examples are partial because the current guest runtime exposes one
-CPU; the TOS account examples still lack configured writable C:/B: drive
-workflows. On the 2026-11-11 ISO, TOSMisc's MemTest and Psalmody JukePuppet's
-stock-song and Beep-fixture execution/cleanup now pass on a disposable QEMU
-disk. Its DiskCheckAll path and TOSDistro's format/copy/ISO generation remain
-blocked by that drive layer; the Beep fixture check does not measure audio
-output. A TOSDistro rebuild probe on the current ISO again faults at the
-unresolved `Drive` binding before formatting or copying; see
-[`demo-tosmisc-jukepuppet-current-qemu-2026-11-11.json`](docs/acceptance/demo-tosmisc-jukepuppet-current-qemu-2026-11-11.json).
-The exact current-image failure is recorded in
-[`demo-tosdistro-std-current-qemu-2026-11-11.json`](docs/acceptance/demo-tosdistro-std-current-qemu-2026-11-11.json).
+CPU. On the 2026-11-11 ISO, TOSMisc's MemTest and Psalmody JukePuppet's
+stock-song and Beep-fixture execution/cleanup pass on a disposable QEMU disk.
+Its DiskCheckAll path still needs a stock drive-registry workflow; the Beep
+fixture check does not measure audio output. On the fresh `80cd189a…` image,
+TOSDistro's `DistroPrep` now copies and text-converts the full source tree and
+recovers cleanly. The subsequent `MakeStdDistro` flow remains incomplete:
+`BootDVDIns` is an explicit `ArmBoot` stub for x86 BIOS image generation, and
+the legacy RedSea ISO boot path has not been replaced with ARM64 UEFI boot
+integration. See the [DistroPrep acceptance](docs/acceptance/tos-distro-prep-current-qemu-2026-11-11.json),
+[TOSMisc probes](docs/acceptance/demo-tosmisc-jukepuppet-current-qemu-2026-11-11.json),
+and [earlier full-build failure](docs/acceptance/demo-tosdistro-std-current-qemu-2026-11-11.json).
 The ARM64
 `TimeIns` adaptation has runtime acceptance, while the pinned stock source's
 optimizer `PassTrace` diagnostic is not implemented. `TOSExtern` is accepted
@@ -333,6 +334,15 @@ normal-load result is not runtime acceptance.
 | Vocabulary | The current ISO (`93cb3d3e…`) accepts an answer, advances the quiz, and returns through Escape to a working terminal; `zstatus` reports no failures ([current-image named-app checks](docs/acceptance/named-apps-current-utm-qemu-2026-11-11.json)). Incorrect-answer WAV evidence exists for an earlier ISO; live UTM/Pi app-audio output remains unverified. Run `make check-vocabulary-program`. |
 
 | X-Caliber | The current ISO (`93cb3d3e…`) passes both plain-arrow thrusters, a visible Space projectile, Escape, and terminal recovery (`40+7` returns 47) with UTM's bundled QEMU profile ([current-image check](docs/acceptance/named-apps-current-utm-qemu-2026-11-11.json)). Broader gameplay remains unverified. |
+
+After the latest source-backed filesystem/runtime rebuild, the ISO
+`80cd189a…` passed the UTM-bundled QEMU regression for GrModels, KeepAway and
+Titanium, including a 186-second KeepAway run with 18 repeated input cycles,
+Escape recovery and task cleanup. The same image passed Budget's form, menu,
+save/reopen and cold disk-only persistence workflow. This refreshes automated
+QEMU evidence for the new image; it does not close the earlier visible-UTM
+freeze reports for Budget and KeepAway or the live GrModels visual check. See
+[`current-utm-qemu-followup-2026-11-11.json`](docs/acceptance/current-utm-qemu-followup-2026-11-11.json).
 
 A subsequent Vocabulary run using the graphical launcher captured a tone
 consistent with its correct-answer `Sound(74)` as well; see the
