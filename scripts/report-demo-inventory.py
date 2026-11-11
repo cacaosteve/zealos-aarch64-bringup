@@ -297,6 +297,8 @@ RUNTIME_ACCEPTED = {
     "/Demo/Sound/ASCIIOrgan.ZC": "docs/acceptance/demo-ascii-organ-virtio-sound-qemu-2026-11-07.json",
     "/Demo/AcctExample/HomeWrappers.ZC": "docs/acceptance/demo-home-wrappers-dol-doc-links-qemu-2026-11-07.json",
     "/Demo/Graphics/WallPapers/WallPaperDesktop/HomeSys.ZC": "docs/acceptance/demo-wallpaper-desktop-qemu-2026-11-08.json",
+    "/Demo/TimeIns.ZC":
+        "docs/acceptance/demo-time-ins-stock-pass-trace-qemu-2026-11-10.json",
     "/Demo/MultiCore/MPAdd.ZC": "docs/acceptance/demo-mpadd-qemu-2026-11-07.json",
     "/Demo/MultiCore/Palindrome.ZC":
         "docs/acceptance/demo-palindrome-qemu-2026-11-08.json",
@@ -312,8 +314,6 @@ RUNTIME_ACCEPTED = {
         "docs/acceptance/diskraw-readonly-qemu-2026-11-09.json",
 }
 RUNTIME_PARTIAL = {
-    "/Demo/TimeIns.ZC":
-        "docs/acceptance/demo-time-ins-stock-qemu-2026-11-09.json",
     "/Demo/AcctExample/TOS/TOSMisc.ZC":
         "docs/acceptance/demo-tosmisc-current-qemu-2026-11-10.json",
     "/Demo/AcctExample/TOS/TOSDistro.ZC":
