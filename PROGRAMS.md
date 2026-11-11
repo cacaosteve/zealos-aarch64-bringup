@@ -36,13 +36,16 @@ CPU. On the 2026-11-11 ISO, TOSMisc's MemTest and Psalmody JukePuppet's
 stock-song and Beep-fixture execution/cleanup pass on a disposable QEMU disk.
 Its ARM64 `DiskCheckAll` adaptation skips the source-backed C volume and an
 absent optional D drive, and its actual dispatch now passes against a clean
-mounted writable RedSea D fixture. The stock repair scan now also finds and
-frees one orphan allocation on a disposable RedSea D fixture; a read-back and
-second clean scan pass. Populated RedSea volumes, directory repair, and FAT32
-remain open. The Beep fixture check does not measure audio output. See the
+mounted writable RedSea D fixture. The RedSea file-enumeration bridge now
+preserves each entry's starting sector in `CDirEntry.clus`, allowing the stock
+repair scan to retain an allocated `KEEP.ZC` file while reclaiming a separate
+orphan allocation; read-back and a second clean scan pass. Nested populated
+directories, directory repair, and FAT32 remain open. The Beep fixture check
+does not measure audio output. See the
 [absent-drive check](docs/acceptance/demo-tosmisc-diskcheckall-current-qemu-2026-11-11.json),
 [mounted-RedSea check](docs/acceptance/demo-tosmisc-diskcheckall-redsea-qemu-2026-11-11.json),
-and [repair check](docs/acceptance/demo-tosmisc-diskcheck-repair-redsea-qemu-2026-11-11.json).
+and [empty-root repair check](docs/acceptance/demo-tosmisc-diskcheck-repair-redsea-qemu-2026-11-11.json)
+and [populated-root repair check](docs/acceptance/demo-tosmisc-diskcheck-populated-redsea-qemu-2026-11-11.json).
 On the fresh `80cd189a…` image,
 TOSDistro's `DistroPrep` now copies and text-converts the full source tree and
 recovers cleanly. The subsequent `MakeStdDistro` flow remains incomplete:

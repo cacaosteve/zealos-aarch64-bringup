@@ -1342,7 +1342,7 @@ struct source_list_entry {
     size_t size;
 };
 extern int zeal_redsea_file_at(uint64_t index, char *dst, size_t cap,
-                               size_t *out_size);
+                               size_t *out_size, uint64_t *out_first);
 extern int zeal_redsea_dir_exists(const char *name);
 extern int zeal_redsea_dir_at(uint64_t index, char *dst, size_t cap);
 #define ZC_SOURCE_META_FILE ".ZCFS.META"
@@ -1585,13 +1585,16 @@ static int64_t host_virtual_file_delete(int64_t *a) {
 }
 static int64_t host_redsea_file_at(int64_t *a) {
     size_t size = 0;
+    uint64_t first = 0;
     if (a[0] < 0 || a[2] <= 0)
         return 0;
     if (!zeal_redsea_file_at((uint64_t)a[0], (char *)(uintptr_t)a[1],
-                             (size_t)a[2], &size))
+                             (size_t)a[2], &size, &first))
         return 0;
     if (a[3])
         *(int64_t *)(uintptr_t)a[3] = (int64_t)size;
+    if (a[4])
+        *(int64_t *)(uintptr_t)a[4] = (int64_t)first;
     return 1;
 }
 static int64_t host_redsea_dir_at(int64_t *a) {
@@ -10066,7 +10069,7 @@ static int load_source_path(const char *path, int merged, int recover) {
         PrsBindCSymbol("ZcRamFileAt", host_ram_file_at, 4);
         PrsBindCSymbol("ZcRamVolumeFormat", host_ram_volume_format, 1);
         PrsBindCSymbol("ZcVirtualFileDelete", host_virtual_file_delete, 1);
-        PrsBindCSymbol("ZcRedSeaFileAt", host_redsea_file_at, 4);
+        PrsBindCSymbol("ZcRedSeaFileAt", host_redsea_file_at, 5);
         PrsBindCSymbol("ZcRedSeaDirAt", host_redsea_dir_at, 3);
         PrsBindCSymbol("ZcSourceVolumeStats", host_source_volume_stats, 2);
         PrsBindCSymbol("ZcSourceMetaGet", host_source_meta_get, 3);

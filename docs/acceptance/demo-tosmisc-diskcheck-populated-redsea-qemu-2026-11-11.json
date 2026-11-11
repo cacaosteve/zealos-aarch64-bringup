@@ -1,0 +1,27 @@
+{
+  "date": "2026-11-11",
+  "target": "UTM-bundled QEMU, AArch64 PCI, one vCPU, disposable writable RedSea VirtIO fixture",
+  "iso_sha256": "d8e2672e6e4e00c42ada67b5e8efcac0bcaa0ef5eb84c2273b330a591fd80bf3",
+  "kernel_sha256": "a16946d6d05bbc7a6a5c0474446f6617c43d9a21932669d4001734a9a5ab6ac2",
+  "source_bundle_sha256": "825ac3ea1cb31164019be913f04e76a0550db1b55be6cea505d580c5e08cf034",
+  "probe_sha256": "ffa5eec794bc12c8af473a1bf84989c0aa84fde6e86790d8bfd55a79e0705416",
+  "check_compat_sha256": "f6745eb6d4006a26c8b801600c0c4d9fc42463c587bbea03393f8c44d6016009",
+  "task_bridge_sha256": "4f1ab5573c99f42b1d22b91d210f93b2692fac0013303114e4d3a82039e00c14",
+  "command": "ZEAL_COMPAT_LOG_PATH=build/tosmisc-diskcheck-repair-populated-current-qemu-2026-11-11.log python3 -u scripts/check-compat.py --pci --quick --probe-raw-redsea-geometry repair",
+  "result": "pass: FilesFind reports the real RedSea file start sector; stock DiskCheck preserves that file, frees the separate orphan allocation, and returns a clean second scan",
+  "verified": [
+    "The disposable 128-sector writable RedSea volume mounts as D with a valid bounded geometry.",
+    "The root directory contains KEEP.ZC, whose first sector is data_area + 9; its allocation bit is set alongside the root directory and a separate orphan cluster.",
+    "FilesFind(\"D:/*\", FUF_RECURSE) returns exactly KEEP.ZC with the expected path, physical starting sector, size, and archive attribute.",
+    "The ARM64 ZcRedSeaFileAt bridge now returns each file's physical starting sector, and TaskBridge stores it in CDirEntry.clus as stock RedSea DiskCheck expects.",
+    "DiskCheck('D', TRUE, FALSE) reports only the independent orphan allocation, frees it, and leaves the KEEP.ZC allocation bit set.",
+    "DiskCheck('D', FALSE, FALSE) then returns zero; final zstatus reports failed=0."
+  ],
+  "limits": [
+    "The fixture contains one root file; nested populated-directory checking and directory repair remain untested.",
+    "This tests a disposable QEMU disk fixture, not physical SD or USB media.",
+    "FAT32 repair and live UTM UI or Raspberry Pi behavior are not established."
+  ],
+  "log": "build/tosmisc-diskcheck-repair-populated-current-qemu-2026-11-11.log",
+  "log_sha256": "c985a9f27b6e4a3fd74f02a57be8ac8aa3adaae158bcabbe163716c0bd20d520"
+}

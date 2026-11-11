@@ -101,7 +101,8 @@ extern Bool ZcSourceFileAt(I64 index, U8 *path, I64 path_cap, I64 *_size);
 extern Bool ZcRamFileAt(I64 index, U8 *path, I64 path_cap, I64 *_size);
 extern Bool ZcRamVolumeFormat(U8 drv_let);
 extern Bool ZcVirtualFileDelete(U8 *path);
-extern Bool ZcRedSeaFileAt(I64 index, U8 *path, I64 path_cap, I64 *_size);
+extern Bool ZcRedSeaFileAt(I64 index, U8 *path, I64 path_cap, I64 *_size,
+                           I64 *_first);
 extern Bool ZcRedSeaDirAt(I64 index, U8 *path, I64 path_cap);
 extern Bool ZcSourceVolumeStats(U64 *_capacity_bytes, U64 *_free_bytes);
 extern Bool FilesFindMatch(U8 *test_name, U8 *files_find_mask,
@@ -2254,7 +2255,7 @@ U8 *DirFile(U8 *dirname, U8 *name=NULL, U8 *_extension=NULL)
 }
 Bool BootstrapFilesFindAppend(CDirEntry **head, CDirEntry **tail,
                               U8 *full_name, I64 size, Bool is_dir,
-                              U8 *mask, I64 fuf_flags)
+                              U8 *mask, I64 fuf_flags, I64 clus=0)
 {
     CDirEntry *de;
     U8 *leaf, *test_name;
@@ -2293,6 +2294,7 @@ Bool BootstrapFilesFindAppend(CDirEntry **head, CDirEntry **tail,
     de = CAlloc(sizeof(CDirEntry));
     if (!de)
         return FALSE;
+    de->clus = clus;
     de->full_name = StrNew(full_name);
     if (!de->full_name)
     {
@@ -2350,7 +2352,7 @@ CDirEntry *FilesFind(U8 *files_find_mask, I64 fuf_flags=0)
     U8 path[256], full_name[258], cur_dir[128];
     U8 *remainder, *slash, *end, *mask_dir = NULL, *mask_leaf, *disk_mask;
     U8 *absolute_dir = NULL, *root_dir = NULL;
-    I64 index = 0, size, cur_len, i, j, file_len, dir_len;
+    I64 index = 0, size, first, cur_len, i, j, file_len, dir_len;
     Bool recurse, added, ram_only = FALSE;
     Bool disk_only = Fs && Fs->cur_dv == &zc_legacy_redsea_drive &&
         zc_legacy_redsea_drive.drive_signature == DRIVE_SIGNATURE_VAL;
@@ -2564,7 +2566,7 @@ CDirEntry *FilesFind(U8 *files_find_mask, I64 fuf_flags=0)
     if (!(fuf_flags & FUF_SINGLE) || !head)
     {
         index = 0;
-        while (ZcRedSeaFileAt(index++, path, sizeof(path), &size))
+        while (ZcRedSeaFileAt(index++, path, sizeof(path), &size, &first))
         {
             file_len = StrLen(path);
             if (file_len + 2 < sizeof(full_name))
@@ -2578,7 +2580,7 @@ CDirEntry *FilesFind(U8 *files_find_mask, I64 fuf_flags=0)
                         (recurse || !StrOcc(remainder, '/')))
                     {
                         added = BootstrapFilesFindAppend(&head, &tail, full_name,
-                            size, FALSE, mask_leaf, fuf_flags);
+                            size, FALSE, mask_leaf, fuf_flags, first);
                         if (added && (fuf_flags & FUF_SINGLE))
                             break;
                     }

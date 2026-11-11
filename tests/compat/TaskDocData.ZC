@@ -357,7 +357,7 @@ I64 TaskFilesFindChecks()
 {
     CDirEntry *entries, *de, *next;
     U8 *old_cur_dir, *contents, redsea_path[256];
-    I64 redsea_size = 0, read_size = 0;
+    I64 redsea_size = 0, redsea_first = 0, read_size = 0;
     I64 count, found, result = 42;
 
     old_cur_dir = Fs->cur_dir;
@@ -450,7 +450,8 @@ I64 TaskFilesFindChecks()
         Free(de->full_name);
         Free(de);
     }
-    if (ZcRedSeaFileAt(0, redsea_path, sizeof(redsea_path), &redsea_size))
+    if (ZcRedSeaFileAt(0, redsea_path, sizeof(redsea_path), &redsea_size,
+                       &redsea_first))
     {
         entries = FilesFind("FilesFindRedSeaOnly.ZC", FUF_JUST_FILES);
         count = 0;

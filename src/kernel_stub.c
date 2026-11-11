@@ -13483,7 +13483,8 @@ int zeal_redsea_dir_exists(const char *name) {
 static int rs_stock_file_at(uint64_t base, uint64_t sectors, uint64_t directory,
                             char path[96], size_t prefix, uint64_t *index,
                             uint64_t ancestors[8], unsigned depth,
-                            char *dst, size_t cap, size_t *out_size, int want_dirs) {
+                            char *dst, size_t cap, size_t *out_size,
+                            uint64_t *out_first, int want_dirs) {
     uint8_t block[512];
     if (depth >= 8 || directory < base || directory - base >= sectors)
         return 0;
@@ -13530,7 +13531,7 @@ static int rs_stock_file_at(uint64_t base, uint64_t sectors, uint64_t directory,
                 path[prefix + n] = '/';
                 if (rs_stock_file_at(base, sectors, first, path, prefix + n + 1,
                                      index, ancestors, depth + 1, dst, cap, out_size,
-                                     want_dirs))
+                                     out_first, want_dirs))
                     return 1;
                 path[prefix + n] = 0;
             } else {
@@ -13545,6 +13546,7 @@ static int rs_stock_file_at(uint64_t base, uint64_t sectors, uint64_t directory,
                 if (prefix + n + 1 > cap) return 0;
                 for (size_t j = 0; j <= prefix + n; j++) dst[j] = path[j];
                 if (out_size) *out_size = (size_t)length;
+                if (out_first) *out_first = first;
                 return 1;
             }
         }
@@ -13575,7 +13577,7 @@ static int zc_read_redsea(const char *name, char *dst, size_t cap, size_t *out_l
  * source archive/native catalog remains the primary listing; this adapter
  * exposes only root files that the same FileRead path can still resolve. */
 int zeal_redsea_file_at(uint64_t index, char *dst, size_t cap,
-                        size_t *out_size) {
+                        size_t *out_size, uint64_t *out_first) {
     uint8_t br[512], dir[512];
     uint64_t sectors = 0;
     uint64_t visible = 0;
@@ -13588,7 +13590,8 @@ int zeal_redsea_file_at(uint64_t index, char *dst, size_t cap,
         uint64_t ancestors[8] = {0};
         char path[96];
         return rs_stock_file_at(base, stock_sectors, rs_stock_u64(br + 24),
-                                path, 0, &index, ancestors, 0, dst, cap, out_size, 0);
+                                path, 0, &index, ancestors, 0, dst, cap, out_size,
+                                out_first, 0);
     }
     if (rs_read_root(br, dir, NULL, &sectors) != 0)
         return 0;
@@ -13633,6 +13636,8 @@ int zeal_redsea_file_at(uint64_t index, char *dst, size_t cap,
         dst[name_len] = 0;
         if (out_size)
             *out_size = (size_t)length;
+        if (out_first)
+            *out_first = first;
         return 1;
     }
     return 0;
@@ -13646,7 +13651,7 @@ int zeal_redsea_dir_at(uint64_t index, char *dst, size_t cap) {
         !base || !zc_raw_disk_read(boot, base, 1) || rs_stock_u64(boot + 8) != base)
         return 0;
     return rs_stock_file_at(base, sectors, rs_stock_u64(boot + 24), path, 0,
-                            &index, ancestors, 0, dst, cap, NULL, 1);
+                            &index, ancestors, 0, dst, cap, NULL, NULL, 1);
 }
 
 static int zc_write_source(const char *path, const char *src, size_t len) {

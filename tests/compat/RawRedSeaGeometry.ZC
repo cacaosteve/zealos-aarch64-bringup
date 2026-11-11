@@ -162,15 +162,53 @@ I64 RawRedSeaRepairChecks()
     bitmap = CAlloc(BLK_SIZE);
     if (!bitmap)
         return 3;
+    if (!BlkRead(drive, bitmap, drive->fat1, 1))
+    {
+        Free(bitmap);
+        return 4;
+    }
+    {
+        CDirEntry *entry, *next;
+        I64 count = 0;
+        entry = FilesFind("D:/*", FUF_RECURSE);
+        while (entry)
+        {
+            next = entry->next;
+            count++;
+            if (!entry->full_name || StrCompare(entry->full_name, "/KEEP.ZC") ||
+                entry->clus != base + 10 || entry->size != 512 ||
+                !(entry->attr & RS_ATTR_ARCHIVE))
+            {
+                DirEntryDel(entry);
+                while (next)
+                {
+                    entry = next;
+                    next = entry->next;
+                    DirEntryDel(entry);
+                }
+                Free(bitmap);
+                return 4;
+            }
+            DirEntryDel(entry);
+            entry = next;
+        }
+        if (count != 1)
+        {
+            Free(bitmap);
+            return 4;
+        }
+    }
     if (!BlkRead(drive, bitmap, drive->fat1, 1) || !Bt(bitmap, 2))
     {
         Free(bitmap);
         return 4;
     }
-    // The fixture contains one allocated but unreferenced cluster. The stock
-    // repair path should report that finding, free it, and leave a clean scan.
+    // The fixture contains a referenced file cluster and one separate
+    // allocated but unreferenced cluster. Repair must retain the file and
+    // reclaim only the orphan.
     errs = DiskCheck('D', TRUE, FALSE);
-    if (errs != 1 || !BlkRead(drive, bitmap, drive->fat1, 1) || Bt(bitmap, 2))
+    if (errs != 1 || !BlkRead(drive, bitmap, drive->fat1, 1) ||
+        Bt(bitmap, 2) || !Bt(bitmap, 9))
     {
         Free(bitmap);
         return 5;

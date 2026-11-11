@@ -1073,13 +1073,22 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                         struct.pack_into('<q', boot, 24, offset + 129)  # root past end
                     boot[510:512] = b'\x55\xaa'
                     # The present-drive fixture has only its root allocated.
-                    # The repair fixture adds one orphan allocation for the
-                    # stock DiskCheck repair path to reclaim.
+                    # The repair fixture also has a live root file and one
+                    # separate orphan allocation for DiskCheck to reclaim.
                     bitmap[0] = 3 if args.probe_raw_redsea_geometry == 'present' else 7
                     if args.probe_raw_redsea_geometry in ('present', 'repair'):
-                        # A root directory occupies one RedSea cluster even
-                        # when it has no entries.
+                        # The root directory occupies one cluster in both
+                        # fixtures. Repair also verifies traversal of a real
+                        # file before freeing the independent orphan.
                         struct.pack_into('<q', root_dir, 48, 512)
+                    if args.probe_raw_redsea_geometry == 'repair':
+                        struct.pack_into('<H', root_dir, 0, 0x410)
+                        root_dir[2:4] = b'.\0'
+                        struct.pack_into('<qqq', root_dir, 40, offset + 2, 512, 0)
+                        struct.pack_into('<H', root_dir, 64, 0x420)
+                        root_dir[66:74] = b'KEEP.ZC\0'
+                        struct.pack_into('<qqq', root_dir, 104, offset + 10, 512, 0)
+                        bitmap[1] |= 0x02  # Keep the referenced data cluster allocated.
                     if args.probe_raw_redsea_geometry == 'stockfile':
                         source = b'I64 StockRedSeaFileChecks(){return 42;}\n'
                         struct.pack_into('<H', root_dir, 0, 0x410)
@@ -8797,9 +8806,9 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                                 'Print("empty_ok=%d\\n",empty_data!=NULL && '
                                 'empty_size==0 && *empty_data==0); Free(empty_data);',
                                 'empty_ok=1')
-                        command('zc I64 rs_enum_i=0,rs_enum_size=0,rs_enum_bits=0; '
+                        command('zc I64 rs_enum_i=0,rs_enum_size=0,rs_enum_bits=0,rs_enum_first=0; '
                                 'U8 rs_enum_name[96]; '
-                                'while(ZcRedSeaFileAt(rs_enum_i++,rs_enum_name,96,&rs_enum_size)) {'
+                                'while(ZcRedSeaFileAt(rs_enum_i++,rs_enum_name,96,&rs_enum_size,&rs_enum_first)) {'
                                 'if(!StrCompare(rs_enum_name,"LATE.ZC")) rs_enum_bits|=1; '
                                 'if(!StrCompare(rs_enum_name,"NEST/INNER.ZC")) rs_enum_bits|=2; '
                                 'if(!StrCompare(rs_enum_name,"EMPTY.ZC") && !rs_enum_size) rs_enum_bits|=4; '
