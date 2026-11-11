@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-11",
+  "target": "AArch64 PCI QEMU/HVF with disposable VirtIO disk clone",
+  "kernel_sha256": "c211b0ecb262d8aae9ee9656de819fdd4c13466c0e57d7b3bcd2963dfb29be4a",
+  "iso_sha256": "93cb3d3eec000a3b482922d17bcdb37077b42650ff2ddb5e34650f4495b37149",
+  "probe_sha256": "a74538681ba41cf2f518ef068217df13ee69cabb316bdd234d5e0fdbcb24d1d",
+  "command": "python3 scripts/check-compat.py --pci --quick --probe-raw-redsea-geometry present",
+  "result": "pass: explicitly mounted D: reports writable; BlkWrite changed one sector inside the 128-sector RedSea window, readback matched, original bytes were restored and verified, and writes immediately before and after the window threw Drive; zstatus failed=0",
+  "log": "build/check-demo-dol-doc-pci.log",
+  "log_sha256": "a74538681ba41cf2f518ef068217df13ee69cabb316bdd234d5e0fdbcb24d1d",
+  "scope": "All writes were limited by TaskBridge to D:'s absolute sector window at LBA 130911 through 131038 and run only against the harness's disposable copy-on-write QEMU disk clone. This is a bounded low-level BlkWrite backend. It does not register the stock drive in blkdev.let_to_drive, implement stock RedSea create/delete/rename or general FileWrite persistence, add lock/cache/hotplug behavior, support Pi SDHCI writes, or constitute physical Pi/UTM acceptance. The separate stock DiskCheck call was excluded from this write regression because its intentionally inconsistent geometry fixture emits PrintWarn, which is not bound in this bootstrap shell."
+}

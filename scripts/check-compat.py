@@ -118,13 +118,13 @@ p.add_argument('--probe-raw-disk-read', action='store_true',
 p.add_argument('--probe-raw-disk-write', action='store_true',
                help='check bounded, flushed absolute VirtIO writes on a disposable disk clone')
 p.add_argument('--probe-raw-redsea-geometry', choices=('absent', 'present', 'legacy', 'invalid', 'stockfile'),
-               help='check legacy RedSea geometry against an isolated fixture')
+               help='check bounded legacy RedSea reads and writes against an isolated fixture')
 p.add_argument('--probe-stock-redsea-file', action='store_true',
                help='load one contiguous stock-layout RedSea root file on a disposable disk')
 p.add_argument('--probe-diskraw-context', action='store_true',
                help='report DiskRaw compile result in the current desktop context')
 p.add_argument('--probe-diskraw-live', action='store_true',
-               help='run stock DiskRaw on a disposable read-only RedSea fixture')
+               help='run stock DiskRaw on a disposable RedSea fixture')
 p.add_argument('--probe-unused-define-timeout', type=int, default=300,
                help='runtime limit in seconds for the slow UnusedDefine scan')
 p.add_argument('--probe-demo-callbacks', action='store_true',
@@ -8772,7 +8772,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                                 'Print("rs_find_isolated=%d\\n",rs_source_leak==NULL); '
                                 'DirTreeDel(rs_source_leak);',
                                 'rs_find_isolated=1')
-                        command('zc Print("rs_mount_ok=%d\\n",ZcMountLegacyRedSeaReadOnly);',
+                        command('zc Print("rs_mount_ok=%d\\n",ZcMountLegacyRedSea);',
                                 'rs_mount_ok=1')
                         command('zc Print("rs_isdir_ok=%d\\n", '
                                 'IsDir("D:/NEST") && IsDir("D:/EMPTYDIR") && '
@@ -8900,7 +8900,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                         raise SystemExit(0)
                     if args.probe_diskraw_live:
                         command('zc Print("diskraw_mount=%d\\n", '
-                                'ZcMountLegacyRedSeaReadOnly);', 'diskraw_mount=1')
+                                'ZcMountLegacyRedSea);', 'diskraw_mount=1')
                         focus_graphical_terminal()
                         source = ('CDrive *diskraw_saved_drive=Fs->cur_dv; '
                                   'try {Fs->cur_dv=Letter2Drive(\'D\'); '
@@ -8949,7 +8949,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                                   else 'Absent')
                         report = command('zcall RawRedSea' + suffix + 'Checks',
                                          'zc => 0x000000000000002a')
-                        if suffix == 'Present' and 'D RedSea    VirtIO (read-only)' not in report:
+                        if suffix == 'Present' and 'D RedSea    VirtIO (bounded writable window)' not in report:
                             raise RuntimeError('DriveRep omitted the mounted RedSea drive:\n' + report)
                         command('zstatus', 'failed=0')
                         print('PASS raw RedSea geometry ' + suffix.lower(), flush=True)
@@ -9617,7 +9617,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                         'zc: executed', timeout=180)
                 if args.probe_demo_tos_distro_std:
                     # Blocker reproducer: the current ARM64 bridge exposes the
-                    # source store and optional read-only RedSea D: fixture,
+                    # source store and optional bounded RedSea D: fixture,
                     # but does not register stock C: or RAM B: drives. The
                     # first Drive('C') therefore faults before any format,
                     # erase, copy, or ISO-generation operation can run.

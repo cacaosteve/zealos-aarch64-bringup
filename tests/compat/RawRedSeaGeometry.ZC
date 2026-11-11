@@ -1,6 +1,5 @@
 extern I64 ZcRawRedSeaGeometry(U64 *base, U64 *sectors);
-extern Bool ZcMountLegacyRedSeaReadOnly();
-extern I64 DiskCheck(U8 drv_let=0, Bool fix=FALSE, Bool confirm=TRUE);
+extern Bool ZcMountLegacyRedSea();
 
 I64 RawRedSeaAbsentChecks()
 {
@@ -10,7 +9,7 @@ I64 RawRedSeaAbsentChecks()
     if (ZcRawRedSeaGeometry(NULL, &sectors) ||
         ZcRawRedSeaGeometry(&base, NULL))
         return 2;
-    if (ZcMountLegacyRedSeaReadOnly() || Letter2Drive('D', FALSE))
+    if (ZcMountLegacyRedSea() || Letter2Drive('D', FALSE))
         return 3;
     if (RedSeaValidate('D'))
         return 4;
@@ -22,43 +21,98 @@ I64 RawRedSeaPresentChecks()
     U64 base = 0, sectors = 0;
     CDrive *drive;
     CBlkDev *bd;
-    U8 *buf;
-    I64 caught = 0;
+    U8 *buf, *saved, *pattern;
+    I64 caught = 0, i;
+    Bool write_ok, readback_ok, restore_ok;
     if (!ZcRawRedSeaGeometry(&base, &sectors))
         return 1;
     if (base != 130911 || sectors != 128)
         return 2;
-    if (!ZcMountLegacyRedSeaReadOnly() || !(drive = Letter2Drive('D')) ||
+    if (!ZcMountLegacyRedSea() || !(drive = Letter2Drive('D')) ||
         !(bd = Letter2BlkDev('D')) || drive->bd != bd ||
         Drive2Letter(drive) != 'D' || drive->drv_offset != base ||
         drive->size != sectors || drive->root_clus != base + 2 ||
         drive->fs_type != FSt_REDSEA || drive->fat1 != base + 1 ||
         drive->fat2 != base + 1 || drive->data_area != base + 1 ||
         drive->cur_fat_blk_num != -1 || !RedSeaValidate('D') ||
-        !(bd->flags & BDF_READ_ONLY) ||
-        DriveIsWritable('D', FALSE))
+        (bd->flags & BDF_READ_ONLY) || DriveIsWritable('D', FALSE) != bd)
         return 3;
     DriveRep;
     buf = CAlloc(512);
-    if (!buf || !BlkRead(drive, buf, base, 1) ||
+    saved = CAlloc(512);
+    pattern = CAlloc(512);
+    if (!buf || !saved || !pattern || !BlkRead(drive, buf, base, 1) ||
         buf[3] != 0x88 || buf[510] != 0x55 || buf[511] != 0xAA)
     {
         Free(buf);
+        Free(saved);
+        Free(pattern);
         return 4;
     }
-    // Exercise the stock checker against this disposable, explicitly mounted
-    // volume. Both repair and confirmation stay disabled, so the scan is read-only.
-    if (DiskCheck('D', FALSE, FALSE) != 0)
+    // Write only the final sector in the disposable 128-sector RedSea
+    // fixture, verify it, then restore and verify the original bytes.
+    if (!BlkRead(drive, saved, base + sectors - 1, 1))
     {
         Free(buf);
+        Free(saved);
+        Free(pattern);
         return 5;
+    }
+    for (i = 0; i < BLK_SIZE; i++)
+        pattern[i] = i ^ 0xA5;
+    write_ok = BlkWrite(drive, pattern, base + sectors - 1, 1);
+    readback_ok = write_ok && BlkRead(drive, buf, base + sectors - 1, 1);
+    if (readback_ok)
+        for (i = 0; i < BLK_SIZE; i++)
+            if (buf[i] != pattern[i])
+            {
+                readback_ok = FALSE;
+                break;
+            }
+    restore_ok = BlkWrite(drive, saved, base + sectors - 1, 1) &&
+                 BlkRead(drive, buf, base + sectors - 1, 1);
+    if (restore_ok)
+        for (i = 0; i < BLK_SIZE; i++)
+            if (buf[i] != saved[i])
+            {
+                restore_ok = FALSE;
+                break;
+            }
+    if (!write_ok || !readback_ok || !restore_ok)
+    {
+        Free(buf);
+        Free(saved);
+        Free(pattern);
+        return 6;
     }
     try { BlkRead(drive, buf, base - 1, 1); }
     catch { caught = Fs->except_ch; Fs->catch_except = TRUE; }
     if (caught != 'Drive')
     {
         Free(buf);
-        return 6;
+        Free(saved);
+        Free(pattern);
+        return 7;
+    }
+    caught = 0;
+    try { BlkWrite(drive, pattern, base - 1, 1); }
+    catch { caught = Fs->except_ch; Fs->catch_except = TRUE; }
+    if (caught != 'Drive')
+    {
+        Free(buf);
+        Free(saved);
+        Free(pattern);
+        return 8;
+    }
+    caught = 0;
+    try { BlkWrite(drive, pattern, base + sectors, 1); }
+    catch { caught = Fs->except_ch; Fs->catch_except = TRUE; }
+    if (caught != 'Drive')
+    {
+        Free(buf);
+        Free(saved);
+        Free(pattern);
+        return 9;
     }
     // DiskRaw deliberately broadens its drive range to inspect sector 1.
     drive->drv_offset = 0;
@@ -67,9 +121,13 @@ I64 RawRedSeaPresentChecks()
         buf[2] != 'I' || buf[3] != ' ')
     {
         Free(buf);
+        Free(saved);
+        Free(pattern);
         return 7;
     }
     Free(buf);
+    Free(saved);
+    Free(pattern);
     Unmount('D');
     if (Letter2Drive('D', FALSE) || RedSeaValidate('D'))
         return 8;
