@@ -2,13 +2,13 @@
   "date": "2026-11-11",
   "target": "AArch64 UTM-compatible QEMU, disposable VirtIO disk clone",
   "source_file": "upstream/bootstrap/System/TaskBridge.ZC",
-  "source_file_sha256": "32bc6c883a46bf54b788ceb2e53597de0562c0b7836df4f23da64d5ddbf95eec",
+  "source_file_sha256": "116d5ca18c67e2a169da0d249f03f62bd117bb5cb2bee4ac95914b6ecf0d280c",
   "iso": "build/zealos-aarch64-hello.iso",
-  "iso_sha256": "e59634f7b22041759a449fd600be9f0bd2e3af5a131105cc88fb3fb6b937ac4c",
-  "source_bundle_sha256": "7dc84d3fbb6be903fa246b20c8e109b0a16423fb85154893e3943e6a9abbce51",
-  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-stock-redsea-namespace-rebuilt.log python3 -u scripts/check-compat.py --pci --probe-stock-redsea-file",
-  "result": "pass: FilesFind on disk:/ found the nested RedSea fixture file and directory, did not return source-only /System/InFile.ZC, preserved case-insensitive RedSea and relative source lookups, and the existing stock file, empty file, persistence, compaction and zstatus checks passed (failed=0).",
-  "log": "build/check-stock-redsea-namespace-rebuilt.log",
-  "log_sha256": "63a18a52e0d869425b2bf8296296152fd2f6ac03412f483f2d633d37438cfd11",
-  "scope": "One explicit disk namespace enumeration bug is fixed and regression-tested. This does not implement writable RedSea, a general drive-letter service, hotplug, Pi storage, or validate the behavior in physical UTM or on Pi hardware."
+  "iso_sha256": "9c1f74e59b49d0002a42752a98706faf4db8c4b538944cad57747fe86085fb93",
+  "source_bundle_sha256": "c88594f804c4b0ea59ae08ba514b97bc652d0b43db184a3b774a3503d204d165",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1026 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-stock-redsea-drive-find.log python3 -u scripts/check-compat.py --pci --probe-stock-redsea-file",
+  "result": "pass: FilesFind found the nested RedSea fixture through disk:/ and D:/, excluded source-only /System/InFile.ZC for both namespaces, and found LATE.ZC when Fs->cur_dv was the RedSea drive. Case-insensitive RedSea and relative source lookups, empty-file behavior, persistence, compaction, and zstatus failed=0 also passed.",
+  "log": "build/check-stock-redsea-drive-find.log",
+  "log_sha256": "de8c8bd79dfd3de767c005a41114b2f9c6da9e91238ae12efbf3553b66e93d87",
+  "scope": "This bridges FilesFind to the one read-only RedSea fixture exposed as D: in the ARM guest. It is not a general drive service, writable RedSea, removable-media support, Pi storage update, or physical UTM/Pi acceptance."
 }

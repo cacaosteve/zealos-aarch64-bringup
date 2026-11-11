@@ -8779,6 +8779,23 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                                 'Print("rs_find_isolated=%d\\n",rs_source_leak==NULL); '
                                 'DirTreeDel(rs_source_leak);',
                                 'rs_find_isolated=1')
+                        command('zc CDirEntry *rs_drive_found=FilesFind("D:/NEST/INNER.ZC",FUF_JUST_FILES); '
+                                'Print("rs_drive_find_ok=%d\\n",rs_drive_found!=NULL); '
+                                'DirTreeDel(rs_drive_found);',
+                                'rs_drive_find_ok=1')
+                        command('zc CDirEntry *rs_drive_leak=FilesFind("D:/System/InFile.ZC",FUF_JUST_FILES); '
+                                'Print("rs_drive_isolated=%d\\n",rs_drive_leak==NULL); '
+                                'DirTreeDel(rs_drive_leak);',
+                                'rs_drive_isolated=1')
+                        command('zc CDrive *rs_saved_drive=Fs->cur_dv; '
+                                'CDirEntry *rs_current_drive, *rs_de; Bool rs_current_late=FALSE; '
+                                'Fs->cur_dv=&zc_legacy_redsea_drive; '
+                                'rs_current_drive=FilesFind("*.ZC",FUF_JUST_FILES); '
+                                'for(rs_de=rs_current_drive;rs_de;rs_de=rs_de->next) '
+                                'if(!StrCompare(rs_de->name,"LATE.ZC")) rs_current_late=TRUE; '
+                                'Print("rs_current_drive_ok=%d\\n",rs_current_late); '
+                                'DirTreeDel(rs_current_drive); Fs->cur_dv=rs_saved_drive;',
+                                'rs_current_drive_ok=1')
                         command('zc Print("rs_dirs_ok=%d\\n", '
                                 'ZcSourceDirExists("disk:/EMPTYDIR") && '
                                 'ZcSourceDirExists("disk:/nest") && '

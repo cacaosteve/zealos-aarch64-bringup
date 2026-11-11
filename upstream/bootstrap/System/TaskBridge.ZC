@@ -2336,14 +2336,39 @@ CDirEntry *FilesFind(U8 *files_find_mask, I64 fuf_flags=0)
 {
     CDirEntry *head = NULL, *tail = NULL;
     U8 path[256], full_name[258], cur_dir[128];
-    U8 *remainder, *slash, *end, *mask_dir = NULL, *mask_leaf;
+    U8 *remainder, *slash, *end, *mask_dir = NULL, *mask_leaf, *disk_mask;
     U8 *absolute_dir = NULL, *root_dir = NULL;
     I64 index = 0, size, cur_len, i, j, file_len, dir_len;
-    Bool recurse, added, disk_only = FALSE;
+    Bool recurse, added;
+    Bool disk_only = Fs && Fs->cur_dv == &zc_legacy_redsea_drive &&
+        zc_legacy_redsea_drive.drive_signature == DRIVE_SIGNATURE_VAL;
 
     if (!files_find_mask || !*files_find_mask ||
         ((fuf_flags & FUF_JUST_DIRS) && (fuf_flags & FUF_JUST_FILES)))
         return NULL;
+    // DiskDirA accepts drive-qualified masks. The ARM bridge currently exposes
+    // the stock RedSea fixture through disk:, so normalize D: masks to that
+    // namespace before resolving the directory and avoid merging source files.
+    if ((files_find_mask[0] == 'D' || files_find_mask[0] == 'd') &&
+        files_find_mask[1] == ':')
+    {
+        if (files_find_mask[2] == '/')
+            disk_mask = MStrPrint("disk:%s", files_find_mask + 2);
+        else
+            disk_mask = MStrPrint("disk:/%s", files_find_mask + 2);
+        head = FilesFind(disk_mask, fuf_flags);
+        Free(disk_mask);
+        return head;
+    }
+    // A root-level disk:mask is equivalent to disk:/mask.
+    if (!StrNCompare(files_find_mask, "disk:", 5) &&
+        !StrOcc(files_find_mask + 5, '/'))
+    {
+        disk_mask = MStrPrint("disk:/%s", files_find_mask + 5);
+        head = FilesFind(disk_mask, fuf_flags);
+        Free(disk_mask);
+        return head;
+    }
     mask_leaf = files_find_mask;
     if (Fs && Fs->cur_dir)
     {
