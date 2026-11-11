@@ -1,0 +1,21 @@
+{
+  "date": "2026-11-10",
+  "target": "UTM-bundled QEMU framework, HVF, virtio-ramfb, one vCPU, 1 GiB RAM, VirtIO keyboard/tablet",
+  "source": "/Apps/KeepAway/Run.ZC",
+  "source_sha256": "476c37fbd37b8bd6bc47709bb6a4b2025bbad243b1e7b754ac7e72b031505e65",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "b5682ca299f6709d456e82e69cce5ee565a3efb043b413b668233cda6afbdd68",
+  "kernel_sha256": "cfa2202f654a4d5d76768c957384b93a50e34a58fd2ecc6793c43d47bf9276cd",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-keepaway-current-after-tos.log python3 -u scripts/check-compat.py --pci --quick --probe-3d-apps --probe-keepaway-full-game",
+  "exit_code": 0,
+  "result": "QEMU full-game run passed; visible UTM freeze report remains unresolved",
+  "checks": [
+    "KeepAway reached its gameplay frame; pointer and Space inputs were accepted and the HUD refreshed.",
+    "The scanout changed during the full 184-second interval; the last observed change was immediate at the end of the interval.",
+    "Escape restored the graphical terminal and keyboard focus.",
+    "No Animate child task remained after exit and zstatus reported failed=0."
+  ],
+  "log": "build/check-keepaway-current-after-tos.log",
+  "log_sha256": "56e7e2c580485309f3691f8cd66ff99538d63c24dacd569dd5805255ba56b410",
+  "scope_note": "This is a 184-second run in UTM's bundled QEMU framework, not a test in the visible UTM application. It does not override the user's earlier report that KeepAway froze in the visible UTM session."
+}

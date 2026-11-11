@@ -17,6 +17,7 @@ PROGRAM_CATALOG = ROOT / "docs/acceptance/program-catalog-qemu-2026-11-03.json"
 SOURCE_CONTEXT_CATALOG = ROOT / "docs/acceptance/source-context-catalog-qemu-2026-11-02.json"
 NAMED_APPS = ROOT / "docs/acceptance/named-apps-qemu-2026-11-02.json"
 THREE_D = ROOT / "docs/acceptance/three-d-apps-utm-qemu-current-2026-11-10.json"
+KEEP_AWAY = ROOT / "docs/acceptance/keepaway-full-current-qemu-2026-11-10.json"
 SPAN_STRUT_CURRENT = ROOT / "docs/acceptance/span-strut-current-qemu-2026-11-10.json"
 TOTHEFRONT_CURRENT = ROOT / "docs/acceptance/tothefront-current-qemu-2026-11-10.json"
 BUDGET = ROOT / "docs/acceptance/budget-current-qemu-2026-11-10.json"
@@ -114,6 +115,13 @@ def main():
             "status": "pass",
             "evidence": str(THREE_D.relative_to(ROOT)),
         }
+    # KeepAway has a separate long-run check on the exact current image. The
+    # 184-second QEMU run is useful evidence, but the user's visible-UTM freeze
+    # report remains open and is called out in this narrower record.
+    app_runtime["/Apps/KeepAway/Run.ZC"] = {
+        "status": "pass",
+        "evidence": str(KEEP_AWAY.relative_to(ROOT)),
+    }
     app_runtime["/Apps/Budget/Run.ZC"] = {
         "status": "pass",
         "evidence": str(BUDGET.relative_to(ROOT)),
