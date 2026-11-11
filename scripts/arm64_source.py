@@ -3933,23 +3933,45 @@ def translate_make_tos_dependency(source: bytes) -> bytes:
 
 
 def translate_jukepuppet_song_mask(source: bytes) -> bytes:
-    """Enumerate .ZC songs and complete JukeBox's two-key run gesture."""
+    """Enumerate .ZC songs and launch them directly for SongPuppet."""
     old = b'FilesFind("*", FUF_RECURSE | FUF_JUST_TXT | FUF_JUST_FILES)'
     new = b'FilesFind("*.ZC", FUF_RECURSE | FUF_JUST_FILES)'
     if source.count(old) != 1:
         raise ValueError('pinned JukePuppet text-file filter changed')
     source = source.replace(old, new, 1)
-    old = (b'MessagePost(juke_task->popup_task, MESSAGE_KEY_DOWN_UP, CH_SPACE, 0);\n'
-           b'\tTaskWait(juke_task->popup_task);\n'
-           b'\tSleep(500);')
-    new = (b'MessagePost(juke_task->popup_task, MESSAGE_KEY_DOWN_UP, CH_SPACE, 0);\n'
-           b'\tTaskWait(juke_task->popup_task);\n'
-           b'\tMessagePost(juke_task->popup_task, MESSAGE_KEY_DOWN_UP, CH_ESC, 0);\n'
-           b'\tTaskWait(juke_task->popup_task);\n'
-           b'\tSleep(500);')
+    start = source.find(b'U0 JukeSongPuppet(')
+    end = source.find(b'public U0 JukeSongsPuppet(', start)
+    if start < 0 or end < 0 or source.find(b'U0 JukeSongPuppet(', start + 1) >= 0:
+        raise ValueError('pinned JukePuppet song helper boundaries changed')
+    replacement = (b'U0 JukeSongPuppet(I64 passes, U8 *name, U8 *full_name)\n'
+                   b'{\n'
+                   b'\tCTask *task;\n'
+                   b'\tU8 *st2, *st;\n'
+                   b'\n'
+                   b'\tst2 = StrNew(name);\n'
+                   b'\tif (FileExtDot(st2))\n'
+                   b'\t\tFileExtRemove(st2);\n'
+                   b'\tst = MStrPrint("ExeFile(\\\"%s\\\");", full_name);\n'
+                   b'\tMusicSettingsReset;\n'
+                   b'\ttask = SingleSong(st, st2);\n'
+                   b'\tFree(st);\n'
+                   b'\tFree(st2);\n'
+                   b'\tSongPuppet(task, passes);\n'
+                   b'\tKill(task);\n'
+                   b'}\n\n')
+    source = source[:start] + replacement + source[end:]
+    old = b'CTask\t\t*juke_task = User("JukeBox(0x%X);\\n", dirname);'
     if source.count(old) != 1:
-        raise ValueError('pinned JukePuppet song start gesture changed')
-    source = source.replace(old, new, 1)
+        raise ValueError('pinned JukePuppet JukeBox task launch changed')
+    source = source.replace(old, b'', 1)
+    old = b'JukeSongPuppet(juke_task, passes, i, tmpde->name);'
+    if source.count(old) != 1:
+        raise ValueError('pinned JukePuppet song dispatch changed')
+    source = source.replace(old, b'JukeSongPuppet(passes, tmpde->name, tmpde->full_name);', 1)
+    old = b'\tKill(juke_task);'
+    if source.count(old) != 1:
+        raise ValueError('pinned JukePuppet task cleanup changed')
+    source = source.replace(old, b'', 1)
     return source
 
 

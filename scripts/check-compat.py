@@ -2795,6 +2795,18 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 run_graphical_terminal_command(
                     'demo-jukebox-terminal-recovery', '40+2;',
                     'ans=0x2A=42', timeout=30)
+                beep_song = (ROOT/'tests/compat/JukePuppetBeepSong.ZC').read_bytes()
+                uploaded = upload_source('JukePuppetTone.ZC', beep_song)
+                if 'zrecv: saved JukePuppetTone.ZC' not in uploaded:
+                    raise RuntimeError(
+                        'JukePuppet beep fixture was not uploaded to the disposable disk:\n'
+                        + uploaded)
+                command(
+                    'zc Copy("/JukePuppetTone.ZC", "/Tests/JukePuppet/JukePuppetTone.ZC"); '
+                    'Print("juke_tone_fixture=%d|%d\\n", '
+                    'FileOcc("Play(", "/Tests/JukePuppet/JukePuppetTone.ZC", "")>0, '
+                    'FileOcc("Beep(60);", "/Tests/JukePuppet/JukePuppetTone.ZC", "")>0);',
+                    'juke_tone_fixture=1|1')
                 playback_check = (ROOT/'tests/compat/JukePuppetPlaybackCheck.ZC').read_bytes()
                 uploaded = upload_source('JukePuppetPlaybackCheck.ZC', playback_check)
                 if 'zrecv: saved JukePuppetPlaybackCheck.ZC' not in uploaded:
@@ -2809,17 +2821,25 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 # shell so this probe measures song playback, not GUI editing.
                 playback_output = command(
                     'zcall JukePuppetPlaybackCheck',
-                    'juke-puppet-returned=42', timeout=120)
-                if 'juke-puppet-returned=42' not in playback_output:
+                    'juke-puppet-stock-returned=42', timeout=120)
+                if 'juke-puppet-stock-returned=42' not in playback_output:
                     raise RuntimeError(
-                        'JukePuppet checker did not return after playback:\n'
+                        'JukePuppet did not return after the stock song fixture:\n'
                         + playback_output)
+                beep_output = command(
+                    'zcall JukePuppetBeepCheck',
+                    'juke-puppet-beep-fixture-returned=42|1|1', timeout=120)
+                if ('juke-marker-reset=1|1' not in beep_output or
+                        'juke-puppet-beep-fixture-returned=42|1|1' not in beep_output):
+                    raise RuntimeError(
+                        'JukePuppet did not execute its file and enter the looping Song body:\n'
+                        + beep_output)
                 run_graphical_terminal_command(
                     'demo-jukepuppet-terminal-recovery', '40+2;',
                     'ans=0x2A=42', timeout=30)
                 output = command('zstatus', 'failed=0')
                 runtime_checks.append({
-                    'name': 'JukeBox lists a real song fixture; JukeSongsPuppet returns to a responsive graphical terminal and leaves the compiler healthy',
+                    'name': 'JukeSongsPuppet returns after stock and beep-fixture songs; graphical terminal and compiler remain healthy',
                     'passed': 'failed=0' in output,
                     'output': output,
                 })

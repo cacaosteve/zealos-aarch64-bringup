@@ -1,0 +1,43 @@
+{
+  "date": "2026-11-11",
+  "repository_base_commit": "16a6da4ec4901fbf37ecf3f0225ac41bc75134a6",
+  "working_tree_changes": [
+    "scripts/arm64_source.py",
+    "scripts/check-compat.py",
+    "tests/compat/JukePuppetPlaybackCheck.ZC",
+    "tests/compat/JukePuppetBeepSong.ZC"
+  ],
+  "target": "UTM-bundled QEMU framework, HVF, one vCPU, 1 GiB RAM, virtio-ramfb, VirtIO keyboard/tablet, VirtIO sound WAV backend",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "923ae07d75b734b9e882f4bbeab608f81aed502fc49d3b25adac30409c0741d5",
+  "kernel_sha256": "cfa2202f654a4d5d76768c957384b93a50e34a58fd2ecc6793c43d47bf9276cd",
+  "changed_source_sha256": {
+    "scripts/arm64_source.py": "fd8f85853ee7a285e2c9ffba5e802d9e76426d20bd8f584007d6041983a2a9a8",
+    "scripts/check-compat.py": "c04258378e7fe63921017d60ff9b43a82a5e897f584c1f055e9b9ca5e05fcb23",
+    "tests/compat/JukePuppetPlaybackCheck.ZC": "6bbd6e67abddef2a10913314a8625bca7b13899a934e52b4dc530377eccef034",
+    "tests/compat/JukePuppetBeepSong.ZC": "fae217992eaa3bf8736b081fe294098f1ad9c844f9e812e02ae58492431e4764"
+  },
+  "result": "The stock song and a looping Beep fixture both returned from JukeSongsPuppet. The fixture entered Song and generated nonzero PCM; graphical-terminal recovery and compiler health passed.",
+  "verified": [
+    "The disposable guest received the looping fixture and confirmed both Play( and Beep(60); occur in its source.",
+    "The stock childish.ZC song launched through SingleSong and returned from JukeSongsPuppet.",
+    "The beep fixture wrote its file-executed marker and Song-started marker, then returned from JukeSongsPuppet.",
+    "After both cases, the graphical terminal accepted 40+2; as 42 and zstatus reported ready=1 failed=0.",
+    "The output WAV contained nonzero stereo PCM for 2.52 seconds, consistent with the fixture's repeated Beep(60) and Sleep(300) loop."
+  ],
+  "log": "build/check-juke-puppet-direct.log",
+  "log_sha256": "a9b626df47958a22ac587d9b5a13a96267eef43c51a896169136cdfcd82e6519",
+  "wav": "build/juke-puppet-direct.wav",
+  "wav_sha256": "796469756992619c578ac55c313b1172fbe44fe259ed77fba1bafe001bf78e6a",
+  "audio_capture": {
+    "sample_rate_hz": 44100,
+    "channels": 2,
+    "sample_width_bits": 16,
+    "frames": 111132,
+    "seconds": 2.52,
+    "nonzero_samples": 209916,
+    "peak": 7000,
+    "qemu_warning": "Could not create a backend for voice virtio-sound.in; this concerns the input voice. The output WAV was created and contains nonzero samples."
+  },
+  "scope_note": "Automated QEMU only. The check demonstrates that JukeSongsPuppet starts stock and fixture song tasks and that the fixture emits audio samples. It does not establish audible music playback in the visible UTM app or on a physical Pi. Interactive JukeBox selection remains a separate path."
+}

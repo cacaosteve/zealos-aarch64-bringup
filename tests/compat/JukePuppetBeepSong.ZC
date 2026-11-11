@@ -1,0 +1,14 @@
+//9 has words
+// Play( lets JukeBox list this test song.
+FileWrite("/Tests/JukePuppetFileExecuted", "yes", 3);
+U0 Song()
+{
+	FileWrite("/Tests/JukePuppetSongStarted", "yes", 3);
+	while (TRUE)
+	{
+		Beep(60);
+		Sleep(300);
+	}
+}
+
+Song;

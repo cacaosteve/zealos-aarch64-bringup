@@ -1,6 +1,20 @@
 I64 JukePuppetPlaybackCheck()
 {
 	JukeSongsPuppet("/Tests/JukePuppet", 1, 0, 1);
-	Print("juke-puppet-returned=%d\n", 40 + 2);
+	Print("juke-puppet-stock-returned=%d\n", 40 + 2);
+	return 1;
+}
+
+I64 JukePuppetBeepCheck()
+{
+	Del("/Tests/JukePuppetFileExecuted");
+	Del("/Tests/JukePuppetSongStarted");
+	Print("juke-marker-reset=%d|%d\n",
+		FileFind("/Tests/JukePuppetFileExecuted") == NULL,
+		FileFind("/Tests/JukePuppetSongStarted") == NULL);
+	JukeSongsPuppet("/Tests/JukePuppet", 1, 1, 2);
+	Print("juke-puppet-beep-fixture-returned=%d|%d|%d\n",
+		40 + 2, FileFind("/Tests/JukePuppetFileExecuted") != NULL,
+		FileFind("/Tests/JukePuppetSongStarted") != NULL);
 	return 1;
 }

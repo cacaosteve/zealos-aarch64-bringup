@@ -507,18 +507,20 @@ working compiler; the earlier failure was the synthetic root task pointing at
 an uninitialized per-fiber code heap ([acceptance](docs/acceptance/demo-tosmisc-memtest-qemu-2026-11-10.json)). The stock
 `DiskCheck('D',FALSE,FALSE)` path also returns zero on the disposable,
 explicitly mounted read-only RedSea fixture; `DiskCheckAll`, repair behavior,
-and its configured-drive workflow remain unverified. On the exact current ISO
-(`5effe8cb…`), the actual JukeBox application finds a stock `.ZC` song, shows
-its label in the popup, and returns with Escape to a healthy terminal; this is
-automated QEMU evidence, not a visible UTM or Pi test. JukePuppet song playback
-and audible output remain unverified ([JukeBox acceptance](docs/acceptance/jukebox-current-qemu-2026-11-10.json)). Other TOS workflows remain unverified
+and its configured-drive workflow remain unverified. On the current ISO
+(`923ae07d…`), the ARM64 `JukeSongsPuppet` adapter now launches stock `.ZC`
+songs directly through JukeBox's `SingleSong` path. The QEMU regression
+returned from both the stock song and a looping Beep fixture; the fixture wrote
+markers before and after entering `Song`, the graphical terminal recovered,
+and `zstatus` reported `failed=0`. The WAV capture contains 2.52 seconds of
+nonzero stereo PCM. This establishes song-task execution and tone generation
+in automated QEMU; it is not a live UTM-window, Pi, or audible music acceptance
+([JukePuppet direct-play acceptance](docs/acceptance/jukepuppet-direct-play-qemu-2026-11-11.json)).
+Other TOS workflows remain unverified
 ([acceptance](docs/acceptance/demo-tosmisc-current-qemu-2026-11-10.json)).
-JukePuppet remains open for actual playback. On the rebuilt ISO (`4ba080db…`),
-the corrected fixture check returned from `JukeSongsPuppet`, recovered the
-graphical terminal, and left `zstatus` at `failed=0`. Its WAV contained only
-0.04 seconds of silence, so the test does not establish that the song started
-or produced sound. Keep the earlier timeout and its false-positive warning in
-view; this new run closes only the return ambiguity for this fixture
+The earlier JukePuppet run on ISO (`4ba080db…`) is superseded: its fixture
+returned without proving that playback started. Keep that record as historical
+evidence alongside the earlier timeout
 ([current check](docs/acceptance/jukepuppet-current-4ba-utm-qemu-2026-11-11.json),
 [earlier timeout](docs/acceptance/demo-jukepuppet-timeout-qemu-2026-11-10.json)).
 The same heap-routing fix preserves the GrModels, KeepAway and Titanium QEMU
