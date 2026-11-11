@@ -1197,6 +1197,27 @@ static int pi4_xhci_dma_bot_read10_cbw_seed(uint8_t *cbw, unsigned length,
     return pi4_xhci_dma_bot_read_cbw_seed(cbw, length, tag, cdb, 10u, block_bytes);
 }
 
+/* Seed one explicitly bounded WRITE(10) BOT command. Keep this separate from
+ * the read-only wrapper above so adding write support cannot accidentally
+ * widen the probe's command allowlist. The caller owns media policy, DMA
+ * publication, data-OUT completion and read-back verification. */
+static int __attribute__((unused)) pi4_xhci_dma_bot_write10_cbw_seed(uint8_t *cbw, unsigned length,
+        uint32_t tag, uint32_t lba, uint32_t last_lba, unsigned block_bytes) {
+    uint8_t cdb[10] = {0x2au, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 1u, 0u};
+    if (!cbw || length < PI4_XHCI_DMA_BOT_CBW_BYTES || last_lba == UINT32_MAX ||
+        lba > last_lba || !pi4_xhci_dma_bot_block_size_ok(block_bytes) ||
+        block_bytes > PI4_XHCI_DMA_BOT_MAX_BLOCK_BYTES) return -1;
+    for (unsigned i = 0; i < 4u; i++) cdb[2u + i] = (uint8_t)(lba >> (24u - 8u * i));
+    for (unsigned i = 0; i < PI4_XHCI_DMA_BOT_CBW_BYTES; i++) cbw[i] = 0;
+    cbw[0] = 0x55u; cbw[1] = 0x53u; cbw[2] = 0x42u; cbw[3] = 0x43u;
+    for (unsigned i = 0; i < 4u; i++) cbw[4u + i] = (uint8_t)(tag >> (i * 8u));
+    for (unsigned i = 0; i < 4u; i++) cbw[8u + i] = (uint8_t)(block_bytes >> (i * 8u));
+    cbw[12] = 0x00u; /* Host-to-device data-OUT phase. */
+    cbw[14] = 10u;
+    for (unsigned i = 0; i < 10u; i++) cbw[15u + i] = cdb[i];
+    return 0;
+}
+
 static int pi4_xhci_dma_bot_sense_cbw_seed(uint8_t *cbw, unsigned length,
         uint32_t tag) {
     const uint8_t cdb[6] = {0x03u, 0u, 0u, 0u, 18u, 0u};

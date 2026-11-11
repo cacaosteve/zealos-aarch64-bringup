@@ -232,6 +232,12 @@ int main(void) {
             0x28, 0, 0x12, 0x34, 0x56, 0x78, 0, 0, 1, 0,
             0, 0, 0, 0, 0, 0
         };
+        const uint8_t write_expected[31] = {
+            0x55, 0x53, 0x42, 0x43, 4, 3, 2, 1,
+            0, 2, 0, 0, 0x00, 0, 10,
+            0x2a, 0, 0x12, 0x34, 0x56, 0x78, 0, 0, 1, 0,
+            0, 0, 0, 0, 0, 0
+        };
         uint8_t capacity[8] = {0, 0, 7, 0xff, 0, 0, 2, 0};
         uint32_t last = 0, block = 0;
         uint64_t size = 0;
@@ -241,6 +247,17 @@ int main(void) {
         for (unsigned i = 0; i < 31u; i++)
             if (cbw[i] != read_expected[i])
                 return fail("READ(10) CDB is BE while CBW tag/byte count are LE");
+        if (pi4_xhci_dma_bot_write10_cbw_seed(cbw, 31u, 0x01020304u,
+                0x12345678u, 0x12345679u, 512u) != 0)
+            return fail("WRITE(10) one-block wrapper");
+        for (unsigned i = 0; i < 31u; i++)
+            if (cbw[i] != write_expected[i])
+                return fail("WRITE(10) host-to-device direction and CDB byte order");
+        if (pi4_xhci_dma_bot_write10_cbw_seed(cbw, 30u, 42u, 0u, 10u, 512u) == 0 ||
+            pi4_xhci_dma_bot_write10_cbw_seed(cbw, 31u, 42u, 11u, 10u, 512u) == 0 ||
+            pi4_xhci_dma_bot_write10_cbw_seed(cbw, 31u, 42u, 0u, UINT32_MAX, 512u) == 0 ||
+            pi4_xhci_dma_bot_write10_cbw_seed(cbw, 31u, 42u, 0u, 10u, 4096u) == 0)
+            return fail("WRITE(10) rejects invalid capacity, LBA and transfer bounds");
         if (pi4_xhci_dma_bot_capacity10_cbw_seed(cbw, 31u, 0x01020304u) != 0 ||
             cbw[8] != 8u || cbw[14] != 10u || cbw[15] != 0x25u)
             return fail("READ CAPACITY(10) CDB and eight-byte data length");
@@ -1660,6 +1677,6 @@ int main(void) {
         pi4_xhci_dma_enable_command(PI4_PCI_COMMAND_MASTER, &enabled) == 0)
         return fail("PCI command enables BME only from a clear state");
 
-    puts("PASS Pi4 xHCI DMA, live ring publication/wrap/prefix, mixed command/BOT/event laps and both event cycles, SuperSpeed root selection/warm reset/EP0, fixed-speed MPS, BOT/SS companions, bulk contexts/Normal TRBs, read-only INQUIRY/capacity/READ10/sense/CSW, CRC32, ring and hub controls");
+    puts("PASS Pi4 xHCI DMA, live ring publication/wrap/prefix, mixed command/BOT/event laps and both event cycles, SuperSpeed root selection/warm reset/EP0, fixed-speed MPS, BOT/SS companions, bulk contexts/Normal TRBs, read-only INQUIRY/capacity/READ10/sense/CSW, bounded WRITE10 CBW encoding, CRC32, ring and hub controls");
     return 0;
 }
