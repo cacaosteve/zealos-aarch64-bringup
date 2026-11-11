@@ -43,10 +43,12 @@ launchable apps. The installed
 palette save/reopen, Home and Terminal shells, NetLog, and a local Telnet
 round-trip; live UTM and Pi behavior remain separate checks. See
 [`demo-wallpaper-desktop-current-qemu-2026-11-10.json`](docs/acceptance/demo-wallpaper-desktop-current-qemu-2026-11-10.json).
-The read-only `DiskRaw` workflow is now counted as accepted for its tested
-VirtIO fixture; general block-device registration, writes, filesystem mounts,
-hotplug, Pi storage and live-target behavior remain separate storage gaps.
-See the [per-source ledger](docs/acceptance/demo-source-ledger-2026-11-10.json).
+`DiskRaw` reads and bounded absolute writes now pass on disposable PCI VirtIO
+fixtures. The write probe flushes, reads back, and restores its test sectors.
+This is still below the stock drive registry and does not make a writable
+RedSea/filesystem mount; hotplug and Pi SD storage remain separate gaps. See
+the [write acceptance record](docs/acceptance/raw-disk-write-qemu-2026-11-11.json)
+and [per-source ledger](docs/acceptance/demo-source-ledger-2026-11-10.json).
 The 206/206 compile-only sweep was rerun against the current ISO
 (`f17ed84e…`); see the [current-image compile record](docs/acceptance/demo-source-catalog-current-qemu-2026-11-10.json).
 
@@ -423,8 +425,10 @@ replacing a line, fixing a QEMU long-line display mismatch; see the
 [input regression](docs/acceptance/gui-long-input-qemu-2026-11-09.json).
 Physical Pi and live UTM validation remain outstanding.
 The missing-block-device bridge now throws `Drive` when requested, matching
-the upstream missing-drive contract. A separate read-only primitive can read
-absolute PCI VirtIO disk sectors, with a [QEMU GPT and bounds check](docs/acceptance/raw-disk-read-qemu-2026-11-09.json).
+the upstream missing-drive contract. Raw sector access now supports bounded
+reads and writes on absolute PCI VirtIO disks; the [read check](docs/acceptance/raw-disk-read-qemu-2026-11-09.json)
+and [write/flush/readback check](docs/acceptance/raw-disk-write-qemu-2026-11-11.json)
+run on disposable QEMU disk clones.
 The legacy RedSea window can now be identified only after checking its boot
 header and bounded root; [QEMU fixtures](docs/acceptance/raw-redsea-geometry-qemu-2026-11-09.json)
 cover stock absolute and bootstrap relative addresses, absent media, and a
@@ -445,8 +449,8 @@ Direct directory checks and `Cd` can also resolve empty directories.
 Empty stock RedSea files also read as zero-length files rather than missing
 files. The native source store can create and reopen empty files; a QEMU check
 overwrote a nonempty file with an empty file and reopened it after a cold boot.
-This does not establish file operations, stock drive-registry integration,
-writes, or a Pi storage backend. The boot source store remains separate.
+This does not establish stock drive-registry integration, a writable mounted
+filesystem, or a Pi storage backend. The boot source store remains separate.
 `Directives.ZC` and `WebLogRep.ZC` now compile with native built-in handling. The previous ToHtml resource blocker is
 resolved; the 96 MiB executable arena is reserved as zero-filled RAM so it
 does not add 96 MiB to the ISO. The enlarged compiler arenas and recovery

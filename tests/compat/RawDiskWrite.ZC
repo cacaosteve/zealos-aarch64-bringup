@@ -1,0 +1,73 @@
+extern I64 ZcRawDiskSectors();
+extern I64 ZcRawDiskRead(U8 *dst, I64 sector, I64 count);
+extern I64 ZcRawDiskWrite(U8 *src, I64 sector, I64 count);
+
+I64 RawDiskWriteChecks()
+{
+    I64 sectors = ZcRawDiskSectors;
+    I64 count = 256;
+    I64 bytes = count * 512;
+    U8 *original = CAlloc(bytes);
+    U8 *pattern = CAlloc(bytes);
+    U8 *readback = CAlloc(bytes);
+    I64 result = 0;
+    I64 modified = FALSE;
+
+    if (!original || !pattern || !readback || sectors < count)
+        result = 1;
+    else if (!ZcRawDiskRead(original, sectors - count, count))
+        result = 2;
+    else if (ZcRawDiskWrite(NULL, 0, 1) || ZcRawDiskWrite(pattern, -1, 1) ||
+             ZcRawDiskWrite(pattern, 0, 0) ||
+             ZcRawDiskWrite(pattern, sectors, 1) ||
+             ZcRawDiskWrite(pattern, sectors - 1, 2))
+        result = 3;
+    else
+    {
+        I64 i;
+        for (i = 0; i < bytes; i++)
+            pattern[i] = (i * 37 + 0x5A) & 255;
+
+        // The checker boots from a copy-on-write disposable disk image. Use
+        // its final 256 sectors to exercise batching, then restore them.
+        modified = TRUE;
+        if (!ZcRawDiskWrite(pattern, sectors - count, count))
+            result = 4;
+        else if (!ZcRawDiskRead(readback, sectors - count, count))
+            result = 5;
+        else
+        {
+            for (i = 0; i < bytes; i++)
+                if (readback[i] != pattern[i])
+                {
+                    result = 6;
+                    break;
+                }
+        }
+    }
+
+    if (modified)
+    {
+        I64 i;
+        if (!ZcRawDiskWrite(original, sectors - count, count) ||
+            !ZcRawDiskRead(readback, sectors - count, count))
+            result = 7;
+        else
+            for (i = 0; i < bytes; i++)
+                if (readback[i] != original[i])
+                {
+                    result = 8;
+                    break;
+                }
+    }
+
+    if (original)
+        Free(original);
+    if (pattern)
+        Free(pattern);
+    if (readback)
+        Free(readback);
+    if (result)
+        return result;
+    return 42;
+}

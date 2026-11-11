@@ -1404,6 +1404,12 @@ static int64_t host_raw_disk_read(int64_t *a) {
     return zc_raw_disk_read((void *)(uintptr_t)a[0], (uint64_t)a[1],
                             (uint64_t)a[2]);
 }
+static int64_t host_raw_disk_write(int64_t *a) {
+    if (!a[0] || a[1] < 0 || a[2] <= 0)
+        return 0;
+    return zc_raw_disk_write((const void *)(uintptr_t)a[0], (uint64_t)a[1],
+                             (uint64_t)a[2]);
+}
 static int64_t host_raw_redsea_geometry(int64_t *a) {
     return zc_raw_redsea_geometry((uint64_t *)(uintptr_t)a[0],
                                   (uint64_t *)(uintptr_t)a[1]);
@@ -9697,6 +9703,7 @@ static int load_source_path(const char *path, int merged, int recover) {
         PrsBindCSymbol("ZcSourceVolumeStats", host_source_volume_stats, 2);
         PrsBindCSymbol("ZcRawDiskSectors", host_raw_disk_sectors, 0);
         PrsBindCSymbol("ZcRawDiskRead", host_raw_disk_read, 3);
+        PrsBindCSymbol("ZcRawDiskWrite", host_raw_disk_write, 3);
         PrsBindCSymbol("ZcRawRedSeaGeometry", host_raw_redsea_geometry, 2);
         PrsBindCSymbol("LowPass1", host_low_pass1, 4);
         /* These functions were pre-registered before TaskBridge introduced
@@ -10503,6 +10510,7 @@ void zc_init(const void *archive, size_t size, zc_output_fn output) {
     } bindings[] = {{"ZcSoundMaxPumpGapUs", host_sound_max_pump_gap, 0},
                     {"ZcRawDiskSectors", host_raw_disk_sectors, 0},
                     {"ZcRawDiskRead", host_raw_disk_read, 3},
+                    {"ZcRawDiskWrite", host_raw_disk_write, 3},
                     {"ZcRawRedSeaGeometry", host_raw_redsea_geometry, 2},
                     {"ZcSoundSubmittedFrames", host_sound_submitted_frames, 0},
                     {"ZcSoundTimerEnable", host_sound_timer_enable, 0},

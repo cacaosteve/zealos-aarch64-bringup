@@ -115,6 +115,8 @@ p.add_argument('--probe-missing-block-device', action='store_true',
                help='check the missing block-device exception contract')
 p.add_argument('--probe-raw-disk-read', action='store_true',
                help='check read-only physical VirtIO sector access')
+p.add_argument('--probe-raw-disk-write', action='store_true',
+               help='check bounded, flushed absolute VirtIO writes on a disposable disk clone')
 p.add_argument('--probe-raw-redsea-geometry', choices=('absent', 'present', 'legacy', 'invalid', 'stockfile'),
                help='check legacy RedSea geometry against an isolated fixture')
 p.add_argument('--probe-stock-redsea-file', action='store_true',
@@ -669,6 +671,9 @@ if args.probe_gui_long_input:
 if args.probe_missing_block_device:
     args.probe_demo_definestr = True
 if args.probe_raw_disk_read:
+    args.probe_demo_definestr = True
+if args.probe_raw_disk_write:
+    args.pci = True
     args.probe_demo_definestr = True
 if args.probe_raw_redsea_geometry:
     args.probe_demo_definestr = True
@@ -8921,6 +8926,14 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                                 'zc => 0x000000000000002a')
                         command('zstatus', 'failed=0')
                         print('PASS raw VirtIO GPT read and bounds', flush=True)
+                        raise SystemExit(0)
+                    if args.probe_raw_disk_write:
+                        command('zload /Tests/RawDiskWrite.ZC',
+                                'zc: loaded /Tests/RawDiskWrite.ZC')
+                        command('zcall RawDiskWriteChecks',
+                                'zc => 0x000000000000002a')
+                        command('zstatus', 'failed=0')
+                        print('PASS raw VirtIO write, flush, readback, restore and bounds', flush=True)
                         raise SystemExit(0)
                     if args.probe_missing_block_device:
                         command('zload /Tests/MissingBlockDevice.ZC',

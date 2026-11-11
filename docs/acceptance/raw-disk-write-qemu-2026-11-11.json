@@ -1,0 +1,13 @@
+{
+  "date": "2026-11-11",
+  "target": "AArch64 PCI QEMU/HVF, disposable VirtIO disk clone",
+  "kernel_sha256": "411623ed6d0779007f7d0f436ba7d26d60d40d4551660b5c1db61746d271e28e",
+  "source_bundle_sha256": "3e139a51a95a848d690420d48fb271c81000bd94d04b8fdbfe0c378abb15c727",
+  "iso_sha256": "0e816d41ec5570054ac10e40a401691bb6a4c2bbcba03ca7e045184014408af2",
+  "probe_sha256": "36c421d3a9df9bb223ffc9ca93917bef2e773d20392b553cb45278b7d2380182",
+  "command": "python3 scripts/check-compat.py --pci --quick --probe-raw-disk-write",
+  "result": "pass: exposed bounded absolute PCI VirtIO writes to ZealC; rejected null, negative, zero-count and out-of-range requests; wrote a 256-sector pattern across DMA batches, flushed it, read back every byte, restored the original sectors, and verified the restoration; zstatus failed=0",
+  "log": "build/check-demo-dol-doc-pci.log",
+  "log_sha256": "151bbbccaf3243734da0592b294604e03848e288a002963ced3b2db4f8afcb00",
+  "limits": "The probe only writes to the harness's copy-on-write QEMU disk clone. The new ZcRawDiskWrite bridge is a low-level absolute PCI VirtIO primitive; it does not register a stock CDrive/CBlkDev, provide mounted filesystem write semantics, enable Pi SDHCI writes, or validate a physical target."
+}

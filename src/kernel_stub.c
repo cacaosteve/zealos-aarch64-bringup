@@ -12149,6 +12149,29 @@ int zc_raw_disk_read(void *dst, uint64_t sector, uint64_t count) {
     return 1;
 }
 
+/* Raw writes are limited to the absolute PCI VirtIO disk. Callers must own
+ * the sectors they modify; this primitive does not provide filesystem or
+ * mounted-volume safety. */
+int zc_raw_disk_write(const void *src, uint64_t sector, uint64_t count) {
+    uint64_t capacity = zc_raw_disk_sectors();
+    if (!src || !count || sector >= capacity || count > capacity - sector ||
+        count > SIZE_MAX / 512u)
+        return 0;
+    const uint8_t *in = src;
+    while (count) {
+        uint32_t limit = virtio_blk_max_sectors();
+        if (!limit)
+            return 0;
+        uint32_t batch = count < limit ? (uint32_t)count : limit;
+        if (!virtio_blk_write_abs_many(in, sector, batch))
+            return 0;
+        sector += batch;
+        count -= batch;
+        in += (size_t)batch * 512u;
+    }
+    return virtio_blk_flush_disk();
+}
+
 uint64_t hc_builtin_blkwrite(uint64_t buf, uint64_t blk, uint64_t count) {
     uint8_t *src = (uint8_t *)(uintptr_t)buf;
     if (!src || count == 0) {
