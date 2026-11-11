@@ -14,7 +14,12 @@
     "The QEMU log reports that it could not create a backend for virtio-sound.in. The 0.28-second WAV capture is not attributable to the song and does not verify audible playback.",
     "Other TOSMisc checks in this run passed: printable ASCII OCR, literal dollar encoding, SoundShift/AUWrite/FileRead, synthetic GR movie round trip, ScreenCast GR/AU capture, and MemTest."
   ],
-  "next": "Inspect the ARM64 guest TaskCaller/debug-info progress used by JukePuppet's SongPuppet loop, then rerun with a sound backend that actually accepts virtio-sound output. Keep JukePuppet song playback and terminal recovery marked open until both return and attributable PCM are verified.",
+  "task_caller_probe": {
+    "result": "A sleeping spawned guest task's saved-frame walk reaches TCCallerLoop+0x28 at depth 3. The top-level bootstrap command context returns zero for a local nested TaskCaller probe, so that probe is not representative of JukePuppet's spawned Song task.",
+    "log": "build/check-task-caller-frames-2026-11-10-r4.log",
+    "log_sha256": "fd9c89aee946d57e45a176a78613760567887f034fead5e6fcca44a35c465be3"
+  },
+  "next": "Instrument the exact JukeSongsPuppet path to determine whether it launches and observes the selected Song task and whether the task returns; do not change TaskCaller based only on the bootstrap-context result. Then rerun with a sound backend that accepts virtio-sound output. Keep JukePuppet song playback and terminal recovery open until return and attributable PCM are verified.",
   "log": "build/check-tosmisc-jukepuppet-current.log",
   "log_sha256": "8c0ae11d2a62f960839d9585015f3930745de058570d94dd4ae1265e0178a1d8",
   "wav": "build/tosmisc-jukepuppet-current.wav",

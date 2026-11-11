@@ -1,0 +1,15 @@
+{
+  "date": "2026-11-10",
+  "target": "User Pi 4B microSD, inspected read-only on macOS",
+  "inspection": "diskutil list external and diskutil info on the ZEALPI media; mounted the FAT32 volume for a directory listing, then unmounted it",
+  "result": "The 196.9 GB card currently has an MBR (FDisk) partition table with one FAT32 partition named ZEALPI spanning the card. No second data partition or unallocated tail is present.",
+  "media_changed": false,
+  "mount_note": "The mount command did not expose the volume as read-only despite the readOnly argument. No intentional file writes were made; the volume was unmounted immediately after listing. No partitioning or formatting occurred.",
+  "implications": [
+    "The existing Pi firmware/boot FAT32 volume must be preserved.",
+    "A separate RedSea data partition requires a partition-layout change, which means backing up and shrinking/rebuilding the full-card FAT32 layout first.",
+    "No Pi writable block or filesystem path is accepted yet; this inspection does not test reads or writes from ZealOS."
+  ],
+  "recommended_direction": "Keep the FAT32 boot volume and target a separate native RedSea data partition for ZealOS persistence. USB storage can remain a later optional data target.",
+  "scope_note": "Host-side card layout and directory listing only. No partitioning, formatting, boot, or intentional filesystem write was performed."
+}

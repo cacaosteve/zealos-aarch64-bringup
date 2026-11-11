@@ -33,6 +33,8 @@ p.add_argument('--window-frame-only', action='store_true',
 p.add_argument('--probe-upstream', action='store_true', help='check current full-header/subsystem compiler results')
 p.add_argument('--probe-task-reset-context', action='store_true',
                help='isolate task bridge header context after compiler reset')
+p.add_argument('--probe-task-caller-frames', action='store_true',
+               help='check TaskCaller stack walking in nested and descheduled ARM64 guest functions')
 p.add_argument('--probe-sound-quiet', action='store_true',
                help='stop the graphical terminal and window manager before a fast source sound probe')
 p.add_argument('--probe-module', metavar='ARCHIVE_PATH',
@@ -741,6 +743,8 @@ if args.demo_system_path and not args.probe_demo_system_context:
     p.error('--demo-system-path requires --probe-demo-system-context')
 if args.demo_system_module and not args.probe_demo_system_context:
     p.error('--demo-system-module requires --probe-demo-system-context')
+if args.probe_task_caller_frames and not args.probe_demo_system_context:
+    p.error('--probe-task-caller-frames requires --probe-demo-system-context')
 if args.wenceslas_escape_first and not args.probe_demo_wenceslas:
     p.error('--wenceslas-escape-first requires --probe-demo-wenceslas')
 if args.wenceslas_space_first and not args.probe_demo_wenceslas:
@@ -2403,6 +2407,20 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                                      'output': output})
                 if not loaded:
                     break
+            if args.probe_task_caller_frames:
+                command(
+                    'zc U0 TCCallerLoop(U8 *data){while(TRUE)Sleep(1);}',
+                    'zc: executed')
+                output = command(
+                    'zc CTask *TCCallerTask=Spawn(&TCCallerLoop,NULL,"TaskCallerLoop",0,NULL,0,1<<8);BirthWait(&TCCallerTask);Sleep(5);Print("tc_remote=%p|%p|%p|%p|%p|%p|%p|%p|%p entry=%p sleep=%p",TaskCaller(TCCallerTask,0),TaskCaller(TCCallerTask,1),TaskCaller(TCCallerTask,2),TaskCaller(TCCallerTask,3),TaskCaller(TCCallerTask,4),TaskCaller(TCCallerTask,5),TaskCaller(TCCallerTask,6),TaskCaller(TCCallerTask,7),TaskCaller(TCCallerTask,8),&TCCallerLoop,&Sleep);Kill(TCCallerTask);',
+                    'tc_remote=', timeout=60)
+                if '&TCCallerLoop+0x' not in output:
+                    raise RuntimeError(
+                        'TaskCaller saved stack walk did not reach the waiting guest function:\n'
+                        + output)
+                print('PASS TaskCaller saved stack walk reaches waiting guest function',
+                      flush=True)
+                raise SystemExit(0)
             runtime_checks = []
             if (all(m['loaded'] for m in module_loads) and
                     '/Demo/AcctExample/TOS/TOSConfig.ZC' in args.demo_system_module):
