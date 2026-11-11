@@ -293,7 +293,7 @@ installer. Saving requires a writable installed VirtIO source volume.
 
 A separate [installer candidate](docs/acceptance/candidate-installer-utm-qemu-2026-11-09.json) includes the current document and popup fixes. It passed an automated USB-CD install, full disk read-back and disk-only persistence, plus the 3D gate using UTM's QEMU framework and `virtio-ramfb`. The Pi desktop kernel builds, but this candidate has not been tested in the live UTM UI or on the Pi.
 
-The matching [Pi desktop payload](docs/acceptance/pi-desktop-candidate-2026-11-10.json) is prepared separately and passed its boot-chain validator and host platform tests. It has not been written to microSD or tested on physical hardware. The user already accepted keyboard and pointer input on an earlier Pi desktop image; only the refreshed payload’s new desktop state and HDMI audio need physical confirmation.
+The matching [Pi desktop payload](docs/acceptance/pi-desktop-candidate-2026-11-10.json) was rebuilt from commit `0299bd32`, passed its boot-chain validator and host platform tests, and was staged, hash-verified, and safely ejected on 2026-11-10. It is awaiting a physical boot check. Keyboard and pointer input were already accepted on an earlier Pi desktop image; the refreshed desktop state needs confirmation, and HDMI audio can be checked with `Beep(60);`.
 
 The follow-up [ToTheFront-fix candidate](docs/acceptance/tothefront-installer-utm-qemu-2026-11-09.json) includes the player-2 visibility correction in both its live bundle and installed disk. Its USB-CD installer, disk-only persistence and uninstrumented ToTheFront artillery workflow pass using UTM's QEMU engine. A matching Pi payload has been prepared, but neither candidate has been checked in live UTM UI or on physical Pi hardware.
 
@@ -513,10 +513,10 @@ its label in the popup, and returns with Escape to a healthy terminal; this is
 automated QEMU evidence, not a visible UTM or Pi test. JukePuppet song playback
 and audible output remain unverified ([JukeBox acceptance](docs/acceptance/jukebox-current-qemu-2026-11-10.json)). Other TOS workflows remain unverified
 ([acceptance](docs/acceptance/demo-tosmisc-current-qemu-2026-11-10.json)).
-On the exact current ISO (`f17ed84e…`), TOSMisc's helper checks and the
+On an earlier ISO (`f17ed84e…`), TOSMisc's helper checks and the
 `JukeSongsPuppet` call with a disposable one-song fixture returned cleanly to
 the terminal. The short WAV and QEMU backend warning do not prove the song
-played ([current-image check](docs/acceptance/demo-jukepuppet-exact-current-f17-2026-11-10.json)).
+played ([earlier-image check](docs/acceptance/demo-jukepuppet-exact-current-f17-2026-11-10.json)).
 The same heap-routing fix preserves the GrModels, KeepAway and Titanium QEMU
 app checks; the fresh regression log is recorded
 [here](docs/acceptance/three-d-apps-heap-fix-qemu-2026-11-10.json).
