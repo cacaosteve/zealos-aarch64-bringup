@@ -742,6 +742,38 @@ I64 StockCatalogCompileNetProgram(U8 *path)
     return result == 42;
 }
 
+I64 StockCatalogCompileWithAppLoader(U8 *load_path, U8 *app_path)
+{//Load an App's normal context, then compile a selected source in that context.
+    CTask *task = Spawn(&StockCatalogServer);
+    CJob *job;
+    U8 *source;
+    U8 *preload = "";
+    I64 result;
+
+    if (!task)
+        return -1;
+    if (StrMatch(load_path, "/Apps/ToTheFront/Load.ZC"))
+        preload = "ExeFile2(\"/System/Math/Math.ZC\");";
+    else if (StrMatch(load_path, "/Apps/X-Caliber/Load.ZC"))
+        preload = "ExeFile2(\"/Demo/AcctExample/Registry.ZC\");";
+    source = MStrPrint(
+        "%s"
+        "ExeFile2(\"%Q\");"
+        "if (!StrMatch(\"%Q\",\"%Q\")) ExeFile2(\"%Q\",CCF_JUST_LOAD);"
+        "42;",
+        preload, load_path, app_path, load_path, app_path);
+    job = TaskExe(task, Fs, source, 0);
+    Free(source);
+    if (!job)
+    {
+        Kill(task);
+        return -2;
+    }
+    result = JobResGet(job);
+    Kill(task);
+    return result == 42;
+}
+
 I64 StockCatalogCompileDocAfterLoad(U8 *load_path, U8 *app_path)
 {//Compile a DolDoc app source after its app loader has declared dependencies.
     CTask *task = Spawn(&StockCatalogServer);

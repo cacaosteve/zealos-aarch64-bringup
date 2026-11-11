@@ -1,0 +1,383 @@
+{
+  "date": "2026-11-11",
+  "repository_commit": "2354f2a66f4c6908e0e2b39188b9374b4ffac4e2",
+  "upstream_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "command": "python3 scripts/check-compat.py --pci --quick --probe-program-catalog with --program-catalog-path repeated for all 70 files under upstream/pinned/Apps/**/*.ZC",
+  "target": "UTM-bundled QEMU / PCI ARM64 graphical guest",
+  "scope": "Compile-only inventory of every pinned Apps .ZC file, using each App loader context and app-specific declarations where required. This is not runtime or visible UTM acceptance.",
+  "artifacts": {
+    "iso": "build/zealos-aarch64-hello.iso",
+    "iso_sha256": "9a0d1433529e41b2cda6c36daef7255a7afdbe40c7f4f875bb305784fc56556a",
+    "kernel": "build/kernel.elf",
+    "kernel_sha256": "261bafde12c94029ebc46064a7fc650b66b3ec98e0a9ae0f5eaf9a774d3235d9"
+  },
+  "counts": {
+    "total": 70,
+    "compiled": 70,
+    "blocked": 0
+  },
+  "normal_loads": [
+    {
+      "path": "/Apps/ToTheFront/Load.ZC",
+      "loaded": true,
+      "output": "WARN /Apps/ToTheFront/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/ToTheFront/Load.ZC:13:13 AIWN ignore's #help_index's ignored by the C side\r\nnormal_load=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/X-Caliber/Load.ZC",
+      "loaded": true,
+      "output": "WARN /Apps/X-Caliber/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/X-Caliber/Load.ZC:7:13 AIWN ignore's #help_index's ignored by the C side\r\nnormal_load=1\r\nzc: executed\r\n> "
+    }
+  ],
+  "programs": [
+    {
+      "path": "/Apps/Budget/Run.ZC",
+      "compiled": true,
+      "output": "Print(\"catalog_compile=%d\\n\", StockCatalogCompileWithAppLoader(\"/Apps/Budget/Load.ZC\",\"/Apps/Budget/Run.ZC\"));\r\nWARN /Apps/Budget/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Budget/Load.ZC:12:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Budget/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Budget/Load.ZC:12:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/GrModels/Run.ZC",
+      "compiled": true,
+      "output": "ps/GrModels/Run.ZC\"));\r\nWARN /Apps/GrModels/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/GrModels/Load.ZC:8:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/GrModels/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/GrModels/Load.ZC:8:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/KeepAway/Run.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/KeepAway/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/KeepAway/Load.ZC:6:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/KeepAway/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/KeepAway/Load.ZC:6:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/Logic/Run.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/Logic/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Logic/Load.ZC:6:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Logic/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Logic/Load.ZC:6:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/Psalmody/Run.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/Psalmody/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Psalmody/Load.ZC:12:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Psalmody/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Psalmody/Load.ZC:12:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/Span/Run.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/Span/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Span/Load.ZC:10:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Span/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Span/Load.ZC:10:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/Strut/Run.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/Strut/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Strut/Load.ZC:6:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Strut/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Strut/Load.ZC:6:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/TimeClock/Load.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/TimeClock/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/TimeClock/Load.ZC:7:13 AIWN ignore's #help_index's ignored by the C side\r\nAfter Loading, type $GREEN$PunchIn;$FG$, $GREEN$PunchOut;$FG$ or $GREEN$TimeRep;$FG$\r\nYou might want to make PLUGINS for hot keys.\r\n\r\n\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/Titanium/Run.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/Titanium/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Titanium/Load.ZC:6:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Titanium/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Titanium/Load.ZC:6:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/ToTheFront/Run.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/ToTheFront/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/ToTheFront/Load.ZC:13:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/ToTheFront/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/ToTheFront/Load.ZC:13:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/Vocabulary/Run.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/Vocabulary/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Vocabulary/Load.ZC:6:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Vocabulary/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Vocabulary/Load.ZC:6:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/X-Caliber/Run.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/X-Caliber/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/X-Caliber/Load.ZC:7:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/X-Caliber/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/X-Caliber/Load.ZC:7:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/Budget/BgtAccts.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/Budget/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Budget/Load.ZC:12:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/Budget/BgtEntry.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/Budget/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Budget/Load.ZC:12:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/Budget/BgtFile.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/Budget/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Budget/Load.ZC:12:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/Budget/BgtMain.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/Budget/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Budget/Load.ZC:12:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/Budget/BgtStrs.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/Budget/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Budget/Load.ZC:12:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/Budget/BgtTemplate.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/Budget/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Budget/Load.ZC:12:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/Budget/Budget.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/Budget/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Budget/Load.ZC:12:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/Budget/Install.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/Budget/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Budget/Load.ZC:12:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/Budget/Load.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/Budget/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Budget/Load.ZC:12:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/GrModels/BallGen.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/GrModels/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/GrModels/Load.ZC:8:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/GrModels/Load.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/GrModels/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/GrModels/Load.ZC:8:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/GrModels/ManGen.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/GrModels/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/GrModels/Load.ZC:8:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/GrModels/Models.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/GrModels/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/GrModels/Load.ZC:8:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/KeepAway/KeepAway.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/KeepAway/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/KeepAway/Load.ZC:6:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/KeepAway/Load.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/KeepAway/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/KeepAway/Load.ZC:6:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/Logic/Load.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/Logic/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Logic/Load.ZC:6:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/Logic/Logic.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/Logic/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Logic/Load.ZC:6:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/Psalmody/Examples/childish.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/Psalmody/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Psalmody/Load.ZC:12:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/Psalmody/Examples/night.ZC",
+      "compiled": true,
+      "output": "WARN /System/Sound.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:8:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:101:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:122:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:149:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:376:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Psalmody/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Psalmody/Load.ZC:12:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/Psalmody/Examples/prosper.ZC",
+      "compiled": true,
+      "output": "WARN /System/Sound.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:8:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:101:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:122:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:149:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Sound.ZC:376:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Psalmody/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Psalmody/Load.ZC:12:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/Psalmody/Install.ZC",
+      "compiled": true,
+      "output": "catalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/Psalmody/JukeBox.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/Psalmody/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Psalmody/Load.ZC:12:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/Psalmody/JukePuppet.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/Psalmody/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Psalmody/Load.ZC:12:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/Psalmody/Load.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/Psalmody/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Psalmody/Load.ZC:12:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/Psalmody/Psalmody.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/Psalmody/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Psalmody/Load.ZC:12:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/Psalmody/PsalmodyCtrls.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/Psalmody/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Psalmody/Load.ZC:12:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/Psalmody/PsalmodyDraw.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/Psalmody/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Psalmody/Load.ZC:12:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/Psalmody/PsalmodyFile.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/Psalmody/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Psalmody/Load.ZC:12:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/Psalmody/PsalmodyMain.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/Psalmody/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Psalmody/Load.ZC:12:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/Span/Install.ZC",
+      "compiled": true,
+      "output": "catalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/Span/Load.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/Span/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Span/Load.ZC:10:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/Span/SpanBridge.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/Span/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Span/Load.ZC:10:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/Span/SpanDerive.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/Span/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Span/Load.ZC:10:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/Span/SpanMain.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/Span/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Span/Load.ZC:10:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/Span/SpanNew.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/Span/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Span/Load.ZC:10:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/Strut/Load.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/Strut/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Strut/Load.ZC:6:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/Strut/Strut.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/Strut/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Strut/Load.ZC:6:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/TimeClock/Install.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/TimeClock/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/TimeClock/Load.ZC:7:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/TimeClock/TimeClk.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/TimeClock/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/TimeClock/Load.ZC:7:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/Titanium/Load.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/Titanium/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Titanium/Load.ZC:6:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/Titanium/Titanium.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/Titanium/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Titanium/Load.ZC:6:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/ToTheFront/AIs/Human.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/ToTheFront/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/ToTheFront/Load.ZC:13:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/ToTheFront/AIs/SimpleAI.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/ToTheFront/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/ToTheFront/Load.ZC:13:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/ToTheFront/Install.ZC",
+      "compiled": true,
+      "output": "catalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/ToTheFront/Load.ZC",
+      "compiled": true,
+      "output": "WARN /System/Math/Math.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Math/Math.ZC:74:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/ToTheFront/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/ToTheFront/Load.ZC:13:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/ToTheFront/TTFDraw.ZC",
+      "compiled": true,
+      "output": "WARN /System/Math/Math.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Math/Math.ZC:74:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/ToTheFront/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/ToTheFront/Load.ZC:13:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/ToTheFront/TTFFire.ZC",
+      "compiled": true,
+      "output": "WARN /System/Math/Math.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Math/Math.ZC:74:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/ToTheFront/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/ToTheFront/Load.ZC:13:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/ToTheFront/TTFGlobals.ZC",
+      "compiled": true,
+      "output": "WARN /System/Math/Math.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Math/Math.ZC:74:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/ToTheFront/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/ToTheFront/Load.ZC:13:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/ToTheFront/TTFInit.ZC",
+      "compiled": true,
+      "output": "WARN /System/Math/Math.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Math/Math.ZC:74:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/ToTheFront/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/ToTheFront/Load.ZC:13:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/ToTheFront/TTFLib.ZC",
+      "compiled": true,
+      "output": "WARN /System/Math/Math.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Math/Math.ZC:74:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/ToTheFront/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/ToTheFront/Load.ZC:13:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/ToTheFront/TTFMove.ZC",
+      "compiled": true,
+      "output": "WARN /System/Math/Math.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Math/Math.ZC:74:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/ToTheFront/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/ToTheFront/Load.ZC:13:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/ToTheFront/TTFVis.ZC",
+      "compiled": true,
+      "output": "WARN /System/Math/Math.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Math/Math.ZC:74:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/ToTheFront/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/ToTheFront/Load.ZC:13:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/ToTheFront/ToTheFront.ZC",
+      "compiled": true,
+      "output": "WARN /System/Math/Math.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /System/Math/Math.ZC:74:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/ToTheFront/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/ToTheFront/Load.ZC:13:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/Vocabulary/Load.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/Vocabulary/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Vocabulary/Load.ZC:6:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/Vocabulary/VocabQuiz.ZC",
+      "compiled": true,
+      "output": "WARN /Apps/Vocabulary/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Vocabulary/Load.ZC:6:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/X-Caliber/Load.ZC",
+      "compiled": true,
+      "output": "WARN /Demo/AcctExample/Registry.ZC:2:13 AIWN ignore's #help_index's ignored by the C side\r\nInsReg:TAD:0\r\nWARN /Demo/AcctExample/Registry.ZC:2:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/X-Caliber/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/X-Caliber/Load.ZC:7:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/X-Caliber/X-Caliber.ZC",
+      "compiled": true,
+      "output": "WARN /Demo/AcctExample/Registry.ZC:2:13 AIWN ignore's #help_index's ignored by the C side\r\nInsReg:TAD:0\r\nWARN /Demo/AcctExample/Registry.ZC:2:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/X-Caliber/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/X-Caliber/Load.ZC:7:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    },
+    {
+      "path": "/Apps/X-Caliber/XCCtrls.ZC",
+      "compiled": true,
+      "output": "WARN /Demo/AcctExample/Registry.ZC:2:13 AIWN ignore's #help_index's ignored by the C side\r\nInsReg:TAD:0\r\nWARN /Demo/AcctExample/Registry.ZC:2:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/X-Caliber/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/X-Caliber/Load.ZC:7:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+    }
+  ]
+}

@@ -27,6 +27,11 @@ The refreshed compile sweep on the current ISO (`f17ed84e…`) reproduced the
 same 193/290 result; the current-image manifest and per-file output are in
 [`program-catalog-full-qemu-current-2026-11-10.json`](docs/acceptance/program-catalog-full-qemu-current-2026-11-10.json).
 
+A complete source-level scan now covers all 70 files under `/Apps`: 70 compile
+with their normal app loader context, with zero compile blockers. This only
+confirms source compilation; individual app workflows still need runtime and
+visible UTM checks. See [the full Apps catalog](docs/acceptance/apps-source-catalog-current-utm-qemu-2026-11-11.json).
+
 After the nested RedSea allocation repair, the rebuilt ISO (`9a0d1433…`)
 passed current-image UTM-bundled QEMU runs for GrModels, KeepAway, Titanium,
 Budget, X-Caliber and ToTheFront. KeepAway completed a 186-second run with 18

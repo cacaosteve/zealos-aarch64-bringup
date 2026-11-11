@@ -9875,6 +9875,14 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 for directory in sorted((ROOT/'upstream/pinned/Apps').iterdir()):
                     entry = directory/('Run.ZC' if (directory/'Run.ZC').exists() else 'Load.ZC')
                     paths.append('/'+entry.relative_to(ROOT/'upstream/pinned').as_posix())
+                # Include every pinned App source, not only the launcher and
+                # loader. Implementation files are compiled in their App's
+                # loader context below; this is compile evidence, not runtime
+                # acceptance of every feature.
+                paths += [
+                    '/'+source.relative_to(ROOT/'upstream/pinned').as_posix()
+                    for source in sorted((ROOT/'upstream/pinned/Apps').rglob('*.ZC'))
+                ]
                 paths += ['/System/Gr/GrMath.ZC', '/System/Gr/GrPrimatives.ZC',
                           '/Demo/Graphics/Doodle.ZC', '/Demo/Graphics/Life.ZC',
                           '/Demo/Games/MassSpring.ZC']
@@ -10076,6 +10084,10 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                         '/Apps/Span/Install.ZC',
                         '/Apps/ToTheFront/Install.ZC'}:
                     compile_expr = f'StockCatalogCompile("{path}")'
+                elif path.startswith('/Apps/'):
+                    app_loader = '/'.join(path.split('/')[:3])+'/Load.ZC'
+                    compile_expr = (
+                        f'StockCatalogCompileWithAppLoader("{app_loader}","{path}")')
                 elif path == '/Home/HtmlGen.ZC':
                     compile_expr = f'StockCatalogCompileWithModules("{path}","/System/BlkDev/ZDiskB.ZC")'
                 elif path == '/Home/DoDistro.ZC':
