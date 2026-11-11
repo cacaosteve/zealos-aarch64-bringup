@@ -1,0 +1,25 @@
+{
+  "date": "2026-11-10",
+  "target": "UTM-bundled QEMU framework, HVF, one vCPU, virtio-ramfb, disposable copy-on-write PCI disk",
+  "repository_commit": "69be282e3012449b03c95dc55623fec2554e7495",
+  "upstream_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "source_sha256": {
+    "/Apps/Psalmody/JukeBox.ZC": "92c1075d9027b9b2c7ba453a7935f9b37be5ff8faae6c9e92e64f6b1981adeaf",
+    "/Apps/Psalmody/JukePuppet.ZC": "9fcfb2ebd77050c93166b14078870a0ea104ce3bd9b923f580a92fdbd909e5ae"
+  },
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "5effe8cb5a69344d078a89b758ea94571239d72ce99e5dd60d4e393e7ce5199d",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-jukebox-final.log python3 -u scripts/check-compat.py --pci --quick --probe-demo-system-context --demo-system-path /Apps/Psalmody/JukePuppet.ZC --demo-system-module /Apps/Psalmody/Load.ZC",
+  "result": "pass for the real JukeBox song menu, Escape recovery, and terminal health; JukeSongsPuppet playback remains unverified",
+  "verified": [
+    "The guest disk accepted the stock childish.ZC fixture and copied it into /Tests/JukePuppet/childish.ZC.",
+    "The fixture check found one .ZC song, confirmed its Play entry and its //9 has words document tag, and read back all 591 bytes.",
+    "The actual JukeBox('/Tests/JukePuppet') application opened its popup; the child song label was visibly rendered in the expected blue-tag/yellow-selection palette (183 matching yellow pixels in the recorded menu region).",
+    "Escape returned from the popup to the graphical terminal, which accepted 40+2 and evaluated it as 42; zstatus reported failed=0.",
+    "The source-context probe compiled /Apps/Psalmody/JukePuppet.ZC."
+  ],
+  "log": "build/check-jukebox-final.log",
+  "log_sha256": "52ea7ca1d21091d66d19f0c572079b9a94210d04ffa405bfadb5b898c33c25f6",
+  "menu_screenshot": "build/gui-catalog-demo-jukebox-open-result.ppm",
+  "scope_note": "This is automated QEMU evidence using UTM's bundled QEMU framework, not a visible UTM-window or Pi hardware check. It accepts the interactive JukeBox chooser, not actual song playback by JukeSongsPuppet or audible Psalmody output."
+}

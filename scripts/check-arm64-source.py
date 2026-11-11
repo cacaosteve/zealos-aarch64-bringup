@@ -33,7 +33,8 @@ from arm64_source import (translate_mandel_single_cpu,
                           translate_multicore_loadtest_jit,
                           translate_multicore_lock_single_cpu,
                           translate_ring3_svc)
-from arm64_source import translate_tos_config_boot_memory
+from arm64_source import (translate_tos_config_boot_memory,
+                          translate_jukepuppet_song_mask)
 from arm64_source import translate_elephant_walk_default_dc
 from arm64_source import translate_fonted_draw_callback, translate_wallpaper_compiler_stat
 
@@ -415,6 +416,18 @@ except ValueError:
     pass
 else:
     raise AssertionError('KeepAway overlay accepted changed nearest-player selection')
+jukepuppet_source = (root/'upstream/pinned/Apps/Psalmody/JukePuppet.ZC').read_bytes()
+jukepuppet_overlay = translate_jukepuppet_song_mask(jukepuppet_source)
+assert b'FilesFind("*.ZC", FUF_RECURSE | FUF_JUST_FILES)' in jukepuppet_overlay
+assert b'FUF_JUST_TXT' not in jukepuppet_overlay
+try:
+    translate_jukepuppet_song_mask(jukepuppet_source.replace(
+        b'FUF_JUST_TXT', b'FUF_JUST_DD', 1))
+except ValueError:
+    pass
+else:
+    raise AssertionError('JukePuppet overlay accepted a changed text-only song filter')
+print('PASS guarded JukePuppet enumerates ZealOS .ZC song sources', flush=True)
 xcaliber_source = (root / 'upstream/pinned/Apps/X-Caliber/X-Caliber.ZC').read_bytes()
 xcaliber_overlay = translate_xcaliber_shot_return(xcaliber_source)
 assert xcaliber_overlay != xcaliber_source

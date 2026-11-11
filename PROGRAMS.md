@@ -506,8 +506,11 @@ working compiler; the earlier failure was the synthetic root task pointing at
 an uninitialized per-fiber code heap ([acceptance](docs/acceptance/demo-tosmisc-memtest-qemu-2026-11-10.json)). The stock
 `DiskCheck('D',FALSE,FALSE)` path also returns zero on the disposable,
 explicitly mounted read-only RedSea fixture; `DiskCheckAll`, repair behavior,
-and its configured-drive workflow remain unverified. JukePuppet media playback
-and other TOS workflows remain unverified
+and its configured-drive workflow remain unverified. On the exact current ISO
+(`5effe8cb…`), the actual JukeBox application finds a stock `.ZC` song, shows
+its label in the popup, and returns with Escape to a healthy terminal; this is
+automated QEMU evidence, not a visible UTM or Pi test. JukePuppet song playback
+and audible output remain unverified ([JukeBox acceptance](docs/acceptance/jukebox-current-qemu-2026-11-10.json)). Other TOS workflows remain unverified
 ([acceptance](docs/acceptance/demo-tosmisc-current-qemu-2026-11-10.json)).
 On the exact current ISO (`f17ed84e…`), TOSMisc's helper checks and the
 `JukeSongsPuppet` call with a disposable one-song fixture returned cleanly to

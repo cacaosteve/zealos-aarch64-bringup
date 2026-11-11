@@ -3932,6 +3932,15 @@ def translate_make_tos_dependency(source: bytes) -> bytes:
     return source.replace(old, new, 1)
 
 
+def translate_jukepuppet_song_mask(source: bytes) -> bytes:
+    """Allow JukeSongsPuppet to enumerate Psalmody's .ZC song files."""
+    old = b'FilesFind("*", FUF_RECURSE | FUF_JUST_TXT | FUF_JUST_FILES)'
+    new = b'FilesFind("*.ZC", FUF_RECURSE | FUF_JUST_FILES)'
+    if source.count(old) != 1:
+        raise ValueError('pinned JukePuppet text-file filter changed')
+    return source.replace(old, new, 1)
+
+
 def translate_make_home_dependency(source: bytes) -> bytes:
     """Load MakeHome's kernel/compiler and disk helpers before MakeUtils."""
     old = (b'#include "/System/Boot/MakeBoot"\n'

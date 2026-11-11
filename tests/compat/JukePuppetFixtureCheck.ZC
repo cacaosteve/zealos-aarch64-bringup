@@ -1,0 +1,36 @@
+I64 JukePuppetFixtureCheck()
+{
+	I64			size = 0, found_play = FALSE;
+	Bool		fixture_ok;
+	U8			*bytes, *dir, *mask, *name = "", *tag = "";
+	CDirEntry	*entries;
+	CDoc		*doc;
+	CDocEntry	*line;
+
+	bytes = FileRead("/Tests/JukePuppet/childish.ZC", &size);
+	dir = StrNew("/Tests/JukePuppet");
+	mask = MStrPrint("%s/*.ZC", dir);
+	entries = FilesFind(mask);
+	Free(mask);
+	Free(dir);
+	if (entries)
+	{
+		name = entries->name;
+		found_play = FileOcc("Play(", entries->full_name, "");
+	}
+	doc = DocRead("/Tests/JukePuppet/childish.ZC");
+	line = doc->head.next;
+	while (line != doc && line->type_u8 != DOCT_TEXT)
+		line = line->next;
+	if (line != doc && line->type_u8 == DOCT_TEXT)
+		tag = line->tag;
+	fixture_ok = bytes != NULL && entries != NULL && found_play;
+	Print("juke_fixture=%d|%d|%d|%s|%d|%d|%s\n",
+		bytes != NULL, size, entries != NULL, name, found_play,
+		line != doc && line->type_u8 == DOCT_TEXT,
+		tag);
+	Free(bytes);
+	DocDel(doc);
+	DirTreeDel(entries);
+	return fixture_ok;
+}

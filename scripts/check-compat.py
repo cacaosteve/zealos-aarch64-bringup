@@ -2744,11 +2744,9 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 })
             if (all(m['loaded'] for m in module_loads) and
                     '/Apps/Psalmody/Load.ZC' in args.demo_system_module):
-                # Run the stock JukeSongsPuppet against the bundled one-song
-                # example. zrecv stages it on the disposable COW disk because
+                # Stage one stock Psalmody song on the disposable COW disk.
                 # FilesFind enumerates the guest filesystem, not the read-only
-                # source partition. The probe verifies the chooser/task path
-                # without touching any user media.
+                # source partition, so the fixture must be copied there.
                 song_fixture = (ROOT/'upstream/pinned/Apps/Psalmody/Examples/childish.ZC').read_bytes()
                 uploaded = upload_source('JukePuppetProbe.ZC', song_fixture)
                 if 'zrecv: saved JukePuppetProbe.ZC' not in uploaded:
@@ -2759,36 +2757,53 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     'zc DirMake("/Tests/JukePuppet"); '
                     'Copy("/JukePuppetProbe.ZC","/Tests/JukePuppet/childish.ZC");',
                     'zc: executed')
-                run_graphical_terminal_command(
-                    'demo-juke-puppet-ready', '40+2;', 'ans=0x2A=42')
-                try:
-                    run_graphical_terminal_command(
-                        'demo-juke-puppet-run',
-                        'JukeSongsPuppet("/Tests/JukePuppet",1,0,1); '
-                        'Print("juke-puppet-done\\n");',
-                        'juke-puppet-done', timeout=60)
-                except RuntimeError as exc:
-                    # The serial shell is independent of the GUI terminal.
-                    # Capture guest-side task/window diagnostics before the
-                    # harness tears down its disposable VM on a GUI timeout.
-                    try:
-                        status = command('zstatus', None, timeout=8)
-                    except Exception as status_exc:
-                        status = f'zstatus unavailable: {status_exc}'
+                fixture_probe = (ROOT/'tests/compat/JukePuppetFixtureCheck.ZC').read_bytes()
+                uploaded = upload_source('JukePuppetFixtureCheck.ZC', fixture_probe)
+                if 'zrecv: saved JukePuppetFixtureCheck.ZC' not in uploaded:
                     raise RuntimeError(
-                        f'{exc}\npost-timeout guest zstatus:\n{status}') from exc
+                        'JukePuppet fixture checker was not uploaded to the disposable disk:\n'
+                        + uploaded)
+                command('zload disk:JukePuppetFixtureCheck.ZC',
+                        'zc: loaded disk:JukePuppetFixtureCheck.ZC', timeout=30)
+                fixture_check = command(
+                    'zcall JukePuppetFixtureCheck',
+                    'juke_fixture=1|591|1|childish.ZC|1|1|//9 has words',
+                    timeout=30)
+                if ('juke_fixture=1|591|1|childish.ZC|1|1|//9 has words'
+                        not in fixture_check):
+                    raise RuntimeError(
+                        'JukeBox fixture does not pass its exact dynamic mask and song checks:\n'
+                        + fixture_check)
+                jukebox_screen = run_graphical_terminal_command(
+                    'demo-jukebox-open',
+                    'JukeBox("/Tests/JukePuppet"); '
+                    'Print("juke-box-done\\n");',
+                    'DONE', timeout=20)
+                if rgb_pixels_in(jukebox_screen, (255, 255, 85),
+                                 (0, 54, 120, 68)) < 20:
+                    raise RuntimeError(
+                        'JukeBox did not visibly render the selected song; '
+                        f'see {graphical_path("demo-jukebox-open-result")}')
+                qmp_send_key('esc')
+                require_graphical_text(
+                    'demo-jukebox-return', 'juke-box-done', timeout=10)
                 run_graphical_terminal_command(
-                    'demo-juke-puppet-terminal-recovery', '40+2;',
+                    'demo-jukebox-graphical-fixture',
+                    'zcall JukePuppetFixtureCheck',
+                    'juke_fixture=1|591|1|childish.ZC|1|1|//9 has',
+                    timeout=30)
+                run_graphical_terminal_command(
+                    'demo-jukebox-terminal-recovery', '40+2;',
                     'ans=0x2A=42', timeout=30)
                 output = command('zstatus', 'failed=0')
                 runtime_checks.append({
-                    'name': 'JukeSongsPuppet selects and runs the bundled childish song, then returns control to the terminal',
+                    'name': 'JukeBox lists a real .ZC song fixture in its popup and Escape returns to the graphical terminal',
                     'passed': 'failed=0' in output,
                     'output': output,
                 })
                 if 'failed=0' not in output:
                     raise RuntimeError(
-                        'JukeSongsPuppet did not leave the guest compiler healthy:\n'
+                        'JukeBox did not leave the guest compiler healthy:\n'
                         + output)
             if (all(m['loaded'] for m in module_loads) and
                     '/Demo/WebLogDemo/WebLogScramble.ZC' in args.demo_system_module):
