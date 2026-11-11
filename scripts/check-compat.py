@@ -2412,6 +2412,12 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                                      'output': output})
                 if not loaded:
                     break
+            failed_modules = [m for m in module_loads if not m['loaded']]
+            if failed_modules:
+                details = '\n'.join(
+                    f"{m['path']}: {m['output']}" for m in failed_modules)
+                raise RuntimeError(
+                    'requested demo system module failed to load:\n' + details)
             if args.probe_task_caller_frames:
                 command(
                     'zc U0 TCCallerLoop(U8 *data){while(TRUE)Sleep(1);}',

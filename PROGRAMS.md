@@ -510,9 +510,13 @@ arenas through their expected 16 MiB reserve thresholds, then returns to a
 working compiler; the earlier failure was the synthetic root task pointing at
 an uninitialized per-fiber code heap ([acceptance](docs/acceptance/demo-tosmisc-memtest-qemu-2026-11-10.json)). The stock
 `DiskCheck('D',FALSE,FALSE)` path also returns zero on the disposable,
-explicitly mounted read-only RedSea fixture; `DiskCheckAll`, repair behavior,
-and its configured-drive workflow remain unverified. On the current ISO
-(`923ae07d…`), the ARM64 `JukeSongsPuppet` adapter now launches stock `.ZC`
+explicitly mounted read-only RedSea fixture. A rerun on current ISO `0e816d41…`
+passes the TOSMisc checks, MemTest, and stock plus looping-fixture
+`JukeSongsPuppet` paths; the terminal recovers and `zstatus` reports no failed
+tasks. The module-context harness now fails explicitly if a requested module
+does not load. See the [current TOSMisc check](docs/acceptance/tosmisc-current-song-memory-qemu-2026-11-11.json).
+`DiskCheckAll`, repair behavior, and its configured-drive workflow remain
+unverified. The ARM64 `JukeSongsPuppet` adapter launches stock `.ZC`
 songs directly through JukeBox's `SingleSong` path. The QEMU regression
 returned from both the stock song and a looping Beep fixture; the fixture wrote
 markers before and after entering `Song`, the graphical terminal recovered,
