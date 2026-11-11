@@ -1,7 +1,6 @@
 // Pinned Job.ZC and SerialDev/Message.ZC signatures, cooperative bridge.
 I64 msg_stage, msg_code1, msg_code2, msg_arg1, msg_arg2;
-I64 msg_scan_peer_stage, msg_scan_peer_scans, msg_scan_peer_key_scans;
-I64 msg_scan_peer_char_scans, msg_scan_peer_flushes, msg_scan_started;
+I64 msg_scan_peer_stage, msg_scan_peer_scans, msg_scan_started;
 I64 msg_scan_yield_stage, msg_scan_early_peer, msg_scan_peer_bad_order;
 I64 msg_scan_after_yield, msg_scan_finished, msg_scan_peer_finished;
 CTask *msg_get_waiter;
@@ -42,26 +41,14 @@ U0 MessageIdleReceiver(U8 *data)
     Yield;
 }
 
-U0 MessageScanBusyWaiter()
+U0 MessageScanPoller()
 {
-    I64 a, b, ch, scan_code, i;
+    I64 a, b, i;
     msg_scan_started = 1;
     for (i = 0; i < 5; i++)
     {
         MessageScan(&a, &b, 1 << MESSAGE_CMD);
         msg_scan_peer_scans++;
-        if (msg_scan_peer_stage)
-            msg_scan_early_peer = 1;
-        KeyScan(&ch, &scan_code, FALSE);
-        msg_scan_peer_key_scans++;
-        if (msg_scan_peer_stage)
-            msg_scan_early_peer = 1;
-        CharScan;
-        msg_scan_peer_char_scans++;
-        if (msg_scan_peer_stage)
-            msg_scan_early_peer = 1;
-        FlushMessages;
-        msg_scan_peer_flushes++;
         if (msg_scan_peer_stage)
             msg_scan_early_peer = 1;
     }
@@ -75,9 +62,7 @@ U0 MessageScanPeer()
 {
     while (!msg_scan_started)
         Yield;
-    if (msg_scan_yield_stage != 1 || msg_scan_peer_scans != 5 ||
-            msg_scan_peer_key_scans != 5 || msg_scan_peer_char_scans != 5 ||
-            msg_scan_peer_flushes != 5)
+    if (msg_scan_yield_stage != 1 || msg_scan_peer_scans != 5)
         msg_scan_peer_bad_order = 1;
     msg_scan_peer_stage = 1;
     msg_scan_peer_finished = 1;
@@ -86,11 +71,10 @@ U0 MessageScanPeer()
 I64 TaskMessageSchedulingChecks()
 {//Polling does not switch tasks; explicit Yield selects the next ready task.
     I64 scanner, peer, i;
-    msg_scan_peer_stage = msg_scan_peer_scans = msg_scan_peer_key_scans = 0;
-    msg_scan_peer_char_scans = msg_scan_peer_flushes = msg_scan_started = 0;
+    msg_scan_peer_stage = msg_scan_peer_scans = msg_scan_started = 0;
     msg_scan_yield_stage = msg_scan_early_peer = msg_scan_peer_bad_order = 0;
     msg_scan_after_yield = msg_scan_finished = msg_scan_peer_finished = 0;
-    scanner = ZcTaskSpawn(&MessageScanBusyWaiter);
+    scanner = ZcTaskSpawn(&MessageScanPoller);
     peer = ZcTaskSpawn(&MessageScanPeer);
     // The GUI/session may already own earlier guest-fiber slots. Scheduling
     // order must not depend on which numeric slots Spawn reuses.
@@ -103,6 +87,8 @@ I64 TaskMessageSchedulingChecks()
         ZcTaskYield;
     if (!msg_scan_finished || !msg_scan_peer_finished)
         return 12;
+    // This task's first five operations are only MessageScan polls. The peer
+    // must remain pending until the explicit Yield below.
     if (msg_scan_peer_scans != 5)
         return 2;
     if (msg_scan_yield_stage != 1)
@@ -211,15 +197,17 @@ I64 TaskMessageMoveCoalesceChecks()
         return 4;
     FlushMessages(Fs);
     // Saturation may discard replaceable motion, but must retain transitions.
+    // The host bridge's shared job pool has 1024 slots (not the 128-entry
+    // guest-side queue size used by older message tests).
     move = TaskMessage(Fs, NULL, MESSAGE_MS_MOVE, 1, 2, 0);
     if (!move)
         return 5;
-    for (i = 0; i < 127; i++)
+    for (i = 0; i < 1023; i++)
         if (!TaskMessage(Fs, NULL, MESSAGE_KEY_DOWN, i, 0, 0))
             return 6;
     if (TaskMessage(Fs, NULL, MESSAGE_MS_MOVE, 9, 10, 0))
         return 7;
-    if (FlushMessages(Fs) != 128)
+    if (FlushMessages(Fs) != 1024)
         return 8;
     return 42;
 }

@@ -1,0 +1,35 @@
+{
+  "date": "2026-11-11",
+  "repository_commit_before_test": "a036993f3b9c81bd7082ab80c57e650bea2dd6a8",
+  "upstream_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "target": "UTM-bundled QEMU framework, HVF, PCI ARM64 graphical guest, 1 vCPU, 1 GiB RAM, VirtIO keyboard/tablet",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "93cb3d3eec000a3b482922d17bcdb37077b42650ff2ddb5e34650f4495b37149",
+  "source": "tests/compat/TaskMessages.ZC",
+  "source_sha256": "9c4c47bf676c8733e502914908164cb99726b0ed599b55453403db805e6f8958",
+  "scheduler_probe": {
+    "exit_code": 0,
+    "result": "pass",
+    "checks": [
+      "Five consecutive MessageScan polls do not run the peer task; explicit Yield selects the next ready peer.",
+      "MessageGet waiting for a matching command yields to a ready peer, receives its posted command and resumes.",
+      "Move coalescing, event-order barriers, and saturated-pool motion dropping pass against the bridge's 1024-slot shared job pool.",
+      "TaskMessageRequestedChecks returned 0x2a. The probe loaded the modified source from a disposable disk overlay; the ISO itself was not rebuilt for this source-only regression."
+    ],
+    "log": "build/check-task-messages-focused-2026-11-11.log",
+    "log_sha256": "08843ccccfedd349c603ac6378d7c1b0e98cb06305e7b4e34eb09ed5543536ce"
+  },
+  "xcaliber_probe": {
+    "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' python3 -u scripts/check-compat.py --pci --quick --probe-xcaliber",
+    "exit_code": 0,
+    "result": "pass",
+    "checks": [
+      "Plain Right and Left each changed the player ship in scanout.",
+      "Space projectile appeared in scanout.",
+      "Escape returned to the graphical terminal, which accepted and executed 40+7 as 47."
+    ],
+    "log": "build/check-xcaliber-after-message-poll-2026-11-11.log",
+    "log_sha256": "1d6ec5346f38311884e0f6b8c7525050818ae9cb1bba9ec7d752c3fce099f0e5"
+  },
+  "scope_note": "This verifies the cooperative host task/message bridge, not the pinned upstream Sched.ZC as the active runtime scheduler. QEMU acceptance does not establish visible UTM-app behavior, multi-CPU scheduling, or physical Pi behavior."
+}
