@@ -2339,7 +2339,7 @@ CDirEntry *FilesFind(U8 *files_find_mask, I64 fuf_flags=0)
     U8 *remainder, *slash, *end, *mask_dir = NULL, *mask_leaf;
     U8 *absolute_dir = NULL, *root_dir = NULL;
     I64 index = 0, size, cur_len, i, j, file_len, dir_len;
-    Bool recurse, added;
+    Bool recurse, added, disk_only = FALSE;
 
     if (!files_find_mask || !*files_find_mask ||
         ((fuf_flags & FUF_JUST_DIRS) && (fuf_flags & FUF_JUST_FILES)))
@@ -2390,7 +2390,10 @@ CDirEntry *FilesFind(U8 *files_find_mask, I64 fuf_flags=0)
             if (absolute_path[0] == 'd' && absolute_path[1] == 'i' &&
                 absolute_path[2] == 's' && absolute_path[3] == 'k' &&
                 absolute_path[4] == ':')
+            {
+                disk_only = TRUE;
                 absolute_path += 5;
+            }
             for (i = 0; absolute_path[i] && i < sizeof(cur_dir) - 1; i++)
                 cur_dir[i] = absolute_path[i];
             cur_dir[i] = 0;
@@ -2402,7 +2405,7 @@ CDirEntry *FilesFind(U8 *files_find_mask, I64 fuf_flags=0)
     while (cur_len > 1 && cur_dir[cur_len - 1] == '/')
         cur_dir[--cur_len] = 0;
     recurse = fuf_flags & FUF_RECURSE;
-    while (ZcSourceFileAt(index++, path, sizeof(path), &size))
+    while (!disk_only && ZcSourceFileAt(index++, path, sizeof(path), &size))
     {
         added = FALSE;
         file_len = StrLen(path);

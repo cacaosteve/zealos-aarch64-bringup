@@ -8775,6 +8775,10 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                         command('zc CDirEntry *rs_found=FilesFind("disk:/NEST/INNER.ZC",FUF_JUST_FILES); '
                                 'Print("rs_find_ok=%d\\n",rs_found!=NULL); DirTreeDel(rs_found);',
                                 'rs_find_ok=1')
+                        command('zc CDirEntry *rs_source_leak=FilesFind("disk:/System/InFile.ZC",FUF_JUST_FILES); '
+                                'Print("rs_find_isolated=%d\\n",rs_source_leak==NULL); '
+                                'DirTreeDel(rs_source_leak);',
+                                'rs_find_isolated=1')
                         command('zc Print("rs_dirs_ok=%d\\n", '
                                 'ZcSourceDirExists("disk:/EMPTYDIR") && '
                                 'ZcSourceDirExists("disk:/nest") && '
