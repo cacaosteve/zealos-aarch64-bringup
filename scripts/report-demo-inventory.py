@@ -317,7 +317,7 @@ RUNTIME_PARTIAL = {
     "/Demo/AcctExample/TOS/TOSMisc.ZC":
         "docs/acceptance/demo-tosmisc-current-qemu-2026-11-10.json",
     "/Demo/AcctExample/TOS/TOSDistro.ZC":
-        "docs/acceptance/demo-tosdistro-safe-load-qemu-2026-11-09.json",
+        "docs/acceptance/demo-tosdistro-std-build-qemu-2026-11-10.json",
     "/Demo/MultiCore/MPRadix.ZC":
         "docs/acceptance/demo-mpradix-current-qemu-2026-11-10.json",
     "/Demo/MultiCore/Lock.ZC":

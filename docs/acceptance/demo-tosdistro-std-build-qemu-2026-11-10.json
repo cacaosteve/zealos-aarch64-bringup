@@ -1,0 +1,29 @@
+{
+  "date": "2026-11-10",
+  "repository_commit": "afeff99bbdadcd67ab894375e0286baad225ee4f",
+  "working_tree_changes_included": true,
+  "upstream_source_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "target": "AArch64 native ZealC in PCI QEMU guest",
+  "source": "/Demo/AcctExample/TOS/TOSDistro.ZC",
+  "source_sha256": "4ffbd1877c58bdd11aeb8de69785a35fa7065f3ff25cf97db86bc2e49c2de94e",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "b5682ca299f6709d456e82e69cce5ee565a3efb043b413b668233cda6afbdd68",
+  "kernel_sha256": "cfa2202f654a4d5d76768c957384b93a50e34a58fd2ecc6793c43d47bf9276cd",
+  "command": "python3 scripts/check-compat.py --pci --quick --probe-demo-tos-distro-std",
+  "test_harness_sha256": "7220752b37e14dfc9140c3d2fcbf946f400fcac7f1a3808d3da58d5e4c6c0ffe",
+  "exit_code": 1,
+  "result": "partial: stock module initialization passes; standard distro build is blocked by an unresolved Drive API",
+  "checks": [
+    "QEMU boot and graphical terminal initialization passed.",
+    "MakeHome.ZC and MakeTOS.ZC loaded successfully; TOS_HDS was \"CD\".",
+    "TOSDistro.ZC top-level initialization executed successfully.",
+    "The probe compiled a wrapper for MakeStdDistro and began execution.",
+    "The full build stopped at StdDistroPrep+0x24: unresolved external symbol Drive.",
+    "The unresolved call happened before any format, erase, copy, or ISO-generation operation.",
+    "The run used the PCI QEMU harness with its disposable temporary disk clone; no host/removable volume was exposed to the guest."
+  ],
+  "failure_evidence": "zc: unresolved symbol=Drive; zc: unresolved external call from StdDistroPrep+0x24",
+  "log": "build/check-tos-distro-std-current.log",
+  "log_sha256": "d8c00009552557e6499ac0cf62b3033bec2c0917ed8deee8a8a7e3262583a39b",
+  "scope_note": "The demo is compiled and its module initialization works, but full standard distribution regeneration does not. This ARM64 runtime lacks the stock Drive binding and likely needs a broader writable multi-volume/block-device integration before the destructive stock distro path can be supported. No successful distro ISO was produced."
+}

@@ -183,6 +183,8 @@ p.add_argument('--probe-demo-serialize-tree', action='store_true',
                help='run SerializeTree and verify serialization/rebuild output and terminal recovery')
 p.add_argument('--probe-demo-makehome', action='store_true',
                help='run MakeHome stock module loader and verify terminal recovery')
+p.add_argument('--probe-demo-tos-distro-std', action='store_true',
+               help='run the full standard TOS distro build in a disposable PCI QEMU guest')
 p.add_argument('--probe-demo-define', action='store_true',
                help='run the interactive Define demo and verify localized prompts/recovery')
 p.add_argument('--probe-demo-compiledemo', action='store_true',
@@ -571,6 +573,12 @@ p.add_argument('--probe-source-kernel', action='store_true',
 p.add_argument('--probe-source-fast', action='store_true',
                help='after boot/framebuffer checks, run source probes before the longer PCI suite')
 args = p.parse_args()
+if args.probe_demo_tos_distro_std:
+    # This path executes stock format/copy routines. Force the PCI harness,
+    # which clones build/disk.img into its private temporary directory before
+    # booting, so no host or removable volume can be modified.
+    args.pci = True
+    args.probe_demo_makehome = True
 if args.probe_budget_template_edit:
     args.probe_budget_template_ui = True
 if args.probe_budget_template_ui:
@@ -7320,6 +7328,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     not args.probe_demo_inpopup and
                     not args.probe_demo_serialize_tree and
                     not args.probe_demo_makehome and
+                    not args.probe_demo_tos_distro_std and
                     not args.probe_demo_define and
                     not args.probe_demo_compiledemo and
                     not args.probe_demo_directives and
@@ -9466,7 +9475,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                       'terminal recovery', flush=True)
                 raise SystemExit(0)
 
-            if args.probe_demo_makehome:
+            if args.probe_demo_makehome or args.probe_demo_tos_distro_std:
                 command('zload /Demo/AcctExample/MakeHome.ZC',
                         'zc: loaded /Demo/AcctExample/MakeHome.ZC', timeout=180)
                 command('zload /Demo/AcctExample/TOS/MakeTOS.ZC',
@@ -9478,10 +9487,26 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 # explicit functions and must not be invoked by this probe.
                 command('zc ExeFile2("/Demo/AcctExample/TOS/TOSDistro.ZC");',
                         'zc: executed', timeout=180)
+                if args.probe_demo_tos_distro_std:
+                    # MakeStdDistro intentionally runs the real source copy,
+                    # RedSea format and ISO-generation path. The test's C
+                    # source volume is the temporary PCI disk clone; B is the
+                    # guest RAM drive, so Format/Cleanup cannot touch host data.
+                    command('zc I64 TOSStdDistroBuild(){MakeStdDistro;if(Size(TOS_ISO_NAME,"+s")>1048576)return 42;return 0;}',
+                            'zc: executed', timeout=180)
+                    command('zcall TOSStdDistroBuild',
+                            'zc => 0x000000000000002a', timeout=600)
+                    command('zc Print("tos-std-distro-bytes=%d\\n",Size(TOS_ISO_NAME,"+s"));',
+                            'tos-std-distro-bytes=', timeout=60)
                 run_graphical_terminal_command(
                     'demo-makehome-terminal-recovery', '40+2;',
-                    'ans=0x2A=42', timeout=30)
+                    'ans=0x2A=42', timeout=60)
                 command('zstatus', 'failed=0')
+                if args.probe_demo_tos_distro_std:
+                    print('PASS TOSDistro built a nonempty standard RedSea ISO '
+                          'on the guest RAM drive; terminal recovery and failed=0',
+                          flush=True)
+                    raise SystemExit(0)
                 print('PASS MakeHome and MakeTOS loaded their stock module sets; '
                       'TOSDistro executed its non-destructive initialization; '
                       'terminal recovery and failed=0', flush=True)

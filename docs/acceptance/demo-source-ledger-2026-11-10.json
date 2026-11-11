@@ -172,7 +172,7 @@
     "docs/acceptance/diskraw-readonly-qemu-2026-11-09.json",
     "docs/acceptance/demo-lock-single-cpu-current-qemu-2026-11-10.json",
     "docs/acceptance/demo-mpradix-current-qemu-2026-11-10.json",
-    "docs/acceptance/demo-tosdistro-safe-load-qemu-2026-11-09.json",
+    "docs/acceptance/demo-tosdistro-std-build-qemu-2026-11-10.json",
     "docs/acceptance/demo-tosmisc-current-qemu-2026-11-10.json"
   ],
   "source_count": 206,
@@ -382,7 +382,7 @@
       "compile": "pass",
       "first_compile_error": null,
       "runtime": "partial",
-      "runtime_evidence": "docs/acceptance/demo-tosdistro-safe-load-qemu-2026-11-09.json"
+      "runtime_evidence": "docs/acceptance/demo-tosdistro-std-build-qemu-2026-11-10.json"
     },
     {
       "path": "/Demo/AcctExample/TOS/TOSExtern.ZC",
