@@ -1,0 +1,23 @@
+{
+  "date": "2026-11-11",
+  "target": "AArch64 PCI QEMU, one guest CPU, rebuilt current desktop ISO",
+  "source": "/Apps/KeepAway/Run.ZC",
+  "source_sha256": "f9649e95680f0cb91bb91c7ee5b43bd54d48ec287ddce6b2b38d4425f8535ceb",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "64a57f66dc2d1ef3232f06c8472360fde75af65da4f84abee398730c3d07a760",
+  "kernel_sha256": "c211b0ecb262d8aae9ee9656de819fdd4c13466c0e57d7b3bcd2963dfb29be4a",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-keepaway-current-2026-11-11.log python3 -u scripts/check-compat.py --pci --quick --probe-3d-apps --probe-keepaway-full-game",
+  "result": "pass: current image launched KeepAway, rendered its court/HUD/players, accepted mouse and Space input, completed the full timed game, and Escape restored the terminal with no surviving Animate task; final zstatus reported failed=0",
+  "verified": [
+    "Current ISO compiled and ran the 3D service, mesh, interpolation and height regression fixtures.",
+    "Current ISO compiled the GrModels, KeepAway and Titanium app entry points.",
+    "KeepAway court, HUD and player frame rendered.",
+    "Space and mouse input updated the game frame.",
+    "The full-game probe completed after 186 seconds with 18 repeated input cycles.",
+    "Escape restored terminal focus, the app's Animate task was absent, and zstatus reported failed=0."
+  ],
+  "log": "build/check-keepaway-current-2026-11-11.log",
+  "log_sha256": "f88987b05b82487ab99d271c22b57606f6abfbe2b5c3fb42311371f8de56468e",
+  "live_utm": "Still needs retest. QEMU pass does not resolve the user's earlier report that KeepAway froze in UTM.",
+  "scope_note": "Current-image one-vCPU QEMU runtime acceptance only. It does not establish live UTM or physical Pi behavior."
+}

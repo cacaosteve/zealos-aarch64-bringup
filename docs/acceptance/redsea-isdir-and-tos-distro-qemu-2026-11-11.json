@@ -1,0 +1,30 @@
+{
+  "date": "2026-11-11",
+  "repository_commit": "cdc53dec9a990dac7e629026e29ce3b9d7817601",
+  "working_tree_changes_included": true,
+  "target": "AArch64 native ZealC in PCI QEMU guest",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "64a57f66dc2d1ef3232f06c8472360fde75af65da4f84abee398730c3d07a760",
+  "changes": [
+    "Added an ARM64 IsDir bridge over source-tree and explicitly mounted read-only RedSea directories.",
+    "Added a regression for source roots, ordinary directories, empty RedSea directories, drive aliases, trailing slashes, file paths and missing paths."
+  ],
+  "redsea_isdir_probe": {
+    "command": "QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device' python3 scripts/check-compat.py --pci --quick --probe-stock-redsea-file",
+    "result": "pass: RedSea file and IsDir cases passed, source-store compaction completed, empty-file persistence and deleted-path behavior survived cold reboot, and final zstatus reported failed=0",
+    "marker": "rs_isdir_ok=1",
+    "zgc": "zgc: OK sectors=14316->14302 records=890 bank=B",
+    "host_compaction": "compacted 889 files, retained 1 deleted path, 14302 -> 14302/65536 sectors used",
+    "log": "build/check-demo-dol-doc-pci.log",
+    "log_sha256": "4098a3ad36e3d6c6a92c32137a57bc76e7fae9f00623e9c040aa0a81641cf6b9",
+    "note": "The current run used the system QEMU PCI guest. The single-pass latest-record catalog optimization allowed full compaction to complete."
+  },
+  "tos_standard_distro_probe": {
+    "command": "python3 -u scripts/check-compat.py --pci --probe-demo-tos-distro-std",
+    "result": "blocked: MakeStdDistro executes through module initialization, then Drive('C') throws because the ARM64 bridge does not register the stock writable C: source drive or RAM B: drive. The exception occurs before formatting, copying, or ISO creation.",
+    "failure_evidence": "zc: uncaught guest exception 0x0000006576697244",
+    "log": "build/check-demo-tos-distro-std-current.log",
+    "log_sha256": "0d0742a231ec7182f01263a17a5a9c099d8eea468c16dac5e7cb6c0256c2c7cf"
+  },
+  "limits": "This does not constitute full RedSea disk, writable drive, RAM drive, TOS distro, or all-program acceptance. No physical card or host volume was modified. The ISO file SHA is above; the working-tree changes are not committed."
+}

@@ -3820,20 +3820,20 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             qmp_send_key('esc')
             time.sleep(0.3)
             # Lock finishes too quickly to inspect its separate app window;
-            # run it in the visible terminal so both output rows persist on
-            # scanout for a meaningful user-facing acceptance check.
+            # run it in the visible terminal and verify both result rows there.
             lock_result = run_graphical_terminal_command(
                 'demo-lock-result', 'ExeFile2("/Demo/MultiCore/Lock.ZC");',
                 'Correct Count:2000000 Actual Count:2000000', timeout=180)
-            if lock_result[3].count(
-                    'Correct Count:2000000 Actual Count:2000000') < 2:
+            visible_rows = lock_result[3].count(
+                'Correct Count:2000000 Actual Count:2000000')
+            if visible_rows < 2:
                 try:
                     status = command('zstatus', None, timeout=8)
                 except Exception as exc:
                     status = f'zstatus unavailable: {exc}'
-                raise RuntimeError('Lock did not visibly report both unlocked and '
-                    'locked results; see ' + str(
+                raise RuntimeError('Lock did not visibly report both results; see ' + str(
                         graphical_path('demo-lock-result-result'))
+                    + f'\nvisible_rows={visible_rows}'
                     + '\n' + lock_result[3] + '\npost-timeout zstatus:\n' + status)
             run_graphical_terminal_command(
                 'demo-lock-terminal-recovery', '40+2;', 'ans=0x2A=42', timeout=60)
@@ -4653,14 +4653,11 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     qmp_send_keys(['ctrl', 'o'])
                     chooser = require_graphical_text('span-open-dialog', 'Game.DATA', timeout=30,
                                                     foreground_threshold=80000)
-                    for row_index, line in enumerate(chooser[3].splitlines()):
-                        if 'Game.DATA' in line:
-                            move_graphical_pointer(line.index('Game.DATA') * 8 + 12, row_index * 8 + 5)
-                            break
-                    time.sleep(.3)
-                    graphical_mouse_button('left', True)
-                    time.sleep(.15)
-                    graphical_mouse_button('left', False)
+                    # PopUpPickFile opens with ~/Span selected. Use the tree's
+                    # keyboard order (.DIR, then Game.DATA) so the test does
+                    # not depend on window geometry or pointer-to-cell scaling.
+                    qmp_send_key('down')
+                    qmp_send_key('down')
                     qmp_send_key('esc')
                     move_graphical_pointer(700, 500)
                     deadline = time.monotonic() + 20
@@ -4725,14 +4722,10 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     qmp_send_keys(['ctrl', 'o'])
                     chooser = require_graphical_text('span-cold-open', 'Game.DATA', timeout=30,
                                                     foreground_threshold=80000)
-                    for row_index, line in enumerate(chooser[3].splitlines()):
-                        if 'Game.DATA' in line:
-                            move_graphical_pointer(line.index('Game.DATA') * 8 + 12, row_index * 8 + 5)
-                            break
-                    time.sleep(.3)
-                    graphical_mouse_button('left', True)
-                    time.sleep(.15)
-                    graphical_mouse_button('left', False)
+                    # PopUpPickFile opens with ~/Span selected; move to
+                    # Game.DATA through the directory tree with the keyboard.
+                    qmp_send_key('down')
+                    qmp_send_key('down')
                     qmp_send_key('esc')
                     move_graphical_pointer(700, 500)
                     deadline = time.monotonic() + 20
@@ -8781,6 +8774,12 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                                 'rs_find_isolated=1')
                         command('zc Print("rs_mount_ok=%d\\n",ZcMountLegacyRedSeaReadOnly);',
                                 'rs_mount_ok=1')
+                        command('zc Print("rs_isdir_ok=%d\\n", '
+                                'IsDir("D:/NEST") && IsDir("D:/EMPTYDIR") && '
+                                'IsDir("disk:/NEST/") && !IsDir("D:/NEST/INNER.ZC") && '
+                                '!IsDir("D:/MISSING") && IsDir("/System") && '
+                                '!IsDir("/NO_SUCH_DIRECTORY"));',
+                                'rs_isdir_ok=1')
                         command('zc CDirEntry *rs_drive_found=FilesFind("D:/NEST/INNER.ZC",FUF_JUST_FILES); '
                                 'Print("rs_drive_find_ok=%d\\n",rs_drive_found!=NULL); '
                                 'DirTreeDel(rs_drive_found);',
@@ -9617,10 +9616,11 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 command('zc ExeFile2("/Demo/AcctExample/TOS/TOSDistro.ZC");',
                         'zc: executed', timeout=180)
                 if args.probe_demo_tos_distro_std:
-                    # MakeStdDistro intentionally runs the real source copy,
-                    # RedSea format and ISO-generation path. The test's C
-                    # source volume is the temporary PCI disk clone; B is the
-                    # guest RAM drive, so Format/Cleanup cannot touch host data.
+                    # Blocker reproducer: the current ARM64 bridge exposes the
+                    # source store and optional read-only RedSea D: fixture,
+                    # but does not register stock C: or RAM B: drives. The
+                    # first Drive('C') therefore faults before any format,
+                    # erase, copy, or ISO-generation operation can run.
                     command('zc I64 TOSStdDistroBuild(){MakeStdDistro;if(Size(TOS_ISO_NAME,"+s")>1048576)return 42;return 0;}',
                             'zc: executed', timeout=180)
                     command('zcall TOSStdDistroBuild',

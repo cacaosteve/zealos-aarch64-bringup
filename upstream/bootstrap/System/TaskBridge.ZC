@@ -2551,6 +2551,7 @@ CDirEntry *FilesFind(U8 *files_find_mask, I64 fuf_flags=0)
         Free(mask_leaf);
     return head;
 }
+
 U0 DirTreeDel(CDirEntry *entry)
 {
     CDirEntry *next;
@@ -2563,6 +2564,34 @@ U0 DirTreeDel(CDirEntry *entry)
         Free(entry);
         entry = next;
     }
+}
+public Bool IsDir(U8 *dir_name)
+{// Match stock IsDir for source files and the mounted read-only RedSea drive.
+    U8 *name;
+    I64 length;
+    CDirEntry *entry;
+    Bool result;
+
+    if (!dir_name || !*dir_name)
+        return FALSE;
+    name = StrNew(dir_name);
+    length = StrLen(name);
+    while (length > 1 && name[length - 1] == '/' &&
+           !(length == 3 && name[1] == ':'))
+        name[--length] = 0;
+    if (!StrCompare(name, "/"))
+        result = TRUE;
+    else if (!StrCompare(name, "D:/") || !StrCompare(name, "d:/") ||
+             !StrCompare(name, "disk:/"))
+        result = zc_legacy_redsea_drive.drive_signature == DRIVE_SIGNATURE_VAL;
+    else
+    {
+        entry = FilesFind(name, FUF_JUST_DIRS | FUF_SINGLE);
+        result = entry != NULL;
+        DirTreeDel(entry);
+    }
+    Free(name);
+    return result;
 }
 CDirEntry *Cd2DirEntry(CDirEntry *entry, U8 *abs_name)
 {

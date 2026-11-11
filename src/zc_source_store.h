@@ -9,6 +9,10 @@
 #define ZSS_MAX_FILE (8u * 1024u * 1024u)
 #define ZSS_MAX_NAME 95u
 
+struct zss_entry {
+    uint32_t header_sector, length, checksum, blocks;
+};
+
 /* Bank A is the original 32 MiB partition. Bank B occupies the previously
  * reserved tail of the GPT disk. A v2 superblock is committed last when a
  * compacted bank is ready; old v1 images remain readable as generation 0. */
@@ -17,14 +21,16 @@ static uint32_t g_zss_sectors = ZEAL_SRC_SECTS;
 static uint32_t g_zss_generation;
 static uint64_t g_zss_catalog_revision;
 #define ZSS_CATALOG_CAP 4096u
-struct zss_catalog_item { char name[ZSS_MAX_NAME + 1]; size_t size; int status; };
+struct zss_catalog_item {
+    char name[ZSS_MAX_NAME + 1];
+    size_t size;
+    int status;
+    struct zss_entry entry;
+};
 static struct zss_catalog_item g_zss_catalog[ZSS_CATALOG_CAP];
 static uint32_t g_zss_catalog_count;
+static uint32_t g_zss_catalog_tail;
 static int g_zss_catalog_valid;
-
-struct zss_entry {
-    uint32_t header_sector, length, checksum, blocks;
-};
 
 static uint32_t zss_u32(const uint8_t *p) {
     return (uint32_t)p[0] | ((uint32_t)p[1] << 8) |
@@ -184,42 +190,50 @@ static int zss_find(const char *name, struct zss_entry *out,
     if (out_records) *out_records = records;
     return found;
 }
+/* Build the latest-record index in one validated pass. Besides keeping source
+ * enumeration linear, compaction uses each cached record location directly
+ * instead of rescanning the disk log once per record. */
+static int zss_catalog_build(void) {
+    uint8_t sector[512];
+    char record_name[ZSS_MAX_NAME + 1];
+    uint32_t pos = 1;
+    if (g_zss_catalog_valid) return 1;
+    if (!zss_available()) return -2;
+    g_zss_catalog_count = 0;
+    while (pos < g_zss_sectors) {
+        struct zss_entry entry;
+        int deleted, empty = 1;
+        if (!zss_sector_read(pos, sector)) return -1;
+        for (unsigned i = 0; i < 512; i++)
+            if (sector[i]) { empty = 0; break; }
+        if (empty) break;
+        if (zss_decode_record(sector, pos, &entry, record_name, &deleted))
+            return -1;
+        uint32_t i;
+        for (i = 0; i < g_zss_catalog_count; i++)
+            if (zss_str_eq(g_zss_catalog[i].name, record_name)) break;
+        if (i == g_zss_catalog_count) {
+            if (g_zss_catalog_count >= ZSS_CATALOG_CAP) return -1;
+            g_zss_catalog_count++;
+        }
+        struct zss_catalog_item *item = &g_zss_catalog[i];
+        size_t length = 0;
+        while (record_name[length]) length++;
+        for (size_t j = 0; j <= length; j++) item->name[j] = record_name[j];
+        item->size = entry.length;
+        item->status = deleted ? -3 : 1;
+        item->entry = entry;
+        pos += 1u + entry.blocks;
+    }
+    g_zss_catalog_tail = pos;
+    g_zss_catalog_valid = 1;
+    return 1;
+}
 /* Enumerate each latest record, including tombstones, so callers can merge
  * native overrides without performing a disk lookup for every bundled file. */
 static int zss_entry_at(uint32_t wanted, char *name, size_t name_cap,
                         size_t *size_out) {
-    uint8_t sector[512];
-    char record_name[ZSS_MAX_NAME + 1];
-    uint32_t pos = 1;
-    if (!name || !name_cap || !zss_available()) return 0;
-    if (!g_zss_catalog_valid) {
-        g_zss_catalog_count = 0;
-        while (pos < g_zss_sectors) {
-            struct zss_entry entry;
-            int deleted, empty = 1;
-            if (!zss_sector_read(pos, sector)) return 0;
-            for (unsigned i = 0; i < 512; i++)
-                if (sector[i]) { empty = 0; break; }
-            if (empty) break;
-            if (zss_decode_record(sector, pos, &entry, record_name, &deleted))
-                return 0;
-            uint32_t i;
-            for (i = 0; i < g_zss_catalog_count; i++)
-                if (zss_str_eq(g_zss_catalog[i].name, record_name)) break;
-            if (i == g_zss_catalog_count) {
-                if (g_zss_catalog_count >= ZSS_CATALOG_CAP) return 0;
-                g_zss_catalog_count++;
-            }
-            struct zss_catalog_item *item = &g_zss_catalog[i];
-            size_t length = 0;
-            while (record_name[length]) length++;
-            for (size_t j = 0; j <= length; j++) item->name[j] = record_name[j];
-            item->size = entry.length;
-            item->status = deleted ? -3 : 1;
-            pos += 1u + entry.blocks;
-        }
-        g_zss_catalog_valid = 1;
-    }
+    if (!name || !name_cap || zss_catalog_build() != 1) return 0;
     if (wanted >= g_zss_catalog_count) return 0;
     struct zss_catalog_item *item = &g_zss_catalog[wanted];
     size_t length = 0;
@@ -334,10 +348,11 @@ static int zss_put(const char *name, const char *src, size_t len) {
 static int zss_compact(uint32_t *old_sectors, uint32_t *new_sectors,
                        uint32_t *kept_records) {
     uint8_t header[512], copied[512], check[512];
-    char name[ZSS_MAX_NAME + 1];
-    uint32_t tail, need = 1, kept = 0, target_sectors, next = 1;
+    uint32_t need = 1, kept = 0, target_sectors, next = 1;
     uint64_t source, target;
-    if (zss_find(NULL, NULL, &tail, NULL) < 0) return -2;
+    int catalog_status = zss_catalog_build();
+    if (catalog_status != 1) return catalog_status == -2 ? -2 : -1;
+    uint32_t tail = g_zss_catalog_tail;
     source = g_zss_base;
     target = source == ZEAL_SRC_LBA_BASE ? ZEAL_SRC_SHADOW_LBA : ZEAL_SRC_LBA_BASE;
     target_sectors = source == ZEAL_SRC_LBA_BASE ?
@@ -346,43 +361,27 @@ static int zss_compact(uint32_t *old_sectors, uint32_t *new_sectors,
         g_zss_generation == UINT32_MAX || !g_vb.flush_supported) return -4;
     if (!virtio_blk_flush_abs()) return -1;
     /* Do all capacity and source-CRC checks before modifying the other bank. */
-    for (uint32_t pos = 1; pos < tail;) {
-        struct zss_entry entry, latest;
-        int deleted, status;
-        if (!zss_sector_read(pos, header) ||
-            zss_decode_record(header, pos, &entry, name, &deleted)) return -1;
-        status = zss_find(name, &latest, NULL, NULL);
-        if (status != 1 && status != -3) return -1;
-        if (latest.header_sector == pos &&
-            status == (deleted ? -3 : 1)) {
-            if (!deleted && zss_verify(&entry)) return -1;
-            if (need + 1u + entry.blocks > target_sectors) return -3;
-            need += 1u + entry.blocks;
-            kept++;
-        }
-        pos += 1u + entry.blocks;
+    for (uint32_t i = 0; i < g_zss_catalog_count; i++) {
+        struct zss_catalog_item *item = &g_zss_catalog[i];
+        struct zss_entry *entry = &item->entry;
+        if (item->status == 1 && zss_verify(entry)) return -1;
+        if (need + 1u + entry->blocks > target_sectors) return -3;
+        need += 1u + entry->blocks;
+        kept++;
     }
     /* An old target superblock has a lower generation. Partial writes to that
      * bank cannot become active if copying is interrupted. */
-    for (uint32_t pos = 1; pos < tail;) {
-        struct zss_entry entry, latest;
-        int deleted, status;
-        if (!zss_sector_read(pos, header) ||
-            zss_decode_record(header, pos, &entry, name, &deleted)) return -1;
-        status = zss_find(name, &latest, NULL, NULL);
-        if (status != 1 && status != -3) return -1;
-        if (latest.header_sector == pos &&
-            status == (deleted ? -3 : 1)) {
-            for (uint32_t b = 0; b <= entry.blocks; b++) {
-                if (!zss_sector_read(pos + b, copied) ||
-                    !zss_bank_write(target, next + b, copied) ||
-                    !zss_bank_read(target, next + b, check)) return -1;
-                for (unsigned i = 0; i < 512; i++)
-                    if (copied[i] != check[i]) return -1;
-            }
-            next += 1u + entry.blocks;
+    for (uint32_t i = 0; i < g_zss_catalog_count; i++) {
+        struct zss_catalog_item *item = &g_zss_catalog[i];
+        struct zss_entry *entry = &item->entry;
+        for (uint32_t b = 0; b <= entry->blocks; b++) {
+            if (!zss_sector_read(entry->header_sector + b, copied) ||
+                !zss_bank_write(target, next + b, copied) ||
+                !zss_bank_read(target, next + b, check)) return -1;
+            for (unsigned j = 0; j < 512; j++)
+                if (copied[j] != check[j]) return -1;
         }
-        pos += 1u + entry.blocks;
+        next += 1u + entry->blocks;
     }
     if (next != need) return -1;
     if (next < target_sectors) {
@@ -399,6 +398,8 @@ static int zss_compact(uint32_t *old_sectors, uint32_t *new_sectors,
     if (!zss_bank_write(target, 0, header)) return -1;
     if (!virtio_blk_flush_abs()) return -5;
     if (!zss_available() || g_zss_base != target) return -1;
+    g_zss_catalog_valid = 0;
+    g_zss_catalog_revision++;
     if (old_sectors) *old_sectors = tail;
     if (new_sectors) *new_sectors = next;
     if (kept_records) *kept_records = kept;

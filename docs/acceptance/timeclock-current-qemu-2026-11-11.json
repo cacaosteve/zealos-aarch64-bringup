@@ -1,0 +1,22 @@
+{
+  "date": "2026-11-11",
+  "upstream_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "target": "AArch64 PCI QEMU, one guest CPU, rebuilt current desktop ISO",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "64a57f66dc2d1ef3232f06c8472360fde75af65da4f84abee398730c3d07a760",
+  "kernel_sha256": "c211b0ecb262d8aae9ee9656de819fdd4c13466c0e57d7b3bcd2963dfb29be4a",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-timeclock-current-2026-11-11.log python3 -u scripts/check-compat.py --pci --quick --probe-timeclock",
+  "result": "pass",
+  "verified": [
+    "TimeClock loaded and displayed its interactive prompt.",
+    "PunchIn and PunchOut accepted descriptions.",
+    "TimeRep displayed the saved time report.",
+    "Escape returned to the graphical terminal and `40+2;` evaluated successfully.",
+    "Final zstatus reported failed=0."
+  ],
+  "log": "build/check-timeclock-current-2026-11-11.log",
+  "log_sha256": "1604ec5e5b949822ff741dc6648eb46eacd7428e63feec7c1d329904d1c59c23",
+  "live_utm": "Not verified by this run.",
+  "pi_hardware": "not verified by this run",
+  "scope_note": "One-vCPU QEMU acceptance for the current ISO, not a full inventory of ZealOS applications and not UTM or Pi hardware acceptance."
+}

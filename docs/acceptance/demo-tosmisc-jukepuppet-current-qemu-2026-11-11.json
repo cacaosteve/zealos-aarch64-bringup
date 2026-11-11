@@ -1,0 +1,27 @@
+{
+  "date": "2026-11-11",
+  "target": "AArch64 PCI QEMU, one guest CPU, current desktop ISO, disposable disk",
+  "source": "/Demo/AcctExample/TOS/TOSMisc.ZC",
+  "source_sha256": "ee141104e1476df4a08925447be33fa7ba42dbc4c989ec0d374851263af1f616",
+  "kernel_sha256": "c211b0ecb262d8aae9ee9656de819fdd4c13466c0e57d7b3bcd2963dfb29be4a",
+  "iso_sha256": "64a57f66dc2d1ef3232f06c8472360fde75af65da4f84abee398730c3d07a760",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device -netdev user,id=net0 -device virtio-net-pci,netdev=net0,disable-legacy=on' ZEAL_COMPAT_LOG_PATH=build/check-tosmisc-jukepuppet-current-2026-11-11.log python3 -u scripts/check-compat.py --pci --quick --probe-demo-system-context --demo-system-path /Demo/AcctExample/TOS/TOSMisc.ZC --demo-system-module /Demo/AcctExample/TOS/TOSConfig.ZC --demo-system-module /System/Gr/ScreenCast.ZC --demo-system-module /System/BlkDev/DiskCheck.ZC --demo-system-module /Apps/Psalmody/Load.ZC --demo-system-module /Demo/AcctExample/TOS/TOSMisc.ZC",
+  "result": "partial",
+  "verified": [
+    "TOSMisc default configuration, exact-font OCR over all 94 printable glyphs, dollar-sign document serialization, SoundShift/AUWrite round trip, GR2MV frame round trip, and ScreenCast GR/AU capture passed.",
+    "TOSMisc MemTest completed its data- and code-heap stress loops and returned to the compiler.",
+    "Psalmody Load.ZC loaded the stock JukePuppet implementation; the stock childish.ZC song fixture was listed and played through JukeSongsPuppet, which returned normally.",
+    "A Beep fixture was listed, executed by JukePuppet, entered its looping Song body, and was stopped by the normal puppet cleanup path.",
+    "The graphical terminal recovered, accepted 40+2 as 42, and final zstatus reported failed=0."
+  ],
+  "remaining": [
+    "DiskCheckAll requires the configured C:/D: drive workflow; the ARM64 bridge still lacks the stock writable C: and RAM B: drives.",
+    "TOSDistro standard image generation and other drive-copy/format operations remain blocked on real writable multi-volume semantics.",
+    "The Beep fixture check establishes song execution and cleanup, not captured or audible QEMU audio output.",
+    "Live UTM and physical Pi 4B acceptance were not performed by this run."
+  ],
+  "log": "build/check-tosmisc-jukepuppet-current-2026-11-11.log",
+  "log_sha256": "e38dbc966497320c850a9a27a8ac29afd74212c17de64fef046e06c920286e5e",
+  "check_compat_sha256": "8046266b0fc6be5ef2a40040382e23b1ad7ebdb2c9490c36f0fe4b95780165e6",
+  "scope_note": "Non-destructive QEMU runtime evidence using a disposable guest disk. TOSMisc and JukePuppet remain partial at the wider drive-workflow scope; these checks do not claim configured writable-drive, full filesystem or distribution-builder acceptance."
+}

@@ -1,0 +1,27 @@
+{
+  "date": "2026-11-11",
+  "source_commit": "cdc53dec9a990dac7e629026e29ce3b9d7817601",
+  "working_tree_changes_included": true,
+  "result": "rebuilt and validated locally; microSD copy not performed",
+  "payload_directory": "build/pi-desktop-esp",
+  "files_sha256": {
+    "boot/kernel.elf": "ab788aecbb67083f56cffc95506203be4a8f9a72bbbbd2640dbc9e35411535cd",
+    "boot/kernel-diag.elf": "d5bd6c5ae9396fe82df48ca741f17ba6a25a7c4888fb90eda4f37dcbf7d2c752",
+    "boot/zealbooter.elf": "a23ed91daff4a61f11d832fb198d623208635bb1b0bb0292082c4e302eee15d7",
+    "boot/demo.hcbc": "e37c1b530962064c451fac288327f7ae799d3e344cc5c77dc2ba55625c0042d0",
+    "boot/sources.tar": "18859d69090114dc56b28f1d8e7bae6e45b35534816893cdcd0cf4bcbbeccb53",
+    "EFI/BOOT/BOOTAA64.EFI": "3f51768c5eb8a0818b8e7aa2ac9a9caef3c64707b5b6db15d1e612de23236b8c",
+    "limine.conf": "a8981abc3cda174982db0e510a1bce180b2cefa74973789cd49c481ef92b5bc4"
+  },
+  "checks": [
+    "scripts/pi-desktop-stage.sh completed make pi-desktop pi-diag esp and rebuilt the source archive.",
+    "scripts/check-pi-desktop-image.py passed the Pi native/recovery ELF identity, load bounds/relocations, two-entry boot-chain and 1048-source-module checks.",
+    "The seven staged files have the SHA-256 values recorded above."
+  ],
+  "card_status": "No physical card was written. At inspection time macOS listed only the Samsung T7 external disk and did not expose ZEALPI or a card reader.",
+  "known_scope": [
+    "This is a locally prepared candidate, not a card-staged or physical Pi-booted payload.",
+    "Writable SD/USB persistence remains unimplemented in this Pi candidate.",
+    "The prior physical Pi keyboard, pointer and audio observations apply to earlier images; the refreshed candidate still needs a physical boot check."
+  ]
+}

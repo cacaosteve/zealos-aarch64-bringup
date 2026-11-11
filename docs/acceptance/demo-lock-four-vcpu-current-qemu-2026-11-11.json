@@ -1,0 +1,20 @@
+{
+  "date": "2026-11-11",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 4 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device -netdev user,id=net0 -device virtio-net-pci,netdev=net0,disable-legacy=on' ZEAL_COMPAT_LOG_PATH=build/check-lock-current-smp4-verified-2026-11-11.log python3 -u scripts/check-compat.py --pci --quick --probe-demo-lock",
+  "target": "AArch64 QEMU virt with four requested vCPUs and the current desktop ISO",
+  "result": "partial",
+  "source_path": "upstream/pinned/Demo/MultiCore/Lock.ZC",
+  "source_sha256": "6dd15bf9c17f7ea72699e2074d9a1ca20a72a3ebd4aa819827900ecb577308d2",
+  "kernel_path": "esp/boot/kernel.elf",
+  "kernel_sha256": "c211b0ecb262d8aae9ee9656de819fdd4c13466c0e57d7b3bcd2963dfb29be4a",
+  "iso_path": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "64a57f66dc2d1ef3232f06c8472360fde75af65da4f84abee398730c3d07a760",
+  "checks": [
+    "QEMU was invoked with four vCPUs requested; both expected unlocked/locked count rows were visible in the GUI, terminal recovery returned 42, and zstatus reported failed=0.",
+    "This validates the Lock demo and recovery path on the ARM64 bridge's single modeled CPU only; it does not exercise simultaneous inter-CPU lock contention.",
+    "The ARM64 runtime binds mp_count to guest_mp_count=1, and TaskBridge.ZC documents JobQueue as CPU-0-only; requesting four QEMU vCPUs does not establish ZealOS SMP scheduling or inter-CPU lock contention."
+  ],
+  "log": "build/check-lock-current-smp4-verified-2026-11-11.log",
+  "log_sha256": "dc59c5581824cb6bb72d80021393f3fee36c45a6b72e4db9a28196da417f9af9",
+  "scope_note": "Diagnostic only. The ARM64 task bridge is currently a single modeled CPU with cooperative CPU-0 jobs. Full SMP support, vCPU discovery, per-CPU executive/task structures, cross-CPU job dispatch, and genuine unlocked-versus-locked contention remain unimplemented and unverified."
+}

@@ -32,7 +32,14 @@ all 206 pinned Demo `.ZC` files compile, and 202 have explicit QEMU runtime
 acceptance; four remain partial. Those are the two TOS account examples
 (`TOSDistro` and `TOSMisc`) and `MultiCore/Lock`/`MultiCore/MPRadix`. The
 multicore examples are partial because the current guest runtime exposes one
-CPU; the TOS account examples still have workflow coverage gaps. The ARM64
+CPU; the TOS account examples still lack configured writable C:/B: drive
+workflows. On the 2026-11-11 ISO, TOSMisc's MemTest and Psalmody JukePuppet's
+stock-song and Beep-fixture execution/cleanup now pass on a disposable QEMU
+disk. Its DiskCheckAll path and TOSDistro's format/copy/ISO generation remain
+blocked by that drive layer; the Beep fixture check does not measure audio
+output. See
+[`demo-tosmisc-jukepuppet-current-qemu-2026-11-11.json`](docs/acceptance/demo-tosmisc-jukepuppet-current-qemu-2026-11-11.json).
+The ARM64
 `TimeIns` adaptation has runtime acceptance, while the pinned stock source's
 optimizer `PassTrace` diagnostic is not implemented. `TOSExtern` is accepted
 at its interface-module scope: its forms and external declarations load and

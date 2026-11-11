@@ -1,0 +1,18 @@
+{
+  "date": "2026-11-11",
+  "program": "Strut",
+  "target": "AArch64 PCI QEMU, one guest CPU, current desktop ISO",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "64a57f66dc2d1ef3232f06c8472360fde75af65da4f84abee398730c3d07a760",
+  "kernel_sha256": "c211b0ecb262d8aae9ee9656de819fdd4c13466c0e57d7b3bcd2963dfb29be4a",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-span-strut-current-2026-11-11.log python3 -u scripts/check-compat.py --pci --quick --probe-span-cold --probe-strut-spring",
+  "result": "pass",
+  "verified": [
+    "Strut help and mass placement rendered; a spring connected two masses and produced visible cyan pixels.",
+    "The ship moved and the star field animated during gameplay.",
+    "Escape restored the terminal and `40+2;` evaluated successfully; zstatus reported failed=0."
+  ],
+  "log": "build/check-span-strut-current-2026-11-11.log",
+  "log_sha256": "eba924483ae5f35050f41bf966866ac7a73a6b8865c7d340cb7e71806822d375",
+  "scope_note": "Current-image QEMU Strut runtime acceptance; not a live UTM or Pi hardware check."
+}

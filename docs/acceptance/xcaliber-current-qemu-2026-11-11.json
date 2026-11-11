@@ -1,0 +1,19 @@
+{
+  "date": "2026-11-11",
+  "program": "X-Caliber",
+  "target": "UTM-bundled QEMU framework, HVF, one vCPU, VirtIO input, current desktop ISO",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "64a57f66dc2d1ef3232f06c8472360fde75af65da4f84abee398730c3d07a760",
+  "kernel_sha256": "c211b0ecb262d8aae9ee9656de819fdd4c13466c0e57d7b3bcd2963dfb29be4a",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-xcaliber-current-2026-11-11.log python3 -u scripts/check-compat.py --pci --quick --probe-xcaliber",
+  "result": "pass",
+  "verified": [
+    "X-Caliber started and the storm help popup was dismissed.",
+    "Left and right thrusters changed the player ship pixels; Space produced a visible projectile.",
+    "Escape returned to a working graphical terminal that accepted and executed a command.",
+    "System-server, compiler recovery, terminal keyboard/history, and window-demo recovery regressions passed afterward."
+  ],
+  "log": "build/check-xcaliber-current-2026-11-11.log",
+  "log_sha256": "526ea1a0f045d13149c6b6b25ffd5b6ed7d4fefca1d8af44a3714d326be06319",
+  "scope_note": "Current-image QEMU acceptance. It does not close earlier live UTM X-Caliber/Escape observations or Pi hardware behavior."
+}
