@@ -1,0 +1,22 @@
+{
+  "date": "2026-11-11",
+  "target": "AArch64 native ZealC under UTM-bundled QEMU with HVF, one vCPU, virtio-ramfb, VirtIO keyboard and tablet",
+  "iso_path": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "0e816d41ec5570054ac10e40a401691bb6a4c2bbcba03ca7e045184014408af2",
+  "kernel_sha256": "411623ed6d0779007f7d0f436ba7d26d60d40d4551660b5c1db61746d271e28e",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-keepaway-recheck.log python3 -u scripts/check-compat.py --pci --quick --probe-3d-apps --probe-keepaway-full-game",
+  "log": "build/check-keepaway-recheck.log",
+  "log_sha256": "01418632c435c067f208cc7b7e6395775dbf4aac6d7a2efbd77f0316b68bdd56",
+  "result": "pass",
+  "checks": {
+    "GrModels": "Forms, mesh generation, raster path, and terminal recovery passed.",
+    "KeepAway": [
+      "The court, HUD, and player rendered; Space and mouse input updated the game.",
+      "The full 186-second run completed with 18 repeated input cycles; scanout changed at every sample, including beyond the user's reported freeze point.",
+      "Escape returned to the graphical terminal, restored terminal focus, removed the Animate task, and zstatus reported failed=0."
+    ],
+    "Titanium": "Intro/gameplay, Space input, Escape, and terminal recovery passed."
+  },
+  "live_utm_status": "Still open: the user previously reported a complete freeze in the visible UTM session. This automated UTM-bundled QEMU run on the current ISO did not reproduce it; the visible UTM app still needs confirmation on this exact ISO.",
+  "scope_note": "Automated current-ISO acceptance in UTM's bundled QEMU profile, not the visible UTM app window or Pi hardware."
+}
