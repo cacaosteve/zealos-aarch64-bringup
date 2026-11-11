@@ -1,0 +1,20 @@
+{
+  "date": "2026-11-10",
+  "target": "UTM-bundled QEMU framework, HVF, two vCPUs, 1 GiB RAM, virtio-ramfb, VirtIO keyboard/tablet",
+  "source": "/Apps/KeepAway/Run.ZC",
+  "source_sha256": "476c37fbd37b8bd6bc47709bb6a4b2025bbad243b1e7b754ac7e72b031505e65",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "5effe8cb5a69344d078a89b758ea94571239d72ce99e5dd60d4e393e7ce5199d",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 2 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-keepaway-current-smp2.log python3 -u scripts/check-compat.py --pci --quick --probe-3d-apps --probe-keepaway-full-game",
+  "exit_code": 0,
+  "result": "Two-vCPU full-game run passed; visible UTM freeze report remains unresolved",
+  "checks": [
+    "KeepAway reached its gameplay frame; pointer and Space inputs were accepted and the HUD refreshed.",
+    "The scanout changed during the full 184-second interval.",
+    "Escape restored the graphical terminal and keyboard focus.",
+    "No Animate child task remained after exit and zstatus reported failed=0."
+  ],
+  "log": "build/check-keepaway-current-smp2.log",
+  "log_sha256": "dd178a76ee1b39bd39f00398145f639739101ec403b0021412657fe17ba5d7a7",
+  "scope_note": "This is a 184-second run in UTM's bundled QEMU framework, not a test in the visible UTM application. It does not override the user's report that KeepAway froze in the visible UTM session. The tested ISO is the same exact image as the one-vCPU run in keepaway-full-current-qemu-2026-11-10.json."
+}
