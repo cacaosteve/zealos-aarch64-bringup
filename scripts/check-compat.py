@@ -3748,12 +3748,17 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             # scanout for a meaningful user-facing acceptance check.
             lock_result = run_graphical_terminal_command(
                 'demo-lock-result', 'ExeFile2("/Demo/MultiCore/Lock.ZC");',
-                'Correct Count:2000000 Actual Count:2000000', timeout=90)
+                'Correct Count:2000000 Actual Count:2000000', timeout=180)
             if lock_result[3].count(
                     'Correct Count:2000000 Actual Count:2000000') < 2:
+                try:
+                    status = command('zstatus', None, timeout=8)
+                except Exception as exc:
+                    status = f'zstatus unavailable: {exc}'
                 raise RuntimeError('Lock did not visibly report both unlocked and '
-                    'locked results; see ' + graphical_path('demo-lock-result-result')
-                    + '\n' + lock_result[3])
+                    'locked results; see ' + str(
+                        graphical_path('demo-lock-result-result'))
+                    + '\n' + lock_result[3] + '\npost-timeout zstatus:\n' + status)
             run_graphical_terminal_command(
                 'demo-lock-terminal-recovery', '40+2;', 'ans=0x2A=42', timeout=60)
             command('zstatus', 'failed=0')

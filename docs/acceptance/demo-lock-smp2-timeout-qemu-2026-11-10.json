@@ -1,0 +1,19 @@
+{
+  "date": "2026-11-10",
+  "target": "AArch64 PCI QEMU, two vCPUs, current desktop ISO",
+  "source": "/Demo/MultiCore/Lock.ZC",
+  "source_sha256": "6dd15bf9c17f7ea72699e2074d9a1ca20a72a3ebd4aa819827900ecb577308d2",
+  "kernel_sha256": "cfa2202f654a4d5d76768c957384b93a50e34a58fd2ecc6793c43d47bf9276cd",
+  "iso_sha256": "b5682ca299f6709d456e82e69cce5ee565a3efb043b413b668233cda6afbdd68",
+  "command": "ZEAL_COMPAT_LOG_PATH=build/check-lock-smp2-current.log QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -smp 2 -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device -netdev user,id=net0 -device virtio-net-pci,netdev=net0,disable-legacy=on' python3 -u scripts/check-compat.py --pci --quick --probe-demo-lock",
+  "result": "partial: graphical acceptance timed out after 180 seconds with only one count row visible; post-timeout zstatus reported failed=0 and the terminal transcript included a second count row while diagnostics were collected",
+  "checks": [
+    "Two-vCPU QEMU booted the current image and passed framebuffer, keyboard focus, and graphical terminal input checks.",
+    "The stock terminal-launched Lock source showed Correct Count:2000000 Actual Count:2000000 before the 180-second graphical result timeout.",
+    "Post-timeout zstatus reported failed=0; the captured transcript included the other count row interleaved with the diagnostic command, so late completion is plausible but not visually proven.",
+    "The acceptance script previously crashed formatting this failure because it concatenated a PosixPath with a string; that diagnostic bug is fixed and now includes zstatus output."
+  ],
+  "scope_note": "Not accepted as a successful two-vCPU run. Keep Lock partial until both count rows are visibly captured before a clean terminal recovery. The source bundle maps worker CPU requests to CPU 0, so even a later pass would not prove true SMP lock contention.",
+  "log": "build/check-lock-smp2-current.log",
+  "log_sha256": "1714525d612c124f8859020c8deee121dc44bba9fbe0b225781aaba1624ea7b3"
+}

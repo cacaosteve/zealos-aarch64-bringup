@@ -1,0 +1,34 @@
+{
+  "date": "2026-11-10",
+  "target": "AArch64 PCI QEMU, native ARM64 compiler",
+  "kernel_sha256": "cfa2202f654a4d5d76768c957384b93a50e34a58fd2ecc6793c43d47bf9276cd",
+  "iso_sha256": "b5682ca299f6709d456e82e69cce5ee565a3efb043b413b668233cda6afbdd68",
+  "source_bundle_sha256": "f0001f449e272f8da9679d10a7144295c9cc529a5d4cc347251dc75647af89ad",
+  "source": "upstream/pinned/Demo/TimeIns.ZC",
+  "source_sha256": "a1bc618f384baff16e973717483308d08ec53d57f9db3f5f9aa2ca310e968ff6",
+  "command": "python3 scripts/check-compat.py --pci --probe-source-fast --probe-source-kernel --probe-source upstream/pinned/Demo/TimeIns.ZC",
+  "result": "pass: unchanged stock TimeIns compiled and ran all three benchmark samples; PassTrace emitted final AArch64 machine code; control returned to the ZealC prompt",
+  "checks": [
+    "KernelA, KernelB, KMathB, KernelC, and TaskBridge loaded before the source probe.",
+    "The stock #exe PassTrace(0b10000000000) call enabled the native compiler's pass-10 final AArch64 code dump.",
+    "The source printed three Overhead Cycles and Measured Cycles samples and returned to the prompt.",
+    "The probe completed with a native compiler reset after the source returned."
+  ],
+  "measurements": [
+    {
+      "overhead_cycles": 0.135277,
+      "measured_cycles": 0.107507
+    },
+    {
+      "overhead_cycles": 0.10536,
+      "measured_cycles": 0.0376
+    },
+    {
+      "overhead_cycles": 0.129563,
+      "measured_cycles": -0.034048
+    }
+  ],
+  "log": "build/timeins-stock-pass-trace-qemu.log",
+  "log_sha256": "95e4203b029d55bb975491915b0a5260b6c3b27fede30236f6524708072a9649",
+  "scope_note": "QEMU acceptance only. Timing samples vary and can be negative after subtracting loop overhead; this verifies the stock program runs and the native trace feature works, not precise cycle accounting on Pi hardware."
+}

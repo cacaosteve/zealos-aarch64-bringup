@@ -207,6 +207,7 @@ extern I64 ZcTabletSample();
 extern U0 GrScaleZoom(F64 scale);
 extern Bool ZcWinMouseUpdate();
 extern I64 ZcMonotonicNs();
+extern I64 PassTrace(I64 mask=0b10001111101);
 extern I64 ZcUnixTimeNs();
 // Compiler reflection crosses an explicit ABI; Aiwnios CHashClass and
 // CMemberLst are not the original ZealOS compiler's structures.

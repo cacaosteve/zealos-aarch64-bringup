@@ -173,6 +173,7 @@ static int compiler_recovery_active;
 static uint64_t compiler_recovery_errors;
 static int64_t compiler_recovery_exception;
 static CLexer *guest_active_compile_lex;
+static CCmpCtrl *guest_active_compile_cc;
 #define GUEST_EXCEPT_COMPILER INT64_C(0x72656c69706d6f43)
 #define GUEST_EXCEPT_BREAK INT64_C(0x6b61657242)
 static int window_demo_loaded;
@@ -649,6 +650,7 @@ static void guest_raise(int64_t code) __attribute__((noreturn));
 static void guest_unwind_all(void);
 static int64_t host_rflags_get(int64_t *a);
 static int64_t host_rflags_set(int64_t *a);
+static int64_t host_pass_trace(int64_t *a);
 static int64_t execute_source_result(const char *path, const char *src,
                                      int return_expr, int record_answer);
 extern void __clear_cache(void *, void *);
@@ -7116,6 +7118,16 @@ static int64_t host_tsc(int64_t *a) {
     __asm__ volatile("mrs %0, cntpct_el0" : "=r"(ticks));
     return (int64_t)ticks;
 }
+static int64_t host_pass_trace(int64_t *a) {
+    if (!guest_active_compile_cc)
+        zc_fail("PassTrace requires an active native compilation");
+    CCmpCtrl *cc = guest_active_compile_cc;
+    int64_t old = cc->pass_trace;
+    if (a[0])
+        cc->saved_pass_trace = a[0];
+    cc->pass_trace = a[0];
+    return old;
+}
 extern volatile uint64_t g_arm64_svc_bench_hits;
 static int64_t host_arm64_svc_bench(int64_t *a) {
     (void)a;
@@ -8089,6 +8101,7 @@ static void bind_guest_task(void) {
     PrsBindCSymbol("RFlagsGet", host_rflags_get, 0);
     PrsBindCSymbol("RFlagsSet", host_rflags_set, 1);
     PrsBindCSymbol("TSCGet", host_tsc, 0);
+    PrsBindCSymbol("PassTrace", host_pass_trace, 1);
     PrsBindCSymbol("Arm64SvcBench", host_arm64_svc_bench, 0);
     PrsBindCSymbol("Arm64SvcBenchCount", host_arm64_svc_bench_count, 0);
     PrsBindCSymbol("ZcMonotonicNs", host_monotonic_ns, 0);
@@ -8503,11 +8516,13 @@ struct source_execution {
     int previous_compiling;
     int registered;
     CLexer *previous_active_lex;
+    CCmpCtrl *previous_active_cc;
 };
 static void source_execution_cleanup(struct guest_unwind *scope) {
     struct source_execution *execution = (struct source_execution *)scope;
     guest_task_exe_active = execution->previous_compiling;
     guest_active_compile_lex = execution->previous_active_lex;
+    guest_active_compile_cc = execution->previous_active_cc;
     free(execution->code);
     guest_context_leave(&execution->context);
     compiler_source_cleanup(execution->cc, execution->lex);
@@ -8553,9 +8568,11 @@ static int64_t execute_source_mode(const char *path, const char *src,
     CodeCtrlPush(cc);
     struct source_execution execution = {
         .lex = lex, .cc = cc, .previous_compiling = guest_task_exe_active,
-        .registered = guest_task_bound, .previous_active_lex = guest_active_compile_lex
+        .registered = guest_task_bound, .previous_active_lex = guest_active_compile_lex,
+        .previous_active_cc = guest_active_compile_cc
     };
     guest_active_compile_lex = lex;
+    guest_active_compile_cc = cc;
     guest_context_enter(&execution.context, lex, !strcmp(path, "<shell>"), guest_flags);
     lex->port_fun_complete = guest_function_complete;
     int previous_compiling = guest_task_exe_active;

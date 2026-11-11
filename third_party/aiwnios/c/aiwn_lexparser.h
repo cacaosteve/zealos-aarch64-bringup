@@ -251,6 +251,8 @@ typedef struct CCmpCtrl {
   // I will use the ldxsr/stxr instructions in a loop
   int64_t aarch64_atomic_loop_start;
   CRPN *cur_rpn;
+  /* ZealOS PassTrace-compatible mask for native optimizer diagnostics. */
+  int64_t pass_trace, saved_pass_trace;
 } CCmpCtrl;
 #define PRSF_CLASS    1
 #define PRSF_UNION    2

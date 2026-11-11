@@ -3,8 +3,53 @@
 #include "aiwn_mem.h"
 #include <math.h>
 #include <stddef.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+extern void zc_output(const char *text);
+
+static void NativePassTraceIR(CCmpCtrl *cc, int bit, const char *name) {
+  if (!(cc->saved_pass_trace & (INT64_C(1) << bit)))
+    return;
+  char header[96];
+  snprintf(header, sizeof(header), "Pass %d (%s):\n", bit, name);
+  zc_output(header);
+  CRPN *sentinel = (CRPN *)cc->code_ctrl->ir_code;
+  CRPN *rpn = (CRPN *)sentinel->base.next;
+  while (rpn != sentinel) {
+    int64_t length = DolDocDumpIR(NULL, 0, rpn);
+    char *text = calloc((size_t)length + 1, 1);
+    if (!text) {
+      zc_output("  <IR trace allocation failed>\n");
+      return;
+    }
+    DolDocDumpIR(text, 0, rpn);
+    zc_output(text);
+    free(text);
+    rpn = ICFwd(rpn);
+  }
+}
+
+static void NativePassTraceCode(CCmpCtrl *cc, const char *code, int64_t size) {
+  if (!(cc->saved_pass_trace & (INT64_C(1) << 10)))
+    return;
+  zc_output("Pass 10 (final AArch64 code):\n");
+  char line[128];
+  for (int64_t offset = 0; offset < size; offset += 16) {
+    int used = snprintf(line, sizeof(line), "%04llX:",
+                        (unsigned long long)offset);
+    int64_t end = offset + 16 < size ? offset + 16 : size;
+    for (int64_t i = offset; i < end && used < (int)sizeof(line) - 5; i++)
+      used += snprintf(line + used, sizeof(line) - (size_t)used,
+                       " %02X", (unsigned char)code[i]);
+    if (used < (int)sizeof(line) - 2) {
+      line[used++] = '\n';
+      line[used] = 0;
+    }
+    zc_output(line);
+  }
+}
 
 static int64_t IsConst(CRPN *rpn) {
   switch (rpn->type) {
@@ -1718,21 +1763,37 @@ char *Compile(CCmpCtrl *cctrl, int64_t *res_sz, char **dbg_info,
               CHeapCtrl *heap) {
   CRPN *r;
   int64_t old_flags = cctrl->flags;
+  NativePassTraceIR(cctrl, 0, "source IR");
   for (r = cctrl->code_ctrl->ir_code->next; r != cctrl->code_ctrl->ir_code;
        r = r->base.next) {
     AssignRawTypeToNode(cctrl, r);
   }
+  NativePassTraceIR(cctrl, 1, "raw types assigned");
   OptPassFixFunArgs(cctrl);
+  NativePassTraceIR(cctrl, 2, "function arguments fixed");
   OptPassExpandPtrs(cctrl);
+  NativePassTraceIR(cctrl, 3, "pointers expanded");
   OptPassConstFold(cctrl);
+  NativePassTraceIR(cctrl, 4, "constants folded");
   OptPassMergeCommunitives(cctrl);
+  NativePassTraceIR(cctrl, 5, "commutative expressions merged");
   // OptPassDeadCodeElim(cctrl);
   OptPassRegAlloc(cctrl);
+  NativePassTraceIR(cctrl, 6, "registers allocated");
   OptPassRemoveUselessArith(cctrl);
+  NativePassTraceIR(cctrl, 7, "useless arithmetic removed");
   OptPassRemoveUselessTypecasts(cctrl);
+  NativePassTraceIR(cctrl, 8, "useless casts removed");
   OptPassMergeAddressOffsets(cctrl);
+  NativePassTraceIR(cctrl, 9, "address offsets merged");
   cctrl->flags = old_flags;
-  return OptPassFinal(cctrl, res_sz, dbg_info, heap);
+  int64_t code_size = 0;
+  char *code = OptPassFinal(cctrl, &code_size, dbg_info, heap);
+  NativePassTraceCode(cctrl, code, code_size);
+  cctrl->saved_pass_trace = cctrl->pass_trace;
+  if (res_sz)
+    *res_sz = code_size;
+  return code;
 }
 
 #include "aiwn_bytecode.h"
