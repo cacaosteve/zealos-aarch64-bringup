@@ -13526,6 +13526,8 @@ static int rs_stock_file_at(uint64_t base, uint64_t sectors, uint64_t directory,
                 if (want_dirs && !(*index)--) {
                     if (prefix + n + 1 > cap) return 0;
                     for (size_t j = 0; j <= prefix + n; j++) dst[j] = path[j];
+                    if (out_size) *out_size = (size_t)length;
+                    if (out_first) *out_first = first;
                     return 1;
                 }
                 path[prefix + n] = '/';
@@ -13643,7 +13645,8 @@ int zeal_redsea_file_at(uint64_t index, char *dst, size_t cap,
     return 0;
 }
 
-int zeal_redsea_dir_at(uint64_t index, char *dst, size_t cap) {
+int zeal_redsea_dir_at(uint64_t index, char *dst, size_t cap,
+                       size_t *out_size, uint64_t *out_first) {
     uint8_t boot[512];
     uint64_t base, sectors, ancestors[8] = {0};
     char path[96];
@@ -13651,7 +13654,7 @@ int zeal_redsea_dir_at(uint64_t index, char *dst, size_t cap) {
         !base || !zc_raw_disk_read(boot, base, 1) || rs_stock_u64(boot + 8) != base)
         return 0;
     return rs_stock_file_at(base, sectors, rs_stock_u64(boot + 24), path, 0,
-                            &index, ancestors, 0, dst, cap, NULL, NULL, 1);
+                            &index, ancestors, 0, dst, cap, out_size, out_first, 1);
 }
 
 static int zc_write_source(const char *path, const char *src, size_t len) {

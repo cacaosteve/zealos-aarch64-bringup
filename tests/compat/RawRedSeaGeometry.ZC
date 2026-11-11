@@ -169,15 +169,30 @@ I64 RawRedSeaRepairChecks()
     }
     {
         CDirEntry *entry, *next;
-        I64 count = 0;
+        I64 count = 0, seen = 0;
         entry = FilesFind("D:/*", FUF_RECURSE);
         while (entry)
         {
             next = entry->next;
             count++;
-            if (!entry->full_name || StrCompare(entry->full_name, "/KEEP.ZC") ||
-                entry->clus != base + 10 || entry->size != 512 ||
-                !(entry->attr & RS_ATTR_ARCHIVE))
+            if (entry->full_name && !StrCompare(entry->full_name, "/SUB"))
+            {
+                if (entry->clus != base + 10 || entry->size != 512 ||
+                    !(entry->attr & RS_ATTR_DIR))
+                    seen = -100;
+                else
+                    seen |= 1;
+            }
+            else if (entry->full_name &&
+                     !StrCompare(entry->full_name, "/SUB/KEEP.ZC"))
+            {
+                if (entry->clus != base + 20 || entry->size != 512 ||
+                    !(entry->attr & RS_ATTR_ARCHIVE))
+                    seen = -100;
+                else
+                    seen |= 2;
+            }
+            else
             {
                 DirEntryDel(entry);
                 while (next)
@@ -192,7 +207,7 @@ I64 RawRedSeaRepairChecks()
             DirEntryDel(entry);
             entry = next;
         }
-        if (count != 1)
+        if (count != 2 || seen != 3)
         {
             Free(bitmap);
             return 4;
@@ -203,12 +218,12 @@ I64 RawRedSeaRepairChecks()
         Free(bitmap);
         return 4;
     }
-    // The fixture contains a referenced file cluster and one separate
-    // allocated but unreferenced cluster. Repair must retain the file and
-    // reclaim only the orphan.
+    // The fixture contains a referenced nested directory and file plus one
+    // separate allocated but unreferenced cluster. Repair must retain both
+    // allocations and reclaim only the orphan.
     errs = DiskCheck('D', TRUE, FALSE);
     if (errs != 1 || !BlkRead(drive, bitmap, drive->fat1, 1) ||
-        Bt(bitmap, 2) || !Bt(bitmap, 9))
+        Bt(bitmap, 2) || !Bt(bitmap, 9) || !Bt(bitmap, 19))
     {
         Free(bitmap);
         return 5;

@@ -1,0 +1,28 @@
+{
+  "date": "2026-11-11",
+  "target": "UTM-bundled QEMU, AArch64 PCI, one vCPU, disposable writable RedSea VirtIO fixture",
+  "iso_sha256": "9a0d1433529e41b2cda6c36daef7255a7afdbe40c7f4f875bb305784fc56556a",
+  "kernel_sha256": "261bafde12c94029ebc46064a7fc650b66b3ec98e0a9ae0f5eaf9a774d3235d9",
+  "source_bundle_sha256": "670b45857c231fbffe2c9ee6c086066fd542f52406ca01d462187de3b87c81eb",
+  "probe_sha256": "c9b58a9491e5c793dd52f21f36ef8068a416edcd97398cfafdc258fcd746c621",
+  "check_compat_sha256": "f44bed5bba11d2e0fef69c0438b48b4b67a51be91bf2237877f71fe399405657",
+  "task_bridge_sha256": "dceed49afc4ecde4c0f27d2ebfc3358e89b2273867d73140fe13d2b2ad6d0ea4",
+  "command": "ZEAL_COMPAT_LOG_PATH=build/tosmisc-diskcheck-repair-nested-current-qemu-2026-11-11.log python3 -u scripts/check-compat.py --pci --quick --probe-raw-redsea-geometry repair",
+  "result": "pass: recursive FilesFind reports physical metadata for a nested RedSea directory and file; stock DiskCheck retains both allocations, reclaims the separate orphan, and returns a clean second scan",
+  "verified": [
+    "The disposable 128-sector writable RedSea volume mounts as D with valid bounded geometry.",
+    "The root contains SUB at base + 10; SUB contains KEEP.ZC at base + 20; the fixture also has one separate orphan allocation.",
+    "FilesFind(\"D:/*\", FUF_RECURSE) returns exactly /SUB and /SUB/KEEP.ZC with the expected attributes, sizes, and physical starting sectors.",
+    "The ARM64 ZcRedSeaDirAt bridge returns each directory's physical starting sector and byte length; TaskBridge updates synthesized parent-directory metadata from this pass.",
+    "DiskCheck('D', TRUE, FALSE) reclaims only the orphan while preserving the SUB and KEEP.ZC allocation bits.",
+    "DiskCheck('D', FALSE, FALSE) then returns zero; final zstatus reports failed=0.",
+    "The broader stock-file probe's Drive('D') selection assertion also fails when rerun against the pre-change source at 2285c37, so that failure is not introduced by this patch."
+  ],
+  "limits": [
+    "This validates nested allocation preservation and orphan cleanup, not repair of malformed directory contents or directory-entry corruption.",
+    "The fixture is a disposable QEMU disk window, not physical SD or USB storage.",
+    "FAT32 repair and live UTM UI or Raspberry Pi behavior are not established."
+  ],
+  "log": "build/tosmisc-diskcheck-repair-nested-current-qemu-2026-11-11.log",
+  "log_sha256": "48cc7dc2e25e188f5ba6a0abaeba9a16055ce8c989cec595a3659049a32a205c"
+}

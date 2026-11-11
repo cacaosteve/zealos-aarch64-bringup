@@ -39,13 +39,18 @@ absent optional D drive, and its actual dispatch now passes against a clean
 mounted writable RedSea D fixture. The RedSea file-enumeration bridge now
 preserves each entry's starting sector in `CDirEntry.clus`, allowing the stock
 repair scan to retain an allocated `KEEP.ZC` file while reclaiming a separate
-orphan allocation; read-back and a second clean scan pass. Nested populated
-directories, directory repair, and FAT32 remain open. The Beep fixture check
-does not measure audio output. See the
+orphan allocation; read-back and a second clean scan pass. A nested `SUB/KEEP.ZC`
+fixture now also confirms directory enumeration preserves both the nested
+directory and file allocations while reclaiming only the orphan. Malformed
+directory repair and FAT32 remain open. A separate broader stock-file probe
+still stops at its `Drive('D')` selection assertion; that failure reproduces
+against the pre-change source. The Beep fixture check does not measure audio
+output. See the
 [absent-drive check](docs/acceptance/demo-tosmisc-diskcheckall-current-qemu-2026-11-11.json),
 [mounted-RedSea check](docs/acceptance/demo-tosmisc-diskcheckall-redsea-qemu-2026-11-11.json),
 and [empty-root repair check](docs/acceptance/demo-tosmisc-diskcheck-repair-redsea-qemu-2026-11-11.json)
-and [populated-root repair check](docs/acceptance/demo-tosmisc-diskcheck-populated-redsea-qemu-2026-11-11.json).
+and [populated-root repair check](docs/acceptance/demo-tosmisc-diskcheck-populated-redsea-qemu-2026-11-11.json),
+plus the [nested-tree repair check](docs/acceptance/demo-tosmisc-diskcheck-nested-redsea-qemu-2026-11-11.json).
 On the fresh `80cd189a…` image,
 TOSDistro's `DistroPrep` now copies and text-converts the full source tree and
 recovers cleanly. The subsequent `MakeStdDistro` flow remains incomplete:

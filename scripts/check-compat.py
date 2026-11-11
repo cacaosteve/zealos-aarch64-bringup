@@ -1062,6 +1062,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 bitmap = bytearray(512)
                 root_dir = bytearray(1024 if args.probe_raw_redsea_geometry == 'stockfile' else 512)
                 file_data = bytearray(512)
+                sub_dir = bytearray(512)
                 child_dir = bytearray(512)
                 broken_dir = bytearray(512)
                 empty_dir = bytearray(512)
@@ -1073,22 +1074,28 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                         struct.pack_into('<q', boot, 24, offset + 129)  # root past end
                     boot[510:512] = b'\x55\xaa'
                     # The present-drive fixture has only its root allocated.
-                    # The repair fixture also has a live root file and one
-                    # separate orphan allocation for DiskCheck to reclaim.
+                    # The repair fixture contains a nested directory and file
+                    # plus one independent orphan allocation for DiskCheck.
                     bitmap[0] = 3 if args.probe_raw_redsea_geometry == 'present' else 7
                     if args.probe_raw_redsea_geometry in ('present', 'repair'):
                         # The root directory occupies one cluster in both
-                        # fixtures. Repair also verifies traversal of a real
-                        # file before freeing the independent orphan.
+                        # fixtures. Repair exercises nested allocations.
                         struct.pack_into('<q', root_dir, 48, 512)
                     if args.probe_raw_redsea_geometry == 'repair':
                         struct.pack_into('<H', root_dir, 0, 0x410)
                         root_dir[2:4] = b'.\0'
                         struct.pack_into('<qqq', root_dir, 40, offset + 2, 512, 0)
-                        struct.pack_into('<H', root_dir, 64, 0x420)
-                        root_dir[66:74] = b'KEEP.ZC\0'
+                        struct.pack_into('<H', root_dir, 64, 0x410)
+                        root_dir[66:70] = b'SUB\0'
                         struct.pack_into('<qqq', root_dir, 104, offset + 10, 512, 0)
-                        bitmap[1] |= 0x02  # Keep the referenced data cluster allocated.
+                        struct.pack_into('<H', sub_dir, 0, 0x410)
+                        sub_dir[2:4] = b'.\0'
+                        struct.pack_into('<qqq', sub_dir, 40, offset + 10, 512, 0)
+                        struct.pack_into('<H', sub_dir, 64, 0x420)
+                        sub_dir[66:74] = b'KEEP.ZC\0'
+                        struct.pack_into('<qqq', sub_dir, 104, offset + 20, 512, 0)
+                        bitmap[1] |= 0x02  # Nested directory at cluster index 9.
+                        bitmap[2] |= 0x08  # Nested file at cluster index 19.
                     if args.probe_raw_redsea_geometry == 'stockfile':
                         source = b'I64 StockRedSeaFileChecks(){return 42;}\n'
                         struct.pack_into('<H', root_dir, 0, 0x410)
@@ -1150,6 +1157,11 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     disk.write(empty_dir)
                     disk.seek((130911 + 127) * 512)
                     disk.write(broken_dir)
+                elif args.probe_raw_redsea_geometry == 'repair':
+                    disk.seek((offset + 10) * 512)
+                    disk.write(sub_dir)
+                    disk.seek((offset + 20) * 512)
+                    disk.write(file_data)
                 else:
                     disk.write(file_data)
         # A torn shadow-bank superblock must never supersede the valid A bank.
@@ -8878,8 +8890,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                                 'Print("rs_empty_dir_ok=%d\\n",rs_empty_dir!=NULL && '
                                 '(rs_empty_dir->attr & RS_ATTR_DIR)); '
                                 'DirTreeDel(rs_empty_dir);', 'rs_empty_dir_ok=1')
-                        command('zc I64 rs_di=0,rs_db=0; U8 rs_dn[96]; '
-                                'while(ZcRedSeaDirAt(rs_di++,rs_dn,96)) {'
+                        command('zc I64 rs_di=0,rs_db=0,rs_ds=0,rs_df=0; U8 rs_dn[96]; '
+                                'while(ZcRedSeaDirAt(rs_di++,rs_dn,96,&rs_ds,&rs_df)) {'
                                 'if(!StrCompare(rs_dn,"EMPTYDIR")) rs_db|=1; '
                                 'if(!StrCompare(rs_dn,"NEST")) rs_db|=2; '
                                 'if(!StrCompare(rs_dn,"BROKENDIR")) rs_db|=4; '

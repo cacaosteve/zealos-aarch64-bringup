@@ -103,7 +103,8 @@ extern Bool ZcRamVolumeFormat(U8 drv_let);
 extern Bool ZcVirtualFileDelete(U8 *path);
 extern Bool ZcRedSeaFileAt(I64 index, U8 *path, I64 path_cap, I64 *_size,
                            I64 *_first);
-extern Bool ZcRedSeaDirAt(I64 index, U8 *path, I64 path_cap);
+extern Bool ZcRedSeaDirAt(I64 index, U8 *path, I64 path_cap, I64 *_size,
+                          I64 *_first);
 extern Bool ZcSourceVolumeStats(U64 *_capacity_bytes, U64 *_free_bytes);
 extern Bool FilesFindMatch(U8 *test_name, U8 *files_find_mask,
                            I64 fuf_flags=0);
@@ -2290,7 +2291,16 @@ Bool BootstrapFilesFindAppend(CDirEntry **head, CDirEntry **tail,
     }
     for (de = *head; de; de = de->next)
         if (!StrCompare(de->full_name, full_name))
+        {
+            // File enumeration synthesizes parent directories before the
+            // RedSea directory pass can attach their physical allocation.
+            if (is_dir && (de->attr & RS_ATTR_DIR) && clus > 0)
+            {
+                de->clus = clus;
+                de->size = size;
+            }
             return FALSE;
+        }
     de = CAlloc(sizeof(CDirEntry));
     if (!de)
         return FALSE;
@@ -2309,7 +2319,7 @@ Bool BootstrapFilesFindAppend(CDirEntry **head, CDirEntry **tail,
     if (is_dir)
     {
         de->attr = RS_ATTR_DIR;
-        de->size = 0;
+        de->size = size;
     }
     else
     {
@@ -2615,7 +2625,7 @@ CDirEntry *FilesFind(U8 *files_find_mask, I64 fuf_flags=0)
     if (!(fuf_flags & FUF_JUST_FILES) && (!(fuf_flags & FUF_SINGLE) || !head))
     {
         index = 0;
-        while (ZcRedSeaDirAt(index++, path, sizeof(path)))
+        while (ZcRedSeaDirAt(index++, path, sizeof(path), &size, &first))
         {
             file_len = StrLen(path);
             if (file_len + 2 < sizeof(full_name))
@@ -2627,7 +2637,7 @@ CDirEntry *FilesFind(U8 *files_find_mask, I64 fuf_flags=0)
                     (recurse || !StrOcc(remainder, '/')))
                 {
                     added = BootstrapFilesFindAppend(&head, &tail, full_name,
-                        0, TRUE, mask_leaf, fuf_flags);
+                        size, TRUE, mask_leaf, fuf_flags, first);
                     if (added && (fuf_flags & FUF_SINGLE))
                         break;
                 }
