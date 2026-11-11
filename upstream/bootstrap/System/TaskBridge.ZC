@@ -3345,6 +3345,43 @@ Bool BlkWrite(CDrive *drive, U8 *buf, I64 blk, I64 count)
     return ZcRawDiskWrite(buf, blk, count);
 }
 
+U0 RedSeaFreeClus(CDrive *drive, I64 c, I64 count)
+{//Free allocation-map bits on the explicitly mounted, bounded RedSea drive.
+    U8 *bitmap;
+    I64 i, bit, blk;
+    if (drive != &zc_legacy_redsea_drive ||
+        drive->drive_signature != DRIVE_SIGNATURE_VAL ||
+        drive->fs_type != FSt_REDSEA)
+        throw('Drive');
+    if (!c || count <= 0)
+        return;
+    if (c < drive->data_area || c >= drive->drv_offset + drive->size ||
+        count > drive->drv_offset + drive->size - c)
+        throw('Drive');
+    bitmap = CAlloc(BLK_SIZE);
+    if (!bitmap)
+        throw('Mem');
+    try
+    {
+        for (i = 0; i < count; i++)
+        {
+            bit = c + i - drive->data_area;
+            blk = drive->fat1 + (bit >> (BLK_SIZE_BITS + 3));
+            if (!BlkRead(drive, bitmap, blk, 1))
+                throw('Drive');
+            LBtr(bitmap, bit & (BLK_SIZE << 3 - 1));
+            if (!BlkWrite(drive, bitmap, blk, 1))
+                throw('Drive');
+        }
+    }
+    catch
+    {
+        Free(bitmap);
+        throw('Drive');
+    }
+    Free(bitmap);
+}
+
 Bool RedSeaValidate(U8 drv_let)
 {//Same boot-signature check as Kernel/BlkDev/FileSysRedSea.ZC.
     CDrive *drive = Letter2Drive(drv_let, FALSE);

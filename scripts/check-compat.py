@@ -117,8 +117,8 @@ p.add_argument('--probe-raw-disk-read', action='store_true',
                help='check read-only physical VirtIO sector access')
 p.add_argument('--probe-raw-disk-write', action='store_true',
                help='check bounded, flushed absolute VirtIO writes on a disposable disk clone')
-p.add_argument('--probe-raw-redsea-geometry', choices=('absent', 'present', 'legacy', 'invalid', 'stockfile'),
-               help='check bounded legacy RedSea reads and writes against an isolated fixture')
+p.add_argument('--probe-raw-redsea-geometry', choices=('absent', 'present', 'repair', 'legacy', 'invalid', 'stockfile'),
+               help='check bounded legacy RedSea reads, writes, or repair against an isolated fixture')
 p.add_argument('--probe-stock-redsea-file', action='store_true',
                help='load one contiguous stock-layout RedSea root file on a disposable disk')
 p.add_argument('--probe-diskraw-context', action='store_true',
@@ -1047,6 +1047,14 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
     if args.pci:
         copyfile_cow(pathlib.Path(os.environ.get('ZEAL_TEST_DISK', str(ROOT/'build/disk.img'))), tmp/'disk.img')
         if args.probe_raw_redsea_geometry:
+            # The focused fixture is mounted as disk:, separate from the ISO's
+            # read-only source volume. Refresh its test source in this private
+            # clone so a probe never silently runs an older embedded copy.
+            subprocess.run(['python3', str(ROOT/'scripts/source-volume.py'), 'put',
+                            str(tmp/'disk.img'),
+                            str(ROOT/'tests/compat/RawRedSeaGeometry.ZC'),
+                            'Tests/RawRedSeaGeometry.ZC'],
+                           check=True, stdout=subprocess.DEVNULL)
             # Modify only the disposable clone, never the host image or SD.
             with (tmp/'disk.img').open('r+b') as disk:
                 disk.seek(130911 * 512)
@@ -1057,16 +1065,21 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 child_dir = bytearray(512)
                 broken_dir = bytearray(512)
                 empty_dir = bytearray(512)
-                if args.probe_raw_redsea_geometry in ('present', 'legacy', 'invalid', 'stockfile'):
+                if args.probe_raw_redsea_geometry in ('present', 'repair', 'legacy', 'invalid', 'stockfile'):
                     boot[3] = 0x88
                     offset = 0 if args.probe_raw_redsea_geometry == 'legacy' else 130911
                     struct.pack_into('<qqqqq', boot, 8, offset, 128, offset + 2, 1, 7)
                     if args.probe_raw_redsea_geometry == 'invalid':
                         struct.pack_into('<q', boot, 24, offset + 129)  # root past end
                     boot[510:512] = b'\x55\xaa'
-                    # The present-drive RedSea fixture has only its root
-                    # directory allocated; keep it clean for DiskCheck.
+                    # The present-drive fixture has only its root allocated.
+                    # The repair fixture adds one orphan allocation for the
+                    # stock DiskCheck repair path to reclaim.
                     bitmap[0] = 3 if args.probe_raw_redsea_geometry == 'present' else 7
+                    if args.probe_raw_redsea_geometry in ('present', 'repair'):
+                        # A root directory occupies one RedSea cluster even
+                        # when it has no entries.
+                        struct.pack_into('<q', root_dir, 48, 512)
                     if args.probe_raw_redsea_geometry == 'stockfile':
                         source = b'I64 StockRedSeaFileChecks(){return 42;}\n'
                         struct.pack_into('<H', root_dir, 0, 0x410)
@@ -8975,13 +8988,14 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                                 'zc: loaded /System/Gr/ScreenCast.ZC', timeout=45)
                         command('zload /System/BlkDev/DiskCheck.ZC',
                                 'zc: loaded /System/BlkDev/DiskCheck.ZC', timeout=45)
+                        command('zload disk:Tests/RawRedSeaGeometry.ZC',
+                                'zc: loaded disk:Tests/RawRedSeaGeometry.ZC')
                         command('zload /Apps/Psalmody/Load.ZC',
                                 'zc: loaded /Apps/Psalmody/Load.ZC', timeout=45)
                         command('zload /Demo/AcctExample/TOS/TOSMisc.ZC',
                                 'zc: loaded /Demo/AcctExample/TOS/TOSMisc.ZC', timeout=60)
-                        command('zload /Tests/RawRedSeaGeometry.ZC',
-                                'zc: loaded /Tests/RawRedSeaGeometry.ZC')
                         suffix = ('Present' if args.probe_raw_redsea_geometry in ('present', 'legacy')
+                                  else 'Repair' if args.probe_raw_redsea_geometry == 'repair'
                                   else 'Absent')
                         report = command('zcall RawRedSea' + suffix + 'Checks',
                                          'zc => 0x000000000000002a')

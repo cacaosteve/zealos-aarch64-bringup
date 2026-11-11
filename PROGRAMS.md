@@ -36,10 +36,13 @@ CPU. On the 2026-11-11 ISO, TOSMisc's MemTest and Psalmody JukePuppet's
 stock-song and Beep-fixture execution/cleanup pass on a disposable QEMU disk.
 Its ARM64 `DiskCheckAll` adaptation skips the source-backed C volume and an
 absent optional D drive, and its actual dispatch now passes against a clean
-mounted writable RedSea D fixture. Repair of a corrupt disk, populated RedSea
-volumes, and FAT32 remain open. The Beep fixture check does not measure audio
-output. See the [absent-drive check](docs/acceptance/demo-tosmisc-diskcheckall-current-qemu-2026-11-11.json)
-and [mounted-RedSea check](docs/acceptance/demo-tosmisc-diskcheckall-redsea-qemu-2026-11-11.json).
+mounted writable RedSea D fixture. The stock repair scan now also finds and
+frees one orphan allocation on a disposable RedSea D fixture; a read-back and
+second clean scan pass. Populated RedSea volumes, directory repair, and FAT32
+remain open. The Beep fixture check does not measure audio output. See the
+[absent-drive check](docs/acceptance/demo-tosmisc-diskcheckall-current-qemu-2026-11-11.json),
+[mounted-RedSea check](docs/acceptance/demo-tosmisc-diskcheckall-redsea-qemu-2026-11-11.json),
+and [repair check](docs/acceptance/demo-tosmisc-diskcheck-repair-redsea-qemu-2026-11-11.json).
 On the fresh `80cd189a…` image,
 TOSDistro's `DistroPrep` now copies and text-converts the full source tree and
 recovers cleanly. The subsequent `MakeStdDistro` flow remains incomplete:
@@ -540,11 +543,13 @@ passes the TOSMisc checks, MemTest, and stock plus looping-fixture
 `JukeSongsPuppet` paths; the terminal recovers and `zstatus` reports no failed
 tasks. The module-context harness now fails explicitly if a requested module
 does not load. See the [current TOSMisc check](docs/acceptance/tosmisc-current-song-memory-qemu-2026-11-11.json).
-The `DiskCheckAll` follow-up probe currently fails at `DiskCheck('C')` with an
-uncaught `Drive` exception: the ARM64 bridge has no writable C drive object or
-stock `Drive()` implementation. The probe stopped before disk repair or mutation;
-implementing the shared block-device/filesystem bridge is required before the
-configured-drive workflow can pass ([acceptance](docs/acceptance/tosmisc-current-song-memory-qemu-2026-11-11.json)). The ARM64 `JukeSongsPuppet` adapter launches stock `.ZC`
+An earlier `DiskCheckAll` probe failed at `DiskCheck('C')` with an uncaught
+`Drive` exception. The current ARM64 adaptation skips source-only C, dispatches
+to a mounted RedSea D, and supplies a bounded `RedSeaFreeClus` operation for
+the stock `DiskCheck` repair call. The new disposable-fixture regression frees
+an orphan allocation, verifies the bitmap on disk, and passes a second clean
+scan ([repair acceptance](docs/acceptance/demo-tosmisc-diskcheck-repair-redsea-qemu-2026-11-11.json)).
+This does not yet cover populated volumes, directory repair, or FAT32. The ARM64 `JukeSongsPuppet` adapter launches stock `.ZC`
 songs directly through JukeBox's `SingleSong` path. The QEMU regression
 returned from both the stock song and a looping Beep fixture; the fixture wrote
 markers before and after entering `Song`, the graphical terminal recovered,

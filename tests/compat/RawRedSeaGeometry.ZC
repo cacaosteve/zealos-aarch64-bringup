@@ -1,6 +1,7 @@
 extern I64 ZcRawRedSeaGeometry(U64 *base, U64 *sectors);
 extern Bool ZcMountLegacyRedSea();
 extern U0 DiskCheckAll();
+extern I64 DiskCheck(U8 drv_let, Bool fix=FALSE, Bool confirm=TRUE);
 
 // The focused checker probe doesn't load the full StrPrint stack. The clean
 // fixture should never warn; this stub only supplies DiskCheck's log symbol.
@@ -143,5 +144,39 @@ I64 RawRedSeaPresentChecks()
     Unmount('D');
     if (Letter2Drive('D', FALSE) || RedSeaValidate('D'))
         return 8;
+    return 42;
+}
+
+I64 RawRedSeaRepairChecks()
+{
+    U64 base = 0, sectors = 0;
+    CDrive *drive;
+    U8 *bitmap;
+    I64 errs;
+    if (!ZcRawRedSeaGeometry(&base, &sectors) || base != 130911 || sectors != 128)
+        return 1;
+    if (!ZcMountLegacyRedSea() || !(drive = Letter2Drive('D')) ||
+        drive->drv_offset != base || drive->fs_type != FSt_REDSEA ||
+        !DriveIsWritable('D', FALSE))
+        return 2;
+    bitmap = CAlloc(BLK_SIZE);
+    if (!bitmap)
+        return 3;
+    if (!BlkRead(drive, bitmap, drive->fat1, 1) || !Bt(bitmap, 2))
+    {
+        Free(bitmap);
+        return 4;
+    }
+    // The fixture contains one allocated but unreferenced cluster. The stock
+    // repair path should report that finding, free it, and leave a clean scan.
+    errs = DiskCheck('D', TRUE, FALSE);
+    if (errs != 1 || !BlkRead(drive, bitmap, drive->fat1, 1) || Bt(bitmap, 2))
+    {
+        Free(bitmap);
+        return 5;
+    }
+    Free(bitmap);
+    if (DiskCheck('D', FALSE, FALSE))
+        return 6;
     return 42;
 }

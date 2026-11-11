@@ -1,0 +1,27 @@
+{
+  "date": "2026-11-11",
+  "target": "UTM-bundled QEMU, AArch64 PCI, one vCPU, disposable writable RedSea VirtIO fixture",
+  "iso_sha256": "06732c48667524cae64c3fef6525fe7a401882b6fed1aa22bb9eb0d43ef684ab",
+  "kernel_sha256": "55536307b44768abf98ab8eb64369448394ff78e24b46cbbddd5dd09d4ef5ae1",
+  "source_bundle_sha256": "813a737ed809d58e5b5e323d513d6984057856c659b25e1dc3369c641121b1e4",
+  "probe_sha256": "1e90fabd18094e998db04c7d20618867464a6e94247cca0e03bbd7066a24cb85",
+  "check_compat_sha256": "823c8a0977b392487085b0377c27b4499a363b33bdcb8f1cc92659a6c8e84235",
+  "task_bridge_sha256": "06b1b8c3f3ee6b93cc41f61fc8e23606b9d2087c1057fe607e7fb13755c057f1",
+  "command": "ZEAL_COMPAT_LOG_PATH=build/tosmisc-diskcheck-repair-current-qemu-2026-11-11.log python3 -u scripts/check-compat.py --pci --quick --probe-raw-redsea-geometry repair",
+  "result": "pass: stock DiskCheck found one orphan allocation, freed it through the bounded ARM64 RedSea bridge, and returned a clean second scan",
+  "verified": [
+    "The fixture mounts as writable RedSea D with a valid bounded geometry and an empty one-cluster root directory.",
+    "The allocation bitmap starts with exactly one unreferenced allocated cluster in addition to the root allocation.",
+    "DiskCheck('D', TRUE, FALSE) reports one consistency error and invokes the ARM64 RedSeaFreeClus adapter.",
+    "Read-back confirms the orphan allocation bit was cleared on disk.",
+    "A follow-up DiskCheck('D', FALSE, FALSE) returns zero.",
+    "The guest reaches the terminal and zstatus reports failed=0."
+  ],
+  "limits": [
+    "This tests allocation-bitmap repair only; directory repair and populated RedSea trees remain untested.",
+    "The mounted fixture is a disposable 128-sector window, not a physical SD card or user disk.",
+    "FAT32 repair and live UTM UI or Raspberry Pi behavior are not established."
+  ],
+  "log": "build/tosmisc-diskcheck-repair-current-qemu-2026-11-11.log",
+  "log_sha256": "8f0577830216eff67b9eef0e4b02c017daf6003a88319be8f68dc51c2caf2f3e"
+}
