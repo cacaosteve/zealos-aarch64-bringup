@@ -74,11 +74,11 @@ I64 SourceContextFailureChecks()
     DirContextDel(context);
     context = DirContextNew("disk:Tests/TaskSettings.ZC");
     if (!context || StrCompare(context->mask, "TaskSettings.ZC") ||
-        StrCompare(Fs->cur_dir, "/Tests")) return 5;
+        StrCompare(Fs->cur_dir, "disk:/Tests")) return 5;
     DirContextDel(context);
     context = DirContextNew("disk:NewContextFile.ZC");
     if (!context || StrCompare(context->mask, "NewContextFile.ZC") ||
-        StrCompare(Fs->cur_dir, "/")) return 6;
+        StrCompare(Fs->cur_dir, "disk:/")) return 6;
     DirContextDel(context);
     if (!Cd(original)) return 7;
     Free(original);

@@ -592,6 +592,13 @@ if args.probe_budget_template_ui:
         p.error('--probe-budget-template-ui manages its own source fixture')
     args.probe_budget_program = True
     args.probe_source = [ROOT/'tests/compat/BudgetTemplateUiPersist.ZC']
+if args.probe_source_context:
+    # Keep this fixture in sync with the current disk: namespace semantics;
+    # the ISO's embedded copy can lag behind the host compatibility test.
+    if args.probe_source:
+        p.error('--probe-source-context manages its own source fixture')
+    args.pci = True
+    args.probe_source = [ROOT/'tests/compat/SourceContext.ZC']
 if args.probe_source_cold_call and (not args.pci or not args.probe_source_fast or
         not args.probe_source_call or not args.probe_source or
         len(args.probe_source) != 1 or args.probe_source_module or
@@ -14797,7 +14804,14 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         command('zcall TaskCurrentDirectoryChecks', 'zc => 0x000000000000002a')
         command('zcall TaskSettingsRestoreChecks', 'zc => 0x000000000000002a')
         command('zcall TaskSettingsDocumentChecks', 'zc => 0x000000000000002a')
-        command('zload /Tests/SourceContext.ZC', 'zc: loaded /Tests/SourceContext.ZC')
+        if args.probe_source_context:
+            source_context_path = 'disk:Probe/Source0.ZC'
+            command('zload '+source_context_path,
+                    'zc: loaded '+source_context_path)
+        else:
+            source_context_path = '/Tests/SourceContext.ZC'
+            command('zload '+source_context_path,
+                    'zc: loaded '+source_context_path)
         command('zcall SourceContextOffsetShadowChecks', 'zc => 0x000000000000002a')
         command('zcall SourceContextMaskChecks', 'zc => 0x000000000000002a')
         command('zcall SourceContextFailureChecks', 'zc => 0x000000000000002a')
