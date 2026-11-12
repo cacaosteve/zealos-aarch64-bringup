@@ -1370,17 +1370,18 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
         # Send chords as ordered edges, with enough spacing for the guest to
         # sample each transition under load. Grouping Shift+key in one QMP
         # request or releasing Shift too quickly can leave the modifier stuck
-        # and corrupt the next mixed-case command.
+        # and corrupt the next mixed-case command. Keep each edge visible long
+        # enough for the emulated keyboard poller during software rendering.
         for qcode in qcodes:
             qmp_key_edges([qcode], True)
-            time.sleep(0.1)
+            time.sleep(0.25)
         for qcode in reversed(qcodes):
             qmp_key_edges([qcode], False)
-            time.sleep(0.1)
+            time.sleep(0.25)
         for modifier in ('shift', 'ctrl', 'alt'):
             if modifier in qcodes:
                 qmp_key_edges([modifier], False)
-                time.sleep(0.1)
+                time.sleep(0.25)
     def graphical_path(name):
         # Independent program/workflow gates may run concurrently. Keep
         # their QMP screendumps separate so one VM cannot satisfy another's
@@ -1556,7 +1557,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             time.sleep(0.1)
     def type_graphical_prompt_line(name, text, attempts=3, prompt_required=True,
                                    command_timeout=120, key_delay=0.5,
-                                   focus_primary=True):
+                                   focus_primary=True, verify_each_key=False):
         # After focus changes, a guest may miss one early key edge even when
         # QMP accepted the event. Clear and verify the guest's input buffer
         # before each attempt so a retry never appends to a partial command.
@@ -1614,7 +1615,41 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                                        f'see {graphical_path(name + "-empty-prompt")}\n'
                                        f'input length={input_length}\n' + screen[3])
                 time.sleep(0.1)
-            qmp_send_text(text, delay=key_delay)
+            if verify_each_key:
+                # A long QMP string can lose isolated key edges when the guest
+                # is rendering a software 3D scene. Confirm the graphical
+                # editor consumed each character before sending the next one;
+                # retry only the character whose input-buffer edge was missed.
+                for index, char in enumerate(text):
+                    accepted = False
+                    for key_attempt in range(3):
+                        qmp_send_text(char, delay=key_delay,
+                                      dismiss_splash=False)
+                        key_deadline = time.monotonic() + 2.0
+                        while time.monotonic() < key_deadline:
+                            state = command('zcall BootstrapGuiTerminalInputDiag',
+                                            'zc => 0x', timeout=command_timeout)
+                            length_match = re.search(
+                                r'zc => 0x([0-9a-fA-F]+)', state)
+                            current_length = (int(length_match.group(1), 16) & 255
+                                              if length_match else -1)
+                            if current_length == index + 1:
+                                accepted = True
+                                break
+                            if current_length > index + 1:
+                                raise RuntimeError(
+                                    f'graphical editor input advanced too far '
+                                    f'while typing character {index}: '
+                                    f'{current_length}')
+                            time.sleep(0.1)
+                        if accepted:
+                            break
+                    if not accepted:
+                        raise RuntimeError(
+                            f'graphical editor did not accept character '
+                            f'{index} ({char!r}) after 3 attempts')
+            else:
+                qmp_send_text(text, delay=key_delay)
             try:
                 screen = graphical_screen(name)
                 state = command('zc Print("gui_input_length=%d\\n", '
@@ -1647,7 +1682,24 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                       f'expected_length={len(text)} '
                       f'guest_length={match.group(1) if match else "unavailable"} '
                       f'visible={visible}', flush=True)
-                return require_graphical_prompt_text(name, text, timeout=8)
+                # Give the terminal a short repaint window, then check both
+                # the rendered line and the live editor buffer again.  The old
+                # path returned on visible text alone, which could submit a
+                # truncated command if one or more QMP key edges were missed.
+                screen = require_graphical_prompt_text(name, text, timeout=8)
+                state = command('zc Print("gui_input_length=%d\\n", '
+                                'BootstrapGuiTerminalInputDiag() & 255);',
+                                'gui_input_length=', timeout=command_timeout)
+                match = re.search(r'gui_input_length=(\d+)', state)
+                if (match and int(match.group(1)) == len(text) and
+                        (not prompt_required or
+                         re.search(r'>[ \t]+' + re.escape(text), screen[3]) or
+                         text in screen[3])):
+                    return screen
+                raise RuntimeError(
+                    f'graphical input remained incomplete after repaint: '
+                    f'expected={len(text)} '
+                    f'guest={match.group(1) if match else "unavailable"}')
             except RuntimeError:
                 if attempt + 1 == attempts:
                     raise
@@ -5162,7 +5214,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
             if not (args.probe_keepaway_audio or args.probe_keepaway_full_game):
                 type_graphical_prompt_line(
                     '3d-grmodels-launch',
-                    'ExeFile2("/Apps/GrModels/Run.ZC");')
+                    'ExeFile2("/Apps/GrModels/Run.ZC");',
+                    attempts=3, key_delay=1.0, verify_each_key=True)
                 qmp_send_key('ret')
                 time.sleep(1)
                 grmodels = graphical_screen('3d-grmodels-entry')
@@ -5183,6 +5236,16 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 time.sleep(0.15)
                 graphical_mouse_button('left', False)
                 qmp_send_key('esc')
+                time.sleep(0.25)
+                # When the click puts DocForm into its active field editor,
+                # the first Escape can dismiss that editor while leaving the
+                # form open.  Close the form as a second step only if its
+                # fields are still on screen; this also keeps the picker
+                # assertion below as the authority for successful acceptance.
+                after_form_escape = graphical_screen('3d-grmodels-man-form-escape')
+                if ('Head Radius' in after_form_escape[3] and
+                        'Single-Sided means' not in after_form_escape[3]):
+                    qmp_send_key('esc')
                 require_graphical_text(
                     '3d-grmodels-man-color-shirt', 'Single-Sided means', timeout=12)
 
@@ -5317,7 +5380,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
 
                 type_graphical_prompt_line(
                     '3d-grmodels-ball-launch',
-                    'ExeFile2("/Apps/GrModels/Run.ZC");')
+                    'ExeFile2("/Apps/GrModels/Run.ZC");',
+                    attempts=3, key_delay=1.0, verify_each_key=True)
                 qmp_send_key('ret')
                 # The previous Man run leaves its menu and repeat prompt in
                 # the document until the new run executes DocClear. Do not

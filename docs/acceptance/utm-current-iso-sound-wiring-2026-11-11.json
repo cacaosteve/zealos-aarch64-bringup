@@ -1,0 +1,23 @@
+{
+  "date": "2026-11-11",
+  "target": "UTM on macOS, ZealOS AArch64 Current ISO Acceptance",
+  "result": "configured; audible playback pending guest restart",
+  "utm_config": "/Users/steve/Library/Containers/com.utmapp.UTM/Data/Documents/ZealOS AArch64 Current ISO Acceptance.utm/config.plist",
+  "config_backup": "/Users/steve/Library/Containers/com.utmapp.UTM/Data/Documents/ZealOS AArch64 Current ISO Acceptance.utm/config.plist.pre-virtio-sound-20261111",
+  "iso_path": "/Users/steve/.codex/worktrees/three-3d-apps/zealos-aarch64-bringup/build/zealos-aarch64-hello.iso",
+  "iso_sha256": "55719ef8a54663ae42a43143579c10a557126e94d8ecad4e9438331ed8bc5a8a",
+  "guest_sound_device": "virtio-sound-pci",
+  "host_audio_backend": "SPICE",
+  "verified": [
+    "The current ISO hash matches the ISO in the prepared UTM Sound Acceptance profile.",
+    "The Current ISO Acceptance profile previously selected intel-hda, while the AArch64 guest sound implementation probes for VirtIO Sound.",
+    "The Current ISO Acceptance profile now selects virtio-sound-pci, and plutil validates the edited configuration.",
+    "A pre-change config.plist backup was preserved."
+  ],
+  "not_verified": [
+    "The running VM still has its old Intel HDA device until it is stopped and restarted.",
+    "Audible Beep(60); playback from the updated Current ISO Acceptance VM."
+  ],
+  "next": "Stop and restart ZealOS AArch64 Current ISO Acceptance, then run Beep(60); and confirm whether it is audible.",
+  "scope_note": "This records UTM device wiring only. It does not establish playback until the updated VM is restarted and heard live."
+}
