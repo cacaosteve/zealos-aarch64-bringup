@@ -386,14 +386,15 @@ normal-load result is not runtime acceptance.
 
 | X-Caliber | The current ISO (`55719ef8…`) passes both plain-arrow thrusters, visible Space projectile changes, Escape, and graphical-terminal shell recovery with UTM's bundled QEMU profile ([current-image check](docs/acceptance/xcaliber-current-55719-utm-qemu-2026-11-11.json)). Broader gameplay remains unverified. |
 
-After the latest source-backed filesystem/runtime rebuild, the ISO
-`80cd189a…` passed the UTM-bundled QEMU regression for GrModels, KeepAway and
-Titanium, including a 186-second KeepAway run with 18 repeated input cycles,
-Escape recovery and task cleanup. The same image passed Budget's form, menu,
-save/reopen and cold disk-only persistence workflow. This refreshes automated
-QEMU evidence for the new image; it does not close the earlier visible-UTM
-freeze reports for Budget and KeepAway or the live GrModels visual check. See
-[`current-utm-qemu-followup-2026-11-11.json`](docs/acceptance/current-utm-qemu-followup-2026-11-11.json).
+The preceding source-backed filesystem/runtime rebuild, ISO `80cd189a…`,
+passed the UTM-bundled QEMU regression for GrModels, KeepAway and Titanium,
+including a 186-second KeepAway run with 18 repeated input cycles, Escape
+recovery and task cleanup. The same image passed Budget's form, menu,
+save/reopen and cold disk-only persistence workflow. On the current ISO
+`55719ef8…`, the user has since confirmed live UTM Budget launch/Escape and
+KeepAway pointer/Escape recovery. Live GrModels model visibility remains open.
+See [`current-utm-qemu-followup-2026-11-11.json`](docs/acceptance/current-utm-qemu-followup-2026-11-11.json)
+and the [current 3D-app record](docs/acceptance/three-d-apps-current-55719-utm-qemu-2026-11-11.json).
 
 A subsequent Vocabulary run using the graphical launcher captured a tone
 consistent with its correct-answer `Sound(74)` as well; see the
