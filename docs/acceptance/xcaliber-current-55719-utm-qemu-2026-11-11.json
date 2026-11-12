@@ -1,0 +1,18 @@
+{
+  "date": "2026-11-11",
+  "target": "AArch64 native ZealC under UTM-bundled QEMU/HVF, one vCPU, virtio-ramfb, VirtIO keyboard and tablet",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "55719ef8a54663ae42a43143579c10a557126e94d8ecad4e9438331ed8bc5a8a",
+  "kernel_sha256": "42d44f33ae960df3f4e6d4ec51921b225e5cb3a83740f9c862417573f01b1abf",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-xcaliber-current-55719.log python3 -u scripts/check-compat.py --pci --quick --probe-xcaliber",
+  "serial_log": "build/check-xcaliber-current-55719.log",
+  "serial_log_sha256": "0c4adb5b7494d0acc628d01e9941a56dbf8381303be18f4827a8b5e18ab33b11",
+  "exit_code": 0,
+  "result": "pass",
+  "checks": [
+    "X-Caliber's startup popup appeared and its suppression checkbox worked.",
+    "Plain Left and Right thruster inputs changed the player ship; Space produced visible projectile-region changes.",
+    "Escape returned to the graphical terminal, which accepted and executed a shell command."
+  ],
+  "scope_note": "Automated UTM-bundled QEMU evidence for the current exact ISO. Broader gameplay and live UTM/Pi app behavior are not covered."
+}

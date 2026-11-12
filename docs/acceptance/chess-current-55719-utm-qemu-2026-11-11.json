@@ -1,0 +1,18 @@
+{
+  "date": "2026-11-11",
+  "target": "AArch64 native ZealC under UTM-bundled QEMU/HVF, one vCPU, virtio-ramfb, VirtIO keyboard and tablet",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "55719ef8a54663ae42a43143579c10a557126e94d8ecad4e9438331ed8bc5a8a",
+  "kernel_sha256": "42d44f33ae960df3f4e6d4ec51921b225e5cb3a83740f9c862417573f01b1abf",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-chess-current-55719.log python3 -u scripts/check-compat.py --pci --quick --probe-demo-chess-ai",
+  "serial_log": "build/check-chess-current-55719.log",
+  "serial_log_sha256": "119ae48665d0df3ac488c72b69c74d27e75b7c7543da0008cb657715442bb6c8",
+  "exit_code": 0,
+  "result": "pass",
+  "checks": [
+    "Chess board rendered after selecting human players.",
+    "A mouse drag moved a pawn from source to destination and the AI replied with E7-E6.",
+    "Escape returned to the graphical terminal; 40+2 returned 42 and zstatus reported failed=0."
+  ],
+  "scope_note": "Automated QEMU evidence for the basic move/AI workflow on this exact ISO. Other moves, full games, and visible live UTM/Pi behavior remain unverified."
+}
