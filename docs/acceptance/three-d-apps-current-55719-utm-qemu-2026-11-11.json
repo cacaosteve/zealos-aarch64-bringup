@@ -1,0 +1,31 @@
+{
+  "date": "2026-11-11",
+  "target": "AArch64 native ZealC under UTM-bundled QEMU/HVF, one vCPU, virtio-ramfb, VirtIO keyboard and tablet",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "55719ef8a54663ae42a43143579c10a557126e94d8ecad4e9438331ed8bc5a8a",
+  "kernel_sha256": "42d44f33ae960df3f4e6d4ec51921b225e5cb3a83740f9c862417573f01b1abf",
+  "runs": [
+    {
+      "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-3d-interactive-current-55719.log python3 -u scripts/check-compat.py --pci --quick --probe-3d-apps",
+      "serial_log": "build/check-3d-interactive-current-55719.log",
+      "serial_log_sha256": "b10f99799a58335d31351d6b3165856472a221b659168c826b692dba3ce6dbbb",
+      "exit_code": 0,
+      "checks": {
+        "GrModels": "Man form and color selection generated a 112-vertex/168-triangle mesh with 1,273 visible inline pixels; Ball generated 58 vertices with 778 visible purple pixels. Both completed their repeat prompts and returned to a working terminal; zstatus failed=0.",
+        "KeepAway": "Court and HUD rendered; gameplay, pointer movement and Space input updated the frame; Escape returned to terminal focus and removed the Animate task; zstatus failed=0.",
+        "Titanium": "Press-a-key intro advanced; Left and Right moved the player, Space advanced gameplay, and Escape returned to a working terminal; zstatus failed=0.",
+        "shared_regressions": "3D mesh/interpolation/services fixtures and shared GUI terminal, compiler, task, source-context, and system-server regressions passed."
+      }
+    },
+    {
+      "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-3d-current-55719.log python3 -u scripts/check-compat.py --pci --quick --probe-3d-apps --probe-keepaway-full-game",
+      "serial_log": "build/check-3d-current-55719.log",
+      "serial_log_sha256": "68b3dad508d5ae48d0f6fd43b5c2fa6a1e4a3e6012e92e133f5136bff6809925",
+      "exit_code": 0,
+      "checks": {
+        "KeepAway": "A separate 187-second full-game run stayed animated through 18 repeated pointer/Space input cycles, then Escape restored terminal focus and removed the Animate task; zstatus failed=0."
+      }
+    }
+  ],
+  "scope_note": "Automated UTM-bundled QEMU/HVF evidence for this exact ISO. It does not prove the prior visible UTM KeepAway freeze is resolved, and it is not full application feature parity or Pi hardware acceptance."
+}
