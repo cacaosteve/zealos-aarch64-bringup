@@ -15,8 +15,14 @@
     "The saved entry reopens, and its data persists across a cold boot with only the VirtIO disk.",
     "Each app exit returns to a graphical terminal where 40+2 evaluates to 42."
   ],
+  "live_utm_user_confirmation": {
+    "date": "2026-11-11",
+    "checks": [
+      "User opened Budget from the Apps menu and confirmed its Escape exit/recovery remained responsive."
+    ],
+    "scope": "A brief live check; not a manual reproduction of every create/edit/save workflow."
+  },
   "not_verified": [
-    "Visible UTM app-window acceptance: an earlier user report described Budget freezing; this QEMU automation does not resolve that report.",
     "Account file editing and account selection workflows are not covered by this probe."
   ]
 }

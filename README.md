@@ -37,9 +37,9 @@ GrModels' generated model is visible). Additional stock graphics programs
 including Doodle, Mass Spring and Game of Life have live UTM acceptance.
 Budget's full entry workflow was rerun on the exact current ISO: create, edit,
 abort, cancel, save, reopen, cold disk-only persistence, and return to a working
-terminal all pass with `zstatus failed=0`. This is automated QEMU coverage; the
-earlier visible UTM freeze report remains open, as do account-file editing and
-account selection. See
+terminal all pass with `zstatus failed=0`. The user also confirmed that launching
+Budget in UTM and pressing Escape returns responsively to a terminal. Account-file
+editing and account selection remain unverified. See
 [`Budget current-image acceptance`](docs/acceptance/budget-current-55719-utm-qemu-2026-11-11.json).
 `make check-stock-programs` and `make check-stock-interactive` exercise
 drawing, mouse/keyboard input, animation and clean exit in QEMU. Evidence and
