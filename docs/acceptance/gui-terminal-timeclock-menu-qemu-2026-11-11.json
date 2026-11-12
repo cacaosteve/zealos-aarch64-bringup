@@ -15,5 +15,5 @@
     "The user confirmed the new Apps → Time Clock entry launches and works in the live UTM guest.",
     "The graphical terminal smoke passed after restart with failed=0."
   ],
-  "scope_note": "The TimeClock workflow was separately user-confirmed on an earlier ISO. The user now confirms the new menu entry on this image works in the live UTM guest."
+  "scope_note": "The TimeClock workflow was separately user-confirmed in live UTM, and this QEMU smoke verifies the c007d5a7 menu binding and source mapping. In a later session, the user did not see Time Clock in Apps; the ISO hash of that guest is unknown, so exact live menu visibility should be checked against c007d5a7."
 }

@@ -1,0 +1,17 @@
+{
+  "date": "2026-11-11",
+  "target": "AArch64 native ZealC under UTM-bundled QEMU/HVF, one vCPU, virtio-ramfb, VirtIO keyboard and tablet",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "c007d5a760c33df5f509781790b9a29eb69bacc5f310d5c8b1267c7dbb1d2913",
+  "kernel_sha256": "0a36b1d0a4262aa75b67c58477c311cbbd702d890eaa988744e2725b643cdc20",
+  "command": "python3 scripts/check-compat.py --pci --quick --probe-timeclock",
+  "serial_log": "build/check-timeclock-pci.log",
+  "serial_log_sha256": "4aabc1ca61a5aab9a4c3c9e2d1721617ebe803eedb28b8db7de28cd65e574b6d",
+  "result": "pass",
+  "checks": [
+    "The c007d5a7 ISO booted to a focused graphical terminal and launched /Apps/TimeClock/Load.ZC.",
+    "The app accepted punch-in and punch-out descriptions, reported the saved entry, and returned to a responsive terminal.",
+    "The terminal evaluated 40+2 as 42 and zstatus reported failed=0."
+  ],
+  "scope_note": "This is automated UTM-bundled QEMU acceptance. The current user session did not show Time Clock in its Apps menu; its guest ISO hash is unknown, so live menu visibility still needs confirmation against this exact c007d5a7 ISO."
+}
