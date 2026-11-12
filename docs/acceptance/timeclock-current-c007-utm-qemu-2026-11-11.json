@@ -13,5 +13,6 @@
     "The app accepted punch-in and punch-out descriptions, reported the saved entry, and returned to a responsive terminal.",
     "The terminal evaluated 40+2 as 42 and zstatus reported failed=0."
   ],
-  "scope_note": "This is automated UTM-bundled QEMU acceptance. The current user session did not show Time Clock in its Apps menu; its guest ISO hash is unknown, so live menu visibility still needs confirmation against this exact c007d5a7 ISO."
+  "user_live_result": "The user confirmed TimeClock works great in the live UTM guest. The exact ISO hash and whether it was launched through the Apps menu were not stated.",
+  "scope_note": "This is automated UTM-bundled QEMU acceptance plus a user-reported live app pass. The guest ISO hash is unknown, and the user previously reported not seeing Time Clock in Apps, so exact live menu visibility remains unconfirmed against this c007d5a7 ISO."
 }

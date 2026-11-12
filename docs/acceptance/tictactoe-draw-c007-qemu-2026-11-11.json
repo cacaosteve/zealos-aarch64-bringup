@@ -1,0 +1,17 @@
+{
+  "date": "2026-11-11",
+  "target": "AArch64 guest under qemu-system-aarch64 with HVF, one vCPU, ramfb, VirtIO keyboard and tablet",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "c007d5a760c33df5f509781790b9a29eb69bacc5f310d5c8b1267c7dbb1d2913",
+  "kernel_sha256": "0a36b1d0a4262aa75b67c58477c311cbbd702d890eaa988744e2725b643cdc20",
+  "command": "python3 scripts/check-compat.py --pci --quick --probe-demo-tictactoe-draw",
+  "serial_log": "build/check-demo-tictactoe-pci.log",
+  "serial_log_sha256": "3f36abd0a1b2cf955eaff3a5f6ea88c4e2da6fc73f46607329eb6c8ee6b7e8a6",
+  "exit_code": 0,
+  "result": "pass",
+  "checks": [
+    "TicTacToe completed a nine-move draw, reset the board, and replayed the game.",
+    "The app accepted mouse turns, Escape returned to the graphical terminal, and zstatus reported failed=0."
+  ],
+  "scope_note": "Automated QEMU/HVF evidence on the exact c007d5a7 ISO. This run covers the draw/replay path; the existing 55719ef8 record covers win/replay. Live UTM and Pi interaction were not checked by this run."
+}
