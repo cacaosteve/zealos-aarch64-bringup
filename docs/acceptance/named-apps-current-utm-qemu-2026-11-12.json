@@ -1,0 +1,58 @@
+{
+  "date": "2026-11-12",
+  "repository_commit": "1750a794343a71c448a2cfc622619c7dcc997d48",
+  "target": "UTM-bundled QEMU, HVF, one vCPU, VirtIO keyboard/tablet, graphical ARM64 guest",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "9b98f3b27ff385d10924332482dfaa3ed1d29d8943b67845afb97eac8bfe87e4",
+  "kernel_sha256": "2503d79df289a108fa77fa489130c7d4480ae679df668bb6885a8d561158baa2",
+  "result": "pass",
+  "probes": {
+    "Digital Logic": {
+      "command": "python3 -u scripts/check-compat.py --pci --probe-logic-program",
+      "result": "pass",
+      "verified": [
+        "AND/OR gate prompt editing including deletion and mid-field edits",
+        "Expected gate drawings and nonempty rendered pixels",
+        "Setup abort and Shift+Escape recovery, relaunch, and clean terminal return",
+        "Terminal evaluates 40+2 as 42 and zstatus reports failed=0"
+      ],
+      "serial_log": "build/check-logic-pci.log",
+      "serial_log_sha256": "a8c7dbd158d024607cfbd8365099376411168ca520c91b443c5b2e7f917d7b10"
+    },
+    "Budget": {
+      "command": "python3 -u scripts/check-compat.py --pci --probe-budget-program",
+      "result": "pass",
+      "verified": [
+        "Create, edit, cancel, save, and abort a budget entry",
+        "Reopen saved data and verify cold disk-only persistence",
+        "Clean terminal recovery and zstatus failed=0"
+      ],
+      "serial_log": "build/check-budget-pci.log",
+      "serial_log_sha256": "fe74dc210501cc8b0d243dad8679159c164fc194c4033ee942baf99ed60a8c3d"
+    },
+    "TimeClock": {
+      "command": "python3 -u scripts/check-compat.py --pci --probe-timeclock",
+      "result": "pass",
+      "verified": [
+        "Punch in/out with descriptions",
+        "Saved report contains the expected entries",
+        "Returns to a working terminal"
+      ],
+      "serial_log": "build/check-timeclock-pci.log",
+      "serial_log_sha256": "b35110fd37a12e999208a446c4067c57d61758bf329003ca43dac3f372ee55aa"
+    },
+    "GrModels, KeepAway, Titanium": {
+      "command": "python3 -u scripts/check-compat.py --pci --probe-3d-apps",
+      "result": "pass",
+      "verified": [
+        "GrModels Man and Ball forms generate visible inline models and reach repeat prompts; Man mesh has 112 vertices and Ball mesh has 58 vertices",
+        "KeepAway renders the court and HUD, accepts mouse/Space input, and Escape returns to the terminal with task cleanup",
+        "Titanium reaches gameplay, accepts gameplay input, and Escape returns to the terminal",
+        "Terminal evaluation and zstatus checks pass after app exit"
+      ],
+      "serial_log": "build/check-3d-apps-pci.log",
+      "serial_log_sha256": "41534b7c81eb7cf9ffdc0c87cac40028e2ed3168c4a12695478f59794069ed48"
+    }
+  },
+  "scope_note": "Automated QEMU runtime gates on the exact ISO listed above. These focused probes do not prove every upstream app or demo workflow and do not replace live UTM interaction. The earlier user-reported live Span unresponsiveness remains open."
+}

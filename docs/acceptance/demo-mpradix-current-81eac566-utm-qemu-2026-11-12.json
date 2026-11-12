@@ -1,0 +1,25 @@
+{
+  "date": "2026-11-12",
+  "target": "UTM-bundled QEMU, AArch64 PCI graphical guest, one guest CPU",
+  "program": "/Demo/MultiCore/MPRadix.ZC",
+  "source_sha256": "d414f5d3f93588e193c9833e3ae48c7828c322d731b9bfa8aef6ce0ccfd1e5ef",
+  "test_source": "tests/compat/MultiCore1Runtime.ZC",
+  "test_source_sha256": "aeefa516d3b549059fa59cd271017b84dcf623ad5d51a6d8f2bd67735651fbf0",
+  "artifacts": {
+    "iso": "build/zealos-aarch64-hello.iso",
+    "iso_sha256": "81eac566be9a778fe299b1b3c66fcb6fb0454108e482304b12c62244f55a7e01",
+    "kernel_sha256": "d3060540e8392379e6a005dfa28b0170b55f203ba14ec2e0f702c4a6de8d4f9e",
+    "sources_tar_sha256": "1569d9565986473f831d57ac61c77f53d96f90879d2315b9f455630db19d21f7"
+  },
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-mpradix-current-81eac566.log python3 -u scripts/check-compat.py --pci --quick --probe-source-fast --probe-source-module disk:/Demo/MultiCore/MPRadix.ZC --probe-source tests/compat/MultiCore1Runtime.ZC --probe-source-call MultiCore1RuntimeAcceptance",
+  "result": "partial",
+  "verified": [
+    "The bundled MPRadix source ran QuickSort, QuickSortU32, and its one-worker radix stage.",
+    "All three printed the same sorted sample bytes.",
+    "The cooperative worker regression returned 0x2a after checking Spawn, Yield, result aggregation, and completion."
+  ],
+  "log": "build/check-mpradix-current-81eac566.log",
+  "log_sha256": "85abe5e1f5bd7cc35f1548701335a9d2c0020ef36511b4fe335651596f60b81d",
+  "remaining": "The guest runtime exposes one logical CPU. Multi-CPU radix distribution, parallel speedup, and real SMP scheduling remain unverified; keep the multicore demo classified partial until those pass.",
+  "scope_note": "Current ISO QEMU acceptance for the single-worker fallback only. This does not establish true SMP behavior, live UTM UI behavior, or physical Pi behavior."
+}

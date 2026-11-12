@@ -1,0 +1,25 @@
+{
+  "date": "2026-11-12",
+  "repository_commit": "1750a794343a71c448a2cfc622619c7dcc997d48",
+  "working_tree": "dirty; exact tested ISO and audio artifacts identified by SHA-256",
+  "program": "/Apps/Psalmody/Run.ZC",
+  "target": "UTM-bundled QEMU, HVF, one vCPU, VirtIO keyboard/tablet and WAV-backed virtio-sound-pci",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "81eac566be9a778fe299b1b3c66fcb6fb0454108e482304b12c62244f55a7e01",
+  "kernel_sha256": "d3060540e8392379e6a005dfa28b0170b55f203ba14ec2e0f702c4a6de8d4f9e",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device -audiodev wav,id=sound0,path=build/psalmody-current-audio-81eac566.wav -device virtio-sound-pci,audiodev=sound0' ZEAL_COMPAT_LOG_PATH=build/check-psalmody-current-audio-81eac566.log python3 -u scripts/check-compat.py --pci --quick --probe-psalmody --probe-psalmody-audio-timer",
+  "result": "pass",
+  "verified": [
+    "Psalmody launched, accepted note input, played a note, exited with Shift+Escape and returned to a working terminal",
+    "WAV captured 18,522 stereo frames at 44,100 Hz; 29,988 nonzero samples, peak 7,000, RMS about 6,252",
+    "Strongest sustained tone measured about 523.5 Hz (C5)",
+    "Sound timer delivered 22 IRQs; terminal evaluated 40+2 as 42 and zstatus failed=0"
+  ],
+  "artifacts": {
+    "serial_log": "build/check-psalmody-current-audio-81eac566.log",
+    "serial_log_sha256": "7898dbbba7091e5f5722416ce1f8ede5e00df16783a3f76361a8b0ffc38b2b6e",
+    "wav": "build/psalmody-current-audio-81eac566.wav",
+    "wav_sha256": "a1b0e4ca2f22e57aac2a3f7a450dc81df76ab6abbd615aee4ecaad311714d33e"
+  },
+  "scope_note": "The generated PCM is verified for this exact ISO. Audible UTM/Pi output was separately confirmed by the user on earlier builds; the WAV result does not replace live output acceptance on this exact image."
+}

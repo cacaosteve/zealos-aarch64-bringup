@@ -1,0 +1,25 @@
+{
+  "date": "2026-11-12",
+  "repository_commit": "1750a794343a71c448a2cfc622619c7dcc997d48",
+  "program": "/Apps/Psalmody/Run.ZC",
+  "target": "UTM-bundled QEMU, HVF, one vCPU, VirtIO keyboard/tablet and WAV-backed virtio-sound-pci",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "9b98f3b27ff385d10924332482dfaa3ed1d29d8943b67845afb97eac8bfe87e4",
+  "kernel_sha256": "2503d79df289a108fa77fa489130c7d4480ae679df668bb6885a8d561158baa2",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device -audiodev wav,id=sound0,path=build/psalmody-current-audio-2026-11-12.wav -device virtio-sound-pci,audiodev=sound0' ZEAL_COMPAT_LOG_PATH=build/check-psalmody-current-audio-2026-11-12.log python3 -u scripts/check-compat.py --pci --quick --probe-psalmody --probe-psalmody-audio-timer",
+  "result": "pass",
+  "verified": [
+    "Psalmody launched through the graphical terminal, accepted note input, played the note, exited with Shift+Escape, and returned to a working terminal.",
+    "The WAV-backed VirtIO sound device captured 18,522 stereo frames at 44,100 Hz; 29,988 samples were nonzero, with peak amplitude 7,000 and RMS about 6,252.",
+    "The strongest sustained tone measured about 523.5 Hz, consistent with C5.",
+    "The experimental sound timer delivered 22 IRQs.",
+    "After exit, the terminal evaluated 40+2 as 42 and zstatus reported failed=0."
+  ],
+  "artifacts": {
+    "serial_log": "build/check-psalmody-current-audio-2026-11-12.log",
+    "serial_log_sha256": "9db7c1c5fca3b7a6c69fa7925506e3d549d4ba7ba91f36c020cb638d078646d5",
+    "wav": "build/psalmody-current-audio-2026-11-12.wav",
+    "wav_sha256": "a1b0e4ca2f22e57aac2a3f7a450dc81df76ab6abbd615aee4ecaad311714d33e"
+  },
+  "scope_note": "This verifies app interaction and generated PCM under UTM-bundled QEMU with a WAV sink. It does not replace live audible-output acceptance, which the user has separately confirmed for UTM and Pi HDMI/headphone output."
+}

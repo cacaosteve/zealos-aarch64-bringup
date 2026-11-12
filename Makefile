@@ -97,7 +97,7 @@ SRC_SHADOW_END   := $(shell echo $$(($(SRC_SHADOW_LBA) + $(SRC_SHADOW_SECTS) - 1
 ESP_END_SECTOR   := $(shell echo $$(($(RS_LBA_BASE) - 1)))
 ESP_SECTORS      := $(shell echo $$(($(ESP_END_SECTOR) - $(ESP_START_SECTOR) + 1)))
 
-.PHONY: all clean esp iso run run-serial check-serial check-page-tables check-pi4-pcie-fdt check-pi4-pcie-cfg check-pi4-dma check-pi4-xhci-probe check-pi4-xhci-dma check-pi4-platform check-window-buttons check-sprite-arrow-symmetry check-doced-popup check-docfile-persistence check-time-format check-timeclock check-compare-chains run-iso run-pci utm pi-sd pi-diag
+.PHONY: all clean esp iso run run-serial check-serial check-page-tables check-pi4-pcie-fdt check-pi4-pcie-cfg check-pi4-dma check-pi4-xhci-probe check-pi4-xhci-dma check-pi4-platform check-block-device check-window-buttons check-sprite-arrow-symmetry check-doced-popup check-docfile-persistence check-time-format check-timeclock check-compare-chains run-iso run-pci utm pi-sd pi-diag
 
 all: $(BOOT) $(KERNEL) iso esp
 
@@ -450,7 +450,9 @@ $(BUILD)/kernel_stub-pi.o: src/kernel_stub.c src/zc/runtime.h Makefile src/hando
 
 $(BUILD)/kernel_stub-pi.o: src/pi4_dma_probe.h src/pi4_xhci_probe.h src/pi4_xhci_dma_probe.h src/pi4_xhci_dma_alias.h
 
-$(BUILD)/kernel_stub.o $(BUILD)/kernel_stub-pi.o $(BUILD)/kernel_stub-pi-desktop.o: src/pi4_audio.h
+$(BUILD)/kernel_stub.o $(BUILD)/kernel_stub-pi.o $(BUILD)/kernel_stub-pi-desktop.o: src/pi4_audio.h src/pi4_sdhci_core.h
+$(BUILD)/kernel_stub-pi-desktop.o: src/pi4_sdhci_card.h src/pi4_sdhci_probe.h
+$(BUILD)/kernel_stub.o $(BUILD)/kernel_stub-pi.o $(BUILD)/kernel_stub-pi-desktop.o: src/block_device.h src/block_partition.h
 $(BUILD)/kernel_stub.o $(BUILD)/kernel_stub-pi.o $(BUILD)/kernel_stub-pi-desktop.o: src/block_range.h
 $(BUILD)/kernel_stub-pi-desktop.o: src/pi4_hdmi_audio.inc src/pi4_audio_policy.h
 
@@ -476,6 +478,13 @@ pi-desktop: $(BOOT_PI) $(KERNEL_PI_DESKTOP) $(BUILD)/sources.tar
 
 pi-desktop-sd: pi-desktop pi-diag esp
 	./scripts/pi-desktop-stage.sh
+
+PI_FIRMWARE_ROOT ?=
+PI_IMAGE ?= $(BUILD)/zealos-pi4b.img
+PI_IMAGE_SIZE_MIB ?= 8192
+.PHONY: pi-image
+pi-image: pi-desktop-sd
+	python3 scripts/build-pi-image.py --firmware-root "$(PI_FIRMWARE_ROOT)" --payload "$(BUILD)/pi-desktop-esp" --output "$(PI_IMAGE)" --size-mib "$(PI_IMAGE_SIZE_MIB)"
 
 check-pi-desktop-image: pi-desktop-sd
 
@@ -642,7 +651,27 @@ check-block-range: | $(BUILD)
 	$(HOST_CC) -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined -I$(ROOT)/src tests/block_range_test.c -o $(BUILD)/block-range-test
 	$(BUILD)/block-range-test
 
-check-pi4-platform: check-pi4-pcie-fdt check-pi4-pcie-cfg check-pi4-dma check-pi4-xhci-probe check-pi4-xhci-dma check-pi4-fat32 check-pi4-keyboard check-pi4-mouse check-pi4-usb-bus check-pi4-desktop-fb check-pi4-hdmi-audio
+.PHONY: check-block-partition
+check-block-partition: | $(BUILD)
+	$(HOST_CC) -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined -I$(ROOT)/src tests/block_partition_test.c -o $(BUILD)/block-partition-test
+	$(BUILD)/block-partition-test
+
+.PHONY: check-block-device
+check-block-device: | $(BUILD)
+	$(HOST_CC) -std=c11 -Wall -Wextra -Werror -Wno-unused-function -fsanitize=address,undefined -I$(ROOT)/src tests/block_device_test.c -o $(BUILD)/block-device-test
+	$(BUILD)/block-device-test
+
+.PHONY: check-pi4-sdhci-core
+check-pi4-sdhci-core: | $(BUILD)
+	$(HOST_CC) -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined -I$(ROOT)/src tests/pi4_sdhci_core_test.c -o $(BUILD)/pi4-sdhci-core-test
+	$(BUILD)/pi4-sdhci-core-test
+
+.PHONY: check-pi4-sdhci-card
+check-pi4-sdhci-card: | $(BUILD)
+	$(HOST_CC) -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined -I$(ROOT)/src tests/pi4_sdhci_card_test.c -o $(BUILD)/pi4-sdhci-card-test
+	$(BUILD)/pi4-sdhci-card-test
+
+check-pi4-platform: check-pi4-pcie-fdt check-pi4-pcie-cfg check-pi4-dma check-pi4-xhci-probe check-pi4-xhci-dma check-pi4-fat32 check-pi4-keyboard check-pi4-mouse check-pi4-usb-bus check-pi4-desktop-fb check-pi4-hdmi-audio check-block-partition check-block-device check-pi4-sdhci-core check-pi4-sdhci-card
 
 .PHONY: check-usb-hid check-usb-route check-usb-input check-usb-topology
 check-usb-hid: | $(BUILD)

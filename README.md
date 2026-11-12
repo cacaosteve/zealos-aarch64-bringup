@@ -331,9 +331,16 @@ UTM: `make utm` → only **ZealosAarch64Hello** ([ACCEPTANCE.md](ACCEPTANCE.md))
 
 Pi 4B UEFI (parallel track): [PI4.md](PI4.md). `make pi-desktop-sd` prepares
 `build/pi-desktop-esp/` with the native desktop, bundled sources and the accepted
-USB diagnostic recovery entry; `make pi-sd` prepares diagnostics only. These
-targets prepare files without writing a card. Existing Pi UEFI/firmware/DTBs
-must be preserved; a fresh card first needs [pftf/RPi4](https://github.com/pftf/RPi4/releases).
+USB diagnostic recovery entry. `make pi-image PI_FIRMWARE_ROOT=/path/to/copied-pftf-boot`
+builds a raw image with a 512 MiB FAT32 firmware/boot partition and an isolated
+ZealOS data partition; the image size defaults to 8 GiB and can be changed with
+`PI_IMAGE_SIZE_MIB`. It requires `mkfs.fat`, `mcopy`, and `mmd`, and never writes
+to a physical card. The Pi now has an explicit `psdopen` path that binds a
+matching data partition and bounded SDHCI sector writes; this is bring-up
+storage, not yet a normal full RedSea installation. The bootstrap RedSea writer
+is deliberately limited, and the physical Pi write/readback/reboot path still
+needs validation. See [the writable-storage status and layout](docs/PI4-WRITABLE-STORAGE.md).
+A fresh card needs [pftf/RPi4](https://github.com/pftf/RPi4/releases).
 
 Bridge notes: [AIWNIOS.md](AIWNIOS.md). Milestone ladder: [upstream/README.md](upstream/README.md).
 
@@ -342,10 +349,10 @@ Bridge notes: [AIWNIOS.md](AIWNIOS.md). Milestone ladder: [upstream/README.md](u
 | Track | Status |
 |--|--|
 | QEMU/UTM virt | Current ISO `build/zealos-aarch64-hello.iso` (`9c5e90c9…`, also `build/zealos-aarch64-logic-prompt-fix.iso`) corrects Digital Logic's graphical prompt editing and fatal setup-abort path. Expanded NEC/VirtIO Logic, editor/save/reboot/reopen, Doodle/Mass Spring/Life and USB-CD install/persistence gates pass. The user confirmed the corrected-image live UTM retest works; its screenshot shows the expected AND circuit. The preserved `3b59782c…` image has live UTM acceptance for Doodle, Mass Spring and Life; `52c214c…` has live installer/desktop/persistence acceptance. See [ACCEPTANCE.md](ACCEPTANCE.md) and [PROGRAMS.md](PROGRAMS.md) for the remaining collection. |
-| Pi 4B UEFI | **PI-DESKTOP-2 native desktop/basic input accepted (2026-10-26)**: native graphical terminals, visible pointer movement, menu clicks and `40+2; → 42`. IMG_9182 confirms firmware 1920×1280, packed 800×600 desktop scaled 2×, 1632 composed frames and USB active/fault/stopped 1/0/0. Physical read-only FAT32 USB file reads and simultaneous keyboard/pointer/storage were accepted earlier. Kernel `b12497c8…93d4930b`; M6 diagnostic recovery preserved. Writable persistence remains open, with USB storage and a separate microSD data partition as user-selectable targets; the EFI/firmware boot partition stays FAT32. Native SD, reconnect recovery and Pi installation also remain open ([PI4.md](PI4.md)). |
+| Pi 4B UEFI | **PI-DESKTOP-2 native desktop/basic input accepted (2026-10-26)**: native graphical terminals, visible pointer movement, menu clicks and `40+2; → 42`. IMG_9182 confirms firmware 1920×1280, packed 800×600 desktop scaled 2×, 1632 composed frames and USB active/fault/stopped 1/0/0. Physical USB reads, headphone-jack and HDMI0 tones have also been user-confirmed. The raw-image builder now lays out a FAT32 firmware partition plus a ZealOS data partition; explicit `psdopen` and bounded native SD writes are implemented but not yet validated on the physical Pi. Full RedSea filesystem behavior, saved-data reboot persistence, disconnect recovery and a Pi installation acceptance remain open. See [the writable-storage plan](docs/PI4-WRITABLE-STORAGE.md) and [PI4.md](PI4.md). |
 
 ## Earlier platform follow-ups
 
 1. UTM: continue the remaining application compatibility work listed in PROGRAMS.md. Digital Logic's corrected-ISO retest on `9c5e90c9…` is accepted by user report. Doodle, Mass Spring and Life pass live checks in the preserved `3b59782c…` image. The current image passes expanded Logic, interactive-program, editor and ISO install/persistence gates; the broader graphics gates passed before the source-only prompt correction.
-2. Pi: extend the accepted native desktop/input milestone to source-program/editor workflows and writable save/reboot/reopen persistence; native SD, disconnect recovery and installation remain open.
+2. Pi: extend the accepted native desktop/input milestone to source-program/editor workflows and writable save/reboot/reopen persistence; validate the new SDHCI write path on hardware, then complete normal RedSea integration, disconnect recovery and installation acceptance.
 3. HCRT host stubs only after IR gap shrinks; DT-based discovery before other ARM64 boards

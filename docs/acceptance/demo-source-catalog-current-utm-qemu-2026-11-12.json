@@ -1,0 +1,26 @@
+{
+  "date": "2026-11-12",
+  "repository_commit": "1750a794343a71c448a2cfc622619c7dcc997d48",
+  "upstream_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-demo-catalog-current-utm-qemu.log python3 -u scripts/check-compat.py --pci --quick --probe-demo-source-catalog --demo-source-path <each of the 206 upstream/pinned/Demo/**/*.ZC paths>",
+  "target": "UTM-bundled QEMU / PCI ARM64 graphical guest, HVF, one vCPU",
+  "scope": "Compile-only inventory of every pinned Demo .ZC source using DocRead/ExeDoc or ExeFile2 in source-specific stock module context. This does not prove runtime behavior for every demo.",
+  "artifacts": {
+    "iso": "build/zealos-aarch64-hello.iso",
+    "iso_sha256": "9b98f3b27ff385d10924332482dfaa3ed1d29d8943b67845afb97eac8bfe87e4",
+    "kernel": "build/iso_root/boot/kernel.elf",
+    "kernel_sha256": "2503d79df289a108fa77fa489130c7d4480ae679df668bb6885a8d561158baa2",
+    "source_results": "build/demo-source-catalog-targeted.json",
+    "stdout": "build/check-demo-catalog-current-utm-qemu.stdout",
+    "stdout_sha256": "b24d9d9702c2d50127806e209654992f30df61d39f8e214244337a0727810c32",
+    "serial_log": "build/check-demo-catalog-current-utm-qemu.log",
+    "serial_log_sha256": "32c706535dfd5cd8211269f734782212700f95eeb396f2f29a5116f9fea694d5"
+  },
+  "result": "pass",
+  "counts": {
+    "total": 206,
+    "compiled": 206,
+    "blocked": 0
+  },
+  "scope_note": "Compile acceptance only. Runtime acceptance is tracked separately in the demo source ledger; expected hardware-specific or multi-core limitations remain categorized there."
+}

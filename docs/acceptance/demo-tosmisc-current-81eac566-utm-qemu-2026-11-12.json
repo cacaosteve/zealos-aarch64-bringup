@@ -1,0 +1,31 @@
+{
+  "date": "2026-11-12",
+  "repository_commit": "1750a794343a71c448a2cfc622619c7dcc997d48",
+  "working_tree": "dirty; exact tested ISO, source and logs identified by SHA-256",
+  "target": "UTM-bundled QEMU, HVF, AArch64 PCI graphical guest, one vCPU, VirtIO input",
+  "program": "/Demo/AcctExample/TOS/TOSMisc.ZC",
+  "source_sha256": "ee141104e1476df4a08925447be33fa7ba42dbc4c989ec0d374851263af1f616",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "81eac566be9a778fe299b1b3c66fcb6fb0454108e482304b12c62244f55a7e01",
+  "kernel_sha256": "d3060540e8392379e6a005dfa28b0170b55f203ba14ec2e0f702c4a6de8d4f9e",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device -netdev user,id=net0 -device virtio-net-pci,netdev=net0,disable-legacy=on' ZEAL_COMPAT_LOG_PATH=build/check-tosmisc-current-81eac566.log python3 -u scripts/check-compat.py --pci --quick --probe-demo-system-context --demo-system-path /Demo/AcctExample/TOS/TOSMisc.ZC --demo-system-module /Demo/AcctExample/TOS/TOSConfig.ZC --demo-system-module /System/Gr/ScreenCast.ZC --demo-system-module /System/BlkDev/DiskCheck.ZC --demo-system-module /Apps/Psalmody/Load.ZC --demo-system-module /Demo/AcctExample/TOS/TOSMisc.ZC",
+  "result": "partial",
+  "verified": [
+    "TOSInit and the configured drive values loaded; DiskCheckAll returned through the command path.",
+    "DC2Doc recognized all 94 printable ASCII glyphs and preserved dollar-sign document encoding.",
+    "SoundShift and AUWrite/FileRead round-tripped events; ScreenCast captured a frame and sound events into readable GR/AU files.",
+    "GRWrite/GR2MV/GRRead round-tripped a movie frame.",
+    "MemTest completed its data-heap and code-heap stress loops.",
+    "Stock childish.ZC playback and a looping Beep fixture both returned through JukeSongsPuppet cleanup.",
+    "The graphical terminal recovered, 40+2 evaluated to 42, zstatus reported failed=0, and TOSMisc.ZC compiled in the loaded source context."
+  ],
+  "remaining": [
+    "DiskCheckAll's configured C:/D: drive scan/repair behavior is not established by command return alone; the ARM64 bridge still lacks complete stock multi-volume Drive semantics.",
+    "Full TOS distribution building and related format/copy workflows remain dependent on general writable drive semantics.",
+    "Captured sound events prove the audio-data path, not audible output on this ISO or on physical Pi hardware."
+  ],
+  "log": "build/check-tosmisc-current-81eac566.log",
+  "log_sha256": "1555db92cf3ac14eab7874ec7e931410e357de449a3c5b0610a7681d8dbebddc",
+  "check_compat_sha256": "a51f63722777b52272cadd8ac0aa37844d4191f65227088c8a1d5e2f41d98249",
+  "scope_note": "Current-ISO one-vCPU QEMU runtime evidence for the listed TOSMisc workflows only. TOSMisc remains partial at the full drive/filesystem and distribution-builder scope. No live UTM UI or physical Pi acceptance is claimed."
+}

@@ -87,10 +87,10 @@ static uint32_t zss_crc(const uint8_t *data, unsigned length) {
     return crc ^ 0xffffffffu;
 }
 static int zss_bank_read(uint64_t base, uint32_t sector, uint8_t buf[512]) {
-    return virtio_blk_read_abs(buf, base + sector);
+    return zbd_read_abs_many(buf, base + sector, 1);
 }
 static int zss_bank_write(uint64_t base, uint32_t sector, const uint8_t buf[512]) {
-    return virtio_blk_write_abs(buf, base + sector);
+    return zbd_write_abs_many(buf, base + sector, 1);
 }
 static int zss_sector_read(uint32_t sector, uint8_t buf[512]) {
     return sector < g_zss_sectors && zss_bank_read(g_zss_base, sector, buf);
@@ -108,7 +108,7 @@ static int zss_terminate_log(uint32_t next) {
 }
 static int zss_probe_bank(uint64_t base, uint32_t sectors, uint32_t *generation) {
     uint8_t sector[512];
-    if (g_vb.full_capacity < base + sectors ||
+    if (zbd_capacity() < base + sectors ||
         !zss_bank_read(base, 0, sector) || zss_u32(sector + 12) != sectors)
         return 0;
     if (zss_eq(sector, "ZCSRC001", 8) && zss_u32(sector + 8) == 1) {
@@ -124,17 +124,18 @@ static int zss_probe_bank(uint64_t base, uint32_t sectors, uint32_t *generation)
 }
 static int zss_available(void) {
     uint32_t a_gen = 0, b_gen = 0;
-    if (!virtio_blk_ready() || g_vb.xport != VB_XPORT_PCI) return 0;
-    int a = zss_probe_bank(ZEAL_SRC_LBA_BASE, ZEAL_SRC_SECTS, &a_gen);
-    int b = zss_probe_bank(ZEAL_SRC_SHADOW_LBA, ZEAL_SRC_SHADOW_SECTS, &b_gen);
+    if (!zbd_ready() || !g_zbd.source_a_sectors || !g_zbd.source_b_sectors)
+        return 0;
+    int a = zss_probe_bank(g_zbd.source_a_lba, g_zbd.source_a_sectors, &a_gen);
+    int b = zss_probe_bank(g_zbd.source_b_lba, g_zbd.source_b_sectors, &b_gen);
     if (!a && !b) return 0;
     if (b && (!a || b_gen > a_gen)) {
-        g_zss_base = ZEAL_SRC_SHADOW_LBA;
-        g_zss_sectors = ZEAL_SRC_SHADOW_SECTS;
+        g_zss_base = g_zbd.source_b_lba;
+        g_zss_sectors = g_zbd.source_b_sectors;
         g_zss_generation = b_gen;
     } else {
-        g_zss_base = ZEAL_SRC_LBA_BASE;
-        g_zss_sectors = ZEAL_SRC_SECTS;
+        g_zss_base = g_zbd.source_a_lba;
+        g_zss_sectors = g_zbd.source_a_sectors;
         g_zss_generation = a_gen;
     }
     return 1;
@@ -266,14 +267,14 @@ static int zss_delete(const char *name) {
     if (tail >= g_zss_sectors) return -3;
     for (unsigned i = 0; i < 512; i++) header[i] = 0;
     if (!zss_terminate_log(tail + 1u)) return -1;
-    if (g_vb.flush_supported && !virtio_blk_flush_abs()) return -1;
+    if (g_zbd.flush_supported && !zbd_flush()) return -1;
     for (unsigned i = 0; i < 7; i++) header[i] = (uint8_t)"ZCDEL1"[i];
     zss_w32(header + 20, name_len);
     for (unsigned i = 0; i < name_len; i++) header[32 + i] = (uint8_t)name[i];
     if (!zss_sector_write(tail, header)) return -1;
     g_zss_catalog_valid = 0;
     g_zss_catalog_revision++;
-    return g_vb.flush_supported && !virtio_blk_flush_abs() ? -5 : 0;
+    return g_zbd.flush_supported && !zbd_flush() ? -5 : 0;
 }
 static int zss_read(const struct zss_entry *entry, char *dst, size_t cap, size_t *out_len) {
     uint8_t sector[512];
@@ -329,7 +330,7 @@ static int zss_put(const char *name, const char *src, size_t len) {
     }
     for (unsigned i = 0; i < 512; i++) sector[i] = 0;
     if (!zss_terminate_log(tail + 1u + blocks)) return -1;
-    if (g_vb.flush_supported && !virtio_blk_flush_abs()) return -1;
+    if (g_zbd.flush_supported && !zbd_flush()) return -1;
     for (unsigned i = 0; i < 7; i++) sector[i] = (uint8_t)"ZCFILE1"[i];
     zss_w32(sector + 8, (uint32_t)len);
     zss_w32(sector + 12, crc ^ 0xffffffffu);
@@ -339,7 +340,7 @@ static int zss_put(const char *name, const char *src, size_t len) {
     if (!zss_sector_write(tail, sector)) return -1;
     g_zss_catalog_valid = 0;
     g_zss_catalog_revision++;
-    return g_vb.flush_supported && !virtio_blk_flush_abs() ? -5 : 0;
+    return g_zbd.flush_supported && !zbd_flush() ? -5 : 0;
 }
 
 /* Copy only the latest record for each path to the inactive bank. Both data
@@ -354,12 +355,13 @@ static int zss_compact(uint32_t *old_sectors, uint32_t *new_sectors,
     if (catalog_status != 1) return catalog_status == -2 ? -2 : -1;
     uint32_t tail = g_zss_catalog_tail;
     source = g_zss_base;
-    target = source == ZEAL_SRC_LBA_BASE ? ZEAL_SRC_SHADOW_LBA : ZEAL_SRC_LBA_BASE;
-    target_sectors = source == ZEAL_SRC_LBA_BASE ?
-                     ZEAL_SRC_SHADOW_SECTS : ZEAL_SRC_SECTS;
-    if (g_vb.full_capacity < target + target_sectors ||
-        g_zss_generation == UINT32_MAX || !g_vb.flush_supported) return -4;
-    if (!virtio_blk_flush_abs()) return -1;
+    target = source == g_zbd.source_a_lba ? g_zbd.source_b_lba :
+                                             g_zbd.source_a_lba;
+    target_sectors = source == g_zbd.source_a_lba ? g_zbd.source_b_sectors :
+                                                    g_zbd.source_a_sectors;
+    if (zbd_capacity() < target + target_sectors || !target_sectors ||
+        g_zss_generation == UINT32_MAX || !g_zbd.flush_supported) return -4;
+    if (!zbd_flush()) return -1;
     /* Do all capacity and source-CRC checks before modifying the other bank. */
     for (uint32_t i = 0; i < g_zss_catalog_count; i++) {
         struct zss_catalog_item *item = &g_zss_catalog[i];
@@ -388,7 +390,7 @@ static int zss_compact(uint32_t *old_sectors, uint32_t *new_sectors,
         for (unsigned i = 0; i < 512; i++) header[i] = 0;
         if (!zss_bank_write(target, next, header)) return -1;
     }
-    if (!virtio_blk_flush_abs()) return -1;
+    if (!zbd_flush()) return -1;
     for (unsigned i = 0; i < 512; i++) header[i] = 0;
     for (unsigned i = 0; i < 8; i++) header[i] = (uint8_t)"ZCSRC002"[i];
     zss_w32(header + 8, 2);
@@ -396,7 +398,7 @@ static int zss_compact(uint32_t *old_sectors, uint32_t *new_sectors,
     zss_w32(header + 16, g_zss_generation + 1u);
     zss_w32(header + 20, zss_crc(header, 20));
     if (!zss_bank_write(target, 0, header)) return -1;
-    if (!virtio_blk_flush_abs()) return -5;
+    if (!zbd_flush()) return -5;
     if (!zss_available() || g_zss_base != target) return -1;
     g_zss_catalog_valid = 0;
     g_zss_catalog_revision++;
@@ -456,7 +458,7 @@ static int zss_stream_finish(struct zss_stream *s) {
         !zss_sector_write(s->tail + 1u + s->written / 512u, s->sector)) return -1;
     for (unsigned i = 0; i < 512; i++) header[i] = 0;
     if (!zss_terminate_log(s->tail + 1u + (s->length + 511u) / 512u)) return -1;
-    if (g_vb.flush_supported && !virtio_blk_flush_abs()) return -1;
+    if (g_zbd.flush_supported && !zbd_flush()) return -1;
     for (unsigned i = 0; i < 7; i++) header[i] = (uint8_t)"ZCFILE1"[i];
     zss_w32(header + 8, s->length);
     zss_w32(header + 12, s->expected_crc);
@@ -466,5 +468,5 @@ static int zss_stream_finish(struct zss_stream *s) {
     if (!zss_sector_write(s->tail, header)) return -1;
     g_zss_catalog_valid = 0;
     g_zss_catalog_revision++;
-    return g_vb.flush_supported && !virtio_blk_flush_abs() ? -5 : 0;
+    return g_zbd.flush_supported && !zbd_flush() ? -5 : 0;
 }

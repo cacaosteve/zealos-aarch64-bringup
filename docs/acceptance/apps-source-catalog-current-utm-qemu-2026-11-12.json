@@ -1,0 +1,30 @@
+{
+  "date": "2026-11-12",
+  "repository_commit": "1750a794343a71c448a2cfc622619c7dcc997d48",
+  "upstream_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-app-catalog-current-utm-qemu.log python3 -u scripts/check-compat.py --pci --quick --probe-program-catalog --program-catalog-path <each of the 70 upstream/pinned/Apps/**/*.ZC paths>",
+  "target": "UTM-bundled QEMU / PCI ARM64 graphical guest, HVF, one vCPU",
+  "scope": "Compile-only inventory of all 70 pinned Apps .ZC sources in their app loader contexts. ToTheFront and X-Caliber normal loaders also passed. This does not prove runtime behavior for every app.",
+  "artifacts": {
+    "iso": "build/zealos-aarch64-hello.iso",
+    "iso_sha256": "9b98f3b27ff385d10924332482dfaa3ed1d29d8943b67845afb97eac8bfe87e4",
+    "kernel": "build/iso_root/boot/kernel.elf",
+    "kernel_sha256": "2503d79df289a108fa77fa489130c7d4480ae679df668bb6885a8d561158baa2",
+    "source_results": "build/program-catalog-targeted.json",
+    "stdout": "build/check-app-catalog-current-utm-qemu.stdout",
+    "stdout_sha256": "e6e5690af09b90632dfc33c31a16b96196c9c807168e20d161feaaf4daa67e5b",
+    "serial_log": "build/check-app-catalog-current-utm-qemu.log",
+    "serial_log_sha256": "4b186b73a88000c0f33b0336d8bc175ce4e1ada183853fbe4e659b991a264fa6"
+  },
+  "result": "pass",
+  "counts": {
+    "total": 70,
+    "compiled": 70,
+    "blocked": 0
+  },
+  "normal_loads": {
+    "/Apps/ToTheFront/Load.ZC": "pass",
+    "/Apps/X-Caliber/Load.ZC": "pass"
+  },
+  "scope_note": "Compile acceptance only. The separate all-program catalog also includes x86-only network drivers and other expected exclusions; this app-only run isolates the 70 Apps sources and exits cleanly."
+}

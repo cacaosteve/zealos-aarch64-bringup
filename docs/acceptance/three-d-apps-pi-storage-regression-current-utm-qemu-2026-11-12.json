@@ -1,0 +1,17 @@
+{
+  "date": "2026-11-12",
+  "source_revision": "1750a794343a71c448a2cfc622619c7dcc997d48",
+  "source_state": "working tree includes uncommitted Pi writable-storage changes",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "81eac566be9a778fe299b1b3c66fcb6fb0454108e482304b12c62244f55a7e01",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-3d-apps-pi-storage-regression.log python3 -u scripts/check-compat.py --pci --quick --probe-3d-apps",
+  "result": "pass",
+  "checks": {
+    "grmodels_man": "Man form, color choices, generated mesh, visible inline sprite, repeat prompt, and terminal recovery passed",
+    "grmodels_ball": "Ball form, color choice, generated mesh, visible inline sprite, repeat prompt, and terminal recovery passed",
+    "keepaway": "Court and HUD rendered; mouse/Space input advanced the game; Escape restored terminal focus and stopped the Animate task",
+    "titanium": "Intro advanced to gameplay; a frame advanced after Space; Escape restored terminal focus"
+  },
+  "shared_regressions": "The compatibility probe exited 0 after graphical-terminal input, system-server, task-settings, source-context, compiler-recovery, and editor startup checks.",
+  "limits": "This is an automated UTM-bundled QEMU/HVF probe. It is not a live UTM UI or physical Pi check and does not establish writable Pi SD acceptance."
+}

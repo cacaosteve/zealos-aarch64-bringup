@@ -1,0 +1,81 @@
+{
+  "date": "2026-11-12",
+  "repository_commit": "1750a794343a71c448a2cfc622619c7dcc997d48",
+  "working_tree": "dirty; exact tested ISO and logs identified by SHA-256",
+  "target": "UTM-bundled QEMU, HVF, AArch64 PCI graphical guest, one vCPU, VirtIO keyboard and tablet",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "81eac566be9a778fe299b1b3c66fcb6fb0454108e482304b12c62244f55a7e01",
+  "kernel_sha256": "d3060540e8392379e6a005dfa28b0170b55f203ba14ec2e0f702c4a6de8d4f9e",
+  "result": "pass",
+  "probes": {
+    "Digital Logic": {
+      "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-logic-current-81eac566.log python3 -u scripts/check-compat.py --pci --quick --probe-logic-program",
+      "result": "pass",
+      "verified": [
+        "AND gate setup and table inputs produced the expected drawing",
+        "Prompt editing, deletion, cancellation, setup abort, relaunch, Shift+Escape and clean recovery passed",
+        "Returned to the terminal; 40+2 evaluated to 42 and zstatus failed=0"
+      ],
+      "serial_log": "build/check-logic-current-81eac566.log",
+      "serial_log_sha256": "2a4aeef579181a02f57c9a19066492264b53a4fb9625e0bd83629779ea7c9cad"
+    },
+    "Budget, GrModels, KeepAway, Titanium": {
+      "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-named-apps-current-81eac566.log python3 -u scripts/check-compat.py --pci --quick --probe-logic-program --probe-budget-program --probe-timeclock --probe-3d-apps",
+      "result": "pass",
+      "verified": [
+        "Budget create/edit/cancel/save/reopen and disk persistence checks passed",
+        "GrModels Man and Ball forms produced visible inline meshes (112 and 58 vertices)",
+        "KeepAway rendered and accepted pointer/Space input; Escape returned to terminal",
+        "Titanium reached gameplay, accepted input, handled Escape and returned to terminal",
+        "Terminal evaluation and zstatus checks passed after app exits"
+      ],
+      "serial_log": "build/check-named-apps-current-81eac566.log",
+      "serial_log_sha256": "5aabafbac714b76ecee3307481461758dc8101a5bc5bdd6388ede1a4d5297a52"
+    },
+    "TimeClock": {
+      "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-timeclock-current-81eac566.log python3 -u scripts/check-compat.py --pci --quick --probe-timeclock",
+      "result": "pass",
+      "verified": [
+        "Punch-in and punch-out accepted descriptions",
+        "Saved report contained the expected entries",
+        "Returned to a working terminal; zstatus failed=0"
+      ],
+      "serial_log": "build/check-timeclock-current-81eac566.log",
+      "serial_log_sha256": "ed02167336fa387e7817e8bd0b7c12c9988bafe8af4e8d3dd4bb64ac197b3a1f"
+    },
+    "ToTheFront": {
+      "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-tothefront-current-81eac566.log python3 -u scripts/check-compat.py --pci --quick --probe-tothefront",
+      "result": "pass",
+      "verified": [
+        "Both player slots accepted Human and the map reached gameplay.",
+        "Artillery selection showed a range overlay and accepted an adjacent-hex order.",
+        "Escape returned to a working graphical terminal; 40+2 evaluated to 42 and zstatus reported failed=0."
+      ],
+      "serial_log": "build/check-tothefront-current-81eac566.log",
+      "serial_log_sha256": "86c777229238be169851ee0e77c3cbbb81d7a587a80a713ead75b3152d9a706a"
+    },
+    "X-Caliber": {
+      "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-xcaliber-current-81eac566.log python3 -u scripts/check-compat.py --pci --quick --probe-xcaliber",
+      "result": "pass",
+      "verified": [
+        "The storm popup was dismissed; plain Left and Right thrusters changed the player ship.",
+        "Space produced a visible projectile.",
+        "Escape returned to a graphical terminal that accepted and executed a command; subsequent terminal, system-server and compiler-recovery checks passed."
+      ],
+      "serial_log": "build/check-xcaliber-current-81eac566.log",
+      "serial_log_sha256": "0e6d9b9dfbff044b01698d414144f7c1266eadcd7dab9f3a60e15f0fe817be2f"
+    },
+    "Vocabulary": {
+      "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-vocabulary-current-81eac566-xtalk.log python3 -u scripts/check-compat.py --pci --quick --probe-vocabulary --probe-vocabulary-xtalk",
+      "result": "pass",
+      "verified": [
+        "Vocabulary accepted an answer and advanced the quiz.",
+        "Escape returned to the graphical terminal; 40+2 evaluated to 42 and zstatus reported failed=0."
+      ],
+      "serial_log": "build/check-vocabulary-current-81eac566-xtalk.log",
+      "serial_log_sha256": "181d9ee548b25f8fa5a56288ab3dfc4198991d68d2dc9e1036b6235dd364935c",
+      "diagnostic_note": "The direct graphical-shell launcher also advanced the quiz, but its test then found the original launcher text still in the terminal input buffer after Escape. The XTalk launcher path passed the complete app and shell-recovery check; the direct-launch buffer behavior is not counted as app acceptance."
+    }
+  },
+  "scope_note": "Focused automated runtime checks on this exact ISO. They do not prove every app workflow, every one of the 70 Apps sources, or live UTM behavior."
+}

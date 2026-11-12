@@ -14,8 +14,8 @@ cp "$ROOT/esp/boot/demo.hcbc" "$OUT/boot/demo.hcbc"
 cp "$ROOT/esp/EFI/BOOT/BOOTAA64.EFI" "$OUT/EFI/BOOT/BOOTAA64.EFI"
 cp "$ROOT/esp/limine-pi-desktop.conf" "$OUT/limine.conf"
 python3 "$ROOT/scripts/check-pi-desktop-image.py" "$OUT"
-cat <<EOF
-PI-DESKTOP-2 prepared: $OUT
+printf 'PI-DESKTOP-2 prepared: %s\n' "$OUT"
+cat <<'EOF'
 This script prepares files only. It never writes or erases a card.
 Keep existing Pi UEFI/firmware/DTBs. The seven payload files are:
   boot/kernel.elf           native ZealC/compiler/graphics/runtime + Pi hardware
@@ -32,7 +32,14 @@ and pointer for the native desktop. The bundled source archive supplies
 the apps, and the USB storage test stick is optional.
 
 Expect PI-DESKTOP-2 progress text, then the native terminals and centered
-animated Z splash. In a guest terminal try 40+2; then Dir; and usbstatus.
+animated Z splash. In a guest terminal try 40+2; then Dir, usbstatus, and
+psdread. psdread initializes the SD controller and reads the card's partition
+table; it does not write sectors. The current full-card FAT-only layout is
+expected to report no ZealOS data partition. On a card flashed from the new
+Pi image, `psdopen` binds the unique 0xDA data partition and enables bounded
+disk writes only within it. The image builder initializes empty source-bank
+headers and an empty full-size RedSea volume. `rspersist` is limited to the
+128-sector bring-up format and must not be used to initialize this image.
 The desktop uses a packed 800x600 surface centered and integer-scaled into
 the firmware display mode. Borders are expected on larger screens. The
 physical width/height/pitch/scale and logical surface are reported at startup.
@@ -40,7 +47,7 @@ Confirm keyboard input, pointer movement and menu clicks. Capture the desktop
 and command output. If startup stops, capture the last PI-DESKTOP-2/zc/USB
 message; the second Limine entry is the diagnostic recovery path.
 
-USB storage remains read-only and the native source writer is disabled on
-this Pi candidate. Bundled sources come from the boot module, not VirtIO.
+USB storage remains read-only. The native source writer stays unbound until
+`psdopen` is run. Bundled sources come from the boot module, not VirtIO.
 This first desktop check does not claim writable persistence or Pi installation.
 EOF

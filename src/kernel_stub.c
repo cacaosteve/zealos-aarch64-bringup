@@ -24,13 +24,18 @@
 #include "pi4_xhci_dma_alias.h"
 #include "pi4_fat32.h"
 #include "pi4_sdhci_probe.h"
+#include "pi4_sdhci_core.h"
 #include "pi4_usb_keyboard.h"
 #include "pi4_usb_mouse.h"
 #include "pi4_usb_bus.h"
 #endif
+#if defined(ZEAL_FORCE_PI4) && !defined(ZEAL_PI_DIAG)
+#include "pi4_sdhci_card.h"
+#endif
 #include "virtio_kbd.h"
 #include "virtio_tablet.h"
 #include "virtio_blk.h"
+#include "block_device.h"
 #include "virtio_net.h"
 #include "virtio_snd.h"
 #include "pi4_audio.h"
@@ -39,6 +44,10 @@
 #endif
 #include "disk_layout.h"
 #include "block_range.h"
+
+#if defined(ZEAL_FORCE_PI4) && !defined(ZEAL_PI_DIAG)
+static int zc_write_source(const char *path, const char *src, size_t len);
+#endif
 
 int zc_virtio_keyboard_ready(void) { return virtio_kbd_ready(); }
 uint64_t zc_virtio_keyboard_event_count(void) { return virtio_kbd_key_event_count(); }
@@ -801,6 +810,9 @@ static struct pi4_pcie_readback g_pi4_pcie_readback;
 #define PI4_XHCI_CAPS_INVALID 8u
 #endif
 static uint64_t g_hhdm;
+#if defined(ZEAL_FORCE_PI4) && !defined(ZEAL_PI_DIAG)
+static const struct zeal_handoff *g_kernel_handoff;
+#endif
 static uint64_t g_timer_ticks;
 static const uint8_t *g_install_image;
 static uint64_t g_install_image_size;
@@ -2427,6 +2439,231 @@ static int pi4_sdhci_read32(const struct zeal_handoff *h,
     return 0;
 }
 
+#if defined(ZEAL_FORCE_PI4) && !defined(ZEAL_PI_DIAG)
+static void con_puts(const char *s);
+static void zc_print_decimal(uint64_t value);
+
+static int pi4_sdhci_write32(const struct zeal_handoff *h,
+                             const struct pi4_sdhci_probe_plan *plan,
+                             unsigned offset, uint32_t value) {
+    uint64_t phys, virt;
+    volatile uint32_t *reg;
+
+    if (!h || !pi4_sdhci_probe_offset_valid(plan, offset) ||
+        plan->phys_base > UINT64_MAX - offset)
+        return -1;
+    phys = plan->phys_base + offset;
+    if (phys >= (1ull << 48) || h->hhdm_offset > UINT64_MAX - phys ||
+        !h->hhdm_offset || mmio_map_2m(h->hhdm_offset, phys) != 0)
+        return -2;
+    virt = h->hhdm_offset + phys;
+    reg = (volatile uint32_t *)(uintptr_t)virt;
+
+    g_uart_probe = 1;
+    g_sync_recover = 1;
+    g_uart_dead = 0;
+    g_probe_esr = 0;
+    g_probe_far = 0;
+    __asm__ volatile("str %w0, [%1]" :: "r"(value), "r"(reg) : "memory");
+    __asm__ volatile("dsb sy" ::: "memory");
+    g_sync_recover = 0;
+    g_uart_probe = 0;
+    if (g_uart_dead) {
+        g_uart_dead = 0;
+        return -3;
+    }
+    return 0;
+}
+
+struct pi4_sdhci_card_context {
+    const struct zeal_handoff *handoff;
+    const struct pi4_sdhci_probe_plan *plan;
+};
+
+static struct pi4_sdhci_card g_pi4_sdhci_card;
+static struct pi4_sdhci_probe_plan g_pi4_sdhci_plan;
+static struct pi4_sdhci_card_context g_pi4_sdhci_context;
+
+static uint64_t pi4_sdhci_card_counter(void *context) {
+    uint64_t count;
+    (void)context;
+    __asm__ volatile("mrs %0, cntpct_el0" : "=r"(count));
+    return count;
+}
+
+static int pi4_sdhci_card_read32(void *context, unsigned offset,
+                                  uint32_t *value) {
+    const struct pi4_sdhci_card_context *ctx = context;
+    return ctx && pi4_sdhci_read32(ctx->handoff, ctx->plan, offset, value) == 0;
+}
+
+static int pi4_sdhci_card_write32(void *context, unsigned offset,
+                                   uint32_t value) {
+    const struct pi4_sdhci_card_context *ctx = context;
+    return ctx && pi4_sdhci_write32(ctx->handoff, ctx->plan, offset, value) == 0;
+}
+
+static int pi4_sdhci_card_read_partition_sector(void *context, uint64_t lba,
+                                                 uint8_t sector[512]) {
+    return pi4_sdhci_card_read_sector(context, lba, sector) == 0;
+}
+
+static int pi4_sdhci_card_ensure_ready(void) {
+    struct pi4_sdhci_card_io io;
+    uint64_t frequency;
+    if (g_pi4_sdhci_card.ready) return 0;
+    if (!g_kernel_handoff ||
+        pi4_sdhci_probe_plan_make(g_kernel_handoff,
+                                  &g_pi4_sdhci_plan) != 0)
+        return PI4_SDHCI_CARD_ERR_UNSUPPORTED;
+    __asm__ volatile("mrs %0, cntfrq_el0" : "=r"(frequency));
+    if (!frequency) return PI4_SDHCI_CARD_ERR_UNSUPPORTED;
+    g_pi4_sdhci_context.handoff = g_kernel_handoff;
+    g_pi4_sdhci_context.plan = &g_pi4_sdhci_plan;
+    io.context = &g_pi4_sdhci_context;
+    io.counter_hz = frequency;
+    io.counter = pi4_sdhci_card_counter;
+    io.read32 = pi4_sdhci_card_read32;
+    io.write32 = pi4_sdhci_card_write32;
+    return pi4_sdhci_card_init(&g_pi4_sdhci_card, &io);
+}
+
+static int pi4_sdhci_backend_read(void *buffer, uint64_t lba,
+                                  uint32_t count) {
+    return pi4_sdhci_card_read_many(&g_pi4_sdhci_card, lba, count, buffer) == 0;
+}
+
+static int pi4_sdhci_backend_write(const void *buffer, uint64_t lba,
+                                   uint32_t count) {
+    return pi4_sdhci_card_write_many(&g_pi4_sdhci_card, lba, count, buffer) == 0;
+}
+
+static int pi4_sdhci_backend_flush(void) {
+    return pi4_sdhci_card_flush(&g_pi4_sdhci_card) == 0;
+}
+
+static void pi4_sdhci_card_diagnostic(void) {
+    static struct zeal_partition partitions[ZEAL_PARTITION_MAX];
+    static uint8_t sector[ZEAL_PARTITION_SECTOR_SIZE];
+    struct zeal_partition data_partition;
+    size_t partition_count = 0;
+    int rc;
+
+    con_puts("psdread: initializing SDHCI and reading sector 0; no card writes\n");
+    rc = pi4_sdhci_card_ensure_ready();
+    if (rc) {
+        con_puts("psdread: card initialization failed rc=-");
+        zc_print_decimal((uint64_t)(-rc));
+        con_puts("\n");
+        return;
+    }
+    con_puts("psdread: sectors=");
+    zc_print_decimal(g_pi4_sdhci_card.sectors);
+    con_puts(" id-clock-hz=");
+    zc_print_decimal(g_pi4_sdhci_card.identification_clock_hz);
+    con_puts(" high-capacity=");
+    zc_print_decimal(g_pi4_sdhci_card.high_capacity);
+    con_puts("\n");
+
+    if (pi4_sdhci_card_read_sector(&g_pi4_sdhci_card, 0, sector) != 0) {
+        con_puts("psdread: sector-zero read failed\n");
+        return;
+    }
+    if (sector[510] != 0x55 || sector[511] != 0xaa) {
+        con_puts("psdread: sector 0 read, but no MBR signature\n");
+        return;
+    }
+    rc = zeal_partition_scan(pi4_sdhci_card_read_partition_sector,
+                             &g_pi4_sdhci_card,
+                             g_pi4_sdhci_card.sectors, partitions,
+                             ZEAL_PARTITION_MAX, &partition_count);
+    if (rc != ZEAL_PARTITION_OK) {
+        con_puts("psdread: MBR signature present; partition scan rc=");
+        if (rc < 0) {
+            con_puts("-");
+            zc_print_decimal((uint64_t)(-rc));
+        } else {
+            zc_print_decimal((uint64_t)rc);
+        }
+        con_puts("\n");
+        return;
+    }
+    con_puts("psdread: valid partition table; partitions=");
+    zc_print_decimal(partition_count);
+    con_puts("\n");
+    for (size_t i = 0; i < partition_count; i++) {
+        con_puts("  part "); zc_print_decimal(i + 1u);
+        con_puts(" type="); zc_print_decimal(partitions[i].mbr_type);
+        con_puts(" first-lba="); zc_print_decimal(partitions[i].first_lba);
+        con_puts(" sectors="); zc_print_decimal(partitions[i].sector_count);
+        con_puts("\n");
+    }
+    rc = zeal_partition_find_data(partitions, partition_count, &data_partition);
+    con_puts(rc == ZEAL_PARTITION_OK ?
+             "psdread: ZealOS data partition found\n" :
+             rc == ZEAL_PARTITION_NOT_FOUND ?
+             "psdread: no ZealOS data partition (card unchanged)\n" :
+             "psdread: ambiguous ZealOS data partition table\n");
+}
+
+static void pi4_sdhci_card_open(void) {
+    int rc = pi4_sdhci_card_ensure_ready();
+    if (rc) {
+        con_puts("psdopen: card initialization failed rc=-");
+        zc_print_decimal((uint64_t)(-rc));
+        con_puts("; disk backend unchanged\n");
+        return;
+    }
+    if (pi4_sdhci_card_flush(&g_pi4_sdhci_card) != 0) {
+        con_puts("psdopen: card did not reach ready/transfer state; disk backend unchanged\n");
+        return;
+    }
+    const struct zeal_block_backend device = {
+        .max_sectors = 1,
+        .sectors = g_pi4_sdhci_card.sectors,
+        .device_sectors = g_pi4_sdhci_card.sectors,
+        .flush_supported = 1,
+        .read_abs = pi4_sdhci_backend_read,
+        .write_abs = pi4_sdhci_backend_write,
+        .flush = pi4_sdhci_backend_flush,
+    };
+    if (!zbd_discover_and_bind_data_partition(&device)) {
+        con_puts("psdopen: no unique, valid ZealOS data partition; disk backend unchanged\n");
+        return;
+    }
+#if defined(ZEAL_FORCE_PI4) && !defined(ZEAL_PI_DIAG)
+    /* Keep the Pi desktop read-only until an explicit psdopen validates and
+     * binds a partition-bounded SD backend. From here FileWrite and zput can
+     * use only the two reserved source banks, never the firmware FAT volume. */
+    zc_set_source_writer(zc_write_source);
+    con_puts("psdopen: persistent source/data writes enabled in the ZealOS partition\n");
+#endif
+    con_puts("psdopen: data partition bound; writes are limited to its RedSea and source banks\n");
+    con_puts("psdopen: RedSea sectors=");
+    zc_print_decimal(g_zbd.redsea_sectors);
+    if (zss_available()) {
+        con_puts(" source-bank=");
+        con_puts(g_zss_base == g_zbd.source_a_lba ? "A" : "B");
+        con_puts(" ready\n");
+    } else {
+        con_puts(" source banks uninitialized\n");
+    }
+    uint8_t boot[512];
+    if (zbd_read_volume(boot, 0, 1) && boot[3] == 0x88 &&
+        boot[510] == 0x55 && boot[511] == 0xaa) {
+        uint64_t formatted_sectors = 0;
+        for (unsigned i = 0; i < 8; i++)
+            formatted_sectors |= (uint64_t)boot[16 + i] << (i * 8);
+        if (formatted_sectors > 128)
+            con_puts("psdopen: stock-size RedSea volume found; general RedSea writes are not enabled yet\n");
+        else
+            con_puts("psdopen: small bootstrap RedSea volume found\n");
+    } else {
+        con_puts("psdopen: no RedSea format found; `rspersist` creates only the 128-sector bring-up format\n");
+    }
+}
+#endif
+
 static void pi4_sdhci_readonly_probe(const struct zeal_handoff *h) {
     struct pi4_sdhci_probe_plan plan;
     uint32_t caps, caps1, present, clock, interrupt, version_word;
@@ -2456,9 +2693,22 @@ static void pi4_sdhci_readonly_probe(const struct zeal_handoff *h) {
     uart_puts(g_uart, " clock="); uart_put_u64_hex(g_uart, clock);
     uart_puts(g_uart, " int="); uart_put_u64_hex(g_uart, interrupt);
     uart_puts(g_uart, " version="); uart_put_u64_hex(g_uart, version_word >> 16);
+    uint32_t base_hz = ((caps >> 8) & 0xffu) * 1000000u;
+    uint8_t host_version = (uint8_t)(version_word >> 16);
+    uint16_t id_clock_bits = 0;
+    uint32_t id_clock_hz = 0;
+    if (base_hz && pi4_sdhci_clock_divisor(base_hz, 400000u, host_version,
+                                           &id_clock_bits, &id_clock_hz)) {
+        uart_puts(g_uart, "\n  identification_clock: base_hz=");
+        uart_put_u32_dec(g_uart, base_hz);
+        uart_puts(g_uart, " actual_hz="); uart_put_u32_dec(g_uart, id_clock_hz);
+        uart_puts(g_uart, " divider_bits="); uart_put_u64_hex(g_uart, id_clock_bits);
+    } else {
+        uart_puts(g_uart, "\n  identification_clock: unavailable from SDHCI capabilities");
+    }
     rc = (present & (1u << 16)) != 0;
-    uart_puts(g_uart, rc ? " card-detect=1 (no card commands sent)\n" :
-                           " card-detect=0 (no card commands sent)\n");
+    uart_puts(g_uart, rc ? " card-detect=1 (read-only; no card commands sent)\n" :
+                           " card-detect=0 (read-only; no card commands sent)\n");
 }
 
 /* Guarded 32-bit write for a bounded, save/restore PCIe bridge probe. */
@@ -12126,7 +12376,7 @@ uint64_t hc_builtin_call1(uint64_t fp, uint64_t a0) {
 static uint8_t g_ram_dsk[HC_RAM_N_BLKS * HC_RAM_BLK_SIZE] __attribute__((aligned(16)));
 
 uint64_t zc_raw_disk_sectors(void) {
-    return virtio_blk_absolute_ready() ? virtio_blk_full_capacity() : 0;
+    return zbd_capacity();
 }
 
 int zc_raw_disk_read(void *dst, uint64_t sector, uint64_t count) {
@@ -12136,11 +12386,8 @@ int zc_raw_disk_read(void *dst, uint64_t sector, uint64_t count) {
         return 0;
     uint8_t *out = dst;
     while (count) {
-        uint32_t limit = virtio_blk_max_sectors();
-        if (!limit)
-            return 0;
-        uint32_t batch = count < limit ? (uint32_t)count : limit;
-        if (!virtio_blk_read_abs_many(out, sector, batch))
+        uint32_t batch = count > UINT32_MAX ? UINT32_MAX : (uint32_t)count;
+        if (!zbd_read_abs_many(out, sector, batch))
             return 0;
         sector += batch;
         count -= batch;
@@ -12149,9 +12396,10 @@ int zc_raw_disk_read(void *dst, uint64_t sector, uint64_t count) {
     return 1;
 }
 
-/* Raw writes are limited to the absolute PCI VirtIO disk. Callers must own
- * the sectors they modify; this primitive does not provide filesystem or
- * mounted-volume safety. */
+/* Raw writes use the active absolute block backend. Callers must own the
+ * sectors they modify; this primitive does not provide filesystem or
+ * mounted-volume safety. The Pi backend remains unbound until its SD driver
+ * can guarantee initialization and bounds. */
 int zc_raw_disk_write(const void *src, uint64_t sector, uint64_t count) {
     uint64_t capacity = zc_raw_disk_sectors();
     if (!src || !count || sector >= capacity || count > capacity - sector ||
@@ -12159,17 +12407,14 @@ int zc_raw_disk_write(const void *src, uint64_t sector, uint64_t count) {
         return 0;
     const uint8_t *in = src;
     while (count) {
-        uint32_t limit = virtio_blk_max_sectors();
-        if (!limit)
-            return 0;
-        uint32_t batch = count < limit ? (uint32_t)count : limit;
-        if (!virtio_blk_write_abs_many(in, sector, batch))
+        uint32_t batch = count > UINT32_MAX ? UINT32_MAX : (uint32_t)count;
+        if (!zbd_write_abs_many(in, sector, batch))
             return 0;
         sector += batch;
         count -= batch;
         in += (size_t)batch * 512u;
     }
-    return virtio_blk_flush_disk();
+    return zbd_flush();
 }
 
 uint64_t hc_builtin_blkwrite(uint64_t buf, uint64_t blk, uint64_t count) {
@@ -12177,11 +12422,11 @@ uint64_t hc_builtin_blkwrite(uint64_t buf, uint64_t blk, uint64_t count) {
     if (!src || count == 0) {
         return 0;
     }
-    if (virtio_blk_ready()) {
-        if (!zeal_block_range_valid(blk, count, virtio_blk_capacity())) {
+    if (zbd_ready()) {
+        if (!zeal_block_range_valid(blk, count, g_zbd.redsea_sectors)) {
             return 0;
         }
-        return (uint64_t)virtio_blk_write(src, blk, count);
+        return (uint64_t)zbd_write_volume(src, blk, count);
     }
     if (!zeal_block_range_valid(blk, count, HC_RAM_N_BLKS)) {
         return 0;
@@ -12196,11 +12441,11 @@ uint64_t hc_builtin_blkread(uint64_t buf, uint64_t blk, uint64_t count) {
     if (!dst || count == 0) {
         return 0;
     }
-    if (virtio_blk_ready()) {
-        if (!zeal_block_range_valid(blk, count, virtio_blk_capacity())) {
+    if (zbd_ready()) {
+        if (!zeal_block_range_valid(blk, count, g_zbd.redsea_sectors)) {
             return 0;
         }
-        return (uint64_t)virtio_blk_read(dst, blk, count);
+        return (uint64_t)zbd_read_volume(dst, blk, count);
     }
     if (!zeal_block_range_valid(blk, count, HC_RAM_N_BLKS)) {
         return 0;
@@ -13056,7 +13301,7 @@ static const char *skip_ws(const char *s) {
 /* Read boot + root dir; returns 0 and fills buffers. */
 static int rs_read_root(uint8_t *br, uint8_t *dir, uint64_t *out_root, uint64_t *out_sects) {
     const int64_t *w;
-    uint64_t root, sects = 16;
+    uint64_t root, sects;
     unsigned i;
 
     for (i = 0; i < 512; i++) {
@@ -13070,11 +13315,16 @@ static int rs_read_root(uint8_t *br, uint8_t *dir, uint64_t *out_root, uint64_t 
         return -2;
     }
     w = (const int64_t *)(br + 8);
-    root = (uint64_t)w[2];
-    if (w[1] > 0 && (uint64_t)w[1] <= 128) {
-        sects = (uint64_t)w[1];
+    if (w[1] <= 0 || w[1] > 128 || w[2] <= w[3] || w[3] <= 0 ||
+        w[2] >= w[1]) {
+        /* The legacy eight-entry writer understands only the small
+         * bootstrap format. Never let it treat a stock RedSea bitmap as an
+         * eight-entry allocation map. */
+        return -3;
     }
-    if (!root) {
+    sects = (uint64_t)w[1];
+    root = (uint64_t)w[2];
+    if (!root || root >= sects) {
         return -3;
     }
     if (!hc_builtin_blkread((uint64_t)(uintptr_t)dir, root, 1)) {
@@ -13093,8 +13343,8 @@ int zc_raw_redsea_geometry(uint64_t *base, uint64_t *sectors) {
     uint8_t br[512], dir[512];
     int64_t words[4];
     uint64_t root;
-    if (!base || !sectors || !virtio_blk_absolute_ready() ||
-        !zc_raw_disk_read(br, g_vb.lba_base, 1) ||
+    if (!base || !sectors || !zbd_ready() ||
+        !zc_raw_disk_read(br, g_zbd.redsea_lba, 1) ||
         br[3] != 0x88 || br[510] != 0x55 || br[511] != 0xaa)
         return 0;
     for (unsigned i = 0; i < 4; i++) {
@@ -13103,28 +13353,28 @@ int zc_raw_redsea_geometry(uint64_t *base, uint64_t *sectors) {
             value |= (uint64_t)br[8 + i * 8 + j] << (j * 8);
         words[i] = (int64_t)value;
     }
-    if (words[1] < 4 || (uint64_t)words[1] > g_vb.capacity ||
+    if (words[1] < 4 || (uint64_t)words[1] > g_zbd.redsea_sectors ||
         words[3] <= 0 || (uint64_t)words[3] >= (uint64_t)words[1] ||
-        g_vb.lba_base > g_vb.full_capacity ||
-        (uint64_t)words[1] > g_vb.full_capacity - g_vb.lba_base)
+        g_zbd.redsea_lba > g_zbd.sectors ||
+        (uint64_t)words[1] > g_zbd.sectors - g_zbd.redsea_lba)
         return 0;
     /* Stock RedSeaFormat records absolute root sectors and the partition's
      * drv_offset; the older bootstrap formatter records both relative to 0. */
     if (words[0] == 0) {
         if (words[2] <= words[3] || words[2] >= words[1])
             return 0;
-        root = g_vb.lba_base + (uint64_t)words[2];
-    } else if (words[0] > 0 && (uint64_t)words[0] == g_vb.lba_base) {
-        if (words[2] < 0 || (uint64_t)words[2] < g_vb.lba_base ||
-            (uint64_t)words[2] - g_vb.lba_base <= (uint64_t)words[3] ||
-            (uint64_t)words[2] - g_vb.lba_base >= (uint64_t)words[1])
+        root = g_zbd.redsea_lba + (uint64_t)words[2];
+    } else if (words[0] > 0 && (uint64_t)words[0] == g_zbd.redsea_lba) {
+        if (words[2] < 0 || (uint64_t)words[2] < g_zbd.redsea_lba ||
+            (uint64_t)words[2] - g_zbd.redsea_lba <= (uint64_t)words[3] ||
+            (uint64_t)words[2] - g_zbd.redsea_lba >= (uint64_t)words[1])
             return 0;
         root = (uint64_t)words[2];
     } else
         return 0;
     if (!zc_raw_disk_read(dir, root, 1))
         return 0;
-    *base = g_vb.lba_base;
+    *base = g_zbd.redsea_lba;
     *sectors = (uint64_t)words[1];
     return 1;
 }
@@ -13408,7 +13658,7 @@ static int rs_stock_root_read(const char *name, char *dst, size_t cap,
     uint64_t base, sectors, root, first = 0, length = 0;
     uint16_t attr = 0;
     if (!name || !*name || !zc_raw_redsea_geometry(&base, &sectors) ||
-        !base || !zc_raw_disk_read(boot, base, 1))
+        !zc_raw_disk_read(boot, base, 1))
         return -1;
     root = rs_stock_u64(boot + 24);
     if (rs_stock_u64(boot + 8) != base)
@@ -13454,7 +13704,7 @@ int zeal_redsea_dir_exists(const char *name) {
     uint64_t base, sectors, directory, first, length;
     uint16_t attr;
     if (!name || !*name || !zc_raw_redsea_geometry(&base, &sectors) ||
-        !base || !zc_raw_disk_read(boot, base, 1) || rs_stock_u64(boot + 8) != base)
+        !zc_raw_disk_read(boot, base, 1) || rs_stock_u64(boot + 8) != base)
         return 0;
     directory = rs_stock_u64(boot + 24);
     while (*name) {
@@ -13571,7 +13821,7 @@ static int zc_read_redsea(const char *name, char *dst, size_t cap, size_t *out_l
     if (found == -1) return -1;
     /* The old eight-entry RedSea catalog stays readable during migration. */
     uint64_t len = 0;
-    if (!virtio_blk_ready())
+    if (!zbd_ready())
         return -1;
     if (str_len(name) > 37 || !rs_file_exists(name, &len))
         return rs_stock_root_read(name, dst, cap, out_len);
@@ -13592,8 +13842,8 @@ int zeal_redsea_file_at(uint64_t index, char *dst, size_t cap,
     unsigned i;
 
     uint64_t base, stock_sectors;
-    if (!virtio_blk_ready() || !dst || cap < 2) return 0;
-    if (zc_raw_redsea_geometry(&base, &stock_sectors) && base &&
+    if (!zbd_ready() || !dst || cap < 2) return 0;
+    if (zc_raw_redsea_geometry(&base, &stock_sectors) &&
         zc_raw_disk_read(br, base, 1) && rs_stock_u64(br + 8) == base) {
         uint64_t ancestors[8] = {0};
         char path[96];
@@ -13657,7 +13907,7 @@ int zeal_redsea_dir_at(uint64_t index, char *dst, size_t cap,
     uint64_t base, sectors, ancestors[8] = {0};
     char path[96];
     if (!dst || cap < 2 || !zc_raw_redsea_geometry(&base, &sectors) ||
-        !base || !zc_raw_disk_read(boot, base, 1) || rs_stock_u64(boot + 8) != base)
+        !zc_raw_disk_read(boot, base, 1) || rs_stock_u64(boot + 8) != base)
         return 0;
     return rs_stock_file_at(base, sectors, rs_stock_u64(boot + 24), path, 0,
                             &index, ancestors, 0, dst, cap, out_size, out_first, 1);
@@ -13675,12 +13925,19 @@ static int zc_write_source(const char *path, const char *src, size_t len) {
         return -1;
     if (zss_available())
         return zss_put(name, src, len);
+#ifdef ZEAL_FORCE_PI4
+    /* Pi's full-size RedSea volume is not yet mounted through the normal
+     * filesystem writer. Never fall back to the small bootstrap root writer
+     * on SD; refuse saves unless the image's protected source banks validate. */
+    return -1;
+#else
     /* Legacy RedSea only supports a root filename without a directory. */
     for (const char *p = name; *p; p++)
         if (*p == '/') return -1;
-    if (!len || len > 65536 || !virtio_blk_ready())
+    if (!len || len > 65536 || !zbd_ready())
         return -1;
     return rs_put_file(name, src, len);
+#endif
 }
 #endif
 
@@ -14354,6 +14611,64 @@ static int pi4_hdmi_firmware_resources(uint32_t *pixel_hz, uint32_t *dma_channel
     return 1;
 }
 
+/* Read the firmware's configured eMMC2 clock for the future SDHCI backend.
+ * This only asks the property mailbox; it does not touch controller or card. */
+static int pi4_firmware_emmc2_clock(uint32_t *rate_hz) {
+    struct {
+        uint32_t size, status;
+        uint32_t tag, capacity, length, clock_id, rate;
+        uint32_t end;
+    } volatile *message;
+    uint64_t counter_hz, cache_type;
+    if (!rate_hz || !g_pi4_mailbox_phys || g_pi4_mailbox_reply_pending ||
+        g_hhdm > UINT64_MAX - PI4_MAILBOX_PHYS - PI4_MAILBOX_TX_STATUS ||
+        mmio_map_2m(g_hhdm, PI4_MAILBOX_PHYS) != 0)
+        return 0;
+    __asm__ volatile("mrs %0, cntfrq_el0" : "=r"(counter_hz));
+    __asm__ volatile("mrs %0, ctr_el0" : "=r"(cache_type));
+    if (counter_hz < 10) return 0;
+    uintptr_t cache_line = 4u << ((cache_type >> 16) & 15u);
+    if (cache_line > 4096) return 0;
+    volatile uint32_t *regs = (volatile uint32_t *)(uintptr_t)(g_hhdm + PI4_MAILBOX_PHYS);
+    uint64_t deadline = pi4_audio_counter() + counter_hz / 10;
+    if (!(regs[PI4_MAILBOX_RX_STATUS / 4] & PI4_MAILBOX_EMPTY) ||
+        !pi4_mailbox_wait(&regs[PI4_MAILBOX_TX_STATUS / 4], PI4_MAILBOX_FULL, deadline))
+        return 0;
+
+    message = (void *)(uintptr_t)(g_hhdm + g_pi4_mailbox_phys);
+    message->size = sizeof(*message);
+    message->status = 0;
+    message->tag = PI4_PROPERTY_GET_CLOCK_RATE_MEASURED;
+    message->capacity = 2 * sizeof(uint32_t);
+    message->length = sizeof(uint32_t);
+    message->clock_id = PI4_PROPERTY_EMMC2_CLOCK;
+    message->rate = 0;
+    message->end = 0;
+    for (uintptr_t p = (uintptr_t)message; p < (uintptr_t)message + sizeof(*message);
+         p += cache_line)
+        __asm__ volatile("dc civac, %0" :: "r"(p) : "memory");
+    pi4_audio_dsb();
+
+    uint32_t request = (uint32_t)g_pi4_mailbox_phys | PI4_MAILBOX_GPU_ALIAS |
+                       PI4_MAILBOX_PROPERTY_CHANNEL;
+    regs[PI4_MAILBOX_WRITE / 4] = request;
+    pi4_audio_dsb();
+    g_pi4_mailbox_reply_pending = 1;
+    if (!pi4_mailbox_wait(&regs[PI4_MAILBOX_RX_STATUS / 4], PI4_MAILBOX_EMPTY, deadline) ||
+        regs[PI4_MAILBOX_READ / 4] != request)
+        return 0; /* A late firmware reply may still write to this buffer. */
+    g_pi4_mailbox_reply_pending = 0;
+    for (uintptr_t p = (uintptr_t)message; p < (uintptr_t)message + sizeof(*message);
+         p += cache_line)
+        __asm__ volatile("dc ivac, %0" :: "r"(p) : "memory");
+    pi4_audio_dsb();
+    if (message->status != 0x80000000u || message->length != 0x80000008u ||
+        message->clock_id != PI4_PROPERTY_EMMC2_CLOCK)
+        return 0;
+    *rate_hz = message->rate;
+    return *rate_hz != 0;
+}
+
 #include "pi4_hdmi_audio.inc"
 
 /* Inspect the firmware's HDMI setup without changing the video or audio path. */
@@ -14389,12 +14704,15 @@ static void pi4_hdmi_audio_status(void) {
         con_puts(" cts="); zc_print_hex64(cts);
         con_puts("\n");
     }
-    uint32_t pixel_hz = 0, dma_channels = 0;
+    uint32_t pixel_hz = 0, emmc2_hz = 0, dma_channels = 0;
     int firmware_ok = pi4_hdmi_firmware_resources(&pixel_hz, &dma_channels);
+    int emmc2_clock_ok = pi4_firmware_emmc2_clock(&emmc2_hz);
     con_puts("pi4_hdmi: firmware_ok="); zc_print_decimal(firmware_ok);
     con_puts(" pixel_bvb_hz="); zc_print_decimal(pixel_hz);
     con_puts("\n  dma_available="); zc_print_hex64(dma_channels);
     con_puts("\n");
+    con_puts("pi4_sd: firmware_emmc2_clock_ok="); zc_print_decimal(emmc2_clock_ok);
+    con_puts(" rate_hz="); zc_print_decimal(emmc2_hz); con_puts("\n");
     con_puts("pi4_hdmi_audio: stage="); zc_print_decimal(g_pi4_hdmi_stage);
     con_puts(" starts="); zc_print_decimal(g_pi4_hdmi_starts);
     con_puts(" hz="); zc_print_decimal(g_pi4_hdmi_last_hz);
@@ -14910,6 +15228,8 @@ static void shell_handle(const char *line, int *done) {
     if (streq(line, "paudiobeep")) { zc_pi4_audio_test_beep(); return; }
 #ifdef ZEAL_FORCE_PI4
     if (streq(line, "phdmi")) { pi4_hdmi_audio_status(); return; }
+    if (streq(line, "psdread")) { pi4_sdhci_card_diagnostic(); return; }
+    if (streq(line, "psdopen")) { pi4_sdhci_card_open(); return; }
     if (streq(line, "paudio analog") || streq(line, "paudio hdmi")) {
         zc_virtio_sound_set_tone(0);
         g_pi4_hdmi_selected = streq(line, "paudio hdmi");
@@ -14990,9 +15310,9 @@ static void shell_handle(const char *line, int *done) {
     if (streq(line, "zvol")) {
         if (zss_available()) {
             con_puts("zvol: source partition ready bank=");
-            con_puts(g_zss_base == ZEAL_SRC_LBA_BASE ? "A" : "B");
+            con_puts(g_zss_base == g_zbd.source_a_lba ? "A" : "B");
             con_puts(" generation="); zc_print_decimal(g_zss_generation);
-            con_puts(g_vb.flush_supported ? " flush=yes" : " flush=no");
+            con_puts(g_zbd.flush_supported ? " flush=yes" : " flush=no");
             con_puts("\n");
         } else con_puts("zvol: source partition unavailable (legacy RedSea only)\n");
         return;
@@ -15003,14 +15323,14 @@ static void shell_handle(const char *line, int *done) {
         if (status) {
             con_puts(status == -2 ? "zgc: native source partition unavailable\n" :
                      status == -3 ? "zgc: live source does not fit inactive bank\n" :
-                     status == -4 ? "zgc: shadow bank or virtio flush unavailable\n" :
+                     status == -4 ? "zgc: shadow bank or ordered flush unavailable\n" :
                      status == -5 ? "zgc: new bank written but flush failed; verify before further writes\n" :
                                     "zgc: source damaged or disk I/O failed; old bank remains active\n");
         } else {
             con_puts("zgc: OK sectors="); zc_print_decimal(before);
             con_puts("->"); zc_print_decimal(after);
             con_puts(" records="); zc_print_decimal(kept);
-            con_puts(" bank="); con_puts(g_zss_base == ZEAL_SRC_LBA_BASE ? "A" : "B");
+            con_puts(" bank="); con_puts(g_zss_base == g_zbd.source_a_lba ? "A" : "B");
             con_puts("\n");
         }
         return;
@@ -15075,7 +15395,7 @@ static void shell_handle(const char *line, int *done) {
         }
         if (!bn || *p) { con_puts("zput: source empty or too long\n"); return; }
         body[bn] = 0;
-        if (!virtio_blk_ready()) { con_puts("zput: persistent disk unavailable\n"); return; }
+        if (!zbd_ready()) { con_puts("zput: persistent disk unavailable\n"); return; }
         if (zss_available()) {
             int err = zss_put(name, body, bn);
             if (err) {
@@ -16707,6 +17027,7 @@ int64_t zc_gui_shell_exec(int64_t *a) {
 #ifdef ZEAL_FORCE_PI4
             "Pi USB diagnostics: usbstatus | usbread (media remains read-only).\n"
             "Pi audio: paudio hdmi | paudio analog | paudio | phdmi.\n"
+            "Pi SD: psdread (scan only) | psdopen (bind unique ZealOS data partition; enables bounded writes there).\n"
 #endif
             "OS menu: hold the pointer button, drag, then release on an item.\n"
             "Lattice controls: Esc exit | Enter restart | Space step | c colors | L-click place | R-drag aim\n"
@@ -16723,6 +17044,7 @@ int64_t zc_gui_shell_exec(int64_t *a) {
 #ifdef ZEAL_FORCE_PI4
           streq(command, "usbstatus") || streq(command, "usbread") ||
           streq(command, "paudio") || streq(command, "phdmi") ||
+          streq(command, "psdread") || streq(command, "psdopen") ||
           streq(command, "paudio analog") || streq(command, "paudio hdmi") ||
 #endif
           streq(command, "zstatus") ||
@@ -19449,7 +19771,7 @@ static __attribute__((always_inline)) inline void native_desktop_start(const str
         zc_set_boot_time(-1, 0);
     zc_set_source_reader(zc_read_redsea);
 #ifdef ZEAL_FORCE_PI4
-    zc_set_source_writer(NULL); /* Pi media remains read-only in this gate. */
+    zc_set_source_writer(NULL); /* Explicit psdopen opts in after partition validation. */
 #else
     zc_set_source_writer(zc_write_source);
 #endif
@@ -19493,6 +19815,10 @@ void kernel_entry(const struct zeal_handoff *h) {
             __asm__ volatile("wfi");
         }
     }
+
+#if defined(ZEAL_FORCE_PI4) && !defined(ZEAL_PI_DIAG)
+    g_kernel_handoff = h;
+#endif
 
     if (h->revision >= 7 &&
         h->size >= offsetof(struct zeal_handoff, install_image_size) +
@@ -20889,6 +21215,7 @@ void kernel_entry(const struct zeal_handoff *h) {
             uart_puts(g_uart, "virtio-tablet: none\n");
         }
         if (virtio_blk_init(h->hhdm_offset)) {
+            (void)zbd_bind_virtio();
             uart_puts(g_uart, "virtio-blk: OK @ ");
             uart_put_u64_hex(g_uart, virtio_blk_mmio_phys());
             uart_puts(g_uart, " cap=");

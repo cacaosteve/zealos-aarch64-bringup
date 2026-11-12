@@ -1,0 +1,38 @@
+{
+  "date": "2026-11-12",
+  "repository_commit": "1750a794343a71c448a2cfc622619c7dcc997d48",
+  "working_tree": "dirty; exact tested ISO and logs identified by SHA-256",
+  "artifacts": {
+    "iso": "build/zealos-aarch64-hello.iso",
+    "iso_sha256": "81eac566be9a778fe299b1b3c66fcb6fb0454108e482304b12c62244f55a7e01",
+    "kernel": "build/kernel.elf",
+    "kernel_sha256": "d3060540e8392379e6a005dfa28b0170b55f203ba14ec2e0f702c4a6de8d4f9e"
+  },
+  "command": "python3 -u scripts/check-iso-installer.py --usb-cd",
+  "target": "UTM-bundled QEMU, NEC xHCI USB CD and disposable VirtIO disk",
+  "result": "PASS",
+  "checks": [
+    "live ISO boot",
+    "unconfirmed zinstall did not write to the target disk",
+    "zinstall ERASE completed full read-back verification",
+    "installed raw disk matched packaged disk byte-for-byte (SHA-256 db2390d60dd7d120d36e275c3c88bf0454c90fac0105d71883f669490974ed90)",
+    "installed disk cold-booted to the graphical desktop",
+    "installed sources were readable and arithmetic returned 42",
+    "InstallerPersist returned 0x2a before and after an additional cold reboot with the ISO detached"
+  ],
+  "serial_logs": {
+    "live": {
+      "path": "build/check-iso-installer-live.log",
+      "sha256": "dbe53b00d790342c83ef557486bb2753e9e7530fe3282454e18e97ce3b2289b8"
+    },
+    "disk_boot": {
+      "path": "build/check-iso-installer-disk-boot.log",
+      "sha256": "03fba20f486fea7ebfc1b76db2e9bc836d3fa3ed227120170af69149941cc3da"
+    },
+    "reboot": {
+      "path": "build/check-iso-installer-reboot.log",
+      "sha256": "0dc8444222b8dca567c256060582d4d05e04820b5a2b69431cce800408942d73"
+    }
+  },
+  "scope_note": "This is automated QEMU acceptance of the exact ISO installer and disposable VirtIO target. It does not replace a live UTM check on this exact image or validate a Pi installation workflow."
+}

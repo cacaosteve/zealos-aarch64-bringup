@@ -1,0 +1,23 @@
+{
+  "date": "2026-11-12",
+  "repository_commit": "1750a794343a71c448a2cfc622619c7dcc997d48",
+  "working_tree": "dirty; exact tested binary artifacts identified by SHA-256",
+  "artifacts": {
+    "iso": "build/zealos-aarch64-hello.iso",
+    "iso_sha256": "81eac566be9a778fe299b1b3c66fcb6fb0454108e482304b12c62244f55a7e01",
+    "kernel": "build/iso_root/boot/kernel.elf",
+    "kernel_sha256": "d3060540e8392379e6a005dfa28b0170b55f203ba14ec2e0f702c4a6de8d4f9e"
+  },
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-span-current-300s-2026-11-12.log python3 -u scripts/check-compat.py --pci --quick --probe-span-strut --span-soak-seconds 300",
+  "target": "UTM-bundled QEMU / PCI ARM64 graphical guest",
+  "result": "PASS",
+  "checks": [
+    "Span Run/Stop button visibly transitioned from Stopped to Running after Space",
+    "running simulation remained active for 300 seconds",
+    "guest remained queryable with zstatus after the active soak",
+    "Shift+Escape returned focus to the graphical terminal",
+    "40+2 returned 42 and zstatus reported failed=0",
+    "Strut follow-up interaction and Escape recovery passed"
+  ],
+  "limitation": "This automated soak exceeds the reported 137.77-second live UTM failure interval, but the exact ISO used in that live session is unknown. It does not replace a live UTM retest of this identified image or physical Pi validation."
+}

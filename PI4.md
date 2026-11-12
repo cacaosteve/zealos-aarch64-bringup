@@ -82,22 +82,33 @@ Acceptance:
 - **Shell entry accepted (2026-09-23):** after IRQ OK, FB shows `ZealOS aarch64 shell`
   and the cmd list. Next: prove UART RX on hardware (`help`/`halt` on USB-TTL @ 115200).
   Soft (M150): `uart_getc_nb` clears RSR/ECR after each DR; RXE already on.
-## SD card layout
+## Pi image partitions and first setup
 
-FAT32 (MBR type `0xEF` recommended by pftf):
+The planned user image has two partitions. The first is a 512 MiB FAT32 EFI
+partition (MBR type `0xEF`) containing pftf/RPi4 firmware files, the DTB, and
+the ZealOS boot payload. The second uses MBR type `0xDA` and holds the RedSea
+user volume plus its two source-store banks. This keeps firmware files outside
+the ZealOS writable area. The UTM ISO is not the Pi installer; Pi firmware
+boots from a FAT volume on SD or USB mass storage.
 
-| Path | Source |
-|--|--|
-| `RPI_EFI.fd`, `*.dtb`, `fixup4.dat`, `start4.elf`, … | Unpack [pftf/RPi4 release](https://github.com/pftf/RPi4/releases) zip onto card root |
-| `EFI/BOOT/BOOTAA64.EFI` | Our Limine (`make esp`) |
-| `boot/zealbooter.elf`, `boot/kernel.elf`, `limine.conf` | From `build/pi-esp/` (`make pi-sd` — Pi-diag ELFs, not virt) |
+`scripts/build-pi-image.py` combines a working pftf FAT-volume directory with
+`build/pi-desktop-esp` and emits a raw image. `make pi-image` stages the current
+Pi desktop payload first. For example, using the mounted working `ZEALPI` FAT
+volume as the firmware-file source:
 
 ```sh
-# On the Mac, after inserting an SD (example disk name):
-make pi-sd          # builds build/pi-esp/ from current ESP
-# Then manually copy pftf zip + build/pi-esp/* onto the card
-# (script prints exact steps; does not wipe disks by default)
+make pi-image PI_FIRMWARE_ROOT=/Volumes/ZEALPI PI_IMAGE_SIZE_MIB=8192
 ```
+
+The output is `build/zealos-pi4b.img`. It can be selected as a custom image in
+Raspberry Pi Imager and flashed onto a card at least 8 GiB. The builder reads
+the firmware source and writes only that output file; it never repartitions
+the inserted card. The data partition contains an empty stock-format RedSea
+volume and initialized source-bank headers. Bounded Pi SD reads/writes and
+explicit `psdopen` binding are implemented, but physical writes and persistence
+still need validation. `rspersist` only formats the small 128-sector bring-up
+volume; do not use it to initialize this full-size image. Existing ZEALPI cards
+are not resized in place.
 
 ## Platform deltas vs QEMU `virt`
 
@@ -4239,3 +4250,23 @@ After booting it, capture the early Pi eMMC2 probe line over the serial
 console. This is controller discovery only; native SD block I/O, a writable
 data partition, persistence, disconnect recovery and Pi installation remain
 unimplemented.
+
+**Writable SD implementation update (2026-11-12):** the November 10 note above
+records the read-only candidate at that point. The current worktree has since
+added a bounded eMMC2/SDHCI PIO backend, primary MBR/GPT partition scanning,
+partition-relative block binding, and explicit `psdopen`/`psdread` commands.
+`scripts/build-pi-image.py` now creates a whole-card image with a 512 MiB FAT32
+firmware/boot partition and a type `0xDA` ZealOS data partition. Source-bank
+headers are initialized in the data partition; the image builder also writes an
+empty full-size RedSea boot sector, bitmap, and root directory. It writes only a
+host-side `.img`, never the card.
+
+Host helper/fake-controller coverage and the Pi desktop build are present, but
+the new SD read/write/flush path has not yet been validated on the physical Pi.
+The bootstrap `rspersist` filesystem remains limited and is not the full-size
+volume format. Runtime writes through ordinary RedSea file APIs are not enabled;
+save/readback across a cold reboot on the physical Pi is still unaccepted.
+For exact partition layout, flashing flow, and limits, see
+[`docs/PI4-WRITABLE-STORAGE.md`](docs/PI4-WRITABLE-STORAGE.md). This update
+supersedes the earlier “unimplemented” storage status only for code presence;
+it does not close physical storage acceptance.

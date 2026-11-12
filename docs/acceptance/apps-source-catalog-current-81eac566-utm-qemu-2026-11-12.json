@@ -1,0 +1,34 @@
+{
+  "date": "2026-11-12",
+  "repository_commit": "1750a794343a71c448a2cfc622619c7dcc997d48",
+  "working_tree": "dirty; exact tested ISO and catalog artifacts identified by SHA-256",
+  "upstream_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "target": "UTM-bundled QEMU, HVF, AArch64 PCI graphical guest, one vCPU",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "81eac566be9a778fe299b1b3c66fcb6fb0454108e482304b12c62244f55a7e01",
+  "kernel_sha256": "d3060540e8392379e6a005dfa28b0170b55f203ba14ec2e0f702c4a6de8d4f9e",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-app-catalog-current-81eac566.log python3 -u scripts/check-compat.py --pci --quick --probe-program-catalog --program-catalog-path <each of the 70 upstream/pinned/Apps/**/*.ZC paths>",
+  "artifacts": {
+    "catalog": "build/program-catalog-targeted.json",
+    "catalog_sha256": "4b9aca692654d5eaf6862e39685e29de05e71234085d245a993f19aa55a8a7f7",
+    "serial_log": "build/check-app-catalog-current-81eac566.log",
+    "serial_log_sha256": "fc16da56bff9c8cd39a244195e871f7196d5b75c7d6d9c1cab0126af95cf6279"
+  },
+  "result": "pass",
+  "counts": {
+    "total": 70,
+    "compiled": 70,
+    "blocked": 0
+  },
+  "normal_loads": [
+    {
+      "path": "/Apps/ToTheFront/Load.ZC",
+      "result": "pass"
+    },
+    {
+      "path": "/Apps/X-Caliber/Load.ZC",
+      "result": "pass"
+    }
+  ],
+  "scope_note": "Compile-only acceptance for all pinned Apps sources and normal-loader checks for ToTheFront and X-Caliber on this exact ISO. This does not establish runtime acceptance of all apps, all app workflows, live UTM, or Pi hardware."
+}
