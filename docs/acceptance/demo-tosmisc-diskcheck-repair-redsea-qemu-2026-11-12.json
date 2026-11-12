@@ -1,0 +1,31 @@
+{
+  "date": "2026-11-12",
+  "repository_commit": "d2d299b",
+  "working_tree": "dirty; exact tested binary artifacts identified by SHA-256",
+  "target": "UTM-bundled QEMU, AArch64 PCI, one vCPU, disposable writable RedSea VirtIO fixture",
+  "artifacts": {
+    "iso": "build/zealos-aarch64-hello.iso",
+    "iso_sha256": "9b98f3b27ff385d10924332482dfaa3ed1d29d8943b67845afb97eac8bfe87e4",
+    "kernel": "build/iso_root/boot/kernel.elf",
+    "kernel_sha256": "2503d79df289a108fa77fa489130c7d4480ae679df668bb6885a8d561158baa2",
+    "probe": "tests/compat/RawRedSeaGeometry.ZC",
+    "probe_sha256": "5045d16654c554c296444338faec3fb7157783bf036ae49b59c0c981934aa723",
+    "source_bundle_sha256": "6bc07cf2af9aa64d54d227b5e51b339ee27066e05dd69626d003bdadfa359a68",
+    "check_compat_sha256": "a51f63722777b52272cadd8ac0aa37844d4191f65227088c8a1d5e2f41d98249"
+  },
+  "command": "ZEAL_COMPAT_LOG_PATH=build/tosmisc-repair-redsea-current-qemu-2026-11-12.log python3 scripts/check-compat.py --pci --probe-raw-redsea-geometry repair",
+  "result": "PASS",
+  "verified": [
+    "The writable RedSea fixture contains a nested directory/file plus one separate allocated orphan cluster.",
+    "Directory enumeration reports the nested SUB/KEEP.ZC entry and its starting sector.",
+    "Stock DiskCheck('D', TRUE, FALSE) reports one consistency error and frees only the orphan allocation.",
+    "Read-back confirms the nested directory and file allocations remain set while the orphan bit is cleared.",
+    "A second clean DiskCheck('D', FALSE, FALSE) returns zero and zstatus reports failed=0."
+  ],
+  "limits": [
+    "This exercises the stock checker and bounded RedSea repair bridge, not the TOSMisc DiskCheckAll dispatcher.",
+    "Directory repair, larger populated volumes, FAT32, and live Pi behavior remain untested by this probe."
+  ],
+  "log": "build/tosmisc-repair-redsea-current-qemu-2026-11-12.log",
+  "log_sha256": "0178efa94a22c4041845a4af811aa83b15f273469796e3a613f981b3e366d34e"
+}

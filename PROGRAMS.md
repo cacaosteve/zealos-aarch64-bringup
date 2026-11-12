@@ -62,7 +62,11 @@ live UTM checks are recorded in the
 and [`UTM app refresh`](docs/acceptance/utm-app-refresh-2026-11-11.json).
 Earlier Budget, X-Caliber and ToTheFront checks remain recorded separately;
 the combined named-app invocation exited after ToTheFront, so its unexecuted
-flags are not counted.
+flags are not counted. The 2026-11-12 current build also passes a 180-second
+active Span simulation soak, remains queryable, and exits with Shift+Escape;
+the older 180-second Span wait had left the app stopped and is now labeled as
+an idle wait. The user's earlier live UTM freeze remains open because that
+session's ISO hash was not captured ([active soak](docs/acceptance/span-running-soak-current-180s-qemu-2026-11-12.json)).
 
 The dependency-aware Demo inventory is separate from that 290-source sample:
 all 206 pinned Demo `.ZC` files compile, and 202 have explicit QEMU runtime
@@ -73,7 +77,8 @@ CPU. On the 2026-11-11 ISO, TOSMisc's MemTest and Psalmody JukePuppet's
 stock-song and Beep-fixture execution/cleanup pass on a disposable QEMU disk.
 Its ARM64 `DiskCheckAll` adaptation skips the source-backed C volume and an
 absent optional D drive, and its actual dispatch now passes against a clean
-mounted writable RedSea D fixture. The RedSea file-enumeration bridge now
+mounted writable RedSea D fixture; that dispatch passed again on the
+2026-11-12 current ISO ([acceptance](docs/acceptance/demo-tosmisc-diskcheckall-redsea-qemu-2026-11-12.json)). The RedSea file-enumeration bridge now
 preserves each entry's starting sector in `CDirEntry.clus`, allowing the stock
 repair scan to retain an allocated `KEEP.ZC` file while reclaiming a separate
 orphan allocation; read-back and a second clean scan pass. A nested `SUB/KEEP.ZC`
@@ -628,6 +633,8 @@ to a mounted RedSea D, and supplies a bounded `RedSeaFreeClus` operation for
 the stock `DiskCheck` repair call. The new disposable-fixture regression frees
 an orphan allocation, verifies the bitmap on disk, and passes a second clean
 scan ([repair acceptance](docs/acceptance/demo-tosmisc-diskcheck-repair-redsea-qemu-2026-11-11.json)).
+The same repair fixture passes again on the 2026-11-12 current ISO
+([revalidation](docs/acceptance/demo-tosmisc-diskcheck-repair-redsea-qemu-2026-11-12.json)).
 This does not yet cover populated volumes, directory repair, or FAT32. The ARM64 `JukeSongsPuppet` adapter launches stock `.ZC`
 songs directly through JukeBox's `SingleSong` path. The QEMU regression
 returned from both the stock song and a looping Beep fixture; the fixture wrote

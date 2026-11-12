@@ -1,0 +1,23 @@
+{
+  "date": "2026-11-12",
+  "repository_commit": "d2d299b",
+  "working_tree": "dirty; exact tested binary artifacts identified by SHA-256",
+  "artifacts": {
+    "iso": "build/zealos-aarch64-hello.iso",
+    "iso_sha256": "9b98f3b27ff385d10924332482dfaa3ed1d29d8943b67845afb97eac8bfe87e4",
+    "kernel": "build/iso_root/boot/kernel.elf",
+    "kernel_sha256": "2503d79df289a108fa77fa489130c7d4480ae679df668bb6885a8d561158baa2"
+  },
+  "command": "python3 scripts/check-compat.py --pci --quick --probe-span-strut --span-soak-seconds 180",
+  "target": "UTM-bundled QEMU / PCI ARM64 graphical guest",
+  "result": "PASS",
+  "checks": [
+    "Span Run/Stop button visibly transitioned from Stopped to Running after Space",
+    "running simulation remained active for 180 seconds",
+    "guest remained queryable with zstatus after the active soak",
+    "Shift+Escape returned focus to the graphical terminal",
+    "40+2 returned 42 and zstatus reported failed=0",
+    "Strut follow-up interaction and Escape recovery passed"
+  ],
+  "limitation": "This automated active soak passed on the identified artifact, but it does not close the live UTM report because the exact ISO used when Span became unresponsive is unknown. The corrected soak explicitly starts the simulation; the earlier idle wait did not."
+}

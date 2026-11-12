@@ -429,7 +429,7 @@ p.add_argument('--probe-keepaway-audio-timer', action='store_true',
 p.add_argument('--probe-span-strut', action='store_true',
                help='exercise original Span bridge and Strut ship apps through entry, input and exit')
 p.add_argument('--span-soak-seconds', type=int, default=0,
-               help='leave Span running this long before checking input and Escape recovery')
+               help='run Span simulation this long before checking input and Escape recovery')
 p.add_argument('--probe-span-save', action='store_true',
                help='exercise Span save and reopen on a disposable disk')
 p.add_argument('--probe-span-cold', action='store_true',
@@ -4821,6 +4821,16 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 if args.span_soak_seconds:
                     if args.span_soak_seconds < 0:
                         raise RuntimeError('--span-soak-seconds must be non-negative')
+                    qmp_send_key('spc')
+                    time.sleep(0.5)
+                    running_frame = graphical_screen('span-running-state')
+                    run_button_diff = rgb_diff_count(
+                        span_frame, running_frame, (0, 0, 80, 20))
+                    if run_button_diff < 100:
+                        raise RuntimeError(
+                            'Span Run/Stop button did not visibly change after Space; '
+                            f'changed pixels={run_button_diff}')
+                    print('PASS Span simulation entered Running state', flush=True)
                     print(f'SOAK Span simulation for {args.span_soak_seconds}s', flush=True)
                     time.sleep(args.span_soak_seconds)
                     command('zstatus', 'keyboard_focus=', timeout=10)

@@ -12,12 +12,12 @@
   "result": "PASS",
   "checks": [
     "Span opened and rendered its bridge canvas",
-    "simulation ran without input for 180 seconds",
-    "guest remained queryable with zstatus after the soak",
+    "Span remained in its default Stopped state for 180 seconds without input",
+    "guest remained queryable with zstatus after the idle wait",
     "Shift+Escape returned focus to the graphical terminal",
     "40+2 returned 42",
     "Strut follow-up interaction and Escape recovery passed",
     "zstatus reported failed=0"
   ],
-  "limitation": "This automated QEMU/HVF soak does not close the user's live UTM freeze report because the exact ISO used in that session is unknown. Repeat the long-running scenario in the visible UTM guest to establish live behavior."
+  "limitation": "This was an idle-app wait, not a running-simulation soak. See span-running-soak-current-180s-qemu-2026-11-12.json for the active simulation check. The user's live UTM freeze report remains open because its exact ISO is unknown."
 }
