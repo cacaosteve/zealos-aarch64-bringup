@@ -32,8 +32,8 @@ has feature and live-UTM gaps. The user has confirmed audible UTM output for
 The Apps menu includes the tested upstream programs such as Digital Logic,
 Budget, GrModels, KeepAway, Psalmody, Span, Strut, TimeClock and Titanium.
 Automated UTM-bundled QEMU checks cover these apps, while a few live-window
-reports remain unresolved (including the KeepAway freeze and whether GrModels'
-generated model is visible). Additional stock graphics programs
+reports remain unresolved (including whether GrModels' generated model is
+visible). Additional stock graphics programs
 including Doodle, Mass Spring and Game of Life have live UTM acceptance.
 Budget's full entry workflow was rerun on the exact current ISO: create, edit,
 abort, cancel, save, reopen, cold disk-only persistence, and return to a working

@@ -27,5 +27,9 @@
       }
     }
   ],
-  "scope_note": "Automated UTM-bundled QEMU/HVF evidence for this exact ISO. It does not prove the prior visible UTM KeepAway freeze is resolved, and it is not full application feature parity or Pi hardware acceptance."
+  "live_utm_user_confirmation": {
+    "date": "2026-11-11",
+    "KeepAway": "User confirmed pointer movement was accepted and Escape returned to the terminal without a freeze."
+  },
+  "scope_note": "Automated UTM-bundled QEMU/HVF evidence for this exact ISO, with a brief user-confirmed live UTM KeepAway pointer/Escape check. This is not full application feature parity or Pi hardware acceptance."
 }
