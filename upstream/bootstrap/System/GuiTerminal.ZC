@@ -311,7 +311,7 @@ Bool BootstrapGuiTerminalMenuBindLeaf(CMenuEntry *root, U8 *source_name,
                                       U8 *display_name, I64 action)
 {
     CMenuEntry *entry;
-    if (!root || !source_name || !display_name || action < 1 || action > 29)
+    if (!root || !source_name || !display_name || action < 1 || action > 37)
         return FALSE;
     entry = root->sub;
     while (entry)
@@ -354,7 +354,7 @@ U0 BootstrapGuiTerminalMenuInstall()
 {
     CMenu *menu = MenuNew("File { Files(); Disk(); }");
     BootstrapGuiTerminalMenuAppendRoot(menu, MenuNew("Windows { Demo(); TileHorz(); TileVert(); TileGrid(); }"));
-    BootstrapGuiTerminalMenuAppendRoot(menu, MenuNew("Apps { LatticePlay(); StockPlay(); PaintDemo(); NetOfDots(); Lines(); Doodle(); MassSpring(); Life(); Logic(); Budget(); Titanium(); }"));
+    BootstrapGuiTerminalMenuAppendRoot(menu, MenuNew("Apps { LatticePlay(); StockPlay(); PaintDemo(); NetOfDots(); Lines(); Doodle(); MassSpring(); Life(); Logic(); Budget(); Titanium(); Psalmody(); GrModels(); KeepAway(); Span(); Strut(); ToTheFront(); Vocabulary(); XCaliber(); }"));
     BootstrapGuiTerminalMenuAppendRoot(menu, MenuNew("Games { Maze(); CharDemo(); }"));
     BootstrapGuiTerminalMenuAppendRoot(menu, MenuNew("View { ViewAngles(); ZoomIn(); ZoomOut(); ResetView(); PanLeft(); PanRight(); PanUp(); PanDown(); }"));
     BootstrapGuiTerminalMenuAppendRoot(menu, MenuNew("OS { Help(); Status(); }"));
@@ -384,6 +384,14 @@ U0 BootstrapGuiTerminalMenuInstall()
         !BootstrapGuiTerminalMenuBindLeaf(apps, "Logic", "Digital Logic", 25) ||
         !BootstrapGuiTerminalMenuBindLeaf(apps, "Budget", "Budget", 26) ||
         !BootstrapGuiTerminalMenuBindLeaf(apps, "Titanium", "Titanium", 27) ||
+        !BootstrapGuiTerminalMenuBindLeaf(apps, "Psalmody", "Psalmody", 30) ||
+        !BootstrapGuiTerminalMenuBindLeaf(apps, "GrModels", "GrModels", 31) ||
+        !BootstrapGuiTerminalMenuBindLeaf(apps, "KeepAway", "KeepAway", 32) ||
+        !BootstrapGuiTerminalMenuBindLeaf(apps, "Span", "Span", 33) ||
+        !BootstrapGuiTerminalMenuBindLeaf(apps, "Strut", "Strut", 34) ||
+        !BootstrapGuiTerminalMenuBindLeaf(apps, "ToTheFront", "To The Front", 35) ||
+        !BootstrapGuiTerminalMenuBindLeaf(apps, "Vocabulary", "Vocabulary", 36) ||
+        !BootstrapGuiTerminalMenuBindLeaf(apps, "XCaliber", "X-Caliber", 37) ||
         !BootstrapGuiTerminalMenuBindLeaf(games, "Maze", "Maze", 28) ||
         !BootstrapGuiTerminalMenuBindLeaf(games, "CharDemo", "Character Demo", 29) ||
         !BootstrapGuiTerminalMenuBindLeaf(view, "ViewAngles", "View Angles", 11) ||
@@ -535,6 +543,13 @@ U0 BootstrapGuiTerminalRunLightProgram(U8 *filename)
     // MessageGet/KeyGet wait loops do not hold the GUI terminal's WinMgr frame.
     if (!StrCompare(filename, "/Apps/Titanium/Run.ZC") ||
         !StrCompare(filename, "/Apps/X-Caliber/Run.ZC") ||
+        !StrCompare(filename, "/Apps/Psalmody/Run.ZC") ||
+        !StrCompare(filename, "/Apps/GrModels/Run.ZC") ||
+        !StrCompare(filename, "/Apps/KeepAway/Run.ZC") ||
+        !StrCompare(filename, "/Apps/Span/Run.ZC") ||
+        !StrCompare(filename, "/Apps/Strut/Run.ZC") ||
+        !StrCompare(filename, "/Apps/ToTheFront/Run.ZC") ||
+        !StrCompare(filename, "/Apps/Vocabulary/Run.ZC") ||
         !StrCompare(filename, "/Demo/Graphics/Symmetry.ZC") ||
         !StrCompare(filename, "/Demo/Graphics/Pick.ZC") ||
         !StrCompare(filename, "/Demo/Graphics/CommonAncestor.ZC") ||
@@ -559,6 +574,20 @@ U0 BootstrapGuiTerminalRunLightProgram(U8 *filename)
         title = "X-Caliber";
         if (!StrCompare(filename, "/Apps/Titanium/Run.ZC"))
             title = "Titanium";
+        else if (!StrCompare(filename, "/Apps/Psalmody/Run.ZC"))
+            title = "Psalmody";
+        else if (!StrCompare(filename, "/Apps/GrModels/Run.ZC"))
+            title = "GrModels";
+        else if (!StrCompare(filename, "/Apps/KeepAway/Run.ZC"))
+            title = "KeepAway";
+        else if (!StrCompare(filename, "/Apps/Span/Run.ZC"))
+            title = "Span";
+        else if (!StrCompare(filename, "/Apps/Strut/Run.ZC"))
+            title = "Strut";
+        else if (!StrCompare(filename, "/Apps/ToTheFront/Run.ZC"))
+            title = "To The Front";
+        else if (!StrCompare(filename, "/Apps/Vocabulary/Run.ZC"))
+            title = "Vocabulary";
         else if (!StrCompare(filename, "/Demo/Graphics/Symmetry.ZC"))
             title = "Symmetry";
         else if (!StrCompare(filename, "/Demo/Graphics/Pick.ZC"))
@@ -646,6 +675,22 @@ U8 *BootstrapGuiTerminalMenuSource(I64 action)
         return "BootstrapGuiTerminalRunLightProgram(\"/Demo/Games/Maze.ZC\");";
     if (action == 29)
         return "BootstrapGuiTerminalRunLightProgram(\"/Demo/Games/CharDemo.ZC\");";
+    if (action == 30)
+        return "BootstrapGuiTerminalRunLightProgram(\"/Apps/Psalmody/Run.ZC\");";
+    if (action == 31)
+        return "BootstrapGuiTerminalRunLightProgram(\"/Apps/GrModels/Run.ZC\");";
+    if (action == 32)
+        return "BootstrapGuiTerminalRunLightProgram(\"/Apps/KeepAway/Run.ZC\");";
+    if (action == 33)
+        return "BootstrapGuiTerminalRunLightProgram(\"/Apps/Span/Run.ZC\");";
+    if (action == 34)
+        return "BootstrapGuiTerminalRunLightProgram(\"/Apps/Strut/Run.ZC\");";
+    if (action == 35)
+        return "BootstrapGuiTerminalRunLightProgram(\"/Apps/ToTheFront/Run.ZC\");";
+    if (action == 36)
+        return "BootstrapGuiTerminalRunLightProgram(\"/Apps/Vocabulary/Run.ZC\");";
+    if (action == 37)
+        return "BootstrapGuiTerminalRunLightProgram(\"/Apps/X-Caliber/Run.ZC\");";
     return NULL;
 }
 
@@ -1762,6 +1807,14 @@ I64 BootstrapGuiTerminalSmoke()
             !BootstrapGuiTerminalMenuActionValid(menu, "Apps", "Digital Logic", 25) ||
             !BootstrapGuiTerminalMenuActionValid(menu, "Apps", "Budget", 26) ||
             !BootstrapGuiTerminalMenuActionValid(menu, "Apps", "Titanium", 27) ||
+            !BootstrapGuiTerminalMenuActionValid(menu, "Apps", "Psalmody", 30) ||
+            !BootstrapGuiTerminalMenuActionValid(menu, "Apps", "GrModels", 31) ||
+            !BootstrapGuiTerminalMenuActionValid(menu, "Apps", "KeepAway", 32) ||
+            !BootstrapGuiTerminalMenuActionValid(menu, "Apps", "Span", 33) ||
+            !BootstrapGuiTerminalMenuActionValid(menu, "Apps", "Strut", 34) ||
+            !BootstrapGuiTerminalMenuActionValid(menu, "Apps", "To The Front", 35) ||
+            !BootstrapGuiTerminalMenuActionValid(menu, "Apps", "Vocabulary", 36) ||
+            !BootstrapGuiTerminalMenuActionValid(menu, "Apps", "X-Caliber", 37) ||
             !BootstrapGuiTerminalMenuActionValid(menu, "Games", "Maze", 28) ||
             !BootstrapGuiTerminalMenuActionValid(menu, "Games", "Character Demo", 29) ||
             !BootstrapGuiTerminalMenuActionValid(menu, "View", "View Angles", 11) ||
@@ -1779,6 +1832,31 @@ I64 BootstrapGuiTerminalSmoke()
         if (!output || StrCompare(output,
             "BootstrapGuiTerminalTitaniumRun();"))
             return 75;
+        if (!BootstrapGuiTerminalMenuSource(30) ||
+            StrCompare(BootstrapGuiTerminalMenuSource(30),
+                "BootstrapGuiTerminalRunLightProgram(\"/Apps/Psalmody/Run.ZC\");") ||
+            !BootstrapGuiTerminalMenuSource(31) ||
+            StrCompare(BootstrapGuiTerminalMenuSource(31),
+                "BootstrapGuiTerminalRunLightProgram(\"/Apps/GrModels/Run.ZC\");") ||
+            !BootstrapGuiTerminalMenuSource(32) ||
+            StrCompare(BootstrapGuiTerminalMenuSource(32),
+                "BootstrapGuiTerminalRunLightProgram(\"/Apps/KeepAway/Run.ZC\");") ||
+            !BootstrapGuiTerminalMenuSource(33) ||
+            StrCompare(BootstrapGuiTerminalMenuSource(33),
+                "BootstrapGuiTerminalRunLightProgram(\"/Apps/Span/Run.ZC\");") ||
+            !BootstrapGuiTerminalMenuSource(34) ||
+            StrCompare(BootstrapGuiTerminalMenuSource(34),
+                "BootstrapGuiTerminalRunLightProgram(\"/Apps/Strut/Run.ZC\");") ||
+            !BootstrapGuiTerminalMenuSource(35) ||
+            StrCompare(BootstrapGuiTerminalMenuSource(35),
+                "BootstrapGuiTerminalRunLightProgram(\"/Apps/ToTheFront/Run.ZC\");") ||
+            !BootstrapGuiTerminalMenuSource(36) ||
+            StrCompare(BootstrapGuiTerminalMenuSource(36),
+                "BootstrapGuiTerminalRunLightProgram(\"/Apps/Vocabulary/Run.ZC\");") ||
+            !BootstrapGuiTerminalMenuSource(37) ||
+            StrCompare(BootstrapGuiTerminalMenuSource(37),
+                "BootstrapGuiTerminalRunLightProgram(\"/Apps/X-Caliber/Run.ZC\");"))
+            return 76;
         if (BootstrapGuiTerminalOutputOwnershipChecks() != 0x2a)
             return 74;
         if (BootstrapGuiTerminalZoomPanChecks() != 0x2a) return 64;
