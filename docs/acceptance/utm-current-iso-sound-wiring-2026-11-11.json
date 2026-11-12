@@ -1,7 +1,7 @@
 {
   "date": "2026-11-11",
   "target": "UTM on macOS, ZealOS AArch64 Current ISO Acceptance",
-  "result": "configured; audible playback pending guest restart",
+  "result": "pass: live VirtIO Sound audible for Beep and Psalmody",
   "utm_config": "/Users/steve/Library/Containers/com.utmapp.UTM/Data/Documents/ZealOS AArch64 Current ISO Acceptance.utm/config.plist",
   "config_backup": "/Users/steve/Library/Containers/com.utmapp.UTM/Data/Documents/ZealOS AArch64 Current ISO Acceptance.utm/config.plist.pre-virtio-sound-20261111",
   "iso_path": "/Users/steve/.codex/worktrees/three-3d-apps/zealos-aarch64-bringup/build/zealos-aarch64-hello.iso",
@@ -12,12 +12,17 @@
     "The current ISO hash matches the ISO in the prepared UTM Sound Acceptance profile.",
     "The Current ISO Acceptance profile previously selected intel-hda, while the AArch64 guest sound implementation probes for VirtIO Sound.",
     "The Current ISO Acceptance profile now selects virtio-sound-pci, and plutil validates the edited configuration.",
-    "A pre-change config.plist backup was preserved."
+    "A pre-change config.plist backup was preserved.",
+    "After the VM was restarted, the user heard Beep(60); from the current ISO.",
+    "The user also heard Psalmody playback in the same UTM guest."
   ],
   "not_verified": [
-    "The running VM still has its old Intel HDA device until it is stopped and restarted.",
-    "Audible Beep(60); playback from the updated Current ISO Acceptance VM."
+    "Long-form song playback and sound effects from every app have not been accepted live."
   ],
-  "next": "Stop and restart ZealOS AArch64 Current ISO Acceptance, then run Beep(60); and confirm whether it is audible.",
-  "scope_note": "This records UTM device wiring only. It does not establish playback until the updated VM is restarted and heard live."
+  "audible_confirmation": {
+    "commands": ["Beep(60);", "Psalmody playback"],
+    "result": "User reports hearing both the beep and Psalmody playback.",
+    "reported_by": "user"
+  },
+  "scope_note": "This verifies basic audible output and Psalmody playback on the current UTM profile. It does not establish every app sound effect or Pi hardware audio."
 }

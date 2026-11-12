@@ -1,0 +1,18 @@
+{
+  "date": "2026-11-11",
+  "target": "AArch64 native ZealC under UTM-bundled QEMU/HVF, one vCPU, virtio-ramfb, VirtIO keyboard and tablet",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "55719ef8a54663ae42a43143579c10a557126e94d8ecad4e9438331ed8bc5a8a",
+  "kernel_sha256": "42d44f33ae960df3f4e6d4ec51921b225e5cb3a83740f9c862417573f01b1abf",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-logic-current-55719.log python3 -u scripts/check-compat.py --pci --quick --probe-logic-program",
+  "serial_log": "build/check-logic-current-55719.log",
+  "serial_log_sha256": "85a76d3fb296c1494df40324b4b09815a25e311ea12c963161865622ed800a43",
+  "exit_code": 0,
+  "result": "pass",
+  "checks": [
+    "Rendered the expected AND circuit with exact gate truth-table values.",
+    "Prompt insertion, Backspace deletion, mid-field editing and setup input passed.",
+    "Abort/cancel cleanup, relaunch, and clean exit passed with zstatus failed=0."
+  ],
+  "scope_note": "Automated UTM-bundled QEMU evidence for this exact ISO, not a visible UTM-window check or full feature-parity claim."
+}
