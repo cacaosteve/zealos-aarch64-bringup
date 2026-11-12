@@ -49,20 +49,20 @@ confirm the current ISO install and basic installed-use path; live UTM still
 needs a retest after the user's earlier Span freeze. See the [installer record](docs/acceptance/iso-installer-current-utm-qemu-2026-11-11.json)
 and [180-second Span soak record](docs/acceptance/span-long-run-soak-current-180s-qemu-2026-11-11.json).
 
-The current ISO (`55719ef8…`, kernel `42d44f33…`) passes UTM-bundled QEMU
-checks for GrModels Man and Ball mesh generation and inline rendering,
-KeepAway gameplay/input/Escape, and Titanium intro, plain-arrow movement,
-Space, and Escape. A separate 187-second KeepAway run stayed animated through
-18 input cycles and cleaned up its animation task on exit. All checks returned
-to a working terminal with `zstatus failed=0`. The same run passed shared GUI,
-compiler, task, source-context, and system-server regressions. This is automated
-QEMU evidence. The user has since confirmed live UTM pointer input and Escape
-recovery for KeepAway, plus visible generated-model output from GrModels on this
-ISO. Earlier Budget, X-Caliber and ToTheFront checks are recorded
-separately; the combined named-app invocation exited after ToTheFront, so its
-unexecuted flags are not counted. See the
-[`current 3D-app checks`](docs/acceptance/three-d-apps-current-55719-utm-qemu-2026-11-11.json)
+The rebuilt ISO (`58c5ab0f…`, kernel `0a36b1d0…`) passed the GrModels Man and
+Ball generation/rendering checks, KeepAway gameplay/input/Escape recovery, and
+Titanium intro, Left/Right, Space, and Escape checks in UTM-bundled QEMU. The
+shared GUI, compiler, task, source-context, and system-server regressions also
+completed with `zstatus failed=0`. See the
+[`exact-current 3D-app check`](docs/acceptance/three-d-apps-current-58c5-utm-qemu-2026-11-11.json).
+These automated checks do not prove every app feature, and do not replace a
+live UTM or Pi check. The previous ISO's 187-second KeepAway run and earlier
+live UTM checks are recorded in the
+[`55719 ISO check`](docs/acceptance/three-d-apps-current-55719-utm-qemu-2026-11-11.json)
 and [`UTM app refresh`](docs/acceptance/utm-app-refresh-2026-11-11.json).
+Earlier Budget, X-Caliber and ToTheFront checks remain recorded separately;
+the combined named-app invocation exited after ToTheFront, so its unexecuted
+flags are not counted.
 
 The dependency-aware Demo inventory is separate from that 290-source sample:
 all 206 pinned Demo `.ZC` files compile, and 202 have explicit QEMU runtime

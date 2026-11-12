@@ -1,0 +1,19 @@
+{
+  "date": "2026-11-11",
+  "target": "AArch64 native ZealC in UTM-bundled QEMU with HVF, one vCPU, virtio-ramfb, VirtIO keyboard and tablet",
+  "iso_path": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "58c5ab0f79f0368ec1ade5c6aafd89a271a1c9858095902428cb6f9e73984140",
+  "kernel_sha256": "0a36b1d0a4262aa75b67c58477c311cbbd702d890eaa988744e2725b643cdc20",
+  "command": "python3 -u scripts/check-compat.py --pci --quick --probe-3d-apps",
+  "log_path": "build/check-3d-apps-pci.log",
+  "log_sha256": "5db285edba1518fd095582ca5a91a9e62c0941c09d2030d4cea898a649889f31",
+  "exit_code": 0,
+  "result": "pass",
+  "checks": {
+    "GrModels": "Man and Ball forms completed color selection, generated meshes, displayed inline output, and returned to the terminal.",
+    "KeepAway": "Gameplay and input checks passed; Escape returned to a responsive terminal.",
+    "Titanium": "Intro advanced, Left/Right and Space were accepted, and Escape returned to a responsive terminal.",
+    "shared_regressions": "The shared GUI terminal, compiler, task, source-context, and system-server checks completed; zstatus reported failed=0."
+  },
+  "scope_note": "Automated acceptance of this exact ISO in UTM-bundled QEMU/HVF. It does not prove every application workflow or physical Pi behavior, and it is separate from the visible UTM app-window checks."
+}
