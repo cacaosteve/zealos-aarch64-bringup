@@ -117,7 +117,7 @@ p.add_argument('--probe-raw-disk-read', action='store_true',
                help='check read-only physical VirtIO sector access')
 p.add_argument('--probe-raw-disk-write', action='store_true',
                help='check bounded, flushed absolute VirtIO writes on a disposable disk clone')
-p.add_argument('--probe-raw-redsea-geometry', choices=('absent', 'present', 'repair', 'malformed', 'cycle', 'legacy', 'invalid', 'stockfile'),
+p.add_argument('--probe-raw-redsea-geometry', choices=('absent', 'present', 'repair', 'malformed', 'malformedrepair', 'cycle', 'legacy', 'invalid', 'stockfile'),
                help='check bounded legacy RedSea reads, writes, or repair against an isolated fixture')
 p.add_argument('--probe-stock-redsea-file', action='store_true',
                help='load one contiguous stock-layout RedSea root file on a disposable disk')
@@ -1067,13 +1067,13 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 disk.seek(130911 * 512)
                 boot = bytearray(512)
                 bitmap = bytearray(512)
-                root_dir = bytearray(1024 if args.probe_raw_redsea_geometry in ('malformed', 'stockfile') else 512)
+                root_dir = bytearray(1024 if args.probe_raw_redsea_geometry in ('malformed', 'malformedrepair', 'stockfile') else 512)
                 file_data = bytearray(512)
                 sub_dir = bytearray(512)
                 child_dir = bytearray(512)
                 broken_dir = bytearray(512)
                 empty_dir = bytearray(512)
-                if args.probe_raw_redsea_geometry in ('present', 'repair', 'malformed', 'cycle', 'legacy', 'invalid', 'stockfile'):
+                if args.probe_raw_redsea_geometry in ('present', 'repair', 'malformed', 'malformedrepair', 'cycle', 'legacy', 'invalid', 'stockfile'):
                     boot[3] = 0x88
                     offset = 0 if args.probe_raw_redsea_geometry == 'legacy' else 130911
                     struct.pack_into('<qqqqq', boot, 8, offset, 128, offset + 2, 1, 7)
@@ -1103,7 +1103,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                         struct.pack_into('<qqq', sub_dir, 104, offset + 20, 512, 0)
                         bitmap[1] |= 0x02  # Nested directory at cluster index 9.
                         bitmap[2] |= 0x08  # Nested file at cluster index 19.
-                    if args.probe_raw_redsea_geometry == 'malformed':
+                    if args.probe_raw_redsea_geometry in ('malformed', 'malformedrepair'):
                         # Keep the root directory valid but make its child
                         # directory extent start at the last sector and cross
                         # the end of the disposable volume. The checker is
@@ -9120,6 +9120,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                                 'zc: loaded /Demo/AcctExample/TOS/TOSMisc.ZC', timeout=60)
                         suffix = ('Present' if args.probe_raw_redsea_geometry in ('present', 'legacy')
                                   else 'Repair' if args.probe_raw_redsea_geometry == 'repair'
+                                  else 'MalformedRepair' if args.probe_raw_redsea_geometry == 'malformedrepair'
                                   else 'Malformed' if args.probe_raw_redsea_geometry == 'malformed'
                                   else 'Cycle' if args.probe_raw_redsea_geometry == 'cycle'
                                   else 'Absent')

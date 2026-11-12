@@ -13515,6 +13515,19 @@ static int rs_stock_file_at(uint64_t base, uint64_t sectors, uint64_t directory,
             uint64_t first = rs_stock_u64(e + 40), length = rs_stock_u64(e + 48);
             if (attr & 0x10u) {
                 if (prefix + n + 1 >= 96) continue;
+                /* Keep bounded directory references visible to FilesFind even
+                 * when the child header is damaged. DiskCheck must see the
+                 * referenced allocation before deciding that a bitmap bit is
+                 * orphaned; recursive descent below still requires a valid,
+                 * acyclic directory header. */
+                if (first < base || first - base >= sectors) continue;
+                if (want_dirs && !(*index)--) {
+                    if (prefix + n + 1 > cap) return 0;
+                    for (size_t j = 0; j <= prefix + n; j++) dst[j] = path[j];
+                    if (out_size) *out_size = (size_t)length;
+                    if (out_first) *out_first = first;
+                    return 1;
+                }
                 uint64_t self, dir_length;
                 uint16_t dir_attr;
                 int cycle = depth + 1 >= 8;
@@ -13523,13 +13536,6 @@ static int rs_stock_file_at(uint64_t base, uint64_t sectors, uint64_t directory,
                 if (cycle || !rs_stock_find(base, sectors, first, ".", &self,
                                             &dir_length, &dir_attr) || self != first)
                     continue;
-                if (want_dirs && !(*index)--) {
-                    if (prefix + n + 1 > cap) return 0;
-                    for (size_t j = 0; j <= prefix + n; j++) dst[j] = path[j];
-                    if (out_size) *out_size = (size_t)length;
-                    if (out_first) *out_first = first;
-                    return 1;
-                }
                 path[prefix + n] = '/';
                 if (rs_stock_file_at(base, sectors, first, path, prefix + n + 1,
                                      index, ancestors, depth + 1, dst, cap, out_size,

@@ -1,0 +1,21 @@
+{
+  "date": "2026-11-11",
+  "target": "UTM-bundled QEMU, AArch64 PCI, one vCPU, disposable writable RedSea VirtIO fixture",
+  "iso_path": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "96d81db32eccdf3dc7285e3ed246976bc5f7efb93d456ac477079820be5c8a98",
+  "kernel_sha256": "0a36b1d0a4262aa75b67c58477c311cbbd702d890eaa988744e2725b643cdc20",
+  "probe_path": "tests/compat/RawRedSeaGeometry.ZC",
+  "probe_sha256": "5045d16654c554c296444338faec3fb7157783bf036ae49b59c0c981934aa723",
+  "check_compat_sha256": "a8b958eed55dc610ab0af0433af45a80fc6e30375db7f507d1770f9cef165e10",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/tosmisc-malformed-repair-final-qemu.log python3 -u scripts/check-compat.py --pci --quick --probe-raw-redsea-geometry malformedrepair",
+  "result": "pass: malformed bounded directory repair preserves the referenced allocation and leaves the volume valid",
+  "verified": [
+    "The test uses a private disposable disk with a 128-sector writable RedSea fixture; no host disk or SD card is modified.",
+    "FilesFind returns BROKENDIR with its actual first sector (base+127), two-sector size, and directory attribute, despite its extent crossing the volume boundary.",
+    "Stock DiskCheck('D', TRUE, FALSE) reports one consistency error, does not clear allocation bitmap bit 126, and RedSeaValidate('D') still succeeds.",
+    "A subsequent read-only DiskCheck still reports the malformed extent, and the guest returns 42 with zstatus failed=0."
+  ],
+  "log": "build/tosmisc-malformed-repair-final-qemu.log",
+  "log_sha256": "3e47921fd4343fea09cb1f5af2921a454a2f6fd58cb6acddb1f98a394cab2038",
+  "scope_note": "This covers one malformed bounded directory and its referenced first allocation on a disposable RedSea fixture. It does not cover FAT32, arbitrary on-disk corruption, live UTM app interaction, or physical Raspberry Pi behavior."
+}

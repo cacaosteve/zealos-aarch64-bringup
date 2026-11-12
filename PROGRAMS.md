@@ -61,8 +61,11 @@ preserves each entry's starting sector in `CDirEntry.clus`, allowing the stock
 repair scan to retain an allocated `KEEP.ZC` file while reclaiming a separate
 orphan allocation; read-back and a second clean scan pass. A nested `SUB/KEEP.ZC`
 fixture now also confirms directory enumeration preserves both the nested
-directory and file allocations while reclaiming only the orphan. Malformed
-directory repair and FAT32 remain open. The current image also passes the
+directory and file allocations while reclaiming only the orphan. The fresh
+`96d81db3…` image also passes writable repair of a malformed bounded directory:
+`FilesFind` retains its referenced first cluster, the bitmap keeps that
+allocation, `RedSeaValidate` succeeds, and the follow-up read-only check still
+reports the malformed extent. FAT32 remains open. The current image also passes the
 broader read-only stock RedSea file probe: D: selection, relative current-drive
 enumeration, nested/case-insensitive reads, empty-file semantics and source
 store persistence across a cold boot. The probe expects the ARM64 bridge's
@@ -76,9 +79,11 @@ playback; see the
 A new read-only check confirms stock `DiskCheck` completes against a
 malformed bounded RedSea fixture, reports one consistency error, and does not
 fail the guest; a separate cyclic-directory fixture confirms `FilesFind`
-omits an ancestor back-edge and the stock scan returns cleanly. Neither check
-enables repair on malformed metadata. See the
+omits an ancestor back-edge and the stock scan returns cleanly. The malformed
+repair regression now confirms that the referenced sector is not reclaimed.
+See the
 [malformed scan check](docs/acceptance/demo-tosmisc-diskcheck-malformed-redsea-qemu-2026-11-11.json),
+[malformed repair check](docs/acceptance/demo-tosmisc-diskcheck-malformed-repair-redsea-qemu-2026-11-11.json),
 the [cyclic-directory check](docs/acceptance/demo-tosmisc-diskcheck-cycle-redsea-qemu-2026-11-11.json),
 along with the
 [absent-drive check](docs/acceptance/demo-tosmisc-diskcheckall-current-qemu-2026-11-11.json),

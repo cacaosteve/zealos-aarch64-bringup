@@ -257,6 +257,52 @@ I64 RawRedSeaMalformedChecks()
     return 42;
 }
 
+I64 RawRedSeaMalformedRepairChecks()
+{
+    U64 base = 0, sectors = 0;
+    CDrive *drive;
+    CDirEntry *entry;
+    U8 *bitmap;
+    I64 errs;
+    Bool valid, read_ok, allocated;
+    if (!ZcRawRedSeaGeometry(&base, &sectors) || base != 130911 || sectors != 128)
+        return 1;
+    if (!ZcMountLegacyRedSea() || !(drive = Letter2Drive('D')) ||
+        drive->drv_offset != base || drive->fs_type != FSt_REDSEA ||
+        !DriveIsWritable('D', FALSE))
+        return 2;
+    entry = FilesFind("D:/BROKENDIR", FUF_JUST_DIRS | FUF_SINGLE);
+    if (!entry || !entry->full_name || StrCompare(entry->full_name, "/BROKENDIR") ||
+        entry->clus != base + 127 || entry->size != 1024 ||
+        !(entry->attr & RS_ATTR_DIR))
+    {
+        if (entry)
+            DirEntryDel(entry);
+        return 3;
+    }
+    DirEntryDel(entry);
+    bitmap = CAlloc(BLK_SIZE);
+    if (!bitmap)
+        return 3;
+    // The malformed directory begins at the final in-volume sector. Repair
+    // may report its overlong extent, but must not reclaim its still-referenced
+    // first cluster as an orphan.
+    errs = DiskCheck('D', TRUE, FALSE);
+    valid = RedSeaValidate('D');
+    read_ok = BlkRead(drive, bitmap, drive->fat1, 1);
+    allocated = read_ok && Bt(bitmap, 126);
+    Print("malformed_repair=%d,%d,%d,%d\n", errs, valid, read_ok, allocated);
+    if (errs < 1 || !valid || !read_ok || !allocated)
+    {
+        Free(bitmap);
+        return 4;
+    }
+    Free(bitmap);
+    if (DiskCheck('D', FALSE, FALSE) < 1)
+        return 5;
+    return 42;
+}
+
 I64 RawRedSeaCycleChecks()
 {
     U64 base = 0, sectors = 0;
