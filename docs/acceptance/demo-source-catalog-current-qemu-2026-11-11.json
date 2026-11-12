@@ -1,0 +1,847 @@
+{
+  "date": "2026-11-11",
+  "repository_commit": "c408a74fcbe0a0119cfd8b2310fc435d7eb883da",
+  "upstream_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "command": "python3 scripts/check-compat.py --pci --quick --probe-demo-source-catalog",
+  "target": "UTM-bundled QEMU / PCI ARM64 graphical guest",
+  "scope": "CCF_JUST_LOAD per Demo .ZC source in a disposable task; DocRead/ExeDoc or ExeFile2 and source-specific stock module context; compile evidence only; compile evidence only, not runtime acceptance.",
+  "artifacts": {
+    "iso": "build/zealos-aarch64-hello.iso",
+    "iso_sha256": "58c5ab0f79f0368ec1ade5c6aafd89a271a1c9858095902428cb6f9e73984140",
+    "kernel": "build/iso_root/boot/kernel.elf",
+    "kernel_sha256": "0a36b1d0a4262aa75b67c58477c311cbbd702d890eaa988744e2725b643cdc20",
+    "source_results": "build/demo-source-catalog.json"
+  },
+  "counts": {
+    "total": 206,
+    "compiled": 206,
+    "blocked": 0
+  },
+  "probe_context_correction": "Load /Apps/Psalmody/JukeBox.ZC before /Apps/Psalmody/JukePuppet.ZC in the isolated compiler contexts; this resolved the false negative affecting 11 sources, including MultiCore/LoadTest.",
+  "sources": [
+    {
+      "path": "/Demo/AcctExample/HomeKeyPlugIns.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/AcctExample/HomeLocalize.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/AcctExample/HomeSys.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/AcctExample/HomeWrappers.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/AcctExample/MakeHome.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/AcctExample/Once.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/AcctExample/Registry.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/AcctExample/TOS/MakeTOS.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/AcctExample/TOS/TOSConfig.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/AcctExample/TOS/TOSDistro.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/AcctExample/TOS/TOSExtern.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/AcctExample/TOS/TOSMisc.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/AcctExample/TOS/TOSTheme.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Asm/AsmAndC1.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Asm/AsmAndC2.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Asm/AsmAndC3.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Asm/AsmHelloWorld.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Asm/BuzzFizz.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Asm/DivByHand.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Asm/MulByHand.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Asm/PutDec.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Carry.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/ClassMeta.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/CompileDemo.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/DateTime.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/DebugDemo.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Define.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Directives.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Disk/DataBase.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Disk/DiskRaw.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Disk/FPrintF.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Disk/SerializeTree.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Disk/UnusedSpaceRep.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/DolDoc/CallBack.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/DolDoc/ClickCallBack.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/DolDoc/CursorMove.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/DolDoc/Data.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/DolDoc/DefineStr.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/DolDoc/FileRead.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/DolDoc/Form.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/DolDoc/MenuBttn.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/DolDoc/MenuSprite.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/DolDoc/NumBible.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/DolDoc/TextDemo.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/DolDoc/TreeDemo.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/DolDoc/UnusedDefine.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Exceptions.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/ExtChars.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Games/BattleLines.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Games/BigGuns.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Games/BlackDiamond.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Games/BomberGolf.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Games/CastleFrankenstein.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Games/CharDemo.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Games/Chess.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Games/CircleTrace.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Games/Collision.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Games/Digits.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Games/DunGen.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Games/ElephantWalk.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Games/FlapBat.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Games/FlatTops.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Games/Halogen.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Games/MassSpring.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Games/Maze.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Games/RainDrops.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Games/RawHide.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Games/Rocket.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Games/RocketScience.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Games/Squirt.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Games/Stadium/Stadium.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Games/Stadium/StadiumGen.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Games/Talons.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Games/TheDead.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Games/TicTacToe.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Games/TreeCheckers.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Games/Varoom.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Games/Wenceslas.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Games/Whap.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Games/Zing.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Games/ZoneOut.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/GlobalVars.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/32BitColor.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/32BitPaint.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/3DPoly.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/BSpline.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/Blot.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/Bounce.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/Box.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/Cartesian.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/CharAnimation.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/Clock.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/Collision.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/CommonAncestor.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/Doodle.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/EdSprite.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/Elephant.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/Extents.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/FontEd.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/GrDir.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/Grid.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/Hanoi.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/Lattice.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/Life.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/LightTable.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/Lines.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/LowPassFilter.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/Mandel.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/MathAudioDemo.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/MouseDemo.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/NetOfDots.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/Palette.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/PanText.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/Pick.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/Pick3D.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/PoleZeros.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/PredatorPrey.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/RotateTank.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/ScreenCapture.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/ScrollBars.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/Shading.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/Shadow.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/Slider.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/Speedline.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/SpritePlot.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/SpritePlot3D.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/SpritePut.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/SpritePutExt.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/SpriteRaw.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/SpriteText.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/SunMoon.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/Symmetry.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/Transform.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/Usage.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/WallPapers/WallPaperCtrl.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/WallPapers/WallPaperDesktop/HomeSys.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/WallPapers/WallPaperDesktop/Install.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/WallPapers/WallPaperDesktop.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/WallPapers/WallPaperFish.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/WallPapers/WallPaperStars.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Graphics/WinZBuf.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/InFile/InPopUp.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/InFile/InSetIP.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/KeyBitMap.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/LastClass.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Lectures/AndNotMod.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Lectures/FixedPoint.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Lectures/FixedPointAdvanced.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Lectures/InterruptDemo.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Lectures/LexDemo.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Lectures/MiniCompiler.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Lectures/MiniGrLib.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Lectures/NegDisp.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Lectures/Optimization.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Lectures/PCIInterrupts.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Lectures/Ring3.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/MagicPairs.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/MemDemo.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/MessageLoop.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/MultiCore/Interrupts.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/MultiCore/LoadTest.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/MultiCore/Lock.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/MultiCore/MPAdd.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/MultiCore/MPPrint.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/MultiCore/MPRadix.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/MultiCore/Palindrome.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/MultiCore/Primes.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/NullCase.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/OnceDemo.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/ParenWarn.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/PhoneNumWords.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Print.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Progress.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Prompt.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/PullDownMenu.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/RadixSort.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/RandDemo.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/RegistryDemo.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/RevFileDemo/Rev.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/ScreenCodes.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/SortFileDemo/F64FileGen.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/SortFileDemo/F64FileSort.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Sound/ASCIIOrgan.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Sound/MorseCode.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Sound/OhGreat.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Sound/WaterFowl.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Spy.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/StackGrow.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/SubIntAccess.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/SubSwitch.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/SuggestSpelling.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Templates/Game1.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Templates/Lex1.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Templates/MultiCore1.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Templates/ODE1.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Templates/Registry1.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Templates/Util1.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/Templates/Util2.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/TimeIns.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/ToHtmlToTXTDemo/HtmlDirList.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/ToHtmlToTXTDemo/HtmlGen.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/ToHtmlToTXTDemo/TXTGen.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/ToHtmlToTXTDemo/ToHtml.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/WebLogDemo/WebLogRep.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/WebLogDemo/WebLogScramble.ZC",
+      "compiled": true
+    },
+    {
+      "path": "/Demo/WordSearch.ZC",
+      "compiled": true
+    }
+  ]
+}

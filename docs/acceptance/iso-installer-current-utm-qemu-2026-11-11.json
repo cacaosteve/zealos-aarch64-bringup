@@ -1,0 +1,23 @@
+{
+  "date": "2026-11-11",
+  "repository_commit": "c408a74fcbe0a0119cfd8b2310fc435d7eb883da",
+  "artifacts": {
+    "iso": "build/zealos-aarch64-hello.iso",
+    "iso_sha256": "58c5ab0f79f0368ec1ade5c6aafd89a271a1c9858095902428cb6f9e73984140",
+    "kernel": "build/iso_root/boot/kernel.elf",
+    "kernel_sha256": "0a36b1d0a4262aa75b67c58477c311cbbd702d890eaa988744e2725b643cdc20"
+  },
+  "command": "python3 scripts/check-iso-installer.py --usb-cd",
+  "target": "UTM-bundled QEMU, NEC xHCI USB CD and disposable VirtIO disk",
+  "result": "PASS",
+  "checks": [
+    "live ISO boot",
+    "zinstall confirmation did not write before ERASE",
+    "zinstall ERASE completed full read-back",
+    "installed raw disk matched packaged disk byte-for-byte",
+    "cold disk-only boot reached graphical desktop",
+    "source graphic and arithmetic were readable after install",
+    "InstallerPersist returned 0x2a before and after a further cold reboot"
+  ],
+  "installer_disk_sha256": "2f1b18f4492ceab7aa77efdf70cb773850deb7b33201ab6bac51f677f653554c"
+}

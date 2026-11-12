@@ -1,0 +1,14 @@
+{
+  "date": "2026-11-11",
+  "program": "/Apps/Span/Run.ZC",
+  "target": "Live UTM guest, profile titled ZealOS AArch64 Current ISO Acceptance",
+  "result": "User reported the guest became fully unresponsive while Span simulation was running and while attempting to reach File \u2192 Exit.",
+  "visible_evidence": {
+    "simulation_state": "Running",
+    "displayed_time_seconds": 137.77,
+    "cost_displayed": "583,000.22"
+  },
+  "iso_sha256": "unknown; exact guest image provenance was not captured",
+  "contrast": "The fresh candidate 929fc278\u2026 passes the short automated Span/Strut entry, canvas and Shift+Escape check; this does not cover the reported long-running live scenario.",
+  "status": "open; reproduce with a long-running simulation, then inspect task scheduling, frame refresh, input delivery, and close path."
+}

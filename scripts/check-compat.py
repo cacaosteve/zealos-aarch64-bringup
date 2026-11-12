@@ -428,6 +428,8 @@ p.add_argument('--probe-keepaway-audio-timer', action='store_true',
                help='enable opt-in timer-based audio service for the KeepAway audio probe')
 p.add_argument('--probe-span-strut', action='store_true',
                help='exercise original Span bridge and Strut ship apps through entry, input and exit')
+p.add_argument('--span-soak-seconds', type=int, default=0,
+               help='leave Span running this long before checking input and Escape recovery')
 p.add_argument('--probe-span-save', action='store_true',
                help='exercise Span save and reopen on a disposable disk')
 p.add_argument('--probe-span-cold', action='store_true',
@@ -4816,6 +4818,14 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     print('PASS Span chooser reopened the saved edited bridge', flush=True)
                 # Send a complete chord after dismissing help by mouse so there is
                 # no unrelated Return key-up queued for Span's exit wait.
+                if args.span_soak_seconds:
+                    if args.span_soak_seconds < 0:
+                        raise RuntimeError('--span-soak-seconds must be non-negative')
+                    print(f'SOAK Span simulation for {args.span_soak_seconds}s', flush=True)
+                    time.sleep(args.span_soak_seconds)
+                    command('zstatus', 'keyboard_focus=', timeout=10)
+                    graphical_screen('span-after-soak')
+                    print('PASS Span guest remained queryable after soak', flush=True)
                 qmp_send_keys(['shift', 'esc'])
                 deadline = time.monotonic() + 10
                 span_exit_status = ''

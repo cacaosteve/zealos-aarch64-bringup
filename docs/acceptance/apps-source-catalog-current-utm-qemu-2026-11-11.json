@@ -1,15 +1,16 @@
 {
   "date": "2026-11-11",
-  "repository_commit": "2354f2a66f4c6908e0e2b39188b9374b4ffac4e2",
+  "repository_commit": "c408a74fcbe0a0119cfd8b2310fc435d7eb883da",
   "upstream_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
-  "command": "python3 scripts/check-compat.py --pci --quick --probe-program-catalog with --program-catalog-path repeated for all 70 files under upstream/pinned/Apps/**/*.ZC",
+  "command": "python3 scripts/check-compat.py --pci --quick --probe-program-catalog --program-catalog-path <each of the 70 upstream/pinned/Apps/**/*.ZC files>",
   "target": "UTM-bundled QEMU / PCI ARM64 graphical guest",
-  "scope": "Compile-only inventory of every pinned Apps .ZC file, using each App loader context and app-specific declarations where required. This is not runtime or visible UTM acceptance.",
+  "scope": "Compile-only inventory of all 70 pinned Apps .ZC sources, compiling each in its normal app loader context and using app-specific declarations where needed. The script reached zc: ready=1 and completed. This does not prove runtime or visible UTM acceptance for all app workflows. Re-run against the rebuilt ISO hash recorded here completed with the same 70/70 result.",
   "artifacts": {
     "iso": "build/zealos-aarch64-hello.iso",
-    "iso_sha256": "9a0d1433529e41b2cda6c36daef7255a7afdbe40c7f4f875bb305784fc56556a",
-    "kernel": "build/kernel.elf",
-    "kernel_sha256": "261bafde12c94029ebc46064a7fc650b66b3ec98e0a9ae0f5eaf9a774d3235d9"
+    "iso_sha256": "58c5ab0f79f0368ec1ade5c6aafd89a271a1c9858095902428cb6f9e73984140",
+    "kernel": "build/iso_root/boot/kernel.elf",
+    "kernel_sha256": "0a36b1d0a4262aa75b67c58477c311cbbd702d890eaa988744e2725b643cdc20",
+    "source_results": "build/program-catalog-targeted.json"
   },
   "counts": {
     "total": 70,
@@ -32,12 +33,12 @@
     {
       "path": "/Apps/Budget/Run.ZC",
       "compiled": true,
-      "output": "Print(\"catalog_compile=%d\\n\", StockCatalogCompileWithAppLoader(\"/Apps/Budget/Load.ZC\",\"/Apps/Budget/Run.ZC\"));\r\nWARN /Apps/Budget/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Budget/Load.ZC:12:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Budget/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Budget/Load.ZC:12:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+      "output": "WARN /Apps/Budget/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Budget/Load.ZC:12:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Budget/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/Budget/Load.ZC:12:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
     },
     {
       "path": "/Apps/GrModels/Run.ZC",
       "compiled": true,
-      "output": "ps/GrModels/Run.ZC\"));\r\nWARN /Apps/GrModels/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/GrModels/Load.ZC:8:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/GrModels/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/GrModels/Load.ZC:8:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
+      "output": "\",\"/Apps/GrModels/Run.ZC\"));\r\nWARN /Apps/GrModels/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/GrModels/Load.ZC:8:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/GrModels/Load.ZC:1:13 AIWN ignore's #help_index's ignored by the C side\r\nWARN /Apps/GrModels/Load.ZC:8:13 AIWN ignore's #help_index's ignored by the C side\r\ncatalog_compile=1\r\nzc: executed\r\n> "
     },
     {
       "path": "/Apps/KeepAway/Run.ZC",
