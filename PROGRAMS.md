@@ -40,8 +40,8 @@ Space, and Escape. A separate 187-second KeepAway run stayed animated through
 to a working terminal with `zstatus failed=0`. The same run passed shared GUI,
 compiler, task, source-context, and system-server regressions. This is automated
 QEMU evidence. The user has since confirmed live UTM pointer input and Escape
-recovery for KeepAway on this ISO; GrModels' generated model still needs visible
-UTM confirmation. Earlier Budget, X-Caliber and ToTheFront checks are recorded
+recovery for KeepAway, plus visible generated-model output from GrModels on this
+ISO. Earlier Budget, X-Caliber and ToTheFront checks are recorded
 separately; the combined named-app invocation exited after ToTheFront, so its
 unexecuted flags are not counted. See the
 [`current 3D-app checks`](docs/acceptance/three-d-apps-current-55719-utm-qemu-2026-11-11.json)
@@ -372,7 +372,7 @@ normal-load result is not runtime acceptance.
 |--|--|
 | Digital Logic | The current ISO (`55719ef8…`) draws the expected AND circuit and passes prompt insertion/deletion, mid-field edits, setup abort/cancel cleanup, relaunch and clean exit in UTM's bundled QEMU profile; `zstatus` reports no failures ([current-image check](docs/acceptance/digital-logic-current-55719-utm-qemu-2026-11-11.json)). This is automated QEMU evidence, not a visible UTM-window check. |
 | Budget | The current ISO (`55719ef8…`) passes calendar/UTC clock and scanner setup, File/Edit/View shortcuts and menu hover, entry creation/edit/cancel/abort/save/reopen, cold disk-only persistence, and terminal recovery (`40+2` -> 42, `zstatus failed=0`) under UTM's bundled QEMU profile ([current-image acceptance](docs/acceptance/budget-current-55719-utm-qemu-2026-11-11.json)). The user also confirmed live UTM launch and responsive Escape recovery. Interval templates can be created, edited, deleted, and verified across cold disk-only boots in the [NEC USB template UI run](docs/acceptance/budget-integrated-template-qemu-2026-11-09.json). Account-file editing and account selection remain open. |
-| GrModels | On the current ISO (`55719ef8…`), Man generated 112 vertices/168 triangles with 1,273 visible inline pixels; Ball generated 58 vertices with 778 visible purple pixels. Color selection, repeat prompts, and terminal recovery passed in automated UTM-bundled QEMU/HVF ([current 3D-app checks](docs/acceptance/three-d-apps-current-55719-utm-qemu-2026-11-11.json)). The prior live UTM report said the model was not apparent after color selection, so visible UTM confirmation remains open; at `Do another(y or n)?`, enter `n` to finish the current model and return. |
+| GrModels | On the current ISO (`55719ef8…`), Man generated 112 vertices/168 triangles with 1,273 visible inline pixels; Ball generated 58 vertices with 778 visible purple pixels. Color selection, repeat prompts, and terminal recovery passed in automated UTM-bundled QEMU/HVF ([current 3D-app checks](docs/acceptance/three-d-apps-current-55719-utm-qemu-2026-11-11.json)). The user has now confirmed the generated model is visible in live UTM. |
 | KeepAway | On the current ISO (`55719ef8…`), short gameplay/HUD/input checks and a separate 187-second run with 18 repeated input cycles passed; Escape restored terminal focus and cleaned up the Animate task ([current 3D-app checks](docs/acceptance/three-d-apps-current-55719-utm-qemu-2026-11-11.json)). The user also confirmed live UTM pointer response and Escape recovery, resolving the earlier freeze report for this ISO. Earlier one/two-vCPU runs and input stress also pass in automated QEMU ([one-vCPU](docs/acceptance/keepaway-full-current-qemu-2026-11-10.json), [two-vCPU](docs/acceptance/keepaway-current-smp2-qemu-2026-11-10.json), [input stress](docs/acceptance/keepaway-smp2-input-stress-qemu-2026-11-10.json)). ARM64 `Beep()` emits a VirtIO tone and `SoundReset()` stops it. The pinned `Noise()` and `Sweep()` tasks produce PCM in isolated QEMU captures; effect timing and live UTM/Pi audio remain unverified; see [sound effects](docs/acceptance/sound-effects-qemu-2026-11-09.json) and [full-game audio](docs/acceptance/keepaway-audio-qemu-2026-11-09.json). |
 | Psalmody | The current ISO (`55719ef8…`) opens the editor, accepts note entry and playback input, handles Shift+Escape, and returns to a working terminal ([current-image check](docs/acceptance/psalmody-current-55719-utm-qemu-2026-11-11.json)). The user also confirms Psalmody playback is audible in UTM with VirtIO Sound. Broader song editing and app-specific audio effects remain open. |
 | Oh Great (Demo) | The current ISO (`55719ef8…`) completes the long song after a normal key, returns to the graphical terminal, and captures 4,337,678 nonzero WAV samples over 49.22 seconds with VirtIO Sound ([current-image sound acceptance](docs/acceptance/ohgreat-current-55719-utm-qemu-2026-11-11.json)). The user reported Oh Great playing through Pi 4B HDMI on an earlier image; live UTM playback and exact Pi image provenance remain unverified. |
@@ -392,8 +392,8 @@ passed the UTM-bundled QEMU regression for GrModels, KeepAway and Titanium,
 including a 186-second KeepAway run with 18 repeated input cycles, Escape
 recovery and task cleanup. The same image passed Budget's form, menu,
 save/reopen and cold disk-only persistence workflow. On the current ISO
-`55719ef8…`, the user has since confirmed live UTM Budget launch/Escape and
-KeepAway pointer/Escape recovery. Live GrModels model visibility remains open.
+`55719ef8…`, the user has since confirmed live UTM Budget launch/Escape,
+KeepAway pointer/Escape recovery, and visible GrModels model output.
 See [`current-utm-qemu-followup-2026-11-11.json`](docs/acceptance/current-utm-qemu-followup-2026-11-11.json)
 and the [current 3D-app record](docs/acceptance/three-d-apps-current-55719-utm-qemu-2026-11-11.json).
 
