@@ -5174,9 +5174,10 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 time.sleep(1)
                 man_form = graphical_screen('3d-grmodels-man-form')
                 print('GRMODELS MAN FORM\n'+man_form[3], flush=True)
-                # Escape accepts DocForm's default dimensions and opens its
-                # first color picker. Focus a form field first: the launch
-                # button can leave keyboard focus on the terminal behind it.
+                # In ZealOS DocForm, plain Escape accepts the current values;
+                # Shift+Escape cancels the form. Focus a form field first: the
+                # launch button can leave keyboard focus on the terminal behind
+                # it. Return only edits/submits a field and leaves DocEd open.
                 move_graphical_pointer(280, 18)
                 graphical_mouse_button('left', True)
                 time.sleep(0.15)
@@ -5349,6 +5350,8 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 if 'Radius' not in ball_form[3] or 'Lattitude Rings' not in ball_form[3]:
                     raise RuntimeError('GrModels Ball form is missing expected fields:\n'+
                                        ball_form[3])
+                # Plain Escape accepts DocForm's current default dimensions;
+                # Enter leaves the form open, while Shift+Escape cancels it.
                 qmp_send_key('esc')
                 require_graphical_text('3d-grmodels-ball-color', 'Single-Sided means',
                                        timeout=12)
