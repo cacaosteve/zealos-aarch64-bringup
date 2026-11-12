@@ -1,0 +1,18 @@
+{
+  "date": "2026-11-11",
+  "target": "AArch64 native ZealC under UTM-bundled QEMU/HVF, one vCPU, virtio-ramfb, VirtIO keyboard and tablet",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "c007d5a760c33df5f509781790b9a29eb69bacc5f310d5c8b1267c7dbb1d2913",
+  "kernel_sha256": "0a36b1d0a4262aa75b67c58477c311cbbd702d890eaa988744e2725b643cdc20",
+  "command": "python3 scripts/check-compat.py --pci --probe-module /System/DolDoc/DocRecalc.ZC --probe-gui-terminal",
+  "serial_log": "build/check-module-probe.log",
+  "serial_log_sha256": "077b8221801acb3f42fb246508b84a374e35eee050dd23150a0b44c49606e84a",
+  "result": "pass",
+  "checks": [
+    "The guest booted with failed=0 and a visible graphical terminal.",
+    "BootstrapGuiTerminalSmoke accepted the Apps → Time Clock menu binding at action 38.",
+    "BootstrapGuiTerminalMenuSource(38) maps the item to /Apps/TimeClock/Load.ZC.",
+    "The graphical terminal smoke passed after restart with failed=0."
+  ],
+  "scope_note": "This verifies menu construction and dispatch-source mapping in QEMU, not a live pointer click or the TimeClock app workflow. Live TimeClock workflow was separately user-confirmed on the prior ISO; test the new menu entry on this image before claiming end-to-end acceptance."
+}

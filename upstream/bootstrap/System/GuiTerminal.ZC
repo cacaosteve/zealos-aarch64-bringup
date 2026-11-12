@@ -311,7 +311,7 @@ Bool BootstrapGuiTerminalMenuBindLeaf(CMenuEntry *root, U8 *source_name,
                                       U8 *display_name, I64 action)
 {
     CMenuEntry *entry;
-    if (!root || !source_name || !display_name || action < 1 || action > 37)
+    if (!root || !source_name || !display_name || action < 1 || action > 38)
         return FALSE;
     entry = root->sub;
     while (entry)
@@ -354,7 +354,7 @@ U0 BootstrapGuiTerminalMenuInstall()
 {
     CMenu *menu = MenuNew("File { Files(); Disk(); }");
     BootstrapGuiTerminalMenuAppendRoot(menu, MenuNew("Windows { Demo(); TileHorz(); TileVert(); TileGrid(); }"));
-    BootstrapGuiTerminalMenuAppendRoot(menu, MenuNew("Apps { LatticePlay(); StockPlay(); PaintDemo(); NetOfDots(); Lines(); Doodle(); MassSpring(); Life(); Logic(); Budget(); Titanium(); Psalmody(); GrModels(); KeepAway(); Span(); Strut(); ToTheFront(); Vocabulary(); XCaliber(); }"));
+    BootstrapGuiTerminalMenuAppendRoot(menu, MenuNew("Apps { LatticePlay(); StockPlay(); PaintDemo(); NetOfDots(); Lines(); Doodle(); MassSpring(); Life(); Logic(); Budget(); Titanium(); Psalmody(); GrModels(); KeepAway(); Span(); Strut(); TimeClock(); ToTheFront(); Vocabulary(); XCaliber(); }"));
     BootstrapGuiTerminalMenuAppendRoot(menu, MenuNew("Games { Maze(); CharDemo(); }"));
     BootstrapGuiTerminalMenuAppendRoot(menu, MenuNew("View { ViewAngles(); ZoomIn(); ZoomOut(); ResetView(); PanLeft(); PanRight(); PanUp(); PanDown(); }"));
     BootstrapGuiTerminalMenuAppendRoot(menu, MenuNew("OS { Help(); Status(); }"));
@@ -389,6 +389,7 @@ U0 BootstrapGuiTerminalMenuInstall()
         !BootstrapGuiTerminalMenuBindLeaf(apps, "KeepAway", "KeepAway", 32) ||
         !BootstrapGuiTerminalMenuBindLeaf(apps, "Span", "Span", 33) ||
         !BootstrapGuiTerminalMenuBindLeaf(apps, "Strut", "Strut", 34) ||
+        !BootstrapGuiTerminalMenuBindLeaf(apps, "TimeClock", "Time Clock", 38) ||
         !BootstrapGuiTerminalMenuBindLeaf(apps, "ToTheFront", "To The Front", 35) ||
         !BootstrapGuiTerminalMenuBindLeaf(apps, "Vocabulary", "Vocabulary", 36) ||
         !BootstrapGuiTerminalMenuBindLeaf(apps, "XCaliber", "X-Caliber", 37) ||
@@ -691,6 +692,8 @@ U8 *BootstrapGuiTerminalMenuSource(I64 action)
         return "BootstrapGuiTerminalRunLightProgram(\"/Apps/Vocabulary/Run.ZC\");";
     if (action == 37)
         return "BootstrapGuiTerminalRunLightProgram(\"/Apps/X-Caliber/Run.ZC\");";
+    if (action == 38)
+        return "BootstrapGuiTerminalRunLightProgram(\"/Apps/TimeClock/Load.ZC\");";
     return NULL;
 }
 
@@ -1812,6 +1815,7 @@ I64 BootstrapGuiTerminalSmoke()
             !BootstrapGuiTerminalMenuActionValid(menu, "Apps", "KeepAway", 32) ||
             !BootstrapGuiTerminalMenuActionValid(menu, "Apps", "Span", 33) ||
             !BootstrapGuiTerminalMenuActionValid(menu, "Apps", "Strut", 34) ||
+            !BootstrapGuiTerminalMenuActionValid(menu, "Apps", "Time Clock", 38) ||
             !BootstrapGuiTerminalMenuActionValid(menu, "Apps", "To The Front", 35) ||
             !BootstrapGuiTerminalMenuActionValid(menu, "Apps", "Vocabulary", 36) ||
             !BootstrapGuiTerminalMenuActionValid(menu, "Apps", "X-Caliber", 37) ||
@@ -1855,7 +1859,10 @@ I64 BootstrapGuiTerminalSmoke()
                 "BootstrapGuiTerminalRunLightProgram(\"/Apps/Vocabulary/Run.ZC\");") ||
             !BootstrapGuiTerminalMenuSource(37) ||
             StrCompare(BootstrapGuiTerminalMenuSource(37),
-                "BootstrapGuiTerminalRunLightProgram(\"/Apps/X-Caliber/Run.ZC\");"))
+                "BootstrapGuiTerminalRunLightProgram(\"/Apps/X-Caliber/Run.ZC\");") ||
+            !BootstrapGuiTerminalMenuSource(38) ||
+            StrCompare(BootstrapGuiTerminalMenuSource(38),
+                "BootstrapGuiTerminalRunLightProgram(\"/Apps/TimeClock/Load.ZC\");"))
             return 76;
         if (BootstrapGuiTerminalOutputOwnershipChecks() != 0x2a)
             return 74;
