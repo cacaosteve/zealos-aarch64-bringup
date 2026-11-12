@@ -1,0 +1,22 @@
+{
+  "date": "2026-11-11",
+  "target": "AArch64 guest under qemu-system-aarch64 with HVF, one vCPU, ramfb, VirtIO keyboard, tablet and sound",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "c007d5a760c33df5f509781790b9a29eb69bacc5f310d5c8b1267c7dbb1d2913",
+  "kernel_sha256": "0a36b1d0a4262aa75b67c58477c311cbbd702d890eaa988744e2725b643cdc20",
+  "command": "QEMU_VIRT='-machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device ramfb -device virtio-keyboard-device -device virtio-tablet-device -audiodev wav,id=sound0,path=build/ohgreat-c007.wav -device virtio-sound-pci,audiodev=sound0' ZEAL_COMPAT_LOG_PATH=build/check-ohgreat-c007.log python3 -u scripts/check-compat.py --pci --quick --probe-demo-ohgreat-full",
+  "serial_log": "build/check-ohgreat-c007.log",
+  "serial_log_sha256": "fdfdb1c16d73708c79938afc13a73ba79012546fc487d737bee15c1141bfbefa",
+  "wav": "build/ohgreat-c007.wav",
+  "wav_sha256": "9b02209395f4a3c97dbbd51fef19479e1527094b44438be6057458758829e713",
+  "wav_check": "python3 scripts/check-sound-effects-wav.py --minimum-seconds 10 build/ohgreat-c007.wav",
+  "wav_result": "pass: 4,424,114 nonzero samples at 44,100 Hz; peak 7,000",
+  "exit_code": 0,
+  "result": "pass",
+  "checks": [
+    "Oh Great reached the late lyric 'smack' before exiting after normal key input.",
+    "The guest returned to the graphical terminal, where the recovery expression evaluated to 42 and zstatus reported failed=0.",
+    "The VirtIO sound WAV capture contains sustained nonzero audio samples."
+  ],
+  "scope_note": "Automated QEMU/HVF audio and input evidence on the exact c007d5a7 ISO; this verifies generated audio data, not that a person heard it in a live UTM window or on Pi hardware."
+}
