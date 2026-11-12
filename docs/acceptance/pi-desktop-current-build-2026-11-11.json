@@ -1,0 +1,28 @@
+{
+  "date": "2026-11-11",
+  "source_commit": "51331c74e63edf39fda06ff95c432cb2951904e8",
+  "result": "pass: current Pi desktop payload built and host-validated; no microSD copy",
+  "build_command": "make pi-desktop-sd",
+  "image_check": "python3 scripts/check-pi-desktop-image.py build/pi-desktop-esp",
+  "platform_check": "make check-pi4-platform",
+  "payload_directory": "build/pi-desktop-esp",
+  "files_sha256": {
+    "boot/demo.hcbc": "e37c1b530962064c451fac288327f7ae799d3e344cc5c77dc2ba55625c0042d0",
+    "boot/kernel-diag.elf": "d5bd6c5ae9396fe82df48ca741f17ba6a25a7c4888fb90eda4f37dcbf7d2c752",
+    "boot/kernel.elf": "36e580de2fdfae0a32b6f4673be8854b7c9dd2d43906f0e1eb68e6be91722356",
+    "boot/sources.tar": "1569d9565986473f831d57ac61c77f53d96f90879d2315b9f455630db19d21f7",
+    "boot/zealbooter.elf": "a23ed91daff4a61f11d832fb198d623208635bb1b0bb0292082c4e302eee15d7",
+    "EFI/BOOT/BOOTAA64.EFI": "3f51768c5eb8a0818b8e7aa2ac9a9caef3c64707b5b6db15d1e612de23236b8c",
+    "limine.conf": "a8981abc3cda174982db0e510a1bce180b2cefa74973789cd49c481ef92b5bc4"
+  },
+  "verified": [
+    "Pi desktop, recovery kernel, booter, EFI application, source archive and boot configuration built successfully.",
+    "Image checker passed native/recovery ELF identity, load bounds and relocations, two-entry boot chain and 1049 bundled ZealOS source modules.",
+    "Full Pi host platform suite passed for FDT/PCIe/DMA/xHCI, read-only FAT32, USB keyboard/mouse, desktop framebuffer and HDMI audio routing policy."
+  ],
+  "not_verified": [
+    "The payload was not copied to a physical microSD card and was not booted on a Pi during this check.",
+    "Pi USB storage and source writes remain disabled; writable SD/USB persistence is not implemented.",
+    "The host HDMI audio policy test does not replace an audible Pi HDMI test on this exact build."
+  ]
+}
