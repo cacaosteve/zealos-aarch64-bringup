@@ -2,12 +2,13 @@
 
 Limine → ZealBooter → kernel + `demo.hcbc` → HolyC-IR JIT → graphical terminal → **native USB or VirtIO input**
 
-**Not a full ZealOS port.** QEMU/UTM has an accepted ARM64 ISO install,
+**Not a full ZealOS port yet.** QEMU/UTM has an accepted ARM64 ISO install,
 disk-only desktop boot and saved-data persistence milestone. Physical Pi 4B
-UEFI now boots the native graphical terminals with working USB keyboard,
-pointer, menu clicks and `40+2;` returning `42`. Read-only USB storage remains
-active alongside the desktop. The Pi desktop/basic input milestone is accepted;
-writable Pi storage, persistence and installation remain work. See
+UEFI boots the native graphical terminals with working USB keyboard, pointer,
+menu clicks and `40+2;` returning `42`. The user has also confirmed Pi audio
+through HDMI and the headphone jack, though those listening tests were not tied
+to a recorded image hash. Writable Pi storage, persistence and installation
+remain work. See
 [ACCEPTANCE.md](ACCEPTANCE.md) and [PI4.md](PI4.md).
 
 ## AArch64 desktop in UTM
@@ -19,30 +20,25 @@ splash logo:
 
 ## Regular ZealOS programs
 
-The **Apps** menu now launches unchanged upstream **Net of Dots**, **Lines**,
-**Doodle**, **Mass Spring**, **Game of Life** and **Digital Logic**. For the first two, you can also type
-`#include "/Demo/Graphics/NetOfDots"` or `#include "/Demo/Graphics/Lines"`
-in a graphical terminal. These are separate from the older adapted bring-up
-commands. The complete pinned Apps/Demo collection (294 files) is bundled,
-but most applications still need compatibility work. See
-[PROGRAMS.md](PROGRAMS.md) for tested behavior and the remaining blockers.
-`make check-stock-programs` and `make check-stock-interactive` exercise visible
-drawing, mouse/keyboard input, animation and clean exit in QEMU with UTM's NEC
-USB controller model. Live UTM checks also pass for Doodle drawing/colors,
-Mass Spring motion/reset, Life evolution and all three programs' return to a
-working terminal. Evidence is recorded in
-[ACCEPTANCE.md](ACCEPTANCE.md).
+The current ISO (`build/zealos-aarch64-hello.iso`, SHA-256
+`55719ef8…`) contains the pinned Apps and Demo sources. Source-catalog runs
+report all 70 pinned Apps files and all 206 Demo files compile in the ARM64
+guest. Runtime acceptance is broader but incomplete: 202 Demo sources have
+explicit runtime acceptance, four remain partial, and named-app testing still
+has feature and live-UTM gaps. The user has confirmed audible UTM output for
+`Beep(60);` and Psalmody on the current image. See
+[PROGRAMS.md](PROGRAMS.md) for per-program evidence and remaining work.
 
-The next candidate adds **Apps → Budget**, calendar/UTC clock services and
-editable class forms. Its create/edit/cancel/save/reopen workflow passes
-automated NEC USB tests, including persistence after a cold disk-only boot.
-Use `build/zealos-aarch64-budget-menu-fix.iso` (SHA-256 `c92f5f3c…`) as the first USB CD
-with an installed writable VirtIO disk attached; no reinstall is needed.
-The original `00b5cd34…` candidate froze on menu hover; this replacement
-loads the missing key-name services and restores the Edit/View menus.
-Live UTM acceptance of the replacement is pending. The standard ISO path still contains the
-live-accepted Digital Logic image. Budget's advanced account/template
-workflows and the rest of the collection remain separate acceptance work.
+The Apps menu includes the tested upstream programs such as Digital Logic,
+Budget, GrModels, KeepAway, Psalmody, Span, Strut, TimeClock and Titanium.
+Automated UTM-bundled QEMU checks cover these apps, while a few live-window
+reports remain unresolved (including Budget and KeepAway freezes, and whether
+GrModels' generated model is visible). Additional stock graphics programs
+including Doodle, Mass Spring and Game of Life have live UTM acceptance.
+`make check-stock-programs` and `make check-stock-interactive` exercise
+drawing, mouse/keyboard input, animation and clean exit in QEMU. Evidence and
+remaining compatibility limits are tracked in [PROGRAMS.md](PROGRAMS.md) and
+[ACCEPTANCE.md](ACCEPTANCE.md).
 
 ## Native source compatibility milestone
 
