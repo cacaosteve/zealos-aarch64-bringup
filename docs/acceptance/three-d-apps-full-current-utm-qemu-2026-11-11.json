@@ -2,22 +2,39 @@
   "date": "2026-11-11",
   "target": "AArch64 native ZealC in UTM-bundled QEMU with HVF, one vCPU, virtio-ramfb, VirtIO keyboard and tablet",
   "iso_path": "build/zealos-aarch64-hello.iso",
-  "iso_sha256": "93cb3d3eec000a3b482922d17bcdb37077b42650ff2ddb5e34650f4495b37149",
-  "kernel_sha256": "c211b0ecb262d8aae9ee9656de819fdd4c13466c0e57d7b3bcd2963dfb29be4a",
-  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-3d-apps-current-utm-qemu.log python3 -u scripts/check-compat.py --pci --quick --probe-3d-apps --probe-keepaway-full-game",
-  "qemu": "UTM-bundled QEMU profile; one AArch64 vCPU with HVF and virtio-ramfb",
-  "serial_log": "build/check-3d-apps-current-utm-qemu.log",
-  "serial_log_sha256": "dd91f6cd74439b8225ffc704b113d9bce3821511017b497b39fddb40d1fe2cb8",
+  "iso_sha256": "58dd6d41c47e9872d1af4d1755d2846ecc3edaa4375eb86a9010a97255d8c758",
+  "kernel_sha256": "55536307b44768abf98ab8eb64369448394ff78e24b46cbbddd5dd09d4ef5ae1",
   "result": "pass",
-  "checks": {
-    "GrModels": "Man and Ball forms/color selection, mesh generation and inline rendering passed; Man generated 112 vertices/168 triangles and has 1,146 nonblack pixels in the expected sprite region; Ball generated 58 vertices/128 triangles and has 417 purple sprite pixels; terminal recovery passed.",
-    "KeepAway": "Court, HUD and player rendered; Space/mouse input updated gameplay. Full 187-second run completed 18 repeated input cycles; scanout changed at every sample, including after the previously reported freeze interval. Escape restored terminal focus, removed the Animate task, and zstatus reported failed=0.",
-    "Titanium": "Intro/gameplay, Space input, Escape recovery and terminal return passed."
-  },
+  "runs": [
+    {
+      "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-3d-source-context-escape-both-forms-58dd.log python3 -u scripts/check-compat.py --pci --quick --probe-3d-apps --probe-source-context",
+      "serial_log": "build/check-3d-source-context-escape-both-forms-58dd.log",
+      "serial_log_sha256": "696053db083ccf20df8776d717c20f002c9dc88899705d600d50a3a583b19272",
+      "stdout": "build/check-3d-source-context-escape-both-forms-58dd.stdout",
+      "exit_code": 0,
+      "checks": {
+        "GrModels": "Man and Ball DocForms accepted their defaults with plain Escape, both color choosers rendered, and both models generated and rendered inline. Man generated 112 vertices/168 triangles and had 1,200 nonblack pixels in the checked inline region; Ball generated 58 vertices and had 591 purple pixels. Both paths recovered to a terminal with zstatus failed=0.",
+        "KeepAway": "Court, HUD, and player rendered; Space/mouse input updated gameplay; terminal recovery and zstatus failed=0 passed.",
+        "Titanium": "Game frame, input, Escape recovery and terminal return passed.",
+        "source_context": "All eight source-context checks returned 0x2a and zstatus failed=0."
+      }
+    },
+    {
+      "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-keepaway-full-source-context-58dd.log python3 -u scripts/check-compat.py --pci --quick --probe-keepaway-full-game --probe-source-context",
+      "serial_log": "build/check-keepaway-full-source-context-58dd.log",
+      "serial_log_sha256": "acdcc135eab6c0c4615eadcff8ffa8e144fee75883fecd96062181049ed38a56",
+      "stdout": "build/check-keepaway-full-source-context-58dd.stdout",
+      "exit_code": 0,
+      "checks": {
+        "KeepAway": "Full 187-second run completed 18 repeated input cycles; scanout changed at every sample. Escape restored terminal focus, removed the Animate task, and zstatus reported failed=0.",
+        "source_context": "All eight source-context checks returned 0x2a and zstatus failed=0."
+      }
+    }
+  ],
   "live_utm_status": {
-    "GrModels": "Visible UTM visual confirmation remains open; user previously reported not seeing the model.",
-    "KeepAway": "Visible UTM freeze report remains open; current full-game automated run did not reproduce it.",
+    "GrModels": "Automated render and input checks pass; visible UTM visual confirmation remains open after the earlier report that the model was not apparent.",
+    "KeepAway": "Automated full-game run did not reproduce the visible UTM freeze report; live UTM retest remains open.",
     "Titanium": "User confirmed plain Left/Right, Space and Escape work in a live UTM session."
   },
-  "scope_note": "This is an automated run using UTM bundled QEMU, not a visible UTM app-window or Pi hardware test. The full-game soak reduces the likelihood of a deterministic long-play freeze but does not explain the earlier visible-UTM report."
+  "scope_note": "These are automated runs using UTM-bundled QEMU, not visible UTM app-window or Pi hardware acceptance. The full-game soak does not explain the earlier visible-UTM KeepAway freeze report."
 }
