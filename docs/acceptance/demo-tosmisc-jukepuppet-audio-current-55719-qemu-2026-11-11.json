@@ -7,7 +7,7 @@
   "kernel_sha256": "42d44f33ae960df3f4e6d4ec51921b225e5cb3a83740f9c862417573f01b1abf",
   "result": "pass for listed probes; TOSMisc remains partial for configured writable-drive and distro workflows",
   "verified": [
-    "TOSMisc configuration and DiskCheckAll probes ran; DiskCheckAll remains blocked by the absent C: Drive bridge.",
+    "TOSMisc configuration initialized and DiskCheckAll returned through the probe without a guest exception; this run did not exercise configured per-drive scan or repair semantics.",
     "DC2Doc checks passed for all 94 printable ASCII glyphs and saved dollar-sign encoding.",
     "SoundShift and AUWrite/FileRead round trips passed.",
     "GRWrite/GR2MV/GRRead movie-frame round trip passed.",
