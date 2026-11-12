@@ -3,14 +3,14 @@
   "target": "AArch64 PCI QEMU, one guest CPU, UTM-bundled QEMU/HVF, VirtIO sound with WAV backend, disposable disk",
   "source": "/Demo/AcctExample/TOS/TOSMisc.ZC",
   "source_sha256": "ee141104e1476df4a08925447be33fa7ba42dbc4c989ec0d374851263af1f616",
-  "kernel_sha256": "261bafde12c94029ebc46064a7fc650b66b3ec98e0a9ae0f5eaf9a774d3235d9",
-  "iso_sha256": "9a0d1433529e41b2cda6c36daef7255a7afdbe40c7f4f875bb305784fc56556a",
-  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device -audiodev wav,id=sound0,path=build/tosmisc-jukepuppet-current-9a0d.wav -device virtio-sound-pci,audiodev=sound0' ZEAL_COMPAT_LOG_PATH=build/check-tosmisc-jukepuppet-audio-current-9a0d.log python3 -u scripts/check-compat.py --pci --quick --probe-demo-system-context --demo-system-path /Demo/AcctExample/TOS/TOSMisc.ZC --demo-system-module /Demo/AcctExample/TOS/TOSConfig.ZC --demo-system-module /System/Gr/ScreenCast.ZC --demo-system-module /System/BlkDev/DiskCheck.ZC --demo-system-module /Apps/Psalmody/Load.ZC --demo-system-module /Demo/AcctExample/TOS/TOSMisc.ZC",
+  "kernel_sha256": "42d44f33ae960df3f4e6d4ec51921b225e5cb3a83740f9c862417573f01b1abf",
+  "iso_sha256": "58dd6d41c47e9872d1af4d1755d2846ecc3edaa4375eb86a9010a97255d8c758",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device -audiodev wav,id=sound0,path=build/tosmisc-jukepuppet-current-58dd.wav -device virtio-sound-pci,audiodev=sound0' ZEAL_COMPAT_LOG_PATH=build/check-tosmisc-jukepuppet-audio-current-58dd.log python3 -u scripts/check-compat.py --pci --quick --probe-demo-system-context --demo-system-path /Demo/AcctExample/TOS/TOSMisc.ZC --demo-system-module /Demo/AcctExample/TOS/TOSConfig.ZC --demo-system-module /System/Gr/ScreenCast.ZC --demo-system-module /System/BlkDev/DiskCheck.ZC --demo-system-module /Apps/Psalmody/Load.ZC --demo-system-module /Demo/AcctExample/TOS/TOSMisc.ZC",
   "result": "pass for JukePuppet song execution, Beep PCM output, cleanup, and guest recovery; TOSMisc remains partial at its wider drive-workflow scope",
   "verified": [
     "Stock childish.ZC played through JukeSongsPuppet and returned normally.",
     "A disposable Beep fixture was discovered and played through JukePuppet; its playback task stopped through normal cleanup.",
-    "The QEMU WAV backend captured 121716 stereo frames at 44100 Hz (2.76 seconds), with RMS 6797, peak 7000, and a dominant tone near 659 Hz.",
+    "The QEMU WAV backend captured 128772 stereo frames at 44100 Hz (2.92 seconds), with RMS 6780, peak 7000, and a dominant tone at 658.8 Hz.",
     "The graphical terminal recovered, accepted 40+2 as 42, and final zstatus reported failed=0."
   ],
   "remaining": [
@@ -19,10 +19,10 @@
     "This is QEMU-generated PCM, not audible playback through the live UTM window or Pi 4B."
   ],
   "artifacts": {
-    "wav": "build/tosmisc-jukepuppet-current-9a0d.wav",
-    "wav_sha256": "2339922e1ddc8c8711441fbb9853176d018e9cf455e5f714ac026804a4eb2be9",
-    "log": "build/check-tosmisc-jukepuppet-audio-current-9a0d.log",
-    "log_sha256": "de4032d828d35569ae0e3def8dd6509e99edd03dffee5c0cad214bdbb43e956e"
+    "wav": "build/tosmisc-jukepuppet-current-58dd.wav",
+    "wav_sha256": "00e8333e8e6b66a81d3715857907723a382cf5a182c715dc280747b3426322f4",
+    "log": "build/check-tosmisc-jukepuppet-audio-current-58dd.log",
+    "log_sha256": "987a765c66c35b594c84128532309701a6bbef517d40f68e9d0dc0d06a8edd13"
   },
   "scope_note": "Automated UTM-bundled QEMU audio/runtime acceptance only; it does not establish live UTM audible playback, physical Pi audio, or full TOSMisc writable-drive behavior. QEMU logged that it could not create an input voice backend; WAV playback capture and guest acceptance succeeded."
 }
