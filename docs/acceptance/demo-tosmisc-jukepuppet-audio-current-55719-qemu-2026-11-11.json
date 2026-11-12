@@ -1,0 +1,31 @@
+{
+  "date": "2026-11-11",
+  "target": "UTM-bundled QEMU, AArch64 PCI guest, one vCPU, current desktop ISO, disposable disk, VirtIO Sound WAV backend",
+  "source": "/Demo/AcctExample/TOS/TOSMisc.ZC",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "55719ef8a54663ae42a43143579c10a557126e94d8ecad4e9438331ed8bc5a8a",
+  "kernel_sha256": "42d44f33ae960df3f4e6d4ec51921b225e5cb3a83740f9c862417573f01b1abf",
+  "result": "pass for listed probes; TOSMisc remains partial for configured writable-drive and distro workflows",
+  "verified": [
+    "TOSMisc configuration and DiskCheckAll probes ran; DiskCheckAll remains blocked by the absent C: Drive bridge.",
+    "DC2Doc checks passed for all 94 printable ASCII glyphs and saved dollar-sign encoding.",
+    "SoundShift and AUWrite/FileRead round trips passed.",
+    "GRWrite/GR2MV/GRRead movie-frame round trip passed.",
+    "ScreenCast saved a readable frame and AU audio data, then stopped recording cleanly.",
+    "TOSMisc MemTest completed and returned to the compiler.",
+    "Psalmody loaded; stock childish.ZC and the looping beep fixture returned through JukeSongsPuppet cleanup.",
+    "The GUI terminal recovered, accepted 40+2; as 42, and zstatus reported failed=0.",
+    "The current ISO produced 3.3 seconds of stereo PCM at 44.1 kHz; 278712 samples were nonzero, RMS was 6799.72, and peak amplitude was 7000."
+  ],
+  "not_verified": [
+    "This WAV capture does not establish audible playback for the JukePuppet fixture specifically; the user separately confirms live UTM Beep and Psalmody audio.",
+    "TOSMisc configured writable-drive repair and full TOSDistro image generation remain incomplete.",
+    "Pi hardware behavior for this exact ISO was not tested."
+  ],
+  "runner_log": "build/check-tosmisc-audio-current-55719.log",
+  "runner_log_sha256": "1f749db9d3d9600f761885ecb918c0ba79a6c523430a65a70656481e7461b079",
+  "wav_capture": "build/tosmisc-jukepuppet-current-55719.wav",
+  "wav_sha256": "63c9c9ffee97e390abe41f643c433913d64e556fd77da7212a507c64d6537d8d",
+  "check_compat_sha256": "d0a623facd05015a8b6b057b7a416bf8297ade132d2cebc862971a41f9da0bfc",
+  "scope_note": "Non-destructive QEMU runtime evidence. The attached disposable disk preserves guest data only for this run; it does not prove writable user-storage or full ZealOS parity."
+}

@@ -586,6 +586,10 @@ passes the TOSMisc checks, MemTest, and stock plus looping-fixture
 `JukeSongsPuppet` paths; the terminal recovers and `zstatus` reports no failed
 tasks. The module-context harness now fails explicitly if a requested module
 does not load. See the [current TOSMisc check](docs/acceptance/tosmisc-current-song-memory-qemu-2026-11-11.json).
+The follow-up on ISO `55719ef8…` repeats these checks with a VirtIO Sound WAV
+backend and records strong PCM output; live UTM Beep and Psalmody playback are
+also now user-confirmed. This still leaves configured-drive workflows and
+TOSDistro image generation open ([current audio/workflow check](docs/acceptance/demo-tosmisc-jukepuppet-audio-current-55719-qemu-2026-11-11.json)).
 An earlier `DiskCheckAll` probe failed at `DiskCheck('C')` with an uncaught
 `Drive` exception. The current ARM64 adaptation skips source-only C, dispatches
 to a mounted RedSea D, and supplies a bounded `RedSeaFreeClus` operation for
