@@ -39,10 +39,11 @@ Space, and Escape. A separate 187-second KeepAway run stayed animated through
 18 input cycles and cleaned up its animation task on exit. All checks returned
 to a working terminal with `zstatus failed=0`. The same run passed shared GUI,
 compiler, task, source-context, and system-server regressions. This is automated
-QEMU evidence; the earlier visible UTM KeepAway freeze still needs a live-window
-retest. Earlier Budget, X-Caliber and ToTheFront checks are recorded separately;
-the combined named-app invocation exited after ToTheFront, so its unexecuted
-flags are not counted. See the
+QEMU evidence. The user has since confirmed live UTM pointer input and Escape
+recovery for KeepAway on this ISO; GrModels' generated model still needs visible
+UTM confirmation. Earlier Budget, X-Caliber and ToTheFront checks are recorded
+separately; the combined named-app invocation exited after ToTheFront, so its
+unexecuted flags are not counted. See the
 [`current 3D-app checks`](docs/acceptance/three-d-apps-current-55719-utm-qemu-2026-11-11.json)
 and [`UTM app refresh`](docs/acceptance/utm-app-refresh-2026-11-11.json).
 
