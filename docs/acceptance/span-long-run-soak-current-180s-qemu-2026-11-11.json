@@ -1,0 +1,23 @@
+{
+  "date": "2026-11-11",
+  "repository_commit": "50eaa6f",
+  "artifacts": {
+    "iso": "build/zealos-aarch64-hello.iso",
+    "iso_sha256": "58c5ab0f79f0368ec1ade5c6aafd89a271a1c9858095902428cb6f9e73984140",
+    "kernel": "build/iso_root/boot/kernel.elf",
+    "kernel_sha256": "0a36b1d0a4262aa75b67c58477c311cbbd702d890eaa988744e2725b643cdc20"
+  },
+  "command": "python3 scripts/check-compat.py --pci --quick --probe-span-strut --span-soak-seconds 180",
+  "target": "UTM-bundled QEMU / PCI ARM64 graphical guest",
+  "result": "PASS",
+  "checks": [
+    "Span opened and rendered its bridge canvas",
+    "simulation ran without input for 180 seconds",
+    "guest remained queryable with zstatus after the soak",
+    "Shift+Escape returned focus to the graphical terminal",
+    "40+2 returned 42",
+    "Strut follow-up interaction and Escape recovery passed",
+    "zstatus reported failed=0"
+  ],
+  "limitation": "This automated QEMU/HVF soak does not close the user's live UTM freeze report because the exact ISO used in that session is unknown. Repeat the long-running scenario in the visible UTM guest to establish live behavior."
+}

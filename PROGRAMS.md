@@ -43,11 +43,11 @@ demos run or that every workflow is supported. See the
 That same ISO also passed the full USB-CD install cycle: erase confirmation,
 full read-back, byte-for-byte disk comparison, installed disk-only boot, and
 `InstallerPersist` returning `0x2a` across another cold reboot. Span ran for
-150 seconds in QEMU, remained queryable, and exited with Shift+Escape to a
-working terminal. Those results confirm the current ISO install and basic
-installed-use path; live UTM still needs a retest after the user's earlier
-Span freeze. See the [installer record](docs/acceptance/iso-installer-current-utm-qemu-2026-11-11.json)
-and [Span soak record](docs/acceptance/span-long-run-soak-current-qemu-2026-11-11.json).
+180 seconds in QEMU, remained queryable, and exited with Shift+Escape to a
+working terminal; Strut also passed its follow-up interaction. Those results
+confirm the current ISO install and basic installed-use path; live UTM still
+needs a retest after the user's earlier Span freeze. See the [installer record](docs/acceptance/iso-installer-current-utm-qemu-2026-11-11.json)
+and [180-second Span soak record](docs/acceptance/span-long-run-soak-current-180s-qemu-2026-11-11.json).
 
 The current ISO (`55719ef8…`, kernel `42d44f33…`) passes UTM-bundled QEMU
 checks for GrModels Man and Ball mesh generation and inline rendering,
