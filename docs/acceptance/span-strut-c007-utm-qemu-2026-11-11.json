@@ -1,0 +1,32 @@
+{
+  "date": "2026-11-11",
+  "target": "AArch64 guest in UTM-bundled QEMU/HVF, one vCPU, virtio-ramfb, VirtIO keyboard and tablet",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "c007d5a760c33df5f509781790b9a29eb69bacc5f310d5c8b1267c7dbb1d2913",
+  "kernel_sha256": "0a36b1d0a4262aa75b67c58477c311cbbd702d890eaa988744e2725b643cdc20",
+  "results": [
+    {
+      "app": "Span",
+      "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-span-save-c007.log python3 -u scripts/check-compat.py --pci --quick --probe-span-save",
+      "log": "build/check-span-save-c007.log",
+      "log_sha256": "eb98f626b0603f2d97387fcf576c002947f48abd6d5fe6943b1a49856c495e76",
+      "result": "pass",
+      "checks": [
+        "Span opened its help and bridge canvas, placed a visible mass, saved the edited bridge to the writable disk, and reopened it from the file chooser.",
+        "Span also exited through Shift+Escape to a responsive terminal; zstatus reported failed=0."
+      ]
+    },
+    {
+      "app": "Strut",
+      "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-strut-spring-c007.log python3 -u scripts/check-compat.py --pci --quick --probe-strut-spring",
+      "log": "build/check-strut-spring-c007.log",
+      "log_sha256": "a36af9a538e6c4c06d4cd3d10b85afd890de4cc6013ba5a8e8eeb0f6d5602a82",
+      "result": "pass",
+      "checks": [
+        "Strut connected two masses with a visible spring, switched to play mode, and verified its thruster moved the world and ship.",
+        "Escape restored the terminal; zstatus reported failed=0."
+      ]
+    }
+  ],
+  "scope_note": "Automated QEMU interaction evidence only; the user is separately checking Span in the visible UTM UI."
+}
