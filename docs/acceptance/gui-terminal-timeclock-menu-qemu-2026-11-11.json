@@ -12,7 +12,8 @@
     "The guest booted with failed=0 and a visible graphical terminal.",
     "BootstrapGuiTerminalSmoke accepted the Apps → Time Clock menu binding at action 38.",
     "BootstrapGuiTerminalMenuSource(38) maps the item to /Apps/TimeClock/Load.ZC.",
+    "The user confirmed the new Apps → Time Clock entry launches and works in the live UTM guest.",
     "The graphical terminal smoke passed after restart with failed=0."
   ],
-  "scope_note": "This verifies menu construction and dispatch-source mapping in QEMU, not a live pointer click or the TimeClock app workflow. Live TimeClock workflow was separately user-confirmed on the prior ISO; test the new menu entry on this image before claiming end-to-end acceptance."
+  "scope_note": "The TimeClock workflow was separately user-confirmed on an earlier ISO. The user now confirms the new menu entry on this image works in the live UTM guest."
 }
