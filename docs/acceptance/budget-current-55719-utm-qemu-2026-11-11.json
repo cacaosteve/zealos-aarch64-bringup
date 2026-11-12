@@ -1,19 +1,22 @@
 {
   "date": "2026-11-11",
-  "target": "AArch64 native ZealC under UTM-bundled QEMU/HVF, one vCPU, virtio-ramfb, VirtIO keyboard and tablet",
-  "iso": "build/zealos-aarch64-hello.iso",
+  "target": "UTM-bundled QEMU on macOS, AArch64 PCI guest, one vCPU, virtio-ramfb, VirtIO keyboard and tablet",
+  "iso_path": "build/zealos-aarch64-hello.iso",
   "iso_sha256": "55719ef8a54663ae42a43143579c10a557126e94d8ecad4e9438331ed8bc5a8a",
   "kernel_sha256": "42d44f33ae960df3f4e6d4ec51921b225e5cb3a83740f9c862417573f01b1abf",
-  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-budget-current-55719.log python3 -u scripts/check-compat.py --pci --quick --probe-budget-program",
-  "serial_log": "build/check-budget-current-55719.log",
-  "serial_log_sha256": "8a53c57075a093620647cddad34703ea75820a578ecbc52f8135e65de993bc19",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-budget-program-current-55719-2026-11-11.log python3 -u scripts/check-compat.py --pci --quick --probe-budget-program",
+  "log_path": "build/check-budget-program-current-55719-2026-11-11.log",
+  "log_sha256": "105089b8e47062482225c45fcd83feedf66c6df337a82cbaa58cc16b0cae6b70",
   "exit_code": 0,
   "result": "pass",
-  "checks": [
-    "Calendar, UTC clock, scanner, menu and form services passed with no allocator leaks.",
-    "Budget entry creation/edit, cancel, abort, save, reopen and terminal recovery passed.",
-    "The saved entry survived a cold disk-only reboot and was visible after reboot.",
-    "Graphical terminal accepted 40+2 and zstatus reported failed=0."
+  "verified": [
+    "Budget menu and shortcut hover continue presenting frames without failed tasks.",
+    "The real entry form creates an entry; save, abort, edit and cancellation behave as expected.",
+    "The saved entry reopens, and its data persists across a cold boot with only the VirtIO disk.",
+    "Each app exit returns to a graphical terminal where 40+2 evaluates to 42."
   ],
-  "scope_note": "Automated UTM-bundled QEMU evidence for this exact ISO. The earlier visible UTM Budget freeze report still requires live-window confirmation; this does not prove full application feature parity."
+  "not_verified": [
+    "Visible UTM app-window acceptance: an earlier user report described Budget freezing; this QEMU automation does not resolve that report.",
+    "Account file editing and account selection workflows are not covered by this probe."
+  ]
 }
