@@ -1,0 +1,20 @@
+{
+  "date": "2026-11-11",
+  "program": "/Demo/Sound/OhGreat.ZC",
+  "target": "UTM-bundled QEMU framework, HVF, one vCPU, VirtIO input and WAV-backed virtio-sound-pci",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "55719ef8a54663ae42a43143579c10a557126e94d8ecad4e9438331ed8bc5a8a",
+  "kernel_sha256": "42d44f33ae960df3f4e6d4ec51921b225e5cb3a83740f9c862417573f01b1abf",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device -audiodev wav,id=sound0,path=build/ohgreat-current-55719.wav -device virtio-sound-pci,audiodev=sound0' ZEAL_COMPAT_LOG_PATH=build/check-ohgreat-audio-current-55719.log python3 -u scripts/check-compat.py --pci --quick --probe-demo-ohgreat-full",
+  "serial_log": "build/check-ohgreat-audio-current-55719.log",
+  "serial_log_sha256": "0f55aeb898923b0163d6b6a4e232406ade7f56658a896491e0cdbe640ab84e8f",
+  "exit_code": 0,
+  "result": "pass",
+  "checks": [
+    "The original song played through its late lyric, accepted a normal key to exit, and restored the graphical terminal; zstatus reported failed=0.",
+    "WAV capture contains 49.22 seconds of stereo 16-bit PCM at 44.1 kHz, with 4,337,678 nonzero samples, RMS 6902.52, and peak 7000."
+  ],
+  "wav": "build/ohgreat-current-55719.wav",
+  "wav_sha256": "fe1d33084b426263ce784abb5010bc02b88b33e6556aa6886f4917c42b4badcc",
+  "scope_note": "Verifies PCM generation and app/shell recovery on this exact ISO. It is not a live UTM audible playback check; the user's earlier report of Oh Great playing through Pi HDMI was for an image whose hash was not recorded."
+}
