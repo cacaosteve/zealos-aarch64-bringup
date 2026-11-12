@@ -26,6 +26,7 @@ REDSEA_SIGNATURE = 0x88
 REDSEA_DIR = 0x10
 REDSEA_CONTIGUOUS = 0x400
 REDSEA_BITS_PER_SECTOR = SECTOR * 8
+HOME_DIR_SECTORS = 8
 REQUIRED_FIRMWARE = (
     "RPI_EFI.fd",
     "start4.elf",
@@ -119,22 +120,31 @@ def redsea_layout(data_count: int, layout: dict[str, int]) -> dict[str, int]:
     # stored at LBA 1, and the data area starts after all bitmap sectors.
     bitmap_sectors = (redsea_sectors + REDSEA_BITS_PER_SECTOR - 1) // REDSEA_BITS_PER_SECTOR
     root_cluster = bitmap_sectors + 1  # cluster 0 is reserved by RedSeaFormat
-    if bitmap_sectors < 1 or root_cluster >= redsea_sectors:
+    home_cluster = root_cluster + 1
+    tmp_cluster = home_cluster + HOME_DIR_SECTORS
+    if (bitmap_sectors < 1 or tmp_cluster >= redsea_sectors or
+            tmp_cluster - bitmap_sectors >= bitmap_sectors * REDSEA_BITS_PER_SECTOR):
         raise ValueError("ZealOS data partition is too small for a RedSea root directory")
     return {
         "redsea_sectors": redsea_sectors,
         "bitmap_sectors": bitmap_sectors,
         "root_cluster": root_cluster,
+        "home_cluster": home_cluster,
+        "home_sectors": HOME_DIR_SECTORS,
+        "tmp_cluster": tmp_cluster,
     }
 
 
 def initialize_redsea(image: pathlib.Path, data_start: int,
                        data_count: int, layout: dict[str, int]) -> None:
-    """Write the pinned ZealOS RedSea boot sector, bitmap, and empty root."""
+    """Write the RedSea boot sector, allocation map, root, Home, and Tmp."""
     geometry = redsea_layout(data_count, layout)
     redsea_sectors = geometry["redsea_sectors"]
     bitmap_sectors = geometry["bitmap_sectors"]
     root_cluster = geometry["root_cluster"]
+    home_cluster = geometry["home_cluster"]
+    home_sectors = geometry["home_sectors"]
+    tmp_cluster = geometry["tmp_cluster"]
 
     boot = bytearray(SECTOR)
     boot[3] = REDSEA_SIGNATURE
@@ -147,17 +157,33 @@ def initialize_redsea(image: pathlib.Path, data_start: int,
                      bitmap_sectors, unique_id)
     boot[510:512] = b"\x55\xaa"
 
-    # Match RedSeaFormat: reserve the first data cluster, then allocate the
-    # root directory in the next cluster. Both bits are relative to data_area.
+    # Match RedSeaFormat: bit zero is reserved, then allocate root, Home, and
+    # Tmp contiguously in the RedSea data area. The Home directory reserves
+    # eight sectors for ordinary user files at first boot.
     bitmap_first = bytearray(SECTOR)
-    bitmap_first[0] = 0x03
+    allocated_bits = tmp_cluster + 1 - bitmap_sectors
+    for bit in range(allocated_bits):
+        bitmap_first[bit >> 3] |= 1 << (bit & 7)
 
     root = bytearray(SECTOR)
+    home = bytearray(home_sectors * SECTOR)
+    tmp = bytearray(SECTOR)
     entry_attr = REDSEA_DIR | REDSEA_CONTIGUOUS
-    struct.pack_into("<H38sQQQ", root, 0, entry_attr, b".\0" + bytes(36),
-                     root_cluster, SECTOR, 0)
-    struct.pack_into("<H38sQQQ", root, 64, entry_attr, b"..\0" + bytes(35),
-                     root_cluster, 0, 0)
+
+    def dir_entry(buf: bytearray, slot: int, name: bytes, cluster: int,
+                  size: int) -> None:
+        encoded = name + b"\0"
+        struct.pack_into("<H38sQQQ", buf, slot * 64, entry_attr, encoded,
+                         cluster, size, 0)
+
+    dir_entry(root, 0, b".", root_cluster, SECTOR)
+    dir_entry(root, 1, b"..", root_cluster, 0)
+    dir_entry(root, 2, b"Home", home_cluster, home_sectors * SECTOR)
+    dir_entry(root, 3, b"Tmp", tmp_cluster, SECTOR)
+    dir_entry(home, 0, b".", home_cluster, home_sectors * SECTOR)
+    dir_entry(home, 1, b"..", root_cluster, 0)
+    dir_entry(tmp, 0, b".", tmp_cluster, SECTOR)
+    dir_entry(tmp, 1, b"..", root_cluster, 0)
 
     with image.open("r+b") as stream:
         stream.seek(data_start * SECTOR)
@@ -166,6 +192,10 @@ def initialize_redsea(image: pathlib.Path, data_start: int,
         stream.write(bitmap_first)
         stream.seek((data_start + root_cluster) * SECTOR)
         stream.write(root)
+        stream.seek((data_start + home_cluster) * SECTOR)
+        stream.write(home)
+        stream.seek((data_start + tmp_cluster) * SECTOR)
+        stream.write(tmp)
 
 
 def verify_redsea_image(image: pathlib.Path, data_start: int,
@@ -175,6 +205,10 @@ def verify_redsea_image(image: pathlib.Path, data_start: int,
     redsea_sectors = geometry["redsea_sectors"]
     bitmap_sectors = geometry["bitmap_sectors"]
     root_cluster = geometry["root_cluster"]
+    home_cluster = geometry["home_cluster"]
+    home_sectors = geometry["home_sectors"]
+    tmp_cluster = geometry["tmp_cluster"]
+    tmp_bit = tmp_cluster - bitmap_sectors
     with image.open("rb") as stream:
         stream.seek(data_start * SECTOR)
         boot = stream.read(SECTOR)
@@ -190,8 +224,10 @@ def verify_redsea_image(image: pathlib.Path, data_start: int,
 
         stream.seek((data_start + 1) * SECTOR)
         allocation = stream.read(SECTOR)
-        if len(allocation) != SECTOR or allocation[0] & 0x03 != 0x03:
-            raise ValueError("raw image RedSea reserved/root bitmap bits are missing")
+        if (len(allocation) != SECTOR or
+                any((allocation[bit >> 3] & (1 << (bit & 7))) == 0
+                    for bit in range(tmp_bit + 1))):
+            raise ValueError("raw image RedSea reserved/root/Home/Tmp bitmap bits are missing")
 
         stream.seek((data_start + root_cluster) * SECTOR)
         directory = stream.read(SECTOR)
@@ -201,13 +237,40 @@ def verify_redsea_image(image: pathlib.Path, data_start: int,
             "<H38sQQQ", directory, 0)
         dotdot_attr, dotdot_name, dotdot_cluster, _dotdot_size, _dotdot_time = struct.unpack_from(
             "<H38sQQQ", directory, 64)
+        home_attr, home_name, home_first, home_size, _home_time = struct.unpack_from(
+            "<H38sQQQ", directory, 128)
+        tmp_attr, tmp_name, tmp_first, tmp_size, _tmp_time = struct.unpack_from(
+            "<H38sQQQ", directory, 192)
         if (dot_attr != (REDSEA_DIR | REDSEA_CONTIGUOUS) or
                 dot_name.split(b"\0", 1)[0] != b"." or
                 dot_cluster != root_cluster or dot_size != SECTOR or
                 dotdot_attr != (REDSEA_DIR | REDSEA_CONTIGUOUS) or
                 dotdot_name.split(b"\0", 1)[0] != b".." or
-                dotdot_cluster != root_cluster or any(directory[128:])):
+                dotdot_cluster != root_cluster or
+                home_attr != (REDSEA_DIR | REDSEA_CONTIGUOUS) or
+                home_name.split(b"\0", 1)[0] != b"Home" or
+                home_first != home_cluster or home_size != home_sectors * SECTOR or
+                tmp_attr != (REDSEA_DIR | REDSEA_CONTIGUOUS) or
+                tmp_name.split(b"\0", 1)[0] != b"Tmp" or
+                tmp_first != tmp_cluster or tmp_size != SECTOR or
+                any(directory[256:])):
             raise ValueError("raw image RedSea root directory verification failed")
+
+        for cluster, parent, size in ((home_cluster, root_cluster,
+                                       home_sectors * SECTOR),
+                                      (tmp_cluster, root_cluster, SECTOR)):
+            stream.seek((data_start + cluster) * SECTOR)
+            child = stream.read(SECTOR)
+            child_dot = struct.unpack_from("<H38sQQQ", child, 0)
+            child_dotdot = struct.unpack_from("<H38sQQQ", child, 64)
+            if (len(child) != SECTOR or
+                    child_dot[0] != (REDSEA_DIR | REDSEA_CONTIGUOUS) or
+                    child_dot[1].split(b"\0", 1)[0] != b"." or
+                    child_dot[2] != cluster or child_dot[3] != size or
+                    child_dotdot[0] != (REDSEA_DIR | REDSEA_CONTIGUOUS) or
+                    child_dotdot[1].split(b"\0", 1)[0] != b".." or
+                    child_dotdot[2] != parent):
+                raise ValueError("raw image RedSea Home/Tmp directory verification failed")
 
 
 def verify_source_banks(image: pathlib.Path, data_start: int,
@@ -406,8 +469,8 @@ def build(args: argparse.Namespace) -> None:
     print(f"  size: {args.size_mib} MiB ({total_sectors} sectors)")
     print(f"  FAT32 boot: LBA {boot_start} + {boot_count} sectors")
     print(f"  ZealOS data (MBR type 0xDA): LBA {data_start} + {data_count} sectors")
-    print("  ZealOS data: empty full-size RedSea volume and both source banks initialized")
-    print("  `psdopen` binds this partition at runtime; ordinary full RedSea writes are not yet enabled")
+    print("  ZealOS data: full-size RedSea volume with /Home and /Tmp, plus both source banks")
+    print("  `psdopen` binds this partition at runtime; ordinary FileWrite targets RedSea")
     print("  no physical disk or microSD card was opened")
 
 

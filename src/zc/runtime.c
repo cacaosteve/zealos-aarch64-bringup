@@ -175,6 +175,7 @@ static size_t source_archive_index_count;
 static int source_archive_index_state;
 static zc_source_read_fn disk_reader;
 static zc_source_write_fn disk_writer;
+static zc_file_write_fn file_writer;
 static jmp_buf guard;
 static int guarded, ready, failed;
 static jmp_buf compiler_recovery_guard;
@@ -693,6 +694,7 @@ void zc_output(const char *s) {
 }
 void zc_set_source_reader(zc_source_read_fn read) { disk_reader = read; }
 void zc_set_source_writer(zc_source_write_fn write) { disk_writer = write; }
+void zc_set_file_writer(zc_file_write_fn write) { file_writer = write; }
 void zc_set_key_reader(zc_key_event_fn read, zc_key_reset_fn reset) {
     key_reader = read;
     key_reset = reset;
@@ -1957,17 +1959,29 @@ static int64_t host_file_write(int64_t *a) {
         return -1;
     if (!strncmp(path, "ram:", 4))
         return zc_ram_write(path, src, (size_t)length) ? -1 : length;
-    if (!disk_writer) return -1;
-    int result = disk_writer(path, src, (size_t)length);
+    int64_t result;
+    size_t path_len = strlen(path);
+    int source_file = path_len >= 3 && path[path_len - 3] == '.' &&
+                      (path[path_len - 2] == 'Z' || path[path_len - 2] == 'z') &&
+                      (path[path_len - 1] == 'C' || path[path_len - 1] == 'c');
+    if (file_writer && !source_file)
+        result = file_writer(path, src, (size_t)length, (uint64_t)a[3],
+                             (uint16_t)a[4]);
+    else {
+        if (!disk_writer) return -1;
+        result = disk_writer(path, src, (size_t)length);
+    }
     if (strstr(path, "DataBaseDemo.BIN"))
         printf("zc: db FileWrite path=%s size=%ld first=%02x%02x%02x%02x result=%d\n",
                path, (long)length, (unsigned char)src[0],
                length > 1 ? (unsigned char)src[1] : 0,
                length > 2 ? (unsigned char)src[2] : 0,
                length > 3 ? (unsigned char)src[3] : 0, result);
-    if (result)
-        return -1;
-    return length;
+    if (result < 0) return -1;
+    /* Source-bank writes report status; normal FileWrite returns the number
+     * of bytes written in this host fallback. RedSea's callback returns the
+     * allocated cluster, matching the guest API. */
+    return (file_writer && !source_file) ? result : length;
 }
 static int64_t host_doc_input_bytes(int64_t *a) {
     if (a[1] < 0 || a[1] > DATA_BYTES || (!a[0] && a[1]) || !a[2])

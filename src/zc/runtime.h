@@ -13,6 +13,12 @@ typedef int (*zc_source_read_fn)(const char *name, char *dst, size_t cap, size_t
 void zc_set_source_reader(zc_source_read_fn read);
 typedef int (*zc_source_write_fn)(const char *name, const char *src, size_t length);
 void zc_set_source_writer(zc_source_write_fn write);
+/* Normal ZealOS FileWrite path. Returns the allocated RedSea cluster on
+ * success (matching the guest API), or a negative value on failure. */
+typedef int64_t (*zc_file_write_fn)(const char *name, const char *src,
+                                    size_t length, uint64_t datetime,
+                                    uint16_t attributes);
+void zc_set_file_writer(zc_file_write_fn write);
 /* Absolute PCI VirtIO block device; zero capacity means unavailable. */
 uint64_t zc_raw_disk_sectors(void);
 int zc_raw_disk_read(void *dst, uint64_t sector, uint64_t count);

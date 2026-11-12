@@ -37,9 +37,13 @@ psdread. psdread initializes the SD controller and reads the card's partition
 table; it does not write sectors. The current full-card FAT-only layout is
 expected to report no ZealOS data partition. On a card flashed from the new
 Pi image, `psdopen` binds the unique 0xDA data partition and enables bounded
-disk writes only within it. The image builder initializes empty source-bank
-headers and an empty full-size RedSea volume. `rspersist` is limited to the
-128-sector bring-up format and must not be used to initialize this image.
+disk writes only within it. The image builder initializes the two append-only
+source banks and a full-size RedSea volume containing `/Home` and `/Tmp`.
+After `psdopen`, ordinary `FileWrite` create/replace and `DirMake` are enabled
+within existing directory capacity; deletion, rename, and automatic directory
+growth are not. `.ZC` saves use the separate source banks. `rspersist` is
+limited to the 128-sector bring-up format and must not be used to initialize
+this image.
 The desktop uses a packed 800x600 surface centered and integer-scaled into
 the firmware display mode. Borders are expected on larger screens. The
 physical width/height/pitch/scale and logical surface are reported at startup.
@@ -49,5 +53,6 @@ message; the second Limine entry is the diagnostic recovery path.
 
 USB storage remains read-only. The native source writer stays unbound until
 `psdopen` is run. Bundled sources come from the boot module, not VirtIO.
-This first desktop check does not claim writable persistence or Pi installation.
+This staging script prepares files only; it does not flash a card. Physical
+SD read/write, flush, cold-boot persistence, and app acceptance remain open.
 EOF

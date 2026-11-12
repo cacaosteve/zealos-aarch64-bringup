@@ -41,12 +41,13 @@
   translated backend, rejects out-of-range writes, and verifies the MBR and
   FAT boot partition remain unchanged. This checks the memory-mapped block
   layer, not physical SD card behavior.
-- The current bootstrap RedSea writer is not the full ZealOS filesystem: its
-  formatter is limited to 128 sectors, its root-file writer is limited to
-  64 KiB and eight root entries, and it does not provide stock directory,
-  rename, or general file-write behavior. The partition mapping alone does not
-  make this a normal writable ZealOS installation. Full RedSea integration is
-  a separate requirement before claiming ordinary persistent file use.
+- The 128-sector bootstrap formatter and eight-entry root writer remain for
+  bring-up diagnostics; `psdopen` does not use them for the stock-format data
+  volume. Once the partition is explicitly bound, bounded RedSea
+  `FileWrite` create/replace and `DirMake` operations are available for
+  existing directory capacity. Delete, rename, and automatic directory growth
+  are not implemented. This is useful writable storage, but not yet complete
+  stock filesystem parity.
 - The bounded SDHCI backend uses conservative single-sector CMD17/CMD24 PIO
   operations with capacity checks and CMD13/DAT-busy flush confirmation.
   Multi-sector backend requests are split into single-sector commands. These
@@ -58,6 +59,12 @@
   spanning the card. There is no data partition or free tail to adopt as-is.
 
 ## Target layout and install flow
+
+Latest 8 GiB raw-image candidate: `build/zealos-pi4b-redsea-candidate.img`,
+SHA-256 `085d41f4c52c800cb085668c2015c89881b12ea48624860e52654d224116c818`.
+Its layout and staged boot payload passed the host builder checks. It has not
+been flashed to or booted from a physical card; see the
+[candidate acceptance record](acceptance/pi-raw-image-redsea-write-candidate-2026-11-12.json).
 
 The current bring-up setup is an image-flash workflow, not the UTM ISO
 installer. `scripts/build-pi-image.py` builds a Pi-specific whole-card raw
@@ -71,20 +78,22 @@ The image has two MBR partitions:
    files and the ZealOS boot payload.
 2. A ZealOS data partition (type `0xDA`) occupying the rest of the image. Its
    first region is reserved for RedSea; two 32 MiB append-only source banks
-   live at the end. The builder initializes an empty full-size RedSea volume
-   and the source-bank headers. These are regions inside one data partition, not
-   additional partitions. The current builder emits MBR, although the runtime
-   scanner also recognizes the ZealOS GPT type GUID.
+   live at the end. The builder initializes a full-size RedSea volume with
+   `/Home` and `/Tmp` plus the source-bank headers. These are regions inside
+   one data partition, not additional partitions. The current builder emits
+   MBR, although the runtime scanner also recognizes the ZealOS GPT type GUID.
 
 For this development image, boot the card and explicitly run `psdopen` to
 initialize the SD controller and bind the unique ZealOS data partition. Only
 then can generic disk/source commands reach it. The image builder formats the
-RedSea area as an empty stock-format volume. Do not run `rspersist` on it:
-`rspersist` is only for the 128-sector bring-up format. The runtime has bounded
-RedSea reads and source-store persistence, but ordinary full-size RedSea file
-create/replace/delete operations are not yet enabled. The physical Pi
-write/readback/reboot persistence path still needs acceptance. The FAT boot
-partition is outside the block-device write range.
+RedSea area as a stock-format volume with `/Home` and `/Tmp`. Do not run
+`rspersist` on it: `rspersist` is only for the 128-sector bring-up format.
+After `psdopen`, ordinary `FileWrite` create/replace and the bootstrap `DirMake`
+path can write RedSea entries; `.ZC` source saves continue to use the separate
+source banks. File deletion, rename, and automatic growth of a full directory
+are not enabled yet. The physical Pi write/readback/reboot persistence path
+still needs acceptance. The FAT boot partition is outside the block-device
+write range.
 
 The builder requires `mkfs.fat`, `mcopy`, and `mmd` (Homebrew `dosfstools` and
 `mtools` on macOS). Example, after copying the current FAT boot volume to a
@@ -109,10 +118,11 @@ Pi `.img` with Raspberry Pi Imager. UTM continues to boot the ISO and run
 `zinstall ERASE` against its VirtIO disk.
 
 The image layout is not yet a finished end-user installer: it is a reproducible
-bring-up image with manual `psdopen` and incomplete ordinary file-write support.
-A later installer could offer either microSD or USB mass storage as the
-destination, but the current native writable backend targets the Pi SD
-controller and does not yet provide general writable USB-storage support.
+bring-up image with manual `psdopen` and incomplete ordinary filesystem
+operations. A later Pi-bootable USB installer could offer microSD as the
+destination, but it would be a UEFI/FAT boot environment, not the current UTM
+optical ISO. The current native writable backend targets the Pi SD controller
+and does not yet provide general writable USB-storage support.
 
 Do not resize or repartition the user's existing card in place as part of
 development. The current full-card FAT32 layout has no safe place for the
@@ -129,19 +139,19 @@ backup and explicit confirmation before changing that layout.
    reads/writes, and flush status. Host tests cover helper logic and fake
    controller I/O. Run `psdread` and then `psdopen` on a Pi image with the new
    partition layout to validate physical controller behavior.
-3. The image builder now initializes the empty full-size RedSea volume and
-   both source-bank headers. Validate `zput`/`zload disk:` and cold-boot
+3. The image builder initializes the full-size RedSea volume, `/Home`, `/Tmp`,
+   and both source-bank headers. Validate `zput`/`zload disk:` and cold-boot
    persistence on Pi. The boot partition remains outside every writable
    ZealOS range.
-4. Port/connect stock RedSea formatting and normal filesystem operations.
-   The raw-image builder now creates a valid empty full-size RedSea volume;
-   the runtime still needs stock-compatible create, replace, delete, and
-   rename operations. Keep bootstrap raw writes separate from normal
-   filesystem APIs.
+4. Connect normal RedSea operations. Bounded `FileWrite` create/replace and
+   `DirMake` support are implemented for existing directory capacity; delete,
+   rename, and directory growth remain. Keep bootstrap source-bank writes
+   separate from normal filesystem APIs.
 5. Keep the raw-image builder and source the supported Pi firmware package in
    a repeatable way. The builder lays out both partitions, builds the FAT boot
    volume from a copied firmware directory and staged payload, initializes the
-   source banks, and formats an empty RedSea data region in the output image.
+   source banks, and formats a RedSea data region with `/Home` and `/Tmp` in
+   the output image.
    It does not flash a card or initialize SD.
 6. Validate on disposable images first, then on a backed-up microSD: boot,
    read files, write and reread a test source, cold-reboot, and verify it

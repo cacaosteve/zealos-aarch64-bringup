@@ -47,6 +47,8 @@
 
 #if defined(ZEAL_FORCE_PI4) && !defined(ZEAL_PI_DIAG)
 static int zc_write_source(const char *path, const char *src, size_t len);
+static int64_t zc_write_redsea(const char *path, const char *src, size_t len,
+                               uint64_t datetime, uint16_t attributes);
 #endif
 
 int zc_virtio_keyboard_ready(void) { return virtio_kbd_ready(); }
@@ -2607,6 +2609,10 @@ static void pi4_sdhci_card_diagnostic(void) {
 }
 
 static void pi4_sdhci_card_open(void) {
+    /* A new open attempt must explicitly re-enable writers after the card and
+     * its partition have both been validated. */
+    zc_set_file_writer(NULL);
+    zc_set_source_writer(NULL);
     int rc = pi4_sdhci_card_ensure_ready();
     if (rc) {
         con_puts("psdopen: card initialization failed rc=-");
@@ -2632,9 +2638,8 @@ static void pi4_sdhci_card_open(void) {
         return;
     }
 #if defined(ZEAL_FORCE_PI4) && !defined(ZEAL_PI_DIAG)
-    /* Keep the Pi desktop read-only until an explicit psdopen validates and
-     * binds a partition-bounded SD backend. From here FileWrite and zput can
-     * use only the two reserved source banks, never the firmware FAT volume. */
+    /* Only an explicit psdopen enables writes. Source code stays in the
+     * append-only banks; ordinary FileWrite uses the bounded RedSea area. */
     zc_set_source_writer(zc_write_source);
     con_puts("psdopen: persistent source/data writes enabled in the ZealOS partition\n");
 #endif
@@ -2648,18 +2653,14 @@ static void pi4_sdhci_card_open(void) {
     } else {
         con_puts(" source banks uninitialized\n");
     }
-    uint8_t boot[512];
-    if (zbd_read_volume(boot, 0, 1) && boot[3] == 0x88 &&
-        boot[510] == 0x55 && boot[511] == 0xaa) {
-        uint64_t formatted_sectors = 0;
-        for (unsigned i = 0; i < 8; i++)
-            formatted_sectors |= (uint64_t)boot[16 + i] << (i * 8);
-        if (formatted_sectors > 128)
-            con_puts("psdopen: stock-size RedSea volume found; general RedSea writes are not enabled yet\n");
-        else
-            con_puts("psdopen: small bootstrap RedSea volume found\n");
+    uint64_t redsea_base = 0, redsea_sectors = 0;
+    if (zc_raw_redsea_geometry(&redsea_base, &redsea_sectors) &&
+        redsea_base == 0 && redsea_sectors > 128) {
+        zc_set_file_writer(zc_write_redsea);
+        con_puts("psdopen: full-size RedSea FileWrite enabled; use zsync before removal\n");
     } else {
-        con_puts("psdopen: no RedSea format found; `rspersist` creates only the 128-sector bring-up format\n");
+        zc_set_file_writer(NULL);
+        con_puts("psdopen: writable RedSea volume not found; ordinary FileWrite remains disabled\n");
     }
 }
 #endif
@@ -13913,6 +13914,423 @@ int zeal_redsea_dir_at(uint64_t index, char *dst, size_t cap,
                             &index, ancestors, 0, dst, cap, out_size, out_first, 1);
 }
 
+/* Stock RedSea stores one allocation bit per data-area sector. Its data area
+ * begins at drv_offset + bitmap_sects; bit zero is reserved, and the root
+ * directory normally occupies bit one. Keep every operation inside the
+ * RedSea extent published by the bounded block backend. */
+static uint64_t g_rs_alloc_base;
+static uint64_t g_rs_alloc_sectors;
+static uint64_t g_rs_alloc_hint = 2;
+
+static void rs_stock_put16(uint8_t *p, uint16_t value) {
+    p[0] = (uint8_t)value;
+    p[1] = (uint8_t)(value >> 8);
+}
+
+static void rs_stock_put64(uint8_t *p, uint64_t value) {
+    for (unsigned i = 0; i < 8; i++) p[i] = (uint8_t)(value >> (i * 8));
+}
+
+static int rs_stock_volume_read(uint64_t base, uint64_t sectors,
+                                uint64_t lba, void *dst, uint32_t count) {
+    return dst && count && lba >= base && lba - base < sectors &&
+           count <= sectors - (lba - base) &&
+           zbd_read_abs_many(dst, lba, count);
+}
+
+static int rs_stock_volume_write(uint64_t base, uint64_t sectors,
+                                 uint64_t lba, const void *src,
+                                 uint32_t count) {
+    return src && count && lba >= base && lba - base < sectors &&
+           count <= sectors - (lba - base) &&
+           zbd_write_abs_many(src, lba, count);
+}
+
+static int rs_stock_bitmap_update(uint64_t base, uint64_t sectors,
+                                  uint64_t bitmap_sectors, uint64_t first,
+                                  uint64_t count, int allocate) {
+    uint8_t map[512];
+    uint64_t data_area, bit, left;
+    if (!count) return 1;
+    if (bitmap_sectors >= sectors || base > UINT64_MAX - bitmap_sectors)
+        return 0;
+    data_area = base + bitmap_sectors;
+    if (first < data_area || first - data_area >= sectors - bitmap_sectors ||
+        count > sectors - bitmap_sectors - (first - data_area))
+        return 0;
+    bit = first - data_area;
+    left = count;
+    while (left) {
+        uint64_t map_index = bit / 4096;
+        uint64_t in_sector = bit & 4095;
+        uint64_t batch = 4096 - in_sector;
+        if (batch > left) batch = left;
+        if (map_index >= bitmap_sectors ||
+            !rs_stock_volume_read(base, sectors, base + 1 + map_index, map, 1))
+            return 0;
+        for (uint64_t i = 0; i < batch; i++) {
+            uint64_t b = in_sector + i;
+            uint8_t mask = (uint8_t)(1u << (b & 7));
+            if (allocate) map[b >> 3] |= mask;
+            else map[b >> 3] &= (uint8_t)~mask;
+        }
+        if (!rs_stock_volume_write(base, sectors, base + 1 + map_index, map, 1))
+            return 0;
+        bit += batch;
+        left -= batch;
+    }
+    return 1;
+}
+
+static int rs_stock_find_extent_pass(uint64_t base, uint64_t sectors,
+                                     uint64_t bitmap_sectors, uint64_t begin,
+                                     uint64_t end, uint64_t count,
+                                     uint64_t *out_bit) {
+    uint8_t map[512];
+    uint64_t run = 0, run_start = 0;
+    if (begin >= end || !count) return 0;
+    uint64_t first_map = begin / 4096;
+    uint64_t last_map = (end - 1) / 4096;
+    for (uint64_t map_index = first_map; map_index <= last_map; map_index++) {
+        if (map_index >= bitmap_sectors ||
+            !rs_stock_volume_read(base, sectors, base + 1 + map_index, map, 1))
+            return 0;
+        uint64_t map_begin = map_index * 4096;
+        uint64_t from = begin > map_begin ? begin - map_begin : 0;
+        uint64_t to = end - map_begin;
+        if (to > 4096) to = 4096;
+        for (uint64_t bit = from; bit < to; bit++) {
+            int used = (map[bit >> 3] & (uint8_t)(1u << (bit & 7))) != 0;
+            if (used) {
+                run = 0;
+            } else {
+                if (!run) run_start = map_begin + bit;
+                if (++run == count) {
+                    *out_bit = run_start;
+                    return 1;
+                }
+            }
+        }
+    }
+    return 0;
+}
+
+static int rs_stock_find_extent(uint64_t base, uint64_t sectors,
+                                uint64_t bitmap_sectors, uint64_t count,
+                                uint64_t *out_first) {
+    uint64_t data_bits = sectors - bitmap_sectors;
+    uint64_t hint, bit;
+    if (!out_first || data_bits <= 2 || count > data_bits - 2) return 0;
+    if (g_rs_alloc_base != base || g_rs_alloc_sectors != sectors) {
+        g_rs_alloc_base = base;
+        g_rs_alloc_sectors = sectors;
+        g_rs_alloc_hint = 2;
+    }
+    hint = g_rs_alloc_hint;
+    if (hint < 2 || hint >= data_bits) hint = 2;
+    if (rs_stock_find_extent_pass(base, sectors, bitmap_sectors, hint,
+                                  data_bits, count, &bit) ||
+        (hint > 2 && rs_stock_find_extent_pass(base, sectors,
+                                               bitmap_sectors, 2, hint,
+                                               count, &bit))) {
+        *out_first = base + bitmap_sectors + bit;
+        g_rs_alloc_hint = bit + count;
+        if (g_rs_alloc_hint >= data_bits) g_rs_alloc_hint = 2;
+        return 1;
+    }
+    return 0;
+}
+
+static int rs_stock_extent_allocated(uint64_t base, uint64_t sectors,
+                                     uint64_t bitmap_sectors, uint64_t first,
+                                     uint64_t count) {
+    uint8_t map[512];
+    uint64_t bit, left;
+    if (!count) return 1;
+    if (bitmap_sectors >= sectors || base > UINT64_MAX - bitmap_sectors)
+        return 0;
+    uint64_t data_area = base + bitmap_sectors;
+    if (first < data_area || first - data_area >= sectors - bitmap_sectors ||
+        count > sectors - bitmap_sectors - (first - data_area)) return 0;
+    bit = first - data_area;
+    left = count;
+    while (left) {
+        uint64_t map_index = bit / 4096;
+        uint64_t in_sector = bit & 4095;
+        uint64_t batch = 4096 - in_sector;
+        if (batch > left) batch = left;
+        if (map_index >= bitmap_sectors ||
+            !rs_stock_volume_read(base, sectors, base + 1 + map_index, map, 1))
+            return 0;
+        for (uint64_t i = 0; i < batch; i++) {
+            uint64_t b = in_sector + i;
+            if (!(map[b >> 3] & (uint8_t)(1u << (b & 7)))) return 0;
+        }
+        bit += batch;
+        left -= batch;
+    }
+    return 1;
+}
+
+static int rs_stock_valid_component(const char *name, size_t *out_len) {
+    size_t n = 0;
+    if (!name || !*name) return 0;
+    while (name[n]) {
+        unsigned char c = (unsigned char)name[n];
+        if (++n > 37 || c < 32 || c > 126 || c == '/' || c == '\\' || c == ':')
+            return 0;
+    }
+    if ((n == 1 && name[0] == '.') ||
+        (n == 2 && name[0] == '.' && name[1] == '.')) return 0;
+    if (out_len) *out_len = n;
+    return 1;
+}
+
+static int rs_stock_resolve_parent(uint64_t base, uint64_t sectors,
+                                   const char *path, uint64_t *parent,
+                                   char leaf[38]) {
+    uint8_t boot[512];
+    uint64_t directory;
+    const char *name = path;
+    if (!path || !parent || !leaf) return 0;
+    if (str_startswith(name, "disk:")) name += 5;
+    else if (str_startswith(name, "ram:")) return 0;
+    while (*name == '/') name++;
+    if (!*name || !rs_stock_volume_read(base, sectors, base, boot, 1) ||
+        rs_stock_u64(boot + 8) != base) return 0;
+    directory = rs_stock_u64(boot + 24);
+    while (*name) {
+        char component[38];
+        size_t n = 0;
+        while (name[n] && name[n] != '/' && n < sizeof(component) - 1) {
+            component[n] = name[n];
+            n++;
+        }
+        /* Do not silently truncate an overlong component into a different
+         * on-disk name. A component may end only at '/' or NUL. */
+        if (name[n] && name[n] != '/') return 0;
+        component[n] = 0;
+        if (!rs_stock_valid_component(component, NULL)) return 0;
+        name += n;
+        if (*name == '/') {
+            uint64_t first, length;
+            uint16_t attr;
+            name++;
+            if (!*name || !rs_stock_find(base, sectors, directory, component,
+                                         &first, &length, &attr) ||
+                !(attr & 0x10u) || first < base || first - base >= sectors)
+                return 0;
+            directory = first;
+        } else {
+            for (size_t i = 0; i <= n; i++) leaf[i] = component[i];
+            *parent = directory;
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static int rs_stock_dir_slot(uint64_t base, uint64_t sectors,
+                             uint64_t directory, const char *leaf,
+                             uint64_t *slot_index, int *found,
+                             uint64_t *old_first, uint64_t *old_length,
+                             uint16_t *old_attributes) {
+    uint8_t block[512];
+    uint64_t first, length, slots, empty_slot = UINT64_MAX;
+    uint16_t attr;
+    if (!rs_stock_find(base, sectors, directory, ".", &first, &length, &attr) ||
+        first != directory || !(attr & 0x10u) || !length || (length & 511u))
+        return 0;
+    slots = length / 64;
+    for (uint64_t sector = 0; sector < length / 512; sector++) {
+        if (!rs_stock_volume_read(base, sectors, directory + sector, block, 1))
+            return 0;
+        for (unsigned i = 0; i < 8; i++) {
+            const uint8_t *entry = block + i * 64;
+            uint16_t entry_attr = (uint16_t)entry[0] | (uint16_t)entry[1] << 8;
+            uint64_t index = sector * 8 + i;
+            char stored[38];
+            size_t n = 0;
+            if (!entry[2]) {
+                if (empty_slot == UINT64_MAX) empty_slot = index;
+                *slot_index = empty_slot;
+                *found = 0;
+                return 1;
+            }
+            if (entry_attr & 0x100u) {
+                if (empty_slot == UINT64_MAX) empty_slot = index;
+                continue;
+            }
+            while (n < 37 && entry[2 + n]) { stored[n] = (char)entry[2 + n]; n++; }
+            if (n == 37 && entry[2 + n]) continue;
+            stored[n] = 0;
+            if (!str_ieq(stored, leaf)) continue;
+            *slot_index = index;
+            *found = 1;
+            *old_first = rs_stock_u64(entry + 40);
+            *old_length = rs_stock_u64(entry + 48);
+            *old_attributes = entry_attr;
+            return 1;
+        }
+    }
+    if (empty_slot == UINT64_MAX || empty_slot >= slots) return 0;
+    *slot_index = empty_slot;
+    *found = 0;
+    return 1;
+}
+
+static int rs_stock_write_file_data(uint64_t base, uint64_t sectors,
+                                    uint64_t first, uint64_t length,
+                                    uint64_t parent, uint16_t attributes,
+                                    uint64_t datetime, const char *src) {
+    uint8_t block[512];
+    uint64_t blocks = (length + 511) / 512;
+    for (uint64_t i = 0; i < blocks; i++) {
+        size_t chunk = (size_t)(length - i * 512);
+        if (chunk > 512) chunk = 512;
+        for (unsigned j = 0; j < 512; j++) block[j] = 0;
+        if (src)
+            for (size_t j = 0; j < chunk; j++)
+                block[j] = (uint8_t)src[i * 512 + j];
+        if ((attributes & 0x10u) && i == 0) {
+            uint16_t dir_attr = (uint16_t)(attributes | 0x400u);
+            rs_stock_put16(block, dir_attr);
+            block[2] = '.'; block[3] = 0;
+            rs_stock_put64(block + 40, first);
+            rs_stock_put64(block + 48, length);
+            rs_stock_put64(block + 56, datetime);
+            rs_stock_put16(block + 64, dir_attr);
+            block[66] = '.'; block[67] = '.'; block[68] = 0;
+            rs_stock_put64(block + 104, parent);
+            rs_stock_put64(block + 112, 0);
+            rs_stock_put64(block + 120, datetime);
+        }
+        if (!rs_stock_volume_write(base, sectors, first + i, block, 1)) return 0;
+    }
+    return 1;
+}
+
+static int64_t zc_write_redsea(const char *path, const char *src, size_t len,
+                               uint64_t datetime, uint16_t attributes) {
+    uint8_t boot[512], entry_sector[512];
+    uint64_t base, sectors, bitmap_sectors, parent, slot, old_first = 0;
+    uint64_t old_length = 0, new_first = 0, blocks, old_blocks;
+    uint64_t entry_lba, file_datetime = datetime;
+    uint16_t old_attr = 0;
+    char leaf[38];
+    char target_path[134];
+    const char *entry_path = path;
+    size_t path_len;
+    int make_directory = 0;
+    int found = 0;
+    if (!path || (!src && len) || !zbd_ready() || !g_zbd.flush_supported ||
+        !zc_raw_redsea_geometry(&base, &sectors) ||
+        !rs_stock_volume_read(base, sectors, base, boot, 1) ||
+        rs_stock_u64(boot + 8) != base)
+        return -1;
+    bitmap_sectors = rs_stock_u64(boot + 32);
+    if (!bitmap_sectors || bitmap_sectors >= sectors ||
+        bitmap_sectors < (sectors + 4095) / 4096)
+        return -1;
+
+    /* TaskBridge represents DirMake as a three-byte .DIR marker. Materialize
+     * that request as a stock RedSea directory entry so later paths resolve
+     * through the ordinary directory tree. */
+    path_len = str_len(path);
+    if (len == 3 && src && src[0] == 'D' && src[1] == 'I' && src[2] == 'R' &&
+        path_len > 5 && streq(path + path_len - 5, "/.DIR")) {
+        size_t target_len = path_len - 5;
+        if (target_len >= sizeof(target_path)) return -1;
+        for (size_t i = 0; i < target_len; i++) target_path[i] = path[i];
+        target_path[target_len] = 0;
+        entry_path = target_path;
+        attributes = 0x10u;
+        len = 512;
+        make_directory = 1;
+    }
+    if (!rs_stock_resolve_parent(base, sectors, entry_path, &parent, leaf))
+        return -1;
+    if (!rs_stock_dir_slot(base, sectors, parent, leaf, &slot, &found,
+                           &old_first, &old_length, &old_attr))
+        return -1;
+    if (make_directory && found) return -1;
+    if ((attributes & 0x10u) && (!len || (len & 511u) || len < 512))
+        return -1;
+    if (found && (!!(old_attr & 0x10u) != !!(attributes & 0x10u)))
+        return -1;
+    if (found && (old_attr & 0x10u)) return -1; /* Never replace a directory. */
+    blocks = ((uint64_t)len + 511) / 512;
+    if (blocks && !rs_stock_find_extent(base, sectors, bitmap_sectors, blocks,
+                                        &new_first))
+        return -1;
+    if (found && old_length) {
+        old_blocks = (old_length + 511) / 512;
+        if (!(old_attr & 0x400u) || !old_blocks ||
+            !rs_stock_extent_allocated(base, sectors, bitmap_sectors,
+                                       old_first, old_blocks))
+            return -1;
+    } else old_blocks = 0;
+
+    entry_lba = parent + slot / 8;
+    unsigned entry_offset = (unsigned)(slot % 8) * 64;
+    if (!rs_stock_volume_read(base, sectors, entry_lba, entry_sector, 1))
+        return -1;
+    if (found && !file_datetime)
+        file_datetime = rs_stock_u64(entry_sector + entry_offset + 56);
+
+    if (blocks && !rs_stock_write_file_data(base, sectors, new_first, len,
+                                            parent, attributes, file_datetime,
+                                            make_directory ? NULL : src))
+        return -1;
+    if (blocks && !zbd_flush()) return -1;
+    if (blocks && !rs_stock_bitmap_update(base, sectors, bitmap_sectors,
+                                          new_first, blocks, 1)) {
+        (void)rs_stock_bitmap_update(base, sectors, bitmap_sectors,
+                                     new_first, blocks, 0);
+        (void)zbd_flush();
+        return -1;
+    }
+    if (blocks && !zbd_flush()) {
+        (void)rs_stock_bitmap_update(base, sectors, bitmap_sectors,
+                                     new_first, blocks, 0);
+        (void)zbd_flush();
+        return -1;
+    }
+
+    if (!rs_stock_volume_read(base, sectors, entry_lba, entry_sector, 1)) {
+        if (blocks) {
+            (void)rs_stock_bitmap_update(base, sectors, bitmap_sectors,
+                                         new_first, blocks, 0);
+            (void)zbd_flush();
+        }
+        return -1;
+    }
+    uint8_t *entry = entry_sector + entry_offset;
+    for (unsigned i = 0; i < 64; i++) entry[i] = 0;
+    rs_stock_put16(entry, (uint16_t)(attributes | 0x400u));
+    size_t leaf_len = str_len(leaf);
+    for (size_t i = 0; i < leaf_len; i++) entry[2 + i] = (uint8_t)leaf[i];
+    rs_stock_put64(entry + 40, blocks ? new_first : UINT64_MAX);
+    rs_stock_put64(entry + 48, len);
+    rs_stock_put64(entry + 56, file_datetime);
+    /* The device may have accepted the directory sector even if the write
+     * reports an error. Keep the new extent allocated on an uncertain commit;
+     * leaking space is safer than leaving a durable entry pointing to free
+     * sectors. */
+    if (!rs_stock_volume_write(base, sectors, entry_lba, entry_sector, 1))
+        return -1;
+    /* Once the directory sector is submitted, never free its new extent on a
+     * flush error: the entry may already be durable and must not point free. */
+    if (!zbd_flush()) return -1;
+    if (old_blocks) {
+        if (rs_stock_bitmap_update(base, sectors, bitmap_sectors,
+                                   old_first, old_blocks, 0))
+            (void)zbd_flush(); /* A failed free leaks space; the new file is committed. */
+    }
+    if (make_directory) return 3; /* DirMake's marker FileWrite contract. */
+    return blocks ? (int64_t)new_first : 0;
+}
+
 static int zc_write_source(const char *path, const char *src, size_t len) {
     const char *name = path;
     if (!path || (!src && len) || len > ZSS_MAX_FILE)
@@ -13926,9 +14344,9 @@ static int zc_write_source(const char *path, const char *src, size_t len) {
     if (zss_available())
         return zss_put(name, src, len);
 #ifdef ZEAL_FORCE_PI4
-    /* Pi's full-size RedSea volume is not yet mounted through the normal
-     * filesystem writer. Never fall back to the small bootstrap root writer
-     * on SD; refuse saves unless the image's protected source banks validate. */
+    /* Keep source-code saves in the protected source banks. They are separate
+     * from ordinary RedSea FileWrite data and must never fall back to the
+     * small bootstrap root writer on the Pi. */
     return -1;
 #else
     /* Legacy RedSea only supports a root filename without a directory. */
@@ -19771,6 +20189,7 @@ static __attribute__((always_inline)) inline void native_desktop_start(const str
         zc_set_boot_time(-1, 0);
     zc_set_source_reader(zc_read_redsea);
 #ifdef ZEAL_FORCE_PI4
+    zc_set_file_writer(NULL); /* Ordinary SD writes require an explicit psdopen. */
     zc_set_source_writer(NULL); /* Explicit psdopen opts in after partition validation. */
 #else
     zc_set_source_writer(zc_write_source);
