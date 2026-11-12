@@ -68,10 +68,12 @@ allocation, `RedSeaValidate` succeeds, and the follow-up read-only check still
 reports the malformed extent. FAT32 remains open. The current image also passes the
 broader read-only stock RedSea file probe: D: selection, relative current-drive
 enumeration, nested/case-insensitive reads, empty-file semantics and source
-store persistence across a cold boot. The probe expects the ARM64 bridge's
-`disk:/` current-directory spelling; it does not validate writable RedSea or
-general drive mounting. The Beep fixture now also passes with UTM-bundled
-QEMU's VirtIO-sound WAV backend: its disposable tone fixture completed
+store persistence across a cold boot. Those file operations are read-only and
+the probe expects the ARM64 bridge's `disk:/` current-directory spelling.
+Separate writable-D checks cover the bounded RedSea mount and DiskCheck repair
+paths described above; neither check establishes general drive mounting,
+multi-volume behavior, or FAT32 support. The Beep fixture now also passes with
+UTM-bundled QEMU's VirtIO-sound WAV backend: its disposable tone fixture completed
 JukePuppet playback and cleanup, and the 2.76-second capture contains a strong
 tone near 659 Hz. This is generated PCM evidence, not audible live-UTM or Pi
 playback; see the
@@ -117,8 +119,10 @@ round-trip; live UTM and Pi behavior remain separate checks. See
 [`demo-wallpaper-desktop-current-qemu-2026-11-10.json`](docs/acceptance/demo-wallpaper-desktop-current-qemu-2026-11-10.json).
 `DiskRaw` reads and bounded absolute writes now pass on disposable PCI VirtIO
 fixtures. The write probe flushes, reads back, and restores its test sectors.
-This is still below the stock drive registry and does not make a writable
-RedSea/filesystem mount; hotplug and Pi SD storage remain separate gaps. See
+This is still below the stock drive registry. The ARM64 bridge separately
+provides one bounded writable RedSea D: mount for targeted checks, not the
+general stock drive registry, writable multi-volume workflow, or FAT32; hotplug
+and Pi SD storage remain separate gaps. See
 the [write acceptance record](docs/acceptance/raw-disk-write-qemu-2026-11-11.json)
 and [per-source ledger](docs/acceptance/demo-source-ledger-2026-11-10.json).
 The 206/206 compile-only sweep was rerun against the current ISO
