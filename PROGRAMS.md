@@ -90,9 +90,13 @@ On the current `9a0d1433…` image, the standard distro workflow reaches
 `BootDVDIns` after selecting source drive C, formatting its virtual RAM drive
 B, and converting source files. It then raises `ArmBoot`: the legacy boot-image
 writer is an explicit x86 BIOS stub, and ARM64 UEFI distro-image generation
-has not been implemented. An earlier record blamed a missing `Drive` binding;
-that diagnosis was stale, and this run confirms the current drive bridge works
-for this workflow. See the [DistroPrep acceptance](docs/acceptance/tos-distro-prep-current-qemu-2026-11-11.json),
+has not been implemented. The existing `RedSeaISO` writer places its BIOS
+El Torito catalog and stage-one loader at fixed legacy sectors; the ARM64 live
+ISO instead uses Limine's UEFI CD image, `BOOTAA64.EFI`, an AArch64 ELF kernel,
+and boot modules. A real port must stage those ARM64 files and build an EFI
+El Torito image/catalog, rather than merely bypassing the exception. An earlier
+record blamed a missing `Drive` binding; that diagnosis was stale, and this run
+confirms the current drive bridge works for this workflow. See the [DistroPrep acceptance](docs/acceptance/tos-distro-prep-current-qemu-2026-11-11.json),
 [TOSMisc probes](docs/acceptance/demo-tosmisc-jukepuppet-current-qemu-2026-11-11.json),
 and [current full-build result](docs/acceptance/demo-tosdistro-std-current-qemu-2026-11-11.json).
 The ARM64
