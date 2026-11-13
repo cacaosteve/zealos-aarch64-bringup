@@ -1,0 +1,25 @@
+{
+  "date": "2026-11-12",
+  "repository_commit": "e8f8b21e295867a310949e0671bf8341035132e0",
+  "working_tree_changes_included": true,
+  "upstream_source_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "target": "UTM-bundled QEMU/HVF, AArch64 PCI graphical guest, one vCPU, isolated disposable guest disk",
+  "source": "upstream/pinned/Demo/AcctExample/TOS/TOSDistro.ZC",
+  "source_sha256": "4ffbd1877c58bdd11aeb8de69785a35fa7065f3ff25cf97db86bc2e49c2de94e",
+  "arm64_boot_bridge": "upstream/bootstrap/System/Boot/MakeBoot.ZC",
+  "arm64_boot_bridge_sha256": "264fc0aade1135e10d0258d5b6bedb906775f3186ec2085bdfa5de2ccd092fb0",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "8181de3ccb045a04649aca945170dce5a5fe8dab7263672d38fd100df9078240",
+  "kernel_sha256": "a654c794db5e796cc28624f231cccd4e565b5d788132c26882158c39751fd7b3",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-tos-distro-std-8181-current-2026-11-12.log python3 -u scripts/check-compat.py --pci --quick --probe-demo-tos-distro-std",
+  "result": "partial: standard distro packaging stops at the intentional ARM64 ArmBoot guard",
+  "verified": [
+    "The exact current ISO booted and initialized the graphical terminal under the UTM-bundled QEMU/HVF profile.",
+    "The stock MakeHome and MakeTOS module sets loaded; TOS_HDS was CD; TOSDistro and the MakeStdDistro wrapper loaded and began execution.",
+    "The prior unresolved Drive failure is absent; the probe proceeds into source-tree preparation before reaching the boot-image helper.",
+    "The guest raises uncaught exception 0x00746f6f426d7241 (ASCII ArmBoot) at BootDVDIns. The ARM64 bridge intentionally rejects legacy BIOS boot-image generation until an EFI-capable path exists."
+  ],
+  "log": "build/check-tos-distro-std-8181-current-2026-11-12.log",
+  "log_sha256": "61048dbeaa23c5f0bbcc4c1933825bcdc19103ca73e71cc7d8b3f25399fe237b",
+  "scope_note": "The probe used an isolated disposable guest disk and did not touch a host or removable volume. It does not produce or boot an ARM64 UEFI distro image, and it does not indicate a RedSea filesystem failure."
+}

@@ -1,0 +1,36 @@
+{
+  "date": "2026-11-12",
+  "repository_commit": "e8f8b21e295867a310949e0671bf8341035132e0",
+  "working_tree_changes_included": true,
+  "target": "UTM-bundled QEMU/HVF, AArch64 PCI graphical guest, one vCPU, disposable writable RedSea VirtIO fixture",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "8181de3ccb045a04649aca945170dce5a5fe8dab7263672d38fd100df9078240",
+  "kernel_sha256": "a654c794db5e796cc28624f231cccd4e565b5d788132c26882158c39751fd7b3",
+  "source_bundle_sha256": "e346a12c0bbc2305d44d95a74373e232d119bee2faa4124ccd2e0728e97f57c0",
+  "probe": "tests/compat/RawRedSeaGeometry.ZC",
+  "probe_sha256": "5045d16654c554c296444338faec3fb7157783bf036ae49b59c0c981934aa723",
+  "check_compat_sha256": "972aa124f9e47efa73012e478bae7279bd197823c7b066e996a09fad1a9b6325",
+  "commands": [
+    "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-redsea-current-8181de3.log python3 -u scripts/check-compat.py --pci --probe-raw-redsea-geometry present",
+    "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-redsea-repair-current-8181de3.log python3 -u scripts/check-compat.py --pci --probe-raw-redsea-geometry repair"
+  ],
+  "result": "pass",
+  "verified": [
+    "The disposable fixture mounted a bounded writable RedSea volume as drive D.",
+    "TOSConfig selected CD source mode, and TOSMisc DiskCheckAll skipped source-only C before checking mounted RedSea D without throwing.",
+    "The clean-volume stock DiskCheck returned zero; raw geometry, bounded read/write/restore, unmount, terminal recovery, and zstatus failed=0 passed.",
+    "The repair fixture contained a nested SUB/KEEP.ZC file and a separate allocated orphan cluster. Stock DiskCheck reported one consistency error and freed only the orphan allocation.",
+    "Read-back confirmed the nested directory and file remained allocated while the orphan bit was cleared; a second clean scan returned zero and zstatus reported failed=0."
+  ],
+  "logs": {
+    "present": {
+      "path": "build/check-redsea-current-8181de3.log",
+      "sha256": "60eb1d31a31bc897a2d053b462e36bb829ff2558725865113c9e19ffa2aea2db"
+    },
+    "repair": {
+      "path": "build/check-redsea-repair-current-8181de3.log",
+      "sha256": "71701b5ee160711a9cb6c068ad937f5aabdd11e745ad07c716c634dcc7e52097"
+    }
+  },
+  "scope_note": "Automated UTM-bundled QEMU/HVF checks on disposable VirtIO RedSea storage. This does not establish FAT32 behavior, all RedSea repair cases, physical Pi SD behavior, or live UTM UI behavior."
+}

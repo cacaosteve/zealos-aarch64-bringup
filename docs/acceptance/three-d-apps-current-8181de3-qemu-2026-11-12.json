@@ -1,0 +1,44 @@
+{
+  "date": "2026-11-12",
+  "repository_commit": "e8f8b21e295867a310949e0671bf8341035132e0",
+  "working_tree_changes_included": true,
+  "target": "UTM-bundled QEMU with HVF, ARM64 virt machine, one vCPU, VirtIO ramfb, keyboard and tablet",
+  "upstream_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "8181de3ccb045a04649aca945170dce5a5fe8dab7263672d38fd100df9078240",
+  "kernel_sha256": "a654c794db5e796cc28624f231cccd4e565b5d788132c26882158c39751fd7b3",
+  "source_bundle_sha256": "e346a12c0bbc2305d44d95a74373e232d119bee2faa4124ccd2e0728e97f57c0",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-3d-apps-8181de3-qemu-2026-11-12.log python3 -u scripts/check-compat.py --pci --quick --probe-3d-apps",
+  "exit_code": 0,
+  "result": "pass",
+  "verified": {
+    "compile_and_service_fixtures": [
+      "GrModels, KeepAway and Titanium entry-point compile checks passed",
+      "Sprite mesh and interpolation fixture checks passed",
+      "Sprite service and formatter runtime checks returned 42"
+    ],
+    "GrModels": [
+      "Man generated a visible inline sprite from a 112-vertex, 168-triangle mesh and reached the repeat prompt",
+      "Ball generated a visible inline sprite from a 58-vertex, 128-triangle mesh and reached the repeat prompt",
+      "Both runs returned to a working terminal; final zstatus reported failed=0"
+    ],
+    "KeepAway": [
+      "Court, HUD and player frame rendered",
+      "Space and mouse input were accepted and the game frame remained visible",
+      "Escape returned to a terminal with no surviving Animate task"
+    ],
+    "Titanium": [
+      "The Press-a-key intro advanced to gameplay and a frame rendered",
+      "Space input advanced gameplay frames",
+      "Escape returned to a working terminal"
+    ],
+    "shared_regressions": "The full selected QEMU compatibility run exited 0; final shell, GUI, compiler, system-server and task checks passed."
+  },
+  "artifacts": {
+    "serial_log": "build/check-3d-apps-8181de3-qemu-2026-11-12.log",
+    "serial_log_sha256": "37c52c3abe718d2f750eb8a3b2e4bf21f811e2cebd223d1ef65dff45c78263aa",
+    "compile_report": "build/3d-apps-compile.json",
+    "compile_report_sha256": "6b38feae9a66fca5423669fd8ad9d712d60f9d71a60352737d9fb779033fd2d4"
+  },
+  "scope_note": "This exact-image automated QEMU/HVF run did not include the 184-second KeepAway soak, Titanium arrow-direction assertions, audio, the visible UTM app window, or physical Pi hardware. Those are separate acceptance scopes."
+}

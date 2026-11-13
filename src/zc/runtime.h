@@ -19,6 +19,9 @@ typedef int64_t (*zc_file_write_fn)(const char *name, const char *src,
                                     size_t length, uint64_t datetime,
                                     uint16_t attributes);
 void zc_set_file_writer(zc_file_write_fn write);
+/* A mounted writable filesystem may provide the durable FileDel path. */
+typedef int (*zc_file_delete_fn)(const char *name, int allow_directory);
+void zc_set_file_deleter(zc_file_delete_fn delete_file);
 /* Absolute PCI VirtIO block device; zero capacity means unavailable. */
 uint64_t zc_raw_disk_sectors(void);
 int zc_raw_disk_read(void *dst, uint64_t sector, uint64_t count);

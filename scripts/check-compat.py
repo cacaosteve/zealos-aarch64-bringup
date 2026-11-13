@@ -117,10 +117,12 @@ p.add_argument('--probe-raw-disk-read', action='store_true',
                help='check read-only physical VirtIO sector access')
 p.add_argument('--probe-raw-disk-write', action='store_true',
                help='check bounded, flushed absolute VirtIO writes on a disposable disk clone')
-p.add_argument('--probe-raw-redsea-geometry', choices=('absent', 'present', 'repair', 'malformed', 'malformedrepair', 'cycle', 'legacy', 'invalid', 'stockfile'),
+p.add_argument('--probe-raw-redsea-geometry', choices=('absent', 'present', 'repair', 'malformed', 'malformedrepair', 'cycle', 'legacy', 'invalid', 'stockfile', 'stockwrite'),
                help='check bounded legacy RedSea reads, writes, or repair against an isolated fixture')
 p.add_argument('--probe-stock-redsea-file', action='store_true',
                help='load one contiguous stock-layout RedSea root file on a disposable disk')
+p.add_argument('--probe-stock-redsea-write', action='store_true',
+               help='create/delete stock RedSea files and empty directories on a disposable disk')
 p.add_argument('--probe-diskraw-context', action='store_true',
                help='report DiskRaw compile result in the current desktop context')
 p.add_argument('--probe-diskraw-live', action='store_true',
@@ -696,6 +698,10 @@ if args.probe_diskraw_live:
 if args.probe_stock_redsea_file:
     args.probe_raw_redsea_geometry = 'stockfile'
     args.probe_demo_definestr = True
+if args.probe_stock_redsea_write:
+    args.pci = True
+    args.probe_raw_redsea_geometry = 'stockwrite'
+    args.probe_demo_definestr = True
 if args.probe_demo_global_vars_xtalk:
     args.probe_demo_global_vars = True
 if args.probe_demo_definestr:
@@ -1075,7 +1081,7 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 child_dir = bytearray(512)
                 broken_dir = bytearray(512)
                 empty_dir = bytearray(512)
-                if args.probe_raw_redsea_geometry in ('present', 'repair', 'malformed', 'malformedrepair', 'cycle', 'legacy', 'invalid', 'stockfile'):
+                if args.probe_raw_redsea_geometry in ('present', 'repair', 'malformed', 'malformedrepair', 'cycle', 'legacy', 'invalid', 'stockfile', 'stockwrite'):
                     boot[3] = 0x88
                     offset = 0 if args.probe_raw_redsea_geometry == 'legacy' else 130911
                     struct.pack_into('<qqqqq', boot, 8, offset, 128, offset + 2, 1, 7)
@@ -1180,6 +1186,47 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                         struct.pack_into('<qqq', empty_dir, 40, offset + 7, 512, 0)
                         bitmap[0] |= 0xa8
                         bitmap[1] |= 0x04
+                    if args.probe_raw_redsea_geometry == 'stockwrite':
+                        struct.pack_into('<H', root_dir, 0, 0x410)
+                        root_dir[2:4] = b'.\0'
+                        struct.pack_into('<qqq', root_dir, 40, offset + 2, 512, 0)
+                        for slot, name, first, data in (
+                            (1, b'EARLY.TXT', offset + 10, b'early'),
+                            (2, b'LATE.TXT', offset + 11, b'late'),
+                        ):
+                            entry = slot * 64
+                            struct.pack_into('<H', root_dir, entry, 0x420)
+                            root_dir[entry + 2:entry + 2 + len(name) + 1] = name + b'\0'
+                            struct.pack_into('<qqq', root_dir, entry + 40,
+                                             first, len(data), 0)
+                        for slot, name, first in (
+                            (3, b'EMPTYDIR', offset + 12),
+                            (4, b'FULLDIR', offset + 13),
+                        ):
+                            entry = slot * 64
+                            struct.pack_into('<H', root_dir, entry, 0x410)
+                            root_dir[entry + 2:entry + 2 + len(name) + 1] = name + b'\0'
+                            struct.pack_into('<qqq', root_dir, entry + 40,
+                                             first, 512, 0)
+                        for directory, first, parent in (
+                            (empty_dir, offset + 12, offset + 2),
+                            (child_dir, offset + 13, offset + 2),
+                            (sub_dir, offset + 14, offset + 13),
+                        ):
+                            struct.pack_into('<H', directory, 0, 0x410)
+                            directory[2:4] = b'.\0'
+                            struct.pack_into('<qqq', directory, 40, first, 512, 0)
+                            struct.pack_into('<H', directory, 64, 0x410)
+                            directory[66:69] = b'..\0'
+                            struct.pack_into('<qqq', directory, 104, parent, 0, 0)
+                        struct.pack_into('<H', child_dir, 128, 0x410)
+                        child_dir[130:135] = b'SUB\0\0'
+                        struct.pack_into('<qqq', child_dir, 168, offset + 14, 512, 0)
+                        struct.pack_into('<H', sub_dir, 128, 0x420)
+                        sub_dir[130:139] = b'LEAF.TXT\0'
+                        struct.pack_into('<qqq', sub_dir, 168, offset + 15, 4, 0)
+                        bitmap[0] = 0x03  # Reserved bit and root directory.
+                        bitmap[1] = 0x7e  # Two root files, three directories, and one nested file.
                 disk.write(boot)
                 disk.write(bitmap)
                 disk.write(root_dir)
@@ -1192,6 +1239,19 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     disk.write(empty_dir)
                     disk.seek((130911 + 127) * 512)
                     disk.write(broken_dir)
+                elif args.probe_raw_redsea_geometry == 'stockwrite':
+                    disk.seek((offset + 10) * 512)
+                    disk.write(b'early' + bytes(512 - len(b'early')))
+                    disk.seek((offset + 11) * 512)
+                    disk.write(b'late' + bytes(512 - len(b'late')))
+                    disk.seek((offset + 12) * 512)
+                    disk.write(empty_dir)
+                    disk.seek((offset + 13) * 512)
+                    disk.write(child_dir)
+                    disk.seek((offset + 14) * 512)
+                    disk.write(sub_dir)
+                    disk.seek((offset + 15) * 512)
+                    disk.write(b'leaf' + bytes(512 - len(b'leaf')))
                 elif args.probe_raw_redsea_geometry == 'repair':
                     disk.seek((offset + 10) * 512)
                     disk.write(sub_dir)
@@ -1267,7 +1327,9 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 raise RuntimeError(f'timeout waiting for {marker!r}\n'+buf[-4000:].decode(errors='replace'))
             if select.select([guest.stdout], [], [], .2)[0]:
                 data = os.read(guest.stdout.fileno(), 65536)
-                if not data: raise RuntimeError('guest exited')
+                if not data:
+                    raise RuntimeError(f'guest exited (status={guest.poll()})\n' +
+                                        buf[-4000:].decode(errors='replace'))
                 buf.extend(data); log.write(data); log.flush()
                 fault_start = buf.find(b'sync: ESR=')
                 if (fault_start >= 0 and b'\n' in buf[fault_start:] and
@@ -4836,7 +4898,16 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     command('zstatus', 'keyboard_focus=', timeout=10)
                     graphical_screen('span-after-soak')
                     print('PASS Span guest remained queryable after soak', flush=True)
-                qmp_send_keys(['shift', 'esc'])
+                # File -> Exit is CH_ESC: it opens PopUpFileName with the
+                # default ~/Span/Game.DATA path. A second Escape accepts the
+                # filename form, saves, and then exits.
+                # Shift+Escape is Abort and deliberately skips this save.
+                if args.probe_span_save:
+                    qmp_send_key('esc')
+                    require_graphical_text('span-exit-save-form', 'FileName:', timeout=20)
+                    qmp_send_key('esc')
+                else:
+                    qmp_send_keys(['shift', 'esc'])
                 deadline = time.monotonic() + 10
                 span_exit_status = ''
                 while time.monotonic() < deadline:
@@ -4847,7 +4918,9 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                     time.sleep(0.2)
                 if not re.search(r'keyboard_focus=Terminal(?:\s|$)', span_exit_status):
                     raise RuntimeError(
-                        'Span did not return focus to terminal after Shift+Escape:\n' +
+                        'Span did not return focus to terminal after ' +
+                        ('Escape/File->Exit' if args.probe_span_save else 'Shift+Escape/Abort') +
+                        ':\n' +
                         span_exit_status)
                 span_worker_ids_after = re.findall(
                     r'guest_task\[(\d+)\]: name=(?:Song|Animate) parent=Terminal',
@@ -4859,8 +4932,15 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                         span_exit_status)
                 focus_graphical_terminal()
                 run_graphical_terminal_command('span-exit-smoke', '40+2;', 'ans=0x2A=42', timeout=20)
-                print('PASS Span bridge entry, instructions, graphical frame and Shift+Escape recovery',
-                      flush=True)
+                if args.probe_span_save:
+                    saved = command('zc Print("%s%s=%d\\n","SPAN","_EXIT_FILE",'
+                                    'FileFind("/Home/Span/Game.DATA"));', 'SPAN_EXIT_FILE=')
+                    if 'SPAN_EXIT_FILE=1' not in saved:
+                        raise RuntimeError('Span File->Exit did not save /Home/Span/Game.DATA:\n' + saved)
+                    print('PASS Span File->Exit saved the bridge and restored terminal input', flush=True)
+                else:
+                    print('PASS Span bridge entry, instructions, graphical frame and Shift+Escape recovery',
+                          flush=True)
 
                 if args.probe_span_cold:
                     command('zvol', 'flush=yes')
@@ -8921,6 +9001,85 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                           flush=True)
                     raise SystemExit(0)
                 if args.probe_demo_definestr:
+                    if args.probe_stock_redsea_write:
+                        command('zc I64 early_len=-1,late_len=-1; '
+                                'U8 *early=FileRead("disk:/EARLY.TXT",&early_len); '
+                                'U8 *late=FileRead("disk:/LATE.TXT",&late_len); '
+                                'Print("redsea_before=%d\\n",early!=NULL && late!=NULL && '
+                                'early_len==5 && late_len==4 && !StrCompare(early,"early") && '
+                                '!StrCompare(late,"late")); Free(early); Free(late);',
+                                'redsea_before=1')
+                        command('zc Print("redsea_delete=%d\\n",'
+                                'ZcVirtualFileDelete("disk:/EARLY.TXT"));',
+                                'redsea_delete=1')
+                        command('zc I64 late_len=-1; U8 *early='
+                                'FileRead("disk:/EARLY.TXT"); U8 *late='
+                                'FileRead("disk:/LATE.TXT",&late_len); '
+                                'CDirEntry *later=FilesFind("disk:/LATE.TXT",FUF_JUST_FILES); '
+                                'Print("redsea_after_delete=%d\\n",early==NULL && late!=NULL && '
+                                'late_len==4 && !StrCompare(late,"late") && later!=NULL); '
+                                'Free(late); DirTreeDel(later);',
+                                'redsea_after_delete=1')
+                        command('zc I64 reused_lba=FileWrite("disk:/REUSED.TXT","again",5); '
+                                'I64 reused_len=-1; U8 *reused='
+                                'FileRead("disk:/REUSED.TXT",&reused_len); '
+                                'I64 late_len=-1; U8 *late=FileRead("disk:/LATE.TXT",&late_len); '
+                                'Print("redsea_reuse=%d\\n",reused_lba>=0 && reused!=NULL && '
+                                'reused_len==5 && !StrCompare(reused,"again") && late!=NULL && '
+                                'late_len==4 && !StrCompare(late,"late")); '
+                                'Free(reused); Free(late);', 'redsea_reuse=1')
+                        command('zc Print("redsea_nonempty_refused=%d\\n",'
+                                '!ZcVirtualDirDelete("disk:/FULLDIR") && '
+                                'IsDir("disk:/FULLDIR"));',
+                                'redsea_nonempty_refused=1')
+                        command('zc Del("disk:/EMPTYDIR",FALSE,TRUE,FALSE); '
+                                'Print("redsea_empty_deleted=%d\\n",'
+                                '!IsDir("disk:/EMPTYDIR"));',
+                                'redsea_empty_deleted=1')
+                        command('zc Print("redsea_empty_recreated=%d\\n",'
+                                'DirMake("disk:/EMPTYDIR") && IsDir("disk:/EMPTYDIR"));',
+                                'redsea_empty_recreated=1')
+                        command('zc Print("redsea_tree_deleted=%d\\n",'
+                                'DelTree("disk:/FULLDIR") && '
+                                '!IsDir("disk:/FULLDIR") && '
+                                '!IsDir("disk:/FULLDIR/SUB") && '
+                                'FileRead("disk:/FULLDIR/SUB/LEAF.TXT")==NULL && '
+                                'FileRead("disk:/LATE.TXT")!=NULL);',
+                                'redsea_tree_deleted=1')
+                        command('zc I64 nested_write=FileWrite('
+                                '"disk:/EMPTYDIR/AFTER.TXT","persist",7); '
+                                'Print("redsea_nested_write=%d\\n",'
+                                'nested_write>=0 && IsDir("disk:/EMPTYDIR") && '
+                                'FileRead("disk:/EMPTYDIR/AFTER.TXT")!=NULL);',
+                                'redsea_nested_write=1')
+                        command('zstatus', 'failed=0')
+                        guest.terminate()
+                        guest.wait(timeout=10)
+                        buf.clear()
+                        guest = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                                 stderr=subprocess.STDOUT, bufsize=0)
+                        reboot = until(b'\n> ', timeout=180)
+                        if 'zc: graphical terminal started at boot' not in reboot:
+                            raise RuntimeError('stock RedSea write cold boot did not reach desktop')
+                        command('zc Print("redsea_cold_dirs=%d\\n",'
+                                'IsDir("disk:/EMPTYDIR") && '
+                                '!IsDir("disk:/FULLDIR") && '
+                                '!IsDir("disk:/FULLDIR/SUB"));',
+                                'redsea_cold_dirs=1')
+                        command('zc I64 n=-1; U8 *p='
+                                'FileRead("disk:/EMPTYDIR/AFTER.TXT",&n); '
+                                'Print("redsea_cold_nested=%d\\n",'
+                                'p!=NULL && n==7 && !StrCompare(p,"persist")); Free(p);',
+                                'redsea_cold_nested=1')
+                        command('zc U8 *r=FileRead("disk:/REUSED.TXT"); '
+                                'U8 *l=FileRead("disk:/LATE.TXT"); '
+                                'Print("redsea_cold_files=%d\\n",r!=NULL && l!=NULL && '
+                                'FileRead("disk:/EARLY.TXT")==NULL); Free(r); Free(l);',
+                                'redsea_cold_files=1')
+                        command('zstatus', 'failed=0')
+                        print('PASS stock RedSea file and empty-directory deletion, nested '
+                              'DelTree, allocation reuse, and cold persistence', flush=True)
+                        raise SystemExit(0)
                     if args.probe_stock_redsea_file:
                         command('zload disk:ARMTEST.ZC',
                                 'zc: loaded disk:ARMTEST.ZC')
@@ -14116,9 +14275,14 @@ with tempfile.TemporaryDirectory(prefix='zeal-compat-') as tmp, log_path.open('w
                 raise RuntimeError('Vocabulary did not advance after answer 1:\n'+
                                    screen[3])
             print('PASS Vocabulary accepted an answer and advanced the quiz', flush=True)
-            # The randomized dictionary popup and feedback are brief; the
-            # boot dictionary gate independently verifies definition lookup.
-            # Escape from the next question must restore the terminal.
+            # A correct/incorrect answer opens ACDPopUpDef through PopUp;
+            # the first Escape dismisses that definition viewer. The quiz
+            # then advances to another question, where a second Escape exits
+            # VocabQuiz. Keep those two modal levels explicit so the shell
+            # smoke test cannot accidentally type into the quiz.
+            qmp_send_key('esc')
+            time.sleep(0.5)
+            graphical_screen('vocabulary-definition-dismissed')
             qmp_send_key('esc')
             time.sleep(0.5)
             graphical_screen('vocabulary-exit')

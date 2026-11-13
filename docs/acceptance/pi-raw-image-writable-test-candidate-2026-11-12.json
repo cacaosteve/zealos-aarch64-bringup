@@ -1,0 +1,50 @@
+{
+  "date": "2026-11-12",
+  "source_commit": "e8f8b21e295867a310949e0671bf8341035132e0",
+  "working_tree_changes_included": true,
+  "result": "Built a fresh 8 GiB Pi 4B raw-image candidate with the current Pi desktop payload, firmware FAT32 boot partition, full-size RedSea data region, and two source banks. The psdopen message now accurately says writes flush before returning. The image has not been flashed to or tested from a physical microSD card.",
+  "image": "build/zealos-pi4b-writable-test-2026-11-12.img",
+  "image_bytes": 8589934592,
+  "image_sha256": "9561adbdd938a1611be18c150d55f0f60e89a291840c5278bdb7755eff57547a",
+  "payload_sha256": {
+    "boot/kernel.elf": "510160377cbda9a866c5da96dc23177f51868ec37bd3ee0fc24603dbfbf9d615",
+    "boot/zealbooter.elf": "a23ed91daff4a61f11d832fb198d623208635bb1b0bb0292082c4e302eee15d7",
+    "EFI/BOOT/BOOTAA64.EFI": "3f51768c5eb8a0818b8e7aa2ac9a9caef3c64707b5b6db15d1e612de23236b8c",
+    "boot/sources.tar": "e346a12c0bbc2305d44d95a74373e232d119bee2faa4124ccd2e0728e97f57c0"
+  },
+  "partition_layout": {
+    "scheme": "MBR",
+    "boot": {
+      "type": "0xEF",
+      "filesystem": "FAT32",
+      "start_lba": 2048,
+      "sectors": 1048576,
+      "size_mib": 512
+    },
+    "zealos_data": {
+      "type": "0xDA",
+      "start_lba": 1050624,
+      "sectors": 15726592,
+      "contents": "Full-size RedSea volume followed by two 32 MiB append-only source banks"
+    }
+  },
+  "checks": [
+    "make pi-image PI_FIRMWARE_ROOT=/Users/steve/Downloads/RPi4_UEFI_Firmware_v1.53 PI_IMAGE=build/zealos-pi4b-writable-test-2026-11-12.img PI_IMAGE_SIZE_MIB=8192 passed.",
+    "The image builder verified MBR extents, FAT32 boot-sector structure, required firmware and payload file read-back, RedSea geometry/root/Home/Tmp/bitmap, and both source-bank headers.",
+    "scripts/check-pi-desktop-image.py passed native/recovery ELF, relocation, boot-chain, and source-module checks.",
+    "make check-pi4-platform passed, including MBR/GPT validation, partition-bounded I/O with FAT isolation, and fake SDHCI single-block reads/writes/flush/read-back."
+  ],
+  "physical_acceptance": {
+    "microSD_written": false,
+    "pi_boot": false,
+    "psdread_psdopen": false,
+    "redsea_write_read_reboot_persistence": false,
+    "source_bank_read_reboot_persistence": false
+  },
+  "known_scope": [
+    "This is a host-built raw image, not a Pi USB-CD installer or UTM ISO.",
+    "The Pi guest must explicitly run psdopen before writes; the binding is not restored automatically after reboot.",
+    "Physical SD-controller write, card read-back, and cold-boot persistence remain unverified.",
+    "Directory deletion, rename, automatic directory growth, and general writable USB storage are not included."
+  ]
+}

@@ -39,9 +39,10 @@ expected to report no ZealOS data partition. On a card flashed from the new
 Pi image, `psdopen` binds the unique 0xDA data partition and enables bounded
 disk writes only within it. The image builder initializes the two append-only
 source banks and a full-size RedSea volume containing `/Home` and `/Tmp`.
-After `psdopen`, ordinary `FileWrite` create/replace and `DirMake` are enabled
-within existing directory capacity; deletion, rename, and automatic directory
-growth are not. `.ZC` saves use the separate source banks. `rspersist` is
+After `psdopen`, ordinary `FileWrite` create/replace, `FileDel` for regular
+files, `DirMake`, empty-directory deletion, and recursive `DelTree` are enabled
+within existing directory capacity. Rename and automatic directory growth
+are not. `.ZC` saves and deletes use the separate source banks. `rspersist` is
 limited to the 128-sector bring-up format and must not be used to initialize
 this image.
 The desktop uses a packed 800x600 surface centered and integer-scaled into

@@ -1,0 +1,26 @@
+{
+  "date": "2026-11-12",
+  "repository_commit": "e8f8b21e295867a310949e0671bf8341035132e0",
+  "working_tree_changes_included": true,
+  "program": "/Apps/Psalmody/Run.ZC",
+  "program_sha256": "4e0fc73f3980d9c23222d18423637cf902cc681a01d8796c41fa5fa0438aa588",
+  "target": "UTM-bundled QEMU/HVF, AArch64 PCI graphical guest, one vCPU, VirtIO keyboard/tablet, WAV-backed virtio-sound-pci",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "c161534e55fbf5b41fa6709546b0d23b3e33c22f71ac4cd93608fcf8cd1abc0e",
+  "kernel_sha256": "a654c794db5e796cc28624f231cccd4e565b5d788132c26882158c39751fd7b3",
+  "check_compat_sha256": "681a403f7b7d1149bb5b3d784b781c69ea0b9db4b867b58fe379d00df8d20e4d",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device -audiodev wav,id=sound0,path=build/psalmody-current-c161.wav -device virtio-sound-pci,audiodev=sound0' ZEAL_COMPAT_LOG_PATH=build/check-psalmody-current-c161-2026-11-12.log python3 -u scripts/check-compat.py --pci --quick --probe-psalmody --probe-psalmody-audio-timer",
+  "result": "pass",
+  "verified": [
+    "Psalmody launched through the graphical terminal, accepted note input, generated playback, exited with Shift+Escape, and returned to a terminal that evaluated 40+2 as 42.",
+    "The experimental QEMU audio timer delivered 24 IRQs during the app run.",
+    "The WAV-backed VirtIO sound device captured stereo 16-bit PCM at 44,100 Hz for 0.4 seconds: 28,224 of 35,280 samples nonzero, peak amplitude 7,000, RMS 6,215.35, dominant tone about 520 Hz."
+  ],
+  "artifacts": {
+    "serial_log": "build/check-psalmody-current-c161-2026-11-12.log",
+    "serial_log_sha256": "6ec90df22523d5043f715fd2cc4bf83542a1ecac6d8229615a574ed360b32569",
+    "wav": "build/psalmody-current-c161.wav",
+    "wav_sha256": "075a33f1beeb107767e15cbd50c8e4fab89d58ad205ea3c06afdab6ac057c38a"
+  },
+  "scope_note": "Exact-current ISO automated app, input, and PCM generation evidence. The user previously confirmed audible UTM sound, but that live test is not tied to this exact ISO hash."
+}

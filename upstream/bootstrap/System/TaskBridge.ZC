@@ -101,6 +101,7 @@ extern Bool ZcSourceFileAt(I64 index, U8 *path, I64 path_cap, I64 *_size);
 extern Bool ZcRamFileAt(I64 index, U8 *path, I64 path_cap, I64 *_size);
 extern Bool ZcRamVolumeFormat(U8 drv_let);
 extern Bool ZcVirtualFileDelete(U8 *path);
+extern Bool ZcVirtualDirDelete(U8 *path);
 extern Bool ZcRedSeaFileAt(I64 index, U8 *path, I64 path_cap, I64 *_size,
                            I64 *_first);
 extern Bool ZcRedSeaDirAt(I64 index, U8 *path, I64 path_cap, I64 *_size,
@@ -8689,9 +8690,9 @@ Bool CopyTree(U8 *src, U8 *dst)
 }
 Bool DelTree(U8 *path)
 {
-    CDirEntry *files, *entry;
+    CDirEntry *files, *dirs, *entry;
     U8 *mask;
-    Bool ok = TRUE, wildcard;
+    Bool ok = TRUE, wildcard, progress;
     I64 count = 0;
 
     if (!path || !*path)
@@ -8699,10 +8700,44 @@ Bool DelTree(U8 *path)
     wildcard = StrOcc(path, '*') || StrOcc(path, '?');
     if (!wildcard && IsDir(path))
     {
+        if (!StrCompare(path, "/") || !StrCompare(path, "D:/") ||
+            !StrCompare(path, "d:/") || !StrCompare(path, "disk:/") ||
+            !StrCompare(path, "B:/") || !StrCompare(path, "b:/"))
+            return FALSE;
         if (path[StrLen(path) - 1] == '/')
             mask = MStrPrint("%s*", path);
         else
             mask = MStrPrint("%s/*", path);
+        files = FilesFind(mask, FUF_RECURSE | FUF_JUST_FILES);
+        for (entry = files; entry; entry = entry->next)
+        {
+            if (!ZcVirtualFileDelete(entry->full_name))
+                ok = FALSE;
+            else
+                count++;
+        }
+        DirTreeDel(files);
+        dirs = FilesFind(mask, FUF_RECURSE | FUF_JUST_DIRS);
+        do
+        {
+            progress = FALSE;
+            for (entry = dirs; entry; entry = entry->next)
+                if ((entry->attr & RS_ATTR_DIR) &&
+                    ZcVirtualDirDelete(entry->full_name))
+                {
+                    entry->attr &= ~RS_ATTR_DIR;
+                    progress = TRUE;
+                    count++;
+                }
+        } while (progress);
+        for (entry = dirs; entry; entry = entry->next)
+            if (entry->attr & RS_ATTR_DIR)
+                ok = FALSE;
+        DirTreeDel(dirs);
+        Free(mask);
+        if (!ZcVirtualDirDelete(path))
+            ok = FALSE;
+        return ok;
     }
     else
         mask = StrNew(path);
@@ -8721,7 +8756,7 @@ Bool DelTree(U8 *path)
 I64 Del(U8 *files_find_mask, Bool make_mask=FALSE, Bool del_dir=FALSE,
         Bool print_message=TRUE)
 {
-    CDirEntry *files, *entry;
+    CDirEntry *files, *dirs, *entry;
     I64 count = 0;
 
     if (!files_find_mask || !*files_find_mask)
@@ -8731,8 +8766,14 @@ I64 Del(U8 *files_find_mask, Bool make_mask=FALSE, Bool del_dir=FALSE,
         if (ZcVirtualFileDelete(entry->full_name))
             count++;
     DirTreeDel(files);
+    if (del_dir)
+    {
+        dirs = FilesFind(files_find_mask, FUF_JUST_DIRS);
+        for (entry = dirs; entry; entry = entry->next)
+            ZcVirtualDirDelete(entry->full_name);
+        DirTreeDel(dirs);
+    }
     if (make_mask) {}
-    if (del_dir) {}
     if (print_message) {}
     return count;
 }

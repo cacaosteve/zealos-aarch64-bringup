@@ -1,0 +1,27 @@
+{
+  "date": "2026-11-12",
+  "repository_commit": "e8f8b21e295867a310949e0671bf8341035132e0",
+  "working_tree": "dirty; exact tested ISO and catalog artifacts identified by SHA-256",
+  "upstream_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "target": "UTM-bundled QEMU, HVF, AArch64 PCI graphical guest, one vCPU",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "8181de3ccb045a04649aca945170dce5a5fe8dab7263672d38fd100df9078240",
+  "kernel_sha256": "a654c794db5e796cc28624f231cccd4e565b5d788132c26882158c39751fd7b3",
+  "source_bundle_sha256": "e346a12c0bbc2305d44d95a74373e232d119bee2faa4124ccd2e0728e97f57c0",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-demo-catalog-current-8181de3.log python3 -u scripts/check-compat.py --pci --quick --probe-demo-source-catalog --demo-source-path <each of all 206 pinned upstream/Demo/**/*.ZC paths>",
+  "artifacts": {
+    "catalog": "build/demo-source-catalog-targeted.json",
+    "catalog_sha256": "373aaf5507a7aedee54ae12b1c7cdb543888adeeaf8a35f0b08e651cc95ea762",
+    "serial_log": "build/check-demo-catalog-current-8181de3.log",
+    "serial_log_sha256": "00619c7ff3abe762cdf5e536ebf0dde68c1152684725ebf2bd764dc6d71f415a",
+    "checker": "scripts/check-compat.py",
+    "checker_sha256": "972aa124f9e47efa73012e478bae7279bd197823c7b066e996a09fad1a9b6325"
+  },
+  "result": "pass",
+  "counts": {
+    "total": 206,
+    "compiled": 206,
+    "blocked": 0
+  },
+  "scope_note": "Compile-only acceptance for every pinned Demo .ZC source on the exact 8181de3 ISO using DocRead/ExeDoc or ExeFile2 in a source-specific stock module context. This does not establish runtime acceptance of every demo, live UTM behavior, or Pi hardware behavior."
+}

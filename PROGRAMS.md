@@ -8,56 +8,70 @@ ZealOS commit as the system sources:
 
 ## Latest current ISO compile inventories (2026-11-12)
 
-The current UTM ISO is `build/zealos-aarch64-hello.iso`, SHA-256
-`81eac566be9a778fe299b1b3c66fcb6fb0454108e482304b12c62244f55a7e01`; its
-kernel SHA-256 is `d3060540e8392379e6a005dfa28b0170b55f203ba14ec2e0f702c4a6de8d4f9e`.
-Against this exact image, all 70 pinned `/Apps/**/*.ZC` sources compile in
-their normal loader contexts, both ToTheFront and X-Caliber normal loaders
-pass, and all 206 pinned `/Demo/**/*.ZC` sources compile in source-specific
-module contexts. The [current Apps catalog](docs/acceptance/apps-source-catalog-current-81eac566-utm-qemu-2026-11-12.json)
-and [current Demo catalog](docs/acceptance/demo-source-catalog-current-81eac566-utm-qemu-2026-11-12.json)
+The current working build is `build/zealos-aarch64-hello.iso`, SHA-256
+`22bec589e5018007f58c420a9e2ed352c1b3d521e5d14508489643ec90cc0560`, with
+kernel SHA-256 `cfa973611c0a6c90fd7f34050e192213b0aa5551a1523f5b4413c61ba45d8f12`.
+On this exact ISO, all 70 pinned `/Apps/**/*.ZC` sources compile in their
+normal loader contexts, both ToTheFront and X-Caliber normal loaders pass, and
+all 206 pinned `/Demo/**/*.ZC` sources compile in source-specific module
+contexts. The [exact-current Apps catalog](docs/acceptance/apps-source-catalog-current-22bec589-qemu-2026-11-12.json)
+and [exact-current Demo catalog](docs/acceptance/demo-source-catalog-current-22bec589-qemu-2026-11-12.json)
 record these results. These are compile gates, not proof of every app's runtime
 workflow.
 
-The dependency-aware Demo runtime ledger currently has 202 accepted sources,
+Focused runtime acceptance covers all 12 top-level Apps entrypoints on the
+earlier `c161534e…` ISO: Digital Logic, Budget, TimeClock, Vocabulary,
+GrModels, KeepAway, Titanium, Span, Strut, Psalmody, ToTheFront, and X-Caliber.
+Coverage includes app-specific interaction and shell recovery; Budget
+save/reopen and its persistence fixture passed, and X-Caliber plain arrow,
+Space, and Escape controls passed. See the [current-image Apps index](docs/acceptance/named-apps-current-c161534e-qemu-2026-11-12.json)
+and its linked per-app records. This runtime sample complements the latest
+70-source compile catalog; it does not establish runtime acceptance on ISO
+`22bec589…`, every workflow in every source, or live Pi hardware acceptance.
+
+The dependency-aware Demo runtime ledger (last full update 2026-11-10) has 202 accepted sources,
 four partial sources, and zero failed sources. The partials are `TOSDistro`,
 `TOSMisc`, `MultiCore/Lock`, and `MultiCore/MPRadix`; see the
 [per-source ledger](docs/acceptance/demo-source-ledger-2026-11-10.json) for
-their exact limits. On this same ISO, Psalmody accepts note input, produces a
-measured C5 tone through QEMU's WAV-backed VirtIO sound device, exits with
-Shift+Escape, and returns to a working terminal. The [current audio record](docs/acceptance/psalmody-current-audio-81eac566-qemu-2026-11-12.json)
-captures generated PCM; live Pi output was previously confirmed by the user
-over both HDMI and the headphone jack, but that older physical result is not
-tied to this exact image ([Pi audio acceptance](docs/acceptance/pi4-audio-live-user-acceptance-2026-11-09.json)).
+their exact limits. The earlier `c161534e…` ISO passed the Psalmody audio
+probe with measured non-silent PCM through QEMU's WAV-backed VirtIO sound
+device; see the [Psalmody audio record](docs/acceptance/psalmody-current-audio-c161534e-qemu-2026-11-12.json).
+Live Pi output was previously confirmed over both HDMI and the headphone jack,
+but that physical result is not tied to the latest image
+([Pi audio acceptance](docs/acceptance/pi4-audio-live-user-acceptance-2026-11-09.json)).
+The stock Demo `OhGreat` song also passed on an earlier ISO, generating 47.22
+seconds of non-silent VirtIO WAV output ([OhGreat acceptance](docs/acceptance/demo-ohgreat-current-8181de3-utm-qemu-2026-11-12.json)).
 
-The current image passes focused UTM-bundled QEMU runtime probes for Digital
-Logic, Budget, TimeClock, GrModels, KeepAway, and Titanium. The checks cover
-editable prompts and clean terminal recovery, saved Budget/TimeClock data,
-generated GrModels meshes, KeepAway input, and Titanium gameplay input. See
-the [current named-app record](docs/acceptance/named-apps-current-81eac566-utm-qemu-2026-11-12.json).
-On the same ISO, standalone current-image runs also pass ToTheFront's player
-setup/map/artillery/Escape flow, X-Caliber's Left/Right/Space gameplay and
-Escape recovery, and Vocabulary's answer/next-question/Escape flow using the
-XTalk launcher. The complete launcher-path evidence is in that same current
-named-app record. A direct-shell Vocabulary launch advanced the quiz but left
-its launcher command in the terminal input buffer after Escape; that specific
-shell-buffer behavior remains unclassified.
-The current image also has a 300-second Span QEMU soak and current-image
-MPRadix compile/runtime smoke evidence, linked below. These focused checks do
-not establish that every app workflow or every upstream demo is complete. The
-prior live UTM report of Span becoming unresponsive remains a separate open
-issue.
+The exact `8181de3c…` ISO now has focused UTM-bundled QEMU runtime passes for
+Digital Logic, Budget, TimeClock, GrModels, KeepAway, Titanium, Span, Strut,
+ToTheFront, X-Caliber, Vocabulary, and Psalmody. The checks cover gameplay or
+editing input, save/reopen where applicable, Escape recovery, and a working
+terminal afterward. X-Caliber's plain Left/Right controls were verified in
+this run. Vocabulary's answer opens a definition popup, so one Escape closes
+that popup and a second exits the quiz; the probe now follows that original
+flow. See the [exact-image named-app acceptance record](docs/acceptance/named-apps-current-8181de3-utm-qemu-2026-11-12.json)
+and [Span save/exit record](docs/acceptance/span-file-exit-save-utm-qemu-2026-11-12.json).
+Psalmody produced a measured non-silent WAV in the same-image audio run. These
+focused checks do not establish runtime acceptance for every one of the 70
+Apps sources or replace live UTM-window and Pi hardware checks.
+The earlier working ISO `c161534e…` passed a 180-second active Span run,
+save/reopen, File → Exit, terminal recovery, and the Strut follow-up in
+UTM-bundled QEMU/HVF ([exact-image acceptance](docs/acceptance/span-running-exit-current-c161534e-qemu-2026-11-12.json)).
+This exceeds the 137.77 seconds shown in the earlier live freeze screenshot,
+but the screenshot's ISO hash is unknown, so a live retest remains useful.
+The prior Pi-storage ISO (`81eac566…`) also has a 300-second active Span QEMU
+soak, MPRadix compile/runtime smoke evidence, and the USB-CD installation plus
+disk-only persistence check ([Span soak](docs/acceptance/span-running-soak-current-300s-qemu-2026-11-12.json),
+[installer acceptance](docs/acceptance/iso-installer-current-81eac566-utm-qemu-2026-11-12.json)).
+That soak does not close the earlier live UTM freeze report because the ISO
+hash from that session was not captured. The `8181de3c…` image has focused
+Span/Strut save, reopen, exit, and shell-recovery evidence; the current
+`c161534e…` image adds a 180-second soak. Neither ISO's focused checks establish that
+every app workflow or every upstream demo is complete.
 
-The current Pi-storage ISO (`81eac566…`) was tested with a 300-second active
-Span run. It stayed queryable, exited with Shift+Escape, and passed the Strut
-follow-up check ([300-second soak](docs/acceptance/span-running-soak-current-300s-qemu-2026-11-12.json)).
-This exceeds the reported live UTM freeze interval, but does not close that
-report because its ISO hash is unknown; retest this identified image in live
-UTM to close the app-specific issue.
-
-The [current USB-CD install record](docs/acceptance/iso-installer-current-81eac566-utm-qemu-2026-11-12.json)
+The [prior Pi-storage ISO's USB-CD install record](docs/acceptance/iso-installer-current-81eac566-utm-qemu-2026-11-12.json)
 confirms full read-back, byte-for-byte disk match, installed disk-only boot,
-and source persistence across an additional cold reboot for this exact ISO.
+and source persistence across an additional cold reboot for that exact ISO.
 
 ## Historical broader compile inventory (2026-11-10)
 
@@ -157,7 +171,13 @@ store persistence across a cold boot. Those file operations are read-only and
 the probe expects the ARM64 bridge's `disk:/` current-directory spelling.
 Separate writable-D checks cover the bounded RedSea mount and DiskCheck repair
 paths described above; neither check establishes general drive mounting,
-multi-volume behavior, or FAT32 support. The Beep fixture now also passes with
+multi-volume behavior, or FAT32 support. The exact current `c161534e…` ISO
+also passes stock RedSea `FileWrite`/`FileDel`, allocation reuse, and file
+persistence across a cold QEMU reboot on a disposable VirtIO disk; that tests
+the generic filesystem path, not Pi's SDHCI hardware or the remaining FAT32
+and drive-registry gaps ([file-write acceptance](docs/acceptance/redsea-stockwrite-current-c161534e-qemu-2026-11-12.json),
+[TOSMisc DiskCheck acceptance](docs/acceptance/tosmisc-redsea-current-c161534e-qemu-2026-11-12.json)).
+The Beep fixture now also passes with
 UTM-bundled QEMU's VirtIO-sound WAV backend: its disposable tone fixture completed
 JukePuppet playback and cleanup, and the 2.76-second capture contains a strong
 tone near 659 Hz. This is generated PCM evidence, not audible live-UTM or Pi
@@ -191,6 +211,10 @@ record blamed a missing `Drive` binding; that diagnosis was stale, and this run
 confirms the current drive bridge works for this workflow. See the [DistroPrep acceptance](docs/acceptance/tos-distro-prep-current-qemu-2026-11-11.json),
 [TOSMisc probes](docs/acceptance/demo-tosmisc-jukepuppet-current-qemu-2026-11-11.json),
 and [current full-build result](docs/acceptance/demo-tosdistro-std-current-qemu-2026-11-11.json).
+The later `c161534e…` ISO repeats the workflow: TOSDistro prepares the full
+source tree on a disposable guest disk, then stops at that same explicit
+`ArmBoot` guard. This confirms packaging preparation works on the exact image;
+ARM64 EFI distro-image creation remains unimplemented ([current check](docs/acceptance/demo-tosdistro-std-current-c161534e-utm-qemu-2026-11-12.json)).
 The ARM64
 `TimeIns` adaptation has runtime acceptance, while the pinned stock source's
 optimizer `PassTrace` diagnostic is not implemented. `TOSExtern` is accepted
@@ -485,6 +509,13 @@ normal-load result is not runtime acceptance.
 
 | X-Caliber | The current ISO (`55719ef8…`) passes both plain-arrow thrusters, visible Space projectile changes, Escape, and graphical-terminal shell recovery with UTM's bundled QEMU profile ([current-image check](docs/acceptance/xcaliber-current-55719-utm-qemu-2026-11-11.json)). Broader gameplay remains unverified. |
 
+The later ISO (`c161534e…`) also passes the focused GrModels, KeepAway, and
+Titanium checks under UTM-bundled QEMU/HVF with VirtIO ramfb. Man and Ball
+produce visible inline sprites; KeepAway completes a 185-second run with
+repeated input and clean Escape recovery; Titanium reaches gameplay and
+returns to the terminal. This is exact-image automated evidence, not a new
+live UTM or Pi check. See the [current 3D-app record](docs/acceptance/three-d-apps-current-c161534e-qemu-2026-11-12.json).
+
 The preceding source-backed filesystem/runtime rebuild, ISO `80cd189a…`,
 passed the UTM-bundled QEMU regression for GrModels, KeepAway and Titanium,
 including a 186-second KeepAway run with 18 repeated input cycles, Escape
@@ -543,6 +574,16 @@ An independent check of three UserText terminal/filter cycles found no live
 allocations owned by finished tasks. It does not cover shared allocations or
 allocations retained by live tasks, so the aggregate no-growth failure remains
 open.
+
+The focused scheduler and X-Caliber probes were rerun against the exact current
+ISO `8181de3c…` on 2026-11-12. `TaskMessageSchedulingChecks` returned 42 with
+poll-only calls keeping the peer pending, explicit `Yield` handing off, and a
+blocked `MessageGet` resuming after the peer posted a command. The separate
+X-Caliber probe passed plain Left/Right, visible Space projectile, Escape, and
+terminal command recovery (`40+7` -> 47; `zstatus failed=0`). These automated
+QEMU/HVF results do not resolve a live UTM-only failure report and do not
+establish that pinned `Sched.ZC` is the active scheduler. See the
+[`8181de3c scheduler/X-Caliber record`](docs/acceptance/scheduler-xcaliber-current-8181de3-utm-qemu-2026-11-12.json).
 An isolated live-task test found that interrupting partial document output
 retained 16–32 bytes per run. A guarded ARM64 overlay now releases its scratch
 buffer and acquired document lock when document processing throws, then
@@ -690,6 +731,12 @@ The 2026-11-12 exact-current run repeats its text/font, sound-event, ScreenCast,
 movie, MemTest, JukePuppet and terminal-recovery checks on ISO `81eac566…`; it
 remains partial at full drive/filesystem and distribution-builder coverage
 ([current exact-image record](docs/acceptance/demo-tosmisc-current-81eac566-utm-qemu-2026-11-12.json)).
+The later `c161534e…` ISO rerun repeats the text/font, audio-file, movie,
+ScreenCast, and MemTest checks with the corrected `JukeBox`/`JukePuppet`
+module load order. `TOSMisc` remains partial because this run does not establish
+all configured-drive/filesystem behavior or the formatting workflow; those
+have separate RedSea fixture checks, while FAT32 and TOSDistro's EFI image
+generation remain open ([current TOSMisc checks](docs/acceptance/demo-tosmisc-current-c161534e-utm-qemu-2026-11-12.json)).
 The follow-up on ISO `55719ef8…` repeats these checks with a VirtIO Sound WAV
 backend and records strong PCM output; live UTM Beep and Psalmody playback are
 also now user-confirmed. This still leaves configured-drive workflows and

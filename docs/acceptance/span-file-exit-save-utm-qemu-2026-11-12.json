@@ -1,0 +1,21 @@
+{
+  "date": "2026-11-12",
+  "repository_commit": "e8f8b21e295867a310949e0671bf8341035132e0",
+  "working_tree_changes_included": true,
+  "target": "UTM-bundled QEMU, HVF, AArch64 graphical guest, one vCPU, VirtIO keyboard and tablet",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "8181de3ccb045a04649aca945170dce5a5fe8dab7263672d38fd100df9078240",
+  "kernel_sha256": "a654c794db5e796cc28624f231cccd4e565b5d788132c26882158c39751fd7b3",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-span-exit-save-8181de3-final-2026-11-12.log python3 -u scripts/check-compat.py --pci --quick --probe-span-strut --probe-span-save",
+  "result": "pass",
+  "verified": [
+    "Span launched, displayed its help and framebuffer, and accepted mass placement.",
+    "Ctrl+A saved the edited bridge to /Home/Span/Game.DATA; Ctrl+N cleared it; Ctrl+O reopened the saved bridge.",
+    "File -> Exit opened the filename form. A second Escape accepted the default ~/Span/Game.DATA path, saved, and returned keyboard focus to the terminal.",
+    "The graphical terminal accepted 40+2 and evaluated it as 42 after Span exited.",
+    "The Strut help, edit/play input, graphics, Escape recovery, and final zstatus failed=0 regression passed."
+  ],
+  "log": "build/check-span-exit-save-8181de3-final-2026-11-12.log",
+  "log_sha256": "0fa7d3336d0f1b545ce5c1696839c2915e41776f32747b0d21a0102ea2df2640",
+  "scope_note": "Automated UTM-bundled QEMU/HVF acceptance. This confirms the save/exit path and Strut regression in the tested ISO; it is not a live UTM application or physical Pi test."
+}

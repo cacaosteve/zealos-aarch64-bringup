@@ -1,0 +1,108 @@
+{
+  "date": "2026-11-12",
+  "repository_commit": "e8f8b21e295867a310949e0671bf8341035132e0",
+  "working_tree_changes_included": true,
+  "target": "UTM-bundled QEMU with HVF, AArch64 PCI graphical guest, one vCPU, VirtIO keyboard and tablet",
+  "upstream_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "8181de3ccb045a04649aca945170dce5a5fe8dab7263672d38fd100df9078240",
+  "kernel_sha256": "a654c794db5e796cc28624f231cccd4e565b5d788132c26882158c39751fd7b3",
+  "result": "pass",
+  "probes": {
+    "Digital Logic": {
+      "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-logic-8181de3-qemu-2026-11-12.log python3 -u scripts/check-compat.py --pci --quick --probe-logic-program",
+      "verified": [
+        "AND gate setup drew the expected circuit.",
+        "Editable prompts, deletion, cancellation, setup abort, relaunch, Shift+Escape and clean recovery passed.",
+        "Terminal recovery returned 42 for 40+2; zstatus reported failed=0."
+      ],
+      "serial_log": "build/check-logic-8181de3-qemu-2026-11-12.log",
+      "serial_log_sha256": "abaffb183be96a53c18fd99c20e028c1c07f74e3086537182e5453c56874c128"
+    },
+    "Budget": {
+      "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-budget-8181de3-qemu-2026-11-12.log python3 -u scripts/check-compat.py --pci --quick --probe-budget-program",
+      "verified": [
+        "Transaction create/edit/cancel/save/reopen workflows passed.",
+        "Saved data survived a cold disk-only reboot."
+      ],
+      "serial_log": "build/check-budget-8181de3-qemu-2026-11-12.log",
+      "serial_log_sha256": "c1a248323f937570cf4678d165e7b8939db3e1c680875ba9fdf69c245df6c7c2"
+    },
+    "TimeClock": {
+      "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-timeclock-8181de3-qemu-2026-11-12.log python3 -u scripts/check-compat.py --pci --quick --probe-timeclock",
+      "verified": [
+        "Punch-in and punch-out accepted descriptions.",
+        "The saved report included both entries and the graphical terminal recovered."
+      ],
+      "serial_log": "build/check-timeclock-8181de3-qemu-2026-11-12.log",
+      "serial_log_sha256": "e01454571bf2262fa5c775a259b9e3d2ec8f3cc85cac15d653ee327ce87a0fd7"
+    },
+    "GrModels, KeepAway, Titanium": {
+      "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-3d-apps-8181de3-qemu-2026-11-12.log python3 -u scripts/check-compat.py --pci --quick --probe-3d-apps",
+      "verified": [
+        "GrModels Man and Ball generated visible inline meshes and returned to the terminal.",
+        "KeepAway rendered, accepted Space/mouse input, and exited without a remaining Animate task.",
+        "Titanium advanced from intro to gameplay, accepted Space, and returned to the terminal with Escape."
+      ],
+      "serial_log": "build/check-3d-apps-8181de3-qemu-2026-11-12.log",
+      "serial_log_sha256": "37c52c3abe718d2f750eb8a3b2e4bf21f811e2cebd223d1ef65dff45c78263aa"
+    },
+    "Span and Strut": {
+      "result": "pass",
+      "acceptance_record": "span-file-exit-save-utm-qemu-2026-11-12.json",
+      "verified": [
+        "Span accepted mass placement, saved/reopened the bridge, and File -> Exit returned to the terminal.",
+        "Strut accepted edit/play input and Escape returned to a working terminal; zstatus reported failed=0."
+      ]
+    },
+    "ToTheFront": {
+      "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-tothefront-8181de3-qemu-2026-11-12.log python3 -u scripts/check-compat.py --pci --quick --probe-tothefront",
+      "verified": [
+        "Both player slots accepted Human and gameplay map rendered.",
+        "Artillery selection displayed its range and accepted an adjacent-hex order; Space advanced the phase.",
+        "Escape returned to a working terminal; zstatus reported failed=0."
+      ],
+      "serial_log": "build/check-tothefront-8181de3-qemu-2026-11-12.log",
+      "serial_log_sha256": "d8c688cfd1ed064d9ec463f0cdfbaac3e8e0413f736b4de5b12e66eaaf970abe"
+    },
+    "X-Caliber": {
+      "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-xcaliber-8181de3-qemu-2026-11-12.log python3 -u scripts/check-compat.py --pci --quick --probe-xcaliber",
+      "verified": [
+        "Plain Left and Right thrusters visibly changed the ship; Space produced a visible projectile.",
+        "Escape returned to a graphical terminal that accepted and ran a command; zstatus reported failed=0."
+      ],
+      "serial_log": "build/check-xcaliber-8181de3-qemu-2026-11-12.log",
+      "serial_log_sha256": "aa98651343132cef6bdfef6f10825be98980a8113deda346b4702efa7a0ed73c"
+    },
+    "Vocabulary": {
+      "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-vocabulary-8181de3-qemu-2026-11-12-rerun.log python3 -u scripts/check-compat.py --pci --quick --probe-vocabulary",
+      "verified": [
+        "The quiz accepted an answer and advanced.",
+        "Escape dismissed the answer's definition popup; a second Escape exited the quiz and returned to a working terminal. 40+2 returned 42 and zstatus reported failed=0."
+      ],
+      "serial_log": "build/check-vocabulary-8181de3-qemu-2026-11-12-rerun.log",
+      "serial_log_sha256": "8e9663b5c0f63e8cd5382183cfe01032e704ab4e91331f4c10a31fad0d0772b3",
+      "probe_note": "The first attempt sent one Escape, which closed the definition popup but left the quiz active. The automated sequence was corrected to dismiss the popup and then exit the quiz; this second run passed."
+    },
+    "Psalmody": {
+      "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-psalmody-8181de3-qemu-2026-11-12.log python3 -u scripts/check-compat.py --pci --quick --probe-psalmody",
+      "verified": [
+        "The editor opened, accepted note input, played it, and Shift+Escape returned to a working terminal; zstatus reported failed=0."
+      ],
+      "serial_log": "build/check-psalmody-8181de3-qemu-2026-11-12.log",
+      "serial_log_sha256": "b9b3f2bdb791456d2915d2aca7724a1c8b134b989986a8b5202c593a49d04dcc"
+    },
+    "Psalmody audio stream": {
+      "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device -audiodev wav,id=sound0,path=build/psalmody-8181de3-2026-11-12.wav -device virtio-sound-pci,audiodev=sound0' ZEAL_COMPAT_LOG_PATH=build/check-psalmody-audio-8181de3-qemu-2026-11-12.log python3 -u scripts/check-compat.py --pci --quick --probe-psalmody --probe-psalmody-audio-timer",
+      "verified": [
+        "Psalmody note output produced a 0.4-second, stereo 44.1 kHz, 16-bit PCM WAV with peak 7000 and RMS 6215.35.",
+        "The sound timer delivered 22 IRQs; Shift+Escape and terminal recovery passed."
+      ],
+      "serial_log": "build/check-psalmody-audio-8181de3-qemu-2026-11-12.log",
+      "serial_log_sha256": "59658c47c896f62f6f2f883584a081f58ef7a4f087da28a70181b242c7c7dfb2",
+      "wav": "build/psalmody-8181de3-2026-11-12.wav",
+      "wav_sha256": "075a33f1beeb107767e15cbd50c8e4fab89d58ad205ea3c06afdab6ac057c38a"
+    }
+  },
+  "scope_note": "Focused automated runtime acceptance for the named apps on this exact ISO. It does not prove every feature in every app, use of the visible UTM application window, or physical Pi behavior. Live Pi HDMI/headphone audio has prior user confirmation on a separate image; the writable-card candidate still needs physical storage acceptance."
+}

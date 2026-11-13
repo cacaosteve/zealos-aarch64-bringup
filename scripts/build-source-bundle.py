@@ -899,6 +899,24 @@ U0 TelnetDisconnect()
         if data.count(needle) != 1:
             raise SystemExit('ARM64 LexFirstRemove pointer overlay no longer applies')
         data = data.replace(needle, replacement)
+    if rel == 'Compiler/BackLib.ZC':
+        # BackLib emits little-endian values into its byte buffer. The pinned
+        # x86 source casts the address to a scalar and then dereferences that
+        # scalar, which ZealC correctly rejects. Use the target's typed-pointer
+        # cast form so the same stores remain valid without changing the
+        # pinned upstream source.
+        replacements = (
+            (b'\t*(&tmpi->ic_body[tmpi->ic_count])(U16) = w;',
+             b'\t*(&tmpi->ic_body[tmpi->ic_count])(U16 *) = w;', 1),
+            (b'\t*(&tmpi->ic_body[tmpi->ic_count])(U32) = d;',
+             b'\t*(&tmpi->ic_body[tmpi->ic_count])(U32 *) = d;', 2),
+            (b'\t*(&tmpi->ic_body[tmpi->ic_count])(U64) = q;',
+             b'\t*(&tmpi->ic_body[tmpi->ic_count])(U64 *) = q;', 1),
+        )
+        for needle, replacement, expected in replacements:
+            if data.count(needle) != expected:
+                raise SystemExit('ARM64 BackLib typed-store overlay no longer applies')
+            data = data.replace(needle, replacement)
     if rel == 'Compiler/Lex.ZC':
         numeric_range = b'\t\t\tcase 128...255:'
         if data.count(numeric_range) != 1:

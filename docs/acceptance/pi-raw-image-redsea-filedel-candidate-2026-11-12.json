@@ -1,0 +1,54 @@
+{
+  "date": "2026-11-12",
+  "source_commit": "e8f8b21e295867a310949e0671bf8341035132e0",
+  "working_tree_changes_included": true,
+  "result": "8 GiB Pi 4B raw-image candidate rebuilt with full-size RedSea /Home and /Tmp, bounded FileWrite create/replace, regular-file FileDel, DirMake, and two protected source banks. Image builder, Pi platform checks, and a disposable stock-RedSea delete/slot-reuse/cold-persistence probe passed. Physical microSD was not written.",
+  "image": "build/zealos-pi4b-redsea-filedel-candidate-2026-11-12.img",
+  "image_bytes": 8589934592,
+  "image_sha256": "459a7f32e871a7322260465e477d5aaa86ec7d3e94eab68c8ba66f6d2828ad82",
+  "firmware": {
+    "source": "/Users/steve/Downloads/RPi4_UEFI_Firmware_v1.53",
+    "RPI_EFI.fd_sha256": "8334d9d3c3fe5341fb9876f2ddf653eca7b260ee2cda669c5446a0dd7f0104c5"
+  },
+  "payload_directory": "build/pi-desktop-esp",
+  "payload_sha256": {
+    "boot/kernel.elf": "a0eff5f5d95494d8864ff151d41aed8c6a4b1aa5e7ff0c538f2d78a45a1d182c",
+    "boot/kernel-diag.elf": "df06f28f1afc5e3d91960d54658f049341ac4c3add0137f732d8e4d036e8eddc",
+    "boot/zealbooter.elf": "a23ed91daff4a61f11d832fb198d623208635bb1b0bb0292082c4e302eee15d7",
+    "boot/demo.hcbc": "e37c1b530962064c451fac288327f7ae799d3e344cc5c77dc2ba55625c0042d0",
+    "boot/sources.tar": "1569d9565986473f831d57ac61c77f53d96f90879d2315b9f455630db19d21f7",
+    "EFI/BOOT/BOOTAA64.EFI": "3f51768c5eb8a0818b8e7aa2ac9a9caef3c64707b5b6db15d1e612de23236b8c",
+    "limine.conf": "a8981abc3cda174982db0e510a1bce180b2cefa74973789cd49c481ef92b5bc4"
+  },
+  "partition_layout": {
+    "scheme": "MBR",
+    "boot": {
+      "type": "0xEF",
+      "filesystem": "FAT32",
+      "start_lba": 2048,
+      "sectors": 1048576,
+      "size_mib": 512
+    },
+    "zealos_data": {
+      "type": "0xDA",
+      "start_lba": 1050624,
+      "sectors": 15726592,
+      "contents": "Full-size RedSea volume followed by two 32 MiB append-only source banks"
+    }
+  },
+  "checks": [
+    "make pi-image completed successfully; builder verified the merged FAT32 payload by mtools read-back.",
+    "Builder verified MBR extents, RedSea geometry/root bitmap, /Home and /Tmp, and both source-bank headers.",
+    "scripts/check-pi-desktop-image.py passed native/recovery ELF, relocation, boot-chain and source-module checks.",
+    "make check-pi4-platform passed, including partition-bounded block I/O and fake SDHCI read/write/flush/read-back tests.",
+    "The stock RedSea disposable-image probe deleted EARLY.TXT, confirmed LATE.TXT remained readable/listed, reused the deleted directory slot for REUSED.TXT, cold-booted, and verified both remaining files persisted with zstatus failed=0.",
+    "The shared RedSea delete callback compiled into the Pi desktop payload; the Pi SDHCI and partition-bounded backend pass fake-controller/host checks. The RedSea probe used UTM VirtIO, not the physical Pi SDHCI path."
+  ],
+  "known_scope": [
+    "Host-built image only; no physical microSD write, boot, card read-back, or cold-boot persistence test.",
+    "The runtime requires explicit psdopen before ordinary SD writes and deletes.",
+    "Physical Pi FileWrite/FileDel, card read-back, and cold-boot persistence are unverified.",
+    "Directory deletion, rename, directory growth, general writable USB storage, and a Pi-bootable USB installer are not included.",
+    "This candidate includes uncommitted source and documentation changes."
+  ]
+}

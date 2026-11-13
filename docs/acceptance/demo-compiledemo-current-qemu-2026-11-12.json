@@ -1,0 +1,20 @@
+{
+  "date": "2026-11-12",
+  "target": "AArch64 QEMU/HVF using UTM-bundled QEMU, one guest CPU, PCI graphical terminal",
+  "source": "/Demo/CompileDemo.ZC",
+  "source_sha256": "b8b8c45d83c2522b61c5774e41e71b3da09f19d79d07f8528e4648e85bd7b91c",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "c161534e55fbf5b41fa6709546b0d23b3e33c22f71ac4cd93608fcf8cd1abc0e",
+  "kernel_sha256": "a654c794db5e796cc28624f231cccd4e565b5d788132c26882158c39751fd7b3",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-demo-compiledemo-current.log python3 -u scripts/check-compat.py --pci --quick --probe-demo-compiledemo",
+  "harness_sha256": "681a403f7b7d1149bb5b3d784b781c69ea0b9db4b867b58fe379d00df8d20e4d",
+  "result": "pass",
+  "verified": [
+    "CompileDemo launched through the graphical terminal and its generated JIT expressions ran.",
+    "The probe observed the expected printed results, including 9 from the final loop.",
+    "Escape returned to a responsive graphical terminal; 40+2 returned 42 and zstatus reported failed=0."
+  ],
+  "log": "build/check-demo-compiledemo-current.log",
+  "log_sha256": "8aa763efb687012254a7518f8437f8cbede090b67d38c24e14f02c40271f595c",
+  "scope_note": "Automated runtime acceptance on this exact ISO. It refreshes CompileDemo evidence but does not increase the historical count of distinct runtime-accepted Demo sources. Live UTM interaction and Pi behavior are separate checks."
+}

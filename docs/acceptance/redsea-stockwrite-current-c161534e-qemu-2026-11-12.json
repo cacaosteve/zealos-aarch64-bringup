@@ -1,0 +1,23 @@
+{
+  "date": "2026-11-12",
+  "repository_commit": "e8f8b21e295867a310949e0671bf8341035132e0",
+  "working_tree_changes_included": true,
+  "target": "UTM-bundled QEMU/HVF, AArch64 PCI graphical guest, one vCPU, disposable writable VirtIO disk",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "c161534e55fbf5b41fa6709546b0d23b3e33c22f71ac4cd93608fcf8cd1abc0e",
+  "kernel_sha256": "a654c794db5e796cc28624f231cccd4e565b5d788132c26882158c39751fd7b3",
+  "probe": "scripts/check-compat.py --probe-stock-redsea-write",
+  "probe_sha256": "681a403f7b7d1149bb5b3d784b781c69ea0b9db4b867b58fe379d00df8d20e4d",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-redsea-stockwrite-current-c161-2026-11-12.log python3 -u scripts/check-compat.py --pci --quick --probe-stock-redsea-write",
+  "result": "pass",
+  "verified": [
+    "Stock-format RedSea mounted from the disposable VirtIO disk and both seeded files were read correctly.",
+    "Regular FileWrite and FileDel removed one file while preserving the later directory entry.",
+    "A subsequent write reused the freed allocation without changing the later file.",
+    "After a cold QEMU reboot, the new file and preserved file remained readable and the deleted file stayed absent.",
+    "The guest returned to a working terminal and zstatus reported failed=0."
+  ],
+  "log": "build/check-redsea-stockwrite-current-c161-2026-11-12.log",
+  "log_sha256": "0f41d9b4fef1732f4703cb99b2d2922ee3dec15f5351a7e12608508870a506ed",
+  "scope_note": "This validates ordinary RedSea file writes over UTM VirtIO and cold persistence on a disposable guest disk. It does not exercise the Pi SDHCI driver or prove physical microSD writes; Pi psdopen and cold-boot acceptance remain open."
+}

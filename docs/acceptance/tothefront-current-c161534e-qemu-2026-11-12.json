@@ -1,0 +1,22 @@
+{
+  "date": "2026-11-12",
+  "repository_commit": "e8f8b21e295867a310949e0671bf8341035132e0",
+  "working_tree_changes_included": true,
+  "program": "/Apps/ToTheFront/Run.ZC",
+  "program_sha256": "e4d1492f241effc0dd7d2e15b57bf9196df78a422e4183c07f9aba03483850ae",
+  "target": "UTM-bundled QEMU/HVF, AArch64 PCI graphical guest, one vCPU, VirtIO keyboard and tablet",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "c161534e55fbf5b41fa6709546b0d23b3e33c22f71ac4cd93608fcf8cd1abc0e",
+  "kernel_sha256": "a654c794db5e796cc28624f231cccd4e565b5d788132c26882158c39751fd7b3",
+  "check_compat_sha256": "681a403f7b7d1149bb5b3d784b781c69ea0b9db4b867b58fe379d00df8d20e4d",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-tothefront-current-c161-2026-11-12.log python3 -u scripts/check-compat.py --pci --quick --probe-tothefront",
+  "result": "pass",
+  "verified": [
+    "ToTheFront launched through the normal graphical-terminal path, accepted player setup, and rendered its map.",
+    "The app accepted phase input, selected artillery, displayed its range, and plotted an order to an adjacent hex.",
+    "Escape returned to the graphical terminal; 40+2 evaluated as 42 and zstatus reported failed=0."
+  ],
+  "log": "build/check-tothefront-current-c161-2026-11-12.log",
+  "log_sha256": "69f46149c8905e9404f1d0dceb9a73f1bf1997fed3486bbb3cb9a3b10802ed11",
+  "scope_note": "Focused exact-image automated input and terminal-recovery acceptance; not live UTM UI or physical Pi acceptance."
+}

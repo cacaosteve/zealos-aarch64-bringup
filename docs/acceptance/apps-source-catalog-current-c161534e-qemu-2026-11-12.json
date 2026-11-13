@@ -1,0 +1,36 @@
+{
+  "date": "2026-11-12",
+  "repository_commit": "e8f8b21e295867a310949e0671bf8341035132e0",
+  "working_tree": "dirty; exact tested ISO, catalog, serial log, and checker identified by SHA-256",
+  "upstream_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "target": "UTM-bundled QEMU/HVF, AArch64 PCI graphical guest, one vCPU, VirtIO keyboard/tablet",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "c161534e55fbf5b41fa6709546b0d23b3e33c22f71ac4cd93608fcf8cd1abc0e",
+  "kernel_sha256": "a654c794db5e796cc28624f231cccd4e565b5d788132c26882158c39751fd7b3",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-app-catalog-current-c161-2026-11-12.log python3 -u scripts/check-compat.py --pci --quick --probe-program-catalog --program-catalog-path <each of all 70 pinned upstream/Apps/**/*.ZC paths>",
+  "artifacts": {
+    "catalog": "build/program-catalog-targeted.json",
+    "catalog_sha256": "eb93f438020b7d229200ef79a41fccd7b699b8001cff5a6db3c4fb6d1f2431a2",
+    "serial_log": "build/check-app-catalog-current-c161-2026-11-12.log",
+    "serial_log_sha256": "24d530932c69adaefe91c5221e9ea05239c4bd1bddfe058d381b288ba1c9c231",
+    "checker": "scripts/check-compat.py",
+    "checker_sha256": "681a403f7b7d1149bb5b3d784b781c69ea0b9db4b867b58fe379d00df8d20e4d"
+  },
+  "result": "pass",
+  "counts": {
+    "total": 70,
+    "compiled": 70,
+    "blocked": 0
+  },
+  "normal_loads": [
+    {
+      "path": "/Apps/ToTheFront/Load.ZC",
+      "result": "pass"
+    },
+    {
+      "path": "/Apps/X-Caliber/Load.ZC",
+      "result": "pass"
+    }
+  ],
+  "scope_note": "Compile-only acceptance for every pinned Apps .ZC file on exact ISO c161534e, using each app source in its stock loader/module context. ToTheFront and X-Caliber normal loaders also pass. This does not establish runtime acceptance of all app workflows or Pi hardware behavior."
+}

@@ -1,0 +1,37 @@
+{
+  "date": "2026-11-12",
+  "target": "UTM-bundled QEMU/HVF, AArch64 PCI graphical guest, one vCPU; compile-only catalog",
+  "upstream_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "c161534e55fbf5b41fa6709546b0d23b3e33c22f71ac4cd93608fcf8cd1abc0e",
+  "kernel_sha256": "a654c794db5e796cc28624f231cccd4e565b5d788132c26882158c39751fd7b3",
+  "checker": "scripts/check-compat.py",
+  "checker_sha256": "681a403f7b7d1149bb5b3d784b781c69ea0b9db4b867b58fe379d00df8d20e4d",
+  "coverage": {
+    "source_tree": "upstream/pinned/Demo/**/*.ZC",
+    "compiled": 206,
+    "blocked": 0,
+    "total": 206,
+    "runtime_acceptance_effect": "none; compile-only evidence"
+  },
+  "method": "Two sequential source-catalog runs on the same exact ISO and checker: first batch covered 128 paths; remaining-path batch covered 78 paths. Per-file results are merged in path order and validated against the complete pinned Demo .ZC path set.",
+  "logs": [
+    {
+      "path": "build/check-demo-catalog-current-c161-2026-11-12.log",
+      "sha256": "e4a5dab29a7f97081042956bc3918cb2ee937b3564e6cacd4664cd88a0b6f2f7",
+      "paths": 128,
+      "compiled": 128,
+      "blocked": 0
+    },
+    {
+      "path": "build/check-demo-catalog-current-c161-remaining-2026-11-12.log",
+      "sha256": "8fec977cd41ff8aad0ae670aa92121f4d506b615779af168f9f49a7d8c8462dd",
+      "paths": 78,
+      "compiled": 78,
+      "blocked": 0
+    }
+  ],
+  "merged_catalog": "build/demo-source-catalog.json",
+  "merged_catalog_sha256": "2526c646d984efa70543035128c34ec244bd0f938f6c895d6a791572219f41d1",
+  "result": "pass"
+}

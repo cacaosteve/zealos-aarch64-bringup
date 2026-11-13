@@ -1,0 +1,50 @@
+{
+  "date": "2026-11-12",
+  "repository_commit": "e8f8b21e295867a310949e0671bf8341035132e0",
+  "working_tree_changes_included": true,
+  "target": "UTM-bundled QEMU with HVF, AArch64 PCI guest, one vCPU, VirtIO ramfb, keyboard and tablet",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "c161534e55fbf5b41fa6709546b0d23b3e33c22f71ac4cd93608fcf8cd1abc0e",
+  "kernel_sha256": "a654c794db5e796cc28624f231cccd4e565b5d788132c26882158c39751fd7b3",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-3d-apps-current-c161-2026-11-12.log python3 -u scripts/check-compat.py --pci --quick --probe-3d-apps",
+  "result": "pass",
+  "verified": {
+    "shared_3d_fixtures": [
+      "Sprite mesh and interpolation checks returned 0x2a.",
+      "3D services and height formatter checks passed; final zstatus reported failed=0."
+    ],
+    "GrModels": [
+      "Man used the color selection form, generated a 112-vertex/168-triangle mesh, drew a visible inline sprite (997 nonblack pixels), and reached the repeat prompt.",
+      "Ball used the color selection form, generated a 58-vertex/128-triangle mesh, drew a visible inline sprite (504 purple pixels), and confirmed the embedded DOCT_SPRITE entry has binary data.",
+      "Both paths returned to the graphical terminal; recovery checks reported failed=0."
+    ],
+    "KeepAway": [
+      "Court, HUD and player frame rendered.",
+      "Space and mouse input were accepted; Escape returned to the shell with no surviving Animate task, 40+2 returning 42, and zstatus failed=0."
+    ],
+    "Titanium": [
+      "The Press-a-key intro advanced to gameplay.",
+      "Space input advanced gameplay; Escape returned to the graphical terminal and 40+2 returned 42 with zstatus failed=0."
+    ]
+  },
+  "keepaway_soak": {
+    "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-keepaway-full-current-c161-2026-11-12.log python3 -u scripts/check-compat.py --pci --quick --probe-keepaway-full-game",
+    "result": "pass",
+    "verified": [
+      "The game remained responsive to 18 repeated mouse/Space input cycles during the 185-second run and reached its Game Over screen as the timer expired.",
+      "The input-frame and final scanout captures differed by 19,583 RGB pixels, including 535 pixels in the top 20 HUD rows.",
+      "Escape returned to the shell, no Animate child task remained, and final zstatus reported failed=0."
+    ]
+  },
+  "artifacts": {
+    "3d_run_log": "build/check-3d-apps-current-c161-2026-11-12.log",
+    "3d_run_log_sha256": "353560c60622843fcd791e2d4d98041cf0146a7b67b7034657f2e1e71a0c4e00",
+    "keepaway_soak_log": "build/check-keepaway-full-current-c161-2026-11-12.log",
+    "keepaway_soak_log_sha256": "185cbe2896b14e6b1c4e63224e7c7fb1833a889d02d414a2ff6e54b7f44d8392",
+    "keepaway_input_frame": "build/gui-3d-apps-3d-keepaway-input-frame.ppm",
+    "keepaway_input_frame_sha256": "86a2ac6fdaf2a6bed07ddf1a932800cd22b82061ce60b761001d35daa57b67b4",
+    "keepaway_final_frame": "build/gui-3d-apps-3d-keepaway-long-run.ppm",
+    "keepaway_final_frame_sha256": "4fefd987c42fab22941eaa4b5ea1bc0a021ab48df685f93c632f96f6f9be4454"
+  },
+  "scope_note": "Automated UTM-bundled QEMU/HVF evidence for the exact ISO. It is not live UTM-window or physical Pi acceptance and does not test audio. Confirm GrModels visibility in the live UTM window on this exact image if the earlier no-sprite report came from it."
+}

@@ -1,0 +1,66 @@
+{
+  "date": "2026-11-12",
+  "repository_commit": "e8f8b21e295867a310949e0671bf8341035132e0",
+  "working_tree": "dirty; exact tested ISO, kernel, source catalog, serial logs, and checker identified by SHA-256",
+  "upstream_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "target": "UTM-bundled QEMU/HVF, AArch64 PCI graphical guest, one vCPU, VirtIO keyboard/tablet",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "22bec589e5018007f58c420a9e2ed352c1b3d521e5d14508489643ec90cc0560",
+  "kernel_sha256": "cfa973611c0a6c90fd7f34050e192213b0aa5551a1523f5b4413c61ba45d8f12",
+  "demo_sha256": "e37c1b530962064c451fac288327f7ae799d3e344cc5c77dc2ba55625c0042d0",
+  "checker": "scripts/check-compat.py",
+  "checker_sha256": "d3ee5fe4517944f34398621b4310146e3514120d68d60aafc44e217d87d6eb65",
+  "method": "Compile every pinned Demo .ZC from the exact ISO, using source-specific module context and a disposable task. The sweep used one initial sequential run through Cartesian (90 files), an isolated CharAnimation retry, then fresh-VM batches of 40, 40, and 35 files. The initial runner stopped before returning CharAnimation; it passed in isolation. Results were merged, deduplicated, and validated against the exact 206-path pinned Demo inventory.",
+  "logs": [
+    {
+      "path": "build/check-demo-source-catalog-current-22bec-2026-11-12.log",
+      "sha256": "7d33ae4a145b9d29a2e2ba474e66a9621a71abe6a1f85ba6246f3444e644d356",
+      "paths": 90,
+      "compiled": 90,
+      "blocked": 0,
+      "note": "initial sequential scan; runner stopped while requesting CharAnimation; its result was rerun in isolation"
+    },
+    {
+      "path": "build/check-char-animation-current-22bec-2026-11-12.log",
+      "sha256": "1088928de0f360e95de3f12caac675fbd6b52896e7707b13e875931d20c30f22",
+      "paths": 1,
+      "compiled": 1,
+      "blocked": 0,
+      "note": "isolated retry"
+    },
+    {
+      "path": "build/check-demo-current-22bec-batch-01.log",
+      "sha256": "beef85f0aff43a54c447d07b36cb48b07077b3958b5716194002e57258fce844",
+      "paths": 40,
+      "compiled": 40,
+      "blocked": 0,
+      "note": "fresh-VM source batch"
+    },
+    {
+      "path": "build/check-demo-current-22bec-batch-02.log",
+      "sha256": "98d5e5c1cdd1b70aade2d744bce5e7f60a51643cf780b809576c913c90a94259",
+      "paths": 40,
+      "compiled": 40,
+      "blocked": 0,
+      "note": "fresh-VM source batch"
+    },
+    {
+      "path": "build/check-demo-current-22bec-batch-03.log",
+      "sha256": "c56dbed777899598919c687d703611345e50fab0e007ef7cf99e467edf07b6c6",
+      "paths": 35,
+      "compiled": 35,
+      "blocked": 0,
+      "note": "fresh-VM source batch"
+    }
+  ],
+  "catalog": "build/demo-source-catalog.json",
+  "catalog_sha256": "2526c646d984efa70543035128c34ec244bd0f938f6c895d6a791572219f41d1",
+  "result": "pass",
+  "coverage": {
+    "source_tree": "upstream/pinned/Demo/**/*.ZC",
+    "compiled": 206,
+    "blocked": 0,
+    "total": 206,
+    "runtime_acceptance_effect": "none; compile-only evidence"
+  }
+}

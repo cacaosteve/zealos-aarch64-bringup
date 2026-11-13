@@ -1,0 +1,46 @@
+{
+  "date": "2026-11-12",
+  "repository_commit": "e8f8b21e295867a310949e0671bf8341035132e0",
+  "working_tree_changes_included": true,
+  "target": "UTM-bundled QEMU, HVF, AArch64 graphical guest, one vCPU, VirtIO keyboard and tablet",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "cadd6afcd32101dafcec10ba1f095aff9bbcd0e24931c2371ef0eb56098e8c22",
+  "kernel_sha256": "a654c794db5e796cc28624f231cccd4e565b5d788132c26882158c39751fd7b3",
+  "result": "pass",
+  "checks": {
+    "Digital Logic, Budget, TimeClock, GrModels, KeepAway, Titanium, ToTheFront, X-Caliber, Vocabulary": {
+      "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-named-apps-cadd6af-2026-11-12.log python3 -u scripts/check-compat.py --pci --quick --probe-logic-program --probe-budget-program --probe-timeclock --probe-3d-apps --probe-tothefront --probe-xcaliber --probe-vocabulary",
+      "result": "pass",
+      "verified": [
+        "Digital Logic prompts, edit/delete/cancel paths, gate drawing and terminal recovery passed.",
+        "Budget transaction create/edit/cancel/save/reopen and TimeClock punch/report flows passed.",
+        "GrModels Man/Ball, KeepAway and Titanium workflows passed with terminal recovery.",
+        "ToTheFront setup and move selection, X-Caliber controls, and Vocabulary quiz input passed.",
+        "The combined command exited 0; terminal input and post-app recovery checks passed."
+      ],
+      "serial_log": "build/check-named-apps-cadd6af-2026-11-12.log",
+      "serial_log_sha256": "c2a2ee8a4e926b70541b5a4597f682a8051c36a1ccdf5c837adb9b459c988a44"
+    },
+    "Span and Strut": {
+      "result": "pass",
+      "acceptance_record": "docs/acceptance/span-strut-180s-current-utm-qemu-2026-11-12.json",
+      "verified": [
+        "Span remained queryable through a 180-second running simulation, then Shift+Escape returned to a responsive terminal.",
+        "Strut accepted edit/play input and Escape returned to a responsive terminal."
+      ]
+    },
+    "Psalmody": {
+      "result": "pass",
+      "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device -audiodev wav,id=sound0,path=build/psalmody-cadd6af-2026-11-12.wav -device virtio-sound-pci,audiodev=sound0' ZEAL_COMPAT_LOG_PATH=build/check-psalmody-cadd6af-2026-11-12.log python3 -u scripts/check-compat.py --pci --quick --probe-psalmody --probe-psalmody-audio-timer",
+      "verified": [
+        "Psalmody accepted note input, played audio, exited with Shift+Escape and returned to a working terminal.",
+        "Sound timer delivered 22 IRQs; final zstatus reported failed=0."
+      ],
+      "serial_log": "build/check-psalmody-cadd6af-2026-11-12.log",
+      "serial_log_sha256": "530aa7499617abffc14ff58a8185041020f2813ea3c1e09af275603dbeb53bdc",
+      "wav": "build/psalmody-cadd6af-2026-11-12.wav",
+      "wav_sha256": "075a33f1beeb107767e15cbd50c8e4fab89d58ad205ea3c06afdab6ac057c38a"
+    }
+  },
+  "scope_note": "Focused automated QEMU/HVF checks for all 12 named Apps entrypoints on this exact ISO. These checks are not a live UTM UI acceptance, do not cover every workflow in each app, and do not establish physical Pi behavior."
+}

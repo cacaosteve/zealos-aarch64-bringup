@@ -176,6 +176,7 @@ static int source_archive_index_state;
 static zc_source_read_fn disk_reader;
 static zc_source_write_fn disk_writer;
 static zc_file_write_fn file_writer;
+static zc_file_delete_fn file_deleter;
 static jmp_buf guard;
 static int guarded, ready, failed;
 static jmp_buf compiler_recovery_guard;
@@ -695,6 +696,7 @@ void zc_output(const char *s) {
 void zc_set_source_reader(zc_source_read_fn read) { disk_reader = read; }
 void zc_set_source_writer(zc_source_write_fn write) { disk_writer = write; }
 void zc_set_file_writer(zc_file_write_fn write) { file_writer = write; }
+void zc_set_file_deleter(zc_file_delete_fn delete_file) { file_deleter = delete_file; }
 void zc_set_key_reader(zc_key_event_fn read, zc_key_reset_fn reset) {
     key_reader = read;
     key_reset = reset;
@@ -1580,11 +1582,29 @@ static int64_t host_virtual_file_delete(int64_t *a) {
     char path[134];
     if (guest_path((const char *)(uintptr_t)a[0], path)) return 0;
     if (!strncmp(path, "ram:", 4)) return zc_ram_delete(path) == 0;
-    if (!strncmp(path, "disk:", 5)) return 0;
+    size_t path_len = strlen(path);
+    int source_code = path_len >= 3 && path[path_len - 3] == '.' &&
+                      (path[path_len - 2] == 'Z' || path[path_len - 2] == 'z') &&
+                      (path[path_len - 1] == 'C' || path[path_len - 1] == 'c');
+    /* Match FileWrite routing: .ZC lives in the native source store, while
+     * ordinary D: data uses the mounted filesystem writer. */
+    if (!strncmp(path, "disk:", 5) && !source_code) {
+        if (file_writer) return file_deleter && file_deleter(path, 0) == 0;
+    } else if (file_writer && !source_code) {
+        return file_deleter && file_deleter(path, 0) == 0;
+    }
     char name[128];
-    if (normal_path(path, name) || !*name) return 0;
+    const char *source = !strncmp(path, "disk:", 5) ? path + 5 : path;
+    if (normal_path(source, name) || !*name) return 0;
     int status = zeal_zss_delete(name);
     return status == 0 || status == -4;
+}
+static int64_t host_virtual_dir_delete(int64_t *a) {
+    char path[134];
+    if (guest_path((const char *)(uintptr_t)a[0], path) || !file_writer ||
+        !file_deleter)
+        return 0;
+    return file_deleter(path, 1) == 0;
 }
 static int64_t host_redsea_file_at(int64_t *a) {
     size_t size = 0;
@@ -10091,6 +10111,7 @@ static int load_source_path(const char *path, int merged, int recover) {
         PrsBindCSymbol("ZcRamFileAt", host_ram_file_at, 4);
         PrsBindCSymbol("ZcRamVolumeFormat", host_ram_volume_format, 1);
         PrsBindCSymbol("ZcVirtualFileDelete", host_virtual_file_delete, 1);
+        PrsBindCSymbol("ZcVirtualDirDelete", host_virtual_dir_delete, 1);
         PrsBindCSymbol("ZcRedSeaFileAt", host_redsea_file_at, 5);
         PrsBindCSymbol("ZcRedSeaDirAt", host_redsea_dir_at, 5);
         PrsBindCSymbol("ZcSourceVolumeStats", host_source_volume_stats, 2);

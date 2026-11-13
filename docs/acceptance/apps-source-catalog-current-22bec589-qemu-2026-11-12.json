@@ -1,0 +1,37 @@
+{
+  "date": "2026-11-12",
+  "repository_commit": "e8f8b21e295867a310949e0671bf8341035132e0",
+  "working_tree": "dirty; exact ISO, catalog, serial log, and checker identified by SHA-256",
+  "upstream_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "target": "UTM-bundled QEMU/HVF, AArch64 PCI graphical guest, one vCPU, VirtIO keyboard/tablet",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "22bec589e5018007f58c420a9e2ed352c1b3d521e5d14508489643ec90cc0560",
+  "kernel_sha256": "cfa973611c0a6c90fd7f34050e192213b0aa5551a1523f5b4413c61ba45d8f12",
+  "demo_sha256": "e37c1b530962064c451fac288327f7ae799d3e344cc5c77dc2ba55625c0042d0",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT=\"-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device\" ZEAL_COMPAT_LOG_PATH=build/check-app-catalog-current-22bec-2026-11-12.log python3 -u scripts/check-compat.py --pci --quick --probe-program-catalog --program-catalog-path <each of all 70 pinned upstream/Apps/**/*.ZC paths>",
+  "artifacts": {
+    "catalog": "build/program-catalog-targeted.json",
+    "catalog_sha256": "9bed3068c3be98d01519283c7b28beab8ca4300b36c27a08e0a81197e6563f22",
+    "serial_log": "build/check-app-catalog-current-22bec-2026-11-12.log",
+    "serial_log_sha256": "583c86cc10bd47049da40efbe37910ee34e253e4dbcb27cada1cffdac60b72a2",
+    "checker": "scripts/check-compat.py",
+    "checker_sha256": "d3ee5fe4517944f34398621b4310146e3514120d68d60aafc44e217d87d6eb65"
+  },
+  "result": "pass",
+  "counts": {
+    "total": 70,
+    "compiled": 70,
+    "blocked": 0
+  },
+  "normal_loads": [
+    {
+      "path": "/Apps/ToTheFront/Load.ZC",
+      "result": "pass"
+    },
+    {
+      "path": "/Apps/X-Caliber/Load.ZC",
+      "result": "pass"
+    }
+  ],
+  "scope_note": "Compile-only acceptance for every pinned Apps .ZC source on exact ISO 22bec589, in normal app loader/module context. ToTheFront and X-Caliber normal loaders also pass. This does not establish runtime acceptance of each app workflow or live Pi hardware behavior."
+}

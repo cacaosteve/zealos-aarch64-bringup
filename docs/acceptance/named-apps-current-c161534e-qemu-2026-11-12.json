@@ -1,0 +1,22 @@
+{
+  "date": "2026-11-12",
+  "repository_commit": "e8f8b21e295867a310949e0671bf8341035132e0",
+  "working_tree_changes_included": true,
+  "target": "UTM-bundled QEMU/HVF, AArch64 PCI graphical guest, one vCPU, VirtIO ramfb, keyboard and tablet",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "c161534e55fbf5b41fa6709546b0d23b3e33c22f71ac4cd93608fcf8cd1abc0e",
+  "kernel_sha256": "a654c794db5e796cc28624f231cccd4e565b5d788132c26882158c39751fd7b3",
+  "result": "pass",
+  "apps_runtime_accepted": 12,
+  "checks": {
+    "Digital Logic, Budget, TimeClock, Vocabulary": "docs/acceptance/apps-runtime-current-c161534e-qemu-2026-11-12.json",
+    "GrModels, KeepAway, Titanium": "docs/acceptance/three-d-apps-current-c161534e-qemu-2026-11-12.json",
+    "Span, Strut": "docs/acceptance/span-running-exit-current-c161534e-qemu-2026-11-12.json",
+    "Psalmody": "docs/acceptance/psalmody-current-audio-c161534e-qemu-2026-11-12.json",
+    "ToTheFront": "docs/acceptance/tothefront-current-c161534e-qemu-2026-11-12.json",
+    "X-Caliber": "docs/acceptance/xcaliber-current-c161534e-qemu-2026-11-12.json"
+  },
+  "compile_catalog": "docs/acceptance/apps-source-catalog-current-c161534e-qemu-2026-11-12.json",
+  "compile_catalog_result": "70 of 70 pinned Apps .ZC sources compile in their normal source-loader contexts on this exact ISO.",
+  "scope_note": "All 12 top-level Apps entrypoints have focused exact-image automated runtime evidence. This does not mean all workflows in every app, every one of the 70 source files as a separate program, live UTM UI, or physical Pi behavior are accepted."
+}

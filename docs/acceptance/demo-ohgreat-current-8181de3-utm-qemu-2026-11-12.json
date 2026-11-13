@@ -1,0 +1,28 @@
+{
+  "date": "2026-11-12",
+  "repository_commit": "e8f8b21e295867a310949e0671bf8341035132e0",
+  "working_tree_changes_included": true,
+  "target": "UTM-bundled QEMU, HVF, AArch64 graphical guest, one vCPU, VirtIO keyboard/tablet and VirtIO Sound",
+  "upstream_commit": "eee210f4379ba3d00b47507f336a158eefb2c993",
+  "source": "/Demo/Sound/OhGreat.ZC",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "8181de3ccb045a04649aca945170dce5a5fe8dab7263672d38fd100df9078240",
+  "kernel_sha256": "a654c794db5e796cc28624f231cccd4e565b5d788132c26882158c39751fd7b3",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device -audiodev wav,id=sound0,path=build/ohgreat-8181de3-2026-11-12.wav -device virtio-sound-pci,audiodev=sound0' ZEAL_COMPAT_LOG_PATH=build/check-ohgreat-8181de3-qemu-2026-11-12.log python3 -u scripts/check-compat.py --pci --quick --probe-demo-ohgreat-full",
+  "result": "pass",
+  "verified": [
+    "The stock song reached its late lyric and accepted a normal-key exit.",
+    "The graphical terminal resumed, evaluated 40+2 as 42, and zstatus reported failed=0.",
+    "VirtIO Sound captured a 47.22-second stereo 44.1 kHz, 16-bit WAV; peak sample was 7000 and RMS was 6901.89."
+  ],
+  "artifacts": {
+    "serial_log": "build/check-ohgreat-8181de3-qemu-2026-11-12.log",
+    "serial_log_sha256": "e90d9e42a220c67c0d878e46c166ff2edf4f04dae40d50dbb4dae224dc04e58f",
+    "wav": "build/ohgreat-8181de3-2026-11-12.wav",
+    "wav_sha256": "eb3f2cc3ee83b457766895bf42314a0e2d19244674080a960c5f75a28c33aed6",
+    "wav_seconds": 47.22,
+    "wav_peak": 7000,
+    "wav_rms": 6901.89
+  },
+  "scope_note": "This establishes full-song execution and a non-silent captured output stream on the exact current ISO under UTM-bundled QEMU. It does not establish audible playback in the visible UTM app or Pi HDMI/headphone output for this exact image."
+}

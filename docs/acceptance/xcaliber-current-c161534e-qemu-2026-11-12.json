@@ -1,0 +1,22 @@
+{
+  "date": "2026-11-12",
+  "repository_commit": "e8f8b21e295867a310949e0671bf8341035132e0",
+  "working_tree_changes_included": true,
+  "program": "/Apps/X-Caliber/Run.ZC",
+  "program_sha256": "0996519a5a452d443ae64ab1d3dcdea36e7d02aeca5adac6c577534a1fac5d0f",
+  "target": "UTM-bundled QEMU/HVF, AArch64 PCI graphical guest, one vCPU, VirtIO keyboard and tablet",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "c161534e55fbf5b41fa6709546b0d23b3e33c22f71ac4cd93608fcf8cd1abc0e",
+  "kernel_sha256": "a654c794db5e796cc28624f231cccd4e565b5d788132c26882158c39751fd7b3",
+  "check_compat_sha256": "681a403f7b7d1149bb5b3d784b781c69ea0b9db4b867b58fe379d00df8d20e4d",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-xcaliber-current-c161-2026-11-12.log python3 -u scripts/check-compat.py --pci --quick --probe-xcaliber",
+  "result": "pass",
+  "verified": [
+    "X-Caliber reached the game after its popup and maintained graphical keyboard focus.",
+    "Plain Right and Left each visibly moved the ship; Space produced a visible projectile in scanout.",
+    "Escape restored the graphical terminal; 40+7 evaluated as 47, terminal keyboard input remained usable, and final zstatus reported failed=0."
+  ],
+  "log": "build/check-xcaliber-current-c161-2026-11-12.log",
+  "log_sha256": "07220026e1257cbd94c847ea7fa2141599d3e1f4ec1238202a00b16f2f6c5a88",
+  "scope_note": "Focused exact-image automated input and terminal-recovery acceptance; not live UTM UI or physical Pi acceptance."
+}

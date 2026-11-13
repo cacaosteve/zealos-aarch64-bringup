@@ -187,12 +187,11 @@ all six SubSwitch branches, all six NullCase labels, and confirmed a subsequent
 | Doodle, Mass Spring, Game of Life | User confirmed live UTM drawing/simulation and Escape recovery. | Retest only if shared graphics/input code changes. |
 | Digital Logic | User confirmed corrected AND workflow in live UTM; PCI workflow covers editing, setup aborts, drawing and recovery. | Retest only if shared prompt/document code changes. |
 | Budget | PCI workflow covers form editing, save/reopen and cold persistence; menu-fix image has automated coverage. | Live UTM retest of the corrected menu/form image. |
-| GrModels | The 2026-10-31 PCI rerun passed Man/Ball forms and mesh generation. QEMU diagnostics confirm an embedded `DOCT_SPRITE` entry with binary data; the fresh scanout assertion found 643 purple pixels for the generated Ball inline in the document. Live UTM reaches `Vertices:58` and the repeat prompt, but the user did not see a sprite; visual UTM acceptance remains open. The screenshot does not establish the selected swatch, and UTM uses `virtio-ramfb` while the gate uses plain `ramfb`. | Reproduce with the gate's bright purple swatch under UTM's display path, confirm visible output, then choose `n` and verify Escape recovery. |
-| KeepAway | PCI workflow covers gameplay, Space/mouse input, Escape and shell recovery. A fresh 183-second run on the rebuilt ISO keeps scanout active through game-over and Escape recovery, then returns to a working terminal. Live UTM gameplay initially advances and the player follows the pointer, but the user reports a later guest freeze with input unresponsive. | Retest the live UTM freeze against the rebuilt ISO; ARM64 speaker effects are silent. |
-| KeepAway | PCI workflow covers gameplay, Space/mouse input, Escape and shell recovery. Live UTM gameplay initially advances and the player follows the pointer, but the user reports a later guest freeze with input unresponsive. | Reproduce and diagnose the live UTM freeze; ARM64 speaker effects are silent. |
-| Titanium | Live UTM confirms gameplay, Space firing, Escape recovery, and ordinary Left/Right movement on ISO `219d751c…`. The VirtIO keyboard bridge updates merged and raw scan-code bitmaps; QEMU confirms arrow movement and Escape recovery to a terminal where `40+2;` returns 42. | ARM64 speaker effects are silent. |
+| GrModels | On ISO `c161534e…`, the VirtIO framebuffer probe generated visible inline sprites after Man/Ball color selection: Man 112 vertices/168 triangles with 997 nonblack pixels; Ball 58 vertices/128 triangles with 504 purple pixels and a valid embedded `DOCT_SPRITE`. Both reached the repeat prompt and recovered to a terminal with `failed=0`. | Confirm generated-sprite visibility in the live UTM window on this exact ISO; the earlier report's ISO hash is unclear. |
+| KeepAway | On ISO `c161534e…`, QEMU rendered the court/HUD/player and accepted Space/mouse input. A 185-second run accepted 18 repeated input cycles, reached Game Over as the timer expired, changed 19,583 scanout pixels from the initial input frame, and returned to a working terminal without a surviving `Animate` task. The user previously confirmed live UTM pointer response and Escape recovery; the older freeze report's ISO hash is unknown. | Recheck live UTM only if this image changes; ARM64 speaker effects remain a separate audio item. |
+| Titanium | Live UTM previously confirmed gameplay, Space firing, Escape recovery, and ordinary Left/Right movement. On ISO `c161534e…`, QEMU advanced the intro to gameplay, accepted Space, and recovered to a terminal with `40+2;` returning 42 and `zstatus failed=0`. | Recheck live UTM only if this image changes; ARM64 speaker effects remain a separate audio item. |
 | Psalmody | PCI graphical probe enters the editor, accepts a note, exercises playback, and returns with Shift+Escape to a working terminal. | ARM64 audio output is silent; audible playback remains unsupported. Live UTM editor acceptance remains open. |
-| Span | QEMU graphical entry/help/frame, bridge editing, Shift+Escape cleanup, worker cleanup, and shell recovery pass; rerun on 2026-10-30. | Live UTM bridge editing and save workflow. |
+| Span | Exact working ISO `c161534e…` passes bridge edit/save/reopen, a 180-second active simulation soak, File → Exit save, terminal recovery, and Strut follow-up in UTM-bundled QEMU/HVF. | Retest the earlier reported freeze in live UTM with identified ISO provenance; its screenshot hash is unknown. |
 | Strut | QEMU help, mass placement/frame change, Space play-mode switch, Escape, and shell recovery pass; rerun on 2026-10-30. | Live UTM editing/play behavior; ship save/reopen workflow. |
 | TimeClock | App compile, date/time formatter gates, and automated punch-in/out record write/read plus report-state round-trip pass. The graphical QEMU probe loads the stock app, submits both descriptions through `StrGet`, reads them back with `TimeRep;`, and recovers to a terminal where `40+2;` returns 42. The red `IN`/`OUT` report labels are below the probe's monochrome OCR threshold, so the probe asserts the saved descriptions instead. CMOS register access stays unavailable. | Verify report labels and clock behavior in live UTM; CMOS hardware clock access remains unavailable. |
 | ToTheFront | ARM64 source overlay fixes the Human player's indirect-fire unit-count loop; the stock `i > UNITS_NUM` condition skipped the artillery order phase. PCI runtime probe selects both player types, displays/dismisses help, renders the generated map, selects artillery and sees its range indicator, plots an order into an adjacent hex, advances a phase with Space, and returns through Escape to a working terminal (`40+2;` -> 42). | Exercise unit movement/direct fire, view controls and broader AI behavior in QEMU, then verify setup and turn flow live in UTM. |
@@ -390,3 +389,81 @@ The ScreenCapture demo now also passes a graphical QEMU write/read round-trip,
 visible scanout verification, Escape recovery, and terminal smoke check. The
 explicit runtime-accepted Demo count is 36; compile and runtime totals measure
 different coverage.
+
+## 2026-11-12 current ISO refresh
+
+The exact `8181de3c…` ISO now compiles all 206 pinned Demo `.ZC` sources in a
+fresh UTM-bundled QEMU/HVF catalog run (206 compiled, 0 blocked). This is
+compile-only evidence; it does not change the runtime-acceptance count. The
+full source list, catalog, serial log, and exact ISO/kernel hashes are recorded
+in [`acceptance/demo-source-catalog-current-8181de3-qemu-2026-11-12.json`](acceptance/demo-source-catalog-current-8181de3-qemu-2026-11-12.json).
+The later exact-current `c161534e…` ISO was also checked against the complete
+pinned Demo path set: 206 compiled, 0 blocked. The two sequential QEMU batches
+and merged source catalog are recorded in
+[`acceptance/demo-source-catalog-current-c161534e-qemu-2026-11-12.json`](acceptance/demo-source-catalog-current-c161534e-qemu-2026-11-12.json).
+The exact-current `c161534e…` ISO now also compiles all 70 pinned Apps `.ZC`
+sources in their normal loader contexts (70 compiled, 0 blocked); the
+ToTheFront and X-Caliber normal loaders pass. See the
+[`current Apps catalog`](acceptance/apps-source-catalog-current-c161534e-qemu-2026-11-12.json).
+Both current-image catalogs are compile-only and do not change runtime-
+acceptance totals.
+
+On the same ISO, `TOSMisc` now passes focused RedSea-backed volume checks:
+`DiskCheckAll` skips the source-only CD and checks the mounted data volume,
+bounded read/write/restore succeeds, and the stock `DiskCheck` repair path
+frees an orphan allocation while preserving a nested file. This strengthens
+the filesystem evidence but does not establish all-volume stock drive
+semantics or complete the distribution builder. `TOSDistro` can prepare the
+source tree, then stops at the intentional `ArmBoot` guard in the legacy BIOS
+`BootDVDIns` path; an ARM64 EFI image builder is still needed for that workflow.
+See the focused [TOSMisc RedSea](acceptance/tosmisc-redsea-current-8181de3-qemu-2026-11-12.json)
+and [TOSDistro](acceptance/demo-tosdistro-std-current-8181de3-qemu-2026-11-12.json)
+records. Neither result is physical Pi acceptance.
+On the later `c161534e…` image, the standard TOSDistro workflow again prepared
+the full source tree on its disposable guest disk and stopped at the explicit
+`ArmBoot` guard in the BIOS-only image writer; ARM64 EFI distro-image creation
+remains open ([exact-image rerun](acceptance/demo-tosdistro-std-current-c161534e-utm-qemu-2026-11-12.json)).
+
+The later `c161534e…` ISO also passes the TOSMisc text/font conversion,
+SoundShift/AUWrite round trip, GRWrite/GR2MV/GRRead movie round trip, live
+ScreenCast GR/AU capture, and MemTest probes with Psalmody dependencies loaded
+in upstream order. TOSMisc remains partial: this run has no mounted data drive,
+and the configured-drive/filesystem, formatting, and TOSDistro EFI-image
+workflows are not covered. See the exact-image
+[TOSMisc rerun](acceptance/demo-tosmisc-current-c161534e-utm-qemu-2026-11-12.json).
+
+The same exact `8181de3c…` ISO now passes an isolated UTM-bundled QEMU runtime
+run of GrModels, KeepAway, and Titanium. Man and Ball each generated a visible
+inline mesh and recovered to the terminal; KeepAway rendered, accepted
+Space/mouse input, and exited without a remaining Animate task; Titanium
+advanced from its intro to gameplay, advanced frames with Space, and exited to
+a working terminal. The full selected QEMU run exited 0. See the exact-image
+[3D app acceptance record](acceptance/three-d-apps-current-8181de3-qemu-2026-11-12.json).
+The run did not include the long KeepAway soak, Titanium arrow-direction
+assertions, live UTM UI, audio, or Pi hardware.
+
+On the later ISO `c161534e…`, the focused 3D checks again pass with the
+VirtIO framebuffer used by UTM: both GrModels color-selection paths draw
+visible inline sprites, KeepAway completes a 185-second run with repeated
+input and clean Escape recovery, and Titanium reaches gameplay and returns to
+the shell. The exact-image record is
+[here](acceptance/three-d-apps-current-c161534e-qemu-2026-11-12.json). These
+automated checks do not replace the separate live UTM confirmation.
+
+An additional exact-ISO runtime pass now covers the named Apps batch on
+`8181de3c…`: Digital Logic, Budget, TimeClock, GrModels, KeepAway, Titanium,
+Span, Strut, ToTheFront, X-Caliber, Vocabulary, and Psalmody all returned to a
+working terminal in focused UTM-bundled QEMU/HVF checks. Budget save data
+survived a cold disk-only reboot. Psalmody also produced a measured non-silent
+VirtIO audio stream, with sound-timer IRQs and terminal recovery. Vocabulary's
+definition popup requires one Escape to dismiss and another to exit its quiz.
+The full per-app commands, logs, hashes, and limits are in
+[`acceptance/named-apps-current-8181de3-utm-qemu-2026-11-12.json`](acceptance/named-apps-current-8181de3-utm-qemu-2026-11-12.json).
+This verifies those selected workflows on QEMU, not every feature of the 70
+Apps sources, the visible UTM GUI, or physical Pi behavior.
+
+The stock `/Demo/Sound/OhGreat.ZC` song also passed on `8181de3c…`: it reached
+the late lyric, accepted a normal-key exit, returned to a working terminal,
+and generated 47.22 seconds of non-silent VirtIO Sound output. The exact WAV,
+log hashes, and scope limits are recorded in
+[`acceptance/demo-ohgreat-current-8181de3-utm-qemu-2026-11-12.json`](acceptance/demo-ohgreat-current-8181de3-utm-qemu-2026-11-12.json).

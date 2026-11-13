@@ -1,0 +1,46 @@
+{
+  "date": "2026-11-12",
+  "target": "AArch64 native ZealC/QEMU guest",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "8181de3ccb045a04649aca945170dce5a5fe8dab7263672d38fd100df9078240",
+  "source_bundle_sha256": "e346a12c0bbc2305d44d95a74373e232d119bee2faa4124ccd2e0728e97f57c0",
+  "compile_mode": "CCF_JUST_LOAD in the booted ZealC kernel/system namespace",
+  "context": "29 ordered Compiler.PRJ modules and compile-context fixtures loaded through OptPass6; CMisc and later modules omitted because CMisc contains legacy x86 inline assembly.",
+  "results": {
+    "/Compiler/BackLib.ZC": {
+      "compile": "pass",
+      "runtime": "unverified",
+      "note": "Source-bundle overlay changes four legacy scalar-cast stores to typed-pointer casts; pinned upstream source is unchanged."
+    },
+    "/Compiler/BackA.ZC": {
+      "compile": "pass",
+      "runtime": "unverified"
+    },
+    "/Compiler/BackC.ZC": {
+      "compile": "pass",
+      "runtime": "unverified"
+    },
+    "/Compiler/BackFA.ZC": {
+      "compile": "blocked",
+      "runtime": "unverified",
+      "diagnostic": "AArch64 external data comp_templates_dont_push2 is not bound; the normal Compiler.PRJ definition comes from legacy x86 assembly in Templates.ZC."
+    },
+    "/Compiler/BackFB.ZC": {
+      "compile": "blocked",
+      "runtime": "unverified",
+      "diagnostic": "Expected ':' after label candidate ICFConvert2; legacy x86 inline-assembly label syntax."
+    },
+    "/Compiler/BackB.ZC": {
+      "compile": "blocked",
+      "runtime": "unverified",
+      "diagnostic": "Expected ':' after label candidate ICFConvert; legacy x86 inline-assembly label syntax."
+    },
+    "/Compiler/OptPass789A.ZC": {
+      "compile": "blocked",
+      "runtime": "unverified",
+      "diagnostic": "Expected ':' after label candidate ICFConvert; legacy x86 inline-assembly label syntax."
+    }
+  },
+  "scope": "Compile-only source catalog evidence; it does not imply that the legacy x86 backend is used by the AArch64 native compiler, nor that any compiled backend source runs correctly.",
+  "limitations": "Pi physical SD write/readback and cold-boot persistence remain unverified; the current Pi raw image is a separate build and was not flashed in this acceptance run."
+}

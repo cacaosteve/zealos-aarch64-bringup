@@ -45,10 +45,16 @@
 #include "disk_layout.h"
 #include "block_range.h"
 
-#if defined(ZEAL_FORCE_PI4) && !defined(ZEAL_PI_DIAG)
-static int zc_write_source(const char *path, const char *src, size_t len);
+#ifndef ZEAL_PI_DIAG
 static int64_t zc_write_redsea(const char *path, const char *src, size_t len,
                                uint64_t datetime, uint16_t attributes);
+static int zc_delete_redsea(const char *path, int allow_directory);
+#endif
+#if defined(ZEAL_FORCE_PI4) && !defined(ZEAL_PI_DIAG)
+static int zc_write_source(const char *path, const char *src, size_t len);
+#endif
+#if !defined(ZEAL_PI_DIAG) && !defined(ZEAL_FORCE_PI4)
+static int zc_enable_virtio_redsea_writes(void);
 #endif
 
 int zc_virtio_keyboard_ready(void) { return virtio_kbd_ready(); }
@@ -2612,6 +2618,7 @@ static void pi4_sdhci_card_open(void) {
     /* A new open attempt must explicitly re-enable writers after the card and
      * its partition have both been validated. */
     zc_set_file_writer(NULL);
+    zc_set_file_deleter(NULL);
     zc_set_source_writer(NULL);
     int rc = pi4_sdhci_card_ensure_ready();
     if (rc) {
@@ -2657,9 +2664,11 @@ static void pi4_sdhci_card_open(void) {
     if (zc_raw_redsea_geometry(&redsea_base, &redsea_sectors) &&
         redsea_base == 0 && redsea_sectors > 128) {
         zc_set_file_writer(zc_write_redsea);
-        con_puts("psdopen: full-size RedSea FileWrite enabled; use zsync before removal\n");
+        zc_set_file_deleter(zc_delete_redsea);
+        con_puts("psdopen: full-size RedSea FileWrite enabled; successful writes flush before return\n");
     } else {
         zc_set_file_writer(NULL);
+        zc_set_file_deleter(NULL);
         con_puts("psdopen: writable RedSea volume not found; ordinary FileWrite remains disabled\n");
     }
 }
@@ -14331,6 +14340,143 @@ static int64_t zc_write_redsea(const char *path, const char *src, size_t len,
     return blocks ? (int64_t)new_first : 0;
 }
 
+/* Delete a stock RedSea file after its directory removal is durable. If the
+ * later bitmap release fails, the now-unreferenced extent leaks safely. */
+static int zc_delete_redsea(const char *path, int allow_directory) {
+    uint8_t boot[512], entry_sector[512];
+    uint64_t base, sectors, bitmap_sectors, parent, slot;
+    uint64_t old_first = 0, old_length = 0, old_blocks = 0, entry_lba;
+    uint16_t old_attr = 0;
+    char leaf[38];
+    int found = 0;
+    if (!path || !zbd_ready() || !g_zbd.flush_supported ||
+        !zc_raw_redsea_geometry(&base, &sectors) ||
+        !rs_stock_volume_read(base, sectors, base, boot, 1) ||
+        rs_stock_u64(boot + 8) != base)
+        return -1;
+    bitmap_sectors = rs_stock_u64(boot + 32);
+    if (!bitmap_sectors || bitmap_sectors >= sectors ||
+        bitmap_sectors < (sectors + 4095) / 4096 ||
+        !rs_stock_resolve_parent(base, sectors, path, &parent, leaf) ||
+        !rs_stock_dir_slot(base, sectors, parent, leaf, &slot, &found,
+                           &old_first, &old_length, &old_attr) || !found)
+        return -1;
+    int is_directory = !!(old_attr & 0x10u);
+    if (is_directory != !!allow_directory) return -1;
+    if (old_length) {
+        old_blocks = (old_length + 511) / 512;
+        if (!(old_attr & 0x400u) || !old_blocks ||
+            !rs_stock_extent_allocated(base, sectors, bitmap_sectors,
+                                       old_first, old_blocks))
+            return -1;
+    }
+    if (is_directory) {
+        uint8_t block[512];
+        uint64_t dot_first, dot_length, dotdot_first, dotdot_length;
+        uint16_t dot_attr, dotdot_attr;
+        int saw_dot = 0, saw_dotdot = 0;
+        if (!old_length || (old_length & 511u) || old_first < base ||
+            old_first - base >= sectors ||
+            old_length / 512 > sectors - (old_first - base) ||
+            !rs_stock_find(base, sectors, old_first, ".", &dot_first,
+                           &dot_length, &dot_attr) || dot_first != old_first ||
+            dot_length != old_length ||
+            (dot_attr & 0x410u) != 0x410u ||
+            !rs_stock_find(base, sectors, old_first, "..", &dotdot_first,
+                           &dotdot_length, &dotdot_attr) ||
+            dotdot_first != parent || dotdot_length != 0 ||
+            (dotdot_attr & 0x410u) != 0x410u)
+            return -1;
+        for (uint64_t sector = 0; sector < old_length / 512; sector++) {
+            if (!rs_stock_volume_read(base, sectors, old_first + sector,
+                                      block, 1))
+                return -1;
+            for (unsigned i = 0; i < 8; i++) {
+                const uint8_t *child = block + i * 64;
+                uint16_t child_attr = (uint16_t)child[0] |
+                                      (uint16_t)child[1] << 8;
+                char child_name[38];
+                size_t n = 0;
+                if (!child[2] || (child_attr & 0x100u)) continue;
+                while (n < sizeof(child_name) - 1 && child[2 + n]) {
+                    child_name[n] = (char)child[2 + n];
+                    n++;
+                }
+                if (!n || child[2 + n]) return -1;
+                child_name[n] = 0;
+                if (streq(child_name, ".")) {
+                    if (saw_dot || !(child_attr & 0x10u) ||
+                        rs_stock_u64(child + 40) != old_first ||
+                        rs_stock_u64(child + 48) != old_length)
+                        return -1;
+                    saw_dot = 1;
+                } else if (streq(child_name, "..")) {
+                    if (saw_dotdot || !(child_attr & 0x10u) ||
+                        rs_stock_u64(child + 40) != parent)
+                        return -1;
+                    saw_dotdot = 1;
+                } else {
+                    /* Only an empty directory is removable. */
+                    return -1;
+                }
+            }
+        }
+        if (!saw_dot || !saw_dotdot) return -1;
+    }
+    entry_lba = parent + slot / 8;
+    unsigned entry_offset = (unsigned)(slot % 8) * 64;
+    if (!rs_stock_volume_read(base, sectors, entry_lba, entry_sector, 1))
+        return -1;
+    uint8_t *entry = entry_sector + entry_offset;
+    uint16_t current_attr = (uint16_t)entry[0] | (uint16_t)entry[1] << 8;
+    if (!entry[2] || current_attr != old_attr ||
+        !str_ieq((const char *)(entry + 2), leaf) ||
+        rs_stock_u64(entry + 40) != old_first ||
+        rs_stock_u64(entry + 48) != old_length)
+        return -1;
+    /* RedSea uses attribute bit 0x100 as the deleted-entry marker. Keep the
+     * name bytes so scanners continue past this slot to later live entries. */
+    rs_stock_put16(entry, (uint16_t)(current_attr | 0x100u));
+    if (!rs_stock_volume_write(base, sectors, entry_lba, entry_sector, 1) ||
+        !zbd_flush())
+        return -1;
+    if (old_blocks &&
+        (!rs_stock_bitmap_update(base, sectors, bitmap_sectors, old_first,
+                                 old_blocks, 0) || !zbd_flush()))
+        return -1;
+    return 0;
+}
+
+#if !defined(ZEAL_PI_DIAG) && !defined(ZEAL_FORCE_PI4)
+/* UTM's writable VirtIO target may expose stock RedSea. Enable the normal
+ * FileWrite/FileDel callbacks only after validating its stock root and bitmap.
+ * Pi stays opt-in through psdopen after the physical SD partition is checked. */
+static int zc_enable_virtio_redsea_writes(void) {
+    uint8_t boot[512];
+    uint64_t base, sectors, root, bitmap_sectors, dot_first, dot_length;
+    uint16_t dot_attr;
+    if (!zbd_ready() || !g_zbd.flush_supported ||
+        !zc_raw_redsea_geometry(&base, &sectors) ||
+        !rs_stock_volume_read(base, sectors, base, boot, 1) ||
+        rs_stock_u64(boot + 8) != base)
+        return 0;
+    root = rs_stock_u64(boot + 24);
+    bitmap_sectors = rs_stock_u64(boot + 32);
+    if (!bitmap_sectors || bitmap_sectors >= sectors ||
+        bitmap_sectors < (sectors - 1) / 4096 + 1 ||
+        root < base || root - base >= sectors ||
+        !rs_stock_find(base, sectors, root, ".", &dot_first, &dot_length,
+                       &dot_attr) || dot_first != root ||
+        !(dot_attr & 0x10u) || !(dot_attr & 0x400u) ||
+        !dot_length || (dot_length & 511u) ||
+        dot_length / 512 > sectors - (root - base))
+        return 0;
+    zc_set_file_writer(zc_write_redsea);
+    zc_set_file_deleter(zc_delete_redsea);
+    return 1;
+}
+#endif
+
 static int zc_write_source(const char *path, const char *src, size_t len) {
     const char *name = path;
     if (!path || (!src && len) || len > ZSS_MAX_FILE)
@@ -20190,6 +20336,7 @@ static __attribute__((always_inline)) inline void native_desktop_start(const str
     zc_set_source_reader(zc_read_redsea);
 #ifdef ZEAL_FORCE_PI4
     zc_set_file_writer(NULL); /* Ordinary SD writes require an explicit psdopen. */
+    zc_set_file_deleter(NULL); /* File deletion shares the same explicit opt-in. */
     zc_set_source_writer(NULL); /* Explicit psdopen opts in after partition validation. */
 #else
     zc_set_source_writer(zc_write_source);
@@ -21635,6 +21782,10 @@ void kernel_entry(const struct zeal_handoff *h) {
         }
         if (virtio_blk_init(h->hhdm_offset)) {
             (void)zbd_bind_virtio();
+#if !defined(ZEAL_PI_DIAG) && !defined(ZEAL_FORCE_PI4)
+            if (zc_enable_virtio_redsea_writes())
+                uart_puts(g_uart, "virtio-blk: stock RedSea FileWrite/FileDel enabled\n");
+#endif
             uart_puts(g_uart, "virtio-blk: OK @ ");
             uart_put_u64_hex(g_uart, virtio_blk_mmio_phys());
             uart_puts(g_uart, " cap=");

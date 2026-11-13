@@ -402,7 +402,7 @@
       "compile": "pass",
       "first_compile_error": null,
       "runtime": "partial",
-      "runtime_evidence": "docs/acceptance/demo-tosmisc-current-qemu-2026-11-10.json"
+      "runtime_evidence": "docs/acceptance/demo-tosmisc-current-c161534e-utm-qemu-2026-11-12.json"
     },
     {
       "path": "/Demo/AcctExample/TOS/TOSTheme.ZC",

@@ -1,0 +1,23 @@
+{
+  "date": "2026-11-12",
+  "repository_commit": "e8f8b21e295867a310949e0671bf8341035132e0",
+  "working_tree_changes_included": true,
+  "target": "UTM-bundled QEMU/HVF, AArch64 PCI graphical guest, one vCPU, disposable writable VirtIO RedSea fixture",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "c161534e55fbf5b41fa6709546b0d23b3e33c22f71ac4cd93608fcf8cd1abc0e",
+  "kernel_sha256": "a654c794db5e796cc28624f231cccd4e565b5d788132c26882158c39751fd7b3",
+  "probe": "tests/compat/RawRedSeaGeometry.ZC:RawRedSeaPresentChecks",
+  "probe_sha256": "5045d16654c554c296444338faec3fb7157783bf036ae49b59c0c981934aa723",
+  "check_compat_sha256": "681a403f7b7d1149bb5b3d784b781c69ea0b9db4b867b58fe379d00df8d20e4d",
+  "command": "QEMU=build/utm-qemu-probe/qemu-probe QEMU_VIRT='-L /Applications/UTM.app/Contents/Resources/qemu -machine virt,accel=hvf,gic-version=3 -cpu host -smp 1 -m 1024 -device virtio-ramfb -device virtio-keyboard-device -device virtio-tablet-device' ZEAL_COMPAT_LOG_PATH=build/check-redsea-present-current-c161-2026-11-12.log python3 -u scripts/check-compat.py --pci --quick --probe-raw-redsea-geometry present",
+  "result": "pass",
+  "verified": [
+    "The bounded RedSea fixture mounted as writable D with the expected 128-sector extent and stock filesystem metadata.",
+    "Stock DiskCheck returned clean and the TOSMisc DiskCheckAll dispatcher checked D while safely skipping the source-only C volume.",
+    "The probe wrote, read back, restored, and re-read the final sector without leaving changes in the fixture.",
+    "The guest returned to a working terminal and zstatus reported failed=0."
+  ],
+  "log": "build/check-redsea-present-current-c161-2026-11-12.log",
+  "log_sha256": "873357d07f396772a019583c3facfa1ecd7e2a423edd84296a796e6e6a876872",
+  "scope_note": "This is a disposable VirtIO fixture test of the generic block and RedSea paths. It does not exercise physical Pi SDHCI or FAT32."
+}

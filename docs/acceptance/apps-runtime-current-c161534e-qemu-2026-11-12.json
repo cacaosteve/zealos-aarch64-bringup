@@ -1,0 +1,49 @@
+{
+  "date": "2026-11-12",
+  "repository_commit": "e8f8b21e295867a310949e0671bf8341035132e0",
+  "working_tree_changes_included": true,
+  "target": "UTM-bundled QEMU with HVF, AArch64 graphical guest, one vCPU, VirtIO keyboard and tablet",
+  "iso": "build/zealos-aarch64-hello.iso",
+  "iso_sha256": "c161534e55fbf5b41fa6709546b0d23b3e33c22f71ac4cd93608fcf8cd1abc0e",
+  "kernel_sha256": "a654c794db5e796cc28624f231cccd4e565b5d788132c26882158c39751fd7b3",
+  "result": "pass",
+  "checks": {
+    "Digital Logic": {
+      "result": "pass",
+      "verified": [
+        "Prompt editing and delete behavior, truth-table entry, AND/OR gate rendering, setup cancellation and relaunch passed.",
+        "Escape returned to a graphical terminal that evaluated 40+2 as 42; final zstatus reported failed=0."
+      ],
+      "serial_log": "build/check-logic-current-c161-2026-11-12.log",
+      "serial_log_sha256": "95f69f52e26df74b8c4a469e73fd1ccb7b969d355ef0330f556a16312c4ab986"
+    },
+    "Budget": {
+      "result": "pass",
+      "verified": [
+        "Create, edit, cancel and abort flows passed; a saved transaction was visible after reopening.",
+        "The Budget persistence fixture returned 42 during the app checks; the shell recovered and zstatus reported failed=0."
+      ],
+      "serial_log": "build/check-budget-current-c161-2026-11-12.log",
+      "serial_log_sha256": "25beff686a3587e3e3b2aa88edc18dc458a5dbccaee632565d41b0379b26aae7"
+    },
+    "TimeClock": {
+      "result": "pass",
+      "verified": [
+        "Punch-in and punch-out descriptions were accepted and appeared in the generated report.",
+        "Escape returned to a responsive terminal; final zstatus reported failed=0."
+      ],
+      "serial_log": "build/check-timeclock-current-c161-2026-11-12.log",
+      "serial_log_sha256": "dacf068e70f99c615116ab232082b26e9addb907119828c8cc650aad39ff96b0"
+    },
+    "Vocabulary": {
+      "result": "pass",
+      "verified": [
+        "The quiz accepted an answer and advanced to another question.",
+        "Escape dismissed the definition popup and then exited the quiz; the graphical terminal recovered and final zstatus reported failed=0."
+      ],
+      "serial_log": "build/check-vocabulary-current-c161-retry-2026-11-12.log",
+      "serial_log_sha256": "4109a155cd022dc10655dcf7e2e5d793e7f6f151c9463202f1b29a01a0635555"
+    }
+  },
+  "scope_note": "Focused exact-image automated workflows for four Apps. Vocabulary's first combined-batch guest exited before app interaction; its isolated retry passed. This is not a live UTM UI test, does not cover all 70 Apps, and does not establish Raspberry Pi behavior."
+}

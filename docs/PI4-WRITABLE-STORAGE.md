@@ -35,8 +35,10 @@
   disk. The planned layout reserves two 32 MiB append-only source banks at its
   end and maps the preceding sectors as the RedSea region. All generic block
   reads and writes are translated through the partition start and kept within
-  its length. UTM continues to expose its existing whole-disk layout. The Pi
-  kernel now binds to this backend only after an explicit `psdopen` command.
+  its length. UTM continues to expose its existing whole-disk layout and now
+  enables stock RedSea file writes only when its writable VirtIO disk has a
+  validated stock root and flush support. The Pi kernel binds to its SD backend
+  only after an explicit `psdopen` command.
   A host test now exercises RedSea/source-bank reads and writes through the
   translated backend, rejects out-of-range writes, and verifies the MBR and
   FAT boot partition remain unchanged. This checks the memory-mapped block
@@ -44,10 +46,15 @@
 - The 128-sector bootstrap formatter and eight-entry root writer remain for
   bring-up diagnostics; `psdopen` does not use them for the stock-format data
   volume. Once the partition is explicitly bound, bounded RedSea
-  `FileWrite` create/replace and `DirMake` operations are available for
-  existing directory capacity. Delete, rename, and automatic directory growth
-  are not implemented. This is useful writable storage, but not yet complete
-  stock filesystem parity.
+  `FileWrite` create/replace, regular-file `FileDel`, `DirMake`, empty-directory
+  deletion, and recursive `DelTree` operations are available within existing
+  directory capacity. Rename and automatic directory growth are not
+  implemented. File and directory deletion tombstone their directory entry
+  and flush before freeing allocation bitmap sectors. A nonempty directory
+  cannot be deleted directly; `DelTree` removes its contents first. If freeing
+  fails, sectors leak rather than risking a live entry pointing at free space.
+  This is useful writable storage, but not yet complete stock filesystem
+  parity.
 - The bounded SDHCI backend uses conservative single-sector CMD17/CMD24 PIO
   operations with capacity checks and CMD13/DAT-busy flush confirmation.
   Multi-sector backend requests are split into single-sector commands. These
@@ -55,16 +62,27 @@
   validated against a physical Pi SD controller. `psdopen` is the only Pi
   command that binds this backend, and writes stay inside the MBR type `0xDA`
   or ZealOS GPT data partition.
+- The current UTM ISO passes a disposable-VirtIO stock RedSea test for
+  `FileWrite`, `FileDel`, `DirMake`, refusing a direct nonempty-directory
+  delete, empty-directory deletion, recursive `DelTree`, slot/allocation
+  reuse, and persistence across a cold QEMU reboot ([acceptance record](acceptance/pi-raw-image-redsea-deltree-candidate-2026-11-12.json)).
+  This validates the filesystem operations over the generic block layer; it
+  does not validate the Pi SDHCI controller or replace physical-card testing.
+  A separate current-image probe covers the mounted RedSea `DiskCheck` path and
+  `TOSMisc` dispatcher on a disposable VirtIO fixture
+  ([acceptance record](acceptance/tosmisc-redsea-current-c161534e-qemu-2026-11-12.json)).
 - The inspected `ZEALPI` card uses an MBR with a single FAT32 partition
   spanning the card. There is no data partition or free tail to adopt as-is.
 
 ## Target layout and install flow
 
-Latest 8 GiB raw-image candidate: `build/zealos-pi4b-redsea-candidate.img`,
-SHA-256 `085d41f4c52c800cb085668c2015c89881b12ea48624860e52654d224116c818`.
-Its layout and staged boot payload passed the host builder checks. It has not
-been flashed to or booted from a physical card; see the
-[candidate acceptance record](acceptance/pi-raw-image-redsea-write-candidate-2026-11-12.json).
+Latest prepared 8 GiB raw-image candidate:
+`build/zealos-pi4b-current-prepared-2026-11-12.img`, SHA-256
+`d9a8d21b872de57e725be6fe0f8132efc1f52a887f14e888cb721cbbb31bc93b`. It was
+built from the current Pi desktop staging output; image structure, payload
+read-back, partition-bounded block I/O, and fake SDHCI write/flush/read-back
+checks passed. It has not been flashed to or booted from a physical card. See
+the [current prepared-image acceptance record](acceptance/pi-raw-image-current-prepared-2026-11-12.json).
 
 The current bring-up setup is an image-flash workflow, not the UTM ISO
 installer. `scripts/build-pi-image.py` builds a Pi-specific whole-card raw
@@ -88,12 +106,45 @@ initialize the SD controller and bind the unique ZealOS data partition. Only
 then can generic disk/source commands reach it. The image builder formats the
 RedSea area as a stock-format volume with `/Home` and `/Tmp`. Do not run
 `rspersist` on it: `rspersist` is only for the 128-sector bring-up format.
-After `psdopen`, ordinary `FileWrite` create/replace and the bootstrap `DirMake`
-path can write RedSea entries; `.ZC` source saves continue to use the separate
-source banks. File deletion, rename, and automatic growth of a full directory
-are not enabled yet. The physical Pi write/readback/reboot persistence path
-still needs acceptance. The FAT boot partition is outside the block-device
-write range.
+After `psdopen`, ordinary `FileWrite` create/replace, regular-file `FileDel`,
+`DirMake`, empty-directory deletion, and recursive `DelTree` can modify RedSea
+entries; `.ZC` source saves and deletes continue to use the separate source
+banks. Direct deletion refuses nonempty directories. Rename and automatic
+growth of a full directory are not enabled. Deletion tombstones and flushes
+the directory entry before returning allocated sectors to the bitmap, so later
+files remain discoverable and a failure during reclamation leaks space safely.
+The physical Pi write/readback/reboot persistence path still needs acceptance.
+The FAT boot partition is outside the block-device write range.
+
+### Physical-card acceptance
+
+Use a freshly imaged development card. `psdread` only reads the card; it should
+report a valid partition table with the FAT32 boot partition and one ZealOS data
+partition. Then run `psdopen`; continue only if it reports the data partition
+bound, source banks ready, and full-size RedSea `FileWrite` enabled. The command
+does not format or repartition the card.
+
+At the ZealOS prompt, verify an ordinary file in RedSea with:
+
+```text
+zc I64 w=FileWrite("disk:/PIWRITE.TXT","persist",7),n=-1; U8 *p=FileRead("disk:/PIWRITE.TXT",&n); Print("PI_REDSEA_WRITE=%d\n",w>=0 && p!=NULL && n==7 && !StrCompare(p,"persist")); Free(p);
+```
+
+The output must include `PI_REDSEA_WRITE=1`. Verify the separate source-bank
+path as well:
+
+```text
+zput Tests/PiSDPersist.ZC I64 PiSDPersist(){return 40+2;}
+zload disk:Tests/PiSDPersist.ZC
+zcall PiSDPersist
+```
+
+The function must return `0x2a`. Power down the Pi, boot the same card again,
+run `psdopen` again (the binding is deliberately not automatic), and repeat
+the RedSea read check and the final two source commands. Both the saved file
+and the function must still be present. Successful file writes flush before
+return; power the Pi down before physically removing the card. `zput` exercises
+the source banks, so it does not replace the separate RedSea file check above.
 
 The builder requires `mkfs.fat`, `mcopy`, and `mmd` (Homebrew `dosfstools` and
 `mtools` on macOS). Example, after copying the current FAT boot volume to a
@@ -143,10 +194,13 @@ backup and explicit confirmation before changing that layout.
    and both source-bank headers. Validate `zput`/`zload disk:` and cold-boot
    persistence on Pi. The boot partition remains outside every writable
    ZealOS range.
-4. Connect normal RedSea operations. Bounded `FileWrite` create/replace and
-   `DirMake` support are implemented for existing directory capacity; delete,
-   rename, and directory growth remain. Keep bootstrap source-bank writes
-   separate from normal filesystem APIs.
+4. Connect normal RedSea operations. Bounded `FileWrite` create/replace,
+   regular-file `FileDel`, `DirMake`, empty-directory deletion, and recursive
+   `DelTree` support are implemented for existing directory capacity. A
+   disposable stock-RedSea probe checks nonempty-delete refusal, recursive
+   deletion, slot/allocation reuse, and cold persistence. Rename and directory
+   growth remain. Keep bootstrap source-bank writes separate from ordinary
+   RedSea files.
 5. Keep the raw-image builder and source the supported Pi firmware package in
    a repeatable way. The builder lays out both partitions, builds the FAT boot
    volume from a copied firmware directory and staged payload, initializes the
